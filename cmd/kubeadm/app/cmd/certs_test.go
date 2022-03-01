@@ -34,7 +34,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
@@ -269,31 +269,6 @@ func TestRunRenewCommands(t *testing.T) {
 	}
 }
 
-func TestRenewUsingCSR(t *testing.T) {
-	tmpDir := testutil.SetupTempDir(t)
-	defer os.RemoveAll(tmpDir)
-	cert := certsphase.KubeadmCertEtcdServer()
-
-	cfg := testutil.GetDefaultInternalConfig(t)
-	cfg.CertificatesDir = tmpDir
-
-	caCert, caKey, err := certsphase.KubeadmCertEtcdCA().CreateAsCA(cfg)
-	if err != nil {
-		t.Fatalf("couldn't write out CA %s: %v", certsphase.KubeadmCertEtcdCA().Name, err)
-	}
-
-	if err := cert.CreateFromCA(cfg, caCert, caKey); err != nil {
-		t.Fatalf("couldn't write certificate %s: %v", cert.Name, err)
-	}
-
-	renewCmds := getRenewSubCommands(os.Stdout, tmpDir)
-	cmdtestutil.RunSubCommand(t, renewCmds, cert.Name, "--csr-only", "--csr-dir="+tmpDir, fmt.Sprintf("--cert-dir=%s", tmpDir))
-
-	if _, _, err := pkiutil.TryLoadCSRAndKeyFromDisk(tmpDir, cert.Name); err != nil {
-		t.Fatalf("couldn't load certificate %q: %v", cert.Name, err)
-	}
-}
-
 func TestRunGenCSR(t *testing.T) {
 	tmpDir := testutil.SetupTempDir(t)
 	defer os.RemoveAll(tmpDir)
@@ -378,18 +353,20 @@ func TestGenCSRConfig(t *testing.T) {
 
 	// A minimal kubeadm config with just enough values to avoid triggering
 	// auto-detection of config values at runtime.
-	var kubeadmConfig = `
-apiVersion: kubeadm.k8s.io/v1beta2
+	var kubeadmConfig = fmt.Sprintf(`
+apiVersion: %s
 kind: InitConfiguration
 localAPIEndpoint:
   advertiseAddress: 192.0.2.1
 nodeRegistration:
-  criSocket: /path/to/dockershim.sock
+  criSocket: "unix:///var/run/containerd/containerd.sock"
 ---
-apiVersion: kubeadm.k8s.io/v1beta2
+apiVersion: %[1]s
 kind: ClusterConfiguration
 certificatesDir: /custom/config/certificates-dir
-kubernetesVersion: ` + kubeadmconstants.MinimumControlPlaneVersion.String()
+kubernetesVersion: %s`,
+		kubeadmapiv1.SchemeGroupVersion.String(),
+		kubeadmconstants.MinimumControlPlaneVersion.String())
 
 	tmpDir := testutil.SetupTempDir(t)
 	defer os.RemoveAll(tmpDir)
@@ -410,7 +387,7 @@ kubernetesVersion: ` + kubeadmconstants.MinimumControlPlaneVersion.String()
 		{
 			name: "default",
 			assertions: []assertion{
-				hasCertDir(kubeadmapiv1beta2.DefaultCertificatesDir),
+				hasCertDir(kubeadmapiv1.DefaultCertificatesDir),
 				hasKubeConfigDir(kubeadmconstants.KubernetesDir),
 			},
 		},

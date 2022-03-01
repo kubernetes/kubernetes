@@ -20,7 +20,6 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/go-openapi/jsonpointer"
 	"github.com/go-openapi/swag"
 )
 
@@ -215,24 +214,6 @@ type Schema struct {
 	SchemaProps
 	SwaggerSchemaProps
 	ExtraProps map[string]interface{} `json:"-"`
-}
-
-// JSONLookup implements an interface to customize json pointer lookup
-func (s Schema) JSONLookup(token string) (interface{}, error) {
-	if ex, ok := s.Extensions[token]; ok {
-		return &ex, nil
-	}
-
-	if ex, ok := s.ExtraProps[token]; ok {
-		return &ex, nil
-	}
-
-	r, _, err := jsonpointer.GetForToken(s.SchemaProps, token)
-	if r != nil || (err != nil && !strings.HasPrefix(err.Error(), "object has no field")) {
-		return r, err
-	}
-	r, _, err = jsonpointer.GetForToken(s.SwaggerSchemaProps, token)
-	return r, err
 }
 
 // WithID sets the id for this schema, allows for chaining

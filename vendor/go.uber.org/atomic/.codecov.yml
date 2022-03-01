@@ -13,3 +13,7 @@ coverage:
         if_not_found: success  # if parent is not found report status as success, error, or failure
         if_ci_failed: error    # if ci fails report status as success, error, or failure
 
+# Also update COVER_IGNORE_PKGS in the Makefile.
+ignore:
+  - /internal/gen-atomicint/
+  - /internal/gen-valuewrapper/

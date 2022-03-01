@@ -27,7 +27,6 @@ import (
 	"go/format"
 	"go/parser"
 	"go/token"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -35,14 +34,14 @@ import (
 	"sort"
 	"strings"
 
-	"golang.org/x/crypto/ssh/terminal"
+	"golang.org/x/term"
 )
 
 var (
 	importAliases = flag.String("import-aliases", "hack/.import-aliases", "json file with import aliases")
 	confirm       = flag.Bool("confirm", false, "update file with the preferred aliases for imports")
 	regex         = flag.String("include-path", "(test/e2e/|test/e2e_node)", "only files with paths matching this regex is touched")
-	isTerminal    = terminal.IsTerminal(int(os.Stdout.Fd()))
+	isTerminal    = term.IsTerminal(int(os.Stdout.Fd()))
 	logPrefix     = ""
 	aliases       map[string]string
 )
@@ -129,7 +128,7 @@ func (a *analyzer) collect(dir string) {
 						panic(fmt.Sprintf("Error stat'ing file: %s\n%s\n", pathToFile, err.Error()))
 					}
 
-					err = ioutil.WriteFile(pathToFile, buffer.Bytes(), fileInfo.Mode())
+					err = os.WriteFile(pathToFile, buffer.Bytes(), fileInfo.Mode())
 					if err != nil {
 						panic(fmt.Sprintf("Error writing file: %s\n%s\n", pathToFile, err.Error()))
 					}
@@ -235,7 +234,7 @@ func main() {
 	sort.Strings(c.dirs)
 
 	if len(*importAliases) > 0 {
-		bytes, err := ioutil.ReadFile(*importAliases)
+		bytes, err := os.ReadFile(*importAliases)
 		if err != nil {
 			log.Fatalf("Error reading import aliases: %v", err)
 		}

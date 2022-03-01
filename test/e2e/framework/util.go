@@ -63,6 +63,7 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	uexec "k8s.io/utils/exec"
+	netutils "k8s.io/utils/net"
 
 	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
@@ -281,6 +282,32 @@ func WaitForNamespacesDeleted(c clientset.Interface, namespaces []string, timeou
 		})
 }
 
+func waitForConfigMapInNamespace(c clientset.Interface, ns, name string, timeout time.Duration) error {
+	fieldSelector := fields.OneTermEqualSelector("metadata.name", name).String()
+	lw := &cache.ListWatch{
+		ListFunc: func(options metav1.ListOptions) (object runtime.Object, e error) {
+			options.FieldSelector = fieldSelector
+			return c.CoreV1().ConfigMaps(ns).List(context.TODO(), options)
+		},
+		WatchFunc: func(options metav1.ListOptions) (i watch.Interface, e error) {
+			options.FieldSelector = fieldSelector
+			return c.CoreV1().ConfigMaps(ns).Watch(context.TODO(), options)
+		},
+	}
+	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), timeout)
+	defer cancel()
+	_, err := watchtools.UntilWithSync(ctx, lw, &v1.ConfigMap{}, nil, func(event watch.Event) (bool, error) {
+		switch event.Type {
+		case watch.Deleted:
+			return false, apierrors.NewNotFound(schema.GroupResource{Resource: "configmaps"}, name)
+		case watch.Added, watch.Modified:
+			return true, nil
+		}
+		return false, nil
+	})
+	return err
+}
+
 func waitForServiceAccountInNamespace(c clientset.Interface, ns, serviceAccountName string, timeout time.Duration) error {
 	fieldSelector := fields.OneTermEqualSelector("metadata.name", serviceAccountName).String()
 	lw := &cache.ListWatch{
@@ -295,22 +322,16 @@ func waitForServiceAccountInNamespace(c clientset.Interface, ns, serviceAccountN
 	}
 	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), timeout)
 	defer cancel()
-	_, err := watchtools.UntilWithSync(ctx, lw, &v1.ServiceAccount{}, nil, serviceAccountHasSecrets)
+	_, err := watchtools.UntilWithSync(ctx, lw, &v1.ServiceAccount{}, nil, func(event watch.Event) (bool, error) {
+		switch event.Type {
+		case watch.Deleted:
+			return false, apierrors.NewNotFound(schema.GroupResource{Resource: "serviceaccounts"}, serviceAccountName)
+		case watch.Added, watch.Modified:
+			return true, nil
+		}
+		return false, nil
+	})
 	return err
-}
-
-// serviceAccountHasSecrets returns true if the service account has at least one secret,
-// false if it does not, or an error.
-func serviceAccountHasSecrets(event watch.Event) (bool, error) {
-	switch event.Type {
-	case watch.Deleted:
-		return false, apierrors.NewNotFound(schema.GroupResource{Resource: "serviceaccounts"}, "")
-	}
-	switch t := event.Object.(type) {
-	case *v1.ServiceAccount:
-		return len(t.Secrets) > 0, nil
-	}
-	return false, nil
 }
 
 // WaitForDefaultServiceAccountInNamespace waits for the default service account to be provisioned
@@ -318,6 +339,13 @@ func serviceAccountHasSecrets(event watch.Event) (bool, error) {
 // as a result, pods are not able to be provisioned in a namespace until the service account is provisioned
 func WaitForDefaultServiceAccountInNamespace(c clientset.Interface, namespace string) error {
 	return waitForServiceAccountInNamespace(c, namespace, "default", ServiceAccountProvisionTimeout)
+}
+
+// WaitForKubeRootCAInNamespace waits for the configmap kube-root-ca.crt containing the service account
+// CA trust bundle to be provisioned in the specified namespace so that pods do not have to retry mounting
+// the config map (which creates noise that hides other issues in the Kubelet).
+func WaitForKubeRootCAInNamespace(c clientset.Interface, namespace string) error {
+	return waitForConfigMapInNamespace(c, namespace, "kube-root-ca.crt", ServiceAccountProvisionTimeout)
 }
 
 // CreateTestingNS should be used by every test, note that we append a common prefix to the provided test name.
@@ -898,7 +926,7 @@ func DumpAllNamespaceInfo(c clientset.Interface, namespace string) {
 		return c.CoreV1().Events(ns).List(context.TODO(), opts)
 	}, namespace)
 
-	e2epod.DumpAllPodInfoForNamespace(c, namespace)
+	e2epod.DumpAllPodInfoForNamespace(c, namespace, TestContext.ReportDir)
 
 	// If cluster is large, then the following logs are basically useless, because:
 	// 1. it takes tens of minutes or hours to grab all of them
@@ -1265,7 +1293,7 @@ func getControlPlaneAddresses(c clientset.Interface) ([]string, []string, []stri
 	if err != nil {
 		Failf("Failed to parse hostname: %v", err)
 	}
-	if net.ParseIP(hostURL.Host) != nil {
+	if netutils.ParseIPSloppy(hostURL.Host) != nil {
 		externalIPs = append(externalIPs, hostURL.Host)
 	} else {
 		hostnames = append(hostnames, hostURL.Host)
@@ -1376,7 +1404,7 @@ retriesLoop:
 		// NOTE the test may need access to the events to see what's going on, such as a change in status
 		actualWatchEvents := scenario(resourceWatch)
 		errs := sets.NewString()
-		ExpectEqual(len(expectedWatchEvents) <= len(actualWatchEvents), true, "Error: actual watch events amount (%d) must be greater than or equal to expected watch events amount (%d)", len(actualWatchEvents), len(expectedWatchEvents))
+		gomega.Expect(len(expectedWatchEvents)).To(gomega.BeNumerically("<=", len(actualWatchEvents)), "Did not get enough watch events")
 
 		totalValidWatchEvents := 0
 		foundEventIndexes := map[int]*int{}
@@ -1405,7 +1433,9 @@ retriesLoop:
 			fmt.Println("invariants violated:\n", strings.Join(errs.List(), "\n - "))
 			continue retriesLoop
 		}
-		ExpectEqual(errs.Len() > 0, false, strings.Join(errs.List(), "\n - "))
+		if errs.Len() > 0 {
+			Failf("Unexpected error(s): %v", strings.Join(errs.List(), "\n - "))
+		}
 		ExpectEqual(totalValidWatchEvents, len(expectedWatchEvents), "Error: there must be an equal amount of total valid watch events (%d) and expected watch events (%d)", totalValidWatchEvents, len(expectedWatchEvents))
 		break retriesLoop
 	}

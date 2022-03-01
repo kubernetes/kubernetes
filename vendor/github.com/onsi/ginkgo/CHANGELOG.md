@@ -1,3 +1,58 @@
+## 1.14.0
+
+### Features
+- Defer running top-level container nodes until RunSpecs is called [d44dedf]
+- [Document Ginkgo lifecycle](http://onsi.github.io/ginkgo/#understanding-ginkgos-lifecycle)
+- Add `extensions/globals` package (#692) [3295c8f] - this can be helpful in contexts where you are test-driving your test-generation code (see [#692](https://github.com/onsi/ginkgo/pull/692))
+- Print Skip reason in JUnit reporter if one was provided [820dfab]
+
+## 1.13.0
+
+### Features
+- Add a version of table.Entry that allows dumping the entry parameters. (#689) [21eaef2]
+
+### Fixes
+- Ensure integration tests pass in an environment sans GOPATH [606fba2]
+- Add books package (#568) [fc0e44e]
+- doc(readme): installation via "tools package" (#677) [83bb20e]
+- Solve the undefined: unix.Dup2 compile error on mips64le (#680) [0624f75]
+- Import package without dot (#687) [6321024]
+- Fix integration tests to stop require GOPATH (#686) [a912ec5]
+
+## 1.12.3
+
+### Fixes
+- Print correct code location of failing table test (#666) [c6d7afb]
+
+## 1.12.2
+
+### Fixes
+- Update dependencies [ea4a036]
+
+## 1.12.1
+
+### Fixes
+- Make unfocus ("blur") much faster (#674) [8b18061]
+- Fix typo (#673) [7fdcbe8]
+- Test against 1.14 and remove 1.12 [d5c2ad6]
+- Test if a coverprofile content is empty before checking its latest character (#670) [14d9fa2]
+- replace tail package with maintained one. this fixes go get errors (#667) [4ba33d4]
+- improve ginkgo performance - makes progress on #644 [a14f98e]
+- fix convert integration tests [1f8ba69]
+- fix typo succesful -> successful (#663) [1ea49cf]
+- Fix invalid link (#658) [b886136]
+- convert utility : Include comments from source (#657) [1077c6d]
+- Explain what BDD means [d79e7fb]
+- skip race detector test on unsupported platform (#642) [f8ab89d]
+- Use Dup2 from golang.org/x/sys/unix instead of syscallDup (#638) [5d53c55]
+- Fix missing newline in combined coverage file (#641) [6a07ea2]
+- check if a spec is run before returning SpecSummary (#645) [8850000]
+
+## 1.12.0
+
+### Features
+- Add module definition (#630) [78916ab]
+
 ## 1.11.0
 
 ### Features
@@ -203,7 +258,7 @@ New Features:
 - `ginkgo -tags=TAG_LIST` passes a list of tags down to the `go build` command.
 - `ginkgo --failFast` aborts the test suite after the first failure.
 - `ginkgo generate file_1 file_2` can take multiple file arguments.
-- Ginkgo now summarizes any spec failures that occured at the end of the test run. 
+- Ginkgo now summarizes any spec failures that occurred at the end of the test run. 
 - `ginkgo --randomizeSuites` will run tests *suites* in random order using the generated/passed-in seed.
 
 Improvements:

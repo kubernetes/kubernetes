@@ -19,7 +19,6 @@ package network
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"strconv"
 	"strings"
 
@@ -33,6 +32,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
+	"k8s.io/kubernetes/test/e2e/network/common"
 
 	"github.com/onsi/ginkgo"
 )
@@ -53,7 +53,8 @@ func checkConnectivityToHost(f *framework.Framework, nodeName, podName, host str
 	pod := e2epod.NewAgnhostPod(f.Namespace.Name, podName, nil, nil, nil)
 	pod.Spec.Containers[0].Command = command
 	pod.Spec.Containers[0].Args = nil // otherwise 'pause` is magically an argument to nc, which causes all hell to break loose
-	pod.Spec.NodeName = nodeName
+	nodeSelection := e2epod.NodeSelection{Name: nodeName}
+	e2epod.SetNodeSelection(&pod.Spec, nodeSelection)
 	pod.Spec.RestartPolicy = v1.RestartPolicyNever
 
 	podClient := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
@@ -75,23 +76,9 @@ func checkConnectivityToHost(f *framework.Framework, nodeName, podName, host str
 	return err
 }
 
-var _ = SIGDescribe("Networking", func() {
+var _ = common.SIGDescribe("Networking", func() {
 	var svcname = "nettest"
 	f := framework.NewDefaultFramework(svcname)
-
-	ginkgo.BeforeEach(func() {
-		// Assert basic external connectivity.
-		// Since this is not really a test of kubernetes in any way, we
-		// leave it as a pre-test assertion, rather than a Ginko test.
-		ginkgo.By("Executing a successful http request from the external internet")
-		resp, err := http.Get("http://google.com")
-		if err != nil {
-			framework.Failf("Unable to connect/talk to the internet: %v", err)
-		}
-		if resp.StatusCode != http.StatusOK {
-			framework.Failf("Unexpected error code, expected 200, got, %v (%v)", resp.StatusCode, resp)
-		}
-	})
 
 	ginkgo.It("should provide Internet connection for containers [Feature:Networking-IPv4]", func() {
 		ginkgo.By("Running container which tries to connect to 8.8.8.8")
@@ -105,6 +92,12 @@ var _ = SIGDescribe("Networking", func() {
 		ginkgo.By("Running container which tries to connect to 2001:4860:4860::8888")
 		framework.ExpectNoError(
 			checkConnectivityToHost(f, "", "connectivity-test", "2001:4860:4860::8888", 53, 30))
+	})
+
+	ginkgo.It("should provider Internet connection for containers using DNS [Feature:Networking-DNS]", func() {
+		ginkgo.By("Running container which tries to connect to google.com")
+		framework.ExpectNoError(
+			checkConnectivityToHost(f, "", "connectivity-test", "google.com", 80, 30))
 	})
 
 	// First test because it has no dependencies on variables created later on.
@@ -376,9 +369,12 @@ var _ = SIGDescribe("Networking", func() {
 			config.DeleteNodePortService()
 
 			ginkgo.By(fmt.Sprintf("dialing(http) %v (node) --> %v:%v (nodeIP) and getting ZERO host endpoints", config.NodeIP, config.NodeIP, config.NodeHTTPPort))
-			err = config.DialFromNode("http", config.NodeIP, config.NodeHTTPPort, config.MaxTries, config.MaxTries, sets.NewString())
+			// #106770 MaxTries can be very large on large clusters, with the risk that a new NodePort is created by another test and start to answer traffic.
+			// Since we only want to assert that traffic is not being forwarded anymore and the retry timeout is 2 seconds, consider the test is correct
+			// if the service doesn't answer after 10 tries.
+			err = config.DialFromNode("http", config.NodeIP, config.NodeHTTPPort, 10, 10, sets.NewString())
 			if err != nil {
-				framework.Failf("Error dialing http from node: %v", err)
+				framework.Failf("Failure validating that node port service STOPPED removed properly: %v", err)
 			}
 		})
 
@@ -405,7 +401,10 @@ var _ = SIGDescribe("Networking", func() {
 			config.DeleteNodePortService()
 
 			ginkgo.By(fmt.Sprintf("dialing(udp) %v (node) --> %v:%v (nodeIP) and getting ZERO host endpoints", config.NodeIP, config.NodeIP, config.NodeUDPPort))
-			err = config.DialFromNode("udp", config.NodeIP, config.NodeUDPPort, config.MaxTries, config.MaxTries, sets.NewString())
+			// #106770 MaxTries can be very large on large clusters, with the risk that a new NodePort is created by another test and start to answer traffic.
+			// Since we only want to assert that traffic is not being forwarded anymore and the retry timeout is 2 seconds, consider the test is correct
+			// if the service doesn't answer after 10 tries.
+			err = config.DialFromNode("udp", config.NodeIP, config.NodeUDPPort, 10, 10, sets.NewString())
 			if err != nil {
 				framework.Failf("Failure validating that node port service STOPPED removed properly: %v", err)
 			}
@@ -467,24 +466,6 @@ var _ = SIGDescribe("Networking", func() {
 			}
 		})
 
-		// skip because pods can not reach the endpoint in the same host if using UDP and hostNetwork
-		// xref: #95565
-		ginkgo.It("should function for pod-Service(hostNetwork): udp", func() {
-			e2eskipper.Skipf("skip because pods can not reach the endpoint in the same host if using UDP and hostNetwork #95565")
-			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EndpointsUseHostNetwork)
-			ginkgo.By(fmt.Sprintf("dialing(udp) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.ClusterIP, e2enetwork.ClusterUDPPort))
-			err := config.DialFromTestContainer("udp", config.ClusterIP, e2enetwork.ClusterUDPPort, config.MaxTries, 0, config.EndpointHostnames())
-			if err != nil {
-				framework.Failf("failed dialing endpoint, %v", err)
-			}
-
-			ginkgo.By(fmt.Sprintf("dialing(udp) %v --> %v:%v (nodeIP)", config.TestContainerPod.Name, config.NodeIP, config.NodeUDPPort))
-			err = config.DialFromTestContainer("udp", config.NodeIP, config.NodeUDPPort, config.MaxTries, 0, config.EndpointHostnames())
-			if err != nil {
-				framework.Failf("failed dialing endpoint, %v", err)
-			}
-		})
-
 		// if the endpoints pods use hostNetwork, several tests can't run in parallel
 		// because the pods will try to acquire the same port in the host.
 		// We run the test in serial, to avoid port conflicts.
@@ -500,6 +481,20 @@ var _ = SIGDescribe("Networking", func() {
 			}
 			ginkgo.By(fmt.Sprintf("dialing(http) %v --> %v:%v (nodeIP)", config.TestContainerPod.Name, config.NodeIP, config.NodeHTTPPort))
 			err = config.DialFromTestContainer("http", config.NodeIP, config.NodeHTTPPort, config.MaxTries, 0, config.EndpointHostnames())
+			if err != nil {
+				framework.Failf("failed dialing endpoint, %v", err)
+			}
+
+			ginkgo.By("pod-Service(hostNetwork): udp")
+
+			ginkgo.By(fmt.Sprintf("dialing(udp) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.ClusterIP, e2enetwork.ClusterUDPPort))
+			err = config.DialFromTestContainer("udp", config.ClusterIP, e2enetwork.ClusterUDPPort, config.MaxTries, 0, config.EndpointHostnames())
+			if err != nil {
+				framework.Failf("failed dialing endpoint, %v", err)
+			}
+
+			ginkgo.By(fmt.Sprintf("dialing(udp) %v --> %v:%v (nodeIP)", config.TestContainerPod.Name, config.NodeIP, config.NodeUDPPort))
+			err = config.DialFromTestContainer("udp", config.NodeIP, config.NodeUDPPort, config.MaxTries, 0, config.EndpointHostnames())
 			if err != nil {
 				framework.Failf("failed dialing endpoint, %v", err)
 			}

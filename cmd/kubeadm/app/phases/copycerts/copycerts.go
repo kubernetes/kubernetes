@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"strings"
@@ -37,6 +36,8 @@ import (
 	keyutil "k8s.io/client-go/util/keyutil"
 	bootstraputil "k8s.io/cluster-bootstrap/token/util"
 	"k8s.io/klog/v2"
+
+	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	nodebootstraptokenphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
@@ -57,11 +58,11 @@ func createShortLivedBootstrapToken(client clientset.Interface) (string, error) 
 	if err != nil {
 		return "", errors.Wrap(err, "error generating token to upload certs")
 	}
-	token, err := kubeadmapi.NewBootstrapTokenString(tokenStr)
+	token, err := bootstraptokenv1.NewBootstrapTokenString(tokenStr)
 	if err != nil {
 		return "", errors.Wrap(err, "error creating upload certs token")
 	}
-	tokens := []kubeadmapi.BootstrapToken{{
+	tokens := []bootstraptokenv1.BootstrapToken{{
 		Token:       token,
 		Description: "Proxy for managing TTL for the kubeadm-certs secret",
 		TTL: &metav1.Duration{
@@ -171,7 +172,7 @@ func getSecretOwnerRef(client clientset.Interface, tokenID string) ([]metav1.Own
 }
 
 func loadAndEncryptCert(certPath string, key []byte) ([]byte, error) {
-	cert, err := ioutil.ReadFile(certPath)
+	cert, err := os.ReadFile(certPath)
 	if err != nil {
 		return nil, err
 	}
@@ -251,9 +252,9 @@ func DownloadCerts(client clientset.Interface, cfg *kubeadmapi.InitConfiguration
 }
 
 func writeCertOrKey(certOrKeyPath string, certOrKeyData []byte) error {
-	if _, err := keyutil.ParsePublicKeysPEM(certOrKeyData); err == nil {
+	if _, err := keyutil.ParsePrivateKeyPEM(certOrKeyData); err == nil {
 		return keyutil.WriteKey(certOrKeyPath, certOrKeyData)
-	} else if _, err := certutil.ParseCertsPEM(certOrKeyData); err == nil {
+	} else if _, err := keyutil.ParsePublicKeysPEM(certOrKeyData); err == nil {
 		return certutil.WriteCert(certOrKeyPath, certOrKeyData)
 	}
 	return errors.New("unknown data found in Secret entry")

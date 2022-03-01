@@ -19,8 +19,9 @@ package topologymanager
 import (
 	"k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
+	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
-	"k8s.io/kubernetes/pkg/kubelet/util/format"
 )
 
 type containerScope struct {
@@ -37,7 +38,7 @@ func NewContainerScope(policy Policy) Scope {
 			name:             containerTopologyScope,
 			podTopologyHints: podTopologyHints{},
 			policy:           policy,
-			podMap:           make(map[string]string),
+			podMap:           containermap.NewContainerMap(),
 		},
 	}
 }
@@ -50,20 +51,20 @@ func (s *containerScope) Admit(pod *v1.Pod) lifecycle.PodAdmitResult {
 
 	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
 		bestHint, admit := s.calculateAffinity(pod, &container)
-		klog.Infof("[topologymanager] Best TopologyHint for (pod: %v container: %v): %v", format.Pod(pod), container.Name, bestHint)
+		klog.InfoS("Best TopologyHint", "bestHint", bestHint, "pod", klog.KObj(pod), "containerName", container.Name)
 
 		if !admit {
-			return topologyAffinityError()
+			return admission.GetPodAdmitResult(&TopologyAffinityError{})
 		}
-		klog.Infof("[topologymanager] Topology Affinity for (pod: %v container: %v): %v", format.Pod(pod), container.Name, bestHint)
+		klog.InfoS("Topology Affinity", "bestHint", bestHint, "pod", klog.KObj(pod), "containerName", container.Name)
 		s.setTopologyHints(string(pod.UID), container.Name, bestHint)
 
 		err := s.allocateAlignedResources(pod, &container)
 		if err != nil {
-			return unexpectedAdmissionError(err)
+			return admission.GetPodAdmitResult(err)
 		}
 	}
-	return admitPod()
+	return admission.GetPodAdmitResult(nil)
 }
 
 func (s *containerScope) accumulateProvidersHints(pod *v1.Pod, container *v1.Container) []map[string][]TopologyHint {
@@ -73,7 +74,7 @@ func (s *containerScope) accumulateProvidersHints(pod *v1.Pod, container *v1.Con
 		// Get the TopologyHints for a Container from a provider.
 		hints := provider.GetTopologyHints(pod, container)
 		providersHints = append(providersHints, hints)
-		klog.Infof("[topologymanager] TopologyHints for pod '%v', container '%v': %v", format.Pod(pod), container.Name, hints)
+		klog.InfoS("TopologyHints", "hints", hints, "pod", klog.KObj(pod), "containerName", container.Name)
 	}
 	return providersHints
 }
@@ -81,6 +82,6 @@ func (s *containerScope) accumulateProvidersHints(pod *v1.Pod, container *v1.Con
 func (s *containerScope) calculateAffinity(pod *v1.Pod, container *v1.Container) (TopologyHint, bool) {
 	providersHints := s.accumulateProvidersHints(pod, container)
 	bestHint, admit := s.policy.Merge(providersHints)
-	klog.Infof("[topologymanager] ContainerTopologyHint: %v", bestHint)
+	klog.InfoS("ContainerTopologyHint", "bestHint", bestHint)
 	return bestHint, admit
 }

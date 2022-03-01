@@ -20,19 +20,22 @@ import "time"
 
 const (
 	// Default timeouts to be used in TimeoutContext
-	podStartTimeout            = 5 * time.Minute
-	podStartShortTimeout       = 2 * time.Minute
-	podStartSlowTimeout        = 15 * time.Minute
-	podDeleteTimeout           = 5 * time.Minute
-	claimProvisionTimeout      = 5 * time.Minute
-	claimProvisionShortTimeout = 1 * time.Minute
-	claimBoundTimeout          = 3 * time.Minute
-	pvReclaimTimeout           = 3 * time.Minute
-	pvBoundTimeout             = 3 * time.Minute
-	pvDeleteTimeout            = 3 * time.Minute
-	pvDeleteSlowTimeout        = 20 * time.Minute
-	snapshotCreateTimeout      = 5 * time.Minute
-	snapshotDeleteTimeout      = 5 * time.Minute
+	podStartTimeout                  = 5 * time.Minute
+	podStartShortTimeout             = 2 * time.Minute
+	podStartSlowTimeout              = 15 * time.Minute
+	podDeleteTimeout                 = 5 * time.Minute
+	claimProvisionTimeout            = 5 * time.Minute
+	claimProvisionShortTimeout       = 1 * time.Minute
+	dataSourceProvisionTimeout       = 5 * time.Minute
+	claimBoundTimeout                = 3 * time.Minute
+	pvReclaimTimeout                 = 3 * time.Minute
+	pvBoundTimeout                   = 3 * time.Minute
+	pvCreateTimeout                  = 3 * time.Minute
+	pvDeleteTimeout                  = 3 * time.Minute
+	pvDeleteSlowTimeout              = 20 * time.Minute
+	snapshotCreateTimeout            = 5 * time.Minute
+	snapshotDeleteTimeout            = 5 * time.Minute
+	snapshotControllerMetricsTimeout = 5 * time.Minute
 )
 
 // TimeoutContext contains timeout settings for several actions.
@@ -54,6 +57,9 @@ type TimeoutContext struct {
 	// ClaimProvision is how long claims have to become dynamically provisioned.
 	ClaimProvision time.Duration
 
+	// DataSourceProvision is how long claims have to become dynamically provisioned from source claim.
+	DataSourceProvision time.Duration
+
 	// ClaimProvisionShort is the same as `ClaimProvision`, but shorter.
 	ClaimProvisionShort time.Duration
 
@@ -66,6 +72,9 @@ type TimeoutContext struct {
 	// PVBound is how long PVs have to become bound.
 	PVBound time.Duration
 
+	// PVCreate is how long PVs have to be created.
+	PVCreate time.Duration
+
 	// PVDelete is how long PVs have to become deleted.
 	PVDelete time.Duration
 
@@ -77,23 +86,29 @@ type TimeoutContext struct {
 
 	// SnapshotDelete is how long for snapshot to delete snapshotContent.
 	SnapshotDelete time.Duration
+
+	// SnapshotControllerMetrics is how long to wait for snapshot controller metrics.
+	SnapshotControllerMetrics time.Duration
 }
 
 // NewTimeoutContextWithDefaults returns a TimeoutContext with default values.
 func NewTimeoutContextWithDefaults() *TimeoutContext {
 	return &TimeoutContext{
-		PodStart:            podStartTimeout,
-		PodStartShort:       podStartShortTimeout,
-		PodStartSlow:        podStartSlowTimeout,
-		PodDelete:           podDeleteTimeout,
-		ClaimProvision:      claimProvisionTimeout,
-		ClaimProvisionShort: claimProvisionShortTimeout,
-		ClaimBound:          claimBoundTimeout,
-		PVReclaim:           pvReclaimTimeout,
-		PVBound:             pvBoundTimeout,
-		PVDelete:            pvDeleteTimeout,
-		PVDeleteSlow:        pvDeleteSlowTimeout,
-		SnapshotCreate:      snapshotCreateTimeout,
-		SnapshotDelete:      snapshotDeleteTimeout,
+		PodStart:                  podStartTimeout,
+		PodStartShort:             podStartShortTimeout,
+		PodStartSlow:              podStartSlowTimeout,
+		PodDelete:                 podDeleteTimeout,
+		ClaimProvision:            claimProvisionTimeout,
+		ClaimProvisionShort:       claimProvisionShortTimeout,
+		DataSourceProvision:       dataSourceProvisionTimeout,
+		ClaimBound:                claimBoundTimeout,
+		PVReclaim:                 pvReclaimTimeout,
+		PVBound:                   pvBoundTimeout,
+		PVCreate:                  pvCreateTimeout,
+		PVDelete:                  pvDeleteTimeout,
+		PVDeleteSlow:              pvDeleteSlowTimeout,
+		SnapshotCreate:            snapshotCreateTimeout,
+		SnapshotDelete:            snapshotDeleteTimeout,
+		SnapshotControllerMetrics: snapshotControllerMetricsTimeout,
 	}
 }

@@ -18,9 +18,9 @@ package scheduling
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"math"
+	"sync"
 	"time"
 
 	"github.com/onsi/ginkgo"
@@ -29,10 +29,10 @@ import (
 	_ "github.com/stretchr/testify/assert"
 
 	v1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
@@ -41,10 +41,8 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	testutils "k8s.io/kubernetes/test/utils"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 // Resource is a collection of compute resource.
@@ -71,67 +69,13 @@ var podRequestedResource = &v1.ResourceRequirements{
 	},
 }
 
-// addOrUpdateAvoidPodOnNode adds avoidPods annotations to node, will override if it exists
-func addOrUpdateAvoidPodOnNode(c clientset.Interface, nodeName string, avoidPods v1.AvoidPods) {
-	err := wait.PollImmediate(framework.Poll, framework.SingleCallTimeout, func() (bool, error) {
-		node, err := c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-
-		taintsData, err := json.Marshal(avoidPods)
-		framework.ExpectNoError(err)
-
-		if node.Annotations == nil {
-			node.Annotations = make(map[string]string)
-		}
-		node.Annotations[v1.PreferAvoidPodsAnnotationKey] = string(taintsData)
-		_, err = c.CoreV1().Nodes().Update(context.TODO(), node, metav1.UpdateOptions{})
-		if err != nil {
-			if !apierrors.IsConflict(err) {
-				framework.ExpectNoError(err)
-			} else {
-				framework.Logf("Conflict when trying to add/update avoidPods %v to %v with error %v", avoidPods, nodeName, err)
-				return false, nil
-			}
-		}
-		return true, nil
-	})
-	framework.ExpectNoError(err)
-}
-
-// removeAvoidPodsOffNode removes AvoidPods annotations from the node. It does not fail if no such annotation exists.
-func removeAvoidPodsOffNode(c clientset.Interface, nodeName string) {
-	err := wait.PollImmediate(framework.Poll, framework.SingleCallTimeout, func() (bool, error) {
-		node, err := c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-
-		if node.Annotations == nil {
-			return true, nil
-		}
-		delete(node.Annotations, v1.PreferAvoidPodsAnnotationKey)
-		_, err = c.CoreV1().Nodes().Update(context.TODO(), node, metav1.UpdateOptions{})
-		if err != nil {
-			if !apierrors.IsConflict(err) {
-				framework.ExpectNoError(err)
-			} else {
-				framework.Logf("Conflict when trying to remove avoidPods to %v", nodeName)
-				return false, nil
-			}
-		}
-		return true, nil
-	})
-	framework.ExpectNoError(err)
-}
-
 // nodesAreTooUtilized ensures that each node can support 2*crioMinMemLimit
 // We check for double because it needs to support at least the cri-o minimum
 // plus whatever delta between node usages (which could be up to or at least crioMinMemLimit)
 func nodesAreTooUtilized(cs clientset.Interface, nodeList *v1.NodeList) bool {
+	nodeNameToPodList := podListForEachNode(cs)
 	for _, node := range nodeList.Items {
-		_, memFraction, _, memAllocatable := computeCPUMemFraction(cs, node, podRequestedResource)
+		_, memFraction, _, memAllocatable := computeCPUMemFraction(node, podRequestedResource, nodeNameToPodList[node.Name])
 		if float64(memAllocatable)-(memFraction*float64(memAllocatable)) < float64(2*crioMinMemLimit) {
 			return true
 		}
@@ -259,70 +203,6 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		framework.ExpectNotEqual(labelPod.Spec.NodeName, nodeName)
 	})
 
-	ginkgo.It("Pod should avoid nodes that have avoidPod annotation", func() {
-		nodeName := nodeList.Items[0].Name
-		// make the nodes have balanced cpu,mem usage
-		cleanUp, err := createBalancedPodForNodes(f, cs, ns, nodeList.Items, podRequestedResource, 0.5)
-		defer cleanUp()
-		framework.ExpectNoError(err)
-		ginkgo.By("Create a RC, with 0 replicas")
-		rc := createRC(ns, "scheduler-priority-avoid-pod", int32(0), map[string]string{"name": "scheduler-priority-avoid-pod"}, f, podRequestedResource)
-		// Cleanup the replication controller when we are done.
-		defer func() {
-			// Resize the replication controller to zero to get rid of pods.
-			if err := e2erc.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, rc.Name); err != nil {
-				framework.Logf("Failed to cleanup replication controller %v: %v.", rc.Name, err)
-			}
-		}()
-
-		ginkgo.By("Trying to apply avoidPod annotations on the first node.")
-		avoidPod := v1.AvoidPods{
-			PreferAvoidPods: []v1.PreferAvoidPodsEntry{
-				{
-					PodSignature: v1.PodSignature{
-						PodController: &metav1.OwnerReference{
-							APIVersion: "v1",
-							Kind:       "ReplicationController",
-							Name:       rc.Name,
-							UID:        rc.UID,
-							Controller: func() *bool { b := true; return &b }(),
-						},
-					},
-					Reason:  "some reson",
-					Message: "some message",
-				},
-			},
-		}
-		action := func() error {
-			addOrUpdateAvoidPodOnNode(cs, nodeName, avoidPod)
-			return nil
-		}
-		predicate := func(node *v1.Node) bool {
-			val, err := json.Marshal(avoidPod)
-			if err != nil {
-				return false
-			}
-			return node.Annotations[v1.PreferAvoidPodsAnnotationKey] == string(val)
-		}
-		success, err := observeNodeUpdateAfterAction(f.ClientSet, nodeName, predicate, action)
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(success, true)
-
-		defer removeAvoidPodsOffNode(cs, nodeName)
-
-		ginkgo.By(fmt.Sprintf("Scale the RC: %s to len(nodeList.Item)-1 : %v.", rc.Name, len(nodeList.Items)-1))
-
-		e2erc.ScaleRC(f.ClientSet, f.ScalesGetter, ns, rc.Name, uint(len(nodeList.Items)-1), true)
-		testPods, err := cs.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{
-			LabelSelector: "name=scheduler-priority-avoid-pod",
-		})
-		framework.ExpectNoError(err)
-		ginkgo.By(fmt.Sprintf("Verify the pods should not scheduled to the node: %s", nodeName))
-		for _, pod := range testPods.Items {
-			framework.ExpectNotEqual(pod.Spec.NodeName, nodeName)
-		}
-	})
-
 	ginkgo.It("Pod should be preferably scheduled to nodes pod can tolerate", func() {
 		// make the nodes have balanced cpu,mem usage ratio
 		cleanUp, err := createBalancedPodForNodes(f, cs, ns, nodeList.Items, podRequestedResource, 0.5)
@@ -387,6 +267,9 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		topologyKey := "kubernetes.io/e2e-pts-score"
 
 		ginkgo.BeforeEach(func() {
+			if len(nodeList.Items) < 2 {
+				ginkgo.Skip("At least 2 nodes are required to run the test")
+			}
 			ginkgo.By("Trying to get 2 available nodes which can run pod")
 			nodeNames = Get2NodesThatCanRunPod(f)
 			ginkgo.By(fmt.Sprintf("Apply dedicated topologyKey %v for this test on the 2 nodes.", topologyKey))
@@ -508,8 +391,11 @@ func createBalancedPodForNodes(f *framework.Framework, cs clientset.Interface, n
 	var cpuFractionMap = make(map[string]float64)
 	var memFractionMap = make(map[string]float64)
 
+	// For each node, stores its pods info
+	nodeNameToPodList := podListForEachNode(cs)
+
 	for _, node := range nodes {
-		cpuFraction, memFraction, _, _ := computeCPUMemFraction(cs, node, requestedResource)
+		cpuFraction, memFraction, _, _ := computeCPUMemFraction(node, requestedResource, nodeNameToPodList[node.Name])
 		cpuFractionMap[node.Name] = cpuFraction
 		memFractionMap[node.Name] = memFraction
 		if cpuFraction > maxCPUFraction {
@@ -520,15 +406,22 @@ func createBalancedPodForNodes(f *framework.Framework, cs clientset.Interface, n
 		}
 	}
 
+	errChan := make(chan error, len(nodes))
+	var wg sync.WaitGroup
+
 	// we need the max one to keep the same cpu/mem use rate
 	ratio = math.Max(maxCPUFraction, maxMemFraction)
 	for _, node := range nodes {
 		memAllocatable, found := node.Status.Allocatable[v1.ResourceMemory]
-		framework.ExpectEqual(found, true)
+		if !found {
+			framework.Failf("Node %v: node.Status.Allocatable %v does not contain entry %v", node.Name, node.Status.Allocatable, v1.ResourceMemory)
+		}
 		memAllocatableVal := memAllocatable.Value()
 
 		cpuAllocatable, found := node.Status.Allocatable[v1.ResourceCPU]
-		framework.ExpectEqual(found, true)
+		if !found {
+			framework.Failf("Node %v: node.Status.Allocatable %v does not contain entry %v", node.Name, node.Status.Allocatable, v1.ResourceCPU)
+		}
 		cpuAllocatableMil := cpuAllocatable.MilliValue()
 
 		needCreateResource := v1.ResourceList{}
@@ -543,7 +436,6 @@ func createBalancedPodForNodes(f *framework.Framework, cs clientset.Interface, n
 			Name:   "",
 			Labels: balancePodLabel,
 			Resources: &v1.ResourceRequirements{
-				Limits:   needCreateResource,
 				Requests: needCreateResource,
 			},
 			Affinity: &v1.Affinity{
@@ -560,44 +452,69 @@ func createBalancedPodForNodes(f *framework.Framework, cs clientset.Interface, n
 				},
 			},
 		}
-
-		err := testutils.StartPods(cs, 1, ns, string(uuid.NewUUID()),
-			*initPausePod(f, *podConfig), true, framework.Logf)
-
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			err := testutils.StartPods(cs, 1, ns, string(uuid.NewUUID()),
+				*initPausePod(f, *podConfig), true, framework.Logf)
+			if err != nil {
+				errChan <- err
+			}
+		}()
+	}
+	wg.Wait()
+	close(errChan)
+	var errs []error
+	for err := range errChan {
 		if err != nil {
-			return cleanUp, err
+			errs = append(errs, err)
 		}
 	}
+	if len(errs) > 0 {
+		return cleanUp, errors.NewAggregate(errs)
+	}
 
+	nodeNameToPodList = podListForEachNode(cs)
 	for _, node := range nodes {
 		ginkgo.By("Compute Cpu, Mem Fraction after create balanced pods.")
-		computeCPUMemFraction(cs, node, requestedResource)
+		computeCPUMemFraction(node, requestedResource, nodeNameToPodList[node.Name])
 	}
 
 	return cleanUp, nil
 }
 
-func computeCPUMemFraction(cs clientset.Interface, node v1.Node, resource *v1.ResourceRequirements) (float64, float64, int64, int64) {
-	framework.Logf("ComputeCPUMemFraction for node: %v", node.Name)
-	totalRequestedCPUResource := resource.Requests.Cpu().MilliValue()
-	totalRequestedMemResource := resource.Requests.Memory().Value()
-	allpods, err := cs.CoreV1().Pods(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
+func podListForEachNode(cs clientset.Interface) map[string][]*v1.Pod {
+	nodeNameToPodList := make(map[string][]*v1.Pod)
+	allPods, err := cs.CoreV1().Pods(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		framework.Failf("Expect error of invalid, got : %v", err)
 	}
-	for _, pod := range allpods.Items {
-		if pod.Spec.NodeName == node.Name {
-			framework.Logf("Pod for on the node: %v, Cpu: %v, Mem: %v", pod.Name, getNonZeroRequests(&pod).MilliCPU, getNonZeroRequests(&pod).Memory)
-			// Ignore best effort pods while computing fractions as they won't be taken in account by scheduler.
-			if v1qos.GetPodQOS(&pod) == v1.PodQOSBestEffort {
-				continue
-			}
-			totalRequestedCPUResource += getNonZeroRequests(&pod).MilliCPU
-			totalRequestedMemResource += getNonZeroRequests(&pod).Memory
-		}
+	for i, pod := range allPods.Items {
+		nodeName := pod.Spec.NodeName
+		nodeNameToPodList[nodeName] = append(nodeNameToPodList[nodeName], &allPods.Items[i])
 	}
+	return nodeNameToPodList
+}
+
+func computeCPUMemFraction(node v1.Node, resource *v1.ResourceRequirements, pods []*v1.Pod) (float64, float64, int64, int64) {
+	framework.Logf("ComputeCPUMemFraction for node: %v", node.Name)
+	totalRequestedCPUResource := resource.Requests.Cpu().MilliValue()
+	totalRequestedMemResource := resource.Requests.Memory().Value()
+
+	for _, pod := range pods {
+		framework.Logf("Pod for on the node: %v, Cpu: %v, Mem: %v", pod.Name, getNonZeroRequests(pod).MilliCPU, getNonZeroRequests(pod).Memory)
+		// Ignore best effort pods while computing fractions as they won't be taken in account by scheduler.
+		if v1qos.GetPodQOS(pod) == v1.PodQOSBestEffort {
+			continue
+		}
+		totalRequestedCPUResource += getNonZeroRequests(pod).MilliCPU
+		totalRequestedMemResource += getNonZeroRequests(pod).Memory
+	}
+
 	cpuAllocatable, found := node.Status.Allocatable[v1.ResourceCPU]
-	framework.ExpectEqual(found, true)
+	if !found {
+		framework.Failf("Node %v: node.Status.Allocatable %v does not contain entry %v", node.Name, node.Status.Allocatable, v1.ResourceCPU)
+	}
 	cpuAllocatableMil := cpuAllocatable.MilliValue()
 
 	floatOne := float64(1)
@@ -606,7 +523,9 @@ func computeCPUMemFraction(cs clientset.Interface, node v1.Node, resource *v1.Re
 		cpuFraction = floatOne
 	}
 	memAllocatable, found := node.Status.Allocatable[v1.ResourceMemory]
-	framework.ExpectEqual(found, true)
+	if !found {
+		framework.Failf("Node %v: node.Status.Allocatable %v does not contain entry %v", node.Name, node.Status.Allocatable, v1.ResourceMemory)
+	}
 	memAllocatableVal := memAllocatable.Value()
 	memFraction := float64(totalRequestedMemResource) / float64(memAllocatableVal)
 	if memFraction > floatOne {
@@ -628,38 +547,6 @@ func getNonZeroRequests(pod *v1.Pod) Resource {
 		result.Memory += memory
 	}
 	return result
-}
-
-func createRC(ns, rsName string, replicas int32, rcPodLabels map[string]string, f *framework.Framework, resource *v1.ResourceRequirements) *v1.ReplicationController {
-	rc := &v1.ReplicationController{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "ReplicationController",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: rsName,
-		},
-		Spec: v1.ReplicationControllerSpec{
-			Replicas: &replicas,
-			Template: &v1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: rcPodLabels,
-				},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{
-							Name:      rsName,
-							Image:     imageutils.GetPauseImageName(),
-							Resources: *resource,
-						},
-					},
-				},
-			},
-		},
-	}
-	rc, err := f.ClientSet.CoreV1().ReplicationControllers(ns).Create(context.TODO(), rc, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
-	return rc
 }
 
 func getRandomTaint() v1.Taint {

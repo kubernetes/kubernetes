@@ -31,6 +31,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/test/integration/framework"
+	testutil "k8s.io/kubernetes/test/utils"
 	"k8s.io/utils/pointer"
 )
 
@@ -56,8 +57,8 @@ func TestNewDeployment(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	informers.Start(stopCh)
-	go rm.Run(5, stopCh)
-	go dc.Run(5, stopCh)
+	go rm.Run(context.TODO(), 5)
+	go dc.Run(context.TODO(), 5)
 
 	// Wait for the Deployment to be updated to revision 1
 	if err := tester.waitForDeploymentRevisionAndImage("1", fakeImage); err != nil {
@@ -123,8 +124,8 @@ func TestDeploymentRollingUpdate(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	informers.Start(stopCh)
-	go rm.Run(5, stopCh)
-	go dc.Run(5, stopCh)
+	go rm.Run(context.TODO(), 5)
+	go dc.Run(context.TODO(), 5)
 
 	replicas := int32(20)
 	tester := &deploymentTester{t: t, c: c, deployment: newDeployment(name, ns.Name, replicas)}
@@ -197,7 +198,7 @@ func TestDeploymentRollingUpdate(t *testing.T) {
 	if err := tester.waitForDeploymentCompleteAndCheckRollingAndMarkPodsReady(); err != nil {
 		t.Fatal(err)
 	}
-	_, allOldRSs, err := deploymentutil.GetOldReplicaSets(tester.deployment, c.AppsV1())
+	_, allOldRSs, err := testutil.GetOldReplicaSets(tester.deployment, c)
 	if err != nil {
 		t.Fatalf("failed retrieving old replicasets of deployment %s: %v", tester.deployment.Name, err)
 	}
@@ -224,12 +225,11 @@ func TestDeploymentSelectorImmutability(t *testing.T) {
 	}
 
 	// test to ensure apps/v1 selector is immutable
-	newSelectorLabels := map[string]string{"name_apps_v1beta1": "test_apps_v1beta1"}
 	deploymentAppsV1, err := c.AppsV1().Deployments(ns.Name).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("failed to get apps/v1 deployment %s: %v", name, err)
 	}
-	newSelectorLabels = map[string]string{"name_apps_v1": "test_apps_v1"}
+	newSelectorLabels := map[string]string{"name_apps_v1": "test_apps_v1"}
 	deploymentAppsV1.Spec.Selector.MatchLabels = newSelectorLabels
 	deploymentAppsV1.Spec.Template.Labels = newSelectorLabels
 	_, err = c.AppsV1().Deployments(ns.Name).Update(context.TODO(), deploymentAppsV1, metav1.UpdateOptions{})
@@ -267,8 +267,8 @@ func TestPausedDeployment(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	informers.Start(stopCh)
-	go rm.Run(5, stopCh)
-	go dc.Run(5, stopCh)
+	go rm.Run(context.TODO(), 5)
+	go dc.Run(context.TODO(), 5)
 
 	// Verify that the paused deployment won't create new replica set.
 	if err := tester.expectNoNewReplicaSet(); err != nil {
@@ -333,7 +333,7 @@ func TestPausedDeployment(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, allOldRs, err := deploymentutil.GetOldReplicaSets(tester.deployment, c.AppsV1())
+	_, allOldRs, err := testutil.GetOldReplicaSets(tester.deployment, c)
 	if err != nil {
 		t.Fatalf("failed retrieving old replicasets of deployment %s: %v", tester.deployment.Name, err)
 	}
@@ -368,8 +368,8 @@ func TestScalePausedDeployment(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	informers.Start(stopCh)
-	go rm.Run(5, stopCh)
-	go dc.Run(5, stopCh)
+	go rm.Run(context.TODO(), 5)
+	go dc.Run(context.TODO(), 5)
 
 	// Wait for the Deployment to be updated to revision 1
 	if err := tester.waitForDeploymentRevisionAndImage("1", fakeImage); err != nil {
@@ -449,8 +449,8 @@ func TestDeploymentHashCollision(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	informers.Start(stopCh)
-	go rm.Run(5, stopCh)
-	go dc.Run(5, stopCh)
+	go rm.Run(context.TODO(), 5)
+	go dc.Run(context.TODO(), 5)
 
 	// Wait for the Deployment to be updated to revision 1
 	if err := tester.waitForDeploymentRevisionAndImage("1", fakeImage); err != nil {
@@ -458,7 +458,7 @@ func TestDeploymentHashCollision(t *testing.T) {
 	}
 
 	// Mock a hash collision
-	newRS, err := deploymentutil.GetNewReplicaSet(tester.deployment, c.AppsV1())
+	newRS, err := testutil.GetNewReplicaSet(tester.deployment, c)
 	if err != nil {
 		t.Fatalf("failed getting new replicaset of deployment %s: %v", tester.deployment.Name, err)
 	}
@@ -552,8 +552,8 @@ func TestFailedDeployment(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	informers.Start(stopCh)
-	go rm.Run(5, stopCh)
-	go dc.Run(5, stopCh)
+	go rm.Run(context.TODO(), 5)
+	go dc.Run(context.TODO(), 5)
 
 	if err = tester.waitForDeploymentUpdatedReplicasGTE(replicas); err != nil {
 		t.Fatal(err)
@@ -594,8 +594,8 @@ func TestOverlappingDeployments(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	informers.Start(stopCh)
-	go rm.Run(5, stopCh)
-	go dc.Run(5, stopCh)
+	go rm.Run(context.TODO(), 5)
+	go dc.Run(context.TODO(), 5)
 
 	// Create 2 deployments with overlapping selectors
 	var err error
@@ -668,8 +668,8 @@ func TestScaledRolloutDeployment(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	informers.Start(stopCh)
-	go rm.Run(5, stopCh)
-	go dc.Run(5, stopCh)
+	go rm.Run(context.TODO(), 5)
+	go dc.Run(context.TODO(), 5)
 
 	// Create a deployment with rolling update strategy, max surge = 3, and max unavailable = 2
 	var err error
@@ -752,7 +752,7 @@ func TestScaledRolloutDeployment(t *testing.T) {
 	}
 
 	// Verify every replicaset has correct desiredReplicas annotation after 3rd rollout
-	thirdRS, err := deploymentutil.GetNewReplicaSet(tester.deployment, c.AppsV1())
+	thirdRS, err := testutil.GetNewReplicaSet(tester.deployment, c)
 	if err != nil {
 		t.Fatalf("failed getting new revision 3 replicaset for deployment %q: %v", name, err)
 	}
@@ -829,7 +829,7 @@ func TestScaledRolloutDeployment(t *testing.T) {
 	}
 
 	// Verify every replicaset has correct desiredReplicas annotation after 5th rollout
-	fifthRS, err := deploymentutil.GetNewReplicaSet(tester.deployment, c.AppsV1())
+	fifthRS, err := testutil.GetNewReplicaSet(tester.deployment, c)
 	if err != nil {
 		t.Fatalf("failed getting new revision 5 replicaset for deployment %q: %v", name, err)
 	}
@@ -871,8 +871,8 @@ func TestSpecReplicasChange(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	informers.Start(stopCh)
-	go rm.Run(5, stopCh)
-	go dc.Run(5, stopCh)
+	go rm.Run(context.TODO(), 5)
+	go dc.Run(context.TODO(), 5)
 
 	// Scale up/down deployment and verify its replicaset has matching .spec.replicas
 	if err = tester.scaleDeployment(2); err != nil {
@@ -929,8 +929,8 @@ func TestDeploymentAvailableCondition(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	informers.Start(stopCh)
-	go rm.Run(5, stopCh)
-	go dc.Run(5, stopCh)
+	go rm.Run(context.TODO(), 5)
+	go dc.Run(context.TODO(), 5)
 
 	// Wait for the deployment to be observed by the controller and has at least specified number of updated replicas
 	if err = tester.waitForDeploymentUpdatedReplicasGTE(replicas); err != nil {
@@ -1046,8 +1046,8 @@ func TestGeneralReplicaSetAdoption(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	informers.Start(stopCh)
-	go rm.Run(5, stopCh)
-	go dc.Run(5, stopCh)
+	go rm.Run(context.TODO(), 5)
+	go dc.Run(context.TODO(), 5)
 
 	// Wait for the Deployment to be updated to revision 1
 	if err := tester.waitForDeploymentRevisionAndImage("1", fakeImage); err != nil {
@@ -1060,7 +1060,7 @@ func TestGeneralReplicaSetAdoption(t *testing.T) {
 	}
 
 	// Get replicaset of the deployment
-	rs, err := deploymentutil.GetNewReplicaSet(tester.deployment, c.AppsV1())
+	rs, err := testutil.GetNewReplicaSet(tester.deployment, c)
 	if err != nil {
 		t.Fatalf("failed to get replicaset of deployment %q: %v", deploymentName, err)
 	}
@@ -1138,8 +1138,8 @@ func TestDeploymentScaleSubresource(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	informers.Start(stopCh)
-	go rm.Run(5, stopCh)
-	go dc.Run(5, stopCh)
+	go rm.Run(context.TODO(), 5)
+	go dc.Run(context.TODO(), 5)
 
 	// Wait for the Deployment to be updated to revision 1
 	if err := tester.waitForDeploymentRevisionAndImage("1", fakeImage); err != nil {
@@ -1182,8 +1182,8 @@ func TestReplicaSetOrphaningAndAdoptionWhenLabelsChange(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	informers.Start(stopCh)
-	go rm.Run(5, stopCh)
-	go dc.Run(5, stopCh)
+	go rm.Run(context.TODO(), 5)
+	go dc.Run(context.TODO(), 5)
 
 	// Wait for the Deployment to be updated to revision 1
 	if err := tester.waitForDeploymentRevisionAndImage("1", fakeImage); err != nil {
@@ -1198,7 +1198,7 @@ func TestReplicaSetOrphaningAndAdoptionWhenLabelsChange(t *testing.T) {
 	// Orphaning: deployment should remove OwnerReference from a RS when the RS's labels change to not match its labels
 
 	// Get replicaset of the deployment
-	rs, err := deploymentutil.GetNewReplicaSet(tester.deployment, c.AppsV1())
+	rs, err := testutil.GetNewReplicaSet(tester.deployment, c)
 	if err != nil {
 		t.Fatalf("failed to get replicaset of deployment %q: %v", deploymentName, err)
 	}
@@ -1241,7 +1241,7 @@ func TestReplicaSetOrphaningAndAdoptionWhenLabelsChange(t *testing.T) {
 	// i.e., the new replicaset will have a name with different hash to preserve name uniqueness
 	var newRS *apps.ReplicaSet
 	if err = wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
-		newRS, err = deploymentutil.GetNewReplicaSet(tester.deployment, c.AppsV1())
+		newRS, err = testutil.GetNewReplicaSet(tester.deployment, c)
 		if err != nil {
 			return false, fmt.Errorf("failed to get new replicaset of deployment %q after orphaning: %v", deploymentName, err)
 		}

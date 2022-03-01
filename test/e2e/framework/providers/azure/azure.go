@@ -41,8 +41,9 @@ func newProvider() (framework.ProviderInterface, error) {
 	if err != nil {
 		framework.Logf("Couldn't open cloud provider configuration %s: %#v",
 			framework.TestContext.CloudConfig.ConfigFile, err)
+	} else {
+		defer config.Close()
 	}
-	defer config.Close()
 	azureCloud, err := azure.NewCloud(config)
 	return &Provider{
 		azureCloud: azureCloud.(*azure.Cloud),

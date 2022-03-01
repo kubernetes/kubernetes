@@ -32,13 +32,13 @@ func TestDisabledVersion(t *testing.T) {
 	config.DisableVersions(g1v1)
 	config.EnableVersions(g1v2, g2v1)
 
-	if config.VersionEnabled(g1v1) {
+	if config.versionEnabled(g1v1) {
 		t.Errorf("expected disabled for %v, from %v", g1v1, config)
 	}
-	if !config.VersionEnabled(g1v2) {
+	if !config.versionEnabled(g1v2) {
 		t.Errorf("expected enabled for %v, from %v", g1v1, config)
 	}
-	if !config.VersionEnabled(g2v1) {
+	if !config.versionEnabled(g2v1) {
 		t.Errorf("expected enabled for %v, from %v", g1v1, config)
 	}
 }
@@ -65,15 +65,18 @@ func TestDisabledResource(t *testing.T) {
 	config.EnableResources(g1v1rEnabled, g1v2rEnabled, g2v1rEnabled)
 	config.DisableResources(g1v1rDisabled, g1v2rDisabled, g2v1rDisabled)
 
-	// all resources under g1v1 are disabled because the group-version is disabled
+	// all resources not explicitly enabled under g1v1 are disabled because the group-version is disabled
 	if config.ResourceEnabled(g1v1rUnspecified) {
 		t.Errorf("expected disabled for %v, from %v", g1v1rUnspecified, config)
 	}
-	if config.ResourceEnabled(g1v1rEnabled) {
-		t.Errorf("expected disabled for %v, from %v", g1v1rEnabled, config)
+	if !config.ResourceEnabled(g1v1rEnabled) {
+		t.Errorf("expected enabled for %v, from %v", g1v1rEnabled, config)
 	}
 	if config.ResourceEnabled(g1v1rDisabled) {
 		t.Errorf("expected disabled for %v, from %v", g1v1rDisabled, config)
+	}
+	if config.ResourceEnabled(g1v1rUnspecified) {
+		t.Errorf("expected disabled for %v, from %v", g1v1rUnspecified, config)
 	}
 
 	// explicitly disabled resources in enabled group-versions are disabled
@@ -96,61 +99,6 @@ func TestDisabledResource(t *testing.T) {
 	}
 	if !config.ResourceEnabled(g2v1rEnabled) {
 		t.Errorf("expected enabled for %v, from %v", g2v1rEnabled, config)
-	}
-
-	// DisableAll() only disables to the group/version level for compatibility
-	// corresponds to --runtime-config=api/all=false
-	config.DisableAll()
-	if config.ResourceEnabled(g1v1rEnabled) {
-		t.Errorf("expected disabled for %v, from %v", g1v1rEnabled, config)
-	}
-	if config.ResourceEnabled(g1v2rEnabled) {
-		t.Errorf("expected disabled for %v, from %v", g1v2rEnabled, config)
-	}
-	if config.ResourceEnabled(g2v1rEnabled) {
-		t.Errorf("expected disabled for %v, from %v", g2v1rEnabled, config)
-	}
-
-	// DisableAll() only disables to the group/version level for compatibility
-	// corresponds to --runtime-config=api/all=false,g1/v1=true
-	config.DisableAll()
-	config.EnableVersions(g1v1)
-	if !config.ResourceEnabled(g1v1rEnabled) {
-		t.Errorf("expected enabled for %v, from %v", g1v1rEnabled, config)
-	}
-
-	// EnableAll() only enables to the group/version level for compatibility
-	config.EnableAll()
-
-	// all unspecified or enabled resources under all groups now enabled
-	if !config.ResourceEnabled(g1v1rUnspecified) {
-		t.Errorf("expected enabled for %v, from %v", g1v1rUnspecified, config)
-	}
-	if !config.ResourceEnabled(g1v1rEnabled) {
-		t.Errorf("expected enabled for %v, from %v", g1v1rEnabled, config)
-	}
-	if !config.ResourceEnabled(g1v2rUnspecified) {
-		t.Errorf("expected enabled for %v, from %v", g1v2rUnspecified, config)
-	}
-	if !config.ResourceEnabled(g1v2rEnabled) {
-		t.Errorf("expected enabled for %v, from %v", g1v2rEnabled, config)
-	}
-	if !config.ResourceEnabled(g2v1rUnspecified) {
-		t.Errorf("expected enabled for %v, from %v", g2v1rUnspecified, config)
-	}
-	if !config.ResourceEnabled(g2v1rEnabled) {
-		t.Errorf("expected enabled for %v, from %v", g2v1rEnabled, config)
-	}
-
-	// previously disabled resources are still disabled
-	if config.ResourceEnabled(g1v1rDisabled) {
-		t.Errorf("expected disabled for %v, from %v", g1v1rDisabled, config)
-	}
-	if config.ResourceEnabled(g1v2rDisabled) {
-		t.Errorf("expected disabled for %v, from %v", g1v2rDisabled, config)
-	}
-	if config.ResourceEnabled(g2v1rDisabled) {
-		t.Errorf("expected disabled for %v, from %v", g2v1rDisabled, config)
 	}
 }
 
@@ -194,11 +142,37 @@ func TestAnyVersionForGroupEnabled(t *testing.T) {
 
 			expectedResult: true,
 		},
+		{
+			name: "present, and one resource enabled",
+			creator: func() APIResourceConfigSource {
+				ret := NewResourceConfig()
+				ret.DisableVersions(schema.GroupVersion{Group: "one", Version: "version1"})
+				ret.EnableResources(schema.GroupVersionResource{Group: "one", Version: "version2", Resource: "foo"})
+				return ret
+			},
+			testGroup: "one",
+
+			expectedResult: true,
+		},
+		{
+			name: "present, and one resource under disabled version enabled",
+			creator: func() APIResourceConfigSource {
+				ret := NewResourceConfig()
+				ret.DisableVersions(schema.GroupVersion{Group: "one", Version: "version1"})
+				ret.EnableResources(schema.GroupVersionResource{Group: "one", Version: "version1", Resource: "foo"})
+				return ret
+			},
+			testGroup: "one",
+
+			expectedResult: true,
+		},
 	}
 
 	for _, tc := range tests {
-		if e, a := tc.expectedResult, tc.creator().AnyVersionForGroupEnabled(tc.testGroup); e != a {
-			t.Errorf("%s: expected %v, got %v", tc.name, e, a)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			if e, a := tc.expectedResult, tc.creator().AnyResourceForGroupEnabled(tc.testGroup); e != a {
+				t.Errorf("expected %v, got %v", e, a)
+			}
+		})
 	}
 }

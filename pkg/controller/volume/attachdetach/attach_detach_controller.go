@@ -57,6 +57,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/csi"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
@@ -149,7 +150,7 @@ func NewAttachDetachController(
 	adc.volumeAttachmentSynced = volumeAttachmentInformer.Informer().HasSynced
 
 	if err := adc.volumePluginMgr.InitPlugins(plugins, prober, adc); err != nil {
-		return nil, fmt.Errorf("Could not initialize volume plugins for Attach/Detach Controller: %+v", err)
+		return nil, fmt.Errorf("could not initialize volume plugins for Attach/Detach Controller: %w", err)
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
@@ -165,7 +166,6 @@ func NewAttachDetachController(
 			kubeClient,
 			&adc.volumePluginMgr,
 			recorder,
-			false, // flag for experimental binary check for volume mount
 			blkutil))
 	adc.nodeStatusUpdater = statusupdater.NewNodeStatusUpdater(
 		kubeClient, nodeInformer.Lister(), adc.actualStateOfWorld)
@@ -184,7 +184,7 @@ func NewAttachDetachController(
 
 	csiTranslator := csitrans.New()
 	adc.intreeToCSITranslator = csiTranslator
-	adc.csiMigratedPluginManager = csimigration.NewPluginManager(csiTranslator)
+	adc.csiMigratedPluginManager = csimigration.NewPluginManager(csiTranslator, utilfeature.DefaultFeatureGate)
 
 	adc.desiredStateOfWorldPopulator = populator.NewDesiredStateOfWorldPopulator(
 		timerConfig.DesiredStateOfWorldPopulatorLoopSleepPeriod,
@@ -206,7 +206,7 @@ func NewAttachDetachController(
 	// This custom indexer will index pods by its PVC keys. Then we don't need
 	// to iterate all pods every time to find pods which reference given PVC.
 	if err := common.AddPodPVCIndexerIfNotPresent(adc.podIndexer); err != nil {
-		return nil, fmt.Errorf("Could not initialize attach detach controller: %v", err)
+		return nil, fmt.Errorf("could not initialize attach detach controller: %w", err)
 	}
 
 	nodeInformer.Informer().AddEventHandler(kcache.ResourceEventHandlerFuncs{
@@ -714,17 +714,45 @@ func (adc *attachDetachController) processVolumeAttachments() error {
 			klog.Errorf("Unable to lookup pv object for: %q, err: %v", *pvName, err)
 			continue
 		}
+
+		var plugin volume.AttachableVolumePlugin
 		volumeSpec := volume.NewSpecFromPersistentVolume(pv, false)
-		plugin, err := adc.volumePluginMgr.FindAttachablePluginBySpec(volumeSpec)
-		if err != nil || plugin == nil {
-			// Currently VA objects are created for CSI volumes only. nil plugin is unexpected, generate a warning
-			klog.Warningf(
-				"Skipping processing the volume %q on nodeName: %q, no attacher interface found. err=%v",
-				*pvName,
-				nodeName,
-				err)
-			continue
+
+		// Consult csiMigratedPluginManager first before querying the plugins registered during runtime in volumePluginMgr.
+		// In-tree plugins that provisioned PVs will not be registered anymore after migration to CSI, once the respective
+		// feature gate is enabled.
+		if inTreePluginName, err := adc.csiMigratedPluginManager.GetInTreePluginNameFromSpec(pv, nil); err == nil {
+			if adc.csiMigratedPluginManager.IsMigrationEnabledForPlugin(inTreePluginName) {
+				// PV is migrated and should be handled by the CSI plugin instead of the in-tree one
+				plugin, _ = adc.volumePluginMgr.FindAttachablePluginByName(csi.CSIPluginName)
+				// podNamespace is not needed here for Azurefile as the volumeName generated will be the same with or without podNamespace
+				volumeSpec, err = csimigration.TranslateInTreeSpecToCSI(volumeSpec, "" /* podNamespace */, adc.intreeToCSITranslator)
+				if err != nil {
+					klog.Errorf(
+						"Failed to translate intree volumeSpec to CSI volumeSpec for volume:%q, va.Name:%q, nodeName:%q: %s. Error: %v",
+						*pvName,
+						va.Name,
+						nodeName,
+						inTreePluginName,
+						err)
+					continue
+				}
+			}
 		}
+
+		if plugin == nil {
+			plugin, err = adc.volumePluginMgr.FindAttachablePluginBySpec(volumeSpec)
+			if err != nil || plugin == nil {
+				// Currently VA objects are created for CSI volumes only. nil plugin is unexpected, generate a warning
+				klog.Warningf(
+					"Skipping processing the volume %q on nodeName: %q, no attacher interface found. err=%v",
+					*pvName,
+					nodeName,
+					err)
+				continue
+			}
+		}
+
 		volumeName, err := volumeutil.GetUniqueVolumeNameFromSpec(plugin, volumeSpec)
 		if err != nil {
 			klog.Errorf(
@@ -827,6 +855,10 @@ func (adc *attachDetachController) GetHostIP() (net.IP, error) {
 
 func (adc *attachDetachController) GetNodeAllocatable() (v1.ResourceList, error) {
 	return v1.ResourceList{}, nil
+}
+
+func (adc *attachDetachController) GetAttachedVolumesFromNodeStatus() (map[v1.UniqueVolumeName]string, error) {
+	return map[v1.UniqueVolumeName]string{}, nil
 }
 
 func (adc *attachDetachController) GetSecretFunc() func(namespace, name string) (*v1.Secret, error) {

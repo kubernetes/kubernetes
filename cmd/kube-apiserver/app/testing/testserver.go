@@ -19,7 +19,6 @@ package testing
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"path"
@@ -28,9 +27,13 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
+	"go.etcd.io/etcd/client/pkg/v3/transport"
+	clientv3 "go.etcd.io/etcd/client/v3"
+	"google.golang.org/grpc"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
@@ -43,6 +46,13 @@ import (
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	testutil "k8s.io/kubernetes/test/utils"
 )
+
+// This key is for testing purposes only and is not considered secure.
+const ecdsaPrivateKey = `-----BEGIN EC PRIVATE KEY-----
+MHcCAQEEIEZmTmUhuanLjPA2CLquXivuwBDHTt5XYwgIr/kA1LtRoAoGCCqGSM49
+AwEHoUQDQgAEH6cuzP8XuD5wal6wf9M6xDljTOPLX2i8uIp/C/ASqiIGUeeKQtX0
+/IR3qCXyThP/dbCiHrF3v1cuhBOHY8CLVg==
+-----END EC PRIVATE KEY-----`
 
 // TearDownFunc is to be called to tear down a test server.
 type TearDownFunc func()
@@ -59,10 +69,12 @@ type TestServerInstanceOptions struct {
 
 // TestServer return values supplied by kube-test-ApiServer
 type TestServer struct {
-	ClientConfig *restclient.Config        // Rest client config
-	ServerOpts   *options.ServerRunOptions // ServerOpts
-	TearDownFn   TearDownFunc              // TearDown function
-	TmpDir       string                    // Temp Dir used, by the apiserver
+	ClientConfig      *restclient.Config        // Rest client config
+	ServerOpts        *options.ServerRunOptions // ServerOpts
+	TearDownFn        TearDownFunc              // TearDown function
+	TmpDir            string                    // Temp Dir used, by the apiserver
+	EtcdClient        *clientv3.Client          // used by tests that need to check data migrated from APIs that are no longer served
+	EtcdStoragePrefix string                    // storage prefix in etcd
 }
 
 // Logger allows t.Testing and b.Testing to be passed to StartTestServer and StartTestServerOrDie
@@ -114,7 +126,7 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 		}
 	}()
 
-	result.TmpDir, err = ioutil.TempDir("", "kubernetes-kube-apiserver")
+	result.TmpDir, err = os.MkdirTemp("", "kubernetes-kube-apiserver")
 	if err != nil {
 		return result, fmt.Errorf("failed to create temp dir: %v", err)
 	}
@@ -143,7 +155,7 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 			return result, err
 		}
 		proxyCACertFile := path.Join(s.SecureServing.ServerCert.CertDirectory, "proxy-ca.crt")
-		if err := ioutil.WriteFile(proxyCACertFile, testutil.EncodeCertPEM(proxySigningCert), 0644); err != nil {
+		if err := os.WriteFile(proxyCACertFile, testutil.EncodeCertPEM(proxySigningCert), 0644); err != nil {
 			return result, err
 		}
 		s.Authentication.RequestHeader.ClientCAFile = proxyCACertFile
@@ -156,7 +168,7 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 			return result, err
 		}
 		clientCACertFile := path.Join(s.SecureServing.ServerCert.CertDirectory, "client-ca.crt")
-		if err := ioutil.WriteFile(clientCACertFile, testutil.EncodeCertPEM(clientSigningCert), 0644); err != nil {
+		if err := os.WriteFile(clientCACertFile, testutil.EncodeCertPEM(clientSigningCert), 0644); err != nil {
 			return result, err
 		}
 		s.Authentication.ClientCert.ClientCA = clientCACertFile
@@ -177,19 +189,36 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 	if err := fs.Parse(customFlags); err != nil {
 		return result, err
 	}
+
+	saSigningKeyFile, err := os.CreateTemp("/tmp", "insecure_test_key")
+	if err != nil {
+		t.Fatalf("create temp file failed: %v", err)
+	}
+	defer os.RemoveAll(saSigningKeyFile.Name())
+	if err = os.WriteFile(saSigningKeyFile.Name(), []byte(ecdsaPrivateKey), 0666); err != nil {
+		t.Fatalf("write file %s failed: %v", saSigningKeyFile.Name(), err)
+	}
+	s.ServiceAccountSigningKeyFile = saSigningKeyFile.Name()
+	s.Authentication.ServiceAccounts.Issuers = []string{"https://foo.bar.example.com"}
+	s.Authentication.ServiceAccounts.KeyFiles = []string{saSigningKeyFile.Name()}
+
 	completedOptions, err := app.Complete(s)
 	if err != nil {
 		return result, fmt.Errorf("failed to set default ServerRunOptions: %v", err)
 	}
 
+	if errs := completedOptions.Validate(); len(errs) != 0 {
+		return result, fmt.Errorf("failed to validate ServerRunOptions: %v", utilerrors.NewAggregate(errs))
+	}
+
 	t.Logf("runtime-config=%v", completedOptions.APIEnablement.RuntimeConfig)
 	t.Logf("Starting kube-apiserver on port %d...", s.SecureServing.BindPort)
 	server, err := app.CreateServerChain(completedOptions, stopCh)
-	if instanceOptions.StorageVersionWrapFunc != nil {
-		server.GenericAPIServer.StorageVersionManager = instanceOptions.StorageVersionWrapFunc(server.GenericAPIServer.StorageVersionManager)
-	}
 	if err != nil {
 		return result, fmt.Errorf("failed to create server chain: %v", err)
+	}
+	if instanceOptions.StorageVersionWrapFunc != nil {
+		server.GenericAPIServer.StorageVersionManager = instanceOptions.StorageVersionWrapFunc(server.GenericAPIServer.StorageVersionManager)
 	}
 
 	errCh := make(chan error)
@@ -258,12 +287,36 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 		return result, fmt.Errorf("failed to wait for default namespace to be created: %v", err)
 	}
 
+	tlsInfo := transport.TLSInfo{
+		CertFile:      storageConfig.Transport.CertFile,
+		KeyFile:       storageConfig.Transport.KeyFile,
+		TrustedCAFile: storageConfig.Transport.TrustedCAFile,
+	}
+	tlsConfig, err := tlsInfo.ClientConfig()
+	if err != nil {
+		return result, err
+	}
+	etcdConfig := clientv3.Config{
+		Endpoints:   storageConfig.Transport.ServerList,
+		DialTimeout: 20 * time.Second,
+		DialOptions: []grpc.DialOption{
+			grpc.WithBlock(), // block until the underlying connection is up
+		},
+		TLS: tlsConfig,
+	}
+	etcdClient, err := clientv3.New(etcdConfig)
+	if err != nil {
+		return result, err
+	}
+
 	// from here the caller must call tearDown
 	result.ClientConfig = restclient.CopyConfig(server.GenericAPIServer.LoopbackClientConfig)
 	result.ClientConfig.QPS = 1000
 	result.ClientConfig.Burst = 10000
 	result.ServerOpts = s
 	result.TearDownFn = tearDown
+	result.EtcdClient = etcdClient
+	result.EtcdStoragePrefix = storageConfig.Prefix
 
 	return result, nil
 }

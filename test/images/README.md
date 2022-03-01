@@ -13,8 +13,8 @@ new images, test the changes made, promote the newly built staging images.
 
 In order to build the docker test images, a Linux node is required. The node will require `make`,
 `docker (version 19.03.0 or newer)`, and ``docker buildx``, which will be used to build multiarch
-images, as well as Windows images. In order to properly build multiarch and Windows images, some
-initialization is required:
+images, as well as Windows images. In order to properly build multi-arch and Windows images, some
+initialization is required (in CI this is done in [cloudbuild.yaml](cloudbuild.yaml)):
 
 ```shell
 docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
@@ -25,8 +25,7 @@ docker buildx inspect --bootstrap
 The node must be able to push the images to the desired container registry, make sure you are
 authenticated with the registry you're pushing to.
 
-
-## Making changes to images
+## Updating the tests images
 
 There are several thousands of tests in Kubernetes E2E testing. Not all of them are being run on
 new PRs, and thus, not all images are used, especially those that are not used by Conformance tests.
@@ -36,42 +35,20 @@ itself or its binaries will require the image's version to be bumped. In the cas
 which cannot be immediately resolved, the image version used in E2E tests will be reverted to the
 last known stable version.
 
-The version can easily be bumped by modifying the file `test/images/${IMAGE_NAME}/VERSION`, which will
-be used when building the image. Additionally, for the `agnhost` image, also bump the `Version` in
-`test/images/agnhost/agnhost.go`.
-
-The typical image used in E2E testing is the `agnhost` image. It contains several subcommands with
-different [functionalities](agnhost/README.md), used to validate different Kubernetes behaviours. If
+Most tests used in E2E testing suite use the `agnhost` image. It contains several subcommands with
+different [functionalities](agnhost/README.md) used to validate different Kubernetes behaviors. If
 a new functionality needs testing, consider adding an `agnhost` subcommand for it first, before
 creating an entirely separate test image.
 
-Some test images (`agnhost`) are used as bases for other images (`kitten`, `nautilus`). If the parent
-image's `VERSION` has been bumped, also bump the version in the children's `BASEIMAGE` files in order
-for base image changes to be reflected in the child images as well.
+The general process of making updates to the images is as follows:
 
-Keep in mind that the Kubernetes CI will not run with the image changes you've made. It is a good idea
-to build the image and push it to your own registry first, and run some tests that are using that image.
-For these steps, see the sections below.
+1. [Making changes to an image](#making-changes-to-an-image)
+2. [Building the image](#building-images)
+3. [Testing your changes](#testing-images)
+4. [Promoting your changes](#promoting-images)
 
-After the desired changes have been made, the affected images will have to be built and published,
-and then tested. After the pull request with those changes has been approved and merged, a postsubmit
-job will then be triggered which will build the images that were changed (for example, if a change was
-made in `test/images/agnhost`, then the job [post-kubernetes-push-e2e-agnhost-test-images](
-https://testgrid.k8s.io/sig-testing-images#post-kubernetes-push-e2e-agnhost-test-images)
- will be triggered). The image will then be pushed to the `gcr.io/k8s-staging-e2e-test-images` registry,
-from which it can then promoted to the `k8s.gcr.io/e2e-test-images` registry by adding a line in
-[kubernetes/k8s.io](https://github.com/kubernetes/k8s.io/blob/master/k8s.gcr.io/images/k8s-staging-e2e-test-images/images.yaml). For this, you will need the image manifest list's digest, which can be obtained by running:
-
-```bash
-manifest-tool inspect --raw gcr.io/k8s-staging-e2e-test-images/${IMAGE_NAME}:${VERSION} | jq '.[0].Digest'
-```
-
-All the postsubmit jobs and their logs for all the images can be seen in
-[testgrid](https://testgrid.k8s.io/sig-testing-images).
-
-The images are built through `make`. Since some images (e.g.: `busybox`) are used as a base for
-other images, it is recommended to build them first, if needed.
-
+After going through these steps your image will be used in the e2e tests. There are some additional considerations for 
+[completely new images](#creating-and-promoting-new-images) and [Windows images](#windows-test-images-considerations).
 
 ### Creating and promoting new images
 
@@ -79,7 +56,6 @@ If you intend to add an entirely different image and have it automatically built
 and used in E2E tests, you will also have to define the postsubmit prow job for it. This can easily
 be done by running [this script](https://github.com/kubernetes/test-infra/blob/master/config/jobs/image-pushing/k8s-staging-e2e-test-images.sh)
 in `kubernetes/test-infra`.
-
 
 ### Windows test images considerations
 
@@ -104,7 +80,7 @@ limitations when it comes to the Windows images:
   which won't work properly on Windows. See https://github.com/moby/buildkit/issues/1560
 - The base image for all the Windows images is nanoserver, which is ~10 times smaller than Windows Servercore.
   Most binaries added to the image will work out of the box, but some will not due to missing dependencies
-  (**atention**: the image will still build successfully, even if the added binaries will not work).
+  (**attention**: the image will still build successfully, even if the added binaries will not work).
   For example, `coredns.exe` requires `netapi32.dll`, which cannot be found on a nanoserver image, but
   we can copy it from a servercore image (see the agnhost image's `Dockerfile_windows` file as an example).
   A good rule of thumb is to use 64-bit applications instead of 32-bit as they have fewer dependencies.
@@ -118,11 +94,24 @@ the regular image building process. This helper image can be found in at `e2etea
 It can be used by anyone, but if you need to build your own, you can read more about it [here](windows/README.md).
 
 For Windows, in order to spawn process-isolated containers, the container OS version should closely match
-the host OS version. For this reason, we build test images for different Windows OS Versions: 1809, 1903,
-1909, 2004, 20H2. In order add support for a new Windows OS version, a new entry for that OS version will have
+the host OS version. For this reason, we build test images for different Windows OS Versions: 1809 (Windows Server 2019),
+2004, 20H2, ltsc2022. In order add support for a new Windows OS version, a new entry for that OS version will have
 to be first added to the `windows-servercore-cache` and `busybox` images, followed by the rest of the images.
 These images are then used by the rest of the E2E test images as a cache / base image.
 
+## Making changes to an image
+
+Make updates to the functionality of the images required for your test case and update the version number.
+
+The version can easily be bumped by modifying the file `test/images/${IMAGE_NAME}/VERSION`, which will
+be used when building the image.
+
+Some test images (`agnhost`) are used as bases for other images (`kitten`, `nautilus`). If the parent
+image's `VERSION` has been bumped, also bump the version in the children's `BASEIMAGE` files in order
+for base image changes to be reflected in the child images as well.
+
+Keep in mind that the Kubernetes CI will not run with the image changes you've made until promoted. It is a good idea
+to build the image and push it to your own registry first, and run some tests that are using that image. Continue with the steps below to build, test and promote the changes.
 
 ## Building images
 
@@ -141,7 +130,7 @@ To build AND push an image, the following command can be used:
 make all-push WHAT=agnhost
 ```
 
-By default, the images will be tagged and pushed under the `gcr.io/kubernetes-e2e-test-images`
+By default, the images will be tagged and pushed under the `k8s.gcr.io/e2e-test-images`
 registry. That can changed by running this command instead:
 
 ```bash
@@ -152,7 +141,7 @@ REGISTRY=foo_registry make all-push WHAT=agnhost
 require the `agnhost` image to be published in an authenticated repo as well:
 
 ```bash
-REGISTRY=gcr.io/kubernetes-e2e-test-images make all-push WHAT=agnhost
+REGISTRY=k8s.gcr.io/e2e-test-images make all-push WHAT=agnhost
 REGISTRY=gcr.io/k8s-authenticated-test make all-push WHAT=agnhost
 ```
 
@@ -160,7 +149,7 @@ Additionally, `WHAT=all-conformance` can be used to build / push the images most
 Conformance tests.
 
 
-## Testing the new image
+## Testing images
 
 Once the image has been built and pushed to an accesible registry, you can run the tests using that image
 by having the environment variable `KUBE_TEST_REPO_LIST` set before running the tests that are using the
@@ -174,7 +163,6 @@ export KUBE_TEST_REPO_LIST=/path/to/repo_list.yaml
 to pull the images from. Sample file:
 
 ```yaml
-e2eRegistry: your-awesome-registry
 promoterE2eRegistry: your-awesome-registry
 gcRegistry: your-awesome-registry
 sampleRegistry: your-awesome-registry
@@ -188,8 +176,29 @@ Finally, make sure to bump the image version used in E2E testing by modifying th
 ./build/run.sh make WHAT=test/e2e/e2e.test
 ```
 
-After all the above has been done, run the desired tests.
+After all the above has been done, run the [desired tests](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-testing/e2e-tests.md) to make sure your changes work.
 
+### Promoting Images
+
+Now that you have made the changes and tested locally, you are ready to share those changes.  This is a multi step process:
+
+1. Open a pull request with your changes to the test image (the new functionality and version bump). Go through the review process and merge the pull request. See this [pull request](https://github.com/kubernetes/kubernetes/pull/99860/files) for an example.
+2. After the pull request has been approved and merged, an **automatic** postsubmit
+job will then be triggered which will build the images that were changed.  For example, if a change was
+made in `test/images/agnhost`, then the job [post-kubernetes-push-e2e-agnhost-test-images](
+https://testgrid.k8s.io/sig-testing-images#post-kubernetes-push-e2e-agnhost-test-images)
+will be triggered. The postsubmit job will push the images to the `gcr.io/k8s-staging-e2e-test-images` registry. You can use the image
+from the staging registry to do more testing if required. All the postsubmit jobs and their logs for all the images can be seen in
+[testgrid](https://testgrid.k8s.io/sig-testing-images) which is helpful for troubleshooting.  Note that these images are not the same as used by the e2e jobs and still need to be promoted to the final registry.
+1. The next step is to promote the image to the `k8s.gcr.io/e2e-test-images` registry by adding a line in
+[kubernetes/k8s.io](https://github.com/kubernetes/k8s.io/blob/main/k8s.gcr.io/images/k8s-staging-e2e-test-images/images.yaml).  See this [pull request](https://github.com/kubernetes/k8s.io/pull/1804) for an example You will need the image manifest list's digest, which can be obtained by using [manifest-tool](https://github.com/estesp/manifest-tool):
+
+    ```bash
+    manifest-tool inspect --raw gcr.io/k8s-staging-e2e-test-images/${IMAGE_NAME}:${VERSION} | jq '.[0].Digest'
+    ```
+1. Finally you can open a pull request to update the e2e tests to use the newly promoted image by updating the image tag in [test/utils/image/manifest.go](../utils/image/manifest.go) file. See this [pull request](https://github.com/kubernetes/kubernetes/pull/100383/files) for an example.
+
+You have now gone through the entire process and your changes will be used by the e2e tests.
 
 ## Known issues and workarounds
 
@@ -198,3 +207,9 @@ After all the above has been done, run the desired tests.
 ```bash
 sudo chmod o+x /etc/docker
 ```
+
+A few images have been mirrored from dockerhub into the `gcr.io/k8s-staging-e2e-test-images` registry
+(`busybox`, `glusterdynamic-provisioner`, `httpd`, `httpd-new`, `nginx`, `nginx-new`, `perl`), and they
+only have a noop Dockerfile. However, due to an [issue](https://github.com/kubernetes/test-infra/issues/20884),
+the same SHA cannot be pushed twice. A small change to them is required in order to generate a new SHA,
+which can then be pushed and promoted.

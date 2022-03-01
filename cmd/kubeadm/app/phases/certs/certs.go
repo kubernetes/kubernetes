@@ -25,12 +25,14 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
+
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/util/keyutil"
 	"k8s.io/klog/v2"
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	pkiutil "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	pkiutil "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
 
 var (
@@ -303,30 +305,32 @@ type certKeyLocation struct {
 	uxName     string
 }
 
-// SharedCertificateExists verifies if the shared certificates - the certificates that must be
-// equal across control-plane nodes: ca.key, ca.crt, sa.key, sa.pub + etcd/ca.key, etcd/ca.crt if local/stacked etcd
-// Missing keys are non-fatal and produce warnings.
+// SharedCertificateExists verifies if the shared certificates exist and are still valid - the certificates must be
+// equal across control-plane nodes: ca.key, ca.crt, sa.key, sa.pub, front-proxy-ca.key, front-proxy-ca.crt and etcd/ca.key, etcd/ca.crt if local/stacked etcd
+// Missing private keys of CA are non-fatal and produce warnings.
 func SharedCertificateExists(cfg *kubeadmapi.ClusterConfiguration) (bool, error) {
-
+	var errs []error
 	if err := validateCACertAndKey(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName, "", "CA"}); err != nil {
-		return false, err
+		errs = append(errs, err)
 	}
 
 	if err := validatePrivatePublicKey(certKeyLocation{cfg.CertificatesDir, "", kubeadmconstants.ServiceAccountKeyBaseName, "service account"}); err != nil {
-		return false, err
+		errs = append(errs, err)
 	}
 
 	if err := validateCACertAndKey(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.FrontProxyCACertAndKeyBaseName, "", "front-proxy CA"}); err != nil {
-		return false, err
+		errs = append(errs, err)
 	}
 
 	// in case of local/stacked etcd
 	if cfg.Etcd.External == nil {
 		if err := validateCACertAndKey(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.EtcdCACertAndKeyBaseName, "", "etcd CA"}); err != nil {
-			return false, err
+			errs = append(errs, err)
 		}
 	}
-
+	if len(errs) != 0 {
+		return false, utilerrors.NewAggregate(errs)
+	}
 	return true, nil
 }
 
@@ -371,6 +375,38 @@ func UsingExternalFrontProxyCA(cfg *kubeadmapi.ClusterConfiguration) (bool, erro
 	}
 
 	if err := validateSignedCert(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.FrontProxyCACertAndKeyBaseName, kubeadmconstants.FrontProxyClientCertAndKeyBaseName, "front-proxy client"}); err != nil {
+		return true, err
+	}
+
+	return true, nil
+}
+
+// UsingExternalEtcdCA determines whether the user is relying on an external etcd CA. We currently implicitly determine this is the case
+// when the etcd CA Cert is present but the etcd CA Key is not.
+// In case we are using an external etcd CA, the function validates the certificates signed by etcd CA that should be provided by the user.
+func UsingExternalEtcdCA(cfg *kubeadmapi.ClusterConfiguration) (bool, error) {
+	if err := validateCACert(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.EtcdCACertAndKeyBaseName, "", "etcd CA"}); err != nil {
+		return false, err
+	}
+
+	path := filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdCAKeyName)
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		return false, nil
+	}
+
+	if err := validateSignedCert(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.EtcdCACertAndKeyBaseName, kubeadmconstants.APIServerEtcdClientCertAndKeyBaseName, "apiserver etcd client"}); err != nil {
+		return true, err
+	}
+
+	if err := validateSignedCert(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.EtcdCACertAndKeyBaseName, kubeadmconstants.EtcdServerCertAndKeyBaseName, "etcd server"}); err != nil {
+		return true, err
+	}
+
+	if err := validateSignedCert(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.EtcdCACertAndKeyBaseName, kubeadmconstants.EtcdPeerCertAndKeyBaseName, "etcd peer"}); err != nil {
+		return true, err
+	}
+
+	if err := validateSignedCert(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.EtcdCACertAndKeyBaseName, kubeadmconstants.EtcdHealthcheckClientCertAndKeyBaseName, "etcd health-check client"}); err != nil {
 		return true, err
 	}
 
@@ -477,12 +513,11 @@ func validateCertificateWithConfig(cert *x509.Certificate, baseName string, cfg 
 // by keeping track with a cache.
 func CheckCertificatePeriodValidity(baseName string, cert *x509.Certificate) {
 	certPeriodValidationMutex.Lock()
+	defer certPeriodValidationMutex.Unlock()
 	if _, exists := certPeriodValidation[baseName]; exists {
-		certPeriodValidationMutex.Unlock()
 		return
 	}
 	certPeriodValidation[baseName] = struct{}{}
-	certPeriodValidationMutex.Unlock()
 
 	klog.V(5).Infof("validating certificate period for %s certificate", baseName)
 	if err := pkiutil.ValidateCertPeriod(cert, 0); err != nil {

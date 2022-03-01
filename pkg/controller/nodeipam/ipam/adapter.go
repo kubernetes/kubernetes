@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -25,6 +26,7 @@ import (
 	"net"
 
 	"k8s.io/klog/v2"
+	netutils "k8s.io/utils/net"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,7 +34,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/record"
-	nodeutil "k8s.io/kubernetes/pkg/util/node"
+	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/legacy-cloud-providers/gce"
 	"k8s.io/metrics/pkg/client/clientset/versioned/scheme"
 )
@@ -80,7 +82,7 @@ func (a *adapter) Alias(ctx context.Context, node *v1.Node) (*net.IPNet, error) 
 		klog.Warningf("Node %q has more than one alias assigned (%v), defaulting to the first", node.Name, cidrs)
 	}
 
-	_, cidrRange, err := net.ParseCIDR(cidrs[0])
+	_, cidrRange, err := netutils.ParseCIDRSloppy(cidrs[0])
 	if err != nil {
 		return nil, err
 	}

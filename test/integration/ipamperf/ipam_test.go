@@ -19,13 +19,13 @@ package ipamperf
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"testing"
 	"time"
 
 	"k8s.io/klog/v2"
+	netutils "k8s.io/utils/net"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/informers"
@@ -100,7 +100,7 @@ func logResults(allResults []*Results) {
 	}
 	if resultsLogFile != "" {
 		klog.Infof("Logging results to %s", resultsLogFile)
-		if err := ioutil.WriteFile(resultsLogFile, jStr, os.FileMode(0644)); err != nil {
+		if err := os.WriteFile(resultsLogFile, jStr, os.FileMode(0644)); err != nil {
 			klog.Errorf("Error logging results to %s: %v", resultsLogFile, err)
 		}
 	}
@@ -114,11 +114,11 @@ func TestPerformance(t *testing.T) {
 		t.Skip("Skipping because we want to run short tests")
 	}
 
-	apiURL, masterShutdown := util.StartApiserver()
-	defer masterShutdown()
+	apiURL, apiserverShutdown := util.StartApiserver()
+	defer apiserverShutdown()
 
-	_, clusterCIDR, _ := net.ParseCIDR("10.96.0.0/11") // allows up to 8K nodes
-	_, serviceCIDR, _ := net.ParseCIDR("10.94.0.0/24") // does not matter for test - pick upto  250 services
+	_, clusterCIDR, _ := netutils.ParseCIDRSloppy("10.96.0.0/11") // allows up to 8K nodes
+	_, serviceCIDR, _ := netutils.ParseCIDRSloppy("10.94.0.0/24") // does not matter for test - pick upto  250 services
 	subnetMaskSize := 24
 
 	var (

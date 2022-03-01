@@ -18,63 +18,86 @@ package proxy
 
 import (
 	v1 "k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 )
 
-// FilterTopologyEndpoint returns the appropriate endpoints based on the cluster
-// topology.
-// This uses the current node's labels, which contain topology information, and
-// the required topologyKeys to find appropriate endpoints. If both the endpoint's
-// topology and the current node have matching values for topologyKeys[0], the
-// endpoint will be chosen.  If no endpoints are chosen, toplogyKeys[1] will be
-// considered, and so on.  If either the node or the endpoint do not have values
-// for a key, it is considered to not match.
-//
-// If topologyKeys is specified, but no endpoints are chosen for any key, the
-// the service has no viable endpoints for clients on this node, and connections
-// should fail.
-//
-// The special key "*" may be used as the last entry in topologyKeys to indicate
-// "any endpoint" is acceptable.
-//
-// If topologyKeys is not specified or empty, no topology constraints will be
-// applied and this will return all endpoints.
-func FilterTopologyEndpoint(nodeLabels map[string]string, topologyKeys []string, endpoints []Endpoint) []Endpoint {
-	// Do not filter endpoints if service has no topology keys.
-	if len(topologyKeys) == 0 {
+// FilterEndpoints filters endpoints based on Service configuration, node
+// labels, and enabled feature gates. This is primarily used to enable topology
+// aware routing.
+func FilterEndpoints(endpoints []Endpoint, svcInfo ServicePort, nodeLabels map[string]string) []Endpoint {
+	if svcInfo.NodeLocalExternal() {
 		return endpoints
 	}
 
-	filteredEndpoint := []Endpoint{}
-
-	if len(nodeLabels) == 0 {
-		if topologyKeys[len(topologyKeys)-1] == v1.TopologyKeyAny {
-			// edge case: include all endpoints if topology key "Any" specified
-			// when we cannot determine current node's topology.
-			return endpoints
-		}
-		// edge case: do not include any endpoints if topology key "Any" is
-		// not specified when we cannot determine current node's topology.
-		return filteredEndpoint
+	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceInternalTrafficPolicy) && svcInfo.NodeLocalInternal() {
+		return FilterLocalEndpoint(endpoints)
 	}
 
-	for _, key := range topologyKeys {
-		if key == v1.TopologyKeyAny {
-			return endpoints
+	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareHints) {
+		return filterEndpointsWithHints(endpoints, svcInfo.HintsAnnotation(), nodeLabels)
+	}
+
+	return endpoints
+}
+
+// filterEndpointsWithHints provides filtering based on the hints included in
+// EndpointSlices. If any of the following are true, the full list of endpoints
+// will be returned without any filtering:
+// * The AnnotationTopologyAwareHints annotation is not set to "Auto" for this
+//   Service.
+// * No zone is specified in node labels.
+// * No endpoints for this Service have a hint pointing to the zone this
+//   instance of kube-proxy is running in.
+// * One or more endpoints for this Service do not have hints specified.
+func filterEndpointsWithHints(endpoints []Endpoint, hintsAnnotation string, nodeLabels map[string]string) []Endpoint {
+	if hintsAnnotation != "Auto" && hintsAnnotation != "auto" {
+		if hintsAnnotation != "" && hintsAnnotation != "Disabled" && hintsAnnotation != "disabled" {
+			klog.InfoS("Skipping topology aware endpoint filtering since Service has unexpected value", "annotationTopologyAwareHints", v1.AnnotationTopologyAwareHints, "hints", hintsAnnotation)
 		}
-		topologyValue, found := nodeLabels[key]
-		if !found {
+		return endpoints
+	}
+
+	zone, ok := nodeLabels[v1.LabelTopologyZone]
+	if !ok || zone == "" {
+		klog.InfoS("Skipping topology aware endpoint filtering since node is missing label", "label", v1.LabelTopologyZone)
+		return endpoints
+	}
+
+	filteredEndpoints := []Endpoint{}
+
+	for _, endpoint := range endpoints {
+		if !endpoint.IsReady() {
 			continue
 		}
-
-		for _, ep := range endpoints {
-			topology := ep.GetTopology()
-			if value, found := topology[key]; found && value == topologyValue {
-				filteredEndpoint = append(filteredEndpoint, ep)
-			}
+		if endpoint.GetZoneHints().Len() == 0 {
+			klog.InfoS("Skipping topology aware endpoint filtering since one or more endpoints is missing a zone hint")
+			return endpoints
 		}
-		if len(filteredEndpoint) > 0 {
-			return filteredEndpoint
+		if endpoint.GetZoneHints().Has(zone) {
+			filteredEndpoints = append(filteredEndpoints, endpoint)
 		}
 	}
-	return filteredEndpoint
+
+	if len(filteredEndpoints) == 0 {
+		klog.InfoS("Skipping topology aware endpoint filtering since no hints were provided for zone", "zone", zone)
+		return endpoints
+	}
+
+	return filteredEndpoints
+}
+
+// FilterLocalEndpoint returns the node local endpoints
+func FilterLocalEndpoint(endpoints []Endpoint) []Endpoint {
+	var filteredEndpoints []Endpoint
+
+	// Get all the local endpoints
+	for _, ep := range endpoints {
+		if ep.GetIsLocal() {
+			filteredEndpoints = append(filteredEndpoints, ep)
+		}
+	}
+
+	return filteredEndpoints
 }

@@ -20,6 +20,8 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -28,6 +30,7 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	applyconfigurationscorev1 "k8s.io/client-go/applyconfigurations/core/v1"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -118,7 +121,7 @@ func (c *FakeReplicationControllers) UpdateStatus(ctx context.Context, replicati
 // Delete takes name of the replicationController and deletes it. Returns an error if one occurs.
 func (c *FakeReplicationControllers) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(replicationcontrollersResource, c.ns, name), &corev1.ReplicationController{})
+		Invokes(testing.NewDeleteActionWithOptions(replicationcontrollersResource, c.ns, name, opts), &corev1.ReplicationController{})
 
 	return err
 }
@@ -135,6 +138,51 @@ func (c *FakeReplicationControllers) DeleteCollection(ctx context.Context, opts 
 func (c *FakeReplicationControllers) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *corev1.ReplicationController, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(replicationcontrollersResource, c.ns, name, pt, data, subresources...), &corev1.ReplicationController{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*corev1.ReplicationController), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied replicationController.
+func (c *FakeReplicationControllers) Apply(ctx context.Context, replicationController *applyconfigurationscorev1.ReplicationControllerApplyConfiguration, opts v1.ApplyOptions) (result *corev1.ReplicationController, err error) {
+	if replicationController == nil {
+		return nil, fmt.Errorf("replicationController provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(replicationController)
+	if err != nil {
+		return nil, err
+	}
+	name := replicationController.Name
+	if name == nil {
+		return nil, fmt.Errorf("replicationController.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(replicationcontrollersResource, c.ns, *name, types.ApplyPatchType, data), &corev1.ReplicationController{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*corev1.ReplicationController), err
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *FakeReplicationControllers) ApplyStatus(ctx context.Context, replicationController *applyconfigurationscorev1.ReplicationControllerApplyConfiguration, opts v1.ApplyOptions) (result *corev1.ReplicationController, err error) {
+	if replicationController == nil {
+		return nil, fmt.Errorf("replicationController provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(replicationController)
+	if err != nil {
+		return nil, err
+	}
+	name := replicationController.Name
+	if name == nil {
+		return nil, fmt.Errorf("replicationController.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(replicationcontrollersResource, c.ns, *name, types.ApplyPatchType, data, "status"), &corev1.ReplicationController{})
 
 	if obj == nil {
 		return nil, err

@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	v1helper "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
 // NodeUnschedulable plugin filters nodes that set node.Spec.Unschedulable=true unless
@@ -31,9 +32,10 @@ type NodeUnschedulable struct {
 }
 
 var _ framework.FilterPlugin = &NodeUnschedulable{}
+var _ framework.EnqueueExtensions = &NodeUnschedulable{}
 
 // Name is the name of the plugin used in the plugin registry and configurations.
-const Name = "NodeUnschedulable"
+const Name = names.NodeUnschedulable
 
 const (
 	// ErrReasonUnknownCondition is used for NodeUnknownCondition predicate error.
@@ -41,6 +43,14 @@ const (
 	// ErrReasonUnschedulable is used for NodeUnschedulable predicate error.
 	ErrReasonUnschedulable = "node(s) were unschedulable"
 )
+
+// EventsToRegister returns the possible events that may make a Pod
+// failed by this plugin schedulable.
+func (pl *NodeUnschedulable) EventsToRegister() []framework.ClusterEvent {
+	return []framework.ClusterEvent{
+		{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeTaint},
+	}
+}
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *NodeUnschedulable) Name() string {

@@ -73,8 +73,13 @@ func LoadPolicyFromBytes(policyDef []byte) (*auditinternal.Policy, error) {
 	}
 
 	// Ensure the policy file contained an apiVersion and kind.
-	if !apiGroupVersionSet[schema.GroupVersion{Group: gvk.Group, Version: gvk.Version}] {
+	gv := schema.GroupVersion{Group: gvk.Group, Version: gvk.Version}
+	if !apiGroupVersionSet[gv] {
 		return nil, fmt.Errorf("unknown group version field %v in policy", gvk)
+	}
+
+	if gv != auditv1.SchemeGroupVersion {
+		klog.Warningf("%q is deprecated and will be removed in a future release, use %q instead", gv, auditv1.SchemeGroupVersion)
 	}
 
 	if err := validation.ValidatePolicy(policy); err != nil {

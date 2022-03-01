@@ -1,2 +1,4 @@
 logrus
 vendor
+
+.idea/

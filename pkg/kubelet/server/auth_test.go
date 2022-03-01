@@ -131,13 +131,9 @@ func AuthzTestCases() []AuthzTestCase {
 		"/portForward/{podNamespace}/{podID}/{uid}":         "proxy",
 		"/run/{podNamespace}/{podID}/{containerName}":       "proxy",
 		"/run/{podNamespace}/{podID}/{uid}/{containerName}": "proxy",
-		"/runningpods/":    "proxy",
-		"/spec/":           "spec",
-		"/stats/":          "stats",
-		"/stats/container": "stats",
-		"/stats/summary":   "stats",
-		"/stats/{namespace}/{podName}/{uid}/{containerName}": "stats",
-		"/stats/{podName}/{containerName}":                   "stats",
+		"/runningpods/":  "proxy",
+		"/stats/":        "stats",
+		"/stats/summary": "stats",
 	}
 	testCases := []AuthzTestCase{}
 	for path, subresource := range testPaths {

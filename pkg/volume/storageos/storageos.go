@@ -328,17 +328,10 @@ var _ volume.Mounter = &storageosMounter{}
 
 func (b *storageosMounter) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:        b.readOnly,
-		Managed:         !b.readOnly,
-		SupportsSELinux: true,
+		ReadOnly:       b.readOnly,
+		Managed:        !b.readOnly,
+		SELinuxRelabel: true,
 	}
-}
-
-// Checks prior to mount operations to verify that the required components (binaries, etc.)
-// to mount the volume are available on the underlying node.
-// If not, it returns an error
-func (b *storageosMounter) CanMount() error {
-	return nil
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
@@ -452,7 +445,7 @@ func getVolumeInfo(pvName string, podUID types.UID, host volume.VolumeHost) (str
 	volumeDir := filepath.Dir(host.GetPodVolumeDir(podUID, utilstrings.EscapeQualifiedName(storageosPluginName), pvName))
 	files, err := ioutil.ReadDir(volumeDir)
 	if err != nil {
-		return "", "", fmt.Errorf("Could not read mounts from pod volume dir: %s", err)
+		return "", "", fmt.Errorf("could not read mounts from pod volume dir: %s", err)
 	}
 	for _, f := range files {
 		if f.Mode().IsDir() && strings.HasPrefix(f.Name(), pvName+".") {
@@ -461,7 +454,7 @@ func getVolumeInfo(pvName string, podUID types.UID, host volume.VolumeHost) (str
 			}
 		}
 	}
-	return "", "", fmt.Errorf("Could not get info from unmounted pv %q at %q", pvName, volumeDir)
+	return "", "", fmt.Errorf("could not get info from unmounted pv %q at %q", pvName, volumeDir)
 }
 
 // Splits the volume ref on "." to return the volNamespace and pvName.  Neither
@@ -570,7 +563,7 @@ type storageosProvisioner struct {
 var _ volume.Provisioner = &storageosProvisioner{}
 
 func (c *storageosProvisioner) Provision(selectedNode *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (*v1.PersistentVolume, error) {
-	if !util.AccessModesContainedInAll(c.plugin.GetAccessModes(), c.options.PVC.Spec.AccessModes) {
+	if !util.ContainsAllAccessModes(c.plugin.GetAccessModes(), c.options.PVC.Spec.AccessModes) {
 		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", c.options.PVC.Spec.AccessModes, c.plugin.GetAccessModes())
 	}
 	if util.CheckPersistentVolumeClaimModeBlock(c.options.PVC) {

@@ -148,3 +148,65 @@ func TestPodDisruptionBudgetStatusStrategy(t *testing.T) {
 		t.Errorf("Unexpected error %v", errs)
 	}
 }
+
+func TestPodDisruptionBudgetStatusValidationByApiVersion(t *testing.T) {
+	testCases := map[string]struct {
+		apiVersion string
+		validation bool
+	}{
+		"policy/v1beta1 should not do update validation": {
+			apiVersion: "v1beta1",
+			validation: false,
+		},
+		"policy/v1 should do update validation": {
+			apiVersion: "v1",
+			validation: true,
+		},
+		"policy/some-version should do update validation": {
+			apiVersion: "some-version",
+			validation: true,
+		},
+	}
+
+	for tn, tc := range testCases {
+		t.Run(tn, func(t *testing.T) {
+			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(),
+				&genericapirequest.RequestInfo{
+					APIGroup:   "policy",
+					APIVersion: tc.apiVersion,
+				})
+
+			oldMaxUnavailable := intstr.FromInt(2)
+			newMaxUnavailable := intstr.FromInt(3)
+			oldPdb := &policy.PodDisruptionBudget{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault, ResourceVersion: "10"},
+				Spec: policy.PodDisruptionBudgetSpec{
+					Selector:       &metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}},
+					MaxUnavailable: &oldMaxUnavailable,
+				},
+				Status: policy.PodDisruptionBudgetStatus{
+					DisruptionsAllowed: 1,
+				},
+			}
+			newPdb := &policy.PodDisruptionBudget{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault, ResourceVersion: "9"},
+				Spec: policy.PodDisruptionBudgetSpec{
+					Selector:     &metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}},
+					MinAvailable: &newMaxUnavailable,
+				},
+				Status: policy.PodDisruptionBudgetStatus{
+					DisruptionsAllowed: -1, // This is not allowed, so should trigger validation error.
+				},
+			}
+
+			errs := StatusStrategy.ValidateUpdate(ctx, newPdb, oldPdb)
+			hasErrors := len(errs) > 0
+			if !tc.validation && hasErrors {
+				t.Errorf("Validation failed when no validation should happen")
+			}
+			if tc.validation && !hasErrors {
+				t.Errorf("Expected validation errors but didn't get any")
+			}
+		})
+	}
+}

@@ -28,16 +28,18 @@ import (
 type buildManagerInfoManager struct {
 	fieldManager Manager
 	groupVersion schema.GroupVersion
+	subresource  string
 }
 
 var _ Manager = &buildManagerInfoManager{}
 
 // NewBuildManagerInfoManager creates a new Manager that converts the manager name into a unique identifier
 // combining operation and version for update requests, and just operation for apply requests.
-func NewBuildManagerInfoManager(f Manager, gv schema.GroupVersion) Manager {
+func NewBuildManagerInfoManager(f Manager, gv schema.GroupVersion, subresource string) Manager {
 	return &buildManagerInfoManager{
 		fieldManager: f,
 		groupVersion: gv,
+		subresource:  subresource,
 	}
 }
 
@@ -61,9 +63,10 @@ func (f *buildManagerInfoManager) Apply(liveObj, appliedObj runtime.Object, mana
 
 func (f *buildManagerInfoManager) buildManagerInfo(prefix string, operation metav1.ManagedFieldsOperationType) (string, error) {
 	managerInfo := metav1.ManagedFieldsEntry{
-		Manager:    prefix,
-		Operation:  operation,
-		APIVersion: f.groupVersion.String(),
+		Manager:     prefix,
+		Operation:   operation,
+		APIVersion:  f.groupVersion.String(),
+		Subresource: f.subresource,
 	}
 	if managerInfo.Manager == "" {
 		managerInfo.Manager = "unknown"

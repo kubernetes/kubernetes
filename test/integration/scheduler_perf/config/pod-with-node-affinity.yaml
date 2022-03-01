@@ -14,7 +14,7 @@ spec:
             - zone1
             - zone2
   containers:
-  - image: k8s.gcr.io/pause:3.4.1
+  - image: k8s.gcr.io/pause:3.6
     name: pause
     ports:
     - containerPort: 80

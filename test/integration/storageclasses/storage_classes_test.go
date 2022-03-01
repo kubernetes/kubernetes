@@ -36,7 +36,7 @@ const provisionerPluginName = "kubernetes.io/mock-provisioner"
 
 // TestStorageClasses tests apiserver-side behavior of creation of storage class objects and their use by pvcs.
 func TestStorageClasses(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(nil)
+	_, s, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})

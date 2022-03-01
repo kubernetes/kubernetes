@@ -23,20 +23,24 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	types "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/network/common"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
 )
 
-var _ = SIGDescribe("EndpointSlice", func() {
+var _ = common.SIGDescribe("EndpointSlice", func() {
 	f := framework.NewDefaultFramework("endpointslice")
 
 	var cs clientset.Interface
@@ -47,29 +51,52 @@ var _ = SIGDescribe("EndpointSlice", func() {
 		podClient = f.PodClient()
 	})
 
-	ginkgo.It("should have Endpoints and EndpointSlices pointing to API Server", func() {
+	/*
+		Release: v1.21
+		Testname: EndpointSlice API
+		Description: The discovery.k8s.io API group MUST exist in the /apis discovery document.
+		The discovery.k8s.io/v1 API group/version MUST exist in the /apis/discovery.k8s.io discovery document.
+		The endpointslices resource MUST exist in the /apis/discovery.k8s.io/v1 discovery document.
+		The cluster MUST have a service named "kubernetes" on the default namespace referencing the API servers.
+		The "kubernetes.default" service MUST have Endpoints and EndpointSlices pointing to each API server instance.
+	*/
+	framework.ConformanceIt("should have Endpoints and EndpointSlices pointing to API Server", func() {
 		namespace := "default"
 		name := "kubernetes"
+		// verify "kubernetes.default" service exist
+		_, err := cs.CoreV1().Services(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+		framework.ExpectNoError(err, "error obtaining API server \"kubernetes\" Service resource on \"default\" namespace")
+
+		// verify Endpoints for the API servers exist
 		endpoints, err := cs.CoreV1().Endpoints(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-		framework.ExpectNoError(err, "error creating Endpoints resource")
-		if len(endpoints.Subsets) != 1 {
-			framework.Failf("Expected 1 subset in endpoints, got %d: %#v", len(endpoints.Subsets), endpoints.Subsets)
+		framework.ExpectNoError(err, "error obtaining API server \"kubernetes\" Endpoint resource on \"default\" namespace")
+		if len(endpoints.Subsets) == 0 {
+			framework.Failf("Expected at least 1 subset in endpoints, got %d: %#v", len(endpoints.Subsets), endpoints.Subsets)
+		}
+		// verify EndpointSlices for the API servers exist
+		endpointSliceList, err := cs.DiscoveryV1().EndpointSlices(namespace).List(context.TODO(), metav1.ListOptions{
+			LabelSelector: "kubernetes.io/service-name=" + name,
+		})
+		framework.ExpectNoError(err, "error obtaining API server \"kubernetes\" EndpointSlice resource on \"default\" namespace")
+		if len(endpointSliceList.Items) == 0 {
+			framework.Failf("Expected at least 1 EndpointSlice, got %d: %#v", len(endpoints.Subsets), endpoints.Subsets)
 		}
 
-		endpointSubset := endpoints.Subsets[0]
-		endpointSlice, err := cs.DiscoveryV1beta1().EndpointSlices(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-		framework.ExpectNoError(err, "error creating EndpointSlice resource")
-		if len(endpointSlice.Ports) != len(endpointSubset.Ports) {
-			framework.Failf("Expected EndpointSlice to have %d ports, got %d: %#v", len(endpointSubset.Ports), len(endpointSlice.Ports), endpointSlice.Ports)
-		}
-		numExpectedEndpoints := len(endpointSubset.Addresses) + len(endpointSubset.NotReadyAddresses)
-		if len(endpointSlice.Endpoints) != numExpectedEndpoints {
-			framework.Failf("Expected EndpointSlice to have %d endpoints, got %d: %#v", numExpectedEndpoints, len(endpointSlice.Endpoints), endpointSlice.Endpoints)
+		if !endpointSlicesEqual(endpoints, endpointSliceList) {
+			framework.Failf("Expected EndpointSlice to have same addresses and port as Endpoints, got %#v: %#v", endpoints, endpointSliceList)
 		}
 
 	})
 
-	ginkgo.It("should create and delete Endpoints and EndpointSlices for a Service with a selector specified", func() {
+	/*
+		Release: v1.21
+		Testname: EndpointSlice API
+		Description: The discovery.k8s.io API group MUST exist in the /apis discovery document.
+		The discovery.k8s.io/v1 API group/version MUST exist in the /apis/discovery.k8s.io discovery document.
+		The endpointslices resource MUST exist in the /apis/discovery.k8s.io/v1 discovery document.
+		The endpointslice controller should create and delete EndpointSlices for Pods matching a Service.
+	*/
+	framework.ConformanceIt("should create and delete Endpoints and EndpointSlices for a Service with a selector specified", func() {
 		svc := createServiceReportErr(cs, f.Namespace.Name, &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "example-empty-selector",
@@ -98,9 +125,9 @@ var _ = SIGDescribe("EndpointSlice", func() {
 		}
 
 		// Expect EndpointSlice resource to be created.
-		var endpointSlice discoveryv1beta1.EndpointSlice
+		var endpointSlice discoveryv1.EndpointSlice
 		if err := wait.PollImmediate(2*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
-			endpointSliceList, err := cs.DiscoveryV1beta1().EndpointSlices(svc.Namespace).List(context.TODO(), metav1.ListOptions{
+			endpointSliceList, err := cs.DiscoveryV1().EndpointSlices(svc.Namespace).List(context.TODO(), metav1.ListOptions{
 				LabelSelector: "kubernetes.io/service-name=" + svc.Name,
 			})
 			if err != nil {
@@ -116,12 +143,12 @@ var _ = SIGDescribe("EndpointSlice", func() {
 		}
 
 		// Ensure EndpointSlice has expected values.
-		managedBy, ok := endpointSlice.Labels[discoveryv1beta1.LabelManagedBy]
+		managedBy, ok := endpointSlice.Labels[discoveryv1.LabelManagedBy]
 		expectedManagedBy := "endpointslice-controller.k8s.io"
 		if !ok {
-			framework.Failf("Expected EndpointSlice to have %s label, got %#v", discoveryv1beta1.LabelManagedBy, endpointSlice.Labels)
+			framework.Failf("Expected EndpointSlice to have %s label, got %#v", discoveryv1.LabelManagedBy, endpointSlice.Labels)
 		} else if managedBy != expectedManagedBy {
-			framework.Failf("Expected EndpointSlice to have %s label with %s value, got %s", discoveryv1beta1.LabelManagedBy, expectedManagedBy, managedBy)
+			framework.Failf("Expected EndpointSlice to have %s label with %s value, got %s", discoveryv1.LabelManagedBy, expectedManagedBy, managedBy)
 		}
 		if len(endpointSlice.Endpoints) != 0 {
 			framework.Failf("Expected EndpointSlice to have 0 endpoints, got %d: %#v", len(endpointSlice.Endpoints), endpointSlice.Endpoints)
@@ -149,7 +176,7 @@ var _ = SIGDescribe("EndpointSlice", func() {
 		// and may need to retry informer resync at some point during an e2e
 		// run.
 		if err := wait.PollImmediate(2*time.Second, 90*time.Second, func() (bool, error) {
-			endpointSliceList, err := cs.DiscoveryV1beta1().EndpointSlices(svc.Namespace).List(context.TODO(), metav1.ListOptions{
+			endpointSliceList, err := cs.DiscoveryV1().EndpointSlices(svc.Namespace).List(context.TODO(), metav1.ListOptions{
 				LabelSelector: "kubernetes.io/service-name=" + svc.Name,
 			})
 			if err != nil {
@@ -164,7 +191,15 @@ var _ = SIGDescribe("EndpointSlice", func() {
 		}
 	})
 
-	ginkgo.It("should create Endpoints and EndpointSlices for Pods matching a Service", func() {
+	/*
+		Release: v1.21
+		Testname: EndpointSlice API
+		Description: The discovery.k8s.io API group MUST exist in the /apis discovery document.
+		The discovery.k8s.io/v1 API group/version MUST exist in the /apis/discovery.k8s.io discovery document.
+		The endpointslices resource MUST exist in the /apis/discovery.k8s.io/v1 discovery document.
+		The endpointslice controller must create EndpointSlices for Pods mataching a Service.
+	*/
+	framework.ConformanceIt("should create Endpoints and EndpointSlices for Pods matching a Service", func() {
 		labelPod1 := "pod1"
 		labelPod2 := "pod2"
 		labelPod3 := "pod3"
@@ -303,6 +338,189 @@ var _ = SIGDescribe("EndpointSlice", func() {
 		deleteEndpointSlices(cs, f.Namespace.Name, svc2)
 		expectEndpointsAndSlices(cs, f.Namespace.Name, svc2, []*v1.Pod{pod1, pod2}, 2, 2, true)
 	})
+
+	/*
+		Release: v1.21
+		Testname: EndpointSlice API
+		Description: The discovery.k8s.io API group MUST exist in the /apis discovery document.
+		The discovery.k8s.io/v1 API group/version MUST exist in the /apis/discovery.k8s.io discovery document.
+		The endpointslices resource MUST exist in the /apis/discovery.k8s.io/v1 discovery document.
+		The endpointslices resource must support create, get, list, watch, update, patch, delete, and deletecollection.
+	*/
+	framework.ConformanceIt("should support creating EndpointSlice API operations", func() {
+		// Setup
+		ns := f.Namespace.Name
+		epsVersion := "v1"
+		epsClient := f.ClientSet.DiscoveryV1().EndpointSlices(ns)
+
+		epsTemplate := &discoveryv1.EndpointSlice{
+			ObjectMeta: metav1.ObjectMeta{GenerateName: "e2e-example-ing",
+				Labels: map[string]string{
+					"special-label": f.UniqueName,
+				}},
+			AddressType: discoveryv1.AddressTypeIPv4,
+			Endpoints: []discoveryv1.Endpoint{
+				{Addresses: []string{"1.2.3.4", "5.6.7.8"}},
+				{Addresses: []string{"2.2.3.4", "6.6.7.8"}},
+			},
+		}
+		// Discovery
+		ginkgo.By("getting /apis")
+		{
+			discoveryGroups, err := f.ClientSet.Discovery().ServerGroups()
+			framework.ExpectNoError(err)
+			found := false
+			for _, group := range discoveryGroups.Groups {
+				if group.Name == discoveryv1.GroupName {
+					for _, version := range group.Versions {
+						if version.Version == epsVersion {
+							found = true
+							break
+						}
+					}
+				}
+			}
+			if !found {
+				framework.Failf("expected discovery API group/version, got %#v", discoveryGroups.Groups)
+			}
+		}
+
+		ginkgo.By("getting /apis/discovery.k8s.io")
+		{
+			group := &metav1.APIGroup{}
+			err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis/discovery.k8s.io").Do(context.TODO()).Into(group)
+			framework.ExpectNoError(err)
+			found := false
+			for _, version := range group.Versions {
+				if version.Version == epsVersion {
+					found = true
+					break
+				}
+			}
+			if !found {
+				framework.Failf("expected discovery API version, got %#v", group.Versions)
+			}
+		}
+
+		ginkgo.By("getting /apis/discovery.k8s.io" + epsVersion)
+		{
+			resources, err := f.ClientSet.Discovery().ServerResourcesForGroupVersion(discoveryv1.SchemeGroupVersion.String())
+			framework.ExpectNoError(err)
+			foundEPS := false
+			for _, resource := range resources.APIResources {
+				switch resource.Name {
+				case "endpointslices":
+					foundEPS = true
+				}
+			}
+			if !foundEPS {
+				framework.Failf("expected endpointslices, got %#v", resources.APIResources)
+			}
+		}
+
+		// EndpointSlice resource create/read/update/watch verbs
+		ginkgo.By("creating")
+		_, err := epsClient.Create(context.TODO(), epsTemplate, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+		_, err = epsClient.Create(context.TODO(), epsTemplate, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+		createdEPS, err := epsClient.Create(context.TODO(), epsTemplate, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("getting")
+		queriedEPS, err := epsClient.Get(context.TODO(), createdEPS.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+		framework.ExpectEqual(queriedEPS.UID, createdEPS.UID)
+
+		ginkgo.By("listing")
+		epsList, err := epsClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
+		framework.ExpectNoError(err)
+		framework.ExpectEqual(len(epsList.Items), 3, "filtered list should have 3 items")
+
+		ginkgo.By("watching")
+		framework.Logf("starting watch")
+		epsWatch, err := epsClient.Watch(context.TODO(), metav1.ListOptions{ResourceVersion: epsList.ResourceVersion, LabelSelector: "special-label=" + f.UniqueName})
+		framework.ExpectNoError(err)
+
+		// Test cluster-wide list and watch
+		clusterEPSClient := f.ClientSet.DiscoveryV1().EndpointSlices("")
+		ginkgo.By("cluster-wide listing")
+		clusterEPSList, err := clusterEPSClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
+		framework.ExpectNoError(err)
+		framework.ExpectEqual(len(clusterEPSList.Items), 3, "filtered list should have 3 items")
+
+		ginkgo.By("cluster-wide watching")
+		framework.Logf("starting watch")
+		_, err = clusterEPSClient.Watch(context.TODO(), metav1.ListOptions{ResourceVersion: epsList.ResourceVersion, LabelSelector: "special-label=" + f.UniqueName})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("patching")
+		patchedEPS, err := epsClient.Patch(context.TODO(), createdEPS.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"patched":"true"}}}`), metav1.PatchOptions{})
+		framework.ExpectNoError(err)
+		framework.ExpectEqual(patchedEPS.Annotations["patched"], "true", "patched object should have the applied annotation")
+
+		ginkgo.By("updating")
+		var epsToUpdate, updatedEPS *discoveryv1.EndpointSlice
+		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			epsToUpdate, err = epsClient.Get(context.TODO(), createdEPS.Name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			epsToUpdate.Annotations["updated"] = "true"
+			updatedEPS, err = epsClient.Update(context.TODO(), epsToUpdate, metav1.UpdateOptions{})
+			return err
+		})
+		framework.ExpectNoError(err)
+		framework.ExpectEqual(updatedEPS.Annotations["updated"], "true", "updated object should have the applied annotation")
+
+		framework.Logf("waiting for watch events with expected annotations")
+		for sawAnnotations := false; !sawAnnotations; {
+			select {
+			case evt, ok := <-epsWatch.ResultChan():
+				if !ok {
+					framework.Fail("watch channel should not close")
+				}
+				framework.ExpectEqual(evt.Type, watch.Modified)
+				watchedEPS, isEPS := evt.Object.(*discoveryv1.EndpointSlice)
+				if !isEPS {
+					framework.Failf("expected EndpointSlice, got %T", evt.Object)
+				}
+				if watchedEPS.Annotations["patched"] == "true" {
+					framework.Logf("saw patched and updated annotations")
+					sawAnnotations = true
+					epsWatch.Stop()
+				} else {
+					framework.Logf("missing expected annotations, waiting: %#v", watchedEPS.Annotations)
+				}
+			case <-time.After(wait.ForeverTestTimeout):
+				framework.Fail("timed out waiting for watch event")
+			}
+		}
+
+		ginkgo.By("deleting")
+
+		err = epsClient.Delete(context.TODO(), createdEPS.Name, metav1.DeleteOptions{})
+		framework.ExpectNoError(err)
+		_, err = epsClient.Get(context.TODO(), createdEPS.Name, metav1.GetOptions{})
+		if !apierrors.IsNotFound(err) {
+			framework.Failf("expected 404, got %v", err)
+		}
+		epsList, err = epsClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
+		framework.ExpectNoError(err)
+		framework.ExpectEqual(len(epsList.Items), 2, "filtered list should have 2 items")
+		for _, eps := range epsList.Items {
+			if eps.Namespace == createdEPS.Namespace && eps.Name == createdEPS.Name {
+				framework.Fail("listing after deleting createdEPS")
+			}
+		}
+
+		ginkgo.By("deleting a collection")
+		err = epsClient.DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
+		framework.ExpectNoError(err)
+		epsList, err = epsClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
+		framework.ExpectNoError(err)
+		framework.ExpectEqual(len(epsList.Items), 0, "filtered list should have 0 items")
+	})
 })
 
 // expectEndpointsAndSlices verifies that Endpoints and EndpointSlices exist for
@@ -312,7 +530,7 @@ var _ = SIGDescribe("EndpointSlice", func() {
 // and takes some shortcuts with the assumption that those test cases will be
 // the only caller of this function.
 func expectEndpointsAndSlices(cs clientset.Interface, ns string, svc *v1.Service, pods []*v1.Pod, numSubsets, numSlices int, namedPort bool) {
-	endpointSlices := []discoveryv1beta1.EndpointSlice{}
+	endpointSlices := []discoveryv1.EndpointSlice{}
 	if err := wait.PollImmediate(5*time.Second, 2*time.Minute, func() (bool, error) {
 		endpointSlicesFound, hasMatchingSlices := hasMatchingEndpointSlices(cs, ns, svc.Name, len(pods), numSlices)
 		if !hasMatchingSlices {
@@ -478,12 +696,12 @@ func expectEndpointsAndSlices(cs clientset.Interface, ns string, svc *v1.Service
 
 // deleteEndpointSlices deletes EndpointSlices for the specified Service.
 func deleteEndpointSlices(cs clientset.Interface, ns string, svc *v1.Service) {
-	listOptions := metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", discoveryv1beta1.LabelServiceName, svc.Name)}
-	esList, err := cs.DiscoveryV1beta1().EndpointSlices(ns).List(context.TODO(), listOptions)
+	listOptions := metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", discoveryv1.LabelServiceName, svc.Name)}
+	esList, err := cs.DiscoveryV1().EndpointSlices(ns).List(context.TODO(), listOptions)
 	framework.ExpectNoError(err, "Error fetching EndpointSlices for %s/%s Service", ns, svc.Name)
 
 	for _, endpointSlice := range esList.Items {
-		err := cs.DiscoveryV1beta1().EndpointSlices(ns).Delete(context.TODO(), endpointSlice.Name, metav1.DeleteOptions{})
+		err := cs.DiscoveryV1().EndpointSlices(ns).Delete(context.TODO(), endpointSlice.Name, metav1.DeleteOptions{})
 		framework.ExpectNoError(err, "Error deleting %s/%s EndpointSlice", ns, endpointSlice.Name)
 	}
 }
@@ -491,14 +709,14 @@ func deleteEndpointSlices(cs clientset.Interface, ns string, svc *v1.Service) {
 // hasMatchingEndpointSlices returns any EndpointSlices that match the
 // conditions along with a boolean indicating if all the conditions have been
 // met.
-func hasMatchingEndpointSlices(cs clientset.Interface, ns, svcName string, numEndpoints, numSlices int) ([]discoveryv1beta1.EndpointSlice, bool) {
-	listOptions := metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", discoveryv1beta1.LabelServiceName, svcName)}
-	esList, err := cs.DiscoveryV1beta1().EndpointSlices(ns).List(context.TODO(), listOptions)
+func hasMatchingEndpointSlices(cs clientset.Interface, ns, svcName string, numEndpoints, numSlices int) ([]discoveryv1.EndpointSlice, bool) {
+	listOptions := metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", discoveryv1.LabelServiceName, svcName)}
+	esList, err := cs.DiscoveryV1().EndpointSlices(ns).List(context.TODO(), listOptions)
 	framework.ExpectNoError(err, "Error fetching EndpointSlice for Service %s/%s", ns, svcName)
 
 	if len(esList.Items) == 0 {
 		framework.Logf("EndpointSlice for Service %s/%s not found", ns, svcName)
-		return []discoveryv1beta1.EndpointSlice{}, false
+		return []discoveryv1.EndpointSlice{}, false
 	}
 	// In some cases the EndpointSlice controller will create more
 	// EndpointSlices than necessary resulting in some duplication. This is
@@ -585,4 +803,58 @@ func createServiceReportErr(cs clientset.Interface, ns string, service *v1.Servi
 	svc, err := cs.CoreV1().Services(ns).Create(context.TODO(), service, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "error deleting Service")
 	return svc
+}
+
+// endpointSlicesEqual compare if the Endpoint and the EndpointSliceList contains the same endpoints values
+// as in addresses and ports, considering Ready and Unready addresses
+func endpointSlicesEqual(endpoints *v1.Endpoints, endpointSliceList *discoveryv1.EndpointSliceList) bool {
+	// get the apiserver endpoint addresses
+	epAddresses := sets.NewString()
+	epPorts := sets.NewInt32()
+	for _, subset := range endpoints.Subsets {
+		for _, addr := range subset.Addresses {
+			epAddresses.Insert(addr.IP)
+		}
+		for _, addr := range subset.NotReadyAddresses {
+			epAddresses.Insert(addr.IP)
+		}
+		for _, port := range subset.Ports {
+			epPorts.Insert(port.Port)
+		}
+	}
+	framework.Logf("Endpoints addresses: %v , ports: %v", epAddresses.List(), epPorts.List())
+
+	// Endpoints are single stack, and must match the primary IP family of the Service kubernetes.default
+	// However, EndpointSlices can be IPv4 or IPv6, we can only compare the Slices that match the same IP family
+	// framework.TestContext.ClusterIsIPv6() reports the IP family of the kubernetes.default service
+	var addrType discoveryv1.AddressType
+	if framework.TestContext.ClusterIsIPv6() {
+		addrType = discoveryv1.AddressTypeIPv6
+	} else {
+		addrType = discoveryv1.AddressTypeIPv4
+	}
+
+	// get the apiserver addresses from the endpoint slice list
+	sliceAddresses := sets.NewString()
+	slicePorts := sets.NewInt32()
+	for _, slice := range endpointSliceList.Items {
+		if slice.AddressType != addrType {
+			framework.Logf("Skipping slice %s: wanted %s family, got %s", slice.Name, addrType, slice.AddressType)
+			continue
+		}
+		for _, s := range slice.Endpoints {
+			sliceAddresses.Insert(s.Addresses...)
+		}
+		for _, ports := range slice.Ports {
+			if ports.Port != nil {
+				slicePorts.Insert(*ports.Port)
+			}
+		}
+	}
+
+	framework.Logf("EndpointSlices addresses: %v , ports: %v", sliceAddresses.List(), slicePorts.List())
+	if sliceAddresses.Equal(epAddresses) && slicePorts.Equal(epPorts) {
+		return true
+	}
+	return false
 }

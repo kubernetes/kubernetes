@@ -21,7 +21,6 @@ import (
 	"reflect"
 	"testing"
 
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 )
 
@@ -79,45 +78,43 @@ func TestPrintAvailableUpgrades(t *testing.T) {
 			name: "Patch version available",
 			upgrades: []upgrade.Upgrade{
 				{
-					Description: "version in the v1.8 series",
+					Description: "version in the v1.18 series",
 					Before: upgrade.ClusterState{
-						KubeVersion: "v1.8.1",
+						KubeVersion: "v1.18.1",
 						KubeletVersions: map[string]uint16{
-							"v1.8.1": 1,
+							"v1.18.1": 1,
 						},
-						KubeadmVersion: "v1.8.2",
-						DNSType:        kubeadmapi.KubeDNS,
-						DNSVersion:     "1.14.5",
-						EtcdVersion:    "3.0.17",
+						KubeadmVersion: "v1.18.1",
+						DNSVersion:     "1.6.7",
+						EtcdVersion:    "3.4.3-0",
 					},
 					After: upgrade.ClusterState{
-						KubeVersion:    "v1.8.3",
-						KubeadmVersion: "v1.8.3",
-						DNSType:        kubeadmapi.KubeDNS,
-						DNSVersion:     "1.14.5",
-						EtcdVersion:    "3.0.17",
+						KubeVersion:    "v1.18.4",
+						KubeadmVersion: "v1.18.4",
+						DNSVersion:     "1.6.7",
+						EtcdVersion:    "3.4.3-0",
 					},
 				},
 			},
 			expectedBytes: []byte(`Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':
-COMPONENT   CURRENT      TARGET
-kubelet     1 x v1.8.1   v1.8.3
+COMPONENT   CURRENT       TARGET
+kubelet     1 x v1.18.1   v1.18.4
 
-Upgrade to the latest version in the v1.8 series:
+Upgrade to the latest version in the v1.18 series:
 
 COMPONENT                 CURRENT   TARGET
-kube-apiserver            v1.8.1    v1.8.3
-kube-controller-manager   v1.8.1    v1.8.3
-kube-scheduler            v1.8.1    v1.8.3
-kube-proxy                v1.8.1    v1.8.3
-kube-dns                  1.14.5    1.14.5
-etcd                      3.0.17    3.0.17
+kube-apiserver            v1.18.1   v1.18.4
+kube-controller-manager   v1.18.1   v1.18.4
+kube-scheduler            v1.18.1   v1.18.4
+kube-proxy                v1.18.1   v1.18.4
+CoreDNS                   1.6.7     1.6.7
+etcd                      3.4.3-0   3.4.3-0
 
 You can now apply the upgrade by executing the following command:
 
-	kubeadm upgrade apply v1.8.3
+	kubeadm upgrade apply v1.18.4
 
-Note: Before you can perform this upgrade, you have to update kubeadm to v1.8.3.
+Note: Before you can perform this upgrade, you have to update kubeadm to v1.18.4.
 
 _____________________________________________________________________
 
@@ -129,41 +126,41 @@ _____________________________________________________________________
 				{
 					Description: "stable version",
 					Before: upgrade.ClusterState{
-						KubeVersion: "v1.8.3",
+						KubeVersion: "v1.18.4",
 						KubeletVersions: map[string]uint16{
-							"v1.8.3": 1,
+							"v1.18.4": 1,
 						},
-						KubeadmVersion: "v1.9.0",
-						DNSType:        kubeadmapi.KubeDNS,
-						DNSVersion:     "1.14.5",
-						EtcdVersion:    "3.0.17",
+						KubeadmVersion: "v1.18.4",
+						DNSVersion:     "1.6.7",
+						EtcdVersion:    "3.4.3-0",
 					},
 					After: upgrade.ClusterState{
-						KubeVersion:    "v1.9.0",
-						KubeadmVersion: "v1.9.0",
-						DNSType:        kubeadmapi.KubeDNS,
-						DNSVersion:     "1.14.13",
-						EtcdVersion:    "3.1.12",
+						KubeVersion:    "v1.19.0",
+						KubeadmVersion: "v1.19.0",
+						DNSVersion:     "1.7.0",
+						EtcdVersion:    "3.4.7-0",
 					},
 				},
 			},
 			expectedBytes: []byte(`Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':
-COMPONENT   CURRENT      TARGET
-kubelet     1 x v1.8.3   v1.9.0
+COMPONENT   CURRENT       TARGET
+kubelet     1 x v1.18.4   v1.19.0
 
 Upgrade to the latest stable version:
 
 COMPONENT                 CURRENT   TARGET
-kube-apiserver            v1.8.3    v1.9.0
-kube-controller-manager   v1.8.3    v1.9.0
-kube-scheduler            v1.8.3    v1.9.0
-kube-proxy                v1.8.3    v1.9.0
-kube-dns                  1.14.5    1.14.13
-etcd                      3.0.17    3.1.12
+kube-apiserver            v1.18.4   v1.19.0
+kube-controller-manager   v1.18.4   v1.19.0
+kube-scheduler            v1.18.4   v1.19.0
+kube-proxy                v1.18.4   v1.19.0
+CoreDNS                   1.6.7     1.7.0
+etcd                      3.4.3-0   3.4.7-0
 
 You can now apply the upgrade by executing the following command:
 
-	kubeadm upgrade apply v1.9.0
+	kubeadm upgrade apply v1.19.0
+
+Note: Before you can perform this upgrade, you have to update kubeadm to v1.19.0.
 
 _____________________________________________________________________
 
@@ -173,85 +170,81 @@ _____________________________________________________________________
 			name: "patch and minor version available",
 			upgrades: []upgrade.Upgrade{
 				{
-					Description: "version in the v1.8 series",
+					Description: "version in the v1.18 series",
 					Before: upgrade.ClusterState{
-						KubeVersion: "v1.8.3",
+						KubeVersion: "v1.18.3",
 						KubeletVersions: map[string]uint16{
-							"v1.8.3": 1,
+							"v1.18.3": 1,
 						},
-						KubeadmVersion: "v1.8.3",
-						DNSType:        kubeadmapi.KubeDNS,
-						DNSVersion:     "1.14.5",
-						EtcdVersion:    "3.0.17",
+						KubeadmVersion: "v1.18.3",
+						DNSVersion:     "1.6.7",
+						EtcdVersion:    "3.4.3-0",
 					},
 					After: upgrade.ClusterState{
-						KubeVersion:    "v1.8.5",
-						KubeadmVersion: "v1.8.3",
-						DNSType:        kubeadmapi.KubeDNS,
-						DNSVersion:     "1.14.5",
-						EtcdVersion:    "3.0.17",
+						KubeVersion:    "v1.18.5",
+						KubeadmVersion: "v1.18.3",
+						DNSVersion:     "1.6.7",
+						EtcdVersion:    "3.4.3-0",
 					},
 				},
 				{
 					Description: "stable version",
 					Before: upgrade.ClusterState{
-						KubeVersion: "v1.8.3",
+						KubeVersion: "v1.18.3",
 						KubeletVersions: map[string]uint16{
-							"v1.8.3": 1,
+							"v1.18.3": 1,
 						},
-						KubeadmVersion: "v1.8.3",
-						DNSType:        kubeadmapi.KubeDNS,
-						DNSVersion:     "1.14.5",
-						EtcdVersion:    "3.0.17",
+						KubeadmVersion: "v1.18.3",
+						DNSVersion:     "1.6.7",
+						EtcdVersion:    "3.4.3-0",
 					},
 					After: upgrade.ClusterState{
-						KubeVersion:    "v1.9.0",
-						KubeadmVersion: "v1.9.0",
-						DNSType:        kubeadmapi.KubeDNS,
-						DNSVersion:     "1.14.13",
-						EtcdVersion:    "3.1.12",
+						KubeVersion:    "v1.19.0",
+						KubeadmVersion: "v1.19.0",
+						DNSVersion:     "1.7.0",
+						EtcdVersion:    "3.4.7-0",
 					},
 				},
 			},
 			expectedBytes: []byte(`Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':
-COMPONENT   CURRENT      TARGET
-kubelet     1 x v1.8.3   v1.8.5
+COMPONENT   CURRENT       TARGET
+kubelet     1 x v1.18.3   v1.18.5
 
-Upgrade to the latest version in the v1.8 series:
+Upgrade to the latest version in the v1.18 series:
 
 COMPONENT                 CURRENT   TARGET
-kube-apiserver            v1.8.3    v1.8.5
-kube-controller-manager   v1.8.3    v1.8.5
-kube-scheduler            v1.8.3    v1.8.5
-kube-proxy                v1.8.3    v1.8.5
-kube-dns                  1.14.5    1.14.5
-etcd                      3.0.17    3.0.17
+kube-apiserver            v1.18.3   v1.18.5
+kube-controller-manager   v1.18.3   v1.18.5
+kube-scheduler            v1.18.3   v1.18.5
+kube-proxy                v1.18.3   v1.18.5
+CoreDNS                   1.6.7     1.6.7
+etcd                      3.4.3-0   3.4.3-0
 
 You can now apply the upgrade by executing the following command:
 
-	kubeadm upgrade apply v1.8.5
+	kubeadm upgrade apply v1.18.5
 
 _____________________________________________________________________
 
 Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':
-COMPONENT   CURRENT      TARGET
-kubelet     1 x v1.8.3   v1.9.0
+COMPONENT   CURRENT       TARGET
+kubelet     1 x v1.18.3   v1.19.0
 
 Upgrade to the latest stable version:
 
 COMPONENT                 CURRENT   TARGET
-kube-apiserver            v1.8.3    v1.9.0
-kube-controller-manager   v1.8.3    v1.9.0
-kube-scheduler            v1.8.3    v1.9.0
-kube-proxy                v1.8.3    v1.9.0
-kube-dns                  1.14.5    1.14.13
-etcd                      3.0.17    3.1.12
+kube-apiserver            v1.18.3   v1.19.0
+kube-controller-manager   v1.18.3   v1.19.0
+kube-scheduler            v1.18.3   v1.19.0
+kube-proxy                v1.18.3   v1.19.0
+CoreDNS                   1.6.7     1.7.0
+etcd                      3.4.3-0   3.4.7-0
 
 You can now apply the upgrade by executing the following command:
 
-	kubeadm upgrade apply v1.9.0
+	kubeadm upgrade apply v1.19.0
 
-Note: Before you can perform this upgrade, you have to update kubeadm to v1.9.0.
+Note: Before you can perform this upgrade, you have to update kubeadm to v1.19.0.
 
 _____________________________________________________________________
 
@@ -263,43 +256,41 @@ _____________________________________________________________________
 				{
 					Description: "experimental version",
 					Before: upgrade.ClusterState{
-						KubeVersion: "v1.8.5",
+						KubeVersion: "v1.18.5",
 						KubeletVersions: map[string]uint16{
-							"v1.8.5": 1,
+							"v1.18.5": 1,
 						},
-						KubeadmVersion: "v1.8.5",
-						DNSType:        kubeadmapi.KubeDNS,
-						DNSVersion:     "1.14.5",
-						EtcdVersion:    "3.0.17",
+						KubeadmVersion: "v1.18.5",
+						DNSVersion:     "1.6.7",
+						EtcdVersion:    "3.4.3-0",
 					},
 					After: upgrade.ClusterState{
-						KubeVersion:    "v1.9.0-beta.1",
-						KubeadmVersion: "v1.9.0-beta.1",
-						DNSType:        kubeadmapi.KubeDNS,
-						DNSVersion:     "1.14.13",
-						EtcdVersion:    "3.1.12",
+						KubeVersion:    "v1.19.0-beta.1",
+						KubeadmVersion: "v1.19.0-beta.1",
+						DNSVersion:     "1.7.0",
+						EtcdVersion:    "3.4.7-0",
 					},
 				},
 			},
 			expectedBytes: []byte(`Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':
-COMPONENT   CURRENT      TARGET
-kubelet     1 x v1.8.5   v1.9.0-beta.1
+COMPONENT   CURRENT       TARGET
+kubelet     1 x v1.18.5   v1.19.0-beta.1
 
 Upgrade to the latest experimental version:
 
 COMPONENT                 CURRENT   TARGET
-kube-apiserver            v1.8.5    v1.9.0-beta.1
-kube-controller-manager   v1.8.5    v1.9.0-beta.1
-kube-scheduler            v1.8.5    v1.9.0-beta.1
-kube-proxy                v1.8.5    v1.9.0-beta.1
-kube-dns                  1.14.5    1.14.13
-etcd                      3.0.17    3.1.12
+kube-apiserver            v1.18.5   v1.19.0-beta.1
+kube-controller-manager   v1.18.5   v1.19.0-beta.1
+kube-scheduler            v1.18.5   v1.19.0-beta.1
+kube-proxy                v1.18.5   v1.19.0-beta.1
+CoreDNS                   1.6.7     1.7.0
+etcd                      3.4.3-0   3.4.7-0
 
 You can now apply the upgrade by executing the following command:
 
-	kubeadm upgrade apply v1.9.0-beta.1 --allow-experimental-upgrades
+	kubeadm upgrade apply v1.19.0-beta.1 --allow-experimental-upgrades
 
-Note: Before you can perform this upgrade, you have to update kubeadm to v1.9.0-beta.1.
+Note: Before you can perform this upgrade, you have to update kubeadm to v1.19.0-beta.1.
 
 _____________________________________________________________________
 
@@ -311,43 +302,41 @@ _____________________________________________________________________
 				{
 					Description: "release candidate version",
 					Before: upgrade.ClusterState{
-						KubeVersion: "v1.8.5",
+						KubeVersion: "v1.18.5",
 						KubeletVersions: map[string]uint16{
-							"v1.8.5": 1,
+							"v1.18.5": 1,
 						},
-						KubeadmVersion: "v1.8.5",
-						DNSType:        kubeadmapi.KubeDNS,
-						DNSVersion:     "1.14.5",
-						EtcdVersion:    "3.0.17",
+						KubeadmVersion: "v1.18.5",
+						DNSVersion:     "1.6.7",
+						EtcdVersion:    "3.4.3-0",
 					},
 					After: upgrade.ClusterState{
-						KubeVersion:    "v1.9.0-rc.1",
-						KubeadmVersion: "v1.9.0-rc.1",
-						DNSType:        kubeadmapi.KubeDNS,
-						DNSVersion:     "1.14.13",
-						EtcdVersion:    "3.1.12",
+						KubeVersion:    "v1.19.0-rc.1",
+						KubeadmVersion: "v1.19.0-rc.1",
+						DNSVersion:     "1.7.0",
+						EtcdVersion:    "3.4.7-0",
 					},
 				},
 			},
 			expectedBytes: []byte(`Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':
-COMPONENT   CURRENT      TARGET
-kubelet     1 x v1.8.5   v1.9.0-rc.1
+COMPONENT   CURRENT       TARGET
+kubelet     1 x v1.18.5   v1.19.0-rc.1
 
 Upgrade to the latest release candidate version:
 
 COMPONENT                 CURRENT   TARGET
-kube-apiserver            v1.8.5    v1.9.0-rc.1
-kube-controller-manager   v1.8.5    v1.9.0-rc.1
-kube-scheduler            v1.8.5    v1.9.0-rc.1
-kube-proxy                v1.8.5    v1.9.0-rc.1
-kube-dns                  1.14.5    1.14.13
-etcd                      3.0.17    3.1.12
+kube-apiserver            v1.18.5   v1.19.0-rc.1
+kube-controller-manager   v1.18.5   v1.19.0-rc.1
+kube-scheduler            v1.18.5   v1.19.0-rc.1
+kube-proxy                v1.18.5   v1.19.0-rc.1
+CoreDNS                   1.6.7     1.7.0
+etcd                      3.4.3-0   3.4.7-0
 
 You can now apply the upgrade by executing the following command:
 
-	kubeadm upgrade apply v1.9.0-rc.1 --allow-release-candidate-upgrades
+	kubeadm upgrade apply v1.19.0-rc.1 --allow-release-candidate-upgrades
 
-Note: Before you can perform this upgrade, you have to update kubeadm to v1.9.0-rc.1.
+Note: Before you can perform this upgrade, you have to update kubeadm to v1.19.0-rc.1.
 
 _____________________________________________________________________
 
@@ -357,47 +346,45 @@ _____________________________________________________________________
 			name: "multiple kubelet versions",
 			upgrades: []upgrade.Upgrade{
 				{
-					Description: "version in the v1.9 series",
+					Description: "version in the v1.19 series",
 					Before: upgrade.ClusterState{
-						KubeVersion: "v1.9.2",
+						KubeVersion: "v1.19.2",
 						KubeletVersions: map[string]uint16{
-							"v1.9.2": 1,
-							"v1.9.3": 2,
+							"v1.19.2": 1,
+							"v1.19.3": 2,
 						},
-						KubeadmVersion: "v1.9.2",
-						DNSType:        kubeadmapi.KubeDNS,
-						DNSVersion:     "1.14.5",
-						EtcdVersion:    "3.0.17",
+						KubeadmVersion: "v1.19.2",
+						DNSVersion:     "1.7.0",
+						EtcdVersion:    "3.4.7-0",
 					},
 					After: upgrade.ClusterState{
-						KubeVersion:    "v1.9.3",
-						KubeadmVersion: "v1.9.3",
-						DNSType:        kubeadmapi.KubeDNS,
-						DNSVersion:     "1.14.8",
-						EtcdVersion:    "3.1.12",
+						KubeVersion:    "v1.19.3",
+						KubeadmVersion: "v1.19.3",
+						DNSVersion:     "1.7.0",
+						EtcdVersion:    "3.4.7-0",
 					},
 				},
 			},
 			expectedBytes: []byte(`Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':
-COMPONENT   CURRENT      TARGET
-kubelet     1 x v1.9.2   v1.9.3
-            2 x v1.9.3   v1.9.3
+COMPONENT   CURRENT       TARGET
+kubelet     1 x v1.19.2   v1.19.3
+            2 x v1.19.3   v1.19.3
 
-Upgrade to the latest version in the v1.9 series:
+Upgrade to the latest version in the v1.19 series:
 
 COMPONENT                 CURRENT   TARGET
-kube-apiserver            v1.9.2    v1.9.3
-kube-controller-manager   v1.9.2    v1.9.3
-kube-scheduler            v1.9.2    v1.9.3
-kube-proxy                v1.9.2    v1.9.3
-kube-dns                  1.14.5    1.14.8
-etcd                      3.0.17    3.1.12
+kube-apiserver            v1.19.2   v1.19.3
+kube-controller-manager   v1.19.2   v1.19.3
+kube-scheduler            v1.19.2   v1.19.3
+kube-proxy                v1.19.2   v1.19.3
+CoreDNS                   1.7.0     1.7.0
+etcd                      3.4.7-0   3.4.7-0
 
 You can now apply the upgrade by executing the following command:
 
-	kubeadm upgrade apply v1.9.3
+	kubeadm upgrade apply v1.19.3
 
-Note: Before you can perform this upgrade, you have to update kubeadm to v1.9.3.
+Note: Before you can perform this upgrade, you have to update kubeadm to v1.19.3.
 
 _____________________________________________________________________
 
@@ -408,185 +395,43 @@ _____________________________________________________________________
 			name: "external etcd upgrade available",
 			upgrades: []upgrade.Upgrade{
 				{
-					Description: "version in the v1.9 series",
+					Description: "version in the v1.19 series",
 					Before: upgrade.ClusterState{
-						KubeVersion: "v1.9.2",
+						KubeVersion: "v1.19.2",
 						KubeletVersions: map[string]uint16{
-							"v1.9.2": 1,
+							"v1.19.2": 1,
 						},
-						KubeadmVersion: "v1.9.2",
-						DNSType:        kubeadmapi.KubeDNS,
-						DNSVersion:     "1.14.5",
-						EtcdVersion:    "3.0.17",
+						KubeadmVersion: "v1.19.2",
+						DNSVersion:     "1.7.0",
+						EtcdVersion:    "3.4.7-0",
 					},
 					After: upgrade.ClusterState{
-						KubeVersion:    "v1.9.3",
-						KubeadmVersion: "v1.9.3",
-						DNSType:        kubeadmapi.KubeDNS,
-						DNSVersion:     "1.14.8",
-						EtcdVersion:    "3.1.12",
+						KubeVersion:    "v1.19.3",
+						KubeadmVersion: "v1.19.3",
+						DNSVersion:     "1.7.0",
+						EtcdVersion:    "3.4.7-0",
 					},
 				},
 			},
 			externalEtcd: true,
 			expectedBytes: []byte(`Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':
-COMPONENT   CURRENT      TARGET
-kubelet     1 x v1.9.2   v1.9.3
-
-Upgrade to the latest version in the v1.9 series:
-
-COMPONENT                 CURRENT   TARGET
-kube-apiserver            v1.9.2    v1.9.3
-kube-controller-manager   v1.9.2    v1.9.3
-kube-scheduler            v1.9.2    v1.9.3
-kube-proxy                v1.9.2    v1.9.3
-kube-dns                  1.14.5    1.14.8
-
-You can now apply the upgrade by executing the following command:
-
-	kubeadm upgrade apply v1.9.3
-
-Note: Before you can perform this upgrade, you have to update kubeadm to v1.9.3.
-
-_____________________________________________________________________
-
-`),
-		},
-		{
-			name: "kubedns to coredns",
-			upgrades: []upgrade.Upgrade{
-				{
-					Description: "kubedns to coredns",
-					Before: upgrade.ClusterState{
-						KubeVersion: "v1.10.2",
-						KubeletVersions: map[string]uint16{
-							"v1.10.2": 1,
-						},
-						KubeadmVersion: "v1.11.0",
-						DNSType:        kubeadmapi.KubeDNS,
-						DNSVersion:     "1.14.7",
-						EtcdVersion:    "3.1.11",
-					},
-					After: upgrade.ClusterState{
-						KubeVersion:    "v1.11.0",
-						KubeadmVersion: "v1.11.0",
-						DNSType:        kubeadmapi.CoreDNS,
-						DNSVersion:     "1.0.6",
-						EtcdVersion:    "3.2.18",
-					},
-				},
-			},
-			expectedBytes: []byte(`Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':
 COMPONENT   CURRENT       TARGET
-kubelet     1 x v1.10.2   v1.11.0
+kubelet     1 x v1.19.2   v1.19.3
 
-Upgrade to the latest kubedns to coredns:
+Upgrade to the latest version in the v1.19 series:
 
 COMPONENT                 CURRENT   TARGET
-kube-apiserver            v1.10.2   v1.11.0
-kube-controller-manager   v1.10.2   v1.11.0
-kube-scheduler            v1.10.2   v1.11.0
-kube-proxy                v1.10.2   v1.11.0
-CoreDNS                             1.0.6
-kube-dns                  1.14.7    
-etcd                      3.1.11    3.2.18
+kube-apiserver            v1.19.2   v1.19.3
+kube-controller-manager   v1.19.2   v1.19.3
+kube-scheduler            v1.19.2   v1.19.3
+kube-proxy                v1.19.2   v1.19.3
+CoreDNS                   1.7.0     1.7.0
 
 You can now apply the upgrade by executing the following command:
 
-	kubeadm upgrade apply v1.11.0
+	kubeadm upgrade apply v1.19.3
 
-_____________________________________________________________________
-
-`),
-		},
-		{
-			name: "coredns",
-			upgrades: []upgrade.Upgrade{
-				{
-					Description: "coredns",
-					Before: upgrade.ClusterState{
-						KubeVersion: "v1.10.2",
-						KubeletVersions: map[string]uint16{
-							"v1.10.2": 1,
-						},
-						KubeadmVersion: "v1.11.0",
-						DNSType:        kubeadmapi.CoreDNS,
-						DNSVersion:     "1.0.5",
-						EtcdVersion:    "3.1.11",
-					},
-					After: upgrade.ClusterState{
-						KubeVersion:    "v1.11.0",
-						KubeadmVersion: "v1.11.0",
-						DNSType:        kubeadmapi.CoreDNS,
-						DNSVersion:     "1.0.6",
-						EtcdVersion:    "3.2.18",
-					},
-				},
-			},
-			expectedBytes: []byte(`Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':
-COMPONENT   CURRENT       TARGET
-kubelet     1 x v1.10.2   v1.11.0
-
-Upgrade to the latest coredns:
-
-COMPONENT                 CURRENT   TARGET
-kube-apiserver            v1.10.2   v1.11.0
-kube-controller-manager   v1.10.2   v1.11.0
-kube-scheduler            v1.10.2   v1.11.0
-kube-proxy                v1.10.2   v1.11.0
-CoreDNS                   1.0.5     1.0.6
-etcd                      3.1.11    3.2.18
-
-You can now apply the upgrade by executing the following command:
-
-	kubeadm upgrade apply v1.11.0
-
-_____________________________________________________________________
-
-`),
-		},
-		{
-			name: "coredns to kubedns",
-			upgrades: []upgrade.Upgrade{
-				{
-					Description: "coredns to kubedns",
-					Before: upgrade.ClusterState{
-						KubeVersion: "v1.10.2",
-						KubeletVersions: map[string]uint16{
-							"v1.10.2": 1,
-						},
-						KubeadmVersion: "v1.11.0",
-						DNSType:        kubeadmapi.CoreDNS,
-						DNSVersion:     "1.0.6",
-						EtcdVersion:    "3.1.11",
-					},
-					After: upgrade.ClusterState{
-						KubeVersion:    "v1.11.0",
-						KubeadmVersion: "v1.11.0",
-						DNSType:        kubeadmapi.KubeDNS,
-						DNSVersion:     "1.14.9",
-						EtcdVersion:    "3.2.18",
-					},
-				},
-			},
-			expectedBytes: []byte(`Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':
-COMPONENT   CURRENT       TARGET
-kubelet     1 x v1.10.2   v1.11.0
-
-Upgrade to the latest coredns to kubedns:
-
-COMPONENT                 CURRENT   TARGET
-kube-apiserver            v1.10.2   v1.11.0
-kube-controller-manager   v1.10.2   v1.11.0
-kube-scheduler            v1.10.2   v1.11.0
-kube-proxy                v1.10.2   v1.11.0
-CoreDNS                   1.0.6     
-kube-dns                            1.14.9
-etcd                      3.1.11    3.2.18
-
-You can now apply the upgrade by executing the following command:
-
-	kubeadm upgrade apply v1.11.0
+Note: Before you can perform this upgrade, you have to update kubeadm to v1.19.3.
 
 _____________________________________________________________________
 

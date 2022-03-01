@@ -62,15 +62,15 @@ type Stage string
 const (
 	// The stage for events generated as soon as the audit handler receives the request, and before it
 	// is delegated down the handler chain.
-	StageRequestReceived = "RequestReceived"
+	StageRequestReceived Stage = "RequestReceived"
 	// The stage for events generated once the response headers are sent, but before the response body
 	// is sent. This stage is only generated for long-running requests (e.g. watch).
-	StageResponseStarted = "ResponseStarted"
+	StageResponseStarted Stage = "ResponseStarted"
 	// The stage for events generated once the response body has been completed, and no more bytes
 	// will be sent.
-	StageResponseComplete = "ResponseComplete"
+	StageResponseComplete Stage = "ResponseComplete"
 	// The stage for events generated when a panic occurred.
-	StagePanic = "Panic"
+	StagePanic Stage = "Panic"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -172,6 +172,15 @@ type Policy struct {
 	// be specified per rule in which case the union of both are omitted.
 	// +optional
 	OmitStages []Stage
+
+	// OmitManagedFields indicates whether to omit the managed fields of the request
+	// and response bodies from being written to the API audit log.
+	// This is used as a global default - a value of 'true' will omit the managed fileds,
+	// otherwise the managed fields will be included in the API audit log.
+	// Note that this can also be specified per rule in which case the value specified
+	// in a rule will override the global default.
+	// +optional
+	OmitManagedFields bool
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -232,6 +241,17 @@ type PolicyRule struct {
 	// An empty list means no restrictions will apply.
 	// +optional
 	OmitStages []Stage
+
+	// OmitManagedFields indicates whether to omit the managed fields of the request
+	// and response bodies from being written to the API audit log.
+	// - a value of 'true' will drop the managed fields from the API audit log
+	// - a value of 'false' indicates that the managed fileds should be included
+	//   in the API audit log
+	// Note that the value, if specified, in this rule will override the global default
+	// If a value is not specified then the global default specified in
+	// Policy.OmitManagedFields will stand.
+	// +optional
+	OmitManagedFields *bool
 }
 
 // GroupResources represents resource kinds in an API group.

@@ -982,7 +982,7 @@ func (c *EC2) WaitUntilSecurityGroupExistsWithContext(ctx aws.Context, input *De
 			{
 				State:    request.RetryWaiterState,
 				Matcher:  request.ErrorWaiterMatch,
-				Expected: "InvalidGroupNotFound",
+				Expected: "InvalidGroup.NotFound",
 			},
 		},
 		Logger: c.Config.Logger,

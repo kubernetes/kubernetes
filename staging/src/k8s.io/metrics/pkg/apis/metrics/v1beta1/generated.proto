@@ -28,7 +28,7 @@ import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 
 // Package-wide variables from generator "generated".
-option go_package = "v1beta1";
+option go_package = "k8s.io/metrics/pkg/apis/metrics/v1beta1";
 
 // ContainerMetrics sets resource usage metrics of a container.
 message ContainerMetrics {
@@ -41,6 +41,9 @@ message ContainerMetrics {
 
 // NodeMetrics sets resource usage metrics of a node.
 message NodeMetrics {
+  // Standard object's metadata.
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+  // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // The following fields define time interval from which metrics were
@@ -65,6 +68,9 @@ message NodeMetricsList {
 
 // PodMetrics sets resource usage metrics of a pod.
 message PodMetrics {
+  // Standard object's metadata.
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+  // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // The following fields define time interval from which metrics were

@@ -54,7 +54,10 @@ type Handler struct {
 	rootFs          string
 	pid             int
 	includedMetrics container.MetricSet
+	// pidMetricsCache holds CPU scheduler stats for existing processes (map key is PID) between calls to schedulerStatsFromProcs.
 	pidMetricsCache map[int]*info.CpuSchedstat
+	// pidMetricsSaved holds accumulated CPU scheduler stats for processes that no longer exist.
+	pidMetricsSaved info.CpuSchedstat
 	cycles          uint64
 }
 
@@ -70,21 +73,22 @@ func NewHandler(cgroupManager cgroups.Manager, rootFs string, pid int, includedM
 
 // Get cgroup and networking stats of the specified container
 func (h *Handler) GetStats() (*info.ContainerStats, error) {
-	var cgroupStats *cgroups.Stats
-	readCgroupStats := true
+	ignoreStatsError := false
 	if cgroups.IsCgroup2UnifiedMode() {
-		// On cgroup v2 there are no stats at the root cgroup
-		// so check whether it is the root cgroup
+		// On cgroup v2 the root cgroup stats have been introduced in recent kernel versions,
+		// so not all kernel versions have all the data. This means that stat fetching can fail
+		// due to lacking cgroup stat files, but that some data is provided.
 		if h.cgroupManager.Path("") == fs2.UnifiedMountpoint {
-			readCgroupStats = false
+			ignoreStatsError = true
 		}
 	}
-	var err error
-	if readCgroupStats {
-		cgroupStats, err = h.cgroupManager.GetStats()
-		if err != nil {
+
+	cgroupStats, err := h.cgroupManager.GetStats()
+	if err != nil {
+		if !ignoreStatsError {
 			return nil, err
 		}
+		klog.V(4).Infof("Ignoring errors when gathering stats for root cgroup since some controllers don't have stats on the root cgroup: %v", err)
 	}
 	libcontainerStats := &libcontainer.Stats{
 		CgroupStats: cgroupStats,
@@ -92,14 +96,9 @@ func (h *Handler) GetStats() (*info.ContainerStats, error) {
 	stats := newContainerStats(libcontainerStats, h.includedMetrics)
 
 	if h.includedMetrics.Has(container.ProcessSchedulerMetrics) {
-		pids, err := h.cgroupManager.GetAllPids()
+		stats.Cpu.Schedstat, err = h.schedulerStatsFromProcs()
 		if err != nil {
-			klog.V(4).Infof("Could not get PIDs for container %d: %v", h.pid, err)
-		} else {
-			stats.Cpu.Schedstat, err = schedulerStatsFromProcs(h.rootFs, pids, h.pidMetricsCache)
-			if err != nil {
-				klog.V(4).Infof("Unable to get Process Scheduler Stats: %v", err)
-			}
+			klog.V(4).Infof("Unable to get Process Scheduler Stats: %v", err)
 		}
 	}
 
@@ -313,9 +312,14 @@ func processStatsFromProcs(rootFs string, cgroupPath string, rootPid int) (info.
 	return processStats, nil
 }
 
-func schedulerStatsFromProcs(rootFs string, pids []int, pidMetricsCache map[int]*info.CpuSchedstat) (info.CpuSchedstat, error) {
+func (h *Handler) schedulerStatsFromProcs() (info.CpuSchedstat, error) {
+	pids, err := h.cgroupManager.GetAllPids()
+	if err != nil {
+		return info.CpuSchedstat{}, fmt.Errorf("Could not get PIDs for container %d: %w", h.pid, err)
+	}
+	alivePids := make(map[int]struct{}, len(pids))
 	for _, pid := range pids {
-		f, err := os.Open(path.Join(rootFs, "proc", strconv.Itoa(pid), "schedstat"))
+		f, err := os.Open(path.Join(h.rootFs, "proc", strconv.Itoa(pid), "schedstat"))
 		if err != nil {
 			return info.CpuSchedstat{}, fmt.Errorf("couldn't open scheduler statistics for process %d: %v", pid, err)
 		}
@@ -324,14 +328,15 @@ func schedulerStatsFromProcs(rootFs string, pids []int, pidMetricsCache map[int]
 		if err != nil {
 			return info.CpuSchedstat{}, fmt.Errorf("couldn't read scheduler statistics for process %d: %v", pid, err)
 		}
+		alivePids[pid] = struct{}{}
 		rawMetrics := bytes.Split(bytes.TrimRight(contents, "\n"), []byte(" "))
 		if len(rawMetrics) != 3 {
 			return info.CpuSchedstat{}, fmt.Errorf("unexpected number of metrics in schedstat file for process %d", pid)
 		}
-		cacheEntry, ok := pidMetricsCache[pid]
+		cacheEntry, ok := h.pidMetricsCache[pid]
 		if !ok {
 			cacheEntry = &info.CpuSchedstat{}
-			pidMetricsCache[pid] = cacheEntry
+			h.pidMetricsCache[pid] = cacheEntry
 		}
 		for i, rawMetric := range rawMetrics {
 			metric, err := strconv.ParseUint(string(rawMetric), 10, 64)
@@ -348,11 +353,20 @@ func schedulerStatsFromProcs(rootFs string, pids []int, pidMetricsCache map[int]
 			}
 		}
 	}
-	schedstats := info.CpuSchedstat{}
-	for _, v := range pidMetricsCache {
+	schedstats := h.pidMetricsSaved // copy
+	for p, v := range h.pidMetricsCache {
 		schedstats.RunPeriods += v.RunPeriods
 		schedstats.RunqueueTime += v.RunqueueTime
 		schedstats.RunTime += v.RunTime
+		if _, alive := alivePids[p]; !alive {
+			// PID p is gone: accumulate its stats ...
+			h.pidMetricsSaved.RunPeriods += v.RunPeriods
+			h.pidMetricsSaved.RunqueueTime += v.RunqueueTime
+			h.pidMetricsSaved.RunTime += v.RunTime
+			// ... and remove its cache entry, to prevent
+			// pidMetricsCache from growing.
+			delete(h.pidMetricsCache, p)
+		}
 	}
 	return schedstats, nil
 }
@@ -382,7 +396,7 @@ func getReferencedKBytes(pids []int) (uint64, error) {
 		if err != nil {
 			klog.V(5).Infof("Cannot read %s file, err: %s", smapsFilePath, err)
 			if os.IsNotExist(err) {
-				continue //smaps file does not exists for all PIDs
+				continue // smaps file does not exists for all PIDs
 			}
 			return 0, err
 		}
@@ -425,7 +439,7 @@ func clearReferencedBytes(pids []int, cycles uint64, resetInterval uint64) error
 	if cycles%resetInterval == 0 {
 		for _, pid := range pids {
 			clearRefsFilePath := fmt.Sprintf(clearRefsFilePathPattern, pid)
-			clerRefsFile, err := os.OpenFile(clearRefsFilePath, os.O_WRONLY, 0644)
+			clerRefsFile, err := os.OpenFile(clearRefsFilePath, os.O_WRONLY, 0o644)
 			if err != nil {
 				// clear_refs file may not exist for all PIDs
 				continue
@@ -454,9 +468,7 @@ func networkStatsFromProc(rootFs string, pid int) ([]info.InterfaceStats, error)
 	return ifaceStats, nil
 }
 
-var (
-	ignoredDevicePrefixes = []string{"lo", "veth", "docker"}
-)
+var ignoredDevicePrefixes = []string{"lo", "veth", "docker"}
 
 func isIgnoredDevice(ifName string) bool {
 	for _, prefix := range ignoredDevicePrefixes {
@@ -614,11 +626,9 @@ func scanAdvancedTCPStats(advancedStats *info.TcpAdvancedStat, advancedTCPStatsF
 	}
 
 	return scanner.Err()
-
 }
 
 func scanTCPStats(tcpStatsFile string) (info.TcpStat, error) {
-
 	var stats info.TcpStat
 
 	data, err := ioutil.ReadFile(tcpStatsFile)
@@ -627,17 +637,17 @@ func scanTCPStats(tcpStatsFile string) (info.TcpStat, error) {
 	}
 
 	tcpStateMap := map[string]uint64{
-		"01": 0, //ESTABLISHED
-		"02": 0, //SYN_SENT
-		"03": 0, //SYN_RECV
-		"04": 0, //FIN_WAIT1
-		"05": 0, //FIN_WAIT2
-		"06": 0, //TIME_WAIT
-		"07": 0, //CLOSE
-		"08": 0, //CLOSE_WAIT
-		"09": 0, //LAST_ACK
-		"0A": 0, //LISTEN
-		"0B": 0, //CLOSING
+		"01": 0, // ESTABLISHED
+		"02": 0, // SYN_SENT
+		"03": 0, // SYN_RECV
+		"04": 0, // FIN_WAIT1
+		"05": 0, // FIN_WAIT2
+		"06": 0, // TIME_WAIT
+		"07": 0, // CLOSE
+		"08": 0, // CLOSE_WAIT
+		"09": 0, // LAST_ACK
+		"0A": 0, // LISTEN
+		"0B": 0, // CLOSING
 	}
 
 	reader := strings.NewReader(string(data))
@@ -778,14 +788,14 @@ func setCPUStats(s *cgroups.Stats, ret *info.ContainerStats, withPerCPU bool) {
 }
 
 func setDiskIoStats(s *cgroups.Stats, ret *info.ContainerStats) {
-	ret.DiskIo.IoServiceBytes = DiskStatsCopy(s.BlkioStats.IoServiceBytesRecursive)
-	ret.DiskIo.IoServiced = DiskStatsCopy(s.BlkioStats.IoServicedRecursive)
-	ret.DiskIo.IoQueued = DiskStatsCopy(s.BlkioStats.IoQueuedRecursive)
-	ret.DiskIo.Sectors = DiskStatsCopy(s.BlkioStats.SectorsRecursive)
-	ret.DiskIo.IoServiceTime = DiskStatsCopy(s.BlkioStats.IoServiceTimeRecursive)
-	ret.DiskIo.IoWaitTime = DiskStatsCopy(s.BlkioStats.IoWaitTimeRecursive)
-	ret.DiskIo.IoMerged = DiskStatsCopy(s.BlkioStats.IoMergedRecursive)
-	ret.DiskIo.IoTime = DiskStatsCopy(s.BlkioStats.IoTimeRecursive)
+	ret.DiskIo.IoServiceBytes = diskStatsCopy(s.BlkioStats.IoServiceBytesRecursive)
+	ret.DiskIo.IoServiced = diskStatsCopy(s.BlkioStats.IoServicedRecursive)
+	ret.DiskIo.IoQueued = diskStatsCopy(s.BlkioStats.IoQueuedRecursive)
+	ret.DiskIo.Sectors = diskStatsCopy(s.BlkioStats.SectorsRecursive)
+	ret.DiskIo.IoServiceTime = diskStatsCopy(s.BlkioStats.IoServiceTimeRecursive)
+	ret.DiskIo.IoWaitTime = diskStatsCopy(s.BlkioStats.IoWaitTimeRecursive)
+	ret.DiskIo.IoMerged = diskStatsCopy(s.BlkioStats.IoMergedRecursive)
+	ret.DiskIo.IoTime = diskStatsCopy(s.BlkioStats.IoTimeRecursive)
 }
 
 func setMemoryStats(s *cgroups.Stats, ret *info.ContainerStats) {
@@ -793,7 +803,12 @@ func setMemoryStats(s *cgroups.Stats, ret *info.ContainerStats) {
 	ret.Memory.MaxUsage = s.MemoryStats.Usage.MaxUsage
 	ret.Memory.Failcnt = s.MemoryStats.Usage.Failcnt
 
-	if s.MemoryStats.UseHierarchy {
+	if cgroups.IsCgroup2UnifiedMode() {
+		ret.Memory.Cache = s.MemoryStats.Stats["file"]
+		ret.Memory.RSS = s.MemoryStats.Stats["anon"]
+		ret.Memory.Swap = s.MemoryStats.SwapUsage.Usage - s.MemoryStats.Usage.Usage
+		ret.Memory.MappedFile = s.MemoryStats.Stats["file_mapped"]
+	} else if s.MemoryStats.UseHierarchy {
 		ret.Memory.Cache = s.MemoryStats.Stats["total_cache"]
 		ret.Memory.RSS = s.MemoryStats.Stats["total_rss"]
 		ret.Memory.Swap = s.MemoryStats.Stats["total_swap"]
@@ -827,6 +842,10 @@ func setMemoryStats(s *cgroups.Stats, ret *info.ContainerStats) {
 		}
 	}
 	ret.Memory.WorkingSet = workingSet
+}
+
+func setCPUSetStats(s *cgroups.Stats, ret *info.ContainerStats) {
+	ret.CpuSet.MemoryMigrate = s.CPUSetStats.MemoryMigrate
 }
 
 func getNumaStats(memoryStats map[uint8]uint64) map[uint8]uint64 {
@@ -886,7 +905,6 @@ func setThreadsStats(s *cgroups.Stats, ret *info.ContainerStats) {
 		ret.Processes.ThreadsCurrent = s.PidsStats.Current
 		ret.Processes.ThreadsMax = s.PidsStats.Limit
 	}
-
 }
 
 func newContainerStats(libcontainerStats *libcontainer.Stats, includedMetrics container.MetricSet) *info.ContainerStats {
@@ -905,6 +923,9 @@ func newContainerStats(libcontainerStats *libcontainer.Stats, includedMetrics co
 		}
 		if includedMetrics.Has(container.HugetlbUsageMetrics) {
 			setHugepageStats(s, ret)
+		}
+		if includedMetrics.Has(container.CPUSetMetrics) {
+			setCPUSetStats(s, ret)
 		}
 	}
 	if len(libcontainerStats.Interfaces) > 0 {

@@ -17,10 +17,38 @@ limitations under the License.
 package exec
 
 import (
+	"errors"
+	"io/fs"
+	"os/exec"
+	"reflect"
 	"sync"
 	"time"
 
+	"k8s.io/klog/v2"
+
 	"k8s.io/client-go/tools/metrics"
+)
+
+// The following constants shadow the special values used in the prometheus metrics implementation.
+const (
+	// noError indicates that the plugin process was successfully started and exited with an exit
+	// code of 0.
+	noError = "no_error"
+	// pluginExecutionError indicates that the plugin process was successfully started and then
+	// it returned a non-zero exit code.
+	pluginExecutionError = "plugin_execution_error"
+	// pluginNotFoundError indicates that we could not find the exec plugin.
+	pluginNotFoundError = "plugin_not_found_error"
+	// clientInternalError indicates that we attempted to start the plugin process, but failed
+	// for some reason.
+	clientInternalError = "client_internal_error"
+
+	// successExitCode represents an exec plugin invocation that was successful.
+	successExitCode = 0
+	// failureExitCode represents an exec plugin invocation that was not successful. This code is
+	// used in some failure modes (e.g., plugin not found, client internal error) so that someone
+	// can more easily monitor all unsuccessful invocations.
+	failureExitCode = 1
 )
 
 type certificateExpirationTracker struct {
@@ -56,5 +84,28 @@ func (c *certificateExpirationTracker) set(a *Authenticator, t time.Time) {
 		c.metricSet(nil)
 	} else {
 		c.metricSet(&earliest)
+	}
+}
+
+// incrementCallsMetric increments a global metrics counter for the number of calls to an exec
+// plugin, partitioned by exit code. The provided err should be the return value from
+// exec.Cmd.Run().
+func incrementCallsMetric(err error) {
+	execExitError := &exec.ExitError{}
+	execError := &exec.Error{}
+	pathError := &fs.PathError{}
+	switch {
+	case err == nil: // Binary execution succeeded.
+		metrics.ExecPluginCalls.Increment(successExitCode, noError)
+
+	case errors.As(err, &execExitError): // Binary execution failed (see "os/exec".Cmd.Run()).
+		metrics.ExecPluginCalls.Increment(execExitError.ExitCode(), pluginExecutionError)
+
+	case errors.As(err, &execError), errors.As(err, &pathError): // Binary does not exist (see exec.Error, fs.PathError).
+		metrics.ExecPluginCalls.Increment(failureExitCode, pluginNotFoundError)
+
+	default: // We don't know about this error type.
+		klog.V(2).InfoS("unexpected exec plugin return error type", "type", reflect.TypeOf(err).String(), "err", err)
+		metrics.ExecPluginCalls.Increment(failureExitCode, clientInternalError)
 	}
 }

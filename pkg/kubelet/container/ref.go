@@ -32,9 +32,6 @@ var ImplicitContainerPrefix = "implicitly required container "
 // GenerateContainerRef returns an *v1.ObjectReference which references the given container
 // within the given pod. Returns an error if the reference can't be constructed or the
 // container doesn't actually belong to the pod.
-//
-// This function will return an error if the provided Pod does not have a selfLink,
-// but we expect selfLink to be populated at all call sites for the function.
 func GenerateContainerRef(pod *v1.Pod, container *v1.Container) (*v1.ObjectReference, error) {
 	fieldPath, err := fieldPath(pod, container)
 	if err != nil {

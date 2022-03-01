@@ -35,7 +35,7 @@ if [[ -z "$(which protoc)" || "$(protoc --version)" != "libprotoc 3."* ]]; then
   echo "Generating protobuf requires protoc 3.0.0-beta1 or newer. Please download and"
   echo "install the platform appropriate Protobuf package for your OS: "
   echo
-  echo "  https://github.com/google/protobuf/releases"
+  echo "  https://github.com/protocolbuffers/protobuf/releases"
   echo
   echo "WARNING: Protobuf changes are not being validated"
   exit 1
@@ -59,7 +59,7 @@ function generate_code() {
 	protoc \
 	--proto_path="${KUBE_REMOTE_RUNTIME_PATH}" \
 	--proto_path="${KUBE_ROOT}/vendor" \
-	--gogo_out=plugins=grpc:"${KUBE_REMOTE_RUNTIME_PATH}" "${KUBE_REMOTE_RUNTIME_PATH}/api.proto"
+	--gogo_out=plugins=grpc:"${KUBE_ROOT}/staging/src" "${KUBE_REMOTE_RUNTIME_PATH}/api.proto"
 
 	# Update boilerplate for the generated file.
 	cat hack/boilerplate/boilerplate.generatego.txt "${KUBE_REMOTE_RUNTIME_PATH}/api.pb.go" > "${KUBE_REMOTE_RUNTIME_PATH}/api.pb.go.tmp"

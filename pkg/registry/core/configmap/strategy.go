@@ -64,6 +64,9 @@ func (strategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorLis
 	return validation.ValidateConfigMap(cfg)
 }
 
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (strategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string { return nil }
+
 // Canonicalize normalizes the object after validation.
 func (strategy) Canonicalize(obj runtime.Object) {
 }
@@ -83,6 +86,9 @@ func (strategy) ValidateUpdate(ctx context.Context, newObj, oldObj runtime.Objec
 
 	return validation.ValidateConfigMapUpdate(newCfg, oldCfg)
 }
+
+// WarningsOnUpdate returns warnings for the given update.
+func (strategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string { return nil }
 
 func dropDisabledFields(configMap *api.ConfigMap, oldConfigMap *api.ConfigMap) {
 }

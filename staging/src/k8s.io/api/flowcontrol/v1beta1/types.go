@@ -57,10 +57,55 @@ const (
 	ResponseHeaderMatchedFlowSchemaUID                 = "X-Kubernetes-PF-FlowSchema-UID"
 )
 
+const (
+	// AutoUpdateAnnotationKey is the name of an annotation that enables
+	// automatic update of the spec of the bootstrap configuration
+	// object(s), if set to 'true'.
+	//
+	// On a fresh install, all bootstrap configuration objects will have auto
+	// update enabled with the following annotation key:
+	//    apf.kubernetes.io/autoupdate-spec: 'true'
+	//
+	// The kube-apiserver periodically checks the bootstrap configuration
+	// objects on the cluster and applies updates if necessary.
+	//
+	// kube-apiserver enforces an 'always auto-update' policy for the
+	// mandatory configuration object(s). This implies:
+	// - the auto-update annotation key is added with a value of 'true'
+	//   if it is missing.
+	// - the auto-update annotation key is set to 'true' if its current value
+	//   is a boolean false or has an invalid boolean representation
+	//   (if the cluster operator sets it to 'false' it will be stomped)
+	// - any changes to the spec made by the cluster operator will be
+	//   stomped.
+	//
+	// The kube-apiserver will apply updates on the suggested configuration if:
+	// - the cluster operator has enabled auto-update by setting the annotation
+	//   (apf.kubernetes.io/autoupdate-spec: 'true') or
+	// - the annotation key is missing but the generation is 1
+	//
+	// If the suggested configuration object is missing the annotation key,
+	// kube-apiserver will update the annotation appropriately:
+	// - it is set to 'true' if generation of the object is '1' which usually
+	//   indicates that the spec of the object has not been changed.
+	// - it is set to 'false' if generation of the object is greater than 1.
+	//
+	// The goal is to enable the kube-apiserver to apply update on suggested
+	// configuration objects installed by previous releases but not overwrite
+	// changes made by the cluster operators.
+	// Note that this distinction is imperfectly detected: in the case where an
+	// operator deletes a suggested configuration object and later creates it
+	// but with a variant spec and then does no updates of the object
+	// (generation is 1), the technique outlined above will incorrectly
+	// determine that the object should be auto-updated.
+	AutoUpdateAnnotationKey = "apf.kubernetes.io/autoupdate-spec"
+)
+
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.20
+// +k8s:prerelease-lifecycle-gen:replacement=flowcontrol.apiserver.k8s.io,v1beta2,FlowSchema
 
 // FlowSchema defines the schema of a group of flows. Note that a flow is made up of a set of inbound API requests with
 // similar attributes and is identified by a pair of strings: the name of the FlowSchema and a "flow distinguisher".
@@ -82,6 +127,7 @@ type FlowSchema struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.20
+// +k8s:prerelease-lifecycle-gen:replacement=flowcontrol.apiserver.k8s.io,v1beta2,FlowSchemaList
 
 // FlowSchemaList is a list of FlowSchema objects.
 type FlowSchemaList struct {
@@ -179,13 +225,17 @@ type PolicyRulesWithSubjects struct {
 // ways of matching an originator; by user, group, or service account.
 // +union
 type Subject struct {
+	// `kind` indicates which one of the other fields is non-empty.
 	// Required
 	// +unionDiscriminator
 	Kind SubjectKind `json:"kind" protobuf:"bytes,1,opt,name=kind"`
+	// `user` matches based on username.
 	// +optional
 	User *UserSubject `json:"user,omitempty" protobuf:"bytes,2,opt,name=user"`
+	// `group` matches based on user group name.
 	// +optional
 	Group *GroupSubject `json:"group,omitempty" protobuf:"bytes,3,opt,name=group"`
+	// `serviceAccount` matches ServiceAccounts.
 	// +optional
 	ServiceAccount *ServiceAccountSubject `json:"serviceAccount,omitempty" protobuf:"bytes,4,opt,name=serviceAccount"`
 }
@@ -231,8 +281,10 @@ type ServiceAccountSubject struct {
 // ResourcePolicyRule matches a resource request if and only if: (a)
 // at least one member of verbs matches the request, (b) at least one
 // member of apiGroups matches the request, (c) at least one member of
-// resources matches the request, and (d) least one member of
-// namespaces matches the request.
+// resources matches the request, and (d) either (d1) the request does
+// not specify a namespace (i.e., `Namespace==""`) and clusterScope is
+// true or (d2) the request specifies a namespace and least one member
+// of namespaces matches the request's namespace.
 type ResourcePolicyRule struct {
 	// `verbs` is a list of matching verbs and may not be empty.
 	// "*" matches all verbs and, if present, must be the only entry.
@@ -330,6 +382,7 @@ type FlowSchemaConditionType string
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.20
+// +k8s:prerelease-lifecycle-gen:replacement=flowcontrol.apiserver.k8s.io,v1beta2,PriorityLevelConfiguration
 
 // PriorityLevelConfiguration represents the configuration of a priority level.
 type PriorityLevelConfiguration struct {
@@ -350,6 +403,7 @@ type PriorityLevelConfiguration struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.20
+// +k8s:prerelease-lifecycle-gen:replacement=flowcontrol.apiserver.k8s.io,v1beta2,PriorityLevelConfigurationList
 
 // PriorityLevelConfigurationList is a list of PriorityLevelConfiguration objects.
 type PriorityLevelConfigurationList struct {

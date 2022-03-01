@@ -17,6 +17,7 @@ limitations under the License.
 package filters
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -31,11 +32,17 @@ import (
 	"k8s.io/klog/v2"
 )
 
+type recordMetrics func(context.Context, *authenticator.Response, bool, error, authenticator.Audiences, time.Time, time.Time)
+
 // WithAuthentication creates an http handler that tries to authenticate the given request as a user, and then
 // stores any such user found onto the provided context for the request. If authentication fails or returns an error
 // the failed handler is used. On success, "Authorization" header is removed from the request and handler
 // is invoked to serve the request.
 func WithAuthentication(handler http.Handler, auth authenticator.Request, failed http.Handler, apiAuds authenticator.Audiences) http.Handler {
+	return withAuthentication(handler, auth, failed, apiAuds, recordAuthMetrics)
+}
+
+func withAuthentication(handler http.Handler, auth authenticator.Request, failed http.Handler, apiAuds authenticator.Audiences, metrics recordMetrics) http.Handler {
 	if auth == nil {
 		klog.Warning("Authentication is disabled")
 		return handler
@@ -47,7 +54,10 @@ func WithAuthentication(handler http.Handler, auth authenticator.Request, failed
 			req = req.WithContext(authenticator.WithAudiences(req.Context(), apiAuds))
 		}
 		resp, ok, err := auth.AuthenticateRequest(req)
-		defer recordAuthMetrics(req.Context(), resp, ok, err, apiAuds, authenticationStart)
+		authenticationFinish := time.Now()
+		defer func() {
+			metrics(req.Context(), resp, ok, err, apiAuds, authenticationStart, authenticationFinish)
+		}()
 		if err != nil || !ok {
 			if err != nil {
 				klog.ErrorS(err, "Unable to authenticate the request")

@@ -81,6 +81,7 @@ func ValidateLabels(labels map[string]string, fldPath *field.Path) field.ErrorLi
 
 func ValidateDeleteOptions(options *metav1.DeleteOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
+	//lint:file-ignore SA1019 Keep validation for deprecated OrphanDependents option until it's being removed
 	if options.OrphanDependents != nil && options.PropagationPolicy != nil {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("propagationPolicy"), options.PropagationPolicy, "orphanDependents and deletionPropagation cannot be both set"))
 	}
@@ -95,17 +96,19 @@ func ValidateDeleteOptions(options *metav1.DeleteOptions) field.ErrorList {
 }
 
 func ValidateCreateOptions(options *metav1.CreateOptions) field.ErrorList {
-	return append(
-		ValidateFieldManager(options.FieldManager, field.NewPath("fieldManager")),
-		ValidateDryRun(field.NewPath("dryRun"), options.DryRun)...,
-	)
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, ValidateFieldManager(options.FieldManager, field.NewPath("fieldManager"))...)
+	allErrs = append(allErrs, ValidateDryRun(field.NewPath("dryRun"), options.DryRun)...)
+	allErrs = append(allErrs, ValidateFieldValidation(field.NewPath("fieldValidation"), options.FieldValidation)...)
+	return allErrs
 }
 
 func ValidateUpdateOptions(options *metav1.UpdateOptions) field.ErrorList {
-	return append(
-		ValidateFieldManager(options.FieldManager, field.NewPath("fieldManager")),
-		ValidateDryRun(field.NewPath("dryRun"), options.DryRun)...,
-	)
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, ValidateFieldManager(options.FieldManager, field.NewPath("fieldManager"))...)
+	allErrs = append(allErrs, ValidateDryRun(field.NewPath("dryRun"), options.DryRun)...)
+	allErrs = append(allErrs, ValidateFieldValidation(field.NewPath("fieldValidation"), options.FieldValidation)...)
+	return allErrs
 }
 
 func ValidatePatchOptions(options *metav1.PatchOptions, patchType types.PatchType) field.ErrorList {
@@ -122,6 +125,7 @@ func ValidatePatchOptions(options *metav1.PatchOptions, patchType types.PatchTyp
 	}
 	allErrs = append(allErrs, ValidateFieldManager(options.FieldManager, field.NewPath("fieldManager"))...)
 	allErrs = append(allErrs, ValidateDryRun(field.NewPath("dryRun"), options.DryRun)...)
+	allErrs = append(allErrs, ValidateFieldValidation(field.NewPath("fieldValidation"), options.FieldValidation)...)
 	return allErrs
 }
 
@@ -158,6 +162,18 @@ func ValidateDryRun(fldPath *field.Path, dryRun []string) field.ErrorList {
 	return allErrs
 }
 
+var allowedFieldValidationValues = sets.NewString("", metav1.FieldValidationIgnore, metav1.FieldValidationWarn, metav1.FieldValidationStrict)
+
+// ValidateFieldValidation validates that a fieldValidation query param only contains allowed values.
+func ValidateFieldValidation(fldPath *field.Path, fieldValidation string) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if !allowedFieldValidationValues.Has(fieldValidation) {
+		allErrs = append(allErrs, field.NotSupported(fldPath, fieldValidation, allowedFieldValidationValues.List()))
+	}
+	return allErrs
+
+}
+
 const UninitializedStatusUpdateErrorMsg string = `must not update status when the object is uninitialized`
 
 // ValidateTableOptions returns any invalid flags on TableOptions.
@@ -171,9 +187,12 @@ func ValidateTableOptions(opts *metav1.TableOptions) field.ErrorList {
 	return allErrs
 }
 
+const MaxSubresourceNameLength = 256
+
 func ValidateManagedFields(fieldsList []metav1.ManagedFieldsEntry, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
-	for _, fields := range fieldsList {
+	for i, fields := range fieldsList {
+		fldPath := fldPath.Index(i)
 		switch fields.Operation {
 		case metav1.ManagedFieldsOperationApply, metav1.ManagedFieldsOperationUpdate:
 		default:
@@ -181,6 +200,11 @@ func ValidateManagedFields(fieldsList []metav1.ManagedFieldsEntry, fldPath *fiel
 		}
 		if len(fields.FieldsType) > 0 && fields.FieldsType != "FieldsV1" {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("fieldsType"), fields.FieldsType, "must be `FieldsV1`"))
+		}
+		allErrs = append(allErrs, ValidateFieldManager(fields.Manager, fldPath.Child("manager"))...)
+
+		if len(fields.Subresource) > MaxSubresourceNameLength {
+			allErrs = append(allErrs, field.TooLong(fldPath.Child("subresource"), fields.Subresource, MaxSubresourceNameLength))
 		}
 	}
 	return allErrs

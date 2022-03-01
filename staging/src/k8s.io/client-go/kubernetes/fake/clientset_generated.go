@@ -46,6 +46,8 @@ import (
 	fakeauthorizationv1beta1 "k8s.io/client-go/kubernetes/typed/authorization/v1beta1/fake"
 	autoscalingv1 "k8s.io/client-go/kubernetes/typed/autoscaling/v1"
 	fakeautoscalingv1 "k8s.io/client-go/kubernetes/typed/autoscaling/v1/fake"
+	autoscalingv2 "k8s.io/client-go/kubernetes/typed/autoscaling/v2"
+	fakeautoscalingv2 "k8s.io/client-go/kubernetes/typed/autoscaling/v2/fake"
 	autoscalingv2beta1 "k8s.io/client-go/kubernetes/typed/autoscaling/v2beta1"
 	fakeautoscalingv2beta1 "k8s.io/client-go/kubernetes/typed/autoscaling/v2beta1/fake"
 	autoscalingv2beta2 "k8s.io/client-go/kubernetes/typed/autoscaling/v2beta2"
@@ -64,8 +66,8 @@ import (
 	fakecoordinationv1beta1 "k8s.io/client-go/kubernetes/typed/coordination/v1beta1/fake"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	fakecorev1 "k8s.io/client-go/kubernetes/typed/core/v1/fake"
-	discoveryv1alpha1 "k8s.io/client-go/kubernetes/typed/discovery/v1alpha1"
-	fakediscoveryv1alpha1 "k8s.io/client-go/kubernetes/typed/discovery/v1alpha1/fake"
+	discoveryv1 "k8s.io/client-go/kubernetes/typed/discovery/v1"
+	fakediscoveryv1 "k8s.io/client-go/kubernetes/typed/discovery/v1/fake"
 	discoveryv1beta1 "k8s.io/client-go/kubernetes/typed/discovery/v1beta1"
 	fakediscoveryv1beta1 "k8s.io/client-go/kubernetes/typed/discovery/v1beta1/fake"
 	eventsv1 "k8s.io/client-go/kubernetes/typed/events/v1"
@@ -78,6 +80,8 @@ import (
 	fakeflowcontrolv1alpha1 "k8s.io/client-go/kubernetes/typed/flowcontrol/v1alpha1/fake"
 	flowcontrolv1beta1 "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta1"
 	fakeflowcontrolv1beta1 "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta1/fake"
+	flowcontrolv1beta2 "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta2"
+	fakeflowcontrolv1beta2 "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta2/fake"
 	networkingv1 "k8s.io/client-go/kubernetes/typed/networking/v1"
 	fakenetworkingv1 "k8s.io/client-go/kubernetes/typed/networking/v1/fake"
 	networkingv1beta1 "k8s.io/client-go/kubernetes/typed/networking/v1beta1"
@@ -88,6 +92,8 @@ import (
 	fakenodev1alpha1 "k8s.io/client-go/kubernetes/typed/node/v1alpha1/fake"
 	nodev1beta1 "k8s.io/client-go/kubernetes/typed/node/v1beta1"
 	fakenodev1beta1 "k8s.io/client-go/kubernetes/typed/node/v1beta1/fake"
+	policyv1 "k8s.io/client-go/kubernetes/typed/policy/v1"
+	fakepolicyv1 "k8s.io/client-go/kubernetes/typed/policy/v1/fake"
 	policyv1beta1 "k8s.io/client-go/kubernetes/typed/policy/v1beta1"
 	fakepolicyv1beta1 "k8s.io/client-go/kubernetes/typed/policy/v1beta1/fake"
 	rbacv1 "k8s.io/client-go/kubernetes/typed/rbac/v1"
@@ -156,7 +162,10 @@ func (c *Clientset) Tracker() testing.ObjectTracker {
 	return c.tracker
 }
 
-var _ clientset.Interface = &Clientset{}
+var (
+	_ clientset.Interface = &Clientset{}
+	_ testing.FakeClient  = &Clientset{}
+)
 
 // AdmissionregistrationV1 retrieves the AdmissionregistrationV1Client
 func (c *Clientset) AdmissionregistrationV1() admissionregistrationv1.AdmissionregistrationV1Interface {
@@ -213,6 +222,11 @@ func (c *Clientset) AutoscalingV1() autoscalingv1.AutoscalingV1Interface {
 	return &fakeautoscalingv1.FakeAutoscalingV1{Fake: &c.Fake}
 }
 
+// AutoscalingV2 retrieves the AutoscalingV2Client
+func (c *Clientset) AutoscalingV2() autoscalingv2.AutoscalingV2Interface {
+	return &fakeautoscalingv2.FakeAutoscalingV2{Fake: &c.Fake}
+}
+
 // AutoscalingV2beta1 retrieves the AutoscalingV2beta1Client
 func (c *Clientset) AutoscalingV2beta1() autoscalingv2beta1.AutoscalingV2beta1Interface {
 	return &fakeautoscalingv2beta1.FakeAutoscalingV2beta1{Fake: &c.Fake}
@@ -258,9 +272,9 @@ func (c *Clientset) CoreV1() corev1.CoreV1Interface {
 	return &fakecorev1.FakeCoreV1{Fake: &c.Fake}
 }
 
-// DiscoveryV1alpha1 retrieves the DiscoveryV1alpha1Client
-func (c *Clientset) DiscoveryV1alpha1() discoveryv1alpha1.DiscoveryV1alpha1Interface {
-	return &fakediscoveryv1alpha1.FakeDiscoveryV1alpha1{Fake: &c.Fake}
+// DiscoveryV1 retrieves the DiscoveryV1Client
+func (c *Clientset) DiscoveryV1() discoveryv1.DiscoveryV1Interface {
+	return &fakediscoveryv1.FakeDiscoveryV1{Fake: &c.Fake}
 }
 
 // DiscoveryV1beta1 retrieves the DiscoveryV1beta1Client
@@ -293,6 +307,11 @@ func (c *Clientset) FlowcontrolV1beta1() flowcontrolv1beta1.FlowcontrolV1beta1In
 	return &fakeflowcontrolv1beta1.FakeFlowcontrolV1beta1{Fake: &c.Fake}
 }
 
+// FlowcontrolV1beta2 retrieves the FlowcontrolV1beta2Client
+func (c *Clientset) FlowcontrolV1beta2() flowcontrolv1beta2.FlowcontrolV1beta2Interface {
+	return &fakeflowcontrolv1beta2.FakeFlowcontrolV1beta2{Fake: &c.Fake}
+}
+
 // NetworkingV1 retrieves the NetworkingV1Client
 func (c *Clientset) NetworkingV1() networkingv1.NetworkingV1Interface {
 	return &fakenetworkingv1.FakeNetworkingV1{Fake: &c.Fake}
@@ -316,6 +335,11 @@ func (c *Clientset) NodeV1alpha1() nodev1alpha1.NodeV1alpha1Interface {
 // NodeV1beta1 retrieves the NodeV1beta1Client
 func (c *Clientset) NodeV1beta1() nodev1beta1.NodeV1beta1Interface {
 	return &fakenodev1beta1.FakeNodeV1beta1{Fake: &c.Fake}
+}
+
+// PolicyV1 retrieves the PolicyV1Client
+func (c *Clientset) PolicyV1() policyv1.PolicyV1Interface {
+	return &fakepolicyv1.FakePolicyV1{Fake: &c.Fake}
 }
 
 // PolicyV1beta1 retrieves the PolicyV1beta1Client

@@ -458,6 +458,22 @@ func (c *AvailableConditionController) updateAPIServiceStatus(originalAPIService
 		return newAPIService, nil
 	}
 
+	orig := apiregistrationv1apihelper.GetAPIServiceConditionByType(originalAPIService, apiregistrationv1.Available)
+	now := apiregistrationv1apihelper.GetAPIServiceConditionByType(newAPIService, apiregistrationv1.Available)
+	unknown := apiregistrationv1.APIServiceCondition{
+		Type:   apiregistrationv1.Available,
+		Status: apiregistrationv1.ConditionUnknown,
+	}
+	if orig == nil {
+		orig = &unknown
+	}
+	if now == nil {
+		now = &unknown
+	}
+	if *orig != *now {
+		klog.V(2).InfoS("changing APIService availability", "name", newAPIService.Name, "oldStatus", orig.Status, "newStatus", now.Status, "message", now.Message, "reason", now.Reason)
+	}
+
 	newAPIService, err := c.apiServiceClient.APIServices().UpdateStatus(context.TODO(), newAPIService, metav1.UpdateOptions{})
 	if err != nil {
 		return nil, err
@@ -468,7 +484,7 @@ func (c *AvailableConditionController) updateAPIServiceStatus(originalAPIService
 }
 
 // Run starts the AvailableConditionController loop which manages the availability condition of API services.
-func (c *AvailableConditionController) Run(threadiness int, stopCh <-chan struct{}) {
+func (c *AvailableConditionController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
@@ -479,7 +495,7 @@ func (c *AvailableConditionController) Run(threadiness int, stopCh <-chan struct
 		return
 	}
 
-	for i := 0; i < threadiness; i++ {
+	for i := 0; i < workers; i++ {
 		go wait.Until(c.runWorker, time.Second, stopCh)
 	}
 

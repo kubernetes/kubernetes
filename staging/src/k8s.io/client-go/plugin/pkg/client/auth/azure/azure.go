@@ -84,7 +84,15 @@ func (c *azureTokenCache) setToken(tokenKey string, token *azureToken) {
 	c.cache[tokenKey] = token
 }
 
+var warnOnce sync.Once
+
 func newAzureAuthProvider(_ string, cfg map[string]string, persister restclient.AuthProviderConfigPersister) (restclient.AuthProvider, error) {
+	// deprecated in v1.22, remove in v1.25
+	warnOnce.Do(func() {
+		klog.Warningf(`WARNING: the azure auth plugin is deprecated in v1.22+, unavailable in v1.25+; use https://github.com/Azure/kubelogin instead.
+To learn more, consult https://kubernetes.io/docs/reference/access-authn-authz/authentication/#client-go-credential-plugins`)
+	})
+
 	var (
 		ts          tokenSource
 		environment azure.Environment
@@ -354,7 +362,6 @@ func (ts *azureTokenSource) Refresh(token *azureToken) (*azureToken, error) {
 }
 
 // refresh outdated token with adal.
-// adal.RefreshTokenError will be returned if error occur during refreshing.
 func (ts *azureTokenSourceDeviceCode) Refresh(token *azureToken) (*azureToken, error) {
 	env, err := azure.EnvironmentFromName(token.environment)
 	if err != nil {
@@ -388,7 +395,8 @@ func (ts *azureTokenSourceDeviceCode) Refresh(token *azureToken) (*azureToken, e
 	}
 
 	if err := spt.Refresh(); err != nil {
-		return nil, fmt.Errorf("refreshing token: %v", err)
+		// Caller expects IsTokenRefreshError(err) to trigger prompt.
+		return nil, fmt.Errorf("refreshing token: %w", err)
 	}
 
 	return &azureToken{

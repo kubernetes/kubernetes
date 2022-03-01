@@ -18,7 +18,7 @@ package manifest
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"time"
 
@@ -115,7 +115,7 @@ func DaemonSetFromURL(url string) (*appsv1.DaemonSet, error) {
 	}
 	defer response.Body.Close()
 
-	data, err := ioutil.ReadAll(response.Body)
+	data, err := io.ReadAll(response.Body)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to read html response body: %v", err)
 	}

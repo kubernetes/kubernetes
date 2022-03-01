@@ -24,11 +24,13 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/discovery"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/metricsutil"
+	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 	metricsapi "k8s.io/metrics/pkg/apis/metrics"
@@ -41,13 +43,16 @@ import (
 )
 
 type TopPodOptions struct {
-	ResourceName    string
-	Namespace       string
-	Selector        string
-	SortBy          string
-	AllNamespaces   bool
-	PrintContainers bool
-	NoHeaders       bool
+	ResourceName       string
+	Namespace          string
+	LabelSelector      string
+	FieldSelector      string
+	SortBy             string
+	AllNamespaces      bool
+	PrintContainers    bool
+	NoHeaders          bool
+	UseProtocolBuffers bool
+
 	PodClient       corev1client.PodsGetter
 	Printer         *metricsutil.TopCmdPrinter
 	DiscoveryClient discovery.DiscoveryInterface
@@ -60,7 +65,7 @@ const metricsCreationDelay = 2 * time.Minute
 
 var (
 	topPodLong = templates.LongDesc(i18n.T(`
-		Display Resource (CPU/Memory/Storage) usage of pods.
+		Display resource (CPU/memory) usage of pods.
 
 		The 'top pod' command allows you to see the resource consumption of pods.
 
@@ -84,16 +89,18 @@ var (
 func NewCmdTopPod(f cmdutil.Factory, o *TopPodOptions, streams genericclioptions.IOStreams) *cobra.Command {
 	if o == nil {
 		o = &TopPodOptions{
-			IOStreams: streams,
+			IOStreams:          streams,
+			UseProtocolBuffers: true,
 		}
 	}
 
 	cmd := &cobra.Command{
 		Use:                   "pod [NAME | -l label]",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Display Resource (CPU/Memory/Storage) usage of pods"),
+		Short:                 i18n.T("Display resource (CPU/memory) usage of pods"),
 		Long:                  topPodLong,
 		Example:               topPodExample,
+		ValidArgsFunction:     util.ResourceNameCompletionFunc(f, "pod"),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
@@ -101,11 +108,13 @@ func NewCmdTopPod(f cmdutil.Factory, o *TopPodOptions, streams genericclioptions
 		},
 		Aliases: []string{"pods", "po"},
 	}
-	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
-	cmd.Flags().StringVar(&o.SortBy, "sort-by", o.Selector, "If non-empty, sort pods list using specified field. The field can be either 'cpu' or 'memory'.")
+	cmdutil.AddLabelSelectorFlagVar(cmd, &o.LabelSelector)
+	cmd.Flags().StringVar(&o.FieldSelector, "field-selector", o.FieldSelector, "Selector (field query) to filter on, supports '=', '==', and '!='.(e.g. --field-selector key1=value1,key2=value2). The server only supports a limited number of field queries per type.")
+	cmd.Flags().StringVar(&o.SortBy, "sort-by", o.SortBy, "If non-empty, sort pods list using specified field. The field can be either 'cpu' or 'memory'.")
 	cmd.Flags().BoolVar(&o.PrintContainers, "containers", o.PrintContainers, "If present, print usage of containers within a pod.")
 	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespaces", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 	cmd.Flags().BoolVar(&o.NoHeaders, "no-headers", o.NoHeaders, "If present, print output without headers.")
+	cmd.Flags().BoolVar(&o.UseProtocolBuffers, "use-protocol-buffers", o.UseProtocolBuffers, "Enables using protocol-buffers to access Metrics API.")
 	return cmd
 }
 
@@ -131,6 +140,9 @@ func (o *TopPodOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []s
 	if err != nil {
 		return err
 	}
+	if o.UseProtocolBuffers {
+		config.ContentType = "application/vnd.kubernetes.protobuf"
+	}
 	o.MetricsClient, err = metricsclientset.NewForConfig(config)
 	if err != nil {
 		return err
@@ -148,17 +160,24 @@ func (o *TopPodOptions) Validate() error {
 			return errors.New("--sort-by accepts only cpu or memory")
 		}
 	}
-	if len(o.ResourceName) > 0 && len(o.Selector) > 0 {
-		return errors.New("only one of NAME or --selector can be provided")
+	if len(o.ResourceName) > 0 && (len(o.LabelSelector) > 0 || len(o.FieldSelector) > 0) {
+		return errors.New("only one of NAME or selector can be provided")
 	}
 	return nil
 }
 
 func (o TopPodOptions) RunTopPod() error {
 	var err error
-	selector := labels.Everything()
-	if len(o.Selector) > 0 {
-		selector, err = labels.Parse(o.Selector)
+	labelSelector := labels.Everything()
+	if len(o.LabelSelector) > 0 {
+		labelSelector, err = labels.Parse(o.LabelSelector)
+		if err != nil {
+			return err
+		}
+	}
+	fieldSelector := fields.Everything()
+	if len(o.FieldSelector) > 0 {
+		fieldSelector, err = fields.ParseSelector(o.FieldSelector)
 		if err != nil {
 			return err
 		}
@@ -174,7 +193,7 @@ func (o TopPodOptions) RunTopPod() error {
 	if !metricsAPIAvailable {
 		return errors.New("Metrics API not available")
 	}
-	metrics, err := getMetricsFromMetricsAPI(o.MetricsClient, o.Namespace, o.ResourceName, o.AllNamespaces, selector)
+	metrics, err := getMetricsFromMetricsAPI(o.MetricsClient, o.Namespace, o.ResourceName, o.AllNamespaces, labelSelector, fieldSelector)
 	if err != nil {
 		return err
 	}
@@ -183,7 +202,7 @@ func (o TopPodOptions) RunTopPod() error {
 	if len(metrics.Items) == 0 {
 		// If the API server query is successful but all the pods are newly created,
 		// the metrics are probably not ready yet, so we return the error here in the first place.
-		err := verifyEmptyMetrics(o, selector)
+		err := verifyEmptyMetrics(o, labelSelector, fieldSelector)
 		if err != nil {
 			return err
 		}
@@ -199,7 +218,7 @@ func (o TopPodOptions) RunTopPod() error {
 	return o.Printer.PrintPodMetrics(metrics.Items, o.PrintContainers, o.AllNamespaces, o.NoHeaders, o.SortBy)
 }
 
-func getMetricsFromMetricsAPI(metricsClient metricsclientset.Interface, namespace, resourceName string, allNamespaces bool, selector labels.Selector) (*metricsapi.PodMetricsList, error) {
+func getMetricsFromMetricsAPI(metricsClient metricsclientset.Interface, namespace, resourceName string, allNamespaces bool, labelSelector labels.Selector, fieldSelector fields.Selector) (*metricsapi.PodMetricsList, error) {
 	var err error
 	ns := metav1.NamespaceAll
 	if !allNamespaces {
@@ -213,7 +232,7 @@ func getMetricsFromMetricsAPI(metricsClient metricsclientset.Interface, namespac
 		}
 		versionedMetrics.Items = []metricsv1beta1api.PodMetrics{*m}
 	} else {
-		versionedMetrics, err = metricsClient.MetricsV1beta1().PodMetricses(ns).List(context.TODO(), metav1.ListOptions{LabelSelector: selector.String()})
+		versionedMetrics, err = metricsClient.MetricsV1beta1().PodMetricses(ns).List(context.TODO(), metav1.ListOptions{LabelSelector: labelSelector.String(), FieldSelector: fieldSelector.String()})
 		if err != nil {
 			return nil, err
 		}
@@ -226,7 +245,7 @@ func getMetricsFromMetricsAPI(metricsClient metricsclientset.Interface, namespac
 	return metrics, nil
 }
 
-func verifyEmptyMetrics(o TopPodOptions, selector labels.Selector) error {
+func verifyEmptyMetrics(o TopPodOptions, labelSelector labels.Selector, fieldSelector fields.Selector) error {
 	if len(o.ResourceName) > 0 {
 		pod, err := o.PodClient.Pods(o.Namespace).Get(context.TODO(), o.ResourceName, metav1.GetOptions{})
 		if err != nil {
@@ -237,7 +256,8 @@ func verifyEmptyMetrics(o TopPodOptions, selector labels.Selector) error {
 		}
 	} else {
 		pods, err := o.PodClient.Pods(o.Namespace).List(context.TODO(), metav1.ListOptions{
-			LabelSelector: selector.String(),
+			LabelSelector: labelSelector.String(),
+			FieldSelector: fieldSelector.String(),
 		})
 		if err != nil {
 			return err
@@ -258,7 +278,6 @@ func checkPodAge(pod *v1.Pod) error {
 	age := time.Since(pod.CreationTimestamp.Time)
 	if age > metricsCreationDelay {
 		message := fmt.Sprintf("Metrics not available for pod %s/%s, age: %s", pod.Namespace, pod.Name, age.String())
-		klog.Warningf(message)
 		return errors.New(message)
 	} else {
 		klog.V(2).Infof("Metrics not yet available for pod %s/%s, age: %s", pod.Namespace, pod.Name, age.String())

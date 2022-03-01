@@ -43,10 +43,38 @@ popd >/dev/null
 
 cd "${KUBE_ROOT}"
 
-echo 'running golangci-lint '
-golangci-lint run \
-  --timeout 30m \
-  --disable-all \
-  -E deadcode \
-  -E unused \
-  -E varcheck
+# The config is in ${KUBE_ROOT}/.golangci.yaml
+echo 'running golangci-lint ' >&2
+res=0
+if [[ "$#" -gt 0 ]]; then
+    golangci-lint run "$@" >&2 || res=$?
+else
+    golangci-lint run ./... >&2 || res=$?
+    for d in staging/src/k8s.io/*; do
+        MODPATH="staging/src/k8s.io/$(basename "${d}")"
+        echo "running golangci-lint for ${KUBE_ROOT}/${MODPATH}"
+        pushd "${KUBE_ROOT}/${MODPATH}" >/dev/null
+            golangci-lint --path-prefix "${MODPATH}" run ./... >&2 || res=$?
+        popd >/dev/null
+    done
+fi
+
+# print a message based on the result
+if [ "$res" -eq 0 ]; then
+  echo 'Congratulations! All files are passing lint :-)'
+else
+  {
+    echo
+    echo 'Please review the above warnings. You can test via "./hack/verify-golangci-lint.sh"'
+    echo 'If the above warnings do not make sense, you can exempt this warning with a comment'
+    echo ' (if your reviewer is okay with it).'
+    echo 'In general please prefer to fix the error, we have already disabled specific lints'
+    echo ' that the project chooses to ignore.'
+    echo 'See: https://golangci-lint.run/usage/false-positives/'
+    echo
+  } >&2
+  exit 1
+fi
+
+# preserve the result
+exit "$res"

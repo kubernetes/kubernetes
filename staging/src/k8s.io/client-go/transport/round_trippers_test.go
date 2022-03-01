@@ -202,6 +202,25 @@ func TestImpersonationRoundTripper(t *testing.T) {
 			name: "all",
 			impersonationConfig: ImpersonationConfig{
 				UserName: "user",
+				UID:      "uid-a",
+				Groups:   []string{"one", "two"},
+				Extra: map[string][]string{
+					"first":  {"A", "a"},
+					"second": {"B", "b"},
+				},
+			},
+			expected: map[string][]string{
+				ImpersonateUserHeader:                       {"user"},
+				ImpersonateUIDHeader:                        {"uid-a"},
+				ImpersonateGroupHeader:                      {"one", "two"},
+				ImpersonateUserExtraHeaderPrefix + "First":  {"A", "a"},
+				ImpersonateUserExtraHeaderPrefix + "Second": {"B", "b"},
+			},
+		},
+		{
+			name: "username, groups and extra",
+			impersonationConfig: ImpersonationConfig{
+				UserName: "user",
 				Groups:   []string{"one", "two"},
 				Extra: map[string][]string{
 					"first":  {"A", "a"},
@@ -213,6 +232,17 @@ func TestImpersonationRoundTripper(t *testing.T) {
 				ImpersonateGroupHeader:                      {"one", "two"},
 				ImpersonateUserExtraHeaderPrefix + "First":  {"A", "a"},
 				ImpersonateUserExtraHeaderPrefix + "Second": {"B", "b"},
+			},
+		},
+		{
+			name: "username and uid",
+			impersonationConfig: ImpersonationConfig{
+				UserName: "user",
+				UID:      "uid-a",
+			},
+			expected: map[string][]string{
+				ImpersonateUserHeader: {"user"},
+				ImpersonateUIDHeader:  {"uid-a"},
 			},
 		},
 		{
@@ -480,7 +510,7 @@ func TestDebuggingRoundTripper(t *testing.T) {
 		},
 		{
 			levels:              []DebugLevel{DebugCurlCommand},
-			expectedOutputLines: []string{fmt.Sprintf("curl -k -v -X")},
+			expectedOutputLines: []string{fmt.Sprintf("curl -v -X")},
 		},
 	}
 

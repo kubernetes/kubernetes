@@ -34,7 +34,7 @@ var _ = SIGDescribe("[Feature:HPA] Horizontal pod autoscaling (scale resource: C
 	titleUp := "Should scale from 1 pod to 3 pods and from 3 to 5"
 	titleDown := "Should scale from 5 pods to 3 pods and from 3 to 1"
 
-	SIGDescribe("[Serial] [Slow] Deployment", func() {
+	ginkgo.Describe("[Serial] [Slow] Deployment", func() {
 		// CPU tests via deployments
 		ginkgo.It(titleUp, func() {
 			scaleUp("test-deployment", e2eautoscaling.KindDeployment, false, f)
@@ -44,7 +44,7 @@ var _ = SIGDescribe("[Feature:HPA] Horizontal pod autoscaling (scale resource: C
 		})
 	})
 
-	SIGDescribe("[Serial] [Slow] ReplicaSet", func() {
+	ginkgo.Describe("[Serial] [Slow] ReplicaSet", func() {
 		// CPU tests via ReplicaSets
 		ginkgo.It(titleUp, func() {
 			scaleUp("rs", e2eautoscaling.KindReplicaSet, false, f)
@@ -55,7 +55,7 @@ var _ = SIGDescribe("[Feature:HPA] Horizontal pod autoscaling (scale resource: C
 	})
 
 	// These tests take ~20 minutes each.
-	SIGDescribe("[Serial] [Slow] ReplicationController", func() {
+	ginkgo.Describe("[Serial] [Slow] ReplicationController", func() {
 		// CPU tests via replication controllers
 		ginkgo.It(titleUp+" and verify decision stability", func() {
 			scaleUp("rc", e2eautoscaling.KindRC, true, f)
@@ -65,7 +65,7 @@ var _ = SIGDescribe("[Feature:HPA] Horizontal pod autoscaling (scale resource: C
 		})
 	})
 
-	SIGDescribe("ReplicationController light", func() {
+	ginkgo.Describe("ReplicationController light", func() {
 		ginkgo.It("Should scale from 1 pod to 2 pods", func() {
 			scaleTest := &HPAScaleTest{
 				initPods:                    1,
@@ -91,6 +91,18 @@ var _ = SIGDescribe("[Feature:HPA] Horizontal pod autoscaling (scale resource: C
 			scaleTest.run("rc-light", e2eautoscaling.KindRC, f)
 		})
 	})
+
+	ginkgo.Describe("[Serial] [Slow] ReplicaSet with idle sidecar (ContainerResource use case)", func() {
+		// ContainerResource CPU autoscaling on idle sidecar
+		ginkgo.It(titleUp+" on a busy application with an idle sidecar container", func() {
+			scaleOnIdleSideCar("rs", e2eautoscaling.KindReplicaSet, false, f)
+		})
+
+		// ContainerResource CPU autoscaling on busy sidecar
+		ginkgo.It("Should not scale up on a busy sidecar with an idle application", func() {
+			doNotScaleOnBusySidecar("rs", e2eautoscaling.KindReplicaSet, true, f)
+		})
+	})
 })
 
 // HPAScaleTest struct is used by the scale(...) function.
@@ -114,7 +126,7 @@ type HPAScaleTest struct {
 // TODO The use of 3 states is arbitrary, we could eventually make this test handle "n" states once this test stabilizes.
 func (scaleTest *HPAScaleTest) run(name string, kind schema.GroupVersionKind, f *framework.Framework) {
 	const timeToWait = 15 * time.Minute
-	rc := e2eautoscaling.NewDynamicResourceConsumer(name, f.Namespace.Name, kind, scaleTest.initPods, scaleTest.totalInitialCPUUsage, 0, 0, scaleTest.perPodCPURequest, 200, f.ClientSet, f.ScalesGetter)
+	rc := e2eautoscaling.NewDynamicResourceConsumer(name, f.Namespace.Name, kind, scaleTest.initPods, scaleTest.totalInitialCPUUsage, 0, 0, scaleTest.perPodCPURequest, 200, f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle)
 	defer rc.CleanUp()
 	hpa := e2eautoscaling.CreateCPUHorizontalPodAutoscaler(rc, scaleTest.targetCPUUtilizationPercent, scaleTest.minPods, scaleTest.maxPods)
 	defer e2eautoscaling.DeleteHorizontalPodAutoscaler(rc, hpa.Name)
@@ -165,6 +177,91 @@ func scaleDown(name string, kind schema.GroupVersionKind, checkStability bool, f
 		firstScaleStasis:            stasis,
 		cpuBurst:                    10,
 		secondScale:                 1,
+	}
+	scaleTest.run(name, kind, f)
+}
+
+type HPAContainerResourceScaleTest struct {
+	initPods                    int
+	totalInitialCPUUsage        int
+	perContainerCPURequest      int64
+	targetCPUUtilizationPercent int32
+	minPods                     int32
+	maxPods                     int32
+	noScale                     bool
+	noScaleStasis               time.Duration
+	firstScale                  int
+	firstScaleStasis            time.Duration
+	cpuBurst                    int
+	secondScale                 int32
+	sidecarStatus               e2eautoscaling.SidecarStatusType
+	sidecarType                 e2eautoscaling.SidecarWorkloadType
+}
+
+func (scaleTest *HPAContainerResourceScaleTest) run(name string, kind schema.GroupVersionKind, f *framework.Framework) {
+	const timeToWait = 15 * time.Minute
+	rc := e2eautoscaling.NewDynamicResourceConsumer(name, f.Namespace.Name, kind, scaleTest.initPods, scaleTest.totalInitialCPUUsage, 0, 0, scaleTest.perContainerCPURequest, 200, f.ClientSet, f.ScalesGetter, scaleTest.sidecarStatus, scaleTest.sidecarType)
+	defer rc.CleanUp()
+	hpa := e2eautoscaling.CreateContainerResourceCPUHorizontalPodAutoscaler(rc, scaleTest.targetCPUUtilizationPercent, scaleTest.minPods, scaleTest.maxPods)
+	defer e2eautoscaling.DeleteContainerResourceHPA(rc, hpa.Name)
+
+	if scaleTest.noScale {
+		if scaleTest.noScaleStasis > 0 {
+			rc.EnsureDesiredReplicasInRange(scaleTest.initPods, scaleTest.initPods, scaleTest.noScaleStasis, hpa.Name)
+		}
+	} else {
+		rc.WaitForReplicas(scaleTest.firstScale, timeToWait)
+		if scaleTest.firstScaleStasis > 0 {
+			rc.EnsureDesiredReplicasInRange(scaleTest.firstScale, scaleTest.firstScale+1, scaleTest.firstScaleStasis, hpa.Name)
+		}
+		if scaleTest.cpuBurst > 0 && scaleTest.secondScale > 0 {
+			rc.ConsumeCPU(scaleTest.cpuBurst)
+			rc.WaitForReplicas(int(scaleTest.secondScale), timeToWait)
+		}
+	}
+}
+
+func scaleOnIdleSideCar(name string, kind schema.GroupVersionKind, checkStability bool, f *framework.Framework) {
+	// Scale up on a busy application with an idle sidecar container
+	stasis := 0 * time.Minute
+	if checkStability {
+		stasis = 10 * time.Minute
+	}
+	scaleTest := &HPAContainerResourceScaleTest{
+		initPods:                    1,
+		totalInitialCPUUsage:        125,
+		perContainerCPURequest:      250,
+		targetCPUUtilizationPercent: 20,
+		minPods:                     1,
+		maxPods:                     5,
+		firstScale:                  3,
+		firstScaleStasis:            stasis,
+		cpuBurst:                    500,
+		secondScale:                 5,
+		sidecarStatus:               e2eautoscaling.Enable,
+		sidecarType:                 e2eautoscaling.Idle,
+	}
+	scaleTest.run(name, kind, f)
+}
+
+func doNotScaleOnBusySidecar(name string, kind schema.GroupVersionKind, checkStability bool, f *framework.Framework) {
+	// Do not scale up on a busy sidecar with an idle application
+	stasis := 0 * time.Minute
+	if checkStability {
+		stasis = 1 * time.Minute
+	}
+	scaleTest := &HPAContainerResourceScaleTest{
+		initPods:                    1,
+		totalInitialCPUUsage:        250,
+		perContainerCPURequest:      500,
+		targetCPUUtilizationPercent: 20,
+		minPods:                     1,
+		maxPods:                     5,
+		cpuBurst:                    700,
+		sidecarStatus:               e2eautoscaling.Enable,
+		sidecarType:                 e2eautoscaling.Busy,
+		noScale:                     true,
+		noScaleStasis:               stasis,
 	}
 	scaleTest.run(name, kind, f)
 }

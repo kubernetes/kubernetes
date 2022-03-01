@@ -21,11 +21,10 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 )
 
@@ -88,51 +87,6 @@ func validateTaintEffect(effect v1.TaintEffect) error {
 	return nil
 }
 
-// NewTaintsVar wraps []api.Taint in a struct that implements flag.Value to allow taints to be
-// bound to command line flags.
-func NewTaintsVar(ptr *[]api.Taint) taintsVar {
-	return taintsVar{
-		ptr: ptr,
-	}
-}
-
-type taintsVar struct {
-	ptr *[]api.Taint
-}
-
-func (t taintsVar) Set(s string) error {
-	if len(s) == 0 {
-		*t.ptr = nil
-		return nil
-	}
-	sts := strings.Split(s, ",")
-	var taints []api.Taint
-	for _, st := range sts {
-		taint, err := parseTaint(st)
-		if err != nil {
-			return err
-		}
-		taints = append(taints, api.Taint{Key: taint.Key, Value: taint.Value, Effect: api.TaintEffect(taint.Effect)})
-	}
-	*t.ptr = taints
-	return nil
-}
-
-func (t taintsVar) String() string {
-	if len(*t.ptr) == 0 {
-		return ""
-	}
-	var taints []string
-	for _, taint := range *t.ptr {
-		taints = append(taints, fmt.Sprintf("%s=%s:%s", taint.Key, taint.Value, taint.Effect))
-	}
-	return strings.Join(taints, ",")
-}
-
-func (t taintsVar) Type() string {
-	return "[]api.Taint"
-}
-
 // ParseTaints takes a spec which is an array and creates slices for new taints to be added, taints to be deleted.
 // It also validates the spec. For example, the form `<key>` may be used to remove a taint, but not to add one.
 func ParseTaints(spec []string) ([]v1.Taint, []v1.Taint, error) {
@@ -192,7 +146,7 @@ func deleteTaints(taintsToRemove []v1.Taint, newTaints *[]v1.Taint) ([]error, bo
 	allErrs := []error{}
 	var removed bool
 	for _, taintToRemove := range taintsToRemove {
-		removed = false
+		removed = false // nolint:ineffassign
 		if len(taintToRemove.Effect) > 0 {
 			*newTaints, removed = DeleteTaint(*newTaints, &taintToRemove)
 		} else {
@@ -349,4 +303,24 @@ func TaintSetFilter(taints []v1.Taint, fn func(*v1.Taint) bool) []v1.Taint {
 	}
 
 	return res
+}
+
+// CheckTaintValidation checks if the given taint is valid.
+// Returns error if the given taint is invalid.
+func CheckTaintValidation(taint v1.Taint) error {
+	if errs := validation.IsQualifiedName(taint.Key); len(errs) > 0 {
+		return fmt.Errorf("invalid taint key: %s", strings.Join(errs, "; "))
+	}
+	if taint.Value != "" {
+		if errs := validation.IsValidLabelValue(taint.Value); len(errs) > 0 {
+			return fmt.Errorf("invalid taint value: %s", strings.Join(errs, "; "))
+		}
+	}
+	if taint.Effect != "" {
+		if err := validateTaintEffect(taint.Effect); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

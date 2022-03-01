@@ -44,16 +44,16 @@ var (
 		Create a role with single rule.`))
 
 	roleExample = templates.Examples(i18n.T(`
-		# Create a Role named "pod-reader" that allows user to perform "get", "watch" and "list" on pods
+		# Create a role named "pod-reader" that allows user to perform "get", "watch" and "list" on pods
 		kubectl create role pod-reader --verb=get --verb=list --verb=watch --resource=pods
 
-		# Create a Role named "pod-reader" with ResourceName specified
+		# Create a role named "pod-reader" with ResourceName specified
 		kubectl create role pod-reader --verb=get --resource=pods --resource-name=readablepod --resource-name=anotherpod
 
-		# Create a Role named "foo" with API Group specified
+		# Create a role named "foo" with API Group specified
 		kubectl create role foo --verb=get,list,watch --resource=rs.extensions
 
-		# Create a Role named "foo" with SubResource specified
+		# Create a role named "foo" with SubResource specified
 		kubectl create role foo --verb=get,list,watch --resource=pods,pods/status`))
 
 	// Valid resource verb list for validation.
@@ -112,6 +112,14 @@ var (
 	}
 )
 
+// AddSpecialVerb allows the addition of items to the `specialVerbs` map for non-k8s native resources.
+func AddSpecialVerb(verb string, gr schema.GroupResource) {
+	if resources, ok := specialVerbs[verb]; ok {
+		resources = append(resources, gr)
+		specialVerbs[verb] = resources
+	}
+}
+
 // ResourceOptions holds the related options for '--resource' option
 type ResourceOptions struct {
 	Group       string
@@ -158,7 +166,7 @@ func NewCmdCreateRole(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) 
 	cmd := &cobra.Command{
 		Use:                   "role NAME --verb=verb --resource=resource.group/subresource [--resource-name=resourcename] [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
-		Short:                 roleLong,
+		Short:                 i18n.T("Create a role with single rule"),
 		Long:                  roleLong,
 		Example:               roleExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -250,11 +258,7 @@ func (o *CreateRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args
 	if err != nil {
 		return err
 	}
-	discoveryClient, err := f.ToDiscoveryClient()
-	if err != nil {
-		return err
-	}
-	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
+	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, f.OpenAPIGetter())
 	o.OutputFormat = cmdutil.GetFlagString(cmd, "output")
 	o.CreateAnnotation = cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
 

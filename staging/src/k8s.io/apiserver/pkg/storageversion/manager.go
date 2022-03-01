@@ -40,6 +40,10 @@ type ResourceInfo struct {
 	// Used to calculate decodable versions. Can only be used after all
 	// equivalent versions are registered by InstallREST.
 	EquivalentResourceMapper runtime.EquivalentResourceRegistry
+
+	// DirectlyDecodableVersions is a list of versions that the converter for REST storage knows how to convert.  This
+	// contains items like apiextensions.k8s.io/v1beta1 even if we don't serve that version.
+	DirectlyDecodableVersions []schema.GroupVersion
 }
 
 // Manager records the resources whose StorageVersions need updates, and provides a method to update those StorageVersions.
@@ -133,13 +137,13 @@ func (s *defaultManager) UpdateStorageVersions(kubeAPIServerClientConfig *rest.C
 	// StorageVersion objects have CommonEncodingVersion (each with one server registered).
 	sortResourceInfosByGroupResource(resources)
 	for _, r := range dedupResourceInfos(resources) {
-		dv := decodableVersions(r.EquivalentResourceMapper, r.GroupResource)
+		decodableVersions := decodableVersions(r.DirectlyDecodableVersions, r.EquivalentResourceMapper, r.GroupResource)
 		gr := r.GroupResource
 		// Group must be a valid subdomain in DNS (RFC 1123)
 		if len(gr.Group) == 0 {
 			gr.Group = "core"
 		}
-		if err := updateStorageVersionFor(sc, serverID, gr, r.EncodingVersion, dv); err != nil {
+		if err := updateStorageVersionFor(sc, serverID, gr, r.EncodingVersion, decodableVersions); err != nil {
 			utilruntime.HandleError(fmt.Errorf("failed to update storage version for %v: %v", r.GroupResource, err))
 			s.recordStatusFailure(&r, err)
 			hasFailure = true
@@ -267,10 +271,23 @@ func (s *defaultManager) Completed() bool {
 	return s.completed.Load().(bool)
 }
 
-func decodableVersions(e runtime.EquivalentResourceRegistry, gr schema.GroupResource) []string {
+func decodableVersions(directlyDecodableVersions []schema.GroupVersion, e runtime.EquivalentResourceRegistry, gr schema.GroupResource) []string {
 	var versions []string
+	for _, decodableVersions := range directlyDecodableVersions {
+		versions = append(versions, decodableVersions.String())
+	}
+
 	decodingGVRs := e.EquivalentResourcesFor(gr.WithVersion(""), "")
 	for _, v := range decodingGVRs {
+		found := false
+		for _, existingVersion := range versions {
+			if existingVersion == v.GroupVersion().String() {
+				found = true
+			}
+		}
+		if found {
+			continue
+		}
 		versions = append(versions, v.GroupVersion().String())
 	}
 	return versions

@@ -44,32 +44,32 @@ import (
 
 var (
 	configMapLong = templates.LongDesc(i18n.T(`
-		Create a configmap based on a file, directory, or specified literal value.
+		Create a config map based on a file, directory, or specified literal value.
 
-		A single configmap may package one or more key/value pairs.
+		A single config map may package one or more key/value pairs.
 
-		When creating a configmap based on a file, the key will default to the basename of the file, and the value will
+		When creating a config map based on a file, the key will default to the basename of the file, and the value will
 		default to the file content.  If the basename is an invalid key, you may specify an alternate key.
 
-		When creating a configmap based on a directory, each file whose basename is a valid key in the directory will be
-		packaged into the configmap.  Any directory entries except regular files are ignored (e.g. subdirectories,
+		When creating a config map based on a directory, each file whose basename is a valid key in the directory will be
+		packaged into the config map.  Any directory entries except regular files are ignored (e.g. subdirectories,
 		symlinks, devices, pipes, etc).`))
 
 	configMapExample = templates.Examples(i18n.T(`
-		  # Create a new configmap named my-config based on folder bar
+		  # Create a new config map named my-config based on folder bar
 		  kubectl create configmap my-config --from-file=path/to/bar
 
-		  # Create a new configmap named my-config with specified keys instead of file basenames on disk
+		  # Create a new config map named my-config with specified keys instead of file basenames on disk
 		  kubectl create configmap my-config --from-file=key1=/path/to/bar/file1.txt --from-file=key2=/path/to/bar/file2.txt
 
-		  # Create a new configmap named my-config with key1=config1 and key2=config2
+		  # Create a new config map named my-config with key1=config1 and key2=config2
 		  kubectl create configmap my-config --from-literal=key1=config1 --from-literal=key2=config2
 
-		  # Create a new configmap named my-config from the key=value pairs in the file
+		  # Create a new config map named my-config from the key=value pairs in the file
 		  kubectl create configmap my-config --from-file=path/to/bar
 
-		  # Create a new configmap named my-config from an env file
-		  kubectl create configmap my-config --from-env-file=path/to/bar.env`))
+		  # Create a new config map named my-config from an env file
+		  kubectl create configmap my-config --from-env-file=path/to/foo.env --from-env-file=path/to/bar.env`))
 )
 
 // ConfigMapOptions holds properties for create configmap sub-command
@@ -86,8 +86,8 @@ type ConfigMapOptions struct {
 	FileSources []string
 	// LiteralSources to derive the configMap from (optional)
 	LiteralSources []string
-	// EnvFileSource to derive the configMap from (optional)
-	EnvFileSource string
+	// EnvFileSources to derive the configMap from (optional)
+	EnvFileSources []string
 	// AppendHash; if true, derive a hash from the ConfigMap and append it to the name
 	AppendHash bool
 
@@ -106,10 +106,8 @@ type ConfigMapOptions struct {
 // NewConfigMapOptions creates a new *ConfigMapOptions with default value
 func NewConfigMapOptions(ioStreams genericclioptions.IOStreams) *ConfigMapOptions {
 	return &ConfigMapOptions{
-		FileSources:    []string{},
-		LiteralSources: []string{},
-		PrintFlags:     genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
-		IOStreams:      ioStreams,
+		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
+		IOStreams:  ioStreams,
 	}
 }
 
@@ -121,7 +119,7 @@ func NewCmdCreateConfigMap(f cmdutil.Factory, ioStreams genericclioptions.IOStre
 		Use:                   "configmap NAME [--from-file=[key=]source] [--from-literal=key1=value1] [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
 		Aliases:               []string{"cm"},
-		Short:                 i18n.T("Create a configmap from a local file, directory or literal value"),
+		Short:                 i18n.T("Create a config map from a local file, directory or literal value"),
 		Long:                  configMapLong,
 		Example:               configMapExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -138,7 +136,7 @@ func NewCmdCreateConfigMap(f cmdutil.Factory, ioStreams genericclioptions.IOStre
 
 	cmd.Flags().StringSliceVar(&o.FileSources, "from-file", o.FileSources, "Key file can be specified using its file path, in which case file basename will be used as configmap key, or optionally with a key and file path, in which case the given key will be used.  Specifying a directory will iterate each named file in the directory whose basename is a valid configmap key.")
 	cmd.Flags().StringArrayVar(&o.LiteralSources, "from-literal", o.LiteralSources, "Specify a key and literal value to insert in configmap (i.e. mykey=somevalue)")
-	cmd.Flags().StringVar(&o.EnvFileSource, "from-env-file", o.EnvFileSource, "Specify the path to a file to read lines of key=val pairs to create a configmap (i.e. a Docker .env file).")
+	cmd.Flags().StringSliceVar(&o.EnvFileSources, "from-env-file", o.EnvFileSources, "Specify the path to a file to read lines of key=val pairs to create a configmap (i.e. a Docker .env file).")
 	cmd.Flags().BoolVar(&o.AppendHash, "append-hash", o.AppendHash, "Append a hash of the configmap to its name.")
 
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
@@ -205,7 +203,7 @@ func (o *ConfigMapOptions) Validate() error {
 	if len(o.Name) == 0 {
 		return fmt.Errorf("name must be specified")
 	}
-	if len(o.EnvFileSource) > 0 && (len(o.FileSources) > 0 || len(o.LiteralSources) > 0) {
+	if len(o.EnvFileSources) > 0 && (len(o.FileSources) > 0 || len(o.LiteralSources) > 0) {
 		return fmt.Errorf("from-env-file cannot be combined with from-file or from-literal")
 	}
 	return nil
@@ -215,7 +213,7 @@ func (o *ConfigMapOptions) Validate() error {
 func (o *ConfigMapOptions) Run() error {
 	configMap, err := o.createConfigMap()
 	if err != nil {
-		return nil
+		return err
 	}
 	if err := util.CreateOrUpdateAnnotation(o.CreateAnnotation, configMap, scheme.DefaultJSONEncoder()); err != nil {
 		return err
@@ -272,8 +270,8 @@ func (o *ConfigMapOptions) createConfigMap() (*corev1.ConfigMap, error) {
 			return nil, err
 		}
 	}
-	if len(o.EnvFileSource) > 0 {
-		if err := handleConfigMapFromEnvFileSource(configMap, o.EnvFileSource); err != nil {
+	if len(o.EnvFileSources) > 0 {
+		if err := handleConfigMapFromEnvFileSources(configMap, o.EnvFileSources); err != nil {
 			return nil, err
 		}
 	}
@@ -351,25 +349,31 @@ func handleConfigMapFromFileSources(configMap *corev1.ConfigMap, fileSources []s
 	return nil
 }
 
-// handleConfigMapFromEnvFileSource adds the specified env file source information
+// handleConfigMapFromEnvFileSources adds the specified env file source information
 // into the provided configMap
-func handleConfigMapFromEnvFileSource(configMap *corev1.ConfigMap, envFileSource string) error {
-	info, err := os.Stat(envFileSource)
-	if err != nil {
-		switch err := err.(type) {
-		case *os.PathError:
-			return fmt.Errorf("error reading %s: %v", envFileSource, err.Err)
-		default:
-			return fmt.Errorf("error reading %s: %v", envFileSource, err)
+func handleConfigMapFromEnvFileSources(configMap *corev1.ConfigMap, envFileSources []string) error {
+	for _, envFileSource := range envFileSources {
+		info, err := os.Stat(envFileSource)
+		if err != nil {
+			switch err := err.(type) {
+			case *os.PathError:
+				return fmt.Errorf("error reading %s: %v", envFileSource, err.Err)
+			default:
+				return fmt.Errorf("error reading %s: %v", envFileSource, err)
+			}
+		}
+		if info.IsDir() {
+			return fmt.Errorf("env config file cannot be a directory")
+		}
+		err = cmdutil.AddFromEnvFile(envFileSource, func(key, value string) error {
+			return addKeyFromLiteralToConfigMap(configMap, key, value)
+		})
+		if err != nil {
+			return err
 		}
 	}
-	if info.IsDir() {
-		return fmt.Errorf("env config file cannot be a directory")
-	}
 
-	return cmdutil.AddFromEnvFile(envFileSource, func(key, value string) error {
-		return addKeyFromLiteralToConfigMap(configMap, key, value)
-	})
+	return nil
 }
 
 // addKeyFromFileToConfigMap adds a key with the given name to a ConfigMap, populating

@@ -31,8 +31,8 @@ import (
 )
 
 // rollback the deployment to the specified revision. In any case cleanup the rollback spec.
-func (dc *DeploymentController) rollback(d *apps.Deployment, rsList []*apps.ReplicaSet) error {
-	newRS, allOldRSs, err := dc.getAllReplicaSetsAndSyncRevision(d, rsList, true)
+func (dc *DeploymentController) rollback(ctx context.Context, d *apps.Deployment, rsList []*apps.ReplicaSet) error {
+	newRS, allOldRSs, err := dc.getAllReplicaSetsAndSyncRevision(ctx, d, rsList, true)
 	if err != nil {
 		return err
 	}
@@ -45,7 +45,7 @@ func (dc *DeploymentController) rollback(d *apps.Deployment, rsList []*apps.Repl
 			// If we still can't find the last revision, gives up rollback
 			dc.emitRollbackWarningEvent(d, deploymentutil.RollbackRevisionNotFound, "Unable to find last revision.")
 			// Gives up rollback
-			return dc.updateDeploymentAndClearRollbackTo(d)
+			return dc.updateDeploymentAndClearRollbackTo(ctx, d)
 		}
 	}
 	for _, rs := range allRSs {
@@ -59,7 +59,7 @@ func (dc *DeploymentController) rollback(d *apps.Deployment, rsList []*apps.Repl
 			// rollback by copying podTemplate.Spec from the replica set
 			// revision number will be incremented during the next getAllReplicaSetsAndSyncRevision call
 			// no-op if the spec matches current deployment's podTemplate.Spec
-			performedRollback, err := dc.rollbackToTemplate(d, rs)
+			performedRollback, err := dc.rollbackToTemplate(ctx, d, rs)
 			if performedRollback && err == nil {
 				dc.emitRollbackNormalEvent(d, fmt.Sprintf("Rolled back deployment %q to revision %d", d.Name, rollbackTo.Revision))
 			}
@@ -68,13 +68,13 @@ func (dc *DeploymentController) rollback(d *apps.Deployment, rsList []*apps.Repl
 	}
 	dc.emitRollbackWarningEvent(d, deploymentutil.RollbackRevisionNotFound, "Unable to find the revision to rollback to.")
 	// Gives up rollback
-	return dc.updateDeploymentAndClearRollbackTo(d)
+	return dc.updateDeploymentAndClearRollbackTo(ctx, d)
 }
 
 // rollbackToTemplate compares the templates of the provided deployment and replica set and
 // updates the deployment with the replica set template in case they are different. It also
 // cleans up the rollback spec so subsequent requeues of the deployment won't end up in here.
-func (dc *DeploymentController) rollbackToTemplate(d *apps.Deployment, rs *apps.ReplicaSet) (bool, error) {
+func (dc *DeploymentController) rollbackToTemplate(ctx context.Context, d *apps.Deployment, rs *apps.ReplicaSet) (bool, error) {
 	performedRollback := false
 	if !deploymentutil.EqualIgnoreHash(&d.Spec.Template, &rs.Spec.Template) {
 		klog.V(4).Infof("Rolling back deployment %q to template spec %+v", d.Name, rs.Spec.Template.Spec)
@@ -98,7 +98,7 @@ func (dc *DeploymentController) rollbackToTemplate(d *apps.Deployment, rs *apps.
 		dc.emitRollbackWarningEvent(d, deploymentutil.RollbackTemplateUnchanged, eventMsg)
 	}
 
-	return performedRollback, dc.updateDeploymentAndClearRollbackTo(d)
+	return performedRollback, dc.updateDeploymentAndClearRollbackTo(ctx, d)
 }
 
 func (dc *DeploymentController) emitRollbackWarningEvent(d *apps.Deployment, reason, message string) {
@@ -112,10 +112,10 @@ func (dc *DeploymentController) emitRollbackNormalEvent(d *apps.Deployment, mess
 // updateDeploymentAndClearRollbackTo sets .spec.rollbackTo to nil and update the input deployment
 // It is assumed that the caller will have updated the deployment template appropriately (in case
 // we want to rollback).
-func (dc *DeploymentController) updateDeploymentAndClearRollbackTo(d *apps.Deployment) error {
+func (dc *DeploymentController) updateDeploymentAndClearRollbackTo(ctx context.Context, d *apps.Deployment) error {
 	klog.V(4).Infof("Cleans up rollbackTo of deployment %q", d.Name)
 	setRollbackTo(d, nil)
-	_, err := dc.client.AppsV1().Deployments(d.Namespace).Update(context.TODO(), d, metav1.UpdateOptions{})
+	_, err := dc.client.AppsV1().Deployments(d.Namespace).Update(ctx, d, metav1.UpdateOptions{})
 	return err
 }
 

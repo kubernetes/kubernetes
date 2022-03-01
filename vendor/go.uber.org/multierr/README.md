@@ -17,7 +17,7 @@ Released under the [MIT License].
 [MIT License]: LICENSE.txt
 [doc-img]: https://godoc.org/go.uber.org/multierr?status.svg
 [doc]: https://godoc.org/go.uber.org/multierr
-[ci-img]: https://travis-ci.org/uber-go/multierr.svg?branch=master
+[ci-img]: https://travis-ci.com/uber-go/multierr.svg?branch=master
 [cov-img]: https://codecov.io/gh/uber-go/multierr/branch/master/graph/badge.svg
-[ci]: https://travis-ci.org/uber-go/multierr
+[ci]: https://travis-ci.com/uber-go/multierr
 [cov]: https://codecov.io/gh/uber-go/multierr

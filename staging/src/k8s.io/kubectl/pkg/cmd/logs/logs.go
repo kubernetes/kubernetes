@@ -58,7 +58,7 @@ var (
 		kubectl logs nginx --all-containers=true
 
 		# Return snapshot logs from all containers in pods defined by label app=nginx
-		kubectl logs -lapp=nginx --all-containers=true
+		kubectl logs -l app=nginx --all-containers=true
 
 		# Return snapshot of previous terminated ruby container logs from pod web-1
 		kubectl logs -p -c ruby web-1
@@ -67,7 +67,7 @@ var (
 		kubectl logs -f -c ruby web-1
 
 		# Begin streaming the logs from all containers in pods defined by label app=nginx
-		kubectl logs -f -lapp=nginx --all-containers=true
+		kubectl logs -f -l app=nginx --all-containers=true
 
 		# Display only the most recent 20 lines of output in pod nginx
 		kubectl logs --tail=20 nginx
@@ -152,6 +152,7 @@ func NewCmdLogs(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		Short:                 i18n.T("Print the logs for a container in a pod"),
 		Long:                  logsLong,
 		Example:               logsExample,
+		ValidArgsFunction:     util.PodResourceNameAndContainerCompletionFunc(f),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
@@ -176,7 +177,7 @@ func (o *LogsOptions) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVar(&o.InsecureSkipTLSVerifyBackend, "insecure-skip-tls-verify-backend", o.InsecureSkipTLSVerifyBackend,
 		"Skip verifying the identity of the kubelet that logs are requested from.  In theory, an attacker could provide invalid log content back. You might want to use this if your kubelet serving certificates have expired.")
 	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodLogsTimeout)
-	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on.")
+	cmdutil.AddLabelSelectorFlagVar(cmd, &o.Selector)
 	cmd.Flags().IntVar(&o.MaxFollowConcurrency, "max-log-requests", o.MaxFollowConcurrency, "Specify maximum number of concurrent logs to follow when using by a selector. Defaults to 5.")
 	cmd.Flags().BoolVar(&o.Prefix, "prefix", o.Prefix, "Prefix each log line with the log source (pod name and container name)")
 }
@@ -375,7 +376,11 @@ func (o LogsOptions) sequentialConsumeRequest(requests map[corev1.ObjectReferenc
 	for objRef, request := range requests {
 		out := o.addPrefixIfNeeded(objRef, o.Out)
 		if err := o.ConsumeRequestFn(request, out); err != nil {
-			return err
+			if !o.IgnoreLogErrors {
+				return err
+			}
+
+			fmt.Fprintf(o.Out, "error: %v\n", err)
 		}
 	}
 

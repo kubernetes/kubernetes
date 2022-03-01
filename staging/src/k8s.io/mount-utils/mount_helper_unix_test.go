@@ -1,3 +1,4 @@
+//go:build !windows
 // +build !windows
 
 /*
@@ -82,6 +83,7 @@ func TestParseMountInfo(t *testing.T) {
 38 28 0:34 / /sys/fs/cgroup/blkio rw,nosuid,nodev,noexec,relatime shared:20 - cgroup cgroup rw,blkio
 39 28 0:35 / /sys/fs/cgroup/memory rw,nosuid,nodev,noexec,relatime shared:21 - cgroup cgroup rw,memory
 40 28 0:36 / /sys/fs/cgroup/perf_event rw,nosuid,nodev,noexec,relatime shared:22 - cgroup cgroup rw,perf_event
+761 60 8:0 / /var/lib/kubelet/plugins/kubernetes.io/iscsi/iface-default/127.0.0.1:3260-iqn.2003-01.org.linux-iscsi.f21.x8664:sn.4b0aae584f7c-lun-0 rw,relatime shared:421 - ext4 /dev/sda rw,context="system_u:object_r:container_file_t:s0:c314,c894",data=ordered
 `
 	tempDir, filename, err := writeFile(info)
 	if err != nil {
@@ -194,6 +196,23 @@ func TestParseMountInfo(t *testing.T) {
 				FsType:         "cgroup",
 				MountOptions:   []string{"rw", "nosuid", "nodev", "noexec", "relatime"},
 				SuperOptions:   []string{"rw", "cpuset"},
+			},
+		},
+		{
+			"mount option with commas inside quotes",
+			761,
+			MountInfo{
+				ID:             761,
+				ParentID:       60,
+				Major:          8,
+				Minor:          0,
+				Root:           "/",
+				Source:         "/dev/sda",
+				MountPoint:     "/var/lib/kubelet/plugins/kubernetes.io/iscsi/iface-default/127.0.0.1:3260-iqn.2003-01.org.linux-iscsi.f21.x8664:sn.4b0aae584f7c-lun-0",
+				OptionalFields: []string{"shared:421"},
+				FsType:         "ext4",
+				MountOptions:   []string{"rw", "relatime"},
+				SuperOptions:   []string{"rw", "context=\"system_u:object_r:container_file_t:s0:c314,c894\"", "data=ordered"},
 			},
 		},
 	}

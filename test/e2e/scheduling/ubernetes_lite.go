@@ -45,7 +45,6 @@ var _ = SIGDescribe("Multi-AZ Clusters", func() {
 	var err error
 	var cleanUp func()
 	ginkgo.BeforeEach(func() {
-		e2eskipper.SkipUnlessProviderIs("gce", "gke", "aws")
 		if zoneCount <= 0 {
 			zoneCount, err = getZoneCount(f.ClientSet)
 			framework.ExpectNoError(err)
@@ -69,11 +68,11 @@ var _ = SIGDescribe("Multi-AZ Clusters", func() {
 			cleanUp()
 		}
 	})
-	ginkgo.It("should spread the pods of a service across zones", func() {
+	ginkgo.It("should spread the pods of a service across zones [Serial]", func() {
 		SpreadServiceOrFail(f, 5*zoneCount, imageutils.GetPauseImageName())
 	})
 
-	ginkgo.It("should spread the pods of a replication controller across zones", func() {
+	ginkgo.It("should spread the pods of a replication controller across zones [Serial]", func() {
 		SpreadRCOrFail(f, int32(5*zoneCount), framework.ServeHostnameImage, []string{"serve-hostname"})
 	})
 })

@@ -60,7 +60,7 @@ type endpointImpl struct {
 func newEndpointImpl(socketPath, resourceName string, callback monitorCallback) (*endpointImpl, error) {
 	client, c, err := dial(socketPath)
 	if err != nil {
-		klog.Errorf("Can't create new endpoint with path %s err %v", socketPath, err)
+		klog.ErrorS(err, "Can't create new endpoint with socket path", "path", socketPath)
 		return nil, err
 	}
 
@@ -96,7 +96,7 @@ func (e *endpointImpl) callback(resourceName string, devices []pluginapi.Device)
 func (e *endpointImpl) run() {
 	stream, err := e.client.ListAndWatch(context.Background(), &pluginapi.Empty{})
 	if err != nil {
-		klog.Errorf(errListAndWatch, e.resourceName, err)
+		klog.ErrorS(err, "listAndWatch ended unexpectedly for device plugin", "resourceName", e.resourceName)
 
 		return
 	}
@@ -104,12 +104,12 @@ func (e *endpointImpl) run() {
 	for {
 		response, err := stream.Recv()
 		if err != nil {
-			klog.Errorf(errListAndWatch, e.resourceName, err)
+			klog.ErrorS(err, "listAndWatch ended unexpectedly for device plugin", "resourceName", e.resourceName)
 			return
 		}
 
 		devs := response.Devices
-		klog.V(2).Infof("State pushed for device plugin %s", e.resourceName)
+		klog.V(2).InfoS("State pushed for device plugin", "resourceName", e.resourceName, "resourceCapacity", len(devs))
 
 		var newDevs []pluginapi.Device
 		for _, d := range devs {

@@ -46,12 +46,12 @@ if [ -z "${KUBECTL_PRUNE_WHITELIST_OVERRIDE:-}" ]; then
     core/v1/Secret
     core/v1/Service
     batch/v1/Job
-    batch/v1beta1/CronJob
+    batch/v1/CronJob
     apps/v1/DaemonSet
     apps/v1/Deployment
     apps/v1/ReplicaSet
     apps/v1/StatefulSet
-    extensions/v1beta1/Ingress
+    networking.k8s.io/v1/Ingress
   )
 else
   read -ra KUBECTL_PRUNE_WHITELIST <<< "${KUBECTL_PRUNE_WHITELIST_OVERRIDE}"
@@ -273,15 +273,22 @@ function is_leader() {
   fi
   # shellcheck disable=SC2086
   # Disabling because "${KUBECTL_OPTS}" needs to allow for expansion here
-  KUBE_CONTROLLER_MANAGER_LEADER=$(${KUBECTL} ${KUBECTL_OPTS} -n kube-system get ep kube-controller-manager \
-    -o go-template=$'{{index .metadata.annotations "control-plane.alpha.kubernetes.io/leader"}}' \
-    | sed 's/^.*"holderIdentity":"\([^"]*\)".*/\1/')
-  # If there was any problem with getting the leader election results, var will
-  # be empty. Since it's better to have multiple addon managers than no addon
-  # managers at all, we're going to assume that we're the leader in such case.
-  log INFO "Leader is $KUBE_CONTROLLER_MANAGER_LEADER"
-  # KUBE_CONTROLLER_MANAGER_LEADER value is in the form "${HOSTNAME}_*"
-  # Here we verify that the value is either empty or is in the expected form for the leader
-  KUBE_CONTROLLER_MANAGER_LEADER="${KUBE_CONTROLLER_MANAGER_LEADER##${HOSTNAME}_*}"
-  [[ "$KUBE_CONTROLLER_MANAGER_LEADER" == "" ]]
+  KUBE_CONTROLLER_MANAGER_LEADER=$(${KUBECTL} ${KUBECTL_OPTS} -n kube-system get leases.v1.coordination.k8s.io kube-controller-manager -o "jsonpath={.spec.holderIdentity}")
+
+  case "${KUBE_CONTROLLER_MANAGER_LEADER}" in
+  "")
+    log ERR "No leader election info found."
+    return 1
+    ;;
+
+  "${HOSTNAME}"_*)
+    log INFO "Leader is $KUBE_CONTROLLER_MANAGER_LEADER"
+    return 0
+    ;;
+
+  *)
+    log INFO "Leader is $KUBE_CONTROLLER_MANAGER_LEADER, not ${HOSTNAME}_*"
+    return 1
+    ;;
+  esac
 }

@@ -8,6 +8,7 @@ approvers:
   - shyamjvs
   - sig-scalability-approvers
   - wojtek-t
-
 emeritus_approvers:
-- gmarek
+  - gmarek
+labels:
+  - sig/scalability

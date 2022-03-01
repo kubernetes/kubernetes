@@ -32,6 +32,7 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/controller/finalizer"
 	"k8s.io/apiextensions-apiserver/pkg/controller/nonstructuralschema"
 	openapicontroller "k8s.io/apiextensions-apiserver/pkg/controller/openapi"
+	openapiv3controller "k8s.io/apiextensions-apiserver/pkg/controller/openapiv3"
 	"k8s.io/apiextensions-apiserver/pkg/controller/status"
 	"k8s.io/apiextensions-apiserver/pkg/registry/customresourcedefinition"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,10 +42,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
+	"k8s.io/apiserver/pkg/features"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/webhook"
 )
 
@@ -116,9 +119,11 @@ func (cfg *Config) Complete() CompletedConfig {
 	}
 
 	c.GenericConfig.EnableDiscovery = false
-	c.GenericConfig.Version = &version.Info{
-		Major: "0",
-		Minor: "1",
+	if c.GenericConfig.Version == nil {
+		c.GenericConfig.Version = &version.Info{
+			Major: "0",
+			Minor: "1",
+		}
 	}
 
 	return CompletedConfig{&c}
@@ -131,40 +136,30 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		return nil, err
 	}
 
+	// hasCRDInformerSyncedSignal is closed when the CRD informer this server uses has been fully synchronized.
+	// It ensures that requests to potential custom resource endpoints while the server hasn't installed all known HTTP paths get a 503 error instead of a 404
+	hasCRDInformerSyncedSignal := make(chan struct{})
+	if err := genericServer.RegisterMuxAndDiscoveryCompleteSignal("CRDInformerHasNotSynced", hasCRDInformerSyncedSignal); err != nil {
+		return nil, err
+	}
+
 	s := &CustomResourceDefinitions{
 		GenericAPIServer: genericServer,
 	}
 
-	// used later  to filter the served resource by those that have expired.
-	resourceExpirationEvaluator, err := genericapiserver.NewResourceExpirationEvaluator(*c.GenericConfig.Version)
-	if err != nil {
-		return nil, err
-	}
-
 	apiResourceConfig := c.GenericConfig.MergedResourceConfig
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(apiextensions.GroupName, Scheme, metav1.ParameterCodec, Codecs)
-	if resourceExpirationEvaluator.ShouldServeForVersion(1, 22) && apiResourceConfig.VersionEnabled(v1beta1.SchemeGroupVersion) {
-		storage := map[string]rest.Storage{}
-		// customresourcedefinitions
+	storage := map[string]rest.Storage{}
+	// customresourcedefinitions
+	if resource := "customresourcedefinitions"; apiResourceConfig.ResourceEnabled(v1.SchemeGroupVersion.WithResource(resource)) {
 		customResourceDefinitionStorage, err := customresourcedefinition.NewREST(Scheme, c.GenericConfig.RESTOptionsGetter)
 		if err != nil {
 			return nil, err
 		}
-		storage["customresourcedefinitions"] = customResourceDefinitionStorage
-		storage["customresourcedefinitions/status"] = customresourcedefinition.NewStatusREST(Scheme, customResourceDefinitionStorage)
-
-		apiGroupInfo.VersionedResourcesStorageMap[v1beta1.SchemeGroupVersion.Version] = storage
+		storage[resource] = customResourceDefinitionStorage
+		storage[resource+"/status"] = customresourcedefinition.NewStatusREST(Scheme, customResourceDefinitionStorage)
 	}
-	if apiResourceConfig.VersionEnabled(v1.SchemeGroupVersion) {
-		storage := map[string]rest.Storage{}
-		// customresourcedefinitions
-		customResourceDefinitionStorage, err := customresourcedefinition.NewREST(Scheme, c.GenericConfig.RESTOptionsGetter)
-		if err != nil {
-			return nil, err
-		}
-		storage["customresourcedefinitions"] = customResourceDefinitionStorage
-		storage["customresourcedefinitions/status"] = customresourcedefinition.NewStatusREST(Scheme, customResourceDefinitionStorage)
-
+	if len(storage) > 0 {
 		apiGroupInfo.VersionedResourcesStorageMap[v1.SchemeGroupVersion.Version] = storage
 	}
 
@@ -227,6 +222,10 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		crdHandler,
 	)
 	openapiController := openapicontroller.NewController(s.Informers.Apiextensions().V1().CustomResourceDefinitions())
+	var openapiv3Controller *openapiv3controller.Controller
+	if utilfeature.DefaultFeatureGate.Enabled(features.OpenAPIV3) {
+		openapiv3Controller = openapiv3controller.NewController(s.Informers.Apiextensions().V1().CustomResourceDefinitions())
+	}
 
 	s.GenericAPIServer.AddPostStartHookOrDie("start-apiextensions-informers", func(context genericapiserver.PostStartHookContext) error {
 		s.Informers.Start(context.StopCh)
@@ -239,6 +238,9 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		// and StaticOpenAPISpec are both null. In that case we don't run the CRD OpenAPI controller.
 		if s.GenericAPIServer.OpenAPIVersionedService != nil && s.GenericAPIServer.StaticOpenAPISpec != nil {
 			go openapiController.Run(s.GenericAPIServer.StaticOpenAPISpec, s.GenericAPIServer.OpenAPIVersionedService, context.StopCh)
+			if utilfeature.DefaultFeatureGate.Enabled(features.OpenAPIV3) {
+				go openapiv3Controller.Run(s.GenericAPIServer.OpenAPIV3VersionedService, context.StopCh)
+			}
 		}
 
 		go namingController.Run(context.StopCh)
@@ -261,7 +263,11 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	// but we won't go healthy until we can handle the ones already present.
 	s.GenericAPIServer.AddPostStartHookOrDie("crd-informer-synced", func(context genericapiserver.PostStartHookContext) error {
 		return wait.PollImmediateUntil(100*time.Millisecond, func() (bool, error) {
-			return s.Informers.Apiextensions().V1().CustomResourceDefinitions().Informer().HasSynced(), nil
+			if s.Informers.Apiextensions().V1().CustomResourceDefinitions().Informer().HasSynced() {
+				close(hasCRDInformerSyncedSignal)
+				return true, nil
+			}
+			return false, nil
 		}, context.StopCh)
 	})
 

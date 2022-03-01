@@ -84,7 +84,7 @@ func (a *AdmissionOptions) Validate() []error {
 	if a == nil {
 		return nil
 	}
-	errs := []error{}
+	var errs []error
 	if a.PluginNames != nil &&
 		(a.GenericAdmission.EnablePlugins != nil || a.GenericAdmission.DisablePlugins != nil) {
 		errs = append(errs, fmt.Errorf("admission-control and enable-admission-plugins/disable-admission-plugins flags are mutually exclusive"))

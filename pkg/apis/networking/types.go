@@ -77,7 +77,7 @@ type NetworkPolicySpec struct {
 	Egress []NetworkPolicyEgressRule
 
 	// List of rule types that the NetworkPolicy relates to.
-	// Valid options are "Ingress", "Egress", or "Ingress,Egress".
+	// Valid options are ["Ingress"], ["Egress"], or ["Ingress", "Egress"].
 	// If this field is not specified, it will default based on the existence of Ingress or Egress rules;
 	// policies that contain an Egress section are assumed to affect Egress, and all policies
 	// (whether or not they contain an Ingress section) are assumed to affect Ingress.
@@ -149,8 +149,8 @@ type NetworkPolicyPort struct {
 	// should be allowed by the policy. This field cannot be defined if the port field
 	// is not defined or if the port field is defined as a named (string) port.
 	// The endPort must be equal or greater than port.
-	// This feature is in Alpha state and should be enabled using the Feature Gate
-	// "NetworkPolicyEndPort".
+	// This feature is in Beta state and is enabled by default.
+	// It can be disabled using the Feature Gate "NetworkPolicyEndPort".
 	// +optional
 	EndPort *int32
 }
@@ -313,7 +313,39 @@ type IngressClassSpec struct {
 	// configuration for the controller. This is optional if the controller does
 	// not require extra parameters.
 	// +optional
-	Parameters *api.TypedLocalObjectReference
+	Parameters *IngressClassParametersReference
+}
+
+const (
+	// IngressClassParametersReferenceScopeNamespace indicates that the
+	// referenced Parameters resource is namespace-scoped.
+	IngressClassParametersReferenceScopeNamespace = "Namespace"
+	// IngressClassParametersReferenceScopeNamespace indicates that the
+	// referenced Parameters resource is cluster-scoped.
+	IngressClassParametersReferenceScopeCluster = "Cluster"
+)
+
+// IngressClassParametersReference identifies an API object. This can be used
+// to specify a cluster or namespace-scoped resource.
+type IngressClassParametersReference struct {
+	// APIGroup is the group for the resource being referenced. If APIGroup is
+	// not specified, the specified Kind must be in the core API group. For any
+	// other third-party types, APIGroup is required.
+	// +optional
+	APIGroup *string
+	// Kind is the type of resource being referenced.
+	Kind string
+	// Name is the name of resource being referenced.
+	Name string
+	// Scope represents if this refers to a cluster or namespace scoped resource.
+	// This may be set to "Cluster" (default) or "Namespace".
+	// +optional
+	Scope *string
+	// Namespace is the namespace of the resource being referenced. This field is
+	// required when scope is set to "Namespace" and must be unset when scope is set to
+	// "Cluster".
+	// +optional
+	Namespace *string
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -457,8 +489,8 @@ const (
 type HTTPIngressPath struct {
 	// Path is matched against the path of an incoming request. Currently it can
 	// contain characters disallowed from the conventional "path" part of a URL
-	// as defined by RFC 3986. Paths must begin with a '/'. When unspecified,
-	// all paths from incoming requests are matched.
+	// as defined by RFC 3986. Paths must begin with a '/' and must be present
+	// when using PathType with value "Exact" or "Prefix".
 	// +optional
 	Path string
 
@@ -502,6 +534,7 @@ type IngressServiceBackend struct {
 // ServiceBackendPort is the service port being referenced.
 type ServiceBackendPort struct {
 	// Name is the name of the port on the Service.
+	// This must be an IANA_SVC_NAME (following RFC6335).
 	// This is a mutually exclusive setting with "Number".
 	// +optional
 	Name string

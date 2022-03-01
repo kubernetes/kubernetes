@@ -22,6 +22,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -32,6 +33,7 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/net/proxy"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -101,7 +103,7 @@ func NewRoundTripperWithProxy(tlsConfig *tls.Config, followRedirects, requireSam
 	})
 }
 
-// NewRoundTripperWithProxy creates a new SpdyRoundTripper with the specified
+// NewRoundTripperWithConfig creates a new SpdyRoundTripper with the specified
 // configuration.
 func NewRoundTripperWithConfig(cfg RoundTripperConfig) *SpdyRoundTripper {
 	if cfg.Proxier == nil {
@@ -163,6 +165,18 @@ func (s *SpdyRoundTripper) dial(req *http.Request) (net.Conn, error) {
 		return s.dialWithoutProxy(req.Context(), req.URL)
 	}
 
+	switch proxyURL.Scheme {
+	case "socks5":
+		return s.dialWithSocks5Proxy(req, proxyURL)
+	case "https", "http", "":
+		return s.dialWithHttpProxy(req, proxyURL)
+	}
+
+	return nil, fmt.Errorf("proxy URL scheme not supported: %s", proxyURL.Scheme)
+}
+
+// dialWithHttpProxy dials the host specified by url through an http or an https proxy.
+func (s *SpdyRoundTripper) dialWithHttpProxy(req *http.Request, proxyURL *url.URL) (net.Conn, error) {
 	// ensure we use a canonical host with proxyReq
 	targetHost := netutil.CanonicalAddr(req.URL)
 
@@ -173,27 +187,81 @@ func (s *SpdyRoundTripper) dial(req *http.Request) (net.Conn, error) {
 		Host:   targetHost,
 	}
 
+	proxyReq = *proxyReq.WithContext(req.Context())
+
 	if pa := s.proxyAuth(proxyURL); pa != "" {
 		proxyReq.Header = http.Header{}
 		proxyReq.Header.Set("Proxy-Authorization", pa)
 	}
 
-	proxyDialConn, err := s.dialWithoutProxy(req.Context(), proxyURL)
+	proxyDialConn, err := s.dialWithoutProxy(proxyReq.Context(), proxyURL)
 	if err != nil {
 		return nil, err
 	}
 
+	//nolint:staticcheck // SA1019 ignore deprecated httputil.NewProxyClientConn
 	proxyClientConn := httputil.NewProxyClientConn(proxyDialConn, nil)
 	_, err = proxyClientConn.Do(&proxyReq)
+	//nolint:staticcheck // SA1019 ignore deprecated httputil.ErrPersistEOF: it might be
+	// returned from the invocation of proxyClientConn.Do
 	if err != nil && err != httputil.ErrPersistEOF {
 		return nil, err
 	}
 
 	rwc, _ := proxyClientConn.Hijack()
 
-	if req.URL.Scheme != "https" {
-		return rwc, nil
+	if req.URL.Scheme == "https" {
+		return s.tlsConn(proxyReq.Context(), rwc, targetHost)
 	}
+	return rwc, nil
+}
+
+// dialWithSocks5Proxy dials the host specified by url through a socks5 proxy.
+func (s *SpdyRoundTripper) dialWithSocks5Proxy(req *http.Request, proxyURL *url.URL) (net.Conn, error) {
+	// ensure we use a canonical host with proxyReq
+	targetHost := netutil.CanonicalAddr(req.URL)
+	proxyDialAddr := netutil.CanonicalAddr(proxyURL)
+
+	var auth *proxy.Auth
+	if proxyURL.User != nil {
+		pass, _ := proxyURL.User.Password()
+		auth = &proxy.Auth{
+			User:     proxyURL.User.Username(),
+			Password: pass,
+		}
+	}
+
+	dialer := s.Dialer
+	if dialer == nil {
+		dialer = &net.Dialer{
+			Timeout: 30 * time.Second,
+		}
+	}
+
+	proxyDialer, err := proxy.SOCKS5("tcp", proxyDialAddr, auth, dialer)
+	if err != nil {
+		return nil, err
+	}
+
+	// According to the implementation of proxy.SOCKS5, the type assertion will always succeed
+	contextDialer, ok := proxyDialer.(proxy.ContextDialer)
+	if !ok {
+		return nil, errors.New("SOCKS5 Dialer must implement ContextDialer")
+	}
+
+	proxyDialConn, err := contextDialer.DialContext(req.Context(), "tcp", targetHost)
+	if err != nil {
+		return nil, err
+	}
+
+	if req.URL.Scheme == "https" {
+		return s.tlsConn(req.Context(), proxyDialConn, targetHost)
+	}
+	return proxyDialConn, nil
+}
+
+// tlsConn returns a TLS client side connection using rwc as the underlying transport.
+func (s *SpdyRoundTripper) tlsConn(ctx context.Context, rwc net.Conn, targetHost string) (net.Conn, error) {
 
 	host, _, err := net.SplitHostPort(targetHost)
 	if err != nil {
@@ -212,7 +280,7 @@ func (s *SpdyRoundTripper) dial(req *http.Request) (net.Conn, error) {
 	tlsConn := tls.Client(rwc, tlsConfig)
 
 	// need to manually call Handshake() so we can call VerifyHostname() below
-	if err := tlsConn.Handshake(); err != nil {
+	if err := tlsConn.HandshakeContext(ctx); err != nil {
 		return nil, err
 	}
 

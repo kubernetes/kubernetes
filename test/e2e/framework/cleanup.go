@@ -17,6 +17,8 @@ limitations under the License.
 package framework
 
 import (
+	"reflect"
+	"runtime"
 	"sync"
 )
 
@@ -70,6 +72,7 @@ func RunCleanupActions() {
 	}()
 	// Run unlocked.
 	for _, fn := range list {
+		Logf("Running Cleanup Action: %v", runtime.FuncForPC(reflect.ValueOf(fn).Pointer()).Name())
 		fn()
 	}
 }

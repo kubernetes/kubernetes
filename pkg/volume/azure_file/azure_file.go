@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -56,7 +57,6 @@ var _ volume.ExpandableVolumePlugin = &azureFilePlugin{}
 
 const (
 	azureFilePluginName     = "kubernetes.io/azure-file"
-	defaultSecretNamespace  = "default"
 	minimumPremiumShareSize = 100 // GB
 )
 
@@ -117,7 +117,7 @@ func (plugin *azureFilePlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod
 	if err != nil {
 		return nil, err
 	}
-	secretName, secretNamespace, err := getSecretNameAndNamespace(spec, defaultSecretNamespace)
+	secretName, secretNamespace, err := getSecretNameAndNamespace(spec, pod.Namespace)
 	if err != nil {
 		// Log-and-continue instead of returning an error for now
 		// due to unspecified backwards compatibility concerns (a subject to revise)
@@ -175,7 +175,7 @@ func (plugin *azureFilePlugin) ExpandVolumeDevice(
 		resourceGroup = spec.PersistentVolume.ObjectMeta.Annotations[resourceGroupAnnotation]
 	}
 
-	secretName, secretNamespace, err := getSecretNameAndNamespace(spec, defaultSecretNamespace)
+	secretName, secretNamespace, err := getSecretNameAndNamespace(spec, spec.PersistentVolume.Spec.ClaimRef.Namespace)
 	if err != nil {
 		return oldSize, err
 	}
@@ -239,17 +239,10 @@ var _ volume.Mounter = &azureFileMounter{}
 
 func (b *azureFileMounter) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:        b.readOnly,
-		Managed:         !b.readOnly,
-		SupportsSELinux: false,
+		ReadOnly:       b.readOnly,
+		Managed:        !b.readOnly,
+		SELinuxRelabel: false,
 	}
-}
-
-// Checks prior to mount operations to verify that the required components (binaries, etc.)
-// to mount the volume are available on the underlying node.
-// If not, it returns an error
-func (b *azureFileMounter) CanMount() error {
-	return nil
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
@@ -398,7 +391,7 @@ func getSecretNameAndNamespace(spec *volume.Spec, defaultNamespace string) (stri
 func getAzureCloud(cloudProvider cloudprovider.Interface) (*azure.Cloud, error) {
 	azure, ok := cloudProvider.(*azure.Cloud)
 	if !ok || azure == nil {
-		return nil, fmt.Errorf("Failed to get Azure Cloud Provider. GetCloudProvider returned %v instead", cloudProvider)
+		return nil, fmt.Errorf("failed to get Azure Cloud Provider. GetCloudProvider returned %v instead", cloudProvider)
 	}
 
 	return azure, nil

@@ -23,9 +23,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
+	netutils "k8s.io/utils/net"
 )
 
 func TestGetPreferredAddress(t *testing.T) {
@@ -98,7 +96,6 @@ func TestGetNodeHostIPs(t *testing.T) {
 	testcases := []struct {
 		name      string
 		addresses []v1.NodeAddress
-		dualStack bool
 
 		expectIPs []net.IP
 	}{
@@ -120,7 +117,7 @@ func TestGetNodeHostIPs(t *testing.T) {
 				{Type: v1.NodeExternalIP, Address: "4.3.2.1"},
 				{Type: v1.NodeExternalIP, Address: "4.3.2.2"},
 			},
-			expectIPs: []net.IP{net.ParseIP("1.2.3.4")},
+			expectIPs: []net.IP{netutils.ParseIPSloppy("1.2.3.4")},
 		},
 		{
 			name: "IPv4-only, external-first",
@@ -129,7 +126,7 @@ func TestGetNodeHostIPs(t *testing.T) {
 				{Type: v1.NodeExternalIP, Address: "4.3.2.2"},
 				{Type: v1.NodeInternalIP, Address: "1.2.3.4"},
 			},
-			expectIPs: []net.IP{net.ParseIP("1.2.3.4")},
+			expectIPs: []net.IP{netutils.ParseIPSloppy("1.2.3.4")},
 		},
 		{
 			name: "IPv4-only, no internal",
@@ -137,10 +134,10 @@ func TestGetNodeHostIPs(t *testing.T) {
 				{Type: v1.NodeExternalIP, Address: "4.3.2.1"},
 				{Type: v1.NodeExternalIP, Address: "4.3.2.2"},
 			},
-			expectIPs: []net.IP{net.ParseIP("4.3.2.1")},
+			expectIPs: []net.IP{netutils.ParseIPSloppy("4.3.2.1")},
 		},
 		{
-			name: "dual-stack node, single-stack cluster",
+			name: "dual-stack node",
 			addresses: []v1.NodeAddress{
 				{Type: v1.NodeInternalIP, Address: "1.2.3.4"},
 				{Type: v1.NodeExternalIP, Address: "4.3.2.1"},
@@ -148,10 +145,10 @@ func TestGetNodeHostIPs(t *testing.T) {
 				{Type: v1.NodeInternalIP, Address: "a:b::c:d"},
 				{Type: v1.NodeExternalIP, Address: "d:c::b:a"},
 			},
-			expectIPs: []net.IP{net.ParseIP("1.2.3.4")},
+			expectIPs: []net.IP{netutils.ParseIPSloppy("1.2.3.4"), netutils.ParseIPSloppy("a:b::c:d")},
 		},
 		{
-			name: "dual-stack node, dual-stack cluster",
+			name: "dual-stack node",
 			addresses: []v1.NodeAddress{
 				{Type: v1.NodeInternalIP, Address: "1.2.3.4"},
 				{Type: v1.NodeExternalIP, Address: "4.3.2.1"},
@@ -159,11 +156,10 @@ func TestGetNodeHostIPs(t *testing.T) {
 				{Type: v1.NodeInternalIP, Address: "a:b::c:d"},
 				{Type: v1.NodeExternalIP, Address: "d:c::b:a"},
 			},
-			dualStack: true,
-			expectIPs: []net.IP{net.ParseIP("1.2.3.4"), net.ParseIP("a:b::c:d")},
+			expectIPs: []net.IP{netutils.ParseIPSloppy("1.2.3.4"), netutils.ParseIPSloppy("a:b::c:d")},
 		},
 		{
-			name: "dual-stack node, different order, single-stack cluster",
+			name: "dual-stack node, different order",
 			addresses: []v1.NodeAddress{
 				{Type: v1.NodeInternalIP, Address: "1.2.3.4"},
 				{Type: v1.NodeInternalIP, Address: "a:b::c:d"},
@@ -171,10 +167,10 @@ func TestGetNodeHostIPs(t *testing.T) {
 				{Type: v1.NodeExternalIP, Address: "4.3.2.2"},
 				{Type: v1.NodeExternalIP, Address: "d:c::b:a"},
 			},
-			expectIPs: []net.IP{net.ParseIP("1.2.3.4")},
+			expectIPs: []net.IP{netutils.ParseIPSloppy("1.2.3.4"), netutils.ParseIPSloppy("a:b::c:d")},
 		},
 		{
-			name: "dual-stack node, different order, dual-stack cluster",
+			name: "dual-stack node, different order",
 			addresses: []v1.NodeAddress{
 				{Type: v1.NodeInternalIP, Address: "1.2.3.4"},
 				{Type: v1.NodeInternalIP, Address: "a:b::c:d"},
@@ -182,18 +178,17 @@ func TestGetNodeHostIPs(t *testing.T) {
 				{Type: v1.NodeExternalIP, Address: "4.3.2.2"},
 				{Type: v1.NodeExternalIP, Address: "d:c::b:a"},
 			},
-			dualStack: true,
-			expectIPs: []net.IP{net.ParseIP("1.2.3.4"), net.ParseIP("a:b::c:d")},
+			expectIPs: []net.IP{netutils.ParseIPSloppy("1.2.3.4"), netutils.ParseIPSloppy("a:b::c:d")},
 		},
 		{
-			name: "dual-stack node, IPv6-first, no internal IPv4, single-stack cluster",
+			name: "dual-stack node, IPv6-first, no internal IPv4",
 			addresses: []v1.NodeAddress{
 				{Type: v1.NodeInternalIP, Address: "a:b::c:d"},
 				{Type: v1.NodeExternalIP, Address: "d:c::b:a"},
 				{Type: v1.NodeExternalIP, Address: "4.3.2.1"},
 				{Type: v1.NodeExternalIP, Address: "4.3.2.2"},
 			},
-			expectIPs: []net.IP{net.ParseIP("a:b::c:d")},
+			expectIPs: []net.IP{netutils.ParseIPSloppy("a:b::c:d"), netutils.ParseIPSloppy("4.3.2.1")},
 		},
 		{
 			name: "dual-stack node, IPv6-first, no internal IPv4, dual-stack cluster",
@@ -203,14 +198,12 @@ func TestGetNodeHostIPs(t *testing.T) {
 				{Type: v1.NodeExternalIP, Address: "4.3.2.1"},
 				{Type: v1.NodeExternalIP, Address: "4.3.2.2"},
 			},
-			dualStack: true,
-			expectIPs: []net.IP{net.ParseIP("a:b::c:d"), net.ParseIP("4.3.2.1")},
+			expectIPs: []net.IP{netutils.ParseIPSloppy("a:b::c:d"), netutils.ParseIPSloppy("4.3.2.1")},
 		},
 	}
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, tc.dualStack)()
 			node := &v1.Node{
 				Status: v1.NodeStatus{Addresses: tc.addresses},
 			}
@@ -264,86 +257,5 @@ func TestGetHostname(t *testing.T) {
 			t.Errorf("[%d]: expected output %q, got %q", idx, test.expectedHostName, hostName)
 		}
 
-	}
-}
-
-func Test_GetZoneKey(t *testing.T) {
-	tests := []struct {
-		name string
-		node *v1.Node
-		zone string
-	}{
-		{
-			name: "has no zone or region keys",
-			node: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{},
-				},
-			},
-			zone: "",
-		},
-		{
-			name: "has beta zone and region keys",
-			node: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						v1.LabelFailureDomainBetaZone:   "zone1",
-						v1.LabelFailureDomainBetaRegion: "region1",
-					},
-				},
-			},
-			zone: "region1:\x00:zone1",
-		},
-		{
-			name: "has GA zone and region keys",
-			node: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						v1.LabelTopologyZone:   "zone1",
-						v1.LabelTopologyRegion: "region1",
-					},
-				},
-			},
-			zone: "region1:\x00:zone1",
-		},
-		{
-			name: "has both beta and GA zone and region keys",
-			node: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						v1.LabelTopologyZone:            "zone1",
-						v1.LabelTopologyRegion:          "region1",
-						v1.LabelFailureDomainBetaZone:   "zone1",
-						v1.LabelFailureDomainBetaRegion: "region1",
-					},
-				},
-			},
-			zone: "region1:\x00:zone1",
-		},
-		{
-			name: "has both beta and GA zone and region keys, beta labels take precedent",
-			node: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						v1.LabelTopologyZone:            "zone1",
-						v1.LabelTopologyRegion:          "region1",
-						v1.LabelFailureDomainBetaZone:   "zone2",
-						v1.LabelFailureDomainBetaRegion: "region2",
-					},
-				},
-			},
-			zone: "region2:\x00:zone2",
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			zone := GetZoneKey(test.node)
-			if zone != test.zone {
-				t.Logf("actual zone key: %q", zone)
-				t.Logf("expected zone key: %q", test.zone)
-				t.Errorf("unexpected zone key")
-			}
-		})
 	}
 }

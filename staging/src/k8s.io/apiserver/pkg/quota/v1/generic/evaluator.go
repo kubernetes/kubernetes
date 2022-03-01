@@ -270,7 +270,7 @@ func (o *objectCountEvaluator) MatchingScopes(item runtime.Object, scopes []core
 }
 
 // UncoveredQuotaScopes takes the input matched scopes which are limited by configuration and the matched quota scopes.
-// It returns the scopes which are in limited scopes but dont have a corresponding covering quota scope
+// It returns the scopes which are in limited scopes but don't have a corresponding covering quota scope
 func (o *objectCountEvaluator) UncoveredQuotaScopes(limitedScopes []corev1.ScopedResourceSelectorRequirement, matchedQuotaScopes []corev1.ScopedResourceSelectorRequirement) ([]corev1.ScopedResourceSelectorRequirement, error) {
 	return []corev1.ScopedResourceSelectorRequirement{}, nil
 }

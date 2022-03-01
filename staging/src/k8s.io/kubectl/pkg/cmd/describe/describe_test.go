@@ -216,6 +216,32 @@ func TestDescribeObjectSkipEvents(t *testing.T) {
 	}
 }
 
+func TestDescribeObjectChunkSize(t *testing.T) {
+	d := &testDescriber{Output: "test output"}
+	oldFn := describe.DescriberFn
+	defer func() {
+		describe.DescriberFn = oldFn
+	}()
+	describe.DescriberFn = d.describerFor
+
+	pods, _, _ := cmdtesting.TestData()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Resp:                 &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, pods)},
+	}
+
+	cmd := NewCmdDescribe("kubectl", tf, genericclioptions.NewTestIOStreamsDiscard())
+	cmd.Flags().Set("chunk-size", "100")
+	cmd.Run(cmd, []string{"pods"})
+	if d.Settings.ChunkSize != 100 {
+		t.Errorf("ChunkSize = 100 expected, got ChunkSize = %v", d.Settings.ChunkSize)
+	}
+}
+
 func TestDescribeHelpMessage(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()

@@ -31,7 +31,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
@@ -941,8 +941,8 @@ func TestCapacity(t *testing.T) {
 
 		// Create CSIStorageCapacity
 		if test.haveCapacity {
-			if _, err := config.client.StorageV1alpha1().CSIStorageCapacities("default").Create(context.TODO(),
-				&storagev1alpha1.CSIStorageCapacity{
+			if _, err := config.client.StorageV1beta1().CSIStorageCapacities("default").Create(context.TODO(),
+				&storagev1beta1.CSIStorageCapacity{
 					ObjectMeta: metav1.ObjectMeta{
 						GenerateName: "foo-",
 					},
@@ -1004,15 +1004,15 @@ func TestCapacity(t *testing.T) {
 // on provision failure.
 func TestRescheduleProvisioning(t *testing.T) {
 	// Set feature gates
-	controllerCh := make(chan struct{})
+	ctx, cancel := context.WithCancel(context.Background())
 
-	testCtx := initTestMaster(t, "reschedule-volume-provision", nil)
+	testCtx := initTestAPIServer(t, "reschedule-volume-provision", nil)
 
 	clientset := testCtx.clientSet
 	ns := testCtx.ns.Name
 
 	defer func() {
-		close(controllerCh)
+		cancel()
 		deleteTestObjects(clientset, ns, metav1.DeleteOptions{})
 		testCtx.clientSet.CoreV1().Nodes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 		testCtx.closeFn()
@@ -1024,7 +1024,7 @@ func TestRescheduleProvisioning(t *testing.T) {
 	}
 
 	// Prepare node and storage class.
-	testNode := makeNode(0)
+	testNode := makeNode(1)
 	if _, err := clientset.CoreV1().Nodes().Create(context.TODO(), testNode, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("Failed to create Node %q: %v", testNode.Name, err)
 	}
@@ -1051,9 +1051,9 @@ func TestRescheduleProvisioning(t *testing.T) {
 	}
 
 	// Start controller.
-	go ctrl.Run(controllerCh)
-	informerFactory.Start(controllerCh)
-	informerFactory.WaitForCacheSync(controllerCh)
+	go ctrl.Run(ctx)
+	informerFactory.Start(ctx.Done())
+	informerFactory.WaitForCacheSync(ctx.Done())
 
 	// Validate that the annotation is removed by controller for provision reschedule.
 	if err := waitForProvisionAnn(clientset, pvc, false); err != nil {
@@ -1062,23 +1062,23 @@ func TestRescheduleProvisioning(t *testing.T) {
 }
 
 func setupCluster(t *testing.T, nsName string, numberOfNodes int, resyncPeriod time.Duration, provisionDelaySeconds int) *testConfig {
-	textCtx := initTestSchedulerWithOptions(t, initTestMaster(t, nsName, nil), resyncPeriod)
-	clientset := textCtx.clientSet
-	ns := textCtx.ns.Name
+	testCtx := initTestSchedulerWithOptions(t, initTestAPIServer(t, nsName, nil), resyncPeriod)
+	clientset := testCtx.clientSet
+	ns := testCtx.ns.Name
 
-	ctrl, informerFactory, err := initPVController(t, textCtx, provisionDelaySeconds)
+	ctrl, informerFactory, err := initPVController(t, testCtx, provisionDelaySeconds)
 	if err != nil {
 		t.Fatalf("Failed to create PV controller: %v", err)
 	}
-	go ctrl.Run(textCtx.ctx.Done())
+	go ctrl.Run(testCtx.ctx)
 	// Start informer factory after all controllers are configured and running.
-	informerFactory.Start(textCtx.ctx.Done())
-	informerFactory.WaitForCacheSync(textCtx.ctx.Done())
+	informerFactory.Start(testCtx.ctx.Done())
+	informerFactory.WaitForCacheSync(testCtx.ctx.Done())
 
 	// Create shared objects
 	// Create nodes
 	for i := 0; i < numberOfNodes; i++ {
-		testNode := makeNode(i)
+		testNode := makeNode(i + 1)
 		if _, err := clientset.CoreV1().Nodes().Create(context.TODO(), testNode, metav1.CreateOptions{}); err != nil {
 			t.Fatalf("Failed to create Node %q: %v", testNode.Name, err)
 		}
@@ -1094,11 +1094,11 @@ func setupCluster(t *testing.T, nsName string, numberOfNodes int, resyncPeriod t
 	return &testConfig{
 		client: clientset,
 		ns:     ns,
-		stop:   textCtx.ctx.Done(),
+		stop:   testCtx.ctx.Done(),
 		teardown: func() {
 			klog.Infof("test cluster %q start to tear down", ns)
 			deleteTestObjects(clientset, ns, metav1.DeleteOptions{})
-			cleanupTest(t, textCtx)
+			cleanupTest(t, testCtx)
 		},
 	}
 }
@@ -1155,7 +1155,7 @@ func deleteTestObjects(client clientset.Interface, ns string, option metav1.Dele
 	client.CoreV1().PersistentVolumes().DeleteCollection(context.TODO(), option, metav1.ListOptions{})
 	client.StorageV1().StorageClasses().DeleteCollection(context.TODO(), option, metav1.ListOptions{})
 	client.StorageV1().CSIDrivers().DeleteCollection(context.TODO(), option, metav1.ListOptions{})
-	client.StorageV1alpha1().CSIStorageCapacities("default").DeleteCollection(context.TODO(), option, metav1.ListOptions{})
+	client.StorageV1beta1().CSIStorageCapacities("default").DeleteCollection(context.TODO(), option, metav1.ListOptions{})
 }
 
 func makeStorageClass(name string, mode *storagev1.VolumeBindingMode) *storagev1.StorageClass {
@@ -1199,26 +1199,29 @@ func makePV(name, scName, pvcName, ns, node string) *v1.PersistentVolume {
 					Path: "/test-path",
 				},
 			},
-			NodeAffinity: &v1.VolumeNodeAffinity{
-				Required: &v1.NodeSelector{
-					NodeSelectorTerms: []v1.NodeSelectorTerm{
-						{
-							MatchExpressions: []v1.NodeSelectorRequirement{
-								{
-									Key:      nodeAffinityLabelKey,
-									Operator: v1.NodeSelectorOpIn,
-									Values:   []string{node},
-								},
-							},
-						},
-					},
-				},
-			},
 		},
 	}
 
 	if pvcName != "" {
 		pv.Spec.ClaimRef = &v1.ObjectReference{Name: pvcName, Namespace: ns}
+	}
+
+	if node != "" {
+		pv.Spec.NodeAffinity = &v1.VolumeNodeAffinity{
+			Required: &v1.NodeSelector{
+				NodeSelectorTerms: []v1.NodeSelectorTerm{
+					{
+						MatchExpressions: []v1.NodeSelectorRequirement{
+							{
+								Key:      nodeAffinityLabelKey,
+								Operator: v1.NodeSelectorOpIn,
+								Values:   []string{node},
+							},
+						},
+					},
+				},
+			},
+		}
 	}
 
 	return pv
@@ -1280,11 +1283,13 @@ func makePod(name, ns string, pvcs []string) *v1.Pod {
 	}
 }
 
+// makeNode creates a node with the name "node-<index>"
 func makeNode(index int) *v1.Node {
+	name := fmt.Sprintf("node-%d", index)
 	return &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:   fmt.Sprintf("node-%d", index+1),
-			Labels: map[string]string{nodeAffinityLabelKey: fmt.Sprintf("node-%d", index+1)},
+			Name:   name,
+			Labels: map[string]string{nodeAffinityLabelKey: name},
 		},
 		Spec: v1.NodeSpec{Unschedulable: false},
 		Status: v1.NodeStatus{

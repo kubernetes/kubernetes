@@ -20,12 +20,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"k8s.io/kubernetes/test/e2e/storage/utils"
 	"net"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
+
+	"k8s.io/kubernetes/test/e2e/storage/utils"
 
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
@@ -40,9 +41,9 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-
+	"k8s.io/kubernetes/test/e2e/network/common"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	utilnet "k8s.io/utils/net"
+	netutils "k8s.io/utils/net"
 )
 
 /*
@@ -59,7 +60,7 @@ type protocolPort struct {
 	protocol v1.Protocol
 }
 
-var _ = SIGDescribeCopy("NetworkPolicy [LinuxOnly]", func() {
+var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 	var service *v1.Service
 	var podServer *v1.Pod
 	var podServerLabelSelector string
@@ -1346,7 +1347,7 @@ var _ = SIGDescribeCopy("NetworkPolicy [LinuxOnly]", func() {
 				framework.ExpectNoError(err, "Error occurred while getting pod status.")
 			}
 			hostMask := 32
-			if utilnet.IsIPv6String(podServerStatus.Status.PodIP) {
+			if netutils.IsIPv6String(podServerStatus.Status.PodIP) {
 				hostMask = 128
 			}
 			podServerCIDR := fmt.Sprintf("%s/%d", podServerStatus.Status.PodIP, hostMask)
@@ -1416,11 +1417,11 @@ var _ = SIGDescribeCopy("NetworkPolicy [LinuxOnly]", func() {
 
 			allowMask := 24
 			hostMask := 32
-			if utilnet.IsIPv6String(podServerStatus.Status.PodIP) {
+			if netutils.IsIPv6String(podServerStatus.Status.PodIP) {
 				allowMask = 64
 				hostMask = 128
 			}
-			_, podServerAllowSubnet, err := net.ParseCIDR(fmt.Sprintf("%s/%d", podServerStatus.Status.PodIP, allowMask))
+			_, podServerAllowSubnet, err := netutils.ParseCIDRSloppy(fmt.Sprintf("%s/%d", podServerStatus.Status.PodIP, allowMask))
 			framework.ExpectNoError(err, "could not parse allow subnet")
 			podServerAllowCIDR := podServerAllowSubnet.String()
 
@@ -1479,11 +1480,11 @@ var _ = SIGDescribeCopy("NetworkPolicy [LinuxOnly]", func() {
 
 			allowMask := 24
 			hostMask := 32
-			if utilnet.IsIPv6String(podServerStatus.Status.PodIP) {
+			if netutils.IsIPv6String(podServerStatus.Status.PodIP) {
 				allowMask = 64
 				hostMask = 128
 			}
-			_, podServerAllowSubnet, err := net.ParseCIDR(fmt.Sprintf("%s/%d", podServerStatus.Status.PodIP, allowMask))
+			_, podServerAllowSubnet, err := netutils.ParseCIDRSloppy(fmt.Sprintf("%s/%d", podServerStatus.Status.PodIP, allowMask))
 			framework.ExpectNoError(err, "could not parse allow subnet")
 			podServerAllowCIDR := podServerAllowSubnet.String()
 
@@ -1682,7 +1683,7 @@ var _ = SIGDescribeCopy("NetworkPolicy [LinuxOnly]", func() {
 			})
 			cleanupServerPodAndService(f, podA, serviceA)
 		})
-		ginkgo.It("should not allow access by TCP when a policy specifies only SCTP [Feature:NetworkPolicy] [Feature:SCTP]", func() {
+		ginkgo.It("should not allow access by TCP when a policy specifies only SCTP [Feature:NetworkPolicy]", func() {
 			ginkgo.By("getting the state of the sctp module on nodes")
 			nodes, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
 			framework.ExpectNoError(err)
@@ -1725,7 +1726,7 @@ var _ = SIGDescribeCopy("NetworkPolicy [LinuxOnly]", func() {
 	})
 })
 
-var _ = SIGDescribeCopy("NetworkPolicy [Feature:SCTPConnectivity][LinuxOnly][Disruptive]", func() {
+var _ = common.SIGDescribe("NetworkPolicy [Feature:SCTPConnectivity][LinuxOnly][Disruptive]", func() {
 	var service *v1.Service
 	var podServer *v1.Pod
 	var podServerLabelSelector string
@@ -2044,7 +2045,7 @@ func createServerPodAndService(f *framework.Framework, namespace *v1.Namespace, 
 				},
 			},
 			ReadinessProbe: &v1.Probe{
-				Handler: v1.Handler{
+				ProbeHandler: v1.ProbeHandler{
 					Exec: &v1.ExecAction{
 						Command: []string{"/agnhost", "connect", fmt.Sprintf("--protocol=%s", connectProtocol), "--timeout=1s", fmt.Sprintf("127.0.0.1:%d", portProtocol.port)},
 					},
@@ -2181,7 +2182,7 @@ func cleanupNetworkPolicy(f *framework.Framework, policy *networkingv1.NetworkPo
 	}
 }
 
-var _ = SIGDescribeCopy("NetworkPolicy API", func() {
+var _ = common.SIGDescribe("NetworkPolicy API", func() {
 	f := framework.NewDefaultFramework("networkpolicies")
 	/*
 		Release: v1.20
@@ -2245,7 +2246,9 @@ var _ = SIGDescribeCopy("NetworkPolicy API", func() {
 					}
 				}
 			}
-			framework.ExpectEqual(found, true, fmt.Sprintf("expected networking API group/version, got %#v", discoveryGroups.Groups))
+			if !found {
+				framework.Failf("expected networking API group/version, got %#v", discoveryGroups.Groups)
+			}
 		}
 		ginkgo.By("getting /apis/networking.k8s.io")
 		{
@@ -2259,7 +2262,9 @@ var _ = SIGDescribeCopy("NetworkPolicy API", func() {
 					break
 				}
 			}
-			framework.ExpectEqual(found, true, fmt.Sprintf("expected networking API version, got %#v", group.Versions))
+			if !found {
+				framework.Failf("expected networking API version, got %#v", group.Versions)
+			}
 		}
 		ginkgo.By("getting /apis/networking.k8s.io" + npVersion)
 		{
@@ -2272,7 +2277,9 @@ var _ = SIGDescribeCopy("NetworkPolicy API", func() {
 					foundNetPol = true
 				}
 			}
-			framework.ExpectEqual(foundNetPol, true, fmt.Sprintf("expected networkpolicies, got %#v", resources.APIResources))
+			if !foundNetPol {
+				framework.Failf("expected networkpolicies, got %#v", resources.APIResources)
+			}
 		}
 		// NetPol resource create/read/update/watch verbs
 		ginkgo.By("creating")
@@ -2325,10 +2332,14 @@ var _ = SIGDescribeCopy("NetworkPolicy API", func() {
 		for sawAnnotations := false; !sawAnnotations; {
 			select {
 			case evt, ok := <-npWatch.ResultChan():
-				framework.ExpectEqual(ok, true, "watch channel should not close")
+				if !ok {
+					framework.Fail("watch channel should not close")
+				}
 				framework.ExpectEqual(evt.Type, watch.Modified)
 				watchedNetPol, isNetPol := evt.Object.(*networkingv1.NetworkPolicy)
-				framework.ExpectEqual(isNetPol, true, fmt.Sprintf("expected NetworkPolicy, got %T", evt.Object))
+				if !isNetPol {
+					framework.Failf("expected NetworkPolicy, got %T", evt.Object)
+				}
 				if watchedNetPol.Annotations["patched"] == "true" && watchedNetPol.Annotations["updated"] == "true" {
 					framework.Logf("saw patched and updated annotations")
 					sawAnnotations = true
@@ -2345,7 +2356,9 @@ var _ = SIGDescribeCopy("NetworkPolicy API", func() {
 		err = npClient.Delete(context.TODO(), createdNetPol.Name, metav1.DeleteOptions{})
 		framework.ExpectNoError(err)
 		_, err = npClient.Get(context.TODO(), createdNetPol.Name, metav1.GetOptions{})
-		framework.ExpectEqual(apierrors.IsNotFound(err), true, fmt.Sprintf("expected 404, got %#v", err))
+		if !apierrors.IsNotFound(err) {
+			framework.Failf("expected 404, got %#v", err)
+		}
 		nps, err = npClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(len(nps.Items), 2, "filtered list should have 2 items")

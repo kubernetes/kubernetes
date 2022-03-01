@@ -39,27 +39,11 @@ func (f *FakeNetwork) AddInterfaceAddr(intf *net.Interface, addrs []net.Addr) {
 	f.Address[intf.Name] = addrs
 }
 
-// Addrs is part of NetworkInterfacer interface.
-func (f *FakeNetwork) Addrs(intf *net.Interface) ([]net.Addr, error) {
-	return f.Address[intf.Name], nil
+// InterfaceAddrs is part of NetworkInterfacer interface.
+func (f *FakeNetwork) InterfaceAddrs() ([]net.Addr, error) {
+	addrs := make([]net.Addr, 0)
+	for _, value := range f.Address {
+		addrs = append(addrs, value...)
+	}
+	return addrs, nil
 }
-
-// Interfaces is part of NetworkInterfacer interface.
-func (f *FakeNetwork) Interfaces() ([]net.Interface, error) {
-	return f.NetworkInterfaces, nil
-}
-
-// AddrStruct implements the net.Addr for test purpose.
-type AddrStruct struct{ Val string }
-
-// Network is part of net.Addr interface.
-func (a AddrStruct) Network() string {
-	return a.Val
-}
-
-// String is part of net.Addr interface.
-func (a AddrStruct) String() string {
-	return a.Val
-}
-
-var _ net.Addr = &AddrStruct{}

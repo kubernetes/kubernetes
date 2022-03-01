@@ -1,0 +1,6 @@
+test/test
+test/piggie/piggie
+test/phaul
+image
+rpc/rpc.proto
+stats/stats.proto

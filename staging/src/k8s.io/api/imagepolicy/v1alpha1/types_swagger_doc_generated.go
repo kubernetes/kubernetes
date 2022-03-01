@@ -28,9 +28,10 @@ package v1alpha1
 
 // AUTO-GENERATED FUNCTIONS START HERE. DO NOT EDIT.
 var map_ImageReview = map[string]string{
-	"":       "ImageReview checks if the set of images in a pod are allowed.",
-	"spec":   "Spec holds information about the pod being evaluated",
-	"status": "Status is filled in by the backend and indicates whether the pod should be allowed.",
+	"":         "ImageReview checks if the set of images in a pod are allowed.",
+	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"spec":     "Spec holds information about the pod being evaluated",
+	"status":   "Status is filled in by the backend and indicates whether the pod should be allowed.",
 }
 
 func (ImageReview) SwaggerDoc() map[string]string {

@@ -1,0 +1,32 @@
+# See https://github.com/golangci/golangci-lint#config-file
+run:
+  issues-exit-code: 1 #Default
+  tests: true #Default
+
+linters:
+  enable:
+    - misspell
+    - goimports
+    - golint
+    - gofmt
+
+issues:
+  exclude-rules:
+    # helpers in tests often (rightfully) pass a *testing.T as their first argument
+    - path: _test\.go
+      text: "context.Context should be the first parameter of a function"
+      linters:
+        - golint
+    # Yes, they are, but it's okay in a test
+    - path: _test\.go
+      text: "exported func.*returns unexported type.*which can be annoying to use"
+      linters:
+        - golint
+
+linters-settings:
+  misspell:
+    locale: US
+    ignore-words:
+      - cancelled
+  goimports:
+    local-prefixes: go.opentelemetry.io

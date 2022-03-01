@@ -24,11 +24,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	. "k8s.io/kubernetes/pkg/kubelet/container"
 	ctest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 type pullerExpects struct {
@@ -158,7 +158,7 @@ func pullerTestCases() []pullerTestCase {
 	}
 }
 
-func pullerTestEnv(c pullerTestCase, serialized bool) (puller ImageManager, fakeClock *clock.FakeClock, fakeRuntime *ctest.FakeRuntime, container *v1.Container) {
+func pullerTestEnv(c pullerTestCase, serialized bool) (puller ImageManager, fakeClock *testingclock.FakeClock, fakeRuntime *ctest.FakeRuntime, container *v1.Container) {
 	container = &v1.Container{
 		Name:            "container_name",
 		Image:           c.containerImage,
@@ -166,7 +166,7 @@ func pullerTestEnv(c pullerTestCase, serialized bool) (puller ImageManager, fake
 	}
 
 	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
-	fakeClock = clock.NewFakeClock(time.Now())
+	fakeClock = testingclock.NewFakeClock(time.Now())
 	backOff.Clock = fakeClock
 
 	fakeRuntime = &ctest.FakeRuntime{}
@@ -187,7 +187,6 @@ func TestParallelPuller(t *testing.T) {
 			Namespace:       "test-ns",
 			UID:             "bar",
 			ResourceVersion: "42",
-			SelfLink:        "/api/v1/pods/foo",
 		}}
 
 	cases := pullerTestCases()
@@ -201,7 +200,7 @@ func TestParallelPuller(t *testing.T) {
 				fakeRuntime.CalledFunctions = nil
 				fakeClock.Step(time.Second)
 				_, _, err := puller.EnsureImageExists(pod, container, nil, nil)
-				assert.NoError(t, fakeRuntime.AssertCalls(expected.calls))
+				fakeRuntime.AssertCalls(expected.calls)
 				assert.Equal(t, expected.err, err)
 			}
 		})
@@ -215,7 +214,6 @@ func TestSerializedPuller(t *testing.T) {
 			Namespace:       "test-ns",
 			UID:             "bar",
 			ResourceVersion: "42",
-			SelfLink:        "/api/v1/pods/foo",
 		}}
 
 	cases := pullerTestCases()
@@ -229,7 +227,7 @@ func TestSerializedPuller(t *testing.T) {
 				fakeRuntime.CalledFunctions = nil
 				fakeClock.Step(time.Second)
 				_, _, err := puller.EnsureImageExists(pod, container, nil, nil)
-				assert.NoError(t, fakeRuntime.AssertCalls(expected.calls))
+				fakeRuntime.AssertCalls(expected.calls)
 				assert.Equal(t, expected.err, err)
 			}
 		})
@@ -264,7 +262,6 @@ func TestPullAndListImageWithPodAnnotations(t *testing.T) {
 			Namespace:       "test-ns",
 			UID:             "bar",
 			ResourceVersion: "42",
-			SelfLink:        "/api/v1/pods/foo",
 			Annotations: map[string]string{
 				"kubernetes.io/runtimehandler": "handler_name",
 			},
@@ -287,7 +284,7 @@ func TestPullAndListImageWithPodAnnotations(t *testing.T) {
 
 	t.Run(c.testName, func(t *testing.T) {
 		_, _, err := puller.EnsureImageExists(pod, container, nil, nil)
-		assert.NoError(t, fakeRuntime.AssertCalls(c.expected[0].calls), "tick=%d", 0)
+		fakeRuntime.AssertCalls(c.expected[0].calls)
 		assert.Equal(t, c.expected[0].err, err, "tick=%d", 0)
 
 		images, _ := fakeRuntime.ListImages()

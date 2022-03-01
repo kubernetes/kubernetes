@@ -18,13 +18,11 @@ package audit
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net/http"
 	"reflect"
 	"time"
-
-	"github.com/google/uuid"
-	"k8s.io/klog/v2"
 
 	authnv1 "k8s.io/api/authentication/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -36,6 +34,10 @@ import (
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/klog/v2"
+
+	"github.com/google/uuid"
 )
 
 const (
@@ -52,14 +54,11 @@ func NewEventFromRequest(req *http.Request, requestReceivedTimestamp time.Time, 
 		Level:                    level,
 	}
 
-	// prefer the id from the headers. If not available, create a new one.
-	// TODO(audit): do we want to forbid the header for non-front-proxy users?
-	ids := req.Header.Get(auditinternal.HeaderAuditID)
-	if ids != "" {
-		ev.AuditID = types.UID(ids)
-	} else {
-		ev.AuditID = types.UID(uuid.New().String())
+	auditID, found := request.AuditIDFrom(req.Context())
+	if !found {
+		auditID = types.UID(uuid.New().String())
 	}
+	ev.AuditID = auditID
 
 	ips := utilnet.SourceIPs(req)
 	ev.SourceIPs = make([]string, len(ips))
@@ -113,7 +112,8 @@ func LogImpersonatedUser(ae *auditinternal.Event, user user.Info) {
 
 // LogRequestObject fills in the request object into an audit event. The passed runtime.Object
 // will be converted to the given gv.
-func LogRequestObject(ae *auditinternal.Event, obj runtime.Object, gvr schema.GroupVersionResource, subresource string, s runtime.NegotiatedSerializer) {
+func LogRequestObject(ctx context.Context, obj runtime.Object, objGV schema.GroupVersion, gvr schema.GroupVersionResource, subresource string, s runtime.NegotiatedSerializer) {
+	ae := AuditEventFrom(ctx)
 	if ae == nil || ae.Level.Less(auditinternal.LevelMetadata) {
 		return
 	}
@@ -153,9 +153,19 @@ func LogRequestObject(ae *auditinternal.Event, obj runtime.Object, gvr schema.Gr
 		return
 	}
 
+	if shouldOmitManagedFields(ctx) {
+		copy, ok, err := copyWithoutManagedFields(obj)
+		if err != nil {
+			klog.Warningf("error while dropping managed fields from the request for %q error: %v", reflect.TypeOf(obj).Name(), err)
+		}
+		if ok {
+			obj = copy
+		}
+	}
+
 	// TODO(audit): hook into the serializer to avoid double conversion
 	var err error
-	ae.RequestObject, err = encodeObject(obj, gvr.GroupVersion(), s)
+	ae.RequestObject, err = encodeObject(obj, objGV, s)
 	if err != nil {
 		// TODO(audit): add error slice to audit event struct
 		klog.Warningf("Auditing failed of %v request: %v", reflect.TypeOf(obj).Name(), err)
@@ -164,7 +174,8 @@ func LogRequestObject(ae *auditinternal.Event, obj runtime.Object, gvr schema.Gr
 }
 
 // LogRequestPatch fills in the given patch as the request object into an audit event.
-func LogRequestPatch(ae *auditinternal.Event, patch []byte) {
+func LogRequestPatch(ctx context.Context, patch []byte) {
+	ae := AuditEventFrom(ctx)
 	if ae == nil || ae.Level.Less(auditinternal.LevelRequest) {
 		return
 	}
@@ -177,22 +188,36 @@ func LogRequestPatch(ae *auditinternal.Event, patch []byte) {
 
 // LogResponseObject fills in the response object into an audit event. The passed runtime.Object
 // will be converted to the given gv.
-func LogResponseObject(ae *auditinternal.Event, obj runtime.Object, gv schema.GroupVersion, s runtime.NegotiatedSerializer) {
+func LogResponseObject(ctx context.Context, obj runtime.Object, gv schema.GroupVersion, s runtime.NegotiatedSerializer) {
+	ae := AuditEventFrom(ctx)
 	if ae == nil || ae.Level.Less(auditinternal.LevelMetadata) {
 		return
 	}
 	if status, ok := obj.(*metav1.Status); ok {
 		// selectively copy the bounded fields.
 		ae.ResponseStatus = &metav1.Status{
-			Status: status.Status,
-			Reason: status.Reason,
-			Code:   status.Code,
+			Status:  status.Status,
+			Message: status.Message,
+			Reason:  status.Reason,
+			Details: status.Details,
+			Code:    status.Code,
 		}
 	}
 
 	if ae.Level.Less(auditinternal.LevelRequestResponse) {
 		return
 	}
+
+	if shouldOmitManagedFields(ctx) {
+		copy, ok, err := copyWithoutManagedFields(obj)
+		if err != nil {
+			klog.Warningf("error while dropping managed fields from the response for %q error: %v", reflect.TypeOf(obj).Name(), err)
+		}
+		if ok {
+			obj = copy
+		}
+	}
+
 	// TODO(audit): hook into the serializer to avoid double conversion
 	var err error
 	ae.ResponseObject, err = encodeObject(obj, gv, s)
@@ -243,4 +268,73 @@ func maybeTruncateUserAgent(req *http.Request) string {
 	}
 
 	return ua
+}
+
+// copyWithoutManagedFields will make a deep copy of the specified object and
+// will discard the managed fields from the copy.
+// The specified object is expected to be a meta.Object or a "list".
+// The specified object obj is treated as readonly and hence not mutated.
+// On return, an error is set if the function runs into any error while
+// removing the managed fields, the boolean value is true if the copy has
+// been made successfully, otherwise false.
+func copyWithoutManagedFields(obj runtime.Object) (runtime.Object, bool, error) {
+	isAccessor := true
+	if _, err := meta.Accessor(obj); err != nil {
+		isAccessor = false
+	}
+	isList := meta.IsListType(obj)
+	_, isTable := obj.(*metav1.Table)
+	if !isAccessor && !isList && !isTable {
+		return nil, false, nil
+	}
+
+	// TODO a deep copy isn't really needed here, figure out how we can reliably
+	//  use shallow copy here to omit the manageFields.
+	copy := obj.DeepCopyObject()
+
+	if isAccessor {
+		if err := removeManagedFields(copy); err != nil {
+			return nil, false, err
+		}
+	}
+
+	if isList {
+		if err := meta.EachListItem(copy, removeManagedFields); err != nil {
+			return nil, false, err
+		}
+	}
+
+	if isTable {
+		table := copy.(*metav1.Table)
+		for i := range table.Rows {
+			rowObj := table.Rows[i].Object
+			if err := removeManagedFields(rowObj.Object); err != nil {
+				return nil, false, err
+			}
+		}
+	}
+
+	return copy, true, nil
+}
+
+func removeManagedFields(obj runtime.Object) error {
+	if obj == nil {
+		return nil
+	}
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		return err
+	}
+	accessor.SetManagedFields(nil)
+	return nil
+}
+
+func shouldOmitManagedFields(ctx context.Context) bool {
+	if auditContext := AuditContextFrom(ctx); auditContext != nil {
+		return auditContext.RequestAuditConfig.OmitManagedFields
+	}
+
+	// If we can't decide, return false to maintain current behavior which is
+	// to retain the manage fields in the audit.
+	return false
 }

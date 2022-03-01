@@ -9,13 +9,13 @@ options:
   substitution_option: ALLOW_LOOSE
   machineType: 'N1_HIGHCPU_8'
 steps:
-  - name: 'gcr.io/k8s-testimages/gcb-docker-gcloud:v20201130-750d12f'
+  - name: 'gcr.io/k8s-staging-test-infra/gcb-docker-gcloud:v20210917-12df099d55'
     entrypoint: 'bash'
     dir: ./test/images/
     env:
     - DOCKER_CLI_EXPERIMENTAL=enabled
-    - TAG=$_GIT_TAG
     - BASE_REF=$_PULL_BASE_REF
+    - GIT_COMMIT_ID=$_PULL_BASE_SHA
     - WHAT=$_WHAT
     - REGISTRY=$_REGISTRY
     # The default cloudbuild has HOME=/builder/home and docker buildx is in /root/.docker/cli-plugins/docker-buildx
@@ -40,6 +40,8 @@ substitutions:
   # _PULL_BASE_REF will contain the ref that was pushed to to trigger this build -
   # a branch like 'master' or 'release-0.2', or a tag like 'v0.2'.
   _PULL_BASE_REF: 'master'
+  # _PULL_BASE_SHA will contain the git SHA from which the image will be built from.
+  _PULL_BASE_SHA: '12345'
   # _REGISTRY will contain the staging registry.
   _REGISTRY: 'gcr.io/k8s-staging-e2e-test-images'
   # _WHAT will contain the image name to be built and published to the staging registry.

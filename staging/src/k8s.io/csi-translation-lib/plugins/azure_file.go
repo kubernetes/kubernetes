@@ -34,7 +34,7 @@ const (
 	AzureFileInTreePluginName = "kubernetes.io/azure-file"
 
 	separator        = "#"
-	volumeIDTemplate = "%s#%s#%s#%s"
+	volumeIDTemplate = "%s#%s#%s#%s#%s"
 	// Parameter names defined in azure file CSI driver, refer to
 	// https://github.com/kubernetes-sigs/azurefile-csi-driver/blob/master/docs/driver-parameters.md
 	shareNameField          = "sharename"
@@ -58,14 +58,14 @@ func NewAzureFileCSITranslator() InTreePlugin {
 	return &azureFileCSITranslator{}
 }
 
-// TranslateInTreeStorageClassParametersToCSI translates InTree Azure File storage class parameters to CSI storage class
+// TranslateInTreeStorageClassToCSI translates InTree Azure File storage class parameters to CSI storage class
 func (t *azureFileCSITranslator) TranslateInTreeStorageClassToCSI(sc *storage.StorageClass) (*storage.StorageClass, error) {
 	return sc, nil
 }
 
 // TranslateInTreeInlineVolumeToCSI takes a Volume with AzureFile set from in-tree
 // and converts the AzureFile source to a CSIPersistentVolumeSource
-func (t *azureFileCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Volume) (*v1.PersistentVolume, error) {
+func (t *azureFileCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Volume, podNamespace string) (*v1.PersistentVolume, error) {
 	if volume == nil || volume.AzureFile == nil {
 		return nil, fmt.Errorf("volume is nil or Azure File not defined on volume")
 	}
@@ -77,23 +77,28 @@ func (t *azureFileCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Vol
 		accountName = azureSource.SecretName
 	}
 
+	secretNamespace := defaultSecretNamespace
+	if podNamespace != "" {
+		secretNamespace = podNamespace
+	}
+	volumeID := fmt.Sprintf(volumeIDTemplate, "", accountName, azureSource.ShareName, volume.Name, secretNamespace)
+
 	var (
 		pv = &v1.PersistentVolume{
 			ObjectMeta: metav1.ObjectMeta{
-				// Must be unique per disk as it is used as the unique part of the
-				// staging path
-				Name: fmt.Sprintf("%s-%s", AzureFileDriverName, azureSource.ShareName),
+				// Must be unique as it is used as the unique part of the staging path
+				Name: volumeID,
 			},
 			Spec: v1.PersistentVolumeSpec{
 				PersistentVolumeSource: v1.PersistentVolumeSource{
 					CSI: &v1.CSIPersistentVolumeSource{
 						Driver:           AzureFileDriverName,
-						VolumeHandle:     fmt.Sprintf(volumeIDTemplate, "", accountName, azureSource.ShareName, ""),
+						VolumeHandle:     volumeID,
 						ReadOnly:         azureSource.ReadOnly,
 						VolumeAttributes: map[string]string{shareNameField: azureSource.ShareName},
 						NodeStageSecretRef: &v1.SecretReference{
 							Name:      azureSource.SecretName,
-							Namespace: defaultSecretNamespace,
+							Namespace: secretNamespace,
 						},
 					},
 				},
@@ -124,7 +129,12 @@ func (t *azureFileCSITranslator) TranslateInTreePVToCSI(pv *v1.PersistentVolume)
 			resourceGroup = v
 		}
 	}
-	volumeID := fmt.Sprintf(volumeIDTemplate, resourceGroup, accountName, azureSource.ShareName, "")
+	namespace := defaultSecretNamespace
+	if azureSource.SecretNamespace != nil {
+		namespace = *azureSource.SecretNamespace
+	}
+
+	volumeID := fmt.Sprintf(volumeIDTemplate, resourceGroup, accountName, azureSource.ShareName, pv.ObjectMeta.Name, namespace)
 
 	var (
 		// refer to https://github.com/kubernetes-sigs/azurefile-csi-driver/blob/master/docs/driver-parameters.md
@@ -132,17 +142,13 @@ func (t *azureFileCSITranslator) TranslateInTreePVToCSI(pv *v1.PersistentVolume)
 			Driver: AzureFileDriverName,
 			NodeStageSecretRef: &v1.SecretReference{
 				Name:      azureSource.SecretName,
-				Namespace: defaultSecretNamespace,
+				Namespace: namespace,
 			},
 			ReadOnly:         azureSource.ReadOnly,
 			VolumeAttributes: map[string]string{shareNameField: azureSource.ShareName},
 			VolumeHandle:     volumeID,
 		}
 	)
-
-	if azureSource.SecretNamespace != nil {
-		csiSource.NodeStageSecretRef.Namespace = *azureSource.SecretNamespace
-	}
 
 	pv.Spec.PersistentVolumeSource.AzureFile = nil
 	pv.Spec.PersistentVolumeSource.CSI = csiSource

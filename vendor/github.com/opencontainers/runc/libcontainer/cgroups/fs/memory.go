@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -15,71 +14,73 @@ import (
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/cgroups/fscommon"
 	"github.com/opencontainers/runc/libcontainer/configs"
+	"github.com/pkg/errors"
+	"golang.org/x/sys/unix"
 )
 
 const (
-	numaNodeSymbol            = "N"
-	numaStatColumnSeparator   = " "
-	numaStatKeyValueSeparator = "="
-	numaStatMaxColumns        = math.MaxUint8 + 1
-	numaStatValueIndex        = 1
-	numaStatTypeIndex         = 0
-	numaStatColumnSliceLength = 2
-	cgroupMemorySwapLimit     = "memory.memsw.limit_in_bytes"
-	cgroupMemoryLimit         = "memory.limit_in_bytes"
-	cgroupMemoryPagesByNuma   = "memory.numa_stat"
+	cgroupMemorySwapLimit = "memory.memsw.limit_in_bytes"
+	cgroupMemoryLimit     = "memory.limit_in_bytes"
+	cgroupMemoryUsage     = "memory.usage_in_bytes"
+	cgroupMemoryMaxUsage  = "memory.max_usage_in_bytes"
 )
 
-type MemoryGroup struct {
-}
+type MemoryGroup struct{}
 
 func (s *MemoryGroup) Name() string {
 	return "memory"
 }
 
 func (s *MemoryGroup) Apply(path string, d *cgroupData) (err error) {
-	if path == "" {
-		return nil
-	}
-	if memoryAssigned(d.config) {
-		if _, err := os.Stat(path); os.IsNotExist(err) {
-			if err := os.MkdirAll(path, 0755); err != nil {
-				return err
-			}
-			// Only enable kernel memory accouting when this cgroup
-			// is created by libcontainer, otherwise we might get
-			// error when people use `cgroupsPath` to join an existed
-			// cgroup whose kernel memory is not initialized.
-			if err := EnableKernelMemoryAccounting(path); err != nil {
-				return err
-			}
-		}
-	}
-	defer func() {
-		if err != nil {
-			os.RemoveAll(path)
-		}
-	}()
-
-	// We need to join memory cgroup after set memory limits, because
-	// kmem.limit_in_bytes can only be set when the cgroup is empty.
 	return join(path, d.pid)
 }
 
-func setMemoryAndSwap(path string, cgroup *configs.Cgroup) error {
+func setMemory(path string, val int64) error {
+	if val == 0 {
+		return nil
+	}
+
+	err := cgroups.WriteFile(path, cgroupMemoryLimit, strconv.FormatInt(val, 10))
+	if !errors.Is(err, unix.EBUSY) {
+		return err
+	}
+
+	// EBUSY means the kernel can't set new limit as it's too low
+	// (lower than the current usage). Return more specific error.
+	usage, err := fscommon.GetCgroupParamUint(path, cgroupMemoryUsage)
+	if err != nil {
+		return err
+	}
+	max, err := fscommon.GetCgroupParamUint(path, cgroupMemoryMaxUsage)
+	if err != nil {
+		return err
+	}
+
+	return errors.Errorf("unable to set memory limit to %d (current usage: %d, peak usage: %d)", val, usage, max)
+}
+
+func setSwap(path string, val int64) error {
+	if val == 0 {
+		return nil
+	}
+
+	return cgroups.WriteFile(path, cgroupMemorySwapLimit, strconv.FormatInt(val, 10))
+}
+
+func setMemoryAndSwap(path string, r *configs.Resources) error {
 	// If the memory update is set to -1 and the swap is not explicitly
 	// set, we should also set swap to -1, it means unlimited memory.
-	if cgroup.Resources.Memory == -1 && cgroup.Resources.MemorySwap == 0 {
+	if r.Memory == -1 && r.MemorySwap == 0 {
 		// Only set swap if it's enabled in kernel
 		if cgroups.PathExists(filepath.Join(path, cgroupMemorySwapLimit)) {
-			cgroup.Resources.MemorySwap = -1
+			r.MemorySwap = -1
 		}
 	}
 
 	// When memory and swap memory are both set, we need to handle the cases
 	// for updating container.
-	if cgroup.Resources.Memory != 0 && cgroup.Resources.MemorySwap != 0 {
-		memoryUsage, err := getMemoryData(path, "")
+	if r.Memory != 0 && r.MemorySwap != 0 {
+		curLimit, err := fscommon.GetCgroupParamUint(path, cgroupMemoryLimit)
 		if err != nil {
 			return err
 		}
@@ -87,72 +88,53 @@ func setMemoryAndSwap(path string, cgroup *configs.Cgroup) error {
 		// When update memory limit, we should adapt the write sequence
 		// for memory and swap memory, so it won't fail because the new
 		// value and the old value don't fit kernel's validation.
-		if cgroup.Resources.MemorySwap == -1 || memoryUsage.Limit < uint64(cgroup.Resources.MemorySwap) {
-			if err := fscommon.WriteFile(path, cgroupMemorySwapLimit, strconv.FormatInt(cgroup.Resources.MemorySwap, 10)); err != nil {
+		if r.MemorySwap == -1 || curLimit < uint64(r.MemorySwap) {
+			if err := setSwap(path, r.MemorySwap); err != nil {
 				return err
 			}
-			if err := fscommon.WriteFile(path, cgroupMemoryLimit, strconv.FormatInt(cgroup.Resources.Memory, 10)); err != nil {
+			if err := setMemory(path, r.Memory); err != nil {
 				return err
 			}
-		} else {
-			if err := fscommon.WriteFile(path, cgroupMemoryLimit, strconv.FormatInt(cgroup.Resources.Memory, 10)); err != nil {
-				return err
-			}
-			if err := fscommon.WriteFile(path, cgroupMemorySwapLimit, strconv.FormatInt(cgroup.Resources.MemorySwap, 10)); err != nil {
-				return err
-			}
+			return nil
 		}
-	} else {
-		if cgroup.Resources.Memory != 0 {
-			if err := fscommon.WriteFile(path, cgroupMemoryLimit, strconv.FormatInt(cgroup.Resources.Memory, 10)); err != nil {
-				return err
-			}
-		}
-		if cgroup.Resources.MemorySwap != 0 {
-			if err := fscommon.WriteFile(path, cgroupMemorySwapLimit, strconv.FormatInt(cgroup.Resources.MemorySwap, 10)); err != nil {
-				return err
-			}
-		}
+	}
+
+	if err := setMemory(path, r.Memory); err != nil {
+		return err
+	}
+	if err := setSwap(path, r.MemorySwap); err != nil {
+		return err
 	}
 
 	return nil
 }
 
-func (s *MemoryGroup) Set(path string, cgroup *configs.Cgroup) error {
-	if err := setMemoryAndSwap(path, cgroup); err != nil {
+func (s *MemoryGroup) Set(path string, r *configs.Resources) error {
+	if err := setMemoryAndSwap(path, r); err != nil {
 		return err
 	}
 
-	if cgroup.Resources.KernelMemory != 0 {
-		if err := setKernelMemory(path, cgroup.Resources.KernelMemory); err != nil {
+	// ignore KernelMemory and KernelMemoryTCP
+
+	if r.MemoryReservation != 0 {
+		if err := cgroups.WriteFile(path, "memory.soft_limit_in_bytes", strconv.FormatInt(r.MemoryReservation, 10)); err != nil {
 			return err
 		}
 	}
 
-	if cgroup.Resources.MemoryReservation != 0 {
-		if err := fscommon.WriteFile(path, "memory.soft_limit_in_bytes", strconv.FormatInt(cgroup.Resources.MemoryReservation, 10)); err != nil {
+	if r.OomKillDisable {
+		if err := cgroups.WriteFile(path, "memory.oom_control", "1"); err != nil {
 			return err
 		}
 	}
-
-	if cgroup.Resources.KernelMemoryTCP != 0 {
-		if err := fscommon.WriteFile(path, "memory.kmem.tcp.limit_in_bytes", strconv.FormatInt(cgroup.Resources.KernelMemoryTCP, 10)); err != nil {
-			return err
-		}
-	}
-	if cgroup.Resources.OomKillDisable {
-		if err := fscommon.WriteFile(path, "memory.oom_control", "1"); err != nil {
-			return err
-		}
-	}
-	if cgroup.Resources.MemorySwappiness == nil || int64(*cgroup.Resources.MemorySwappiness) == -1 {
+	if r.MemorySwappiness == nil || int64(*r.MemorySwappiness) == -1 {
 		return nil
-	} else if *cgroup.Resources.MemorySwappiness <= 100 {
-		if err := fscommon.WriteFile(path, "memory.swappiness", strconv.FormatUint(*cgroup.Resources.MemorySwappiness, 10)); err != nil {
+	} else if *r.MemorySwappiness <= 100 {
+		if err := cgroups.WriteFile(path, "memory.swappiness", strconv.FormatUint(*r.MemorySwappiness, 10)); err != nil {
 			return err
 		}
 	} else {
-		return fmt.Errorf("invalid value:%d. valid memory swappiness range is 0-100", *cgroup.Resources.MemorySwappiness)
+		return fmt.Errorf("invalid value:%d. valid memory swappiness range is 0-100", *r.MemorySwappiness)
 	}
 
 	return nil
@@ -160,7 +142,7 @@ func (s *MemoryGroup) Set(path string, cgroup *configs.Cgroup) error {
 
 func (s *MemoryGroup) GetStats(path string, stats *cgroups.Stats) error {
 	// Set stats from memory.stat.
-	statsFile, err := os.Open(filepath.Join(path, "memory.stat"))
+	statsFile, err := cgroups.OpenFile(path, "memory.stat", os.O_RDONLY)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil
@@ -171,7 +153,7 @@ func (s *MemoryGroup) GetStats(path string, stats *cgroups.Stats) error {
 
 	sc := bufio.NewScanner(statsFile)
 	for sc.Scan() {
-		t, v, err := fscommon.GetCgroupParamKeyValue(sc.Text())
+		t, v, err := fscommon.ParseKeyValue(sc.Text())
 		if err != nil {
 			return fmt.Errorf("failed to parse memory.stat (%q) - %v", sc.Text(), err)
 		}
@@ -200,8 +182,7 @@ func (s *MemoryGroup) GetStats(path string, stats *cgroups.Stats) error {
 	}
 	stats.MemoryStats.KernelTCPUsage = kernelTCPUsage
 
-	useHierarchy := strings.Join([]string{"memory", "use_hierarchy"}, ".")
-	value, err := fscommon.GetCgroupParamUint(path, useHierarchy)
+	value, err := fscommon.GetCgroupParamUint(path, "memory.use_hierarchy")
 	if err != nil {
 		return err
 	}
@@ -218,31 +199,25 @@ func (s *MemoryGroup) GetStats(path string, stats *cgroups.Stats) error {
 	return nil
 }
 
-func memoryAssigned(cgroup *configs.Cgroup) bool {
-	return cgroup.Resources.Memory != 0 ||
-		cgroup.Resources.MemoryReservation != 0 ||
-		cgroup.Resources.MemorySwap > 0 ||
-		cgroup.Resources.KernelMemory > 0 ||
-		cgroup.Resources.KernelMemoryTCP > 0 ||
-		cgroup.Resources.OomKillDisable ||
-		(cgroup.Resources.MemorySwappiness != nil && int64(*cgroup.Resources.MemorySwappiness) != -1)
-}
-
 func getMemoryData(path, name string) (cgroups.MemoryData, error) {
 	memoryData := cgroups.MemoryData{}
 
 	moduleName := "memory"
 	if name != "" {
-		moduleName = strings.Join([]string{"memory", name}, ".")
+		moduleName = "memory." + name
 	}
-	usage := strings.Join([]string{moduleName, "usage_in_bytes"}, ".")
-	maxUsage := strings.Join([]string{moduleName, "max_usage_in_bytes"}, ".")
-	failcnt := strings.Join([]string{moduleName, "failcnt"}, ".")
-	limit := strings.Join([]string{moduleName, "limit_in_bytes"}, ".")
+	var (
+		usage    = moduleName + ".usage_in_bytes"
+		maxUsage = moduleName + ".max_usage_in_bytes"
+		failcnt  = moduleName + ".failcnt"
+		limit    = moduleName + ".limit_in_bytes"
+	)
 
 	value, err := fscommon.GetCgroupParamUint(path, usage)
 	if err != nil {
-		if moduleName != "memory" && os.IsNotExist(err) {
+		if name != "" && os.IsNotExist(err) {
+			// Ignore ENOENT as swap and kmem controllers
+			// are optional in the kernel.
 			return cgroups.MemoryData{}, nil
 		}
 		return cgroups.MemoryData{}, fmt.Errorf("failed to parse %s - %v", usage, err)
@@ -250,25 +225,16 @@ func getMemoryData(path, name string) (cgroups.MemoryData, error) {
 	memoryData.Usage = value
 	value, err = fscommon.GetCgroupParamUint(path, maxUsage)
 	if err != nil {
-		if moduleName != "memory" && os.IsNotExist(err) {
-			return cgroups.MemoryData{}, nil
-		}
 		return cgroups.MemoryData{}, fmt.Errorf("failed to parse %s - %v", maxUsage, err)
 	}
 	memoryData.MaxUsage = value
 	value, err = fscommon.GetCgroupParamUint(path, failcnt)
 	if err != nil {
-		if moduleName != "memory" && os.IsNotExist(err) {
-			return cgroups.MemoryData{}, nil
-		}
 		return cgroups.MemoryData{}, fmt.Errorf("failed to parse %s - %v", failcnt, err)
 	}
 	memoryData.Failcnt = value
 	value, err = fscommon.GetCgroupParamUint(path, limit)
 	if err != nil {
-		if moduleName != "memory" && os.IsNotExist(err) {
-			return cgroups.MemoryData{}, nil
-		}
 		return cgroups.MemoryData{}, fmt.Errorf("failed to parse %s - %v", limit, err)
 	}
 	memoryData.Limit = value
@@ -277,47 +243,82 @@ func getMemoryData(path, name string) (cgroups.MemoryData, error) {
 }
 
 func getPageUsageByNUMA(cgroupPath string) (cgroups.PageUsageByNUMA, error) {
+	const (
+		maxColumns = math.MaxUint8 + 1
+		filename   = "memory.numa_stat"
+	)
 	stats := cgroups.PageUsageByNUMA{}
 
-	file, err := os.Open(path.Join(cgroupPath, cgroupMemoryPagesByNuma))
+	file, err := cgroups.OpenFile(cgroupPath, filename, os.O_RDONLY)
 	if os.IsNotExist(err) {
 		return stats, nil
 	} else if err != nil {
 		return stats, err
 	}
+	defer file.Close()
+
+	// File format is documented in linux/Documentation/cgroup-v1/memory.txt
+	// and it looks like this:
+	//
+	// total=<total pages> N0=<node 0 pages> N1=<node 1 pages> ...
+	// file=<total file pages> N0=<node 0 pages> N1=<node 1 pages> ...
+	// anon=<total anon pages> N0=<node 0 pages> N1=<node 1 pages> ...
+	// unevictable=<total anon pages> N0=<node 0 pages> N1=<node 1 pages> ...
+	// hierarchical_<counter>=<counter pages> N0=<node 0 pages> N1=<node 1 pages> ...
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		var statsType string
-		statsByType := cgroups.PageStats{Nodes: map[uint8]uint64{}}
-		columns := strings.SplitN(scanner.Text(), numaStatColumnSeparator, numaStatMaxColumns)
+		var field *cgroups.PageStats
 
-		for _, column := range columns {
-			pagesByNode := strings.SplitN(column, numaStatKeyValueSeparator, numaStatColumnSliceLength)
+		line := scanner.Text()
+		columns := strings.SplitN(line, " ", maxColumns)
+		for i, column := range columns {
+			byNode := strings.SplitN(column, "=", 2)
+			// Some custom kernels have non-standard fields, like
+			//   numa_locality 0 0 0 0 0 0 0 0 0 0
+			//   numa_exectime 0
+			if len(byNode) < 2 {
+				if i == 0 {
+					// Ignore/skip those.
+					break
+				} else {
+					// The first column was already validated,
+					// so be strict to the rest.
+					return stats, fmt.Errorf("malformed line %q in %s",
+						line, filename)
+				}
+			}
+			key, val := byNode[0], byNode[1]
+			if i == 0 { // First column: key is name, val is total.
+				field = getNUMAField(&stats, key)
+				if field == nil { // unknown field (new kernel?)
+					break
+				}
+				field.Total, err = strconv.ParseUint(val, 0, 64)
+				if err != nil {
+					return stats, err
+				}
+				field.Nodes = map[uint8]uint64{}
+			} else { // Subsequent columns: key is N<id>, val is usage.
+				if len(key) < 2 || key[0] != 'N' {
+					// This is definitely an error.
+					return stats, fmt.Errorf("malformed line %q in %s",
+						line, filename)
+				}
 
-			if strings.HasPrefix(pagesByNode[numaStatTypeIndex], numaNodeSymbol) {
-				nodeID, err := strconv.ParseUint(pagesByNode[numaStatTypeIndex][1:], 10, 8)
+				n, err := strconv.ParseUint(key[1:], 10, 8)
 				if err != nil {
 					return cgroups.PageUsageByNUMA{}, err
 				}
 
-				statsByType.Nodes[uint8(nodeID)], err = strconv.ParseUint(pagesByNode[numaStatValueIndex], 0, 64)
-				if err != nil {
-					return cgroups.PageUsageByNUMA{}, err
-				}
-			} else {
-				statsByType.Total, err = strconv.ParseUint(pagesByNode[numaStatValueIndex], 0, 64)
+				usage, err := strconv.ParseUint(val, 10, 64)
 				if err != nil {
 					return cgroups.PageUsageByNUMA{}, err
 				}
 
-				statsType = pagesByNode[numaStatTypeIndex]
+				field.Nodes[uint8(n)] = usage
 			}
 
-			err := addNUMAStatsByType(&stats, statsByType, statsType)
-			if err != nil {
-				return cgroups.PageUsageByNUMA{}, err
-			}
 		}
 	}
 	err = scanner.Err()
@@ -328,26 +329,24 @@ func getPageUsageByNUMA(cgroupPath string) (cgroups.PageUsageByNUMA, error) {
 	return stats, nil
 }
 
-func addNUMAStatsByType(stats *cgroups.PageUsageByNUMA, byTypeStats cgroups.PageStats, statsType string) error {
-	switch statsType {
+func getNUMAField(stats *cgroups.PageUsageByNUMA, name string) *cgroups.PageStats {
+	switch name {
 	case "total":
-		stats.Total = byTypeStats
+		return &stats.Total
 	case "file":
-		stats.File = byTypeStats
+		return &stats.File
 	case "anon":
-		stats.Anon = byTypeStats
+		return &stats.Anon
 	case "unevictable":
-		stats.Unevictable = byTypeStats
+		return &stats.Unevictable
 	case "hierarchical_total":
-		stats.Hierarchical.Total = byTypeStats
+		return &stats.Hierarchical.Total
 	case "hierarchical_file":
-		stats.Hierarchical.File = byTypeStats
+		return &stats.Hierarchical.File
 	case "hierarchical_anon":
-		stats.Hierarchical.Anon = byTypeStats
+		return &stats.Hierarchical.Anon
 	case "hierarchical_unevictable":
-		stats.Hierarchical.Unevictable = byTypeStats
-	default:
-		return fmt.Errorf("unsupported NUMA page type found: %s", statsType)
+		return &stats.Hierarchical.Unevictable
 	}
 	return nil
 }

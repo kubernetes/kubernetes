@@ -22,7 +22,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"sync"
@@ -31,7 +31,7 @@ import (
 	"time"
 
 	"k8s.io/api/admission/v1beta1"
-	admissionv1beta1 "k8s.io/api/admissionregistration/v1beta1"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -114,28 +114,29 @@ func TestWebhookLoadBalance(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	fail := admissionv1beta1.Fail
-	mutatingCfg, err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Create(context.TODO(), &admissionv1beta1.MutatingWebhookConfiguration{
+	fail := admissionregistrationv1.Fail
+	mutatingCfg, err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Create(context.TODO(), &admissionregistrationv1.MutatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{Name: "admission.integration.test"},
-		Webhooks: []admissionv1beta1.MutatingWebhook{{
+		Webhooks: []admissionregistrationv1.MutatingWebhook{{
 			Name: "admission.integration.test",
-			ClientConfig: admissionv1beta1.WebhookClientConfig{
+			ClientConfig: admissionregistrationv1.WebhookClientConfig{
 				URL:      &webhookURL,
 				CABundle: localhostCert,
 			},
-			Rules: []admissionv1beta1.RuleWithOperations{{
-				Operations: []admissionv1beta1.OperationType{admissionv1beta1.OperationAll},
-				Rule:       admissionv1beta1.Rule{APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"pods"}},
+			Rules: []admissionregistrationv1.RuleWithOperations{{
+				Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.OperationAll},
+				Rule:       admissionregistrationv1.Rule{APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"pods"}},
 			}},
 			FailurePolicy:           &fail,
 			AdmissionReviewVersions: []string{"v1beta1"},
+			SideEffects:             &noSideEffects,
 		}},
 	}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() {
-		err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Delete(context.TODO(), mutatingCfg.GetName(), metav1.DeleteOptions{})
+		err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Delete(context.TODO(), mutatingCfg.GetName(), metav1.DeleteOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -244,7 +245,7 @@ func newLoadBalanceWebhookHandler(recorder *connectionRecorder) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Println(r.Proto)
 		defer r.Body.Close()
-		data, err := ioutil.ReadAll(r.Body)
+		data, err := io.ReadAll(r.Body)
 		if err != nil {
 			http.Error(w, err.Error(), 400)
 		}

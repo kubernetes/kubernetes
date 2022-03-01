@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -70,5 +71,65 @@ func TestGetPathFromFileNotFound(t *testing.T) {
 	_, err = getPathFromFileNotFound(nil)
 	if err == nil {
 		t.Errorf("expected err when calling getPathFromFileNotFound with nil err")
+	}
+}
+
+func TestVMX15Deprecated(t *testing.T) {
+	vmhardwaredeprecated, err := isGuestHardwareVersionDeprecated("vmx-15")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if vmhardwaredeprecated {
+		t.Fatal("vmx-15 should not be deprecated")
+	}
+}
+
+func TestVMX14Deprecated(t *testing.T) {
+	vmhardwaredeprecated, err := isGuestHardwareVersionDeprecated("vmx-14")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !vmhardwaredeprecated {
+		t.Fatal("vmx-14 should be deprecated")
+	}
+}
+
+func TestVMX13Deprecated(t *testing.T) {
+	vmhardwaredeprecated, err := isGuestHardwareVersionDeprecated("vmx-13")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !vmhardwaredeprecated {
+		t.Fatal("vmx-13 should be deprecated")
+	}
+}
+
+func TestVMX11Deprecated(t *testing.T) {
+	vmhardwaredeprecated, err := isGuestHardwareVersionDeprecated("vmx-11")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !vmhardwaredeprecated {
+		t.Fatal("vmx-11 should be deprecated")
+	}
+}
+
+func TestVMX17Deprecated(t *testing.T) {
+	vmhardwaredeprecated, err := isGuestHardwareVersionDeprecated("vmx-17")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if vmhardwaredeprecated {
+		t.Fatal("vmx-17 should not be deprecated")
+	}
+}
+
+func TestVMX18Deprecated(t *testing.T) {
+	vmhardwaredeprecated, err := isGuestHardwareVersionDeprecated("vmx-18")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if vmhardwaredeprecated {
+		t.Fatal("vmx-18 should not be deprecated")
 	}
 }

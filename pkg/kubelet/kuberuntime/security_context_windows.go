@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 /*
@@ -43,13 +44,15 @@ func verifyRunAsNonRoot(pod *v1.Pod, container *v1.Container, uid *int64, userna
 		return nil
 	}
 	if effectiveSc.RunAsUser != nil {
-		klog.Warningf("Windows container does not support SecurityContext.RunAsUser, please use SecurityContext.WindowsOptions (pod: %q, container: %s)", format.Pod(pod), container.Name)
+		klog.InfoS("Windows container does not support SecurityContext.RunAsUser, please use SecurityContext.WindowsOptions",
+			"pod", klog.KObj(pod), "containerName", container.Name)
 	}
 	if effectiveSc.SELinuxOptions != nil {
-		klog.Warningf("Windows container does not support SecurityContext.SELinuxOptions, please use SecurityContext.WindowsOptions (pod: %q, container: %s)", format.Pod(pod), container.Name)
+		klog.InfoS("Windows container does not support SecurityContext.SELinuxOptions, please use SecurityContext.WindowsOptions",
+			"pod", klog.KObj(pod), "containerName", container.Name)
 	}
 	if effectiveSc.RunAsGroup != nil {
-		klog.Warningf("Windows container does not support SecurityContext.RunAsGroup (pod: %q, container: %s)", format.Pod(pod), container.Name)
+		klog.InfoS("Windows container does not support SecurityContext.RunAsGroup", "pod", klog.KObj(pod), "containerName", container.Name)
 	}
 	if effectiveSc.WindowsOptions != nil {
 		if effectiveSc.WindowsOptions.RunAsUserName != nil {

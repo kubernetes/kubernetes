@@ -139,6 +139,17 @@ func TestHTTPProbeChecker(t *testing.T) {
 		}
 	}
 
+	redirectHandlerWithBody := func(s int, body string) func(w http.ResponseWriter, r *http.Request) {
+		return func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/" {
+				http.Redirect(w, r, "/new", s)
+			} else if r.URL.Path == "/new" {
+				w.WriteHeader(s)
+				w.Write([]byte(body))
+			}
+		}
+	}
+
 	followNonLocalRedirects := true
 	prober := New(followNonLocalRedirects)
 	testCases := []struct {
@@ -336,6 +347,16 @@ func TestHTTPProbeChecker(t *testing.T) {
 			handler: redirectHandler(http.StatusPermanentRedirect, true), // 308
 			health:  probe.Failure,
 		},
+		{
+			handler: redirectHandlerWithBody(http.StatusPermanentRedirect, ""), // redirect with empty body
+			health:  probe.Warning,
+			accBody: "Probe terminated redirects, Response body:",
+		},
+		{
+			handler: redirectHandlerWithBody(http.StatusPermanentRedirect, "ok body"), // redirect with body
+			health:  probe.Warning,
+			accBody: "Probe terminated redirects, Response body: ok body",
+		},
 	}
 	for i, test := range testCases {
 		t.Run(fmt.Sprintf("case-%2d", i), func(t *testing.T) {
@@ -508,8 +529,8 @@ func TestHTTPProbeChecker_PayloadTruncated(t *testing.T) {
 		require.NoError(t, err)
 		result, body, err := prober.Probe(target, headers, wait.ForeverTestTimeout)
 		assert.NoError(t, err)
-		assert.Equal(t, result, probe.Success)
-		assert.Equal(t, body, string(truncatedPayload))
+		assert.Equal(t, probe.Success, result)
+		assert.Equal(t, string(truncatedPayload), body)
 	})
 }
 
@@ -541,7 +562,7 @@ func TestHTTPProbeChecker_PayloadNormal(t *testing.T) {
 		require.NoError(t, err)
 		result, body, err := prober.Probe(target, headers, wait.ForeverTestTimeout)
 		assert.NoError(t, err)
-		assert.Equal(t, result, probe.Success)
-		assert.Equal(t, body, string(normalPayload))
+		assert.Equal(t, probe.Success, result)
+		assert.Equal(t, string(normalPayload), body)
 	})
 }

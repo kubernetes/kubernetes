@@ -16,7 +16,7 @@ type release struct {
 	//   tasks that dont fit well into the modular plugin/option migration framework. For example, when the
 	//   action on a plugin would need to extend beyond the scope of that plugin (affecting other plugins, or
 	//   server blocks, etc). e.g. Splitting plugins out into separate server blocks.
-	preProcess corefileAction
+	preProcess  corefileAction
 	postProcess corefileAction
 
 	// defaultConf holds the default Corefile template packaged with the corresponding k8sReleases.
@@ -30,9 +30,102 @@ type release struct {
 
 // Versions holds a map of plugin/option migrations per CoreDNS release (since 1.1.4)
 var Versions = map[string]release{
+	"1.8.6": {
+		priorVersion:   "1.8.5",
+		dockerImageSHA: "5b6ec0d6de9baaf3e92d0f66cd96a25b9edbce8716f5f15dcd1a616b3abd590e",
+		plugins: map[string]plugin{
+			"errors":       plugins["errors"]["v2"],
+			"log":          plugins["log"]["v1"],
+			"health":       plugins["health"]["v1"],
+			"ready":        {},
+			"autopath":     {},
+			"kubernetes":   plugins["kubernetes"]["v8"],
+			"k8s_external": plugins["k8s_external"]["v1"],
+			"prometheus":   {},
+			"forward":      plugins["forward"]["v3"],
+			"cache":        plugins["cache"]["v1"],
+			"loop":         {},
+			"reload":       {},
+			"loadbalance":  {},
+			"hosts":        plugins["hosts"]["v1"],
+			"rewrite":      plugins["rewrite"]["v2"],
+			"transfer":     plugins["transfer"]["v1"],
+		},
+	},
+	"1.8.5": {
+		nextVersion:    "1.8.6",
+		priorVersion:   "1.8.4",
+		dockerImageSHA: "43a9f52f5dce39bf1816afe6141724cc2d08811e466dd46e6628c925e2419bdc",
+		plugins: map[string]plugin{
+			"errors":       plugins["errors"]["v2"],
+			"log":          plugins["log"]["v1"],
+			"health":       plugins["health"]["v1"],
+			"ready":        {},
+			"autopath":     {},
+			"kubernetes":   plugins["kubernetes"]["v8"],
+			"k8s_external": plugins["k8s_external"]["v1"],
+			"prometheus":   {},
+			"forward":      plugins["forward"]["v3"],
+			"cache":        plugins["cache"]["v1"],
+			"loop":         {},
+			"reload":       {},
+			"loadbalance":  {},
+			"hosts":        plugins["hosts"]["v1"],
+			"rewrite":      plugins["rewrite"]["v2"],
+			"transfer":     plugins["transfer"]["v1"],
+		},
+	},
+	"1.8.4": {
+		nextVersion:    "1.8.5",
+		priorVersion:   "1.8.3",
+		dockerImageSHA: "6e5a02c21641597998b4be7cb5eb1e7b02c0d8d23cce4dd09f4682d463798890",
+		plugins: map[string]plugin{
+			"errors":       plugins["errors"]["v2"],
+			"log":          plugins["log"]["v1"],
+			"health":       plugins["health"]["v1"],
+			"ready":        {},
+			"autopath":     {},
+			"kubernetes":   plugins["kubernetes"]["v8"],
+			"k8s_external": plugins["k8s_external"]["v1"],
+			"prometheus":   {},
+			"forward":      plugins["forward"]["v3"],
+			"cache":        plugins["cache"]["v1"],
+			"loop":         {},
+			"reload":       {},
+			"loadbalance":  {},
+			"hosts":        plugins["hosts"]["v1"],
+			"rewrite":      plugins["rewrite"]["v2"],
+			"transfer":     plugins["transfer"]["v1"],
+		},
+	},
+	"1.8.3": {
+		nextVersion:    "1.8.4",
+		priorVersion:   "1.8.0", // CoreDNS 1.8.2 is not a valid version and 1.8.1 docker images were never released.
+		dockerImageSHA: "642ff9910da6ea9a8624b0234eef52af9ca75ecbec474c5507cb096bdfbae4e5",
+		plugins: map[string]plugin{
+			"errors":       plugins["errors"]["v2"],
+			"log":          plugins["log"]["v1"],
+			"health":       plugins["health"]["v1"],
+			"ready":        {},
+			"autopath":     {},
+			"kubernetes":   plugins["kubernetes"]["v8"],
+			"k8s_external": plugins["k8s_external"]["v1"],
+			"prometheus":   {},
+			"forward":      plugins["forward"]["v3"],
+			"cache":        plugins["cache"]["v1"],
+			"loop":         {},
+			"reload":       {},
+			"loadbalance":  {},
+			"hosts":        plugins["hosts"]["v1"],
+			"rewrite":      plugins["rewrite"]["v2"],
+			"transfer":     plugins["transfer"]["v1"],
+		},
+	},
 	"1.8.0": {
+		nextVersion:    "1.8.3", // CoreDNS 1.8.2 is not a valid version and 1.8.1 docker images were never released.
 		priorVersion:   "1.7.1",
-		dockerImageSHA: "TBD",
+		k8sReleases:    []string{"1.21"},
+		dockerImageSHA: "cc8fb77bc2a0541949d1d9320a641b82fd392b0d3d8145469ca4709ae769980e",
 		plugins: map[string]plugin{
 			"errors":       plugins["errors"]["v2"],
 			"log":          plugins["log"]["v1"],
@@ -78,7 +171,7 @@ var Versions = map[string]release{
 	"1.7.0": {
 		nextVersion:    "1.7.1",
 		priorVersion:   "1.6.9",
-		k8sReleases:    []string{"1.19"},
+		k8sReleases:    []string{"1.19", "1.20"},
 		dockerImageSHA: "73ca82b4ce829766d4f1f10947c3a338888f876fbed0540dc849c89ff256e90c",
 		defaultConf: `.:53 {
     errors
@@ -424,7 +517,7 @@ var Versions = map[string]release{
 			"log":    plugins["log"]["v1"],
 			"health": plugins["health"]["v1"],
 			"ready": {
-				status: newdefault,
+				status: SevNewDefault,
 				add: func(c *corefile.Server) (*corefile.Server, error) {
 					return addToKubernetesServerBlocks(c, &corefile.Plugin{Name: "ready"})
 				},
@@ -681,7 +774,7 @@ var Versions = map[string]release{
 			"forward":    plugins["forward"]["v2"],
 			"cache":      plugins["cache"]["v1"],
 			"loop": {
-				status: newdefault,
+				status: SevNewDefault,
 				add: func(s *corefile.Server) (*corefile.Server, error) {
 					return addToForwardingServerBlocks(s, &corefile.Plugin{Name: "loop"})
 				},

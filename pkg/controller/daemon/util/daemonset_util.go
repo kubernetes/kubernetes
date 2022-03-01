@@ -24,8 +24,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // GetTemplateGeneration gets the template generation associated with a v1.DaemonSet by extracting it from the
@@ -122,6 +124,47 @@ func CreatePodTemplate(template v1.PodTemplateSpec, generation *int64, hash stri
 	return newTemplate
 }
 
+// AllowsSurge returns true if the daemonset allows more than a single pod on any node.
+func AllowsSurge(ds *apps.DaemonSet) bool {
+	maxSurge, err := SurgeCount(ds, 1)
+	return err == nil && maxSurge > 0
+}
+
+// SurgeCount returns 0 if surge is not requested, the expected surge number to allow
+// out of numberToSchedule if surge is configured, or an error if the surge percentage
+// requested is invalid.
+func SurgeCount(ds *apps.DaemonSet, numberToSchedule int) (int, error) {
+	if ds.Spec.UpdateStrategy.Type != apps.RollingUpdateDaemonSetStrategyType {
+		return 0, nil
+	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DaemonSetUpdateSurge) {
+		return 0, nil
+	}
+	r := ds.Spec.UpdateStrategy.RollingUpdate
+	if r == nil {
+		return 0, nil
+	}
+	// If surge is not requested, we should default to 0.
+	if r.MaxSurge == nil {
+		return 0, nil
+	}
+	return intstrutil.GetScaledValueFromIntOrPercent(r.MaxSurge, numberToSchedule, true)
+}
+
+// UnavailableCount returns 0 if unavailability is not requested, the expected
+// unavailability number to allow out of numberToSchedule if requested, or an error if
+// the unavailability percentage requested is invalid.
+func UnavailableCount(ds *apps.DaemonSet, numberToSchedule int) (int, error) {
+	if ds.Spec.UpdateStrategy.Type != apps.RollingUpdateDaemonSetStrategyType {
+		return 0, nil
+	}
+	r := ds.Spec.UpdateStrategy.RollingUpdate
+	if r == nil {
+		return 0, nil
+	}
+	return intstrutil.GetScaledValueFromIntOrPercent(r.MaxUnavailable, numberToSchedule, true)
+}
+
 // IsPodUpdated checks if pod contains label value that either matches templateGeneration or hash
 func IsPodUpdated(pod *v1.Pod, hash string, dsTemplateGeneration *int64) bool {
 	// Compare with hash to see if the pod is updated, need to maintain backward compatibility of templateGeneration
@@ -129,20 +172,6 @@ func IsPodUpdated(pod *v1.Pod, hash string, dsTemplateGeneration *int64) bool {
 		pod.Labels[extensions.DaemonSetTemplateGenerationKey] == fmt.Sprint(dsTemplateGeneration)
 	hashMatches := len(hash) > 0 && pod.Labels[extensions.DefaultDaemonSetUniqueLabelKey] == hash
 	return hashMatches || templateMatches
-}
-
-// SplitByAvailablePods splits provided daemon set pods by availability
-func SplitByAvailablePods(minReadySeconds int32, pods []*v1.Pod) ([]*v1.Pod, []*v1.Pod) {
-	unavailablePods := []*v1.Pod{}
-	availablePods := []*v1.Pod{}
-	for _, pod := range pods {
-		if podutil.IsPodAvailable(pod, minReadySeconds, metav1.Now()) {
-			availablePods = append(availablePods, pod)
-		} else {
-			unavailablePods = append(unavailablePods, pod)
-		}
-	}
-	return availablePods, unavailablePods
 }
 
 // ReplaceDaemonSetPodNodeNameNodeAffinity replaces the RequiredDuringSchedulingIgnoredDuringExecution

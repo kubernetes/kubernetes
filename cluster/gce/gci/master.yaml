@@ -6,13 +6,37 @@ users:
   lock_passwd: true
   ssh_redirect_user: true
 
+- name: kube-bootstrap-logs-forwarder
+  gecos: User the kube-bootstrap-logs-forwarder.service runs as.
+  system: true
+
 write_files:
+  - path: /etc/systemd/system/kube-bootstrap-logs-forwarder.service
+    permissions: 0644
+    owner: root
+    content: |
+      [Unit]
+      Description=Forwards Kubernetes bootstrap logs to serial port.
+      Before=kube-master-installation.service
+
+      [Service]
+      User=kube-bootstrap-logs-forwarder
+      Group=systemd-journal
+      SupplementaryGroups=serial
+      ExecStart=journalctl --no-tail --no-pager --follow --utc --output short-iso --unit kube-master-installation --unit kube-master-configuration --unit kubelet
+      StandardOutput=tty
+      TTYPath=/dev/ttyS2
+
+      [Install]
+      WantedBy=kubernetes.target
+
   - path: /etc/systemd/system/kube-master-installation.service
     permissions: 0644
     owner: root
     content: |
       [Unit]
       Description=Download and install k8s binaries and configurations
+      Requires=network-online.target
       After=network-online.target
 
       [Service]
@@ -21,8 +45,7 @@ write_files:
       ExecStartPre=/bin/mkdir -p /home/kubernetes/bin
       ExecStartPre=/bin/mount --bind /home/kubernetes/bin /home/kubernetes/bin
       ExecStartPre=/bin/mount -o remount,exec /home/kubernetes/bin
-      # Use --retry-connrefused opt only if it's supported by curl.
-      ExecStartPre=/bin/bash -c 'OPT=""; if curl --help | grep -q -- "--retry-connrefused"; then OPT="--retry-connrefused"; fi; /usr/bin/curl --fail --retry 5 --retry-delay 3 $OPT --silent --show-error -H "X-Google-Metadata-Request: True" -o /home/kubernetes/bin/configure.sh http://metadata.google.internal/computeMetadata/v1/instance/attributes/configure-sh'
+      ExecStartPre=/usr/bin/curl --fail --retry 600 --retry-delay 3 --retry-connrefused --connect-timeout 10 --silent --show-error -H "X-Google-Metadata-Request: True" -o /home/kubernetes/bin/configure.sh http://metadata.google.internal/computeMetadata/v1/instance/attributes/configure-sh
       ExecStartPre=/bin/chmod 544 /home/kubernetes/bin/configure.sh
       ExecStart=/home/kubernetes/bin/configure.sh
 
@@ -35,12 +58,13 @@ write_files:
     content: |
       [Unit]
       Description=Configure kube internal route
+      Requires=kube-master-installation.service
       After=kube-master-installation.service
 
       [Service]
       Type=oneshot
       RemainAfterExit=yes
-      ExecStartPre=/usr/bin/curl --fail --retry 5 --retry-delay 3 --silent --show-error -H "X-Google-Metadata-Request: True" -o /home/kubernetes/bin/kube-master-internal-route.sh http://metadata.google.internal/computeMetadata/v1/instance/attributes/kube-master-internal-route
+      ExecStartPre=/usr/bin/curl --fail --retry 5 --retry-delay 3 --retry-connrefused --connect-timeout 10 --silent --show-error -H "X-Google-Metadata-Request: True" -o /home/kubernetes/bin/kube-master-internal-route.sh http://metadata.google.internal/computeMetadata/v1/instance/attributes/kube-master-internal-route
       ExecStartPre=/bin/chmod 544 /home/kubernetes/bin/kube-master-internal-route.sh
       ExecStart=/home/kubernetes/bin/kube-master-internal-route.sh
 
@@ -53,6 +77,7 @@ write_files:
     content: |
       [Unit]
       Description=Configure kubernetes master
+      Requires=kube-master-installation.service
       After=kube-master-installation.service
 
       [Service]
@@ -60,6 +85,7 @@ write_files:
       RemainAfterExit=yes
       ExecStartPre=/bin/chmod 544 /home/kubernetes/bin/configure-helper.sh
       ExecStart=/home/kubernetes/bin/configure-helper.sh
+      ExecStartPost=systemctl stop kube-bootstrap-logs-forwarder.service
 
       [Install]
       WantedBy=kubernetes.target
@@ -75,7 +101,6 @@ write_files:
       [Service]
       Restart=always
       RestartSec=10
-      RemainAfterExit=yes
       RemainAfterExit=yes
       ExecStartPre=/bin/chmod 544 /home/kubernetes/bin/health-monitor.sh
       ExecStart=/home/kubernetes/bin/health-monitor.sh container-runtime
@@ -94,7 +119,6 @@ write_files:
       [Service]
       Restart=always
       RestartSec=10
-      RemainAfterExit=yes
       RemainAfterExit=yes
       ExecStartPre=/bin/chmod 544 /home/kubernetes/bin/health-monitor.sh
       ExecStart=/home/kubernetes/bin/health-monitor.sh kubelet
@@ -142,6 +166,7 @@ write_files:
 
 runcmd:
  - systemctl daemon-reload
+ - systemctl enable kube-bootstrap-logs-forwarder.service
  - systemctl enable kube-master-installation.service
  - systemctl enable kube-master-internal-route.service
  - systemctl enable kube-master-configuration.service

@@ -141,6 +141,41 @@ func execSourceIPTest(sourcePod v1.Pod, targetAddr string) (string, string) {
 	return sourcePod.Status.PodIP, host
 }
 
+// execHostnameTest executes curl to access "/hostname" endpoint on target address
+// from given Pod to check the hostname of the target destination.
+// It also converts FQDNs to hostnames, so if an FQDN is passed as
+// targetHostname only the hostname part will be considered for comparison.
+func execHostnameTest(sourcePod v1.Pod, targetAddr, targetHostname string) {
+	var (
+		err     error
+		stdout  string
+		timeout = 2 * time.Minute
+	)
+
+	framework.Logf("Waiting up to %v to get response from %s", timeout, targetAddr)
+	cmd := fmt.Sprintf(`curl -q -s --connect-timeout 30 %s/hostname`, targetAddr)
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(2 * time.Second) {
+		stdout, err = framework.RunHostCmd(sourcePod.Namespace, sourcePod.Name, cmd)
+		if err != nil {
+			framework.Logf("got err: %v, retry until timeout", err)
+			continue
+		}
+		// Need to check output because it might omit in case of error.
+		if strings.TrimSpace(stdout) == "" {
+			framework.Logf("got empty stdout, retry until timeout")
+			continue
+		}
+		break
+	}
+
+	// Ensure we're comparing hostnames and not FQDNs
+	targetHostname = strings.Split(targetHostname, ".")[0]
+	hostname := strings.TrimSpace(strings.Split(stdout, ".")[0])
+
+	framework.ExpectNoError(err)
+	framework.ExpectEqual(hostname, targetHostname)
+}
+
 // createSecondNodePortService creates a service with the same selector as config.NodePortService and same HTTP Port
 func createSecondNodePortService(f *framework.Framework, config *e2enetwork.NetworkingTestConfig) (*v1.Service, int) {
 	svc := &v1.Service{

@@ -32,18 +32,20 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/watch"
+	v1apply "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
 	ref "k8s.io/client-go/tools/reference"
+	utilnode "k8s.io/component-helpers/node/topology"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	utilnode "k8s.io/kubernetes/pkg/util/node"
+	"k8s.io/utils/clock"
+	testingclock "k8s.io/utils/clock/testing"
 
 	jsonpatch "github.com/evanphx/json-patch"
 )
@@ -349,6 +351,36 @@ func (m *FakeNodeHandler) Patch(_ context.Context, name string, pt types.PatchTy
 	return &updatedNode, nil
 }
 
+// Apply applies a NodeApplyConfiguration to a Node in the fake store.
+func (m *FakeNodeHandler) Apply(ctx context.Context, node *v1apply.NodeApplyConfiguration, opts metav1.ApplyOptions) (*v1.Node, error) {
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(node)
+	if err != nil {
+		return nil, err
+	}
+	name := node.Name
+	if name == nil {
+		return nil, fmt.Errorf("deployment.Name must be provided to Apply")
+	}
+
+	return m.Patch(ctx, *name, types.ApplyPatchType, data, patchOpts)
+}
+
+// ApplyStatus applies a status of a Node in the fake store.
+func (m *FakeNodeHandler) ApplyStatus(ctx context.Context, node *v1apply.NodeApplyConfiguration, opts metav1.ApplyOptions) (*v1.Node, error) {
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(node)
+	if err != nil {
+		return nil, err
+	}
+	name := node.Name
+	if name == nil {
+		return nil, fmt.Errorf("deployment.Name must be provided to Apply")
+	}
+
+	return m.Patch(ctx, *name, types.ApplyPatchType, data, patchOpts, "status")
+}
+
 // FakeRecorder is used as a fake during testing.
 type FakeRecorder struct {
 	sync.Mutex
@@ -424,7 +456,7 @@ func NewFakeRecorder() *FakeRecorder {
 	return &FakeRecorder{
 		source: v1.EventSource{Component: "nodeControllerTest"},
 		Events: []*v1.Event{},
-		clock:  clock.NewFakeClock(time.Now()),
+		clock:  testingclock.NewFakeClock(time.Now()),
 	}
 }
 
@@ -498,15 +530,13 @@ func GetKey(obj interface{}, t *testing.T) string {
 	}
 	val := reflect.ValueOf(obj).Elem()
 	name := val.FieldByName("Name").String()
-	kind := val.FieldByName("Kind").String()
-	// Note kind is not always set in the tests, so ignoring that for now
-	if len(name) == 0 || len(kind) == 0 {
+	if len(name) == 0 {
 		t.Errorf("Unexpected object %v", obj)
 	}
 
 	key, err := keyFunc(obj)
 	if err != nil {
-		t.Errorf("Unexpected error getting key for %v %v: %v", kind, name, err)
+		t.Errorf("Unexpected error getting key for %T %v: %v", val.Interface(), name, err)
 		return ""
 	}
 	return key

@@ -35,7 +35,7 @@ func CRDFromDynamic(client dynamic.Interface) CRDGetter {
 	return func() ([]schema.GroupKind, error) {
 		list, err := client.Resource(schema.GroupVersionResource{
 			Group:    "apiextensions.k8s.io",
-			Version:  "v1beta1",
+			Version:  "v1",
 			Resource: "customresourcedefinitions",
 		}).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {

@@ -60,20 +60,12 @@ func (s *DryRunnableStorage) Watch(ctx context.Context, key string, opts storage
 	return s.Storage.Watch(ctx, key, opts)
 }
 
-func (s *DryRunnableStorage) WatchList(ctx context.Context, key string, opts storage.ListOptions) (watch.Interface, error) {
-	return s.Storage.WatchList(ctx, key, opts)
-}
-
 func (s *DryRunnableStorage) Get(ctx context.Context, key string, opts storage.GetOptions, objPtr runtime.Object) error {
 	return s.Storage.Get(ctx, key, opts, objPtr)
 }
 
-func (s *DryRunnableStorage) GetToList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
-	return s.Storage.GetToList(ctx, key, opts, listObj)
-}
-
-func (s *DryRunnableStorage) List(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
-	return s.Storage.List(ctx, key, opts, listObj)
+func (s *DryRunnableStorage) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
+	return s.Storage.GetList(ctx, key, opts, listObj)
 }
 
 func (s *DryRunnableStorage) GuaranteedUpdate(

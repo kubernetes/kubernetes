@@ -29,9 +29,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/kubelet/util/format"
+	sc "k8s.io/kubernetes/pkg/securitycontext"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 	"k8s.io/kubernetes/third_party/forked/golang/expansion"
 	utilsnet "k8s.io/utils/net"
@@ -39,7 +39,7 @@ import (
 
 // HandlerRunner runs a lifecycle handler for a container.
 type HandlerRunner interface {
-	Run(containerID ContainerID, pod *v1.Pod, container *v1.Container, handler *v1.Handler) (string, error)
+	Run(containerID ContainerID, pod *v1.Pod, container *v1.Container, handler *v1.LifecycleHandler) (string, error)
 }
 
 // RuntimeHelper wraps kubelet to make container runtime
@@ -82,13 +82,13 @@ func ShouldContainerBeRestarted(container *v1.Container, pod *v1.Pod, podStatus 
 	}
 	// Check RestartPolicy for dead container
 	if pod.Spec.RestartPolicy == v1.RestartPolicyNever {
-		klog.V(4).Infof("Already ran container %q of pod %q, do nothing", container.Name, format.Pod(pod))
+		klog.V(4).InfoS("Already ran container, do nothing", "pod", klog.KObj(pod), "containerName", container.Name)
 		return false
 	}
 	if pod.Spec.RestartPolicy == v1.RestartPolicyOnFailure {
 		// Check the exit code.
 		if status.ExitCode == 0 {
-			klog.V(4).Infof("Already successfully ran container %q of pod %q, do nothing", container.Name, format.Pod(pod))
+			klog.V(4).InfoS("Already successfully ran container, do nothing", "pod", klog.KObj(pod), "containerName", container.Name)
 			return false
 		}
 	}
@@ -277,14 +277,6 @@ func SandboxToContainerState(state runtimeapi.PodSandboxState) State {
 	return ContainerStateUnknown
 }
 
-// FormatPod returns a string representing a pod in a human readable format,
-// with pod UID as part of the string.
-func FormatPod(pod *Pod) string {
-	// Use underscore as the delimiter because it is not allowed in pod name
-	// (DNS subdomain format), while allowed in the container name format.
-	return fmt.Sprintf("%s_%s(%s)", pod.Name, pod.Namespace, pod.ID)
-}
-
 // GetContainerSpec gets the container spec by containerName.
 func GetContainerSpec(pod *v1.Pod, containerName string) *v1.Container {
 	var containerSpec *v1.Container
@@ -311,6 +303,34 @@ func HasPrivilegedContainer(pod *v1.Pod) bool {
 	return hasPrivileged
 }
 
+// HasWindowsHostProcessContainer returns true if any of the containers in a pod are HostProcess containers.
+func HasWindowsHostProcessContainer(pod *v1.Pod) bool {
+	var hasHostProcess bool
+	podutil.VisitContainers(&pod.Spec, podutil.AllFeatureEnabledContainers(), func(c *v1.Container, containerType podutil.ContainerType) bool {
+		if sc.HasWindowsHostProcessRequest(pod, c) {
+			hasHostProcess = true
+			return false
+		}
+		return true
+	})
+
+	return hasHostProcess
+}
+
+// AllContainersAreWindowsHostProcess returns true if all containers in a pod are HostProcess containers.
+func AllContainersAreWindowsHostProcess(pod *v1.Pod) bool {
+	allHostProcess := true
+	podutil.VisitContainers(&pod.Spec, podutil.AllFeatureEnabledContainers(), func(c *v1.Container, containerType podutil.ContainerType) bool {
+		if !sc.HasWindowsHostProcessRequest(pod, c) {
+			allHostProcess = false
+			return false
+		}
+		return true
+	})
+
+	return allHostProcess
+}
+
 // MakePortMappings creates internal port mapping from api port mapping.
 func MakePortMappings(container *v1.Container) (ports []PortMapping) {
 	names := make(map[string]struct{})
@@ -334,14 +354,14 @@ func MakePortMappings(container *v1.Container) (ports []PortMapping) {
 			}
 		}
 
-		var name string = p.Name
+		var name = p.Name
 		if name == "" {
 			name = fmt.Sprintf("%s-%s-%s:%d:%d", family, p.Protocol, p.HostIP, p.ContainerPort, p.HostPort)
 		}
 
 		// Protect against a port name being used more than once in a container.
 		if _, ok := names[name]; ok {
-			klog.Warningf("Port name conflicted, %q is defined more than once", name)
+			klog.InfoS("Port name conflicted, it is defined more than once", "portName", name)
 			continue
 		}
 		ports = append(ports, pm)

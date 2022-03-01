@@ -12,7 +12,7 @@ import (
 // the parent layer provided.
 func CreateLayer(ctx context.Context, path, parent string) (err error) {
 	title := "hcsshim::CreateLayer"
-	ctx, span := trace.StartSpan(ctx, title)
+	ctx, span := trace.StartSpan(ctx, title) //nolint:ineffassign,staticcheck
 	defer span.End()
 	defer func() { oc.SetSpanStatus(span, err) }()
 	span.AddAttributes(

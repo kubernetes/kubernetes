@@ -35,8 +35,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	schedulingapiv1 "k8s.io/kubernetes/pkg/apis/scheduling/v1"
-	schedulingapiv1alpha1 "k8s.io/kubernetes/pkg/apis/scheduling/v1alpha1"
-	schedulingapiv1beta1 "k8s.io/kubernetes/pkg/apis/scheduling/v1beta1"
 	priorityclassstore "k8s.io/kubernetes/pkg/registry/scheduling/priorityclass/storage"
 )
 
@@ -46,63 +44,28 @@ type RESTStorageProvider struct{}
 
 var _ genericapiserver.PostStartHookProvider = RESTStorageProvider{}
 
-func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool, error) {
+func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, error) {
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(scheduling.GroupName, legacyscheme.Scheme, legacyscheme.ParameterCodec, legacyscheme.Codecs)
 
-	if apiResourceConfigSource.VersionEnabled(schedulingapiv1alpha1.SchemeGroupVersion) {
-		if storage, err := p.v1alpha1Storage(apiResourceConfigSource, restOptionsGetter); err != nil {
-			return genericapiserver.APIGroupInfo{}, false, err
-		} else {
-			apiGroupInfo.VersionedResourcesStorageMap[schedulingapiv1alpha1.SchemeGroupVersion.Version] = storage
-		}
-	}
-	if apiResourceConfigSource.VersionEnabled(schedulingapiv1beta1.SchemeGroupVersion) {
-		if storage, err := p.v1beta1Storage(apiResourceConfigSource, restOptionsGetter); err != nil {
-			return genericapiserver.APIGroupInfo{}, false, err
-		} else {
-			apiGroupInfo.VersionedResourcesStorageMap[schedulingapiv1beta1.SchemeGroupVersion.Version] = storage
-		}
-	}
-	if apiResourceConfigSource.VersionEnabled(schedulingapiv1.SchemeGroupVersion) {
-		if storage, err := p.v1Storage(apiResourceConfigSource, restOptionsGetter); err != nil {
-			return genericapiserver.APIGroupInfo{}, false, err
-		} else {
-			apiGroupInfo.VersionedResourcesStorageMap[schedulingapiv1.SchemeGroupVersion.Version] = storage
-		}
-	}
-	return apiGroupInfo, true, nil
-}
-
-func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
-	storage := map[string]rest.Storage{}
-	// priorityclasses
-	if priorityClassStorage, err := priorityclassstore.NewREST(restOptionsGetter); err != nil {
-		return nil, err
-	} else {
-		storage["priorityclasses"] = priorityClassStorage
-	}
-	return storage, nil
-}
-
-func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
-	storage := map[string]rest.Storage{}
-	// priorityclasses
-	if priorityClassStorage, err := priorityclassstore.NewREST(restOptionsGetter); err != nil {
-		return nil, err
-	} else {
-		storage["priorityclasses"] = priorityClassStorage
+	if storageMap, err := p.v1Storage(apiResourceConfigSource, restOptionsGetter); err != nil {
+		return genericapiserver.APIGroupInfo{}, err
+	} else if len(storageMap) > 0 {
+		apiGroupInfo.VersionedResourcesStorageMap[schedulingapiv1.SchemeGroupVersion.Version] = storageMap
 	}
 
-	return storage, nil
+	return apiGroupInfo, nil
 }
 
 func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
 	storage := map[string]rest.Storage{}
+
 	// priorityclasses
-	if priorityClassStorage, err := priorityclassstore.NewREST(restOptionsGetter); err != nil {
-		return nil, err
-	} else {
-		storage["priorityclasses"] = priorityClassStorage
+	if resource := "priorityclasses"; apiResourceConfigSource.ResourceEnabled(schedulingapiv1.SchemeGroupVersion.WithResource(resource)) {
+		if priorityClassStorage, err := priorityclassstore.NewREST(restOptionsGetter); err != nil {
+			return nil, err
+		} else {
+			storage[resource] = priorityClassStorage
+		}
 	}
 
 	return storage, nil

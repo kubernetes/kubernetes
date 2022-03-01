@@ -24,8 +24,10 @@ import (
 	"testing"
 	"time"
 
-	"go.etcd.io/etcd/clientv3"
-	"go.etcd.io/etcd/pkg/transport"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+
+	"go.etcd.io/etcd/client/pkg/v3/transport"
+	clientv3 "go.etcd.io/etcd/client/v3"
 	"google.golang.org/grpc"
 
 	"sigs.k8s.io/yaml"
@@ -39,28 +41,36 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/utils/pointer"
 
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 )
 
-var pruningFixture = &apiextensionsv1beta1.CustomResourceDefinition{
+var pruningFixture = &apiextensionsv1.CustomResourceDefinition{
 	ObjectMeta: metav1.ObjectMeta{Name: "foos.tests.example.com"},
-	Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-		Group:   "tests.example.com",
-		Version: "v1beta1",
-		Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+	Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+		Group: "tests.example.com",
+		Scope: apiextensionsv1.ClusterScoped,
+		Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+			{
+				Name:    "v1beta1",
+				Served:  true,
+				Storage: true,
+				Subresources: &apiextensionsv1.CustomResourceSubresources{
+					Status: &apiextensionsv1.CustomResourceSubresourceStatus{},
+				},
+				Schema: &apiextensionsv1.CustomResourceValidation{
+					OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+						Type: "object",
+					},
+				},
+			},
+		},
+		Names: apiextensionsv1.CustomResourceDefinitionNames{
 			Plural:   "foos",
 			Singular: "foo",
 			Kind:     "Foo",
 			ListKind: "FooList",
-		},
-		Scope:                 apiextensionsv1beta1.ClusterScoped,
-		PreserveUnknownFields: pointer.BoolPtr(false),
-		Subresources: &apiextensionsv1beta1.CustomResourceSubresources{
-			Status: &apiextensionsv1beta1.CustomResourceSubresourceStatus{},
 		},
 	},
 }
@@ -189,18 +199,18 @@ func TestPruningCreate(t *testing.T) {
 	defer tearDownFn()
 
 	crd := pruningFixture.DeepCopy()
-	crd.Spec.Validation = &apiextensionsv1beta1.CustomResourceValidation{}
-	if err := yaml.Unmarshal([]byte(fooSchema), &crd.Spec.Validation.OpenAPIV3Schema); err != nil {
+	crd.Spec.Versions[0].Schema = &apiextensionsv1.CustomResourceValidation{}
+	if err := yaml.Unmarshal([]byte(fooSchema), &crd.Spec.Versions[0].Schema.OpenAPIV3Schema); err != nil {
 		t.Fatal(err)
 	}
 
-	crd, err = fixtures.CreateNewCustomResourceDefinition(crd, apiExtensionClient, dynamicClient)
+	crd, err = fixtures.CreateNewV1CustomResourceDefinition(crd, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	t.Logf("Creating CR and expect 'unspecified' fields to be pruned")
-	fooClient := dynamicClient.Resource(schema.GroupVersionResource{crd.Spec.Group, crd.Spec.Version, crd.Spec.Names.Plural})
+	fooClient := dynamicClient.Resource(schema.GroupVersionResource{crd.Spec.Group, crd.Spec.Versions[0].Name, crd.Spec.Names.Plural})
 	foo := &unstructured.Unstructured{}
 	if err := yaml.Unmarshal([]byte(pruningFooInstance), &foo.Object); err != nil {
 		t.Fatal(err)
@@ -241,18 +251,18 @@ func TestPruningStatus(t *testing.T) {
 	defer tearDownFn()
 
 	crd := pruningFixture.DeepCopy()
-	crd.Spec.Validation = &apiextensionsv1beta1.CustomResourceValidation{}
-	if err := yaml.Unmarshal([]byte(fooStatusSchema), &crd.Spec.Validation.OpenAPIV3Schema); err != nil {
+	crd.Spec.Versions[0].Schema = &apiextensionsv1.CustomResourceValidation{}
+	if err := yaml.Unmarshal([]byte(fooStatusSchema), &crd.Spec.Versions[0].Schema.OpenAPIV3Schema); err != nil {
 		t.Fatal(err)
 	}
 
-	crd, err = fixtures.CreateNewCustomResourceDefinition(crd, apiExtensionClient, dynamicClient)
+	crd, err = fixtures.CreateNewV1CustomResourceDefinition(crd, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	t.Logf("Creating CR and expect 'unspecified' fields to be pruned")
-	fooClient := dynamicClient.Resource(schema.GroupVersionResource{crd.Spec.Group, crd.Spec.Version, crd.Spec.Names.Plural})
+	fooClient := dynamicClient.Resource(schema.GroupVersionResource{crd.Spec.Group, crd.Spec.Versions[0].Name, crd.Spec.Names.Plural})
 	foo := &unstructured.Unstructured{}
 	if err := yaml.Unmarshal([]byte(pruningFooInstance), &foo.Object); err != nil {
 		t.Fatal(err)
@@ -310,12 +320,12 @@ func TestPruningFromStorage(t *testing.T) {
 	}
 
 	crd := pruningFixture.DeepCopy()
-	crd.Spec.Validation = &apiextensionsv1beta1.CustomResourceValidation{}
-	if err := yaml.Unmarshal([]byte(fooSchema), &crd.Spec.Validation.OpenAPIV3Schema); err != nil {
+	crd.Spec.Versions[0].Schema = &apiextensionsv1.CustomResourceValidation{}
+	if err := yaml.Unmarshal([]byte(fooSchema), &crd.Spec.Versions[0].Schema.OpenAPIV3Schema); err != nil {
 		t.Fatal(err)
 	}
 
-	crd, err = fixtures.CreateNewCustomResourceDefinition(crd, apiExtensionClient, dynamicClient)
+	crd, err = fixtures.CreateNewV1CustomResourceDefinition(crd, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -368,7 +378,7 @@ func TestPruningFromStorage(t *testing.T) {
 	}
 
 	t.Logf("Checking that CustomResource is pruned from unknown fields")
-	fooClient := dynamicClient.Resource(schema.GroupVersionResource{crd.Spec.Group, crd.Spec.Version, crd.Spec.Names.Plural})
+	fooClient := dynamicClient.Resource(schema.GroupVersionResource{crd.Spec.Group, crd.Spec.Versions[0].Name, crd.Spec.Names.Plural})
 	foo, err := fooClient.Get(context.TODO(), "foo", metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -400,16 +410,16 @@ func TestPruningPatch(t *testing.T) {
 	defer tearDownFn()
 
 	crd := pruningFixture.DeepCopy()
-	crd.Spec.Validation = &apiextensionsv1beta1.CustomResourceValidation{}
-	if err := yaml.Unmarshal([]byte(fooSchema), &crd.Spec.Validation.OpenAPIV3Schema); err != nil {
+	crd.Spec.Versions[0].Schema = &apiextensionsv1.CustomResourceValidation{}
+	if err := yaml.Unmarshal([]byte(fooSchema), &crd.Spec.Versions[0].Schema.OpenAPIV3Schema); err != nil {
 		t.Fatal(err)
 	}
-	crd, err = fixtures.CreateNewCustomResourceDefinition(crd, apiExtensionClient, dynamicClient)
+	crd, err = fixtures.CreateNewV1CustomResourceDefinition(crd, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	fooClient := dynamicClient.Resource(schema.GroupVersionResource{crd.Spec.Group, crd.Spec.Version, crd.Spec.Names.Plural})
+	fooClient := dynamicClient.Resource(schema.GroupVersionResource{crd.Spec.Group, crd.Spec.Versions[0].Name, crd.Spec.Names.Plural})
 	foo := &unstructured.Unstructured{}
 	if err := yaml.Unmarshal([]byte(pruningFooInstance), &foo.Object); err != nil {
 		t.Fatal(err)
@@ -451,18 +461,18 @@ func TestPruningCreatePreservingUnknownFields(t *testing.T) {
 	defer tearDownFn()
 
 	crd := pruningFixture.DeepCopy()
-	crd.Spec.Validation = &apiextensionsv1beta1.CustomResourceValidation{}
-	if err := yaml.Unmarshal([]byte(fooSchemaPreservingUnknownFields), &crd.Spec.Validation.OpenAPIV3Schema); err != nil {
+	crd.Spec.Versions[0].Schema = &apiextensionsv1.CustomResourceValidation{}
+	if err := yaml.Unmarshal([]byte(fooSchemaPreservingUnknownFields), &crd.Spec.Versions[0].Schema.OpenAPIV3Schema); err != nil {
 		t.Fatal(err)
 	}
 
-	crd, err = fixtures.CreateNewCustomResourceDefinition(crd, apiExtensionClient, dynamicClient)
+	crd, err = fixtures.CreateNewV1CustomResourceDefinition(crd, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	t.Logf("Creating CR and expect 'unspecified' field to be pruned")
-	fooClient := dynamicClient.Resource(schema.GroupVersionResource{crd.Spec.Group, crd.Spec.Version, crd.Spec.Names.Plural})
+	fooClient := dynamicClient.Resource(schema.GroupVersionResource{crd.Spec.Group, crd.Spec.Versions[0].Name, crd.Spec.Names.Plural})
 	foo := &unstructured.Unstructured{}
 	if err := yaml.Unmarshal([]byte(pruningFooInstance), &foo.Object); err != nil {
 		t.Fatal(err)
@@ -536,18 +546,18 @@ func TestPruningEmbeddedResources(t *testing.T) {
 	defer tearDownFn()
 
 	crd := pruningFixture.DeepCopy()
-	crd.Spec.Validation = &apiextensionsv1beta1.CustomResourceValidation{}
-	if err := yaml.Unmarshal([]byte(fooSchemaEmbeddedResource), &crd.Spec.Validation.OpenAPIV3Schema); err != nil {
+	crd.Spec.Versions[0].Schema = &apiextensionsv1.CustomResourceValidation{}
+	if err := yaml.Unmarshal([]byte(fooSchemaEmbeddedResource), &crd.Spec.Versions[0].Schema.OpenAPIV3Schema); err != nil {
 		t.Fatal(err)
 	}
 
-	crd, err = fixtures.CreateNewCustomResourceDefinition(crd, apiExtensionClient, dynamicClient)
+	crd, err = fixtures.CreateNewV1CustomResourceDefinition(crd, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	t.Logf("Creating CR and expect 'unspecified' field to be pruned")
-	fooClient := dynamicClient.Resource(schema.GroupVersionResource{crd.Spec.Group, crd.Spec.Version, crd.Spec.Names.Plural})
+	fooClient := dynamicClient.Resource(schema.GroupVersionResource{crd.Spec.Group, crd.Spec.Versions[0].Name, crd.Spec.Names.Plural})
 	foo := &unstructured.Unstructured{}
 	if err := yaml.Unmarshal([]byte(fooSchemaEmbeddedResourceInstance), &foo.Object); err != nil {
 		t.Fatal(err)

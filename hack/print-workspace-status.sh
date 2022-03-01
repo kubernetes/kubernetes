@@ -13,8 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This script is used by bazel as the workspace_status_command to implement
+# This script was used by bazel as the workspace_status_command to implement
 # build stamping with git information.
+#
+# It is still useful for obtaining kube::version::get_version_vars without
+# sourcing Kubernetes build internals.
+#
 # Usage: `hack/print-workspace-status.sh`.
 
 set -o errexit

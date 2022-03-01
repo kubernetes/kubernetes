@@ -33,6 +33,7 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
+	"k8s.io/kubernetes/test/e2e/network/common"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -45,7 +46,7 @@ func (d durations) Len() int           { return len(d) }
 func (d durations) Less(i, j int) bool { return d[i] < d[j] }
 func (d durations) Swap(i, j int)      { d[i], d[j] = d[j], d[i] }
 
-var _ = SIGDescribe("Service endpoints latency", func() {
+var _ = common.SIGDescribe("Service endpoints latency", func() {
 	f := framework.NewDefaultFramework("svc-latency")
 
 	/*

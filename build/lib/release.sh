@@ -28,7 +28,7 @@ readonly RELEASE_STAGE="${LOCAL_OUTPUT_ROOT}/release-stage"
 readonly RELEASE_TARS="${LOCAL_OUTPUT_ROOT}/release-tars"
 readonly RELEASE_IMAGES="${LOCAL_OUTPUT_ROOT}/release-images"
 
-KUBE_BUILD_CONFORMANCE=${KUBE_BUILD_CONFORMANCE:-y}
+KUBE_BUILD_CONFORMANCE=${KUBE_BUILD_CONFORMANCE:-n}
 KUBE_BUILD_PULL_LATEST_IMAGES=${KUBE_BUILD_PULL_LATEST_IMAGES:-y}
 
 # Validate a ci version
@@ -216,6 +216,8 @@ function kube::release::package_node_tarballs() {
 
 # Package up all of the server binaries in docker images
 function kube::release::build_server_images() {
+  kube::util::ensure-docker-buildx
+
   # Clean out any old images
   rm -rf "${RELEASE_IMAGES}"
   local platform
@@ -310,7 +312,7 @@ function kube::release::build_conformance_image() {
   local -r save_dir="${4-}"
   kube::log::status "Building conformance image for arch: ${arch}"
   ARCH="${arch}" REGISTRY="${registry}" VERSION="${version}" \
-    make -C cluster/images/conformance/ build >/dev/null
+    make -C test/conformance/image/ build >/dev/null
 
   local conformance_tag
   conformance_tag="${registry}/conformance-${arch}:${version}"
@@ -361,7 +363,7 @@ function kube::release::create_docker_images_for_server() {
     for wrappable in $binaries; do
 
       local binary_name=${wrappable%%,*}
-      local base_image_name=${wrappable##*,}
+      local base_image=${wrappable##*,}
       local binary_file_path="${binary_dir}/${binary_name}"
       local docker_build_path="${binary_file_path}.dockerbuild"
       local docker_image_tag="${docker_registry}/${binary_name}-${arch}:${docker_tag}"
@@ -384,8 +386,8 @@ function kube::release::create_docker_images_for_server() {
           --platform linux/"${arch}" \
           --load ${docker_build_opts:+"${docker_build_opts}"} \
           -t "${docker_image_tag}" \
-          --build-arg BASE_IMAGE_REGISTRY="${KUBE_BASE_IMAGE_REGISTRY}" \
-          --build-arg BASE_IMAGE_NAME="${base_image_name}" \
+          --build-arg BASEIMAGE="${base_image}" \
+          --build-arg SETCAP_IMAGE="${KUBE_BUILD_SETCAP_IMAGE}" \
           --build-arg BINARY="${binary_name}" \
           "${docker_build_path}" >"${build_log}" 2>&1; then
             cat "${build_log}"

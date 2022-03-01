@@ -18,6 +18,7 @@ package dryrun
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -41,24 +42,48 @@ import (
 
 // Only add kinds to this list when this a virtual resource with get and create verbs that doesn't actually
 // store into it's kind.  We've used this downstream for mappings before.
-var kindWhiteList = sets.NewString()
+var kindAllowList = sets.NewString()
 
 // namespace used for all tests, do not change this
 const testNamespace = "dryrunnamespace"
 
+func DryRunCreateWithGenerateNameTest(t *testing.T, rsc dynamic.ResourceInterface, obj *unstructured.Unstructured, gvResource schema.GroupVersionResource) {
+	// special resources with dots in the name cannot use generateName
+	if strings.Contains(obj.GetName(), ".") {
+		return
+	}
+	// Create a new object with generateName to ensure we don't taint the original object
+	gnObj := obj.DeepCopy()
+	gnObj.SetGenerateName(obj.GetName() + "-")
+	gnObj.SetName("")
+	DryRunCreateTest(t, rsc, gnObj, gvResource)
+}
+
 func DryRunCreateTest(t *testing.T, rsc dynamic.ResourceInterface, obj *unstructured.Unstructured, gvResource schema.GroupVersionResource) {
 	createdObj, err := rsc.Create(context.TODO(), obj, metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
 	if err != nil {
-		t.Fatalf("failed to dry-run create stub for %s: %#v", gvResource, err)
+		t.Fatalf("failed to dry-run create stub for %s: %#v: %v", gvResource, err, obj)
 	}
 	if obj.GroupVersionKind() != createdObj.GroupVersionKind() {
 		t.Fatalf("created object doesn't have the same gvk as original object: got %v, expected %v",
 			createdObj.GroupVersionKind(),
 			obj.GroupVersionKind())
 	}
+	if createdObj.GetUID() != "" {
+		t.Fatalf("created object shouldn't have a uid: %v", createdObj)
+	}
+	if createdObj.GetResourceVersion() != "" {
+		t.Fatalf("created object shouldn't have a resource version: %v", createdObj)
+	}
+	if obj.GetGenerateName() != "" && createdObj.GetName() != "" {
+		t.Fatalf("created object's name should be an empty string if using GenerateName: %v", createdObj)
+	}
 
-	if _, err := rsc.Get(context.TODO(), obj.GetName(), metav1.GetOptions{}); !apierrors.IsNotFound(err) {
-		t.Fatalf("object shouldn't exist: %v", err)
+	// we won't have a generated name here, so we won't check for this case
+	if obj.GetGenerateName() == "" {
+		if _, err := rsc.Get(context.TODO(), obj.GetName(), metav1.GetOptions{}); !apierrors.IsNotFound(err) {
+			t.Fatalf("object shouldn't exist: %v, %v", obj, err)
+		}
 	}
 }
 
@@ -264,8 +289,8 @@ func TestDryRun(t *testing.T) {
 			gvResource := resourceToTest.Mapping.Resource
 			kind := gvk.Kind
 
-			if kindWhiteList.Has(kind) {
-				t.Skip("whitelisted")
+			if kindAllowList.Has(kind) {
+				t.Skip("allowlisted")
 			}
 
 			testData, hasTest := dryrunData[gvResource]
@@ -282,6 +307,7 @@ func TestDryRun(t *testing.T) {
 			name := obj.GetName()
 
 			DryRunCreateTest(t, rsc, obj, gvResource)
+			DryRunCreateWithGenerateNameTest(t, rsc, obj, gvResource)
 
 			if _, err := rsc.Create(context.TODO(), obj, metav1.CreateOptions{}); err != nil {
 				t.Fatalf("failed to create stub for %s: %#v", gvResource, err)

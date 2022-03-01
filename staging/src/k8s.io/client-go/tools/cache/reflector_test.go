@@ -32,9 +32,10 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/utils/clock"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 var nevererrc chan error
@@ -376,7 +377,7 @@ func TestReflectorListAndWatchInitConnBackoff(t *testing.T) {
 			func(t *testing.T) {
 				stopCh := make(chan struct{})
 				connFails := test.numConnFails
-				fakeClock := clock.NewFakeClock(time.Unix(0, 0))
+				fakeClock := testingclock.NewFakeClock(time.Unix(0, 0))
 				bm := wait.NewExponentialBackoffManager(time.Millisecond, maxBackoff, 100*time.Millisecond, 2.0, 1.0, fakeClock)
 				done := make(chan struct{})
 				defer close(done)
@@ -433,6 +434,59 @@ func TestReflectorListAndWatchInitConnBackoff(t *testing.T) {
 					t.Errorf("expected upper bound of ListAndWatch: %v, got %v", test.expUpperBound, elapsed)
 				}
 			})
+	}
+}
+
+type fakeBackoff struct {
+	clock clock.Clock
+	calls int
+}
+
+func (f *fakeBackoff) Backoff() clock.Timer {
+	f.calls++
+	return f.clock.NewTimer(time.Duration(0))
+}
+
+func TestBackoffOnTooManyRequests(t *testing.T) {
+	err := apierrors.NewTooManyRequests("too many requests", 1)
+	clock := &clock.RealClock{}
+	bm := &fakeBackoff{clock: clock}
+
+	lw := &testLW{
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "1"}}, nil
+		},
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			switch bm.calls {
+			case 0:
+				return nil, err
+			case 1:
+				w := watch.NewFakeWithChanSize(1, false)
+				status := err.Status()
+				w.Error(&status)
+				return w, nil
+			default:
+				w := watch.NewFake()
+				w.Stop()
+				return w, nil
+			}
+		},
+	}
+
+	r := &Reflector{
+		name:                   "test-reflector",
+		listerWatcher:          lw,
+		store:                  NewFIFO(MetaNamespaceKeyFunc),
+		initConnBackoffManager: bm,
+		clock:                  clock,
+		watchErrorHandler:      WatchErrorHandler(DefaultWatchErrorHandler),
+	}
+
+	stopCh := make(chan struct{})
+	r.ListAndWatch(stopCh)
+	close(stopCh)
+	if bm.calls != 2 {
+		t.Errorf("unexpected watch backoff calls: %d", bm.calls)
 	}
 }
 
@@ -759,7 +813,6 @@ func TestReflectorFullListIfExpired(t *testing.T) {
 				t.Error(err)
 				return nil, err
 			}
-			return nil, nil
 		},
 	}
 	r := NewReflector(lw, &v1.Pod{}, s, 0)

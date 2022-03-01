@@ -3,18 +3,16 @@
 # Any kind/feature PRs must be approved by SIG Cloud Provider going forward.
 
 emeritus_approvers:
-- justinsb
-- gnufied
-- jsafrane
-- micahhausler
-- m00nf1sh
-- zmerlynn
-- mcrute
+  - justinsb
+  - gnufied
+  - jsafrane
+  - micahhausler
+  - m00nf1sh
+  - zmerlynn
+  - mcrute
 reviewers:
-- gnufied
-- jsafrane
-- justinsb
-- chrislovecnm
-- nckturner
-- micahhausler
-- m00nf1sh
+  - gnufied
+  - jsafrane
+  - justinsb
+  - nckturner
+  - m00nf1sh

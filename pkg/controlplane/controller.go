@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/storage"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
@@ -40,9 +41,12 @@ import (
 	servicecontroller "k8s.io/kubernetes/pkg/registry/core/service/ipallocator/controller"
 	portallocatorcontroller "k8s.io/kubernetes/pkg/registry/core/service/portallocator/controller"
 	"k8s.io/kubernetes/pkg/util/async"
+	netutils "k8s.io/utils/net"
 )
 
-const kubernetesServiceName = "kubernetes"
+const (
+	kubernetesServiceName = "kubernetes"
+)
 
 // Controller is the controller manager for the core bootstrap Kubernetes
 // controller loops, which manage creating the "kubernetes" service, the
@@ -85,10 +89,21 @@ type Controller struct {
 }
 
 // NewBootstrapController returns a controller for watching the core capabilities of the master
-func (c *completedConfig) NewBootstrapController(legacyRESTStorage corerest.LegacyRESTStorage, serviceClient corev1client.ServicesGetter, nsClient corev1client.NamespacesGetter, eventClient corev1client.EventsGetter, readyzClient rest.Interface) *Controller {
+func (c *completedConfig) NewBootstrapController(legacyRESTStorage corerest.LegacyRESTStorage, serviceClient corev1client.ServicesGetter, nsClient corev1client.NamespacesGetter, eventClient corev1client.EventsGetter, readyzClient rest.Interface) (*Controller, error) {
 	_, publicServicePort, err := c.GenericConfig.SecureServing.HostPort()
 	if err != nil {
-		klog.Fatalf("failed to get listener address: %v", err)
+		return nil, fmt.Errorf("failed to get listener address: %w", err)
+	}
+
+	// The "kubernetes.default" Service is SingleStack based on the configured ServiceIPRange.
+	// If the bootstrap controller reconcile the kubernetes.default Service and Endpoints, it must
+	// guarantee that the Service ClusterIP and the associated Endpoints have the same IP family, or
+	// it will not work for clients because of the IP family mismatch.
+	// TODO: revisit for dual-stack https://github.com/kubernetes/enhancements/issues/2438
+	if c.ExtraConfig.EndpointReconcilerType != reconcilers.NoneEndpointReconcilerType {
+		if netutils.IsIPv4CIDR(&c.ExtraConfig.ServiceIPRange) != netutils.IsIPv4(c.GenericConfig.PublicAddress) {
+			return nil, fmt.Errorf("service IP family %q must match public address family %q", c.ExtraConfig.ServiceIPRange.String(), c.GenericConfig.PublicAddress.String())
+		}
 	}
 
 	systemNamespaces := []string{metav1.NamespaceSystem, metav1.NamespacePublic, corev1.NamespaceNodeLease}
@@ -110,11 +125,11 @@ func (c *completedConfig) NewBootstrapController(legacyRESTStorage corerest.Lega
 		SecondaryServiceClusterIPRegistry: legacyRESTStorage.SecondaryServiceClusterIPAllocator,
 		SecondaryServiceClusterIPRange:    c.ExtraConfig.SecondaryServiceIPRange,
 
-		ServiceClusterIPInterval: 3 * time.Minute,
+		ServiceClusterIPInterval: c.ExtraConfig.RepairServicesInterval,
 
 		ServiceNodePortRegistry: legacyRESTStorage.ServiceNodePortAllocator,
 		ServiceNodePortRange:    c.ExtraConfig.ServiceNodePortRange,
-		ServiceNodePortInterval: 3 * time.Minute,
+		ServiceNodePortInterval: c.ExtraConfig.RepairServicesInterval,
 
 		PublicIP: c.GenericConfig.PublicAddress,
 
@@ -124,7 +139,7 @@ func (c *completedConfig) NewBootstrapController(legacyRESTStorage corerest.Lega
 		ExtraEndpointPorts:        c.ExtraConfig.ExtraEndpointPorts,
 		PublicServicePort:         publicServicePort,
 		KubernetesServiceNodePort: c.ExtraConfig.KubernetesServiceNodePort,
-	}
+	}, nil
 }
 
 // PostStartHook initiates the core controller loops that must exist for bootstrapping.
@@ -148,8 +163,10 @@ func (c *Controller) Start() {
 
 	// Reconcile during first run removing itself until server is ready.
 	endpointPorts := createEndpointPortSpec(c.PublicServicePort, "https", c.ExtraEndpointPorts)
-	if err := c.EndpointReconciler.RemoveEndpoints(kubernetesServiceName, c.PublicIP, endpointPorts); err != nil {
-		klog.Errorf("Unable to remove old endpoints from kubernetes service: %v", err)
+	if err := c.EndpointReconciler.RemoveEndpoints(kubernetesServiceName, c.PublicIP, endpointPorts); err == nil {
+		klog.Error("Found stale data, removed previous endpoints on kubernetes service, apiserver didn't exit successfully previously")
+	} else if !storage.IsNotFound(err) {
+		klog.Errorf("Error removing old endpoints from kubernetes service: %v", err)
 	}
 
 	repairClusterIPs := servicecontroller.NewRepair(c.ServiceClusterIPInterval, c.ServiceClient, c.EventClient, &c.ServiceClusterIPRange, c.ServiceClusterIPRegistry, &c.SecondaryServiceClusterIPRange, c.SecondaryServiceClusterIPRegistry)
@@ -181,7 +198,7 @@ func (c *Controller) Stop() {
 		klog.Infof("Shutting down kubernetes service endpoint reconciler")
 		c.EndpointReconciler.StopReconciling()
 		if err := c.EndpointReconciler.RemoveEndpoints(kubernetesServiceName, c.PublicIP, endpointPorts); err != nil {
-			klog.Error(err)
+			klog.Errorf("Unable to remove endpoints from kubernetes service: %v", err)
 		}
 	}()
 

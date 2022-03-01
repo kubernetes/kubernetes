@@ -181,7 +181,7 @@ func Invalid(field *Path, value interface{}, detail string) *Error {
 // valid values).
 func NotSupported(field *Path, value interface{}, validValues []string) *Error {
 	detail := ""
-	if validValues != nil && len(validValues) > 0 {
+	if len(validValues) > 0 {
 		quotedValues := make([]string, len(validValues))
 		for i, v := range validValues {
 			quotedValues[i] = strconv.Quote(v)
@@ -239,6 +239,9 @@ func NewErrorTypeMatcher(t ErrorType) utilerrors.Matcher {
 
 // ToAggregate converts the ErrorList into an errors.Aggregate.
 func (list ErrorList) ToAggregate() utilerrors.Aggregate {
+	if len(list) == 0 {
+		return nil
+	}
 	errs := make([]error, 0, len(list))
 	errorMsgs := sets.NewString()
 	for _, err := range list {

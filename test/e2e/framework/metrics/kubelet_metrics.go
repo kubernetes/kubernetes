@@ -19,7 +19,7 @@ package metrics
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"sort"
 	"strconv"
@@ -73,7 +73,7 @@ func GrabKubeletMetricsWithoutProxy(nodeName, path string) (KubeletMetrics, erro
 		return KubeletMetrics{}, err
 	}
 	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return KubeletMetrics{}, err
 	}
@@ -139,7 +139,7 @@ func getKubeletMetricsFromNode(c clientset.Interface, nodeName string) (KubeletM
 	if c == nil {
 		return GrabKubeletMetricsWithoutProxy(nodeName, "/metrics")
 	}
-	grabber, err := NewMetricsGrabber(c, nil, true, false, false, false, false)
+	grabber, err := NewMetricsGrabber(c, nil, nil, true, false, false, false, false, false)
 	if err != nil {
 		return KubeletMetrics{}, err
 	}

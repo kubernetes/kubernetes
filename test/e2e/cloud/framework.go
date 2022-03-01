@@ -16,9 +16,9 @@ limitations under the License.
 
 package cloud
 
-import "k8s.io/kubernetes/test/e2e/framework"
+import "github.com/onsi/ginkgo"
 
 // SIGDescribe annotates the test with the SIG label.
 func SIGDescribe(text string, body func()) bool {
-	return framework.KubeDescribe("[sig-cloud-provider] "+text, body)
+	return ginkgo.Describe("[sig-cloud-provider] "+text, body)
 }

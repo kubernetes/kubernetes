@@ -1,11 +1,10 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- cheftako
-- justinsb
+  - cheftako
+  - justinsb
 reviewers:
-- cheftako
-- justinsb
-
+  - cheftako
+  - justinsb
 labels:
-- sig/cloud-provider
+  - sig/cloud-provider

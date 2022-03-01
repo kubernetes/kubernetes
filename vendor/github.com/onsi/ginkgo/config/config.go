@@ -1,7 +1,7 @@
 /*
 Ginkgo accepts a number of configuration options.
 
-These are documented [here](http://onsi.github.io/ginkgo/#the_ginkgo_cli)
+These are documented [here](http://onsi.github.io/ginkgo/#the-ginkgo-cli)
 
 You can also learn more via
 
@@ -20,7 +20,7 @@ import (
 	"fmt"
 )
 
-const VERSION = "1.11.0"
+const VERSION = "1.14.0"
 
 type GinkgoConfigType struct {
 	RandomSeed         int64

@@ -69,7 +69,7 @@ const (
 )
 
 var (
-	errTimeout = fmt.Errorf("Timeout")
+	errTimeout = fmt.Errorf("timeout")
 )
 
 // DriverCall implements the basic contract between FlexVolume and its driver.
@@ -108,7 +108,7 @@ func (dc *DriverCall) AppendSpec(spec *volume.Spec, host volume.VolumeHost, extr
 
 	jsonBytes, err := json.Marshal(optionsForDriver)
 	if err != nil {
-		return fmt.Errorf("Failed to marshal spec, error: %s", err.Error())
+		return fmt.Errorf("failed to marshal spec, error: %s", err.Error())
 	}
 
 	dc.Append(string(jsonBytes))
@@ -249,11 +249,7 @@ func defaultCapabilities() *DriverCapabilities {
 // isCmdNotSupportedErr checks if the error corresponds to command not supported by
 // driver.
 func isCmdNotSupportedErr(err error) bool {
-	if err != nil && err.Error() == StatusNotSupported {
-		return true
-	}
-
-	return false
+	return err != nil && err.Error() == StatusNotSupported
 }
 
 // handleCmdResponse processes the command output and returns the appropriate

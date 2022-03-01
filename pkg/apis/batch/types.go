@@ -18,8 +18,17 @@ package batch
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
+
+// JobTrackingFinalizer is a finalizer for Job's pods. It prevents them from
+// being deleted before being accounted in the Job status.
+// The apiserver and job controller use this string as a Job annotation, to
+// mark Jobs that are being tracked using pod finalizers. Two releases after
+// the JobTrackingWithFinalizers graduates to GA, JobTrackingFinalizer will
+// no longer be used as a Job annotation.
+const JobTrackingFinalizer = "batch.kubernetes.io/job-tracking"
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -85,6 +94,22 @@ type JobTemplateSpec struct {
 	Spec JobSpec
 }
 
+// CompletionMode specifies how Pod completions of a Job are tracked.
+type CompletionMode string
+
+const (
+	// NonIndexedCompletion is a Job completion mode. In this mode, the Job is
+	// considered complete when there have been .spec.completions
+	// successfully completed Pods. Pod completions are homologous to each other.
+	NonIndexedCompletion CompletionMode = "NonIndexed"
+
+	// IndexedCompletion is a Job completion mode. In this mode, the Pods of a
+	// Job get an associated completion index from 0 to (.spec.completions - 1).
+	// The Job is  considered complete when a Pod completes for each completion
+	// index.
+	IndexedCompletion CompletionMode = "Indexed"
+)
+
 // JobSpec describes how the job execution will look like.
 type JobSpec struct {
 
@@ -103,8 +128,11 @@ type JobSpec struct {
 	// +optional
 	Completions *int32
 
-	// Optional duration in seconds relative to the startTime that the job may be active
-	// before the system tries to terminate it; value must be positive integer
+	// Specifies the duration in seconds relative to the startTime that the job
+	// may be continuously active before the system tries to terminate it; value
+	// must be positive integer. If a Job is suspended (at creation or through an
+	// update), this timer will effectively be stopped and reset when the Job is
+	// resumed again.
 	// +optional
 	ActiveDeadlineSeconds *int64
 
@@ -145,23 +173,61 @@ type JobSpec struct {
 	// guarantees (e.g. finalizers) will be honored. If this field is unset,
 	// the Job won't be automatically deleted. If this field is set to zero,
 	// the Job becomes eligible to be deleted immediately after it finishes.
-	// This field is alpha-level and is only honored by servers that enable the
-	// TTLAfterFinished feature.
 	// +optional
 	TTLSecondsAfterFinished *int32
+
+	// CompletionMode specifies how Pod completions are tracked. It can be
+	// `NonIndexed` (default) or `Indexed`.
+	//
+	// `NonIndexed` means that the Job is considered complete when there have
+	// been .spec.completions successfully completed Pods. Each Pod completion is
+	// homologous to each other.
+	//
+	// `Indexed` means that the Pods of a
+	// Job get an associated completion index from 0 to (.spec.completions - 1),
+	// available in the annotation batch.kubernetes.io/job-completion-index.
+	// The Job is considered complete when there is one successfully completed Pod
+	// for each index.
+	// When value is `Indexed`, .spec.completions must be specified and
+	// `.spec.parallelism` must be less than or equal to 10^5.
+	// In addition, The Pod name takes the form
+	// `$(job-name)-$(index)-$(random-string)`,
+	// the Pod hostname takes the form `$(job-name)-$(index)`.
+	//
+	// This field is beta-level. More completion modes can be added in the future.
+	// If the Job controller observes a mode that it doesn't recognize, the
+	// controller skips updates for the Job.
+	// +optional
+	CompletionMode *CompletionMode
+
+	// Suspend specifies whether the Job controller should create Pods or not. If
+	// a Job is created with suspend set to true, no Pods are created by the Job
+	// controller. If a Job is suspended after creation (i.e. the flag goes from
+	// false to true), the Job controller will delete all active Pods associated
+	// with this Job. Users must design their workload to gracefully handle this.
+	// Suspending a Job will reset the StartTime field of the Job, effectively
+	// resetting the ActiveDeadlineSeconds timer too. Defaults to false.
+	//
+	// +optional
+	Suspend *bool
 }
 
 // JobStatus represents the current state of a Job.
 type JobStatus struct {
 
-	// The latest available observations of an object's current state.
-	// When a job fails, one of the conditions will have type == "Failed".
+	// The latest available observations of an object's current state. When a Job
+	// fails, one of the conditions will have type "Failed" and status true. When
+	// a Job is suspended, one of the conditions will have type "Suspended" and
+	// status true; when the Job is resumed, the status of this condition will
+	// become false. When a Job is completed, one of the conditions will have
+	// type "Complete" and status true.
 	// +optional
 	Conditions []JobCondition
 
-	// Represents time when the job was acknowledged by the job controller.
-	// It is not guaranteed to be set in happens-before order across separate operations.
-	// It is represented in RFC3339 form and is in UTC.
+	// Represents time when the job controller started processing a job. When a
+	// Job is created in the suspended state, this field is not set until the
+	// first time it is resumed. This field is reset every time a Job is resumed
+	// from suspension. It is represented in RFC3339 form and is in UTC.
 	// +optional
 	StartTime *metav1.Time
 
@@ -172,9 +238,16 @@ type JobStatus struct {
 	// +optional
 	CompletionTime *metav1.Time
 
-	// The number of actively running pods.
+	// The number of pending and running pods.
 	// +optional
 	Active int32
+
+	// The number of active pods which have a Ready condition.
+	//
+	// This field is alpha-level. The job controller populates the field when
+	// the feature gate JobReadyPods is enabled (disabled by default).
+	// +optional
+	Ready *int32
 
 	// The number of pods which reached phase Succeeded.
 	// +optional
@@ -183,6 +256,49 @@ type JobStatus struct {
 	// The number of pods which reached phase Failed.
 	// +optional
 	Failed int32
+
+	// CompletedIndexes holds the completed indexes when .spec.completionMode =
+	// "Indexed" in a text format. The indexes are represented as decimal integers
+	// separated by commas. The numbers are listed in increasing order. Three or
+	// more consecutive numbers are compressed and represented by the first and
+	// last element of the series, separated by a hyphen.
+	// For example, if the completed indexes are 1, 3, 4, 5 and 7, they are
+	// represented as "1,3-5,7".
+	// +optional
+	CompletedIndexes string
+
+	// UncountedTerminatedPods holds the UIDs of Pods that have terminated but
+	// the job controller hasn't yet accounted for in the status counters.
+	//
+	// The job controller creates pods with a finalizer. When a pod terminates
+	// (succeeded or failed), the controller does three steps to account for it
+	// in the job status:
+	// (1) Add the pod UID to the corresponding array in this field.
+	// (2) Remove the pod finalizer.
+	// (3) Remove the pod UID from the array while increasing the corresponding
+	//     counter.
+	//
+	// This field is beta-level. The job controller only makes use of this field
+	// when the feature gate JobTrackingWithFinalizers is enabled (enabled
+	// by default).
+	// Old jobs might not be tracked using this field, in which case the field
+	// remains null.
+	// +optional
+	UncountedTerminatedPods *UncountedTerminatedPods
+}
+
+// UncountedTerminatedPods holds UIDs of Pods that have terminated but haven't
+// been accounted in Job status counters.
+type UncountedTerminatedPods struct {
+	// Succeeded holds UIDs of succeeded Pods.
+	// +listType=set
+	// +optional
+	Succeeded []types.UID
+
+	// Failed holds UIDs of failed Pods.
+	// +listType=set
+	// +optional
+	Failed []types.UID
 }
 
 // JobConditionType is a valid value for JobCondition.Type
@@ -190,6 +306,8 @@ type JobConditionType string
 
 // These are valid conditions of a job.
 const (
+	// JobSuspended means the job has been suspended.
+	JobSuspended JobConditionType = "Suspended"
 	// JobComplete means the job has completed its execution.
 	JobComplete JobConditionType = "Complete"
 	// JobFailed means the job has failed its execution.
@@ -198,7 +316,7 @@ const (
 
 // JobCondition describes current state of a job.
 type JobCondition struct {
-	// Type of job condition, Complete or Failed.
+	// Type of job condition.
 	Type JobConditionType
 	// Status of the condition, one of True, False, Unknown.
 	Status api.ConditionStatus
@@ -271,7 +389,7 @@ type CronJobSpec struct {
 	ConcurrencyPolicy ConcurrencyPolicy
 
 	// This flag tells the controller to suspend subsequent executions, it does
-	// not apply to already started executions.  Defaults to false.
+	// not apply to already started executions. Defaults to false.
 	// +optional
 	Suspend *bool
 
@@ -316,4 +434,8 @@ type CronJobStatus struct {
 	// Information when was the last time the job was successfully scheduled.
 	// +optional
 	LastScheduleTime *metav1.Time
+
+	// Information when was the last time the job successfully completed.
+	// +optional
+	LastSuccessfulTime *metav1.Time
 }

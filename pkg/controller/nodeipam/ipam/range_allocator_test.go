@@ -30,11 +30,10 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/testutil"
+	netutils "k8s.io/utils/net"
 )
 
-const (
-	nodePollInterval = 100 * time.Millisecond
-)
+const testNodePollInterval = 10 * time.Millisecond
 
 var alwaysReady = func() bool { return true }
 
@@ -88,7 +87,7 @@ func TestOccupyPreExistingCIDR(t *testing.T) {
 			},
 			allocatorParams: CIDRAllocatorParams{
 				ClusterCIDRs: func() []*net.IPNet {
-					_, clusterCIDRv4, _ := net.ParseCIDR("10.10.0.0/16")
+					_, clusterCIDRv4, _ := netutils.ParseCIDRSloppy("10.10.0.0/16")
 					return []*net.IPNet{clusterCIDRv4}
 				}(),
 				ServiceCIDR:          nil,
@@ -113,8 +112,8 @@ func TestOccupyPreExistingCIDR(t *testing.T) {
 			},
 			allocatorParams: CIDRAllocatorParams{
 				ClusterCIDRs: func() []*net.IPNet {
-					_, clusterCIDRv4, _ := net.ParseCIDR("10.10.0.0/16")
-					_, clusterCIDRv6, _ := net.ParseCIDR("ace:cab:deca::/8")
+					_, clusterCIDRv4, _ := netutils.ParseCIDRSloppy("10.10.0.0/16")
+					_, clusterCIDRv6, _ := netutils.ParseCIDRSloppy("ace:cab:deca::/8")
 					return []*net.IPNet{clusterCIDRv4, clusterCIDRv6}
 				}(),
 				ServiceCIDR:          nil,
@@ -142,7 +141,7 @@ func TestOccupyPreExistingCIDR(t *testing.T) {
 			},
 			allocatorParams: CIDRAllocatorParams{
 				ClusterCIDRs: func() []*net.IPNet {
-					_, clusterCIDRv4, _ := net.ParseCIDR("10.10.0.0/16")
+					_, clusterCIDRv4, _ := netutils.ParseCIDRSloppy("10.10.0.0/16")
 					return []*net.IPNet{clusterCIDRv4}
 				}(),
 				ServiceCIDR:          nil,
@@ -170,8 +169,8 @@ func TestOccupyPreExistingCIDR(t *testing.T) {
 			},
 			allocatorParams: CIDRAllocatorParams{
 				ClusterCIDRs: func() []*net.IPNet {
-					_, clusterCIDRv4, _ := net.ParseCIDR("10.10.0.0/16")
-					_, clusterCIDRv6, _ := net.ParseCIDR("ace:cab:deca::/8")
+					_, clusterCIDRv4, _ := netutils.ParseCIDRSloppy("10.10.0.0/16")
+					_, clusterCIDRv6, _ := netutils.ParseCIDRSloppy("ace:cab:deca::/8")
 					return []*net.IPNet{clusterCIDRv4, clusterCIDRv6}
 				}(),
 				ServiceCIDR:          nil,
@@ -200,7 +199,7 @@ func TestOccupyPreExistingCIDR(t *testing.T) {
 			},
 			allocatorParams: CIDRAllocatorParams{
 				ClusterCIDRs: func() []*net.IPNet {
-					_, clusterCIDRv4, _ := net.ParseCIDR("10.10.0.0/16")
+					_, clusterCIDRv4, _ := netutils.ParseCIDRSloppy("10.10.0.0/16")
 					return []*net.IPNet{clusterCIDRv4}
 				}(),
 				ServiceCIDR:          nil,
@@ -229,7 +228,7 @@ func TestOccupyPreExistingCIDR(t *testing.T) {
 			},
 			allocatorParams: CIDRAllocatorParams{
 				ClusterCIDRs: func() []*net.IPNet {
-					_, clusterCIDRv4, _ := net.ParseCIDR("10.10.0.0/16")
+					_, clusterCIDRv4, _ := netutils.ParseCIDRSloppy("10.10.0.0/16")
 					return []*net.IPNet{clusterCIDRv4}
 				}(),
 				ServiceCIDR:          nil,
@@ -258,8 +257,8 @@ func TestOccupyPreExistingCIDR(t *testing.T) {
 			},
 			allocatorParams: CIDRAllocatorParams{
 				ClusterCIDRs: func() []*net.IPNet {
-					_, clusterCIDRv4, _ := net.ParseCIDR("10.10.0.0/16")
-					_, clusterCIDRv6, _ := net.ParseCIDR("ace:cab:deca::/8")
+					_, clusterCIDRv4, _ := netutils.ParseCIDRSloppy("10.10.0.0/16")
+					_, clusterCIDRv6, _ := netutils.ParseCIDRSloppy("ace:cab:deca::/8")
 					return []*net.IPNet{clusterCIDRv4, clusterCIDRv6}
 				}(),
 				ServiceCIDR:          nil,
@@ -288,8 +287,8 @@ func TestOccupyPreExistingCIDR(t *testing.T) {
 			},
 			allocatorParams: CIDRAllocatorParams{
 				ClusterCIDRs: func() []*net.IPNet {
-					_, clusterCIDRv4, _ := net.ParseCIDR("10.10.0.0/16")
-					_, clusterCIDRv6, _ := net.ParseCIDR("ace:cab:deca::/8")
+					_, clusterCIDRv4, _ := netutils.ParseCIDRSloppy("10.10.0.0/16")
+					_, clusterCIDRv6, _ := netutils.ParseCIDRSloppy("ace:cab:deca::/8")
 					return []*net.IPNet{clusterCIDRv4, clusterCIDRv6}
 				}(),
 				ServiceCIDR:          nil,
@@ -320,6 +319,13 @@ func TestOccupyPreExistingCIDR(t *testing.T) {
 }
 
 func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
+	// Non-parallel test (overrides global var)
+	oldNodePollInterval := nodePollInterval
+	nodePollInterval = testNodePollInterval
+	defer func() {
+		nodePollInterval = oldNodePollInterval
+	}()
+
 	// all tests operate on a single node
 	testCases := []testCase{
 		{
@@ -336,7 +342,7 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 			},
 			allocatorParams: CIDRAllocatorParams{
 				ClusterCIDRs: func() []*net.IPNet {
-					_, clusterCIDR, _ := net.ParseCIDR("127.123.234.0/24")
+					_, clusterCIDR, _ := netutils.ParseCIDRSloppy("127.123.234.0/24")
 					return []*net.IPNet{clusterCIDR}
 				}(),
 				ServiceCIDR:          nil,
@@ -361,11 +367,11 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 			},
 			allocatorParams: CIDRAllocatorParams{
 				ClusterCIDRs: func() []*net.IPNet {
-					_, clusterCIDR, _ := net.ParseCIDR("127.123.234.0/24")
+					_, clusterCIDR, _ := netutils.ParseCIDRSloppy("127.123.234.0/24")
 					return []*net.IPNet{clusterCIDR}
 				}(),
 				ServiceCIDR: func() *net.IPNet {
-					_, serviceCIDR, _ := net.ParseCIDR("127.123.234.0/26")
+					_, serviceCIDR, _ := netutils.ParseCIDRSloppy("127.123.234.0/26")
 					return serviceCIDR
 				}(),
 				SecondaryServiceCIDR: nil,
@@ -390,11 +396,11 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 			},
 			allocatorParams: CIDRAllocatorParams{
 				ClusterCIDRs: func() []*net.IPNet {
-					_, clusterCIDR, _ := net.ParseCIDR("127.123.234.0/24")
+					_, clusterCIDR, _ := netutils.ParseCIDRSloppy("127.123.234.0/24")
 					return []*net.IPNet{clusterCIDR}
 				}(),
 				ServiceCIDR: func() *net.IPNet {
-					_, serviceCIDR, _ := net.ParseCIDR("127.123.234.0/26")
+					_, serviceCIDR, _ := netutils.ParseCIDRSloppy("127.123.234.0/26")
 					return serviceCIDR
 				}(),
 				SecondaryServiceCIDR: nil,
@@ -421,12 +427,12 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 			},
 			allocatorParams: CIDRAllocatorParams{
 				ClusterCIDRs: func() []*net.IPNet {
-					_, clusterCIDRv4, _ := net.ParseCIDR("127.123.234.0/8")
-					_, clusterCIDRv6, _ := net.ParseCIDR("ace:cab:deca::/84")
+					_, clusterCIDRv4, _ := netutils.ParseCIDRSloppy("127.123.234.0/8")
+					_, clusterCIDRv6, _ := netutils.ParseCIDRSloppy("ace:cab:deca::/84")
 					return []*net.IPNet{clusterCIDRv4, clusterCIDRv6}
 				}(),
 				ServiceCIDR: func() *net.IPNet {
-					_, serviceCIDR, _ := net.ParseCIDR("127.123.234.0/26")
+					_, serviceCIDR, _ := netutils.ParseCIDRSloppy("127.123.234.0/26")
 					return serviceCIDR
 				}(),
 				SecondaryServiceCIDR: nil,
@@ -447,12 +453,12 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 			},
 			allocatorParams: CIDRAllocatorParams{
 				ClusterCIDRs: func() []*net.IPNet {
-					_, clusterCIDRv4, _ := net.ParseCIDR("127.123.234.0/8")
-					_, clusterCIDRv6, _ := net.ParseCIDR("ace:cab:deca::/84")
+					_, clusterCIDRv4, _ := netutils.ParseCIDRSloppy("127.123.234.0/8")
+					_, clusterCIDRv6, _ := netutils.ParseCIDRSloppy("ace:cab:deca::/84")
 					return []*net.IPNet{clusterCIDRv6, clusterCIDRv4}
 				}(),
 				ServiceCIDR: func() *net.IPNet {
-					_, serviceCIDR, _ := net.ParseCIDR("127.123.234.0/26")
+					_, serviceCIDR, _ := netutils.ParseCIDRSloppy("127.123.234.0/26")
 					return serviceCIDR
 				}(),
 				SecondaryServiceCIDR: nil,
@@ -473,13 +479,13 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 			},
 			allocatorParams: CIDRAllocatorParams{
 				ClusterCIDRs: func() []*net.IPNet {
-					_, clusterCIDRv4, _ := net.ParseCIDR("127.123.234.0/8")
-					_, clusterCIDRv6, _ := net.ParseCIDR("ace:cab:deca::/84")
-					_, clusterCIDRv4_2, _ := net.ParseCIDR("10.0.0.0/8")
+					_, clusterCIDRv4, _ := netutils.ParseCIDRSloppy("127.123.234.0/8")
+					_, clusterCIDRv6, _ := netutils.ParseCIDRSloppy("ace:cab:deca::/84")
+					_, clusterCIDRv4_2, _ := netutils.ParseCIDRSloppy("10.0.0.0/8")
 					return []*net.IPNet{clusterCIDRv4, clusterCIDRv6, clusterCIDRv4_2}
 				}(),
 				ServiceCIDR: func() *net.IPNet {
-					_, serviceCIDR, _ := net.ParseCIDR("127.123.234.0/26")
+					_, serviceCIDR, _ := netutils.ParseCIDRSloppy("127.123.234.0/26")
 					return serviceCIDR
 				}(),
 				SecondaryServiceCIDR: nil,
@@ -516,7 +522,7 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 			},
 			allocatorParams: CIDRAllocatorParams{
 				ClusterCIDRs: func() []*net.IPNet {
-					_, clusterCIDR, _ := net.ParseCIDR("10.10.0.0/22")
+					_, clusterCIDR, _ := netutils.ParseCIDRSloppy("10.10.0.0/22")
 					return []*net.IPNet{clusterCIDR}
 				}(),
 				ServiceCIDR:          nil,
@@ -552,7 +558,7 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 		// pre allocate the cidrs as per the test
 		for idx, allocatedList := range tc.allocatedCIDRs {
 			for _, allocated := range allocatedList {
-				_, cidr, err := net.ParseCIDR(allocated)
+				_, cidr, err := netutils.ParseCIDRSloppy(allocated)
 				if err != nil {
 					t.Fatalf("%v: unexpected error when parsing CIDR %v: %v", tc.description, allocated, err)
 				}
@@ -618,7 +624,7 @@ func TestAllocateOrOccupyCIDRFailure(t *testing.T) {
 			},
 			allocatorParams: CIDRAllocatorParams{
 				ClusterCIDRs: func() []*net.IPNet {
-					_, clusterCIDR, _ := net.ParseCIDR("127.123.234.0/28")
+					_, clusterCIDR, _ := netutils.ParseCIDRSloppy("127.123.234.0/28")
 					return []*net.IPNet{clusterCIDR}
 				}(),
 				ServiceCIDR:          nil,
@@ -649,7 +655,7 @@ func TestAllocateOrOccupyCIDRFailure(t *testing.T) {
 		// this is a bit of white box testing
 		for setIdx, allocatedList := range tc.allocatedCIDRs {
 			for _, allocated := range allocatedList {
-				_, cidr, err := net.ParseCIDR(allocated)
+				_, cidr, err := netutils.ParseCIDRSloppy(allocated)
 				if err != nil {
 					t.Fatalf("%v: unexpected error when parsing CIDR %v: %v", tc.description, cidr, err)
 				}
@@ -700,6 +706,13 @@ type releaseTestCase struct {
 }
 
 func TestReleaseCIDRSuccess(t *testing.T) {
+	// Non-parallel test (overrides global var)
+	oldNodePollInterval := nodePollInterval
+	nodePollInterval = testNodePollInterval
+	defer func() {
+		nodePollInterval = oldNodePollInterval
+	}()
+
 	testCases := []releaseTestCase{
 		{
 			description: "Correctly release preallocated CIDR",
@@ -715,7 +728,7 @@ func TestReleaseCIDRSuccess(t *testing.T) {
 			},
 			allocatorParams: CIDRAllocatorParams{
 				ClusterCIDRs: func() []*net.IPNet {
-					_, clusterCIDR, _ := net.ParseCIDR("127.123.234.0/28")
+					_, clusterCIDR, _ := netutils.ParseCIDRSloppy("127.123.234.0/28")
 					return []*net.IPNet{clusterCIDR}
 				}(),
 				ServiceCIDR:          nil,
@@ -747,7 +760,7 @@ func TestReleaseCIDRSuccess(t *testing.T) {
 			},
 			allocatorParams: CIDRAllocatorParams{
 				ClusterCIDRs: func() []*net.IPNet {
-					_, clusterCIDR, _ := net.ParseCIDR("127.123.234.0/28")
+					_, clusterCIDR, _ := netutils.ParseCIDRSloppy("127.123.234.0/28")
 					return []*net.IPNet{clusterCIDR}
 				}(),
 				ServiceCIDR:          nil,
@@ -784,7 +797,7 @@ func TestReleaseCIDRSuccess(t *testing.T) {
 		// this is a bit of white box testing
 		for setIdx, allocatedList := range tc.allocatedCIDRs {
 			for _, allocated := range allocatedList {
-				_, cidr, err := net.ParseCIDR(allocated)
+				_, cidr, err := netutils.ParseCIDRSloppy(allocated)
 				if err != nil {
 					t.Fatalf("%v: unexpected error when parsing CIDR %v: %v", tc.description, allocated, err)
 				}

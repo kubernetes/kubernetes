@@ -125,7 +125,7 @@ func TestIsMigratable(t *testing.T) {
 	}
 	csiTranslator := csitrans.New()
 	for _, test := range testCases {
-		pm := NewPluginManager(csiTranslator)
+		pm := NewPluginManager(csiTranslator, utilfeature.DefaultFeatureGate)
 		t.Run(fmt.Sprintf("Testing %v", test.name), func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, test.csiMigrationEnabled)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, test.pluginFeature, test.pluginFeatureEnabled)()
@@ -142,74 +142,64 @@ func TestIsMigratable(t *testing.T) {
 
 func TestCheckMigrationFeatureFlags(t *testing.T) {
 	testCases := []struct {
-		name                         string
-		pluginFeature                featuregate.Feature
-		pluginFeatureEnabled         bool
-		csiMigrationEnabled          bool
-		pluginFeatureComplete        featuregate.Feature
-		pluginFeatureCompleteEnabled bool
-		pluginUnregsiterFeature      featuregate.Feature
-		pluginUnregsiterEnabled      bool
-		expectMigrationComplete      bool
-		expectErr                    bool
+		name                    string
+		pluginFeature           featuregate.Feature
+		pluginFeatureEnabled    bool
+		csiMigrationEnabled     bool
+		pluginUnregsiterFeature featuregate.Feature
+		pluginUnregsiterEnabled bool
+		expectMigrationComplete bool
+		expectErr               bool
 	}{
 		{
-			name:                         "plugin specific feature flag enabled with migration flag disabled",
-			pluginFeature:                features.CSIMigrationvSphere,
-			pluginFeatureEnabled:         true,
-			csiMigrationEnabled:          false,
-			pluginFeatureComplete:        features.CSIMigrationvSphereComplete,
-			pluginFeatureCompleteEnabled: false,
-			pluginUnregsiterFeature:      features.InTreePluginvSphereUnregister,
-			pluginUnregsiterEnabled:      false,
-			expectMigrationComplete:      false,
-			expectErr:                    false,
+			name:                    "plugin specific feature flag enabled with migration flag disabled",
+			pluginFeature:           features.CSIMigrationvSphere,
+			pluginFeatureEnabled:    true,
+			csiMigrationEnabled:     false,
+			pluginUnregsiterFeature: features.InTreePluginvSphereUnregister,
+			pluginUnregsiterEnabled: false,
+			expectMigrationComplete: false,
+			expectErr:               true,
 		},
 		{
-			name:                         "plugin specific complete flag enabled but plugin specific feature flag disabled",
-			pluginFeature:                features.CSIMigrationvSphere,
-			pluginFeatureEnabled:         false,
-			csiMigrationEnabled:          true,
-			pluginFeatureComplete:        features.CSIMigrationvSphereComplete,
-			pluginFeatureCompleteEnabled: true,
-			pluginUnregsiterFeature:      features.InTreePluginvSphereUnregister,
-			pluginUnregsiterEnabled:      false,
-			expectMigrationComplete:      false,
-			expectErr:                    false,
-		},
-		{
-			name:                         "plugin specific complete feature disabled but plugin specific migration feature and CSI migration flag enabled",
-			pluginFeature:                features.CSIMigrationvSphere,
-			pluginFeatureEnabled:         true,
-			csiMigrationEnabled:          true,
-			pluginFeatureComplete:        features.CSIMigrationvSphereComplete,
-			pluginFeatureCompleteEnabled: false,
-			pluginUnregsiterFeature:      features.InTreePluginvSphereUnregister,
-			pluginUnregsiterEnabled:      false,
-			expectMigrationComplete:      false,
-			expectErr:                    true,
-		},
-		{
-			name:                         "all features enabled",
-			pluginFeature:                features.CSIMigrationvSphere,
-			pluginFeatureEnabled:         true,
-			csiMigrationEnabled:          true,
-			pluginFeatureComplete:        features.CSIMigrationvSphereComplete,
-			pluginFeatureCompleteEnabled: true,
-			pluginUnregsiterFeature:      features.InTreePluginvSphereUnregister,
-			pluginUnregsiterEnabled:      true,
-			expectMigrationComplete:      true,
-			expectErr:                    true,
-		},
-		{
-			name:                    "no plugin feature complete set",
-			pluginFeature:           features.CSIMigrationGCE,
+			name:                    "plugin specific migration feature and CSI migration flag both enabled with plugin unregister disabled",
+			pluginFeature:           features.CSIMigrationvSphere,
 			pluginFeatureEnabled:    true,
 			csiMigrationEnabled:     true,
-			pluginUnregsiterFeature: features.InTreePluginGCEUnregister,
+			pluginUnregsiterFeature: features.InTreePluginvSphereUnregister,
+			pluginUnregsiterEnabled: false,
+			expectMigrationComplete: false,
+			expectErr:               false,
+		},
+		{
+			name:                    "plugin specific migration feature and plugin unregister disabled and CSI migration flag enabled",
+			pluginFeature:           features.CSIMigrationvSphere,
+			pluginFeatureEnabled:    false,
+			csiMigrationEnabled:     true,
+			pluginUnregsiterFeature: features.InTreePluginvSphereUnregister,
+			pluginUnregsiterEnabled: false,
+			expectMigrationComplete: false,
+			expectErr:               false,
+		},
+		{
+			name:                    "all features enabled",
+			pluginFeature:           features.CSIMigrationvSphere,
+			pluginFeatureEnabled:    true,
+			csiMigrationEnabled:     true,
+			pluginUnregsiterFeature: features.InTreePluginvSphereUnregister,
 			pluginUnregsiterEnabled: true,
 			expectMigrationComplete: true,
-			expectErr:               true,
+			expectErr:               false,
+		},
+		{
+			name:                    "all features disabled",
+			pluginFeature:           features.CSIMigrationvSphere,
+			pluginFeatureEnabled:    false,
+			csiMigrationEnabled:     false,
+			pluginUnregsiterFeature: features.InTreePluginvSphereUnregister,
+			pluginUnregsiterEnabled: false,
+			expectMigrationComplete: false,
+			expectErr:               false,
 		},
 	}
 	for _, test := range testCases {
@@ -217,14 +207,11 @@ func TestCheckMigrationFeatureFlags(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, test.csiMigrationEnabled)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, test.pluginFeature, test.pluginFeatureEnabled)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, test.pluginUnregsiterFeature, test.pluginUnregsiterEnabled)()
-			if test.pluginFeatureComplete != "" {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, test.pluginFeatureComplete, test.pluginFeatureCompleteEnabled)()
-			}
-			migrationComplete, err := CheckMigrationFeatureFlags(utilfeature.DefaultFeatureGate, test.pluginFeature, test.pluginFeatureComplete, test.pluginUnregsiterFeature)
-			if err != nil && test.expectErr == true {
+			migrationComplete, err := CheckMigrationFeatureFlags(utilfeature.DefaultFeatureGate, test.pluginFeature, test.pluginUnregsiterFeature)
+			if err != nil && test.expectErr == false {
 				t.Errorf("Unexpected error: %v", err)
 			}
-			if err == nil && test.expectErr == false {
+			if err == nil && test.expectErr == true {
 				t.Errorf("Unexpected validation pass")
 			}
 			if migrationComplete != test.expectMigrationComplete {
@@ -337,7 +324,7 @@ func TestMigrationFeatureFlagStatus(t *testing.T) {
 	}
 	csiTranslator := csitrans.New()
 	for _, test := range testCases {
-		pm := NewPluginManager(csiTranslator)
+		pm := NewPluginManager(csiTranslator, utilfeature.DefaultFeatureGate)
 		t.Run(fmt.Sprintf("Testing %v", test.name), func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, test.csiMigrationEnabled)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, test.pluginFeature, test.pluginFeatureEnabled)()

@@ -87,14 +87,14 @@ run_save_config_tests() {
   kubectl autoscale -f hack/testdata/frontend-controller.yaml --save-config "${kube_flags[@]}" --max=2
   # Post-Condition: hpa "frontend" has configuration annotation
   grep -q "kubectl.kubernetes.io/last-applied-configuration" <<< "$(kubectl get hpa frontend -o yaml "${kube_flags[@]}")"
-  # Ensure we can interact with HPA objects in lists through autoscaling/v1 APIs
+  # Ensure we can interact with HPA objects in lists through autoscaling/v2 APIs
   output_message=$(kubectl get hpa -o=jsonpath='{.items[0].apiVersion}' 2>&1 "${kube_flags[@]}")
-  kube::test::if_has_string "${output_message}" 'autoscaling/v1'
+  kube::test::if_has_string "${output_message}" 'autoscaling/v2'
   output_message=$(kubectl get hpa.autoscaling -o=jsonpath='{.items[0].apiVersion}' 2>&1 "${kube_flags[@]}")
-  kube::test::if_has_string "${output_message}" 'autoscaling/v1'
+  kube::test::if_has_string "${output_message}" 'autoscaling/v2'
   # tests kubectl group prefix matching
   output_message=$(kubectl get hpa.autoscal -o=jsonpath='{.items[0].apiVersion}' 2>&1 "${kube_flags[@]}")
-  kube::test::if_has_string "${output_message}" 'autoscaling/v1'
+  kube::test::if_has_string "${output_message}" 'autoscaling/v2'
   # Clean up
   # Note that we should delete hpa first, otherwise it may fight with the rc reaper.
   kubectl delete hpa frontend "${kube_flags[@]}"

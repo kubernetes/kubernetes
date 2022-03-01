@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
@@ -36,7 +36,7 @@ import (
 )
 
 const (
-	reconcilerLoopPeriod      time.Duration = 0 * time.Millisecond
+	reconcilerLoopPeriod      time.Duration = 10 * time.Millisecond
 	syncLoopPeriod            time.Duration = 100 * time.Minute
 	maxWaitForUnmountDuration time.Duration = 50 * time.Millisecond
 )
@@ -55,7 +55,6 @@ func Test_Run_Positive_DoNothing(t *testing.T) {
 		fakeKubeClient,
 		volumePluginMgr,
 		fakeRecorder,
-		false, /* checkNodeCapabilitiesBeforeMount */
 		fakeHandler))
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 	nsu := statusupdater.NewNodeStatusUpdater(
@@ -91,7 +90,6 @@ func Test_Run_Positive_OneDesiredVolumeAttach(t *testing.T) {
 		fakeKubeClient,
 		volumePluginMgr,
 		fakeRecorder,
-		false, /* checkNodeCapabilitiesBeforeMount */
 		fakeHandler))
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	reconciler := NewReconciler(
@@ -143,7 +141,6 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithUnmountedVolume(t *te
 		fakeKubeClient,
 		volumePluginMgr,
 		fakeRecorder,
-		false, /* checkNodeCapabilitiesBeforeMount */
 		fakeHandler))
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	reconciler := NewReconciler(
@@ -216,7 +213,6 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithMountedVolume(t *test
 		fakeKubeClient,
 		volumePluginMgr,
 		fakeRecorder,
-		false, /* checkNodeCapabilitiesBeforeMount */
 		fakeHandler))
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	reconciler := NewReconciler(
@@ -289,7 +285,6 @@ func Test_Run_Negative_OneDesiredVolumeAttachThenDetachWithUnmountedVolumeUpdate
 		fakeKubeClient,
 		volumePluginMgr,
 		fakeRecorder,
-		false, /* checkNodeCapabilitiesBeforeMount */
 		fakeHandler))
 	nsu := statusupdater.NewFakeNodeStatusUpdater(true /* returnError */)
 	reconciler := NewReconciler(
@@ -365,7 +360,6 @@ func Test_Run_OneVolumeAttachAndDetachMultipleNodesWithReadWriteMany(t *testing.
 		fakeKubeClient,
 		volumePluginMgr,
 		fakeRecorder,
-		false, /* checkNodeCapabilitiesBeforeMount */
 		fakeHandler))
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	reconciler := NewReconciler(
@@ -458,7 +452,6 @@ func Test_Run_OneVolumeAttachAndDetachMultipleNodesWithReadWriteOnce(t *testing.
 		fakeKubeClient,
 		volumePluginMgr,
 		fakeRecorder,
-		false, /* checkNodeCapabilitiesBeforeMount */
 		fakeHandler))
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	reconciler := NewReconciler(
@@ -549,7 +542,6 @@ func Test_Run_OneVolumeAttachAndDetachUncertainNodesWithReadWriteOnce(t *testing
 		fakeKubeClient,
 		volumePluginMgr,
 		fakeRecorder,
-		false, /* checkNodeCapabilitiesBeforeMount */
 		fakeHandler))
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	reconciler := NewReconciler(
@@ -599,6 +591,102 @@ func Test_Run_OneVolumeAttachAndDetachUncertainNodesWithReadWriteOnce(t *testing
 
 }
 
+func Test_Run_OneVolumeDetachFailNodeWithReadWriteOnce(t *testing.T) {
+	// Arrange
+	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
+	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
+	asw := cache.NewActualStateOfWorld(volumePluginMgr)
+	fakeKubeClient := controllervolumetesting.CreateTestClient()
+	fakeRecorder := &record.FakeRecorder{}
+	fakeHandler := volumetesting.NewBlockVolumePathHandler()
+	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
+		fakeKubeClient,
+		volumePluginMgr,
+		fakeRecorder,
+		fakeHandler))
+	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
+	reconciler := NewReconciler(
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad, nsu, fakeRecorder)
+	podName1 := "pod-uid1"
+	podName2 := "pod-uid2"
+	podName3 := "pod-uid3"
+	volumeName := v1.UniqueVolumeName("volume-name")
+	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
+	volumeSpec.PersistentVolume.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
+	nodeName1 := k8stypes.NodeName(volumetesting.FailDetachNode)
+	nodeName2 := k8stypes.NodeName("node-name2")
+	dsw.AddNode(nodeName1, false /*keepTerminatedPodVolumes*/)
+	dsw.AddNode(nodeName2, false /*keepTerminatedPodVolumes*/)
+
+	// Act
+	ch := make(chan struct{})
+	go reconciler.Run(ch)
+	defer close(ch)
+
+	// Add the pod in which the volume is attached to the FailDetachNode
+	generatedVolumeName, podAddErr := dsw.AddPod(types.UniquePodName(podName1), controllervolumetesting.NewPod(podName1, podName1), volumeSpec, nodeName1)
+	if podAddErr != nil {
+		t.Fatalf("AddPod failed. Expected: <no error> Actual: <%v>", podAddErr)
+	}
+
+	time.Sleep(1000 * time.Millisecond)
+	// Volume is added to asw, volume should be reported as attached to the node.
+	waitForVolumeAddedToNode(t, generatedVolumeName, nodeName1, asw)
+	verifyVolumeAttachedToNode(t, generatedVolumeName, nodeName1, cache.AttachStateAttached, asw)
+	verifyVolumeReportedAsAttachedToNode(t, generatedVolumeName, nodeName1, true, asw)
+
+	// Delete the pod, but detach will fail
+	dsw.DeletePod(types.UniquePodName(podName1), generatedVolumeName, nodeName1)
+
+	// The first detach will be triggered after at leaset 50ms (maxWaitForUnmountDuration in test).
+	// Right before detach operation is performed, the volume will be first removed from being reported
+	// as attached on node status (RemoveVolumeFromReportAsAttached). After detach operation which is expected to fail,
+	// controller then added the volume back as attached.
+	// Here it sleeps 100ms so that detach should be triggered already at this point.
+	// verifyVolumeReportedAsAttachedToNode will check volume is in the list of volume attached that needs to be updated
+	// in node status. By calling this function (GetVolumesToReportAttached), node status should be updated, and the volume
+	// will not need to be updated until new changes are applied (detach is triggered again)
+	time.Sleep(100 * time.Millisecond)
+	verifyVolumeAttachedToNode(t, generatedVolumeName, nodeName1, cache.AttachStateAttached, asw)
+	verifyVolumeReportedAsAttachedToNode(t, generatedVolumeName, nodeName1, true, asw)
+
+	// After the first detach fails, reconciler will wait for a period of time before retrying to detach.
+	// The wait time is increasing exponentially from initial value of 0.5s (0.5, 1, 2, 4, ...).
+	// The test here waits for 100 Millisecond to make sure it is in exponential backoff period after
+	// the first detach operation. At this point, volumes status should not be updated
+	time.Sleep(100 * time.Millisecond)
+	verifyVolumeAttachedToNode(t, generatedVolumeName, nodeName1, cache.AttachStateAttached, asw)
+	verifyVolumeNoStatusUpdateNeeded(t, generatedVolumeName, nodeName1, asw)
+
+	// Wait for 600ms to make sure second detach operation triggered. Again, The volume will be
+	// removed from being reported as attached on node status and then added back as attached.
+	// The volume will be in the list of attached volumes that need to be updated to node status.
+	time.Sleep(600 * time.Millisecond)
+	verifyVolumeAttachedToNode(t, generatedVolumeName, nodeName1, cache.AttachStateAttached, asw)
+	verifyVolumeReportedAsAttachedToNode(t, generatedVolumeName, nodeName1, true, asw)
+
+	// Add a second pod which tries to attach the volume to the same node.
+	// After adding pod to the same node, detach will not be triggered any more.
+	generatedVolumeName, podAddErr = dsw.AddPod(types.UniquePodName(podName2), controllervolumetesting.NewPod(podName2, podName2), volumeSpec, nodeName1)
+	if podAddErr != nil {
+		t.Fatalf("AddPod failed. Expected: <no error> Actual: <%v>", podAddErr)
+	}
+	// Sleep 1s to verify no detach are triggered after second pod is added in the future.
+	time.Sleep(1000 * time.Millisecond)
+	verifyVolumeAttachedToNode(t, generatedVolumeName, nodeName1, cache.AttachStateAttached, asw)
+	verifyVolumeNoStatusUpdateNeeded(t, generatedVolumeName, nodeName1, asw)
+
+	// Add a third pod which tries to attach the volume to a different node.
+	// At this point, volume is still attached to first node. There are no status update for both nodes.
+	generatedVolumeName, podAddErr = dsw.AddPod(types.UniquePodName(podName3), controllervolumetesting.NewPod(podName3, podName3), volumeSpec, nodeName2)
+	if podAddErr != nil {
+		t.Fatalf("AddPod failed. Expected: <no error> Actual: <%v>", podAddErr)
+	}
+	verifyVolumeAttachedToNode(t, generatedVolumeName, nodeName1, cache.AttachStateAttached, asw)
+	verifyVolumeNoStatusUpdateNeeded(t, generatedVolumeName, nodeName1, asw)
+	verifyVolumeNoStatusUpdateNeeded(t, generatedVolumeName, nodeName2, asw)
+}
+
 // Creates a volume with accessMode ReadWriteOnce
 // First create a pod which will try to attach the volume to the a node named "timeout-node". The attach call for this node will
 // fail for timeout, but the volume will be actually attached to the node after the call.
@@ -616,7 +704,6 @@ func Test_Run_OneVolumeAttachAndDetachTimeoutNodesWithReadWriteOnce(t *testing.T
 		fakeKubeClient,
 		volumePluginMgr,
 		fakeRecorder,
-		false, /* checkNodeCapabilitiesBeforeMount */
 		fakeHandler))
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	reconciler := NewReconciler(
@@ -722,7 +809,6 @@ func Test_ReportMultiAttachError(t *testing.T) {
 			fakeKubeClient,
 			volumePluginMgr,
 			fakeRecorder,
-			false, /* checkNodeCapabilitiesBeforeMount */
 			fakeHandler))
 		nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 		rc := NewReconciler(
@@ -1179,6 +1265,22 @@ func verifyVolumeReportedAsAttachedToNode(
 		result,
 		isAttached)
 
+}
+
+func verifyVolumeNoStatusUpdateNeeded(
+	t *testing.T,
+	volumeName v1.UniqueVolumeName,
+	nodeName k8stypes.NodeName,
+	asw cache.ActualStateOfWorld,
+) {
+	volumes := asw.GetVolumesToReportAttached()
+	for _, volume := range volumes[nodeName] {
+		if volume.Name == volumeName {
+			t.Fatalf("Check volume <%v> is reported as need to update status on node <%v>, expected false",
+				volumeName,
+				nodeName)
+		}
+	}
 }
 
 func verifyNewDetacherCallCount(

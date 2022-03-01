@@ -29,6 +29,7 @@ import (
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/networking/ingress"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // REST implements a RESTStorage for replication controllers
@@ -43,9 +44,10 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 		NewListFunc:              func() runtime.Object { return &networking.IngressList{} },
 		DefaultQualifiedResource: networking.Resource("ingresses"),
 
-		CreateStrategy: ingress.Strategy,
-		UpdateStrategy: ingress.Strategy,
-		DeleteStrategy: ingress.Strategy,
+		CreateStrategy:      ingress.Strategy,
+		UpdateStrategy:      ingress.Strategy,
+		DeleteStrategy:      ingress.Strategy,
+		ResetFieldsStrategy: ingress.Strategy,
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
@@ -56,6 +58,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 
 	statusStore := *store
 	statusStore.UpdateStrategy = ingress.StatusStrategy
+	statusStore.ResetFieldsStrategy = ingress.StatusStrategy
 	return &REST{store}, &StatusREST{store: &statusStore}, nil
 }
 
@@ -87,4 +90,9 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
 	// subresources should never allow create on update.
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
+}
+
+// GetResetFields implements rest.ResetFieldsStrategy
+func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return r.store.GetResetFields()
 }

@@ -79,7 +79,7 @@ func (d *defaultDockerConfigProvider) Provide(image string) DockerConfig {
 	if cfg, err := ReadDockerConfigFile(); err == nil {
 		return cfg
 	} else if !os.IsNotExist(err) {
-		klog.V(4).Infof("Unable to parse Docker config file: %v", err)
+		klog.V(2).Infof("Docker config file not found: %v", err)
 	}
 	return DockerConfig{}
 }

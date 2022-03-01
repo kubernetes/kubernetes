@@ -32,8 +32,9 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	"k8s.io/apiserver/pkg/storage/value"
+	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 
-	"go.etcd.io/etcd/clientv3"
+	clientv3 "go.etcd.io/etcd/client/v3"
 	"k8s.io/klog/v2"
 )
 
@@ -120,6 +121,14 @@ func (w *watcher) Watch(ctx context.Context, key string, rev int64, recursive, p
 	}
 	wc := w.createWatchChan(ctx, key, rev, recursive, progressNotify, pred)
 	go wc.run()
+
+	// For etcd watch we don't have an easy way to answer whether the watch
+	// has already caught up. So in the initial version (given that watchcache
+	// is by default enabled for all resources but Events), we just deliver
+	// the initialization signal immediately. Improving this will be explored
+	// in the future.
+	utilflowcontrol.WatchInitialized(ctx)
+
 	return wc, nil
 }
 
@@ -283,7 +292,7 @@ func (wc *watchChan) processEvent(wg *sync.WaitGroup) {
 				continue
 			}
 			if len(wc.resultChan) == outgoingBufSize {
-				klog.V(3).InfoS("Fast watcher, slow processing. Probably caused by slow dispatching events to watchers", "outgoingEvents", outgoingBufSize)
+				klog.V(3).InfoS("Fast watcher, slow processing. Probably caused by slow dispatching events to watchers", "outgoingEvents", outgoingBufSize, "objectType", wc.watcher.objectType)
 			}
 			// If user couldn't receive results fast enough, we also block incoming events from watcher.
 			// Because storing events in local will cause more memory usage.
@@ -402,7 +411,7 @@ func (wc *watchChan) sendError(err error) {
 
 func (wc *watchChan) sendEvent(e *event) {
 	if len(wc.incomingEventChan) == incomingBufSize {
-		klog.V(3).InfoS("Fast watcher, slow processing. Probably caused by slow decoding, user not receiving fast, or other processing logic", "incomingEvents", incomingBufSize)
+		klog.V(3).InfoS("Fast watcher, slow processing. Probably caused by slow decoding, user not receiving fast, or other processing logic", "incomingEvents", incomingBufSize, "objectType", wc.watcher.objectType)
 	}
 	select {
 	case wc.incomingEventChan <- e:
@@ -417,7 +426,7 @@ func (wc *watchChan) prepareObjs(e *event) (curObj runtime.Object, oldObj runtim
 	}
 
 	if !e.isDeleted {
-		data, _, err := wc.watcher.transformer.TransformFromStorage(e.value, authenticatedDataString(e.key))
+		data, _, err := wc.watcher.transformer.TransformFromStorage(wc.ctx, e.value, authenticatedDataString(e.key))
 		if err != nil {
 			return nil, nil, err
 		}
@@ -432,7 +441,7 @@ func (wc *watchChan) prepareObjs(e *event) (curObj runtime.Object, oldObj runtim
 	// we need the object only to compute whether it was filtered out
 	// before).
 	if len(e.prevValue) > 0 && (e.isDeleted || !wc.acceptAll()) {
-		data, _, err := wc.watcher.transformer.TransformFromStorage(e.prevValue, authenticatedDataString(e.key))
+		data, _, err := wc.watcher.transformer.TransformFromStorage(wc.ctx, e.prevValue, authenticatedDataString(e.key))
 		if err != nil {
 			return nil, nil, err
 		}

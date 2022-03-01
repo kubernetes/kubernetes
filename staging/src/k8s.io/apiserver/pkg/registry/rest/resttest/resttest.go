@@ -105,9 +105,6 @@ func (t *Tester) TestNamespace() string {
 // TestContext returns a namespaced context that will be used when making storage calls.
 // Namespace is determined by TestNamespace()
 func (t *Tester) TestContext() context.Context {
-	if t.clusterScope {
-		return genericapirequest.NewContext()
-	}
 	return genericapirequest.WithNamespace(genericapirequest.NewContext(), t.TestNamespace())
 }
 
@@ -206,6 +203,8 @@ func (t *Tester) TestDelete(valid runtime.Object, createFn CreateFunc, getFn Get
 	t.testDeleteNoGraceful(valid.DeepCopyObject(), createFn, getFn, isNotFoundFn, false)
 	t.testDeleteWithUID(valid.DeepCopyObject(), createFn, getFn, isNotFoundFn, dryRunOpts)
 	t.testDeleteWithUID(valid.DeepCopyObject(), createFn, getFn, isNotFoundFn, opts)
+	t.testDeleteWithResourceVersion(valid.DeepCopyObject(), createFn, getFn, isNotFoundFn, dryRunOpts)
+	t.testDeleteWithResourceVersion(valid.DeepCopyObject(), createFn, getFn, isNotFoundFn, opts)
 }
 
 // Test gracefully deleting an object.
@@ -379,7 +378,8 @@ func (t *Tester) testCreateGeneratesName(valid runtime.Object) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	defer t.delete(t.TestContext(), created)
-	if objectMeta.GetName() == "test-" || !strings.HasPrefix(objectMeta.GetName(), "test-") {
+	createdMeta := t.getObjectMetaOrFail(created)
+	if createdMeta.GetName() == "test-" || !strings.HasPrefix(createdMeta.GetName(), "test-") {
 		t.Errorf("unexpected name: %#v", valid)
 	}
 }
@@ -397,7 +397,8 @@ func (t *Tester) testCreateHasMetadata(valid runtime.Object) {
 		t.Fatalf("Unexpected object from result: %#v", obj)
 	}
 	defer t.delete(t.TestContext(), obj)
-	if !metav1.HasObjectMetaSystemFieldValues(objectMeta) {
+	createdMeta := t.getObjectMetaOrFail(obj)
+	if !metav1.HasObjectMetaSystemFieldValues(createdMeta) {
 		t.Errorf("storage did not populate object meta field values")
 	}
 }
@@ -499,7 +500,8 @@ func (t *Tester) testCreateResetsUserData(valid runtime.Object, opts metav1.Crea
 		t.Fatalf("Unexpected object from result: %#v", obj)
 	}
 	defer t.delete(t.TestContext(), obj)
-	if objectMeta.GetUID() == "bad-uid" || objectMeta.GetCreationTimestamp() == now {
+	createdMeta := t.getObjectMetaOrFail(obj)
+	if createdMeta.GetUID() == "bad-uid" || createdMeta.GetCreationTimestamp() == now {
 		t.Errorf("ObjectMeta did not reset basic fields: %#v", objectMeta)
 	}
 }
@@ -917,12 +919,16 @@ func (t *Tester) testDeleteWithResourceVersion(obj runtime.Object, createFn Crea
 
 	foo := obj.DeepCopyObject()
 	t.setObjectMeta(foo, t.namer(1))
-	objectMeta := t.getObjectMetaOrFail(foo)
-	objectMeta.SetResourceVersion("RV0000")
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	opts.Preconditions = metav1.NewRVDeletionPrecondition("RV1111").Preconditions
+	newObj, err := getFn(ctx, foo)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	objectMeta := t.getObjectMetaOrFail(newObj)
+
+	opts.Preconditions = metav1.NewRVDeletionPrecondition("wrongVersion").Preconditions
 	_, wasDeleted, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), rest.ValidateAllObjectFunc, &opts)
 	if err == nil || !errors.IsConflict(err) {
 		t.Errorf("unexpected error: %v", err)
@@ -930,7 +936,7 @@ func (t *Tester) testDeleteWithResourceVersion(obj runtime.Object, createFn Crea
 	if wasDeleted {
 		t.Errorf("unexpected, object %s should not have been deleted immediately", objectMeta.GetName())
 	}
-	obj, _, err = t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), rest.ValidateAllObjectFunc, metav1.NewRVDeletionPrecondition("RV0000"))
+	obj, _, err = t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), rest.ValidateAllObjectFunc, metav1.NewRVDeletionPrecondition(objectMeta.GetResourceVersion()))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1447,13 +1453,12 @@ func (t *Tester) testListTableConversion(obj runtime.Object, assignFn AssignFunc
 	}
 	m.SetContinue("continuetoken")
 	m.SetResourceVersion("11")
-	m.SetSelfLink("/list/link")
 
 	table, err := t.storage.(rest.TableConvertor).ConvertToTable(ctx, listObj, nil)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if table.ResourceVersion != "11" || table.SelfLink != "/list/link" || table.Continue != "continuetoken" {
+	if table.ResourceVersion != "11" || table.Continue != "continuetoken" {
 		t.Errorf("printer lost list meta: %#v", table.ListMeta)
 	}
 	if len(table.Rows) != len(items) {

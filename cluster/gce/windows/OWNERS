@@ -1,14 +1,16 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 reviewers:
+  - ibabou
   - mtaufen
   - pjh
   - yujuhong
   - yliaog
 approvers:
+  - ibabou
   - mtaufen
   - pjh
   - yujuhong
   - yliaog
 labels:
-- area/provider/gcp
+  - area/provider/gcp

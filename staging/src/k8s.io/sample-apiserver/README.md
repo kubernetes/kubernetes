@@ -203,3 +203,4 @@ only this superuser group is authorized.
    http --verify=no --cert client.crt --cert-key client.key \
       https://localhost:8443/apis/wardle.example.com/v1alpha1/namespaces/default/flunders
    ```
+

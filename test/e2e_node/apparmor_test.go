@@ -20,14 +20,14 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	"github.com/opencontainers/runc/libcontainer/apparmor"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -37,7 +37,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/security/apparmor"
+	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 
@@ -57,7 +57,7 @@ var _ = SIGDescribe("AppArmor [Feature:AppArmor][NodeFeature:AppArmor]", func() 
 
 			ginkgo.It("should reject an unloaded profile", func() {
 				status := runAppArmorTest(f, false, v1.AppArmorBetaProfileNamePrefix+"non-existent-profile")
-				expectSoftRejection(status)
+				gomega.Expect(status.ContainerStatuses[0].State.Waiting.Message).To(gomega.ContainSubstring("apparmor"))
 			})
 			ginkgo.It("should enforce a profile blocking writes", func() {
 				status := runAppArmorTest(f, true, v1.AppArmorBetaProfileNamePrefix+apparmorProfilePrefix+"deny-write")
@@ -117,7 +117,7 @@ profile e2e-node-apparmor-test-audit-write flags=(attach_disconnected) {
 `
 
 func loadTestProfiles() error {
-	f, err := ioutil.TempFile("/tmp", "apparmor")
+	f, err := os.CreateTemp("/tmp", "apparmor")
 	if err != nil {
 		return fmt.Errorf("failed to open temp file: %v", err)
 	}
@@ -190,6 +190,10 @@ func runAppArmorTest(f *framework.Framework, shouldRun bool, profile string) v1.
 				if t.Status.Reason == "AppArmor" {
 					return true, nil
 				}
+				// Loading a profile not available on disk should return a container creation error
+				if len(t.Status.ContainerStatuses) > 0 && t.Status.ContainerStatuses[0].State.Waiting.Reason == kuberuntime.ErrCreateContainer.Error() {
+					return true, nil
+				}
 			}
 			return false, nil
 		})
@@ -246,5 +250,5 @@ func isAppArmorEnabled() bool {
 	if strings.Contains(framework.TestContext.NodeName, "-ubuntu-") {
 		return true
 	}
-	return apparmor.IsAppArmorEnabled()
+	return apparmor.IsEnabled()
 }

@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo"
-	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -109,7 +108,7 @@ func CreateVolumeResource(driver TestDriver, config *PerTestConfig, pattern Test
 				driverVolumeSizeRange := dDriver.GetDriverInfo().SupportedSizeRange
 				claimSize, err := storageutils.GetSizeRangesIntersection(testVolumeSizeRange, driverVolumeSizeRange)
 				framework.ExpectNoError(err, "determine intersection of test size range %+v and driver size range %+v", testVolumeSizeRange, driverVolumeSizeRange)
-				r.VolSource = createEphemeralVolumeSource(r.Sc.Name, dInfo.RequiredAccessModes, claimSize, false /* readOnly */)
+				r.VolSource = createEphemeralVolumeSource(r.Sc.Name, pattern.VolMode, dInfo.RequiredAccessModes, claimSize)
 			}
 		}
 	case CSIInlineVolume:
@@ -134,9 +133,12 @@ func CreateVolumeResource(driver TestDriver, config *PerTestConfig, pattern Test
 	return &r
 }
 
-func createEphemeralVolumeSource(scName string, accessModes []v1.PersistentVolumeAccessMode, claimSize string, readOnly bool) *v1.VolumeSource {
+func createEphemeralVolumeSource(scName string, volMode v1.PersistentVolumeMode, accessModes []v1.PersistentVolumeAccessMode, claimSize string) *v1.VolumeSource {
 	if len(accessModes) == 0 {
 		accessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
+	}
+	if volMode == "" {
+		volMode = v1.PersistentVolumeFilesystem
 	}
 	return &v1.VolumeSource{
 		Ephemeral: &v1.EphemeralVolumeSource{
@@ -144,6 +146,7 @@ func createEphemeralVolumeSource(scName string, accessModes []v1.PersistentVolum
 				Spec: v1.PersistentVolumeClaimSpec{
 					StorageClassName: &scName,
 					AccessModes:      accessModes,
+					VolumeMode:       &volMode,
 					Resources: v1.ResourceRequirements{
 						Requests: v1.ResourceList{
 							v1.ResourceStorage: resource.MustParse(claimSize),
@@ -151,7 +154,6 @@ func createEphemeralVolumeSource(scName string, accessModes []v1.PersistentVolum
 					},
 				},
 			},
-			ReadOnly: readOnly,
 		},
 	}
 }
@@ -185,27 +187,27 @@ func (r *VolumeResource) CleanupResource() error {
 						if pvc.Spec.VolumeName != "" {
 							pv, err = cs.CoreV1().PersistentVolumes().Get(context.TODO(), pvc.Spec.VolumeName, metav1.GetOptions{})
 							if err != nil {
-								cleanUpErrs = append(cleanUpErrs, errors.Wrapf(err, "Failed to find PV %v", pvc.Spec.VolumeName))
+								cleanUpErrs = append(cleanUpErrs, fmt.Errorf("failed to find PV %v: %w", pvc.Spec.VolumeName, err))
 							}
 						}
 					case apierrors.IsNotFound(err):
 						// Without the PVC, we cannot locate the corresponding PV. Let's
 						// hope that it is gone.
 					default:
-						cleanUpErrs = append(cleanUpErrs, errors.Wrapf(err, "Failed to find PVC %v", r.Pvc.Name))
+						cleanUpErrs = append(cleanUpErrs, fmt.Errorf("failed to find PVC %v: %w", r.Pvc.Name, err))
 					}
 				}
 
 				err := e2epv.DeletePersistentVolumeClaim(f.ClientSet, r.Pvc.Name, f.Namespace.Name)
 				if err != nil {
-					cleanUpErrs = append(cleanUpErrs, errors.Wrapf(err, "Failed to delete PVC %v", r.Pvc.Name))
+					cleanUpErrs = append(cleanUpErrs, fmt.Errorf("failed to delete PVC %v: %w", r.Pvc.Name, err))
 				}
 
 				if pv != nil {
 					err = e2epv.WaitForPersistentVolumeDeleted(f.ClientSet, pv.Name, 5*time.Second, 5*time.Minute)
 					if err != nil {
-						cleanUpErrs = append(cleanUpErrs, errors.Wrapf(err,
-							"Persistent Volume %v not deleted by dynamic provisioner", pv.Name))
+						cleanUpErrs = append(cleanUpErrs, fmt.Errorf(
+							"persistent Volume %v not deleted by dynamic provisioner: %w", pv.Name, err))
 					}
 				}
 			}
@@ -217,14 +219,14 @@ func (r *VolumeResource) CleanupResource() error {
 	if r.Sc != nil {
 		ginkgo.By("Deleting sc")
 		if err := storageutils.DeleteStorageClass(f.ClientSet, r.Sc.Name); err != nil {
-			cleanUpErrs = append(cleanUpErrs, errors.Wrapf(err, "Failed to delete StorageClass %v", r.Sc.Name))
+			cleanUpErrs = append(cleanUpErrs, fmt.Errorf("failed to delete StorageClass %v: %w", r.Sc.Name, err))
 		}
 	}
 
 	// Cleanup volume for pre-provisioned volume tests
 	if r.Volume != nil {
 		if err := storageutils.TryFunc(r.Volume.DeleteVolume); err != nil {
-			cleanUpErrs = append(cleanUpErrs, errors.Wrap(err, "Failed to delete Volume"))
+			cleanUpErrs = append(cleanUpErrs, fmt.Errorf("failed to delete Volume: %w", err))
 		}
 	}
 	return utilerrors.NewAggregate(cleanUpErrs)
@@ -257,7 +259,7 @@ func createPVCPV(
 	}
 
 	framework.Logf("Creating PVC and PV")
-	pv, pvc, err := e2epv.CreatePVCPV(f.ClientSet, pvConfig, pvcConfig, f.Namespace.Name, false)
+	pv, pvc, err := e2epv.CreatePVCPV(f.ClientSet, f.Timeouts, pvConfig, pvcConfig, f.Namespace.Name, false)
 	framework.ExpectNoError(err, "PVC, PV creation failed")
 
 	err = e2epv.WaitOnPVandPVC(f.ClientSet, f.Timeouts, f.Namespace.Name, pv, pvc)

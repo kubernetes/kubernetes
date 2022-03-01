@@ -25,7 +25,7 @@ import (
 
 	"k8s.io/klog/v2"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -88,7 +88,7 @@ type Controller struct {
 	// missingUsageQueue holds objects that are missing the initial usage information
 	missingUsageQueue workqueue.RateLimitingInterface
 	// To allow injection of syncUsage for testing.
-	syncHandler func(key string) error
+	syncHandler func(ctx context.Context, key string) error
 	// function that controls full recalculation of quota usage
 	resyncPeriod controller.ResyncPeriodFunc
 	// knows how to calculate usage
@@ -236,8 +236,8 @@ func (rq *Controller) addQuota(obj interface{}) {
 }
 
 // worker runs a worker thread that just dequeues items, processes them, and marks them done.
-func (rq *Controller) worker(queue workqueue.RateLimitingInterface) func() {
-	workFunc := func() bool {
+func (rq *Controller) worker(ctx context.Context, queue workqueue.RateLimitingInterface) func(context.Context) {
+	workFunc := func(ctx context.Context) bool {
 		key, quit := queue.Get()
 		if quit {
 			return true
@@ -245,7 +245,7 @@ func (rq *Controller) worker(queue workqueue.RateLimitingInterface) func() {
 		defer queue.Done(key)
 		rq.workerLock.RLock()
 		defer rq.workerLock.RUnlock()
-		err := rq.syncHandler(key.(string))
+		err := rq.syncHandler(ctx, key.(string))
 		if err == nil {
 			queue.Forget(key)
 			return false
@@ -255,9 +255,9 @@ func (rq *Controller) worker(queue workqueue.RateLimitingInterface) func() {
 		return false
 	}
 
-	return func() {
+	return func(ctx context.Context) {
 		for {
-			if quit := workFunc(); quit {
+			if quit := workFunc(ctx); quit {
 				klog.Infof("resource quota controller worker shutting down")
 				return
 			}
@@ -266,7 +266,7 @@ func (rq *Controller) worker(queue workqueue.RateLimitingInterface) func() {
 }
 
 // Run begins quota controller using the specified number of workers
-func (rq *Controller) Run(workers int, stopCh <-chan struct{}) {
+func (rq *Controller) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 	defer rq.queue.ShutDown()
 
@@ -274,25 +274,29 @@ func (rq *Controller) Run(workers int, stopCh <-chan struct{}) {
 	defer klog.Infof("Shutting down resource quota controller")
 
 	if rq.quotaMonitor != nil {
-		go rq.quotaMonitor.Run(stopCh)
+		go rq.quotaMonitor.Run(ctx.Done())
 	}
 
-	if !cache.WaitForNamedCacheSync("resource quota", stopCh, rq.informerSyncedFuncs...) {
+	if !cache.WaitForNamedCacheSync("resource quota", ctx.Done(), rq.informerSyncedFuncs...) {
 		return
 	}
 
 	// the workers that chug through the quota calculation backlog
 	for i := 0; i < workers; i++ {
-		go wait.Until(rq.worker(rq.queue), time.Second, stopCh)
-		go wait.Until(rq.worker(rq.missingUsageQueue), time.Second, stopCh)
+		go wait.UntilWithContext(ctx, rq.worker(ctx, rq.queue), time.Second)
+		go wait.UntilWithContext(ctx, rq.worker(ctx, rq.missingUsageQueue), time.Second)
 	}
 	// the timer for how often we do a full recalculation across all quotas
-	go wait.Until(func() { rq.enqueueAll() }, rq.resyncPeriod(), stopCh)
-	<-stopCh
+	if rq.resyncPeriod() > 0 {
+		go wait.Until(func() { rq.enqueueAll() }, rq.resyncPeriod(), ctx.Done())
+	} else {
+		klog.Warningf("periodic quota controller resync disabled")
+	}
+	<-ctx.Done()
 }
 
 // syncResourceQuotaFromKey syncs a quota key
-func (rq *Controller) syncResourceQuotaFromKey(key string) (err error) {
+func (rq *Controller) syncResourceQuotaFromKey(ctx context.Context, key string) (err error) {
 	startTime := time.Now()
 	defer func() {
 		klog.V(4).Infof("Finished syncing resource quota %q (%v)", key, time.Since(startTime))
@@ -311,11 +315,11 @@ func (rq *Controller) syncResourceQuotaFromKey(key string) (err error) {
 		klog.Infof("Unable to retrieve resource quota %v from store: %v", key, err)
 		return err
 	}
-	return rq.syncResourceQuota(resourceQuota)
+	return rq.syncResourceQuota(ctx, resourceQuota)
 }
 
 // syncResourceQuota runs a complete sync of resource quota status across all known kinds
-func (rq *Controller) syncResourceQuota(resourceQuota *v1.ResourceQuota) (err error) {
+func (rq *Controller) syncResourceQuota(ctx context.Context, resourceQuota *v1.ResourceQuota) (err error) {
 	// quota is dirty if any part of spec hard limits differs from the status hard limits
 	statusLimitsDirty := !apiequality.Semantic.DeepEqual(resourceQuota.Spec.Hard, resourceQuota.Status.Hard)
 
@@ -357,7 +361,7 @@ func (rq *Controller) syncResourceQuota(resourceQuota *v1.ResourceQuota) (err er
 
 	// there was a change observed by this controller that requires we update quota
 	if dirty {
-		_, err = rq.rqClient.ResourceQuotas(usage.Namespace).UpdateStatus(context.TODO(), usage, metav1.UpdateOptions{})
+		_, err = rq.rqClient.ResourceQuotas(usage.Namespace).UpdateStatus(ctx, usage, metav1.UpdateOptions{})
 		if err != nil {
 			errs = append(errs, err)
 		}
@@ -431,8 +435,8 @@ func (rq *Controller) Sync(discoveryFunc NamespacedResourcesFunc, period time.Du
 		defer rq.workerLock.Unlock()
 
 		// Something has changed, so track the new state and perform a sync.
-		if klog.V(2).Enabled() {
-			klog.Infof("syncing resource quota controller with updated resources from discovery: %s", printDiff(oldResources, newResources))
+		if klogV := klog.V(2); klogV.Enabled() {
+			klogV.Infof("syncing resource quota controller with updated resources from discovery: %s", printDiff(oldResources, newResources))
 		}
 
 		// Perform the monitor resync and wait for controllers to report cache sync.

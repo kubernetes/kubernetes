@@ -2,228 +2,245 @@ apiVersion: storage.k8s.io/v1beta1
 kind: VolumeAttachment
 metadata:
   annotations:
-    "9": "10"
-  clusterName: "15"
-  creationTimestamp: null
-  deletionGracePeriodSeconds: -4955867275792137171
+    annotationsKey: annotationsValue
+  clusterName: clusterNameValue
+  creationTimestamp: "2008-01-01T01:01:01Z"
+  deletionGracePeriodSeconds: 10
+  deletionTimestamp: "2009-01-01T01:01:01Z"
   finalizers:
-  - "14"
-  generateName: "3"
-  generation: 8071137005907523419
+  - finalizersValue
+  generateName: generateNameValue
+  generation: 7
   labels:
-    "7": "8"
+    labelsKey: labelsValue
   managedFields:
-  - apiVersion: "17"
-    fieldsType: "18"
-    manager: "16"
-    operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
-  name: "2"
-  namespace: "4"
+  - apiVersion: apiVersionValue
+    fieldsType: fieldsTypeValue
+    fieldsV1: {}
+    manager: managerValue
+    operation: operationValue
+    subresource: subresourceValue
+    time: "2004-01-01T01:01:01Z"
+  name: nameValue
+  namespace: namespaceValue
   ownerReferences:
-  - apiVersion: "11"
+  - apiVersion: apiVersionValue
     blockOwnerDeletion: true
-    controller: false
-    kind: "12"
-    name: "13"
-    uid: Dz廔ȇ{sŊƏp
-  resourceVersion: "11042405498087606203"
-  selfLink: "5"
-  uid: "7"
+    controller: true
+    kind: kindValue
+    name: nameValue
+    uid: uidValue
+  resourceVersion: resourceVersionValue
+  selfLink: selfLinkValue
+  uid: uidValue
 spec:
-  attacher: "19"
-  nodeName: "132"
+  attacher: attacherValue
+  nodeName: nodeNameValue
   source:
     inlineVolumeSpec:
       accessModes:
-      - d賑'üA謥ǣ偐圠=
+      - accessModesValue
       awsElasticBlockStore:
-        fsType: "24"
-        partition: -387137265
-        volumeID: "23"
+        fsType: fsTypeValue
+        partition: 3
+        readOnly: true
+        volumeID: volumeIDValue
       azureDisk:
-        cachingMode: x
-        diskName: "80"
-        diskURI: "81"
-        fsType: "82"
-        kind: a鯿rŎǀ朲^苣
-        readOnly: false
+        cachingMode: cachingModeValue
+        diskName: diskNameValue
+        diskURI: diskURIValue
+        fsType: fsTypeValue
+        kind: kindValue
+        readOnly: true
       azureFile:
-        secretName: "68"
-        secretNamespace: "70"
-        shareName: "69"
+        readOnly: true
+        secretName: secretNameValue
+        secretNamespace: secretNamespaceValue
+        shareName: shareNameValue
       capacity:
-        qJ枊a8衍`Ĩ: "652"
+        capacityKey: "0"
       cephfs:
         monitors:
-        - "51"
-        path: "52"
+        - monitorsValue
+        path: pathValue
         readOnly: true
-        secretFile: "54"
+        secretFile: secretFileValue
         secretRef:
-          name: "55"
-          namespace: "56"
-        user: "53"
+          name: nameValue
+          namespace: namespaceValue
+        user: userValue
       cinder:
-        fsType: "48"
+        fsType: fsTypeValue
         readOnly: true
         secretRef:
-          name: "49"
-          namespace: "50"
-        volumeID: "47"
+          name: nameValue
+          namespace: namespaceValue
+        volumeID: volumeIDValue
       claimRef:
-        apiVersion: "123"
-        fieldPath: "125"
-        kind: "120"
-        name: "122"
-        namespace: "121"
-        resourceVersion: "124"
+        apiVersion: apiVersionValue
+        fieldPath: fieldPathValue
+        kind: kindValue
+        name: nameValue
+        namespace: namespaceValue
+        resourceVersion: resourceVersionValue
+        uid: uidValue
       csi:
         controllerExpandSecretRef:
-          name: "118"
-          namespace: "119"
+          name: nameValue
+          namespace: namespaceValue
         controllerPublishSecretRef:
-          name: "112"
-          namespace: "113"
-        driver: "107"
-        fsType: "109"
+          name: nameValue
+          namespace: namespaceValue
+        driver: driverValue
+        fsType: fsTypeValue
         nodePublishSecretRef:
-          name: "116"
-          namespace: "117"
+          name: nameValue
+          namespace: namespaceValue
         nodeStageSecretRef:
-          name: "114"
-          namespace: "115"
+          name: nameValue
+          namespace: namespaceValue
         readOnly: true
         volumeAttributes:
-          "110": "111"
-        volumeHandle: "108"
+          volumeAttributesKey: volumeAttributesValue
+        volumeHandle: volumeHandleValue
       fc:
-        fsType: "58"
-        lun: -616291512
+        fsType: fsTypeValue
+        lun: 2
+        readOnly: true
         targetWWNs:
-        - "57"
+        - targetWWNsValue
         wwids:
-        - "59"
+        - wwidsValue
       flexVolume:
-        driver: "62"
-        fsType: "63"
+        driver: driverValue
+        fsType: fsTypeValue
         options:
-          "66": "67"
+          optionsKey: optionsValue
+        readOnly: true
         secretRef:
-          name: "64"
-          namespace: "65"
+          name: nameValue
+          namespace: namespaceValue
       flocker:
-        datasetName: "60"
-        datasetUUID: "61"
+        datasetName: datasetNameValue
+        datasetUUID: datasetUUIDValue
       gcePersistentDisk:
-        fsType: "22"
-        partition: 1847377175
-        pdName: "21"
+        fsType: fsTypeValue
+        partition: 3
+        pdName: pdNameValue
+        readOnly: true
       glusterfs:
-        endpoints: "26"
-        endpointsNamespace: "28"
-        path: "27"
+        endpoints: endpointsValue
+        endpointsNamespace: endpointsNamespaceValue
+        path: pathValue
         readOnly: true
       hostPath:
-        path: "25"
-        type: 夸eɑeʤ脽ěĂ凗蓏Ŋ蛊ĉy
+        path: pathValue
+        type: typeValue
       iscsi:
-        fsType: "42"
-        initiatorName: "46"
-        iqn: "40"
-        iscsiInterface: "41"
-        lun: 2048967527
+        chapAuthDiscovery: true
+        chapAuthSession: true
+        fsType: fsTypeValue
+        initiatorName: initiatorNameValue
+        iqn: iqnValue
+        iscsiInterface: iscsiInterfaceValue
+        lun: 3
         portals:
-        - "43"
+        - portalsValue
         readOnly: true
         secretRef:
-          name: "44"
-          namespace: "45"
-        targetPortal: "39"
+          name: nameValue
+          namespace: namespaceValue
+        targetPortal: targetPortalValue
       local:
-        fsType: "97"
-        path: "96"
+        fsType: fsTypeValue
+        path: pathValue
       mountOptions:
-      - "127"
+      - mountOptionsValue
       nfs:
-        path: "30"
-        server: "29"
+        path: pathValue
+        readOnly: true
+        server: serverValue
       nodeAffinity:
         required:
           nodeSelectorTerms:
           - matchExpressions:
-            - key: "128"
-              operator: 檮Ǣ冖ž琔n宂¬轚9Ȏ瀮昃2
+            - key: keyValue
+              operator: operatorValue
               values:
-              - "129"
+              - valuesValue
             matchFields:
-            - key: "130"
-              operator: -议}ȧ外ĺ稥氹Ç|¶
+            - key: keyValue
+              operator: operatorValue
               values:
-              - "131"
-      persistentVolumeReclaimPolicy: 錕?øēƺ魋Ď儇击3ƆìQ喞艋
+              - valuesValue
+      persistentVolumeReclaimPolicy: persistentVolumeReclaimPolicyValue
       photonPersistentDisk:
-        fsType: "84"
-        pdID: "83"
+        fsType: fsTypeValue
+        pdID: pdIDValue
       portworxVolume:
-        fsType: "86"
+        fsType: fsTypeValue
         readOnly: true
-        volumeID: "85"
+        volumeID: volumeIDValue
       quobyte:
-        group: "78"
+        group: groupValue
         readOnly: true
-        registry: "75"
-        tenant: "79"
-        user: "77"
-        volume: "76"
+        registry: registryValue
+        tenant: tenantValue
+        user: userValue
+        volume: volumeValue
       rbd:
-        fsType: "33"
-        image: "32"
-        keyring: "36"
+        fsType: fsTypeValue
+        image: imageValue
+        keyring: keyringValue
         monitors:
-        - "31"
-        pool: "34"
+        - monitorsValue
+        pool: poolValue
+        readOnly: true
         secretRef:
-          name: "37"
-          namespace: "38"
-        user: "35"
+          name: nameValue
+          namespace: namespaceValue
+        user: userValue
       scaleIO:
-        fsType: "95"
-        gateway: "87"
-        protectionDomain: "91"
+        fsType: fsTypeValue
+        gateway: gatewayValue
+        protectionDomain: protectionDomainValue
+        readOnly: true
         secretRef:
-          name: "89"
-          namespace: "90"
-        storageMode: "93"
-        storagePool: "92"
-        system: "88"
-        volumeName: "94"
-      storageClassName: "126"
+          name: nameValue
+          namespace: namespaceValue
+        sslEnabled: true
+        storageMode: storageModeValue
+        storagePool: storagePoolValue
+        system: systemValue
+        volumeName: volumeNameValue
+      storageClassName: storageClassNameValue
       storageos:
-        fsType: "100"
+        fsType: fsTypeValue
+        readOnly: true
         secretRef:
-          apiVersion: "104"
-          fieldPath: "106"
-          kind: "101"
-          name: "103"
-          namespace: "102"
-          resourceVersion: "105"
-          uid: ȮO励鹗塢ē ƕP
-        volumeName: "98"
-        volumeNamespace: "99"
-      volumeMode: ½
+          apiVersion: apiVersionValue
+          fieldPath: fieldPathValue
+          kind: kindValue
+          name: nameValue
+          namespace: namespaceValue
+          resourceVersion: resourceVersionValue
+          uid: uidValue
+        volumeName: volumeNameValue
+        volumeNamespace: volumeNamespaceValue
+      volumeMode: volumeModeValue
       vsphereVolume:
-        fsType: "72"
-        storagePolicyID: "74"
-        storagePolicyName: "73"
-        volumePath: "71"
-    persistentVolumeName: "20"
+        fsType: fsTypeValue
+        storagePolicyID: storagePolicyIDValue
+        storagePolicyName: storagePolicyNameValue
+        volumePath: volumePathValue
+    persistentVolumeName: persistentVolumeNameValue
 status:
   attachError:
-    message: "135"
-    time: "2327-07-20T07:31:37Z"
+    message: messageValue
+    time: "2001-01-01T01:01:01Z"
   attached: true
   attachmentMetadata:
-    "133": "134"
+    attachmentMetadataKey: attachmentMetadataValue
   detachError:
-    message: "136"
-    time: "2046-08-01T16:33:49Z"
+    message: messageValue
+    time: "2001-01-01T01:01:01Z"

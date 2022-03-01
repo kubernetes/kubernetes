@@ -735,7 +735,6 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 					Image: imageutils.GetE2EImage(imageutils.Agnhost),
 					Args: []string{
 						"test-service-account-issuer-discovery",
-						"--in-cluster-discovery",
 						"--token-path", path.Join(tokenPath, tokenName),
 						"--audience", audience,
 					},

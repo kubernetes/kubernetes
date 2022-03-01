@@ -32,6 +32,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	"k8s.io/kubernetes/test/e2e/network/common"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	netutils "k8s.io/utils/net"
 
@@ -40,9 +41,8 @@ import (
 
 var kubeProxyE2eImage = imageutils.GetE2EImage(imageutils.Agnhost)
 
-var _ = SIGDescribe("KubeProxy", func() {
+var _ = common.SIGDescribe("KubeProxy", func() {
 	const (
-		testDaemonHTTPPort    = 11301
 		testDaemonTCPPort     = 11302
 		postFinTimeoutSeconds = 30
 	)
@@ -72,6 +72,7 @@ var _ = SIGDescribe("KubeProxy", func() {
 		}
 
 		ips := e2enode.GetAddressesByTypeAndFamily(&nodes.Items[0], v1.NodeInternalIP, family)
+		framework.ExpectNotEqual(len(ips), 0)
 
 		clientNodeInfo := NodeInfo{
 			node:   &nodes.Items[0],
@@ -80,6 +81,7 @@ var _ = SIGDescribe("KubeProxy", func() {
 		}
 
 		ips = e2enode.GetAddressesByTypeAndFamily(&nodes.Items[1], v1.NodeInternalIP, family)
+		framework.ExpectNotEqual(len(ips), 0)
 
 		serverNodeInfo := NodeInfo{
 			node:   &nodes.Items[1],
@@ -183,7 +185,7 @@ var _ = SIGDescribe("KubeProxy", func() {
 		fr.PodClient().CreateSync(serverPodSpec)
 
 		// The server should be listening before spawning the client pod
-		if readyErr := e2epod.WaitForPodsReady(fr.ClientSet, fr.Namespace.Name, serverPodSpec.Name, 0); readyErr != nil {
+		if readyErr := e2epod.WaitTimeoutForPodReadyInNamespace(fr.ClientSet, serverPodSpec.Name, fr.Namespace.Name, framework.PodStartTimeout); readyErr != nil {
 			framework.Failf("error waiting for server pod %s to be ready: %v", serverPodSpec.Name, readyErr)
 		}
 		// Connect to the server and leak the connection
@@ -212,7 +214,7 @@ var _ = SIGDescribe("KubeProxy", func() {
 		cmd := fmt.Sprintf("conntrack -L -f %s -d %v "+
 			"| grep -m 1 'CLOSE_WAIT.*dport=%v' ",
 			ipFamily, ip, testDaemonTCPPort)
-		if err := wait.PollImmediate(2*time.Second, epsilonSeconds, func() (bool, error) {
+		if err := wait.PollImmediate(2*time.Second, epsilonSeconds*time.Second, func() (bool, error) {
 			result, err := framework.RunHostCmd(fr.Namespace.Name, "e2e-net-exec", cmd)
 			// retry if we can't obtain the conntrack entry
 			if err != nil {
@@ -235,9 +237,9 @@ var _ = SIGDescribe("KubeProxy", func() {
 			return false, fmt.Errorf("wrong TCP CLOSE_WAIT timeout: %v expected: %v", timeoutSeconds, expectedTimeoutSeconds)
 		}); err != nil {
 			// Dump all conntrack entries for debugging
-			result, err := framework.RunHostCmd(fr.Namespace.Name, "e2e-net-exec", "conntrack -L")
-			if err != nil {
-				framework.Logf("failed to obtain conntrack entry: %v %v", result, err)
+			result, err2 := framework.RunHostCmd(fr.Namespace.Name, "e2e-net-exec", "conntrack -L")
+			if err2 != nil {
+				framework.Logf("failed to obtain conntrack entry: %v %v", result, err2)
 			}
 			framework.Logf("conntrack entries for node %v:  %v", serverNodeInfo.nodeIP, result)
 			framework.Failf("no valid conntrack entry for port %d on node %s: %v", testDaemonTCPPort, serverNodeInfo.nodeIP, err)

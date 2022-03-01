@@ -17,6 +17,7 @@ limitations under the License.
 package attach
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"net/http"
@@ -35,6 +36,7 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/kubectl/pkg/cmd/exec"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+	"k8s.io/kubectl/pkg/cmd/util/podcmd"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubectl/pkg/scheme"
 )
@@ -65,6 +67,7 @@ func TestPodAndContainerAttach(t *testing.T) {
 		expectError           string
 		expectedPodName       string
 		expectedContainerName string
+		expectOut             string
 		obj                   *corev1.Pod
 	}{
 		{
@@ -85,6 +88,25 @@ func TestPodAndContainerAttach(t *testing.T) {
 			expectedPodName:       "foo",
 			expectedContainerName: "bar",
 			obj:                   attachPod(),
+			expectOut:             `Defaulted container "bar" out of: bar, debugger (ephem), initfoo (init)`,
+		},
+		{
+			name:                  "no container, no flags, sets default expected container as annotation",
+			options:               &AttachOptions{GetPodTimeout: defaultPodLogsTimeout},
+			args:                  []string{"foo"},
+			expectedPodName:       "foo",
+			expectedContainerName: "bar",
+			obj:                   setDefaultContainer(attachPod(), "initfoo"),
+			expectOut:             ``,
+		},
+		{
+			name:                  "no container, no flags, sets default missing container as annotation",
+			options:               &AttachOptions{GetPodTimeout: defaultPodLogsTimeout},
+			args:                  []string{"foo"},
+			expectedPodName:       "foo",
+			expectedContainerName: "bar",
+			obj:                   setDefaultContainer(attachPod(), "does-not-exist"),
+			expectOut:             `Defaulted container "bar" out of: bar, debugger (ephem), initfoo (init)`,
 		},
 		{
 			name:                  "container in flag",
@@ -115,7 +137,7 @@ func TestPodAndContainerAttach(t *testing.T) {
 			options:         &AttachOptions{StreamOptions: exec.StreamOptions{ContainerName: "wrong"}, GetPodTimeout: 10},
 			args:            []string{"foo"},
 			expectedPodName: "foo",
-			expectError:     "container not found",
+			expectError:     "container wrong not found in pod foo",
 			obj:             attachPod(),
 		},
 		{
@@ -153,9 +175,21 @@ func TestPodAndContainerAttach(t *testing.T) {
 			pod, err := test.options.findAttachablePod(&corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-pod", Namespace: "test"},
 				Spec: corev1.PodSpec{
+					InitContainers: []corev1.Container{
+						{
+							Name: "initfoo",
+						},
+					},
 					Containers: []corev1.Container{
 						{
 							Name: "foobar",
+						},
+					},
+					EphemeralContainers: []corev1.EphemeralContainer{
+						{
+							EphemeralContainerCommon: corev1.EphemeralContainerCommon{
+								Name: "ephemfoo",
+							},
 						},
 					},
 				},
@@ -171,10 +205,17 @@ func TestPodAndContainerAttach(t *testing.T) {
 				t.Errorf("unexpected pod name: expected %q, got %q", test.expectedContainerName, pod.Name)
 			}
 
+			var buf bytes.Buffer
+			test.options.ErrOut = &buf
 			container, err := test.options.containerToAttachTo(attachPod())
+
+			if len(test.expectOut) > 0 && !strings.Contains(buf.String(), test.expectOut) {
+				t.Errorf("unexpected output: output did not contain %q\n---\n%s", test.expectOut, buf.String())
+			}
+
 			if err != nil {
 				if test.expectError == "" || !strings.Contains(err.Error(), test.expectError) {
-					t.Errorf("unexpected error: expected %q, got %q", err, test.expectError)
+					t.Errorf("unexpected error: expected %q, got %q", test.expectError, err)
 				}
 				return
 			}
@@ -230,7 +271,7 @@ func TestAttach(t *testing.T) {
 			attachPath:   "/api/" + version + "/namespaces/test/pods/foo/attach",
 			pod:          attachPod(),
 			container:    "foo",
-			expectedErr:  "cannot attach to the container: container not found (foo)",
+			expectedErr:  "cannot attach to the container: container foo not found in pod foo",
 		},
 	}
 	for _, test := range tests {
@@ -434,4 +475,12 @@ func attachPod() *corev1.Pod {
 			Phase: corev1.PodRunning,
 		},
 	}
+}
+
+func setDefaultContainer(pod *corev1.Pod, name string) *corev1.Pod {
+	if pod.Annotations == nil {
+		pod.Annotations = make(map[string]string)
+	}
+	pod.Annotations[podcmd.DefaultContainerAnnotationName] = name
+	return pod
 }

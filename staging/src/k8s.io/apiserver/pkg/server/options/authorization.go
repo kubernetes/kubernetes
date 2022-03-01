@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
-	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -32,6 +31,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/transport"
+	"k8s.io/klog/v2"
 )
 
 // DelegatingAuthorizationOptions provides an easy way for composing API servers to delegate their authorization to
@@ -69,6 +70,9 @@ type DelegatingAuthorizationOptions struct {
 	// This allows us to configure the sleep time at each iteration and the maximum number of retries allowed
 	// before we fail the webhook call in order to limit the fan out that ensues when the system is degraded.
 	WebhookRetryBackoff *wait.Backoff
+
+	// CustomRoundTripperFn allows for specifying a middleware function for custom HTTP behaviour for the authorization webhook client.
+	CustomRoundTripperFn transport.WrapperFunc
 }
 
 func NewDelegatingAuthorizationOptions() *DelegatingAuthorizationOptions {
@@ -109,6 +113,11 @@ func (s *DelegatingAuthorizationOptions) WithClientTimeout(timeout time.Duration
 // WithCustomRetryBackoff sets the custom backoff parameters for the authorization webhook retry logic.
 func (s *DelegatingAuthorizationOptions) WithCustomRetryBackoff(backoff wait.Backoff) {
 	s.WebhookRetryBackoff = &backoff
+}
+
+// WithCustomRoundTripper allows for specifying a middleware function for custom HTTP behaviour for the authorization webhook client.
+func (s *DelegatingAuthorizationOptions) WithCustomRoundTripper(rt transport.WrapperFunc) {
+	s.CustomRoundTripperFn = rt
 }
 
 func (s *DelegatingAuthorizationOptions) Validate() []error {
@@ -184,7 +193,7 @@ func (s *DelegatingAuthorizationOptions) toAuthorizer(client kubernetes.Interfac
 		klog.Warning("No authorization-kubeconfig provided, so SubjectAccessReview of authorization tokens won't work.")
 	} else {
 		cfg := authorizerfactory.DelegatingAuthorizerConfig{
-			SubjectAccessReviewClient: client.AuthorizationV1().SubjectAccessReviews(),
+			SubjectAccessReviewClient: client.AuthorizationV1(),
 			AllowCacheTTL:             s.AllowCacheTTL,
 			DenyCacheTTL:              s.DenyCacheTTL,
 			WebhookRetryBackoff:       s.WebhookRetryBackoff,
@@ -226,6 +235,9 @@ func (s *DelegatingAuthorizationOptions) getClient() (kubernetes.Interface, erro
 	clientConfig.QPS = 200
 	clientConfig.Burst = 400
 	clientConfig.Timeout = s.ClientTimeout
+	if s.CustomRoundTripperFn != nil {
+		clientConfig.Wrap(s.CustomRoundTripperFn)
+	}
 
 	return kubernetes.NewForConfig(clientConfig)
 }

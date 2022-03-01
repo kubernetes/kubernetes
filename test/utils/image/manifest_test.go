@@ -24,116 +24,133 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 )
 
-type result struct {
-	result string
-	err    error
+func BenchmarkReplaceRegistryInImageURL(b *testing.B) {
+	registryTests := []struct {
+		in  string
+		out string
+	}{
+		{
+			in:  "docker.io/library/test:123",
+			out: "test.io/library/test:123",
+		}, {
+			in:  "docker.io/library/test",
+			out: "test.io/library/test",
+		}, {
+			in:  "test",
+			out: "test.io/library/test",
+		}, {
+			in:  "k8s.gcr.io/test:123",
+			out: "test.io/test:123",
+		}, {
+			in:  "gcr.io/k8s-authenticated-test/test:123",
+			out: "test.io/k8s-authenticated-test/test:123",
+		}, {
+			in:  "k8s.gcr.io/sig-storage/test:latest",
+			out: "test.io/sig-storage/test:latest",
+		}, {
+			in:  "invalid.registry.k8s.io/invalid/test:latest",
+			out: "test.io/invalid/test:latest",
+		}, {
+			in:  "mcr.microsoft.com/test:latest",
+			out: "test.io/microsoft/test:latest",
+		}, {
+			in:  "k8s.gcr.io/e2e-test-images/test:latest",
+			out: "test.io/promoter/test:latest",
+		}, {
+			in:  "k8s.gcr.io/build-image/test:latest",
+			out: "test.io/build/test:latest",
+		}, {
+			in:  "gcr.io/authenticated-image-pulling/test:latest",
+			out: "test.io/gcAuth/test:latest",
+		},
+	}
+	reg := RegistryList{
+		DockerLibraryRegistry:   "test.io/library",
+		GcRegistry:              "test.io",
+		PrivateRegistry:         "test.io/k8s-authenticated-test",
+		SigStorageRegistry:      "test.io/sig-storage",
+		InvalidRegistry:         "test.io/invalid",
+		MicrosoftRegistry:       "test.io/microsoft",
+		PromoterE2eRegistry:     "test.io/promoter",
+		BuildImageRegistry:      "test.io/build",
+		GcAuthenticatedRegistry: "test.io/gcAuth",
+	}
+	for i := 0; i < b.N; i++ {
+		tt := registryTests[i%len(registryTests)]
+		s, _ := replaceRegistryInImageURLWithList(tt.in, reg)
+		if s != tt.out {
+			b.Errorf("got %q, want %q", s, tt.out)
+		}
+	}
 }
 
-var registryTests = []struct {
-	in  string
-	out result
-}{
-	{
-		"docker.io/library/test:123",
-		result{
-			result: "test.io/library/test:123",
-			err:    nil,
-		},
-	},
-	{
-		"docker.io/library/test",
-		result{
-			result: "test.io/library/test",
-			err:    nil,
-		},
-	},
-	{
-		"test",
-		result{
-			result: "test.io/library/test",
-			err:    nil,
-		},
-	},
-	{
-		"gcr.io/kubernetes-e2e-test-images/test:123",
-		result{
-			result: "test.io/kubernetes-e2e-test-images/test:123",
-			err:    nil,
-		},
-	},
-	{
-		"gcr.io/kubernetes-e2e-test-images/volume/test:123",
-		result{
-			result: "test.io/kubernetes-e2e-test-images/volume/test:123",
-			err:    nil,
-		},
-	},
-	{
-		"k8s.gcr.io/test:123",
-		result{
-			result: "test.io/test:123",
-			err:    nil,
-		},
-	},
-	{
-		"gcr.io/k8s-authenticated-test/test:123",
-		result{
-			result: "test.io/k8s-authenticated-test/test:123",
-			err:    nil,
-		},
-	},
-	{
-		"gcr.io/gke-release/test:latest",
-		result{
-			result: "test.io/gke-release/test:latest",
-			err:    nil,
-		},
-	},
-	{
-		"gcr.io/google-samples/test:latest",
-		result{
-			result: "test.io/google-samples/test:latest",
-			err:    nil,
-		},
-	},
-	{
-		"k8s.gcr.io/sig-storage/test:latest",
-		result{
-			result: "test.io/sig-storage/test:latest",
-			err:    nil,
-		},
-	},
-	{
-		"unknwon.io/google-samples/test:latest",
-		result{
-			result: "",
-			err:    fmt.Errorf("Registry: unknwon.io/google-samples is missing in test/utils/image/manifest.go, please add the registry, otherwise the test will fail on air-gapped clusters"),
-		},
-	},
-}
-
-// ToDo Add Benchmark
 func TestReplaceRegistryInImageURL(t *testing.T) {
+	registryTests := []struct {
+		in        string
+		out       string
+		expectErr error
+	}{
+		{
+			in:  "docker.io/library/test:123",
+			out: "test.io/library/test:123",
+		}, {
+			in:  "docker.io/library/test",
+			out: "test.io/library/test",
+		}, {
+			in:  "test",
+			out: "test.io/library/test",
+		}, {
+			in:  "k8s.gcr.io/test:123",
+			out: "test.io/test:123",
+		}, {
+			in:  "gcr.io/k8s-authenticated-test/test:123",
+			out: "test.io/k8s-authenticated-test/test:123",
+		}, {
+			in:  "k8s.gcr.io/sig-storage/test:latest",
+			out: "test.io/sig-storage/test:latest",
+		}, {
+			in:  "invalid.registry.k8s.io/invalid/test:latest",
+			out: "test.io/invalid/test:latest",
+		}, {
+			in:  "mcr.microsoft.com/test:latest",
+			out: "test.io/microsoft/test:latest",
+		}, {
+			in:  "k8s.gcr.io/e2e-test-images/test:latest",
+			out: "test.io/promoter/test:latest",
+		}, {
+			in:  "k8s.gcr.io/build-image/test:latest",
+			out: "test.io/build/test:latest",
+		}, {
+			in:  "gcr.io/authenticated-image-pulling/test:latest",
+			out: "test.io/gcAuth/test:latest",
+		}, {
+			in:        "unknwon.io/google-samples/test:latest",
+			expectErr: fmt.Errorf("Registry: unknwon.io/google-samples is missing in test/utils/image/manifest.go, please add the registry, otherwise the test will fail on air-gapped clusters"),
+		},
+	}
+
 	// Set custom registries
-	dockerLibraryRegistry = "test.io/library"
-	e2eRegistry = "test.io/kubernetes-e2e-test-images"
-	e2eVolumeRegistry = "test.io/kubernetes-e2e-test-images/volume"
-	gcRegistry = "test.io"
-	gcrReleaseRegistry = "test.io/gke-release"
-	PrivateRegistry = "test.io/k8s-authenticated-test"
-	sampleRegistry = "test.io/google-samples"
-	sigStorageRegistry = "test.io/sig-storage"
+	reg := RegistryList{
+		DockerLibraryRegistry:   "test.io/library",
+		GcRegistry:              "test.io",
+		PrivateRegistry:         "test.io/k8s-authenticated-test",
+		SigStorageRegistry:      "test.io/sig-storage",
+		InvalidRegistry:         "test.io/invalid",
+		MicrosoftRegistry:       "test.io/microsoft",
+		PromoterE2eRegistry:     "test.io/promoter",
+		BuildImageRegistry:      "test.io/build",
+		GcAuthenticatedRegistry: "test.io/gcAuth",
+	}
 
 	for _, tt := range registryTests {
 		t.Run(tt.in, func(t *testing.T) {
-			s, err := ReplaceRegistryInImageURL(tt.in)
+			s, err := replaceRegistryInImageURLWithList(tt.in, reg)
 
-			if err != nil && err.Error() != tt.out.err.Error() {
-				t.Errorf("got %q, want %q", err, tt.out.err)
+			if err != nil && err.Error() != tt.expectErr.Error() {
+				t.Errorf("got %q, want %q", err, tt.expectErr)
 			}
-
-			if s != tt.out.result {
-				t.Errorf("got %q, want %q", s, tt.out.result)
+			if s != tt.out {
+				t.Errorf("got %q, want %q", s, tt.out)
 			}
 		})
 	}
@@ -157,7 +174,7 @@ func TestGetMappedImageConfigs(t *testing.T) {
 		actual[source.GetE2EImage()] = mapping.GetE2EImage()
 	}
 	expected := map[string]string{
-		"docker.io/source/repo:1.0": "quay.io/repo/for-test:e2e-0-docker-io-source-repo-1-0-72R4aXm7YnxQ4_ekf1DrFA",
+		"docker.io/source/repo:1.0": "quay.io/repo/for-test:e2e-0-docker-io-source-repo-1-0-72R4aXm7YnxQ4_ek",
 	}
 	if !reflect.DeepEqual(expected, actual) {
 		t.Fatal(diff.ObjectReflectDiff(expected, actual))

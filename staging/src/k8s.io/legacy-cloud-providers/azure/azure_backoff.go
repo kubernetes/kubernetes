@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -275,6 +276,9 @@ func (az *Cloud) ListLB(service *v1.Service) ([]network.LoadBalancer, error) {
 	rgName := az.getLoadBalancerResourceGroup()
 	allLBs, rerr := az.LoadBalancerClient.List(ctx, rgName)
 	if rerr != nil {
+		if rerr.IsNotFound() {
+			return nil, nil
+		}
 		az.Event(service, v1.EventTypeWarning, "ListLoadBalancers", rerr.Error().Error())
 		klog.Errorf("LoadBalancerClient.List(%v) failure with err=%v", rgName, rerr)
 		return nil, rerr.Error()
@@ -290,6 +294,9 @@ func (az *Cloud) ListPIP(service *v1.Service, pipResourceGroup string) ([]networ
 
 	allPIPs, rerr := az.PublicIPAddressesClient.List(ctx, pipResourceGroup)
 	if rerr != nil {
+		if rerr.IsNotFound() {
+			return nil, nil
+		}
 		az.Event(service, v1.EventTypeWarning, "ListPublicIPs", rerr.Error().Error())
 		klog.Errorf("PublicIPAddressesClient.List(%v) failure with err=%v", pipResourceGroup, rerr)
 		return nil, rerr.Error()

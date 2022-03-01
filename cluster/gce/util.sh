@@ -88,13 +88,13 @@ function set-linux-node-image() {
 function set-windows-node-image() {
   WINDOWS_NODE_IMAGE_PROJECT="windows-cloud"
   if [[ "${WINDOWS_NODE_OS_DISTRIBUTION}" == "win2019" ]]; then
-    WINDOWS_NODE_IMAGE="windows-server-2019-dc-core-v20210112"
+    WINDOWS_NODE_IMAGE="windows-server-2019-dc-core-v20210914"
   elif [[ "${WINDOWS_NODE_OS_DISTRIBUTION}" == "win1909" ]]; then
-    WINDOWS_NODE_IMAGE="windows-server-1909-dc-core-v20210112"
+    WINDOWS_NODE_IMAGE="windows-server-1909-dc-core-v20210413"
   elif [[ "${WINDOWS_NODE_OS_DISTRIBUTION}" == "win2004" ]]; then
-    WINDOWS_NODE_IMAGE="windows-server-2004-dc-core-v20210112"
+    WINDOWS_NODE_IMAGE="windows-server-2004-dc-core-v20210914"
   elif [[ "${WINDOWS_NODE_OS_DISTRIBUTION,,}" == "win20h2" ]]; then
-    WINDOWS_NODE_IMAGE="windows-server-20h2-dc-core-v20210112"
+    WINDOWS_NODE_IMAGE="windows-server-20h2-dc-core-v20210914"
   else
     echo "Unknown WINDOWS_NODE_OS_DISTRIBUTION ${WINDOWS_NODE_OS_DISTRIBUTION}" >&2
     exit 1
@@ -163,19 +163,9 @@ function verify-prereqs() {
   # we use gcloud to create the cluster, gsutil to stage binaries and data
   for cmd in gcloud gsutil; do
     if ! which "${cmd}" >/dev/null; then
-      local resp="n"
-      if [[ "${KUBE_PROMPT_FOR_UPDATE}" == "y" ]]; then
-        echo "Can't find ${cmd} in PATH.  Do you wish to install the Google Cloud SDK? [Y/n]"
-        read -r resp
-      fi
-      if [[ "${resp}" != "n" && "${resp}" != "N" ]]; then
-        curl https://sdk.cloud.google.com | bash
-      fi
-      if ! which "${cmd}" >/dev/null; then
-        echo "Can't find ${cmd} in PATH, please fix and retry. The Google Cloud " >&2
-        echo "SDK can be downloaded from https://cloud.google.com/sdk/." >&2
-        exit 1
-      fi
+      echo "Can't find ${cmd} in PATH, please fix and retry. The Google Cloud " >&2
+      echo "SDK can be downloaded from https://cloud.google.com/sdk/." >&2
+      exit 1
     fi
   done
   update-or-verify-gcloud
@@ -532,7 +522,7 @@ function tars_from_version() {
     KUBE_MANIFESTS_TAR_HASH=$(curl "${KUBE_MANIFESTS_TAR_URL}" --silent --show-error | ${sha512sum})
     KUBE_MANIFESTS_TAR_HASH=${KUBE_MANIFESTS_TAR_HASH%%[[:blank:]]*}
   elif [[ ${KUBE_VERSION} =~ ${KUBE_CI_VERSION_REGEX} ]]; then
-    SERVER_BINARY_TAR_URL="https://storage.googleapis.com/kubernetes-release-dev/ci/${KUBE_VERSION}/kubernetes-server-linux-amd64.tar.gz"
+    SERVER_BINARY_TAR_URL="https://storage.googleapis.com/k8s-release-dev/ci/${KUBE_VERSION}/kubernetes-server-linux-amd64.tar.gz"
     # TODO: Clean this up.
     KUBE_MANIFESTS_TAR_URL="${SERVER_BINARY_TAR_URL/server-linux-amd64/manifests}"
     KUBE_MANIFESTS_TAR_HASH=$(curl "${KUBE_MANIFESTS_TAR_URL}" --silent --show-error | ${sha512sum})
@@ -740,7 +730,7 @@ function yaml-map-string-string {
 # Returns kubelet flags used on both Linux and Windows nodes.
 function construct-common-kubelet-flags {
   local flags="${KUBELET_TEST_LOG_LEVEL:-"--v=2"} ${KUBELET_TEST_ARGS:-}"
-  flags+=" --cloud-provider=gce"
+  flags+=" --cloud-provider=${CLOUD_PROVIDER_FLAG:-gce}"
   # TODO(mtaufen): ROTATE_CERTIFICATES seems unused; delete it?
   if [[ -n "${ROTATE_CERTIFICATES:-}" ]]; then
     flags+=" --rotate-certificates=true"
@@ -759,12 +749,8 @@ function construct-linux-kubelet-flags {
   flags="$(construct-common-kubelet-flags)"
   # Keep in sync with CONTAINERIZED_MOUNTER_HOME in configure-helper.sh
   flags+=" --experimental-mounter-path=/home/kubernetes/containerized_mounter/mounter"
-  flags+=" --experimental-check-node-capabilities-before-mount=true"
   # Keep in sync with the mkdir command in configure-helper.sh (until the TODO is resolved)
   flags+=" --cert-dir=/var/lib/kubelet/pki/"
-  # Configure the directory that the Kubelet should use to store dynamic config checkpoints
-  flags+=" --dynamic-config-dir=/var/lib/kubelet/dynamic-config"
-
 
   if [[ "${node_type}" == "master" ]]; then
     flags+=" ${MASTER_KUBELET_TEST_ARGS:-}"
@@ -794,26 +780,6 @@ function construct-linux-kubelet-flags {
       flags+=" --resolv-conf=/run/systemd/resolve/resolv.conf"
     fi
   fi
-  # Network plugin
-  if [[ -n "${NETWORK_PROVIDER:-}" || -n "${NETWORK_POLICY_PROVIDER:-}" ]]; then
-    flags+=" --cni-bin-dir=/home/kubernetes/bin"
-    if [[ "${NETWORK_POLICY_PROVIDER:-}" == "calico" || "${ENABLE_NETD:-}" == "true" ]]; then
-      # Calico uses CNI always.
-      # Note that network policy won't work for master node.
-      if [[ "${node_type}" == "master" ]]; then
-        flags+=" --network-plugin=${NETWORK_PROVIDER}"
-      else
-        flags+=" --network-plugin=cni"
-      fi
-    else
-      # Otherwise use the configured value.
-      flags+=" --network-plugin=${NETWORK_PROVIDER}"
-
-    fi
-  fi
-  if [[ -n "${NON_MASQUERADE_CIDR:-}" ]]; then
-    flags+=" --non-masquerade-cidr=${NON_MASQUERADE_CIDR}"
-  fi
   flags+=" --volume-plugin-dir=${VOLUME_PLUGIN_DIR}"
   local node_labels
   node_labels="$(build-linux-node-labels "${node_type}")"
@@ -823,16 +789,12 @@ function construct-linux-kubelet-flags {
   if [[ -n "${NODE_TAINTS:-}" ]]; then
     flags+=" --register-with-taints=${NODE_TAINTS}"
   fi
-  if [[ "${CONTAINER_RUNTIME:-}" != "docker" ]]; then
-    flags+=" --container-runtime=remote"
-    if [[ "${CONTAINER_RUNTIME}" == "containerd" ]]; then
-      CONTAINER_RUNTIME_ENDPOINT=${KUBE_CONTAINER_RUNTIME_ENDPOINT:-unix:///run/containerd/containerd.sock}
-      flags+=" --runtime-cgroups=/system.slice/containerd.service"
-    fi
-  fi
 
-  if [[ -n "${CONTAINER_RUNTIME_ENDPOINT:-}" ]]; then
-    flags+=" --container-runtime-endpoint=${CONTAINER_RUNTIME_ENDPOINT}"
+  CONTAINER_RUNTIME_ENDPOINT=${KUBE_CONTAINER_RUNTIME_ENDPOINT:-unix:///run/containerd/containerd.sock}
+  flags+=" --container-runtime-endpoint=${CONTAINER_RUNTIME_ENDPOINT}"
+
+  if [[ "${CONTAINER_RUNTIME_ENDPOINT}" =~ /containerd.sock$ ]]; then
+    flags+=" --runtime-cgroups=/system.slice/containerd.service"
   fi
 
   KUBELET_ARGS="${flags}"
@@ -874,28 +836,10 @@ function construct-windows-kubelet-flags {
 
   # The directory where the TLS certs are located.
   flags+=" --cert-dir=${WINDOWS_PKI_DIR}"
-
-  flags+=" --network-plugin=cni"
-  flags+=" --cni-bin-dir=${WINDOWS_CNI_DIR}"
-  flags+=" --cni-conf-dir=${WINDOWS_CNI_CONFIG_DIR}"
   flags+=" --pod-manifest-path=${WINDOWS_MANIFESTS_DIR}"
-
-  # Windows images are large and we don't have gcr mirrors yet. Allow longer
-  # pull progress deadline.
-  flags+=" --image-pull-progress-deadline=5m"
-  flags+=" --enable-debugging-handlers=true"
 
   # Configure kubelet to run as a windows service.
   flags+=" --windows-service=true"
-
-  # TODO(mtaufen): Configure logging for kubelet running as a service. I haven't
-  # been able to figure out how to direct stdout/stderr into log files when
-  # configuring it to run via sc.exe, so we just manually override logging
-  # config here.
-  flags+=" --log-file=${WINDOWS_LOGS_DIR}\kubelet.log"
-  # klog sets this to true internally, so need to override to false so we
-  # actually log to the file
-  flags+=" --logtostderr=false"
 
   # Configure the file path for host dns configuration
   flags+=" --resolv-conf=${WINDOWS_CNI_DIR}\hostdns.conf"
@@ -911,13 +855,8 @@ function construct-windows-kubelet-flags {
   # Force disable KubeletPodResources feature on Windows until #78628 is fixed.
   flags+=" --feature-gates=KubeletPodResources=false"
 
-  if [[ "${WINDOWS_CONTAINER_RUNTIME:-}" != "docker" ]]; then
-    flags+=" --container-runtime=remote"
-    if [[ "${WINDOWS_CONTAINER_RUNTIME}" == "containerd" ]]; then
-      WINDOWS_CONTAINER_RUNTIME_ENDPOINT=${KUBE_WINDOWS_CONTAINER_RUNTIME_ENDPOINT:-npipe:////./pipe/containerd-containerd}
-      flags+=" --container-runtime-endpoint=${WINDOWS_CONTAINER_RUNTIME_ENDPOINT}"
-    fi
-  fi
+  WINDOWS_CONTAINER_RUNTIME_ENDPOINT=${KUBE_WINDOWS_CONTAINER_RUNTIME_ENDPOINT:-npipe:////./pipe/containerd-containerd}
+  flags+=" --container-runtime-endpoint=${WINDOWS_CONTAINER_RUNTIME_ENDPOINT}"
 
   KUBELET_ARGS="${flags}"
 }
@@ -933,16 +872,6 @@ function construct-windows-kubeproxy-flags {
 
   # Configure kube-proxy to run as a windows service.
   flags+=" --windows-service=true"
-
-  # TODO(mtaufen): Configure logging for kube-proxy running as a service.
-  # I haven't been able to figure out how to direct stdout/stderr into log
-  # files when configuring it to run via sc.exe, so we just manually
-  # override logging config here.
-  flags+=" --log-file=${WINDOWS_LOGS_DIR}\kube-proxy.log"
-
-  # klog sets this to true internally, so need to override to false
-  # so we actually log to the file
-  flags+=" --logtostderr=false"
 
   # Enabling Windows DSR mode unlocks newer network features and reduces
   # port usage for services.
@@ -1025,7 +954,7 @@ EOF
 # cat the Kubelet config yaml for masters
 function print-master-kubelet-config {
   cat <<EOF
-enableDebuggingHandlers: false
+enableDebuggingHandlers: ${MASTER_KUBELET_ENABLE_DEBUGGING_HANDLERS:-false}
 hairpinMode: none
 staticPodPath: /etc/kubernetes/manifests
 authentication:
@@ -1049,7 +978,7 @@ EOF
 # cat the Kubelet config yaml in common between linux nodes and windows nodes
 function print-common-node-kubelet-config {
   cat <<EOF
-enableDebuggingHandlers: true
+enableDebuggingHandlers: ${KUBELET_ENABLE_DEBUGGING_HANDLERS:-true}
 EOF
   if [[ "${HAIRPIN_MODE:-}" == "promiscuous-bridge" ]] || \
      [[ "${HAIRPIN_MODE:-}" == "hairpin-veth" ]] || \
@@ -1114,6 +1043,18 @@ ETCD_APISERVER_SERVER_KEY: $(yaml-quote "${ETCD_APISERVER_SERVER_KEY_BASE64:-}")
 ETCD_APISERVER_SERVER_CERT: $(yaml-quote "${ETCD_APISERVER_SERVER_CERT_BASE64:-}")
 ETCD_APISERVER_CLIENT_KEY: $(yaml-quote "${ETCD_APISERVER_CLIENT_KEY_BASE64:-}")
 ETCD_APISERVER_CLIENT_CERT: $(yaml-quote "${ETCD_APISERVER_CLIENT_CERT_BASE64:-}")
+KONNECTIVITY_SERVER_CA_KEY: $(yaml-quote "${KONNECTIVITY_SERVER_CA_KEY_BASE64:-}")
+KONNECTIVITY_SERVER_CA_CERT: $(yaml-quote "${KONNECTIVITY_SERVER_CA_CERT_BASE64:-}")
+KONNECTIVITY_SERVER_CERT: $(yaml-quote "${KONNECTIVITY_SERVER_CERT_BASE64:-}")
+KONNECTIVITY_SERVER_KEY: $(yaml-quote "${KONNECTIVITY_SERVER_KEY_BASE64:-}")
+KONNECTIVITY_SERVER_CLIENT_CERT: $(yaml-quote "${KONNECTIVITY_SERVER_CLIENT_CERT_BASE64:-}")
+KONNECTIVITY_SERVER_CLIENT_KEY: $(yaml-quote "${KONNECTIVITY_SERVER_CLIENT_KEY_BASE64:-}")
+KONNECTIVITY_AGENT_CA_KEY: $(yaml-quote "${KONNECTIVITY_AGENT_CA_KEY_BASE64:-}")
+KONNECTIVITY_AGENT_CA_CERT: $(yaml-quote "${KONNECTIVITY_AGENT_CA_CERT_BASE64:-}")
+KONNECTIVITY_AGENT_CERT: $(yaml-quote "${KONNECTIVITY_AGENT_CERT_BASE64:-}")
+KONNECTIVITY_AGENT_KEY: $(yaml-quote "${KONNECTIVITY_AGENT_KEY_BASE64:-}")
+KONNECTIVITY_AGENT_CLIENT_CERT: $(yaml-quote "${KONNECTIVITY_AGENT_CLIENT_CERT_BASE64:-}")
+KONNECTIVITY_AGENT_CLIENT_KEY: $(yaml-quote "${KONNECTIVITY_AGENT_CLIENT_KEY_BASE64:-}")
 EOF
 }
 
@@ -1157,7 +1098,6 @@ METADATA_AGENT_CLUSTER_LEVEL_MEMORY_REQUEST: $(yaml-quote "${METADATA_AGENT_CLUS
 DOCKER_REGISTRY_MIRROR_URL: $(yaml-quote "${DOCKER_REGISTRY_MIRROR_URL:-}")
 ENABLE_L7_LOADBALANCING: $(yaml-quote "${ENABLE_L7_LOADBALANCING:-none}")
 ENABLE_CLUSTER_LOGGING: $(yaml-quote "${ENABLE_CLUSTER_LOGGING:-false}")
-ENABLE_CLUSTER_UI: $(yaml-quote "${ENABLE_CLUSTER_UI:-false}")
 ENABLE_NODE_PROBLEM_DETECTOR: $(yaml-quote "${ENABLE_NODE_PROBLEM_DETECTOR:-none}")
 NODE_PROBLEM_DETECTOR_VERSION: $(yaml-quote "${NODE_PROBLEM_DETECTOR_VERSION:-}")
 NODE_PROBLEM_DETECTOR_TAR_HASH: $(yaml-quote "${NODE_PROBLEM_DETECTOR_TAR_HASH:-}")
@@ -1246,7 +1186,6 @@ VOLUME_PLUGIN_DIR: $(yaml-quote "${VOLUME_PLUGIN_DIR}")
 KUBELET_ARGS: $(yaml-quote "${KUBELET_ARGS}")
 REQUIRE_METADATA_KUBELET_CONFIG_FILE: $(yaml-quote true)
 ENABLE_NETD: $(yaml-quote "${ENABLE_NETD:-false}")
-ENABLE_NODE_TERMINATION_HANDLER: $(yaml-quote "${ENABLE_NODE_TERMINATION_HANDLER:-false}")
 CUSTOM_NETD_YAML: |
 ${CUSTOM_NETD_YAML//\'/\'\'}
 CUSTOM_CALICO_NODE_DAEMONSET_YAML: |
@@ -1265,6 +1204,9 @@ EOF
   fi
   if [[ "${master}" == "false" ]]; then
     cat >>"$file" <<EOF
+KONNECTIVITY_AGENT_CA_CERT: $(yaml-quote "${KONNECTIVITY_AGENT_CA_CERT_BASE64:-}")
+KONNECTIVITY_AGENT_CLIENT_KEY: $(yaml-quote "${KONNECTIVITY_AGENT_CLIENT_KEY_BASE64:-}")
+KONNECTIVITY_AGENT_CLIENT_CERT: $(yaml-quote "${KONNECTIVITY_AGENT_CLIENT_CERT_BASE64:-}")
 EOF
   fi
   if [ -n "${KUBE_APISERVER_REQUEST_TIMEOUT:-}" ]; then
@@ -1355,6 +1297,21 @@ ETCD_PEER_KEY: $(yaml-quote "${ETCD_PEER_KEY_BASE64:-}")
 ETCD_PEER_CERT: $(yaml-quote "${ETCD_PEER_CERT_BASE64:-}")
 SERVICEACCOUNT_ISSUER: $(yaml-quote "${SERVICEACCOUNT_ISSUER:-}")
 KUBECTL_PRUNE_WHITELIST_OVERRIDE: $(yaml-quote "${KUBECTL_PRUNE_WHITELIST_OVERRIDE:-}")
+KUBE_SCHEDULER_RUNASUSER: 2001
+KUBE_SCHEDULER_RUNASGROUP: 2001
+KUBE_ADDON_MANAGER_RUNASUSER: 2002
+KUBE_ADDON_MANAGER_RUNASGROUP: 2002
+KUBE_CONTROLLER_MANAGER_RUNASUSER: 2003
+KUBE_CONTROLLER_MANAGER_RUNASGROUP: 2003
+KUBE_API_SERVER_RUNASUSER: 2004
+KUBE_API_SERVER_RUNASGROUP: 2004
+KUBE_PKI_READERS_GROUP: 2005
+ETCD_RUNASUSER: 2006
+ETCD_RUNASGROUP: 2006
+KUBE_POD_LOG_READERS_GROUP: 2007
+KONNECTIVITY_SERVER_RUNASUSER: 2008
+KONNECTIVITY_SERVER_RUNASGROUP: 2008
+KONNECTIVITY_SERVER_SOCKET_WRITER_GROUP: 2008
 EOF
     # KUBE_APISERVER_REQUEST_TIMEOUT_SEC (if set) controls the --request-timeout
     # flag
@@ -1571,6 +1528,7 @@ NODE_BINARY_TAR_URL: $(yaml-quote "${NODE_BINARY_TAR_URL}")
 NODE_BINARY_TAR_HASH: $(yaml-quote "${NODE_BINARY_TAR_HASH}")
 CSI_PROXY_STORAGE_PATH: $(yaml-quote "${CSI_PROXY_STORAGE_PATH}")
 CSI_PROXY_VERSION: $(yaml-quote "${CSI_PROXY_VERSION}")
+CSI_PROXY_FLAGS: $(yaml-quote "${CSI_PROXY_FLAGS}")
 ENABLE_CSI_PROXY: $(yaml-quote "${ENABLE_CSI_PROXY}")
 K8S_DIR: $(yaml-quote "${WINDOWS_K8S_DIR}")
 NODE_DIR: $(yaml-quote "${WINDOWS_NODE_DIR}")
@@ -1580,7 +1538,7 @@ CNI_CONFIG_DIR: $(yaml-quote "${WINDOWS_CNI_CONFIG_DIR}")
 WINDOWS_CNI_STORAGE_PATH: $(yaml-quote "${WINDOWS_CNI_STORAGE_PATH}")
 WINDOWS_CNI_VERSION: $(yaml-quote "${WINDOWS_CNI_VERSION}")
 WINDOWS_CONTAINER_RUNTIME: $(yaml-quote "${WINDOWS_CONTAINER_RUNTIME}")
-WINDOWS_CONTAINER_RUNTIME_ENDPOINT: $(yaml-quote "${WINDOWS_CONTAINER_RUNTIME_ENDPOINT}")
+WINDOWS_CONTAINER_RUNTIME_ENDPOINT: $(yaml-quote "${WINDOWS_CONTAINER_RUNTIME_ENDPOINT:-}")
 MANIFESTS_DIR: $(yaml-quote "${WINDOWS_MANIFESTS_DIR}")
 PKI_DIR: $(yaml-quote "${WINDOWS_PKI_DIR}")
 CA_FILE_PATH: $(yaml-quote "${WINDOWS_CA_FILE}")
@@ -1591,6 +1549,14 @@ BOOTSTRAP_KUBECONFIG_FILE: $(yaml-quote "${WINDOWS_BOOTSTRAP_KUBECONFIG_FILE}")
 KUBEPROXY_KUBECONFIG_FILE: $(yaml-quote "${WINDOWS_KUBEPROXY_KUBECONFIG_FILE}")
 WINDOWS_INFRA_CONTAINER: $(yaml-quote "${WINDOWS_INFRA_CONTAINER}")
 WINDOWS_ENABLE_PIGZ: $(yaml-quote "${WINDOWS_ENABLE_PIGZ}")
+WINDOWS_ENABLE_HYPERV: $(yaml-quote "${WINDOWS_ENABLE_HYPERV}")
+ENABLE_NODE_PROBLEM_DETECTOR: $(yaml-quote "${WINDOWS_ENABLE_NODE_PROBLEM_DETECTOR}")
+NODE_PROBLEM_DETECTOR_VERSION: $(yaml-quote "${NODE_PROBLEM_DETECTOR_VERSION}")
+NODE_PROBLEM_DETECTOR_TAR_HASH: $(yaml-quote "${NODE_PROBLEM_DETECTOR_TAR_HASH}")
+NODE_PROBLEM_DETECTOR_RELEASE_PATH: $(yaml-quote "${NODE_PROBLEM_DETECTOR_RELEASE_PATH}")
+NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS: $(yaml-quote "${WINDOWS_NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS}")
+NODE_PROBLEM_DETECTOR_TOKEN: $(yaml-quote "${NODE_PROBLEM_DETECTOR_TOKEN:-}")
+WINDOWS_NODEPROBLEMDETECTOR_KUBECONFIG_FILE: $(yaml-quote "${WINDOWS_NODEPROBLEMDETECTOR_KUBECONFIG_FILE}")
 EOF
 }
 
@@ -1656,6 +1622,7 @@ function create-certs {
   setup-easyrsa
   PRIMARY_CN="${primary_cn}" SANS="${sans}" generate-certs
   AGGREGATOR_PRIMARY_CN="${primary_cn}" AGGREGATOR_SANS="${sans}" generate-aggregator-certs
+  KONNECTIVITY_SERVER_PRIMARY_CN="${primary_cn}" KONNECTIVITY_SERVER_SANS="${sans}" generate-konnectivity-server-certs
 
   # By default, linux wraps base64 output every 76 cols, so we use 'tr -d' to remove whitespaces.
   # Note 'base64 -w0' doesn't work on Mac OS X, which has different flags.
@@ -1677,6 +1644,22 @@ function create-certs {
   REQUESTHEADER_CA_CERT_BASE64=$(base64 "${AGGREGATOR_CERT_DIR}/pki/ca.crt" | tr -d '\r\n')
   PROXY_CLIENT_CERT_BASE64=$(base64 "${AGGREGATOR_CERT_DIR}/pki/issued/proxy-client.crt" | tr -d '\r\n')
   PROXY_CLIENT_KEY_BASE64=$(base64 "${AGGREGATOR_CERT_DIR}/pki/private/proxy-client.key" | tr -d '\r\n')
+
+  # Setting up the Kubernetes API Server Konnectivity Server auth.
+  # This includes certs for both API Server to Konnectivity Server and
+  # Konnectivity Agent to Konnectivity Server.
+  KONNECTIVITY_SERVER_CA_KEY_BASE64=$(base64 "${KONNECTIVITY_SERVER_CERT_DIR}/pki/private/ca.key" | tr -d '\r\n')
+  KONNECTIVITY_SERVER_CA_CERT_BASE64=$(base64 "${KONNECTIVITY_SERVER_CERT_DIR}/pki/ca.crt" | tr -d '\r\n')
+  KONNECTIVITY_SERVER_CERT_BASE64=$(base64 "${KONNECTIVITY_SERVER_CERT_DIR}/pki/issued/server.crt" | tr -d '\r\n')
+  KONNECTIVITY_SERVER_KEY_BASE64=$(base64 "${KONNECTIVITY_SERVER_CERT_DIR}/pki/private/server.key" | tr -d '\r\n')
+  KONNECTIVITY_SERVER_CLIENT_CERT_BASE64=$(base64 "${KONNECTIVITY_SERVER_CERT_DIR}/pki/issued/client.crt" | tr -d '\r\n')
+  KONNECTIVITY_SERVER_CLIENT_KEY_BASE64=$(base64 "${KONNECTIVITY_SERVER_CERT_DIR}/pki/private/client.key" | tr -d '\r\n')
+  KONNECTIVITY_AGENT_CA_KEY_BASE64=$(base64 "${KONNECTIVITY_AGENT_CERT_DIR}/pki/private/ca.key" | tr -d '\r\n')
+  KONNECTIVITY_AGENT_CA_CERT_BASE64=$(base64 "${KONNECTIVITY_AGENT_CERT_DIR}/pki/ca.crt" | tr -d '\r\n')
+  KONNECTIVITY_AGENT_CERT_BASE64=$(base64 "${KONNECTIVITY_AGENT_CERT_DIR}/pki/issued/server.crt" | tr -d '\r\n')
+  KONNECTIVITY_AGENT_KEY_BASE64=$(base64 "${KONNECTIVITY_AGENT_CERT_DIR}/pki/private/server.key" | tr -d '\r\n')
+  KONNECTIVITY_AGENT_CLIENT_CERT_BASE64=$(base64 "${KONNECTIVITY_AGENT_CERT_DIR}/pki/issued/client.crt" | tr -d '\r\n')
+  KONNECTIVITY_AGENT_CLIENT_KEY_BASE64=$(base64 "${KONNECTIVITY_AGENT_CERT_DIR}/pki/private/client.key" | tr -d '\r\n')
 }
 
 # Set up easy-rsa directory structure.
@@ -1697,9 +1680,15 @@ function setup-easyrsa {
     mkdir easy-rsa-master/kubelet
     cp -r easy-rsa-master/easyrsa3/* easy-rsa-master/kubelet
     mkdir easy-rsa-master/aggregator
-    cp -r easy-rsa-master/easyrsa3/* easy-rsa-master/aggregator) &>"${cert_create_debug_output}" || true
+    cp -r easy-rsa-master/easyrsa3/* easy-rsa-master/aggregator
+    mkdir easy-rsa-master/konnectivity-server
+    cp -r easy-rsa-master/easyrsa3/* easy-rsa-master/konnectivity-server
+    mkdir easy-rsa-master/konnectivity-agent
+    cp -r easy-rsa-master/easyrsa3/* easy-rsa-master/konnectivity-agent) &>"${cert_create_debug_output}" || true
   CERT_DIR="${KUBE_TEMP}/easy-rsa-master/easyrsa3"
   AGGREGATOR_CERT_DIR="${KUBE_TEMP}/easy-rsa-master/aggregator"
+  KONNECTIVITY_SERVER_CERT_DIR="${KUBE_TEMP}/easy-rsa-master/konnectivity-server"
+  KONNECTIVITY_AGENT_CERT_DIR="${KUBE_TEMP}/easy-rsa-master/konnectivity-agent"
   if [ ! -x "${CERT_DIR}/easyrsa" ] || [ ! -x "${AGGREGATOR_CERT_DIR}/easyrsa" ]; then
     # TODO(roberthbailey,porridge): add better error handling here,
     # see https://github.com/kubernetes/kubernetes/issues/55229
@@ -1837,6 +1826,86 @@ function generate-aggregator-certs {
   fi
 }
 
+# Runs the easy RSA commands to generate server side certificate files
+# for the konnectivity server. This includes both server side to both
+# konnectivity-server and konnectivity-agent.
+# The generated files are in ${KONNECTIVITY_SERVER_CERT_DIR} and
+# ${KONNECTIVITY_AGENT_CERT_DIR}
+#
+# Assumed vars
+#   KUBE_TEMP
+#   KONNECTIVITY_SERVER_CERT_DIR
+#   KONNECTIVITY_SERVER_PRIMARY_CN: Primary canonical name
+#   KONNECTIVITY_SERVER_SANS: Subject alternate names
+#
+function generate-konnectivity-server-certs {
+  local -r cert_create_debug_output=$(mktemp "${KUBE_TEMP}/cert_create_debug_output.XXX")
+  # Note: This was heavily cribbed from make-ca-cert.sh
+  (set -x
+    # Make the client <-> konnectivity server side certificates.
+    cd "${KUBE_TEMP}/easy-rsa-master/konnectivity-server"
+    ./easyrsa init-pki
+    # this puts the cert into pki/ca.crt and the key into pki/private/ca.key
+    ./easyrsa --batch "--req-cn=${KONNECTIVITY_SERVER_PRIMARY_CN}@$(date +%s)" build-ca nopass
+    ./easyrsa --subject-alt-name="IP:127.0.0.1,${KONNECTIVITY_SERVER_SANS}" build-server-full server nopass
+    ./easyrsa build-client-full client nopass
+
+    kube::util::ensure-cfssl "${KUBE_TEMP}/cfssl"
+
+    # make the config for the signer
+    echo '{"signing":{"default":{"expiry":"43800h","usages":["signing","key encipherment","client auth"]}}}' > "ca-config.json"
+    # create the konnectivity server cert with the correct groups
+    echo '{"CN":"konnectivity-server","hosts":[""],"key":{"algo":"rsa","size":2048}}' | "${CFSSL_BIN}" gencert -ca=pki/ca.crt -ca-key=pki/private/ca.key -config=ca-config.json - | "${CFSSLJSON_BIN}" -bare konnectivity-server
+    rm -f "konnectivity-server.csr"
+
+    # Make the agent <-> konnectivity server side certificates.
+    cd "${KUBE_TEMP}/easy-rsa-master/konnectivity-agent"
+    ./easyrsa init-pki
+    # this puts the cert into pki/ca.crt and the key into pki/private/ca.key
+    ./easyrsa --batch "--req-cn=${KONNECTIVITY_SERVER_PRIMARY_CN}@$(date +%s)" build-ca nopass
+    ./easyrsa --subject-alt-name="${KONNECTIVITY_SERVER_SANS}" build-server-full server nopass
+    ./easyrsa build-client-full client nopass
+
+    kube::util::ensure-cfssl "${KUBE_TEMP}/cfssl"
+
+    # make the config for the signer
+    echo '{"signing":{"default":{"expiry":"43800h","usages":["signing","key encipherment","agent auth"]}}}' > "ca-config.json"
+    # create the konnectivity server cert with the correct groups
+    echo '{"CN":"koonectivity-server","hosts":[""],"key":{"algo":"rsa","size":2048}}' | "${CFSSL_BIN}" gencert -ca=pki/ca.crt -ca-key=pki/private/ca.key -config=ca-config.json - | "${CFSSLJSON_BIN}" -bare konnectivity-agent
+    rm -f "konnectivity-agent.csr"
+
+    echo "completed main certificate section") &>"${cert_create_debug_output}" || true
+
+  local output_file_missing=0
+  local output_file
+  for output_file in \
+    "${KONNECTIVITY_SERVER_CERT_DIR}/pki/private/ca.key" \
+    "${KONNECTIVITY_SERVER_CERT_DIR}/pki/ca.crt" \
+    "${KONNECTIVITY_SERVER_CERT_DIR}/pki/issued/server.crt" \
+    "${KONNECTIVITY_SERVER_CERT_DIR}/pki/private/server.key" \
+    "${KONNECTIVITY_SERVER_CERT_DIR}/pki/issued/client.crt" \
+    "${KONNECTIVITY_SERVER_CERT_DIR}/pki/private/client.key" \
+    "${KONNECTIVITY_AGENT_CERT_DIR}/pki/private/ca.key" \
+    "${KONNECTIVITY_AGENT_CERT_DIR}/pki/ca.crt" \
+    "${KONNECTIVITY_AGENT_CERT_DIR}/pki/issued/server.crt" \
+    "${KONNECTIVITY_AGENT_CERT_DIR}/pki/private/server.key" \
+    "${KONNECTIVITY_AGENT_CERT_DIR}/pki/issued/client.crt" \
+    "${KONNECTIVITY_AGENT_CERT_DIR}/pki/private/client.key"
+  do
+    if [[ ! -s "${output_file}" ]]; then
+      echo "Expected file ${output_file} not created" >&2
+      output_file_missing=1
+    fi
+  done
+  if (( output_file_missing )); then
+    # TODO(roberthbailey,porridge): add better error handling here,
+    # see https://github.com/kubernetes/kubernetes/issues/55229
+    cat "${cert_create_debug_output}" >&2
+    echo "=== Failed to generate konnectivity-server certificates: Aborting ===" >&2
+    exit 2
+  fi
+}
+
 # Using provided master env, extracts value from provided key.
 #
 # Args:
@@ -1878,6 +1947,16 @@ function parse-master-env() {
   ETCD_APISERVER_SERVER_CERT_BASE64=$(get-env-val "${master_env}" "ETCD_APISERVER_SERVER_CERT")
   ETCD_APISERVER_CLIENT_KEY_BASE64=$(get-env-val "${master_env}" "ETCD_APISERVER_CLIENT_KEY")
   ETCD_APISERVER_CLIENT_CERT_BASE64=$(get-env-val "${master_env}" "ETCD_APISERVER_CLIENT_CERT")
+  KONNECTIVITY_SERVER_CA_KEY_BASE64=$(get-env-val "${master_env}" "KONNECTIVITY_SERVER_CA_KEY")
+  KONNECTIVITY_SERVER_CA_CERT_BASE64=$(get-env-val "${master_env}" "KONNECTIVITY_SERVER_CA_CERT")
+  KONNECTIVITY_SERVER_CERT_BASE64=$(get-env-val "${master_env}" "KONNECTIVITY_SERVER_CERT")
+  KONNECTIVITY_SERVER_KEY_BASE64=$(get-env-val "${master_env}" "KONNECTIVITY_SERVER_KEY")
+  KONNECTIVITY_SERVER_CLIENT_CERT_BASE64=$(get-env-val "${master_env}" "KONNECTIVITY_SERVER_CLIENT_CERT")
+  KONNECTIVITY_SERVER_CLIENT_KEY_BASE64=$(get-env-val "${master_env}" "KONNECTIVITY_SERVER_CLIENT_KEY")
+  KONNECTIVITY_AGENT_CA_KEY_BASE64=$(get-env-val "${master_env}" "KONNECTIVITY_AGENT_CA_KEY")
+  KONNECTIVITY_AGENT_CA_CERT_BASE64=$(get-env-val "${master_env}" "KONNECTIVITY_AGENT_CA_CERT")
+  KONNECTIVITY_AGENT_CERT_BASE64=$(get-env-val "${master_env}" "KONNECTIVITY_AGENT_CERT")
+  KONNECTIVITY_AGENT_KEY_BASE64=$(get-env-val "${master_env}" "KONNECTIVITY_AGENT_KEY")
 }
 
 # Update or verify required gcloud components are installed
@@ -1899,7 +1978,7 @@ function update-or-verify-gcloud() {
   else
     local version
     version=$(gcloud version --format=json)
-    python -c"
+    python3 -c"
 import json,sys
 from distutils import version
 
@@ -3363,7 +3442,7 @@ function check-cluster() {
   get-kubeconfig-basicauth
 
   if [[ ${GCE_UPLOAD_KUBCONFIG_TO_MASTER_METADATA:-} == "true" ]]; then
-    gcloud compute instances add-metadata "${MASTER_NAME}" --zone="${ZONE}"  --metadata-from-file="kubeconfig=${KUBECONFIG}" || true
+    gcloud compute instances add-metadata "${MASTER_NAME}" --project="${PROJECT}" --zone="${ZONE}"  --metadata-from-file="kubeconfig=${KUBECONFIG}" || true
   fi
 
   echo

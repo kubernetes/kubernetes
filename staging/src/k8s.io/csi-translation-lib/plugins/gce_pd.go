@@ -77,7 +77,7 @@ func generateToplogySelectors(key string, values []string) []v1.TopologySelector
 	}
 }
 
-// TranslateInTreeStorageClassParametersToCSI translates InTree GCE storage class parameters to CSI storage class
+// TranslateInTreeStorageClassToCSI translates InTree GCE storage class parameters to CSI storage class
 func (g *gcePersistentDiskCSITranslator) TranslateInTreeStorageClassToCSI(sc *storage.StorageClass) (*storage.StorageClass, error) {
 	var generatedTopologies []v1.TopologySelectorTerm
 
@@ -162,7 +162,7 @@ func backwardCompatibleAccessModes(ams []v1.PersistentVolumeAccessMode) []v1.Per
 
 // TranslateInTreeInlineVolumeToCSI takes a Volume with GCEPersistentDisk set from in-tree
 // and converts the GCEPersistentDisk source to a CSIPersistentVolumeSource
-func (g *gcePersistentDiskCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Volume) (*v1.PersistentVolume, error) {
+func (g *gcePersistentDiskCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Volume, podNamespace string) (*v1.PersistentVolume, error) {
 	if volume == nil || volume.GCEPersistentDisk == nil {
 		return nil, fmt.Errorf("volume is nil or GCE PD not defined on volume")
 	}
@@ -231,7 +231,7 @@ func (g *gcePersistentDiskCSITranslator) TranslateInTreePVToCSI(pv *v1.Persisten
 		if err != nil {
 			return nil, fmt.Errorf("failed to get region from zones: %v", err)
 		}
-		volID = fmt.Sprintf(volIDZonalFmt, UnspecifiedValue, region, pv.Spec.GCEPersistentDisk.PDName)
+		volID = fmt.Sprintf(volIDRegionalFmt, UnspecifiedValue, region, pv.Spec.GCEPersistentDisk.PDName)
 	} else {
 		// Unspecified
 		volID = fmt.Sprintf(volIDZonalFmt, UnspecifiedValue, UnspecifiedValue, pv.Spec.GCEPersistentDisk.PDName)

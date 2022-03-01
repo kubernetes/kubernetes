@@ -16,18 +16,16 @@
 package machine
 
 import (
-	"bytes"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
-	"path/filepath"
 	"regexp"
-	"strconv"
-	"strings"
 
 	// s390/s390x changes
 	"runtime"
+	"strconv"
+	"strings"
 
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/utils"
@@ -46,6 +44,7 @@ var (
 	cpuClockSpeedMHz     = regexp.MustCompile(`(?:cpu MHz|CPU MHz|clock)\s*:\s*([0-9]+\.[0-9]+)(?:MHz)?`)
 	memoryCapacityRegexp = regexp.MustCompile(`MemTotal:\s*([0-9]+) kB`)
 	swapCapacityRegexp   = regexp.MustCompile(`SwapTotal:\s*([0-9]+) kB`)
+	vendorIDRegexp       = regexp.MustCompile(`vendor_id\s*:\s*(\w+)`)
 
 	cpuBusPath         = "/sys/bus/cpu/devices/"
 	isMemoryController = regexp.MustCompile("mc[0-9]+")
@@ -54,11 +53,23 @@ var (
 	maxFreqFile        = "/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq"
 )
 
-const sysFsCPUCoreID = "core_id"
-const sysFsCPUPhysicalPackageID = "physical_package_id"
-const sysFsCPUTopology = "topology"
 const memTypeFileName = "dimm_mem_type"
 const sizeFileName = "size"
+
+// GetCPUVendorID returns "vendor_id" reading /proc/cpuinfo file.
+func GetCPUVendorID(procInfo []byte) string {
+	vendorID := ""
+
+	matches := vendorIDRegexp.FindSubmatch(procInfo)
+	if len(matches) != 2 {
+		klog.Warning("Cannot read vendor id correctly, set empty.")
+		return vendorID
+	}
+
+	vendorID = string(matches[1])
+
+	return vendorID
+}
 
 // GetPhysicalCores returns number of CPU cores reading /proc/cpuinfo file or if needed information from sysfs cpu path
 func GetPhysicalCores(procInfo []byte) int {
@@ -66,7 +77,7 @@ func GetPhysicalCores(procInfo []byte) int {
 	if numCores == 0 {
 		// read number of cores from /sys/bus/cpu/devices/cpu*/topology/core_id to deal with processors
 		// for which 'core id' is not available in /proc/cpuinfo
-		numCores = getUniqueCPUPropertyCount(cpuBusPath, sysFsCPUCoreID)
+		numCores = sysfs.GetUniqueCPUPropertyCount(cpuBusPath, sysfs.CPUCoreID)
 	}
 	if numCores == 0 {
 		klog.Errorf("Cannot read number of physical cores correctly, number of cores set to %d", numCores)
@@ -80,7 +91,7 @@ func GetSockets(procInfo []byte) int {
 	if numSocket == 0 {
 		// read number of sockets from /sys/bus/cpu/devices/cpu*/topology/physical_package_id to deal with processors
 		// for which 'physical id' is not available in /proc/cpuinfo
-		numSocket = getUniqueCPUPropertyCount(cpuBusPath, sysFsCPUPhysicalPackageID)
+		numSocket = sysfs.GetUniqueCPUPropertyCount(cpuBusPath, sysfs.CPUPhysicalPackageID)
 	}
 	if numSocket == 0 {
 		klog.Errorf("Cannot read number of sockets correctly, number of sockets set to %d", numSocket)
@@ -234,39 +245,6 @@ func parseCapacity(b []byte, r *regexp.Regexp) (uint64, error) {
 
 	// Convert to bytes.
 	return m * 1024, err
-}
-
-// Looks for sysfs cpu path containing given CPU property, e.g. core_id or physical_package_id
-// and returns number of unique values of given property, exemplary usage: getting number of CPU physical cores
-func getUniqueCPUPropertyCount(cpuBusPath string, propertyName string) int {
-	pathPattern := cpuBusPath + "cpu*[0-9]"
-	sysCPUPaths, err := filepath.Glob(pathPattern)
-	if err != nil {
-		klog.Errorf("Cannot find files matching pattern (pathPattern: %s),  number of unique %s set to 0", pathPattern, propertyName)
-		return 0
-	}
-	uniques := make(map[string]bool)
-	for _, sysCPUPath := range sysCPUPaths {
-		onlinePath := filepath.Join(sysCPUPath, "online")
-		onlineVal, err := ioutil.ReadFile(onlinePath)
-		if err != nil {
-			klog.Warningf("Cannot determine CPU %s online state, skipping", sysCPUPath)
-			continue
-		}
-		onlineVal = bytes.TrimSpace(onlineVal)
-		if len(onlineVal) == 0 || onlineVal[0] != 49 {
-			klog.Warningf("CPU %s is offline, skipping", sysCPUPath)
-			continue
-		}
-		propertyPath := filepath.Join(sysCPUPath, sysFsCPUTopology, propertyName)
-		propertyVal, err := ioutil.ReadFile(propertyPath)
-		if err != nil {
-			klog.Errorf("Cannot open %s, number of unique %s  set to 0", propertyPath, propertyName)
-			return 0
-		}
-		uniques[string(propertyVal)] = true
-	}
-	return len(uniques)
 }
 
 // getUniqueMatchesCount returns number of unique matches in given argument using provided regular expression

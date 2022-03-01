@@ -29,12 +29,13 @@ package v1beta1
 // AUTO-GENERATED FUNCTIONS START HERE. DO NOT EDIT.
 var map_Endpoint = map[string]string{
 	"":           "Endpoint represents a single logical \"backend\" implementing a service.",
-	"addresses":  "addresses of this endpoint. The contents of this field are interpreted according to the corresponding EndpointSlice addressType field. Consumers must handle different types of addresses in the context of their own capabilities. This must contain at least one address but no more than 100.",
+	"addresses":  "addresses of this endpoint. The contents of this field are interpreted according to the corresponding EndpointSlice addressType field. Consumers must handle different types of addresses in the context of their own capabilities. This must contain at least one address but no more than 100. These are all assumed to be fungible and clients may choose to only use the first element. Refer to: https://issue.k8s.io/106267",
 	"conditions": "conditions contains information about the current status of the endpoint.",
 	"hostname":   "hostname of this endpoint. This field may be used by consumers of endpoints to distinguish endpoints from each other (e.g. in DNS names). Multiple endpoints which use the same hostname should be considered fungible (e.g. multiple A values in DNS). Must be lowercase and pass DNS Label (RFC 1123) validation.",
 	"targetRef":  "targetRef is a reference to a Kubernetes object that represents this endpoint.",
 	"topology":   "topology contains arbitrary topology information associated with the endpoint. These key/value pairs must conform with the label format. https://kubernetes.io/docs/concepts/overview/working-with-objects/labels Topology may include a maximum of 16 key/value pairs. This includes, but is not limited to the following well known keys: * kubernetes.io/hostname: the value indicates the hostname of the node\n  where the endpoint is located. This should match the corresponding\n  node label.\n* topology.kubernetes.io/zone: the value indicates the zone where the\n  endpoint is located. This should match the corresponding node label.\n* topology.kubernetes.io/region: the value indicates the region where the\n  endpoint is located. This should match the corresponding node label.\nThis field is deprecated and will be removed in future api versions.",
 	"nodeName":   "nodeName represents the name of the Node hosting this endpoint. This can be used to determine endpoints local to a Node. This field can be enabled with the EndpointSliceNodeName feature gate.",
+	"hints":      "hints contains information associated with how an endpoint should be consumed.",
 }
 
 func (Endpoint) SwaggerDoc() map[string]string {
@@ -52,12 +53,21 @@ func (EndpointConditions) SwaggerDoc() map[string]string {
 	return map_EndpointConditions
 }
 
+var map_EndpointHints = map[string]string{
+	"":         "EndpointHints provides hints describing how an endpoint should be consumed.",
+	"forZones": "forZones indicates the zone(s) this endpoint should be consumed by to enable topology aware routing. May contain a maximum of 8 entries.",
+}
+
+func (EndpointHints) SwaggerDoc() map[string]string {
+	return map_EndpointHints
+}
+
 var map_EndpointPort = map[string]string{
 	"":            "EndpointPort represents a Port used by an EndpointSlice",
 	"name":        "The name of this port. All ports in an EndpointSlice must have a unique name. If the EndpointSlice is dervied from a Kubernetes service, this corresponds to the Service.ports[].name. Name must either be an empty string or pass DNS_LABEL validation: * must be no more than 63 characters long. * must consist of lower case alphanumeric characters or '-'. * must start and end with an alphanumeric character. Default is empty string.",
 	"protocol":    "The IP protocol for this port. Must be UDP, TCP, or SCTP. Default is TCP.",
 	"port":        "The port number of the endpoint. If this is not specified, ports are not restricted and must be interpreted in the context of the specific consumer.",
-	"appProtocol": "The application protocol for this port. This field follows standard Kubernetes label syntax. Un-prefixed names are reserved for IANA standard service names (as per RFC-6335 and http://www.iana.org/assignments/service-names). Non-standard protocols should use prefixed names such as mycompany.com/my-custom-protocol.",
+	"appProtocol": "The application protocol for this port. This field follows standard Kubernetes label syntax. Un-prefixed names are reserved for IANA standard service names (as per RFC-6335 and https://www.iana.org/assignments/service-names). Non-standard protocols should use prefixed names such as mycompany.com/my-custom-protocol.",
 }
 
 func (EndpointPort) SwaggerDoc() map[string]string {
@@ -84,6 +94,15 @@ var map_EndpointSliceList = map[string]string{
 
 func (EndpointSliceList) SwaggerDoc() map[string]string {
 	return map_EndpointSliceList
+}
+
+var map_ForZone = map[string]string{
+	"":     "ForZone provides information about which zones should consume this endpoint.",
+	"name": "name represents the name of the zone.",
+}
+
+func (ForZone) SwaggerDoc() map[string]string {
+	return map_ForZone
 }
 
 // AUTO-GENERATED FUNCTIONS END HERE

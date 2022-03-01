@@ -51,7 +51,7 @@ type SetImageOptions struct {
 	All            bool
 	Output         string
 	Local          bool
-	ResolveImage   ImageResolver
+	ResolveImage   ImageResolverFunc
 	fieldManager   string
 
 	PrintObj printers.ResourcePrinterFunc
@@ -64,9 +64,17 @@ type SetImageOptions struct {
 	genericclioptions.IOStreams
 }
 
+// ImageResolver is a func that receives an image name, and
+// resolves it to an appropriate / compatible image name.
+// Adds flexibility for future image resolving methods.
+type ImageResolverFunc func(in string) (string, error)
+
+// ImageResolver to use.
+var ImageResolver = resolveImageFunc
+
 var (
 	imageResources = i18n.T(`
-  	pod (po), replicationcontroller (rc), deployment (deploy), daemonset (ds), replicaset (rs)`)
+  	pod (po), replicationcontroller (rc), deployment (deploy), daemonset (ds), statefulset (sts), cronjob (cj), replicaset (rs)`)
 
 	imageLong = templates.LongDesc(i18n.T(`
 		Update existing container image(s) of resources.
@@ -75,7 +83,7 @@ var (
 		`) + imageResources)
 
 	imageExample = templates.Examples(`
-		# Set a deployment's nginx container image to 'nginx:1.9.1', and its busybox container image to 'busybox'.
+		# Set a deployment's nginx container image to 'nginx:1.9.1', and its busybox container image to 'busybox'
 		kubectl set image deployment/nginx busybox=busybox nginx=nginx:1.9.1
 
 		# Update all deployments' and rc's nginx container's image to 'nginx:1.9.1'
@@ -107,7 +115,7 @@ func NewCmdImage(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 	cmd := &cobra.Command{
 		Use:                   "image (-f FILENAME | TYPE NAME) CONTAINER_NAME_1=CONTAINER_IMAGE_1 ... CONTAINER_NAME_N=CONTAINER_IMAGE_N",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Update image of a pod template"),
+		Short:                 i18n.T("Update the image of a pod template"),
 		Long:                  imageLong,
 		Example:               imageExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -122,11 +130,12 @@ func NewCmdImage(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 
 	usage := "identifying the resource to get from a server."
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
-	cmd.Flags().BoolVar(&o.All, "all", o.All, "Select all resources, including uninitialized ones, in the namespace of the specified resource types")
-	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on, not including uninitialized ones, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
+	cmd.Flags().BoolVar(&o.All, "all", o.All, "Select all resources, in the namespace of the specified resource types")
 	cmd.Flags().BoolVar(&o.Local, "local", o.Local, "If true, set image will NOT contact api-server but run locally.")
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.fieldManager, "kubectl-set")
+	cmdutil.AddLabelSelectorFlagVar(cmd, &o.Selector)
+
 	return cmd
 }
 
@@ -149,13 +158,9 @@ func (o *SetImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	if err != nil {
 		return err
 	}
-	discoveryClient, err := f.ToDiscoveryClient()
-	if err != nil {
-		return err
-	}
-	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
+	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, f.OpenAPIGetter())
 	o.Output = cmdutil.GetFlagString(cmd, "output")
-	o.ResolveImage = resolveImageFunc
+	o.ResolveImage = ImageResolver
 
 	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
 	printer, err := o.PrintFlags.ToPrinter()
@@ -329,11 +334,6 @@ func hasWildcardKey(containerImages map[string]string) bool {
 	_, ok := containerImages["*"]
 	return ok
 }
-
-// ImageResolver is a func that receives an image name, and
-// resolves it to an appropriate / compatible image name.
-// Adds flexibility for future image resolving methods.
-type ImageResolver func(in string) (string, error)
 
 // implements ImageResolver
 func resolveImageFunc(in string) (string, error) {

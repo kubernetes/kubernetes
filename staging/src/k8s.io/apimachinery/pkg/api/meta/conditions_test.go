@@ -121,6 +121,12 @@ func TestRemoveStatusCondition(t *testing.T) {
 				{Type: "third"},
 			},
 		},
+		{
+			name:          "empty_conditions",
+			conditions:    []metav1.Condition{},
+			conditionType: "Foo",
+			expected:      []metav1.Condition{},
+		},
 	}
 
 	for _, test := range tests {

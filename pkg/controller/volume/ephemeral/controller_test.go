@@ -18,21 +18,26 @@ package ephemeral
 
 import (
 	"context"
+	"errors"
 	"sort"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	// storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	// "k8s.io/apimachinery/pkg/types"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	kcache "k8s.io/client-go/tools/cache"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
+	ephemeralvolumemetrics "k8s.io/kubernetes/pkg/controller/volume/ephemeral/metrics"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -57,18 +62,20 @@ func init() {
 
 func TestSyncHandler(t *testing.T) {
 	tests := []struct {
-		name          string
-		podKey        string
-		pvcs          []*v1.PersistentVolumeClaim
-		pods          []*v1.Pod
-		expectedPVCs  []v1.PersistentVolumeClaim
-		expectedError bool
+		name            string
+		podKey          string
+		pvcs            []*v1.PersistentVolumeClaim
+		pods            []*v1.Pod
+		expectedPVCs    []v1.PersistentVolumeClaim
+		expectedError   bool
+		expectedMetrics expectedMetrics
 	}{
 		{
-			name:         "create",
-			pods:         []*v1.Pod{testPodWithEphemeral},
-			podKey:       podKey(testPodWithEphemeral),
-			expectedPVCs: []v1.PersistentVolumeClaim{*testPodEphemeralClaim},
+			name:            "create",
+			pods:            []*v1.Pod{testPodWithEphemeral},
+			podKey:          podKey(testPodWithEphemeral),
+			expectedPVCs:    []v1.PersistentVolumeClaim{*testPodEphemeralClaim},
+			expectedMetrics: expectedMetrics{1, 0},
 		},
 		{
 			name:   "no-such-pod",
@@ -90,11 +97,12 @@ func TestSyncHandler(t *testing.T) {
 			podKey: podKey(testPod),
 		},
 		{
-			name:         "create-with-other-PVC",
-			pods:         []*v1.Pod{testPodWithEphemeral},
-			podKey:       podKey(testPodWithEphemeral),
-			pvcs:         []*v1.PersistentVolumeClaim{otherNamespaceClaim},
-			expectedPVCs: []v1.PersistentVolumeClaim{*otherNamespaceClaim, *testPodEphemeralClaim},
+			name:            "create-with-other-PVC",
+			pods:            []*v1.Pod{testPodWithEphemeral},
+			podKey:          podKey(testPodWithEphemeral),
+			pvcs:            []*v1.PersistentVolumeClaim{otherNamespaceClaim},
+			expectedPVCs:    []v1.PersistentVolumeClaim{*otherNamespaceClaim, *testPodEphemeralClaim},
+			expectedMetrics: expectedMetrics{1, 0},
 		},
 		{
 			name:          "wrong-PVC-owner",
@@ -104,10 +112,17 @@ func TestSyncHandler(t *testing.T) {
 			expectedPVCs:  []v1.PersistentVolumeClaim{*conflictingClaim},
 			expectedError: true,
 		},
+		{
+			name:            "create-conflict",
+			pods:            []*v1.Pod{testPodWithEphemeral},
+			podKey:          podKey(testPodWithEphemeral),
+			expectedMetrics: expectedMetrics{1, 1},
+			expectedError:   true,
+		},
 	}
 
 	for _, tc := range tests {
-		// Run sequentially because of global logging.
+		// Run sequentially because of global logging and global metrics.
 		t.Run(tc.name, func(t *testing.T) {
 			// There is no good way to shut down the informers. They spawn
 			// various goroutines and some of them (in particular shared informer)
@@ -124,6 +139,12 @@ func TestSyncHandler(t *testing.T) {
 			}
 
 			fakeKubeClient := createTestClient(objects...)
+			if tc.expectedMetrics.numFailures > 0 {
+				fakeKubeClient.PrependReactor("create", "persistentvolumeclaims", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+					return true, nil, apierrors.NewConflict(action.GetResource().GroupResource(), "fake name", errors.New("fake conflict"))
+				})
+			}
+			setupMetrics()
 			informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 			podInformer := informerFactory.Core().V1().Pods()
 			pvcInformer := informerFactory.Core().V1().PersistentVolumeClaims()
@@ -139,7 +160,7 @@ func TestSyncHandler(t *testing.T) {
 			informerFactory.WaitForCacheSync(ctx.Done())
 			cache.WaitForCacheSync(ctx.Done(), podInformer.Informer().HasSynced, pvcInformer.Informer().HasSynced)
 
-			err = ec.syncHandler(tc.podKey)
+			err = ec.syncHandler(context.TODO(), tc.podKey)
 			if err != nil && !tc.expectedError {
 				t.Fatalf("unexpected error while running handler: %v", err)
 			}
@@ -152,6 +173,7 @@ func TestSyncHandler(t *testing.T) {
 				t.Fatalf("unexpected error while listing PVCs: %v", err)
 			}
 			assert.Equal(t, sortPVCs(tc.expectedPVCs), sortPVCs(pvcs.Items))
+			expectMetrics(t, tc.expectedMetrics)
 		})
 	}
 }
@@ -218,4 +240,38 @@ func sortPVCs(pvcs []v1.PersistentVolumeClaim) []v1.PersistentVolumeClaim {
 func createTestClient(objects ...runtime.Object) *fake.Clientset {
 	fakeClient := fake.NewSimpleClientset(objects...)
 	return fakeClient
+}
+
+// Metrics helpers
+
+type expectedMetrics struct {
+	numCreated  int
+	numFailures int
+}
+
+func expectMetrics(t *testing.T, em expectedMetrics) {
+	t.Helper()
+
+	actualCreated, err := testutil.GetCounterMetricValue(ephemeralvolumemetrics.EphemeralVolumeCreateAttempts)
+	handleErr(t, err, "ephemeralVolumeCreate")
+	if actualCreated != float64(em.numCreated) {
+		t.Errorf("Expected PVCs to be created %d, got %v", em.numCreated, actualCreated)
+	}
+	actualConflicts, err := testutil.GetCounterMetricValue(ephemeralvolumemetrics.EphemeralVolumeCreateFailures)
+	handleErr(t, err, "ephemeralVolumeCreate/Conflict")
+	if actualConflicts != float64(em.numFailures) {
+		t.Errorf("Expected PVCs to have conflicts %d, got %v", em.numFailures, actualConflicts)
+	}
+}
+
+func handleErr(t *testing.T, err error, metricName string) {
+	if err != nil {
+		t.Errorf("Failed to get %s value, err: %v", metricName, err)
+	}
+}
+
+func setupMetrics() {
+	ephemeralvolumemetrics.RegisterMetrics()
+	ephemeralvolumemetrics.EphemeralVolumeCreateAttempts.Reset()
+	ephemeralvolumemetrics.EphemeralVolumeCreateFailures.Reset()
 }

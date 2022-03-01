@@ -20,39 +20,65 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"math"
+	"os"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	cacheddiscovery "k8s.io/client-go/discovery/cached"
+	"k8s.io/client-go/dynamic"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/restmapper"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/test/integration/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 	"sigs.k8s.io/yaml"
 )
 
 const (
-	configFile        = "config/performance-config.yaml"
-	createNodesOpcode = "createNodes"
-	createPodsOpcode  = "createPods"
-	barrierOpcode     = "barrier"
+	configFile               = "config/performance-config.yaml"
+	createNodesOpcode        = "createNodes"
+	createNamespacesOpcode   = "createNamespaces"
+	createPodsOpcode         = "createPods"
+	createPodSetsOpcode      = "createPodSets"
+	churnOpcode              = "churn"
+	barrierOpcode            = "barrier"
+	extensionPointsLabelName = "extension_point"
+
+	// Two modes supported in "churn" operator.
+
+	// Recreate creates a number of API objects and then delete them, and repeat the iteration.
+	Recreate = "recreate"
+	// Create continuously create API objects without deleting them.
+	Create = "create"
 )
 
 var (
 	defaultMetricsCollectorConfig = metricsCollectorConfig{
-		Metrics: []string{
-			"scheduler_scheduling_algorithm_predicate_evaluation_seconds",
-			"scheduler_scheduling_algorithm_priority_evaluation_seconds",
-			"scheduler_e2e_scheduling_duration_seconds",
-			"scheduler_pod_scheduling_duration_seconds",
+		Metrics: map[string]*labelValues{
+			"scheduler_framework_extension_point_duration_seconds": {
+				label:  extensionPointsLabelName,
+				values: []string{"Filter", "Score"},
+			},
+			"scheduler_e2e_scheduling_duration_seconds": nil,
+			"scheduler_pod_scheduling_duration_seconds": nil,
 		},
 	}
 )
@@ -74,6 +100,8 @@ type testCase struct {
 	WorkloadTemplate []op
 	// List of workloads to run under this testCase.
 	Workloads []*workload
+	// SchedulerConfigFile is the path of scheduler configuration
+	SchedulerConfigFile string
 	// TODO(#93792): reduce config toil by having a default pod and node spec per
 	// testCase? CreatePods and CreateNodes ops will inherit these unless
 	// manually overridden.
@@ -88,14 +116,81 @@ func (tc *testCase) collectsMetrics() bool {
 	return false
 }
 
+func (tc *testCase) workloadNamesUnique() error {
+	workloadUniqueNames := map[string]bool{}
+	for _, w := range tc.Workloads {
+		if workloadUniqueNames[w.Name] {
+			return fmt.Errorf("%s: workload name %s is not unique", tc.Name, w.Name)
+		}
+		workloadUniqueNames[w.Name] = true
+	}
+	return nil
+}
+
 // workload is a subtest under a testCase that tests the scheduler performance
 // for a certain ordering of ops. The set of nodes created and pods scheduled
-// in a workload may be heterogenous.
+// in a workload may be heterogeneous.
 type workload struct {
 	// Name of the workload.
 	Name string
 	// Values of parameters used in the workloadTemplate.
-	Params map[string]int
+	Params params
+}
+
+type params struct {
+	params map[string]int
+	// isUsed field records whether params is used or not.
+	isUsed map[string]bool
+}
+
+// UnmarshalJSON is a custom unmarshaler for params.
+//
+// from(json):
+// 	{
+// 		"initNodes": 500,
+// 		"initPods": 50
+// 	}
+//
+// to:
+//	params{
+//		params: map[string]int{
+//			"intNodes": 500,
+//			"initPods": 50,
+//		},
+//		isUsed: map[string]bool{}, // empty map
+//	}
+//
+func (p *params) UnmarshalJSON(b []byte) error {
+	aux := map[string]int{}
+
+	if err := json.Unmarshal(b, &aux); err != nil {
+		return err
+	}
+
+	p.params = aux
+	p.isUsed = map[string]bool{}
+	return nil
+}
+
+// get returns param.
+func (p params) get(key string) (int, error) {
+	p.isUsed[key] = true
+	param, ok := p.params[key]
+	if ok {
+		return param, nil
+	}
+	return 0, fmt.Errorf("parameter %s is undefined", key)
+}
+
+// unusedParams returns the names of unusedParams
+func (w workload) unusedParams() []string {
+	var ret []string
+	for name := range w.Params.params {
+		if !w.Params.isUsed[name] {
+			ret = append(ret, name)
+		}
+	}
+	return ret
 }
 
 // op is a dummy struct which stores the real op in itself.
@@ -108,7 +203,10 @@ type op struct {
 func (op *op) UnmarshalJSON(b []byte) error {
 	possibleOps := []realOp{
 		&createNodesOp{},
+		&createNamespacesOp{},
 		&createPodsOp{},
+		&createPodSetsOp{},
+		&churnOp{},
 		&barrierOp{},
 		// TODO(#93793): add a sleep timer op to simulate waiting?
 		// TODO(#94601): add a delete nodes op to simulate scaling behaviour?
@@ -169,7 +267,7 @@ type createNodesOp struct {
 
 func (cno *createNodesOp) isValid(allowParameterization bool) error {
 	if cno.Opcode != createNodesOpcode {
-		return fmt.Errorf("invalid opcode")
+		return fmt.Errorf("invalid opcode %q", cno.Opcode)
 	}
 	ok := cno.Count > 0 ||
 		(cno.CountParam != "" && allowParameterization && isValidParameterizable(cno.CountParam))
@@ -185,12 +283,55 @@ func (*createNodesOp) collectsMetrics() bool {
 
 func (cno createNodesOp) patchParams(w *workload) (realOp, error) {
 	if cno.CountParam != "" {
-		var ok bool
-		if cno.Count, ok = w.Params[cno.CountParam[1:]]; !ok {
-			return nil, fmt.Errorf("parameter %s is undefined", cno.CountParam)
+		var err error
+		cno.Count, err = w.Params.get(cno.CountParam[1:])
+		if err != nil {
+			return nil, err
 		}
 	}
 	return &cno, (&cno).isValid(false)
+}
+
+// createNamespacesOp defines an op for creating namespaces
+type createNamespacesOp struct {
+	// Must be "createNamespaces".
+	Opcode string
+	// Name prefix of the Namespace. The format is "<prefix>-<number>", where number is
+	// between 0 and count-1.
+	Prefix string
+	// Number of namespaces to create. Parameterizable through CountParam.
+	Count int
+	// Template parameter for Count. Takes precedence over Count if both set.
+	CountParam string
+	// Path to spec file describing the Namespaces to create. Optional.
+	NamespaceTemplatePath *string
+}
+
+func (cmo *createNamespacesOp) isValid(allowParameterization bool) error {
+	if cmo.Opcode != createNamespacesOpcode {
+		return fmt.Errorf("invalid opcode %q", cmo.Opcode)
+	}
+	ok := cmo.Count > 0 ||
+		(cmo.CountParam != "" && allowParameterization && isValidParameterizable(cmo.CountParam))
+	if !ok {
+		return fmt.Errorf("invalid Count=%d / CountParam=%q", cmo.Count, cmo.CountParam)
+	}
+	return nil
+}
+
+func (*createNamespacesOp) collectsMetrics() bool {
+	return false
+}
+
+func (cmo createNamespacesOp) patchParams(w *workload) (realOp, error) {
+	if cmo.CountParam != "" {
+		var err error
+		cmo.Count, err = w.Params.get(cmo.CountParam[1:])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return &cmo, (&cmo).isValid(false)
 }
 
 // createPodsOp defines an op where pods are scheduled as a part of a workload.
@@ -222,7 +363,7 @@ type createPodsOp struct {
 
 func (cpo *createPodsOp) isValid(allowParameterization bool) error {
 	if cpo.Opcode != createPodsOpcode {
-		return fmt.Errorf("invalid opcode")
+		return fmt.Errorf("invalid opcode %q; expected %q", cpo.Opcode, createPodsOpcode)
 	}
 	ok := cpo.Count > 0 ||
 		(cpo.CountParam != "" && allowParameterization && isValidParameterizable(cpo.CountParam))
@@ -244,12 +385,104 @@ func (cpo *createPodsOp) collectsMetrics() bool {
 
 func (cpo createPodsOp) patchParams(w *workload) (realOp, error) {
 	if cpo.CountParam != "" {
-		var ok bool
-		if cpo.Count, ok = w.Params[cpo.CountParam[1:]]; !ok {
-			return nil, fmt.Errorf("parameter %s is undefined", cpo.CountParam)
+		var err error
+		cpo.Count, err = w.Params.get(cpo.CountParam[1:])
+		if err != nil {
+			return nil, err
 		}
 	}
 	return &cpo, (&cpo).isValid(false)
+}
+
+// createPodSetsOp defines an op where a set of createPodsOp is created each in a unique namespace.
+type createPodSetsOp struct {
+	// Must be "createPodSets".
+	Opcode string
+	// Number of sets to create.
+	Count int
+	// Template parameter for Count.
+	CountParam string
+	// Each set of pods will be created in a namespace of the form namespacePrefix-<number>,
+	// where number is from 0 to count-1
+	NamespacePrefix string
+	// The template of a createPodsOp.
+	CreatePodsOp createPodsOp
+}
+
+func (cpso *createPodSetsOp) isValid(allowParameterization bool) error {
+	if cpso.Opcode != createPodSetsOpcode {
+		return fmt.Errorf("invalid opcode %q; expected %q", cpso.Opcode, createPodSetsOpcode)
+	}
+	ok := cpso.Count > 0 ||
+		(cpso.CountParam != "" && allowParameterization && isValidParameterizable(cpso.CountParam))
+	if !ok {
+		return fmt.Errorf("invalid Count=%d / CountParam=%q", cpso.Count, cpso.CountParam)
+	}
+	return cpso.CreatePodsOp.isValid(allowParameterization)
+}
+
+func (cpso *createPodSetsOp) collectsMetrics() bool {
+	return cpso.CreatePodsOp.CollectMetrics
+}
+
+func (cpso createPodSetsOp) patchParams(w *workload) (realOp, error) {
+	if cpso.CountParam != "" {
+		var err error
+		cpso.Count, err = w.Params.get(cpso.CountParam[1:])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return &cpso, (&cpso).isValid(true)
+}
+
+// churnOp defines an op where services are created as a part of a workload.
+type churnOp struct {
+	// Must be "churnOp".
+	Opcode string
+	// Value must be one of the followings:
+	// - recreate. In this mode, API objects will be created for N cycles, and then
+	//   deleted in the next N cycles. N is specified by the "Number" field.
+	// - create. In this mode, API objects will be created (without deletion) until
+	//   reaching a threshold - which is specified by the "Number" field.
+	Mode string
+	// Maximum number of API objects to be created.
+	// Defaults to 0, which means unlimited.
+	Number int
+	// Intervals of churning. Defaults to 500 millisecond.
+	IntervalMilliseconds int64
+	// Namespace the churning objects should be created in. Optional, defaults to a unique
+	// namespace of the format "namespace-<number>".
+	Namespace *string
+	// Path of API spec files.
+	TemplatePaths []string
+}
+
+func (co *churnOp) isValid(_ bool) error {
+	if co.Opcode != churnOpcode {
+		return fmt.Errorf("invalid opcode %q", co.Opcode)
+	}
+	if co.Mode != Recreate && co.Mode != Create {
+		return fmt.Errorf("invalid mode: %v. must be one of %v", co.Mode, []string{Recreate, Create})
+	}
+	if co.Number < 0 {
+		return fmt.Errorf("number (%v) cannot be negative", co.Number)
+	}
+	if co.Mode == Recreate && co.Number == 0 {
+		return fmt.Errorf("number cannot be 0 when mode is %v", Recreate)
+	}
+	if len(co.TemplatePaths) == 0 {
+		return fmt.Errorf("at least one template spec file needs to be specified")
+	}
+	return nil
+}
+
+func (*churnOp) collectsMetrics() bool {
+	return false
+}
+
+func (co churnOp) patchParams(w *workload) (realOp, error) {
+	return &co, nil
 }
 
 // barrierOp defines an op that can be used to wait until all scheduled pods of
@@ -265,7 +498,7 @@ type barrierOp struct {
 
 func (bo *barrierOp) isValid(allowParameterization bool) error {
 	if bo.Opcode != barrierOpcode {
-		return fmt.Errorf("invalid opcode")
+		return fmt.Errorf("invalid opcode %q", bo.Opcode)
 	}
 	return nil
 }
@@ -296,20 +529,73 @@ func BenchmarkPerfScheduling(b *testing.B) {
 						defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, feature, flag)()
 					}
 					dataItems.DataItems = append(dataItems.DataItems, runWorkload(b, tc, w)...)
+					// Reset metrics to prevent metrics generated in current workload gets
+					// carried over to the next workload.
+					legacyregistry.Reset()
 				})
 			}
 		})
 	}
 	if err := dataItems2JSONFile(dataItems, b.Name()); err != nil {
-		klog.Fatalf("%v: unable to write measured data: %v", b.Name(), err)
+		klog.Fatalf("%v: unable to write measured data %+v: %v", b.Name(), dataItems, err)
 	}
+}
+
+func loadSchedulerConfig(file string) (*config.KubeSchedulerConfiguration, error) {
+	data, err := os.ReadFile(file)
+	if err != nil {
+		return nil, err
+	}
+	// The UniversalDecoder runs defaulting and returns the internal type by default.
+	obj, gvk, err := scheme.Codecs.UniversalDecoder().Decode(data, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	if cfgObj, ok := obj.(*config.KubeSchedulerConfiguration); ok {
+		return cfgObj, nil
+	}
+	return nil, fmt.Errorf("couldn't decode as KubeSchedulerConfiguration, got %s: ", gvk)
+}
+
+func unrollWorkloadTemplate(b *testing.B, wt []op, w *workload) []op {
+	var unrolled []op
+	for opIndex, o := range wt {
+		realOp, err := o.realOp.patchParams(w)
+		if err != nil {
+			b.Fatalf("op %d: %v", opIndex, err)
+		}
+		switch concreteOp := realOp.(type) {
+		case *createPodSetsOp:
+			klog.Infof("Creating %d pod sets %s", concreteOp.Count, concreteOp.CountParam)
+			for i := 0; i < concreteOp.Count; i++ {
+				copy := concreteOp.CreatePodsOp
+				ns := fmt.Sprintf("%s-%d", concreteOp.NamespacePrefix, i)
+				copy.Namespace = &ns
+				unrolled = append(unrolled, op{realOp: &copy})
+			}
+		default:
+			unrolled = append(unrolled, o)
+		}
+	}
+	return unrolled
 }
 
 func runWorkload(b *testing.B, tc *testCase, w *workload) []DataItem {
 	// 30 minutes should be plenty enough even for the 5000-node tests.
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
-	finalFunc, podInformer, clientset := mustSetupScheduler()
+	var cfg *config.KubeSchedulerConfiguration
+	var err error
+	if len(tc.SchedulerConfigFile) != 0 {
+		cfg, err = loadSchedulerConfig(tc.SchedulerConfigFile)
+		if err != nil {
+			b.Fatalf("error loading scheduler config file: %v", err)
+		}
+		if err = validation.ValidateKubeSchedulerConfiguration(cfg); err != nil {
+			b.Fatalf("validate scheduler config file failed: %v", err)
+		}
+	}
+	finalFunc, podInformer, client, dynClient := mustSetupScheduler(cfg)
 	b.Cleanup(finalFunc)
 
 	var mu sync.Mutex
@@ -317,7 +603,7 @@ func runWorkload(b *testing.B, tc *testCase, w *workload) []DataItem {
 	numPodsScheduledPerNamespace := make(map[string]int)
 	nextNodeIndex := 0
 
-	for opIndex, op := range tc.WorkloadTemplate {
+	for opIndex, op := range unrollWorkloadTemplate(b, tc.WorkloadTemplate, w) {
 		realOp, err := op.realOp.patchParams(w)
 		if err != nil {
 			b.Fatalf("op %d: %v", opIndex, err)
@@ -329,7 +615,7 @@ func runWorkload(b *testing.B, tc *testCase, w *workload) []DataItem {
 		}
 		switch concreteOp := realOp.(type) {
 		case *createNodesOp:
-			nodePreparer, err := getNodePreparer(fmt.Sprintf("node-%d-", opIndex), concreteOp, clientset)
+			nodePreparer, err := getNodePreparer(fmt.Sprintf("node-%d-", opIndex), concreteOp, client)
 			if err != nil {
 				b.Fatalf("op %d: %v", opIndex, err)
 			}
@@ -341,12 +627,36 @@ func runWorkload(b *testing.B, tc *testCase, w *workload) []DataItem {
 			})
 			nextNodeIndex += concreteOp.Count
 
+		case *createNamespacesOp:
+			nsPreparer, err := newNamespacePreparer(concreteOp, client)
+			if err != nil {
+				b.Fatalf("op %d: %v", opIndex, err)
+			}
+			if err := nsPreparer.prepare(); err != nil {
+				nsPreparer.cleanup()
+				b.Fatalf("op %d: %v", opIndex, err)
+			}
+			b.Cleanup(func() {
+				nsPreparer.cleanup()
+			})
+
 		case *createPodsOp:
 			var namespace string
 			if concreteOp.Namespace != nil {
 				namespace = *concreteOp.Namespace
 			} else {
+				// define Pod's namespace automatically, and create that namespace.
 				namespace = fmt.Sprintf("namespace-%d", opIndex)
+				_, err := client.CoreV1().Namespaces().Create(ctx, &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}, metav1.CreateOptions{})
+				if err != nil && !apierrors.IsAlreadyExists(err) {
+					b.Fatalf("failed to create namespace for Pod: %v", namespace)
+				}
+				b.Cleanup(func() {
+					err := client.CoreV1().Namespaces().Delete(ctx, namespace, metav1.DeleteOptions{})
+					if err != nil {
+						b.Errorf("failed to delete namespace %v", namespace)
+					}
+				})
 			}
 			var collectors []testDataCollector
 			var collectorCtx context.Context
@@ -359,7 +669,7 @@ func runWorkload(b *testing.B, tc *testCase, w *workload) []DataItem {
 					go collector.run(collectorCtx)
 				}
 			}
-			if err := createPods(namespace, concreteOp, clientset); err != nil {
+			if err := createPods(namespace, concreteOp, client); err != nil {
 				b.Fatalf("op %d: %v", opIndex, err)
 			}
 			if concreteOp.SkipWaitToCompletion {
@@ -387,6 +697,110 @@ func runWorkload(b *testing.B, tc *testCase, w *workload) []DataItem {
 				mu.Unlock()
 			}
 
+			if !concreteOp.SkipWaitToCompletion {
+				// SkipWaitToCompletion=false indicates this step has waited for the Pods to be scheduled.
+				// So we reset the metrics in global registry; otherwise metrics gathered in this step
+				// will be carried over to next step.
+				legacyregistry.Reset()
+			}
+
+		case *churnOp:
+			var namespace string
+			if concreteOp.Namespace != nil {
+				namespace = *concreteOp.Namespace
+			} else {
+				namespace = fmt.Sprintf("namespace-%d", opIndex)
+			}
+			restMapper := restmapper.NewDeferredDiscoveryRESTMapper(cacheddiscovery.NewMemCacheClient(client.Discovery()))
+			// Ensure the namespace exists.
+			nsObj := &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
+			if _, err := client.CoreV1().Namespaces().Create(ctx, nsObj, metav1.CreateOptions{}); err != nil && !apierrors.IsAlreadyExists(err) {
+				b.Fatalf("op %d: unable to create namespace %v: %v", opIndex, namespace, err)
+			}
+
+			var churnFns []func(name string) string
+
+			for i, path := range concreteOp.TemplatePaths {
+				unstructuredObj, gvk, err := getUnstructuredFromFile(path)
+				if err != nil {
+					b.Fatalf("op %d: unable to parse the %v-th template path: %v", opIndex, i, err)
+				}
+				// Obtain GVR.
+				mapping, err := restMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+				if err != nil {
+					b.Fatalf("op %d: unable to find GVR for %v: %v", opIndex, gvk, err)
+				}
+				gvr := mapping.Resource
+				// Distinguish cluster-scoped with namespaced API objects.
+				var dynRes dynamic.ResourceInterface
+				if mapping.Scope.Name() == meta.RESTScopeNameNamespace {
+					dynRes = dynClient.Resource(gvr).Namespace(namespace)
+				} else {
+					dynRes = dynClient.Resource(gvr)
+				}
+
+				churnFns = append(churnFns, func(name string) string {
+					if name != "" {
+						dynRes.Delete(ctx, name, metav1.DeleteOptions{})
+						return ""
+					}
+
+					live, err := dynRes.Create(ctx, unstructuredObj, metav1.CreateOptions{})
+					if err != nil {
+						return ""
+					}
+					return live.GetName()
+				})
+			}
+
+			var interval int64 = 500
+			if concreteOp.IntervalMilliseconds != 0 {
+				interval = concreteOp.IntervalMilliseconds
+			}
+			ticker := time.NewTicker(time.Duration(interval) * time.Millisecond)
+			defer ticker.Stop()
+
+			if concreteOp.Mode == Recreate {
+				go func() {
+					retVals := make([][]string, len(churnFns))
+					// For each churn function, instantiate a slice of strings with length "concreteOp.Number".
+					for i := range retVals {
+						retVals[i] = make([]string, concreteOp.Number)
+					}
+
+					count := 0
+					for {
+						select {
+						case <-ticker.C:
+							for i := range churnFns {
+								retVals[i][count%concreteOp.Number] = churnFns[i](retVals[i][count%concreteOp.Number])
+							}
+							count++
+						case <-ctx.Done():
+							return
+						}
+					}
+				}()
+			} else if concreteOp.Mode == Create {
+				go func() {
+					count, threshold := 0, concreteOp.Number
+					if threshold == 0 {
+						threshold = math.MaxInt32
+					}
+					for count < threshold {
+						select {
+						case <-ticker.C:
+							for i := range churnFns {
+								churnFns[i]("")
+							}
+							count++
+						case <-ctx.Done():
+							return
+						}
+					}
+				}()
+			}
+
 		case *barrierOp:
 			for _, namespace := range concreteOp.Namespaces {
 				if _, ok := numPodsScheduledPerNamespace[namespace]; !ok {
@@ -410,6 +824,13 @@ func runWorkload(b *testing.B, tc *testCase, w *workload) []DataItem {
 			b.Fatalf("op %d: invalid op %v", opIndex, concreteOp)
 		}
 	}
+
+	// check unused params and inform users
+	unusedParams := w.unusedParams()
+	if len(unusedParams) != 0 {
+		b.Fatalf("the parameters %v are defined on workload %s, but unused.\nPlease make sure there are no typos.", unusedParams, w.Name)
+	}
+
 	// Some tests have unschedulable pods. Do not add an implicit barrier at the
 	// end as we do not want to wait for them.
 	return dataItems
@@ -463,6 +884,7 @@ func createPods(namespace string, cpo *createPodsOp, clientset clientset.Interfa
 	if err != nil {
 		return err
 	}
+	klog.Infof("Creating %d pods in namespace %q", cpo.Count, namespace)
 	config := testutils.NewTestPodCreatorConfig()
 	config.AddStrategy(namespace, cpo.Count, strategy)
 	podCreator := testutils.NewTestPodCreator(clientset, config)
@@ -518,11 +940,33 @@ func waitUntilPodsScheduled(ctx context.Context, podInformer coreinformers.PodIn
 }
 
 func getSpecFromFile(path *string, spec interface{}) error {
-	bytes, err := ioutil.ReadFile(*path)
+	bytes, err := os.ReadFile(*path)
 	if err != nil {
 		return err
 	}
 	return yaml.UnmarshalStrict(bytes, spec)
+}
+
+func getUnstructuredFromFile(path string) (*unstructured.Unstructured, *schema.GroupVersionKind, error) {
+	bytes, err := os.ReadFile(path)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	bytes, err = yaml.YAMLToJSONStrict(bytes)
+	if err != nil {
+		return nil, nil, fmt.Errorf("cannot covert YAML to JSON: %v", err)
+	}
+
+	obj, gvk, err := unstructured.UnstructuredJSONScheme.Decode(bytes, nil, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	unstructuredObj, ok := obj.(*unstructured.Unstructured)
+	if !ok {
+		return nil, nil, fmt.Errorf("cannot convert spec file in %v to an unstructured obj", path)
+	}
+	return unstructuredObj, gvk, nil
 }
 
 func getTestCases(path string) ([]*testCase, error) {
@@ -537,9 +981,17 @@ func validateTestCases(testCases []*testCase) error {
 	if len(testCases) == 0 {
 		return fmt.Errorf("no test cases defined")
 	}
+	testCaseUniqueNames := map[string]bool{}
 	for _, tc := range testCases {
+		if testCaseUniqueNames[tc.Name] {
+			return fmt.Errorf("%s: name is not unique", tc.Name)
+		}
+		testCaseUniqueNames[tc.Name] = true
 		if len(tc.Workloads) == 0 {
 			return fmt.Errorf("%s: no workloads defined", tc.Name)
+		}
+		if err := tc.workloadNamesUnique(); err != nil {
+			return err
 		}
 		if len(tc.WorkloadTemplate) == 0 {
 			return fmt.Errorf("%s: no ops defined", tc.Name)
@@ -626,4 +1078,61 @@ func getCustomVolumeFactory(pvTemplate *v1.PersistentVolume) func(id int) *v1.Pe
 		}
 		return pv
 	}
+}
+
+// namespacePreparer holds configuration information for the test namespace preparer.
+type namespacePreparer struct {
+	client clientset.Interface
+	count  int
+	prefix string
+	spec   *v1.Namespace
+}
+
+func newNamespacePreparer(cno *createNamespacesOp, clientset clientset.Interface) (*namespacePreparer, error) {
+	ns := &v1.Namespace{}
+	if cno.NamespaceTemplatePath != nil {
+		if err := getSpecFromFile(cno.NamespaceTemplatePath, ns); err != nil {
+			return nil, fmt.Errorf("parsing NamespaceTemplate: %w", err)
+		}
+	}
+
+	return &namespacePreparer{
+		client: clientset,
+		count:  cno.Count,
+		prefix: cno.Prefix,
+		spec:   ns,
+	}, nil
+}
+
+// prepare creates the namespaces.
+func (p *namespacePreparer) prepare() error {
+	base := &v1.Namespace{}
+	if p.spec != nil {
+		base = p.spec
+	}
+	klog.Infof("Making %d namespaces with prefix %q and template %v", p.count, p.prefix, *base)
+	for i := 0; i < p.count; i++ {
+		n := base.DeepCopy()
+		n.Name = fmt.Sprintf("%s-%d", p.prefix, i)
+		if err := testutils.RetryWithExponentialBackOff(func() (bool, error) {
+			_, err := p.client.CoreV1().Namespaces().Create(context.TODO(), n, metav1.CreateOptions{})
+			return err == nil || apierrors.IsAlreadyExists(err), nil
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// cleanup deletes existing test namespaces.
+func (p *namespacePreparer) cleanup() error {
+	var errRet error
+	for i := 0; i < p.count; i++ {
+		n := fmt.Sprintf("%s-%d", p.prefix, i)
+		if err := p.client.CoreV1().Namespaces().Delete(context.TODO(), n, metav1.DeleteOptions{}); err != nil {
+			klog.Errorf("Deleting Namespace: %v", err)
+			errRet = err
+		}
+	}
+	return errRet
 }

@@ -26,7 +26,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"k8s.io/apimachinery/pkg/util/clock"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 func TestInsert(t *testing.T) {
@@ -200,9 +200,9 @@ func TestGC(t *testing.T) {
 	assertCacheSize(t, c, 1)
 }
 
-func newTestCache() (*requestCache, *clock.FakeClock) {
+func newTestCache() (*requestCache, *testingclock.FakeClock) {
 	c := newRequestCache()
-	fakeClock := clock.NewFakeClock(time.Now())
+	fakeClock := testingclock.NewFakeClock(time.Now())
 	c.clock = fakeClock
 	return c, fakeClock
 }

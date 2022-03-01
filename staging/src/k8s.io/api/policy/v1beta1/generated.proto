@@ -28,7 +28,7 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
-option go_package = "v1beta1";
+option go_package = "k8s.io/api/policy/v1beta1";
 
 // AllowedCSIDriver represents a single inline CSI Driver that is allowed to be used.
 message AllowedCSIDriver {
@@ -105,6 +105,8 @@ message IDRange {
 
 // PodDisruptionBudget is an object to define the max disruption that can be caused to a collection of pods
 message PodDisruptionBudget {
+  // Standard object's metadata.
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -119,9 +121,12 @@ message PodDisruptionBudget {
 
 // PodDisruptionBudgetList is a collection of PodDisruptionBudgets.
 message PodDisruptionBudgetList {
+  // Standard object's metadata.
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
+  // items list individual PodDisruptionBudget objects
   repeated PodDisruptionBudget items = 2;
 }
 
@@ -136,6 +141,9 @@ message PodDisruptionBudgetSpec {
 
   // Label query over pods whose evictions are managed by the disruption
   // budget.
+  // A null selector selects no pods.
+  // An empty selector ({}) also selects no pods, which differs from standard behavior of selecting all pods.
+  // In policy/v1, an empty selector will select all pods in the namespace.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 2;
 
@@ -180,6 +188,26 @@ message PodDisruptionBudgetStatus {
 
   // total number of pods counted by this disruption budget
   optional int32 expectedPods = 6;
+
+  // Conditions contain conditions for PDB. The disruption controller sets the
+  // DisruptionAllowed condition. The following are known values for the reason field
+  // (additional reasons could be added in the future):
+  // - SyncFailed: The controller encountered an error and wasn't able to compute
+  //               the number of allowed disruptions. Therefore no disruptions are
+  //               allowed and the status of the condition will be False.
+  // - InsufficientPods: The number of pods are either at or below the number
+  //                     required by the PodDisruptionBudget. No disruptions are
+  //                     allowed and the status of the condition will be False.
+  // - SufficientPods: There are more pods than required by the PodDisruptionBudget.
+  //                   The condition will be True, and the number of allowed
+  //                   disruptions are provided by the disruptionsAllowed property.
+  //
+  // +optional
+  // +patchMergeKey=type
+  // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=type
+  repeated k8s.io.apimachinery.pkg.apis.meta.v1.Condition conditions = 7;
 }
 
 // PodSecurityPolicy governs the ability to make requests that affect the Security Context

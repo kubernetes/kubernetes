@@ -118,7 +118,7 @@ func makePodToVerifyHugePages(baseName string, hugePagesLimit resource.Quantity,
 }
 
 // configureHugePages attempts to allocate hugepages of the specified size
-func configureHugePages(hugepagesSize int, hugepagesCount int) error {
+func configureHugePages(hugepagesSize int, hugepagesCount int, numaNodeID *int) error {
 	// Compact memory to make bigger contiguous blocks of memory available
 	// before allocating huge pages.
 	// https://www.kernel.org/doc/Documentation/sysctl/vm.txt
@@ -128,16 +128,26 @@ func configureHugePages(hugepagesSize int, hugepagesCount int) error {
 		}
 	}
 
+	// e.g. hugepages/hugepages-2048kB/nr_hugepages
+	hugepagesSuffix := fmt.Sprintf("hugepages/hugepages-%dkB/%s", hugepagesSize, hugepagesCapacityFile)
+
+	// e.g. /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
+	hugepagesFile := fmt.Sprintf("/sys/kernel/mm/%s", hugepagesSuffix)
+	if numaNodeID != nil {
+		// e.g. /sys/devices/system/node/node0/hugepages/hugepages-2048kB/nr_hugepages
+		hugepagesFile = fmt.Sprintf("/sys/devices/system/node/node%d/%s", *numaNodeID, hugepagesSuffix)
+	}
+
 	// Reserve number of hugepages
-	// e.g. /bin/sh -c "echo 5 > /sys/kernel/mm/hugepages/hugepages-2048kB/vm.nr_hugepages"
-	command := fmt.Sprintf("echo %d > %s-%dkB/%s", hugepagesCount, hugepagesDirPrefix, hugepagesSize, hugepagesCapacityFile)
+	// e.g. /bin/sh -c "echo 5 > /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages"
+	command := fmt.Sprintf("echo %d > %s", hugepagesCount, hugepagesFile)
 	if err := exec.Command("/bin/sh", "-c", command).Run(); err != nil {
 		return err
 	}
 
 	// verify that the number of hugepages was updated
 	// e.g. /bin/sh -c "cat /sys/kernel/mm/hugepages/hugepages-2048kB/vm.nr_hugepages"
-	command = fmt.Sprintf("cat %s-%dkB/%s", hugepagesDirPrefix, hugepagesSize, hugepagesCapacityFile)
+	command = fmt.Sprintf("cat %s", hugepagesFile)
 	outData, err := exec.Command("/bin/sh", "-c", command).Output()
 	if err != nil {
 		return err
@@ -207,7 +217,7 @@ var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeSpecialFeature:H
 		framework.ExpectEqual(value.String(), "9Mi", "huge pages with size 3Mi should be supported")
 
 		ginkgo.By("restarting the node and verifying that huge pages with size 3Mi are not supported")
-		restartKubelet()
+		restartKubelet(true)
 
 		ginkgo.By("verifying that the hugepages-3Mi resource no longer is present")
 		gomega.Eventually(func() bool {
@@ -258,7 +268,7 @@ var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeSpecialFeature:H
 
 				ginkgo.By(fmt.Sprintf("Configuring the host to reserve %d of pre-allocated hugepages of size %d", count, size))
 				gomega.Eventually(func() error {
-					if err := configureHugePages(size, count); err != nil {
+					if err := configureHugePages(size, count, nil); err != nil {
 						return err
 					}
 					return nil
@@ -337,22 +347,25 @@ var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeSpecialFeature:H
 			setHugepages()
 
 			ginkgo.By("restarting kubelet to pick up pre-allocated hugepages")
-			restartKubelet()
+			restartKubelet(true)
 
 			waitForHugepages()
 
 			pod := getHugepagesTestPod(f, limits, mounts, volumes)
 
-			ginkgo.By("by running a guarantee pod that requests hugepages")
+			ginkgo.By("by running a test pod that requests hugepages")
 			testpod = f.PodClient().CreateSync(pod)
 		})
 
 		// we should use JustAfterEach because framework will teardown the client under the AfterEach method
 		ginkgo.JustAfterEach(func() {
+			ginkgo.By(fmt.Sprintf("deleting test pod %s", testpod.Name))
+			f.PodClient().DeleteSync(testpod.Name, metav1.DeleteOptions{}, 2*time.Minute)
+
 			releaseHugepages()
 
 			ginkgo.By("restarting kubelet to pick up pre-allocated hugepages")
-			restartKubelet()
+			restartKubelet(true)
 
 			waitForHugepages()
 		})

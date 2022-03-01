@@ -24,11 +24,11 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -36,6 +36,7 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e_node/remote"
 	"k8s.io/kubernetes/test/e2e_node/system"
 
@@ -47,6 +48,7 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
+var mode = flag.String("mode", "gce", "Mode to operate in. One of gce|ssh. Defaults to gce")
 var testArgs = flag.String("test_args", "", "Space-separated list of arguments to pass to Ginkgo test runner.")
 var testSuite = flag.String("test-suite", "default", "Test suite the runner initializes with. Currently support default|cadvisor|conformance")
 var instanceNamePrefix = flag.String("instance-name-prefix", "", "prefix for instance names")
@@ -66,6 +68,8 @@ var gubernator = flag.Bool("gubernator", false, "If true, output Gubernator link
 var ginkgoFlags = flag.String("ginkgo-flags", "", "Passed to ginkgo to specify additional flags such as --skip=.")
 var systemSpecName = flag.String("system-spec-name", "", fmt.Sprintf("The name of the system spec used for validating the image in the node conformance test. The specs are at %s. If unspecified, the default built-in spec (system.DefaultSpec) will be used.", system.SystemSpecPath))
 var extraEnvs = flag.String("extra-envs", "", "The extra environment variables needed for node e2e tests. Format: a list of key=value pairs, e.g., env1=val1,env2=val2")
+var runtimeConfig = flag.String("runtime-config", "", "The runtime configuration for the API server on the node e2e tests.. Format: a list of key=value pairs, e.g., env1=val1,env2=val2")
+var kubeletConfigFile = flag.String("kubelet-config-file", "", "The KubeletConfiguration file that should be applied to the kubelet")
 
 // envs is the type used to collect all node envs. The key is the env name,
 // and the value is the env value
@@ -153,12 +157,13 @@ type GCEImage struct {
 	Image      string `json:"image,omitempty"`
 	ImageRegex string `json:"image_regex,omitempty"`
 	// ImageFamily is the image family to use. The latest image from the image family will be used, e.g cos-81-lts.
-	ImageFamily string    `json:"image_family,omitempty"`
-	ImageDesc   string    `json:"image_description,omitempty"`
-	Project     string    `json:"project"`
-	Metadata    string    `json:"metadata"`
-	Machine     string    `json:"machine,omitempty"`
-	Resources   Resources `json:"resources,omitempty"`
+	ImageFamily     string    `json:"image_family,omitempty"`
+	ImageDesc       string    `json:"image_description,omitempty"`
+	KernelArguments []string  `json:"kernel_arguments,omitempty"`
+	Project         string    `json:"project"`
+	Metadata        string    `json:"metadata"`
+	Machine         string    `json:"machine,omitempty"`
+	Resources       Resources `json:"resources,omitempty"`
 	// This test is for benchmark (no limit verification, more result log, node name has format 'machine-image-uuid') if 'Tests' is non-empty.
 	Tests []string `json:"tests,omitempty"`
 }
@@ -172,12 +177,13 @@ type internalGCEImage struct {
 	image string
 	// imageDesc is the description of the image. If empty, the value in the
 	// 'image' will be used.
-	imageDesc string
-	project   string
-	resources Resources
-	metadata  *compute.Metadata
-	machine   string
-	tests     []string
+	imageDesc       string
+	kernelArguments []string
+	project         string
+	resources       Resources
+	metadata        *compute.Metadata
+	machine         string
+	tests           []string
 }
 
 func main() {
@@ -196,25 +202,119 @@ func main() {
 		klog.Fatalf("--test-suite must be one of default, cadvisor, or conformance")
 	}
 
+	// Listen for SIGINT and ignore the first one. In case SIGINT is sent to this
+	// process and all its children, we ignore it here, while our children ssh connections
+	// are stopped. This allows us to gather artifacts and print out test state before
+	// being killed.
+	c := make(chan os.Signal, 2)
+	signal.Notify(c, os.Interrupt)
+	go func() {
+		<-c
+		fmt.Printf("Received SIGINT. Will exit on next SIGINT.\n")
+		<-c
+		fmt.Printf("Received another SIGINT. Will exit.\n")
+		os.Exit(1)
+	}()
+
 	rand.Seed(time.Now().UnixNano())
 	if *buildOnly {
 		// Build the archive and exit
-		remote.CreateTestArchive(suite, *systemSpecName)
+		remote.CreateTestArchive(suite, *systemSpecName, *kubeletConfigFile)
 		return
 	}
 
-	if *hosts == "" && *imageConfigFile == "" && *images == "" {
-		klog.Fatalf("Must specify one of --image-config-file, --hosts, --images.")
-	}
-	var err error
-	computeService, err = getComputeClient()
-	if err != nil {
-		klog.Fatalf("Unable to create gcloud compute service using defaults.  Make sure you are authenticated. %v", err)
+	var gceImages *internalImageConfig
+	if *mode == "gce" {
+		if *hosts == "" && *imageConfigFile == "" && *images == "" {
+			klog.Fatalf("Must specify one of --image-config-file, --hosts, --images.")
+		}
+		var err error
+		computeService, err = getComputeClient()
+		if err != nil {
+			klog.Fatalf("Unable to create gcloud compute service using defaults.  Make sure you are authenticated. %v", err)
+		}
+		if gceImages, err = prepareGceImages(); err != nil {
+			klog.Fatalf("While preparing GCE images: %v", err)
+		}
+		if *instanceNamePrefix == "" {
+			*instanceNamePrefix = "tmp-node-e2e-" + uuid.New().String()[:8]
+		}
 	}
 
+	// Setup coloring
+	stat, _ := os.Stdout.Stat()
+	useColor := (stat.Mode() & os.ModeCharDevice) != 0
+	blue := ""
+	noColour := ""
+	if useColor {
+		blue = "\033[0;34m"
+		noColour = "\033[0m"
+	}
+
+	go arc.getArchive()
+	defer arc.deleteArchive()
+
+	results := make(chan *TestResult)
+	running := 0
+	if gceImages != nil {
+		for shortName := range gceImages.images {
+			imageConfig := gceImages.images[shortName]
+			fmt.Printf("Initializing e2e tests using image %s/%s/%s.\n", shortName, imageConfig.project, imageConfig.image)
+			running++
+			go func(image *internalGCEImage, junitFileName string) {
+				results <- testImage(image, junitFileName)
+			}(&imageConfig, shortName)
+		}
+	}
+	if *hosts != "" {
+		for _, host := range strings.Split(*hosts, ",") {
+			fmt.Printf("Initializing e2e tests using host %s.\n", host)
+			running++
+			go func(host string, junitFileName string) {
+				results <- testHost(host, *cleanup, "", junitFileName, *ginkgoFlags)
+			}(host, host)
+		}
+	}
+
+	// Wait for all tests to complete and emit the results
+	errCount := 0
+	exitOk := true
+	for i := 0; i < running; i++ {
+		tr := <-results
+		host := tr.host
+		fmt.Println() // Print an empty line
+		fmt.Printf("%s>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>%s\n", blue, noColour)
+		fmt.Printf("%s>                              START TEST                                >%s\n", blue, noColour)
+		fmt.Printf("%s>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>%s\n", blue, noColour)
+		fmt.Printf("Start Test Suite on Host %s\n", host)
+		fmt.Printf("%s\n", tr.output)
+		if tr.err != nil {
+			errCount++
+			fmt.Printf("Failure Finished Test Suite on Host %s\n%v\n", host, tr.err)
+		} else {
+			fmt.Printf("Success Finished Test Suite on Host %s\n", host)
+		}
+		exitOk = exitOk && tr.exitOk
+		fmt.Printf("%s<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<%s\n", blue, noColour)
+		fmt.Printf("%s<                              FINISH TEST                               <%s\n", blue, noColour)
+		fmt.Printf("%s<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<%s\n", blue, noColour)
+		fmt.Println() // Print an empty line
+	}
+	// Set the exit code if there were failures
+	if !exitOk {
+		fmt.Printf("Failure: %d errors encountered.\n", errCount)
+		callGubernator(*gubernator)
+		arc.deleteArchive()
+		os.Exit(1)
+	}
+	callGubernator(*gubernator)
+}
+
+func prepareGceImages() (*internalImageConfig, error) {
 	gceImages := &internalImageConfig{
 		images: make(map[string]internalGCEImage),
 	}
+
 	// Parse images from given config file and convert them to internalGCEImage.
 	if *imageConfigFile != "" {
 		configPath := *imageConfigFile
@@ -222,16 +322,16 @@ func main() {
 			configPath = filepath.Join(*imageConfigDir, *imageConfigFile)
 		}
 
-		imageConfigData, err := ioutil.ReadFile(configPath)
+		imageConfigData, err := os.ReadFile(configPath)
 		if err != nil {
-			klog.Fatalf("Could not read image config file provided: %v", err)
+			return nil, fmt.Errorf("Could not read image config file provided: %v", err)
 		}
 		// Unmarshal the given image config file. All images for this test run will be organized into a map.
 		// shortName->GCEImage, e.g cos-stable->cos-stable-81-12871-103-0.
 		externalImageConfig := ImageConfig{Images: make(map[string]GCEImage)}
 		err = yaml.Unmarshal(imageConfigData, &externalImageConfig)
 		if err != nil {
-			klog.Fatalf("Could not parse image config file: %v", err)
+			return nil, fmt.Errorf("Could not parse image config file: %v", err)
 		}
 
 		for shortName, imageConfig := range externalImageConfig.Images {
@@ -239,7 +339,7 @@ func main() {
 			if (imageConfig.ImageRegex != "" || imageConfig.ImageFamily != "") && imageConfig.Image == "" {
 				image, err = getGCEImage(imageConfig.ImageRegex, imageConfig.ImageFamily, imageConfig.Project)
 				if err != nil {
-					klog.Fatalf("Could not retrieve a image based on image regex %q and family %q: %v",
+					return nil, fmt.Errorf("Could not retrieve a image based on image regex %q and family %q: %v",
 						imageConfig.ImageRegex, imageConfig.ImageFamily, err)
 				}
 			} else {
@@ -251,13 +351,14 @@ func main() {
 				metadata += "," + *instanceMetadata
 			}
 			gceImage := internalGCEImage{
-				image:     image,
-				imageDesc: imageConfig.ImageDesc,
-				project:   imageConfig.Project,
-				metadata:  getImageMetadata(metadata),
-				machine:   imageConfig.Machine,
-				tests:     imageConfig.Tests,
-				resources: imageConfig.Resources,
+				image:           image,
+				imageDesc:       imageConfig.ImageDesc,
+				project:         imageConfig.Project,
+				metadata:        getImageMetadata(metadata),
+				kernelArguments: imageConfig.KernelArguments,
+				machine:         imageConfig.Machine,
+				tests:           imageConfig.Tests,
+				resources:       imageConfig.Resources,
 			}
 			if gceImage.imageDesc == "" {
 				gceImage.imageDesc = gceImage.image
@@ -297,75 +398,8 @@ func main() {
 			klog.Fatal("Must specify --project flag to launch images into")
 		}
 	}
-	if *instanceNamePrefix == "" {
-		*instanceNamePrefix = "tmp-node-e2e-" + uuid.New().String()[:8]
-	}
 
-	// Setup coloring
-	stat, _ := os.Stdout.Stat()
-	useColor := (stat.Mode() & os.ModeCharDevice) != 0
-	blue := ""
-	noColour := ""
-	if useColor {
-		blue = "\033[0;34m"
-		noColour = "\033[0m"
-	}
-
-	go arc.getArchive()
-	defer arc.deleteArchive()
-
-	results := make(chan *TestResult)
-	running := 0
-	for shortName := range gceImages.images {
-		imageConfig := gceImages.images[shortName]
-		fmt.Printf("Initializing e2e tests using image %s/%s/%s.\n", shortName, imageConfig.project, imageConfig.image)
-		running++
-		go func(image *internalGCEImage, junitFilePrefix string) {
-			results <- testImage(image, junitFilePrefix)
-		}(&imageConfig, shortName)
-	}
-	if *hosts != "" {
-		for _, host := range strings.Split(*hosts, ",") {
-			fmt.Printf("Initializing e2e tests using host %s.\n", host)
-			running++
-			go func(host string, junitFilePrefix string) {
-				results <- testHost(host, *cleanup, "", junitFilePrefix, *ginkgoFlags)
-			}(host, host)
-		}
-	}
-
-	// Wait for all tests to complete and emit the results
-	errCount := 0
-	exitOk := true
-	for i := 0; i < running; i++ {
-		tr := <-results
-		host := tr.host
-		fmt.Println() // Print an empty line
-		fmt.Printf("%s>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>%s\n", blue, noColour)
-		fmt.Printf("%s>                              START TEST                                >%s\n", blue, noColour)
-		fmt.Printf("%s>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>%s\n", blue, noColour)
-		fmt.Printf("Start Test Suite on Host %s\n", host)
-		fmt.Printf("%s\n", tr.output)
-		if tr.err != nil {
-			errCount++
-			fmt.Printf("Failure Finished Test Suite on Host %s\n%v\n", host, tr.err)
-		} else {
-			fmt.Printf("Success Finished Test Suite on Host %s\n", host)
-		}
-		exitOk = exitOk && tr.exitOk
-		fmt.Printf("%s<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<%s\n", blue, noColour)
-		fmt.Printf("%s<                              FINISH TEST                               <%s\n", blue, noColour)
-		fmt.Printf("%s<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<%s\n", blue, noColour)
-		fmt.Println() // Print an empty line
-	}
-	// Set the exit code if there were failures
-	if !exitOk {
-		fmt.Printf("Failure: %d errors encountered.\n", errCount)
-		callGubernator(*gubernator)
-		arc.deleteArchive()
-		os.Exit(1)
-	}
-	callGubernator(*gubernator)
+	return gceImages, nil
 }
 
 func callGubernator(gubernator bool) {
@@ -384,7 +418,7 @@ func callGubernator(gubernator bool) {
 }
 
 func (a *Archive) getArchive() (string, error) {
-	a.Do(func() { a.path, a.err = remote.CreateTestArchive(suite, *systemSpecName) })
+	a.Do(func() { a.path, a.err = remote.CreateTestArchive(suite, *systemSpecName, *kubeletConfigFile) })
 	return a.path, a.err
 }
 
@@ -415,29 +449,23 @@ func getImageMetadata(input string) *compute.Metadata {
 	return &ret
 }
 
-// Run tests in archive against host
-func testHost(host string, deleteFiles bool, imageDesc, junitFilePrefix, ginkgoFlagsStr string) *TestResult {
+func registerGceHostIP(host string) error {
 	instance, err := computeService.Instances.Get(*project, *zone, host).Do()
 	if err != nil {
-		return &TestResult{
-			err:    err,
-			host:   host,
-			exitOk: false,
-		}
+		return err
 	}
 	if strings.ToUpper(instance.Status) != "RUNNING" {
-		err = fmt.Errorf("instance %s not in state RUNNING, was %s", host, instance.Status)
-		return &TestResult{
-			err:    err,
-			host:   host,
-			exitOk: false,
-		}
+		return fmt.Errorf("instance %s not in state RUNNING, was %s", host, instance.Status)
 	}
 	externalIP := getExternalIP(instance)
 	if len(externalIP) > 0 {
 		remote.AddHostnameIP(host, externalIP)
 	}
+	return nil
+}
 
+// Run tests in archive against host
+func testHost(host string, deleteFiles bool, imageDesc, junitFileName, ginkgoFlagsStr string) *TestResult {
 	path, err := arc.getArchive()
 	if err != nil {
 		// Don't log fatal because we need to do any needed cleanup contained in "defer" statements
@@ -446,7 +474,7 @@ func testHost(host string, deleteFiles bool, imageDesc, junitFilePrefix, ginkgoF
 		}
 	}
 
-	output, exitOk, err := remote.RunRemote(suite, path, host, deleteFiles, imageDesc, junitFilePrefix, *testArgs, ginkgoFlagsStr, *systemSpecName, *extraEnvs)
+	output, exitOk, err := remote.RunRemote(suite, path, host, deleteFiles, imageDesc, junitFileName, *testArgs, ginkgoFlagsStr, *systemSpecName, *extraEnvs, *runtimeConfig)
 	return &TestResult{
 		output: output,
 		err:    err,
@@ -506,7 +534,7 @@ func getGCEImage(imageRegex, imageFamily string, project string) (string, error)
 
 // Provision a gce instance using image and run the tests in archive against the instance.
 // Delete the instance afterward.
-func testImage(imageConfig *internalGCEImage, junitFilePrefix string) *TestResult {
+func testImage(imageConfig *internalGCEImage, junitFileName string) *TestResult {
 	ginkgoFlagsStr := *ginkgoFlags
 	// Check whether the test is for benchmark.
 	if len(imageConfig.tests) > 0 {
@@ -532,7 +560,15 @@ func testImage(imageConfig *internalGCEImage, junitFilePrefix string) *TestResul
 	// If we are going to delete the instance, don't bother with cleaning up the files
 	deleteFiles := !*deleteInstances && *cleanup
 
-	result := testHost(host, deleteFiles, imageConfig.imageDesc, junitFilePrefix, ginkgoFlagsStr)
+	if err = registerGceHostIP(host); err != nil {
+		return &TestResult{
+			err:    err,
+			host:   host,
+			exitOk: false,
+		}
+	}
+
+	result := testHost(host, deleteFiles, imageConfig.imageDesc, junitFileName, ginkgoFlagsStr)
 	// This is a temporary solution to collect serial node serial log. Only port 1 contains useful information.
 	// TODO(random-liu): Extract out and unify log collection logic with cluste e2e.
 	serialPortOutput, err := computeService.Instances.GetSerialPortOutput(*project, *zone, host).Port(1).Do()
@@ -552,7 +588,7 @@ func testImage(imageConfig *internalGCEImage, junitFilePrefix string) *TestResul
 func createInstance(imageConfig *internalGCEImage) (string, error) {
 	p, err := computeService.Projects.Get(*project).Do()
 	if err != nil {
-		return "", fmt.Errorf("failed to get project info %q", *project)
+		return "", fmt.Errorf("failed to get project info %q: %v", *project, err)
 	}
 	// Use default service account
 	serviceAccount := p.DefaultServiceAccount
@@ -631,6 +667,7 @@ func createInstance(imageConfig *internalGCEImage) (string, error) {
 		insertionOperationName = op.Name
 	}
 	instanceRunning := false
+	var instance *compute.Instance
 	for i := 0; i < 30 && !instanceRunning; i++ {
 		if i > 0 {
 			time.Sleep(time.Second * 20)
@@ -652,7 +689,6 @@ func createInstance(imageConfig *internalGCEImage) (string, error) {
 			return name, fmt.Errorf("could not create instance %s: %+v", name, errs)
 		}
 
-		var instance *compute.Instance
 		instance, err = computeService.Instances.Get(*project, *zone, name).Do()
 		if err != nil {
 			continue
@@ -701,7 +737,82 @@ func createInstance(imageConfig *internalGCEImage) (string, error) {
 			cloudInitFinished = true
 		}
 	}
+
+	// apply additional kernel arguments to the instance
+	if len(imageConfig.kernelArguments) > 0 {
+		klog.Info("Update kernel arguments")
+		if err := updateKernelArguments(instance, imageConfig.image, imageConfig.kernelArguments); err != nil {
+			return name, err
+		}
+	}
+
 	return name, err
+}
+
+func updateKernelArguments(instance *compute.Instance, image string, kernelArgs []string) error {
+	kernelArgsString := strings.Join(kernelArgs, " ")
+
+	var cmd []string
+	if strings.Contains(image, "cos") {
+		cmd = []string{
+			"dir=$(mktemp -d)",
+			"mount /dev/sda12 ${dir}",
+			fmt.Sprintf("sed -i -e \"s|cros_efi|cros_efi %s|g\" ${dir}/efi/boot/grub.cfg", kernelArgsString),
+			"umount ${dir}",
+			"rmdir ${dir}",
+		}
+	}
+
+	if strings.Contains(image, "ubuntu") {
+		cmd = []string{
+			fmt.Sprintf("echo \"GRUB_CMDLINE_LINUX_DEFAULT=%s ${GRUB_CMDLINE_LINUX_DEFAULT}\" > /etc/default/grub.d/99-additional-arguments.cfg", kernelArgsString),
+			"/usr/sbin/update-grub",
+		}
+	}
+
+	if len(cmd) == 0 {
+		klog.Warningf("The image %s does not support adding an additional kernel arguments", image)
+		return nil
+	}
+
+	out, err := remote.SSH(instance.Name, "sh", "-c", fmt.Sprintf("'%s'", strings.Join(cmd, "&&")))
+	if err != nil {
+		klog.Errorf("failed to run command %s: out: %s, err: %v", cmd, out, err)
+		return err
+	}
+
+	if err := rebootInstance(instance); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func rebootInstance(instance *compute.Instance) error {
+	// wait until the instance will not response to SSH
+	klog.Info("Reboot the node and wait for instance not to be available via SSH")
+	if waitErr := wait.PollImmediate(5*time.Second, 5*time.Minute, func() (bool, error) {
+		if _, err := remote.SSH(instance.Name, "reboot"); err != nil {
+			return true, nil
+		}
+
+		return false, nil
+	}); waitErr != nil {
+		return fmt.Errorf("the instance %s still response to SSH: %v", instance.Name, waitErr)
+	}
+
+	// wait until the instance will response again to SSH
+	klog.Info("Wait for instance to be available via SSH")
+	if waitErr := wait.PollImmediate(30*time.Second, 5*time.Minute, func() (bool, error) {
+		if _, err := remote.SSH(instance.Name, "sh", "-c", "date"); err != nil {
+			return false, nil
+		}
+		return true, nil
+	}); waitErr != nil {
+		return fmt.Errorf("the instance %s does not response to SSH: %v", instance.Name, waitErr)
+	}
+
+	return nil
 }
 
 func isCloudInitUsed(metadata *compute.Metadata) bool {
@@ -783,7 +894,7 @@ func parseInstanceMetadata(str string) map[string]string {
 		if *imageConfigDir != "" {
 			metaPath = filepath.Join(*imageConfigDir, metaPath)
 		}
-		v, err := ioutil.ReadFile(metaPath)
+		v, err := os.ReadFile(metaPath)
 		if err != nil {
 			klog.Fatalf("Failed to read metadata file %q: %v", metaPath, err)
 			continue

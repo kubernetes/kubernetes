@@ -1,3 +1,7 @@
+# Do not edit, downloaded from https://github.com/kubernetes-csi/external-resizer/raw/v1.3.0/deploy/kubernetes//rbac.yaml
+# for csi-driver-host-path v1.7.3
+# by ./update-hostpath.sh
+#
 # This YAML file contains all RBAC objects that are necessary to run external
 # CSI resizer.
 #
@@ -29,13 +33,16 @@ rules:
   #   verbs: ["get", "list", "watch"]
   - apiGroups: [""]
     resources: ["persistentvolumes"]
-    verbs: ["get", "list", "watch", "update", "patch"]
+    verbs: ["get", "list", "watch", "patch"]
   - apiGroups: [""]
     resources: ["persistentvolumeclaims"]
     verbs: ["get", "list", "watch"]
   - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
     resources: ["persistentvolumeclaims/status"]
-    verbs: ["update", "patch"]
+    verbs: ["patch"]
   - apiGroups: [""]
     resources: ["events"]
     verbs: ["list", "watch", "create", "update", "patch"]

@@ -27,9 +27,12 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	autoscalingv1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	"k8s.io/kubernetes/pkg/apis/autoscaling/validation"
@@ -39,6 +42,7 @@ import (
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/core/replicationcontroller"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // ControllerStorage includes dummy storage for Replication Controllers and for Scale subresource.
@@ -46,6 +50,16 @@ type ControllerStorage struct {
 	Controller *REST
 	Status     *StatusREST
 	Scale      *ScaleREST
+}
+
+// ReplicasPathMappings returns the mappings between each group version and a replicas path
+func ReplicasPathMappings() fieldmanager.ResourcePathMappings {
+	return replicasPathInReplicationController
+}
+
+// maps a group version to the replicas path in a deployment object
+var replicasPathInReplicationController = fieldmanager.ResourcePathMappings{
+	schema.GroupVersion{Group: "", Version: "v1"}.String(): fieldpath.MakePathOrDie("spec", "replicas"),
 }
 
 func NewStorage(optsGetter generic.RESTOptionsGetter) (ControllerStorage, error) {
@@ -73,9 +87,10 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 		PredicateFunc:            replicationcontroller.MatchController,
 		DefaultQualifiedResource: api.Resource("replicationcontrollers"),
 
-		CreateStrategy: replicationcontroller.Strategy,
-		UpdateStrategy: replicationcontroller.Strategy,
-		DeleteStrategy: replicationcontroller.Strategy,
+		CreateStrategy:      replicationcontroller.Strategy,
+		UpdateStrategy:      replicationcontroller.Strategy,
+		DeleteStrategy:      replicationcontroller.Strategy,
+		ResetFieldsStrategy: replicationcontroller.Strategy,
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
@@ -86,6 +101,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 
 	statusStore := *store
 	statusStore.UpdateStrategy = replicationcontroller.StatusStrategy
+	statusStore.ResetFieldsStrategy = replicationcontroller.StatusStrategy
 
 	return &REST{store}, &StatusREST{store: &statusStore}, nil
 }
@@ -125,6 +141,11 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
 	// subresources should never allow create on update.
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
+}
+
+// GetResetFields implements rest.ResetFieldsStrategy
+func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return r.store.GetResetFields()
 }
 
 type ScaleREST struct {
@@ -231,8 +252,29 @@ func (i *scaleUpdatedObjectInfo) UpdatedObject(ctx context.Context, oldObj runti
 		return nil, errors.NewNotFound(api.Resource("replicationcontrollers/scale"), i.name)
 	}
 
+	groupVersion := schema.GroupVersion{Group: "", Version: "v1"}
+	if requestInfo, found := genericapirequest.RequestInfoFrom(ctx); found {
+		requestGroupVersion := schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
+		if _, ok := replicasPathInReplicationController[requestGroupVersion.String()]; ok {
+			groupVersion = requestGroupVersion
+		} else {
+			klog.Fatal("Unrecognized group/version in request info %q", requestGroupVersion.String())
+		}
+	}
+
+	managedFieldsHandler := fieldmanager.NewScaleHandler(
+		replicationcontroller.ManagedFields,
+		groupVersion,
+		replicasPathInReplicationController,
+	)
+
 	// replicationcontroller -> old scale
 	oldScale := scaleFromRC(replicationcontroller)
+	scaleManagedFields, err := managedFieldsHandler.ToSubresource()
+	if err != nil {
+		return nil, err
+	}
+	oldScale.ManagedFields = scaleManagedFields
 
 	// old scale -> new scale
 	newScaleObj, err := i.reqObjInfo.UpdatedObject(ctx, oldScale)
@@ -264,5 +306,12 @@ func (i *scaleUpdatedObjectInfo) UpdatedObject(ctx context.Context, oldObj runti
 	// move replicas/resourceVersion fields to object and return
 	replicationcontroller.Spec.Replicas = scale.Spec.Replicas
 	replicationcontroller.ResourceVersion = scale.ResourceVersion
+
+	updatedEntries, err := managedFieldsHandler.ToParent(scale.ManagedFields)
+	if err != nil {
+		return nil, err
+	}
+	replicationcontroller.ManagedFields = updatedEntries
+
 	return replicationcontroller, nil
 }

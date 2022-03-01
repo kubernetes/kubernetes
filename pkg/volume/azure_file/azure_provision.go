@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -79,7 +80,7 @@ func (plugin *azureFilePlugin) newDeleterInternal(spec *volume.Spec, util azureU
 		return nil, fmt.Errorf("invalid PV spec")
 	}
 
-	secretName, secretNamespace, err := getSecretNameAndNamespace(spec, defaultSecretNamespace)
+	secretName, secretNamespace, err := getSecretNameAndNamespace(spec, spec.PersistentVolume.Spec.ClaimRef.Namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +150,7 @@ type azureFileProvisioner struct {
 var _ volume.Provisioner = &azureFileProvisioner{}
 
 func (a *azureFileProvisioner) Provision(selectedNode *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (*v1.PersistentVolume, error) {
-	if !util.AccessModesContainedInAll(a.plugin.GetAccessModes(), a.options.PVC.Spec.AccessModes) {
+	if !util.ContainsAllAccessModes(a.plugin.GetAccessModes(), a.options.PVC.Spec.AccessModes) {
 		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", a.options.PVC.Spec.AccessModes, a.plugin.GetAccessModes())
 	}
 	if util.CheckPersistentVolumeClaimModeBlock(a.options.PVC) {
@@ -198,9 +199,10 @@ func (a *azureFileProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 	}
 
 	if shareName == "" {
-		// File share name has a length limit of 63, and it cannot contain two consecutive '-'s.
+		// File share name has a length limit of 63, it cannot contain two consecutive '-'s, and all letters must be lower case.
 		name := util.GenerateVolumeName(a.options.ClusterName, a.options.PVName, 63)
 		shareName = strings.Replace(name, "--", "-", -1)
+		shareName = strings.ToLower(shareName)
 	}
 
 	if resourceGroup == "" {
@@ -276,7 +278,7 @@ func (a *azureFileProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 func getAzureCloudProvider(cloudProvider cloudprovider.Interface) (azureCloudProvider, string, error) {
 	azureCloudProvider, ok := cloudProvider.(*azure.Cloud)
 	if !ok || azureCloudProvider == nil {
-		return nil, "", fmt.Errorf("Failed to get Azure Cloud Provider. GetCloudProvider returned %v instead", cloudProvider)
+		return nil, "", fmt.Errorf("failed to get Azure Cloud Provider. GetCloudProvider returned %v instead", cloudProvider)
 	}
 
 	return azureCloudProvider, azureCloudProvider.ResourceGroup, nil

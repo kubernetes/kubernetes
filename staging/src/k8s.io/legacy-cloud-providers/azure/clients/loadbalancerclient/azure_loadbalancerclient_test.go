@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -172,7 +173,8 @@ func TestListWithNextPage(t *testing.T) {
 	resourceID := "/subscriptions/subscriptionID/resourceGroups/rg/providers/Microsoft.Network/loadBalancers"
 	armClient := mockarmclient.NewMockInterface(ctrl)
 	lbList := []network.LoadBalancer{getTestLoadBalancer("lb1"), getTestLoadBalancer("lb2"), getTestLoadBalancer("lb3")}
-	partialResponse, err := json.Marshal(network.LoadBalancerListResult{Value: &lbList, NextLink: to.StringPtr("nextLink")})
+	// LoadBalancerListResult.MarshalJson() doesn't include "nextLink" in its result, hence partialResponse is composed manually below.
+	partialResponse, err := json.Marshal(map[string]interface{}{"value": lbList, "nextLink": "nextLink"})
 	assert.NoError(t, err)
 	pagedResponse, err := json.Marshal(network.LoadBalancerListResult{Value: &lbList})
 	assert.NoError(t, err)

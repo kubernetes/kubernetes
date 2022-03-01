@@ -24,7 +24,9 @@ import (
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.16
-// +k8s:prerelease-lifecycle-gen:deprecated=1.22
+// +k8s:prerelease-lifecycle-gen:deprecated=1.21
+// +k8s:prerelease-lifecycle-gen:removed=1.25
+// +k8s:prerelease-lifecycle-gen:replacement=discovery.k8s.io,v1,EndpointSlice
 
 // EndpointSlice represents a subset of the endpoints that implement a service.
 // For a given service there may be multiple EndpointSlice objects, selected by
@@ -74,7 +76,8 @@ type Endpoint struct {
 	// according to the corresponding EndpointSlice addressType field. Consumers
 	// must handle different types of addresses in the context of their own
 	// capabilities. This must contain at least one address but no more than
-	// 100.
+	// 100. These are all assumed to be fungible and clients may choose to only
+	// use the first element. Refer to: https://issue.k8s.io/106267
 	// +listType=set
 	Addresses []string `json:"addresses" protobuf:"bytes,1,rep,name=addresses"`
 	// conditions contains information about the current status of the endpoint.
@@ -110,6 +113,11 @@ type Endpoint struct {
 	// with the EndpointSliceNodeName feature gate.
 	// +optional
 	NodeName *string `json:"nodeName,omitempty" protobuf:"bytes,6,opt,name=nodeName"`
+	// hints contains information associated with how an endpoint should be
+	// consumed.
+	// +featureGate=TopologyAwareHints
+	// +optional
+	Hints *EndpointHints `json:"hints,omitempty" protobuf:"bytes,7,opt,name=hints"`
 }
 
 // EndpointConditions represents the current condition of an endpoint.
@@ -138,6 +146,20 @@ type EndpointConditions struct {
 	Terminating *bool `json:"terminating,omitempty" protobuf:"bytes,3,name=terminating"`
 }
 
+// EndpointHints provides hints describing how an endpoint should be consumed.
+type EndpointHints struct {
+	// forZones indicates the zone(s) this endpoint should be consumed by to
+	// enable topology aware routing. May contain a maximum of 8 entries.
+	// +listType=atomic
+	ForZones []ForZone `json:"forZones,omitempty" protobuf:"bytes,1,name=forZones"`
+}
+
+// ForZone provides information about which zones should consume this endpoint.
+type ForZone struct {
+	// name represents the name of the zone.
+	Name string `json:"name" protobuf:"bytes,1,name=name"`
+}
+
 // EndpointPort represents a Port used by an EndpointSlice
 type EndpointPort struct {
 	// The name of this port. All ports in an EndpointSlice must have a unique
@@ -160,7 +182,7 @@ type EndpointPort struct {
 	// The application protocol for this port.
 	// This field follows standard Kubernetes label syntax.
 	// Un-prefixed names are reserved for IANA standard service names (as per
-	// RFC-6335 and http://www.iana.org/assignments/service-names).
+	// RFC-6335 and https://www.iana.org/assignments/service-names).
 	// Non-standard protocols should use prefixed names such as
 	// mycompany.com/my-custom-protocol.
 	// +optional
@@ -169,7 +191,9 @@ type EndpointPort struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.16
-// +k8s:prerelease-lifecycle-gen:deprecated=1.22
+// +k8s:prerelease-lifecycle-gen:deprecated=1.21
+// +k8s:prerelease-lifecycle-gen:removed=1.25
+// +k8s:prerelease-lifecycle-gen:replacement=discovery.k8s.io,v1,EndpointSlice
 
 // EndpointSliceList represents a list of endpoint slices
 type EndpointSliceList struct {

@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -30,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // namespaceStrategy implements behavior for Namespaces
@@ -45,6 +47,16 @@ var Strategy = namespaceStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 // NamespaceScoped is false for namespaces.
 func (namespaceStrategy) NamespaceScoped() bool {
 	return false
+}
+
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (namespaceStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return map[fieldpath.APIVersion]*fieldpath.Set{
+		"v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+	}
 }
 
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
@@ -86,8 +98,35 @@ func (namespaceStrategy) Validate(ctx context.Context, obj runtime.Object) field
 	return validation.ValidateNamespace(namespace)
 }
 
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (namespaceStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	return nil
+}
+
 // Canonicalize normalizes the object after validation.
 func (namespaceStrategy) Canonicalize(obj runtime.Object) {
+	// Ensure the label matches the name for namespaces just created using GenerateName,
+	// where the final name wasn't available for defaulting to make this change.
+	// This code needs to be kept in sync with the implementation that exists
+	// in Namespace defaulting (pkg/apis/core/v1)
+	// Why this hook *and* defaults.go?
+	//
+	// CREATE:
+	// Defaulting and PrepareForCreate happen before generateName is completed
+	// (i.e. the name is not yet known). Validation happens after generateName
+	// but should not modify objects. Canonicalize happens later, which makes
+	// it the best hook for setting the label.
+	//
+	// UPDATE:
+	// Defaulting and Canonicalize will both trigger with the full name.
+	//
+	// GET:
+	// Only defaulting will be applied.
+	ns := obj.(*api.Namespace)
+	if ns.Labels == nil {
+		ns.Labels = map[string]string{}
+	}
+	ns.Labels[v1.LabelMetadataName] = ns.Name
 }
 
 // AllowCreateOnUpdate is false for namespaces.
@@ -101,6 +140,11 @@ func (namespaceStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Ob
 	return append(errorList, validation.ValidateNamespaceUpdate(obj.(*api.Namespace), old.(*api.Namespace))...)
 }
 
+// WarningsOnUpdate returns warnings for the given update.
+func (namespaceStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
+}
+
 func (namespaceStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
@@ -110,6 +154,16 @@ type namespaceStatusStrategy struct {
 }
 
 var StatusStrategy = namespaceStatusStrategy{Strategy}
+
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (namespaceStatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return map[fieldpath.APIVersion]*fieldpath.Set{
+		"v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("spec"),
+		),
+	}
+}
 
 func (namespaceStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newNamespace := obj.(*api.Namespace)
@@ -121,6 +175,11 @@ func (namespaceStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runt
 	return validation.ValidateNamespaceStatusUpdate(obj.(*api.Namespace), old.(*api.Namespace))
 }
 
+// WarningsOnUpdate returns warnings for the given update.
+func (namespaceStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
+}
+
 type namespaceFinalizeStrategy struct {
 	namespaceStrategy
 }
@@ -129,6 +188,21 @@ var FinalizeStrategy = namespaceFinalizeStrategy{Strategy}
 
 func (namespaceFinalizeStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateNamespaceFinalizeUpdate(obj.(*api.Namespace), old.(*api.Namespace))
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (namespaceFinalizeStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
+}
+
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (namespaceFinalizeStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return map[fieldpath.APIVersion]*fieldpath.Set{
+		"v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+	}
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.

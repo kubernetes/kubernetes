@@ -18,13 +18,13 @@ import (
 // any deprecated, removed, or ignored plugins/directives present in the Corefile.  Notifications are also returned for
 // any new default plugins that would be added in a migration.
 func Deprecated(fromCoreDNSVersion, toCoreDNSVersion, corefileStr string) ([]Notice, error) {
-	return getStatus(fromCoreDNSVersion, toCoreDNSVersion, corefileStr, all)
+	return getStatus(fromCoreDNSVersion, toCoreDNSVersion, corefileStr, SevAll)
 }
 
 // Unsupported returns a list notifications of plugins/options that are not handled supported by this migration tool,
 // but may still be valid in CoreDNS.
 func Unsupported(fromCoreDNSVersion, toCoreDNSVersion, corefileStr string) ([]Notice, error) {
-	return getStatus(fromCoreDNSVersion, toCoreDNSVersion, corefileStr, unsupported)
+	return getStatus(fromCoreDNSVersion, toCoreDNSVersion, corefileStr, SevUnsupported)
 }
 
 func getStatus(fromCoreDNSVersion, toCoreDNSVersion, corefileStr, status string) ([]Notice, error) {
@@ -45,14 +45,14 @@ func getStatus(fromCoreDNSVersion, toCoreDNSVersion, corefileStr, status string)
 		for _, s := range cf.Servers {
 			for _, p := range s.Plugins {
 				vp, present := Versions[v].plugins[p.Name]
-				if status == unsupported && !present {
+				if status == SevUnsupported && !present {
 					notices = append(notices, Notice{Plugin: p.Name, Severity: status, Version: v})
 					continue
 				}
 				if !present {
 					continue
 				}
-				if vp.status != "" && vp.status != newdefault && status != unsupported {
+				if vp.status != "" && vp.status != SevNewDefault && status != SevUnsupported {
 					notices = append(notices, Notice{
 						Plugin:     p.Name,
 						Severity:   vp.status,
@@ -64,7 +64,7 @@ func getStatus(fromCoreDNSVersion, toCoreDNSVersion, corefileStr, status string)
 				}
 				for _, o := range p.Options {
 					vo, present := matchOption(o.Name, Versions[v].plugins[p.Name])
-					if status == unsupported {
+					if status == SevUnsupported {
 						if present {
 							continue
 						}
@@ -79,15 +79,15 @@ func getStatus(fromCoreDNSVersion, toCoreDNSVersion, corefileStr, status string)
 					if !present {
 						continue
 					}
-					if vo.status != "" && vo.status != newdefault {
+					if vo.status != "" && vo.status != SevNewDefault {
 						notices = append(notices, Notice{Plugin: p.Name, Option: o.Name, Severity: vo.status, Version: v})
 						continue
 					}
 				}
-				if status != unsupported {
+				if status != SevUnsupported {
 				CheckForNewOptions:
 					for name, vo := range Versions[v].plugins[p.Name].namedOptions {
-						if vo.status != newdefault {
+						if vo.status != SevNewDefault {
 							continue
 						}
 						for _, o := range p.Options {
@@ -95,14 +95,14 @@ func getStatus(fromCoreDNSVersion, toCoreDNSVersion, corefileStr, status string)
 								continue CheckForNewOptions
 							}
 						}
-						notices = append(notices, Notice{Plugin: p.Name, Option: name, Severity: newdefault, Version: v})
+						notices = append(notices, Notice{Plugin: p.Name, Option: name, Severity: SevNewDefault, Version: v})
 					}
 				}
 			}
-			if status != unsupported {
+			if status != SevUnsupported {
 			CheckForNewPlugins:
 				for name, vp := range Versions[v].plugins {
-					if vp.status != newdefault {
+					if vp.status != SevNewDefault {
 						continue
 					}
 					for _, p := range s.Plugins {
@@ -110,7 +110,7 @@ func getStatus(fromCoreDNSVersion, toCoreDNSVersion, corefileStr, status string)
 							continue CheckForNewPlugins
 						}
 					}
-					notices = append(notices, Notice{Plugin: name, Option: "", Severity: newdefault, Version: v})
+					notices = append(notices, Notice{Plugin: name, Option: "", Severity: SevNewDefault, Version: v})
 				}
 			}
 		}
@@ -158,7 +158,7 @@ func Migrate(fromCoreDNSVersion, toCoreDNSVersion, corefileStr string, deprecati
 					newPlugs = append(newPlugs, p)
 					continue
 				}
-				if !deprecations && vp.status == deprecated {
+				if !deprecations && vp.status == SevDeprecated {
 					newPlugs = append(newPlugs, p)
 					continue
 				}
@@ -169,7 +169,7 @@ func Migrate(fromCoreDNSVersion, toCoreDNSVersion, corefileStr string, deprecati
 						newOpts = append(newOpts, o)
 						continue
 					}
-					if !deprecations && vo.status == deprecated {
+					if !deprecations && vo.status == SevDeprecated {
 						newOpts = append(newOpts, o)
 						continue
 					}
@@ -204,7 +204,7 @@ func Migrate(fromCoreDNSVersion, toCoreDNSVersion, corefileStr string, deprecati
 				}
 			CheckForNewOptions:
 				for name, vo := range Versions[v].plugins[p.Name].namedOptions {
-					if vo.status != newdefault {
+					if vo.status != SevNewDefault {
 						continue
 					}
 					for _, o := range p.Options {
@@ -226,7 +226,7 @@ func Migrate(fromCoreDNSVersion, toCoreDNSVersion, corefileStr string, deprecati
 			}
 		CheckForNewPlugins:
 			for name, vp := range Versions[v].plugins {
-				if vp.status != newdefault {
+				if vp.status != SevNewDefault {
 					continue
 				}
 				for _, p := range s.Plugins {

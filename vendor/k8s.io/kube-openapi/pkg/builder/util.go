@@ -20,7 +20,7 @@ import (
 	"sort"
 
 	"github.com/emicklei/go-restful"
-	"github.com/go-openapi/spec"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 type parameters []spec.Parameter

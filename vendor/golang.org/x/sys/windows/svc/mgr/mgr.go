@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:build windows
 // +build windows
 
 // Package mgr can be used to manage Windows service programs.
@@ -116,9 +117,6 @@ func toStringBlock(ss []string) *uint16 {
 func (m *Mgr) CreateService(name, exepath string, c Config, args ...string) (*Service, error) {
 	if c.StartType == 0 {
 		c.StartType = StartManual
-	}
-	if c.ErrorControl == 0 {
-		c.ErrorControl = ErrorNormal
 	}
 	if c.ServiceType == 0 {
 		c.ServiceType = windows.SERVICE_WIN32_OWN_PROCESS

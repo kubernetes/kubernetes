@@ -36,7 +36,7 @@ func (f *JSONYamlPrintFlags) AllowedFormats() []string {
 // Given the following flag values, a printer can be requested that knows
 // how to handle printing based on these values.
 type JSONYamlPrintFlags struct {
-	showManagedFields bool
+	ShowManagedFields bool
 }
 
 // ToPrinter receives an outputFormat and returns a printer capable of
@@ -56,7 +56,7 @@ func (f *JSONYamlPrintFlags) ToPrinter(outputFormat string) (printers.ResourcePr
 		return nil, NoCompatiblePrinterError{OutputFormat: &outputFormat, AllowedFormats: f.AllowedFormats()}
 	}
 
-	if !f.showManagedFields {
+	if !f.ShowManagedFields {
 		printer = &printers.OmitManagedFieldsPrinter{Delegate: printer}
 	}
 	return printer, nil
@@ -65,7 +65,11 @@ func (f *JSONYamlPrintFlags) ToPrinter(outputFormat string) (printers.ResourcePr
 // AddFlags receives a *cobra.Command reference and binds
 // flags related to JSON or Yaml printing to it
 func (f *JSONYamlPrintFlags) AddFlags(c *cobra.Command) {
-	c.Flags().BoolVar(&f.showManagedFields, "show-managed-fields", f.showManagedFields, "If true, keep the managedFields when printing objects in JSON or YAML format.")
+	if f == nil {
+		return
+	}
+
+	c.Flags().BoolVar(&f.ShowManagedFields, "show-managed-fields", f.ShowManagedFields, "If true, keep the managedFields when printing objects in JSON or YAML format.")
 }
 
 // NewJSONYamlPrintFlags returns flags associated with

@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -39,6 +38,11 @@ type Model struct {
 	Ports          []int32
 	Protocols      []v1.Protocol
 	DNSDomain      string
+}
+
+// NewWindowsModel returns a model specific to windows testing.
+func NewWindowsModel(namespaces []string, podNames []string, ports []int32, dnsDomain string) *Model {
+	return NewModel(namespaces, podNames, ports, []v1.Protocol{v1.ProtocolTCP, v1.ProtocolUDP}, dnsDomain)
 }
 
 // NewModel instantiates a model based on:
@@ -84,6 +88,20 @@ func NewModel(namespaces []string, podNames []string, ports []int32, protocols [
 	return model
 }
 
+// GetProbeTimeoutSeconds returns a timeout for how long the probe should work before failing a check, and takes windows heuristics into account, where requests can take longer sometimes.
+func (m *Model) GetProbeTimeoutSeconds() int {
+	timeoutSeconds := 1
+	if framework.NodeOSDistroIs("windows") {
+		timeoutSeconds = 3
+	}
+	return timeoutSeconds
+}
+
+// GetWorkers returns the number of workers suggested to run when testing.
+func (m *Model) GetWorkers() int {
+	return 3
+}
+
 // NewReachability instantiates a default-true reachability from the model's pods
 func (m *Model) NewReachability() *Reachability {
 	return NewReachability(m.AllPods(), true)
@@ -126,7 +144,7 @@ func (m *Model) FindPod(ns string, name string) (*Pod, error) {
 			}
 		}
 	}
-	return nil, errors.Errorf("unable to find pod %s/%s", ns, name)
+	return nil, fmt.Errorf("unable to find pod %s/%s", ns, name)
 }
 
 // Namespace is the abstract representation of what matters to network policy
@@ -158,6 +176,7 @@ type Pod struct {
 	Namespace  string
 	Name       string
 	Containers []*Container
+	ServiceIP  string
 }
 
 // PodString returns a corresponding pod string
@@ -190,10 +209,11 @@ func (p *Pod) LabelSelector() map[string]string {
 	}
 }
 
-// KubePod returns the kube pod
+// KubePod returns the kube pod (will add label selectors for windows if needed).
 func (p *Pod) KubePod() *v1.Pod {
 	zero := int64(0)
-	return &v1.Pod{
+
+	thePod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      p.Name,
 			Labels:    p.LabelSelector(),
@@ -204,6 +224,13 @@ func (p *Pod) KubePod() *v1.Pod {
 			Containers:                    p.ContainerSpecs(),
 		},
 	}
+
+	if framework.NodeOSDistroIs("windows") {
+		thePod.Spec.NodeSelector = map[string]string{
+			"kubernetes.io/os": "windows",
+		}
+	}
+	return thePod
 }
 
 // QualifiedServiceAddress returns the address that can be used to hit a service from

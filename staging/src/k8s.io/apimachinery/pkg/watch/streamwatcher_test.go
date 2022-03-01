@@ -21,6 +21,7 @@ import (
 	"io"
 	"reflect"
 	"testing"
+	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	. "k8s.io/apimachinery/pkg/watch"
@@ -103,5 +104,18 @@ func TestStreamWatcherError(t *testing.T) {
 	_, ok = <-sw.ResultChan()
 	if ok {
 		t.Fatalf("unexpected open channel")
+	}
+}
+
+func TestStreamWatcherRace(t *testing.T) {
+	fd := fakeDecoder{err: fmt.Errorf("test error")}
+	fr := &fakeReporter{}
+	sw := NewStreamWatcher(fd, fr)
+	time.Sleep(10 * time.Millisecond)
+	sw.Stop()
+	time.Sleep(10 * time.Millisecond)
+	_, ok := <-sw.ResultChan()
+	if ok {
+		t.Fatalf("unexpected pending send")
 	}
 }

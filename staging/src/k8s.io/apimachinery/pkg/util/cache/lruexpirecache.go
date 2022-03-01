@@ -17,10 +17,9 @@ limitations under the License.
 package cache
 
 import (
+	"container/list"
 	"sync"
 	"time"
-
-	"github.com/hashicorp/golang-lru"
 )
 
 // Clock defines an interface for obtaining the current time
@@ -39,8 +38,11 @@ type LRUExpireCache struct {
 	// clock is used to obtain the current time
 	clock Clock
 
-	cache *lru.Cache
-	lock  sync.Mutex
+	lock sync.Mutex
+
+	maxSize      int
+	evictionList list.List
+	entries      map[interface{}]*list.Element
 }
 
 // NewLRUExpireCache creates an expiring cache with the given size
@@ -50,15 +52,19 @@ func NewLRUExpireCache(maxSize int) *LRUExpireCache {
 
 // NewLRUExpireCacheWithClock creates an expiring cache with the given size, using the specified clock to obtain the current time.
 func NewLRUExpireCacheWithClock(maxSize int, clock Clock) *LRUExpireCache {
-	cache, err := lru.New(maxSize)
-	if err != nil {
-		// if called with an invalid size
-		panic(err)
+	if maxSize <= 0 {
+		panic("maxSize must be > 0")
 	}
-	return &LRUExpireCache{clock: clock, cache: cache}
+
+	return &LRUExpireCache{
+		clock:   clock,
+		maxSize: maxSize,
+		entries: map[interface{}]*list.Element{},
+	}
 }
 
 type cacheEntry struct {
+	key        interface{}
 	value      interface{}
 	expireTime time.Time
 }
@@ -67,7 +73,31 @@ type cacheEntry struct {
 func (c *LRUExpireCache) Add(key interface{}, value interface{}, ttl time.Duration) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	c.cache.Add(key, &cacheEntry{value, c.clock.Now().Add(ttl)})
+
+	// Key already exists
+	oldElement, ok := c.entries[key]
+	if ok {
+		c.evictionList.MoveToFront(oldElement)
+		oldElement.Value.(*cacheEntry).value = value
+		oldElement.Value.(*cacheEntry).expireTime = c.clock.Now().Add(ttl)
+		return
+	}
+
+	// Make space if necessary
+	if c.evictionList.Len() >= c.maxSize {
+		toEvict := c.evictionList.Back()
+		c.evictionList.Remove(toEvict)
+		delete(c.entries, toEvict.Value.(*cacheEntry).key)
+	}
+
+	// Add new entry
+	entry := &cacheEntry{
+		key:        key,
+		value:      value,
+		expireTime: c.clock.Now().Add(ttl),
+	}
+	element := c.evictionList.PushFront(entry)
+	c.entries[key] = element
 }
 
 // Get returns the value at the specified key from the cache if it exists and is not
@@ -75,28 +105,56 @@ func (c *LRUExpireCache) Add(key interface{}, value interface{}, ttl time.Durati
 func (c *LRUExpireCache) Get(key interface{}) (interface{}, bool) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	e, ok := c.cache.Get(key)
+
+	element, ok := c.entries[key]
 	if !ok {
 		return nil, false
 	}
-	if c.clock.Now().After(e.(*cacheEntry).expireTime) {
-		c.cache.Remove(key)
+
+	if c.clock.Now().After(element.Value.(*cacheEntry).expireTime) {
+		c.evictionList.Remove(element)
+		delete(c.entries, key)
 		return nil, false
 	}
-	return e.(*cacheEntry).value, true
+
+	c.evictionList.MoveToFront(element)
+
+	return element.Value.(*cacheEntry).value, true
 }
 
 // Remove removes the specified key from the cache if it exists
 func (c *LRUExpireCache) Remove(key interface{}) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	c.cache.Remove(key)
+
+	element, ok := c.entries[key]
+	if !ok {
+		return
+	}
+
+	c.evictionList.Remove(element)
+	delete(c.entries, key)
 }
 
-// Keys returns all the keys in the cache, even if they are expired. Subsequent calls to
-// get may return not found. It returns all keys from oldest to newest.
+// Keys returns all unexpired keys in the cache.
+//
+// Keep in mind that subsequent calls to Get() for any of the returned keys
+// might return "not found".
+//
+// Keys are returned ordered from least recently used to most recently used.
 func (c *LRUExpireCache) Keys() []interface{} {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	return c.cache.Keys()
+
+	now := c.clock.Now()
+
+	val := make([]interface{}, 0, c.evictionList.Len())
+	for element := c.evictionList.Back(); element != nil; element = element.Prev() {
+		// Only return unexpired keys
+		if !now.After(element.Value.(*cacheEntry).expireTime) {
+			val = append(val, element.Value.(*cacheEntry).key)
+		}
+	}
+
+	return val
 }

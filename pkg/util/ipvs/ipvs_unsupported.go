@@ -1,3 +1,4 @@
+//go:build !linux
 // +build !linux
 
 /*
@@ -21,12 +22,10 @@ package ipvs
 import (
 	"fmt"
 	"time"
-
-	utilexec "k8s.io/utils/exec"
 )
 
 // New returns a dummy Interface for unsupported platform.
-func New(utilexec.Interface) Interface {
+func New() Interface {
 	return &runner{}
 }
 

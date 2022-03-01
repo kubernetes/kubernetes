@@ -23,20 +23,16 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/client-go/tools/record"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
 	"k8s.io/kubernetes/pkg/probe"
-	"k8s.io/utils/exec"
 )
 
 func init() {
-	runtime.ReallyCrash = true
 }
 
 func TestDoProbe(t *testing.T) {
@@ -283,7 +279,7 @@ func TestCleanUp(t *testing.T) {
 		for i := 0; i < 10; i++ {
 			w.stop() // Stop should be callable multiple times without consequence.
 		}
-		if err := waitForWorkerExit(m, []probeKey{key}); err != nil {
+		if err := waitForWorkerExit(t, m, []probeKey{key}); err != nil {
 			t.Fatalf("[%s] error waiting for worker exit: %v", probeType, err)
 		}
 
@@ -294,27 +290,6 @@ func TestCleanUp(t *testing.T) {
 			t.Errorf("[%s] Expected worker to be cleared.", probeType)
 		}
 	}
-}
-
-func TestHandleCrash(t *testing.T) {
-	runtime.ReallyCrash = false // Test that we *don't* really crash.
-
-	m := newTestManager()
-	w := newTestWorker(m, readiness, v1.Probe{})
-	m.statusManager.SetPodStatus(w.pod, getTestRunningStatus())
-
-	expectContinue(t, w, w.doProbe(), "Initial successful probe.")
-	expectResult(t, w, results.Success, "Initial successful probe.")
-
-	// Prober starts crashing.
-	m.prober = &prober{
-		recorder: &record.FakeRecorder{},
-		exec:     crashingExecProber{},
-	}
-
-	// doProbe should recover from the crash, and keep going.
-	expectContinue(t, w, w.doProbe(), "Crashing probe.")
-	expectResult(t, w, results.Success, "Crashing probe unchanged.")
 }
 
 func expectResult(t *testing.T, w *worker, expectedResult results.Result, msg string) {
@@ -333,12 +308,6 @@ func expectContinue(t *testing.T, w *worker, c bool, msg string) {
 	}
 }
 
-func expectStop(t *testing.T, w *worker, c bool, msg string) {
-	if c {
-		t.Errorf("[%s - %s] Expected to stop, but did not", w.probeType, msg)
-	}
-}
-
 func resultsManager(m *manager, probeType probeType) results.Manager {
 	switch probeType {
 	case readiness:
@@ -349,12 +318,6 @@ func resultsManager(m *manager, probeType probeType) results.Manager {
 		return m.startupManager
 	}
 	panic(fmt.Errorf("Unhandled case: %v", probeType))
-}
-
-type crashingExecProber struct{}
-
-func (p crashingExecProber) Probe(_ exec.Cmd) (probe.Result, string, error) {
-	panic("Intentional Probe crash.")
 }
 
 func TestOnHoldOnLivenessOrStartupCheckFailure(t *testing.T) {
@@ -508,6 +471,6 @@ func TestStartupProbeDisabledByStarted(t *testing.T) {
 	// startupProbe fails, but is disabled
 	m.prober.exec = fakeExecProber{probe.Failure, nil}
 	msg = "Started, probe failure, result success"
-	expectStop(t, w, w.doProbe(), msg)
+	expectContinue(t, w, w.doProbe(), msg)
 	expectResult(t, w, results.Success, msg)
 }

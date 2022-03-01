@@ -221,6 +221,10 @@ type KubeletConfiguration struct {
 	// CPUManagerPolicy is the name of the policy to use.
 	// Requires the CPUManager feature gate to be enabled.
 	CPUManagerPolicy string
+	// CPUManagerPolicyOptions is a set of key=value which 	allows to set extra options
+	// to fine tune the behaviour of the cpu manager policies.
+	// Requires  both the "CPUManager" and "CPUManagerPolicyOptions" feature gates to be enabled.
+	CPUManagerPolicyOptions map[string]string
 	// CPU Manager reconciliation period.
 	// Requires the CPUManager feature gate to be enabled.
 	CPUManagerReconcilePeriod metav1.Duration
@@ -326,13 +330,17 @@ type KubeletConfiguration struct {
 	FeatureGates map[string]bool
 	// Tells the Kubelet to fail to start if swap is enabled on the node.
 	FailSwapOn bool
+	// memorySwap configures swap memory available to container workloads.
+	// +featureGate=NodeSwap
+	// +optional
+	MemorySwap MemorySwapConfiguration
 	// A quantity defines the maximum size of the container log file before it is rotated. For example: "5Mi" or "256Ki".
 	ContainerLogMaxSize string
 	// Maximum number of container log files that can be present for a container.
 	ContainerLogMaxFiles int32
 	// ConfigMapAndSecretChangeDetectionStrategy is a mode in which config map and secret managers are running.
 	ConfigMapAndSecretChangeDetectionStrategy ResourceChangeDetectionStrategy
-	// A comma separated whitelist of unsafe sysctls or sysctl patterns (ending in *).
+	// A comma separated allowlist of unsafe sysctls or sysctl patterns (ending in *).
 	// Unsafe sysctl groups are kernel.shm*, kernel.msg*, kernel.sem, fs.mqueue.*, and net.*.
 	// These sysctls are namespaced but not allowed by default.  For example: "kernel.msg*,net.ipv4.route.min_pmtu"
 	// +optional
@@ -379,12 +387,25 @@ type KubeletConfiguration struct {
 	// EnableSystemLogHandler enables /logs handler.
 	EnableSystemLogHandler bool
 	// ShutdownGracePeriod specifies the total duration that the node should delay the shutdown and total grace period for pod termination during a node shutdown.
-	// Defaults to 30 seconds, requires GracefulNodeShutdown feature gate to be enabled.
+	// Defaults to 0 seconds.
+	// +featureGate=GracefulNodeShutdown
+	// +optional
 	ShutdownGracePeriod metav1.Duration
 	// ShutdownGracePeriodCriticalPods specifies the duration used to terminate critical pods during a node shutdown. This should be less than ShutdownGracePeriod.
-	// Defaults to 10 seconds, requires GracefulNodeShutdown feature gate to be enabled.
+	// Defaults to 0 seconds.
 	// For example, if ShutdownGracePeriod=30s, and ShutdownGracePeriodCriticalPods=10s, during a node shutdown the first 20 seconds would be reserved for gracefully terminating normal pods, and the last 10 seconds would be reserved for terminating critical pods.
+	// +featureGate=GracefulNodeShutdown
+	// +optional
 	ShutdownGracePeriodCriticalPods metav1.Duration
+	// ShutdownGracePeriodByPodPriority specifies the shutdown grace period for Pods based
+	// on their associated priority class value.
+	// When a shutdown request is received, the Kubelet will initiate shutdown on all pods
+	// running on the node with a grace period that depends on the priority of the pod,
+	// and then wait for all pods to exit.
+	// Each entry in the array represents the graceful shutdown time a pod with a priority
+	// class value that lies in the range of that value and the next higher entry in the
+	// list when the node is shutting down.
+	ShutdownGracePeriodByPodPriority []ShutdownGracePeriodByPodPriority
 	// ReservedMemory specifies a comma-separated list of memory reservations for NUMA nodes.
 	// The parameter makes sense only in the context of the memory manager feature. The memory manager will not allocate reserved memory for container workloads.
 	// For example, if you have a NUMA0 with 10Gi of memory and the ReservedMemory was specified to reserve 1Gi of memory at NUMA0,
@@ -403,6 +424,26 @@ type KubeletConfiguration struct {
 	EnableProfilingHandler bool
 	// EnableDebugFlagsHandler enables/debug/flags/v handler.
 	EnableDebugFlagsHandler bool
+	// SeccompDefault enables the use of `RuntimeDefault` as the default seccomp profile for all workloads.
+	SeccompDefault bool
+	// MemoryThrottlingFactor specifies the factor multiplied by the memory limit or node allocatable memory
+	// when setting the cgroupv2 memory.high value to enforce MemoryQoS.
+	// Decreasing this factor will set lower high limit for container cgroups and put heavier reclaim pressure
+	// while increasing will put less reclaim pressure.
+	// See http://kep.k8s.io/2570 for more details.
+	// Default: 0.8
+	// +featureGate=MemoryQoS
+	// +optional
+	MemoryThrottlingFactor *float64
+	// registerWithTaints are an array of taints to add to a node object when
+	// the kubelet registers itself. This only takes effect when registerNode
+	// is true and upon the initial registration of the node.
+	// +optional
+	RegisterWithTaints []v1.Taint
+
+	// registerNode enables automatic registration with the apiserver.
+	// +optional
+	RegisterNode bool
 }
 
 // KubeletAuthorizationMode denotes the authorization mode for the kubelet
@@ -561,4 +602,21 @@ type ExecEnvVar struct {
 type MemoryReservation struct {
 	NumaNode int32
 	Limits   v1.ResourceList
+}
+
+// ShutdownGracePeriodByPodPriority specifies the shutdown grace period for Pods based on their associated priority class value
+type ShutdownGracePeriodByPodPriority struct {
+	// priority is the priority value associated with the shutdown grace period
+	Priority int32
+	// shutdownGracePeriodSeconds is the shutdown grace period in seconds
+	ShutdownGracePeriodSeconds int64
+}
+
+type MemorySwapConfiguration struct {
+	// swapBehavior configures swap memory available to container workloads. May be one of
+	// "", "LimitedSwap": workload combined memory and swap usage cannot exceed pod memory limit
+	// "UnlimitedSwap": workloads can use unlimited swap, up to the allocatable limit.
+	// +featureGate=NodeSwap
+	// +optional
+	SwapBehavior string
 }

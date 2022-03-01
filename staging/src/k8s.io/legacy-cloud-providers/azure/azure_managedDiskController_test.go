@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -209,7 +210,7 @@ func TestDeleteManagedDisk(t *testing.T) {
 			diskName:       fakeGetDiskFailed,
 			existedDisk:    compute.Disk{Name: to.StringPtr(fakeGetDiskFailed)},
 			expectedErr:    true,
-			expectedErrMsg: fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 0, RawError: Get Disk failed"),
+			expectedErrMsg: fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 0, RawError: %w", fmt.Errorf("Get Disk failed")),
 		},
 	}
 
@@ -263,7 +264,7 @@ func TestGetDisk(t *testing.T) {
 			diskName:                  fakeGetDiskFailed,
 			existedDisk:               compute.Disk{Name: to.StringPtr(fakeGetDiskFailed)},
 			expectedErr:               true,
-			expectedErrMsg:            fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 0, RawError: Get Disk failed"),
+			expectedErrMsg:            fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 0, RawError: %w", fmt.Errorf("Get Disk failed")),
 			expectedProvisioningState: "",
 			expectedDiskID:            "",
 		},
@@ -342,7 +343,7 @@ func TestResizeDisk(t *testing.T) {
 			existedDisk:      compute.Disk{Name: to.StringPtr(fakeGetDiskFailed), DiskProperties: &compute.DiskProperties{DiskSizeGB: &diskSizeGB, DiskState: compute.Unattached}},
 			expectedQuantity: *resource.NewQuantity(2*(1024*1024*1024), resource.BinarySI),
 			expectedErr:      true,
-			expectedErrMsg:   fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 0, RawError: Get Disk failed"),
+			expectedErrMsg:   fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 0, RawError: %w", fmt.Errorf("Get Disk failed")),
 		},
 		{
 			desc:             "an error shall be returned if everything is good but create disk failed",
@@ -352,7 +353,7 @@ func TestResizeDisk(t *testing.T) {
 			existedDisk:      compute.Disk{Name: to.StringPtr(fakeCreateDiskFailed), DiskProperties: &compute.DiskProperties{DiskSizeGB: &diskSizeGB, DiskState: compute.Unattached}},
 			expectedQuantity: *resource.NewQuantity(2*(1024*1024*1024), resource.BinarySI),
 			expectedErr:      true,
-			expectedErrMsg:   fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 0, RawError: Create Disk failed"),
+			expectedErrMsg:   fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 0, RawError: %w", fmt.Errorf("Create Disk failed")),
 		},
 		{
 			desc:             "an error shall be returned if disk is not in Unattached state",
@@ -427,8 +428,8 @@ func TestGetLabelsForVolume(t *testing.T) {
 			},
 			existedDisk: compute.Disk{Name: to.StringPtr(diskName), DiskProperties: &compute.DiskProperties{DiskSizeGB: &diskSizeGB}, Zones: &[]string{"1"}},
 			expected: map[string]string{
-				LabelFailureDomainBetaRegion: testCloud0.Location,
-				LabelFailureDomainBetaZone:   testCloud0.makeZone(testCloud0.Location, 1),
+				v1.LabelTopologyRegion: testCloud0.Location,
+				v1.LabelTopologyZone:   testCloud0.makeZone(testCloud0.Location, 1),
 			},
 			expectedErr: false,
 		},
@@ -464,7 +465,7 @@ func TestGetLabelsForVolume(t *testing.T) {
 			},
 			existedDisk: compute.Disk{Name: to.StringPtr(diskName), DiskProperties: &compute.DiskProperties{DiskSizeGB: &diskSizeGB}},
 			expected: map[string]string{
-				LabelFailureDomainBetaRegion: testCloud0.Location,
+				v1.LabelTopologyRegion: testCloud0.Location,
 			},
 			expectedErr:    false,
 			expectedErrMsg: nil,
@@ -484,7 +485,7 @@ func TestGetLabelsForVolume(t *testing.T) {
 			},
 			existedDisk:    compute.Disk{Name: to.StringPtr(fakeGetDiskFailed), DiskProperties: &compute.DiskProperties{DiskSizeGB: &diskSizeGB}, Zones: &[]string{"1"}},
 			expectedErr:    true,
-			expectedErrMsg: fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 0, RawError: Get Disk failed"),
+			expectedErrMsg: fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 0, RawError: %w", fmt.Errorf("Get Disk failed")),
 		},
 		{
 			desc:     "an error shall be returned if everything is good with invalid DiskURI",

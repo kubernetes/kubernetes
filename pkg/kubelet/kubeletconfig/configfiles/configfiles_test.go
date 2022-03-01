@@ -17,11 +17,10 @@ limitations under the License.
 package configfiles
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 	"testing"
-
-	"github.com/pkg/errors"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -152,7 +151,8 @@ foo: bar`),
 
 	for _, c := range cases {
 		t.Run(c.desc, func(t *testing.T) {
-			fs := utilfs.NewFakeFs()
+			fs := utilfs.NewTempFs()
+			fs.MkdirAll(configDir, 0777)
 			path := filepath.Join(configDir, kubeletFile)
 			if c.file != nil {
 				if err := addFile(fs, path, *c.file); err != nil {
@@ -165,7 +165,7 @@ foo: bar`),
 			}
 			kc, err := loader.Load()
 
-			if c.strictErr && !runtime.IsStrictDecodingError(errors.Cause(err)) {
+			if c.strictErr && !runtime.IsStrictDecodingError(errors.Unwrap(err)) {
 				t.Fatalf("got error: %v, want strict decoding error", err)
 			}
 			if utiltest.SkipRest(t, c.desc, err, c.err) {

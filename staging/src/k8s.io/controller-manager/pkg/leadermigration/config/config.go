@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	internal "k8s.io/controller-manager/config"
 	"k8s.io/controller-manager/config/v1alpha1"
+	"k8s.io/controller-manager/config/v1beta1"
 )
 
 // ResourceLockLeases is the resourceLock value for 'leases' API
@@ -43,6 +44,10 @@ func init() {
 	// v1alpha1
 	util.Must(v1alpha1.AddToScheme(cfgScheme))
 	util.Must(cfgScheme.SetVersionPriority(v1alpha1.SchemeGroupVersion))
+
+	// v1beta1
+	util.Must(v1beta1.AddToScheme(cfgScheme))
+	util.Must(cfgScheme.SetVersionPriority(v1beta1.SchemeGroupVersion))
 }
 
 // ReadLeaderMigrationConfiguration reads LeaderMigrationConfiguration from a YAML file at the given path.
@@ -51,7 +56,7 @@ func init() {
 func ReadLeaderMigrationConfiguration(configFilePath string) (*internal.LeaderMigrationConfiguration, error) {
 	data, err := ioutil.ReadFile(configFilePath)
 	if err != nil {
-		return nil, fmt.Errorf("unable to read leader migration configuration from %q: %v", configFilePath, err)
+		return nil, fmt.Errorf("unable to read leader migration configuration from %q: %w", configFilePath, err)
 	}
 	config, gvk, err := serializer.NewCodecFactory(cfgScheme).UniversalDecoder().Decode(data, nil, nil)
 	if err != nil {

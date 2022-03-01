@@ -27,20 +27,30 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
+	"k8s.io/utils/pointer"
 )
 
-func controllerRef(kind, name, uid string) []metav1.OwnerReference {
-	// TODO: When ControllerRef will be implemented uncomment code below.
-	return nil
-	//trueVar := true
-	//return []metav1.OwnerReference{
-	//	{Kind: kind, Name: name, UID: types.UID(uid), Controller: &trueVar},
-	//}
+var (
+	rcKind = v1.SchemeGroupVersion.WithKind("ReplicationController")
+	rsKind = apps.SchemeGroupVersion.WithKind("ReplicaSet")
+	ssKind = apps.SchemeGroupVersion.WithKind("StatefulSet")
+)
+
+func controllerRef(name string, gvk schema.GroupVersionKind) []metav1.OwnerReference {
+	return []metav1.OwnerReference{
+		{
+			APIVersion: gvk.GroupVersion().String(),
+			Kind:       gvk.Kind,
+			Name:       name,
+			Controller: pointer.BoolPtr(true),
+		},
+	}
 }
 
 func TestSelectorSpreadScore(t *testing.T) {
@@ -86,7 +96,7 @@ func TestSelectorSpreadScore(t *testing.T) {
 			pod:          &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
 			pods:         []*v1.Pod{{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels2}}},
 			nodes:        []string{"machine1", "machine2"},
-			services:     []*v1.Service{{Spec: v1.ServiceSpec{Selector: map[string]string{"key": "value"}}}},
+			services:     []*v1.Service{{ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "s1"}, Spec: v1.ServiceSpec{Selector: map[string]string{"key": "value"}}}},
 			expectedList: []framework.NodeScore{{Name: "machine1", Score: framework.MaxNodeScore}, {Name: "machine2", Score: framework.MaxNodeScore}},
 			name:         "different services",
 		},
@@ -97,7 +107,7 @@ func TestSelectorSpreadScore(t *testing.T) {
 				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
 			},
 			nodes:        []string{"machine1", "machine2"},
-			services:     []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}}},
+			services:     []*v1.Service{{ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "s1"}, Spec: v1.ServiceSpec{Selector: labels1}}},
 			expectedList: []framework.NodeScore{{Name: "machine1", Score: framework.MaxNodeScore}, {Name: "machine2", Score: 0}},
 			name:         "two pods, one service pod",
 		},
@@ -111,7 +121,7 @@ func TestSelectorSpreadScore(t *testing.T) {
 				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels2}},
 			},
 			nodes:        []string{"machine1", "machine2"},
-			services:     []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}}},
+			services:     []*v1.Service{{ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "s1"}, Spec: v1.ServiceSpec{Selector: labels1}}},
 			expectedList: []framework.NodeScore{{Name: "machine1", Score: framework.MaxNodeScore}, {Name: "machine2", Score: 0}},
 			name:         "five pods, one service pod in no namespace",
 		},
@@ -124,7 +134,7 @@ func TestSelectorSpreadScore(t *testing.T) {
 				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels2}},
 			},
 			nodes:        []string{"machine1", "machine2"},
-			services:     []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}, ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault}}},
+			services:     []*v1.Service{{ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "s1"}, Spec: v1.ServiceSpec{Selector: labels1}}},
 			expectedList: []framework.NodeScore{{Name: "machine1", Score: framework.MaxNodeScore}, {Name: "machine2", Score: 0}},
 			name:         "four pods, one service pod in default namespace",
 		},
@@ -150,7 +160,7 @@ func TestSelectorSpreadScore(t *testing.T) {
 				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
 			},
 			nodes:        []string{"machine1", "machine2"},
-			services:     []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}}},
+			services:     []*v1.Service{{ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "s1"}, Spec: v1.ServiceSpec{Selector: labels1}}},
 			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: 0}},
 			name:         "three pods, two service pods on different machines",
 		},
@@ -163,7 +173,7 @@ func TestSelectorSpreadScore(t *testing.T) {
 				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
 			},
 			nodes:        []string{"machine1", "machine2"},
-			services:     []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}}},
+			services:     []*v1.Service{{ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "s1"}, Spec: v1.ServiceSpec{Selector: labels1}}},
 			expectedList: []framework.NodeScore{{Name: "machine1", Score: 50}, {Name: "machine2", Score: 0}},
 			name:         "four pods, three service pods",
 		},
@@ -175,166 +185,180 @@ func TestSelectorSpreadScore(t *testing.T) {
 				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
 			},
 			nodes:        []string{"machine1", "machine2"},
-			services:     []*v1.Service{{Spec: v1.ServiceSpec{Selector: map[string]string{"baz": "blah"}}}},
+			services:     []*v1.Service{{ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "s1"}, Spec: v1.ServiceSpec{Selector: map[string]string{"baz": "blah"}}}},
 			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: 50}},
 			name:         "service with partial pod label matches",
 		},
 		{
-			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
+			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: labels1, OwnerReferences: controllerRef("rc1", rcKind)}},
 			pods: []*v1.Pod{
-				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels2}},
-				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
-				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: labels1}},
+				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: labels1}},
 			},
-			nodes:    []string{"machine1", "machine2"},
-			rcs:      []*v1.ReplicationController{{Spec: v1.ReplicationControllerSpec{Selector: map[string]string{"foo": "bar"}}}},
-			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: map[string]string{"baz": "blah"}}}},
+			nodes: []string{"machine1", "machine2"},
+			rcs: []*v1.ReplicationController{
+				{ObjectMeta: metav1.ObjectMeta{Name: "rc1", Namespace: metav1.NamespaceDefault}, Spec: v1.ReplicationControllerSpec{Selector: map[string]string{"foo": "bar"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "rc2", Namespace: metav1.NamespaceDefault}, Spec: v1.ReplicationControllerSpec{Selector: map[string]string{"bar": "foo"}}},
+			},
+			services: []*v1.Service{{ObjectMeta: metav1.ObjectMeta{Name: "s1", Namespace: metav1.NamespaceDefault}, Spec: v1.ServiceSpec{Selector: map[string]string{"baz": "blah"}}}},
 			// "baz=blah" matches both labels1 and labels2, and "foo=bar" matches only labels 1. This means that we assume that we want to
 			// do spreading pod2 and pod3 and not pod1.
 			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: 0}},
 			name:         "service with partial pod label matches with service and replication controller",
 		},
 		{
-			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
+			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: labels1, OwnerReferences: controllerRef("rs1", rsKind)}},
 			pods: []*v1.Pod{
-				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels2}},
-				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
-				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: labels1}},
+				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: labels1}},
 			},
 			nodes:    []string{"machine1", "machine2"},
-			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: map[string]string{"baz": "blah"}}}},
-			rss:      []*apps.ReplicaSet{{Spec: apps.ReplicaSetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}}}},
+			services: []*v1.Service{{ObjectMeta: metav1.ObjectMeta{Name: "s1", Namespace: metav1.NamespaceDefault}, Spec: v1.ServiceSpec{Selector: map[string]string{"baz": "blah"}}}},
+			rss: []*apps.ReplicaSet{
+				{ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "rs1"}, Spec: apps.ReplicaSetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}}},
+				{ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "rs2"}, Spec: apps.ReplicaSetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"bar": "foo"}}}},
+			},
 			// We use ReplicaSet, instead of ReplicationController. The result should be exactly as above.
 			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: 0}},
 			name:         "service with partial pod label matches with service and replica set",
 		},
 		{
-			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("StatefulSet", "name", "abc123")}},
+			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: labels1, OwnerReferences: controllerRef("ss1", ssKind)}},
 			pods: []*v1.Pod{
-				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels2}},
-				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("StatefulSet", "name", "abc123")}},
-				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("StatefulSet", "name", "abc123")}},
-			},
-			nodes:        []string{"machine1", "machine2"},
-			services:     []*v1.Service{{Spec: v1.ServiceSpec{Selector: map[string]string{"baz": "blah"}}}},
-			sss:          []*apps.StatefulSet{{Spec: apps.StatefulSetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}}}},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: 0}},
-			name:         "service with partial pod label matches with service and stateful set",
-		},
-		{
-			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"foo": "bar", "bar": "foo"}, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
-			pods: []*v1.Pod{
-				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels2}},
-				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
-				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: labels1}},
+				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: labels1}},
 			},
 			nodes:    []string{"machine1", "machine2"},
-			rcs:      []*v1.ReplicationController{{Spec: v1.ReplicationControllerSpec{Selector: map[string]string{"foo": "bar"}}}},
-			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: map[string]string{"bar": "foo"}}}},
+			services: []*v1.Service{{ObjectMeta: metav1.ObjectMeta{Name: "s1", Namespace: metav1.NamespaceDefault}, Spec: v1.ServiceSpec{Selector: map[string]string{"baz": "blah"}}}},
+			sss: []*apps.StatefulSet{
+				{ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "ss1"}, Spec: apps.StatefulSetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}}},
+				{ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "ss2"}, Spec: apps.StatefulSetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"bar": "foo"}}}},
+			},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: 0}},
+			name:         "service with partial pod label matches with service and statefulset",
+		},
+		{
+			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: map[string]string{"foo": "bar", "bar": "foo"}, OwnerReferences: controllerRef("rc3", rcKind)}},
+			pods: []*v1.Pod{
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: labels2, OwnerReferences: controllerRef("rc2", rcKind)}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: labels1, OwnerReferences: controllerRef("rc1", rcKind)}},
+				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: labels1, OwnerReferences: controllerRef("rc1", rcKind)}},
+			},
+			nodes: []string{"machine1", "machine2"},
+			rcs: []*v1.ReplicationController{{
+				ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "rc3"},
+				Spec:       v1.ReplicationControllerSpec{Selector: map[string]string{"foo": "bar"}}}},
+			services: []*v1.Service{{ObjectMeta: metav1.ObjectMeta{Name: "s1", Namespace: metav1.NamespaceDefault}, Spec: v1.ServiceSpec{Selector: map[string]string{"bar": "foo"}}}},
 			// Taken together Service and Replication Controller should match no pods.
 			expectedList: []framework.NodeScore{{Name: "machine1", Score: framework.MaxNodeScore}, {Name: "machine2", Score: framework.MaxNodeScore}},
 			name:         "disjoined service and replication controller matches no pods",
 		},
 		{
-			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"foo": "bar", "bar": "foo"}, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
+			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: map[string]string{"foo": "bar", "bar": "foo"},
+				OwnerReferences: controllerRef("rs3", rsKind)}},
 			pods: []*v1.Pod{
-				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels2}},
-				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
-				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: labels2, OwnerReferences: controllerRef("rs2", rsKind)}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: labels1, OwnerReferences: controllerRef("rs1", rsKind)}},
+				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: labels1, OwnerReferences: controllerRef("rs1", rsKind)}},
 			},
 			nodes:    []string{"machine1", "machine2"},
-			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: map[string]string{"bar": "foo"}}}},
-			rss:      []*apps.ReplicaSet{{Spec: apps.ReplicaSetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}}}},
+			services: []*v1.Service{{ObjectMeta: metav1.ObjectMeta{Name: "s1", Namespace: metav1.NamespaceDefault}, Spec: v1.ServiceSpec{Selector: map[string]string{"bar": "foo"}}}},
+			rss: []*apps.ReplicaSet{
+				{ObjectMeta: metav1.ObjectMeta{Name: "rs3", Namespace: metav1.NamespaceDefault}, Spec: apps.ReplicaSetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}}}},
 			// We use ReplicaSet, instead of ReplicationController. The result should be exactly as above.
 			expectedList: []framework.NodeScore{{Name: "machine1", Score: framework.MaxNodeScore}, {Name: "machine2", Score: framework.MaxNodeScore}},
 			name:         "disjoined service and replica set matches no pods",
 		},
 		{
-			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"foo": "bar", "bar": "foo"}, OwnerReferences: controllerRef("StatefulSet", "name", "abc123")}},
+			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: map[string]string{"foo": "bar", "bar": "foo"}, OwnerReferences: controllerRef("ss3", ssKind)}},
 			pods: []*v1.Pod{
-				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels2}},
-				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("StatefulSet", "name", "abc123")}},
-				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("StatefulSet", "name", "abc123")}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: labels2, OwnerReferences: controllerRef("ss2", ssKind)}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: labels1, OwnerReferences: controllerRef("ss1", ssKind)}},
+				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: labels1, OwnerReferences: controllerRef("ss1", ssKind)}},
 			},
-			nodes:        []string{"machine1", "machine2"},
-			services:     []*v1.Service{{Spec: v1.ServiceSpec{Selector: map[string]string{"bar": "foo"}}}},
-			sss:          []*apps.StatefulSet{{Spec: apps.StatefulSetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}}}},
+			nodes:    []string{"machine1", "machine2"},
+			services: []*v1.Service{{ObjectMeta: metav1.ObjectMeta{Name: "s1", Namespace: metav1.NamespaceDefault}, Spec: v1.ServiceSpec{Selector: map[string]string{"bar": "foo"}}}},
+			sss: []*apps.StatefulSet{
+				{ObjectMeta: metav1.ObjectMeta{Name: "ss3", Namespace: metav1.NamespaceDefault}, Spec: apps.StatefulSetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}}}},
 			expectedList: []framework.NodeScore{{Name: "machine1", Score: framework.MaxNodeScore}, {Name: "machine2", Score: framework.MaxNodeScore}},
 			name:         "disjoined service and stateful set matches no pods",
 		},
 		{
-			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
+			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: labels1, OwnerReferences: controllerRef("rc1", rcKind)}},
 			pods: []*v1.Pod{
-				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels2}},
-				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
-				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: labels2, OwnerReferences: controllerRef("rc2", rcKind)}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: labels1, OwnerReferences: controllerRef("rc1", rcKind)}},
+				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: labels1, OwnerReferences: controllerRef("rc1", rcKind)}},
 			},
 			nodes: []string{"machine1", "machine2"},
-			rcs:   []*v1.ReplicationController{{Spec: v1.ReplicationControllerSpec{Selector: map[string]string{"foo": "bar"}}}},
+			rcs:   []*v1.ReplicationController{{ObjectMeta: metav1.ObjectMeta{Name: "rc1", Namespace: metav1.NamespaceDefault}, Spec: v1.ReplicationControllerSpec{Selector: map[string]string{"foo": "bar"}}}},
 			// Both Nodes have one pod from the given RC, hence both get 0 score.
 			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: 0}},
 			name:         "Replication controller with partial pod label matches",
 		},
 		{
-			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
+			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: labels1, OwnerReferences: controllerRef("rs1", rsKind)}},
 			pods: []*v1.Pod{
-				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels2}},
-				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
-				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: labels2, OwnerReferences: controllerRef("rs2", rsKind)}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: labels1, OwnerReferences: controllerRef("rs1", rsKind)}},
+				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: labels1, OwnerReferences: controllerRef("rs1", rsKind)}},
 			},
 			nodes: []string{"machine1", "machine2"},
-			rss:   []*apps.ReplicaSet{{Spec: apps.ReplicaSetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}}}},
+			rss:   []*apps.ReplicaSet{{ObjectMeta: metav1.ObjectMeta{Name: "rs1", Namespace: metav1.NamespaceDefault}, Spec: apps.ReplicaSetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}}}},
 			// We use ReplicaSet, instead of ReplicationController. The result should be exactly as above.
 			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: 0}},
 			name:         "Replica set with partial pod label matches",
 		},
 		{
-			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("StatefulSet", "name", "abc123")}},
+			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: labels1, OwnerReferences: controllerRef("ss1", ssKind)}},
 			pods: []*v1.Pod{
-				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels2}},
-				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("StatefulSet", "name", "abc123")}},
-				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("StatefulSet", "name", "abc123")}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: labels2, OwnerReferences: controllerRef("ss2", ssKind)}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: labels1, OwnerReferences: controllerRef("ss1", ssKind)}},
+				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: labels1, OwnerReferences: controllerRef("ss1", ssKind)}},
 			},
 			nodes: []string{"machine1", "machine2"},
-			sss:   []*apps.StatefulSet{{Spec: apps.StatefulSetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}}}},
+			sss:   []*apps.StatefulSet{{ObjectMeta: metav1.ObjectMeta{Name: "ss1", Namespace: metav1.NamespaceDefault}, Spec: apps.StatefulSetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}}}},
 			// We use StatefulSet, instead of ReplicationController. The result should be exactly as above.
 			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: 0}},
 			name:         "StatefulSet with partial pod label matches",
 		},
 		{
-			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
+			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: labels1, OwnerReferences: controllerRef("rc3", rcKind)}},
 			pods: []*v1.Pod{
-				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels2, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
-				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
-				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: labels2, OwnerReferences: controllerRef("rc2", rcKind)}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: labels1, OwnerReferences: controllerRef("rc1", rcKind)}},
+				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: labels1, OwnerReferences: controllerRef("rc1", rcKind)}},
 			},
 			nodes:        []string{"machine1", "machine2"},
-			rcs:          []*v1.ReplicationController{{Spec: v1.ReplicationControllerSpec{Selector: map[string]string{"baz": "blah"}}}},
+			rcs:          []*v1.ReplicationController{{ObjectMeta: metav1.ObjectMeta{Name: "rc3", Namespace: metav1.NamespaceDefault}, Spec: v1.ReplicationControllerSpec{Selector: map[string]string{"baz": "blah"}}}},
 			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: 50}},
 			name:         "Another replication controller with partial pod label matches",
 		},
 		{
-			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
+			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: labels1, OwnerReferences: controllerRef("rs3", rsKind)}},
 			pods: []*v1.Pod{
-				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels2, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
-				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
-				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: labels2, OwnerReferences: controllerRef("rs2", rsKind)}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: labels1, OwnerReferences: controllerRef("rs1", rsKind)}},
+				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: labels1, OwnerReferences: controllerRef("rs1", rsKind)}},
 			},
 			nodes: []string{"machine1", "machine2"},
-			rss:   []*apps.ReplicaSet{{Spec: apps.ReplicaSetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"baz": "blah"}}}}},
+			rss:   []*apps.ReplicaSet{{ObjectMeta: metav1.ObjectMeta{Name: "rs3", Namespace: metav1.NamespaceDefault}, Spec: apps.ReplicaSetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"baz": "blah"}}}}},
 			// We use ReplicaSet, instead of ReplicationController. The result should be exactly as above.
 			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: 50}},
 			name:         "Another replication set with partial pod label matches",
 		},
 		{
-			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("StatefulSet", "name", "abc123")}},
+			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: labels1, OwnerReferences: controllerRef("ss3", ssKind)}},
 			pods: []*v1.Pod{
-				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels2, OwnerReferences: controllerRef("StatefulSet", "name", "abc123")}},
-				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("StatefulSet", "name", "abc123")}},
-				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("StatefulSet", "name", "abc123")}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: labels2, OwnerReferences: controllerRef("ss2", ssKind)}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: labels1, OwnerReferences: controllerRef("ss1", ssKind)}},
+				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: labels1, OwnerReferences: controllerRef("ss1", ssKind)}},
 			},
 			nodes: []string{"machine1", "machine2"},
-			sss:   []*apps.StatefulSet{{Spec: apps.StatefulSetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"baz": "blah"}}}}},
+			sss:   []*apps.StatefulSet{{ObjectMeta: metav1.ObjectMeta{Name: "ss3", Namespace: metav1.NamespaceDefault}, Spec: apps.StatefulSetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"baz": "blah"}}}}},
 			// We use StatefulSet, instead of ReplicationController. The result should be exactly as above.
 			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: 50}},
 			name:         "Another stateful set with partial pod label matches",
@@ -342,8 +366,9 @@ func TestSelectorSpreadScore(t *testing.T) {
 		{
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
+					Namespace:       metav1.NamespaceDefault,
 					Labels:          labels1,
-					OwnerReferences: controllerRef("StatefulSet", "name", "abc123"),
+					OwnerReferences: controllerRef("ss1", ssKind),
 				},
 				Spec: v1.PodSpec{
 					TopologySpreadConstraints: []v1.TopologySpreadConstraint{
@@ -356,14 +381,14 @@ func TestSelectorSpreadScore(t *testing.T) {
 				},
 			},
 			pods: []*v1.Pod{
-				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels2, OwnerReferences: controllerRef("StatefulSet", "name", "abc123")}},
-				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("StatefulSet", "name", "abc123")}},
-				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("StatefulSet", "name", "abc123")}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: labels2, OwnerReferences: controllerRef("ss2", ssKind)}},
+				{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: labels1, OwnerReferences: controllerRef("ss1", ssKind)}},
+				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: labels1, OwnerReferences: controllerRef("ss1", ssKind)}},
 			},
 			nodes:        []string{"machine1", "machine2"},
-			sss:          []*apps.StatefulSet{{Spec: apps.StatefulSetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"baz": "blah"}}}}},
+			sss:          []*apps.StatefulSet{{ObjectMeta: metav1.ObjectMeta{Name: "ss1", Namespace: metav1.NamespaceDefault}, Spec: apps.StatefulSetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"baz": "blah"}}}}},
 			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: 0}},
-			name:         "Another stateful set with TopologySpreadConstraints set in pod",
+			name:         "Another statefulset with TopologySpreadConstraints set in pod",
 		},
 	}
 
@@ -371,12 +396,13 @@ func TestSelectorSpreadScore(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			nodes := makeNodeList(test.nodes)
 			snapshot := cache.NewSnapshot(test.pods, nodes)
-			ctx := context.Background()
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			informerFactory, err := populateAndStartInformers(ctx, test.rcs, test.rss, test.services, test.sss)
 			if err != nil {
 				t.Errorf("error creating informerFactory: %+v", err)
 			}
-			fh, err := frameworkruntime.NewFramework(nil, nil, nil, frameworkruntime.WithSnapshotSharedLister(snapshot), frameworkruntime.WithInformerFactory(informerFactory))
+			fh, err := frameworkruntime.NewFramework(nil, nil, frameworkruntime.WithSnapshotSharedLister(snapshot), frameworkruntime.WithInformerFactory(informerFactory))
 			if err != nil {
 				t.Errorf("error creating new framework handle: %+v", err)
 			}
@@ -417,7 +443,7 @@ func TestSelectorSpreadScore(t *testing.T) {
 
 func buildPod(nodeName string, labels map[string]string, ownerRefs []metav1.OwnerReference) *v1.Pod {
 	return &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Labels: labels, OwnerReferences: ownerRefs},
+		ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Labels: labels, OwnerReferences: ownerRefs},
 		Spec:       v1.PodSpec{NodeName: nodeName},
 	}
 }
@@ -492,7 +518,7 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 		{
 			pod:      buildPod("", labels1, nil),
 			pods:     []*v1.Pod{buildPod(nodeMachine1Zone1, labels2, nil)},
-			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: map[string]string{"key": "value"}}}},
+			services: []*v1.Service{{ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "s1"}, Spec: v1.ServiceSpec{Selector: map[string]string{"key": "value"}}}},
 			expectedList: []framework.NodeScore{
 				{Name: nodeMachine1Zone1, Score: framework.MaxNodeScore},
 				{Name: nodeMachine1Zone2, Score: framework.MaxNodeScore},
@@ -509,7 +535,7 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 				buildPod(nodeMachine1Zone1, labels2, nil),
 				buildPod(nodeMachine1Zone2, labels2, nil),
 			},
-			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}}},
+			services: []*v1.Service{{ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "s1"}, Spec: v1.ServiceSpec{Selector: labels1}}},
 			expectedList: []framework.NodeScore{
 				{Name: nodeMachine1Zone1, Score: framework.MaxNodeScore},
 				{Name: nodeMachine1Zone2, Score: framework.MaxNodeScore},
@@ -526,7 +552,7 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 				buildPod(nodeMachine1Zone1, labels2, nil),
 				buildPod(nodeMachine1Zone2, labels1, nil),
 			},
-			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}}},
+			services: []*v1.Service{{ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "s1"}, Spec: v1.ServiceSpec{Selector: labels1}}},
 			expectedList: []framework.NodeScore{
 				{Name: nodeMachine1Zone1, Score: framework.MaxNodeScore},
 				{Name: nodeMachine1Zone2, Score: 0},  // Already have pod on machine
@@ -546,7 +572,7 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 				buildPod(nodeMachine1Zone3, labels2, nil),
 				buildPod(nodeMachine2Zone3, labels1, nil),
 			},
-			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}}},
+			services: []*v1.Service{{ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "s1"}, Spec: v1.ServiceSpec{Selector: labels1}}},
 			expectedList: []framework.NodeScore{
 				{Name: nodeMachine1Zone1, Score: framework.MaxNodeScore},
 				{Name: nodeMachine1Zone2, Score: 0},  // Pod on node
@@ -565,7 +591,7 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 				buildPod(nodeMachine2Zone2, labels2, nil),
 				buildPod(nodeMachine1Zone3, labels1, nil),
 			},
-			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}}},
+			services: []*v1.Service{{ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "s1"}, Spec: v1.ServiceSpec{Selector: labels1}}},
 			expectedList: []framework.NodeScore{
 				{Name: nodeMachine1Zone1, Score: 0},  // Pod on node
 				{Name: nodeMachine1Zone2, Score: 0},  // Pod on node
@@ -585,7 +611,7 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 				buildPod(nodeMachine2Zone2, labels2, nil),
 				buildPod(nodeMachine1Zone3, labels1, nil),
 			},
-			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}}},
+			services: []*v1.Service{{ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "s1"}, Spec: v1.ServiceSpec{Selector: labels1}}},
 			expectedList: []framework.NodeScore{
 				{Name: nodeMachine1Zone1, Score: 33}, // Pod on node
 				{Name: nodeMachine1Zone2, Score: 0},  // Pod on node
@@ -597,13 +623,14 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 			name: "five pods, 4 matching (z1=1, z2=2, z3=1)",
 		},
 		{
-			pod: buildPod("", labels1, controllerRef("ReplicationController", "name", "abc123")),
+			pod: buildPod("", labels1, controllerRef("rc1", rcKind)),
 			pods: []*v1.Pod{
-				buildPod(nodeMachine1Zone3, labels1, controllerRef("ReplicationController", "name", "abc123")),
-				buildPod(nodeMachine1Zone2, labels1, controllerRef("ReplicationController", "name", "abc123")),
-				buildPod(nodeMachine1Zone3, labels1, controllerRef("ReplicationController", "name", "abc123")),
+				buildPod(nodeMachine1Zone3, labels1, nil),
+				buildPod(nodeMachine1Zone2, labels1, nil),
+				buildPod(nodeMachine1Zone3, labels1, nil),
 			},
-			rcs: []*v1.ReplicationController{{Spec: v1.ReplicationControllerSpec{Selector: labels1}}},
+			rcs: []*v1.ReplicationController{
+				{ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "rc1"}, Spec: v1.ReplicationControllerSpec{Selector: labels1}}},
 			expectedList: []framework.NodeScore{
 				// Note that because we put two pods on the same node (nodeMachine1Zone3),
 				// the values here are questionable for zone2, in particular for nodeMachine1Zone2.
@@ -627,12 +654,13 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			nodes := makeLabeledNodeList(labeledNodes)
 			snapshot := cache.NewSnapshot(test.pods, nodes)
-			ctx := context.Background()
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			informerFactory, err := populateAndStartInformers(ctx, test.rcs, test.rss, test.services, test.sss)
 			if err != nil {
 				t.Errorf("error creating informerFactory: %+v", err)
 			}
-			fh, err := frameworkruntime.NewFramework(nil, nil, nil, frameworkruntime.WithSnapshotSharedLister(snapshot), frameworkruntime.WithInformerFactory(informerFactory))
+			fh, err := frameworkruntime.NewFramework(nil, nil, frameworkruntime.WithSnapshotSharedLister(snapshot), frameworkruntime.WithInformerFactory(informerFactory))
 			if err != nil {
 				t.Errorf("error creating new framework handle: %+v", err)
 			}

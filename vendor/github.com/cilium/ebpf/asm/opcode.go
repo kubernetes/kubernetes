@@ -66,16 +66,16 @@ type OpCode uint8
 // InvalidOpCode is returned by setters on OpCode
 const InvalidOpCode OpCode = 0xff
 
-// marshalledInstructions returns the number of BPF instructions required
+// rawInstructions returns the number of BPF instructions required
 // to encode this opcode.
-func (op OpCode) marshalledInstructions() int {
-	if op == LoadImmOp(DWord) {
+func (op OpCode) rawInstructions() int {
+	if op.IsDWordLoad() {
 		return 2
 	}
 	return 1
 }
 
-func (op OpCode) isDWordLoad() bool {
+func (op OpCode) IsDWordLoad() bool {
 	return op == LoadImmOp(DWord)
 }
 

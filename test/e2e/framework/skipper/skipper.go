@@ -43,9 +43,6 @@ import (
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 )
 
-// New local storage types to support local storage capacity isolation
-var localStorageCapacityIsolation featuregate.Feature = "LocalStorageCapacityIsolation"
-
 func skipInternalf(caller int, format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
 	framework.Logf(msg)
@@ -121,6 +118,7 @@ func pruneStack(skip int) string {
 // Skipf skips with information about why the test is being skipped.
 func Skipf(format string, args ...interface{}) {
 	skipInternalf(1, format, args...)
+	panic("unreachable")
 }
 
 // SkipUnlessAtLeast skips if the value is less than the minValue.
@@ -130,10 +128,17 @@ func SkipUnlessAtLeast(value int, minValue int, message string) {
 	}
 }
 
-// SkipUnlessLocalEphemeralStorageEnabled skips if the LocalStorageCapacityIsolation is not enabled.
-func SkipUnlessLocalEphemeralStorageEnabled() {
-	if !utilfeature.DefaultFeatureGate.Enabled(localStorageCapacityIsolation) {
-		skipInternalf(1, "Only supported when %v feature is enabled", localStorageCapacityIsolation)
+// SkipUnlessFeatureGateEnabled skips if the feature is disabled
+func SkipUnlessFeatureGateEnabled(gate featuregate.Feature) {
+	if !utilfeature.DefaultFeatureGate.Enabled(gate) {
+		skipInternalf(1, "Only supported when %v feature is enabled", gate)
+	}
+}
+
+// SkipIfFeatureGateEnabled skips if the feature is enabled
+func SkipIfFeatureGateEnabled(gate featuregate.Feature) {
+	if utilfeature.DefaultFeatureGate.Enabled(gate) {
+		skipInternalf(1, "Only supported when %v feature is disabled", gate)
 	}
 }
 
@@ -267,16 +272,6 @@ func SkipIfAppArmorNotSupported() {
 	SkipUnlessNodeOSDistroIs(AppArmorDistros...)
 }
 
-// RunIfContainerRuntimeIs runs if the container runtime is included in the runtimes.
-func RunIfContainerRuntimeIs(runtimes ...string) {
-	for _, containerRuntime := range runtimes {
-		if containerRuntime == framework.TestContext.ContainerRuntime {
-			return
-		}
-	}
-	skipInternalf(1, "Skipped because container runtime %q is not in %s", framework.TestContext.ContainerRuntime, runtimes)
-}
-
 // RunIfSystemSpecNameIs runs if the system spec name is included in the names.
 func RunIfSystemSpecNameIs(names ...string) {
 	for _, name := range names {
@@ -306,5 +301,12 @@ func SkipUnlessComponentRunsAsPodsAndClientCanDeleteThem(componentName string, c
 	pod := pods.Items[0]
 	if err := c.CoreV1().Pods(ns).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{DryRun: []string{metav1.DryRunAll}}); err != nil {
 		skipInternalf(1, "Skipped because client failed to delete component:%s pod, err:%v", componentName, err)
+	}
+}
+
+// SkipIfIPv6 skips if the cluster IP family is IPv6 and the provider is included in the unsupportedProviders.
+func SkipIfIPv6(unsupportedProviders ...string) {
+	if framework.TestContext.ClusterIsIPv6() && framework.ProviderIs(unsupportedProviders...) {
+		skipInternalf(1, "Not supported for IPv6 clusters and providers %v (found %s)", unsupportedProviders, framework.TestContext.Provider)
 	}
 }

@@ -1,4 +1,4 @@
-// Copyright 2017 Google Inc. All Rights Reserved.
+// Copyright 2020 Google LLC. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -40,6 +40,9 @@ option java_package = "org.openapi_v2";
 // hopefully unique enough to not conflict with things that may come along in
 // the future. 'GPB' is reserved for the protocol buffer implementation itself.
 option objc_class_prefix = "OAS";
+
+// The Go package name.
+option go_package = "./openapiv2;openapi_v2";
 
 message AdditionalPropertiesItem {
   oneof oneof {
@@ -553,7 +556,7 @@ message Response {
   repeated NamedAny vendor_extension = 5;
 }
 
-// One or more JSON representations for parameters
+// One or more JSON representations for responses
 message ResponseDefinitions {
   repeated NamedResponse additional_properties = 1;
 }

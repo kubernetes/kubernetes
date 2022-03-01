@@ -21,7 +21,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"strings"
 	"time"
@@ -34,6 +33,7 @@ import (
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
@@ -75,7 +75,7 @@ func loadConfig(cfgPath string, client clientset.Interface, skipComponentConfigs
 	}
 
 	// Otherwise, we have a config file. Let's load it.
-	configBytes, err := ioutil.ReadFile(cfgPath)
+	configBytes, err := os.ReadFile(cfgPath)
 	if err != nil {
 		return nil, false, errors.Wrapf(err, "unable to load config from file %q", cfgPath)
 	}
@@ -241,7 +241,7 @@ func runPreflightChecks(client clientset.Interface, ignorePreflightErrors sets.S
 	if err != nil {
 		return err
 	}
-	err = upgrade.RunCoreDNSMigrationCheck(client, ignorePreflightErrors, cfg.DNS.Type)
+	err = upgrade.RunCoreDNSMigrationCheck(client, ignorePreflightErrors)
 	if err != nil {
 		return err
 	}

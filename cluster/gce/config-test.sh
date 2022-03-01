@@ -42,6 +42,13 @@ NODE_LOCAL_SSDS=${NODE_LOCAL_SSDS:-0}
 NODE_LABELS=${KUBE_NODE_LABELS:-}
 WINDOWS_NODE_LABELS=${WINDOWS_NODE_LABELS:-}
 NODE_LOCAL_SSDS_EPHEMERAL=${NODE_LOCAL_SSDS_EPHEMERAL:-}
+# Turning GRPC based Konnectivity testing on id advance of
+# removing the SSHTunnel code.
+export KUBE_ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE=true
+export PREPARE_KONNECTIVITY_SERVICE="${KUBE_ENABLE_KONNECTIVITY_SERVICE:-true}"
+export EGRESS_VIA_KONNECTIVITY="${KUBE_ENABLE_KONNECTIVITY_SERVICE:-true}"
+export RUN_KONNECTIVITY_PODS="${KUBE_ENABLE_KONNECTIVITY_SERVICE:-true}"
+export KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE="${KUBE_KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE:-grpc}"
 
 # KUBE_CREATE_NODES can be used to avoid creating nodes, while master will be sized for NUM_NODES nodes.
 # Firewalls and node templates are still created.
@@ -92,30 +99,18 @@ ALLOWED_NOTREADY_NODES=${ALLOWED_NOTREADY_NODES:-$(($(get-num-nodes) / 100))}
 # you are updating the os image versions, update this variable.
 # Also please update corresponding image for node e2e at:
 # https://github.com/kubernetes/kubernetes/blob/master/test/e2e_node/jenkins/image-config.yaml
-GCI_VERSION=${KUBE_GCI_VERSION:-cos-85-13310-1041-9}
+GCI_VERSION=${KUBE_GCI_VERSION:-cos-85-13310-1308-1}
 export MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-}
 export MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-cos-cloud}
 export NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${GCI_VERSION}}
 export NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-cos-cloud}
 export NODE_SERVICE_ACCOUNT=${KUBE_GCE_NODE_SERVICE_ACCOUNT:-default}
 
-# Default container runtime for linux
-export CONTAINER_RUNTIME=${KUBE_CONTAINER_RUNTIME:-containerd}
-# Default container runtime for windows
-export WINDOWS_CONTAINER_RUNTIME=${KUBE_WINDOWS_CONTAINER_RUNTIME:-docker}
-
-# Set default values with override
-if [[ "${CONTAINER_RUNTIME}" == "docker" ]]; then
-  export CONTAINER_RUNTIME_ENDPOINT=${KUBE_CONTAINER_RUNTIME_ENDPOINT:-unix:///var/run/dockershim.sock}
-  export CONTAINER_RUNTIME_NAME=${KUBE_CONTAINER_RUNTIME_NAME:-docker}
-  export LOAD_IMAGE_COMMAND=${KUBE_LOAD_IMAGE_COMMAND:-}
-elif [[ "${CONTAINER_RUNTIME}" == "containerd" || "${CONTAINER_RUNTIME}" == "remote" ]]; then
-  export CONTAINER_RUNTIME_ENDPOINT=${KUBE_CONTAINER_RUNTIME_ENDPOINT:-unix:///run/containerd/containerd.sock}
-  export CONTAINER_RUNTIME_NAME=${KUBE_CONTAINER_RUNTIME_NAME:-containerd}
-  export LOAD_IMAGE_COMMAND=${KUBE_LOAD_IMAGE_COMMAND:-ctr -n=k8s.io images import}
-  export LOG_DUMP_SYSTEMD_SERVICES=${LOG_DUMP_SYSTEMD_SERVICES:-containerd}
-  export CONTAINER_RUNTIME_TEST_HANDLER="true"
-fi
+export CONTAINER_RUNTIME_ENDPOINT=${KUBE_CONTAINER_RUNTIME_ENDPOINT:-unix:///run/containerd/containerd.sock}
+export CONTAINER_RUNTIME_NAME=${KUBE_CONTAINER_RUNTIME_NAME:-containerd}
+export LOAD_IMAGE_COMMAND=${KUBE_LOAD_IMAGE_COMMAND:-ctr -n=k8s.io images import}
+export LOG_DUMP_SYSTEMD_SERVICES=${LOG_DUMP_SYSTEMD_SERVICES:-containerd}
+export CONTAINER_RUNTIME_TEST_HANDLER="true"
 
 export GCI_DOCKER_VERSION=${KUBE_GCI_DOCKER_VERSION:-}
 
@@ -205,7 +200,7 @@ HEAPSTER_MACHINE_TYPE=${HEAPSTER_MACHINE_TYPE:-}
 NUM_ADDITIONAL_NODES=${NUM_ADDITIONAL_NODES:-}
 ADDITIONAL_MACHINE_TYPE=${ADDITIONAL_MACHINE_TYPE:-}
 
-# Set etcd image (e.g. k8s.gcr.io/etcd) and version (e.g. 3.4.13-0) if you need
+# Set etcd image (e.g. k8s.gcr.io/etcd) and version (e.g. v3.5.1-0) if you need
 # non-default version.
 export ETCD_IMAGE=${TEST_ETCD_IMAGE:-}
 export ETCD_DOCKER_REPOSITORY=${TEST_ETCD_DOCKER_REPOSITORY:-}
@@ -228,6 +223,10 @@ TEST_CLUSTER_RESYNC_PERIOD=${TEST_CLUSTER_RESYNC_PERIOD:---min-resync-period=3m}
 
 # ContentType used by all components to communicate with apiserver.
 TEST_CLUSTER_API_CONTENT_TYPE=${TEST_CLUSTER_API_CONTENT_TYPE:-}
+
+# Enable debug handlers (port forwarding, exec, container logs, etc.).
+KUBELET_ENABLE_DEBUGGING_HANDLERS=${KUBELET_ENABLE_DEBUGGING_HANDLERS:-true}
+MASTER_KUBELET_ENABLE_DEBUGGING_HANDLERS=${MASTER_KUBELET_ENABLE_DEBUGGING_HANDLERS:-${KUBELET_ENABLE_DEBUGGING_HANDLERS}}
 
 KUBELET_TEST_ARGS="${KUBELET_TEST_ARGS:-} --serialize-image-pulls=false ${TEST_CLUSTER_API_CONTENT_TYPE}"
 if [[ "${NODE_OS_DISTRIBUTION}" = 'gci' ]] || [[ "${NODE_OS_DISTRIBUTION}" = 'ubuntu' ]] || [[ "${NODE_OS_DISTRIBUTION}" = 'custom' ]]; then
@@ -289,7 +288,7 @@ fi
 
 # Optional: Enable node logging.
 export ENABLE_NODE_LOGGING=${KUBE_ENABLE_NODE_LOGGING:-true}
-export LOGGING_DESTINATION=${KUBE_LOGGING_DESTINATION:-gcp} # options: elasticsearch, gcp
+export LOGGING_DESTINATION=${KUBE_LOGGING_DESTINATION:-gcp} # options: gcp
 
 # Optional: When set to true, Elasticsearch and Kibana will be setup as part of the cluster bring up.
 export ENABLE_CLUSTER_LOGGING=${KUBE_ENABLE_CLUSTER_LOGGING:-true}
@@ -322,9 +321,6 @@ export DNS_MEMORY_LIMIT=${KUBE_DNS_MEMORY_LIMIT:-170Mi}
 
 # Optional: Enable DNS horizontal autoscaler
 export ENABLE_DNS_HORIZONTAL_AUTOSCALER=${KUBE_ENABLE_DNS_HORIZONTAL_AUTOSCALER:-true}
-
-# Optional: Install Kubernetes UI
-export ENABLE_CLUSTER_UI=${KUBE_ENABLE_CLUSTER_UI:-true}
 
 # Optional: Install node problem detector.
 #   none           - Not run node problem detector.
@@ -460,7 +456,7 @@ EVICTION_HARD=${EVICTION_HARD:-memory.available<250Mi,nodefs.available<10%,nodef
 SCHEDULING_ALGORITHM_PROVIDER=${SCHEDULING_ALGORITHM_PROVIDER:-}
 
 # Optional: install a default StorageClass
-ENABLE_DEFAULT_STORAGE_CLASS=${ENABLE_DEFAULT_STORAGE_CLASS:-true}
+ENABLE_DEFAULT_STORAGE_CLASS=${ENABLE_DEFAULT_STORAGE_CLASS:-false}
 
 # Optional: install volume snapshot CRDs
 ENABLE_VOLUME_SNAPSHOTS=${ENABLE_VOLUME_SNAPSHOTS:-true}
@@ -512,14 +508,11 @@ HEAPSTER_GCP_MEMORY_PER_NODE=${HEAPSTER_GCP_MEMORY_PER_NODE:-4}
 HEAPSTER_GCP_BASE_CPU=${HEAPSTER_GCP_BASE_CPU:-80m}
 HEAPSTER_GCP_CPU_PER_NODE=${HEAPSTER_GCP_CPU_PER_NODE:-0.5}
 
-# Optional: custom system banner for dashboard addon
-CUSTOM_KUBE_DASHBOARD_BANNER=${CUSTOM_KUBE_DASHBOARD_BANNER:-}
-
 # Default Stackdriver resources version exported by Fluentd-gcp addon
 LOGGING_STACKDRIVER_RESOURCE_TYPES=${LOGGING_STACKDRIVER_RESOURCE_TYPES:-old}
 
 # Adding to PROVIDER_VARS, since this is GCP-specific.
-PROVIDER_VARS="${PROVIDER_VARS:-} FLUENTD_GCP_YAML_VERSION FLUENTD_GCP_VERSION FLUENTD_GCP_MEMORY_LIMIT FLUENTD_GCP_CPU_REQUEST FLUENTD_GCP_MEMORY_REQUEST HEAPSTER_GCP_BASE_MEMORY HEAPSTER_GCP_MEMORY_PER_NODE HEAPSTER_GCP_BASE_CPU HEAPSTER_GCP_CPU_PER_NODE CUSTOM_KUBE_DASHBOARD_BANNER LOGGING_STACKDRIVER_RESOURCE_TYPES"
+PROVIDER_VARS="${PROVIDER_VARS:-} FLUENTD_GCP_YAML_VERSION FLUENTD_GCP_VERSION FLUENTD_GCP_MEMORY_LIMIT FLUENTD_GCP_CPU_REQUEST FLUENTD_GCP_MEMORY_REQUEST HEAPSTER_GCP_BASE_MEMORY HEAPSTER_GCP_MEMORY_PER_NODE HEAPSTER_GCP_BASE_CPU HEAPSTER_GCP_CPU_PER_NODE LOGGING_STACKDRIVER_RESOURCE_TYPES"
 
 # Fluentd configuration for node-journal
 ENABLE_NODE_JOURNAL=${ENABLE_NODE_JOURNAL:-false}
@@ -565,14 +558,6 @@ CONCURRENT_SERVICE_SYNCS=${CONCURRENT_SERVICE_SYNCS:-}
 # to resolve the partially qualified name.
 export SERVICEACCOUNT_ISSUER='https://kubernetes.default.svc.cluster.local'
 
-# Optional: Enable Node termination Handler for Preemptible and GPU VMs.
-# https://github.com/GoogleCloudPlatform/k8s-node-termination-handler
-ENABLE_NODE_TERMINATION_HANDLER=${ENABLE_NODE_TERMINATION_HANDLER:-false}
-# Override default Node Termination Handler Image
-if [[ "${NODE_TERMINATION_HANDLER_IMAGE:-}" ]]; then
-  PROVIDER_VARS="${PROVIDER_VARS:-} NODE_TERMINATION_HANDLER_IMAGE"
-fi
-
 # Taint Windows nodes by default to prevent Linux workloads from being
 # scheduled onto them.
 WINDOWS_NODE_TAINTS=${WINDOWS_NODE_TAINTS:-node.kubernetes.io/os=win1809:NoSchedule}
@@ -593,7 +578,7 @@ export ENABLE_CSI_PROXY="${ENABLE_CSI_PROXY:-true}"
 export KUBE_APISERVER_HEALTHCHECK_ON_HOST_IP="${KUBE_APISERVER_HEALTHCHECK_ON_HOST_IP:-false}"
 
 # ETCD_PROGRESS_NOTIFY_INTERVAL defines the interval for etcd watch progress notify events.
-export ETCD_PROGRESS_NOTIFY_INTERVAL="${ETCD_PROGRESS_NOTIFY_INTERVAL:-10m}"
+export ETCD_PROGRESS_NOTIFY_INTERVAL="${ETCD_PROGRESS_NOTIFY_INTERVAL:-5s}"
 
 # Optional: Install Pigz on Windows.
 # Pigz is a multi-core optimized version of unzip.exe.
@@ -604,6 +589,15 @@ export WINDOWS_ENABLE_PIGZ="${WINDOWS_ENABLE_PIGZ:-true}"
 # Enable Windows DSR (Direct Server Return)
 export WINDOWS_ENABLE_DSR="${WINDOWS_ENABLE_DSR:-false}"
 
+# Install Node Problem Detector (NPD) on Windows nodes.
+# NPD analyzes the host for problems that can disrupt workloads.
+export WINDOWS_ENABLE_NODE_PROBLEM_DETECTOR="${WINDOWS_ENABLE_NODE_PROBLEM_DETECTOR:-none}"
+export WINDOWS_NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS="${WINDOWS_NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS:-}"
+
 # TLS_CIPHER_SUITES defines cipher suites allowed to be used by kube-apiserver.
 # If this variable is unset or empty, kube-apiserver will allow its default set of cipher suites.
 export TLS_CIPHER_SUITES=""
+
+# CLOUD_PROVIDER_FLAG defines the cloud-provider value presented to KCM, apiserver,
+# and kubelet
+export CLOUD_PROVIDER_FLAG="${CLOUD_PROVIDER_FLAG:-gce}"

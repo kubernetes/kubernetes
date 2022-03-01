@@ -48,7 +48,12 @@ spec:
         hostPath:
           path: /
       initContainers:
-      - image: gcr.io/cos-cloud/cos-gpu-installer:v20200701
+        # The COS GPU installer image version may be dependent on the version of COS being used.
+        # Refer to details about the installer in https://cos.googlesource.com/cos/tools/+/refs/heads/master/src/cmd/cos_gpu_installer/
+        # and the COS release notes (https://cloud.google.com/container-optimized-os/docs/release-notes) to determine version COS GPU installer for a given version of COS.
+
+        # Maps to gcr.io/cos-cloud/cos-gpu-installer:v2.0.3 - suitable for COS M85 as per https://cloud.google.com/container-optimized-os/docs/release-notes#cos-85-13310-1209-3
+      - image: gcr.io/cos-cloud/cos-gpu-installer:v2.0.5
         name: nvidia-driver-installer
         resources:
           requests:
@@ -76,6 +81,6 @@ spec:
         - name: root-mount
           mountPath: /root
       containers:
-      - image: "k8s.gcr.io/pause:3.4.1"
+      - image: "k8s.gcr.io/pause:3.6"
         name: pause
 

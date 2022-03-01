@@ -1,6 +1,8 @@
-// +build !selinux !linux
+// +build !linux
 
 package selinux
+
+const privContainerMountLabel = ""
 
 func setDisabled() {
 }
@@ -145,4 +147,8 @@ func dupSecOpt(src string) ([]string, error) {
 
 func disableSecOpt() []string {
 	return []string{"disable"}
+}
+
+func getDefaultContextWithLevel(user, level, scon string) (string, error) {
+	return "", nil
 }

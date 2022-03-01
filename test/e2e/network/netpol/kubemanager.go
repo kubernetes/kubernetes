@@ -19,18 +19,30 @@ package netpol
 import (
 	"context"
 	"fmt"
+	"net"
+	"strconv"
 	"strings"
-	"time"
 
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	netutils "k8s.io/utils/net"
 
-	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
+
+// probeConnectivityArgs is set of arguments for a probeConnectivity
+type probeConnectivityArgs struct {
+	nsFrom         string
+	podFrom        string
+	containerFrom  string
+	addrTo         string
+	protocol       v1.Protocol
+	toPort         int
+	timeoutSeconds int
+}
 
 // kubeManager provides a convenience interface to kube functionality that we leverage for polling NetworkPolicy connections.
 // Its responsibilities are:
@@ -61,16 +73,22 @@ func (k *kubeManager) initializeCluster(model *Model) error {
 		for _, pod := range ns.Pods {
 			framework.Logf("creating/updating pod %s/%s", ns.Name, pod.Name)
 
+			// note that we defer the logic of pod (i.e. node selector) specifics to the model
+			// which is aware of linux vs windows pods
 			kubePod, err := k.createPod(pod.KubePod())
 			if err != nil {
 				return err
 			}
-			createdPods = append(createdPods, kubePod)
 
-			_, err = k.createService(pod.Service())
+			createdPods = append(createdPods, kubePod)
+			svc, err := k.createService(pod.Service())
 			if err != nil {
 				return err
 			}
+			if netutils.ParseIPSloppy(svc.Spec.ClusterIP) == nil {
+				return fmt.Errorf("empty IP address found for service %s/%s", svc.Namespace, svc.Name)
+			}
+			pod.ServiceIP = svc.Spec.ClusterIP
 		}
 	}
 
@@ -80,18 +98,18 @@ func (k *kubeManager) initializeCluster(model *Model) error {
 			return err
 		}
 		if k8sPod == nil {
-			return errors.Errorf("unable to find pod in ns %s with key/val pod=%s", podString.Namespace(), podString.PodName())
+			return fmt.Errorf("unable to find pod in ns %s with key/val pod=%s", podString.Namespace(), podString.PodName())
 		}
 		err = e2epod.WaitForPodNameRunningInNamespace(k.clientSet, k8sPod.Name, k8sPod.Namespace)
 		if err != nil {
-			return errors.Wrapf(err, "unable to wait for pod %s/%s", podString.Namespace(), podString.PodName())
+			return fmt.Errorf("unable to wait for pod %s/%s: %w", podString.Namespace(), podString.PodName(), err)
 		}
 	}
 
 	for _, createdPod := range createdPods {
 		err := e2epod.WaitForPodRunningInNamespace(k.clientSet, createdPod)
 		if err != nil {
-			return errors.Wrapf(err, "unable to wait for pod %s/%s", createdPod.Namespace, createdPod.Name)
+			return fmt.Errorf("unable to wait for pod %s/%s: %w", createdPod.Namespace, createdPod.Name, err)
 		}
 	}
 
@@ -102,29 +120,40 @@ func (k *kubeManager) initializeCluster(model *Model) error {
 func (k *kubeManager) getPod(ns string, name string) (*v1.Pod, error) {
 	kubePod, err := k.clientSet.CoreV1().Pods(ns).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
-		return nil, errors.Wrapf(err, "unable to get pod %s/%s", ns, name)
+		return nil, fmt.Errorf("unable to get pod %s/%s: %w", ns, name, err)
 	}
 	return kubePod, nil
 }
 
-// probeConnectivity execs into a pod and checks its connectivity to another pod..
-func (k *kubeManager) probeConnectivity(nsFrom string, podFrom string, containerFrom string, addrTo string, protocol v1.Protocol, toPort int) (bool, string, error) {
+// probeConnectivity execs into a pod and checks its connectivity to another pod.
+// Implements the Prober interface.
+func (k *kubeManager) probeConnectivity(args *probeConnectivityArgs) (bool, string, error) {
+	port := strconv.Itoa(args.toPort)
+	if args.addrTo == "" {
+		return false, "no IP provided", fmt.Errorf("empty addrTo field")
+	}
+	framework.Logf("Starting probe from pod %v to %v", args.podFrom, args.addrTo)
 	var cmd []string
-	switch protocol {
+	timeout := fmt.Sprintf("--timeout=%vs", args.timeoutSeconds)
+
+	switch args.protocol {
 	case v1.ProtocolSCTP:
-		cmd = []string{"/agnhost", "connect", fmt.Sprintf("%s:%d", addrTo, toPort), "--timeout=1s", "--protocol=sctp"}
+		cmd = []string{"/agnhost", "connect", net.JoinHostPort(args.addrTo, port), timeout, "--protocol=sctp"}
 	case v1.ProtocolTCP:
-		cmd = []string{"/agnhost", "connect", fmt.Sprintf("%s:%d", addrTo, toPort), "--timeout=1s", "--protocol=tcp"}
+		cmd = []string{"/agnhost", "connect", net.JoinHostPort(args.addrTo, port), timeout, "--protocol=tcp"}
 	case v1.ProtocolUDP:
-		cmd = []string{"/agnhost", "connect", fmt.Sprintf("%s:%d", addrTo, toPort), "--timeout=1s", "--protocol=udp"}
+		cmd = []string{"/agnhost", "connect", net.JoinHostPort(args.addrTo, port), timeout, "--protocol=udp"}
+		if framework.NodeOSDistroIs("windows") {
+			framework.Logf("probing UDP for windows may result in cluster instability for certain windows nodes with low CPU/Memory, depending on CRI version")
+		}
 	default:
-		framework.Failf("protocol %s not supported", protocol)
+		framework.Failf("protocol %s not supported", args.protocol)
 	}
 
-	commandDebugString := fmt.Sprintf("kubectl exec %s -c %s -n %s -- %s", podFrom, containerFrom, nsFrom, strings.Join(cmd, " "))
-	stdout, stderr, err := k.executeRemoteCommand(nsFrom, podFrom, containerFrom, cmd)
+	commandDebugString := fmt.Sprintf("kubectl exec %s -c %s -n %s -- %s", args.podFrom, args.containerFrom, args.nsFrom, strings.Join(cmd, " "))
+	stdout, stderr, err := k.executeRemoteCommand(args.nsFrom, args.podFrom, args.containerFrom, cmd)
 	if err != nil {
-		framework.Logf("%s/%s -> %s: error when running command: err - %v /// stdout - %s /// stderr - %s", nsFrom, podFrom, addrTo, err, stdout, stderr)
+		framework.Logf("%s/%s -> %s: error when running command: err - %v /// stdout - %s /// stderr - %s", args.nsFrom, args.podFrom, args.addrTo, err, stdout, stderr)
 		return false, commandDebugString, nil
 	}
 	return true, commandDebugString, nil
@@ -148,7 +177,7 @@ func (k *kubeManager) executeRemoteCommand(namespace string, pod string, contain
 func (k *kubeManager) createNamespace(ns *v1.Namespace) (*v1.Namespace, error) {
 	createdNamespace, err := k.clientSet.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
 	if err != nil {
-		return nil, errors.Wrapf(err, "unable to update namespace %s", ns.Name)
+		return nil, fmt.Errorf("unable to update namespace %s: %w", ns.Name, err)
 	}
 	return createdNamespace, nil
 }
@@ -160,7 +189,7 @@ func (k *kubeManager) createService(service *v1.Service) (*v1.Service, error) {
 
 	createdService, err := k.clientSet.CoreV1().Services(ns).Create(context.TODO(), service, metav1.CreateOptions{})
 	if err != nil {
-		return nil, errors.Wrapf(err, "unable to create service %s/%s", ns, name)
+		return nil, fmt.Errorf("unable to create service %s/%s: %w", ns, name, err)
 	}
 	return createdService, nil
 }
@@ -172,7 +201,7 @@ func (k *kubeManager) createPod(pod *v1.Pod) (*v1.Pod, error) {
 
 	createdPod, err := k.clientSet.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 	if err != nil {
-		return nil, errors.Wrapf(err, "unable to update pod %s/%s", ns, pod.Name)
+		return nil, fmt.Errorf("unable to update pod %s/%s: %w", ns, pod.Name, err)
 	}
 	return createdPod, nil
 }
@@ -183,13 +212,13 @@ func (k *kubeManager) cleanNetworkPolicies(namespaces []string) error {
 		framework.Logf("deleting policies in %s ..........", ns)
 		l, err := k.clientSet.NetworkingV1().NetworkPolicies(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
-			return errors.Wrapf(err, "unable to list network policies in ns %s", ns)
+			return fmt.Errorf("unable to list network policies in ns %s: %w", ns, err)
 		}
 		for _, np := range l.Items {
 			framework.Logf("deleting network policy %s/%s", ns, np.Name)
 			err = k.clientSet.NetworkingV1().NetworkPolicies(ns).Delete(context.TODO(), np.Name, metav1.DeleteOptions{})
 			if err != nil {
-				return errors.Wrapf(err, "unable to delete network policy %s/%s", ns, np.Name)
+				return fmt.Errorf("unable to delete network policy %s/%s: %w", ns, np.Name, err)
 			}
 		}
 	}
@@ -202,7 +231,7 @@ func (k *kubeManager) createNetworkPolicy(ns string, netpol *networkingv1.Networ
 	netpol.ObjectMeta.Namespace = ns
 	np, err := k.clientSet.NetworkingV1().NetworkPolicies(ns).Create(context.TODO(), netpol, metav1.CreateOptions{})
 	if err != nil {
-		return nil, errors.Wrapf(err, "unable to create network policy %s/%s", ns, netpol.Name)
+		return nil, fmt.Errorf("unable to create network policy %s/%s: %w", ns, netpol.Name, err)
 	}
 	return np, nil
 }
@@ -213,7 +242,7 @@ func (k *kubeManager) updateNetworkPolicy(ns string, netpol *networkingv1.Networ
 	netpol.ObjectMeta.Namespace = ns
 	np, err := k.clientSet.NetworkingV1().NetworkPolicies(ns).Update(context.TODO(), netpol, metav1.UpdateOptions{})
 	if err != nil {
-		return np, errors.Wrapf(err, "unable to update network policy %s/%s", ns, netpol.Name)
+		return np, fmt.Errorf("unable to update network policy %s/%s: %w", ns, netpol.Name, err)
 	}
 	return np, nil
 }
@@ -222,7 +251,7 @@ func (k *kubeManager) updateNetworkPolicy(ns string, netpol *networkingv1.Networ
 func (k *kubeManager) getNamespace(ns string) (*v1.Namespace, error) {
 	selectedNameSpace, err := k.clientSet.CoreV1().Namespaces().Get(context.TODO(), ns, metav1.GetOptions{})
 	if err != nil {
-		return nil, errors.Wrapf(err, "unable to get namespace %s", ns)
+		return nil, fmt.Errorf("unable to get namespace %s: %w", ns, err)
 	}
 	return selectedNameSpace, nil
 }
@@ -235,7 +264,10 @@ func (k *kubeManager) setNamespaceLabels(ns string, labels map[string]string) er
 	}
 	selectedNameSpace.ObjectMeta.Labels = labels
 	_, err = k.clientSet.CoreV1().Namespaces().Update(context.TODO(), selectedNameSpace, metav1.UpdateOptions{})
-	return errors.Wrapf(err, "unable to update namespace %s", ns)
+	if err != nil {
+		return fmt.Errorf("unable to update namespace %s: %w", ns, err)
+	}
+	return nil
 }
 
 // deleteNamespaces removes a namespace from kubernetes.
@@ -243,49 +275,8 @@ func (k *kubeManager) deleteNamespaces(namespaces []string) error {
 	for _, ns := range namespaces {
 		err := k.clientSet.CoreV1().Namespaces().Delete(context.TODO(), ns, metav1.DeleteOptions{})
 		if err != nil {
-			return errors.Wrapf(err, "unable to delete namespace %s", ns)
+			return fmt.Errorf("unable to delete namespace %s: %w", ns, err)
 		}
 	}
 	return nil
-}
-
-// waitForHTTPServers waits for all webservers to be up, on all protocols, and then validates them using the same probe logic as the rest of the suite.
-func (k *kubeManager) waitForHTTPServers(model *Model) error {
-	const maxTries = 10
-	framework.Logf("waiting for HTTP servers (ports 80 and 81) to become ready")
-
-	testCases := map[string]*TestCase{}
-	for _, port := range model.Ports {
-		for _, protocol := range model.Protocols {
-			fromPort := 81
-			desc := fmt.Sprintf("%d->%d,%s", fromPort, port, protocol)
-			testCases[desc] = &TestCase{ToPort: int(port), Protocol: protocol}
-		}
-	}
-	notReady := map[string]bool{}
-	for caseName := range testCases {
-		notReady[caseName] = true
-	}
-
-	for i := 0; i < maxTries; i++ {
-		for caseName, testCase := range testCases {
-			if notReady[caseName] {
-				reachability := NewReachability(model.AllPods(), true)
-				testCase.Reachability = reachability
-				ProbePodToPodConnectivity(k, model, testCase)
-				_, wrong, _, _ := reachability.Summary(ignoreLoopback)
-				if wrong == 0 {
-					framework.Logf("server %s is ready", caseName)
-					delete(notReady, caseName)
-				} else {
-					framework.Logf("server %s is not ready", caseName)
-				}
-			}
-		}
-		if len(notReady) == 0 {
-			return nil
-		}
-		time.Sleep(waitInterval)
-	}
-	return errors.Errorf("after %d tries, %d HTTP servers are not ready", maxTries, len(notReady))
 }

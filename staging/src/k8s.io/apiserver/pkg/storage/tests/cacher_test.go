@@ -34,8 +34,8 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/apimachinery/pkg/util/clock"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -51,6 +51,8 @@ import (
 	"k8s.io/apiserver/pkg/storage/value"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/utils/clock"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 var (
@@ -105,7 +107,7 @@ func newPodList() runtime.Object { return &example.PodList{} }
 
 func newEtcdTestStorage(t *testing.T, prefix string) (*etcd3testing.EtcdTestServer, storage.Interface) {
 	server, _ := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
-	storage := etcd3.New(server.V3Client, apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion), newPod, prefix, value.IdentityTransformer, true, etcd3.NewDefaultLeaseManagerConfig())
+	storage := etcd3.New(server.V3Client, apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion), newPod, prefix, schema.GroupResource{Resource: "pods"}, value.IdentityTransformer, true, etcd3.NewDefaultLeaseManagerConfig())
 	return server, storage
 }
 
@@ -194,7 +196,7 @@ func TestGet(t *testing.T) {
 	}
 }
 
-func TestGetToList(t *testing.T) {
+func TestGetListNonRecursive(t *testing.T) {
 	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
 	defer server.Terminate(t)
 	cacher, _, err := newTestCacher(etcdStorage)
@@ -210,15 +212,15 @@ func TestGetToList(t *testing.T) {
 		key         string
 		pred        storage.SelectionPredicate
 		expectedOut []*example.Pod
-	}{{ // test GetToList on existing key
+	}{{ // test non-recursive GetList on existing key
 		key:         key,
 		pred:        storage.Everything,
 		expectedOut: []*example.Pod{storedObj},
-	}, { // test GetToList on non-existing key
+	}, { // test non-recursive GetList on non-existing key
 		key:         "/non-existing",
 		pred:        storage.Everything,
 		expectedOut: nil,
-	}, { // test GetToList with matching pod name
+	}, { // test non-recursive GetList with matching pod name
 		key: "/non-existing",
 		pred: storage.SelectionPredicate{
 			Label: labels.Everything(),
@@ -233,9 +235,9 @@ func TestGetToList(t *testing.T) {
 
 	for i, tt := range tests {
 		out := &example.PodList{}
-		err := cacher.GetToList(context.TODO(), tt.key, storage.ListOptions{Predicate: tt.pred}, out)
+		err := cacher.GetList(context.TODO(), tt.key, storage.ListOptions{Predicate: tt.pred, Recursive: false}, out)
 		if err != nil {
-			t.Fatalf("GetToList failed: %v", err)
+			t.Fatalf("GetList failed: %v", err)
 		}
 		if len(out.ResourceVersion) == 0 {
 			t.Errorf("#%d: unset resourceVersion", i)
@@ -289,7 +291,11 @@ func TestList(t *testing.T) {
 	// We first List directly from etcd by passing empty resourceVersion,
 	// to get the current etcd resourceVersion.
 	rvResult := &example.PodList{}
-	if err := cacher.List(context.TODO(), "pods/ns", storage.ListOptions{Predicate: storage.Everything}, rvResult); err != nil {
+	options := storage.ListOptions{
+		Predicate: storage.Everything,
+		Recursive: true,
+	}
+	if err := cacher.GetList(context.TODO(), "pods/ns", options, rvResult); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	deletedPodRV := rvResult.ListMeta.ResourceVersion
@@ -297,7 +303,12 @@ func TestList(t *testing.T) {
 	result := &example.PodList{}
 	// We pass the current etcd ResourceVersion received from the above List() operation,
 	// since there is not easy way to get ResourceVersion of barPod deletion operation.
-	if err := cacher.List(context.TODO(), "pods/ns", storage.ListOptions{ResourceVersion: deletedPodRV, Predicate: storage.Everything}, result); err != nil {
+	options = storage.ListOptions{
+		ResourceVersion: deletedPodRV,
+		Predicate:       storage.Everything,
+		Recursive:       true,
+	}
+	if err := cacher.GetList(context.TODO(), "pods/ns", options, result); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	if result.ListMeta.ResourceVersion != deletedPodRV {
@@ -359,7 +370,12 @@ func TestTooLargeResourceVersionList(t *testing.T) {
 	listRV := strconv.Itoa(int(rv + 10))
 
 	result := &example.PodList{}
-	err = cacher.List(context.TODO(), "pods/ns", storage.ListOptions{ResourceVersion: listRV, Predicate: storage.Everything}, result)
+	options := storage.ListOptions{
+		ResourceVersion: listRV,
+		Predicate:       storage.Everything,
+		Recursive:       true,
+	}
+	err = cacher.GetList(context.TODO(), "pods/ns", options, result)
 	if !errors.IsTimeout(err) {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -395,12 +411,12 @@ type injectListError struct {
 	storage.Interface
 }
 
-func (self *injectListError) List(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
+func (self *injectListError) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
 	if self.errors > 0 {
 		self.errors--
 		return fmt.Errorf("injected error")
 	}
-	return self.Interface.List(ctx, key, opts, listObj)
+	return self.Interface.GetList(ctx, key, opts, listObj)
 }
 
 func TestWatch(t *testing.T) {
@@ -408,7 +424,7 @@ func TestWatch(t *testing.T) {
 	// Inject one list error to make sure we test the relist case.
 	etcdStorage = &injectListError{errors: 1, Interface: etcdStorage}
 	defer server.Terminate(t)
-	fakeClock := clock.NewFakeClock(time.Now())
+	fakeClock := testingclock.NewFakeClock(time.Now())
 	cacher, _, err := newTestCacherWithClock(etcdStorage, fakeClock)
 	if err != nil {
 		t.Fatalf("Couldn't create cacher: %v", err)
@@ -513,7 +529,7 @@ func TestWatcherTimeout(t *testing.T) {
 	// Create a number of watchers that will not be reading any result.
 	nonReadingWatchers := 50
 	for i := 0; i < nonReadingWatchers; i++ {
-		watcher, err := cacher.WatchList(context.TODO(), "pods/ns", storage.ListOptions{ResourceVersion: startVersion, Predicate: storage.Everything})
+		watcher, err := cacher.Watch(context.TODO(), "pods/ns", storage.ListOptions{ResourceVersion: startVersion, Predicate: storage.Everything, Recursive: true})
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
@@ -521,7 +537,7 @@ func TestWatcherTimeout(t *testing.T) {
 	}
 
 	// Create a second watcher that will be reading result.
-	readingWatcher, err := cacher.WatchList(context.TODO(), "pods/ns", storage.ListOptions{ResourceVersion: startVersion, Predicate: storage.Everything})
+	readingWatcher, err := cacher.Watch(context.TODO(), "pods/ns", storage.ListOptions{ResourceVersion: startVersion, Predicate: storage.Everything, Recursive: true})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -686,7 +702,7 @@ func TestRandomWatchDeliver(t *testing.T) {
 	}
 	startVersion := strconv.Itoa(int(rv))
 
-	watcher, err := cacher.WatchList(context.TODO(), "pods/ns", storage.ListOptions{ResourceVersion: startVersion, Predicate: storage.Everything})
+	watcher, err := cacher.Watch(context.TODO(), "pods/ns", storage.ListOptions{ResourceVersion: startVersion, Predicate: storage.Everything, Recursive: true})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -880,13 +896,14 @@ func TestWatchBookmarksWithCorrectResourceVersion(t *testing.T) {
 	pred := storage.Everything
 	pred.AllowWatchBookmarks = true
 	ctx, _ := context.WithTimeout(context.Background(), 3*time.Second)
-	watcher, err := cacher.WatchList(ctx, "pods/ns", storage.ListOptions{ResourceVersion: "0", Predicate: pred})
+	watcher, err := cacher.Watch(ctx, "pods/ns", storage.ListOptions{ResourceVersion: "0", Predicate: pred, Recursive: true})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	defer watcher.Stop()
 
 	done := make(chan struct{})
+	errc := make(chan error, 1)
 	var wg sync.WaitGroup
 	wg.Add(1)
 	defer wg.Wait()   // We must wait for the waitgroup to exit before we terminate the cache or the server in prior defers
@@ -901,7 +918,8 @@ func TestWatchBookmarksWithCorrectResourceVersion(t *testing.T) {
 				pod := fmt.Sprintf("foo-%d", i)
 				err := createPod(etcdStorage, makeTestPod(pod))
 				if err != nil {
-					t.Fatalf("failed to create pod %v: %v", pod, err)
+					errc <- fmt.Errorf("failed to create pod %v: %v", pod, err)
+					return
 				}
 				time.Sleep(time.Second / 100)
 			}
@@ -910,27 +928,36 @@ func TestWatchBookmarksWithCorrectResourceVersion(t *testing.T) {
 
 	bookmarkReceived := false
 	lastObservedResourceVersion := uint64(0)
-	for event := range watcher.ResultChan() {
-		rv, err := v.ObjectResourceVersion(event.Object)
-		if err != nil {
-			t.Fatalf("failed to parse resourceVersion from %#v", event)
-		}
-		if event.Type == watch.Bookmark {
-			bookmarkReceived = true
-			// bookmark event has a RV greater than or equal to the before one
-			if rv < lastObservedResourceVersion {
-				t.Fatalf("Unexpected bookmark resourceVersion %v less than observed %v)", rv, lastObservedResourceVersion)
+
+	for {
+		select {
+		case err := <-errc:
+			t.Fatal(err)
+		case event, ok := <-watcher.ResultChan():
+			if !ok {
+				// Make sure we have received a bookmark event
+				if !bookmarkReceived {
+					t.Fatalf("Unpexected error, we did not received a bookmark event")
+				}
+				return
 			}
-		} else {
-			// non-bookmark event has a RV greater than anything before
-			if rv <= lastObservedResourceVersion {
-				t.Fatalf("Unexpected event resourceVersion %v less than or equal to bookmark %v)", rv, lastObservedResourceVersion)
+			rv, err := v.ObjectResourceVersion(event.Object)
+			if err != nil {
+				t.Fatalf("failed to parse resourceVersion from %#v", event)
 			}
+			if event.Type == watch.Bookmark {
+				bookmarkReceived = true
+				// bookmark event has a RV greater than or equal to the before one
+				if rv < lastObservedResourceVersion {
+					t.Fatalf("Unexpected bookmark resourceVersion %v less than observed %v)", rv, lastObservedResourceVersion)
+				}
+			} else {
+				// non-bookmark event has a RV greater than anything before
+				if rv <= lastObservedResourceVersion {
+					t.Fatalf("Unexpected event resourceVersion %v less than or equal to bookmark %v)", rv, lastObservedResourceVersion)
+				}
+			}
+			lastObservedResourceVersion = rv
 		}
-		lastObservedResourceVersion = rv
-	}
-	// Make sure we have received a bookmark event
-	if !bookmarkReceived {
-		t.Fatalf("Unpexected error, we did not received a bookmark event")
 	}
 }

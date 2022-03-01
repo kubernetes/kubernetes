@@ -60,15 +60,15 @@ const (
 type FlowSchema struct {
 	metav1.TypeMeta
 	// `metadata` is the standard object's metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta
 	// `spec` is the specification of the desired behavior of a FlowSchema.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
 	Spec FlowSchemaSpec
 	// `status` is the current status of a FlowSchema.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
 	Status FlowSchemaStatus
 }
@@ -79,7 +79,7 @@ type FlowSchema struct {
 type FlowSchemaList struct {
 	metav1.TypeMeta
 	// `metadata` is the standard list metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ListMeta
 
@@ -171,13 +171,17 @@ type PolicyRulesWithSubjects struct {
 // ways of matching an originator; by user, group, or service account.
 // +union
 type Subject struct {
+	// `kind` indicates which one of the other fields is non-empty.
 	// Required
 	// +unionDiscriminator
 	Kind SubjectKind
+	// `user` matches based on username.
 	// +optional
 	User *UserSubject
+	// `group` matches based on user group name.
 	// +optional
 	Group *GroupSubject
+	// `serviceAccount` matches ServiceAccounts.
 	// +optional
 	ServiceAccount *ServiceAccountSubject
 }
@@ -326,15 +330,15 @@ type FlowSchemaConditionType string
 type PriorityLevelConfiguration struct {
 	metav1.TypeMeta
 	// `metadata` is the standard object's metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta
 	// `spec` is the specification of the desired behavior of a "request-priority".
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
 	Spec PriorityLevelConfigurationSpec
 	// `status` is the current status of a "request-priority".
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
 	Status PriorityLevelConfigurationStatus
 }
@@ -345,7 +349,7 @@ type PriorityLevelConfiguration struct {
 type PriorityLevelConfigurationList struct {
 	metav1.TypeMeta
 	// `metadata` is the standard object's metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ListMeta
 	// `items` is a list of request-priorities.
@@ -392,7 +396,7 @@ const (
 type LimitedPriorityLevelConfiguration struct {
 	// `assuredConcurrencyShares` (ACS) configures the execution
 	// limit, which is a limit on the number of requests of this
-	// priority level that may be exeucting at a given time.  ACS must
+	// priority level that may be executing at a given time.  ACS must
 	// be a positive number. The server's concurrency limit (SCL) is
 	// divided among the concurrency-controlled priority levels in
 	// proportion to their assured concurrency shares. This produces

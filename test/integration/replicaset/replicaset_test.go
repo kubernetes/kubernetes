@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	appsclient "k8s.io/client-go/kubernetes/typed/apps/v1"
@@ -39,10 +40,14 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/retry"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controller/replicaset"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
 	testutil "k8s.io/kubernetes/test/utils"
+	"k8s.io/utils/pointer"
 )
 
 const (
@@ -113,8 +118,8 @@ func newMatchingPod(podName, namespace string) *v1.Pod {
 }
 
 func rmSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, *replicaset.ReplicaSetController, informers.SharedInformerFactory, clientset.Interface) {
-	masterConfig := framework.NewIntegrationTestMasterConfig()
-	_, s, closeFn := framework.RunAMaster(masterConfig)
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
+	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 
 	config := restclient.Config{Host: s.URL}
 	clientSet, err := clientset.NewForConfig(&config)
@@ -135,8 +140,8 @@ func rmSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, *replicaset.R
 }
 
 func rmSimpleSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, clientset.Interface) {
-	masterConfig := framework.NewIntegrationTestMasterConfig()
-	_, s, closeFn := framework.RunAMaster(masterConfig)
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
+	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 
 	config := restclient.Config{Host: s.URL}
 	clientSet, err := clientset.NewForConfig(&config)
@@ -151,7 +156,7 @@ func runControllerAndInformers(t *testing.T, rm *replicaset.ReplicaSetController
 	stopCh := make(chan struct{})
 	informers.Start(stopCh)
 	waitToObservePods(t, informers.Core().V1().Pods().Informer(), podNum)
-	go rm.Run(5, stopCh)
+	go rm.Run(context.TODO(), 5)
 	return stopCh
 }
 
@@ -220,9 +225,9 @@ func updatePod(t *testing.T, podClient typedv1.PodInterface, podName string, upd
 	return pod
 }
 
-func updatePodStatus(t *testing.T, podClient typedv1.PodInterface, pod *v1.Pod, updateStatusFunc func(*v1.Pod)) {
+func updatePodStatus(t *testing.T, podClient typedv1.PodInterface, podName string, updateStatusFunc func(*v1.Pod)) {
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		newPod, err := podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
+		newPod, err := podClient.Get(context.TODO(), podName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -230,7 +235,7 @@ func updatePodStatus(t *testing.T, podClient typedv1.PodInterface, pod *v1.Pod, 
 		_, err = podClient.UpdateStatus(context.TODO(), newPod, metav1.UpdateOptions{})
 		return err
 	}); err != nil {
-		t.Fatalf("Failed to update status of pod %s: %v", pod.Name, err)
+		t.Fatalf("Failed to update status of pod %s: %v", podName, err)
 	}
 }
 
@@ -562,7 +567,7 @@ func TestDeletingAndFailedPods(t *testing.T) {
 
 	// Set second pod as failed pod
 	failedPod := &pods.Items[1]
-	updatePodStatus(t, podClient, failedPod, func(pod *v1.Pod) {
+	updatePodStatus(t, podClient, failedPod.Name, func(pod *v1.Pod) {
 		pod.Status.Phase = v1.PodFailed
 	})
 
@@ -592,6 +597,103 @@ func TestDeletingAndFailedPods(t *testing.T) {
 	// Verify failed pod exists
 	if !foundFailedPod {
 		t.Fatalf("expected failed pod %s exists, but it is not found", failedPod.Name)
+	}
+}
+
+func TestPodDeletionCost(t *testing.T) {
+	tests := []struct {
+		name              string
+		costs             []string
+		restarts          []int32
+		enabled           bool
+		remainingPodIndex int
+	}{
+		{
+			name:              "enabled-with-different-costs",
+			costs:             []string{"1000", "100"},
+			restarts:          []int32{5, 0},
+			enabled:           true,
+			remainingPodIndex: 0,
+		},
+		{
+			name:              "enabled-with-same-costs",
+			costs:             []string{"100", "100"},
+			restarts:          []int32{5, 0},
+			enabled:           true,
+			remainingPodIndex: 1,
+		},
+		{
+			name:              "enabled-with-no-costs",
+			restarts:          []int32{5, 0},
+			enabled:           true,
+			remainingPodIndex: 1,
+		},
+		{
+			name:              "disabled-with-different-costs",
+			costs:             []string{"1000", "100"},
+			restarts:          []int32{5, 0},
+			enabled:           false,
+			remainingPodIndex: 1,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDeletionCost, tc.enabled)()
+			s, closeFn, rm, informers, c := rmSetup(t)
+			defer closeFn()
+			ns := framework.CreateTestingNamespace(tc.name, s, t)
+			defer framework.DeleteTestingNamespace(ns, s, t)
+			stopCh := runControllerAndInformers(t, rm, informers, 0)
+			defer close(stopCh)
+
+			rs := newRS("rs", ns.Name, 2)
+			rss, _ := createRSsPods(t, c, []*apps.ReplicaSet{rs}, []*v1.Pod{})
+			rs = rss[0]
+			waitRSStable(t, c, rs)
+
+			// Verify RS creates 2 pods.
+			podClient := c.CoreV1().Pods(ns.Name)
+			pods := getPods(t, podClient, labelMap())
+			if err := wait.PollImmediate(interval, timeout, func() (bool, error) {
+				pods = getPods(t, podClient, labelMap())
+				return len(pods.Items) == 2, nil
+			}); err != nil {
+				t.Fatalf("Failed to verify replicaset has 2 pods: %v", err)
+			}
+
+			// Set a higher deletion cost to the pod that is supposed to remain after scale down.
+			remainingPodUID := pods.Items[tc.remainingPodIndex].UID
+			for i := range pods.Items {
+				podName := pods.Items[i].Name
+				if len(tc.costs) != 0 {
+					updatePod(t, podClient, podName, func(pod *v1.Pod) {
+						pod.Annotations = map[string]string{core.PodDeletionCost: tc.costs[i]}
+					})
+				}
+				updatePodStatus(t, podClient, podName, func(pod *v1.Pod) {
+					pod.Status.ContainerStatuses = []v1.ContainerStatus{{RestartCount: tc.restarts[i]}}
+				})
+			}
+
+			// Change RS's number of replics to 1
+			rsClient := c.AppsV1().ReplicaSets(ns.Name)
+			updateRS(t, rsClient, rs.Name, func(rs *apps.ReplicaSet) {
+				rs.Spec.Replicas = pointer.Int32Ptr(1)
+			})
+
+			// Poll until ReplicaSet is downscaled to 1.
+			if err := wait.PollImmediate(interval, timeout, func() (bool, error) {
+				pods = getPods(t, podClient, labelMap())
+				return len(pods.Items) == 1, nil
+			}); err != nil {
+				t.Fatalf("Failed to downscale replicaset to 1 pod: %v", err)
+			}
+
+			if pods.Items[0].UID != remainingPodUID {
+				t.Errorf("expected remaining Pod UID %v, got UID %v with container statues %v",
+					remainingPodUID, pods.Items[0].UID, pods.Items[0].Status.ContainerStatuses)
+			}
+		})
 	}
 }
 

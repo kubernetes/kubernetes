@@ -39,6 +39,7 @@ import (
 	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -75,24 +76,24 @@ type PatchOptions struct {
 
 var (
 	patchLong = templates.LongDesc(i18n.T(`
-		Update field(s) of a resource using strategic merge patch, a JSON merge patch, or a JSON patch.
+		Update fields of a resource using strategic merge patch, a JSON merge patch, or a JSON patch.
 
 		JSON and YAML formats are accepted.`))
 
 	patchExample = templates.Examples(i18n.T(`
-		# Partially update a node using a strategic merge patch. Specify the patch as JSON.
+		# Partially update a node using a strategic merge patch, specifying the patch as JSON
 		kubectl patch node k8s-node-1 -p '{"spec":{"unschedulable":true}}'
 
-		# Partially update a node using a strategic merge patch. Specify the patch as YAML.
+		# Partially update a node using a strategic merge patch, specifying the patch as YAML
 		kubectl patch node k8s-node-1 -p $'spec:\n unschedulable: true'
 
-		# Partially update a node identified by the type and name specified in "node.json" using strategic merge patch.
+		# Partially update a node identified by the type and name specified in "node.json" using strategic merge patch
 		kubectl patch -f node.json -p '{"spec":{"unschedulable":true}}'
 
-		# Update a container's image; spec.containers[*].name is required because it's a merge key.
+		# Update a container's image; spec.containers[*].name is required because it's a merge key
 		kubectl patch pod valid-pod -p '{"spec":{"containers":[{"name":"kubernetes-serve-hostname","image":"new image"}]}}'
 
-		# Update a container's image using a json patch with positional arrays.
+		# Update a container's image using a JSON patch with positional arrays
 		kubectl patch pod valid-pod --type='json' -p='[{"op": "replace", "path": "/spec/containers/0/image", "value":"new image"}]'`))
 )
 
@@ -111,9 +112,10 @@ func NewCmdPatch(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 	cmd := &cobra.Command{
 		Use:                   "patch (-f FILENAME | TYPE NAME) [-p PATCH|--patch-file FILE]",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Update field(s) of a resource"),
+		Short:                 i18n.T("Update fields of a resource"),
 		Long:                  patchLong,
 		Example:               patchExample,
+		ValidArgsFunction:     util.ResourceTypeAndNameCompletionFunc(f),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
@@ -167,11 +169,7 @@ func (o *PatchOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	if err != nil {
 		return err
 	}
-	discoveryClient, err := f.ToDiscoveryClient()
-	if err != nil {
-		return err
-	}
-	o.dryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
+	o.dryRunVerifier = resource.NewDryRunVerifier(dynamicClient, f.OpenAPIGetter())
 
 	return nil
 }
@@ -269,7 +267,7 @@ func (o *PatchOptions) RunPatch() error {
 			if mergePatch, err := o.Recorder.MakeRecordMergePatch(patchedObj); err != nil {
 				klog.V(4).Infof("error recording current command: %v", err)
 			} else if len(mergePatch) > 0 {
-				if recordedObj, err := helper.Patch(info.Namespace, info.Name, types.MergePatchType, mergePatch, nil); err != nil {
+				if recordedObj, err := helper.Patch(namespace, name, types.MergePatchType, mergePatch, nil); err != nil {
 					klog.V(4).Infof("error recording reason: %v", err)
 				} else {
 					patchedObj = recordedObj

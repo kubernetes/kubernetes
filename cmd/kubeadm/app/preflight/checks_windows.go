@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 /*
@@ -47,12 +48,6 @@ func (ipuc IsPrivilegedUserCheck) Check() (warnings, errorList []error) {
 	}
 
 	return nil, []error{errors.New("user is not running as administrator")}
-}
-
-// Check validates if Docker is setup to use systemd as the cgroup driver.
-// No-op for Windows.
-func (idsc IsDockerSystemdCheck) Check() (warnings, errorList []error) {
-	return nil, nil
 }
 
 // Check number of memory required by kubeadm

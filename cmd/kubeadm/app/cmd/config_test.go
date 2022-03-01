@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -31,15 +30,18 @@ import (
 
 	"github.com/lithammer/dedent"
 	"github.com/spf13/cobra"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+
+	"k8s.io/utils/exec"
+	fakeexec "k8s.io/utils/exec/testing"
+
+	kubeadmapiv1old "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	outputapischeme "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/scheme"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
-	"k8s.io/utils/exec"
-	fakeexec "k8s.io/utils/exec/testing"
 )
 
 const (
@@ -81,10 +83,10 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 				constants.CurrentKubernetesVersion.String(),
 			},
 			configContents: []byte(dedent.Dedent(fmt.Sprintf(`
-				apiVersion: kubeadm.k8s.io/v1beta2
+				apiVersion: %s
 				kind: ClusterConfiguration
 				kubernetesVersion: %s
-			`, constants.CurrentKubernetesVersion))),
+			`, kubeadmapiv1.SchemeGroupVersion.String(), constants.CurrentKubernetesVersion))),
 		},
 		{
 			name:               "use coredns",
@@ -93,10 +95,10 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 				"coredns",
 			},
 			configContents: []byte(dedent.Dedent(fmt.Sprintf(`
-				apiVersion: kubeadm.k8s.io/v1beta2
+				apiVersion: %s
 				kind: ClusterConfiguration
 				kubernetesVersion: %s
-			`, constants.MinimumControlPlaneVersion))),
+			`, kubeadmapiv1.SchemeGroupVersion.String(), constants.MinimumControlPlaneVersion))),
 		},
 	}
 
@@ -108,18 +110,18 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			tmpDir, err := ioutil.TempDir("", "kubeadm-images-test")
+			tmpDir, err := os.MkdirTemp("", "kubeadm-images-test")
 			if err != nil {
 				t.Fatalf("Unable to create temporary directory: %v", err)
 			}
 			defer os.RemoveAll(tmpDir)
 
 			configFilePath := filepath.Join(tmpDir, "test-config-file")
-			if err := ioutil.WriteFile(configFilePath, tc.configContents, 0644); err != nil {
+			if err := os.WriteFile(configFilePath, tc.configContents, 0644); err != nil {
 				t.Fatalf("Failed writing a config file: %v", err)
 			}
 
-			i, err := NewImagesList(configFilePath, &kubeadmapiv1beta2.ClusterConfiguration{
+			i, err := NewImagesList(configFilePath, &kubeadmapiv1.ClusterConfiguration{
 				KubernetesVersion: dummyKubernetesVersionStr,
 			})
 			if err != nil {
@@ -146,21 +148,21 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 func TestConfigImagesListRunWithoutPath(t *testing.T) {
 	testcases := []struct {
 		name           string
-		cfg            kubeadmapiv1beta2.ClusterConfiguration
+		cfg            kubeadmapiv1.ClusterConfiguration
 		expectedImages int
 	}{
 		{
 			name:           "empty config",
 			expectedImages: defaultNumberOfImages,
-			cfg: kubeadmapiv1beta2.ClusterConfiguration{
+			cfg: kubeadmapiv1.ClusterConfiguration{
 				KubernetesVersion: dummyKubernetesVersionStr,
 			},
 		},
 		{
 			name: "external etcd configuration",
-			cfg: kubeadmapiv1beta2.ClusterConfiguration{
-				Etcd: kubeadmapiv1beta2.Etcd{
-					External: &kubeadmapiv1beta2.ExternalEtcd{
+			cfg: kubeadmapiv1.ClusterConfiguration{
+				Etcd: kubeadmapiv1.Etcd{
+					External: &kubeadmapiv1.ExternalEtcd{
 						Endpoints: []string{"https://some.etcd.com:2379"},
 					},
 				},
@@ -170,20 +172,10 @@ func TestConfigImagesListRunWithoutPath(t *testing.T) {
 		},
 		{
 			name: "coredns enabled",
-			cfg: kubeadmapiv1beta2.ClusterConfiguration{
+			cfg: kubeadmapiv1.ClusterConfiguration{
 				KubernetesVersion: dummyKubernetesVersionStr,
 			},
 			expectedImages: defaultNumberOfImages,
-		},
-		{
-			name: "kube-dns enabled",
-			cfg: kubeadmapiv1beta2.ClusterConfiguration{
-				KubernetesVersion: dummyKubernetesVersionStr,
-				DNS: kubeadmapiv1beta2.DNS{
-					Type: kubeadmapiv1beta2.KubeDNS,
-				},
-			},
-			expectedImages: defaultNumberOfImages + 2,
 		},
 	}
 
@@ -215,8 +207,8 @@ func TestConfigImagesListRunWithoutPath(t *testing.T) {
 
 func TestConfigImagesListOutput(t *testing.T) {
 
-	etcdVersion, ok := constants.SupportedEtcdVersion[uint8(dummyKubernetesVersion.Minor())]
-	if !ok {
+	etcdVersion, _, err := constants.EtcdSupportedVersion(constants.SupportedEtcdVersion, dummyKubernetesVersionStr)
+	if err != nil {
 		t.Fatalf("cannot determine etcd version for Kubernetes version %s", dummyKubernetesVersionStr)
 	}
 	versionMapping := struct {
@@ -225,7 +217,7 @@ func TestConfigImagesListOutput(t *testing.T) {
 		PauseVersion   string
 		CoreDNSVersion string
 	}{
-		EtcdVersion:    etcdVersion,
+		EtcdVersion:    etcdVersion.String(),
 		KubeVersion:    "v" + dummyKubernetesVersionStr,
 		PauseVersion:   constants.PauseVersion,
 		CoreDNSVersion: constants.CoreDNSVersion,
@@ -233,13 +225,13 @@ func TestConfigImagesListOutput(t *testing.T) {
 
 	testcases := []struct {
 		name           string
-		cfg            kubeadmapiv1beta2.ClusterConfiguration
+		cfg            kubeadmapiv1.ClusterConfiguration
 		outputFormat   string
 		expectedOutput string
 	}{
 		{
 			name: "text output",
-			cfg: kubeadmapiv1beta2.ClusterConfiguration{
+			cfg: kubeadmapiv1.ClusterConfiguration{
 				KubernetesVersion: dummyKubernetesVersionStr,
 			},
 			outputFormat: "text",
@@ -254,13 +246,13 @@ k8s.gcr.io/coredns/coredns:{{.CoreDNSVersion}}
 		},
 		{
 			name: "JSON output",
-			cfg: kubeadmapiv1beta2.ClusterConfiguration{
+			cfg: kubeadmapiv1.ClusterConfiguration{
 				KubernetesVersion: dummyKubernetesVersionStr,
 			},
 			outputFormat: "json",
 			expectedOutput: `{
     "kind": "Images",
-    "apiVersion": "output.kubeadm.k8s.io/v1alpha1",
+    "apiVersion": "output.kubeadm.k8s.io/v1alpha2",
     "images": [
         "k8s.gcr.io/kube-apiserver:{{.KubeVersion}}",
         "k8s.gcr.io/kube-controller-manager:{{.KubeVersion}}",
@@ -275,11 +267,11 @@ k8s.gcr.io/coredns/coredns:{{.CoreDNSVersion}}
 		},
 		{
 			name: "YAML output",
-			cfg: kubeadmapiv1beta2.ClusterConfiguration{
+			cfg: kubeadmapiv1.ClusterConfiguration{
 				KubernetesVersion: dummyKubernetesVersionStr,
 			},
 			outputFormat: "yaml",
-			expectedOutput: `apiVersion: output.kubeadm.k8s.io/v1alpha1
+			expectedOutput: `apiVersion: output.kubeadm.k8s.io/v1alpha2
 images:
 - k8s.gcr.io/kube-apiserver:{{.KubeVersion}}
 - k8s.gcr.io/kube-controller-manager:{{.KubeVersion}}
@@ -293,7 +285,7 @@ kind: Images
 		},
 		{
 			name: "go-template output",
-			cfg: kubeadmapiv1beta2.ClusterConfiguration{
+			cfg: kubeadmapiv1.ClusterConfiguration{
 				KubernetesVersion: dummyKubernetesVersionStr,
 			},
 			outputFormat: `go-template={{range .images}}{{.}}{{"\n"}}{{end}}`,
@@ -308,7 +300,7 @@ k8s.gcr.io/coredns/coredns:{{.CoreDNSVersion}}
 		},
 		{
 			name: "JSONPATH output",
-			cfg: kubeadmapiv1beta2.ClusterConfiguration{
+			cfg: kubeadmapiv1.ClusterConfiguration{
 				KubernetesVersion: dummyKubernetesVersionStr,
 			},
 			outputFormat: `jsonpath={range.images[*]}{@} {end}`,
@@ -370,10 +362,10 @@ func TestImagesPull(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
-		LookPathFunc: func(cmd string) (string, error) { return "/usr/bin/docker", nil },
+		LookPathFunc: func(cmd string) (string, error) { return "/usr/bin/crictl", nil },
 	}
 
-	containerRuntime, err := utilruntime.NewContainerRuntime(&fexec, constants.DefaultDockerCRISocket)
+	containerRuntime, err := utilruntime.NewContainerRuntime(&fexec, constants.DefaultCRISocket)
 	if err != nil {
 		t.Errorf("unexpected NewContainerRuntime error: %v", err)
 	}
@@ -392,11 +384,11 @@ func TestImagesPull(t *testing.T) {
 }
 
 func TestMigrate(t *testing.T) {
-	cfg := []byte(dedent.Dedent(`
+	cfg := []byte(dedent.Dedent(fmt.Sprintf(`
 		# This is intentionally testing an old API version. Sometimes this may be the latest version (if no old configs are supported).
-		apiVersion: kubeadm.k8s.io/v1beta1
+		apiVersion: %s
 		kind: InitConfiguration
-	`))
+	`, kubeadmapiv1old.SchemeGroupVersion.String())))
 	configFile, cleanup := tempConfig(t, cfg)
 	defer cleanup()
 
@@ -420,12 +412,12 @@ func TestMigrate(t *testing.T) {
 // Returns the name of the file created and a cleanup callback
 func tempConfig(t *testing.T, config []byte) (string, func()) {
 	t.Helper()
-	tmpDir, err := ioutil.TempDir("", "kubeadm-migration-test")
+	tmpDir, err := os.MkdirTemp("", "kubeadm-migration-test")
 	if err != nil {
 		t.Fatalf("Unable to create temporary directory: %v", err)
 	}
 	configFilePath := filepath.Join(tmpDir, "test-config-file")
-	if err := ioutil.WriteFile(configFilePath, config, 0644); err != nil {
+	if err := os.WriteFile(configFilePath, config, 0644); err != nil {
 		os.RemoveAll(tmpDir)
 		t.Fatalf("Failed writing a config file: %v", err)
 	}

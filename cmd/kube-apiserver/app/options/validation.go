@@ -27,7 +27,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/features"
 	netutils "k8s.io/utils/net"
 )
 
@@ -54,15 +53,7 @@ func validateClusterIPFlags(options *ServerRunOptions) []error {
 		errs = append(errs, err)
 	}
 
-	// Secondary IP validation
-	// while api-server dualstack bits does not have dependency on EndPointSlice, its
-	// a good idea to have validation consistent across all components (ControllerManager
-	// needs EndPointSlice + DualStack feature flags).
 	secondaryServiceClusterIPRangeUsed := (options.SecondaryServiceClusterIPRange.IP != nil)
-	if secondaryServiceClusterIPRangeUsed && (!utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) || !utilfeature.DefaultFeatureGate.Enabled(features.EndpointSlice)) {
-		errs = append(errs, fmt.Errorf("secondary service cluster-ip range(--service-cluster-ip-range[1]) can only be used if %v and %v feature is enabled", string(features.IPv6DualStack), string(features.EndpointSlice)))
-	}
-
 	// note: While the cluster might be dualstack (i.e. pods with multiple IPs), the user may choose
 	// to only ingress traffic within and into the cluster on one IP family only. this family is decided
 	// by the range set on --service-cluster-ip-range. If/when the user decides to use dual stack services
@@ -106,7 +97,7 @@ func validateServiceNodePort(options *ServerRunOptions) []error {
 	}
 
 	if options.KubernetesServiceNodePort > 0 && !options.ServiceNodePortRange.Contains(options.KubernetesServiceNodePort) {
-		errs = append(errs, fmt.Errorf("kubernetes service port range %v doesn't contain %v", options.ServiceNodePortRange, (options.KubernetesServiceNodePort)))
+		errs = append(errs, fmt.Errorf("kubernetes service node port range %v doesn't contain %v", options.ServiceNodePortRange, options.KubernetesServiceNodePort))
 	}
 	return errs
 }
@@ -115,7 +106,7 @@ func validateTokenRequest(options *ServerRunOptions) []error {
 	var errs []error
 
 	enableAttempted := options.ServiceAccountSigningKeyFile != "" ||
-		options.Authentication.ServiceAccounts.Issuer != "" ||
+		(len(options.Authentication.ServiceAccounts.Issuers) != 0 && options.Authentication.ServiceAccounts.Issuers[0] != "") ||
 		len(options.Authentication.APIAudiences) != 0
 
 	enableSucceeded := options.ServiceAccountIssuer != nil
@@ -136,7 +127,7 @@ func validateAPIPriorityAndFairness(options *ServerRunOptions) []error {
 		// If none of the following runtime config options are specified, APF is
 		// assumed to be turned on.
 		enabledAPIString := options.APIEnablement.RuntimeConfig.String()
-		testConfigs := []string{"flowcontrol.apiserver.k8s.io/v1beta1", "api/beta", "api/all"} // in the order of precedence
+		testConfigs := []string{"flowcontrol.apiserver.k8s.io/v1beta2", "flowcontrol.apiserver.k8s.io/v1beta1", "api/beta", "api/all"} // in the order of precedence
 		for _, testConfig := range testConfigs {
 			if strings.Contains(enabledAPIString, fmt.Sprintf("%s=false", testConfig)) {
 				return []error{fmt.Errorf("--runtime-config=%s=false conflicts with --enable-priority-and-fairness=true and --feature-gates=APIPriorityAndFairness=true", testConfig)}
@@ -148,6 +139,17 @@ func validateAPIPriorityAndFairness(options *ServerRunOptions) []error {
 	}
 
 	return nil
+}
+
+func validateAPIServerIdentity(options *ServerRunOptions) []error {
+	var errs []error
+	if options.IdentityLeaseDurationSeconds <= 0 {
+		errs = append(errs, fmt.Errorf("--identity-lease-duration-seconds should be a positive number, but value '%d' provided", options.IdentityLeaseDurationSeconds))
+	}
+	if options.IdentityLeaseRenewIntervalSeconds <= 0 {
+		errs = append(errs, fmt.Errorf("--identity-lease-renew-interval-seconds should be a positive number, but value '%d' provided", options.IdentityLeaseRenewIntervalSeconds))
+	}
+	return errs
 }
 
 // Validate checks ServerRunOptions and return a slice of found errs.
@@ -168,13 +170,7 @@ func (s *ServerRunOptions) Validate() []error {
 	errs = append(errs, s.APIEnablement.Validate(legacyscheme.Scheme, apiextensionsapiserver.Scheme, aggregatorscheme.Scheme)...)
 	errs = append(errs, validateTokenRequest(s)...)
 	errs = append(errs, s.Metrics.Validate()...)
-	errs = append(errs, s.Logs.Validate()...)
-	if s.IdentityLeaseDurationSeconds <= 0 {
-		errs = append(errs, fmt.Errorf("--identity-lease-duration-seconds should be a positive number, but value '%d' provided", s.IdentityLeaseDurationSeconds))
-	}
-	if s.IdentityLeaseRenewIntervalSeconds <= 0 {
-		errs = append(errs, fmt.Errorf("--identity-lease-renew-interval-seconds should be a positive number, but value '%d' provided", s.IdentityLeaseRenewIntervalSeconds))
-	}
+	errs = append(errs, validateAPIServerIdentity(s)...)
 
 	return errs
 }

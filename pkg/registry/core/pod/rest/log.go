@@ -27,10 +27,8 @@ import (
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	genericrest "k8s.io/apiserver/pkg/registry/generic/rest"
 	"k8s.io/apiserver/pkg/registry/rest"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/registry/core/pod"
 
@@ -80,11 +78,7 @@ func (r *LogREST) Get(ctx context.Context, name string, opts runtime.Object) (ru
 		return nil, fmt.Errorf("invalid options object: %#v", opts)
 	}
 
-	// we must do this before forcing the insecure flag if the feature is disabled
 	countSkipTLSMetric(logOpts.InsecureSkipTLSVerifyBackend)
-	if !utilfeature.DefaultFeatureGate.Enabled(features.AllowInsecureBackendProxy) {
-		logOpts.InsecureSkipTLSVerifyBackend = false
-	}
 
 	if errs := validation.ValidatePodLogOptions(logOpts); len(errs) > 0 {
 		return nil, errors.NewInvalid(api.Kind("PodLogOptions"), name, errs)
@@ -107,11 +101,7 @@ func (r *LogREST) Get(ctx context.Context, name string, opts runtime.Object) (ru
 func countSkipTLSMetric(insecureSkipTLSVerifyBackend bool) {
 	usageType := usageEnforce
 	if insecureSkipTLSVerifyBackend {
-		if utilfeature.DefaultFeatureGate.Enabled(features.AllowInsecureBackendProxy) {
-			usageType = usageSkipAllowed
-		} else {
-			usageType = usageSkipDenied
-		}
+		usageType = usageSkipAllowed
 	}
 
 	counter, err := podLogsUsage.GetMetricWithLabelValues(usageType)

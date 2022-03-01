@@ -23,33 +23,41 @@ import (
 // This is an implementation of testing.testDeps. It doesn't need to do anything, because
 // no tests are actually run. It does need a concrete implementation of at least ImportPath,
 // which is called unconditionally when running tests.
-//lint:ignore U1000 see comment above, we know it's unused normally.
+//nolint:unused // U1000 see comment above, we know it's unused normally.
 type fakeTestDeps struct{}
 
+//nolint:unused // U1000 see comment above, we know it's unused normally.
 func (fakeTestDeps) ImportPath() string {
 	return ""
 }
 
+//nolint:unused // U1000 see comment above, we know it's unused normally.
 func (fakeTestDeps) MatchString(pat, str string) (bool, error) {
 	return false, nil
 }
 
+//nolint:unused // U1000 see comment above, we know it's unused normally.
 func (fakeTestDeps) StartCPUProfile(io.Writer) error {
 	return nil
 }
 
+//nolint:unused // U1000 see comment above, we know it's unused normally.
 func (fakeTestDeps) StopCPUProfile() {}
 
+//nolint:unused // U1000 see comment above, we know it's unused normally.
 func (fakeTestDeps) StartTestLog(io.Writer) {}
 
+//nolint:unused // U1000 see comment above, we know it's unused normally.
 func (fakeTestDeps) StopTestLog() error {
 	return nil
 }
 
+//nolint:unused // U1000 see comment above, we know it's unused normally.
 func (fakeTestDeps) WriteHeapProfile(io.Writer) error {
 	return nil
 }
 
+//nolint:unused // U1000 see comment above, we know it's unused normally.
 func (fakeTestDeps) WriteProfileTo(string, io.Writer, int) error {
 	return nil
 }

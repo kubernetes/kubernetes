@@ -67,19 +67,14 @@ function start-kube-apiserver {
 
   # Calculate variables and assemble the command line.
   local params="${API_SERVER_TEST_LOG_LEVEL:-"--v=2"} ${APISERVER_TEST_ARGS:-} ${CLOUD_CONFIG_OPT}"
-  params+=" --address=127.0.0.1"
   params+=" --allow-privileged=true"
-  params+=" --cloud-provider=gce"
+  params+=" --cloud-provider=${CLOUD_PROVIDER_FLAG:-gce}"
   params+=" --client-ca-file=${CA_CERT_BUNDLE_PATH}"
 
   # params is passed by reference, so no "$"
   configure-etcd-params params
 
   params+=" --secure-port=443"
-  if [[ "${ENABLE_APISERVER_INSECURE_PORT:-false}" != "true" ]]; then
-    # Default is :8080
-    params+=" --insecure-port=0"
-  fi
   params+=" --tls-cert-file=${APISERVER_SERVER_CERT_PATH}"
   params+=" --tls-private-key-file=${APISERVER_SERVER_KEY_PATH}"
   if [[ -n "${OLD_MASTER_IP:-}" ]]; then
@@ -94,6 +89,9 @@ function start-kube-apiserver {
   fi
   if [[ -n "${TLS_CIPHER_SUITES:-}" ]]; then
     params+=" --tls-cipher-suites=${TLS_CIPHER_SUITES}"
+  fi
+  if [[ -e "${KUBE_HOME}/bin/gke-internal-configure-helper.sh" ]]; then
+    params+=" $(gke-kube-apiserver-internal-sni-param)"
   fi
   params+=" --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname"
   if [[ -s "${REQUESTHEADER_CA_CERT_PATH:-}" ]]; then
@@ -143,7 +141,7 @@ function start-kube-apiserver {
     params+=" --service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"
   fi
   params+=" --service-account-issuer=${SERVICEACCOUNT_ISSUER}"
-  params+=" --service-account-api-audiences=${SERVICEACCOUNT_ISSUER}"
+  params+=" --api-audiences=${SERVICEACCOUNT_ISSUER}"
   params+=" --service-account-signing-key-file=${SERVICEACCOUNT_KEY_PATH}"
 
   local audit_policy_config_mount=""
@@ -273,16 +271,11 @@ function start-kube-apiserver {
   fi
   if [[ -n "${MASTER_ADVERTISE_ADDRESS:-}" ]]; then
     params+=" --advertise-address=${MASTER_ADVERTISE_ADDRESS}"
-    if [[ -n "${PROXY_SSH_USER:-}" ]]; then
-      params+=" --ssh-user=${PROXY_SSH_USER}"
-      params+=" --ssh-keyfile=/etc/srv/sshproxy/.sshkeyfile"
-    fi
   elif [[ -n "${PROJECT_ID:-}" && -n "${TOKEN_URL:-}" && -n "${TOKEN_BODY:-}" && -n "${NODE_NETWORK:-}" ]]; then
     local -r vm_external_ip=$(get-metadata-value "instance/network-interfaces/0/access-configs/0/external-ip")
-    if [[ -n "${PROXY_SSH_USER:-}" ]]; then
-      params+=" --advertise-address=${vm_external_ip}"
-      params+=" --ssh-user=${PROXY_SSH_USER}"
-      params+=" --ssh-keyfile=/etc/srv/sshproxy/.sshkeyfile"
+    params+=" --advertise-address=${vm_external_ip}"
+    if [[ -n "${KUBE_API_SERVER_RUNASUSER:-}" && -n "${KUBE_API_SERVER_RUNASGROUP:-}" ]]; then
+      chown -R "${KUBE_API_SERVER_RUNASUSER}":"${KUBE_API_SERVER_RUNASGROUP}" /etc/srv/sshproxy/
     fi
   fi
 
@@ -412,8 +405,7 @@ function start-kube-apiserver {
   if [[ -n "${KUBE_API_SERVER_RUNASUSER:-}" && -n "${KUBE_API_SERVER_RUNASGROUP:-}" && -n "${KUBE_PKI_READERS_GROUP:-}" ]]; then
     sed -i -e "s@{{runAsUser}}@\"runAsUser\": ${KUBE_API_SERVER_RUNASUSER},@g" "${src_file}"
     sed -i -e "s@{{runAsGroup}}@\"runAsGroup\": ${KUBE_API_SERVER_RUNASGROUP},@g" "${src_file}"
-    sed -i -e "s@{{capabilities}}@\"capabilities\": { \"drop\": [\"all\"], \"add\": [\"NET_BIND_SERVICE\"]},@g" "${src_file}"
-    sed -i -e "s@{{allowPrivilegeEscalation}}@\"allowPrivilegeEscalation\": false,@g" "${src_file}"
+    sed -i -e "s@{{containerSecurityContext}}@\"securityContext\": { \"capabilities\": { \"drop\": [\"all\"], \"add\": [\"NET_BIND_SERVICE\"] } },@g" "${src_file}"
     local supplementalGroups="${KUBE_PKI_READERS_GROUP}"
     if [[ -n "${KMS_PLUGIN_SOCKET_WRITER_GROUP:-}" ]]; then
       supplementalGroups+=",${KMS_PLUGIN_SOCKET_WRITER_GROUP}"
@@ -425,8 +417,7 @@ function start-kube-apiserver {
   else
     sed -i -e "s@{{runAsUser}}@@g" "${src_file}"
     sed -i -e "s@{{runAsGroup}}@@g" "${src_file}"
-    sed -i -e "s@{{capabilities}}@@g" "${src_file}"
-    sed -i -e "s@{{allowPrivilegeEscalation}}@@g" "${src_file}"
+    sed -i -e "s@{{containerSecurityContext}}@@g" "${src_file}"
     sed -i -e "s@{{supplementalGroups}}@@g" "${src_file}"
   fi
 

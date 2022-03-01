@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -114,9 +115,9 @@ func TestAttachDetach(t *testing.T) {
 	readOnly := false
 	regional := false
 	spec := createVolSpec(diskName, readOnly)
-	attachError := errors.New("Fake attach error")
-	detachError := errors.New("Fake detach error")
-	diskCheckError := errors.New("Fake DiskIsAttached error")
+	attachError := errors.New("fake attach error")
+	detachError := errors.New("fake detach error")
+	diskCheckError := errors.New("fake DiskIsAttached error")
 	tests := []testcase{
 		// Successful Attach call
 		{
@@ -498,19 +499,19 @@ func (testcase *testcase) AttachDisk(diskName string, nodeName types.NodeName, r
 	}
 
 	if expected.diskName != diskName {
-		return fmt.Errorf("Unexpected AttachDisk call: expected diskName %s, got %s", expected.diskName, diskName)
+		return fmt.Errorf("unexpected AttachDisk call: expected diskName %s, got %s", expected.diskName, diskName)
 	}
 
 	if expected.nodeName != nodeName {
-		return fmt.Errorf("Unexpected AttachDisk call: expected nodeName %s, got %s", expected.nodeName, nodeName)
+		return fmt.Errorf("unexpected AttachDisk call: expected nodeName %s, got %s", expected.nodeName, nodeName)
 	}
 
 	if expected.readOnly != readOnly {
-		return fmt.Errorf("Unexpected AttachDisk call: expected readOnly %v, got %v", expected.readOnly, readOnly)
+		return fmt.Errorf("unexpected AttachDisk call: expected readOnly %v, got %v", expected.readOnly, readOnly)
 	}
 
 	if expected.regional != regional {
-		return fmt.Errorf("Unexpected AttachDisk call: expected regional %v, got %v", expected.regional, regional)
+		return fmt.Errorf("unexpected AttachDisk call: expected regional %v, got %v", expected.regional, regional)
 	}
 
 	klog.V(4).Infof("AttachDisk call: %s, %s, %v, returning %v", diskName, nodeName, readOnly, expected.retErr)
@@ -527,11 +528,11 @@ func (testcase *testcase) DetachDisk(devicePath string, nodeName types.NodeName)
 	}
 
 	if expected.devicePath != devicePath {
-		return fmt.Errorf("Unexpected DetachDisk call: expected devicePath %s, got %s", expected.devicePath, devicePath)
+		return fmt.Errorf("unexpected DetachDisk call: expected devicePath %s, got %s", expected.devicePath, devicePath)
 	}
 
 	if expected.nodeName != nodeName {
-		return fmt.Errorf("Unexpected DetachDisk call: expected nodeName %s, got %s", expected.nodeName, nodeName)
+		return fmt.Errorf("unexpected DetachDisk call: expected nodeName %s, got %s", expected.nodeName, nodeName)
 	}
 
 	klog.V(4).Infof("DetachDisk call: %s, %s, returning %v", devicePath, nodeName, expected.retErr)
@@ -598,24 +599,24 @@ func (testcase *testcase) BulkDisksAreAttached(diskByNodes map[types.NodeName][]
 }
 
 func (testcase *testcase) CreateDisk(name string, diskType string, zone string, sizeGb int64, tags map[string]string) (*gce.Disk, error) {
-	return nil, errors.New("Not implemented")
+	return nil, errors.New("not implemented")
 }
 
 func (testcase *testcase) CreateRegionalDisk(name string, diskType string, replicaZones sets.String, sizeGb int64, tags map[string]string) (*gce.Disk, error) {
-	return nil, errors.New("Not implemented")
+	return nil, errors.New("not implemented")
 }
 
 func (testcase *testcase) DeleteDisk(diskToDelete string) error {
-	return errors.New("Not implemented")
+	return errors.New("not implemented")
 }
 
 func (testcase *testcase) GetAutoLabelsForPD(*gce.Disk) (map[string]string, error) {
-	return map[string]string{}, errors.New("Not implemented")
+	return map[string]string{}, errors.New("not implemented")
 }
 
 func (testcase *testcase) ResizeDisk(
 	diskName string,
 	oldSize resource.Quantity,
 	newSize resource.Quantity) (resource.Quantity, error) {
-	return oldSize, errors.New("Not implemented")
+	return oldSize, errors.New("not implemented")
 }

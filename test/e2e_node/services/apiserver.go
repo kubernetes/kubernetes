@@ -18,17 +18,26 @@ package services
 
 import (
 	"fmt"
-	"io/ioutil"
-	"net"
+	"os"
 
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	netutils "k8s.io/utils/net"
 
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	apiserver "k8s.io/kubernetes/cmd/kube-apiserver/app"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
-const clusterIPRange = "10.0.0.1/24"
+const (
+	clusterIPRange = "10.0.0.1/24"
+	// This key is for testing purposes only and is not considered secure.
+	ecdsaPrivateKey = `-----BEGIN EC PRIVATE KEY-----
+MHcCAQEEIEZmTmUhuanLjPA2CLquXivuwBDHTt5XYwgIr/kA1LtRoAoGCCqGSM49
+AwEHoUQDQgAEH6cuzP8XuD5wal6wf9M6xDljTOPLX2i8uIp/C/ASqiIGUeeKQtX0
+/IR3qCXyThP/dbCiHrF3v1cuhBOHY8CLVg==
+-----END EC PRIVATE KEY-----`
+)
 
 // APIServer is a server which manages apiserver.
 type APIServer struct {
@@ -50,11 +59,14 @@ func (a *APIServer) Start() error {
 
 	o := options.NewServerRunOptions()
 	o.Etcd.StorageConfig = a.storageConfig
-	_, ipnet, err := net.ParseCIDR(clusterIPRange)
+	_, ipnet, err := netutils.ParseCIDRSloppy(clusterIPRange)
 	if err != nil {
 		return err
 	}
-	o.SecureServing.BindAddress = net.ParseIP("127.0.0.1")
+	if len(framework.TestContext.RuntimeConfig) > 0 {
+		o.APIEnablement.RuntimeConfig = framework.TestContext.RuntimeConfig
+	}
+	o.SecureServing.BindAddress = netutils.ParseIPSloppy("127.0.0.1")
 	o.ServiceClusterIPRanges = ipnet.String()
 	o.AllowPrivileged = true
 	if err := generateTokenFile(tokenFilePath); err != nil {
@@ -62,6 +74,20 @@ func (a *APIServer) Start() error {
 	}
 	o.Authentication.TokenFile.TokenFile = tokenFilePath
 	o.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition"}
+
+	saSigningKeyFile, err := os.CreateTemp("/tmp", "insecure_test_key")
+	if err != nil {
+		return fmt.Errorf("create temp file failed: %v", err)
+	}
+	defer os.RemoveAll(saSigningKeyFile.Name())
+	if err = os.WriteFile(saSigningKeyFile.Name(), []byte(ecdsaPrivateKey), 0666); err != nil {
+		return fmt.Errorf("write file %s failed: %v", saSigningKeyFile.Name(), err)
+	}
+	o.ServiceAccountSigningKeyFile = saSigningKeyFile.Name()
+	o.Authentication.APIAudiences = []string{"https://foo.bar.example.com"}
+	o.Authentication.ServiceAccounts.Issuers = []string{"https://foo.bar.example.com"}
+	o.Authentication.ServiceAccounts.KeyFiles = []string{saSigningKeyFile.Name()}
+
 	errCh := make(chan error)
 	go func() {
 		defer close(errCh)
@@ -70,6 +96,11 @@ func (a *APIServer) Start() error {
 			errCh <- fmt.Errorf("set apiserver default options error: %v", err)
 			return
 		}
+		if errs := completedOptions.Validate(); len(errs) != 0 {
+			errCh <- fmt.Errorf("failed to validate ServerRunOptions: %v", utilerrors.NewAggregate(errs))
+			return
+		}
+
 		err = apiserver.Run(completedOptions, a.stopCh)
 		if err != nil {
 			errCh <- fmt.Errorf("run apiserver error: %v", err)
@@ -111,5 +142,5 @@ func getAPIServerHealthCheckURL() string {
 
 func generateTokenFile(tokenFilePath string) error {
 	tokenFile := fmt.Sprintf("%s,kubelet,uid,system:masters\n", framework.TestContext.BearerToken)
-	return ioutil.WriteFile(tokenFilePath, []byte(tokenFile), 0644)
+	return os.WriteFile(tokenFilePath, []byte(tokenFile), 0644)
 }

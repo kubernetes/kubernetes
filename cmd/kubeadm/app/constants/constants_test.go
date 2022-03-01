@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/version"
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	apimachineryversion "k8s.io/apimachinery/pkg/version"
 )
 
 func TestGetStaticPodDirectory(t *testing.T) {
@@ -172,34 +172,6 @@ func TestEtcdSupportedVersion(t *testing.T) {
 	}
 }
 
-func TestGetKubeDNSVersion(t *testing.T) {
-	var tests = []struct {
-		dns      kubeadmapi.DNSAddOnType
-		expected string
-	}{
-		{
-			dns:      kubeadmapi.KubeDNS,
-			expected: KubeDNSVersion,
-		},
-		{
-			dns:      kubeadmapi.CoreDNS,
-			expected: CoreDNSVersion,
-		},
-	}
-	for _, rt := range tests {
-		t.Run(string(rt.dns), func(t *testing.T) {
-			actualDNSVersion := GetDNSVersion(rt.dns)
-			if actualDNSVersion != rt.expected {
-				t.Errorf(
-					"failed GetDNSVersion:\n\texpected: %s\n\t  actual: %s",
-					rt.expected,
-					actualDNSVersion,
-				)
-			}
-		})
-	}
-}
-
 func TestGetKubernetesServiceCIDR(t *testing.T) {
 	var tests = []struct {
 		svcSubnetList string
@@ -210,35 +182,30 @@ func TestGetKubernetesServiceCIDR(t *testing.T) {
 	}{
 		{
 			svcSubnetList: "192.168.10.0/24",
-			isDualStack:   false,
 			expected:      "192.168.10.0/24",
 			expectedError: false,
 			name:          "valid: valid IPv4 range from single-stack",
 		},
 		{
 			svcSubnetList: "fd03::/112",
-			isDualStack:   false,
 			expected:      "fd03::/112",
 			expectedError: false,
 			name:          "valid: valid IPv6 range from single-stack",
 		},
 		{
 			svcSubnetList: "192.168.10.0/24,fd03::/112",
-			isDualStack:   true,
 			expected:      "192.168.10.0/24",
 			expectedError: false,
 			name:          "valid: valid <IPv4,IPv6> ranges from dual-stack",
 		},
 		{
 			svcSubnetList: "fd03::/112,192.168.10.0/24",
-			isDualStack:   true,
 			expected:      "fd03::/112",
 			expectedError: false,
 			name:          "valid: valid <IPv6,IPv4> ranges from dual-stack",
 		},
 		{
 			svcSubnetList: "192.168.10.0/24,fd03:x::/112",
-			isDualStack:   true,
 			expected:      "",
 			expectedError: true,
 			name:          "invalid: failed to parse subnet range for dual-stack",
@@ -247,7 +214,7 @@ func TestGetKubernetesServiceCIDR(t *testing.T) {
 
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
-			actual, actualError := GetKubernetesServiceCIDR(rt.svcSubnetList, rt.isDualStack)
+			actual, actualError := GetKubernetesServiceCIDR(rt.svcSubnetList)
 			if rt.expectedError {
 				if actualError == nil {
 					t.Errorf("failed GetKubernetesServiceCIDR:\n\texpected error, but got no error")
@@ -262,6 +229,48 @@ func TestGetKubernetesServiceCIDR(t *testing.T) {
 						actual.String(),
 					)
 				}
+			}
+		})
+	}
+}
+
+func TestGetSkewedKubernetesVersionImpl(t *testing.T) {
+	tests := []struct {
+		name           string
+		versionInfo    *apimachineryversion.Info
+		n              int
+		expectedResult *version.Version
+	}{
+		{
+			name:           "invalid versionInfo; placeholder version is returned",
+			versionInfo:    &apimachineryversion.Info{},
+			expectedResult: defaultKubernetesPlaceholderVersion,
+		},
+		{
+			name:           "valid skew of -1",
+			versionInfo:    &apimachineryversion.Info{Major: "1", GitVersion: "v1.23.0"},
+			n:              -1,
+			expectedResult: version.MustParseSemantic("v1.22.0"),
+		},
+		{
+			name:           "valid skew of 0",
+			versionInfo:    &apimachineryversion.Info{Major: "1", GitVersion: "v1.23.0"},
+			n:              0,
+			expectedResult: version.MustParseSemantic("v1.23.0"),
+		},
+		{
+			name:           "valid skew of +1",
+			versionInfo:    &apimachineryversion.Info{Major: "1", GitVersion: "v1.23.0"},
+			n:              1,
+			expectedResult: version.MustParseSemantic("v1.24.0"),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := getSkewedKubernetesVersionImpl(tc.versionInfo, tc.n)
+			if cmp, _ := result.Compare(tc.expectedResult.String()); cmp != 0 {
+				t.Errorf("expected result: %v, got %v", tc.expectedResult, result)
 			}
 		})
 	}

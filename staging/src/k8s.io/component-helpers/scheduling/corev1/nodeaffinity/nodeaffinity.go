@@ -287,3 +287,38 @@ type preferredSchedulingTerm struct {
 	nodeSelectorTerm
 	weight int
 }
+
+type RequiredNodeAffinity struct {
+	labelSelector labels.Selector
+	nodeSelector  *LazyErrorNodeSelector
+}
+
+// GetRequiredNodeAffinity returns the parsing result of pod's nodeSelector and nodeAffinity.
+func GetRequiredNodeAffinity(pod *v1.Pod) RequiredNodeAffinity {
+	var selector labels.Selector
+	if len(pod.Spec.NodeSelector) > 0 {
+		selector = labels.SelectorFromSet(pod.Spec.NodeSelector)
+	}
+	// Use LazyErrorNodeSelector for backwards compatibility of parsing errors.
+	var affinity *LazyErrorNodeSelector
+	if pod.Spec.Affinity != nil &&
+		pod.Spec.Affinity.NodeAffinity != nil &&
+		pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
+		affinity = NewLazyErrorNodeSelector(pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution)
+	}
+	return RequiredNodeAffinity{labelSelector: selector, nodeSelector: affinity}
+}
+
+// Match checks whether the pod is schedulable onto nodes according to
+// the requirements in both nodeSelector and nodeAffinity.
+func (s RequiredNodeAffinity) Match(node *v1.Node) (bool, error) {
+	if s.labelSelector != nil {
+		if !s.labelSelector.Matches(labels.Set(node.Labels)) {
+			return false, nil
+		}
+	}
+	if s.nodeSelector != nil {
+		return s.nodeSelector.Match(node)
+	}
+	return true, nil
+}

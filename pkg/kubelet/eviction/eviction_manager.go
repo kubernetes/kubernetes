@@ -26,7 +26,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/util/clock"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	v1helper "k8s.io/component-helpers/scheduling/corev1"
@@ -39,7 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/kubelet/util/format"
+	"k8s.io/utils/clock"
 )
 
 const (
@@ -59,12 +58,12 @@ const (
 // managerImpl implements Manager
 type managerImpl struct {
 	//  used to track time
-	clock clock.Clock
+	clock clock.WithTicker
 	// config is how the manager is configured
 	config Config
 	// the function to invoke to kill a pod
 	killPodFunc KillPodFunc
-	// the function to get the mirror pod by a given statid pod
+	// the function to get the mirror pod by a given static pod
 	mirrorPodFunc MirrorPodFunc
 	// the interface that knows how to do image gc
 	imageGC ImageGC
@@ -113,7 +112,7 @@ func NewManager(
 	containerGC ContainerGC,
 	recorder record.EventRecorder,
 	nodeRef *v1.ObjectReference,
-	clock clock.Clock,
+	clock clock.WithTicker,
 ) (Manager, lifecycle.PodAdmitHandler) {
 	manager := &managerImpl{
 		clock:                        clock,
@@ -165,7 +164,7 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 	}
 
 	// reject pods when under memory pressure (if pod is best effort), or if under disk pressure.
-	klog.Warningf("Failed to admit pod %s - node has conditions: %v", format.Pod(attrs.Pod), m.nodeConditions)
+	klog.InfoS("Failed to admit pod to node", "pod", klog.KObj(attrs.Pod), "nodeCondition", m.nodeConditions)
 	return lifecycle.PodAdmitResult{
 		Admit:   false,
 		Reason:  Reason,
@@ -176,7 +175,7 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 // Start starts the control loop to observe and response to low compute resources.
 func (m *managerImpl) Start(diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc, podCleanedUpFunc PodCleanedUpFunc, monitoringInterval time.Duration) {
 	thresholdHandler := func(message string) {
-		klog.Infof(message)
+		klog.InfoS(message)
 		m.synchronize(diskInfoProvider, podFunc)
 	}
 	if m.config.KernelMemcgNotification {
@@ -184,7 +183,7 @@ func (m *managerImpl) Start(diskInfoProvider DiskInfoProvider, podFunc ActivePod
 			if threshold.Signal == evictionapi.SignalMemoryAvailable || threshold.Signal == evictionapi.SignalAllocatableMemoryAvailable {
 				notifier, err := NewMemoryThresholdNotifier(threshold, m.config.PodCgroupRoot, &CgroupNotifierFactory{}, thresholdHandler)
 				if err != nil {
-					klog.Warningf("eviction manager: failed to create memory threshold notifier: %v", err)
+					klog.InfoS("Eviction manager: failed to create memory threshold notifier", "err", err)
 				} else {
 					go notifier.Start()
 					m.thresholdNotifiers = append(m.thresholdNotifiers, notifier)
@@ -196,7 +195,7 @@ func (m *managerImpl) Start(diskInfoProvider DiskInfoProvider, podFunc ActivePod
 	go func() {
 		for {
 			if evictedPods := m.synchronize(diskInfoProvider, podFunc); evictedPods != nil {
-				klog.Infof("eviction manager: pods %s evicted, waiting for pod to be cleaned up", format.Pods(evictedPods))
+				klog.InfoS("Eviction manager: pods evicted, waiting for pod to be cleaned up", "pods", klog.KObjs(evictedPods))
 				m.waitForPodsCleanup(podCleanedUpFunc, evictedPods)
 			} else {
 				time.Sleep(monitoringInterval)
@@ -235,7 +234,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 		return nil
 	}
 
-	klog.V(3).Infof("eviction manager: synchronize housekeeping")
+	klog.V(3).InfoS("Eviction manager: synchronize housekeeping")
 	// build the ranking functions (if not yet known)
 	// TODO: have a function in cadvisor that lets us know if global housekeeping has completed
 	if m.dedicatedImageFs == nil {
@@ -252,7 +251,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	updateStats := true
 	summary, err := m.summaryProvider.Get(updateStats)
 	if err != nil {
-		klog.Errorf("eviction manager: failed to get summary stats: %v", err)
+		klog.ErrorS(err, "Eviction manager: failed to get summary stats")
 		return nil
 	}
 
@@ -260,7 +259,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 		m.thresholdsLastUpdated = m.clock.Now()
 		for _, notifier := range m.thresholdNotifiers {
 			if err := notifier.UpdateThreshold(summary); err != nil {
-				klog.Warningf("eviction manager: failed to update %s: %v", notifier.Description(), err)
+				klog.InfoS("Eviction manager: failed to update notifier", "notifier", notifier.Description(), "err", err)
 			}
 		}
 	}
@@ -287,7 +286,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	// the set of node conditions that are triggered by currently observed thresholds
 	nodeConditions := nodeConditions(thresholds)
 	if len(nodeConditions) > 0 {
-		klog.V(3).Infof("eviction manager: node conditions - observed: %v", nodeConditions)
+		klog.V(3).InfoS("Eviction manager: node conditions - observed", "nodeCondition", nodeConditions)
 	}
 
 	// track when a node condition was last observed
@@ -296,7 +295,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	// node conditions report true if it has been observed within the transition period window
 	nodeConditions = nodeConditionsObservedSince(nodeConditionsLastObservedAt, m.config.PressureTransitionPeriod, now)
 	if len(nodeConditions) > 0 {
-		klog.V(3).Infof("eviction manager: node conditions - transition period not met: %v", nodeConditions)
+		klog.V(3).InfoS("Eviction manager: node conditions - transition period not met", "nodeCondition", nodeConditions)
 	}
 
 	// determine the set of thresholds we need to drive eviction behavior (i.e. all grace periods are met)
@@ -326,7 +325,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	}
 
 	if len(thresholds) == 0 {
-		klog.V(3).Infof("eviction manager: no resources are starved")
+		klog.V(3).InfoS("Eviction manager: no resources are starved")
 		return nil
 	}
 
@@ -336,36 +335,36 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	if !foundAny {
 		return nil
 	}
-	klog.Warningf("eviction manager: attempting to reclaim %v", resourceToReclaim)
+	klog.InfoS("Eviction manager: attempting to reclaim", "resourceName", resourceToReclaim)
 
 	// record an event about the resources we are now attempting to reclaim via eviction
 	m.recorder.Eventf(m.nodeRef, v1.EventTypeWarning, "EvictionThresholdMet", "Attempting to reclaim %s", resourceToReclaim)
 
 	// check if there are node-level resources we can reclaim to reduce pressure before evicting end-user pods.
 	if m.reclaimNodeLevelResources(thresholdToReclaim.Signal, resourceToReclaim) {
-		klog.Infof("eviction manager: able to reduce %v pressure without evicting pods.", resourceToReclaim)
+		klog.InfoS("Eviction manager: able to reduce resource pressure without evicting pods.", "resourceName", resourceToReclaim)
 		return nil
 	}
 
-	klog.Infof("eviction manager: must evict pod(s) to reclaim %v", resourceToReclaim)
+	klog.InfoS("Eviction manager: must evict pod(s) to reclaim", "resourceName", resourceToReclaim)
 
 	// rank the pods for eviction
 	rank, ok := m.signalToRankFunc[thresholdToReclaim.Signal]
 	if !ok {
-		klog.Errorf("eviction manager: no ranking function for signal %s", thresholdToReclaim.Signal)
+		klog.ErrorS(nil, "Eviction manager: no ranking function for signal", "threshold", thresholdToReclaim.Signal)
 		return nil
 	}
 
 	// the only candidates viable for eviction are those pods that had anything running.
 	if len(activePods) == 0 {
-		klog.Errorf("eviction manager: eviction thresholds have been met, but no pods are active to evict")
+		klog.ErrorS(nil, "Eviction manager: eviction thresholds have been met, but no pods are active to evict")
 		return nil
 	}
 
 	// rank the running pods for eviction for the specified resource
 	rank(activePods, statsFunc)
 
-	klog.Infof("eviction manager: pods ranked for eviction: %s", format.Pods(activePods))
+	klog.InfoS("Eviction manager: pods ranked for eviction", "pods", klog.KObjs(activePods))
 
 	//record age of metrics for met thresholds that we are using for evictions.
 	for _, t := range thresholds {
@@ -388,7 +387,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 			return []*v1.Pod{pod}
 		}
 	}
-	klog.Infof("eviction manager: unable to evict any pods from the node")
+	klog.InfoS("Eviction manager: unable to evict any pods from the node")
 	return nil
 }
 
@@ -400,7 +399,7 @@ func (m *managerImpl) waitForPodsCleanup(podCleanedUpFunc PodCleanedUpFunc, pods
 	for {
 		select {
 		case <-timeout.C():
-			klog.Warningf("eviction manager: timed out waiting for pods %s to be cleaned up", format.Pods(pods))
+			klog.InfoS("Eviction manager: timed out waiting for pods to be cleaned up", "pods", klog.KObjs(pods))
 			return
 		case <-ticker.C():
 			for i, pod := range pods {
@@ -408,7 +407,7 @@ func (m *managerImpl) waitForPodsCleanup(podCleanedUpFunc PodCleanedUpFunc, pods
 					break
 				}
 				if i == len(pods)-1 {
-					klog.Infof("eviction manager: pods %s successfully cleaned up", format.Pods(pods))
+					klog.InfoS("Eviction manager: pods successfully cleaned up", "pods", klog.KObjs(pods))
 					return
 				}
 			}
@@ -422,14 +421,14 @@ func (m *managerImpl) reclaimNodeLevelResources(signalToReclaim evictionapi.Sign
 	for _, nodeReclaimFunc := range nodeReclaimFuncs {
 		// attempt to reclaim the pressured resource.
 		if err := nodeReclaimFunc(); err != nil {
-			klog.Warningf("eviction manager: unexpected error when attempting to reduce %v pressure: %v", resourceToReclaim, err)
+			klog.InfoS("Eviction manager: unexpected error when attempting to reduce resource pressure", "resourceName", resourceToReclaim, "err", err)
 		}
 
 	}
 	if len(nodeReclaimFuncs) > 0 {
 		summary, err := m.summaryProvider.Get(true)
 		if err != nil {
-			klog.Errorf("eviction manager: failed to get summary stats after resource reclaim: %v", err)
+			klog.ErrorS(err, "Eviction manager: failed to get summary stats after resource reclaim")
 			return false
 		}
 
@@ -437,8 +436,9 @@ func (m *managerImpl) reclaimNodeLevelResources(signalToReclaim evictionapi.Sign
 		observations, _ := makeSignalObservations(summary)
 		debugLogObservations("observations after resource reclaim", observations)
 
-		// determine the set of thresholds met independent of grace period
-		thresholds := thresholdsMet(m.config.Thresholds, observations, false)
+		// evaluate all thresholds independently of their grace period to see if with
+		// the new observations, we think we have met min reclaim goals
+		thresholds := thresholdsMet(m.config.Thresholds, observations, true)
 		debugLogThresholdsWithObservation("thresholds after resource reclaim - ignoring grace period", thresholds, observations)
 
 		if len(thresholds) == 0 {
@@ -557,22 +557,22 @@ func (m *managerImpl) evictPod(pod *v1.Pod, gracePeriodOverride int64, evictMsg 
 	// do not evict such pods. Static pods are not re-admitted after evictions.
 	// https://github.com/kubernetes/kubernetes/issues/40573 has more details.
 	if kubelettypes.IsCriticalPod(pod) {
-		klog.Errorf("eviction manager: cannot evict a critical pod %s", format.Pod(pod))
+		klog.ErrorS(nil, "Eviction manager: cannot evict a critical pod", "pod", klog.KObj(pod))
 		return false
-	}
-	status := v1.PodStatus{
-		Phase:   v1.PodFailed,
-		Message: evictMsg,
-		Reason:  Reason,
 	}
 	// record that we are evicting the pod
 	m.recorder.AnnotatedEventf(pod, annotations, v1.EventTypeWarning, Reason, evictMsg)
 	// this is a blocking call and should only return when the pod and its containers are killed.
-	err := m.killPodFunc(pod, status, &gracePeriodOverride)
+	klog.V(3).InfoS("Evicting pod", "pod", klog.KObj(pod), "podUID", pod.UID, "message", evictMsg)
+	err := m.killPodFunc(pod, true, &gracePeriodOverride, func(status *v1.PodStatus) {
+		status.Phase = v1.PodFailed
+		status.Reason = Reason
+		status.Message = evictMsg
+	})
 	if err != nil {
-		klog.Errorf("eviction manager: pod %s failed to evict %v", format.Pod(pod), err)
+		klog.ErrorS(err, "Eviction manager: pod failed to evict", "pod", klog.KObj(pod))
 	} else {
-		klog.Infof("eviction manager: pod %s is evicted successfully", format.Pod(pod))
+		klog.InfoS("Eviction manager: pod is evicted successfully", "pod", klog.KObj(pod))
 	}
 	return true
 }

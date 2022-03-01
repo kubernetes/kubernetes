@@ -16,9 +16,9 @@ limitations under the License.
 
 package storage
 
-import "k8s.io/kubernetes/test/e2e/framework"
+import "github.com/onsi/ginkgo"
 
 // SIGDescribe annotates the test with the SIG label.
 func SIGDescribe(text string, body func()) bool {
-	return framework.KubeDescribe("[sig-storage] "+text, body)
+	return ginkgo.Describe("[sig-storage] "+text, body)
 }

@@ -67,6 +67,6 @@ func TestIngressClassStrategy(t *testing.T) {
 	}
 	errs = Strategy.ValidateUpdate(ctx, &ingressClass, &ingressClass)
 	if len(errs) == 0 {
-		t.Errorf("Unexpected error from update validation for IngressClass, got none")
+		t.Errorf("Expected error from update validation for IngressClass, got none")
 	}
 }

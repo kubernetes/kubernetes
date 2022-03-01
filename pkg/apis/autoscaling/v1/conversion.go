@@ -362,6 +362,7 @@ func Convert_autoscaling_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscaler(i
 		}
 		// copy before mutating
 		if !copiedAnnotations {
+			//nolint:ineffassign
 			copiedAnnotations = true
 			out.Annotations = autoscaling.DeepCopyStringMap(out.Annotations)
 		}
@@ -460,11 +461,9 @@ func Convert_autoscaling_HorizontalPodAutoscalerSpec_To_v1_HorizontalPodAutoscal
 	out.MaxReplicas = in.MaxReplicas
 
 	for _, metric := range in.Metrics {
-		if metric.Type == autoscaling.ResourceMetricSourceType && metric.Resource != nil && metric.Resource.Name == core.ResourceCPU {
-			if metric.Resource.Target.AverageUtilization != nil {
-				out.TargetCPUUtilizationPercentage = new(int32)
-				*out.TargetCPUUtilizationPercentage = *metric.Resource.Target.AverageUtilization
-			}
+		if metric.Type == autoscaling.ResourceMetricSourceType && metric.Resource != nil && metric.Resource.Name == core.ResourceCPU && metric.Resource.Target.AverageUtilization != nil {
+			out.TargetCPUUtilizationPercentage = new(int32)
+			*out.TargetCPUUtilizationPercentage = *metric.Resource.Target.AverageUtilization
 			break
 		}
 	}

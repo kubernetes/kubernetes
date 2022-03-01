@@ -28,11 +28,12 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -42,9 +43,7 @@ import (
 	"k8s.io/klog/v2"
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
 	"k8s.io/kubernetes/pkg/scheduler"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
-	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
-	schedulerapiv1 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1"
+	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -55,13 +54,13 @@ type ShutdownFunc func()
 
 // StartApiserver starts a local API server for testing and returns the handle to the URL and the shutdown function to stop it.
 func StartApiserver() (string, ShutdownFunc) {
-	h := &framework.MasterHolder{Initialized: make(chan struct{})}
+	h := &framework.APIServerHolder{Initialized: make(chan struct{})}
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		<-h.Initialized
 		h.M.GenericAPIServer.Handler.ServeHTTP(w, req)
 	}))
 
-	_, _, closeFn := framework.RunAMasterUsingServer(framework.NewIntegrationTestMasterConfig(), s, h)
+	_, _, closeFn := framework.RunAnAPIServerUsingServer(framework.NewIntegrationTestControlPlaneConfig(), s, h)
 
 	shutdownFunc := func() {
 		klog.Infof("destroying API server")
@@ -74,7 +73,7 @@ func StartApiserver() (string, ShutdownFunc) {
 
 // StartScheduler configures and starts a scheduler given a handle to the clientSet interface
 // and event broadcaster. It returns the running scheduler, podInformer and the shutdown function to stop it.
-func StartScheduler(clientSet clientset.Interface) (*scheduler.Scheduler, coreinformers.PodInformer, ShutdownFunc) {
+func StartScheduler(clientSet clientset.Interface, kubeConfig *restclient.Config, cfg *kubeschedulerconfig.KubeSchedulerConfiguration) (*scheduler.Scheduler, coreinformers.PodInformer, ShutdownFunc) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	informerFactory := scheduler.NewInformerFactory(clientSet, 0)
@@ -86,8 +85,16 @@ func StartScheduler(clientSet clientset.Interface) (*scheduler.Scheduler, corein
 	sched, err := scheduler.New(
 		clientSet,
 		informerFactory,
+		nil,
 		profile.NewRecorderFactory(evtBroadcaster),
-		ctx.Done())
+		ctx.Done(),
+		scheduler.WithKubeConfig(kubeConfig),
+		scheduler.WithProfiles(cfg.Profiles...),
+		scheduler.WithPercentageOfNodesToScore(cfg.PercentageOfNodesToScore),
+		scheduler.WithPodMaxBackoffSeconds(cfg.PodMaxBackoffSeconds),
+		scheduler.WithPodInitialBackoffSeconds(cfg.PodInitialBackoffSeconds),
+		scheduler.WithExtenders(cfg.Extenders...),
+		scheduler.WithParallelism(cfg.Parallelism))
 	if err != nil {
 		klog.Fatalf("Error creating scheduler: %v", err)
 	}
@@ -126,7 +133,7 @@ func StartFakePVController(clientSet clientset.Interface) ShutdownFunc {
 				metav1.SetMetaDataAnnotation(&pvc.ObjectMeta, pvutil.AnnBindCompleted, "yes")
 				_, err := clientSet.CoreV1().PersistentVolumeClaims(claimRef.Namespace).Update(ctx, pvc, metav1.UpdateOptions{})
 				if err != nil {
-					klog.Errorf("error while getting %v/%v: %v", claimRef.Namespace, claimRef.Name, err)
+					klog.Errorf("error while updating %v/%v: %v", claimRef.Namespace, claimRef.Name, err)
 					return
 				}
 			}
@@ -148,14 +155,16 @@ func StartFakePVController(clientSet clientset.Interface) ShutdownFunc {
 
 // TestContext store necessary context info
 type TestContext struct {
-	CloseFn         framework.CloseFunc
-	HTTPServer      *httptest.Server
-	NS              *v1.Namespace
-	ClientSet       *clientset.Clientset
-	InformerFactory informers.SharedInformerFactory
-	Scheduler       *scheduler.Scheduler
-	Ctx             context.Context
-	CancelFn        context.CancelFunc
+	CloseFn            framework.CloseFunc
+	HTTPServer         *httptest.Server
+	NS                 *v1.Namespace
+	ClientSet          clientset.Interface
+	KubeConfig         *restclient.Config
+	InformerFactory    informers.SharedInformerFactory
+	DynInformerFactory dynamicinformer.DynamicSharedInformerFactory
+	Scheduler          *scheduler.Scheduler
+	Ctx                context.Context
+	CancelFn           context.CancelFunc
 }
 
 // CleanupNodes cleans all nodes which were created during integration test
@@ -183,7 +192,13 @@ func PodDeleted(c clientset.Interface, podNamespace, podName string) wait.Condit
 // SyncInformerFactory starts informer and waits for caches to be synced
 func SyncInformerFactory(testCtx *TestContext) {
 	testCtx.InformerFactory.Start(testCtx.Ctx.Done())
+	if testCtx.DynInformerFactory != nil {
+		testCtx.DynInformerFactory.Start(testCtx.Ctx.Done())
+	}
 	testCtx.InformerFactory.WaitForCacheSync(testCtx.Ctx.Done())
+	if testCtx.DynInformerFactory != nil {
+		testCtx.DynInformerFactory.WaitForCacheSync(testCtx.Ctx.Done())
+	}
 }
 
 // CleanupTest cleans related resources which were created during integration test
@@ -310,29 +325,29 @@ func UpdateNodeStatus(cs clientset.Interface, node *v1.Node) error {
 	return err
 }
 
-// InitTestMaster initializes a test environment and creates a master with default
+// InitTestAPIServer initializes a test environment and creates an API server with default
 // configuration.
-func InitTestMaster(t *testing.T, nsPrefix string, admission admission.Interface) *TestContext {
+func InitTestAPIServer(t *testing.T, nsPrefix string, admission admission.Interface) *TestContext {
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	testCtx := TestContext{
 		Ctx:      ctx,
 		CancelFn: cancelFunc,
 	}
 
-	// 1. Create master
-	h := &framework.MasterHolder{Initialized: make(chan struct{})}
+	// 1. Create API server
+	h := &framework.APIServerHolder{Initialized: make(chan struct{})}
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		<-h.Initialized
 		h.M.GenericAPIServer.Handler.ServeHTTP(w, req)
 	}))
 
-	masterConfig := framework.NewIntegrationTestMasterConfig()
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
 
 	if admission != nil {
-		masterConfig.GenericConfig.AdmissionControl = admission
+		controlPlaneConfig.GenericConfig.AdmissionControl = admission
 	}
 
-	_, testCtx.HTTPServer, testCtx.CloseFn = framework.RunAMasterUsingServer(masterConfig, s, h)
+	_, testCtx.HTTPServer, testCtx.CloseFn = framework.RunAnAPIServerUsingServer(controlPlaneConfig, s, h)
 
 	if nsPrefix != "default" {
 		testCtx.NS = framework.CreateTestingNamespace(nsPrefix+string(uuid.NewUUID()), s, t)
@@ -341,21 +356,21 @@ func InitTestMaster(t *testing.T, nsPrefix string, admission admission.Interface
 	}
 
 	// 2. Create kubeclient
-	testCtx.ClientSet = clientset.NewForConfigOrDie(
-		&restclient.Config{
-			QPS: -1, Host: s.URL,
-			ContentConfig: restclient.ContentConfig{
-				GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"},
-			},
+	kubeConfig := &restclient.Config{
+		QPS: -1, Host: s.URL,
+		ContentConfig: restclient.ContentConfig{
+			GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"},
 		},
-	)
+	}
+	testCtx.KubeConfig = kubeConfig
+	testCtx.ClientSet = clientset.NewForConfigOrDie(kubeConfig)
 	return &testCtx
 }
 
 // WaitForSchedulerCacheCleanup waits for cleanup of scheduler's cache to complete
 func WaitForSchedulerCacheCleanup(sched *scheduler.Scheduler, t *testing.T) {
 	schedulerCacheIsEmpty := func() (bool, error) {
-		dump := sched.SchedulerCache.Dump()
+		dump := sched.Cache.Dump()
 
 		return len(dump.Nodes) == 0 && len(dump.AssumedPods) == 0, nil
 	}
@@ -370,10 +385,9 @@ func WaitForSchedulerCacheCleanup(sched *scheduler.Scheduler, t *testing.T) {
 func InitTestScheduler(
 	t *testing.T,
 	testCtx *TestContext,
-	policy *schedulerapi.Policy,
 ) *TestContext {
 	// Pod preemption is enabled by default scheduler configuration.
-	return InitTestSchedulerWithOptions(t, testCtx, policy)
+	return InitTestSchedulerWithOptions(t, testCtx)
 }
 
 // InitTestSchedulerWithOptions initializes a test environment and creates a scheduler with default
@@ -381,23 +395,25 @@ func InitTestScheduler(
 func InitTestSchedulerWithOptions(
 	t *testing.T,
 	testCtx *TestContext,
-	policy *schedulerapi.Policy,
 	opts ...scheduler.Option,
 ) *TestContext {
 	// 1. Create scheduler
 	testCtx.InformerFactory = scheduler.NewInformerFactory(testCtx.ClientSet, 0)
+	if testCtx.KubeConfig != nil {
+		dynClient := dynamic.NewForConfigOrDie(testCtx.KubeConfig)
+		testCtx.DynInformerFactory = dynamicinformer.NewFilteredDynamicSharedInformerFactory(dynClient, 0, v1.NamespaceAll, nil)
+	}
 
 	var err error
 	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{
 		Interface: testCtx.ClientSet.EventsV1(),
 	})
 
-	if policy != nil {
-		opts = append(opts, scheduler.WithAlgorithmSource(CreateAlgorithmSourceFromPolicy(policy, testCtx.ClientSet)))
-	}
+	opts = append(opts, scheduler.WithKubeConfig(testCtx.KubeConfig))
 	testCtx.Scheduler, err = scheduler.New(
 		testCtx.ClientSet,
 		testCtx.InformerFactory,
+		testCtx.DynInformerFactory,
 		profile.NewRecorderFactory(eventBroadcaster),
 		testCtx.Ctx.Done(),
 		opts...,
@@ -411,33 +427,6 @@ func InitTestSchedulerWithOptions(
 	eventBroadcaster.StartRecordingToSink(stopCh)
 
 	return testCtx
-}
-
-// CreateAlgorithmSourceFromPolicy creates the schedulerAlgorithmSource from the policy parameter
-func CreateAlgorithmSourceFromPolicy(policy *schedulerapi.Policy, clientSet clientset.Interface) schedulerapi.SchedulerAlgorithmSource {
-	// Serialize the Policy object into a ConfigMap later.
-	info, ok := runtime.SerializerInfoForMediaType(scheme.Codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
-	if !ok {
-		panic("could not find json serializer")
-	}
-	encoder := scheme.Codecs.EncoderForVersion(info.Serializer, schedulerapiv1.SchemeGroupVersion)
-	policyString := runtime.EncodeOrDie(encoder, policy)
-	configPolicyName := "scheduler-custom-policy-config"
-	policyConfigMap := v1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: configPolicyName},
-		Data:       map[string]string{schedulerapi.SchedulerPolicyConfigMapKey: policyString},
-	}
-	policyConfigMap.APIVersion = "v1"
-	clientSet.CoreV1().ConfigMaps(metav1.NamespaceSystem).Create(context.TODO(), &policyConfigMap, metav1.CreateOptions{})
-
-	return schedulerapi.SchedulerAlgorithmSource{
-		Policy: &schedulerapi.SchedulerPolicySource{
-			ConfigMap: &schedulerapi.SchedulerPolicyConfigMapSource{
-				Namespace: policyConfigMap.Namespace,
-				Name:      policyConfigMap.Name,
-			},
-		},
-	}
 }
 
 // WaitForPodToScheduleWithTimeout waits for a pod to get scheduled and returns

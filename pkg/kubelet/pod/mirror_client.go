@@ -42,7 +42,7 @@ type MirrorClient interface {
 	DeleteMirrorPod(podFullName string, uid *types.UID) (bool, error)
 }
 
-// nodeGetter is a subset a NodeLister, simplified for testing.
+// nodeGetter is a subset of NodeLister, simplified for testing.
 type nodeGetter interface {
 	// Get retrieves the Node for a given name.
 	Get(name string) (*v1.Node, error)
@@ -82,7 +82,7 @@ func (mc *basicMirrorClient) CreateMirrorPod(pod *v1.Pod) error {
 
 	// With the MirrorPodNodeRestriction feature, mirror pods are required to have an owner reference
 	// to the owning node.
-	// See http://git.k8s.io/enhancements/keps/sig-auth/20190916-noderestriction-pods.md
+	// See https://git.k8s.io/enhancements/keps/sig-auth/1314-node-restriction-pods/README.md
 	nodeUID, err := mc.getNodeUID()
 	if err != nil {
 		return fmt.Errorf("failed to get node UID: %v", err)
@@ -122,7 +122,13 @@ func (mc *basicMirrorClient) DeleteMirrorPod(podFullName string, uid *types.UID)
 		klog.ErrorS(err, "Failed to parse a pod full name", "podFullName", podFullName)
 		return false, err
 	}
-	klog.V(2).InfoS("Deleting a mirror pod", "pod", klog.KRef(namespace, name), "podUID", uid)
+
+	var uidValue types.UID
+	if uid != nil {
+		uidValue = *uid
+	}
+	klog.V(2).InfoS("Deleting a mirror pod", "pod", klog.KRef(namespace, name), "podUID", uidValue)
+
 	var GracePeriodSeconds int64
 	if err := mc.apiserverClient.CoreV1().Pods(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{GracePeriodSeconds: &GracePeriodSeconds, Preconditions: &metav1.Preconditions{UID: uid}}); err != nil {
 		// Unfortunately, there's no generic error for failing a precondition
@@ -145,12 +151,6 @@ func (mc *basicMirrorClient) getNodeUID() (types.UID, error) {
 		return "", fmt.Errorf("UID unset for node %s", mc.nodeName)
 	}
 	return node.UID, nil
-}
-
-// IsStaticPod returns true if the passed Pod is static.
-func IsStaticPod(pod *v1.Pod) bool {
-	source, err := kubetypes.GetPodSource(pod)
-	return err == nil && source != kubetypes.ApiserverSource
 }
 
 func getHashFromMirrorPod(pod *v1.Pod) (string, bool) {

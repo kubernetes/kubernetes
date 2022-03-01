@@ -21,24 +21,72 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 var generation int64
+
+// ActionType is an integer to represent one type of resource change.
+// Different ActionTypes can be bit-wised to compose new semantics.
+type ActionType int64
+
+// Constants for ActionTypes.
+const (
+	Add    ActionType = 1 << iota // 1
+	Delete                        // 10
+	// UpdateNodeXYZ is only applicable for Node events.
+	UpdateNodeAllocatable // 100
+	UpdateNodeLabel       // 1000
+	UpdateNodeTaint       // 10000
+	UpdateNodeCondition   // 100000
+
+	All ActionType = 1<<iota - 1 // 111111
+
+	// Use the general Update type if you don't either know or care the specific sub-Update type to use.
+	Update = UpdateNodeAllocatable | UpdateNodeLabel | UpdateNodeTaint | UpdateNodeCondition
+)
+
+// GVK is short for group/version/kind, which can uniquely represent a particular API resource.
+type GVK string
+
+// Constants for GVKs.
+const (
+	Pod                   GVK = "Pod"
+	Node                  GVK = "Node"
+	PersistentVolume      GVK = "PersistentVolume"
+	PersistentVolumeClaim GVK = "PersistentVolumeClaim"
+	Service               GVK = "Service"
+	StorageClass          GVK = "storage.k8s.io/StorageClass"
+	CSINode               GVK = "storage.k8s.io/CSINode"
+	CSIDriver             GVK = "storage.k8s.io/CSIDriver"
+	CSIStorageCapacity    GVK = "storage.k8s.io/CSIStorageCapacity"
+	WildCard              GVK = "*"
+)
+
+// ClusterEvent abstracts how a system resource's state gets changed.
+// Resource represents the standard API resources such as Pod, Node, etc.
+// ActionType denotes the specific change such as Add, Update or Delete.
+type ClusterEvent struct {
+	Resource   GVK
+	ActionType ActionType
+	Label      string
+}
+
+// IsWildCard returns true if ClusterEvent follows WildCard semantics
+func (ce ClusterEvent) IsWildCard() bool {
+	return ce.Resource == WildCard && ce.ActionType == All
+}
 
 // QueuedPodInfo is a Pod wrapper with additional information related to
 // the pod's status in the scheduling queue, such as the timestamp when
@@ -55,6 +103,8 @@ type QueuedPodInfo struct {
 	// It shouldn't be updated once initialized. It's used to record the e2e scheduling
 	// latency for a pod.
 	InitialAttemptTimestamp time.Time
+	// If a Pod failed in a scheduling cycle, record the plugin names it failed by.
+	UnschedulablePlugins sets.String
 }
 
 // DeepCopy returns a deep copy of the QueuedPodInfo object.
@@ -113,12 +163,12 @@ func (pi *PodInfo) Update(pod *v1.Pod) {
 
 	// Attempt to parse the affinity terms
 	var parseErrs []error
-	requiredAffinityTerms, err := getAffinityTerms(pod, schedutil.GetPodAffinityTerms(pod.Spec.Affinity))
+	requiredAffinityTerms, err := getAffinityTerms(pod, getPodAffinityTerms(pod.Spec.Affinity))
 	if err != nil {
 		parseErrs = append(parseErrs, fmt.Errorf("requiredAffinityTerms: %w", err))
 	}
 	requiredAntiAffinityTerms, err := getAffinityTerms(pod,
-		schedutil.GetPodAntiAffinityTerms(pod.Spec.Affinity))
+		getPodAntiAffinityTerms(pod.Spec.Affinity))
 	if err != nil {
 		parseErrs = append(parseErrs, fmt.Errorf("requiredAntiAffinityTerms: %w", err))
 	}
@@ -141,9 +191,18 @@ func (pi *PodInfo) Update(pod *v1.Pod) {
 
 // AffinityTerm is a processed version of v1.PodAffinityTerm.
 type AffinityTerm struct {
-	Namespaces  sets.String
-	Selector    labels.Selector
-	TopologyKey string
+	Namespaces        sets.String
+	Selector          labels.Selector
+	TopologyKey       string
+	NamespaceSelector labels.Selector
+}
+
+// Matches returns true if the pod matches the label selector and namespaces or namespace selector.
+func (at *AffinityTerm) Matches(pod *v1.Pod, nsLabels labels.Set) bool {
+	if at.Namespaces.Has(pod.Namespace) || at.NamespaceSelector.Matches(nsLabels) {
+		return at.Selector.Matches(labels.Set(pod.Labels))
+	}
+	return false
 }
 
 // WeightedAffinityTerm is a "processed" representation of v1.WeightedAffinityTerm.
@@ -156,6 +215,8 @@ type WeightedAffinityTerm struct {
 type Diagnosis struct {
 	NodeToStatusMap      NodeToStatusMap
 	UnschedulablePlugins sets.String
+	// PostFilterMsg records the messages returned from PostFilterPlugins.
+	PostFilterMsg string
 }
 
 // FitError describes a fit error of a pod.
@@ -188,16 +249,26 @@ func (f *FitError) Error() string {
 		return reasonStrings
 	}
 	reasonMsg := fmt.Sprintf(NoNodeAvailableMsg+": %v.", f.NumAllNodes, strings.Join(sortReasonsHistogram(), ", "))
+	postFilterMsg := f.Diagnosis.PostFilterMsg
+	if postFilterMsg != "" {
+		reasonMsg += " " + postFilterMsg
+	}
 	return reasonMsg
 }
 
 func newAffinityTerm(pod *v1.Pod, term *v1.PodAffinityTerm) (*AffinityTerm, error) {
-	namespaces := schedutil.GetNamespacesFromPodAffinityTerm(pod, term)
 	selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
 	if err != nil {
 		return nil, err
 	}
-	return &AffinityTerm{Namespaces: namespaces, Selector: selector, TopologyKey: term.TopologyKey}, nil
+
+	namespaces := getNamespacesFromPodAffinityTerm(pod, term)
+	nsSelector, err := metav1.LabelSelectorAsSelector(term.NamespaceSelector)
+	if err != nil {
+		return nil, err
+	}
+
+	return &AffinityTerm{Namespaces: namespaces, Selector: selector, TopologyKey: term.TopologyKey, NamespaceSelector: nsSelector}, nil
 }
 
 // getAffinityTerms receives a Pod and affinity terms and returns the namespaces and
@@ -208,8 +279,8 @@ func getAffinityTerms(pod *v1.Pod, v1Terms []v1.PodAffinityTerm) ([]AffinityTerm
 	}
 
 	var terms []AffinityTerm
-	for _, term := range v1Terms {
-		t, err := newAffinityTerm(pod, &term)
+	for i := range v1Terms {
+		t, err := newAffinityTerm(pod, &v1Terms[i])
 		if err != nil {
 			// We get here if the label selector failed to process
 			return nil, err
@@ -226,13 +297,13 @@ func getWeightedAffinityTerms(pod *v1.Pod, v1Terms []v1.WeightedPodAffinityTerm)
 	}
 
 	var terms []WeightedAffinityTerm
-	for _, term := range v1Terms {
-		t, err := newAffinityTerm(pod, &term.PodAffinityTerm)
+	for i := range v1Terms {
+		t, err := newAffinityTerm(pod, &v1Terms[i].PodAffinityTerm)
 		if err != nil {
 			// We get here if the label selector failed to process
 			return nil, err
 		}
-		terms = append(terms, WeightedAffinityTerm{AffinityTerm: *t, Weight: term.Weight})
+		terms = append(terms, WeightedAffinityTerm{AffinityTerm: *t, Weight: v1Terms[i].Weight})
 	}
 	return terms, nil
 }
@@ -242,6 +313,44 @@ func NewPodInfo(pod *v1.Pod) *PodInfo {
 	pInfo := &PodInfo{}
 	pInfo.Update(pod)
 	return pInfo
+}
+
+func getPodAffinityTerms(affinity *v1.Affinity) (terms []v1.PodAffinityTerm) {
+	if affinity != nil && affinity.PodAffinity != nil {
+		if len(affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0 {
+			terms = affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution
+		}
+		// TODO: Uncomment this block when implement RequiredDuringSchedulingRequiredDuringExecution.
+		//if len(affinity.PodAffinity.RequiredDuringSchedulingRequiredDuringExecution) != 0 {
+		//	terms = append(terms, affinity.PodAffinity.RequiredDuringSchedulingRequiredDuringExecution...)
+		//}
+	}
+	return terms
+}
+
+func getPodAntiAffinityTerms(affinity *v1.Affinity) (terms []v1.PodAffinityTerm) {
+	if affinity != nil && affinity.PodAntiAffinity != nil {
+		if len(affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0 {
+			terms = affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution
+		}
+		// TODO: Uncomment this block when implement RequiredDuringSchedulingRequiredDuringExecution.
+		//if len(affinity.PodAntiAffinity.RequiredDuringSchedulingRequiredDuringExecution) != 0 {
+		//	terms = append(terms, affinity.PodAntiAffinity.RequiredDuringSchedulingRequiredDuringExecution...)
+		//}
+	}
+	return terms
+}
+
+// returns a set of names according to the namespaces indicated in podAffinityTerm.
+// If namespaces is empty it considers the given pod's namespace.
+func getNamespacesFromPodAffinityTerm(pod *v1.Pod, podAffinityTerm *v1.PodAffinityTerm) sets.String {
+	names := sets.String{}
+	if len(podAffinityTerm.Namespaces) == 0 && podAffinityTerm.NamespaceSelector == nil {
+		names.Insert(pod.Namespace)
+	} else {
+		names.Insert(podAffinityTerm.Namespaces...)
+	}
+	return names
 }
 
 // ImageStateSummary provides summarized information about the state of an image.
@@ -286,19 +395,13 @@ type NodeInfo struct {
 	// state information.
 	ImageStates map[string]*ImageStateSummary
 
-	// TransientInfo holds the information pertaining to a scheduling cycle. This will be destructed at the end of
-	// scheduling cycle.
-	// TODO: @ravig. Remove this once we have a clear approach for message passing across predicates and priorities.
-	TransientInfo *TransientSchedulerInfo
+	// PVCRefCounts contains a mapping of PVC names to the number of pods on the node using it.
+	// Keys are in the format "namespace/name".
+	PVCRefCounts map[string]int
 
 	// Whenever NodeInfo changes, generation is bumped.
 	// This is used to avoid cloning it if the object didn't change.
 	Generation int64
-}
-
-//initializeNodeTransientInfo initializes transient information pertaining to node.
-func initializeNodeTransientInfo() nodeTransientInfo {
-	return nodeTransientInfo{AllocatableVolumesCount: 0, RequestedVolumes: 0}
 }
 
 // nextGeneration: Let's make sure history never forgets the name...
@@ -307,43 +410,6 @@ func initializeNodeTransientInfo() nodeTransientInfo {
 // added back with the same name. See issue#63262.
 func nextGeneration() int64 {
 	return atomic.AddInt64(&generation, 1)
-}
-
-// nodeTransientInfo contains transient node information while scheduling.
-type nodeTransientInfo struct {
-	// AllocatableVolumesCount contains number of volumes that could be attached to node.
-	AllocatableVolumesCount int
-	// Requested number of volumes on a particular node.
-	RequestedVolumes int
-}
-
-// TransientSchedulerInfo is a transient structure which is destructed at the end of each scheduling cycle.
-// It consists of items that are valid for a scheduling cycle and is used for message passing across predicates and
-// priorities. Some examples which could be used as fields are number of volumes being used on node, current utilization
-// on node etc.
-// IMPORTANT NOTE: Make sure that each field in this structure is documented along with usage. Expand this structure
-// only when absolutely needed as this data structure will be created and destroyed during every scheduling cycle.
-type TransientSchedulerInfo struct {
-	TransientLock sync.Mutex
-	// NodeTransInfo holds the information related to nodeTransientInformation. NodeName is the key here.
-	TransNodeInfo nodeTransientInfo
-}
-
-// NewTransientSchedulerInfo returns a new scheduler transient structure with initialized values.
-func NewTransientSchedulerInfo() *TransientSchedulerInfo {
-	tsi := &TransientSchedulerInfo{
-		TransNodeInfo: initializeNodeTransientInfo(),
-	}
-	return tsi
-}
-
-// ResetTransientSchedulerInfo resets the TransientSchedulerInfo.
-func (transientSchedInfo *TransientSchedulerInfo) ResetTransientSchedulerInfo() {
-	transientSchedInfo.TransientLock.Lock()
-	defer transientSchedInfo.TransientLock.Unlock()
-	// Reset TransientNodeInfo.
-	transientSchedInfo.TransNodeInfo.AllocatableVolumesCount = 0
-	transientSchedInfo.TransNodeInfo.RequestedVolumes = 0
 }
 
 // Resource is a collection of compute resource.
@@ -392,24 +458,6 @@ func (r *Resource) Add(rl v1.ResourceList) {
 	}
 }
 
-// ResourceList returns a resource list of this resource.
-func (r *Resource) ResourceList() v1.ResourceList {
-	result := v1.ResourceList{
-		v1.ResourceCPU:              *resource.NewMilliQuantity(r.MilliCPU, resource.DecimalSI),
-		v1.ResourceMemory:           *resource.NewQuantity(r.Memory, resource.BinarySI),
-		v1.ResourcePods:             *resource.NewQuantity(int64(r.AllowedPodNumber), resource.BinarySI),
-		v1.ResourceEphemeralStorage: *resource.NewQuantity(r.EphemeralStorage, resource.BinarySI),
-	}
-	for rName, rQuant := range r.ScalarResources {
-		if v1helper.IsHugePageResourceName(rName) {
-			result[rName] = *resource.NewQuantity(rQuant, resource.BinarySI)
-		} else {
-			result[rName] = *resource.NewQuantity(rQuant, resource.DecimalSI)
-		}
-	}
-	return result
-}
-
 // Clone returns a copy of this resource.
 func (r *Resource) Clone() *Resource {
 	res := &Resource{
@@ -450,25 +498,16 @@ func (r *Resource) SetMaxResource(rl v1.ResourceList) {
 	for rName, rQuantity := range rl {
 		switch rName {
 		case v1.ResourceMemory:
-			if mem := rQuantity.Value(); mem > r.Memory {
-				r.Memory = mem
-			}
+			r.Memory = max(r.Memory, rQuantity.Value())
 		case v1.ResourceCPU:
-			if cpu := rQuantity.MilliValue(); cpu > r.MilliCPU {
-				r.MilliCPU = cpu
-			}
+			r.MilliCPU = max(r.MilliCPU, rQuantity.MilliValue())
 		case v1.ResourceEphemeralStorage:
 			if utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
-				if ephemeralStorage := rQuantity.Value(); ephemeralStorage > r.EphemeralStorage {
-					r.EphemeralStorage = ephemeralStorage
-				}
+				r.EphemeralStorage = max(r.EphemeralStorage, rQuantity.Value())
 			}
 		default:
 			if schedutil.IsScalarResourceName(rName) {
-				value := rQuantity.Value()
-				if value > r.ScalarResources[rName] {
-					r.SetScalar(rName, value)
-				}
+				r.SetScalar(rName, max(r.ScalarResources[rName], rQuantity.Value()))
 			}
 		}
 	}
@@ -482,10 +521,10 @@ func NewNodeInfo(pods ...*v1.Pod) *NodeInfo {
 		Requested:        &Resource{},
 		NonZeroRequested: &Resource{},
 		Allocatable:      &Resource{},
-		TransientInfo:    NewTransientSchedulerInfo(),
 		Generation:       nextGeneration(),
 		UsedPorts:        make(HostPortInfo),
 		ImageStates:      make(map[string]*ImageStateSummary),
+		PVCRefCounts:     make(map[string]int),
 	}
 	for _, pod := range pods {
 		ni.AddPod(pod)
@@ -508,9 +547,9 @@ func (n *NodeInfo) Clone() *NodeInfo {
 		Requested:        n.Requested.Clone(),
 		NonZeroRequested: n.NonZeroRequested.Clone(),
 		Allocatable:      n.Allocatable.Clone(),
-		TransientInfo:    n.TransientInfo,
 		UsedPorts:        make(HostPortInfo),
 		ImageStates:      n.ImageStates,
+		PVCRefCounts:     n.PVCRefCounts,
 		Generation:       n.Generation,
 	}
 	if len(n.Pods) > 0 {
@@ -570,6 +609,7 @@ func (n *NodeInfo) AddPodInfo(podInfo *PodInfo) {
 
 	// Consume ports when pods added.
 	n.updateUsedPorts(podInfo.Pod, true)
+	n.updatePVCRefCounts(podInfo.Pod, true)
 
 	n.Generation = nextGeneration()
 }
@@ -647,6 +687,7 @@ func (n *NodeInfo) RemovePod(pod *v1.Pod) error {
 
 			// Release ports when remove Pods.
 			n.updateUsedPorts(pod, false)
+			n.updatePVCRefCounts(pod, false)
 
 			n.Generation = nextGeneration()
 			n.resetSlicesIfEmpty()
@@ -669,6 +710,13 @@ func (n *NodeInfo) resetSlicesIfEmpty() {
 	}
 }
 
+func max(a, b int64) int64 {
+	if a >= b {
+		return a
+	}
+	return b
+}
+
 // resourceRequest = max(sum(podSpec.Containers), podSpec.InitContainers) + overHead
 func calculateResource(pod *v1.Pod) (res Resource, non0CPU int64, non0Mem int64) {
 	resPtr := &res
@@ -683,13 +731,8 @@ func calculateResource(pod *v1.Pod) (res Resource, non0CPU int64, non0Mem int64)
 	for _, ic := range pod.Spec.InitContainers {
 		resPtr.SetMaxResource(ic.Resources.Requests)
 		non0CPUReq, non0MemReq := schedutil.GetNonzeroRequests(&ic.Resources.Requests)
-		if non0CPU < non0CPUReq {
-			non0CPU = non0CPUReq
-		}
-
-		if non0Mem < non0MemReq {
-			non0Mem = non0MemReq
-		}
+		non0CPU = max(non0CPU, non0CPUReq)
+		non0Mem = max(non0Mem, non0MemReq)
 	}
 
 	// If Overhead is being utilized, add to the total requests for the pod
@@ -709,10 +752,8 @@ func calculateResource(pod *v1.Pod) (res Resource, non0CPU int64, non0Mem int64)
 
 // updateUsedPorts updates the UsedPorts of NodeInfo.
 func (n *NodeInfo) updateUsedPorts(pod *v1.Pod, add bool) {
-	for j := range pod.Spec.Containers {
-		container := &pod.Spec.Containers[j]
-		for k := range container.Ports {
-			podPort := &container.Ports[k]
+	for _, container := range pod.Spec.Containers {
+		for _, podPort := range container.Ports {
 			if add {
 				n.UsedPorts.Add(podPort.HostIP, string(podPort.Protocol), podPort.HostPort)
 			} else {
@@ -722,13 +763,30 @@ func (n *NodeInfo) updateUsedPorts(pod *v1.Pod, add bool) {
 	}
 }
 
+// updatePVCRefCounts updates the PVCRefCounts of NodeInfo.
+func (n *NodeInfo) updatePVCRefCounts(pod *v1.Pod, add bool) {
+	for _, v := range pod.Spec.Volumes {
+		if v.PersistentVolumeClaim == nil {
+			continue
+		}
+
+		key := pod.Namespace + "/" + v.PersistentVolumeClaim.ClaimName
+		if add {
+			n.PVCRefCounts[key] += 1
+		} else {
+			n.PVCRefCounts[key] -= 1
+			if n.PVCRefCounts[key] <= 0 {
+				delete(n.PVCRefCounts, key)
+			}
+		}
+	}
+}
+
 // SetNode sets the overall node information.
-func (n *NodeInfo) SetNode(node *v1.Node) error {
+func (n *NodeInfo) SetNode(node *v1.Node) {
 	n.node = node
 	n.Allocatable = NewResource(node.Status.Allocatable)
-	n.TransientInfo = NewTransientSchedulerInfo()
 	n.Generation = nextGeneration()
-	return nil
 }
 
 // RemoveNode removes the node object, leaving all other tracking information.
@@ -775,7 +833,7 @@ func (n *NodeInfo) FilterOutPods(pods []*v1.Pod) []*v1.Pod {
 func GetPodKey(pod *v1.Pod) (string, error) {
 	uid := string(pod.UID)
 	if len(uid) == 0 {
-		return "", errors.New("Cannot get cache key for pod with empty UID")
+		return "", errors.New("cannot get cache key for pod with empty UID")
 	}
 	return uid, nil
 }

@@ -1,3 +1,4 @@
+//go:build !linux
 // +build !linux
 
 /*
@@ -29,6 +30,6 @@ func (i *unsupportedImageFsInfoProvider) ImageFsInfoLabel() (string, error) {
 }
 
 // NewImageFsInfoProvider returns a provider for the specified runtime configuration.
-func NewImageFsInfoProvider(runtime, runtimeEndpoint string) ImageFsInfoProvider {
+func NewImageFsInfoProvider(runtimeEndpoint string) ImageFsInfoProvider {
 	return &unsupportedImageFsInfoProvider{}
 }

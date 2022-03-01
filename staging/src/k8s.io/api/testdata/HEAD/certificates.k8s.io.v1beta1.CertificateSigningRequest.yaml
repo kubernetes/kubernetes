@@ -2,51 +2,56 @@ apiVersion: certificates.k8s.io/v1beta1
 kind: CertificateSigningRequest
 metadata:
   annotations:
-    "9": "10"
-  clusterName: "15"
-  creationTimestamp: null
-  deletionGracePeriodSeconds: -4955867275792137171
+    annotationsKey: annotationsValue
+  clusterName: clusterNameValue
+  creationTimestamp: "2008-01-01T01:01:01Z"
+  deletionGracePeriodSeconds: 10
+  deletionTimestamp: "2009-01-01T01:01:01Z"
   finalizers:
-  - "14"
-  generateName: "3"
-  generation: 8071137005907523419
+  - finalizersValue
+  generateName: generateNameValue
+  generation: 7
   labels:
-    "7": "8"
+    labelsKey: labelsValue
   managedFields:
-  - apiVersion: "17"
-    fieldsType: "18"
-    manager: "16"
-    operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
-  name: "2"
-  namespace: "4"
+  - apiVersion: apiVersionValue
+    fieldsType: fieldsTypeValue
+    fieldsV1: {}
+    manager: managerValue
+    operation: operationValue
+    subresource: subresourceValue
+    time: "2004-01-01T01:01:01Z"
+  name: nameValue
+  namespace: namespaceValue
   ownerReferences:
-  - apiVersion: "11"
+  - apiVersion: apiVersionValue
     blockOwnerDeletion: true
-    controller: false
-    kind: "12"
-    name: "13"
-    uid: Dz廔ȇ{sŊƏp
-  resourceVersion: "11042405498087606203"
-  selfLink: "5"
-  uid: "7"
+    controller: true
+    kind: kindValue
+    name: nameValue
+    uid: uidValue
+  resourceVersion: resourceVersionValue
+  selfLink: selfLinkValue
+  uid: uidValue
 spec:
+  expirationSeconds: 8
   extra:
-    "23":
-    - "24"
+    extraKey:
+    - extraValue
   groups:
-  - "22"
-  request: OA==
-  signerName: "19"
-  uid: "21"
+  - groupsValue
+  request: AQ==
+  signerName: signerNameValue
+  uid: uidValue
   usages:
-  - J枊a
-  username: "20"
+  - usagesValue
+  username: usernameValue
 status:
-  certificate: cw==
+  certificate: Ag==
   conditions:
-  - lastTransitionTime: "2352-05-22T04:29:36Z"
-    lastUpdateTime: "1985-03-23T14:10:57Z"
-    message: "26"
-    reason: "25"
-    status: ěĂ凗蓏Ŋ蛊ĉy緅縕
-    type: o,c鮽ort昍řČ扷5Ɨ
+  - lastTransitionTime: "2005-01-01T01:01:01Z"
+    lastUpdateTime: "2004-01-01T01:01:01Z"
+    message: messageValue
+    reason: reasonValue
+    status: statusValue
+    type: typeValue

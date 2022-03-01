@@ -29,6 +29,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -45,6 +46,7 @@ type RestartOptions struct {
 	Restarter        polymorphichelpers.ObjectRestarterFunc
 	Namespace        string
 	EnforceNamespace bool
+	LabelSelector    string
 
 	resource.FilenameOptions
 	genericclioptions.IOStreams
@@ -56,14 +58,17 @@ var (
 	restartLong = templates.LongDesc(i18n.T(`
 		Restart a resource.
 
-	        Resource will be rollout restarted.`))
+	        Resource rollout will be restarted.`))
 
 	restartExample = templates.Examples(`
 		# Restart a deployment
 		kubectl rollout restart deployment/nginx
 
-		# Restart a daemonset
-		kubectl rollout restart daemonset/abc`)
+		# Restart a daemon set
+		kubectl rollout restart daemonset/abc
+
+		# Restart deployments with the app=nginx label
+		kubectl rollout restart deployment --selector=app=nginx`)
 )
 
 // NewRolloutRestartOptions returns an initialized RestartOptions instance
@@ -86,17 +91,18 @@ func NewCmdRolloutRestart(f cmdutil.Factory, streams genericclioptions.IOStreams
 		Short:                 i18n.T("Restart a resource"),
 		Long:                  restartLong,
 		Example:               restartExample,
+		ValidArgsFunction:     util.SpecifiedResourceTypeAndNameCompletionFunc(f, validArgs),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.RunRestart())
 		},
-		ValidArgs: validArgs,
 	}
 
 	usage := "identifying the resource to get from a server."
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.fieldManager, "kubectl-rollout")
+	cmdutil.AddLabelSelectorFlagVar(cmd, &o.LabelSelector)
 	o.PrintFlags.AddFlags(cmd)
 	return cmd
 }
@@ -136,6 +142,7 @@ func (o RestartOptions) RunRestart() error {
 		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		NamespaceParam(o.Namespace).DefaultNamespace().
 		FilenameParam(o.EnforceNamespace, &o.FilenameOptions).
+		LabelSelectorParam(o.LabelSelector).
 		ResourceTypeOrNameArgs(true, o.Resources...).
 		ContinueOnError().
 		Latest().
@@ -156,7 +163,14 @@ func (o RestartOptions) RunRestart() error {
 		allErrs = append(allErrs, err)
 	}
 
-	for _, patch := range set.CalculatePatches(infos, scheme.DefaultJSONEncoder(), set.PatchFn(o.Restarter)) {
+	patches := set.CalculatePatches(infos, scheme.DefaultJSONEncoder(), set.PatchFn(o.Restarter))
+
+	if len(patches) == 0 && len(allErrs) == 0 {
+		fmt.Fprintf(o.ErrOut, "No resources found in %s namespace.\n", o.Namespace)
+		return nil
+	}
+
+	for _, patch := range patches {
 		info := patch.Info
 
 		if patch.Err != nil {

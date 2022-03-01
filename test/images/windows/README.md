@@ -71,10 +71,22 @@ Finally, the node must be able to push the images to the desired container regis
 authenticated with the registry you're pushing to.
 
 
+### Additional configuration
+
+The `powershell-helper` image uses `mcr.microsoft.com/windows/nanoserver:1809` as a base image.
+Note that `docker buildx` has an issue pulling cross-registry images when building images, and in
+order to circumvent this issue, the make target `all-push-as-linux` will push a Linux cache image
+which will contain only the necessary bits, and this cache image can then be used in the regular
+image building process. As an additional benefit, using a Linux cache image will be faster.
+
+In order to build the Linux cache image, `docker buildx` is needed. For more information about it
+can be read [here](../README.md).
+
+
 ## Building images
 
 The images are built through `make`:
 
 ```bash
-make REGISTRY=foo_registry REMOTE_DOCKER_URL=$REMOTE_DOCKER_URL all-push
+make REGISTRY=foo_registry REMOTE_DOCKER_URL=$REMOTE_DOCKER_URL all-push-as-linux
 ```

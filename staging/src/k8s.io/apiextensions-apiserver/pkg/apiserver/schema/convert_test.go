@@ -83,7 +83,7 @@ func TestStructuralRoundtripOrError(t *testing.T) {
 		}
 
 		// roundtrip through go-openapi, JSON, v1beta1 JSONSchemaProp, internal JSONSchemaProp
-		goOpenAPI := orig.ToGoOpenAPI()
+		goOpenAPI := orig.ToKubeOpenAPI()
 		bs, err := json.Marshal(goOpenAPI)
 		if err != nil {
 			t.Fatal(err)

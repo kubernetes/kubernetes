@@ -17,6 +17,7 @@ limitations under the License.
 package stats
 
 import (
+	"k8s.io/client-go/tools/record"
 	"time"
 )
 
@@ -37,8 +38,8 @@ type resourceAnalyzer struct {
 var _ ResourceAnalyzer = &resourceAnalyzer{}
 
 // NewResourceAnalyzer returns a new ResourceAnalyzer
-func NewResourceAnalyzer(statsProvider Provider, calVolumeFrequency time.Duration) ResourceAnalyzer {
-	fsAnalyzer := newFsResourceAnalyzer(statsProvider, calVolumeFrequency)
+func NewResourceAnalyzer(statsProvider Provider, calVolumeFrequency time.Duration, eventRecorder record.EventRecorder) ResourceAnalyzer {
+	fsAnalyzer := newFsResourceAnalyzer(statsProvider, calVolumeFrequency, eventRecorder)
 	summaryProvider := NewSummaryProvider(statsProvider)
 	return &resourceAnalyzer{fsAnalyzer, summaryProvider}
 }

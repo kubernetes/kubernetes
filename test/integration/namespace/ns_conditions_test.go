@@ -19,6 +19,7 @@ package namespace
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
@@ -115,6 +116,39 @@ func TestNamespaceCondition(t *testing.T) {
 	}
 }
 
+// TestNamespaceLabels tests for default labels added in https://github.com/kubernetes/kubernetes/pull/96968
+func TestNamespaceLabels(t *testing.T) {
+	closeFn, _, _, kubeClient, _ := namespaceLifecycleSetup(t)
+	defer closeFn()
+	nsName := "test-namespace-labels-generated"
+	// Create a new namespace w/ no name
+	ns, err := kubeClient.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: nsName,
+		},
+	}, metav1.CreateOptions{})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if ns.Name != ns.Labels[corev1.LabelMetadataName] {
+		t.Fatal(fmt.Errorf("expected %q, got %q", ns.Name, ns.Labels[corev1.LabelMetadataName]))
+	}
+
+	nsList, err := kubeClient.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, ns := range nsList.Items {
+		if ns.Name != ns.Labels[corev1.LabelMetadataName] {
+			t.Fatal(fmt.Errorf("expected %q, got %q", ns.Name, ns.Labels[corev1.LabelMetadataName]))
+		}
+	}
+}
+
 // JSONToUnstructured converts a JSON stub to unstructured.Unstructured and
 // returns a dynamic resource client that can be used to interact with it
 func jsonToUnstructured(stub, version, kind string) (*unstructured.Unstructured, error) {
@@ -131,8 +165,8 @@ func jsonToUnstructured(stub, version, kind string) (*unstructured.Unstructured,
 }
 
 func namespaceLifecycleSetup(t *testing.T) (framework.CloseFunc, *namespace.NamespaceController, informers.SharedInformerFactory, clientset.Interface, dynamic.Interface) {
-	masterConfig := framework.NewIntegrationTestMasterConfig()
-	_, s, closeFn := framework.RunAMaster(masterConfig)
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
+	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 
 	config := restclient.Config{Host: s.URL}
 	config.QPS = 10000

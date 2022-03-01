@@ -18,6 +18,7 @@ package stats
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
@@ -29,7 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 )
 
-// PodEtcHostsPathFunc is a function to fetch a etc hosts path by pod uid.
+// PodEtcHostsPathFunc is a function to fetch a etc hosts path by pod uid and whether etc host path is supported by the runtime
 type PodEtcHostsPathFunc func(podUID types.UID) string
 
 // metricsProviderByPath maps a path to its metrics provider
@@ -79,7 +80,14 @@ func (h hostStatsProvider) getPodContainerLogStats(podNamespace, podName string,
 
 // getPodEtcHostsStats gets status for pod etc hosts usage
 func (h hostStatsProvider) getPodEtcHostsStats(podUID types.UID, rootFsInfo *cadvisorapiv2.FsInfo) (*statsapi.FsStats, error) {
-	metrics := h.podEtcHostsMetrics(podUID)
+	// Runtimes may not support etc hosts file (Windows with docker)
+	podEtcHostsPath := h.podEtcHostsPathFunc(podUID)
+	// Some pods have an explicit /etc/hosts mount and the Kubelet will not create an etc-hosts file for them
+	if _, err := os.Stat(podEtcHostsPath); os.IsNotExist(err) {
+		return nil, nil
+	}
+
+	metrics := volume.NewMetricsDu(podEtcHostsPath)
 	hostMetrics, err := metrics.GetMetrics()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get stats %v", err)
@@ -101,11 +109,6 @@ func (h hostStatsProvider) podLogMetrics(podNamespace, podName string, podUID ty
 func (h hostStatsProvider) podContainerLogMetrics(podNamespace, podName string, podUID types.UID, containerName string) (metricsProviderByPath, error) {
 	podContainerLogsDirectoryPath := kuberuntime.BuildContainerLogsDirectory(podNamespace, podName, podUID, containerName)
 	return h.fileMetricsByDir(podContainerLogsDirectoryPath)
-}
-
-func (h hostStatsProvider) podEtcHostsMetrics(podUID types.UID) volume.MetricsProvider {
-	podEtcHostsPath := h.podEtcHostsPathFunc(podUID)
-	return volume.NewMetricsDu(podEtcHostsPath)
 }
 
 // fileMetricsByDir returns metrics by path for each file under specified directory

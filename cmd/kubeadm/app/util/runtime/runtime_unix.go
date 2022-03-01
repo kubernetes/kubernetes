@@ -1,3 +1,4 @@
+//go:build !windows
 // +build !windows
 
 /*
@@ -16,23 +17,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package runtime
 
 import (
-	"os"
-)
-
-const (
-	dockerSocket     = "/var/run/docker.sock" // The Docker socket is not CRI compatible
-	containerdSocket = "/run/containerd/containerd.sock"
+	"net"
+	"net/url"
 )
 
 // isExistingSocket checks if path exists and is domain socket
 func isExistingSocket(path string) bool {
-	fileInfo, err := os.Stat(path)
+	u, err := url.Parse(path)
 	if err != nil {
+		// should not happen, since we are trying to access known / hardcoded sockets
 		return false
 	}
 
-	return fileInfo.Mode()&os.ModeSocket != 0
+	c, err := net.Dial(u.Scheme, u.Path)
+	if err != nil {
+		return false
+	}
+	defer c.Close()
+	return true
 }

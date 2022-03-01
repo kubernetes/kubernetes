@@ -1,3 +1,4 @@
+//go:build !windows
 // +build !windows
 
 /*
@@ -19,12 +20,15 @@ limitations under the License.
 package mount
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"strconv"
 	"strings"
 	"syscall"
 
+	"k8s.io/klog/v2"
 	utilio "k8s.io/utils/io"
 )
 
@@ -32,7 +36,7 @@ const (
 	// At least number of fields per line in /proc/<pid>/mountinfo.
 	expectedAtLeastNumFieldsPerMountInfo = 10
 	// How many times to retry for a consistent read of /proc/mounts.
-	maxListTries = 3
+	maxListTries = 10
 )
 
 // IsCorruptedMnt return true if err is about corrupted mount point
@@ -50,9 +54,11 @@ func IsCorruptedMnt(err error) bool {
 		underlyingError = pe.Err
 	case *os.SyscallError:
 		underlyingError = pe.Err
+	case syscall.Errno:
+		underlyingError = err
 	}
 
-	return underlyingError == syscall.ENOTCONN || underlyingError == syscall.ESTALE || underlyingError == syscall.EIO || underlyingError == syscall.EACCES
+	return underlyingError == syscall.ENOTCONN || underlyingError == syscall.ESTALE || underlyingError == syscall.EIO || underlyingError == syscall.EACCES || underlyingError == syscall.EHOSTDOWN
 }
 
 // MountInfo represents a single line in /proc/<pid>/mountinfo.
@@ -130,7 +136,7 @@ func ParseMountInfo(filename string) ([]MountInfo, error) {
 			Minor:        minor,
 			Root:         fields[3],
 			MountPoint:   fields[4],
-			MountOptions: strings.Split(fields[5], ","),
+			MountOptions: splitMountOptions(fields[5]),
 		}
 		// All fields until "-" are "optional fields".
 		i := 6
@@ -144,10 +150,24 @@ func ParseMountInfo(filename string) ([]MountInfo, error) {
 		}
 		info.FsType = fields[i]
 		info.Source = fields[i+1]
-		info.SuperOptions = strings.Split(fields[i+2], ",")
+		info.SuperOptions = splitMountOptions(fields[i+2])
 		infos = append(infos, info)
 	}
 	return infos, nil
+}
+
+// splitMountOptions parses comma-separated list of mount options into an array.
+// It respects double quotes - commas in them are not considered as the option separator.
+func splitMountOptions(s string) []string {
+	inQuotes := false
+	list := strings.FieldsFunc(s, func(r rune) bool {
+		if r == '"' {
+			inQuotes = !inQuotes
+		}
+		// Report a new field only when outside of double quotes.
+		return r == ',' && !inQuotes
+	})
+	return list
 }
 
 // isMountPointMatch returns true if the path in mp is the same as dir.
@@ -155,4 +175,27 @@ func ParseMountInfo(filename string) ([]MountInfo, error) {
 func isMountPointMatch(mp MountPoint, dir string) bool {
 	deletedDir := fmt.Sprintf("%s\\040(deleted)", dir)
 	return ((mp.Path == dir) || (mp.Path == deletedDir))
+}
+
+// PathExists returns true if the specified path exists.
+// TODO: clean this up to use pkg/util/file/FileExists
+func PathExists(path string) (bool, error) {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true, nil
+	} else if errors.Is(err, fs.ErrNotExist) {
+		err = syscall.Access(path, syscall.F_OK)
+		if err == nil {
+			// The access syscall says the file exists, the stat syscall says it
+			// doesn't. This was observed on CIFS when the path was removed at
+			// the server somehow. POSIX calls this a stale file handle, let's fake
+			// that error and treat the path as existing but corrupted.
+			klog.Warningf("Potential stale file handle detected: %s", path)
+			return true, syscall.ESTALE
+		}
+		return false, nil
+	} else if IsCorruptedMnt(err) {
+		return true, err
+	}
+	return false, err
 }

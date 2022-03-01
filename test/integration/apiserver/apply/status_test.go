@@ -44,20 +44,20 @@ import (
 const testNamespace = "statusnamespace"
 
 var statusData = map[schema.GroupVersionResource]string{
-	gvr("", "v1", "persistentvolumes"):                                  `{"status": {"message": "hello"}}`,
-	gvr("", "v1", "resourcequotas"):                                     `{"status": {"used": {"cpu": "5M"}}}`,
-	gvr("", "v1", "services"):                                           `{"status": {"loadBalancer": {"ingress": [{"ip": "127.0.0.1"}]}}}`,
-	gvr("extensions", "v1beta1", "ingresses"):                           `{"status": {"loadBalancer": {"ingress": [{"ip": "127.0.0.1"}]}}}`,
-	gvr("networking.k8s.io", "v1beta1", "ingresses"):                    `{"status": {"loadBalancer": {"ingress": [{"ip": "127.0.0.1"}]}}}`,
-	gvr("networking.k8s.io", "v1", "ingresses"):                         `{"status": {"loadBalancer": {"ingress": [{"ip": "127.0.0.1"}]}}}`,
-	gvr("autoscaling", "v1", "horizontalpodautoscalers"):                `{"status": {"currentReplicas": 5}}`,
-	gvr("batch", "v1beta1", "cronjobs"):                                 `{"status": {"lastScheduleTime": null}}`,
-	gvr("batch", "v2alpha1", "cronjobs"):                                `{"status": {"lastScheduleTime": null}}`,
-	gvr("storage.k8s.io", "v1", "volumeattachments"):                    `{"status": {"attached": true}}`,
-	gvr("policy", "v1beta1", "poddisruptionbudgets"):                    `{"status": {"currentHealthy": 5}}`,
-	gvr("certificates.k8s.io", "v1beta1", "certificatesigningrequests"): `{"status": {"conditions": [{"type": "MyStatus"}]}}`,
-	gvr("certificates.k8s.io", "v1", "certificatesigningrequests"):      `{"status": {"conditions": [{"type": "MyStatus", "status": "True"}]}}`,
-	gvr("internal.apiserver.k8s.io", "v1alpha1", "storageversions"):     `{"status": {"commonEncodingVersion":"v1","storageVersions":[{"apiServerID":"1","decodableVersions":["v1","v2"],"encodingVersion":"v1"}],"conditions":[{"type":"AllEncodingVersionsEqual","status":"True","lastTransitionTime":"2020-01-01T00:00:00Z","reason":"allEncodingVersionsEqual","message":"all encoding versions are set to v1"}]}}`,
+	gvr("", "v1", "persistentvolumes"):                              `{"status": {"message": "hello"}}`,
+	gvr("", "v1", "resourcequotas"):                                 `{"status": {"used": {"cpu": "5M"}}}`,
+	gvr("", "v1", "services"):                                       `{"status": {"loadBalancer": {"ingress": [{"ip": "127.0.0.1"}]}}}`,
+	gvr("extensions", "v1beta1", "ingresses"):                       `{"status": {"loadBalancer": {"ingress": [{"ip": "127.0.0.1"}]}}}`,
+	gvr("networking.k8s.io", "v1beta1", "ingresses"):                `{"status": {"loadBalancer": {"ingress": [{"ip": "127.0.0.1"}]}}}`,
+	gvr("networking.k8s.io", "v1", "ingresses"):                     `{"status": {"loadBalancer": {"ingress": [{"ip": "127.0.0.1"}]}}}`,
+	gvr("autoscaling", "v1", "horizontalpodautoscalers"):            `{"status": {"currentReplicas": 5}}`,
+	gvr("autoscaling", "v2", "horizontalpodautoscalers"):            `{"status": {"currentReplicas": 5}}`,
+	gvr("batch", "v1", "cronjobs"):                                  `{"status": {"lastScheduleTime": null}}`,
+	gvr("batch", "v1beta1", "cronjobs"):                             `{"status": {"lastScheduleTime": null}}`,
+	gvr("storage.k8s.io", "v1", "volumeattachments"):                `{"status": {"attached": true}}`,
+	gvr("policy", "v1", "poddisruptionbudgets"):                     `{"status": {"currentHealthy": 5}}`,
+	gvr("policy", "v1beta1", "poddisruptionbudgets"):                `{"status": {"currentHealthy": 5}}`,
+	gvr("internal.apiserver.k8s.io", "v1alpha1", "storageversions"): `{"status": {"commonEncodingVersion":"v1","storageVersions":[{"apiServerID":"1","decodableVersions":["v1","v2"],"encodingVersion":"v1"}],"conditions":[{"type":"AllEncodingVersionsEqual","status":"True","lastTransitionTime":"2020-01-01T00:00:00Z","reason":"allEncodingVersionsEqual","message":"all encoding versions are set to v1"}]}}`,
 }
 
 const statusDefault = `{"status": {"conditions": [{"type": "MyStatus", "status":"True"}]}}`
@@ -132,6 +132,12 @@ func TestApplyStatus(t *testing.T) {
 				t.Fatal(err)
 			}
 			t.Run(mapping.Resource.String(), func(t *testing.T) {
+				// both spec and status get wiped for CSRs,
+				// nothing is expected to be managed for it, skip it
+				if mapping.Resource.Resource == "certificatesigningrequests" {
+					t.Skip()
+				}
+
 				status, ok := statusData[mapping.Resource]
 				if !ok {
 					status = statusDefault

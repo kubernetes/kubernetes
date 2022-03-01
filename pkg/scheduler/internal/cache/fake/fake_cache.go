@@ -18,6 +18,7 @@ package fake
 
 import (
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 )
 
@@ -64,10 +65,10 @@ func (c *Cache) GetPod(pod *v1.Pod) (*v1.Pod, error) {
 }
 
 // AddNode is a fake method for testing.
-func (c *Cache) AddNode(node *v1.Node) error { return nil }
+func (c *Cache) AddNode(node *v1.Node) *framework.NodeInfo { return nil }
 
 // UpdateNode is a fake method for testing.
-func (c *Cache) UpdateNode(oldNode, newNode *v1.Node) error { return nil }
+func (c *Cache) UpdateNode(oldNode, newNode *v1.Node) *framework.NodeInfo { return nil }
 
 // RemoveNode is a fake method for testing.
 func (c *Cache) RemoveNode(node *v1.Node) error { return nil }

@@ -28,15 +28,8 @@ function container_runtime_monitoring {
   local -r max_attempts=5
   local attempt=1
   local -r crictl="${KUBE_HOME}/bin/crictl"
-  local -r container_runtime_name="${CONTAINER_RUNTIME_NAME:-docker}"
-  # We still need to use `docker ps` when container runtime is "docker". This is because
-  # dockershim is still part of kubelet today. When kubelet is down, crictl pods
-  # will also fail, and docker will be killed. This is undesirable especially when
-  # docker live restore is disabled.
-  local healthcheck_command=(docker ps)
-  if [[ "${CONTAINER_RUNTIME:-docker}" != "docker" ]]; then
-    healthcheck_command=("${crictl}" pods)
-  fi
+  local -r container_runtime_name="${CONTAINER_RUNTIME_NAME:-containerd}"
+  local -r healthcheck_command=("${crictl}" pods)
   # Container runtime startup takes time. Make initial attempts before starting
   # killing the container runtime.
   until timeout 60 "${healthcheck_command[@]}" > /dev/null; do
@@ -50,12 +43,6 @@ function container_runtime_monitoring {
   while true; do
     if ! timeout 60 "${healthcheck_command[@]}" > /dev/null; then
       echo "Container runtime ${container_runtime_name} failed!"
-      if [[ "$container_runtime_name" == "docker" ]]; then
-          # Dump stack of docker daemon for investigation.
-          # Log fle name looks like goroutine-stacks-TIMESTAMP and will be saved to
-          # the exec root directory, which is /var/run/docker/ on Ubuntu and COS.
-          pkill -SIGUSR1 dockerd
-      fi
       systemctl kill --kill-who=main "${container_runtime_name}"
       # Wait for a while, as we don't want to kill it again before it is really up.
       sleep 120

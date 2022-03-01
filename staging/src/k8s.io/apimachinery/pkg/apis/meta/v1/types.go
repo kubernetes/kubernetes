@@ -58,13 +58,7 @@ type TypeMeta struct {
 // ListMeta describes metadata that synthetic resources must have, including lists and
 // various status objects. A resource may have only one of {ObjectMeta, ListMeta}.
 type ListMeta struct {
-	// selfLink is a URL representing this object.
-	// Populated by the system.
-	// Read-only.
-	//
-	// DEPRECATED
-	// Kubernetes will stop propagating this field in 1.20 release and the field is planned
-	// to be removed in 1.21 release.
+	// Deprecated: selfLink is a legacy read-only field that is no longer populated by the system.
 	// +optional
 	SelfLink string `json:"selfLink,omitempty" protobuf:"bytes,1,opt,name=selfLink"`
 
@@ -152,13 +146,7 @@ type ObjectMeta struct {
 	// +optional
 	Namespace string `json:"namespace,omitempty" protobuf:"bytes,3,opt,name=namespace"`
 
-	// SelfLink is a URL representing this object.
-	// Populated by the system.
-	// Read-only.
-	//
-	// DEPRECATED
-	// Kubernetes will stop propagating this field in 1.20 release and the field is planned
-	// to be removed in 1.21 release.
+	// Deprecated: selfLink is a legacy read-only field that is no longer populated by the system.
 	// +optional
 	SelfLink string `json:"selfLink,omitempty" protobuf:"bytes,4,opt,name=selfLink"`
 
@@ -303,6 +291,7 @@ const (
 // OwnerReference contains enough information to let you identify an owning
 // object. An owning object must be in the same namespace as the dependent, or
 // be cluster-scoped, so there is no namespace field.
+// +structType=atomic
 type OwnerReference struct {
 	// API version of the referent.
 	APIVersion string `json:"apiVersion" protobuf:"bytes,5,opt,name=apiVersion"`
@@ -321,6 +310,8 @@ type OwnerReference struct {
 	// If true, AND if the owner has the "foregroundDeletion" finalizer, then
 	// the owner cannot be deleted from the key-value store until this
 	// reference is removed.
+	// See https://kubernetes.io/docs/concepts/architecture/garbage-collection/#foreground-deletion
+	// for how the garbage collector interacts with this field and enforces the foreground deletion.
 	// Defaults to false.
 	// To set this field, a user needs "delete" permission of the owner,
 	// otherwise 422 (Unprocessable Entity) will be returned.
@@ -356,8 +347,6 @@ type ListOptions struct {
 	// assume bookmarks are returned at any specific interval, nor may they
 	// assume the server will send any BOOKMARK event during a session.
 	// If this is not a watch, this field is ignored.
-	// If the feature gate WatchBookmarks is not enabled in apiserver,
-	// this field is ignored.
 	// +optional
 	AllowWatchBookmarks bool `json:"allowWatchBookmarks,omitempty" protobuf:"varint,9,opt,name=allowWatchBookmarks"`
 
@@ -523,6 +512,15 @@ type DeleteOptions struct {
 	DryRun []string `json:"dryRun,omitempty" protobuf:"bytes,5,rep,name=dryRun"`
 }
 
+const (
+	// FieldValidationIgnore ignores unknown/duplicate fields
+	FieldValidationIgnore = "Ignore"
+	// FieldValidationWarn responds with a warning, but successfully serve the request
+	FieldValidationWarn = "Warn"
+	// FieldValidationStrict fails the request on unknown/duplicate fields
+	FieldValidationStrict = "Strict"
+)
+
 // +k8s:conversion-gen:explicit-from=net/url.Values
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -545,6 +543,28 @@ type CreateOptions struct {
 	// as defined by https://golang.org/pkg/unicode/#IsPrint.
 	// +optional
 	FieldManager string `json:"fieldManager,omitempty" protobuf:"bytes,3,name=fieldManager"`
+
+	// fieldValidation instructs the server on how to handle
+	// objects in the request (POST/PUT/PATCH) containing unknown
+	// or duplicate fields, provided that the `ServerSideFieldValidation`
+	// feature gate is also enabled. Valid values are:
+	// - Ignore: This will ignore any unknown fields that are silently
+	// dropped from the object, and will ignore all but the last duplicate
+	// field that the decoder encounters. This is the default behavior
+	// prior to v1.23 and is the default behavior when the
+	// `ServerSideFieldValidation` feature gate is disabled.
+	// - Warn: This will send a warning via the standard warning response
+	// header for each unknown field that is dropped from the object, and
+	// for each duplicate field that is encountered. The request will
+	// still succeed if there are no other errors, and will only persist
+	// the last of any duplicate fields. This is the default when the
+	// `ServerSideFieldValidation` feature gate is enabled.
+	// - Strict: This will fail the request with a BadRequest error if
+	// any unknown fields would be dropped from the object, or if any
+	// duplicate fields are present. The error returned from the server
+	// will contain all unknown and duplicate fields encountered.
+	// +optional
+	FieldValidation string `json:"fieldValidation,omitempty" protobuf:"bytes,4,name=fieldValidation"`
 }
 
 // +k8s:conversion-gen:explicit-from=net/url.Values
@@ -578,6 +598,59 @@ type PatchOptions struct {
 	// types (JsonPatch, MergePatch, StrategicMergePatch).
 	// +optional
 	FieldManager string `json:"fieldManager,omitempty" protobuf:"bytes,3,name=fieldManager"`
+
+	// fieldValidation instructs the server on how to handle
+	// objects in the request (POST/PUT/PATCH) containing unknown
+	// or duplicate fields, provided that the `ServerSideFieldValidation`
+	// feature gate is also enabled. Valid values are:
+	// - Ignore: This will ignore any unknown fields that are silently
+	// dropped from the object, and will ignore all but the last duplicate
+	// field that the decoder encounters. This is the default behavior
+	// prior to v1.23 and is the default behavior when the
+	// `ServerSideFieldValidation` feature gate is disabled.
+	// - Warn: This will send a warning via the standard warning response
+	// header for each unknown field that is dropped from the object, and
+	// for each duplicate field that is encountered. The request will
+	// still succeed if there are no other errors, and will only persist
+	// the last of any duplicate fields. This is the default when the
+	// `ServerSideFieldValidation` feature gate is enabled.
+	// - Strict: This will fail the request with a BadRequest error if
+	// any unknown fields would be dropped from the object, or if any
+	// duplicate fields are present. The error returned from the server
+	// will contain all unknown and duplicate fields encountered.
+	// +optional
+	FieldValidation string `json:"fieldValidation,omitempty" protobuf:"bytes,4,name=fieldValidation"`
+}
+
+// ApplyOptions may be provided when applying an API object.
+// FieldManager is required for apply requests.
+// ApplyOptions is equivalent to PatchOptions. It is provided as a convenience with documentation
+// that speaks specifically to how the options fields relate to apply.
+type ApplyOptions struct {
+	TypeMeta `json:",inline"`
+
+	// When present, indicates that modifications should not be
+	// persisted. An invalid or unrecognized dryRun directive will
+	// result in an error response and no further processing of the
+	// request. Valid values are:
+	// - All: all dry run stages will be processed
+	// +optional
+	DryRun []string `json:"dryRun,omitempty" protobuf:"bytes,1,rep,name=dryRun"`
+
+	// Force is going to "force" Apply requests. It means user will
+	// re-acquire conflicting fields owned by other people.
+	Force bool `json:"force" protobuf:"varint,2,opt,name=force"`
+
+	// fieldManager is a name associated with the actor or entity
+	// that is making these changes. The value must be less than or
+	// 128 characters long, and only contain printable characters,
+	// as defined by https://golang.org/pkg/unicode/#IsPrint. This
+	// field is required.
+	FieldManager string `json:"fieldManager" protobuf:"bytes,3,name=fieldManager"`
+}
+
+func (o ApplyOptions) ToPatchOptions() PatchOptions {
+	return PatchOptions{DryRun: o.DryRun, Force: &o.Force, FieldManager: o.FieldManager}
 }
 
 // +k8s:conversion-gen:explicit-from=net/url.Values
@@ -602,6 +675,28 @@ type UpdateOptions struct {
 	// as defined by https://golang.org/pkg/unicode/#IsPrint.
 	// +optional
 	FieldManager string `json:"fieldManager,omitempty" protobuf:"bytes,2,name=fieldManager"`
+
+	// fieldValidation instructs the server on how to handle
+	// objects in the request (POST/PUT/PATCH) containing unknown
+	// or duplicate fields, provided that the `ServerSideFieldValidation`
+	// feature gate is also enabled. Valid values are:
+	// - Ignore: This will ignore any unknown fields that are silently
+	// dropped from the object, and will ignore all but the last duplicate
+	// field that the decoder encounters. This is the default behavior
+	// prior to v1.23 and is the default behavior when the
+	// `ServerSideFieldValidation` feature gate is disabled.
+	// - Warn: This will send a warning via the standard warning response
+	// header for each unknown field that is dropped from the object, and
+	// for each duplicate field that is encountered. The request will
+	// still succeed if there are no other errors, and will only persist
+	// the last of any duplicate fields. This is the default when the
+	// `ServerSideFieldValidation` feature gate is enabled.
+	// - Strict: This will fail the request with a BadRequest error if
+	// any unknown fields would be dropped from the object, or if any
+	// duplicate fields are present. The error returned from the server
+	// will contain all unknown and duplicate fields encountered.
+	// +optional
+	FieldValidation string `json:"fieldValidation,omitempty" protobuf:"bytes,3,name=fieldValidation"`
 }
 
 // Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.
@@ -1136,7 +1231,11 @@ type ManagedFieldsEntry struct {
 	// APIVersion field. It is necessary to track the version of a field
 	// set because it cannot be automatically converted.
 	APIVersion string `json:"apiVersion,omitempty" protobuf:"bytes,3,opt,name=apiVersion"`
-	// Time is timestamp of when these fields were set. It should always be empty if Operation is 'Apply'
+	// Time is the timestamp of when the ManagedFields entry was added. The
+	// timestamp will also be updated if a field is added, the manager
+	// changes any of the owned fields value or removes a field. The
+	// timestamp does not update when a field is removed from the entry
+	// because another manager took it over.
 	// +optional
 	Time *Time `json:"time,omitempty" protobuf:"bytes,4,opt,name=time"`
 
@@ -1149,6 +1248,15 @@ type ManagedFieldsEntry struct {
 	// FieldsV1 holds the first JSON version format as described in the "FieldsV1" type.
 	// +optional
 	FieldsV1 *FieldsV1 `json:"fieldsV1,omitempty" protobuf:"bytes,7,opt,name=fieldsV1"`
+
+	// Subresource is the name of the subresource used to update that object, or
+	// empty string if the object was updated through the main resource. The
+	// value of this field is used to distinguish between managers, even if they
+	// share the same name. For example, a status update will be distinct from a
+	// regular update using the same manager name.
+	// Note that the APIVersion field is not related to the Subresource field and
+	// it always corresponds to the version of the main resource.
+	Subresource string `json:"subresource,omitempty" protobuf:"bytes,8,opt,name=subresource"`
 }
 
 // ManagedFieldsOperationType is the type of operation which lead to a ManagedFieldsEntry being created.

@@ -24,13 +24,12 @@ import (
 	"testing"
 	"time"
 
-	"go.etcd.io/etcd/clientv3"
-	"go.etcd.io/etcd/pkg/transport"
+	"go.etcd.io/etcd/client/pkg/v3/transport"
+	clientv3 "go.etcd.io/etcd/client/v3"
 	"google.golang.org/grpc"
 	"sigs.k8s.io/yaml"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	serveroptions "k8s.io/apiextensions-apiserver/pkg/cmd/server/options"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
@@ -52,8 +51,8 @@ func TestPostInvalidObjectMeta(t *testing.T) {
 	}
 	defer tearDown()
 
-	noxuDefinition := fixtures.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.NamespaceScoped)
-	noxuDefinition, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	noxuDefinition := fixtures.NewNoxuV1CustomResourceDefinition(apiextensionsv1.NamespaceScoped)
+	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,11 +113,11 @@ func TestInvalidObjectMetaInStorage(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	noxuDefinition := fixtures.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.NamespaceScoped)
-	noxuDefinition.Spec.Validation = &apiextensionsv1beta1.CustomResourceValidation{
-		OpenAPIV3Schema: &apiextensionsv1beta1.JSONSchemaProps{
+	noxuDefinition := fixtures.NewNoxuV1CustomResourceDefinition(apiextensionsv1.NamespaceScoped)
+	noxuDefinition.Spec.Versions[0].Schema = &apiextensionsv1.CustomResourceValidation{
+		OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
 			Type: "object",
-			Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+			Properties: map[string]apiextensionsv1.JSONSchemaProps{
 				"embedded": {
 					Type:                   "object",
 					XEmbeddedResource:      true,
@@ -127,7 +126,7 @@ func TestInvalidObjectMetaInStorage(t *testing.T) {
 			},
 		},
 	}
-	noxuDefinition, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}

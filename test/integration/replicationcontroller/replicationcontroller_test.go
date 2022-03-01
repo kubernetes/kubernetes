@@ -25,19 +25,23 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	typedv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/retry"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/replication"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -107,8 +111,8 @@ func newMatchingPod(podName, namespace string) *v1.Pod {
 }
 
 func rmSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, *replication.ReplicationManager, informers.SharedInformerFactory, clientset.Interface) {
-	masterConfig := framework.NewIntegrationTestMasterConfig()
-	_, s, closeFn := framework.RunAMaster(masterConfig)
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
+	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 
 	config := restclient.Config{Host: s.URL}
 	clientSet, err := clientset.NewForConfig(&config)
@@ -133,7 +137,7 @@ func runControllerAndInformers(t *testing.T, rm *replication.ReplicationManager,
 	stopCh := make(chan struct{})
 	informers.Start(stopCh)
 	waitToObservePods(t, informers.Core().V1().Pods().Informer(), podNum)
-	go rm.Run(5, stopCh)
+	go rm.Run(context.TODO(), 5)
 	return stopCh
 }
 
@@ -488,6 +492,44 @@ func TestSpecReplicasChange(t *testing.T) {
 		return newRC.Status.ObservedGeneration >= savedGeneration, nil
 	}); err != nil {
 		t.Fatalf("Failed to verify .Status.ObservedGeneration has incremented for rc %s: %v", rc.Name, err)
+	}
+}
+
+func TestLogarithmicScaleDown(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LogarithmicScaleDown, true)()
+	s, closeFn, rm, informers, c := rmSetup(t)
+	defer closeFn()
+	ns := framework.CreateTestingNamespace("test-spec-replicas-change", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
+	stopCh := runControllerAndInformers(t, rm, informers, 0)
+	defer close(stopCh)
+
+	rc := newRC("rc", ns.Name, 2)
+	rcs, _ := createRCsPods(t, c, []*v1.ReplicationController{rc}, []*v1.Pod{})
+	rc = rcs[0]
+	waitRCStable(t, c, rc)
+
+	// get list of pods in the cluster
+	pods, err := c.CoreV1().Pods(ns.Name).List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		t.Fatalf("failed to get pods in namespace %s: %+v", ns.Name, err)
+	}
+
+	// Wait 10 seconds and scale up, the new pod should be in a new logarithmic rank from the first 2
+	time.Sleep(10 * time.Second)
+	scaleRC(t, c, rc, 3)
+
+	// scale back down, and confirm that the pods left in the namespace are the original ones
+	// (meaning the 3rd one was deleted)
+	scaleRC(t, c, rc, 2)
+
+	newPods, err := c.CoreV1().Pods(ns.Name).List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		t.Fatalf("failed to get pods in namespace %s: %+v", ns.Name, err)
+	}
+
+	if !apiequality.Semantic.DeepEqual(pods.Items, newPods.Items) {
+		t.Fatalf("expected pods %+v, got %+v", pods.Items, newPods.Items)
 	}
 }
 

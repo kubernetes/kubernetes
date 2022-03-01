@@ -106,7 +106,7 @@ func TestCanSupport(t *testing.T) {
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/rbd")
 	if err != nil {
-		t.Errorf("Can't find the plugin by name")
+		t.Fatal("Can't find the plugin by name")
 	}
 	if plug.GetPluginName() != "kubernetes.io/rbd" {
 		t.Errorf("Wrong name: %s", plug.GetPluginName())
@@ -252,7 +252,7 @@ func doTestPlugin(t *testing.T, c *testcase) {
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, fakeVolumeHost)
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/rbd")
 	if err != nil {
-		t.Errorf("Can't find the plugin by name")
+		t.Fatal("Can't find the plugin by name")
 	}
 	fakeMounter := fakeVolumeHost.GetMounter(plug.GetPluginName()).(*mount.FakeMounter)
 	fakeNodeName := types.NodeName("localhost")
@@ -281,7 +281,7 @@ func doTestPlugin(t *testing.T, c *testcase) {
 	if deviceMountPath != c.expectedDeviceMountPath {
 		t.Errorf("Unexpected mount path, expected %q, not: %q", c.expectedDeviceMountPath, deviceMountPath)
 	}
-	err = attacher.MountDevice(c.spec, devicePath, deviceMountPath)
+	err = attacher.MountDevice(c.spec, devicePath, deviceMountPath, volume.DeviceMounterArgs{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -604,7 +604,7 @@ func TestConstructVolumeSpec(t *testing.T) {
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, fakeVolumeHost)
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/rbd")
 	if err != nil {
-		t.Errorf("Can't find the plugin by name")
+		t.Fatal("Can't find the plugin by name")
 	}
 	fakeMounter := fakeVolumeHost.GetMounter(plug.GetPluginName()).(*mount.FakeMounter)
 
@@ -753,7 +753,7 @@ func TestUnsupportedVolumeHost(t *testing.T) {
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/rbd")
 	if err != nil {
-		t.Errorf("Can't find the plugin by name")
+		t.Fatal("Can't find the plugin by name")
 	}
 
 	_, err = plug.ConstructVolumeSpec("", "")

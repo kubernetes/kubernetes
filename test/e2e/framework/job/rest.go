@@ -42,3 +42,9 @@ func GetJobPods(c clientset.Interface, ns, jobName string) (*v1.PodList, error) 
 func CreateJob(c clientset.Interface, ns string, job *batchv1.Job) (*batchv1.Job, error) {
 	return c.BatchV1().Jobs(ns).Create(context.TODO(), job, metav1.CreateOptions{})
 }
+
+// CreateJob uses c to update a job in namespace ns. If the returned error is
+// nil, the returned Job is valid and has been updated.
+func UpdateJob(c clientset.Interface, ns string, job *batchv1.Job) (*batchv1.Job, error) {
+	return c.BatchV1().Jobs(ns).Update(context.TODO(), job, metav1.UpdateOptions{})
+}

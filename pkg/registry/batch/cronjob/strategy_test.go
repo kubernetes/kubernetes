@@ -44,8 +44,9 @@ func TestCronJobStrategy(t *testing.T) {
 	}
 	cronJob := &batch.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "mycronjob",
-			Namespace: metav1.NamespaceDefault,
+			Name:       "mycronjob",
+			Namespace:  metav1.NamespaceDefault,
+			Generation: 999,
 		},
 		Spec: batch.CronJobSpec{
 			Schedule:          "* * * * ?",
@@ -62,11 +63,23 @@ func TestCronJobStrategy(t *testing.T) {
 	if len(cronJob.Status.Active) != 0 {
 		t.Errorf("CronJob does not allow setting status on create")
 	}
+	if cronJob.Generation != 1 {
+		t.Errorf("expected Generation=1, got %d", cronJob.Generation)
+	}
 	errs := Strategy.Validate(ctx, cronJob)
 	if len(errs) != 0 {
 		t.Errorf("Unexpected error validating %v", errs)
 	}
 	now := metav1.Now()
+
+	// ensure we do not change generation for non-spec updates
+	updatedLabelCronJob := cronJob.DeepCopy()
+	updatedLabelCronJob.Labels = map[string]string{"a": "true"}
+	Strategy.PrepareForUpdate(ctx, updatedLabelCronJob, cronJob)
+	if updatedLabelCronJob.Generation != 1 {
+		t.Errorf("expected Generation=1, got %d", updatedLabelCronJob.Generation)
+	}
+
 	updatedCronJob := &batch.CronJob{
 		ObjectMeta: metav1.ObjectMeta{Name: "bar", ResourceVersion: "4"},
 		Spec: batch.CronJobSpec{
@@ -81,6 +94,9 @@ func TestCronJobStrategy(t *testing.T) {
 	Strategy.PrepareForUpdate(ctx, updatedCronJob, cronJob)
 	if updatedCronJob.Status.Active != nil {
 		t.Errorf("PrepareForUpdate should have preserved prior version status")
+	}
+	if updatedCronJob.Generation != 2 {
+		t.Errorf("expected Generation=2, got %d", updatedCronJob.Generation)
 	}
 	errs = Strategy.ValidateUpdate(ctx, updatedCronJob, cronJob)
 	if len(errs) == 0 {

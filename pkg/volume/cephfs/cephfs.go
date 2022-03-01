@@ -103,11 +103,11 @@ func (plugin *cephfsPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.
 		// if secret is provideded, retrieve it
 		kubeClient := plugin.host.GetKubeClient()
 		if kubeClient == nil {
-			return nil, fmt.Errorf("Cannot get kube client")
+			return nil, fmt.Errorf("cannot get kube client")
 		}
 		secrets, err := kubeClient.CoreV1().Secrets(secretNs).Get(context.TODO(), secretName, metav1.GetOptions{})
 		if err != nil {
-			err = fmt.Errorf("Couldn't get secret %v/%v err: %v", secretNs, secretName, err)
+			err = fmt.Errorf("couldn't get secret %v/%v err: %w", secretNs, secretName, err)
 			return nil, err
 		}
 		for name, data := range secrets.Data {
@@ -206,17 +206,10 @@ var _ volume.Mounter = &cephfsMounter{}
 
 func (cephfsVolume *cephfsMounter) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:        cephfsVolume.readonly,
-		Managed:         false,
-		SupportsSELinux: false,
+		ReadOnly:       cephfsVolume.readonly,
+		Managed:        false,
+		SELinuxRelabel: false,
 	}
-}
-
-// Checks prior to mount operations to verify that the required components (binaries, etc.)
-// to mount the volume are available on the underlying node.
-// If not, it returns an error
-func (cephfsVolume *cephfsMounter) CanMount() error {
-	return nil
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.

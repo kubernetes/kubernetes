@@ -1,13 +1,8 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- erictune
-- liggitt
-- deads2k
-- mikedanese
+  - sig-auth-api-approvers
 reviewers:
-- erictune
-- liggitt
-- deads2k
-- enj
-- mikedanese
+  - sig-auth-api-reviewers
+labels:
+  - sig/auth

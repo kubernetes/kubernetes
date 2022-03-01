@@ -26,10 +26,8 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
-	"k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // the name used for object count quota
@@ -90,7 +88,7 @@ func (p *serviceEvaluator) MatchingScopes(item runtime.Object, scopes []corev1.S
 }
 
 // UncoveredQuotaScopes takes the input matched scopes which are limited by configuration and the matched quota scopes.
-// It returns the scopes which are in limited scopes but dont have a corresponding covering quota scope
+// It returns the scopes which are in limited scopes but don't have a corresponding covering quota scope
 func (p *serviceEvaluator) UncoveredQuotaScopes(limitedScopes []corev1.ScopedResourceSelectorRequirement, matchedQuotaScopes []corev1.ScopedResourceSelectorRequirement) ([]corev1.ScopedResourceSelectorRequirement, error) {
 	return []corev1.ScopedResourceSelectorRequirement{}, nil
 }
@@ -134,8 +132,7 @@ func (p *serviceEvaluator) Usage(item runtime.Object) (corev1.ResourceList, erro
 		// is suppressed only ports with explicit NodePort values are counted.
 		// nodeports won't be allocated yet, so we can't simply count the actual values.
 		// We need to look at the intent.
-		if feature.DefaultFeatureGate.Enabled(features.ServiceLBNodePortControl) &&
-			svc.Spec.AllocateLoadBalancerNodePorts != nil &&
+		if svc.Spec.AllocateLoadBalancerNodePorts != nil &&
 			*svc.Spec.AllocateLoadBalancerNodePorts == false {
 			result[corev1.ResourceServicesNodePorts] = *portsWithNodePorts(svc)
 		} else {

@@ -1,34 +1,23 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 reviewers:
-- thockin
-- lavalamp
-- smarterclayton
-- wojtek-t
-- deads2k
-- brendandburns
-- derekwaynecarr
-- caesarxuchao
-- mikedanese
-- liggitt
-- erictune
-- pmorie
-- sttts
-- saad-ali
-- janetkuo
-- justinsb
-- ncdc
-- tallclair
-- mwielgus
-- soltysh
-- piosz
-- dims
-- errordeveloper
-- rootfs
-- mml
-- resouer
-- therc
-- pweil-
-- lukaszo
+  - thockin
+  - lavalamp
+  - smarterclayton
+  - wojtek-t
+  - deads2k
+  - derekwaynecarr
+  - caesarxuchao
+  - mikedanese
+  - liggitt
+  - sttts
+  - saad-ali
+  - janetkuo
+  - justinsb
+  - ncdc
+  - tallclair
+  - mwielgus
+  - soltysh
+  - dims
 labels:
-- sig/apps
+  - sig/apps

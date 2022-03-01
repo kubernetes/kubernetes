@@ -2,7 +2,8 @@
   "kind": "CreateOptions",
   "apiVersion": "v1",
   "dryRun": [
-    "2"
+    "dryRunValue"
   ],
-  "fieldManager": "3"
+  "fieldManager": "fieldManagerValue",
+  "fieldValidation": "fieldValidationValue"
 }

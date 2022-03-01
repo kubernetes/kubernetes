@@ -20,12 +20,12 @@ import (
 	"crypto"
 	"crypto/tls"
 	"crypto/x509"
-	"io/ioutil"
 	"os"
 	"path"
 	"testing"
 
 	certutil "k8s.io/client-go/util/cert"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
@@ -144,7 +144,7 @@ func TestMakeCertTree(t *testing.T) {
 }
 
 func TestCreateCertificateChain(t *testing.T) {
-	dir, err := ioutil.TempDir("", t.Name())
+	dir, err := os.MkdirTemp("", t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}

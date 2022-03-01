@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:build windows
 // +build windows
 
 package mgr
@@ -46,7 +47,7 @@ func (s *Service) Start(args ...string) error {
 	return windows.StartService(s.Handle, uint32(len(args)), p)
 }
 
-// Control sends state change request c to the servce s.
+// Control sends state change request c to the service s.
 func (s *Service) Control(c svc.Cmd) (svc.Status, error) {
 	var t windows.SERVICE_STATUS
 	err := windows.ControlService(s.Handle, uint32(c), &t)
@@ -68,8 +69,10 @@ func (s *Service) Query() (svc.Status, error) {
 		return svc.Status{}, err
 	}
 	return svc.Status{
-		State:     svc.State(t.CurrentState),
-		Accepts:   svc.Accepted(t.ControlsAccepted),
-		ProcessId: t.ProcessId,
+		State:                   svc.State(t.CurrentState),
+		Accepts:                 svc.Accepted(t.ControlsAccepted),
+		ProcessId:               t.ProcessId,
+		Win32ExitCode:           t.Win32ExitCode,
+		ServiceSpecificExitCode: t.ServiceSpecificExitCode,
 	}, nil
 }

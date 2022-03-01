@@ -41,12 +41,14 @@ func mergePermutation(numaNodes []int, permutation []TopologyHint) TopologyHint 
 	var numaAffinities []bitmask.BitMask
 	for _, hint := range permutation {
 		// Only consider hints that have an actual NUMANodeAffinity set.
-		if hint.NUMANodeAffinity == nil {
-			numaAffinities = append(numaAffinities, defaultAffinity)
-		} else {
+		if hint.NUMANodeAffinity != nil {
 			numaAffinities = append(numaAffinities, hint.NUMANodeAffinity)
+			// Only mark preferred if all affinities are equal.
+			if !hint.NUMANodeAffinity.IsEqual(numaAffinities[0]) {
+				preferred = false
+			}
 		}
-
+		// Only mark preferred if all affinities are preferred.
 		if !hint.Preferred {
 			preferred = false
 		}
@@ -54,8 +56,8 @@ func mergePermutation(numaNodes []int, permutation []TopologyHint) TopologyHint 
 
 	// Merge the affinities using a bitwise-and operation.
 	mergedAffinity := bitmask.And(defaultAffinity, numaAffinities...)
-	// Build a mergedHint from the merged affinity mask, indicating if an
-	// preferred allocation was used to generate the affinity mask or not.
+	// Build a mergedHint from the merged affinity mask, setting preferred as
+	// appropriate based on the logic above.
 	return TopologyHint{mergedAffinity, preferred}
 }
 
@@ -67,7 +69,7 @@ func filterProvidersHints(providersHints []map[string][]TopologyHint) [][]Topolo
 	for _, hints := range providersHints {
 		// If hints is nil, insert a single, preferred any-numa hint into allProviderHints.
 		if len(hints) == 0 {
-			klog.Infof("[topologymanager] Hint Provider has no preference for NUMA affinity with any resource")
+			klog.InfoS("Hint Provider has no preference for NUMA affinity with any resource")
 			allProviderHints = append(allProviderHints, []TopologyHint{{nil, true}})
 			continue
 		}
@@ -75,13 +77,13 @@ func filterProvidersHints(providersHints []map[string][]TopologyHint) [][]Topolo
 		// Otherwise, accumulate the hints for each resource type into allProviderHints.
 		for resource := range hints {
 			if hints[resource] == nil {
-				klog.Infof("[topologymanager] Hint Provider has no preference for NUMA affinity with resource '%s'", resource)
+				klog.InfoS("Hint Provider has no preference for NUMA affinity with resource", "resource", resource)
 				allProviderHints = append(allProviderHints, []TopologyHint{{nil, true}})
 				continue
 			}
 
 			if len(hints[resource]) == 0 {
-				klog.Infof("[topologymanager] Hint Provider has no possible NUMA affinities for resource '%s'", resource)
+				klog.InfoS("Hint Provider has no possible NUMA affinities for resource", "resource", resource)
 				allProviderHints = append(allProviderHints, []TopologyHint{{nil, false}})
 				continue
 			}

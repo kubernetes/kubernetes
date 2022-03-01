@@ -124,7 +124,10 @@ type AuthInfo struct {
 	// Impersonate is the username to act-as.
 	// +optional
 	Impersonate string `json:"act-as,omitempty"`
-	// ImpersonateGroups is the groups to imperonate.
+	// ImpersonateUID is the uid to impersonate.
+	// +optional
+	ImpersonateUID string `json:"act-as-uid,omitempty"`
+	// ImpersonateGroups is the groups to impersonate.
 	// +optional
 	ImpersonateGroups []string `json:"act-as-groups,omitempty"`
 	// ImpersonateUserExtra contains additional information for impersonated user.
@@ -245,6 +248,33 @@ type ExecConfig struct {
 	// to be stored directly in the kubeconfig.
 	// +k8s:conversion-gen=false
 	Config runtime.Object
+
+	// InteractiveMode determines this plugin's relationship with standard input. Valid
+	// values are "Never" (this exec plugin never uses standard input), "IfAvailable" (this
+	// exec plugin wants to use standard input if it is available), or "Always" (this exec
+	// plugin requires standard input to function). See ExecInteractiveMode values for more
+	// details.
+	//
+	// If APIVersion is client.authentication.k8s.io/v1alpha1 or
+	// client.authentication.k8s.io/v1beta1, then this field is optional and defaults
+	// to "IfAvailable" when unset. Otherwise, this field is required.
+	// +optional
+	InteractiveMode ExecInteractiveMode
+
+	// StdinUnavailable indicates whether the exec authenticator can pass standard
+	// input through to this exec plugin. For example, a higher level entity might be using
+	// standard input for something else and therefore it would not be safe for the exec
+	// plugin to use standard input. This is kept here in order to keep all of the exec configuration
+	// together, but it is never serialized.
+	// +k8s:conversion-gen=false
+	StdinUnavailable bool
+
+	// StdinUnavailableMessage is an optional message to be displayed when the exec authenticator
+	// cannot successfully run this exec plugin because it needs to use standard input and
+	// StdinUnavailable is true. For example, a process that is already using standard input to
+	// read user instructions might set this to "used by my-program to read user instructions".
+	// +k8s:conversion-gen=false
+	StdinUnavailableMessage string
 }
 
 var _ fmt.Stringer = new(ExecConfig)
@@ -271,7 +301,7 @@ func (c ExecConfig) String() string {
 	if c.Config != nil {
 		config = "runtime.Object(--- REDACTED ---)"
 	}
-	return fmt.Sprintf("api.ExecConfig{Command: %q, Args: %#v, Env: %s, APIVersion: %q, ProvideClusterInfo: %t, Config: %s}", c.Command, args, env, c.APIVersion, c.ProvideClusterInfo, config)
+	return fmt.Sprintf("api.ExecConfig{Command: %q, Args: %#v, Env: %s, APIVersion: %q, ProvideClusterInfo: %t, Config: %s, StdinUnavailable: %t}", c.Command, args, env, c.APIVersion, c.ProvideClusterInfo, config, c.StdinUnavailable)
 }
 
 // ExecEnvVar is used for setting environment variables when executing an exec-based
@@ -280,6 +310,26 @@ type ExecEnvVar struct {
 	Name  string `json:"name"`
 	Value string `json:"value"`
 }
+
+// ExecInteractiveMode is a string that describes an exec plugin's relationship with standard input.
+type ExecInteractiveMode string
+
+const (
+	// NeverExecInteractiveMode declares that this exec plugin never needs to use standard
+	// input, and therefore the exec plugin will be run regardless of whether standard input is
+	// available for user input.
+	NeverExecInteractiveMode ExecInteractiveMode = "Never"
+	// IfAvailableExecInteractiveMode declares that this exec plugin would like to use standard input
+	// if it is available, but can still operate if standard input is not available. Therefore, the
+	// exec plugin will be run regardless of whether stdin is available for user input. If standard
+	// input is available for user input, then it will be provided to this exec plugin.
+	IfAvailableExecInteractiveMode ExecInteractiveMode = "IfAvailable"
+	// AlwaysExecInteractiveMode declares that this exec plugin requires standard input in order to
+	// run, and therefore the exec plugin will only be run if standard input is available for user
+	// input. If standard input is not available for user input, then the exec plugin will not be run
+	// and an error will be returned by the exec plugin runner.
+	AlwaysExecInteractiveMode ExecInteractiveMode = "Always"
+)
 
 // NewConfig is a convenience function that returns a new Config object with non-nil maps
 func NewConfig() *Config {

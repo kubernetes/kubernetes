@@ -24,6 +24,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/fsnotify/fsnotify"
 	"k8s.io/client-go/util/cert"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -35,18 +36,6 @@ import (
 // FileRefreshDuration is exposed so that integration tests can crank up the reload speed.
 var FileRefreshDuration = 1 * time.Minute
 
-// Listener is an interface to use to notify interested parties of a change.
-type Listener interface {
-	// Enqueue should be called when an input may have changed
-	Enqueue()
-}
-
-// Notifier is a way to add listeners
-type Notifier interface {
-	// AddListener is adds a listener to be notified of potential input changes
-	AddListener(listener Listener)
-}
-
 // ControllerRunner is a generic interface for starting a controller
 type ControllerRunner interface {
 	// RunOnce runs the sync loop a single time.  This useful for synchronous priming
@@ -56,7 +45,7 @@ type ControllerRunner interface {
 	Run(workers int, stopCh <-chan struct{})
 }
 
-// DynamicFileCAContent provies a CAContentProvider that can dynamically react to new file content
+// DynamicFileCAContent provides a CAContentProvider that can dynamically react to new file content
 // It also fulfills the authenticator interface to provide verifyoptions
 type DynamicFileCAContent struct {
 	name string
@@ -126,7 +115,7 @@ func (c *DynamicFileCAContent) loadCABundle() error {
 		return err
 	}
 	c.caBundle.Store(caBundleAndVerifier)
-	klog.V(2).Infof("Loaded a new CA Bundle and Verifier for %q", c.Name())
+	klog.V(2).InfoS("Loaded a new CA Bundle and Verifier", "name", c.Name())
 
 	for _, listener := range c.listeners {
 		listener.Enqueue()
@@ -159,26 +148,71 @@ func (c *DynamicFileCAContent) RunOnce() error {
 	return c.loadCABundle()
 }
 
-// Run starts the kube-apiserver and blocks until stopCh is closed.
+// Run starts the controller and blocks until stopCh is closed.
 func (c *DynamicFileCAContent) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	klog.Infof("Starting %s", c.name)
-	defer klog.Infof("Shutting down %s", c.name)
+	klog.InfoS("Starting controller", "name", c.name)
+	defer klog.InfoS("Shutting down controller", "name", c.name)
 
 	// doesn't matter what workers say, only start one.
 	go wait.Until(c.runWorker, time.Second, stopCh)
 
-	// start timer that rechecks every minute, just in case.  this also serves to prime the controller quickly.
-	go wait.PollImmediateUntil(FileRefreshDuration, func() (bool, error) {
-		c.queue.Add(workItemKey)
-		return false, nil
-	}, stopCh)
-
-	// TODO this can be wired to an fsnotifier as well.
+	// start the loop that watches the CA file until stopCh is closed.
+	go wait.Until(func() {
+		if err := c.watchCAFile(stopCh); err != nil {
+			klog.ErrorS(err, "Failed to watch CA file, will retry later")
+		}
+	}, time.Minute, stopCh)
 
 	<-stopCh
+}
+
+func (c *DynamicFileCAContent) watchCAFile(stopCh <-chan struct{}) error {
+	// Trigger a check here to ensure the content will be checked periodically even if the following watch fails.
+	c.queue.Add(workItemKey)
+
+	w, err := fsnotify.NewWatcher()
+	if err != nil {
+		return fmt.Errorf("error creating fsnotify watcher: %v", err)
+	}
+	defer w.Close()
+
+	if err = w.Add(c.filename); err != nil {
+		return fmt.Errorf("error adding watch for file %s: %v", c.filename, err)
+	}
+	// Trigger a check in case the file is updated before the watch starts.
+	c.queue.Add(workItemKey)
+
+	for {
+		select {
+		case e := <-w.Events:
+			if err := c.handleWatchEvent(e, w); err != nil {
+				return err
+			}
+		case err := <-w.Errors:
+			return fmt.Errorf("received fsnotify error: %v", err)
+		case <-stopCh:
+			return nil
+		}
+	}
+}
+
+// handleWatchEvent triggers reloading the CA file, and restarts a new watch if it's a Remove or Rename event.
+func (c *DynamicFileCAContent) handleWatchEvent(e fsnotify.Event, w *fsnotify.Watcher) error {
+	// This should be executed after restarting the watch (if applicable) to ensure no file event will be missing.
+	defer c.queue.Add(workItemKey)
+	if e.Op&(fsnotify.Remove|fsnotify.Rename) == 0 {
+		return nil
+	}
+	if err := w.Remove(c.filename); err != nil {
+		klog.InfoS("Failed to remove file watch, it may have been deleted", "file", c.filename, "err", err)
+	}
+	if err := w.Add(c.filename); err != nil {
+		return fmt.Errorf("error adding watch for file %s: %v", c.filename, err)
+	}
+	return nil
 }
 
 func (c *DynamicFileCAContent) runWorker() {

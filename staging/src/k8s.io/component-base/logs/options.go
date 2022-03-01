@@ -17,117 +17,79 @@ limitations under the License.
 package logs
 
 import (
-	"flag"
 	"fmt"
-	"strings"
 
-	"github.com/go-logr/logr"
 	"github.com/spf13/pflag"
 
-	"k8s.io/component-base/logs/sanitization"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/component-base/config"
+	"k8s.io/component-base/config/v1alpha1"
+	"k8s.io/component-base/logs/registry"
 	"k8s.io/klog/v2"
 )
 
-const (
-	logFormatFlagName = "logging-format"
-	defaultLogFormat  = "text"
-)
-
-// List of logs (k8s.io/klog + k8s.io/component-base/logs) flags supported by all logging formats
-var supportedLogsFlags = map[string]struct{}{
-	"v": {},
-	// TODO: support vmodule after 1.19 Alpha
-}
-
 // Options has klog format parameters
 type Options struct {
-	LogFormat       string
-	LogSanitization bool
+	Config config.LoggingConfiguration
 }
 
 // NewOptions return new klog options
 func NewOptions() *Options {
-	return &Options{
-		LogFormat: defaultLogFormat,
-	}
+	c := v1alpha1.LoggingConfiguration{}
+	v1alpha1.RecommendedLoggingConfiguration(&c)
+	o := &Options{}
+	v1alpha1.Convert_v1alpha1_LoggingConfiguration_To_config_LoggingConfiguration(&c, &o.Config, nil)
+	return o
 }
 
-// Validate verifies if any unsupported flag is set
+// ValidateAndApply combines validation and application of the logging configuration.
+// This should be invoked as early as possible because then the rest of the program
+// startup (including validation of other options) will already run with the final
+// logging configuration.
+func (o *Options) ValidateAndApply() error {
+	errs := o.validate()
+	if len(errs) > 0 {
+		return utilerrors.NewAggregate(errs)
+	}
+	o.apply()
+	return nil
+}
+
+// validate verifies if any unsupported flag is set
 // for non-default logging format
-func (o *Options) Validate() []error {
-	errs := []error{}
-	if o.LogFormat != defaultLogFormat {
-		allFlags := unsupportedLoggingFlags()
-		for _, fname := range allFlags {
-			if flagIsSet(fname) {
-				errs = append(errs, fmt.Errorf("non-default logging format doesn't honor flag: %s", fname))
-			}
-		}
+func (o *Options) validate() []error {
+	errs := ValidateLoggingConfiguration(&o.Config, nil)
+	if len(errs) != 0 {
+		return errs.ToAggregate().Errors()
 	}
-	if _, err := o.Get(); err != nil {
-		errs = append(errs, fmt.Errorf("unsupported log format: %s", o.LogFormat))
-	}
-	return errs
+	return nil
 }
 
-func flagIsSet(name string) bool {
-	f := flag.Lookup(name)
-	if f != nil {
-		return f.DefValue != f.Value.String()
-	}
-	pf := pflag.Lookup(name)
-	if pf != nil {
-		return pf.DefValue != pf.Value.String()
-	}
-	panic("failed to lookup unsupported log flag")
-}
-
-// AddFlags add logging-format flag
+// AddFlags add logging-format flag.
+//
+// Programs using LoggingConfiguration must use SkipLoggingConfigurationFlags
+// when calling AddFlags to avoid the duplicate registration of flags.
 func (o *Options) AddFlags(fs *pflag.FlagSet) {
-	unsupportedFlags := fmt.Sprintf("--%s", strings.Join(unsupportedLoggingFlags(), ", --"))
-	formats := fmt.Sprintf(`"%s"`, strings.Join(logRegistry.List(), `", "`))
-	fs.StringVar(&o.LogFormat, logFormatFlagName, defaultLogFormat, fmt.Sprintf("Sets the log format. Permitted formats: %s.\nNon-default formats don't honor these flags: %s.\nNon-default choices are currently alpha and subject to change without warning.", formats, unsupportedFlags))
-
-	// No new log formats should be added after generation is of flag options
-	logRegistry.Freeze()
-	fs.BoolVar(&o.LogSanitization, "experimental-logging-sanitization", o.LogSanitization, `[Experimental] When enabled prevents logging of fields tagged as sensitive (passwords, keys, tokens).
-Runtime log sanitization may introduce significant computation overhead and therefore should not be enabled in production.`)
+	BindLoggingFlags(&o.Config, fs)
 }
 
-// Apply set klog logger from LogFormat type
-func (o *Options) Apply() {
+// apply set klog logger from LogFormat type
+func (o *Options) apply() {
 	// if log format not exists, use nil loggr
-	loggr, _ := o.Get()
-	klog.SetLogger(loggr)
-	if o.LogSanitization {
-		klog.SetLogFilter(&sanitization.SanitizingFilter{})
+	factory, _ := registry.LogRegistry.Get(o.Config.Format)
+	if factory == nil {
+		klog.ClearLogger()
+	} else {
+		log, flush := factory.Create(o.Config.Options)
+		klog.SetLogger(log)
+		logrFlush = flush
 	}
-}
-
-// Get logger with LogFormat field
-func (o *Options) Get() (logr.Logger, error) {
-	return logRegistry.Get(o.LogFormat)
-}
-
-func unsupportedLoggingFlags() []string {
-	allFlags := []string{}
-
-	// k8s.io/klog flags
-	fs := &flag.FlagSet{}
-	klog.InitFlags(fs)
-	fs.VisitAll(func(flag *flag.Flag) {
-		if _, found := supportedLogsFlags[flag.Name]; !found {
-			allFlags = append(allFlags, strings.Replace(flag.Name, "_", "-", -1))
-		}
-	})
-
-	// k8s.io/component-base/logs flags
-	pfs := &pflag.FlagSet{}
-	AddFlags(pfs)
-	pfs.VisitAll(func(flag *pflag.Flag) {
-		if _, found := supportedLogsFlags[flag.Name]; !found {
-			allFlags = append(allFlags, flag.Name)
-		}
-	})
-	return allFlags
+	if err := loggingFlags.Lookup("v").Value.Set(o.Config.Verbosity.String()); err != nil {
+		panic(fmt.Errorf("internal error while setting klog verbosity: %v", err))
+	}
+	if err := loggingFlags.Lookup("vmodule").Value.Set(o.Config.VModule.String()); err != nil {
+		panic(fmt.Errorf("internal error while setting klog vmodule: %v", err))
+	}
+	go wait.Forever(FlushLogs, o.Config.FlushFrequency)
 }

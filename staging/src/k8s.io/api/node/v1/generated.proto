@@ -28,7 +28,7 @@ import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 
 // Package-wide variables from generator "generated".
-option go_package = "v1";
+option go_package = "k8s.io/api/node/v1";
 
 // Overhead structure represents the resource overhead associated with running a pod.
 message Overhead {
@@ -97,6 +97,7 @@ message Scheduling {
   // with a pod's existing nodeSelector. Any conflicts will cause the pod to
   // be rejected in admission.
   // +optional
+  // +mapType=atomic
   map<string, string> nodeSelector = 1;
 
   // tolerations are appended (excluding duplicates) to pods running with this

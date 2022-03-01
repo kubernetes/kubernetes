@@ -31,7 +31,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-openapi/spec"
 	"sigs.k8s.io/yaml"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -51,6 +50,7 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -58,6 +58,7 @@ import (
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 func TestConvertFieldLabel(t *testing.T) {
@@ -151,15 +152,25 @@ func TestRouting(t *testing.T) {
 	crdIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 	crdLister := listers.NewCustomResourceDefinitionLister(crdIndexer)
 
+	// note that in production we delegate to the special handler that is attached at the end of the delegation chain that checks if the server has installed all known HTTP paths before replying to the client.
+	// it returns 503 if not all registered signals have been ready (closed) otherwise it simply replies with 404.
+	// the apiextentionserver is considered to be initialized once hasCRDInformerSyncedSignal is closed.
+	//
+	// here, in this test the delegate represent the special handler and hasSync represents the signal.
+	// primarily we just want to make sure that the delegate has been called.
+	// the behaviour of the real delegate is tested elsewhere.
 	delegateCalled := false
 	delegate := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		delegateCalled = true
+		if !hasSynced {
+			http.Error(w, "", 503)
+			return
+		}
 		http.Error(w, "", 418)
 	})
 	customV1 := schema.GroupVersion{Group: "custom", Version: "v1"}
 	handler := &crdHandler{
 		crdLister: crdLister,
-		hasSynced: func() bool { return hasSynced },
 		delegate:  delegate,
 		versionDiscoveryHandler: &versionDiscoveryHandler{
 			discovery: map[schema.GroupVersion]*discovery.APIVersionHandler{
@@ -209,7 +220,7 @@ func TestRouting(t *testing.T) {
 			HasSynced:            false,
 			IsResourceRequest:    false,
 			ExpectDelegateCalled: false,
-			ExpectStatus:         503,
+			ExpectStatus:         200,
 		},
 		{
 			Name:                 "existing group discovery",
@@ -231,7 +242,7 @@ func TestRouting(t *testing.T) {
 			APIVersion:           "",
 			HasSynced:            false,
 			IsResourceRequest:    false,
-			ExpectDelegateCalled: false,
+			ExpectDelegateCalled: true,
 			ExpectStatus:         503,
 		},
 		{
@@ -255,7 +266,7 @@ func TestRouting(t *testing.T) {
 			HasSynced:            false,
 			IsResourceRequest:    false,
 			ExpectDelegateCalled: false,
-			ExpectStatus:         503,
+			ExpectStatus:         200,
 		},
 		{
 			Name:                 "existing group version discovery",
@@ -277,7 +288,7 @@ func TestRouting(t *testing.T) {
 			APIVersion:           "v1",
 			HasSynced:            false,
 			IsResourceRequest:    false,
-			ExpectDelegateCalled: false,
+			ExpectDelegateCalled: true,
 			ExpectStatus:         503,
 		},
 		{
@@ -300,7 +311,7 @@ func TestRouting(t *testing.T) {
 			APIVersion:           "v2",
 			HasSynced:            false,
 			IsResourceRequest:    false,
-			ExpectDelegateCalled: false,
+			ExpectDelegateCalled: true,
 			ExpectStatus:         503,
 		},
 		{
@@ -325,7 +336,7 @@ func TestRouting(t *testing.T) {
 			Resource:             "foos",
 			HasSynced:            false,
 			IsResourceRequest:    true,
-			ExpectDelegateCalled: false,
+			ExpectDelegateCalled: true,
 			ExpectStatus:         503,
 		},
 		{
@@ -460,7 +471,10 @@ func testHandlerConversion(t *testing.T, enableWatchCache bool) {
 	defer server.Terminate(t)
 
 	crd := multiVersionFixture.DeepCopy()
-	if _, err := cl.ApiextensionsV1().CustomResourceDefinitions().Create(context.TODO(), crd, metav1.CreateOptions{}); err != nil {
+	// Create a context with metav1.NamespaceNone as the namespace since multiVersionFixture
+	// is a cluster scoped CRD.
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceNone)
+	if _, err := cl.ApiextensionsV1().CustomResourceDefinitions().Create(ctx, crd, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	if err := crdInformer.Informer().GetStore().Add(crd); err != nil {
@@ -470,7 +484,7 @@ func testHandlerConversion(t *testing.T, enableWatchCache bool) {
 	etcdOptions := options.NewEtcdOptions(storageConfig)
 	etcdOptions.StorageConfig.Codec = unstructured.UnstructuredJSONScheme
 	restOptionsGetter := generic.RESTOptions{
-		StorageConfig:           &etcdOptions.StorageConfig,
+		StorageConfig:           etcdOptions.StorageConfig.ForResource(schema.GroupResource{Group: crd.Spec.Group, Resource: crd.Spec.Names.Plural}),
 		Decorator:               generic.UndecoratedStorage,
 		EnableGarbageCollection: true,
 		DeleteCollectionWorkers: 1,
@@ -516,12 +530,12 @@ func testHandlerConversion(t *testing.T, enableWatchCache bool) {
 		u := &unstructured.Unstructured{Object: map[string]interface{}{}}
 		u.SetGroupVersionKind(schema.GroupVersionKind{Group: "stable.example.com", Version: "v1beta1", Kind: "MultiVersion"})
 		u.SetName("marker")
-		if item, err := crdInfo.storages["v1beta1"].CustomResource.Create(context.TODO(), u, validateFunc, &metav1.CreateOptions{}); err != nil {
+		if item, err := crdInfo.storages["v1beta1"].CustomResource.Create(ctx, u, validateFunc, &metav1.CreateOptions{}); err != nil {
 			t.Fatal(err)
 		} else {
 			startResourceVersion = item.(*unstructured.Unstructured).GetResourceVersion()
 		}
-		if _, _, err := crdInfo.storages["v1beta1"].CustomResource.Delete(context.TODO(), u.GetName(), validateFunc, &metav1.DeleteOptions{}); err != nil {
+		if _, _, err := crdInfo.storages["v1beta1"].CustomResource.Delete(ctx, u.GetName(), validateFunc, &metav1.DeleteOptions{}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -535,7 +549,7 @@ func testHandlerConversion(t *testing.T, enableWatchCache bool) {
 		unstructured.SetNestedField(u.Object, int64(1), "spec", "num")
 
 		// Create
-		if item, err := crdInfo.storages[version.Name].CustomResource.Create(context.TODO(), u, validateFunc, &metav1.CreateOptions{}); err != nil {
+		if item, err := crdInfo.storages[version.Name].CustomResource.Create(ctx, u, validateFunc, &metav1.CreateOptions{}); err != nil {
 			t.Fatal(err)
 		} else if item.GetObjectKind().GroupVersionKind() != expectGVK {
 			t.Errorf("expected create result to be %#v, got %#v", expectGVK, item.GetObjectKind().GroupVersionKind())
@@ -545,14 +559,14 @@ func testHandlerConversion(t *testing.T, enableWatchCache bool) {
 
 		// Update
 		u.SetAnnotations(map[string]string{"updated": "true"})
-		if item, _, err := crdInfo.storages[version.Name].CustomResource.Update(context.TODO(), u.GetName(), rest.DefaultUpdatedObjectInfo(u), validateFunc, updateValidateFunc, false, &metav1.UpdateOptions{}); err != nil {
+		if item, _, err := crdInfo.storages[version.Name].CustomResource.Update(ctx, u.GetName(), rest.DefaultUpdatedObjectInfo(u), validateFunc, updateValidateFunc, false, &metav1.UpdateOptions{}); err != nil {
 			t.Fatal(err)
 		} else if item.GetObjectKind().GroupVersionKind() != expectGVK {
 			t.Errorf("expected update result to be %#v, got %#v", expectGVK, item.GetObjectKind().GroupVersionKind())
 		}
 
 		// Get
-		if item, err := crdInfo.storages[version.Name].CustomResource.Get(context.TODO(), u.GetName(), &metav1.GetOptions{}); err != nil {
+		if item, err := crdInfo.storages[version.Name].CustomResource.Get(ctx, u.GetName(), &metav1.GetOptions{}); err != nil {
 			t.Fatal(err)
 		} else if item.GetObjectKind().GroupVersionKind() != expectGVK {
 			t.Errorf("expected get result to be %#v, got %#v", expectGVK, item.GetObjectKind().GroupVersionKind())
@@ -562,7 +576,7 @@ func testHandlerConversion(t *testing.T, enableWatchCache bool) {
 			// Allow time to propagate the create into the cache
 			time.Sleep(time.Second)
 			// Get cached
-			if item, err := crdInfo.storages[version.Name].CustomResource.Get(context.TODO(), u.GetName(), &metav1.GetOptions{ResourceVersion: "0"}); err != nil {
+			if item, err := crdInfo.storages[version.Name].CustomResource.Get(ctx, u.GetName(), &metav1.GetOptions{ResourceVersion: "0"}); err != nil {
 				t.Fatal(err)
 			} else if item.GetObjectKind().GroupVersionKind() != expectGVK {
 				t.Errorf("expected cached get result to be %#v, got %#v", expectGVK, item.GetObjectKind().GroupVersionKind())
@@ -574,7 +588,7 @@ func testHandlerConversion(t *testing.T, enableWatchCache bool) {
 	for _, version := range crd.Spec.Versions {
 		expectGVK := schema.GroupVersionKind{Group: "stable.example.com", Version: version.Name, Kind: "MultiVersion"}
 
-		if list, err := crdInfo.storages[version.Name].CustomResource.List(context.TODO(), &metainternalversion.ListOptions{}); err != nil {
+		if list, err := crdInfo.storages[version.Name].CustomResource.List(ctx, &metainternalversion.ListOptions{}); err != nil {
 			t.Fatal(err)
 		} else {
 			for _, item := range list.(*unstructured.UnstructuredList).Items {
@@ -586,7 +600,7 @@ func testHandlerConversion(t *testing.T, enableWatchCache bool) {
 
 		if enableWatchCache {
 			// List from watch cache
-			if list, err := crdInfo.storages[version.Name].CustomResource.List(context.TODO(), &metainternalversion.ListOptions{ResourceVersion: "0"}); err != nil {
+			if list, err := crdInfo.storages[version.Name].CustomResource.List(ctx, &metainternalversion.ListOptions{ResourceVersion: "0"}); err != nil {
 				t.Fatal(err)
 			} else {
 				for _, item := range list.(*unstructured.UnstructuredList).Items {
@@ -597,7 +611,7 @@ func testHandlerConversion(t *testing.T, enableWatchCache bool) {
 			}
 		}
 
-		watch, err := crdInfo.storages[version.Name].CustomResource.Watch(context.TODO(), &metainternalversion.ListOptions{ResourceVersion: startResourceVersion})
+		watch, err := crdInfo.storages[version.Name].CustomResource.Watch(ctx, &metainternalversion.ListOptions{ResourceVersion: startResourceVersion})
 		if err != nil {
 			t.Fatal(err)
 		}

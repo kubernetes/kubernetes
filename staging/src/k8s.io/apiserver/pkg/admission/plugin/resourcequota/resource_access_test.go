@@ -24,10 +24,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	lru "github.com/hashicorp/golang-lru"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/utils/lru"
 )
 
 func TestLRUCacheLookup(t *testing.T) {
@@ -86,10 +86,7 @@ func TestLRUCacheLookup(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.description, func(t *testing.T) {
-			liveLookupCache, err := lru.New(1)
-			if err != nil {
-				t.Fatal(err)
-			}
+			liveLookupCache := lru.New(1)
 			kubeClient := fake.NewSimpleClientset(tc.clientInput...)
 			informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
 

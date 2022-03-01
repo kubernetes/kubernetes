@@ -1,0 +1,3183 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: \n"
+"Report-Msgid-Bugs-To: EMAIL\n"
+"POT-Creation-Date: 2021-07-07 20:15+0200\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/certificates/certificates.go:138
+msgid ""
+"\n"
+"\t\t\t# Approve CSR 'csr-sqgzp'\n"
+"\t\t\tkubectl certificate approve csr-sqgzp\n"
+"\t\t"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/certificates/certificates.go:182
+msgid ""
+"\n"
+"\t\t\t# Deny CSR 'csr-sqgzp'\n"
+"\t\t\tkubectl certificate deny csr-sqgzp\n"
+"\t\t"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/config/config.go:43
+msgid ""
+"\n"
+"\t\t\tModify kubeconfig files using subcommands like \"kubectl config set "
+"current-context my-context\"\n"
+"\n"
+"\t\t\tThe loading order follows these rules:\n"
+"\n"
+"\t\t\t1. If the --"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_clusterrolebinding.go:44
+msgid ""
+"\n"
+"\t\t  # Create a cluster role binding for user1, user2, and group1 using the "
+"cluster-admin cluster role\n"
+"\t\t  kubectl create clusterrolebinding cluster-admin --clusterrole=cluster-"
+"admin --user=user1 --user=user2 --group=group1"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_configmap.go:58
+msgid ""
+"\n"
+"\t\t  # Create a new config map named my-config based on folder bar\n"
+"\t\t  kubectl create configmap my-config --from-file=path/to/bar\n"
+"\n"
+"\t\t  # Create a new config map named my-config with specified keys instead "
+"of file basenames on disk\n"
+"\t\t  kubectl create configmap my-config --from-file=key1=/path/to/bar/file1."
+"txt --from-file=key2=/path/to/bar/file2.txt\n"
+"\n"
+"\t\t  # Create a new config map named my-config with key1=config1 and "
+"key2=config2\n"
+"\t\t  kubectl create configmap my-config --from-literal=key1=config1 --from-"
+"literal=key2=config2\n"
+"\n"
+"\t\t  # Create a new config map named my-config from the key=value pairs in "
+"the file\n"
+"\t\t  kubectl create configmap my-config --from-file=path/to/bar\n"
+"\n"
+"\t\t  # Create a new config map named my-config from an env file\n"
+"\t\t  kubectl create configmap my-config --from-env-file=path/to/bar.env"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_rolebinding.go:43
+msgid ""
+"\n"
+"\t\t  # Create a role binding for user1, user2, and group1 using the admin "
+"cluster role\n"
+"\t\t  kubectl create rolebinding admin --clusterrole=admin --user=user1 --"
+"user=user2 --group=group1"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_secret_docker.go:56
+msgid ""
+"\n"
+"\t\t  # If you don't already have a .dockercfg file, you can create a "
+"dockercfg secret directly by using:\n"
+"\t\t  kubectl create secret docker-registry my-secret --docker-"
+"server=DOCKER_REGISTRY_SERVER --docker-username=DOCKER_USER --docker-"
+"password=DOCKER_PASSWORD --docker-email=DOCKER_EMAIL\n"
+"\n"
+"\t\t  # Create a new secret named my-secret from ~/.docker/config.json\n"
+"\t\t  kubectl create secret docker-registry my-secret --from-file=."
+"dockerconfigjson=path/to/.docker/config.json"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/top/top_node.go:62
+msgid ""
+"\n"
+"\t\t  # Show metrics for all nodes\n"
+"\t\t  kubectl top node\n"
+"\n"
+"\t\t  # Show metrics for a given node\n"
+"\t\t  kubectl top node NODE_NAME"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/cp/cp.go:45
+msgid ""
+"\n"
+"\t\t# !!!Important Note!!!\n"
+"\t\t# Requires that the 'tar' binary is present in your container\n"
+"\t\t# image.  If 'tar' is not present, 'kubectl cp' will fail.\n"
+"\t\t#\n"
+"\t\t# For advanced use cases, such as symlinks, wildcard expansion or\n"
+"\t\t# file mode preservation, consider using 'kubectl exec'.\n"
+"\n"
+"\t\t# Copy /tmp/foo local file to /tmp/bar in a remote pod in namespace "
+"<some-namespace>\n"
+"\t\ttar cf - /tmp/foo | kubectl exec -i -n <some-namespace> <some-pod> -- "
+"tar xf - -C /tmp/bar\n"
+"\n"
+"\t\t# Copy /tmp/foo from a remote pod to /tmp/bar locally\n"
+"\t\tkubectl exec -n <some-namespace> <some-pod> -- tar cf - /tmp/foo | tar "
+"xf - -C /tmp/bar\n"
+"\n"
+"\t\t# Copy /tmp/foo_dir local directory to /tmp/bar_dir in a remote pod in "
+"the default namespace\n"
+"\t\tkubectl cp /tmp/foo_dir <some-pod>:/tmp/bar_dir\n"
+"\n"
+"\t\t# Copy /tmp/foo local file to /tmp/bar in a remote pod in a specific "
+"container\n"
+"\t\tkubectl cp /tmp/foo <some-pod>:/tmp/bar -c <specific-container>\n"
+"\n"
+"\t\t# Copy /tmp/foo local file to /tmp/bar in a remote pod in namespace "
+"<some-namespace>\n"
+"\t\tkubectl cp /tmp/foo <some-namespace>/<some-pod>:/tmp/bar\n"
+"\n"
+"\t\t# Copy /tmp/foo from a remote pod to /tmp/bar locally\n"
+"\t\tkubectl cp <some-namespace>/<some-pod>:/tmp/foo /tmp/bar"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/apply/apply.go:119
+msgid ""
+"\n"
+"\t\t# Apply the configuration in pod.json to a pod\n"
+"\t\tkubectl apply -f ./pod.json\n"
+"\n"
+"\t\t# Apply resources from a directory containing kustomization.yaml - e.g. "
+"dir/kustomization.yaml\n"
+"\t\tkubectl apply -k dir/\n"
+"\n"
+"\t\t# Apply the JSON passed into stdin to a pod\n"
+"\t\tcat pod.json | kubectl apply -f -\n"
+"\n"
+"\t\t# Note: --prune is still in Alpha\n"
+"\t\t# Apply the configuration in manifest.yaml that matches label app=nginx "
+"and delete all other resources that are not in the file and match label "
+"app=nginx\n"
+"\t\tkubectl apply --prune -f manifest.yaml -l app=nginx\n"
+"\n"
+"\t\t# Apply the configuration in manifest.yaml and delete all the other "
+"config maps that are not in the file\n"
+"\t\tkubectl apply --prune -f manifest.yaml --all --prune-whitelist=core/v1/"
+"ConfigMap"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/autoscale/autoscale.go:48
+#, c-format
+msgid ""
+"\n"
+"\t\t# Auto scale a deployment \"foo\", with the number of pods between 2 and "
+"10, no target CPU utilization specified so a default autoscaling policy will "
+"be used\n"
+"\t\tkubectl autoscale deployment foo --min=2 --max=10\n"
+"\n"
+"\t\t# Auto scale a replication controller \"foo\", with the number of pods "
+"between 1 and 5, target CPU utilization at 80%\n"
+"\t\tkubectl autoscale rc foo --max=5 --cpu-percent=80"
+msgstr ""
+
+#: pkg/kubectl/cmd/convert/convert.go:51
+msgid ""
+"\n"
+"\t\t# Convert 'pod.yaml' to latest version and print to stdout.\n"
+"\t\tkubectl convert -f pod.yaml\n"
+"\n"
+"\t\t# Convert the live state of the resource specified by 'pod.yaml' to the "
+"latest version\n"
+"\t\t# and print to stdout in JSON format.\n"
+"\t\tkubectl convert -f pod.yaml --local -o json\n"
+"\n"
+"\t\t# Convert all files under current directory to latest version and create "
+"them all.\n"
+"\t\tkubectl convert -f . | kubectl create -f -"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_clusterrole.go:41
+msgid ""
+"\n"
+"\t\t# Create a cluster role named \"pod-reader\" that allows user to perform "
+"\"get\", \"watch\" and \"list\" on pods\n"
+"\t\tkubectl create clusterrole pod-reader --verb=get,list,watch --"
+"resource=pods\n"
+"\n"
+"\t\t# Create a cluster role named \"pod-reader\" with ResourceName "
+"specified\n"
+"\t\tkubectl create clusterrole pod-reader --verb=get --resource=pods --"
+"resource-name=readablepod --resource-name=anotherpod\n"
+"\n"
+"\t\t# Create a cluster role named \"foo\" with API Group specified\n"
+"\t\tkubectl create clusterrole foo --verb=get,list,watch --resource=rs."
+"extensions\n"
+"\n"
+"\t\t# Create a cluster role named \"foo\" with SubResource specified\n"
+"\t\tkubectl create clusterrole foo --verb=get,list,watch --resource=pods,"
+"pods/status\n"
+"\n"
+"\t\t# Create a cluster role name \"foo\" with NonResourceURL specified\n"
+"\t\tkubectl create clusterrole \"foo\" --verb=get --non-resource-url=/logs/"
+"*\n"
+"\n"
+"\t\t# Create a cluster role name \"monitoring\" with AggregationRule "
+"specified\n"
+"\t\tkubectl create clusterrole monitoring --aggregation-rule=\"rbac.example."
+"com/aggregate-to-monitoring=true\""
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_job.go:43
+msgid ""
+"\n"
+"\t\t# Create a job\n"
+"\t\tkubectl create job my-job --image=busybox\n"
+"\n"
+"\t\t# Create a job with a command\n"
+"\t\tkubectl create job my-job --image=busybox -- date\n"
+"\n"
+"\t\t# Create a job from a cron job named \"a-cronjob\"\n"
+"\t\tkubectl create job test-job --from=cronjob/a-cronjob"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_quota.go:44
+msgid ""
+"\n"
+"\t\t# Create a new resource quota named my-quota\n"
+"\t\tkubectl create quota my-quota --hard=cpu=1,memory=1G,pods=2,services=3,"
+"replicationcontrollers=2,resourcequotas=1,secrets=5,"
+"persistentvolumeclaims=10\n"
+"\n"
+"\t\t# Create a new resource quota named best-effort\n"
+"\t\tkubectl create quota best-effort --hard=pods=100 --scopes=BestEffort"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_pdb.go:44
+#, c-format
+msgid ""
+"\n"
+"\t\t# Create a pod disruption budget named my-pdb that will select all pods "
+"with the app=rails label\n"
+"\t\t# and require at least one of them being available at any point in time\n"
+"\t\tkubectl create poddisruptionbudget my-pdb --selector=app=rails --min-"
+"available=1\n"
+"\n"
+"\t\t# Create a pod disruption budget named my-pdb that will select all pods "
+"with the app=nginx label\n"
+"\t\t# and require at least half of the pods selected to be available at any "
+"point in time\n"
+"\t\tkubectl create pdb my-pdb --selector=app=nginx --min-available=50%"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create.go:76
+msgid ""
+"\n"
+"\t\t# Create a pod using the data in pod.json\n"
+"\t\tkubectl create -f ./pod.json\n"
+"\n"
+"\t\t# Create a pod based on the JSON passed into stdin\n"
+"\t\tcat pod.json | kubectl create -f -\n"
+"\n"
+"\t\t# Edit the data in docker-registry.yaml in JSON then create the resource "
+"using the edited data\n"
+"\t\tkubectl create -f docker-registry.yaml --edit -o json"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_priorityclass.go:43
+msgid ""
+"\n"
+"\t\t# Create a priority class named high-priority\n"
+"\t\tkubectl create priorityclass high-priority --value=1000 --description="
+"\"high priority\"\n"
+"\n"
+"\t\t# Create a priority class named default-priority that is considered as "
+"the global default priority\n"
+"\t\tkubectl create priorityclass default-priority --value=1000 --global-"
+"default=true --description=\"default priority\"\n"
+"\n"
+"\t\t# Create a priority class named high-priority that cannot preempt pods "
+"with lower priority\n"
+"\t\tkubectl create priorityclass high-priority --value=1000 --description="
+"\"high priority\" --preemption-policy=\"Never\""
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_role.go:46
+msgid ""
+"\n"
+"\t\t# Create a role named \"pod-reader\" that allows user to perform \"get"
+"\", \"watch\" and \"list\" on pods\n"
+"\t\tkubectl create role pod-reader --verb=get --verb=list --verb=watch --"
+"resource=pods\n"
+"\n"
+"\t\t# Create a role named \"pod-reader\" with ResourceName specified\n"
+"\t\tkubectl create role pod-reader --verb=get --resource=pods --resource-"
+"name=readablepod --resource-name=anotherpod\n"
+"\n"
+"\t\t# Create a role named \"foo\" with API Group specified\n"
+"\t\tkubectl create role foo --verb=get,list,watch --resource=rs.extensions\n"
+"\n"
+"\t\t# Create a role named \"foo\" with SubResource specified\n"
+"\t\tkubectl create role foo --verb=get,list,watch --resource=pods,pods/status"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:61
+msgid ""
+"\n"
+"\t\t# Create a service for a replicated nginx, which serves on port 80 and "
+"connects to the containers on port 8000\n"
+"\t\tkubectl expose rc nginx --port=80 --target-port=8000\n"
+"\n"
+"\t\t# Create a service for a replication controller identified by type and "
+"name specified in \"nginx-controller.yaml\", which serves on port 80 and "
+"connects to the containers on port 8000\n"
+"\t\tkubectl expose -f nginx-controller.yaml --port=80 --target-port=8000\n"
+"\n"
+"\t\t# Create a service for a pod valid-pod, which serves on port 444 with "
+"the name \"frontend\"\n"
+"\t\tkubectl expose pod valid-pod --port=444 --name=frontend\n"
+"\n"
+"\t\t# Create a second service based on the above service, exposing the "
+"container port 8443 as port 443 with the name \"nginx-https\"\n"
+"\t\tkubectl expose service nginx --port=443 --target-port=8443 --name=nginx-"
+"https\n"
+"\n"
+"\t\t# Create a service for a replicated streaming application on port 4100 "
+"balancing UDP traffic and named 'video-stream'.\n"
+"\t\tkubectl expose rc streamer --port=4100 --protocol=UDP --name=video-"
+"stream\n"
+"\n"
+"\t\t# Create a service for a replicated nginx using replica set, which "
+"serves on port 80 and connects to the containers on port 8000\n"
+"\t\tkubectl expose rs nginx --port=80 --target-port=8000\n"
+"\n"
+"\t\t# Create a service for an nginx deployment, which serves on port 80 and "
+"connects to the containers on port 8000\n"
+"\t\tkubectl expose deployment nginx --port=80 --target-port=8000"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_ingress.go:64
+msgid ""
+"\n"
+"\t\t# Create a single ingress called 'simple' that directs requests to foo."
+"com/bar to svc\n"
+"\t\t# svc1:8080 with a tls secret \"my-cert\"\n"
+"\t\tkubectl create ingress simple --rule=\"foo.com/bar=svc1:8080,tls=my-cert"
+"\"\n"
+"\n"
+"\t\t# Create a catch all ingress of \"/path\" pointing to service svc:port "
+"and Ingress Class as \"otheringress\"\n"
+"\t\tkubectl create ingress catch-all --class=otheringress --rule=\"/path=svc:"
+"port\"\n"
+"\n"
+"\t\t# Create an ingress with two annotations: ingress.annotation1 and "
+"ingress.annotations2\n"
+"\t\tkubectl create ingress annotated --class=default --rule=\"foo.com/"
+"bar=svc:port\" \\n\t\t\t--annotation ingress.annotation1=foo \\n\t\t\t--"
+"annotation ingress.annotation2=bla\n"
+"\n"
+"\t\t# Create an ingress with the same host and multiple paths\n"
+"\t\tkubectl create ingress multipath --class=default \\n\t\t\t--rule=\"foo."
+"com/=svc:port\" \\n\t\t\t--rule=\"foo.com/admin/=svcadmin:portadmin\"\n"
+"\n"
+"\t\t# Create an ingress with multiple hosts and the pathType as Prefix\n"
+"\t\tkubectl create ingress ingress1 --class=default \\n\t\t\t--rule=\"foo."
+"com/path*=svc:8080\" \\n\t\t\t--rule=\"bar.com/admin*=svc2:http\"\n"
+"\n"
+"\t\t# Create an ingress with TLS enabled using the default ingress "
+"certificate and different path types\n"
+"\t\tkubectl create ingress ingtls --class=default \\n\t\t   --rule=\"foo.com/"
+"=svc:https,tls\" \\n\t\t   --rule=\"foo.com/path/subpath*=othersvc:8080\"\n"
+"\n"
+"\t\t# Create an ingress with TLS enabled using a specific secret and "
+"pathType as Prefix\n"
+"\t\tkubectl create ingress ingsecret --class=default \\n\t\t   --rule=\"foo."
+"com/*=svc:8080,tls=secret1\"\n"
+"\n"
+"\t\t# Create an ingress with a default backend\n"
+"\t\tkubectl create ingress ingdefault --class=default \\n\t\t   --default-"
+"backend=defaultsvc:http \\n\t\t   --rule=\"foo.com/*=svc:8080,tls=secret1\"\n"
+"\n"
+"\t\t"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/debug/debug.go:74
+msgid ""
+"\n"
+"\t\t# Create an interactive debugging session in pod mypod and immediately "
+"attach to it.\n"
+"\t\t# (requires the EphemeralContainers feature to be enabled in the "
+"cluster)\n"
+"\t\tkubectl debug mypod -it --image=busybox\n"
+"\n"
+"\t\t# Create a debug container named debugger using a custom automated "
+"debugging image.\n"
+"\t\t# (requires the EphemeralContainers feature to be enabled in the "
+"cluster)\n"
+"\t\tkubectl debug --image=myproj/debug-tools -c debugger mypod\n"
+"\n"
+"\t\t# Create a copy of mypod adding a debug container and attach to it\n"
+"\t\tkubectl debug mypod -it --image=busybox --copy-to=my-debugger\n"
+"\n"
+"\t\t# Create a copy of mypod changing the command of mycontainer\n"
+"\t\tkubectl debug mypod -it --copy-to=my-debugger --container=mycontainer -- "
+"sh\n"
+"\n"
+"\t\t# Create a copy of mypod changing all container images to busybox\n"
+"\t\tkubectl debug mypod --copy-to=my-debugger --set-image=*=busybox\n"
+"\n"
+"\t\t# Create a copy of mypod adding a debug container and changing container "
+"images\n"
+"\t\tkubectl debug mypod -it --copy-to=my-debugger --image=debian --set-"
+"image=app=app:debug,sidecar=sidecar:debug\n"
+"\n"
+"\t\t# Create an interactive debugging session on a node and immediately "
+"attach to it.\n"
+"\t\t# The container will run in the host namespaces and the host's "
+"filesystem will be mounted at /host\n"
+"\t\tkubectl debug node/mynode -it --image=busybox\n"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/delete/delete.go:74
+msgid ""
+"\n"
+"\t\t# Delete a pod using the type and name specified in pod.json\n"
+"\t\tkubectl delete -f ./pod.json\n"
+"\n"
+"\t\t# Delete resources from a directory containing kustomization.yaml - e.g. "
+"dir/kustomization.yaml\n"
+"\t\tkubectl delete -k dir\n"
+"\n"
+"\t\t# Delete a pod based on the type and name in the JSON passed into stdin\n"
+"\t\tcat pod.json | kubectl delete -f -\n"
+"\n"
+"\t\t# Delete pods and services with same names \"baz\" and \"foo\"\n"
+"\t\tkubectl delete pod,service baz foo\n"
+"\n"
+"\t\t# Delete pods and services with label name=myLabel\n"
+"\t\tkubectl delete pods,services -l name=myLabel\n"
+"\n"
+"\t\t# Delete a pod with minimal delay\n"
+"\t\tkubectl delete pod foo --now\n"
+"\n"
+"\t\t# Force delete a pod on a dead node\n"
+"\t\tkubectl delete pod foo --force\n"
+"\n"
+"\t\t# Delete all pods\n"
+"\t\tkubectl delete pods --all"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/describe/describe.go:51
+msgid ""
+"\n"
+"\t\t# Describe a node\n"
+"\t\tkubectl describe nodes kubernetes-node-emt8.c.myproject.internal\n"
+"\n"
+"\t\t# Describe a pod\n"
+"\t\tkubectl describe pods/nginx\n"
+"\n"
+"\t\t# Describe a pod identified by type and name in \"pod.json\"\n"
+"\t\tkubectl describe -f pod.json\n"
+"\n"
+"\t\t# Describe all pods\n"
+"\t\tkubectl describe pods\n"
+"\n"
+"\t\t# Describe pods by label name=myLabel\n"
+"\t\tkubectl describe po -l name=myLabel\n"
+"\n"
+"\t\t# Describe all pods managed by the 'frontend' replication controller (rc-"
+"created pods\n"
+"\t\t# get the name of the rc as a prefix in the pod the name)\n"
+"\t\tkubectl describe pods frontend"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/diff/diff.go:76
+msgid ""
+"\n"
+"\t\t# Diff resources included in pod.json\n"
+"\t\tkubectl diff -f pod.json\n"
+"\n"
+"\t\t# Diff file read from stdin\n"
+"\t\tcat service.yaml | kubectl diff -f -"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/drain/drain.go:138
+msgid ""
+"\n"
+"\t\t# Drain node \"foo\", even if there are pods not managed by a "
+"replication controller, replica set, job, daemon set or stateful set on it\n"
+"\t\tkubectl drain foo --force\n"
+"\n"
+"\t\t# As above, but abort if there are pods not managed by a replication "
+"controller, replica set, job, daemon set or stateful set, and use a grace "
+"period of 15 minutes\n"
+"\t\tkubectl drain foo --grace-period=900"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/edit/edit.go:55
+msgid ""
+"\n"
+"\t\t# Edit the service named 'docker-registry'\n"
+"\t\tkubectl edit svc/docker-registry\n"
+"\n"
+"\t\t# Use an alternative editor\n"
+"\t\tKUBE_EDITOR=\"nano\" kubectl edit svc/docker-registry\n"
+"\n"
+"\t\t# Edit the job 'myjob' in JSON using the v1 API format\n"
+"\t\tkubectl edit job.v1.batch/myjob -o json\n"
+"\n"
+"\t\t# Edit the deployment 'mydeployment' in YAML and save the modified "
+"config in its annotation\n"
+"\t\tkubectl edit deployment/mydeployment -o yaml --save-config"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/attach/attach.go:44
+msgid ""
+"\n"
+"\t\t# Get output from running pod mypod; use the 'kubectl.kubernetes.io/"
+"default-container' annotation\n"
+"\t\t# for selecting the container to be attached or the first container in "
+"the pod will be chosen\n"
+"\t\tkubectl attach mypod\n"
+"\n"
+"\t\t# Get output from ruby-container from pod mypod\n"
+"\t\tkubectl attach mypod -c ruby-container\n"
+"\n"
+"\t\t# Switch to raw terminal mode; sends stdin to 'bash' in ruby-container "
+"from pod mypod\n"
+"\t\t# and sends stdout/stderr from 'bash' back to the client\n"
+"\t\tkubectl attach mypod -c ruby-container -i -t\n"
+"\n"
+"\t\t# Get output from the first pod of a replica set named nginx\n"
+"\t\tkubectl attach rs/nginx\n"
+"\t\t"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/exec/exec.go:48
+msgid ""
+"\n"
+"\t\t# Get output from running the 'date' command from pod mypod, using the "
+"first container by default\n"
+"\t\tkubectl exec mypod -- date\n"
+"\n"
+"\t\t# Get output from running the 'date' command in ruby-container from pod "
+"mypod\n"
+"\t\tkubectl exec mypod -c ruby-container -- date\n"
+"\n"
+"\t\t# Switch to raw terminal mode; sends stdin to 'bash' in ruby-container "
+"from pod mypod\n"
+"\t\t# and sends stdout/stderr from 'bash' back to the client\n"
+"\t\tkubectl exec mypod -c ruby-container -i -t -- bash -il\n"
+"\n"
+"\t\t# List contents of /usr from the first container of pod mypod and sort "
+"by modification time\n"
+"\t\t# If the command you want to execute in the pod has any flags in common "
+"(e.g. -i),\n"
+"\t\t# you must use two dashes (--) to separate your command's flags/"
+"arguments\n"
+"\t\t# Also note, do not surround your command and its flags/arguments with "
+"quotes\n"
+"\t\t# unless that is how you would execute it normally (i.e., do ls -t /usr, "
+"not \"ls -t /usr\")\n"
+"\t\tkubectl exec mypod -i -t -- ls -t /usr\n"
+"\n"
+"\t\t# Get output from running 'date' command from the first pod of the "
+"deployment mydeployment, using the first container by default\n"
+"\t\tkubectl exec deploy/mydeployment -- date\n"
+"\n"
+"\t\t# Get output from running 'date' command from the first pod of the "
+"service myservice, using the first container by default\n"
+"\t\tkubectl exec svc/myservice -- date\n"
+"\t\t"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/explain/explain.go:46
+msgid ""
+"\n"
+"\t\t# Get the documentation of the resource and its fields\n"
+"\t\tkubectl explain pods\n"
+"\n"
+"\t\t# Get the documentation of a specific field of a resource\n"
+"\t\tkubectl explain pods.spec.containers"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/completion/completion.go:65
+msgid ""
+"\n"
+"\t\t# Installing bash completion on macOS using homebrew\n"
+"\t\t## If running Bash 3.2 included with macOS\n"
+"\t\t    brew install bash-completion\n"
+"\t\t## or, if running Bash 4.1+\n"
+"\t\t    brew install bash-completion@2\n"
+"\t\t## If kubectl is installed via homebrew, this should start working "
+"immediately\n"
+"\t\t## If you've installed via other means, you may need add the completion "
+"to your completion directory\n"
+"\t\t    kubectl completion bash > $(brew --prefix)/etc/bash_completion.d/"
+"kubectl\n"
+"\n"
+"\n"
+"\t\t# Installing bash completion on Linux\n"
+"\t\t## If bash-completion is not installed on Linux, install the 'bash-"
+"completion' package\n"
+"\t\t## via your distribution's package manager.\n"
+"\t\t## Load the kubectl completion code for bash into the current shell\n"
+"\t\t    source <(kubectl completion bash)\n"
+"\t\t## Write bash completion code to a file and source it from ."
+"bash_profile\n"
+"\t\t    kubectl completion bash > ~/.kube/completion.bash.inc\n"
+"\t\t    printf \"\n"
+"\t\t      # Kubectl shell completion\n"
+"\t\t      source '$HOME/.kube/completion.bash.inc'\n"
+"\t\t      \" >> $HOME/.bash_profile\n"
+"\t\t    source $HOME/.bash_profile\n"
+"\n"
+"\t\t# Load the kubectl completion code for zsh[1] into the current shell\n"
+"\t\t    source <(kubectl completion zsh)\n"
+"\t\t# Set the kubectl completion code for zsh[1] to autoload on startup\n"
+"\t\t    kubectl completion zsh > \"${fpath[1]}/_kubectl\""
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/get/get.go:105
+msgid ""
+"\n"
+"\t\t# List all pods in ps output format\n"
+"\t\tkubectl get pods\n"
+"\n"
+"\t\t# List all pods in ps output format with more information (such as node "
+"name)\n"
+"\t\tkubectl get pods -o wide\n"
+"\n"
+"\t\t# List a single replication controller with specified NAME in ps output "
+"format\n"
+"\t\tkubectl get replicationcontroller web\n"
+"\n"
+"\t\t# List deployments in JSON output format, in the \"v1\" version of the "
+"\"apps\" API group\n"
+"\t\tkubectl get deployments.v1.apps -o json\n"
+"\n"
+"\t\t# List a single pod in JSON output format\n"
+"\t\tkubectl get -o json pod web-pod-13je7\n"
+"\n"
+"\t\t# List a pod identified by type and name specified in \"pod.yaml\" in "
+"JSON output format\n"
+"\t\tkubectl get -f pod.yaml -o json\n"
+"\n"
+"\t\t# List resources from a directory with kustomization.yaml - e.g. dir/"
+"kustomization.yaml\n"
+"\t\tkubectl get -k dir/\n"
+"\n"
+"\t\t# Return only the phase value of the specified pod\n"
+"\t\tkubectl get -o template pod/web-pod-13je7 --template={{.status.phase}}\n"
+"\n"
+"\t\t# List resource information in custom columns\n"
+"\t\tkubectl get pod test-pod -o custom-columns=CONTAINER:.spec.containers[0]."
+"name,IMAGE:.spec.containers[0].image\n"
+"\n"
+"\t\t# List all replication controllers and services together in ps output "
+"format\n"
+"\t\tkubectl get rc,services\n"
+"\n"
+"\t\t# List one or more resources by their type and names\n"
+"\t\tkubectl get rc/web service/frontend pods/web-pod-13je7"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/portforward/portforward.go:72
+msgid ""
+"\n"
+"\t\t# Listen on ports 5000 and 6000 locally, forwarding data to/from ports "
+"5000 and 6000 in the pod\n"
+"\t\tkubectl port-forward pod/mypod 5000 6000\n"
+"\n"
+"\t\t# Listen on ports 5000 and 6000 locally, forwarding data to/from ports "
+"5000 and 6000 in a pod selected by the deployment\n"
+"\t\tkubectl port-forward deployment/mydeployment 5000 6000\n"
+"\n"
+"\t\t# Listen on port 8443 locally, forwarding to the targetPort of the "
+"service's port named \"https\" in a pod selected by the service\n"
+"\t\tkubectl port-forward service/myservice 8443:https\n"
+"\n"
+"\t\t# Listen on port 8888 locally, forwarding to 5000 in the pod\n"
+"\t\tkubectl port-forward pod/mypod 8888:5000\n"
+"\n"
+"\t\t# Listen on port 8888 on all addresses, forwarding to 5000 in the pod\n"
+"\t\tkubectl port-forward --address 0.0.0.0 pod/mypod 8888:5000\n"
+"\n"
+"\t\t# Listen on port 8888 on localhost and selected IP, forwarding to 5000 "
+"in the pod\n"
+"\t\tkubectl port-forward --address localhost,10.19.21.23 pod/mypod "
+"8888:5000\n"
+"\n"
+"\t\t# Listen on a random port locally, forwarding to 5000 in the pod\n"
+"\t\tkubectl port-forward pod/mypod :5000"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/drain/drain.go:87
+msgid ""
+"\n"
+"\t\t# Mark node \"foo\" as schedulable\n"
+"\t\tkubectl uncordon foo"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/drain/drain.go:58
+msgid ""
+"\n"
+"\t\t# Mark node \"foo\" as unschedulable\n"
+"\t\tkubectl cordon foo"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/patch/patch.go:83
+msgid ""
+"\n"
+"\t\t# Partially update a node using a strategic merge patch, specifying the "
+"patch as JSON\n"
+"\t\tkubectl patch node k8s-node-1 -p '{\"spec\":{\"unschedulable\":true}}'\n"
+"\n"
+"\t\t# Partially update a node using a strategic merge patch, specifying the "
+"patch as YAML\n"
+"\t\tkubectl patch node k8s-node-1 -p $'spec:\n"
+" unschedulable: true'\n"
+"\n"
+"\t\t# Partially update a node identified by the type and name specified in "
+"\"node.json\" using strategic merge patch\n"
+"\t\tkubectl patch -f node.json -p '{\"spec\":{\"unschedulable\":true}}'\n"
+"\n"
+"\t\t# Update a container's image; spec.containers[*].name is required "
+"because it's a merge key\n"
+"\t\tkubectl patch pod valid-pod -p '{\"spec\":{\"containers\":[{\"name\":"
+"\"kubernetes-serve-hostname\",\"image\":\"new image\"}]}}'\n"
+"\n"
+"\t\t# Update a container's image using a JSON patch with positional arrays\n"
+"\t\tkubectl patch pod valid-pod --type='json' -p='[{\"op\": \"replace\", "
+"\"path\": \"/spec/containers/0/image\", \"value\":\"new image\"}]'"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/options/options.go:29
+msgid ""
+"\n"
+"\t\t# Print flags inherited by all commands\n"
+"\t\tkubectl options"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/clusterinfo/clusterinfo.go:44
+msgid ""
+"\n"
+"\t\t# Print the address of the control plane and cluster services\n"
+"\t\tkubectl cluster-info"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/version/version.go:44
+msgid ""
+"\n"
+"\t\t# Print the client and server versions for the current context\n"
+"\t\tkubectl version"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/apiresources/apiversions.go:34
+msgid ""
+"\n"
+"\t\t# Print the supported API versions\n"
+"\t\tkubectl api-versions"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/replace/replace.go:56
+msgid ""
+"\n"
+"\t\t# Replace a pod using the data in pod.json\n"
+"\t\tkubectl replace -f ./pod.json\n"
+"\n"
+"\t\t# Replace a pod based on the JSON passed into stdin\n"
+"\t\tcat pod.json | kubectl replace -f -\n"
+"\n"
+"\t\t# Update a single-container pod's image version (tag) to v4\n"
+"\t\tkubectl get pod mypod -o yaml | sed 's/\\(image: myimage\\):.*$/:v4/' | "
+"kubectl replace -f -\n"
+"\n"
+"\t\t# Force replace, delete and then re-create the resource\n"
+"\t\tkubectl replace --force -f ./pod.json"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/logs/logs.go:53
+msgid ""
+"\n"
+"\t\t# Return snapshot logs from pod nginx with only one container\n"
+"\t\tkubectl logs nginx\n"
+"\n"
+"\t\t# Return snapshot logs from pod nginx with multi containers\n"
+"\t\tkubectl logs nginx --all-containers=true\n"
+"\n"
+"\t\t# Return snapshot logs from all containers in pods defined by label "
+"app=nginx\n"
+"\t\tkubectl logs -l app=nginx --all-containers=true\n"
+"\n"
+"\t\t# Return snapshot of previous terminated ruby container logs from pod "
+"web-1\n"
+"\t\tkubectl logs -p -c ruby web-1\n"
+"\n"
+"\t\t# Begin streaming the logs of the ruby container in pod web-1\n"
+"\t\tkubectl logs -f -c ruby web-1\n"
+"\n"
+"\t\t# Begin streaming the logs from all containers in pods defined by label "
+"app=nginx\n"
+"\t\tkubectl logs -f -l app=nginx --all-containers=true\n"
+"\n"
+"\t\t# Display only the most recent 20 lines of output in pod nginx\n"
+"\t\tkubectl logs --tail=20 nginx\n"
+"\n"
+"\t\t# Show all logs from pod nginx written in the last hour\n"
+"\t\tkubectl logs --since=1h nginx\n"
+"\n"
+"\t\t# Show logs from a kubelet with an expired serving certificate\n"
+"\t\tkubectl logs --insecure-skip-tls-verify-backend nginx\n"
+"\n"
+"\t\t# Return snapshot logs from first container of a job named hello\n"
+"\t\tkubectl logs job/hello\n"
+"\n"
+"\t\t# Return snapshot logs from container nginx-1 of a deployment named "
+"nginx\n"
+"\t\tkubectl logs deployment/nginx -c nginx-1"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/scale/scale.go:49
+msgid ""
+"\n"
+"\t\t# Scale a replica set named 'foo' to 3\n"
+"\t\tkubectl scale --replicas=3 rs/foo\n"
+"\n"
+"\t\t# Scale a resource identified by type and name specified in \"foo.yaml\" "
+"to 3\n"
+"\t\tkubectl scale --replicas=3 -f foo.yaml\n"
+"\n"
+"\t\t# If the deployment named mysql's current size is 2, scale mysql to 3\n"
+"\t\tkubectl scale --current-replicas=2 --replicas=3 deployment/mysql\n"
+"\n"
+"\t\t# Scale multiple replication controllers\n"
+"\t\tkubectl scale --replicas=5 rc/foo rc/bar rc/baz\n"
+"\n"
+"\t\t# Scale stateful set named 'web' to 3\n"
+"\t\tkubectl scale --replicas=3 statefulset/web"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/apply/apply_set_last_applied.go:75
+msgid ""
+"\n"
+"\t\t# Set the last-applied-configuration of a resource to match the contents "
+"of a file\n"
+"\t\tkubectl apply set-last-applied -f deploy.yaml\n"
+"\n"
+"\t\t# Execute set-last-applied against each configuration file in a "
+"directory\n"
+"\t\tkubectl apply set-last-applied -f path/\n"
+"\n"
+"\t\t# Set the last-applied-configuration of a resource to match the contents "
+"of a file; will create the annotation if it does not already exist\n"
+"\t\tkubectl apply set-last-applied -f deploy.yaml --create-annotation=true\n"
+"\t\t"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/top/top_pod.go:75
+msgid ""
+"\n"
+"\t\t# Show metrics for all pods in the default namespace\n"
+"\t\tkubectl top pod\n"
+"\n"
+"\t\t# Show metrics for all pods in the given namespace\n"
+"\t\tkubectl top pod --namespace=NAMESPACE\n"
+"\n"
+"\t\t# Show metrics for a given pod and its containers\n"
+"\t\tkubectl top pod POD_NAME --containers\n"
+"\n"
+"\t\t# Show metrics for the pods defined by label name=myLabel\n"
+"\t\tkubectl top pod -l name=myLabel"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/run/run.go:62
+msgid ""
+"\n"
+"\t\t# Start a nginx pod\n"
+"\t\tkubectl run nginx --image=nginx\n"
+"\n"
+"\t\t# Start a hazelcast pod and let the container expose port 5701\n"
+"\t\tkubectl run hazelcast --image=hazelcast/hazelcast --port=5701\n"
+"\n"
+"\t\t# Start a hazelcast pod and set environment variables "
+"\"DNS_DOMAIN=cluster\" and \"POD_NAMESPACE=default\" in the container\n"
+"\t\tkubectl run hazelcast --image=hazelcast/hazelcast --env="
+"\"DNS_DOMAIN=cluster\" --env=\"POD_NAMESPACE=default\"\n"
+"\n"
+"\t\t# Start a hazelcast pod and set labels \"app=hazelcast\" and \"env=prod"
+"\" in the container\n"
+"\t\tkubectl run hazelcast --image=hazelcast/hazelcast --labels="
+"\"app=hazelcast,env=prod\"\n"
+"\n"
+"\t\t# Dry run; print the corresponding API objects without creating them\n"
+"\t\tkubectl run nginx --image=nginx --dry-run=client\n"
+"\n"
+"\t\t# Start a nginx pod, but overload the spec with a partial set of values "
+"parsed from JSON\n"
+"\t\tkubectl run nginx --image=nginx --overrides='{ \"apiVersion\": \"v1\", "
+"\"spec\": { ... } }'\n"
+"\n"
+"\t\t# Start a busybox pod and keep it in the foreground, don't restart it if "
+"it exits\n"
+"\t\tkubectl run -i -t busybox --image=busybox --restart=Never\n"
+"\n"
+"\t\t# Start the nginx pod using the default command, but use custom "
+"arguments (arg1 .. argN) for that command\n"
+"\t\tkubectl run nginx --image=nginx -- <arg1> <arg2> ... <argN>\n"
+"\n"
+"\t\t# Start the nginx pod using a different command and custom arguments\n"
+"\t\tkubectl run nginx --image=nginx --command -- <cmd> <arg1> ... <argN>"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/proxy/proxy.go:73
+msgid ""
+"\n"
+"\t\t# To proxy all of the Kubernetes API and nothing else\n"
+"\t\tkubectl proxy --api-prefix=/\n"
+"\n"
+"\t\t# To proxy only part of the Kubernetes API and also some static files\n"
+"\t\t# You can get pods info with 'curl localhost:8001/api/v1/pods'\n"
+"\t\tkubectl proxy --www=/my/files --www-prefix=/static/ --api-prefix=/api/\n"
+"\n"
+"\t\t# To proxy the entire Kubernetes API at a different root\n"
+"\t\t# You can get pods info with 'curl localhost:8001/custom/api/v1/pods'\n"
+"\t\tkubectl proxy --api-prefix=/custom/\n"
+"\n"
+"\t\t# Run a proxy to the Kubernetes API server on port 8011, serving static "
+"content from ./local/www/\n"
+"\t\tkubectl proxy --port=8011 --www=./local/www/\n"
+"\n"
+"\t\t# Run a proxy to the Kubernetes API server on an arbitrary local port\n"
+"\t\t# The chosen port for the server will be output to stdout\n"
+"\t\tkubectl proxy --port=0\n"
+"\n"
+"\t\t# Run a proxy to the Kubernetes API server, changing the API prefix to "
+"k8s-api\n"
+"\t\t# This makes e.g. the pods API available at localhost:8001/k8s-api/v1/"
+"pods/\n"
+"\t\tkubectl proxy --api-prefix=/k8s-api"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/taint/taint.go:80
+msgid ""
+"\n"
+"\t\t# Update node 'foo' with a taint with key 'dedicated' and value 'special-"
+"user' and effect 'NoSchedule'\n"
+"\t\t# If a taint with that key and effect already exists, its value is "
+"replaced as specified\n"
+"\t\tkubectl taint nodes foo dedicated=special-user:NoSchedule\n"
+"\n"
+"\t\t# Remove from node 'foo' the taint with key 'dedicated' and effect "
+"'NoSchedule' if one exists\n"
+"\t\tkubectl taint nodes foo dedicated:NoSchedule-\n"
+"\n"
+"\t\t# Remove from node 'foo' all the taints with key 'dedicated'\n"
+"\t\tkubectl taint nodes foo dedicated-\n"
+"\n"
+"\t\t# Add a taint with key 'dedicated' on nodes having label mylabel=X\n"
+"\t\tkubectl taint node -l myLabel=X  dedicated=foo:PreferNoSchedule\n"
+"\n"
+"\t\t# Add to node 'foo' a taint with key 'bar' and no value\n"
+"\t\tkubectl taint nodes foo bar:NoSchedule"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/label/label.go:95
+msgid ""
+"\n"
+"\t\t# Update pod 'foo' with the label 'unhealthy' and the value 'true'\n"
+"\t\tkubectl label pods foo unhealthy=true\n"
+"\n"
+"\t\t# Update pod 'foo' with the label 'status' and the value 'unhealthy', "
+"overwriting any existing value\n"
+"\t\tkubectl label --overwrite pods foo status=unhealthy\n"
+"\n"
+"\t\t# Update all pods in the namespace\n"
+"\t\tkubectl label pods --all status=unhealthy\n"
+"\n"
+"\t\t# Update a pod identified by the type and name in \"pod.json\"\n"
+"\t\tkubectl label -f pod.json status=unhealthy\n"
+"\n"
+"\t\t# Update pod 'foo' only if the resource is unchanged from version 1\n"
+"\t\tkubectl label pods foo status=unhealthy --resource-version=1\n"
+"\n"
+"\t\t# Update pod 'foo' by removing a label named 'bar' if it exists\n"
+"\t\t# Does not require the --overwrite flag\n"
+"\t\tkubectl label pods foo bar-"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/apply/apply_view_last_applied.go:53
+msgid ""
+"\n"
+"\t\t# View the last-applied-configuration annotations by type/name in YAML\n"
+"\t\tkubectl apply view-last-applied deployment/nginx\n"
+"\n"
+"\t\t# View the last-applied-configuration annotations by file in JSON\n"
+"\t\tkubectl apply view-last-applied -f deploy.yaml -o json"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/wait/wait.go:61
+msgid ""
+"\n"
+"\t\t# Wait for the pod \"busybox1\" to contain the status condition of type "
+"\"Ready\"\n"
+"\t\tkubectl wait --for=condition=Ready pod/busybox1\n"
+"\n"
+"\t\t# The default value of status condition is true; you can set it to "
+"false\n"
+"\t\tkubectl wait --for=condition=Ready=false pod/busybox1\n"
+"\n"
+"\t\t# Wait for the pod \"busybox1\" to be deleted, with a timeout of 60s, "
+"after having issued the \"delete\" command\n"
+"\t\tkubectl delete pod/busybox1\n"
+"\t\tkubectl wait --for=delete pod/busybox1 --timeout=60s"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/apply/apply.go:110
+msgid ""
+"\n"
+"\t\tApply a configuration to a resource by file name or stdin.\n"
+"\t\tThe resource name must be specified. This resource will be created if it "
+"doesn't exist yet.\n"
+"\t\tTo use 'apply', always create the resource initially with either 'apply' "
+"or 'create --save-config'.\n"
+"\n"
+"\t\tJSON and YAML formats are accepted.\n"
+"\n"
+"\t\tAlpha Disclaimer: the --prune functionality is not yet complete. Do not "
+"use unless you are aware of what the current state is. See https://issues."
+"k8s.io/34274."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/certificates/certificates.go:126
+msgid ""
+"\n"
+"\t\tApprove a certificate signing request.\n"
+"\n"
+"\t\tkubectl certificate approve allows a cluster admin to approve a "
+"certificate\n"
+"\t\tsigning request (CSR). This action tells a certificate signing "
+"controller to\n"
+"\t\tissue a certificate to the requestor with the attributes requested in "
+"the CSR.\n"
+"\n"
+"\t\tSECURITY NOTICE: Depending on the requested attributes, the issued "
+"certificate\n"
+"\t\tcan potentially grant a requester access to cluster resources or to "
+"authenticate\n"
+"\t\tas a requested identity. Before approving a CSR, ensure you understand "
+"what the\n"
+"\t\tsigned certificate can do.\n"
+"\t\t"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/set/set.go:28
+msgid ""
+"\n"
+"\t\tConfigure application resources.\n"
+"\n"
+"\t\tThese commands help you make changes to existing application resources."
+msgstr ""
+
+#: pkg/kubectl/cmd/convert/convert.go:40
+msgid ""
+"\n"
+"\t\tConvert config files between different API versions. Both YAML\n"
+"\t\tand JSON formats are accepted.\n"
+"\n"
+"\t\tThe command takes filename, directory, or URL as input, and convert it "
+"into format\n"
+"\t\tof version specified by --output-version flag. If target version is not "
+"specified or\n"
+"\t\tnot supported, convert to latest version.\n"
+"\n"
+"\t\tThe default output will be printed to stdout in YAML format. One can use "
+"-o option\n"
+"\t\tto change to output destination."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_secret_tls.go:41
+msgid ""
+"\n"
+"\t\tCreate a TLS secret from the given public/private key pair.\n"
+"\n"
+"\t\tThe public/private key pair must exist beforehand. The public key "
+"certificate must be .PEM encoded and match\n"
+"\t\tthe given private key."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_clusterrolebinding.go:41
+msgid ""
+"\n"
+"\t\tCreate a cluster role binding for a particular cluster role."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_clusterrole.go:38
+msgid ""
+"\n"
+"\t\tCreate a cluster role."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_configmap.go:46
+msgid ""
+"\n"
+"\t\tCreate a config map based on a file, directory, or specified literal "
+"value.\n"
+"\n"
+"\t\tA single config map may package one or more key/value pairs.\n"
+"\n"
+"\t\tWhen creating a config map based on a file, the key will default to the "
+"basename of the file, and the value will\n"
+"\t\tdefault to the file content.  If the basename is an invalid key, you may "
+"specify an alternate key.\n"
+"\n"
+"\t\tWhen creating a config map based on a directory, each file whose "
+"basename is a valid key in the directory will be\n"
+"\t\tpackaged into the config map.  Any directory entries except regular "
+"files are ignored (e.g. subdirectories,\n"
+"\t\tsymlinks, devices, pipes, etc)."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_cronjob.go:40
+msgid ""
+"\n"
+"\t\tCreate a cron job with the specified name."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_job.go:40
+msgid ""
+"\n"
+"\t\tCreate a job with the specified name."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_namespace.go:39
+msgid ""
+"\n"
+"\t\tCreate a namespace with the specified name."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_secret_docker.go:41
+msgid ""
+"\n"
+"\t\tCreate a new secret for use with Docker registries.\n"
+"\n"
+"\t\tDockercfg secrets are used to authenticate against Docker registries.\n"
+"\n"
+"\t\tWhen using the Docker command line to push images, you can authenticate "
+"to a given registry by running:\n"
+"\t\t\t'$ docker login DOCKER_REGISTRY_SERVER --username=DOCKER_USER --"
+"password=DOCKER_PASSWORD --email=DOCKER_EMAIL'.\n"
+"\n"
+"\tThat produces a ~/.dockercfg file that is used by subsequent 'docker push' "
+"and 'docker pull' commands to\n"
+"\t\tauthenticate to the registry. The email address is optional.\n"
+"\n"
+"\t\tWhen creating applications, you may have a Docker registry that requires "
+"authentication.  In order for the\n"
+"\t\tnodes to pull images on your behalf, they must have the credentials.  "
+"You can provide this information\n"
+"\t\tby creating a dockercfg secret and attaching it to your service account."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_pdb.go:41
+msgid ""
+"\n"
+"\t\tCreate a pod disruption budget with the specified name, selector, and "
+"desired minimum available pods."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_priorityclass.go:40
+msgid ""
+"\n"
+"\t\tCreate a priority class with the specified name, value, globalDefault "
+"and description."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create.go:71
+msgid ""
+"\n"
+"\t\tCreate a resource from a file or from stdin.\n"
+"\n"
+"\t\tJSON and YAML formats are accepted."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_quota.go:41
+msgid ""
+"\n"
+"\t\tCreate a resource quota with the specified name, hard limits, and "
+"optional scopes."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_rolebinding.go:40
+msgid ""
+"\n"
+"\t\tCreate a role binding for a particular role or cluster role."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_role.go:43
+msgid ""
+"\n"
+"\t\tCreate a role with single rule."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_secret.go:61
+msgid ""
+"\n"
+"\t\tCreate a secret based on a file, directory, or specified literal value.\n"
+"\n"
+"\t\tA single secret may package one or more key/value pairs.\n"
+"\n"
+"\t\tWhen creating a secret based on a file, the key will default to the "
+"basename of the file, and the value will\n"
+"\t\tdefault to the file content. If the basename is an invalid key or you "
+"wish to chose your own, you may specify\n"
+"\t\tan alternate key.\n"
+"\n"
+"\t\tWhen creating a secret based on a directory, each file whose basename is "
+"a valid key in the directory will be\n"
+"\t\tpackaged into the secret. Any directory entries except regular files are "
+"ignored (e.g. subdirectories,\n"
+"\t\tsymlinks, devices, pipes, etc)."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_serviceaccount.go:40
+msgid ""
+"\n"
+"\t\tCreate a service account with the specified name."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/proxy/proxy.go:67
+msgid ""
+"\n"
+"\t\tCreates a proxy server or application-level gateway between localhost "
+"and\n"
+"\t\tthe Kubernetes API server. It also allows serving static content over "
+"specified\n"
+"\t\tHTTP path. All incoming data enters through one port and gets forwarded "
+"to\n"
+"\t\tthe remote Kubernetes API server port, except for the path matching the "
+"static content path."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/autoscale/autoscale.go:42
+msgid ""
+"\n"
+"\t\tCreates an autoscaler that automatically chooses and sets the number of "
+"pods that run in a Kubernetes cluster.\n"
+"\n"
+"\t\tLooks up a deployment, replica set, stateful set, or replication "
+"controller by name and creates an autoscaler that uses the given resource as "
+"a reference.\n"
+"\t\tAn autoscaler can automatically increase or decrease number of pods "
+"deployed within the system as needed."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/debug/debug.go:57
+msgid ""
+"\n"
+"\t\tDebug cluster resources using interactive debugging containers.\n"
+"\n"
+"\t\t'debug' provides automation for common debugging tasks for cluster "
+"objects identified by\n"
+"\t\tresource and name. Pods will be used by default if no resource is "
+"specified.\n"
+"\n"
+"\t\tThe action taken by 'debug' varies depending on what resource is "
+"specified. Supported\n"
+"\t\tactions include:\n"
+"\n"
+"\t\t* Workload: Create a copy of an existing pod with certain attributes "
+"changed,\n"
+"\t                for example changing the image tag to a new version.\n"
+"\t\t* Workload: Add an ephemeral container to an already running pod, for "
+"example to add\n"
+"\t\t            debugging utilities without restarting the pod.\n"
+"\t\t* Node: Create a new pod that runs in the node's host namespaces and can "
+"access\n"
+"\t\t        the node's filesystem.\n"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/delete/delete.go:45
+msgid ""
+"\n"
+"\t\tDelete resources by file names, stdin, resources and names, or by "
+"resources and label selector.\n"
+"\n"
+"\t\tJSON and YAML formats are accepted. Only one type of argument may be "
+"specified: file names,\n"
+"\t\tresources and names, or resources and label selector.\n"
+"\n"
+"\t\tSome resources, such as pods, support graceful deletion. These resources "
+"define a default period\n"
+"\t\tbefore they are forcibly terminated (the grace period) but you may "
+"override that value with\n"
+"\t\tthe --grace-period flag, or pass --now to set a grace-period of 1. "
+"Because these resources often\n"
+"\t\trepresent entities in the cluster, deletion may not be acknowledged "
+"immediately. If the node\n"
+"\t\thosting a pod is down or cannot reach the API server, termination may "
+"take significantly longer\n"
+"\t\tthan the grace period. To force delete a resource, you must specify the "
+"--force flag.\n"
+"\t\tNote: only a subset of resources support graceful deletion. In absence "
+"of the support,\n"
+"\t\tthe --grace-period flag is ignored.\n"
+"\n"
+"\t\tIMPORTANT: Force deleting pods does not wait for confirmation that the "
+"pod's processes have been\n"
+"\t\tterminated, which can leave those processes running until the node "
+"detects the deletion and\n"
+"\t\tcompletes graceful deletion. If your processes use shared storage or "
+"talk to a remote API and\n"
+"\t\tdepend on the name of the pod to identify themselves, force deleting "
+"those pods may result in\n"
+"\t\tmultiple processes running on different machines using the same "
+"identification which may lead\n"
+"\t\tto data corruption or inconsistency. Only force delete pods when you are "
+"sure the pod is\n"
+"\t\tterminated, or if your application can tolerate multiple copies of the "
+"same pod running at once.\n"
+"\t\tAlso, if you force delete pods, the scheduler may place new pods on "
+"those nodes before the node\n"
+"\t\thas released those resources and causing those pods to be evicted "
+"immediately.\n"
+"\n"
+"\t\tNote that the delete command does NOT do resource version checks, so if "
+"someone submits an\n"
+"\t\tupdate to a resource right when you submit a delete, their update will "
+"be lost along with the\n"
+"\t\trest of the resource."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/certificates/certificates.go:175
+msgid ""
+"\n"
+"\t\tDeny a certificate signing request.\n"
+"\n"
+"\t\tkubectl certificate deny allows a cluster admin to deny a certificate\n"
+"\t\tsigning request (CSR). This action tells a certificate signing "
+"controller to\n"
+"\t\tnot to issue a certificate to the requestor.\n"
+"\t\t"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/diff/diff.go:53
+msgid ""
+"\n"
+"\t\tDiff configurations specified by file name or stdin between the current "
+"online\n"
+"\t\tconfiguration, and the configuration as it would be if applied.\n"
+"\n"
+"\t\tThe output is always YAML.\n"
+"\n"
+"\t\tKUBECTL_EXTERNAL_DIFF environment variable can be used to select your "
+"own\n"
+"\t\tdiff command. Users can use external commands with params too, example:\n"
+"\t\tKUBECTL_EXTERNAL_DIFF=\"colordiff -N -u\"\n"
+"\n"
+"\t\tBy default, the \"diff\" command available in your path will be\n"
+"\t\trun with the \"-u\" (unified diff) and \"-N\" (treat absent files as "
+"empty) options.\n"
+"\n"
+"\t\tExit status:\n"
+"\t\t 0\n"
+"\t\tNo differences were found.\n"
+"\t\t 1\n"
+"\t\tDifferences were found.\n"
+"\t\t >1\n"
+"\t\tKubectl or diff failed with an error.\n"
+"\n"
+"\t\tNote: KUBECTL_EXTERNAL_DIFF, if used, is expected to follow that "
+"convention."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/top/top.go:39
+msgid ""
+"\n"
+"\t\tDisplay Resource (CPU/Memory) usage.\n"
+"\n"
+"\t\tThe top command allows you to see the resource consumption for nodes or "
+"pods.\n"
+"\n"
+"\t\tThis command requires Metrics Server to be correctly configured and "
+"working on the server. "
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/config/view.go:54
+msgid ""
+"\n"
+"\t\tDisplay merged kubeconfig settings or a specified kubeconfig file.\n"
+"\n"
+"\t\tYou can use --output jsonpath={...} to extract specific values using a "
+"jsonpath expression."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/get/get.go:92
+msgid ""
+"\n"
+"\t\tDisplay one or many resources.\n"
+"\n"
+"\t\tPrints a table of the most important information about the specified "
+"resources.\n"
+"\t\tYou can filter the list using a label selector and the --selector flag. "
+"If the\n"
+"\t\tdesired resource type is namespaced you will only see results in your "
+"current\n"
+"\t\tnamespace unless you pass --all-namespaces.\n"
+"\n"
+"\t\tUninitialized objects are not shown unless --include-uninitialized is "
+"passed.\n"
+"\n"
+"\t\tBy specifying the output as 'template' and providing a Go template as "
+"the value\n"
+"\t\tof the --template flag, you can filter the attributes of the fetched "
+"resources."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/top/top_node.go:57
+msgid ""
+"\n"
+"\t\tDisplay resource (CPU/memory) usage of nodes.\n"
+"\n"
+"\t\tThe top-node command allows you to see the resource consumption of nodes."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/top/top_pod.go:67
+msgid ""
+"\n"
+"\t\tDisplay resource (CPU/memory) usage of pods.\n"
+"\n"
+"\t\tThe 'top pod' command allows you to see the resource consumption of "
+"pods.\n"
+"\n"
+"\t\tDue to the metrics pipeline delay, they may be unavailable for a few "
+"minutes\n"
+"\t\tsince pod creation."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/config/current_context.go:37
+msgid ""
+"\n"
+"\t\tDisplay the current-context."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/drain/drain.go:113
+msgid ""
+"\n"
+"\t\tDrain node in preparation for maintenance.\n"
+"\n"
+"\t\tThe given node will be marked unschedulable to prevent new pods from "
+"arriving.\n"
+"\t\t'drain' evicts the pods if the API server supports\n"
+"\t\t[eviction](https://kubernetes.io/docs/concepts/workloads/pods/"
+"disruptions/). Otherwise, it will use normal\n"
+"\t\tDELETE to delete the pods.\n"
+"\t\tThe 'drain' evicts or deletes all pods except mirror pods (which cannot "
+"be deleted through\n"
+"\t\tthe API server).  If there are daemon set-managed pods, drain will not "
+"proceed\n"
+"\t\twithout --ignore-daemonsets, and regardless it will not delete any\n"
+"\t\tdaemon set-managed pods, because those pods would be immediately "
+"replaced by the\n"
+"\t\tdaemon set controller, which ignores unschedulable markings.  If there "
+"are any\n"
+"\t\tpods that are neither mirror pods nor managed by a replication "
+"controller,\n"
+"\t\treplica set, daemon set, stateful set, or job, then drain will not "
+"delete any pods unless you\n"
+"\t\tuse --force.  --force will also allow deletion to proceed if the "
+"managing resource of one\n"
+"\t\tor more pods is missing.\n"
+"\n"
+"\t\t'drain' waits for graceful termination. You should not operate on the "
+"machine until\n"
+"\t\tthe command completes.\n"
+"\n"
+"\t\tWhen you are ready to put the node back into service, use kubectl "
+"uncordon, which\n"
+"\t\twill make the node schedulable again.\n"
+"\n"
+"\t\t![Workflow](https://kubernetes.io/images/docs/kubectl_drain.svg)"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/edit/edit.go:31
+msgid ""
+"\n"
+"\t\tEdit a resource from the default editor.\n"
+"\n"
+"\t\tThe edit command allows you to directly edit any API resource you can "
+"retrieve via the\n"
+"\t\tcommand-line tools. It will open the editor defined by your KUBE_EDITOR, "
+"or EDITOR\n"
+"\t\tenvironment variables, or fall back to 'vi' for Linux or 'notepad' for "
+"Windows.\n"
+"\t\tYou can edit multiple objects, although changes are applied one at a "
+"time. The command\n"
+"\t\taccepts file names as well as command-line arguments, although the files "
+"you point to must\n"
+"\t\tbe previously saved versions of resources.\n"
+"\n"
+"\t\tEditing is done with the API version used to fetch the resource.\n"
+"\t\tTo edit using a specific API version, fully-qualify the resource, "
+"version, and group.\n"
+"\n"
+"\t\tThe default format is YAML. To edit in JSON, specify \"-o json\".\n"
+"\n"
+"\t\tThe flag --windows-line-endings can be used to force Windows line "
+"endings,\n"
+"\t\totherwise the default for your operating system will be used.\n"
+"\n"
+"\t\tIn the event an error occurs while updating, a temporary file will be "
+"created on disk\n"
+"\t\tthat contains your unapplied changes. The most common error when "
+"updating a resource\n"
+"\t\tis another editor changing the resource on the server. When this occurs, "
+"you will have\n"
+"\t\tto apply your changes to the newer version of the resource, or update "
+"your temporary\n"
+"\t\tsaved copy to include the latest resource version."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/apply/apply_edit_last_applied.go:31
+msgid ""
+"\n"
+"\t\tEdit the latest last-applied-configuration annotations of resources from "
+"the default editor.\n"
+"\n"
+"\t\tThe edit-last-applied command allows you to directly edit any API "
+"resource you can retrieve via the\n"
+"\t\tcommand-line tools. It will open the editor defined by your KUBE_EDITOR, "
+"or EDITOR\n"
+"\t\tenvironment variables, or fall back to 'vi' for Linux or 'notepad' for "
+"Windows.\n"
+"\t\tYou can edit multiple objects, although changes are applied one at a "
+"time. The command\n"
+"\t\taccepts file names as well as command-line arguments, although the files "
+"you point to must\n"
+"\t\tbe previously saved versions of resources.\n"
+"\n"
+"\t\tThe default format is YAML. To edit in JSON, specify \"-o json\".\n"
+"\n"
+"\t\tThe flag --windows-line-endings can be used to force Windows line "
+"endings,\n"
+"\t\totherwise the default for your operating system will be used.\n"
+"\n"
+"\t\tIn the event an error occurs while updating, a temporary file will be "
+"created on disk\n"
+"\t\tthat contains your unapplied changes. The most common error when "
+"updating a resource\n"
+"\t\tis another editor changing the resource on the server. When this occurs, "
+"you will have\n"
+"\t\tto apply your changes to the newer version of the resource, or update "
+"your temporary\n"
+"\t\tsaved copy to include the latest resource version."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/wait/wait.go:49
+msgid ""
+"\n"
+"\t\tExperimental: Wait for a specific condition on one or many resources.\n"
+"\n"
+"\t\tThe command takes multiple resources and waits until the specified "
+"condition\n"
+"\t\tis seen in the Status field of every given resource.\n"
+"\n"
+"\t\tAlternatively, the command can wait for the given set of resources to be "
+"deleted\n"
+"\t\tby providing the \"delete\" keyword as the value to the --for flag.\n"
+"\n"
+"\t\tA successful message will be printed to stdout indicating when the "
+"specified\n"
+"        condition has been met. You can use -o option to change to output "
+"destination."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:47
+msgid ""
+"\n"
+"\t\tExpose a resource as a new Kubernetes service.\n"
+"\n"
+"\t\tLooks up a deployment, service, replica set, replication controller or "
+"pod by name and uses the selector\n"
+"\t\tfor that resource as the selector for a new service on the specified "
+"port. A deployment or replica set\n"
+"\t\twill be exposed as a service only if its selector is convertible to a "
+"selector that service supports,\n"
+"\t\ti.e. when the selector contains only the matchLabels component. Note "
+"that if no port is specified via\n"
+"\t\t--port and the exposed resource has multiple ports, all will be re-used "
+"by the new service. Also if no\n"
+"\t\tlabels are specified, the new service will re-use the labels from the "
+"resource it exposes.\n"
+"\n"
+"\t\tPossible resources include (case insensitive):\n"
+"\n"
+"\t\t"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/plugin/plugin.go:46
+msgid ""
+"\n"
+"\t\tList all available plugin files on a user's PATH.\n"
+"\n"
+"\t\tAvailable plugin files are those that are:\n"
+"\t\t- executable\n"
+"\t\t- anywhere on the user's PATH\n"
+"\t\t- begin with \"kubectl-\"\n"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/explain/explain.go:35
+msgid ""
+"\n"
+"\t\tList the fields for supported resources.\n"
+"\n"
+"\t\tThis command describes the fields associated with each supported API "
+"resource.\n"
+"\t\tFields are identified via a simple JSONPath identifier:\n"
+"\n"
+"\t\t\t<type>.<fieldName>[.<fieldName>]\n"
+"\n"
+"\t\tAdd the --recursive flag to display all of the fields at once without "
+"descriptions.\n"
+"\t\tInformation about each field is retrieved from the server in OpenAPI "
+"format."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/rollout/rollout.go:30
+msgid ""
+"\n"
+"\t\tManage the rollout of a resource."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/drain/drain.go:84
+msgid ""
+"\n"
+"\t\tMark node as schedulable."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/drain/drain.go:55
+msgid ""
+"\n"
+"\t\tMark node as unschedulable."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/rollout/rollout_pause.go:57
+msgid ""
+"\n"
+"\t\tMark the provided resource as paused.\n"
+"\n"
+"\t\tPaused resources will not be reconciled by a controller.\n"
+"\t\tUse \"kubectl rollout resume\" to resume a paused resource.\n"
+"\t\tCurrently only deployments support being paused."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/completion/completion.go:46
+msgid ""
+"\n"
+"\t\tOutput shell completion code for the specified shell (bash or zsh).\n"
+"\t\tThe shell code must be evaluated to provide interactive\n"
+"\t\tcompletion of kubectl commands.  This can be done by sourcing it from\n"
+"\t\tthe .bash_profile.\n"
+"\n"
+"\t\tDetailed instructions on how to do this are available here:\n"
+"\n"
+"        for macOS:\n"
+"        https://kubernetes.io/docs/tasks/tools/install-kubectl-macos/#enable-"
+"shell-autocompletion\n"
+"\n"
+"        for linux:\n"
+"        https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/#enable-"
+"shell-autocompletion\n"
+"\n"
+"        for windows:\n"
+"        https://kubernetes.io/docs/tasks/tools/install-kubectl-windows/"
+"#enable-shell-autocompletion\n"
+"\n"
+"\t\tNote for zsh users: [1] zsh completions are only supported in versions "
+"of zsh >= 5.2."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/logs/logs.go:49
+msgid ""
+"\n"
+"\t\tPrint the logs for a container in a pod or specified resource. \n"
+"\t\tIf the pod has only one container, the container name is optional."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/plugin/plugin.go:37
+msgid ""
+"\n"
+"\t\tProvides utilities for interacting with plugins.\n"
+"\n"
+"\t\tPlugins provide extended functionality that is not part of the major "
+"command-line distribution.\n"
+"\t\tPlease refer to the documentation and examples for more information "
+"about how write your own plugins.\n"
+"\n"
+"\t\tThe easiest way to discover and install plugins is via the kubernetes "
+"sub-project krew.\n"
+"\t\tTo install krew, visit [krew.sigs.k8s.io](https://krew.sigs.k8s.io/docs/"
+"user-guide/setup/install/)"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/config/rename_context.go:47
+msgid ""
+"\n"
+"\t\tRenames a context from the kubeconfig file.\n"
+"\n"
+"\t\tCONTEXT_NAME is the context name that you want to change.\n"
+"\n"
+"\t\tNEW_NAME is the new name you want to set.\n"
+"\n"
+"\t\tNote: If the context being renamed is the 'current-context', this field "
+"will also be updated."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/replace/replace.go:48
+msgid ""
+"\n"
+"\t\tReplace a resource by file name or stdin.\n"
+"\n"
+"\t\tJSON and YAML formats are accepted. If replacing an existing resource, "
+"the\n"
+"\t\tcomplete resource spec must be provided. This can be obtained by\n"
+"\n"
+"\t\t    $ kubectl get TYPE NAME -o yaml"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/rollout/rollout_restart.go:57
+msgid ""
+"\n"
+"\t\tRestart a resource.\n"
+"\n"
+"\t        Resource rollout will be restarted."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/rollout/rollout_resume.go:58
+msgid ""
+"\n"
+"\t\tResume a paused resource.\n"
+"\n"
+"\t\tPaused resources will not be reconciled by a controller. By resuming a\n"
+"\t\tresource, we allow it to be reconciled again.\n"
+"\t\tCurrently only deployments support being resumed."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/rollout/rollout_undo.go:55
+msgid ""
+"\n"
+"\t\tRoll back to a previous rollout."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/config/create_cluster.go:47
+msgid ""
+"\n"
+"\t\tSet a cluster entry in kubeconfig.\n"
+"\n"
+"\t\tSpecifying a name that already exists will merge new fields on top of "
+"existing values for those fields."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/config/create_context.go:44
+msgid ""
+"\n"
+"\t\tSet a context entry in kubeconfig.\n"
+"\n"
+"\t\tSpecifying a name that already exists will merge new fields on top of "
+"existing values for those fields."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/scale/scale.go:40
+msgid ""
+"\n"
+"\t\tSet a new size for a deployment, replica set, replication controller, or "
+"stateful set.\n"
+"\n"
+"\t\tScale also allows users to specify one or more preconditions for the "
+"scale action.\n"
+"\n"
+"\t\tIf --current-replicas or --resource-version is specified, it is "
+"validated before the\n"
+"\t\tscale is attempted, and it is guaranteed that the precondition holds "
+"true when the\n"
+"\t\tscale is sent to the server."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/config/create_authinfo.go:70
+#, c-format
+msgid ""
+"\n"
+"\t\tSet a user entry in kubeconfig.\n"
+"\n"
+"\t\tSpecifying a name that already exists will merge new fields on top of "
+"existing values.\n"
+"\n"
+"\t\t    Client-certificate flags:\n"
+"\t\t    --%v=certfile --%v=keyfile\n"
+"\n"
+"\t\t    Bearer token flags:\n"
+"\t\t\t  --%v=bearer_token\n"
+"\n"
+"\t\t    Basic auth flags:\n"
+"\t\t\t  --%v=basic_user --%v=basic_password\n"
+"\n"
+"\t\tBearer token and basic auth are mutually exclusive."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/apply/apply_set_last_applied.go:70
+msgid ""
+"\n"
+"\t\tSet the latest last-applied-configuration annotations by setting it to "
+"match the contents of a file.\n"
+"\t\tThis results in the last-applied-configuration being updated as though "
+"'kubectl apply -f <file>' was run,\n"
+"\t\twithout updating any other parts of the object."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/set/set_selector.go:67
+#, c-format
+msgid ""
+"\n"
+"\t\tSet the selector on a resource. Note that the new selector will "
+"overwrite the old selector if the resource had one prior to the invocation\n"
+"\t\tof 'set selector'.\n"
+"\n"
+"\t\tA selector must begin with a letter or number, and may contain letters, "
+"numbers, hyphens, dots, and underscores, up to %[1]d characters.\n"
+"\t\tIf --resource-version is specified, then updates will use this resource "
+"version, otherwise the existing resource-version will be used.\n"
+"        Note: currently selectors can only be set on Service objects."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/describe/describe.go:39
+msgid ""
+"\n"
+"\t\tShow details of a specific resource or group of resources.\n"
+"\n"
+"\t\tPrint a detailed description of the selected resources, including "
+"related resources such\n"
+"\t\tas events or controllers. You may select a single object by name, all "
+"objects of that\n"
+"\t\ttype, provide a name prefix, or label selector. For example:\n"
+"\n"
+"\t\t    $ kubectl describe TYPE NAME_PREFIX\n"
+"\n"
+"\t\twill first check for an exact match on TYPE and NAME_PREFIX. If no such "
+"resource\n"
+"\t\texists, it will output details for every resource that has a name "
+"prefixed with NAME_PREFIX."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/rollout/rollout_status.go:47
+msgid ""
+"\n"
+"\t\tShow the status of the rollout.\n"
+"\n"
+"\t\tBy default 'rollout status' will watch the status of the latest rollout\n"
+"\t\tuntil it's done. If you don't want to wait for the rollout to finish "
+"then\n"
+"\t\tyou can use --watch=false. Note that if a new rollout starts in-between, "
+"then\n"
+"\t\t'rollout status' will continue watching the latest revision. If you want "
+"to\n"
+"\t\tpin to a specific revision and abort if it is rolled over by another "
+"revision,\n"
+"\t\tuse --revision=N where N is the revision you need to watch for."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/set/set_resources.go:41
+#, c-format
+msgid ""
+"\n"
+"\t\tSpecify compute resource requirements (CPU, memory) for any resource "
+"that defines a pod template.  If a pod is successfully scheduled, it is "
+"guaranteed the amount of resource requested, but may burst up to its "
+"specified limits.\n"
+"\n"
+"\t\tFor each compute resource, if a limit is specified and a request is "
+"omitted, the request will default to the limit.\n"
+"\n"
+"\t\tPossible resources include (case insensitive): %s."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/set/set_env.go:50
+msgid ""
+"\n"
+"\t\tUpdate environment variables on a pod template.\n"
+"\n"
+"\t\tList environment variable definitions in one or more pods, pod "
+"templates.\n"
+"\t\tAdd, update, or remove container environment variable definitions in one "
+"or\n"
+"\t\tmore pod templates (within replication controllers or deployment "
+"configurations).\n"
+"\t\tView or modify the environment variable definitions on all containers in "
+"the\n"
+"\t\tspecified pods or pod templates, or just those that match a wildcard.\n"
+"\n"
+"\t\tIf \"--env -\" is passed, environment variables can be read from STDIN "
+"using the standard env\n"
+"\t\tsyntax.\n"
+"\n"
+"\t\tPossible resources include (case insensitive):\n"
+"\t\t"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/set/set_image.go:71
+msgid ""
+"\n"
+"\t\tUpdate existing container image(s) of resources.\n"
+"\n"
+"\t\tPossible resources include (case insensitive):\n"
+"\t\t"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/patch/patch.go:78
+msgid ""
+"\n"
+"\t\tUpdate fields of a resource using strategic merge patch, a JSON merge "
+"patch, or a JSON patch.\n"
+"\n"
+"\t\tJSON and YAML formats are accepted."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/annotate/annotate.go:83
+msgid ""
+"\n"
+"\t\tUpdate the annotations on one or more resources.\n"
+"\n"
+"\t\tAll Kubernetes objects support the ability to store additional data with "
+"the object as\n"
+"\t\tannotations. Annotations are key/value pairs that can be larger than "
+"labels and include\n"
+"\t\tarbitrary string values such as structured JSON. Tools and system "
+"extensions may use\n"
+"\t\tannotations to store their own data.\n"
+"\n"
+"\t\tAttempting to set an annotation that already exists will fail unless --"
+"overwrite is set.\n"
+"\t\tIf --resource-version is specified and does not match the current "
+"resource version on\n"
+"\t\tthe server the command will fail."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/label/label.go:87
+#, c-format
+msgid ""
+"\n"
+"\t\tUpdate the labels on a resource.\n"
+"\n"
+"\t\t* A label key and value must begin with a letter or number, and may "
+"contain letters, numbers, hyphens, dots, and underscores, up to %[1]d "
+"characters each.\n"
+"\t\t* Optionally, the key can begin with a DNS subdomain prefix and a single "
+"'/', like example.com/my-app.\n"
+"\t\t* If --overwrite is true, then existing labels can be overwritten, "
+"otherwise attempting to overwrite a label will result in an error.\n"
+"\t\t* If --resource-version is specified, then updates will use this "
+"resource version, otherwise the existing resource-version will be used."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/taint/taint.go:70
+#, c-format
+msgid ""
+"\n"
+"\t\tUpdate the taints on one or more nodes.\n"
+"\n"
+"\t\t* A taint consists of a key, value, and effect. As an argument here, it "
+"is expressed as key=value:effect.\n"
+"\t\t* The key must begin with a letter or number, and may contain letters, "
+"numbers, hyphens, dots, and underscores, up to %[1]d characters.\n"
+"\t\t* Optionally, the key can begin with a DNS subdomain prefix and a single "
+"'/', like example.com/my-app.\n"
+"\t\t* The value is optional. If given, it must begin with a letter or "
+"number, and may contain letters, numbers, hyphens, dots, and underscores, up "
+"to %[2]d characters.\n"
+"\t\t* The effect must be NoSchedule, PreferNoSchedule or NoExecute.\n"
+"\t\t* Currently taint can only apply to node."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/rollout/rollout_history.go:36
+msgid ""
+"\n"
+"\t\tView previous rollout revisions and configurations."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/apply/apply_view_last_applied.go:47
+msgid ""
+"\n"
+"\t\tView the latest last-applied-configuration annotations by type/name or "
+"file.\n"
+"\n"
+"\t\tThe default output will be printed to stdout in YAML format. You can use "
+"the -o option\n"
+"\t\tto change the output format."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_secret_tls.go:47
+msgid ""
+"\n"
+"\t  # Create a new TLS secret named tls-secret with the given key pair\n"
+"\t  kubectl create secret tls tls-secret --cert=path/to/tls.cert --key=path/"
+"to/tls.key"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_namespace.go:42
+msgid ""
+"\n"
+"\t  # Create a new namespace named my-namespace\n"
+"\t  kubectl create namespace my-namespace"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_secret.go:74
+msgid ""
+"\n"
+"\t  # Create a new secret named my-secret with keys for each file in folder "
+"bar\n"
+"\t  kubectl create secret generic my-secret --from-file=path/to/bar\n"
+"\n"
+"\t  # Create a new secret named my-secret with specified keys instead of "
+"names on disk\n"
+"\t  kubectl create secret generic my-secret --from-file=ssh-privatekey=path/"
+"to/id_rsa --from-file=ssh-publickey=path/to/id_rsa.pub\n"
+"\n"
+"\t  # Create a new secret named my-secret with key1=supersecret and "
+"key2=topsecret\n"
+"\t  kubectl create secret generic my-secret --from-literal=key1=supersecret "
+"--from-literal=key2=topsecret\n"
+"\n"
+"\t  # Create a new secret named my-secret using a combination of a file and "
+"a literal\n"
+"\t  kubectl create secret generic my-secret --from-file=ssh-privatekey=path/"
+"to/id_rsa --from-literal=passphrase=topsecret\n"
+"\n"
+"\t  # Create a new secret named my-secret from an env file\n"
+"\t  kubectl create secret generic my-secret --from-env-file=path/to/bar.env"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_serviceaccount.go:43
+msgid ""
+"\n"
+"\t  # Create a new service account named my-service-account\n"
+"\t  kubectl create serviceaccount my-service-account"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_deployment.go:45
+msgid ""
+"\n"
+"\t# Create a deployment named my-dep that runs the busybox image\n"
+"\tkubectl create deployment my-dep --image=busybox\n"
+"\n"
+"\t# Create a deployment with a command\n"
+"\tkubectl create deployment my-dep --image=busybox -- date\n"
+"\n"
+"\t# Create a deployment named my-dep that runs the nginx image with 3 "
+"replicas\n"
+"\tkubectl create deployment my-dep --image=nginx --replicas=3\n"
+"\n"
+"\t# Create a deployment named my-dep that runs the busybox image and expose "
+"port 5701\n"
+"\tkubectl create deployment my-dep --image=busybox --port=5701"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_service.go:351
+msgid ""
+"\n"
+"\t# Create a new ExternalName service named my-ns\n"
+"\tkubectl create service externalname my-ns --external-name bar.com"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/set/set_serviceaccount.go:50
+msgid ""
+"\n"
+"\t# Set deployment nginx-deployment's service account to serviceaccount1\n"
+"\tkubectl set serviceaccount deployment nginx-deployment serviceaccount1\n"
+"\n"
+"\t# Print the result (in YAML format) of updated nginx deployment with the "
+"service account from local file, without hitting the API server\n"
+"\tkubectl set sa -f nginx-deployment.yaml serviceaccount1 --local --dry-"
+"run=client -o yaml\n"
+"\t"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_deployment.go:42
+msgid ""
+"\n"
+"\tCreate a deployment with the specified name."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_service.go:344
+msgid ""
+"\n"
+"\tCreate an ExternalName service with the specified name.\n"
+"\n"
+"\tExternalName service references to an external DNS address instead of\n"
+"\tonly pods, which will allow application authors to reference services\n"
+"\tthat exist off platform, on other clusters, or locally."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_ingress.go:61
+msgid ""
+"\n"
+"\tCreate an ingress with the specified name."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/help/help.go:28
+msgid ""
+"\n"
+"\tHelp provides help for any command in the application.\n"
+"\tSimply type kubectl help [path to command] for full details."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/config/set.go:44
+msgid ""
+"\n"
+"\tSet an individual value in a kubeconfig file.\n"
+"\n"
+"\tPROPERTY_NAME is a dot delimited name where each token represents either "
+"an attribute name or a map key.  Map keys may not contain dots.\n"
+"\n"
+"\tPROPERTY_VALUE is the new value you want to set. Binary fields such as "
+"'certificate-authority-data' expect a base64 encoded string unless the --set-"
+"raw-bytes flag is used.\n"
+"\n"
+"\tSpecifying an attribute name that already exists will merge new fields on "
+"top of existing values."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/config/unset.go:39
+msgid ""
+"\n"
+"\tUnset an individual value in a kubeconfig file.\n"
+"\n"
+"\tPROPERTY_NAME is a dot delimited name where each token represents either "
+"an attribute name or a map key.  Map keys may not contain dots."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/set/set_serviceaccount.go:43
+msgid ""
+"\n"
+"\tUpdate the service account of pod template resources.\n"
+"\n"
+"\tPossible resources (case insensitive) can be:\n"
+"\n"
+"\t"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/set/set_subject.go:40
+msgid ""
+"\n"
+"\tUpdate the user, group, or service account in a role binding or cluster "
+"role binding."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/set/set_image.go:68
+msgid ""
+"\n"
+"  \tpod (po), replicationcontroller (rc), deployment (deploy), daemonset "
+"(ds), replicaset (rs)"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/portforward/portforward.go:63
+msgid ""
+"\n"
+"                Forward one or more local ports to a pod.\n"
+"\n"
+"                Use resource type/name such as deployment/mydeployment to "
+"select a pod. Resource type defaults to 'pod' if omitted.\n"
+"\n"
+"                If there are multiple pods matching the criteria, a pod will "
+"be selected automatically. The\n"
+"                forwarding session ends when the selected pod terminates, "
+"and a rerun of the command is needed\n"
+"                to resume forwarding."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_service.go:233
+msgid ""
+"\n"
+"    # Create a new ClusterIP service named my-cs\n"
+"    kubectl create service clusterip my-cs --tcp=5678:8080\n"
+"\n"
+"    # Create a new ClusterIP service named my-cs (in headless mode)\n"
+"    kubectl create service clusterip my-cs --clusterip=\"None\""
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_service.go:311
+msgid ""
+"\n"
+"    # Create a new LoadBalancer service named my-lbs\n"
+"    kubectl create service loadbalancer my-lbs --tcp=5678:8080"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_service.go:274
+msgid ""
+"\n"
+"    # Create a new NodePort service named my-ns\n"
+"    kubectl create service nodeport my-ns --tcp=5678:8080"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/clusterinfo/clusterinfo_dump.go:102
+msgid ""
+"\n"
+"    # Dump current cluster state to stdout\n"
+"    kubectl cluster-info dump\n"
+"\n"
+"    # Dump current cluster state to /path/to/cluster-state\n"
+"    kubectl cluster-info dump --output-directory=/path/to/cluster-state\n"
+"\n"
+"    # Dump all namespaces to stdout\n"
+"    kubectl cluster-info dump --all-namespaces\n"
+"\n"
+"    # Dump a set of namespaces to /path/to/cluster-state\n"
+"    kubectl cluster-info dump --namespaces default,kube-system --output-"
+"directory=/path/to/cluster-state"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/annotate/annotate.go:95
+msgid ""
+"\n"
+"    # Update pod 'foo' with the annotation 'description' and the value 'my "
+"frontend'\n"
+"    # If the same annotation is set multiple times, only the last value will "
+"be applied\n"
+"    kubectl annotate pods foo description='my frontend'\n"
+"\n"
+"    # Update a pod identified by type and name in \"pod.json\"\n"
+"    kubectl annotate -f pod.json description='my frontend'\n"
+"\n"
+"    # Update pod 'foo' with the annotation 'description' and the value 'my "
+"frontend running nginx', overwriting any existing value\n"
+"    kubectl annotate --overwrite pods foo description='my frontend running "
+"nginx'\n"
+"\n"
+"    # Update all pods in the namespace\n"
+"    kubectl annotate pods --all description='my frontend running nginx'\n"
+"\n"
+"    # Update pod 'foo' only if the resource is unchanged from version 1\n"
+"    kubectl annotate pods foo description='my frontend running nginx' --"
+"resource-version=1\n"
+"\n"
+"    # Update pod 'foo' by removing an annotation named 'description' if it "
+"exists\n"
+"    # Does not require the --overwrite flag\n"
+"    kubectl annotate pods foo description-"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_service.go:230
+msgid ""
+"\n"
+"    Create a ClusterIP service with the specified name."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_service.go:308
+msgid ""
+"\n"
+"    Create a LoadBalancer service with the specified name."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_service.go:271
+msgid ""
+"\n"
+"    Create a NodePort service with the specified name."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/clusterinfo/clusterinfo_dump.go:93
+msgid ""
+"\n"
+"    Dump cluster information out suitable for debugging and diagnosing "
+"cluster problems.  By default, dumps everything to\n"
+"    stdout. You can optionally specify a directory with --output-directory.  "
+"If you specify a directory, Kubernetes will\n"
+"    build a set of files in that directory.  By default, only dumps things "
+"in the current namespace and 'kube-system' namespace, but you can\n"
+"    switch to a different namespace with the --namespaces flag, or specify --"
+"all-namespaces to dump all namespaces.\n"
+"\n"
+"    The command also dumps the logs of all of the pods in the cluster; these "
+"logs are dumped into different directories\n"
+"    based on namespace and pod name."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/clusterinfo/clusterinfo.go:40
+msgid ""
+"\n"
+"  Display addresses of the control plane and services with label kubernetes."
+"io/cluster-service=true.\n"
+"  To further debug and diagnose cluster problems, use 'kubectl cluster-info "
+"dump'."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/config/config.go:49
+msgid ""
+" environment variable is set, then it is used as a list of paths (normal "
+"path delimiting rules for your system). These paths are merged. When a value "
+"is modified, it is modified in the file that defines the stanza. When a "
+"value is created, it is created in the first file that exists. If no files "
+"in the chain exist, then it creates the last file in the list.\n"
+"\t\t\t3. Otherwise, "
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/config/config.go:48
+msgid ""
+" flag is set, then only that file is loaded. The flag may only be set once "
+"and no merging takes place.\n"
+"\t\t\t2. If $"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/config/config.go:50
+msgid " is used and no merging takes place."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_quota.go:107
+msgid ""
+"A comma-delimited set of quota scopes that must all match each object "
+"tracked by the quota."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_quota.go:106
+msgid ""
+"A comma-delimited set of resource=quantity pairs that define a hard limit."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_pdb.go:113
+msgid ""
+"A label selector to use for this budget. Only equality-based selector "
+"requirements are supported."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:152
+msgid ""
+"A label selector to use for this service. Only equality-based selector "
+"requirements are supported. If empty (the default) infer the selector from "
+"the replication controller or replica set.)"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:157
+msgid ""
+"Additional external IP address (not managed by Kubernetes) to accept for the "
+"service. If this IP is routed to a node, the service can be accessed by this "
+"IP in addition to its generated service IP."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/debug/debug.go:178
+msgid "Allocate a TTY for the debugging container."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:158
+#: staging/src/k8s.io/kubectl/pkg/cmd/run/run.go:178
+msgid ""
+"An inline JSON override for the generated object. If this is non-empty, it "
+"is used to override the generated object. Requires that the object supply a "
+"valid apiVersion field."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/run/run.go:173
+msgid "Annotations to apply to the pod."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/apply/apply.go:173
+msgid "Apply a configuration to a resource by file name or stdin"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/certificates/certificates.go:125
+msgid "Approve a certificate signing request"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_service.go:263
+msgid ""
+"Assign your own ClusterIP or set to 'None' for a 'headless' service (no "
+"loadbalancing)."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/attach/attach.go:106
+msgid ""
+"Attach to a process that is already running inside an existing container."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/attach/attach.go:105
+msgid "Attach to a running container"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/autoscale/autoscale.go:107
+msgid ""
+"Auto-scale a deployment, replica set, stateful set, or replication controller"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:161
+msgid ""
+"ClusterIP to be assigned to the service. Leave empty to auto-allocate, or "
+"set to 'None' to create a headless service."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_clusterrolebinding.go:101
+msgid "ClusterRole this ClusterRoleBinding should reference"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_rolebinding.go:104
+msgid "ClusterRole this RoleBinding should reference"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/alpha.go:32
+msgid "Commands for features in alpha"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/debug/debug.go:170
+msgid "Container image to use for debug container."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/debug/debug.go:166
+msgid "Container name to use for debug container."
+msgstr ""
+
+#: pkg/kubectl/cmd/convert/convert.go:95
+msgid "Convert config files between different API versions"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/cp/cp.go:105
+msgid "Copy files and directories to and from containers"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/cp/cp.go:106
+msgid "Copy files and directories to and from containers."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_service.go:248
+msgid "Create a ClusterIP service"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_service.go:323
+msgid "Create a LoadBalancer service"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_service.go:286
+msgid "Create a NodePort service"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_secret_tls.go:94
+msgid "Create a TLS secret"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_clusterrole.go:81
+msgid "Create a cluster role"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_clusterrolebinding.go:87
+msgid "Create a cluster role binding for a particular cluster role"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_configmap.go:124
+msgid "Create a config map from a local file, directory or literal value"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/debug/debug.go:167
+msgid "Create a copy of the target Pod with this name."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_cronjob.go:90
+msgid "Create a cron job with the specified name"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_deployment.go:100
+msgid "Create a deployment with the specified name"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_job.go:91
+msgid "Create a job with the specified name"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_namespace.go:83
+msgid "Create a namespace with the specified name"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_pdb.go:95
+msgid "Create a pod disruption budget with the specified name"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_priorityclass.go:92
+msgid "Create a priority class with the specified name"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_quota.go:91
+msgid "Create a quota with the specified name"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create.go:106
+msgid "Create a resource from a file or from stdin"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_rolebinding.go:89
+msgid "Create a role binding for a particular role or cluster role"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_role.go:161
+msgid "Create a role with single rule"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_secret_docker.go:134
+msgid "Create a secret for use with a Docker registry"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_secret.go:137
+msgid "Create a secret from a local file, directory, or literal value"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_secret.go:49
+msgid "Create a secret using specified subcommand"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_secret.go:50
+msgid "Create a secret using specified subcommand."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_serviceaccount.go:85
+msgid "Create a service account with the specified name"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_service.go:48
+msgid "Create a service using a specified subcommand"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_service.go:49
+msgid "Create a service using a specified subcommand."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_service.go:363
+msgid "Create an ExternalName service"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_ingress.go:145
+msgid "Create an ingress with the specified name"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/run/run.go:60
+msgid "Create and run a particular image in a pod."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/debug/debug.go:149
+msgid "Create debugging sessions for troubleshooting workloads and nodes"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/delete/delete.go:137
+msgid ""
+"Delete resources by file names, stdin, resources and names, or by resources "
+"and label selector"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/config/delete_cluster.go:42
+msgid "Delete the specified cluster from the kubeconfig"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/config/delete_cluster.go:43
+msgid "Delete the specified cluster from the kubeconfig."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/config/delete_context.go:42
+msgid "Delete the specified context from the kubeconfig"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/config/delete_context.go:43
+msgid "Delete the specified context from the kubeconfig."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/config/delete_user.go:64
+msgid "Delete the specified user from the kubeconfig"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/config/delete_user.go:65
+msgid "Delete the specified user from the kubeconfig."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/certificates/certificates.go:174
+msgid "Deny a certificate signing request"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/config/get_contexts.go:72
+msgid "Describe one or many contexts"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/diff/diff.go:142
+msgid "Diff the live version against a would-be applied version"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/clusterinfo/clusterinfo.go:65
+msgid "Display cluster information"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/config/get_clusters.go:41
+msgid "Display clusters defined in the kubeconfig"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/config/get_clusters.go:42
+msgid "Display clusters defined in the kubeconfig."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/config/view.go:81
+msgid "Display merged kubeconfig settings or a specified kubeconfig file"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/config/get_contexts.go:50
+msgid "Display one or many contexts from the kubeconfig file."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/get/get.go:165
+msgid "Display one or many resources"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/top/top.go:50
+msgid "Display resource (CPU/memory) usage"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/top/top_node.go:81
+msgid "Display resource (CPU/memory) usage of nodes"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/top/top_pod.go:100
+msgid "Display resource (CPU/memory) usage of pods"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/config/current_context.go:51
+msgid "Display the current-context"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/config/get_users.go:60
+msgid "Display users defined in the kubeconfig"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/config/get_users.go:61
+msgid "Display users defined in the kubeconfig."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/drain/drain.go:184
+msgid "Drain node in preparation for maintenance"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/clusterinfo/clusterinfo_dump.go:74
+msgid "Dump relevant information for debugging and diagnosis"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/edit/edit.go:77
+msgid "Edit a resource on the server"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/apply/apply_edit_last_applied.go:67
+msgid "Edit latest last-applied-configuration annotations of a resource/object"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_secret_docker.go:152
+msgid "Email for Docker registry"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/debug/debug.go:169
+msgid "Environment variables to set in the container."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/exec/exec.go:89
+msgid "Execute a command in a container"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/exec/exec.go:90
+msgid "Execute a command in a container."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/wait/wait.go:115
+msgid "Experimental: Wait for a specific condition on one or many resources"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_service.go:378
+msgid "External name of service"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/portforward/portforward.go:109
+msgid "Forward one or more local ports to a pod"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/explain/explain.go:79
+msgid "Get documentation for a resource"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/help/help.go:37
+msgid "Help about any command"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:151
+msgid ""
+"IP to assign to the LoadBalancer. If empty, an ephemeral IP will be created "
+"and used (cloud-provider specific)."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:160
+msgid ""
+"If non-empty, set the session affinity for the service to this; legal "
+"values: 'None', 'ClientIP'"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/annotate/annotate.go:157
+msgid ""
+"If non-empty, the annotation update will only succeed if this is the current "
+"resource-version for the object. Only valid when specifying a single "
+"resource."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/label/label.go:154
+msgid ""
+"If non-empty, the labels update will only succeed if this is the current "
+"resource-version for the object. Only valid when specifying a single "
+"resource."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/debug/debug.go:164
+msgid ""
+"If specified, everything after -- will be passed to the new container as "
+"Args instead of Command."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/run/run.go:198
+msgid "If true, run the container in privileged mode."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/debug/debug.go:174
+msgid "If true, suppress informational messages."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/debug/debug.go:165
+msgid ""
+"If true, wait for the container to start running, and then attach as if "
+"'kubectl attach ...' were called.  Default false, unless '-i/--stdin' is "
+"set, in which case the default is true."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/debug/debug.go:173
+msgid ""
+"Keep stdin open on the container(s) in the pod, even if nothing is attached."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/plugin/plugin.go:90
+msgid "List all visible plugin executables on a user's PATH"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/rollout/rollout.go:54
+msgid "Manage the rollout of a resource"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/drain/drain.go:98
+msgid "Mark node as schedulable"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/drain/drain.go:69
+msgid "Mark node as unschedulable"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/rollout/rollout_pause.go:83
+msgid "Mark the provided resource as paused"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/certificates/certificates.go:49
+#: staging/src/k8s.io/kubectl/pkg/cmd/certificates/certificates.go:50
+msgid "Modify certificate resources."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/config/config.go:42
+msgid "Modify kubeconfig files"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:156
+msgid ""
+"Name or number for the port on the container that the service should direct "
+"traffic to. Optional."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/alpha.go:43
+msgid "No alpha commands are available in this version of kubectl"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/logs/logs.go:174
+msgid ""
+"Only return logs after a specific date (RFC3339). Defaults to all logs. Only "
+"one of since-time / since may be used."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/completion/completion.go:112
+msgid "Output shell completion code for the specified shell (bash or zsh)"
+msgstr ""
+
+#: pkg/kubectl/cmd/convert/convert.go:105
+msgid ""
+"Output the formatted object with the given group version (for ex: "
+"'extensions/v1beta1')."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_secret_docker.go:151
+msgid "Password for Docker registry authentication"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_secret_tls.go:110
+msgid "Path to PEM encoded public key certificate."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_secret_tls.go:111
+msgid "Path to private key associated with given certificate."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/scale/scale.go:130
+msgid ""
+"Precondition for resource version. Requires that the current resource "
+"version match this value in order to scale."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/version/version.go:73
+msgid "Print the client and server version information"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/version/version.go:74
+msgid ""
+"Print the client and server version information for the current context."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/options/options.go:38
+#: staging/src/k8s.io/kubectl/pkg/cmd/options/options.go:39
+msgid "Print the list of flags inherited by all commands"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/logs/logs.go:152
+msgid "Print the logs for a container in a pod"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/apiresources/apiresources.go:97
+msgid "Print the supported API resources on the server"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/apiresources/apiresources.go:98
+msgid "Print the supported API resources on the server."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/apiresources/apiversions.go:58
+msgid ""
+"Print the supported API versions on the server, in the form of \"group/"
+"version\""
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/apiresources/apiversions.go:59
+msgid ""
+"Print the supported API versions on the server, in the form of \"group/"
+"version\"."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/plugin/plugin.go:62
+msgid "Provides utilities for interacting with plugins"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/config/rename_context.go:45
+msgid "Rename a context from the kubeconfig file"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/replace/replace.go:115
+msgid "Replace a resource by file name or stdin"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/rollout/rollout_restart.go:87
+msgid "Restart a resource"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/rollout/rollout_resume.go:87
+msgid "Resume a paused resource"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_rolebinding.go:105
+msgid "Role this RoleBinding should reference"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/run/run.go:152
+msgid "Run a particular image on the cluster"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/proxy/proxy.go:119
+msgid "Run a proxy to the Kubernetes API server"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_secret_docker.go:153
+msgid "Server location for Docker registry"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/config/create_cluster.go:73
+msgid "Set a cluster entry in kubeconfig"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/config/create_context.go:61
+msgid "Set a context entry in kubeconfig"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/scale/scale.go:114
+msgid "Set a new size for a deployment, replica set, or replication controller"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/config/create_authinfo.go:152
+msgid "Set a user entry in kubeconfig"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/config/set.go:74
+msgid "Set an individual value in a kubeconfig file"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/set/set.go:39
+msgid "Set specific features on objects"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/config/use_context.go:52
+msgid "Set the current-context in a kubeconfig file"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/apply/apply_set_last_applied.go:101
+msgid ""
+"Set the last-applied-configuration annotation on a live object to match the "
+"contents of a file"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/set/set_selector.go:104
+msgid "Set the selector on a resource"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/describe/describe.go:107
+msgid "Show details of a specific resource or group of resources"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/rollout/rollout_status.go:102
+msgid "Show the status of the rollout"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:154
+msgid "Synonym for --target-port"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:134
+msgid ""
+"Take a replication controller, service, deployment or pod and expose it as a "
+"new Kubernetes service"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/run/run.go:174
+msgid "The image for the container to run."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/run/run.go:176
+msgid ""
+"The image pull policy for the container. If left empty, this value will not "
+"be specified by the client and defaulted by the server"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/debug/debug.go:172
+msgid ""
+"The image pull policy for the container. If left empty, this value will not "
+"be specified by the client and defaulted by the server."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_pdb.go:112
+msgid ""
+"The maximum number or percentage of unavailable pods this budget requires."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_pdb.go:111
+msgid ""
+"The minimum number or percentage of available pods this budget requires."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:159
+msgid "The name for the newly created object."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/autoscale/autoscale.go:125
+msgid ""
+"The name for the newly created object. If not specified, the name of the "
+"input resource will be used."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:147
+msgid ""
+"The name of the API generator to use. There are 2 generators: 'service/v1' "
+"and 'service/v2'. The only difference between them is that service port in "
+"v1 is named 'default', while it is left unnamed in v2. Default is 'service/"
+"v2'."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:148
+msgid "The network protocol for the service to be created. Default is 'TCP'."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:149
+msgid ""
+"The port that the service should serve on. Copied from the resource being "
+"exposed, if unspecified"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/run/run.go:182
+msgid "The port that this container exposes."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/run/run.go:194
+msgid ""
+"The resource requirement limits for this container.  For example, 'cpu=200m,"
+"memory=512Mi'.  Note that server side components may assign limits depending "
+"on the server configuration, such as limit ranges."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/run/run.go:192
+msgid ""
+"The resource requirement requests for this container.  For example, "
+"'cpu=100m,memory=256Mi'.  Note that server side components may assign "
+"requests depending on the server configuration, such as limit ranges."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/run/run.go:190
+msgid ""
+"The restart policy for this Pod.  Legal values [Always, OnFailure, Never]."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_secret.go:155
+msgid "The type of secret to create"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/alpha.go:33
+msgid ""
+"These commands correspond to alpha features that are not enabled in "
+"Kubernetes clusters by default."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:150
+msgid ""
+"Type for this service: ClusterIP, NodePort, LoadBalancer, or ExternalName. "
+"Default is 'ClusterIP'."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/rollout/rollout_undo.go:87
+msgid "Undo a previous rollout"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/config/unset.go:59
+msgid "Unset an individual value in a kubeconfig file"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/set/set_env.go:154
+msgid "Update environment variables on a pod template"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/patch/patch.go:115
+msgid "Update fields of a resource"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/set/set_resources.go:116
+msgid "Update resource requests/limits on objects with pod templates"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/annotate/annotate.go:135
+msgid "Update the annotations on a resource"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/set/set_image.go:110
+msgid "Update the image of a pod template"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/label/label.go:133
+msgid "Update the labels on a resource"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/set/set_serviceaccount.go:102
+msgid "Update the service account of a resource"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/taint/taint.go:109
+msgid "Update the taints on one or more nodes"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/set/set_subject.go:99
+msgid ""
+"Update the user, group, or service account in a role binding or cluster role "
+"binding"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_secret_docker.go:150
+msgid "Username for Docker registry authentication"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/rollout/rollout_history.go:83
+msgid "View rollout history"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/apply/apply_view_last_applied.go:77
+msgid ""
+"View the latest last-applied-configuration annotations of a resource/object"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/debug/debug.go:171
+msgid ""
+"When used with '--copy-to', a list of name=image pairs for changing "
+"container images, similar to how 'kubectl set image' works."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/debug/debug.go:168
+msgid "When used with '--copy-to', delete the original Pod."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/debug/debug.go:176
+msgid ""
+"When used with '--copy-to', enable process namespace sharing in the copy."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/debug/debug.go:175
+msgid ""
+"When used with '--copy-to', schedule the copy of target Pod on the same node."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/debug/debug.go:177
+msgid ""
+"When using an ephemeral container, target processes in this container name."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/clusterinfo/clusterinfo_dump.go:85
+msgid ""
+"Where to output the files.  If empty or '-' uses stdout, otherwise creates a "
+"directory hierarchy in that directory"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_priorityclass.go:108
+msgid ""
+"description is an arbitrary string that usually provides guidelines on when "
+"this priority class should be used."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/run/run_test.go:88
+msgid "dummy restart flag)"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_priorityclass.go:107
+msgid ""
+"global-default specifies whether this PriorityClass should be considered as "
+"the default priority."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/cmd.go:227
+msgid "kubectl controls the Kubernetes cluster manager"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/expose/expose.go:45
+msgid ""
+"pod (po), service (svc), replicationcontroller (rc), deployment (deploy), "
+"replicaset (rs)"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_priorityclass.go:109
+msgid ""
+"preemption-policy is the policy for preempting pods with lower priority."
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/set/set_serviceaccount.go:41
+msgid ""
+"replicationcontroller (rc), deployment (deploy), daemonset (ds), job, "
+"replicaset (rs), statefulset"
+msgstr ""
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/create/create_priorityclass.go:106
+msgid "the value of this priority class."
+msgstr ""

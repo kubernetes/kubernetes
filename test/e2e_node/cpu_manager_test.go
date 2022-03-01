@@ -17,8 +17,10 @@ limitations under the License.
 package e2enode
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -26,18 +28,18 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	cpumanagerstate "k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/test/e2e/framework"
-	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
+	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 )
 
 // Helper for makeCPUManagerPod().
@@ -57,12 +59,12 @@ func makeCPUManagerPod(podName string, ctnAttributes []ctnAttribute) *v1.Pod {
 			Image: busyboxImage,
 			Resources: v1.ResourceRequirements{
 				Requests: v1.ResourceList{
-					v1.ResourceName(v1.ResourceCPU):    resource.MustParse(ctnAttr.cpuRequest),
-					v1.ResourceName(v1.ResourceMemory): resource.MustParse("100Mi"),
+					v1.ResourceCPU:    resource.MustParse(ctnAttr.cpuRequest),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
 				},
 				Limits: v1.ResourceList{
-					v1.ResourceName(v1.ResourceCPU):    resource.MustParse(ctnAttr.cpuLimit),
-					v1.ResourceName(v1.ResourceMemory): resource.MustParse("100Mi"),
+					v1.ResourceCPU:    resource.MustParse(ctnAttr.cpuLimit),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
 				},
 			},
 			Command: []string{"sh", "-c", cpusetCmd},
@@ -81,13 +83,17 @@ func makeCPUManagerPod(podName string, ctnAttributes []ctnAttribute) *v1.Pod {
 	}
 }
 
+func deletePodSyncByName(f *framework.Framework, podName string) {
+	gp := int64(0)
+	delOpts := metav1.DeleteOptions{
+		GracePeriodSeconds: &gp,
+	}
+	f.PodClient().DeleteSync(podName, delOpts, framework.DefaultPodDeletionTimeout)
+}
+
 func deletePods(f *framework.Framework, podNames []string) {
 	for _, podName := range podNames {
-		gp := int64(0)
-		delOpts := metav1.DeleteOptions{
-			GracePeriodSeconds: &gp,
-		}
-		f.PodClient().DeleteSync(podName, delOpts, framework.DefaultPodDeletionTimeout)
+		deletePodSyncByName(f, podName)
 	}
 }
 
@@ -102,7 +108,7 @@ func getLocalNodeCPUDetails(f *framework.Framework) (cpuCapVal int64, cpuAllocVa
 	// RoundUp reserved CPUs to get only integer cores.
 	cpuRes.RoundUp(0)
 
-	return cpuCap.Value(), (cpuCap.Value() - cpuRes.Value()), cpuRes.Value()
+	return cpuCap.Value(), cpuCap.Value() - cpuRes.Value(), cpuRes.Value()
 }
 
 func waitForContainerRemoval(containerName, podName, podNS string) {
@@ -155,6 +161,17 @@ func isMultiNUMA() bool {
 	return numaNodes > 1
 }
 
+func getSMTLevel() int {
+	cpuID := 0 // this is just the most likely cpu to be present in a random system. No special meaning besides this.
+	out, err := exec.Command("/bin/sh", "-c", fmt.Sprintf("cat /sys/devices/system/cpu/cpu%d/topology/thread_siblings_list | tr -d \"\n\r\"", cpuID)).Output()
+	framework.ExpectNoError(err)
+	// how many thread sibling you have = SMT level
+	// example: 2-way SMT means 2 threads sibling for each thread
+	cpus, err := cpuset.Parse(strings.TrimSpace(string(out)))
+	framework.ExpectNoError(err)
+	return cpus.Size()
+}
+
 func getCPUSiblingList(cpuRes int64) string {
 	out, err := exec.Command("/bin/sh", "-c", fmt.Sprintf("cat /sys/devices/system/cpu/cpu%d/topology/thread_siblings_list | tr -d \"\n\r\"", cpuRes)).Output()
 	framework.ExpectNoError(err)
@@ -167,134 +184,84 @@ func getCoreSiblingList(cpuRes int64) string {
 	return string(out)
 }
 
-func deleteStateFile() {
-	err := exec.Command("/bin/sh", "-c", "rm -f /var/lib/kubelet/cpu_manager_state").Run()
-	framework.ExpectNoError(err, "error deleting state file")
+type cpuManagerKubeletArguments struct {
+	policyName              string
+	enableCPUManager        bool
+	enableCPUManagerOptions bool
+	reservedSystemCPUs      cpuset.CPUSet
+	options                 map[string]string
 }
 
-func setOldKubeletConfig(f *framework.Framework, oldCfg *kubeletconfig.KubeletConfiguration) {
-	// Delete the CPU Manager state file so that the old Kubelet configuration
-	// can take effect.i
-	deleteStateFile()
-
-	if oldCfg != nil {
-		framework.ExpectNoError(setKubeletConfiguration(f, oldCfg))
-	}
-}
-
-func disableCPUManagerInKubelet(f *framework.Framework) (oldCfg *kubeletconfig.KubeletConfiguration) {
-	// Disable CPU Manager in Kubelet.
-	oldCfg, err := getCurrentKubeletConfig()
-	framework.ExpectNoError(err)
+func configureCPUManagerInKubelet(oldCfg *kubeletconfig.KubeletConfiguration, kubeletArguments *cpuManagerKubeletArguments) *kubeletconfig.KubeletConfiguration {
 	newCfg := oldCfg.DeepCopy()
 	if newCfg.FeatureGates == nil {
 		newCfg.FeatureGates = make(map[string]bool)
 	}
-	newCfg.FeatureGates["CPUManager"] = false
 
-	// Update the Kubelet configuration.
-	framework.ExpectNoError(setKubeletConfiguration(f, newCfg))
+	newCfg.FeatureGates["CPUManager"] = kubeletArguments.enableCPUManager
 
-	// Wait for the Kubelet to be ready.
-	gomega.Eventually(func() bool {
-		nodes, err := e2enode.TotalReady(f.ClientSet)
-		framework.ExpectNoError(err)
-		return nodes == 1
-	}, time.Minute, time.Second).Should(gomega.BeTrue())
+	newCfg.FeatureGates["CPUManagerPolicyOptions"] = kubeletArguments.enableCPUManagerOptions
+	newCfg.FeatureGates["CPUManagerPolicyBetaOptions"] = kubeletArguments.enableCPUManagerOptions
+	newCfg.FeatureGates["CPUManagerPolicyAlphaOptions"] = kubeletArguments.enableCPUManagerOptions
 
-	return oldCfg
-}
-
-func enableCPUManagerInKubelet(f *framework.Framework, cleanStateFile bool) (oldCfg *kubeletconfig.KubeletConfiguration) {
-	// Enable CPU Manager in Kubelet with static policy.
-	oldCfg, err := getCurrentKubeletConfig()
-	framework.ExpectNoError(err)
-	newCfg := oldCfg.DeepCopy()
-	if newCfg.FeatureGates == nil {
-		newCfg.FeatureGates = make(map[string]bool)
-	} else {
-		newCfg.FeatureGates["CPUManager"] = true
-	}
-
-	// After graduation of the CPU Manager feature to Beta, the CPU Manager
-	// "none" policy is ON by default. But when we set the CPU Manager policy to
-	// "static" in this test and the Kubelet is restarted so that "static"
-	// policy can take effect, there will always be a conflict with the state
-	// checkpointed in the disk (i.e., the policy checkpointed in the disk will
-	// be "none" whereas we are trying to restart Kubelet with "static"
-	// policy). Therefore, we delete the state file so that we can proceed
-	// with the tests.
-	// Only delete the state file at the begin of the tests.
-	if cleanStateFile {
-		deleteStateFile()
-	}
-
-	// Set the CPU Manager policy to static.
-	newCfg.CPUManagerPolicy = string(cpumanager.PolicyStatic)
-
-	// Set the CPU Manager reconcile period to 1 second.
+	newCfg.CPUManagerPolicy = kubeletArguments.policyName
 	newCfg.CPUManagerReconcilePeriod = metav1.Duration{Duration: 1 * time.Second}
 
-	// The Kubelet panics if either kube-reserved or system-reserved is not set
-	// when CPU Manager is enabled. Set cpu in kube-reserved > 0 so that
-	// kubelet doesn't panic.
-	if newCfg.KubeReserved == nil {
-		newCfg.KubeReserved = map[string]string{}
+	if kubeletArguments.options != nil {
+		newCfg.CPUManagerPolicyOptions = kubeletArguments.options
 	}
 
-	if _, ok := newCfg.KubeReserved["cpu"]; !ok {
-		newCfg.KubeReserved["cpu"] = "200m"
+	if kubeletArguments.reservedSystemCPUs.Size() > 0 {
+		cpus := kubeletArguments.reservedSystemCPUs.String()
+		framework.Logf("configureCPUManagerInKubelet: using reservedSystemCPUs=%q", cpus)
+		newCfg.ReservedSystemCPUs = cpus
+	} else {
+		// The Kubelet panics if either kube-reserved or system-reserved is not set
+		// when CPU Manager is enabled. Set cpu in kube-reserved > 0 so that
+		// kubelet doesn't panic.
+		if newCfg.KubeReserved == nil {
+			newCfg.KubeReserved = map[string]string{}
+		}
+
+		if _, ok := newCfg.KubeReserved["cpu"]; !ok {
+			newCfg.KubeReserved["cpu"] = "200m"
+		}
 	}
-	// Update the Kubelet configuration.
-	framework.ExpectNoError(setKubeletConfiguration(f, newCfg))
 
-	// Wait for the Kubelet to be ready.
-	gomega.Eventually(func() bool {
-		nodes, err := e2enode.TotalReady(f.ClientSet)
-		framework.ExpectNoError(err)
-		return nodes == 1
-	}, time.Minute, time.Second).Should(gomega.BeTrue())
-
-	return oldCfg
+	return newCfg
 }
 
-func runGuPodTest(f *framework.Framework) {
-	var ctnAttrs []ctnAttribute
-	var cpu1 int
-	var err error
-	var cpuList []int
+func runGuPodTest(f *framework.Framework, cpuCount int) {
 	var pod *v1.Pod
-	var expAllowedCPUsListRegex string
 
-	ctnAttrs = []ctnAttribute{
+	ctnAttrs := []ctnAttribute{
 		{
 			ctnName:    "gu-container",
-			cpuRequest: "1000m",
-			cpuLimit:   "1000m",
+			cpuRequest: fmt.Sprintf("%dm", 1000*cpuCount),
+			cpuLimit:   fmt.Sprintf("%dm", 1000*cpuCount),
 		},
 	}
 	pod = makeCPUManagerPod("gu-pod", ctnAttrs)
 	pod = f.PodClient().CreateSync(pod)
 
 	ginkgo.By("checking if the expected cpuset was assigned")
-	cpu1 = 1
-	if isHTEnabled() {
-		cpuList = cpuset.MustParse(getCPUSiblingList(0)).ToSlice()
-		cpu1 = cpuList[1]
-	} else if isMultiNUMA() {
-		cpuList = cpuset.MustParse(getCoreSiblingList(0)).ToSlice()
-		if len(cpuList) > 1 {
-			cpu1 = cpuList[1]
-		}
+	// any full CPU is fine - we cannot nor we should predict which one, though
+	for _, cnt := range pod.Spec.Containers {
+		ginkgo.By(fmt.Sprintf("validating the container %s on Gu pod %s", cnt.Name, pod.Name))
+
+		logs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, cnt.Name)
+		framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]", cnt.Name, pod.Name)
+
+		framework.Logf("got pod logs: %v", logs)
+		cpus, err := cpuset.Parse(strings.TrimSpace(logs))
+		framework.ExpectNoError(err, "parsing cpuset from logs for [%s] of pod [%s]", cnt.Name, pod.Name)
+
+		framework.ExpectEqual(cpus.Size(), cpuCount, "expected cpu set size == %d, got %q", cpuCount, cpus.String())
 	}
-	expAllowedCPUsListRegex = fmt.Sprintf("^%d\n$", cpu1)
-	err = f.PodClient().MatchContainerOutput(pod.Name, pod.Spec.Containers[0].Name, expAllowedCPUsListRegex)
-	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
-		pod.Spec.Containers[0].Name, pod.Name)
 
 	ginkgo.By("by deleting the pods and waiting for container removal")
 	deletePods(f, []string{pod.Name})
-	waitForContainerRemoval(pod.Spec.Containers[0].Name, pod.Name, pod.Namespace)
+	waitForAllContainerRemoval(pod.Name, pod.Namespace)
 }
 
 func runNonGuPodTest(f *framework.Framework, cpuCap int64) {
@@ -563,6 +530,14 @@ func runCPUManagerTests(f *framework.Framework) {
 	var ctnAttrs []ctnAttribute
 	var pod *v1.Pod
 
+	ginkgo.BeforeEach(func() {
+		var err error
+		if oldCfg == nil {
+			oldCfg, err = getCurrentKubeletConfig()
+			framework.ExpectNoError(err)
+		}
+	})
+
 	ginkgo.It("should assign CPUs as expected based on the Pod spec", func() {
 		cpuCap, cpuAlloc, _ = getLocalNodeCPUDetails(f)
 
@@ -572,13 +547,18 @@ func runCPUManagerTests(f *framework.Framework) {
 		}
 
 		// Enable CPU Manager in the kubelet.
-		oldCfg = enableCPUManagerInKubelet(f, true)
+		newCfg := configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+			policyName:         string(cpumanager.PolicyStatic),
+			enableCPUManager:   true,
+			reservedSystemCPUs: cpuset.CPUSet{},
+		})
+		updateKubeletConfig(f, newCfg, true)
 
 		ginkgo.By("running a non-Gu pod")
 		runNonGuPodTest(f, cpuCap)
 
 		ginkgo.By("running a Gu pod")
-		runGuPodTest(f)
+		runGuPodTest(f, 1)
 
 		ginkgo.By("running multiple Gu and non-Gu pods")
 		runMultipleGuNonGuPods(f, cpuCap, cpuAlloc)
@@ -632,27 +612,177 @@ func runCPUManagerTests(f *framework.Framework) {
 			pod.Spec.Containers[0].Name, pod.Name)
 
 		ginkgo.By("disable cpu manager in kubelet")
-		disableCPUManagerInKubelet(f)
+		newCfg = configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+			policyName:         string(cpumanager.PolicyStatic),
+			enableCPUManager:   false,
+			reservedSystemCPUs: cpuset.CPUSet{},
+		})
+		updateKubeletConfig(f, newCfg, false)
 
 		ginkgo.By("by deleting the pod and waiting for container removal")
 		deletePods(f, []string{pod.Name})
 		waitForContainerRemoval(pod.Spec.Containers[0].Name, pod.Name, pod.Namespace)
 
 		ginkgo.By("enable cpu manager in kubelet without delete state file")
-		enableCPUManagerInKubelet(f, false)
+		newCfg = configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+			policyName:         string(cpumanager.PolicyStatic),
+			enableCPUManager:   true,
+			reservedSystemCPUs: cpuset.CPUSet{},
+		})
+		updateKubeletConfig(f, newCfg, false)
 
 		ginkgo.By("wait for the deleted pod to be cleaned up from the state file")
 		waitForStateFileCleanedUp()
 		ginkgo.By("the deleted pod has already been deleted from the state file")
 	})
 
+	ginkgo.It("should assign CPUs as expected with enhanced policy based on strict SMT alignment", func() {
+		fullCPUsOnlyOpt := fmt.Sprintf("option=%s", cpumanager.FullPCPUsOnlyOption)
+		_, cpuAlloc, _ = getLocalNodeCPUDetails(f)
+		smtLevel := getSMTLevel()
+
+		// strict SMT alignment is trivially verified and granted on non-SMT systems
+		if smtLevel < 2 {
+			e2eskipper.Skipf("Skipping CPU Manager %s tests since SMT disabled", fullCPUsOnlyOpt)
+		}
+
+		// our tests want to allocate a full core, so we need at last 2*2=4 virtual cpus
+		if cpuAlloc < int64(smtLevel*2) {
+			e2eskipper.Skipf("Skipping CPU Manager %s tests since the CPU capacity < 4", fullCPUsOnlyOpt)
+		}
+
+		framework.Logf("SMT level %d", smtLevel)
+
+		// TODO: we assume the first available CPUID is 0, which is pretty fair, but we should probably
+		// check what we do have in the node.
+		cpuPolicyOptions := map[string]string{
+			cpumanager.FullPCPUsOnlyOption: "true",
+		}
+		newCfg := configureCPUManagerInKubelet(oldCfg,
+			&cpuManagerKubeletArguments{
+				policyName:              string(cpumanager.PolicyStatic),
+				enableCPUManager:        true,
+				reservedSystemCPUs:      cpuset.NewCPUSet(0),
+				enableCPUManagerOptions: true,
+				options:                 cpuPolicyOptions,
+			},
+		)
+		updateKubeletConfig(f, newCfg, true)
+
+		// the order between negative and positive doesn't really matter
+		runSMTAlignmentNegativeTests(f)
+		runSMTAlignmentPositiveTests(f, smtLevel)
+	})
+
 	ginkgo.AfterEach(func() {
-		setOldKubeletConfig(f, oldCfg)
+		updateKubeletConfig(f, oldCfg, true)
 	})
 }
 
+func runSMTAlignmentNegativeTests(f *framework.Framework) {
+	// negative test: try to run a container whose requests aren't a multiple of SMT level, expect a rejection
+	ctnAttrs := []ctnAttribute{
+		{
+			ctnName:    "gu-container-neg",
+			cpuRequest: "1000m",
+			cpuLimit:   "1000m",
+		},
+	}
+	pod := makeCPUManagerPod("gu-pod", ctnAttrs)
+	// CreateSync would wait for pod to become Ready - which will never happen if production code works as intended!
+	pod = f.PodClient().Create(pod)
+
+	err := e2epod.WaitForPodCondition(f.ClientSet, f.Namespace.Name, pod.Name, "Failed", 30*time.Second, func(pod *v1.Pod) (bool, error) {
+		if pod.Status.Phase != v1.PodPending {
+			return true, nil
+		}
+		return false, nil
+	})
+	framework.ExpectNoError(err)
+	pod, err = f.PodClient().Get(context.TODO(), pod.Name, metav1.GetOptions{})
+	framework.ExpectNoError(err)
+
+	if pod.Status.Phase != v1.PodFailed {
+		framework.Failf("pod %s not failed: %v", pod.Name, pod.Status)
+	}
+	if !isSMTAlignmentError(pod) {
+		framework.Failf("pod %s failed for wrong reason: %q", pod.Name, pod.Status.Reason)
+	}
+
+	deletePodSyncByName(f, pod.Name)
+	// we need to wait for all containers to really be gone so cpumanager reconcile loop will not rewrite the cpu_manager_state.
+	// this is in turn needed because we will have an unavoidable (in the current framework) race with th
+	// reconcile loop which will make our attempt to delete the state file and to restore the old config go haywire
+	waitForAllContainerRemoval(pod.Name, pod.Namespace)
+}
+
+func runSMTAlignmentPositiveTests(f *framework.Framework, smtLevel int) {
+	// positive test: try to run a container whose requests are a multiple of SMT level, check allocated cores
+	// 1. are core siblings
+	// 2. take a full core
+	// WARNING: this assumes 2-way SMT systems - we don't know how to access other SMT levels.
+	//          this means on more-than-2-way SMT systems this test will prove nothing
+	ctnAttrs := []ctnAttribute{
+		{
+			ctnName:    "gu-container-pos",
+			cpuRequest: "2000m",
+			cpuLimit:   "2000m",
+		},
+	}
+	pod := makeCPUManagerPod("gu-pod", ctnAttrs)
+	pod = f.PodClient().CreateSync(pod)
+
+	for _, cnt := range pod.Spec.Containers {
+		ginkgo.By(fmt.Sprintf("validating the container %s on Gu pod %s", cnt.Name, pod.Name))
+
+		logs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, cnt.Name)
+		framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]", cnt.Name, pod.Name)
+
+		framework.Logf("got pod logs: %v", logs)
+		cpus, err := cpuset.Parse(strings.TrimSpace(logs))
+		framework.ExpectNoError(err, "parsing cpuset from logs for [%s] of pod [%s]", cnt.Name, pod.Name)
+
+		validateSMTAlignment(cpus, smtLevel, pod, &cnt)
+	}
+
+	deletePodSyncByName(f, pod.Name)
+	// we need to wait for all containers to really be gone so cpumanager reconcile loop will not rewrite the cpu_manager_state.
+	// this is in turn needed because we will have an unavoidable (in the current framework) race with th
+	// reconcile loop which will make our attempt to delete the state file and to restore the old config go haywire
+	waitForAllContainerRemoval(pod.Name, pod.Namespace)
+}
+
+func validateSMTAlignment(cpus cpuset.CPUSet, smtLevel int, pod *v1.Pod, cnt *v1.Container) {
+	framework.Logf("validating cpus: %v", cpus)
+
+	if cpus.Size()%smtLevel != 0 {
+		framework.Failf("pod %q cnt %q received non-smt-multiple cpuset %v (SMT level %d)", pod.Name, cnt.Name, cpus, smtLevel)
+	}
+
+	// now check all the given cpus are thread siblings.
+	// to do so the easiest way is to rebuild the expected set of siblings from all the cpus we got.
+	// if the expected set matches the given set, the given set was good.
+	b := cpuset.NewBuilder()
+	for _, cpuID := range cpus.ToSliceNoSort() {
+		threadSiblings, err := cpuset.Parse(strings.TrimSpace(getCPUSiblingList(int64(cpuID))))
+		framework.ExpectNoError(err, "parsing cpuset from logs for [%s] of pod [%s]", cnt.Name, pod.Name)
+		b.Add(threadSiblings.ToSliceNoSort()...)
+	}
+	siblingsCPUs := b.Result()
+
+	framework.Logf("siblings cpus: %v", siblingsCPUs)
+	if !siblingsCPUs.Equals(cpus) {
+		framework.Failf("pod %q cnt %q received non-smt-aligned cpuset %v (expected %v)", pod.Name, cnt.Name, cpus, siblingsCPUs)
+	}
+}
+
+func isSMTAlignmentError(pod *v1.Pod) bool {
+	re := regexp.MustCompile(`SMT.*Alignment.*Error`)
+	return re.MatchString(pod.Status.Reason)
+}
+
 // Serial because the test updates kubelet configuration.
-var _ = SIGDescribe("CPU Manager [Serial] [Feature:CPUManager][NodeAlphaFeature:CPUManager]", func() {
+var _ = SIGDescribe("CPU Manager [Serial] [Feature:CPUManager]", func() {
 	f := framework.NewDefaultFramework("cpu-manager-test")
 
 	ginkgo.Context("With kubeconfig updated with static CPU Manager policy run the CPU Manager tests", func() {

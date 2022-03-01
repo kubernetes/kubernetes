@@ -24,15 +24,17 @@ import (
 	"strings"
 	"testing"
 
-	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	"k8s.io/klog/v2"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/stretchr/testify/assert"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
@@ -100,8 +102,7 @@ func (p *mockPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Containe
 	return p.err
 }
 
-func (p *mockPolicy) RemoveContainer(s state.State, podUID string, containerName string) error {
-	return p.err
+func (p *mockPolicy) RemoveContainer(s state.State, podUID string, containerName string) {
 }
 
 func (p *mockPolicy) GetTopologyHints(s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
@@ -110,6 +111,11 @@ func (p *mockPolicy) GetTopologyHints(s state.State, pod *v1.Pod, container *v1.
 
 func (p *mockPolicy) GetPodTopologyHints(s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
 	return nil
+}
+
+// GetAllocatableMemory returns the amount of allocatable memory for each NUMA node
+func (p *mockPolicy) GetAllocatableMemory(s state.State) []state.Block {
+	return []state.Block{}
 }
 
 type mockRuntimeService struct {
@@ -141,6 +147,18 @@ func getPod(podUID string, containerName string, requirements *v1.ResourceRequir
 					Resources: *requirements,
 				},
 			},
+		},
+	}
+}
+
+func getPodWithInitContainers(podUID string, containers []v1.Container, initContainers []v1.Container) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: types.UID(podUID),
+		},
+		Spec: v1.PodSpec{
+			InitContainers: initContainers,
+			Containers:     containers,
 		},
 	}
 }
@@ -892,7 +910,7 @@ func TestRemoveStaleState(t *testing.T) {
 
 			mgr.removeStaleState()
 
-			if !areContainerMemoryAssignmentsEqual(mgr.state.GetMemoryAssignments(), testCase.expectedAssignments) {
+			if !areContainerMemoryAssignmentsEqual(t, mgr.state.GetMemoryAssignments(), testCase.expectedAssignments) {
 				t.Errorf("Memory Manager removeStaleState() error, expected assignments %v, but got: %v",
 					testCase.expectedAssignments, mgr.state.GetMemoryAssignments())
 			}
@@ -1117,102 +1135,6 @@ func TestAddContainer(t *testing.T) {
 				},
 			},
 			expectedAllocateError:     fmt.Errorf("fake reg error"),
-			expectedAddContainerError: nil,
-			podAllocate:               pod,
-			assignments:               state.ContainerMemoryAssignments{},
-			activePods:                nil,
-		},
-		{
-			description: "Adding container should fail (CRI error) but without an error",
-			updateError: fmt.Errorf("fake reg error"),
-			policyName:  policyTypeStatic,
-			machineInfo: machineInfo,
-			reserved:    reserved,
-			machineState: state.NUMANodeMap{
-				0: &state.NUMANodeState{
-					Cells:               []int{0},
-					NumberOfAssignments: 0,
-					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
-						v1.ResourceMemory: {
-							Allocatable:    9 * gb,
-							Free:           9 * gb,
-							Reserved:       0 * gb,
-							SystemReserved: 1 * gb,
-							TotalMemSize:   10 * gb,
-						},
-						hugepages1Gi: {
-							Allocatable:    5 * gb,
-							Free:           5 * gb,
-							Reserved:       0,
-							SystemReserved: 0,
-							TotalMemSize:   5 * gb,
-						},
-					},
-				},
-				1: &state.NUMANodeState{
-					Cells:               []int{1},
-					NumberOfAssignments: 0,
-					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
-						v1.ResourceMemory: {
-							Allocatable:    9 * gb,
-							Free:           9 * gb,
-							Reserved:       0 * gb,
-							SystemReserved: 1 * gb,
-							TotalMemSize:   10 * gb,
-						},
-						hugepages1Gi: {
-							Allocatable:    5 * gb,
-							Free:           5 * gb,
-							Reserved:       0,
-							SystemReserved: 0,
-							TotalMemSize:   5 * gb,
-						},
-					},
-				},
-			},
-			expectedMachineState: state.NUMANodeMap{
-				0: &state.NUMANodeState{
-					Cells:               []int{0},
-					NumberOfAssignments: 0,
-					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
-						v1.ResourceMemory: {
-							Allocatable:    9 * gb,
-							Free:           9 * gb,
-							Reserved:       0 * gb,
-							SystemReserved: 1 * gb,
-							TotalMemSize:   10 * gb,
-						},
-						hugepages1Gi: {
-							Allocatable:    5 * gb,
-							Free:           5 * gb,
-							Reserved:       0,
-							SystemReserved: 0,
-							TotalMemSize:   5 * gb,
-						},
-					},
-				},
-				1: &state.NUMANodeState{
-					Cells:               []int{1},
-					NumberOfAssignments: 0,
-					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
-						v1.ResourceMemory: {
-							Allocatable:    9 * gb,
-							Free:           9 * gb,
-							Reserved:       0 * gb,
-							SystemReserved: 1 * gb,
-							TotalMemSize:   10 * gb,
-						},
-						hugepages1Gi: {
-							Allocatable:    5 * gb,
-							Free:           5 * gb,
-							Reserved:       0,
-							SystemReserved: 0,
-							TotalMemSize:   5 * gb,
-						},
-					},
-				},
-			},
-			expectedAllocateError:     nil,
 			expectedAddContainerError: nil,
 			podAllocate:               pod,
 			assignments:               state.ContainerMemoryAssignments{},
@@ -1487,7 +1409,8 @@ func TestAddContainer(t *testing.T) {
 				t.Errorf("Memory Manager Allocate() error (%v), expected error: %v, but got: %v",
 					testCase.description, testCase.expectedAllocateError, err)
 			}
-			err = mgr.AddContainer(pod, container, "fakeID")
+			mgr.AddContainer(pod, container, "fakeID")
+			_, _, err = mgr.containerMap.GetContainerRef("fakeID")
 			if !reflect.DeepEqual(err, testCase.expectedAddContainerError) {
 				t.Errorf("Memory Manager AddContainer() error (%v), expected error: %v, but got: %v",
 					testCase.description, testCase.expectedAddContainerError, err)
@@ -1786,154 +1709,6 @@ func TestRemoveContainer(t *testing.T) {
 			expectedError: nil,
 		},
 		{
-			description:       "Should fail if policy returns an error",
-			removeContainerID: "fakeID1",
-			policyName:        policyTypeMock,
-			machineInfo:       machineInfo,
-			reserved:          reserved,
-			assignments: state.ContainerMemoryAssignments{
-				"fakePod1": map[string][]state.Block{
-					"fakeContainer1": {
-						{
-							NUMAAffinity: []int{0},
-							Type:         v1.ResourceMemory,
-							Size:         1 * gb,
-						},
-						{
-							NUMAAffinity: []int{0},
-							Type:         hugepages1Gi,
-							Size:         1 * gb,
-						},
-					},
-					"fakeContainer2": {
-						{
-							NUMAAffinity: []int{0},
-							Type:         v1.ResourceMemory,
-							Size:         1 * gb,
-						},
-						{
-							NUMAAffinity: []int{0},
-							Type:         hugepages1Gi,
-							Size:         1 * gb,
-						},
-					},
-				},
-			},
-			expectedAssignments: state.ContainerMemoryAssignments{
-				"fakePod1": map[string][]state.Block{
-					"fakeContainer1": {
-						{
-							NUMAAffinity: []int{0},
-							Type:         v1.ResourceMemory,
-							Size:         1 * gb,
-						},
-						{
-							NUMAAffinity: []int{0},
-							Type:         hugepages1Gi,
-							Size:         1 * gb,
-						},
-					},
-					"fakeContainer2": {
-						{
-							NUMAAffinity: []int{0},
-							Type:         v1.ResourceMemory,
-							Size:         1 * gb,
-						},
-						{
-							NUMAAffinity: []int{0},
-							Type:         hugepages1Gi,
-							Size:         1 * gb,
-						},
-					},
-				},
-			},
-			machineState: state.NUMANodeMap{
-				0: &state.NUMANodeState{
-					Cells:               []int{0},
-					NumberOfAssignments: 4,
-					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
-						v1.ResourceMemory: {
-							Allocatable:    9 * gb,
-							Free:           7 * gb,
-							Reserved:       2 * gb,
-							SystemReserved: 1 * gb,
-							TotalMemSize:   10 * gb,
-						},
-						hugepages1Gi: {
-							Allocatable:    5 * gb,
-							Free:           3 * gb,
-							Reserved:       2 * gb,
-							SystemReserved: 0 * gb,
-							TotalMemSize:   5 * gb,
-						},
-					},
-				},
-				1: &state.NUMANodeState{
-					Cells:               []int{1},
-					NumberOfAssignments: 0,
-					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
-						v1.ResourceMemory: {
-							Allocatable:    9 * gb,
-							Free:           9 * gb,
-							Reserved:       0 * gb,
-							SystemReserved: 1 * gb,
-							TotalMemSize:   10 * gb,
-						},
-						hugepages1Gi: {
-							Allocatable:    5 * gb,
-							Free:           5 * gb,
-							Reserved:       0,
-							SystemReserved: 0,
-							TotalMemSize:   5 * gb,
-						},
-					},
-				},
-			},
-			expectedMachineState: state.NUMANodeMap{
-				0: &state.NUMANodeState{
-					Cells:               []int{0},
-					NumberOfAssignments: 4,
-					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
-						v1.ResourceMemory: {
-							Allocatable:    9 * gb,
-							Free:           7 * gb,
-							Reserved:       2 * gb,
-							SystemReserved: 1 * gb,
-							TotalMemSize:   10 * gb,
-						},
-						hugepages1Gi: {
-							Allocatable:    5 * gb,
-							Free:           3 * gb,
-							Reserved:       2 * gb,
-							SystemReserved: 0 * gb,
-							TotalMemSize:   5 * gb,
-						},
-					},
-				},
-				1: &state.NUMANodeState{
-					Cells:               []int{1},
-					NumberOfAssignments: 0,
-					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
-						v1.ResourceMemory: {
-							Allocatable:    9 * gb,
-							Free:           9 * gb,
-							Reserved:       0 * gb,
-							SystemReserved: 1 * gb,
-							TotalMemSize:   10 * gb,
-						},
-						hugepages1Gi: {
-							Allocatable:    5 * gb,
-							Free:           5 * gb,
-							Reserved:       0,
-							SystemReserved: 0,
-							TotalMemSize:   5 * gb,
-						},
-					},
-				},
-			},
-			expectedError: fmt.Errorf("fake reg error"),
-		},
-		{
 			description:       "Should do nothing if container is not in containerMap",
 			removeContainerID: "fakeID3",
 			policyName:        policyTypeStatic,
@@ -2107,7 +1882,7 @@ func TestRemoveContainer(t *testing.T) {
 					testCase.description, testCase.expectedError, err)
 			}
 
-			if !areContainerMemoryAssignmentsEqual(mgr.state.GetMemoryAssignments(), testCase.expectedAssignments) {
+			if !areContainerMemoryAssignmentsEqual(t, mgr.state.GetMemoryAssignments(), testCase.expectedAssignments) {
 				t.Fatalf("Memory Manager RemoveContainer() inconsistent assignment, expected: %+v, but got: %+v, start %+v",
 					testCase.expectedAssignments, mgr.state.GetMemoryAssignments(), testCase.expectedAssignments)
 			}
@@ -2337,6 +2112,129 @@ func TestGetTopologyHints(t *testing.T) {
 						NUMANodeAffinity: newNUMAAffinity(1),
 						Preferred:        true,
 					},
+				},
+				string(hugepages1Gi): {
+					{
+						NUMANodeAffinity: newNUMAAffinity(0),
+						Preferred:        true,
+					},
+					{
+						NUMANodeAffinity: newNUMAAffinity(1),
+						Preferred:        true,
+					},
+				},
+			},
+			activePods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						UID: "fakePod1",
+					},
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
+							{
+								Name: "fakeContainer1",
+							},
+							{
+								Name: "fakeContainer2",
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			description: "Successful hint generation",
+			policyName:  policyTypeStatic,
+			machineInfo: returnMachineInfo(),
+			reserved: systemReservedMemory{
+				0: map[v1.ResourceName]uint64{
+					v1.ResourceMemory: 1 * gb,
+				},
+				1: map[v1.ResourceName]uint64{
+					v1.ResourceMemory: 1 * gb,
+				},
+			},
+			assignments: state.ContainerMemoryAssignments{
+				"fakePod1": map[string][]state.Block{
+					"fakeContainer1": {
+						{
+							NUMAAffinity: []int{0},
+							Type:         v1.ResourceMemory,
+							Size:         1 * gb,
+						},
+						{
+							NUMAAffinity: []int{0},
+							Type:         hugepages1Gi,
+							Size:         1 * gb,
+						},
+					},
+					"fakeContainer2": {
+						{
+							NUMAAffinity: []int{0},
+							Type:         v1.ResourceMemory,
+							Size:         1 * gb,
+						},
+						{
+							NUMAAffinity: []int{0},
+							Type:         hugepages1Gi,
+							Size:         1 * gb,
+						},
+					},
+				},
+			},
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					Cells:               []int{0},
+					NumberOfAssignments: 4,
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    9 * gb,
+							Free:           7 * gb,
+							Reserved:       2 * gb,
+							SystemReserved: 1 * gb,
+							TotalMemSize:   10 * gb,
+						},
+						hugepages1Gi: {
+							Allocatable:    5 * gb,
+							Free:           3 * gb,
+							Reserved:       2 * gb,
+							SystemReserved: 0 * gb,
+							TotalMemSize:   5 * gb,
+						},
+					},
+				},
+				1: &state.NUMANodeState{
+					Cells:               []int{1},
+					NumberOfAssignments: 0,
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    9 * gb,
+							Free:           9 * gb,
+							Reserved:       0 * gb,
+							SystemReserved: 1 * gb,
+							TotalMemSize:   10 * gb,
+						},
+						hugepages1Gi: {
+							Allocatable:    5 * gb,
+							Free:           5 * gb,
+							Reserved:       0,
+							SystemReserved: 0,
+							TotalMemSize:   5 * gb,
+						},
+					},
+				},
+			},
+			expectedError: nil,
+			expectedHints: map[string][]topologymanager.TopologyHint{
+				string(v1.ResourceMemory): {
+					{
+						NUMANodeAffinity: newNUMAAffinity(0),
+						Preferred:        true,
+					},
+					{
+						NUMANodeAffinity: newNUMAAffinity(1),
+						Preferred:        true,
+					},
 					{
 						NUMANodeAffinity: newNUMAAffinity(0, 1),
 						Preferred:        false,
@@ -2357,6 +2255,7 @@ func TestGetTopologyHints(t *testing.T) {
 					},
 				},
 			},
+			activePods: []*v1.Pod{},
 		},
 	}
 
@@ -2369,14 +2268,14 @@ func TestGetTopologyHints(t *testing.T) {
 				containerRuntime: mockRuntimeService{
 					err: nil,
 				},
-				activePods:        func() []*v1.Pod { return nil },
+				activePods:        func() []*v1.Pod { return testCase.activePods },
 				podStatusProvider: mockPodStatusProvider{},
 			}
 			mgr.sourcesReady = &sourcesReadyStub{}
 			mgr.state.SetMachineState(testCase.machineState.Clone())
 			mgr.state.SetMemoryAssignments(testCase.assignments.Clone())
 
-			pod := getPod("fakePod1", "fakeContainer1", requirementsGuaranteed)
+			pod := getPod("fakePod2", "fakeContainer1", requirementsGuaranteed)
 			container := &pod.Spec.Containers[0]
 			hints := mgr.GetTopologyHints(pod, container)
 			if !reflect.DeepEqual(hints, testCase.expectedHints) {
@@ -2385,7 +2284,211 @@ func TestGetTopologyHints(t *testing.T) {
 			}
 		})
 	}
+}
 
+func TestAllocateAndAddPodWithInitContainers(t *testing.T) {
+	testCases := []testMemoryManager{
+		{
+			description: "should remove init containers from the state file, once app container started",
+			policyName:  policyTypeStatic,
+			machineInfo: returnMachineInfo(),
+			assignments: state.ContainerMemoryAssignments{},
+			expectedAssignments: state.ContainerMemoryAssignments{
+				"pod1": map[string][]state.Block{
+					"container1": {
+						{
+							NUMAAffinity: []int{0},
+							Type:         v1.ResourceMemory,
+							Size:         4 * gb,
+						},
+						{
+							NUMAAffinity: []int{0},
+							Type:         hugepages1Gi,
+							Size:         4 * gb,
+						},
+					},
+				},
+			},
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    9728 * mb,
+							Free:           9728 * mb,
+							Reserved:       0,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   10 * gb,
+						},
+						hugepages1Gi: {
+							Allocatable:    5 * gb,
+							Free:           5 * gb,
+							Reserved:       0,
+							SystemReserved: 0,
+							TotalMemSize:   5 * gb,
+						},
+					},
+					Cells: []int{0},
+				},
+				1: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    9728 * mb,
+							Free:           9728 * mb,
+							Reserved:       0,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   10 * gb,
+						},
+						hugepages1Gi: {
+							Allocatable:    5 * gb,
+							Free:           5 * gb,
+							Reserved:       0,
+							SystemReserved: 0,
+							TotalMemSize:   5 * gb,
+						},
+					},
+					Cells: []int{1},
+				},
+			},
+			expectedMachineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    9728 * mb,
+							Free:           5632 * mb,
+							Reserved:       4 * gb,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   10 * gb,
+						},
+						hugepages1Gi: {
+							Allocatable:    5 * gb,
+							Free:           gb,
+							Reserved:       4 * gb,
+							SystemReserved: 0,
+							TotalMemSize:   5 * gb,
+						},
+					},
+					Cells:               []int{0},
+					NumberOfAssignments: 2,
+				},
+				1: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    9728 * mb,
+							Free:           9728 * mb,
+							Reserved:       0,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   10 * gb,
+						},
+						hugepages1Gi: {
+							Allocatable:    5 * gb,
+							Free:           5 * gb,
+							Reserved:       0,
+							SystemReserved: 0,
+							TotalMemSize:   5 * gb,
+						},
+					},
+					Cells: []int{1},
+				},
+			},
+			reserved: systemReservedMemory{
+				0: map[v1.ResourceName]uint64{
+					v1.ResourceMemory: 512 * mb,
+				},
+			},
+			podAllocate: getPodWithInitContainers(
+				"pod1",
+				[]v1.Container{
+					{
+						Name: "container1",
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("1000Mi"),
+								v1.ResourceMemory: resource.MustParse("4Gi"),
+								hugepages1Gi:      resource.MustParse("4Gi"),
+							},
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("1000Mi"),
+								v1.ResourceMemory: resource.MustParse("4Gi"),
+								hugepages1Gi:      resource.MustParse("4Gi"),
+							},
+						},
+					},
+				},
+				[]v1.Container{
+					{
+						Name: "initContainer1",
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("1000Mi"),
+								v1.ResourceMemory: resource.MustParse("7Gi"),
+								hugepages1Gi:      resource.MustParse("5Gi"),
+							},
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("1000Mi"),
+								v1.ResourceMemory: resource.MustParse("7Gi"),
+								hugepages1Gi:      resource.MustParse("5Gi"),
+							},
+						},
+					},
+				},
+			),
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			klog.InfoS("TestAllocateAndAddPodWithInitContainers", "test name", testCase.description)
+			mgr := &manager{
+				policy:       returnPolicyByName(testCase),
+				state:        state.NewMemoryState(),
+				containerMap: containermap.NewContainerMap(),
+				containerRuntime: mockRuntimeService{
+					err: nil,
+				},
+				activePods:        func() []*v1.Pod { return []*v1.Pod{testCase.podAllocate} },
+				podStatusProvider: mockPodStatusProvider{},
+			}
+			mgr.sourcesReady = &sourcesReadyStub{}
+			mgr.state.SetMachineState(testCase.machineState.Clone())
+			mgr.state.SetMemoryAssignments(testCase.assignments.Clone())
+
+			// Allocates memory for init containers
+			for i := range testCase.podAllocate.Spec.InitContainers {
+				err := mgr.Allocate(testCase.podAllocate, &testCase.podAllocate.Spec.InitContainers[i])
+				if !reflect.DeepEqual(err, testCase.expectedError) {
+					t.Fatalf("The actual error %v is different from the expected one %v", err, testCase.expectedError)
+				}
+			}
+
+			// Allocates memory for apps containers
+			for i := range testCase.podAllocate.Spec.Containers {
+				err := mgr.Allocate(testCase.podAllocate, &testCase.podAllocate.Spec.Containers[i])
+				if !reflect.DeepEqual(err, testCase.expectedError) {
+					t.Fatalf("The actual error %v is different from the expected one %v", err, testCase.expectedError)
+				}
+			}
+
+			// Calls AddContainer for init containers
+			for i, initContainer := range testCase.podAllocate.Spec.InitContainers {
+				mgr.AddContainer(testCase.podAllocate, &testCase.podAllocate.Spec.InitContainers[i], initContainer.Name)
+			}
+
+			// Calls AddContainer for apps containers
+			for i, appContainer := range testCase.podAllocate.Spec.Containers {
+				mgr.AddContainer(testCase.podAllocate, &testCase.podAllocate.Spec.Containers[i], appContainer.Name)
+			}
+
+			assignments := mgr.state.GetMemoryAssignments()
+			if !areContainerMemoryAssignmentsEqual(t, assignments, testCase.expectedAssignments) {
+				t.Fatalf("Actual assignments %v are different from the expected %v", assignments, testCase.expectedAssignments)
+			}
+
+			machineState := mgr.state.GetMachineState()
+			if !areMachineStatesEqual(machineState, testCase.expectedMachineState) {
+				t.Fatalf("The actual machine state %v is different from the expected %v", machineState, testCase.expectedMachineState)
+			}
+		})
+	}
 }
 
 func returnMachineInfo() cadvisorapi.MachineInfo {

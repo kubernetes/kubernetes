@@ -19,15 +19,13 @@ package cm
 import (
 	"bufio"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
@@ -115,7 +113,7 @@ func HugePageLimits(resourceList v1.ResourceList) map[int64]int64 {
 }
 
 // ResourceConfigForPod takes the input pod and outputs the cgroup resource config.
-func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64) *ResourceConfig {
+func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64, enforceMemoryQoS bool) *ResourceConfig {
 	// sum requests and limits.
 	reqs, limits := resource.PodRequestsAndLimits(pod)
 
@@ -158,6 +156,21 @@ func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64) 
 		}
 	}
 
+	for _, container := range pod.Spec.InitContainers {
+		if container.Resources.Limits.Cpu().IsZero() {
+			cpuLimitsDeclared = false
+		}
+		if container.Resources.Limits.Memory().IsZero() {
+			memoryLimitsDeclared = false
+		}
+		containerHugePageLimits := HugePageLimits(container.Resources.Requests)
+		for k, v := range containerHugePageLimits {
+			if value, exists := hugePageLimits[k]; !exists || v > value {
+				hugePageLimits[k] = v
+			}
+		}
+	}
+
 	// quota is not capped when cfs quota is disabled
 	if !enforceCPULimits {
 		cpuQuota = int64(-1)
@@ -187,6 +200,19 @@ func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64) 
 		result.CpuShares = &shares
 	}
 	result.HugePageLimit = hugePageLimits
+
+	if enforceMemoryQoS {
+		memoryMin := int64(0)
+		if request, found := reqs[v1.ResourceMemory]; found {
+			memoryMin = request.Value()
+		}
+		if memoryMin > 0 {
+			result.Unified = map[string]string{
+				MemoryMin: strconv.FormatInt(memoryMin, 10),
+			}
+		}
+	}
+
 	return result
 }
 
@@ -222,13 +248,12 @@ func getCgroupSubsystemsV1() (*CgroupSubsystems, error) {
 
 // getCgroupSubsystemsV2 returns information about the enabled cgroup v2 subsystems
 func getCgroupSubsystemsV2() (*CgroupSubsystems, error) {
-	content, err := ioutil.ReadFile(filepath.Join(util.CgroupRoot, "cgroup.controllers"))
+	controllers, err := libcontainercgroups.GetAllSubsystems()
 	if err != nil {
 		return nil, err
 	}
 
 	mounts := []libcontainercgroups.Mount{}
-	controllers := strings.Fields(string(content))
 	mountPoints := make(map[string]string, len(controllers))
 	for _, controller := range controllers {
 		mountPoints[controller] = util.CgroupRoot
@@ -311,16 +336,4 @@ func GetKubeletContainer(kubeletCgroups string) (string, error) {
 		return cont, nil
 	}
 	return kubeletCgroups, nil
-}
-
-// GetRuntimeContainer returns the cgroup used by the container runtime
-func GetRuntimeContainer(containerRuntime, runtimeCgroups string) (string, error) {
-	if containerRuntime == "docker" {
-		cont, err := getContainerNameForProcess(dockerProcessName, dockerPidFile)
-		if err != nil {
-			return "", fmt.Errorf("failed to get container name for docker process: %v", err)
-		}
-		return cont, nil
-	}
-	return runtimeCgroups, nil
 }

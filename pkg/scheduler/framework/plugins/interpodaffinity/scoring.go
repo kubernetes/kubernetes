@@ -22,10 +22,9 @@ import (
 	"math"
 	"sync/atomic"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
-	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 // preScoreStateKey is the key in CycleState to InterPodAffinity pre-computed data for Scoring.
@@ -37,6 +36,8 @@ type scoreMap map[string]map[string]int64
 type preScoreState struct {
 	topologyScore scoreMap
 	podInfo       *framework.PodInfo
+	// A copy of the incoming pod's namespace labels.
+	namespaceLabels labels.Set
 }
 
 // Clone implements the mandatory Clone interface. We don't really copy the data since
@@ -45,30 +46,20 @@ func (s *preScoreState) Clone() framework.StateData {
 	return s
 }
 
-func (m scoreMap) processTerm(
-	term *framework.WeightedAffinityTerm,
-	podToCheck *v1.Pod,
-	fixedNode *v1.Node,
-	multiplier int,
-) {
-	if len(fixedNode.Labels) == 0 {
-		return
-	}
-
-	match := schedutil.PodMatchesTermsNamespaceAndSelector(podToCheck, term.Namespaces, term.Selector)
-	tpValue, tpValueExist := fixedNode.Labels[term.TopologyKey]
-	if match && tpValueExist {
-		if m[term.TopologyKey] == nil {
-			m[term.TopologyKey] = make(map[string]int64)
+func (m scoreMap) processTerm(term *framework.AffinityTerm, weight int32, pod *v1.Pod, nsLabels labels.Set, node *v1.Node, multiplier int32) {
+	if term.Matches(pod, nsLabels) {
+		if tpValue, tpValueExist := node.Labels[term.TopologyKey]; tpValueExist {
+			if m[term.TopologyKey] == nil {
+				m[term.TopologyKey] = make(map[string]int64)
+			}
+			m[term.TopologyKey][tpValue] += int64(weight * multiplier)
 		}
-		m[term.TopologyKey][tpValue] += int64(term.Weight * int32(multiplier))
 	}
-	return
 }
 
-func (m scoreMap) processTerms(terms []framework.WeightedAffinityTerm, podToCheck *v1.Pod, fixedNode *v1.Node, multiplier int) {
+func (m scoreMap) processTerms(terms []framework.WeightedAffinityTerm, pod *v1.Pod, nsLabels labels.Set, node *v1.Node, multiplier int32) {
 	for _, term := range terms {
-		m.processTerm(&term, podToCheck, fixedNode, multiplier)
+		m.processTerm(&term.AffinityTerm, term.Weight, pod, nsLabels, node, multiplier)
 	}
 }
 
@@ -93,36 +84,42 @@ func (pl *InterPodAffinity) processExistingPod(
 	topoScore scoreMap,
 ) {
 	existingPodNode := existingPodNodeInfo.Node()
+	if len(existingPodNode.Labels) == 0 {
+		return
+	}
 
 	// For every soft pod affinity term of <pod>, if <existingPod> matches the term,
 	// increment <p.counts> for every node in the cluster with the same <term.TopologyKey>
 	// value as that of <existingPods>`s node by the term`s weight.
-	topoScore.processTerms(state.podInfo.PreferredAffinityTerms, existingPod.Pod, existingPodNode, 1)
+	// Note that the incoming pod's terms have the namespaceSelector merged into the namespaces, and so
+	// here we don't lookup the existing pod's namespace labels, hence passing nil for nsLabels.
+	topoScore.processTerms(state.podInfo.PreferredAffinityTerms, existingPod.Pod, nil, existingPodNode, 1)
 
 	// For every soft pod anti-affinity term of <pod>, if <existingPod> matches the term,
 	// decrement <p.counts> for every node in the cluster with the same <term.TopologyKey>
 	// value as that of <existingPod>`s node by the term`s weight.
-	topoScore.processTerms(state.podInfo.PreferredAntiAffinityTerms, existingPod.Pod, existingPodNode, -1)
+	// Note that the incoming pod's terms have the namespaceSelector merged into the namespaces, and so
+	// here we don't lookup the existing pod's namespace labels, hence passing nil for nsLabels.
+	topoScore.processTerms(state.podInfo.PreferredAntiAffinityTerms, existingPod.Pod, nil, existingPodNode, -1)
 
 	// For every hard pod affinity term of <existingPod>, if <pod> matches the term,
 	// increment <p.counts> for every node in the cluster with the same <term.TopologyKey>
 	// value as that of <existingPod>'s node by the constant <args.hardPodAffinityWeight>
-	if pl.args.HardPodAffinityWeight > 0 {
-		for _, term := range existingPod.RequiredAffinityTerms {
-			t := framework.WeightedAffinityTerm{AffinityTerm: term, Weight: pl.args.HardPodAffinityWeight}
-			topoScore.processTerm(&t, incomingPod, existingPodNode, 1)
+	if pl.args.HardPodAffinityWeight > 0 && len(existingPodNode.Labels) != 0 {
+		for _, t := range existingPod.RequiredAffinityTerms {
+			topoScore.processTerm(&t, pl.args.HardPodAffinityWeight, incomingPod, state.namespaceLabels, existingPodNode, 1)
 		}
 	}
 
 	// For every soft pod affinity term of <existingPod>, if <pod> matches the term,
 	// increment <p.counts> for every node in the cluster with the same <term.TopologyKey>
 	// value as that of <existingPod>'s node by the term's weight.
-	topoScore.processTerms(existingPod.PreferredAffinityTerms, incomingPod, existingPodNode, 1)
+	topoScore.processTerms(existingPod.PreferredAffinityTerms, incomingPod, state.namespaceLabels, existingPodNode, 1)
 
 	// For every soft pod anti-affinity term of <existingPod>, if <pod> matches the term,
 	// decrement <pm.counts> for every node in the cluster with the same <term.TopologyKey>
 	// value as that of <existingPod>'s node by the term's weight.
-	topoScore.processTerms(existingPod.PreferredAntiAffinityTerms, incomingPod, existingPodNode, -1)
+	topoScore.processTerms(existingPod.PreferredAntiAffinityTerms, incomingPod, state.namespaceLabels, existingPodNode, -1)
 }
 
 // PreScore builds and writes cycle state used by Score and NormalizeScore.
@@ -152,25 +149,36 @@ func (pl *InterPodAffinity) PreScore(
 	if hasPreferredAffinityConstraints || hasPreferredAntiAffinityConstraints {
 		allNodes, err = pl.sharedLister.NodeInfos().List()
 		if err != nil {
-			framework.AsStatus(fmt.Errorf("failed to get all nodes from shared lister: %w", err))
+			return framework.AsStatus(fmt.Errorf("failed to get all nodes from shared lister: %w", err))
 		}
 	} else {
 		allNodes, err = pl.sharedLister.NodeInfos().HavePodsWithAffinityList()
 		if err != nil {
-			framework.AsStatus(fmt.Errorf("failed to get pods with affinity list: %w", err))
+			return framework.AsStatus(fmt.Errorf("failed to get pods with affinity list: %w", err))
 		}
-	}
-
-	podInfo := framework.NewPodInfo(pod)
-	if podInfo.ParseError != nil {
-		// Ideally we never reach here, because errors will be caught by PreFilter
-		return framework.AsStatus(fmt.Errorf("failed to parse pod: %w", podInfo.ParseError))
 	}
 
 	state := &preScoreState{
 		topologyScore: make(map[string]map[string]int64),
-		podInfo:       podInfo,
 	}
+
+	state.podInfo = framework.NewPodInfo(pod)
+	if state.podInfo.ParseError != nil {
+		// Ideally we never reach here, because errors will be caught by PreFilter
+		return framework.AsStatus(fmt.Errorf("failed to parse pod: %w", state.podInfo.ParseError))
+	}
+
+	for i := range state.podInfo.PreferredAffinityTerms {
+		if err := pl.mergeAffinityTermNamespacesIfNotEmpty(&state.podInfo.PreferredAffinityTerms[i].AffinityTerm); err != nil {
+			return framework.AsStatus(fmt.Errorf("updating PreferredAffinityTerms: %w", err))
+		}
+	}
+	for i := range state.podInfo.PreferredAntiAffinityTerms {
+		if err := pl.mergeAffinityTermNamespacesIfNotEmpty(&state.podInfo.PreferredAntiAffinityTerms[i].AffinityTerm); err != nil {
+			return framework.AsStatus(fmt.Errorf("updating PreferredAntiAffinityTerms: %w", err))
+		}
+	}
+	state.namespaceLabels = GetNamespaceLabelsSnapshot(pod.Namespace, pl.nsLister)
 
 	topoScores := make([]scoreMap, len(allNodes))
 	index := int32(-1)
@@ -195,7 +203,7 @@ func (pl *InterPodAffinity) PreScore(
 			topoScores[atomic.AddInt32(&index, 1)] = topoScore
 		}
 	}
-	parallelize.Until(context.Background(), len(allNodes), processNode)
+	pl.parallelizer.Until(context.Background(), len(allNodes), processNode)
 
 	for i := 0; i <= int(index); i++ {
 		state.topologyScore.append(topoScores[i])
@@ -208,7 +216,7 @@ func (pl *InterPodAffinity) PreScore(
 func getPreScoreState(cycleState *framework.CycleState) (*preScoreState, error) {
 	c, err := cycleState.Read(preScoreStateKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read %q from cycleState: %v", preScoreStateKey, err)
+		return nil, fmt.Errorf("failed to read %q from cycleState: %w", preScoreStateKey, err)
 	}
 
 	s, ok := c.(*preScoreState)

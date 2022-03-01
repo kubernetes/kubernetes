@@ -21,8 +21,9 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/go-openapi/spec"
 	"github.com/stretchr/testify/assert"
+
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 type handlerTest struct {

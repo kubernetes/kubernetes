@@ -22,7 +22,7 @@ syntax = "proto2";
 package k8s.io.apimachinery.pkg.api.resource;
 
 // Package-wide variables from generator "generated".
-option go_package = "resource";
+option go_package = "k8s.io/apimachinery/pkg/api/resource";
 
 // Quantity is a fixed-point representation of a number.
 // It provides convenient marshaling/unmarshaling in JSON and YAML,
@@ -83,6 +83,18 @@ option go_package = "resource";
 // +k8s:deepcopy-gen=true
 // +k8s:openapi-gen=true
 message Quantity {
+  optional string string = 1;
+}
+
+// QuantityValue makes it possible to use a Quantity as value for a command
+// line parameter.
+//
+// +protobuf=true
+// +protobuf.embed=string
+// +protobuf.options.marshal=false
+// +protobuf.options.(gogoproto.goproto_stringer)=false
+// +k8s:deepcopy-gen=true
+message QuantityValue {
   optional string string = 1;
 }
 

@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -19,7 +20,7 @@ limitations under the License.
 package phases
 
 import (
-	"io/ioutil"
+	"os"
 	"strings"
 	"syscall"
 
@@ -28,7 +29,7 @@ import (
 
 // unmountKubeletDirectory unmounts all paths that contain KubeletRunDirectory
 func unmountKubeletDirectory(absoluteKubeletRunDirectory string) error {
-	raw, err := ioutil.ReadFile("/proc/mounts")
+	raw, err := os.ReadFile("/proc/mounts")
 	if err != nil {
 		return err
 	}

@@ -1,7 +1,3 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
-reviewers:
-- jiayingz
-- mindprince
-- RenaudWasTaken
-- vishh
+reviewers: []

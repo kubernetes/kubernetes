@@ -17,10 +17,7 @@ limitations under the License.
 package metrics
 
 import (
-	"os"
 	"time"
-
-	"github.com/prometheus/procfs"
 
 	"k8s.io/klog/v2"
 )
@@ -51,17 +48,4 @@ func RegisterProcessStartTime(registrationFunc func(Registerable) error) error {
 
 	processStartTime.WithLabelValues().Set(start)
 	return nil
-}
-
-func getProcessStart() (float64, error) {
-	pid := os.Getpid()
-	p, err := procfs.NewProc(pid)
-	if err != nil {
-		return 0, err
-	}
-
-	if stat, err := p.Stat(); err == nil {
-		return stat.StartTime()
-	}
-	return 0, err
 }

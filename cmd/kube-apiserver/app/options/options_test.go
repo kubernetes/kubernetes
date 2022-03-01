@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
+	netutils "k8s.io/utils/net"
 )
 
 func TestAddFlags(t *testing.T) {
@@ -111,6 +112,7 @@ func TestAddFlags(t *testing.T) {
 		"--kubelet-client-certificate=/var/run/kubernetes/ceserver.crt",
 		"--kubelet-client-key=/var/run/kubernetes/server.key",
 		"--kubelet-certificate-authority=/var/run/kubernetes/caserver.crt",
+		"--tracing-config-file=/var/run/kubernetes/tracing_config.yaml",
 		"--proxy-client-cert-file=/var/run/kubernetes/proxy.crt",
 		"--proxy-client-key-file=/var/run/kubernetes/proxy.key",
 		"--request-timeout=2m",
@@ -123,12 +125,12 @@ func TestAddFlags(t *testing.T) {
 	// This is a snapshot of expected options parsed by args.
 	expected := &ServerRunOptions{
 		ServiceNodePortRange:   kubeoptions.DefaultServiceNodePortRange,
-		ServiceClusterIPRanges: (&net.IPNet{IP: net.ParseIP("192.168.128.0"), Mask: net.CIDRMask(17, 32)}).String(),
+		ServiceClusterIPRanges: (&net.IPNet{IP: netutils.ParseIPSloppy("192.168.128.0"), Mask: net.CIDRMask(17, 32)}).String(),
 		MasterCount:            5,
 		EndpointReconcilerType: string(reconcilers.LeaseEndpointReconcilerType),
 		AllowPrivileged:        false,
 		GenericServerRunOptions: &apiserveroptions.ServerRunOptions{
-			AdvertiseAddress:            net.ParseIP("192.168.10.10"),
+			AdvertiseAddress:            netutils.ParseIPSloppy("192.168.10.10"),
 			CorsAllowedOriginList:       []string{"10.10.10.100", "10.10.10.200"},
 			MaxRequestsInFlight:         400,
 			MaxMutatingRequestsInFlight: 200,
@@ -174,7 +176,7 @@ func TestAddFlags(t *testing.T) {
 			DefaultWatchCacheSize:   100,
 		},
 		SecureServing: (&apiserveroptions.SecureServingOptions{
-			BindAddress: net.ParseIP("192.168.10.20"),
+			BindAddress: netutils.ParseIPSloppy("192.168.10.20"),
 			BindPort:    6443,
 			ServerCert: apiserveroptions.GeneratableKeyCert{
 				CertDirectory: "/var/run/kubernetes",
@@ -304,12 +306,15 @@ func TestAddFlags(t *testing.T) {
 		EgressSelector: &apiserveroptions.EgressSelectorOptions{
 			ConfigFile: "/var/run/kubernetes/egress-selector/connectivity.yaml",
 		},
-		EnableLogsHandler:                 false,
-		EnableAggregatorRouting:           true,
-		ProxyClientKeyFile:                "/var/run/kubernetes/proxy.key",
-		ProxyClientCertFile:               "/var/run/kubernetes/proxy.crt",
-		Metrics:                           &metrics.Options{},
-		Logs:                              logs.NewOptions(),
+		EnableLogsHandler:       false,
+		EnableAggregatorRouting: true,
+		ProxyClientKeyFile:      "/var/run/kubernetes/proxy.key",
+		ProxyClientCertFile:     "/var/run/kubernetes/proxy.crt",
+		Metrics:                 &metrics.Options{},
+		Logs:                    logs.NewOptions(),
+		Traces: &apiserveroptions.TracingOptions{
+			ConfigFile: "/var/run/kubernetes/tracing_config.yaml",
+		},
 		IdentityLeaseDurationSeconds:      3600,
 		IdentityLeaseRenewIntervalSeconds: 10,
 	}

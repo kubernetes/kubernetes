@@ -24,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
 
@@ -38,8 +39,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/pod"
-	"k8s.io/kubernetes/pkg/kubelet/status"
-	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/populator"
@@ -106,12 +105,27 @@ type VolumeManager interface {
 	// the duration defined in podAttachAndMountTimeout.
 	WaitForAttachAndMount(pod *v1.Pod) error
 
+	// WaitForUnmount processes the volumes referenced in the specified
+	// pod and blocks until they are all unmounted (reflected in the actual
+	// state of the world).
+	// An error is returned if all volumes are not unmounted within
+	// the duration defined in podAttachAndMountTimeout.
+	WaitForUnmount(pod *v1.Pod) error
+
 	// GetMountedVolumesForPod returns a VolumeMap containing the volumes
 	// referenced by the specified pod that are successfully attached and
 	// mounted. The key in the map is the OuterVolumeSpecName (i.e.
 	// pod.Spec.Volumes[x].Name). It returns an empty VolumeMap if pod has no
 	// volumes.
 	GetMountedVolumesForPod(podName types.UniquePodName) container.VolumeMap
+
+	// GetPossiblyMountedVolumesForPod returns a VolumeMap containing the volumes
+	// referenced by the specified pod that are either successfully attached
+	// and mounted or are "uncertain", i.e. a volume plugin may be mounting
+	// them right now. The key in the map is the OuterVolumeSpecName (i.e.
+	// pod.Spec.Volumes[x].Name). It returns an empty VolumeMap if pod has no
+	// volumes.
+	GetPossiblyMountedVolumesForPod(podName types.UniquePodName) container.VolumeMap
 
 	// GetExtraSupplementalGroupsForPod returns a list of the extra
 	// supplemental groups for the Pod. These extra supplemental groups come
@@ -141,6 +155,12 @@ type VolumeManager interface {
 	MarkVolumesAsReportedInUse(volumesReportedAsInUse []v1.UniqueVolumeName)
 }
 
+// podStateProvider can determine if a pod is is going to be terminated
+type podStateProvider interface {
+	ShouldPodContainersBeTerminating(k8stypes.UID) bool
+	ShouldPodRuntimeBeRemoved(k8stypes.UID) bool
+}
+
 // NewVolumeManager returns a new concrete instance implementing the
 // VolumeManager interface.
 //
@@ -152,7 +172,7 @@ func NewVolumeManager(
 	controllerAttachDetachEnabled bool,
 	nodeName k8stypes.NodeName,
 	podManager pod.Manager,
-	podStatusProvider status.PodStatusProvider,
+	podStateProvider podStateProvider,
 	kubeClient clientset.Interface,
 	volumePluginMgr *volume.VolumePluginMgr,
 	kubeContainerRuntime container.Runtime,
@@ -160,7 +180,6 @@ func NewVolumeManager(
 	hostutil hostutil.HostUtils,
 	kubeletPodsDir string,
 	recorder record.EventRecorder,
-	checkNodeCapabilitiesBeforeMount bool,
 	keepTerminatedPodVolumes bool,
 	blockVolumePathHandler volumepathhandler.BlockVolumePathHandler) VolumeManager {
 
@@ -173,12 +192,11 @@ func NewVolumeManager(
 			kubeClient,
 			volumePluginMgr,
 			recorder,
-			checkNodeCapabilitiesBeforeMount,
 			blockVolumePathHandler)),
 	}
 
 	intreeToCSITranslator := csitrans.New()
-	csiMigratedPluginManager := csimigration.NewPluginManager(intreeToCSITranslator)
+	csiMigratedPluginManager := csimigration.NewPluginManager(intreeToCSITranslator, utilfeature.DefaultFeatureGate)
 
 	vm.intreeToCSITranslator = intreeToCSITranslator
 	vm.csiMigratedPluginManager = csiMigratedPluginManager
@@ -187,7 +205,7 @@ func NewVolumeManager(
 		desiredStateOfWorldPopulatorLoopSleepPeriod,
 		desiredStateOfWorldPopulatorGetPodStatusRetryDuration,
 		podManager,
-		podStatusProvider,
+		podStateProvider,
 		vm.desiredStateOfWorld,
 		vm.actualStateOfWorld,
 		kubeContainerRuntime,
@@ -266,20 +284,33 @@ func (vm *volumeManager) Run(sourcesReady config.SourcesReady, stopCh <-chan str
 	}
 
 	go vm.desiredStateOfWorldPopulator.Run(sourcesReady, stopCh)
-	klog.V(2).Infof("The desired_state_of_world populator starts")
+	klog.V(2).InfoS("The desired_state_of_world populator starts")
 
-	klog.Infof("Starting Kubelet Volume Manager")
+	klog.InfoS("Starting Kubelet Volume Manager")
 	go vm.reconciler.Run(stopCh)
 
 	metrics.Register(vm.actualStateOfWorld, vm.desiredStateOfWorld, vm.volumePluginMgr)
 
 	<-stopCh
-	klog.Infof("Shutting down Kubelet Volume Manager")
+	klog.InfoS("Shutting down Kubelet Volume Manager")
 }
 
 func (vm *volumeManager) GetMountedVolumesForPod(podName types.UniquePodName) container.VolumeMap {
 	podVolumes := make(container.VolumeMap)
 	for _, mountedVolume := range vm.actualStateOfWorld.GetMountedVolumesForPod(podName) {
+		podVolumes[mountedVolume.OuterVolumeSpecName] = container.VolumeInfo{
+			Mounter:             mountedVolume.Mounter,
+			BlockVolumeMapper:   mountedVolume.BlockVolumeMapper,
+			ReadOnly:            mountedVolume.VolumeSpec.ReadOnly,
+			InnerVolumeSpecName: mountedVolume.InnerVolumeSpecName,
+		}
+	}
+	return podVolumes
+}
+
+func (vm *volumeManager) GetPossiblyMountedVolumesForPod(podName types.UniquePodName) container.VolumeMap {
+	podVolumes := make(container.VolumeMap)
+	for _, mountedVolume := range vm.actualStateOfWorld.GetPossiblyMountedVolumesForPod(podName) {
 		podVolumes[mountedVolume.OuterVolumeSpecName] = container.VolumeInfo{
 			Mounter:             mountedVolume.Mounter,
 			BlockVolumeMapper:   mountedVolume.BlockVolumeMapper,
@@ -370,7 +401,7 @@ func (vm *volumeManager) WaitForAttachAndMount(pod *v1.Pod) error {
 		return nil
 	}
 
-	klog.V(3).Infof("Waiting for volumes to attach and mount for pod %q", format.Pod(pod))
+	klog.V(3).InfoS("Waiting for volumes to attach and mount for pod", "pod", klog.KObj(pod))
 	uniquePodName := util.GetUniquePodName(pod)
 
 	// Some pods expect to have Setup called over and over again to update.
@@ -401,7 +432,43 @@ func (vm *volumeManager) WaitForAttachAndMount(pod *v1.Pod) error {
 			err)
 	}
 
-	klog.V(3).Infof("All volumes are attached and mounted for pod %q", format.Pod(pod))
+	klog.V(3).InfoS("All volumes are attached and mounted for pod", "pod", klog.KObj(pod))
+	return nil
+}
+
+func (vm *volumeManager) WaitForUnmount(pod *v1.Pod) error {
+	if pod == nil {
+		return nil
+	}
+
+	klog.V(3).InfoS("Waiting for volumes to unmount for pod", "pod", klog.KObj(pod))
+	uniquePodName := util.GetUniquePodName(pod)
+
+	vm.desiredStateOfWorldPopulator.ReprocessPod(uniquePodName)
+
+	err := wait.PollImmediate(
+		podAttachAndMountRetryInterval,
+		podAttachAndMountTimeout,
+		vm.verifyVolumesUnmountedFunc(uniquePodName))
+
+	if err != nil {
+		var mountedVolumes []string
+		for _, v := range vm.actualStateOfWorld.GetMountedVolumesForPod(uniquePodName) {
+			mountedVolumes = append(mountedVolumes, v.OuterVolumeSpecName)
+		}
+		sort.Strings(mountedVolumes)
+
+		if len(mountedVolumes) == 0 {
+			return nil
+		}
+
+		return fmt.Errorf(
+			"mounted volumes=%v: %s",
+			mountedVolumes,
+			err)
+	}
+
+	klog.V(3).InfoS("All volumes are unmounted for pod", "pod", klog.KObj(pod))
 	return nil
 }
 
@@ -425,6 +492,17 @@ func (vm *volumeManager) verifyVolumesMountedFunc(podName types.UniquePodName, e
 			return true, errors.New(strings.Join(errs, "; "))
 		}
 		return len(vm.getUnmountedVolumes(podName, expectedVolumes)) == 0, nil
+	}
+}
+
+// verifyVolumesUnmountedFunc returns a method that is true when there are no mounted volumes for this
+// pod.
+func (vm *volumeManager) verifyVolumesUnmountedFunc(podName types.UniquePodName) wait.ConditionFunc {
+	return func() (done bool, err error) {
+		if errs := vm.desiredStateOfWorld.PopPodErrors(podName); len(errs) > 0 {
+			return true, errors.New(strings.Join(errs, "; "))
+		}
+		return len(vm.actualStateOfWorld.GetMountedVolumesForPod(podName)) == 0, nil
 	}
 }
 

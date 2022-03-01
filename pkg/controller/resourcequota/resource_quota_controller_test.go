@@ -17,6 +17,7 @@ limitations under the License.
 package resourcequota
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -782,7 +783,7 @@ func TestSyncResourceQuota(t *testing.T) {
 		qc := setupQuotaController(t, kubeClient, mockListerForResourceFunc(listersForResourceConfig), mockDiscoveryFunc)
 		defer close(qc.stop)
 
-		if err := qc.syncResourceQuota(&testCase.quota); err != nil {
+		if err := qc.syncResourceQuota(context.TODO(), &testCase.quota); err != nil {
 			if len(testCase.expectedError) == 0 || !strings.Contains(err.Error(), testCase.expectedError) {
 				t.Fatalf("test: %s, unexpected error: %v", testName, err)
 			}

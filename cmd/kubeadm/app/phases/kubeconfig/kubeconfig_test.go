@@ -31,6 +31,7 @@ import (
 
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -261,7 +262,7 @@ func TestCreateKubeConfigFileIfNotExists(t *testing.T) {
 			kubeConfig:         configWithAnotherClusterCa,
 			expectedError:      true,
 		},
-		{ // if KubeConfig is not equal to the existingKubeConfig - tollerate custom server addresses
+		{ // if KubeConfig is not equal to the existingKubeConfig - tolerate custom server addresses
 			name:               "KubeConfig referst to the cluster with another address",
 			existingKubeConfig: config,
 			kubeConfig:         configWithAnotherClusterAddress,
@@ -374,13 +375,13 @@ func TestWriteKubeConfigFailsIfCADoesntExists(t *testing.T) {
 		{
 			name: "WriteKubeConfigWithClientCert",
 			writeKubeConfigFunction: func(out io.Writer) error {
-				return WriteKubeConfigWithClientCert(out, cfg, "myUser", []string{"myOrg"})
+				return WriteKubeConfigWithClientCert(out, cfg, "myUser", []string{"myOrg"}, nil)
 			},
 		},
 		{
 			name: "WriteKubeConfigWithToken",
 			writeKubeConfigFunction: func(out io.Writer) error {
-				return WriteKubeConfigWithToken(out, cfg, "myUser", "12345")
+				return WriteKubeConfigWithToken(out, cfg, "myUser", "12345", nil)
 			},
 		},
 	}
@@ -428,14 +429,14 @@ func TestWriteKubeConfig(t *testing.T) {
 		{
 			name: "WriteKubeConfigWithClientCert",
 			writeKubeConfigFunction: func(out io.Writer) error {
-				return WriteKubeConfigWithClientCert(out, cfg, "myUser", []string{"myOrg"})
+				return WriteKubeConfigWithClientCert(out, cfg, "myUser", []string{"myOrg"}, nil)
 			},
 			withClientCert: true,
 		},
 		{
 			name: "WriteKubeConfigWithToken",
 			writeKubeConfigFunction: func(out io.Writer) error {
-				return WriteKubeConfigWithToken(out, cfg, "myUser", "12345")
+				return WriteKubeConfigWithToken(out, cfg, "myUser", "12345", nil)
 			},
 			withToken: true,
 		},
@@ -483,7 +484,7 @@ func TestValidateKubeConfig(t *testing.T) {
 	configWithAnotherServerURL := setupdKubeConfigWithClientAuth(t, caCert, caKey, "https://4.3.2.1:4321", "test-cluster", "myOrg1")
 
 	// create a valid config but with whitespace around the CA PEM.
-	// validateKubeConfig() should tollerate that.
+	// validateKubeConfig() should tolerate that.
 	configWhitespace := config.DeepCopy()
 	configWhitespaceCtx := configWhitespace.Contexts[configWhitespace.CurrentContext]
 	configWhitespaceCA := string(configWhitespace.Clusters[configWhitespaceCtx.Cluster].CertificateAuthorityData)
@@ -664,7 +665,7 @@ func setupdKubeConfigWithClientAuth(t *testing.T, caCert *x509.Certificate, caKe
 		},
 	}
 
-	config, err := buildKubeConfigFromSpec(spec, clustername)
+	config, err := buildKubeConfigFromSpec(spec, clustername, nil)
 	if err != nil {
 		t.Fatal("buildKubeConfigFromSpec failed!")
 	}
@@ -683,7 +684,7 @@ func setupdKubeConfigWithTokenAuth(t *testing.T, caCert *x509.Certificate, APISe
 		},
 	}
 
-	config, err := buildKubeConfigFromSpec(spec, clustername)
+	config, err := buildKubeConfigFromSpec(spec, clustername, nil)
 	if err != nil {
 		t.Fatal("buildKubeConfigFromSpec failed!")
 	}

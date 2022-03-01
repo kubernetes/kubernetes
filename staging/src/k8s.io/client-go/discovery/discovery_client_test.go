@@ -29,7 +29,7 @@ import (
 	"github.com/gogo/protobuf/proto"
 	openapi_v2 "github.com/googleapis/gnostic/openapiv2"
 	"github.com/stretchr/testify/assert"
-
+	golangproto "google.golang.org/protobuf/proto"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
@@ -547,8 +547,8 @@ func TestGetOpenAPISchema(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error getting openapi: %v", err)
 	}
-	if e, a := returnedOpenAPI(), got; !reflect.DeepEqual(e, a) {
-		t.Errorf("expected %v, got %v", e, a)
+	if e, a := returnedOpenAPI(), got; !golangproto.Equal(e, a) {
+		t.Errorf("expected \n%v, got \n%v", e, a)
 	}
 }
 
@@ -564,7 +564,7 @@ func TestGetOpenAPISchemaForbiddenFallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error getting openapi: %v", err)
 	}
-	if e, a := returnedOpenAPI(), got; !reflect.DeepEqual(e, a) {
+	if e, a := returnedOpenAPI(), got; !golangproto.Equal(e, a) {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 }
@@ -581,7 +581,7 @@ func TestGetOpenAPISchemaNotFoundFallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error getting openapi: %v", err)
 	}
-	if e, a := returnedOpenAPI(), got; !reflect.DeepEqual(e, a) {
+	if e, a := returnedOpenAPI(), got; !golangproto.Equal(e, a) {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 }
@@ -598,7 +598,7 @@ func TestGetOpenAPISchemaNotAcceptableFallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error getting openapi: %v", err)
 	}
-	if e, a := returnedOpenAPI(), got; !reflect.DeepEqual(e, a) {
+	if e, a := returnedOpenAPI(), got; !golangproto.Equal(e, a) {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package labels
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -147,7 +148,7 @@ func expectMatchDirect(t *testing.T, selector, ls Set) {
 	}
 }
 
-//lint:ignore U1000 currently commented out in TODO of TestSetMatches
+//nolint:staticcheck,unused //iccheck // U1000 currently commented out in TODO of TestSetMatches
 func expectNoMatchDirect(t *testing.T, selector, ls Set) {
 	if SelectorFromSet(selector).Matches(ls) {
 		t.Errorf("Wanted '%s' to not match '%s', but it did.", selector, ls)
@@ -300,6 +301,33 @@ func TestParserLookahead(t *testing.T) {
 			if token != token2 || lit != lit2 {
 				t.Errorf("Bad values")
 			}
+		}
+	}
+}
+
+func TestParseOperator(t *testing.T) {
+	testcases := []struct {
+		token         string
+		expectedError error
+	}{
+		{"in", nil},
+		{"=", nil},
+		{"==", nil},
+		{">", nil},
+		{"<", nil},
+		{"notin", nil},
+		{"!=", nil},
+		{"!", fmt.Errorf("found '%s', expected: %v", selection.DoesNotExist, strings.Join(binaryOperators, ", "))},
+		{"exists", fmt.Errorf("found '%s', expected: %v", selection.Exists, strings.Join(binaryOperators, ", "))},
+		{"(", fmt.Errorf("found '%s', expected: %v", "(", strings.Join(binaryOperators, ", "))},
+	}
+	for _, testcase := range testcases {
+		p := &Parser{l: &Lexer{s: testcase.token, pos: 0}, position: 0}
+		p.scan()
+
+		_, err := p.parseOperator()
+		if ok := reflect.DeepEqual(testcase.expectedError, err); !ok {
+			t.Errorf("\nexpect err [%v], \nactual err [%v]", testcase.expectedError, err)
 		}
 	}
 }

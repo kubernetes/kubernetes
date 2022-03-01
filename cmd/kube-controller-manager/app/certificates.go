@@ -21,10 +21,10 @@ limitations under the License.
 package app
 
 import (
+	"context"
 	"fmt"
-	"net/http"
 
-	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/controller-manager/controller"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/certificates/approver"
 	"k8s.io/kubernetes/pkg/controller/certificates/cleaner"
@@ -33,61 +33,56 @@ import (
 	csrsigningconfig "k8s.io/kubernetes/pkg/controller/certificates/signer/config"
 )
 
-func startCSRSigningController(ctx ControllerContext) (http.Handler, bool, error) {
-	gvr := schema.GroupVersionResource{Group: "certificates.k8s.io", Version: "v1", Resource: "certificatesigningrequests"}
-	if !ctx.AvailableResources[gvr] {
-		klog.Warningf("Resource %s is not available now", gvr.String())
-		return nil, false, nil
-	}
-	missingSingleSigningFile := ctx.ComponentConfig.CSRSigningController.ClusterSigningCertFile == "" || ctx.ComponentConfig.CSRSigningController.ClusterSigningKeyFile == ""
-	if missingSingleSigningFile && !anySpecificFilesSet(ctx.ComponentConfig.CSRSigningController) {
+func startCSRSigningController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
+	missingSingleSigningFile := controllerContext.ComponentConfig.CSRSigningController.ClusterSigningCertFile == "" || controllerContext.ComponentConfig.CSRSigningController.ClusterSigningKeyFile == ""
+	if missingSingleSigningFile && !anySpecificFilesSet(controllerContext.ComponentConfig.CSRSigningController) {
 		klog.V(2).Info("skipping CSR signer controller because no csr cert/key was specified")
 		return nil, false, nil
 	}
-	if !missingSingleSigningFile && anySpecificFilesSet(ctx.ComponentConfig.CSRSigningController) {
+	if !missingSingleSigningFile && anySpecificFilesSet(controllerContext.ComponentConfig.CSRSigningController) {
 		return nil, false, fmt.Errorf("cannot specify default and per controller certs at the same time")
 	}
 
-	c := ctx.ClientBuilder.ClientOrDie("certificate-controller")
-	csrInformer := ctx.InformerFactory.Certificates().V1().CertificateSigningRequests()
-	certTTL := ctx.ComponentConfig.CSRSigningController.ClusterSigningDuration.Duration
+	c := controllerContext.ClientBuilder.ClientOrDie("certificate-controller")
+	csrInformer := controllerContext.InformerFactory.Certificates().V1().CertificateSigningRequests()
+	certTTL := controllerContext.ComponentConfig.CSRSigningController.ClusterSigningDuration.Duration
 
-	if kubeletServingSignerCertFile, kubeletServingSignerKeyFile := getKubeletServingSignerFiles(ctx.ComponentConfig.CSRSigningController); len(kubeletServingSignerCertFile) > 0 || len(kubeletServingSignerKeyFile) > 0 {
+	if kubeletServingSignerCertFile, kubeletServingSignerKeyFile := getKubeletServingSignerFiles(controllerContext.ComponentConfig.CSRSigningController); len(kubeletServingSignerCertFile) > 0 || len(kubeletServingSignerKeyFile) > 0 {
 		kubeletServingSigner, err := signer.NewKubeletServingCSRSigningController(c, csrInformer, kubeletServingSignerCertFile, kubeletServingSignerKeyFile, certTTL)
 		if err != nil {
 			return nil, false, fmt.Errorf("failed to start kubernetes.io/kubelet-serving certificate controller: %v", err)
 		}
-		go kubeletServingSigner.Run(5, ctx.Stop)
+		go kubeletServingSigner.Run(5, ctx.Done())
 	} else {
 		klog.V(2).Infof("skipping CSR signer controller %q because specific files were specified for other signers and not this one.", "kubernetes.io/kubelet-serving")
 	}
 
-	if kubeletClientSignerCertFile, kubeletClientSignerKeyFile := getKubeletClientSignerFiles(ctx.ComponentConfig.CSRSigningController); len(kubeletClientSignerCertFile) > 0 || len(kubeletClientSignerKeyFile) > 0 {
+	if kubeletClientSignerCertFile, kubeletClientSignerKeyFile := getKubeletClientSignerFiles(controllerContext.ComponentConfig.CSRSigningController); len(kubeletClientSignerCertFile) > 0 || len(kubeletClientSignerKeyFile) > 0 {
 		kubeletClientSigner, err := signer.NewKubeletClientCSRSigningController(c, csrInformer, kubeletClientSignerCertFile, kubeletClientSignerKeyFile, certTTL)
 		if err != nil {
 			return nil, false, fmt.Errorf("failed to start kubernetes.io/kube-apiserver-client-kubelet certificate controller: %v", err)
 		}
-		go kubeletClientSigner.Run(5, ctx.Stop)
+		go kubeletClientSigner.Run(5, ctx.Done())
 	} else {
 		klog.V(2).Infof("skipping CSR signer controller %q because specific files were specified for other signers and not this one.", "kubernetes.io/kube-apiserver-client-kubelet")
 	}
 
-	if kubeAPIServerSignerCertFile, kubeAPIServerSignerKeyFile := getKubeAPIServerClientSignerFiles(ctx.ComponentConfig.CSRSigningController); len(kubeAPIServerSignerCertFile) > 0 || len(kubeAPIServerSignerKeyFile) > 0 {
+	if kubeAPIServerSignerCertFile, kubeAPIServerSignerKeyFile := getKubeAPIServerClientSignerFiles(controllerContext.ComponentConfig.CSRSigningController); len(kubeAPIServerSignerCertFile) > 0 || len(kubeAPIServerSignerKeyFile) > 0 {
 		kubeAPIServerClientSigner, err := signer.NewKubeAPIServerClientCSRSigningController(c, csrInformer, kubeAPIServerSignerCertFile, kubeAPIServerSignerKeyFile, certTTL)
 		if err != nil {
 			return nil, false, fmt.Errorf("failed to start kubernetes.io/kube-apiserver-client certificate controller: %v", err)
 		}
-		go kubeAPIServerClientSigner.Run(5, ctx.Stop)
+		go kubeAPIServerClientSigner.Run(5, ctx.Done())
 	} else {
 		klog.V(2).Infof("skipping CSR signer controller %q because specific files were specified for other signers and not this one.", "kubernetes.io/kube-apiserver-client")
 	}
 
-	if legacyUnknownSignerCertFile, legacyUnknownSignerKeyFile := getLegacyUnknownSignerFiles(ctx.ComponentConfig.CSRSigningController); len(legacyUnknownSignerCertFile) > 0 || len(legacyUnknownSignerKeyFile) > 0 {
+	if legacyUnknownSignerCertFile, legacyUnknownSignerKeyFile := getLegacyUnknownSignerFiles(controllerContext.ComponentConfig.CSRSigningController); len(legacyUnknownSignerCertFile) > 0 || len(legacyUnknownSignerKeyFile) > 0 {
 		legacyUnknownSigner, err := signer.NewLegacyUnknownCSRSigningController(c, csrInformer, legacyUnknownSignerCertFile, legacyUnknownSignerKeyFile, certTTL)
 		if err != nil {
 			return nil, false, fmt.Errorf("failed to start kubernetes.io/legacy-unknown certificate controller: %v", err)
 		}
-		go legacyUnknownSigner.Run(5, ctx.Stop)
+		go legacyUnknownSigner.Run(5, ctx.Done())
 	} else {
 		klog.V(2).Infof("skipping CSR signer controller %q because specific files were specified for other signers and not this one.", "kubernetes.io/legacy-unknown")
 	}
@@ -96,34 +91,22 @@ func startCSRSigningController(ctx ControllerContext) (http.Handler, bool, error
 }
 
 func areKubeletServingSignerFilesSpecified(config csrsigningconfig.CSRSigningControllerConfiguration) bool {
-	if len(config.KubeletServingSignerConfiguration.CertFile) > 0 || len(config.KubeletServingSignerConfiguration.KeyFile) > 0 {
-		// if only one is specified, it will error later during construction
-		return true
-	}
-	return false
+	// if only one is specified, it will error later during construction
+	return len(config.KubeletServingSignerConfiguration.CertFile) > 0 || len(config.KubeletServingSignerConfiguration.KeyFile) > 0
 }
 func areKubeletClientSignerFilesSpecified(config csrsigningconfig.CSRSigningControllerConfiguration) bool {
-	if len(config.KubeletClientSignerConfiguration.CertFile) > 0 || len(config.KubeletClientSignerConfiguration.KeyFile) > 0 {
-		// if only one is specified, it will error later during construction
-		return true
-	}
-	return false
+	// if only one is specified, it will error later during construction
+	return len(config.KubeletClientSignerConfiguration.CertFile) > 0 || len(config.KubeletClientSignerConfiguration.KeyFile) > 0
 }
 
 func areKubeAPIServerClientSignerFilesSpecified(config csrsigningconfig.CSRSigningControllerConfiguration) bool {
-	if len(config.KubeAPIServerClientSignerConfiguration.CertFile) > 0 || len(config.KubeAPIServerClientSignerConfiguration.KeyFile) > 0 {
-		// if only one is specified, it will error later during construction
-		return true
-	}
-	return false
+	// if only one is specified, it will error later during construction
+	return len(config.KubeAPIServerClientSignerConfiguration.CertFile) > 0 || len(config.KubeAPIServerClientSignerConfiguration.KeyFile) > 0
 }
 
 func areLegacyUnknownSignerFilesSpecified(config csrsigningconfig.CSRSigningControllerConfiguration) bool {
-	if len(config.LegacyUnknownSignerConfiguration.CertFile) > 0 || len(config.LegacyUnknownSignerConfiguration.KeyFile) > 0 {
-		// if only one is specified, it will error later during construction
-		return true
-	}
-	return false
+	// if only one is specified, it will error later during construction
+	return len(config.LegacyUnknownSignerConfiguration.CertFile) > 0 || len(config.LegacyUnknownSignerConfiguration.KeyFile) > 0
 }
 
 func anySpecificFilesSet(config csrsigningconfig.CSRSigningControllerConfiguration) bool {
@@ -165,53 +148,47 @@ func getLegacyUnknownSignerFiles(config csrsigningconfig.CSRSigningControllerCon
 	return config.ClusterSigningCertFile, config.ClusterSigningKeyFile
 }
 
-func startCSRApprovingController(ctx ControllerContext) (http.Handler, bool, error) {
-	gvr := schema.GroupVersionResource{Group: "certificates.k8s.io", Version: "v1", Resource: "certificatesigningrequests"}
-	if !ctx.AvailableResources[gvr] {
-		klog.Warningf("Resource %s is not available now", gvr.String())
-		return nil, false, nil
-	}
-
+func startCSRApprovingController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	approver := approver.NewCSRApprovingController(
-		ctx.ClientBuilder.ClientOrDie("certificate-controller"),
-		ctx.InformerFactory.Certificates().V1().CertificateSigningRequests(),
+		controllerContext.ClientBuilder.ClientOrDie("certificate-controller"),
+		controllerContext.InformerFactory.Certificates().V1().CertificateSigningRequests(),
 	)
-	go approver.Run(5, ctx.Stop)
+	go approver.Run(5, ctx.Done())
 
 	return nil, true, nil
 }
 
-func startCSRCleanerController(ctx ControllerContext) (http.Handler, bool, error) {
+func startCSRCleanerController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	cleaner := cleaner.NewCSRCleanerController(
-		ctx.ClientBuilder.ClientOrDie("certificate-controller").CertificatesV1().CertificateSigningRequests(),
-		ctx.InformerFactory.Certificates().V1().CertificateSigningRequests(),
+		controllerContext.ClientBuilder.ClientOrDie("certificate-controller").CertificatesV1().CertificateSigningRequests(),
+		controllerContext.InformerFactory.Certificates().V1().CertificateSigningRequests(),
 	)
-	go cleaner.Run(1, ctx.Stop)
+	go cleaner.Run(1, ctx.Done())
 	return nil, true, nil
 }
 
-func startRootCACertPublisher(ctx ControllerContext) (http.Handler, bool, error) {
+func startRootCACertPublisher(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	var (
 		rootCA []byte
 		err    error
 	)
-	if ctx.ComponentConfig.SAController.RootCAFile != "" {
-		if rootCA, err = readCA(ctx.ComponentConfig.SAController.RootCAFile); err != nil {
-			return nil, true, fmt.Errorf("error parsing root-ca-file at %s: %v", ctx.ComponentConfig.SAController.RootCAFile, err)
+	if controllerContext.ComponentConfig.SAController.RootCAFile != "" {
+		if rootCA, err = readCA(controllerContext.ComponentConfig.SAController.RootCAFile); err != nil {
+			return nil, true, fmt.Errorf("error parsing root-ca-file at %s: %v", controllerContext.ComponentConfig.SAController.RootCAFile, err)
 		}
 	} else {
-		rootCA = ctx.ClientBuilder.ConfigOrDie("root-ca-cert-publisher").CAData
+		rootCA = controllerContext.ClientBuilder.ConfigOrDie("root-ca-cert-publisher").CAData
 	}
 
 	sac, err := rootcacertpublisher.NewPublisher(
-		ctx.InformerFactory.Core().V1().ConfigMaps(),
-		ctx.InformerFactory.Core().V1().Namespaces(),
-		ctx.ClientBuilder.ClientOrDie("root-ca-cert-publisher"),
+		controllerContext.InformerFactory.Core().V1().ConfigMaps(),
+		controllerContext.InformerFactory.Core().V1().Namespaces(),
+		controllerContext.ClientBuilder.ClientOrDie("root-ca-cert-publisher"),
 		rootCA,
 	)
 	if err != nil {
 		return nil, true, fmt.Errorf("error creating root CA certificate publisher: %v", err)
 	}
-	go sac.Run(1, ctx.Stop)
+	go sac.Run(1, ctx.Done())
 	return nil, true, nil
 }

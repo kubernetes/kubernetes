@@ -52,6 +52,10 @@ readonly KUBE_BASE_IMAGE_REGISTRY="${KUBE_BASE_IMAGE_REGISTRY:-k8s.gcr.io/build-
 readonly KUBE_BUILD_IMAGE_VERSION_BASE="$(cat "${KUBE_ROOT}/build/build-image/VERSION")"
 readonly KUBE_BUILD_IMAGE_VERSION="${KUBE_BUILD_IMAGE_VERSION_BASE}-${KUBE_BUILD_IMAGE_CROSS_TAG}"
 
+# Make it possible to override the `kube-cross` image, and tag independent of `KUBE_BASE_IMAGE_REGISTRY`
+readonly KUBE_CROSS_IMAGE="${KUBE_CROSS_IMAGE:-"${KUBE_BASE_IMAGE_REGISTRY}/kube-cross"}"
+readonly KUBE_CROSS_VERSION="${KUBE_CROSS_VERSION:-"${KUBE_BUILD_IMAGE_CROSS_TAG}"}"
+
 # Here we map the output directories across both the local and remote _output
 # directories:
 #
@@ -85,22 +89,36 @@ readonly KUBE_RSYNC_PORT="${KUBE_RSYNC_PORT:-}"
 # mapped to KUBE_RSYNC_PORT via docker networking.
 readonly KUBE_CONTAINER_RSYNC_PORT=8730
 
+# These are the default versions (image tags) for their respective base images.
+readonly __default_debian_iptables_version=bullseye-v1.1.0
+readonly __default_go_runner_version=v2.3.1-go1.18rc1-bullseye.0
+readonly __default_setcap_version=bullseye-v1.0.0
+
+# These are the base images for the Docker-wrapped binaries.
+readonly KUBE_GORUNNER_IMAGE="${KUBE_GORUNNER_IMAGE:-$KUBE_BASE_IMAGE_REGISTRY/go-runner:$__default_go_runner_version}"
+readonly KUBE_APISERVER_BASE_IMAGE="${KUBE_APISERVER_BASE_IMAGE:-$KUBE_GORUNNER_IMAGE}"
+readonly KUBE_CONTROLLER_MANAGER_BASE_IMAGE="${KUBE_CONTROLLER_MANAGER_BASE_IMAGE:-$KUBE_GORUNNER_IMAGE}"
+readonly KUBE_SCHEDULER_BASE_IMAGE="${KUBE_SCHEDULER_BASE_IMAGE:-$KUBE_GORUNNER_IMAGE}"
+readonly KUBE_PROXY_BASE_IMAGE="${KUBE_PROXY_BASE_IMAGE:-$KUBE_BASE_IMAGE_REGISTRY/debian-iptables:$__default_debian_iptables_version}"
+
+# This is the image used in a multi-stage build to apply capabilities to Docker-wrapped binaries.
+readonly KUBE_BUILD_SETCAP_IMAGE="${KUBE_BUILD_SETCAP_IMAGE:-$KUBE_BASE_IMAGE_REGISTRY/setcap:$__default_setcap_version}"
+
 # Get the set of master binaries that run in Docker (on Linux)
-# Entry format is "<name-of-binary>,<base-image-name>:<base-image-version>".
+# Entry format is "<binary-name>,<base-image>".
 # Binaries are placed in /usr/local/bin inside the image.
-# When building these images the registry for the base images is considered to be ${KUBE_BASE_IMAGE_REGISTRY}.
+# `make` users can override any or all of the base images using the associated
+# environment variables.
 #
 # $1 - server architecture
 kube::build::get_docker_wrapped_binaries() {
-  local debian_iptables_version=buster-v1.5.0
-  local go_runner_version=buster-v2.3.1
   ### If you change any of these lists, please also update DOCKERIZED_BINARIES
   ### in build/BUILD. And kube::golang::server_image_targets
   local targets=(
-    "kube-apiserver,go-runner:${go_runner_version}"
-    "kube-controller-manager,go-runner:${go_runner_version}"
-    "kube-scheduler,go-runner:${go_runner_version}"
-    "kube-proxy,debian-iptables:${debian_iptables_version}"
+    "kube-apiserver,${KUBE_APISERVER_BASE_IMAGE}"
+    "kube-controller-manager,${KUBE_CONTROLLER_MANAGER_BASE_IMAGE}"
+    "kube-scheduler,${KUBE_SCHEDULER_BASE_IMAGE}"
+    "kube-proxy,${KUBE_PROXY_BASE_IMAGE}"
   )
 
   echo "${targets[@]}"
@@ -359,7 +377,7 @@ function kube::build::build_image() {
   dd if=/dev/urandom bs=512 count=1 2>/dev/null | LC_ALL=C tr -dc 'A-Za-z0-9' | dd bs=32 count=1 2>/dev/null > "${LOCAL_OUTPUT_BUILD_CONTEXT}/rsyncd.password"
   chmod go= "${LOCAL_OUTPUT_BUILD_CONTEXT}/rsyncd.password"
 
-  kube::build::docker_build "${KUBE_BUILD_IMAGE}" "${LOCAL_OUTPUT_BUILD_CONTEXT}" 'false' "--build-arg=KUBE_BUILD_IMAGE_CROSS_TAG=${KUBE_BUILD_IMAGE_CROSS_TAG}"
+  kube::build::docker_build "${KUBE_BUILD_IMAGE}" "${LOCAL_OUTPUT_BUILD_CONTEXT}" 'false' "--build-arg=KUBE_CROSS_IMAGE=${KUBE_CROSS_IMAGE} --build-arg=KUBE_CROSS_VERSION=${KUBE_CROSS_VERSION}"
 
   # Clean up old versions of everything
   kube::build::docker_delete_old_containers "${KUBE_BUILD_CONTAINER_NAME_BASE}" "${KUBE_BUILD_CONTAINER_NAME}"
@@ -377,15 +395,19 @@ function kube::build::build_image() {
 # $3 is the value to set the --pull flag for docker build; true by default
 # $4 is the set of --build-args for docker.
 function kube::build::docker_build() {
+  kube::util::ensure-docker-buildx
+
   local -r image=$1
   local -r context_dir=$2
   local -r pull="${3:-true}"
-  local -r build_args=$4
-  local -ra build_cmd=("${DOCKER[@]}" build -t "${image}" "--pull=${pull}" "${build_args}" "${context_dir}")
+  local build_args
+  IFS=" " read -r -a build_args <<< "$4"
+  readonly build_args
+  local -ra build_cmd=("${DOCKER[@]}" buildx build --load -t "${image}" "--pull=${pull}" "${build_args[@]}" "${context_dir}")
 
   kube::log::status "Building Docker image ${image}"
   local docker_output
-  docker_output=$("${build_cmd[@]}" 2>&1) || {
+  docker_output=$(DOCKER_CLI_EXPERIMENTAL=enabled "${build_cmd[@]}" 2>&1) || {
     cat <<EOF >&2
 +++ Docker build command failed for ${image}
 
@@ -393,7 +415,7 @@ ${docker_output}
 
 To retry manually, run:
 
-${build_cmd[*]}
+DOCKER_CLI_EXPERIMENTAL=enabled ${build_cmd[*]}
 
 EOF
     return 1
@@ -503,6 +525,7 @@ function kube::build::run_build_command_ex() {
     --env "KUBE_VERBOSE=${KUBE_VERBOSE}"
     --env "KUBE_BUILD_WITH_COVERAGE=${KUBE_BUILD_WITH_COVERAGE:-}"
     --env "KUBE_BUILD_PLATFORMS=${KUBE_BUILD_PLATFORMS:-}"
+    --env "KUBE_CGO_OVERRIDES=' ${KUBE_CGO_OVERRIDES[*]:-} '"
     --env "GOFLAGS=${GOFLAGS:-}"
     --env "GOGCFLAGS=${GOGCFLAGS:-}"
     --env "SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH:-}"

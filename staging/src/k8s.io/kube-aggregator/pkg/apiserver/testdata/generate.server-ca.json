@@ -1,0 +1,6 @@
+{
+    "CN": "Server-CA",
+    "ca": {
+        "expiry": "876000h"
+    }
+}

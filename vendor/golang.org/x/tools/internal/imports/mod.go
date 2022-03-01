@@ -86,7 +86,14 @@ func (r *ModuleResolver) init() error {
 		r.modsByDir = []*gocommand.ModuleJSON{mainMod, r.dummyVendorMod}
 	} else {
 		// Vendor mode is off, so run go list -m ... to find everything.
-		r.initAllMods()
+		err := r.initAllMods()
+		// We expect an error when running outside of a module with
+		// GO111MODULE=on. Other errors are fatal.
+		if err != nil {
+			if errMsg := err.Error(); !strings.Contains(errMsg, "working directory is not part of a module") && !strings.Contains(errMsg, "go.mod file not found") {
+				return err
+			}
+		}
 	}
 
 	if gmc := r.env.Env["GOMODCACHE"]; gmc != "" {
@@ -161,7 +168,7 @@ func (r *ModuleResolver) init() error {
 }
 
 func (r *ModuleResolver) initAllMods() error {
-	stdout, err := r.env.invokeGo(context.TODO(), "list", "-m", "-json", "...")
+	stdout, err := r.env.invokeGo(context.TODO(), "list", "-m", "-e", "-json", "...")
 	if err != nil {
 		return err
 	}

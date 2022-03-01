@@ -26,7 +26,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiextensionstestserver "k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -136,11 +136,11 @@ func newOwnerRC(name, namespace string) *v1.ReplicationController {
 	}
 }
 
-func newCRDInstance(definition *apiextensionsv1beta1.CustomResourceDefinition, namespace, name string) *unstructured.Unstructured {
+func newCRDInstance(definition *apiextensionsv1.CustomResourceDefinition, namespace, name string) *unstructured.Unstructured {
 	return &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"kind":       definition.Spec.Names.Kind,
-			"apiVersion": definition.Spec.Group + "/" + definition.Spec.Version,
+			"apiVersion": definition.Spec.Group + "/" + definition.Spec.Versions[0].Name,
 			"metadata": map[string]interface{}{
 				"name":      name,
 				"namespace": namespace,
@@ -180,18 +180,18 @@ func createRandomCustomResourceDefinition(
 	t *testing.T, apiExtensionClient apiextensionsclientset.Interface,
 	dynamicClient dynamic.Interface,
 	namespace string,
-) (*apiextensionsv1beta1.CustomResourceDefinition, dynamic.ResourceInterface) {
+) (*apiextensionsv1.CustomResourceDefinition, dynamic.ResourceInterface) {
 	// Create a random custom resource definition and ensure it's available for
 	// use.
-	definition := apiextensionstestserver.NewRandomNameCustomResourceDefinition(apiextensionsv1beta1.NamespaceScoped)
+	definition := apiextensionstestserver.NewRandomNameV1CustomResourceDefinition(apiextensionsv1.NamespaceScoped)
 
-	definition, err := apiextensionstestserver.CreateNewCustomResourceDefinition(definition, apiExtensionClient, dynamicClient)
+	definition, err := apiextensionstestserver.CreateNewV1CustomResourceDefinition(definition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatalf("failed to create CustomResourceDefinition: %v", err)
 	}
 
 	// Get a client for the custom resource.
-	gvr := schema.GroupVersionResource{Group: definition.Spec.Group, Version: definition.Spec.Version, Resource: definition.Spec.Names.Plural}
+	gvr := schema.GroupVersionResource{Group: definition.Spec.Group, Version: definition.Spec.Versions[0].Name, Resource: definition.Spec.Names.Plural}
 
 	resourceClient := dynamicClient.Resource(gvr).Namespace(namespace)
 
@@ -226,7 +226,7 @@ func setupWithServer(t *testing.T, result *kubeapiservertesting.TestServer, work
 	if err != nil {
 		t.Fatalf("error creating extension clientset: %v", err)
 	}
-	// CreateNewCustomResourceDefinition wants to use this namespace for verifying
+	// CreateCRDUsingRemovedAPI wants to use this namespace for verifying
 	// namespace-scoped CRD creation.
 	createNamespaceOrDie("aval", clientSet, t)
 
@@ -258,9 +258,9 @@ func setupWithServer(t *testing.T, result *kubeapiservertesting.TestServer, work
 		t.Fatalf("failed to create garbage collector: %v", err)
 	}
 
-	stopCh := make(chan struct{})
+	ctx, cancel := context.WithCancel(context.Background())
 	tearDown := func() {
-		close(stopCh)
+		cancel()
 		result.TearDownFn()
 	}
 	syncPeriod := 5 * time.Second
@@ -270,9 +270,9 @@ func setupWithServer(t *testing.T, result *kubeapiservertesting.TestServer, work
 			// client. This is a leaky abstraction and assumes behavior about the REST
 			// mapper, but we'll deal with it for now.
 			restMapper.Reset()
-		}, syncPeriod, stopCh)
-		go gc.Run(workers, stopCh)
-		go gc.Sync(clientSet.Discovery(), syncPeriod, stopCh)
+		}, syncPeriod, ctx.Done())
+		go gc.Run(ctx, workers)
+		go gc.Sync(clientSet.Discovery(), syncPeriod, ctx.Done())
 	}
 
 	if workerCount > 0 {
@@ -598,12 +598,12 @@ func setupRCsPods(t *testing.T, gc *garbagecollector.GarbageCollector, clientSet
 	}
 	orphan := false
 	switch {
-	case options.OrphanDependents == nil && options.PropagationPolicy == nil && len(initialFinalizers) == 0:
+	case options.OrphanDependents == nil && options.PropagationPolicy == nil && len(initialFinalizers) == 0: //nolint:staticcheck // SA1019 Keep testing deprecated OrphanDependents option until it's being removed
 		// if there are no deletion options, the default policy for replication controllers is orphan
 		orphan = true
-	case options.OrphanDependents != nil:
+	case options.OrphanDependents != nil: //nolint:staticcheck // SA1019 Keep testing deprecated OrphanDependents option until it's being removed
 		// if the deletion options explicitly specify whether to orphan, that controls
-		orphan = *options.OrphanDependents
+		orphan = *options.OrphanDependents //nolint:staticcheck // SA1019 Keep testing deprecated OrphanDependents option until it's being removed
 	case options.PropagationPolicy != nil:
 		// if the deletion options explicitly specify whether to orphan, that controls
 		orphan = *options.PropagationPolicy == metav1.DeletePropagationOrphan
@@ -1024,12 +1024,7 @@ func TestBlockingOwnerRefDoesBlock(t *testing.T) {
 	// dependency graph before handling the foreground deletion of the rc.
 	ctx.startGC(5)
 	timeout := make(chan struct{})
-	go func() {
-		select {
-		case <-time.After(5 * time.Second):
-			close(timeout)
-		}
-	}()
+	time.AfterFunc(5*time.Second, func() { close(timeout) })
 	if !cache.WaitForCacheSync(timeout, gc.IsSynced) {
 		t.Fatalf("failed to wait for garbage collector to be synced")
 	}
@@ -1230,14 +1225,14 @@ func TestCRDDeletionCascading(t *testing.T) {
 	t.Logf("Second pass CRD cascading deletion")
 	accessor := meta.NewAccessor()
 	accessor.SetResourceVersion(definition, "")
-	_, err := apiextensionstestserver.CreateNewCustomResourceDefinition(definition, apiExtensionClient, dynamicClient)
+	_, err := apiextensionstestserver.CreateNewV1CustomResourceDefinition(definition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatalf("failed to create CustomResourceDefinition: %v", err)
 	}
 	testCRDDeletion(t, ctx, ns, definition, resourceClient)
 }
 
-func testCRDDeletion(t *testing.T, ctx *testContext, ns *v1.Namespace, definition *apiextensionsv1beta1.CustomResourceDefinition, resourceClient dynamic.ResourceInterface) {
+func testCRDDeletion(t *testing.T, ctx *testContext, ns *v1.Namespace, definition *apiextensionsv1.CustomResourceDefinition, resourceClient dynamic.ResourceInterface) {
 	clientSet, apiExtensionClient := ctx.clientSet, ctx.apiExtensionClient
 
 	configMapClient := clientSet.CoreV1().ConfigMaps(ns.Name)
@@ -1261,7 +1256,7 @@ func testCRDDeletion(t *testing.T, ctx *testContext, ns *v1.Namespace, definitio
 	time.Sleep(ctx.syncPeriod + 5*time.Second)
 
 	// Delete the definition, which should cascade to the owner and ultimately its dependents.
-	if err := apiextensionstestserver.DeleteCustomResourceDefinition(definition, apiExtensionClient); err != nil {
+	if err := apiextensionstestserver.DeleteV1CustomResourceDefinition(definition, apiExtensionClient); err != nil {
 		t.Fatalf("failed to delete %q: %v", definition.Name, err)
 	}
 

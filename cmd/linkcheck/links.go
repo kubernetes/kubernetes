@@ -23,7 +23,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -81,7 +80,7 @@ func newWalkFunc(invalidLink *bool, client *http.Client) filepath.WalkFunc {
 			return nil
 		}
 
-		fileBytes, err := ioutil.ReadFile(filePath)
+		fileBytes, err := os.ReadFile(filePath)
 		if err != nil {
 			return err
 		}

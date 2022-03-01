@@ -1,17 +1,20 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- Random-Liu
-- derekwaynecarr
-- tallclair
-- yujuhong
-- sjenning
-- mrunalp
+  - Random-Liu
+  - derekwaynecarr
+  - tallclair
+  - yujuhong
+  - sjenning
+  - mrunalp
+  - ehashman
+  - SergeyKanzhelev
 emeritus_approvers:
-- vishh
-- dchen1107
-- dashpole
+  - vishh
+  - dchen1107
+  - dashpole
 reviewers:
-- sig-node-reviewers
+  - endocrimes
+  - sig-node-reviewers
 labels:
-- sig/node
+  - sig/node

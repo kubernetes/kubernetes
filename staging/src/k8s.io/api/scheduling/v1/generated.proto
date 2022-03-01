@@ -27,7 +27,7 @@ import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 
 // Package-wide variables from generator "generated".
-option go_package = "v1";
+option go_package = "k8s.io/api/scheduling/v1";
 
 // PriorityClass defines mapping from a priority class name to the priority
 // integer value. The value can be any valid integer.
@@ -57,7 +57,6 @@ message PriorityClass {
   // PreemptionPolicy is the Policy for preempting pods with lower priority.
   // One of Never, PreemptLowerPriority.
   // Defaults to PreemptLowerPriority if unset.
-  // This field is beta-level, gated by the NonPreemptingPriority feature-gate.
   // +optional
   optional string preemptionPolicy = 5;
 }

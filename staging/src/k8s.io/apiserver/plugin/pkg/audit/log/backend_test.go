@@ -50,7 +50,7 @@ func TestLogEventsLegacy(t *testing.T) {
 			&auditinternal.Event{
 				AuditID: types.UID(uuid.New().String()),
 			},
-			`[\d\:\-\.\+TZ]+ AUDIT: id="[\w-]+" stage="" ip="<unknown>" method="" user="<none>" groups="<none>" as="<self>" asgroups="<lookup>" namespace="<none>" uri="" response="<deferred>"`,
+			`[\d\:\-\.\+TZ]+ AUDIT: id="[\w-]+" stage="" ip="<unknown>" method="" user="<none>" groups="<none>" as="<self>" asgroups="<lookup>" user-agent="" namespace="<none>" uri="" response="<deferred>"`,
 		},
 		{
 			&auditinternal.Event{
@@ -72,11 +72,12 @@ func TestLogEventsLegacy(t *testing.T) {
 						"system:authenticated",
 					},
 				},
+				UserAgent: "kube-admin",
 				ObjectRef: &auditinternal.ObjectReference{
 					Namespace: "default",
 				},
 			},
-			`[\d\:\-\.\+TZ]+ AUDIT: id="[\w-]+" stage="RequestReceived" ip="127.0.0.1" method="get" user="admin" groups="\\"system:masters\\",\\"system:authenticated\\"" as="<self>" asgroups="<lookup>" namespace="default" uri="/apis/rbac.authorization.k8s.io/v1/roles" response="200"`,
+			`[\d\:\-\.\+TZ]+ AUDIT: id="[\w-]+" stage="RequestReceived" ip="127.0.0.1" method="get" user="admin" groups="\\"system:masters\\",\\"system:authenticated\\"" as="<self>" asgroups="<lookup>" user-agent="kube-admin" namespace="default" uri="/apis/rbac.authorization.k8s.io/v1/roles" response="200"`,
 		},
 		{
 			&auditinternal.Event{
@@ -88,7 +89,7 @@ func TestLogEventsLegacy(t *testing.T) {
 					Subresource: "bar",
 				},
 			},
-			`[\d\:\-\.\+TZ]+ AUDIT: id="[\w-]+" stage="" ip="<unknown>" method="" user="<none>" groups="<none>" as="<self>" asgroups="<lookup>" namespace="<none>" uri="" response="<deferred>"`,
+			`[\d\:\-\.\+TZ]+ AUDIT: id="[\w-]+" stage="" ip="<unknown>" method="" user="<none>" groups="<none>" as="<self>" asgroups="<lookup>" user-agent="" namespace="<none>" uri="" response="<deferred>"`,
 		},
 	} {
 		var buf bytes.Buffer

@@ -37,7 +37,8 @@ type InTreePlugin interface {
 	// TranslateInTreeInlineVolumeToCSI takes a inline volume and will translate
 	// the in-tree inline volume source to a CSIPersistentVolumeSource
 	// A PV object containing the CSIPersistentVolumeSource in it's spec is returned
-	TranslateInTreeInlineVolumeToCSI(volume *v1.Volume) (*v1.PersistentVolume, error)
+	// podNamespace is only needed for azurefile to fetch secret namespace, no need to be set for other plugins.
+	TranslateInTreeInlineVolumeToCSI(volume *v1.Volume, podNamespace string) (*v1.PersistentVolume, error)
 
 	// TranslateInTreePVToCSI takes a persistent volume and will translate
 	// the in-tree pv source to a CSI Source. The input persistent volume can be modified
@@ -305,7 +306,7 @@ func translateTopologyFromCSIToInTree(pv *v1.PersistentVolume, csiTopologyKey st
 	return nil
 }
 
-// translateAllowedTopologies translates allowed topologies within storage class
+// translateAllowedTopologies translates allowed topologies within storage class or PV
 // from legacy failure domain to given CSI topology key
 func translateAllowedTopologies(terms []v1.TopologySelectorTerm, key string) ([]v1.TopologySelectorTerm, error) {
 	if terms == nil {
@@ -322,10 +323,9 @@ func translateAllowedTopologies(terms []v1.TopologySelectorTerm, key string) ([]
 					Key:    key,
 					Values: exp.Values,
 				}
-			} else if exp.Key == key {
-				newExp = exp
 			} else {
-				return nil, fmt.Errorf("unknown topology key: %v", exp.Key)
+				// Other topologies are passed through unchanged.
+				newExp = exp
 			}
 			newTerm.MatchLabelExpressions = append(newTerm.MatchLabelExpressions, newExp)
 		}

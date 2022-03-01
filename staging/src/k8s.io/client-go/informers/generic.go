@@ -28,6 +28,7 @@ import (
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	v1beta2 "k8s.io/api/apps/v1beta2"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
+	v2 "k8s.io/api/autoscaling/v2"
 	v2beta1 "k8s.io/api/autoscaling/v2beta1"
 	v2beta2 "k8s.io/api/autoscaling/v2beta2"
 	batchv1 "k8s.io/api/batch/v1"
@@ -37,18 +38,20 @@ import (
 	coordinationv1 "k8s.io/api/coordination/v1"
 	coordinationv1beta1 "k8s.io/api/coordination/v1beta1"
 	corev1 "k8s.io/api/core/v1"
-	v1alpha1 "k8s.io/api/discovery/v1alpha1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	eventsv1 "k8s.io/api/events/v1"
 	eventsv1beta1 "k8s.io/api/events/v1beta1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
-	flowcontrolv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
+	v1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
 	flowcontrolv1beta1 "k8s.io/api/flowcontrol/v1beta1"
+	flowcontrolv1beta2 "k8s.io/api/flowcontrol/v1beta2"
 	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	nodev1 "k8s.io/api/node/v1"
 	nodev1alpha1 "k8s.io/api/node/v1alpha1"
 	nodev1beta1 "k8s.io/api/node/v1beta1"
+	policyv1 "k8s.io/api/policy/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
@@ -137,6 +140,10 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 	case autoscalingv1.SchemeGroupVersion.WithResource("horizontalpodautoscalers"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Autoscaling().V1().HorizontalPodAutoscalers().Informer()}, nil
 
+		// Group=autoscaling, Version=v2
+	case v2.SchemeGroupVersion.WithResource("horizontalpodautoscalers"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Autoscaling().V2().HorizontalPodAutoscalers().Informer()}, nil
+
 		// Group=autoscaling, Version=v2beta1
 	case v2beta1.SchemeGroupVersion.WithResource("horizontalpodautoscalers"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Autoscaling().V2beta1().HorizontalPodAutoscalers().Informer()}, nil
@@ -146,6 +153,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Autoscaling().V2beta2().HorizontalPodAutoscalers().Informer()}, nil
 
 		// Group=batch, Version=v1
+	case batchv1.SchemeGroupVersion.WithResource("cronjobs"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Batch().V1().CronJobs().Informer()}, nil
 	case batchv1.SchemeGroupVersion.WithResource("jobs"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Batch().V1().Jobs().Informer()}, nil
 
@@ -203,9 +212,9 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 	case corev1.SchemeGroupVersion.WithResource("serviceaccounts"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Core().V1().ServiceAccounts().Informer()}, nil
 
-		// Group=discovery.k8s.io, Version=v1alpha1
-	case v1alpha1.SchemeGroupVersion.WithResource("endpointslices"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Discovery().V1alpha1().EndpointSlices().Informer()}, nil
+		// Group=discovery.k8s.io, Version=v1
+	case discoveryv1.SchemeGroupVersion.WithResource("endpointslices"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Discovery().V1().EndpointSlices().Informer()}, nil
 
 		// Group=discovery.k8s.io, Version=v1beta1
 	case discoveryv1beta1.SchemeGroupVersion.WithResource("endpointslices"):
@@ -234,9 +243,9 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Extensions().V1beta1().ReplicaSets().Informer()}, nil
 
 		// Group=flowcontrol.apiserver.k8s.io, Version=v1alpha1
-	case flowcontrolv1alpha1.SchemeGroupVersion.WithResource("flowschemas"):
+	case v1alpha1.SchemeGroupVersion.WithResource("flowschemas"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Flowcontrol().V1alpha1().FlowSchemas().Informer()}, nil
-	case flowcontrolv1alpha1.SchemeGroupVersion.WithResource("prioritylevelconfigurations"):
+	case v1alpha1.SchemeGroupVersion.WithResource("prioritylevelconfigurations"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Flowcontrol().V1alpha1().PriorityLevelConfigurations().Informer()}, nil
 
 		// Group=flowcontrol.apiserver.k8s.io, Version=v1beta1
@@ -244,6 +253,12 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Flowcontrol().V1beta1().FlowSchemas().Informer()}, nil
 	case flowcontrolv1beta1.SchemeGroupVersion.WithResource("prioritylevelconfigurations"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Flowcontrol().V1beta1().PriorityLevelConfigurations().Informer()}, nil
+
+		// Group=flowcontrol.apiserver.k8s.io, Version=v1beta2
+	case flowcontrolv1beta2.SchemeGroupVersion.WithResource("flowschemas"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Flowcontrol().V1beta2().FlowSchemas().Informer()}, nil
+	case flowcontrolv1beta2.SchemeGroupVersion.WithResource("prioritylevelconfigurations"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Flowcontrol().V1beta2().PriorityLevelConfigurations().Informer()}, nil
 
 		// Group=internal.apiserver.k8s.io, Version=v1alpha1
 	case apiserverinternalv1alpha1.SchemeGroupVersion.WithResource("storageversions"):
@@ -274,6 +289,10 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		// Group=node.k8s.io, Version=v1beta1
 	case nodev1beta1.SchemeGroupVersion.WithResource("runtimeclasses"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Node().V1beta1().RuntimeClasses().Informer()}, nil
+
+		// Group=policy, Version=v1
+	case policyv1.SchemeGroupVersion.WithResource("poddisruptionbudgets"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Policy().V1().PodDisruptionBudgets().Informer()}, nil
 
 		// Group=policy, Version=v1beta1
 	case policyv1beta1.SchemeGroupVersion.WithResource("poddisruptionbudgets"):
@@ -344,6 +363,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Storage().V1beta1().CSIDrivers().Informer()}, nil
 	case storagev1beta1.SchemeGroupVersion.WithResource("csinodes"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Storage().V1beta1().CSINodes().Informer()}, nil
+	case storagev1beta1.SchemeGroupVersion.WithResource("csistoragecapacities"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Storage().V1beta1().CSIStorageCapacities().Informer()}, nil
 	case storagev1beta1.SchemeGroupVersion.WithResource("storageclasses"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Storage().V1beta1().StorageClasses().Informer()}, nil
 	case storagev1beta1.SchemeGroupVersion.WithResource("volumeattachments"):

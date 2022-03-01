@@ -24,17 +24,16 @@ import (
 	"sync"
 	"time"
 
-	systemd "github.com/coreos/go-systemd/daemon"
-	"github.com/go-openapi/spec"
+	systemd "github.com/coreos/go-systemd/v22/daemon"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilwaitgroup "k8s.io/apimachinery/pkg/util/waitgroup"
+	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -50,11 +49,14 @@ import (
 	utilopenapi "k8s.io/apiserver/pkg/util/openapi"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
-	openapibuilder "k8s.io/kube-openapi/pkg/builder"
+	openapibuilder2 "k8s.io/kube-openapi/pkg/builder"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/handler"
+	"k8s.io/kube-openapi/pkg/handler3"
 	openapiutil "k8s.io/kube-openapi/pkg/util"
 	openapiproto "k8s.io/kube-openapi/pkg/util/proto"
+	"k8s.io/kube-openapi/pkg/validation/spec"
+	"k8s.io/utils/clock"
 )
 
 // Info about an API group.
@@ -133,9 +135,19 @@ type GenericAPIServer struct {
 	// Enable swagger and/or OpenAPI if these configs are non-nil.
 	openAPIConfig *openapicommon.Config
 
+	// SkipOpenAPIInstallation indicates not to install the OpenAPI handler
+	// during PrepareRun.
+	// Set this to true when the specific API Server has its own OpenAPI handler
+	// (e.g. kube-aggregator)
+	skipOpenAPIInstallation bool
+
 	// OpenAPIVersionedService controls the /openapi/v2 endpoint, and can be used to update the served spec.
-	// It is set during PrepareRun.
+	// It is set during PrepareRun if `openAPIConfig` is non-nil unless `skipOpenAPIInstallation` is true.
 	OpenAPIVersionedService *handler.OpenAPIService
+
+	// OpenAPIV3VersionedService controls the /openapi/v3 endpoint and can be used to update the served spec.
+	// It is set during PrepareRun if `openAPIConfig` is non-nil unless `skipOpenAPIInstallation` is true.
+	OpenAPIV3VersionedService *handler3.OpenAPIService
 
 	// StaticOpenAPISpec is the spec derived from the restful container endpoints.
 	// It is set during PrepareRun.
@@ -167,9 +179,6 @@ type GenericAPIServer struct {
 	readyzChecksInstalled bool
 	livezGracePeriod      time.Duration
 	livezClock            clock.Clock
-	// the readiness stop channel is used to signal that the apiserver has initiated a shutdown sequence, this
-	// will cause readyz to return unhealthy.
-	readinessStopCh chan struct{}
 
 	// auditing. The backend is started after the server starts listening.
 	AuditBackend audit.Backend
@@ -203,6 +212,27 @@ type GenericAPIServer struct {
 
 	// StorageVersionManager holds the storage versions of the API resources installed by this server.
 	StorageVersionManager storageversion.Manager
+
+	// Version will enable the /version endpoint if non-nil
+	Version *version.Info
+
+	// lifecycleSignals provides access to the various signals that happen during the life cycle of the apiserver.
+	lifecycleSignals lifecycleSignals
+
+	// muxAndDiscoveryCompleteSignals holds signals that indicate all known HTTP paths have been registered.
+	// it exists primarily to avoid returning a 404 response when a resource actually exists but we haven't installed the path to a handler.
+	// it is exposed for easier composition of the individual servers.
+	// the primary users of this field are the WithMuxCompleteProtection filter and the NotFoundHandler
+	muxAndDiscoveryCompleteSignals map[string]<-chan struct{}
+
+	// ShutdownSendRetryAfter dictates when to initiate shutdown of the HTTP
+	// Server during the graceful termination of the apiserver. If true, we wait
+	// for non longrunning requests in flight to be drained and then initiate a
+	// shutdown of the HTTP Server. If false, we initiate a shutdown of the HTTP
+	// Server as soon as ShutdownDelayDuration has elapsed.
+	// If enabled, after ShutdownDelayDuration elapses, any incoming request is
+	// rejected with a 429 status code and a 'Retry-After' response.
+	ShutdownSendRetryAfter bool
 }
 
 // DelegationTarget is an interface which allows for composition of API servers with top level handling that works
@@ -228,6 +258,9 @@ type DelegationTarget interface {
 
 	// PrepareRun does post API installation setup steps. It calls recursively the same function of the delegates.
 	PrepareRun() preparedGenericAPIServer
+
+	// MuxAndDiscoveryCompleteSignals exposes registered signals that indicate if all known HTTP paths have been installed.
+	MuxAndDiscoveryCompleteSignals() map[string]<-chan struct{}
 }
 
 func (s *GenericAPIServer) UnprotectedHandler() http.Handler {
@@ -251,15 +284,37 @@ func (s *GenericAPIServer) NextDelegate() DelegationTarget {
 	return s.delegationTarget
 }
 
+// RegisterMuxAndDiscoveryCompleteSignal registers the given signal that will be used to determine if all known
+// HTTP paths have been registered. It is okay to call this method after instantiating the generic server but before running.
+func (s *GenericAPIServer) RegisterMuxAndDiscoveryCompleteSignal(signalName string, signal <-chan struct{}) error {
+	if _, exists := s.muxAndDiscoveryCompleteSignals[signalName]; exists {
+		return fmt.Errorf("%s already registered", signalName)
+	}
+	s.muxAndDiscoveryCompleteSignals[signalName] = signal
+	return nil
+}
+
+func (s *GenericAPIServer) MuxAndDiscoveryCompleteSignals() map[string]<-chan struct{} {
+	return s.muxAndDiscoveryCompleteSignals
+}
+
 type emptyDelegate struct {
+	// handler is called at the end of the delegation chain
+	// when a request has been made against an unregistered HTTP path the individual servers will simply pass it through until it reaches the handler.
+	handler http.Handler
 }
 
 func NewEmptyDelegate() DelegationTarget {
 	return emptyDelegate{}
 }
 
+// NewEmptyDelegateWithCustomHandler allows for registering a custom handler usually for special handling of 404 requests
+func NewEmptyDelegateWithCustomHandler(handler http.Handler) DelegationTarget {
+	return emptyDelegate{handler}
+}
+
 func (s emptyDelegate) UnprotectedHandler() http.Handler {
-	return nil
+	return s.handler
 }
 func (s emptyDelegate) PostStartHooks() map[string]postStartHookEntry {
 	return map[string]postStartHookEntry{}
@@ -279,6 +334,9 @@ func (s emptyDelegate) NextDelegate() DelegationTarget {
 func (s emptyDelegate) PrepareRun() preparedGenericAPIServer {
 	return preparedGenericAPIServer{nil}
 }
+func (s emptyDelegate) MuxAndDiscoveryCompleteSignals() map[string]<-chan struct{} {
+	return map[string]<-chan struct{}{}
+}
 
 // preparedGenericAPIServer is a private wrapper that enforces a call of PrepareRun() before Run can be invoked.
 type preparedGenericAPIServer struct {
@@ -289,15 +347,23 @@ type preparedGenericAPIServer struct {
 func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 	s.delegationTarget.PrepareRun()
 
-	if s.openAPIConfig != nil {
+	if s.openAPIConfig != nil && !s.skipOpenAPIInstallation {
 		s.OpenAPIVersionedService, s.StaticOpenAPISpec = routes.OpenAPI{
 			Config: s.openAPIConfig,
-		}.Install(s.Handler.GoRestfulContainer, s.Handler.NonGoRestfulMux)
+		}.InstallV2(s.Handler.GoRestfulContainer, s.Handler.NonGoRestfulMux)
+		if utilfeature.DefaultFeatureGate.Enabled(features.OpenAPIV3) {
+			s.OpenAPIV3VersionedService = routes.OpenAPI{
+				Config: s.openAPIConfig,
+			}.InstallV3(s.Handler.GoRestfulContainer, s.Handler.NonGoRestfulMux)
+		}
 	}
 
 	s.installHealthz()
 	s.installLivez()
-	err := s.addReadyzShutdownCheck(s.readinessStopCh)
+
+	// as soon as shutdown is initiated, readiness should start failing
+	readinessStopCh := s.lifecycleSignals.ShutdownInitiated.Signaled()
+	err := s.addReadyzShutdownCheck(readinessStopCh)
 	if err != nil {
 		klog.Errorf("Failed to install readyz shutdown check %s", err)
 	}
@@ -320,27 +386,80 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 // Run spawns the secure http server. It only returns if stopCh is closed
 // or the secure port cannot be listened on initially.
 func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
-	delayedStopCh := make(chan struct{})
+	delayedStopCh := s.lifecycleSignals.AfterShutdownDelayDuration
+	shutdownInitiatedCh := s.lifecycleSignals.ShutdownInitiated
+
+	// spawn a new goroutine for closing the MuxAndDiscoveryComplete signal
+	// registration happens during construction of the generic api server
+	// the last server in the chain aggregates signals from the previous instances
+	go func() {
+		for _, muxAndDiscoveryCompletedSignal := range s.GenericAPIServer.MuxAndDiscoveryCompleteSignals() {
+			select {
+			case <-muxAndDiscoveryCompletedSignal:
+				continue
+			case <-stopCh:
+				klog.V(1).Infof("haven't completed %s, stop requested", s.lifecycleSignals.MuxAndDiscoveryComplete.Name())
+				return
+			}
+		}
+		s.lifecycleSignals.MuxAndDiscoveryComplete.Signal()
+		klog.V(1).Infof("%s has all endpoints registered and discovery information is complete", s.lifecycleSignals.MuxAndDiscoveryComplete.Name())
+	}()
 
 	go func() {
-		defer close(delayedStopCh)
+		defer delayedStopCh.Signal()
+		defer klog.V(1).InfoS("[graceful-termination] shutdown event", "name", delayedStopCh.Name())
 
 		<-stopCh
 
 		// As soon as shutdown is initiated, /readyz should start returning failure.
 		// This gives the load balancer a window defined by ShutdownDelayDuration to detect that /readyz is red
 		// and stop sending traffic to this server.
-		close(s.readinessStopCh)
+		shutdownInitiatedCh.Signal()
+		klog.V(1).InfoS("[graceful-termination] shutdown event", "name", shutdownInitiatedCh.Name())
 
 		time.Sleep(s.ShutdownDelayDuration)
 	}()
 
 	// close socket after delayed stopCh
-	stoppedCh, err := s.NonBlockingRun(delayedStopCh)
+	drainedCh := s.lifecycleSignals.InFlightRequestsDrained
+	stopHttpServerCh := delayedStopCh.Signaled()
+	shutdownTimeout := s.ShutdownTimeout
+	if s.ShutdownSendRetryAfter {
+		// when this mode is enabled, we do the following:
+		// - the server will continue to listen until all existing requests in flight
+		//   (not including active long runnning requests) have been drained.
+		// - once drained, http Server Shutdown is invoked with a timeout of 2s,
+		//   net/http waits for 1s for the peer to respond to a GO_AWAY frame, so
+		//   we should wait for a minimum of 2s
+		stopHttpServerCh = drainedCh.Signaled()
+		shutdownTimeout = 2 * time.Second
+		klog.V(1).InfoS("[graceful-termination] using HTTP Server shutdown timeout", "ShutdownTimeout", shutdownTimeout)
+	}
+
+	stoppedCh, listenerStoppedCh, err := s.NonBlockingRun(stopHttpServerCh, shutdownTimeout)
 	if err != nil {
 		return err
 	}
+	httpServerStoppedListeningCh := s.lifecycleSignals.HTTPServerStoppedListening
+	go func() {
+		<-listenerStoppedCh
+		httpServerStoppedListeningCh.Signal()
+		klog.V(1).InfoS("[graceful-termination] shutdown event", "name", httpServerStoppedListeningCh.Name())
+	}()
 
+	go func() {
+		defer drainedCh.Signal()
+		defer klog.V(1).InfoS("[graceful-termination] shutdown event", "name", drainedCh.Name())
+
+		// wait for the delayed stopCh before closing the handler chain (it rejects everything after Wait has been called).
+		<-delayedStopCh.Signaled()
+
+		// Wait for all requests to finish, which are bounded by the RequestTimeout variable.
+		s.HandlerChainWaitGroup.Wait()
+	}()
+
+	klog.V(1).Info("[graceful-termination] waiting for shutdown to be initiated")
 	<-stopCh
 
 	// run shutdown hooks directly. This includes deregistering from the kubernetes endpoint in case of kube-apiserver.
@@ -348,22 +467,21 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 	if err != nil {
 		return err
 	}
+	klog.V(1).Info("[graceful-termination] RunPreShutdownHooks has completed")
 
-	// wait for the delayed stopCh before closing the handler chain (it rejects everything after Wait has been called).
-	<-delayedStopCh
+	// Wait for all requests in flight to drain, bounded by the RequestTimeout variable.
+	<-drainedCh.Signaled()
 	// wait for stoppedCh that is closed when the graceful termination (server.Shutdown) is finished.
 	<-stoppedCh
 
-	// Wait for all requests to finish, which are bounded by the RequestTimeout variable.
-	s.HandlerChainWaitGroup.Wait()
-
+	klog.V(1).Info("[graceful-termination] apiserver is exiting")
 	return nil
 }
 
 // NonBlockingRun spawns the secure http server. An error is
 // returned if the secure port cannot be listened on.
 // The returned channel is closed when the (asynchronous) termination is finished.
-func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) (<-chan struct{}, error) {
+func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}, shutdownTimeout time.Duration) (<-chan struct{}, <-chan struct{}, error) {
 	// Use an stop channel to allow graceful shutdown without dropping audit events
 	// after http server shutdown.
 	auditStopCh := make(chan struct{})
@@ -372,20 +490,21 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) (<-chan
 	// before http server start serving. Otherwise the Backend.ProcessEvents call might block.
 	if s.AuditBackend != nil {
 		if err := s.AuditBackend.Run(auditStopCh); err != nil {
-			return nil, fmt.Errorf("failed to run the audit backend: %v", err)
+			return nil, nil, fmt.Errorf("failed to run the audit backend: %v", err)
 		}
 	}
 
 	// Use an internal stop channel to allow cleanup of the listeners on error.
 	internalStopCh := make(chan struct{})
 	var stoppedCh <-chan struct{}
+	var listenerStoppedCh <-chan struct{}
 	if s.SecureServingInfo != nil && s.Handler != nil {
 		var err error
-		stoppedCh, err = s.SecureServingInfo.Serve(s.Handler, s.ShutdownTimeout, internalStopCh)
+		stoppedCh, listenerStoppedCh, err = s.SecureServingInfo.Serve(s.Handler, shutdownTimeout, internalStopCh)
 		if err != nil {
 			close(internalStopCh)
 			close(auditStopCh)
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
@@ -408,7 +527,7 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) (<-chan
 		klog.Errorf("Unable to send systemd daemon successful start message: %v\n", err)
 	}
 
-	return stoppedCh, nil
+	return stoppedCh, listenerStoppedCh, nil
 }
 
 // installAPIResources is a private method for installing the REST storage backing each api groupversionresource
@@ -420,7 +539,10 @@ func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *A
 			continue
 		}
 
-		apiGroupVersion := s.getAPIGroupVersion(apiGroupInfo, groupVersion, apiPrefix)
+		apiGroupVersion, err := s.getAPIGroupVersion(apiGroupInfo, groupVersion, apiPrefix)
+		if err != nil {
+			return err
+		}
 		if apiGroupInfo.OptionsExternalVersion != nil {
 			apiGroupVersion.OptionsExternalVersion = apiGroupInfo.OptionsExternalVersion
 		}
@@ -533,15 +655,18 @@ func (s *GenericAPIServer) InstallAPIGroup(apiGroupInfo *APIGroupInfo) error {
 	return s.InstallAPIGroups(apiGroupInfo)
 }
 
-func (s *GenericAPIServer) getAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupVersion schema.GroupVersion, apiPrefix string) *genericapi.APIGroupVersion {
+func (s *GenericAPIServer) getAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupVersion schema.GroupVersion, apiPrefix string) (*genericapi.APIGroupVersion, error) {
 	storage := make(map[string]rest.Storage)
 	for k, v := range apiGroupInfo.VersionedResourcesStorageMap[groupVersion.Version] {
-		storage[strings.ToLower(k)] = v
+		if strings.ToLower(k) != k {
+			return nil, fmt.Errorf("resource names must be lowercase only, not %q", k)
+		}
+		storage[k] = v
 	}
 	version := s.newAPIGroupVersion(apiGroupInfo, groupVersion)
 	version.Root = apiPrefix
 	version.Storage = storage
-	return version
+	return version, nil
 }
 
 func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupVersion schema.GroupVersion) *genericapi.APIGroupVersion {
@@ -549,14 +674,15 @@ func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 		GroupVersion:     groupVersion,
 		MetaGroupVersion: apiGroupInfo.MetaGroupVersion,
 
-		ParameterCodec:  apiGroupInfo.ParameterCodec,
-		Serializer:      apiGroupInfo.NegotiatedSerializer,
-		Creater:         apiGroupInfo.Scheme,
-		Convertor:       apiGroupInfo.Scheme,
-		UnsafeConvertor: runtime.UnsafeObjectConvertor(apiGroupInfo.Scheme),
-		Defaulter:       apiGroupInfo.Scheme,
-		Typer:           apiGroupInfo.Scheme,
-		Linker:          runtime.SelfLinker(meta.NewAccessor()),
+		ParameterCodec:        apiGroupInfo.ParameterCodec,
+		Serializer:            apiGroupInfo.NegotiatedSerializer,
+		Creater:               apiGroupInfo.Scheme,
+		Convertor:             apiGroupInfo.Scheme,
+		ConvertabilityChecker: apiGroupInfo.Scheme,
+		UnsafeConvertor:       runtime.UnsafeObjectConvertor(apiGroupInfo.Scheme),
+		Defaulter:             apiGroupInfo.Scheme,
+		Typer:                 apiGroupInfo.Scheme,
+		Namer:                 runtime.Namer(meta.NewAccessor()),
 
 		EquivalentResourceRegistry: s.EquivalentResourceRegistry,
 
@@ -596,7 +722,7 @@ func (s *GenericAPIServer) getOpenAPIModels(apiPrefix string, apiGroupInfos ...*
 	}
 
 	// Build the openapi definitions for those resources and convert it to proto models
-	openAPISpec, err := openapibuilder.BuildOpenAPIDefinitionsForResources(s.openAPIConfig, resourceNames...)
+	openAPISpec, err := openapibuilder2.BuildOpenAPIDefinitionsForResources(s.openAPIConfig, resourceNames...)
 	if err != nil {
 		return nil, err
 	}

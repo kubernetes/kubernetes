@@ -27,13 +27,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/informers"
-	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	plugintesting "k8s.io/kubernetes/pkg/scheduler/framework/plugins/testing"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
-	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
-	"k8s.io/utils/pointer"
 )
 
 var cmpOpts = []cmp.Option{
@@ -88,9 +86,9 @@ func TestPreFilterState(t *testing.T) {
 				TpKeyToCriticalPaths: map[string]*criticalPaths{
 					"zone": {{"zone1", 0}, {"zone2", 0}},
 				},
-				TpPairToMatchNum: map[topologyPair]*int32{
-					{key: "zone", value: "zone1"}: pointer.Int32Ptr(0),
-					{key: "zone", value: "zone2"}: pointer.Int32Ptr(0),
+				TpPairToMatchNum: map[topologyPair]int{
+					{key: "zone", value: "zone1"}: 0,
+					{key: "zone", value: "zone2"}: 0,
 				},
 			},
 		},
@@ -123,9 +121,9 @@ func TestPreFilterState(t *testing.T) {
 				TpKeyToCriticalPaths: map[string]*criticalPaths{
 					"zone": {{"zone2", 2}, {"zone1", 3}},
 				},
-				TpPairToMatchNum: map[topologyPair]*int32{
-					{key: "zone", value: "zone1"}: pointer.Int32Ptr(3),
-					{key: "zone", value: "zone2"}: pointer.Int32Ptr(2),
+				TpPairToMatchNum: map[topologyPair]int{
+					{key: "zone", value: "zone1"}: 3,
+					{key: "zone", value: "zone2"}: 2,
 				},
 			},
 		},
@@ -160,10 +158,10 @@ func TestPreFilterState(t *testing.T) {
 				TpKeyToCriticalPaths: map[string]*criticalPaths{
 					"zone": {{"zone3", 0}, {"zone2", 2}},
 				},
-				TpPairToMatchNum: map[topologyPair]*int32{
-					{key: "zone", value: "zone1"}: pointer.Int32Ptr(3),
-					{key: "zone", value: "zone2"}: pointer.Int32Ptr(2),
-					{key: "zone", value: "zone3"}: pointer.Int32Ptr(0),
+				TpPairToMatchNum: map[topologyPair]int{
+					{key: "zone", value: "zone1"}: 3,
+					{key: "zone", value: "zone2"}: 2,
+					{key: "zone", value: "zone3"}: 0,
 				},
 			},
 		},
@@ -196,9 +194,9 @@ func TestPreFilterState(t *testing.T) {
 				TpKeyToCriticalPaths: map[string]*criticalPaths{
 					"zone": {{"zone2", 1}, {"zone1", 2}},
 				},
-				TpPairToMatchNum: map[topologyPair]*int32{
-					{key: "zone", value: "zone1"}: pointer.Int32Ptr(2),
-					{key: "zone", value: "zone2"}: pointer.Int32Ptr(1),
+				TpPairToMatchNum: map[topologyPair]int{
+					{key: "zone", value: "zone1"}: 2,
+					{key: "zone", value: "zone2"}: 1,
 				},
 			},
 		},
@@ -240,13 +238,13 @@ func TestPreFilterState(t *testing.T) {
 					"zone": {{"zone1", 3}, {"zone2", 4}},
 					"node": {{"node-x", 0}, {"node-b", 1}},
 				},
-				TpPairToMatchNum: map[topologyPair]*int32{
-					{key: "zone", value: "zone1"}:  pointer.Int32Ptr(3),
-					{key: "zone", value: "zone2"}:  pointer.Int32Ptr(4),
-					{key: "node", value: "node-a"}: pointer.Int32Ptr(2),
-					{key: "node", value: "node-b"}: pointer.Int32Ptr(1),
-					{key: "node", value: "node-x"}: pointer.Int32Ptr(0),
-					{key: "node", value: "node-y"}: pointer.Int32Ptr(4),
+				TpPairToMatchNum: map[topologyPair]int{
+					{key: "zone", value: "zone1"}:  3,
+					{key: "zone", value: "zone2"}:  4,
+					{key: "node", value: "node-a"}: 2,
+					{key: "node", value: "node-b"}: 1,
+					{key: "node", value: "node-x"}: 0,
+					{key: "node", value: "node-y"}: 4,
 				},
 			},
 		},
@@ -289,12 +287,12 @@ func TestPreFilterState(t *testing.T) {
 					"zone": {{"zone1", 3}, {"zone2", 4}},
 					"node": {{"node-b", 1}, {"node-a", 2}},
 				},
-				TpPairToMatchNum: map[topologyPair]*int32{
-					{key: "zone", value: "zone1"}:  pointer.Int32Ptr(3),
-					{key: "zone", value: "zone2"}:  pointer.Int32Ptr(4),
-					{key: "node", value: "node-a"}: pointer.Int32Ptr(2),
-					{key: "node", value: "node-b"}: pointer.Int32Ptr(1),
-					{key: "node", value: "node-y"}: pointer.Int32Ptr(4),
+				TpPairToMatchNum: map[topologyPair]int{
+					{key: "zone", value: "zone1"}:  3,
+					{key: "zone", value: "zone2"}:  4,
+					{key: "node", value: "node-a"}: 2,
+					{key: "node", value: "node-b"}: 1,
+					{key: "node", value: "node-y"}: 4,
 				},
 			},
 		},
@@ -330,12 +328,12 @@ func TestPreFilterState(t *testing.T) {
 					"zone": {{"zone2", 0}, {"zone1", 1}},
 					"node": {{"node-a", 0}, {"node-y", 0}},
 				},
-				TpPairToMatchNum: map[topologyPair]*int32{
-					{key: "zone", value: "zone1"}:  pointer.Int32Ptr(1),
-					{key: "zone", value: "zone2"}:  pointer.Int32Ptr(0),
-					{key: "node", value: "node-a"}: pointer.Int32Ptr(0),
-					{key: "node", value: "node-b"}: pointer.Int32Ptr(1),
-					{key: "node", value: "node-y"}: pointer.Int32Ptr(0),
+				TpPairToMatchNum: map[topologyPair]int{
+					{key: "zone", value: "zone1"}:  1,
+					{key: "zone", value: "zone2"}:  0,
+					{key: "node", value: "node-a"}: 0,
+					{key: "node", value: "node-b"}: 1,
+					{key: "node", value: "node-y"}: 0,
 				},
 			},
 		},
@@ -376,12 +374,12 @@ func TestPreFilterState(t *testing.T) {
 					"zone": {{"zone1", 3}, {"zone2", 4}},
 					"node": {{"node-b", 0}, {"node-a", 1}},
 				},
-				TpPairToMatchNum: map[topologyPair]*int32{
-					{key: "zone", value: "zone1"}:  pointer.Int32Ptr(3),
-					{key: "zone", value: "zone2"}:  pointer.Int32Ptr(4),
-					{key: "node", value: "node-a"}: pointer.Int32Ptr(1),
-					{key: "node", value: "node-b"}: pointer.Int32Ptr(0),
-					{key: "node", value: "node-y"}: pointer.Int32Ptr(2),
+				TpPairToMatchNum: map[topologyPair]int{
+					{key: "zone", value: "zone1"}:  3,
+					{key: "zone", value: "zone2"}:  4,
+					{key: "node", value: "node-a"}: 1,
+					{key: "node", value: "node-b"}: 0,
+					{key: "node", value: "node-y"}: 2,
 				},
 			},
 		},
@@ -424,12 +422,12 @@ func TestPreFilterState(t *testing.T) {
 					"zone": {{"zone1", 3}, {"zone2", 4}},
 					"node": {{"node-b", 1}, {"node-a", 2}},
 				},
-				TpPairToMatchNum: map[topologyPair]*int32{
-					{key: "zone", value: "zone1"}:  pointer.Int32Ptr(3),
-					{key: "zone", value: "zone2"}:  pointer.Int32Ptr(4),
-					{key: "node", value: "node-a"}: pointer.Int32Ptr(2),
-					{key: "node", value: "node-b"}: pointer.Int32Ptr(1),
-					{key: "node", value: "node-y"}: pointer.Int32Ptr(4),
+				TpPairToMatchNum: map[topologyPair]int{
+					{key: "zone", value: "zone1"}:  3,
+					{key: "zone", value: "zone2"}:  4,
+					{key: "node", value: "node-a"}: 2,
+					{key: "node", value: "node-b"}: 1,
+					{key: "node", value: "node-y"}: 4,
 				},
 			},
 		},
@@ -461,7 +459,7 @@ func TestPreFilterState(t *testing.T) {
 					"node": newCriticalPaths(),
 					"rack": newCriticalPaths(),
 				},
-				TpPairToMatchNum: make(map[topologyPair]*int32),
+				TpPairToMatchNum: make(map[topologyPair]int),
 			},
 		},
 		{
@@ -497,7 +495,7 @@ func TestPreFilterState(t *testing.T) {
 				TpKeyToCriticalPaths: map[string]*criticalPaths{
 					"zone": newCriticalPaths(),
 				},
-				TpPairToMatchNum: make(map[topologyPair]*int32),
+				TpPairToMatchNum: make(map[topologyPair]int),
 			},
 		},
 		{
@@ -514,17 +512,15 @@ func TestPreFilterState(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := context.Background()
-			informerFactory := informers.NewSharedInformerFactory(fake.NewSimpleClientset(tt.objs...), 0)
-			pl := PodTopologySpread{
-				sharedLister:       cache.NewSnapshot(tt.existingPods, tt.nodes),
-				defaultConstraints: tt.defaultConstraints,
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			args := &config.PodTopologySpreadArgs{
+				DefaultConstraints: tt.defaultConstraints,
+				DefaultingType:     config.ListDefaulting,
 			}
-			pl.setListers(informerFactory)
-			informerFactory.Start(ctx.Done())
-			informerFactory.WaitForCacheSync(ctx.Done())
+			p := plugintesting.SetupPluginWithInformers(ctx, t, New, args, cache.NewSnapshot(tt.existingPods, tt.nodes), tt.objs)
 			cs := framework.NewCycleState()
-			if s := pl.PreFilter(ctx, cs, tt.pod); !s.IsSuccess() {
+			if s := p.(*PodTopologySpread).PreFilter(ctx, cs, tt.pod); !s.IsSuccess() {
 				t.Fatal(s.AsError())
 			}
 			got, err := getPreFilterState(cs)
@@ -572,9 +568,9 @@ func TestPreFilterStateAddPod(t *testing.T) {
 				TpKeyToCriticalPaths: map[string]*criticalPaths{
 					"node": {{"node-b", 0}, {"node-a", 1}},
 				},
-				TpPairToMatchNum: map[topologyPair]*int32{
-					{key: "node", value: "node-a"}: pointer.Int32Ptr(1),
-					{key: "node", value: "node-b"}: pointer.Int32Ptr(0),
+				TpPairToMatchNum: map[topologyPair]int{
+					{key: "node", value: "node-a"}: 1,
+					{key: "node", value: "node-b"}: 0,
 				},
 			},
 		},
@@ -597,9 +593,9 @@ func TestPreFilterStateAddPod(t *testing.T) {
 				TpKeyToCriticalPaths: map[string]*criticalPaths{
 					"node": {{"node-a", 1}, {"node-b", 1}},
 				},
-				TpPairToMatchNum: map[topologyPair]*int32{
-					{key: "node", value: "node-a"}: pointer.Int32Ptr(1),
-					{key: "node", value: "node-b"}: pointer.Int32Ptr(1),
+				TpPairToMatchNum: map[topologyPair]int{
+					{key: "node", value: "node-a"}: 1,
+					{key: "node", value: "node-b"}: 1,
 				},
 			},
 		},
@@ -622,9 +618,9 @@ func TestPreFilterStateAddPod(t *testing.T) {
 				TpKeyToCriticalPaths: map[string]*criticalPaths{
 					"node": {{"node-a", 0}, {"node-b", 1}},
 				},
-				TpPairToMatchNum: map[topologyPair]*int32{
-					{key: "node", value: "node-a"}: pointer.Int32Ptr(0),
-					{key: "node", value: "node-b"}: pointer.Int32Ptr(1),
+				TpPairToMatchNum: map[topologyPair]int{
+					{key: "node", value: "node-a"}: 0,
+					{key: "node", value: "node-b"}: 1,
 				},
 			},
 		},
@@ -647,9 +643,9 @@ func TestPreFilterStateAddPod(t *testing.T) {
 				TpKeyToCriticalPaths: map[string]*criticalPaths{
 					"node": {{"node-a", 0}, {"node-b", 2}},
 				},
-				TpPairToMatchNum: map[topologyPair]*int32{
-					{key: "node", value: "node-a"}: pointer.Int32Ptr(0),
-					{key: "node", value: "node-b"}: pointer.Int32Ptr(2),
+				TpPairToMatchNum: map[topologyPair]int{
+					{key: "node", value: "node-a"}: 0,
+					{key: "node", value: "node-b"}: 2,
 				},
 			},
 		},
@@ -672,11 +668,11 @@ func TestPreFilterStateAddPod(t *testing.T) {
 					"zone": {{"zone2", 0}, {"zone1", 1}},
 					"node": {{"node-x", 0}, {"node-a", 1}},
 				},
-				TpPairToMatchNum: map[topologyPair]*int32{
-					{key: "zone", value: "zone1"}:  pointer.Int32Ptr(1),
-					{key: "zone", value: "zone2"}:  pointer.Int32Ptr(0),
-					{key: "node", value: "node-a"}: pointer.Int32Ptr(1),
-					{key: "node", value: "node-x"}: pointer.Int32Ptr(0),
+				TpPairToMatchNum: map[topologyPair]int{
+					{key: "zone", value: "zone1"}:  1,
+					{key: "zone", value: "zone2"}:  0,
+					{key: "node", value: "node-a"}: 1,
+					{key: "node", value: "node-x"}: 0,
 				},
 			},
 		},
@@ -701,11 +697,11 @@ func TestPreFilterStateAddPod(t *testing.T) {
 					"zone": {{"zone1", 1}, {"zone2", 1}},
 					"node": {{"node-a", 1}, {"node-x", 1}},
 				},
-				TpPairToMatchNum: map[topologyPair]*int32{
-					{key: "zone", value: "zone1"}:  pointer.Int32Ptr(1),
-					{key: "zone", value: "zone2"}:  pointer.Int32Ptr(1),
-					{key: "node", value: "node-a"}: pointer.Int32Ptr(1),
-					{key: "node", value: "node-x"}: pointer.Int32Ptr(1),
+				TpPairToMatchNum: map[topologyPair]int{
+					{key: "zone", value: "zone1"}:  1,
+					{key: "zone", value: "zone2"}:  1,
+					{key: "node", value: "node-a"}: 1,
+					{key: "node", value: "node-x"}: 1,
 				},
 			},
 		},
@@ -733,12 +729,12 @@ func TestPreFilterStateAddPod(t *testing.T) {
 					"zone": {{"zone2", 1}, {"zone1", 3}},
 					"node": {{"node-a", 1}, {"node-x", 1}},
 				},
-				TpPairToMatchNum: map[topologyPair]*int32{
-					{key: "zone", value: "zone1"}:  pointer.Int32Ptr(3),
-					{key: "zone", value: "zone2"}:  pointer.Int32Ptr(1),
-					{key: "node", value: "node-a"}: pointer.Int32Ptr(1),
-					{key: "node", value: "node-b"}: pointer.Int32Ptr(2),
-					{key: "node", value: "node-x"}: pointer.Int32Ptr(1),
+				TpPairToMatchNum: map[topologyPair]int{
+					{key: "zone", value: "zone1"}:  3,
+					{key: "zone", value: "zone2"}:  1,
+					{key: "node", value: "node-a"}: 1,
+					{key: "node", value: "node-b"}: 2,
+					{key: "node", value: "node-x"}: 1,
 				},
 			},
 		},
@@ -773,12 +769,12 @@ func TestPreFilterStateAddPod(t *testing.T) {
 					"zone": {{"zone2", 1}, {"zone1", 2}},
 					"node": {{"node-a", 0}, {"node-b", 1}},
 				},
-				TpPairToMatchNum: map[topologyPair]*int32{
-					{key: "zone", value: "zone1"}:  pointer.Int32Ptr(2),
-					{key: "zone", value: "zone2"}:  pointer.Int32Ptr(1),
-					{key: "node", value: "node-a"}: pointer.Int32Ptr(0),
-					{key: "node", value: "node-b"}: pointer.Int32Ptr(1),
-					{key: "node", value: "node-x"}: pointer.Int32Ptr(2),
+				TpPairToMatchNum: map[topologyPair]int{
+					{key: "zone", value: "zone1"}:  2,
+					{key: "zone", value: "zone2"}:  1,
+					{key: "node", value: "node-a"}: 0,
+					{key: "node", value: "node-b"}: 1,
+					{key: "node", value: "node-x"}: 2,
 				},
 			},
 		},
@@ -813,32 +809,31 @@ func TestPreFilterStateAddPod(t *testing.T) {
 					"zone": {{"zone1", 1}, {"zone2", 1}},
 					"node": {{"node-a", 1}, {"node-b", 1}},
 				},
-				TpPairToMatchNum: map[topologyPair]*int32{
-					{key: "zone", value: "zone1"}:  pointer.Int32Ptr(1),
-					{key: "zone", value: "zone2"}:  pointer.Int32Ptr(1),
-					{key: "node", value: "node-a"}: pointer.Int32Ptr(1),
-					{key: "node", value: "node-b"}: pointer.Int32Ptr(1),
-					{key: "node", value: "node-x"}: pointer.Int32Ptr(2),
+				TpPairToMatchNum: map[topologyPair]int{
+					{key: "zone", value: "zone1"}:  1,
+					{key: "zone", value: "zone2"}:  1,
+					{key: "node", value: "node-a"}: 1,
+					{key: "node", value: "node-b"}: 1,
+					{key: "node", value: "node-x"}: 2,
 				},
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			snapshot := cache.NewSnapshot(tt.existingPods, tt.nodes)
-			pl := PodTopologySpread{
-				sharedLister: snapshot,
-			}
-			cs := framework.NewCycleState()
 			ctx := context.Background()
-			if s := pl.PreFilter(ctx, cs, tt.preemptor); !s.IsSuccess() {
+			snapshot := cache.NewSnapshot(tt.existingPods, tt.nodes)
+			pl := plugintesting.SetupPlugin(t, New, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, snapshot)
+			p := pl.(*PodTopologySpread)
+			cs := framework.NewCycleState()
+			if s := p.PreFilter(ctx, cs, tt.preemptor); !s.IsSuccess() {
 				t.Fatal(s.AsError())
 			}
 			nodeInfo, err := snapshot.Get(tt.nodes[tt.nodeIdx].Name)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if s := pl.AddPod(ctx, cs, tt.preemptor, framework.NewPodInfo(tt.addedPod), nodeInfo); !s.IsSuccess() {
+			if s := p.AddPod(ctx, cs, tt.preemptor, framework.NewPodInfo(tt.addedPod), nodeInfo); !s.IsSuccess() {
 				t.Fatal(s.AsError())
 			}
 			state, err := getPreFilterState(cs)
@@ -894,9 +889,9 @@ func TestPreFilterStateRemovePod(t *testing.T) {
 				TpKeyToCriticalPaths: map[string]*criticalPaths{
 					"zone": {{"zone1", 1}, {"zone2", 1}},
 				},
-				TpPairToMatchNum: map[topologyPair]*int32{
-					{key: "zone", value: "zone1"}: pointer.Int32Ptr(1),
-					{key: "zone", value: "zone2"}: pointer.Int32Ptr(1),
+				TpPairToMatchNum: map[topologyPair]int{
+					{key: "zone", value: "zone1"}: 1,
+					{key: "zone", value: "zone2"}: 1,
 				},
 			},
 		},
@@ -924,9 +919,9 @@ func TestPreFilterStateRemovePod(t *testing.T) {
 				TpKeyToCriticalPaths: map[string]*criticalPaths{
 					"zone": {{"zone1", 1}, {"zone2", 2}},
 				},
-				TpPairToMatchNum: map[topologyPair]*int32{
-					{key: "zone", value: "zone1"}: pointer.Int32Ptr(1),
-					{key: "zone", value: "zone2"}: pointer.Int32Ptr(2),
+				TpPairToMatchNum: map[topologyPair]int{
+					{key: "zone", value: "zone1"}: 1,
+					{key: "zone", value: "zone2"}: 2,
 				},
 			},
 		},
@@ -955,9 +950,9 @@ func TestPreFilterStateRemovePod(t *testing.T) {
 				TpKeyToCriticalPaths: map[string]*criticalPaths{
 					"zone": {{"zone1", 2}, {"zone2", 2}},
 				},
-				TpPairToMatchNum: map[topologyPair]*int32{
-					{key: "zone", value: "zone1"}: pointer.Int32Ptr(2),
-					{key: "zone", value: "zone2"}: pointer.Int32Ptr(2),
+				TpPairToMatchNum: map[topologyPair]int{
+					{key: "zone", value: "zone1"}: 2,
+					{key: "zone", value: "zone2"}: 2,
 				},
 			},
 		},
@@ -986,9 +981,9 @@ func TestPreFilterStateRemovePod(t *testing.T) {
 				TpKeyToCriticalPaths: map[string]*criticalPaths{
 					"zone": {{"zone1", 2}, {"zone2", 2}},
 				},
-				TpPairToMatchNum: map[topologyPair]*int32{
-					{key: "zone", value: "zone1"}: pointer.Int32Ptr(2),
-					{key: "zone", value: "zone2"}: pointer.Int32Ptr(2),
+				TpPairToMatchNum: map[topologyPair]int{
+					{key: "zone", value: "zone1"}: 2,
+					{key: "zone", value: "zone2"}: 2,
 				},
 			},
 		},
@@ -1018,25 +1013,24 @@ func TestPreFilterStateRemovePod(t *testing.T) {
 					"zone": {{"zone2", 1}, {"zone1", 3}},
 					"node": {{"node-b", 1}, {"node-x", 1}},
 				},
-				TpPairToMatchNum: map[topologyPair]*int32{
-					{key: "zone", value: "zone1"}:  pointer.Int32Ptr(3),
-					{key: "zone", value: "zone2"}:  pointer.Int32Ptr(1),
-					{key: "node", value: "node-a"}: pointer.Int32Ptr(2),
-					{key: "node", value: "node-b"}: pointer.Int32Ptr(1),
-					{key: "node", value: "node-x"}: pointer.Int32Ptr(1),
+				TpPairToMatchNum: map[topologyPair]int{
+					{key: "zone", value: "zone1"}:  3,
+					{key: "zone", value: "zone2"}:  1,
+					{key: "node", value: "node-a"}: 2,
+					{key: "node", value: "node-b"}: 1,
+					{key: "node", value: "node-x"}: 1,
 				},
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			snapshot := cache.NewSnapshot(tt.existingPods, tt.nodes)
-			pl := PodTopologySpread{
-				sharedLister: snapshot,
-			}
-			cs := framework.NewCycleState()
 			ctx := context.Background()
-			s := pl.PreFilter(ctx, cs, tt.preemptor)
+			snapshot := cache.NewSnapshot(tt.existingPods, tt.nodes)
+			pl := plugintesting.SetupPlugin(t, New, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, snapshot)
+			p := pl.(*PodTopologySpread)
+			cs := framework.NewCycleState()
+			s := p.PreFilter(ctx, cs, tt.preemptor)
 			if !s.IsSuccess() {
 				t.Fatal(s.AsError())
 			}
@@ -1050,7 +1044,7 @@ func TestPreFilterStateRemovePod(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if s := pl.RemovePod(ctx, cs, tt.preemptor, framework.NewPodInfo(deletedPod), nodeInfo); !s.IsSuccess() {
+			if s := p.RemovePod(ctx, cs, tt.preemptor, framework.NewPodInfo(deletedPod), nodeInfo); !s.IsSuccess() {
 				t.Fatal(s.AsError())
 			}
 
@@ -1106,22 +1100,21 @@ func BenchmarkFilter(b *testing.B) {
 		var state *framework.CycleState
 		b.Run(tt.name, func(b *testing.B) {
 			existingPods, allNodes, _ := st.MakeNodesAndPodsForEvenPodsSpread(tt.pod.Labels, tt.existingPodsNum, tt.allNodesNum, tt.filteredNodesNum)
-			pl := PodTopologySpread{
-				sharedLister: cache.NewSnapshot(existingPods, allNodes),
-			}
 			ctx := context.Background()
+			pl := plugintesting.SetupPlugin(b, New, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, cache.NewSnapshot(existingPods, allNodes))
+			p := pl.(*PodTopologySpread)
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				state = framework.NewCycleState()
-				s := pl.PreFilter(ctx, state, tt.pod)
+				s := p.PreFilter(ctx, state, tt.pod)
 				if !s.IsSuccess() {
 					b.Fatal(s.AsError())
 				}
 				filterNode := func(i int) {
-					n, _ := pl.sharedLister.NodeInfos().Get(allNodes[i].Name)
-					pl.Filter(ctx, state, tt.pod, n)
+					n, _ := p.sharedLister.NodeInfos().Get(allNodes[i].Name)
+					p.Filter(ctx, state, tt.pod, n)
 				}
-				parallelize.Until(ctx, len(allNodes), filterNode)
+				p.parallelizer.Until(ctx, len(allNodes), filterNode)
 			}
 		})
 		b.Run(tt.name+"/Clone", func(b *testing.B) {
@@ -1407,11 +1400,37 @@ func TestSingleConstraint(t *testing.T) {
 				"node-b": framework.Unschedulable,
 			},
 		},
+		{
+			// In this unit test, NodeAffinity plugin is not involved, so node-b still fits
+			name: "incoming pod has nodeAffinity, pods spread as 0/~2~/0/1, hence node-a fits",
+			pod: st.MakePod().Name("p").Label("foo", "").
+				NodeAffinityNotIn("node", []string{"node-b"}).
+				SpreadConstraint(1, "zone", v1.DoNotSchedule, st.MakeLabelSelector().Exists("foo").Obj()).
+				Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
+				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
+				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
+				st.MakePod().Name("p-b2").Node("node-b").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
+			},
+			wantStatusCode: map[string]framework.Code{
+				"node-a": framework.Success,
+				"node-b": framework.Success, // in real case, it's Unschedulable
+				"node-x": framework.Unschedulable,
+				"node-y": framework.Unschedulable,
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			snapshot := cache.NewSnapshot(tt.existingPods, tt.nodes)
-			p := &PodTopologySpread{sharedLister: snapshot}
+			pl := plugintesting.SetupPlugin(t, New, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, snapshot)
+			p := pl.(*PodTopologySpread)
 			state := framework.NewCycleState()
 			preFilterStatus := p.PreFilter(context.Background(), state, tt.pod)
 			if !preFilterStatus.IsSuccess() {
@@ -1637,7 +1656,8 @@ func TestMultipleConstraints(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			snapshot := cache.NewSnapshot(tt.existingPods, tt.nodes)
-			p := &PodTopologySpread{sharedLister: snapshot}
+			pl := plugintesting.SetupPlugin(t, New, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, snapshot)
+			p := pl.(*PodTopologySpread)
 			state := framework.NewCycleState()
 			preFilterStatus := p.PreFilter(context.Background(), state, tt.pod)
 			if !preFilterStatus.IsSuccess() {
@@ -1660,10 +1680,10 @@ func TestPreFilterDisabled(t *testing.T) {
 	nodeInfo := framework.NewNodeInfo()
 	node := v1.Node{}
 	nodeInfo.SetNode(&node)
-	p := &PodTopologySpread{}
+	p := plugintesting.SetupPlugin(t, New, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, cache.NewEmptySnapshot())
 	cycleState := framework.NewCycleState()
-	gotStatus := p.Filter(context.Background(), cycleState, pod, nodeInfo)
-	wantStatus := framework.AsStatus(fmt.Errorf(`reading "PreFilterPodTopologySpread" from cycleState: not found`))
+	gotStatus := p.(*PodTopologySpread).Filter(context.Background(), cycleState, pod, nodeInfo)
+	wantStatus := framework.AsStatus(fmt.Errorf(`reading "PreFilterPodTopologySpread" from cycleState: %w`, framework.ErrNotFound))
 	if !reflect.DeepEqual(gotStatus, wantStatus) {
 		t.Errorf("status does not match: %v, want: %v", gotStatus, wantStatus)
 	}

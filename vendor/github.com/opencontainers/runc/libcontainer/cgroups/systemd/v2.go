@@ -3,7 +3,8 @@
 package systemd
 
 import (
-	"os"
+	"fmt"
+	"math"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -24,6 +25,7 @@ type unifiedManager struct {
 	// path is like "/sys/fs/cgroup/user.slice/user-1001.slice/session-1.scope"
 	path     string
 	rootless bool
+	dbus     *dbusConnManager
 }
 
 func NewUnifiedManager(config *configs.Cgroup, path string, rootless bool) cgroups.Manager {
@@ -31,19 +33,145 @@ func NewUnifiedManager(config *configs.Cgroup, path string, rootless bool) cgrou
 		cgroups:  config,
 		path:     path,
 		rootless: rootless,
+		dbus:     newDbusConnManager(rootless),
 	}
 }
 
-func genV2ResourcesProperties(c *configs.Cgroup, conn *systemdDbus.Conn) ([]systemdDbus.Property, error) {
+// unifiedResToSystemdProps tries to convert from Cgroup.Resources.Unified
+// key/value map (where key is cgroupfs file name) to systemd unit properties.
+// This is on a best-effort basis, so the properties that are not known
+// (to this function and/or systemd) are ignored (but logged with "debug"
+// log level).
+//
+// For the list of keys, see https://www.kernel.org/doc/Documentation/cgroup-v2.txt
+//
+// For the list of systemd unit properties, see systemd.resource-control(5).
+func unifiedResToSystemdProps(cm *dbusConnManager, res map[string]string) (props []systemdDbus.Property, _ error) {
+	var err error
+
+	for k, v := range res {
+		if strings.Contains(k, "/") {
+			return nil, fmt.Errorf("unified resource %q must be a file name (no slashes)", k)
+		}
+		sk := strings.SplitN(k, ".", 2)
+		if len(sk) != 2 {
+			return nil, fmt.Errorf("unified resource %q must be in the form CONTROLLER.PARAMETER", k)
+		}
+		// Kernel is quite forgiving to extra whitespace
+		// around the value, and so should we.
+		v = strings.TrimSpace(v)
+		// Please keep cases in alphabetical order.
+		switch k {
+		case "cpu.max":
+			// value: quota [period]
+			quota := int64(0) // 0 means "unlimited" for addCpuQuota, if period is set
+			period := defCPUQuotaPeriod
+			sv := strings.Fields(v)
+			if len(sv) < 1 || len(sv) > 2 {
+				return nil, fmt.Errorf("unified resource %q value invalid: %q", k, v)
+			}
+			// quota
+			if sv[0] != "max" {
+				quota, err = strconv.ParseInt(sv[0], 10, 64)
+				if err != nil {
+					return nil, fmt.Errorf("unified resource %q period value conversion error: %w", k, err)
+				}
+			}
+			// period
+			if len(sv) == 2 {
+				period, err = strconv.ParseUint(sv[1], 10, 64)
+				if err != nil {
+					return nil, fmt.Errorf("unified resource %q quota value conversion error: %w", k, err)
+				}
+			}
+			addCpuQuota(cm, &props, quota, period)
+
+		case "cpu.weight":
+			num, err := strconv.ParseUint(v, 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("unified resource %q value conversion error: %w", k, err)
+			}
+			props = append(props,
+				newProp("CPUWeight", num))
+
+		case "cpuset.cpus", "cpuset.mems":
+			bits, err := RangeToBits(v)
+			if err != nil {
+				return nil, fmt.Errorf("unified resource %q=%q conversion error: %w", k, v, err)
+			}
+			m := map[string]string{
+				"cpuset.cpus": "AllowedCPUs",
+				"cpuset.mems": "AllowedMemoryNodes",
+			}
+			// systemd only supports these properties since v244
+			sdVer := systemdVersion(cm)
+			if sdVer >= 244 {
+				props = append(props,
+					newProp(m[k], bits))
+			} else {
+				logrus.Debugf("systemd v%d is too old to support %s"+
+					" (setting will still be applied to cgroupfs)",
+					sdVer, m[k])
+			}
+
+		case "memory.high", "memory.low", "memory.min", "memory.max", "memory.swap.max":
+			num := uint64(math.MaxUint64)
+			if v != "max" {
+				num, err = strconv.ParseUint(v, 10, 64)
+				if err != nil {
+					return nil, fmt.Errorf("unified resource %q value conversion error: %w", k, err)
+				}
+			}
+			m := map[string]string{
+				"memory.high":     "MemoryHigh",
+				"memory.low":      "MemoryLow",
+				"memory.min":      "MemoryMin",
+				"memory.max":      "MemoryMax",
+				"memory.swap.max": "MemorySwapMax",
+			}
+			props = append(props,
+				newProp(m[k], num))
+
+		case "pids.max":
+			num := uint64(math.MaxUint64)
+			if v != "max" {
+				var err error
+				num, err = strconv.ParseUint(v, 10, 64)
+				if err != nil {
+					return nil, fmt.Errorf("unified resource %q value conversion error: %w", k, err)
+				}
+			}
+			props = append(props,
+				newProp("TasksMax", num))
+
+		case "memory.oom.group":
+			// Setting this to 1 is roughly equivalent to OOMPolicy=kill
+			// (as per systemd.service(5) and
+			// https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v2.html),
+			// but it's not clear what to do if it is unset or set
+			// to 0 in runc update, as there are two other possible
+			// values for OOMPolicy (continue/stop).
+			fallthrough
+
+		default:
+			// Ignore the unknown resource here -- will still be
+			// applied in Set which calls fs2.Set.
+			logrus.Debugf("don't know how to convert unified resource %q=%q to systemd unit property; skipping (will still be applied to cgroupfs)", k, v)
+		}
+	}
+
+	return props, nil
+}
+
+func genV2ResourcesProperties(r *configs.Resources, cm *dbusConnManager) ([]systemdDbus.Property, error) {
 	var properties []systemdDbus.Property
-	r := c.Resources
 
 	// NOTE: This is of questionable correctness because we insert our own
 	//       devices eBPF program later. Two programs with identical rules
 	//       aren't the end of the world, but it is a bit concerning. However
 	//       it's unclear if systemd removes all eBPF programs attached when
 	//       doing SetUnitProperties...
-	deviceProperties, err := generateDeviceProperties(r.Devices)
+	deviceProperties, err := generateDeviceProperties(r)
 	if err != nil {
 		return nil, err
 	}
@@ -72,15 +200,28 @@ func genV2ResourcesProperties(c *configs.Cgroup, conn *systemdDbus.Conn) ([]syst
 			newProp("CPUWeight", r.CpuWeight))
 	}
 
-	addCpuQuota(conn, &properties, r.CpuQuota, r.CpuPeriod)
+	addCpuQuota(cm, &properties, r.CpuQuota, r.CpuPeriod)
 
 	if r.PidsLimit > 0 || r.PidsLimit == -1 {
 		properties = append(properties,
-			newProp("TasksAccounting", true),
 			newProp("TasksMax", uint64(r.PidsLimit)))
 	}
 
+	err = addCpuset(cm, &properties, r.CpusetCpus, r.CpusetMems)
+	if err != nil {
+		return nil, err
+	}
+
 	// ignore r.KernelMemory
+
+	// convert Resources.Unified map to systemd properties
+	if r.Unified != nil {
+		unifiedProps, err := unifiedResToSystemdProps(cm, r.Unified)
+		if err != nil {
+			return nil, err
+		}
+		properties = append(properties, unifiedProps...)
+	}
 
 	return properties, nil
 }
@@ -130,28 +271,21 @@ func (m *unifiedManager) Apply(pid int) error {
 	properties = append(properties,
 		newProp("MemoryAccounting", true),
 		newProp("CPUAccounting", true),
-		newProp("IOAccounting", true))
+		newProp("IOAccounting", true),
+		newProp("TasksAccounting", true),
+	)
 
 	// Assume DefaultDependencies= will always work (the check for it was previously broken.)
 	properties = append(properties,
 		newProp("DefaultDependencies", false))
 
-	dbusConnection, err := getDbusConnection(m.rootless)
-	if err != nil {
-		return err
-	}
-	resourcesProperties, err := genV2ResourcesProperties(c, dbusConnection)
-	if err != nil {
-		return err
-	}
-	properties = append(properties, resourcesProperties...)
 	properties = append(properties, c.SystemdProps...)
 
-	if err := startUnit(dbusConnection, unitName, properties); err != nil {
+	if err := startUnit(m.dbus, unitName, properties); err != nil {
 		return errors.Wrapf(err, "error while starting unit %q with properties %+v", unitName, properties)
 	}
 
-	if err = m.initPath(); err != nil {
+	if err := m.initPath(); err != nil {
 		return err
 	}
 	if err := fs2.CreateCgroupPath(m.path, m.cgroups); err != nil {
@@ -167,18 +301,15 @@ func (m *unifiedManager) Destroy() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	dbusConnection, err := getDbusConnection(m.rootless)
-	if err != nil {
-		return err
-	}
 	unitName := getUnitName(m.cgroups)
-	if err := stopUnit(dbusConnection, unitName); err != nil {
+	if err := stopUnit(m.dbus, unitName); err != nil {
 		return err
 	}
 
-	// XXX this is probably not needed, systemd should handle it
-	err = os.Remove(m.path)
-	if err != nil && !os.IsNotExist(err) {
+	// systemd 239 do not remove sub-cgroups.
+	err := cgroups.RemovePath(m.path)
+	// cgroups.RemovePath has handled ErrNotExist
+	if err != nil {
 		return err
 	}
 
@@ -186,6 +317,7 @@ func (m *unifiedManager) Destroy() error {
 }
 
 func (m *unifiedManager) Path(_ string) string {
+	_ = m.initPath()
 	return m.path
 }
 
@@ -206,16 +338,8 @@ func (m *unifiedManager) getSliceFull() (string, error) {
 	}
 
 	if m.rootless {
-		dbusConnection, err := getDbusConnection(m.rootless)
-		if err != nil {
-			return "", err
-		}
-		// managerCGQuoted is typically "/user.slice/user-${uid}.slice/user@${uid}.service" including the quote symbols
-		managerCGQuoted, err := dbusConnection.GetManagerProperty("ControlGroup")
-		if err != nil {
-			return "", err
-		}
-		managerCG, err := strconv.Unquote(managerCGQuoted)
+		// managerCG is typically "/user.slice/user-${uid}.slice/user@${uid}.service".
+		managerCG, err := getManagerProperty(m.dbus, "ControlGroup")
 		if err != nil {
 			return "", err
 		}
@@ -288,53 +412,21 @@ func (m *unifiedManager) GetStats() (*cgroups.Stats, error) {
 	return fsMgr.GetStats()
 }
 
-func (m *unifiedManager) Set(container *configs.Config) error {
-	dbusConnection, err := getDbusConnection(m.rootless)
-	if err != nil {
-		return err
-	}
-	properties, err := genV2ResourcesProperties(m.cgroups, dbusConnection)
+func (m *unifiedManager) Set(r *configs.Resources) error {
+	properties, err := genV2ResourcesProperties(r, m.dbus)
 	if err != nil {
 		return err
 	}
 
-	// We have to freeze the container while systemd sets the cgroup settings.
-	// The reason for this is that systemd's application of DeviceAllow rules
-	// is done disruptively, resulting in spurrious errors to common devices
-	// (unlike our fs driver, they will happily write deny-all rules to running
-	// containers). So we freeze the container to avoid them hitting the cgroup
-	// error. But if the freezer cgroup isn't supported, we just warn about it.
-	targetFreezerState := configs.Undefined
-	if !m.cgroups.SkipDevices {
-		// Figure out the current freezer state, so we can revert to it after we
-		// temporarily freeze the container.
-		targetFreezerState, err = m.GetFreezerState()
-		if err != nil {
-			return err
-		}
-		if targetFreezerState == configs.Undefined {
-			targetFreezerState = configs.Thawed
-		}
-
-		if err := m.Freeze(configs.Frozen); err != nil {
-			logrus.Infof("freeze container before SetUnitProperties failed: %v", err)
-		}
-	}
-
-	if err := dbusConnection.SetUnitProperties(getUnitName(m.cgroups), true, properties...); err != nil {
-		_ = m.Freeze(targetFreezerState)
+	if err := setUnitProperties(m.dbus, getUnitName(m.cgroups), properties...); err != nil {
 		return errors.Wrap(err, "error while setting unit properties")
 	}
-
-	// Reset freezer state before we apply the configuration, to avoid clashing
-	// with the freezer setting in the configuration.
-	_ = m.Freeze(targetFreezerState)
 
 	fsMgr, err := m.fsManager()
 	if err != nil {
 		return err
 	}
-	return fsMgr.Set(container)
+	return fsMgr.Set(r)
 }
 
 func (m *unifiedManager) GetPaths() map[string]string {
@@ -357,4 +449,12 @@ func (m *unifiedManager) GetFreezerState() (configs.FreezerState, error) {
 
 func (m *unifiedManager) Exists() bool {
 	return cgroups.PathExists(m.path)
+}
+
+func (m *unifiedManager) OOMKillCount() (uint64, error) {
+	fsMgr, err := m.fsManager()
+	if err != nil {
+		return 0, err
+	}
+	return fsMgr.OOMKillCount()
 }

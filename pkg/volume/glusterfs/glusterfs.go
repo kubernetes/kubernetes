@@ -22,11 +22,9 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
-	"net"
 	"net/http"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	dstrings "strings"
 	"sync"
@@ -35,6 +33,7 @@ import (
 	gapi "github.com/heketi/heketi/pkg/glusterfs/api"
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
+	netutils "k8s.io/utils/net"
 	utilstrings "k8s.io/utils/strings"
 
 	v1 "k8s.io/api/core/v1"
@@ -47,7 +46,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	storagehelpers "k8s.io/component-helpers/storage/volume"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/volume"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
@@ -73,15 +72,13 @@ var _ volume.Provisioner = &glusterfsVolumeProvisioner{}
 var _ volume.Deleter = &glusterfsVolumeDeleter{}
 
 const (
-	glusterfsPluginName            = "kubernetes.io/glusterfs"
-	volPrefix                      = "vol_"
-	dynamicEpSvcPrefix             = "glusterfs-dynamic"
-	replicaCount                   = 3
-	durabilityType                 = "replicate"
-	secretKeyName                  = "key" // key name used in secret
-	gciLinuxGlusterMountBinaryPath = "/sbin/mount.glusterfs"
-	defaultGidMin                  = 2000
-	defaultGidMax                  = math.MaxInt32
+	glusterfsPluginName = "kubernetes.io/glusterfs"
+	volPrefix           = "vol_"
+	dynamicEpSvcPrefix  = "glusterfs-dynamic"
+	replicaCount        = 3
+	secretKeyName       = "key" // key name used in secret
+	defaultGidMin       = 2000
+	defaultGidMax       = math.MaxInt32
 
 	// maxCustomEpNamePrefix is the maximum number of chars.
 	// which can be used as ep/svc name prefix. This number is carved
@@ -252,24 +249,10 @@ var _ volume.Mounter = &glusterfsMounter{}
 
 func (b *glusterfsMounter) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:        b.readOnly,
-		Managed:         false,
-		SupportsSELinux: false,
+		ReadOnly:       b.readOnly,
+		Managed:        false,
+		SELinuxRelabel: false,
 	}
-}
-
-// Checks prior to mount operations to verify that the required components (binaries, etc.)
-// to mount the volume are available on the underlying node.
-// If not, it returns an error
-func (b *glusterfsMounter) CanMount() error {
-	exe := b.plugin.host.GetExec(b.plugin.GetPluginName())
-	switch runtime.GOOS {
-	case "linux":
-		if _, err := exe.Command("test", "-x", gciLinuxGlusterMountBinaryPath).CombinedOutput(); err != nil {
-			return fmt.Errorf("required binary %s is missing", gciLinuxGlusterMountBinaryPath)
-		}
-	}
-	return nil
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
@@ -551,7 +534,7 @@ func (plugin *glusterfsPlugin) collectGids(className string, gidTable *MinMaxAll
 		return fmt.Errorf("failed to get existing persistent volumes")
 	}
 	for _, pv := range pvList.Items {
-		if v1helper.GetPersistentVolumeClass(&pv) != className {
+		if storagehelpers.GetPersistentVolumeClass(&pv) != className {
 			continue
 		}
 		pvName := pv.ObjectMeta.Name
@@ -721,7 +704,7 @@ func filterClient(client *gcli.Client, opts *proxyutil.FilteredDialOptions) *gcl
 }
 
 func (p *glusterfsVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (*v1.PersistentVolume, error) {
-	if !volutil.AccessModesContainedInAll(p.plugin.GetAccessModes(), p.options.PVC.Spec.AccessModes) {
+	if !volutil.ContainsAllAccessModes(p.plugin.GetAccessModes(), p.options.PVC.Spec.AccessModes) {
 		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", p.options.PVC.Spec.AccessModes, p.plugin.GetAccessModes())
 	}
 	if p.options.PVC.Spec.Selector != nil {
@@ -732,7 +715,7 @@ func (p *glusterfsVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTop
 		return nil, fmt.Errorf("%s does not support block volume provisioning", p.plugin.GetPluginName())
 	}
 	klog.V(4).Infof("provision volume with options %v", p.options)
-	scName := v1helper.GetPersistentVolumeClaimClass(p.options.PVC)
+	scName := storagehelpers.GetPersistentVolumeClaimClass(p.options.PVC)
 	cfg, err := parseClassParameters(p.options.Parameters, p.plugin.host.GetKubeClient())
 	if err != nil {
 		return nil, err
@@ -993,7 +976,7 @@ func getClusterNodes(cli *gcli.Client, cluster string) (dynamicHostIps []string,
 		}
 		ipaddr := dstrings.Join(nodeInfo.NodeAddRequest.Hostnames.Storage, "")
 		// IP validates if a string is a valid IP address.
-		ip := net.ParseIP(ipaddr)
+		ip := netutils.ParseIPSloppy(ipaddr)
 		if ip == nil {
 			return nil, fmt.Errorf("glusterfs server node ip address %s must be a valid IP address, (e.g. 10.9.8.7)", ipaddr)
 		}

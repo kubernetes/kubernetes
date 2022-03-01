@@ -108,7 +108,7 @@ func (hu *FakeHostUtil) GetOwner(pathname string) (int64, int64, error) {
 // GetSELinuxSupport tests if pathname is on a mount that supports SELinux.
 // Not implemented for testing
 func (hu *FakeHostUtil) GetSELinuxSupport(pathname string) (bool, error) {
-	return false, errors.New("GetSELinuxSupport not implemented")
+	return false, nil
 }
 
 // GetMode returns permissions of pathname.

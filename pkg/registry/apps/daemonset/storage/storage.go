@@ -29,6 +29,7 @@ import (
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/apps/daemonset"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // REST implements a RESTStorage for DaemonSets
@@ -44,9 +45,10 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 		NewListFunc:              func() runtime.Object { return &apps.DaemonSetList{} },
 		DefaultQualifiedResource: apps.Resource("daemonsets"),
 
-		CreateStrategy: daemonset.Strategy,
-		UpdateStrategy: daemonset.Strategy,
-		DeleteStrategy: daemonset.Strategy,
+		CreateStrategy:      daemonset.Strategy,
+		UpdateStrategy:      daemonset.Strategy,
+		DeleteStrategy:      daemonset.Strategy,
+		ResetFieldsStrategy: daemonset.Strategy,
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
@@ -57,6 +59,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 
 	statusStore := *store
 	statusStore.UpdateStrategy = daemonset.StatusStrategy
+	statusStore.ResetFieldsStrategy = daemonset.StatusStrategy
 
 	return &REST{store, []string{"all"}}, &StatusREST{store: &statusStore}, nil
 }
@@ -102,4 +105,9 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
 	// subresources should never allow create on update.
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
+}
+
+// GetResetFields implements rest.ResetFieldsStrategy
+func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return r.store.GetResetFields()
 }

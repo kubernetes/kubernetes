@@ -26,32 +26,32 @@ subjects:
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: npd-v0.8.5
+  name: npd-v0.8.9
   namespace: kube-system
   labels:
     k8s-app: node-problem-detector
-    version: v0.8.5
+    version: v0.8.9
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
 spec:
   selector:
     matchLabels:
       k8s-app: node-problem-detector
-      version: v0.8.5
+      version: v0.8.9
   template:
     metadata:
       labels:
         k8s-app: node-problem-detector
-        version: v0.8.5
+        version: v0.8.9
         kubernetes.io/cluster-service: "true"
     spec:
       containers:
       - name: node-problem-detector
-        image: k8s.gcr.io/node-problem-detector/node-problem-detector:v0.8.5
+        image: k8s.gcr.io/node-problem-detector/node-problem-detector:v0.8.9
         command:
         - "/bin/sh"
         - "-c"
-        - "exec /node-problem-detector --logtostderr --config.system-log-monitor=/config/kernel-monitor.json,/config/docker-monitor.json,/config/systemd-monitor.json --config.custom-plugin-monitor=/config/kernel-monitor-counter.json,/config/systemd-monitor-counter.json --config.system-stats-monitor=/config/system-stats-monitor.json >>/var/log/node-problem-detector.log 2>&1"
+        - "exec /node-problem-detector --logtostderr --config.system-log-monitor=/config/kernel-monitor.json,/config/systemd-monitor.json --config.custom-plugin-monitor=/config/kernel-monitor-counter.json,/config/systemd-monitor-counter.json --config.system-stats-monitor=/config/system-stats-monitor.json >>/var/log/node-problem-detector.log 2>&1"
         securityContext:
           privileged: true
         resources:

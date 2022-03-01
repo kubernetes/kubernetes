@@ -52,6 +52,8 @@ run_configmap_tests() {
   kube::test::get_object_assert 'configmap/test-binary-configmap --namespace=test-configmaps' "{{$id_field}}" 'test-binary-configmap'
   grep -q "key1: value1" <<< "$(kubectl get configmap/test-configmap --namespace=test-configmaps -o yaml "${kube_flags[@]}")"
   grep -q "binaryData" <<< "$(kubectl get configmap/test-binary-configmap --namespace=test-configmaps -o yaml "${kube_flags[@]}")"
+  # Describe command should respect the chunk size parameter
+  kube::test::describe_resource_chunk_size_assert configmaps events "--namespace=test-configmaps"
   # Clean-up
   kubectl delete configmap test-configmap --namespace=test-configmaps
   kubectl delete configmap test-binary-configmap --namespace=test-configmaps
@@ -105,6 +107,8 @@ run_pod_tests() {
   kube::test::describe_resource_events_assert pods false
   # Describe command should print events information when show-events=true
   kube::test::describe_resource_events_assert pods true
+  # Describe command should respect the chunk size parameter
+  kube::test::describe_resource_chunk_size_assert pods events
 
   ### Dump current valid-pod POD
   output_pod=$(kubectl get pod valid-pod -o yaml "${kube_flags[@]}")
@@ -257,6 +261,8 @@ run_pod_tests() {
   kubectl create pdb test-pdb-2 --selector=app=rails --min-available=50% --namespace=test-kubectl-describe-pod
   # Post-condition: pdb exists and has expected values
   kube::test::get_object_assert 'pdb/test-pdb-2 --namespace=test-kubectl-describe-pod' "{{$pdb_min_available}}" '50%'
+  # Describe command should respect the chunk size parameter
+  kube::test::describe_resource_chunk_size_assert poddisruptionbudgets events "--namespace=test-kubectl-describe-pod"
 
   ### Create a pod disruption budget with maxUnavailable
   # Command
@@ -295,6 +301,8 @@ run_pod_tests() {
   # Command
   kubectl create priorityclass test-priorityclass
   kube::test::get_object_assert 'priorityclasses' "{{range.items}}{{ if eq $id_field \\\"test-priorityclass\\\" }}found{{end}}{{end}}:" 'found:'
+  # Describe command should respect the chunk size parameter
+  kube::test::describe_resource_chunk_size_assert priorityclasses events
   kubectl delete priorityclass test-priorityclass
 
   ### Create two PODs
@@ -529,9 +537,9 @@ run_pod_tests() {
   kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'changed-with-yaml:'
   ## Patch pod from JSON can change image
   # Command
-  kubectl patch "${kube_flags[@]}" -f test/fixtures/doc-yaml/admin/limitrange/valid-pod.yaml -p='{"spec":{"containers":[{"name": "kubernetes-serve-hostname", "image": "k8s.gcr.io/pause:3.4.1"}]}}'
+  kubectl patch "${kube_flags[@]}" -f test/fixtures/doc-yaml/admin/limitrange/valid-pod.yaml -p='{"spec":{"containers":[{"name": "kubernetes-serve-hostname", "image": "k8s.gcr.io/pause:3.6"}]}}'
   # Post-condition: valid-pod POD has expected image
-  kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'k8s.gcr.io/pause:3.4.1:'
+  kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'k8s.gcr.io/pause:3.6:'
 
   # pod has field for kubectl patch field manager
   output_message=$(kubectl get pod valid-pod -o=jsonpath='{.metadata.managedFields[*].manager}' "${kube_flags[@]:?}" 2>&1)
@@ -560,7 +568,7 @@ run_pod_tests() {
   resourceVersion=$(kubectl get "${kube_flags[@]}" pod valid-pod -o go-template='{{ .metadata.resourceVersion }}')
   ((resourceVersion+=100))
   # Command
-  kubectl patch "${kube_flags[@]}" pod valid-pod -p='{"spec":{"containers":[{"name": "kubernetes-serve-hostname", "image": "nginx"}]},"metadata":{"resourceVersion":"'$resourceVersion'"}}' 2> "${ERROR_FILE}" || true
+  kubectl patch "${kube_flags[@]}" pod valid-pod -p='{"spec":{"containers":[{"name": "kubernetes-serve-hostname", "image": "nginx"}]},"metadata":{"resourceVersion":"'"$resourceVersion"'"}}' 2> "${ERROR_FILE}" || true
   # Post-condition: should get an error reporting the conflict
   if grep -q "please apply your changes to the latest version and try again" "${ERROR_FILE}"; then
     kube::log::status "\"kubectl patch with resourceVersion $resourceVersion\" returns error as expected: $(cat "${ERROR_FILE}")"
@@ -835,6 +843,8 @@ run_secrets_test() {
   kube::test::get_object_assert 'secret/test-secret --namespace=test-secrets' "{{$id_field}}" 'test-secret'
   kube::test::get_object_assert 'secret/test-secret --namespace=test-secrets' "{{$secret_type}}" 'test-type'
   grep -q 'key1: dmFsdWUx' <<< "$(kubectl get secret/test-secret --namespace=test-secrets -o yaml "${kube_flags[@]}")"
+  # Describe command should respect the chunk size parameter
+  kube::test::describe_resource_chunk_size_assert secrets ""  "--namespace=test-secrets"
   # Clean-up
   kubectl delete secret test-secret --namespace=test-secrets
 
@@ -955,6 +965,8 @@ run_service_accounts_tests() {
   kubectl create serviceaccount test-service-account --namespace=test-service-accounts
   # Post-condition: secret exists and has expected values
   kube::test::get_object_assert 'serviceaccount/test-service-account --namespace=test-service-accounts' "{{$id_field}}" 'test-service-account'
+  # Describe command should respect the chunk size parameter
+  kube::test::describe_resource_chunk_size_assert serviceaccounts secrets,events "--namespace=test-service-accounts"
   # Clean-up
   kubectl delete serviceaccount test-service-account --namespace=test-service-accounts
   # Clean up
@@ -995,6 +1007,8 @@ run_service_tests() {
   kube::test::describe_resource_events_assert services false
   # Describe command should print events information when show-events=true
   kube::test::describe_resource_events_assert services true
+  # Describe command should respect the chunk size parameter
+  kube::test::describe_resource_chunk_size_assert services events
 
   ### set selector
   # prove role=master
@@ -1142,15 +1156,15 @@ __EOF__
   # Pre-condition: Only the default kubernetes services exist
   kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
   # Dry-run command
-  kubectl run testmetadata --image=nginx --port=80 --expose --dry-run=client --service-overrides='{ "metadata": { "annotations": { "zone-context": "home" } } } '
-  kubectl run testmetadata --image=nginx --port=80 --expose --dry-run=server --service-overrides='{ "metadata": { "annotations": { "zone-context": "home" } } } '
+  kubectl run testmetadata --image=nginx --port=80 --expose --dry-run=client
+  kubectl run testmetadata --image=nginx --port=80 --expose --dry-run=server
   # Check only the default kubernetes services exist
   kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
   # Command
-  kubectl run testmetadata --image=nginx --port=80 --expose --service-overrides='{ "metadata": { "annotations": { "zone-context": "home" } } } '
+  kubectl run testmetadata --image=nginx --port=80 --expose
   # Check result
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'testmetadata:'
-  kube::test::get_object_assert 'service testmetadata' "{{.metadata.annotations}}" "map\[zone-context:home\]"
+  kube::test::get_object_assert 'service testmetadata' "{{${port_field:?}}}" '80'
   # pod has field for kubectl run field manager
   output_message=$(kubectl get pod testmetadata -o=jsonpath='{.metadata.managedFields[*].manager}' "${kube_flags[@]:?}" 2>&1)
   kube::test::if_has_string "${output_message}" 'kubectl-run'
@@ -1218,6 +1232,8 @@ run_rc_tests() {
   kube::test::describe_resource_events_assert rc false
   # Describe command should print events information when show-events=true
   kube::test::describe_resource_events_assert rc true
+  # Describe command should respect the chunk size parameter
+  kube::test::describe_resource_chunk_size_assert replicationcontrollers events
 
   ### Scale replication controller frontend with current-replicas and replicas
   # Pre-condition: 3 replicas
@@ -1313,17 +1329,13 @@ run_rc_tests() {
   kubectl expose pod valid-pod --port=444 --name=frontend-3 "${kube_flags[@]}"
   # Post-condition: service exists and the port is unnamed
   kube::test::get_object_assert 'service frontend-3' "{{$port_name}} {{$port_field}}" '<no value> 444'
-  # Create a service using service/v1 generator
-  kubectl expose rc frontend --port=80 --name=frontend-4 --generator=service/v1 "${kube_flags[@]}"
-  # Post-condition: service exists and the port is named default.
-  kube::test::get_object_assert 'service frontend-4' "{{$port_name}} {{$port_field}}" 'default 80'
   # Verify that expose service works without specifying a port.
-  kubectl expose service frontend --name=frontend-5 "${kube_flags[@]}"
+  kubectl expose service frontend --name=frontend-4 "${kube_flags[@]}"
   # Post-condition: service exists with the same port as the original service.
-  kube::test::get_object_assert 'service frontend-5' "{{$port_field}}" '80'
+  kube::test::get_object_assert 'service frontend-4' "{{$port_field}}" '80'
   # Cleanup services
   kubectl delete pod valid-pod "${kube_flags[@]}"
-  kubectl delete service frontend{,-2,-3,-4,-5} "${kube_flags[@]}"
+  kubectl delete service frontend{,-2,-3,-4} "${kube_flags[@]}"
 
   ### Expose negative invalid resource test
   # Pre-condition: don't need
@@ -1457,6 +1469,8 @@ run_namespace_tests() {
   kubectl create namespace my-namespace
   # Post-condition: namespace 'my-namespace' is created.
   kube::test::get_object_assert 'namespaces/my-namespace' "{{$id_field}}" 'my-namespace'
+  # Describe command should respect the chunk size parameter
+  kube::test::describe_resource_chunk_size_assert namespaces resourcequotas,limitranges
   # Clean up
   kubectl delete namespace my-namespace --wait=false
   # make sure that wait properly waits for finalization
@@ -1481,6 +1495,8 @@ run_namespace_tests() {
   # Command
   kubectl create quota test-quota --namespace=quotas
   kube::test::get_object_assert 'quota --namespace=quotas' "{{range.items}}{{ if eq $id_field \\\"test-quota\\\" }}found{{end}}{{end}}:" 'found:'
+  # Describe command should respect the chunk size parameter
+  kube::test::describe_resource_chunk_size_assert resourcequotas "" "--namespace=quotas"
   # Clean up
   kubectl delete quota test-quota --namespace=quotas
   kubectl delete namespace quotas
@@ -1549,6 +1565,8 @@ run_nodes_tests() {
   kube::test::describe_resource_events_assert nodes false
   # Describe command should print events information when show-events=true
   kube::test::describe_resource_events_assert nodes true
+  # Describe command should respect the chunk size parameter
+  kube::test::describe_resource_chunk_size_assert nodes pods,events
 
   ### kubectl patch update can mark node unschedulable
   # Pre-condition: node is schedulable
@@ -1562,7 +1580,6 @@ run_nodes_tests() {
 
   # check webhook token authentication endpoint, kubectl doesn't actually display the returned object so this isn't super useful
   # but it proves that works
-  kubectl create -f test/fixtures/pkg/kubectl/cmd/create/tokenreview-v1beta1.json --validate=false
   kubectl create -f test/fixtures/pkg/kubectl/cmd/create/tokenreview-v1.json --validate=false
 
   set +o nounset
@@ -1591,6 +1608,8 @@ run_pod_templates_tests() {
   ### Delete nginx pod template by name
   # Pre-condition: nginx pod template is available
   kube::test::get_object_assert podtemplates "{{range.items}}{{.metadata.name}}:{{end}}" 'nginx:'
+  # Describe command should respect the chunk size parameter
+  kube::test::describe_resource_chunk_size_assert podtemplates events
   # Command
   kubectl delete podtemplate nginx "${kube_flags[@]}"
   # Post-condition: No templates exist

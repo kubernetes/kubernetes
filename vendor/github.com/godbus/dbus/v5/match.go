@@ -1,6 +1,7 @@
 package dbus
 
 import (
+	"strconv"
 	"strings"
 )
 
@@ -59,4 +60,30 @@ func WithMatchPathNamespace(namespace ObjectPath) MatchOption {
 // WithMatchDestination sets destination match option.
 func WithMatchDestination(destination string) MatchOption {
 	return WithMatchOption("destination", destination)
+}
+
+// WithMatchArg sets argN match option, range of N is 0 to 63.
+func WithMatchArg(argIdx int, value string) MatchOption {
+	if argIdx < 0 || argIdx > 63 {
+		panic("range of argument index is 0 to 63")
+	}
+	return WithMatchOption("arg"+strconv.Itoa(argIdx), value)
+}
+
+// WithMatchArgPath sets argN path match option, range of N is 0 to 63.
+func WithMatchArgPath(argIdx int, path string) MatchOption {
+	if argIdx < 0 || argIdx > 63 {
+		panic("range of argument index is 0 to 63")
+	}
+	return WithMatchOption("arg"+strconv.Itoa(argIdx)+"path", path)
+}
+
+// WithMatchArg0Namespace sets arg0namespace match option.
+func WithMatchArg0Namespace(arg0Namespace string) MatchOption {
+	return WithMatchOption("arg0namespace", arg0Namespace)
+}
+
+// WithMatchEavesdrop sets eavesdrop match option.
+func WithMatchEavesdrop(eavesdrop bool) MatchOption {
+	return WithMatchOption("eavesdrop", strconv.FormatBool(eavesdrop))
 }

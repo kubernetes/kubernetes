@@ -223,7 +223,7 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAWS)
 		},
 		csitranslationplugins.CinderInTreePluginName: func() bool {
-			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationOpenStack)
+			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration)
 		},
 		csitranslationplugins.AzureDiskInTreePluginName: func() bool {
 			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAzureDisk)
@@ -233,6 +233,12 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 		},
 		csitranslationplugins.VSphereInTreePluginName: func() bool {
 			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationvSphere)
+		},
+		csitranslationplugins.PortworxVolumePluginName: func() bool {
+			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationPortworx)
+		},
+		csitranslationplugins.RBDVolumePluginName: func() bool {
+			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationRBD)
 		},
 	}
 
@@ -287,7 +293,7 @@ func initializeCSINode(host volume.VolumeHost) error {
 			klog.V(4).Infof("Initializing migrated drivers on CSINode")
 			err := nim.InitializeCSINodeWithAnnotation()
 			if err != nil {
-				kvh.SetKubeletError(fmt.Errorf("Failed to initialize CSINode: %v", err))
+				kvh.SetKubeletError(fmt.Errorf("failed to initialize CSINode: %v", err))
 				klog.Errorf("Failed to initialize CSINode: %v", err)
 				return false, nil
 			}
@@ -339,9 +345,6 @@ func (p *csiPlugin) CanSupport(spec *volume.Spec) bool {
 }
 
 func (p *csiPlugin) RequiresRemount(spec *volume.Spec) bool {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIServiceAccountToken) {
-		return false
-	}
 	if p.csiDriverLister == nil {
 		return false
 	}
@@ -685,6 +688,7 @@ func (p *csiPlugin) NewBlockVolumeMapper(spec *volume.Spec, podRef *api.Pod, opt
 		readOnly:   readOnly,
 		spec:       spec,
 		specName:   spec.Name(),
+		pod:        podRef,
 		podUID:     podRef.UID,
 	}
 	mapper.csiClientGetter.driverName = csiDriverName(pvSource.Driver)
@@ -696,6 +700,13 @@ func (p *csiPlugin) NewBlockVolumeMapper(spec *volume.Spec, podRef *api.Pod, opt
 		return nil, errors.New(log("failed to create data dir %s:  %v", dataDir, err))
 	}
 	klog.V(4).Info(log("created path successfully [%s]", dataDir))
+
+	blockPath, err := mapper.GetGlobalMapPath(spec)
+	if err != nil {
+		return nil, errors.New(log("failed to get device path: %v", err))
+	}
+
+	mapper.MetricsProvider = NewMetricsCsi(pvSource.VolumeHandle, blockPath+"/"+string(podRef.UID), csiDriverName(pvSource.Driver))
 
 	// persist volume info data for teardown
 	node := string(p.host.GetNodeName())
@@ -957,6 +968,34 @@ func (p *csiPlugin) newAttacherDetacher() (*csiAttacher, error) {
 		k8s:          k8s,
 		watchTimeout: csiTimeout,
 	}, nil
+}
+
+// podInfoEnabled  check CSIDriver enabled pod info flag
+func (p *csiPlugin) podInfoEnabled(driverName string) (bool, error) {
+	kletHost, ok := p.host.(volume.KubeletVolumeHost)
+	if ok {
+		kletHost.WaitForCacheSync()
+	}
+
+	if p.csiDriverLister == nil {
+		return false, fmt.Errorf("CSIDriverLister not found")
+	}
+
+	csiDriver, err := p.csiDriverLister.Get(driverName)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			klog.V(4).Infof(log("CSIDriver %q not found, not adding pod information", driverName))
+			return false, nil
+		}
+		return false, err
+	}
+
+	// if PodInfoOnMount is not set or false we do not set pod attributes
+	if csiDriver.Spec.PodInfoOnMount == nil || *csiDriver.Spec.PodInfoOnMount == false {
+		klog.V(4).Infof(log("CSIDriver %q does not require pod information", driverName))
+		return false, nil
+	}
+	return true, nil
 }
 
 func unregisterDriver(driverName string) error {

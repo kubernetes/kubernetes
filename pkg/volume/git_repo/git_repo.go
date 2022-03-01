@@ -161,17 +161,10 @@ var _ volume.Mounter = &gitRepoVolumeMounter{}
 
 func (b *gitRepoVolumeMounter) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:        false,
-		Managed:         true,
-		SupportsSELinux: true, // xattr change should be okay, TODO: double check
+		ReadOnly:       false,
+		Managed:        true,
+		SELinuxRelabel: true, // xattr change should be okay, TODO: double check
 	}
-}
-
-// Checks prior to mount operations to verify that the required components (binaries, etc.)
-// to mount the volume are available on the underlying node.
-// If not, it returns an error
-func (b *gitRepoVolumeMounter) CanMount() error {
-	return nil
 }
 
 // SetUp creates new directory and clones a git repo.

@@ -31,6 +31,7 @@ import (
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/apis/core"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 // Funcs returns the fuzzer functions for the core group.
@@ -296,6 +297,10 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			types := []core.ServiceExternalTrafficPolicyType{core.ServiceExternalTrafficPolicyTypeCluster, core.ServiceExternalTrafficPolicyTypeLocal}
 			*p = types[c.Rand.Intn(len(types))]
 		},
+		func(p *core.ServiceInternalTrafficPolicyType, c fuzz.Continue) {
+			types := []core.ServiceInternalTrafficPolicyType{core.ServiceInternalTrafficPolicyCluster, core.ServiceInternalTrafficPolicyLocal}
+			*p = types[c.Rand.Intn(len(types))]
+		},
 		func(ct *core.Container, c fuzz.Continue) {
 			c.FuzzNoCustom(ct)                                          // fuzz self without calling this function again
 			ct.TerminationMessagePath = "/" + ct.TerminationMessagePath // Must be non-empty
@@ -472,6 +477,16 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 		func(s *core.NamespaceSpec, c fuzz.Continue) {
 			s.Finalizers = []core.FinalizerName{core.FinalizerKubernetes}
 		},
+		func(s *core.Namespace, c fuzz.Continue) {
+			c.FuzzNoCustom(s) // fuzz self without calling this function again
+			// Match name --> label defaulting
+			if len(s.Name) > 0 {
+				if s.Labels == nil {
+					s.Labels = map[string]string{}
+				}
+				s.Labels["kubernetes.io/metadata.name"] = s.Name
+			}
+		},
 		func(s *core.NamespaceStatus, c fuzz.Continue) {
 			s.Phase = core.NamespaceActive
 		},
@@ -508,6 +523,9 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			case core.ServiceAffinityNone:
 				ss.SessionAffinityConfig = nil
 			}
+			if ss.AllocateLoadBalancerNodePorts == nil {
+				ss.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
+			}
 		},
 		func(s *core.NodeStatus, c fuzz.Continue) {
 			c.FuzzNoCustom(s)
@@ -518,6 +536,12 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			e.EventTime = metav1.MicroTime{Time: time.Unix(1, 1000)}
 			if e.Series != nil {
 				e.Series.LastObservedTime = metav1.MicroTime{Time: time.Unix(3, 3000)}
+			}
+		},
+		func(j *core.GRPCAction, c fuzz.Continue) {
+			empty := ""
+			if j.Service == nil {
+				j.Service = &empty
 			}
 		},
 	}

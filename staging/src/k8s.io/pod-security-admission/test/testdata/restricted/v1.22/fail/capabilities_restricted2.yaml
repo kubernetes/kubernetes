@@ -1,0 +1,97 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: capabilities_restricted2
+spec:
+  containers:
+  - image: k8s.gcr.io/pause
+    name: container1
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - SYS_TIME
+        - SYS_MODULE
+        - SYS_RAWIO
+        - SYS_PACCT
+        - SYS_ADMIN
+        - SYS_NICE
+        - SYS_RESOURCE
+        - SYS_TIME
+        - SYS_TTY_CONFIG
+        - MKNOD
+        - AUDIT_WRITE
+        - AUDIT_CONTROL
+        - MAC_OVERRIDE
+        - MAC_ADMIN
+        - NET_ADMIN
+        - SYSLOG
+        - CHOWN
+        - NET_RAW
+        - DAC_OVERRIDE
+        - FOWNER
+        - DAC_READ_SEARCH
+        - FSETID
+        - KILL
+        - SETGID
+        - SETUID
+        - LINUX_IMMUTABLE
+        - NET_BIND_SERVICE
+        - NET_BROADCAST
+        - IPC_LOCK
+        - IPC_OWNER
+        - SYS_CHROOT
+        - SYS_PTRACE
+        - SYS_BOOT
+        - LEASE
+        - SETFCAP
+        - WAKE_ALARM
+        - BLOCK_SUSPEND
+  initContainers:
+  - image: k8s.gcr.io/pause
+    name: initcontainer1
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - SYS_TIME
+        - SYS_MODULE
+        - SYS_RAWIO
+        - SYS_PACCT
+        - SYS_ADMIN
+        - SYS_NICE
+        - SYS_RESOURCE
+        - SYS_TIME
+        - SYS_TTY_CONFIG
+        - MKNOD
+        - AUDIT_WRITE
+        - AUDIT_CONTROL
+        - MAC_OVERRIDE
+        - MAC_ADMIN
+        - NET_ADMIN
+        - SYSLOG
+        - CHOWN
+        - NET_RAW
+        - DAC_OVERRIDE
+        - FOWNER
+        - DAC_READ_SEARCH
+        - FSETID
+        - KILL
+        - SETGID
+        - SETUID
+        - LINUX_IMMUTABLE
+        - NET_BIND_SERVICE
+        - NET_BROADCAST
+        - IPC_LOCK
+        - IPC_OWNER
+        - SYS_CHROOT
+        - SYS_PTRACE
+        - SYS_BOOT
+        - LEASE
+        - SETFCAP
+        - WAKE_ALARM
+        - BLOCK_SUSPEND
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault

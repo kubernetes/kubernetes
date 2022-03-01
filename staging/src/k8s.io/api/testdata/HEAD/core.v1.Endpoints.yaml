@@ -2,60 +2,64 @@ apiVersion: v1
 kind: Endpoints
 metadata:
   annotations:
-    "9": "10"
-  clusterName: "15"
-  creationTimestamp: null
-  deletionGracePeriodSeconds: -4955867275792137171
+    annotationsKey: annotationsValue
+  clusterName: clusterNameValue
+  creationTimestamp: "2008-01-01T01:01:01Z"
+  deletionGracePeriodSeconds: 10
+  deletionTimestamp: "2009-01-01T01:01:01Z"
   finalizers:
-  - "14"
-  generateName: "3"
-  generation: 8071137005907523419
+  - finalizersValue
+  generateName: generateNameValue
+  generation: 7
   labels:
-    "7": "8"
+    labelsKey: labelsValue
   managedFields:
-  - apiVersion: "17"
-    fieldsType: "18"
-    manager: "16"
-    operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
-  name: "2"
-  namespace: "4"
+  - apiVersion: apiVersionValue
+    fieldsType: fieldsTypeValue
+    fieldsV1: {}
+    manager: managerValue
+    operation: operationValue
+    subresource: subresourceValue
+    time: "2004-01-01T01:01:01Z"
+  name: nameValue
+  namespace: namespaceValue
   ownerReferences:
-  - apiVersion: "11"
+  - apiVersion: apiVersionValue
     blockOwnerDeletion: true
-    controller: false
-    kind: "12"
-    name: "13"
-    uid: Dz廔ȇ{sŊƏp
-  resourceVersion: "11042405498087606203"
-  selfLink: "5"
-  uid: "7"
+    controller: true
+    kind: kindValue
+    name: nameValue
+    uid: uidValue
+  resourceVersion: resourceVersionValue
+  selfLink: selfLinkValue
+  uid: uidValue
 subsets:
 - addresses:
-  - hostname: "20"
-    ip: "19"
-    nodeName: "21"
+  - hostname: hostnameValue
+    ip: ipValue
+    nodeName: nodeNameValue
     targetRef:
-      apiVersion: "25"
-      fieldPath: "27"
-      kind: "22"
-      name: "24"
-      namespace: "23"
-      resourceVersion: "26"
-      uid: Hr鯹)晿<o,c鮽ort昍řČ扷5Ɨ
+      apiVersion: apiVersionValue
+      fieldPath: fieldPathValue
+      kind: kindValue
+      name: nameValue
+      namespace: namespaceValue
+      resourceVersion: resourceVersionValue
+      uid: uidValue
   notReadyAddresses:
-  - hostname: "29"
-    ip: "28"
-    nodeName: "30"
+  - hostname: hostnameValue
+    ip: ipValue
+    nodeName: nodeNameValue
     targetRef:
-      apiVersion: "34"
-      fieldPath: "36"
-      kind: "31"
-      name: "33"
-      namespace: "32"
-      resourceVersion: "35"
-      uid: Ă凗蓏Ŋ蛊ĉy
+      apiVersion: apiVersionValue
+      fieldPath: fieldPathValue
+      kind: kindValue
+      name: nameValue
+      namespace: namespaceValue
+      resourceVersion: resourceVersionValue
+      uid: uidValue
   ports:
-  - appProtocol: "38"
-    name: "37"
-    port: 1546792211
-    protocol: '>Ž燹憍峕?狱³-Ǐ忄*'
+  - appProtocol: appProtocolValue
+    name: nameValue
+    port: 2
+    protocol: protocolValue

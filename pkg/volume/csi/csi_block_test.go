@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"google.golang.org/grpc/codes"
@@ -28,7 +29,6 @@ import (
 
 	api "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/volume"
@@ -40,11 +40,11 @@ func prepareBlockMapperTest(plug *csiPlugin, specVolumeName string, t *testing.T
 	spec := volume.NewSpecFromPersistentVolume(pv, pv.Spec.PersistentVolumeSource.CSI.ReadOnly)
 	mapper, err := plug.NewBlockVolumeMapper(
 		spec,
-		&api.Pod{ObjectMeta: meta.ObjectMeta{UID: testPodUID, Namespace: testns}},
+		&api.Pod{ObjectMeta: metav1.ObjectMeta{UID: testPodUID, Namespace: testns, Name: testPod}},
 		volume.VolumeOptions{},
 	)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("Failed to make a new Mapper: %v", err)
+		return nil, nil, nil, fmt.Errorf("failed to make a new Mapper: %w", err)
 	}
 	csiMapper := mapper.(*csiBlockMapper)
 	return csiMapper, spec, pv, nil
@@ -332,7 +332,7 @@ func TestBlockMapperMapPodDeviceNotSupportAttach(t *testing.T) {
 	fakeClient := fakeclient.NewSimpleClientset()
 	attachRequired := false
 	fakeDriver := &storagev1.CSIDriver{
-		ObjectMeta: meta.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: testDriver,
 		},
 		Spec: storagev1.CSIDriverSpec{
@@ -364,6 +364,52 @@ func TestBlockMapperMapPodDeviceNotSupportAttach(t *testing.T) {
 	publishPath := csiMapper.getPublishPath()
 	if path != publishPath {
 		t.Errorf("path %s and %s doesn't match", path, publishPath)
+	}
+}
+
+func TestBlockMapperMapPodDeviceWithPodInfo(t *testing.T) {
+	fakeClient := fakeclient.NewSimpleClientset()
+	attachRequired := false
+	podInfo := true
+	fakeDriver := &storagev1.CSIDriver{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: testDriver,
+		},
+		Spec: storagev1.CSIDriverSpec{
+			PodInfoOnMount: &podInfo,
+			AttachRequired: &attachRequired,
+		},
+	}
+	_, err := fakeClient.StorageV1().CSIDrivers().Create(context.TODO(), fakeDriver, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create a fakeDriver: %v", err)
+	}
+
+	// after the driver is created, create the plugin. newTestPlugin waits for the informer to sync,
+	// such that csiMapper.SetUpDevice below sees the VolumeAttachment object in the lister.
+
+	plug, tmpDir := newTestPlugin(t, fakeClient)
+	defer os.RemoveAll(tmpDir)
+
+	csiMapper, _, _, err := prepareBlockMapperTest(plug, "test-pv", t)
+	if err != nil {
+		t.Fatalf("Failed to make a new Mapper: %v", err)
+	}
+	csiMapper.csiClient = setupClient(t, true)
+
+	// Map device to global and pod device map path
+	_, err = csiMapper.MapPodDevice()
+	if err != nil {
+		t.Fatalf("mapper failed to GetGlobalMapPath: %v", err)
+	}
+	pvols := csiMapper.csiClient.(*fakeCsiDriverClient).nodeClient.GetNodePublishedVolumes()
+	pvol, ok := pvols[csiMapper.volumeID]
+	if !ok {
+		t.Error("csi server may not have received NodePublishVolume call")
+	}
+
+	if !reflect.DeepEqual(pvol.VolumeContext, map[string]string{"csi.storage.k8s.io/pod.uid": "test-pod", "csi.storage.k8s.io/serviceAccount.name": "", "csi.storage.k8s.io/pod.name": "test-pod", "csi.storage.k8s.io/pod.namespace": "test-ns", "csi.storage.k8s.io/ephemeral": "false"}) {
+		t.Error("csi mapper check pod info failed")
 	}
 }
 

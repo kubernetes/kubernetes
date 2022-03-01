@@ -45,11 +45,52 @@ type CertificateSigningRequestSpec struct {
 	// Base64-encoded PKCS#10 CSR data
 	Request []byte
 
-	// Requested signer for the request. It is a qualified name in the form:
-	// `scope-hostname.io/name`.
-	// Distribution of trust for signers happens out of band.
-	// You can select on this field using `spec.signerName`.
+	// signerName indicates the requested signer, and is a qualified name.
+	//
+	// List/watch requests for CertificateSigningRequests can filter on this field using a "spec.signerName=NAME" fieldSelector.
+	//
+	// Well-known Kubernetes signers are:
+	//  1. "kubernetes.io/kube-apiserver-client": issues client certificates that can be used to authenticate to kube-apiserver.
+	//   Requests for this signer are never auto-approved by kube-controller-manager, can be issued by the "csrsigning" controller in kube-controller-manager.
+	//  2. "kubernetes.io/kube-apiserver-client-kubelet": issues client certificates that kubelets use to authenticate to kube-apiserver.
+	//   Requests for this signer can be auto-approved by the "csrapproving" controller in kube-controller-manager, and can be issued by the "csrsigning" controller in kube-controller-manager.
+	//  3. "kubernetes.io/kubelet-serving" issues serving certificates that kubelets use to serve TLS endpoints, which kube-apiserver can connect to securely.
+	//   Requests for this signer are never auto-approved by kube-controller-manager, and can be issued by the "csrsigning" controller in kube-controller-manager.
+	//
+	// More details are available at https://k8s.io/docs/reference/access-authn-authz/certificate-signing-requests/#kubernetes-signers
+	//
+	// Custom signerNames can also be specified. The signer defines:
+	//  1. Trust distribution: how trust (CA bundles) are distributed.
+	//  2. Permitted subjects: and behavior when a disallowed subject is requested.
+	//  3. Required, permitted, or forbidden x509 extensions in the request (including whether subjectAltNames are allowed, which types, restrictions on allowed values) and behavior when a disallowed extension is requested.
+	//  4. Required, permitted, or forbidden key usages / extended key usages.
+	//  5. Expiration/certificate lifetime: whether it is fixed by the signer, configurable by the admin.
+	//  6. Whether or not requests for CA certificates are allowed.
 	SignerName string
+
+	// expirationSeconds is the requested duration of validity of the issued
+	// certificate. The certificate signer may issue a certificate with a different
+	// validity duration so a client must check the delta between the notBefore and
+	// and notAfter fields in the issued certificate to determine the actual duration.
+	//
+	// The v1.22+ in-tree implementations of the well-known Kubernetes signers will
+	// honor this field as long as the requested duration is not greater than the
+	// maximum duration they will honor per the --cluster-signing-duration CLI
+	// flag to the Kubernetes controller manager.
+	//
+	// Certificate signers may not honor this field for various reasons:
+	//
+	//   1. Old signer that is unaware of the field (such as the in-tree
+	//      implementations prior to v1.22)
+	//   2. Signer whose configured maximum is shorter than the requested duration
+	//   3. Signer whose configured minimum is longer than the requested duration
+	//
+	// The minimum valid value for expirationSeconds is 600, i.e. 10 minutes.
+	//
+	// As of v1.22, this field is beta and is controlled via the CSRDuration feature gate.
+	//
+	// +optional
+	ExpirationSeconds *int32
 
 	// usages specifies a set of usage contexts the key will be
 	// valid for.

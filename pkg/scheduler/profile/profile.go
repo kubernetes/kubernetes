@@ -37,12 +37,8 @@ type RecorderFactory func(string) events.EventRecorder
 func newProfile(cfg config.KubeSchedulerProfile, r frameworkruntime.Registry, recorderFact RecorderFactory,
 	opts ...frameworkruntime.Option) (framework.Framework, error) {
 	recorder := recorderFact(cfg.SchedulerName)
-	opts = append(opts, frameworkruntime.WithEventRecorder(recorder), frameworkruntime.WithProfileName(cfg.SchedulerName))
-	fwk, err := frameworkruntime.NewFramework(r, cfg.Plugins, cfg.PluginConfig, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return fwk, nil
+	opts = append(opts, frameworkruntime.WithEventRecorder(recorder))
+	return frameworkruntime.NewFramework(r, &cfg, opts...)
 }
 
 // Map holds frameworks indexed by scheduler name.
@@ -55,12 +51,12 @@ func NewMap(cfgs []config.KubeSchedulerProfile, r frameworkruntime.Registry, rec
 	v := cfgValidator{m: m}
 
 	for _, cfg := range cfgs {
-		if err := v.validate(cfg); err != nil {
-			return nil, err
-		}
 		p, err := newProfile(cfg, r, recorderFact, opts...)
 		if err != nil {
 			return nil, fmt.Errorf("creating profile for scheduler name %s: %v", cfg.SchedulerName, err)
+		}
+		if err := v.validate(cfg, p); err != nil {
+			return nil, err
 		}
 		m[cfg.SchedulerName] = p
 	}
@@ -86,20 +82,18 @@ type cfgValidator struct {
 	queueSortArgs runtime.Object
 }
 
-func (v *cfgValidator) validate(cfg config.KubeSchedulerProfile) error {
-	if len(cfg.SchedulerName) == 0 {
+func (v *cfgValidator) validate(cfg config.KubeSchedulerProfile, f framework.Framework) error {
+	if len(f.ProfileName()) == 0 {
 		return errors.New("scheduler name is needed")
 	}
 	if cfg.Plugins == nil {
-		return fmt.Errorf("plugins required for profile with scheduler name %q", cfg.SchedulerName)
+		return fmt.Errorf("plugins required for profile with scheduler name %q", f.ProfileName())
 	}
-	if v.m[cfg.SchedulerName] != nil {
-		return fmt.Errorf("duplicate profile with scheduler name %q", cfg.SchedulerName)
+	if v.m[f.ProfileName()] != nil {
+		return fmt.Errorf("duplicate profile with scheduler name %q", f.ProfileName())
 	}
-	if len(cfg.Plugins.QueueSort.Enabled) != 1 {
-		return fmt.Errorf("one queue sort plugin required for profile with scheduler name %q", cfg.SchedulerName)
-	}
-	queueSort := cfg.Plugins.QueueSort.Enabled[0].Name
+
+	queueSort := f.ListPlugins().QueueSort.Enabled[0].Name
 	var queueSortArgs runtime.Object
 	for _, plCfg := range cfg.PluginConfig {
 		if plCfg.Name == queueSort {

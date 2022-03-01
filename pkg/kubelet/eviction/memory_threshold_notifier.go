@@ -71,7 +71,7 @@ func NewMemoryThresholdNotifier(threshold evictionapi.Threshold, cgroupRoot stri
 }
 
 func (m *memoryThresholdNotifier) Start() {
-	klog.Infof("eviction manager: created %s", m.Description())
+	klog.InfoS("Eviction manager: created memoryThresholdNotifier", "notifier", m.Description())
 	for range m.events {
 		m.handler(fmt.Sprintf("eviction manager: %s crossed", m.Description()))
 	}
@@ -98,7 +98,7 @@ func (m *memoryThresholdNotifier) UpdateThreshold(summary *statsapi.Summary) err
 	memcgThreshold.Sub(*evictionThresholdQuantity)
 	memcgThreshold.Add(*inactiveFile)
 
-	klog.V(3).Infof("eviction manager: setting %s to %s\n", m.Description(), memcgThreshold.String())
+	klog.V(3).InfoS("Eviction manager: setting notifier to capacity", "notifier", m.Description(), "capacity", memcgThreshold.String())
 	if m.notifier != nil {
 		m.notifier.Stop()
 	}

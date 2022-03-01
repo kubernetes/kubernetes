@@ -9,6 +9,9 @@ Building Kubernetes is easy if you take advantage of the containerized build env
      **Note**: You will want to set the Docker VM to have at least 8GB of initial memory or building will likely fail. (See: [#11852]( http://issue.k8s.io/11852)).
   * **Linux with local Docker**  Install Docker according to the [instructions](https://docs.docker.com/installation/#installation) for your OS.
   * **Windows with Docker Desktop WSL2 backend**  Install Docker according to the [instructions](https://docs.docker.com/docker-for-windows/wsl-tech-preview/). Be sure to store your sources in the local Linux file system, not the Windows remote mount at `/mnt/c`.
+  
+  **Note**: You will need to check if Docker CLI plugin buildx is properly installed (`docker-buildx` file should be present in `~/.docker/cli-plugins`). You can install buildx according to the [instructions](https://github.com/docker/buildx/blob/master/README.md#installing).
+
 2. **Optional** [Google Cloud SDK](https://developers.google.com/cloud/sdk/)
 
 You must install and configure Google Cloud SDK if you want to upload your release to Google Cloud Storage and may safely omit this otherwise.
@@ -34,7 +37,7 @@ The following scripts are found in the [`build/`](.) directory. Note that all sc
 
 ## Basic Flow
 
-The scripts directly under [`build/`](.) are used to build and test.  They will ensure that the `kube-build` Docker image is built (based on [`build/build-image/Dockerfile`](build-image/Dockerfile) and after base image's `KUBE_BUILD_IMAGE_CROSS_TAG` from Dockerfile is replaced with one of those actual tags of the base image, like `v1.13.9-2`) and then execute the appropriate command in that container.  These scripts will both ensure that the right data is cached from run to run for incremental builds and will copy the results back out of the container.
+The scripts directly under [`build/`](.) are used to build and test.  They will ensure that the `kube-build` Docker image is built (based on [`build/build-image/Dockerfile`](build-image/Dockerfile) and after base image's `KUBE_BUILD_IMAGE_CROSS_TAG` from Dockerfile is replaced with one of those actual tags of the base image, like `v1.13.9-2`) and then execute the appropriate command in that container.  These scripts will both ensure that the right data is cached from run to run for incremental builds and will copy the results back out of the container. You can specify a different registry/name and version for `kube-cross` by setting `KUBE_CROSS_IMAGE` and `KUBE_CROSS_VERSION`, see [`common.sh`](common.sh) for more details.
 
 The `kube-build` container image is built by first creating a "context" directory in `_output/images/build-image`.  It is done there instead of at the root of the Kubernetes repo to minimize the amount of data we need to package up when building the image.
 
@@ -43,6 +46,12 @@ There are 3 different containers instances that are run from this image.  The fi
 `rsync` is used transparently behind the scenes to efficiently move data in and out of the container.  This will use an ephemeral port picked by Docker.  You can modify this by setting the `KUBE_RSYNC_PORT` env variable.
 
 All Docker names are suffixed with a hash derived from the file path (to allow concurrent usage on things like CI machines) and a version number.  When the version number changes all state is cleared and clean build is started.  This allows the build infrastructure to be changed and signal to CI systems that old artifacts need to be deleted.
+
+## Build artifacts
+The build system output all its products to a top level directory in the source repository named `_output`.
+These include the binary compiled packages (e.g. kubectl, kube-scheduler etc.) and archived Docker images.
+If you intend to run a component with a docker image you will need to import it from this directory with
+the appropriate command (e.g. `docker import _output/release-images/amd64/kube-scheduler.tar k8s.io/kube-scheduler:$(git describe)`).
 
 ## Releasing
 
@@ -62,7 +71,7 @@ In addition, there are some other tar files that are created:
 When building final release tars, they are first staged into `_output/release-stage` before being tar'd up and put into `_output/release-tars`.
 
 ## Reproducibility
-`make release`, its variant `make quick-release`, and Bazel all provide a
+`make release` and its variant `make quick-release` provide a
 hermetic build environment which should provide some level of reproducibility
 for builds. `make` itself is **not** hermetic.
 

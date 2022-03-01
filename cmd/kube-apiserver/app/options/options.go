@@ -22,7 +22,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spf13/pflag"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
@@ -39,10 +38,6 @@ import (
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
 
-// InsecurePortFlags are dummy flags, they are kept only for compatibility and will be removed in v1.24.
-// TODO: remove these flags in v1.24.
-var InsecurePortFlags = []string{"insecure-port", "port"}
-
 // ServerRunOptions runs a kubernetes api server.
 type ServerRunOptions struct {
 	GenericServerRunOptions *genericoptions.ServerRunOptions
@@ -58,6 +53,7 @@ type ServerRunOptions struct {
 	EgressSelector          *genericoptions.EgressSelectorOptions
 	Metrics                 *metrics.Options
 	Logs                    *logs.Options
+	Traces                  *genericoptions.TracingOptions
 
 	AllowPrivileged           bool
 	EnableLogsHandler         bool
@@ -71,10 +67,10 @@ type ServerRunOptions struct {
 	// of parsing ServiceClusterIPRange into actual values
 	PrimaryServiceClusterIPRange   net.IPNet
 	SecondaryServiceClusterIPRange net.IPNet
+	// APIServerServiceIP is the first valid IP from PrimaryServiceClusterIPRange
+	APIServerServiceIP net.IP
 
 	ServiceNodePortRange utilnet.PortRange
-	SSHKeyfile           string
-	SSHUser              string
 
 	ProxyClientCertFile string
 	ProxyClientKeyFile  string
@@ -110,6 +106,7 @@ func NewServerRunOptions() *ServerRunOptions {
 		EgressSelector:          genericoptions.NewEgressSelectorOptions(),
 		Metrics:                 metrics.NewOptions(),
 		Logs:                    logs.NewOptions(),
+		Traces:                  genericoptions.NewTracingOptions(),
 
 		EnableLogsHandler:                 true,
 		EventTTL:                          1 * time.Hour,
@@ -143,33 +140,12 @@ func NewServerRunOptions() *ServerRunOptions {
 	return &s
 }
 
-// TODO: remove these insecure flags in v1.24
-func addDummyInsecureFlags(fs *pflag.FlagSet) {
-	var (
-		bindAddr = net.IPv4(127, 0, 0, 1)
-		bindPort int
-	)
-
-	for _, name := range []string{"insecure-bind-address", "address"} {
-		fs.IPVar(&bindAddr, name, bindAddr, ""+
-			"The IP address on which to serve the insecure port (set to 0.0.0.0 or :: for listening in all interfaces and IP families).")
-		fs.MarkDeprecated(name, "This flag has no effect now and will be removed in v1.24.")
-	}
-
-	for _, name := range InsecurePortFlags {
-		fs.IntVar(&bindPort, name, bindPort, ""+
-			"The port on which to serve unsecured, unauthenticated access.")
-		fs.MarkDeprecated(name, "This flag has no effect now and will be removed in v1.24.")
-	}
-}
-
 // Flags returns flags for a specific APIServer by section name
 func (s *ServerRunOptions) Flags() (fss cliflag.NamedFlagSets) {
 	// Add the generic flags.
 	s.GenericServerRunOptions.AddUniversalFlags(fss.FlagSet("generic"))
 	s.Etcd.AddFlags(fss.FlagSet("etcd"))
 	s.SecureServing.AddFlags(fss.FlagSet("secure serving"))
-	addDummyInsecureFlags(fss.FlagSet("insecure serving"))
 	s.Audit.AddFlags(fss.FlagSet("auditing"))
 	s.Features.AddFlags(fss.FlagSet("features"))
 	s.Authentication.AddFlags(fss.FlagSet("authentication"))
@@ -180,6 +156,7 @@ func (s *ServerRunOptions) Flags() (fss cliflag.NamedFlagSets) {
 	s.Admission.AddFlags(fss.FlagSet("admission"))
 	s.Metrics.AddFlags(fss.FlagSet("metrics"))
 	s.Logs.AddFlags(fss.FlagSet("logs"))
+	s.Traces.AddFlags(fss.FlagSet("traces"))
 
 	// Note: the weird ""+ in below lines seems to be the only way to get gofmt to
 	// arrange these text blocks sensibly. Grrr.
@@ -194,25 +171,16 @@ func (s *ServerRunOptions) Flags() (fss cliflag.NamedFlagSets) {
 		"If true, install a /logs handler for the apiserver logs.")
 	fs.MarkDeprecated("enable-logs-handler", "This flag will be removed in v1.19")
 
-	// Deprecated in release 1.9
-	fs.StringVar(&s.SSHUser, "ssh-user", s.SSHUser,
-		"If non-empty, use secure SSH proxy to the nodes, using this user name")
-	fs.MarkDeprecated("ssh-user", "This flag will be removed in a future version.")
-
-	// Deprecated in release 1.9
-	fs.StringVar(&s.SSHKeyfile, "ssh-keyfile", s.SSHKeyfile,
-		"If non-empty, use secure SSH proxy to the nodes, using this user keyfile")
-	fs.MarkDeprecated("ssh-keyfile", "This flag will be removed in a future version.")
-
 	fs.Int64Var(&s.MaxConnectionBytesPerSec, "max-connection-bytes-per-sec", s.MaxConnectionBytesPerSec, ""+
 		"If non-zero, throttle each user connection to this number of bytes/sec. "+
 		"Currently only applies to long-running requests.")
 
 	fs.IntVar(&s.MasterCount, "apiserver-count", s.MasterCount,
 		"The number of apiservers running in the cluster, must be a positive number. (In use when --endpoint-reconciler-type=master-count is enabled.)")
+	fs.MarkDeprecated("apiserver-count", "apiserver-count is deprecated and will be removed in a future version.")
 
 	fs.StringVar(&s.EndpointReconcilerType, "endpoint-reconciler-type", string(s.EndpointReconcilerType),
-		"Use an endpoint reconciler ("+strings.Join(reconcilers.AllTypes.Names(), ", ")+")")
+		"Use an endpoint reconciler ("+strings.Join(reconcilers.AllTypes.Names(), ", ")+") master-count is deprecated, and will be removed in a future version.")
 
 	fs.IntVar(&s.IdentityLeaseDurationSeconds, "identity-lease-duration-seconds", s.IdentityLeaseDurationSeconds,
 		"The duration of kube-apiserver lease in seconds, must be a positive number. (In use when the APIServerIdentity feature gate is enabled.)")
@@ -236,10 +204,6 @@ func (s *ServerRunOptions) Flags() (fss cliflag.NamedFlagSets) {
 		"Example: '30000-32767'. Inclusive at both ends of the range.")
 
 	// Kubelet related flags:
-	kubeletHTTPS := true
-	fs.BoolVar(&kubeletHTTPS, "kubelet-https", kubeletHTTPS, "Use https for kubelet connections.")
-	fs.MarkDeprecated("kubelet-https", "API Server connections to kubelets always use https. This flag will be removed in 1.22.")
-
 	fs.StringSliceVar(&s.KubeletConfig.PreferredAddressTypes, "kubelet-preferred-address-types", s.KubeletConfig.PreferredAddressTypes,
 		"List of the preferred NodeAddressTypes to use for kubelet connections.")
 

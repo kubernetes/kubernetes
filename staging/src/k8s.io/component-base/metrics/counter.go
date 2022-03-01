@@ -20,6 +20,7 @@ import (
 	"context"
 	"github.com/blang/semver"
 	"github.com/prometheus/client_golang/prometheus"
+	dto "github.com/prometheus/client_model/go"
 )
 
 // Counter is our internal representation for our wrapping struct around prometheus
@@ -30,6 +31,9 @@ type Counter struct {
 	lazyMetric
 	selfCollector
 }
+
+// The implementation of the Metric interface is expected by testutil.GetCounterMetricValue.
+var _ Metric = &Counter{}
 
 // NewCounter returns an object which satisfies the kubeCollector and CounterMetric interfaces.
 // However, the object returned will not measure anything unless the collector is first
@@ -44,6 +48,14 @@ func NewCounter(opts *CounterOpts) *Counter {
 	kc.setPrometheusCounter(noop)
 	kc.lazyInit(kc, BuildFQName(opts.Namespace, opts.Subsystem, opts.Name))
 	return kc
+}
+
+func (c *Counter) Desc() *prometheus.Desc {
+	return c.metric.Desc()
+}
+
+func (c *Counter) Write(to *dto.Metric) error {
+	return c.metric.Write(to)
 }
 
 // Reset resets the underlying prometheus Counter to start counting from 0 again
@@ -100,13 +112,20 @@ type CounterVec struct {
 func NewCounterVec(opts *CounterOpts, labels []string) *CounterVec {
 	opts.StabilityLevel.setDefaults()
 
+	fqName := BuildFQName(opts.Namespace, opts.Subsystem, opts.Name)
+	allowListLock.RLock()
+	if allowList, ok := labelValueAllowLists[fqName]; ok {
+		opts.LabelValueAllowLists = allowList
+	}
+	allowListLock.RUnlock()
+
 	cv := &CounterVec{
 		CounterVec:     noopCounterVec,
 		CounterOpts:    opts,
 		originalLabels: labels,
 		lazyMetric:     lazyMetric{},
 	}
-	cv.lazyInit(cv, BuildFQName(opts.Namespace, opts.Subsystem, opts.Name))
+	cv.lazyInit(cv, fqName)
 	return cv
 }
 
@@ -146,6 +165,9 @@ func (v *CounterVec) WithLabelValues(lvs ...string) CounterMetric {
 	if !v.IsCreated() {
 		return noop // return no-op counter
 	}
+	if v.LabelValueAllowLists != nil {
+		v.LabelValueAllowLists.ConstrainToAllowedList(v.originalLabels, lvs)
+	}
 	return v.CounterVec.WithLabelValues(lvs...)
 }
 
@@ -156,6 +178,9 @@ func (v *CounterVec) WithLabelValues(lvs ...string) CounterMetric {
 func (v *CounterVec) With(labels map[string]string) CounterMetric {
 	if !v.IsCreated() {
 		return noop // return no-op counter
+	}
+	if v.LabelValueAllowLists != nil {
+		v.LabelValueAllowLists.ConstrainLabelMap(labels)
 	}
 	return v.CounterVec.With(labels)
 }

@@ -107,8 +107,14 @@ func TestTopPod(t *testing.T) {
 		},
 		{
 			name:          "pod with label selector",
-			options:       &TopPodOptions{Selector: "key=value"},
+			options:       &TopPodOptions{LabelSelector: "key=value"},
 			expectedQuery: "labelSelector=" + url.QueryEscape("key=value"),
+			namespaces:    []string{testNS, testNS},
+		},
+		{
+			name:          "pod with field selector",
+			options:       &TopPodOptions{FieldSelector: "key=value"},
+			expectedQuery: "fieldSelector=" + url.QueryEscape("key=value"),
 			namespaces:    []string{testNS, testNS},
 		},
 		{

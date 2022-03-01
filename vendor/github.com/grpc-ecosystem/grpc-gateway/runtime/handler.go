@@ -1,13 +1,13 @@
 package runtime
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/textproto"
 
-	"context"
 	"github.com/golang/protobuf/proto"
 	"github.com/grpc-ecosystem/grpc-gateway/internal"
 	"google.golang.org/grpc/grpclog"
@@ -61,7 +61,19 @@ func ForwardResponseStream(ctx context.Context, mux *ServeMux, marshaler Marshal
 			return
 		}
 
-		buf, err := marshaler.Marshal(streamChunk(ctx, resp, mux.streamErrorHandler))
+		var buf []byte
+		switch {
+		case resp == nil:
+			buf, err = marshaler.Marshal(errorChunk(streamError(ctx, mux.streamErrorHandler, errEmptyResponse)))
+		default:
+			result := map[string]interface{}{"result": resp}
+			if rb, ok := resp.(responseBody); ok {
+				result["result"] = rb.XXX_ResponseBody()
+			}
+
+			buf, err = marshaler.Marshal(result)
+		}
+
 		if err != nil {
 			grpclog.Infof("Failed to marshal response chunk: %v", err)
 			handleForwardResponseStreamError(ctx, wroteHeader, marshaler, w, req, mux, err)
@@ -123,11 +135,11 @@ func ForwardResponseMessage(ctx context.Context, mux *ServeMux, marshaler Marsha
 	handleForwardResponseTrailerHeader(w, md)
 
 	contentType := marshaler.ContentType()
-	// Check marshaler on run time in order to keep backwards compatability
+	// Check marshaler on run time in order to keep backwards compatibility
 	// An interface param needs to be added to the ContentType() function on
 	// the Marshal interface to be able to remove this check
-	if httpBodyMarshaler, ok := marshaler.(*HTTPBodyMarshaler); ok {
-		contentType = httpBodyMarshaler.ContentTypeFromMessage(resp)
+	if typeMarshaler, ok := marshaler.(contentTypeMarshaler); ok {
+		contentType = typeMarshaler.ContentTypeFromMessage(resp)
 	}
 	w.Header().Set("Content-Type", contentType)
 
@@ -182,15 +194,6 @@ func handleForwardResponseStreamError(ctx context.Context, wroteHeader bool, mar
 		grpclog.Infof("Failed to notify error to client: %v", werr)
 		return
 	}
-}
-
-// streamChunk returns a chunk in a response stream for the given result. The
-// given errHandler is used to render an error chunk if result is nil.
-func streamChunk(ctx context.Context, result proto.Message, errHandler StreamErrorHandlerFunc) map[string]proto.Message {
-	if result == nil {
-		return errorChunk(streamError(ctx, errHandler, errEmptyResponse))
-	}
-	return map[string]proto.Message{"result": result}
 }
 
 // streamError returns the payload for the final message in a response stream

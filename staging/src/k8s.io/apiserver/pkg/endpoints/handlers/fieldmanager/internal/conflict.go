@@ -75,11 +75,15 @@ func printManager(manager string) string {
 	if err := json.Unmarshal([]byte(manager), encodedManager); err != nil {
 		return fmt.Sprintf("%q", manager)
 	}
+	managerStr := fmt.Sprintf("%q", encodedManager.Manager)
+	if encodedManager.Subresource != "" {
+		managerStr = fmt.Sprintf("%s with subresource %q", managerStr, encodedManager.Subresource)
+	}
 	if encodedManager.Operation == metav1.ManagedFieldsOperationUpdate {
 		if encodedManager.Time == nil {
-			return fmt.Sprintf("%q using %v", encodedManager.Manager, encodedManager.APIVersion)
+			return fmt.Sprintf("%s using %v", managerStr, encodedManager.APIVersion)
 		}
-		return fmt.Sprintf("%q using %v at %v", encodedManager.Manager, encodedManager.APIVersion, encodedManager.Time.UTC().Format(time.RFC3339))
+		return fmt.Sprintf("%s using %v at %v", managerStr, encodedManager.APIVersion, encodedManager.Time.UTC().Format(time.RFC3339))
 	}
-	return fmt.Sprintf("%q", encodedManager.Manager)
+	return managerStr
 }

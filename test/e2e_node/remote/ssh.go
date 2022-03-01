@@ -44,8 +44,12 @@ func init() {
 	sshOptionsMap = map[string]string{
 		"gce": "-o UserKnownHostsFile=/dev/null -o IdentitiesOnly=yes -o CheckHostIP=no -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o LogLevel=ERROR",
 	}
+	defaultGceKey := os.Getenv("GCE_SSH_PRIVATE_KEY_FILE")
+	if defaultGceKey == "" {
+		defaultGceKey = fmt.Sprintf("%s/.ssh/google_compute_engine", usr.HomeDir)
+	}
 	sshDefaultKeyMap = map[string]string{
-		"gce": fmt.Sprintf("%s/.ssh/google_compute_engine", usr.HomeDir),
+		"gce": defaultGceKey,
 	}
 }
 
@@ -99,9 +103,12 @@ func SSHNoSudo(host string, cmd ...string) (string, error) {
 
 // runSSHCommand executes the ssh or scp command, adding the flag provided --ssh-options
 func runSSHCommand(cmd string, args ...string) (string, error) {
-	if *sshKey != "" {
-		args = append([]string{"-i", *sshKey}, args...)
-	} else if key, found := sshDefaultKeyMap[*sshEnv]; found {
+	if key, err := getPrivateSSHKey(); len(key) != 0 {
+		if err != nil {
+			klog.Errorf("private SSH key (%s) not found. Check if the SSH key is configured properly:, err: %v", key, err)
+			return "", fmt.Errorf("private SSH key (%s) does not exist", key)
+		}
+
 		args = append([]string{"-i", key}, args...)
 	}
 	if env, found := sshOptionsMap[*sshEnv]; found {
@@ -110,9 +117,32 @@ func runSSHCommand(cmd string, args ...string) (string, error) {
 	if *sshOptions != "" {
 		args = append(strings.Split(*sshOptions, " "), args...)
 	}
+	klog.Infof("Running the command %s, with args: %v", cmd, args)
 	output, err := exec.Command(cmd, args...).CombinedOutput()
 	if err != nil {
+		klog.Errorf("failed to run SSH command: out: %s, err: %v", output, err)
 		return string(output), fmt.Errorf("command [%s %s] failed with error: %v", cmd, strings.Join(args, " "), err)
 	}
 	return string(output), nil
+}
+
+// getPrivateSSHKey returns the path to ssh private key
+func getPrivateSSHKey() (string, error) {
+	if *sshKey != "" {
+		if _, err := os.Stat(*sshKey); err != nil {
+			return *sshKey, err
+		}
+
+		return *sshKey, nil
+	}
+
+	if key, found := sshDefaultKeyMap[*sshEnv]; found {
+		if _, err := os.Stat(key); err != nil {
+			return key, err
+		}
+
+		return key, nil
+	}
+
+	return "", nil
 }

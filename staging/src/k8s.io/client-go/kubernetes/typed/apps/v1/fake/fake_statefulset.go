@@ -20,6 +20,8 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
@@ -28,6 +30,8 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	applyconfigurationsappsv1 "k8s.io/client-go/applyconfigurations/apps/v1"
+	applyconfigurationsautoscalingv1 "k8s.io/client-go/applyconfigurations/autoscaling/v1"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -118,7 +122,7 @@ func (c *FakeStatefulSets) UpdateStatus(ctx context.Context, statefulSet *appsv1
 // Delete takes name of the statefulSet and deletes it. Returns an error if one occurs.
 func (c *FakeStatefulSets) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(statefulsetsResource, c.ns, name), &appsv1.StatefulSet{})
+		Invokes(testing.NewDeleteActionWithOptions(statefulsetsResource, c.ns, name, opts), &appsv1.StatefulSet{})
 
 	return err
 }
@@ -142,6 +146,51 @@ func (c *FakeStatefulSets) Patch(ctx context.Context, name string, pt types.Patc
 	return obj.(*appsv1.StatefulSet), err
 }
 
+// Apply takes the given apply declarative configuration, applies it and returns the applied statefulSet.
+func (c *FakeStatefulSets) Apply(ctx context.Context, statefulSet *applyconfigurationsappsv1.StatefulSetApplyConfiguration, opts v1.ApplyOptions) (result *appsv1.StatefulSet, err error) {
+	if statefulSet == nil {
+		return nil, fmt.Errorf("statefulSet provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(statefulSet)
+	if err != nil {
+		return nil, err
+	}
+	name := statefulSet.Name
+	if name == nil {
+		return nil, fmt.Errorf("statefulSet.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(statefulsetsResource, c.ns, *name, types.ApplyPatchType, data), &appsv1.StatefulSet{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*appsv1.StatefulSet), err
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *FakeStatefulSets) ApplyStatus(ctx context.Context, statefulSet *applyconfigurationsappsv1.StatefulSetApplyConfiguration, opts v1.ApplyOptions) (result *appsv1.StatefulSet, err error) {
+	if statefulSet == nil {
+		return nil, fmt.Errorf("statefulSet provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(statefulSet)
+	if err != nil {
+		return nil, err
+	}
+	name := statefulSet.Name
+	if name == nil {
+		return nil, fmt.Errorf("statefulSet.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(statefulsetsResource, c.ns, *name, types.ApplyPatchType, data, "status"), &appsv1.StatefulSet{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*appsv1.StatefulSet), err
+}
+
 // GetScale takes name of the statefulSet, and returns the corresponding scale object, and an error if there is any.
 func (c *FakeStatefulSets) GetScale(ctx context.Context, statefulSetName string, options v1.GetOptions) (result *autoscalingv1.Scale, err error) {
 	obj, err := c.Fake.
@@ -157,6 +206,25 @@ func (c *FakeStatefulSets) GetScale(ctx context.Context, statefulSetName string,
 func (c *FakeStatefulSets) UpdateScale(ctx context.Context, statefulSetName string, scale *autoscalingv1.Scale, opts v1.UpdateOptions) (result *autoscalingv1.Scale, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(statefulsetsResource, "scale", c.ns, scale), &autoscalingv1.Scale{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*autoscalingv1.Scale), err
+}
+
+// ApplyScale takes top resource name and the apply declarative configuration for scale,
+// applies it and returns the applied scale, and an error, if there is any.
+func (c *FakeStatefulSets) ApplyScale(ctx context.Context, statefulSetName string, scale *applyconfigurationsautoscalingv1.ScaleApplyConfiguration, opts v1.ApplyOptions) (result *autoscalingv1.Scale, err error) {
+	if scale == nil {
+		return nil, fmt.Errorf("scale provided to ApplyScale must not be nil")
+	}
+	data, err := json.Marshal(scale)
+	if err != nil {
+		return nil, err
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(statefulsetsResource, c.ns, statefulSetName, types.ApplyPatchType, data, "status"), &autoscalingv1.Scale{})
 
 	if obj == nil {
 		return nil, err

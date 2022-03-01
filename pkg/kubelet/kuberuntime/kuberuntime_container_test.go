@@ -18,6 +18,8 @@ package kuberuntime
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -32,7 +34,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
@@ -120,7 +122,7 @@ func TestKillContainer(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		err := m.killContainer(test.pod, test.containerID, test.containerName, test.reason, &test.gracePeriodOverride)
+		err := m.killContainer(test.pod, test.containerID, test.containerName, test.reason, "", &test.gracePeriodOverride)
 		if test.succeed != (err == nil) {
 			t.Errorf("%s: expected %v, got %v (%v)", test.caseName, test.succeed, (err == nil), err)
 		}
@@ -253,7 +255,7 @@ func TestLifeCycleHook(t *testing.T) {
 		},
 	}
 	cmdPostStart := &v1.Lifecycle{
-		PostStart: &v1.Handler{
+		PostStart: &v1.LifecycleHandler{
 			Exec: &v1.ExecAction{
 				Command: []string{"PostStartCMD"},
 			},
@@ -261,7 +263,7 @@ func TestLifeCycleHook(t *testing.T) {
 	}
 
 	httpLifeCycle := &v1.Lifecycle{
-		PreStop: &v1.Handler{
+		PreStop: &v1.LifecycleHandler{
 			HTTPGet: &v1.HTTPGetAction{
 				Host: "testHost.com",
 				Path: "/GracefulExit",
@@ -270,7 +272,7 @@ func TestLifeCycleHook(t *testing.T) {
 	}
 
 	cmdLifeCycle := &v1.Lifecycle{
-		PreStop: &v1.Handler{
+		PreStop: &v1.LifecycleHandler{
 			Exec: &v1.ExecAction{
 				Command: []string{"PreStopCMD"},
 			},
@@ -290,7 +292,7 @@ func TestLifeCycleHook(t *testing.T) {
 	// Configured and works as expected
 	t.Run("PreStop-CMDExec", func(t *testing.T) {
 		testPod.Spec.Containers[0].Lifecycle = cmdLifeCycle
-		m.killContainer(testPod, cID, "foo", "testKill", &gracePeriod)
+		m.killContainer(testPod, cID, "foo", "testKill", "", &gracePeriod)
 		if fakeRunner.Cmd[0] != cmdLifeCycle.PreStop.Exec.Command[0] {
 			t.Errorf("CMD Prestop hook was not invoked")
 		}
@@ -300,7 +302,7 @@ func TestLifeCycleHook(t *testing.T) {
 	t.Run("PreStop-HTTPGet", func(t *testing.T) {
 		defer func() { fakeHTTP.url = "" }()
 		testPod.Spec.Containers[0].Lifecycle = httpLifeCycle
-		m.killContainer(testPod, cID, "foo", "testKill", &gracePeriod)
+		m.killContainer(testPod, cID, "foo", "testKill", "", &gracePeriod)
 
 		if !strings.Contains(fakeHTTP.url, httpLifeCycle.PreStop.HTTPGet.Host) {
 			t.Errorf("HTTP Prestop hook was not invoked")
@@ -314,7 +316,7 @@ func TestLifeCycleHook(t *testing.T) {
 		testPod.DeletionGracePeriodSeconds = &gracePeriodLocal
 		testPod.Spec.TerminationGracePeriodSeconds = &gracePeriodLocal
 
-		m.killContainer(testPod, cID, "foo", "testKill", &gracePeriodLocal)
+		m.killContainer(testPod, cID, "foo", "testKill", "", &gracePeriodLocal)
 
 		if strings.Contains(fakeHTTP.url, httpLifeCycle.PreStop.HTTPGet.Host) {
 			t.Errorf("HTTP Should not execute when gracePeriod is 0")
@@ -420,5 +422,47 @@ func TestStartSpec(t *testing.T) {
 				t.Errorf("%v: getTargetID got: %v, wanted nil", t.Name(), got)
 			}
 		})
+	}
+}
+
+func TestRestartCountByLogDir(t *testing.T) {
+	for _, tc := range []struct {
+		filenames    []string
+		restartCount int
+	}{
+		{
+			filenames:    []string{"0.log.rotated-log"},
+			restartCount: 1,
+		},
+		{
+			filenames:    []string{"0.log"},
+			restartCount: 1,
+		},
+		{
+			filenames:    []string{"0.log", "1.log", "2.log"},
+			restartCount: 3,
+		},
+		{
+			filenames:    []string{"0.log.rotated", "1.log", "2.log"},
+			restartCount: 3,
+		},
+		{
+			filenames:    []string{"5.log.rotated", "6.log.rotated"},
+			restartCount: 7,
+		},
+		{
+			filenames:    []string{"5.log.rotated", "6.log", "7.log"},
+			restartCount: 8,
+		},
+	} {
+		tempDirPath, err := ioutil.TempDir("", "test-restart-count-")
+		assert.NoError(t, err, "create tempdir error")
+		defer os.RemoveAll(tempDirPath)
+		for _, filename := range tc.filenames {
+			err = ioutil.WriteFile(filepath.Join(tempDirPath, filename), []byte("a log line"), 0600)
+			assert.NoError(t, err, "could not write log file")
+		}
+		count, _ := calcRestartCountByLogDir(tempDirPath)
+		assert.Equal(t, count, tc.restartCount, "count %v should equal restartCount %v", count, tc.restartCount)
 	}
 }

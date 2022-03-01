@@ -22,12 +22,12 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/proxy/config"
 )
 
 // Provider is the interface provided by proxier implementations.
 type Provider interface {
-	config.EndpointsHandler
 	config.EndpointSliceHandler
 	config.ServiceHandler
 	config.NodeHandler
@@ -83,10 +83,14 @@ type ServicePort interface {
 	HealthCheckNodePort() int
 	// GetNodePort returns a service Node port if present. If return 0, it means not present.
 	NodePort() int
-	// GetOnlyNodeLocalEndpoints returns if a service has only node local endpoints
-	OnlyNodeLocalEndpoints() bool
-	// TopologyKeys returns service TopologyKeys as a string array.
-	TopologyKeys() []string
+	// NodeLocalExternal returns if a service has only node local endpoints for external traffic.
+	NodeLocalExternal() bool
+	// NodeLocalInternal returns if a service has only node local endpoints for internal traffic.
+	NodeLocalInternal() bool
+	// InternalTrafficPolicy returns service InternalTrafficPolicy
+	InternalTrafficPolicy() *v1.ServiceInternalTrafficPolicyType
+	// HintsAnnotation returns the value of the v1.AnnotationTopologyAwareHints annotation.
+	HintsAnnotation() string
 }
 
 // Endpoint in an interface which abstracts information about an endpoint.
@@ -111,14 +115,19 @@ type Endpoint interface {
 	// This is only set when watching EndpointSlices. If using Endpoints, this is always
 	// false since terminating endpoints are always excluded from Endpoints.
 	IsTerminating() bool
-	// GetTopology returns the topology information of the endpoint.
-	GetTopology() map[string]string
+	// GetZoneHint returns the zone hint for the endpoint. This is based on
+	// endpoint.hints.forZones[0].name in the EndpointSlice API.
+	GetZoneHints() sets.String
 	// IP returns IP part of the endpoint.
 	IP() string
 	// Port returns the Port part of the endpoint.
 	Port() (int, error)
 	// Equal checks if two endpoints are equal.
 	Equal(Endpoint) bool
+	// GetNodeName returns the node name for the endpoint
+	GetNodeName() string
+	// GetZone returns the zone for the endpoint
+	GetZone() string
 }
 
 // ServiceEndpoint is used to identify a service and one of its endpoint pair.

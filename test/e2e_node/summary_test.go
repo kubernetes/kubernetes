@@ -18,8 +18,7 @@ package e2enode
 
 import (
 	"fmt"
-	"io/ioutil"
-	"os/exec"
+	"os"
 	"strings"
 	"time"
 
@@ -31,7 +30,7 @@ import (
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 
-	systemdutil "github.com/coreos/go-systemd/util"
+	systemdutil "github.com/coreos/go-systemd/v22/util"
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/gstruct"
@@ -95,7 +94,7 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 						// either 0 or between 10000 and 2e9.
 						// Please refer, https://github.com/kubernetes/kubernetes/pull/95345#discussion_r501630942
 						// for more information.
-						"UsageNanoCores":       gomega.SatisfyAny(gomega.BeZero(), bounded(10000, 2e9)),
+						"UsageNanoCores":       gomega.SatisfyAny(gstruct.PointTo(gomega.BeZero()), bounded(10000, 2e9)),
 						"UsageCoreNanoSeconds": bounded(10000000, 1e15),
 					}),
 					"Memory": ptrMatchAllFields(gstruct.Fields{
@@ -115,6 +114,15 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 					"UserDefinedMetrics": gomega.BeEmpty(),
 				})
 			}
+			expectedPageFaultsUpperBound := 1000000
+			expectedMajorPageFaultsUpperBound := 15
+			if IsCgroup2UnifiedMode() {
+				// On cgroupv2 these stats are recursive, so make sure they are at least like the value set
+				// above for the container.
+				expectedPageFaultsUpperBound = 1e9
+				expectedMajorPageFaultsUpperBound = 100000
+			}
+
 			podsContExpectations := sysContExpectations().(*gstruct.FieldsMatcher)
 			podsContExpectations.Fields["Memory"] = ptrMatchAllFields(gstruct.Fields{
 				"Time": recent(maxStatsAge),
@@ -123,33 +131,10 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 				"UsageBytes":      bounded(10*e2evolume.Kb, memoryLimit),
 				"WorkingSetBytes": bounded(10*e2evolume.Kb, memoryLimit),
 				"RSSBytes":        bounded(1*e2evolume.Kb, memoryLimit),
-				"PageFaults":      bounded(0, 1000000),
-				"MajorPageFaults": bounded(0, 10),
+				"PageFaults":      bounded(0, expectedPageFaultsUpperBound),
+				"MajorPageFaults": bounded(0, expectedMajorPageFaultsUpperBound),
 			})
 			runtimeContExpectations := sysContExpectations().(*gstruct.FieldsMatcher)
-			if systemdutil.IsRunningSystemd() && framework.TestContext.ContainerRuntime == "docker" {
-				// Some Linux distributions still ship a docker.service that is missing
-				// a `Delegate=yes` setting (or equivalent CPUAccounting= and MemoryAccounting=)
-				// that allows us to monitor the container runtime resource usage through
-				// the "cpu" and "memory" cgroups.
-				//
-				// Make an exception here for those distros, only for Docker, so that they
-				// can pass the full node e2e tests even in that case.
-				//
-				// For newer container runtimes (using CRI) and even distros that still
-				// ship Docker, we should encourage them to always set `Delegate=yes` in
-				// order to make monitoring of the runtime possible.
-				stdout, err := exec.Command("systemctl", "show", "-p", "Delegate", "docker.service").CombinedOutput()
-				if err == nil && strings.TrimSpace(string(stdout)) == "Delegate=no" {
-					// Only make these optional if we can successfully confirm that
-					// Delegate is set to "no" (in other words, unset.) If we fail
-					// to check that, default to requiring it, which might cause
-					// false positives, but that should be the safer approach.
-					ginkgo.By("Making runtime container expectations optional, since systemd was not configured to Delegate=yes the cgroups")
-					runtimeContExpectations.Fields["Memory"] = gomega.Or(gomega.BeNil(), runtimeContExpectations.Fields["Memory"])
-					runtimeContExpectations.Fields["CPU"] = gomega.Or(gomega.BeNil(), runtimeContExpectations.Fields["CPU"])
-				}
-			}
 			systemContainers := gstruct.Elements{
 				"kubelet": sysContExpectations(),
 				"runtime": runtimeContExpectations,
@@ -191,8 +176,8 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 							"UsageBytes":      bounded(10*e2evolume.Kb, 80*e2evolume.Mb),
 							"WorkingSetBytes": bounded(10*e2evolume.Kb, 80*e2evolume.Mb),
 							"RSSBytes":        bounded(1*e2evolume.Kb, 80*e2evolume.Mb),
-							"PageFaults":      bounded(100, 1000000),
-							"MajorPageFaults": bounded(0, 10),
+							"PageFaults":      bounded(100, expectedPageFaultsUpperBound),
+							"MajorPageFaults": bounded(0, expectedMajorPageFaultsUpperBound),
 						}),
 						"Accelerators": gomega.BeEmpty(),
 						"Rootfs": ptrMatchAllFields(gstruct.Fields{
@@ -238,8 +223,8 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 					"UsageBytes":      bounded(10*e2evolume.Kb, 80*e2evolume.Mb),
 					"WorkingSetBytes": bounded(10*e2evolume.Kb, 80*e2evolume.Mb),
 					"RSSBytes":        bounded(1*e2evolume.Kb, 80*e2evolume.Mb),
-					"PageFaults":      bounded(0, 1000000),
-					"MajorPageFaults": bounded(0, 10),
+					"PageFaults":      bounded(0, expectedPageFaultsUpperBound),
+					"MajorPageFaults": bounded(0, expectedMajorPageFaultsUpperBound),
 				}),
 				"VolumeStats": gstruct.MatchAllElements(summaryObjectID, gstruct.Elements{
 					"test-empty-dir": gstruct.MatchAllFields(gstruct.Fields{
@@ -339,7 +324,7 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 
 			ginkgo.By("Validating /stats/summary")
 			// Give pods a minute to actually start up.
-			gomega.Eventually(getNodeSummary, 90*time.Second, 15*time.Second).Should(matchExpectations)
+			gomega.Eventually(getNodeSummary, 180*time.Second, 15*time.Second).Should(matchExpectations)
 			// Then the summary should match the expectations a few more times.
 			gomega.Consistently(getNodeSummary, 30*time.Second, 15*time.Second).Should(matchExpectations)
 		})
@@ -449,7 +434,7 @@ func recordSystemCgroupProcesses() {
 		if IsCgroup2UnifiedMode() {
 			filePattern = "/sys/fs/cgroup/%s/cgroup.procs"
 		}
-		pids, err := ioutil.ReadFile(fmt.Sprintf(filePattern, cgroup))
+		pids, err := os.ReadFile(fmt.Sprintf(filePattern, cgroup))
 		if err != nil {
 			framework.Logf("Failed to read processes in cgroup %s: %v", name, err)
 			continue
@@ -458,7 +443,7 @@ func recordSystemCgroupProcesses() {
 		framework.Logf("Processes in %s cgroup (%s):", name, cgroup)
 		for _, pid := range strings.Fields(string(pids)) {
 			path := fmt.Sprintf("/proc/%s/cmdline", pid)
-			cmd, err := ioutil.ReadFile(path)
+			cmd, err := os.ReadFile(path)
 			if err != nil {
 				framework.Logf("  ginkgo.Failed to read %s: %v", path, err)
 			} else {

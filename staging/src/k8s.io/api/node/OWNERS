@@ -2,8 +2,8 @@
 
 # approval on api packages bubbles to api-approvers
 reviewers:
-- tallclair
-- dchen1107
-- derekwaynecarr
+  - tallclair
+  - dchen1107
+  - derekwaynecarr
 labels:
-- sig/node
+  - sig/node

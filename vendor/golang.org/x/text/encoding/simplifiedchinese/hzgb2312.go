@@ -57,7 +57,7 @@ loop:
 					err = transform.ErrShortSrc
 					break loop
 				}
-				r = utf8.RuneError
+				r, size = utf8.RuneError, 1
 				goto write
 			}
 			size = 2

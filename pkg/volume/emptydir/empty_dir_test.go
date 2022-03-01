@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -35,7 +36,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
-	"k8s.io/kubernetes/pkg/volume/util"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/mount-utils"
 )
@@ -47,7 +47,7 @@ func makePluginUnderTest(t *testing.T, plugName, basePath string) volume.VolumeP
 
 	plug, err := plugMgr.FindPluginByName(plugName)
 	if err != nil {
-		t.Errorf("Can't find the plugin by name")
+		t.Fatal("Can't find the plugin by name")
 	}
 	return plug
 }
@@ -109,24 +109,17 @@ func TestPluginEmptyRootContext(t *testing.T) {
 
 func TestPluginHugetlbfs(t *testing.T) {
 	testCases := map[string]struct {
-		medium                          v1.StorageMedium
-		enableHugePageStorageMediumSize bool
+		medium v1.StorageMedium
 	}{
-		"HugePageStorageMediumSize enabled: medium without size": {
-			medium:                          "HugePages",
-			enableHugePageStorageMediumSize: true,
-		},
-		"HugePageStorageMediumSize disabled: medium without size": {
+		"medium without size": {
 			medium: "HugePages",
 		},
-		"HugePageStorageMediumSize enabled: medium with size": {
-			medium:                          "HugePages-2Mi",
-			enableHugePageStorageMediumSize: true,
+		"medium with size": {
+			medium: "HugePages-2Mi",
 		},
 	}
 	for tcName, tc := range testCases {
 		t.Run(tcName, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HugePageStorageMediumSize, tc.enableHugePageStorageMediumSize)()
 			doTestPlugin(t, pluginTestConfig{
 				medium:                        tc.medium,
 				expectedSetupMounts:           1,
@@ -193,7 +186,7 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 				Path: volumePath,
 			},
 		}
-		util.SetReady(metadataDir)
+		volumeutil.SetReady(metadataDir)
 	}
 
 	mounter, err := plug.(*emptyDirPlugin).newMounterInternal(volume.NewSpecFromVolume(spec),
@@ -272,7 +265,7 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 
 func testSetUp(mounter volume.Mounter, metadataDir, volPath string) error {
 	if err := mounter.SetUp(volume.MounterArgs{}); err != nil {
-		return fmt.Errorf("Expected success, got: %v", err)
+		return fmt.Errorf("expected success, got: %w", err)
 	}
 	// Stat the directory and check the permission bits
 	if !volumeutil.IsReady(metadataDir) {
@@ -286,7 +279,7 @@ func testSetUp(mounter volume.Mounter, metadataDir, volPath string) error {
 		return fmt.Errorf("SetUp() failed: %v", err)
 	}
 	if e, a := perm, fileinfo.Mode().Perm(); e != a {
-		return fmt.Errorf("Unexpected file mode for %v: expected: %v, got: %v", volPath, e, a)
+		return fmt.Errorf("unexpected file mode for %v: expected: %v, got: %v", volPath, e, a)
 	}
 	return nil
 }
@@ -382,11 +375,10 @@ func TestMetrics(t *testing.T) {
 
 func TestGetHugePagesMountOptions(t *testing.T) {
 	testCases := map[string]struct {
-		pod                             *v1.Pod
-		medium                          v1.StorageMedium
-		shouldFail                      bool
-		expectedResult                  string
-		enableHugePageStorageMediumSize bool
+		pod            *v1.Pod
+		medium         v1.StorageMedium
+		shouldFail     bool
+		expectedResult string
 	}{
 		"ProperValues": {
 			pod: &v1.Pod{
@@ -502,10 +494,9 @@ func TestGetHugePagesMountOptions(t *testing.T) {
 					},
 				},
 			},
-			medium:                          v1.StorageMediumHugePages,
-			shouldFail:                      true,
-			expectedResult:                  "",
-			enableHugePageStorageMediumSize: true,
+			medium:         v1.StorageMediumHugePages,
+			shouldFail:     true,
+			expectedResult: "",
 		},
 		"PodWithNoHugePagesRequest": {
 			pod:            &v1.Pod{},
@@ -528,10 +519,9 @@ func TestGetHugePagesMountOptions(t *testing.T) {
 					},
 				},
 			},
-			medium:                          v1.StorageMediumHugePagesPrefix + "1Gi",
-			shouldFail:                      false,
-			expectedResult:                  "pagesize=1Gi",
-			enableHugePageStorageMediumSize: true,
+			medium:         v1.StorageMediumHugePagesPrefix + "1Gi",
+			shouldFail:     false,
+			expectedResult: "pagesize=1Gi",
 		},
 		"InitContainerAndContainerHasProperValuesMultipleSizes": {
 			pod: &v1.Pod{
@@ -556,10 +546,9 @@ func TestGetHugePagesMountOptions(t *testing.T) {
 					},
 				},
 			},
-			medium:                          v1.StorageMediumHugePagesPrefix + "2Mi",
-			shouldFail:                      false,
-			expectedResult:                  "pagesize=2Mi",
-			enableHugePageStorageMediumSize: true,
+			medium:         v1.StorageMediumHugePagesPrefix + "2Mi",
+			shouldFail:     false,
+			expectedResult: "pagesize=2Mi",
 		},
 		"MediumWithoutSizeMultipleSizes": {
 			pod: &v1.Pod{
@@ -622,7 +611,6 @@ func TestGetHugePagesMountOptions(t *testing.T) {
 
 	for testCaseName, testCase := range testCases {
 		t.Run(testCaseName, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HugePageStorageMediumSize, testCase.enableHugePageStorageMediumSize)()
 			value, err := getPageSizeMountOption(testCase.medium, testCase.pod)
 			if testCase.shouldFail && err == nil {
 				t.Errorf("%s: Unexpected success", testCaseName)

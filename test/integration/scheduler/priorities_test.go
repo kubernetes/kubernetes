@@ -22,51 +22,159 @@ import (
 	"strings"
 	"testing"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/kube-scheduler/config/v1beta3"
 	"k8s.io/kubernetes/pkg/scheduler"
-	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/imagelocality"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testutils "k8s.io/kubernetes/test/integration/util"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	"k8s.io/utils/pointer"
+)
+
+const (
+	resourceGPU = "example.com/gpu"
 )
 
 // This file tests the scheduler priority functions.
 func initTestSchedulerForPriorityTest(t *testing.T, scorePluginName string) *testutils.TestContext {
-	prof := schedulerconfig.KubeSchedulerProfile{
-		SchedulerName: v1.DefaultSchedulerName,
-		Plugins: &schedulerconfig.Plugins{
-			Score: schedulerconfig.PluginSet{
-				Enabled: []schedulerconfig.Plugin{
-					{Name: scorePluginName, Weight: 1},
-				},
-				Disabled: []schedulerconfig.Plugin{
-					{Name: "*"},
+	cfg := configtesting.V1beta3ToInternalWithDefaults(t, v1beta3.KubeSchedulerConfiguration{
+		Profiles: []v1beta3.KubeSchedulerProfile{{
+			SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
+			Plugins: &v1beta3.Plugins{
+				Score: v1beta3.PluginSet{
+					Enabled: []v1beta3.Plugin{
+						{Name: scorePluginName, Weight: pointer.Int32Ptr(1)},
+					},
+					Disabled: []v1beta3.Plugin{
+						{Name: "*"},
+					},
 				},
 			},
-		},
-	}
+		}},
+	})
 	testCtx := testutils.InitTestSchedulerWithOptions(
 		t,
-		testutils.InitTestMaster(t, strings.ToLower(scorePluginName), nil),
-		nil,
-		scheduler.WithProfiles(prof),
+		testutils.InitTestAPIServer(t, strings.ToLower(scorePluginName), nil),
+		scheduler.WithProfiles(cfg.Profiles...),
 	)
 	testutils.SyncInformerFactory(testCtx)
 	go testCtx.Scheduler.Run(testCtx.Ctx)
 	return testCtx
 }
 
-// TestNodeAffinity verifies that scheduler's node affinity priority function
-// works correctly.s
-func TestNodeAffinity(t *testing.T) {
+func initTestSchedulerForNodeResourcesTest(t *testing.T) *testutils.TestContext {
+	cfg := configtesting.V1beta3ToInternalWithDefaults(t, v1beta3.KubeSchedulerConfiguration{
+		Profiles: []v1beta3.KubeSchedulerProfile{
+			{
+				SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
+			},
+			{
+				SchedulerName: pointer.StringPtr("gpu-binpacking-scheduler"),
+				PluginConfig: []v1beta3.PluginConfig{
+					{
+						Name: noderesources.Name,
+						Args: runtime.RawExtension{Object: &v1beta3.NodeResourcesFitArgs{
+							ScoringStrategy: &v1beta3.ScoringStrategy{
+								Type: v1beta3.MostAllocated,
+								Resources: []v1beta3.ResourceSpec{
+									{Name: string(v1.ResourceCPU), Weight: 1},
+									{Name: string(v1.ResourceMemory), Weight: 1},
+									{Name: resourceGPU, Weight: 2}},
+							},
+						}},
+					},
+				},
+			},
+		},
+	})
+	testCtx := testutils.InitTestSchedulerWithOptions(
+		t,
+		testutils.InitTestAPIServer(t, strings.ToLower(noderesources.Name), nil),
+		scheduler.WithProfiles(cfg.Profiles...),
+	)
+	testutils.SyncInformerFactory(testCtx)
+	go testCtx.Scheduler.Run(testCtx.Ctx)
+	return testCtx
+}
+
+// TestNodeResourcesScoring verifies that scheduler's node resources priority function
+// works correctly.
+func TestNodeResourcesScoring(t *testing.T) {
+	testCtx := initTestSchedulerForNodeResourcesTest(t)
+	defer testutils.CleanupTest(t, testCtx)
+	// Add a few nodes.
+	_, err := createAndWaitForNodesInCache(testCtx, "testnode", st.MakeNode().Capacity(
+		map[v1.ResourceName]string{
+			v1.ResourceCPU:    "8",
+			v1.ResourceMemory: "16G",
+			resourceGPU:       "4",
+		}), 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cpuBoundPod1, err := runPausePod(testCtx.ClientSet, st.MakePod().Namespace(testCtx.NS.Name).Name("cpubound1").Req(
+		map[v1.ResourceName]string{
+			v1.ResourceCPU:    "2",
+			v1.ResourceMemory: "4G",
+			resourceGPU:       "1",
+		},
+	).Obj())
+	if err != nil {
+		t.Fatal(err)
+	}
+	gpuBoundPod1, err := runPausePod(testCtx.ClientSet, st.MakePod().Namespace(testCtx.NS.Name).Name("gpubound1").Req(
+		map[v1.ResourceName]string{
+			v1.ResourceCPU:    "1",
+			v1.ResourceMemory: "2G",
+			resourceGPU:       "2",
+		},
+	).Obj())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cpuBoundPod1.Spec.NodeName == "" || gpuBoundPod1.Spec.NodeName == "" {
+		t.Fatalf("pods should have nodeName assigned, got %q and %q",
+			cpuBoundPod1.Spec.NodeName, gpuBoundPod1.Spec.NodeName)
+	}
+
+	// Since both pods used the default scheduler, then they should land on two different
+	// nodes because the default configuration uses LeastAllocated.
+	if cpuBoundPod1.Spec.NodeName == gpuBoundPod1.Spec.NodeName {
+		t.Fatalf("pods should have landed on different nodes, both scheduled on %q",
+			cpuBoundPod1.Spec.NodeName)
+	}
+
+	// The following pod is using the gpu-binpacking-scheduler profile, which gives a higher weight to
+	// GPU-based binpacking, and so it should land on the node with higher GPU utilization.
+	cpuBoundPod2, err := runPausePod(testCtx.ClientSet, st.MakePod().Namespace(testCtx.NS.Name).Name("cpubound2").SchedulerName("gpu-binpacking-scheduler").Req(
+		map[v1.ResourceName]string{
+			v1.ResourceCPU:    "2",
+			v1.ResourceMemory: "4G",
+			resourceGPU:       "1",
+		},
+	).Obj())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cpuBoundPod2.Spec.NodeName != gpuBoundPod1.Spec.NodeName {
+		t.Errorf("pods should have landed on the same node")
+	}
+}
+
+// TestNodeAffinityScoring verifies that scheduler's node affinity priority function
+// works correctly.
+func TestNodeAffinityScoring(t *testing.T) {
 	testCtx := initTestSchedulerForPriorityTest(t, nodeaffinity.Name)
 	defer testutils.CleanupTest(t, testCtx)
 	// Add a few nodes.
@@ -116,87 +224,122 @@ func TestNodeAffinity(t *testing.T) {
 	}
 }
 
-// TestPodAffinity verifies that scheduler's pod affinity priority function
+// TestPodAffinityScoring verifies that scheduler's pod affinity priority function
 // works correctly.
-func TestPodAffinity(t *testing.T) {
-	testCtx := initTestSchedulerForPriorityTest(t, interpodaffinity.Name)
-	defer testutils.CleanupTest(t, testCtx)
-	// Add a few nodes.
-	topologyKey := "node-topologykey"
-	topologyValue := "topologyvalue"
-	nodesInTopology, err := createAndWaitForNodesInCache(testCtx, "in-topology", st.MakeNode().Label(topologyKey, topologyValue), 5)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Add a pod with a label and wait for it to schedule.
+func TestPodAffinityScoring(t *testing.T) {
 	labelKey := "service"
 	labelValue := "S1"
-	_, err = runPausePod(testCtx.ClientSet, initPausePod(&pausePodConfig{
-		Name:      "attractor-pod",
-		Namespace: testCtx.NS.Name,
-		Labels:    map[string]string{labelKey: labelValue},
-	}))
-	if err != nil {
-		t.Fatalf("Error running the attractor pod: %v", err)
-	}
-	// Add a few more nodes without the topology label.
-	_, err = createAndWaitForNodesInCache(testCtx, "other-node", st.MakeNode(), 5)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Add a new pod with affinity to the attractor pod.
-	podName := "pod-with-podaffinity"
-	pod, err := runPausePod(testCtx.ClientSet, initPausePod(&pausePodConfig{
-		Name:      podName,
-		Namespace: testCtx.NS.Name,
-		Affinity: &v1.Affinity{
-			PodAffinity: &v1.PodAffinity{
-				PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{
-					{
-						PodAffinityTerm: v1.PodAffinityTerm{
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
-									{
-										Key:      labelKey,
-										Operator: metav1.LabelSelectorOpIn,
-										Values:   []string{labelValue, "S3"},
+	topologyKey := "node-topologykey"
+	topologyValue := "topologyvalue"
+	tests := []struct {
+		name      string
+		podConfig *pausePodConfig
+	}{
+		{
+			name: "pod affinity",
+			podConfig: &pausePodConfig{
+				Name:      "pod1",
+				Namespace: "ns1",
+				Affinity: &v1.Affinity{
+					PodAffinity: &v1.PodAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{
+							{
+								PodAffinityTerm: v1.PodAffinityTerm{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      labelKey,
+												Operator: metav1.LabelSelectorOpIn,
+												Values:   []string{labelValue, "S3"},
+											},
+										},
 									},
-									{
-										Key:      labelKey,
-										Operator: metav1.LabelSelectorOpNotIn,
-										Values:   []string{"S2"},
-									}, {
-										Key:      labelKey,
-										Operator: metav1.LabelSelectorOpExists,
-									},
+									TopologyKey: topologyKey,
 								},
+								Weight: 50,
 							},
-							TopologyKey: topologyKey,
-							Namespaces:  []string{testCtx.NS.Name},
 						},
-						Weight: 50,
 					},
 				},
 			},
 		},
-	}))
-	if err != nil {
-		t.Fatalf("Error running pause pod: %v", err)
+		{
+			name: "pod affinity with namespace selector",
+			podConfig: &pausePodConfig{
+				Name:      "pod1",
+				Namespace: "ns2",
+				Affinity: &v1.Affinity{
+					PodAffinity: &v1.PodAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{
+							{
+								PodAffinityTerm: v1.PodAffinityTerm{
+									NamespaceSelector: &metav1.LabelSelector{}, // all namespaces
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      labelKey,
+												Operator: metav1.LabelSelectorOpIn,
+												Values:   []string{labelValue, "S3"},
+											},
+										},
+									},
+									TopologyKey: topologyKey,
+								},
+								Weight: 50,
+							},
+						},
+					},
+				},
+			},
+		},
 	}
-	// The new pod must be scheduled on one of the nodes with the same topology
-	// key-value as the attractor pod.
-	for _, node := range nodesInTopology {
-		if node.Name == pod.Spec.NodeName {
-			t.Logf("Pod %v got successfully scheduled on node %v.", podName, pod.Spec.NodeName)
-			return
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testCtx := initTestSchedulerForPriorityTest(t, interpodaffinity.Name)
+			defer testutils.CleanupTest(t, testCtx)
+			// Add a few nodes.
+			nodesInTopology, err := createAndWaitForNodesInCache(testCtx, "in-topology", st.MakeNode().Label(topologyKey, topologyValue), 5)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := createNamespacesWithLabels(testCtx.ClientSet, []string{"ns1", "ns2"}, map[string]string{"team": "team1"}); err != nil {
+				t.Fatal(err)
+			}
+			// Add a pod with a label and wait for it to schedule.
+			_, err = runPausePod(testCtx.ClientSet, initPausePod(&pausePodConfig{
+				Name:      "attractor-pod",
+				Namespace: "ns1",
+				Labels:    map[string]string{labelKey: labelValue},
+			}))
+			if err != nil {
+				t.Fatalf("Error running the attractor pod: %v", err)
+			}
+			// Add a few more nodes without the topology label.
+			_, err = createAndWaitForNodesInCache(testCtx, "other-node", st.MakeNode(), 5)
+			if err != nil {
+				t.Fatal(err)
+			}
+			// Add a new pod with affinity to the attractor pod.
+			pod, err := runPausePod(testCtx.ClientSet, initPausePod(tt.podConfig))
+			if err != nil {
+				t.Fatalf("Error running pause pod: %v", err)
+			}
+			// The new pod must be scheduled on one of the nodes with the same topology
+			// key-value as the attractor pod.
+			for _, node := range nodesInTopology {
+				if node.Name == pod.Spec.NodeName {
+					t.Logf("Pod %v got successfully scheduled on node %v.", tt.podConfig.Name, pod.Spec.NodeName)
+					return
+				}
+			}
+			t.Errorf("Pod %v got scheduled on an unexpected node: %v.", tt.podConfig.Name, pod.Spec.NodeName)
+		})
 	}
-	t.Errorf("Pod %v got scheduled on an unexpected node: %v.", podName, pod.Spec.NodeName)
 }
 
-// TestImageLocality verifies that the scheduler's image locality priority function
+// TestImageLocalityScoring verifies that the scheduler's image locality priority function
 // works correctly, i.e., the pod gets scheduled to the node where its container images are ready.
-func TestImageLocality(t *testing.T) {
+func TestImageLocalityScoring(t *testing.T) {
 	testCtx := initTestSchedulerForPriorityTest(t, imagelocality.Name)
 	defer testutils.CleanupTest(t, testCtx)
 
@@ -253,8 +396,8 @@ func makeContainersWithImages(images []string) []v1.Container {
 	return containers
 }
 
-// TestPodTopologySpreadScore verifies that the PodTopologySpread Score plugin works.
-func TestPodTopologySpreadScore(t *testing.T) {
+// TestPodTopologySpreadScoring verifies that the PodTopologySpread Score plugin works.
+func TestPodTopologySpreadScoring(t *testing.T) {
 	testCtx := initTestSchedulerForPriorityTest(t, podtopologyspread.Name)
 	defer testutils.CleanupTest(t, testCtx)
 	cs := testCtx.ClientSet
@@ -361,10 +504,10 @@ func TestPodTopologySpreadScore(t *testing.T) {
 	}
 }
 
-// TestDefaultPodTopologySpreadScore verifies that the PodTopologySpread Score plugin
+// TestDefaultPodTopologySpreadScoring verifies that the PodTopologySpread Score plugin
 // with the system default spreading spreads Pods belonging to a Service.
 // The setup has 300 nodes over 3 zones.
-func TestDefaultPodTopologySpreadScore(t *testing.T) {
+func TestDefaultPodTopologySpreadScoring(t *testing.T) {
 	testCtx := initTestSchedulerForPriorityTest(t, podtopologyspread.Name)
 	t.Cleanup(func() {
 		testutils.CleanupTest(t, testCtx)

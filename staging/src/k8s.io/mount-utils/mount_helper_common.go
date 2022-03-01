@@ -122,6 +122,10 @@ func removePathIfNotMountPoint(mountPath string, mounter Interface, extensiveMou
 	}
 
 	if err != nil {
+		if os.IsNotExist(err) {
+			klog.V(4).Infof("%q does not exist", mountPath)
+			return true, nil
+		}
 		return notMnt, err
 	}
 
@@ -130,18 +134,4 @@ func removePathIfNotMountPoint(mountPath string, mounter Interface, extensiveMou
 		return notMnt, os.Remove(mountPath)
 	}
 	return notMnt, nil
-}
-
-// PathExists returns true if the specified path exists.
-// TODO: clean this up to use pkg/util/file/FileExists
-func PathExists(path string) (bool, error) {
-	_, err := os.Stat(path)
-	if err == nil {
-		return true, nil
-	} else if os.IsNotExist(err) {
-		return false, nil
-	} else if IsCorruptedMnt(err) {
-		return true, err
-	}
-	return false, err
 }

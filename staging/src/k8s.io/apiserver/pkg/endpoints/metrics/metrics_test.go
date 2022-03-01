@@ -17,18 +17,21 @@ limitations under the License.
 package metrics
 
 import (
-	"fmt"
 	"net/http"
 	"net/url"
 	"testing"
+
+	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/endpoints/responsewriter"
 )
 
 func TestCleanVerb(t *testing.T) {
 	testCases := []struct {
-		desc         string
-		initialVerb  string
-		request      *http.Request
-		expectedVerb string
+		desc          string
+		initialVerb   string
+		suggestedVerb string
+		request       *http.Request
+		expectedVerb  string
 	}{
 		{
 			desc:         "An empty string should be designated as unknown",
@@ -46,6 +49,7 @@ func TestCleanVerb(t *testing.T) {
 			desc:        "LIST should be transformed to WATCH if we have the right query param on the request",
 			initialVerb: "LIST",
 			request: &http.Request{
+				Method: "GET",
 				URL: &url.URL{
 					RawQuery: "watch=true",
 				},
@@ -56,11 +60,50 @@ func TestCleanVerb(t *testing.T) {
 			desc:        "LIST isn't transformed to WATCH if we have query params that do not include watch",
 			initialVerb: "LIST",
 			request: &http.Request{
+				Method: "GET",
 				URL: &url.URL{
 					RawQuery: "blah=asdf&something=else",
 				},
 			},
 			expectedVerb: "LIST",
+		},
+		{
+			// The above may seem counter-intuitive, but it actually is needed for cases like
+			// watching a single item, e.g.:
+			//  /api/v1/namespaces/foo/pods/bar?fieldSelector=metadata.name=baz&watch=true
+			desc:        "GET is transformed to WATCH if we have the right query param on the request",
+			initialVerb: "GET",
+			request: &http.Request{
+				Method: "GET",
+				URL: &url.URL{
+					RawQuery: "watch=true",
+				},
+			},
+			expectedVerb: "WATCH",
+		},
+		{
+			desc:          "LIST is transformed to WATCH for the old pattern watch",
+			initialVerb:   "LIST",
+			suggestedVerb: "WATCH",
+			request: &http.Request{
+				Method: "GET",
+				URL: &url.URL{
+					RawQuery: "/api/v1/watch/pods",
+				},
+			},
+			expectedVerb: "WATCH",
+		},
+		{
+			desc:          "LIST is transformed to WATCH for the old pattern watchlist",
+			initialVerb:   "LIST",
+			suggestedVerb: "WATCHLIST",
+			request: &http.Request{
+				Method: "GET",
+				URL: &url.URL{
+					RawQuery: "/api/v1/watch/pods",
+				},
+			},
+			expectedVerb: "WATCH",
 		},
 		{
 			desc:         "WATCHLIST should be transformed to WATCH",
@@ -103,7 +146,7 @@ func TestCleanVerb(t *testing.T) {
 			if tt.request != nil {
 				req = tt.request
 			}
-			cleansedVerb := cleanVerb(tt.initialVerb, req)
+			cleansedVerb := cleanVerb(tt.initialVerb, tt.suggestedVerb, req)
 			if cleansedVerb != tt.expectedVerb {
 				t.Errorf("Got %s, but expected %s", cleansedVerb, tt.expectedVerb)
 			}
@@ -111,43 +154,60 @@ func TestCleanVerb(t *testing.T) {
 	}
 }
 
-func TestContentType(t *testing.T) {
+func TestCleanScope(t *testing.T) {
 	testCases := []struct {
-		rawContentType      string
-		expectedContentType string
+		name          string
+		requestInfo   *request.RequestInfo
+		expectedScope string
 	}{
 		{
-			rawContentType:      "application/json",
-			expectedContentType: "application/json",
+			name:          "empty scope",
+			requestInfo:   &request.RequestInfo{},
+			expectedScope: "",
 		},
 		{
-			rawContentType:      "image/svg+xml",
-			expectedContentType: "other",
+			name: "resource scope",
+			requestInfo: &request.RequestInfo{
+				Name:              "my-resource",
+				Namespace:         "my-namespace",
+				IsResourceRequest: false,
+			},
+			expectedScope: "resource",
 		},
 		{
-			rawContentType:      "text/plain; charset=utf-8",
-			expectedContentType: "text/plain;charset=utf-8",
+			name: "namespace scope",
+			requestInfo: &request.RequestInfo{
+				Namespace:         "my-namespace",
+				IsResourceRequest: false,
+			},
+			expectedScope: "namespace",
 		},
 		{
-			rawContentType:      "application/json;foo=bar",
-			expectedContentType: "other",
-		},
-		{
-			rawContentType:      "application/json;charset=hancoding",
-			expectedContentType: "other",
-		},
-		{
-			rawContentType:      "unknownbutvalidtype",
-			expectedContentType: "other",
+			name: "cluster scope",
+			requestInfo: &request.RequestInfo{
+				Namespace:         "",
+				IsResourceRequest: true,
+			},
+			expectedScope: "cluster",
 		},
 	}
 
-	for _, tt := range testCases {
-		t.Run(fmt.Sprintf("parse %s", tt.rawContentType), func(t *testing.T) {
-			cleansedContentType := cleanContentType(tt.rawContentType)
-			if cleansedContentType != tt.expectedContentType {
-				t.Errorf("Got %s, but expected %s", cleansedContentType, tt.expectedContentType)
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			if CleanScope(test.requestInfo) != test.expectedScope {
+				t.Errorf("failed to clean scope: %v", test.requestInfo)
 			}
 		})
+	}
+}
+
+func TestResponseWriterDecorator(t *testing.T) {
+	decorator := &ResponseWriterDelegator{
+		ResponseWriter: &responsewriter.FakeResponseWriter{},
+	}
+	var w http.ResponseWriter = decorator
+
+	if inner := w.(responsewriter.UserProvidedDecorator).Unwrap(); inner != decorator.ResponseWriter {
+		t.Errorf("Expected the decorator to return the inner http.ResponseWriter object")
 	}
 }

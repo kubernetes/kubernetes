@@ -22,16 +22,17 @@ import (
 	"regexp"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	policyapiv1beta1 "k8s.io/api/policy/v1beta1"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	appsvalidation "k8s.io/kubernetes/pkg/apis/apps/validation"
 	core "k8s.io/kubernetes/pkg/apis/core"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/policy"
-	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
 )
@@ -40,7 +41,6 @@ import (
 // with any errors.
 func ValidatePodDisruptionBudget(pdb *policy.PodDisruptionBudget) field.ErrorList {
 	allErrs := ValidatePodDisruptionBudgetSpec(pdb.Spec, field.NewPath("spec"))
-	allErrs = append(allErrs, ValidatePodDisruptionBudgetStatus(pdb.Status, field.NewPath("status"))...)
 	return allErrs
 }
 
@@ -68,10 +68,16 @@ func ValidatePodDisruptionBudgetSpec(spec policy.PodDisruptionBudgetSpec, fldPat
 	return allErrs
 }
 
-// ValidatePodDisruptionBudgetStatus validates a PodDisruptionBudgetStatus and returns an ErrorList
+// ValidatePodDisruptionBudgetStatusUpdate validates a PodDisruptionBudgetStatus and returns an ErrorList
 // with any errors.
-func ValidatePodDisruptionBudgetStatus(status policy.PodDisruptionBudgetStatus, fldPath *field.Path) field.ErrorList {
+func ValidatePodDisruptionBudgetStatusUpdate(status, oldStatus policy.PodDisruptionBudgetStatus, fldPath *field.Path, apiVersion schema.GroupVersion) field.ErrorList {
 	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, unversionedvalidation.ValidateConditions(status.Conditions, fldPath.Child("conditions"))...)
+	// Don't run other validations for v1beta1 since we don't want to introduce
+	// new validations retroactively.
+	if apiVersion == policyapiv1beta1.SchemeGroupVersion {
+		return allErrs
+	}
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.DisruptionsAllowed), fldPath.Child("disruptionsAllowed"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.CurrentHealthy), fldPath.Child("currentHealthy"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.DesiredHealthy), fldPath.Child("desiredHealthy"))...)
@@ -131,13 +137,13 @@ func ValidatePodSecurityPolicySpecificAnnotations(annotations map[string]string,
 	allErrs := field.ErrorList{}
 
 	if p := annotations[v1.AppArmorBetaDefaultProfileAnnotationKey]; p != "" {
-		if err := apparmor.ValidateProfileFormat(p); err != nil {
+		if err := apivalidation.ValidateAppArmorProfileFormat(p); err != nil {
 			allErrs = append(allErrs, field.Invalid(fldPath.Key(v1.AppArmorBetaDefaultProfileAnnotationKey), p, err.Error()))
 		}
 	}
 	if allowed := annotations[v1.AppArmorBetaAllowedProfilesAnnotationKey]; allowed != "" {
 		for _, p := range strings.Split(allowed, ",") {
-			if err := apparmor.ValidateProfileFormat(p); err != nil {
+			if err := apivalidation.ValidateAppArmorProfileFormat(p); err != nil {
 				allErrs = append(allErrs, field.Invalid(fldPath.Key(v1.AppArmorBetaAllowedProfilesAnnotationKey), allowed, err.Error()))
 			}
 		}
@@ -352,12 +358,24 @@ const sysctlPatternSegmentFmt string = "([a-z0-9][-_a-z0-9]*)?[a-z0-9*]"
 // SysctlPatternFmt is a regex used for matching valid sysctl patterns.
 const SysctlPatternFmt string = "(" + apivalidation.SysctlSegmentFmt + "\\.)*" + sysctlPatternSegmentFmt
 
+// SysctlContainSlashPatternFmt is a regex that contains a slash used for matching valid sysctl patterns.
+const SysctlContainSlashPatternFmt string = "(" + apivalidation.SysctlSegmentFmt + "[\\./])*" + sysctlPatternSegmentFmt
+
 var sysctlPatternRegexp = regexp.MustCompile("^" + SysctlPatternFmt + "$")
 
+var sysctlContainSlashPatternRegexp = regexp.MustCompile("^" + SysctlContainSlashPatternFmt + "$")
+
 // IsValidSysctlPattern checks if name is a valid sysctl pattern.
-func IsValidSysctlPattern(name string) bool {
+// i.e. matches sysctlPatternRegexp (or sysctlContainSlashPatternRegexp if canContainSlash is true).
+// More info:
+//   https://man7.org/linux/man-pages/man8/sysctl.8.html
+//   https://man7.org/linux/man-pages/man5/sysctl.d.5.html
+func IsValidSysctlPattern(name string, canContainSlash bool) bool {
 	if len(name) > apivalidation.SysctlMaxLength {
 		return false
+	}
+	if canContainSlash {
+		return sysctlContainSlashPatternRegexp.MatchString(name)
 	}
 	return sysctlPatternRegexp.MatchString(name)
 }
@@ -414,8 +432,8 @@ func validatePodSecurityPolicySysctls(fldPath *field.Path, sysctls []string) fie
 	coversAll := false
 	for i, s := range sysctls {
 		if len(s) == 0 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Index(i), sysctls[i], fmt.Sprintf("empty sysctl not allowed")))
-		} else if !IsValidSysctlPattern(string(s)) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Index(i), sysctls[i], "empty sysctl not allowed"))
+		} else if !IsValidSysctlPattern(string(s), false) {
 			allErrs = append(
 				allErrs,
 				field.Invalid(fldPath.Index(i), sysctls[i], fmt.Sprintf("must have at most %d characters and match regex %s",
@@ -429,7 +447,7 @@ func validatePodSecurityPolicySysctls(fldPath *field.Path, sysctls []string) fie
 	}
 
 	if coversAll && len(sysctls) > 1 {
-		allErrs = append(allErrs, field.Forbidden(fldPath.Child("items"), fmt.Sprintf("if '*' is present, must not specify other sysctls")))
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("items"), "if '*' is present, must not specify other sysctls"))
 	}
 
 	return allErrs

@@ -23,7 +23,6 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
-	"io/ioutil"
 	"math"
 	"math/big"
 	"os"
@@ -45,34 +44,21 @@ func TestCertRotation(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	clientSigningKey, err := utils.NewPrivateKey()
-	if err != nil {
-		t.Fatal(err)
-	}
-	clientSigningCert, err := cert.NewSelfSignedCACert(cert.Config{CommonName: "client-ca"}, clientSigningKey)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	transport.CertCallbackRefreshDuration = 1 * time.Second
 
 	certDir := os.TempDir()
-	clientCAFilename := path.Join(certDir, "ca.crt")
-
-	if err := ioutil.WriteFile(clientCAFilename, utils.EncodeCertPEM(clientSigningCert), 0644); err != nil {
-		t.Fatal(err)
-	}
+	clientCAFilename, clientSigningCert, clientSigningKey := writeCACertFiles(t, certDir)
 
 	server := apiservertesting.StartTestServerOrDie(t, apiservertesting.NewDefaultTestServerOptions(), []string{
 		"--client-ca-file=" + clientCAFilename,
 	}, framework.SharedEtcd())
 	defer server.TearDownFn()
 
-	writeCerts(t, clientSigningCert, clientSigningKey, certDir, 30*time.Second)
+	clientCertFilename, clientKeyFilename := writeCerts(t, clientSigningCert, clientSigningKey, certDir, 30*time.Second)
 
 	kubeconfig := server.ClientConfig
-	kubeconfig.CertFile = path.Join(certDir, "client.crt")
-	kubeconfig.KeyFile = path.Join(certDir, "client.key")
+	kubeconfig.CertFile = clientCertFilename
+	kubeconfig.KeyFile = clientKeyFilename
 	kubeconfig.BearerToken = ""
 
 	client := clientset.NewForConfigOrDie(kubeconfig)
@@ -115,34 +101,21 @@ func TestCertRotationContinuousRequests(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	clientSigningKey, err := utils.NewPrivateKey()
-	if err != nil {
-		t.Fatal(err)
-	}
-	clientSigningCert, err := cert.NewSelfSignedCACert(cert.Config{CommonName: "client-ca"}, clientSigningKey)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	transport.CertCallbackRefreshDuration = 1 * time.Second
 
 	certDir := os.TempDir()
-	clientCAFilename := path.Join(certDir, "ca.crt")
-
-	if err := ioutil.WriteFile(clientCAFilename, utils.EncodeCertPEM(clientSigningCert), 0644); err != nil {
-		t.Fatal(err)
-	}
+	clientCAFilename, clientSigningCert, clientSigningKey := writeCACertFiles(t, certDir)
 
 	server := apiservertesting.StartTestServerOrDie(t, apiservertesting.NewDefaultTestServerOptions(), []string{
 		"--client-ca-file=" + clientCAFilename,
 	}, framework.SharedEtcd())
 	defer server.TearDownFn()
 
-	writeCerts(t, clientSigningCert, clientSigningKey, certDir, 30*time.Second)
+	clientCertFilename, clientKeyFilename := writeCerts(t, clientSigningCert, clientSigningKey, certDir, 30*time.Second)
 
 	kubeconfig := server.ClientConfig
-	kubeconfig.CertFile = path.Join(certDir, "client.crt")
-	kubeconfig.KeyFile = path.Join(certDir, "client.key")
+	kubeconfig.CertFile = clientCertFilename
+	kubeconfig.KeyFile = clientKeyFilename
 	kubeconfig.BearerToken = ""
 
 	client := clientset.NewForConfigOrDie(kubeconfig)
@@ -171,7 +144,26 @@ func TestCertRotationContinuousRequests(t *testing.T) {
 	}
 }
 
-func writeCerts(t *testing.T, clientSigningCert *x509.Certificate, clientSigningKey *rsa.PrivateKey, certDir string, duration time.Duration) {
+func writeCACertFiles(t *testing.T, certDir string) (string, *x509.Certificate, *rsa.PrivateKey) {
+	clientSigningKey, err := utils.NewPrivateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	clientSigningCert, err := cert.NewSelfSignedCACert(cert.Config{CommonName: "client-ca"}, clientSigningKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	clientCAFilename := path.Join(certDir, "ca.crt")
+
+	if err := os.WriteFile(clientCAFilename, utils.EncodeCertPEM(clientSigningCert), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	return clientCAFilename, clientSigningCert, clientSigningKey
+}
+
+func writeCerts(t *testing.T, clientSigningCert *x509.Certificate, clientSigningKey *rsa.PrivateKey, certDir string, duration time.Duration) (string, string) {
 	clientKey, err := utils.NewPrivateKey()
 	if err != nil {
 		t.Fatal(err)
@@ -182,7 +174,7 @@ func writeCerts(t *testing.T, clientSigningCert *x509.Certificate, clientSigning
 		t.Fatal(err)
 	}
 
-	if err := ioutil.WriteFile(path.Join(certDir, "client.key"), pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: privBytes}), 0666); err != nil {
+	if err := os.WriteFile(path.Join(certDir, "client.key"), pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: privBytes}), 0666); err != nil {
 		t.Fatal(err)
 	}
 
@@ -208,7 +200,9 @@ func writeCerts(t *testing.T, clientSigningCert *x509.Certificate, clientSigning
 		t.Fatal(err)
 	}
 
-	if err := ioutil.WriteFile(path.Join(certDir, "client.crt"), pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDERBytes}), 0666); err != nil {
+	if err := os.WriteFile(path.Join(certDir, "client.crt"), pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDERBytes}), 0666); err != nil {
 		t.Fatal(err)
 	}
+
+	return path.Join(certDir, "client.crt"), path.Join(certDir, "client.key")
 }

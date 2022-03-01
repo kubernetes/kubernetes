@@ -28,8 +28,16 @@ import (
 	"strings"
 	"testing"
 
+	autoscalingapiv2beta1 "k8s.io/api/autoscaling/v2beta1"
+	autoscalingapiv2beta2 "k8s.io/api/autoscaling/v2beta2"
+	batchapiv1beta1 "k8s.io/api/batch/v1beta1"
 	certificatesapiv1beta1 "k8s.io/api/certificates/v1beta1"
 	apiv1 "k8s.io/api/core/v1"
+	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
+	eventsv1beta1 "k8s.io/api/events/v1beta1"
+	nodev1beta1 "k8s.io/api/node/v1beta1"
+	policyapiv1beta1 "k8s.io/api/policy/v1beta1"
+	storageapiv1beta1 "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -39,6 +47,7 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/server/resourceconfig"
+	"k8s.io/apiserver/pkg/server/storage"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	"k8s.io/client-go/discovery"
@@ -49,6 +58,7 @@ import (
 	kubeversion "k8s.io/component-base/version"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	flowcontrolv1beta2 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta2"
 	"k8s.io/kubernetes/pkg/apis/networking"
 	apisstorage "k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
@@ -57,6 +67,7 @@ import (
 	certificatesrest "k8s.io/kubernetes/pkg/registry/certificates/rest"
 	corerest "k8s.io/kubernetes/pkg/registry/core/rest"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
+	netutils "k8s.io/utils/net"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -72,7 +83,7 @@ func setUp(t *testing.T) (*etcd3testing.EtcdTestServer, Config, *assert.Assertio
 			APIServerServicePort:    443,
 			MasterCount:             1,
 			EndpointReconcilerType:  reconcilers.MasterCountReconcilerType,
-			ServiceIPRange:          net.IPNet{IP: net.ParseIP("10.0.0.0"), Mask: net.CIDRMask(24, 32)},
+			ServiceIPRange:          net.IPNet{IP: netutils.ParseIPSloppy("10.0.0.0"), Mask: net.CIDRMask(24, 32)},
 		},
 	}
 
@@ -101,7 +112,7 @@ func setUp(t *testing.T) (*etcd3testing.EtcdTestServer, Config, *assert.Assertio
 	config.GenericConfig.Version = &kubeVersion
 	config.ExtraConfig.StorageFactory = storageFactory
 	config.GenericConfig.LoopbackClientConfig = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs}}
-	config.GenericConfig.PublicAddress = net.ParseIP("192.168.10.4")
+	config.GenericConfig.PublicAddress = netutils.ParseIPSloppy("192.168.10.4")
 	config.GenericConfig.LegacyAPIGroupPrefixes = sets.NewString("/api")
 	config.ExtraConfig.KubeletClientConfig = kubeletclient.KubeletClientConfig{Port: 10250}
 	config.ExtraConfig.ProxyTransport = utilnet.SetTransportDefaults(&http.Transport{
@@ -155,7 +166,7 @@ func TestLegacyRestStorageStrategies(t *testing.T) {
 		LoopbackClientConfig: apiserverCfg.GenericConfig.LoopbackClientConfig,
 	}
 
-	_, apiGroupInfo, err := storageProvider.NewLegacyRESTStorage(apiserverCfg.GenericConfig.RESTOptionsGetter)
+	_, apiGroupInfo, err := storageProvider.NewLegacyRESTStorage(storage.NewResourceConfig(), apiserverCfg.GenericConfig.RESTOptionsGetter)
 	if err != nil {
 		t.Errorf("failed to create legacy REST storage: %v", err)
 	}
@@ -171,7 +182,7 @@ func TestCertificatesRestStorageStrategies(t *testing.T) {
 	defer etcdserver.Terminate(t)
 
 	certStorageProvider := certificatesrest.RESTStorageProvider{}
-	apiGroupInfo, _, err := certStorageProvider.NewRESTStorage(apiserverCfg.ExtraConfig.APIResourceConfigSource, apiserverCfg.GenericConfig.RESTOptionsGetter)
+	apiGroupInfo, err := certStorageProvider.NewRESTStorage(apiserverCfg.ExtraConfig.APIResourceConfigSource, apiserverCfg.GenericConfig.RESTOptionsGetter)
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
@@ -317,31 +328,13 @@ func TestAPIVersionOfDiscoveryEndpoints(t *testing.T) {
 	assert.NoError(decodeResponse(resp, &groupList))
 	assert.Equal(groupList.APIVersion, "")
 
-	// /apis/extensions exists in release-1.1
-	resp, err = http.Get(server.URL + "/apis/extensions")
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	group := metav1.APIGroup{}
-	assert.NoError(decodeResponse(resp, &group))
-	assert.Equal(group.APIVersion, "")
-
-	// /apis/extensions/v1beta1 exists in release-1.1
-	resp, err = http.Get(server.URL + "/apis/extensions/v1beta1")
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	resourceList = metav1.APIResourceList{}
-	assert.NoError(decodeResponse(resp, &resourceList))
-	assert.Equal(resourceList.APIVersion, "")
-
 	// /apis/autoscaling doesn't exist in release-1.1, so the APIVersion field
 	// should be non-empty in the results returned by the server.
 	resp, err = http.Get(server.URL + "/apis/autoscaling")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	group = metav1.APIGroup{}
+	group := metav1.APIGroup{}
 	assert.NoError(decodeResponse(resp, &group))
 	assert.Equal(group.APIVersion, "v1")
 
@@ -376,8 +369,10 @@ func TestStorageVersionHashes(t *testing.T) {
 		t.Error(err)
 	}
 	var count int
+	apiResources := sets.NewString()
 	for _, g := range all {
 		for _, r := range g.APIResources {
+			apiResources.Insert(g.GroupVersion + "/" + r.Name)
 			if strings.Contains(r.Name, "/") ||
 				storageversionhashdata.NoStorageVersionHash.Has(g.GroupVersion+"/"+r.Name) {
 				if r.StorageVersionHash != "" {
@@ -399,7 +394,8 @@ func TestStorageVersionHashes(t *testing.T) {
 		}
 	}
 	if count != len(storageversionhashdata.GVRToStorageVersionHash) {
-		t.Errorf("please remove the redundant entries from GVRToStorageVersionHash")
+		knownResources := sets.StringKeySet(storageversionhashdata.GVRToStorageVersionHash)
+		t.Errorf("please remove the redundant entries from GVRToStorageVersionHash: %v", knownResources.Difference(apiResources).List())
 	}
 }
 
@@ -471,5 +467,58 @@ func TestNoAlphaVersionsEnabledByDefault(t *testing.T) {
 		if enable && strings.Contains(gv.Version, "alpha") {
 			t.Errorf("Alpha API version %s enabled by default", gv.String())
 		}
+	}
+}
+
+func TestNoBetaVersionsEnabledByDefault(t *testing.T) {
+	config := DefaultAPIResourceConfigSource()
+	for gv, enable := range config.GroupVersionConfigs {
+		if enable && strings.Contains(gv.Version, "beta") {
+			t.Errorf("Beta API version %s enabled by default", gv.String())
+		}
+	}
+}
+
+func TestNewBetaResourcesEnabledByDefault(t *testing.T) {
+	// legacyEnabledBetaResources is nearly a duplication from elsewhere.  This is intentional.  These types already have
+	// GA equivalents available and should therefore never have a beta enabled by default again.
+	legacyEnabledBetaResources := map[schema.GroupVersionResource]bool{
+		autoscalingapiv2beta1.SchemeGroupVersion.WithResource("horizontalpodautoscalers"): true,
+		autoscalingapiv2beta2.SchemeGroupVersion.WithResource("horizontalpodautoscalers"): true,
+		batchapiv1beta1.SchemeGroupVersion.WithResource("cronjobs"):                       true,
+		discoveryv1beta1.SchemeGroupVersion.WithResource("endpointslices"):                true,
+		eventsv1beta1.SchemeGroupVersion.WithResource("events"):                           true,
+		nodev1beta1.SchemeGroupVersion.WithResource("runtimeclasses"):                     true,
+		policyapiv1beta1.SchemeGroupVersion.WithResource("poddisruptionbudgets"):          true,
+		policyapiv1beta1.SchemeGroupVersion.WithResource("podsecuritypolicies"):           true,
+		storageapiv1beta1.SchemeGroupVersion.WithResource("csinodes"):                     true,
+		storageapiv1beta1.SchemeGroupVersion.WithResource("csistoragecapacities"):         true,
+	}
+
+	// legacyBetaResourcesWithoutStableEquivalents contains those groupresources that were enabled by default as beta
+	// before we changed that policy and do not have stable versions. These resources are allowed to have additional
+	// beta versions enabled by default.  Nothing new should be added here.  There are no future exceptions because there
+	// are no more beta resources enabled by default.
+	legacyBetaResourcesWithoutStableEquivalents := map[schema.GroupResource]bool{
+		storageapiv1beta1.SchemeGroupVersion.WithResource("csistoragecapacities").GroupResource():         true,
+		flowcontrolv1beta2.SchemeGroupVersion.WithResource("flowschemas").GroupResource():                 true,
+		flowcontrolv1beta2.SchemeGroupVersion.WithResource("prioritylevelconfigurations").GroupResource(): true,
+	}
+
+	config := DefaultAPIResourceConfigSource()
+	for gvr, enable := range config.ResourceConfigs {
+		if !strings.Contains(gvr.Version, "beta") {
+			continue // only check beta things
+		}
+		if !enable {
+			continue // only check things that are enabled
+		}
+		if legacyEnabledBetaResources[gvr] {
+			continue // this is a legacy beta resource
+		}
+		if legacyBetaResourcesWithoutStableEquivalents[gvr.GroupResource()] {
+			continue // this is another beta of a legacy beta resource with no stable equivalent
+		}
+		t.Errorf("no new beta resources can be enabled by default, see https://github.com/kubernetes/enhancements/blob/0ad0fc8269165ca300d05ca51c7ce190a79976a5/keps/sig-architecture/3136-beta-apis-off-by-default/README.md: %v", gvr)
 	}
 }

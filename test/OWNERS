@@ -5,18 +5,16 @@ reviewers:
   - neolit123
   - johnSchnake
   - SataQiu
-  - tanjunchen
-  - dims
 approvers:
-  - alejandrox1
   - andrewsykim
+  - aojea
   - BenTheElder
   - bowei # for test/e2e/{dns*,network}.go
   - caseydavenport # for test/e2e/{dns*,network}.go
   - cblecker
+  - dims
   - MrHohn
   - deads2k
-  - enisoc
   - enj
   - janetkuo
   - liggitt
@@ -31,10 +29,8 @@ approvers:
   - smarterclayton
   - soltysh
   - sttts
-  - timothysc
 emeritus_approvers:
   - eparis
-  - erictune
   - foxish
   - gmarek
   - krousey
@@ -47,7 +43,9 @@ emeritus_approvers:
   - ncdc
   - vishh
   - shyamjvs
-
+  - enisoc
+  - alejandrox1
+  - timothysc
 labels:
-- area/test
-- sig/testing
+  - area/test
+  - sig/testing

@@ -23,11 +23,12 @@ import (
 	"strings"
 	"sync"
 
-	"k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1beta1"
+	v1 "k8s.io/api/core/v1"
+	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
@@ -50,7 +51,7 @@ type EndpointSliceCache struct {
 	makeEndpointInfo makeEndpointFunc
 	hostname         string
 	ipFamily         v1.IPFamily
-	recorder         record.EventRecorder
+	recorder         events.EventRecorder
 }
 
 // endpointSliceTracker keeps track of EndpointSlices as they have been applied
@@ -75,11 +76,12 @@ type endpointSliceInfo struct {
 
 // endpointInfo contains just the attributes kube-proxy cares about.
 // Used for caching. Intentionally small to limit memory util.
-// Addresses and Topology are copied from EndpointSlice Endpoints.
+// Addresses, NodeName, and Zone are copied from EndpointSlice Endpoints.
 type endpointInfo struct {
 	Addresses []string
 	NodeName  *string
-	Topology  map[string]string
+	Zone      *string
+	ZoneHints sets.String
 
 	Ready       bool
 	Serving     bool
@@ -87,11 +89,11 @@ type endpointInfo struct {
 }
 
 // spToEndpointMap stores groups Endpoint objects by ServicePortName and
-// IP address.
+// endpoint string (returned by Endpoint.String()).
 type spToEndpointMap map[ServicePortName]map[string]Endpoint
 
 // NewEndpointSliceCache initializes an EndpointSliceCache.
-func NewEndpointSliceCache(hostname string, ipFamily v1.IPFamily, recorder record.EventRecorder, makeEndpointInfo makeEndpointFunc) *EndpointSliceCache {
+func NewEndpointSliceCache(hostname string, ipFamily v1.IPFamily, recorder events.EventRecorder, makeEndpointInfo makeEndpointFunc) *EndpointSliceCache {
 	if makeEndpointInfo == nil {
 		makeEndpointInfo = standardEndpointInfo
 	}
@@ -128,7 +130,8 @@ func newEndpointSliceInfo(endpointSlice *discovery.EndpointSlice, remove bool) *
 		for _, endpoint := range endpointSlice.Endpoints {
 			epInfo := &endpointInfo{
 				Addresses: endpoint.Addresses,
-				Topology:  endpoint.Topology,
+				Zone:      endpoint.Zone,
+				NodeName:  endpoint.NodeName,
 
 				// conditions
 				Ready:       endpoint.Conditions.Ready == nil || *endpoint.Conditions.Ready,
@@ -136,8 +139,13 @@ func newEndpointSliceInfo(endpointSlice *discovery.EndpointSlice, remove bool) *
 				Terminating: endpoint.Conditions.Terminating != nil && *endpoint.Conditions.Terminating,
 			}
 
-			if utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceNodeName) {
-				epInfo.NodeName = endpoint.NodeName
+			if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareHints) {
+				if endpoint.Hints != nil && len(endpoint.Hints.ForZones) > 0 {
+					epInfo.ZoneHints = sets.String{}
+					for _, zone := range endpoint.Hints.ForZones {
+						epInfo.ZoneHints.Insert(zone.Name)
+					}
+				}
 			}
 
 			esInfo.Endpoints = append(esInfo.Endpoints, epInfo)
@@ -158,7 +166,7 @@ func standardEndpointInfo(ep *BaseEndpointInfo) Endpoint {
 func (cache *EndpointSliceCache) updatePending(endpointSlice *discovery.EndpointSlice, remove bool) bool {
 	serviceKey, sliceKey, err := endpointSliceCacheKeys(endpointSlice)
 	if err != nil {
-		klog.Warningf("Error getting endpoint slice cache keys: %v", err)
+		klog.ErrorS(err, "Error getting endpoint slice cache keys")
 		return false
 	}
 
@@ -227,12 +235,12 @@ func (cache *EndpointSliceCache) endpointInfoByServicePort(serviceNN types.Names
 	for _, sliceInfo := range sliceInfoByName {
 		for _, port := range sliceInfo.Ports {
 			if port.Name == nil {
-				klog.Warningf("ignoring port with nil name %v", port)
+				klog.ErrorS(nil, "Ignoring port with nil name", "portName", port.Name)
 				continue
 			}
 			// TODO: handle nil ports to mean "all"
 			if port.Port == nil || *port.Port == int32(0) {
-				klog.Warningf("ignoring invalid endpoint port %s", *port.Name)
+				klog.ErrorS(nil, "Ignoring invalid endpoint port", "portName", *port.Name)
 				continue
 			}
 
@@ -242,23 +250,23 @@ func (cache *EndpointSliceCache) endpointInfoByServicePort(serviceNN types.Names
 				Protocol:       *port.Protocol,
 			}
 
-			endpointInfoBySP[svcPortName] = cache.addEndpointsByIP(serviceNN, int(*port.Port), endpointInfoBySP[svcPortName], sliceInfo.Endpoints)
+			endpointInfoBySP[svcPortName] = cache.addEndpoints(serviceNN, int(*port.Port), endpointInfoBySP[svcPortName], sliceInfo.Endpoints)
 		}
 	}
 
 	return endpointInfoBySP
 }
 
-// addEndpointsByIP adds endpointInfo for each IP.
-func (cache *EndpointSliceCache) addEndpointsByIP(serviceNN types.NamespacedName, portNum int, endpointsByIP map[string]Endpoint, endpoints []*endpointInfo) map[string]Endpoint {
-	if endpointsByIP == nil {
-		endpointsByIP = map[string]Endpoint{}
+// addEndpoints adds endpointInfo for each unique endpoint.
+func (cache *EndpointSliceCache) addEndpoints(serviceNN types.NamespacedName, portNum int, endpointSet map[string]Endpoint, endpoints []*endpointInfo) map[string]Endpoint {
+	if endpointSet == nil {
+		endpointSet = map[string]Endpoint{}
 	}
 
-	// iterate through endpoints to add them to endpointsByIP.
+	// iterate through endpoints to add them to endpointSet.
 	for _, endpoint := range endpoints {
 		if len(endpoint.Addresses) == 0 {
-			klog.Warningf("ignoring invalid endpoint port %s with empty addresses", endpoint)
+			klog.ErrorS(nil, "Ignoring invalid endpoint port with empty address", "endpoint", endpoint)
 			continue
 		}
 
@@ -272,24 +280,29 @@ func (cache *EndpointSliceCache) addEndpointsByIP(serviceNN types.NamespacedName
 		}
 
 		isLocal := false
+		nodeName := ""
 		if endpoint.NodeName != nil {
 			isLocal = cache.isLocal(*endpoint.NodeName)
-		} else {
-			isLocal = cache.isLocal(endpoint.Topology[v1.LabelHostname])
+			nodeName = *endpoint.NodeName
 		}
 
-		endpointInfo := newBaseEndpointInfo(endpoint.Addresses[0], portNum, isLocal, endpoint.Topology,
-			endpoint.Ready, endpoint.Serving, endpoint.Terminating)
+		zone := ""
+		if endpoint.Zone != nil {
+			zone = *endpoint.Zone
+		}
 
-		// This logic ensures we're deduping potential overlapping endpoints
-		// isLocal should not vary between matching IPs, but if it does, we
+		endpointInfo := newBaseEndpointInfo(endpoint.Addresses[0], nodeName, zone, portNum, isLocal,
+			endpoint.Ready, endpoint.Serving, endpoint.Terminating, endpoint.ZoneHints)
+
+		// This logic ensures we're deduplicating potential overlapping endpoints
+		// isLocal should not vary between matching endpoints, but if it does, we
 		// favor a true value here if it exists.
-		if _, exists := endpointsByIP[endpointInfo.IP()]; !exists || isLocal {
-			endpointsByIP[endpointInfo.IP()] = cache.makeEndpointInfo(endpointInfo)
+		if _, exists := endpointSet[endpointInfo.String()]; !exists || isLocal {
+			endpointSet[endpointInfo.String()] = cache.makeEndpointInfo(endpointInfo)
 		}
 	}
 
-	return endpointsByIP
+	return endpointSet
 }
 
 func (cache *EndpointSliceCache) isLocal(hostname string) bool {
@@ -332,17 +345,17 @@ func endpointsMapFromEndpointInfo(endpointInfoBySP map[ServicePortName]map[strin
 	endpointsMap := EndpointsMap{}
 
 	// transform endpointInfoByServicePort into an endpointsMap with sorted IPs.
-	for svcPortName, endpointInfoByIP := range endpointInfoBySP {
-		if len(endpointInfoByIP) > 0 {
+	for svcPortName, endpointSet := range endpointInfoBySP {
+		if len(endpointSet) > 0 {
 			endpointsMap[svcPortName] = []Endpoint{}
-			for _, endpointInfo := range endpointInfoByIP {
+			for _, endpointInfo := range endpointSet {
 				endpointsMap[svcPortName] = append(endpointsMap[svcPortName], endpointInfo)
 
 			}
-			// Ensure IPs are always returned in the same order to simplify diffing.
-			sort.Sort(byIP(endpointsMap[svcPortName]))
+			// Ensure endpoints are always returned in the same order to simplify diffing.
+			sort.Sort(byEndpoint(endpointsMap[svcPortName]))
 
-			klog.V(3).Infof("Setting endpoints for %q to %+v", svcPortName, formatEndpointsList(endpointsMap[svcPortName]))
+			klog.V(3).InfoS("Setting endpoints for service port name", "portName", svcPortName, "endpoints", formatEndpointsList(endpointsMap[svcPortName]))
 		}
 	}
 
@@ -363,9 +376,9 @@ func endpointSliceCacheKeys(endpointSlice *discovery.EndpointSlice) (types.Names
 	var err error
 	serviceName, ok := endpointSlice.Labels[discovery.LabelServiceName]
 	if !ok || serviceName == "" {
-		err = fmt.Errorf("No %s label set on endpoint slice: %s", discovery.LabelServiceName, endpointSlice.Name)
+		err = fmt.Errorf("no %s label set on endpoint slice: %s", discovery.LabelServiceName, endpointSlice.Name)
 	} else if endpointSlice.Namespace == "" || endpointSlice.Name == "" {
-		err = fmt.Errorf("Expected EndpointSlice name and namespace to be set: %v", endpointSlice)
+		err = fmt.Errorf("expected EndpointSlice name and namespace to be set: %v", endpointSlice)
 	}
 	return types.NamespacedName{Namespace: endpointSlice.Namespace, Name: serviceName}, endpointSlice.Name, err
 }
@@ -383,16 +396,16 @@ func (e byAddress) Less(i, j int) bool {
 	return strings.Join(e[i].Addresses, ",") < strings.Join(e[j].Addresses, ",")
 }
 
-// byIP helps sort endpoints by IP
-type byIP []Endpoint
+// byEndpoint helps sort endpoints by endpoint string.
+type byEndpoint []Endpoint
 
-func (e byIP) Len() int {
+func (e byEndpoint) Len() int {
 	return len(e)
 }
-func (e byIP) Swap(i, j int) {
+func (e byEndpoint) Swap(i, j int) {
 	e[i], e[j] = e[j], e[i]
 }
-func (e byIP) Less(i, j int) bool {
+func (e byEndpoint) Less(i, j int) bool {
 	return e[i].String() < e[j].String()
 }
 

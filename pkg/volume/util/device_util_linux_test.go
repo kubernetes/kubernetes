@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -54,7 +55,7 @@ func (handler *mockOsIOHandler) ReadFile(filename string) ([]byte, error) {
 			return []byte("target2"), nil
 		}
 	}
-	return nil, errors.New("Not Implemented for Mock")
+	return nil, errors.New("not Implemented for Mock")
 }
 
 func (handler *mockOsIOHandler) ReadDir(dirname string) ([]os.FileInfo, error) {
@@ -139,7 +140,7 @@ func (handler *mockOsIOHandler) ReadDir(dirname string) ([]os.FileInfo, error) {
 		}
 		return []os.FileInfo{f1}, nil
 	}
-	return nil, errors.New("Not Implemented for Mock")
+	return nil, errors.New("not Implemented for Mock")
 }
 
 func (handler *mockOsIOHandler) Lstat(name string) (os.FileInfo, error) {
@@ -154,7 +155,7 @@ func (handler *mockOsIOHandler) Lstat(name string) (os.FileInfo, error) {
 	if dev, ok := links[name]; ok {
 		return &fakeFileInfo{name: dev}, nil
 	}
-	return nil, errors.New("Not Implemented for Mock")
+	return nil, errors.New("not Implemented for Mock")
 }
 
 func (handler *mockOsIOHandler) EvalSymlinks(path string) (string, error) {
@@ -172,7 +173,7 @@ func (handler *mockOsIOHandler) EvalSymlinks(path string) (string, error) {
 }
 
 func (handler *mockOsIOHandler) WriteFile(filename string, data []byte, perm os.FileMode) error {
-	return errors.New("Not Implemented for Mock")
+	return errors.New("not Implemented for Mock")
 }
 
 type fakeFileInfo struct {

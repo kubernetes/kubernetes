@@ -65,4 +65,6 @@ const (
 	// any backends on excluded nodes are not reachable by those external load-balancers.
 	// Implementations of this exclusion may vary based on provider.
 	LabelNodeExcludeBalancers = "node.kubernetes.io/exclude-from-external-load-balancers"
+	// LabelMetadataName is the label name which, in-tree, is used to automatically label namespaces, so they can be selected easily by tools which require definitive labels
+	LabelMetadataName = "kubernetes.io/metadata.name"
 )

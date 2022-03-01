@@ -17,31 +17,15 @@ limitations under the License.
 package alpha
 
 import (
-	"io"
-
 	"github.com/spf13/cobra"
 )
 
 // NewCmdAlpha returns "kubeadm alpha" command.
-func NewCmdAlpha(in io.Reader, out io.Writer) *cobra.Command {
+func NewCmdAlpha() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "alpha",
 		Short: "Kubeadm experimental sub-commands",
 	}
 
-	kubeconfigCmd := NewCmdKubeConfigUtility(out)
-	deprecateCommand(`please use the same command under "kubeadm kubeconfig"`, kubeconfigCmd)
-	cmd.AddCommand(kubeconfigCmd)
-
 	return cmd
-}
-
-func deprecateCommand(msg string, cmds ...*cobra.Command) {
-	for _, cmd := range cmds {
-		cmd.Deprecated = msg
-		childCmds := cmd.Commands()
-		if len(childCmds) > 0 {
-			deprecateCommand(msg, childCmds...)
-		}
-	}
 }

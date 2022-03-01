@@ -60,7 +60,7 @@ func TestDeleteSync(t *testing.T) {
 			// delete failure - plugin not found
 			"8-3 - plugin not found",
 			newVolumeArray("volume8-3", "1Gi", "uid8-3", "claim8-3", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty),
-			withMessage("Error getting deleter volume plugin for volume \"volume8-3\": no volume plugin matched", newVolumeArray("volume8-3", "1Gi", "uid8-3", "claim8-3", v1.VolumeFailed, v1.PersistentVolumeReclaimDelete, classEmpty)),
+			withMessage("error getting deleter volume plugin for volume \"volume8-3\": no volume plugin matched", newVolumeArray("volume8-3", "1Gi", "uid8-3", "claim8-3", v1.VolumeFailed, v1.PersistentVolumeReclaimDelete, classEmpty)),
 			noclaims,
 			noclaims,
 			[]string{"Warning VolumeFailedDelete"}, noerrors, testSyncVolume,
@@ -69,7 +69,7 @@ func TestDeleteSync(t *testing.T) {
 			// delete failure - newDeleter returns error
 			"8-4 - newDeleter returns error",
 			newVolumeArray("volume8-4", "1Gi", "uid8-4", "claim8-4", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty),
-			withMessage("Failed to create deleter for volume \"volume8-4\": Mock plugin error: no deleteCalls configured", newVolumeArray("volume8-4", "1Gi", "uid8-4", "claim8-4", v1.VolumeFailed, v1.PersistentVolumeReclaimDelete, classEmpty)),
+			withMessage("failed to create deleter for volume \"volume8-4\": Mock plugin error: no deleteCalls configured", newVolumeArray("volume8-4", "1Gi", "uid8-4", "claim8-4", v1.VolumeFailed, v1.PersistentVolumeReclaimDelete, classEmpty)),
 			noclaims,
 			noclaims,
 			[]string{"Warning VolumeFailedDelete"}, noerrors,

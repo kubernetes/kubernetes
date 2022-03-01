@@ -1,6 +1,8 @@
 rules:
   - selectorRegexp: k8s[.]io/kubernetes
     allowedPrefixes:
+      - k8s.io/kubernetes/cmd/kube-controller-manager/app/options
+      - k8s.io/kubernetes/cmd/kube-controller-manager/app/config
       - k8s.io/kubernetes/pkg/api/legacyscheme
       - k8s.io/kubernetes/pkg/api/service
       - k8s.io/kubernetes/pkg/api/v1/pod
@@ -35,3 +37,6 @@ rules:
       - k8s.io/kubernetes/pkg/util/node
       - k8s.io/kubernetes/pkg/util/parsers
       - k8s.io/kubernetes/pkg/util/taints
+      - k8s.io/kubernetes/pkg/proxy/util
+      - k8s.io/kubernetes/pkg/proxy/util/testing
+      - k8s.io/kubernetes/pkg/util/sysctl

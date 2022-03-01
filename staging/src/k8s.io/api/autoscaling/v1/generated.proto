@@ -28,7 +28,7 @@ import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 
 // Package-wide variables from generator "generated".
-option go_package = "v1";
+option go_package = "k8s.io/api/autoscaling/v1";
 
 // ContainerResourceMetricSource indicates how to scale on a resource metric known to
 // Kubernetes, as specified in the requests and limits, describing a single container in
@@ -85,6 +85,7 @@ message ContainerResourceMetricStatus {
 }
 
 // CrossVersionObjectReference contains enough information to let you identify the referred resource.
+// +structType=atomic
 message CrossVersionObjectReference {
   // Kind of the referent; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds"
   optional string kind = 1;

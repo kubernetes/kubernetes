@@ -16,6 +16,7 @@ package validate
 
 // SchemaValidatorOptions defines optional rules for schema validation
 type SchemaValidatorOptions struct {
+	validationRulesEnabled bool
 }
 
 // Option sets optional rules for schema validation

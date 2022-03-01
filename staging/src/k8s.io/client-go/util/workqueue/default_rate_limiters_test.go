@@ -182,3 +182,50 @@ func TestMaxOfRateLimiter(t *testing.T) {
 	}
 
 }
+
+func TestWithMaxWaitRateLimiter(t *testing.T) {
+	limiter := NewWithMaxWaitRateLimiter(NewStepRateLimiter(5*time.Millisecond, 1000*time.Second, 100), 500*time.Second)
+	for i := 0; i < 100; i++ {
+		if e, a := 5*time.Millisecond, limiter.When(i); e != a {
+			t.Errorf("expected %v, got %v ", e, a)
+		}
+	}
+
+	for i := 100; i < 200; i++ {
+		if e, a := 500*time.Second, limiter.When(i); e != a {
+			t.Errorf("expected %v, got %v", e, a)
+		}
+	}
+}
+
+var _ RateLimiter = &StepRateLimiter{}
+
+func NewStepRateLimiter(baseDelay time.Duration, maxDelay time.Duration, threshold int) RateLimiter {
+	return &StepRateLimiter{
+		baseDelay: baseDelay,
+		maxDelay:  maxDelay,
+		threshold: threshold,
+	}
+}
+
+type StepRateLimiter struct {
+	count     int
+	threshold int
+	baseDelay time.Duration
+	maxDelay  time.Duration
+}
+
+func (r *StepRateLimiter) When(item interface{}) time.Duration {
+	r.count += 1
+	if r.count <= r.threshold {
+		return r.baseDelay
+	}
+	return r.maxDelay
+}
+
+func (r *StepRateLimiter) NumRequeues(item interface{}) int {
+	return 0
+}
+
+func (r *StepRateLimiter) Forget(item interface{}) {
+}

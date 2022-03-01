@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 /*
@@ -19,14 +20,16 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"fmt"
 	"runtime"
 
-	"k8s.io/api/core/v1"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	v1 "k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/securitycontext"
-
-	"k8s.io/klog/v2"
 )
 
 // applyPlatformSpecificContainerConfig applies platform specific configurations to runtimeapi.ContainerConfig.
@@ -75,7 +78,7 @@ func (m *kubeGenericRuntimeManager) generateWindowsContainerConfig(container *v1
 		// Part three - CRI & ContainerD's implementation
 		//   The kubelet sets these directly on CGroups in Linux, but needs to pass them across CRI on Windows.
 		//   There is an existing cpu_maximum field, with a range of percent * 100, so 1-10000. This is different from Docker, but consistent with OCI
-		//   https://github.com/kubernetes/kubernetes/blob/56d1c3b96d0a544130a82caad33dd57629b8a7f8/staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2/api.proto#L681-L682
+		//   https://github.com/kubernetes/kubernetes/blob/56d1c3b96d0a544130a82caad33dd57629b8a7f8/staging/src/k8s.io/cri-api/pkg/apis/runtime/v1/api.proto#L681-L682
 		//   https://github.com/opencontainers/runtime-spec/blob/ad53dcdc39f1f7f7472b10aa0a45648fe4865496/config-windows.md#cpu
 		//   If both CpuWeight and CpuMaximum are set - ContainerD catches this invalid case and returns an error instead.
 
@@ -97,7 +100,7 @@ func (m *kubeGenericRuntimeManager) generateWindowsContainerConfig(container *v1
 	if wc.Resources.CpuCount > 0 {
 		if wc.Resources.CpuMaximum > 0 {
 			wc.Resources.CpuMaximum = 0
-			klog.Warningf("Mutually exclusive options: CPUCount priority > CPUMaximum priority on Windows Server Containers. CPUMaximum should be ignored")
+			klog.InfoS("Mutually exclusive options: CPUCount priority > CPUMaximum priority on Windows Server Containers. CPUMaximum should be ignored")
 		}
 	}
 
@@ -120,6 +123,13 @@ func (m *kubeGenericRuntimeManager) generateWindowsContainerConfig(container *v1
 	// override with Windows options if present
 	if effectiveSc.WindowsOptions != nil && effectiveSc.WindowsOptions.RunAsUserName != nil {
 		wc.SecurityContext.RunAsUsername = *effectiveSc.WindowsOptions.RunAsUserName
+	}
+
+	if securitycontext.HasWindowsHostProcessRequest(pod, container) {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.WindowsHostProcessContainers) {
+			return nil, fmt.Errorf("pod contains HostProcess containers but feature 'WindowsHostProcessContainers' is not enabled")
+		}
+		wc.SecurityContext.HostProcess = true
 	}
 
 	return wc, nil

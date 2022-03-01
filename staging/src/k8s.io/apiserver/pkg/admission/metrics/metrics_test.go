@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/component-base/metrics/legacyregistry"
 )
 
 var (
@@ -35,7 +36,8 @@ var (
 )
 
 func TestObserveAdmissionStep(t *testing.T) {
-	Metrics.reset()
+	defer Metrics.reset()
+	defer legacyregistry.Reset()
 	handler := WithStepMetrics(&mutatingAndValidatingFakeHandler{admission.NewHandler(admission.Create), true, true})
 	if err := handler.(admission.MutationInterface).Admit(context.TODO(), attr, nil); err != nil {
 		t.Errorf("Unexpected error in admit: %v", err)
@@ -57,7 +59,8 @@ func TestObserveAdmissionStep(t *testing.T) {
 }
 
 func TestObserveAdmissionController(t *testing.T) {
-	Metrics.reset()
+	defer Metrics.reset()
+	defer legacyregistry.Reset()
 	handler := WithControllerMetrics(&mutatingAndValidatingFakeHandler{admission.NewHandler(admission.Create), true, true}, "a")
 	if err := handler.(admission.MutationInterface).Admit(context.TODO(), attr, nil); err != nil {
 		t.Errorf("Unexpected error in admit: %v", err)
@@ -78,22 +81,50 @@ func TestObserveAdmissionController(t *testing.T) {
 }
 
 func TestObserveWebhook(t *testing.T) {
-	Metrics.reset()
-	Metrics.ObserveWebhook(context.TODO(), 2*time.Second, false, attr, stepAdmit, "x")
-	wantLabels := map[string]string{
+	defer Metrics.reset()
+	defer legacyregistry.Reset()
+	Metrics.ObserveWebhook(context.TODO(), "x", 2*time.Second, false, attr, stepAdmit, 200)
+	Metrics.ObserveWebhook(context.TODO(), "x", 2*time.Second, true, attr, stepValidate, 654)
+	wantLabelsCounterAdmit := map[string]string{
+		"name":      "x",
+		"operation": string(admission.Create),
+		"type":      "admit",
+		"code":      "200",
+		"rejected":  "false",
+	}
+	wantLabelsCounterValidate := map[string]string{
+		"name":      "x",
+		"operation": string(admission.Create),
+		"type":      "validate",
+		"code":      "600",
+		"rejected":  "true",
+	}
+	wantLabelsHistogramAdmit := map[string]string{
 		"name":      "x",
 		"operation": string(admission.Create),
 		"type":      "admit",
 		"rejected":  "false",
 	}
-	expectHistogramCountTotal(t, "apiserver_admission_webhook_admission_duration_seconds", wantLabels, 1)
+	wantLabelsHistogramValidate := map[string]string{
+		"name":      "x",
+		"operation": string(admission.Create),
+		"type":      "validate",
+		"rejected":  "true",
+	}
+
+	expectCounterValue(t, "apiserver_admission_webhook_request_total", wantLabelsCounterAdmit, 1)
+	expectCounterValue(t, "apiserver_admission_webhook_request_total", wantLabelsCounterValidate, 1)
+
+	expectHistogramCountTotal(t, "apiserver_admission_webhook_admission_duration_seconds", wantLabelsHistogramAdmit, 1)
+	expectHistogramCountTotal(t, "apiserver_admission_webhook_admission_duration_seconds", wantLabelsHistogramValidate, 1)
 }
 
 func TestObserveWebhookRejection(t *testing.T) {
 	Metrics.reset()
 	Metrics.ObserveWebhookRejection(context.TODO(), "x", stepAdmit, string(admission.Create), WebhookRejectionNoError, 500)
 	Metrics.ObserveWebhookRejection(context.TODO(), "x", stepAdmit, string(admission.Create), WebhookRejectionNoError, 654)
-	Metrics.ObserveWebhookRejection(context.TODO(), "x", stepValidate, string(admission.Update), WebhookRejectionCallingWebhookError, 0)
+	Metrics.ObserveWebhookRejection(context.TODO(), "x", stepValidate, string(admission.Update), WebhookRejectionCallingWebhookError, 501)
+	Metrics.ObserveWebhookRejection(context.TODO(), "x", stepValidate, string(admission.Update), WebhookRejectionAPIServerInternalError, 0)
 	wantLabels := map[string]string{
 		"name":           "x",
 		"operation":      string(admission.Create),
@@ -113,16 +144,41 @@ func TestObserveWebhookRejection(t *testing.T) {
 		"operation":      string(admission.Update),
 		"type":           "validate",
 		"error_type":     "calling_webhook_error",
+		"rejection_code": "501",
+	}
+	wantLabelsAPIServerInternalError := map[string]string{
+		"name":           "x",
+		"operation":      string(admission.Update),
+		"type":           "validate",
+		"error_type":     "apiserver_internal_error",
 		"rejection_code": "0",
 	}
 	expectCounterValue(t, "apiserver_admission_webhook_rejection_count", wantLabels, 1)
 	expectCounterValue(t, "apiserver_admission_webhook_rejection_count", wantLabels600, 1)
 	expectCounterValue(t, "apiserver_admission_webhook_rejection_count", wantLabelsCallingWebhookError, 1)
+	expectCounterValue(t, "apiserver_admission_webhook_rejection_count", wantLabelsAPIServerInternalError, 1)
+}
+
+func TestObserveWebhookFailOpen(t *testing.T) {
+	defer Metrics.reset()
+	defer legacyregistry.Reset()
+	Metrics.ObserveWebhookFailOpen(context.TODO(), "x", stepAdmit)
+	Metrics.ObserveWebhookFailOpen(context.TODO(), "x", stepValidate)
+	wantLabelsCounterAdmit := map[string]string{
+		"name": "x",
+		"type": "admit",
+	}
+	wantLabelsCounterValidate := map[string]string{
+		"name": "x",
+		"type": "validate",
+	}
+	expectCounterValue(t, "apiserver_admission_webhook_fail_open_count", wantLabelsCounterAdmit, 1)
+	expectCounterValue(t, "apiserver_admission_webhook_fail_open_count", wantLabelsCounterValidate, 1)
 }
 
 func TestWithMetrics(t *testing.T) {
-	Metrics.reset()
-
+	defer Metrics.reset()
+	defer legacyregistry.Reset()
 	type Test struct {
 		name            string
 		ns              string

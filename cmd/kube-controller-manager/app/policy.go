@@ -21,53 +21,43 @@ limitations under the License.
 package app
 
 import (
-	"net/http"
+	"context"
 
 	"k8s.io/klog/v2"
 
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/scale"
+	"k8s.io/controller-manager/controller"
 	"k8s.io/kubernetes/pkg/controller/disruption"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 )
 
-func startDisruptionController(ctx ControllerContext) (http.Handler, bool, error) {
-	var group = "policy"
-	var version = "v1beta1"
-	var resource = "poddisruptionbudgets"
-
-	if !ctx.AvailableResources[schema.GroupVersionResource{Group: group, Version: version, Resource: resource}] {
-		klog.Infof(
-			"Refusing to start disruption because resource %q in group %q is not available.",
-			resource, group+"/"+version)
-		return nil, false, nil
-	}
+func startDisruptionController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodDisruptionBudget) {
-		klog.Infof("Refusing to start disruption because the PodDisruptionBudget feature is disabled")
+		klog.InfoS("Refusing to start disruption because the PodDisruptionBudget feature is disabled")
 		return nil, false, nil
 	}
 
-	client := ctx.ClientBuilder.ClientOrDie("disruption-controller")
-	config := ctx.ClientBuilder.ConfigOrDie("disruption-controller")
+	client := controllerContext.ClientBuilder.ClientOrDie("disruption-controller")
+	config := controllerContext.ClientBuilder.ConfigOrDie("disruption-controller")
 	scaleKindResolver := scale.NewDiscoveryScaleKindResolver(client.Discovery())
-	scaleClient, err := scale.NewForConfig(config, ctx.RESTMapper, dynamic.LegacyAPIPathResolverFunc, scaleKindResolver)
+	scaleClient, err := scale.NewForConfig(config, controllerContext.RESTMapper, dynamic.LegacyAPIPathResolverFunc, scaleKindResolver)
 	if err != nil {
 		return nil, false, err
 	}
 
 	go disruption.NewDisruptionController(
-		ctx.InformerFactory.Core().V1().Pods(),
-		ctx.InformerFactory.Policy().V1beta1().PodDisruptionBudgets(),
-		ctx.InformerFactory.Core().V1().ReplicationControllers(),
-		ctx.InformerFactory.Apps().V1().ReplicaSets(),
-		ctx.InformerFactory.Apps().V1().Deployments(),
-		ctx.InformerFactory.Apps().V1().StatefulSets(),
+		controllerContext.InformerFactory.Core().V1().Pods(),
+		controllerContext.InformerFactory.Policy().V1().PodDisruptionBudgets(),
+		controllerContext.InformerFactory.Core().V1().ReplicationControllers(),
+		controllerContext.InformerFactory.Apps().V1().ReplicaSets(),
+		controllerContext.InformerFactory.Apps().V1().Deployments(),
+		controllerContext.InformerFactory.Apps().V1().StatefulSets(),
 		client,
-		ctx.RESTMapper,
+		controllerContext.RESTMapper,
 		scaleClient,
 		client.Discovery(),
-	).Run(ctx.Stop)
+	).Run(ctx)
 	return nil, true, nil
 }

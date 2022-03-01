@@ -21,8 +21,8 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	utilnode "k8s.io/component-helpers/node/topology"
 	"k8s.io/klog/v2"
-	utilnode "k8s.io/kubernetes/pkg/util/node"
 )
 
 // nodeTree is a tree-like data structure that holds node names in each zone. Zone names are
@@ -53,7 +53,7 @@ func (nt *nodeTree) addNode(n *v1.Node) {
 	if na, ok := nt.tree[zone]; ok {
 		for _, nodeName := range na {
 			if nodeName == n.Name {
-				klog.Warningf("node %q already exist in the NodeTree", n.Name)
+				klog.InfoS("Node already exists in the NodeTree", "node", klog.KObj(n))
 				return
 			}
 		}
@@ -62,7 +62,7 @@ func (nt *nodeTree) addNode(n *v1.Node) {
 		nt.zones = append(nt.zones, zone)
 		nt.tree[zone] = []string{n.Name}
 	}
-	klog.V(2).Infof("Added node %q in group %q to NodeTree", n.Name, zone)
+	klog.V(2).InfoS("Added node in listed group to NodeTree", "node", klog.KObj(n), "zone", zone)
 	nt.numNodes++
 }
 
@@ -76,13 +76,13 @@ func (nt *nodeTree) removeNode(n *v1.Node) error {
 				if len(nt.tree[zone]) == 0 {
 					nt.removeZone(zone)
 				}
-				klog.V(2).Infof("Removed node %q in group %q from NodeTree", n.Name, zone)
+				klog.V(2).InfoS("Removed node in listed group from NodeTree", "node", klog.KObj(n), "zone", zone)
 				nt.numNodes--
 				return nil
 			}
 		}
 	}
-	klog.Errorf("Node %q in group %q was not found", n.Name, zone)
+	klog.ErrorS(nil, "Node in listed group was not found", "node", klog.KObj(n), "zone", zone)
 	return fmt.Errorf("node %q in group %q was not found", n.Name, zone)
 }
 

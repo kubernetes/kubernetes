@@ -38,7 +38,9 @@ cd -
 # Prefer full path for running zeitgeist
 ZEITGEIST_BIN="$(which zeitgeist)"
 
-"${ZEITGEIST_BIN}" validate \
+# TODO: revert sed hack when zetigeist respects CLICOLOR/ttys
+CLICOLOR=0 "${ZEITGEIST_BIN}" validate \
   --local \
   --base-path "${KUBE_ROOT}" \
-  --config "${KUBE_ROOT}"/build/dependencies.yaml
+  --config "${KUBE_ROOT}"/build/dependencies.yaml \
+  2> >(sed -e $'s/\x1b\[[0-9;]*m//g' >&2)

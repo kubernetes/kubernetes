@@ -37,28 +37,44 @@ package drivers
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"regexp"
 	"strconv"
+	"strings"
+	"sync"
 	"time"
 
-	"gopkg.in/yaml.v2"
-
 	"github.com/onsi/ginkgo"
+	spb "google.golang.org/genproto/googleapis/rpc/status"
+	"google.golang.org/grpc/codes"
+	grpcstatus "google.golang.org/grpc/status"
+
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
+	mockdriver "k8s.io/kubernetes/test/e2e/storage/drivers/csi-test/driver"
+	mockservice "k8s.io/kubernetes/test/e2e/storage/drivers/csi-test/mock/service"
+	"k8s.io/kubernetes/test/e2e/storage/drivers/proxy"
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+
+	"google.golang.org/grpc"
 )
 
 const (
@@ -66,6 +82,9 @@ const (
 	GCEPDCSIDriverName = "pd.csi.storage.gke.io"
 	// GCEPDCSIZoneTopologyKey is the key of GCE Persistent Disk CSI zone topology
 	GCEPDCSIZoneTopologyKey = "topology.gke.io/zone"
+
+	// Prefix of the mock driver grpc log
+	grpcCallPrefix = "gRPCCall:"
 )
 
 // hostpathCSI
@@ -96,6 +115,18 @@ func initHostPathCSIDriver(name string, capabilities map[storageframework.Capabi
 				NumPods:      10,
 				NumSnapshots: 10,
 			},
+			PerformanceTestOptions: &storageframework.PerformanceTestOptions{
+				ProvisioningOptions: &storageframework.PerformanceTestProvisioningOptions{
+					VolumeSize: "1Mi",
+					Count:      300,
+					// Volume provisioning metrics are compared to a high baseline.
+					// Failure to pass would suggest a performance regression.
+					ExpectedMetrics: &storageframework.Metrics{
+						AvgLatency: 2 * time.Minute,
+						Throughput: 0.5,
+					},
+				},
+			},
 		},
 		manifests:        manifests,
 		volumeAttributes: volumeAttributes,
@@ -116,8 +147,14 @@ func InitHostPathCSIDriver() storageframework.TestDriver {
 		storageframework.CapBlock:               true,
 		storageframework.CapPVCDataSource:       true,
 		storageframework.CapControllerExpansion: true,
+		storageframework.CapOnlineExpansion:     true,
 		storageframework.CapSingleNodeVolume:    true,
-		storageframework.CapVolumeLimits:        true,
+
+		// This is needed for the
+		// testsuites/volumelimits.go `should support volume limits`
+		// test. --maxvolumespernode=10 gets
+		// added when patching the deployment.
+		storageframework.CapVolumeLimits: true,
 	}
 	return initHostPathCSIDriver("csi-hostpath",
 		capabilities,
@@ -127,14 +164,11 @@ func InitHostPathCSIDriver() storageframework.TestDriver {
 		},
 		"test/e2e/testing-manifests/storage-csi/external-attacher/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-provisioner/rbac.yaml",
-		"test/e2e/testing-manifests/storage-csi/external-snapshotter/rbac.yaml",
+		"test/e2e/testing-manifests/storage-csi/external-snapshotter/csi-snapshotter/rbac-csi-snapshotter.yaml",
+		"test/e2e/testing-manifests/storage-csi/external-health-monitor/external-health-monitor-controller/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-resizer/rbac.yaml",
-		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpath-attacher.yaml",
 		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpath-driverinfo.yaml",
 		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpath-plugin.yaml",
-		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpath-provisioner.yaml",
-		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpath-resizer.yaml",
-		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpath-snapshotter.yaml",
 		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/e2e-test-rbac.yaml",
 	)
 }
@@ -168,9 +202,8 @@ func (h *hostpathCSIDriver) GetCSIDriverName(config *storageframework.PerTestCon
 func (h *hostpathCSIDriver) GetSnapshotClass(config *storageframework.PerTestConfig, parameters map[string]string) *unstructured.Unstructured {
 	snapshotter := config.GetUniqueDriverName()
 	ns := config.Framework.Namespace.Name
-	suffix := fmt.Sprintf("%s-vsc", snapshotter)
 
-	return utils.GenerateSnapshotClassSpec(snapshotter, parameters, ns, suffix)
+	return utils.GenerateSnapshotClassSpec(snapshotter, parameters, ns)
 }
 
 func (h *hostpathCSIDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTestConfig, func()) {
@@ -195,16 +228,58 @@ func (h *hostpathCSIDriver) PrepareTest(f *framework.Framework) (*storageframewo
 	}
 
 	o := utils.PatchCSIOptions{
-		OldDriverName:            h.driverInfo.Name,
-		NewDriverName:            config.GetUniqueDriverName(),
-		DriverContainerName:      "hostpath",
-		DriverContainerArguments: []string{"--drivername=" + config.GetUniqueDriverName()},
+		OldDriverName:       h.driverInfo.Name,
+		NewDriverName:       config.GetUniqueDriverName(),
+		DriverContainerName: "hostpath",
+		DriverContainerArguments: []string{"--drivername=" + config.GetUniqueDriverName(),
+			// This is needed for the
+			// testsuites/volumelimits.go `should support volume limits`
+			// test.
+			"--maxvolumespernode=10",
+			// Enable volume lifecycle checks, to report failure if
+			// the volume is not unpublished / unstaged correctly.
+			"--check-volume-lifecycle=true",
+		},
 		ProvisionerContainerName: "csi-provisioner",
 		SnapshotterContainerName: "csi-snapshotter",
 		NodeName:                 node.Name,
 	}
+
+	// Disable volume lifecycle checks due to issue #103651 for the one
+	// test that it breaks.
+	// TODO: enable this check once issue is resolved for csi-host-path driver
+	// (https://github.com/kubernetes/kubernetes/pull/104858).
+	if regexp.MustCompile("should unmount if pod is.*deleted while kubelet is down").MatchString(ginkgo.CurrentGinkgoTestDescription().FullTestText) {
+		o.DriverContainerArguments = append(o.DriverContainerArguments, "--check-volume-lifecycle=false")
+	}
+
 	cleanup, err := utils.CreateFromManifests(config.Framework, driverNamespace, func(item interface{}) error {
-		return utils.PatchCSIDeployment(config.Framework, o, item)
+		if err := utils.PatchCSIDeployment(config.Framework, o, item); err != nil {
+			return err
+		}
+
+		// Remove csi-external-health-monitor-agent and
+		// csi-external-health-monitor-controller
+		// containers. The agent is obsolete.
+		// The controller is not needed for any of the
+		// tests and is causing too much overhead when
+		// running in a large cluster (see
+		// https://github.com/kubernetes/kubernetes/issues/102452#issuecomment-856991009).
+		switch item := item.(type) {
+		case *appsv1.StatefulSet:
+			var containers []v1.Container
+			for _, container := range item.Spec.Template.Spec.Containers {
+				switch container.Name {
+				case "csi-external-health-monitor-agent", "csi-external-health-monitor-controller":
+					// Remove these containers.
+				default:
+					// Keep the others.
+					containers = append(containers, container)
+				}
+			}
+			item.Spec.Template.Spec.Containers = containers
+		}
+		return nil
 	}, h.manifests...)
 
 	if err != nil {
@@ -224,35 +299,155 @@ func (h *hostpathCSIDriver) PrepareTest(f *framework.Framework) (*storageframewo
 
 // mockCSI
 type mockCSIDriver struct {
-	driverInfo          storageframework.DriverInfo
-	manifests           []string
-	podInfo             *bool
-	storageCapacity     *bool
-	attachable          bool
-	attachLimit         int
-	enableTopology      bool
-	enableNodeExpansion bool
-	javascriptHooks     map[string]string
-	tokenRequests       []storagev1.TokenRequest
-	requiresRepublish   *bool
-	fsGroupPolicy       *storagev1.FSGroupPolicy
+	driverInfo             storageframework.DriverInfo
+	manifests              []string
+	podInfo                *bool
+	storageCapacity        *bool
+	attachable             bool
+	attachLimit            int
+	enableTopology         bool
+	enableNodeExpansion    bool
+	hooks                  Hooks
+	tokenRequests          []storagev1.TokenRequest
+	requiresRepublish      *bool
+	fsGroupPolicy          *storagev1.FSGroupPolicy
+	enableVolumeMountGroup bool
+	embedded               bool
+	calls                  MockCSICalls
+	embeddedCSIDriver      *mockdriver.CSIDriver
+
+	// Additional values set during PrepareTest
+	clientSet       kubernetes.Interface
+	driverNamespace *v1.Namespace
+}
+
+// Hooks to be run to execute while handling gRPC calls.
+//
+// At the moment, only generic pre- and post-function call
+// hooks are implemented. Those hooks can cast the request and
+// response values if needed. More hooks inside specific
+// functions could be added if needed.
+type Hooks struct {
+	// Pre is called before invoking the mock driver's implementation of a method.
+	// If either a non-nil reply or error are returned, then those are returned to the caller.
+	Pre func(ctx context.Context, method string, request interface{}) (reply interface{}, err error)
+
+	// Post is called after invoking the mock driver's implementation of a method.
+	// What it returns is used as actual result.
+	Post func(ctx context.Context, method string, request, reply interface{}, err error) (finalReply interface{}, finalErr error)
+}
+
+// MockCSITestDriver provides additional functions specific to the CSI mock driver.
+type MockCSITestDriver interface {
+	storageframework.DynamicPVTestDriver
+
+	// GetCalls returns all currently observed gRPC calls. Only valid
+	// after PrepareTest.
+	GetCalls() ([]MockCSICall, error)
 }
 
 // CSIMockDriverOpts defines options used for csi driver
 type CSIMockDriverOpts struct {
-	RegisterDriver      bool
-	DisableAttach       bool
-	PodInfo             *bool
-	StorageCapacity     *bool
-	AttachLimit         int
-	EnableTopology      bool
-	EnableResizing      bool
-	EnableNodeExpansion bool
-	EnableSnapshot      bool
-	JavascriptHooks     map[string]string
-	TokenRequests       []storagev1.TokenRequest
-	RequiresRepublish   *bool
-	FSGroupPolicy       *storagev1.FSGroupPolicy
+	RegisterDriver         bool
+	DisableAttach          bool
+	PodInfo                *bool
+	StorageCapacity        *bool
+	AttachLimit            int
+	EnableTopology         bool
+	EnableResizing         bool
+	EnableNodeExpansion    bool
+	EnableSnapshot         bool
+	EnableVolumeMountGroup bool
+	TokenRequests          []storagev1.TokenRequest
+	RequiresRepublish      *bool
+	FSGroupPolicy          *storagev1.FSGroupPolicy
+
+	// Embedded defines whether the CSI mock driver runs
+	// inside the cluster (false, the default) or just a proxy
+	// runs inside the cluster and all gRPC calls are handled
+	// inside the e2e.test binary.
+	Embedded bool
+
+	// Hooks that will be called if (and only if!) the embedded
+	// mock driver is used. Beware that hooks are invoked
+	// asynchronously in different goroutines.
+	Hooks Hooks
+}
+
+// Dummy structure that parses just volume_attributes and error code out of logged CSI call
+type MockCSICall struct {
+	json string // full log entry
+
+	Method  string
+	Request struct {
+		VolumeContext map[string]string `json:"volume_context"`
+	}
+	FullError struct {
+		Code    codes.Code `json:"code"`
+		Message string     `json:"message"`
+	}
+	Error string
+}
+
+// MockCSICalls is a Thread-safe storage for MockCSICall instances.
+type MockCSICalls struct {
+	calls []MockCSICall
+	mutex sync.Mutex
+}
+
+// Get returns all currently recorded calls.
+func (c *MockCSICalls) Get() []MockCSICall {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	return c.calls[:]
+}
+
+// Add appens one new call at the end.
+func (c *MockCSICalls) Add(call MockCSICall) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	c.calls = append(c.calls, call)
+}
+
+// LogGRPC takes individual parameters from the mock CSI driver and adds them.
+func (c *MockCSICalls) LogGRPC(method string, request, reply interface{}, err error) {
+	// Encoding to JSON and decoding mirrors the traditional way of capturing calls.
+	// Probably could be simplified now...
+	logMessage := struct {
+		Method   string
+		Request  interface{}
+		Response interface{}
+		// Error as string, for backward compatibility.
+		// "" on no error.
+		Error string
+		// Full error dump, to be able to parse out full gRPC error code and message separately in a test.
+		FullError *spb.Status
+	}{
+		Method:   method,
+		Request:  request,
+		Response: reply,
+	}
+
+	if err != nil {
+		logMessage.Error = err.Error()
+		logMessage.FullError = grpcstatus.Convert(err).Proto()
+	}
+
+	msg, _ := json.Marshal(logMessage)
+	call := MockCSICall{
+		json: string(msg),
+	}
+	json.Unmarshal(msg, &call)
+
+	klog.Infof("%s %s", grpcCallPrefix, string(msg))
+
+	// Trim gRPC service name, i.e. "/csi.v1.Identity/Probe" -> "Probe"
+	methodParts := strings.Split(call.Method, "/")
+	call.Method = methodParts[len(methodParts)-1]
+
+	c.Add(call)
 }
 
 var _ storageframework.TestDriver = &mockCSIDriver{}
@@ -260,15 +455,19 @@ var _ storageframework.DynamicPVTestDriver = &mockCSIDriver{}
 var _ storageframework.SnapshottableTestDriver = &mockCSIDriver{}
 
 // InitMockCSIDriver returns a mockCSIDriver that implements TestDriver interface
-func InitMockCSIDriver(driverOpts CSIMockDriverOpts) storageframework.TestDriver {
+func InitMockCSIDriver(driverOpts CSIMockDriverOpts) MockCSITestDriver {
 	driverManifests := []string{
 		"test/e2e/testing-manifests/storage-csi/external-attacher/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-provisioner/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-resizer/rbac.yaml",
-		"test/e2e/testing-manifests/storage-csi/external-snapshotter/rbac.yaml",
+		"test/e2e/testing-manifests/storage-csi/external-snapshotter/csi-snapshotter/rbac-csi-snapshotter.yaml",
 		"test/e2e/testing-manifests/storage-csi/mock/csi-mock-rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/mock/csi-storageclass.yaml",
-		"test/e2e/testing-manifests/storage-csi/mock/csi-mock-driver.yaml",
+	}
+	if driverOpts.Embedded {
+		driverManifests = append(driverManifests, "test/e2e/testing-manifests/storage-csi/mock/csi-mock-proxy.yaml")
+	} else {
+		driverManifests = append(driverManifests, "test/e2e/testing-manifests/storage-csi/mock/csi-mock-driver.yaml")
 	}
 
 	if driverOpts.RegisterDriver {
@@ -302,17 +501,19 @@ func InitMockCSIDriver(driverOpts CSIMockDriverOpts) storageframework.TestDriver
 				storageframework.CapVolumeLimits: true,
 			},
 		},
-		manifests:           driverManifests,
-		podInfo:             driverOpts.PodInfo,
-		storageCapacity:     driverOpts.StorageCapacity,
-		enableTopology:      driverOpts.EnableTopology,
-		attachable:          !driverOpts.DisableAttach,
-		attachLimit:         driverOpts.AttachLimit,
-		enableNodeExpansion: driverOpts.EnableNodeExpansion,
-		javascriptHooks:     driverOpts.JavascriptHooks,
-		tokenRequests:       driverOpts.TokenRequests,
-		requiresRepublish:   driverOpts.RequiresRepublish,
-		fsGroupPolicy:       driverOpts.FSGroupPolicy,
+		manifests:              driverManifests,
+		podInfo:                driverOpts.PodInfo,
+		storageCapacity:        driverOpts.StorageCapacity,
+		enableTopology:         driverOpts.EnableTopology,
+		attachable:             !driverOpts.DisableAttach,
+		attachLimit:            driverOpts.AttachLimit,
+		enableNodeExpansion:    driverOpts.EnableNodeExpansion,
+		tokenRequests:          driverOpts.TokenRequests,
+		requiresRepublish:      driverOpts.RequiresRepublish,
+		fsGroupPolicy:          driverOpts.FSGroupPolicy,
+		enableVolumeMountGroup: driverOpts.EnableVolumeMountGroup,
+		embedded:               driverOpts.Embedded,
+		hooks:                  driverOpts.Hooks,
 	}
 }
 
@@ -334,68 +535,114 @@ func (m *mockCSIDriver) GetDynamicProvisionStorageClass(config *storageframework
 func (m *mockCSIDriver) GetSnapshotClass(config *storageframework.PerTestConfig, parameters map[string]string) *unstructured.Unstructured {
 	snapshotter := m.driverInfo.Name + "-" + config.Framework.UniqueName
 	ns := config.Framework.Namespace.Name
-	suffix := fmt.Sprintf("%s-vsc", snapshotter)
 
-	return utils.GenerateSnapshotClassSpec(snapshotter, parameters, ns, suffix)
+	return utils.GenerateSnapshotClassSpec(snapshotter, parameters, ns)
 }
 
 func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTestConfig, func()) {
+	m.clientSet = f.ClientSet
+
 	// Create secondary namespace which will be used for creating driver
-	driverNamespace := utils.CreateDriverNamespace(f)
-	driverns := driverNamespace.Name
+	m.driverNamespace = utils.CreateDriverNamespace(f)
+	driverns := m.driverNamespace.Name
 	testns := f.Namespace.Name
 
-	ginkgo.By("deploying csi mock driver")
-	cancelLogging := utils.StartPodLogs(f, driverNamespace)
+	if m.embedded {
+		ginkgo.By("deploying csi mock proxy")
+	} else {
+		ginkgo.By("deploying csi mock driver")
+	}
+	cancelLogging := utils.StartPodLogs(f, m.driverNamespace)
 	cs := f.ClientSet
 
 	// pods should be scheduled on the node
 	node, err := e2enode.GetRandomReadySchedulableNode(cs)
 	framework.ExpectNoError(err)
+
+	embeddedCleanup := func() {}
+	containerArgs := []string{}
+	if m.embedded {
+		// Run embedded CSI driver.
+		//
+		// For now we start exactly one instance which implements controller,
+		// node and identity services. It matches with the one pod that we run
+		// inside the cluster. The name and namespace of that one is deterministic,
+		// so we know what to connect to.
+		//
+		// Long-term we could also deploy one central controller and multiple
+		// node instances, with knowledge about provisioned volumes shared in
+		// this process.
+		podname := "csi-mockplugin-0"
+		containername := "mock"
+		ctx, cancel := context.WithCancel(context.Background())
+		serviceConfig := mockservice.Config{
+			DisableAttach:            !m.attachable,
+			DriverName:               "csi-mock-" + f.UniqueName,
+			AttachLimit:              int64(m.attachLimit),
+			NodeExpansionRequired:    m.enableNodeExpansion,
+			VolumeMountGroupRequired: m.enableVolumeMountGroup,
+			EnableTopology:           m.enableTopology,
+			IO: proxy.PodDirIO{
+				F:             f,
+				Namespace:     m.driverNamespace.Name,
+				PodName:       podname,
+				ContainerName: "busybox",
+			},
+		}
+		s := mockservice.New(serviceConfig)
+		servers := &mockdriver.CSIDriverServers{
+			Controller: s,
+			Identity:   s,
+			Node:       s,
+		}
+		m.embeddedCSIDriver = mockdriver.NewCSIDriver(servers)
+
+		l, err := proxy.Listen(ctx, f.ClientSet, f.ClientConfig(),
+			proxy.Addr{
+				Namespace:     m.driverNamespace.Name,
+				PodName:       podname,
+				ContainerName: containername,
+				Port:          9000,
+			},
+		)
+		framework.ExpectNoError(err, "start connecting to proxy pod")
+		err = m.embeddedCSIDriver.Start(l, m.interceptGRPC)
+		framework.ExpectNoError(err, "start mock driver")
+
+		embeddedCleanup = func() {
+			// Kill all goroutines and delete resources of the mock driver.
+			m.embeddedCSIDriver.Stop()
+			l.Close()
+			cancel()
+		}
+	} else {
+		// When using the mock driver inside the cluster it has to be reconfigured
+		// via command line parameters.
+		containerArgs = append(containerArgs, "--drivername=csi-mock-"+f.UniqueName)
+
+		if m.attachable {
+			containerArgs = append(containerArgs, "--enable-attach")
+		}
+
+		if m.enableTopology {
+			containerArgs = append(containerArgs, "--enable-topology")
+		}
+
+		if m.attachLimit > 0 {
+			containerArgs = append(containerArgs, "--attach-limit", strconv.Itoa(m.attachLimit))
+		}
+
+		if m.enableNodeExpansion {
+			containerArgs = append(containerArgs, "--node-expand-required=true")
+		}
+	}
+
 	config := &storageframework.PerTestConfig{
 		Driver:              m,
 		Prefix:              "mock",
 		Framework:           f,
 		ClientNodeSelection: e2epod.NodeSelection{Name: node.Name},
-		DriverNamespace:     driverNamespace,
-	}
-
-	containerArgs := []string{"--name=csi-mock-" + f.UniqueName}
-	if !m.attachable {
-		containerArgs = append(containerArgs, "--disable-attach")
-	}
-
-	if m.enableTopology {
-		containerArgs = append(containerArgs, "--enable-topology")
-	}
-
-	if m.attachLimit > 0 {
-		containerArgs = append(containerArgs, "--attach-limit", strconv.Itoa(m.attachLimit))
-	}
-
-	if m.enableNodeExpansion {
-		containerArgs = append(containerArgs, "--node-expand-required=true")
-	}
-
-	// Create a config map with javascript hooks. Create it even when javascriptHooks
-	// are empty, so we can unconditionally add it to the mock pod.
-	const hooksConfigMapName = "mock-driver-hooks"
-	hooksYaml, err := yaml.Marshal(m.javascriptHooks)
-	framework.ExpectNoError(err)
-	hooks := &v1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: hooksConfigMapName,
-		},
-		Data: map[string]string{
-			"hooks.yaml": string(hooksYaml),
-		},
-	}
-
-	_, err = f.ClientSet.CoreV1().ConfigMaps(driverns).Create(context.TODO(), hooks, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
-
-	if len(m.javascriptHooks) > 0 {
-		containerArgs = append(containerArgs, "--hooks-file=/etc/hooks/hooks.yaml")
+		DriverNamespace:     m.driverNamespace,
 	}
 
 	o := utils.PatchCSIOptions{
@@ -416,15 +663,33 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*storageframework.P
 		RequiresRepublish: m.requiresRepublish,
 		FSGroupPolicy:     m.fsGroupPolicy,
 	}
-	cleanup, err := utils.CreateFromManifests(f, driverNamespace, func(item interface{}) error {
-		return utils.PatchCSIDeployment(f, o, item)
+	cleanup, err := utils.CreateFromManifests(f, m.driverNamespace, func(item interface{}) error {
+		if err := utils.PatchCSIDeployment(config.Framework, o, item); err != nil {
+			return err
+		}
+
+		switch item := item.(type) {
+		case *rbacv1.ClusterRole:
+			if strings.HasPrefix(item.Name, "external-snapshotter-runner") {
+				// Re-enable access to secrets for the snapshotter sidecar for
+				// https://github.com/kubernetes/kubernetes/blob/6ede5ca95f78478fa627ecfea8136e0dff34436b/test/e2e/storage/csi_mock_volume.go#L1539-L1548
+				// It was disabled in https://github.com/kubernetes-csi/external-snapshotter/blob/501cc505846c03ee665355132f2da0ce7d5d747d/deploy/kubernetes/csi-snapshotter/rbac-csi-snapshotter.yaml#L26-L32
+				item.Rules = append(item.Rules, rbacv1.PolicyRule{
+					APIGroups: []string{""},
+					Resources: []string{"secrets"},
+					Verbs:     []string{"get", "list"},
+				})
+			}
+		}
+
+		return nil
 	}, m.manifests...)
 
 	if err != nil {
 		framework.Failf("deploying csi mock driver: %v", err)
 	}
 
-	cleanupFunc := generateDriverCleanupFunc(
+	driverCleanupFunc := generateDriverCleanupFunc(
 		f,
 		"mock",
 		testns,
@@ -432,7 +697,79 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*storageframework.P
 		cleanup,
 		cancelLogging)
 
+	cleanupFunc := func() {
+		embeddedCleanup()
+		driverCleanupFunc()
+	}
+
 	return config, cleanupFunc
+}
+
+func (m *mockCSIDriver) interceptGRPC(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
+	defer func() {
+		// Always log the call and its final result,
+		// regardless whether the result was from the real
+		// implementation or a hook.
+		m.calls.LogGRPC(info.FullMethod, req, resp, err)
+	}()
+
+	if m.hooks.Pre != nil {
+		resp, err = m.hooks.Pre(ctx, info.FullMethod, req)
+		if resp != nil || err != nil {
+			return
+		}
+	}
+	resp, err = handler(ctx, req)
+	if m.hooks.Post != nil {
+		resp, err = m.hooks.Post(ctx, info.FullMethod, req, resp, err)
+	}
+	return
+}
+
+func (m *mockCSIDriver) GetCalls() ([]MockCSICall, error) {
+	if m.embedded {
+		return m.calls.Get(), nil
+	}
+
+	if m.driverNamespace == nil {
+		return nil, errors.New("PrepareTest not called yet")
+	}
+
+	// Name of CSI driver pod name (it's in a StatefulSet with a stable name)
+	driverPodName := "csi-mockplugin-0"
+	// Name of CSI driver container name
+	driverContainerName := "mock"
+
+	// Load logs of driver pod
+	log, err := e2epod.GetPodLogs(m.clientSet, m.driverNamespace.Name, driverPodName, driverContainerName)
+	if err != nil {
+		return nil, fmt.Errorf("could not load CSI driver logs: %s", err)
+	}
+
+	logLines := strings.Split(log, "\n")
+	var calls []MockCSICall
+	for _, line := range logLines {
+		index := strings.Index(line, grpcCallPrefix)
+		if index == -1 {
+			continue
+		}
+		line = line[index+len(grpcCallPrefix):]
+		call := MockCSICall{
+			json: string(line),
+		}
+		err := json.Unmarshal([]byte(line), &call)
+		if err != nil {
+			framework.Logf("Could not parse CSI driver log line %q: %s", line, err)
+			continue
+		}
+
+		// Trim gRPC service name, i.e. "/csi.v1.Identity/Probe" -> "Probe"
+		methodParts := strings.Split(call.Method, "/")
+		call.Method = methodParts[len(methodParts)-1]
+
+		calls = append(calls, call)
+	}
+	return calls, nil
 }
 
 // gce-pd
@@ -473,6 +810,7 @@ func InitGcePDCSIDriver() storageframework.TestDriver {
 				storageframework.CapVolumeLimits:        false,
 				storageframework.CapTopology:            true,
 				storageframework.CapControllerExpansion: true,
+				storageframework.CapOnlineExpansion:     true,
 				storageframework.CapNodeExpansion:       true,
 				storageframework.CapSnapshotDataSource:  true,
 			},
@@ -503,7 +841,7 @@ func (g *gcePDCSIDriver) SkipUnsupportedTest(pattern storageframework.TestPatter
 	if pattern.FsType == "xfs" {
 		e2eskipper.SkipUnlessNodeOSDistroIs("ubuntu", "custom")
 	}
-	if pattern.FeatureTag == "[sig-windows]" {
+	if pattern.FeatureTag == "[Feature:Windows]" {
 		e2eskipper.Skipf("Skipping tests for windows since CSI does not support it yet")
 	}
 }
@@ -524,9 +862,8 @@ func (g *gcePDCSIDriver) GetDynamicProvisionStorageClass(config *storageframewor
 func (g *gcePDCSIDriver) GetSnapshotClass(config *storageframework.PerTestConfig, parameters map[string]string) *unstructured.Unstructured {
 	snapshotter := g.driverInfo.Name
 	ns := config.Framework.Namespace.Name
-	suffix := fmt.Sprintf("%s-vsc", snapshotter)
 
-	return utils.GenerateSnapshotClassSpec(snapshotter, parameters, ns, suffix)
+	return utils.GenerateSnapshotClassSpec(snapshotter, parameters, ns)
 }
 
 func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTestConfig, func()) {

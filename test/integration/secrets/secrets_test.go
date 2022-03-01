@@ -39,7 +39,7 @@ func deleteSecretOrErrorf(t *testing.T, c clientset.Interface, ns, name string) 
 
 // TestSecrets tests apiserver-side behavior of creation of secret objects and their use by pods.
 func TestSecrets(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(nil)
+	_, s, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})

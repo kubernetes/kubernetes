@@ -19,7 +19,7 @@ package auth
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"testing"
 	"time"
@@ -27,10 +27,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apiserver/pkg/authentication/group"
 	"k8s.io/apiserver/pkg/authentication/request/bearertoken"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/bootstrap"
-	bootstraputil "k8s.io/kubernetes/test/e2e/lifecycle/bootstrap"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -47,14 +47,8 @@ func (b bootstrapSecrets) Get(name string) (*corev1.Secret, error) {
 
 // TestBootstrapTokenAuth tests the bootstrap token auth provider
 func TestBootstrapTokenAuth(t *testing.T) {
-	tokenID, err := bootstraputil.GenerateTokenID()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	secret, err := bootstraputil.GenerateTokenSecret()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	validTokenID := "token1"
+	validSecret := "validtokensecret"
 	var bootstrapSecretValid = &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: metav1.NamespaceSystem,
@@ -62,8 +56,8 @@ func TestBootstrapTokenAuth(t *testing.T) {
 		},
 		Type: corev1.SecretTypeBootstrapToken,
 		Data: map[string][]byte{
-			bootstrapapi.BootstrapTokenIDKey:               []byte(tokenID),
-			bootstrapapi.BootstrapTokenSecretKey:           []byte(secret),
+			bootstrapapi.BootstrapTokenIDKey:               []byte(validTokenID),
+			bootstrapapi.BootstrapTokenSecretKey:           []byte(validSecret),
 			bootstrapapi.BootstrapTokenUsageAuthentication: []byte("true"),
 		},
 	}
@@ -74,11 +68,12 @@ func TestBootstrapTokenAuth(t *testing.T) {
 		},
 		Type: corev1.SecretTypeBootstrapToken,
 		Data: map[string][]byte{
-			bootstrapapi.BootstrapTokenIDKey:               []byte(tokenID),
+			bootstrapapi.BootstrapTokenIDKey:               []byte(validTokenID),
 			bootstrapapi.BootstrapTokenSecretKey:           []byte("invalid"),
 			bootstrapapi.BootstrapTokenUsageAuthentication: []byte("true"),
 		},
 	}
+	tokenExpiredTime := time.Now().UTC().Add(-time.Hour).Format(time.RFC3339)
 	var expiredBootstrapToken = &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: metav1.NamespaceSystem,
@@ -86,10 +81,10 @@ func TestBootstrapTokenAuth(t *testing.T) {
 		},
 		Type: corev1.SecretTypeBootstrapToken,
 		Data: map[string][]byte{
-			bootstrapapi.BootstrapTokenIDKey:               []byte(tokenID),
+			bootstrapapi.BootstrapTokenIDKey:               []byte(validTokenID),
 			bootstrapapi.BootstrapTokenSecretKey:           []byte("invalid"),
 			bootstrapapi.BootstrapTokenUsageAuthentication: []byte("true"),
-			bootstrapapi.BootstrapTokenExpirationKey:       []byte(bootstraputil.TimeStringFromNow(-time.Hour)),
+			bootstrapapi.BootstrapTokenExpirationKey:       []byte(tokenExpiredTime),
 		},
 	}
 	type request struct {
@@ -121,11 +116,11 @@ func TestBootstrapTokenAuth(t *testing.T) {
 	}
 	for _, test := range tests {
 
-		authenticator := bearertoken.New(bootstrap.NewTokenAuthenticator(bootstrapSecrets{test.secret}))
-		// Set up a master
-		masterConfig := framework.NewIntegrationTestMasterConfig()
-		masterConfig.GenericConfig.Authentication.Authenticator = authenticator
-		_, s, closeFn := framework.RunAMaster(masterConfig)
+		authenticator := group.NewAuthenticatedGroupAdder(bearertoken.New(bootstrap.NewTokenAuthenticator(bootstrapSecrets{test.secret})))
+		// Set up an API server
+		controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
+		controlPlaneConfig.GenericConfig.Authentication.Authenticator = authenticator
+		_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 		defer closeFn()
 
 		ns := framework.CreateTestingNamespace("auth-bootstrap-token", s, t)
@@ -134,7 +129,7 @@ func TestBootstrapTokenAuth(t *testing.T) {
 		previousResourceVersion := make(map[string]float64)
 		transport := http.DefaultTransport
 
-		token := tokenID + "." + secret
+		token := validTokenID + "." + validSecret
 		var bodyStr string
 		if test.request.body != "" {
 			sub := ""
@@ -165,7 +160,7 @@ func TestBootstrapTokenAuth(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			defer resp.Body.Close()
-			b, _ := ioutil.ReadAll(resp.Body)
+			b, _ := io.ReadAll(resp.Body)
 			if _, ok := test.request.statusCodes[resp.StatusCode]; !ok {
 				t.Logf("case %v", test.name)
 				t.Errorf("Expected status one of %v, but got %v", test.request.statusCodes, resp.StatusCode)

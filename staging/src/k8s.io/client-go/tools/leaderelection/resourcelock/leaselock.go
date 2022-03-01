@@ -87,7 +87,11 @@ func (ll *LeaseLock) RecordEvent(s string) {
 		return
 	}
 	events := fmt.Sprintf("%v %v", ll.LockConfig.Identity, s)
-	ll.LockConfig.EventRecorder.Eventf(&coordinationv1.Lease{ObjectMeta: ll.lease.ObjectMeta}, corev1.EventTypeNormal, "LeaderElection", events)
+	subject := &coordinationv1.Lease{ObjectMeta: ll.lease.ObjectMeta}
+	// Populate the type meta, so we don't have to get it from the schema
+	subject.Kind = "Lease"
+	subject.APIVersion = coordinationv1.SchemeGroupVersion.String()
+	ll.LockConfig.EventRecorder.Eventf(subject, corev1.EventTypeNormal, "LeaderElection", events)
 }
 
 // Describe is used to convert details on current resource lock

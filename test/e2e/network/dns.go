@@ -29,6 +29,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	"k8s.io/kubernetes/test/e2e/network/common"
 
 	"github.com/onsi/ginkgo"
 )
@@ -36,7 +37,7 @@ import (
 const dnsTestPodHostName = "dns-querier-1"
 const dnsTestServiceName = "dns-test-service"
 
-var _ = SIGDescribe("DNS", func() {
+var _ = common.SIGDescribe("DNS", func() {
 	f := framework.NewDefaultFramework("dns")
 
 	/*

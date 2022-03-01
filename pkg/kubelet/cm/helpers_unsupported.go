@@ -1,3 +1,4 @@
+//go:build !linux
 // +build !linux
 
 /*
@@ -42,7 +43,7 @@ func MilliCPUToShares(milliCPU int64) int64 {
 }
 
 // ResourceConfigForPod takes the input pod and outputs the cgroup resource config.
-func ResourceConfigForPod(pod *v1.Pod, enforceCPULimit bool, cpuPeriod uint64) *ResourceConfig {
+func ResourceConfigForPod(pod *v1.Pod, enforceCPULimit bool, cpuPeriod uint64, enforceMemoryQoS bool) *ResourceConfig {
 	return nil
 }
 
@@ -67,10 +68,5 @@ func NodeAllocatableRoot(cgroupRoot string, cgroupsPerQOS bool, cgroupDriver str
 
 // GetKubeletContainer returns the cgroup the kubelet will use
 func GetKubeletContainer(kubeletCgroups string) (string, error) {
-	return "", nil
-}
-
-// GetRuntimeContainer returns the cgroup used by the container runtime
-func GetRuntimeContainer(containerRuntime, runtimeCgroups string) (string, error) {
 	return "", nil
 }

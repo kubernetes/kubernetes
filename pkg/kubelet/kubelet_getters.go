@@ -22,7 +22,6 @@ import (
 	"io/ioutil"
 	"net"
 	"path/filepath"
-	"time"
 
 	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
 	cadvisorv2 "github.com/google/cadvisor/info/v2"
@@ -33,7 +32,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -237,15 +235,6 @@ func (kl *Kubelet) GetNode() (*v1.Node, error) {
 	if kl.kubeClient == nil {
 		return kl.initialNode(context.TODO())
 	}
-	// if we have a valid kube client, we wait for initial lister to sync
-	if !kl.nodeHasSynced() {
-		err := wait.PollImmediate(time.Second, maxWaitForAPIServerSync, func() (bool, error) {
-			return kl.nodeHasSynced(), nil
-		})
-		if err != nil {
-			return nil, fmt.Errorf("nodes have not yet been read at least once, cannot construct node object")
-		}
-	}
 	return kl.nodeLister.Get(string(kl.nodeName))
 }
 
@@ -256,7 +245,7 @@ func (kl *Kubelet) GetNode() (*v1.Node, error) {
 // zero capacity, and the default labels.
 func (kl *Kubelet) getNodeAnyWay() (*v1.Node, error) {
 	if kl.kubeClient != nil {
-		if n, err := kl.GetNode(); err == nil {
+		if n, err := kl.nodeLister.Get(string(kl.nodeName)); err == nil {
 			return n, nil
 		}
 	}
@@ -308,13 +297,13 @@ func (kl *Kubelet) getPodVolumePathListFromDisk(podUID types.UID) ([]string, err
 	if pathExists, pathErr := mount.PathExists(podVolDir); pathErr != nil {
 		return volumes, fmt.Errorf("error checking if path %q exists: %v", podVolDir, pathErr)
 	} else if !pathExists {
-		klog.Warningf("Path %q does not exist", podVolDir)
+		klog.InfoS("Path does not exist", "path", podVolDir)
 		return volumes, nil
 	}
 
 	volumePluginDirs, err := ioutil.ReadDir(podVolDir)
 	if err != nil {
-		klog.Errorf("Could not read directory %s: %v", podVolDir, err)
+		klog.ErrorS(err, "Could not read directory", "path", podVolDir)
 		return volumes, err
 	}
 	for _, volumePluginDir := range volumePluginDirs {
@@ -383,7 +372,7 @@ func (kl *Kubelet) getPodVolumeSubpathListFromDisk(podUID types.UID) ([]string, 
 	// Explicitly walks /<volume>/<container name>/<subPathIndex>
 	volumePluginDirs, err := ioutil.ReadDir(podSubpathsDir)
 	if err != nil {
-		klog.Errorf("Could not read directory %s: %v", podSubpathsDir, err)
+		klog.ErrorS(err, "Could not read directory", "path", podSubpathsDir)
 		return volumes, err
 	}
 	for _, volumePluginDir := range volumePluginDirs {

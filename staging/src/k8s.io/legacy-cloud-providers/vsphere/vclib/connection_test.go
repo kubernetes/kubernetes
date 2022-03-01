@@ -31,7 +31,6 @@ import (
 	"testing"
 
 	"k8s.io/legacy-cloud-providers/vsphere/vclib"
-	"k8s.io/legacy-cloud-providers/vsphere/vclib/fixtures"
 )
 
 func createTestServer(
@@ -83,14 +82,14 @@ func createTestServer(
 func TestWithValidCaCert(t *testing.T) {
 	handler, verifyConnectionWasMade := getRequestVerifier(t)
 
-	server, _ := createTestServer(t, fixtures.CaCertPath, fixtures.ServerCertPath, fixtures.ServerKeyPath, handler)
+	server, _ := createTestServer(t, "./testdata/ca.pem", "./testdata/server.pem", "./testdata/server.key", handler)
 	server.StartTLS()
 	u := mustParseURL(t, server.URL)
 
 	connection := &vclib.VSphereConnection{
 		Hostname: u.Hostname(),
 		Port:     u.Port(),
-		CACert:   fixtures.CaCertPath,
+		CACert:   "./testdata/ca.pem",
 	}
 
 	// Ignoring error here, because we only care about the TLS connection
@@ -102,7 +101,7 @@ func TestWithValidCaCert(t *testing.T) {
 func TestWithVerificationWithWrongThumbprint(t *testing.T) {
 	handler, _ := getRequestVerifier(t)
 
-	server, _ := createTestServer(t, fixtures.CaCertPath, fixtures.ServerCertPath, fixtures.ServerKeyPath, handler)
+	server, _ := createTestServer(t, "./testdata/ca.pem", "./testdata/server.pem", "./testdata/server.key", handler)
 	server.StartTLS()
 	u := mustParseURL(t, server.URL)
 
@@ -122,7 +121,7 @@ func TestWithVerificationWithWrongThumbprint(t *testing.T) {
 func TestWithVerificationWithoutCaCertOrThumbprint(t *testing.T) {
 	handler, _ := getRequestVerifier(t)
 
-	server, _ := createTestServer(t, fixtures.CaCertPath, fixtures.ServerCertPath, fixtures.ServerKeyPath, handler)
+	server, _ := createTestServer(t, "./testdata/ca.pem", "./testdata/server.pem", "./testdata/server.key", handler)
 	server.StartTLS()
 	u := mustParseURL(t, server.URL)
 
@@ -140,7 +139,7 @@ func TestWithValidThumbprint(t *testing.T) {
 	handler, verifyConnectionWasMade := getRequestVerifier(t)
 
 	server, thumbprint :=
-		createTestServer(t, fixtures.CaCertPath, fixtures.ServerCertPath, fixtures.ServerKeyPath, handler)
+		createTestServer(t, "./testdata/ca.pem", "./testdata/server.pem", "./testdata/server.key", handler)
 	server.StartTLS()
 	u := mustParseURL(t, server.URL)
 
@@ -173,7 +172,7 @@ func TestInvalidCaCert(t *testing.T) {
 	connection := &vclib.VSphereConnection{
 		Hostname: "should-not-matter",
 		Port:     "27015", // doesn't matter, but has to be a valid port
-		CACert:   fixtures.InvalidCertPath,
+		CACert:   "./testdata/invalid.pem",
 	}
 
 	_, err := connection.NewClient(context.Background())

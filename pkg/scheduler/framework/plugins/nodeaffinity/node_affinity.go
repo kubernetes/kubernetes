@@ -26,7 +26,8 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	pluginhelper "k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
 // NodeAffinity is a plugin that checks if a pod node selector matches the node label.
@@ -36,15 +37,21 @@ type NodeAffinity struct {
 	addedPrefSchedTerms *nodeaffinity.PreferredSchedulingTerms
 }
 
+var _ framework.PreFilterPlugin = &NodeAffinity{}
 var _ framework.FilterPlugin = &NodeAffinity{}
+var _ framework.PreScorePlugin = &NodeAffinity{}
 var _ framework.ScorePlugin = &NodeAffinity{}
+var _ framework.EnqueueExtensions = &NodeAffinity{}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
-	Name = "NodeAffinity"
+	Name = names.NodeAffinity
 
 	// preScoreStateKey is the key in CycleState to NodeAffinity pre-computed data for Scoring.
 	preScoreStateKey = "PreScore" + Name
+
+	// preFilterStateKey is the key in CycleState to NodeAffinity pre-compute data for Filtering.
+	preFilterStateKey = "PreFilter" + Name
 
 	// ErrReasonPod is the reason for Pod's node affinity/selector not matching.
 	ErrReasonPod = "node(s) didn't match Pod's node affinity/selector"
@@ -58,6 +65,35 @@ func (pl *NodeAffinity) Name() string {
 	return Name
 }
 
+type preFilterState struct {
+	requiredNodeSelectorAndAffinity nodeaffinity.RequiredNodeAffinity
+}
+
+// Clone just returns the same state because it is not affected by pod additions or deletions.
+func (s *preFilterState) Clone() framework.StateData {
+	return s
+}
+
+// EventsToRegister returns the possible events that may make a Pod
+// failed by this plugin schedulable.
+func (pl *NodeAffinity) EventsToRegister() []framework.ClusterEvent {
+	return []framework.ClusterEvent{
+		{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeLabel},
+	}
+}
+
+// PreFilter builds and writes cycle state used by Filter.
+func (pl *NodeAffinity) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod) *framework.Status {
+	state := &preFilterState{requiredNodeSelectorAndAffinity: nodeaffinity.GetRequiredNodeAffinity(pod)}
+	cycleState.Write(preFilterStateKey, state)
+	return nil
+}
+
+// PreFilterExtensions not necessary for this plugin as state doesn't depend on pod additions or deletions.
+func (pl *NodeAffinity) PreFilterExtensions() framework.PreFilterExtensions {
+	return nil
+}
+
 // Filter checks if the Node matches the Pod .spec.affinity.nodeAffinity and
 // the plugin's added affinity.
 func (pl *NodeAffinity) Filter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
@@ -68,9 +104,20 @@ func (pl *NodeAffinity) Filter(ctx context.Context, state *framework.CycleState,
 	if pl.addedNodeSelector != nil && !pl.addedNodeSelector.Match(node) {
 		return framework.NewStatus(framework.UnschedulableAndUnresolvable, errReasonEnforced)
 	}
-	if !pluginhelper.PodMatchesNodeSelectorAndAffinityTerms(pod, node) {
+
+	s, err := getPreFilterState(state)
+	if err != nil {
+		// Fallback to calculate requiredNodeSelector and requiredNodeAffinity
+		// here when PreFilter is disabled.
+		s = &preFilterState{requiredNodeSelectorAndAffinity: nodeaffinity.GetRequiredNodeAffinity(pod)}
+	}
+
+	// Ignore parsing errors for backwards compatibility.
+	match, _ := s.requiredNodeSelectorAndAffinity.Match(node)
+	if !match {
 		return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod)
 	}
+
 	return nil
 }
 
@@ -111,9 +158,6 @@ func (pl *NodeAffinity) Score(ctx context.Context, state *framework.CycleState, 
 	}
 
 	node := nodeInfo.Node()
-	if node == nil {
-		return 0, framework.AsStatus(fmt.Errorf("getting node %q from Snapshot: %w", nodeName, err))
-	}
 
 	var count int64
 	if pl.addedPrefSchedTerms != nil {
@@ -122,7 +166,7 @@ func (pl *NodeAffinity) Score(ctx context.Context, state *framework.CycleState, 
 
 	s, err := getPreScoreState(state)
 	if err != nil {
-		// fallback to calculate preferredNodeAffinity here when PreScore is disabled
+		// Fallback to calculate preferredNodeAffinity here when PreScore is disabled.
 		preferredNodeAffinity, err := getPodPreferredNodeAffinity(pod)
 		if err != nil {
 			return 0, framework.AsStatus(err)
@@ -141,7 +185,7 @@ func (pl *NodeAffinity) Score(ctx context.Context, state *framework.CycleState, 
 
 // NormalizeScore invoked after scoring all nodes.
 func (pl *NodeAffinity) NormalizeScore(ctx context.Context, state *framework.CycleState, pod *v1.Pod, scores framework.NodeScoreList) *framework.Status {
-	return pluginhelper.DefaultNormalizeScore(framework.MaxNodeScore, false, scores)
+	return helper.DefaultNormalizeScore(framework.MaxNodeScore, false, scores)
 }
 
 // ScoreExtensions of the Score plugin.
@@ -181,7 +225,7 @@ func getArgs(obj runtime.Object) (config.NodeAffinityArgs, error) {
 	if !ok {
 		return config.NodeAffinityArgs{}, fmt.Errorf("args are not of type NodeAffinityArgs, got %T", obj)
 	}
-	return *ptr, validation.ValidateNodeAffinityArgs(ptr)
+	return *ptr, validation.ValidateNodeAffinityArgs(nil, ptr)
 }
 
 func getPodPreferredNodeAffinity(pod *v1.Pod) (*nodeaffinity.PreferredSchedulingTerms, error) {
@@ -195,12 +239,25 @@ func getPodPreferredNodeAffinity(pod *v1.Pod) (*nodeaffinity.PreferredScheduling
 func getPreScoreState(cycleState *framework.CycleState) (*preScoreState, error) {
 	c, err := cycleState.Read(preScoreStateKey)
 	if err != nil {
-		return nil, fmt.Errorf("reading %q from cycleState: %v", preScoreStateKey, err)
+		return nil, fmt.Errorf("reading %q from cycleState: %w", preScoreStateKey, err)
 	}
 
 	s, ok := c.(*preScoreState)
 	if !ok {
 		return nil, fmt.Errorf("invalid PreScore state, got type %T", c)
+	}
+	return s, nil
+}
+
+func getPreFilterState(cycleState *framework.CycleState) (*preFilterState, error) {
+	c, err := cycleState.Read(preFilterStateKey)
+	if err != nil {
+		return nil, fmt.Errorf("reading %q from cycleState: %v", preFilterStateKey, err)
+	}
+
+	s, ok := c.(*preFilterState)
+	if !ok {
+		return nil, fmt.Errorf("invalid PreFilter state, got type %T", c)
 	}
 	return s, nil
 }

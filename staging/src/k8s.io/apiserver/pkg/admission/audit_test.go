@@ -19,6 +19,7 @@ package admission
 import (
 	"context"
 	"fmt"
+	"sync"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -171,4 +172,33 @@ func TestWithAudit(t *testing.T) {
 			assert.Equal(t, annotations, ae.Annotations, tcName+": unexptected annotations set in audit event")
 		}
 	}
+}
+
+func TestWithAuditConcurrency(t *testing.T) {
+	admitAnnotations := map[string]string{
+		"plugin.example.com/foo": "foo",
+		"plugin.example.com/bar": "bar",
+		"plugin.example.com/baz": "baz",
+		"plugin.example.com/qux": "qux",
+	}
+	var handler Interface = fakeHandler{admitAnnotations: admitAnnotations, handles: true}
+	ae := &auditinternal.Event{Level: auditinternal.LevelMetadata}
+	auditHandler := WithAudit(handler, ae)
+	a := attributes()
+
+	// Simulate the scenario store.DeleteCollection
+	workers := 2
+	wg := &sync.WaitGroup{}
+	wg.Add(workers)
+	for i := 0; i < workers; i++ {
+		go func() {
+			defer wg.Done()
+			mutator, ok := handler.(MutationInterface)
+			require.True(t, ok)
+			auditMutator, ok := auditHandler.(MutationInterface)
+			require.True(t, ok)
+			assert.Equal(t, mutator.Admit(context.TODO(), a, nil), auditMutator.Admit(context.TODO(), a, nil), "WithAudit decorator should not effect the return value")
+		}()
+	}
+	wg.Wait()
 }

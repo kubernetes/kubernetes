@@ -26,11 +26,14 @@ import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 
 // Package-wide variables from generator "generated".
-option go_package = "v1";
+option go_package = "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1";
 
 // APIService represents a server for a particular GroupVersion.
 // Name must be "version.group".
 message APIService {
+  // Standard object's metadata.
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+  // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec contains information for locating and communicating with a server
@@ -64,8 +67,12 @@ message APIServiceCondition {
 
 // APIServiceList is a list of APIService objects.
 message APIServiceList {
+  // Standard list metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+  // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
+  // Items is the list of APIService
   repeated APIService items = 2;
 }
 

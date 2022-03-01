@@ -35,9 +35,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	clientscheme "k8s.io/client-go/kubernetes/scheme"
@@ -45,17 +45,21 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	utiltesting "k8s.io/client-go/util/testing"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/apis/core"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/controller/testutil"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/securitycontext"
+	testingclock "k8s.io/utils/clock/testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
 // NewFakeControllerExpectationsLookup creates a fake store for PodExpectations.
-func NewFakeControllerExpectationsLookup(ttl time.Duration) (*ControllerExpectations, *clock.FakeClock) {
+func NewFakeControllerExpectationsLookup(ttl time.Duration) (*ControllerExpectations, *testingclock.FakeClock) {
 	fakeTime := time.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC)
-	fakeClock := clock.NewFakeClock(fakeTime)
+	fakeClock := testingclock.NewFakeClock(fakeTime)
 	ttlPolicy := &cache.TTLPolicy{TTL: ttl, Clock: fakeClock}
 	ttlStore := cache.NewFakeExpirationStore(
 		ExpKeyFunc, nil, ttlPolicy, fakeClock)
@@ -296,9 +300,10 @@ func TestCreatePods(t *testing.T) {
 	}
 
 	controllerSpec := newReplicationController(1)
+	controllerRef := metav1.NewControllerRef(controllerSpec, v1.SchemeGroupVersion.WithKind("ReplicationController"))
 
 	// Make sure createReplica sends a POST to the apiserver with a pod from the controllers pod template
-	err := podControl.CreatePods(ns, controllerSpec.Spec.Template, controllerSpec)
+	err := podControl.CreatePods(context.TODO(), ns, controllerSpec.Spec.Template, controllerSpec, controllerRef)
 	assert.NoError(t, err, "unexpected error: %v", err)
 
 	expectedPod := v1.Pod{
@@ -316,6 +321,47 @@ func TestCreatePods(t *testing.T) {
 		"Body: %s", fakeHandler.RequestBody)
 }
 
+func TestCreatePodsWithGenerateName(t *testing.T) {
+	ns := metav1.NamespaceDefault
+	body := runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "empty_pod"}})
+	fakeHandler := utiltesting.FakeHandler{
+		StatusCode:   200,
+		ResponseBody: string(body),
+	}
+	testServer := httptest.NewServer(&fakeHandler)
+	defer testServer.Close()
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
+
+	podControl := RealPodControl{
+		KubeClient: clientset,
+		Recorder:   &record.FakeRecorder{},
+	}
+
+	controllerSpec := newReplicationController(1)
+	controllerRef := metav1.NewControllerRef(controllerSpec, v1.SchemeGroupVersion.WithKind("ReplicationController"))
+
+	// Make sure createReplica sends a POST to the apiserver with a pod from the controllers pod template
+	generateName := "hello-"
+	err := podControl.CreatePodsWithGenerateName(context.TODO(), ns, controllerSpec.Spec.Template, controllerSpec, controllerRef, generateName)
+	assert.NoError(t, err, "unexpected error: %v", err)
+
+	expectedPod := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels:          controllerSpec.Spec.Template.Labels,
+			GenerateName:    generateName,
+			OwnerReferences: []metav1.OwnerReference{*controllerRef},
+		},
+		Spec: controllerSpec.Spec.Template.Spec,
+	}
+
+	fakeHandler.ValidateRequest(t, "/api/v1/namespaces/default/pods", "POST", nil)
+	var actualPod = &v1.Pod{}
+	err = json.Unmarshal([]byte(fakeHandler.RequestBody), actualPod)
+	assert.NoError(t, err, "unexpected error: %v", err)
+	assert.True(t, apiequality.Semantic.DeepDerivative(&expectedPod, actualPod),
+		"Body: %s", fakeHandler.RequestBody)
+}
+
 func TestDeletePodsAllowsMissing(t *testing.T) {
 	fakeClient := fake.NewSimpleClientset()
 	podControl := RealPodControl{
@@ -325,7 +371,7 @@ func TestDeletePodsAllowsMissing(t *testing.T) {
 
 	controllerSpec := newReplicationController(1)
 
-	err := podControl.DeletePod("namespace-name", "podName", controllerSpec)
+	err := podControl.DeletePod(context.TODO(), "namespace-name", "podName", controllerSpec)
 	assert.True(t, apierrors.IsNotFound(err))
 }
 
@@ -433,9 +479,12 @@ func TestSortingActivePods(t *testing.T) {
 
 func TestSortingActivePodsWithRanks(t *testing.T) {
 	now := metav1.Now()
-	then := metav1.Time{Time: now.AddDate(0, -1, 0)}
+	then1Month := metav1.Time{Time: now.AddDate(0, -1, 0)}
+	then2Hours := metav1.Time{Time: now.Add(-2 * time.Hour)}
+	then5Hours := metav1.Time{Time: now.Add(-5 * time.Hour)}
+	then8Hours := metav1.Time{Time: now.Add(-8 * time.Hour)}
 	zeroTime := metav1.Time{}
-	pod := func(podName, nodeName string, phase v1.PodPhase, ready bool, restarts int32, readySince metav1.Time, created metav1.Time) *v1.Pod {
+	pod := func(podName, nodeName string, phase v1.PodPhase, ready bool, restarts int32, readySince metav1.Time, created metav1.Time, annotations map[string]string) *v1.Pod {
 		var conditions []v1.PodCondition
 		var containerStatuses []v1.ContainerStatus
 		if ready {
@@ -446,6 +495,7 @@ func TestSortingActivePodsWithRanks(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				CreationTimestamp: created,
 				Name:              podName,
+				Annotations:       annotations,
 			},
 			Spec: v1.PodSpec{NodeName: nodeName},
 			Status: v1.PodStatus{
@@ -456,34 +506,52 @@ func TestSortingActivePodsWithRanks(t *testing.T) {
 		}
 	}
 	var (
-		unscheduledPod                      = pod("unscheduled", "", v1.PodPending, false, 0, zeroTime, zeroTime)
-		scheduledPendingPod                 = pod("pending", "node", v1.PodPending, false, 0, zeroTime, zeroTime)
-		unknownPhasePod                     = pod("unknown-phase", "node", v1.PodUnknown, false, 0, zeroTime, zeroTime)
-		runningNotReadyPod                  = pod("not-ready", "node", v1.PodRunning, false, 0, zeroTime, zeroTime)
-		runningReadyNoLastTransitionTimePod = pod("ready-no-last-transition-time", "node", v1.PodRunning, true, 0, zeroTime, zeroTime)
-		runningReadyNow                     = pod("ready-now", "node", v1.PodRunning, true, 0, now, now)
-		runningReadyThen                    = pod("ready-then", "node", v1.PodRunning, true, 0, then, then)
-		runningReadyNowHighRestarts         = pod("ready-high-restarts", "node", v1.PodRunning, true, 9001, now, now)
-		runningReadyNowCreatedThen          = pod("ready-now-created-then", "node", v1.PodRunning, true, 0, now, then)
+		unscheduledPod                      = pod("unscheduled", "", v1.PodPending, false, 0, zeroTime, zeroTime, nil)
+		scheduledPendingPod                 = pod("pending", "node", v1.PodPending, false, 0, zeroTime, zeroTime, nil)
+		unknownPhasePod                     = pod("unknown-phase", "node", v1.PodUnknown, false, 0, zeroTime, zeroTime, nil)
+		runningNotReadyPod                  = pod("not-ready", "node", v1.PodRunning, false, 0, zeroTime, zeroTime, nil)
+		runningReadyNoLastTransitionTimePod = pod("ready-no-last-transition-time", "node", v1.PodRunning, true, 0, zeroTime, zeroTime, nil)
+		runningReadyNow                     = pod("ready-now", "node", v1.PodRunning, true, 0, now, now, nil)
+		runningReadyThen                    = pod("ready-then", "node", v1.PodRunning, true, 0, then1Month, then1Month, nil)
+		runningReadyNowHighRestarts         = pod("ready-high-restarts", "node", v1.PodRunning, true, 9001, now, now, nil)
+		runningReadyNowCreatedThen          = pod("ready-now-created-then", "node", v1.PodRunning, true, 0, now, then1Month, nil)
+		lowPodDeletionCost                  = pod("low-deletion-cost", "node", v1.PodRunning, true, 0, now, then1Month, map[string]string{core.PodDeletionCost: "10"})
+		highPodDeletionCost                 = pod("high-deletion-cost", "node", v1.PodRunning, true, 0, now, then1Month, map[string]string{core.PodDeletionCost: "100"})
+		unscheduled5Hours                   = pod("unscheduled-5-hours", "", v1.PodPending, false, 0, then5Hours, then5Hours, nil)
+		unscheduled8Hours                   = pod("unscheduled-10-hours", "", v1.PodPending, false, 0, then8Hours, then8Hours, nil)
+		ready2Hours                         = pod("ready-2-hours", "", v1.PodRunning, true, 0, then2Hours, then1Month, nil)
+		ready5Hours                         = pod("ready-5-hours", "", v1.PodRunning, true, 0, then5Hours, then1Month, nil)
+		ready10Hours                        = pod("ready-10-hours", "", v1.PodRunning, true, 0, then8Hours, then1Month, nil)
 	)
-	equalityTests := []*v1.Pod{
-		unscheduledPod,
-		scheduledPendingPod,
-		unknownPhasePod,
-		runningNotReadyPod,
-		runningReadyNowCreatedThen,
-		runningReadyNow,
-		runningReadyThen,
-		runningReadyNowHighRestarts,
-		runningReadyNowCreatedThen,
+	equalityTests := []struct {
+		p1                          *v1.Pod
+		p2                          *v1.Pod
+		disableLogarithmicScaleDown bool
+	}{
+		{p1: unscheduledPod},
+		{p1: scheduledPendingPod},
+		{p1: unknownPhasePod},
+		{p1: runningNotReadyPod},
+		{p1: runningReadyNowCreatedThen},
+		{p1: runningReadyNow},
+		{p1: runningReadyThen},
+		{p1: runningReadyNowHighRestarts},
+		{p1: runningReadyNowCreatedThen},
+		{p1: unscheduled5Hours, p2: unscheduled8Hours},
+		{p1: ready5Hours, p2: ready10Hours},
 	}
-	for _, pod := range equalityTests {
+	for _, tc := range equalityTests {
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LogarithmicScaleDown, !tc.disableLogarithmicScaleDown)()
+		if tc.p2 == nil {
+			tc.p2 = tc.p1
+		}
 		podsWithRanks := ActivePodsWithRanks{
-			Pods: []*v1.Pod{pod, pod},
+			Pods: []*v1.Pod{tc.p1, tc.p2},
 			Rank: []int{1, 1},
+			Now:  now,
 		}
 		if podsWithRanks.Less(0, 1) || podsWithRanks.Less(1, 0) {
-			t.Errorf("expected pod %q not to be less than than itself", pod.Name)
+			t.Errorf("expected pod %q to be equivalent to %q", tc.p1.Name, tc.p2.Name)
 		}
 	}
 	type podWithRank struct {
@@ -491,33 +559,44 @@ func TestSortingActivePodsWithRanks(t *testing.T) {
 		rank int
 	}
 	inequalityTests := []struct {
-		lesser, greater podWithRank
+		lesser, greater             podWithRank
+		disablePodDeletioncost      bool
+		disableLogarithmicScaleDown bool
 	}{
-		{podWithRank{unscheduledPod, 1}, podWithRank{scheduledPendingPod, 2}},
-		{podWithRank{unscheduledPod, 2}, podWithRank{scheduledPendingPod, 1}},
-		{podWithRank{scheduledPendingPod, 1}, podWithRank{unknownPhasePod, 2}},
-		{podWithRank{unknownPhasePod, 1}, podWithRank{runningNotReadyPod, 2}},
-		{podWithRank{runningNotReadyPod, 1}, podWithRank{runningReadyNoLastTransitionTimePod, 1}},
-		{podWithRank{runningReadyNoLastTransitionTimePod, 1}, podWithRank{runningReadyNow, 1}},
-		{podWithRank{runningReadyNow, 2}, podWithRank{runningReadyNoLastTransitionTimePod, 1}},
-		{podWithRank{runningReadyNow, 1}, podWithRank{runningReadyThen, 1}},
-		{podWithRank{runningReadyNow, 2}, podWithRank{runningReadyThen, 1}},
-		{podWithRank{runningReadyNowHighRestarts, 1}, podWithRank{runningReadyNow, 1}},
-		{podWithRank{runningReadyNow, 2}, podWithRank{runningReadyNowHighRestarts, 1}},
-		{podWithRank{runningReadyNow, 1}, podWithRank{runningReadyNowCreatedThen, 1}},
-		{podWithRank{runningReadyNowCreatedThen, 2}, podWithRank{runningReadyNow, 1}},
+		{lesser: podWithRank{unscheduledPod, 1}, greater: podWithRank{scheduledPendingPod, 2}},
+		{lesser: podWithRank{unscheduledPod, 2}, greater: podWithRank{scheduledPendingPod, 1}},
+		{lesser: podWithRank{scheduledPendingPod, 1}, greater: podWithRank{unknownPhasePod, 2}},
+		{lesser: podWithRank{unknownPhasePod, 1}, greater: podWithRank{runningNotReadyPod, 2}},
+		{lesser: podWithRank{runningNotReadyPod, 1}, greater: podWithRank{runningReadyNoLastTransitionTimePod, 1}},
+		{lesser: podWithRank{runningReadyNoLastTransitionTimePod, 1}, greater: podWithRank{runningReadyNow, 1}},
+		{lesser: podWithRank{runningReadyNow, 2}, greater: podWithRank{runningReadyNoLastTransitionTimePod, 1}},
+		{lesser: podWithRank{runningReadyNow, 1}, greater: podWithRank{runningReadyThen, 1}},
+		{lesser: podWithRank{runningReadyNow, 2}, greater: podWithRank{runningReadyThen, 1}},
+		{lesser: podWithRank{runningReadyNowHighRestarts, 1}, greater: podWithRank{runningReadyNow, 1}},
+		{lesser: podWithRank{runningReadyNow, 2}, greater: podWithRank{runningReadyNowHighRestarts, 1}},
+		{lesser: podWithRank{runningReadyNow, 1}, greater: podWithRank{runningReadyNowCreatedThen, 1}},
+		{lesser: podWithRank{runningReadyNowCreatedThen, 2}, greater: podWithRank{runningReadyNow, 1}},
+		{lesser: podWithRank{lowPodDeletionCost, 2}, greater: podWithRank{highPodDeletionCost, 1}},
+		{lesser: podWithRank{highPodDeletionCost, 2}, greater: podWithRank{lowPodDeletionCost, 1}, disablePodDeletioncost: true},
+		{lesser: podWithRank{ready2Hours, 1}, greater: podWithRank{ready5Hours, 1}},
 	}
-	for _, test := range inequalityTests {
-		podsWithRanks := ActivePodsWithRanks{
-			Pods: []*v1.Pod{test.lesser.pod, test.greater.pod},
-			Rank: []int{test.lesser.rank, test.greater.rank},
-		}
-		if !podsWithRanks.Less(0, 1) {
-			t.Errorf("expected pod %q with rank %v to be less than %q with rank %v", podsWithRanks.Pods[0].Name, podsWithRanks.Rank[0], podsWithRanks.Pods[1].Name, podsWithRanks.Rank[1])
-		}
-		if podsWithRanks.Less(1, 0) {
-			t.Errorf("expected pod %q with rank %v not to be less than %v with rank %v", podsWithRanks.Pods[1].Name, podsWithRanks.Rank[1], podsWithRanks.Pods[0].Name, podsWithRanks.Rank[0])
-		}
+	for i, test := range inequalityTests {
+		t.Run(fmt.Sprintf("test%d", i), func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDeletionCost, !test.disablePodDeletioncost)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LogarithmicScaleDown, !test.disableLogarithmicScaleDown)()
+
+			podsWithRanks := ActivePodsWithRanks{
+				Pods: []*v1.Pod{test.lesser.pod, test.greater.pod},
+				Rank: []int{test.lesser.rank, test.greater.rank},
+				Now:  now,
+			}
+			if !podsWithRanks.Less(0, 1) {
+				t.Errorf("expected pod %q with rank %v to be less than %q with rank %v", podsWithRanks.Pods[0].Name, podsWithRanks.Rank[0], podsWithRanks.Pods[1].Name, podsWithRanks.Rank[1])
+			}
+			if podsWithRanks.Less(1, 0) {
+				t.Errorf("expected pod %q with rank %v not to be less than %v with rank %v", podsWithRanks.Pods[1].Name, podsWithRanks.Rank[1], podsWithRanks.Pods[0].Name, podsWithRanks.Rank[0])
+			}
+		})
 	}
 }
 
@@ -736,7 +815,7 @@ func TestRemoveTaintOffNode(t *testing.T) {
 	}
 	for _, test := range tests {
 		node, _ := test.nodeHandler.Get(context.TODO(), test.nodeName, metav1.GetOptions{})
-		err := RemoveTaintOffNode(test.nodeHandler, test.nodeName, node, test.taintsToRemove...)
+		err := RemoveTaintOffNode(context.TODO(), test.nodeHandler, test.nodeName, node, test.taintsToRemove...)
 		assert.NoError(t, err, "%s: RemoveTaintOffNode() error = %v", test.name, err)
 
 		node, _ = test.nodeHandler.Get(context.TODO(), test.nodeName, metav1.GetOptions{})
@@ -911,7 +990,7 @@ func TestAddOrUpdateTaintOnNode(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		err := AddOrUpdateTaintOnNode(test.nodeHandler, test.nodeName, test.taintsToAdd...)
+		err := AddOrUpdateTaintOnNode(context.TODO(), test.nodeHandler, test.nodeName, test.taintsToAdd...)
 		assert.NoError(t, err, "%s: AddOrUpdateTaintOnNode() error = %v", test.name, err)
 
 		node, _ := test.nodeHandler.Get(context.TODO(), test.nodeName, metav1.GetOptions{})

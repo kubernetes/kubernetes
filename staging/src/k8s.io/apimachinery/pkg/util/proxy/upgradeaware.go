@@ -60,6 +60,8 @@ type UpgradeAwareHandler struct {
 	// Location is the location of the upstream proxy. It is used as the location to Dial on the upstream server
 	// for upgrade requests unless UseRequestLocationOnUpgrade is true.
 	Location *url.URL
+	// AppendLocationPath determines if the original path of the Location should be appended to the upstream proxy request path
+	AppendLocationPath bool
 	// Transport provides an optional round tripper to use to proxy. If nil, the default proxy transport is used
 	Transport http.RoundTripper
 	// UpgradeTransport, if specified, will be used as the backend transport when upgrade requests are provided.
@@ -74,6 +76,12 @@ type UpgradeAwareHandler struct {
 	RequireSameHostRedirects bool
 	// UseRequestLocation will use the incoming request URL when talking to the backend server.
 	UseRequestLocation bool
+	// UseLocationHost overrides the HTTP host header in requests to the backend server to use the Host from Location.
+	// This will override the req.Host field of a request, while UseRequestLocation will override the req.URL field
+	// of a request. The req.URL.Host specifies the server to connect to, while the req.Host field
+	// specifies the Host header value to send in the HTTP request. If this is false, the incoming req.Host header will
+	// just be forwarded to the backend server.
+	UseLocationHost bool
 	// FlushInterval controls how often the standard HTTP proxy will flush content from the upstream.
 	FlushInterval time.Duration
 	// MaxBytesPerSec controls the maximum rate for an upstream connection. No rate is imposed if the value is zero.
@@ -184,6 +192,26 @@ func NewUpgradeAwareHandler(location *url.URL, transport http.RoundTripper, wrap
 	}
 }
 
+func proxyRedirectsforRootPath(path string, w http.ResponseWriter, req *http.Request) bool {
+	redirect := false
+	method := req.Method
+
+	// From pkg/genericapiserver/endpoints/handlers/proxy.go#ServeHTTP:
+	// Redirect requests with an empty path to a location that ends with a '/'
+	// This is essentially a hack for http://issue.k8s.io/4958.
+	// Note: Keep this code after tryUpgrade to not break that flow.
+	if len(path) == 0 && (method == http.MethodGet || method == http.MethodHead) {
+		var queryPart string
+		if len(req.URL.RawQuery) > 0 {
+			queryPart = "?" + req.URL.RawQuery
+		}
+		w.Header().Set("Location", req.URL.Path+"/"+queryPart)
+		w.WriteHeader(http.StatusMovedPermanently)
+		redirect = true
+	}
+	return redirect
+}
+
 // ServeHTTP handles the proxy request
 func (h *UpgradeAwareHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if h.tryUpgrade(w, req) {
@@ -203,17 +231,8 @@ func (h *UpgradeAwareHandler) ServeHTTP(w http.ResponseWriter, req *http.Request
 		loc.Path += "/"
 	}
 
-	// From pkg/genericapiserver/endpoints/handlers/proxy.go#ServeHTTP:
-	// Redirect requests with an empty path to a location that ends with a '/'
-	// This is essentially a hack for http://issue.k8s.io/4958.
-	// Note: Keep this code after tryUpgrade to not break that flow.
-	if len(loc.Path) == 0 {
-		var queryPart string
-		if len(req.URL.RawQuery) > 0 {
-			queryPart = "?" + req.URL.RawQuery
-		}
-		w.Header().Set("Location", req.URL.Path+"/"+queryPart)
-		w.WriteHeader(http.StatusMovedPermanently)
+	proxyRedirect := proxyRedirectsforRootPath(loc.Path, w, req)
+	if proxyRedirect {
 		return
 	}
 
@@ -227,8 +246,19 @@ func (h *UpgradeAwareHandler) ServeHTTP(w http.ResponseWriter, req *http.Request
 	if !h.UseRequestLocation {
 		newReq.URL = &loc
 	}
+	if h.UseLocationHost {
+		// exchanging req.Host with the backend location is necessary for backends that act on the HTTP host header (e.g. API gateways),
+		// because req.Host has preference over req.URL.Host in filling this header field
+		newReq.Host = h.Location.Host
+	}
 
-	proxy := httputil.NewSingleHostReverseProxy(&url.URL{Scheme: h.Location.Scheme, Host: h.Location.Host})
+	// create the target location to use for the reverse proxy
+	reverseProxyLocation := &url.URL{Scheme: h.Location.Scheme, Host: h.Location.Host}
+	if h.AppendLocationPath {
+		reverseProxyLocation.Path = h.Location.Path
+	}
+
+	proxy := httputil.NewSingleHostReverseProxy(reverseProxyLocation)
 	proxy.Transport = h.Transport
 	proxy.FlushInterval = h.FlushInterval
 	proxy.ErrorLog = log.New(noSuppressPanicError{}, "", log.LstdFlags)
@@ -271,6 +301,9 @@ func (h *UpgradeAwareHandler) tryUpgrade(w http.ResponseWriter, req *http.Reques
 		location = *req.URL
 		location.Scheme = h.Location.Scheme
 		location.Host = h.Location.Host
+		if h.AppendLocationPath {
+			location.Path = singleJoiningSlash(h.Location.Path, location.Path)
+		}
 	}
 
 	clone := utilnet.CloneRequest(req)
@@ -282,6 +315,9 @@ func (h *UpgradeAwareHandler) tryUpgrade(w http.ResponseWriter, req *http.Reques
 		backendConn, rawResponse, err = utilnet.ConnectWithRedirects(req.Method, &location, clone.Header, req.Body, utilnet.DialerFunc(h.DialForUpgrade), h.RequireSameHostRedirects)
 	} else {
 		klog.V(6).Infof("Connecting to backend proxy (direct dial) %s\n  Headers: %v", &location, clone.Header)
+		if h.UseLocationHost {
+			clone.Host = h.Location.Host
+		}
 		clone.URL = &location
 		backendConn, err = h.DialForUpgrade(clone)
 	}
@@ -398,6 +434,20 @@ func (h *UpgradeAwareHandler) tryUpgrade(w http.ResponseWriter, req *http.Reques
 	klog.V(6).Infof("Disconnecting from backend proxy %s\n  Headers: %v", &location, clone.Header)
 
 	return true
+}
+
+// FIXME: Taken from net/http/httputil/reverseproxy.go as singleJoiningSlash is not exported to be re-used.
+// See-also: https://github.com/golang/go/issues/44290
+func singleJoiningSlash(a, b string) string {
+	aslash := strings.HasSuffix(a, "/")
+	bslash := strings.HasPrefix(b, "/")
+	switch {
+	case aslash && bslash:
+		return a + b[1:]
+	case !aslash && !bslash:
+		return a + "/" + b
+	}
+	return a + b
 }
 
 func (h *UpgradeAwareHandler) DialForUpgrade(req *http.Request) (net.Conn, error) {

@@ -17,10 +17,70 @@ package spec
 import (
 	"encoding/json"
 	"fmt"
-	"strconv"
 
-	"github.com/go-openapi/jsonpointer"
+	"github.com/go-openapi/swag"
 )
+
+// Swagger this is the root document object for the API specification.
+// It combines what previously was the Resource Listing and API Declaration (version 1.2 and earlier)
+// together into one document.
+//
+// For more information: http://goo.gl/8us55a#swagger-object-
+type Swagger struct {
+	VendorExtensible
+	SwaggerProps
+}
+
+// MarshalJSON marshals this swagger structure to json
+func (s Swagger) MarshalJSON() ([]byte, error) {
+	b1, err := json.Marshal(s.SwaggerProps)
+	if err != nil {
+		return nil, err
+	}
+	b2, err := json.Marshal(s.VendorExtensible)
+	if err != nil {
+		return nil, err
+	}
+	return swag.ConcatJSON(b1, b2), nil
+}
+
+// UnmarshalJSON unmarshals a swagger spec from json
+func (s *Swagger) UnmarshalJSON(data []byte) error {
+	var sw Swagger
+	if err := json.Unmarshal(data, &sw.SwaggerProps); err != nil {
+		return err
+	}
+	if err := json.Unmarshal(data, &sw.VendorExtensible); err != nil {
+		return err
+	}
+	*s = sw
+	return nil
+}
+
+// SwaggerProps captures the top-level properties of an Api specification
+//
+// NOTE: validation rules
+// - the scheme, when present must be from [http, https, ws, wss]
+// - BasePath must start with a leading "/"
+// - Paths is required
+type SwaggerProps struct {
+	ID                  string                 `json:"id,omitempty"`
+	Consumes            []string               `json:"consumes,omitempty"`
+	Produces            []string               `json:"produces,omitempty"`
+	Schemes             []string               `json:"schemes,omitempty"`
+	Swagger             string                 `json:"swagger,omitempty"`
+	Info                *Info                  `json:"info,omitempty"`
+	Host                string                 `json:"host,omitempty"`
+	BasePath            string                 `json:"basePath,omitempty"`
+	Paths               *Paths                 `json:"paths"`
+	Definitions         Definitions            `json:"definitions,omitempty"`
+	Parameters          map[string]Parameter   `json:"parameters,omitempty"`
+	Responses           map[string]Response    `json:"responses,omitempty"`
+	SecurityDefinitions SecurityDefinitions    `json:"securityDefinitions,omitempty"`
+	Security            []map[string][]string  `json:"security,omitempty"`
+	Tags                []Tag                  `json:"tags,omitempty"`
+	ExternalDocs        *ExternalDocumentation `json:"externalDocs,omitempty"`
+}
 
 // Dependencies represent a dependencies property
 type Dependencies map[string]SchemaOrStringArray
@@ -29,15 +89,6 @@ type Dependencies map[string]SchemaOrStringArray
 type SchemaOrBool struct {
 	Allows bool
 	Schema *Schema
-}
-
-// JSONLookup implements an interface to customize json pointer lookup
-func (s SchemaOrBool) JSONLookup(token string) (interface{}, error) {
-	if token == "allows" {
-		return s.Allows, nil
-	}
-	r, _, err := jsonpointer.GetForToken(s.Schema, token)
-	return r, err
 }
 
 var jsTrue = []byte("true")
@@ -76,12 +127,6 @@ func (s *SchemaOrBool) UnmarshalJSON(data []byte) error {
 type SchemaOrStringArray struct {
 	Schema   *Schema
 	Property []string
-}
-
-// JSONLookup implements an interface to customize json pointer lookup
-func (s SchemaOrStringArray) JSONLookup(token string) (interface{}, error) {
-	r, _, err := jsonpointer.GetForToken(s.Schema, token)
-	return r, err
 }
 
 // MarshalJSON converts this schema object or array into JSON structure
@@ -125,6 +170,13 @@ func (s *SchemaOrStringArray) UnmarshalJSON(data []byte) error {
 // For more information: http://goo.gl/8us55a#definitionsObject
 type Definitions map[string]Schema
 
+// SecurityDefinitions a declaration of the security schemes available to be used in the specification.
+// This does not enforce the security schemes on the operations and only serves to provide
+// the relevant details for each scheme.
+//
+// For more information: http://goo.gl/8us55a#securityDefinitionsObject
+type SecurityDefinitions map[string]*SecurityScheme
+
 // StringOrArray represents a value that can either be a string
 // or an array of strings. Mainly here for serialization purposes
 type StringOrArray []string
@@ -137,16 +189,6 @@ func (s StringOrArray) Contains(value string) bool {
 		}
 	}
 	return false
-}
-
-// JSONLookup implements an interface to customize json pointer lookup
-func (s SchemaOrArray) JSONLookup(token string) (interface{}, error) {
-	if _, err := strconv.Atoi(token); err == nil {
-		r, _, err := jsonpointer.GetForToken(s.Schemas, token)
-		return r, err
-	}
-	r, _, err := jsonpointer.GetForToken(s.Schema, token)
-	return r, err
 }
 
 // UnmarshalJSON unmarshals this string or array object from a JSON array or JSON string

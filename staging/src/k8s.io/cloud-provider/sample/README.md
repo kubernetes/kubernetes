@@ -4,13 +4,13 @@ This directory provides sample code about how all cloud providers should leverag
 
 ## Purpose
 
-Begin with 1.20, all cloud providers should not copy over or vender in `k8s.io/kubernetes/cmd/cloud-controller-manager`. Inside this directory, some sample code will be provided to demonstrate how cloud providers should leverage cloud-controller-manager. 
+Begin with 1.20, all cloud providers should not copy over or vendor in `k8s.io/kubernetes/cmd/cloud-controller-manager`. Inside this directory, some sample code will be provided to demonstrate how cloud providers should leverage cloud-controller-manager. 
 
-## Steps cloud providers shoud follow
+## Steps cloud providers should follow
 
 1. Have your external repo under k8s.io. e.g. `k8s.io/cloud-provider-<provider>`
-2. Create `main.go` file under your external repo CCM directory. Please refer to `basic_main.go` for a minial working sample and `advanced_main.go` for advanced configuration samples.
-Note: If you have a requirement of adding/deleting controllers within CCM, please refer to `k8s.io/kubernetes/cmd/cloud-controller-manager/main.go` for detailed samples.
+2. Create `main.go` file under your external repo CCM directory. Please refer to `basic_main.go` for a minimum working sample.
+Note: If you have a requirement of adding/deleting controllers within CCM, please refer to `k8s.io/kubernetes/cmd/cloud-controller-manager/main.go` for extra details.
 3. Build/release CCM from your external repo. For existing cloud providers, the option to import legacy providers from `k8s.io/legacy-cloud-provider/<provider>` is still available.
 
 ## Things you should NOT do

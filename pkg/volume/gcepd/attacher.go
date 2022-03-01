@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -241,8 +242,9 @@ func (attacher *gcePersistentDiskAttacher) WaitForAttach(spec *volume.Spec, devi
 		id, err := getDiskID(pdName, exec)
 		if err != nil {
 			klog.Errorf("WaitForAttach (windows) failed with error %s", err)
+			return "", err
 		}
-		return id, err
+		return id, nil
 	}
 
 	partition := ""
@@ -288,7 +290,7 @@ func (attacher *gcePersistentDiskAttacher) GetDeviceMountPath(
 	return makeGlobalPDName(attacher.host, volumeSource.PDName), nil
 }
 
-func (attacher *gcePersistentDiskAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
+func (attacher *gcePersistentDiskAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string, _ volume.DeviceMounterArgs) error {
 	// Only mount the PD globally once.
 	mounter := attacher.host.GetMounter(gcePersistentDiskPluginName)
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)

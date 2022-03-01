@@ -18,13 +18,14 @@ TARGET ?= $(CURDIR)
 GOARM = 7
 GOLANG_VERSION ?= latest
 SRC_DIR = $(notdir $(shell pwd))
+KUBE_CROSS_VERSION ?= $(shell cat ../../../build/build-image/cross/VERSION)
 export
 
 # Build v1.17.0 to ensure the current release supports a prior version of the sample apiserver
 # Get without building to populate module cache
 # Then, get with OS/ARCH-specific env to build
 bin:
-	docker run --rm -i -v "${TARGET}:${TARGET}:Z" k8s.gcr.io/build-image/kube-cross:v1.15.8-1 \
+	docker run --rm -i -v "${TARGET}:${TARGET}:Z" k8s.gcr.io/build-image/kube-cross:${KUBE_CROSS_VERSION} \
 		/bin/bash -c "\
 			mkdir -p /go/src /go/bin && \
 			GO111MODULE=on go get -d k8s.io/sample-apiserver@v0.17.0 && \

@@ -107,6 +107,7 @@ var _ = utils.SIGDescribe("Zone Support [Feature:vsphere]", func() {
 		e2eskipper.SkipUnlessProviderIs("vsphere")
 		Bootstrap(f)
 		client = f.ClientSet
+		e2eskipper.SkipUnlessMultizone(client)
 		namespace = f.Namespace.Name
 		vsanDatastore1 = GetAndExpectStringEnvVar(VCPZoneVsanDatastore1)
 		vsanDatastore2 = GetAndExpectStringEnvVar(VCPZoneVsanDatastore2)
@@ -369,7 +370,7 @@ var _ = utils.SIGDescribe("Zone Support [Feature:vsphere]", func() {
 		zones = append(zones, zoneA)
 		nodeSelectorMap := map[string]string{
 			// nodeSelector set as zoneB
-			v1.LabelFailureDomainBetaZone: zoneB,
+			v1.LabelTopologyZone: zoneB,
 		}
 		verifyPodSchedulingFails(client, namespace, nodeSelectorMap, scParameters, zones, storagev1.VolumeBindingWaitForFirstConsumer)
 	})
@@ -518,7 +519,7 @@ func verifyPVZoneLabels(client clientset.Interface, timeouts *framework.TimeoutC
 	ginkgo.By("Verify zone information is present in the volume labels")
 	for _, pv := range persistentvolumes {
 		// Multiple zones are separated with "__"
-		pvZoneLabels := strings.Split(pv.ObjectMeta.Labels["failure-domain.beta.kubernetes.io/zone"], "__")
+		pvZoneLabels := strings.Split(pv.ObjectMeta.Labels[v1.LabelTopologyZone], "__")
 		for _, zone := range zones {
 			gomega.Expect(pvZoneLabels).Should(gomega.ContainElement(zone), "Incorrect or missing zone labels in pv.")
 		}

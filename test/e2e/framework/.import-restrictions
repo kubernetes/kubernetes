@@ -37,7 +37,6 @@ rules:
       - k8s.io/kubernetes/pkg/controller/service
       - k8s.io/kubernetes/pkg/controller/util/node
       - k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util
-      - k8s.io/kubernetes/pkg/controller/volume/scheduling
       - k8s.io/kubernetes/pkg/credentialprovider
       - k8s.io/kubernetes/pkg/credentialprovider/aws
       - k8s.io/kubernetes/pkg/credentialprovider/azure
@@ -87,16 +86,6 @@ rules:
       - k8s.io/kubernetes/pkg/kubelet/config
       - k8s.io/kubernetes/pkg/kubelet/configmap
       - k8s.io/kubernetes/pkg/kubelet/container
-      - k8s.io/kubernetes/pkg/kubelet/dockershim
-      - k8s.io/kubernetes/pkg/kubelet/dockershim/cm
-      - k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker
-      - k8s.io/kubernetes/pkg/kubelet/dockershim/metrics
-      - k8s.io/kubernetes/pkg/kubelet/dockershim/network
-      - k8s.io/kubernetes/pkg/kubelet/dockershim/network/cni
-      - k8s.io/kubernetes/pkg/kubelet/dockershim/network/hostport
-      - k8s.io/kubernetes/pkg/kubelet/dockershim/network/kubenet
-      - k8s.io/kubernetes/pkg/kubelet/dockershim/network/metrics
-      - k8s.io/kubernetes/pkg/kubelet/dockershim/remote
       - k8s.io/kubernetes/pkg/kubelet/envvars
       - k8s.io/kubernetes/pkg/kubelet/eviction
       - k8s.io/kubernetes/pkg/kubelet/eviction/api
@@ -193,10 +182,14 @@ rules:
       - k8s.io/kubernetes/pkg/scheduler/internal/parallelize
       - k8s.io/kubernetes/pkg/scheduler/internal/queue
       - k8s.io/kubernetes/pkg/scheduler/listers
+      - k8s.io/kubernetes/pkg/scheduler/testing
       - k8s.io/kubernetes/pkg/scheduler/metrics
       - k8s.io/kubernetes/pkg/scheduler/nodeinfo
       - k8s.io/kubernetes/pkg/scheduler/util
       - k8s.io/kubernetes/pkg/scheduler/volumebinder
+      - k8s.io/kubernetes/pkg/scheduler
+      - k8s.io/kubernetes/pkg/scheduler/profile
+      - k8s.io/kubernetes/pkg/scheduler/testing
       - k8s.io/kubernetes/pkg/security/apparmor
       - k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp
       - k8s.io/kubernetes/pkg/security/podsecuritypolicy/sysctl

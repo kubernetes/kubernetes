@@ -23,12 +23,9 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/scheme"
 	ref "k8s.io/client-go/tools/reference"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -318,7 +315,7 @@ func TestAllPossibleAccessModes(t *testing.T) {
 		t.Errorf("Expected 3 arrays of modes that match RWO, but got %v", len(possibleModes))
 	}
 	for _, m := range possibleModes {
-		if !util.AccessModesContains(m, v1.ReadWriteOnce) {
+		if !util.ContainsAccessMode(m, v1.ReadWriteOnce) {
 			t.Errorf("AccessModes does not contain %s", v1.ReadWriteOnce)
 		}
 	}
@@ -327,7 +324,7 @@ func TestAllPossibleAccessModes(t *testing.T) {
 	if len(possibleModes) != 1 {
 		t.Errorf("Expected 1 array of modes that match RWX, but got %v", len(possibleModes))
 	}
-	if !util.AccessModesContains(possibleModes[0], v1.ReadWriteMany) {
+	if !util.ContainsAccessMode(possibleModes[0], v1.ReadWriteMany) {
 		t.Errorf("AccessModes does not contain %s", v1.ReadWriteOnce)
 	}
 
@@ -1226,41 +1223,24 @@ func TestStorageObjectInUseProtectionFiltering(t *testing.T) {
 	}
 
 	satisfyingTestCases := map[string]struct {
-		isExpectedMatch                    bool
-		vol                                *v1.PersistentVolume
-		pvc                                *v1.PersistentVolumeClaim
-		enableStorageObjectInUseProtection bool
+		isExpectedMatch bool
+		vol             *v1.PersistentVolume
+		pvc             *v1.PersistentVolumeClaim
 	}{
-		"feature enabled - pv deletionTimeStamp not set": {
-			isExpectedMatch:                    true,
-			vol:                                pv,
-			pvc:                                pvc,
-			enableStorageObjectInUseProtection: true,
+		"pv deletionTimeStamp not set": {
+			isExpectedMatch: true,
+			vol:             pv,
+			pvc:             pvc,
 		},
-		"feature enabled - pv deletionTimeStamp set": {
-			isExpectedMatch:                    false,
-			vol:                                pvToDelete,
-			pvc:                                pvc,
-			enableStorageObjectInUseProtection: true,
-		},
-		"feature disabled - pv deletionTimeStamp not set": {
-			isExpectedMatch:                    true,
-			vol:                                pv,
-			pvc:                                pvc,
-			enableStorageObjectInUseProtection: false,
-		},
-		"feature disabled - pv deletionTimeStamp set": {
-			isExpectedMatch:                    true,
-			vol:                                pvToDelete,
-			pvc:                                pvc,
-			enableStorageObjectInUseProtection: false,
+		"pv deletionTimeStamp set": {
+			isExpectedMatch: false,
+			vol:             pvToDelete,
+			pvc:             pvc,
 		},
 	}
 
 	for name, testCase := range satisfyingTestCases {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StorageObjectInUseProtection, testCase.enableStorageObjectInUseProtection)()
-
 			err := checkVolumeSatisfyClaim(testCase.vol, testCase.pvc)
 			// expected to match but got an error
 			if err != nil && testCase.isExpectedMatch {
@@ -1274,40 +1254,23 @@ func TestStorageObjectInUseProtectionFiltering(t *testing.T) {
 	}
 
 	filteringTestCases := map[string]struct {
-		isExpectedMatch                    bool
-		vol                                persistentVolumeOrderedIndex
-		pvc                                *v1.PersistentVolumeClaim
-		enableStorageObjectInUseProtection bool
+		isExpectedMatch bool
+		vol             persistentVolumeOrderedIndex
+		pvc             *v1.PersistentVolumeClaim
 	}{
-		"feature enabled - pv deletionTimeStamp not set": {
-			isExpectedMatch:                    true,
-			vol:                                createTestVolOrderedIndex(pv),
-			pvc:                                pvc,
-			enableStorageObjectInUseProtection: true,
+		"pv deletionTimeStamp not set": {
+			isExpectedMatch: true,
+			vol:             createTestVolOrderedIndex(pv),
+			pvc:             pvc,
 		},
-		"feature enabled - pv deletionTimeStamp set": {
-			isExpectedMatch:                    false,
-			vol:                                createTestVolOrderedIndex(pvToDelete),
-			pvc:                                pvc,
-			enableStorageObjectInUseProtection: true,
-		},
-		"feature disabled - pv deletionTimeStamp not set": {
-			isExpectedMatch:                    true,
-			vol:                                createTestVolOrderedIndex(pv),
-			pvc:                                pvc,
-			enableStorageObjectInUseProtection: false,
-		},
-		"feature disabled - pv deletionTimeStamp set": {
-			isExpectedMatch:                    true,
-			vol:                                createTestVolOrderedIndex(pvToDelete),
-			pvc:                                pvc,
-			enableStorageObjectInUseProtection: false,
+		"pv deletionTimeStamp set": {
+			isExpectedMatch: false,
+			vol:             createTestVolOrderedIndex(pvToDelete),
+			pvc:             pvc,
 		},
 	}
 	for name, testCase := range filteringTestCases {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StorageObjectInUseProtection, testCase.enableStorageObjectInUseProtection)()
-
 			pvmatch, err := testCase.vol.findBestMatchForClaim(testCase.pvc, false)
 			// expected to match but either got an error or no returned pvmatch
 			if pvmatch == nil && testCase.isExpectedMatch {
@@ -1333,7 +1296,6 @@ func TestFindingPreboundVolumes(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "claim01",
 			Namespace: "myns",
-			SelfLink:  "/api/v1/namespaces/myns/persistentvolumeclaims/claim01",
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
@@ -1504,7 +1466,7 @@ func TestFindMatchVolumeWithNode(t *testing.T) {
 			}),
 			node: node3,
 		},
-		"fail-nonavaiable": {
+		"fail-nonavaliable": {
 			expectedMatch: "",
 			claim: makePVC("100G", func(pvc *v1.PersistentVolumeClaim) {
 				pvc.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}

@@ -26,7 +26,7 @@ import (
 
 /*
  * By default, all the following metrics are defined as falling under
- * ALPHA stability level https://github.com/kubernetes/enhancements/blob/master/keps/sig-instrumentation/1209-metrics-stability/20190404-kubernetes-control-plane-metrics-stability.md#stability-classes)
+ * ALPHA stability level https://github.com/kubernetes/enhancements/blob/master/keps/sig-instrumentation/1209-metrics-stability/kubernetes-control-plane-metrics-stability.md#stability-classes)
  *
  * Promoting the stability level of the metric is a responsibility of the component owner, since it
  * involves explicitly acknowledging support for the metric across multiple releases, in accordance with
@@ -43,11 +43,20 @@ var (
 		},
 		[]string{"operation", "type"},
 	)
+	etcdObjectCounts = compbasemetrics.NewGaugeVec(
+		&compbasemetrics.GaugeOpts{
+			Name:              "etcd_object_counts",
+			DeprecatedVersion: "1.22.0",
+			Help:              "Number of stored objects at the time of last check split by kind. This metric is replaced by apiserver_storage_object_counts.",
+			StabilityLevel:    compbasemetrics.ALPHA,
+		},
+		[]string{"resource"},
+	)
 	objectCounts = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
-			Name:           "etcd_object_counts",
+			Name:           "apiserver_storage_objects",
 			Help:           "Number of stored objects at the time of last check split by kind.",
-			StabilityLevel: compbasemetrics.ALPHA,
+			StabilityLevel: compbasemetrics.STABLE,
 		},
 		[]string{"resource"},
 	)
@@ -76,6 +85,38 @@ var (
 		},
 		[]string{},
 	)
+	listStorageCount = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Name:           "apiserver_storage_list_total",
+			Help:           "Number of LIST requests served from storage",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"resource"},
+	)
+	listStorageNumFetched = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Name:           "apiserver_storage_list_fetched_objects_total",
+			Help:           "Number of objects read from storage in the course of serving a LIST request",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"resource"},
+	)
+	listStorageNumSelectorEvals = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Name:           "apiserver_storage_list_evaluated_objects_total",
+			Help:           "Number of objects tested in the course of serving a LIST request from storage",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"resource"},
+	)
+	listStorageNumReturned = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Name:           "apiserver_storage_list_returned_objects_total",
+			Help:           "Number of objects returned for a LIST request from storage",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"resource"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -86,15 +127,21 @@ func Register() {
 	registerMetrics.Do(func() {
 		legacyregistry.MustRegister(etcdRequestLatency)
 		legacyregistry.MustRegister(objectCounts)
+		legacyregistry.MustRegister(etcdObjectCounts)
 		legacyregistry.MustRegister(dbTotalSize)
 		legacyregistry.MustRegister(etcdBookmarkCounts)
 		legacyregistry.MustRegister(etcdLeaseObjectCounts)
+		legacyregistry.MustRegister(listStorageCount)
+		legacyregistry.MustRegister(listStorageNumFetched)
+		legacyregistry.MustRegister(listStorageNumSelectorEvals)
+		legacyregistry.MustRegister(listStorageNumReturned)
 	})
 }
 
-// UpdateObjectCount sets the etcd_object_counts metric.
+// UpdateObjectCount sets the apiserver_storage_object_counts and etcd_object_counts (deprecated) metric.
 func UpdateObjectCount(resourcePrefix string, count int64) {
 	objectCounts.WithLabelValues(resourcePrefix).Set(float64(count))
+	etcdObjectCounts.WithLabelValues(resourcePrefix).Set(float64(count))
 }
 
 // RecordEtcdRequestLatency sets the etcd_request_duration_seconds metrics.
@@ -127,4 +174,12 @@ func UpdateLeaseObjectCount(count int64) {
 	// Currently we only store one previous lease, since all the events have the same ttl.
 	// See pkg/storage/etcd3/lease_manager.go
 	etcdLeaseObjectCounts.WithLabelValues().Observe(float64(count))
+}
+
+// RecordListEtcd3Metrics notes various metrics of the cost to serve a LIST request
+func RecordStorageListMetrics(resource string, numFetched, numEvald, numReturned int) {
+	listStorageCount.WithLabelValues(resource).Inc()
+	listStorageNumFetched.WithLabelValues(resource).Add(float64(numFetched))
+	listStorageNumSelectorEvals.WithLabelValues(resource).Add(float64(numEvald))
+	listStorageNumReturned.WithLabelValues(resource).Add(float64(numReturned))
 }

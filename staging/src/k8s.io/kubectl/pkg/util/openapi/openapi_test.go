@@ -30,7 +30,7 @@ import (
 
 var fakeSchema = testing.Fake{Path: filepath.Join("..", "..", "..", "testdata", "openapi", "swagger.json")}
 
-var _ = Describe("Reading apps/v1beta1/Deployment from openAPIData", func() {
+var _ = Describe("Reading apps/v1/Deployment from openAPIData", func() {
 	var resources openapi.Resources
 	BeforeEach(func() {
 		s, err := fakeSchema.OpenAPISchema()
@@ -41,7 +41,7 @@ var _ = Describe("Reading apps/v1beta1/Deployment from openAPIData", func() {
 
 	gvk := schema.GroupVersionKind{
 		Kind:    "Deployment",
-		Version: "v1beta1",
+		Version: "v1",
 		Group:   "apps",
 	}
 
@@ -49,12 +49,7 @@ var _ = Describe("Reading apps/v1beta1/Deployment from openAPIData", func() {
 	It("should lookup the Schema by its GroupVersionKind", func() {
 		schema = resources.LookupResource(gvk)
 		Expect(schema).ToNot(BeNil())
-	})
-
-	var deployment *proto.Kind
-	It("should be a Kind", func() {
-		deployment = schema.(*proto.Kind)
-		Expect(deployment).ToNot(BeNil())
+		Expect(schema.(*proto.Kind)).ToNot(BeNil())
 	})
 })
 
@@ -77,17 +72,12 @@ var _ = Describe("Reading authorization.k8s.io/v1/SubjectAccessReview from openA
 	It("should lookup the Schema by its GroupVersionKind", func() {
 		schema = resources.LookupResource(gvk)
 		Expect(schema).ToNot(BeNil())
-	})
-
-	var sarspec *proto.Kind
-	It("should be a Kind and have a spec", func() {
 		sar := schema.(*proto.Kind)
 		Expect(sar).ToNot(BeNil())
 		Expect(sar.Fields).To(HaveKey("spec"))
 		specRef := sar.Fields["spec"].(proto.Reference)
 		Expect(specRef).ToNot(BeNil())
 		Expect(specRef.Reference()).To(Equal("io.k8s.api.authorization.v1.SubjectAccessReviewSpec"))
-		sarspec = specRef.SubSchema().(*proto.Kind)
-		Expect(sarspec).ToNot(BeNil())
+		Expect(specRef.SubSchema().(*proto.Kind)).ToNot(BeNil())
 	})
 })

@@ -30,7 +30,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
-	policyv1beta1 "k8s.io/api/policy/v1beta1"
+	policyv1 "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -59,7 +59,7 @@ const (
 	minNodes            = 2
 )
 
-var _ = utils.SIGDescribe("Pod Disks", func() {
+var _ = utils.SIGDescribe("Pod Disks [Feature:StorageProvider]", func() {
 	var (
 		ns         string
 		cs         clientset.Interface
@@ -423,7 +423,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 					framework.ExpectNoError(podClient.Delete(context.TODO(), host0Pod.Name, *metav1.NewDeleteOptions(0)), "Unable to delete host0Pod")
 
 				} else if disruptOp == evictPod {
-					evictTarget := &policyv1beta1.Eviction{
+					evictTarget := &policyv1.Eviction{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      host0Pod.Name,
 							Namespace: ns,
@@ -431,7 +431,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 					}
 					ginkgo.By("evicting host0Pod")
 					err = wait.PollImmediate(framework.Poll, podEvictTimeout, func() (bool, error) {
-						if err := cs.CoreV1().Pods(ns).Evict(context.TODO(), evictTarget); err != nil {
+						if err := cs.CoreV1().Pods(ns).EvictV1(context.TODO(), evictTarget); err != nil {
 							framework.Logf("Failed to evict host0Pod, ignoring error: %v", err)
 							return false, nil
 						}
@@ -596,7 +596,7 @@ func testPDPod(diskNames []string, targetNode types.NodeName, readOnly bool, num
 		if numContainers > 1 {
 			containers[i].Name = fmt.Sprintf("mycontainer%v", i+1)
 		}
-		containers[i].Image = imageutils.GetE2EImage(imageutils.BusyBox)
+		containers[i].Image = e2epod.GetTestImage(imageutils.BusyBox)
 		containers[i].Command = []string{"sleep", "6000"}
 		containers[i].VolumeMounts = make([]v1.VolumeMount, len(diskNames))
 		for k := range diskNames {
@@ -636,7 +636,7 @@ func testPDPod(diskNames []string, targetNode types.NodeName, readOnly bool, num
 			pod.Spec.Volumes[k].VolumeSource = v1.VolumeSource{
 				GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
 					PDName:   diskName,
-					FSType:   "ext4",
+					FSType:   e2epv.GetDefaultFSType(),
 					ReadOnly: readOnly,
 				},
 			}

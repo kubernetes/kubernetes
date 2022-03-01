@@ -22,7 +22,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -34,8 +34,7 @@ import (
 	"time"
 
 	"k8s.io/api/admission/v1beta1"
-	admissionv1beta1 "k8s.io/api/admissionregistration/v1beta1"
-	registrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
@@ -84,12 +83,12 @@ func patchAnnotationValue(configuration, webhook string, patch string) string {
 
 // testWebhookReinvocationPolicy ensures that the admission webhook reinvocation policy is applied correctly.
 func testWebhookReinvocationPolicy(t *testing.T, watchCache bool) {
-	reinvokeNever := registrationv1beta1.NeverReinvocationPolicy
-	reinvokeIfNeeded := registrationv1beta1.IfNeededReinvocationPolicy
+	reinvokeNever := admissionregistrationv1.NeverReinvocationPolicy
+	reinvokeIfNeeded := admissionregistrationv1.IfNeededReinvocationPolicy
 
 	type testWebhook struct {
 		path           string
-		policy         *registrationv1beta1.ReinvocationPolicyType
+		policy         *admissionregistrationv1.ReinvocationPolicyType
 		objectSelector *metav1.LabelSelector
 	}
 
@@ -266,7 +265,7 @@ func testWebhookReinvocationPolicy(t *testing.T, watchCache bool) {
 	defer webhookServer.Close()
 
 	// prepare audit policy file
-	policyFile, err := ioutil.TempFile("", "audit-policy.yaml")
+	policyFile, err := os.CreateTemp("", "audit-policy.yaml")
 	if err != nil {
 		t.Fatalf("Failed to create audit policy file: %v", err)
 	}
@@ -279,7 +278,7 @@ func testWebhookReinvocationPolicy(t *testing.T, watchCache bool) {
 	}
 
 	// prepare audit log file
-	logFile, err := ioutil.TempFile("", "audit.log")
+	logFile, err := os.CreateTemp("", "audit.log")
 	if err != nil {
 		t.Fatalf("Failed to create audit log file: %v", err)
 	}
@@ -339,46 +338,48 @@ func testWebhookReinvocationPolicy(t *testing.T, watchCache bool) {
 				t.Fatal(err)
 			}
 
-			fail := admissionv1beta1.Fail
-			webhooks := []admissionv1beta1.MutatingWebhook{}
+			fail := admissionregistrationv1.Fail
+			webhooks := []admissionregistrationv1.MutatingWebhook{}
 			for j, webhook := range tt.webhooks {
 				endpoint := webhookServer.URL + webhook.path
 				name := fmt.Sprintf("admission.integration.test.%d.%s", j, strings.TrimPrefix(webhook.path, "/"))
-				webhooks = append(webhooks, admissionv1beta1.MutatingWebhook{
+				webhooks = append(webhooks, admissionregistrationv1.MutatingWebhook{
 					Name: name,
-					ClientConfig: admissionv1beta1.WebhookClientConfig{
+					ClientConfig: admissionregistrationv1.WebhookClientConfig{
 						URL:      &endpoint,
 						CABundle: localhostCert,
 					},
-					Rules: []admissionv1beta1.RuleWithOperations{{
-						Operations: []admissionv1beta1.OperationType{admissionv1beta1.OperationAll},
-						Rule:       admissionv1beta1.Rule{APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"pods"}},
+					Rules: []admissionregistrationv1.RuleWithOperations{{
+						Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.OperationAll},
+						Rule:       admissionregistrationv1.Rule{APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"pods"}},
 					}},
 					ObjectSelector:          webhook.objectSelector,
 					NamespaceSelector:       &metav1.LabelSelector{MatchLabels: nsLabels},
 					FailurePolicy:           &fail,
 					ReinvocationPolicy:      webhook.policy,
 					AdmissionReviewVersions: []string{"v1beta1"},
+					SideEffects:             &noSideEffects,
 				})
 			}
 			// Register a marker checking webhook with each set of webhook configurations
 			markerEndpoint := webhookServer.URL + "/marker"
-			webhooks = append(webhooks, admissionv1beta1.MutatingWebhook{
+			webhooks = append(webhooks, admissionregistrationv1.MutatingWebhook{
 				Name: "admission.integration.test.marker",
-				ClientConfig: admissionv1beta1.WebhookClientConfig{
+				ClientConfig: admissionregistrationv1.WebhookClientConfig{
 					URL:      &markerEndpoint,
 					CABundle: localhostCert,
 				},
-				Rules: []admissionv1beta1.RuleWithOperations{{
-					Operations: []admissionv1beta1.OperationType{admissionv1beta1.OperationAll},
-					Rule:       admissionv1beta1.Rule{APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"pods"}},
+				Rules: []admissionregistrationv1.RuleWithOperations{{
+					Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.OperationAll},
+					Rule:       admissionregistrationv1.Rule{APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"pods"}},
 				}},
 				NamespaceSelector:       &metav1.LabelSelector{MatchLabels: markerNsLabels},
 				ObjectSelector:          &metav1.LabelSelector{MatchLabels: map[string]string{"marker": "true"}},
 				AdmissionReviewVersions: []string{"v1beta1"},
+				SideEffects:             &noSideEffects,
 			})
 
-			cfg, err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Create(context.TODO(), &admissionv1beta1.MutatingWebhookConfiguration{
+			cfg, err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Create(context.TODO(), &admissionregistrationv1.MutatingWebhookConfiguration{
 				ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("admission.integration.test-%d", i)},
 				Webhooks:   webhooks,
 			}, metav1.CreateOptions{})
@@ -386,7 +387,7 @@ func testWebhookReinvocationPolicy(t *testing.T, watchCache bool) {
 				t.Fatal(err)
 			}
 			defer func() {
-				err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Delete(context.TODO(), cfg.GetName(), metav1.DeleteOptions{})
+				err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Delete(context.TODO(), cfg.GetName(), metav1.DeleteOptions{})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -535,7 +536,7 @@ func newReinvokeWebhookHandler(recorder *invocationRecorder) http.Handler {
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
-		data, err := ioutil.ReadAll(r.Body)
+		data, err := io.ReadAll(r.Body)
 		if err != nil {
 			http.Error(w, err.Error(), 400)
 		}

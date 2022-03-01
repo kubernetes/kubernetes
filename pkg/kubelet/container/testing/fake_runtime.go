@@ -18,17 +18,17 @@ package testing
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"net/url"
 	"reflect"
 	"sync"
+	"testing"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/flowcontrol"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/volume"
 )
@@ -58,6 +58,7 @@ type FakeRuntime struct {
 	Err               error
 	InspectErr        error
 	StatusErr         error
+	T                 *testing.T
 }
 
 const FakeHost = "localhost:12345"
@@ -135,39 +136,40 @@ func (f *FakeRuntime) UpdatePodCIDR(c string) error {
 	return nil
 }
 
-func (f *FakeRuntime) assertList(expect []string, test []string) error {
+func (f *FakeRuntime) assertList(expect []string, test []string) bool {
 	if !reflect.DeepEqual(expect, test) {
-		return fmt.Errorf("expected %#v, got %#v", expect, test)
+		f.T.Errorf("AssertList: expected %#v, got %#v", expect, test)
+		return false
 	}
-	return nil
+	return true
 }
 
 // AssertCalls test if the invoked functions are as expected.
-func (f *FakeRuntime) AssertCalls(calls []string) error {
+func (f *FakeRuntime) AssertCalls(calls []string) bool {
 	f.Lock()
 	defer f.Unlock()
 	return f.assertList(calls, f.CalledFunctions)
 }
 
-func (f *FakeRuntime) AssertStartedPods(pods []string) error {
+func (f *FakeRuntime) AssertStartedPods(pods []string) bool {
 	f.Lock()
 	defer f.Unlock()
 	return f.assertList(pods, f.StartedPods)
 }
 
-func (f *FakeRuntime) AssertKilledPods(pods []string) error {
+func (f *FakeRuntime) AssertKilledPods(pods []string) bool {
 	f.Lock()
 	defer f.Unlock()
 	return f.assertList(pods, f.KilledPods)
 }
 
-func (f *FakeRuntime) AssertStartedContainers(containers []string) error {
+func (f *FakeRuntime) AssertStartedContainers(containers []string) bool {
 	f.Lock()
 	defer f.Unlock()
 	return f.assertList(containers, f.StartedContainers)
 }
 
-func (f *FakeRuntime) AssertKilledContainers(containers []string) error {
+func (f *FakeRuntime) AssertKilledContainers(containers []string) bool {
 	f.Lock()
 	defer f.Unlock()
 	return f.assertList(containers, f.KilledContainers)
@@ -175,10 +177,6 @@ func (f *FakeRuntime) AssertKilledContainers(containers []string) error {
 
 func (f *FakeRuntime) Type() string {
 	return f.RuntimeType
-}
-
-func (f *FakeRuntime) SupportsSingleFileMapping() bool {
-	return true
 }
 
 func (f *FakeRuntime) Version() (kubecontainer.Version, error) {

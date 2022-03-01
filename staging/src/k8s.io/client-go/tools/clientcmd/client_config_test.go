@@ -217,6 +217,43 @@ func TestTLSServerNameClearsWhenServerNameSet(t *testing.T) {
 	matchStringArg("", actualCfg.ServerName, t)
 }
 
+func TestFullImpersonateConfig(t *testing.T) {
+	config := createValidTestConfig()
+	config.Clusters["clean"] = &clientcmdapi.Cluster{
+		Server: "https://localhost:8443",
+	}
+	config.AuthInfos["clean"] = &clientcmdapi.AuthInfo{
+		Impersonate:          "alice",
+		ImpersonateUID:       "abc123",
+		ImpersonateGroups:    []string{"group-1"},
+		ImpersonateUserExtra: map[string][]string{"some-key": {"some-value"}},
+	}
+	config.Contexts["clean"] = &clientcmdapi.Context{
+		Cluster:  "clean",
+		AuthInfo: "clean",
+	}
+	config.CurrentContext = "clean"
+
+	clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{
+		ClusterInfo: clientcmdapi.Cluster{
+			Server: "http://something",
+		},
+	}, nil)
+
+	actualCfg, err := clientBuilder.ClientConfig()
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	matchStringArg("alice", actualCfg.Impersonate.UserName, t)
+	matchStringArg("abc123", actualCfg.Impersonate.UID, t)
+	matchIntArg(1, len(actualCfg.Impersonate.Groups), t)
+	matchStringArg("group-1", actualCfg.Impersonate.Groups[0], t)
+	matchIntArg(1, len(actualCfg.Impersonate.Extra), t)
+	matchIntArg(1, len(actualCfg.Impersonate.Extra["some-key"]), t)
+	matchStringArg("some-value", actualCfg.Impersonate.Extra["some-key"][0], t)
+}
+
 func TestMergeContext(t *testing.T) {
 	const namespace = "overridden-namespace"
 
@@ -630,9 +667,10 @@ func TestCreateAuthConfigExecInstallHintCleanup(t *testing.T) {
 	clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{
 		AuthInfo: clientcmdapi.AuthInfo{
 			Exec: &clientcmdapi.ExecConfig{
-				APIVersion:  "client.authentication.k8s.io/v1alpha1",
-				Command:     "some-command",
-				InstallHint: "some install hint with \x1b[1mcontrol chars\x1b[0m\nand a newline",
+				APIVersion:      "client.authentication.k8s.io/v1alpha1",
+				Command:         "some-command",
+				InstallHint:     "some install hint with \x1b[1mcontrol chars\x1b[0m\nand a newline",
+				InteractiveMode: clientcmdapi.IfAvailableExecInteractiveMode,
 			},
 		},
 	}, nil)
@@ -804,6 +842,12 @@ func matchStringArg(expected, got string, t *testing.T) {
 func matchByteArg(expected, got []byte, t *testing.T) {
 	if !reflect.DeepEqual(expected, got) {
 		t.Errorf("Expected %v, got %v", expected, got)
+	}
+}
+
+func matchIntArg(expected, got int, t *testing.T) {
+	if expected != got {
+		t.Errorf("Expected %d, got %d", expected, got)
 	}
 }
 

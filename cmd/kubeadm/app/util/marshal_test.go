@@ -27,8 +27,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+
+	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
@@ -110,44 +112,44 @@ func TestMarshalUnmarshalYaml(t *testing.T) {
 }
 
 func TestMarshalUnmarshalToYamlForCodecs(t *testing.T) {
-	cfg := &kubeadmapiv1beta2.InitConfiguration{
+	cfg := &kubeadmapiv1.InitConfiguration{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       constants.InitConfigurationKind,
-			APIVersion: kubeadmapiv1beta2.SchemeGroupVersion.String(),
+			APIVersion: kubeadmapiv1.SchemeGroupVersion.String(),
 		},
-		NodeRegistration: kubeadmapiv1beta2.NodeRegistrationOptions{
+		NodeRegistration: kubeadmapiv1.NodeRegistrationOptions{
 			Name:      "testNode",
-			CRISocket: "/var/run/cri.sock",
+			CRISocket: "unix:///var/run/cri.sock",
 		},
-		BootstrapTokens: []kubeadmapiv1beta2.BootstrapToken{
+		BootstrapTokens: []bootstraptokenv1.BootstrapToken{
 			{
-				Token: &kubeadmapiv1beta2.BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
+				Token: &bootstraptokenv1.BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
 			},
 		},
 		// NOTE: Using MarshalToYamlForCodecs and UnmarshalFromYamlForCodecs for ClusterConfiguration fields here won't work
 		// by design. This is because we have a `json:"-"` annotation in order to avoid struct duplication. See the comment
-		// at the kubeadmapiv1beta2.InitConfiguration definition.
+		// at the kubeadmapiv1.InitConfiguration definition.
 	}
 
-	kubeadmapiv1beta2.SetDefaults_InitConfiguration(cfg)
+	kubeadmapiv1.SetDefaults_InitConfiguration(cfg)
 	scheme := runtime.NewScheme()
-	if err := kubeadmapiv1beta2.AddToScheme(scheme); err != nil {
+	if err := kubeadmapiv1.AddToScheme(scheme); err != nil {
 		t.Fatal(err)
 	}
 	codecs := serializer.NewCodecFactory(scheme)
 
-	bytes, err := MarshalToYamlForCodecs(cfg, kubeadmapiv1beta2.SchemeGroupVersion, codecs)
+	bytes, err := MarshalToYamlForCodecs(cfg, kubeadmapiv1.SchemeGroupVersion, codecs)
 	if err != nil {
 		t.Fatalf("unexpected error marshalling InitConfiguration: %v", err)
 	}
 	t.Logf("\n%s", bytes)
 
-	obj, err := UnmarshalFromYamlForCodecs(bytes, kubeadmapiv1beta2.SchemeGroupVersion, codecs)
+	obj, err := UnmarshalFromYamlForCodecs(bytes, kubeadmapiv1.SchemeGroupVersion, codecs)
 	if err != nil {
 		t.Fatalf("unexpected error unmarshalling InitConfiguration: %v", err)
 	}
 
-	cfg2, ok := obj.(*kubeadmapiv1beta2.InitConfiguration)
+	cfg2, ok := obj.(*kubeadmapiv1.InitConfiguration)
 	if !ok || cfg2 == nil {
 		t.Fatal("did not get InitConfiguration back")
 	}

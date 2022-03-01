@@ -26,16 +26,17 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
+	"k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/clock"
 )
 
 // the name used for object count quota
@@ -124,17 +125,25 @@ func (p *podEvaluator) Constraints(required []corev1.ResourceName, item runtime.
 	// validation with resource counting, but we did this before QoS was even defined.
 	// let's not make that mistake again with other resources now that QoS is defined.
 	requiredSet := quota.ToSet(required).Intersection(validationSet)
-	missingSet := sets.NewString()
+	missingSetResourceToContainerNames := make(map[string]sets.String)
 	for i := range pod.Spec.Containers {
-		enforcePodContainerConstraints(&pod.Spec.Containers[i], requiredSet, missingSet)
+		enforcePodContainerConstraints(&pod.Spec.Containers[i], requiredSet, missingSetResourceToContainerNames)
 	}
 	for i := range pod.Spec.InitContainers {
-		enforcePodContainerConstraints(&pod.Spec.InitContainers[i], requiredSet, missingSet)
+		enforcePodContainerConstraints(&pod.Spec.InitContainers[i], requiredSet, missingSetResourceToContainerNames)
 	}
-	if len(missingSet) == 0 {
+	if len(missingSetResourceToContainerNames) == 0 {
 		return nil
 	}
-	return fmt.Errorf("must specify %s", strings.Join(missingSet.List(), ","))
+	var resources = sets.NewString()
+	for resource := range missingSetResourceToContainerNames {
+		resources.Insert(resource)
+	}
+	var errorMessages = make([]string, 0, len(missingSetResourceToContainerNames))
+	for _, resource := range resources.List() {
+		errorMessages = append(errorMessages, fmt.Sprintf("%s for: %s", resource, strings.Join(missingSetResourceToContainerNames[resource].List(), ",")))
+	}
+	return fmt.Errorf("must specify %s", strings.Join(errorMessages, "; "))
 }
 
 // GroupResource that this evaluator tracks
@@ -189,7 +198,7 @@ func (p *podEvaluator) MatchingScopes(item runtime.Object, scopeSelectors []core
 }
 
 // UncoveredQuotaScopes takes the input matched scopes which are limited by configuration and the matched quota scopes.
-// It returns the scopes which are in limited scopes but dont have a corresponding covering quota scope
+// It returns the scopes which are in limited scopes but don't have a corresponding covering quota scope
 func (p *podEvaluator) UncoveredQuotaScopes(limitedScopes []corev1.ScopedResourceSelectorRequirement, matchedQuotaScopes []corev1.ScopedResourceSelectorRequirement) ([]corev1.ScopedResourceSelectorRequirement, error) {
 	uncoveredScopes := []corev1.ScopedResourceSelectorRequirement{}
 	for _, selector := range limitedScopes {
@@ -224,14 +233,21 @@ var _ quota.Evaluator = &podEvaluator{}
 
 // enforcePodContainerConstraints checks for required resources that are not set on this container and
 // adds them to missingSet.
-func enforcePodContainerConstraints(container *corev1.Container, requiredSet, missingSet sets.String) {
+func enforcePodContainerConstraints(container *corev1.Container, requiredSet sets.String, missingSetResourceToContainerNames map[string]sets.String) {
 	requests := container.Resources.Requests
 	limits := container.Resources.Limits
 	containerUsage := podComputeUsageHelper(requests, limits)
 	containerSet := quota.ToSet(quota.ResourceNames(containerUsage))
 	if !containerSet.Equal(requiredSet) {
-		difference := requiredSet.Difference(containerSet)
-		missingSet.Insert(difference.List()...)
+		if difference := requiredSet.Difference(containerSet); difference.Len() != 0 {
+			for _, diff := range difference.List() {
+				if _, ok := missingSetResourceToContainerNames[diff]; !ok {
+					missingSetResourceToContainerNames[diff] = sets.NewString(container.Name)
+				} else {
+					missingSetResourceToContainerNames[diff].Insert(container.Name)
+				}
+			}
+		}
 	}
 }
 
@@ -308,6 +324,8 @@ func podMatchesScopeFunc(selector corev1.ScopedResourceSelectorRequirement, obje
 		return !isBestEffort(pod), nil
 	case corev1.ResourceQuotaScopePriorityClass:
 		return podMatchesSelector(pod, selector)
+	case corev1.ResourceQuotaScopeCrossNamespacePodAffinity:
+		return usesCrossNamespacePodAffinity(pod), nil
 	}
 	return false, nil
 }
@@ -351,6 +369,10 @@ func PodUsageFunc(obj runtime.Object, clock clock.Clock) (corev1.ResourceList, e
 		limits = quota.Max(limits, pod.Spec.InitContainers[i].Resources.Limits)
 	}
 
+	if feature.DefaultFeatureGate.Enabled(features.PodOverhead) {
+		requests = quota.Add(requests, pod.Spec.Overhead)
+		limits = quota.Add(limits, pod.Spec.Overhead)
+	}
 	result = quota.Add(result, podComputeUsageHelper(requests, limits))
 	return result, nil
 }
@@ -379,6 +401,56 @@ func podMatchesSelector(pod *corev1.Pod, selector corev1.ScopedResourceSelectorR
 		return true, nil
 	}
 	return false, nil
+}
+
+func crossNamespacePodAffinityTerm(term *corev1.PodAffinityTerm) bool {
+	return len(term.Namespaces) != 0 || term.NamespaceSelector != nil
+}
+
+func crossNamespacePodAffinityTerms(terms []corev1.PodAffinityTerm) bool {
+	for _, t := range terms {
+		if crossNamespacePodAffinityTerm(&t) {
+			return true
+		}
+	}
+	return false
+}
+
+func crossNamespaceWeightedPodAffinityTerms(terms []corev1.WeightedPodAffinityTerm) bool {
+	for _, t := range terms {
+		if crossNamespacePodAffinityTerm(&t.PodAffinityTerm) {
+			return true
+		}
+	}
+	return false
+}
+
+func usesCrossNamespacePodAffinity(pod *corev1.Pod) bool {
+	if pod == nil || pod.Spec.Affinity == nil {
+		return false
+	}
+
+	affinity := pod.Spec.Affinity.PodAffinity
+	if affinity != nil {
+		if crossNamespacePodAffinityTerms(affinity.RequiredDuringSchedulingIgnoredDuringExecution) {
+			return true
+		}
+		if crossNamespaceWeightedPodAffinityTerms(affinity.PreferredDuringSchedulingIgnoredDuringExecution) {
+			return true
+		}
+	}
+
+	antiAffinity := pod.Spec.Affinity.PodAntiAffinity
+	if antiAffinity != nil {
+		if crossNamespacePodAffinityTerms(antiAffinity.RequiredDuringSchedulingIgnoredDuringExecution) {
+			return true
+		}
+		if crossNamespaceWeightedPodAffinityTerms(antiAffinity.PreferredDuringSchedulingIgnoredDuringExecution) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // QuotaV1Pod returns true if the pod is eligible to track against a quota

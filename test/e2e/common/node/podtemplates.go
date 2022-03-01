@@ -25,8 +25,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -159,6 +161,43 @@ var _ = SIGDescribe("PodTemplates", func() {
 
 		err = wait.PollImmediate(podTemplateRetryPeriod, podTemplateRetryTimeout, checkPodTemplateListQuantity(f, "podtemplate-set=true", 0))
 		framework.ExpectNoError(err, "failed to count required pod templates")
+
+	})
+
+	ginkgo.It("should replace a pod template", func() {
+		ptClient := f.ClientSet.CoreV1().PodTemplates(f.Namespace.Name)
+		ptName := "podtemplate-" + utilrand.String(5)
+
+		ginkgo.By("Create a pod template")
+		ptResource, err := ptClient.Create(context.TODO(), &v1.PodTemplate{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: ptName,
+			},
+			Template: v1.PodTemplateSpec{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "e2e-test", Image: imageutils.GetE2EImage(imageutils.Agnhost)},
+					},
+				},
+			},
+		}, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "failed to create pod template")
+
+		ginkgo.By("Replace a pod template")
+		var updatedPT *v1.PodTemplate
+
+		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			ptResource, err = ptClient.Get(context.TODO(), ptName, metav1.GetOptions{})
+			framework.ExpectNoError(err, "Unable to get pod template %s", ptName)
+			ptResource.Annotations = map[string]string{
+				"updated": "true",
+			}
+			updatedPT, err = ptClient.Update(context.TODO(), ptResource, metav1.UpdateOptions{})
+			return err
+		})
+		framework.ExpectNoError(err)
+		framework.ExpectEqual(updatedPT.Annotations["updated"], "true", "updated object should have the applied annotation")
+		framework.Logf("Found updated podtemplate annotation: %#v\n", updatedPT.Annotations["updated"])
 	})
 
 })

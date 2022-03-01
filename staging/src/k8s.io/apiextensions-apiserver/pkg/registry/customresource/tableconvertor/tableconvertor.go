@@ -21,6 +21,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"reflect"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -69,9 +70,14 @@ func New(crdColumns []apiextensionsv1.CustomResourceColumnDefinition) (rest.Tabl
 	return c, nil
 }
 
+type columnPrinter interface {
+	FindResults(data interface{}) ([][]reflect.Value, error)
+	PrintResults(w io.Writer, results []reflect.Value) error
+}
+
 type convertor struct {
 	headers           []metav1.TableColumnDefinition
-	additionalColumns []*jsonpath.JSONPath
+	additionalColumns []columnPrinter
 }
 
 func (c *convertor) ConvertToTable(ctx context.Context, obj runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {
@@ -84,13 +90,11 @@ func (c *convertor) ConvertToTable(ctx context.Context, obj runtime.Object, tabl
 
 	if m, err := meta.ListAccessor(obj); err == nil {
 		table.ResourceVersion = m.GetResourceVersion()
-		table.SelfLink = m.GetSelfLink()
 		table.Continue = m.GetContinue()
 		table.RemainingItemCount = m.GetRemainingItemCount()
 	} else {
 		if m, err := meta.CommonAccessor(obj); err == nil {
 			table.ResourceVersion = m.GetResourceVersion()
-			table.SelfLink = m.GetSelfLink()
 		}
 	}
 

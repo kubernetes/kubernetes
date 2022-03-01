@@ -29,8 +29,9 @@ import (
 	"github.com/vmware/govmomi/sts"
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/soap"
-	"k8s.io/client-go/pkg/version"
 	"k8s.io/klog/v2"
+
+	"k8s.io/client-go/pkg/version"
 )
 
 // VSphereConnection contains information for connecting to vCenter
@@ -84,7 +85,6 @@ func (connection *VSphereConnection) Connect(ctx context.Context) error {
 		klog.Errorf("Failed to create govmomi client. err: %+v", err)
 		return err
 	}
-	setVCenterInfoMetric(connection)
 	return nil
 }
 
@@ -206,10 +206,11 @@ func (connection *VSphereConnection) NewClient(ctx context.Context) (*vim25.Clie
 	if err != nil {
 		return nil, err
 	}
-	if klog.V(3).Enabled() {
+	klogV := klog.V(3)
+	if klogV.Enabled() {
 		s, err := session.NewManager(client).UserSession(ctx)
 		if err == nil {
-			klog.Infof("New session ID for '%s' = %s", s.UserName, s.Key)
+			klogV.Infof("New session ID for '%s' = %s", s.UserName, s.Key)
 		}
 	}
 
@@ -217,6 +218,17 @@ func (connection *VSphereConnection) NewClient(ctx context.Context) (*vim25.Clie
 		connection.RoundTripperCount = RoundTripperDefaultCount
 	}
 	client.RoundTripper = vim25.Retry(client.RoundTripper, vim25.TemporaryNetworkError(int(connection.RoundTripperCount)))
+	vcdeprecated, err := isvCenterDeprecated(client.ServiceContent.About.Version, client.ServiceContent.About.ApiVersion)
+	if err != nil {
+		klog.Errorf("failed to check if vCenter version:%v and api version: %s is deprecated. Error: %v", client.ServiceContent.About.Version, client.ServiceContent.About.ApiVersion, err)
+	}
+	if vcdeprecated {
+		// After this deprecation, vSphere 6.5 support period is extended to October 15, 2022 as
+		// https://blogs.vmware.com/vsphere/2021/03/announcing-limited-extension-of-vmware-vsphere-6-5-general-support-period.html
+		// In addition, the external vSphere cloud provider does not support vSphere 6.5.
+		// Please keep vSphere 6.5 support til the period.
+		klog.Warningf("vCenter is deprecated. version: %s, api verson: %s Please consider upgrading vCenter and ESXi servers to 6.7u3 or higher", client.ServiceContent.About.Version, client.ServiceContent.About.ApiVersion)
+	}
 	return client, nil
 }
 

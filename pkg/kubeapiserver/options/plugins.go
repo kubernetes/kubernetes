@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction"
 	podpriority "k8s.io/kubernetes/plugin/pkg/admission/priority"
 	"k8s.io/kubernetes/plugin/pkg/admission/runtimeclass"
+	"k8s.io/kubernetes/plugin/pkg/admission/security/podsecurity"
 	"k8s.io/kubernetes/plugin/pkg/admission/security/podsecuritypolicy"
 	"k8s.io/kubernetes/plugin/pkg/admission/securitycontext/scdeny"
 	"k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
@@ -74,6 +75,7 @@ var AllOrderedPlugins = []string{
 	nodetaint.PluginName,                    // TaintNodesByCondition
 	alwayspullimages.PluginName,             // AlwaysPullImages
 	imagepolicy.PluginName,                  // ImagePolicyWebhook
+	podsecurity.PluginName,                  // PodSecurity - before PodSecurityPolicy so audit/warn get exercised even if PodSecurityPolicy denies
 	podsecuritypolicy.PluginName,            // PodSecurityPolicy
 	podnodeselector.PluginName,              // PodNodeSelector
 	podpriority.PluginName,                  // Priority
@@ -102,8 +104,8 @@ var AllOrderedPlugins = []string{
 	deny.PluginName,              // AlwaysDeny
 }
 
-// RegisterAllAdmissionPlugins registers all admission plugins and
-// sets the recommended plugins order.
+// RegisterAllAdmissionPlugins registers all admission plugins.
+// The order of registration is irrelevant, see AllOrderedPlugins for execution order.
 func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	admit.Register(plugins) // DEPRECATED as no real meaning
 	alwayspullimages.Register(plugins)
@@ -126,6 +128,7 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	podtolerationrestriction.Register(plugins)
 	runtimeclass.Register(plugins)
 	resourcequota.Register(plugins)
+	podsecurity.Register(plugins)
 	podsecuritypolicy.Register(plugins)
 	podpriority.Register(plugins)
 	scdeny.Register(plugins)
@@ -158,6 +161,7 @@ func DefaultOffAdmissionPlugins() sets.String {
 		certsigning.PluginName,                  // CertificateSigning
 		certsubjectrestriction.PluginName,       // CertificateSubjectRestriction
 		defaultingressclass.PluginName,          // DefaultIngressClass
+		podsecurity.PluginName,                  // PodSecurity
 	)
 
 	return sets.NewString(AllOrderedPlugins...).Difference(defaultOnPlugins)

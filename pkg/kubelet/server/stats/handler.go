@@ -14,24 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+//go:generate mockgen -source=handler.go -destination=testing/mock_stats_provider.go -package=testing Provider
 package stats
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
-	"path"
-	"time"
 
 	restful "github.com/emicklei/go-restful"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorv2 "github.com/google/cadvisor/info/v2"
-	"github.com/pkg/errors"
 	"k8s.io/klog/v2"
 
 	"k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -93,6 +88,9 @@ type Provider interface {
 	// ListVolumesForPod returns the stats of the volume used by the pod with
 	// the podUID.
 	ListVolumesForPod(podUID types.UID) (map[string]volume.Volume, bool)
+	// ListBlockVolumesForPod returns the stats of the volume used by the
+	// pod with the podUID.
+	ListBlockVolumesForPod(podUID types.UID) (map[string]volume.BlockVolume, bool)
 	// GetPods returns the specs of all the pods running on this node.
 	GetPods() []*v1.Pod
 
@@ -113,29 +111,18 @@ type handler struct {
 }
 
 // CreateHandlers creates the REST handlers for the stats.
-func CreateHandlers(rootPath string, provider Provider, summaryProvider SummaryProvider, enableCAdvisorJSONEndpoints bool) *restful.WebService {
+func CreateHandlers(rootPath string, provider Provider, summaryProvider SummaryProvider) *restful.WebService {
 	h := &handler{provider, summaryProvider}
 
 	ws := &restful.WebService{}
 	ws.Path(rootPath).
 		Produces(restful.MIME_JSON)
 
-	type endpoint struct {
+	endpoints := []struct {
 		path    string
 		handler restful.RouteFunction
-	}
-
-	endpoints := []endpoint{
+	}{
 		{"/summary", h.handleSummary},
-	}
-
-	if enableCAdvisorJSONEndpoints {
-		endpoints = append(endpoints,
-			endpoint{"", h.handleStats},
-			endpoint{"/container", h.handleSystemContainer},
-			endpoint{"/{podName}/{containerName}", h.handlePodContainer},
-			endpoint{"/{namespace}/{podName}/{uid}/{containerName}", h.handlePodContainer},
-		)
 	}
 
 	for _, e := range endpoints {
@@ -150,79 +137,13 @@ func CreateHandlers(rootPath string, provider Provider, summaryProvider SummaryP
 	return ws
 }
 
-type statsRequest struct {
-	// The name of the container for which to request stats.
-	// Default: /
-	// +optional
-	ContainerName string `json:"containerName,omitempty"`
-
-	// Max number of stats to return.
-	// If start and end time are specified this limit is ignored.
-	// Default: 60
-	// +optional
-	NumStats int `json:"num_stats,omitempty"`
-
-	// Start time for which to query information.
-	// If omitted, the beginning of time is assumed.
-	// +optional
-	Start time.Time `json:"start,omitempty"`
-
-	// End time for which to query information.
-	// If omitted, current time is assumed.
-	// +optional
-	End time.Time `json:"end,omitempty"`
-
-	// Whether to also include information from subcontainers.
-	// Default: false.
-	// +optional
-	Subcontainers bool `json:"subcontainers,omitempty"`
-}
-
-func (r *statsRequest) cadvisorRequest() *cadvisorapi.ContainerInfoRequest {
-	return &cadvisorapi.ContainerInfoRequest{
-		NumStats: r.NumStats,
-		Start:    r.Start,
-		End:      r.End,
-	}
-}
-
-func parseStatsRequest(request *restful.Request) (statsRequest, error) {
-	// Default request.
-	query := statsRequest{
-		NumStats: 60,
-	}
-
-	err := json.NewDecoder(request.Request.Body).Decode(&query)
-	if err != nil && err != io.EOF {
-		return query, err
-	}
-	return query, nil
-}
-
-// Handles root container stats requests to /stats
-func (h *handler) handleStats(request *restful.Request, response *restful.Response) {
-	query, err := parseStatsRequest(request)
-	if err != nil {
-		handleError(response, "/stats", err)
-		return
-	}
-
-	// Root container stats.
-	statsMap, err := h.provider.GetRawContainerInfo("/", query.cadvisorRequest(), false)
-	if err != nil {
-		handleError(response, fmt.Sprintf("/stats %v", query), err)
-		return
-	}
-	writeResponse(response, statsMap["/"])
-}
-
 // Handles stats summary requests to /stats/summary
 // If "only_cpu_and_memory" GET param is true then only cpu and memory is returned in response.
 func (h *handler) handleSummary(request *restful.Request, response *restful.Response) {
 	onlyCPUAndMemory := false
 	err := request.Request.ParseForm()
 	if err != nil {
-		handleError(response, "/stats/summary", errors.Wrapf(err, "parse form failed"))
+		handleError(response, "/stats/summary", fmt.Errorf("parse form failed: %w", err))
 		return
 	}
 	if onlyCluAndMemoryParam, found := request.Request.Form["only_cpu_and_memory"]; found &&
@@ -242,74 +163,6 @@ func (h *handler) handleSummary(request *restful.Request, response *restful.Resp
 	} else {
 		writeResponse(response, summary)
 	}
-}
-
-// Handles non-kubernetes container stats requests to /stats/container/
-func (h *handler) handleSystemContainer(request *restful.Request, response *restful.Response) {
-	query, err := parseStatsRequest(request)
-	if err != nil {
-		handleError(response, "/stats/container", err)
-		return
-	}
-
-	// Non-Kubernetes container stats.
-	containerName := path.Join("/", query.ContainerName)
-	stats, err := h.provider.GetRawContainerInfo(
-		containerName, query.cadvisorRequest(), query.Subcontainers)
-	if err != nil {
-		if _, ok := stats[containerName]; ok {
-			// If the failure is partial, log it and return a best-effort response.
-			klog.ErrorS(err, "Partial failure issuing GetRawContainerInfo", "query", query)
-		} else {
-			handleError(response, fmt.Sprintf("/stats/container %v", query), err)
-			return
-		}
-	}
-	writeResponse(response, stats)
-}
-
-// Handles kubernetes pod/container stats requests to:
-// /stats/<pod name>/<container name>
-// /stats/<namespace>/<pod name>/<uid>/<container name>
-func (h *handler) handlePodContainer(request *restful.Request, response *restful.Response) {
-	query, err := parseStatsRequest(request)
-	if err != nil {
-		handleError(response, request.Request.URL.String(), err)
-		return
-	}
-
-	// Default parameters.
-	params := map[string]string{
-		"namespace": metav1.NamespaceDefault,
-		"uid":       "",
-	}
-	for k, v := range request.PathParameters() {
-		params[k] = v
-	}
-
-	if params["podName"] == "" || params["containerName"] == "" {
-		response.WriteErrorString(http.StatusBadRequest,
-			fmt.Sprintf("Invalid pod container request: %v", params))
-		return
-	}
-
-	pod, ok := h.provider.GetPodByName(params["namespace"], params["podName"])
-	if !ok {
-		klog.V(4).InfoS("Container not found", "pod", klog.KRef(params["namespace"], params["podName"]))
-		response.WriteError(http.StatusNotFound, kubecontainer.ErrContainerNotFound)
-		return
-	}
-	stats, err := h.provider.GetContainerInfo(
-		kubecontainer.GetPodFullName(pod),
-		types.UID(params["uid"]),
-		params["containerName"],
-		query.cadvisorRequest())
-
-	if err != nil {
-		handleError(response, fmt.Sprintf("%s %v", request.Request.URL.String(), query), err)
-		return
-	}
-	writeResponse(response, stats)
 }
 
 func writeResponse(response *restful.Response, stats interface{}) {

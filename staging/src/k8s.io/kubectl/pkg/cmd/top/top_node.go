@@ -29,6 +29,7 @@ import (
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/metricsutil"
+	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 	metricsapi "k8s.io/metrics/pkg/apis/metrics"
@@ -38,10 +39,13 @@ import (
 
 // TopNodeOptions contains all the options for running the top-node cli command.
 type TopNodeOptions struct {
-	ResourceName    string
-	Selector        string
-	SortBy          string
-	NoHeaders       bool
+	ResourceName       string
+	Selector           string
+	SortBy             string
+	NoHeaders          bool
+	UseProtocolBuffers bool
+	ShowCapacity       bool
+
 	NodeClient      corev1client.CoreV1Interface
 	Printer         *metricsutil.TopCmdPrinter
 	DiscoveryClient discovery.DiscoveryInterface
@@ -52,7 +56,7 @@ type TopNodeOptions struct {
 
 var (
 	topNodeLong = templates.LongDesc(i18n.T(`
-		Display Resource (CPU/Memory/Storage) usage of nodes.
+		Display resource (CPU/memory) usage of nodes.
 
 		The top-node command allows you to see the resource consumption of nodes.`))
 
@@ -67,16 +71,18 @@ var (
 func NewCmdTopNode(f cmdutil.Factory, o *TopNodeOptions, streams genericclioptions.IOStreams) *cobra.Command {
 	if o == nil {
 		o = &TopNodeOptions{
-			IOStreams: streams,
+			IOStreams:          streams,
+			UseProtocolBuffers: true,
 		}
 	}
 
 	cmd := &cobra.Command{
 		Use:                   "node [NAME | -l label]",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Display Resource (CPU/Memory/Storage) usage of nodes"),
+		Short:                 i18n.T("Display resource (CPU/memory) usage of nodes"),
 		Long:                  topNodeLong,
 		Example:               topNodeExample,
+		ValidArgsFunction:     util.ResourceNameCompletionFunc(f, "node"),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
@@ -84,9 +90,11 @@ func NewCmdTopNode(f cmdutil.Factory, o *TopNodeOptions, streams genericclioptio
 		},
 		Aliases: []string{"nodes", "no"},
 	}
-	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
-	cmd.Flags().StringVar(&o.SortBy, "sort-by", o.Selector, "If non-empty, sort nodes list using specified field. The field can be either 'cpu' or 'memory'.")
+	cmdutil.AddLabelSelectorFlagVar(cmd, &o.Selector)
+	cmd.Flags().StringVar(&o.SortBy, "sort-by", o.SortBy, "If non-empty, sort nodes list using specified field. The field can be either 'cpu' or 'memory'.")
 	cmd.Flags().BoolVar(&o.NoHeaders, "no-headers", o.NoHeaders, "If present, print output without headers")
+	cmd.Flags().BoolVar(&o.UseProtocolBuffers, "use-protocol-buffers", o.UseProtocolBuffers, "Enables using protocol-buffers to access Metrics API.")
+	cmd.Flags().BoolVar(&o.ShowCapacity, "show-capacity", o.ShowCapacity, "Print node resources based on Capacity instead of Allocatable(default) of the nodes.")
 
 	return cmd
 }
@@ -108,6 +116,9 @@ func (o *TopNodeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 	config, err := f.ToRESTConfig()
 	if err != nil {
 		return err
+	}
+	if o.UseProtocolBuffers {
+		config.ContentType = "application/vnd.kubernetes.protobuf"
 	}
 	o.MetricsClient, err = metricsclientset.NewForConfig(config)
 	if err != nil {
@@ -179,13 +190,17 @@ func (o TopNodeOptions) RunTopNode() error {
 		nodes = append(nodes, nodeList.Items...)
 	}
 
-	allocatable := make(map[string]v1.ResourceList)
+	availableResources := make(map[string]v1.ResourceList)
 
 	for _, n := range nodes {
-		allocatable[n.Name] = n.Status.Allocatable
+		if !o.ShowCapacity {
+			availableResources[n.Name] = n.Status.Allocatable
+		} else {
+			availableResources[n.Name] = n.Status.Capacity
+		}
 	}
 
-	return o.Printer.PrintNodeMetrics(metrics.Items, allocatable, o.NoHeaders, o.SortBy)
+	return o.Printer.PrintNodeMetrics(metrics.Items, availableResources, o.NoHeaders, o.SortBy)
 }
 
 func getNodeMetricsFromMetricsAPI(metricsClient metricsclientset.Interface, resourceName string, selector labels.Selector) (*metricsapi.NodeMetricsList, error) {

@@ -63,7 +63,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 	// Build PodToleration Admission.
 	admission := podtolerationrestriction.NewPodTolerationsPlugin(&pluginapi.Configuration{})
 
-	testCtx := testutils.InitTestMaster(t, "default", admission)
+	testCtx := testutils.InitTestAPIServer(t, "default", admission)
 
 	// Build clientset and informers for controllers.
 	externalClientset := kubernetes.NewForConfigOrDie(&restclient.Config{
@@ -75,7 +75,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 	admission.SetExternalKubeClientSet(externalClientset)
 	admission.SetExternalKubeInformerFactory(externalInformers)
 
-	testCtx = testutils.InitTestScheduler(t, testCtx, nil)
+	testCtx = testutils.InitTestScheduler(t, testCtx)
 	defer testutils.CleanupTest(t, testCtx)
 
 	cs := testCtx.ClientSet
@@ -83,6 +83,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 
 	// Start NodeLifecycleController for taint.
 	nc, err := nodelifecycle.NewNodeLifecycleController(
+		context.TODO(),
 		externalInformers.Coordination().V1().Leases(),
 		externalInformers.Core().V1().Pods(),
 		externalInformers.Core().V1().Nodes(),
@@ -109,7 +110,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 	testutils.SyncInformerFactory(testCtx)
 
 	// Run all controllers
-	go nc.Run(testCtx.Ctx.Done())
+	go nc.Run(testCtx.Ctx)
 	go testCtx.Scheduler.Run(testCtx.Ctx)
 
 	// -------------------------------------------

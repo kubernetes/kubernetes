@@ -27,6 +27,7 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	cliflag "k8s.io/component-base/cli/flag"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -42,7 +43,7 @@ type createContextOptions struct {
 
 var (
 	createContextLong = templates.LongDesc(i18n.T(`
-		Sets a context entry in kubeconfig
+		Set a context entry in kubeconfig.
 
 		Specifying a name that already exists will merge new fields on top of existing values for those fields.`))
 
@@ -58,9 +59,10 @@ func NewCmdConfigSetContext(out io.Writer, configAccess clientcmd.ConfigAccess) 
 	cmd := &cobra.Command{
 		Use:                   fmt.Sprintf("set-context [NAME | --current] [--%v=cluster_nickname] [--%v=user_nickname] [--%v=namespace]", clientcmd.FlagClusterName, clientcmd.FlagAuthInfoName, clientcmd.FlagNamespace),
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Sets a context entry in kubeconfig"),
+		Short:                 i18n.T("Set a context entry in kubeconfig"),
 		Long:                  createContextLong,
 		Example:               createContextExample,
+		ValidArgsFunction:     util.ContextCompletionFunc,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.complete(cmd))
 			name, exists, err := options.run()

@@ -20,8 +20,8 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 )
 
 // ExpirationCache implements the store interface

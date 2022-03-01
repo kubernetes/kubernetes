@@ -19,6 +19,7 @@ package checkpoint
 import (
 	"context"
 	"fmt"
+	"k8s.io/klog/v2"
 	"math/rand"
 	"time"
 
@@ -35,7 +36,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/status"
 	utilcodec "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/codec"
-	utillog "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/log"
 )
 
 // Payload represents a local copy of a config source (payload) object
@@ -60,7 +60,7 @@ type RemoteConfigSource interface {
 	// KubeletFilename returns the name of the Kubelet config file as it should appear in the keys of Payload.Files()
 	KubeletFilename() string
 
-	// APIPath returns the API path to the remote resource, e.g. its SelfLink
+	// APIPath returns the API path to the remote resource.
 	APIPath() string
 
 	// UID returns the globally unique identifier for the most recently downloaded payload targeted by the source.
@@ -178,25 +178,25 @@ func (r *remoteConfigMap) Download(client clientset.Interface, store cache.Store
 	)
 	// check the in-memory store for the ConfigMap, so we can skip unnecessary downloads
 	if store != nil {
-		utillog.Infof("checking in-memory store for %s", r.APIPath())
+		klog.InfoS("Kubelet config controller checking in-memory store for remoteConfigMap", "apiPath", r.APIPath())
 		cm, err = getConfigMapFromStore(store, r.source.ConfigMap.Namespace, r.source.ConfigMap.Name)
 		if err != nil {
 			// just log the error, we'll attempt a direct download instead
-			utillog.Errorf("failed to check in-memory store for %s, error: %v", r.APIPath(), err)
+			klog.ErrorS(err, "Kubelet config controller failed to check in-memory store for remoteConfigMap", "apiPath", r.APIPath())
 		} else if cm != nil {
-			utillog.Infof("found %s in in-memory store, UID: %s, ResourceVersion: %s", r.APIPath(), cm.UID, cm.ResourceVersion)
+			klog.InfoS("Kubelet config controller found remoteConfigMap in in-memory store", "apiPath", r.APIPath(), "configMapUID", cm.UID, "resourceVersion", cm.ResourceVersion)
 		} else {
-			utillog.Infof("did not find %s in in-memory store", r.APIPath())
+			klog.InfoS("Kubelet config controller did not find remoteConfigMap in in-memory store", "apiPath", r.APIPath())
 		}
 	}
 	// if we didn't find the ConfigMap in the in-memory store, download it from the API server
 	if cm == nil {
-		utillog.Infof("attempting to download %s", r.APIPath())
+		klog.InfoS("Kubelet config controller attempting to download remoteConfigMap", "apiPath", r.APIPath())
 		cm, err = client.CoreV1().ConfigMaps(r.source.ConfigMap.Namespace).Get(context.TODO(), r.source.ConfigMap.Name, metav1.GetOptions{})
 		if err != nil {
 			return nil, status.DownloadError, fmt.Errorf("%s, error: %v", status.DownloadError, err)
 		}
-		utillog.Infof("successfully downloaded %s, UID: %s, ResourceVersion: %s", r.APIPath(), cm.UID, cm.ResourceVersion)
+		klog.InfoS("Kubelet config controller successfully downloaded remoteConfigMap", "apiPath", r.APIPath(), "configMapUID", cm.UID, "resourceVersion", cm.ResourceVersion)
 	} // Assert: Now we have a non-nil ConfigMap
 	// construct Payload from the ConfigMap
 	payload, err := NewConfigMapPayload(cm)
@@ -255,7 +255,7 @@ func getConfigMapFromStore(store cache.Store, namespace, name string) (*apiv1.Co
 	cm, ok := obj.(*apiv1.ConfigMap)
 	if !ok {
 		err := fmt.Errorf("failed to cast object %s from informer's store to ConfigMap", key)
-		utillog.Errorf(err.Error())
+		klog.ErrorS(err, "Kubelet config controller")
 		return nil, err
 	}
 	return cm, nil

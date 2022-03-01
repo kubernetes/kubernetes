@@ -19,7 +19,10 @@ package framework
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
+
+	"k8s.io/apimachinery/pkg/util/wait"
 
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 
@@ -295,17 +298,40 @@ func DeletePVCandValidatePVGroup(c clientset.Interface, timeouts *framework.Time
 }
 
 // create the PV resource. Fails test on error.
-func createPV(c clientset.Interface, pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
-	pv, err := c.CoreV1().PersistentVolumes().Create(context.TODO(), pv, metav1.CreateOptions{})
+func createPV(c clientset.Interface, timeouts *framework.TimeoutContext, pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
+	var resultPV *v1.PersistentVolume
+	var lastCreateErr error
+	err := wait.PollImmediate(29*time.Second, timeouts.PVCreate, func() (done bool, err error) {
+		resultPV, lastCreateErr = c.CoreV1().PersistentVolumes().Create(context.TODO(), pv, metav1.CreateOptions{})
+		if lastCreateErr != nil {
+			// If we hit a quota problem, we are not done and should retry again.  This happens to be the quota failure string for GCP.
+			// If quota failure strings are found for other platforms, they can be added to improve reliability when running
+			// many parallel test jobs in a single cloud account.  This corresponds to controller-like behavior and
+			// to what we would recommend for general clients.
+			if strings.Contains(lastCreateErr.Error(), `googleapi: Error 403: Quota exceeded for quota group`) {
+				return false, nil
+			}
+
+			// if it was not a quota failure, fail immediately
+			return false, lastCreateErr
+		}
+
+		return true, nil
+	})
+	// if we have an error from creating the PV, use that instead of a timeout error
+	if lastCreateErr != nil {
+		return nil, fmt.Errorf("PV Create API error: %v", err)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("PV Create API error: %v", err)
 	}
-	return pv, nil
+
+	return resultPV, nil
 }
 
 // CreatePV creates the PV resource. Fails test on error.
-func CreatePV(c clientset.Interface, pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
-	return createPV(c, pv)
+func CreatePV(c clientset.Interface, timeouts *framework.TimeoutContext, pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
+	return createPV(c, timeouts, pv)
 }
 
 // CreatePVC creates the PVC resource. Fails test on error.
@@ -323,7 +349,7 @@ func CreatePVC(c clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim) 
 // Note: in the pre-bind case the real PVC name, which is generated, is not
 //   known until after the PVC is instantiated. This is why the pvc is created
 //   before the pv.
-func CreatePVCPV(c clientset.Interface, pvConfig PersistentVolumeConfig, pvcConfig PersistentVolumeClaimConfig, ns string, preBind bool) (*v1.PersistentVolume, *v1.PersistentVolumeClaim, error) {
+func CreatePVCPV(c clientset.Interface, timeouts *framework.TimeoutContext, pvConfig PersistentVolumeConfig, pvcConfig PersistentVolumeClaimConfig, ns string, preBind bool) (*v1.PersistentVolume, *v1.PersistentVolumeClaim, error) {
 	// make the pvc spec
 	pvc := MakePersistentVolumeClaim(pvcConfig, ns)
 	preBindMsg := ""
@@ -344,7 +370,7 @@ func CreatePVCPV(c clientset.Interface, pvConfig PersistentVolumeConfig, pvcConf
 	if preBind {
 		pv.Spec.ClaimRef.Name = pvc.Name
 	}
-	pv, err = createPV(c, pv)
+	pv, err = createPV(c, timeouts, pv)
 	if err != nil {
 		return nil, pvc, err
 	}
@@ -358,7 +384,7 @@ func CreatePVCPV(c clientset.Interface, pvConfig PersistentVolumeConfig, pvcConf
 // Note: in the pre-bind case the real PV name, which is generated, is not
 //   known until after the PV is instantiated. This is why the pv is created
 //   before the pvc.
-func CreatePVPVC(c clientset.Interface, pvConfig PersistentVolumeConfig, pvcConfig PersistentVolumeClaimConfig, ns string, preBind bool) (*v1.PersistentVolume, *v1.PersistentVolumeClaim, error) {
+func CreatePVPVC(c clientset.Interface, timeouts *framework.TimeoutContext, pvConfig PersistentVolumeConfig, pvcConfig PersistentVolumeClaimConfig, ns string, preBind bool) (*v1.PersistentVolume, *v1.PersistentVolumeClaim, error) {
 	preBindMsg := ""
 	if preBind {
 		preBindMsg = " pre-bound"
@@ -370,7 +396,7 @@ func CreatePVPVC(c clientset.Interface, pvConfig PersistentVolumeConfig, pvcConf
 	pvc := MakePersistentVolumeClaim(pvcConfig, ns)
 
 	// instantiate the pv
-	pv, err := createPV(c, pv)
+	pv, err := createPV(c, timeouts, pv)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -392,7 +418,7 @@ func CreatePVPVC(c clientset.Interface, pvConfig PersistentVolumeConfig, pvcConf
 // sees an error returned, it needs to decide what to do about entries in the maps.
 // Note: when the test suite deletes the namespace orphaned pvcs and pods are deleted. However,
 //   orphaned pvs are not deleted and will remain after the suite completes.
-func CreatePVsPVCs(numpvs, numpvcs int, c clientset.Interface, ns string, pvConfig PersistentVolumeConfig, pvcConfig PersistentVolumeClaimConfig) (PVMap, PVCMap, error) {
+func CreatePVsPVCs(numpvs, numpvcs int, c clientset.Interface, timeouts *framework.TimeoutContext, ns string, pvConfig PersistentVolumeConfig, pvcConfig PersistentVolumeClaimConfig) (PVMap, PVCMap, error) {
 	pvMap := make(PVMap, numpvs)
 	pvcMap := make(PVCMap, numpvcs)
 	extraPVCs := 0
@@ -405,7 +431,7 @@ func CreatePVsPVCs(numpvs, numpvcs int, c clientset.Interface, ns string, pvConf
 
 	// create pvs and pvcs
 	for i := 0; i < pvsToCreate; i++ {
-		pv, pvc, err := CreatePVPVC(c, pvConfig, pvcConfig, ns, false)
+		pv, pvc, err := CreatePVPVC(c, timeouts, pvConfig, pvcConfig, ns, false)
 		if err != nil {
 			return pvMap, pvcMap, err
 		}
@@ -416,7 +442,7 @@ func CreatePVsPVCs(numpvs, numpvcs int, c clientset.Interface, ns string, pvConf
 	// create extra pvs or pvcs as needed
 	for i := 0; i < extraPVs; i++ {
 		pv := MakePersistentVolume(pvConfig)
-		pv, err := createPV(c, pv)
+		pv, err := createPV(c, timeouts, pv)
 		if err != nil {
 			return pvMap, pvcMap, err
 		}
@@ -638,10 +664,10 @@ func createPDWithRetry(zone string) (string, error) {
 	for start := time.Now(); time.Since(start) < pdRetryTimeout; time.Sleep(pdRetryPollTime) {
 		newDiskName, err = createPD(zone)
 		if err != nil {
-			framework.Logf("Couldn't create a new PD, sleeping 5 seconds: %v", err)
+			framework.Logf("Couldn't create a new PD in zone %q, sleeping 5 seconds: %v", zone, err)
 			continue
 		}
-		framework.Logf("Successfully created a new PD: %q.", newDiskName)
+		framework.Logf("Successfully created a new PD in zone %q: %q.", zone, newDiskName)
 		return newDiskName, nil
 	}
 	return "", err
@@ -735,7 +761,7 @@ func WaitForPersistentVolumeClaimsPhase(phase v1.PersistentVolumeClaimPhase, c c
 	if len(pvcNames) == 0 {
 		return fmt.Errorf("Incorrect parameter: Need at least one PVC to track. Found 0")
 	}
-	framework.Logf("Waiting up to %v for PersistentVolumeClaims %v to have phase %s", timeout, pvcNames, phase)
+	framework.Logf("Waiting up to timeout=%v for PersistentVolumeClaims %v to have phase %s", timeout, pvcNames, phase)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
 		phaseFoundInAllClaims := true
 		for _, pvcName := range pvcNames {
@@ -864,4 +890,12 @@ func WaitForPVCFinalizer(ctx context.Context, cs clientset.Interface, name, name
 		err = fmt.Errorf("finalizer %s not added to pvc %s/%s", finalizer, namespace, name)
 	}
 	return err
+}
+
+// GetDefaultFSType returns the default fsType
+func GetDefaultFSType() string {
+	if framework.NodeOSDistroIs("windows") {
+		return "ntfs"
+	}
+	return "ext4"
 }

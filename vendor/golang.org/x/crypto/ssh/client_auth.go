@@ -471,7 +471,7 @@ func (cb KeyboardInteractiveChallenge) auth(session []byte, user string, c packe
 		}
 
 		if len(answers) != len(prompts) {
-			return authFailure, nil, errors.New("ssh: not enough answers from keyboard-interactive callback")
+			return authFailure, nil, fmt.Errorf("ssh: incorrect number of answers from keyboard-interactive callback %d (expected %d)", len(answers), len(prompts))
 		}
 		responseLength := 1 + 4
 		for _, a := range answers {

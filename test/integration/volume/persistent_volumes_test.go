@@ -105,7 +105,7 @@ func testSleep() {
 
 func TestPersistentVolumeRecycler(t *testing.T) {
 	klog.V(2).Infof("TestPersistentVolumeRecycler started")
-	_, s, closeFn := framework.RunAMaster(nil)
+	_, s, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("pv-recycler", s, t)
@@ -119,10 +119,10 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 	// non-namespaced objects (PersistenceVolumes).
 	defer testClient.CoreV1().PersistentVolumes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 
-	stopCh := make(chan struct{})
-	informers.Start(stopCh)
-	go ctrl.Run(stopCh)
-	defer close(stopCh)
+	ctx, cancel := context.WithCancel(context.TODO())
+	informers.Start(ctx.Done())
+	go ctrl.Run(ctx)
+	defer cancel()
 
 	// This PV will be claimed, released, and recycled.
 	pv := createPV("fake-pv-recycler", "/tmp/foo", "10G", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}, v1.PersistentVolumeReclaimRecycle)
@@ -160,7 +160,7 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 
 func TestPersistentVolumeDeleter(t *testing.T) {
 	klog.V(2).Infof("TestPersistentVolumeDeleter started")
-	_, s, closeFn := framework.RunAMaster(nil)
+	_, s, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("pv-deleter", s, t)
@@ -174,10 +174,10 @@ func TestPersistentVolumeDeleter(t *testing.T) {
 	// non-namespaced objects (PersistenceVolumes).
 	defer testClient.CoreV1().PersistentVolumes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 
-	stopCh := make(chan struct{})
-	informers.Start(stopCh)
-	go ctrl.Run(stopCh)
-	defer close(stopCh)
+	ctx, cancel := context.WithCancel(context.TODO())
+	informers.Start(ctx.Done())
+	go ctrl.Run(ctx)
+	defer cancel()
 
 	// This PV will be claimed, released, and deleted.
 	pv := createPV("fake-pv-deleter", "/tmp/foo", "10G", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}, v1.PersistentVolumeReclaimDelete)
@@ -220,7 +220,7 @@ func TestPersistentVolumeBindRace(t *testing.T) {
 	// Test a race binding many claims to a PV that is pre-bound to a specific
 	// PVC. Only this specific PVC should get bound.
 	klog.V(2).Infof("TestPersistentVolumeBindRace started")
-	_, s, closeFn := framework.RunAMaster(nil)
+	_, s, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("pv-bind-race", s, t)
@@ -234,10 +234,10 @@ func TestPersistentVolumeBindRace(t *testing.T) {
 	// non-namespaced objects (PersistenceVolumes).
 	defer testClient.CoreV1().PersistentVolumes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 
-	stopCh := make(chan struct{})
-	informers.Start(stopCh)
-	go ctrl.Run(stopCh)
-	defer close(stopCh)
+	ctx, cancel := context.WithCancel(context.TODO())
+	informers.Start(ctx.Done())
+	go ctrl.Run(ctx)
+	defer cancel()
 
 	pv := createPV("fake-pv-race", "/tmp/foo", "10G", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}, v1.PersistentVolumeReclaimRetain)
 	pvc := createPVC("fake-pvc-race", ns.Name, "5G", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}, "")
@@ -290,7 +290,7 @@ func TestPersistentVolumeBindRace(t *testing.T) {
 
 // TestPersistentVolumeClaimLabelSelector test binding using label selectors
 func TestPersistentVolumeClaimLabelSelector(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(nil)
+	_, s, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("pvc-label-selector", s, t)
@@ -304,10 +304,10 @@ func TestPersistentVolumeClaimLabelSelector(t *testing.T) {
 	// non-namespaced objects (PersistenceVolumes).
 	defer testClient.CoreV1().PersistentVolumes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 
-	stopCh := make(chan struct{})
-	informers.Start(stopCh)
-	go controller.Run(stopCh)
-	defer close(stopCh)
+	ctx, cancel := context.WithCancel(context.TODO())
+	informers.Start(ctx.Done())
+	go controller.Run(ctx)
+	defer cancel()
 
 	var (
 		err     error
@@ -371,7 +371,7 @@ func TestPersistentVolumeClaimLabelSelector(t *testing.T) {
 // TestPersistentVolumeClaimLabelSelectorMatchExpressions test binding using
 // MatchExpressions label selectors
 func TestPersistentVolumeClaimLabelSelectorMatchExpressions(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(nil)
+	_, s, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("pvc-match-expressions", s, t)
@@ -385,10 +385,10 @@ func TestPersistentVolumeClaimLabelSelectorMatchExpressions(t *testing.T) {
 	// non-namespaced objects (PersistenceVolumes).
 	defer testClient.CoreV1().PersistentVolumes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 
-	stopCh := make(chan struct{})
-	informers.Start(stopCh)
-	go controller.Run(stopCh)
-	defer close(stopCh)
+	ctx, cancel := context.WithCancel(context.TODO())
+	informers.Start(ctx.Done())
+	go controller.Run(ctx)
+	defer cancel()
 
 	var (
 		err     error
@@ -471,7 +471,7 @@ func TestPersistentVolumeClaimLabelSelectorMatchExpressions(t *testing.T) {
 // TestPersistentVolumeMultiPVs tests binding of one PVC to 100 PVs with
 // different size.
 func TestPersistentVolumeMultiPVs(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(nil)
+	_, s, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("multi-pvs", s, t)
@@ -485,10 +485,10 @@ func TestPersistentVolumeMultiPVs(t *testing.T) {
 	// non-namespaced objects (PersistenceVolumes).
 	defer testClient.CoreV1().PersistentVolumes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 
-	stopCh := make(chan struct{})
-	informers.Start(stopCh)
-	go controller.Run(stopCh)
-	defer close(stopCh)
+	ctx, cancel := context.WithCancel(context.TODO())
+	informers.Start(ctx.Done())
+	go controller.Run(ctx)
+	defer cancel()
 
 	maxPVs := getObjectCount()
 	pvs := make([]*v1.PersistentVolume, maxPVs)
@@ -561,7 +561,7 @@ func TestPersistentVolumeMultiPVs(t *testing.T) {
 // TestPersistentVolumeMultiPVsPVCs tests binding of 100 PVC to 100 PVs.
 // This test is configurable by KUBE_INTEGRATION_PV_* variables.
 func TestPersistentVolumeMultiPVsPVCs(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(nil)
+	_, s, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("multi-pvs-pvcs", s, t)
@@ -575,10 +575,10 @@ func TestPersistentVolumeMultiPVsPVCs(t *testing.T) {
 	// non-namespaced objects (PersistenceVolumes).
 	defer testClient.CoreV1().PersistentVolumes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 
-	controllerStopCh := make(chan struct{})
-	informers.Start(controllerStopCh)
-	go binder.Run(controllerStopCh)
-	defer close(controllerStopCh)
+	ctx, cancel := context.WithCancel(context.TODO())
+	informers.Start(ctx.Done())
+	go binder.Run(ctx)
+	defer cancel()
 
 	objCount := getObjectCount()
 	pvs := make([]*v1.PersistentVolume, objCount)
@@ -721,7 +721,7 @@ func TestPersistentVolumeMultiPVsPVCs(t *testing.T) {
 // TestPersistentVolumeControllerStartup tests startup of the controller.
 // The controller should not unbind any volumes when it starts.
 func TestPersistentVolumeControllerStartup(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(nil)
+	_, s, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("controller-startup", s, t)
@@ -788,10 +788,10 @@ func TestPersistentVolumeControllerStartup(t *testing.T) {
 	}
 
 	// Start the controller when all PVs and PVCs are already saved in etcd
-	stopCh := make(chan struct{})
-	informers.Start(stopCh)
-	go binder.Run(stopCh)
-	defer close(stopCh)
+	ctx, cancel := context.WithCancel(context.TODO())
+	informers.Start(ctx.Done())
+	go binder.Run(ctx)
+	defer cancel()
 
 	// wait for at least two sync periods for changes. No volume should be
 	// Released and no claim should be Lost during this time.
@@ -850,7 +850,7 @@ func TestPersistentVolumeControllerStartup(t *testing.T) {
 // TestPersistentVolumeProvisionMultiPVCs tests provisioning of many PVCs.
 // This test is configurable by KUBE_INTEGRATION_PV_* variables.
 func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(nil)
+	_, s, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("provision-multi-pvs", s, t)
@@ -876,10 +876,10 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 	}
 	testClient.StorageV1().StorageClasses().Create(context.TODO(), &storageClass, metav1.CreateOptions{})
 
-	stopCh := make(chan struct{})
-	informers.Start(stopCh)
-	go binder.Run(stopCh)
-	defer close(stopCh)
+	ctx, cancel := context.WithCancel(context.TODO())
+	informers.Start(ctx.Done())
+	go binder.Run(ctx)
+	defer cancel()
 
 	objCount := getObjectCount()
 	pvcs := make([]*v1.PersistentVolumeClaim, objCount)
@@ -945,7 +945,7 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 // TestPersistentVolumeMultiPVsDiffAccessModes tests binding of one PVC to two
 // PVs with different access modes.
 func TestPersistentVolumeMultiPVsDiffAccessModes(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(nil)
+	_, s, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("multi-pvs-diff-access", s, t)
@@ -959,10 +959,10 @@ func TestPersistentVolumeMultiPVsDiffAccessModes(t *testing.T) {
 	// non-namespaced objects (PersistenceVolumes).
 	defer testClient.CoreV1().PersistentVolumes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 
-	stopCh := make(chan struct{})
-	informers.Start(stopCh)
-	go controller.Run(stopCh)
-	defer close(stopCh)
+	ctx, cancel := context.WithCancel(context.TODO())
+	informers.Start(ctx.Done())
+	go controller.Run(ctx)
+	defer cancel()
 
 	// This PV will be claimed, released, and deleted
 	pvRwo := createPV("pv-rwo", "/tmp/foo", "10G",

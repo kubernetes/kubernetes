@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // nodeStrategy implements behavior for nodes
@@ -56,6 +57,18 @@ var Strategy = nodeStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 // NamespaceScoped is false for nodes.
 func (nodeStrategy) NamespaceScoped() bool {
 	return false
+}
+
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (nodeStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	fields := map[fieldpath.APIVersion]*fieldpath.Set{
+		"v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+	}
+
+	return fields
 }
 
 // AllowCreateOnUpdate is false for nodes.
@@ -91,23 +104,6 @@ func dropDisabledFields(node *api.Node, oldNode *api.Node) {
 		node.Spec.ConfigSource = nil
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) && !multiNodeCIDRsInUse(oldNode) {
-		if len(node.Spec.PodCIDRs) > 1 {
-			node.Spec.PodCIDRs = node.Spec.PodCIDRs[0:1]
-		}
-	}
-}
-
-// multiNodeCIDRsInUse returns true if Node.Spec.PodCIDRs is greater than one
-func multiNodeCIDRsInUse(node *api.Node) bool {
-	if node == nil {
-		return false
-	}
-
-	if len(node.Spec.PodCIDRs) > 1 {
-		return true
-	}
-	return false
 }
 
 // nodeConfigSourceInUse returns true if node's Spec ConfigSource is set(used)
@@ -127,6 +123,11 @@ func (nodeStrategy) Validate(ctx context.Context, obj runtime.Object) field.Erro
 	return validation.ValidateNode(node)
 }
 
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (nodeStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	return dynamicKubeletConfigIsDeprecatedWarning(obj)
+}
+
 // Canonicalize normalizes the object after validation.
 func (nodeStrategy) Canonicalize(obj runtime.Object) {
 }
@@ -135,6 +136,11 @@ func (nodeStrategy) Canonicalize(obj runtime.Object) {
 func (nodeStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	errorList := validation.ValidateNode(obj.(*api.Node))
 	return append(errorList, validation.ValidateNodeUpdate(obj.(*api.Node), old.(*api.Node))...)
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (nodeStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return dynamicKubeletConfigIsDeprecatedWarning(obj)
 }
 
 func (nodeStrategy) AllowUnconditionalUpdate() bool {
@@ -146,6 +152,18 @@ type nodeStatusStrategy struct {
 }
 
 var StatusStrategy = nodeStatusStrategy{Strategy}
+
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (nodeStatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	fields := map[fieldpath.APIVersion]*fieldpath.Set{
+		"v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("spec"),
+		),
+	}
+
+	return fields
+}
 
 func (nodeStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newNode := obj.(*api.Node)
@@ -170,6 +188,11 @@ func nodeStatusConfigInUse(node *api.Node) bool {
 
 func (nodeStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateNodeUpdate(obj.(*api.Node), old.(*api.Node))
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (nodeStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 // Canonicalize normalizes the object after validation.
@@ -244,4 +267,15 @@ func ResourceLocation(getter ResourceGetter, connection client.ConnectionInfoGet
 
 	// Otherwise, return the requested scheme and port, and the proxy transport
 	return &url.URL{Scheme: schemeReq, Host: net.JoinHostPort(info.Hostname, portReq)}, proxyTransport, nil
+}
+
+func dynamicKubeletConfigIsDeprecatedWarning(obj runtime.Object) []string {
+	newNode := obj.(*api.Node)
+	if newNode.Spec.ConfigSource != nil {
+		var warnings []string
+		// KEP https://github.com/kubernetes/enhancements/issues/281
+		warnings = append(warnings, "spec.configSource: deprecated in v1.22, support removal is planned in v1.23")
+		return warnings
+	}
+	return nil
 }

@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -55,14 +56,10 @@ func (m *azureDiskMounter) GetAttributes() volume.Attributes {
 		readOnly = *volumeSource.ReadOnly
 	}
 	return volume.Attributes{
-		ReadOnly:        readOnly,
-		Managed:         !readOnly,
-		SupportsSELinux: true,
+		ReadOnly:       readOnly,
+		Managed:        !readOnly,
+		SELinuxRelabel: true,
 	}
-}
-
-func (m *azureDiskMounter) CanMount() error {
-	return nil
 }
 
 func (m *azureDiskMounter) SetUp(mounterArgs volume.MounterArgs) error {
@@ -102,7 +99,6 @@ func (m *azureDiskMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) e
 			klog.Errorf("azureDisk - Unmount directory %s failed with %v", dir, err)
 			return err
 		}
-		mountPoint = true
 	}
 
 	if runtime.GOOS != "windows" {
@@ -177,7 +173,7 @@ func (u *azureDiskUnmounter) TearDown() error {
 
 func (u *azureDiskUnmounter) TearDownAt(dir string) error {
 	if pathExists, pathErr := mount.PathExists(dir); pathErr != nil {
-		return fmt.Errorf("Error checking if path exists: %v", pathErr)
+		return fmt.Errorf("error checking if path exists: %w", pathErr)
 	} else if !pathExists {
 		klog.Warningf("Warning: Unmount skipped because path does not exist: %v", dir)
 		return nil

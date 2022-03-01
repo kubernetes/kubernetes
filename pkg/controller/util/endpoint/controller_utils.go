@@ -25,7 +25,8 @@ import (
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1beta1"
+	discovery "k8s.io/api/discovery/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -211,14 +212,14 @@ func GetServicesToUpdateOnPodChange(serviceLister v1listers.ServiceLister, selec
 
 	services, err := selectorCache.GetPodServiceMemberships(serviceLister, newPod)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Unable to get pod %s/%s's service memberships: %v", newPod.Namespace, newPod.Name, err))
+		utilruntime.HandleError(fmt.Errorf("unable to get pod %s/%s's service memberships: %v", newPod.Namespace, newPod.Name, err))
 		return sets.String{}
 	}
 
 	if labelsChanged {
 		oldServices, err := selectorCache.GetPodServiceMemberships(serviceLister, oldPod)
 		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("Unable to get pod %s/%s's service memberships: %v", newPod.Namespace, newPod.Name, err))
+			utilruntime.HandleError(fmt.Errorf("unable to get pod %s/%s's service memberships: %v", newPod.Namespace, newPod.Name, err))
 		}
 		services = determineNeededServiceUpdates(oldServices, services, podChanged)
 	}
@@ -237,12 +238,12 @@ func GetPodFromDeleteAction(obj interface{}) *v1.Pod {
 	// If we reached here it means the pod was deleted but its final state is unrecorded.
 	tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %#v", obj))
+		utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
 		return nil
 	}
 	pod, ok := tombstone.Obj.(*v1.Pod)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a Pod: %#v", obj))
+		utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a Pod: %#v", obj))
 		return nil
 	}
 	return pod
@@ -274,4 +275,61 @@ func (sl portsInOrder) Less(i, j int) bool {
 	h1 := DeepHashObjectToString(sl[i])
 	h2 := DeepHashObjectToString(sl[j])
 	return h1 < h2
+}
+
+// EndpointsEqualBeyondHash returns true if endpoints have equal attributes
+// but excludes equality checks that would have already been covered with
+// endpoint hashing (see hashEndpoint func for more info).
+func EndpointsEqualBeyondHash(ep1, ep2 *discovery.Endpoint) bool {
+	if stringPtrChanged(ep1.NodeName, ep2.NodeName) {
+		return false
+	}
+
+	if stringPtrChanged(ep1.Zone, ep2.Zone) {
+		return false
+	}
+
+	if boolPtrChanged(ep1.Conditions.Ready, ep2.Conditions.Ready) {
+		return false
+	}
+
+	if objectRefPtrChanged(ep1.TargetRef, ep2.TargetRef) {
+		return false
+	}
+
+	return true
+}
+
+// boolPtrChanged returns true if a set of bool pointers have different values.
+func boolPtrChanged(ptr1, ptr2 *bool) bool {
+	if (ptr1 == nil) != (ptr2 == nil) {
+		return true
+	}
+	if ptr1 != nil && ptr2 != nil && *ptr1 != *ptr2 {
+		return true
+	}
+	return false
+}
+
+// objectRefPtrChanged returns true if a set of object ref pointers have
+// different values.
+func objectRefPtrChanged(ref1, ref2 *v1.ObjectReference) bool {
+	if (ref1 == nil) != (ref2 == nil) {
+		return true
+	}
+	if ref1 != nil && ref2 != nil && !apiequality.Semantic.DeepEqual(*ref1, *ref2) {
+		return true
+	}
+	return false
+}
+
+// stringPtrChanged returns true if a set of string pointers have different values.
+func stringPtrChanged(ptr1, ptr2 *string) bool {
+	if (ptr1 == nil) != (ptr2 == nil) {
+		return true
+	}
+	if ptr1 != nil && ptr2 != nil && *ptr1 != *ptr2 {
+		return true
+	}
+	return false
 }

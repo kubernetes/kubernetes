@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/apitesting"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -38,7 +39,7 @@ import (
 func NewDryRunnableTestStorage(t *testing.T) (DryRunnableStorage, func()) {
 	server, sc := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
 	sc.Codec = apitesting.TestStorageCodec(codecs, examplev1.SchemeGroupVersion)
-	s, destroy, err := factory.Create(*sc, nil)
+	s, destroy, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "pods"}), nil)
 	if err != nil {
 		t.Fatalf("Error creating storage: %v", err)
 	}

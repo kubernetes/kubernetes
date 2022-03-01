@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 //TODO:
@@ -89,6 +90,13 @@ type CategoriesProvider interface {
 // TODO KindProvider (only used by federation) should be removed and replaced with this, but that presents greater risk late in 1.8.
 type GroupVersionKindProvider interface {
 	GroupVersionKind(containingGV schema.GroupVersion) schema.GroupVersionKind
+}
+
+// GroupVersionAcceptor is used to determine if a particular GroupVersion is acceptable to send to an endpoint.
+// This is used for endpoints which accept multiple versions (which is extremely rare).
+// The only known instance is pods/evictions which accepts policy/v1, but also policy/v1beta1 for backwards compatibility.
+type GroupVersionAcceptor interface {
+	AcceptsGroupVersion(gv schema.GroupVersion) bool
 }
 
 // Lister is an object that can retrieve resources that match the provided field and label criteria.
@@ -338,4 +346,24 @@ type StorageVersionProvider interface {
 	// an object will be converted to before persisted in etcd, given a
 	// list of kinds the object might belong to.
 	StorageVersion() runtime.GroupVersioner
+}
+
+// ResetFieldsStrategy is an optional interface that a storage object can
+// implement if it wishes to provide the fields reset by its strategies.
+type ResetFieldsStrategy interface {
+	GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set
+}
+
+// CreateUpdateResetFieldsStrategy is a union of RESTCreateUpdateStrategy
+// and ResetFieldsStrategy.
+type CreateUpdateResetFieldsStrategy interface {
+	RESTCreateUpdateStrategy
+	ResetFieldsStrategy
+}
+
+// UpdateResetFieldsStrategy is a union of RESTUpdateStrategy
+// and ResetFieldsStrategy.
+type UpdateResetFieldsStrategy interface {
+	RESTUpdateStrategy
+	ResetFieldsStrategy
 }

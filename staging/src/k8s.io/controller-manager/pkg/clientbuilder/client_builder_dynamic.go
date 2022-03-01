@@ -28,14 +28,15 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/wait"
 	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
+	"k8s.io/client-go/discovery"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/transport"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -115,7 +116,7 @@ func (t *DynamicControllerClientBuilder) Config(saName string) (*restclient.Conf
 
 	rt, ok := t.roundTripperFuncMap[saName]
 	if ok {
-		configCopy.WrapTransport = rt
+		configCopy.Wrap(rt)
 	} else {
 		cachedTokenSource := transport.NewCachedTokenSource(&tokenSourceImpl{
 			namespace:          t.Namespace,
@@ -124,8 +125,7 @@ func (t *DynamicControllerClientBuilder) Config(saName string) (*restclient.Conf
 			expirationSeconds:  t.expirationSeconds,
 			leewayPercent:      t.leewayPercent,
 		})
-		configCopy.WrapTransport = transport.TokenSourceWrapTransport(cachedTokenSource)
-
+		configCopy.Wrap(transport.ResettableTokenSourceWrapTransport(cachedTokenSource))
 		t.roundTripperFuncMap[saName] = configCopy.WrapTransport
 	}
 
@@ -150,6 +150,26 @@ func (t *DynamicControllerClientBuilder) Client(name string) (clientset.Interfac
 
 func (t *DynamicControllerClientBuilder) ClientOrDie(name string) clientset.Interface {
 	client, err := t.Client(name)
+	if err != nil {
+		klog.Fatal(err)
+	}
+	return client
+}
+
+func (t *DynamicControllerClientBuilder) DiscoveryClient(name string) (discovery.DiscoveryInterface, error) {
+	clientConfig, err := t.Config(name)
+	if err != nil {
+		return nil, err
+	}
+	// Discovery makes a lot of requests infrequently.  This allows the burst to succeed and refill to happen
+	// in just a few seconds.
+	clientConfig.Burst = 200
+	clientConfig.QPS = 20
+	return clientset.NewForConfig(clientConfig)
+}
+
+func (t *DynamicControllerClientBuilder) DiscoveryClientOrDie(name string) discovery.DiscoveryInterface {
+	client, err := t.DiscoveryClient(name)
 	if err != nil {
 		klog.Fatal(err)
 	}
@@ -215,7 +235,11 @@ func (ts *tokenSourceImpl) Token() (*oauth2.Token, error) {
 
 func constructClient(saNamespace, saName string, config *restclient.Config) restclient.Config {
 	username := apiserverserviceaccount.MakeUsername(saNamespace, saName)
-	ret := *restclient.AnonymousClientConfig(config)
+	// make a shallow copy
+	// the caller already castrated the config during creation
+	// this allows for potential extensions in the future
+	// for example it preserve HTTP wrappers for custom behavior per request
+	ret := *config
 	restclient.AddUserAgent(&ret, username)
 	return ret
 }

@@ -22,7 +22,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	imageutils "k8s.io/kubernetes/test/utils/image"
+	"k8s.io/utils/pointer"
 )
 
 var zero int64
@@ -170,6 +173,19 @@ func (p *PodWrapper) Namespace(s string) *PodWrapper {
 	return p
 }
 
+// OwnerReference updates the owning controller of the pod.
+func (p *PodWrapper) OwnerReference(name string, gvk schema.GroupVersionKind) *PodWrapper {
+	p.OwnerReferences = []metav1.OwnerReference{
+		{
+			APIVersion: gvk.GroupVersion().String(),
+			Kind:       gvk.Kind,
+			Name:       name,
+			Controller: pointer.BoolPtr(true),
+		},
+	}
+	return p
+}
+
 // Container appends a container into PodSpec of the inner pod.
 func (p *PodWrapper) Container(s string) *PodWrapper {
 	p.Spec.Containers = append(p.Spec.Containers, v1.Container{
@@ -247,6 +263,36 @@ func (p *PodWrapper) StartTime(t metav1.Time) *PodWrapper {
 // NominatedNodeName sets `n` as the .Status.NominatedNodeName of the inner pod.
 func (p *PodWrapper) NominatedNodeName(n string) *PodWrapper {
 	p.Status.NominatedNodeName = n
+	return p
+}
+
+// Toleration creates a toleration (with the operator Exists)
+// and injects into the inner pod.
+func (p *PodWrapper) Toleration(key string) *PodWrapper {
+	p.Spec.Tolerations = append(p.Spec.Tolerations, v1.Toleration{
+		Key:      key,
+		Operator: v1.TolerationOpExists,
+	})
+	return p
+}
+
+// HostPort creates a container with a hostPort valued `hostPort`,
+// and injects into the inner pod.
+func (p *PodWrapper) HostPort(port int32) *PodWrapper {
+	p.Spec.Containers = append(p.Spec.Containers, v1.Container{
+		Ports: []v1.ContainerPort{{HostPort: port}},
+	})
+	return p
+}
+
+// PVC creates a Volume with a PVC and injects into the inner pod.
+func (p *PodWrapper) PVC(name string) *PodWrapper {
+	p.Spec.Volumes = append(p.Spec.Volumes, v1.Volume{
+		Name: name,
+		VolumeSource: v1.VolumeSource{
+			PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: name},
+		},
+	})
 	return p
 }
 
@@ -381,8 +427,11 @@ func (p *PodWrapper) Req(resMap map[v1.ResourceName]string) *PodWrapper {
 		res[k] = resource.MustParse(v)
 	}
 	p.Spec.Containers = append(p.Spec.Containers, v1.Container{
+		Name:  fmt.Sprintf("con%d", len(p.Spec.Containers)),
+		Image: imageutils.GetPauseImageName(),
 		Resources: v1.ResourceRequirements{
 			Requests: res,
+			Limits:   res,
 		},
 	})
 	return p
@@ -391,6 +440,12 @@ func (p *PodWrapper) Req(resMap map[v1.ResourceName]string) *PodWrapper {
 // PreemptionPolicy sets the give preemption policy to the inner pod.
 func (p *PodWrapper) PreemptionPolicy(policy v1.PreemptionPolicy) *PodWrapper {
 	p.Spec.PreemptionPolicy = &policy
+	return p
+}
+
+// Overhead sets the give resourcelist to the inner pod
+func (p *PodWrapper) Overhead(rl v1.ResourceList) *PodWrapper {
+	p.Spec.Overhead = rl
 	return p
 }
 
@@ -451,5 +506,11 @@ func (n *NodeWrapper) Images(images map[string]int64) *NodeWrapper {
 		containerImages = append(containerImages, v1.ContainerImage{Names: []string{name}, SizeBytes: size})
 	}
 	n.Status.Images = containerImages
+	return n
+}
+
+// Taints applies taints to the inner node.
+func (n *NodeWrapper) Taints(taints []v1.Taint) *NodeWrapper {
+	n.Spec.Taints = taints
 	return n
 }

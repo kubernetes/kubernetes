@@ -168,18 +168,11 @@ var _ volume.Mounter = &projectedVolumeMounter{}
 
 func (sv *projectedVolume) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:        true,
-		Managed:         true,
-		SupportsSELinux: true,
+		ReadOnly:       true,
+		Managed:        true,
+		SELinuxRelabel: true,
 	}
 
-}
-
-// Checks prior to mount operations to verify that the required components (binaries, etc.)
-// to mount the volume are available on the underlying node.
-// If not, it returns an error
-func (s *projectedVolumeMounter) CanMount() error {
-	return nil
 }
 
 func (s *projectedVolumeMounter) SetUp(mounterArgs volume.MounterArgs) error {
@@ -248,12 +241,12 @@ func (s *projectedVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterA
 
 func (s *projectedVolumeMounter) collectData(mounterArgs volume.MounterArgs) (map[string]volumeutil.FileProjection, error) {
 	if s.source.DefaultMode == nil {
-		return nil, fmt.Errorf("No defaultMode used, not even the default value for it")
+		return nil, fmt.Errorf("no defaultMode used, not even the default value for it")
 	}
 
 	kubeClient := s.plugin.host.GetKubeClient()
 	if kubeClient == nil {
-		return nil, fmt.Errorf("Cannot setup projected volume %v because kube client is not configured", s.volName)
+		return nil, fmt.Errorf("cannot setup projected volume %v because kube client is not configured", s.volName)
 	}
 
 	errlist := []error{}

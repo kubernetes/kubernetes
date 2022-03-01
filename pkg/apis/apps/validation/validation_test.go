@@ -76,8 +76,10 @@ func TestValidateStatefulSet(t *testing.T) {
 		},
 	}
 
-	successCases := []apps.StatefulSet{
-		{
+	const enableStatefulSetAutoDeletePVC = "[enable StatefulSetAutoDeletePVC]"
+
+	successCases := map[string]apps.StatefulSet{
+		"alpha name": {
 			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 			Spec: apps.StatefulSetSpec{
 				PodManagementPolicy: apps.OrderedReadyPodManagement,
@@ -86,7 +88,7 @@ func TestValidateStatefulSet(t *testing.T) {
 				UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
 			},
 		},
-		{
+		"alphanumeric name": {
 			ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
 			Spec: apps.StatefulSetSpec{
 				PodManagementPolicy: apps.OrderedReadyPodManagement,
@@ -95,7 +97,7 @@ func TestValidateStatefulSet(t *testing.T) {
 				UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
 			},
 		},
-		{
+		"parallel pod management": {
 			ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
 			Spec: apps.StatefulSetSpec{
 				PodManagementPolicy: apps.ParallelPodManagement,
@@ -104,7 +106,7 @@ func TestValidateStatefulSet(t *testing.T) {
 				UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
 			},
 		},
-		{
+		"ordered ready pod management": {
 			ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
 			Spec: apps.StatefulSetSpec{
 				PodManagementPolicy: apps.OrderedReadyPodManagement,
@@ -113,7 +115,7 @@ func TestValidateStatefulSet(t *testing.T) {
 				UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.OnDeleteStatefulSetStrategyType},
 			},
 		},
-		{
+		"update strategy": {
 			ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
 			Spec: apps.StatefulSetSpec{
 				PodManagementPolicy: apps.OrderedReadyPodManagement,
@@ -127,11 +129,29 @@ func TestValidateStatefulSet(t *testing.T) {
 					}()},
 			},
 		},
+		"PVC policy " + enableStatefulSetAutoDeletePVC: {
+			ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
+			Spec: apps.StatefulSetSpec{
+				PodManagementPolicy: apps.OrderedReadyPodManagement,
+				Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+				Template:            validPodTemplate.Template,
+				UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+				PersistentVolumeClaimRetentionPolicy: &apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
+					WhenDeleted: apps.DeletePersistentVolumeClaimRetentionPolicyType,
+					WhenScaled:  apps.RetainPersistentVolumeClaimRetentionPolicyType,
+				},
+			},
+		},
 	}
 
-	for i, successCase := range successCases {
-		t.Run("success case "+strconv.Itoa(i), func(t *testing.T) {
-			if errs := ValidateStatefulSet(&successCase); len(errs) != 0 {
+	for name, successCase := range successCases {
+		name := name
+		set := successCase
+		t.Run("success case "+name, func(t *testing.T) {
+			if strings.Contains(name, enableStatefulSetAutoDeletePVC) {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)()
+			}
+			if errs := ValidateStatefulSet(&set, corevalidation.PodValidationOptions{}); len(errs) != 0 {
 				t.Errorf("expected success: %v", errs)
 			}
 		})
@@ -352,11 +372,36 @@ func TestValidateStatefulSet(t *testing.T) {
 				UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
 			},
 		},
+		"empty PersistentVolumeClaimRetentionPolicy " + enableStatefulSetAutoDeletePVC: {
+			ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
+			Spec: apps.StatefulSetSpec{
+				PersistentVolumeClaimRetentionPolicy: &apps.StatefulSetPersistentVolumeClaimRetentionPolicy{},
+				PodManagementPolicy:                  apps.OrderedReadyPodManagement,
+				Selector:                             &metav1.LabelSelector{MatchLabels: validLabels},
+				Template:                             validPodTemplate.Template,
+				UpdateStrategy:                       apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+			},
+		},
+		"invalid PersistentVolumeClaimRetentionPolicy " + enableStatefulSetAutoDeletePVC: {
+			ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
+			Spec: apps.StatefulSetSpec{
+				PersistentVolumeClaimRetentionPolicy: &apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
+					WhenScaled: apps.PersistentVolumeClaimRetentionPolicyType("invalid-delete-policy"),
+				},
+				PodManagementPolicy: apps.OrderedReadyPodManagement,
+				Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+				Template:            validPodTemplate.Template,
+				UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+			},
+		},
 	}
 
 	for k, v := range errorCases {
 		t.Run(k, func(t *testing.T) {
-			errs := ValidateStatefulSet(&v)
+			if strings.Contains(k, enableStatefulSetAutoDeletePVC) {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)()
+			}
+			errs := ValidateStatefulSet(&v, corevalidation.PodValidationOptions{})
 			if len(errs) == 0 {
 				t.Errorf("expected failure for %s", k)
 			}
@@ -378,9 +423,86 @@ func TestValidateStatefulSet(t *testing.T) {
 					field != "spec.updateStrategy.rollingUpdate" &&
 					field != "spec.updateStrategy.rollingUpdate.partition" &&
 					field != "spec.podManagementPolicy" &&
+					field != "spec.persistentVolumeClaimRetentionPolicy" &&
+					field != "spec.persistentVolumeClaimRetentionPolicy.whenDeleted" &&
+					field != "spec.persistentVolumeClaimRetentionPolicy.whenScaled" &&
 					field != "spec.template.spec.activeDeadlineSeconds" {
 					t.Errorf("%s: missing prefix for: %v", k, errs[i])
 				}
+			}
+		})
+	}
+}
+
+// generateStatefulSetSpec generates a valid StatefulSet spec
+func generateStatefulSetSpec(minSeconds int32) *apps.StatefulSetSpec {
+	labels := map[string]string{"a": "b"}
+	podTemplate := api.PodTemplate{
+		Template: api.PodTemplateSpec{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: labels,
+			},
+			Spec: api.PodSpec{
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+				Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			},
+		},
+	}
+	ss := &apps.StatefulSetSpec{
+		PodManagementPolicy: "OrderedReady",
+		Selector:            &metav1.LabelSelector{MatchLabels: labels},
+		Template:            podTemplate.Template,
+		Replicas:            3,
+		UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+		MinReadySeconds:     minSeconds,
+	}
+	return ss
+}
+
+// TestValidateStatefulSetMinReadySeconds tests the StatefulSet Spec's minReadySeconds field
+func TestValidateStatefulSetMinReadySeconds(t *testing.T) {
+	testCases := map[string]struct {
+		ss                    *apps.StatefulSetSpec
+		enableMinReadySeconds bool
+		expectErr             bool
+	}{
+		"valid : minReadySeconds enabled, zero": {
+			ss:                    generateStatefulSetSpec(0),
+			enableMinReadySeconds: true,
+			expectErr:             false,
+		},
+		"invalid : minReadySeconds enabled, negative": {
+			ss:                    generateStatefulSetSpec(-1),
+			enableMinReadySeconds: true,
+			expectErr:             true,
+		},
+		"valid : minReadySeconds enabled, very large value": {
+			ss:                    generateStatefulSetSpec(2147483647),
+			enableMinReadySeconds: true,
+			expectErr:             false,
+		},
+		"invalid : minReadySeconds enabled, large negative": {
+			ss:                    generateStatefulSetSpec(-2147483648),
+			enableMinReadySeconds: true,
+			expectErr:             true,
+		},
+		"valid : minReadySeconds disabled, we don't validate anything": {
+			ss:                    generateStatefulSetSpec(-2147483648),
+			enableMinReadySeconds: false,
+			expectErr:             false,
+		},
+	}
+	for tcName, tc := range testCases {
+		t.Run(tcName, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetMinReadySeconds, tc.enableMinReadySeconds)()
+			errs := ValidateStatefulSetSpec(tc.ss, field.NewPath("spec", "minReadySeconds"),
+				corevalidation.PodValidationOptions{})
+			if tc.expectErr && len(errs) == 0 {
+				t.Errorf("Unexpected success")
+			}
+			if !tc.expectErr && len(errs) != 0 {
+				t.Errorf("Unexpected error(s): %v", errs)
 			}
 		})
 	}
@@ -390,14 +512,16 @@ func TestValidateStatefulSetStatus(t *testing.T) {
 	observedGenerationMinusOne := int64(-1)
 	collisionCountMinusOne := int32(-1)
 	tests := []struct {
-		name               string
-		replicas           int32
-		readyReplicas      int32
-		currentReplicas    int32
-		updatedReplicas    int32
-		observedGeneration *int64
-		collisionCount     *int32
-		expectedErr        bool
+		name                  string
+		replicas              int32
+		readyReplicas         int32
+		currentReplicas       int32
+		updatedReplicas       int32
+		availableReplicas     int32
+		enableMinReadySeconds bool
+		observedGeneration    *int64
+		collisionCount        *int32
+		expectedErr           bool
 	}{
 		{
 			name:            "valid status",
@@ -481,10 +605,65 @@ func TestValidateStatefulSetStatus(t *testing.T) {
 			updatedReplicas: 4,
 			expectedErr:     true,
 		},
+		{
+			name:                  "invalid: number of available replicas",
+			replicas:              3,
+			readyReplicas:         3,
+			currentReplicas:       2,
+			availableReplicas:     int32(-1),
+			expectedErr:           true,
+			enableMinReadySeconds: true,
+		},
+		{
+			name:                  "invalid: available replicas greater than replicas",
+			replicas:              3,
+			readyReplicas:         3,
+			currentReplicas:       2,
+			availableReplicas:     int32(4),
+			expectedErr:           true,
+			enableMinReadySeconds: true,
+		},
+		{
+			name:                  "invalid: available replicas greater than ready replicas",
+			replicas:              3,
+			readyReplicas:         2,
+			currentReplicas:       2,
+			availableReplicas:     int32(3),
+			expectedErr:           true,
+			enableMinReadySeconds: true,
+		},
+		{
+			name:                  "minReadySeconds flag not set, no validation: number of available replicas",
+			replicas:              3,
+			readyReplicas:         3,
+			currentReplicas:       2,
+			availableReplicas:     int32(-1),
+			expectedErr:           false,
+			enableMinReadySeconds: false,
+		},
+		{
+			name:                  "minReadySeconds flag not set, no validation: available replicas greater than replicas",
+			replicas:              3,
+			readyReplicas:         3,
+			currentReplicas:       2,
+			availableReplicas:     int32(4),
+			expectedErr:           false,
+			enableMinReadySeconds: false,
+		},
+		{
+			name:                  "minReadySeconds flag not set, no validation: available replicas greater than ready replicas",
+			replicas:              3,
+			readyReplicas:         2,
+			currentReplicas:       2,
+			availableReplicas:     int32(3),
+			expectedErr:           false,
+			enableMinReadySeconds: false,
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetMinReadySeconds, test.enableMinReadySeconds)()
 			status := apps.StatefulSetStatus{
 				Replicas:           test.replicas,
 				ReadyReplicas:      test.readyReplicas,
@@ -492,6 +671,7 @@ func TestValidateStatefulSetStatus(t *testing.T) {
 				UpdatedReplicas:    test.updatedReplicas,
 				ObservedGeneration: test.observedGeneration,
 				CollisionCount:     test.collisionCount,
+				AvailableReplicas:  test.availableReplicas,
 			}
 
 			errs := ValidateStatefulSetStatus(&status, field.NewPath("status"))
@@ -604,6 +784,53 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
 					Template:            addContainersValidTemplate.Template,
 					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+				},
+			},
+			update: apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: apps.StatefulSetSpec{
+					PodManagementPolicy: apps.OrderedReadyPodManagement,
+					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+					Template:            validPodTemplate.Template,
+					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+				},
+			},
+		},
+		{
+			old: apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: apps.StatefulSetSpec{
+					PodManagementPolicy: apps.OrderedReadyPodManagement,
+					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+					Template:            addContainersValidTemplate.Template,
+					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+				},
+			},
+			update: apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: apps.StatefulSetSpec{
+					PodManagementPolicy: apps.OrderedReadyPodManagement,
+					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+					Template:            validPodTemplate.Template,
+					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+					PersistentVolumeClaimRetentionPolicy: &apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
+						WhenDeleted: apps.RetainPersistentVolumeClaimRetentionPolicyType,
+						WhenScaled:  apps.RetainPersistentVolumeClaimRetentionPolicyType,
+					},
+				},
+			},
+		},
+		{
+			old: apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: apps.StatefulSetSpec{
+					PodManagementPolicy: apps.OrderedReadyPodManagement,
+					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+					Template:            addContainersValidTemplate.Template,
+					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+					PersistentVolumeClaimRetentionPolicy: &apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
+						WhenScaled: apps.RetainPersistentVolumeClaimRetentionPolicyType,
+					},
 				},
 			},
 			update: apps.StatefulSet{

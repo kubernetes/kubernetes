@@ -46,7 +46,6 @@ func getArbitraryResource(s schema.GroupVersionResource, name, namespace string)
 				"generateName":    "test_generateName",
 				"uid":             "test_uid",
 				"resourceVersion": "test_resourceVersion",
-				"selfLink":        "test_selfLink",
 			},
 			"data": strconv.Itoa(rand.Int()),
 		},
@@ -321,4 +320,91 @@ func TestGetWithExactMatch(t *testing.T) {
 	assert.Error(t, err)
 	errNotFound = errors.NewNotFound(gvr.GroupResource(), "pod")
 	assert.EqualError(t, err, errNotFound.Error())
+}
+
+func Test_resourceCovers(t *testing.T) {
+	type args struct {
+		resource string
+		action   Action
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{
+			args: args{
+				resource: "*",
+				action:   ActionImpl{},
+			},
+			want: true,
+		},
+		{
+			args: args{
+				resource: "serviceaccounts",
+				action:   ActionImpl{},
+			},
+			want: false,
+		},
+		{
+			args: args{
+				resource: "serviceaccounts",
+				action: ActionImpl{
+					Resource: schema.GroupVersionResource{
+						Resource: "serviceaccounts",
+					},
+				},
+			},
+			want: true,
+		},
+		{
+			args: args{
+				resource: "serviceaccounts/token",
+				action: ActionImpl{
+					Resource: schema.GroupVersionResource{},
+				},
+			},
+			want: false,
+		},
+		{
+			args: args{
+				resource: "serviceaccounts/token",
+				action: ActionImpl{
+					Resource: schema.GroupVersionResource{
+						Resource: "serviceaccounts",
+					},
+				},
+			},
+			want: false,
+		},
+		{
+			args: args{
+				resource: "serviceaccounts/token",
+				action: ActionImpl{
+					Resource:    schema.GroupVersionResource{},
+					Subresource: "token",
+				},
+			},
+			want: false,
+		},
+		{
+			args: args{
+				resource: "serviceaccounts/token",
+				action: ActionImpl{
+					Resource: schema.GroupVersionResource{
+						Resource: "serviceaccounts",
+					},
+					Subresource: "token",
+				},
+			},
+			want: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := resourceCovers(tt.args.resource, tt.args.action); got != tt.want {
+				t.Errorf("resourceCovers() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }

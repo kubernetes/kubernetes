@@ -1,20 +1,18 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- andyzhangx
-- brendandburns
-- feiskyer
-- karataliu
-- khenidak
-- rootfs
+  - andyzhangx
+  - feiskyer
+  - khenidak
 reviewers:
-- andyzhangx
-- brendandburns
-- feiskyer
-- jsafrane
-- jingxu97
-- karataliu
-- khenidak
-- msau42
-- rootfs
-- saad-ali
+  - andyzhangx
+  - feiskyer
+  - jsafrane
+  - jingxu97
+  - khenidak
+  - msau42
+  - saad-ali
+emeritus_approvers:
+  - karataliu
+  - rootfs
+  - brendandburns

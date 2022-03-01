@@ -19,6 +19,7 @@ package network
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"net"
 	"strconv"
 
@@ -30,10 +31,11 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	"k8s.io/kubernetes/test/e2e/network/common"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
-var _ = SIGDescribe("HostPort", func() {
+var _ = common.SIGDescribe("HostPort", func() {
 
 	f := framework.NewDefaultFramework("hostport")
 
@@ -71,24 +73,24 @@ var _ = SIGDescribe("HostPort", func() {
 			framework.Failf("No nodes available")
 
 		}
-		nodeName := nodes.Items[0].Name
+		randomNode := &nodes.Items[rand.Intn(len(nodes.Items))]
 
-		ips := e2enode.GetAddressesByTypeAndFamily(&nodes.Items[0], v1.NodeInternalIP, family)
+		ips := e2enode.GetAddressesByTypeAndFamily(randomNode, v1.NodeInternalIP, family)
 		if len(ips) == 0 {
 			framework.Failf("Failed to get NodeIP")
 		}
 		hostIP := ips[0]
-		port := int32(54321)
+		port := int32(54323)
 
 		// Create pods with the same HostPort
 		ginkgo.By(fmt.Sprintf("Trying to create a pod(pod1) with hostport %v and hostIP %s and expect scheduled", port, localhost))
-		createHostPortPodOnNode(f, "pod1", ns, localhost, port, v1.ProtocolTCP, nodeName)
+		createHostPortPodOnNode(f, "pod1", ns, localhost, port, v1.ProtocolTCP, randomNode.Name)
 
 		ginkgo.By(fmt.Sprintf("Trying to create another pod(pod2) with hostport %v but hostIP %s on the node which pod1 resides and expect scheduled", port, hostIP))
-		createHostPortPodOnNode(f, "pod2", ns, hostIP, port, v1.ProtocolTCP, nodeName)
+		createHostPortPodOnNode(f, "pod2", ns, hostIP, port, v1.ProtocolTCP, randomNode.Name)
 
 		ginkgo.By(fmt.Sprintf("Trying to create a third pod(pod3) with hostport %v, hostIP %s but use UDP protocol on the node which pod2 resides", port, hostIP))
-		createHostPortPodOnNode(f, "pod3", ns, hostIP, port, v1.ProtocolUDP, nodeName)
+		createHostPortPodOnNode(f, "pod3", ns, hostIP, port, v1.ProtocolUDP, randomNode.Name)
 
 		// check that the port is being actually exposed to each container
 		// create a pod on the host network in the same node
@@ -99,7 +101,7 @@ var _ = SIGDescribe("HostPort", func() {
 			},
 			Spec: v1.PodSpec{
 				HostNetwork: true,
-				NodeName:    nodeName,
+				NodeName:    randomNode.Name,
 				Containers: []v1.Container{
 					{
 						Name:  "e2e-host-exec",
@@ -172,7 +174,7 @@ func createHostPortPodOnNode(f *framework.Framework, podName, ns, hostIP string,
 						},
 					},
 					ReadinessProbe: &v1.Probe{
-						Handler: v1.Handler{
+						ProbeHandler: v1.ProbeHandler{
 							HTTPGet: &v1.HTTPGetAction{
 								Path: "/hostname",
 								Port: intstr.IntOrString{

@@ -1,14 +1,13 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- saad-ali
-- thockin
-- davidz627
+  - saad-ali
+  - thockin
 reviewers:
-- saad-ali
-- jsafrane
-- jingxu97
-- gnufied
-- msau42
-- verult
-- davidz627
+  - saad-ali
+  - jsafrane
+  - jingxu97
+  - gnufied
+  - msau42
+emeritus_approvers:
+  - davidz627

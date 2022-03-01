@@ -19,7 +19,6 @@ package testing
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"time"
@@ -75,22 +74,18 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 		}
 	}()
 
-	result.TmpDir, err = ioutil.TempDir("", "kube-scheduler")
+	result.TmpDir, err = os.MkdirTemp("", "kube-scheduler")
 	if err != nil {
 		return result, fmt.Errorf("failed to create temp dir: %v", err)
 	}
 
 	fs := pflag.NewFlagSet("test", pflag.PanicOnError)
 
-	opts, err := options.NewOptions()
-	if err != nil {
-		return TestServer{}, err
-	}
-	namedFlagSets := opts.Flags()
-	for _, f := range namedFlagSets.FlagSets {
+	opts := options.NewOptions()
+	nfs := opts.Flags
+	for _, f := range nfs.FlagSets {
 		fs.AddFlagSet(f)
 	}
-
 	fs.Parse(customFlags)
 
 	if opts.SecureServing.BindPort != 0 {
@@ -101,17 +96,6 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 		opts.SecureServing.ServerCert.CertDirectory = result.TmpDir
 
 		t.Logf("kube-scheduler will listen securely on port %d...", opts.SecureServing.BindPort)
-	}
-
-	if opts.CombinedInsecureServing.BindPort != 0 {
-		listener, port, err := createListenerOnFreePort()
-		if err != nil {
-			return result, fmt.Errorf("failed to create listener: %v", err)
-		}
-		opts.CombinedInsecureServing.BindPort = port
-		opts.CombinedInsecureServing.Healthz.Listener = listener
-		opts.CombinedInsecureServing.Metrics.Listener = listener
-		t.Logf("kube-scheduler will listen insecurely on port %d...", opts.CombinedInsecureServing.BindPort)
 	}
 
 	cc, sched, err := app.Setup(ctx, opts)

@@ -78,12 +78,12 @@ ifneq ($(shell which gotestsum),)
 endif
 endif
 
-PROMU_VERSION ?= 0.5.0
+PROMU_VERSION ?= 0.12.0
 PROMU_URL     := https://github.com/prometheus/promu/releases/download/v$(PROMU_VERSION)/promu-$(PROMU_VERSION).$(GO_BUILD_PLATFORM).tar.gz
 
 GOLANGCI_LINT :=
 GOLANGCI_LINT_OPTS ?=
-GOLANGCI_LINT_VERSION ?= v1.18.0
+GOLANGCI_LINT_VERSION ?= v1.39.0
 # golangci-lint only supports linux, darwin and windows platforms on i386/amd64.
 # windows isn't included here because of the path separator being different.
 ifeq ($(GOHOSTOS),$(filter $(GOHOSTOS),linux darwin))
@@ -118,7 +118,7 @@ endif
 %: common-% ;
 
 .PHONY: common-all
-common-all: precheck style check_license lint unused build test
+common-all: precheck style check_license lint yamllint unused build test
 
 .PHONY: common-style
 common-style:
@@ -198,6 +198,15 @@ else
 endif
 endif
 
+.PHONY: common-yamllint
+common-yamllint:
+	@echo ">> running yamllint on all YAML files in the repository"
+ifeq (, $(shell which yamllint))
+	@echo "yamllint not installed so skipping"
+else
+	yamllint .
+endif
+
 # For backward-compatibility.
 .PHONY: common-staticcheck
 common-staticcheck: lint
@@ -245,10 +254,12 @@ common-docker-publish: $(PUBLISH_DOCKER_ARCHS)
 $(PUBLISH_DOCKER_ARCHS): common-docker-publish-%:
 	docker push "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)-linux-$*:$(DOCKER_IMAGE_TAG)"
 
+DOCKER_MAJOR_VERSION_TAG = $(firstword $(subst ., ,$(shell cat VERSION)))
 .PHONY: common-docker-tag-latest $(TAG_DOCKER_ARCHS)
 common-docker-tag-latest: $(TAG_DOCKER_ARCHS)
 $(TAG_DOCKER_ARCHS): common-docker-tag-latest-%:
 	docker tag "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)-linux-$*:$(DOCKER_IMAGE_TAG)" "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)-linux-$*:latest"
+	docker tag "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)-linux-$*:$(DOCKER_IMAGE_TAG)" "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)-linux-$*:v$(DOCKER_MAJOR_VERSION_TAG)"
 
 .PHONY: common-docker-manifest
 common-docker-manifest:

@@ -275,6 +275,28 @@ func TestAccept(t *testing.T) {
 			method:        "PUT",
 			expectAccept:  false,
 		},
+		{
+			name:          "test23",
+			acceptPaths:   DefaultPathAcceptRE,
+			rejectPaths:   DefaultPathRejectRE,
+			acceptHosts:   DefaultHostAcceptRE,
+			rejectMethods: DefaultMethodRejectRE,
+			path:          "/api/v1/namespaces/default/pods/somepod/exec",
+			host:          "localhost",
+			method:        "POST",
+			expectAccept:  false,
+		},
+		{
+			name:          "test24",
+			acceptPaths:   DefaultPathAcceptRE,
+			rejectPaths:   "",
+			acceptHosts:   DefaultHostAcceptRE,
+			rejectMethods: DefaultMethodRejectRE,
+			path:          "/api/v1/namespaces/default/pods/somepod/exec",
+			host:          "localhost",
+			method:        "POST",
+			expectAccept:  true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -433,17 +455,19 @@ func TestPathHandling(t *testing.T) {
 		prefix     string
 		reqPath    string
 		expectPath string
+		appendPath bool
 	}{
-		{"test1", "/api/", "/metrics", "404 page not found\n"},
-		{"test2", "/api/", "/api/metrics", "/api/metrics"},
-		{"test3", "/api/", "/api/v1/pods/", "/api/v1/pods/"},
-		{"test4", "/", "/metrics", "/metrics"},
-		{"test5", "/", "/api/v1/pods/", "/api/v1/pods/"},
-		{"test6", "/custom/", "/metrics", "404 page not found\n"},
-		{"test7", "/custom/", "/api/metrics", "404 page not found\n"},
-		{"test8", "/custom/", "/api/v1/pods/", "404 page not found\n"},
-		{"test9", "/custom/", "/custom/api/metrics", "/api/metrics"},
-		{"test10", "/custom/", "/custom/api/v1/pods/", "/api/v1/pods/"},
+		{"test1", "/api/", "/metrics", "404 page not found\n", false},
+		{"test2", "/api/", "/api/metrics", "/api/metrics", false},
+		{"test3", "/api/", "/api/v1/pods/", "/api/v1/pods/", false},
+		{"test4", "/", "/metrics", "/metrics", false},
+		{"test5", "/", "/api/v1/pods/", "/api/v1/pods/", false},
+		{"test6", "/custom/", "/metrics", "404 page not found\n", false},
+		{"test7", "/custom/", "/api/metrics", "404 page not found\n", false},
+		{"test8", "/custom/", "/api/v1/pods/", "404 page not found\n", false},
+		{"test9", "/custom/", "/custom/api/metrics", "/api/metrics", false},
+		{"test10", "/custom/", "/custom/api/v1/pods/", "/api/v1/pods/", false},
+		{"test11", "/custom/", "/custom/api/v1/services/", "/api/v1/services/", true},
 	}
 
 	cc := &rest.Config{
@@ -452,7 +476,7 @@ func TestPathHandling(t *testing.T) {
 
 	for _, tt := range table {
 		t.Run(tt.name, func(t *testing.T) {
-			p, err := NewServer("", tt.prefix, "/not/used/for/this/test", nil, cc, 0)
+			p, err := NewServer("", tt.prefix, "/not/used/for/this/test", nil, cc, 0, tt.appendPath)
 			if err != nil {
 				t.Fatalf("%#v: %v", tt, err)
 			}

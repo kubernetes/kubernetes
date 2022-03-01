@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -33,7 +34,7 @@ import (
 	storeerr "k8s.io/apiserver/pkg/storage/errors"
 	"k8s.io/apiserver/pkg/util/dryrun"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1beta1"
+	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
@@ -44,6 +45,7 @@ import (
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	registrypod "k8s.io/kubernetes/pkg/registry/core/pod"
 	podrest "k8s.io/kubernetes/pkg/registry/core/pod/rest"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // PodStorage includes storage for pods and all sub resources
@@ -79,6 +81,7 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGet
 		CreateStrategy:      registrypod.Strategy,
 		UpdateStrategy:      registrypod.Strategy,
 		DeleteStrategy:      registrypod.Strategy,
+		ResetFieldsStrategy: registrypod.Strategy,
 		ReturnDeletedObject: true,
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
@@ -95,6 +98,7 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGet
 
 	statusStore := *store
 	statusStore.UpdateStrategy = registrypod.StatusStrategy
+	statusStore.ResetFieldsStrategy = registrypod.StatusStrategy
 	ephemeralContainersStore := *store
 	ephemeralContainersStore.UpdateStrategy = registrypod.EphemeralContainersStrategy
 
@@ -177,20 +181,32 @@ func (r *BindingREST) Create(ctx context.Context, name string, obj runtime.Objec
 		}
 	}
 
-	err = r.assignPod(ctx, binding.Name, binding.Target.Name, binding.Annotations, dryrun.IsDryRun(options.DryRun))
+	err = r.assignPod(ctx, binding.UID, binding.ResourceVersion, binding.Name, binding.Target.Name, binding.Annotations, dryrun.IsDryRun(options.DryRun))
 	out = &metav1.Status{Status: metav1.StatusSuccess}
 	return
 }
 
-// setPodHostAndAnnotations sets the given pod's host to 'machine' if and only if it was
-// previously 'oldMachine' and merges the provided annotations with those of the pod.
+// setPodHostAndAnnotations sets the given pod's host to 'machine' if and only if
+// the pod is unassigned and merges the provided annotations with those of the pod.
 // Returns the current state of the pod, or an error.
-func (r *BindingREST) setPodHostAndAnnotations(ctx context.Context, podID, oldMachine, machine string, annotations map[string]string, dryRun bool) (finalPod *api.Pod, err error) {
+func (r *BindingREST) setPodHostAndAnnotations(ctx context.Context, podUID types.UID, podResourceVersion, podID, machine string, annotations map[string]string, dryRun bool) (finalPod *api.Pod, err error) {
 	podKey, err := r.store.KeyFunc(ctx, podID)
 	if err != nil {
 		return nil, err
 	}
-	err = r.store.Storage.GuaranteedUpdate(ctx, podKey, &api.Pod{}, false, nil, storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
+
+	var preconditions *storage.Preconditions
+	if podUID != "" || podResourceVersion != "" {
+		preconditions = &storage.Preconditions{}
+		if podUID != "" {
+			preconditions.UID = &podUID
+		}
+		if podResourceVersion != "" {
+			preconditions.ResourceVersion = &podResourceVersion
+		}
+	}
+
+	err = r.store.Storage.GuaranteedUpdate(ctx, podKey, &api.Pod{}, false, preconditions, storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
 		pod, ok := obj.(*api.Pod)
 		if !ok {
 			return nil, fmt.Errorf("unexpected object: %#v", obj)
@@ -198,7 +214,7 @@ func (r *BindingREST) setPodHostAndAnnotations(ctx context.Context, podID, oldMa
 		if pod.DeletionTimestamp != nil {
 			return nil, fmt.Errorf("pod %s is being deleted, cannot be assigned to a host", pod.Name)
 		}
-		if pod.Spec.NodeName != oldMachine {
+		if pod.Spec.NodeName != "" {
 			return nil, fmt.Errorf("pod %v is already assigned to node %q", pod.Name, pod.Spec.NodeName)
 		}
 		pod.Spec.NodeName = machine
@@ -219,8 +235,8 @@ func (r *BindingREST) setPodHostAndAnnotations(ctx context.Context, podID, oldMa
 }
 
 // assignPod assigns the given pod to the given machine.
-func (r *BindingREST) assignPod(ctx context.Context, podID string, machine string, annotations map[string]string, dryRun bool) (err error) {
-	if _, err = r.setPodHostAndAnnotations(ctx, podID, "", machine, annotations, dryRun); err != nil {
+func (r *BindingREST) assignPod(ctx context.Context, podUID types.UID, podResourceVersion, podID string, machine string, annotations map[string]string, dryRun bool) (err error) {
+	if _, err = r.setPodHostAndAnnotations(ctx, podUID, podResourceVersion, podID, machine, annotations, dryRun); err != nil {
 		err = storeerr.InterpretGetError(err, api.Resource("pods"), podID)
 		err = storeerr.InterpretUpdateError(err, api.Resource("pods"), podID)
 		if _, ok := err.(*errors.StatusError); !ok {
@@ -278,6 +294,11 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
 }
 
+// GetResetFields implements rest.ResetFieldsStrategy
+func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return r.store.GetResetFields()
+}
+
 // EphemeralContainersREST implements the REST endpoint for adding EphemeralContainers
 type EphemeralContainersREST struct {
 	store *genericregistry.Store
@@ -285,23 +306,18 @@ type EphemeralContainersREST struct {
 
 var _ = rest.Patcher(&EphemeralContainersREST{})
 
-// Get of this endpoint will return the list of ephemeral containers in this pod
+// Get retrieves the object from the storage. It is required to support Patch.
 func (r *EphemeralContainersREST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
 		return nil, errors.NewBadRequest("feature EphemeralContainers disabled")
 	}
 
-	obj, err := r.store.Get(ctx, name, options)
-	if err != nil {
-		return nil, err
-	}
-
-	return ephemeralContainersInPod(obj.(*api.Pod)), nil
+	return r.store.Get(ctx, name, options)
 }
 
-// New creates a new EphemeralContainers resource
+// New creates a new pod resource
 func (r *EphemeralContainersREST) New() runtime.Object {
-	return &api.EphemeralContainers{}
+	return &api.Pod{}
 }
 
 // Update alters the EphemeralContainers field in PodSpec
@@ -310,76 +326,7 @@ func (r *EphemeralContainersREST) Update(ctx context.Context, name string, objIn
 		return nil, false, errors.NewBadRequest("feature EphemeralContainers disabled")
 	}
 
-	obj, err := r.store.Get(ctx, name, &metav1.GetOptions{})
-	if err != nil {
-		return nil, false, err
-	}
-	pod := obj.(*api.Pod)
-
-	// Build an UpdatedObjectInfo to pass to the pod store.
-	// It is given the currently stored v1.Pod and transforms it to the new pod that should be stored.
-	updatedPodInfo := rest.DefaultUpdatedObjectInfo(pod, func(ctx context.Context, oldObject, _ runtime.Object) (newObject runtime.Object, err error) {
-		oldPod, ok := oldObject.(*api.Pod)
-		if !ok {
-			return nil, fmt.Errorf("unexpected type for Pod %T", oldObject)
-		}
-
-		newEphemeralContainersObj, err := objInfo.UpdatedObject(ctx, ephemeralContainersInPod(oldPod))
-		if err != nil {
-			return nil, err
-		}
-		newEphemeralContainers, ok := newEphemeralContainersObj.(*api.EphemeralContainers)
-		if !ok {
-			return nil, fmt.Errorf("unexpected type for EphemeralContainers %T", newEphemeralContainersObj)
-		}
-
-		// avoid mutating
-		newPod := oldPod.DeepCopy()
-		// identity, version (make sure we're working with the right object, instance, and version)
-		newPod.Name = newEphemeralContainers.Name
-		newPod.Namespace = newEphemeralContainers.Namespace
-		newPod.UID = newEphemeralContainers.UID
-		newPod.ResourceVersion = newEphemeralContainers.ResourceVersion
-		// ephemeral containers
-		newPod.Spec.EphemeralContainers = newEphemeralContainers.EphemeralContainers
-
-		return newPod, nil
-	})
-
-	// Validation should be passed the API kind (EphemeralContainers) rather than the storage kind.
-	obj, _, err = r.store.Update(ctx, name, updatedPodInfo, toEphemeralContainersCreateValidation(createValidation), toEphemeralContainersUpdateValidation(updateValidation), false, options)
-	if err != nil {
-		return nil, false, err
-	}
-	return ephemeralContainersInPod(obj.(*api.Pod)), false, err
-}
-
-func toEphemeralContainersCreateValidation(f rest.ValidateObjectFunc) rest.ValidateObjectFunc {
-	return func(ctx context.Context, obj runtime.Object) error {
-		return f(ctx, ephemeralContainersInPod(obj.(*api.Pod)))
-	}
-}
-
-func toEphemeralContainersUpdateValidation(f rest.ValidateObjectUpdateFunc) rest.ValidateObjectUpdateFunc {
-	return func(ctx context.Context, obj, old runtime.Object) error {
-		return f(ctx, ephemeralContainersInPod(obj.(*api.Pod)), ephemeralContainersInPod(old.(*api.Pod)))
-	}
-}
-
-// Extract the list of Ephemeral Containers from a Pod
-func ephemeralContainersInPod(pod *api.Pod) *api.EphemeralContainers {
-	ephemeralContainers := pod.Spec.EphemeralContainers
-	if ephemeralContainers == nil {
-		ephemeralContainers = []api.EphemeralContainer{}
-	}
-	return &api.EphemeralContainers{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              pod.Name,
-			Namespace:         pod.Namespace,
-			UID:               pod.UID,
-			ResourceVersion:   pod.ResourceVersion,
-			CreationTimestamp: pod.CreationTimestamp,
-		},
-		EphemeralContainers: ephemeralContainers,
-	}
+	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
+	// subresources should never allow create on update.
+	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
 }

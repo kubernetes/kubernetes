@@ -42,7 +42,7 @@ func (kl *Kubelet) defaultPodLimitsForDownwardAPI(pod *v1.Pod, container *v1.Con
 		return nil, nil, fmt.Errorf("failed to find node object, expected a node")
 	}
 	allocatable := node.Status.Allocatable
-	klog.Infof("allocatable: %v", allocatable)
+	klog.InfoS("Allocatable", "allocatable", allocatable)
 	outputPod := pod.DeepCopy()
 	for idx := range outputPod.Spec.Containers {
 		resource.MergeContainerResourceLimits(&outputPod.Spec.Containers[idx], allocatable)

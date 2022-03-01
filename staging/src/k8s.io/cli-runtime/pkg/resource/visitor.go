@@ -30,9 +30,6 @@ import (
 
 	"golang.org/x/text/encoding/unicode"
 	"golang.org/x/text/transform"
-
-	"sigs.k8s.io/kustomize/pkg/fs"
-
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,7 +39,6 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/cli-runtime/pkg/kustomize"
 )
 
 const (
@@ -208,9 +204,9 @@ type EagerVisitorList []Visitor
 // Visit implements Visitor, and gathers errors that occur during processing until
 // all sub visitors have been visited.
 func (l EagerVisitorList) Visit(fn VisitorFunc) error {
-	errs := []error(nil)
+	var errs []error
 	for i := range l {
-		if err := l[i].Visit(func(info *Info, err error) error {
+		err := l[i].Visit(func(info *Info, err error) error {
 			if err != nil {
 				errs = append(errs, err)
 				return nil
@@ -219,7 +215,8 @@ func (l EagerVisitorList) Visit(fn VisitorFunc) error {
 				errs = append(errs, err)
 			}
 			return nil
-		}); err != nil {
+		})
+		if err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -257,13 +254,15 @@ func (v *URLVisitor) Visit(fn VisitorFunc) error {
 // readHttpWithRetries tries to http.Get the v.URL retries times before giving up.
 func readHttpWithRetries(get httpget, duration time.Duration, u string, attempts int) (io.ReadCloser, error) {
 	var err error
-	var body io.ReadCloser
 	if attempts <= 0 {
 		return nil, fmt.Errorf("http attempts must be greater than 0, was %d", attempts)
 	}
 	for i := 0; i < attempts; i++ {
-		var statusCode int
-		var status string
+		var (
+			statusCode int
+			status     string
+			body       io.ReadCloser
+		)
 		if i > 0 {
 			time.Sleep(duration)
 		}
@@ -276,10 +275,12 @@ func readHttpWithRetries(get httpget, duration time.Duration, u string, attempts
 			continue
 		}
 
-		// Error - Set the error condition from the StatusCode
-		if statusCode != http.StatusOK {
-			err = fmt.Errorf("unable to read URL %q, server reported %s, status code=%d", u, status, statusCode)
+		if statusCode == http.StatusOK {
+			return body, nil
 		}
+		body.Close()
+		// Error - Set the error condition from the StatusCode
+		err = fmt.Errorf("unable to read URL %q, server reported %s, status code=%d", u, status, statusCode)
 
 		if statusCode >= 500 && statusCode < 600 {
 			// Retry 500's
@@ -289,7 +290,7 @@ func readHttpWithRetries(get httpget, duration time.Duration, u string, attempts
 			break
 		}
 	}
-	return body, err
+	return nil, err
 }
 
 // httpget Defines function to retrieve a url and return the results.  Exists for unit test stubbing.
@@ -350,7 +351,7 @@ type ContinueOnErrorVisitor struct {
 // returned by the visitor directly may still result in some items
 // not being visited.
 func (v ContinueOnErrorVisitor) Visit(fn VisitorFunc) error {
-	errs := []error{}
+	var errs []error
 	err := v.Visitor.Visit(func(info *Info, err error) error {
 		if err != nil {
 			errs = append(errs, err)
@@ -424,7 +425,7 @@ func (v FlattenListVisitor) Visit(fn VisitorFunc) error {
 		if info.Mapping != nil && !info.Mapping.GroupVersionKind.Empty() {
 			preferredGVKs = append(preferredGVKs, info.Mapping.GroupVersionKind)
 		}
-		errs := []error{}
+		var errs []error
 		for i := range items {
 			item, err := v.mapper.infoForObject(items[i], v.typer, preferredGVKs)
 			if err != nil {
@@ -434,12 +435,15 @@ func (v FlattenListVisitor) Visit(fn VisitorFunc) error {
 			if len(info.ResourceVersion) != 0 {
 				item.ResourceVersion = info.ResourceVersion
 			}
+			// propagate list source to items source
+			if len(info.Source) != 0 {
+				item.Source = info.Source
+			}
 			if err := fn(item, nil); err != nil {
 				errs = append(errs, err)
 			}
 		}
 		return utilerrors.NewAggregate(errs)
-
 	})
 }
 
@@ -525,24 +529,6 @@ func (v *FileVisitor) Visit(fn VisitorFunc) error {
 	utf16bom := unicode.BOMOverride(unicode.UTF8.NewDecoder())
 	v.StreamVisitor.Reader = transform.NewReader(f, utf16bom)
 
-	return v.StreamVisitor.Visit(fn)
-}
-
-// KustomizeVisitor is wrapper around a StreamVisitor, to handle Kustomization directories
-type KustomizeVisitor struct {
-	Path string
-	*StreamVisitor
-}
-
-// Visit in a KustomizeVisitor gets the output of Kustomize build and save it in the Streamvisitor
-func (v *KustomizeVisitor) Visit(fn VisitorFunc) error {
-	fSys := fs.MakeRealFS()
-	var out bytes.Buffer
-	err := kustomize.RunKustomizeBuild(&out, fSys, v.Path)
-	if err != nil {
-		return err
-	}
-	v.StreamVisitor.Reader = bytes.NewReader(out.Bytes())
 	return v.StreamVisitor.Visit(fn)
 }
 
@@ -690,16 +676,6 @@ func RetrieveLazy(info *Info, err error) error {
 	if info.Object == nil {
 		return info.Get()
 	}
-	return nil
-}
-
-// CreateAndRefresh creates an object from input info and refreshes info with that object
-func CreateAndRefresh(info *Info) error {
-	obj, err := NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, info.Object)
-	if err != nil {
-		return err
-	}
-	info.Refresh(obj, true)
 	return nil
 }
 

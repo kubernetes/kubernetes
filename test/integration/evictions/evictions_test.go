@@ -18,19 +18,25 @@ package evictions
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-
 	"net/http/httptest"
 	"reflect"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/api/policy/v1beta1"
+	policyv1 "k8s.io/api/policy/v1"
+	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -55,16 +61,16 @@ const (
 func TestConcurrentEvictionRequests(t *testing.T) {
 	podNameFormat := "test-pod-%d"
 
-	s, closeFn, rm, informers, clientSet := rmSetup(t)
+	s, closeFn, rm, informers, _ := rmSetup(t)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("concurrent-eviction-requests", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
-	stopCh := make(chan struct{})
-	informers.Start(stopCh)
-	go rm.Run(stopCh)
-	defer close(stopCh)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	informers.Start(ctx.Done())
+	go rm.Run(ctx)
 
 	config := restclient.Config{Host: s.URL}
 	clientSet, err := clientset.NewForConfig(&config)
@@ -95,7 +101,7 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 	waitToObservePods(t, informers.Core().V1().Pods().Informer(), numOfEvictions, v1.PodRunning)
 
 	pdb := newPDB()
-	if _, err := clientSet.PolicyV1beta1().PodDisruptionBudgets(ns.Name).Create(context.TODO(), pdb, metav1.CreateOptions{}); err != nil {
+	if _, err := clientSet.PolicyV1().PodDisruptionBudgets(ns.Name).Create(context.TODO(), pdb, metav1.CreateOptions{}); err != nil {
 		t.Errorf("Failed to create PodDisruptionBudget: %v", err)
 	}
 
@@ -110,10 +116,10 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 		go func(id int, errCh chan error) {
 			defer wg.Done()
 			podName := fmt.Sprintf(podNameFormat, id)
-			eviction := newEviction(ns.Name, podName, deleteOption)
+			eviction := newV1Eviction(ns.Name, podName, deleteOption)
 
 			err := wait.PollImmediate(5*time.Second, 60*time.Second, func() (bool, error) {
-				e := clientSet.PolicyV1beta1().Evictions(ns.Name).Evict(context.TODO(), eviction)
+				e := clientSet.PolicyV1().Evictions(ns.Name).Evict(context.TODO(), eviction)
 				switch {
 				case apierrors.IsTooManyRequests(e):
 					return false, nil
@@ -174,16 +180,16 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 
 // TestTerminalPodEviction ensures that PDB is not checked for terminal pods.
 func TestTerminalPodEviction(t *testing.T) {
-	s, closeFn, rm, informers, clientSet := rmSetup(t)
+	s, closeFn, rm, informers, _ := rmSetup(t)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("terminalpod-eviction", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
-	stopCh := make(chan struct{})
-	informers.Start(stopCh)
-	go rm.Run(stopCh)
-	defer close(stopCh)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	informers.Start(ctx.Done())
+	go rm.Run(ctx)
 
 	config := restclient.Config{Host: s.URL}
 	clientSet, err := clientset.NewForConfig(&config)
@@ -208,7 +214,7 @@ func TestTerminalPodEviction(t *testing.T) {
 	waitToObservePods(t, informers.Core().V1().Pods().Informer(), 1, v1.PodSucceeded)
 
 	pdb := newPDB()
-	if _, err := clientSet.PolicyV1beta1().PodDisruptionBudgets(ns.Name).Create(context.TODO(), pdb, metav1.CreateOptions{}); err != nil {
+	if _, err := clientSet.PolicyV1().PodDisruptionBudgets(ns.Name).Create(context.TODO(), pdb, metav1.CreateOptions{}); err != nil {
 		t.Errorf("Failed to create PodDisruptionBudget: %v", err)
 	}
 
@@ -219,9 +225,9 @@ func TestTerminalPodEviction(t *testing.T) {
 		t.Fatalf("Error while listing pod disruption budget")
 	}
 	oldPdb := pdbList.Items[0]
-	eviction := newEviction(ns.Name, pod.Name, deleteOption)
+	eviction := newV1Eviction(ns.Name, pod.Name, deleteOption)
 	err = wait.PollImmediate(5*time.Second, 60*time.Second, func() (bool, error) {
-		e := clientSet.PolicyV1beta1().Evictions(ns.Name).Evict(context.TODO(), eviction)
+		e := clientSet.PolicyV1().Evictions(ns.Name).Evict(context.TODO(), eviction)
 		switch {
 		case apierrors.IsTooManyRequests(e):
 			return false, nil
@@ -248,6 +254,97 @@ func TestTerminalPodEviction(t *testing.T) {
 
 	if err := clientSet.PolicyV1beta1().PodDisruptionBudgets(ns.Name).Delete(context.TODO(), pdb.Name, deleteOption); err != nil {
 		t.Fatalf("Failed to delete pod disruption budget")
+	}
+}
+
+// TestEvictionVersions ensures the eviction endpoint accepts and returns the correct API versions
+func TestEvictionVersions(t *testing.T) {
+	s, closeFn, rm, informers, clientSet := rmSetup(t)
+	defer closeFn()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	informers.Start(ctx.Done())
+	go rm.Run(ctx)
+
+	config := restclient.Config{Host: s.URL}
+
+	ns := "default"
+	subresource := "eviction"
+	pod := newPod("test")
+	if _, err := clientSet.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
+		t.Errorf("Failed to create pod: %v", err)
+	}
+
+	dynamicClient, err := dynamic.NewForConfig(&config)
+	if err != nil {
+		t.Fatalf("Failed to create clientset: %v", err)
+	}
+
+	podClient := dynamicClient.Resource(schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}).Namespace(ns)
+
+	// get should not be supported
+	if _, err := podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{}, subresource); !apierrors.IsMethodNotSupported(err) {
+		t.Fatalf("expected MethodNotSupported for GET, got %v", err)
+	}
+
+	// patch should not be supported
+	for _, patchType := range []types.PatchType{types.JSONPatchType, types.MergePatchType, types.StrategicMergePatchType, types.ApplyPatchType} {
+		if _, err := podClient.Patch(context.TODO(), pod.Name, patchType, []byte{}, metav1.PatchOptions{}, subresource); !apierrors.IsMethodNotSupported(err) {
+			t.Fatalf("expected MethodNotSupported for GET, got %v", err)
+		}
+	}
+
+	allowedEvictions := []runtime.Object{
+		// v1beta1, no apiVersion/kind
+		&policyv1beta1.Eviction{
+			TypeMeta:      metav1.TypeMeta{},
+			ObjectMeta:    metav1.ObjectMeta{Name: pod.Name},
+			DeleteOptions: &metav1.DeleteOptions{DryRun: []string{metav1.DryRunAll}},
+		},
+		// v1beta1, apiVersion/kind
+		&policyv1beta1.Eviction{
+			TypeMeta:      metav1.TypeMeta{APIVersion: "policy/v1beta1", Kind: "Eviction"},
+			ObjectMeta:    metav1.ObjectMeta{Name: pod.Name},
+			DeleteOptions: &metav1.DeleteOptions{DryRun: []string{metav1.DryRunAll}},
+		},
+		// v1, no apiVersion/kind
+		&policyv1.Eviction{
+			TypeMeta:      metav1.TypeMeta{},
+			ObjectMeta:    metav1.ObjectMeta{Name: pod.Name},
+			DeleteOptions: &metav1.DeleteOptions{DryRun: []string{metav1.DryRunAll}},
+		},
+		// v1, apiVersion/kind
+		&policyv1.Eviction{
+			TypeMeta:      metav1.TypeMeta{APIVersion: "policy/v1", Kind: "Eviction"},
+			ObjectMeta:    metav1.ObjectMeta{Name: pod.Name},
+			DeleteOptions: &metav1.DeleteOptions{DryRun: []string{metav1.DryRunAll}},
+		},
+	}
+	v1Status := schema.GroupVersionKind{Version: "v1", Kind: "Status"}
+	for _, allowedEviction := range allowedEvictions {
+		data, _ := json.Marshal(allowedEviction)
+		u := &unstructured.Unstructured{}
+		json.Unmarshal(data, u)
+		result, err := podClient.Create(context.TODO(), u, metav1.CreateOptions{}, subresource)
+		if err != nil {
+			t.Fatalf("error posting %s: %v", string(data), err)
+		}
+		if result.GroupVersionKind() != v1Status {
+			t.Fatalf("expected v1 Status, got %#v", result)
+		}
+	}
+
+	// create unknown eviction version with apiVersion/kind should fail
+	u := &unstructured.Unstructured{Object: map[string]interface{}{
+		"metadata":   map[string]interface{}{"name": pod.Name},
+		"apiVersion": "policy/v2",
+		"kind":       "Eviction",
+	}}
+	if _, err := podClient.Create(context.TODO(), u, metav1.CreateOptions{}, subresource); err == nil {
+		t.Fatal("expected error posting unknown Eviction version, got none")
+	} else if !strings.Contains(err.Error(), "policy/v2") {
+		t.Fatalf("expected error about policy/v2, got %#v", err)
 	}
 }
 
@@ -292,12 +389,12 @@ func addPodConditionReady(pod *v1.Pod) {
 	}
 }
 
-func newPDB() *v1beta1.PodDisruptionBudget {
-	return &v1beta1.PodDisruptionBudget{
+func newPDB() *policyv1.PodDisruptionBudget {
+	return &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-pdb",
 		},
-		Spec: v1beta1.PodDisruptionBudgetSpec{
+		Spec: policyv1.PodDisruptionBudgetSpec{
 			MinAvailable: &intstr.IntOrString{
 				Type:   intstr.Int,
 				IntVal: 0,
@@ -309,10 +406,10 @@ func newPDB() *v1beta1.PodDisruptionBudget {
 	}
 }
 
-func newEviction(ns, evictionName string, deleteOption metav1.DeleteOptions) *v1beta1.Eviction {
-	return &v1beta1.Eviction{
+func newV1Eviction(ns, evictionName string, deleteOption metav1.DeleteOptions) *policyv1.Eviction {
+	return &policyv1.Eviction{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: "Policy/v1beta1",
+			APIVersion: "policy/v1",
 			Kind:       "Eviction",
 		},
 		ObjectMeta: metav1.ObjectMeta{
@@ -324,8 +421,8 @@ func newEviction(ns, evictionName string, deleteOption metav1.DeleteOptions) *v1
 }
 
 func rmSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, *disruption.DisruptionController, informers.SharedInformerFactory, clientset.Interface) {
-	masterConfig := framework.NewIntegrationTestMasterConfig()
-	_, s, closeFn := framework.RunAMaster(masterConfig)
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
+	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 
 	config := restclient.Config{Host: s.URL}
 	clientSet, err := clientset.NewForConfig(&config)
@@ -348,7 +445,7 @@ func rmSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, *disruption.D
 
 	rm := disruption.NewDisruptionController(
 		informers.Core().V1().Pods(),
-		informers.Policy().V1beta1().PodDisruptionBudgets(),
+		informers.Policy().V1().PodDisruptionBudgets(),
 		informers.Core().V1().ReplicationControllers(),
 		informers.Apps().V1().ReplicaSets(),
 		informers.Apps().V1().Deployments(),

@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -31,7 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -67,7 +68,7 @@ func validateOOMScoreAdjSettingIsInRange(pid int, expectedMinOOMScoreAdj, expect
 	if oomScore < expectedMinOOMScoreAdj {
 		return fmt.Errorf("expected pid %d's oom_score_adj to be >= %d; found %d", pid, expectedMinOOMScoreAdj, oomScore)
 	}
-	if oomScore < expectedMaxOOMScoreAdj {
+	if oomScore >= expectedMaxOOMScoreAdj {
 		return fmt.Errorf("expected pid %d's oom_score_adj to be < %d; found %d", pid, expectedMaxOOMScoreAdj, oomScore)
 	}
 	return nil
@@ -238,7 +239,7 @@ var _ = SIGDescribe("Container Manager Misc [Serial]", func() {
 					err    error
 				)
 				gomega.Eventually(func() error {
-					wsPids, err = getPidsForProcess("test-webserver", "")
+					wsPids, err = getPidsForProcess("agnhost", "")
 					if err != nil {
 						return fmt.Errorf("failed to get list of test-webserver process pids: %v", err)
 					}

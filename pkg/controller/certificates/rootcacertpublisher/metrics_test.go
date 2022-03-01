@@ -44,7 +44,7 @@ func TestSyncCounter(t *testing.T) {
 			want: `
 # HELP root_ca_cert_publisher_sync_total [ALPHA] Number of namespace syncs happened in root ca cert publisher.
 # TYPE root_ca_cert_publisher_sync_total counter
-root_ca_cert_publisher_sync_total{code="200",namespace="test-ns"} 1
+root_ca_cert_publisher_sync_total{code="200"} 1
 				`,
 		},
 		{
@@ -56,7 +56,7 @@ root_ca_cert_publisher_sync_total{code="200",namespace="test-ns"} 1
 			want: `
 # HELP root_ca_cert_publisher_sync_total [ALPHA] Number of namespace syncs happened in root ca cert publisher.
 # TYPE root_ca_cert_publisher_sync_total counter
-root_ca_cert_publisher_sync_total{code="404",namespace="test-ns"} 1
+root_ca_cert_publisher_sync_total{code="404"} 1
 				`,
 		},
 		{
@@ -68,7 +68,7 @@ root_ca_cert_publisher_sync_total{code="404",namespace="test-ns"} 1
 			want: `
 # HELP root_ca_cert_publisher_sync_total [ALPHA] Number of namespace syncs happened in root ca cert publisher.
 # TYPE root_ca_cert_publisher_sync_total counter
-root_ca_cert_publisher_sync_total{code="500",namespace="test-ns"} 1
+root_ca_cert_publisher_sync_total{code="500"} 1
 				`,
 		},
 		{
@@ -80,14 +80,14 @@ root_ca_cert_publisher_sync_total{code="500",namespace="test-ns"} 1
 			want: `
 # HELP root_ca_cert_publisher_sync_total [ALPHA] Number of namespace syncs happened in root ca cert publisher.
 # TYPE root_ca_cert_publisher_sync_total counter
-root_ca_cert_publisher_sync_total{code="500",namespace="test-ns"} 1
+root_ca_cert_publisher_sync_total{code="500"} 1
 				`,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
-			recordMetrics(time.Now(), "test-ns", tc.err)
+			recordMetrics(time.Now(), tc.err)
 			defer syncCounter.Reset()
 			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tc.want), tc.metrics...); err != nil {
 				t.Fatal(err)

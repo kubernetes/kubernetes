@@ -22,13 +22,13 @@ package operationexecutor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"time"
 
 	"k8s.io/klog/v2"
 
-	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 	"k8s.io/client-go/tools/record"
 	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
@@ -118,7 +118,7 @@ func (og *operationGenerator) GenerateRegisterPluginFunc(
 			Name:       infoResp.Name,
 		})
 		if err != nil {
-			klog.Errorf("RegisterPlugin error -- failed to add plugin at socket %s, err: %v", socketPath, err)
+			klog.ErrorS(err, "RegisterPlugin error -- failed to add plugin", "path", socketPath)
 		}
 		if err := handler.RegisterPlugin(infoResp.Name, infoResp.Endpoint, infoResp.SupportedVersions); err != nil {
 			return og.notifyPlugin(client, false, fmt.Sprintf("RegisterPlugin error -- plugin registration failed with err: %v", err))
@@ -147,7 +147,7 @@ func (og *operationGenerator) GenerateUnregisterPluginFunc(
 
 		pluginInfo.Handler.DeRegisterPlugin(pluginInfo.Name)
 
-		klog.V(4).Infof("DeRegisterPlugin called for %s on %v", pluginInfo.Name, pluginInfo.Handler)
+		klog.V(4).InfoS("DeRegisterPlugin called", "pluginName", pluginInfo.Name, "pluginHandler", pluginInfo.Handler)
 		return nil
 	}
 	return unregisterPluginFunc
@@ -163,7 +163,7 @@ func (og *operationGenerator) notifyPlugin(client registerapi.RegistrationClient
 	}
 
 	if _, err := client.NotifyRegistrationStatus(ctx, status); err != nil {
-		return errors.Wrap(err, errStr)
+		return fmt.Errorf("%s: %w", errStr, err)
 	}
 
 	if errStr != "" {

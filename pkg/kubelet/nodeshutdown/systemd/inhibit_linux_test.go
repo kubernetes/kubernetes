@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -68,6 +69,10 @@ func (obj *fakeDBusObject) GetProperty(p string) (dbus.Variant, error) {
 }
 
 func (obj *fakeDBusObject) SetProperty(p string, v interface{}) error {
+	return nil
+}
+
+func (obj *fakeDBusObject) StoreProperty(p string, v interface{}) error {
 	return nil
 }
 

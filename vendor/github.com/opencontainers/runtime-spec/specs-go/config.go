@@ -60,7 +60,7 @@ type Process struct {
 	SelinuxLabel string `json:"selinuxLabel,omitempty" platform:"linux"`
 }
 
-// LinuxCapabilities specifies the whitelist of capabilities that are kept for a process.
+// LinuxCapabilities specifies the list of allowed capabilities that are kept for a process.
 // http://man7.org/linux/man-pages/man7/capabilities.7.html
 type LinuxCapabilities struct {
 	// Bounding is the set of capabilities checked by the kernel.
@@ -354,7 +354,7 @@ type LinuxRdma struct {
 
 // LinuxResources has container runtime resource constraints
 type LinuxResources struct {
-	// Devices configures the device whitelist.
+	// Devices configures the device allowlist.
 	Devices []LinuxDeviceCgroup `json:"devices,omitempty"`
 	// Memory restriction configuration
 	Memory *LinuxMemory `json:"memory,omitempty"`
@@ -372,6 +372,8 @@ type LinuxResources struct {
 	// Limits are a set of key value pairs that define RDMA resource limits,
 	// where the key is device name and value is resource limits.
 	Rdma map[string]LinuxRdma `json:"rdma,omitempty"`
+	// Unified resources.
+	Unified map[string]string `json:"unified,omitempty"`
 }
 
 // LinuxDevice represents the mknod information for a Linux special device file
@@ -392,7 +394,8 @@ type LinuxDevice struct {
 	GID *uint32 `json:"gid,omitempty"`
 }
 
-// LinuxDeviceCgroup represents a device rule for the whitelist controller
+// LinuxDeviceCgroup represents a device rule for the devices specified to
+// the device controller
 type LinuxDeviceCgroup struct {
 	// Allow or deny
 	Allow bool `json:"allow"`
@@ -595,10 +598,13 @@ type VMImage struct {
 
 // LinuxSeccomp represents syscall restrictions
 type LinuxSeccomp struct {
-	DefaultAction LinuxSeccompAction `json:"defaultAction"`
-	Architectures []Arch             `json:"architectures,omitempty"`
-	Flags         []LinuxSeccompFlag `json:"flags,omitempty"`
-	Syscalls      []LinuxSyscall     `json:"syscalls,omitempty"`
+	DefaultAction    LinuxSeccompAction `json:"defaultAction"`
+	DefaultErrnoRet  *uint              `json:"defaultErrnoRet,omitempty"`
+	Architectures    []Arch             `json:"architectures,omitempty"`
+	Flags            []LinuxSeccompFlag `json:"flags,omitempty"`
+	ListenerPath     string             `json:"listenerPath,omitempty"`
+	ListenerMetadata string             `json:"listenerMetadata,omitempty"`
+	Syscalls         []LinuxSyscall     `json:"syscalls,omitempty"`
 }
 
 // Arch used for additional architectures
@@ -628,6 +634,7 @@ const (
 	ArchS390X       Arch = "SCMP_ARCH_S390X"
 	ArchPARISC      Arch = "SCMP_ARCH_PARISC"
 	ArchPARISC64    Arch = "SCMP_ARCH_PARISC64"
+	ArchRISCV64     Arch = "SCMP_ARCH_RISCV64"
 )
 
 // LinuxSeccompAction taken upon Seccomp rule match
@@ -637,11 +644,13 @@ type LinuxSeccompAction string
 const (
 	ActKill        LinuxSeccompAction = "SCMP_ACT_KILL"
 	ActKillProcess LinuxSeccompAction = "SCMP_ACT_KILL_PROCESS"
+	ActKillThread  LinuxSeccompAction = "SCMP_ACT_KILL_THREAD"
 	ActTrap        LinuxSeccompAction = "SCMP_ACT_TRAP"
 	ActErrno       LinuxSeccompAction = "SCMP_ACT_ERRNO"
 	ActTrace       LinuxSeccompAction = "SCMP_ACT_TRACE"
 	ActAllow       LinuxSeccompAction = "SCMP_ACT_ALLOW"
 	ActLog         LinuxSeccompAction = "SCMP_ACT_LOG"
+	ActNotify      LinuxSeccompAction = "SCMP_ACT_NOTIFY"
 )
 
 // LinuxSeccompOperator used to match syscall arguments in Seccomp

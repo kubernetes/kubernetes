@@ -27,7 +27,6 @@ const (
 
 // Different container runtimes.
 const (
-	DockerContainerRuntime = "docker"
 	RemoteContainerRuntime = "remote"
 )
 
@@ -37,4 +36,10 @@ const (
 	SystemReservedEnforcementKey  = "system-reserved"
 	KubeReservedEnforcementKey    = "kube-reserved"
 	NodeAllocatableNoneKey        = "none"
+)
+
+// SwapBehavior types
+const (
+	LimitedSwap   = "LimitedSwap"
+	UnlimitedSwap = "UnlimitedSwap"
 )

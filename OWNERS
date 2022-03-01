@@ -3,11 +3,11 @@
 filters:
   ".*":
     reviewers:
-      - brendandburns
       - dchen1107
       - lavalamp
       - smarterclayton
       - thockin
+      - wojtek-t
       - liggitt
     approvers:
       - dchen1107
@@ -20,7 +20,6 @@ filters:
       - brendandburns
       - bgrant0607
       - jbeda
-
   # go.{mod,sum} files relate to go dependencies, and should be reviewed by the
   # dep-approvers
   "go\\.(mod|sum)$":

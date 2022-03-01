@@ -21,6 +21,8 @@ import (
 	"time"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -38,6 +40,9 @@ import (
 
 const (
 	fakeSeccompProfileRoot = "/fakeSeccompProfileRoot"
+
+	fakeNodeAllocatableMemory = "32Gi"
+	fakeNodeAllocatableCPU    = "16"
 )
 
 type fakeHTTP struct {
@@ -51,25 +56,30 @@ func (f *fakeHTTP) Get(url string) (*http.Response, error) {
 }
 
 type fakePodStateProvider struct {
-	existingPods map[types.UID]struct{}
-	runningPods  map[types.UID]struct{}
+	terminated map[types.UID]struct{}
+	removed    map[types.UID]struct{}
 }
 
 func newFakePodStateProvider() *fakePodStateProvider {
 	return &fakePodStateProvider{
-		existingPods: make(map[types.UID]struct{}),
-		runningPods:  make(map[types.UID]struct{}),
+		terminated: make(map[types.UID]struct{}),
+		removed:    make(map[types.UID]struct{}),
 	}
 }
 
-func (f *fakePodStateProvider) IsPodDeleted(uid types.UID) bool {
-	_, found := f.existingPods[uid]
-	return !found
+func (f *fakePodStateProvider) IsPodTerminationRequested(uid types.UID) bool {
+	_, found := f.removed[uid]
+	return found
 }
 
-func (f *fakePodStateProvider) IsPodTerminated(uid types.UID) bool {
-	_, found := f.runningPods[uid]
-	return !found
+func (f *fakePodStateProvider) ShouldPodRuntimeBeRemoved(uid types.UID) bool {
+	_, found := f.terminated[uid]
+	return found
+}
+
+func (f *fakePodStateProvider) ShouldPodContentBeRemoved(uid types.UID) bool {
+	_, found := f.removed[uid]
+	return found
 }
 
 func newFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageService internalapi.ImageManagerService, machineInfo *cadvisorapi.MachineInfo, osInterface kubecontainer.OSInterface, runtimeHelper kubecontainer.RuntimeHelper, keyring credentialprovider.DockerKeyring) (*kubeGenericRuntimeManager, error) {
@@ -79,21 +89,22 @@ func newFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageS
 		return nil, err
 	}
 	kubeRuntimeManager := &kubeGenericRuntimeManager{
-		recorder:           recorder,
-		cpuCFSQuota:        false,
-		cpuCFSQuotaPeriod:  metav1.Duration{Duration: time.Microsecond * 100},
-		livenessManager:    proberesults.NewManager(),
-		startupManager:     proberesults.NewManager(),
-		machineInfo:        machineInfo,
-		osInterface:        osInterface,
-		runtimeHelper:      runtimeHelper,
-		runtimeService:     runtimeService,
-		imageService:       imageService,
-		keyring:            keyring,
-		seccompProfileRoot: fakeSeccompProfileRoot,
-		internalLifecycle:  cm.NewFakeInternalContainerLifecycle(),
-		logReduction:       logreduction.NewLogReduction(identicalErrorDelay),
-		logManager:         logManager,
+		recorder:               recorder,
+		cpuCFSQuota:            false,
+		cpuCFSQuotaPeriod:      metav1.Duration{Duration: time.Microsecond * 100},
+		livenessManager:        proberesults.NewManager(),
+		startupManager:         proberesults.NewManager(),
+		machineInfo:            machineInfo,
+		osInterface:            osInterface,
+		runtimeHelper:          runtimeHelper,
+		runtimeService:         runtimeService,
+		imageService:           imageService,
+		keyring:                keyring,
+		seccompProfileRoot:     fakeSeccompProfileRoot,
+		internalLifecycle:      cm.NewFakeInternalContainerLifecycle(),
+		logReduction:           logreduction.NewLogReduction(identicalErrorDelay),
+		logManager:             logManager,
+		memoryThrottlingFactor: 0.8,
 	}
 
 	typedVersion, err := runtimeService.Version(kubeRuntimeAPIVersion)
@@ -117,6 +128,13 @@ func newFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageS
 		&fakeHTTP{},
 		kubeRuntimeManager,
 		kubeRuntimeManager)
+
+	kubeRuntimeManager.getNodeAllocatable = func() v1.ResourceList {
+		return v1.ResourceList{
+			v1.ResourceMemory: resource.MustParse(fakeNodeAllocatableMemory),
+			v1.ResourceCPU:    resource.MustParse(fakeNodeAllocatableCPU),
+		}
+	}
 
 	return kubeRuntimeManager, nil
 }

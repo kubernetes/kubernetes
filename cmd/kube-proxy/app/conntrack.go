@@ -18,14 +18,14 @@ package app
 
 import (
 	"errors"
-	"io/ioutil"
+	"os"
 	"strconv"
 	"strings"
 
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
 
-	"k8s.io/kubernetes/pkg/util/sysctl"
+	"k8s.io/component-helpers/node/util/sysctl"
 )
 
 // Conntracker is an interface to the global sysctl. Descriptions of the various
@@ -49,7 +49,7 @@ func (rct realConntracker) SetMax(max int) error {
 	if err := rct.setIntSysCtl("nf_conntrack_max", max); err != nil {
 		return err
 	}
-	klog.Infof("Setting nf_conntrack_max to %d", max)
+	klog.InfoS("Setting nf_conntrack_max", "nf_conntrack_max", max)
 
 	// Linux does not support writing to /sys/module/nf_conntrack/parameters/hashsize
 	// when the writer process is not in the initial network namespace
@@ -80,7 +80,7 @@ func (rct realConntracker) SetMax(max int) error {
 		return errReadOnlySysFS
 	}
 	// TODO: generify this and sysctl to a new sysfs.WriteInt()
-	klog.Infof("Setting conntrack hashsize to %d", max/4)
+	klog.InfoS("Setting conntrack hashsize", "conntrack hashsize", max/4)
 	return writeIntStringFile("/sys/module/nf_conntrack/parameters/hashsize", max/4)
 }
 
@@ -96,8 +96,8 @@ func (realConntracker) setIntSysCtl(name string, value int) error {
 	entry := "net/netfilter/" + name
 
 	sys := sysctl.New()
-	if val, _ := sys.GetSysctl(entry); val != value {
-		klog.Infof("Set sysctl '%v' to %v", entry, value)
+	if val, _ := sys.GetSysctl(entry); val != value && val < value {
+		klog.InfoS("Set sysctl", "entry", entry, "value", value)
 		if err := sys.SetSysctl(entry, value); err != nil {
 			return err
 		}
@@ -112,7 +112,7 @@ func isSysFSWritable() (bool, error) {
 	m := mount.New("" /* default mount path */)
 	mountPoints, err := m.List()
 	if err != nil {
-		klog.Errorf("failed to list mount points: %v", err)
+		klog.ErrorS(err, "Failed to list mount points")
 		return false, err
 	}
 
@@ -124,8 +124,7 @@ func isSysFSWritable() (bool, error) {
 		if len(mountPoint.Opts) > 0 && mountPoint.Opts[0] == permWritable {
 			return true, nil
 		}
-		klog.Errorf("sysfs is not writable: %+v (mount options are %v)",
-			mountPoint, mountPoint.Opts)
+		klog.ErrorS(nil, "Sysfs is not writable", "mountPoint", mountPoint, "mountOptions", mountPoint.Opts)
 		return false, errReadOnlySysFS
 	}
 
@@ -133,7 +132,7 @@ func isSysFSWritable() (bool, error) {
 }
 
 func readIntStringFile(filename string) (int, error) {
-	b, err := ioutil.ReadFile(filename)
+	b, err := os.ReadFile(filename)
 	if err != nil {
 		return -1, err
 	}
@@ -141,5 +140,5 @@ func readIntStringFile(filename string) (int, error) {
 }
 
 func writeIntStringFile(filename string, value int) error {
-	return ioutil.WriteFile(filename, []byte(strconv.Itoa(value)), 0640)
+	return os.WriteFile(filename, []byte(strconv.Itoa(value)), 0640)
 }

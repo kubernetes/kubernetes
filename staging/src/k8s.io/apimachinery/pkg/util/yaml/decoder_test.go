@@ -211,6 +211,40 @@ stuff: 1
 	}
 }
 
+func TestDecodeYAMLSeparatorValidation(t *testing.T) {
+	s := NewYAMLToJSONDecoder(bytes.NewReader([]byte(`---
+stuff: 1
+---    # Make sure termination happen with inline comment
+stuff: 2
+---
+stuff: 3
+--- Make sure uncommented content results YAMLSyntaxError
+
+ `)))
+	obj := generic{}
+	if err := s.Decode(&obj); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fmt.Sprintf("%#v", obj) != `yaml.generic{"stuff":1}` {
+		t.Errorf("unexpected object: %#v", obj)
+	}
+	obj = generic{}
+	if err := s.Decode(&obj); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fmt.Sprintf("%#v", obj) != `yaml.generic{"stuff":2}` {
+		t.Errorf("unexpected object: %#v", obj)
+	}
+	obj = generic{}
+	err := s.Decode(&obj)
+	if err == nil {
+		t.Fatalf("expected YamlSyntaxError, got nil instead")
+	}
+	if _, ok := err.(YAMLSyntaxError); !ok {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestDecodeBrokenYAML(t *testing.T) {
 	s := NewYAMLOrJSONDecoder(bytes.NewReader([]byte(`---
 stuff: 1
@@ -279,6 +313,10 @@ func TestYAMLOrJSONDecoder(t *testing.T) {
 		}},
 		{"", 1, false, false, []generic{}},
 		{"foo: bar\n---\nbaz: biz", 100, false, false, []generic{
+			{"foo": "bar"},
+			{"baz": "biz"},
+		}},
+		{"---\nfoo: bar\n--- # with Comment\nbaz: biz", 100, false, false, []generic{
 			{"foo": "bar"},
 			{"baz": "biz"},
 		}},

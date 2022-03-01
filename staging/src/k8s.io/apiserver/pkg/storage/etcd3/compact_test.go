@@ -20,15 +20,14 @@ import (
 	"context"
 	"testing"
 
-	"go.etcd.io/etcd/clientv3"
-	etcdrpc "go.etcd.io/etcd/etcdserver/api/v3rpc/rpctypes"
-	"go.etcd.io/etcd/integration"
+	etcdrpc "go.etcd.io/etcd/api/v3/v3rpc/rpctypes"
+	clientv3 "go.etcd.io/etcd/client/v3"
+
+	"k8s.io/apiserver/pkg/storage/etcd3/testserver"
 )
 
 func TestCompact(t *testing.T) {
-	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
-	defer cluster.Terminate(t)
-	client := cluster.RandClient()
+	client := testserver.RunEtcd(t, nil)
 	ctx := context.Background()
 
 	putResp, err := client.Put(ctx, "/somekey", "data")
@@ -57,9 +56,7 @@ func TestCompact(t *testing.T) {
 // - C1 compacts first. It will succeed.
 // - C2 compacts after. It will fail. But it will get latest logical time, which should be larger by one.
 func TestCompactConflict(t *testing.T) {
-	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
-	defer cluster.Terminate(t)
-	client := cluster.RandClient()
+	client := testserver.RunEtcd(t, nil)
 	ctx := context.Background()
 
 	putResp, err := client.Put(ctx, "/somekey", "data")

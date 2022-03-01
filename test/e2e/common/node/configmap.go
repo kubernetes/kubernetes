@@ -89,7 +89,7 @@ var _ = SIGDescribe("ConfigMap", func() {
 	*/
 	framework.ConformanceIt("should be consumable via the environment [NodeConformance]", func() {
 		name := "configmap-test-" + string(uuid.NewUUID())
-		configMap := newEnvFromConfigMap(f, name)
+		configMap := newConfigMap(f, name)
 		ginkgo.By(fmt.Sprintf("Creating configMap %v/%v", f.Namespace.Name, configMap.Name))
 		var err error
 		if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), configMap, metav1.CreateOptions{}); err != nil {
@@ -111,7 +111,7 @@ var _ = SIGDescribe("ConfigMap", func() {
 								ConfigMapRef: &v1.ConfigMapEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: name}},
 							},
 							{
-								Prefix:       "p_",
+								Prefix:       "p-",
 								ConfigMapRef: &v1.ConfigMapEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: name}},
 							},
 						},
@@ -122,8 +122,8 @@ var _ = SIGDescribe("ConfigMap", func() {
 		}
 
 		f.TestContainerOutput("consume configMaps", pod, 0, []string{
-			"data_1=value-1", "data_2=value-2", "data_3=value-3",
-			"p_data_1=value-1", "p_data_2=value-2", "p_data_3=value-3",
+			"data-1=value-1", "data-2=value-2", "data-3=value-3",
+			"p-data-1=value-1", "p-data-2=value-2", "p-data-3=value-3",
 		})
 	})
 
@@ -248,21 +248,6 @@ func newConfigMap(f *framework.Framework, name string) *v1.ConfigMap {
 			"data-1": "value-1",
 			"data-2": "value-2",
 			"data-3": "value-3",
-		},
-	}
-}
-
-// TODO: Unify with newConfigMap
-func newEnvFromConfigMap(f *framework.Framework, name string) *v1.ConfigMap {
-	return &v1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: f.Namespace.Name,
-			Name:      name,
-		},
-		Data: map[string]string{
-			"data_1": "value-1",
-			"data_2": "value-2",
-			"data_3": "value-3",
 		},
 	}
 }

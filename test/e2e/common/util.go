@@ -36,6 +36,8 @@ import (
 	"github.com/onsi/ginkgo"
 )
 
+// TODO: Cleanup this file.
+
 // Suite represents test suite.
 type Suite string
 
@@ -46,17 +48,12 @@ const (
 	NodeE2E Suite = "node e2e"
 )
 
-var (
-	// non-root UID used in tests.
-	nonRootTestUserID = int64(1000)
-)
-
 // CurrentSuite represents current test suite.
 var CurrentSuite Suite
 
 // PrePulledImages are a list of images used in e2e/common tests. These images should be prepulled
 // before tests starts, so that the tests won't fail due image pulling flakes.
-// Currently, this is only used by node e2e test.
+// Currently, this is only used by node e2e test and E2E tests.
 // See also updateImageAllowList() in ../../e2e_node/image_list.go
 // TODO(random-liu): Change the image puller pod to use similar mechanism.
 var PrePulledImages = sets.NewString(
@@ -68,6 +65,16 @@ var PrePulledImages = sets.NewString(
 	imageutils.GetE2EImage(imageutils.VolumeNFSServer),
 	imageutils.GetE2EImage(imageutils.VolumeGlusterServer),
 	imageutils.GetE2EImage(imageutils.NonRoot),
+)
+
+// WindowsPrePulledImages are a list of images used in e2e/common tests. These images should be prepulled
+// before tests starts, so that the tests won't fail due image pulling flakes. These images also have
+// Windows support. Currently, this is only used by E2E tests.
+var WindowsPrePulledImages = sets.NewString(
+	imageutils.GetE2EImage(imageutils.Agnhost),
+	imageutils.GetE2EImage(imageutils.BusyBox),
+	imageutils.GetE2EImage(imageutils.Nginx),
+	imageutils.GetE2EImage(imageutils.Httpd),
 )
 
 type testImagesStruct struct {

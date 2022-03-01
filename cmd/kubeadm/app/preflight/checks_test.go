@@ -19,7 +19,9 @@ package preflight
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"net"
+	"net/http"
+	"os"
 	"runtime"
 	"strings"
 	"testing"
@@ -27,15 +29,15 @@ import (
 	"github.com/lithammer/dedent"
 	"github.com/pkg/errors"
 
-	"net/http"
-	"os"
-
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/utils/exec"
+	fakeexec "k8s.io/utils/exec/testing"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
-	"k8s.io/utils/exec"
-	fakeexec "k8s.io/utils/exec/testing"
 )
 
 var (
@@ -185,124 +187,228 @@ func (pfct preflightCheckTest) Check() (warning, errorList []error) {
 	return
 }
 
-func TestRunInitNodeChecks(t *testing.T) {
+func TestFileExistingCheck(t *testing.T) {
+	f, err := os.CreateTemp("", "file-exist-check")
+	if err != nil {
+		t.Fatalf("Failed to create file: %v", err)
+	}
+	defer os.Remove(f.Name())
 	var tests = []struct {
-		name                    string
-		cfg                     *kubeadmapi.InitConfiguration
-		expected                bool
-		isSecondaryControlPlane bool
-		downloadCerts           bool
+		name          string
+		check         FileExistingCheck
+		expectedError bool
 	}{
-		{name: "Test valid advertised address",
-			cfg: &kubeadmapi.InitConfiguration{
-				LocalAPIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "foo"},
+		{
+			name: "File does not exist, so it's not available",
+			check: FileExistingCheck{
+				Path: "/does/not/exist",
 			},
-			expected: false,
+			expectedError: true,
 		},
 		{
-			name: "Test CA file exists if specified",
-			cfg: &kubeadmapi.InitConfiguration{
-				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					Etcd: kubeadmapi.Etcd{External: &kubeadmapi.ExternalEtcd{CAFile: "/foo"}},
-				},
+			name: "File exists and is available",
+			check: FileExistingCheck{
+				Path: f.Name(),
 			},
-			expected: false,
-		},
-		{
-			name: "Skip test CA file exists if specified/download certs",
-			cfg: &kubeadmapi.InitConfiguration{
-				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					Etcd: kubeadmapi.Etcd{External: &kubeadmapi.ExternalEtcd{CAFile: "/foo"}},
-				},
-			},
-			expected:                true,
-			isSecondaryControlPlane: true,
-			downloadCerts:           true,
-		},
-		{
-			name: "Test Cert file exists if specified",
-			cfg: &kubeadmapi.InitConfiguration{
-				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					Etcd: kubeadmapi.Etcd{External: &kubeadmapi.ExternalEtcd{CertFile: "/foo"}},
-				},
-			},
-			expected: false,
-		},
-		{
-			name: "Test Key file exists if specified",
-			cfg: &kubeadmapi.InitConfiguration{
-				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					Etcd: kubeadmapi.Etcd{External: &kubeadmapi.ExternalEtcd{CertFile: "/foo"}},
-				},
-			},
-			expected: false,
-		},
-		{
-			name: "Test APIEndpoint exists if exists",
-			cfg: &kubeadmapi.InitConfiguration{
-				LocalAPIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "2001:1234::1:15"},
-			},
-			expected: false,
+			expectedError: false,
 		},
 	}
 	for _, rt := range tests {
-		// TODO: Make RunInitNodeChecks accept a ClusterConfiguration object instead of InitConfiguration
-		actual := RunInitNodeChecks(exec.New(), rt.cfg, sets.NewString(), rt.isSecondaryControlPlane, rt.downloadCerts)
-		if (actual == nil) != rt.expected {
+		_, output := rt.check.Check()
+		if (output != nil) != rt.expectedError {
 			t.Errorf(
-				"failed RunInitNodeChecks:%v\n\texpected: %t\n\t  actual: %t\n\t error: %v",
+				"Failed FileExistingCheck:%v\n\texpectedError: %t\n\t  actual: %t",
 				rt.name,
-				rt.expected,
-				(actual == nil),
-				actual,
+				rt.expectedError,
+				(output != nil),
 			)
 		}
 	}
 }
 
-func TestRunJoinNodeChecks(t *testing.T) {
+func TestFileAvailableCheck(t *testing.T) {
+	f, err := os.CreateTemp("", "file-avail-check")
+	if err != nil {
+		t.Fatalf("Failed to create file: %v", err)
+	}
+	defer os.Remove(f.Name())
 	var tests = []struct {
-		name     string
-		cfg      *kubeadmapi.JoinConfiguration
-		expected bool
+		name          string
+		check         FileAvailableCheck
+		expectedError bool
 	}{
 		{
-			name:     "Check empty JoinConfiguration",
-			cfg:      &kubeadmapi.JoinConfiguration{},
-			expected: false,
+			name: "The file does not exist",
+			check: FileAvailableCheck{
+				Path: "/does/not/exist",
+			},
+			expectedError: false,
 		},
 		{
-			name: "Check TLS Bootstrap APIServerEndpoint IPv4 addr",
-			cfg: &kubeadmapi.JoinConfiguration{
-				Discovery: kubeadmapi.Discovery{
-					BootstrapToken: &kubeadmapi.BootstrapTokenDiscovery{
-						APIServerEndpoint: "192.168.1.15",
-					},
-				},
+			name: "The file exists",
+			check: FileAvailableCheck{
+				Path: f.Name(),
 			},
-			expected: false,
-		},
-		{
-			name: "Check TLS Bootstrap APIServerEndpoint IPv6 addr",
-			cfg: &kubeadmapi.JoinConfiguration{
-				Discovery: kubeadmapi.Discovery{
-					BootstrapToken: &kubeadmapi.BootstrapTokenDiscovery{
-						APIServerEndpoint: "2001:1234::1:15",
-					},
-				},
-			},
-			expected: false,
+			expectedError: true,
 		},
 	}
-
 	for _, rt := range tests {
-		actual := RunJoinNodeChecks(exec.New(), rt.cfg, sets.NewString())
-		if (actual == nil) != rt.expected {
+		_, output := rt.check.Check()
+		if (output != nil) != rt.expectedError {
 			t.Errorf(
-				"failed RunJoinNodeChecks:%v\n\texpected: %t\n\t  actual: %t",
+				"Failed FileAvailableCheck:%v\n\texpectedError: %t\n\t  actual: %t",
 				rt.name,
-				rt.expected,
-				(actual != nil),
+				rt.expectedError,
+				(output != nil),
+			)
+		}
+	}
+}
+
+func TestFileContentCheck(t *testing.T) {
+	f, err := os.CreateTemp("", "file-content-check")
+	if err != nil {
+		t.Fatalf("Failed to create file: %v", err)
+	}
+	defer os.Remove(f.Name())
+	var tests = []struct {
+		name          string
+		check         FileContentCheck
+		expectedError bool
+	}{
+		{
+			name: "File exists and has matching content",
+			check: FileContentCheck{
+				Path:    f.Name(),
+				Content: []byte("Test FileContentCheck"),
+			},
+			expectedError: false,
+		},
+		{
+			name: "File exists, content is nil",
+			check: FileContentCheck{
+				Path:    f.Name(),
+				Content: nil,
+			},
+			expectedError: false,
+		},
+		{
+			name: "File exists but has unexpected content",
+			check: FileContentCheck{
+				Path:    f.Name(),
+				Content: []byte("foo"),
+			},
+			expectedError: true,
+		},
+		{
+			name: "File does not exist, content is not nil",
+			check: FileContentCheck{
+				Path:    "/does/not/exist",
+				Content: []byte("foo"),
+			},
+			expectedError: true,
+		},
+		{
+			name: "File dose not exist, content is nil",
+			check: FileContentCheck{
+				Path:    "/does/not/exist",
+				Content: nil,
+			},
+			expectedError: true,
+		},
+	}
+	if _, err = f.WriteString("Test FileContentCheck"); err != nil {
+		t.Fatalf("Failed to write to file: %v", err)
+	}
+	for _, rt := range tests {
+		_, output := rt.check.Check()
+		if (len(output) > 0) != rt.expectedError {
+			t.Errorf(
+				"Failed FileContentCheck:%v\n\texpectedError: %t\n\t  actual: %t",
+				rt.name,
+				rt.expectedError,
+				(len(output) > 0),
+			)
+		}
+	}
+}
+
+func TestDirAvailableCheck(t *testing.T) {
+	fileDir, err := os.MkdirTemp("", "dir-avail-check")
+	if err != nil {
+		t.Fatalf("failed creating directory: %v", err)
+	}
+	defer os.RemoveAll(fileDir)
+	var tests = []struct {
+		name          string
+		check         DirAvailableCheck
+		expectedError bool
+	}{
+		{
+			name: "Directory exists and is empty",
+			check: DirAvailableCheck{
+				Path: fileDir,
+			},
+			expectedError: false,
+		},
+		{
+			name: "Directory exists and has something",
+			check: DirAvailableCheck{
+				Path: os.TempDir(), // a directory was created previously in this test
+			},
+			expectedError: true,
+		},
+		{
+			name: "Directory does not exist",
+			check: DirAvailableCheck{
+				Path: "/does/not/exist",
+			},
+			expectedError: false,
+		},
+	}
+	for _, rt := range tests {
+		_, output := rt.check.Check()
+		if (output != nil) != rt.expectedError {
+			t.Errorf(
+				"Failed DirAvailableCheck:%v\n\texpectedError: %t\n\t  actual: %t",
+				rt.name,
+				rt.expectedError,
+				(output != nil),
+			)
+		}
+	}
+}
+
+func TestPortOpenCheck(t *testing.T) {
+	ln, err := net.Listen("tcp", ":0")
+	if err != nil {
+		t.Fatalf("could not listen on local network: %v", err)
+	}
+	defer ln.Close()
+	var tests = []struct {
+		name          string
+		check         PortOpenCheck
+		expectedError bool
+	}{
+		{
+			name:          "Port is available",
+			check:         PortOpenCheck{port: 0},
+			expectedError: false,
+		},
+		{
+			name:          "Port is not available",
+			check:         PortOpenCheck{port: ln.Addr().(*net.TCPAddr).Port},
+			expectedError: true,
+		},
+	}
+	for _, rt := range tests {
+		_, output := rt.check.Check()
+		if (output != nil) != rt.expectedError {
+			t.Errorf(
+				"Failed PortOpenCheck:%v\n\texpectedError: %t\n\t  actual: %t",
+				rt.name,
+				rt.expectedError,
+				(output != nil),
 			)
 		}
 	}
@@ -348,12 +454,12 @@ func TestRunChecks(t *testing.T) {
 	}
 }
 func TestConfigRootCAs(t *testing.T) {
-	f, err := ioutil.TempFile(os.TempDir(), "kubeadm-external-etcd-test-cafile")
+	f, err := os.CreateTemp(os.TempDir(), "kubeadm-external-etcd-test-cafile")
 	if err != nil {
 		t.Errorf("failed configRootCAs:\n\texpected: succeed creating temp CA file\n\tactual:%v", err)
 	}
 	defer os.Remove(f.Name())
-	if err := ioutil.WriteFile(f.Name(), []byte(externalEtcdRootCAFileContent), 0644); err != nil {
+	if err := os.WriteFile(f.Name(), []byte(externalEtcdRootCAFileContent), 0644); err != nil {
 		t.Errorf("failed configRootCAs:\n\texpected: succeed writing contents to temp CA file %s\n\tactual:%v", f.Name(), err)
 	}
 
@@ -374,7 +480,7 @@ func TestConfigRootCAs(t *testing.T) {
 	}
 }
 func TestConfigCertAndKey(t *testing.T) {
-	certFile, err := ioutil.TempFile(os.TempDir(), "kubeadm-external-etcd-test-certfile")
+	certFile, err := os.CreateTemp(os.TempDir(), "kubeadm-external-etcd-test-certfile")
 	if err != nil {
 		t.Errorf(
 			"failed configCertAndKey:\n\texpected: succeed creating temp CertFile file\n\tactual:%v",
@@ -382,7 +488,7 @@ func TestConfigCertAndKey(t *testing.T) {
 		)
 	}
 	defer os.Remove(certFile.Name())
-	if err := ioutil.WriteFile(certFile.Name(), []byte(externalEtcdCertFileContent), 0644); err != nil {
+	if err := os.WriteFile(certFile.Name(), []byte(externalEtcdCertFileContent), 0644); err != nil {
 		t.Errorf(
 			"failed configCertAndKey:\n\texpected: succeed writing contents to temp CertFile file %s\n\tactual:%v",
 			certFile.Name(),
@@ -390,7 +496,7 @@ func TestConfigCertAndKey(t *testing.T) {
 		)
 	}
 
-	keyFile, err := ioutil.TempFile(os.TempDir(), "kubeadm-external-etcd-test-keyfile")
+	keyFile, err := os.CreateTemp(os.TempDir(), "kubeadm-external-etcd-test-keyfile")
 	if err != nil {
 		t.Errorf(
 			"failed configCertAndKey:\n\texpected: succeed creating temp KeyFile file\n\tactual:%v",
@@ -398,7 +504,7 @@ func TestConfigCertAndKey(t *testing.T) {
 		)
 	}
 	defer os.Remove(keyFile.Name())
-	if err := ioutil.WriteFile(keyFile.Name(), []byte(externalEtcdKeyFileContent), 0644); err != nil {
+	if err := os.WriteFile(keyFile.Name(), []byte(externalEtcdKeyFileContent), 0644); err != nil {
 		t.Errorf(
 			"failed configCertAndKey:\n\texpected: succeed writing contents to temp KeyFile file %s\n\tactual:%v",
 			keyFile.Name(),
@@ -650,6 +756,7 @@ func resetProxyEnv(t *testing.T) map[string]string {
 	t.Log("Saved environment: ", savedEnv)
 
 	os.Setenv("HTTP_PROXY", "http://proxy.example.com:3128")
+	os.Setenv("HTTPS_PROXY", "https://proxy.example.com:3128")
 	os.Setenv("NO_PROXY", "example.com,10.0.0.0/8,2001:db8::/48")
 	// Check if we can reliably execute tests:
 	// ProxyFromEnvironment caches the *_proxy environment variables and
@@ -679,19 +786,22 @@ func restoreEnv(e map[string]string) {
 }
 
 func TestKubeletVersionCheck(t *testing.T) {
+	minimumKubeletVersion := version.MustParseSemantic("v1.3.0")
+	minimumControlPlaneVersion := version.MustParseSemantic("v1.3.0")
+	currentKubernetesVersion := version.MustParseSemantic("v1.4.0")
 	cases := []struct {
 		kubeletVersion string
 		k8sVersion     string
 		expectErrors   bool
 		expectWarnings bool
 	}{
-		{"v" + constants.CurrentKubernetesVersion.WithPatch(2).String(), "", false, false},                                                                     // check minimally supported version when there is no information about control plane
-		{"v1.11.3", "v1.11.8", true, false},                                                                                                                    // too old kubelet (older than kubeadmconstants.MinimumKubeletVersion), should fail.
-		{"v" + constants.MinimumKubeletVersion.String(), constants.MinimumControlPlaneVersion.WithPatch(5).String(), false, false},                             // kubelet within same major.minor as control plane
-		{"v" + constants.MinimumKubeletVersion.WithPatch(5).String(), constants.MinimumControlPlaneVersion.WithPatch(1).String(), false, false},                // kubelet is newer, but still within same major.minor as control plane
-		{"v" + constants.MinimumKubeletVersion.String(), constants.CurrentKubernetesVersion.WithPatch(1).String(), false, false},                               // kubelet is lower than control plane, but newer than minimally supported
-		{"v" + constants.CurrentKubernetesVersion.WithPreRelease("alpha.1").String(), constants.MinimumControlPlaneVersion.WithPatch(1).String(), true, false}, // kubelet is newer (development build) than control plane, should fail.
-		{"v" + constants.CurrentKubernetesVersion.String(), constants.MinimumControlPlaneVersion.WithPatch(5).String(), true, false},                           // kubelet is newer (release) than control plane, should fail.
+		{"v" + currentKubernetesVersion.WithPatch(2).String(), "", false, false},                                                           // check minimally supported version when there is no information about control plane
+		{"v1.1.0", "v1.11.8", true, false},                                                                                                 // too old kubelet, should fail.
+		{"v" + minimumKubeletVersion.String(), minimumControlPlaneVersion.WithPatch(5).String(), false, false},                             // kubelet within same major.minor as control plane
+		{"v" + minimumKubeletVersion.WithPatch(5).String(), minimumControlPlaneVersion.WithPatch(1).String(), false, false},                // kubelet is newer, but still within same major.minor as control plane
+		{"v" + minimumKubeletVersion.String(), currentKubernetesVersion.WithPatch(1).String(), false, false},                               // kubelet is lower than control plane, but newer than minimally supported
+		{"v" + currentKubernetesVersion.WithPreRelease("alpha.1").String(), minimumControlPlaneVersion.WithPatch(1).String(), true, false}, // kubelet is newer (development build) than control plane, should fail.
+		{"v" + currentKubernetesVersion.String(), minimumControlPlaneVersion.WithPatch(5).String(), true, false},                           // kubelet is newer (release) than control plane, should fail.
 	}
 
 	for _, tc := range cases {
@@ -707,7 +817,7 @@ func TestKubeletVersionCheck(t *testing.T) {
 				},
 			}
 
-			check := KubeletVersionCheck{KubernetesVersion: tc.k8sVersion, exec: fexec}
+			check := KubeletVersionCheck{KubernetesVersion: tc.k8sVersion, exec: fexec, minKubeletVersion: minimumKubeletVersion}
 			warnings, errors := check.Check()
 
 			switch {
@@ -806,17 +916,18 @@ func TestImagePullCheck(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
-		LookPathFunc: func(cmd string) (string, error) { return "/usr/bin/docker", nil },
+		LookPathFunc: func(cmd string) (string, error) { return "/usr/bin/crictl", nil },
 	}
 
-	containerRuntime, err := utilruntime.NewContainerRuntime(&fexec, constants.DefaultDockerCRISocket)
+	containerRuntime, err := utilruntime.NewContainerRuntime(&fexec, constants.DefaultCRISocket)
 	if err != nil {
 		t.Errorf("unexpected NewContainerRuntime error: %v", err)
 	}
 
 	check := ImagePullCheck{
-		runtime:   containerRuntime,
-		imageList: []string{"img1", "img2", "img3"},
+		runtime:         containerRuntime,
+		imageList:       []string{"img1", "img2", "img3"},
+		imagePullPolicy: corev1.PullIfNotPresent,
 	}
 	warnings, errors := check.Check()
 	if len(warnings) != 0 {
@@ -832,6 +943,17 @@ func TestImagePullCheck(t *testing.T) {
 	}
 	if len(errors) != 2 {
 		t.Fatalf("expected 2 errors but got %d: %q", len(errors), errors)
+	}
+
+	// Test with unknown policy
+	check = ImagePullCheck{
+		runtime:         containerRuntime,
+		imageList:       []string{"img1", "img2", "img3"},
+		imagePullPolicy: "",
+	}
+	_, errors = check.Check()
+	if len(errors) != 1 {
+		t.Fatalf("expected 1 error but got %d: %q", len(errors), errors)
 	}
 }
 

@@ -18,7 +18,7 @@ package cm
 
 import (
 	"k8s.io/api/core/v1"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 func NewFakeInternalContainerLifecycle() *fakeInternalContainerLifecycle {

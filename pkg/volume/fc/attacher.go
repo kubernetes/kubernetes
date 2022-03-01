@@ -23,13 +23,13 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/klog/v2"
-	"k8s.io/mount-utils"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/mount-utils"
 )
 
 type fcAttacher struct {
@@ -94,7 +94,7 @@ func (attacher *fcAttacher) GetDeviceMountPath(
 	return attacher.manager.MakeGlobalPDName(*mounter.fcDisk), nil
 }
 
-func (attacher *fcAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
+func (attacher *fcAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string, _ volume.DeviceMounterArgs) error {
 	mounter := attacher.host.GetMounter(fcPluginName)
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
@@ -172,12 +172,28 @@ func (detacher *fcDetacher) UnmountDevice(deviceMountPath string) error {
 	if devName == "" {
 		return nil
 	}
+
 	unMounter := volumeSpecToUnmounter(detacher.mounter, detacher.host)
-	err = detacher.manager.DetachDisk(*unMounter, devName)
+	// The device is unmounted now. If UnmountDevice was retried, GetDeviceNameFromMount
+	// won't find any mount and won't return DetachDisk below.
+	// Therefore implement our own retry mechanism here.
+	// E.g. DetachDisk sometimes fails to flush a multipath device with "device is busy" when it was
+	// just unmounted.
+	// 2 minutes should be enough within 6 minute force detach timeout.
+	var detachError error
+	err = wait.PollImmediate(10*time.Second, 2*time.Minute, func() (bool, error) {
+		detachError = detacher.manager.DetachDisk(*unMounter, devName)
+		if detachError != nil {
+			klog.V(4).Infof("fc: failed to detach disk %s (%s): %v", devName, deviceMountPath, detachError)
+			return false, nil
+		}
+		return true, nil
+	})
 	if err != nil {
-		return fmt.Errorf("fc: failed to detach disk: %s\nError: %v", devName, err)
+		return fmt.Errorf("fc: failed to detach disk: %s: %v", devName, detachError)
 	}
-	klog.V(4).Infof("fc: successfully detached disk: %s", devName)
+
+	klog.V(2).Infof("fc: successfully detached disk: %s", devName)
 	return nil
 }
 

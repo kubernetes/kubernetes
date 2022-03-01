@@ -24,6 +24,7 @@ import (
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
@@ -31,13 +32,12 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	storageerr "k8s.io/apiserver/pkg/storage/errors"
 	"k8s.io/apiserver/pkg/util/dryrun"
-
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/core/namespace"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // rest implements a RESTStorage for namespaces
@@ -67,6 +67,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *Finaliz
 		CreateStrategy:      namespace.Strategy,
 		UpdateStrategy:      namespace.Strategy,
 		DeleteStrategy:      namespace.Strategy,
+		ResetFieldsStrategy: namespace.Strategy,
 		ReturnDeletedObject: true,
 
 		ShouldDeleteDuringUpdate: ShouldDeleteNamespaceDuringUpdate,
@@ -80,9 +81,11 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *Finaliz
 
 	statusStore := *store
 	statusStore.UpdateStrategy = namespace.StatusStrategy
+	statusStore.ResetFieldsStrategy = namespace.StatusStrategy
 
 	finalizeStore := *store
 	finalizeStore.UpdateStrategy = namespace.FinalizeStrategy
+	finalizeStore.ResetFieldsStrategy = namespace.FinalizeStrategy
 
 	return &REST{store: store, status: &statusStore}, &StatusREST{store: &statusStore}, &FinalizeREST{store: &finalizeStore}, nil
 }
@@ -250,9 +253,8 @@ func ShouldDeleteNamespaceDuringUpdate(ctx context.Context, key string, obj, exi
 }
 
 func shouldHaveOrphanFinalizer(options *metav1.DeleteOptions, haveOrphanFinalizer bool) bool {
-	//lint:ignore SA1019 backwards compatibility
+	//nolint:staticcheck // SA1019 backwards compatibility
 	if options.OrphanDependents != nil {
-		//lint:ignore SA1019 backwards compatibility
 		return *options.OrphanDependents
 	}
 	if options.PropagationPolicy != nil {
@@ -262,9 +264,8 @@ func shouldHaveOrphanFinalizer(options *metav1.DeleteOptions, haveOrphanFinalize
 }
 
 func shouldHaveDeleteDependentsFinalizer(options *metav1.DeleteOptions, haveDeleteDependentsFinalizer bool) bool {
-	//lint:ignore SA1019 backwards compatibility
+	//nolint:staticcheck // SA1019 backwards compatibility
 	if options.OrphanDependents != nil {
-		//lint:ignore SA1019 backwards compatibility
 		return *options.OrphanDependents == false
 	}
 	if options.PropagationPolicy != nil {
@@ -291,6 +292,10 @@ func (r *REST) StorageVersion() runtime.GroupVersioner {
 	return r.store.StorageVersion()
 }
 
+// GetResetFields implements rest.ResetFieldsStrategy
+func (r *REST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return r.store.GetResetFields()
+}
 func (r *StatusREST) New() runtime.Object {
 	return r.store.New()
 }
@@ -307,6 +312,10 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
 }
 
+// GetResetFields implements rest.ResetFieldsStrategy
+func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return r.store.GetResetFields()
+}
 func (r *FinalizeREST) New() runtime.Object {
 	return r.store.New()
 }
@@ -316,4 +325,9 @@ func (r *FinalizeREST) Update(ctx context.Context, name string, objInfo rest.Upd
 	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
 	// subresources should never allow create on update.
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
+}
+
+// GetResetFields implements rest.ResetFieldsStrategy
+func (r *FinalizeREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return r.store.GetResetFields()
 }

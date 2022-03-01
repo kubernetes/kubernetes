@@ -22,11 +22,10 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/go-openapi/spec"
-	jsoniter "github.com/json-iterator/go"
-
+	utiljson "k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 // Downloader is the OpenAPI downloader type. It will try to download spec from /openapi/v2 or /swagger.json endpoint.
@@ -80,7 +79,7 @@ func (s *Downloader) Download(handler http.Handler, etag string) (returnSpec *sp
 		return nil, "", http.StatusNotFound, nil
 	case http.StatusOK:
 		openAPISpec := &spec.Swagger{}
-		if err := jsoniter.ConfigCompatibleWithStandardLibrary.Unmarshal(writer.data, openAPISpec); err != nil {
+		if err := utiljson.Unmarshal(writer.data, openAPISpec); err != nil {
 			return nil, "", 0, err
 		}
 		newEtag = writer.Header().Get("Etag")

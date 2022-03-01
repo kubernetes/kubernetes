@@ -128,11 +128,7 @@ func (o *ServiceAccountOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 	if err != nil {
 		return err
 	}
-	discoveryClient, err := f.ToDiscoveryClient()
-	if err != nil {
-		return err
-	}
-	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
+	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, f.OpenAPIGetter())
 
 	o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
@@ -205,8 +201,4 @@ func (o *ServiceAccountOpts) createServiceAccount() (*corev1.ServiceAccount, err
 	}
 	serviceAccount.Name = o.Name
 	return serviceAccount, nil
-}
-
-func errUnsupportedGenerator(cmd *cobra.Command, generatorName string) error {
-	return cmdutil.UsageErrorf(cmd, "Generator %s not supported. ", generatorName)
 }

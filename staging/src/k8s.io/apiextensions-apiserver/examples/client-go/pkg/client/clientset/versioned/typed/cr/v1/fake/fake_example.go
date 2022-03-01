@@ -105,7 +105,7 @@ func (c *FakeExamples) Update(ctx context.Context, example *crv1.Example, opts v
 // Delete takes name of the example and deletes it. Returns an error if one occurs.
 func (c *FakeExamples) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(examplesResource, c.ns, name), &crv1.Example{})
+		Invokes(testing.NewDeleteActionWithOptions(examplesResource, c.ns, name, opts), &crv1.Example{})
 
 	return err
 }

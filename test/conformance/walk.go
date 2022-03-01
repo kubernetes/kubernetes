@@ -209,11 +209,14 @@ func getConformanceDataFromStackTrace(fullstackstrace string) (*ConformanceData,
 		i += 2
 	}
 
-	// filenames have `/go/src/k8s.io` prefix which dont exist locally
-	for i, v := range frames {
-		frames[i].File = strings.Replace(v.File,
-			"/go/src/k8s.io/kubernetes/_output/dockerized/go/src/k8s.io/kubernetes",
-			*k8sPath, 1)
+	// filenames are in one of two special GOPATHs depending on if they were
+	// built dockerized or with the host go
+	// we want to trim this prefix to produce portable relative paths
+	k8sSRC := *k8sPath + "/_output/local/go/src/k8s.io/kubernetes/"
+	for i := range frames {
+		trimmedFile := strings.TrimPrefix(frames[i].File, k8sSRC)
+		trimmedFile = strings.TrimPrefix(trimmedFile, "/go/src/k8s.io/kubernetes/_output/dockerized/go/src/k8s.io/kubernetes/")
+		frames[i].File = trimmedFile
 	}
 
 	for _, curFrame := range frames {

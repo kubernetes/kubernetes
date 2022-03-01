@@ -17,14 +17,16 @@ limitations under the License.
 package config
 
 import (
-	"io/ioutil"
+	"os"
 
 	"github.com/pkg/errors"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -59,7 +61,7 @@ func SetJoinControlPlaneDefaults(cfg *kubeadmapi.JoinControlPlane) error {
 // Then the external, versioned configuration is defaulted and converted to the internal type.
 // Right thereafter, the configuration is defaulted again with dynamic values (like IP addresses of a machine, etc)
 // Lastly, the internal config is validated and returned.
-func LoadOrDefaultJoinConfiguration(cfgPath string, defaultversionedcfg *kubeadmapiv1beta2.JoinConfiguration) (*kubeadmapi.JoinConfiguration, error) {
+func LoadOrDefaultJoinConfiguration(cfgPath string, defaultversionedcfg *kubeadmapiv1.JoinConfiguration) (*kubeadmapi.JoinConfiguration, error) {
 	if cfgPath != "" {
 		// Loads configuration from config file, if provided
 		// Nb. --config overrides command line flags, TODO: fix this
@@ -73,7 +75,7 @@ func LoadOrDefaultJoinConfiguration(cfgPath string, defaultversionedcfg *kubeadm
 func LoadJoinConfigurationFromFile(cfgPath string) (*kubeadmapi.JoinConfiguration, error) {
 	klog.V(1).Infof("loading configuration from %q", cfgPath)
 
-	b, err := ioutil.ReadFile(cfgPath)
+	b, err := os.ReadFile(cfgPath)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to read config from %q ", cfgPath)
 	}
@@ -102,7 +104,9 @@ func documentMapToJoinConfiguration(gvkmap kubeadmapi.DocumentMap, allowDeprecat
 		}
 
 		// verify the validity of the YAML
-		strict.VerifyUnmarshalStrict(bytes, gvk)
+		if err := strict.VerifyUnmarshalStrict([]*runtime.Scheme{kubeadmscheme.Scheme}, gvk, bytes); err != nil {
+			klog.Warning(err.Error())
+		}
 
 		joinBytes = bytes
 	}
@@ -129,7 +133,7 @@ func documentMapToJoinConfiguration(gvkmap kubeadmapi.DocumentMap, allowDeprecat
 }
 
 // DefaultedJoinConfiguration takes a versioned JoinConfiguration (usually filled in by command line parameters), defaults it, converts it to internal and validates it
-func DefaultedJoinConfiguration(defaultversionedcfg *kubeadmapiv1beta2.JoinConfiguration) (*kubeadmapi.JoinConfiguration, error) {
+func DefaultedJoinConfiguration(defaultversionedcfg *kubeadmapiv1.JoinConfiguration) (*kubeadmapi.JoinConfiguration, error) {
 	internalcfg := &kubeadmapi.JoinConfiguration{}
 
 	// Takes passed flags into account; the defaulting is executed once again enforcing assignment of

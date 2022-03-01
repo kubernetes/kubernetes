@@ -22,14 +22,11 @@ import (
 	"fmt"
 	"os"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/pkg/apis/clientauthentication"
-	"k8s.io/client-go/pkg/apis/clientauthentication/v1alpha1"
-	"k8s.io/client-go/pkg/apis/clientauthentication/v1beta1"
+	"k8s.io/client-go/pkg/apis/clientauthentication/install"
 	"k8s.io/client-go/rest"
 )
 
@@ -39,10 +36,7 @@ var scheme = runtime.NewScheme()
 var codecs = serializer.NewCodecFactory(scheme)
 
 func init() {
-	metav1.AddToGroupVersion(scheme, schema.GroupVersion{Version: "v1"})
-	utilruntime.Must(v1alpha1.AddToScheme(scheme))
-	utilruntime.Must(v1beta1.AddToScheme(scheme))
-	utilruntime.Must(clientauthentication.AddToScheme(scheme))
+	install.Install(scheme)
 }
 
 // LoadExecCredentialFromEnv is a helper-wrapper around LoadExecCredential that loads from the
@@ -68,7 +62,7 @@ func LoadExecCredentialFromEnv() (runtime.Object, *rest.Config, error) {
 // value.
 //
 // If the provided data is successfully unmarshalled, but it does not contain cluster information
-// (i.e., ExecCredential.Spec.Cluster == nil), then the returned rest.Config and error will be nil.
+// (i.e., ExecCredential.Spec.Cluster == nil), then an error will be returned.
 //
 // Note that the returned rest.Config will use anonymous authentication, since the exec plugin has
 // not returned credentials for this cluster yet.

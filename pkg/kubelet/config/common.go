@@ -22,15 +22,13 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
-	"k8s.io/kubernetes/pkg/features"
 
 	// TODO: remove this import if
 	// api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String() is changed
@@ -68,21 +66,19 @@ func applyDefaults(pod *api.Pod, source string, isFile bool, nodeName types.Node
 			fmt.Fprintf(hasher, "url:%s", source)
 		}
 		pod.UID = types.UID(hex.EncodeToString(hasher.Sum(nil)[0:]))
-		klog.V(5).Infof("Generated UID %q pod %q from %s", pod.UID, pod.Name, source)
+		klog.V(5).InfoS("Generated UID", "pod", klog.KObj(pod), "podUID", pod.UID, "source", source)
 	}
 
 	pod.Name = generatePodName(pod.Name, nodeName)
-	klog.V(5).Infof("Generated Name %q for UID %q from URL %s", pod.Name, pod.UID, source)
+	klog.V(5).InfoS("Generated pod name", "pod", klog.KObj(pod), "podUID", pod.UID, "source", source)
 
 	if pod.Namespace == "" {
 		pod.Namespace = metav1.NamespaceDefault
 	}
-	klog.V(5).Infof("Using namespace %q for pod %q from %s", pod.Namespace, pod.Name, source)
+	klog.V(5).InfoS("Set namespace for pod", "pod", klog.KObj(pod), "source", source)
 
 	// Set the Host field to indicate this pod is scheduled on the current node.
 	pod.Spec.NodeName = string(nodeName)
-
-	pod.ObjectMeta.SelfLink = getSelfLink(pod.Name, pod.Namespace)
 
 	if pod.Annotations == nil {
 		pod.Annotations = make(map[string]string)
@@ -102,15 +98,6 @@ func applyDefaults(pod *api.Pod, source string, isFile bool, nodeName types.Node
 	// Set the default status to pending.
 	pod.Status.Phase = api.PodPending
 	return nil
-}
-
-func getSelfLink(name, namespace string) string {
-	var selfLink string
-	if len(namespace) == 0 {
-		namespace = metav1.NamespaceDefault
-	}
-	selfLink = fmt.Sprintf("/api/v1/namespaces/%s/pods/%s", namespace, name)
-	return selfLink
 }
 
 type defaultFunc func(pod *api.Pod) error
@@ -137,15 +124,12 @@ func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (parsed bool, pod *v
 	if err = defaultFn(newPod); err != nil {
 		return true, pod, err
 	}
-	opts := validation.PodValidationOptions{
-		AllowMultipleHugePageResources: utilfeature.DefaultFeatureGate.Enabled(features.HugePageStorageMediumSize),
-	}
-	if errs := validation.ValidatePodCreate(newPod, opts); len(errs) > 0 {
+	if errs := validation.ValidatePodCreate(newPod, validation.PodValidationOptions{}); len(errs) > 0 {
 		return true, pod, fmt.Errorf("invalid pod: %v", errs)
 	}
 	v1Pod := &v1.Pod{}
 	if err := k8s_api_v1.Convert_core_Pod_To_v1_Pod(newPod, v1Pod, nil); err != nil {
-		klog.Errorf("Pod %q failed to convert to v1", newPod.Name)
+		klog.ErrorS(err, "Pod failed to convert to v1", "pod", klog.KObj(newPod))
 		return true, nil, err
 	}
 	return true, v1Pod, nil
@@ -164,17 +148,13 @@ func tryDecodePodList(data []byte, defaultFn defaultFunc) (parsed bool, pods v1.
 		return false, pods, err
 	}
 
-	opts := validation.PodValidationOptions{
-		AllowMultipleHugePageResources: utilfeature.DefaultFeatureGate.Enabled(features.HugePageStorageMediumSize),
-	}
-
 	// Apply default values and validate pods.
 	for i := range newPods.Items {
 		newPod := &newPods.Items[i]
 		if err = defaultFn(newPod); err != nil {
 			return true, pods, err
 		}
-		if errs := validation.ValidatePodCreate(newPod, opts); len(errs) > 0 {
+		if errs := validation.ValidatePodCreate(newPod, validation.PodValidationOptions{}); len(errs) > 0 {
 			err = fmt.Errorf("invalid pod: %v", errs)
 			return true, pods, err
 		}

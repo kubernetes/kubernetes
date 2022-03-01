@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -47,21 +48,25 @@ const (
 	ILBFinalizerV2 = "gke.networking.io/l4-ilb-v2"
 	// maxInstancesPerInstanceGroup defines maximum number of VMs per InstanceGroup.
 	maxInstancesPerInstanceGroup = 1000
+	// maxL4ILBPorts is the maximum number of ports that can be specified in an L4 ILB Forwarding Rule. Beyond this, "AllPorts" field should be used.
+	maxL4ILBPorts = 5
 )
 
 func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v1.Service, existingFwdRule *compute.ForwardingRule, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
-	if g.AlphaFeatureGate.Enabled(AlphaFeatureILBSubsets) && existingFwdRule == nil {
-		// When ILBSubsets is enabled, new ILB services will not be processed here.
-		// Services that have existing GCE resources created by this controller will continue to update.
-		g.eventRecorder.Eventf(svc, v1.EventTypeNormal, "SkippingEnsureInternalLoadBalancer",
-			"Skipped ensureInternalLoadBalancer since %s feature is enabled.", AlphaFeatureILBSubsets)
-		return nil, cloudprovider.ImplementedElsewhere
-	}
-	if hasFinalizer(svc, ILBFinalizerV2) {
-		// Another controller is handling the resources for this service.
-		g.eventRecorder.Eventf(svc, v1.EventTypeNormal, "SkippingEnsureInternalLoadBalancer",
-			"Skipped ensureInternalLoadBalancer as service contains '%s' finalizer.", ILBFinalizerV2)
-		return nil, cloudprovider.ImplementedElsewhere
+	if existingFwdRule == nil && !hasFinalizer(svc, ILBFinalizerV1) {
+		// Neither the forwarding rule nor the V1 finalizer exists. This is most likely a new service.
+		if g.AlphaFeatureGate.Enabled(AlphaFeatureILBSubsets) {
+			// When ILBSubsets is enabled, new ILB services will not be processed here.
+			// Services that have existing GCE resources created by this controller or the v1 finalizer
+			// will continue to update.
+			klog.V(2).Infof("Skipped ensureInternalLoadBalancer for service %s/%s, since %s feature is enabled.", svc.Namespace, svc.Name, AlphaFeatureILBSubsets)
+			return nil, cloudprovider.ImplementedElsewhere
+		}
+		if hasFinalizer(svc, ILBFinalizerV2) {
+			// No V1 resources present - Another controller is handling the resources for this service.
+			klog.V(2).Infof("Skipped ensureInternalLoadBalancer for service %s/%s, as service contains %q finalizer.", svc.Namespace, svc.Name, ILBFinalizerV2)
+			return nil, cloudprovider.ImplementedElsewhere
+		}
 	}
 
 	nm := types.NamespacedName{Name: svc.Name, Namespace: svc.Namespace}
@@ -187,14 +192,20 @@ func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v
 	if options.AllowGlobalAccess {
 		newFwdRule.AllowGlobalAccess = options.AllowGlobalAccess
 	}
+	if len(ports) > maxL4ILBPorts {
+		newFwdRule.Ports = nil
+		newFwdRule.AllPorts = true
+	}
 
 	fwdRuleDeleted := false
 	if existingFwdRule != nil && !forwardingRulesEqual(existingFwdRule, newFwdRule) {
 		// Delete existing forwarding rule before making changes to the backend service. For example - changing protocol
 		// of backend service without first deleting forwarding rule will throw an error since the linked forwarding
 		// rule would show the old protocol.
-		frDiff := cmp.Diff(existingFwdRule, newFwdRule)
-		klog.V(2).Infof("ensureInternalLoadBalancer(%v): forwarding rule changed - Existing - %+v\n, New - %+v\n, Diff(-existing, +new) - %s\n. Deleting existing forwarding rule.", loadBalancerName, existingFwdRule, newFwdRule, frDiff)
+		if klog.V(2).Enabled() {
+			frDiff := cmp.Diff(existingFwdRule, newFwdRule)
+			klog.V(2).Infof("ensureInternalLoadBalancer(%v): forwarding rule changed - Existing - %+v\n, New - %+v\n, Diff(-existing, +new) - %s\n. Deleting existing forwarding rule.", loadBalancerName, existingFwdRule, newFwdRule, frDiff)
+		}
 		if err = ignoreNotFound(g.DeleteRegionForwardingRule(loadBalancerName, g.region)); err != nil {
 			return nil, err
 		}
@@ -268,7 +279,8 @@ func (g *Cloud) clearPreviousInternalResources(svc *v1.Service, loadBalancerName
 // updateInternalLoadBalancer is called when the list of nodes has changed. Therefore, only the instance groups
 // and possibly the backend service need to be updated.
 func (g *Cloud) updateInternalLoadBalancer(clusterName, clusterID string, svc *v1.Service, nodes []*v1.Node) error {
-	if g.AlphaFeatureGate.Enabled(AlphaFeatureILBSubsets) {
+	if g.AlphaFeatureGate.Enabled(AlphaFeatureILBSubsets) && !hasFinalizer(svc, ILBFinalizerV1) {
+		klog.V(2).Infof("Skipped updateInternalLoadBalancer for service %s/%s since it does not contain %q finalizer.", svc.Namespace, svc.Name, ILBFinalizerV1)
 		return cloudprovider.ImplementedElsewhere
 	}
 	g.sharedResourceLock.Lock()
@@ -613,11 +625,21 @@ func (g *Cloud) ensureInternalInstanceGroups(name string, nodes []*v1.Node) ([]s
 	klog.V(2).Infof("ensureInternalInstanceGroups(%v): %d nodes over %d zones in region %v", name, len(nodes), len(zonedNodes), g.region)
 	var igLinks []string
 	for zone, nodes := range zonedNodes {
-		igLink, err := g.ensureInternalInstanceGroup(name, zone, nodes)
-		if err != nil {
-			return []string{}, err
+		if g.AlphaFeatureGate.Enabled(AlphaFeatureSkipIGsManagement) {
+			igs, err := g.FilterInstanceGroupsByNamePrefix(name, zone)
+			if err != nil {
+				return nil, err
+			}
+			for _, ig := range igs {
+				igLinks = append(igLinks, ig.SelfLink)
+			}
+		} else {
+			igLink, err := g.ensureInternalInstanceGroup(name, zone, nodes)
+			if err != nil {
+				return nil, err
+			}
+			igLinks = append(igLinks, igLink)
 		}
-		igLinks = append(igLinks, igLink)
 	}
 
 	return igLinks, nil
@@ -630,10 +652,13 @@ func (g *Cloud) ensureInternalInstanceGroupsDeleted(name string) error {
 		return err
 	}
 
-	klog.V(2).Infof("ensureInternalInstanceGroupsDeleted(%v): attempting delete instance group in all %d zones", name, len(zones))
-	for _, z := range zones {
-		if err := g.DeleteInstanceGroup(name, z.Name); err != nil && !isNotFoundOrInUse(err) {
-			return err
+	// Skip Instance Group deletion if IG management was moved out of k/k code
+	if !g.AlphaFeatureGate.Enabled(AlphaFeatureSkipIGsManagement) {
+		klog.V(2).Infof("ensureInternalInstanceGroupsDeleted(%v): attempting delete instance group in all %d zones", name, len(zones))
+		for _, z := range zones {
+			if err := g.DeleteInstanceGroup(name, z.Name); err != nil && !isNotFoundOrInUse(err) {
+				return err
+			}
 		}
 	}
 	return nil
@@ -877,7 +902,7 @@ func getPortRanges(ports []int) (ranges []string) {
 }
 
 func (g *Cloud) getBackendServiceLink(name string) string {
-	return g.service.BasePath + strings.Join([]string{g.projectID, "regions", g.region, "backendServices", name}, "/")
+	return g.projectsBasePath + strings.Join([]string{g.projectID, "regions", g.region, "backendServices", name}, "/")
 }
 
 func getNameFromLink(link string) string {
@@ -969,13 +994,18 @@ func (g *Cloud) ensureInternalForwardingRule(existingFwdRule, newFwdRule *comput
 func forwardingRulesEqual(old, new *compute.ForwardingRule) bool {
 	// basepath could have differences like compute.googleapis.com vs www.googleapis.com, compare resourceIDs
 	oldResourceID, err := cloud.ParseResourceURL(old.BackendService)
-	klog.Errorf("forwardingRulesEqual(): failed to parse backend resource URL from existing FR, err - %v", err)
+	if err != nil {
+		klog.Errorf("forwardingRulesEqual(): failed to parse backend resource URL from existing FR, err - %v", err)
+	}
 	newResourceID, err := cloud.ParseResourceURL(new.BackendService)
-	klog.Errorf("forwardingRulesEqual(): failed to parse resource URL from new FR, err - %v", err)
+	if err != nil {
+		klog.Errorf("forwardingRulesEqual(): failed to parse resource URL from new FR, err - %v", err)
+	}
 	return (old.IPAddress == "" || new.IPAddress == "" || old.IPAddress == new.IPAddress) &&
 		old.IPProtocol == new.IPProtocol &&
 		old.LoadBalancingScheme == new.LoadBalancingScheme &&
 		equalStringSets(old.Ports, new.Ports) &&
+		old.AllPorts == new.AllPorts &&
 		oldResourceID.Equal(newResourceID) &&
 		old.AllowGlobalAccess == new.AllowGlobalAccess &&
 		old.Subnetwork == new.Subnetwork

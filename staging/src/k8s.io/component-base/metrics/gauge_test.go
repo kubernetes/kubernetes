@@ -268,3 +268,80 @@ namespace_subsystem_metric_deprecated 1
 		})
 	}
 }
+
+func TestGaugeWithLabelValueAllowList(t *testing.T) {
+	labelAllowValues := map[string]string{
+		"namespace_subsystem_metric_allowlist_test,label_a": "allowed",
+	}
+	labels := []string{"label_a", "label_b"}
+	opts := &GaugeOpts{
+		Namespace: "namespace",
+		Name:      "metric_allowlist_test",
+		Subsystem: "subsystem",
+	}
+	var tests = []struct {
+		desc               string
+		labelValues        [][]string
+		expectMetricValues map[string]float64
+	}{
+		{
+			desc:        "Test no unexpected input",
+			labelValues: [][]string{{"allowed", "b1"}, {"allowed", "b2"}},
+			expectMetricValues: map[string]float64{
+				"allowed b1": 100.0,
+				"allowed b2": 100.0,
+			},
+		},
+		{
+			desc:        "Test unexpected input",
+			labelValues: [][]string{{"allowed", "b1"}, {"not_allowed", "b1"}},
+			expectMetricValues: map[string]float64{
+				"allowed b1":    100.0,
+				"unexpected b1": 100.0,
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			SetLabelAllowListFromCLI(labelAllowValues)
+			registry := newKubeRegistry(apimachineryversion.Info{
+				Major:      "1",
+				Minor:      "15",
+				GitVersion: "v1.15.0-alpha-1.12345",
+			})
+			g := NewGaugeVec(opts, labels)
+			registry.MustRegister(g)
+
+			for _, lv := range test.labelValues {
+				g.WithLabelValues(lv...).Set(100.0)
+			}
+			mfs, err := registry.Gather()
+			assert.Nil(t, err, "Gather failed %v", err)
+
+			for _, mf := range mfs {
+				if *mf.Name != BuildFQName(opts.Namespace, opts.Subsystem, opts.Name) {
+					continue
+				}
+				mfMetric := mf.GetMetric()
+
+				for _, m := range mfMetric {
+					var aValue, bValue string
+					for _, l := range m.Label {
+						if *l.Name == "label_a" {
+							aValue = *l.Value
+						}
+						if *l.Name == "label_b" {
+							bValue = *l.Value
+						}
+					}
+					labelValuePair := aValue + " " + bValue
+					expectedValue, ok := test.expectMetricValues[labelValuePair]
+					assert.True(t, ok, "Got unexpected label values, lable_a is %v, label_b is %v", aValue, bValue)
+					actualValue := m.GetGauge().GetValue()
+					assert.Equalf(t, expectedValue, actualValue, "Got %v, wanted %v as the gauge while setting label_a to %v and label b to %v", actualValue, expectedValue, aValue, bValue)
+				}
+			}
+		})
+	}
+}

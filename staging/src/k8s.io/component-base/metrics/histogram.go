@@ -104,13 +104,20 @@ type HistogramVec struct {
 func NewHistogramVec(opts *HistogramOpts, labels []string) *HistogramVec {
 	opts.StabilityLevel.setDefaults()
 
+	fqName := BuildFQName(opts.Namespace, opts.Subsystem, opts.Name)
+	allowListLock.RLock()
+	if allowList, ok := labelValueAllowLists[fqName]; ok {
+		opts.LabelValueAllowLists = allowList
+	}
+	allowListLock.RUnlock()
+
 	v := &HistogramVec{
 		HistogramVec:   noopHistogramVec,
 		HistogramOpts:  opts,
 		originalLabels: labels,
 		lazyMetric:     lazyMetric{},
 	}
-	v.lazyInit(v, BuildFQName(opts.Namespace, opts.Subsystem, opts.Name))
+	v.lazyInit(v, fqName)
 	return v
 }
 
@@ -145,6 +152,9 @@ func (v *HistogramVec) WithLabelValues(lvs ...string) ObserverMetric {
 	if !v.IsCreated() {
 		return noop
 	}
+	if v.LabelValueAllowLists != nil {
+		v.LabelValueAllowLists.ConstrainToAllowedList(v.originalLabels, lvs)
+	}
 	return v.HistogramVec.WithLabelValues(lvs...)
 }
 
@@ -155,6 +165,9 @@ func (v *HistogramVec) WithLabelValues(lvs ...string) ObserverMetric {
 func (v *HistogramVec) With(labels map[string]string) ObserverMetric {
 	if !v.IsCreated() {
 		return noop
+	}
+	if v.LabelValueAllowLists != nil {
+		v.LabelValueAllowLists.ConstrainLabelMap(labels)
 	}
 	return v.HistogramVec.With(labels)
 }

@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -19,9 +20,9 @@ limitations under the License.
 package volumepathhandler
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -83,32 +84,20 @@ func (v VolumePathHandler) GetLoopDevice(path string) (string, error) {
 		return "", fmt.Errorf("not attachable: %v", err)
 	}
 
-	args := []string{"-j", path}
-	cmd := exec.Command(losetupPath, args...)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		klog.V(2).Infof("Failed device discover command for path %s: %v %s", path, err, out)
-		return "", fmt.Errorf("losetup -j %s failed: %v", path, err)
-	}
-	return parseLosetupOutputForDevice(out, path)
+	return getLoopDeviceFromSysfs(path)
 }
 
 func makeLoopDevice(path string) (string, error) {
-	args := []string{"-f", "--show", path}
+	args := []string{"-f", path}
 	cmd := exec.Command(losetupPath, args...)
+
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		klog.V(2).Infof("Failed device create command for path: %s %v %s ", path, err, out)
-		return "", fmt.Errorf("losetup -f --show %s failed: %v", path, err)
+		klog.V(2).Infof("Failed device create command for path: %s %v %s", path, err, out)
+		return "", fmt.Errorf("losetup %s failed: %v", strings.Join(args, " "), err)
 	}
 
-	// losetup -f --show {path} returns device in the format:
-	// /dev/loop1
-	if len(out) == 0 {
-		return "", errors.New(ErrDeviceNotFound)
-	}
-
-	return strings.TrimSpace(string(out)), nil
+	return getLoopDeviceFromSysfs(path)
 }
 
 // removeLoopDevice removes specified loopback device
@@ -126,51 +115,37 @@ func removeLoopDevice(device string) error {
 	return nil
 }
 
-func parseLosetupOutputForDevice(output []byte, path string) (string, error) {
-	if len(output) == 0 {
-		return "", errors.New(ErrDeviceNotFound)
-	}
-
+// getLoopDeviceFromSysfs finds the backing file for a loop
+// device from sysfs via "/sys/block/loop*/loop/backing_file".
+func getLoopDeviceFromSysfs(path string) (string, error) {
+	// If the file is a symlink.
 	realPath, err := filepath.EvalSymlinks(path)
 	if err != nil {
 		return "", fmt.Errorf("failed to evaluate path %s: %s", path, err)
 	}
 
-	// losetup -j {path} returns device in the format:
-	// /dev/loop1: [0073]:148662 ({path})
-	// /dev/loop2: [0073]:148662 (/dev/sdX)
-	//
-	// losetup -j shows all the loop device for the same device that has the same
-	// major/minor number, by resolving symlink and matching major/minor number.
-	// Therefore, there will be other path than {path} in output, as shown in above output.
-	s := string(output)
-	// Find the line that exact matches to the path, or "({path})"
-	var matched string
-	scanner := bufio.NewScanner(strings.NewReader(s))
-	for scanner.Scan() {
-		// losetup output has symlinks expanded
-		if strings.HasSuffix(scanner.Text(), "("+realPath+")") {
-			matched = scanner.Text()
-			break
-		}
-		// Just in case losetup changes, check for the original path too
-		if strings.HasSuffix(scanner.Text(), "("+path+")") {
-			matched = scanner.Text()
-			break
-		}
+	devices, err := filepath.Glob("/sys/block/loop*")
+	if err != nil {
+		return "", fmt.Errorf("failed to list loop devices in sysfs: %s", err)
 	}
-	if len(matched) == 0 {
-		return "", errors.New(ErrDeviceNotFound)
-	}
-	s = matched
 
-	// Get device name, or the 0th field of the output separated with ":".
-	// We don't need 1st field or later to be splitted, so passing 2 to SplitN.
-	device := strings.TrimSpace(strings.SplitN(s, ":", 2)[0])
-	if len(device) == 0 {
-		return "", errors.New(ErrDeviceNotFound)
+	for _, device := range devices {
+		backingFile := fmt.Sprintf("%s/loop/backing_file", device)
+
+		// The contents of this file is the absolute path of "path".
+		data, err := ioutil.ReadFile(backingFile)
+		if err != nil {
+			continue
+		}
+
+		// Return the first match.
+		backingFilePath := strings.TrimSpace(string(data))
+		if backingFilePath == path || backingFilePath == realPath {
+			return fmt.Sprintf("/dev/%s", filepath.Base(device)), nil
+		}
 	}
-	return device, nil
+
+	return "", errors.New(ErrDeviceNotFound)
 }
 
 // FindGlobalMapPathUUIDFromPod finds {pod uuid} bind mount under globalMapPath

@@ -73,7 +73,7 @@ func (o *PersistentVolumeBinderControllerOptions) Validate() []error {
 
 	errs := []error{}
 	if _, err := ParseVolumeHostFilters(o.VolumeHostCIDRDenylist, o.VolumeHostAllowLocalLoopback); err != nil {
-		errs = append(errs, fmt.Errorf("Bad --volume-host-ip-denylist/--volume-host-allow-local-loopback %w", err))
+		errs = append(errs, fmt.Errorf("bad --volume-host-ip-denylist/--volume-host-allow-local-loopback %w", err))
 	}
 	return errs
 }

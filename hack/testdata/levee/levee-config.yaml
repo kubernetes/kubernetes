@@ -25,11 +25,11 @@
 # These field tags were introduced by KEP-1753 to indicate fields which may contain credentials
 FieldTags:
   - Key: "datapolicy"
-    Val: "security-key"
+    Value: "security-key"
   - Key: "datapolicy"
-    Val: "token"
+    Value: "token"
   - Key: "datapolicy"
-    Val: "password"
+    Value: "password"
 
 # This preliminary collection of source types should be removed once
 # KEP-1753 adds tags to the relevant fields.
@@ -129,6 +129,11 @@ Sources:
   TypeRE: "CertificateAuthority"
   FieldRE: "RawKey"
 
+# The following fields are not yet tagged
+- PackageRE: "k8s.io/api/core/v1"
+  TypeRE: "Secret"
+  FieldRE: "Data|StringData"
+
 # Sinks are functions that should not be called with source or source-tainted arguments.
 # This configuration should capture all log unfiltered log calls.
 Sinks:
@@ -147,15 +152,6 @@ Sanitizers:
 # Exclude reporting within a given function by specifying it similar to Sinks, i.e.,
 # PackageRE | ReceiverRE | MethodRE regexp
 Exclude:
-# Corrected in #97000
 - PackageRE: "k8s.io/kubernetes/cmd/kubelet/app"
   # Regexp matches anonymized inner function
-  MethodRE: "initConfigz|NewKubeletCommand|run"
-# Corrected by go-flow-levee version update in #96999
-- PackageRE: "pkg/credentialprovider"
-  ReceiverRE: "BasicDockerKeyring"
-  MethodRE: "Add"
-# Corrected in #96576.
-- PackageRE: "k8s.io/kubernetes/pkg/credentialprovider/gcp"
-  ReceiverRE: "containerRegistryProvider"
-  MethodRE: "Provide"
+  MethodRE: "NewKubeletCommand"

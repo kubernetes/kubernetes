@@ -128,7 +128,7 @@ items:
     - ""
     resources:
     - configmaps
-    - endpoints
+    - events
     - persistentvolumeclaims
     - replicationcontrollers
     - replicationcontrollers/scale
@@ -142,6 +142,12 @@ items:
     - deletecollection
     - patch
     - update
+  - apiGroups:
+    - ""
+    resources:
+    - serviceaccounts/token
+    verbs:
+    - create
   - apiGroups:
     - apps
     resources:
@@ -267,6 +273,14 @@ items:
     - ""
     resources:
     - namespaces
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - discovery.k8s.io
+    resources:
+    - endpointslices
     verbs:
     - get
     - list
@@ -823,6 +837,30 @@ items:
     - storage.k8s.io
     resources:
     - csinodes
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - ""
+    resources:
+    - namespaces
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - storage.k8s.io
+    resources:
+    - csidrivers
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - storage.k8s.io
+    resources:
+    - csistoragecapacities
     verbs:
     - get
     - list

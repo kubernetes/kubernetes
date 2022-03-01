@@ -29,7 +29,7 @@ HEAD/
 To run serialization tests just for the current version:
 
 ```sh
-go test ./vendor/k8s.io/api -run //HEAD
+go test k8s.io/api -run //HEAD
 ```
 
 All three formats of a given group/version/kind are expected to decode successfully to identical objects,
@@ -37,7 +37,7 @@ and to round-trip back to serialized form with identical bytes.
 Adding new fields or API types *is* expected to modify these fixtures. To regenerate them, run:
 
 ```sh
-UPDATE_COMPATIBILITY_FIXTURE_DATA=true go test ./vendor/k8s.io/api -run //HEAD
+UPDATE_COMPATIBILITY_FIXTURE_DATA=true go test k8s.io/api -run //HEAD
 ```
 
 ## Previous versions
@@ -57,12 +57,12 @@ This requires making optional scalar and struct fields pointers so that protobuf
 To run serialization tests just for a previous version, like `v1.14.0`:
 
 ```sh
-go test ./vendor/k8s.io/api -run //v1.14.0
+go test k8s.io/api -run //v1.14.0
 ```
 
 To run serialization tests for a particular group/version/kind, like `apps/v1` `Deployment`:
 ```sh
-go test ./vendor/k8s.io/api -run /apps.v1.Deployment/
+go test k8s.io/api -run /apps.v1.Deployment/
 ```
 
 Failures to decode, to round-trip identical bytes, or to decode identical objects from json/yaml/protobuf,

@@ -30,6 +30,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -46,6 +47,7 @@ type ResumeOptions struct {
 	Resumer          polymorphichelpers.ObjectResumerFunc
 	Namespace        string
 	EnforceNamespace bool
+	LabelSelector    string
 
 	resource.FilenameOptions
 	genericclioptions.IOStreams
@@ -55,7 +57,7 @@ type ResumeOptions struct {
 
 var (
 	resumeLong = templates.LongDesc(i18n.T(`
-		Resume a paused resource
+		Resume a paused resource.
 
 		Paused resources will not be reconciled by a controller. By resuming a
 		resource, we allow it to be reconciled again.
@@ -86,17 +88,18 @@ func NewCmdRolloutResume(f cmdutil.Factory, streams genericclioptions.IOStreams)
 		Short:                 i18n.T("Resume a paused resource"),
 		Long:                  resumeLong,
 		Example:               resumeExample,
+		ValidArgsFunction:     util.SpecifiedResourceTypeAndNameCompletionFunc(f, validArgs),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.RunResume())
 		},
-		ValidArgs: validArgs,
 	}
 
 	usage := "identifying the resource to get from a server."
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.fieldManager, "kubectl-rollout")
+	cmdutil.AddLabelSelectorFlagVar(cmd, &o.LabelSelector)
 	o.PrintFlags.AddFlags(cmd)
 	return cmd
 }
@@ -135,6 +138,7 @@ func (o ResumeOptions) RunResume() error {
 	r := o.Builder().
 		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		NamespaceParam(o.Namespace).DefaultNamespace().
+		LabelSelectorParam(o.LabelSelector).
 		FilenameParam(o.EnforceNamespace, &o.FilenameOptions).
 		ResourceTypeOrNameArgs(true, o.Resources...).
 		ContinueOnError().
@@ -156,7 +160,14 @@ func (o ResumeOptions) RunResume() error {
 		allErrs = append(allErrs, err)
 	}
 
-	for _, patch := range set.CalculatePatches(infos, scheme.DefaultJSONEncoder(), set.PatchFn(o.Resumer)) {
+	patches := set.CalculatePatches(infos, scheme.DefaultJSONEncoder(), set.PatchFn(o.Resumer))
+
+	if len(patches) == 0 && len(allErrs) == 0 {
+		fmt.Fprintf(o.ErrOut, "No resources found in %s namespace.\n", o.Namespace)
+		return nil
+	}
+
+	for _, patch := range patches {
 		info := patch.Info
 
 		if patch.Err != nil {

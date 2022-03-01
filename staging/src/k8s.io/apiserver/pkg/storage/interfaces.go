@@ -75,11 +75,11 @@ type ResponseMeta struct {
 }
 
 // IndexerFunc is a function that for a given object computes
-// <value of an index> for a particular <index>.
+// `<value of an index>` for a particular `<index>`.
 type IndexerFunc func(obj runtime.Object) string
 
-// IndexerFuncs is a mapping from <index name> to function that
-// for a given object computes <value for that index>.
+// IndexerFuncs is a mapping from `<index name>` to function that
+// for a given object computes `<value for that index>`.
 type IndexerFuncs map[string]IndexerFunc
 
 // Everything accepts all objects.
@@ -88,7 +88,7 @@ var Everything = SelectionPredicate{
 	Field: fields.Everything(),
 }
 
-// MatchValue defines a pair (<index name>, <value for that index>).
+// MatchValue defines a pair (`<index name>`, `<value for that index>`).
 type MatchValue struct {
 	IndexName string
 	Value     string
@@ -183,33 +183,20 @@ type Interface interface {
 	// and send it in an "ADDED" event, before watch starts.
 	Watch(ctx context.Context, key string, opts ListOptions) (watch.Interface, error)
 
-	// WatchList begins watching the specified key's items. Items are decoded into API
-	// objects and any item selected by 'p' are sent down to returned watch.Interface.
-	// resourceVersion may be used to specify what version to begin watching,
-	// which should be the current resourceVersion, and no longer rv+1
-	// (e.g. reconnecting without missing any updates).
-	// If resource version is "0", this interface will list current objects directory defined by key
-	// and send them in "ADDED" events, before watch starts.
-	WatchList(ctx context.Context, key string, opts ListOptions) (watch.Interface, error)
-
-	// Get unmarshals json found at key into objPtr. On a not found error, will either
+	// Get unmarshals object found at key into objPtr. On a not found error, will either
 	// return a zero object of the requested type, or an error, depending on 'opts.ignoreNotFound'.
 	// Treats empty responses and nil response nodes exactly like a not found error.
 	// The returned contents may be delayed, but it is guaranteed that they will
 	// match 'opts.ResourceVersion' according 'opts.ResourceVersionMatch'.
 	Get(ctx context.Context, key string, opts GetOptions, objPtr runtime.Object) error
 
-	// GetToList unmarshals json found at key and opaque it into *List api object
-	// (an object that satisfies the runtime.IsList definition).
+	// GetList unmarshalls objects found at key into a *List api object (an object
+	// that satisfies runtime.IsList definition).
+	// If 'opts.Recursive' is false, 'key' is used as an exact match. If `opts.Recursive'
+	// is true, 'key' is used as a prefix.
 	// The returned contents may be delayed, but it is guaranteed that they will
 	// match 'opts.ResourceVersion' according 'opts.ResourceVersionMatch'.
-	GetToList(ctx context.Context, key string, opts ListOptions, listObj runtime.Object) error
-
-	// List unmarshalls jsons found at directory defined by key and opaque them
-	// into *List api object (an object that satisfies runtime.IsList definition).
-	// The returned contents may be delayed, but it is guaranteed that they will
-	// match 'opts.ResourceVersion' according 'opts.ResourceVersionMatch'.
-	List(ctx context.Context, key string, opts ListOptions, listObj runtime.Object) error
+	GetList(ctx context.Context, key string, opts ListOptions, listObj runtime.Object) error
 
 	// GuaranteedUpdate keeps calling 'tryUpdate()' to update key 'key' (of type 'ptrToType')
 	// retrying the update until success if there is index conflict.
@@ -244,7 +231,7 @@ type Interface interface {
 	// )
 	GuaranteedUpdate(
 		ctx context.Context, key string, ptrToType runtime.Object, ignoreNotFound bool,
-		precondtions *Preconditions, tryUpdate UpdateFunc, cachedExistingObject runtime.Object) error
+		preconditions *Preconditions, tryUpdate UpdateFunc, cachedExistingObject runtime.Object) error
 
 	// Count returns number of different entries under the key (generally being path prefix).
 	Count(key string) (int64, error)
@@ -274,6 +261,9 @@ type ListOptions struct {
 	ResourceVersionMatch metav1.ResourceVersionMatch
 	// Predicate provides the selection rules for the list operation.
 	Predicate SelectionPredicate
+	// Recursive determines whether the list or watch is defined for a single object located at the
+	// given key, or for the whole set of objects with the given key as a prefix.
+	Recursive bool
 	// ProgressNotify determines whether storage-originated bookmark (progress notify) events should
 	// be delivered to the users. The option is ignored for non-watch requests.
 	ProgressNotify bool

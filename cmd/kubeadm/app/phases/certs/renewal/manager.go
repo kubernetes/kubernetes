@@ -21,7 +21,9 @@ import (
 	"sort"
 
 	"github.com/pkg/errors"
+
 	certutil "k8s.io/client-go/util/cert"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
@@ -164,6 +166,7 @@ func NewManager(cfg *kubeadmapi.ClusterConfiguration, kubernetesDir string) (*Ma
 			LongName:   kubeConfig.longName,
 			FileName:   kubeConfig.fileName,
 			CABaseName: kubeadmconstants.CACertAndKeyBaseName, // all certificates in kubeConfig files are signed by the Kubernetes CA
+			CAName:     kubeadmconstants.CACertAndKeyBaseName,
 			readwriter: kubeConfigReadWriter,
 		}
 	}
@@ -372,7 +375,11 @@ func (rm *Manager) IsExternallyManaged(caBaseName string) (bool, error) {
 		}
 		return externallyManaged, nil
 	case kubeadmconstants.EtcdCACertAndKeyBaseName:
-		return false, nil
+		externallyManaged, err := certsphase.UsingExternalEtcdCA(rm.cfg)
+		if err != nil {
+			return false, errors.Wrapf(err, "Error checking external CA condition for %s certificate authority", caBaseName)
+		}
+		return externallyManaged, nil
 	default:
 		return false, errors.Errorf("unknown certificate authority %s", caBaseName)
 	}

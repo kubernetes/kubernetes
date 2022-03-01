@@ -17,161 +17,111 @@ limitations under the License.
 package logs
 
 import (
+	"io"
 	"os"
 	"time"
 
 	"github.com/go-logr/logr"
+	"github.com/go-logr/zapr"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+
+	"k8s.io/component-base/config"
+	"k8s.io/component-base/logs/registry"
 )
 
-// Inspired from https://github.com/go-logr/zapr, some functions is copy from the repo.
-
 var (
-	// JSONLogger is global json log format logr
-	JSONLogger logr.Logger
-
 	// timeNow stubbed out for testing
 	timeNow = time.Now
 )
 
-// zapLogger is a logr.Logger that uses Zap to record log.
-type zapLogger struct {
-	// NB: this looks very similar to zap.SugaredLogger, but
-	// deals with our desire to have multiple verbosity levels.
-	l   *zap.Logger
-	lvl int
-}
-
-// implement logr.Logger
-var _ logr.Logger = &zapLogger{}
-
-// Enabled should always return true
-func (l *zapLogger) Enabled() bool {
-	return true
-}
-
-// Info write message to error level log
-func (l *zapLogger) Info(msg string, keysAndVals ...interface{}) {
-	entry := zapcore.Entry{
-		Time:    timeNow(),
-		Message: msg,
-	}
-	checkedEntry := l.l.Core().Check(entry, nil)
-	checkedEntry.Write(l.handleFields(keysAndVals)...)
-}
-
-// dPanic write message to DPanicLevel level log
-// we need implement this because unit test case need stub time.Now
-// otherwise the ts field always changed
-func (l *zapLogger) dPanic(msg string) {
-	entry := zapcore.Entry{
-		Level:   zapcore.DPanicLevel,
-		Time:    timeNow(),
-		Message: msg,
-	}
-	checkedEntry := l.l.Core().Check(entry, nil)
-	checkedEntry.Write(zap.Int("v", l.lvl))
-}
-
-// handleFields converts a bunch of arbitrary key-value pairs into Zap fields.  It takes
-// additional pre-converted Zap fields, for use with automatically attached fields, like
-// `error`.
-func (l *zapLogger) handleFields(args []interface{}, additional ...zap.Field) []zap.Field {
-	// a slightly modified version of zap.SugaredLogger.sweetenFields
-	if len(args) == 0 {
-		// fast-return if we have no suggared fields.
-		return append(additional, zap.Int("v", l.lvl))
-	}
-
-	// unlike Zap, we can be pretty sure users aren't passing structured
-	// fields (since logr has no concept of that), so guess that we need a
-	// little less space.
-	fields := make([]zap.Field, 0, len(args)/2+len(additional)+1)
-	fields = append(fields, zap.Int("v", l.lvl))
-	for i := 0; i < len(args)-1; i += 2 {
-		// check just in case for strongly-typed Zap fields, which is illegal (since
-		// it breaks implementation agnosticism), so we can give a better error message.
-		if _, ok := args[i].(zap.Field); ok {
-			l.dPanic("strongly-typed Zap Field passed to logr")
-			break
+// NewJSONLogger creates a new json logr.Logger and its associated
+// flush function. The separate error stream is optional and may be nil.
+// The encoder config is also optional.
+func NewJSONLogger(infoStream, errorStream zapcore.WriteSyncer, encoderConfig *zapcore.EncoderConfig) (logr.Logger, func()) {
+	if encoderConfig == nil {
+		encoderConfig = &zapcore.EncoderConfig{
+			MessageKey:     "msg",
+			CallerKey:      "caller",
+			TimeKey:        "ts",
+			EncodeTime:     epochMillisTimeEncoder,
+			EncodeDuration: zapcore.StringDurationEncoder,
+			EncodeCaller:   zapcore.ShortCallerEncoder,
 		}
+	}
 
-		// process a key-value pair,
-		// ensuring that the key is a string
-		key, val := args[i], args[i+1]
-		keyStr, isString := key.(string)
-		if !isString {
-			// if the key isn't a string, stop logging
-			l.dPanic("non-string key argument passed to logging, ignoring all later arguments")
-			break
+	encoder := zapcore.NewJSONEncoder(*encoderConfig)
+	var core zapcore.Core
+	if errorStream == nil {
+		core = zapcore.NewCore(encoder, infoStream, zapcore.Level(-127))
+	} else {
+		highPriority := zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
+			return lvl >= zapcore.ErrorLevel
+		})
+		lowPriority := zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
+			return lvl < zapcore.ErrorLevel
+		})
+		core = zapcore.NewTee(
+			zapcore.NewCore(encoder, errorStream, highPriority),
+			zapcore.NewCore(encoder, infoStream, lowPriority),
+		)
+	}
+	l := zap.New(core, zap.WithCaller(true))
+	return zapr.NewLoggerWithOptions(l, zapr.LogInfoLevel("v"), zapr.ErrorKey("err")), func() {
+		l.Sync()
+	}
+}
+
+func epochMillisTimeEncoder(_ time.Time, enc zapcore.PrimitiveArrayEncoder) {
+	nanos := timeNow().UnixNano()
+	millis := float64(nanos) / float64(time.Millisecond)
+	enc.AppendFloat64(millis)
+}
+
+// Factory produces JSON logger instances.
+type Factory struct{}
+
+var _ registry.LogFormatFactory = Factory{}
+
+func (f Factory) Create(options config.FormatOptions) (logr.Logger, func()) {
+	// We intentionally avoid all os.File.Sync calls. Output is unbuffered,
+	// therefore we don't need to flush, and calling the underlying fsync
+	// would just slow down writing.
+	//
+	// The assumption is that logging only needs to ensure that data gets
+	// written to the output stream before the process terminates, but
+	// doesn't need to worry about data not being written because of a
+	// system crash or powerloss.
+	stderr := zapcore.Lock(AddNopSync(os.Stderr))
+	if options.JSON.SplitStream {
+		stdout := zapcore.Lock(AddNopSync(os.Stdout))
+		size := options.JSON.InfoBufferSize.Value()
+		if size > 0 {
+			// Prevent integer overflow.
+			if size > 2*1024*1024*1024 {
+				size = 2 * 1024 * 1024 * 1024
+			}
+			stdout = &zapcore.BufferedWriteSyncer{
+				WS:   stdout,
+				Size: int(size),
+			}
 		}
-
-		fields = append(fields, zap.Any(keyStr, val))
+		// stdout for info messages, stderr for errors.
+		return NewJSONLogger(stdout, stderr, nil)
 	}
-
-	return append(fields, additional...)
+	// Write info messages and errors to stderr to prevent mixing with normal program output.
+	return NewJSONLogger(stderr, nil, nil)
 }
 
-// Error write log message to error level
-func (l *zapLogger) Error(err error, msg string, keysAndVals ...interface{}) {
-	entry := zapcore.Entry{
-		Level:   zapcore.ErrorLevel,
-		Time:    timeNow(),
-		Message: msg,
-	}
-	checkedEntry := l.l.Core().Check(entry, nil)
-	checkedEntry.Write(l.handleFields(keysAndVals, handleError(err))...)
+// AddNoSync adds a NOP Sync implementation.
+func AddNopSync(writer io.Writer) zapcore.WriteSyncer {
+	return nopSync{Writer: writer}
 }
 
-// V return info logr.Logger  with specified level
-func (l *zapLogger) V(level int) logr.Logger {
-	return &zapLogger{
-		lvl: l.lvl + level,
-		l:   l.l,
-	}
+type nopSync struct {
+	io.Writer
 }
 
-// WithValues return logr.Logger with some keys And Values
-func (l *zapLogger) WithValues(keysAndValues ...interface{}) logr.Logger {
-	l.l = l.l.With(l.handleFields(keysAndValues)...)
-	return l
-}
-
-// WithName return logger Named with specified name
-func (l *zapLogger) WithName(name string) logr.Logger {
-	l.l = l.l.Named(name)
-	return l
-}
-
-// encoderConfig config zap encodetime format
-var encoderConfig = zapcore.EncoderConfig{
-	MessageKey: "msg",
-
-	TimeKey:    "ts",
-	EncodeTime: zapcore.EpochMillisTimeEncoder,
-}
-
-// NewJSONLogger creates a new json logr.Logger using the given Zap Logger to log.
-func NewJSONLogger(w zapcore.WriteSyncer) logr.Logger {
-	l, _ := zap.NewProduction()
-	if w == nil {
-		w = os.Stdout
-	}
-	log := l.WithOptions(zap.AddCallerSkip(1),
-		zap.WrapCore(
-			func(zapcore.Core) zapcore.Core {
-				return zapcore.NewCore(zapcore.NewJSONEncoder(encoderConfig), zapcore.AddSync(w), zapcore.DebugLevel)
-			}))
-	return &zapLogger{
-		l: log,
-	}
-}
-
-func handleError(err error) zap.Field {
-	return zap.NamedError("err", err)
-}
-
-func init() {
-	JSONLogger = NewJSONLogger(nil)
+func (f nopSync) Sync() error {
+	return nil
 }

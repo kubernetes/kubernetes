@@ -24,7 +24,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	goruntime "runtime"
 	"strings"
 	"time"
 
@@ -40,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
@@ -49,7 +49,6 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/warning"
-	"k8s.io/klog/v2"
 )
 
 const (
@@ -64,6 +63,10 @@ const (
 	// NOTE: For CREATE and UPDATE requests the API server dedups both before and after mutating admission.
 	// For PATCH request the API server only dedups after mutating admission.
 	DuplicateOwnerReferencesAfterMutatingAdmissionWarningFormat = ".metadata.ownerReferences contains duplicate entries after mutating admission happens; API server dedups owner references in 1.20+, and may reject such requests as early as 1.24; please fix your requests; duplicate UID(s) observed: %v"
+	// shortPrefix is one possible beginning of yaml unmarshal strict errors.
+	shortPrefix = "yaml: unmarshal errors:\n"
+	// longPrefix is the other possible beginning of yaml unmarshal strict errors.
+	longPrefix = "error converting YAML to JSON: yaml: unmarshal errors:\n"
 )
 
 // RequestScope encapsulates common fields across all RESTful handler methods.
@@ -90,8 +93,14 @@ type RequestScope struct {
 	TableConvertor rest.TableConvertor
 	FieldManager   *fieldmanager.FieldManager
 
-	Resource    schema.GroupVersionResource
-	Kind        schema.GroupVersionKind
+	Resource schema.GroupVersionResource
+	Kind     schema.GroupVersionKind
+
+	// AcceptsGroupVersionDelegate is an optional delegate that can be queried about whether a given GVK
+	// can be accepted in create or update requests. If nil, only scope.Kind is accepted.
+	// Note that this does not enable multi-version support for reads from a single endpoint.
+	AcceptsGroupVersionDelegate rest.GroupVersionAcceptor
+
 	Subresource string
 
 	MetaGroupVersion schema.GroupVersion
@@ -104,6 +113,17 @@ type RequestScope struct {
 
 func (scope *RequestScope) err(err error, w http.ResponseWriter, req *http.Request) {
 	responsewriters.ErrorNegotiated(err, scope.Serializer, scope.Kind.GroupVersion(), w, req)
+}
+
+// AcceptsGroupVersion returns true if the specified GroupVersion is allowed
+// in create and update requests.
+func (scope *RequestScope) AcceptsGroupVersion(gv schema.GroupVersion) bool {
+	// If there's a custom acceptor, delegate to it. This is extremely rare.
+	if scope.AcceptsGroupVersionDelegate != nil {
+		return scope.AcceptsGroupVersionDelegate.AcceptsGroupVersion(gv)
+	}
+	// Fall back to only allowing the singular Kind. This is the typical behavior.
+	return gv == scope.Kind.GroupVersion()
 }
 
 func (scope *RequestScope) AllowsMediaTypeTransform(mimeType, mimeSubType string, gvk *schema.GroupVersionKind) bool {
@@ -171,7 +191,7 @@ func ConnectResource(connecter rest.Connecter, scope *RequestScope, admit admiss
 		}
 		ctx := req.Context()
 		ctx = request.WithNamespace(ctx, namespace)
-		ae := request.AuditEventFrom(ctx)
+		ae := audit.AuditEventFrom(ctx)
 		admit = admission.WithAudit(admit, ae)
 
 		opts, subpath, subpathKey := connecter.NewConnectOptions()
@@ -225,60 +245,6 @@ func (r *responder) Error(err error) {
 	r.scope.err(err, r.w, r.req)
 }
 
-// resultFunc is a function that returns a rest result and can be run in a goroutine
-type resultFunc func() (runtime.Object, error)
-
-// finishRequest makes a given resultFunc asynchronous and handles errors returned by the response.
-// An api.Status object with status != success is considered an "error", which interrupts the normal response flow.
-func finishRequest(ctx context.Context, fn resultFunc) (result runtime.Object, err error) {
-	// these channels need to be buffered to prevent the goroutine below from hanging indefinitely
-	// when the select statement reads something other than the one the goroutine sends on.
-	ch := make(chan runtime.Object, 1)
-	errCh := make(chan error, 1)
-	panicCh := make(chan interface{}, 1)
-	go func() {
-		// panics don't cross goroutine boundaries, so we have to handle ourselves
-		defer func() {
-			panicReason := recover()
-			if panicReason != nil {
-				// do not wrap the sentinel ErrAbortHandler panic value
-				if panicReason != http.ErrAbortHandler {
-					// Same as stdlib http server code. Manually allocate stack
-					// trace buffer size to prevent excessively large logs
-					const size = 64 << 10
-					buf := make([]byte, size)
-					buf = buf[:goruntime.Stack(buf, false)]
-					panicReason = fmt.Sprintf("%v\n%s", panicReason, buf)
-				}
-				// Propagate to parent goroutine
-				panicCh <- panicReason
-			}
-		}()
-
-		if result, err := fn(); err != nil {
-			errCh <- err
-		} else {
-			ch <- result
-		}
-	}()
-
-	select {
-	case result = <-ch:
-		if status, ok := result.(*metav1.Status); ok {
-			if status.Status != metav1.StatusSuccess {
-				return nil, errors.FromObject(status)
-			}
-		}
-		return result, nil
-	case err = <-errCh:
-		return nil, err
-	case p := <-panicCh:
-		panic(p)
-	case <-ctx.Done():
-		return nil, errors.NewTimeoutError(fmt.Sprintf("request did not complete within requested timeout %s", ctx.Err()), 0)
-	}
-}
-
 // transformDecodeError adds additional information into a bad-request api error when a decode fails.
 func transformDecodeError(typer runtime.ObjectTyper, baseErr error, into runtime.Object, gvk *schema.GroupVersionKind, body []byte) error {
 	objGVKs, _, err := typer.ObjectKinds(into)
@@ -291,18 +257,6 @@ func transformDecodeError(typer runtime.ObjectTyper, baseErr error, into runtime
 	}
 	summary := summarizeData(body, 30)
 	return errors.NewBadRequest(fmt.Sprintf("the object provided is unrecognized (must be of type %s): %v (%s)", objGVK.Kind, baseErr, summary))
-}
-
-// setSelfLink sets the self link of an object (or the child items in a list) to the base URL of the request
-// plus the path and query generated by the provided linkFunc
-func setSelfLink(obj runtime.Object, requestInfo *request.RequestInfo, namer ScopeNamer) error {
-	// TODO: SelfLink generation should return a full URL?
-	uri, err := namer.GenerateLink(requestInfo, obj)
-	if err != nil {
-		return nil
-	}
-
-	return namer.SetSelfLink(obj, uri)
 }
 
 func hasUID(obj runtime.Object) (bool, error) {
@@ -402,56 +356,14 @@ func dedupOwnerReferencesAndAddWarning(obj runtime.Object, requestContext contex
 	}
 }
 
-// setObjectSelfLink sets the self link of an object as needed.
-// TODO: remove the need for the namer LinkSetters by requiring objects implement either Object or List
-//   interfaces
-func setObjectSelfLink(ctx context.Context, obj runtime.Object, req *http.Request, namer ScopeNamer) error {
-	if utilfeature.DefaultFeatureGate.Enabled(features.RemoveSelfLink) {
-		// Ensure that for empty lists we don't return <nil> items.
-		if meta.IsListType(obj) && meta.LenList(obj) == 0 {
-			if err := meta.SetList(obj, []runtime.Object{}); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-
-	// We only generate list links on objects that implement ListInterface - historically we duck typed this
-	// check via reflection, but as we move away from reflection we require that you not only carry Items but
-	// ListMeta into order to be identified as a list.
-	if !meta.IsListType(obj) {
-		requestInfo, ok := request.RequestInfoFrom(ctx)
-		if !ok {
-			return fmt.Errorf("missing requestInfo")
-		}
-		return setSelfLink(obj, requestInfo, namer)
-	}
-
-	uri, err := namer.GenerateListLink(req)
-	if err != nil {
-		return err
-	}
-	if err := namer.SetSelfLink(obj, uri); err != nil {
-		klog.V(4).InfoS("Unable to set self link on object", "error", err)
-	}
-	requestInfo, ok := request.RequestInfoFrom(ctx)
-	if !ok {
-		return fmt.Errorf("missing requestInfo")
-	}
-
-	count := 0
-	err = meta.EachListItem(obj, func(obj runtime.Object) error {
-		count++
-		return setSelfLink(obj, requestInfo, namer)
-	})
-
-	if count == 0 {
+// ensureNonNilItems ensures that for empty lists we don't return <nil> items.
+func ensureNonNilItems(obj runtime.Object) error {
+	if meta.IsListType(obj) && meta.LenList(obj) == 0 {
 		if err := meta.SetList(obj, []runtime.Object{}); err != nil {
 			return err
 		}
 	}
-
-	return err
+	return nil
 }
 
 func summarizeData(data []byte, maxLength int) string {
@@ -492,6 +404,53 @@ func limitedReadBody(req *http.Request, limit int64) ([]byte, error) {
 
 func isDryRun(url *url.URL) bool {
 	return len(url.Query()["dryRun"]) != 0
+}
+
+// fieldValidation checks that the field validation feature is enabled
+// and returns a valid directive of either
+// - Ignore (default when feature is disabled)
+// - Warn (default when feature is enabled)
+// - Strict
+func fieldValidation(directive string) string {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ServerSideFieldValidation) {
+		return metav1.FieldValidationIgnore
+	}
+	if directive == "" {
+		return metav1.FieldValidationWarn
+	}
+	return directive
+}
+
+// parseYAMLWarnings takes the strict decoding errors from the yaml decoder's output
+// and parses each individual warnings, or leaves the warning as is if
+// it does not look like a yaml strict decoding error.
+func parseYAMLWarnings(errString string) []string {
+	var trimmedString string
+	if trimmedShortString := strings.TrimPrefix(errString, shortPrefix); len(trimmedShortString) < len(errString) {
+		trimmedString = trimmedShortString
+	} else if trimmedLongString := strings.TrimPrefix(errString, longPrefix); len(trimmedLongString) < len(errString) {
+		trimmedString = trimmedLongString
+	} else {
+		// not a yaml error, return as-is
+		return []string{errString}
+	}
+
+	splitStrings := strings.Split(trimmedString, "\n")
+	for i, s := range splitStrings {
+		splitStrings[i] = strings.TrimSpace(s)
+	}
+	return splitStrings
+}
+
+// addStrictDecodingWarnings confirms that the error is a strict decoding error
+// and if so adds a warning for each strict decoding violation.
+func addStrictDecodingWarnings(requestContext context.Context, errs []error) {
+	for _, e := range errs {
+		yamlWarnings := parseYAMLWarnings(e.Error())
+		for _, w := range yamlWarnings {
+			warning.AddWarning(requestContext, "", w)
+		}
+	}
 }
 
 type etcdError interface {

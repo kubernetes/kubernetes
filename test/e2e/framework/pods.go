@@ -18,6 +18,7 @@ package framework
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"sync"
@@ -27,7 +28,9 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -37,6 +40,7 @@ import (
 	"github.com/onsi/gomega"
 
 	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
+	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 )
 
@@ -146,6 +150,30 @@ func (c *PodClient) Update(name string, updateFn func(pod *v1.Pod)) {
 	}))
 }
 
+// AddEphemeralContainerSync adds an EphemeralContainer to a pod and waits for it to be running.
+func (c *PodClient) AddEphemeralContainerSync(pod *v1.Pod, ec *v1.EphemeralContainer, timeout time.Duration) error {
+	namespace := c.f.Namespace.Name
+
+	podJS, err := json.Marshal(pod)
+	ExpectNoError(err, "error creating JSON for pod %q", format.Pod(pod))
+
+	ecPod := pod.DeepCopy()
+	ecPod.Spec.EphemeralContainers = append(ecPod.Spec.EphemeralContainers, *ec)
+	ecJS, err := json.Marshal(ecPod)
+	ExpectNoError(err, "error creating JSON for pod with ephemeral container %q", format.Pod(pod))
+
+	patch, err := strategicpatch.CreateTwoWayMergePatch(podJS, ecJS, pod)
+	ExpectNoError(err, "error creating patch to add ephemeral container %q", format.Pod(pod))
+
+	// Clients may optimistically attempt to add an ephemeral container to determine whether the EphemeralContainers feature is enabled.
+	if _, err := c.Patch(context.TODO(), pod.Name, types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "ephemeralcontainers"); err != nil {
+		return err
+	}
+
+	ExpectNoError(e2epod.WaitForContainerRunning(c.f.ClientSet, namespace, pod.Name, ec.Name, timeout))
+	return nil
+}
+
 // DeleteSync deletes the pod and wait for the pod to disappear for `timeout`. If the pod doesn't
 // disappear before the timeout, it will fail the test.
 func (c *PodClient) DeleteSync(name string, options metav1.DeleteOptions, timeout time.Duration) {
@@ -181,7 +209,7 @@ func (c *PodClient) mungeSpec(pod *v1.Pod) {
 		c := &pod.Spec.Containers[i]
 		if c.ImagePullPolicy == v1.PullAlways {
 			// If the image pull policy is PullAlways, the image doesn't need to be in
-			// the white list or pre-pulled, because the image is expected to be pulled
+			// the allow list or pre-pulled, because the image is expected to be pulled
 			// in the test anyway.
 			continue
 		}

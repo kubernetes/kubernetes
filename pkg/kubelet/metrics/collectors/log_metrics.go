@@ -63,7 +63,7 @@ func (c *logMetricsCollector) DescribeWithStability(ch chan<- *metrics.Desc) {
 func (c *logMetricsCollector) CollectWithStability(ch chan<- metrics.Metric) {
 	podStats, err := c.podStats()
 	if err != nil {
-		klog.Errorf("failed to get pod stats: %v", err)
+		klog.ErrorS(err, "Failed to get pod stats")
 		return
 	}
 

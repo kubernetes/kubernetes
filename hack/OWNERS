@@ -4,15 +4,12 @@ reviewers:
   - bentheelder
   - cblecker
   - fejta
-  - juanvallejo
   - hwdef
   - justaugustus
   - lavalamp
   - SataQiu
   - spiffxp
   - sttts
-  - vishh
-  - xichengliudui
   - mikedanese
 approvers:
   - bentheelder
@@ -27,10 +24,10 @@ approvers:
   - soltysh # for sig-cli related stuff
   - spiffxp
   - sttts
-  - vishh
   - mikedanese
 emeritus_approvers:
   - eparis
   - ixdy
   - jbeda
   - zmerlynn
+  - vishh

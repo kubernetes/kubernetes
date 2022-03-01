@@ -254,7 +254,15 @@ func (util *fcUtil) AttachDisk(b fcDiskMounter) (string, error) {
 		return "", err
 	}
 
-	return devicePath, nil
+	exists, err := mount.PathExists(devicePath)
+	if exists && err == nil {
+		return devicePath, nil
+	}
+	if exists == false {
+		return "", fmt.Errorf("device %s does not exist", devicePath)
+	} else {
+		return "", err
+	}
 }
 
 // DetachDisk removes scsi device file such as /dev/sdX from the node.
@@ -329,7 +337,7 @@ func (util *fcUtil) DetachBlockFCDisk(c fcDiskUnmapper, mapPath, devicePath stri
 	// Retrieve volume plugin dependent path like '50060e801049cfd1-lun-0' from global map path
 	arr := strings.Split(mapPath, "/")
 	if len(arr) < 1 {
-		return fmt.Errorf("Fail to retrieve volume plugin information from global map path: %v", mapPath)
+		return fmt.Errorf("failed to retrieve volume plugin information from global map path: %v", mapPath)
 	}
 	volumeInfo := arr[len(arr)-1]
 
@@ -402,7 +410,7 @@ func (util *fcUtil) deleteMultipathDevice(exec utilexec.Interface, dmDevice stri
 
 func checkPathExists(path string) (bool, error) {
 	if pathExists, pathErr := mount.PathExists(path); pathErr != nil {
-		return pathExists, fmt.Errorf("Error checking if path exists: %v", pathErr)
+		return pathExists, fmt.Errorf("error checking if path exists: %w", pathErr)
 	} else if !pathExists {
 		klog.Warningf("Warning: Unmap skipped because path does not exist: %v", path)
 		return pathExists, nil

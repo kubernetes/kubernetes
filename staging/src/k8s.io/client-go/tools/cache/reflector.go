@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/naming"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -40,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/pager"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 	"k8s.io/utils/trace"
 )
 
@@ -69,7 +69,7 @@ type Reflector struct {
 
 	// backoff manages backoff of ListWatch
 	backoffManager wait.BackoffManager
-	// initConnBackoffManager manages backoff the initial connection with the Watch calll of ListAndWatch.
+	// initConnBackoffManager manages backoff the initial connection with the Watch call of ListAndWatch.
 	initConnBackoffManager wait.BackoffManager
 
 	resyncPeriod time.Duration
@@ -216,13 +216,13 @@ var internalPackages = []string{"client-go/tools/cache/"}
 // objects and subsequent deltas.
 // Run will exit when stopCh is closed.
 func (r *Reflector) Run(stopCh <-chan struct{}) {
-	klog.V(2).Infof("Starting reflector %s (%s) from %s", r.expectedTypeName, r.resyncPeriod, r.name)
+	klog.V(3).Infof("Starting reflector %s (%s) from %s", r.expectedTypeName, r.resyncPeriod, r.name)
 	wait.BackoffUntil(func() {
 		if err := r.ListAndWatch(stopCh); err != nil {
 			r.watchErrorHandler(r, err)
 		}
 	}, r.backoffManager, true, stopCh)
-	klog.V(2).Infof("Stopping reflector %s (%s) from %s", r.expectedTypeName, r.resyncPeriod, r.name)
+	klog.V(3).Infof("Stopping reflector %s (%s) from %s", r.expectedTypeName, r.resyncPeriod, r.name)
 }
 
 var (
@@ -231,7 +231,7 @@ var (
 
 	// Used to indicate that watching stopped because of a signal from the stop
 	// channel passed in from a client of the reflector.
-	errorStopRequested = errors.New("Stop requested")
+	errorStopRequested = errors.New("stop requested")
 )
 
 // resyncChan returns a channel which will receive something when a resync is
@@ -258,7 +258,7 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 	options := metav1.ListOptions{ResourceVersion: r.relistResourceVersion()}
 
 	if err := func() error {
-		initTrace := trace.New("Reflector ListAndWatch", trace.Field{"name", r.name})
+		initTrace := trace.New("Reflector ListAndWatch", trace.Field{Key: "name", Value: r.name})
 		defer initTrace.LogIfLong(10 * time.Second)
 		var list runtime.Object
 		var paginatedResult bool
@@ -319,7 +319,9 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 			panic(r)
 		case <-listCh:
 		}
+		initTrace.Step("Objects listed", trace.Field{Key: "error", Value: err})
 		if err != nil {
+			klog.Warningf("%s: failed to list %v: %v", r.name, r.expectedTypeName, err)
 			return fmt.Errorf("failed to list %v: %v", r.expectedTypeName, err)
 		}
 
@@ -338,7 +340,6 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 		}
 
 		r.setIsLastSyncResourceVersionUnavailable(false) // list was successful
-		initTrace.Step("Objects listed")
 		listMetaInterface, err := meta.ListAccessor(list)
 		if err != nil {
 			return fmt.Errorf("unable to understand list result %#v: %v", list, err)
@@ -400,7 +401,7 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 		timeoutSeconds := int64(minWatchTimeout.Seconds() * (rand.Float64() + 1.0))
 		options = metav1.ListOptions{
 			ResourceVersion: resourceVersion,
-			// We want to avoid situations of hanging watchers. Stop any wachers that do not
+			// We want to avoid situations of hanging watchers. Stop any watchers that do not
 			// receive any events within the timeout window.
 			TimeoutSeconds: &timeoutSeconds,
 			// To reduce load on kube-apiserver on watch restarts, you may enable watch bookmarks.
@@ -417,7 +418,8 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 			// It doesn't make sense to re-list all objects because most likely we will be able to restart
 			// watch where we ended.
 			// If that's the case begin exponentially backing off and resend watch request.
-			if utilnet.IsConnectionRefused(err) {
+			// Do the same for "429" errors.
+			if utilnet.IsConnectionRefused(err) || apierrors.IsTooManyRequests(err) {
 				<-r.initConnBackoffManager.Backoff().C()
 				continue
 			}
@@ -432,6 +434,10 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 					// has a semantic that it returns data at least as fresh as provided RV.
 					// So first try to LIST with setting RV to resource version of last observed object.
 					klog.V(4).Infof("%s: watch of %v closed with: %v", r.name, r.expectedTypeName, err)
+				case apierrors.IsTooManyRequests(err):
+					klog.V(2).Infof("%s: watch of %v returned 429 - backing off", r.name, r.expectedTypeName)
+					<-r.initConnBackoffManager.Backoff().C()
+					continue
 				default:
 					klog.Warningf("%s: watch of %v ended with: %v", r.name, r.expectedTypeName, err)
 				}

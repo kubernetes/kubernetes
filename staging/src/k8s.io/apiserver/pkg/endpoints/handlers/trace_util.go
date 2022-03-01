@@ -26,6 +26,7 @@ func traceFields(req *http.Request) []utiltrace.Field {
 	return []utiltrace.Field{
 		{Key: "url", Value: req.URL.Path},
 		{Key: "user-agent", Value: &lazyTruncatedUserAgent{req: req}},
+		{Key: "audit-id", Value: &lazyAuditID{req: req}},
 		{Key: "client", Value: &lazyClientIP{req: req}},
 		{Key: "accept", Value: &lazyAccept{req: req}},
 		{Key: "protocol", Value: req.Proto}}

@@ -148,10 +148,7 @@ func IsOperationFinishedError(err error) bool {
 // on PVC and actual filesystem on disk did not match
 func IsFilesystemMismatchError(err error) bool {
 	mountError := mount.MountError{}
-	if errors.As(err, &mountError) && mountError.Type == mount.FilesystemMismatch {
-		return true
-	}
-	return false
+	return errors.As(err, &mountError) && mountError.Type == mount.FilesystemMismatch
 }
 
 // IsUncertainProgressError checks if given error is of type that indicates

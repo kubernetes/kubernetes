@@ -34,12 +34,14 @@ type CPUDetails map[int]CPUInfo
 // CPUTopology contains details of node cpu, where :
 // CPU  - logical CPU, cadvisor - thread
 // Core - physical CPU, cadvisor - Core
-// Socket - socket, cadvisor - Node
+// Socket - socket, cadvisor - Socket
+// NUMA Node - NUMA cell, cadvisor - Node
 type CPUTopology struct {
-	NumCPUs    int
-	NumCores   int
-	NumSockets int
-	CPUDetails CPUDetails
+	NumCPUs      int
+	NumCores     int
+	NumSockets   int
+	NumNUMANodes int
+	CPUDetails   CPUDetails
 }
 
 // CPUsPerCore returns the number of logical CPUs are associated with
@@ -236,24 +238,24 @@ func Discover(machineInfo *cadvisorapi.MachineInfo) (*CPUTopology, error) {
 					}
 				}
 			} else {
-				klog.Errorf("could not get unique coreID for socket: %d core %d threads: %v",
-					core.SocketID, core.Id, core.Threads)
+				klog.ErrorS(nil, "Could not get unique coreID for socket", "socket", core.SocketID, "core", core.Id, "threads", core.Threads)
 				return nil, err
 			}
 		}
 	}
 
 	return &CPUTopology{
-		NumCPUs:    machineInfo.NumCores,
-		NumSockets: len(machineInfo.Topology),
-		NumCores:   numPhysicalCores,
-		CPUDetails: CPUDetails,
+		NumCPUs:      machineInfo.NumCores,
+		NumSockets:   machineInfo.NumSockets,
+		NumCores:     numPhysicalCores,
+		NumNUMANodes: CPUDetails.NUMANodes().Size(),
+		CPUDetails:   CPUDetails,
 	}, nil
 }
 
 // getUniqueCoreID computes coreId as the lowest cpuID
 // for a given Threads []int slice. This will assure that coreID's are
-// platform unique (opposite to what cAdvisor reports - socket unique)
+// platform unique (opposite to what cAdvisor reports)
 func getUniqueCoreID(threads []int) (coreID int, err error) {
 	if len(threads) == 0 {
 		return 0, fmt.Errorf("no cpus provided")

@@ -24,6 +24,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
@@ -46,6 +47,59 @@ func encodeOrDie(obj runtime.Object) []byte {
 		panic(err.Error())
 	}
 	return data
+}
+func createPodSpecResource(t *testing.T, memReq, memLimit, cpuReq, cpuLimit string) corev1.PodSpec {
+	t.Helper()
+	podSpec := corev1.PodSpec{
+		Containers: []corev1.Container{
+			{
+				Resources: corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{},
+					Limits:   corev1.ResourceList{},
+				},
+			},
+		},
+	}
+
+	req := podSpec.Containers[0].Resources.Requests
+	if memReq != "" {
+		memReq, err := resource.ParseQuantity(memReq)
+		if err != nil {
+			t.Errorf("memory request string is not a valid quantity")
+		}
+		req["memory"] = memReq
+	}
+	if cpuReq != "" {
+		cpuReq, err := resource.ParseQuantity(cpuReq)
+		if err != nil {
+			t.Errorf("cpu request string is not a valid quantity")
+		}
+		req["cpu"] = cpuReq
+	}
+	limit := podSpec.Containers[0].Resources.Limits
+	if memLimit != "" {
+		memLimit, err := resource.ParseQuantity(memLimit)
+		if err != nil {
+			t.Errorf("memory limit string is not a valid quantity")
+		}
+		limit["memory"] = memLimit
+	}
+	if cpuLimit != "" {
+		cpuLimit, err := resource.ParseQuantity(cpuLimit)
+		if err != nil {
+			t.Errorf("cpu limit string is not a valid quantity")
+		}
+		limit["cpu"] = cpuLimit
+	}
+
+	return podSpec
+}
+func createUnstructuredPodResource(t *testing.T, memReq, memLimit, cpuReq, cpuLimit string) unstructured.Unstructured {
+	t.Helper()
+	pod := &corev1.Pod{
+		Spec: createPodSpecResource(t, memReq, memLimit, cpuReq, cpuLimit),
+	}
+	return *toUnstructuredOrDie(encodeOrDie(pod))
 }
 
 func TestSortingPrinter(t *testing.T) {
@@ -435,6 +489,158 @@ func TestSortingPrinter(t *testing.T) {
 			},
 			field: "{.lastTimestamp}",
 		},
+		{
+			name: "pod-resources-cpu-random-order-with-missing-fields",
+			obj: &corev1.PodList{
+				Items: []corev1.Pod{
+					{
+						Spec: createPodSpecResource(t, "", "", "0.5", ""),
+					},
+					{
+						Spec: createPodSpecResource(t, "", "", "10", ""),
+					},
+					{
+						Spec: createPodSpecResource(t, "", "", "100m", ""),
+					},
+					{
+						Spec: createPodSpecResource(t, "", "", "", ""),
+					},
+				},
+			},
+			sort: &corev1.PodList{
+				Items: []corev1.Pod{
+					{
+						Spec: createPodSpecResource(t, "", "", "", ""),
+					},
+					{
+						Spec: createPodSpecResource(t, "", "", "100m", ""),
+					},
+					{
+						Spec: createPodSpecResource(t, "", "", "0.5", ""),
+					},
+					{
+						Spec: createPodSpecResource(t, "", "", "10", ""),
+					},
+				},
+			},
+			field: "{.spec.containers[].resources.requests.cpu}",
+		},
+		{
+			name: "pod-resources-memory-random-order-with-missing-fields",
+			obj: &corev1.PodList{
+				Items: []corev1.Pod{
+					{
+						Spec: createPodSpecResource(t, "128Mi", "", "", ""),
+					},
+					{
+						Spec: createPodSpecResource(t, "10Ei", "", "", ""),
+					},
+					{
+						Spec: createPodSpecResource(t, "8Ti", "", "", ""),
+					},
+					{
+						Spec: createPodSpecResource(t, "64Gi", "", "", ""),
+					},
+					{
+						Spec: createPodSpecResource(t, "55Pi", "", "", ""),
+					},
+					{
+						Spec: createPodSpecResource(t, "2Ki", "", "", ""),
+					},
+					{
+						Spec: createPodSpecResource(t, "", "", "", ""),
+					},
+				},
+			},
+			sort: &corev1.PodList{
+				Items: []corev1.Pod{
+					{
+						Spec: createPodSpecResource(t, "", "", "", ""),
+					},
+					{
+						Spec: createPodSpecResource(t, "2Ki", "", "", ""),
+					},
+					{
+						Spec: createPodSpecResource(t, "128Mi", "", "", ""),
+					},
+					{
+						Spec: createPodSpecResource(t, "64Gi", "", "", ""),
+					},
+					{
+						Spec: createPodSpecResource(t, "8Ti", "", "", ""),
+					},
+					{
+						Spec: createPodSpecResource(t, "55Pi", "", "", ""),
+					},
+					{
+						Spec: createPodSpecResource(t, "10Ei", "", "", ""),
+					},
+				},
+			},
+			field: "{.spec.containers[].resources.requests.memory}",
+		},
+		{
+			name: "pod-unstructured-resources-cpu-random-order-with-missing-fields",
+			obj: &unstructured.UnstructuredList{
+				Object: map[string]interface{}{
+					"kind":       "List",
+					"apiVersion": "v1",
+				},
+				Items: []unstructured.Unstructured{
+					createUnstructuredPodResource(t, "", "", "0.5", ""),
+					createUnstructuredPodResource(t, "", "", "10", ""),
+					createUnstructuredPodResource(t, "", "", "100m", ""),
+					createUnstructuredPodResource(t, "", "", "", ""),
+				},
+			},
+			sort: &unstructured.UnstructuredList{
+				Object: map[string]interface{}{
+					"kind":       "List",
+					"apiVersion": "v1",
+				},
+				Items: []unstructured.Unstructured{
+					createUnstructuredPodResource(t, "", "", "", ""),
+					createUnstructuredPodResource(t, "", "", "100m", ""),
+					createUnstructuredPodResource(t, "", "", "0.5", ""),
+					createUnstructuredPodResource(t, "", "", "10", ""),
+				},
+			},
+			field: "{.spec.containers[].resources.requests.cpu}",
+		},
+		{
+			name: "pod-unstructured-resources-memory-random-order-with-missing-fields",
+			obj: &unstructured.UnstructuredList{
+				Object: map[string]interface{}{
+					"kind":       "List",
+					"apiVersion": "v1",
+				},
+				Items: []unstructured.Unstructured{
+					createUnstructuredPodResource(t, "128Mi", "", "", ""),
+					createUnstructuredPodResource(t, "10Ei", "", "", ""),
+					createUnstructuredPodResource(t, "8Ti", "", "", ""),
+					createUnstructuredPodResource(t, "64Gi", "", "", ""),
+					createUnstructuredPodResource(t, "55Pi", "", "", ""),
+					createUnstructuredPodResource(t, "2Ki", "", "", ""),
+					createUnstructuredPodResource(t, "", "", "", ""),
+				},
+			},
+			sort: &unstructured.UnstructuredList{
+				Object: map[string]interface{}{
+					"kind":       "List",
+					"apiVersion": "v1",
+				},
+				Items: []unstructured.Unstructured{
+					createUnstructuredPodResource(t, "", "", "", ""),
+					createUnstructuredPodResource(t, "2Ki", "", "", ""),
+					createUnstructuredPodResource(t, "128Mi", "", "", ""),
+					createUnstructuredPodResource(t, "64Gi", "", "", ""),
+					createUnstructuredPodResource(t, "8Ti", "", "", ""),
+					createUnstructuredPodResource(t, "55Pi", "", "", ""),
+					createUnstructuredPodResource(t, "10Ei", "", "", ""),
+				},
+			},
+			field: "{.spec.containers[].resources.requests.memory}",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name+" table", func(t *testing.T) {
@@ -505,16 +711,19 @@ func TestRuntimeSortLess(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "b",
 				},
+				Spec: createPodSpecResource(t, "0.5", "", "1Gi", ""),
 			},
 			{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "c",
 				},
+				Spec: createPodSpecResource(t, "2", "", "1Ti", ""),
 			},
 			{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "a",
 				},
+				Spec: createPodSpecResource(t, "10m", "", "1Ki", ""),
 			},
 		},
 	}
@@ -524,8 +733,15 @@ func TestRuntimeSortLess(t *testing.T) {
 		t.Fatalf("ExtractList testobj got unexpected error: %v", err)
 	}
 
-	testfield := "{.metadata.name}"
-	testruntimeSort := NewRuntimeSort(testfield, testobjs)
+	testfieldName := "{.metadata.name}"
+	testruntimeSortName := NewRuntimeSort(testfieldName, testobjs)
+
+	testfieldCPU := "{.spec.containers[].resources.requests.cpu}"
+	testruntimeSortCPU := NewRuntimeSort(testfieldCPU, testobjs)
+
+	testfieldMemory := "{.spec.containers[].resources.requests.memory}"
+	testruntimeSortMemory := NewRuntimeSort(testfieldMemory, testobjs)
+
 	tests := []struct {
 		name         string
 		runtimeSort  *RuntimeSort
@@ -535,16 +751,65 @@ func TestRuntimeSortLess(t *testing.T) {
 		expectErr    bool
 	}{
 		{
-			name:         "test less true",
-			runtimeSort:  testruntimeSort,
+			name:         "test name b c less true",
+			runtimeSort:  testruntimeSortName,
 			i:            0,
 			j:            1,
 			expectResult: true,
 		},
 		{
-			name:         "test less false",
-			runtimeSort:  testruntimeSort,
+			name:         "test name c a less false",
+			runtimeSort:  testruntimeSortName,
 			i:            1,
+			j:            2,
+			expectResult: false,
+		},
+		{
+			name:         "test name b a less false",
+			runtimeSort:  testruntimeSortName,
+			i:            0,
+			j:            2,
+			expectResult: false,
+		},
+		{
+			name:         "test cpu 0.5 2 less true",
+			runtimeSort:  testruntimeSortCPU,
+			i:            0,
+			j:            1,
+			expectResult: true,
+		},
+		{
+			name:         "test cpu 2 10mi less false",
+			runtimeSort:  testruntimeSortCPU,
+			i:            1,
+			j:            2,
+			expectResult: false,
+		},
+		{
+			name:         "test cpu 0.5 10mi less false",
+			runtimeSort:  testruntimeSortCPU,
+			i:            0,
+			j:            2,
+			expectResult: false,
+		},
+		{
+			name:         "test memory 1Gi 1Ti less true",
+			runtimeSort:  testruntimeSortMemory,
+			i:            0,
+			j:            1,
+			expectResult: true,
+		},
+		{
+			name:         "test memory 1Ti 1Ki less false",
+			runtimeSort:  testruntimeSortMemory,
+			i:            1,
+			j:            2,
+			expectResult: false,
+		},
+		{
+			name:         "test memory 1Gi 1Ki less false",
+			runtimeSort:  testruntimeSortMemory,
+			i:            0,
 			j:            2,
 			expectResult: false,
 		},

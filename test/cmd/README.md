@@ -10,12 +10,12 @@ To run this entire suite, execute `make test-cmd` from the top level.  This will
 
 ### Specific Tests
 
-To run a subset of tests (e.g. `run_deployment_test` and `run_impersonation_test`), execute `make test-cmd WHAT="deployment impersonation"`.  Running specific
+To run a subset of tests (e.g. `run_deployment_tests` and `run_impersonation_tests`), execute `make test-cmd WHAT="deployment impersonation"`.  Running specific
 tests will not try and validate any required resources are available on the server.
 
 ## Adding Tests
 
-Test functions need to have the format `run_*_test` so they can executed individually.  Once a test has been added, insert a section in `legacy-script.sh` like
+Test functions need to have the format `run_*_tests` so they can be executed individually.  Once a test has been added, insert a section in `legacy-script.sh` like
 
 ```bash
 ######################

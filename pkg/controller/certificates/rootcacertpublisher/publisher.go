@@ -38,7 +38,12 @@ import (
 
 // RootCACertConfigMapName is name of the configmap which stores certificates
 // to access api-server
-const RootCACertConfigMapName = "kube-root-ca.crt"
+const (
+	RootCACertConfigMapName = "kube-root-ca.crt"
+	DescriptionAnnotation   = "kubernetes.io/description"
+	Description             = "Contains a CA bundle that can be used to verify the kube-apiserver when using internal endpoints such as the internal service IP or kubernetes.default.svc. " +
+		"No other usage is guaranteed across distributions of Kubernetes clusters."
+)
 
 func init() {
 	registerMetrics()
@@ -177,7 +182,7 @@ func (c *Publisher) processNextWorkItem() bool {
 func (c *Publisher) syncNamespace(ns string) (err error) {
 	startTime := time.Now()
 	defer func() {
-		recordMetrics(startTime, ns, err)
+		recordMetrics(startTime, err)
 		klog.V(4).Infof("Finished syncing namespace %q (%v)", ns, time.Since(startTime))
 	}()
 
@@ -186,7 +191,8 @@ func (c *Publisher) syncNamespace(ns string) (err error) {
 	case apierrors.IsNotFound(err):
 		_, err = c.client.CoreV1().ConfigMaps(ns).Create(context.TODO(), &v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: RootCACertConfigMapName,
+				Name:        RootCACertConfigMapName,
+				Annotations: map[string]string{DescriptionAnnotation: Description},
 			},
 			Data: map[string]string{
 				"ca.crt": string(c.rootCA),
@@ -205,13 +211,18 @@ func (c *Publisher) syncNamespace(ns string) (err error) {
 		"ca.crt": string(c.rootCA),
 	}
 
-	if reflect.DeepEqual(cm.Data, data) {
+	// ensure the data and the one annotation describing usage of this configmap match.
+	if reflect.DeepEqual(cm.Data, data) && len(cm.Annotations[DescriptionAnnotation]) > 0 {
 		return nil
 	}
 
 	// copy so we don't modify the cache's instance of the configmap
 	cm = cm.DeepCopy()
 	cm.Data = data
+	if cm.Annotations == nil {
+		cm.Annotations = map[string]string{}
+	}
+	cm.Annotations[DescriptionAnnotation] = Description
 
 	_, err = c.client.CoreV1().ConfigMaps(ns).Update(context.TODO(), cm, metav1.UpdateOptions{})
 	return err

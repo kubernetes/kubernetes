@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -33,6 +34,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/legacy-cloud-providers/azure/clients/interfaceclient/mockinterfaceclient"
 	"k8s.io/legacy-cloud-providers/azure/clients/publicipclient/mockpublicipclient"
@@ -877,7 +879,7 @@ func TestGetStandardInstanceIDByNodeName(t *testing.T) {
 		{
 			name:           "GetInstanceIDByNodeName should report error if Error encountered when invoke mockVMClient.Get",
 			nodeName:       "vm3",
-			expectedErrMsg: fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 500, RawError: VMGet error"),
+			expectedErrMsg: fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 500, RawError: %w", fmt.Errorf("VMGet error")),
 		},
 		{
 			name:           "GetInstanceIDByNodeName should report error if ResourceID is invalid",
@@ -972,6 +974,69 @@ func TestGetStandardVMPowerStatusByNodeName(t *testing.T) {
 		powerState, err := cloud.VMSet.GetPowerStatusByNodeName(test.nodeName)
 		assert.Equal(t, test.expectedErrMsg, err, test.name)
 		assert.Equal(t, test.expectedStatus, powerState, test.name)
+	}
+}
+
+func TestGetStandardVMProvisioningStateByNodeName(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	cloud := GetTestCloud(ctrl)
+
+	testcases := []struct {
+		name                      string
+		nodeName                  string
+		vm                        compute.VirtualMachine
+		expectedProvisioningState string
+		getErr                    *retry.Error
+		expectedErrMsg            error
+	}{
+		{
+			name:     "GetProvisioningStateByNodeName should report error if node don't exist",
+			nodeName: "vm1",
+			vm:       compute.VirtualMachine{},
+			getErr: &retry.Error{
+				HTTPStatusCode: http.StatusNotFound,
+				RawError:       cloudprovider.InstanceNotFound,
+			},
+			expectedErrMsg: fmt.Errorf("instance not found"),
+		},
+		{
+			name:     "GetProvisioningStateByNodeName should return Succeeded for running VM",
+			nodeName: "vm2",
+			vm: compute.VirtualMachine{
+				Name: to.StringPtr("vm2"),
+				VirtualMachineProperties: &compute.VirtualMachineProperties{
+					ProvisioningState: to.StringPtr("Succeeded"),
+					InstanceView: &compute.VirtualMachineInstanceView{
+						Statuses: &[]compute.InstanceViewStatus{
+							{
+								Code: to.StringPtr("PowerState/Running"),
+							},
+						},
+					},
+				},
+			},
+			expectedProvisioningState: "Succeeded",
+		},
+		{
+			name:     "GetProvisioningStateByNodeName should return empty string when vm.ProvisioningState is nil",
+			nodeName: "vm3",
+			vm: compute.VirtualMachine{
+				Name: to.StringPtr("vm3"),
+				VirtualMachineProperties: &compute.VirtualMachineProperties{
+					ProvisioningState: nil,
+				},
+			},
+			expectedProvisioningState: "",
+		},
+	}
+	for _, test := range testcases {
+		mockVMClient := cloud.VirtualMachinesClient.(*mockvmclient.MockInterface)
+		mockVMClient.EXPECT().Get(gomock.Any(), cloud.ResourceGroup, test.nodeName, gomock.Any()).Return(test.vm, test.getErr).AnyTimes()
+
+		provisioningState, err := cloud.VMSet.GetProvisioningStateByNodeName(test.nodeName)
+		assert.Equal(t, test.expectedErrMsg, err, test.name)
+		assert.Equal(t, test.expectedProvisioningState, provisioningState, test.name)
 	}
 }
 
@@ -1350,6 +1415,7 @@ func TestStandardEnsureHostsInPool(t *testing.T) {
 		name           string
 		service        *v1.Service
 		nodes          []*v1.Node
+		excludeLBNodes []string
 		nodeName       string
 		backendPoolID  string
 		nicName        string
@@ -1375,9 +1441,10 @@ func TestStandardEnsureHostsInPool(t *testing.T) {
 			vmSetName:     "availabilityset-1",
 		},
 		{
-			name:     "EnsureHostsInPool should skip if node is master node",
-			service:  &v1.Service{},
-			nodeName: "vm2",
+			name:           "EnsureHostsInPool should skip if node is master node",
+			service:        &v1.Service{},
+			nodeName:       "vm2",
+			excludeLBNodes: []string{"vm2"},
 			nodes: []*v1.Node{
 				{
 					ObjectMeta: meta.ObjectMeta{
@@ -1391,9 +1458,10 @@ func TestStandardEnsureHostsInPool(t *testing.T) {
 			vmSetName: "availabilityset-1",
 		},
 		{
-			name:     "EnsureHostsInPool should skip if node is in external resource group",
-			service:  &v1.Service{},
-			nodeName: "vm3",
+			name:           "EnsureHostsInPool should skip if node is in external resource group",
+			service:        &v1.Service{},
+			nodeName:       "vm3",
+			excludeLBNodes: []string{"vm3"},
 			nodes: []*v1.Node{
 				{
 					ObjectMeta: meta.ObjectMeta{
@@ -1407,9 +1475,10 @@ func TestStandardEnsureHostsInPool(t *testing.T) {
 			vmSetName: "availabilityset-1",
 		},
 		{
-			name:     "EnsureHostsInPool should skip if node is unmanaged",
-			service:  &v1.Service{},
-			nodeName: "vm4",
+			name:           "EnsureHostsInPool should skip if node is unmanaged",
+			service:        &v1.Service{},
+			nodeName:       "vm4",
+			excludeLBNodes: []string{"vm4"},
 			nodes: []*v1.Node{
 				{
 					ObjectMeta: meta.ObjectMeta{
@@ -1454,6 +1523,7 @@ func TestStandardEnsureHostsInPool(t *testing.T) {
 	for _, test := range testCases {
 		cloud.Config.LoadBalancerSku = loadBalancerSkuStandard
 		cloud.Config.ExcludeMasterFromStandardLB = to.BoolPtr(true)
+		cloud.excludeLoadBalancerNodes = sets.NewString(test.excludeLBNodes...)
 
 		testVM := buildDefaultTestVirtualMachine(availabilitySetID, []string{test.nicID})
 		testNIC := buildDefaultTestInterface(false, []string{backendAddressPoolID})
@@ -1680,7 +1750,7 @@ func TestStandardEnsureBackendPoolDeleted(t *testing.T) {
 		mockNICClient.EXPECT().CreateOrUpdate(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 		cloud.InterfacesClient = mockNICClient
 
-		err := cloud.VMSet.EnsureBackendPoolDeleted(&service, backendPoolID, vmSetName, test.backendAddressPools)
+		err := cloud.VMSet.EnsureBackendPoolDeleted(&service, backendPoolID, vmSetName, test.backendAddressPools, true)
 		assert.NoError(t, err, test.desc)
 	}
 }
@@ -1746,4 +1816,26 @@ func TestStandardGetNodeNameByIPConfigurationID(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "k8s-agentpool1-00000000-0", nodeName)
 	assert.Equal(t, "agentpool1-availabilityset-00000000", asName)
+}
+
+func TestGetAvailabilitySetNameByID(t *testing.T) {
+	t.Run("getAvailabilitySetNameByID should return empty string if the given ID is empty", func(t *testing.T) {
+		vmasName, err := getAvailabilitySetNameByID("")
+		assert.Nil(t, err)
+		assert.Empty(t, vmasName)
+	})
+
+	t.Run("getAvailabilitySetNameByID should report an error if the format of the given ID is wrong", func(t *testing.T) {
+		asID := "illegal-id"
+		vmasName, err := getAvailabilitySetNameByID(asID)
+		assert.Equal(t, fmt.Errorf("getAvailabilitySetNameByID: failed to parse the VMAS ID illegal-id"), err)
+		assert.Empty(t, vmasName)
+	})
+
+	t.Run("getAvailabilitySetNameByID should extract the VMAS name from the given ID", func(t *testing.T) {
+		asID := "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/availabilitySets/as"
+		vmasName, err := getAvailabilitySetNameByID(asID)
+		assert.Nil(t, err)
+		assert.Equal(t, "as", vmasName)
+	})
 }

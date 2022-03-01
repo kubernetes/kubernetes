@@ -21,7 +21,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -30,6 +29,7 @@ import (
 
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/pkg/errors"
+
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
@@ -103,7 +103,7 @@ func GetPatchManagerForPath(path string, knownTargets []string, output io.Writer
 	pathLock.RUnlock()
 
 	if output == nil {
-		output = ioutil.Discard
+		output = io.Discard
 	}
 
 	fmt.Fprintf(output, "[patches] Reading patches from path %q\n", path)
@@ -283,7 +283,11 @@ func getPatchSetsFromPath(targetPath string, knownTargets []string, output io.Wr
 		goto return_path_error
 	}
 	if !info.IsDir() {
-		err = errors.New("not a directory")
+		err = &os.PathError{
+			Op:   "getPatchSetsFromPath",
+			Path: info.Name(),
+			Err:  errors.New("not a directory"),
+		}
 		goto return_path_error
 	}
 
@@ -311,7 +315,7 @@ func getPatchSetsFromPath(targetPath string, knownTargets []string, output io.Wr
 		}
 
 		// Read the patch file.
-		data, err := ioutil.ReadFile(path)
+		data, err := os.ReadFile(path)
 		if err != nil {
 			return errors.Wrapf(err, "could not read the file %q", path)
 		}

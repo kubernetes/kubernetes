@@ -31,18 +31,18 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/diff"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
+	testingclock "k8s.io/utils/clock/testing"
 	"k8s.io/utils/pointer"
 
 	"k8s.io/klog/v2"
 )
 
 func TestNewNodeLease(t *testing.T) {
-	fakeClock := clock.NewFakeClock(time.Now())
+	fakeClock := testingclock.NewFakeClock(time.Now())
 	node := &corev1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo",
@@ -276,7 +276,7 @@ func TestRetryUpdateNodeLease(t *testing.T) {
 				cl.PrependReactor("get", "leases", tc.getReactor)
 			}
 			c := &controller{
-				clock:                      clock.NewFakeClock(time.Now()),
+				clock:                      testingclock.NewFakeClock(time.Now()),
 				client:                     cl,
 				leaseClient:                cl.CoordinationV1().Leases(corev1.NamespaceNodeLease),
 				holderIdentity:             node.Name,
@@ -414,7 +414,7 @@ func TestUpdateUsingLatestLease(t *testing.T) {
 				cl.PrependReactor("create", "leases", tc.createReactor)
 			}
 			c := &controller{
-				clock:                   clock.NewFakeClock(time.Now()),
+				clock:                   testingclock.NewFakeClock(time.Now()),
 				client:                  cl,
 				leaseClient:             cl.CoordinationV1().Leases(corev1.NamespaceNodeLease),
 				holderIdentity:          node.Name,

@@ -44,6 +44,7 @@ import (
 	"k8s.io/client-go/discovery"
 	restclient "k8s.io/client-go/rest"
 	cliflag "k8s.io/component-base/cli/flag"
+	netutils "k8s.io/utils/net"
 )
 
 func setUp(t *testing.T) server.Config {
@@ -277,7 +278,7 @@ func TestServerRunWithSNI(t *testing.T) {
 
 			config.EnableIndex = true
 			secureOptions := (&SecureServingOptions{
-				BindAddress: net.ParseIP("127.0.0.1"),
+				BindAddress: netutils.ParseIPSloppy("127.0.0.1"),
 				BindPort:    6443,
 				ServerCert: GeneratableKeyCert{
 					CertKey: CertKey{
@@ -381,7 +382,7 @@ func TestServerRunWithSNI(t *testing.T) {
 func parseIPList(ips []string) []net.IP {
 	var netIPs []net.IP
 	for _, ip := range ips {
-		netIPs = append(netIPs, net.ParseIP(ip))
+		netIPs = append(netIPs, netutils.ParseIPSloppy(ip))
 	}
 	return netIPs
 }
@@ -488,7 +489,7 @@ func generateSelfSignedCertKey(host string, alternateIPs []net.IP, alternateDNS 
 		IsCA:                  true,
 	}
 
-	if ip := net.ParseIP(host); ip != nil {
+	if ip := netutils.ParseIPSloppy(host); ip != nil {
 		template.IPAddresses = append(template.IPAddresses, ip)
 	} else {
 		template.DNSNames = append(template.DNSNames, host)

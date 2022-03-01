@@ -14,6 +14,7 @@
 
 ARG BASEIMAGE
 ARG REGISTRY
+ARG OS_VERSION
 
 # We're using a Linux image to unpack the archive, then we're copying it over to Windows.
 FROM --platform=linux/amd64 alpine:3.6 as prep
@@ -55,8 +56,8 @@ RUN mkdir /curl-full /curl-dir && \
 
 
 # Windows Stage
-
-FROM e2eteam/powershell-helper:6.2.7 as ps-helper
+FROM --platform=linux/amd64 $REGISTRY/windows-servercore-cache:1.0-linux-amd64-$OS_VERSION as servercore-helper
+FROM --platform=linux/amd64 e2eteam/powershell-helper:6.2.7-linux-cache as ps-helper
 FROM $BASEIMAGE
 
 COPY --from=prep /tmp-dir /tmp
@@ -65,6 +66,11 @@ COPY --from=prep /curl-dir /curl
 COPY --from=prep /netcat-dir/nc64.exe /bin/nc.exe
 COPY --from=prep /dig-dir /dig
 COPY --from=prep /vcruntime140.dll /Windows/System32/
+
+# include nltest
+COPY --from=servercore-helper /Windows/System32/nltest.exe /Windows/System32/nltest.exe
+COPY --from=servercore-helper /Windows/System32/en-US/nltest.exe.mui /Windows/System32/en-US/nltest.exe.mui
+COPY --from=servercore-helper /Windows/System32/ntdsapi.dll /Windows/System32/ntdsapi.dll
 
 # include powershell and its Module analysis cache.
 COPY --from=ps-helper ["/PowerShell", "/Program Files/PowerShell"]

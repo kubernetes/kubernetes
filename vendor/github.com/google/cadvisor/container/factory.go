@@ -16,6 +16,8 @@ package container
 
 import (
 	"fmt"
+	"sort"
+	"strings"
 	"sync"
 
 	"github.com/google/cadvisor/fs"
@@ -27,7 +29,7 @@ import (
 
 type ContainerHandlerFactory interface {
 	// Create a new ContainerHandler using this factory. CanHandleAndAccept() must have returned true.
-	NewContainerHandler(name string, inHostNamespace bool) (c ContainerHandler, err error)
+	NewContainerHandler(name string, metadataEnvAllowList []string, inHostNamespace bool) (c ContainerHandler, err error)
 
 	// Returns whether this factory can handle and accept the specified container.
 	CanHandleAndAccept(name string) (handle bool, accept bool, err error)
@@ -63,6 +65,8 @@ const (
 	ReferencedMemoryMetrics        MetricKind = "referenced_memory"
 	CPUTopologyMetrics             MetricKind = "cpu_topology"
 	ResctrlMetrics                 MetricKind = "resctrl"
+	CPUSetMetrics                  MetricKind = "cpuset"
+	OOMMetrics                     MetricKind = "oom_event"
 )
 
 // AllMetrics represents all kinds of metrics that cAdvisor supported.
@@ -87,6 +91,8 @@ var AllMetrics = MetricSet{
 	ReferencedMemoryMetrics:        struct{}{},
 	CPUTopologyMetrics:             struct{}{},
 	ResctrlMetrics:                 struct{}{},
+	CPUSetMetrics:                  struct{}{},
+	OOMMetrics:                     struct{}{},
 }
 
 func (mk MetricKind) String() string {
@@ -100,15 +106,50 @@ func (ms MetricSet) Has(mk MetricKind) bool {
 	return exists
 }
 
-func (ms MetricSet) Add(mk MetricKind) {
+func (ms MetricSet) add(mk MetricKind) {
 	ms[mk] = struct{}{}
+}
+
+func (ms MetricSet) String() string {
+	values := make([]string, 0, len(ms))
+	for metric := range ms {
+		values = append(values, string(metric))
+	}
+	sort.Strings(values)
+	return strings.Join(values, ",")
+}
+
+// Not thread-safe, exported only for https://pkg.go.dev/flag#Value
+func (ms *MetricSet) Set(value string) error {
+	*ms = MetricSet{}
+	if value == "" {
+		return nil
+	}
+	for _, metric := range strings.Split(value, ",") {
+		if AllMetrics.Has(MetricKind(metric)) {
+			(*ms).add(MetricKind(metric))
+		} else {
+			return fmt.Errorf("unsupported metric %q specified", metric)
+		}
+	}
+	return nil
 }
 
 func (ms MetricSet) Difference(ms1 MetricSet) MetricSet {
 	result := MetricSet{}
 	for kind := range ms {
 		if !ms1.Has(kind) {
-			result.Add(kind)
+			result.add(kind)
+		}
+	}
+	return result
+}
+
+func (ms MetricSet) Append(ms1 MetricSet) MetricSet {
+	result := ms
+	for kind := range ms1 {
+		if !ms.Has(kind) {
+			result.add(kind)
 		}
 	}
 	return result
@@ -196,12 +237,15 @@ func HasFactories() bool {
 }
 
 // Create a new ContainerHandler for the specified container.
-func NewContainerHandler(name string, watchType watcher.ContainerWatchSource, inHostNamespace bool) (ContainerHandler, bool, error) {
+func NewContainerHandler(name string, watchType watcher.ContainerWatchSource, metadataEnvAllowList []string, inHostNamespace bool) (ContainerHandler, bool, error) {
 	factoriesLock.RLock()
 	defer factoriesLock.RUnlock()
 
 	// Create the ContainerHandler with the first factory that supports it.
-	for _, factory := range factories[watchType] {
+	// Note that since RawContainerHandler can support a wide range of paths,
+	// it's evaluated last just to make sure if any other ContainerHandler
+	// can support it.
+	for _, factory := range GetReorderedFactoryList(watchType) {
 		canHandle, canAccept, err := factory.CanHandleAndAccept(name)
 		if err != nil {
 			klog.V(4).Infof("Error trying to work out if we can handle %s: %v", name, err)
@@ -212,7 +256,7 @@ func NewContainerHandler(name string, watchType watcher.ContainerWatchSource, in
 				return nil, false, nil
 			}
 			klog.V(3).Infof("Using factory %q for container %q", factory, name)
-			handle, err := factory.NewContainerHandler(name, inHostNamespace)
+			handle, err := factory.NewContainerHandler(name, metadataEnvAllowList, inHostNamespace)
 			return handle, canAccept, err
 		}
 		klog.V(4).Infof("Factory %q was unable to handle container %q", factory, name)
@@ -243,4 +287,27 @@ func DebugInfo() map[string][]string {
 		}
 	}
 	return out
+}
+
+// GetReorderedFactoryList returns the list of ContainerHandlerFactory where the
+// RawContainerHandler is always the last element.
+func GetReorderedFactoryList(watchType watcher.ContainerWatchSource) []ContainerHandlerFactory {
+	ContainerHandlerFactoryList := make([]ContainerHandlerFactory, 0, len(factories))
+
+	var rawFactory ContainerHandlerFactory
+	for _, v := range factories[watchType] {
+		if v != nil {
+			if v.String() == "raw" {
+				rawFactory = v
+				continue
+			}
+			ContainerHandlerFactoryList = append(ContainerHandlerFactoryList, v)
+		}
+	}
+
+	if rawFactory != nil {
+		ContainerHandlerFactoryList = append(ContainerHandlerFactoryList, rawFactory)
+	}
+
+	return ContainerHandlerFactoryList
 }

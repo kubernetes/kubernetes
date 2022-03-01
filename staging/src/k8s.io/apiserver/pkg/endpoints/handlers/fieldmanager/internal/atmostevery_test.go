@@ -45,7 +45,7 @@ func TestAtMostEvery(t *testing.T) {
 		}
 	}
 
-	if expected := int(duration/delay) + 1; count != expected {
-		t.Fatalf("Function called %d times, should have been called exactly %d times", count, expected)
+	if expected := int(duration/delay) + 1; count > expected {
+		t.Fatalf("Function called %d times, should have been called less than or equal to %d times", count, expected)
 	}
 }

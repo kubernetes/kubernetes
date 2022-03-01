@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+//go:generate mockgen -source=runtime.go -destination=testing/runtime_mock.go -package=testing Runtime
 package container
 
 import (
@@ -29,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/client-go/util/flowcontrol"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/volume"
 )
@@ -68,9 +69,6 @@ type Runtime interface {
 	// Type returns the type of the container runtime.
 	Type() string
 
-	//SupportsSingleFileMapping returns whether the container runtime supports single file mappings or not.
-	SupportsSingleFileMapping() bool
-
 	// Version returns the version information of the container runtime.
 	Version() (Version, error)
 
@@ -92,10 +90,11 @@ type Runtime interface {
 	// file). In this case, garbage collector should refrain itself from aggressive
 	// behavior such as removing all containers of unrecognized pods (yet).
 	// If evictNonDeletedPods is set to true, containers and sandboxes belonging to pods
-	// that are terminated, but not deleted will be evicted.  Otherwise, only deleted pods will be GC'd.
+	// that are terminated, but not deleted will be evicted.  Otherwise, only deleted pods
+	// will be GC'd.
 	// TODO: Revisit this method and make it cleaner.
 	GarbageCollect(gcPolicy GCPolicy, allSourcesReady bool, evictNonDeletedPods bool) error
-	// Syncs the running pod into the desired pod.
+	// SyncPod syncs the running pod into the desired pod.
 	SyncPod(pod *v1.Pod, podStatus *PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) PodSyncResult
 	// KillPod kills all the containers of a pod. Pod may be nil, running pod must not be.
 	// TODO(random-liu): Return PodSyncResult in KillPod.
@@ -112,7 +111,7 @@ type Runtime interface {
 	// stream the log. Set 'follow' to false and specify the number of lines (e.g.
 	// "100" or "all") to tail the log.
 	GetContainerLogs(ctx context.Context, pod *v1.Pod, containerID ContainerID, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) (err error)
-	// Delete a container. If the container is still running, an error is returned.
+	// DeleteContainer deletes a container. If the container is still running, an error is returned.
 	DeleteContainer(containerID ContainerID) error
 	// ImageService provides methods to image-related methods.
 	ImageService
@@ -139,11 +138,11 @@ type ImageService interface {
 	// GetImageRef gets the reference (digest or ID) of the image which has already been in
 	// the local storage. It returns ("", nil) if the image isn't in the local storage.
 	GetImageRef(image ImageSpec) (string, error)
-	// Gets all images currently on the machine.
+	// ListImages gets all images currently on the machine.
 	ListImages() ([]Image, error)
-	// Removes the specified image.
+	// RemoveImage removes the specified image.
 	RemoveImage(image ImageSpec) error
-	// Returns Image statistics.
+	// ImageStats returns Image statistics.
 	ImageStats() (*ImageStats, error)
 }
 
@@ -204,7 +203,7 @@ func BuildContainerID(typ, ID string) ContainerID {
 func ParseContainerID(containerID string) ContainerID {
 	var id ContainerID
 	if err := id.ParseString(containerID); err != nil {
-		klog.Error(err)
+		klog.ErrorS(err, "Parsing containerID failed")
 	}
 	return id
 }
@@ -369,6 +368,8 @@ type Image struct {
 	Size int64
 	// ImageSpec for the image which include annotations.
 	Spec ImageSpec
+	// Pin for preventing garbage collection
+	Pinned bool
 }
 
 // EnvVar represents the environment variable.

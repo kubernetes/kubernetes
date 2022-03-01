@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -26,10 +27,7 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utiltesting "k8s.io/client-go/util/testing"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 type localFakeMounter struct {
@@ -43,10 +41,6 @@ func (l *localFakeMounter) GetPath() string {
 
 func (l *localFakeMounter) GetAttributes() Attributes {
 	return l.attributes
-}
-
-func (l *localFakeMounter) CanMount() error {
-	return nil
 }
 
 func (l *localFakeMounter) SetUp(mounterArgs MounterArgs) error {
@@ -191,12 +185,10 @@ func TestSetVolumeOwnershipMode(t *testing.T) {
 		fsGroupChangePolicy *v1.PodFSGroupChangePolicy
 		setupFunc           func(path string) error
 		assertFunc          func(path string) error
-		featureGate         bool
 	}{
 		{
 			description:         "featuregate=on, fsgroupchangepolicy=always",
 			fsGroupChangePolicy: &always,
-			featureGate:         true,
 			setupFunc: func(path string) error {
 				info, err := os.Lstat(path)
 				if err != nil {
@@ -229,7 +221,6 @@ func TestSetVolumeOwnershipMode(t *testing.T) {
 		{
 			description:         "featuregate=on, fsgroupchangepolicy=onrootmismatch,rootdir=validperm",
 			fsGroupChangePolicy: &onrootMismatch,
-			featureGate:         true,
 			setupFunc: func(path string) error {
 				info, err := os.Lstat(path)
 				if err != nil {
@@ -261,7 +252,6 @@ func TestSetVolumeOwnershipMode(t *testing.T) {
 		{
 			description:         "featuregate=on, fsgroupchangepolicy=onrootmismatch,rootdir=invalidperm",
 			fsGroupChangePolicy: &onrootMismatch,
-			featureGate:         true,
 			setupFunc: func(path string) error {
 				// change mode of root folder to be right
 				err := os.Chmod(path, 0770)
@@ -290,7 +280,6 @@ func TestSetVolumeOwnershipMode(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConfigurableFSGroupPolicy, test.featureGate)()
 			tmpDir, err := utiltesting.MkTmpdir("volume_linux_ownership")
 			if err != nil {
 				t.Fatalf("error creating temp dir: %v", err)

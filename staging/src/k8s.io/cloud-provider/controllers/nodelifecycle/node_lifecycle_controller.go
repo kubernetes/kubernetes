@@ -36,6 +36,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	cloudproviderapi "k8s.io/cloud-provider/api"
 	cloudnodeutil "k8s.io/cloud-provider/node/helpers"
+	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/klog/v2"
 )
 
@@ -103,7 +104,7 @@ func NewCloudNodeLifecycleController(
 
 // Run starts the main loop for this controller. Run is blocking so should
 // be called via a goroutine
-func (c *CloudNodeLifecycleController) Run(stopCh <-chan struct{}) {
+func (c *CloudNodeLifecycleController) Run(ctx context.Context) {
 	defer utilruntime.HandleCrash()
 
 	// The following loops run communicate with the APIServer with a worst case complexity
@@ -112,13 +113,13 @@ func (c *CloudNodeLifecycleController) Run(stopCh <-chan struct{}) {
 
 	// Start a loop to periodically check if any nodes have been
 	// deleted or shutdown from the cloudprovider
-	wait.Until(c.MonitorNodes, c.nodeMonitorPeriod, stopCh)
+	wait.UntilWithContext(ctx, c.MonitorNodes, c.nodeMonitorPeriod)
 }
 
 // MonitorNodes checks to see if nodes in the cluster have been deleted
 // or shutdown. If deleted, it deletes the node resource. If shutdown it
 // applies a shutdown taint to the node
-func (c *CloudNodeLifecycleController) MonitorNodes() {
+func (c *CloudNodeLifecycleController) MonitorNodes(ctx context.Context) {
 	nodes, err := c.nodeLister.List(labels.Everything())
 	if err != nil {
 		klog.Errorf("error listing nodes from cache: %s", err)
@@ -128,7 +129,7 @@ func (c *CloudNodeLifecycleController) MonitorNodes() {
 	for _, node := range nodes {
 		// Default NodeReady status to v1.ConditionUnknown
 		status := v1.ConditionUnknown
-		if _, c := cloudnodeutil.GetNodeCondition(&node.Status, v1.NodeReady); c != nil {
+		if _, c := nodeutil.GetNodeCondition(&node.Status, v1.NodeReady); c != nil {
 			status = c.Status
 		}
 
@@ -143,7 +144,7 @@ func (c *CloudNodeLifecycleController) MonitorNodes() {
 
 		// At this point the node has NotReady status, we need to check if the node has been removed
 		// from the cloud provider. If node cannot be found in cloudprovider, then delete the node
-		exists, err := ensureNodeExistsByProviderID(context.TODO(), c.cloud, node)
+		exists, err := ensureNodeExistsByProviderID(ctx, c.cloud, node)
 		if err != nil {
 			klog.Errorf("error checking if node %s exists: %v", node.Name, err)
 			continue
@@ -164,14 +165,14 @@ func (c *CloudNodeLifecycleController) MonitorNodes() {
 			c.recorder.Eventf(ref, v1.EventTypeNormal, deleteNodeEvent,
 				"Deleting node %s because it does not exist in the cloud provider", node.Name)
 
-			if err := c.kubeClient.CoreV1().Nodes().Delete(context.TODO(), node.Name, metav1.DeleteOptions{}); err != nil {
+			if err := c.kubeClient.CoreV1().Nodes().Delete(ctx, node.Name, metav1.DeleteOptions{}); err != nil {
 				klog.Errorf("unable to delete node %q: %v", node.Name, err)
 			}
 		} else {
 			// Node exists. We need to check this to get taint working in similar in all cloudproviders
 			// current problem is that shutdown nodes are not working in similar way ie. all cloudproviders
 			// does not delete node from kubernetes cluster when instance it is shutdown see issue #46442
-			shutdown, err := shutdownInCloudProvider(context.TODO(), c.cloud, node)
+			shutdown, err := shutdownInCloudProvider(ctx, c.cloud, node)
 			if err != nil {
 				klog.Errorf("error checking if node %s is shutdown: %v", node.Name, err)
 			}

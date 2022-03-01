@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"strconv"
 	"strings"
@@ -202,7 +201,8 @@ func (w *deferredResponseWriter) Write(p []byte) (n int, err error) {
 			w.trace.Step("Write call finished",
 				utiltrace.Field{"writer", fmt.Sprintf("%T", w.w)},
 				utiltrace.Field{"size", len(p)},
-				utiltrace.Field{"firstWrite", firstWrite})
+				utiltrace.Field{"firstWrite", firstWrite},
+				utiltrace.Field{"err", err})
 		}()
 	}
 	if w.hasWritten {
@@ -244,8 +244,6 @@ func (w *deferredResponseWriter) Close() error {
 	return err
 }
 
-var nopCloser = ioutil.NopCloser(nil)
-
 // WriteObjectNegotiated renders an object in the content type negotiated by the client.
 func WriteObjectNegotiated(s runtime.NegotiatedSerializer, restrictions negotiation.EndpointRestrictions, gv schema.GroupVersion, w http.ResponseWriter, req *http.Request, statusCode int, object runtime.Object) {
 	stream, ok := object.(rest.ResourceStreamer)
@@ -270,9 +268,7 @@ func WriteObjectNegotiated(s runtime.NegotiatedSerializer, restrictions negotiat
 		return
 	}
 
-	if ae := request.AuditEventFrom(req.Context()); ae != nil {
-		audit.LogResponseObject(ae, object, gv, s)
-	}
+	audit.LogResponseObject(req.Context(), object, gv, s)
 
 	encoder := s.EncoderForVersion(serializer.Serializer, gv)
 	SerializeObject(serializer.MediaType, encoder, w, req, statusCode, object)

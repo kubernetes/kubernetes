@@ -20,12 +20,15 @@ package v1beta1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1beta1 "k8s.io/api/coordination/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	coordinationv1beta1 "k8s.io/client-go/applyconfigurations/coordination/v1beta1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
 )
@@ -46,6 +49,7 @@ type LeaseInterface interface {
 	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.LeaseList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.Lease, err error)
+	Apply(ctx context.Context, lease *coordinationv1beta1.LeaseApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.Lease, err error)
 	LeaseExpansion
 }
 
@@ -171,6 +175,32 @@ func (c *leases) Patch(ctx context.Context, name string, pt types.PatchType, dat
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied lease.
+func (c *leases) Apply(ctx context.Context, lease *coordinationv1beta1.LeaseApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.Lease, err error) {
+	if lease == nil {
+		return nil, fmt.Errorf("lease provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(lease)
+	if err != nil {
+		return nil, err
+	}
+	name := lease.Name
+	if name == nil {
+		return nil, fmt.Errorf("lease.Name must be provided to Apply")
+	}
+	result = &v1beta1.Lease{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("leases").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

@@ -49,7 +49,7 @@ type Cgroup struct {
 func parseCgroupString(cgroupStr string) (*Cgroup, error) {
 	var err error
 
-	fields := strings.Split(cgroupStr, ":")
+	fields := strings.SplitN(cgroupStr, ":", 3)
 	if len(fields) < 3 {
 		return nil, fmt.Errorf("at least 3 fields required, found %d fields in cgroup string: %s", len(fields), cgroupStr)
 	}
@@ -90,7 +90,7 @@ func parseCgroups(data []byte) ([]Cgroup, error) {
 // control hierarchy running on this system. On every system (v1 and v2), all hierarchies contain all processes,
 // so the len of the returned struct is equal to the number of active hierarchies on this system
 func (p Proc) Cgroups() ([]Cgroup, error) {
-	data, err := util.ReadFileNoStat(fmt.Sprintf("/proc/%d/cgroup", p.PID))
+	data, err := util.ReadFileNoStat(p.path("cgroup"))
 	if err != nil {
 		return nil, err
 	}

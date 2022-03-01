@@ -41,7 +41,7 @@ if git --no-pager grep -L '// +k8s:prerelease-lifecycle-gen=true' -- 'staging/sr
   exit 1
 fi
 
-if git --no-pager grep -L '// +k8s:prerelease-lifecycle-gen=true' -- 'staging/src/k8s.io/apiextensions-apisever/pkg/apis/**/*beta*/doc.go'; then
+if git --no-pager grep -L '// +k8s:prerelease-lifecycle-gen=true' -- 'staging/src/k8s.io/apiextensions-apiserver/pkg/apis/**/*beta*/doc.go'; then
   echo "!!! Some beta packages doc.go do not include prerelease-lifecycle tags."
   echo "To fix these errors, add '// +k8s:prerelease-lifecycle-gen=true' to doc.go and"
   echo "add '// +k8s:prerelease-lifecycle-gen:introduced=1.<release>' to every type that embeds metav1.TypeMeta"

@@ -19,6 +19,8 @@ limitations under the License.
 // +k8s:deepcopy-gen=package
 // +k8s:conversion-gen=k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm
 
+// Package v1beta2 has been DEPRECATED by v1beta3
+//
 // Package v1beta2 defines the v1beta2 version of the kubeadm configuration file format.
 // This version improves on the v1beta1 format by fixing some minor issues and adding a few new fields.
 //
@@ -121,7 +123,7 @@ limitations under the License.
 // including settings for:
 //
 // - Networking, that holds configuration for the networking topology of the cluster; use it e.g. to customize
-// node subnet or services subnet.
+// pod subnet or services subnet.
 //
 // - Etcd configurations; use it e.g. to customize the local etcd or to configure the API server
 // for using an external etcd cluster.
@@ -167,13 +169,13 @@ limitations under the License.
 // 	  - system:bootstrappers:kubeadm:default-node-token
 // 	nodeRegistration:
 // 	  name: "ec2-10-100-0-1"
-// 	  criSocket: "/var/run/dockershim.sock"
+// 	  criSocket: "unix:///var/run/containerd/containerd.sock"
 // 	  taints:
 // 	  - key: "kubeadmNode"
-// 	    value: "master"
+// 	    value: "someValue"
 // 	    effect: "NoSchedule"
 // 	  kubeletExtraArgs:
-// 	    cgroup-driver: "cgroupfs"
+// 	    v: 4
 //	  ignorePreflightErrors:
 //	  - IsPrivilegedUser
 // 	localAPIEndpoint:
@@ -203,8 +205,8 @@ limitations under the License.
 // 	    # certFile: "/etcd/kubernetes/pki/etcd/etcd.crt"
 // 	    # keyFile: "/etcd/kubernetes/pki/etcd/etcd.key"
 // 	networking:
-// 	  serviceSubnet: "10.96.0.0/12"
-// 	  podSubnet: "10.100.0.1/24"
+// 	  serviceSubnet: "10.96.0.0/16"
+// 	  podSubnet: "10.244.0.0/24"
 // 	  dnsDomain: "cluster.local"
 // 	kubernetesVersion: "v1.12.0"
 // 	controlPlaneEndpoint: "10.100.0.1:6443"

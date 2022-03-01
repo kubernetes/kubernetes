@@ -20,12 +20,12 @@ import (
 	"context"
 	"time"
 
-	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/daemonset"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -37,7 +37,7 @@ const (
 	testSlowMultiplier = 60
 )
 
-var _ = SIGDescribe("Device Plugin", func() {
+var _ = SIGDescribe("[Feature:GPUDevicePlugin] Device Plugin", func() {
 	f := framework.NewDefaultFramework("device-plugin")
 
 	var cs clientset.Interface
@@ -57,62 +57,37 @@ var _ = SIGDescribe("Device Plugin", func() {
 		labels := map[string]string{
 			daemonsetNameLabel: dsName,
 		}
-		ds := &appsv1.DaemonSet{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      dsName,
-				Namespace: "kube-system",
+		volumes := []v1.Volume{
+			{
+				Name: mountName,
+				VolumeSource: v1.VolumeSource{
+					HostPath: &v1.HostPathVolumeSource{
+						Path: mountPath,
+					},
+				},
 			},
-			Spec: appsv1.DaemonSetSpec{
-				Selector: &metav1.LabelSelector{
-					MatchLabels: labels,
-				},
-				Template: v1.PodTemplateSpec{
-					ObjectMeta: metav1.ObjectMeta{
-						Annotations: map[string]string{
-							"scheduler.alpha.kubernetes.io/critical-pod": "",
-						},
-						Labels: labels,
-					},
-					Spec: v1.PodSpec{
-						Tolerations: []v1.Toleration{
-							{
-								Key:      "CriticalAddonsOnly",
-								Operator: "Exists",
-							},
-						},
-						Containers: []v1.Container{
-							{
-								Name:  "hostdev",
-								Image: image,
-								VolumeMounts: []v1.VolumeMount{
-									{
-										Name:      mountName,
-										MountPath: mountPath,
-									},
-								},
-								Env: []v1.EnvVar{
-									{
-										Name:  "DIRECTX_GPU_MATCH_NAME",
-										Value: " ",
-									},
-								},
-							},
-						},
-						Volumes: []v1.Volume{
-							{
-								Name: mountName,
-								VolumeSource: v1.VolumeSource{
-									HostPath: &v1.HostPathVolumeSource{
-										Path: mountPath,
-									},
-								},
-							},
-						},
-						NodeSelector: map[string]string{
-							"kubernetes.io/os": "windows",
-						},
-					},
-				},
+		}
+		mounts := []v1.VolumeMount{
+			{
+				Name:      mountName,
+				MountPath: mountPath,
+			},
+		}
+		ds := daemonset.NewDaemonSet(dsName, image, labels, volumes, mounts, nil)
+		ds.Spec.Template.Spec.PriorityClassName = "system-node-critical"
+		ds.Spec.Template.Spec.Tolerations = []v1.Toleration{
+			{
+				Key:      "CriticalAddonsOnly",
+				Operator: "Exists",
+			},
+		}
+		ds.Spec.Template.Spec.NodeSelector = map[string]string{
+			"kubernetes.io/os": "windows",
+		}
+		ds.Spec.Template.Spec.Containers[0].Env = []v1.EnvVar{
+			{
+				Name:  "DIRECTX_GPU_MATCH_NAME",
+				Value: " ",
 			},
 		}
 

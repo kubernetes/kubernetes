@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	registrytest "k8s.io/apiserver/pkg/registry/generic/testing"
@@ -50,7 +51,8 @@ import (
 func newStorage(t *testing.T) (customresource.CustomResourceStorage, *etcd3testing.EtcdTestServer) {
 	server, etcdStorage := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
 	etcdStorage.Codec = unstructured.UnstructuredJSONScheme
-	restOptions := generic.RESTOptions{StorageConfig: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1, ResourcePrefix: "noxus"}
+	groupResource := schema.GroupResource{Group: "mygroup.example.com", Resource: "noxus"}
+	restOptions := generic.RESTOptions{StorageConfig: etcdStorage.ForResource(groupResource), Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1, ResourcePrefix: "noxus"}
 
 	parameterScheme := runtime.NewScheme()
 	parameterScheme.AddUnversionedTypes(schema.GroupVersion{Group: "mygroup.example.com", Version: "v1beta1"},
@@ -90,7 +92,7 @@ func newStorage(t *testing.T) (customresource.CustomResourceStorage, *etcd3testi
 	table, _ := tableconvertor.New(headers)
 
 	storage := customresource.NewStorage(
-		schema.GroupResource{Group: "mygroup.example.com", Resource: "noxus"},
+		groupResource,
 		kind,
 		schema.GroupVersionKind{Group: "mygroup.example.com", Version: "v1beta1", Kind: "NoxuItemList"},
 		customresource.NewStrategy(
@@ -106,6 +108,7 @@ func newStorage(t *testing.T) (customresource.CustomResourceStorage, *etcd3testi
 		restOptions,
 		[]string{"all"},
 		table,
+		fieldmanager.ResourcePathMappings{},
 	)
 
 	return storage, server

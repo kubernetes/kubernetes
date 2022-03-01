@@ -19,7 +19,6 @@ package get
 import (
 	"bytes"
 	"encoding/json"
-	encjson "encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -124,13 +123,13 @@ func TestGetUnknownSchemaObject(t *testing.T) {
 	for i, obj := range actual {
 		expectedJSON := runtime.EncodeOrDie(codec, expected[i])
 		expectedMap := map[string]interface{}{}
-		if err := encjson.Unmarshal([]byte(expectedJSON), &expectedMap); err != nil {
+		if err := json.Unmarshal([]byte(expectedJSON), &expectedMap); err != nil {
 			t.Fatal(err)
 		}
 
 		actualJSON := runtime.EncodeOrDie(codec, obj)
 		actualMap := map[string]interface{}{}
-		if err := encjson.Unmarshal([]byte(actualJSON), &actualMap); err != nil {
+		if err := json.Unmarshal([]byte(actualJSON), &actualMap); err != nil {
 			t.Fatal(err)
 		}
 
@@ -677,7 +676,6 @@ func TestGetEmptyTable(t *testing.T) {
 "kind":"Table",
 "apiVersion":"meta.k8s.io/v1beta1",
 "metadata":{
-	"selfLink":"/api/v1/namespaces/default/pods",
 	"resourceVersion":"346"
 },
 "columnDefinitions":[
@@ -860,7 +858,7 @@ func TestGetSortedObjects(t *testing.T) {
 	cmd := NewCmdGet("kubectl", tf, streams)
 	cmd.SetOutput(buf)
 
-	// sorting with metedata.name
+	// sorting with metadata.name
 	cmd.Flags().Set("sort-by", ".metadata.name")
 	cmd.Run(cmd, []string{"pods"})
 
@@ -879,7 +877,7 @@ func TestGetSortedObjectsUnstructuredTable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	unstructuredBytes, err := encjson.MarshalIndent(unstructuredMap, "", "  ")
+	unstructuredBytes, err := json.MarshalIndent(unstructuredMap, "", "  ")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -899,7 +897,7 @@ func TestGetSortedObjectsUnstructuredTable(t *testing.T) {
 	cmd := NewCmdGet("kubectl", tf, streams)
 	cmd.SetOutput(buf)
 
-	// sorting with metedata.name
+	// sorting with metadata.name
 	cmd.Flags().Set("sort-by", ".metadata.name")
 	cmd.Run(cmd, []string{"pods"})
 
@@ -1298,8 +1296,7 @@ func TestGetMixedGenericObjects(t *testing.T) {
     ],
     "kind": "List",
     "metadata": {
-        "resourceVersion": "",
-        "selfLink": ""
+        "resourceVersion": ""
     }
 }
 `
@@ -1477,8 +1474,7 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
     ],
     "kind": "List",
     "metadata": {
-        "resourceVersion": "",
-        "selfLink": ""
+        "resourceVersion": ""
     }
 }
 `

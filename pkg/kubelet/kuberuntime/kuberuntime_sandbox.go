@@ -18,35 +18,37 @@ package kuberuntime
 
 import (
 	"fmt"
-	"net"
 	"net/url"
 	"runtime"
 	"sort"
 
 	v1 "k8s.io/api/core/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
+	netutils "k8s.io/utils/net"
 )
 
 // createPodSandbox creates a pod sandbox and returns (podSandBoxID, message, error).
 func (m *kubeGenericRuntimeManager) createPodSandbox(pod *v1.Pod, attempt uint32) (string, string, error) {
 	podSandboxConfig, err := m.generatePodSandboxConfig(pod, attempt)
 	if err != nil {
-		message := fmt.Sprintf("GeneratePodSandboxConfig for pod %q failed: %v", format.Pod(pod), err)
-		klog.Error(message)
+		message := fmt.Sprintf("Failed to generate sandbox config for pod %q: %v", format.Pod(pod), err)
+		klog.ErrorS(err, "Failed to generate sandbox config for pod", "pod", klog.KObj(pod))
 		return "", message, err
 	}
 
 	// Create pod logs directory
 	err = m.osInterface.MkdirAll(podSandboxConfig.LogDirectory, 0755)
 	if err != nil {
-		message := fmt.Sprintf("Create pod log directory for pod %q failed: %v", format.Pod(pod), err)
-		klog.Errorf(message)
+		message := fmt.Sprintf("Failed to create log directory for pod %q: %v", format.Pod(pod), err)
+		klog.ErrorS(err, "Failed to create log directory for pod", "pod", klog.KObj(pod))
 		return "", message, err
 	}
 
@@ -54,18 +56,18 @@ func (m *kubeGenericRuntimeManager) createPodSandbox(pod *v1.Pod, attempt uint32
 	if m.runtimeClassManager != nil {
 		runtimeHandler, err = m.runtimeClassManager.LookupRuntimeHandler(pod.Spec.RuntimeClassName)
 		if err != nil {
-			message := fmt.Sprintf("CreatePodSandbox for pod %q failed: %v", format.Pod(pod), err)
+			message := fmt.Sprintf("Failed to create sandbox for pod %q: %v", format.Pod(pod), err)
 			return "", message, err
 		}
 		if runtimeHandler != "" {
-			klog.V(2).Infof("Running pod %s with RuntimeHandler %q", format.Pod(pod), runtimeHandler)
+			klog.V(2).InfoS("Running pod with runtime handler", "pod", klog.KObj(pod), "runtimeHandler", runtimeHandler)
 		}
 	}
 
 	podSandBoxID, err := m.runtimeService.RunPodSandbox(podSandboxConfig, runtimeHandler)
 	if err != nil {
-		message := fmt.Sprintf("CreatePodSandbox for pod %q failed: %v", format.Pod(pod), err)
-		klog.Error(message)
+		message := fmt.Sprintf("Failed to create sandbox for pod %q: %v", format.Pod(pod), err)
+		klog.ErrorS(err, "Failed to create sandbox for pod", "pod", klog.KObj(pod))
 		return "", message, err
 	}
 
@@ -138,6 +140,18 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *v1.Pod, attemp
 	}
 	podSandboxConfig.Linux = lc
 
+	if runtime.GOOS == "windows" {
+		wc, err := m.generatePodSandboxWindowsConfig(pod)
+		if err != nil {
+			return nil, err
+		}
+		podSandboxConfig.Windows = wc
+	}
+
+	// Update config to include overhead, sandbox level resources
+	if err := m.applySandboxResources(pod, podSandboxConfig); err != nil {
+		return nil, err
+	}
 	return podSandboxConfig, nil
 }
 
@@ -206,6 +220,54 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(pod *v1.Pod) (
 	return lc, nil
 }
 
+// generatePodSandboxWindowsConfig generates WindowsPodSandboxConfig from v1.Pod.
+// On Windows this will get called in addition to LinuxPodSandboxConfig because not all relevant fields have been added to
+// WindowsPodSandboxConfig at this time.
+func (m *kubeGenericRuntimeManager) generatePodSandboxWindowsConfig(pod *v1.Pod) (*runtimeapi.WindowsPodSandboxConfig, error) {
+	wc := &runtimeapi.WindowsPodSandboxConfig{
+		SecurityContext: &runtimeapi.WindowsSandboxSecurityContext{},
+	}
+
+	sc := pod.Spec.SecurityContext
+	if sc == nil || sc.WindowsOptions == nil {
+		return wc, nil
+	}
+
+	wo := sc.WindowsOptions
+	if wo.GMSACredentialSpec != nil {
+		wc.SecurityContext.CredentialSpec = *wo.GMSACredentialSpec
+	}
+
+	if wo.RunAsUserName != nil {
+		wc.SecurityContext.RunAsUsername = *wo.RunAsUserName
+	}
+
+	if kubecontainer.HasWindowsHostProcessContainer(pod) {
+		// Pods containing HostProcess containers should fail to schedule if feature is not
+		// enabled instead of trying to schedule containers as regular containers as stated in
+		// PRR review.
+		if !utilfeature.DefaultFeatureGate.Enabled(features.WindowsHostProcessContainers) {
+			return nil, fmt.Errorf("pod contains HostProcess containers but feature 'WindowsHostProcessContainers' is not enabled")
+		}
+
+		if wo.HostProcess != nil && !*wo.HostProcess {
+			return nil, fmt.Errorf("pod must not contain any HostProcess containers if Pod's WindowsOptions.HostProcess is set to false")
+		}
+		// At present Windows all containers in a Windows pod must be HostProcess containers
+		// and HostNetwork is required to be set.
+		if !kubecontainer.AllContainersAreWindowsHostProcess(pod) {
+			return nil, fmt.Errorf("pod must not contain both HostProcess and non-HostProcess containers")
+		}
+		if !kubecontainer.IsHostNetworkPod(pod) {
+			return nil, fmt.Errorf("hostNetwork is required if Pod contains HostProcess containers")
+		}
+
+		wc.SecurityContext.HostProcess = true
+	}
+
+	return wc, nil
+}
+
 // getKubeletSandboxes lists all (or just the running) sandboxes managed by kubelet.
 func (m *kubeGenericRuntimeManager) getKubeletSandboxes(all bool) ([]*runtimeapi.PodSandbox, error) {
 	var filter *runtimeapi.PodSandboxFilter
@@ -220,7 +282,7 @@ func (m *kubeGenericRuntimeManager) getKubeletSandboxes(all bool) ([]*runtimeapi
 
 	resp, err := m.runtimeService.ListPodSandbox(filter)
 	if err != nil {
-		klog.Errorf("ListPodSandbox failed: %v", err)
+		klog.ErrorS(err, "Failed to list pod sandboxes")
 		return nil, err
 	}
 
@@ -231,7 +293,7 @@ func (m *kubeGenericRuntimeManager) getKubeletSandboxes(all bool) ([]*runtimeapi
 func (m *kubeGenericRuntimeManager) determinePodSandboxIPs(podNamespace, podName string, podSandbox *runtimeapi.PodSandboxStatus) []string {
 	podIPs := make([]string, 0)
 	if podSandbox.Network == nil {
-		klog.Warningf("Pod Sandbox status doesn't have network information, cannot report IPs")
+		klog.InfoS("Pod Sandbox status doesn't have network information, cannot report IPs", "pod", klog.KRef(podNamespace, podName))
 		return podIPs
 	}
 
@@ -240,8 +302,8 @@ func (m *kubeGenericRuntimeManager) determinePodSandboxIPs(podNamespace, podName
 
 	// pick primary IP
 	if len(podSandbox.Network.Ip) != 0 {
-		if net.ParseIP(podSandbox.Network.Ip) == nil {
-			klog.Warningf("Pod Sandbox reported an unparseable IP (Primary) %v", podSandbox.Network.Ip)
+		if netutils.ParseIPSloppy(podSandbox.Network.Ip) == nil {
+			klog.InfoS("Pod Sandbox reported an unparseable primary IP", "pod", klog.KRef(podNamespace, podName), "IP", podSandbox.Network.Ip)
 			return nil
 		}
 		podIPs = append(podIPs, podSandbox.Network.Ip)
@@ -249,8 +311,8 @@ func (m *kubeGenericRuntimeManager) determinePodSandboxIPs(podNamespace, podName
 
 	// pick additional ips, if cri reported them
 	for _, podIP := range podSandbox.Network.AdditionalIps {
-		if nil == net.ParseIP(podIP.Ip) {
-			klog.Warningf("Pod Sandbox reported an unparseable IP (additional) %v", podIP.Ip)
+		if nil == netutils.ParseIPSloppy(podIP.Ip) {
+			klog.InfoS("Pod Sandbox reported an unparseable additional IP", "pod", klog.KRef(podNamespace, podName), "IP", podIP.Ip)
 			return nil
 		}
 		podIPs = append(podIPs, podIP.Ip)
@@ -272,7 +334,7 @@ func (m *kubeGenericRuntimeManager) getSandboxIDByPodUID(podUID kubetypes.UID, s
 	}
 	sandboxes, err := m.runtimeService.ListPodSandbox(filter)
 	if err != nil {
-		klog.Errorf("ListPodSandbox with pod UID %q failed: %v", podUID, err)
+		klog.ErrorS(err, "Failed to list sandboxes for pod", "podUID", podUID)
 		return nil, err
 	}
 

@@ -1,0 +1,75 @@
+{
+  "kind": "CertificateSigningRequest",
+  "apiVersion": "certificates.k8s.io/v1",
+  "metadata": {
+    "name": "2",
+    "generateName": "3",
+    "namespace": "4",
+    "selfLink": "5",
+    "uid": "7",
+    "resourceVersion": "11042405498087606203",
+    "generation": 8071137005907523419,
+    "creationTimestamp": "2061-09-19T18:13:36Z",
+    "deletionGracePeriodSeconds": -4955867275792137171,
+    "labels": {
+      "7": "8"
+    },
+    "annotations": {
+      "9": "10"
+    },
+    "ownerReferences": [
+      {
+        "apiVersion": "11",
+        "kind": "12",
+        "name": "13",
+        "uid": "Dz廔ȇ{sŊƏp",
+        "controller": false,
+        "blockOwnerDeletion": true
+      }
+    ],
+    "finalizers": [
+      "14"
+    ],
+    "clusterName": "15",
+    "managedFields": [
+      {
+        "manager": "16",
+        "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
+        "apiVersion": "17",
+        "fieldsType": "18",
+        "subresource": "19"
+      }
+    ]
+  },
+  "spec": {
+    "request": "OA==",
+    "signerName": "20",
+    "expirationSeconds": 1305381319,
+    "usages": [
+      "鯹)晿\u003c"
+    ],
+    "username": "21",
+    "uid": "22",
+    "groups": [
+      "23"
+    ],
+    "extra": {
+      "24": [
+        "25"
+      ]
+    }
+  },
+  "status": {
+    "conditions": [
+      {
+        "type": ".蘯6ċV夸",
+        "status": "Č扷5ƗǸƢ6/ʕVŚ(ĿȊ甞谐颋ǅS",
+        "reason": "26",
+        "message": "27",
+        "lastUpdateTime": "2762-08-27T06:50:32Z",
+        "lastTransitionTime": "2214-12-23T19:22:14Z"
+      }
+    ],
+    "certificate": "fQ=="
+  }
+}

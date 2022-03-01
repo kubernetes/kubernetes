@@ -21,12 +21,9 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/apis/core/validation"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
 )
@@ -92,11 +89,23 @@ func VisitContainers(podSpec *api.PodSpec, mask ContainerType, visitor Container
 // Visitor is called with each object name, and returns true if visiting should continue
 type Visitor func(name string) (shouldContinue bool)
 
+func skipEmptyNames(visitor Visitor) Visitor {
+	return func(name string) bool {
+		if len(name) == 0 {
+			// continue visiting
+			return true
+		}
+		// delegate to visitor
+		return visitor(name)
+	}
+}
+
 // VisitPodSecretNames invokes the visitor function with the name of every secret
 // referenced by the pod spec. If visitor returns false, visiting is short-circuited.
 // Transitive references (e.g. pod -> pvc -> pv -> secret) are not visited.
 // Returns true if visiting completed, false if visiting was short-circuited.
 func VisitPodSecretNames(pod *api.Pod, visitor Visitor, containerType ContainerType) bool {
+	visitor = skipEmptyNames(visitor)
 	for _, reference := range pod.Spec.ImagePullSecrets {
 		if !visitor(reference.Name) {
 			return false
@@ -185,6 +194,7 @@ func visitContainerSecretNames(container *api.Container, visitor Visitor) bool {
 // Transitive references (e.g. pod -> pvc -> pv -> secret) are not visited.
 // Returns true if visiting completed, false if visiting was short-circuited.
 func VisitPodConfigmapNames(pod *api.Pod, visitor Visitor, containerType ContainerType) bool {
+	visitor = skipEmptyNames(visitor)
 	VisitContainers(&pod.Spec, containerType, func(c *api.Container, containerType ContainerType) bool {
 		return visitContainerConfigmapNames(c, visitor)
 	})
@@ -319,58 +329,162 @@ func usesHugePagesInProjectedEnv(item api.Container) bool {
 	return false
 }
 
-// usesMultipleHugePageResources returns true if the pod spec uses more than
-// one size of hugepage
-func usesMultipleHugePageResources(podSpec *api.PodSpec) bool {
-	hugePageResources := sets.NewString()
-	resourceSet := helper.ToPodResourcesSet(podSpec)
-	for resourceStr := range resourceSet {
-		if v1helper.IsHugePageResourceName(v1.ResourceName(resourceStr)) {
-			hugePageResources.Insert(resourceStr)
+// hasSysctlsWithSlashNames returns true if the sysctl name contains a slash, otherwise it returns false
+func hasSysctlsWithSlashNames(podSpec *api.PodSpec) bool {
+	if podSpec.SecurityContext == nil {
+		return false
+	}
+	securityContext := podSpec.SecurityContext
+	for _, s := range securityContext.Sysctls {
+		if strings.Contains(s.Name, "/") {
+			return true
 		}
 	}
-	return len(hugePageResources) > 1
+	return false
 }
 
-// GetValidationOptionsFromPodSpec returns validation options based on pod specs
-func GetValidationOptionsFromPodSpec(podSpec, oldPodSpec *api.PodSpec) apivalidation.PodValidationOptions {
+func checkContainerUseIndivisibleHugePagesValues(container api.Container) bool {
+	for resourceName, quantity := range container.Resources.Limits {
+		if helper.IsHugePageResourceName(resourceName) {
+			if !helper.IsHugePageResourceValueDivisible(resourceName, quantity) {
+				return true
+			}
+		}
+	}
+
+	for resourceName, quantity := range container.Resources.Requests {
+		if helper.IsHugePageResourceName(resourceName) {
+			if !helper.IsHugePageResourceValueDivisible(resourceName, quantity) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// usesIndivisibleHugePagesValues returns true if the one of the containers uses non-integer multiple
+// of huge page unit size
+func usesIndivisibleHugePagesValues(podSpec *api.PodSpec) bool {
+	foundIndivisibleHugePagesValue := false
+	VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
+		if checkContainerUseIndivisibleHugePagesValues(*c) {
+			foundIndivisibleHugePagesValue = true
+		}
+		return !foundIndivisibleHugePagesValue // continue visiting if we haven't seen an invalid value yet
+	})
+
+	if foundIndivisibleHugePagesValue {
+		return true
+	}
+
+	for resourceName, quantity := range podSpec.Overhead {
+		if helper.IsHugePageResourceName(resourceName) {
+			if !helper.IsHugePageResourceValueDivisible(resourceName, quantity) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// haveSameExpandedDNSConfig returns true if the oldPodSpec already had
+// ExpandedDNSConfig and podSpec has the same DNSConfig
+func haveSameExpandedDNSConfig(podSpec, oldPodSpec *api.PodSpec) bool {
+	if oldPodSpec == nil || oldPodSpec.DNSConfig == nil {
+		return false
+	}
+	if podSpec == nil || podSpec.DNSConfig == nil {
+		return false
+	}
+
+	if len(oldPodSpec.DNSConfig.Searches) <= apivalidation.MaxDNSSearchPathsLegacy &&
+		len(strings.Join(oldPodSpec.DNSConfig.Searches, " ")) <= apivalidation.MaxDNSSearchListCharsLegacy {
+		// didn't have ExpandedDNSConfig
+		return false
+	}
+
+	if len(oldPodSpec.DNSConfig.Searches) != len(podSpec.DNSConfig.Searches) {
+		// updates DNSConfig
+		return false
+	}
+
+	for i, oldSearch := range oldPodSpec.DNSConfig.Searches {
+		if podSpec.DNSConfig.Searches[i] != oldSearch {
+			// updates DNSConfig
+			return false
+		}
+	}
+
+	return true
+}
+
+// GetValidationOptionsFromPodSpecAndMeta returns validation options based on pod specs and metadata
+func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, podMeta, oldPodMeta *metav1.ObjectMeta) apivalidation.PodValidationOptions {
 	// default pod validation options based on feature gate
-	opts := validation.PodValidationOptions{
-		// Allow multiple huge pages on pod create if feature is enabled
-		AllowMultipleHugePageResources: utilfeature.DefaultFeatureGate.Enabled(features.HugePageStorageMediumSize),
+	opts := apivalidation.PodValidationOptions{
 		// Allow pod spec to use hugepages in downward API if feature is enabled
-		AllowDownwardAPIHugePages: utilfeature.DefaultFeatureGate.Enabled(features.DownwardAPIHugePages),
+		AllowDownwardAPIHugePages:   utilfeature.DefaultFeatureGate.Enabled(features.DownwardAPIHugePages),
+		AllowInvalidPodDeletionCost: !utilfeature.DefaultFeatureGate.Enabled(features.PodDeletionCost),
+		// Do not allow pod spec to use non-integer multiple of huge page unit size default
+		AllowIndivisibleHugePagesValues: false,
+		AllowWindowsHostProcessField:    utilfeature.DefaultFeatureGate.Enabled(features.WindowsHostProcessContainers),
+		// Allow pod spec with expanded DNS configuration
+		AllowExpandedDNSConfig: utilfeature.DefaultFeatureGate.Enabled(features.ExpandedDNSConfig) || haveSameExpandedDNSConfig(podSpec, oldPodSpec),
+		// Allow pod spec to use OS field
+		AllowOSField: utilfeature.DefaultFeatureGate.Enabled(features.IdentifyPodOS),
+		// The default sysctl value does not contain a forward slash, and in 1.24 we intend to relax this to be true by default
+		AllowSysctlRegexContainSlash: false,
 	}
-	// if we are not doing an update operation, just return with default options
-	if oldPodSpec == nil {
-		return opts
+
+	if oldPodSpec != nil {
+		// if old spec used hugepages in downward api, we must allow it
+		opts.AllowDownwardAPIHugePages = opts.AllowDownwardAPIHugePages || usesHugePagesInProjectedVolume(oldPodSpec)
+		// determine if any container is using hugepages in env var
+		if !opts.AllowDownwardAPIHugePages {
+			VisitContainers(oldPodSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
+				opts.AllowDownwardAPIHugePages = opts.AllowDownwardAPIHugePages || usesHugePagesInProjectedEnv(*c)
+				return !opts.AllowDownwardAPIHugePages
+			})
+		}
+		// if old spec has Windows Host Process fields set, we must allow it
+		opts.AllowWindowsHostProcessField = opts.AllowWindowsHostProcessField || setsWindowsHostProcess(oldPodSpec)
+
+		// if old spec has OS field set, we must allow it
+		opts.AllowOSField = opts.AllowOSField || oldPodSpec.OS != nil
+
+		// if old spec used non-integer multiple of huge page unit size, we must allow it
+		opts.AllowIndivisibleHugePagesValues = usesIndivisibleHugePagesValues(oldPodSpec)
+
+		// if old spec used use relaxed validation for Update requests where the existing object's sysctl contains a slash, we must allow it.
+		opts.AllowSysctlRegexContainSlash = hasSysctlsWithSlashNames(oldPodSpec)
+
 	}
-	// if old spec used multiple huge page sizes, we must allow it
-	opts.AllowMultipleHugePageResources = opts.AllowMultipleHugePageResources || usesMultipleHugePageResources(oldPodSpec)
-	// if old spec used hugepages in downward api, we must allow it
-	opts.AllowDownwardAPIHugePages = opts.AllowDownwardAPIHugePages || usesHugePagesInProjectedVolume(oldPodSpec)
-	// determine if any container is using hugepages in env var
-	if !opts.AllowDownwardAPIHugePages {
-		VisitContainers(oldPodSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
-			opts.AllowDownwardAPIHugePages = opts.AllowDownwardAPIHugePages || usesHugePagesInProjectedEnv(*c)
-			return !opts.AllowDownwardAPIHugePages
-		})
+	if oldPodMeta != nil && !opts.AllowInvalidPodDeletionCost {
+		// This is an update, so validate only if the existing object was valid.
+		_, err := helper.GetDeletionCostFromPodAnnotations(oldPodMeta.Annotations)
+		opts.AllowInvalidPodDeletionCost = err != nil
 	}
+
 	return opts
 }
 
 // GetValidationOptionsFromPodTemplate will return pod validation options for specified template.
 func GetValidationOptionsFromPodTemplate(podTemplate, oldPodTemplate *api.PodTemplateSpec) apivalidation.PodValidationOptions {
 	var newPodSpec, oldPodSpec *api.PodSpec
+	var newPodMeta, oldPodMeta *metav1.ObjectMeta
 	// we have to be careful about nil pointers here
 	// replication controller in particular is prone to passing nil
 	if podTemplate != nil {
 		newPodSpec = &podTemplate.Spec
+		newPodMeta = &podTemplate.ObjectMeta
 	}
 	if oldPodTemplate != nil {
 		oldPodSpec = &oldPodTemplate.Spec
+		oldPodMeta = &oldPodTemplate.ObjectMeta
 	}
-	return GetValidationOptionsFromPodSpec(newPodSpec, oldPodSpec)
+	return GetValidationOptionsFromPodSpecAndMeta(newPodSpec, oldPodSpec, newPodMeta, oldPodMeta)
 }
 
 // DropDisabledTemplateFields removes disabled fields from the pod template metadata and spec.
@@ -401,32 +515,16 @@ func DropDisabledPodFields(pod, oldPod *api.Pod) {
 		podAnnotations    map[string]string
 		oldPodSpec        *api.PodSpec
 		oldPodAnnotations map[string]string
-		podStatus         *api.PodStatus
-		oldPodStatus      *api.PodStatus
 	)
 	if pod != nil {
 		podSpec = &pod.Spec
 		podAnnotations = pod.Annotations
-		podStatus = &pod.Status
 	}
 	if oldPod != nil {
 		oldPodSpec = &oldPod.Spec
 		oldPodAnnotations = oldPod.Annotations
-		oldPodStatus = &oldPod.Status
 	}
 	dropDisabledFields(podSpec, podAnnotations, oldPodSpec, oldPodAnnotations)
-	dropPodStatusDisabledFields(podStatus, oldPodStatus)
-}
-
-// dropPodStatusDisabledFields removes disabled fields from the pod status
-func dropPodStatusDisabledFields(podStatus *api.PodStatus, oldPodStatus *api.PodStatus) {
-	// trim PodIPs down to only one entry (non dual stack).
-	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) &&
-		!multiplePodIPsInUse(oldPodStatus) {
-		if len(podStatus.PodIPs) != 0 {
-			podStatus.PodIPs = podStatus.PodIPs[0:1]
-		}
-	}
 }
 
 // dropDisabledFields removes disabled fields from the pod metadata and spec.
@@ -455,30 +553,23 @@ func dropDisabledFields(
 		}
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeSubpath) && !subpathInUse(oldPodSpec) {
-		// drop subpath from the pod if the feature is disabled and the old spec did not specify subpaths
-		VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
-			for i := range c.VolumeMounts {
-				c.VolumeMounts[i].SubPath = ""
-			}
-			return true
-		})
-	}
 	if !utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) && !ephemeralContainersInUse(oldPodSpec) {
 		podSpec.EphemeralContainers = nil
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeSubpath) && !subpathExprInUse(oldPodSpec) {
-		// drop subpath env expansion from the pod if subpath feature is disabled and the old spec did not specify subpath env expansion
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ProbeTerminationGracePeriod) && !probeGracePeriodInUse(oldPodSpec) {
+		// Set pod-level terminationGracePeriodSeconds to nil if the feature is disabled and it is not used
 		VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
-			for i := range c.VolumeMounts {
-				c.VolumeMounts[i].SubPathExpr = ""
+			if c.LivenessProbe != nil {
+				c.LivenessProbe.TerminationGracePeriodSeconds = nil
 			}
+			if c.StartupProbe != nil {
+				c.StartupProbe.TerminationGracePeriodSeconds = nil
+			}
+			// cannot be set for readiness probes
 			return true
 		})
 	}
-
-	dropDisabledFSGroupFields(podSpec, oldPodSpec)
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead) && !overheadInUse(oldPodSpec) {
 		// Set Overhead to nil only if the feature is disabled and it is not used
@@ -488,20 +579,21 @@ func dropDisabledFields(
 	dropDisabledProcMountField(podSpec, oldPodSpec)
 
 	dropDisabledCSIVolumeSourceAlphaFields(podSpec, oldPodSpec)
-	dropDisabledEphemeralVolumeSourceAlphaFields(podSpec, oldPodSpec)
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.NonPreemptingPriority) &&
-		!podPriorityInUse(oldPodSpec) {
-		// Set to nil pod's PreemptionPolicy fields if the feature is disabled and the old pod
-		// does not specify any values for these fields.
-		podSpec.PreemptionPolicy = nil
+	if !utilfeature.DefaultFeatureGate.Enabled(features.IdentifyPodOS) && !podOSInUse(oldPodSpec) {
+		podSpec.OS = nil
 	}
+}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.SetHostnameAsFQDN) && !setHostnameAsFQDNInUse(oldPodSpec) {
-		// Set SetHostnameAsFQDN to nil only if feature is disabled and it is not used
-		podSpec.SetHostnameAsFQDN = nil
+// podOSInUse returns true if the pod spec is non-nil and has OS field set
+func podOSInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
 	}
-
+	if podSpec.OS != nil {
+		return true
+	}
+	return false
 }
 
 // dropDisabledProcMountField removes disabled fields from PodSpec related
@@ -521,16 +613,6 @@ func dropDisabledProcMountField(podSpec, oldPodSpec *api.PodSpec) {
 	}
 }
 
-func dropDisabledFSGroupFields(podSpec, oldPodSpec *api.PodSpec) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ConfigurableFSGroupPolicy) && !fsGroupPolicyInUse(oldPodSpec) {
-		// if oldPodSpec had no FSGroupChangePolicy set then we should prevent new pod from having this field
-		// if ConfigurableFSGroupPolicy feature is disabled
-		if podSpec.SecurityContext != nil {
-			podSpec.SecurityContext.FSGroupChangePolicy = nil
-		}
-	}
-}
-
 // dropDisabledCSIVolumeSourceAlphaFields removes disabled alpha fields from []CSIVolumeSource.
 // This should be called from PrepareForCreate/PrepareForUpdate for all pod specs resources containing a CSIVolumeSource
 func dropDisabledCSIVolumeSourceAlphaFields(podSpec, oldPodSpec *api.PodSpec) {
@@ -541,52 +623,11 @@ func dropDisabledCSIVolumeSourceAlphaFields(podSpec, oldPodSpec *api.PodSpec) {
 	}
 }
 
-// dropDisabledEphemeralVolumeSourceAlphaFields removes disabled alpha fields from []EphemeralVolumeSource.
-// This should be called from PrepareForCreate/PrepareForUpdate for all pod specs resources containing a EphemeralVolumeSource
-func dropDisabledEphemeralVolumeSourceAlphaFields(podSpec, oldPodSpec *api.PodSpec) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume) && !csiInUse(oldPodSpec) {
-		for i := range podSpec.Volumes {
-			podSpec.Volumes[i].Ephemeral = nil
-		}
-	}
-}
-
 func ephemeralContainersInUse(podSpec *api.PodSpec) bool {
 	if podSpec == nil {
 		return false
 	}
 	return len(podSpec.EphemeralContainers) > 0
-}
-
-func fsGroupPolicyInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-	securityContext := podSpec.SecurityContext
-	if securityContext != nil && securityContext.FSGroupChangePolicy != nil {
-		return true
-	}
-	return false
-}
-
-// subpathInUse returns true if the pod spec is non-nil and has a volume mount that makes use of the subPath feature
-func subpathInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-
-	var inUse bool
-	VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
-		for i := range c.VolumeMounts {
-			if len(c.VolumeMounts[i].SubPath) > 0 {
-				inUse = true
-				return false
-			}
-		}
-		return true
-	})
-
-	return inUse
 }
 
 // overheadInUse returns true if the pod spec is non-nil and has Overhead set
@@ -631,17 +672,6 @@ func appArmorInUse(podAnnotations map[string]string) bool {
 	return false
 }
 
-// podPriorityInUse returns true if the pod spec is non-nil and has Priority or PriorityClassName set.
-func podPriorityInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-	if podSpec.Priority != nil || podSpec.PriorityClassName != "" {
-		return true
-	}
-	return false
-}
-
 // emptyDirSizeLimitInUse returns true if any pod's EmptyDir volumes use SizeLimit.
 func emptyDirSizeLimitInUse(podSpec *api.PodSpec) bool {
 	if podSpec == nil {
@@ -657,19 +687,20 @@ func emptyDirSizeLimitInUse(podSpec *api.PodSpec) bool {
 	return false
 }
 
-// subpathExprInUse returns true if the pod spec is non-nil and has a volume mount that makes use of the subPathExpr feature
-func subpathExprInUse(podSpec *api.PodSpec) bool {
+// probeGracePeriodInUse returns true if the pod spec is non-nil and has a probe that makes use
+// of the probe-level terminationGracePeriodSeconds feature
+func probeGracePeriodInUse(podSpec *api.PodSpec) bool {
 	if podSpec == nil {
 		return false
 	}
 
 	var inUse bool
 	VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
-		for i := range c.VolumeMounts {
-			if len(c.VolumeMounts[i].SubPathExpr) > 0 {
-				inUse = true
-				return false
-			}
+		// cannot be set for readiness probes
+		if (c.LivenessProbe != nil && c.LivenessProbe.TerminationGracePeriodSeconds != nil) ||
+			(c.StartupProbe != nil && c.StartupProbe.TerminationGracePeriodSeconds != nil) {
+			inUse = true
+			return false
 		}
 		return true
 	})
@@ -688,25 +719,6 @@ func csiInUse(podSpec *api.PodSpec) bool {
 		}
 	}
 	return false
-}
-
-// podPriorityInUse returns true if status is not nil and number of PodIPs is greater than one
-func multiplePodIPsInUse(podStatus *api.PodStatus) bool {
-	if podStatus == nil {
-		return false
-	}
-	if len(podStatus.PodIPs) > 1 {
-		return true
-	}
-	return false
-}
-
-// setHostnameAsFQDNInUse returns true if any pod's spec defines setHostnameAsFQDN field.
-func setHostnameAsFQDNInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil || podSpec.SetHostnameAsFQDN == nil {
-		return false
-	}
-	return *podSpec.SetHostnameAsFQDN
 }
 
 // SeccompAnnotationForField takes a pod seccomp profile field and returns the
@@ -762,4 +774,29 @@ func SeccompFieldForAnnotation(annotation string) *api.SeccompProfile {
 	// we can only reach this code path if the localhostProfile name has a zero
 	// length or if the annotation has an unrecognized value
 	return nil
+}
+
+// setsWindowsHostProcess returns true if WindowsOptions.HostProcess is set (true or false)
+// anywhere in the pod spec.
+func setsWindowsHostProcess(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+
+	// Check Pod's WindowsOptions.HostProcess
+	if podSpec.SecurityContext != nil && podSpec.SecurityContext.WindowsOptions != nil && podSpec.SecurityContext.WindowsOptions.HostProcess != nil {
+		return true
+	}
+
+	// Check WindowsOptions.HostProcess for each container
+	inUse := false
+	VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
+		if c.SecurityContext != nil && c.SecurityContext.WindowsOptions != nil && c.SecurityContext.WindowsOptions.HostProcess != nil {
+			inUse = true
+			return false
+		}
+		return true
+	})
+
+	return inUse
 }

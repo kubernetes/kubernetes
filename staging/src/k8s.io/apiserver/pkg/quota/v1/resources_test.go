@@ -77,6 +77,45 @@ func TestEquals(t *testing.T) {
 	}
 }
 
+func TestLessThanOrEqual(t *testing.T) {
+	testCases := map[string]struct {
+		a        corev1.ResourceList
+		b        corev1.ResourceList
+		expected bool
+		out      []corev1.ResourceName
+	}{
+		"isEmpty": {
+			a:        corev1.ResourceList{},
+			b:        corev1.ResourceList{},
+			expected: true,
+			out:      []corev1.ResourceName{},
+		},
+		"isEqual": {
+			a:        corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("100m")},
+			b:        corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("100m")},
+			expected: true,
+			out:      []corev1.ResourceName{},
+		},
+		"isLessThan": {
+			a:        corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("100m")},
+			b:        corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("200m")},
+			expected: true,
+			out:      []corev1.ResourceName{},
+		},
+		"isGreaterThan": {
+			a:        corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("200m")},
+			b:        corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("100m")},
+			expected: false,
+			out:      []corev1.ResourceName{corev1.ResourceCPU},
+		},
+	}
+	for testName, testCase := range testCases {
+		if result, out := LessThanOrEqual(testCase.a, testCase.b); result != testCase.expected && !reflect.DeepEqual(out, testCase.out) {
+			t.Errorf("%s expected: %v/%v, actual: %v/%v", testName, testCase.expected, testCase.out, result, out)
+		}
+	}
+}
+
 func TestMax(t *testing.T) {
 	testCases := map[string]struct {
 		a        corev1.ResourceList

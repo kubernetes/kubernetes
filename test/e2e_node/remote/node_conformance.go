@@ -262,7 +262,7 @@ func stopKubelet(host, workspace string) error {
 }
 
 // RunTest runs test on the node.
-func (c *ConformanceRemote) RunTest(host, workspace, results, imageDesc, junitFilePrefix, testArgs, _, systemSpecName, extraEnvs string, timeout time.Duration) (string, error) {
+func (c *ConformanceRemote) RunTest(host, workspace, results, imageDesc, junitFilePrefix, testArgs, _, systemSpecName, extraEnvs, _ string, timeout time.Duration) (string, error) {
 	// Install the cni plugins and add a basic CNI configuration.
 	if err := setupCNI(host, workspace); err != nil {
 		return "", err

@@ -28,10 +28,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
-
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
+	netutils "k8s.io/utils/net"
 )
 
 type mockRangeRegistry struct {
@@ -60,7 +57,7 @@ func TestRepair(t *testing.T) {
 	ipregistry := &mockRangeRegistry{
 		item: &api.RangeAllocation{Range: "192.168.1.0/24"},
 	}
-	_, cidr, _ := net.ParseCIDR(ipregistry.item.Range)
+	_, cidr, _ := netutils.ParseCIDRSloppy(ipregistry.item.Range)
 	r := NewRepair(0, fakeClient.CoreV1(), fakeClient.CoreV1(), cidr, ipregistry, nil, nil)
 
 	if err := r.RunOnce(); err != nil {
@@ -81,12 +78,12 @@ func TestRepair(t *testing.T) {
 }
 
 func TestRepairLeak(t *testing.T) {
-	_, cidr, _ := net.ParseCIDR("192.168.1.0/24")
-	previous, err := ipallocator.NewCIDRRange(cidr)
+	_, cidr, _ := netutils.ParseCIDRSloppy("192.168.1.0/24")
+	previous, err := ipallocator.NewInMemory(cidr)
 	if err != nil {
 		t.Fatal(err)
 	}
-	previous.Allocate(net.ParseIP("192.168.1.10"))
+	previous.Allocate(netutils.ParseIPSloppy("192.168.1.10"))
 
 	var dst api.RangeAllocation
 	err = previous.Snapshot(&dst)
@@ -115,7 +112,7 @@ func TestRepairLeak(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !after.Has(net.ParseIP("192.168.1.10")) {
+		if !after.Has(netutils.ParseIPSloppy("192.168.1.10")) {
 			t.Errorf("expected ipallocator to still have leaked IP")
 		}
 	}
@@ -127,14 +124,14 @@ func TestRepairLeak(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if after.Has(net.ParseIP("192.168.1.10")) {
+	if after.Has(netutils.ParseIPSloppy("192.168.1.10")) {
 		t.Errorf("expected ipallocator to not have leaked IP")
 	}
 }
 
 func TestRepairWithExisting(t *testing.T) {
-	_, cidr, _ := net.ParseCIDR("192.168.1.0/24")
-	previous, err := ipallocator.NewCIDRRange(cidr)
+	_, cidr, _ := netutils.ParseCIDRSloppy("192.168.1.0/24")
+	previous, err := ipallocator.NewInMemory(cidr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -211,7 +208,7 @@ func TestRepairWithExisting(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !after.Has(net.ParseIP("192.168.1.1")) || !after.Has(net.ParseIP("192.168.1.100")) {
+	if !after.Has(netutils.ParseIPSloppy("192.168.1.1")) || !after.Has(netutils.ParseIPSloppy("192.168.1.100")) {
 		t.Errorf("unexpected ipallocator state: %#v", after)
 	}
 	if free := after.Free(); free != 252 {
@@ -220,8 +217,8 @@ func TestRepairWithExisting(t *testing.T) {
 }
 
 func makeRangeRegistry(t *testing.T, cidrRange string) *mockRangeRegistry {
-	_, cidr, _ := net.ParseCIDR(cidrRange)
-	previous, err := ipallocator.NewCIDRRange(cidr)
+	_, cidr, _ := netutils.ParseCIDRSloppy(cidrRange)
+	previous, err := ipallocator.NewInMemory(cidr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -247,7 +244,7 @@ func makeFakeClientSet() *fake.Clientset {
 	return fake.NewSimpleClientset()
 }
 func makeIPNet(cidr string) *net.IPNet {
-	_, net, _ := net.ParseCIDR(cidr)
+	_, net, _ := netutils.ParseCIDRSloppy(cidr)
 	return net
 }
 func TestShouldWorkOnSecondary(t *testing.T) {
@@ -327,8 +324,6 @@ func TestShouldWorkOnSecondary(t *testing.T) {
 }
 
 func TestRepairDualStack(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
-
 	fakeClient := fake.NewSimpleClientset()
 	ipregistry := &mockRangeRegistry{
 		item: &api.RangeAllocation{Range: "192.168.1.0/24"},
@@ -337,8 +332,8 @@ func TestRepairDualStack(t *testing.T) {
 		item: &api.RangeAllocation{Range: "2000::/108"},
 	}
 
-	_, cidr, _ := net.ParseCIDR(ipregistry.item.Range)
-	_, secondaryCIDR, _ := net.ParseCIDR(secondaryIPRegistry.item.Range)
+	_, cidr, _ := netutils.ParseCIDRSloppy(ipregistry.item.Range)
+	_, secondaryCIDR, _ := netutils.ParseCIDRSloppy(secondaryIPRegistry.item.Range)
 	r := NewRepair(0, fakeClient.CoreV1(), fakeClient.CoreV1(), cidr, ipregistry, secondaryCIDR, secondaryIPRegistry)
 
 	if err := r.RunOnce(); err != nil {
@@ -367,22 +362,20 @@ func TestRepairDualStack(t *testing.T) {
 }
 
 func TestRepairLeakDualStack(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
-
-	_, cidr, _ := net.ParseCIDR("192.168.1.0/24")
-	previous, err := ipallocator.NewCIDRRange(cidr)
+	_, cidr, _ := netutils.ParseCIDRSloppy("192.168.1.0/24")
+	previous, err := ipallocator.NewInMemory(cidr)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	previous.Allocate(net.ParseIP("192.168.1.10"))
+	previous.Allocate(netutils.ParseIPSloppy("192.168.1.10"))
 
-	_, secondaryCIDR, _ := net.ParseCIDR("2000::/108")
-	secondaryPrevious, err := ipallocator.NewCIDRRange(secondaryCIDR)
+	_, secondaryCIDR, _ := netutils.ParseCIDRSloppy("2000::/108")
+	secondaryPrevious, err := ipallocator.NewInMemory(secondaryCIDR)
 	if err != nil {
 		t.Fatal(err)
 	}
-	secondaryPrevious.Allocate(net.ParseIP("2000::1"))
+	secondaryPrevious.Allocate(netutils.ParseIPSloppy("2000::1"))
 
 	var dst api.RangeAllocation
 	err = previous.Snapshot(&dst)
@@ -427,14 +420,14 @@ func TestRepairLeakDualStack(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !after.Has(net.ParseIP("192.168.1.10")) {
+		if !after.Has(netutils.ParseIPSloppy("192.168.1.10")) {
 			t.Errorf("expected ipallocator to still have leaked IP")
 		}
 		secondaryAfter, err := ipallocator.NewFromSnapshot(secondaryIPRegistry.updated)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !secondaryAfter.Has(net.ParseIP("2000::1")) {
+		if !secondaryAfter.Has(netutils.ParseIPSloppy("2000::1")) {
 			t.Errorf("expected ipallocator to still have leaked IP")
 		}
 	}
@@ -447,14 +440,14 @@ func TestRepairLeakDualStack(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if after.Has(net.ParseIP("192.168.1.10")) {
+	if after.Has(netutils.ParseIPSloppy("192.168.1.10")) {
 		t.Errorf("expected ipallocator to not have leaked IP")
 	}
 	secondaryAfter, err := ipallocator.NewFromSnapshot(secondaryIPRegistry.updated)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if secondaryAfter.Has(net.ParseIP("2000::1")) {
+	if secondaryAfter.Has(netutils.ParseIPSloppy("2000::1")) {
 		t.Errorf("expected ipallocator to not have leaked IP")
 	}
 }
@@ -465,15 +458,14 @@ func TestRepairWithExistingDualStack(t *testing.T) {
 	// we can saftly create tests that has ipFamilyPolicy:nil
 	// this will work every where except alloc & validation
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
-	_, cidr, _ := net.ParseCIDR("192.168.1.0/24")
-	previous, err := ipallocator.NewCIDRRange(cidr)
+	_, cidr, _ := netutils.ParseCIDRSloppy("192.168.1.0/24")
+	previous, err := ipallocator.NewInMemory(cidr)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, secondaryCIDR, _ := net.ParseCIDR("2000::/108")
-	secondaryPrevious, err := ipallocator.NewCIDRRange(secondaryCIDR)
+	_, secondaryCIDR, _ := netutils.ParseCIDRSloppy("2000::/108")
+	secondaryPrevious, err := ipallocator.NewInMemory(secondaryCIDR)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -613,7 +605,7 @@ func TestRepairWithExistingDualStack(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !after.Has(net.ParseIP("192.168.1.1")) || !after.Has(net.ParseIP("192.168.1.100")) {
+	if !after.Has(netutils.ParseIPSloppy("192.168.1.1")) || !after.Has(netutils.ParseIPSloppy("192.168.1.100")) {
 		t.Errorf("unexpected ipallocator state: %#v", after)
 	}
 	if free := after.Free(); free != 251 {
@@ -624,7 +616,7 @@ func TestRepairWithExistingDualStack(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !secondaryAfter.Has(net.ParseIP("2000::1")) || !secondaryAfter.Has(net.ParseIP("2000::2")) {
+	if !secondaryAfter.Has(netutils.ParseIPSloppy("2000::1")) || !secondaryAfter.Has(netutils.ParseIPSloppy("2000::2")) {
 		t.Errorf("unexpected ipallocator state: %#v", secondaryAfter)
 	}
 	if free := secondaryAfter.Free(); free != 65533 {

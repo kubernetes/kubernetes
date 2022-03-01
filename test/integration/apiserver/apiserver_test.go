@@ -22,19 +22,20 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"path"
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -71,28 +72,28 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
-func setup(t *testing.T, groupVersions ...schema.GroupVersion) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
+func setup(t testing.TB, groupVersions ...schema.GroupVersion) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
 	return setupWithResources(t, groupVersions, nil)
 }
 
-func setupWithOptions(t *testing.T, opts *framework.MasterConfigOptions, groupVersions ...schema.GroupVersion) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
+func setupWithOptions(t testing.TB, opts *framework.ControlPlaneConfigOptions, groupVersions ...schema.GroupVersion) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
 	return setupWithResourcesWithOptions(t, opts, groupVersions, nil)
 }
 
-func setupWithResources(t *testing.T, groupVersions []schema.GroupVersion, resources []schema.GroupVersionResource) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
-	return setupWithResourcesWithOptions(t, &framework.MasterConfigOptions{}, groupVersions, resources)
+func setupWithResources(t testing.TB, groupVersions []schema.GroupVersion, resources []schema.GroupVersionResource) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
+	return setupWithResourcesWithOptions(t, &framework.ControlPlaneConfigOptions{}, groupVersions, resources)
 }
 
-func setupWithResourcesWithOptions(t *testing.T, opts *framework.MasterConfigOptions, groupVersions []schema.GroupVersion, resources []schema.GroupVersionResource) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
-	masterConfig := framework.NewIntegrationTestMasterConfigWithOptions(opts)
+func setupWithResourcesWithOptions(t testing.TB, opts *framework.ControlPlaneConfigOptions, groupVersions []schema.GroupVersion, resources []schema.GroupVersionResource) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfigWithOptions(opts)
 	if len(groupVersions) > 0 || len(resources) > 0 {
 		resourceConfig := controlplane.DefaultAPIResourceConfigSource()
 		resourceConfig.EnableVersions(groupVersions...)
 		resourceConfig.EnableResources(resources...)
-		masterConfig.ExtraConfig.APIResourceConfigSource = resourceConfig
+		controlPlaneConfig.ExtraConfig.APIResourceConfigSource = resourceConfig
 	}
-	masterConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
-	_, s, closeFn := framework.RunAMaster(masterConfig)
+	controlPlaneConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
+	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 
 	clientSet, err := clientset.NewForConfig(&restclient.Config{Host: s.URL, QPS: -1})
 	if err != nil {
@@ -102,7 +103,7 @@ func setupWithResourcesWithOptions(t *testing.T, opts *framework.MasterConfigOpt
 }
 
 func verifyStatusCode(t *testing.T, verb, URL, body string, expectedStatusCode int) {
-	// We dont use the typed Go client to send this request to be able to verify the response status code.
+	// We don't use the typed Go client to send this request to be able to verify the response status code.
 	bodyBytes := bytes.NewReader([]byte(body))
 	req, err := http.NewRequest(verb, URL, bodyBytes)
 	if err != nil {
@@ -115,7 +116,7 @@ func verifyStatusCode(t *testing.T, verb, URL, body string, expectedStatusCode i
 		t.Fatalf("unexpected error: %v in req: %v", err, req)
 	}
 	defer resp.Body.Close()
-	b, _ := ioutil.ReadAll(resp.Body)
+	b, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != expectedStatusCode {
 		t.Errorf("Expected status %v, but got %v", expectedStatusCode, resp.StatusCode)
 		t.Errorf("Body: %v", string(b))
@@ -224,12 +225,12 @@ func Test4xxStatusCodeInvalidPatch(t *testing.T) {
 }
 
 func TestCacheControl(t *testing.T) {
-	masterConfig := framework.NewIntegrationTestMasterConfigWithOptions(&framework.MasterConfigOptions{})
-	masterConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
-	master, _, closeFn := framework.RunAMaster(masterConfig)
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfigWithOptions(&framework.ControlPlaneConfigOptions{})
+	controlPlaneConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
+	instanceConfig, _, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()
 
-	rt, err := restclient.TransportFor(master.GenericAPIServer.LoopbackClientConfig)
+	rt, err := restclient.TransportFor(instanceConfig.GenericAPIServer.LoopbackClientConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -253,7 +254,7 @@ func TestCacheControl(t *testing.T) {
 	}
 	for _, path := range paths {
 		t.Run(path, func(t *testing.T) {
-			req, err := http.NewRequest("GET", master.GenericAPIServer.LoopbackClientConfig.Host+path, nil)
+			req, err := http.NewRequest("GET", instanceConfig.GenericAPIServer.LoopbackClientConfig.Host+path, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -264,6 +265,54 @@ func TestCacheControl(t *testing.T) {
 			cc := resp.Header.Get("Cache-Control")
 			if !strings.Contains(cc, "private") {
 				t.Errorf("expected private cache-control, got %q", cc)
+			}
+		})
+	}
+}
+
+// Tests that the apiserver returns HSTS headers as expected.
+func TestHSTS(t *testing.T) {
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfigWithOptions(&framework.ControlPlaneConfigOptions{})
+	controlPlaneConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
+	controlPlaneConfig.GenericConfig.HSTSDirectives = []string{"max-age=31536000", "includeSubDomains"}
+	instanceConfig, _, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
+	defer closeFn()
+
+	rt, err := restclient.TransportFor(instanceConfig.GenericAPIServer.LoopbackClientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	paths := []string{
+		// untyped
+		"/",
+		// health
+		"/healthz",
+		// openapi
+		"/openapi/v2",
+		// discovery
+		"/api",
+		"/api/v1",
+		"/apis",
+		"/apis/apps",
+		"/apis/apps/v1",
+		// apis
+		"/api/v1/namespaces",
+		"/apis/apps/v1/deployments",
+	}
+	for _, path := range paths {
+		t.Run(path, func(t *testing.T) {
+			req, err := http.NewRequest("GET", instanceConfig.GenericAPIServer.LoopbackClientConfig.Host+path, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			resp, err := rt.RoundTrip(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			cc := resp.Header.Get("Strict-Transport-Security")
+			if !strings.Contains(cc, "max-age=31536000; includeSubDomains") {
+				t.Errorf("expected max-age=31536000; includeSubDomains, got %q", cc)
 			}
 		})
 	}
@@ -331,7 +380,7 @@ func TestListOptions(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIListChunking, true)()
 			etcdOptions := framework.DefaultEtcdOptions()
 			etcdOptions.EnableWatchCache = watchCacheEnabled
-			s, clientSet, closeFn := setupWithOptions(t, &framework.MasterConfigOptions{EtcdOptions: etcdOptions})
+			s, clientSet, closeFn := setupWithOptions(t, &framework.ControlPlaneConfigOptions{EtcdOptions: etcdOptions})
 			defer closeFn()
 
 			ns := framework.CreateTestingNamespace("list-options", s, t)
@@ -512,7 +561,7 @@ func testListOptionsCase(t *testing.T, rsClient appsv1.ReplicaSetInterface, watc
 	}
 	count := int64(len(items))
 
-	// Cacher.GetToList defines this for logic to decide if the watch cache is skipped. We need to know it to know if
+	// Cacher.GetList defines this for logic to decide if the watch cache is skipped. We need to know it to know if
 	// the limit is respected when testing here.
 	pagingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
 	hasContinuation := pagingEnabled && len(opts.Continue) > 0
@@ -563,7 +612,7 @@ func TestListResourceVersion0(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIListChunking, true)()
 			etcdOptions := framework.DefaultEtcdOptions()
 			etcdOptions.EnableWatchCache = tc.watchCacheEnabled
-			s, clientSet, closeFn := setupWithOptions(t, &framework.MasterConfigOptions{EtcdOptions: etcdOptions})
+			s, clientSet, closeFn := setupWithOptions(t, &framework.ControlPlaneConfigOptions{EtcdOptions: etcdOptions})
 			defer closeFn()
 
 			ns := framework.CreateTestingNamespace("list-paging", s, t)
@@ -798,28 +847,35 @@ func TestMetadataClient(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	fooCRD := &apiextensionsv1beta1.CustomResourceDefinition{
+	fooCRD := &apiextensionsv1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foos.cr.bar.com",
 		},
-		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-			Group:   "cr.bar.com",
-			Version: "v1",
-			Scope:   apiextensionsv1beta1.NamespaceScoped,
-			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+			Group: "cr.bar.com",
+			Scope: apiextensionsv1.NamespaceScoped,
+			Names: apiextensionsv1.CustomResourceDefinitionNames{
 				Plural: "foos",
 				Kind:   "Foo",
 			},
-			Subresources: &apiextensionsv1beta1.CustomResourceSubresources{
-				Status: &apiextensionsv1beta1.CustomResourceSubresourceStatus{},
+			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+				{
+					Name:    "v1",
+					Served:  true,
+					Storage: true,
+					Schema:  fixtures.AllowAllSchema(),
+					Subresources: &apiextensionsv1.CustomResourceSubresources{
+						Status: &apiextensionsv1.CustomResourceSubresourceStatus{},
+					},
+				},
 			},
 		},
 	}
-	fooCRD, err = fixtures.CreateNewCustomResourceDefinition(fooCRD, apiExtensionClient, dynamicClient)
+	fooCRD, err = fixtures.CreateNewV1CustomResourceDefinition(fooCRD, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
-	crdGVR := schema.GroupVersionResource{Group: fooCRD.Spec.Group, Version: fooCRD.Spec.Version, Resource: "foos"}
+	crdGVR := schema.GroupVersionResource{Group: fooCRD.Spec.Group, Version: fooCRD.Spec.Versions[0].Name, Resource: "foos"}
 
 	testcases := []struct {
 		name string
@@ -1119,26 +1175,33 @@ func TestAPICRDProtobuf(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	fooCRD := &apiextensionsv1beta1.CustomResourceDefinition{
+	fooCRD := &apiextensionsv1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foos.cr.bar.com",
 		},
-		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-			Group:   "cr.bar.com",
-			Version: "v1",
-			Scope:   apiextensionsv1beta1.NamespaceScoped,
-			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+			Group: "cr.bar.com",
+			Scope: apiextensionsv1.NamespaceScoped,
+			Names: apiextensionsv1.CustomResourceDefinitionNames{
 				Plural: "foos",
 				Kind:   "Foo",
 			},
-			Subresources: &apiextensionsv1beta1.CustomResourceSubresources{Status: &apiextensionsv1beta1.CustomResourceSubresourceStatus{}},
+			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+				{
+					Name:         "v1",
+					Served:       true,
+					Storage:      true,
+					Schema:       fixtures.AllowAllSchema(),
+					Subresources: &apiextensionsv1.CustomResourceSubresources{Status: &apiextensionsv1.CustomResourceSubresourceStatus{}},
+				},
+			},
 		},
 	}
-	fooCRD, err = fixtures.CreateNewCustomResourceDefinition(fooCRD, apiExtensionClient, dynamicClient)
+	fooCRD, err = fixtures.CreateNewV1CustomResourceDefinition(fooCRD, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
-	crdGVR := schema.GroupVersionResource{Group: fooCRD.Spec.Group, Version: fooCRD.Spec.Version, Resource: "foos"}
+	crdGVR := schema.GroupVersionResource{Group: fooCRD.Spec.Group, Version: fooCRD.Spec.Versions[0].Name, Resource: "foos"}
 	crclient := dynamicClient.Resource(crdGVR).Namespace(testNamespace)
 
 	testcases := []struct {
@@ -1285,11 +1348,6 @@ func TestAPICRDProtobuf(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			rv, _ := strconv.Atoi(obj.GetResourceVersion())
-			if rv < 1 {
-				rv = 1
-			}
-
 			w, err := client.Get().
 				Resource(resource).NamespaceIfScoped(obj.GetNamespace(), len(obj.GetNamespace()) > 0).Name(obj.GetName()).SubResource(tc.subresource).
 				SetHeader("Accept", tc.accept).
@@ -1331,25 +1389,32 @@ func TestTransform(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	fooCRD := &apiextensionsv1beta1.CustomResourceDefinition{
+	fooCRD := &apiextensionsv1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foos.cr.bar.com",
 		},
-		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-			Group:   "cr.bar.com",
-			Version: "v1",
-			Scope:   apiextensionsv1beta1.NamespaceScoped,
-			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+			Group: "cr.bar.com",
+			Scope: apiextensionsv1.NamespaceScoped,
+			Names: apiextensionsv1.CustomResourceDefinitionNames{
 				Plural: "foos",
 				Kind:   "Foo",
 			},
+			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+				{
+					Name:    "v1",
+					Served:  true,
+					Storage: true,
+					Schema:  fixtures.AllowAllSchema(),
+				},
+			},
 		},
 	}
-	fooCRD, err = fixtures.CreateNewCustomResourceDefinition(fooCRD, apiExtensionClient, dynamicClient)
+	fooCRD, err = fixtures.CreateNewV1CustomResourceDefinition(fooCRD, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
-	crdGVR := schema.GroupVersionResource{Group: fooCRD.Spec.Group, Version: fooCRD.Spec.Version, Resource: "foos"}
+	crdGVR := schema.GroupVersionResource{Group: fooCRD.Spec.Group, Version: fooCRD.Spec.Versions[0].Name, Resource: "foos"}
 	crclient := dynamicClient.Resource(crdGVR).Namespace(testNamespace)
 
 	testcases := []struct {
@@ -2004,7 +2069,7 @@ func expectPartialObjectMetaEventsProtobuf(t *testing.T, r io.Reader, values ...
 	metav1.AddToGroupVersion(scheme, schema.GroupVersion{Version: "v1"})
 	rs := protobuf.NewRawSerializer(scheme, scheme)
 	d := streaming.NewDecoder(
-		protobuf.LengthDelimitedFramer.NewFrameReader(ioutil.NopCloser(r)),
+		protobuf.LengthDelimitedFramer.NewFrameReader(io.NopCloser(r)),
 		rs,
 	)
 	ds := metainternalversionscheme.Codecs.UniversalDeserializer()
@@ -2113,7 +2178,7 @@ func expectPartialObjectMetaV1EventsProtobuf(t *testing.T, r io.Reader, values .
 	metav1.AddToGroupVersion(scheme, schema.GroupVersion{Version: "v1"})
 	rs := protobuf.NewRawSerializer(scheme, scheme)
 	d := streaming.NewDecoder(
-		protobuf.LengthDelimitedFramer.NewFrameReader(ioutil.NopCloser(r)),
+		protobuf.LengthDelimitedFramer.NewFrameReader(io.NopCloser(r)),
 		rs,
 	)
 	ds := metainternalversionscheme.Codecs.UniversalDeserializer()
@@ -2138,6 +2203,65 @@ func expectPartialObjectMetaV1EventsProtobuf(t *testing.T, r io.Reader, values .
 		if meta.Annotations["test"] != value {
 			t.Fatalf("expected event %d to have value %q instead of %q", i+1, value, meta.Annotations["test"])
 		}
+	}
+}
+
+func TestClientsetShareTransport(t *testing.T) {
+	var counter int
+	var mu sync.Mutex
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	dialFn := func(ctx context.Context, network, address string) (net.Conn, error) {
+		mu.Lock()
+		counter++
+		mu.Unlock()
+		return (&net.Dialer{}).DialContext(ctx, network, address)
+	}
+	server.ClientConfig.Dial = dialFn
+	client := clientset.NewForConfigOrDie(server.ClientConfig)
+	// create test namespace
+	_, err := client.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-creation",
+		},
+	}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("failed to create test ns: %v", err)
+	}
+	// List different objects
+	result := client.CoreV1().RESTClient().Get().AbsPath("/healthz").Do(context.TODO())
+	_, err = result.Raw()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _, err = client.Discovery().ServerGroupsAndResources()
+	if err != nil {
+		t.Fatal(err)
+	}
+	n, err := client.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("Listed %d namespaces on the cluster", len(n.Items))
+	p, err := client.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("Listed %d pods on the cluster", len(p.Items))
+	e, err := client.DiscoveryV1().EndpointSlices("").List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("Listed %d endpoint slices on the cluster", len(e.Items))
+	d, err := client.AppsV1().Deployments("").List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("Listed %d deployments on the cluster", len(d.Items))
+
+	if counter != 1 {
+		t.Fatalf("expected only one connection, created %d connections", counter)
 	}
 }
 

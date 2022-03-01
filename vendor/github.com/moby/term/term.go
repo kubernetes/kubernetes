@@ -2,7 +2,7 @@
 
 // Package term provides structures and helper functions to work with
 // terminal (state, sizes).
-package term // import "github.com/moby/term"
+package term
 
 import (
 	"errors"
@@ -50,8 +50,8 @@ func GetFdInfo(in interface{}) (uintptr, bool) {
 
 // IsTerminal returns true if the given file descriptor is a terminal.
 func IsTerminal(fd uintptr) bool {
-	var termios Termios
-	return tcget(fd, &termios) == 0
+	_, err := tcget(fd)
+	return err == nil
 }
 
 // RestoreTerminal restores the terminal connected to the given file descriptor
@@ -60,20 +60,16 @@ func RestoreTerminal(fd uintptr, state *State) error {
 	if state == nil {
 		return ErrInvalidState
 	}
-	if err := tcset(fd, &state.termios); err != 0 {
-		return err
-	}
-	return nil
+	return tcset(fd, &state.termios)
 }
 
 // SaveState saves the state of the terminal connected to the given file descriptor.
 func SaveState(fd uintptr) (*State, error) {
-	var oldState State
-	if err := tcget(fd, &oldState.termios); err != 0 {
+	termios, err := tcget(fd)
+	if err != nil {
 		return nil, err
 	}
-
-	return &oldState, nil
+	return &State{termios: *termios}, nil
 }
 
 // DisableEcho applies the specified state to the terminal connected to the file
@@ -82,7 +78,7 @@ func DisableEcho(fd uintptr, state *State) error {
 	newState := state.termios
 	newState.Lflag &^= unix.ECHO
 
-	if err := tcset(fd, &newState); err != 0 {
+	if err := tcset(fd, &newState); err != nil {
 		return err
 	}
 	handleInterrupt(fd, state)

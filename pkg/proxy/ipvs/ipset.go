@@ -110,7 +110,7 @@ func NewIPSet(handle utilipset.Interface, name string, setType utilipset.Type, i
 		if strings.HasPrefix(name, "KUBE-") {
 			name = strings.Replace(name, "KUBE-", "KUBE-6-", 1)
 			if len(name) > 31 {
-				klog.Warningf("ipset name truncated; [%s] -> [%s]", name, name[:31])
+				klog.InfoS("Ipset name truncated", "ipSetName", name, "truncatedName", name[:31])
 				name = name[:31]
 			}
 		}
@@ -147,7 +147,7 @@ func (set *IPSet) resetEntries() {
 func (set *IPSet) syncIPSetEntries() {
 	appliedEntries, err := set.handle.ListEntries(set.Name)
 	if err != nil {
-		klog.Errorf("Failed to list ip set entries, error: %v", err)
+		klog.ErrorS(err, "Failed to list ip set entries")
 		return
 	}
 
@@ -162,18 +162,18 @@ func (set *IPSet) syncIPSetEntries() {
 		for _, entry := range currentIPSetEntries.Difference(set.activeEntries).List() {
 			if err := set.handle.DelEntry(entry, set.Name); err != nil {
 				if !utilipset.IsNotFoundError(err) {
-					klog.Errorf("Failed to delete ip set entry: %s from ip set: %s, error: %v", entry, set.Name, err)
+					klog.ErrorS(err, "Failed to delete ip set entry from ip set", "ipSetEntry", entry, "ipSet", set.Name)
 				}
 			} else {
-				klog.V(3).Infof("Successfully delete legacy ip set entry: %s from ip set: %s", entry, set.Name)
+				klog.V(3).InfoS("Successfully deleted legacy ip set entry from ip set", "ipSetEntry", entry, "ipSet", set.Name)
 			}
 		}
 		// Create active entries
 		for _, entry := range set.activeEntries.Difference(currentIPSetEntries).List() {
 			if err := set.handle.AddEntry(entry, &set.IPSet, true); err != nil {
-				klog.Errorf("Failed to add entry: %v to ip set: %s, error: %v", entry, set.Name, err)
+				klog.ErrorS(err, "Failed to add ip set entry to ip set", "ipSetEntry", entry, "ipSet", set.Name)
 			} else {
-				klog.V(3).Infof("Successfully add entry: %v to ip set: %s", entry, set.Name)
+				klog.V(3).InfoS("Successfully added ip set entry to ip set", "ipSetEntry", entry, "ipSet", set.Name)
 			}
 		}
 	}
@@ -181,7 +181,7 @@ func (set *IPSet) syncIPSetEntries() {
 
 func ensureIPSet(set *IPSet) error {
 	if err := set.handle.CreateSet(&set.IPSet, true); err != nil {
-		klog.Errorf("Failed to make sure ip set: %v exist, error: %v", set, err)
+		klog.ErrorS(err, "Failed to make sure existence of ip set", "ipSet", set)
 		return err
 	}
 	return nil
@@ -191,13 +191,13 @@ func ensureIPSet(set *IPSet) error {
 func checkMinVersion(vstring string) bool {
 	version, err := utilversion.ParseGeneric(vstring)
 	if err != nil {
-		klog.Errorf("vstring (%s) is not a valid version string: %v", vstring, err)
+		klog.ErrorS(err, "Got invalid version string", "versionString", vstring)
 		return false
 	}
 
 	minVersion, err := utilversion.ParseGeneric(MinIPSetCheckVersion)
 	if err != nil {
-		klog.Errorf("MinCheckVersion (%s) is not a valid version string: %v", MinIPSetCheckVersion, err)
+		klog.ErrorS(err, "Got invalid version string", "versionString", MinIPSetCheckVersion)
 		return false
 	}
 	return !version.LessThan(minVersion)

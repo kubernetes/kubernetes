@@ -16,7 +16,6 @@ package sysfs
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -37,9 +36,21 @@ const (
 	ppcDevTree   = "/proc/device-tree"
 	s390xDevTree = "/etc" // s390/s390x changes
 
-	coreIDFilePath    = "/topology/core_id"
-	packageIDFilePath = "/topology/physical_package_id"
-	meminfoFile       = "meminfo"
+	meminfoFile = "meminfo"
+
+	sysFsCPUTopology = "topology"
+
+	// CPUPhysicalPackageID is a physical package id of cpu#. Typically corresponds to a physical socket number,
+	// but the actual value is architecture and platform dependent.
+	CPUPhysicalPackageID = "physical_package_id"
+	// CPUCoreID is the CPU core ID of cpu#. Typically it is the hardware platform's identifier
+	// (rather than the kernel's). The actual value is architecture and platform dependent.
+	CPUCoreID = "core_id"
+
+	coreIDFilePath    = "/" + sysFsCPUTopology + "/core_id"
+	packageIDFilePath = "/" + sysFsCPUTopology + "/physical_package_id"
+
+	// memory size calculations
 
 	cpuDirPattern  = "cpu*[0-9]"
 	nodeDirPattern = "node*[0-9]"
@@ -53,6 +64,8 @@ var (
 )
 
 type CacheInfo struct {
+	// cache id
+	Id int
 	// size in bytes
 	Size uint64
 	// cache type - instruction, data, unified
@@ -281,14 +294,24 @@ func getCPUCount(cache string) (count int, err error) {
 	return
 }
 
-func (fs *realSysFs) GetCacheInfo(id int, name string) (CacheInfo, error) {
-	cachePath := fmt.Sprintf("%s%d/cache/%s", cacheDir, id, name)
-	out, err := ioutil.ReadFile(path.Join(cachePath, "/size"))
+func (fs *realSysFs) GetCacheInfo(cpu int, name string) (CacheInfo, error) {
+	cachePath := fmt.Sprintf("%s%d/cache/%s", cacheDir, cpu, name)
+	out, err := ioutil.ReadFile(path.Join(cachePath, "/id"))
+	if err != nil {
+		return CacheInfo{}, err
+	}
+	var id int
+	n, err := fmt.Sscanf(string(out), "%d", &id)
+	if err != nil || n != 1 {
+		return CacheInfo{}, err
+	}
+
+	out, err = ioutil.ReadFile(path.Join(cachePath, "/size"))
 	if err != nil {
 		return CacheInfo{}, err
 	}
 	var size uint64
-	n, err := fmt.Sscanf(string(out), "%dK", &size)
+	n, err = fmt.Sscanf(string(out), "%dK", &size)
 	if err != nil || n != 1 {
 		return CacheInfo{}, err
 	}
@@ -314,6 +337,7 @@ func (fs *realSysFs) GetCacheInfo(id int, name string) (CacheInfo, error) {
 		return CacheInfo{}, err
 	}
 	return CacheInfo{
+		Id:    id,
 		Size:  size,
 		Level: level,
 		Type:  cacheType,
@@ -325,9 +349,9 @@ func (fs *realSysFs) GetSystemUUID() (string, error) {
 	if id, err := ioutil.ReadFile(path.Join(dmiDir, "id", "product_uuid")); err == nil {
 		return strings.TrimSpace(string(id)), nil
 	} else if id, err = ioutil.ReadFile(path.Join(ppcDevTree, "system-id")); err == nil {
-		return strings.TrimSpace(string(id)), nil
+		return strings.TrimSpace(strings.TrimRight(string(id), "\000")), nil
 	} else if id, err = ioutil.ReadFile(path.Join(ppcDevTree, "vm,uuid")); err == nil {
-		return strings.TrimSpace(string(id)), nil
+		return strings.TrimSpace(strings.TrimRight(string(id), "\000")), nil
 	} else if id, err = ioutil.ReadFile(path.Join(s390xDevTree, "machine-id")); err == nil {
 		return strings.TrimSpace(string(id)), nil
 	} else {
@@ -335,25 +359,152 @@ func (fs *realSysFs) GetSystemUUID() (string, error) {
 	}
 }
 
-func (fs *realSysFs) IsCPUOnline(dir string) bool {
-	cpuPath := fmt.Sprintf("%s/online", dir)
-	content, err := ioutil.ReadFile(cpuPath)
+func (fs *realSysFs) IsCPUOnline(cpuPath string) bool {
+	onlinePath, err := filepath.Abs(cpuPath + "/../online")
 	if err != nil {
-		pathErr, ok := err.(*os.PathError)
-		if ok {
-			if errors.Is(pathErr.Unwrap(), os.ErrNotExist) && isZeroCPU(dir) {
-				return true
-			}
-		}
-		klog.Warningf("unable to read %s: %s", cpuPath, err.Error())
+		klog.V(1).Infof("Unable to get absolute path for %s", cpuPath)
 		return false
 	}
-	trimmed := bytes.TrimSpace(content)
-	return len(trimmed) == 1 && trimmed[0] == 49
+
+	// Quick check to determine if file exists: if it does not then kernel CPU hotplug is disabled and all CPUs are online.
+	_, err = os.Stat(onlinePath)
+	if err != nil && os.IsNotExist(err) {
+		return true
+	}
+	if err != nil {
+		klog.V(1).Infof("Unable to stat %s: %s", onlinePath, err)
+	}
+
+	cpuID, err := getCPUID(cpuPath)
+	if err != nil {
+		klog.V(1).Infof("Unable to get CPU ID from path %s: %s", cpuPath, err)
+		return false
+	}
+
+	isOnline, err := isCPUOnline(onlinePath, cpuID)
+	if err != nil {
+		klog.V(1).Infof("Unable to get online CPUs list: %s", err)
+		return false
+	}
+	return isOnline
 }
 
-func isZeroCPU(dir string) bool {
-	regex := regexp.MustCompile("cpu([0-9]*)")
+func getCPUID(dir string) (uint16, error) {
+	regex := regexp.MustCompile("cpu([0-9]+)")
 	matches := regex.FindStringSubmatch(dir)
-	return len(matches) == 2 && matches[1] == "0"
+	if len(matches) == 2 {
+		id, err := strconv.Atoi(matches[1])
+		if err != nil {
+			return 0, err
+		}
+		return uint16(id), nil
+	}
+	return 0, fmt.Errorf("can't get CPU ID from %s", dir)
+}
+
+// isCPUOnline is copied from github.com/opencontainers/runc/libcontainer/cgroups/fs and modified to suite cAdvisor
+// needs as Apache 2.0 license allows.
+// It parses CPU list (such as: 0,3-5,10) into a struct that allows to determine quickly if CPU or particular ID is online.
+// see: https://github.com/opencontainers/runc/blob/ab27e12cebf148aa5d1ee3ad13d9fc7ae12bf0b6/libcontainer/cgroups/fs/cpuset.go#L45
+func isCPUOnline(path string, cpuID uint16) (bool, error) {
+	fileContent, err := ioutil.ReadFile(path)
+	if err != nil {
+		return false, err
+	}
+	if len(fileContent) == 0 {
+		return false, fmt.Errorf("%s found to be empty", path)
+	}
+
+	cpuList := strings.TrimSpace(string(fileContent))
+	for _, s := range strings.Split(cpuList, ",") {
+		splitted := strings.SplitN(s, "-", 3)
+		switch len(splitted) {
+		case 3:
+			return false, fmt.Errorf("invalid values in %s", path)
+		case 2:
+			min, err := strconv.ParseUint(splitted[0], 10, 16)
+			if err != nil {
+				return false, err
+			}
+			max, err := strconv.ParseUint(splitted[1], 10, 16)
+			if err != nil {
+				return false, err
+			}
+			if min > max {
+				return false, fmt.Errorf("invalid values in %s", path)
+			}
+			for i := min; i <= max; i++ {
+				if uint16(i) == cpuID {
+					return true, nil
+				}
+			}
+		case 1:
+			value, err := strconv.ParseUint(s, 10, 16)
+			if err != nil {
+				return false, err
+			}
+			if uint16(value) == cpuID {
+				return true, nil
+			}
+		}
+	}
+
+	return false, nil
+}
+
+// Looks for sysfs cpu path containing given CPU property, e.g. core_id or physical_package_id
+// and returns number of unique values of given property, exemplary usage: getting number of CPU physical cores
+func GetUniqueCPUPropertyCount(cpuBusPath string, propertyName string) int {
+	absCPUBusPath, err := filepath.Abs(cpuBusPath)
+	if err != nil {
+		klog.Errorf("Cannot make %s absolute", cpuBusPath)
+		return 0
+	}
+	pathPattern := absCPUBusPath + "/cpu*[0-9]"
+	sysCPUPaths, err := filepath.Glob(pathPattern)
+	if err != nil {
+		klog.Errorf("Cannot find files matching pattern (pathPattern: %s),  number of unique %s set to 0", pathPattern, propertyName)
+		return 0
+	}
+	onlinePath, err := filepath.Abs(cpuBusPath + "/online")
+	if err != nil {
+		klog.V(1).Infof("Unable to get absolute path for %s", cpuBusPath+"/../online")
+		return 0
+	}
+
+	if err != nil {
+		klog.V(1).Infof("Unable to get online CPUs list: %s", err)
+		return 0
+	}
+	uniques := make(map[string]bool)
+	for _, sysCPUPath := range sysCPUPaths {
+		cpuID, err := getCPUID(sysCPUPath)
+		if err != nil {
+			klog.V(1).Infof("Unable to get CPU ID from path %s: %s", sysCPUPath, err)
+			return 0
+		}
+		isOnline, err := isCPUOnline(onlinePath, cpuID)
+		if err != nil && !os.IsNotExist(err) {
+			klog.V(1).Infof("Unable to determine CPU online state: %s", err)
+			continue
+		}
+		if !isOnline && !os.IsNotExist(err) {
+			continue
+		}
+		propertyPath := filepath.Join(sysCPUPath, sysFsCPUTopology, propertyName)
+		propertyVal, err := ioutil.ReadFile(propertyPath)
+		if err != nil {
+			klog.Warningf("Cannot open %s, assuming 0 for %s of CPU %d", propertyPath, propertyName, cpuID)
+			propertyVal = []byte("0")
+		}
+		packagePath := filepath.Join(sysCPUPath, sysFsCPUTopology, CPUPhysicalPackageID)
+		packageVal, err := ioutil.ReadFile(packagePath)
+		if err != nil {
+			klog.Warningf("Cannot open %s, assuming 0 %s of CPU %d", packagePath, CPUPhysicalPackageID, cpuID)
+			packageVal = []byte("0")
+
+		}
+		uniques[fmt.Sprintf("%s_%s", bytes.TrimSpace(propertyVal), bytes.TrimSpace(packageVal))] = true
+	}
+	return len(uniques)
 }

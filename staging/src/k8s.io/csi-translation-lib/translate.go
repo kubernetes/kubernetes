@@ -33,6 +33,8 @@ var (
 		plugins.AzureDiskDriverName: plugins.NewAzureDiskCSITranslator(),
 		plugins.AzureFileDriverName: plugins.NewAzureFileCSITranslator(),
 		plugins.VSphereDriverName:   plugins.NewvSphereCSITranslator(),
+		plugins.PortworxDriverName:  plugins.NewPortworxCSITranslator(),
+		plugins.RBDDriverName:       plugins.NewRBDCSITranslator(),
 	}
 )
 
@@ -62,13 +64,13 @@ func (CSITranslator) TranslateInTreeStorageClassToCSI(inTreePluginName string, s
 // TranslateInTreeInlineVolumeToCSI takes a inline volume and will translate
 // the in-tree volume source to a CSIPersistentVolumeSource (wrapped in a PV)
 // if the translation logic has been implemented.
-func (CSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Volume) (*v1.PersistentVolume, error) {
+func (CSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Volume, podNamespace string) (*v1.PersistentVolume, error) {
 	if volume == nil {
 		return nil, fmt.Errorf("persistent volume was nil")
 	}
 	for _, curPlugin := range inTreePlugins {
 		if curPlugin.CanSupportInline(volume) {
-			pv, err := curPlugin.TranslateInTreeInlineVolumeToCSI(volume)
+			pv, err := curPlugin.TranslateInTreeInlineVolumeToCSI(volume, podNamespace)
 			if err != nil {
 				return nil, err
 			}

@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -81,6 +82,21 @@ func TestMetricsDuGetCapacity(t *testing.T) {
 	if e, a := (expectedEmptyDirUsage.Value() + getExpectedBlockSize(filepath.Join(tmpDir, "f1"))), actual.Used.Value(); e != a {
 		t.Errorf("Unexpected Used for directory with file.  Expected %v, got %d.", e, a)
 	}
+
+	// create a hardlink and expect inodes count to stay the same
+	previousInodes := actual.InodesUsed.Value()
+	err = os.Link(filepath.Join(tmpDir, "f1"), filepath.Join(tmpDir, "f2"))
+	if err != nil {
+		t.Errorf("Unexpected error when creating hard link %v", err)
+	}
+	actual, err = metrics.GetMetrics()
+	if err != nil {
+		t.Errorf("Unexpected error when calling GetMetrics %v", err)
+	}
+	if e, a := previousInodes, actual.InodesUsed.Value(); e != a {
+		t.Errorf("Unexpected Used for directory with file.  Expected %v, got %d.", e, a)
+	}
+
 }
 
 // TestMetricsDuRequireInit tests that if MetricsDu is not initialized with a path, GetMetrics

@@ -285,7 +285,8 @@ func ClusterRoles() []rbacv1.ClusterRole {
 
 				rbacv1helpers.NewRule(Write...).Groups(legacyGroup).Resources("pods", "pods/attach", "pods/proxy", "pods/exec", "pods/portforward").RuleOrDie(),
 				rbacv1helpers.NewRule(Write...).Groups(legacyGroup).Resources("replicationcontrollers", "replicationcontrollers/scale", "serviceaccounts",
-					"services", "services/proxy", "endpoints", "persistentvolumeclaims", "configmaps", "secrets").RuleOrDie(),
+					"services", "services/proxy", "persistentvolumeclaims", "configmaps", "secrets", "events").RuleOrDie(),
+				rbacv1helpers.NewRule("create").Groups(legacyGroup).Resources("serviceaccounts/token").RuleOrDie(),
 
 				rbacv1helpers.NewRule(Write...).Groups(appsGroup).Resources(
 					"statefulsets", "statefulsets/scale",
@@ -319,6 +320,8 @@ func ClusterRoles() []rbacv1.ClusterRole {
 				// read access to namespaces at the namespace scope means you can read *this* namespace.  This can be used as an
 				// indicator of which namespaces you have access to.
 				rbacv1helpers.NewRule(Read...).Groups(legacyGroup).Resources("namespaces").RuleOrDie(),
+
+				rbacv1helpers.NewRule(Read...).Groups(discoveryGroup).Resources("endpointslices").RuleOrDie(),
 
 				rbacv1helpers.NewRule(Read...).Groups(appsGroup).Resources(
 					"controllerrevisions",
@@ -512,9 +515,7 @@ func ClusterRoles() []rbacv1.ClusterRole {
 
 		eventsRule(),
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.EndpointSlice) {
-		nodeProxierRules = append(nodeProxierRules, rbacv1helpers.NewRule("list", "watch").Groups(discoveryGroup).Resources("endpointslices").RuleOrDie())
-	}
+	nodeProxierRules = append(nodeProxierRules, rbacv1helpers.NewRule("list", "watch").Groups(discoveryGroup).Resources("endpointslices").RuleOrDie())
 	roles = append(roles, rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: "system:node-proxier"},
 		Rules:      nodeProxierRules,
@@ -547,6 +548,8 @@ func ClusterRoles() []rbacv1.ClusterRole {
 		rbacv1helpers.NewRule("create").Groups(authorizationGroup).Resources("subjectaccessreviews").RuleOrDie(),
 		// Needed for volume limits
 		rbacv1helpers.NewRule(Read...).Groups(storageGroup).Resources("csinodes").RuleOrDie(),
+		// Needed for namespaceSelector feature in pod affinity
+		rbacv1helpers.NewRule(Read...).Groups(legacyGroup).Resources("namespaces").RuleOrDie(),
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIStorageCapacity) {
 		kubeSchedulerRules = append(kubeSchedulerRules,

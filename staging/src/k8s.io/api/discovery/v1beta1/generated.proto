@@ -27,7 +27,7 @@ import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 
 // Package-wide variables from generator "generated".
-option go_package = "v1beta1";
+option go_package = "k8s.io/api/discovery/v1beta1";
 
 // Endpoint represents a single logical "backend" implementing a service.
 message Endpoint {
@@ -35,7 +35,8 @@ message Endpoint {
   // according to the corresponding EndpointSlice addressType field. Consumers
   // must handle different types of addresses in the context of their own
   // capabilities. This must contain at least one address but no more than
-  // 100.
+  // 100. These are all assumed to be fungible and clients may choose to only
+  // use the first element. Refer to: https://issue.k8s.io/106267
   // +listType=set
   repeated string addresses = 1;
 
@@ -76,6 +77,12 @@ message Endpoint {
   // with the EndpointSliceNodeName feature gate.
   // +optional
   optional string nodeName = 6;
+
+  // hints contains information associated with how an endpoint should be
+  // consumed.
+  // +featureGate=TopologyAwareHints
+  // +optional
+  optional EndpointHints hints = 7;
 }
 
 // EndpointConditions represents the current condition of an endpoint.
@@ -104,6 +111,14 @@ message EndpointConditions {
   optional bool terminating = 3;
 }
 
+// EndpointHints provides hints describing how an endpoint should be consumed.
+message EndpointHints {
+  // forZones indicates the zone(s) this endpoint should be consumed by to
+  // enable topology aware routing. May contain a maximum of 8 entries.
+  // +listType=atomic
+  repeated ForZone forZones = 1;
+}
+
 // EndpointPort represents a Port used by an EndpointSlice
 message EndpointPort {
   // The name of this port. All ports in an EndpointSlice must have a unique
@@ -129,7 +144,7 @@ message EndpointPort {
   // The application protocol for this port.
   // This field follows standard Kubernetes label syntax.
   // Un-prefixed names are reserved for IANA standard service names (as per
-  // RFC-6335 and http://www.iana.org/assignments/service-names).
+  // RFC-6335 and https://www.iana.org/assignments/service-names).
   // Non-standard protocols should use prefixed names such as
   // mycompany.com/my-custom-protocol.
   // +optional
@@ -176,5 +191,11 @@ message EndpointSliceList {
 
   // List of endpoint slices
   repeated EndpointSlice items = 2;
+}
+
+// ForZone provides information about which zones should consume this endpoint.
+message ForZone {
+  // name represents the name of the zone.
+  optional string name = 1;
 }
 

@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -178,7 +179,7 @@ func TestCreateRoute(t *testing.T) {
 				HTTPStatusCode: http.StatusInternalServerError,
 				RawError:       fmt.Errorf("CreateOrUpdate error"),
 			},
-			expectedErrMsg: fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 500, RawError: CreateOrUpdate error"),
+			expectedErrMsg: fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 500, RawError: %w", fmt.Errorf("CreateOrUpdate error")),
 		},
 		{
 			name:           "CreateRoute should do nothing if route already exists",
@@ -197,7 +198,7 @@ func TestCreateRoute(t *testing.T) {
 				HTTPStatusCode: http.StatusInternalServerError,
 				RawError:       fmt.Errorf("CreateOrUpdate error"),
 			},
-			expectedErrMsg: fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 500, RawError: CreateOrUpdate error"),
+			expectedErrMsg: fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 500, RawError: %w", fmt.Errorf("CreateOrUpdate error")),
 		},
 		{
 			name:           "CreateRoute should report error if error occurs when invoke getRouteTable for the second time",
@@ -210,7 +211,7 @@ func TestCreateRoute(t *testing.T) {
 				HTTPStatusCode: http.StatusInternalServerError,
 				RawError:       fmt.Errorf("Get error"),
 			},
-			expectedErrMsg: fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 500, RawError: Get error"),
+			expectedErrMsg: fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 500, RawError: %w", fmt.Errorf("Get error")),
 		},
 		{
 			name:           "CreateRoute should report error if error occurs when invoke routeTableClient.Get",
@@ -219,7 +220,7 @@ func TestCreateRoute(t *testing.T) {
 				HTTPStatusCode: http.StatusInternalServerError,
 				RawError:       fmt.Errorf("Get error"),
 			},
-			expectedErrMsg: fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 500, RawError: Get error"),
+			expectedErrMsg: fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 500, RawError: %w", fmt.Errorf("Get error")),
 		},
 		{
 			name:           "CreateRoute should report error if error occurs when invoke GetIPByNodeName",
@@ -628,7 +629,7 @@ func TestListRoutes(t *testing.T) {
 				HTTPStatusCode: http.StatusInternalServerError,
 				RawError:       fmt.Errorf("Get error"),
 			},
-			expectedErrMsg: fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 500, RawError: Get error"),
+			expectedErrMsg: fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 500, RawError: %w", fmt.Errorf("Get error")),
 		},
 		{
 			name:                  "ListRoutes should report error if node informer is not synced",
@@ -660,5 +661,152 @@ func TestListRoutes(t *testing.T) {
 		routes, err := cloud.ListRoutes(context.TODO(), "cluster")
 		assert.Equal(t, test.expectedRoutes, routes, test.name)
 		assert.Equal(t, test.expectedErrMsg, err, test.name)
+	}
+}
+
+func TestCleanupOutdatedRoutes(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	for _, testCase := range []struct {
+		description                          string
+		existingRoutes, expectedRoutes       []network.Route
+		existingNodeNames                    sets.String
+		expectedChanged, enableIPV6DualStack bool
+	}{
+		{
+			description: "cleanupOutdatedRoutes should delete outdated non-dualstack routes when dualstack is enabled",
+			existingRoutes: []network.Route{
+				{Name: to.StringPtr("aks-node1-vmss000000____xxx")},
+				{Name: to.StringPtr("aks-node1-vmss000000")},
+			},
+			expectedRoutes: []network.Route{
+				{Name: to.StringPtr("aks-node1-vmss000000____xxx")},
+			},
+			existingNodeNames:   sets.NewString("aks-node1-vmss000000"),
+			enableIPV6DualStack: true,
+			expectedChanged:     true,
+		},
+		{
+			description: "cleanupOutdatedRoutes should delete outdated dualstack routes when dualstack is disabled",
+			existingRoutes: []network.Route{
+				{Name: to.StringPtr("aks-node1-vmss000000____xxx")},
+				{Name: to.StringPtr("aks-node1-vmss000000")},
+			},
+			expectedRoutes: []network.Route{
+				{Name: to.StringPtr("aks-node1-vmss000000")},
+			},
+			existingNodeNames: sets.NewString("aks-node1-vmss000000"),
+			expectedChanged:   true,
+		},
+		{
+			description: "cleanupOutdatedRoutes should not delete unmanaged routes when dualstack is enabled",
+			existingRoutes: []network.Route{
+				{Name: to.StringPtr("aks-node1-vmss000000____xxx")},
+				{Name: to.StringPtr("aks-node1-vmss000000")},
+			},
+			expectedRoutes: []network.Route{
+				{Name: to.StringPtr("aks-node1-vmss000000____xxx")},
+				{Name: to.StringPtr("aks-node1-vmss000000")},
+			},
+			existingNodeNames:   sets.NewString("aks-node1-vmss000001"),
+			enableIPV6DualStack: true,
+		},
+		{
+			description: "cleanupOutdatedRoutes should not delete unmanaged routes when dualstack is disabled",
+			existingRoutes: []network.Route{
+				{Name: to.StringPtr("aks-node1-vmss000000____xxx")},
+				{Name: to.StringPtr("aks-node1-vmss000000")},
+			},
+			expectedRoutes: []network.Route{
+				{Name: to.StringPtr("aks-node1-vmss000000____xxx")},
+				{Name: to.StringPtr("aks-node1-vmss000000")},
+			},
+			existingNodeNames: sets.NewString("aks-node1-vmss000001"),
+		},
+	} {
+		t.Run(testCase.description, func(t *testing.T) {
+			cloud := &Cloud{
+				ipv6DualStackEnabled: testCase.enableIPV6DualStack,
+				nodeNames:            testCase.existingNodeNames,
+			}
+
+			d := &delayedRouteUpdater{
+				az: cloud,
+			}
+
+			routes, changed := d.cleanupOutdatedRoutes(testCase.existingRoutes)
+			assert.Equal(t, testCase.expectedChanged, changed)
+			assert.Equal(t, testCase.expectedRoutes, routes)
+		})
+	}
+}
+
+func TestDeleteRouteDualStack(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	routeTableClient := mockroutetableclient.NewMockInterface(ctrl)
+
+	cloud := &Cloud{
+		RouteTablesClient: routeTableClient,
+		Config: Config{
+			RouteTableResourceGroup: "foo",
+			RouteTableName:          "bar",
+			Location:                "location",
+		},
+		unmanagedNodes:       sets.NewString(),
+		nodeInformerSynced:   func() bool { return true },
+		ipv6DualStackEnabled: true,
+	}
+	cache, _ := cloud.newRouteTableCache()
+	cloud.rtCache = cache
+	cloud.routeUpdater = newDelayedRouteUpdater(cloud, 100*time.Millisecond)
+	go cloud.routeUpdater.run()
+
+	route := cloudprovider.Route{
+		TargetNode:      "node",
+		DestinationCIDR: "1.2.3.4/24",
+	}
+	routeName := mapNodeNameToRouteName(true, route.TargetNode, route.DestinationCIDR)
+	routeNameIPV4 := mapNodeNameToRouteName(false, route.TargetNode, route.DestinationCIDR)
+	routeTables := network.RouteTable{
+		Name:     &cloud.RouteTableName,
+		Location: &cloud.Location,
+		RouteTablePropertiesFormat: &network.RouteTablePropertiesFormat{
+			Routes: &[]network.Route{
+				{
+					Name: &routeName,
+				},
+				{
+					Name: &routeNameIPV4,
+				},
+			},
+		},
+	}
+	routeTablesAfterFirstDeletion := network.RouteTable{
+		Name:     &cloud.RouteTableName,
+		Location: &cloud.Location,
+		RouteTablePropertiesFormat: &network.RouteTablePropertiesFormat{
+			Routes: &[]network.Route{
+				{
+					Name: &routeNameIPV4,
+				},
+			},
+		},
+	}
+	routeTablesAfterSecondDeletion := network.RouteTable{
+		Name:     &cloud.RouteTableName,
+		Location: &cloud.Location,
+		RouteTablePropertiesFormat: &network.RouteTablePropertiesFormat{
+			Routes: &[]network.Route{},
+		},
+	}
+	routeTableClient.EXPECT().Get(gomock.Any(), cloud.RouteTableResourceGroup, cloud.RouteTableName, "").Return(routeTables, nil).AnyTimes()
+	routeTableClient.EXPECT().CreateOrUpdate(gomock.Any(), cloud.RouteTableResourceGroup, cloud.RouteTableName, routeTablesAfterFirstDeletion, "").Return(nil)
+	routeTableClient.EXPECT().CreateOrUpdate(gomock.Any(), cloud.RouteTableResourceGroup, cloud.RouteTableName, routeTablesAfterSecondDeletion, "").Return(nil)
+	err := cloud.DeleteRoute(context.TODO(), "cluster", &route)
+	if err != nil {
+		t.Errorf("unexpected error deleting route: %v", err)
+		t.FailNow()
 	}
 }

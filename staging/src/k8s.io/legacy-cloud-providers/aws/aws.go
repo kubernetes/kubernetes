@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -23,7 +24,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"path"
 	"regexp"
 	"sort"
@@ -35,7 +35,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/credentials/ec2rolecreds"
 	"github.com/aws/aws-sdk-go/aws/credentials/stscreds"
 	"github.com/aws/aws-sdk-go/aws/ec2metadata"
 	"github.com/aws/aws-sdk-go/aws/endpoints"
@@ -50,6 +49,7 @@ import (
 	"gopkg.in/gcfg.v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
+	netutils "k8s.io/utils/net"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -821,8 +821,11 @@ func (p *awsSDKProvider) Compute(regionName string) (EC2, error) {
 	}
 	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true).
 		WithEndpointResolver(p.cfg.getResolver())
+	sess, err := session.NewSessionWithOptions(session.Options{
+		Config:            *awsConfig,
+		SharedConfigState: session.SharedConfigEnable,
+	})
 
-	sess, err := session.NewSession(awsConfig)
 	if err != nil {
 		return nil, fmt.Errorf("unable to initialize AWS session: %v", err)
 	}
@@ -843,8 +846,10 @@ func (p *awsSDKProvider) LoadBalancing(regionName string) (ELB, error) {
 	}
 	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true).
 		WithEndpointResolver(p.cfg.getResolver())
-
-	sess, err := session.NewSession(awsConfig)
+	sess, err := session.NewSessionWithOptions(session.Options{
+		Config:            *awsConfig,
+		SharedConfigState: session.SharedConfigEnable,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("unable to initialize AWS session: %v", err)
 	}
@@ -861,8 +866,10 @@ func (p *awsSDKProvider) LoadBalancingV2(regionName string) (ELBV2, error) {
 	}
 	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true).
 		WithEndpointResolver(p.cfg.getResolver())
-
-	sess, err := session.NewSession(awsConfig)
+	sess, err := session.NewSessionWithOptions(session.Options{
+		Config:            *awsConfig,
+		SharedConfigState: session.SharedConfigEnable,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("unable to initialize AWS session: %v", err)
 	}
@@ -880,8 +887,10 @@ func (p *awsSDKProvider) Autoscaling(regionName string) (ASG, error) {
 	}
 	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true).
 		WithEndpointResolver(p.cfg.getResolver())
-
-	sess, err := session.NewSession(awsConfig)
+	sess, err := session.NewSessionWithOptions(session.Options{
+		Config:            *awsConfig,
+		SharedConfigState: session.SharedConfigEnable,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("unable to initialize AWS session: %v", err)
 	}
@@ -911,8 +920,10 @@ func (p *awsSDKProvider) KeyManagement(regionName string) (KMS, error) {
 	}
 	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true).
 		WithEndpointResolver(p.cfg.getResolver())
-
-	sess, err := session.NewSession(awsConfig)
+	sess, err := session.NewSessionWithOptions(session.Options{
+		Config:            *awsConfig,
+		SharedConfigState: session.SharedConfigEnable,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("unable to initialize AWS session: %v", err)
 	}
@@ -949,6 +960,13 @@ func (s *awsSdkEC2) DescribeInstances(request *ec2.DescribeInstancesInput) ([]*e
 	results := []*ec2.Instance{}
 	var nextToken *string
 	requestTime := time.Now()
+
+	if request.MaxResults == nil && request.InstanceIds == nil {
+		// MaxResults must be set in order for pagination to work
+		// MaxResults cannot be set with InstanceIds
+		request.MaxResults = aws.Int64(1000)
+	}
+
 	for {
 		response, err := s.ec2.DescribeInstances(request)
 		if err != nil {
@@ -1170,30 +1188,28 @@ func init() {
 			return nil, fmt.Errorf("unable to validate custom endpoint overrides: %v", err)
 		}
 
-		sess, err := session.NewSession(&aws.Config{})
+		sess, err := session.NewSessionWithOptions(session.Options{
+			Config:            aws.Config{},
+			SharedConfigState: session.SharedConfigEnable,
+		})
 		if err != nil {
 			return nil, fmt.Errorf("unable to initialize AWS session: %v", err)
 		}
 
-		var provider credentials.Provider
-		if cfg.Global.RoleARN == "" {
-			provider = &ec2rolecreds.EC2RoleProvider{
-				Client: ec2metadata.New(sess),
-			}
-		} else {
+		var creds *credentials.Credentials
+		if cfg.Global.RoleARN != "" {
 			klog.Infof("Using AWS assumed role %v", cfg.Global.RoleARN)
-			provider = &stscreds.AssumeRoleProvider{
+			provider := &stscreds.AssumeRoleProvider{
 				Client:  sts.New(sess),
 				RoleARN: cfg.Global.RoleARN,
 			}
-		}
 
-		creds := credentials.NewChainCredentials(
-			[]credentials.Provider{
-				&credentials.EnvProvider{},
-				provider,
-				&credentials.SharedCredentialsProvider{},
-			})
+			creds = credentials.NewChainCredentials(
+				[]credentials.Provider{
+					&credentials.EnvProvider{},
+					provider,
+				})
+		}
 
 		aws := newAWSSDKProvider(creds, cfg)
 		return newAWSCloud(*cfg, aws)
@@ -1583,7 +1599,7 @@ func extractNodeAddresses(instance *ec2.Instance) ([]v1.NodeAddress, error) {
 
 		for _, internalIP := range networkInterface.PrivateIpAddresses {
 			if ipAddress := aws.StringValue(internalIP.PrivateIpAddress); ipAddress != "" {
-				ip := net.ParseIP(ipAddress)
+				ip := netutils.ParseIPSloppy(ipAddress)
 				if ip == nil {
 					return nil, fmt.Errorf("EC2 instance had invalid private address: %s (%q)", aws.StringValue(instance.InstanceId), ipAddress)
 				}
@@ -1595,7 +1611,7 @@ func extractNodeAddresses(instance *ec2.Instance) ([]v1.NodeAddress, error) {
 	// TODO: Other IP addresses (multiple ips)?
 	publicIPAddress := aws.StringValue(instance.PublicIpAddress)
 	if publicIPAddress != "" {
-		ip := net.ParseIP(publicIPAddress)
+		ip := netutils.ParseIPSloppy(publicIPAddress)
 		if ip == nil {
 			return nil, fmt.Errorf("EC2 instance had invalid public address: %s (%s)", aws.StringValue(instance.InstanceId), publicIPAddress)
 		}
@@ -2555,7 +2571,7 @@ func (c *Cloud) CreateDisk(volumeOptions *VolumeOptions) (KubernetesVolumeID, er
 		createType = DefaultVolumeType
 
 	default:
-		return "", fmt.Errorf("invalid AWS VolumeType %q", volumeOptions.VolumeType)
+		return KubernetesVolumeID(""), fmt.Errorf("invalid AWS VolumeType %q", volumeOptions.VolumeType)
 	}
 
 	request := &ec2.CreateVolumeInput{}
@@ -2587,12 +2603,12 @@ func (c *Cloud) CreateDisk(volumeOptions *VolumeOptions) (KubernetesVolumeID, er
 
 	response, err := c.ec2.CreateVolume(request)
 	if err != nil {
-		return "", err
+		return KubernetesVolumeID(""), err
 	}
 
 	awsID := EBSVolumeID(aws.StringValue(response.VolumeId))
 	if awsID == "" {
-		return "", fmt.Errorf("VolumeID was not returned by CreateVolume")
+		return KubernetesVolumeID(""), fmt.Errorf("VolumeID was not returned by CreateVolume")
 	}
 	volumeName := KubernetesVolumeID("aws://" + aws.StringValue(response.AvailabilityZone) + "/" + string(awsID))
 
@@ -2605,8 +2621,22 @@ func (c *Cloud) CreateDisk(volumeOptions *VolumeOptions) (KubernetesVolumeID, er
 		// because Kubernetes may have limited permissions to the key.
 		if isAWSErrorVolumeNotFound(err) {
 			err = fmt.Errorf("failed to create encrypted volume: the volume disappeared after creation, most likely due to inaccessible KMS encryption key")
+		} else {
+			// When DescribeVolumes api failed, plugin will lose track on the volumes' state
+			// driver should be able to clean up these kind of volumes to make sure they are not leaked on customers' account
+			klog.V(5).Infof("Failed to create the volume %v due to %v. Will try to delete it.", volumeName, err)
+			awsDisk, newDiskError := newAWSDisk(c, volumeName)
+			if newDiskError != nil {
+				klog.Errorf("Failed to delete the volume %v due to error: %v", volumeName, newDiskError)
+			} else {
+				if _, deleteVolumeError := awsDisk.deleteVolume(); deleteVolumeError != nil {
+					klog.Errorf("Failed to delete the volume %v due to error: %v", volumeName, deleteVolumeError)
+				} else {
+					klog.V(5).Infof("%v is deleted because it is not in desired state after waiting", volumeName)
+				}
+			}
 		}
-		return "", err
+		return KubernetesVolumeID(""), err
 	}
 
 	return volumeName, nil
@@ -3901,6 +3931,9 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 	if len(apiService.Spec.Ports) == 0 {
 		return nil, fmt.Errorf("requested load balancer with no ports")
 	}
+	if err := checkMixedProtocol(apiService.Spec.Ports); err != nil {
+		return nil, err
+	}
 	// Figure out what mappings we want on the load balancer
 	listeners := []*elb.Listener{}
 	v2Mappings := []nlbPortMapping{}
@@ -4985,6 +5018,19 @@ func (c *Cloud) nodeNameToProviderID(nodeName types.NodeName) (InstanceID, error
 	}
 
 	return KubernetesInstanceID(node.Spec.ProviderID).MapToAWSInstanceID()
+}
+
+func checkMixedProtocol(ports []v1.ServicePort) error {
+	if len(ports) == 0 {
+		return nil
+	}
+	firstProtocol := ports[0].Protocol
+	for _, port := range ports[1:] {
+		if port.Protocol != firstProtocol {
+			return fmt.Errorf("mixed protocol is not supported for LoadBalancer")
+		}
+	}
+	return nil
 }
 
 func checkProtocol(port v1.ServicePort, annotations map[string]string) error {

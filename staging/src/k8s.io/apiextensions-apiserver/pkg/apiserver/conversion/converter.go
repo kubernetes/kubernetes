@@ -165,6 +165,13 @@ func (c *crConverter) ConvertToVersion(in runtime.Object, target runtime.GroupVe
 		// TODO: should this be a typed error?
 		return nil, fmt.Errorf("%v is unstructured and is not suitable for converting to %q", fromGVK.String(), target)
 	}
+	// Special-case typed scale conversion if this custom resource supports a scale endpoint
+	if c.convertScale {
+		if _, isInScale := in.(*autoscalingv1.Scale); isInScale {
+			return typedscheme.Scheme.ConvertToVersion(in, target)
+		}
+	}
+
 	if !c.validVersions[toGVK.GroupVersion()] {
 		return nil, fmt.Errorf("request to convert CR to an invalid group/version: %s", toGVK.GroupVersion().String())
 	}

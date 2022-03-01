@@ -27,8 +27,8 @@ import (
 
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
-	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
-	policyv1beta1 "k8s.io/api/policy/v1beta1"
+	discoveryv1 "k8s.io/api/discovery/v1"
+	policyv1 "k8s.io/api/policy/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -48,7 +48,7 @@ import (
 	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	utilsnet "k8s.io/utils/net"
+	netutils "k8s.io/utils/net"
 )
 
 // NodePortRange should match whatever the default/configured range is
@@ -64,6 +64,9 @@ type TestJig struct {
 	Name      string
 	ID        string
 	Labels    map[string]string
+	// ExternalIPs should be false for Conformance test
+	// Don't check nodeport on external addrs in conformance test, but in e2e test.
+	ExternalIPs bool
 }
 
 // NewTestJig allocates and inits a new TestJig.
@@ -301,6 +304,10 @@ func (j *TestJig) ListNodesWithEndpoint() ([]v1.Node, error) {
 // GetEndpointNodeNames returns a string set of node names on which the
 // endpoints of the given Service are running.
 func (j *TestJig) GetEndpointNodeNames() (sets.String, error) {
+	err := j.waitForAvailableEndpoint(ServiceEndpointsTimeout)
+	if err != nil {
+		return nil, err
+	}
 	endpoints, err := j.Client.CoreV1().Endpoints(j.Namespace).Get(context.TODO(), j.Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("get endpoints for service %s/%s failed (%s)", j.Namespace, j.Name, err)
@@ -392,52 +399,47 @@ func (j *TestJig) waitForAvailableEndpoint(timeout time.Duration) error {
 
 	go controller.Run(stopCh)
 
-	// If EndpointSlice API is enabled, then validate if appropriate EndpointSlice objects were also create/updated/deleted.
-	if _, err := j.Client.Discovery().ServerResourcesForGroupVersion(discoveryv1beta1.SchemeGroupVersion.String()); err == nil {
-		var esController cache.Controller
-		_, esController = cache.NewInformer(
-			&cache.ListWatch{
-				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-					options.LabelSelector = "kubernetes.io/service-name=" + j.Name
-					obj, err := j.Client.DiscoveryV1beta1().EndpointSlices(j.Namespace).List(context.TODO(), options)
-					return runtime.Object(obj), err
-				},
-				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-					options.LabelSelector = "kubernetes.io/service-name=" + j.Name
-					return j.Client.DiscoveryV1beta1().EndpointSlices(j.Namespace).Watch(context.TODO(), options)
-				},
+	var esController cache.Controller
+	_, esController = cache.NewInformer(
+		&cache.ListWatch{
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				options.LabelSelector = "kubernetes.io/service-name=" + j.Name
+				obj, err := j.Client.DiscoveryV1().EndpointSlices(j.Namespace).List(context.TODO(), options)
+				return runtime.Object(obj), err
 			},
-			&discoveryv1beta1.EndpointSlice{},
-			0,
-			cache.ResourceEventHandlerFuncs{
-				AddFunc: func(obj interface{}) {
-					if es, ok := obj.(*discoveryv1beta1.EndpointSlice); ok {
-						// TODO: currently we only consider addreses in 1 slice, but services with
-						// a large number of endpoints (>1000) may have multiple slices. Some slices
-						// with only a few addresses. We should check the addresses in all slices.
-						if len(es.Endpoints) > 0 && len(es.Endpoints[0].Addresses) > 0 {
-							endpointSliceAvailable = true
-						}
-					}
-				},
-				UpdateFunc: func(old, cur interface{}) {
-					if es, ok := cur.(*discoveryv1beta1.EndpointSlice); ok {
-						// TODO: currently we only consider addreses in 1 slice, but services with
-						// a large number of endpoints (>1000) may have multiple slices. Some slices
-						// with only a few addresses. We should check the addresses in all slices.
-						if len(es.Endpoints) > 0 && len(es.Endpoints[0].Addresses) > 0 {
-							endpointSliceAvailable = true
-						}
-					}
-				},
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				options.LabelSelector = "kubernetes.io/service-name=" + j.Name
+				return j.Client.DiscoveryV1().EndpointSlices(j.Namespace).Watch(context.TODO(), options)
 			},
-		)
+		},
+		&discoveryv1.EndpointSlice{},
+		0,
+		cache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+				if es, ok := obj.(*discoveryv1.EndpointSlice); ok {
+					// TODO: currently we only consider addreses in 1 slice, but services with
+					// a large number of endpoints (>1000) may have multiple slices. Some slices
+					// with only a few addresses. We should check the addresses in all slices.
+					if len(es.Endpoints) > 0 && len(es.Endpoints[0].Addresses) > 0 {
+						endpointSliceAvailable = true
+					}
+				}
+			},
+			UpdateFunc: func(old, cur interface{}) {
+				if es, ok := cur.(*discoveryv1.EndpointSlice); ok {
+					// TODO: currently we only consider addreses in 1 slice, but services with
+					// a large number of endpoints (>1000) may have multiple slices. Some slices
+					// with only a few addresses. We should check the addresses in all slices.
+					if len(es.Endpoints) > 0 && len(es.Endpoints[0].Addresses) > 0 {
+						endpointSliceAvailable = true
+					}
+				}
+			},
+		},
+	)
 
-		go esController.Run(stopCh)
+	go esController.Run(stopCh)
 
-	} else {
-		endpointSliceAvailable = true
-	}
 	err := wait.Poll(1*time.Second, timeout, func() (bool, error) {
 		return endpointAvailable && endpointSliceAvailable, nil
 	})
@@ -471,10 +473,7 @@ func (j *TestJig) sanityCheckService(svc *v1.Service, svcType v1.ServiceType) (*
 		}
 	}
 
-	expectNodePorts := false
-	if svcType != v1.ServiceTypeClusterIP && svcType != v1.ServiceTypeExternalName {
-		expectNodePorts = true
-	}
+	expectNodePorts := needsNodePorts(svc)
 	for i, port := range svc.Spec.Ports {
 		hasNodePort := (port.NodePort != 0)
 		if hasNodePort != expectNodePorts {
@@ -495,6 +494,24 @@ func (j *TestJig) sanityCheckService(svc *v1.Service, svcType v1.ServiceType) (*
 	// }
 
 	return svc, nil
+}
+
+func needsNodePorts(svc *v1.Service) bool {
+	if svc == nil {
+		return false
+	}
+	// Type NodePort
+	if svc.Spec.Type == v1.ServiceTypeNodePort {
+		return true
+	}
+	if svc.Spec.Type != v1.ServiceTypeLoadBalancer {
+		return false
+	}
+	// Type LoadBalancer
+	if svc.Spec.AllocateLoadBalancerNodePorts == nil {
+		return true //back-compat
+	}
+	return *svc.Spec.AllocateLoadBalancerNodePorts
 }
 
 // UpdateService fetches a service, calls the update function on it, and
@@ -601,7 +618,8 @@ func (j *TestJig) waitForCondition(timeout time.Duration, message string, condit
 	pollFunc := func() (bool, error) {
 		svc, err := j.Client.CoreV1().Services(j.Namespace).Get(context.TODO(), j.Name, metav1.GetOptions{})
 		if err != nil {
-			return false, err
+			framework.Logf("Retrying .... error trying to get Service %s: %v", j.Name, err)
+			return false, nil
 		}
 		if conditionFn(svc) {
 			service = svc
@@ -610,7 +628,7 @@ func (j *TestJig) waitForCondition(timeout time.Duration, message string, condit
 		return false, nil
 	}
 	if err := wait.PollImmediate(framework.Poll, timeout, pollFunc); err != nil {
-		return nil, fmt.Errorf("timed out waiting for service %q to %s", j.Name, message)
+		return nil, fmt.Errorf("timed out waiting for service %q to %s: %w", j.Name, message, err)
 	}
 	return service, nil
 }
@@ -643,7 +661,7 @@ func (j *TestJig) newRCTemplate() *v1.ReplicationController {
 							Args:  []string{"netexec", "--http-port=80", "--udp-port=80"},
 							ReadinessProbe: &v1.Probe{
 								PeriodSeconds: 3,
-								Handler: v1.Handler{
+								ProbeHandler: v1.ProbeHandler{
 									HTTPGet: &v1.HTTPGetAction{
 										Port: intstr.FromInt(80),
 										Path: "/hostName",
@@ -681,9 +699,9 @@ func (j *TestJig) AddRCAntiAffinity(rc *v1.ReplicationController) {
 }
 
 // CreatePDB returns a PodDisruptionBudget for the given ReplicationController, or returns an error if a PodDisruptionBudget isn't ready
-func (j *TestJig) CreatePDB(rc *v1.ReplicationController) (*policyv1beta1.PodDisruptionBudget, error) {
+func (j *TestJig) CreatePDB(rc *v1.ReplicationController) (*policyv1.PodDisruptionBudget, error) {
 	pdb := j.newPDBTemplate(rc)
-	newPdb, err := j.Client.PolicyV1beta1().PodDisruptionBudgets(j.Namespace).Create(context.TODO(), pdb, metav1.CreateOptions{})
+	newPdb, err := j.Client.PolicyV1().PodDisruptionBudgets(j.Namespace).Create(context.TODO(), pdb, metav1.CreateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create PDB %q %v", pdb.Name, err)
 	}
@@ -694,19 +712,19 @@ func (j *TestJig) CreatePDB(rc *v1.ReplicationController) (*policyv1beta1.PodDis
 	return newPdb, nil
 }
 
-// newPDBTemplate returns the default policyv1beta1.PodDisruptionBudget object for
+// newPDBTemplate returns the default policyv1.PodDisruptionBudget object for
 // this j, but does not actually create the PDB.  The default PDB specifies a
 // MinAvailable of N-1 and matches the pods created by the RC.
-func (j *TestJig) newPDBTemplate(rc *v1.ReplicationController) *policyv1beta1.PodDisruptionBudget {
+func (j *TestJig) newPDBTemplate(rc *v1.ReplicationController) *policyv1.PodDisruptionBudget {
 	minAvailable := intstr.FromInt(int(*rc.Spec.Replicas) - 1)
 
-	pdb := &policyv1beta1.PodDisruptionBudget{
+	pdb := &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: j.Namespace,
 			Name:      j.Name,
 			Labels:    j.Labels,
 		},
-		Spec: policyv1beta1.PodDisruptionBudgetSpec{
+		Spec: policyv1.PodDisruptionBudgetSpec{
 			MinAvailable: &minAvailable,
 			Selector:     &metav1.LabelSelector{MatchLabels: j.Labels},
 		},
@@ -764,7 +782,7 @@ func (j *TestJig) Scale(replicas int) error {
 func (j *TestJig) waitForPdbReady() error {
 	timeout := 2 * time.Minute
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(2 * time.Second) {
-		pdb, err := j.Client.PolicyV1beta1().PodDisruptionBudgets(j.Namespace).Get(context.TODO(), j.Name, metav1.GetOptions{})
+		pdb, err := j.Client.PolicyV1().PodDisruptionBudgets(j.Namespace).Get(context.TODO(), j.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -818,7 +836,7 @@ func testReachabilityOverServiceName(serviceName string, sp v1.ServicePort, exec
 
 func testReachabilityOverClusterIP(clusterIP string, sp v1.ServicePort, execPod *v1.Pod) error {
 	// If .spec.clusterIP is set to "" or "None" for service, ClusterIP is not created, so reachability can not be tested over clusterIP:servicePort
-	if net.ParseIP(clusterIP) == nil {
+	if netutils.ParseIPSloppy(clusterIP) == nil {
 		return fmt.Errorf("unable to parse ClusterIP: %s", clusterIP)
 	}
 	return testEndpointReachability(clusterIP, sp.Port, sp.Protocol, execPod)
@@ -828,10 +846,9 @@ func testReachabilityOverExternalIP(externalIP string, sp v1.ServicePort, execPo
 	return testEndpointReachability(externalIP, sp.Port, sp.Protocol, execPod)
 }
 
-func testReachabilityOverNodePorts(nodes *v1.NodeList, sp v1.ServicePort, pod *v1.Pod, clusterIP string) error {
+func testReachabilityOverNodePorts(nodes *v1.NodeList, sp v1.ServicePort, pod *v1.Pod, clusterIP string, externalIPs bool) error {
 	internalAddrs := e2enode.CollectAddresses(nodes, v1.NodeInternalIP)
-	externalAddrs := e2enode.CollectAddresses(nodes, v1.NodeExternalIP)
-	isClusterIPV4 := utilsnet.IsIPv4String(clusterIP)
+	isClusterIPV4 := netutils.IsIPv4String(clusterIP)
 
 	for _, internalAddr := range internalAddrs {
 		// If the node's internal address points to localhost, then we are not
@@ -841,7 +858,7 @@ func testReachabilityOverNodePorts(nodes *v1.NodeList, sp v1.ServicePort, pod *v
 			continue
 		}
 		// Check service reachability on the node internalIP which is same family as clusterIP
-		if isClusterIPV4 != utilsnet.IsIPv4String(internalAddr) {
+		if isClusterIPV4 != netutils.IsIPv4String(internalAddr) {
 			framework.Logf("skipping testEndpointReachability() for internal adddress %s as it does not match clusterIP (%s) family", internalAddr, clusterIP)
 			continue
 		}
@@ -851,14 +868,17 @@ func testReachabilityOverNodePorts(nodes *v1.NodeList, sp v1.ServicePort, pod *v
 			return err
 		}
 	}
-	for _, externalAddr := range externalAddrs {
-		if isClusterIPV4 != utilsnet.IsIPv4String(externalAddr) {
-			framework.Logf("skipping testEndpointReachability() for external adddress %s as it does not match clusterIP (%s) family", externalAddr, clusterIP)
-			continue
-		}
-		err := testEndpointReachability(externalAddr, sp.NodePort, sp.Protocol, pod)
-		if err != nil {
-			return err
+	if externalIPs {
+		externalAddrs := e2enode.CollectAddresses(nodes, v1.NodeExternalIP)
+		for _, externalAddr := range externalAddrs {
+			if isClusterIPV4 != netutils.IsIPv4String(externalAddr) {
+				framework.Logf("skipping testEndpointReachability() for external adddress %s as it does not match clusterIP (%s) family", externalAddr, clusterIP)
+				continue
+			}
+			err := testEndpointReachability(externalAddr, sp.NodePort, sp.Protocol, pod)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -867,7 +887,7 @@ func testReachabilityOverNodePorts(nodes *v1.NodeList, sp v1.ServicePort, pod *v
 // isInvalidOrLocalhostAddress returns `true` if the provided `ip` is either not
 // parsable or the loopback address. Otherwise it will return `false`.
 func isInvalidOrLocalhostAddress(ip string) bool {
-	parsedIP := net.ParseIP(ip)
+	parsedIP := netutils.ParseIPSloppy(ip)
 	if parsedIP == nil || parsedIP.IsLoopback() {
 		return true
 	}
@@ -969,7 +989,7 @@ func (j *TestJig) checkNodePortServiceReachability(svc *v1.Service, pod *v1.Pod)
 		if err != nil {
 			return err
 		}
-		err = testReachabilityOverNodePorts(nodes, servicePort, pod, clusterIP)
+		err = testReachabilityOverNodePorts(nodes, servicePort, pod, clusterIP, j.ExternalIPs)
 		if err != nil {
 			return err
 		}

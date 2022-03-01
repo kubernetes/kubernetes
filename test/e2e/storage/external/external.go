@@ -20,10 +20,9 @@ import (
 	"context"
 	"encoding/json"
 	"flag"
-	"io/ioutil"
+	"fmt"
+	"os"
 	"time"
-
-	"github.com/pkg/errors"
 
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -168,7 +167,7 @@ func AddDriverDefinition(filename string) error {
 		return err
 	}
 	if driver.DriverInfo.Name == "" {
-		return errors.Errorf("%q: DriverInfo.Name not set", filename)
+		return fmt.Errorf("%q: DriverInfo.Name not set", filename)
 	}
 
 	description := "External Storage " + storageframework.GetDriverNameWithFeatureTags(driver)
@@ -181,9 +180,9 @@ func AddDriverDefinition(filename string) error {
 
 func loadDriverDefinition(filename string) (*driverDefinition, error) {
 	if filename == "" {
-		return nil, errors.New("missing file name")
+		return nil, fmt.Errorf("missing file name")
 	}
-	data, err := ioutil.ReadFile(filename)
+	data, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}
@@ -201,7 +200,15 @@ func loadDriverDefinition(filename string) (*driverDefinition, error) {
 	// TODO: strict checking of the file content once https://github.com/kubernetes/kubernetes/pull/71589
 	// or something similar is merged.
 	if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), data, driver); err != nil {
-		return nil, errors.Wrap(err, filename)
+		return nil, fmt.Errorf("%s: %w", filename, err)
+	}
+
+	// to ensure backward compatibility if controller expansion is enabled then set online expansion to true
+	if _, ok := driver.GetDriverInfo().Capabilities[storageframework.CapOnlineExpansion]; !ok &&
+		driver.GetDriverInfo().Capabilities[storageframework.CapControllerExpansion] {
+		caps := driver.DriverInfo.Capabilities
+		caps[storageframework.CapOnlineExpansion] = true
+		driver.DriverInfo.Capabilities = caps
 	}
 	return driver, nil
 }
@@ -244,7 +251,7 @@ func (d *driverDefinition) SkipUnsupportedTest(pattern storageframework.TestPatt
 	switch pattern.VolType {
 	case "":
 		supported = true
-	case storageframework.DynamicPV:
+	case storageframework.DynamicPV, storageframework.GenericEphemeralVolume:
 		if d.StorageClass.FromName || d.StorageClass.FromFile != "" || d.StorageClass.FromExistingClassName != "" {
 			supported = true
 		}
@@ -264,7 +271,6 @@ func (d *driverDefinition) GetDynamicProvisionStorageClass(e2econfig *storagefra
 	)
 
 	f := e2econfig.Framework
-
 	switch {
 	case d.StorageClass.FromName:
 		sc = &storagev1.StorageClass{Provisioner: d.DriverInfo.Name}
@@ -273,11 +279,9 @@ func (d *driverDefinition) GetDynamicProvisionStorageClass(e2econfig *storagefra
 		framework.ExpectNoError(err, "getting storage class %s", d.StorageClass.FromExistingClassName)
 	case d.StorageClass.FromFile != "":
 		var ok bool
-
 		items, err := utils.LoadFromManifests(d.StorageClass.FromFile)
 		framework.ExpectNoError(err, "load storage class from %s", d.StorageClass.FromFile)
 		framework.ExpectEqual(len(items), 1, "exactly one item from %s", d.StorageClass.FromFile)
-
 		err = utils.PatchItems(f, f.Namespace, items...)
 		framework.ExpectNoError(err, "patch items")
 
@@ -335,14 +339,14 @@ func (d *driverDefinition) GetTimeouts() *framework.TimeoutContext {
 }
 
 func loadSnapshotClass(filename string) (*unstructured.Unstructured, error) {
-	data, err := ioutil.ReadFile(filename)
+	data, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}
 	snapshotClass := &unstructured.Unstructured{}
 
 	if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), data, snapshotClass); err != nil {
-		return nil, errors.Wrap(err, filename)
+		return nil, fmt.Errorf("%s: %w", filename, err)
 	}
 
 	return snapshotClass, nil
@@ -356,7 +360,6 @@ func (d *driverDefinition) GetSnapshotClass(e2econfig *storageframework.PerTestC
 	f := e2econfig.Framework
 	snapshotter := d.DriverInfo.Name
 	ns := e2econfig.Framework.Namespace.Name
-	suffix := "vsc"
 
 	switch {
 	case d.SnapshotClass.FromName:
@@ -389,7 +392,7 @@ func (d *driverDefinition) GetSnapshotClass(e2econfig *storageframework.PerTestC
 		}
 	}
 
-	return utils.GenerateSnapshotClassSpec(snapshotter, parameters, ns, suffix)
+	return utils.GenerateSnapshotClassSpec(snapshotter, parameters, ns)
 }
 
 func (d *driverDefinition) GetVolume(e2econfig *storageframework.PerTestConfig, volumeNumber int) (map[string]string, bool, bool) {

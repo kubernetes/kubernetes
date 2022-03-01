@@ -29,6 +29,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -42,6 +43,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	fakecloud "k8s.io/cloud-provider/fake"
 	servicehelper "k8s.io/cloud-provider/service/helpers"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 const region = "us-central"
@@ -52,7 +54,6 @@ func newService(name string, uid types.UID, serviceType v1.ServiceType) *v1.Serv
 			Name:      name,
 			Namespace: "default",
 			UID:       uid,
-			SelfLink:  "/api/v1/namespaces/default/services/" + name,
 		},
 		Spec: v1.ServiceSpec{
 			Type: serviceType,
@@ -72,11 +73,9 @@ func newController() (*Controller, *fakecloud.Cloud, *fake.Clientset) {
 	cloud.Region = region
 
 	kubeClient := fake.NewSimpleClientset()
-
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
 	serviceInformer := informerFactory.Core().V1().Services()
 	nodeInformer := informerFactory.Core().V1().Nodes()
-
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartStructuredLogging(0)
 	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
@@ -90,9 +89,10 @@ func newController() (*Controller, *fakecloud.Cloud, *fake.Clientset) {
 		cache:            &serviceCache{serviceMap: make(map[string]*cachedService)},
 		eventBroadcaster: broadcaster,
 		eventRecorder:    recorder,
-		nodeLister:       nodeInformer.Lister(),
+		nodeLister:       newFakeNodeLister(nil),
 		nodeListerSynced: nodeInformer.Informer().HasSynced,
 		queue:            workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(minRetryDelay, maxRetryDelay), "service"),
+		nodeSyncCh:       make(chan interface{}, 1),
 	}
 
 	balancer, _ := cloud.LoadBalancer()
@@ -166,7 +166,6 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "udp-service",
 					Namespace: "default",
-					SelfLink:  "/api/v1/namespaces/default/services/udp-service",
 				},
 				Spec: v1.ServiceSpec{
 					Ports: []v1.ServicePort{{
@@ -187,7 +186,6 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "basic-service1",
 					Namespace: "default",
-					SelfLink:  "/api/v1/namespaces/default/services/basic-service1",
 				},
 				Spec: v1.ServiceSpec{
 					Ports: []v1.ServicePort{{
@@ -208,7 +206,6 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "sctp-service",
 					Namespace: "default",
-					SelfLink:  "/api/v1/namespaces/default/services/sctp-service",
 				},
 				Spec: v1.ServiceSpec{
 					Ports: []v1.ServicePort{{
@@ -216,6 +213,44 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 						Protocol: v1.ProtocolSCTP,
 					}},
 					Type: v1.ServiceTypeLoadBalancer,
+				},
+			},
+			expectOp:             ensureLoadBalancer,
+			expectCreateAttempt:  true,
+			expectPatchStatus:    true,
+			expectPatchFinalizer: true,
+		},
+		{
+			desc: "service specifies loadBalancerClass",
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "with-external-balancer",
+					Namespace: "default",
+				},
+				Spec: v1.ServiceSpec{
+					Type:              v1.ServiceTypeLoadBalancer,
+					LoadBalancerClass: utilpointer.StringPtr("custom-loadbalancer"),
+				},
+			},
+			expectOp:             deleteLoadBalancer,
+			expectCreateAttempt:  false,
+			expectPatchStatus:    false,
+			expectPatchFinalizer: false,
+		},
+		{
+			desc: "service doesn't specify loadBalancerClass",
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "with-external-balancer",
+					Namespace: "default",
+				},
+				Spec: v1.ServiceSpec{
+					Ports: []v1.ServicePort{{
+						Port:     80,
+						Protocol: v1.ProtocolSCTP,
+					}},
+					Type:              v1.ServiceTypeLoadBalancer,
+					LoadBalancerClass: nil,
 				},
 			},
 			expectOp:             ensureLoadBalancer,
@@ -255,7 +290,6 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "basic-service1",
 					Namespace: "default",
-					SelfLink:  "/api/v1/namespaces/default/services/basic-service1",
 					DeletionTimestamp: &metav1.Time{
 						Time: time.Now(),
 					},
@@ -288,7 +322,6 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "basic-service1",
 					Namespace: "default",
-					SelfLink:  "/api/v1/namespaces/default/services/basic-service1",
 				},
 				Spec: v1.ServiceSpec{
 					Ports: []v1.ServicePort{{
@@ -309,7 +342,6 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:       "basic-service1",
 					Namespace:  "default",
-					SelfLink:   "/api/v1/namespaces/default/services/basic-service1",
 					Finalizers: []string{servicehelper.LoadBalancerCleanupFinalizer},
 				},
 				Spec: v1.ServiceSpec{
@@ -329,15 +361,17 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			controller, cloud, client := newController()
 			cloud.Exists = tc.lbExists
 			key := fmt.Sprintf("%s/%s", tc.service.Namespace, tc.service.Name)
-			if _, err := client.CoreV1().Services(tc.service.Namespace).Create(context.TODO(), tc.service, metav1.CreateOptions{}); err != nil {
+			if _, err := client.CoreV1().Services(tc.service.Namespace).Create(ctx, tc.service, metav1.CreateOptions{}); err != nil {
 				t.Fatalf("Failed to prepare service %s for testing: %v", key, err)
 			}
 			client.ClearActions()
 
-			op, err := controller.syncLoadBalancerIfNeeded(tc.service, key)
+			op, err := controller.syncLoadBalancerIfNeeded(ctx, tc.service, key)
 			if err != nil {
 				t.Errorf("Got error: %v, want nil", err)
 			}
@@ -416,38 +450,43 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 // TODO: Finish converting and update comments
 func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 	nodes := []*v1.Node{
-		{ObjectMeta: metav1.ObjectMeta{Name: "node0"}},
-		{ObjectMeta: metav1.ObjectMeta{Name: "node1"}},
-		{ObjectMeta: metav1.ObjectMeta{Name: "node73"}},
+		{ObjectMeta: metav1.ObjectMeta{Name: "node0"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}},
+		{ObjectMeta: metav1.ObjectMeta{Name: "node1"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}},
+		{ObjectMeta: metav1.ObjectMeta{Name: "node73"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}},
 	}
 	table := []struct {
+		desc                string
 		services            []*v1.Service
 		expectedUpdateCalls []fakecloud.UpdateBalancerCall
+		workers             int
 	}{
 		{
-			// No services present: no calls should be made.
+			desc:                "No services present: no calls should be made.",
 			services:            []*v1.Service{},
 			expectedUpdateCalls: nil,
+			workers:             1,
 		},
 		{
-			// Services do not have external load balancers: no calls should be made.
+			desc: "Services do not have external load balancers: no calls should be made.",
 			services: []*v1.Service{
 				newService("s0", "111", v1.ServiceTypeClusterIP),
 				newService("s1", "222", v1.ServiceTypeNodePort),
 			},
 			expectedUpdateCalls: nil,
+			workers:             2,
 		},
 		{
-			// Services does have an external load balancer: one call should be made.
+			desc: "Services does have an external load balancer: one call should be made.",
 			services: []*v1.Service{
 				newService("s0", "333", v1.ServiceTypeLoadBalancer),
 			},
 			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
 				{Service: newService("s0", "333", v1.ServiceTypeLoadBalancer), Hosts: nodes},
 			},
+			workers: 3,
 		},
 		{
-			// Three services have an external load balancer: three calls.
+			desc: "Three services have an external load balancer: three calls.",
 			services: []*v1.Service{
 				newService("s0", "444", v1.ServiceTypeLoadBalancer),
 				newService("s1", "555", v1.ServiceTypeLoadBalancer),
@@ -458,9 +497,10 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 				{Service: newService("s1", "555", v1.ServiceTypeLoadBalancer), Hosts: nodes},
 				{Service: newService("s2", "666", v1.ServiceTypeLoadBalancer), Hosts: nodes},
 			},
+			workers: 4,
 		},
 		{
-			// Two services have an external load balancer and two don't: two calls.
+			desc: "Two services have an external load balancer and two don't: two calls.",
 			services: []*v1.Service{
 				newService("s0", "777", v1.ServiceTypeNodePort),
 				newService("s1", "888", v1.ServiceTypeLoadBalancer),
@@ -471,9 +511,10 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 				{Service: newService("s1", "888", v1.ServiceTypeLoadBalancer), Hosts: nodes},
 				{Service: newService("s3", "999", v1.ServiceTypeLoadBalancer), Hosts: nodes},
 			},
+			workers: 5,
 		},
 		{
-			// One service has an external load balancer and one is nil: one call.
+			desc: "One service has an external load balancer and one is nil: one call.",
 			services: []*v1.Service{
 				newService("s0", "234", v1.ServiceTypeLoadBalancer),
 				nil,
@@ -481,20 +522,175 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
 				{Service: newService("s0", "234", v1.ServiceTypeLoadBalancer), Hosts: nodes},
 			},
+			workers: 6,
+		},
+		{
+			desc: "Four services have external load balancer with only 2 workers",
+			services: []*v1.Service{
+				newService("s0", "777", v1.ServiceTypeLoadBalancer),
+				newService("s1", "888", v1.ServiceTypeLoadBalancer),
+				newService("s3", "999", v1.ServiceTypeLoadBalancer),
+				newService("s4", "123", v1.ServiceTypeLoadBalancer),
+			},
+			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
+				{Service: newService("s0", "777", v1.ServiceTypeLoadBalancer), Hosts: nodes},
+				{Service: newService("s1", "888", v1.ServiceTypeLoadBalancer), Hosts: nodes},
+				{Service: newService("s3", "999", v1.ServiceTypeLoadBalancer), Hosts: nodes},
+				{Service: newService("s4", "123", v1.ServiceTypeLoadBalancer), Hosts: nodes},
+			},
+			workers: 2,
 		},
 	}
 	for _, item := range table {
-		controller, cloud, _ := newController()
+		t.Run(item.desc, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			controller, cloud, _ := newController()
+			controller.nodeLister = newFakeNodeLister(nil, nodes...)
 
-		var services []*v1.Service
-		services = append(services, item.services...)
+			if servicesToRetry := controller.updateLoadBalancerHosts(ctx, item.services, item.workers); servicesToRetry != nil {
+				t.Errorf("for case %q, unexpected servicesToRetry: %v", item.desc, servicesToRetry)
+			}
+			compareUpdateCalls(t, item.expectedUpdateCalls, cloud.UpdateCalls)
+		})
+	}
+}
 
-		if servicesToRetry := controller.updateLoadBalancerHosts(services, nodes); servicesToRetry != nil {
-			t.Errorf("unexpected servicesToRetry: %v", servicesToRetry)
+func TestNodeChangesInExternalLoadBalancer(t *testing.T) {
+	node1 := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node0"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}}
+	node2 := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}}
+	node3 := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node73"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}}
+	node4 := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node4"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}}
+
+	services := []*v1.Service{
+		newService("s0", "777", v1.ServiceTypeLoadBalancer),
+		newService("s1", "888", v1.ServiceTypeLoadBalancer),
+		newService("s3", "999", v1.ServiceTypeLoadBalancer),
+		newService("s4", "123", v1.ServiceTypeLoadBalancer),
+	}
+
+	controller, cloud, _ := newController()
+	for _, tc := range []struct {
+		desc                  string
+		nodes                 []*v1.Node
+		expectedUpdateCalls   []fakecloud.UpdateBalancerCall
+		worker                int
+		nodeListerErr         error
+		expectedRetryServices []*v1.Service
+	}{
+		{
+			desc:  "only 1 node",
+			nodes: []*v1.Node{node1},
+			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
+				{Service: newService("s0", "777", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1}},
+				{Service: newService("s1", "888", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1}},
+				{Service: newService("s3", "999", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1}},
+				{Service: newService("s4", "123", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1}},
+			},
+			worker:                3,
+			nodeListerErr:         nil,
+			expectedRetryServices: []*v1.Service{},
+		},
+		{
+			desc:  "2 nodes",
+			nodes: []*v1.Node{node1, node2},
+			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
+				{Service: newService("s0", "777", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1, node2}},
+				{Service: newService("s1", "888", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1, node2}},
+				{Service: newService("s3", "999", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1, node2}},
+				{Service: newService("s4", "123", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1, node2}},
+			},
+			worker:                1,
+			nodeListerErr:         nil,
+			expectedRetryServices: []*v1.Service{},
+		},
+		{
+			desc:  "4 nodes",
+			nodes: []*v1.Node{node1, node2, node3, node4},
+			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
+				{Service: newService("s0", "777", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1, node2, node3, node4}},
+				{Service: newService("s1", "888", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1, node2, node3, node4}},
+				{Service: newService("s3", "999", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1, node2, node3, node4}},
+				{Service: newService("s4", "123", v1.ServiceTypeLoadBalancer), Hosts: []*v1.Node{node1, node2, node3, node4}},
+			},
+			worker:                3,
+			nodeListerErr:         nil,
+			expectedRetryServices: []*v1.Service{},
+		},
+		{
+			desc:                  "error occur during sync",
+			nodes:                 []*v1.Node{node1, node2, node3, node4},
+			expectedUpdateCalls:   []fakecloud.UpdateBalancerCall{},
+			worker:                3,
+			nodeListerErr:         fmt.Errorf("random error"),
+			expectedRetryServices: services,
+		},
+		{
+			desc:                  "error occur during sync with 1 workers",
+			nodes:                 []*v1.Node{node1, node2, node3, node4},
+			expectedUpdateCalls:   []fakecloud.UpdateBalancerCall{},
+			worker:                1,
+			nodeListerErr:         fmt.Errorf("random error"),
+			expectedRetryServices: services,
+		},
+	} {
+		t.Run(tc.desc, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			controller.nodeLister = newFakeNodeLister(tc.nodeListerErr, tc.nodes...)
+			servicesToRetry := controller.updateLoadBalancerHosts(ctx, services, tc.worker)
+			compareServiceList(t, tc.expectedRetryServices, servicesToRetry)
+			compareUpdateCalls(t, tc.expectedUpdateCalls, cloud.UpdateCalls)
+			cloud.UpdateCalls = []fakecloud.UpdateBalancerCall{}
+		})
+	}
+}
+
+// compareServiceList compares if both left and right inputs contains the same service list despite the order.
+func compareServiceList(t *testing.T, left, right []*v1.Service) {
+	if len(left) != len(right) {
+		t.Errorf("expect len(left) == len(right), but got %v != %v", len(left), len(right))
+	}
+
+	mismatch := false
+	for _, l := range left {
+		found := false
+		for _, r := range right {
+			if reflect.DeepEqual(l, r) {
+				found = true
+			}
 		}
-		if !reflect.DeepEqual(item.expectedUpdateCalls, cloud.UpdateCalls) {
-			t.Errorf("expected update calls mismatch, expected %+v, got %+v", item.expectedUpdateCalls, cloud.UpdateCalls)
+		if !found {
+			mismatch = true
+			break
 		}
+	}
+	if mismatch {
+		t.Errorf("expected service list to match, expected %+v, got %+v", left, right)
+	}
+}
+
+// compareUpdateCalls compares if the same update calls were made in both left and right inputs despite the order.
+func compareUpdateCalls(t *testing.T, left, right []fakecloud.UpdateBalancerCall) {
+	if len(left) != len(right) {
+		t.Errorf("expect len(left) == len(right), but got %v != %v", len(left), len(right))
+	}
+
+	mismatch := false
+	for _, l := range left {
+		found := false
+		for _, r := range right {
+			if reflect.DeepEqual(l, r) {
+				found = true
+			}
+		}
+		if !found {
+			mismatch = true
+			break
+		}
+	}
+	if mismatch {
+		t.Errorf("expected update calls to match, expected %+v, got %+v", left, right)
 	}
 }
 
@@ -575,11 +771,13 @@ func TestProcessServiceCreateOrUpdate(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 		newSvc := tc.updateFn(tc.svc)
-		if _, err := client.CoreV1().Services(tc.svc.Namespace).Create(context.TODO(), tc.svc, metav1.CreateOptions{}); err != nil {
+		if _, err := client.CoreV1().Services(tc.svc.Namespace).Create(ctx, tc.svc, metav1.CreateOptions{}); err != nil {
 			t.Fatalf("Failed to prepare service %s for testing: %v", tc.key, err)
 		}
-		obtErr := controller.processServiceCreateOrUpdate(newSvc, tc.key)
+		obtErr := controller.processServiceCreateOrUpdate(ctx, newSvc, tc.key)
 		if err := tc.expectedFn(newSvc, obtErr); err != nil {
 			t.Errorf("%v processServiceCreateOrUpdate() %v", tc.testName, err)
 		}
@@ -613,6 +811,8 @@ func TestProcessServiceCreateOrUpdateK8sError(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			svc := newService(svcName, types.UID("123"), v1.ServiceTypeLoadBalancer)
 			// Preset finalizer so k8s error only happens when patching status.
 			svc.Finalizers = []string{servicehelper.LoadBalancerCleanupFinalizer}
@@ -621,7 +821,7 @@ func TestProcessServiceCreateOrUpdateK8sError(t *testing.T) {
 				return true, nil, tc.k8sErr
 			})
 
-			if err := controller.processServiceCreateOrUpdate(svc, svcName); !reflect.DeepEqual(err, tc.expectErr) {
+			if err := controller.processServiceCreateOrUpdate(ctx, svc, svcName); !reflect.DeepEqual(err, tc.expectErr) {
 				t.Fatalf("processServiceCreateOrUpdate() = %v, want %v", err, tc.expectErr)
 			}
 			if tc.expectErr == nil {
@@ -708,9 +908,11 @@ func TestSyncService(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
 		tc.updateFn()
-		obtainedErr := controller.syncService(tc.key)
+		obtainedErr := controller.syncService(ctx, tc.key)
 
 		//expected matches obtained ??.
 		if exp := tc.expectedFn(obtainedErr); exp != nil {
@@ -794,10 +996,13 @@ func TestProcessServiceDeletion(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
 		//Create a new controller.
 		controller, cloud, _ = newController()
 		tc.updateFn(controller)
-		obtainedErr := controller.processServiceDeletion(svcKey)
+		obtainedErr := controller.processServiceDeletion(ctx, svcKey)
 		if err := tc.expectedFn(obtainedErr); err != nil {
 			t.Errorf("%v processServiceDeletion() %v", tc.testName, err)
 		}
@@ -1138,7 +1343,7 @@ func TestServiceCache(t *testing.T) {
 	}
 }
 
-//Test a utility functions as it's not easy to unit test nodeSyncLoop directly
+//Test a utility functions as it's not easy to unit test nodeSyncInternal directly
 func TestNodeSlicesEqualForLB(t *testing.T) {
 	numNodes := 10
 	nArray := make([]*v1.Node, numNodes)
@@ -1191,11 +1396,13 @@ func TestAddFinalizer(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			c := fake.NewSimpleClientset()
 			s := &Controller{
 				kubeClient: c,
 			}
-			if _, err := s.kubeClient.CoreV1().Services(tc.svc.Namespace).Create(context.TODO(), tc.svc, metav1.CreateOptions{}); err != nil {
+			if _, err := s.kubeClient.CoreV1().Services(tc.svc.Namespace).Create(ctx, tc.svc, metav1.CreateOptions{}); err != nil {
 				t.Fatalf("Failed to prepare service for testing: %v", err)
 			}
 			if err := s.addFinalizer(tc.svc); err != nil {
@@ -1245,11 +1452,13 @@ func TestRemoveFinalizer(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			c := fake.NewSimpleClientset()
 			s := &Controller{
 				kubeClient: c,
 			}
-			if _, err := s.kubeClient.CoreV1().Services(tc.svc.Namespace).Create(context.TODO(), tc.svc, metav1.CreateOptions{}); err != nil {
+			if _, err := s.kubeClient.CoreV1().Services(tc.svc.Namespace).Create(ctx, tc.svc, metav1.CreateOptions{}); err != nil {
 				t.Fatalf("Failed to prepare service for testing: %v", err)
 			}
 			if err := s.removeFinalizer(tc.svc); err != nil {
@@ -1345,11 +1554,13 @@ func TestPatchStatus(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			c := fake.NewSimpleClientset()
 			s := &Controller{
 				kubeClient: c,
 			}
-			if _, err := s.kubeClient.CoreV1().Services(tc.svc.Namespace).Create(context.TODO(), tc.svc, metav1.CreateOptions{}); err != nil {
+			if _, err := s.kubeClient.CoreV1().Services(tc.svc.Namespace).Create(ctx, tc.svc, metav1.CreateOptions{}); err != nil {
 				t.Fatalf("Failed to prepare service for testing: %v", err)
 			}
 			if err := s.patchStatus(tc.svc, &tc.svc.Status.LoadBalancer, tc.newStatus); err != nil {
@@ -1383,6 +1594,9 @@ func Test_getNodeConditionPredicate(t *testing.T) {
 
 		{want: true, input: &v1.Node{Status: validNodeStatus, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{}}}},
 		{want: false, input: &v1.Node{Status: validNodeStatus, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{v1.LabelNodeExcludeBalancers: ""}}}},
+
+		{want: false, input: &v1.Node{Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}},
+			Spec: v1.NodeSpec{Taints: []v1.Taint{{Key: ToBeDeletedTaint, Value: fmt.Sprint(time.Now().Unix()), Effect: v1.TaintEffectNoSchedule}}}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1612,4 +1826,75 @@ func TestTriggerNodeSyncKnownHosts(t *testing.T) {
 	}
 	controller.knownHosts = nodes
 	trigger(t, controller)
+}
+
+func TestMarkAndUnmarkFullSync(t *testing.T) {
+	controller, _, _ := newController()
+	if controller.needFullSync != false {
+		t.Errorf("expect controller.needFullSync to be false, but got true")
+	}
+
+	ret := controller.needFullSyncAndUnmark()
+	if ret != false {
+		t.Errorf("expect ret == false, but got true")
+	}
+
+	ret = controller.needFullSyncAndUnmark()
+	if ret != false {
+		t.Errorf("expect ret == false, but got true")
+	}
+	controller.needFullSync = true
+	ret = controller.needFullSyncAndUnmark()
+	if ret != true {
+		t.Errorf("expect ret == true, but got false")
+	}
+	ret = controller.needFullSyncAndUnmark()
+	if ret != false {
+		t.Errorf("expect ret == false, but got true")
+	}
+}
+
+func tryReadFromChannel(t *testing.T, ch chan interface{}, expectValue bool) {
+	select {
+	case _, ok := <-ch:
+		if !ok {
+			t.Errorf("The channel is closed")
+		}
+		if !expectValue {
+			t.Errorf("Does not expect value from the channel, but got a value")
+		}
+	default:
+		if expectValue {
+			t.Errorf("Expect value from the channel, but got none")
+		}
+	}
+}
+
+type fakeNodeLister struct {
+	cache []*v1.Node
+	err   error
+}
+
+func newFakeNodeLister(err error, nodes ...*v1.Node) *fakeNodeLister {
+	ret := &fakeNodeLister{}
+	ret.cache = nodes
+	ret.err = err
+	return ret
+}
+
+// List lists all Nodes in the indexer.
+// Objects returned here must be treated as read-only.
+func (l *fakeNodeLister) List(selector labels.Selector) (ret []*v1.Node, err error) {
+	return l.cache, l.err
+}
+
+// Get retrieves the Node from the index for a given name.
+// Objects returned here must be treated as read-only.
+func (l *fakeNodeLister) Get(name string) (*v1.Node, error) {
+	for _, node := range l.cache {
+		if node.Name == name {
+			return node, nil
+		}
+	}
+	return nil, nil
 }

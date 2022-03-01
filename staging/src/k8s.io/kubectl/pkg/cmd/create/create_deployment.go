@@ -43,16 +43,16 @@ var (
 	Create a deployment with the specified name.`))
 
 	deploymentExample = templates.Examples(i18n.T(`
-	# Create a deployment named my-dep that runs the busybox image.
+	# Create a deployment named my-dep that runs the busybox image
 	kubectl create deployment my-dep --image=busybox
 
-	# Create a deployment with command
+	# Create a deployment with a command
 	kubectl create deployment my-dep --image=busybox -- date
 
-	# Create a deployment named my-dep that runs the nginx image with 3 replicas.
+	# Create a deployment named my-dep that runs the nginx image with 3 replicas
 	kubectl create deployment my-dep --image=nginx --replicas=3
 
-	# Create a deployment named my-dep that runs the busybox image and expose port 5701.
+	# Create a deployment named my-dep that runs the busybox image and expose port 5701
 	kubectl create deployment my-dep --image=busybox --port=5701`))
 )
 
@@ -97,7 +97,7 @@ func NewCmdCreateDeployment(f cmdutil.Factory, ioStreams genericclioptions.IOStr
 		Use:                   "deployment NAME --image=image -- [COMMAND] [args...]",
 		DisableFlagsInUseLine: true,
 		Aliases:               []string{"deploy"},
-		Short:                 deploymentLong,
+		Short:                 i18n.T("Create a deployment with the specified name"),
 		Long:                  deploymentLong,
 		Example:               deploymentExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -111,7 +111,7 @@ func NewCmdCreateDeployment(f cmdutil.Factory, ioStreams genericclioptions.IOStr
 
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
-	cmdutil.AddGeneratorFlags(cmd, "")
+	cmdutil.AddDryRunFlag(cmd)
 	cmd.Flags().StringSliceVar(&o.Images, "image", o.Images, "Image names to run.")
 	cmd.MarkFlagRequired("image")
 	cmd.Flags().Int32Var(&o.Port, "port", o.Port, "The port that this container exposes.")
@@ -156,11 +156,7 @@ func (o *CreateDeploymentOptions) Complete(f cmdutil.Factory, cmd *cobra.Command
 	if err != nil {
 		return err
 	}
-	discoveryClient, err := f.ToDiscoveryClient()
-	if err != nil {
-		return err
-	}
-	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
+	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, f.OpenAPIGetter())
 	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
 
 	printer, err := o.PrintFlags.ToPrinter()

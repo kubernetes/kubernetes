@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -590,7 +591,7 @@ func testLoadBalancerServiceAutoModeDeleteSelection(t *testing.T, isInternal boo
 			mockLBsClient.EXPECT().Get(gomock.Any(), az.ResourceGroup, *lb.Name, gomock.Any()).Return(expectedLBs[0], nil).MaxTimes(2)
 		}
 		mockLBsClient.EXPECT().Delete(gomock.Any(), az.ResourceGroup, gomock.Any()).Return(nil).AnyTimes()
-		mockLBsClient.EXPECT().List(gomock.Any(), az.ResourceGroup).Return(expectedLBs, nil).MaxTimes(3)
+		mockLBsClient.EXPECT().List(gomock.Any(), az.ResourceGroup).Return(expectedLBs, nil).MaxTimes(4)
 
 		// expected is MIN(index, availabilitySetCount)
 		expectedNumOfLB := int(math.Min(float64(index), float64(availabilitySetCount)))
@@ -1404,7 +1405,7 @@ func getAvailabilitySetName(az *Cloud, vmIndex int, numAS int) string {
 }
 
 // test supporting on 1 nic per vm
-// we really dont care about the name of the nic
+// we really don't care about the name of the nic
 // just using the vm name for testing purposes
 func getNICName(vmIndex int) string {
 	return getVMName(vmIndex)
@@ -3069,17 +3070,6 @@ func TestCanCombineSharedAndPrivateRulesInSameGroup(t *testing.T) {
 	}
 }
 
-// TODO: sanity check if the same IP address incorrectly gets put in twice?
-// (shouldn't happen but...)
-
-// func TestIfServiceIsEditedFromOwnRuleToSharedRuleThenOwnRuleIsDeletedAndSharedRuleIsCreated(t *testing.T) {
-// 	t.Error()
-// }
-
-// func TestIfServiceIsEditedFromSharedRuleToOwnRuleThenItIsRemovedFromSharedRuleAndOwnRuleIsCreated(t *testing.T) {
-// 	t.Error()
-// }
-
 func TestGetResourceGroupFromDiskURI(t *testing.T) {
 	tests := []struct {
 		diskURL        string
@@ -3244,13 +3234,16 @@ func TestUpdateNodeCaches(t *testing.T) {
 	az.nodeZones = map[string]sets.String{zone: nodesInZone}
 	az.nodeResourceGroups = map[string]string{"prevNode": "rg"}
 	az.unmanagedNodes = sets.NewString("prevNode")
+	az.excludeLoadBalancerNodes = sets.NewString("prevNode")
+	az.nodeNames = sets.NewString("prevNode")
 
 	prevNode := v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
-				LabelFailureDomainBetaZone: zone,
-				externalResourceGroupLabel: "true",
-				managedByAzureLabel:        "false",
+				v1.LabelFailureDomainBetaZone: zone,
+				v1.LabelTopologyZone:          zone,
+				externalResourceGroupLabel:    "true",
+				managedByAzureLabel:           "false",
 			},
 			Name: "prevNode",
 		},
@@ -3260,13 +3253,16 @@ func TestUpdateNodeCaches(t *testing.T) {
 	assert.Equal(t, 0, len(az.nodeZones[zone]))
 	assert.Equal(t, 0, len(az.nodeResourceGroups))
 	assert.Equal(t, 0, len(az.unmanagedNodes))
+	assert.Equal(t, 0, len(az.excludeLoadBalancerNodes))
+	assert.Equal(t, 0, len(az.nodeNames))
 
 	newNode := v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
-				LabelFailureDomainBetaZone: zone,
-				externalResourceGroupLabel: "true",
-				managedByAzureLabel:        "false",
+				v1.LabelTopologyZone:         zone,
+				externalResourceGroupLabel:   "true",
+				managedByAzureLabel:          "false",
+				v1.LabelNodeExcludeBalancers: "true",
 			},
 			Name: "newNode",
 		},
@@ -3276,6 +3272,44 @@ func TestUpdateNodeCaches(t *testing.T) {
 	assert.Equal(t, 1, len(az.nodeZones[zone]))
 	assert.Equal(t, 1, len(az.nodeResourceGroups))
 	assert.Equal(t, 1, len(az.unmanagedNodes))
+	assert.Equal(t, 1, len(az.excludeLoadBalancerNodes))
+	assert.Equal(t, 1, len(az.nodeNames))
+}
+
+func TestUpdateNodeCacheExcludeLoadBalancer(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	az := GetTestCloud(ctrl)
+
+	zone := fmt.Sprintf("%s-0", az.Location)
+	nodesInZone := sets.NewString("prevNode")
+	az.nodeZones = map[string]sets.String{zone: nodesInZone}
+	az.nodeResourceGroups = map[string]string{"prevNode": "rg"}
+	az.unmanagedNodes = sets.NewString("prevNode")
+	az.excludeLoadBalancerNodes = sets.NewString()
+	az.nodeNames = sets.NewString("prevNode")
+
+	// excluded node cache shall be updated even if the topology label does not change
+	prevNode := v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{
+				v1.LabelTopologyZone: zone,
+			},
+			Name: "prevNode",
+		},
+	}
+	newNode := v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{
+				v1.LabelTopologyZone:         zone,
+				v1.LabelNodeExcludeBalancers: "true",
+			},
+			Name: "newNode",
+		},
+	}
+	az.updateNodeCaches(&prevNode, &newNode)
+	assert.Equal(t, 1, len(az.excludeLoadBalancerNodes))
+
 }
 
 func TestGetActiveZones(t *testing.T) {
@@ -3331,4 +3365,157 @@ func TestInitializeCloudFromConfig(t *testing.T) {
 	err = az.InitializeCloudFromConfig(&config, false)
 	expectedErr = fmt.Errorf("useInstanceMetadata must be enabled without Azure credentials")
 	assert.Equal(t, expectedErr, err)
+}
+
+func TestFindSecurityRule(t *testing.T) {
+	testRuleName := "test-rule"
+	testIP1 := "192.168.192.168"
+	sg := network.SecurityRule{
+		Name: to.StringPtr(testRuleName),
+		SecurityRulePropertiesFormat: &network.SecurityRulePropertiesFormat{
+			Protocol:                 network.SecurityRuleProtocolTCP,
+			SourcePortRange:          to.StringPtr("*"),
+			SourceAddressPrefix:      to.StringPtr("Internet"),
+			DestinationPortRange:     to.StringPtr("80"),
+			DestinationAddressPrefix: to.StringPtr(testIP1),
+			Access:                   network.SecurityRuleAccessAllow,
+			Direction:                network.SecurityRuleDirectionInbound,
+		},
+	}
+	testCases := []struct {
+		desc     string
+		testRule network.SecurityRule
+		expected bool
+	}{
+		{
+			desc:     "false should be returned for an empty rule",
+			testRule: network.SecurityRule{},
+			expected: false,
+		},
+		{
+			desc: "false should be returned when rule name doesn't match",
+			testRule: network.SecurityRule{
+				Name: to.StringPtr("not-the-right-name"),
+			},
+			expected: false,
+		},
+		{
+			desc: "false should be returned when protocol doesn't match",
+			testRule: network.SecurityRule{
+				Name: to.StringPtr(testRuleName),
+				SecurityRulePropertiesFormat: &network.SecurityRulePropertiesFormat{
+					Protocol: network.SecurityRuleProtocolUDP,
+				},
+			},
+			expected: false,
+		},
+		{
+			desc: "false should be returned when SourcePortRange doesn't match",
+			testRule: network.SecurityRule{
+				Name: to.StringPtr(testRuleName),
+				SecurityRulePropertiesFormat: &network.SecurityRulePropertiesFormat{
+					Protocol:        network.SecurityRuleProtocolUDP,
+					SourcePortRange: to.StringPtr("1.2.3.4/32"),
+				},
+			},
+			expected: false,
+		},
+		{
+			desc: "false should be returned when SourceAddressPrefix doesn't match",
+			testRule: network.SecurityRule{
+				Name: to.StringPtr(testRuleName),
+				SecurityRulePropertiesFormat: &network.SecurityRulePropertiesFormat{
+					Protocol:            network.SecurityRuleProtocolUDP,
+					SourcePortRange:     to.StringPtr("*"),
+					SourceAddressPrefix: to.StringPtr("2.3.4.0/24"),
+				},
+			},
+			expected: false,
+		},
+		{
+			desc: "false should be returned when DestinationPortRange doesn't match",
+			testRule: network.SecurityRule{
+				Name: to.StringPtr(testRuleName),
+				SecurityRulePropertiesFormat: &network.SecurityRulePropertiesFormat{
+					Protocol:             network.SecurityRuleProtocolUDP,
+					SourcePortRange:      to.StringPtr("*"),
+					SourceAddressPrefix:  to.StringPtr("Internet"),
+					DestinationPortRange: to.StringPtr("443"),
+				},
+			},
+			expected: false,
+		},
+		{
+			desc: "false should be returned when DestinationAddressPrefix doesn't match",
+			testRule: network.SecurityRule{
+				Name: to.StringPtr(testRuleName),
+				SecurityRulePropertiesFormat: &network.SecurityRulePropertiesFormat{
+					Protocol:                 network.SecurityRuleProtocolUDP,
+					SourcePortRange:          to.StringPtr("*"),
+					SourceAddressPrefix:      to.StringPtr("Internet"),
+					DestinationPortRange:     to.StringPtr("80"),
+					DestinationAddressPrefix: to.StringPtr("192.168.0.3"),
+				},
+			},
+			expected: false,
+		},
+		{
+			desc: "false should be returned when Access doesn't match",
+			testRule: network.SecurityRule{
+				Name: to.StringPtr(testRuleName),
+				SecurityRulePropertiesFormat: &network.SecurityRulePropertiesFormat{
+					Protocol:                 network.SecurityRuleProtocolUDP,
+					SourcePortRange:          to.StringPtr("*"),
+					SourceAddressPrefix:      to.StringPtr("Internet"),
+					DestinationPortRange:     to.StringPtr("80"),
+					DestinationAddressPrefix: to.StringPtr(testIP1),
+					Access:                   network.SecurityRuleAccessDeny,
+					// Direction:                network.SecurityRuleDirectionInbound,
+				},
+			},
+			expected: false,
+		},
+		{
+			desc: "false should be returned when Direction doesn't match",
+			testRule: network.SecurityRule{
+				Name: to.StringPtr(testRuleName),
+				SecurityRulePropertiesFormat: &network.SecurityRulePropertiesFormat{
+					Protocol:                 network.SecurityRuleProtocolUDP,
+					SourcePortRange:          to.StringPtr("*"),
+					SourceAddressPrefix:      to.StringPtr("Internet"),
+					DestinationPortRange:     to.StringPtr("80"),
+					DestinationAddressPrefix: to.StringPtr(testIP1),
+					Access:                   network.SecurityRuleAccessAllow,
+					Direction:                network.SecurityRuleDirectionOutbound,
+				},
+			},
+			expected: false,
+		},
+		{
+			desc: "true should be returned when everything matches but protocol is in different case",
+			testRule: network.SecurityRule{
+				Name: to.StringPtr(testRuleName),
+				SecurityRulePropertiesFormat: &network.SecurityRulePropertiesFormat{
+					Protocol:                 network.SecurityRuleProtocol("TCP"),
+					SourcePortRange:          to.StringPtr("*"),
+					SourceAddressPrefix:      to.StringPtr("Internet"),
+					DestinationPortRange:     to.StringPtr("80"),
+					DestinationAddressPrefix: to.StringPtr(testIP1),
+					Access:                   network.SecurityRuleAccessAllow,
+					Direction:                network.SecurityRuleDirectionInbound,
+				},
+			},
+			expected: true,
+		},
+		{
+			desc:     "true should be returned when everything matches",
+			testRule: sg,
+			expected: true,
+		},
+	}
+
+	for i := range testCases {
+		found := findSecurityRule([]network.SecurityRule{sg}, testCases[i].testRule)
+		assert.Equal(t, testCases[i].expected, found, testCases[i].desc)
+	}
 }

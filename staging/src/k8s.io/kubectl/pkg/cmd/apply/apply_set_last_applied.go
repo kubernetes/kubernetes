@@ -73,13 +73,13 @@ var (
 		without updating any other parts of the object.`))
 
 	applySetLastAppliedExample = templates.Examples(i18n.T(`
-		# Set the last-applied-configuration of a resource to match the contents of a file.
+		# Set the last-applied-configuration of a resource to match the contents of a file
 		kubectl apply set-last-applied -f deploy.yaml
 
-		# Execute set-last-applied against each configuration file in a directory.
+		# Execute set-last-applied against each configuration file in a directory
 		kubectl apply set-last-applied -f path/
 
-		# Set the last-applied-configuration of a resource to match the contents of a file, will create the annotation if it does not already exist.
+		# Set the last-applied-configuration of a resource to match the contents of a file; will create the annotation if it does not already exist
 		kubectl apply set-last-applied -f deploy.yaml --create-annotation=true
 		`))
 )
@@ -98,7 +98,7 @@ func NewCmdApplySetLastApplied(f cmdutil.Factory, ioStreams genericclioptions.IO
 	cmd := &cobra.Command{
 		Use:                   "set-last-applied -f FILENAME",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Set the last-applied-configuration annotation on a live object to match the contents of a file."),
+		Short:                 i18n.T("Set the last-applied-configuration annotation on a live object to match the contents of a file"),
 		Long:                  applySetLastAppliedLong,
 		Example:               applySetLastAppliedExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -128,11 +128,7 @@ func (o *SetLastAppliedOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) 
 	if err != nil {
 		return err
 	}
-	discoveryClient, err := f.ToDiscoveryClient()
-	if err != nil {
-		return err
-	}
-	o.dryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
+	o.dryRunVerifier = resource.NewDryRunVerifier(dynamicClient, f.OpenAPIGetter())
 	o.output = cmdutil.GetFlagString(cmd, "output")
 	o.shortOutput = o.output == "name"
 

@@ -1,8 +1,12 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- sig-instrumentation-approvers
+  - sig-instrumentation-approvers
+  - serathius
+  - pohly
 reviewers:
-- sig-instrumentation-reviewers
+  - sig-instrumentation-reviewers
+  - serathius
 labels:
-- sig/instrumentation
+  - sig/instrumentation
+  - wg/structured-logging

@@ -25,6 +25,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -44,15 +46,28 @@ func (f *FakeObject) Name() string {
 }
 
 func (f *FakeObject) Merged() (runtime.Object, error) {
+	// Return nil if merged object does not exist
+	if f.merged == nil {
+		return nil, nil
+	}
 	return &unstructured.Unstructured{Object: f.merged}, nil
 }
 
 func (f *FakeObject) Live() runtime.Object {
+	// Return nil if live object does not exist
+	if f.live == nil {
+		return nil
+	}
 	return &unstructured.Unstructured{Object: f.live}
 }
 
 func TestDiffProgram(t *testing.T) {
 	externalDiffCommands := [3]string{"diff", "diff -ruN", "diff --report-identical-files"}
+
+	if oriLang := os.Getenv("LANG"); oriLang != "C" {
+		os.Setenv("LANG", "C")
+		defer os.Setenv("LANG", oriLang)
+	}
 
 	for i, c := range externalDiffCommands {
 		os.Setenv("KUBECTL_EXTERNAL_DIFF", c)
@@ -110,7 +125,11 @@ func TestDiffVersion(t *testing.T) {
 		live:   map[string]interface{}{"live": true},
 		merged: map[string]interface{}{"merged": true},
 	}
-	err = diff.Print(&obj, Printer{})
+	rObj, err := obj.Merged()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = diff.Print(obj.Name(), rObj, Printer{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -201,5 +220,340 @@ func TestDiffer(t *testing.T) {
 	econtent = "merged: true\n"
 	if string(fcontent) != econtent {
 		t.Fatalf("File has %q, expected %q", string(fcontent), econtent)
+	}
+}
+
+func TestMasker(t *testing.T) {
+	type diff struct {
+		from runtime.Object
+		to   runtime.Object
+	}
+	cases := []struct {
+		name  string
+		input diff
+		want  diff
+	}{
+		{
+			name: "no_changes",
+			input: diff{
+				from: &unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"data": map[string]interface{}{
+							"username": "abc",
+							"password": "123",
+						},
+					},
+				},
+				to: &unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"data": map[string]interface{}{
+							"username": "abc",
+							"password": "123",
+						},
+					},
+				},
+			},
+			want: diff{
+				from: &unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"data": map[string]interface{}{
+							"username": "***", // still masked
+							"password": "***", // still masked
+						},
+					},
+				},
+				to: &unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"data": map[string]interface{}{
+							"username": "***", // still masked
+							"password": "***", // still masked
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "object_created",
+			input: diff{
+				from: nil, // does not exist yet
+				to: &unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"data": map[string]interface{}{
+							"username": "abc",
+							"password": "123",
+						},
+					},
+				},
+			},
+			want: diff{
+				from: nil, // does not exist yet
+				to: &unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"data": map[string]interface{}{
+							"username": "***", // no suffix needed
+							"password": "***", // no suffix needed
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "object_removed",
+			input: diff{
+				from: &unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"data": map[string]interface{}{
+							"username": "abc",
+							"password": "123",
+						},
+					},
+				},
+				to: nil, // removed
+			},
+			want: diff{
+				from: &unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"data": map[string]interface{}{
+							"username": "***", // no suffix needed
+							"password": "***", // no suffix needed
+						},
+					},
+				},
+				to: nil, // removed
+			},
+		},
+		{
+			name: "data_key_added",
+			input: diff{
+				from: &unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"data": map[string]interface{}{
+							"username": "abc",
+						},
+					},
+				},
+				to: &unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"data": map[string]interface{}{
+							"username": "abc",
+							"password": "123", // added
+						},
+					},
+				},
+			},
+			want: diff{
+				from: &unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"data": map[string]interface{}{
+							"username": "***",
+						},
+					},
+				},
+				to: &unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"data": map[string]interface{}{
+							"username": "***",
+							"password": "***", // no suffix needed
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "data_key_changed",
+			input: diff{
+				from: &unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"data": map[string]interface{}{
+							"username": "abc",
+							"password": "123",
+						},
+					},
+				},
+				to: &unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"data": map[string]interface{}{
+							"username": "abc",
+							"password": "456", // changed
+						},
+					},
+				},
+			},
+			want: diff{
+				from: &unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"data": map[string]interface{}{
+							"username": "***",
+							"password": "*** (before)", // added suffix for diff
+						},
+					},
+				},
+				to: &unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"data": map[string]interface{}{
+							"username": "***",
+							"password": "*** (after)", // added suffix for diff
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "data_key_removed",
+			input: diff{
+				from: &unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"data": map[string]interface{}{
+							"username": "abc",
+							"password": "123",
+						},
+					},
+				},
+				to: &unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"data": map[string]interface{}{
+							"username": "abc",
+							// "password": "123", // removed
+						},
+					},
+				},
+			},
+			want: diff{
+				from: &unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"data": map[string]interface{}{
+							"username": "***",
+							"password": "***", // no suffix needed
+						},
+					},
+				},
+				to: &unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"data": map[string]interface{}{
+							"username": "***",
+							// "password": "***",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "empty_secret_from",
+			input: diff{
+				from: &unstructured.Unstructured{
+					Object: map[string]interface{}{}, // no data key
+				},
+				to: &unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"data": map[string]interface{}{
+							"username": "abc",
+							"password": "123",
+						},
+					},
+				},
+			},
+			want: diff{
+				from: &unstructured.Unstructured{
+					Object: map[string]interface{}{}, // no data key
+				},
+				to: &unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"data": map[string]interface{}{
+							"username": "***",
+							"password": "***",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "empty_secret_to",
+			input: diff{
+				from: &unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"data": map[string]interface{}{
+							"username": "abc",
+							"password": "123",
+						},
+					},
+				},
+				to: &unstructured.Unstructured{
+					Object: map[string]interface{}{}, // no data key
+				},
+			},
+			want: diff{
+				from: &unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"data": map[string]interface{}{
+							"username": "***",
+							"password": "***",
+						},
+					},
+				},
+				to: &unstructured.Unstructured{
+					Object: map[string]interface{}{}, // no data key
+				},
+			},
+		},
+		{
+			name: "invalid_data_key",
+			input: diff{
+				from: &unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"some_other_key": map[string]interface{}{ // invalid key
+							"username": "abc",
+							"password": "123",
+						},
+					},
+				},
+				to: &unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"some_other_key": map[string]interface{}{ // invalid key
+							"username": "abc",
+							"password": "123",
+						},
+					},
+				},
+			},
+			want: diff{
+				from: &unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"some_other_key": map[string]interface{}{
+							"username": "abc", // skipped
+							"password": "123", // skipped
+						},
+					},
+				},
+				to: &unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"some_other_key": map[string]interface{}{
+							"username": "abc", // skipped
+							"password": "123", // skipped
+						},
+					},
+				},
+			},
+		},
+	}
+	for _, tc := range cases {
+		tc := tc // capture range variable
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			m, err := NewMasker(tc.input.from, tc.input.to)
+			if err != nil {
+				t.Fatal(err)
+			}
+			from, to := m.From(), m.To()
+			if from != nil && tc.want.from != nil {
+				if diff := cmp.Diff(from, tc.want.from); diff != "" {
+					t.Errorf("from: (-want +got):\n%s", diff)
+				}
+			}
+			if to != nil && tc.want.to != nil {
+				if diff := cmp.Diff(to, tc.want.to); diff != "" {
+					t.Errorf("to: (-want +got):\n%s", diff)
+				}
+			}
+		})
 	}
 }

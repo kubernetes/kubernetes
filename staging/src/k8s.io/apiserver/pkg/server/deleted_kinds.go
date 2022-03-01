@@ -21,6 +21,9 @@ import (
 	"strconv"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -45,7 +48,7 @@ type resourceExpirationEvaluator struct {
 type ResourceExpirationEvaluator interface {
 	// RemoveDeletedKinds inspects the storage map and modifies it in place by removing storage for kinds that have been deleted.
 	// versionedResourcesStorageMap mirrors the field on APIGroupInfo, it's a map from version to resource to the storage.
-	RemoveDeletedKinds(groupName string, versionedResourcesStorageMap map[string]map[string]rest.Storage)
+	RemoveDeletedKinds(groupName string, versioner runtime.ObjectVersioner, versionedResourcesStorageMap map[string]map[string]rest.Storage)
 	// ShouldServeForVersion returns true if a particular version cut off is after the current version
 	ShouldServeForVersion(majorRemoved, minorRemoved int) bool
 }
@@ -80,6 +83,7 @@ func NewResourceExpirationEvaluator(currentVersion apimachineryversion.Info) (Re
 	} else {
 		ret.strictRemovedHandlingInAlpha = envBool
 	}
+
 	if envString, ok := os.LookupEnv("KUBE_APISERVER_SERVE_REMOVED_APIS_FOR_ONE_RELEASE"); !ok {
 		// do nothing
 	} else if envBool, err := strconv.ParseBool(envString); err != nil {
@@ -91,8 +95,21 @@ func NewResourceExpirationEvaluator(currentVersion apimachineryversion.Info) (Re
 	return ret, nil
 }
 
-func (e *resourceExpirationEvaluator) shouldServe(resourceServingInfo rest.Storage) bool {
-	versionedPtr := resourceServingInfo.New()
+func (e *resourceExpirationEvaluator) shouldServe(gv schema.GroupVersion, versioner runtime.ObjectVersioner, resourceServingInfo rest.Storage) bool {
+	internalPtr := resourceServingInfo.New()
+
+	target := gv
+	// honor storage that overrides group version (used for things like scale subresources)
+	if versionProvider, ok := resourceServingInfo.(rest.GroupVersionKindProvider); ok {
+		target = versionProvider.GroupVersionKind(target).GroupVersion()
+	}
+
+	versionedPtr, err := versioner.ConvertToVersion(internalPtr, target)
+	if err != nil {
+		utilruntime.HandleError(err)
+		return false
+	}
+
 	removed, ok := versionedPtr.(removedInterface)
 	if !ok {
 		return true
@@ -135,12 +152,13 @@ type removedInterface interface {
 
 // removeDeletedKinds inspects the storage map and modifies it in place by removing storage for kinds that have been deleted.
 // versionedResourcesStorageMap mirrors the field on APIGroupInfo, it's a map from version to resource to the storage.
-func (e *resourceExpirationEvaluator) RemoveDeletedKinds(groupName string, versionedResourcesStorageMap map[string]map[string]rest.Storage) {
+func (e *resourceExpirationEvaluator) RemoveDeletedKinds(groupName string, versioner runtime.ObjectVersioner, versionedResourcesStorageMap map[string]map[string]rest.Storage) {
 	versionsToRemove := sets.NewString()
-	for apiVersion, versionToResource := range versionedResourcesStorageMap {
+	for apiVersion := range sets.StringKeySet(versionedResourcesStorageMap) {
+		versionToResource := versionedResourcesStorageMap[apiVersion]
 		resourcesToRemove := sets.NewString()
 		for resourceName, resourceServingInfo := range versionToResource {
-			if !e.shouldServe(resourceServingInfo) {
+			if !e.shouldServe(schema.GroupVersion{Group: groupName, Version: apiVersion}, versioner, resourceServingInfo) {
 				resourcesToRemove.Insert(resourceName)
 			}
 		}
@@ -151,8 +169,9 @@ func (e *resourceExpirationEvaluator) RemoveDeletedKinds(groupName string, versi
 			}
 
 			klog.V(1).Infof("Removing resource %v.%v.%v because it is time to stop serving it per APILifecycle.", resourceName, apiVersion, groupName)
-			delete(versionedResourcesStorageMap[apiVersion], resourceName)
+			delete(versionToResource, resourceName)
 		}
+		versionedResourcesStorageMap[apiVersion] = versionToResource
 
 		if len(versionedResourcesStorageMap[apiVersion]) == 0 {
 			versionsToRemove.Insert(apiVersion)

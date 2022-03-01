@@ -104,7 +104,7 @@ func createJob(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration)
 	// If client.Discovery().RESTClient() is nil, the fake client is used.
 	// Return early because the kubeadm dryrun dynamic client only handles the core/v1 GroupVersion.
 	if client.Discovery().RESTClient() == nil {
-		fmt.Printf("[dryrun] Would create the Job %q in namespace %q and wait until it completes\n", jobName, ns)
+		fmt.Printf("[upgrade/health] Would create the Job %q in namespace %q and wait until it completes\n", jobName, ns)
 		return nil
 	}
 
@@ -126,7 +126,11 @@ func createJob(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration)
 					},
 					Tolerations: []v1.Toleration{
 						{
-							Key:    "node-role.kubernetes.io/master",
+							Key:    constants.LabelNodeRoleOldControlPlane,
+							Effect: v1.TaintEffectNoSchedule,
+						},
+						{
+							Key:    constants.LabelNodeRoleControlPlane,
 							Effect: v1.TaintEffectNoSchedule,
 						},
 					},
@@ -208,34 +212,17 @@ func deleteHealthCheckJob(client clientset.Interface, ns, jobName string) error 
 
 // controlPlaneNodesReady checks whether all control-plane Nodes in the cluster are in the Running state
 func controlPlaneNodesReady(client clientset.Interface, _ *kubeadmapi.ClusterConfiguration) error {
-	// list nodes labeled with a "master" node-role
-	selectorOldControlPlane := labels.SelectorFromSet(labels.Set(map[string]string{
-		constants.LabelNodeRoleOldControlPlane: "",
-	}))
-	nodesWithOldLabel, err := client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
-		LabelSelector: selectorOldControlPlane.String(),
-	})
-	if err != nil {
-		return errors.Wrapf(err, "could not list nodes labeled with %q", constants.LabelNodeRoleOldControlPlane)
-	}
-
-	// list nodes labeled with a "control-plane" node-role
 	selectorControlPlane := labels.SelectorFromSet(labels.Set(map[string]string{
 		constants.LabelNodeRoleControlPlane: "",
 	}))
-	nodesControlPlane, err := client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
+	nodes, err := client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
 		LabelSelector: selectorControlPlane.String(),
 	})
 	if err != nil {
 		return errors.Wrapf(err, "could not list nodes labeled with %q", constants.LabelNodeRoleControlPlane)
 	}
 
-	nodes := append(nodesWithOldLabel.Items, nodesControlPlane.Items...)
-	if len(nodes) == 0 {
-		return errors.New("failed to find any nodes with a control-plane role")
-	}
-
-	notReadyControlPlanes := getNotReadyNodes(nodes)
+	notReadyControlPlanes := getNotReadyNodes(nodes.Items)
 	if len(notReadyControlPlanes) != 0 {
 		return errors.Errorf("there are NotReady control-planes in the cluster: %v", notReadyControlPlanes)
 	}

@@ -421,6 +421,48 @@ func TestTranslateTopologyFromCSIToInTree(t *testing.T) {
 				v1.LabelTopologyRegion: "us-east1",
 			},
 		},
+		{
+			name:         "cinder translation",
+			key:          CinderTopologyKey,
+			expErr:       false,
+			regionParser: nil,
+			pv: &v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cinder", Namespace: "myns",
+				},
+				Spec: v1.PersistentVolumeSpec{
+					NodeAffinity: &v1.VolumeNodeAffinity{
+						Required: &v1.NodeSelector{
+							NodeSelectorTerms: []v1.NodeSelectorTerm{
+								{
+									MatchExpressions: []v1.NodeSelectorRequirement{
+										{
+											Key:      CinderTopologyKey,
+											Operator: v1.NodeSelectorOpIn,
+											Values:   []string{"nova"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedNodeSelectorTerms: []v1.NodeSelectorTerm{
+				{
+					MatchExpressions: []v1.NodeSelectorRequirement{
+						{
+							Key:      v1.LabelTopologyZone,
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{"nova"},
+						},
+					},
+				},
+			},
+			expectedLabels: map[string]string{
+				v1.LabelTopologyZone: "nova",
+			},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -540,7 +582,6 @@ func TestTranslateAllowedTopologies(t *testing.T) {
 		name            string
 		topology        []v1.TopologySelectorTerm
 		expectedToplogy []v1.TopologySelectorTerm
-		expErr          bool
 	}{
 		{
 			name:     "no translation",
@@ -622,18 +663,24 @@ func TestTranslateAllowedTopologies(t *testing.T) {
 					},
 				},
 			},
-			expErr: true,
+			expectedToplogy: []v1.TopologySelectorTerm{
+				{
+					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
+						{
+							Key:    "test",
+							Values: []string{"foo", "bar"},
+						},
+					},
+				},
+			},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Logf("Running test: %v", tc.name)
 		gotTop, err := translateAllowedTopologies(tc.topology, GCEPDTopologyKey)
-		if err != nil && !tc.expErr {
-			t.Errorf("Did not expect an error, got: %v", err)
-		}
-		if err == nil && tc.expErr {
-			t.Errorf("Expected an error but did not get one")
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
 		}
 
 		if !reflect.DeepEqual(gotTop, tc.expectedToplogy) {

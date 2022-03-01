@@ -17,11 +17,10 @@ limitations under the License.
 package windows
 
 import (
+	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
-
-	"github.com/pkg/errors"
+	"os"
 )
 
 // downloadFile saves a remote URL to a local temp file, and returns its path.
@@ -29,13 +28,13 @@ import (
 func downloadFile(url string) (string, error) {
 	response, err := http.Get(url)
 	if err != nil {
-		return "", errors.Wrapf(err, "unable to download from %q", url)
+		return "", fmt.Errorf("unable to download from %q: %w", url, err)
 	}
 	defer response.Body.Close()
 
-	tempFile, err := ioutil.TempFile("", "")
+	tempFile, err := os.CreateTemp("", "")
 	if err != nil {
-		return "", errors.Wrapf(err, "unable to create temp file")
+		return "", fmt.Errorf("unable to create temp file: %w", err)
 	}
 	defer tempFile.Close()
 

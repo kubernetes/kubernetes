@@ -26,6 +26,7 @@ import (
 	"golang.org/x/tools/go/gcexportdata"
 	"golang.org/x/tools/internal/gocommand"
 	"golang.org/x/tools/internal/packagesinternal"
+	"golang.org/x/tools/internal/typeparams"
 	"golang.org/x/tools/internal/typesinternal"
 )
 
@@ -327,6 +328,9 @@ type Package struct {
 	// The NeedSyntax LoadMode bit populates this field for packages matching the patterns.
 	// If NeedDeps and NeedImports are also set, this field will also be populated
 	// for dependencies.
+	//
+	// Syntax is kept in the same order as CompiledGoFiles, with the caveat that nils are
+	// removed.  If parsing returned nil, Syntax may be shorter than CompiledGoFiles.
 	Syntax []*ast.File
 
 	// TypesInfo provides type information about the package's syntax trees.
@@ -338,6 +342,9 @@ type Package struct {
 
 	// forTest is the package under test, if any.
 	forTest string
+
+	// depsErrors is the DepsErrors field from the go list response, if any.
+	depsErrors []*packagesinternal.PackageError
 
 	// module is the module information for the package if it exists.
 	Module *Module
@@ -365,6 +372,9 @@ type ModuleError struct {
 func init() {
 	packagesinternal.GetForTest = func(p interface{}) string {
 		return p.(*Package).forTest
+	}
+	packagesinternal.GetDepsErrors = func(p interface{}) []*packagesinternal.PackageError {
+		return p.(*Package).depsErrors
 	}
 	packagesinternal.GetGoCmdRunner = func(config interface{}) *gocommand.Runner {
 		return config.(*Config).gocmdRunner
@@ -904,6 +914,7 @@ func (ld *loader) loadPackage(lpkg *loaderPackage) {
 		Scopes:     make(map[ast.Node]*types.Scope),
 		Selections: make(map[*ast.SelectorExpr]*types.Selection),
 	}
+	typeparams.InitInstanceInfo(lpkg.TypesInfo)
 	lpkg.TypesSizes = ld.sizes
 
 	importer := importerFunc(func(path string) (*types.Package, error) {

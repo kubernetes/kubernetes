@@ -15,7 +15,7 @@ spec:
       serviceAccountName: csi-mock
       containers:
         - name: csi-provisioner
-          image: k8s.gcr.io/sig-storage/csi-provisioner:v2.1.0
+          image: k8s.gcr.io/sig-storage/csi-provisioner:v3.0.0
           args:
             - "--csi-address=$(ADDRESS)"
             # Topology support is needed for the pod rescheduling test
@@ -24,6 +24,9 @@ spec:
             - "-v=5"
             # Needed for fsGroup support.
             - "--default-fstype=ext4"
+            # We don't need much concurrency and having many gouroutines
+            # makes klog.Fatal during shutdown very long.
+            - "--worker-threads=5"
           env:
             - name: ADDRESS
               value: /csi/csi.sock
@@ -31,7 +34,7 @@ spec:
             - mountPath: /csi
               name: socket-dir
         - name: driver-registrar
-          image: k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.1.0
+          image: k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.3.0
           args:
             - --v=5
             - --csi-address=/csi/csi.sock
@@ -50,10 +53,13 @@ spec:
           - mountPath: /registration
             name: registration-dir
         - name: mock
-          image: k8s.gcr.io/sig-storage/mock-driver:v4.0.2
+          image: k8s.gcr.io/sig-storage/hostpathplugin:v1.7.3
           args:
-            - "--name=mock.storage.k8s.io"
-            - "-v=3" # enabled the gRPC call logging
+            - "--drivername=mock.storage.k8s.io"
+            - "--nodeid=$(KUBE_NODE_NAME)"
+            - "--endpoint=/csi/csi.sock"
+            - "--statedir=/tmp/csi-hotpath-data"
+            - "-v=5" # enabled the gRPC call logging
           env:
             - name: CSI_ENDPOINT
               value: /csi/csi.sock
@@ -68,10 +74,11 @@ spec:
             - mountPath: /csi
               name: socket-dir
             - mountPath: /var/lib/kubelet/pods
-              mountPropagation: Bidirectional
-              name: mountpoint-dir
-            - name: hooks
-              mountPath: /etc/hooks
+              name: kubelet-pods-dir
+            - mountPath: /var/lib/kubelet/plugins/kubernetes.io/csi
+              name: kubelet-csi-dir
+            - mountPath: /dev
+              name: dev-dir
       volumes:
         - hostPath:
             path: /var/lib/kubelet/plugins/csi-mock
@@ -79,12 +86,19 @@ spec:
           name: socket-dir
         - hostPath:
             path: /var/lib/kubelet/pods
+            type: Directory
+            # mock driver doesn't make mounts and therefore doesn't need mount propagation.
+            # mountPropagation: Bidirectional
+          name: kubelet-pods-dir
+        - hostPath:
+            path: /var/lib/kubelet/plugins/kubernetes.io/csi
             type: DirectoryOrCreate
-          name: mountpoint-dir
+          name: kubelet-csi-dir
         - hostPath:
             path: /var/lib/kubelet/plugins_registry
             type: Directory
           name: registration-dir
-        - name: hooks
-          configMap:
-            name: mock-driver-hooks
+        - hostPath:
+            path: /dev
+            type: Directory
+          name: dev-dir

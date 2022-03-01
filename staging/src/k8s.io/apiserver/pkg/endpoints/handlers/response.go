@@ -59,7 +59,7 @@ func doTransformObject(ctx context.Context, obj runtime.Object, opts interface{}
 	if _, ok := obj.(*metav1.Status); ok {
 		return obj, nil
 	}
-	if err := setObjectSelfLink(ctx, obj, req, scope.Namer); err != nil {
+	if err := ensureNonNilItems(obj); err != nil {
 		return nil, err
 	}
 
@@ -244,9 +244,9 @@ func asPartialObjectMetadataList(result runtime.Object, groupVersion schema.Grou
 		if err != nil {
 			return nil, err
 		}
-		list.SelfLink = li.GetSelfLink()
 		list.ResourceVersion = li.GetResourceVersion()
 		list.Continue = li.GetContinue()
+		list.RemainingItemCount = li.GetRemainingItemCount()
 		return list, nil
 
 	case groupVersion == metav1.SchemeGroupVersion:
@@ -264,9 +264,9 @@ func asPartialObjectMetadataList(result runtime.Object, groupVersion schema.Grou
 		if err != nil {
 			return nil, err
 		}
-		list.SelfLink = li.GetSelfLink()
 		list.ResourceVersion = li.GetResourceVersion()
 		list.Continue = li.GetContinue()
+		list.RemainingItemCount = li.GetRemainingItemCount()
 		return list, nil
 
 	default:

@@ -31,7 +31,6 @@ import (
 	"testing"
 	"time"
 
-	openapi "github.com/go-openapi/spec"
 	"github.com/stretchr/testify/assert"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
@@ -53,6 +53,8 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	restclient "k8s.io/client-go/rest"
 	kubeopenapi "k8s.io/kube-openapi/pkg/common"
+	"k8s.io/kube-openapi/pkg/validation/spec"
+	netutils "k8s.io/utils/net"
 )
 
 const (
@@ -82,13 +84,13 @@ func init() {
 
 func buildTestOpenAPIDefinition() kubeopenapi.OpenAPIDefinition {
 	return kubeopenapi.OpenAPIDefinition{
-		Schema: openapi.Schema{
-			SchemaProps: openapi.SchemaProps{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
 				Description: "Description",
-				Properties:  map[string]openapi.Schema{},
+				Properties:  map[string]spec.Schema{},
 			},
-			VendorExtensible: openapi.VendorExtensible{
-				Extensions: openapi.Extensions{
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
 					"x-kubernetes-group-version-kind": []interface{}{
 						map[string]interface{}{
 							"group":   "",
@@ -126,7 +128,7 @@ func testGetOpenAPIDefinitions(_ kubeopenapi.ReferenceCallback) map[string]kubeo
 func setUp(t *testing.T) (Config, *assert.Assertions) {
 	config := NewConfig(codecs)
 	config.ExternalAddress = "192.168.10.4:443"
-	config.PublicAddress = net.ParseIP("192.168.10.4")
+	config.PublicAddress = netutils.ParseIPSloppy("192.168.10.4")
 	config.LegacyAPIGroupPrefixes = sets.NewString("/api")
 	config.LoopbackClientConfig = &restclient.Config{}
 
@@ -320,6 +322,7 @@ func TestPrepareRun(t *testing.T) {
 	server := httptest.NewServer(s.Handler.Director)
 	defer server.Close()
 	done := make(chan struct{})
+	defer close(done)
 
 	s.PrepareRun()
 	s.RunPostStartHooks(done)
@@ -329,10 +332,19 @@ func TestPrepareRun(t *testing.T) {
 	assert.NoError(err)
 	assert.Equal(http.StatusOK, resp.StatusCode)
 
-	// healthz checks are installed in PrepareRun
-	resp, err = http.Get(server.URL + "/healthz")
-	assert.NoError(err)
-	assert.Equal(http.StatusOK, resp.StatusCode)
+	// wait for health (max-in-flight-filter is initialized asynchronously, can take a few milliseconds to initialize)
+	assert.NoError(wait.PollImmediate(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+		// healthz checks are installed in PrepareRun
+		resp, err = http.Get(server.URL + "/healthz")
+		assert.NoError(err)
+		data, _ := ioutil.ReadAll(resp.Body)
+		if http.StatusOK != resp.StatusCode {
+			t.Logf("got %d", resp.StatusCode)
+			t.Log(string(data))
+			return false, nil
+		}
+		return true, nil
+	}))
 	resp, err = http.Get(server.URL + "/healthz/ping")
 	assert.NoError(err)
 	assert.Equal(http.StatusOK, resp.StatusCode)
@@ -361,7 +373,7 @@ func TestUpdateOpenAPISpec(t *testing.T) {
 
 	// verify we are able to update the served spec using the exposed service
 	newSpec := []byte(`{"swagger":"2.0","info":{"title":"Test Updated Generic API Server Swagger","version":"v0.1.0"},"paths":null}`)
-	swagger := new(openapi.Swagger)
+	swagger := new(spec.Swagger)
 	err = json.Unmarshal(newSpec, swagger)
 	assert.NoError(err)
 
@@ -473,6 +485,39 @@ func TestNotRestRoutesHaveAuth(t *testing.T) {
 	}
 }
 
+func TestMuxAndDiscoveryCompleteSignals(t *testing.T) {
+	// setup
+	cfg, assert := setUp(t)
+
+	// scenario 1: single server with some signals
+	root, err := cfg.Complete(nil).New("rootServer", NewEmptyDelegate())
+	assert.NoError(err)
+	if len(root.MuxAndDiscoveryCompleteSignals()) != 0 {
+		assert.Error(fmt.Errorf("unexpected signals %v registered in the root server", root.MuxAndDiscoveryCompleteSignals()))
+	}
+	root.RegisterMuxAndDiscoveryCompleteSignal("rootTestSignal", make(chan struct{}))
+	if len(root.MuxAndDiscoveryCompleteSignals()) != 1 {
+		assert.Error(fmt.Errorf("unexpected signals %v registered in the root server", root.MuxAndDiscoveryCompleteSignals()))
+	}
+
+	// scenario 2: multiple servers with some signals
+	delegate, err := cfg.Complete(nil).New("delegateServer", NewEmptyDelegate())
+	assert.NoError(err)
+	delegate.RegisterMuxAndDiscoveryCompleteSignal("delegateTestSignal", make(chan struct{}))
+	if len(delegate.MuxAndDiscoveryCompleteSignals()) != 1 {
+		assert.Error(fmt.Errorf("unexpected signals %v registered in the delegate server", delegate.MuxAndDiscoveryCompleteSignals()))
+	}
+	newRoot, err := cfg.Complete(nil).New("newRootServer", delegate)
+	assert.NoError(err)
+	if len(newRoot.MuxAndDiscoveryCompleteSignals()) != 1 {
+		assert.Error(fmt.Errorf("unexpected signals %v registered in the newRoot server", newRoot.MuxAndDiscoveryCompleteSignals()))
+	}
+	newRoot.RegisterMuxAndDiscoveryCompleteSignal("newRootTestSignal", make(chan struct{}))
+	if len(newRoot.MuxAndDiscoveryCompleteSignals()) != 2 {
+		assert.Error(fmt.Errorf("unexpected signals %v registered in the newRoot server", newRoot.MuxAndDiscoveryCompleteSignals()))
+	}
+}
+
 type mockAuthorizer struct {
 	lastURI string
 }
@@ -579,7 +624,7 @@ func TestGracefulShutdown(t *testing.T) {
 
 	// get port
 	serverPort := ln.Addr().(*net.TCPAddr).Port
-	stoppedCh, err := RunServer(insecureServer, ln, 10*time.Second, stopCh)
+	stoppedCh, _, err := RunServer(insecureServer, ln, 10*time.Second, stopCh)
 	if err != nil {
 		t.Fatalf("RunServer err: %v", err)
 	}
