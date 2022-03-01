@@ -1660,6 +1660,115 @@ func (v *azureDiskVolume) DeleteVolume() {
 	e2epv.DeletePDWithRetry(v.volumeName)
 }
 
+// Azure File
+type azureFileDriver struct {
+	driverInfo storageframework.DriverInfo
+}
+
+type azureFileVolume struct {
+	volumeName string
+}
+
+const azureFileSecretName = "azurefile"
+
+var _ storageframework.TestDriver = &azureFileDriver{}
+var _ storageframework.PreprovisionedVolumeTestDriver = &azureFileDriver{}
+var _ storageframework.InlineVolumeTestDriver = &azureFileDriver{}
+var _ storageframework.PreprovisionedPVTestDriver = &azureFileDriver{}
+var _ storageframework.DynamicPVTestDriver = &azureFileDriver{}
+
+// InitAzureFileDriver returns azureFileDriver that implements TestDriver interface
+func InitAzureFileDriver() storageframework.TestDriver {
+	return &azureFileDriver{
+		driverInfo: storageframework.DriverInfo{
+			Name:             "azure-file",
+			InTreePluginName: "kubernetes.io/azure-file",
+			MaxFileSize:      storageframework.FileSizeMedium,
+			SupportedSizeRange: e2evolume.SizeRange{
+				Min: "1Gi",
+			},
+			SupportedFsType: sets.NewString(
+				"", // Default fsType
+			),
+			Capabilities: map[storageframework.Capability]bool{
+				storageframework.CapPersistence:  true,
+				storageframework.CapFsGroup:      true,
+				storageframework.CapBlock:        true,
+				storageframework.CapExec:         true,
+				storageframework.CapMultiPODs:    true,
+				storageframework.CapVolumeLimits: true,
+				storageframework.CapTopology:     false,
+			},
+		},
+	}
+}
+
+func (a *azureFileDriver) GetDriverInfo() *storageframework.DriverInfo {
+	return &a.driverInfo
+}
+
+func (a *azureFileDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) {
+	e2eskipper.SkipUnlessProviderIs("azure")
+}
+
+func (a *azureFileDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) *v1.VolumeSource {
+	av, ok := e2evolume.(*azureFileVolume)
+	framework.ExpectEqual(ok, true, "Failed to cast test volume to Azure test volume")
+
+	volSource := v1.VolumeSource{
+		AzureFile: &v1.AzureFileVolumeSource{
+			ShareName:  av.volumeName,
+			SecretName: azureFileSecretName,
+			ReadOnly:   readOnly,
+		},
+	}
+	return &volSource
+}
+
+func (a *azureFileDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
+	av, ok := e2evolume.(*azureFileVolume)
+	framework.ExpectEqual(ok, true, "Failed to cast test volume to Azure test volume")
+
+	pvSource := v1.PersistentVolumeSource{
+		AzureFile: &v1.AzureFilePersistentVolumeSource{
+			ShareName:  av.volumeName,
+			SecretName: azureFileSecretName,
+			ReadOnly:   readOnly,
+		},
+	}
+	return &pvSource, nil
+}
+
+func (a *azureFileDriver) GetDynamicProvisionStorageClass(config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
+	provisioner := "kubernetes.io/azure-file"
+	parameters := map[string]string{
+		"secretName": azureFileSecretName,
+	}
+	ns := config.Framework.Namespace.Name
+	return storageframework.GetStorageClass(provisioner, parameters, nil, ns)
+}
+
+func (a *azureFileDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTestConfig, func()) {
+	return &storageframework.PerTestConfig{
+		Driver:    a,
+		Prefix:    "azure",
+		Framework: f,
+	}, func() {}
+}
+
+func (a *azureFileDriver) CreateVolume(config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
+	ginkgo.By("creating a test azure file volume")
+	volumeName, err := e2epv.CreatePDWithRetry()
+	framework.ExpectNoError(err)
+	return &azureFileVolume{
+		volumeName: volumeName,
+	}
+}
+
+func (v *azureFileVolume) DeleteVolume() {
+	e2epv.DeletePDWithRetry(v.volumeName)
+}
+
 // AWS
 type awsDriver struct {
 	driverInfo storageframework.DriverInfo
