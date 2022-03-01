@@ -116,6 +116,7 @@ func (n *linuxCgroupNotifier) Start(eventCh chan<- struct{}) {
 		klog.InfoS("Eviction manager: error adding epoll eventfd", "err", err)
 		return
 	}
+	buf := make([]byte, eventSize)
 	for {
 		select {
 		case <-n.stop:
@@ -131,7 +132,6 @@ func (n *linuxCgroupNotifier) Start(eventCh chan<- struct{}) {
 			continue
 		}
 		// Consume the event from the eventfd
-		buf := make([]byte, eventSize)
 		_, err = unix.Read(n.eventfd, buf)
 		if err != nil {
 			klog.InfoS("Eviction manager: error reading memcg events", "err", err)
