@@ -18,6 +18,7 @@ package node
 
 import (
 	"fmt"
+	"time"
 
 	"k8s.io/klog/v2"
 
@@ -155,8 +156,11 @@ func (g *graphPopulator) updatePod(oldObj, obj interface{}) {
 			return
 		}
 	}
+
 	klog.V(4).Infof("updatePod %s/%s for node %s", pod.Namespace, pod.Name, pod.Spec.NodeName)
+	startTime := time.Now()
 	g.graph.AddPod(pod)
+	klog.V(5).Infof("updatePod %s/%s for node %s completed in %v", pod.Namespace, pod.Name, pod.Spec.NodeName, time.Since(startTime))
 }
 
 func (g *graphPopulator) deletePod(obj interface{}) {
@@ -172,8 +176,11 @@ func (g *graphPopulator) deletePod(obj interface{}) {
 		klog.V(5).Infof("deletePod %s/%s, no node", pod.Namespace, pod.Name)
 		return
 	}
+
 	klog.V(4).Infof("deletePod %s/%s for node %s", pod.Namespace, pod.Name, pod.Spec.NodeName)
+	startTime := time.Now()
 	g.graph.DeletePod(pod.Name, pod.Namespace)
+	klog.V(5).Infof("deletePod %s/%s for node %s completed in %v", pod.Namespace, pod.Name, pod.Spec.NodeName, time.Since(startTime))
 }
 
 func (g *graphPopulator) addPV(obj interface{}) {
