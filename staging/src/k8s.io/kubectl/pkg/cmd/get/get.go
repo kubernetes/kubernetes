@@ -163,18 +163,7 @@ func NewCmdGet(parent string, f cmdutil.Factory, streams genericclioptions.IOStr
 		Short:                 i18n.T("Display one or many resources"),
 		Long:                  getLong + "\n\n" + cmdutil.SuggestAPIResources(parent),
 		Example:               getExample,
-		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			var comps []string
-			if len(args) == 0 {
-				comps = apiresources.CompGetResourceList(f, cmd, toComplete)
-			} else {
-				comps = CompGetResource(f, cmd, args[0], toComplete)
-				if len(args) > 1 {
-					comps = cmdutil.Difference(comps, args[1:])
-				}
-			}
-			return comps, cobra.ShellCompDirectiveNoFileComp
-		},
+		ValidArgsFunction:     ResourceTypeAndNameCompletionFunc(f, nil, true),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate(cmd))
@@ -919,4 +908,83 @@ func CompGetFromTemplate(template *string, f cmdutil.Factory, namespace string, 
 		}
 	}
 	return comps
+}
+
+// ResourceTypeAndNameCompletionFunc Returns a completion function that completes resource types
+// and resource names that match the toComplete prefix.  It supports the <type>/<name> form.
+func ResourceTypeAndNameCompletionFunc(f cmdutil.Factory, allowedTypes []string, allowRepeat bool) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		var comps []string
+		directive := cobra.ShellCompDirectiveNoFileComp
+
+		if len(args) > 0 && !strings.Contains(args[0], "/") {
+			// The first argument is of the form <type> (e.g., pods)
+			// All following arguments should be a resource name.
+			if allowRepeat || len(args) == 1 {
+				comps = CompGetResource(f, cmd, args[0], toComplete)
+
+				// Remove choices already on the command-line
+				if len(args) > 1 {
+					comps = cmdutil.Difference(comps, args[1:])
+				}
+			}
+		} else {
+			slashIdx := strings.Index(toComplete, "/")
+			if slashIdx == -1 {
+				if len(args) == 0 {
+					// We are completing the first argument.  We default to the normal
+					// <type> form (not the form <type>/<name>).
+					// So we suggest resource types and let the shell add a space after
+					// the completion.
+					if len(allowedTypes) == 0 {
+						comps = apiresources.CompGetResourceList(f, cmd, toComplete)
+					} else {
+						for _, c := range allowedTypes {
+							if strings.HasPrefix(c, toComplete) {
+								comps = append(comps, c)
+							}
+						}
+					}
+				} else {
+					// Here we know the first argument contains a / (<type>/<name>).
+					// All other arguments must also use that form.
+					if allowRepeat {
+						// Since toComplete does not already contain a / we know we are completing a
+						// resource type. Disable adding a space after the completion, and add the /
+						directive |= cobra.ShellCompDirectiveNoSpace
+
+						if len(allowedTypes) == 0 {
+							typeComps := apiresources.CompGetResourceList(f, cmd, toComplete)
+							for _, c := range typeComps {
+								comps = append(comps, fmt.Sprintf("%s/", c))
+							}
+						} else {
+							for _, c := range allowedTypes {
+								if strings.HasPrefix(c, toComplete) {
+									comps = append(comps, fmt.Sprintf("%s/", c))
+								}
+							}
+						}
+					}
+				}
+			} else {
+				// We are completing an argument of the form <type>/<name>
+				// and since the / is already present, we are completing the resource name.
+				if allowRepeat || len(args) == 0 {
+					resourceType := toComplete[:slashIdx]
+					toComplete = toComplete[slashIdx+1:]
+					nameComps := CompGetResource(f, cmd, resourceType, toComplete)
+					for _, c := range nameComps {
+						comps = append(comps, fmt.Sprintf("%s/%s", resourceType, c))
+					}
+
+					// Remove choices already on the command-line.
+					if len(args) > 0 {
+						comps = cmdutil.Difference(comps, args[0:])
+					}
+				}
+			}
+		}
+		return comps, directive
+	}
 }

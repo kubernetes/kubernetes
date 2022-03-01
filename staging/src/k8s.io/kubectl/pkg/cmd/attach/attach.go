@@ -105,7 +105,7 @@ func NewCmdAttach(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		Short:                 i18n.T("Attach to a running container"),
 		Long:                  i18n.T("Attach to a process that is already running inside an existing container."),
 		Example:               attachExample,
-		ValidArgsFunction:     util.ResourceNameCompletionFunc(f, "pod"),
+		ValidArgsFunction:     util.PodResourceNameCompletionFunc(f),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
