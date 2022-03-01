@@ -2,84 +2,78 @@
   "kind": "HorizontalPodAutoscaler",
   "apiVersion": "autoscaling/v2beta2",
   "metadata": {
-    "name": "nameValue",
-    "generateName": "generateNameValue",
-    "namespace": "namespaceValue",
-    "selfLink": "selfLinkValue",
-    "uid": "uidValue",
-    "resourceVersion": "resourceVersionValue",
-    "generation": 7,
-    "creationTimestamp": "2008-01-01T01:01:01Z",
-    "deletionTimestamp": "2009-01-01T01:01:01Z",
-    "deletionGracePeriodSeconds": 10,
+    "name": "2",
+    "generateName": "3",
+    "namespace": "4",
+    "selfLink": "5",
+    "uid": "7",
+    "resourceVersion": "11042405498087606203",
+    "generation": 8071137005907523419,
+    "creationTimestamp": "2061-09-19T18:13:36Z",
+    "deletionGracePeriodSeconds": -4955867275792137171,
     "labels": {
-      "labelsKey": "labelsValue"
+      "7": "8"
     },
     "annotations": {
-      "annotationsKey": "annotationsValue"
+      "9": "10"
     },
     "ownerReferences": [
       {
-        "apiVersion": "apiVersionValue",
-        "kind": "kindValue",
-        "name": "nameValue",
-        "uid": "uidValue",
-        "controller": true,
+        "apiVersion": "11",
+        "kind": "12",
+        "name": "13",
+        "uid": "Dz廔ȇ{sŊƏp",
+        "controller": false,
         "blockOwnerDeletion": true
       }
     ],
     "finalizers": [
-      "finalizersValue"
+      "14"
     ],
-    "clusterName": "clusterNameValue",
+    "clusterName": "15",
     "managedFields": [
       {
-        "manager": "managerValue",
-        "operation": "operationValue",
-        "apiVersion": "apiVersionValue",
-        "time": "2004-01-01T01:01:01Z",
-        "fieldsType": "fieldsTypeValue",
-        "fieldsV1": {},
-        "subresource": "subresourceValue"
+        "manager": "16",
+        "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
+        "apiVersion": "17",
+        "fieldsType": "18",
+        "subresource": "19"
       }
     ]
   },
   "spec": {
     "scaleTargetRef": {
-      "kind": "kindValue",
-      "name": "nameValue",
-      "apiVersion": "apiVersionValue"
+      "kind": "20",
+      "name": "21",
+      "apiVersion": "22"
     },
-    "minReplicas": 2,
-    "maxReplicas": 3,
+    "minReplicas": 896585016,
+    "maxReplicas": -1971381490,
     "metrics": [
       {
-        "type": "typeValue",
+        "type": "枊a8衍`Ĩɘ.蘯6ċV夸eɑeʤ脽ě",
         "object": {
           "describedObject": {
-            "kind": "kindValue",
-            "name": "nameValue",
-            "apiVersion": "apiVersionValue"
+            "kind": "23",
+            "name": "24",
+            "apiVersion": "25"
           },
           "target": {
-            "type": "typeValue",
-            "value": "0",
-            "averageValue": "0",
-            "averageUtilization": 4
+            "type": "凗蓏Ŋ蛊ĉy緅縕\u003eŽ",
+            "value": "309",
+            "averageValue": "39",
+            "averageUtilization": 1001983654
           },
           "metric": {
-            "name": "nameValue",
+            "name": "26",
             "selector": {
               "matchLabels": {
-                "matchLabelsKey": "matchLabelsValue"
+                "QQ.N2.1.L.l-Y._.4": "0.d.__Gg8-2_kS91.e5K-_e63_-_3-n-_-__3u-.__G"
               },
               "matchExpressions": [
                 {
-                  "key": "keyValue",
-                  "operator": "operatorValue",
-                  "values": [
-                    "valuesValue"
-                  ]
+                  "key": "816m59-dx8----i--5-8t36b0/D7r__.am6-4_WE-_JTrcd-2.-__E_Sv__26KX_R7",
+                  "operator": "DoesNotExist"
                 }
               ]
             }
@@ -87,211 +81,207 @@
         },
         "pods": {
           "metric": {
-            "name": "nameValue",
+            "name": "33",
             "selector": {
               "matchLabels": {
-                "matchLabelsKey": "matchLabelsValue"
+                "8-10pq-0-7-9-2-ekg-071a-2y-y-o0-5q-21.6h/87_2fNc5-_.-RX-82_g50_uL": "6N_._a69"
               },
               "matchExpressions": [
                 {
-                  "key": "keyValue",
-                  "operator": "operatorValue",
+                  "key": "w.__-___196-.dX_iv1H.__.h-J-M.9_T.q-o7.y-SQ.A",
+                  "operator": "NotIn",
                   "values": [
-                    "valuesValue"
+                    "0.N.-.Kj8..3s--_4..I_l...-ym-._k"
                   ]
                 }
               ]
             }
           },
           "target": {
-            "type": "typeValue",
-            "value": "0",
-            "averageValue": "0",
-            "averageUtilization": 4
+            "type": "抴ŨfZhUʎ浵ɲõ",
+            "value": "303",
+            "averageValue": "800",
+            "averageUtilization": -1980941277
           }
         },
         "resource": {
-          "name": "nameValue",
+          "name": "倱\u003c",
           "target": {
-            "type": "typeValue",
-            "value": "0",
-            "averageValue": "0",
-            "averageUtilization": 4
+            "type": "ź贩j瀉",
+            "value": "621",
+            "averageValue": "404",
+            "averageUtilization": 580681683
           }
         },
         "containerResource": {
-          "name": "nameValue",
+          "name": "Ɋł/擇ɦĽ胚O醔ɍ厶耈 ",
           "target": {
-            "type": "typeValue",
-            "value": "0",
-            "averageValue": "0",
-            "averageUtilization": 4
+            "type": "禒Ƙá腿ħ缶.蒅",
+            "value": "999",
+            "averageValue": "151",
+            "averageUtilization": -1105572246
           },
-          "container": "containerValue"
+          "container": "40"
         },
         "external": {
           "metric": {
-            "name": "nameValue",
+            "name": "41",
             "selector": {
               "matchLabels": {
-                "matchLabelsKey": "matchLabelsValue"
+                "wcGnP-w-Sf5_O1": "1_70"
               },
               "matchExpressions": [
                 {
-                  "key": "keyValue",
-                  "operator": "operatorValue",
-                  "values": [
-                    "valuesValue"
-                  ]
+                  "key": "1-1-x1z-j4kh6oqu-or---40--87-1wp6.759s-3------6tv27r-m8w-6-9-35d383-iq-ay1z25-3-vj73d/Y.t--_0..--_6yV07-_.___gO-d.iUaCw",
+                  "operator": "DoesNotExist"
                 }
               ]
             }
           },
           "target": {
-            "type": "typeValue",
-            "value": "0",
-            "averageValue": "0",
-            "averageUtilization": 4
+            "type": "ʣy豎@ɀ羭,铻OŤ",
+            "value": "830",
+            "averageValue": "799",
+            "averageUtilization": 747521320
           }
         }
       }
     ],
     "behavior": {
       "scaleUp": {
-        "stabilizationWindowSeconds": 3,
-        "selectPolicy": "selectPolicyValue",
+        "stabilizationWindowSeconds": -648954478,
+        "selectPolicy": "Ƿ裚瓶釆Ɗ+j忊",
         "policies": [
           {
-            "type": "typeValue",
-            "value": 2,
-            "periodSeconds": 3
+            "type": "ȫ焗捏ĨFħ籘Àǒɿʒ刽",
+            "value": 427196286,
+            "periodSeconds": 1048864116
           }
         ]
       },
       "scaleDown": {
-        "stabilizationWindowSeconds": 3,
-        "selectPolicy": "selectPolicyValue",
+        "stabilizationWindowSeconds": -342705708,
+        "selectPolicy": "褎weǇèux",
         "policies": [
           {
-            "type": "typeValue",
-            "value": 2,
-            "periodSeconds": 3
+            "type": "VƋZ1Ůđ眊ľǎɳ,ǿ飏",
+            "value": 2040455355,
+            "periodSeconds": 1505972335
           }
         ]
       }
+    },
+    "updatePolicy": {
+      "updateMode": "ƻ悖ȩ0Ƹ["
     }
   },
   "status": {
-    "observedGeneration": 1,
-    "lastScaleTime": "2002-01-01T01:01:01Z",
-    "currentReplicas": 3,
-    "desiredReplicas": 4,
+    "observedGeneration": 301534795599983361,
+    "currentReplicas": -117787320,
+    "desiredReplicas": 261842977,
     "currentMetrics": [
       {
-        "type": "typeValue",
+        "type": "5姣\u003e懔%熷谟þ蛯ɰ荶ǉʁ",
         "object": {
           "metric": {
-            "name": "nameValue",
+            "name": "48",
             "selector": {
               "matchLabels": {
-                "matchLabelsKey": "matchLabelsValue"
+                "g91431938c-uo3-a--ng-di299/2.lv-_aLQbI2_-.XFw.8._..._Wxpe..J7rs6.0_OHz_.B-.-_w_--.8_r_N-3": "1_.N_XvSA..e1Vx8_I9"
               },
               "matchExpressions": [
                 {
-                  "key": "keyValue",
-                  "operator": "operatorValue",
+                  "key": "P3J--.48Y.q.0-_1-F.hA",
+                  "operator": "NotIn",
                   "values": [
-                    "valuesValue"
+                    "0E.-2o_-.N.9D-F45eJK7Q5-R4_7A"
                   ]
                 }
               ]
             }
           },
           "current": {
-            "value": "0",
-            "averageValue": "0",
-            "averageUtilization": 3
+            "value": "532",
+            "averageValue": "347",
+            "averageUtilization": -778272981
           },
           "describedObject": {
-            "kind": "kindValue",
-            "name": "nameValue",
-            "apiVersion": "apiVersionValue"
+            "kind": "55",
+            "name": "56",
+            "apiVersion": "57"
           }
         },
         "pods": {
           "metric": {
-            "name": "nameValue",
+            "name": "58",
             "selector": {
               "matchLabels": {
-                "matchLabelsKey": "matchLabelsValue"
+                "a-3/oA_4A.J2s3.XL6_EU--AH-Q.GM72_-c-.-.6--3-___t-Z8SUGP.-4": "1gb2"
               },
               "matchExpressions": [
                 {
-                  "key": "keyValue",
-                  "operator": "operatorValue",
-                  "values": [
-                    "valuesValue"
-                  ]
+                  "key": "3-l-c7181py-8t379s3-8x32--2qu-0-k-q-0--8hv217.79x--434/X_.8xN._-_-vv-Q2qz.W..4....h",
+                  "operator": "Exists"
                 }
               ]
             }
           },
           "current": {
-            "value": "0",
-            "averageValue": "0",
-            "averageUtilization": 3
+            "value": "293",
+            "averageValue": "261",
+            "averageUtilization": -2110435664
           }
         },
         "resource": {
-          "name": "nameValue",
+          "name": "/",
           "current": {
-            "value": "0",
-            "averageValue": "0",
-            "averageUtilization": 3
+            "value": "103",
+            "averageValue": "343",
+            "averageUtilization": 1616390418
           }
         },
         "containerResource": {
-          "name": "nameValue",
+          "name": ")ǂť嗆u8晲T[irȎ3Ĕ\\ɢX鰨松",
           "current": {
-            "value": "0",
-            "averageValue": "0",
-            "averageUtilization": 3
+            "value": "775",
+            "averageValue": "615",
+            "averageUtilization": 1031506256
           },
-          "container": "containerValue"
+          "container": "65"
         },
         "external": {
           "metric": {
-            "name": "nameValue",
+            "name": "66",
             "selector": {
               "matchLabels": {
-                "matchLabelsKey": "matchLabelsValue"
+                "cshj3zi-1-vw39---art--6g1-2-73m-e46-r-g60.8747ox/M.U_-m.-P.yP9S--858LI__.8____rO-S-P_-...0c.-.p_3_J_SA995IKR": "x_rC9..__-6_k.N-2B_V.-tfh4.caTz_.g.w-o.8_WT-M3"
               },
               "matchExpressions": [
                 {
-                  "key": "keyValue",
-                  "operator": "operatorValue",
+                  "key": "4-p9-8--m-cbck561-72-l84--162-gk2-99v2xu-3po4--3os1-5-ufkd/3_B__-P---_H-.X",
+                  "operator": "In",
                   "values": [
-                    "valuesValue"
+                    "0-T1mel--F......3_t_-l..-.DG7r-3.-g"
                   ]
                 }
               ]
             }
           },
           "current": {
-            "value": "0",
-            "averageValue": "0",
-            "averageUtilization": 3
+            "value": "875",
+            "averageValue": "328",
+            "averageUtilization": -1670635169
           }
         }
       }
     ],
     "conditions": [
       {
-        "type": "typeValue",
-        "status": "statusValue",
-        "lastTransitionTime": "2003-01-01T01:01:01Z",
-        "reason": "reasonValue",
-        "message": "messageValue"
+        "type": "",
+        "status": "背遻堣灭ƴɦ燻踸陴Sĕ濦ʓɻ",
+        "lastTransitionTime": "2785-07-14T22:36:07Z",
+        "reason": "73",
+        "message": "74"
       }
     ]
   }

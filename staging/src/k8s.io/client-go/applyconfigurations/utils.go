@@ -319,6 +319,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &autoscalingv2.HorizontalPodAutoscalerSpecApplyConfiguration{}
 	case v2.SchemeGroupVersion.WithKind("HorizontalPodAutoscalerStatus"):
 		return &autoscalingv2.HorizontalPodAutoscalerStatusApplyConfiguration{}
+	case v2.SchemeGroupVersion.WithKind("HorizontalPodAutoscalerUpdatePolicy"):
+		return &autoscalingv2.HorizontalPodAutoscalerUpdatePolicyApplyConfiguration{}
 	case v2.SchemeGroupVersion.WithKind("HPAScalingPolicy"):
 		return &autoscalingv2.HPAScalingPolicyApplyConfiguration{}
 	case v2.SchemeGroupVersion.WithKind("HPAScalingRules"):
@@ -403,6 +405,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &autoscalingv2beta2.HorizontalPodAutoscalerSpecApplyConfiguration{}
 	case v2beta2.SchemeGroupVersion.WithKind("HorizontalPodAutoscalerStatus"):
 		return &autoscalingv2beta2.HorizontalPodAutoscalerStatusApplyConfiguration{}
+	case v2beta2.SchemeGroupVersion.WithKind("HorizontalPodAutoscalerUpdatePolicy"):
+		return &autoscalingv2beta2.HorizontalPodAutoscalerUpdatePolicyApplyConfiguration{}
 	case v2beta2.SchemeGroupVersion.WithKind("HPAScalingPolicy"):
 		return &autoscalingv2beta2.HPAScalingPolicyApplyConfiguration{}
 	case v2beta2.SchemeGroupVersion.WithKind("HPAScalingRules"):
