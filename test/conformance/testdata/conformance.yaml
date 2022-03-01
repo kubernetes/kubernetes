@@ -1927,6 +1927,13 @@
     when listed by its label selector.
   release: v1.19
   file: test/e2e/common/node/podtemplates.go
+- testname: PodTemplate, replace
+  codename: '[sig-node] PodTemplates should replace a pod template [Conformance]'
+  description: Attempt to create a PodTemplate which MUST succeed. Attempt to replace
+    the PodTemplate to include a new annotation which MUST succeed. The annotation
+    MUST be found in the new PodTemplate.
+  release: v1.24
+  file: test/e2e/common/node/podtemplates.go
 - testname: PodTemplate lifecycle
   codename: '[sig-node] PodTemplates should run the lifecycle of PodTemplates [Conformance]'
   description: Attempt to create a PodTemplate. Patch the created PodTemplate. Fetching
