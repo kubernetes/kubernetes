@@ -144,7 +144,7 @@ type testEnv struct {
 	internalCSIStorageCapacityInformer storageinformersv1beta1.CSIStorageCapacityInformer
 }
 
-func newTestBinder(t *testing.T, stopCh <-chan struct{}, csiStorageCapacity ...bool) *testEnv {
+func newTestBinder(t *testing.T, stopCh <-chan struct{}) *testEnv {
 	client := &fake.Clientset{}
 	reactor := pvtesting.NewVolumeReactor(client, nil, nil, nil)
 	// TODO refactor all tests to use real watch mechanism, see #72327
@@ -166,12 +166,9 @@ func newTestBinder(t *testing.T, stopCh <-chan struct{}, csiStorageCapacity ...b
 	classInformer := informerFactory.Storage().V1().StorageClasses()
 	csiDriverInformer := informerFactory.Storage().V1().CSIDrivers()
 	csiStorageCapacityInformer := informerFactory.Storage().V1beta1().CSIStorageCapacities()
-	var capacityCheck *CapacityCheck
-	if len(csiStorageCapacity) > 0 && csiStorageCapacity[0] {
-		capacityCheck = &CapacityCheck{
-			CSIDriverInformer:          csiDriverInformer,
-			CSIStorageCapacityInformer: csiStorageCapacityInformer,
-		}
+	capacityCheck := CapacityCheck{
+		CSIDriverInformer:          csiDriverInformer,
+		CSIStorageCapacityInformer: csiStorageCapacityInformer,
 	}
 	binder := NewVolumeBinder(
 		client,
@@ -970,12 +967,12 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 		},
 	}
 
-	run := func(t *testing.T, scenario scenarioType, csiStorageCapacity bool, csiDriver *storagev1.CSIDriver) {
+	run := func(t *testing.T, scenario scenarioType, csiDriver *storagev1.CSIDriver) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
 		// Setup
-		testEnv := newTestBinder(t, ctx.Done(), csiStorageCapacity)
+		testEnv := newTestBinder(t, ctx.Done())
 		testEnv.initVolumes(scenario.pvs, scenario.pvs)
 		if csiDriver != nil {
 			testEnv.addCSIDriver(csiDriver)
@@ -1009,18 +1006,14 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 		testEnv.validatePodCache(t, testNode.Name, scenario.pod, podVolumes, scenario.expectedBindings, nil)
 	}
 
-	for prefix, csiStorageCapacity := range map[string]bool{"with": true, "without": false} {
-		t.Run(fmt.Sprintf("%s CSIStorageCapacity", prefix), func(t *testing.T) {
-			for description, csiDriver := range map[string]*storagev1.CSIDriver{
-				"no CSIDriver":                        nil,
-				"CSIDriver with capacity tracking":    makeCSIDriver(provisioner, true),
-				"CSIDriver without capacity tracking": makeCSIDriver(provisioner, false),
-			} {
-				t.Run(description, func(t *testing.T) {
-					for name, scenario := range scenarios {
-						t.Run(name, func(t *testing.T) { run(t, scenario, csiStorageCapacity, csiDriver) })
-					}
-				})
+	for description, csiDriver := range map[string]*storagev1.CSIDriver{
+		"no CSIDriver":                        nil,
+		"CSIDriver with capacity tracking":    makeCSIDriver(provisioner, true),
+		"CSIDriver without capacity tracking": makeCSIDriver(provisioner, false),
+	} {
+		t.Run(description, func(t *testing.T) {
+			for name, scenario := range scenarios {
+				t.Run(name, func(t *testing.T) { run(t, scenario, csiDriver) })
 			}
 		})
 	}
@@ -1101,12 +1094,12 @@ func TestFindPodVolumesWithProvisioning(t *testing.T) {
 		},
 	}
 
-	run := func(t *testing.T, scenario scenarioType, csiStorageCapacity bool, csiDriver *storagev1.CSIDriver) {
+	run := func(t *testing.T, scenario scenarioType, csiDriver *storagev1.CSIDriver) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
 		// Setup
-		testEnv := newTestBinder(t, ctx.Done(), csiStorageCapacity)
+		testEnv := newTestBinder(t, ctx.Done())
 		testEnv.initVolumes(scenario.pvs, scenario.pvs)
 		if csiDriver != nil {
 			testEnv.addCSIDriver(csiDriver)
@@ -1138,7 +1131,7 @@ func TestFindPodVolumesWithProvisioning(t *testing.T) {
 		}
 		expectedReasons := scenario.reasons
 		expectedProvisions := scenario.expectedProvisions
-		if scenario.needsCapacity && csiStorageCapacity &&
+		if scenario.needsCapacity &&
 			csiDriver != nil && csiDriver.Spec.StorageCapacity != nil && *csiDriver.Spec.StorageCapacity {
 			// Without CSIStorageCapacity objects, provisioning is blocked.
 			expectedReasons = append(expectedReasons, ErrReasonNotEnoughSpace)
@@ -1148,18 +1141,14 @@ func TestFindPodVolumesWithProvisioning(t *testing.T) {
 		testEnv.validatePodCache(t, testNode.Name, scenario.pod, podVolumes, scenario.expectedBindings, expectedProvisions)
 	}
 
-	for prefix, csiStorageCapacity := range map[string]bool{"with": true, "without": false} {
-		t.Run(fmt.Sprintf("%s CSIStorageCapacity", prefix), func(t *testing.T) {
-			for description, csiDriver := range map[string]*storagev1.CSIDriver{
-				"no CSIDriver":                        nil,
-				"CSIDriver with capacity tracking":    makeCSIDriver(provisioner, true),
-				"CSIDriver without capacity tracking": makeCSIDriver(provisioner, false),
-			} {
-				t.Run(description, func(t *testing.T) {
-					for name, scenario := range scenarios {
-						t.Run(name, func(t *testing.T) { run(t, scenario, csiStorageCapacity, csiDriver) })
-					}
-				})
+	for description, csiDriver := range map[string]*storagev1.CSIDriver{
+		"no CSIDriver":                        nil,
+		"CSIDriver with capacity tracking":    makeCSIDriver(provisioner, true),
+		"CSIDriver without capacity tracking": makeCSIDriver(provisioner, false),
+	} {
+		t.Run(description, func(t *testing.T) {
+			for name, scenario := range scenarios {
+				t.Run(name, func(t *testing.T) { run(t, scenario, csiDriver) })
 			}
 		})
 	}
@@ -2261,13 +2250,12 @@ func TestCapacity(t *testing.T) {
 		},
 	}
 
-	run := func(t *testing.T, scenario scenarioType, featureEnabled, optIn bool) {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIStorageCapacity, featureEnabled)()
+	run := func(t *testing.T, scenario scenarioType, optIn bool) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
 		// Setup: the driver has the feature enabled, but the scheduler might not.
-		testEnv := newTestBinder(t, ctx.Done(), featureEnabled)
+		testEnv := newTestBinder(t, ctx.Done())
 		testEnv.addCSIDriver(makeCSIDriver(provisioner, optIn))
 		testEnv.addCSIStorageCapacities(scenario.capacities)
 
@@ -2286,7 +2274,7 @@ func TestCapacity(t *testing.T) {
 		// Validate
 		shouldFail := scenario.shouldFail
 		expectedReasons := scenario.reasons
-		if !featureEnabled || !optIn {
+		if !optIn {
 			shouldFail = false
 			expectedReasons = nil
 		}
@@ -2305,16 +2293,11 @@ func TestCapacity(t *testing.T) {
 	}
 
 	yesNo := []bool{true, false}
-	for _, featureEnabled := range yesNo {
-		name := fmt.Sprintf("CSIStorageCapacity=%v", featureEnabled)
+	for _, optIn := range yesNo {
+		name := fmt.Sprintf("CSIDriver.StorageCapacity=%v", optIn)
 		t.Run(name, func(t *testing.T) {
-			for _, optIn := range yesNo {
-				name := fmt.Sprintf("CSIDriver.StorageCapacity=%v", optIn)
-				t.Run(name, func(t *testing.T) {
-					for name, scenario := range scenarios {
-						t.Run(name, func(t *testing.T) { run(t, scenario, featureEnabled, optIn) })
-					}
-				})
+			for name, scenario := range scenarios {
+				t.Run(name, func(t *testing.T) { run(t, scenario, optIn) })
 			}
 		})
 	}

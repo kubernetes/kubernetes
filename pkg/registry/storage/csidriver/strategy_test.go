@@ -92,9 +92,8 @@ func TestCSIDriverPrepareForCreate(t *testing.T) {
 	requiresRepublish := true
 
 	tests := []struct {
-		name         string
-		withCapacity bool
-		withInline   bool
+		name       string
+		withInline bool
 	}{
 		{
 			name:       "inline enabled",
@@ -104,19 +103,10 @@ func TestCSIDriverPrepareForCreate(t *testing.T) {
 			name:       "inline disabled",
 			withInline: false,
 		},
-		{
-			name:         "capacity enabled",
-			withCapacity: true,
-		},
-		{
-			name:         "capacity disabled",
-			withCapacity: false,
-		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIStorageCapacity, test.withCapacity)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, test.withInline)()
 
 			csiDriver := &storage.CSIDriver{
@@ -139,14 +129,8 @@ func TestCSIDriverPrepareForCreate(t *testing.T) {
 			if len(errs) != 0 {
 				t.Errorf("unexpected validating errors: %v", errs)
 			}
-			if test.withCapacity {
-				if csiDriver.Spec.StorageCapacity == nil || *csiDriver.Spec.StorageCapacity != storageCapacity {
-					t.Errorf("StorageCapacity modified: %v", csiDriver.Spec.StorageCapacity)
-				}
-			} else {
-				if csiDriver.Spec.StorageCapacity != nil {
-					t.Errorf("StorageCapacity not stripped: %v", csiDriver.Spec.StorageCapacity)
-				}
+			if csiDriver.Spec.StorageCapacity == nil || *csiDriver.Spec.StorageCapacity != storageCapacity {
+				t.Errorf("StorageCapacity modified: %v", csiDriver.Spec.StorageCapacity)
 			}
 			if test.withInline {
 				if len(csiDriver.Spec.VolumeLifecycleModes) != 1 {
@@ -231,31 +215,23 @@ func TestCSIDriverPrepareForUpdate(t *testing.T) {
 	resultPersistent := []storage.VolumeLifecycleMode{storage.VolumeLifecyclePersistent}
 
 	tests := []struct {
-		name                      string
-		old, update               *storage.CSIDriver
-		csiStorageCapacityEnabled bool
-		csiInlineVolumeEnabled    bool
-		wantCapacity              *bool
-		wantModes                 []storage.VolumeLifecycleMode
-		wantTokenRequests         []storage.TokenRequest
-		wantRequiresRepublish     *bool
-		wantGeneration            int64
+		name                   string
+		old, update            *storage.CSIDriver
+		csiInlineVolumeEnabled bool
+		wantCapacity           *bool
+		wantModes              []storage.VolumeLifecycleMode
+		wantTokenRequests      []storage.TokenRequest
+		wantRequiresRepublish  *bool
+		wantGeneration         int64
 	}{
 		{
-			name:                      "capacity feature enabled, before: none, update: enabled",
-			csiStorageCapacityEnabled: true,
-			old:                       driverWithNothing,
-			update:                    driverWithCapacityEnabled,
-			wantCapacity:              &enabled,
-		},
-		{
-			name:         "capacity feature disabled, before: none, update: disabled",
+			name:         "capacity feature enabled, before: none, update: enabled",
 			old:          driverWithNothing,
-			update:       driverWithCapacityDisabled,
-			wantCapacity: nil,
+			update:       driverWithCapacityEnabled,
+			wantCapacity: &enabled,
 		},
 		{
-			name:         "capacity feature disabled, before: enabled, update: disabled",
+			name:         "capacity feature enabled, before: enabled, update: disabled",
 			old:          driverWithCapacityEnabled,
 			update:       driverWithCapacityDisabled,
 			wantCapacity: &disabled,
@@ -291,7 +267,6 @@ func TestCSIDriverPrepareForUpdate(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIStorageCapacity, test.csiStorageCapacityEnabled)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, test.csiInlineVolumeEnabled)()
 
 			csiDriver := test.update.DeepCopy()
