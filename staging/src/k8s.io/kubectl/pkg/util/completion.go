@@ -17,12 +17,15 @@ limitations under the License.
 package util
 
 import (
+	"fmt"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
-	"k8s.io/kubectl/pkg/cmd/apiresources"
 	"k8s.io/kubectl/pkg/cmd/get"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/polymorphichelpers"
+	"k8s.io/kubectl/pkg/scheme"
 )
 
 var factory cmdutil.Factory
@@ -33,61 +36,32 @@ func SetFactoryForCompletion(f cmdutil.Factory) {
 	factory = f
 }
 
-// ResourceTypeAndNameCompletionFunc Returns a completion function that completes as a first argument
-// the resource types that match the toComplete prefix, and all following arguments as resource names that match
-// the toComplete prefix.
+// ResourceTypeAndNameCompletionFunc Returns a completion function that completes resource types
+// and resource names that match the toComplete prefix.  It supports the <type>/<name> form.
 func ResourceTypeAndNameCompletionFunc(f cmdutil.Factory) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
-	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		var comps []string
-		if len(args) == 0 {
-			comps = apiresources.CompGetResourceList(f, cmd, toComplete)
-		} else {
-			comps = get.CompGetResource(f, cmd, args[0], toComplete)
-			if len(args) > 1 {
-				comps = cmdutil.Difference(comps, args[1:])
-			}
-		}
-		return comps, cobra.ShellCompDirectiveNoFileComp
-	}
+	// The logic is in the 'get' package because the 'get' command must be able to call it also
+	return get.ResourceTypeAndNameCompletionFunc(f, nil, true)
 }
 
-// SpecifiedResourceTypeAndNameCompletionFunc Returns a completion function that completes as a first
-// argument the resource types that match the toComplete prefix and are limited to the allowedTypes,
-// and all following arguments as resource names that match the toComplete prefix.
+// SpecifiedResourceTypeAndNameCompletionFunc Returns a completion function that completes resource
+// types limited to the specified allowedTypes, and resource names that match the toComplete prefix.
+// It allows for multiple resources. It supports the <type>/<name> form.
 func SpecifiedResourceTypeAndNameCompletionFunc(f cmdutil.Factory, allowedTypes []string) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
-	return doSpecifiedResourceTypeAndNameComp(f, allowedTypes, true)
+	return get.ResourceTypeAndNameCompletionFunc(f, allowedTypes, true)
 }
 
-// SpecifiedResourceTypeAndNameNoRepeatCompletionFunc Returns a completion function that completes as a first
-// argument the resource types that match the toComplete prefix and are limited to the allowedTypes, and as
-// a second argument a resource name that match the toComplete prefix.
+// SpecifiedResourceTypeAndNameNoRepeatCompletionFunc Returns a completion function that completes resource
+// types limited to the specified allowedTypes, and resource names that match the toComplete prefix.
+// It only allows for one resource. It supports the <type>/<name> form.
 func SpecifiedResourceTypeAndNameNoRepeatCompletionFunc(f cmdutil.Factory, allowedTypes []string) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
-	return doSpecifiedResourceTypeAndNameComp(f, allowedTypes, false)
-}
-
-func doSpecifiedResourceTypeAndNameComp(f cmdutil.Factory, allowedTypes []string, repeat bool) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
-	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		var comps []string
-		if len(args) == 0 {
-			for _, comp := range allowedTypes {
-				if strings.HasPrefix(comp, toComplete) {
-					comps = append(comps, comp)
-				}
-			}
-		} else {
-			if repeat || len(args) == 1 {
-				comps = get.CompGetResource(f, cmd, args[0], toComplete)
-				if repeat && len(args) > 1 {
-					comps = cmdutil.Difference(comps, args[1:])
-				}
-			}
-		}
-		return comps, cobra.ShellCompDirectiveNoFileComp
-	}
+	return get.ResourceTypeAndNameCompletionFunc(f, allowedTypes, false)
 }
 
 // ResourceNameCompletionFunc Returns a completion function that completes as a first argument
 // the resource names specified by the resourceType parameter, and which match the toComplete prefix.
+// This function does NOT support the <type>/<name> form: it is meant to be used by commands
+// that don't support that form.  For commands that apply to pods and that support the <type>/<name>
+// form, please use PodResourceNameCompletionFunc()
 func ResourceNameCompletionFunc(f cmdutil.Factory, resourceType string) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		var comps []string
@@ -98,16 +72,49 @@ func ResourceNameCompletionFunc(f cmdutil.Factory, resourceType string) func(*co
 	}
 }
 
-// PodResourceNameAndContainerCompletionFunc Returns a completion function that completes as a first
-// argument pod names that match the toComplete prefix, and as a second argument the containers
-// within the specified pod.
+// PodResourceNameCompletionFunc Returns a completion function that completes:
+// 1- pod names that match the toComplete prefix
+// 2- resource types containing pods which match the toComplete prefix
+func PodResourceNameCompletionFunc(f cmdutil.Factory) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		var comps []string
+		directive := cobra.ShellCompDirectiveNoFileComp
+		if len(args) == 0 {
+			comps, directive = doPodResourceCompletion(f, cmd, toComplete)
+		}
+		return comps, directive
+	}
+}
+
+// PodResourceNameAndContainerCompletionFunc Returns a completion function that completes, as a first argument:
+// 1- pod names that match the toComplete prefix
+// 2- resource types containing pods which match the toComplete prefix
+// and as a second argument the containers within the specified pod.
 func PodResourceNameAndContainerCompletionFunc(f cmdutil.Factory) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		var comps []string
+		directive := cobra.ShellCompDirectiveNoFileComp
 		if len(args) == 0 {
-			comps = get.CompGetResource(f, cmd, "pod", toComplete)
+			comps, directive = doPodResourceCompletion(f, cmd, toComplete)
 		} else if len(args) == 1 {
-			comps = get.CompGetContainers(f, cmd, args[0], toComplete)
+			podName := convertResourceNameToPodName(f, args[0])
+			comps = get.CompGetContainers(f, cmd, podName, toComplete)
+		}
+		return comps, directive
+	}
+}
+
+// ContainerCompletionFunc Returns a completion function that completes the containers within the
+// pod specified by the first argument.  The resource containing the pod can be specified in
+// the <type>/<name> form.
+func ContainerCompletionFunc(f cmdutil.Factory) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		var comps []string
+		// We need the pod name to be able to complete the container names, it must be in args[0].
+		// That first argument can also be of the form <type>/<name> so we need to convert it.
+		if len(args) > 0 {
+			podName := convertResourceNameToPodName(f, args[0])
+			comps = get.CompGetContainers(f, cmd, podName, toComplete)
 		}
 		return comps, cobra.ShellCompDirectiveNoFileComp
 	}
@@ -183,4 +190,86 @@ func ListUsersInConfig(toComplete string) []string {
 		}
 	}
 	return ret
+}
+
+// doPodResourceCompletion Returns completions of:
+// 1- pod names that match the toComplete prefix
+// 2- resource types containing pods which match the toComplete prefix
+func doPodResourceCompletion(f cmdutil.Factory, cmd *cobra.Command, toComplete string) ([]string, cobra.ShellCompDirective) {
+	var comps []string
+	directive := cobra.ShellCompDirectiveNoFileComp
+	slashIdx := strings.Index(toComplete, "/")
+	if slashIdx == -1 {
+		// Standard case, complete pod names
+		comps = get.CompGetResource(f, cmd, "pod", toComplete)
+
+		// Also include resource choices for the <type>/<name> form,
+		// but only for resources that contain pods
+		resourcesWithPods := []string{
+			"daemonsets",
+			"deployments",
+			"pods",
+			"jobs",
+			"replicasets",
+			"replicationcontrollers",
+			"services",
+			"statefulsets"}
+
+		if len(comps) == 0 {
+			// If there are no pods to complete, we will only be completing
+			// <type>/.  We should disable adding a space after the /.
+			directive |= cobra.ShellCompDirectiveNoSpace
+		}
+
+		for _, resource := range resourcesWithPods {
+			if strings.HasPrefix(resource, toComplete) {
+				comps = append(comps, fmt.Sprintf("%s/", resource))
+			}
+		}
+	} else {
+		// Dealing with the <type>/<name> form, use the specified resource type
+		resourceType := toComplete[:slashIdx]
+		toComplete = toComplete[slashIdx+1:]
+		nameComps := get.CompGetResource(f, cmd, resourceType, toComplete)
+		for _, c := range nameComps {
+			comps = append(comps, fmt.Sprintf("%s/%s", resourceType, c))
+		}
+	}
+	return comps, directive
+}
+
+// convertResourceNameToPodName Converts a resource name to a pod name.
+// If the resource name is of the form <type>/<name>, we use
+// polymorphichelpers.AttachablePodForObjectFn(), if not, the resource name
+// is already a pod name.
+func convertResourceNameToPodName(f cmdutil.Factory, resourceName string) string {
+	var podName string
+	if !strings.Contains(resourceName, "/") {
+		// When we don't have the <type>/<name> form, the resource name is the pod name
+		podName = resourceName
+	} else {
+		// if the resource name is of the form <type>/<name>, we need to convert it to a pod name
+		ns, _, err := f.ToRawKubeConfigLoader().Namespace()
+		if err != nil {
+			return ""
+		}
+
+		resourceWithPod, err := f.NewBuilder().
+			WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
+			ContinueOnError().
+			NamespaceParam(ns).DefaultNamespace().
+			ResourceNames("pods", resourceName).
+			Do().Object()
+		if err != nil {
+			return ""
+		}
+
+		// For shell completion, use a short timeout
+		forwardablePod, err := polymorphichelpers.AttachablePodForObjectFn(f, resourceWithPod, 100*time.Millisecond)
+		if err != nil {
+			return ""
+		}
+		podName = forwardablePod.Name
+	}
+	return podName
 }
