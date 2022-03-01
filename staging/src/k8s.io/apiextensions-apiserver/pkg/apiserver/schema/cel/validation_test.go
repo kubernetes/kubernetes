@@ -1353,6 +1353,238 @@ func TestValidationExpressions(t *testing.T) {
 				// TODO: also find a way to test the errors returned for: array with no items, object with no properties or additionalProperties, invalid listType and invalid type.
 			},
 		},
+		{name: "stdlib list functions",
+			obj: map[string]interface{}{
+				"ints":         []interface{}{int64(1), int64(2), int64(2), int64(3)},
+				"unsortedInts": []interface{}{int64(2), int64(1)},
+				"emptyInts":    []interface{}{},
+
+				"doubles":         []interface{}{float64(1), float64(2), float64(2), float64(3)},
+				"unsortedDoubles": []interface{}{float64(2), float64(1)},
+				"emptyDoubles":    []interface{}{},
+
+				"intBackedDoubles":          []interface{}{int64(1), int64(2), int64(2), int64(3)},
+				"unsortedIntBackedDDoubles": []interface{}{int64(2), int64(1)},
+				"emptyIntBackedDDoubles":    []interface{}{},
+
+				"durations":         []interface{}{"1s", "1m", "1m", "1h"},
+				"unsortedDurations": []interface{}{"1m", "1s"},
+				"emptyDurations":    []interface{}{},
+
+				"strings":         []interface{}{"a", "b", "b", "c"},
+				"unsortedStrings": []interface{}{"b", "a"},
+				"emptyStrings":    []interface{}{},
+
+				"dates":         []interface{}{"2000-01-01", "2000-02-01", "2000-02-01", "2010-01-01"},
+				"unsortedDates": []interface{}{"2000-02-01", "2000-01-01"},
+				"emptyDates":    []interface{}{},
+
+				"objs": []interface{}{
+					map[string]interface{}{"f1": "a", "f2": "a"},
+					map[string]interface{}{"f1": "a", "f2": "b"},
+					map[string]interface{}{"f1": "a", "f2": "b"},
+					map[string]interface{}{"f1": "a", "f2": "c"},
+				},
+			},
+			schema: objectTypePtr(map[string]schema.Structural{
+				"ints":         listType(&integerType),
+				"unsortedInts": listType(&integerType),
+				"emptyInts":    listType(&integerType),
+
+				"doubles":         listType(&doubleType),
+				"unsortedDoubles": listType(&doubleType),
+				"emptyDoubles":    listType(&doubleType),
+
+				"intBackedDoubles":          listType(&doubleType),
+				"unsortedIntBackedDDoubles": listType(&doubleType),
+				"emptyIntBackedDDoubles":    listType(&doubleType),
+
+				"durations":         listType(&durationFormat),
+				"unsortedDurations": listType(&durationFormat),
+				"emptyDurations":    listType(&durationFormat),
+
+				"strings":         listType(&stringType),
+				"unsortedStrings": listType(&stringType),
+				"emptyStrings":    listType(&stringType),
+
+				"dates":         listType(&dateFormat),
+				"unsortedDates": listType(&dateFormat),
+				"emptyDates":    listType(&dateFormat),
+
+				"objs": listType(objectTypePtr(map[string]schema.Structural{
+					"f1": stringType,
+					"f2": stringType,
+				})),
+			}),
+			valid: []string{
+				"self.ints.sum() == 8",
+				"self.ints.min() == 1",
+				"self.ints.max() == 3",
+				"self.emptyInts.sum() == 0",
+				"self.ints.isSorted()",
+				"self.emptyInts.isSorted()",
+				"self.unsortedInts.isSorted() == false",
+				"self.ints.indexOf(2) == 1",
+				"self.ints.lastIndexOf(2) == 2",
+				"self.ints.indexOf(10) == -1",
+				"self.ints.lastIndexOf(10) == -1",
+
+				"self.doubles.sum() == 8.0",
+				"self.doubles.min() == 1.0",
+				"self.doubles.max() == 3.0",
+				"self.emptyDoubles.sum() == 0.0",
+				"self.doubles.isSorted()",
+				"self.emptyDoubles.isSorted()",
+				"self.unsortedDoubles.isSorted() == false",
+				"self.doubles.indexOf(2.0) == 1",
+				"self.doubles.lastIndexOf(2.0) == 2",
+				"self.doubles.indexOf(10.0) == -1",
+				"self.doubles.lastIndexOf(10.0) == -1",
+
+				"self.intBackedDoubles.sum() == 8.0",
+				"self.intBackedDoubles.min() == 1.0",
+				"self.intBackedDoubles.max() == 3.0",
+				"self.emptyIntBackedDDoubles.sum() == 0.0",
+				"self.intBackedDoubles.isSorted()",
+				"self.emptyDoubles.isSorted()",
+				"self.unsortedIntBackedDDoubles.isSorted() == false",
+				"self.intBackedDoubles.indexOf(2.0) == 1",
+				"self.intBackedDoubles.lastIndexOf(2.0) == 2",
+				"self.intBackedDoubles.indexOf(10.0) == -1",
+				"self.intBackedDoubles.lastIndexOf(10.0) == -1",
+
+				"self.durations.sum() == duration('1h2m1s')",
+				"self.durations.min() == duration('1s')",
+				"self.durations.max() == duration('1h')",
+				"self.emptyDurations.sum() == duration('0')",
+				"self.durations.isSorted()",
+				"self.emptyDurations.isSorted()",
+				"self.unsortedDurations.isSorted() == false",
+				"self.durations.indexOf(duration('1m')) == 1",
+				"self.durations.lastIndexOf(duration('1m')) == 2",
+				"self.durations.indexOf(duration('2m')) == -1",
+				"self.durations.lastIndexOf(duration('2m')) == -1",
+
+				"self.strings.min() == 'a'",
+				"self.strings.max() == 'c'",
+				"self.strings.isSorted()",
+				"self.emptyStrings.isSorted()",
+				"self.unsortedStrings.isSorted() == false",
+				"self.strings.indexOf('b') == 1",
+				"self.strings.lastIndexOf('b') == 2",
+				"self.strings.indexOf('x') == -1",
+				"self.strings.lastIndexOf('x') == -1",
+
+				"self.dates.min() == timestamp('2000-01-01T00:00:00.000Z')",
+				"self.dates.max() == timestamp('2010-01-01T00:00:00.000Z')",
+				"self.dates.isSorted()",
+				"self.emptyDates.isSorted()",
+				"self.unsortedDates.isSorted() == false",
+				"self.dates.indexOf(timestamp('2000-02-01T00:00:00.000Z')) == 1",
+				"self.dates.lastIndexOf(timestamp('2000-02-01T00:00:00.000Z')) == 2",
+				"self.dates.indexOf(timestamp('2005-02-01T00:00:00.000Z')) == -1",
+				"self.dates.lastIndexOf(timestamp('2005-02-01T00:00:00.000Z')) == -1",
+
+				// array, map and object types use structural equality (aka "deep equals")
+				"[[1], [2]].indexOf([1]) == 0",
+				"[{'a': 1}, {'b': 2}].lastIndexOf({'b': 2}) == 1",
+				"self.objs.indexOf(self.objs[1]) == 1",
+				"self.objs.lastIndexOf(self.objs[1]) == 2",
+
+				// avoiding empty list error with min and max by appending an acceptable default minimum value
+				"([0] + self.emptyInts).min() == 0",
+
+				// handle CEL's dynamic dispatch appropriately (special cases to handle an empty list)
+				"dyn([]).sum() == 0",
+				"dyn([1, 2]).sum() == 3",
+				"dyn([1.0, 2.0]).sum() == 3.0",
+
+				// TODO: enable once type system fix it made to CEL
+				//"[].sum() == 0", // An empty list returns an 0 int
+			},
+			errors: map[string]string{
+				// return an error for min/max on empty list
+				"self.emptyInts.min() == 1":      "min called on empty list",
+				"self.emptyInts.max() == 3":      "max called on empty list",
+				"self.emptyDoubles.min() == 1.0": "min called on empty list",
+				"self.emptyDoubles.max() == 3.0": "max called on empty list",
+				"self.emptyStrings.min() == 'a'": "min called on empty list",
+				"self.emptyStrings.max() == 'c'": "max called on empty list",
+
+				// only allow sum on numeric types and duration
+				"['a', 'b'].sum() == 'c'": "found no matching overload for 'sum' applied to 'list(string).()", // compiler type checking error
+
+				// only allow min/max/indexOf/lastIndexOf on comparable types
+				"[[1], [2]].min() == [1]":                "found no matching overload for 'min' applied to 'list(list(int)).()",        // compiler type checking error
+				"[{'a': 1}, {'b': 2}].max() == {'b': 2}": "found no matching overload for 'max' applied to 'list(map(string, int)).()", // compiler type checking error
+			},
+		},
+		{name: "stdlib regex functions",
+			obj: map[string]interface{}{
+				"str": "this is a 123 string 456",
+			},
+			schema: objectTypePtr(map[string]schema.Structural{
+				"str": stringType,
+			}),
+			valid: []string{
+				"self.str.find('[0-9]+') == '123'",
+				"self.str.find('[0-9]+') != '456'",
+				"self.str.find('xyz') == ''",
+
+				"self.str.findAll('[0-9]+') == ['123', '456']",
+				"self.str.findAll('[0-9]+', 0) == []",
+				"self.str.findAll('[0-9]+', 1) == ['123']",
+				"self.str.findAll('[0-9]+', 2) == ['123', '456']",
+				"self.str.findAll('[0-9]+', 3) == ['123', '456']",
+				"self.str.findAll('[0-9]+', -1) == ['123', '456']",
+				"self.str.findAll('xyz') == []",
+				"self.str.findAll('xyz', 1) == []",
+			},
+		},
+		{name: "URL parsing",
+			obj: map[string]interface{}{
+				"url": "https://user:pass@kubernetes.io:80/docs/home?k1=a&k2=b&k2=c#anchor",
+			},
+			schema: objectTypePtr(map[string]schema.Structural{
+				"url": stringType,
+			}),
+			valid: []string{
+				"url('/path').getScheme() == ''",
+				"url('https://example.com/').getScheme() == 'https'",
+				"url('https://example.com:80/').getHost() == 'example.com:80'",
+				"url('https://example.com/').getHost() == 'example.com'",
+				"url('https://[::1]:80/').getHost() == '[::1]:80'",
+				"url('https://[::1]/').getHost() == '[::1]'",
+				"url('/path').getHost() == ''",
+				"url('https://example.com:80/').getHostname() == 'example.com'",
+				"url('https://127.0.0.1/').getHostname() == '127.0.0.1'",
+				"url('https://[::1]/').getHostname() == '::1'",
+				"url('/path').getHostname() == ''",
+				"url('https://example.com:80/').getPort() == '80'",
+				"url('https://example.com/').getPort() == ''",
+				"url('/path').getPort() == ''",
+				"url('https://example.com/path').getEscapedPath() == '/path'",
+				"url('https://example.com/with space/').getEscapedPath() == '/with%20space/'",
+				"url('https://example.com').getEscapedPath() == ''",
+				"url('https://example.com/path?k1=a&k2=b&k2=c').getQuery() == { 'k1': ['a'], 'k2': ['b', 'c']}",
+				"url('https://example.com/path?key with spaces=value with spaces').getQuery() == { 'key with spaces': ['value with spaces']}",
+				"url('https://example.com/path?').getQuery() == {}",
+				"url('https://example.com/path').getQuery() == {}",
+
+				// test with string input
+				"url(self.url).getScheme() == 'https'",
+				"url(self.url).getHost() == 'kubernetes.io:80'",
+				"url(self.url).getHostname() == 'kubernetes.io'",
+				"url(self.url).getPort() == '80'",
+				"url(self.url).getEscapedPath() == '/docs/home'",
+				"url(self.url).getQuery() == {'k1': ['a'], 'k2': ['b', 'c']}",
+
+				"isURL('https://user:pass@example.com:80/path?query=val#fragment')",
+				"isURL('/path') == true",
+				"isURL('https://a:b:c/') == false",
+				"isURL('../relative-path') == false",
+			},
+		},
 	}
 
 	for _, tt := range tests {
