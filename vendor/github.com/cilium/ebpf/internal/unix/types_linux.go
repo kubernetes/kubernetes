@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 package unix
@@ -20,10 +21,11 @@ const (
 	EPERM   = linux.EPERM
 	ESRCH   = linux.ESRCH
 	ENODEV  = linux.ENODEV
+	EBADF   = linux.EBADF
+	E2BIG   = linux.E2BIG
 	// ENOTSUPP is not the same as ENOTSUP or EOPNOTSUP
 	ENOTSUPP = syscall.Errno(0x20c)
 
-	EBADF                    = linux.EBADF
 	BPF_F_NO_PREALLOC        = linux.BPF_F_NO_PREALLOC
 	BPF_F_NUMA_NODE          = linux.BPF_F_NUMA_NODE
 	BPF_F_RDONLY             = linux.BPF_F_RDONLY
@@ -35,6 +37,9 @@ const (
 	BPF_F_INNER_MAP          = linux.BPF_F_INNER_MAP
 	BPF_OBJ_NAME_LEN         = linux.BPF_OBJ_NAME_LEN
 	BPF_TAG_SIZE             = linux.BPF_TAG_SIZE
+	BPF_RINGBUF_BUSY_BIT     = linux.BPF_RINGBUF_BUSY_BIT
+	BPF_RINGBUF_DISCARD_BIT  = linux.BPF_RINGBUF_DISCARD_BIT
+	BPF_RINGBUF_HDR_SZ       = linux.BPF_RINGBUF_HDR_SZ
 	SYS_BPF                  = linux.SYS_BPF
 	F_DUPFD_CLOEXEC          = linux.F_DUPFD_CLOEXEC
 	EPOLL_CTL_ADD            = linux.EPOLL_CTL_ADD
@@ -68,11 +73,6 @@ type Statfs_t = linux.Statfs_t
 
 // Rlimit is a wrapper
 type Rlimit = linux.Rlimit
-
-// Setrlimit is a wrapper
-func Setrlimit(resource int, rlim *Rlimit) (err error) {
-	return linux.Setrlimit(resource, rlim)
-}
 
 // Syscall is a wrapper
 func Syscall(trap, a1, a2, a3 uintptr) (r1, r2 uintptr, err syscall.Errno) {
@@ -201,4 +201,8 @@ func KernelRelease() (string, error) {
 	end := bytes.IndexByte(uname.Release[:], 0)
 	release := string(uname.Release[:end])
 	return release, nil
+}
+
+func Prlimit(pid, resource int, new, old *Rlimit) error {
+	return linux.Prlimit(pid, resource, new, old)
 }

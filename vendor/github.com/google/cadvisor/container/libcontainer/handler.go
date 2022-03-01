@@ -35,6 +35,7 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/google/cadvisor/container"
+	"github.com/google/cadvisor/container/common"
 	info "github.com/google/cadvisor/info/v1"
 )
 
@@ -169,8 +170,7 @@ func (h *Handler) GetStats() (*info.ContainerStats, error) {
 	// file descriptors etc.) and not required a proper container's
 	// root PID (systemd services don't have the root PID atm)
 	if h.includedMetrics.Has(container.ProcessMetrics) {
-		paths := h.cgroupManager.GetPaths()
-		path, ok := paths["cpu"]
+		path, ok := common.GetControllerPath(h.cgroupManager.GetPaths(), "cpu", cgroups.IsCgroup2UnifiedMode())
 		if !ok {
 			klog.V(4).Infof("Could not find cgroups CPU for container %d", h.pid)
 		} else {

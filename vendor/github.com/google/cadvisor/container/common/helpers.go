@@ -105,7 +105,7 @@ func getSpecInternal(cgroupPaths map[string]string, machineInfoFactory info.Mach
 	}
 
 	// CPU.
-	cpuRoot, ok := getControllerPath(cgroupPaths, "cpu", cgroup2UnifiedMode)
+	cpuRoot, ok := GetControllerPath(cgroupPaths, "cpu", cgroup2UnifiedMode)
 	if ok {
 		if utils.FileExists(cpuRoot) {
 			if cgroup2UnifiedMode {
@@ -152,7 +152,7 @@ func getSpecInternal(cgroupPaths map[string]string, machineInfoFactory info.Mach
 
 	// Cpu Mask.
 	// This will fail for non-unified hierarchies. We'll return the whole machine mask in that case.
-	cpusetRoot, ok := getControllerPath(cgroupPaths, "cpuset", cgroup2UnifiedMode)
+	cpusetRoot, ok := GetControllerPath(cgroupPaths, "cpuset", cgroup2UnifiedMode)
 	if ok {
 		if utils.FileExists(cpusetRoot) {
 			spec.HasCpu = true
@@ -167,7 +167,7 @@ func getSpecInternal(cgroupPaths map[string]string, machineInfoFactory info.Mach
 	}
 
 	// Memory
-	memoryRoot, ok := getControllerPath(cgroupPaths, "memory", cgroup2UnifiedMode)
+	memoryRoot, ok := GetControllerPath(cgroupPaths, "memory", cgroup2UnifiedMode)
 	if ok {
 		if cgroup2UnifiedMode {
 			if utils.FileExists(path.Join(memoryRoot, "memory.max")) {
@@ -195,7 +195,7 @@ func getSpecInternal(cgroupPaths map[string]string, machineInfoFactory info.Mach
 	}
 
 	// Processes, read it's value from pids path directly
-	pidsRoot, ok := getControllerPath(cgroupPaths, "pids", cgroup2UnifiedMode)
+	pidsRoot, ok := GetControllerPath(cgroupPaths, "pids", cgroup2UnifiedMode)
 	if ok {
 		if utils.FileExists(pidsRoot) {
 			spec.HasProcesses = true
@@ -217,7 +217,7 @@ func getSpecInternal(cgroupPaths map[string]string, machineInfoFactory info.Mach
 	return spec, nil
 }
 
-func getControllerPath(cgroupPaths map[string]string, controllerName string, cgroup2UnifiedMode bool) (string, bool) {
+func GetControllerPath(cgroupPaths map[string]string, controllerName string, cgroup2UnifiedMode bool) (string, bool) {
 
 	ok := false
 	path := ""
