@@ -124,7 +124,7 @@ const (
 	// The HorizontalPodAutoscalerStatus.DesiredReplicas field is still populated.
 	// This can be used for a "dry run"
 	UpdateModeOff UpdateMode = "Off"
-	// UpdateModeAuto means that autoscaler creates/deletes pods based on the sclaing decision
+	// UpdateModeAuto means that autoscaler creates/deletes pods based on the scaling decision
 	UpdateModeAuto UpdateMode = "Auto"
 )
 
