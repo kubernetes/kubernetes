@@ -19,6 +19,7 @@ package customresource
 import (
 	"context"
 
+	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -90,7 +91,8 @@ func (a statusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Obj
 
 		// validate x-kubernetes-validations rules
 		if celValidator, ok := a.customResourceStrategy.celValidators[v]; ok {
-			errs = append(errs, celValidator.Validate(nil, a.customResourceStrategy.structuralSchemas[v], u.Object)...)
+			err, _ := celValidator.Validate(nil, a.customResourceStrategy.structuralSchemas[v], u.Object, cel.RuntimeCELCostBudget)
+			errs = append(errs, err...)
 		}
 	}
 	return errs

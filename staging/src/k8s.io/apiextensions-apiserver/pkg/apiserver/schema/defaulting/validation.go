@@ -47,15 +47,17 @@ func ValidateDefaults(pth *field.Path, s *structuralschema.Structural, isResourc
 		}
 	}
 
-	return validate(pth, s, s, f, false, requirePrunedDefaults)
+	allErr, error, _ := validate(pth, s, s, f, false, requirePrunedDefaults, cel.RuntimeCELCostBudget)
+	return allErr, error
 }
 
 // validate is the recursive step func for the validation. insideMeta is true if s specifies
 // TypeMeta or ObjectMeta. The SurroundingObjectFunc f is used to validate defaults of
 // TypeMeta or ObjectMeta fields.
-func validate(pth *field.Path, s *structuralschema.Structural, rootSchema *structuralschema.Structural, f SurroundingObjectFunc, insideMeta, requirePrunedDefaults bool) (field.ErrorList, error) {
+func validate(pth *field.Path, s *structuralschema.Structural, rootSchema *structuralschema.Structural, f SurroundingObjectFunc, insideMeta, requirePrunedDefaults bool, costBudget int64) (allErrs field.ErrorList, error error, remainingCost int64) {
+	remainingCost = costBudget
 	if s == nil {
-		return nil, nil
+		return nil, nil, remainingCost
 	}
 
 	if s.XEmbeddedResource {
@@ -63,8 +65,6 @@ func validate(pth *field.Path, s *structuralschema.Structural, rootSchema *struc
 		f = NewRootObjectFunc().WithTypeMeta(metav1.TypeMeta{APIVersion: "validation/v1", Kind: "Validation"})
 		rootSchema = s
 	}
-
-	allErrs := field.ErrorList{}
 
 	if s.Default.Object != nil {
 		validator := kubeopenapivalidate.NewSchemaValidator(s.ToKubeOpenAPI(), nil, "", strfmt.Default)
@@ -75,7 +75,7 @@ func validate(pth *field.Path, s *structuralschema.Structural, rootSchema *struc
 				// this should never happen. f(s.Default.Object) only gives an error if f is the
 				// root object func, but the default value is not a map. But then we wouldn't be
 				// in this case.
-				return nil, fmt.Errorf("failed to validate default value inside metadata: %v", err)
+				return nil, fmt.Errorf("failed to validate default value inside metadata: %v", err), remainingCost
 			}
 
 			// check ObjectMeta/TypeMeta and everything else
@@ -85,8 +85,13 @@ func validate(pth *field.Path, s *structuralschema.Structural, rootSchema *struc
 				allErrs = append(allErrs, field.Invalid(pth.Child("default"), s.Default.Object, fmt.Sprintf("must result in valid metadata: %v", errs.ToAggregate())))
 			} else if errs := apiservervalidation.ValidateCustomResource(pth.Child("default"), s.Default.Object, validator); len(errs) > 0 {
 				allErrs = append(allErrs, errs...)
-			} else if celValidator := cel.NewValidator(s); celValidator != nil {
-				allErrs = append(allErrs, celValidator.Validate(pth.Child("default"), s, s.Default.Object)...)
+			} else if celValidator := cel.NewValidator(s, cel.PerCallLimit); celValidator != nil {
+				celErrs, rmCost := celValidator.Validate(pth.Child("default"), s, s.Default.Object, remainingCost)
+				remainingCost = rmCost
+				allErrs = append(allErrs, celErrs...)
+				if remainingCost < 0 {
+					return allErrs, nil, remainingCost
+				}
 			}
 		} else {
 			// check whether default is pruned
@@ -105,8 +110,13 @@ func validate(pth *field.Path, s *structuralschema.Structural, rootSchema *struc
 				allErrs = append(allErrs, errs...)
 			} else if errs := apiservervalidation.ValidateCustomResource(pth.Child("default"), s.Default.Object, validator); len(errs) > 0 {
 				allErrs = append(allErrs, errs...)
-			} else if celValidator := cel.NewValidator(s); celValidator != nil {
-				allErrs = append(allErrs, celValidator.Validate(pth.Child("default"), s, s.Default.Object)...)
+			} else if celValidator := cel.NewValidator(s, cel.PerCallLimit); celValidator != nil {
+				celErrs, rmCost := celValidator.Validate(pth.Child("default"), s, s.Default.Object, remainingCost)
+				remainingCost = rmCost
+				allErrs = append(allErrs, celErrs...)
+				if remainingCost < 0 {
+					return allErrs, nil, remainingCost
+				}
 			}
 		}
 	}
@@ -114,11 +124,15 @@ func validate(pth *field.Path, s *structuralschema.Structural, rootSchema *struc
 	// do not follow additionalProperties because defaults are forbidden there
 
 	if s.Items != nil {
-		errs, err := validate(pth.Child("items"), s.Items, rootSchema, f.Index(), insideMeta, requirePrunedDefaults)
-		if err != nil {
-			return nil, err
-		}
+		errs, err, rCost := validate(pth.Child("items"), s.Items, rootSchema, f.Index(), insideMeta, requirePrunedDefaults, remainingCost)
+		remainingCost = rCost
 		allErrs = append(allErrs, errs...)
+		if err != nil {
+			return nil, err, remainingCost
+		}
+		if remainingCost < 0 {
+			return allErrs, nil, remainingCost
+		}
 	}
 
 	for k, subSchema := range s.Properties {
@@ -126,12 +140,16 @@ func validate(pth *field.Path, s *structuralschema.Structural, rootSchema *struc
 		if s.XEmbeddedResource && (k == "metadata" || k == "apiVersion" || k == "kind") {
 			subInsideMeta = true
 		}
-		errs, err := validate(pth.Child("properties").Key(k), &subSchema, rootSchema, f.Child(k), subInsideMeta, requirePrunedDefaults)
-		if err != nil {
-			return nil, err
-		}
+		errs, err, rCost := validate(pth.Child("properties").Key(k), &subSchema, rootSchema, f.Child(k), subInsideMeta, requirePrunedDefaults, remainingCost)
+		remainingCost = rCost
 		allErrs = append(allErrs, errs...)
+		if err != nil {
+			return nil, err, remainingCost
+		}
+		if remainingCost < 0 {
+			return allErrs, nil, remainingCost
+		}
 	}
 
-	return allErrs, nil
+	return allErrs, nil, remainingCost
 }

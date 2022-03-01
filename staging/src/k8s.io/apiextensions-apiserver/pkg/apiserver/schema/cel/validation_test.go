@@ -30,11 +30,12 @@ import (
 // TestValidationExpressions tests CEL integration with custom resource values and OpenAPIv3.
 func TestValidationExpressions(t *testing.T) {
 	tests := []struct {
-		name   string
-		schema *schema.Structural
-		obj    map[string]interface{}
-		valid  []string
-		errors map[string]string // rule -> string that error message must contain
+		name       string
+		schema     *schema.Structural
+		obj        map[string]interface{}
+		valid      []string
+		errors     map[string]string // rule -> string that error message must contain
+		costBudget int64
 	}{
 		// tests where val1 and val2 are equal but val3 is different
 		// equality, comparisons and type specific functions
@@ -1683,27 +1684,61 @@ func TestValidationExpressions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// set costBudget to maxInt64 for current test
+			tt.costBudget = math.MaxInt64
 			for _, validRule := range tt.valid {
 				t.Run(validRule, func(t *testing.T) {
 					s := withRule(*tt.schema, validRule)
-					celValidator := NewValidator(&s)
+					celValidator := NewValidator(&s, PerCallLimit)
 					if celValidator == nil {
 						t.Fatal("expected non nil validator")
 					}
-					errs := celValidator.Validate(field.NewPath("root"), &s, tt.obj)
+					errs, _ := celValidator.Validate(field.NewPath("root"), &s, tt.obj, tt.costBudget)
 					for _, err := range errs {
 						t.Errorf("unexpected error: %v", err)
+					}
+
+					// test with cost budget exceeded
+					errs, _ = celValidator.Validate(field.NewPath("root"), &s, tt.obj, 0)
+					var found bool
+					for _, err := range errs {
+						if err.Type == field.ErrorTypeInvalid && strings.Contains(err.Error(), "validation failed due to running out of cost budget, no further validation rules will be run") {
+							found = true
+						}
+					}
+					if !found {
+						t.Errorf("expect cost limit exceed err but did not find")
+					}
+					if len(errs) > 1 {
+						t.Errorf("expect to return cost budget exceed err once")
+					}
+
+					// test with PerCallLimit exceeded
+					found = false
+					celValidator = NewValidator(&s, 0)
+					if celValidator == nil {
+						t.Fatal("expected non nil validator")
+					}
+					errs, _ = celValidator.Validate(field.NewPath("root"), &s, tt.obj, tt.costBudget)
+					for _, err := range errs {
+						if err.Type == field.ErrorTypeInvalid && strings.Contains(err.Error(), "call cost exceeds limit for rule") {
+							found = true
+							break
+						}
+					}
+					if !found {
+						t.Errorf("expect PerCostLimit exceed err but did not find")
 					}
 				})
 			}
 			for rule, expectErrToContain := range tt.errors {
 				t.Run(rule, func(t *testing.T) {
 					s := withRule(*tt.schema, rule)
-					celValidator := NewValidator(&s)
+					celValidator := NewValidator(&s, PerCallLimit)
 					if celValidator == nil {
 						t.Fatal("expected non nil validator")
 					}
-					errs := celValidator.Validate(field.NewPath("root"), &s, tt.obj)
+					errs, _ := celValidator.Validate(field.NewPath("root"), &s, tt.obj, tt.costBudget)
 					if len(errs) == 0 {
 						t.Error("expected validation errors but got none")
 					}
@@ -1712,9 +1747,23 @@ func TestValidationExpressions(t *testing.T) {
 							t.Errorf("expected error to contain '%s', but got: %v", expectErrToContain, err)
 						}
 					}
+
+					// test with cost budget exceeded
+					errs, _ = celValidator.Validate(field.NewPath("root"), &s, tt.obj, 0)
+					var found bool
+					for _, err := range errs {
+						if err.Type == field.ErrorTypeInvalid && strings.Contains(err.Error(), "validation failed due to running out of cost budget, no further validation rules will be run") {
+							found = true
+						}
+					}
+					if !found {
+						t.Errorf("expect cost limit exceed err but did not find")
+					}
+					if len(errs) > 1 {
+						t.Errorf("expect to return cost budget exceed err once")
+					}
 				})
 			}
-
 		})
 	}
 }

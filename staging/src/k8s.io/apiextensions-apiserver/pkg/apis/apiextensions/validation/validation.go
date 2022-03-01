@@ -946,7 +946,7 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 
 		structural, err := structuralschema.NewStructural(schema)
 		if err == nil {
-			compResults, err := cel.Compile(structural, isRoot)
+			compResults, err := cel.Compile(structural, isRoot, cel.PerCallLimit)
 			if err != nil {
 				allErrs = append(allErrs, field.InternalError(fldPath.Child("x-kubernetes-validations"), err))
 			} else {
