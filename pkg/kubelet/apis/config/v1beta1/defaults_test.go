@@ -121,6 +121,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				SeccompDefault:          utilpointer.BoolPtr(false),
 				MemoryThrottlingFactor:  utilpointer.Float64Ptr(DefaultMemoryThrottlingFactor),
 				RegisterNode:            utilpointer.BoolPtr(true),
+				PodLogsDirectory:        DefaultPodLogsRootDirectory,
 			},
 		},
 		{
@@ -245,6 +246,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				SeccompDefault:                  utilpointer.Bool(false),
 				MemoryThrottlingFactor:          utilpointer.Float64(0),
 				RegisterNode:                    utilpointer.BoolPtr(false),
+				PodLogsDirectory:                "",
 			},
 			&v1beta1.KubeletConfiguration{
 				EnableServer:       utilpointer.BoolPtr(false),
@@ -340,6 +342,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				SeccompDefault:          utilpointer.Bool(false),
 				MemoryThrottlingFactor:  utilpointer.Float64(0),
 				RegisterNode:            utilpointer.BoolPtr(false),
+				PodLogsDirectory:        DefaultPodLogsRootDirectory,
 			},
 		},
 		{
@@ -486,6 +489,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				SeccompDefault:          utilpointer.Bool(true),
 				MemoryThrottlingFactor:  utilpointer.Float64(1),
 				RegisterNode:            utilpointer.BoolPtr(true),
+				PodLogsDirectory:        "/var/log/k8spods",
 			},
 			&v1beta1.KubeletConfiguration{
 				EnableServer:       utilpointer.BoolPtr(true),
@@ -629,6 +633,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				SeccompDefault:          utilpointer.Bool(true),
 				MemoryThrottlingFactor:  utilpointer.Float64(1),
 				RegisterNode:            utilpointer.BoolPtr(true),
+				PodLogsDirectory:        "/var/log/k8spods",
 			},
 		},
 		{
@@ -715,6 +720,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				SeccompDefault:          utilpointer.BoolPtr(false),
 				MemoryThrottlingFactor:  utilpointer.Float64Ptr(DefaultMemoryThrottlingFactor),
 				RegisterNode:            utilpointer.BoolPtr(true),
+				PodLogsDirectory:        DefaultPodLogsRootDirectory,
 			},
 		},
 	}

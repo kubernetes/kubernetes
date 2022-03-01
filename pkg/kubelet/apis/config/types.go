@@ -444,6 +444,9 @@ type KubeletConfiguration struct {
 	// registerNode enables automatic registration with the apiserver.
 	// +optional
 	RegisterNode bool
+	// podLogsDirectory specifies the root directory for pod logs.
+	// +optional
+	PodLogsDirectory string
 }
 
 // KubeletAuthorizationMode denotes the authorization mode for the kubelet

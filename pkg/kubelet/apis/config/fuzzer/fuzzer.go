@@ -110,6 +110,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			}
 			obj.EnableSystemLogHandler = true
 			obj.MemoryThrottlingFactor = utilpointer.Float64Ptr(rand.Float64())
+			obj.PodLogsDirectory = kubeletconfigv1beta1.DefaultPodLogsRootDirectory
 		},
 	}
 }

@@ -778,6 +778,10 @@ type KubeletConfiguration struct {
 	// Default: true
 	// +optional
 	RegisterNode *bool `json:"registerNode,omitempty"`
+	// podLogsDirectory specifies the root directory for pod logs.
+	// Default: "/var/log/pods"
+	// +optional
+	PodLogsDirectory string `json:"podLogsDirectory,omitempty"`
 }
 
 type KubeletAuthorizationMode string

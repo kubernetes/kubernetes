@@ -62,8 +62,7 @@ import (
 const (
 	// The api version of kubelet runtime api
 	kubeRuntimeAPIVersion = "0.1.0"
-	// The root directory for pod logs
-	podLogsRootDirectory = "/var/log/pods"
+
 	// A minimal shutdown window for avoiding unnecessary SIGKILLs
 	minimumGracePeriodInSeconds = 2
 
@@ -76,6 +75,9 @@ const (
 var (
 	// ErrVersionNotSupported is returned when the api version of runtime interface is not supported
 	ErrVersionNotSupported = errors.New("runtime api version is not supported")
+
+	// The root directory for pod logs
+	podLogsRootDirectory = ""
 )
 
 // podStateProvider can determine if none of the elements are necessary to retain (pod content)
@@ -151,7 +153,7 @@ type kubeGenericRuntimeManager struct {
 	// MemorySwapBehavior defines how swap is used
 	memorySwapBehavior string
 
-	//Function to get node allocatable resources
+	// Function to get node allocatable resources
 	getNodeAllocatable func() v1.ResourceList
 
 	// Memory throttling factor for MemoryQoS
@@ -194,6 +196,7 @@ func NewKubeGenericRuntimeManager(
 	memorySwapBehavior string,
 	getNodeAllocatable func() v1.ResourceList,
 	memoryThrottlingFactor float64,
+	podLogsDirectory string,
 ) (KubeGenericRuntime, error) {
 	kubeRuntimeManager := &kubeGenericRuntimeManager{
 		recorder:               recorder,
@@ -217,6 +220,8 @@ func NewKubeGenericRuntimeManager(
 		getNodeAllocatable:     getNodeAllocatable,
 		memoryThrottlingFactor: memoryThrottlingFactor,
 	}
+
+	podLogsRootDirectory = podLogsDirectory
 
 	typedVersion, err := kubeRuntimeManager.getTypedVersion()
 	if err != nil {
