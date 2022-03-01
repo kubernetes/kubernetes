@@ -294,6 +294,7 @@ func TestAddFlags(t *testing.T) {
 				ConcurrentGCSyncs: 30,
 				GCIgnoredResources: []garbagecollectorconfig.GroupResource{
 					{Group: "", Resource: "events"},
+					{Group: "events.k8s.io", Resource: "events"},
 				},
 				EnableGarbageCollector: false,
 			},
@@ -556,6 +557,7 @@ func TestApplyTo(t *testing.T) {
 				ConcurrentGCSyncs: 30,
 				GCIgnoredResources: []garbagecollectorconfig.GroupResource{
 					{Group: "", Resource: "events"},
+					{Group: "events.k8s.io", Resource: "events"},
 				},
 				EnableGarbageCollector: false,
 			},
