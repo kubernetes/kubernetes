@@ -1577,3 +1577,110 @@ func Test_shouldSyncNode(t *testing.T) {
 		})
 	}
 }
+
+func trigger(t *testing.T, controller *Controller) {
+	tryReadFromChannel(t, controller.nodeSyncCh, false)
+	controller.triggerNodeSync()
+	tryReadFromChannel(t, controller.nodeSyncCh, true)
+	tryReadFromChannel(t, controller.nodeSyncCh, false)
+	tryReadFromChannel(t, controller.nodeSyncCh, false)
+	tryReadFromChannel(t, controller.nodeSyncCh, false)
+	controller.triggerNodeSync()
+	controller.triggerNodeSync()
+	controller.triggerNodeSync()
+	tryReadFromChannel(t, controller.nodeSyncCh, true)
+	tryReadFromChannel(t, controller.nodeSyncCh, false)
+	tryReadFromChannel(t, controller.nodeSyncCh, false)
+	tryReadFromChannel(t, controller.nodeSyncCh, false)
+}
+
+func TestTriggerNodeSync(t *testing.T) {
+	controller, _, _ := newController()
+	trigger(t, controller)
+}
+
+func TestTriggerNodeSyncListerError(t *testing.T) {
+	controller, _, _ := newController()
+	controller.nodeLister = newFakeNodeLister(fmt.Errorf("error"))
+	trigger(t, controller)
+}
+
+func TestTriggerNodeSyncKnownHosts(t *testing.T) {
+	controller, _, _ := newController()
+	nodes := []*v1.Node{
+		{ObjectMeta: metav1.ObjectMeta{Name: "node0"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}},
+	}
+	controller.knownHosts = nodes
+	trigger(t, controller)
+}
+
+func TestMarkAndUnmarkFullSync(t *testing.T) {
+	controller, _, _ := newController()
+	if controller.needFullSync != false {
+		t.Errorf("expect controller.needFullSync to be false, but got true")
+	}
+
+	ret := controller.needFullSyncAndUnmark()
+	if ret != false {
+		t.Errorf("expect ret == false, but got true")
+	}
+
+	ret = controller.needFullSyncAndUnmark()
+	if ret != false {
+		t.Errorf("expect ret == false, but got true")
+	}
+	controller.needFullSync = true
+	ret = controller.needFullSyncAndUnmark()
+	if ret != true {
+		t.Errorf("expect ret == true, but got false")
+	}
+	ret = controller.needFullSyncAndUnmark()
+	if ret != false {
+		t.Errorf("expect ret == false, but got true")
+	}
+}
+
+func tryReadFromChannel(t *testing.T, ch chan interface{}, expectValue bool) {
+	select {
+	case _, ok := <-ch:
+		if !ok {
+			t.Errorf("The channel is closed")
+		}
+		if !expectValue {
+			t.Errorf("Does not expect value from the channel, but got a value")
+		}
+	default:
+		if expectValue {
+			t.Errorf("Expect value from the channel, but got none")
+		}
+	}
+}
+
+type fakeNodeLister struct {
+	cache []*v1.Node
+	err   error
+}
+
+func newFakeNodeLister(err error, nodes ...*v1.Node) *fakeNodeLister {
+	ret := &fakeNodeLister{}
+	ret.cache = nodes
+	ret.err = err
+	return ret
+}
+
+// List lists all Nodes in the indexer.
+// Objects returned here must be treated as read-only.
+func (l *fakeNodeLister) List(selector labels.Selector) (ret []*v1.Node, err error) {
+	return l.cache, l.err
+}
+
+// Get retrieves the Node from the index for a given name.
+// Objects returned here must be treated as read-only.
+func (l *fakeNodeLister) Get(name string) (*v1.Node, error) {
+	for _, node := range l.cache {
+		if node.Name == name {
+			return node, nil
+		}
+	}
+	return nil, nil
+}
