@@ -36,3 +36,8 @@ const DefaultCPUUtilization = 80
 // BehaviorSpecsAnnotation is the annotation which holds the HPA constraints specs
 // when converting the `Behavior` field from autoscaling/v2beta2
 const BehaviorSpecsAnnotation = "autoscaling.alpha.kubernetes.io/behavior"
+
+// UpdatePolicySpecsAnnotation is the annotation which holds the HPA
+// update specs when converting `UpdatePolicy` field from autoscaling/v2
+// to autoscaling/v1.
+const UpdatePolicySpecsAnnotation = "autoscaling.alpha.kubernetes.io/update-policy"

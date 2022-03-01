@@ -2045,6 +2045,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.autoscaling.v2.CrossVersionObjectReference
       default: {}
+    - name: updatePolicy
+      type:
+        namedType: io.k8s.api.autoscaling.v2.HorizontalPodAutoscalerUpdatePolicy
 - name: io.k8s.api.autoscaling.v2.HorizontalPodAutoscalerStatus
   map:
     fields:
@@ -2075,6 +2078,12 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: observedGeneration
       type:
         scalar: numeric
+- name: io.k8s.api.autoscaling.v2.HorizontalPodAutoscalerUpdatePolicy
+  map:
+    fields:
+    - name: updateMode
+      type:
+        scalar: string
 - name: io.k8s.api.autoscaling.v2.MetricIdentifier
   map:
     fields:
@@ -2715,6 +2724,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.autoscaling.v2beta2.CrossVersionObjectReference
       default: {}
+    - name: updatePolicy
+      type:
+        namedType: io.k8s.api.autoscaling.v2beta2.HorizontalPodAutoscalerUpdatePolicy
 - name: io.k8s.api.autoscaling.v2beta2.HorizontalPodAutoscalerStatus
   map:
     fields:
@@ -2744,6 +2756,12 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: observedGeneration
       type:
         scalar: numeric
+- name: io.k8s.api.autoscaling.v2beta2.HorizontalPodAutoscalerUpdatePolicy
+  map:
+    fields:
+    - name: updateMode
+      type:
+        scalar: string
 - name: io.k8s.api.autoscaling.v2beta2.MetricIdentifier
   map:
     fields:

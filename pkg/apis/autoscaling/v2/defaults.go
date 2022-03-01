@@ -104,9 +104,9 @@ func SetDefaults_HorizontalPodAutoscalerBehavior(obj *autoscalingv2.HorizontalPo
 // SetDefaults_HorizontalPodAutoscalerUpdatePolicy fills the UpdatePolicy if it is not null
 func SetDefaults_HorizontalPodAutoscalerUpdatePolicy(obj *autoscalingv2.HorizontalPodAutoscaler) {
 	// if UpdatePolicy is specified, we should fill all the 'nil' values with the default ones
-	if obj.Spec.UpdatePolicy == nil {
-		updateMode := autoscalingv2.UpdateModeAuto
-		obj.Spec.UpdatePolicy = &autoscalingv2.HorizontalPodAutoscalerUpdatePolicy{UpdateMode: &updateMode}
+	if obj.Spec.UpdatePolicy != nil && obj.Spec.UpdatePolicy.UpdateMode == nil {
+		// updateMode := autoscalingv2.UpdateModeAuto
+		// obj.Spec.UpdatePolicy.UpdateMode = &updateMode
 	}
 }
 

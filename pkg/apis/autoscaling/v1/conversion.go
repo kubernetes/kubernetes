@@ -355,6 +355,20 @@ func Convert_autoscaling_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscaler(i
 		out.Annotations[autoscaling.BehaviorSpecsAnnotation] = string(behaviorEnc)
 	}
 
+	if in.Spec.UpdatePolicy != nil {
+		// TODO: this is marshaling an internal type. Fix this without breaking backwards compatibility.
+		updatePolicyEnc, err := json.Marshal(in.Spec.UpdatePolicy)
+		if err != nil {
+			return err
+		}
+		// copy before mutating
+		if !copiedAnnotations {
+			copiedAnnotations = true
+			out.Annotations = autoscaling.DeepCopyStringMap(out.Annotations)
+		}
+		out.Annotations[autoscaling.UpdatePolicySpecsAnnotation] = string(updatePolicyEnc)
+	}
+
 	if len(in.Status.Conditions) > 0 {
 		currentConditionsEnc, err := json.Marshal(currentConditions)
 		if err != nil {
@@ -399,6 +413,14 @@ func Convert_v1_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler(i
 		var behavior autoscaling.HorizontalPodAutoscalerBehavior
 		if err := json.Unmarshal([]byte(behaviorEnc), &behavior); err == nil && behavior != (autoscaling.HorizontalPodAutoscalerBehavior{}) {
 			out.Spec.Behavior = &behavior
+		}
+	}
+
+	if updatePolicyEnc, hasUpdatePolicy := out.Annotations[autoscaling.UpdatePolicySpecsAnnotation]; hasUpdatePolicy {
+		// TODO: this is unmarshaling an internal type. Fix this without breaking backwards compatibility.
+		var updatePolicy autoscaling.HorizontalPodAutoscalerUpdatePolicy
+		if err := json.Unmarshal([]byte(updatePolicyEnc), &updatePolicy); err == nil && updatePolicy != (autoscaling.HorizontalPodAutoscalerUpdatePolicy{}) {
+			out.Spec.UpdatePolicy = &updatePolicy
 		}
 	}
 
