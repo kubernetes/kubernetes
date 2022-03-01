@@ -479,6 +479,8 @@ func (adc *attachDetachController) populateDesiredStateOfWorld() error {
 				if err != nil {
 					klog.Errorf("Failed to update volume spec for node %s: %v", nodeName, err)
 				}
+			} else {
+				adc.actualStateOfWorld.SetVolumeSpec(volumeName, volumeSpec)
 			}
 		}
 	}
