@@ -19,6 +19,7 @@ limitations under the License.
 package statusupdater
 
 import (
+	"fmt"
 	"k8s.io/klog/v2"
 
 	"k8s.io/api/core/v1"
@@ -36,6 +37,8 @@ type NodeStatusUpdater interface {
 	// Gets a list of node statuses that should be updated from the actual state
 	// of the world and updates them.
 	UpdateNodeStatuses() error
+	// Update any pending status change for the given node
+	UpdateNodeStatusForNode(nodeName types.NodeName) error
 }
 
 // NewNodeStatusUpdater returns a new instance of NodeStatusUpdater.
@@ -57,40 +60,67 @@ type nodeStatusUpdater struct {
 }
 
 func (nsu *nodeStatusUpdater) UpdateNodeStatuses() error {
+	var nodeIssues int
 	// TODO: investigate right behavior if nodeName is empty
 	// kubernetes/kubernetes/issues/37777
 	nodesToUpdate := nsu.actualStateOfWorld.GetVolumesToReportAttached()
 	for nodeName, attachedVolumes := range nodesToUpdate {
-		nodeObj, err := nsu.nodeLister.Get(string(nodeName))
-		if errors.IsNotFound(err) {
-			// If node does not exist, its status cannot be updated.
-			// Do nothing so that there is no retry until node is created.
-			klog.V(2).Infof(
-				"Could not update node status. Failed to find node %q in NodeInformer cache. Error: '%v'",
-				nodeName,
-				err)
-			continue
-		} else if err != nil {
-			// For all other errors, log error and reset flag statusUpdateNeeded
-			// back to true to indicate this node status needs to be updated again.
-			klog.V(2).Infof("Error retrieving nodes from node lister. Error: %v", err)
-			nsu.actualStateOfWorld.SetNodeStatusUpdateNeeded(nodeName)
-			continue
+		err := nsu.processNodeVolumes(nodeName, attachedVolumes)
+		if err != nil {
+			nodeIssues += 1
 		}
+	}
+	if nodeIssues > 0 {
+		return fmt.Errorf("unable to update %d nodes", nodeIssues)
+	}
+	return nil
+}
 
-		if err := nsu.updateNodeStatus(nodeName, nodeObj, attachedVolumes); err != nil {
-			// If update node status fails, reset flag statusUpdateNeeded back to true
-			// to indicate this node status needs to be updated again
-			nsu.actualStateOfWorld.SetNodeStatusUpdateNeeded(nodeName)
+func (nsu *nodeStatusUpdater) UpdateNodeStatusForNode(nodeName types.NodeName) error {
+	needsUpdate, attachedVolumes := nsu.actualStateOfWorld.GetVolumesToReportAttachedForNode(nodeName)
+	if !needsUpdate {
+		return nil
+	}
+	return nsu.processNodeVolumes(nodeName, attachedVolumes)
+}
 
-			klog.V(2).Infof(
-				"Could not update node status for %q; re-marking for update. %v",
-				nodeName,
-				err)
+func (nsu *nodeStatusUpdater) processNodeVolumes(nodeName types.NodeName, attachedVolumes []v1.AttachedVolume) error {
+	nodeObj, err := nsu.nodeLister.Get(string(nodeName))
+	if errors.IsNotFound(err) {
+		// If node does not exist, its status cannot be updated.
+		// Do nothing so that there is no retry until node is created.
+		klog.V(2).Infof(
+			"Could not update node status. Failed to find node %q in NodeInformer cache. Error: '%v'",
+			nodeName,
+			err)
+		return nil
+	} else if err != nil {
+		// For all other errors, log error and reset flag statusUpdateNeeded
+		// back to true to indicate this node status needs to be updated again.
+		klog.V(2).Infof("Error retrieving nodes from node lister. Error: %v", err)
+		nsu.actualStateOfWorld.SetNodeStatusUpdateNeeded(nodeName)
+		return err
+	}
 
-			// We currently always return immediately on error
-			return err
-		}
+	err = nsu.updateNodeStatus(nodeName, nodeObj, attachedVolumes)
+	if errors.IsNotFound(err) {
+		// If node does not exist, its status cannot be updated.
+		// Do nothing so that there is no retry until node is created.
+		klog.V(2).Infof(
+			"Could not update node status for %q; node does not exist - skipping",
+			nodeName)
+		return nil
+	} else if err != nil {
+		// If update node status fails, reset flag statusUpdateNeeded back to true
+		// to indicate this node status needs to be updated again
+		nsu.actualStateOfWorld.SetNodeStatusUpdateNeeded(nodeName)
+
+		klog.V(2).Infof(
+			"Could not update node status for %q; re-marking for update. %v",
+			nodeName,
+			err)
+
+		return err
 	}
 	return nil
 }
