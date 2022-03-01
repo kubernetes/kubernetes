@@ -54,13 +54,12 @@ func createAPIExtensionsConfig(
 
 	// override genericConfig.AdmissionControl with apiextensions' scheme,
 	// because apiextensions apiserver should use its own scheme to convert resources.
-	err := commandOptions.Admission.ApplyTo(
+	if err := commandOptions.Admission.ApplyTo(
 		&genericConfig,
 		externalInformers,
 		genericConfig.LoopbackClientConfig,
 		feature.DefaultFeatureGate,
-		pluginInitializers...)
-	if err != nil {
+		pluginInitializers...); err != nil {
 		return nil, err
 	}
 
