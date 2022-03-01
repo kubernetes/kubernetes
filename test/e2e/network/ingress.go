@@ -481,7 +481,6 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 		ginkgo.BeforeEach(func() {
 			e2eskipper.SkipUnlessProviderIs("gce", "gke")
 			ginkgo.By("Initializing nginx controller")
-			jig.Class = "nginx"
 			nginxController = &e2eingress.NginxIngressController{Ns: ns, Client: jig.Client}
 
 			framework.ExpectNoError(gce.GcloudComputeResourceCreate("firewall-rules", fmt.Sprintf("ingress-80-443-%v", ns), framework.TestContext.CloudConfig.ProjectID, "--allow", "tcp:80,tcp:443", "--network", framework.TestContext.CloudConfig.Network))
