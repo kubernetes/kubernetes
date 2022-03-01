@@ -1793,21 +1793,54 @@ func Test_shouldSyncNode(t *testing.T) {
 }
 
 func TestTriggerNodeSync(t *testing.T) {
-	controller, _, _ := newController()
-
-	tryReadFromChannel(t, controller.nodeSyncCh, false)
-	controller.triggerNodeSync()
-	tryReadFromChannel(t, controller.nodeSyncCh, true)
-	tryReadFromChannel(t, controller.nodeSyncCh, false)
-	tryReadFromChannel(t, controller.nodeSyncCh, false)
-	tryReadFromChannel(t, controller.nodeSyncCh, false)
-	controller.triggerNodeSync()
-	controller.triggerNodeSync()
-	controller.triggerNodeSync()
-	tryReadFromChannel(t, controller.nodeSyncCh, true)
-	tryReadFromChannel(t, controller.nodeSyncCh, false)
-	tryReadFromChannel(t, controller.nodeSyncCh, false)
-	tryReadFromChannel(t, controller.nodeSyncCh, false)
+	testCases := []struct {
+		name       string
+		controller func() *Controller
+	}{
+		{
+			name: "node sync controller scenario default",
+			controller: func() *Controller {
+				c, _, _ := newController()
+				return c
+			},
+		},
+		{
+			name: "node sync controller scenario with lister error",
+			controller: func() *Controller {
+				c, _, _ := newController()
+				c.nodeLister = newFakeNodeLister(fmt.Errorf("error"))
+				return c
+			},
+		},
+		{
+			name: "node sync controller knows hosts",
+			controller: func() *Controller {
+				c, _, _ := newController()
+				nodes := []*v1.Node{
+					{ObjectMeta: metav1.ObjectMeta{Name: "node0"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}},
+				}
+				c.knownHosts = nodes
+				return c
+			},
+		},
+	}
+	var controller *Controller
+	for _, testCase := range testCases {
+		controller = testCase.controller()
+		tryReadFromChannel(t, controller.nodeSyncCh, false)
+		controller.triggerNodeSync()
+		tryReadFromChannel(t, controller.nodeSyncCh, true)
+		tryReadFromChannel(t, controller.nodeSyncCh, false)
+		tryReadFromChannel(t, controller.nodeSyncCh, false)
+		tryReadFromChannel(t, controller.nodeSyncCh, false)
+		controller.triggerNodeSync()
+		controller.triggerNodeSync()
+		controller.triggerNodeSync()
+		tryReadFromChannel(t, controller.nodeSyncCh, true)
+		tryReadFromChannel(t, controller.nodeSyncCh, false)
+		tryReadFromChannel(t, controller.nodeSyncCh, false)
+		tryReadFromChannel(t, controller.nodeSyncCh, false)
+	}
 }
 
 func TestMarkAndUnmarkFullSync(t *testing.T) {
