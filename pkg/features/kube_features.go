@@ -162,7 +162,9 @@ const (
 	CSIStorageCapacity featuregate.Feature = "CSIStorageCapacity"
 
 	// owner: @alculquicondor
+	// alpha: v1.19
 	// beta: v1.20
+	// GA: v1.24
 	//
 	// Enables the use of PodTopologySpread scheduling plugin to do default
 	// spreading and disables legacy SelectorSpread plugin.
