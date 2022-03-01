@@ -20,12 +20,14 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"time"
 
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/endpoints/metrics"
 )
 
 var ignoreTimestampEqualities = func() conversion.Equalities {
@@ -54,7 +56,20 @@ func IgnoreManagedFieldsTimestampsTransformer(
 	_ context.Context,
 	newObj runtime.Object,
 	oldObj runtime.Object,
-) (runtime.Object, error) {
+) (res runtime.Object, err error) {
+	outcome := "unequal_objects_fast"
+	start := time.Now()
+	err = nil
+	res = nil
+
+	defer func() {
+		if err != nil {
+			outcome = "error"
+		}
+
+		metrics.RecordTimestampComparisonLatency(outcome, time.Since(start))
+	}()
+
 	// If managedFields modulo timestamps are unchanged
 	//		and
 	//	rest of object is unchanged
@@ -85,12 +100,41 @@ func IgnoreManagedFieldsTimestampsTransformer(
 	oldManagedFields := oldAccessor.GetManagedFields()
 	newManagedFields := accessor.GetManagedFields()
 
+	if len(oldManagedFields) != len(newManagedFields) {
+		// Return early if any managed fields entry was added/removed.
+		// We want to retain user expectation that even if they write to a field
+		// whose value did not change, they will still result as the field
+		// manager at the end.
+		return newObj, nil
+	} else if len(newManagedFields) == 0 {
+		// This transformation only makes sense when managedFields are
+		// non-empty
+		return newObj, nil
+	}
+
+	// This transformation only makes sense if the managed fields has at least one
+	// changed timestamp; and are otherwise equal. Return early if there are no
+	// changed timestamps.
+	allTimesUnchanged := true
+	for i, e := range newManagedFields {
+		if !e.Time.Equal(oldManagedFields[i].Time) {
+			allTimesUnchanged = false
+			break
+		}
+	}
+
+	if allTimesUnchanged {
+		return newObj, nil
+	}
+
 	// This condition ensures the managed fields are always compared first. If
 	//	this check fails, the if statement will short circuit. If the check
 	// 	succeeds the slow path is taken which compares entire objects.
-	if ignoreTimestampEqualities.DeepEqualWithNilDifferentFromEmpty(oldManagedFields, newManagedFields) &&
-		ignoreTimestampEqualities.DeepEqualWithNilDifferentFromEmpty(newObj, oldObj) {
+	if !ignoreTimestampEqualities.DeepEqualWithNilDifferentFromEmpty(oldManagedFields, newManagedFields) {
+		return newObj, nil
+	}
 
+	if ignoreTimestampEqualities.DeepEqualWithNilDifferentFromEmpty(newObj, oldObj) {
 		// Remove any changed timestamps, so that timestamp is not the only
 		// change seen by etcd.
 		//
@@ -103,7 +147,10 @@ func IgnoreManagedFieldsTimestampsTransformer(
 		}
 
 		accessor.SetManagedFields(newManagedFields)
+		outcome = "equal_objects"
 		return newObj, nil
 	}
+
+	outcome = "unequal_objects_slow"
 	return newObj, nil
 }
