@@ -213,6 +213,10 @@ function save-logs() {
         done
     fi
 
+    # log where we pull the images from
+    log-dump-ssh "${node_name}" "sudo ctr -n k8s.io images ls" > "${dir}/images-containerd.log" || true
+    log-dump-ssh "${node_name}" "sudo docker images --all" > "${dir}/images-docker.log" || true
+
     # Try dumping coverage profiles, if it looks like coverage is enabled in the first place.
     if log-dump-ssh "${node_name}" "stat /var/log/kubelet.cov" &> /dev/null; then
       if log-dump-ssh "${node_name}" "command -v docker" &> /dev/null; then
