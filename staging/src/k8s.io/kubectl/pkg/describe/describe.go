@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/http"
 	"net/url"
 	"reflect"
 	"sort"
@@ -108,12 +109,16 @@ func Describer(restClientGetter genericclioptions.RESTClientGetter, mapping *met
 	if err != nil {
 		return nil, err
 	}
+	httpClient, err := restClientGetter.ToHTTPClient()
+	if err != nil {
+		return nil, err
+	}
 	// try to get a describer
-	if describer, ok := DescriberFor(mapping.GroupVersionKind.GroupKind(), clientConfig); ok {
+	if describer, ok := DescriberForClient(mapping.GroupVersionKind.GroupKind(), clientConfig, httpClient); ok {
 		return describer, nil
 	}
 	// if this is a kind we don't have a describer for yet, go generic if possible
-	if genericDescriber, ok := GenericDescriberFor(mapping, clientConfig); ok {
+	if genericDescriber, ok := GenericDescriberForClient(mapping, clientConfig, httpClient); ok {
 		return genericDescriber, nil
 	}
 	// otherwise return an unregistered error
@@ -183,8 +188,14 @@ func (npw *nestedPrefixWriter) WriteLine(a ...interface{}) {
 	npw.PrefixWriter.Write(npw.indent, "%s", fmt.Sprintln(a...))
 }
 
-func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]ResourceDescriber, error) {
-	c, err := clientset.NewForConfig(clientConfig)
+func describerMap(clientConfig *rest.Config, client *http.Client) (map[schema.GroupKind]ResourceDescriber, error) {
+	var c *clientset.Clientset
+	var err error
+	if client == nil {
+		c, err = clientset.NewForConfig(clientConfig)
+	} else {
+		c, err = clientset.NewForConfigAndClient(clientConfig, client)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -239,7 +250,13 @@ func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]ResourceDescr
 // DescriberFor returns the default describe functions for each of the standard
 // Kubernetes types.
 func DescriberFor(kind schema.GroupKind, clientConfig *rest.Config) (ResourceDescriber, bool) {
-	describers, err := describerMap(clientConfig)
+	return DescriberForClient(kind, clientConfig, nil)
+}
+
+// DescriberForClient returns the default describe functions for each of the standard
+// Kubernetes types.
+func DescriberForClient(kind schema.GroupKind, clientConfig *rest.Config, httpClient *http.Client) (ResourceDescriber, bool) {
+	describers, err := describerMap(clientConfig, httpClient)
 	if err != nil {
 		klog.V(1).Info(err)
 		return nil, false
@@ -252,14 +269,31 @@ func DescriberFor(kind schema.GroupKind, clientConfig *rest.Config) (ResourceDes
 // GenericDescriberFor returns a generic describer for the specified mapping
 // that uses only information available from runtime.Unstructured
 func GenericDescriberFor(mapping *meta.RESTMapping, clientConfig *rest.Config) (ResourceDescriber, bool) {
+	return GenericDescriberForClient(mapping, clientConfig, nil)
+}
+
+// GenericDescriberFor returns a generic describer for the specified mapping
+// that uses only information available from runtime.Unstructured
+func GenericDescriberForClient(mapping *meta.RESTMapping, clientConfig *rest.Config, httpClient *http.Client) (ResourceDescriber, bool) {
+	var dynamicClient dynamic.Interface
+	var clientSet *clientset.Clientset
+	var err error
 	// used to fetch the resource
-	dynamicClient, err := dynamic.NewForConfig(clientConfig)
+	if httpClient == nil {
+		dynamicClient, err = dynamic.NewForConfig(clientConfig)
+	} else {
+		dynamicClient, err = dynamic.NewForConfigAndClient(clientConfig, httpClient)
+	}
 	if err != nil {
 		return nil, false
 	}
 
 	// used to get events for the resource
-	clientSet, err := clientset.NewForConfig(clientConfig)
+	if httpClient == nil {
+		clientSet, err = clientset.NewForConfig(clientConfig)
+	} else {
+		clientSet, err = clientset.NewForConfigAndClient(clientConfig, httpClient)
+	}
 	if err != nil {
 		return nil, false
 	}
