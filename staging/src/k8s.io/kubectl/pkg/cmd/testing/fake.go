@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"path/filepath"
 	"time"
@@ -38,7 +39,6 @@ import (
 	diskcached "k8s.io/client-go/discovery/cached/disk"
 	"k8s.io/client-go/dynamic"
 	fakedynamic "k8s.io/client-go/dynamic/fake"
-	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/client-go/restmapper"
@@ -425,7 +425,7 @@ func NewTestFactory() *TestFactory {
 		panic(fmt.Sprintf("unable to create a fake restclient config: %v", err))
 	}
 
-	return &TestFactory{
+	factory := &TestFactory{
 		Factory:           cmdutil.NewFactory(configFlags),
 		kubeConfigFlags:   configFlags,
 		FakeDynamicClient: fakedynamic.NewSimpleDynamicClient(scheme.Scheme),
@@ -433,6 +433,13 @@ func NewTestFactory() *TestFactory {
 
 		ClientConfigVal: restConfig,
 	}
+
+	configFlags.WithHTTPClientFunc(func() (*http.Client, error) {
+		fakeClient := factory.Client.(*fake.RESTClient)
+		return fakeClient.Client, nil
+	})
+
+	return factory
 }
 
 // WithNamespace is used to mention namespace reactively
@@ -542,54 +549,12 @@ func (f *TestFactory) NewBuilder() *resource.Builder {
 	)
 }
 
-// KubernetesClientSet initializes and returns the Clientset using TestFactory
-func (f *TestFactory) KubernetesClientSet() (*kubernetes.Clientset, error) {
-	fakeClient := f.Client.(*fake.RESTClient)
-	clientset := kubernetes.NewForConfigOrDie(f.ClientConfigVal)
-
-	clientset.CoreV1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.AuthorizationV1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.AuthorizationV1beta1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.AuthorizationV1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.AuthorizationV1beta1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.AutoscalingV1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.AutoscalingV2beta1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.BatchV1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.CertificatesV1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.CertificatesV1beta1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.ExtensionsV1beta1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.RbacV1alpha1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.RbacV1beta1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.StorageV1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.StorageV1beta1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.AppsV1beta1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.AppsV1beta2().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.AppsV1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.PolicyV1beta1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.PolicyV1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.DiscoveryClient.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-
-	return clientset, nil
-}
-
 // DynamicClient returns a dynamic client from TestFactory
 func (f *TestFactory) DynamicClient() (dynamic.Interface, error) {
 	if f.FakeDynamicClient != nil {
 		return f.FakeDynamicClient, nil
 	}
 	return f.Factory.DynamicClient()
-}
-
-// RESTClient returns a REST client from TestFactory
-func (f *TestFactory) RESTClient() (*restclient.RESTClient, error) {
-	// Swap out the HTTP client out of the client with the fake's version.
-	fakeClient := f.Client.(*fake.RESTClient)
-	restClient, err := restclient.RESTClientFor(f.ClientConfigVal)
-	if err != nil {
-		panic(err)
-	}
-	restClient.Client = fakeClient.Client
-	return restClient, nil
 }
 
 // DiscoveryClient returns a discovery client from TestFactory
