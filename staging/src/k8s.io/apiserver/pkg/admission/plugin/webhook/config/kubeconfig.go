@@ -29,6 +29,7 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission"
 	v1 "k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission/v1"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission/v1alpha1"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission/v2alpha1"
 )
 
 var (
@@ -40,32 +41,34 @@ func init() {
 	utilruntime.Must(webhookadmission.AddToScheme(scheme))
 	utilruntime.Must(v1.AddToScheme(scheme))
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
+	utilruntime.Must(v2alpha1.AddToScheme(scheme))
 }
 
-// LoadConfig extract the KubeConfigFile from configFile
-func LoadConfig(configFile io.Reader) (string, error) {
-	var kubeconfigFile string
-	if configFile != nil {
-		// we have a config so parse it.
-		data, err := ioutil.ReadAll(configFile)
-		if err != nil {
-			return "", err
-		}
-		decoder := codecs.UniversalDecoder()
-		decodedObj, err := runtime.Decode(decoder, data)
-		if err != nil {
-			return "", err
-		}
-		config, ok := decodedObj.(*webhookadmission.WebhookAdmission)
-		if !ok {
-			return "", fmt.Errorf("unexpected type: %T", decodedObj)
-		}
+// LoadConfig unmarshalls the WebhookAdmission config.
+func LoadConfig(configFile io.Reader) (*webhookadmission.WebhookAdmission, error) {
 
-		if len(config.KubeConfigFile) > 0 && !path.IsAbs(config.KubeConfigFile) {
-			return "", field.Invalid(field.NewPath("kubeConfigFile"), config.KubeConfigFile, "must be an absolute file path")
-		}
-
-		kubeconfigFile = config.KubeConfigFile
+	if configFile == nil {
+		return &webhookadmission.WebhookAdmission{}, nil
 	}
-	return kubeconfigFile, nil
+
+	// we have a config so parse it.
+	data, err := ioutil.ReadAll(configFile)
+	if err != nil {
+		return nil, err
+	}
+	decoder := codecs.UniversalDecoder()
+	decodedObj, err := runtime.Decode(decoder, data)
+	if err != nil {
+		return nil, err
+	}
+	config, ok := decodedObj.(*webhookadmission.WebhookAdmission)
+	if !ok {
+		return nil, fmt.Errorf("unexpected type: %T", decodedObj)
+	}
+
+	if len(config.KubeConfigFile) > 0 && !path.IsAbs(config.KubeConfigFile) {
+		return nil, field.Invalid(field.NewPath("kubeConfigFile"), config.KubeConfigFile, "must be an absolute file path")
+	}
+
+	return config, nil
 }
