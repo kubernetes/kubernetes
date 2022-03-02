@@ -19,6 +19,7 @@ package attach
 import (
 	"fmt"
 	"io"
+	"net/http"
 	"net/url"
 	"time"
 
@@ -83,6 +84,7 @@ type AttachOptions struct {
 	Attach        RemoteAttach
 	GetPodTimeout time.Duration
 	Config        *restclient.Config
+	HttpClient    *http.Client
 }
 
 // NewAttachOptions creates the options for attach
@@ -128,7 +130,7 @@ type RemoteAttach interface {
 // DefaultAttachFunc is the default AttachFunc used
 func DefaultAttachFunc(o *AttachOptions, containerToAttach *corev1.Container, raw bool, sizeQueue remotecommand.TerminalSizeQueue) func() error {
 	return func() error {
-		restClient, err := restclient.RESTClientFor(o.Config)
+		restClient, err := restclient.RESTClientForConfigAndClient(o.Config, o.HttpClient)
 		if err != nil {
 			return err
 		}
@@ -191,6 +193,11 @@ func (o *AttachOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []s
 		return err
 	}
 	o.Config = config
+
+	o.HttpClient, err = f.ToHTTPClient()
+	if err != nil {
+		return err
+	}
 
 	if o.CommandName == "" {
 		o.CommandName = cmd.CommandPath()

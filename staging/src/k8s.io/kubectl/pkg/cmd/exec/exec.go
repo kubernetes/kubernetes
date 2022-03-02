@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http"
 	"net/url"
 	"time"
 
@@ -167,6 +168,7 @@ type ExecOptions struct {
 	PodClient     coreclient.PodsGetter
 	GetPodTimeout time.Duration
 	Config        *restclient.Config
+	HttpClient    *http.Client
 }
 
 // Complete verifies command line arguments and loads data from the command environment
@@ -206,6 +208,11 @@ func (p *ExecOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn []s
 	p.restClientGetter = f
 
 	p.Config, err = f.ToRESTConfig()
+	if err != nil {
+		return err
+	}
+
+	p.HttpClient, err = f.ToHTTPClient()
 	if err != nil {
 		return err
 	}
@@ -345,7 +352,7 @@ func (p *ExecOptions) Run() error {
 	}
 
 	fn := func() error {
-		restClient, err := restclient.RESTClientFor(p.Config)
+		restClient, err := restclient.RESTClientForConfigAndClient(p.Config, p.HttpClient)
 		if err != nil {
 			return err
 		}
