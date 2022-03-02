@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -60,6 +61,8 @@ type Builder struct {
 	clientConfigFn ClientConfigFunc
 
 	restMapperFn RESTMapperFunc
+
+	httpClientFn HTTPClientFunc
 
 	// objectTyper is statically determinant per-command invocation based on your internal or unstructured choice
 	// it does not ever need to rely upon discovery.
@@ -166,7 +169,7 @@ type resourceTuple struct {
 type FakeClientFunc func(version schema.GroupVersion) (RESTClient, error)
 
 func NewFakeBuilder(fakeClientFn FakeClientFunc, restMapper RESTMapperFunc, categoryExpander CategoryExpanderFunc) *Builder {
-	ret := newBuilder(nil, restMapper, categoryExpander)
+	ret := newBuilder(nil, restMapper, nil, categoryExpander)
 	ret.fakeClientFn = fakeClientFn
 	return ret
 }
@@ -175,10 +178,11 @@ func NewFakeBuilder(fakeClientFn FakeClientFunc, restMapper RESTMapperFunc, cate
 // internal or unstructured must be specified.
 // TODO: Add versioned client (although versioned is still lossy)
 // TODO remove internal and unstructured mapper and instead have them set the negotiated serializer for use in the client
-func newBuilder(clientConfigFn ClientConfigFunc, restMapper RESTMapperFunc, categoryExpander CategoryExpanderFunc) *Builder {
+func newBuilder(clientConfigFn ClientConfigFunc, restMapper RESTMapperFunc, httpClientFn HTTPClientFunc, categoryExpander CategoryExpanderFunc) *Builder {
 	return &Builder{
 		clientConfigFn:     clientConfigFn,
 		restMapperFn:       restMapper,
+		httpClientFn:       httpClientFn,
 		categoryExpanderFn: categoryExpander,
 		requireObject:      true,
 	}
@@ -195,6 +199,9 @@ func (noopClientGetter) ToDiscoveryClient() (discovery.CachedDiscoveryInterface,
 	return nil, fmt.Errorf("local operation only")
 }
 func (noopClientGetter) ToRESTMapper() (meta.RESTMapper, error) {
+	return nil, fmt.Errorf("local operation only")
+}
+func (noopClientGetter) ToHTTPClient() (*http.Client, error) {
 	return nil, fmt.Errorf("local operation only")
 }
 
@@ -215,6 +222,7 @@ func NewBuilder(restClientGetter RESTClientGetter) *Builder {
 	return newBuilder(
 		restClientGetter.ToRESTConfig,
 		restClientGetter.ToRESTMapper,
+		restClientGetter.ToHTTPClient,
 		(&cachingCategoryExpanderFunc{delegate: categoryExpanderFn}).ToCategoryExpander,
 	)
 }
@@ -950,9 +958,9 @@ func (b *Builder) getClient(gv schema.GroupVersion) (RESTClient, error) {
 	case b.fakeClientFn != nil:
 		client, err = b.fakeClientFn(gv)
 	case b.negotiatedSerializer != nil:
-		client, err = b.clientConfigFn.withStdinUnavailable(b.stdinInUse).clientForGroupVersion(gv, b.negotiatedSerializer)
+		client, err = b.clientConfigFn.withStdinUnavailable(b.stdinInUse).clientForGroupVersion(b.httpClientFn, gv, b.negotiatedSerializer)
 	default:
-		client, err = b.clientConfigFn.withStdinUnavailable(b.stdinInUse).unstructuredClientForGroupVersion(gv)
+		client, err = b.clientConfigFn.withStdinUnavailable(b.stdinInUse).unstructuredClientForGroupVersion(b.httpClientFn, gv)
 	}
 
 	if err != nil {

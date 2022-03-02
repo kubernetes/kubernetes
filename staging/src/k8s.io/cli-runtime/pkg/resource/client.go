@@ -23,8 +23,12 @@ import (
 )
 
 // TODO require negotiatedSerializer.  leaving it optional lets us plumb current behavior and deal with the difference after major plumbing is complete
-func (clientConfigFn ClientConfigFunc) clientForGroupVersion(gv schema.GroupVersion, negotiatedSerializer runtime.NegotiatedSerializer) (RESTClient, error) {
+func (clientConfigFn ClientConfigFunc) clientForGroupVersion(httpClientFn HTTPClientFunc, gv schema.GroupVersion, negotiatedSerializer runtime.NegotiatedSerializer) (RESTClient, error) {
 	cfg, err := clientConfigFn()
+	if err != nil {
+		return nil, err
+	}
+	client, err := httpClientFn()
 	if err != nil {
 		return nil, err
 	}
@@ -38,11 +42,15 @@ func (clientConfigFn ClientConfigFunc) clientForGroupVersion(gv schema.GroupVers
 		cfg.APIPath = "/apis"
 	}
 
-	return rest.RESTClientFor(cfg)
+	return rest.RESTClientForConfigAndClient(cfg, client)
 }
 
-func (clientConfigFn ClientConfigFunc) unstructuredClientForGroupVersion(gv schema.GroupVersion) (RESTClient, error) {
+func (clientConfigFn ClientConfigFunc) unstructuredClientForGroupVersion(httpClientFn HTTPClientFunc, gv schema.GroupVersion) (RESTClient, error) {
 	cfg, err := clientConfigFn()
+	if err != nil {
+		return nil, err
+	}
+	client, err := httpClientFn()
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +62,7 @@ func (clientConfigFn ClientConfigFunc) unstructuredClientForGroupVersion(gv sche
 		cfg.APIPath = "/apis"
 	}
 
-	return rest.RESTClientFor(cfg)
+	return rest.RESTClientForConfigAndClient(cfg, client)
 }
 
 func (clientConfigFn ClientConfigFunc) withStdinUnavailable(stdinUnavailable bool) ClientConfigFunc {
