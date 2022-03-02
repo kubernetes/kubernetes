@@ -17,7 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -165,9 +165,8 @@ type VolumeError struct {
 //
 // The producer of these objects can decide which approach is more suitable.
 //
-// They are consumed by the kube-scheduler if the CSIStorageCapacity beta feature gate
-// is enabled there and a CSI driver opts into capacity-aware scheduling with
-// CSIDriver.StorageCapacity.
+// They are consumed by the kube-scheduler if a CSI driver opts into
+// capacity-aware scheduling with CSIDriverSpec.StorageCapacity.
 type CSIStorageCapacity struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata. The name has no particular meaning. It must be
