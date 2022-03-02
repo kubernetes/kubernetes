@@ -78,7 +78,7 @@ type ComponentConfigVersionState struct {
 type UpgradePlan struct {
 	metav1.TypeMeta
 
-	Components []ComponentUpgradePlan
+	Components []*ComponentUpgradePlan
 
 	ConfigVersions []ComponentConfigVersionState
 }

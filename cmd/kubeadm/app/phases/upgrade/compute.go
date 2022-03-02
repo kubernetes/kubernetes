@@ -26,6 +26,7 @@ import (
 
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
 // Upgrade defines an upgrade possibility to upgrade from a current version to a new one
@@ -72,7 +73,9 @@ type ClusterState struct {
 
 // GetAvailableUpgrades fetches all versions from the specified VersionGetter and computes which
 // kinds of upgrades can be performed
-func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesAllowed, rcUpgradesAllowed, externalEtcd bool, client clientset.Interface, manifestsDir string) ([]Upgrade, error) {
+func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesAllowed, rcUpgradesAllowed, externalEtcd bool, client clientset.Interface, manifestsDir string, printer output.Printer) ([]Upgrade, error) {
+	printer.Printf("[upgrade] Fetching available versions to upgrade to\n")
+
 	// Collect the upgrades kubeadm can do in this list
 	upgrades := []Upgrade{}
 
@@ -81,14 +84,14 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 	if err != nil {
 		return upgrades, err
 	}
-	fmt.Printf("[upgrade/versions] Cluster version: %s\n", clusterVersionStr)
+	printer.Printf("[upgrade/versions] Cluster version: %s\n", clusterVersionStr)
 
 	// Get current kubeadm CLI version
 	kubeadmVersionStr, kubeadmVersion, err := versionGetterImpl.KubeadmVersion()
 	if err != nil {
 		return upgrades, err
 	}
-	fmt.Printf("[upgrade/versions] kubeadm version: %s\n", kubeadmVersionStr)
+	printer.Printf("[upgrade/versions] kubeadm version: %s\n", kubeadmVersionStr)
 
 	// Get and output the current latest stable version
 	stableVersionStr, stableVersion, err := versionGetterImpl.VersionFromCILabel("stable", "stable version")
@@ -97,7 +100,7 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 		klog.Warningf("[upgrade/versions] WARNING: Falling back to current kubeadm version as latest stable version")
 		stableVersionStr, stableVersion = kubeadmVersionStr, kubeadmVersion
 	} else {
-		fmt.Printf("[upgrade/versions] Target version: %s\n", stableVersionStr)
+		printer.Printf("[upgrade/versions] Target version: %s\n", stableVersionStr)
 	}
 
 	// Get the kubelet versions in the cluster
@@ -146,7 +149,7 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 		if err != nil {
 			klog.Warningf("[upgrade/versions] WARNING: %v\n", err)
 		} else {
-			fmt.Printf("[upgrade/versions] Latest %s: %s\n", description, patchVersionStr)
+			printer.Printf("[upgrade/versions] Latest %s: %s\n", description, patchVersionStr)
 
 			// Check if a minor version upgrade is possible when a patch release exists
 			// It's only possible if the latest patch version is higher than the current patch version
@@ -263,6 +266,9 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 			})
 		}
 	}
+
+	// Add a newline in the end of this output to leave some space to the next output section
+	printer.Printf("\n")
 
 	return upgrades, nil
 }

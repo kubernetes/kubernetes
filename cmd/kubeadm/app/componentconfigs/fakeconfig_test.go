@@ -35,7 +35,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
-	outputapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/output"
+	outputapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/v1alpha2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
@@ -615,12 +615,12 @@ func TestFetchFromClusterWithLocalOverwrites(t *testing.T) {
 
 func TestGetVersionStates(t *testing.T) {
 	fakeKnownContext(func() {
-		versionStateCurrent := outputapi.ComponentConfigVersionState{
+		versionStateCurrent := outputapiv1alpha2.ComponentConfigVersionState{
 			Group:            kubeadmapiv1.GroupName,
 			CurrentVersion:   currentClusterConfigVersion,
 			PreferredVersion: currentClusterConfigVersion,
 		}
-		versionStateOld := outputapi.ComponentConfigVersionState{
+		versionStateOld := outputapiv1alpha2.ComponentConfigVersionState{
 			Group:                 kubeadmapiv1.GroupName,
 			CurrentVersion:        oldClusterConfigVersion,
 			PreferredVersion:      currentClusterConfigVersion,
@@ -631,7 +631,7 @@ func TestGetVersionStates(t *testing.T) {
 			desc     string
 			obj      runtime.Object
 			config   string
-			expected outputapi.ComponentConfigVersionState
+			expected outputapiv1alpha2.ComponentConfigVersionState
 		}{
 			{
 				desc:     "appropriate cluster object without overwrite",
@@ -687,7 +687,7 @@ func TestGetVersionStates(t *testing.T) {
 			{
 				desc: "old signed config without an overwrite",
 				obj:  testClusterConfigMap(oldFooClusterConfig, true),
-				expected: outputapi.ComponentConfigVersionState{
+				expected: outputapiv1alpha2.ComponentConfigVersionState{
 					Group:            kubeadmapiv1.GroupName,
 					CurrentVersion:   "", // The config is treated as if it's missing
 					PreferredVersion: currentClusterConfigVersion,

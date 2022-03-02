@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
 func TestSortedSliceFromStringIntMap(t *testing.T) {
@@ -441,13 +442,19 @@ _____________________________________________________________________
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
 			rt.buf = bytes.NewBufferString("")
+			outputFlags := newUpgradePlanPrintFlags(output.TextOutput)
+			printer, err := outputFlags.ToPrinter()
+			if err != nil {
+				t.Errorf("failed ToPrinter, err: %+v", err)
+			}
+
 			// Generate and print upgrade plans
 			for _, up := range rt.upgrades {
 				plan, unstableVersionFlag, err := genUpgradePlan(&up, rt.externalEtcd)
 				if err != nil {
 					t.Errorf("failed genUpgradePlan, err: %+v", err)
 				}
-				printUpgradePlan(&up, plan, unstableVersionFlag, rt.externalEtcd, rt.buf)
+				printUpgradePlan(&up, plan, unstableVersionFlag, rt.externalEtcd, rt.buf, printer)
 			}
 			actualBytes := rt.buf.Bytes()
 			if !bytes.Equal(actualBytes, rt.expectedBytes) {
@@ -456,6 +463,167 @@ _____________________________________________________________________
 					string(rt.expectedBytes),
 					string(actualBytes),
 				)
+			}
+		})
+	}
+}
+
+func TestPrintAvailableUpgradesStructured(t *testing.T) {
+	upgrades := []upgrade.Upgrade{
+		{
+			Description: "version in the v1.8 series",
+			Before: upgrade.ClusterState{
+				KubeVersion: "v1.8.1",
+				KubeletVersions: map[string]uint16{
+					"v1.8.1": 1,
+				},
+				KubeadmVersion: "v1.8.2",
+				DNSVersion:     "1.14.5",
+				EtcdVersion:    "3.0.17",
+			},
+			After: upgrade.ClusterState{
+				KubeVersion:    "v1.8.3",
+				KubeadmVersion: "v1.8.3",
+				DNSVersion:     "1.14.5",
+				EtcdVersion:    "3.0.17",
+			},
+		},
+	}
+
+	var tests = []struct {
+		name         string
+		outputFormat string
+		buf          *bytes.Buffer
+		expected     string
+		externalEtcd bool
+	}{
+		{
+			name:         "JSON output",
+			outputFormat: "json",
+			expected: `{
+    "kind": "UpgradePlan",
+    "apiVersion": "output.kubeadm.k8s.io/v1alpha2",
+    "components": [
+        {
+            "name": "kubelet",
+            "currentVersion": "1 x v1.8.1",
+            "newVersion": "v1.8.3"
+        },
+        {
+            "name": "kube-apiserver",
+            "currentVersion": "v1.8.1",
+            "newVersion": "v1.8.3"
+        },
+        {
+            "name": "kube-controller-manager",
+            "currentVersion": "v1.8.1",
+            "newVersion": "v1.8.3"
+        },
+        {
+            "name": "kube-scheduler",
+            "currentVersion": "v1.8.1",
+            "newVersion": "v1.8.3"
+        },
+        {
+            "name": "kube-proxy",
+            "currentVersion": "v1.8.1",
+            "newVersion": "v1.8.3"
+        },
+        {
+            "name": "CoreDNS",
+            "currentVersion": "1.14.5",
+            "newVersion": "1.14.5"
+        },
+        {
+            "name": "etcd",
+            "currentVersion": "3.0.17",
+            "newVersion": "3.0.17"
+        }
+    ],
+    "configVersions": null
+}
+`,
+		},
+		{
+			name:         "YAML output",
+			outputFormat: "yaml",
+			expected: `apiVersion: output.kubeadm.k8s.io/v1alpha2
+components:
+- currentVersion: 1 x v1.8.1
+  name: kubelet
+  newVersion: v1.8.3
+- currentVersion: v1.8.1
+  name: kube-apiserver
+  newVersion: v1.8.3
+- currentVersion: v1.8.1
+  name: kube-controller-manager
+  newVersion: v1.8.3
+- currentVersion: v1.8.1
+  name: kube-scheduler
+  newVersion: v1.8.3
+- currentVersion: v1.8.1
+  name: kube-proxy
+  newVersion: v1.8.3
+- currentVersion: 1.14.5
+  name: CoreDNS
+  newVersion: 1.14.5
+- currentVersion: 3.0.17
+  name: etcd
+  newVersion: 3.0.17
+configVersions: null
+kind: UpgradePlan
+`,
+		},
+		{
+			name:         "Text output",
+			outputFormat: "Text",
+			expected: `Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':
+COMPONENT   CURRENT      TARGET
+kubelet     1 x v1.8.1   v1.8.3
+
+Upgrade to the latest version in the v1.8 series:
+
+COMPONENT                 CURRENT   TARGET
+kube-apiserver            v1.8.1    v1.8.3
+kube-controller-manager   v1.8.1    v1.8.3
+kube-scheduler            v1.8.1    v1.8.3
+kube-proxy                v1.8.1    v1.8.3
+CoreDNS                   1.14.5    1.14.5
+etcd                      3.0.17    3.0.17
+
+You can now apply the upgrade by executing the following command:
+
+	kubeadm upgrade apply v1.8.3
+
+Note: Before you can perform this upgrade, you have to update kubeadm to v1.8.3.
+
+_____________________________________________________________________
+
+`,
+		},
+	}
+
+	for _, rt := range tests {
+		t.Run(rt.name, func(t *testing.T) {
+			rt.buf = bytes.NewBufferString("")
+			outputFlags := newUpgradePlanPrintFlags(rt.outputFormat)
+			printer, err := outputFlags.ToPrinter()
+			if err != nil {
+				t.Errorf("failed ToPrinter, err: %+v", err)
+			}
+
+			// Generate and print upgrade plans
+			for _, up := range upgrades {
+				plan, unstableVersionFlag, err := genUpgradePlan(&up, rt.externalEtcd)
+				if err != nil {
+					t.Errorf("failed genUpgradePlan, err: %+v", err)
+				}
+				printUpgradePlan(&up, plan, unstableVersionFlag, rt.externalEtcd, rt.buf, printer)
+			}
+
+			actual := rt.buf.String()
+			if actual != rt.expected {
+				t.Errorf("failed PrintAvailableUpgrades:\n\nexpected:\n%s\n\nactual:\n%s", rt.expected, actual)
 			}
 		})
 	}

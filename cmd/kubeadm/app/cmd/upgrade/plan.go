@@ -35,7 +35,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	outputapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/output"
 	outputapischeme "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/scheme"
 	outputapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/v1alpha2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
@@ -77,9 +76,9 @@ func newCmdPlan(apf *applyPlanFlags) *cobra.Command {
 	return cmd
 }
 
-// newComponentUpgradePlan helper creates outputapiv1alpha1.ComponentUpgradePlan object
-func newComponentUpgradePlan(name, currentVersion, newVersion string) outputapi.ComponentUpgradePlan {
-	return outputapi.ComponentUpgradePlan{
+// newComponentUpgradePlan helper creates outputapiv1alpha2.ComponentUpgradePlan object
+func newComponentUpgradePlan(name, currentVersion, newVersion string) *outputapiv1alpha2.ComponentUpgradePlan {
+	return &outputapiv1alpha2.ComponentUpgradePlan{
 		Name:           name,
 		CurrentVersion: currentVersion,
 		NewVersion:     newVersion,
@@ -151,7 +150,7 @@ func (pf *upgradePlanJSONYamlPrintFlags) AllowedFormats() []string {
 // upgradePlanJSONYAMLPrinter prints upgrade plan in a JSON or YAML format
 type upgradePlanJSONYAMLPrinter struct {
 	output.ResourcePrinterWrapper
-	Buffer []outputapiv1alpha2.ComponentUpgradePlan
+	Buffer []*outputapiv1alpha2.ComponentUpgradePlan
 }
 
 // newUpgradePlanJSONYAMLPrinter creates new upgradePlanJSONYAMLPrinter object
@@ -168,15 +167,16 @@ func (p *upgradePlanJSONYAMLPrinter) PrintObj(obj runtime.Object, writer io.Writ
 	if !ok {
 		return fmt.Errorf("expected ComponentUpgradePlan, but got %+v", obj)
 	}
-	p.Buffer = append(p.Buffer, *item)
+	p.Buffer = append(p.Buffer, item)
 	return nil
 }
 
 // Close writes any buffered data and empties list of buffered components
 func (p *upgradePlanJSONYAMLPrinter) Close(writer io.Writer) {
 	plan := &outputapiv1alpha2.UpgradePlan{Components: p.Buffer}
+	// p.ResourcePrinterWrapper.Printer.PrintObj(plan, writer)
 	p.Printer.PrintObj(plan, writer)
-	p.Buffer = []outputapiv1alpha2.ComponentUpgradePlan{}
+	p.Buffer = []*outputapiv1alpha2.ComponentUpgradePlan{}
 }
 
 // upgradePlanTextPrinter prints upgrade plan in a text form
@@ -226,9 +226,9 @@ func (pf *upgradePlanTextPrintFlags) AllowedFormats() []string {
 // ToPrinter returns kubeadm printer for the text output format
 func (pf *upgradePlanTextPrintFlags) ToPrinter(outputFormat string) (output.Printer, error) {
 	if outputFormat == output.TextOutput {
-		return &upgradePlanTextPrinter{columns: []string{"COMPONENT", "CURRENT", "AVAILABLE"}}, nil
+		return &upgradePlanTextPrinter{columns: []string{"COMPONENT", "CURRENT", "TARGET"}}, nil
 	}
-	return nil, genericclioptions.NoCompatiblePrinterError{OutputFormat: &outputFormat, AllowedFormats: []string{output.TextOutput}}
+	return nil, genericclioptions.NoCompatiblePrinterError{OutputFormat: &outputFormat, AllowedFormats: []string{output.JSONOutput, output.YAMLOutput, output.TextOutput}}
 }
 
 // runPlan takes care of outputting available versions to upgrade to for the user
@@ -247,8 +247,7 @@ func runPlan(flags *planFlags, args []string, printer output.Printer) error {
 
 	// Compute which upgrade possibilities there are
 	klog.V(1).Infoln("[upgrade/plan] computing upgrade possibilities")
-	klog.V(1).Infoln("[upgrade/plan] Fetching available versions to upgrade to")
-	availUpgrades, err := upgrade.GetAvailableUpgrades(versionGetter, flags.allowExperimentalUpgrades, flags.allowRCUpgrades, isExternalEtcd, client, constants.GetStaticPodDirectory())
+	availUpgrades, err := upgrade.GetAvailableUpgrades(versionGetter, flags.allowExperimentalUpgrades, flags.allowRCUpgrades, isExternalEtcd, client, constants.GetStaticPodDirectory(), printer)
 	if err != nil {
 		return errors.Wrap(err, "[upgrade/versions] FATAL")
 	}
@@ -291,7 +290,7 @@ func runPlan(flags *planFlags, args []string, printer output.Printer) error {
 
 // TODO There is currently no way to cleanly output upgrades that involve adding, removing, or changing components
 // https://github.com/kubernetes/kubeadm/issues/810 was created to track addressing this.
-func appendDNSComponent(components []outputapi.ComponentUpgradePlan, up *upgrade.Upgrade, name string) []outputapi.ComponentUpgradePlan {
+func appendDNSComponent(components []*outputapiv1alpha2.ComponentUpgradePlan, up *upgrade.Upgrade, name string) []*outputapiv1alpha2.ComponentUpgradePlan {
 	beforeVersion := up.Before.DNSVersion
 	afterVersion := up.After.DNSVersion
 
@@ -302,7 +301,7 @@ func appendDNSComponent(components []outputapi.ComponentUpgradePlan, up *upgrade
 }
 
 // genUpgradePlan generates output-friendly upgrade plan out of upgrade.Upgrade structure
-func genUpgradePlan(up *upgrade.Upgrade, isExternalEtcd bool) (*outputapi.UpgradePlan, string, error) {
+func genUpgradePlan(up *upgrade.Upgrade, isExternalEtcd bool) (*outputapiv1alpha2.UpgradePlan, string, error) {
 	newK8sVersion, err := version.ParseSemantic(up.After.KubeVersion)
 	if err != nil {
 		return nil, "", errors.Wrapf(err, "Unable to parse normalized version %q as a semantic version", up.After.KubeVersion)
@@ -317,7 +316,7 @@ func genUpgradePlan(up *upgrade.Upgrade, isExternalEtcd bool) (*outputapi.Upgrad
 		}
 	}
 
-	components := []outputapi.ComponentUpgradePlan{}
+	components := []*outputapiv1alpha2.ComponentUpgradePlan{}
 
 	if up.CanUpgradeKubelets() {
 		// The map is of the form <old-version>:<node-count>. Here all the keys are put into a slice and sorted
@@ -339,10 +338,10 @@ func genUpgradePlan(up *upgrade.Upgrade, isExternalEtcd bool) (*outputapi.Upgrad
 		components = append(components, newComponentUpgradePlan(constants.Etcd, up.Before.EtcdVersion, up.After.EtcdVersion))
 	}
 
-	return &outputapi.UpgradePlan{Components: components}, unstableVersionFlag, nil
+	return &outputapiv1alpha2.UpgradePlan{Components: components}, unstableVersionFlag, nil
 }
 
-func getComponentConfigVersionStates(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interface, cfgPath string) ([]outputapi.ComponentConfigVersionState, error) {
+func getComponentConfigVersionStates(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interface, cfgPath string) ([]outputapiv1alpha2.ComponentConfigVersionState, error) {
 	docmap := kubeadmapi.DocumentMap{}
 
 	if cfgPath != "" {
@@ -361,16 +360,7 @@ func getComponentConfigVersionStates(cfg *kubeadmapi.ClusterConfiguration, clien
 }
 
 // printUpgradePlan prints a UX-friendly overview of what versions are available to upgrade to
-func printUpgradePlan(up *upgrade.Upgrade, plan *outputapi.UpgradePlan, unstableVersionFlag string, isExternalEtcd bool, w io.Writer, printer output.Printer) {
-	// The tab writer writes to the "real" writer w
-	tabw := tabwriter.NewWriter(w, 10, 4, 3, ' ', 0)
-
-	// endOfTable helper function flashes table writer
-	endOfTable := func() {
-		tabw.Flush()
-		printer.Fprintln(w, "")
-	}
-
+func printUpgradePlan(up *upgrade.Upgrade, plan *outputapiv1alpha2.UpgradePlan, unstableVersionFlag string, isExternalEtcd bool, writer io.Writer, printer output.Printer) {
 	printHeader := true
 	printManualUpgradeHeader := true
 	for _, component := range plan.Components {
@@ -379,41 +369,40 @@ func printUpgradePlan(up *upgrade.Upgrade, plan *outputapi.UpgradePlan, unstable
 			continue
 		} else if component.Name == constants.Kubelet {
 			if printManualUpgradeHeader {
-				printer.Fprintln(w, "Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':")
-				printer.Fprintln(tabw, "COMPONENT\tCURRENT\tTARGET")
-				printer.Fprintf(tabw, "%s\t%s\t%s\n", component.Name, component.CurrentVersion, component.NewVersion)
+				printer.Fprintln(writer, "Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':")
+				printer.PrintObj(newComponentUpgradePlan(component.Name, component.CurrentVersion, component.NewVersion), writer)
 				printManualUpgradeHeader = false
 			} else {
-				printer.Fprintf(tabw, "%s\t%s\t%s\n", "", component.CurrentVersion, component.NewVersion)
+				printer.PrintObj(newComponentUpgradePlan("", component.CurrentVersion, component.NewVersion), writer)
 			}
 		} else {
 			if printHeader {
 				// End of manual upgrades table
-				endOfTable()
+				printer.Flush(writer)
 
-				printer.Fprintf(w, "Upgrade to the latest %s:\n", up.Description)
-				printer.Fprintln(w, "")
-				printer.Fprintln(tabw, "COMPONENT\tCURRENT\tTARGET")
+				printer.Fprintln(writer, "")
+				printer.Fprintf(writer, "Upgrade to the latest %s:\n", up.Description)
+				printer.Fprintln(writer, "")
 				printHeader = false
 			}
-			printer.Fprintf(tabw, "%s\t%s\t%s\n", component.Name, component.CurrentVersion, component.NewVersion)
+			printer.PrintObj(newComponentUpgradePlan(component.Name, component.CurrentVersion, component.NewVersion), writer)
 		}
 	}
-	// End of control plane table
-	endOfTable()
+	printer.Flush(writer)
+	printer.Fprintln(writer, "")
 
-	//fmt.Fprintln(w, "")
-	printer.Fprintln(w, "You can now apply the upgrade by executing the following command:")
-	printer.Fprintln(w, "")
-	printer.Fprintf(w, "\tkubeadm upgrade apply %s%s\n", up.After.KubeVersion, unstableVersionFlag)
-	printer.Fprintln(w, "")
+	printer.Fprintln(writer, "You can now apply the upgrade by executing the following command:")
+	printer.Fprintln(writer, "")
+	printer.Fprintf(writer, "\tkubeadm upgrade apply %s%s\n", up.After.KubeVersion, unstableVersionFlag)
+	printer.Fprintln(writer, "")
 
 	if up.Before.KubeadmVersion != up.After.KubeadmVersion {
-		printer.Fprintf(w, "Note: Before you can perform this upgrade, you have to update kubeadm to %s.\n", up.After.KubeadmVersion)
-		printer.Fprintln(w, "")
+		printer.Fprintf(writer, "Note: Before you can perform this upgrade, you have to update kubeadm to %s.\n", up.After.KubeadmVersion)
+		printer.Fprintln(writer, "")
 	}
 
-	printLineSeparator(w, printer)
+	printLineSeparator(writer, printer)
+	printer.Close(writer)
 }
 
 // sortedSliceFromStringIntMap returns a slice of the keys in the map sorted alphabetically
@@ -445,7 +434,7 @@ func printLineSeparator(w io.Writer, printer output.Printer) {
 	printer.Fprintln(w, "")
 }
 
-func printComponentConfigVersionStates(versionStates []outputapi.ComponentConfigVersionState, w io.Writer, printer output.Printer) {
+func printComponentConfigVersionStates(versionStates []outputapiv1alpha2.ComponentConfigVersionState, w io.Writer, printer output.Printer) {
 	if len(versionStates) == 0 {
 		printer.Fprintln(w, "No information available on component configs.")
 		return
