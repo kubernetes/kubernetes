@@ -151,6 +151,13 @@ func (t Time) MarshalJSON() ([]byte, error) {
 	return buf, nil
 }
 
+func (this *Time) String() string {
+	if this == nil {
+		return `"null"`
+	}
+	return this.Time.UTC().String()
+}
+
 // ToUnstructured implements the value.UnstructuredConverter interface.
 func (t Time) ToUnstructured() interface{} {
 	if t.IsZero() {

@@ -54,28 +54,31 @@ func (v *Error) ErrorBody() string {
 		valueType := reflect.TypeOf(value)
 		if value == nil || valueType == nil {
 			value = "null"
+		} else if vs, ok := value.(fmt.Stringer); ok {
+			s = fmt.Sprintf("%s: %s", v.Type, vs.String())
 		} else if valueType.Kind() == reflect.Ptr {
 			if reflectValue := reflect.ValueOf(value); reflectValue.IsNil() {
 				value = "null"
 			} else {
 				value = reflectValue.Elem().Interface()
 			}
-		}
-		switch t := value.(type) {
-		case int64, int32, float64, float32, bool:
-			// use simple printer for simple types
-			s = fmt.Sprintf("%s: %v", v.Type, value)
-		case string:
-			s = fmt.Sprintf("%s: %q", v.Type, t)
-		case fmt.Stringer:
-			// anything that defines String() is better than raw struct
-			s = fmt.Sprintf("%s: %s", v.Type, t.String())
-		default:
-			// fallback to raw struct
-			// TODO: internal types have panic guards against json.Marshalling to prevent
-			// accidental use of internal types in external serialized form.  For now, use
-			// %#v, although it would be better to show a more expressive output in the future
-			s = fmt.Sprintf("%s: %#v", v.Type, value)
+
+			switch t := value.(type) {
+			case int64, int32, float64, float32, bool:
+				// use simple printer for simple types
+				s = fmt.Sprintf("%s: %v", v.Type, value)
+			case string:
+				s = fmt.Sprintf("%s: %q", v.Type, t)
+			case fmt.Stringer:
+				// anything that defines String() is better than raw struct
+				s = fmt.Sprintf("%s: %s", v.Type, t.String())
+			default:
+				// fallback to raw struct
+				// TODO: internal types have panic guards against json.Marshalling to prevent
+				// accidental use of internal types in external serialized form.  For now, use
+				// %#v, although it would be better to show a more expressive output in the future
+				s = fmt.Sprintf("%s: %#v", v.Type, value)
+			}
 		}
 	}
 	if len(v.Detail) != 0 {
