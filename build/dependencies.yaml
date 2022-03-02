@@ -152,6 +152,12 @@ dependencies:
   - name: "k8s.gcr.io/pause: dependents"
     version: 3.6
     refPaths:
+    - path: cluster/gce/config-common.sh
+      match: k8s.gcr.io\/pause:\d+\.\d+
+    - path: cluster/gce/gci/configure-helper.sh
+      match: k8s.gcr.io\/pause:\d+\.\d+
+    - path: cluster/gce/windows/smoke-test.sh
+      match: k8s.gcr.io\/pause:\d+\.\d+
     - path: cmd/kubeadm/app/constants/constants.go
       match: PauseVersion\s+=
     - path: cmd/kubeadm/app/util/template_test.go
