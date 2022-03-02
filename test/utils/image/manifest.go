@@ -17,9 +17,13 @@ limitations under the License.
 package image
 
 import (
+	"bufio"
+	"bytes"
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"regexp"
 	"strings"
@@ -72,9 +76,20 @@ func initReg() RegistryList {
 		return registry
 	}
 
-	fileContent, err := os.ReadFile(repoList)
-	if err != nil {
-		panic(fmt.Errorf("Error reading '%v' file contents: %v", repoList, err))
+	var fileContent []byte
+	var err error
+	if strings.HasPrefix(repoList, "https://") || strings.HasPrefix(repoList, "http://") {
+		var b bytes.Buffer
+		err = readFromURL(repoList, bufio.NewWriter(&b))
+		if err != nil {
+			panic(fmt.Errorf("error reading '%v' url contents: %v", repoList, err))
+		}
+		fileContent = b.Bytes()
+	} else {
+		fileContent, err = os.ReadFile(repoList)
+		if err != nil {
+			panic(fmt.Errorf("error reading '%v' file contents: %v", repoList, err))
+		}
 	}
 
 	err = yaml.Unmarshal(fileContent, &registry)
@@ -82,6 +97,27 @@ func initReg() RegistryList {
 		panic(fmt.Errorf("Error unmarshalling '%v' YAML file: %v", repoList, err))
 	}
 	return registry
+}
+
+// Essentially curl url | writer
+func readFromURL(url string, writer io.Writer) error {
+	httpTransport := new(http.Transport)
+	httpTransport.Proxy = http.ProxyFromEnvironment
+
+	c := &http.Client{Transport: httpTransport}
+	r, err := c.Get(url)
+	if err != nil {
+		return err
+	}
+	defer r.Body.Close()
+	if r.StatusCode >= 400 {
+		return fmt.Errorf("%v returned %d", url, r.StatusCode)
+	}
+	_, err = io.Copy(writer, r.Body)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 var (
