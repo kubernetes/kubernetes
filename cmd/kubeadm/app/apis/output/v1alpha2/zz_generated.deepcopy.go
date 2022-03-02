@@ -128,8 +128,14 @@ func (in *UpgradePlan) DeepCopyInto(out *UpgradePlan) {
 	out.TypeMeta = in.TypeMeta
 	if in.Components != nil {
 		in, out := &in.Components, &out.Components
-		*out = make([]ComponentUpgradePlan, len(*in))
-		copy(*out, *in)
+		*out = make([]*ComponentUpgradePlan, len(*in))
+		for i := range *in {
+			if (*in)[i] != nil {
+				in, out := &(*in)[i], &(*out)[i]
+				*out = new(ComponentUpgradePlan)
+				**out = **in
+			}
+		}
 	}
 	if in.ConfigVersions != nil {
 		in, out := &in.ConfigVersions, &out.ConfigVersions

@@ -135,14 +135,14 @@ func enforceRequirements(flags *applyPlanFlags, args []string, dryRun bool, upgr
 	cfg, legacyReconfigure, err := loadConfig(flags.cfgPath, client, !upgradeApply, printer)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			fmt.Printf("[upgrade/config] In order to upgrade, a ConfigMap called %q in the %s namespace must exist.\n", constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
-			fmt.Println("[upgrade/config] Without this information, 'kubeadm upgrade' won't know how to configure your upgraded cluster.")
-			fmt.Println("")
-			fmt.Println("[upgrade/config] Next steps:")
-			fmt.Printf("\t- OPTION 1: Run 'kubeadm config upload from-flags' and specify the same CLI arguments you passed to 'kubeadm init' when you created your control-plane.\n")
-			fmt.Printf("\t- OPTION 2: Run 'kubeadm config upload from-file' and specify the same config file you passed to 'kubeadm init' when you created your control-plane.\n")
-			fmt.Printf("\t- OPTION 3: Pass a config file to 'kubeadm upgrade' using the --config flag.\n")
-			fmt.Println("")
+			printer.Printf("[upgrade/config] In order to upgrade, a ConfigMap called %q in the %s namespace must exist.\n", constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
+			printer.Printf("[upgrade/config] Without this information, 'kubeadm upgrade' won't know how to configure your upgraded cluster.\n")
+			printer.Printf("\n")
+			printer.Printf("[upgrade/config] Next steps:\n")
+			printer.Printf("\t- OPTION 1: Run 'kubeadm config upload from-flags' and specify the same CLI arguments you passed to 'kubeadm init' when you created your control-plane.\n")
+			printer.Printf("\t- OPTION 2: Run 'kubeadm config upload from-file' and specify the same config file you passed to 'kubeadm init' when you created your control-plane.\n")
+			printer.Printf("\t- OPTION 3: Pass a config file to 'kubeadm upgrade' using the --config flag.\n")
+			printer.Printf("\n")
 			err = errors.Errorf("the ConfigMap %q in the %s namespace used for getting configuration information was not found", constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
 		}
 		return nil, nil, nil, errors.Wrap(err, "[upgrade/config] FATAL")
@@ -203,14 +203,14 @@ func enforceRequirements(flags *applyPlanFlags, args []string, dryRun bool, upgr
 	// Check if feature gate flags used in the cluster are consistent with the set of features currently supported by kubeadm
 	if msg := features.CheckDeprecatedFlags(&features.InitFeatureGates, cfg.FeatureGates); len(msg) > 0 {
 		for _, m := range msg {
-			fmt.Printf("[upgrade/config] %s\n", m)
+			printer.Printf("[upgrade/config] %s\n", m)
 		}
 		return nil, nil, nil, errors.New("[upgrade/config] FATAL. Unable to upgrade a cluster using deprecated feature-gate flags. Please see the release notes")
 	}
 
 	// If the user told us to print this information out; do it!
 	if flags.printConfig {
-		printConfiguration(&cfg.ClusterConfiguration, os.Stdout)
+		printConfiguration(&cfg.ClusterConfiguration, os.Stdout, printer)
 	}
 
 	// Use a real version getter interface that queries the API server, the kubeadm client and the Kubernetes CI system for latest versions
@@ -218,7 +218,7 @@ func enforceRequirements(flags *applyPlanFlags, args []string, dryRun bool, upgr
 }
 
 // printConfiguration prints the external version of the API to yaml
-func printConfiguration(clustercfg *kubeadmapi.ClusterConfiguration, w io.Writer) {
+func printConfiguration(clustercfg *kubeadmapi.ClusterConfiguration, w io.Writer, printer output.Printer) {
 	// Short-circuit if cfg is nil, so we can safely get the value of the pointer below
 	if clustercfg == nil {
 		return
@@ -226,11 +226,11 @@ func printConfiguration(clustercfg *kubeadmapi.ClusterConfiguration, w io.Writer
 
 	cfgYaml, err := configutil.MarshalKubeadmConfigObject(clustercfg)
 	if err == nil {
-		fmt.Fprintln(w, "[upgrade/config] Configuration used:")
+		printer.Fprintln(w, "[upgrade/config] Configuration used:")
 
 		scanner := bufio.NewScanner(bytes.NewReader(cfgYaml))
 		for scanner.Scan() {
-			fmt.Fprintf(w, "\t%s\n", scanner.Text())
+			printer.Fprintf(w, "\t%s\n", scanner.Text())
 		}
 	}
 }

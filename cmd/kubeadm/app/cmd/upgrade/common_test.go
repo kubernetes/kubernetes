@@ -139,7 +139,7 @@ func TestPrintConfiguration(t *testing.T) {
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
 			rt.buf = bytes.NewBufferString("")
-			printConfiguration(rt.cfg, rt.buf)
+			printConfiguration(rt.cfg, rt.buf, &output.TextPrinter{})
 			actualBytes := rt.buf.Bytes()
 			if !bytes.Equal(actualBytes, rt.expectedBytes) {
 				t.Errorf(
