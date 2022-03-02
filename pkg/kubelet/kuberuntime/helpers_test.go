@@ -18,7 +18,10 @@ package kuberuntime
 
 import (
 	"path/filepath"
+	"reflect"
+	"sort"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -983,5 +986,193 @@ func TestNamespacesForPod(t *testing.T) {
 		t.Logf("TestCase: %s", desc)
 		actual := namespacesForPod(test.input)
 		assert.Equal(t, test.expected, actual)
+	}
+}
+
+func TestSortPodSandboxByAttempt(t *testing.T) {
+	tests := []struct {
+		description string
+		original    []*runtimeapi.PodSandbox
+		expected    []*runtimeapi.PodSandbox
+	}{
+		{
+			description: "Newest created should come first",
+			original: []*runtimeapi.PodSandbox{
+				{
+					CreatedAt: 1,
+					Metadata: &runtimeapi.PodSandboxMetadata{
+						Attempt: 0,
+					},
+				},
+				{
+					CreatedAt: 2,
+					Metadata: &runtimeapi.PodSandboxMetadata{
+						Attempt: 1,
+					},
+				},
+			},
+			expected: []*runtimeapi.PodSandbox{
+				{
+					CreatedAt: 2,
+					Metadata: &runtimeapi.PodSandboxMetadata{
+						Attempt: 1,
+					},
+				},
+				{
+					CreatedAt: 1,
+					Metadata: &runtimeapi.PodSandboxMetadata{
+						Attempt: 0,
+					},
+				},
+			},
+		},
+		{
+			description: "Newest created should come first even create time is earlier than previous",
+			original: []*runtimeapi.PodSandbox{
+				{
+					CreatedAt: 2,
+					Metadata: &runtimeapi.PodSandboxMetadata{
+						Attempt: 0,
+					},
+				},
+				{
+					CreatedAt: 1,
+					Metadata: &runtimeapi.PodSandboxMetadata{
+						Attempt: 1,
+					},
+				},
+			},
+			expected: []*runtimeapi.PodSandbox{
+				{
+					CreatedAt: 1,
+					Metadata: &runtimeapi.PodSandboxMetadata{
+						Attempt: 1,
+					},
+				},
+				{
+					CreatedAt: 2,
+					Metadata: &runtimeapi.PodSandboxMetadata{
+						Attempt: 0,
+					},
+				},
+			},
+		},
+		{
+			description: "Order newest created by create time if attempt is equal",
+			original: []*runtimeapi.PodSandbox{
+				{
+					CreatedAt: 1,
+					Metadata: &runtimeapi.PodSandboxMetadata{
+						Attempt: 0,
+					},
+				},
+				{
+					CreatedAt: 2,
+					Metadata: &runtimeapi.PodSandboxMetadata{
+						Attempt: 0,
+					},
+				},
+			},
+			expected: []*runtimeapi.PodSandbox{
+				{
+					CreatedAt: 2,
+					Metadata: &runtimeapi.PodSandboxMetadata{
+						Attempt: 0,
+					},
+				},
+				{
+					CreatedAt: 1,
+					Metadata: &runtimeapi.PodSandboxMetadata{
+						Attempt: 0,
+					},
+				},
+			},
+		},
+	}
+	for i, test := range tests {
+		sort.Sort(podSandboxByAttempt(test.original))
+		assert.True(t, reflect.DeepEqual(test.original, test.expected), "TestCase[%d]: %s", i, test.description)
+	}
+}
+
+func TestSortContainerStatusByAttempt(t *testing.T) {
+	tests := []struct {
+		description string
+		original    []*kubecontainer.Status
+		expected    []*kubecontainer.Status
+	}{
+		{
+			description: "Newest created should come first",
+			original: []*kubecontainer.Status{
+				{
+					CreatedAt: time.Unix(1, 0),
+					Attempt:   0,
+				},
+				{
+					CreatedAt: time.Unix(2, 0),
+					Attempt:   1,
+				},
+			},
+			expected: []*kubecontainer.Status{
+				{
+					CreatedAt: time.Unix(2, 0),
+					Attempt:   1,
+				},
+				{
+					CreatedAt: time.Unix(1, 0),
+					Attempt:   0,
+				},
+			},
+		},
+		{
+			description: "Newest created should come first even create time is earlier than previous",
+			original: []*kubecontainer.Status{
+				{
+					CreatedAt: time.Unix(2, 0),
+					Attempt:   0,
+				},
+				{
+					CreatedAt: time.Unix(1, 0),
+					Attempt:   1,
+				},
+			},
+			expected: []*kubecontainer.Status{
+				{
+					CreatedAt: time.Unix(1, 0),
+					Attempt:   1,
+				},
+				{
+					CreatedAt: time.Unix(2, 0),
+					Attempt:   0,
+				},
+			},
+		},
+		{
+			description: "Order newest created by create time if attempt is equal",
+			original: []*kubecontainer.Status{
+				{
+					CreatedAt: time.Unix(1, 0),
+					Attempt:   0,
+				},
+				{
+					CreatedAt: time.Unix(2, 0),
+					Attempt:   0,
+				},
+			},
+			expected: []*kubecontainer.Status{
+				{
+					CreatedAt: time.Unix(2, 0),
+					Attempt:   0,
+				},
+				{
+					CreatedAt: time.Unix(1, 0),
+					Attempt:   0,
+				},
+			},
+		},
+	}
+	for i, test := range tests {
+		sort.Sort(containerStatusByAttempt(test.original))
+		assert.True(t, reflect.DeepEqual(test.original, test.expected), "TestCase[%d]: %s", i, test.description)
 	}
 }

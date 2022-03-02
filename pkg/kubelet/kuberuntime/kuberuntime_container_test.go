@@ -159,6 +159,7 @@ func TestToKubeContainerStatus(t *testing.T) {
 				Image:     imageSpec.Image,
 				State:     kubecontainer.ContainerStateCreated,
 				CreatedAt: time.Unix(0, createdAt),
+				Attempt:   meta.Attempt,
 			},
 		},
 		"running container": {
@@ -176,6 +177,7 @@ func TestToKubeContainerStatus(t *testing.T) {
 				State:     kubecontainer.ContainerStateRunning,
 				CreatedAt: time.Unix(0, createdAt),
 				StartedAt: time.Unix(0, startedAt),
+				Attempt:   meta.Attempt,
 			},
 		},
 		"exited container": {
@@ -201,6 +203,7 @@ func TestToKubeContainerStatus(t *testing.T) {
 				ExitCode:   121,
 				Reason:     "GotKilled",
 				Message:    "The container was killed",
+				Attempt:    meta.Attempt,
 			},
 		},
 		"unknown container": {
@@ -218,6 +221,7 @@ func TestToKubeContainerStatus(t *testing.T) {
 				State:     kubecontainer.ContainerStateUnknown,
 				CreatedAt: time.Unix(0, createdAt),
 				StartedAt: time.Unix(0, startedAt),
+				Attempt:   meta.Attempt,
 			},
 		},
 	} {

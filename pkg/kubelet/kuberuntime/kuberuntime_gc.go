@@ -59,6 +59,8 @@ type containerGCInfo struct {
 	// If true, the container is in unknown state. Garbage collector should try
 	// to stop containers before removal.
 	unknown bool
+	// The attempt number of the container
+	attempt uint32
 }
 
 // sandboxGCInfo is the internal information kept for sandboxes being considered for GC.
@@ -69,6 +71,8 @@ type sandboxGCInfo struct {
 	createTime time.Time
 	// If true, the sandbox is ready or still has containers.
 	active bool
+	// The attempt number of the sandbox
+	attempt uint32
 }
 
 // evictUnit is considered for eviction as units of (UID, container name) pair.
@@ -97,18 +101,28 @@ func (cu containersByEvictUnit) NumEvictUnits() int {
 }
 
 // Newest first.
-type byCreated []containerGCInfo
+type byAttempt []containerGCInfo
 
-func (a byCreated) Len() int           { return len(a) }
-func (a byCreated) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a byCreated) Less(i, j int) bool { return a[i].createTime.After(a[j].createTime) }
+func (a byAttempt) Len() int      { return len(a) }
+func (a byAttempt) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a byAttempt) Less(i, j int) bool {
+	if a[i].attempt == a[j].attempt {
+		return a[i].createTime.After(a[j].createTime)
+	}
+	return a[i].attempt > a[j].attempt
+}
 
 // Newest first.
-type sandboxByCreated []sandboxGCInfo
+type sandboxByAttempt []sandboxGCInfo
 
-func (a sandboxByCreated) Len() int           { return len(a) }
-func (a sandboxByCreated) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a sandboxByCreated) Less(i, j int) bool { return a[i].createTime.After(a[j].createTime) }
+func (a sandboxByAttempt) Len() int      { return len(a) }
+func (a sandboxByAttempt) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a sandboxByAttempt) Less(i, j int) bool {
+	if a[i].attempt == a[j].attempt {
+		return a[i].createTime.After(a[j].createTime)
+	}
+	return a[i].attempt > a[j].attempt
+}
 
 // enforceMaxContainersPerEvictUnit enforces MaxPerPodContainer for each evictUnit.
 func (cgc *containerGC) enforceMaxContainersPerEvictUnit(evictUnits containersByEvictUnit, MaxContainers int) {
@@ -126,7 +140,7 @@ func (cgc *containerGC) removeOldestN(containers []containerGCInfo, toRemove int
 	// Remove from oldest to newest (last to first).
 	numToKeep := len(containers) - toRemove
 	if numToKeep > 0 {
-		sort.Sort(byCreated(containers))
+		sort.Sort(byAttempt(containers))
 	}
 	for i := len(containers) - 1; i >= numToKeep; i-- {
 		if containers[i].unknown {
@@ -156,7 +170,7 @@ func (cgc *containerGC) removeOldestN(containers []containerGCInfo, toRemove int
 func (cgc *containerGC) removeOldestNSandboxes(sandboxes []sandboxGCInfo, toRemove int) {
 	numToKeep := len(sandboxes) - toRemove
 	if numToKeep > 0 {
-		sort.Sort(sandboxByCreated(sandboxes))
+		sort.Sort(sandboxByAttempt(sandboxes))
 	}
 	// Remove from oldest to newest (last to first).
 	for i := len(sandboxes) - 1; i >= numToKeep; i-- {
@@ -208,6 +222,7 @@ func (cgc *containerGC) evictableContainers(minAge time.Duration) (containersByE
 			name:       container.Metadata.Name,
 			createTime: createdAt,
 			unknown:    container.State == runtimeapi.ContainerState_CONTAINER_UNKNOWN,
+			attempt:    container.Metadata.Attempt,
 		}
 		key := evictUnit{
 			uid:  labeledInfo.PodUID,
@@ -258,7 +273,7 @@ func (cgc *containerGC) evictContainers(gcPolicy kubecontainer.GCPolicy, allSour
 			for key := range evictUnits {
 				flattened = append(flattened, evictUnits[key]...)
 			}
-			sort.Sort(byCreated(flattened))
+			sort.Sort(byAttempt(flattened))
 
 			cgc.removeOldestN(flattened, numContainers-gcPolicy.MaxContainers)
 		}
@@ -295,6 +310,7 @@ func (cgc *containerGC) evictSandboxes(evictNonDeletedPods bool) error {
 		sandboxInfo := sandboxGCInfo{
 			id:         sandbox.Id,
 			createTime: time.Unix(0, sandbox.CreatedAt),
+			attempt:    sandbox.Metadata.Attempt,
 		}
 
 		// Set ready sandboxes to be active.

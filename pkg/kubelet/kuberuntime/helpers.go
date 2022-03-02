@@ -42,17 +42,27 @@ func (b containersByID) Swap(i, j int)      { b[i], b[j] = b[j], b[i] }
 func (b containersByID) Less(i, j int) bool { return b[i].ID.ID < b[j].ID.ID }
 
 // Newest first.
-type podSandboxByCreated []*runtimeapi.PodSandbox
+type podSandboxByAttempt []*runtimeapi.PodSandbox
 
-func (p podSandboxByCreated) Len() int           { return len(p) }
-func (p podSandboxByCreated) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
-func (p podSandboxByCreated) Less(i, j int) bool { return p[i].CreatedAt > p[j].CreatedAt }
+func (p podSandboxByAttempt) Len() int      { return len(p) }
+func (p podSandboxByAttempt) Swap(i, j int) { p[i], p[j] = p[j], p[i] }
+func (p podSandboxByAttempt) Less(i, j int) bool {
+	if p[i].Metadata.Attempt == p[j].Metadata.Attempt {
+		return p[i].CreatedAt > p[j].CreatedAt
+	}
+	return p[i].Metadata.Attempt > p[j].Metadata.Attempt
+}
 
-type containerStatusByCreated []*kubecontainer.Status
+type containerStatusByAttempt []*kubecontainer.Status
 
-func (c containerStatusByCreated) Len() int           { return len(c) }
-func (c containerStatusByCreated) Swap(i, j int)      { c[i], c[j] = c[j], c[i] }
-func (c containerStatusByCreated) Less(i, j int) bool { return c[i].CreatedAt.After(c[j].CreatedAt) }
+func (c containerStatusByAttempt) Len() int      { return len(c) }
+func (c containerStatusByAttempt) Swap(i, j int) { c[i], c[j] = c[j], c[i] }
+func (c containerStatusByAttempt) Less(i, j int) bool {
+	if c[i].Attempt == c[j].Attempt {
+		return c[i].CreatedAt.After(c[j].CreatedAt)
+	}
+	return c[i].Attempt > c[j].Attempt
+}
 
 // toKubeContainerState converts runtimeapi.ContainerState to kubecontainer.State.
 func toKubeContainerState(state runtimeapi.ContainerState) kubecontainer.State {

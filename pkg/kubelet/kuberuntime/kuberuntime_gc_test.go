@@ -106,6 +106,16 @@ func TestSandboxGC(t *testing.T) {
 			evictTerminatingPods: false,
 		},
 		{
+			description: "older sandboxes is determined by attempt rather than create time and older exited sandboxes without containers for existing pods should be garbage collected if there are more than one exited sandboxes.",
+			sandboxes: []sandboxTemplate{
+				makeGCSandbox(pods[0], 0, runtimeapi.PodSandboxState_SANDBOX_NOTREADY, true, false, 1),
+				makeGCSandbox(pods[0], 1, runtimeapi.PodSandboxState_SANDBOX_NOTREADY, true, false, 0),
+			},
+			containers:           []containerTemplate{},
+			remain:               []int{1},
+			evictTerminatingPods: false,
+		},
+		{
 			description: "older exited sandboxes with containers for existing pods should not be garbage collected even if there are more than one exited sandboxes.",
 			sandboxes: []sandboxTemplate{
 				makeGCSandbox(pods[0], 1, runtimeapi.PodSandboxState_SANDBOX_NOTREADY, true, false, 1),
@@ -269,6 +279,17 @@ func TestContainerGC(t *testing.T) {
 				makeGCContainer("foo", "bar", 2, 2, runtimeapi.ContainerState_CONTAINER_EXITED),
 				makeGCContainer("foo", "bar", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
 				makeGCContainer("foo", "bar", 0, 0, runtimeapi.ContainerState_CONTAINER_EXITED),
+			},
+			remain:               []int{0, 1},
+			evictTerminatingPods: false,
+			allSourcesReady:      true,
+		},
+		{
+			description: "oldest containers is determined by attempt rather than create time and should be removed when per pod container limit exceeded",
+			containers: []containerTemplate{
+				makeGCContainer("foo", "bar", 2, 0, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer("foo", "bar", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer("foo", "bar", 0, 2, runtimeapi.ContainerState_CONTAINER_EXITED),
 			},
 			remain:               []int{0, 1},
 			evictTerminatingPods: false,

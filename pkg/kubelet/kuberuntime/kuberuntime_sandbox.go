@@ -344,7 +344,7 @@ func (m *kubeGenericRuntimeManager) getSandboxIDByPodUID(podUID kubetypes.UID, s
 
 	// Sort with newest first.
 	sandboxIDs := make([]string, len(sandboxes))
-	sort.Sort(podSandboxByCreated(sandboxes))
+	sort.Sort(podSandboxByAttempt(sandboxes))
 	for i, s := range sandboxes {
 		sandboxIDs[i] = s.Id
 	}

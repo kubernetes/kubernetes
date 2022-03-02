@@ -40,7 +40,10 @@ type podContainerDeletor struct {
 func (a containerStatusbyCreatedList) Len() int      { return len(a) }
 func (a containerStatusbyCreatedList) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
 func (a containerStatusbyCreatedList) Less(i, j int) bool {
-	return a[i].CreatedAt.After(a[j].CreatedAt)
+	if a[i].Attempt == a[j].Attempt {
+		return a[i].CreatedAt.After(a[j].CreatedAt)
+	}
+	return a[i].Attempt > a[j].Attempt
 }
 
 func newPodContainerDeletor(runtime kubecontainer.Runtime, containersToKeep int) *podContainerDeletor {
