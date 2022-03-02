@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 )
 
 type policyMergeTestCase struct {
@@ -615,6 +616,220 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 				Preferred:        false,
 			},
 		},
+		{
+			name: "bestNonPreferredAffinityCount (1)",
+			hp: []HintProvider{
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource1": {
+							{
+								NUMANodeAffinity: NewTestBitMask(0, 1, 2, 3),
+								Preferred:        false,
+							},
+							{
+								NUMANodeAffinity: NewTestBitMask(0, 1),
+								Preferred:        false,
+							},
+						},
+					},
+				},
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource2": {
+							{
+								NUMANodeAffinity: NewTestBitMask(0, 1),
+								Preferred:        false,
+							},
+						},
+					},
+				},
+			},
+			expected: TopologyHint{
+				NUMANodeAffinity: NewTestBitMask(0, 1),
+				Preferred:        false,
+			},
+		},
+		{
+			name: "bestNonPreferredAffinityCount (2)",
+			hp: []HintProvider{
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource1": {
+							{
+								NUMANodeAffinity: NewTestBitMask(0, 1, 2, 3),
+								Preferred:        false,
+							},
+							{
+								NUMANodeAffinity: NewTestBitMask(0, 1),
+								Preferred:        false,
+							},
+						},
+					},
+				},
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource2": {
+							{
+								NUMANodeAffinity: NewTestBitMask(0, 3),
+								Preferred:        false,
+							},
+						},
+					},
+				},
+			},
+			expected: TopologyHint{
+				NUMANodeAffinity: NewTestBitMask(0, 3),
+				Preferred:        false,
+			},
+		},
+		{
+			name: "bestNonPreferredAffinityCount (3)",
+			hp: []HintProvider{
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource1": {
+							{
+								NUMANodeAffinity: NewTestBitMask(0, 1, 2, 3),
+								Preferred:        false,
+							},
+							{
+								NUMANodeAffinity: NewTestBitMask(0, 1),
+								Preferred:        false,
+							},
+						},
+					},
+				},
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource2": {
+							{
+								NUMANodeAffinity: NewTestBitMask(1, 2),
+								Preferred:        false,
+							},
+						},
+					},
+				},
+			},
+			expected: TopologyHint{
+				NUMANodeAffinity: NewTestBitMask(1, 2),
+				Preferred:        false,
+			},
+		},
+		{
+			name: "bestNonPreferredAffinityCount (4)",
+			hp: []HintProvider{
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource1": {
+							{
+								NUMANodeAffinity: NewTestBitMask(0, 1, 2, 3),
+								Preferred:        false,
+							},
+							{
+								NUMANodeAffinity: NewTestBitMask(0, 1),
+								Preferred:        false,
+							},
+						},
+					},
+				},
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource2": {
+							{
+								NUMANodeAffinity: NewTestBitMask(2, 3),
+								Preferred:        false,
+							},
+						},
+					},
+				},
+			},
+			expected: TopologyHint{
+				NUMANodeAffinity: NewTestBitMask(2, 3),
+				Preferred:        false,
+			},
+		},
+		{
+			name: "bestNonPreferredAffinityCount (5)",
+			hp: []HintProvider{
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource1": {
+							{
+								NUMANodeAffinity: NewTestBitMask(0, 1, 2, 3),
+								Preferred:        false,
+							},
+							{
+								NUMANodeAffinity: NewTestBitMask(0, 1),
+								Preferred:        false,
+							},
+						},
+					},
+				},
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource2": {
+							{
+								NUMANodeAffinity: NewTestBitMask(1, 2),
+								Preferred:        false,
+							},
+							{
+								NUMANodeAffinity: NewTestBitMask(2, 3),
+								Preferred:        false,
+							},
+						},
+					},
+				},
+			},
+			expected: TopologyHint{
+				NUMANodeAffinity: NewTestBitMask(1, 2),
+				Preferred:        false,
+			},
+		},
+		{
+			name: "bestNonPreferredAffinityCount (6)",
+			hp: []HintProvider{
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource1": {
+							{
+								NUMANodeAffinity: NewTestBitMask(0, 1, 2, 3),
+								Preferred:        false,
+							},
+							{
+								NUMANodeAffinity: NewTestBitMask(0, 1),
+								Preferred:        false,
+							},
+						},
+					},
+				},
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource2": {
+							{
+								NUMANodeAffinity: NewTestBitMask(1, 2, 3),
+								Preferred:        false,
+							},
+							{
+								NUMANodeAffinity: NewTestBitMask(1, 2),
+								Preferred:        false,
+							},
+							{
+								NUMANodeAffinity: NewTestBitMask(1, 3),
+								Preferred:        false,
+							},
+							{
+								NUMANodeAffinity: NewTestBitMask(2, 3),
+								Preferred:        false,
+							},
+						},
+					},
+				},
+			},
+			expected: TopologyHint{
+				NUMANodeAffinity: NewTestBitMask(1, 2),
+				Preferred:        false,
+			},
+		},
 	}
 }
 
@@ -903,5 +1118,285 @@ func testPolicyMerge(policy Policy, tcases []policyMergeTestCase, t *testing.T) 
 		if !reflect.DeepEqual(actual, tc.expected) {
 			t.Errorf("%v: Expected Topology Hint to be %v, got %v:", tc.name, tc.expected, actual)
 		}
+	}
+}
+
+func TestMaxOfMinAffinityCounts(t *testing.T) {
+	tcases := []struct {
+		hints    [][]TopologyHint
+		expected int
+	}{
+		{
+			[][]TopologyHint{},
+			0,
+		},
+		{
+			[][]TopologyHint{
+				{
+					TopologyHint{NewTestBitMask(), true},
+				},
+			},
+			0,
+		},
+		{
+			[][]TopologyHint{
+				{
+					TopologyHint{NewTestBitMask(0), true},
+				},
+			},
+			1,
+		},
+		{
+			[][]TopologyHint{
+				{
+					TopologyHint{NewTestBitMask(0, 1), true},
+				},
+			},
+			2,
+		},
+		{
+			[][]TopologyHint{
+				{
+					TopologyHint{NewTestBitMask(0, 1), true},
+					TopologyHint{NewTestBitMask(0, 1, 2), true},
+				},
+			},
+			2,
+		},
+		{
+			[][]TopologyHint{
+				{
+					TopologyHint{NewTestBitMask(0, 1), true},
+					TopologyHint{NewTestBitMask(0, 1, 2), true},
+				},
+				{
+					TopologyHint{NewTestBitMask(0, 1, 2), true},
+				},
+			},
+			3,
+		},
+		{
+			[][]TopologyHint{
+				{
+					TopologyHint{NewTestBitMask(0, 1), true},
+					TopologyHint{NewTestBitMask(0, 1, 2), true},
+				},
+				{
+					TopologyHint{NewTestBitMask(0, 1, 2), true},
+					TopologyHint{NewTestBitMask(0, 1, 2, 3), true},
+				},
+			},
+			3,
+		},
+	}
+
+	for _, tc := range tcases {
+		t.Run("", func(t *testing.T) {
+			result := maxOfMinAffinityCounts(tc.hints)
+			if result != tc.expected {
+				t.Errorf("Expected result to be %v, got %v", tc.expected, result)
+			}
+		})
+	}
+}
+
+func TestCompareHints(t *testing.T) {
+	tcases := []struct {
+		description                   string
+		bestNonPreferredAffinityCount int
+		current                       *TopologyHint
+		candidate                     *TopologyHint
+		expected                      string
+	}{
+		{
+			"candidate.NUMANodeAffinity.Count() == 0 (1)",
+			-1,
+			nil,
+			&TopologyHint{bitmask.NewEmptyBitMask(), false},
+			"current",
+		},
+		{
+			"candidate.NUMANodeAffinity.Count() == 0 (2)",
+			-1,
+			&TopologyHint{NewTestBitMask(), true},
+			&TopologyHint{NewTestBitMask(), false},
+			"current",
+		},
+		{
+			"current == nil (1)",
+			-1,
+			nil,
+			&TopologyHint{NewTestBitMask(0), true},
+			"candidate",
+		},
+		{
+			"current == nil (2)",
+			-1,
+			nil,
+			&TopologyHint{NewTestBitMask(0), false},
+			"candidate",
+		},
+		{
+			"!current.Preferred && candidate.Preferred",
+			-1,
+			&TopologyHint{NewTestBitMask(0), false},
+			&TopologyHint{NewTestBitMask(0), true},
+			"candidate",
+		},
+		{
+			"current.Preferred && !candidate.Preferred",
+			-1,
+			&TopologyHint{NewTestBitMask(0), true},
+			&TopologyHint{NewTestBitMask(0), false},
+			"current",
+		},
+		{
+			"current.Preferred && candidate.Preferred (1)",
+			-1,
+			&TopologyHint{NewTestBitMask(0), true},
+			&TopologyHint{NewTestBitMask(0), true},
+			"current",
+		},
+		{
+			"current.Preferred && candidate.Preferred (2)",
+			-1,
+			&TopologyHint{NewTestBitMask(0, 1), true},
+			&TopologyHint{NewTestBitMask(0), true},
+			"candidate",
+		},
+		{
+			"current.Preferred && candidate.Preferred (3)",
+			-1,
+			&TopologyHint{NewTestBitMask(0), true},
+			&TopologyHint{NewTestBitMask(0, 1), true},
+			"current",
+		},
+		{
+			"!current.Preferred && !candidate.Preferred (1.1)",
+			1,
+			&TopologyHint{NewTestBitMask(0, 1), false},
+			&TopologyHint{NewTestBitMask(0, 1), false},
+			"current",
+		},
+		{
+			"!current.Preferred && !candidate.Preferred (1.2)",
+			1,
+			&TopologyHint{NewTestBitMask(1, 2), false},
+			&TopologyHint{NewTestBitMask(0, 1), false},
+			"candidate",
+		},
+		{
+			"!current.Preferred && !candidate.Preferred (1.3)",
+			1,
+			&TopologyHint{NewTestBitMask(0, 1), false},
+			&TopologyHint{NewTestBitMask(1, 2), false},
+			"current",
+		},
+		{
+			"!current.Preferred && !candidate.Preferred (2.1)",
+			2,
+			&TopologyHint{NewTestBitMask(0, 1), false},
+			&TopologyHint{NewTestBitMask(0), false},
+			"current",
+		},
+		{
+			"!current.Preferred && !candidate.Preferred (2.2)",
+			2,
+			&TopologyHint{NewTestBitMask(0, 1), false},
+			&TopologyHint{NewTestBitMask(0, 1), false},
+			"current",
+		},
+		{
+			"!current.Preferred && !candidate.Preferred (2.3)",
+			2,
+			&TopologyHint{NewTestBitMask(1, 2), false},
+			&TopologyHint{NewTestBitMask(0, 1), false},
+			"candidate",
+		},
+		{
+			"!current.Preferred && !candidate.Preferred (2.4)",
+			2,
+			&TopologyHint{NewTestBitMask(0, 1), false},
+			&TopologyHint{NewTestBitMask(1, 2), false},
+			"current",
+		},
+		{
+			"!current.Preferred && !candidate.Preferred (3a)",
+			2,
+			&TopologyHint{NewTestBitMask(0), false},
+			&TopologyHint{NewTestBitMask(0, 1, 2), false},
+			"current",
+		},
+		{
+			"!current.Preferred && !candidate.Preferred (3b)",
+			2,
+			&TopologyHint{NewTestBitMask(0), false},
+			&TopologyHint{NewTestBitMask(0, 1), false},
+			"candidate",
+		},
+		{
+			"!current.Preferred && !candidate.Preferred (3ca.1)",
+			3,
+			&TopologyHint{NewTestBitMask(0), false},
+			&TopologyHint{NewTestBitMask(0, 1), false},
+			"candidate",
+		},
+		{
+			"!current.Preferred && !candidate.Preferred (3ca.2)",
+			3,
+			&TopologyHint{NewTestBitMask(0), false},
+			&TopologyHint{NewTestBitMask(1, 2), false},
+			"candidate",
+		},
+		{
+			"!current.Preferred && !candidate.Preferred (3ca.3)",
+			4,
+			&TopologyHint{NewTestBitMask(0, 1), false},
+			&TopologyHint{NewTestBitMask(1, 2, 3), false},
+			"candidate",
+		},
+		{
+			"!current.Preferred && !candidate.Preferred (3cb)",
+			4,
+			&TopologyHint{NewTestBitMask(1, 2, 3), false},
+			&TopologyHint{NewTestBitMask(0, 1), false},
+			"current",
+		},
+		{
+			"!current.Preferred && !candidate.Preferred (3cc.1)",
+			4,
+			&TopologyHint{NewTestBitMask(0, 1, 2), false},
+			&TopologyHint{NewTestBitMask(0, 1, 2), false},
+			"current",
+		},
+		{
+			"!current.Preferred && !candidate.Preferred (3cc.2)",
+			4,
+			&TopologyHint{NewTestBitMask(0, 1, 2), false},
+			&TopologyHint{NewTestBitMask(1, 2, 3), false},
+			"current",
+		},
+		{
+			"!current.Preferred && !candidate.Preferred (3cc.3)",
+			4,
+			&TopologyHint{NewTestBitMask(1, 2, 3), false},
+			&TopologyHint{NewTestBitMask(0, 1, 2), false},
+			"candidate",
+		},
+	}
+
+	for _, tc := range tcases {
+		t.Run(tc.description, func(t *testing.T) {
+			result := compareHints(tc.bestNonPreferredAffinityCount, tc.current, tc.candidate)
+			if result != tc.current && result != tc.candidate {
+				t.Errorf("Expected result to be either 'current' or 'candidate' hint")
+			}
+			if tc.expected == "current" && result != tc.current {
+				t.Errorf("Expected result to be %v, got %v", tc.current, result)
+			}
+			if tc.expected == "candidate" && result != tc.candidate {
+				t.Errorf("Expected result to be %v, got %v", tc.candidate, result)
+			}
+		})
 	}
 }
