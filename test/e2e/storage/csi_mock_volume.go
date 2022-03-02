@@ -31,7 +31,6 @@ import (
 	"google.golang.org/grpc/status"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1387,7 +1386,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				// before adding CSIStorageCapacity objects for it.
 				for _, capacityStr := range test.capacities {
 					capacityQuantity := resource.MustParse(capacityStr)
-					capacity := &storagev1beta1.CSIStorageCapacity{
+					capacity := &storagev1.CSIStorageCapacity{
 						ObjectMeta: metav1.ObjectMeta{
 							GenerateName: "fake-capacity-",
 						},
@@ -1396,10 +1395,10 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 						NodeTopology:     &metav1.LabelSelector{},
 						Capacity:         &capacityQuantity,
 					}
-					createdCapacity, err := f.ClientSet.StorageV1beta1().CSIStorageCapacities(f.Namespace.Name).Create(context.Background(), capacity, metav1.CreateOptions{})
+					createdCapacity, err := f.ClientSet.StorageV1().CSIStorageCapacities(f.Namespace.Name).Create(context.Background(), capacity, metav1.CreateOptions{})
 					framework.ExpectNoError(err, "create CSIStorageCapacity %+v", *capacity)
 					m.testCleanups = append(m.testCleanups, func() {
-						f.ClientSet.StorageV1beta1().CSIStorageCapacities(f.Namespace.Name).Delete(context.Background(), createdCapacity.Name, metav1.DeleteOptions{})
+						f.ClientSet.StorageV1().CSIStorageCapacities(f.Namespace.Name).Delete(context.Background(), createdCapacity.Name, metav1.DeleteOptions{})
 					})
 				}
 
