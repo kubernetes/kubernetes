@@ -20,6 +20,7 @@ package util
 
 import (
 	"errors"
+	"net/http"
 	"sync"
 
 	corev1 "k8s.io/api/core/v1"
@@ -66,6 +67,10 @@ func (f *factoryImpl) ToRESTMapper() (meta.RESTMapper, error) {
 	return f.clientGetter.ToRESTMapper()
 }
 
+func (f *factoryImpl) ToHTTPClient() (*http.Client, error) {
+	return f.clientGetter.ToHTTPClient()
+}
+
 func (f *factoryImpl) ToDiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
 	return f.clientGetter.ToDiscoveryClient()
 }
@@ -79,7 +84,11 @@ func (f *factoryImpl) KubernetesClientSet() (*kubernetes.Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
-	return kubernetes.NewForConfig(clientConfig)
+	httpClient, err := f.ToHTTPClient()
+	if err != nil {
+		return nil, err
+	}
+	return kubernetes.NewForConfigAndClient(clientConfig, httpClient)
 }
 
 func (f *factoryImpl) DynamicClient() (dynamic.Interface, error) {
@@ -87,7 +96,11 @@ func (f *factoryImpl) DynamicClient() (dynamic.Interface, error) {
 	if err != nil {
 		return nil, err
 	}
-	return dynamic.NewForConfig(clientConfig)
+	httpClient, err := f.ToHTTPClient()
+	if err != nil {
+		return nil, err
+	}
+	return dynamic.NewForConfigAndClient(clientConfig, httpClient)
 }
 
 // NewBuilder returns a new resource builder for structured api objects.
@@ -100,46 +113,58 @@ func (f *factoryImpl) RESTClient() (*restclient.RESTClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	setKubernetesDefaults(clientConfig)
-	return restclient.RESTClientFor(clientConfig)
-}
-
-func (f *factoryImpl) ClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error) {
-	cfg, err := f.clientGetter.ToRESTConfig()
+	httpClient, err := f.ToHTTPClient()
 	if err != nil {
 		return nil, err
 	}
-	if err := setKubernetesDefaults(cfg); err != nil {
+	setKubernetesDefaults(clientConfig)
+	return restclient.RESTClientForConfigAndClient(clientConfig, httpClient)
+}
+
+func (f *factoryImpl) ClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error) {
+	clientConfig, err := f.ToRESTConfig()
+	if err != nil {
+		return nil, err
+	}
+	httpClient, err := f.ToHTTPClient()
+	if err != nil {
+		return nil, err
+	}
+	if err := setKubernetesDefaults(clientConfig); err != nil {
 		return nil, err
 	}
 	gvk := mapping.GroupVersionKind
 	switch gvk.Group {
 	case corev1.GroupName:
-		cfg.APIPath = "/api"
+		clientConfig.APIPath = "/api"
 	default:
-		cfg.APIPath = "/apis"
+		clientConfig.APIPath = "/apis"
 	}
 	gv := gvk.GroupVersion()
-	cfg.GroupVersion = &gv
-	return restclient.RESTClientFor(cfg)
+	clientConfig.GroupVersion = &gv
+	return restclient.RESTClientForConfigAndClient(clientConfig, httpClient)
 }
 
 func (f *factoryImpl) UnstructuredClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error) {
-	cfg, err := f.clientGetter.ToRESTConfig()
+	clientConfig, err := f.ToRESTConfig()
 	if err != nil {
 		return nil, err
 	}
-	if err := restclient.SetKubernetesDefaults(cfg); err != nil {
+	httpClient, err := f.ToHTTPClient()
+	if err != nil {
 		return nil, err
 	}
-	cfg.APIPath = "/apis"
+	if err := restclient.SetKubernetesDefaults(clientConfig); err != nil {
+		return nil, err
+	}
+	clientConfig.APIPath = "/apis"
 	if mapping.GroupVersionKind.Group == corev1.GroupName {
-		cfg.APIPath = "/api"
+		clientConfig.APIPath = "/api"
 	}
 	gv := mapping.GroupVersionKind.GroupVersion()
-	cfg.ContentConfig = resource.UnstructuredPlusDefaultContentConfig()
-	cfg.GroupVersion = &gv
-	return restclient.RESTClientFor(cfg)
+	clientConfig.ContentConfig = resource.UnstructuredPlusDefaultContentConfig()
+	clientConfig.GroupVersion = &gv
+	return restclient.RESTClientForConfigAndClient(clientConfig, httpClient)
 }
 
 func (f *factoryImpl) Validator(validationDirective string, verifier *resource.QueryParamVerifier) (validation.Schema, error) {

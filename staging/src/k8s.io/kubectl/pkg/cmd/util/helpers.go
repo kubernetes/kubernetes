@@ -807,8 +807,13 @@ func scaleClient(restClientGetter genericclioptions.RESTClientGetter) (scale.Sca
 		return nil, err
 	}
 
+	httpClient, err := restClientGetter.ToHTTPClient()
+	if err != nil {
+		return nil, err
+	}
+
 	setKubernetesDefaults(clientConfig)
-	restClient, err := rest.RESTClientFor(clientConfig)
+	restClient, err := rest.RESTClientForConfigAndClient(clientConfig, httpClient)
 	if err != nil {
 		return nil, err
 	}

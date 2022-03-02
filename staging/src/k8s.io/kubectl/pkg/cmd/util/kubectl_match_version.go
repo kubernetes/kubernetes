@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	"net/http"
 	"sync"
 
 	"github.com/spf13/pflag"
@@ -82,6 +83,10 @@ func (f *MatchVersionFlags) ToRESTConfig() (*rest.Config, error) {
 
 func (f *MatchVersionFlags) ToRawKubeConfigLoader() clientcmd.ClientConfig {
 	return f.Delegate.ToRawKubeConfigLoader()
+}
+
+func (f *MatchVersionFlags) ToHTTPClient() (*http.Client, error) {
+	return f.Delegate.ToHTTPClient()
 }
 
 func (f *MatchVersionFlags) ToDiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
