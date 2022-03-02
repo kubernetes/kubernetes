@@ -151,7 +151,6 @@ func runApply(flags *applyFlags, args []string) error {
 	waiter := getWaiter(flags.dryRun, client, upgrade.UpgradeManifestTimeout)
 
 	// Now; perform the upgrade procedure
-	klog.V(1).Infoln("[upgrade/apply] performing upgrade")
 	if err := PerformControlPlaneUpgrade(flags, client, waiter, cfg); err != nil {
 		return errors.Wrap(err, "[upgrade/apply] FATAL")
 	}
@@ -222,7 +221,8 @@ func EnforceVersionPolicies(newK8sVersionStr string, newK8sVersion *version.Vers
 func PerformControlPlaneUpgrade(flags *applyFlags, client clientset.Interface, waiter apiclient.Waiter, internalcfg *kubeadmapi.InitConfiguration) error {
 
 	// OK, the cluster is hosted using static pods. Upgrade a static-pod hosted cluster
-	fmt.Printf("[upgrade/apply] Upgrading your Static Pod-hosted control plane to version %q...\n", internalcfg.KubernetesVersion)
+	fmt.Printf("[upgrade/apply] Upgrading your Static Pod-hosted control plane to version %q (timeout: %v)...\n",
+		internalcfg.KubernetesVersion, upgrade.UpgradeManifestTimeout)
 
 	if flags.dryRun {
 		return upgrade.DryRunStaticPodUpgrade(flags.patchesDir, internalcfg)
