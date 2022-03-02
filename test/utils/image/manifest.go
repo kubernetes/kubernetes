@@ -277,6 +277,11 @@ func initImageConfigs(list RegistryList) (map[int]Config, map[int]Config) {
 	configs[VolumeRBDServer] = Config{list.PromoterE2eRegistry, "volume/rbd", "1.0.4"}
 	configs[WindowsServer] = Config{list.MicrosoftRegistry, "windows", "1809"}
 
+	// This adds more config entries. Those have no pre-defined index number,
+	// but will be used via ReplaceRegistryInImageURL when deploying
+	// CSI drivers (test/e2e/storage/util/create.go).
+	appendCSIImageConfigs(configs)
+
 	// if requested, map all the SHAs into a known format based on the input
 	originalImageConfigs := configs
 	if repo := os.Getenv("KUBE_TEST_REPO"); len(repo) > 0 {
