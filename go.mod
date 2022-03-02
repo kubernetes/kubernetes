@@ -450,6 +450,7 @@ replace (
 	go.opencensus.io => go.opencensus.io v0.22.3
 	go.starlark.net => go.starlark.net v0.0.0-20200306205701-8dd3e2ee1dd5
 	go.uber.org/atomic => go.uber.org/atomic v1.4.0
+	go.uber.org/goleak => go.uber.org/goleak v1.1.10
 	go.uber.org/multierr => go.uber.org/multierr v1.1.0
 	go.uber.org/zap => go.uber.org/zap v1.10.0
 	golang.org/x/crypto => golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83
@@ -532,7 +533,7 @@ replace (
 	modernc.org/strutil => modernc.org/strutil v1.0.0
 	modernc.org/xc => modernc.org/xc v1.0.0
 	rsc.io/pdf => rsc.io/pdf v0.1.1
-	sigs.k8s.io/apiserver-network-proxy/konnectivity-client => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.27
+	sigs.k8s.io/apiserver-network-proxy/konnectivity-client => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.30
 	sigs.k8s.io/kustomize/api => sigs.k8s.io/kustomize/api v0.8.8
 	sigs.k8s.io/kustomize/cmd/config => sigs.k8s.io/kustomize/cmd/config v0.9.10
 	sigs.k8s.io/kustomize/kustomize/v4 => sigs.k8s.io/kustomize/kustomize/v4 v4.1.2
