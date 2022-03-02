@@ -313,16 +313,16 @@ func (runner *runner) AddEntry(entry string, set *IPSet, ignoreExistErr bool) er
 	if ignoreExistErr {
 		args = append(args, "-exist")
 	}
-	if _, err := runner.exec.Command(IPSetCmd, args...).CombinedOutput(); err != nil {
-		return fmt.Errorf("error adding entry %s, error: %v", entry, err)
+	if out, err := runner.exec.Command(IPSetCmd, args...).CombinedOutput(); err != nil {
+		return fmt.Errorf("error adding entry %s, error: %v (%s)", entry, err, out)
 	}
 	return nil
 }
 
 // DelEntry is used to delete the specified entry from the set.
 func (runner *runner) DelEntry(entry string, set string) error {
-	if _, err := runner.exec.Command(IPSetCmd, "del", set, entry).CombinedOutput(); err != nil {
-		return fmt.Errorf("error deleting entry %s: from set: %s, error: %v", entry, set, err)
+	if out, err := runner.exec.Command(IPSetCmd, "del", set, entry).CombinedOutput(); err != nil {
+		return fmt.Errorf("error deleting entry %s: from set: %s, error: %v (%s)", entry, set, err, out)
 	}
 	return nil
 }
