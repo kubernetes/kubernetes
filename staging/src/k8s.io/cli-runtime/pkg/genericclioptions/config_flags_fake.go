@@ -18,6 +18,8 @@ package genericclioptions
 
 import (
 	"fmt"
+	"k8s.io/cli-runtime/pkg/resource"
+	"net/http"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/discovery"
@@ -32,6 +34,7 @@ import (
 type TestConfigFlags struct {
 	clientConfig    clientcmd.ClientConfig
 	discoveryClient discovery.CachedDiscoveryInterface
+	httpClientFn    resource.HTTPClientFunc
 	restMapper      meta.RESTMapper
 }
 
@@ -50,6 +53,10 @@ func (f *TestConfigFlags) ToRawKubeConfigLoader() clientcmd.ClientConfig {
 // Expects the AddFlags method to have been called.
 func (f *TestConfigFlags) ToRESTConfig() (*rest.Config, error) {
 	return f.ToRawKubeConfigLoader().ClientConfig()
+}
+
+func (f *TestConfigFlags) ToHTTPClient() (*http.Client, error) {
+	return f.httpClientFn()
 }
 
 // ToDiscoveryClient implements RESTClientGetter.
@@ -87,6 +94,12 @@ func (f *TestConfigFlags) WithRESTMapper(mapper meta.RESTMapper) *TestConfigFlag
 // WithDiscoveryClient sets the discoveryClient flag
 func (f *TestConfigFlags) WithDiscoveryClient(c discovery.CachedDiscoveryInterface) *TestConfigFlags {
 	f.discoveryClient = c
+	return f
+}
+
+// WithDiscoveryClient sets the discoveryClient flag
+func (f *TestConfigFlags) WithHTTPClientFunc(fn resource.HTTPClientFunc) *TestConfigFlags {
+	f.httpClientFn = fn
 	return f
 }
 

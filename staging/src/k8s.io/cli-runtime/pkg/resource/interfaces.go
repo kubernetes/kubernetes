@@ -17,6 +17,8 @@ limitations under the License.
 package resource
 
 import (
+	"net/http"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
@@ -28,10 +30,12 @@ type RESTClientGetter interface {
 	ToRESTConfig() (*rest.Config, error)
 	ToDiscoveryClient() (discovery.CachedDiscoveryInterface, error)
 	ToRESTMapper() (meta.RESTMapper, error)
+	ToHTTPClient() (*http.Client, error)
 }
 
 type ClientConfigFunc func() (*rest.Config, error)
 type RESTMapperFunc func() (meta.RESTMapper, error)
+type HTTPClientFunc func() (*http.Client, error)
 type CategoryExpanderFunc func() (restmapper.CategoryExpander, error)
 
 // RESTClient is a client helper for dealing with RESTful resources

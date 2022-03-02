@@ -17,6 +17,7 @@ limitations under the License.
 package genericclioptions
 
 import (
+	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -73,6 +74,8 @@ type RESTClientGetter interface {
 	ToRESTMapper() (meta.RESTMapper, error)
 	// ToRawKubeConfigLoader return kubeconfig loader as-is
 	ToRawKubeConfigLoader() clientcmd.ClientConfig
+	// ToHTTPClient returns HTTPClient for sharing transport
+	ToHTTPClient() (*http.Client, error)
 }
 
 var _ RESTClientGetter = &ConfigFlags{}
@@ -124,6 +127,9 @@ type ConfigFlags struct {
 	// Allows increasing qps used for discovery, this is useful
 	// in clusters with many registered resources
 	discoveryQPS float32
+
+	httpClient     *http.Client
+	httpClientLock sync.Mutex
 }
 
 // ToRESTConfig implements RESTClientGetter.
@@ -240,6 +246,38 @@ func (f *ConfigFlags) toRawKubePersistentConfigLoader() clientcmd.ClientConfig {
 	}
 
 	return f.clientConfig
+}
+
+// ToHTTPClient implements RESTClientGetter.
+func (f *ConfigFlags) ToHTTPClient() (*http.Client, error) {
+	if f.usePersistentConfig {
+		return f.toPersistentHTTPClient()
+	}
+	return f.toHTTPClient()
+}
+
+func (f *ConfigFlags) toPersistentHTTPClient() (*http.Client, error) {
+	f.httpClientLock.Lock()
+	defer f.httpClientLock.Unlock()
+
+	if f.httpClient == nil {
+		client, err := f.toHTTPClient()
+		if err != nil {
+			return nil, err
+		}
+		f.httpClient = client
+	}
+
+	return f.httpClient, nil
+}
+
+func (f *ConfigFlags) toHTTPClient() (*http.Client, error) {
+	config, err := f.ToRESTConfig()
+	if err != nil {
+		return nil, err
+	}
+	rest.SetKubernetesDefaults(config)
+	return rest.HTTPClientFor(config)
 }
 
 // ToDiscoveryClient implements RESTClientGetter.
