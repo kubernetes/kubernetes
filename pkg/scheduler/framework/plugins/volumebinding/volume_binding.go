@@ -377,7 +377,7 @@ func New(plArgs runtime.Object, fh framework.Handle, fts feature.Features) (fram
 	csiNodeInformer := fh.SharedInformerFactory().Storage().V1().CSINodes()
 	capacityCheck := CapacityCheck{
 		CSIDriverInformer:          fh.SharedInformerFactory().Storage().V1().CSIDrivers(),
-		CSIStorageCapacityInformer: fh.SharedInformerFactory().Storage().V1beta1().CSIStorageCapacities(),
+		CSIStorageCapacityInformer: fh.SharedInformerFactory().Storage().V1().CSIStorageCapacities(),
 	}
 	binder := NewVolumeBinder(fh.ClientSet(), podInformer, nodeInformer, csiNodeInformer, pvcInformer, pvInformer, storageClassInformer, capacityCheck, time.Duration(args.BindTimeoutSeconds)*time.Second)
 
