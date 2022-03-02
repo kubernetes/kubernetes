@@ -10842,6 +10842,32 @@ var schemaYAML = typed.YAMLObject(`types:
           elementRelationship: associative
           keys:
           - name
+- name: io.k8s.api.storage.v1.CSIStorageCapacity
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: capacity
+      type:
+        namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+    - name: kind
+      type:
+        scalar: string
+    - name: maximumVolumeSize
+      type:
+        namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: nodeTopology
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector
+    - name: storageClassName
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.storage.v1.StorageClass
   map:
     fields:
