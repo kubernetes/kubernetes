@@ -330,16 +330,16 @@ func NewFramework(r Registry, profile *config.KubeSchedulerProfile, opts ...Opti
 		fillEventToPluginMap(p, options.clusterEventMap)
 	}
 
-	// initialize plugins per individual extension points
-	for _, e := range f.getExtensionPoints(profile.Plugins) {
-		if err := updatePluginList(e.slicePtr, *e.plugins, pluginsMap); err != nil {
+	// initialize multiPoint plugins to their expanded extension points
+	if len(profile.Plugins.MultiPoint.Enabled) > 0 {
+		if err := f.expandMultiPointPlugins(profile, pluginsMap); err != nil {
 			return nil, err
 		}
 	}
 
-	// initialize multiPoint plugins to their expanded extension points
-	if len(profile.Plugins.MultiPoint.Enabled) > 0 {
-		if err := f.expandMultiPointPlugins(profile, pluginsMap); err != nil {
+	// initialize plugins per individual extension points
+	for _, e := range f.getExtensionPoints(profile.Plugins) {
+		if err := updatePluginList(e.slicePtr, *e.plugins, pluginsMap); err != nil {
 			return nil, err
 		}
 	}
