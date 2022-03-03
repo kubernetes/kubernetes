@@ -220,9 +220,10 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			rbacv1helpers.NewRule("list").Groups(legacyGroup).Resources("pods").RuleOrDie(),
 			// TODO: restrict this to the appropriate namespace
 			rbacv1helpers.NewRule("get").Groups(legacyGroup).Resources("services/proxy").Names("https:heapster:", "http:heapster:").RuleOrDie(),
-			// allow listing resource metrics and custom metrics
+			// allow listing resource, custom, and external metrics
 			rbacv1helpers.NewRule("list").Groups(resMetricsGroup).Resources("pods").RuleOrDie(),
 			rbacv1helpers.NewRule("get", "list").Groups(customMetricsGroup).Resources("*").RuleOrDie(),
+			rbacv1helpers.NewRule("get", "list").Groups(externalMetricsGroup).Resources("*").RuleOrDie(),
 			eventsRule(),
 		},
 	})
