@@ -654,6 +654,10 @@ type specStandardValidator interface {
 	// insideResourceMeta returns true when validating either TypeMeta or ObjectMeta, from an embedded resource or on the top-level.
 	insideResourceMeta() bool
 	withInsideResourceMeta() specStandardValidator
+
+	// forbidOldSelfValidations returns the path to the first ancestor of the visited path that can't be safely correlated between two revisions of an object, or nil if there is no such path
+	forbidOldSelfValidations() *field.Path
+	withForbidOldSelfValidations(path *field.Path) specStandardValidator
 }
 
 // validateCustomResourceDefinitionValidation statically validates
@@ -776,9 +780,14 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 		for property, jsonSchema := range schema.Properties {
 			subSsv := ssv
 
+			// defensively assumes that a future map type is uncorrelatable
+			if schema.XMapType != nil && (*schema.XMapType != "granular" && *schema.XMapType != "atomic") {
+				subSsv = subSsv.withForbidOldSelfValidations(fldPath)
+			}
+
 			if (isRoot || schema.XEmbeddedResource) && metaFields.Has(property) {
 				// we recurse into the schema that applies to ObjectMeta.
-				subSsv = ssv.withInsideResourceMeta()
+				subSsv = subSsv.withInsideResourceMeta()
 				if isRoot {
 					subSsv = subSsv.withForbiddenDefaults(fmt.Sprintf("in top-level %s", property))
 				}
@@ -814,10 +823,19 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 	}
 
 	if schema.Items != nil {
-		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.Items.Schema, fldPath.Child("items"), ssv, false, opts)...)
+		subSsv := ssv
+
+		// we can only correlate old/new items for "map" and "set" lists, and correlation of
+		// "set" elements by identity is not supported for cel (x-kubernetes-validations)
+		// rules. an unset list type defaults to "atomic".
+		if schema.XListType == nil || *schema.XListType != "map" {
+			subSsv = subSsv.withForbidOldSelfValidations(fldPath)
+		}
+
+		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.Items.Schema, fldPath.Child("items"), subSsv, false, opts)...)
 		if len(schema.Items.JSONSchemas) != 0 {
 			for i, jsonSchema := range schema.Items.JSONSchemas {
-				allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("items").Index(i), ssv, false, opts)...)
+				allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("items").Index(i), subSsv, false, opts)...)
 			}
 		}
 	}
@@ -940,6 +958,15 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 							allErrs = append(allErrs, field.Invalid(fldPath.Child("x-kubernetes-validations").Index(i).Child("rule"), schema.XValidations[i], cr.Error.Detail))
 						}
 					}
+					if cr.TransitionRule {
+						if uncorrelatablePath := ssv.forbidOldSelfValidations(); uncorrelatablePath != nil {
+							allErrs = append(allErrs, field.Invalid(fldPath.Child("x-kubernetes-validations").Index(i).Child("rule"), schema.XValidations[i].Rule, fmt.Sprintf("oldSelf cannot be used on the uncorrelatable portion of the schema within %v", uncorrelatablePath)))
+						} else {
+							// todo: remove when transition rule validation is implemented
+							allErrs = append(allErrs, field.Invalid(fldPath.Child("x-kubernetes-validations").Index(i).Child("rule"), schema.XValidations[i].Rule, "validation of rules containing oldSelf is not yet implemented"))
+
+						}
+					}
 				}
 			}
 		}
@@ -1006,10 +1033,11 @@ func validateMapListKeysMapSet(schema *apiextensions.JSONSchemaProps, fldPath *f
 }
 
 type specStandardValidatorV3 struct {
-	allowDefaults            bool
-	disallowDefaultsReason   string
-	isInsideResourceMeta     bool
-	requireValidPropertyType bool
+	allowDefaults                       bool
+	disallowDefaultsReason              string
+	isInsideResourceMeta                bool
+	requireValidPropertyType            bool
+	uncorrelatableOldSelfValidationPath *field.Path
 }
 
 func (v *specStandardValidatorV3) withForbiddenDefaults(reason string) specStandardValidator {
@@ -1027,6 +1055,21 @@ func (v *specStandardValidatorV3) withInsideResourceMeta() specStandardValidator
 
 func (v *specStandardValidatorV3) insideResourceMeta() bool {
 	return v.isInsideResourceMeta
+}
+
+func (v *specStandardValidatorV3) withForbidOldSelfValidations(path *field.Path) specStandardValidator {
+	if v.uncorrelatableOldSelfValidationPath != nil {
+		// oldSelf validations are already forbidden. preserve the highest-level path
+		// causing oldSelf validations to be forbidden
+		return v
+	}
+	clone := *v
+	clone.uncorrelatableOldSelfValidationPath = path
+	return &clone
+}
+
+func (v *specStandardValidatorV3) forbidOldSelfValidations() *field.Path {
+	return v.uncorrelatableOldSelfValidationPath
 }
 
 // validate validates against OpenAPI Schema v3.

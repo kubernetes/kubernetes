@@ -26,18 +26,30 @@ import (
 	expr "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 	"google.golang.org/protobuf/proto"
 
+	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/library"
 	celmodel "k8s.io/apiextensions-apiserver/third_party/forked/celopenapi/model"
 )
 
-// ScopedVarName is the variable name assigned to the locally scoped data element of a CEL valid.
-const ScopedVarName = "self"
+const (
+	// ScopedVarName is the variable name assigned to the locally scoped data element of a CEL validation
+	// expression.
+	ScopedVarName = "self"
+
+	// OldScopedVarName is the variable name assigned to the existing value of the locally scoped data element of a
+	// CEL validation expression.
+	OldScopedVarName = "oldSelf"
+)
 
 // CompilationResult represents the cel compilation result for one rule
 type CompilationResult struct {
 	Program cel.Program
 	Error   *Error
+
+	// If true, the compiled expression contains a reference to the identifier "oldSelf", and its corresponding rule
+	// is implicitly a transition rule.
+	TransitionRule bool
 }
 
 // Compile compiles all the XValidations rules (without recursing into the schema) and returns a slice containing a
@@ -81,6 +93,7 @@ func Compile(s *schema.Structural, isResourceRoot bool) ([]CompilationResult, er
 		root = rootDecl.MaybeAssignTypeName(scopedTypeName)
 	}
 	propDecls = append(propDecls, decls.NewVar(ScopedVarName, root.ExprType()))
+	propDecls = append(propDecls, decls.NewVar(OldScopedVarName, root.ExprType()))
 	opts = append(opts, cel.Declarations(propDecls...), cel.HomogeneousAggregateLiterals())
 	opts = append(opts, library.ExtensionLibs...)
 	env, err = env.Extend(opts...)
@@ -91,30 +104,49 @@ func Compile(s *schema.Structural, isResourceRoot bool) ([]CompilationResult, er
 	// compResults is the return value which saves a list of compilation results in the same order as x-kubernetes-validations rules.
 	compResults := make([]CompilationResult, len(celRules))
 	for i, rule := range celRules {
-		var compilationResult CompilationResult
-		if len(strings.TrimSpace(rule.Rule)) == 0 {
-			// include a compilation result, but leave both program and error nil per documented return semantics of this
-			// function
-		} else {
-			ast, issues := env.Compile(rule.Rule)
-			if issues != nil {
-				compilationResult.Error = &Error{ErrorTypeInvalid, "compilation failed: " + issues.String()}
-			} else if !proto.Equal(ast.ResultType(), decls.Bool) {
-				compilationResult.Error = &Error{ErrorTypeInvalid, "cel expression must evaluate to a bool"}
-			} else {
-				prog, err := env.Program(ast, cel.EvalOptions(cel.OptOptimize))
-				if err != nil {
-					compilationResult.Error = &Error{ErrorTypeInvalid, "program instantiation failed: " + err.Error()}
-				} else {
-					compilationResult.Program = prog
-				}
-			}
-		}
-
-		compResults[i] = compilationResult
+		compResults[i] = compileRule(rule, env)
 	}
 
 	return compResults, nil
+}
+
+func compileRule(rule apiextensions.ValidationRule, env *cel.Env) (compilationResult CompilationResult) {
+	if len(strings.TrimSpace(rule.Rule)) == 0 {
+		// include a compilation result, but leave both program and error nil per documented return semantics of this
+		// function
+		return
+	}
+	ast, issues := env.Compile(rule.Rule)
+	if issues != nil {
+		compilationResult.Error = &Error{ErrorTypeInvalid, "compilation failed: " + issues.String()}
+		return
+	}
+	if !proto.Equal(ast.ResultType(), decls.Bool) {
+		compilationResult.Error = &Error{ErrorTypeInvalid, "cel expression must evaluate to a bool"}
+		return
+	}
+
+	checkedExpr, err := cel.AstToCheckedExpr(ast)
+	if err != nil {
+		// should be impossible since env.Compile returned no issues
+		compilationResult.Error = &Error{ErrorTypeInternal, "unexpected compilation error: " + err.Error()}
+		return
+	}
+	for _, ref := range checkedExpr.ReferenceMap {
+		if ref.Name == OldScopedVarName {
+			compilationResult.TransitionRule = true
+			break
+		}
+	}
+
+	prog, err := env.Program(ast, cel.EvalOptions(cel.OptOptimize))
+	if err != nil {
+		compilationResult.Error = &Error{ErrorTypeInvalid, "program instantiation failed: " + err.Error()}
+		return
+	}
+
+	compilationResult.Program = prog
+	return
 }
 
 // generateUniqueSelfTypeName creates a placeholder type name to use in a CEL programs for cases

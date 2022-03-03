@@ -17,6 +17,7 @@ limitations under the License.
 package cel
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -24,24 +25,106 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 )
 
-type validationMatch struct {
+type validationMatcher interface {
+	matches(cr CompilationResult) bool
+	String() string
+}
+
+type allMatcher []validationMatcher
+
+func matchesAll(matchers ...validationMatcher) validationMatcher {
+	return allMatcher(matchers)
+}
+
+func (m allMatcher) matches(cr CompilationResult) bool {
+	for _, each := range m {
+		if !each.matches(cr) {
+			return false
+		}
+	}
+	return true
+}
+
+func (m allMatcher) String() string {
+	if len(m) == 0 {
+		return "any result"
+	}
+	var b strings.Builder
+	for i, each := range m {
+		b.WriteString(each.String())
+		if i < len(m)-1 {
+			b.WriteString(" and ")
+		}
+	}
+	return b.String()
+}
+
+type fnMatcher struct {
+	fn  func(CompilationResult) bool
+	msg string
+}
+
+func (m fnMatcher) matches(cr CompilationResult) bool {
+	return m.fn(cr)
+}
+
+func (m fnMatcher) String() string {
+	return m.msg
+}
+
+type errorMatcher struct {
 	errorType ErrorType
 	contains  string
 }
 
-func invalidError(contains string) validationMatch {
-	return validationMatch{errorType: ErrorTypeInvalid, contains: contains}
+func invalidError(contains string) validationMatcher {
+	return errorMatcher{errorType: ErrorTypeInvalid, contains: contains}
 }
 
-func (v validationMatch) matches(err *Error) bool {
-	return err.Type == v.errorType && strings.Contains(err.Error(), v.contains)
+func (v errorMatcher) matches(cr CompilationResult) bool {
+	return cr.Error != nil && cr.Error.Type == v.errorType && strings.Contains(cr.Error.Error(), v.contains)
+}
+
+func (v errorMatcher) String() string {
+	return fmt.Sprintf("has error of type %q containing string %q", v.errorType, v.contains)
+}
+
+type noErrorMatcher struct{}
+
+func noError() validationMatcher {
+	return noErrorMatcher{}
+}
+
+func (noErrorMatcher) matches(cr CompilationResult) bool {
+	return cr.Error == nil
+}
+
+func (noErrorMatcher) String() string {
+	return "no error"
+}
+
+type transitionRuleMatcher bool
+
+func transitionRule(t bool) validationMatcher {
+	return transitionRuleMatcher(t)
+}
+
+func (v transitionRuleMatcher) matches(cr CompilationResult) bool {
+	return cr.TransitionRule == bool(v)
+}
+
+func (v transitionRuleMatcher) String() string {
+	if v {
+		return "is a transition rule"
+	}
+	return "is not a transition rule"
 }
 
 func TestCelCompilation(t *testing.T) {
 	cases := []struct {
-		name           string
-		input          schema.Structural
-		expectedErrors []validationMatch
+		name            string
+		input           schema.Structural
+		expectedResults []validationMatcher
 	}{
 		{
 			name: "valid object",
@@ -70,6 +153,9 @@ func TestCelCompilation(t *testing.T) {
 					},
 				},
 			},
+			expectedResults: []validationMatcher{
+				noError(),
+			},
 		},
 		{
 			name: "valid for string",
@@ -85,6 +171,9 @@ func TestCelCompilation(t *testing.T) {
 						},
 					},
 				},
+			},
+			expectedResults: []validationMatcher{
+				noError(),
 			},
 		},
 		{
@@ -105,6 +194,9 @@ func TestCelCompilation(t *testing.T) {
 					},
 				},
 			},
+			expectedResults: []validationMatcher{
+				noError(),
+			},
 		},
 		{
 			name: "valid for boolean",
@@ -120,6 +212,9 @@ func TestCelCompilation(t *testing.T) {
 						},
 					},
 				},
+			},
+			expectedResults: []validationMatcher{
+				noError(),
 			},
 		},
 		{
@@ -137,6 +232,9 @@ func TestCelCompilation(t *testing.T) {
 					},
 				},
 			},
+			expectedResults: []validationMatcher{
+				noError(),
+			},
 		},
 		{
 			name: "valid for number",
@@ -152,6 +250,9 @@ func TestCelCompilation(t *testing.T) {
 						},
 					},
 				},
+			},
+			expectedResults: []validationMatcher{
+				noError(),
 			},
 		},
 		{
@@ -186,6 +287,9 @@ func TestCelCompilation(t *testing.T) {
 					},
 				},
 			},
+			expectedResults: []validationMatcher{
+				noError(),
+			},
 		},
 		{
 			name: "valid nested object of array",
@@ -219,6 +323,9 @@ func TestCelCompilation(t *testing.T) {
 					},
 				},
 			},
+			expectedResults: []validationMatcher{
+				noError(),
+			},
 		},
 		{
 			name: "valid nested array of array",
@@ -249,6 +356,9 @@ func TestCelCompilation(t *testing.T) {
 						},
 					},
 				},
+			},
+			expectedResults: []validationMatcher{
+				noError(),
 			},
 		},
 		{
@@ -288,6 +398,9 @@ func TestCelCompilation(t *testing.T) {
 					},
 				},
 			},
+			expectedResults: []validationMatcher{
+				noError(),
+			},
 		},
 		{
 			name: "valid map",
@@ -313,6 +426,9 @@ func TestCelCompilation(t *testing.T) {
 					},
 				},
 			},
+			expectedResults: []validationMatcher{
+				noError(),
+			},
 		},
 		{
 			name: "invalid checking for number",
@@ -329,7 +445,7 @@ func TestCelCompilation(t *testing.T) {
 					},
 				},
 			},
-			expectedErrors: []validationMatch{
+			expectedResults: []validationMatcher{
 				invalidError("compilation failed"),
 			},
 		},
@@ -348,7 +464,7 @@ func TestCelCompilation(t *testing.T) {
 					},
 				},
 			},
-			expectedErrors: []validationMatch{
+			expectedResults: []validationMatcher{
 				invalidError("compilation failed"),
 			},
 		},
@@ -400,6 +516,11 @@ func TestCelCompilation(t *testing.T) {
 					},
 				},
 			},
+			expectedResults: []validationMatcher{
+				noError(),
+				noError(),
+				noError(),
+			},
 		},
 		{
 			name: "invalid for escaping",
@@ -449,10 +570,67 @@ func TestCelCompilation(t *testing.T) {
 					},
 				},
 			},
-			expectedErrors: []validationMatch{
+			expectedResults: []validationMatcher{
 				invalidError("undefined field 'namespace'"),
 				invalidError("undefined field 'if'"),
 				invalidError("found no matching overload"),
+			},
+		},
+		{
+			name: "transition rule identified",
+			input: schema.Structural{
+				Generic: schema.Generic{
+					Type: "integer",
+				},
+				Extensions: schema.Extensions{
+					XValidations: apiextensions.ValidationRules{
+						{Rule: "self > 0"},
+						{Rule: "self >= oldSelf"},
+					},
+				},
+			},
+			expectedResults: []validationMatcher{
+				matchesAll(noError(), transitionRule(false)),
+				matchesAll(noError(), transitionRule(true)),
+			},
+		},
+		{
+			name: "whitespace-only rule",
+			input: schema.Structural{
+				Generic: schema.Generic{
+					Type: "object",
+				},
+				Extensions: schema.Extensions{
+					XValidations: apiextensions.ValidationRules{
+						{Rule: " \t"},
+					},
+				},
+			},
+			expectedResults: []validationMatcher{
+				matchesAll(
+					noError(),
+					fnMatcher{
+						msg: "program is nil",
+						fn: func(cr CompilationResult) bool {
+							return cr.Program == nil
+						},
+					}),
+			},
+		},
+		{
+			name: "expression must evaluate to bool",
+			input: schema.Structural{
+				Generic: schema.Generic{
+					Type: "object",
+				},
+				Extensions: schema.Extensions{
+					XValidations: apiextensions.ValidationRules{
+						{Rule: "42"},
+					},
+				},
+			},
+			expectedResults: []validationMatcher{
+				invalidError("must evaluate to a bool"),
 			},
 		},
 	}
@@ -464,26 +642,17 @@ func TestCelCompilation(t *testing.T) {
 				t.Errorf("Expected no error, but got: %v", err)
 			}
 
-			seenErrs := make([]bool, len(compilationResults))
-
-			for _, expectedError := range tt.expectedErrors {
-				found := false
-				for i, result := range compilationResults {
-					if expectedError.matches(result.Error) && !seenErrs[i] {
-						found = true
-						seenErrs[i] = true
-						break
-					}
-				}
-
-				if !found {
-					t.Errorf("expected error: %v", expectedError)
-				}
+			if len(compilationResults) != len(tt.input.XValidations) {
+				t.Fatalf("compilation did not produce one result per rule")
 			}
 
-			for i, seen := range seenErrs {
-				if !seen && compilationResults[i].Error != nil {
-					t.Errorf("unexpected error: %v", compilationResults[i].Error)
+			if len(compilationResults) != len(tt.expectedResults) {
+				t.Fatalf("one test expectation per rule is required")
+			}
+
+			for i, expectedResult := range tt.expectedResults {
+				if !expectedResult.matches(compilationResults[i]) {
+					t.Errorf("result %d does not match expectation: %v", i+1, expectedResult)
 				}
 			}
 		})

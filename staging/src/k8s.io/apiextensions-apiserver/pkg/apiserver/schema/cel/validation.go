@@ -135,6 +135,11 @@ func (s *Validator) validateExpressions(fldPath *field.Path, sts *schema.Structu
 			// rule is empty
 			continue
 		}
+		if compiled.TransitionRule {
+			// transition rules are evaluated only if there is a comparable existing value
+			errs = append(errs, field.InternalError(fldPath, fmt.Errorf("oldSelf validation not implemented")))
+			continue // todo: wire oldObj parameter
+		}
 		evalResult, _, err := compiled.Program.Eval(activation)
 		if err != nil {
 			// see types.Err for list of well defined error types
