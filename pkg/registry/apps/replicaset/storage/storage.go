@@ -81,7 +81,6 @@ func NewStorage(optsGetter generic.RESTOptionsGetter) (ReplicaSetStorage, error)
 // REST implements a RESTStorage for ReplicaSet.
 type REST struct {
 	*genericregistry.Store
-	categories []string
 }
 
 // NewREST returns a RESTStorage object that will work against ReplicaSet.
@@ -108,7 +107,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 	statusStore.UpdateStrategy = replicaset.StatusStrategy
 	statusStore.ResetFieldsStrategy = replicaset.StatusStrategy
 
-	return &REST{store, []string{"all"}}, &StatusREST{store: &statusStore}, nil
+	return &REST{store}, &StatusREST{store: &statusStore}, nil
 }
 
 // Implement ShortNamesProvider
@@ -124,13 +123,7 @@ var _ rest.CategoriesProvider = &REST{}
 
 // Categories implements the CategoriesProvider interface. Returns a list of categories a resource is part of.
 func (r *REST) Categories() []string {
-	return r.categories
-}
-
-// WithCategories sets categories for REST.
-func (r *REST) WithCategories(categories []string) *REST {
-	r.categories = categories
-	return r
+	return []string{"all"}
 }
 
 // StatusREST implements the REST endpoint for changing the status of a ReplicaSet
