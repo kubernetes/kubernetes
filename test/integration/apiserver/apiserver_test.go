@@ -1972,6 +1972,10 @@ func TestTransform(t *testing.T) {
 				rv = previousRV
 			}
 
+			ctx, cancel := context.WithTimeout(context.Background(), wait.ForeverTestTimeout)
+			t.Cleanup(func() {
+				cancel()
+			})
 			w, err := client.Get().
 				Resource(resource).NamespaceIfScoped(obj.GetNamespace(), len(obj.GetNamespace()) > 0).
 				SetHeader("Accept", tc.accept).
@@ -1981,7 +1985,7 @@ func TestTransform(t *testing.T) {
 					FieldSelector:   fields.OneTermEqualSelector("metadata.name", obj.GetName()).String(),
 				}, metav1.ParameterCodec).
 				Param("includeObject", string(tc.includeObject)).
-				Stream(context.TODO())
+				Stream(ctx)
 			if (tc.wantErr != nil) != (err != nil) {
 				t.Fatalf("unexpected error: %v", err)
 			}
