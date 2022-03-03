@@ -55,8 +55,13 @@ func (f *TestConfigFlags) ToRESTConfig() (*rest.Config, error) {
 	return f.ToRawKubeConfigLoader().ClientConfig()
 }
 
+// ToHTTPClient implements RESTClientGetter.
 func (f *TestConfigFlags) ToHTTPClient() (*http.Client, error) {
 	return f.httpClientFn()
+}
+
+// SetStdinInUse implements RESTClientGetter.
+func (f *TestConfigFlags) SetStdinInUse() {
 }
 
 // ToDiscoveryClient implements RESTClientGetter.

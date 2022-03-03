@@ -89,6 +89,10 @@ func (f *MatchVersionFlags) ToHTTPClient() (*http.Client, error) {
 	return f.Delegate.ToHTTPClient()
 }
 
+func (f *MatchVersionFlags) SetStdinInUse() {
+	f.Delegate.SetStdinInUse()
+}
+
 func (f *MatchVersionFlags) ToDiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
 	if err := f.checkMatchingServerVersion(); err != nil {
 		return nil, err

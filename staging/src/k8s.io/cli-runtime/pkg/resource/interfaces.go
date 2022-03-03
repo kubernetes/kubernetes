@@ -31,12 +31,14 @@ type RESTClientGetter interface {
 	ToDiscoveryClient() (discovery.CachedDiscoveryInterface, error)
 	ToRESTMapper() (meta.RESTMapper, error)
 	ToHTTPClient() (*http.Client, error)
+	SetStdinInUse()
 }
 
 type ClientConfigFunc func() (*rest.Config, error)
 type RESTMapperFunc func() (meta.RESTMapper, error)
 type HTTPClientFunc func() (*http.Client, error)
 type CategoryExpanderFunc func() (restmapper.CategoryExpander, error)
+type OnStdinInUse func()
 
 // RESTClient is a client helper for dealing with RESTful resources
 // in a generic way.

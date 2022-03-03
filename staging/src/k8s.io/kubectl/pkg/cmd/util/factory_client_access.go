@@ -91,6 +91,10 @@ func (f *factoryImpl) KubernetesClientSet() (*kubernetes.Clientset, error) {
 	return kubernetes.NewForConfigAndClient(clientConfig, httpClient)
 }
 
+func (f *factoryImpl) SetStdinInUse() {
+	f.clientGetter.SetStdinInUse()
+}
+
 func (f *factoryImpl) DynamicClient() (dynamic.Interface, error) {
 	clientConfig, err := f.ToRESTConfig()
 	if err != nil {

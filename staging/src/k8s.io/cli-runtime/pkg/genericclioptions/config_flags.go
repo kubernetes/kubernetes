@@ -76,6 +76,8 @@ type RESTClientGetter interface {
 	ToRawKubeConfigLoader() clientcmd.ClientConfig
 	// ToHTTPClient returns HTTPClient for sharing transport
 	ToHTTPClient() (*http.Client, error)
+	// SetStdinInUse sets a stdinInUse flag to true and resets clients
+	SetStdinInUse()
 }
 
 var _ RESTClientGetter = &ConfigFlags{}
@@ -130,6 +132,10 @@ type ConfigFlags struct {
 
 	httpClient     *http.Client
 	httpClientLock sync.Mutex
+
+	// Affects behaviour of Exec Credentials Provider.
+	stdinInUse     bool
+	stdinInUseLock sync.Mutex
 }
 
 // ToRESTConfig implements RESTClientGetter.
@@ -143,7 +149,11 @@ func (f *ConfigFlags) ToRESTConfig() (*rest.Config, error) {
 		return nil, err
 	}
 	if f.WrapConfigFn != nil {
-		return f.WrapConfigFn(c), nil
+		c = f.WrapConfigFn(c)
+	}
+	if f.stdinInUse && c.ExecProvider != nil {
+		c.ExecProvider.StdinUnavailable = f.stdinInUse
+		c.ExecProvider.StdinUnavailableMessage = "used by stdin resource manifest reader"
 	}
 	return c, nil
 }
@@ -278,6 +288,31 @@ func (f *ConfigFlags) toHTTPClient() (*http.Client, error) {
 	}
 	rest.SetKubernetesDefaults(config)
 	return rest.HTTPClientFor(config)
+}
+
+// SetStdinInUse sets stdinInUse to true and resets created clients
+// Usage of stdin can be detected (eg by Builder) after initializing the clients, so
+// we should then reset these clients to reflect this new information in config that is passed to http client.
+// This affects behaviour of Exec Credentials Provider.
+func (f *ConfigFlags) SetStdinInUse() {
+	f.stdinInUseLock.Lock()
+	defer f.stdinInUseLock.Unlock()
+	if f.stdinInUse {
+		return
+	}
+	f.stdinInUse = true
+
+	func() {
+		f.httpClientLock.Lock()
+		defer f.httpClientLock.Unlock()
+		f.httpClient = nil
+	}()
+
+	func() {
+		f.discoveryClientLock.Lock()
+		defer f.discoveryClientLock.Unlock()
+		f.discoveryClient = nil
+	}()
 }
 
 // ToDiscoveryClient implements RESTClientGetter.
