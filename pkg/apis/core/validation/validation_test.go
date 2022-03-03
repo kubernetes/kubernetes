@@ -676,11 +676,38 @@ func TestValidatePersistentVolumeSourceUpdate(t *testing.T) {
 		Namespace: "default",
 	}
 
+	// shortSecretRef refers to the secretRefs which are validated with IsDNS1035Label
+	shortSecretName := "key-name"
+	shortSecretRef := &core.SecretReference{
+		Name:      shortSecretName,
+		Namespace: "default",
+	}
+
+	//longSecretRef refers to the secretRefs which are validated with IsDNS1123Subdomain
+	longSecretName := "key-name.example.com"
+	longSecretRef := &core.SecretReference{
+		Name:      longSecretName,
+		Namespace: "default",
+	}
+
+	// invalidSecrets missing name, namespace and both
+	inValidSecretRef := &core.SecretReference{
+		Name:      "",
+		Namespace: "",
+	}
+	invalidSecretRefmissingName := &core.SecretReference{
+		Name:      "",
+		Namespace: "default",
+	}
+	invalidSecretRefmissingNamespace := &core.SecretReference{
+		Name:      "invalidnamespace",
+		Namespace: "",
+	}
+
 	scenarios := map[string]struct {
-		isExpectedFailure   bool
-		csiExpansionEnabled bool
-		oldVolume           *core.PersistentVolume
-		newVolume           *core.PersistentVolume
+		isExpectedFailure bool
+		oldVolume         *core.PersistentVolume
+		newVolume         *core.PersistentVolume
 	}{
 		"condition-no-update": {
 			isExpectedFailure: false,
@@ -698,19 +725,137 @@ func TestValidatePersistentVolumeSourceUpdate(t *testing.T) {
 			newVolume:         invalidPvSourceUpdateDeep,
 		},
 		"csi-expansion-enabled-with-pv-secret": {
-			csiExpansionEnabled: true,
-			isExpectedFailure:   false,
-			oldVolume:           validCSIVolume,
-			newVolume:           getCSIVolumeWithSecret(validCSIVolume, expandSecretRef),
+			isExpectedFailure: false,
+			oldVolume:         validCSIVolume,
+			newVolume:         getCSIVolumeWithSecret(validCSIVolume, expandSecretRef, "controllerExpand"),
 		},
 		"csi-expansion-enabled-with-old-pv-secret": {
-			csiExpansionEnabled: true,
-			isExpectedFailure:   true,
-			oldVolume:           getCSIVolumeWithSecret(validCSIVolume, expandSecretRef),
+			isExpectedFailure: true,
+			oldVolume:         getCSIVolumeWithSecret(validCSIVolume, expandSecretRef, "controllerExpand"),
 			newVolume: getCSIVolumeWithSecret(validCSIVolume, &core.SecretReference{
 				Name:      "foo-secret",
 				Namespace: "default",
-			}),
+			}, "controllerExpand"),
+		},
+		"csi-expansion-enabled-with-shortSecretRef": {
+			isExpectedFailure: false,
+			oldVolume:         validCSIVolume,
+			newVolume:         getCSIVolumeWithSecret(validCSIVolume, shortSecretRef, "controllerExpand"),
+		},
+		"csi-expansion-enabled-with-longSecretRef": {
+			isExpectedFailure: true,
+			oldVolume:         validCSIVolume,
+			newVolume:         getCSIVolumeWithSecret(validCSIVolume, longSecretRef, "controllerExpand"),
+		},
+		"csi-expansion-enabled-from-shortSecretRef-to-shortSecretRef": {
+			isExpectedFailure: false,
+			oldVolume:         getCSIVolumeWithSecret(validCSIVolume, shortSecretRef, "controllerExpand"),
+			newVolume:         getCSIVolumeWithSecret(validCSIVolume, shortSecretRef, "controllerExpand"),
+		},
+		"csi-expansion-enabled-from-shortSecretRef-to-longSecretRef": {
+			isExpectedFailure: true,
+			oldVolume:         getCSIVolumeWithSecret(validCSIVolume, shortSecretRef, "controllerExpand"),
+			newVolume:         getCSIVolumeWithSecret(validCSIVolume, longSecretRef, "controllerExpand"),
+		},
+		"csi-expansion-enabled-from-longSecretRef-to-longSecretRef": {
+			isExpectedFailure: true,
+			oldVolume:         getCSIVolumeWithSecret(validCSIVolume, longSecretRef, "controllerExpand"),
+			newVolume:         getCSIVolumeWithSecret(validCSIVolume, longSecretRef, "controllerExpand"),
+		},
+		"csi-cntrlpublish-enabled-with-shortSecretRef": {
+			isExpectedFailure: true, // updating secretRef will fail as the object is immutable eventhough the secretRef is valid
+			oldVolume:         validCSIVolume,
+			newVolume:         getCSIVolumeWithSecret(validCSIVolume, shortSecretRef, "controllerPublish"),
+		},
+		"csi-cntrlpublish-enabled-with-longSecretRef": {
+			isExpectedFailure: true, // updating secretRef will fail as the object is immutable eventhough the secretRef is valid
+			oldVolume:         validCSIVolume,
+			newVolume:         getCSIVolumeWithSecret(validCSIVolume, longSecretRef, "controllerPublish"),
+		},
+		"csi-cntrlpublish-enabled-from-shortSecretRef-to-shortSecretRef": {
+			isExpectedFailure: false,
+			oldVolume:         getCSIVolumeWithSecret(validCSIVolume, shortSecretRef, "controllerPublish"),
+			newVolume:         getCSIVolumeWithSecret(validCSIVolume, shortSecretRef, "controllerPublish"),
+		},
+		"csi-cntrlpublish-enabled-from-shortSecretRef-to-longSecretRef": {
+			isExpectedFailure: true,
+			oldVolume:         getCSIVolumeWithSecret(validCSIVolume, shortSecretRef, "controllerPublish"),
+			newVolume:         getCSIVolumeWithSecret(validCSIVolume, longSecretRef, "controllerPublish"),
+		},
+		"csi-cntrlpublish-enabled-from-longSecretRef-to-longSecretRef": {
+			isExpectedFailure: true,
+			oldVolume:         getCSIVolumeWithSecret(validCSIVolume, longSecretRef, "controllerPublish"),
+			newVolume:         getCSIVolumeWithSecret(validCSIVolume, longSecretRef, "controllerPublish"),
+		},
+		"csi-nodepublish-enabled-with-shortSecretRef": {
+			isExpectedFailure: true, // updating secretRef will fail as the object is immutable eventhough the secretRef is valid
+			oldVolume:         validCSIVolume,
+			newVolume:         getCSIVolumeWithSecret(validCSIVolume, shortSecretRef, "nodePublish"),
+		},
+		"csi-nodepublish-enabled-with-longSecretRef": {
+			isExpectedFailure: true, // updating secretRef will fail as the object is immutable eventhough the secretRef is valid
+			oldVolume:         validCSIVolume,
+			newVolume:         getCSIVolumeWithSecret(validCSIVolume, longSecretRef, "nodePublish"),
+		},
+		"csi-nodepublish-enabled-from-shortSecretRef-to-shortSecretRef": {
+			isExpectedFailure: false,
+			oldVolume:         getCSIVolumeWithSecret(validCSIVolume, shortSecretRef, "nodePublish"),
+			newVolume:         getCSIVolumeWithSecret(validCSIVolume, shortSecretRef, "nodePublish"),
+		},
+		"csi-nodepublish-enabled-from-shortSecretRef-to-longSecretRef": {
+			isExpectedFailure: true,
+			oldVolume:         getCSIVolumeWithSecret(validCSIVolume, shortSecretRef, "nodePublish"),
+			newVolume:         getCSIVolumeWithSecret(validCSIVolume, longSecretRef, "nodePublish"),
+		},
+		"csi-nodepublish-enabled-from-longSecretRef-to-longSecretRef": {
+			isExpectedFailure: true,
+			oldVolume:         getCSIVolumeWithSecret(validCSIVolume, longSecretRef, "nodePublish"),
+			newVolume:         getCSIVolumeWithSecret(validCSIVolume, longSecretRef, "nodePublish"),
+		},
+		"csi-nodestage-enabled-with-shortSecretRef": {
+			isExpectedFailure: true, // updating secretRef will fail as the object is immutable eventhough the secretRef is valid
+			oldVolume:         validCSIVolume,
+			newVolume:         getCSIVolumeWithSecret(validCSIVolume, shortSecretRef, "nodeStage"),
+		},
+		"csi-nodestage-enabled-with-longSecretRef": {
+			isExpectedFailure: true, // updating secretRef will fail as the object is immutable eventhough the secretRef is valid
+			oldVolume:         validCSIVolume,
+			newVolume:         getCSIVolumeWithSecret(validCSIVolume, longSecretRef, "nodeStage"),
+		},
+		"csi-nodestage-enabled-from-shortSecretRef-to-longSecretRef": {
+			isExpectedFailure: true,
+			oldVolume:         getCSIVolumeWithSecret(validCSIVolume, shortSecretRef, "nodeStage"),
+			newVolume:         getCSIVolumeWithSecret(validCSIVolume, longSecretRef, "nodeStage"),
+		},
+
+		// At present, there is no validation exist for nodeStage secretRef in
+		// ValidatePersistentVolumeSpec->validateCSIPersistentVolumeSource, due to that, below
+		// checks/validations pass!
+
+		"csi-nodestage-enabled-from-invalidSecretRef-to-invalidSecretRef": {
+			isExpectedFailure: false,
+			oldVolume:         getCSIVolumeWithSecret(validCSIVolume, inValidSecretRef, "nodeStage"),
+			newVolume:         getCSIVolumeWithSecret(validCSIVolume, inValidSecretRef, "nodeStage"),
+		},
+		"csi-nodestage-enabled-from-invalidSecretRefmissingname-to-invalidSecretRefmissingname": {
+			isExpectedFailure: false,
+			oldVolume:         getCSIVolumeWithSecret(validCSIVolume, invalidSecretRefmissingName, "nodeStage"),
+			newVolume:         getCSIVolumeWithSecret(validCSIVolume, invalidSecretRefmissingName, "nodeStage"),
+		},
+		"csi-nodestage-enabled-from-invalidSecretRefmissingnamespace-to-invalidSecretRefmissingnamespace": {
+			isExpectedFailure: false,
+			oldVolume:         getCSIVolumeWithSecret(validCSIVolume, invalidSecretRefmissingNamespace, "nodeStage"),
+			newVolume:         getCSIVolumeWithSecret(validCSIVolume, invalidSecretRefmissingNamespace, "nodeStage"),
+		},
+		"csi-nodestage-enabled-from-shortSecretRef-to-shortSecretRef": {
+			isExpectedFailure: false,
+			oldVolume:         getCSIVolumeWithSecret(validCSIVolume, shortSecretRef, "nodeStage"),
+			newVolume:         getCSIVolumeWithSecret(validCSIVolume, shortSecretRef, "nodeStage"),
+		},
+		"csi-nodestage-enabled-from-longSecretRef-to-longSecretRef": {
+			isExpectedFailure: false,
+			oldVolume:         getCSIVolumeWithSecret(validCSIVolume, longSecretRef, "nodeStage"),
+			newVolume:         getCSIVolumeWithSecret(validCSIVolume, longSecretRef, "nodeStage"),
 		},
 	}
 	for name, scenario := range scenarios {
@@ -780,6 +925,23 @@ func TestValidationOptionsForPersistentVolume(t *testing.T) {
 	}
 }
 
+func getCSIVolumeWithSecret(pv *core.PersistentVolume, secret *core.SecretReference, secretfield string) *core.PersistentVolume {
+	pvCopy := pv.DeepCopy()
+	switch secretfield {
+	case "controllerExpand":
+		pvCopy.Spec.CSI.ControllerExpandSecretRef = secret
+	case "controllerPublish":
+		pvCopy.Spec.CSI.ControllerPublishSecretRef = secret
+	case "nodePublish":
+		pvCopy.Spec.CSI.NodePublishSecretRef = secret
+	case "nodeStage":
+		pvCopy.Spec.CSI.NodeStageSecretRef = secret
+	default:
+		panic("unknown string")
+	}
+
+	return pvCopy
+}
 func pvWithAccessModes(accessModes []core.PersistentVolumeAccessMode) *core.PersistentVolume {
 	return &core.PersistentVolume{
 		Spec: core.PersistentVolumeSpec{
@@ -802,14 +964,6 @@ func pvcTemplateWithAccessModes(accessModes []core.PersistentVolumeAccessMode) *
 			AccessModes: accessModes,
 		},
 	}
-}
-
-func getCSIVolumeWithSecret(pv *core.PersistentVolume, secret *core.SecretReference) *core.PersistentVolume {
-	pvCopy := pv.DeepCopy()
-	if secret != nil {
-		pvCopy.Spec.CSI.ControllerExpandSecretRef = secret
-	}
-	return pvCopy
 }
 
 func testLocalVolume(path string, affinity *core.VolumeNodeAffinity) core.PersistentVolumeSpec {
