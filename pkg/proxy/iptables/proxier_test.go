@@ -1587,7 +1587,15 @@ COMMIT
 -A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
 COMMIT
 `
-
+	assert.Equal(t, []*netutils.LocalPort{
+		{
+			Description: "nodePort for ns1/svc1:p80",
+			IP:          "",
+			IPFamily:    netutils.IPv4,
+			Port:        svcNodePort,
+			Protocol:    netutils.TCP,
+		},
+	}, fp.portMapper.(*fakePortOpener).openPorts)
 	assertIPTablesRulesEqual(t, expected, fp.iptablesData.String())
 }
 
