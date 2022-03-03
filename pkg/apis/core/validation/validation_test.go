@@ -2534,6 +2534,119 @@ func TestValidateGlusterfsPersistentVolumeSource(t *testing.T) {
 func TestValidateCSIVolumeSource(t *testing.T) {
 	testCases := []struct {
 		name     string
+		csi      *core.CSIVolumeSource
+		errtype  field.ErrorType
+		errfield string
+	}{
+		{
+			name: "all required fields ok",
+			csi:  &core.CSIVolumeSource{Driver: "test-driver"},
+		},
+		{
+			name:     "missing driver name",
+			csi:      &core.CSIVolumeSource{Driver: ""},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "driver",
+		},
+		{
+			name: "driver name: ok no punctuations",
+			csi:  &core.CSIVolumeSource{Driver: "comgooglestoragecsigcepd"},
+		},
+		{
+			name: "driver name: ok dot only",
+			csi:  &core.CSIVolumeSource{Driver: "io.kubernetes.storage.csi.flex"},
+		},
+		{
+			name: "driver name: ok dash only",
+			csi:  &core.CSIVolumeSource{Driver: "io-kubernetes-storage-csi-flex"},
+		},
+		{
+			name:     "driver name: invalid underscore",
+			csi:      &core.CSIVolumeSource{Driver: "io_kubernetes_storage_csi_flex"},
+			errtype:  field.ErrorTypeInvalid,
+			errfield: "driver",
+		},
+		{
+			name:     "driver name: invalid dot underscores",
+			csi:      &core.CSIVolumeSource{Driver: "io.kubernetes.storage_csi.flex"},
+			errtype:  field.ErrorTypeInvalid,
+			errfield: "driver",
+		},
+		{
+			name: "driver name: ok beginning with number",
+			csi:  &core.CSIVolumeSource{Driver: "2io.kubernetes.storage-csi.flex"},
+		},
+		{
+			name: "driver name: ok ending with number",
+			csi:  &core.CSIVolumeSource{Driver: "io.kubernetes.storage-csi.flex2"},
+		},
+		{
+			name:     "driver name: invalid dot dash underscores",
+			csi:      &core.CSIVolumeSource{Driver: "io.kubernetes-storage.csi_flex"},
+			errtype:  field.ErrorTypeInvalid,
+			errfield: "driver",
+		},
+
+		{
+			name: "driver name: ok length 1",
+			csi:  &core.CSIVolumeSource{Driver: "a"},
+		},
+		{
+			name:     "driver name: invalid length > 63",
+			csi:      &core.CSIVolumeSource{Driver: strings.Repeat("g", 65)},
+			errtype:  field.ErrorTypeTooLong,
+			errfield: "driver",
+		},
+		{
+			name:     "driver name: invalid start char",
+			csi:      &core.CSIVolumeSource{Driver: "_comgooglestoragecsigcepd"},
+			errtype:  field.ErrorTypeInvalid,
+			errfield: "driver",
+		},
+		{
+			name:     "driver name: invalid end char",
+			csi:      &core.CSIVolumeSource{Driver: "comgooglestoragecsigcepd/"},
+			errtype:  field.ErrorTypeInvalid,
+			errfield: "driver",
+		},
+		{
+			name:     "driver name: invalid separators",
+			csi:      &core.CSIVolumeSource{Driver: "com/google/storage/csi~gcepd"},
+			errtype:  field.ErrorTypeInvalid,
+			errfield: "driver",
+		},
+		{
+			name: "valid nodePublishSecretRef",
+			csi:  &core.CSIVolumeSource{Driver: "com.google.gcepd", NodePublishSecretRef: &core.LocalObjectReference{Name: "foobar"}},
+		},
+		{
+			name:     "nodePublishSecretRef: invalid name missing",
+			csi:      &core.CSIVolumeSource{Driver: "com.google.gcepd", NodePublishSecretRef: &core.LocalObjectReference{Name: ""}},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "nodePublishSecretRef.name",
+		},
+	}
+
+	for i, tc := range testCases {
+		errs := validateCSIVolumeSource(tc.csi, field.NewPath("field"))
+
+		if len(errs) > 0 && tc.errtype == "" {
+			t.Errorf("[%d: %q] unexpected error(s): %v", i, tc.name, errs)
+		} else if len(errs) == 0 && tc.errtype != "" {
+			t.Errorf("[%d: %q] expected error type %v", i, tc.name, tc.errtype)
+		} else if len(errs) >= 1 {
+			if errs[0].Type != tc.errtype {
+				t.Errorf("[%d: %q] expected error type %v, got %v", i, tc.name, tc.errtype, errs[0].Type)
+			} else if !strings.HasSuffix(errs[0].Field, "."+tc.errfield) {
+				t.Errorf("[%d: %q] expected error on field %q, got %q", i, tc.name, tc.errfield, errs[0].Field)
+			}
+		}
+	}
+}
+
+func TestValidateCSIPersistentVolumeSource(t *testing.T) {
+	testCases := []struct {
+		name     string
 		csi      *core.CSIPersistentVolumeSource
 		errtype  field.ErrorType
 		errfield string
@@ -2583,7 +2696,7 @@ func TestValidateCSIVolumeSource(t *testing.T) {
 			errfield: "driver",
 		},
 		{
-			name: "driver name: ok beginnin with number",
+			name: "driver name: ok beginning with number",
 			csi:  &core.CSIPersistentVolumeSource{Driver: "2io.kubernetes.storage-csi.flex", VolumeHandle: "test-123"},
 		},
 		{
@@ -2608,7 +2721,7 @@ func TestValidateCSIVolumeSource(t *testing.T) {
 		},
 		{
 			name:     "driver name: invalid length > 63",
-			csi:      &core.CSIPersistentVolumeSource{Driver: "comgooglestoragecsigcepdcomgooglestoragecsigcepdcomgooglestoragecsigcepdcomgooglestoragecsigcepd", VolumeHandle: "test-123"},
+			csi:      &core.CSIPersistentVolumeSource{Driver: strings.Repeat("g", 65), VolumeHandle: "test-123"},
 			errtype:  field.ErrorTypeTooLong,
 			errfield: "driver",
 		},
@@ -2645,6 +2758,38 @@ func TestValidateCSIVolumeSource(t *testing.T) {
 		{
 			name: "valid controllerExpandSecretRef",
 			csi:  &core.CSIPersistentVolumeSource{Driver: "com.google.gcepd", VolumeHandle: "foobar", ControllerExpandSecretRef: &core.SecretReference{Name: "foobar", Namespace: "default"}},
+		},
+		{
+			name:     "controllerPublishSecretRef: invalid name missing",
+			csi:      &core.CSIPersistentVolumeSource{Driver: "com.google.gcepd", VolumeHandle: "foobar", ControllerPublishSecretRef: &core.SecretReference{Namespace: "default"}},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "controllerPublishSecretRef.name",
+		},
+		{
+			name:     "controllerPublishSecretRef: invalid namespace missing",
+			csi:      &core.CSIPersistentVolumeSource{Driver: "com.google.gcepd", VolumeHandle: "foobar", ControllerPublishSecretRef: &core.SecretReference{Name: "foobar"}},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "controllerPublishSecretRef.namespace",
+		},
+		{
+			name: "valid controllerPublishSecretRef",
+			csi:  &core.CSIPersistentVolumeSource{Driver: "com.google.gcepd", VolumeHandle: "foobar", ControllerPublishSecretRef: &core.SecretReference{Name: "foobar", Namespace: "default"}},
+		},
+		{
+			name: "valid nodePublishSecretRef",
+			csi:  &core.CSIPersistentVolumeSource{Driver: "com.google.gcepd", VolumeHandle: "foobar", NodePublishSecretRef: &core.SecretReference{Name: "foobar", Namespace: "default"}},
+		},
+		{
+			name:     "nodePublishSecretRef: invalid name missing",
+			csi:      &core.CSIPersistentVolumeSource{Driver: "com.google.gcepd", VolumeHandle: "foobar", NodePublishSecretRef: &core.SecretReference{Namespace: "foobar"}},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "nodePublishSecretRef.name",
+		},
+		{
+			name:     "nodePublishSecretRef: invalid namespace missing",
+			csi:      &core.CSIPersistentVolumeSource{Driver: "com.google.gcepd", VolumeHandle: "foobar", NodePublishSecretRef: &core.SecretReference{Name: "foobar"}},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "nodePublishSecretRef.namespace",
 		},
 	}
 
