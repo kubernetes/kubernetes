@@ -33,7 +33,7 @@ type Resolver interface {
 func NewRegistry(stdExprEnv *cel.Env) *Registry {
 	return &Registry{
 		exprEnvs: map[string]*cel.Env{"": stdExprEnv},
-		schemas: map[string]*schema.Structural{},
+		schemas:  map[string]*schema.Structural{},
 		types: map[string]*DeclType{
 			BoolType.TypeName():      BoolType,
 			BytesType.TypeName():     BytesType,

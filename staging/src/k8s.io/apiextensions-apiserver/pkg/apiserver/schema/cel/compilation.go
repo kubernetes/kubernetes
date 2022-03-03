@@ -23,12 +23,11 @@ import (
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/checker/decls"
-	"github.com/google/cel-go/ext"
-
 	expr "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 	"google.golang.org/protobuf/proto"
 
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
+	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/library"
 	celmodel "k8s.io/apiextensions-apiserver/third_party/forked/celopenapi/model"
 )
 
@@ -82,8 +81,8 @@ func Compile(s *schema.Structural, isResourceRoot bool) ([]CompilationResult, er
 		root = rootDecl.MaybeAssignTypeName(scopedTypeName)
 	}
 	propDecls = append(propDecls, decls.NewVar(ScopedVarName, root.ExprType()))
-	opts = append(opts, cel.Declarations(propDecls...))
-	opts = append(opts, ext.Strings())
+	opts = append(opts, cel.Declarations(propDecls...), cel.HomogeneousAggregateLiterals())
+	opts = append(opts, library.ExtensionLibs...)
 	env, err = env.Extend(opts...)
 	if err != nil {
 		return nil, err
@@ -103,7 +102,7 @@ func Compile(s *schema.Structural, isResourceRoot bool) ([]CompilationResult, er
 			} else if !proto.Equal(ast.ResultType(), decls.Bool) {
 				compilationResult.Error = &Error{ErrorTypeInvalid, "cel expression must evaluate to a bool"}
 			} else {
-				prog, err := env.Program(ast)
+				prog, err := env.Program(ast, cel.EvalOptions(cel.OptOptimize))
 				if err != nil {
 					compilationResult.Error = &Error{ErrorTypeInvalid, "program instantiation failed: " + err.Error()}
 				} else {
