@@ -18,6 +18,7 @@ package phases
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -27,6 +28,7 @@ import (
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -232,7 +234,21 @@ func runCAPhase(ca *certsphase.KubeadmCert) func(c workflow.RunData) error {
 		if cert, err := pkiutil.TryLoadCertFromDisk(data.CertificateDir(), ca.BaseName); err == nil {
 			certsphase.CheckCertificatePeriodValidity(ca.BaseName, cert)
 
+			// If CA Cert existed while dryrun, copy CA Cert to dryrun dir for later use
+			if data.DryRun() {
+				err := phases.CopyFile(filepath.Join(data.CertificateDir(), kubeadmconstants.CACertName), filepath.Join(data.CertificateWriteDir(), kubeadmconstants.CACertName))
+				if err != nil {
+					return errors.Wrapf(err, "could not copy %s to dry run directory %s", kubeadmconstants.CACertName, data.CertificateWriteDir())
+				}
+			}
 			if _, err := pkiutil.TryLoadKeyFromDisk(data.CertificateDir(), ca.BaseName); err == nil {
+				// If CA Key existed while dryrun, copy CA Key to dryrun dir for later use
+				if data.DryRun() {
+					err := phases.CopyFile(filepath.Join(data.CertificateDir(), kubeadmconstants.CAKeyName), filepath.Join(data.CertificateWriteDir(), kubeadmconstants.CAKeyName))
+					if err != nil {
+						return errors.Wrapf(err, "could not copy %s to dry run directory %s", kubeadmconstants.CAKeyName, data.CertificateWriteDir())
+					}
+				}
 				fmt.Printf("[certs] Using existing %s certificate authority\n", ca.BaseName)
 				return nil
 			}
