@@ -250,7 +250,7 @@ func estimateMinSizeJSON(s *schema.Structural) int64 {
 	case "object":
 		// {},
 		objSize := int64(3)
-		// sum of all non-optional properties
+		// exclude required fields since the request can omit them
 		if s.ValueValidation != nil {
 			for _, propName := range s.ValueValidation.Required {
 				prop := s.Properties[propName]
