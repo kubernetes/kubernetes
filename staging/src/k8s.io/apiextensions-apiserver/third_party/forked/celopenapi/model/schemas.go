@@ -89,10 +89,8 @@ func SchemaDeclType(s *schema.Structural, isResourceRoot bool) *DeclType {
 		if s.Items != nil {
 			itemsType := SchemaDeclType(s.Items, s.Items.XEmbeddedResource)
 			maxItems := int64(noMaxLength)
-			if s.Items.ValueValidation != nil {
-				if s.Items.ValueValidation.MaxItems != nil {
-					maxItems = *s.Items.ValueValidation.MaxItems
-				}
+			if s.Items.ValueValidation != nil && s.Items.ValueValidation.MaxItems != nil {
+				maxItems = *s.Items.ValueValidation.MaxItems
 			}
 			if maxItems == noMaxLength {
 				maxItems = estimateMaxSizeJSON(s)
@@ -107,10 +105,8 @@ func SchemaDeclType(s *schema.Structural, isResourceRoot bool) *DeclType {
 			propsType := SchemaDeclType(s.AdditionalProperties.Structural, s.AdditionalProperties.Structural.XEmbeddedResource)
 			if propsType != nil {
 				maxProperties := int64(noMaxLength)
-				if s.ValueValidation != nil {
-					if s.ValueValidation.MaxProperties != nil {
-						maxProperties = *s.ValueValidation.MaxProperties
-					}
+				if s.ValueValidation != nil && s.ValueValidation.MaxProperties != nil {
+					maxProperties = *s.ValueValidation.MaxProperties
 				}
 				if maxProperties == noMaxLength {
 					maxProperties = estimateMaxSizeJSON(s)
@@ -252,7 +248,8 @@ func estimateMinSizeJSON(s *schema.Structural) int64 {
 		// [],
 		return 3
 	case "object":
-		objSize := int64(3) // {},
+		// {},
+		objSize := int64(3)
 		// sum of all non-optional properties
 		if s.ValueValidation != nil {
 			for _, propName := range s.ValueValidation.Required {
