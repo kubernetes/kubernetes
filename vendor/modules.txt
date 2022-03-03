@@ -946,7 +946,7 @@ go.uber.org/zap/internal/ztest
 go.uber.org/zap/zapcore
 go.uber.org/zap/zapgrpc
 go.uber.org/zap/zaptest
-# golang.org/x/crypto v0.0.0-20220214200702-86341886e292 => golang.org/x/crypto v0.0.0-20220214200702-86341886e292
+# golang.org/x/crypto v0.0.0-20211202192323-5770296d904e => golang.org/x/crypto v0.0.0-20211202192323-5770296d904e
 ## explicit
 golang.org/x/crypto/bcrypt
 golang.org/x/crypto/blowfish
@@ -956,6 +956,7 @@ golang.org/x/crypto/cryptobyte/asn1
 golang.org/x/crypto/curve25519
 golang.org/x/crypto/curve25519/internal/field
 golang.org/x/crypto/ed25519
+golang.org/x/crypto/ed25519/internal/edwards25519
 golang.org/x/crypto/internal/poly1305
 golang.org/x/crypto/internal/subtle
 golang.org/x/crypto/nacl/secretbox
@@ -2724,7 +2725,7 @@ sigs.k8s.io/yaml
 # go.uber.org/goleak => go.uber.org/goleak v1.1.10
 # go.uber.org/multierr => go.uber.org/multierr v1.6.0
 # go.uber.org/zap => go.uber.org/zap v1.19.0
-# golang.org/x/crypto => golang.org/x/crypto v0.0.0-20220214200702-86341886e292
+# golang.org/x/crypto => golang.org/x/crypto v0.0.0-20211202192323-5770296d904e
 # golang.org/x/exp => golang.org/x/exp v0.0.0-20210220032938-85be41e4509f
 # golang.org/x/image => golang.org/x/image v0.0.0-20190802002840-cff245a6509b
 # golang.org/x/lint => golang.org/x/lint v0.0.0-20210508222113-6edffad5e616
