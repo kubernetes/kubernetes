@@ -263,7 +263,7 @@ func estimateMinSizeJSON(s *schema.Structural) int64 {
 		}
 		return objSize
 	}
-	// TODO(DangerOnTheRanger): better error handling (We should never get here in normal operation)
+	// this code should be unreachable, but return noMaxLength just in case
 	return noMaxLength
 }
 
@@ -306,6 +306,6 @@ func estimateMaxSizeJSON(s *schema.Structural) int64 {
 			return noMaxLength
 		}
 	}
-	// TODO(DangerOnTheRanger): better error handling (We should never get here in normal operation)
+	// this code should be unreachable, but return noMaxLength just in case
 	return noMaxLength
 }
