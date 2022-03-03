@@ -142,6 +142,10 @@ func (s *SecureServingOptions) Validate() []error {
 		errors = append(errors, fmt.Errorf("cert/key file and in-memory certificate cannot both be set"))
 	}
 
+	if len(s.ServerCert.CertDirectory) == 0 && (len(s.ServerCert.CertKey.CertFile) == 0 || len(s.ServerCert.CertKey.KeyFile) == 0) {
+		errors = append(errors, fmt.Errorf("cert/key file is missing"))
+	}
+
 	return errors
 }
 
