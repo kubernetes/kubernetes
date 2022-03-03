@@ -22,6 +22,7 @@ import (
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -782,6 +783,26 @@ func verifyPodExistsInVolumeAsw(
 	}
 }
 
+func verifyDeviceStateInVolumeAsw(
+	t *testing.T,
+	podName volumetypes.UniquePodName,
+	volumeName v1.UniqueVolumeName,
+	expectedDevicePath string,
+	expectMounted bool,
+	asw ActualStateOfWorld) {
+
+	mounted, devicePath, err := asw.PodExistsInVolume(podName, volumeName)
+	if err != nil {
+		t.Fatalf("Failed to check PodExistsInVolume: %s", err)
+	}
+	if expectMounted != mounted {
+		t.Errorf("ASW reports the volume mounted %t, got %t", expectMounted, mounted)
+	}
+	if devicePath != expectedDevicePath {
+		t.Errorf("Expected devicePath %q, got %q", expectedDevicePath, devicePath)
+	}
+}
+
 func verifyVolumeMountedElsewhere(
 	t *testing.T,
 	expectedPodName volumetypes.UniquePodName,
@@ -871,4 +892,139 @@ func verifyVolumeSpecNameInVolumeAsw(
 			t.Fatalf("Volume spec name does not match Expected: <%q> Actual: <%q>", volumeSpecs[i].Name(), volume.InnerVolumeSpecName)
 		}
 	}
+}
+
+func TestUpdateReconstructedDevicePath(t *testing.T) {
+	// Arrange - add a reconstructed volume with empty devicePath to ASW
+	volumePluginMgr, plugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
+	asw := NewActualStateOfWorld("mynode" /* nodeName */, volumePluginMgr)
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pod1",
+			UID:  "pod1uid",
+		},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					Name: "volume-name-1",
+					VolumeSource: v1.VolumeSource{
+						GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+							PDName: "fake-device1",
+						},
+					},
+				},
+			},
+		},
+	}
+	volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
+	reconstrucedVolumePath := ""
+	volumeName, err := util.GetUniqueVolumeNameFromSpec(plugin, volumeSpec)
+	require.NoError(t, err)
+
+	// This is how a reconstructed volume looks like, copied from reconciler.updateStates()
+	err = asw.MarkVolumeAsAttached(volumeName, volumeSpec, "" /* nodeName */, "")
+	require.NoError(t, err)
+
+	mounter, err := plugin.NewMounter(volumeSpec, pod, volume.VolumeOptions{})
+	require.NoError(t, err)
+	deviceMounter, err := plugin.NewDeviceMounter()
+	require.NoError(t, err)
+
+	markVolumeOpts := operationexecutor.MarkVolumeOpts{
+		PodName:             util.GetUniquePodName(pod),
+		PodUID:              types.UID(pod.UID),
+		VolumeName:          volumeName,
+		Mounter:             mounter,
+		BlockVolumeMapper:   nil,
+		OuterVolumeSpecName: volumeSpec.Name(),
+		VolumeSpec:          volumeSpec,
+		VolumeMountState:    operationexecutor.VolumeMountUncertain,
+	}
+	err = asw.MarkVolumeMountAsUncertain(markVolumeOpts)
+	require.NoError(t, err)
+
+	deviceMountPath, err := deviceMounter.GetDeviceMountPath(volumeSpec)
+	require.NoError(t, err)
+	err = asw.MarkDeviceAsUncertain(volumeName, reconstrucedVolumePath, deviceMountPath)
+	require.NoError(t, err)
+
+	// Act - update the device path from node.status
+	nodeStatusDevicePath := "/dev/foo"
+	asw.UpdateReconstructedDevicePath(volumeName, nodeStatusDevicePath)
+
+	// Assert - ensure the device path was updated
+	verifyDeviceStateInVolumeAsw(t, util.GetUniquePodName(pod), volumeName, nodeStatusDevicePath, false, asw)
+}
+
+func TestUpdateReconstructedDevicePath_Skio(t *testing.T) {
+	// Arrange - add a reconstructed volume with empty devicePath to ASW and replace it with a real volume
+	volumePluginMgr, plugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
+	asw := NewActualStateOfWorld("mynode" /* nodeName */, volumePluginMgr)
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pod1",
+			UID:  "pod1uid",
+		},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					Name: "volume-name-1",
+					VolumeSource: v1.VolumeSource{
+						GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+							PDName: "fake-device1",
+						},
+					},
+				},
+			},
+		},
+	}
+	volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
+	reconstrucedVolumePath := ""
+	volumeName, err := util.GetUniqueVolumeNameFromSpec(plugin, volumeSpec)
+	require.NoError(t, err)
+
+	// This is how a reconstructed volume looks like, copied from reconciler.updateStates()
+	err = asw.MarkVolumeAsAttached(volumeName, volumeSpec, "" /* nodeName */, "")
+	require.NoError(t, err)
+
+	mounter, err := plugin.NewMounter(volumeSpec, pod, volume.VolumeOptions{})
+	require.NoError(t, err)
+	deviceMounter, err := plugin.NewDeviceMounter()
+	require.NoError(t, err)
+
+	markVolumeOpts := operationexecutor.MarkVolumeOpts{
+		PodName:             util.GetUniquePodName(pod),
+		PodUID:              types.UID(pod.UID),
+		VolumeName:          volumeName,
+		Mounter:             mounter,
+		BlockVolumeMapper:   nil,
+		OuterVolumeSpecName: volumeSpec.Name(),
+		VolumeSpec:          volumeSpec,
+		VolumeMountState:    operationexecutor.VolumeMountUncertain,
+	}
+	err = asw.MarkVolumeMountAsUncertain(markVolumeOpts)
+	require.NoError(t, err)
+
+	deviceMountPath, err := deviceMounter.GetDeviceMountPath(volumeSpec)
+	require.NoError(t, err)
+	err = asw.MarkDeviceAsUncertain(volumeName, reconstrucedVolumePath, deviceMountPath)
+	require.NoError(t, err)
+
+	// Simulate successful volume setup done by the reconciler before device paths are reconstructed from node status
+	realDevicePath := "/dev/sdb"
+	err = asw.MarkDeviceAsMounted(volumeName, realDevicePath, deviceMountPath)
+	require.NoError(t, err)
+
+	markVolumeOpts.VolumeMountState = operationexecutor.VolumeMounted
+	err = asw.MarkVolumeAsMounted(markVolumeOpts)
+	require.NoError(t, err)
+
+	// Act - update the device path from node.status
+	nodeStatusDevicePath := "/dev/foo"
+	asw.UpdateReconstructedDevicePath(volumeName, nodeStatusDevicePath)
+
+	// Assert - ensure the device path was not updated and the volume is mounted
+	verifyDeviceStateInVolumeAsw(t, util.GetUniquePodName(pod), volumeName, realDevicePath, true, asw)
 }
