@@ -230,7 +230,7 @@ func estimateMinSizeJSON(s *schema.Structural) int64 {
 		// 0,
 		return 2
 	case "string":
-		if s.ValueValidation != nil && s.ValueValidation.Format != "" && s.ValueValidation.Format != "byte" {
+		if s.ValueValidation != nil {
 			switch s.ValueValidation.Format {
 			case "duration":
 				return minDurationSizeJSON
@@ -274,7 +274,7 @@ func estimateMaxSizeJSON(s *schema.Structural) int64 {
 		// same case as a string without ValueValidation
 		return (maxRequestSizeBytes - 2)
 	case "string":
-		if s.ValueValidation != nil && s.ValueValidation.Format != "" && s.ValueValidation.Format != "byte" {
+		if s.ValueValidation != nil {
 			switch s.ValueValidation.Format {
 			case "duration":
 				return maxDurationSizeJSON
