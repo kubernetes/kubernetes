@@ -610,7 +610,6 @@ func (r *Request) Watch(ctx context.Context) (watch.Interface, error) {
 		}
 		return false
 	}
-	var retryAfter *RetryAfter
 	url := r.URL().String()
 	for {
 		req, err := r.newHTTPRequest(ctx)
@@ -618,26 +617,13 @@ func (r *Request) Watch(ctx context.Context) (watch.Interface, error) {
 			return nil, err
 		}
 
-		r.backoff.Sleep(r.backoff.CalculateBackoff(r.URL()))
-		if retryAfter != nil {
-			// We are retrying the request that we already send to apiserver
-			// at least once before.
-			// This request should also be throttled with the client-internal rate limiter.
-			if err := r.tryThrottleWithInfo(ctx, retryAfter.Reason); err != nil {
-				return nil, err
-			}
-			retryAfter = nil
+		if err := r.retry.Before(ctx, r); err != nil {
+			return nil, err
 		}
 
 		resp, err := client.Do(req)
 		updateURLMetrics(ctx, r, resp, err)
-		if r.c.base != nil {
-			if err != nil {
-				r.backoff.UpdateBackoff(r.c.base, err, 0)
-			} else {
-				r.backoff.UpdateBackoff(r.c.base, err, resp.StatusCode)
-			}
-		}
+		r.retry.After(ctx, r, resp, err)
 		if err == nil && resp.StatusCode == http.StatusOK {
 			return r.newStreamWatcher(resp)
 		}
@@ -645,14 +631,8 @@ func (r *Request) Watch(ctx context.Context) (watch.Interface, error) {
 		done, transformErr := func() (bool, error) {
 			defer readAndCloseResponseBody(resp)
 
-			var retry bool
-			retryAfter, retry = r.retry.NextRetry(req, resp, err, isErrRetryableFunc)
-			if retry {
-				err := r.retry.BeforeNextRetry(ctx, r.backoff, retryAfter, url, r.body)
-				if err == nil {
-					return false, nil
-				}
-				klog.V(4).Infof("Could not retry request - %v", err)
+			if r.retry.IsNextRetry(ctx, r, req, resp, err, isErrRetryableFunc) {
+				return false, nil
 			}
 
 			if resp == nil {
@@ -738,7 +718,6 @@ func (r *Request) Stream(ctx context.Context) (io.ReadCloser, error) {
 		client = http.DefaultClient
 	}
 
-	var retryAfter *RetryAfter
 	url := r.URL().String()
 	for {
 		req, err := r.newHTTPRequest(ctx)
@@ -749,26 +728,13 @@ func (r *Request) Stream(ctx context.Context) (io.ReadCloser, error) {
 			req.Body = ioutil.NopCloser(r.body)
 		}
 
-		r.backoff.Sleep(r.backoff.CalculateBackoff(r.URL()))
-		if retryAfter != nil {
-			// We are retrying the request that we already send to apiserver
-			// at least once before.
-			// This request should also be throttled with the client-internal rate limiter.
-			if err := r.tryThrottleWithInfo(ctx, retryAfter.Reason); err != nil {
-				return nil, err
-			}
-			retryAfter = nil
+		if err := r.retry.Before(ctx, r); err != nil {
+			return nil, err
 		}
 
 		resp, err := client.Do(req)
 		updateURLMetrics(ctx, r, resp, err)
-		if r.c.base != nil {
-			if err != nil {
-				r.backoff.UpdateBackoff(r.URL(), err, 0)
-			} else {
-				r.backoff.UpdateBackoff(r.URL(), err, resp.StatusCode)
-			}
-		}
+		r.retry.After(ctx, r, resp, err)
 		if err != nil {
 			// we only retry on an HTTP response with 'Retry-After' header
 			return nil, err
@@ -783,14 +749,8 @@ func (r *Request) Stream(ctx context.Context) (io.ReadCloser, error) {
 			done, transformErr := func() (bool, error) {
 				defer resp.Body.Close()
 
-				var retry bool
-				retryAfter, retry = r.retry.NextRetry(req, resp, err, neverRetryError)
-				if retry {
-					err := r.retry.BeforeNextRetry(ctx, r.backoff, retryAfter, url, r.body)
-					if err == nil {
-						return false, nil
-					}
-					klog.V(4).Infof("Could not retry request - %v", err)
+				if r.retry.IsNextRetry(ctx, r, req, resp, err, neverRetryError) {
+					return false, nil
 				}
 				result := r.transformResponse(resp, req)
 				if err := result.Error(); err != nil {
@@ -881,23 +841,29 @@ func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Resp
 		defer cancel()
 	}
 
+	isErrRetryableFunc := func(req *http.Request, err error) bool {
+		// "Connection reset by peer" or "apiserver is shutting down" are usually a transient errors.
+		// Thus in case of "GET" operations, we simply retry it.
+		// We are not automatically retrying "write" operations, as they are not idempotent.
+		if req.Method != "GET" {
+			return false
+		}
+		// For connection errors and apiserver shutdown errors retry.
+		if net.IsConnectionReset(err) || net.IsProbableEOF(err) {
+			return true
+		}
+		return false
+	}
+
 	// Right now we make about ten retry attempts if we get a Retry-After response.
-	var retryAfter *RetryAfter
 	for {
 		req, err := r.newHTTPRequest(ctx)
 		if err != nil {
 			return err
 		}
 
-		r.backoff.Sleep(r.backoff.CalculateBackoff(r.URL()))
-		if retryAfter != nil {
-			// We are retrying the request that we already send to apiserver
-			// at least once before.
-			// This request should also be throttled with the client-internal rate limiter.
-			if err := r.tryThrottleWithInfo(ctx, retryAfter.Reason); err != nil {
-				return err
-			}
-			retryAfter = nil
+		if err := r.retry.Before(ctx, r); err != nil {
+			return err
 		}
 		resp, err := client.Do(req)
 		updateURLMetrics(ctx, r, resp, err)
@@ -906,11 +872,7 @@ func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Resp
 		if req.ContentLength >= 0 && !(req.Body != nil && req.ContentLength == 0) {
 			metrics.RequestSize.Observe(ctx, r.verb, r.URL().Host, float64(req.ContentLength))
 		}
-		if err != nil {
-			r.backoff.UpdateBackoff(r.URL(), err, 0)
-		} else {
-			r.backoff.UpdateBackoff(r.URL(), err, resp.StatusCode)
-		}
+		r.retry.After(ctx, r, resp, err)
 
 		done := func() bool {
 			defer readAndCloseResponseBody(resp)
@@ -923,26 +885,8 @@ func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Resp
 				fn(req, resp)
 			}
 
-			var retry bool
-			retryAfter, retry = r.retry.NextRetry(req, resp, err, func(req *http.Request, err error) bool {
-				// "Connection reset by peer" or "apiserver is shutting down" are usually a transient errors.
-				// Thus in case of "GET" operations, we simply retry it.
-				// We are not automatically retrying "write" operations, as they are not idempotent.
-				if r.verb != "GET" {
-					return false
-				}
-				// For connection errors and apiserver shutdown errors retry.
-				if net.IsConnectionReset(err) || net.IsProbableEOF(err) {
-					return true
-				}
+			if r.retry.IsNextRetry(ctx, r, req, resp, err, isErrRetryableFunc) {
 				return false
-			})
-			if retry {
-				err := r.retry.BeforeNextRetry(ctx, r.backoff, retryAfter, req.URL.String(), r.body)
-				if err == nil {
-					return false
-				}
-				klog.V(4).Infof("Could not retry request - %v", err)
 			}
 
 			f(req, resp)

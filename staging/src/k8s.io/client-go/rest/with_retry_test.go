@@ -17,8 +17,11 @@ limitations under the License.
 package rest
 
 import (
+	"bytes"
+	"context"
 	"errors"
 	"net/http"
+	"net/url"
 	"reflect"
 	"testing"
 	"time"
@@ -30,7 +33,7 @@ var alwaysRetryError = IsRetryableErrorFunc(func(_ *http.Request, _ error) bool 
 	return true
 })
 
-func TestNextRetry(t *testing.T) {
+func TestIsNextRetry(t *testing.T) {
 	fakeError := errors.New("fake error")
 	tests := []struct {
 		name               string
@@ -205,14 +208,20 @@ func TestNextRetry(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			restReq := &Request{
+				body: bytes.NewReader([]byte{}),
+				c: &RESTClient{
+					base: &url.URL{},
+				},
+			}
 			r := &withRetry{maxRetries: test.maxRetries}
 
 			retryGot := make([]bool, 0)
 			retryAfterGot := make([]*RetryAfter, 0)
 			for i := 0; i < test.attempts; i++ {
-				retryAfter, retry := r.NextRetry(test.request, test.response, test.err, test.retryableErrFunc)
+				retry := r.IsNextRetry(context.TODO(), restReq, test.request, test.response, test.err, test.retryableErrFunc)
 				retryGot = append(retryGot, retry)
-				retryAfterGot = append(retryAfterGot, retryAfter)
+				retryAfterGot = append(retryAfterGot, r.retryAfter)
 			}
 
 			if !reflect.DeepEqual(test.retryExpected, retryGot) {
