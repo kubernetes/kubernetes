@@ -988,14 +988,23 @@ func TestRunScorePlugins(t *testing.T) {
 		registry      Registry
 		plugins       *config.Plugins
 		pluginConfigs []config.PluginConfig
-		want          framework.PluginToNodeScores
+		want          []framework.NodePluginScores
 		// If err is true, we expect RunScorePlugin to fail.
 		err bool
 	}{
 		{
 			name:    "no Score plugins",
 			plugins: buildScoreConfigDefaultWeights(),
-			want:    framework.PluginToNodeScores{},
+			want: []framework.NodePluginScores{
+				{
+					Name:   "node1",
+					Scores: []framework.PluginScore{},
+				},
+				{
+					Name:   "node2",
+					Scores: []framework.PluginScore{},
+				},
+			},
 		},
 		{
 			name:    "single Score plugin",
@@ -1009,8 +1018,27 @@ func TestRunScorePlugins(t *testing.T) {
 				},
 			},
 			// scorePlugin1 Score returns 1, weight=1, so want=1.
-			want: framework.PluginToNodeScores{
-				scorePlugin1: {{Name: "node1", Score: 1}, {Name: "node2", Score: 1}},
+			want: []framework.NodePluginScores{
+				{
+					Name: "node1",
+					Scores: []framework.PluginScore{
+						{
+							Name:  scorePlugin1,
+							Score: 1,
+						},
+					},
+					TotalScore: 1,
+				},
+				{
+					Name: "node2",
+					Scores: []framework.PluginScore{
+						{
+							Name:  scorePlugin1,
+							Score: 1,
+						},
+					},
+					TotalScore: 1,
+				},
 			},
 		},
 		{
@@ -1026,12 +1054,31 @@ func TestRunScorePlugins(t *testing.T) {
 				},
 			},
 			// scoreWithNormalizePlugin1 Score returns 10, but NormalizeScore overrides to 5, weight=1, so want=5
-			want: framework.PluginToNodeScores{
-				scoreWithNormalizePlugin1: {{Name: "node1", Score: 5}, {Name: "node2", Score: 5}},
+			want: []framework.NodePluginScores{
+				{
+					Name: "node1",
+					Scores: []framework.PluginScore{
+						{
+							Name:  scoreWithNormalizePlugin1,
+							Score: 5,
+						},
+					},
+					TotalScore: 5,
+				},
+				{
+					Name: "node2",
+					Scores: []framework.PluginScore{
+						{
+							Name:  scoreWithNormalizePlugin1,
+							Score: 5,
+						},
+					},
+					TotalScore: 5,
+				},
 			},
 		},
 		{
-			name:    "2 Score plugins, 2 NormalizeScore plugins",
+			name:    "3 Score plugins, 2 NormalizeScore plugins",
 			plugins: buildScoreConfigDefaultWeights(scorePlugin1, scoreWithNormalizePlugin1, scoreWithNormalizePlugin2),
 			pluginConfigs: []config.PluginConfig{
 				{
@@ -1056,10 +1103,43 @@ func TestRunScorePlugins(t *testing.T) {
 			// scorePlugin1 Score returns 1, weight =1, so want=1.
 			// scoreWithNormalizePlugin1 Score returns 3, but NormalizeScore overrides to 4, weight=1, so want=4.
 			// scoreWithNormalizePlugin2 Score returns 4, but NormalizeScore overrides to 5, weight=2, so want=10.
-			want: framework.PluginToNodeScores{
-				scorePlugin1:              {{Name: "node1", Score: 1}, {Name: "node2", Score: 1}},
-				scoreWithNormalizePlugin1: {{Name: "node1", Score: 4}, {Name: "node2", Score: 4}},
-				scoreWithNormalizePlugin2: {{Name: "node1", Score: 10}, {Name: "node2", Score: 10}},
+			want: []framework.NodePluginScores{
+				{
+					Name: "node1",
+					Scores: []framework.PluginScore{
+						{
+							Name:  scorePlugin1,
+							Score: 1,
+						},
+						{
+							Name:  scoreWithNormalizePlugin1,
+							Score: 4,
+						},
+						{
+							Name:  scoreWithNormalizePlugin2,
+							Score: 10,
+						},
+					},
+					TotalScore: 15,
+				},
+				{
+					Name: "node2",
+					Scores: []framework.PluginScore{
+						{
+							Name:  scorePlugin1,
+							Score: 1,
+						},
+						{
+							Name:  scoreWithNormalizePlugin1,
+							Score: 4,
+						},
+						{
+							Name:  scoreWithNormalizePlugin2,
+							Score: 10,
+						},
+					},
+					TotalScore: 15,
+				},
 			},
 		},
 		{
@@ -1163,8 +1243,27 @@ func TestRunScorePlugins(t *testing.T) {
 				},
 			},
 			// scorePlugin1 Score returns 1, weight=3, so want=3.
-			want: framework.PluginToNodeScores{
-				scorePlugin1: {{Name: "node1", Score: 3}, {Name: "node2", Score: 3}},
+			want: []framework.NodePluginScores{
+				{
+					Name: "node1",
+					Scores: []framework.PluginScore{
+						{
+							Name:  scorePlugin1,
+							Score: 3,
+						},
+					},
+					TotalScore: 3,
+				},
+				{
+					Name: "node2",
+					Scores: []framework.PluginScore{
+						{
+							Name:  scorePlugin1,
+							Score: 3,
+						},
+					},
+					TotalScore: 3,
+				},
 			},
 		},
 	}
