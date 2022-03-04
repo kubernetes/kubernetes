@@ -52,7 +52,7 @@ type PolicyRule struct {
 	// Resources is a list of resources this rule applies to.  '*' represents all resources in the specified apiGroups.
 	// '*/foo' represents the subresource 'foo' for all resources in the specified apiGroups.
 	Resources []string
-	// ResourceNames is an optional white list of names that the rule applies to.  An empty set means that everything is allowed.
+	// ResourceNames is an optional allow list of names that the rule applies to.  An empty set means that everything is allowed.
 	ResourceNames []string
 
 	// NonResourceURLs is a set of partial urls that a user should have access to.  *s are allowed, but only as the full, final step in the path
