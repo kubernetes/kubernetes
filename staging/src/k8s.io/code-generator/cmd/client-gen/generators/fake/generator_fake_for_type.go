@@ -55,7 +55,7 @@ func (g *genFakeForType) Namers(c *generator.Context) namer.NameSystems {
 }
 
 func (g *genFakeForType) Imports(c *generator.Context) (imports []string) {
-	return g.imports.ImportLines()
+	return append(g.imports.ImportLines(), "k8s.io/apimachinery/pkg/fields")
 }
 
 // Ideally, we'd like genStatus to return true if there is a subresource path
@@ -370,13 +370,18 @@ func (c *Fake$.type|publicPlural$) List(ctx context.Context, opts $.ListOptions|
 		return nil, err
 	}
 
-	label, _, _ := $.ExtractFromListOptions|raw$(opts)
+	label, field, _ := $.ExtractFromListOptions|raw$(opts)
 	if label == nil {
 		label = $.Everything|raw$()
 	}
+
 	list := &$.type|raw$List{ListMeta: obj.(*$.type|raw$List).ListMeta}
 	for _, item := range obj.(*$.type|raw$List).Items {
-		if label.Matches(labels.Set(item.Labels)) {
+		fieldSet := fields.Set{
+			"metadata.name":      item.GetName(),
+			$if .namespaced$"metadata.namespace": item.GetNamespace(),$end$
+		}
+		if label.Matches(labels.Set(item.Labels)) && field.Matches(fieldSet) {
 			list.Items = append(list.Items, item)
 		}
 	}
