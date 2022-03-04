@@ -18,8 +18,10 @@ package clientcmd
 
 import (
 	"bytes"
+	"flag"
 	"fmt"
 	"io/ioutil"
+	"k8s.io/klog/v2"
 	"os"
 	"path"
 	"path/filepath"
@@ -121,13 +123,56 @@ func TestNonExistentCommandLineFile(t *testing.T) {
 }
 
 func TestToleratingMissingFiles(t *testing.T) {
+	envVarValue := "bogus"
 	loadingRules := ClientConfigLoadingRules{
-		Precedence: []string{"bogus1", "bogus2", "bogus3"},
+		Precedence:       []string{"bogus1", "bogus2", "bogus3"},
+		WarnIfAllMissing: true,
+		Warner:           klog.Warning,	
 	}
+
+	buffer := &bytes.Buffer{}
+
+	flags := &flag.FlagSet{}
+	klog.InitFlags(flags)
+	flags.Set("logtostderr", "false")
+	klog.SetOutput(buffer)
 
 	_, err := loadingRules.Load()
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	klog.Flush()
+
+	expectedLog := fmt.Sprintf("Config not found: %s", envVarValue)
+	if !strings.Contains(buffer.String(), expectedLog) {
+		t.Fatalf("expected log: \"%s\"", expectedLog)
+	}
+}
+
+func TestWarningMissingFiles(t *testing.T) {
+	envVarValue := "bogus"
+	os.Setenv(RecommendedConfigPathEnvVar, envVarValue)
+	loadingRules := NewDefaultClientConfigLoadingRules()
+
+	buffer := &bytes.Buffer{}
+
+	flags := &flag.FlagSet{}
+	klog.InitFlags(flags)
+	flags.Set("logtostderr", "false")
+	flags.Set("v", "1")
+	klog.SetOutput(buffer)
+
+	_, err := loadingRules.Load()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	klog.Flush()
+
+	expectedLog := fmt.Sprintf("Config not found: %s", envVarValue)
+	if !strings.Contains(buffer.String(), expectedLog) {
+		t.Fatalf("expected log: \"%s\"", expectedLog)
 	}
 }
 
