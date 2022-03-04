@@ -656,6 +656,8 @@ func (s *ProxyServer) Run() error {
 	// To help debugging, immediately log version
 	klog.InfoS("Version info", "version", version.Get())
 
+	klog.InfoS("Golang settings", "GOGC", os.Getenv("GOGC"), "GOMAXPROCS", os.Getenv("GOMAXPROCS"), "GOTRACEBACK", os.Getenv("GOTRACEBACK"))
+
 	// TODO(vmarmol): Use container config for this.
 	var oomAdjuster *oom.OOMAdjuster
 	if s.OOMScoreAdj != nil {

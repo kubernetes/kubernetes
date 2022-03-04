@@ -140,6 +140,8 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 	// To help debugging, immediately log version
 	klog.InfoS("Starting Kubernetes Scheduler", "version", version.Get())
 
+	klog.InfoS("Golang settings", "GOGC", os.Getenv("GOGC"), "GOMAXPROCS", os.Getenv("GOMAXPROCS"), "GOTRACEBACK", os.Getenv("GOTRACEBACK"))
+
 	// Configz registration.
 	if cz, err := configz.New("componentconfig"); err == nil {
 		cz.Set(cc.ComponentConfig)

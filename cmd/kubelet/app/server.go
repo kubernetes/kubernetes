@@ -392,6 +392,9 @@ func UnsecuredDependencies(s *options.KubeletServer, featureGate featuregate.Fea
 func Run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Dependencies, featureGate featuregate.FeatureGate) error {
 	// To help debugging, immediately log version
 	klog.InfoS("Kubelet version", "kubeletVersion", version.Get())
+
+	klog.InfoS("Golang settings", "GOGC", os.Getenv("GOGC"), "GOMAXPROCS", os.Getenv("GOMAXPROCS"), "GOTRACEBACK", os.Getenv("GOTRACEBACK"))
+
 	if err := initForOS(s.KubeletFlags.WindowsService, s.KubeletFlags.WindowsPriorityClass); err != nil {
 		return fmt.Errorf("failed OS init: %w", err)
 	}
