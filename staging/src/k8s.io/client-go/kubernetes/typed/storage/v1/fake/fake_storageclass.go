@@ -25,6 +25,7 @@ import (
 
 	storagev1 "k8s.io/api/storage/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
@@ -60,13 +61,17 @@ func (c *FakeStorageClasses) List(ctx context.Context, opts v1.ListOptions) (res
 		return nil, err
 	}
 
-	label, _, _ := testing.ExtractFromListOptions(opts)
+	label, field, _ := testing.ExtractFromListOptions(opts)
 	if label == nil {
 		label = labels.Everything()
 	}
+
 	list := &storagev1.StorageClassList{ListMeta: obj.(*storagev1.StorageClassList).ListMeta}
 	for _, item := range obj.(*storagev1.StorageClassList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
+		fieldSet := fields.Set{
+			"metadata.name": item.GetName(),
+		}
+		if label.Matches(labels.Set(item.Labels)) && field.Matches(fieldSet) {
 			list.Items = append(list.Items, item)
 		}
 	}

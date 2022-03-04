@@ -23,6 +23,7 @@ import (
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
@@ -58,13 +59,17 @@ func (c *FakeClusterTestTypes) List(ctx context.Context, opts v1.ListOptions) (r
 		return nil, err
 	}
 
-	label, _, _ := testing.ExtractFromListOptions(opts)
+	label, field, _ := testing.ExtractFromListOptions(opts)
 	if label == nil {
 		label = labels.Everything()
 	}
+
 	list := &examplev1.ClusterTestTypeList{ListMeta: obj.(*examplev1.ClusterTestTypeList).ListMeta}
 	for _, item := range obj.(*examplev1.ClusterTestTypeList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
+		fieldSet := fields.Set{
+			"metadata.name": item.GetName(),
+		}
+		if label.Matches(labels.Set(item.Labels)) && field.Matches(fieldSet) {
 			list.Items = append(list.Items, item)
 		}
 	}

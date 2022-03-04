@@ -25,6 +25,7 @@ import (
 
 	v1beta1 "k8s.io/api/coordination/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
@@ -63,13 +64,18 @@ func (c *FakeLeases) List(ctx context.Context, opts v1.ListOptions) (result *v1b
 		return nil, err
 	}
 
-	label, _, _ := testing.ExtractFromListOptions(opts)
+	label, field, _ := testing.ExtractFromListOptions(opts)
 	if label == nil {
 		label = labels.Everything()
 	}
+
 	list := &v1beta1.LeaseList{ListMeta: obj.(*v1beta1.LeaseList).ListMeta}
 	for _, item := range obj.(*v1beta1.LeaseList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
+		fieldSet := fields.Set{
+			"metadata.name":      item.GetName(),
+			"metadata.namespace": item.GetNamespace(),
+		}
+		if label.Matches(labels.Set(item.Labels)) && field.Matches(fieldSet) {
 			list.Items = append(list.Items, item)
 		}
 	}

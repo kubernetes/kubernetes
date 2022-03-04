@@ -23,6 +23,7 @@ import (
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
@@ -57,13 +58,17 @@ func (c *FakeCustomResourceDefinitions) List(ctx context.Context, opts v1.ListOp
 		return nil, err
 	}
 
-	label, _, _ := testing.ExtractFromListOptions(opts)
+	label, field, _ := testing.ExtractFromListOptions(opts)
 	if label == nil {
 		label = labels.Everything()
 	}
+
 	list := &apiextensionsv1.CustomResourceDefinitionList{ListMeta: obj.(*apiextensionsv1.CustomResourceDefinitionList).ListMeta}
 	for _, item := range obj.(*apiextensionsv1.CustomResourceDefinitionList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
+		fieldSet := fields.Set{
+			"metadata.name": item.GetName(),
+		}
+		if label.Matches(labels.Set(item.Labels)) && field.Matches(fieldSet) {
 			list.Items = append(list.Items, item)
 		}
 	}

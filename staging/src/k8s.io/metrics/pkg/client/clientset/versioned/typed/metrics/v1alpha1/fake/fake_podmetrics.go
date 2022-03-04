@@ -22,6 +22,7 @@ import (
 	"context"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -59,13 +60,18 @@ func (c *FakePodMetricses) List(ctx context.Context, opts v1.ListOptions) (resul
 		return nil, err
 	}
 
-	label, _, _ := testing.ExtractFromListOptions(opts)
+	label, field, _ := testing.ExtractFromListOptions(opts)
 	if label == nil {
 		label = labels.Everything()
 	}
+
 	list := &v1alpha1.PodMetricsList{ListMeta: obj.(*v1alpha1.PodMetricsList).ListMeta}
 	for _, item := range obj.(*v1alpha1.PodMetricsList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
+		fieldSet := fields.Set{
+			"metadata.name":      item.GetName(),
+			"metadata.namespace": item.GetNamespace(),
+		}
+		if label.Matches(labels.Set(item.Labels)) && field.Matches(fieldSet) {
 			list.Items = append(list.Items, item)
 		}
 	}
