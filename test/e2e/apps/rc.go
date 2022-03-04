@@ -430,6 +430,10 @@ func TestReplicationControllerServeImageOrFail(f *framework.Framework, test stri
 	// in contrib/for-demos/serve_hostname
 	ginkgo.By(fmt.Sprintf("Creating replication controller %s", name))
 	newRC := newRC(name, replicas, map[string]string{"name": name}, name, image, []string{"serve-hostname"})
+	if test == "private" {
+		newRC.Spec.Template.Spec.Containers[0].ImagePullPolicy = v1.PullAlways
+	}
+
 	newRC.Spec.Template.Spec.Containers[0].Ports = []v1.ContainerPort{{ContainerPort: 9376}}
 	_, err := f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Create(context.TODO(), newRC, metav1.CreateOptions{})
 	framework.ExpectNoError(err)

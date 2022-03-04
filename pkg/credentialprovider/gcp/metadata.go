@@ -160,11 +160,19 @@ func (g *MetadataProvider) Enabled() bool {
 
 // Provide implements DockerConfigProvider
 func (g *DockerConfigKeyProvider) Provide(image string) credentialprovider.DockerConfig {
-	return registryToDocker(gcpcredential.ProvideConfigKey(g.Client, image))
+	rc := gcpcredential.ProvideConfigKey(g.Client, image)
+	if len(rc) > 0 {
+		klog.V(2).Infof("@@adisky ProvideConfigKey got credentials")
+	}
+	return registryToDocker(rc)
 }
 
 // Provide implements DockerConfigProvider
 func (g *DockerConfigURLKeyProvider) Provide(image string) credentialprovider.DockerConfig {
+	rc := gcpcredential.ProvideURLKey(g.Client, image)
+	if len(rc) > 0 {
+		klog.V(2).Infof("@@adisky ProvideURLKey got credentials")
+	}
 	return registryToDocker(gcpcredential.ProvideURLKey(g.Client, image))
 }
 
@@ -256,6 +264,10 @@ func (g *ContainerRegistryProvider) Enabled() bool {
 
 // Provide implements DockerConfigProvider
 func (g *ContainerRegistryProvider) Provide(image string) credentialprovider.DockerConfig {
+	rc := gcpcredential.ProvideContainerRegistry(g.Client, image)
+	if len(rc) > 0 {
+		klog.V(2).Infof("@@adisky ProvideContainerRegistry got credentials")
+	}
 	return registryToDocker(gcpcredential.ProvideContainerRegistry(g.Client, image))
 }
 

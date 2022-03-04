@@ -55,6 +55,8 @@ func (m *kubeGenericRuntimeManager) PullImage(image kubecontainer.ImageSpec, pul
 		return imageRef, nil
 	}
 
+	klog.V(2).InfoS("@@adisky Pulling image with credentials", "image", img)
+
 	var pullErrs []error
 	for _, currentCreds := range creds {
 		auth := &runtimeapi.AuthConfig{
