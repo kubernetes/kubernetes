@@ -31,7 +31,7 @@ require (
 	github.com/coreos/go-systemd/v22 v22.3.2
 	github.com/cpuguy83/go-md2man/v2 v2.0.0
 	github.com/davecgh/go-spew v1.1.1
-	github.com/docker/distribution v2.7.1+incompatible
+	github.com/docker/distribution v2.8.0+incompatible
 	github.com/docker/go-units v0.4.0
 	github.com/elazarl/goproxy v0.0.0-20180725130230-947c36da3153
 	github.com/emicklei/go-restful v2.9.5+incompatible
@@ -44,7 +44,7 @@ require (
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da
 	github.com/golang/mock v1.5.0
 	github.com/golang/protobuf v1.5.2
-	github.com/google/cadvisor v0.43.1-0.20220111033110-a3b5f4f6c501
+	github.com/google/cadvisor v0.44.0
 	github.com/google/go-cmp v0.5.5
 	github.com/google/gofuzz v1.1.0
 	github.com/google/uuid v1.1.2
@@ -66,7 +66,7 @@ require (
 	github.com/opencontainers/selinux v1.10.0
 	github.com/pkg/errors v0.9.1
 	github.com/pmezard/go-difflib v1.0.0
-	github.com/prometheus/client_golang v1.12.1
+	github.com/prometheus/client_golang v1.12.2-0.20220223112252-1f81b3e9130f
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.32.1
 	github.com/quobyte/api v0.1.8
@@ -267,7 +267,7 @@ replace (
 	github.com/golang/protobuf => github.com/golang/protobuf v1.5.2
 	github.com/golangplus/testing => github.com/golangplus/testing v0.0.0-20180327235837-af21d9c3145e
 	github.com/google/btree => github.com/google/btree v1.0.1
-	github.com/google/cadvisor => github.com/bwplotka/cadvisor v0.42.1-0.20220127113621-0d76a7d092f5
+	github.com/google/cadvisor => github.com/google/cadvisor v0.44.0
 	github.com/google/cel-go => github.com/google/cel-go v0.9.0
 	github.com/google/cel-spec => github.com/google/cel-spec v0.6.0
 	github.com/google/go-cmp => github.com/google/go-cmp v0.5.5
@@ -380,7 +380,7 @@ replace (
 	github.com/pmezard/go-difflib => github.com/pmezard/go-difflib v1.0.0
 	github.com/posener/complete => github.com/posener/complete v1.1.1
 	github.com/pquerna/cachecontrol => github.com/pquerna/cachecontrol v0.0.0-20171018203845-0dec1b30a021
-	github.com/prometheus/client_golang => github.com/prometheus/client_golang v1.12.1
+	github.com/prometheus/client_golang => github.com/prometheus/client_golang v1.12.2-0.20220223112252-1f81b3e9130f
 	github.com/prometheus/client_model => github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common => github.com/prometheus/common v0.32.1
 	github.com/prometheus/procfs => github.com/prometheus/procfs v0.7.3

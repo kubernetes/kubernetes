@@ -218,7 +218,7 @@ github.com/cyphar/filepath-securejoin
 github.com/davecgh/go-spew/spew
 # github.com/daviddengcn/go-colortext v0.0.0-20160507010035-511bcaf42ccd => github.com/daviddengcn/go-colortext v0.0.0-20160507010035-511bcaf42ccd
 github.com/daviddengcn/go-colortext
-# github.com/docker/distribution v2.7.1+incompatible => github.com/docker/distribution v2.7.1+incompatible
+# github.com/docker/distribution v2.8.0+incompatible => github.com/docker/distribution v2.7.1+incompatible
 ## explicit
 github.com/docker/distribution/digestset
 github.com/docker/distribution/reference
@@ -322,7 +322,7 @@ github.com/golang/protobuf/ptypes/timestamp
 github.com/golang/protobuf/ptypes/wrappers
 # github.com/google/btree v1.0.1 => github.com/google/btree v1.0.1
 github.com/google/btree
-# github.com/google/cadvisor v0.43.1-0.20220111033110-a3b5f4f6c501 => github.com/google/cadvisor v0.43.1-0.20220111033110-a3b5f4f6c501
+# github.com/google/cadvisor v0.44.0 => github.com/google/cadvisor v0.44.0
 ## explicit
 github.com/google/cadvisor/accelerators
 github.com/google/cadvisor/cache/memory
@@ -641,7 +641,7 @@ github.com/pmezard/go-difflib/difflib
 # github.com/pquerna/cachecontrol v0.0.0-20171018203845-0dec1b30a021 => github.com/pquerna/cachecontrol v0.0.0-20171018203845-0dec1b30a021
 github.com/pquerna/cachecontrol
 github.com/pquerna/cachecontrol/cacheobject
-# github.com/prometheus/client_golang v1.12.1 => github.com/prometheus/client_golang v1.12.1
+# github.com/prometheus/client_golang v1.12.2-0.20220223112252-1f81b3e9130f => github.com/prometheus/client_golang v1.12.2-0.20220223112252-1f81b3e9130f
 ## explicit
 github.com/prometheus/client_golang/prometheus
 github.com/prometheus/client_golang/prometheus/internal
@@ -2540,7 +2540,7 @@ sigs.k8s.io/yaml
 # github.com/golang/protobuf => github.com/golang/protobuf v1.5.2
 # github.com/golangplus/testing => github.com/golangplus/testing v0.0.0-20180327235837-af21d9c3145e
 # github.com/google/btree => github.com/google/btree v1.0.1
-# github.com/google/cadvisor => github.com/google/cadvisor v0.43.1-0.20220111033110-a3b5f4f6c501
+# github.com/google/cadvisor => github.com/google/cadvisor v0.44.0
 # github.com/google/cel-go => github.com/google/cel-go v0.9.0
 # github.com/google/cel-spec => github.com/google/cel-spec v0.6.0
 # github.com/google/go-cmp => github.com/google/go-cmp v0.5.5
@@ -2653,7 +2653,7 @@ sigs.k8s.io/yaml
 # github.com/pmezard/go-difflib => github.com/pmezard/go-difflib v1.0.0
 # github.com/posener/complete => github.com/posener/complete v1.1.1
 # github.com/pquerna/cachecontrol => github.com/pquerna/cachecontrol v0.0.0-20171018203845-0dec1b30a021
-# github.com/prometheus/client_golang => github.com/prometheus/client_golang v1.12.1
+# github.com/prometheus/client_golang => github.com/prometheus/client_golang v1.12.2-0.20220223112252-1f81b3e9130f
 # github.com/prometheus/client_model => github.com/prometheus/client_model v0.2.0
 # github.com/prometheus/common => github.com/prometheus/common v0.32.1
 # github.com/prometheus/procfs => github.com/prometheus/procfs v0.7.3

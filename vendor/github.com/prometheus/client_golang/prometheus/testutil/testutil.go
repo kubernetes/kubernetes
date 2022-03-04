@@ -167,7 +167,16 @@ func CollectAndCompare(c prometheus.Collector, expected io.Reader, metricNames .
 // exposition format. If any metricNames are provided, only metrics with those
 // names are compared.
 func GatherAndCompare(g prometheus.Gatherer, expected io.Reader, metricNames ...string) error {
-	got, err := g.Gather()
+	return TransactionalGatherAndCompare(prometheus.ToTransactionalGatherer(g), expected, metricNames...)
+}
+
+// TransactionalGatherAndCompare gathers all metrics from the provided Gatherer and compares
+// it to an expected output read from the provided Reader in the Prometheus text
+// exposition format. If any metricNames are provided, only metrics with those
+// names are compared.
+func TransactionalGatherAndCompare(g prometheus.TransactionalGatherer, expected io.Reader, metricNames ...string) error {
+	got, done, err := g.Gather()
+	defer done()
 	if err != nil {
 		return fmt.Errorf("gathering metrics failed: %s", err)
 	}

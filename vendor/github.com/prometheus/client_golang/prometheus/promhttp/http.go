@@ -84,6 +84,13 @@ func Handler() http.Handler {
 // instrumentation. Use the InstrumentMetricHandler function to apply the same
 // kind of instrumentation as it is used by the Handler function.
 func HandlerFor(reg prometheus.Gatherer, opts HandlerOpts) http.Handler {
+	return HandlerForTransactional(prometheus.ToTransactionalGatherer(reg), opts)
+}
+
+// HandlerForTransactional is like HandlerFor, but it uses transactional gather, which
+// can safely change in-place returned *dto.MetricFamily before call to `Gather` and after
+// call to `done` of that `Gather`.
+func HandlerForTransactional(reg prometheus.TransactionalGatherer, opts HandlerOpts) http.Handler {
 	var (
 		inFlightSem chan struct{}
 		errCnt      = prometheus.NewCounterVec(
@@ -123,7 +130,8 @@ func HandlerFor(reg prometheus.Gatherer, opts HandlerOpts) http.Handler {
 				return
 			}
 		}
-		mfs, err := reg.Gather()
+		mfs, done, err := reg.Gather()
+		defer done()
 		if err != nil {
 			if opts.ErrorLog != nil {
 				opts.ErrorLog.Println("error gathering metrics:", err)

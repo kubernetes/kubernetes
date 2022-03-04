@@ -20,6 +20,7 @@ import (
 	//nolint:staticcheck // Ignore SA1019. Need to keep deprecated package for compatibility.
 	"github.com/golang/protobuf/proto"
 
+	"github.com/prometheus/client_golang/prometheus/internal"
 	dto "github.com/prometheus/client_model/go"
 )
 
@@ -182,7 +183,7 @@ func (m *wrappingMetric) Write(out *dto.Metric) error {
 			Value: proto.String(lv),
 		})
 	}
-	sort.Sort(labelPairSorter(out.Label))
+	sort.Sort(internal.LabelPairSorter(out.Label))
 	return nil
 }
 

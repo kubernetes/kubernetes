@@ -355,9 +355,6 @@ func (s *Server) InstallDefaultHandlers() {
 	s.addMetricsBucketMatcher("metrics/resource")
 	s.restfulCont.Handle(metricsPath, legacyregistry.Handler())
 
-	// cAdvisor metrics are exposed under the secured handler as well
-	r := compbasemetrics.NewKubeRegistry()
-
 	includedMetrics := cadvisormetrics.MetricSet{
 		cadvisormetrics.CpuUsageMetrics:     struct{}{},
 		cadvisormetrics.MemoryUsageMetrics:  struct{}{},
@@ -369,7 +366,7 @@ func (s *Server) InstallDefaultHandlers() {
 		cadvisormetrics.ProcessMetrics:      struct{}{},
 	}
 
-	// Only add the Accelerator metrics if the feature is inactive
+	// Only add the Accelerator metrics if the feature is inactive.
 	// Note: Accelerator metrics will be removed in the future, hence the feature gate.
 	if !utilfeature.DefaultFeatureGate.Enabled(features.DisableAcceleratorUsageMetrics) {
 		includedMetrics[cadvisormetrics.AcceleratorUsageMetrics] = struct{}{}
@@ -380,22 +377,22 @@ func (s *Server) InstallDefaultHandlers() {
 		Count:     1,
 		Recursive: true,
 	}
+
+	// cAdvisor metrics are exposed under the secured handler as well.
+	r := compbasemetrics.NewKubeRegistry()
 	r.RawMustRegister(metrics.NewPrometheusCollector(prometheusHostAdapter{s.host}, containerPrometheusLabelsFunc(s.host), includedMetrics, clock.RealClock{}, cadvisorOpts))
 	r.RawMustRegister(metrics.NewPrometheusMachineCollector(prometheusHostAdapter{s.host}, includedMetrics))
 	s.restfulCont.Handle(cadvisorMetricsPath,
 		compbasemetrics.HandlerFor(r, compbasemetrics.HandlerOpts{ErrorHandling: compbasemetrics.ContinueOnError}),
 	)
 
-	s.addMetricsBucketMatcher("metrics/resource")
 	resourceRegistry := compbasemetrics.NewKubeRegistry()
 	resourceRegistry.CustomMustRegister(collectors.NewResourceMetricsCollector(s.resourceAnalyzer))
 	s.restfulCont.Handle(resourceMetricsPath,
 		compbasemetrics.HandlerFor(resourceRegistry, compbasemetrics.HandlerOpts{ErrorHandling: compbasemetrics.ContinueOnError}),
 	)
 
-	// prober metrics are exposed under a different endpoint
-
-	s.addMetricsBucketMatcher("metrics/probes")
+	// prober metrics are exposed under a different endpoint.
 	p := compbasemetrics.NewKubeRegistry()
 	_ = compbasemetrics.RegisterProcessStartTime(p.Register)
 	p.MustRegister(prober.ProberResults)
@@ -404,7 +401,7 @@ func (s *Server) InstallDefaultHandlers() {
 	)
 }
 
-// InstallDebuggingHandlers registers the HTTP request patterns that serve logs or run commands/containers
+// InstallDebuggingHandlers registers the HTTP request patterns that serve logs or run commands/containers.
 func (s *Server) InstallDebuggingHandlers() {
 	klog.InfoS("Adding debug handlers to kubelet server")
 
