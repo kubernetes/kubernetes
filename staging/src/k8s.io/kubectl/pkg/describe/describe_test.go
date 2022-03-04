@@ -2358,7 +2358,7 @@ Labels:           id1=app1
 Namespace:        foo
 Address:          
 Ingress Class:    test
-Default backend:  default-http-backend:80 (<error: endpoints "default-http-backend" not found>)
+Default backend:  <default>
 Rules:
   Host         Path  Backends
   ----         ----  --------
@@ -2374,7 +2374,7 @@ Labels:           <none>
 Namespace:        foo
 Address:          
 Ingress Class:    test
-Default backend:  default-http-backend:80 (<error: endpoints "default-http-backend" not found>)
+Default backend:  <default>
 Rules:
   Host         Path  Backends
   ----         ----  --------
@@ -2413,7 +2413,7 @@ Labels:           <none>
 Namespace:        foo
 Address:          
 Ingress Class:    test
-Default backend:  default-http-backend:80 (<error: endpoints "default-http-backend" not found>)
+Default backend:  <default>
 Rules:
   Host         Path  Backends
   ----         ----  --------
@@ -2452,7 +2452,7 @@ Labels:           <none>
 Namespace:        foo
 Address:          
 Ingress Class:    test
-Default backend:  default-http-backend:80 (<error: endpoints "default-http-backend" not found>)
+Default backend:  <default>
 Rules:
   Host         Path  Backends
   ----         ----  --------
