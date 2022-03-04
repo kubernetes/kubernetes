@@ -98,7 +98,7 @@ type KubeletConfiguration struct {
 	// staticPodURL is the URL for accessing static pods to run
 	StaticPodURL string
 	// staticPodURLHeader is a map of slices with HTTP headers to use when accessing the podURL
-	StaticPodURLHeader map[string][]string
+	StaticPodURLHeader map[string][]string `datapolicy:"token"`
 	// address is the IP address for the Kubelet to serve on (set to 0.0.0.0
 	// for all interfaces)
 	Address string

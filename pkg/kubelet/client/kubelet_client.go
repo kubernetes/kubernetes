@@ -48,7 +48,7 @@ type KubeletClientConfig struct {
 	restclient.TLSClientConfig
 
 	// Server requires Bearer authentication
-	BearerToken string
+	BearerToken string `datapolicy:"token"`
 
 	// HTTPTimeout is used by the client to timeout http requests to Kubelet.
 	HTTPTimeout time.Duration
