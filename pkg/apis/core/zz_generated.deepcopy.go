@@ -5403,6 +5403,11 @@ func (in *ServiceSpec) DeepCopyInto(out *ServiceSpec) {
 		*out = new(ServiceInternalTrafficPolicyType)
 		**out = **in
 	}
+	if in.IncludeTerminating != nil {
+		in, out := &in.IncludeTerminating, &out.IncludeTerminating
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 

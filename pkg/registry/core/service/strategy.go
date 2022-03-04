@@ -187,6 +187,12 @@ func dropServiceDisabledFields(newSvc *api.Service, oldSvc *api.Service) {
 			newSvc.Spec.InternalTrafficPolicy = nil
 		}
 	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ProxyTerminatingEndpoints) {
+		if !serviceIncludeTerminatingInUse(oldSvc) {
+			newSvc.Spec.IncludeTerminating = nil
+		}
+	}
 }
 
 // returns true when the svc.Status.Conditions field is in use.
@@ -223,6 +229,14 @@ func serviceInternalTrafficPolicyInUse(svc *api.Service) bool {
 		return false
 	}
 	return svc.Spec.InternalTrafficPolicy != nil
+}
+
+func serviceIncludeTerminatingInUse(svc *api.Service) bool {
+	if svc == nil {
+		return false
+	}
+
+	return svc.Spec.IncludeTerminating != nil
 }
 
 type serviceStatusStrategy struct {

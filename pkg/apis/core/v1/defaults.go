@@ -141,6 +141,14 @@ func SetDefaults_Service(obj *v1.Service) {
 
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.ProxyTerminatingEndpoints) {
+		if obj.Spec.Selector != nil {
+			if obj.Spec.IncludeTerminating == nil {
+				obj.Spec.IncludeTerminating = utilpointer.BoolPtr(false)
+			}
+		}
+	}
+
 	if obj.Spec.Type == v1.ServiceTypeLoadBalancer {
 		if obj.Spec.AllocateLoadBalancerNodePorts == nil {
 			obj.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)

@@ -4696,6 +4696,12 @@ func ValidateService(service *core.Service) field.ErrorList {
 		allErrs = append(allErrs, field.Required(field.NewPath("allocateLoadBalancerNodePorts"), ""))
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.ProxyTerminatingEndpoints) {
+		if service.Spec.Selector == nil && service.Spec.IncludeTerminating != nil {
+			allErrs = append(allErrs, field.Forbidden(specPath.Child("includeTerminating"), "disallowed when using selectorless Services"))
+		}
+	}
+
 	// validate LoadBalancerClass field
 	allErrs = append(allErrs, validateLoadBalancerClassField(nil, service)...)
 

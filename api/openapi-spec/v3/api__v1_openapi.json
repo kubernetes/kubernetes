@@ -5937,6 +5937,10 @@
             "format": "int32",
             "type": "integer"
           },
+          "includeTerminating": {
+            "description": "includeTerminating indicates whether the Service should route traffic to terminating Pods. If true, Pods with a deletion timestamp will be considered in the set of endpoints the Service routes to. The Pod readiness is still considered for terminating Pods, just like non-terminating Pods.",
+            "type": "boolean"
+          },
           "internalTrafficPolicy": {
             "description": "InternalTrafficPolicy specifies if the cluster internal traffic should be routed to all endpoints or node-local endpoints only. \"Cluster\" routes internal traffic to a Service to all endpoints. \"Local\" routes traffic to node-local endpoints only, traffic is dropped if no node-local endpoints are ready. The default value is \"Cluster\".",
             "type": "string"

@@ -6647,6 +6647,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: healthCheckNodePort
       type:
         scalar: numeric
+    - name: includeTerminating
+      type:
+        scalar: boolean
     - name: internalTrafficPolicy
       type:
         scalar: string

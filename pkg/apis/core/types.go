@@ -3920,6 +3920,12 @@ type ServiceSpec struct {
 	// +featureGate=ServiceInternalTrafficPolicy
 	// +optional
 	InternalTrafficPolicy *ServiceInternalTrafficPolicyType
+
+	// includeTerminating indicates whether the Service should route traffic
+	// to terminating Pods. If true, Pods with a deletion timestamp will be considered in the set of endpoints the Service routes to.
+	// The Pod readiness is still considered for terminating Pods, just like non-terminating Pods.
+	// +optional
+	IncludeTerminating *bool
 }
 
 // ServicePort represents the port on which the service is exposed

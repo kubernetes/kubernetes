@@ -24970,6 +24970,13 @@ func schema_k8sio_api_core_v1_ServiceSpec(ref common.ReferenceCallback) common.O
 							Format:      "",
 						},
 					},
+					"includeTerminating": {
+						SchemaProps: spec.SchemaProps{
+							Description: "includeTerminating indicates whether the Service should route traffic to terminating Pods. If true, Pods with a deletion timestamp will be considered in the set of endpoints the Service routes to. The Pod readiness is still considered for terminating Pods, just like non-terminating Pods.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 				},
 			},
 		},

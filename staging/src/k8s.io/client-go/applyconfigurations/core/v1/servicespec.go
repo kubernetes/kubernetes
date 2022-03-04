@@ -44,6 +44,7 @@ type ServiceSpecApplyConfiguration struct {
 	AllocateLoadBalancerNodePorts *bool                                    `json:"allocateLoadBalancerNodePorts,omitempty"`
 	LoadBalancerClass             *string                                  `json:"loadBalancerClass,omitempty"`
 	InternalTrafficPolicy         *corev1.ServiceInternalTrafficPolicyType `json:"internalTrafficPolicy,omitempty"`
+	IncludeTerminating            *bool                                    `json:"includeTerminating,omitempty"`
 }
 
 // ServiceSpecApplyConfiguration constructs an declarative configuration of the ServiceSpec type for use with
@@ -220,5 +221,13 @@ func (b *ServiceSpecApplyConfiguration) WithLoadBalancerClass(value string) *Ser
 // If called multiple times, the InternalTrafficPolicy field is set to the value of the last call.
 func (b *ServiceSpecApplyConfiguration) WithInternalTrafficPolicy(value corev1.ServiceInternalTrafficPolicyType) *ServiceSpecApplyConfiguration {
 	b.InternalTrafficPolicy = &value
+	return b
+}
+
+// WithIncludeTerminating sets the IncludeTerminating field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the IncludeTerminating field is set to the value of the last call.
+func (b *ServiceSpecApplyConfiguration) WithIncludeTerminating(value bool) *ServiceSpecApplyConfiguration {
+	b.IncludeTerminating = &value
 	return b
 }

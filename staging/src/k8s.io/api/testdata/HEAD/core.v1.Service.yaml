@@ -43,6 +43,7 @@ spec:
   externalName: externalNameValue
   externalTrafficPolicy: externalTrafficPolicyValue
   healthCheckNodePort: 12
+  includeTerminating: true
   internalTrafficPolicy: internalTrafficPolicyValue
   ipFamilies:
   - ipFamiliesValue
