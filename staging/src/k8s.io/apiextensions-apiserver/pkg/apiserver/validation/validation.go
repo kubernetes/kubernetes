@@ -79,6 +79,27 @@ func ValidateCustomResource(fldPath *field.Path, customResource interface{}, val
 				}
 				allErrs = append(allErrs, field.NotSupported(errPath, err.Value, values))
 
+			case openapierrors.TooLongFailCode:
+				value := interface{}("")
+				if err.Value != nil {
+					value = err.Value
+				}
+				allErrs = append(allErrs, field.TooLongFail(errPath, value, err.Error()))
+
+			case openapierrors.TooManyPropertiesCode, openapierrors.MaxItemsFailCode:
+				value := interface{}("")
+				if err.Value != nil {
+					value = err.Value
+				}
+				allErrs = append(allErrs, field.TooManyFail(errPath, value, err.Error()))
+
+			case openapierrors.InvalidTypeCode:
+				value := interface{}("")
+				if err.Value != nil {
+					value = err.Value
+				}
+				allErrs = append(allErrs, field.TypeInvalid(errPath, value, err.Error()))
+
 			default:
 				value := interface{}("")
 				if err.Value != nil {

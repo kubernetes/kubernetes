@@ -420,6 +420,241 @@ func TestCustomResourceValidators(t *testing.T) {
 	})
 }
 
+// TestCustomResourceValidatorsWithBlockingErrors tests x-kubernetes-validations is skipped when
+// blocking errors occurred.
+func TestCustomResourceValidatorsWithBlockingErrors(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CustomResourceValidationExpressions, true)()
+
+	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.TearDownFn()
+	config := server.ClientConfig
+
+	apiExtensionClient, err := clientset.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("Structural schema", func(t *testing.T) {
+		structuralWithValidators := crdWithSchema(t, "Structural", structuralSchemaWithBlockingErr)
+		crd, err := fixtures.CreateNewV1CustomResourceDefinition(structuralWithValidators, apiExtensionClient, dynamicClient)
+		if err != nil {
+			t.Fatal(err)
+		}
+		gvr := schema.GroupVersionResource{
+			Group:    crd.Spec.Group,
+			Version:  crd.Spec.Versions[0].Name,
+			Resource: crd.Spec.Names.Plural,
+		}
+		crClient := dynamicClient.Resource(gvr)
+
+		t.Run("CRD creation MUST allow data that is valid according to x-kubernetes-validations", func(t *testing.T) {
+			name1 := names.SimpleNameGenerator.GenerateName("cr-1")
+			_, err = crClient.Create(context.TODO(), &unstructured.Unstructured{Object: map[string]interface{}{
+				"apiVersion": gvr.Group + "/" + gvr.Version,
+				"kind":       crd.Spec.Names.Kind,
+				"metadata": map[string]interface{}{
+					"name": name1,
+				},
+				"spec": map[string]interface{}{
+					"x":     int64(2),
+					"y":     int64(2),
+					"limit": int64(123),
+				},
+			}}, metav1.CreateOptions{})
+			if err != nil {
+				t.Errorf("Failed to create custom resource: %v", err)
+			}
+		})
+		t.Run("custom resource create and update MUST NOT allow data if failed validation", func(t *testing.T) {
+			name1 := names.SimpleNameGenerator.GenerateName("cr-1")
+
+			// a spec create that is invalid MUST fail validation
+			cr := &unstructured.Unstructured{Object: map[string]interface{}{
+				"apiVersion": gvr.Group + "/" + gvr.Version,
+				"kind":       crd.Spec.Names.Kind,
+				"metadata": map[string]interface{}{
+					"name": name1,
+				},
+				"spec": map[string]interface{}{
+					"x": int64(-1),
+					"y": int64(0),
+				},
+			}}
+
+			// a spec create that is invalid MUST fail validation
+			_, err = crClient.Create(context.TODO(), cr, metav1.CreateOptions{})
+			if err == nil {
+				t.Fatal("Expected create of invalid custom resource to fail")
+			} else {
+				if !strings.Contains(err.Error(), "failed rule: self.spec.x + self.spec.y") {
+					t.Fatalf("Expected error to contain %s but got %v", "failed rule: self.spec.x + self.spec.y", err.Error())
+				}
+			}
+		})
+		t.Run("custom resource create and update MUST NOT allow data if there is blocking error of MaxLength", func(t *testing.T) {
+			name2 := names.SimpleNameGenerator.GenerateName("cr-2")
+
+			// a spec create that has maxLengh err MUST fail validation
+			cr := &unstructured.Unstructured{Object: map[string]interface{}{
+				"apiVersion": gvr.Group + "/" + gvr.Version,
+				"kind":       crd.Spec.Names.Kind,
+				"metadata": map[string]interface{}{
+					"name": name2,
+				},
+				"spec": map[string]interface{}{
+					"x":     int64(2),
+					"y":     int64(2),
+					"extra": "skipValidation?",
+					"floatMap": map[string]interface{}{
+						"key1": 0.2,
+						"key2": 0.3,
+					},
+					"limit": nil,
+				},
+			}}
+
+			_, err := crClient.Create(context.TODO(), cr, metav1.CreateOptions{})
+			if err == nil || !strings.Contains(err.Error(), "some validation rules were not checked because the object was invalid; correct the existing errors to complete validation") {
+				t.Fatalf("expect error to contain \"some validation rules were not checked because the object was invalid; correct the existing errors to complete validation\" but get: %v", err)
+			}
+		})
+		t.Run("custom resource create and update MUST NOT allow data if there is blocking error of MaxItems", func(t *testing.T) {
+			name2 := names.SimpleNameGenerator.GenerateName("cr-2")
+			// a spec create that has maxItem err MUST fail validation
+			cr := &unstructured.Unstructured{Object: map[string]interface{}{
+				"apiVersion": gvr.Group + "/" + gvr.Version,
+				"kind":       crd.Spec.Names.Kind,
+				"metadata": map[string]interface{}{
+					"name": name2,
+				},
+				"spec": map[string]interface{}{
+					"x": int64(2),
+					"y": int64(2),
+					"floatMap": map[string]interface{}{
+						"key1": 0.2,
+						"key2": 0.3,
+					},
+					"assocList": []interface{}{
+						map[string]interface{}{
+							"k": "a",
+							"v": "1",
+						},
+						map[string]interface{}{
+							"a": "a",
+						},
+					},
+					"limit": nil,
+				},
+			}}
+
+			_, err = crClient.Create(context.TODO(), cr, metav1.CreateOptions{})
+			if err == nil || !strings.Contains(err.Error(), "some validation rules were not checked because the object was invalid; correct the existing errors to complete validation") {
+				t.Fatalf("expect error to contain \"some validation rules were not checked because the object was invalid; correct the existing errors to complete validation\" but get: %v", err)
+			}
+		})
+		t.Run("custom resource create and update MUST NOT allow data if there is blocking error of MaxProperties", func(t *testing.T) {
+			name2 := names.SimpleNameGenerator.GenerateName("cr-2")
+			// a spec create that has maxItem err MUST fail validation
+			cr := &unstructured.Unstructured{Object: map[string]interface{}{
+				"apiVersion": gvr.Group + "/" + gvr.Version,
+				"kind":       crd.Spec.Names.Kind,
+				"metadata": map[string]interface{}{
+					"name": name2,
+				},
+				"spec": map[string]interface{}{
+					"x": int64(2),
+					"y": int64(2),
+					"floatMap": map[string]interface{}{
+						"key1": 0.2,
+						"key2": 0.3,
+						"key3": 0.4,
+					},
+					"assocList": []interface{}{
+						map[string]interface{}{
+							"k": "a",
+							"v": "1",
+						},
+					},
+					"limit": nil,
+				},
+			}}
+
+			_, err = crClient.Create(context.TODO(), cr, metav1.CreateOptions{})
+			if err == nil || !strings.Contains(err.Error(), "some validation rules were not checked because the object was invalid; correct the existing errors to complete validation") {
+				t.Fatalf("expect error to contain \"some validation rules were not checked because the object was invalid; correct the existing errors to complete validation\" but get: %v", err)
+			}
+		})
+		t.Run("custom resource create and update MUST NOT allow data if there is blocking error of missing required field", func(t *testing.T) {
+			name2 := names.SimpleNameGenerator.GenerateName("cr-2")
+			// a spec create that has required err MUST fail validation
+			cr := &unstructured.Unstructured{Object: map[string]interface{}{
+				"apiVersion": gvr.Group + "/" + gvr.Version,
+				"kind":       crd.Spec.Names.Kind,
+				"metadata": map[string]interface{}{
+					"name": name2,
+				},
+				"spec": map[string]interface{}{
+					"x": int64(2),
+					"y": int64(2),
+					"floatMap": map[string]interface{}{
+						"key1": 0.2,
+						"key2": 0.3,
+					},
+					"assocList": []interface{}{
+						map[string]interface{}{
+							"k": "1",
+						},
+					},
+					"limit": nil,
+				},
+			}}
+
+			_, err = crClient.Create(context.TODO(), cr, metav1.CreateOptions{})
+			if err == nil || !strings.Contains(err.Error(), "some validation rules were not checked because the object was invalid; correct the existing errors to complete validation") {
+				t.Fatalf("expect error to contain \"some validation rules were not checked because the object was invalid; correct the existing errors to complete validation\" but get: %v", err)
+			}
+		})
+		t.Run("custom resource create and update MUST NOT allow data if there is blocking error of type", func(t *testing.T) {
+			name2 := names.SimpleNameGenerator.GenerateName("cr-2")
+			// a spec create that has required err MUST fail validation
+			cr := &unstructured.Unstructured{Object: map[string]interface{}{
+				"apiVersion": gvr.Group + "/" + gvr.Version,
+				"kind":       crd.Spec.Names.Kind,
+				"metadata": map[string]interface{}{
+					"name": name2,
+				},
+				"spec": map[string]interface{}{
+					"x": int64(2),
+					"y": int64(2),
+					"floatMap": map[string]interface{}{
+						"key1": 0.2,
+						"key2": 0.3,
+					},
+					"assocList": []interface{}{
+						map[string]interface{}{
+							"k": "a",
+							"v": true,
+						},
+					},
+					"limit": nil,
+				},
+			}}
+
+			_, err = crClient.Create(context.TODO(), cr, metav1.CreateOptions{})
+			if err == nil || !strings.Contains(err.Error(), "some validation rules were not checked because the object was invalid; correct the existing errors to complete validation") {
+				t.Fatalf("expect error to contain \"some validation rules were not checked because the object was invalid; correct the existing errors to complete validation\" but get: %v", err)
+			}
+		})
+	})
+}
+
 func nonStructuralCrdWithValidations() *apiextensionsv1beta1.CustomResourceDefinition {
 	return &apiextensionsv1beta1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
@@ -523,6 +758,91 @@ var structuralSchemaWithValidators = []byte(`
 			    "v": { "type": "string" }
 			  },
 			  "required": ["k"]
+			},
+			"x-kubernetes-list-type": "map",
+			"x-kubernetes-list-map-keys": ["k"],
+			"x-kubernetes-validations": [
+			  {
+				"rule": "self.exists(e, e.k == 'a' && e.v == '1')"
+			  }
+			]
+          },
+          "limit": {
+			"nullable": true,
+			"x-kubernetes-validations": [
+			  {
+				"rule": "type(self) == int && self == 123"
+			  }
+			],
+			"x-kubernetes-int-or-string": true
+          }
+        }
+      },
+      "status": {
+        "type": "object",
+		"properties": {
+          "z": {
+            "type": "integer",
+			"default": 0
+          }
+        }
+      }
+    }
+  }
+}`)
+
+var structuralSchemaWithBlockingErr = []byte(`
+{
+  "openAPIV3Schema": {
+    "description": "CRD with CEL validators",
+    "type": "object",
+	"x-kubernetes-validations": [
+	  {
+		"rule": "self.spec.x + self.spec.y >= (has(self.status) ? self.status.z : 0)"
+	  }
+	],
+    "properties": {
+      "spec": {
+        "type": "object",
+        "properties": {
+          "x": {
+            "type": "integer",
+			"default": 0
+          },
+          "y": {
+            "type": "integer",
+			"default": 0
+          },
+          "extra": {
+			"type": "string",
+            "maxLength": 0,
+			"x-kubernetes-validations": [
+			  {
+				"rule": "self.startsWith('anything')"
+			  }
+			]
+          },
+		  "floatMap": {
+			"type": "object",
+            "maxProperties": 2,
+			"additionalProperties": { "type": "number" },
+			"x-kubernetes-validations": [
+			  {
+				"rule": "self.all(k, self[k] >= 0.2)"
+			  }
+			]
+          },
+		  "assocList": {
+			"type": "array",
+            "maxItems": 1,
+			"items": {
+			  "type": "object",
+              "maxItems": 1,
+			  "properties": {
+			    "k": { "type": "string" },
+			    "v": { "type": "string" }
+			  },
+			  "required": ["k", "v"]
 			},
 			"x-kubernetes-list-type": "map",
 			"x-kubernetes-list-map-keys": ["k"],
