@@ -3036,7 +3036,7 @@ spec:
   - name: vol
   containers:
   - name: pv-recycler
-    image: k8s.gcr.io/busybox:1.27
+    image: k8s.gcr.io/debian-base:v2.0.0
     command:
     - /bin/sh
     args:
@@ -3046,6 +3046,11 @@ spec:
     - name: vol
       mountPath: /scrub
 EOF
+
+# fixup the alternate registry if specified
+if [[ -n "${KUBE_ADDON_REGISTRY:-}" ]]; then
+  sed -i -e "s@k8s.gcr.io@${KUBE_ADDON_REGISTRY}@g" "${PV_RECYCLER_OVERRIDE_TEMPLATE}"
+fi
 }
 
 function wait-till-apiserver-ready() {
