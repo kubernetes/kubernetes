@@ -159,7 +159,7 @@ func ListenAndServeKubeletServer(
 	address := netutils.ParseIPSloppy(kubeCfg.Address)
 	port := uint(kubeCfg.Port)
 	klog.InfoS("Starting to listen", "address", address, "port", port)
-	handler := NewServer(host, resourceAnalyzer, auth, tp, kubeCfg)
+	handler := NewServer(host, resourceAnalyzer, auth, tp, kubeCfg, clock.RealClock{})
 	s := &http.Server{
 		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
 		Handler:        &handler,
@@ -192,7 +192,7 @@ func ListenAndServeKubeletReadOnlyServer(
 	port uint) {
 	klog.InfoS("Starting to listen read-only", "address", address, "port", port)
 	// TODO: https://github.com/kubernetes/kubernetes/issues/109829 tracer should use WithPublicEndpoint
-	s := NewServer(host, resourceAnalyzer, nil, oteltrace.NewNoopTracerProvider(), nil)
+	s := NewServer(host, resourceAnalyzer, nil, oteltrace.NewNoopTracerProvider(), nil, clock.RealClock{})
 
 	server := &http.Server{
 		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
@@ -260,8 +260,9 @@ func NewServer(
 	resourceAnalyzer stats.ResourceAnalyzer,
 	auth AuthInterface,
 	tp oteltrace.TracerProvider,
-	kubeCfg *kubeletconfiginternal.KubeletConfiguration) Server {
-
+	kubeCfg *kubeletconfiginternal.KubeletConfiguration,
+	clock clock.Clock,
+) Server {
 	server := Server{
 		host:                 host,
 		resourceAnalyzer:     resourceAnalyzer,
@@ -276,7 +277,7 @@ func NewServer(
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletTracing) {
 		server.InstallTracingFilter(tp)
 	}
-	server.InstallDefaultHandlers()
+	server.InstallDefaultHandlers(clock)
 	if kubeCfg != nil && kubeCfg.EnableDebuggingHandlers {
 		server.InstallDebuggingHandlers()
 		// To maintain backward compatibility serve logs and pprof only when enableDebuggingHandlers is also enabled
@@ -358,7 +359,7 @@ func (s *Server) getMetricMethodBucket(method string) string {
 
 // InstallDefaultHandlers registers the default set of supported HTTP request
 // patterns with the restful Container.
-func (s *Server) InstallDefaultHandlers() {
+func (s *Server) InstallDefaultHandlers(clock clock.Clock) {
 	s.addMetricsBucketMatcher("healthz")
 	healthz.InstallHandler(s.restfulCont,
 		healthz.PingHealthz,
@@ -410,7 +411,7 @@ func (s *Server) InstallDefaultHandlers() {
 			Count:     1,
 			Recursive: true,
 		}
-		r.RawMustRegister(metrics.NewPrometheusCollector(prometheusHostAdapter{s.host}, containerPrometheusLabelsFunc(s.host), includedMetrics, clock.RealClock{}, cadvisorOpts))
+		r.RawMustRegister(metrics.NewPrometheusCollector(prometheusHostAdapter{s.host}, containerPrometheusLabelsFunc(s.host), includedMetrics, clock, cadvisorOpts))
 	}
 	s.restfulCont.Handle(cadvisorMetricsPath,
 		compbasemetrics.HandlerFor(r, compbasemetrics.HandlerOpts{ErrorHandling: compbasemetrics.ContinueOnError}),
