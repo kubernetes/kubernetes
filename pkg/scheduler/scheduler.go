@@ -69,8 +69,6 @@ type Scheduler struct {
 	// by NodeLister and Algorithm.
 	Cache internalcache.Cache
 
-	Algorithm ScheduleAlgorithm
-
 	Extenders []framework.Extender
 
 	// NextPod should be a function that blocks until the next pod
@@ -83,6 +81,11 @@ type Scheduler struct {
 	// question, and the error
 	Error func(*framework.QueuedPodInfo, error)
 
+	// SchedulePod tries to schedule the given pod to one of the nodes in the node list.
+	// Return a struct of ScheduleResult with the name of suggested host on success,
+	// otherwise will return a FitError with reasons.
+	SchedulePod func(ctx context.Context, fwk framework.Framework, state *framework.CycleState, pod *v1.Pod) (ScheduleResult, error)
+
 	// Close this to shut down the scheduler.
 	StopEverything <-chan struct{}
 
@@ -93,6 +96,12 @@ type Scheduler struct {
 	Profiles profile.Map
 
 	client clientset.Interface
+
+	nodeInfoSnapshot *internalcache.Snapshot
+
+	percentageOfNodesToScore int32
+
+	nextStartNodeIndex int
 }
 
 type schedulerOptions struct {
@@ -213,6 +222,34 @@ var defaultSchedulerOptions = schedulerOptions{
 	applyDefaultProfile: true,
 }
 
+// newScheduler creates a Scheduler object.
+func newScheduler(
+	cache internalcache.Cache,
+	extenders []framework.Extender,
+	nextPod func() *framework.QueuedPodInfo,
+	Error func(*framework.QueuedPodInfo, error),
+	stopEverything <-chan struct{},
+	schedulingQueue internalqueue.SchedulingQueue,
+	profiles profile.Map,
+	client clientset.Interface,
+	nodeInfoSnapshot *internalcache.Snapshot,
+	percentageOfNodesToScore int32) *Scheduler {
+	sched := Scheduler{
+		Cache:                    cache,
+		Extenders:                extenders,
+		NextPod:                  nextPod,
+		Error:                    Error,
+		StopEverything:           stopEverything,
+		SchedulingQueue:          schedulingQueue,
+		Profiles:                 profiles,
+		client:                   client,
+		nodeInfoSnapshot:         nodeInfoSnapshot,
+		percentageOfNodesToScore: percentageOfNodesToScore,
+	}
+	sched.SchedulePod = sched.schedulePod
+	return &sched
+}
+
 // New returns a Scheduler
 func New(client clientset.Interface,
 	informerFactory informers.SharedInformerFactory,
@@ -278,10 +315,6 @@ func New(client clientset.Interface,
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create scheduler: %v", err)
 	}
-
-	// Additional tweaks to the config produced by the configurator.
-	sched.StopEverything = stopEverything
-	sched.client = client
 
 	addAllEventHandlers(sched, informerFactory, dynInformerFactory, unionedGVKs(clusterEventMap))
 
@@ -462,9 +495,9 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 
 	schedulingCycleCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	scheduleResult, err := sched.Algorithm.Schedule(schedulingCycleCtx, sched.Extenders, fwk, state, pod)
+	scheduleResult, err := sched.SchedulePod(schedulingCycleCtx, fwk, state, pod)
 	if err != nil {
-		// Schedule() may have failed because the pod would not fit on any host, so we try to
+		// SchedulePod() may have failed because the pod would not fit on any host, so we try to
 		// preempt, with the expectation that the next time the pod is tried for scheduling it
 		// will fit due to the preemption. It is also possible that a different pod will schedule
 		// into the resources that were preempted, but this is harmless.

@@ -41,7 +41,7 @@ import (
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
-func TestGenericSchedulerWithExtenders(t *testing.T) {
+func TestSchedulerWithExtenders(t *testing.T) {
 	tests := []struct {
 		name            string
 		registerPlugins []st.RegisterPluginFunc
@@ -294,12 +294,19 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			scheduler := NewGenericScheduler(
+			scheduler := newScheduler(
 				cache,
+				extenders,
+				nil,
+				nil,
+				nil,
+				nil,
+				nil,
+				nil,
 				emptySnapshot,
 				schedulerapi.DefaultPercentageOfNodesToScore)
 			podIgnored := &v1.Pod{}
-			result, err := scheduler.Schedule(context.Background(), extenders, fwk, framework.NewCycleState(), podIgnored)
+			result, err := scheduler.SchedulePod(context.Background(), fwk, framework.NewCycleState(), podIgnored)
 			if test.expectsErr {
 				if err == nil {
 					t.Errorf("Unexpected non-error, result %+v", result)

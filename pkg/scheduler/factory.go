@@ -182,22 +182,18 @@ func (c *Configurator) create() (*Scheduler, error) {
 	)
 	debugger.ListenForSignal(c.StopEverything)
 
-	algo := NewGenericScheduler(
+	sched := newScheduler(
 		c.schedulerCache,
+		extenders,
+		internalqueue.MakeNextPodFunc(podQueue),
+		MakeDefaultErrorFunc(c.client, c.informerFactory.Core().V1().Pods().Lister(), podQueue, c.schedulerCache),
+		c.StopEverything,
+		podQueue,
+		profiles,
+		c.client,
 		c.nodeInfoSnapshot,
-		c.percentageOfNodesToScore,
-	)
-
-	return &Scheduler{
-		Cache:           c.schedulerCache,
-		Algorithm:       algo,
-		Extenders:       extenders,
-		Profiles:        profiles,
-		NextPod:         internalqueue.MakeNextPodFunc(podQueue),
-		Error:           MakeDefaultErrorFunc(c.client, c.informerFactory.Core().V1().Pods().Lister(), podQueue, c.schedulerCache),
-		StopEverything:  c.StopEverything,
-		SchedulingQueue: podQueue,
-	}, nil
+		c.percentageOfNodesToScore)
+	return sched, nil
 }
 
 // MakeDefaultErrorFunc construct a function to handle pod scheduler error

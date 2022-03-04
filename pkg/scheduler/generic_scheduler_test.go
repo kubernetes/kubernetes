@@ -202,7 +202,6 @@ func makeNodeList(nodeNames []string) []*v1.Node {
 }
 
 func TestSelectHost(t *testing.T) {
-	scheduler := genericScheduler{}
 	tests := []struct {
 		name          string
 		list          framework.NodeScoreList
@@ -253,7 +252,7 @@ func TestSelectHost(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			// increase the randomness
 			for i := 0; i < 10; i++ {
-				got, err := scheduler.selectHost(test.list)
+				got, err := selectHost(test.list)
 				if test.expectsErr {
 					if err == nil {
 						t.Error("Unexpected non-error")
@@ -450,7 +449,7 @@ func TestFindNodesThatPassExtenders(t *testing.T) {
 	}
 }
 
-func TestGenericScheduler(t *testing.T) {
+func TestSchedulerSchedulePod(t *testing.T) {
 	fts := feature.Features{}
 	tests := []struct {
 		name            string
@@ -1006,15 +1005,21 @@ func TestGenericScheduler(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			scheduler := NewGenericScheduler(
+			scheduler := newScheduler(
 				cache,
+				nil,
+				nil,
+				nil,
+				nil,
+				nil,
+				nil,
+				nil,
 				snapshot,
-				schedulerapi.DefaultPercentageOfNodesToScore,
-			)
+				schedulerapi.DefaultPercentageOfNodesToScore)
 			informerFactory.Start(ctx.Done())
 			informerFactory.WaitForCacheSync(ctx.Done())
 
-			result, err := scheduler.Schedule(ctx, nil, fwk, framework.NewCycleState(), test.pod)
+			result, err := scheduler.SchedulePod(ctx, fwk, framework.NewCycleState(), test.pod)
 			if err != test.wErr {
 				gotFitErr, gotOK := err.(*framework.FitError)
 				wantFitErr, wantOK := test.wErr.(*framework.FitError)
@@ -1036,19 +1041,26 @@ func TestGenericScheduler(t *testing.T) {
 	}
 }
 
-// makeScheduler makes a simple genericScheduler for testing.
-func makeScheduler(nodes []*v1.Node) *genericScheduler {
+// makeScheduler makes a simple Scheduler for testing.
+func makeScheduler(nodes []*v1.Node) *Scheduler {
 	cache := internalcache.New(time.Duration(0), wait.NeverStop)
 	for _, n := range nodes {
 		cache.AddNode(n)
 	}
 
-	s := NewGenericScheduler(
+	s := newScheduler(
 		cache,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
 		emptySnapshot,
 		schedulerapi.DefaultPercentageOfNodesToScore)
-	cache.UpdateSnapshot(s.(*genericScheduler).nodeInfoSnapshot)
-	return s.(*genericScheduler)
+	cache.UpdateSnapshot(s.nodeInfoSnapshot)
+	return s
 }
 
 func TestFindFitAllError(t *testing.T) {
@@ -1068,8 +1080,7 @@ func TestFindFitAllError(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, diagnosis, err := scheduler.findNodesThatFitPod(context.Background(), nil, fwk, framework.NewCycleState(), &v1.Pod{})
-
+	_, diagnosis, err := scheduler.findNodesThatFitPod(context.Background(), fwk, framework.NewCycleState(), &v1.Pod{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1105,8 +1116,7 @@ func TestFindFitSomeError(t *testing.T) {
 	}
 
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "1", UID: types.UID("1")}}
-	_, diagnosis, err := scheduler.findNodesThatFitPod(context.Background(), nil, fwk, framework.NewCycleState(), pod)
-
+	_, diagnosis, err := scheduler.findNodesThatFitPod(context.Background(), fwk, framework.NewCycleState(), pod)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1179,14 +1189,13 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 			}
 
 			scheduler := makeScheduler(nodes)
-			if err := scheduler.cache.UpdateSnapshot(scheduler.nodeInfoSnapshot); err != nil {
+			if err := scheduler.Cache.UpdateSnapshot(scheduler.nodeInfoSnapshot); err != nil {
 				t.Fatal(err)
 			}
 			fwk.AddNominatedPod(framework.NewPodInfo(&v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "nominated"}, Spec: v1.PodSpec{Priority: &midPriority}}),
 				&framework.NominatingInfo{NominatingMode: framework.ModeOverride, NominatedNodeName: "1"})
 
-			_, _, err = scheduler.findNodesThatFitPod(context.Background(), nil, fwk, framework.NewCycleState(), test.pod)
-
+			_, _, err = scheduler.findNodesThatFitPod(context.Background(), fwk, framework.NewCycleState(), test.pod)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -1335,15 +1344,21 @@ func TestZeroRequest(t *testing.T) {
 				t.Fatalf("error creating framework: %+v", err)
 			}
 
-			scheduler := NewGenericScheduler(
+			scheduler := newScheduler(
 				nil,
-				emptySnapshot,
-				schedulerapi.DefaultPercentageOfNodesToScore).(*genericScheduler)
-			scheduler.nodeInfoSnapshot = snapshot
+				nil,
+				nil,
+				nil,
+				nil,
+				nil,
+				nil,
+				nil,
+				snapshot,
+				schedulerapi.DefaultPercentageOfNodesToScore)
 
 			ctx := context.Background()
 			state := framework.NewCycleState()
-			_, _, err = scheduler.findNodesThatFitPod(ctx, nil, fwk, state, test.pod)
+			_, _, err = scheduler.findNodesThatFitPod(ctx, fwk, state, test.pod)
 			if err != nil {
 				t.Fatalf("error filtering nodes: %+v", err)
 			}
@@ -1406,11 +1421,11 @@ func TestNumFeasibleNodesToFind(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			g := &genericScheduler{
+			sched := &Scheduler{
 				percentageOfNodesToScore: tt.percentageOfNodesToScore,
 			}
-			if gotNumNodes := g.numFeasibleNodesToFind(tt.numAllNodes); gotNumNodes != tt.wantNumNodes {
-				t.Errorf("genericScheduler.numFeasibleNodesToFind() = %v, want %v", gotNumNodes, tt.wantNumNodes)
+			if gotNumNodes := sched.numFeasibleNodesToFind(tt.numAllNodes); gotNumNodes != tt.wantNumNodes {
+				t.Errorf("Scheduler.numFeasibleNodesToFind() = %v, want %v", gotNumNodes, tt.wantNumNodes)
 			}
 		})
 	}
@@ -1423,7 +1438,7 @@ func TestFairEvaluationForNodes(t *testing.T) {
 		nodeNames = append(nodeNames, strconv.Itoa(i))
 	}
 	nodes := makeNodeList(nodeNames)
-	g := makeScheduler(nodes)
+	sched := makeScheduler(nodes)
 	fwk, err := st.NewFramework(
 		[]st.RegisterPluginFunc{
 			st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
@@ -1438,20 +1453,20 @@ func TestFairEvaluationForNodes(t *testing.T) {
 	}
 
 	// To make numAllNodes % nodesToFind != 0
-	g.percentageOfNodesToScore = 30
-	nodesToFind := int(g.numFeasibleNodesToFind(int32(numAllNodes)))
+	sched.percentageOfNodesToScore = 30
+	nodesToFind := int(sched.numFeasibleNodesToFind(int32(numAllNodes)))
 
 	// Iterating over all nodes more than twice
 	for i := 0; i < 2*(numAllNodes/nodesToFind+1); i++ {
-		nodesThatFit, _, err := g.findNodesThatFitPod(context.Background(), nil, fwk, framework.NewCycleState(), &v1.Pod{})
+		nodesThatFit, _, err := sched.findNodesThatFitPod(context.Background(), fwk, framework.NewCycleState(), &v1.Pod{})
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
 		if len(nodesThatFit) != nodesToFind {
 			t.Errorf("got %d nodes filtered, want %d", len(nodesThatFit), nodesToFind)
 		}
-		if g.nextStartNodeIndex != (i+1)*nodesToFind%numAllNodes {
-			t.Errorf("got %d lastProcessedNodeIndex, want %d", g.nextStartNodeIndex, (i+1)*nodesToFind%numAllNodes)
+		if sched.nextStartNodeIndex != (i+1)*nodesToFind%numAllNodes {
+			t.Errorf("got %d lastProcessedNodeIndex, want %d", sched.nextStartNodeIndex, (i+1)*nodesToFind%numAllNodes)
 		}
 	}
 }
@@ -1513,13 +1528,19 @@ func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
 				t.Fatal(err)
 			}
 			snapshot := internalcache.NewSnapshot(nil, nodes)
-			scheduler := NewGenericScheduler(
+			scheduler := newScheduler(
 				cache,
+				nil,
+				nil,
+				nil,
+				nil,
+				nil,
+				nil,
+				nil,
 				snapshot,
-				schedulerapi.DefaultPercentageOfNodesToScore).(*genericScheduler)
+				schedulerapi.DefaultPercentageOfNodesToScore)
 
-			_, _, err = scheduler.findNodesThatFitPod(context.Background(), nil, fwk, framework.NewCycleState(), test.pod)
-
+			_, _, err = scheduler.findNodesThatFitPod(context.Background(), fwk, framework.NewCycleState(), test.pod)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
