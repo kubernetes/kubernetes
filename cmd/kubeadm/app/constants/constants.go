@@ -320,7 +320,7 @@ const (
 	MinExternalEtcdVersion = "3.2.18"
 
 	// DefaultEtcdVersion indicates the default etcd version that kubeadm uses
-	DefaultEtcdVersion = "3.5.1-0"
+	DefaultEtcdVersion = "3.6.0-alpha.0-0"
 
 	// Etcd defines variable used internally when referring to etcd component
 	Etcd = "etcd"
@@ -500,6 +500,7 @@ var (
 		21: "3.4.13-0",
 		22: "3.5.1-0",
 		23: "3.5.1-0",
+		24: "3.6.0-alpha.0",
 	}
 
 	// KubeadmCertsClusterRoleName sets the name for the ClusterRole that allows
