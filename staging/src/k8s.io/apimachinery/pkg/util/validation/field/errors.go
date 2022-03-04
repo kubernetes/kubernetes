@@ -123,6 +123,8 @@ const (
 	// ErrorTypeInternal is used to report other errors that are not related
 	// to user input.  See InternalError().
 	ErrorTypeInternal ErrorType = "InternalError"
+	// ErrorTypeTypeInvalid is for the value did not match the schema type for that field
+	ErrorTypeTypeInvalid ErrorType = "FieldValueTypeInvalid"
 )
 
 // String converts a ErrorType into its corresponding canonical error message.
@@ -146,9 +148,26 @@ func (t ErrorType) String() string {
 		return "Too many"
 	case ErrorTypeInternal:
 		return "Internal error"
+	case ErrorTypeTypeInvalid:
+		return "Invalid value"
 	default:
 		panic(fmt.Sprintf("unrecognized validation error: %q", string(t)))
 	}
+}
+
+// TooLongFail returns a *Error indicating "MaxLength exceed".
+func TooLongFail(field *Path, value interface{}, detail string) *Error {
+	return &Error{ErrorTypeTooLong, field.String(), value, detail}
+}
+
+// TooManyFail returns a *Error indicating "MaxItems/MaxProperties exceed"
+func TooManyFail(field *Path, value interface{}, detail string) *Error {
+	return &Error{ErrorTypeTooMany, field.String(), value, detail}
+}
+
+// TypeInvalid returns a *Error indicating "type is invalid"
+func TypeInvalid(field *Path, value interface{}, detail string) *Error {
+	return &Error{ErrorTypeTypeInvalid, field.String(), value, detail}
 }
 
 // NotFound returns a *Error indicating "value not found".  This is
