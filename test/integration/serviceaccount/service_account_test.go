@@ -285,6 +285,22 @@ func TestServiceAccountTokenAuthentication(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not delete token: %v", err)
 	}
+	// wait for delete to be observed and reacted to via watch
+	err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, func() (bool, error) {
+		_, err := roClient.CoreV1().Secrets(myns).List(context.TODO(), metav1.ListOptions{})
+		if err == nil {
+			t.Logf("token is still valid, waiting")
+			return false, nil
+		}
+		if !apierrors.IsUnauthorized(err) {
+			t.Logf("expected unauthorized error, got %v", err)
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		t.Fatalf("waiting for token to be invalidated: %v", err)
+	}
 	doServiceAccountAPIRequests(t, roClient, myns, false, false, false)
 
 	// Create "rw" user in myns
