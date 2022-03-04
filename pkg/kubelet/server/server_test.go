@@ -17,7 +17,6 @@ limitations under the License.
 package server
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -52,6 +51,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	testclock "k8s.io/utils/clock/testing"
 	"k8s.io/utils/pointer"
 
 	// Do some initialization to decode the query parameters correctly.
@@ -301,6 +301,7 @@ type serverTestFramework struct {
 	fakeKubelet     *fakeKubelet
 	fakeAuth        *fakeAuth
 	testHTTPServer  *httptest.Server
+	clock           *testclock.FakeClock
 }
 
 func newServerTest() *serverTestFramework {
@@ -347,11 +348,14 @@ func newServerTestWithDebuggingHandlers(kubeCfg *kubeletconfiginternal.KubeletCo
 			return authorizer.DecisionAllow, "", nil
 		},
 	}
+	fw.clock = testclock.NewFakeClock(time.Unix(64, 0))
 	server := NewServer(
 		fw.fakeKubelet,
 		stats.NewResourceAnalyzer(fw.fakeKubelet, time.Minute, &record.FakeRecorder{}),
 		fw.fakeAuth,
-		kubeCfg)
+		kubeCfg,
+		fw.clock,
+	)
 	fw.serverUnderTest = &server
 	fw.testHTTPServer = httptest.NewServer(fw.serverUnderTest)
 	return fw
@@ -1441,10 +1445,7 @@ func TestCadvisorMetrics(t *testing.T) {
 
 	body, err := ioutil.ReadAll(resp.Body)
 	require.NoError(t, err)
-
-	// Convert values and timestamps for `container_last_seen` to static "$NOW" string.
-	// This is because it's impossible to inject fake current time to cadvisor - which is used as both value and sam.
-	body = replaceValuesOfContainerLastSeenMetric("container_last_seen", " $NOW $NOW", body)
+	// TODO(bwplotka): Add ScrapeAndCompare utility to prometheus/client_golang (https://github.com/prometheus/client_golang/issues/993).
 	assert.Equal(t, string(expected), string(body))
 
 	// Second call should lead the same result.
@@ -1454,64 +1455,5 @@ func TestCadvisorMetrics(t *testing.T) {
 
 	body, err = ioutil.ReadAll(resp.Body)
 	require.NoError(t, err)
-	body = replaceValuesOfContainerLastSeenMetric("container_last_seen", " $NOW $NOW", body)
 	assert.Equal(t, string(expected), string(body))
-}
-
-func replaceValuesOfContainerLastSeenMetric(metricName, replacement string, metrics []byte) []byte {
-	var nl = []byte("\n")
-	var lines [][]byte
-	for _, line := range bytes.Split(metrics, nl) {
-		if bytes.HasPrefix(line, []byte(metricName+"{")) {
-			i := bytes.Index(line, []byte("}"))
-			line = append(line[:i+1], []byte(replacement)...)
-		}
-		lines = append(lines, line)
-	}
-	return bytes.Join(lines, nl)
-}
-
-func TestReplaceValuesOfMetric(t *testing.T) {
-	input := []byte(`container_last_seen{container="",id="/user.slice/user-1000.slice/user@1000.service/session.slice/org.gnome.SettingsDaemon.Sound.service",image="",name="",namespace="",pod=""} 1.64553842e+09 1645538420953
-container_last_seen{container="",id="/user.slice/user-1000.slice/user@1000.service/session.slice/org.gnome.SettingsDaemon.Wacom.service",image="",name="",namespace="",pod=""} 1.64553842e+09 1645538420948
-container_last_seen{container="",id="/user.slice/user-1000.slice/user@1000.service/session.slice/org.gnome.SettingsDaemon.XSettings.service",image="",name="",namespace="",pod=""} 1.64553842e+09 1645538420931
-container_last_seen{container="",id="/user.slice/user-1000.slice/user@1000.service/session.slice/org.gnome.Shell@x11.service",image="",name="",namespace="",pod=""} 1.64553842e+09 1645538420930
-container_last_seen{container="",id="/user.slice/user-1000.slice/user@1000.service/session.slice/pipewire.service",image="",name="",namespace="",pod=""} 1.64553842e+09 1645538420952
-container_last_seen{container="",id="/user.slice/user-1000.slice/user@1000.service/session.slice/pulseaudio.service",image="",name="",namespace="",pod=""} 1.64553842e+09 1645538420925
-# HELP container_memory_cache Number of bytes of page cache memory.
-# TYPE container_memory_cache gauge
-container_memory_cache{container="",id="/",image="",name="",namespace="",pod=""} 1.4702788608e+10 1645535816939
-container_memory_cache{container="",id="/e2e",image="",name="",namespace="",pod=""} 0 1645535816816
-container_memory_cache{container="",id="/e2e/e2e",image="",name="",namespace="",pod=""} 0 1645535816824
-container_memory_cache{container="",id="/init.scope",image="",name="",namespace="",pod=""} 8.45824e+06 1645535816834
-container_memory_cache{container="",id="/kubepods",image="",name="",namespace="",pod=""} 0 1645535816968
-container_memory_cache{container="",id="/kubepods/besteffort",image="",name="",namespace="",pod=""} 0 1645535816834
-container_memory_cache{container="",id="/kubepods/burstable",image="",name="",namespace="",pod=""} 0 1645535816846
-container_memory_cache{container="",id="/system.slice",image="",name="",namespace="",pod=""} 2.175922176e+09 1645535816832
-container_memory_cache{container="",id="/system.slice/ModemManager.service",image="",name="",namespace="",pod=""} 1.368064e+06 1645535816836
-container_memory_cache{container="",id="/system.slice/NetworkManager.service",image="",name="",namespace="",pod=""} 4.534272e+06 1645535816815
-container_memory_cache{container="",id="/system.slice/accounts-daemon.service",image="",name="",namespace="",pod=""} 561152 1645535816839
-container_memory_cache{container="",id="/system.slice/acpid.service",image="",name="",namespace="",pod=""} 65536 1645535816838`)
-
-	expected := []byte(`container_last_seen{container="",id="/user.slice/user-1000.slice/user@1000.service/session.slice/org.gnome.SettingsDaemon.Sound.service",image="",name="",namespace="",pod=""} $NOW $NOW
-container_last_seen{container="",id="/user.slice/user-1000.slice/user@1000.service/session.slice/org.gnome.SettingsDaemon.Wacom.service",image="",name="",namespace="",pod=""} $NOW $NOW
-container_last_seen{container="",id="/user.slice/user-1000.slice/user@1000.service/session.slice/org.gnome.SettingsDaemon.XSettings.service",image="",name="",namespace="",pod=""} $NOW $NOW
-container_last_seen{container="",id="/user.slice/user-1000.slice/user@1000.service/session.slice/org.gnome.Shell@x11.service",image="",name="",namespace="",pod=""} $NOW $NOW
-container_last_seen{container="",id="/user.slice/user-1000.slice/user@1000.service/session.slice/pipewire.service",image="",name="",namespace="",pod=""} $NOW $NOW
-container_last_seen{container="",id="/user.slice/user-1000.slice/user@1000.service/session.slice/pulseaudio.service",image="",name="",namespace="",pod=""} $NOW $NOW
-# HELP container_memory_cache Number of bytes of page cache memory.
-# TYPE container_memory_cache gauge
-container_memory_cache{container="",id="/",image="",name="",namespace="",pod=""} 1.4702788608e+10 1645535816939
-container_memory_cache{container="",id="/e2e",image="",name="",namespace="",pod=""} 0 1645535816816
-container_memory_cache{container="",id="/e2e/e2e",image="",name="",namespace="",pod=""} 0 1645535816824
-container_memory_cache{container="",id="/init.scope",image="",name="",namespace="",pod=""} 8.45824e+06 1645535816834
-container_memory_cache{container="",id="/kubepods",image="",name="",namespace="",pod=""} 0 1645535816968
-container_memory_cache{container="",id="/kubepods/besteffort",image="",name="",namespace="",pod=""} 0 1645535816834
-container_memory_cache{container="",id="/kubepods/burstable",image="",name="",namespace="",pod=""} 0 1645535816846
-container_memory_cache{container="",id="/system.slice",image="",name="",namespace="",pod=""} 2.175922176e+09 1645535816832
-container_memory_cache{container="",id="/system.slice/ModemManager.service",image="",name="",namespace="",pod=""} 1.368064e+06 1645535816836
-container_memory_cache{container="",id="/system.slice/NetworkManager.service",image="",name="",namespace="",pod=""} 4.534272e+06 1645535816815
-container_memory_cache{container="",id="/system.slice/accounts-daemon.service",image="",name="",namespace="",pod=""} 561152 1645535816839
-container_memory_cache{container="",id="/system.slice/acpid.service",image="",name="",namespace="",pod=""} 65536 1645535816838`)
-	require.Equal(t, string(expected), string(replaceValuesOfContainerLastSeenMetric("container_last_seen", " $NOW $NOW", input)))
 }
