@@ -70,18 +70,6 @@ func (f *fakeIPGetter) BindedIPs() (sets.String, error) {
 	return f.bindedIPs, nil
 }
 
-// fakePortOpener implements portOpener.
-type fakePortOpener struct {
-	openPorts []*netutils.LocalPort
-}
-
-// OpenLocalPort fakes out the listen() and bind() used by syncProxyRules
-// to lock a local port.
-func (f *fakePortOpener) OpenLocalPort(lp *netutils.LocalPort) (netutils.Closeable, error) {
-	f.openPorts = append(f.openPorts, lp)
-	return nil, nil
-}
-
 // fakeKernelHandler implements KernelHandler.
 type fakeKernelHandler struct {
 	modules       []string
@@ -153,8 +141,6 @@ func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset u
 		strictARP:             false,
 		localDetector:         proxyutiliptables.NewNoOpLocalDetector(),
 		hostname:              testHostname,
-		portsMap:              make(map[netutils.LocalPort]netutils.Closeable),
-		portMapper:            &fakePortOpener{[]*netutils.LocalPort{}},
 		serviceHealthServer:   healthcheck.NewFakeServiceHealthServer(),
 		ipvsScheduler:         DefaultScheduler,
 		ipGetter:              &fakeIPGetter{nodeIPs: nodeIPs},
