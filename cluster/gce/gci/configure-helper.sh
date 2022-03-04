@@ -3143,6 +3143,9 @@ EOF
 EOF
   fi
 
+  # print the config we updated
+  cat "${config_path}"
+
   # Reuse docker group for containerd.
   local -r containerd_gid="$(grep ^docker: /etc/group | cut -d: -f 3)"
   if [[ -n "${containerd_gid:-}" ]]; then
