@@ -87,21 +87,21 @@ func (e *StatusError) DebugError() (string, []interface{}) {
 
 // HasStatusCause returns true if the provided error has a details cause
 // with the provided type name.
+// It supports wrapped errors and returns false when the error is nil.
 func HasStatusCause(err error, name metav1.CauseType) bool {
 	_, ok := StatusCause(err, name)
 	return ok
 }
 
 // StatusCause returns the named cause from the provided error if it exists and
-// the error is of the type APIStatus. Otherwise it returns false.
+// the error unwraps to the type APIStatus. Otherwise it returns false.
 func StatusCause(err error, name metav1.CauseType) (metav1.StatusCause, bool) {
-	apierr, ok := err.(APIStatus)
-	if !ok || apierr == nil || apierr.Status().Details == nil {
-		return metav1.StatusCause{}, false
-	}
-	for _, cause := range apierr.Status().Details.Causes {
-		if cause.Type == name {
-			return cause, true
+	var status APIStatus
+	if errors.As(err, &status) && status.Status().Details != nil {
+		for _, cause := range status.Status().Details.Causes {
+			if cause.Type == name {
+				return cause, true
+			}
 		}
 	}
 	return metav1.StatusCause{}, false

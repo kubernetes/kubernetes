@@ -625,3 +625,35 @@ func TestIsErrorTypesByReasonAndCode(t *testing.T) {
 
 	}
 }
+
+func TestStatusCauseSupportsWrappedErrors(t *testing.T) {
+	err := &StatusError{ErrStatus: metav1.Status{
+		Details: &metav1.StatusDetails{
+			Causes: []metav1.StatusCause{{Type: "SomeCause"}},
+		},
+	}}
+
+	if cause, ok := StatusCause(nil, "SomeCause"); ok {
+		t.Errorf("expected no cause for nil, got %v: %#v", ok, cause)
+	}
+	if cause, ok := StatusCause(errors.New("boom"), "SomeCause"); ok {
+		t.Errorf("expected no cause for wrong type, got %v: %#v", ok, cause)
+	}
+
+	if cause, ok := StatusCause(err, "Other"); ok {
+		t.Errorf("expected no cause for wrong name, got %v: %#v", ok, cause)
+	}
+	if cause, ok := StatusCause(err, "SomeCause"); !ok || cause != err.ErrStatus.Details.Causes[0] {
+		t.Errorf("expected cause, got %v: %#v", ok, cause)
+	}
+
+	wrapped := fmt.Errorf("once: %w", err)
+	if cause, ok := StatusCause(wrapped, "SomeCause"); !ok || cause != err.ErrStatus.Details.Causes[0] {
+		t.Errorf("expected cause when wrapped, got %v: %#v", ok, cause)
+	}
+
+	nested := fmt.Errorf("twice: %w", wrapped)
+	if cause, ok := StatusCause(nested, "SomeCause"); !ok || cause != err.ErrStatus.Details.Causes[0] {
+		t.Errorf("expected cause when nested, got %v: %#v", ok, cause)
+	}
+}
