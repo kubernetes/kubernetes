@@ -27,15 +27,18 @@
     countParam: $initNodes
     uniqueNodeLabelStrategy:
       labelKey: kubernetes.io/hostname
+  - opcode: createNamespaces
+    prefix: sched
+    count: 2
   - opcode: createPods
     countParam: $initPods
     podTemplatePath: config/pod-with-pod-anti-affinity.yaml
-    namespace: sched-setup
+    namespace: sched-0
   - opcode: createPods
     countParam: $measurePods
     podTemplatePath: config/pod-with-pod-anti-affinity.yaml
     collectMetrics: true
-    namespace: sched-test
+    namespace: sched-1
   workloads:
   - name: 500Nodes
     params:
@@ -173,14 +176,17 @@
     labelNodePrepareStrategy:
       labelKey: "topology.kubernetes.io/zone"
       labelValues: ["zone1"]
+  - opcode: createNamespaces
+    prefix: sched
+    count: 2
   - opcode: createPods
     countParam: $initPods
     podTemplatePath: config/pod-with-pod-affinity.yaml
-    namespace: sched-setup
+    namespace: sched-0
   - opcode: createPods
     countParam: $measurePods
     podTemplatePath: config/pod-with-pod-affinity.yaml
-    namespace: sched-test
+    namespace: sched-1
     collectMetrics: true
   workloads:
   - name: 500Nodes
@@ -200,14 +206,17 @@
     countParam: $initNodes
     uniqueNodeLabelStrategy:
       labelKey: kubernetes.io/hostname
+  - opcode: createNamespaces
+    prefix: sched
+    count: 2
   - opcode: createPods
     countParam: $initPods
     podTemplatePath: config/pod-with-preferred-pod-affinity.yaml
-    namespace: sched-setup
+    namespace: sched-0
   - opcode: createPods
     countParam: $measurePods
     podTemplatePath: config/pod-with-preferred-pod-affinity.yaml
-    namespace: sched-test
+    namespace: sched-1
     collectMetrics: true
   workloads:
   - name: 500Nodes
@@ -227,14 +236,17 @@
     countParam: $initNodes
     uniqueNodeLabelStrategy:
       labelKey: kubernetes.io/hostname
+  - opcode: createNamespaces
+    prefix: sched
+    count: 2
   - opcode: createPods
     countParam: $initPods
     podTemplatePath: config/pod-with-preferred-pod-anti-affinity.yaml
-    namespace: sched-setup
+    namespace: sched-0
   - opcode: createPods
     countParam: $measurePods
     podTemplatePath: config/pod-with-preferred-pod-anti-affinity.yaml
-    namespace: sched-test
+    namespace: sched-1
     collectMetrics: true
   workloads:
   - name: 500Nodes
@@ -337,26 +349,29 @@
     labelNodePrepareStrategy:
       labelKey: "topology.kubernetes.io/zone"
       labelValues: ["zone1"]
+  - opcode: createNamespaces
+    prefix: sched
+    count: 1
   - opcode: createPods
     countParam: $initPods
     podTemplatePath: config/pod-default.yaml
-    namespace: sched-setup
+    namespace: sched-0
   - opcode: createPods
     countParam: $initPods
     podTemplatePath: config/pod-with-pod-affinity.yaml
-    namespace: sched-setup
+    namespace: sched-0
   - opcode: createPods
     countParam: $initPods
     podTemplatePath: config/pod-with-pod-anti-affinity.yaml
-    namespace: sched-setup
+    namespace: sched-0
   - opcode: createPods
     countParam: $initPods
     podTemplatePath: config/pod-with-preferred-pod-affinity.yaml
-    namespace: sched-setup
+    namespace: sched-0
   - opcode: createPods
     countParam: $initPods
     podTemplatePath: config/pod-with-preferred-pod-anti-affinity.yaml
-    namespace: sched-setup
+    namespace: sched-0
   - opcode: createPods
     countParam: $measurePods
     podTemplatePath: config/pod-default.yaml
@@ -478,7 +493,7 @@
 
 - name: SchedulingRequiredPodAntiAffinityWithNSSelector
   featureGates:
-    PodAffinityNamespaceSelector: true  
+    PodAffinityNamespaceSelector: true
   workloadTemplate:
   - opcode: createNodes
     countParam: $initNodes
@@ -511,10 +526,10 @@
       initPodsPerNamespace: 40
       initNamespaces: 100
       measurePods: 1000
-      
+
 - name: SchedulingPreferredAntiAffinityWithNSSelector
   featureGates:
-    PodAffinityNamespaceSelector: true  
+    PodAffinityNamespaceSelector: true
   workloadTemplate:
   - opcode: createNodes
     countParam: $initNodes
@@ -550,7 +565,7 @@
 
 - name: SchedulingRequiredPodAffinityWithNSSelector
   featureGates:
-    PodAffinityNamespaceSelector: true  
+    PodAffinityNamespaceSelector: true
   workloadTemplate:
   - opcode: createNodes
     countParam: $initNodes
@@ -584,10 +599,10 @@
       initPodsPerNamespace: 50
       initNamespaces: 100
       measurePods: 1000
-      
+
 - name: SchedulingPreferredAffinityWithNSSelector
   featureGates:
-    PodAffinityNamespaceSelector: true  
+    PodAffinityNamespaceSelector: true
   workloadTemplate:
   - opcode: createNodes
     countParam: $initNodes
@@ -620,4 +635,4 @@
       initPodsPerNamespace: 50
       initNamespaces: 100
       measurePods: 1000
-    
+

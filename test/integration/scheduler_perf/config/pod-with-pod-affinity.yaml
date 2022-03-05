@@ -12,7 +12,7 @@ spec:
           matchLabels:
             color: blue
         topologyKey: topology.kubernetes.io/zone
-        namespaces: ["sched-test", "sched-setup"]
+        namespaces: ["sched-1", "sched-0"]
   containers:
   - image: k8s.gcr.io/pause:3.6
     name: pause
