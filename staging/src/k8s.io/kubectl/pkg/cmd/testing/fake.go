@@ -446,6 +446,12 @@ func (f *TestFactory) WithNamespace(ns string) *TestFactory {
 	return f
 }
 
+// WithClientConfig sets the client config to use
+func (f *TestFactory) WithClientConfig(clientConfig clientcmd.ClientConfig) *TestFactory {
+	f.kubeConfigFlags.WithClientConfig(clientConfig)
+	return f
+}
+
 // Cleanup cleans up TestFactory temp config file
 func (f *TestFactory) Cleanup() {
 	if f.tempConfigFile == nil {
