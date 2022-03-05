@@ -17,10 +17,6 @@
 # This script is for configuring kubernetes master and node instances. It is
 # uploaded in the manifests tar ball.
 
-# TODO: this script duplicates templating logic from cluster/saltbase/salt
-# using sed. It should use an actual template parser on the manifest
-# files.
-
 set -o errexit
 set -o nounset
 set -o pipefail
