@@ -851,6 +851,28 @@ func TestEndpointsEqualBeyondHash(t *testing.T) {
 			},
 			expected: true,
 		},
+		{
+			name: "Pod resourceVersion removed",
+			ep1: &discovery.Endpoint{
+				Conditions: discovery.EndpointConditions{
+					Ready: utilpointer.BoolPtr(true),
+				},
+				Addresses: []string{"10.0.0.1"},
+				TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0", ResourceVersion: "1"},
+				Zone:      utilpointer.StringPtr("zone-1"),
+				NodeName:  utilpointer.StringPtr("node-1"),
+			},
+			ep2: &discovery.Endpoint{
+				Conditions: discovery.EndpointConditions{
+					Ready: utilpointer.BoolPtr(true),
+				},
+				Addresses: []string{"10.0.0.1"},
+				TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0", ResourceVersion: ""},
+				Zone:      utilpointer.StringPtr("zone-1"),
+				NodeName:  utilpointer.StringPtr("node-1"),
+			},
+			expected: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -930,6 +952,14 @@ func TestEndpointSubsetsEqualIgnoreResourceVersion(t *testing.T) {
 			subsets1: []v1.EndpointSubset{*es1, *es2},
 			subsets2: []v1.EndpointSubset{*es1, *copyAndMutateEndpointSubset(es2, func(es *v1.EndpointSubset) {
 				es.Addresses[0].TargetRef.ResourceVersion = "100"
+			})},
+			expected: true,
+		},
+		{
+			name:     "Pod ResourceVersion removed",
+			subsets1: []v1.EndpointSubset{*es1, *es2},
+			subsets2: []v1.EndpointSubset{*es1, *copyAndMutateEndpointSubset(es2, func(es *v1.EndpointSubset) {
+				es.Addresses[0].TargetRef.ResourceVersion = ""
 			})},
 			expected: true,
 		},
