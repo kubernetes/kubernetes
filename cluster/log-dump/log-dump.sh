@@ -189,14 +189,17 @@ function save-logs() {
     read -r -a services <<< "${systemd_services} ${opt_systemd_services} ${extra_systemd_services}"
 
     if log-dump-ssh "${node_name}" "command -v journalctl" &> /dev/null; then
+        log-dump-ssh "${node_name}" "sudo cat /etc/systemd/journald.conf && sudo ls -Ralth /var/log/journal/" > "${dir}/journald.conf.log" || true
         if [[ "${on_master}" == "true" ]]; then
           log-dump-ssh "${node_name}" "sudo journalctl --output=short-precise -u kube-master-installation.service" > "${dir}/kube-master-installation.log" || true
           log-dump-ssh "${node_name}" "sudo journalctl --output=short-precise -u kube-master-configuration.service" > "${dir}/kube-master-configuration.log" || true
         else
-          log-dump-ssh "${node_name}" "sudo journalctl --output=short-precise -u kube-node-installation.service" > "${dir}/kube-node-installation.log" || true
-          log-dump-ssh "${node_name}" "sudo journalctl --output=short-precise -u kube-node-configuration.service" > "${dir}/kube-node-configuration.log" || true
+          log-dump-ssh "${node_name}" "sudo journalctl --output=short-precise -u kube-node-installation.service" >> "${dir}/kube-node-installation.log" || true
+          log-dump-ssh "${node_name}" "sudo journalctl --output=short-precise -u kube-node-configuration.service" >> "${dir}/kube-node-configuration.log" || true
         fi
         log-dump-ssh "${node_name}" "sudo journalctl --output=short-precise -k" > "${dir}/kern.log" || true
+        log-dump-ssh "${node_name}" "sudo systemctl status cloud* kube* --no-pager" > "${dir}/cloud-and-kube-status.log" || true
+        log-dump-ssh "${node_name}" "sudo journalctl --output=short-precise -u kube-*" > "${dir}/kube-journal.log" || true
 
         for svc in "${services[@]}"; do
             log-dump-ssh "${node_name}" "sudo journalctl --output=short-precise -u ${svc}.service" > "${dir}/${svc}.log" || true
