@@ -447,6 +447,6 @@ func (i *ImagesList) Run(out io.Writer, printer output.Printer) error {
 func AddImagesCommonConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1.ClusterConfiguration, cfgPath *string, featureGatesString *string) {
 	options.AddKubernetesVersionFlag(flagSet, &cfg.KubernetesVersion)
 	options.AddFeatureGatesStringFlag(flagSet, featureGatesString)
-	options.AddImageMetaFlags(flagSet, &cfg.ImageRepository)
+	options.AddImageMetaFlags(flagSet, &cfg.ImageRepository, &cfg.DNS.ImageRepository)
 	options.AddConfigFlag(flagSet, cfgPath)
 }

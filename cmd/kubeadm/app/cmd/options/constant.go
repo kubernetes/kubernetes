@@ -53,6 +53,9 @@ const (
 	// ImageRepository sets the container registry to pull control plane images from.
 	ImageRepository = "image-repository"
 
+	// ImageRepository sets the dns container registry to pull dns images from.
+	DnsImageRepoSitory = "dns-image-repository"
+
 	// KubeconfigDir flag sets the path where to save the kubeconfig file.
 	KubeconfigDir = "kubeconfig-dir"
 
