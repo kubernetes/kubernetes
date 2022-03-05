@@ -24,6 +24,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -136,18 +137,14 @@ var _ = SIGDescribe("[Disruptive]NodeLease", func() {
 			framework.ExpectEqual(len(targetNodes.Items), int(targetNumNodes))
 
 			ginkgo.By("verify node lease is deleted for the deleted node")
-			var deletedNodeName string
-			for _, originalNode := range originalNodes.Items {
-				originalNodeName := originalNode.ObjectMeta.Name
-				for _, targetNode := range targetNodes.Items {
-					if originalNodeName == targetNode.ObjectMeta.Name {
-						continue
-					}
-				}
-				deletedNodeName = originalNodeName
-				break
-			}
+			originalNodeNames := nodesToNodeNames(originalNodes)
+			targetNodeNames := nodesToNodeNames(targetNodes)
+			deletedNodeNames := originalNodeNames.Difference(targetNodeNames)
+			framework.ExpectEqual(len(deletedNodeNames), 1, "exactly one deleted node")
+			deletedNodeName, _ := deletedNodeNames.PopAny()
 			framework.ExpectNotEqual(deletedNodeName, "")
+
+			ginkgo.By(fmt.Sprintf("waiting for node lease %q to be deleted", deletedNodeName))
 			gomega.Eventually(func() error {
 				if _, err := leaseClient.Get(context.TODO(), deletedNodeName, metav1.GetOptions{}); err == nil {
 					return fmt.Errorf("node lease is not deleted yet for node %q", deletedNodeName)
@@ -167,3 +164,11 @@ var _ = SIGDescribe("[Disruptive]NodeLease", func() {
 		})
 	})
 })
+
+func nodesToNodeNames(nodes *v1.NodeList) sets.String {
+	nodeNames := sets.NewString()
+	for _, node := range nodes.Items {
+		nodeNames.Insert(node.Name)
+	}
+	return nodeNames
+}
