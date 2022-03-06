@@ -270,7 +270,9 @@ func captureStdErr() (func() string, func(), error) {
 	}
 	klog.LogToStderr(true)
 	cleanUp := func() {
-		os.Stderr = stderr
+		if os.Stderr != stderr {
+			os.Stderr = stderr
+		}
 		klog.LogToStderr(false)
 		stopReadingStdErr()
 	}
@@ -290,7 +292,6 @@ func TestErrConnKilled(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unable to setup the test, err %v", err)
 	}
-	defer cleanUp()
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// this error must be ignored by the WithPanicRecovery handler
 		// it is thrown by WithTimeoutForNonLongRunningRequests handler when a response has been already sent to the client and the handler timed out
@@ -304,7 +305,6 @@ func TestErrConnKilled(t *testing.T) {
 	}
 
 	ts := httptest.NewServer(WithPanicRecovery(handler, resolver))
-	defer ts.Close()
 
 	_, err = http.Get(ts.URL)
 	if err == nil {
@@ -320,6 +320,10 @@ func TestErrConnKilled(t *testing.T) {
 	if !strings.Contains(capturedOutput, `timeout or abort while handling: method=GET URI="/" audit-ID=""`) {
 		t.Errorf("unexpected output captured actual = %v", capturedOutput)
 	}
+	t.Cleanup(func() {
+		cleanUp()
+		ts.Close()
+	})
 }
 
 type panicOnNonReuseTransport struct {
