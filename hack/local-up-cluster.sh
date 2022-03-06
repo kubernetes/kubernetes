@@ -1043,7 +1043,8 @@ function parse_eviction {
 function install_cni {
   echo "Installing CNI plugin binaries ..." \
     && curl -sSL --retry 5 --output /tmp/cni."${CNI_TARGETARCH}".tgz "${CNI_PLUGINS_URL}" \
-    && echo "${CNI_PLUGINS_AMD64_SHA256SUM}  /tmp/cni.amd64.tgz" | tee /tmp/cni.sha256 \
+    && CNI_PLUGINS_SHA256SUM="CNI_PLUGINS_${CNI_TARGETARCH^^}_SHA256SUM" \
+    && echo "${!CNI_PLUGINS_SHA256SUM}  /tmp/cni.${CNI_TARGETARCH}.tgz" | tee /tmp/cni.sha256 \
     && sha256sum --ignore-missing -c /tmp/cni.sha256 \
     && rm -f /tmp/cni.sha256 \
     && mkdir -p /opt/cni/bin \
