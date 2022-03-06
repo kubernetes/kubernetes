@@ -175,7 +175,7 @@ func (rw *kubeConfigReadWriter) Read() (*x509.Certificate, error) {
 		return nil, errors.Errorf("kubeConfig file %s does not have an embedded client certificate", rw.kubeConfigFilePath)
 	}
 
-	// parse the client certificate, retrive the cert config and then renew it
+	// parse the client certificate, retrieve the cert config and then renew it
 	certs, err := certutil.ParseCertsPEM(authInfo.ClientCertificateData)
 	if err != nil {
 		return nil, errors.Wrapf(err, "kubeConfig file %s does not contain a valid client certificate", rw.kubeConfigFilePath)
