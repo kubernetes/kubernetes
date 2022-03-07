@@ -305,6 +305,10 @@ func TestErrConnKilled(t *testing.T) {
 	}
 
 	ts := httptest.NewServer(WithPanicRecovery(handler, resolver))
+	t.Cleanup(func() {
+		cleanUp()
+		ts.Close()
+	})
 
 	_, err = http.Get(ts.URL)
 	if err == nil {
@@ -320,10 +324,6 @@ func TestErrConnKilled(t *testing.T) {
 	if !strings.Contains(capturedOutput, `timeout or abort while handling: method=GET URI="/" audit-ID=""`) {
 		t.Errorf("unexpected output captured actual = %v", capturedOutput)
 	}
-	t.Cleanup(func() {
-		cleanUp()
-		ts.Close()
-	})
 }
 
 type panicOnNonReuseTransport struct {
