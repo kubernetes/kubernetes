@@ -48,6 +48,13 @@ import (
 	utiltrace "k8s.io/utils/trace"
 )
 
+const (
+	// maxLimit is a maximum page limit increase used when fetching objects from etcd.
+	// This limit is used only for increasing page size by kube-apiserver. If request
+	// specifies larger limit initially, it won't be changed.
+	maxLimit = 10000
+)
+
 // authenticatedDataString satisfies the value.Context interface. It uses the key to
 // authenticate the stored data. This does not defend against reuse of previously
 // encrypted values under the same key, but will prevent an attacker from using an
@@ -585,11 +592,12 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 	keyPrefix := key
 
 	// set the appropriate clientv3 options to filter the returned data set
-	var paging bool
+	var limitOption *clientv3.OpOption
+	var limit int64 = pred.Limit
 	options := make([]clientv3.OpOption, 0, 4)
 	if s.pagingEnabled && pred.Limit > 0 {
-		paging = true
-		options = append(options, clientv3.WithLimit(pred.Limit))
+		options = append(options, clientv3.WithLimit(limit))
+		limitOption = &options[len(options)-1]
 	}
 
 	newItemFunc := getNewItemFunc(listObj, v)
@@ -714,7 +722,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 
 		// take items from the response until the bucket is full, filtering as we go
 		for i, kv := range getResp.Kvs {
-			if paging && int64(v.Len()) >= pred.Limit {
+			if limitOption != nil && int64(v.Len()) >= pred.Limit {
 				hasMore = true
 				break
 			}
@@ -740,12 +748,22 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		}
 
 		// no more results remain or we didn't request paging
-		if !hasMore || !paging {
+		if !hasMore || limitOption == nil {
 			break
 		}
 		// we're paging but we have filled our bucket
 		if int64(v.Len()) >= pred.Limit {
 			break
+		}
+
+		if limit < maxLimit {
+			// We got incomplete result due to field/label selector dropping the object.
+			// Double page size to reduce total number of calls to etcd.
+			limit *= 2
+			if limit > maxLimit {
+				limit = maxLimit
+			}
+			*limitOption = clientv3.WithLimit(limit)
 		}
 		key = string(lastKey) + "\x00"
 		if withRev == 0 {
