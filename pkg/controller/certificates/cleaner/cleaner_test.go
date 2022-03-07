@@ -17,6 +17,7 @@ limitations under the License.
 package cleaner
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -225,8 +226,8 @@ func TestCleanerWithApprovedExpiredCSR(t *testing.T) {
 			s := &CSRCleanerController{
 				csrClient: client.CertificatesV1().CertificateSigningRequests(),
 			}
-
-			err := s.handle(csr)
+			ctx := context.TODO()
+			err := s.handle(ctx, csr)
 			if err != nil {
 				t.Fatalf("failed to clean CSR: %v", err)
 			}

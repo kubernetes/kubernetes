@@ -106,10 +106,10 @@ func NewCSRSigningController(
 }
 
 // Run the main goroutine responsible for watching and syncing jobs.
-func (c *CSRSigningController) Run(workers int, stopCh <-chan struct{}) {
-	go c.dynamicCertReloader.Run(workers, stopCh)
+func (c *CSRSigningController) Run(ctx context.Context, workers int) {
+	go c.dynamicCertReloader.Run(ctx, workers)
 
-	c.certificateController.Run(workers, stopCh)
+	c.certificateController.Run(ctx, workers)
 }
 
 type isRequestForSignerFunc func(req *x509.CertificateRequest, usages []capi.KeyUsage, signerName string) (bool, error)
@@ -144,7 +144,7 @@ func newSigner(signerName, caFile, caKeyFile string, client clientset.Interface,
 	return ret, nil
 }
 
-func (s *signer) handle(csr *capi.CertificateSigningRequest) error {
+func (s *signer) handle(ctx context.Context, csr *capi.CertificateSigningRequest) error {
 	// Ignore unapproved or failed requests
 	if !certificates.IsCertificateRequestApproved(csr) || certificates.HasTrueCondition(csr, capi.CertificateFailed) {
 		return nil
@@ -167,7 +167,7 @@ func (s *signer) handle(csr *capi.CertificateSigningRequest) error {
 			Message:        err.Error(),
 			LastUpdateTime: metav1.Now(),
 		})
-		_, err = s.client.CertificatesV1().CertificateSigningRequests().UpdateStatus(context.TODO(), csr, metav1.UpdateOptions{})
+		_, err = s.client.CertificatesV1().CertificateSigningRequests().UpdateStatus(ctx, csr, metav1.UpdateOptions{})
 		if err != nil {
 			return fmt.Errorf("error adding failure condition for csr: %v", err)
 		}
@@ -181,7 +181,7 @@ func (s *signer) handle(csr *capi.CertificateSigningRequest) error {
 		return fmt.Errorf("error auto signing csr: %v", err)
 	}
 	csr.Status.Certificate = cert
-	_, err = s.client.CertificatesV1().CertificateSigningRequests().UpdateStatus(context.TODO(), csr, metav1.UpdateOptions{})
+	_, err = s.client.CertificatesV1().CertificateSigningRequests().UpdateStatus(ctx, csr, metav1.UpdateOptions{})
 	if err != nil {
 		return fmt.Errorf("error updating signature for csr: %v", err)
 	}

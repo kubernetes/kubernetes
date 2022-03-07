@@ -17,6 +17,7 @@ limitations under the License.
 package approver
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/x509"
@@ -130,7 +131,8 @@ func TestHandle(t *testing.T) {
 				},
 			}
 			csr := makeTestCsr()
-			if err := approver.handle(csr); err != nil && !c.err {
+			ctx := context.TODO()
+			if err := approver.handle(ctx, csr); err != nil && !c.err {
 				t.Errorf("unexpected err: %v", err)
 			}
 			c.verify(t, client.Actions())
