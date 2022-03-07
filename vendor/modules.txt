@@ -1236,6 +1236,7 @@ go.starlark.net/syntax
 # go.uber.org/atomic v1.4.0 => go.uber.org/atomic v1.4.0
 go.uber.org/atomic
 # go.uber.org/atomic => go.uber.org/atomic v1.4.0
+# go.uber.org/goleak => go.uber.org/goleak v1.1.10
 # go.uber.org/multierr v1.1.0 => go.uber.org/multierr v1.1.0
 go.uber.org/multierr
 # go.uber.org/multierr => go.uber.org/multierr v1.1.0
@@ -2629,8 +2630,8 @@ k8s.io/utils/trace
 # modernc.org/strutil => modernc.org/strutil v1.0.0
 # modernc.org/xc => modernc.org/xc v1.0.0
 # rsc.io/pdf => rsc.io/pdf v0.1.1
-# sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.27 => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.27
-# sigs.k8s.io/apiserver-network-proxy/konnectivity-client => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.27
+# sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.30 => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.30
+# sigs.k8s.io/apiserver-network-proxy/konnectivity-client => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.30
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/proto/client
 # sigs.k8s.io/kustomize/api v0.8.8 => sigs.k8s.io/kustomize/api v0.8.8
