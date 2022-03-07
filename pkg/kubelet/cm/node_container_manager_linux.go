@@ -156,8 +156,8 @@ func enforceExistingCgroup(cgroupManager CgroupManager, cName CgroupName, rl v1.
 		ResourceParameters: rp,
 	}
 	klog.V(4).InfoS("Enforcing limits on cgroup", "cgroupName", cName, "cpuShares", cgroupConfig.ResourceParameters.CpuShares, "memory", cgroupConfig.ResourceParameters.Memory, "pidsLimit", cgroupConfig.ResourceParameters.PidsLimit)
-	if !cgroupManager.Exists(cgroupConfig.Name) {
-		return fmt.Errorf("%q cgroup does not exist", cgroupConfig.Name)
+	if err := cgroupManager.Validate(cgroupConfig.Name); err != nil {
+		return err
 	}
 	if err := cgroupManager.Update(cgroupConfig); err != nil {
 		return err

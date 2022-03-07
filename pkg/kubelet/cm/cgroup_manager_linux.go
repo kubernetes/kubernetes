@@ -274,21 +274,20 @@ func (m *cgroupManagerImpl) libctCgroupConfig(in *CgroupConfig, needResources bo
 	return config
 }
 
-// Exists checks if all subsystem cgroups already exist
-func (m *cgroupManagerImpl) Exists(name CgroupName) bool {
+// Validate checks if all subsystem cgroups already exist
+func (m *cgroupManagerImpl) Validate(name CgroupName) error {
 	if libcontainercgroups.IsCgroup2UnifiedMode() {
 		cgroupPath := m.buildCgroupUnifiedPath(name)
 		neededControllers := getSupportedUnifiedControllers()
 		enabledControllers, err := readUnifiedControllers(cgroupPath)
 		if err != nil {
-			return false
+			return fmt.Errorf("could not read controllers for cgroup %q: %w", name, err)
 		}
 		difference := neededControllers.Difference(enabledControllers)
 		if difference.Len() > 0 {
-			klog.V(4).InfoS("The cgroup has some missing controllers", "cgroupName", name, "controllers", difference)
-			return false
+			return fmt.Errorf("cgroup %q has some missing controllers: %v", name, strings.Join(difference.List(), ", "))
 		}
-		return true
+		return nil // valid V2 cgroup
 	}
 
 	// Get map of all cgroup paths on the system for the particular cgroup
@@ -318,11 +317,15 @@ func (m *cgroupManagerImpl) Exists(name CgroupName) bool {
 	}
 
 	if len(missingPaths) > 0 {
-		klog.V(4).InfoS("The cgroup has some missing paths", "cgroupName", name, "paths", missingPaths)
-		return false
+		return fmt.Errorf("cgroup %q has some missing paths: %v", name, strings.Join(missingPaths, ", "))
 	}
 
-	return true
+	return nil // valid V1 cgroup
+}
+
+// Exists checks if all subsystem cgroups already exist
+func (m *cgroupManagerImpl) Exists(name CgroupName) bool {
+	return m.Validate(name) == nil
 }
 
 // Destroy destroys the specified cgroup
