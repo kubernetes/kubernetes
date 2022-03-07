@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	storageutil "k8s.io/kubernetes/pkg/api/storage"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/apis/storage/validation"
 )
@@ -56,7 +57,7 @@ func (csiStorageCapacityStrategy) Validate(ctx context.Context, obj runtime.Obje
 
 // WarningsOnCreate returns warnings for the creation of the given object.
 func (csiStorageCapacityStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
-	return nil
+	return storageutil.GetWarningsForCSIStorageCapacity(ctx, obj.(*storage.CSIStorageCapacity))
 }
 
 // Canonicalize normalizes the object after validation.
@@ -80,7 +81,7 @@ func (csiStorageCapacityStrategy) ValidateUpdate(ctx context.Context, obj, old r
 
 // WarningsOnUpdate returns warnings for the given update.
 func (csiStorageCapacityStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
-	return nil
+	return storageutil.GetWarningsForCSIStorageCapacity(ctx, obj.(*storage.CSIStorageCapacity))
 }
 
 func (csiStorageCapacityStrategy) AllowUnconditionalUpdate() bool {
