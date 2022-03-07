@@ -452,29 +452,40 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		}
 		controller := clusterauthenticationtrust.NewClusterAuthenticationTrustController(m.ClusterAuthenticationInfo, kubeClient)
 
+		// generate a context  from stopCh. This is to avoid modifying files which are relying on apiserver
+		// TODO: See if we can pass ctx to the current method
+		ctx, cancel := context.WithCancel(context.Background())
+		go func() {
+			select {
+			case <-hookContext.StopCh:
+				cancel() // stopCh closed, so cancel our context
+			case <-ctx.Done():
+			}
+		}()
+
 		// prime values and start listeners
 		if m.ClusterAuthenticationInfo.ClientCA != nil {
 			m.ClusterAuthenticationInfo.ClientCA.AddListener(controller)
 			if controller, ok := m.ClusterAuthenticationInfo.ClientCA.(dynamiccertificates.ControllerRunner); ok {
 				// runonce to be sure that we have a value.
-				if err := controller.RunOnce(); err != nil {
+				if err := controller.RunOnce(ctx); err != nil {
 					runtime.HandleError(err)
 				}
-				go controller.Run(1, hookContext.StopCh)
+				go controller.Run(ctx, 1)
 			}
 		}
 		if m.ClusterAuthenticationInfo.RequestHeaderCA != nil {
 			m.ClusterAuthenticationInfo.RequestHeaderCA.AddListener(controller)
 			if controller, ok := m.ClusterAuthenticationInfo.RequestHeaderCA.(dynamiccertificates.ControllerRunner); ok {
 				// runonce to be sure that we have a value.
-				if err := controller.RunOnce(); err != nil {
+				if err := controller.RunOnce(ctx); err != nil {
 					runtime.HandleError(err)
 				}
-				go controller.Run(1, hookContext.StopCh)
+				go controller.Run(ctx, 1)
 			}
 		}
 
-		go controller.Run(1, hookContext.StopCh)
+		go controller.Run(ctx, 1)
 		return nil
 	})
 
