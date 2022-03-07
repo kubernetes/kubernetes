@@ -505,6 +505,20 @@ function ensure-local-ssds-ephemeral-storage() {
   safe-bind-mount "${ephemeral_mountpoint}/log_pods" "/var/log/pods"
 }
 
+# set journald configuration
+function setup-journald() {
+  if [[ "${SET_JOURNALD_CONFIGURATION:-true}" = "true" ]]; then
+  cat <<EOF > /etc/systemd/journald.conf
+[Journal]
+Storage=persistent
+SystemMaxUse=1G
+SystemMaxFileSize=100M
+RuntimeMaxUse=100M
+EOF
+    systemctl restart systemd-journald.service
+  fi
+}
+
 # Installs logrotate configuration files
 function setup-logrotate() {
   mkdir -p /etc/logrotate.d/
@@ -3410,6 +3424,7 @@ function main() {
   log-wrap 'CreateDirs' create-dirs
   log-wrap 'EnsureLocalSSDs' ensure-local-ssds
   log-wrap 'SetupKubeletDir' setup-kubelet-dir
+  log-wrap 'SetupJournald' setup-journald
   log-wrap 'SetupLogrotate' setup-logrotate
   if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
     log-wrap 'MountMasterPD' mount-master-pd
