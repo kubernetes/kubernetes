@@ -38,11 +38,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/events"
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/metaproxier"
@@ -1008,25 +1006,22 @@ func (proxier *Proxier) syncProxyRules() {
 		// externalTrafficPolicy=Local.
 		allEndpoints = proxy.FilterEndpoints(allEndpoints, svcInfo, proxier.nodeLabels)
 
+		useTerminatingEndpoints := svc.IncludeTerminating()
+
 		// Scan the endpoints list to see what we have. "hasEndpoints" will be true
 		// if there are any usable endpoints for this service anywhere in the cluster.
-		var hasEndpoints, hasLocalReadyEndpoints, hasLocalServingTerminatingEndpoints bool
+		var hasEndpoints bool
 		for _, ep := range allEndpoints {
-			if ep.IsReady() {
-				hasEndpoints = true
-				if ep.GetIsLocal() {
-					hasLocalReadyEndpoints = true
-				}
-			} else if svc.NodeLocalExternal() && utilfeature.DefaultFeatureGate.Enabled(features.ProxyTerminatingEndpoints) {
-				if ep.IsServing() && ep.IsTerminating() {
+			if useTerminatingEndpoints {
+				if ep.IsServing() {
 					hasEndpoints = true
-					if ep.GetIsLocal() {
-						hasLocalServingTerminatingEndpoints = true
-					}
+				}
+			} else {
+				if ep.IsReady() {
+					hasEndpoints = true
 				}
 			}
 		}
-		useTerminatingEndpoints := !hasLocalReadyEndpoints && hasLocalServingTerminatingEndpoints
 
 		// Generate the per-endpoint chains.
 		readyEndpointChains = readyEndpointChains[:0]
@@ -1041,19 +1036,29 @@ func (proxier *Proxier) syncProxyRules() {
 			endpointChain := epInfo.endpointChain(svcNameString, protocol)
 			endpointInUse := false
 
-			if epInfo.Ready {
-				readyEndpointChains = append(readyEndpointChains, endpointChain)
-				endpointInUse = true
+			if useTerminatingEndpoints {
+				if epInfo.Serving {
+					readyEndpointChains = append(readyEndpointChains, endpointChain)
+					endpointInUse = true
+				}
+			} else {
+				if epInfo.Ready {
+					readyEndpointChains = append(readyEndpointChains, endpointChain)
+					endpointInUse = true
+				}
 			}
+
 			if svc.NodeLocalExternal() && epInfo.IsLocal {
 				if useTerminatingEndpoints {
-					if epInfo.Serving && epInfo.Terminating {
+					if epInfo.Serving {
 						localEndpointChains = append(localEndpointChains, endpointChain)
 						endpointInUse = true
 					}
-				} else if epInfo.Ready {
-					localEndpointChains = append(localEndpointChains, endpointChain)
-					endpointInUse = true
+				} else {
+					if epInfo.Ready {
+						localEndpointChains = append(localEndpointChains, endpointChain)
+						endpointInUse = true
+					}
 				}
 			}
 

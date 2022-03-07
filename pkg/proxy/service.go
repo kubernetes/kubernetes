@@ -56,6 +56,7 @@ type BaseServiceInfo struct {
 	nodeLocalInternal        bool
 	internalTrafficPolicy    *v1.ServiceInternalTrafficPolicyType
 	hintsAnnotation          string
+	includeTerminating       bool
 }
 
 var _ ServicePort = &BaseServiceInfo{}
@@ -139,6 +140,11 @@ func (info *BaseServiceInfo) HintsAnnotation() string {
 	return info.hintsAnnotation
 }
 
+// IncludeTerminating is part of the ServicePort interface
+func (info *BaseServiceInfo) IncludeTerminating() bool {
+	return info.includeTerminating
+}
+
 func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, service *v1.Service) *BaseServiceInfo {
 	nodeLocalExternal := false
 	if apiservice.RequestsOnlyLocalTraffic(service) {
@@ -154,6 +160,13 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 		stickyMaxAgeSeconds = int(*service.Spec.SessionAffinityConfig.ClientIP.TimeoutSeconds)
 	}
 
+	includeTerminating := false
+	if utilfeature.DefaultFeatureGate.Enabled(features.ProxyTerminatingEndpoints) {
+		if service.Spec.IncludeTerminating != nil {
+			includeTerminating = *service.Spec.IncludeTerminating
+		}
+	}
+
 	clusterIP := utilproxy.GetClusterIPByFamily(sct.ipFamily, service)
 	info := &BaseServiceInfo{
 		clusterIP:             netutils.ParseIPSloppy(clusterIP),
@@ -166,6 +179,7 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 		nodeLocalInternal:     nodeLocalInternal,
 		internalTrafficPolicy: service.Spec.InternalTrafficPolicy,
 		hintsAnnotation:       service.Annotations[v1.AnnotationTopologyAwareHints],
+		includeTerminating:    includeTerminating,
 	}
 
 	loadBalancerSourceRanges := make([]string, len(service.Spec.LoadBalancerSourceRanges))

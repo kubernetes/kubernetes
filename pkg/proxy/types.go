@@ -91,6 +91,8 @@ type ServicePort interface {
 	InternalTrafficPolicy() *v1.ServiceInternalTrafficPolicyType
 	// HintsAnnotation returns the value of the v1.AnnotationTopologyAwareHints annotation.
 	HintsAnnotation() string
+	// IncludeTerminating() returns whether a Service should route traffic to ready terminating endpoints.
+	IncludeTerminating() bool
 }
 
 // Endpoint in an interface which abstracts information about an endpoint.
