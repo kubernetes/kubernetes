@@ -327,6 +327,20 @@ func (r *YAMLReader) Read() ([]byte, error) {
 				}
 			}
 			if buffer.Len() != 0 {
+				// If we only have one byte in buffer, check if it is a blank line
+				if buffer.Len() == 1 {
+					ru, _, err := buffer.ReadRune()
+					if err != nil {
+						return nil, err
+					}
+					if err := buffer.UnreadRune(); err != nil {
+						return nil, err
+					}
+					// If line is blank, continue adding to the buffer
+					if ru == '\n' {
+						continue
+					}
+				}
 				return buffer.Bytes(), nil
 			}
 			if err == io.EOF {

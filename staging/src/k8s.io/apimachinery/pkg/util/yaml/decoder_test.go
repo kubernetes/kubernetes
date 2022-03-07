@@ -245,6 +245,33 @@ stuff: 3
 	}
 }
 
+func TestDecodeSeparatorWithBlankLine(t *testing.T) {
+	y := `
+---
+stuff: 1
+
+---
+stuff: 2
+`
+	s := NewYAMLToJSONDecoder(bytes.NewReader([]byte(y)))
+
+	obj := generic{}
+	if err := s.Decode(&obj); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fmt.Sprintf("%#v", obj) != `yaml.generic{"stuff":1}` {
+		t.Errorf("unexpected object: %#v", obj)
+	}
+
+	obj = generic{}
+	if err := s.Decode(&obj); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fmt.Sprintf("%#v", obj) != `yaml.generic{"stuff":2}` {
+		t.Errorf("unexpected object: %#v", obj)
+	}
+}
+
 func TestDecodeBrokenYAML(t *testing.T) {
 	s := NewYAMLOrJSONDecoder(bytes.NewReader([]byte(`---
 stuff: 1
