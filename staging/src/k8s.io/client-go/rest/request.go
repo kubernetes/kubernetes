@@ -690,14 +690,31 @@ func updateURLMetrics(ctx context.Context, req *Request, resp *http.Response, er
 		url = req.c.base.Host
 	}
 
+	source := source(resp)
+
 	// Errors can be arbitrary strings. Unbound label cardinality is not suitable for a metric
 	// system so we just report them as `<error>`.
 	if err != nil {
-		metrics.RequestResult.Increment(ctx, "<error>", req.verb, url)
+		metrics.RequestResult.Increment(ctx, "<error>", req.verb, url, source)
 	} else {
 		//Metrics for failure codes
-		metrics.RequestResult.Increment(ctx, strconv.Itoa(resp.StatusCode), req.verb, url)
+		metrics.RequestResult.Increment(ctx, strconv.Itoa(resp.StatusCode), req.verb, url, source)
 	}
+}
+
+func source(resp *http.Response) string {
+	if resp == nil {
+		return "<error>"
+	}
+
+	// if the apiserver sent this reply, the response header should
+	// contain a non-empty 'Audit-ID' value.
+	// Note: it's an invariant, all replies from the apiserver should
+	// contain an 'Audit-ID' response header.
+	if value := resp.Header.Get("Audit-ID"); len(value) != 0 {
+		return "apiserver"
+	}
+	return "proxy"
 }
 
 // Stream formats and executes the request, and offers streaming of the response.

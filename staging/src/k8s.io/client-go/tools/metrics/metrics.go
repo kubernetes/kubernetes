@@ -49,7 +49,7 @@ type SizeMetric interface {
 
 // ResultMetric counts response codes partitioned by method and host.
 type ResultMetric interface {
-	Increment(ctx context.Context, code string, method string, host string)
+	Increment(ctx context.Context, code string, method string, host string, source string)
 }
 
 // CallsMetric counts calls that take place for a specific exec plugin.
@@ -139,7 +139,7 @@ func (noopSize) Observe(context.Context, string, string, float64) {}
 
 type noopResult struct{}
 
-func (noopResult) Increment(context.Context, string, string, string) {}
+func (noopResult) Increment(context.Context, string, string, string, string) {}
 
 type noopCalls struct{}
 

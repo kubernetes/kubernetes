@@ -2814,7 +2814,7 @@ func (lb *withRateLimiterBackoffManagerAndMetrics) Sleep(d time.Duration) {
 	lb.sleepsGot = append(lb.sleepsGot, d.String())
 }
 
-func (lb *withRateLimiterBackoffManagerAndMetrics) Increment(ctx context.Context, code, _, _ string) {
+func (lb *withRateLimiterBackoffManagerAndMetrics) Increment(ctx context.Context, code, _, _, _ string) {
 	// we are interested in the request context that is marked by this test
 	if marked, ok := ctx.Value(retryTestKey).(bool); ok && marked {
 		lb.invokeOrderGot = append(lb.invokeOrderGot, "RequestResult.Increment")

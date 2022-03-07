@@ -75,9 +75,9 @@ var (
 	requestResult = k8smetrics.NewCounterVec(
 		&k8smetrics.CounterOpts{
 			Name: "rest_client_requests_total",
-			Help: "Number of HTTP requests, partitioned by status code, method, and host.",
+			Help: "Number of HTTP requests, partitioned by status code, method, host, and source.",
 		},
-		[]string{"code", "method", "host"},
+		[]string{"code", "method", "host", "source"},
 	)
 
 	execPluginCertTTLAdapter = &expiryToTTLAdapter{}
@@ -182,8 +182,8 @@ type resultAdapter struct {
 	m *k8smetrics.CounterVec
 }
 
-func (r *resultAdapter) Increment(ctx context.Context, code, method, host string) {
-	r.m.WithContext(ctx).WithLabelValues(code, method, host).Inc()
+func (r *resultAdapter) Increment(ctx context.Context, code, method, host, source string) {
+	r.m.WithContext(ctx).WithLabelValues(code, method, host, source).Inc()
 }
 
 type expiryToTTLAdapter struct {
