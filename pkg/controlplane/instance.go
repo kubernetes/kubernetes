@@ -457,7 +457,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 			m.ClusterAuthenticationInfo.ClientCA.AddListener(controller)
 			if controller, ok := m.ClusterAuthenticationInfo.ClientCA.(dynamiccertificates.ControllerRunner); ok {
 				// runonce to be sure that we have a value.
-				if err := controller.RunOnce(); err != nil {
+				if err := controller.RunOnce(ctx); err != nil {
 					runtime.HandleError(err)
 				}
 				go controller.Run(1, hookContext.StopCh)
@@ -467,7 +467,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 			m.ClusterAuthenticationInfo.RequestHeaderCA.AddListener(controller)
 			if controller, ok := m.ClusterAuthenticationInfo.RequestHeaderCA.(dynamiccertificates.ControllerRunner); ok {
 				// runonce to be sure that we have a value.
-				if err := controller.RunOnce(); err != nil {
+				if err := controller.RunOnce(ctx); err != nil {
 					runtime.HandleError(err)
 				}
 				go controller.Run(1, hookContext.StopCh)

@@ -98,7 +98,7 @@ func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, erro
 		if controller, ok := s.ClientCA.(dynamiccertificates.ControllerRunner); ok {
 			// runonce to try to prime data.  If this fails, it's ok because we fail closed.
 			// Files are required to be populated already, so this is for convenience.
-			if err := controller.RunOnce(); err != nil {
+			if err := controller.RunOnce(ctx); err != nil {
 				klog.Warningf("Initial population of client CA failed: %v", err)
 			}
 
@@ -107,7 +107,7 @@ func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, erro
 		if controller, ok := s.Cert.(dynamiccertificates.ControllerRunner); ok {
 			// runonce to try to prime data.  If this fails, it's ok because we fail closed.
 			// Files are required to be populated already, so this is for convenience.
-			if err := controller.RunOnce(); err != nil {
+			if err := controller.RunOnce(ctx); err != nil {
 				klog.Warningf("Initial population of default serving certificate failed: %v", err)
 			}
 
@@ -118,7 +118,7 @@ func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, erro
 			if controller, ok := sniCert.(dynamiccertificates.ControllerRunner); ok {
 				// runonce to try to prime data.  If this fails, it's ok because we fail closed.
 				// Files are required to be populated already, so this is for convenience.
-				if err := controller.RunOnce(); err != nil {
+				if err := controller.RunOnce(ctx); err != nil {
 					klog.Warningf("Initial population of SNI serving certificate failed: %v", err)
 				}
 

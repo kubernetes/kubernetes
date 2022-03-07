@@ -244,7 +244,10 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		if err != nil {
 			return nil, err
 		}
-		if err := aggregatorProxyCerts.RunOnce(); err != nil {
+		// We are passing the context to ProxyCerts.RunOnce as it needs to implement RunOnce(ctx) however the
+		// context is not used at all. So passing a empty context shouldn't be a problem
+		ctx := context.TODO()
+		if err := aggregatorProxyCerts.RunOnce(ctx); err != nil {
 			return nil, err
 		}
 		aggregatorProxyCerts.AddListener(apiserviceRegistrationController)
