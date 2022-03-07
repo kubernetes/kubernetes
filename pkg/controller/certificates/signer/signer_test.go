@@ -17,6 +17,7 @@ limitations under the License.
 package signer
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/x509"
@@ -294,7 +295,8 @@ func TestHandle(t *testing.T) {
 			}
 
 			csr := makeTestCSR(csrBuilder{cn: c.commonName, signerName: c.signerName, approved: c.approved, failed: c.failed, usages: c.usages, org: c.org, dnsNames: c.dnsNames})
-			if err := s.handle(csr); err != nil && !c.err {
+			ctx := context.TODO()
+			if err := s.handle(ctx, csr); err != nil && !c.err {
 				t.Errorf("unexpected err: %v", err)
 			}
 			c.verify(t, client.Actions())
