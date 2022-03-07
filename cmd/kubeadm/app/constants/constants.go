@@ -500,7 +500,7 @@ var (
 		21: "3.4.13-0",
 		22: "3.5.1-0",
 		23: "3.5.1-0",
-		24: "3.6.0-alpha.0",
+		24: "3.6.0-alpha.0-0",
 	}
 
 	// KubeadmCertsClusterRoleName sets the name for the ClusterRole that allows
