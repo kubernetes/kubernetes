@@ -28,12 +28,12 @@ import (
 func GetWarningsForStorageClass(ctx context.Context, sc *storage.StorageClass) []string {
 	var warnings []string
 
-	if sc != nil {
+	if sc != nil && sc.AllowedTopologies != nil {
 		// use of deprecated node labels in allowedTopologies's matchLabelExpressions
 		for i, topo := range sc.AllowedTopologies {
 			for j, expression := range topo.MatchLabelExpressions {
-				if msg, deprecated := nodeapi.DeprecatedNodeLabels[expression.Key]; deprecated {
-					warnings = append(warnings, fmt.Sprintf("%s: %s", field.NewPath("allowedTopologies").Index(i).Child("matchLabelExpressions").Index(j), msg))
+				if msg, deprecated := nodeapi.GetLabelDeprecatedMessage(expression.Key); deprecated {
+					warnings = append(warnings, fmt.Sprintf("%s: %s", field.NewPath("allowedTopologies").Index(i).Child("matchLabelExpressions").Index(j).Child("key"), msg))
 				}
 			}
 		}
@@ -43,31 +43,8 @@ func GetWarningsForStorageClass(ctx context.Context, sc *storage.StorageClass) [
 }
 
 func GetWarningsForCSIStorageCapacity(ctx context.Context, csc *storage.CSIStorageCapacity) []string {
-	var warnings []string
-
 	if csc != nil {
-		// use of deprecated node labels in allowedTopologies's matchLabelExpressions
-		for i, expression := range csc.NodeTopology.MatchExpressions {
-			if msg, deprecated := nodeapi.DeprecatedNodeLabels[expression.Key]; deprecated {
-				warnings = append(
-					warnings,
-					fmt.Sprintf(
-						"%s: %s is %s",
-						field.NewPath("nodeTopology").Child("matchExpressions").Index(i),
-						expression.Key,
-						msg,
-					),
-				)
-			}
-		}
-
-		// use of deprecated node labels in allowedTopologies's matchLabels
-		for label, _ := range csc.NodeTopology.MatchLabels {
-			if msg, deprecated := nodeapi.DeprecatedNodeLabels[label]; deprecated {
-				warnings = append(warnings, fmt.Sprintf("%s: %s", field.NewPath("nodeTopology").Child("matchLabels").Child(label), msg))
-			}
-		}
+		return nodeapi.WarningsForNodeSelector(csc.NodeTopology, field.NewPath("nodeTopology"))
 	}
-
-	return warnings
+	return nil
 }

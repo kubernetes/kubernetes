@@ -85,52 +85,25 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 
 	// use of deprecated node labels in selectors/affinity/topology
 	for k := range podSpec.NodeSelector {
-		if msg, deprecated := nodeapi.DeprecatedNodeLabels[k]; deprecated {
+		if msg, deprecated := nodeapi.GetLabelDeprecatedMessage(k); deprecated {
 			warnings = append(warnings, fmt.Sprintf("%s: %s", fieldPath.Child("spec", "nodeSelector").Key(k), msg))
 		}
 	}
 	if podSpec.Affinity != nil && podSpec.Affinity.NodeAffinity != nil {
 		n := podSpec.Affinity.NodeAffinity
 		if n.RequiredDuringSchedulingIgnoredDuringExecution != nil {
-			for i, t := range n.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
-				for j, e := range t.MatchExpressions {
-					if msg, deprecated := nodeapi.DeprecatedNodeLabels[e.Key]; deprecated {
-						warnings = append(
-							warnings,
-							fmt.Sprintf(
-								"%s: %s is %s",
-								fieldPath.Child("spec", "affinity", "nodeAffinity", "requiredDuringSchedulingIgnoredDuringExecution", "nodeSelectorTerms").Index(i).
-									Child("matchExpressions").Index(j).
-									Child("key"),
-								e.Key,
-								msg,
-							),
-						)
-					}
-				}
+			termFldPath := fieldPath.Child("spec", "affinity", "nodeAffinity", "requiredDuringSchedulingIgnoredDuringExecution", "nodeSelectorTerms")
+			for i, term := range n.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
+				warnings = append(warnings, nodeapi.WarningsForNodeSelectorTerm(term, termFldPath.Index(i))...)
 			}
 		}
-		for i, t := range n.PreferredDuringSchedulingIgnoredDuringExecution {
-			for j, e := range t.Preference.MatchExpressions {
-				if msg, deprecated := nodeapi.DeprecatedNodeLabels[e.Key]; deprecated {
-					warnings = append(
-						warnings,
-						fmt.Sprintf(
-							"%s: %s is %s",
-							fieldPath.Child("spec", "affinity", "nodeAffinity", "preferredDuringSchedulingIgnoredDuringExecution").Index(i).
-								Child("preference").
-								Child("matchExpressions").Index(j).
-								Child("key"),
-							e.Key,
-							msg,
-						),
-					)
-				}
-			}
+		preferredFldPath := fieldPath.Child("spec", "affinity", "nodeAffinity", "preferredDuringSchedulingIgnoredDuringExecution")
+		for i, term := range n.PreferredDuringSchedulingIgnoredDuringExecution {
+			warnings = append(warnings, nodeapi.WarningsForNodeSelectorTerm(term.Preference, preferredFldPath.Index(i).Child("preference"))...)
 		}
 	}
 	for i, t := range podSpec.TopologySpreadConstraints {
-		if msg, deprecated := nodeapi.DeprecatedNodeLabels[t.TopologyKey]; deprecated {
+		if msg, deprecated := nodeapi.GetLabelDeprecatedMessage(t.TopologyKey); deprecated {
 			warnings = append(warnings, fmt.Sprintf(
 				"%s: %s is %s",
 				fieldPath.Child("spec", "topologySpreadConstraints").Index(i).Child("topologyKey"),

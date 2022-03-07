@@ -75,7 +75,7 @@ func (strategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorLis
 
 // WarningsOnCreate returns warnings for the creation of the given object.
 func (strategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
-	return nodeapi.GetWarningsForRuntimeClass(ctx, obj.(*node.RuntimeClass))
+	return nodeapi.GetWarningsForRuntimeClass(obj.(*node.RuntimeClass))
 }
 
 // Canonicalize normalizes the object after validation.
@@ -92,7 +92,7 @@ func (strategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) fie
 
 // WarningsOnUpdate returns warnings for the given update.
 func (strategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
-	return nodeapi.GetWarningsForRuntimeClass(ctx, obj.(*node.RuntimeClass))
+	return nodeapi.GetWarningsForRuntimeClass(obj.(*node.RuntimeClass))
 }
 
 // If AllowUnconditionalUpdate() is true and the object specified by
