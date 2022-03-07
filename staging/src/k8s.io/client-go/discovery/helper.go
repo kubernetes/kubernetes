@@ -19,11 +19,32 @@ package discovery
 import (
 	"fmt"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 )
+
+// IsResourceEnabled queries the server to determine if the resource specified is present on the server.
+// This is particularly helpful when writing a controller or an e2e test that requires a particular resource to function.
+func IsResourceEnabled(client DiscoveryInterface, resourceToCheck schema.GroupVersionResource) (bool, error) {
+	// this is a single request.  The ServerResourcesForGroupVersion handles the core v1 group as legacy.
+	resourceList, err := client.ServerResourcesForGroupVersion(resourceToCheck.GroupVersion().String())
+	if apierrors.IsNotFound(err) { // if the discovery endpoint isn't present, then the resource isn't present.
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	for _, actualResource := range resourceList.APIResources {
+		if actualResource.Name == resourceToCheck.Resource {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
 
 // MatchesServerVersion queries the server to compares the build version
 // (git hash) of the client with the server's build version. It returns an error
