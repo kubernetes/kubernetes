@@ -131,8 +131,8 @@ func ReorganizeTaints(node *v1.Node, overwrite bool, taintsToAdd []v1.Taint, tai
 	newTaints := append([]v1.Taint{}, taintsToAdd...)
 	oldTaints := node.Spec.Taints
 	// add taints that already existing but not updated to newTaints
-	addedTaints, added := addedTaints(oldTaints, newTaints)
-	newTaints = append(newTaints, addedTaints...)
+	existedTaints, added := addedTaints(oldTaints, append([]v1.Taint{}, taintsToAdd...))
+	newTaints = append(existedTaints, newTaints...)
 	allErrs, deleted := deleteTaints(taintsToRemove, &newTaints)
 	if (added && deleted) || overwrite {
 		return MODIFIED, newTaints, utilerrors.NewAggregate(allErrs)
