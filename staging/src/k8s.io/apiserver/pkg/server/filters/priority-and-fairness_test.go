@@ -122,53 +122,53 @@ func (t fakeApfFilter) Run(stopCh <-chan struct{}) error {
 func (t fakeApfFilter) Install(c *mux.PathRecorderMux) {
 }
 
-func newApfServerWithSingleRequest(t *testing.T, decision mockDecision) *httptest.Server {
+func newApfServerWithSingleRequest(t *testing.T, decision mockDecision, watermarkEnabled bool) *httptest.Server {
 	onExecuteFunc := func() {
 		if decision == decisionCancelWait {
 			t.Errorf("execute should not be invoked")
 		}
 		// atomicReadOnlyExecuting can be either 0 or 1 as we test one request at a time.
-		if decision != decisionSkipFilter && atomicReadOnlyExecuting != 1 {
+		if watermarkEnabled && decision != decisionSkipFilter && atomicReadOnlyExecuting != 1 {
 			t.Errorf("Wanted %d requests executing, got %d", 1, atomicReadOnlyExecuting)
 		}
 	}
 	postExecuteFunc := func() {}
 	// atomicReadOnlyWaiting can be either 0 or 1 as we test one request at a time.
 	postEnqueueFunc := func() {
-		if atomicReadOnlyWaiting != 1 {
+		if watermarkEnabled && atomicReadOnlyWaiting != 1 {
 			t.Errorf("Wanted %d requests in queue, got %d", 1, atomicReadOnlyWaiting)
 		}
 	}
 	postDequeueFunc := func() {
-		if atomicReadOnlyWaiting != 0 {
+		if watermarkEnabled && atomicReadOnlyWaiting != 0 {
 			t.Errorf("Wanted %d requests in queue, got %d", 0, atomicReadOnlyWaiting)
 		}
 	}
-	return newApfServerWithHooks(t, decision, onExecuteFunc, postExecuteFunc, postEnqueueFunc, postDequeueFunc)
+	return newApfServerWithHooks(t, decision, onExecuteFunc, postExecuteFunc, postEnqueueFunc, postDequeueFunc, watermarkEnabled)
 }
 
-func newApfServerWithHooks(t *testing.T, decision mockDecision, onExecute, postExecute, postEnqueue, postDequeue func()) *httptest.Server {
+func newApfServerWithHooks(t *testing.T, decision mockDecision, onExecute, postExecute, postEnqueue, postDequeue func(), watermarkEnabled bool) *httptest.Server {
 	fakeFilter := fakeApfFilter{
 		mockDecision: decision,
 		postEnqueue:  postEnqueue,
 		postDequeue:  postDequeue,
 		WatchTracker: utilflowcontrol.NewWatchTracker(),
 	}
-	return newApfServerWithFilter(t, fakeFilter, onExecute, postExecute)
+	return newApfServerWithFilter(t, fakeFilter, onExecute, postExecute, watermarkEnabled)
 }
 
-func newApfServerWithFilter(t *testing.T, flowControlFilter utilflowcontrol.Interface, onExecute, postExecute func()) *httptest.Server {
-	apfServer := httptest.NewServer(newApfHandlerWithFilter(t, flowControlFilter, onExecute, postExecute))
+func newApfServerWithFilter(t *testing.T, flowControlFilter utilflowcontrol.Interface, onExecute, postExecute func(), watermarkEnabled bool) *httptest.Server {
+	apfServer := httptest.NewServer(newApfHandlerWithFilter(t, flowControlFilter, onExecute, postExecute, watermarkEnabled))
 	return apfServer
 }
 
-func newApfHandlerWithFilter(t *testing.T, flowControlFilter utilflowcontrol.Interface, onExecute, postExecute func()) http.Handler {
+func newApfHandlerWithFilter(t *testing.T, flowControlFilter utilflowcontrol.Interface, onExecute, postExecute func(), watermarkEnabled bool) http.Handler {
 	requestInfoFactory := &apirequest.RequestInfoFactory{APIPrefixes: sets.NewString("apis", "api"), GrouplessAPIPrefixes: sets.NewString("api")}
 	longRunningRequestCheck := BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString("proxy"))
 
 	apfHandler := WithPriorityAndFairness(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		onExecute()
-	}), longRunningRequestCheck, flowControlFilter, defaultRequestWorkEstimator)
+	}), longRunningRequestCheck, flowControlFilter, defaultRequestWorkEstimator, watermarkEnabled)
 
 	handler := apifilters.WithRequestInfo(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		r = r.WithContext(apirequest.WithUser(r.Context(), &user.DefaultInfo{
@@ -187,7 +187,7 @@ func newApfHandlerWithFilter(t *testing.T, flowControlFilter utilflowcontrol.Int
 func TestApfSkipLongRunningRequest(t *testing.T) {
 	epmetrics.Register()
 
-	server := newApfServerWithSingleRequest(t, decisionSkipFilter)
+	server := newApfServerWithSingleRequest(t, decisionSkipFilter, true)
 	defer server.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -204,7 +204,7 @@ func TestApfSkipLongRunningRequest(t *testing.T) {
 func TestApfRejectRequest(t *testing.T) {
 	epmetrics.Register()
 
-	server := newApfServerWithSingleRequest(t, decisionReject)
+	server := newApfServerWithSingleRequest(t, decisionReject, true)
 	defer server.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -229,7 +229,7 @@ func TestApfExemptRequest(t *testing.T) {
 	// so that an observation will cause some data to go into the Prometheus metrics.
 	time.Sleep(time.Millisecond * 50)
 
-	server := newApfServerWithSingleRequest(t, decisionNoQueuingExecute)
+	server := newApfServerWithSingleRequest(t, decisionNoQueuingExecute, true)
 	defer server.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -255,7 +255,7 @@ func TestApfExecuteRequest(t *testing.T) {
 	// so that an observation will cause some data to go into the Prometheus metrics.
 	time.Sleep(time.Millisecond * 50)
 
-	server := newApfServerWithSingleRequest(t, decisionQueuingExecute)
+	server := newApfServerWithSingleRequest(t, decisionQueuingExecute, true)
 	defer server.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -327,7 +327,7 @@ func TestApfExecuteMultipleRequests(t *testing.T) {
 		finishExecute.Wait()
 	}
 
-	server := newApfServerWithHooks(t, decisionQueuingExecute, onExecuteFunc, postExecuteFunc, postEnqueueFunc, postDequeueFunc)
+	server := newApfServerWithHooks(t, decisionQueuingExecute, onExecuteFunc, postExecuteFunc, postEnqueueFunc, postDequeueFunc, true)
 	defer server.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -357,7 +357,7 @@ func TestApfExecuteMultipleRequests(t *testing.T) {
 func TestApfCancelWaitRequest(t *testing.T) {
 	epmetrics.Register()
 
-	server := newApfServerWithSingleRequest(t, decisionCancelWait)
+	server := newApfServerWithSingleRequest(t, decisionCancelWait, true)
 	defer server.Close()
 
 	if err := expectHTTPGet(fmt.Sprintf("%s/api/v1/namespaces/default", server.URL), http.StatusTooManyRequests); err != nil {
@@ -487,7 +487,7 @@ func TestApfExecuteWatchRequestsWithInitializationSignal(t *testing.T) {
 
 	postExecuteFunc := func() {}
 
-	server := newApfServerWithFilter(t, fakeFilter, onExecuteFunc, postExecuteFunc)
+	server := newApfServerWithFilter(t, fakeFilter, onExecuteFunc, postExecuteFunc, true)
 	defer server.Close()
 
 	var wg sync.WaitGroup
@@ -527,7 +527,7 @@ func TestApfRejectWatchRequestsWithInitializationSignal(t *testing.T) {
 	}
 	postExecuteFunc := func() {}
 
-	server := newApfServerWithFilter(t, fakeFilter, onExecuteFunc, postExecuteFunc)
+	server := newApfServerWithFilter(t, fakeFilter, onExecuteFunc, postExecuteFunc, true)
 	defer server.Close()
 
 	if err := expectHTTPGet(fmt.Sprintf("%s/api/v1/namespaces/default/pods?watch=true", server.URL), http.StatusTooManyRequests); err != nil {
@@ -543,7 +543,7 @@ func TestApfWatchPanic(t *testing.T) {
 	}
 	postExecuteFunc := func() {}
 
-	apfHandler := newApfHandlerWithFilter(t, fakeFilter, onExecuteFunc, postExecuteFunc)
+	apfHandler := newApfHandlerWithFilter(t, fakeFilter, onExecuteFunc, postExecuteFunc, true)
 	handler := func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if err := recover(); err == nil {
@@ -588,7 +588,7 @@ func TestApfWatchHandlePanic(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			apfHandler := newApfHandlerWithFilter(t, test.filter, onExecuteFunc, postExecuteFunc)
+			apfHandler := newApfHandlerWithFilter(t, test.filter, onExecuteFunc, postExecuteFunc, true)
 			handler := func(w http.ResponseWriter, r *http.Request) {
 				defer func() {
 					if err := recover(); err == nil {
@@ -668,7 +668,7 @@ func TestApfWithRequestDigest(t *testing.T) {
 	handler := WithPriorityAndFairness(http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {}),
 		longRunningFunc,
 		fakeFilter,
-		func(_ *http.Request, _, _ string) fcrequest.WorkEstimate { return workExpected },
+		func(_ *http.Request, _, _ string) fcrequest.WorkEstimate { return workExpected }, true,
 	)
 
 	w := httptest.NewRecorder()
@@ -1086,6 +1086,47 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 	})
 }
 
+func TestDisabledApfWatermarkMaintenance(t *testing.T) {
+	epmetrics.Register()
+	fcmetrics.Register()
+
+	// Wait for at least one sampling window to pass since creation of metrics.ReadWriteConcurrencyObserverPairGenerator,
+	// so that an observation will cause some data to go into the Prometheus metrics.
+	time.Sleep(time.Millisecond * 50)
+
+	// disable or enable watermark maintenance with prooper argument
+	serverWatermarkMaintenanceDisabled := newApfServerWithSingleRequest(t, decisionQueuingExecute, false)
+	defer serverWatermarkMaintenanceDisabled.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	StartPriorityAndFairnessWatermarkMaintenance(ctx.Done())
+
+	if err := expectHTTPGet(fmt.Sprintf("%s/api/v1/namespaces/default", serverWatermarkMaintenanceDisabled.URL), http.StatusOK); err != nil {
+		t.Error(err)
+	}
+
+	// wait to data being reported
+	time.Sleep(time.Second)
+
+	err := gaugeValueMatch("apiserver_current_inqueue_requests", map[string]string{"request_kind": "mutating"}, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = gaugeValueMatch("apiserver_current_inqueue_requests", map[string]string{"request_kind": "readOnly"}, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = gaugeValueMatch("apiserver_current_inflight_requests", map[string]string{"request_kind": "mutating"}, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = gaugeValueMatch("apiserver_current_inflight_requests", map[string]string{"request_kind": "readOnly"}, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func startAPFController(t *testing.T, stopCh <-chan struct{}, apfConfiguration []runtime.Object, serverConcurrency int,
 	requestWaitLimit time.Duration, plName string, plConcurrency int) (utilflowcontrol.Interface, <-chan error) {
 	clientset := newClientset(t, apfConfiguration...)
@@ -1185,7 +1226,7 @@ func newHandlerChain(t *testing.T, handler http.Handler, filter utilflowcontrol.
 	requestInfoFactory := &apirequest.RequestInfoFactory{APIPrefixes: sets.NewString("apis", "api"), GrouplessAPIPrefixes: sets.NewString("api")}
 	longRunningRequestCheck := BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString("proxy"))
 
-	apfHandler := WithPriorityAndFairness(handler, longRunningRequestCheck, filter, defaultRequestWorkEstimator)
+	apfHandler := WithPriorityAndFairness(handler, longRunningRequestCheck, filter, defaultRequestWorkEstimator, true)
 
 	// add the handler in the chain that adds the specified user to the request context
 	handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

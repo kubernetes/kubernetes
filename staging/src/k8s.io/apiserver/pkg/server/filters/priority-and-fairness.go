@@ -73,11 +73,16 @@ func WithPriorityAndFairness(
 	longRunningRequestCheck apirequest.LongRunningRequestCheck,
 	fcIfc utilflowcontrol.Interface,
 	workEstimator flowcontrolrequest.WorkEstimatorFunc,
+	watermarkEnabled bool,
 ) http.Handler {
 	if fcIfc == nil {
 		klog.Warningf("priority and fairness support not found, skipping")
 		return handler
 	}
+
+	recordWaitingW := recordWaitingWatermark(watermarkEnabled)
+	recordInFlightW := recordMaxInFlightWatermarkAtomic(watermarkEnabled)
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		requestInfo, ok := apirequest.RequestInfoFrom(ctx)
@@ -134,25 +139,12 @@ func WithPriorityAndFairness(
 
 		var served bool
 		isMutatingRequest := !nonMutatingRequestVerbs.Has(requestInfo.Verb)
-		noteExecutingDelta := func(delta int32) {
-			if isMutatingRequest {
-				watermark.recordMutating(int(atomic.AddInt32(&atomicMutatingExecuting, delta)))
-			} else {
-				watermark.recordReadOnly(int(atomic.AddInt32(&atomicReadOnlyExecuting, delta)))
-			}
-		}
-		noteWaitingDelta := func(delta int32) {
-			if isMutatingRequest {
-				waitingMark.recordMutating(int(atomic.AddInt32(&atomicMutatingWaiting, delta)))
-			} else {
-				waitingMark.recordReadOnly(int(atomic.AddInt32(&atomicReadOnlyWaiting, delta)))
-			}
-		}
+
 		queueNote := func(inQueue bool) {
 			if inQueue {
-				noteWaitingDelta(1)
+				recordWaitingW(isMutatingRequest, 1)
 			} else {
-				noteWaitingDelta(-1)
+				recordWaitingW(isMutatingRequest, -1)
 			}
 		}
 
@@ -196,8 +188,8 @@ func WithPriorityAndFairness(
 				defer func() {
 					httplog.AddKeyValue(ctx, "apf_init_latency", time.Since(startedAt))
 				}()
-				noteExecutingDelta(1)
-				defer noteExecutingDelta(-1)
+				recordInFlightW(isMutatingRequest, 1)
+				defer recordInFlightW(isMutatingRequest, -1)
 				served = true
 				setResponseHeaders(classification, w)
 
@@ -276,8 +268,8 @@ func WithPriorityAndFairness(
 			}
 		} else {
 			execute := func() {
-				noteExecutingDelta(1)
-				defer noteExecutingDelta(-1)
+				recordInFlightW(isMutatingRequest, 1)
+				defer recordInFlightW(isMutatingRequest, -1)
 				served = true
 				setResponseHeaders(classification, w)
 
@@ -297,10 +289,37 @@ func WithPriorityAndFairness(
 	})
 }
 
+func recordWaitingWatermark(watermarkEnabled bool) func(bool, int32) {
+	if !watermarkEnabled {
+		return func(bool, int32) {}
+	}
+
+	return func(isMutatingRequest bool, delta int32) {
+		if isMutatingRequest {
+			waitingMark.recordMutating(int(atomic.AddInt32(&atomicMutatingWaiting, delta)))
+		} else {
+			waitingMark.recordReadOnly(int(atomic.AddInt32(&atomicReadOnlyWaiting, delta)))
+		}
+	}
+}
+
+func recordMaxInFlightWatermarkAtomic(watermarkEnabled bool) func(bool, int32) {
+	if !watermarkEnabled {
+		return func(bool, int32) {}
+	}
+	return func(isMutatingRequest bool, count int32) {
+		if isMutatingRequest {
+			inFlightWatermark.recordMutating(int(atomic.AddInt32(&atomicMutatingExecuting, count)))
+		} else {
+			inFlightWatermark.recordReadOnly(int(atomic.AddInt32(&atomicReadOnlyExecuting, count)))
+		}
+	}
+}
+
 // StartPriorityAndFairnessWatermarkMaintenance starts the goroutines to observe and maintain watermarks for
 // priority-and-fairness requests.
 func StartPriorityAndFairnessWatermarkMaintenance(stopCh <-chan struct{}) {
-	startWatermarkMaintenance(watermark, stopCh)
+	startWatermarkMaintenance(inFlightWatermark, stopCh)
 	startWatermarkMaintenance(waitingMark, stopCh)
 }
 

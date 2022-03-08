@@ -308,10 +308,13 @@ func TestAddFlags(t *testing.T) {
 		},
 		EnableLogsHandler:       false,
 		EnableAggregatorRouting: true,
-		ProxyClientKeyFile:      "/var/run/kubernetes/proxy.key",
-		ProxyClientCertFile:     "/var/run/kubernetes/proxy.crt",
-		Metrics:                 &metrics.Options{},
-		Logs:                    logs.NewOptions(),
+		Watermark: &apiserveroptions.WatermarkMaintenanceOptions{
+			Enable: true,
+		},
+		ProxyClientKeyFile:  "/var/run/kubernetes/proxy.key",
+		ProxyClientCertFile: "/var/run/kubernetes/proxy.crt",
+		Metrics:             &metrics.Options{},
+		Logs:                logs.NewOptions(),
 		Traces: &apiserveroptions.TracingOptions{
 			ConfigFile: "/var/run/kubernetes/tracing_config.yaml",
 		},

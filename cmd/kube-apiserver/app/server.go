@@ -476,6 +476,11 @@ func buildGenericConfig(
 		genericConfig.FlowControl, lastErr = BuildPriorityAndFairness(s, clientgoExternalClient, versionedInformers)
 	}
 
+	err = s.Watermark.ApplyTo(genericConfig)
+	if err != nil {
+		lastErr = fmt.Errorf("failed to initialize watermark: %v", err)
+		return
+	}
 	return
 }
 

@@ -54,6 +54,7 @@ type ServerRunOptions struct {
 	Metrics                 *metrics.Options
 	Logs                    *logs.Options
 	Traces                  *genericoptions.TracingOptions
+	Watermark               *genericoptions.WatermarkMaintenanceOptions
 
 	AllowPrivileged           bool
 	EnableLogsHandler         bool
@@ -107,6 +108,7 @@ func NewServerRunOptions() *ServerRunOptions {
 		Metrics:                 metrics.NewOptions(),
 		Logs:                    logs.NewOptions(),
 		Traces:                  genericoptions.NewTracingOptions(),
+		Watermark:               genericoptions.NewWatermarkMaintenanceOptions(),
 
 		EnableLogsHandler:                 true,
 		EventTTL:                          1 * time.Hour,
@@ -157,6 +159,7 @@ func (s *ServerRunOptions) Flags() (fss cliflag.NamedFlagSets) {
 	s.Metrics.AddFlags(fss.FlagSet("metrics"))
 	s.Logs.AddFlags(fss.FlagSet("logs"))
 	s.Traces.AddFlags(fss.FlagSet("traces"))
+	s.Watermark.AddFlags(fss.FlagSet("metrics"))
 
 	// Note: the weird ""+ in below lines seems to be the only way to get gofmt to
 	// arrange these text blocks sensibly. Grrr.

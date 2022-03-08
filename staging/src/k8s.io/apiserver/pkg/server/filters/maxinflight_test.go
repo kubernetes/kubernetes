@@ -24,14 +24,17 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/user"
 	apifilters "k8s.io/apiserver/pkg/endpoints/filters"
+	epmetrics "k8s.io/apiserver/pkg/endpoints/metrics"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
+	fcmetrics "k8s.io/apiserver/pkg/util/flowcontrol/metrics"
 )
 
-func createMaxInflightServer(callsWg, blockWg *sync.WaitGroup, disableCallsWg *bool, disableCallsWgMutex *sync.Mutex, nonMutating, mutating int) *httptest.Server {
+func createMaxInflightServer(callsWg, blockWg *sync.WaitGroup, disableCallsWg *bool, disableCallsWgMutex *sync.Mutex, nonMutating, mutating int, watermarksEnabled bool) *httptest.Server {
 	longRunningRequestCheck := BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString("proxy"))
 
 	requestInfoFactory := &apirequest.RequestInfoFactory{APIPrefixes: sets.NewString("apis", "api"), GrouplessAPIPrefixes: sets.NewString("api")}
@@ -52,6 +55,7 @@ func createMaxInflightServer(callsWg, blockWg *sync.WaitGroup, disableCallsWg *b
 		nonMutating,
 		mutating,
 		longRunningRequestCheck,
+		watermarksEnabled,
 	)
 	handler = withFakeUser(handler)
 	handler = apifilters.WithRequestInfo(handler, requestInfoFactory)
@@ -101,7 +105,7 @@ func TestMaxInFlightNonMutating(t *testing.T) {
 	waitForCalls := true
 	waitForCallsMutex := sync.Mutex{}
 
-	server := createMaxInflightServer(calls, block, &waitForCalls, &waitForCallsMutex, AllowedNonMutatingInflightRequestsNo, 1)
+	server := createMaxInflightServer(calls, block, &waitForCalls, &waitForCallsMutex, AllowedNonMutatingInflightRequestsNo, 1, true)
 	defer server.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -185,7 +189,7 @@ func TestMaxInFlightMutating(t *testing.T) {
 	waitForCalls := true
 	waitForCallsMutex := sync.Mutex{}
 
-	server := createMaxInflightServer(calls, block, &waitForCalls, &waitForCallsMutex, 1, AllowedMutatingInflightRequestsNo)
+	server := createMaxInflightServer(calls, block, &waitForCalls, &waitForCallsMutex, 1, AllowedMutatingInflightRequestsNo, true)
 	defer server.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -281,7 +285,7 @@ func TestMaxInFlightSkipsMasters(t *testing.T) {
 	waitForCalls := true
 	waitForCallsMutex := sync.Mutex{}
 
-	server := createMaxInflightServer(calls, block, &waitForCalls, &waitForCallsMutex, 1, AllowedMutatingInflightRequestsNo)
+	server := createMaxInflightServer(calls, block, &waitForCalls, &waitForCallsMutex, 1, AllowedMutatingInflightRequestsNo, true)
 	defer server.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -317,4 +321,67 @@ func TestMaxInFlightSkipsMasters(t *testing.T) {
 	block.Done()
 
 	responses.Wait()
+}
+
+func TestDisabledMaxInFlightWatermarkMaintenance(t *testing.T) {
+	fcmetrics.Register()
+	epmetrics.Register()
+
+	// Wait for at least one sampling window to pass since creation of metrics.ReadWriteConcurrencyObserverPairGenerator,
+	// so that an observation will cause some data to go into the Prometheus metrics.
+	time.Sleep(time.Millisecond * 50)
+
+	allowedNonMutatingInflightRequestsNo := 3
+
+	// Calls is used to wait until all server calls are received. We are sending
+	// AllowedNonMutatingInflightRequestsNo of 'long' not-accounted requests and the same number of
+	// 'short' accounted ones.
+	calls := &sync.WaitGroup{}
+	calls.Add(allowedNonMutatingInflightRequestsNo * 2)
+
+	// Responses is used to wait until all responses are
+	// received. This prevents some async requests getting EOF
+	// errors from prematurely closing the server
+	responses := &sync.WaitGroup{}
+	responses.Add(allowedNonMutatingInflightRequestsNo * 2)
+
+	// Block is used to keep requests in flight for as long as we need to. All requests will
+	// be unblocked at the same time.
+	block := &sync.WaitGroup{}
+	block.Add(1)
+
+	waitForCalls := true
+	waitForCallsMutex := sync.Mutex{}
+
+	// disable or enable watermark maintenance with prooper argument
+	serverInFlightMaintenanceDisabled := createMaxInflightServer(calls, block, &waitForCalls, &waitForCallsMutex, 1, allowedNonMutatingInflightRequestsNo, false)
+	defer serverInFlightMaintenanceDisabled.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	StartPriorityAndFairnessWatermarkMaintenance(ctx.Done())
+
+	if err := expectHTTPGet(serverInFlightMaintenanceDisabled.URL+"/dontwait", http.StatusOK); err != nil {
+		t.Error(err)
+	}
+
+	// wait to data being reported
+	time.Sleep(time.Second)
+
+	err := gaugeValueMatch("apiserver_current_inqueue_requests", map[string]string{"request_kind": "mutating"}, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = gaugeValueMatch("apiserver_current_inqueue_requests", map[string]string{"request_kind": "readOnly"}, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = gaugeValueMatch("apiserver_current_inflight_requests", map[string]string{"request_kind": "mutating"}, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = gaugeValueMatch("apiserver_current_inflight_requests", map[string]string{"request_kind": "readOnly"}, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
 }

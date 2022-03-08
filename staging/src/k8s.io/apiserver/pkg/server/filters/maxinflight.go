@@ -89,7 +89,7 @@ func (w *requestWatermark) recordReadOnly(readOnlyVal int) {
 }
 
 // watermark tracks requests being executed (not waiting in a queue)
-var watermark = &requestWatermark{
+var inFlightWatermark = &requestWatermark{
 	phase:            metrics.ExecutingPhase,
 	readOnlyObserver: fcmetrics.ReadWriteConcurrencyObserverPairGenerator.Generate(1, 1, []string{metrics.ReadOnlyKind}).RequestsExecuting,
 	mutatingObserver: fcmetrics.ReadWriteConcurrencyObserverPairGenerator.Generate(1, 1, []string{metrics.MutatingKind}).RequestsExecuting,
@@ -124,19 +124,21 @@ func WithMaxInFlightLimit(
 	nonMutatingLimit int,
 	mutatingLimit int,
 	longRunningRequestCheck apirequest.LongRunningRequestCheck,
+	watermarkEnabled bool,
 ) http.Handler {
 	if nonMutatingLimit == 0 && mutatingLimit == 0 {
 		return handler
 	}
 	var nonMutatingChan chan bool
 	var mutatingChan chan bool
+
 	if nonMutatingLimit != 0 {
 		nonMutatingChan = make(chan bool, nonMutatingLimit)
-		watermark.readOnlyObserver.SetDenominator(float64(nonMutatingLimit))
+		inFlightWatermark.readOnlyObserver.SetDenominator(float64(nonMutatingLimit))
 	}
 	if mutatingLimit != 0 {
 		mutatingChan = make(chan bool, mutatingLimit)
-		watermark.mutatingObserver.SetDenominator(float64(mutatingLimit))
+		inFlightWatermark.mutatingObserver.SetDenominator(float64(mutatingLimit))
 	}
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -161,47 +163,42 @@ func WithMaxInFlightLimit(
 			c = nonMutatingChan
 		}
 
+		// if there are no concurrency, proceed with handler
 		if c == nil {
 			handler.ServeHTTP(w, r)
-		} else {
+			return
+		}
 
-			select {
-			case c <- true:
-				// We note the concurrency level both while the
-				// request is being served and after it is done being
-				// served, because both states contribute to the
-				// sampled stats on concurrency.
-				if isMutatingRequest {
-					watermark.recordMutating(len(c))
-				} else {
-					watermark.recordReadOnly(len(c))
-				}
-				defer func() {
-					<-c
-					if isMutatingRequest {
-						watermark.recordMutating(len(c))
-					} else {
-						watermark.recordReadOnly(len(c))
-					}
-				}()
-				handler.ServeHTTP(w, r)
+		// beause we are ok to process with concurrency limits, we select what we need to do next
+		select {
+		case c <- true:
+			// We note the concurrency level both while the
+			// request is being served and after it is done being
+			// served, because both states contribute to the
+			// sampled stats on concurrency.
+			recordMaxInFlightWatermark(watermarkEnabled, isMutatingRequest, len(c))
+			defer func() {
+				<-c
+				recordMaxInFlightWatermark(watermarkEnabled, isMutatingRequest, len(c))
+			}()
 
-			default:
-				// at this point we're about to return a 429, BUT not all actors should be rate limited.  A system:master is so powerful
-				// that they should always get an answer.  It's a super-admin or a loopback connection.
-				if currUser, ok := apirequest.UserFrom(ctx); ok {
-					for _, group := range currUser.GetGroups() {
-						if group == user.SystemPrivilegedGroup {
-							handler.ServeHTTP(w, r)
-							return
-						}
+			handler.ServeHTTP(w, r)
+
+		default:
+			// at this point we're about to return a 429, BUT not all actors should be rate limited.  A system:master is so powerful
+			// that they should always get an answer.  It's a super-admin or a loopback connection.
+			if currUser, ok := apirequest.UserFrom(ctx); ok {
+				for _, group := range currUser.GetGroups() {
+					if group == user.SystemPrivilegedGroup {
+						handler.ServeHTTP(w, r)
+						return
 					}
 				}
-				// We need to split this data between buckets used for throttling.
-				metrics.RecordDroppedRequest(r, requestInfo, metrics.APIServerComponent, isMutatingRequest)
-				metrics.RecordRequestTermination(r, requestInfo, metrics.APIServerComponent, http.StatusTooManyRequests)
-				tooManyRequests(r, w)
 			}
+			// We need to split this data between buckets used for throttling.
+			metrics.RecordDroppedRequest(r, requestInfo, metrics.APIServerComponent, isMutatingRequest)
+			metrics.RecordRequestTermination(r, requestInfo, metrics.APIServerComponent, http.StatusTooManyRequests)
+			tooManyRequests(r, w)
 		}
 	})
 }
@@ -209,11 +206,22 @@ func WithMaxInFlightLimit(
 // StartMaxInFlightWatermarkMaintenance starts the goroutines to observe and maintain watermarks for max-in-flight
 // requests.
 func StartMaxInFlightWatermarkMaintenance(stopCh <-chan struct{}) {
-	startWatermarkMaintenance(watermark, stopCh)
+	startWatermarkMaintenance(inFlightWatermark, stopCh)
 }
 
 func tooManyRequests(req *http.Request, w http.ResponseWriter) {
 	// Return a 429 status indicating "Too Many Requests"
 	w.Header().Set("Retry-After", retryAfter)
 	http.Error(w, "Too many requests, please try again later.", http.StatusTooManyRequests)
+}
+
+func recordMaxInFlightWatermark(watermarkEnabled, isMutating bool, count int) {
+	if !watermarkEnabled {
+		return
+	}
+	if isMutating {
+		inFlightWatermark.recordMutating(count)
+	} else {
+		inFlightWatermark.recordReadOnly(count)
+	}
 }

@@ -54,7 +54,8 @@ type RecommendedOptions struct {
 	// API Server Egress Selector is used to control outbound traffic from the API Server
 	EgressSelector *EgressSelectorOptions
 	// Traces contains options to control distributed request tracing.
-	Traces *TracingOptions
+	Traces               *TracingOptions
+	WatermarkMaintenance *WatermarkMaintenanceOptions
 }
 
 func NewRecommendedOptions(prefix string, codec runtime.Codec) *RecommendedOptions {
@@ -82,6 +83,7 @@ func NewRecommendedOptions(prefix string, codec runtime.Codec) *RecommendedOptio
 		Admission:                  NewAdmissionOptions(),
 		EgressSelector:             NewEgressSelectorOptions(),
 		Traces:                     NewTracingOptions(),
+		WatermarkMaintenance:       NewWatermarkMaintenanceOptions(),
 	}
 }
 
@@ -96,6 +98,7 @@ func (o *RecommendedOptions) AddFlags(fs *pflag.FlagSet) {
 	o.Admission.AddFlags(fs)
 	o.EgressSelector.AddFlags(fs)
 	o.Traces.AddFlags(fs)
+	o.WatermarkMaintenance.AddFlags(fs)
 }
 
 // ApplyTo adds RecommendedOptions to the server configuration.
@@ -128,6 +131,9 @@ func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig) error {
 		return err
 	}
 	if err := o.CoreAPI.ApplyTo(config); err != nil {
+		return err
+	}
+	if err := o.WatermarkMaintenance.ApplyTo(&config.Config); err != nil {
 		return err
 	}
 	if initializers, err := o.ExtraAdmissionInitializers(config); err != nil {
@@ -166,6 +172,7 @@ func (o *RecommendedOptions) Validate() []error {
 	errors = append(errors, o.Admission.Validate()...)
 	errors = append(errors, o.EgressSelector.Validate()...)
 	errors = append(errors, o.Traces.Validate()...)
+	errors = append(errors, o.WatermarkMaintenance.Validate()...)
 
 	return errors
 }
