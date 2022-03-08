@@ -977,7 +977,7 @@ func TestCheckVolumeFSResize(t *testing.T) {
 			},
 			verify: func(t *testing.T, vols []v1.UniqueVolumeName, volName v1.UniqueVolumeName) {
 				if len(vols) == 0 {
-					t.Fatalf("Request resize for volume, but volume in ASW hasn't been marked as fsResizeRequired")
+					t.Fatalf("Requested resize for volume, but volume in ASW hasn't been marked as fsResizeRequired")
 				}
 				if len(vols) != 1 {
 					t.Errorf("Some unexpected volumes are marked as fsResizeRequired: %v", vols)
@@ -1053,7 +1053,7 @@ func TestCheckVolumeFSResize(t *testing.T) {
 		func() {
 			tc.resize(t, pv, pvc, dswp)
 
-			resizeRequiredVolumes := reprocess(dswp, uniquePodName, fakeDSW, fakeASW)
+			resizeRequiredVolumes := reprocess(dswp, uniquePodName, fakeDSW, fakeASW, *pv.Spec.Capacity.Storage())
 
 			tc.verify(t, resizeRequiredVolumes, uniqueVolumeName)
 		}()
@@ -1099,16 +1099,16 @@ func clearASW(asw cache.ActualStateOfWorld, dsw cache.DesiredStateOfWorld, t *te
 }
 
 func reprocess(dswp *desiredStateOfWorldPopulator, uniquePodName types.UniquePodName,
-	dsw cache.DesiredStateOfWorld, asw cache.ActualStateOfWorld) []v1.UniqueVolumeName {
+	dsw cache.DesiredStateOfWorld, asw cache.ActualStateOfWorld, newSize resource.Quantity) []v1.UniqueVolumeName {
 	dswp.ReprocessPod(uniquePodName)
 	dswp.findAndAddNewPods()
-	return getResizeRequiredVolumes(dsw, asw)
+	return getResizeRequiredVolumes(dsw, asw, newSize)
 }
 
-func getResizeRequiredVolumes(dsw cache.DesiredStateOfWorld, asw cache.ActualStateOfWorld) []v1.UniqueVolumeName {
+func getResizeRequiredVolumes(dsw cache.DesiredStateOfWorld, asw cache.ActualStateOfWorld, newSize resource.Quantity) []v1.UniqueVolumeName {
 	resizeRequiredVolumes := []v1.UniqueVolumeName{}
 	for _, volumeToMount := range dsw.GetVolumesToMount() {
-		_, _, err := asw.PodExistsInVolume(volumeToMount.PodName, volumeToMount.VolumeName, nil)
+		_, _, err := asw.PodExistsInVolume(volumeToMount.PodName, volumeToMount.VolumeName, newSize)
 		if cache.IsFSResizeRequiredError(err) {
 			resizeRequiredVolumes = append(resizeRequiredVolumes, volumeToMount.VolumeName)
 		}

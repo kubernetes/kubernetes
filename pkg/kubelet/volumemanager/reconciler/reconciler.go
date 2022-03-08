@@ -28,6 +28,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/resource"
+
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
 	utilpath "k8s.io/utils/path"
@@ -203,14 +205,15 @@ func (rc *reconciler) mountOrAttachVolumes() {
 		} else if !volMounted || cache.IsRemountRequiredError(err) {
 			rc.mountAttachedVolumes(volumeToMount, err)
 		} else if cache.IsFSResizeRequiredError(err) {
-			rc.expandVolume(volumeToMount)
+			fsResizeRequiredErr, _ := err.(cache.FsResizeRequiredError)
+			rc.expandVolume(volumeToMount, fsResizeRequiredErr.CurrentSize)
 		}
 	}
 }
 
-func (rc *reconciler) expandVolume(volumeToMount cache.VolumeToMount) {
+func (rc *reconciler) expandVolume(volumeToMount cache.VolumeToMount, currentSize resource.Quantity) {
 	klog.V(4).InfoS(volumeToMount.GenerateMsgDetailed("Starting operationExecutor.ExpandInUseVolume", ""), "pod", klog.KObj(volumeToMount.Pod))
-	err := rc.operationExecutor.ExpandInUseVolume(volumeToMount.VolumeToMount, rc.actualStateOfWorld)
+	err := rc.operationExecutor.ExpandInUseVolume(volumeToMount.VolumeToMount, rc.actualStateOfWorld, currentSize)
 
 	if err != nil && !isExpectedError(err) {
 		klog.ErrorS(err, volumeToMount.GenerateErrorDetailed("operationExecutor.ExpandInUseVolume failed", err).Error(), "pod", klog.KObj(volumeToMount.Pod))

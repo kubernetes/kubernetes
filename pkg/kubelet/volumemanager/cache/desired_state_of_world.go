@@ -135,7 +135,6 @@ type DesiredStateOfWorld interface {
 // be mounted to PodName.
 type VolumeToMount struct {
 	operationexecutor.VolumeToMount
-	PersistentVolumeSize *resource.Quantity
 }
 
 // NewDesiredStateOfWorld returns a new instance of DesiredStateOfWorld.
@@ -435,23 +434,25 @@ func (dsw *desiredStateOfWorld) GetVolumesToMount() []VolumeToMount {
 	volumesToMount := make([]VolumeToMount, 0 /* len */, len(dsw.volumesToMount) /* cap */)
 	for volumeName, volumeObj := range dsw.volumesToMount {
 		for podName, podObj := range volumeObj.podsToMount {
-			volumesToMount = append(
-				volumesToMount,
-				VolumeToMount{
-					VolumeToMount: operationexecutor.VolumeToMount{
-						VolumeName:              volumeName,
-						PodName:                 podName,
-						Pod:                     podObj.pod,
-						VolumeSpec:              podObj.volumeSpec,
-						PluginIsAttachable:      volumeObj.pluginIsAttachable,
-						PluginIsDeviceMountable: volumeObj.pluginIsDeviceMountable,
-						OuterVolumeSpecName:     podObj.outerVolumeSpecName,
-						VolumeGidValue:          volumeObj.volumeGidValue,
-						ReportedInUse:           volumeObj.reportedInUse,
-						MountRequestTime:        podObj.mountRequestTime,
-						DesiredSizeLimit:        volumeObj.desiredSizeLimit},
-					PersistentVolumeSize: volumeObj.persistentVolumeSize,
-				})
+			vmt := VolumeToMount{
+				VolumeToMount: operationexecutor.VolumeToMount{
+					VolumeName:              volumeName,
+					PodName:                 podName,
+					Pod:                     podObj.pod,
+					VolumeSpec:              podObj.volumeSpec,
+					PluginIsAttachable:      volumeObj.pluginIsAttachable,
+					PluginIsDeviceMountable: volumeObj.pluginIsDeviceMountable,
+					OuterVolumeSpecName:     podObj.outerVolumeSpecName,
+					VolumeGidValue:          volumeObj.volumeGidValue,
+					ReportedInUse:           volumeObj.reportedInUse,
+					MountRequestTime:        podObj.mountRequestTime,
+					DesiredSizeLimit:        volumeObj.desiredSizeLimit,
+				},
+			}
+			if volumeObj.persistentVolumeSize != nil {
+				vmt.PersistentVolumeSize = volumeObj.persistentVolumeSize.DeepCopy()
+			}
+			volumesToMount = append(volumesToMount, vmt)
 		}
 	}
 	return volumesToMount

@@ -582,8 +582,9 @@ func (asw *actualStateOfWorld) GetAttachState(
 	return AttachStateDetached
 }
 
+// SetVolumeClaimSize sets size of the volume. But this function should not be used from attach_detach controller.
 func (asw *actualStateOfWorld) SetVolumeClaimSize(volumeName v1.UniqueVolumeName, claimSize *resource.Quantity) {
-	klog.V(5).Infof("doing nothing")
+	klog.V(5).Infof("NO-OP")
 }
 
 func (asw *actualStateOfWorld) GetAttachedVolumes() []AttachedVolume {

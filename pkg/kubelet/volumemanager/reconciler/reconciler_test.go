@@ -1284,10 +1284,11 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 			pvWithSize.Spec.Capacity[v1.ResourceStorage] = tc.newPVSize
 			volumeSpec = &volume.Spec{PersistentVolume: pvWithSize}
 			dsw.AddPodToVolume(podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
-			// mark volume as resize required
-			asw.MarkFSResizeRequired(volumeName, podName)
+			t.Logf("Changing size of the volume to %s", tc.newPVSize.String())
+			newSize := tc.newPVSize.DeepCopy()
+			dsw.UpdatePersistentVolumeSize(volumeName, &newSize)
 
-			_, _, podExistErr := asw.PodExistsInVolume(podName, volumeName, nil)
+			_, _, podExistErr := asw.PodExistsInVolume(podName, volumeName, newSize)
 			if tc.expansionFailed {
 				if cache.IsFSResizeRequiredError(podExistErr) {
 					t.Fatalf("volume %s should not throw fsResizeRequired error: %v", volumeName, podExistErr)
@@ -1299,7 +1300,7 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 				go reconciler.Run(wait.NeverStop)
 
 				waitErr := retryWithExponentialBackOff(testOperationBackOffDuration, func() (done bool, err error) {
-					mounted, _, err := asw.PodExistsInVolume(podName, volumeName, nil)
+					mounted, _, err := asw.PodExistsInVolume(podName, volumeName, newSize)
 					return mounted && err == nil, nil
 				})
 				if waitErr != nil {
@@ -1791,7 +1792,7 @@ func waitForUncertainPodMount(t *testing.T, volumeName v1.UniqueVolumeName, podN
 	err := retryWithExponentialBackOff(
 		testOperationBackOffDuration,
 		func() (bool, error) {
-			mounted, _, err := asw.PodExistsInVolume(podName, volumeName, nil)
+			mounted, _, err := asw.PodExistsInVolume(podName, volumeName, resource.Quantity{})
 			if mounted || err != nil {
 				return false, nil
 			}
