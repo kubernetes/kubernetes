@@ -100,8 +100,6 @@ func StandardOverloads() []*Overload {
 				return cmp
 			}},
 
-		// TODO: Verify overflow, NaN, underflow cases for numeric values.
-
 		// Add operator
 		{Operator: operators.Add,
 			OperandTrait: traits.AdderType,

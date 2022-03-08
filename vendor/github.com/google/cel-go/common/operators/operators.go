@@ -70,46 +70,35 @@ var (
 		"!=": NotEquals,
 		"-":  Subtract,
 	}
-	reverseOperators = map[string]string{
-		Add:           "+",
-		Divide:        "/",
-		Equals:        "==",
-		Greater:       ">",
-		GreaterEquals: ">=",
-		In:            "in",
-		Less:          "<",
-		LessEquals:    "<=",
-		LogicalAnd:    "&&",
-		LogicalNot:    "!",
-		LogicalOr:     "||",
-		Modulo:        "%",
-		Multiply:      "*",
-		Negate:        "-",
-		NotEquals:     "!=",
-		OldIn:         "in",
-		Subtract:      "-",
-	}
-	// precedence of the operator, where the higher value means higher.
-	precedence = map[string]int{
-		Conditional:   8,
-		LogicalOr:     7,
-		LogicalAnd:    6,
-		Equals:        5,
-		Greater:       5,
-		GreaterEquals: 5,
-		In:            5,
-		Less:          5,
-		LessEquals:    5,
-		NotEquals:     5,
-		OldIn:         5,
-		Add:           4,
-		Subtract:      4,
-		Divide:        3,
-		Modulo:        3,
-		Multiply:      3,
-		LogicalNot:    2,
-		Negate:        2,
-		Index:         1,
+	// operatorMap of the operator symbol which refers to a struct containing the display name,
+	// if applicable, the operator precedence, and the arity.
+	//
+	// If the symbol does not have a display name listed in the map, it is only because it requires
+	// special casing to render properly as text.
+	operatorMap = map[string]struct {
+		displayName string
+		precedence  int
+		arity       int
+	}{
+		Conditional:   {displayName: "", precedence: 8, arity: 3},
+		LogicalOr:     {displayName: "||", precedence: 7, arity: 2},
+		LogicalAnd:    {displayName: "&&", precedence: 6, arity: 2},
+		Equals:        {displayName: "==", precedence: 5, arity: 2},
+		Greater:       {displayName: ">", precedence: 5, arity: 2},
+		GreaterEquals: {displayName: ">=", precedence: 5, arity: 2},
+		In:            {displayName: "in", precedence: 5, arity: 2},
+		Less:          {displayName: "<", precedence: 5, arity: 2},
+		LessEquals:    {displayName: "<=", precedence: 5, arity: 2},
+		NotEquals:     {displayName: "!=", precedence: 5, arity: 2},
+		OldIn:         {displayName: "in", precedence: 5, arity: 2},
+		Add:           {displayName: "+", precedence: 4, arity: 2},
+		Subtract:      {displayName: "-", precedence: 4, arity: 2},
+		Divide:        {displayName: "/", precedence: 3, arity: 2},
+		Modulo:        {displayName: "%", precedence: 3, arity: 2},
+		Multiply:      {displayName: "*", precedence: 3, arity: 2},
+		LogicalNot:    {displayName: "!", precedence: 2, arity: 1},
+		Negate:        {displayName: "-", precedence: 2, arity: 1},
+		Index:         {displayName: "", precedence: 1, arity: 2},
 	}
 )
 
@@ -120,26 +109,35 @@ func Find(text string) (string, bool) {
 }
 
 // FindReverse returns the unmangled, text representation of the operator.
-func FindReverse(op string) (string, bool) {
-	txt, found := reverseOperators[op]
-	return txt, found
+func FindReverse(symbol string) (string, bool) {
+	op, found := operatorMap[symbol]
+	if !found {
+		return "", false
+	}
+	return op.displayName, true
 }
 
 // FindReverseBinaryOperator returns the unmangled, text representation of a binary operator.
-func FindReverseBinaryOperator(op string) (string, bool) {
-	if op == LogicalNot || op == Negate {
+//
+// If the symbol does refer to an operator, but the operator does not have a display name the
+// result is false.
+func FindReverseBinaryOperator(symbol string) (string, bool) {
+	op, found := operatorMap[symbol]
+	if !found || op.arity != 2 {
 		return "", false
 	}
-	txt, found := reverseOperators[op]
-	return txt, found
+	if op.displayName == "" {
+		return "", false
+	}
+	return op.displayName, true
 }
 
 // Precedence returns the operator precedence, where the higher the number indicates
 // higher precedence operations.
-func Precedence(op string) int {
-	p, found := precedence[op]
-	if found {
-		return p
+func Precedence(symbol string) int {
+	op, found := operatorMap[symbol]
+	if !found {
+		return 0
 	}
-	return 0
+	return op.precedence
 }

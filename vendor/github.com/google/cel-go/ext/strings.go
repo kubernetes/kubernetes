@@ -67,6 +67,22 @@ import (
 //     'hello mellow'.indexOf('ello', 2)  // returns 7
 //     'hello mellow'.indexOf('ello', 20) // error
 //
+// Join
+//
+// Returns a new string where the elements of string list are concatenated.
+//
+// The function also accepts an optional separator which is placed between elements in the resulting string.
+//
+// <list<string>>.join() -> <string>
+// <list<string>>.join(<string>) -> <string>
+//
+// Examples:
+//
+//     ['hello', 'mellow'].join() // returns 'hellomellow'
+//     ['hello', 'mellow'].join(' ') // returns 'hello mellow'
+//     [].join() // returns ''
+//     [].join('/') // returns ''
+//
 // LastIndexOf
 //
 // Returns the integer index at the start of the last occurrence of the search string. If the
@@ -243,6 +259,14 @@ func (stringLib) CompileOptions() []cel.EnvOption {
 				decls.NewInstanceOverload("string_upper_ascii",
 					[]*exprpb.Type{decls.String},
 					decls.String)),
+			decls.NewFunction("join",
+				decls.NewInstanceOverload("list_join",
+					[]*exprpb.Type{decls.NewListType(decls.String)},
+					decls.String),
+				decls.NewInstanceOverload("list_join_string",
+					[]*exprpb.Type{decls.NewListType(decls.String), decls.String},
+					decls.String),
+			),
 		),
 	}
 }
@@ -355,6 +379,19 @@ func (stringLib) ProgramOptions() []cel.ProgramOption {
 			&functions.Overload{
 				Operator: "string_upper_ascii",
 				Unary:    callInStrOutStr(upperASCII),
+			},
+			&functions.Overload{
+				Operator: "join",
+				Unary:    callInListStrOutStr(join),
+				Binary:   callInListStrStrOutStr(joinSeparator),
+			},
+			&functions.Overload{
+				Operator: "list_join",
+				Unary:    callInListStrOutStr(join),
+			},
+			&functions.Overload{
+				Operator: "list_join_string",
+				Binary:   callInListStrStrOutStr(joinSeparator),
 			},
 		),
 	}
@@ -500,4 +537,12 @@ func upperASCII(str string) (string, error) {
 		}
 	}
 	return string(runes), nil
+}
+
+func joinSeparator(strs []string, separator string) (string, error) {
+	return strings.Join(strs, separator), nil
+}
+
+func join(strs []string) (string, error) {
+	return strings.Join(strs, ""), nil
 }
