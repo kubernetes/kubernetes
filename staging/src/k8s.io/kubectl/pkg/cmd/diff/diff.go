@@ -35,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
-	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/cmd/apply"
@@ -110,7 +109,6 @@ type DiffOptions struct {
 
 	Selector         string
 	OpenAPISchema    openapi.Resources
-	DiscoveryClient  discovery.DiscoveryInterface
 	DynamicClient    dynamic.Interface
 	DryRunVerifier   *resource.DryRunVerifier
 	CmdNamespace     string
@@ -627,11 +625,6 @@ func (o *DiffOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		if err != nil {
 			return err
 		}
-	}
-
-	o.DiscoveryClient, err = f.ToDiscoveryClient()
-	if err != nil {
-		return err
 	}
 
 	o.DynamicClient, err = f.DynamicClient()
