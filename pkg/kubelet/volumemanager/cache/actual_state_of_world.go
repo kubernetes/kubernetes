@@ -107,7 +107,7 @@ type ActualStateOfWorld interface {
 	// volumes, depend on this to update the contents of the volume.
 	// All volume mounting calls should be idempotent so a second mount call for
 	// volumes that do not need to update contents should not fail.
-	PodExistsInVolume(podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName, desiredVolumeSize *resource.Quantity) (bool, string, error)
+	PodExistsInVolume(podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName, desiredVolumeSize resource.Quantity) (bool, string, error)
 
 	// PodRemovedFromVolume returns true if the given pod does not exist in the list of
 	// mountedPods for the given volume in the cache, indicating that the pod has
@@ -160,11 +160,6 @@ type ActualStateOfWorld interface {
 	// have no mountedPods. This list can be used to determine which volumes are
 	// no longer referenced and may be globally unmounted and detached.
 	GetUnmountedVolumes() []AttachedVolume
-
-	// MarkFSResizeRequired marks each volume that is successfully attached and
-	// mounted for the specified pod as requiring file system resize (if the plugin for the
-	// volume indicates it requires file system resize).
-	MarkFSResizeRequired(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName)
 
 	// GetAttachedVolumes returns a list of volumes that is known to be attached
 	// to the node. This list can be used to determine volumes that are either in-use
@@ -328,10 +323,6 @@ type mountedPod struct {
 
 	// volumeGidValue contains the value of the GID annotation, if present.
 	volumeGidValue string
-
-	// fsResizeRequired indicates the underlying volume has been successfully
-	// mounted to this pod but its size has been expanded after that.
-	fsResizeRequired bool
 
 	// volumeMountStateForPod stores state of volume mount for the pod. if it is:
 	//   - VolumeMounted: means volume for pod has been successfully mounted
@@ -552,30 +543,17 @@ func (asw *actualStateOfWorld) AddPodToVolume(markVolumeOpts operationexecutor.M
 	return nil
 }
 
-func (asw *actualStateOfWorld) MarkVolumeAsResized(
-	podName volumetypes.UniquePodName,
-	volumeName v1.UniqueVolumeName) error {
+func (asw *actualStateOfWorld) MarkVolumeAsResized(volumeName v1.UniqueVolumeName, claimSize *resource.Quantity) bool {
 	asw.Lock()
 	defer asw.Unlock()
 
-	volumeObj, volumeExists := asw.attachedVolumes[volumeName]
-	if !volumeExists {
-		return fmt.Errorf(
-			"no volume with the name %q exists in the list of attached volumes",
-			volumeName)
+	volumeObj, ok := asw.attachedVolumes[volumeName]
+	if ok {
+		volumeObj.persistentVolumeSize = claimSize
+		asw.attachedVolumes[volumeName] = volumeObj
+		return true
 	}
-
-	podObj, podExists := volumeObj.mountedPods[podName]
-	if !podExists {
-		return fmt.Errorf(
-			"no pod with the name %q exists in the mounted pods list of volume %s",
-			podName,
-			volumeName)
-	}
-	klog.V(5).InfoS("Pod volume has been resized", "uniquePodName", podName, "volumeName", volumeName, "outerVolumeSpecName", podObj.outerVolumeSpecName)
-	podObj.fsResizeRequired = false
-	asw.attachedVolumes[volumeName].mountedPods[podName] = podObj
-	return nil
+	return false
 }
 
 func (asw *actualStateOfWorld) MarkRemountRequired(
@@ -597,40 +575,6 @@ func (asw *actualStateOfWorld) MarkRemountRequired(
 				asw.attachedVolumes[volumeName].mountedPods[podName] = podObj
 			}
 		}
-	}
-}
-
-func (asw *actualStateOfWorld) MarkFSResizeRequired(
-	volumeName v1.UniqueVolumeName,
-	podName volumetypes.UniquePodName) {
-	asw.Lock()
-	defer asw.Unlock()
-	volumeObj, volumeExists := asw.attachedVolumes[volumeName]
-	if !volumeExists {
-		klog.InfoS("MarkFSResizeRequired for volume failed as volume does not exist", "volumeName", volumeName)
-		return
-	}
-
-	podObj, podExists := volumeObj.mountedPods[podName]
-	if !podExists {
-		klog.InfoS("MarkFSResizeRequired for volume failed because the pod does not exist", "uniquePodName", podName, "volumeName", volumeName)
-		return
-	}
-
-	volumePlugin, err :=
-		asw.volumePluginMgr.FindNodeExpandablePluginBySpec(podObj.volumeSpec)
-	if err != nil || volumePlugin == nil {
-		// Log and continue processing
-		klog.ErrorS(nil, "MarkFSResizeRequired failed to find expandable plugin for volume", "uniquePodName", podObj.podName, "volumeName", volumeObj.volumeName, "volumeSpecName", podObj.volumeSpec.Name())
-		return
-	}
-
-	if volumePlugin.RequiresFSResize() {
-		if !podObj.fsResizeRequired {
-			klog.V(3).InfoS("PVC volume of the pod requires file system resize", "uniquePodName", podName, "volumeName", volumeName, "outerVolumeSpecName", podObj.outerVolumeSpecName)
-			podObj.fsResizeRequired = true
-		}
-		asw.attachedVolumes[volumeName].mountedPods[podName] = podObj
 	}
 }
 
@@ -708,10 +652,7 @@ func (asw *actualStateOfWorld) DeleteVolume(volumeName v1.UniqueVolumeName) erro
 	return nil
 }
 
-func (asw *actualStateOfWorld) PodExistsInVolume(
-	podName volumetypes.UniquePodName,
-	volumeName v1.UniqueVolumeName,
-	desiredVolumeSize *resource.Quantity) (bool, string, error) {
+func (asw *actualStateOfWorld) PodExistsInVolume(podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName, desiredVolumeSize resource.Quantity) (bool, string, error) {
 	asw.RLock()
 	defer asw.RUnlock()
 
@@ -729,36 +670,40 @@ func (asw *actualStateOfWorld) PodExistsInVolume(
 		if podObj.remountRequired {
 			return true, volumeObj.devicePath, newRemountRequiredError(volumeObj.volumeName, podObj.podName)
 		}
-		if asw.volumeNeedsExpansion(volumeObj, desiredVolumeSize) {
-			return true, volumeObj.devicePath, newFsResizeRequiredError(volumeObj.volumeName, podObj.podName)
+		if currentSize, expandVolume := asw.volumeNeedsExpansion(volumeObj, desiredVolumeSize); expandVolume {
+			return true, volumeObj.devicePath, newFsResizeRequiredError(volumeObj.volumeName, podObj.podName, currentSize)
 		}
 	}
 
 	return podExists, volumeObj.devicePath, nil
 }
 
-func (asw *actualStateOfWorld) volumeNeedsExpansion(volumeObj attachedVolume, desiredVolumeSize *resource.Quantity) bool {
-	if volumeObj.volumeInUseErrorForExpansion {
-		return false
+func (asw *actualStateOfWorld) volumeNeedsExpansion(volumeObj attachedVolume, desiredVolumeSize resource.Quantity) (resource.Quantity, bool) {
+	currentSize := resource.Quantity{}
+	if volumeObj.persistentVolumeSize != nil {
+		currentSize = volumeObj.persistentVolumeSize.DeepCopy()
 	}
-	if volumeObj.persistentVolumeSize == nil || desiredVolumeSize == nil {
-		return false
+	if volumeObj.volumeInUseErrorForExpansion {
+		return currentSize, false
+	}
+	if volumeObj.persistentVolumeSize == nil || desiredVolumeSize.IsZero() {
+		return currentSize, false
 	}
 
 	if desiredVolumeSize.Cmp(*volumeObj.persistentVolumeSize) > 0 {
 		volumePlugin, err := asw.volumePluginMgr.FindNodeExpandablePluginBySpec(volumeObj.spec)
 		if err != nil || volumePlugin == nil {
 			// Log and continue processing
-			klog.Errorf(
-				"PodExistsInVolume failed to find expandable plugin volume: %q (volSpecName: %q)",
-				volumeObj.volumeName, volumeObj.spec.Name())
-			return false
+			klog.InfoS("PodExistsInVolume failed to find expandable plugin",
+				"volume", volumeObj.volumeName,
+				"volumeSpecName", volumeObj.spec.Name())
+			return currentSize, false
 		}
 		if volumePlugin.RequiresFSResize() {
-			return true
+			return currentSize, true
 		}
 	}
-	return false
+	return currentSize, false
 }
 
 func (asw *actualStateOfWorld) PodRemovedFromVolume(
@@ -1005,29 +950,31 @@ func newRemountRequiredError(
 // fsResizeRequiredError is an error returned when PodExistsInVolume() found
 // volume/pod attached/mounted but fsResizeRequired was true, indicating the
 // given volume receives an resize request after attached/mounted.
-type fsResizeRequiredError struct {
-	volumeName v1.UniqueVolumeName
-	podName    volumetypes.UniquePodName
+type FsResizeRequiredError struct {
+	CurrentSize resource.Quantity
+	volumeName  v1.UniqueVolumeName
+	podName     volumetypes.UniquePodName
 }
 
-func (err fsResizeRequiredError) Error() string {
+func (err FsResizeRequiredError) Error() string {
 	return fmt.Sprintf(
 		"volumeName %q mounted to %q needs to resize file system",
 		err.volumeName, err.podName)
 }
 
 func newFsResizeRequiredError(
-	volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName) error {
-	return fsResizeRequiredError{
-		volumeName: volumeName,
-		podName:    podName,
+	volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName, currentSize resource.Quantity) error {
+	return FsResizeRequiredError{
+		CurrentSize: currentSize,
+		volumeName:  volumeName,
+		podName:     podName,
 	}
 }
 
 // IsFSResizeRequiredError returns true if the specified error is a
 // fsResizeRequiredError.
 func IsFSResizeRequiredError(err error) bool {
-	_, ok := err.(fsResizeRequiredError)
+	_, ok := err.(FsResizeRequiredError)
 	return ok
 }
 

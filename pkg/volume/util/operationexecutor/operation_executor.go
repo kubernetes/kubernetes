@@ -148,7 +148,7 @@ type OperationExecutor interface {
 	// and one of podName or nodeName is pending or in exponential backoff, otherwise it returns true
 	IsOperationSafeToRetry(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName, nodeName types.NodeName, operationName string) bool
 	// ExpandInUseVolume will resize volume's file system to expected size without unmounting the volume.
-	ExpandInUseVolume(volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater) error
+	ExpandInUseVolume(volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater, currentSize resource.Quantity) error
 	// ReconstructVolumeOperation construct a new volumeSpec and returns it created by plugin
 	ReconstructVolumeOperation(volumeMode v1.PersistentVolumeMode, plugin volume.VolumePlugin, mapperPlugin volume.BlockVolumePlugin, uid types.UID, podName volumetypes.UniquePodName, volumeSpecName string, volumePath string, pluginName string) (*volume.Spec, error)
 	// CheckVolumeExistenceOperation checks volume existence
@@ -201,7 +201,7 @@ type ActualStateOfWorldMounterUpdater interface {
 	MarkDeviceAsUnmounted(volumeName v1.UniqueVolumeName) error
 
 	// Marks the specified volume's file system resize request is finished.
-	MarkVolumeAsResized(podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName) error
+	MarkVolumeAsResized(volumeName v1.UniqueVolumeName, claimSize *resource.Quantity) bool
 
 	// GetDeviceMountState returns mount state of the device in global path
 	GetDeviceMountState(volumeName v1.UniqueVolumeName) DeviceMountState
@@ -423,6 +423,10 @@ type VolumeToMount struct {
 
 	// time at which volume was requested to be mounted
 	MountRequestTime time.Time
+
+	// PersistentVolumeSize stores desired size of the volume.
+	// usually this is the size if pv.Spec.Capacity
+	PersistentVolumeSize resource.Quantity
 }
 
 // DeviceMountState represents device mount state in a global path.
@@ -997,8 +1001,8 @@ func (oe *operationExecutor) UnmountDevice(
 		deviceToDetach.VolumeName, podName, "" /* nodeName */, generatedOperations)
 }
 
-func (oe *operationExecutor) ExpandInUseVolume(volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater) error {
-	generatedOperations, err := oe.operationGenerator.GenerateExpandInUseVolumeFunc(volumeToMount, actualStateOfWorld)
+func (oe *operationExecutor) ExpandInUseVolume(volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater, currentSize resource.Quantity) error {
+	generatedOperations, err := oe.operationGenerator.GenerateExpandInUseVolumeFunc(volumeToMount, actualStateOfWorld, currentSize)
 	if err != nil {
 		return err
 	}

@@ -495,7 +495,6 @@ func (spec *Spec) IsKubeletExpandable() bool {
 		return spec.PersistentVolume.Spec.FlexVolume != nil
 	default:
 		return false
-
 	}
 }
 
