@@ -2387,6 +2387,16 @@ func TestConvertToAPIContainerStatuses(t *testing.T) {
 		},
 		RestartPolicy: v1.RestartPolicyAlways,
 	}
+	desiredStateWithInitContainer := v1.PodSpec{
+		NodeName: "machine",
+		InitContainers: []v1.Container{
+			{Name: "initcontainer1"},
+		},
+		Containers: []v1.Container{
+			{Name: "container1"},
+		},
+		RestartPolicy: v1.RestartPolicyAlways,
+	}
 	now := metav1.Now()
 
 	tests := []struct {
@@ -2447,6 +2457,40 @@ func TestConvertToAPIContainerStatuses(t *testing.T) {
 				waitingWithLastTerminationUnknown("containerA", 1),
 				waitingWithLastTerminationUnknown("containerB", 1),
 			},
+		}, {
+			name: "no init container status in current status and previous statuses, main containers running",
+			pod: &v1.Pod{
+				Spec: desiredStateWithInitContainer,
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{},
+				},
+			},
+			currentStatus: &kubecontainer.PodStatus{
+				ContainerStatuses: []*kubecontainer.Status{
+					{
+						ID:        kubecontainer.ContainerID{ID: "foo"},
+						Name:      "container1",
+						StartedAt: time.Unix(1, 0).UTC(),
+						State:     kubecontainer.ContainerStateRunning,
+					},
+				},
+			},
+			previousStatus: []v1.ContainerStatus{},
+			containers:     desiredStateWithInitContainer.InitContainers,
+			expected: []v1.ContainerStatus{
+				{
+					Name: "initcontainer1",
+					State: v1.ContainerState{
+						Terminated: &v1.ContainerStateTerminated{
+							Reason:   "",
+							Message:  "The init container has already been removed, but any of the main containers have status and are running, treat it as exited normally",
+							ExitCode: 0,
+						},
+					},
+				},
+			},
+			hasInitContainers: true,
+			isInitContainer:   true,
 		},
 	}
 	for _, test := range tests {

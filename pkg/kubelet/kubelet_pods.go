@@ -1808,6 +1808,22 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		containerSeen[cName] = containerSeen[cName] + 1
 	}
 
+	// If any of the main containers have status and are Running, then all init containers must
+	// have been executed at some point in the past.  However, they could have been removed
+	// from the container runtime now, and if this is the case, we should set the state of init containers
+	// exited normally.
+	hasInitialized := false
+	if isInitContainer {
+		for i := range pod.Spec.Containers {
+			container := &pod.Spec.Containers[i]
+			status := podStatus.FindContainerStatusByName(container.Name)
+			if status != nil && status.State == kubecontainer.ContainerStateRunning {
+				hasInitialized = true
+				break
+			}
+		}
+	}
+
 	// Handle the containers failed to be started, which should be in Waiting state.
 	for _, container := range containers {
 		if isInitContainer {
@@ -1815,6 +1831,19 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			// TODO(random-liu): Handle this in a cleaner way.
 			s := podStatus.FindContainerStatusByName(container.Name)
 			if s != nil && s.State == kubecontainer.ContainerStateExited && s.ExitCode == 0 {
+				continue
+			}
+			// If the init containers have been removed from the container runtime now and
+			// any of the main containers have status and are Running, we should set the state
+			// of init containers Terminated with exit code 0 not Waiting
+			if s == nil && hasInitialized && statuses[container.Name].State.Waiting != nil {
+				statuses[container.Name].State = v1.ContainerState{
+					Terminated: &v1.ContainerStateTerminated{
+						Reason:   "",
+						Message:  "The init container has already been removed, but any of the main containers have status and are running, treat it as exited normally",
+						ExitCode: 0,
+					},
+				}
 				continue
 			}
 		}
