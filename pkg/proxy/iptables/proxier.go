@@ -1103,6 +1103,35 @@ func (proxier *Proxier) syncProxyRules() {
 				proxier.natChains.Write(utiliptables.MakeChainLine(svcXlbChain))
 			}
 			activeNATChains[svcXlbChain] = true
+
+			// First rule in the chain redirects all pod -> external VIP
+			// traffic to the Service's ClusterIP instead. This happens
+			// whether or not we have local endpoints; only if localDetector
+			// is implemented
+			if proxier.localDetector.IsImplemented() {
+				proxier.natRules.Write(
+					"-A", string(svcXlbChain),
+					"-m", "comment", "--comment",
+					`"Redirect pods trying to reach external loadbalancer VIP to clusterIP"`,
+					proxier.localDetector.IfLocal(),
+					"-j", string(svcChain))
+			}
+
+			// Next, redirect all src-type=LOCAL -> LB IP to the service chain
+			// for externalTrafficPolicy=Local This allows traffic originating
+			// from the host to be redirected to the service correctly,
+			// otherwise traffic to LB IPs are dropped if there are no local
+			// endpoints.
+			proxier.natRules.Write(
+				"-A", string(svcXlbChain),
+				"-m", "comment", "--comment", fmt.Sprintf(`"masquerade LOCAL traffic for %s LB IP"`, svcNameString),
+				"-m", "addrtype", "--src-type", "LOCAL",
+				"-j", string(KubeMarkMasqChain))
+			proxier.natRules.Write(
+				"-A", string(svcXlbChain),
+				"-m", "comment", "--comment", fmt.Sprintf(`"route LOCAL traffic for %s LB IP to service chain"`, svcNameString),
+				"-m", "addrtype", "--src-type", "LOCAL",
+				"-j", string(svcChain))
 		}
 
 		// Capture the clusterIP.
@@ -1356,31 +1385,6 @@ func (proxier *Proxier) syncProxyRules() {
 		if !svcInfo.NodeLocalExternal() {
 			continue
 		}
-
-		// First rule in the chain redirects all pod -> external VIP traffic to the
-		// Service's ClusterIP instead. This happens whether or not we have local
-		// endpoints; only if localDetector is implemented
-		if proxier.localDetector.IsImplemented() {
-			proxier.natRules.Write(
-				"-A", string(svcXlbChain),
-				"-m", "comment", "--comment",
-				`"Redirect pods trying to reach external loadbalancer VIP to clusterIP"`,
-				proxier.localDetector.IfLocal(),
-				"-j", string(svcChain))
-		}
-
-		// Next, redirect all src-type=LOCAL -> LB IP to the service chain for externalTrafficPolicy=Local
-		// This allows traffic originating from the host to be redirected to the service correctly,
-		// otherwise traffic to LB IPs are dropped if there are no local endpoints.
-		args = append(args[:0], "-A", string(svcXlbChain))
-		proxier.natRules.Write(
-			args,
-			"-m", "comment", "--comment", fmt.Sprintf(`"masquerade LOCAL traffic for %s LB IP"`, svcNameString),
-			"-m", "addrtype", "--src-type", "LOCAL", "-j", string(KubeMarkMasqChain))
-		proxier.natRules.Write(
-			args,
-			"-m", "comment", "--comment", fmt.Sprintf(`"route LOCAL traffic for %s LB IP to service chain"`, svcNameString),
-			"-m", "addrtype", "--src-type", "LOCAL", "-j", string(svcChain))
 
 		numLocalEndpoints := len(localEndpointChains)
 		if numLocalEndpoints == 0 {
