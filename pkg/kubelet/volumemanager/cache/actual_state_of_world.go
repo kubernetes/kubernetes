@@ -107,7 +107,7 @@ type ActualStateOfWorld interface {
 	// volumes, depend on this to update the contents of the volume.
 	// All volume mounting calls should be idempotent so a second mount call for
 	// volumes that do not need to update contents should not fail.
-	PodExistsInVolume(podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName) (bool, string, error)
+	PodExistsInVolume(podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName, desiredVolumeSize *resource.Quantity) (bool, string, error)
 
 	// PodRemovedFromVolume returns true if the given pod does not exist in the list of
 	// mountedPods for the given volume in the cache, indicating that the pod has
@@ -287,7 +287,7 @@ type attachedVolume struct {
 	volumeInUseErrorForExpansion bool
 
 	// persistentVolumeSize records size of the volume when pod was started.
-	persistentVolumeSize resource.Quantity
+	persistentVolumeSize *resource.Quantity
 }
 
 // The mountedPod object represents a pod for which the kubelet volume manager
@@ -655,14 +655,14 @@ func (asw *actualStateOfWorld) SetDeviceMountState(
 	return nil
 }
 
-func (asw *actualStateOfWorld) SetVolumeClaimSize(volumeName v1.UniqueVolumeName, claimSize resource.Quantity) {
+func (asw *actualStateOfWorld) SetVolumeClaimSize(volumeName v1.UniqueVolumeName, claimSize *resource.Quantity) {
 	asw.Lock()
 	defer asw.Unlock()
 
 	volumeObj, ok := asw.attachedVolumes[volumeName]
 	// only set volume claim size if claimStatusSize is zero
 	// this can happen when volume was rebuilt after kubelet startup
-	if ok && volumeObj.persistentVolumeSize.IsZero() {
+	if ok && volumeObj.persistentVolumeSize == nil {
 		volumeObj.persistentVolumeSize = claimSize
 		asw.attachedVolumes[volumeName] = volumeObj
 	}
@@ -710,7 +710,8 @@ func (asw *actualStateOfWorld) DeleteVolume(volumeName v1.UniqueVolumeName) erro
 
 func (asw *actualStateOfWorld) PodExistsInVolume(
 	podName volumetypes.UniquePodName,
-	volumeName v1.UniqueVolumeName) (bool, string, error) {
+	volumeName v1.UniqueVolumeName,
+	desiredVolumeSize *resource.Quantity) (bool, string, error) {
 	asw.RLock()
 	defer asw.RUnlock()
 
@@ -728,13 +729,36 @@ func (asw *actualStateOfWorld) PodExistsInVolume(
 		if podObj.remountRequired {
 			return true, volumeObj.devicePath, newRemountRequiredError(volumeObj.volumeName, podObj.podName)
 		}
-		if podObj.fsResizeRequired &&
-			!volumeObj.volumeInUseErrorForExpansion {
+		if asw.volumeNeedsExpansion(volumeObj, desiredVolumeSize) {
 			return true, volumeObj.devicePath, newFsResizeRequiredError(volumeObj.volumeName, podObj.podName)
 		}
 	}
 
 	return podExists, volumeObj.devicePath, nil
+}
+
+func (asw *actualStateOfWorld) volumeNeedsExpansion(volumeObj attachedVolume, desiredVolumeSize *resource.Quantity) bool {
+	if volumeObj.volumeInUseErrorForExpansion {
+		return false
+	}
+	if volumeObj.persistentVolumeSize == nil || desiredVolumeSize == nil {
+		return false
+	}
+
+	if desiredVolumeSize.Cmp(*volumeObj.persistentVolumeSize) > 0 {
+		volumePlugin, err := asw.volumePluginMgr.FindNodeExpandablePluginBySpec(volumeObj.spec)
+		if err != nil || volumePlugin == nil {
+			// Log and continue processing
+			klog.Errorf(
+				"PodExistsInVolume failed to find expandable plugin volume: %q (volSpecName: %q)",
+				volumeObj.volumeName, volumeObj.spec.Name())
+			return false
+		}
+		if volumePlugin.RequiresFSResize() {
+			return true
+		}
+	}
+	return false
 }
 
 func (asw *actualStateOfWorld) PodRemovedFromVolume(

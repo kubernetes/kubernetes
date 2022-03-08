@@ -1287,7 +1287,7 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 			// mark volume as resize required
 			asw.MarkFSResizeRequired(volumeName, podName)
 
-			_, _, podExistErr := asw.PodExistsInVolume(podName, volumeName)
+			_, _, podExistErr := asw.PodExistsInVolume(podName, volumeName, nil)
 			if tc.expansionFailed {
 				if cache.IsFSResizeRequiredError(podExistErr) {
 					t.Fatalf("volume %s should not throw fsResizeRequired error: %v", volumeName, podExistErr)
@@ -1299,7 +1299,7 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 				go reconciler.Run(wait.NeverStop)
 
 				waitErr := retryWithExponentialBackOff(testOperationBackOffDuration, func() (done bool, err error) {
-					mounted, _, err := asw.PodExistsInVolume(podName, volumeName)
+					mounted, _, err := asw.PodExistsInVolume(podName, volumeName, nil)
 					return mounted && err == nil, nil
 				})
 				if waitErr != nil {
@@ -1791,7 +1791,7 @@ func waitForUncertainPodMount(t *testing.T, volumeName v1.UniqueVolumeName, podN
 	err := retryWithExponentialBackOff(
 		testOperationBackOffDuration,
 		func() (bool, error) {
-			mounted, _, err := asw.PodExistsInVolume(podName, volumeName)
+			mounted, _, err := asw.PodExistsInVolume(podName, volumeName, nil)
 			if mounted || err != nil {
 				return false, nil
 			}

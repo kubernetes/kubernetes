@@ -128,13 +128,14 @@ type DesiredStateOfWorld interface {
 	// UpdatePersistentVolumeSize updates persistentVolumeSize in desired state of the world
 	// so as it can be compared against actual size and volume expansion performed
 	// if necessary
-	UpdatePersistentVolumeSize(volumeName v1.UniqueVolumeName, size resource.Quantity)
+	UpdatePersistentVolumeSize(volumeName v1.UniqueVolumeName, size *resource.Quantity)
 }
 
 // VolumeToMount represents a volume that is attached to this node and needs to
 // be mounted to PodName.
 type VolumeToMount struct {
 	operationexecutor.VolumeToMount
+	PersistentVolumeSize *resource.Quantity
 }
 
 // NewDesiredStateOfWorld returns a new instance of DesiredStateOfWorld.
@@ -193,7 +194,7 @@ type volumeToMount struct {
 	desiredSizeLimit *resource.Quantity
 
 	// persistentVolumeSize records desired size of a persistent volume.
-	persistentVolumeSize resource.Quantity
+	persistentVolumeSize *resource.Quantity
 }
 
 // The pod object represents a pod that references the underlying volume and
@@ -295,7 +296,7 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 		if volumeSpec.PersistentVolume != nil {
 			pvCap := volumeSpec.PersistentVolume.Spec.Capacity.Storage()
 			if pvCap != nil {
-				vmt.persistentVolumeSize = *pvCap
+				vmt.persistentVolumeSize = pvCap
 			}
 		}
 
@@ -366,7 +367,7 @@ func (dsw *desiredStateOfWorld) DeletePodFromVolume(
 
 // UpdatePersistentVolumeSize updates last known PV size. This is used for volume expansion and
 // should be only used for persistent volumes.
-func (dsw *desiredStateOfWorld) UpdatePersistentVolumeSize(volumeName v1.UniqueVolumeName, size resource.Quantity) {
+func (dsw *desiredStateOfWorld) UpdatePersistentVolumeSize(volumeName v1.UniqueVolumeName, size *resource.Quantity) {
 	dsw.Lock()
 	defer dsw.Unlock()
 
@@ -447,7 +448,9 @@ func (dsw *desiredStateOfWorld) GetVolumesToMount() []VolumeToMount {
 						VolumeGidValue:          volumeObj.volumeGidValue,
 						ReportedInUse:           volumeObj.reportedInUse,
 						MountRequestTime:        podObj.mountRequestTime,
-						DesiredSizeLimit:        volumeObj.desiredSizeLimit}})
+						DesiredSizeLimit:        volumeObj.desiredSizeLimit},
+					PersistentVolumeSize: volumeObj.persistentVolumeSize,
+				})
 		}
 	}
 	return volumesToMount

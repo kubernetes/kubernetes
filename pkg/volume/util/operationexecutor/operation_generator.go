@@ -1491,7 +1491,7 @@ func (og *operationGenerator) GenerateVerifyControllerAttachedVolumeFunc(
 
 	verifyControllerAttachedVolumeFunc := func() volumetypes.OperationContext {
 		migrated := getMigratedStatusBySpec(volumeToMount.VolumeSpec)
-		var claimSize resource.Quantity
+		var claimSize *resource.Quantity
 
 		if volumeToMount.VolumeSpec.PersistentVolume != nil {
 			pv := volumeToMount.VolumeSpec.PersistentVolume
@@ -1502,7 +1502,7 @@ func (og *operationGenerator) GenerateVerifyControllerAttachedVolumeFunc(
 			}
 			pvcStatusSize := pvc.Status.Capacity.Storage()
 			if pvcStatusSize != nil {
-				claimSize = *pvcStatusSize
+				claimSize = pvcStatusSize
 			}
 		}
 
