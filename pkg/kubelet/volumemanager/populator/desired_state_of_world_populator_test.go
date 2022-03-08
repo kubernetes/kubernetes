@@ -1108,7 +1108,7 @@ func reprocess(dswp *desiredStateOfWorldPopulator, uniquePodName types.UniquePod
 func getResizeRequiredVolumes(dsw cache.DesiredStateOfWorld, asw cache.ActualStateOfWorld) []v1.UniqueVolumeName {
 	resizeRequiredVolumes := []v1.UniqueVolumeName{}
 	for _, volumeToMount := range dsw.GetVolumesToMount() {
-		_, _, err := asw.PodExistsInVolume(volumeToMount.PodName, volumeToMount.VolumeName)
+		_, _, err := asw.PodExistsInVolume(volumeToMount.PodName, volumeToMount.VolumeName, nil)
 		if cache.IsFSResizeRequiredError(err) {
 			resizeRequiredVolumes = append(resizeRequiredVolumes, volumeToMount.VolumeName)
 		}

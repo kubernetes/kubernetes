@@ -23,6 +23,7 @@ package cache
 
 import (
 	"fmt"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"sync"
 	"time"
 
@@ -579,6 +580,10 @@ func (asw *actualStateOfWorld) GetAttachState(
 	}
 
 	return AttachStateDetached
+}
+
+func (asw *actualStateOfWorld) SetVolumeClaimSize(volumeName v1.UniqueVolumeName, claimSize *resource.Quantity) {
+	klog.V(5).Infof("doing nothing")
 }
 
 func (asw *actualStateOfWorld) GetAttachedVolumes() []AttachedVolume {

@@ -196,7 +196,7 @@ func (rc *reconciler) unmountVolumes() {
 func (rc *reconciler) mountOrAttachVolumes() {
 	// Ensure volumes that should be attached/mounted are attached/mounted.
 	for _, volumeToMount := range rc.desiredStateOfWorld.GetVolumesToMount() {
-		volMounted, devicePath, err := rc.actualStateOfWorld.PodExistsInVolume(volumeToMount.PodName, volumeToMount.VolumeName)
+		volMounted, devicePath, err := rc.actualStateOfWorld.PodExistsInVolume(volumeToMount.PodName, volumeToMount.VolumeName, volumeToMount.PersistentVolumeSize)
 		volumeToMount.DevicePath = devicePath
 		if cache.IsVolumeNotAttachedError(err) {
 			rc.waitForVolumeAttach(volumeToMount)
