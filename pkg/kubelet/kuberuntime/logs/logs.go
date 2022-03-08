@@ -313,6 +313,7 @@ func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, r
 	var parse parseFunc
 	var stop bool
 	found := true
+	waitRecreate := false
 	writer := newLogWriter(stdout, stderr, opts)
 	msg := &logMessage{}
 	for {
@@ -354,14 +355,17 @@ func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, r
 				if err != nil {
 					return err
 				}
-				if recreated {
+				if recreated || waitRecreate {
 					newF, err := os.Open(path)
 					if err != nil {
 						if os.IsNotExist(err) {
+							// If the new log file has not yet been created, try again to read
+							waitRecreate = true
 							continue
 						}
 						return fmt.Errorf("failed to open log file %q: %v", path, err)
 					}
+					waitRecreate = false
 					defer newF.Close()
 					f.Close()
 					if err := watcher.Remove(f.Name()); err != nil && !os.IsNotExist(err) {

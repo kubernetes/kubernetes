@@ -23,6 +23,7 @@ import (
 	apitesting "k8s.io/cri-api/pkg/apis/testing"
 	"k8s.io/utils/pointer"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -204,6 +205,106 @@ func TestReadLogs(t *testing.T) {
 			}
 		})
 	}
+}
+
+type LockedBuffer struct {
+	buffer bytes.Buffer
+	mutex  sync.Mutex
+}
+
+func (s *LockedBuffer) Write(p []byte) (n int, err error) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	return s.buffer.Write(p)
+}
+
+func (s *LockedBuffer) Len() int {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	return s.buffer.Len()
+}
+
+func (s *LockedBuffer) String() string {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	return s.buffer.String()
+}
+
+func TestReadLogsWithLogFileRotate(t *testing.T) {
+	file, err := ioutil.TempFile("", "TestFollowLogs")
+	if err != nil {
+		t.Fatalf("unable to create temp file")
+	}
+	defer file.Close()
+	defer os.Remove(file.Name())
+	rotatefn := file.Name() + ".rotate1"
+	defer os.Remove(rotatefn)
+
+	var stdoutBuf *LockedBuffer = new(LockedBuffer)
+	var stderrBuf *LockedBuffer = new(LockedBuffer)
+
+	// Make the dummy container
+	containerID := "fake-container-id"
+	fakeRuntimeService := &apitesting.FakeRuntimeService{
+		Containers: map[string]*apitesting.FakeContainer{
+			containerID: {
+				ContainerStatus: runtimeapi.ContainerStatus{
+					State: runtimeapi.ContainerState_CONTAINER_RUNNING,
+				},
+			},
+		},
+	}
+
+	// Start the dummy container with log-follow
+	ctx := context.Background()
+	ctxParent, ctxCancel := context.WithCancel(ctx)
+	go func() {
+		podLogOptions := v1.PodLogOptions{
+			Follow: true,
+		}
+		opts := NewLogOptions(&podLogOptions, time.Now())
+		err = ReadLogs(ctxParent, file.Name(), containerID, opts, fakeRuntimeService, stdoutBuf, stderrBuf)
+	}()
+
+	// Start log writing and file rotation
+	bufferlen := 0
+	go func() {
+		for phase := 1; phase <= 2; phase++ {
+			switch phase {
+			case 1: // Write log to file
+				file.WriteString(`{"log":"line1\n","stream":"stdout","time":"2022-04-06T11:18:01.00000000Z"}` + "\n")
+			case 2: // Rotate log file and write log
+				currentfn := file.Name()
+				os.Rename(currentfn, rotatefn)
+				file.Close()
+				time.Sleep(time.Second * 2) // Give time without file
+
+				file, err = os.OpenFile(currentfn, os.O_RDWR|os.O_CREATE, 0644)
+				if err != nil {
+					t.Logf("unable to create second temp file")
+				}
+				file.WriteString(`{"log":"line2\n","stream":"stdout","time":"2022-04-06T11:18:02.00000000Z"}` + "\n")
+			default:
+				continue
+			}
+
+			for i := 0; i < 10; i++ {
+				time.Sleep(time.Second * 1)
+				if stdoutBuf.Len() > bufferlen { // Confirm that the log was added.
+					bufferlen = stdoutBuf.Len()
+					break
+				}
+			}
+		}
+		// Stop the dummy container
+		ctxCancel()
+	}()
+
+	<-ctxParent.Done()
+
+	// Check result
+	expected := "line1\nline2\n"
+	assert.Equal(t, expected, stdoutBuf.String())
 }
 
 func TestParseLog(t *testing.T) {
