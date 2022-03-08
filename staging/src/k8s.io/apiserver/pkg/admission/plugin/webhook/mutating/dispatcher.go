@@ -143,6 +143,7 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attrib
 		changed, err := a.callAttrMutatingHook(ctx, hook, invocation, versionedAttr, annotator, o, round, i)
 		ignoreClientCallFailures := hook.FailurePolicy != nil && *hook.FailurePolicy == admissionregistrationv1.Ignore
 		rejected := false
+		filter := admissionmetrics.LabelCardinalityFilter(a.plugin.Webhook.Config.Metrics.SLODuration.IncludeResourceLabelsFor)
 		if err != nil {
 			switch err := err.(type) {
 			case *webhookutil.ErrCallingWebhook:
@@ -150,18 +151,18 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attrib
 					rejected = true
 					admissionmetrics.Metrics.ObserveWebhookRejection(ctx, hook.Name, "admit", string(versionedAttr.Attributes.GetOperation()), admissionmetrics.WebhookRejectionCallingWebhookError, int(err.Status.ErrStatus.Code))
 				}
-				admissionmetrics.Metrics.ObserveWebhook(ctx, hook.Name, time.Since(t), rejected, versionedAttr.Attributes, "admit", int(err.Status.ErrStatus.Code))
+				admissionmetrics.Metrics.ObserveWebhook(ctx, filter, hook.Name, time.Since(t), rejected, versionedAttr.Attributes, "admit", int(err.Status.ErrStatus.Code))
 			case *webhookutil.ErrWebhookRejection:
 				rejected = true
 				admissionmetrics.Metrics.ObserveWebhookRejection(ctx, hook.Name, "admit", string(versionedAttr.Attributes.GetOperation()), admissionmetrics.WebhookRejectionNoError, int(err.Status.ErrStatus.Code))
-				admissionmetrics.Metrics.ObserveWebhook(ctx, hook.Name, time.Since(t), rejected, versionedAttr.Attributes, "admit", int(err.Status.ErrStatus.Code))
+				admissionmetrics.Metrics.ObserveWebhook(ctx, filter, hook.Name, time.Since(t), rejected, versionedAttr.Attributes, "admit", int(err.Status.ErrStatus.Code))
 			default:
 				rejected = true
 				admissionmetrics.Metrics.ObserveWebhookRejection(ctx, hook.Name, "admit", string(versionedAttr.Attributes.GetOperation()), admissionmetrics.WebhookRejectionAPIServerInternalError, 0)
-				admissionmetrics.Metrics.ObserveWebhook(ctx, hook.Name, time.Since(t), rejected, versionedAttr.Attributes, "admit", 0)
+				admissionmetrics.Metrics.ObserveWebhook(ctx, filter, hook.Name, time.Since(t), rejected, versionedAttr.Attributes, "admit", 0)
 			}
 		} else {
-			admissionmetrics.Metrics.ObserveWebhook(ctx, hook.Name, time.Since(t), rejected, versionedAttr.Attributes, "admit", 200)
+			admissionmetrics.Metrics.ObserveWebhook(ctx, filter, hook.Name, time.Since(t), rejected, versionedAttr.Attributes, "admit", 200)
 		}
 		if changed {
 			// Patch had changed the object. Prepare to reinvoke all previous webhooks that are eligible for re-invocation.

@@ -118,6 +118,7 @@ type AdmissionMetrics struct {
 	webhookRejection *metrics.CounterVec
 	webhookFailOpen  *metrics.CounterVec
 	webhookRequest   *metrics.CounterVec
+	webhookSLO       *metrics.HistogramVec
 }
 
 // newAdmissionMetrics create a new AdmissionMetrics, configured with default metric names.
@@ -217,19 +218,33 @@ func newAdmissionMetrics() *AdmissionMetrics {
 		},
 		[]string{"name", "type", "operation", "code", "rejected"})
 
+	webhookSLO := metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "webhook_admission_slo_duration_seconds",
+			Help:           "Admission webhook latency histogram in seconds, identified by name and broken out for a configurable set of API resources.",
+			Buckets:        metrics.DefBuckets,
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"name", "group", "version", "resource", "subresource"},
+	)
+
 	step.mustRegister()
 	controller.mustRegister()
 	webhook.mustRegister()
 	legacyregistry.MustRegister(webhookRejection)
 	legacyregistry.MustRegister(webhookFailOpen)
 	legacyregistry.MustRegister(webhookRequest)
-	return &AdmissionMetrics{step: step, controller: controller, webhook: webhook, webhookRejection: webhookRejection, webhookFailOpen: webhookFailOpen, webhookRequest: webhookRequest}
+	legacyregistry.MustRegister(webhookSLO)
+	return &AdmissionMetrics{step: step, controller: controller, webhook: webhook, webhookRejection: webhookRejection, webhookFailOpen: webhookFailOpen, webhookRequest: webhookRequest, webhookSLO: webhookSLO}
 }
 
 func (m *AdmissionMetrics) reset() {
 	m.step.reset()
 	m.controller.reset()
 	m.webhook.reset()
+	m.webhookSLO.Reset()
 }
 
 // ObserveAdmissionStep records admission related metrics for a admission step, identified by step type.
@@ -242,14 +257,27 @@ func (m *AdmissionMetrics) ObserveAdmissionController(ctx context.Context, elaps
 	m.controller.observe(ctx, elapsed, append(extraLabels, stepType, string(attr.GetOperation()), strconv.FormatBool(rejected))...)
 }
 
-// ObserveWebhook records admission related metrics for a admission webhook.
-func (m *AdmissionMetrics) ObserveWebhook(ctx context.Context, name string, elapsed time.Duration, rejected bool, attr admission.Attributes, stepType string, code int) {
+// ObserveWebhook records admission related metrics for an admission webhook.
+func (m *AdmissionMetrics) ObserveWebhook(ctx context.Context, filter LabelCardinalityFilter, name string, elapsed time.Duration, rejected bool, attr admission.Attributes, stepType string, code int) {
 	// We truncate codes greater than 600 to keep the cardinality bounded.
 	if code > 600 {
 		code = 600
 	}
 	m.webhookRequest.WithContext(ctx).WithLabelValues(name, stepType, string(attr.GetOperation()), strconv.Itoa(code), strconv.FormatBool(rejected)).Inc()
 	m.webhook.observe(ctx, elapsed, name, stepType, string(attr.GetOperation()), strconv.FormatBool(rejected))
+	m.webhookSLO.WithContext(ctx).WithLabelValues(webhookSLOMetricLabels(name, attr, filter)...).Observe(elapsed.Seconds())
+}
+
+func webhookSLOMetricLabels(name string, attr admission.Attributes, filter LabelCardinalityFilter) []string {
+	labels := []string{name, "OTHER", "OTHER", "OTHER", "OTHER"}
+	gvr := attr.GetResource()
+	if filter.matches(gvr, attr.GetSubresource()) {
+		labels[1] = gvr.Group
+		labels[2] = gvr.Version
+		labels[3] = gvr.Resource
+		labels[4] = attr.GetSubresource()
+	}
+	return labels
 }
 
 // ObserveWebhookRejection records admission related metrics for an admission webhook rejection.

@@ -19,6 +19,8 @@ package metrics
 import (
 	"context"
 	"fmt"
+	"regexp"
+	"strings"
 	"testing"
 	"time"
 
@@ -26,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission"
 	"k8s.io/component-base/metrics/legacyregistry"
 )
 
@@ -83,8 +86,8 @@ func TestObserveAdmissionController(t *testing.T) {
 func TestObserveWebhook(t *testing.T) {
 	defer Metrics.reset()
 	defer legacyregistry.Reset()
-	Metrics.ObserveWebhook(context.TODO(), "x", 2*time.Second, false, attr, stepAdmit, 200)
-	Metrics.ObserveWebhook(context.TODO(), "x", 2*time.Second, true, attr, stepValidate, 654)
+	Metrics.ObserveWebhook(context.TODO(), nil, "x", 2*time.Second, false, attr, stepAdmit, 200)
+	Metrics.ObserveWebhook(context.TODO(), nil, "x", 2*time.Second, true, attr, stepValidate, 654)
 	wantLabelsCounterAdmit := map[string]string{
 		"name":      "x",
 		"operation": string(admission.Create),
@@ -117,6 +120,203 @@ func TestObserveWebhook(t *testing.T) {
 
 	expectHistogramCountTotal(t, "apiserver_admission_webhook_admission_duration_seconds", wantLabelsHistogramAdmit, 1)
 	expectHistogramCountTotal(t, "apiserver_admission_webhook_admission_duration_seconds", wantLabelsHistogramValidate, 1)
+}
+
+func TestObserveWebhookSLO(t *testing.T) {
+	ctx := context.Background()
+
+	// some handy funcs to make the test cases easier on the eyes
+	observeWebhook := func(t *testing.T, r []webhookadmission.Rule, attributes admission.Attributes) {
+		Metrics.ObserveWebhook(ctx, r, strings.ToLower(t.Name()), time.Millisecond, false, attributes, "", 200)
+	}
+	parse := func(t *testing.T, s string) (schema.GroupVersionResource, string, string) {
+		if len(s) == 0 {
+			return schema.GroupVersionResource{}, "", ""
+		}
+		regex := regexp.MustCompile(`^(?P<r>\w+)(?:/(?P<s>\w+))?\.(?P<v>\w+)(?:(?:\.(?P<g>\w+))?)(?:/(?P<n>\w+))?$`)
+		m := regex.FindAllStringSubmatch(s, -1)[0]
+		gvr := schema.GroupVersionResource{Group: m[4], Version: m[3], Resource: m[1]}
+		return gvr, m[5], m[2]
+	}
+	groups := func(g ...string) func(*webhookadmission.Rule) {
+		return func(r *webhookadmission.Rule) {
+			r.Groups = append(r.Groups, g...)
+		}
+	}
+	versions := func(g ...string) func(*webhookadmission.Rule) {
+		return func(r *webhookadmission.Rule) {
+			r.Versions = append(r.Versions, g...)
+		}
+	}
+	resources := func(g ...string) func(*webhookadmission.Rule) {
+		return func(r *webhookadmission.Rule) {
+			r.Resources = append(r.Resources, g...)
+		}
+	}
+	rule := func(options ...func(*webhookadmission.Rule)) webhookadmission.Rule {
+		rule := &webhookadmission.Rule{}
+		for _, o := range options {
+			o(rule)
+		}
+		if len(rule.Groups) == 0 {
+			groups("*")(rule)
+		}
+		if len(rule.Versions) == 0 {
+			versions("*")(rule)
+		}
+		if len(rule.Resources) == 0 {
+			resources("*")(rule)
+		}
+		return *rule
+	}
+
+	testCases := []struct {
+		name         string
+		rules        []webhookadmission.Rule
+		observations map[string]int
+		expected     map[string]int
+	}{
+		{
+			name: "DefaultNoConfig",
+			observations: map[string]int{
+				"test1.v1.group/ns":        1,
+				"test2.v2.group":           2,
+				"test3.v1/ns":              3,
+				"test1/status.v1.group/ns": 4,
+			},
+			expected: map[string]int{
+				"test1.v1.group":        0,
+				"test2.v2.group":        0,
+				"test3.v1":              0,
+				"test1/status.v1.group": 0,
+				"":                      10,
+			},
+		},
+		{
+			name: "MatchGroup",
+			rules: []webhookadmission.Rule{
+				rule(groups("grp1")),
+			},
+			observations: map[string]int{
+				"test1.v1.grp1": 1,
+				"test1.v2.grp1": 2,
+				"test2.v2.grp1": 3,
+				"test1.v1.grp2": 4,
+				"test1.v1.grp3": 5,
+			},
+			expected: map[string]int{
+				"test1.v1.grp1": 1,
+				"test1.v2.grp1": 2,
+				"test2.v2.grp1": 3,
+				"test1.v1.grp2": 0,
+				"test1.v1.grp3": 0,
+				"":              9,
+			},
+		},
+		{
+			name: "MatchVersion",
+			rules: []webhookadmission.Rule{
+				rule(versions("v1")),
+			},
+			observations: map[string]int{
+				"test1.v1.grp1": 1,
+				"test1.v2.grp1": 2,
+				"test2.v2.grp1": 3,
+				"test1.v1.grp2": 4,
+				"test1.v1.grp3": 5,
+			},
+			expected: map[string]int{
+				"test1.v1.grp1": 1,
+				"test1.v2.grp1": 0,
+				"test2.v2.grp1": 0,
+				"test1.v1.grp2": 4,
+				"test1.v1.grp3": 5,
+				"":              5,
+			},
+		},
+		{
+			name: "MatchResource",
+			rules: []webhookadmission.Rule{
+				rule(resources("test2")),
+			},
+			observations: map[string]int{
+				"test1.v1.grp1": 1,
+				"test1.v2.grp1": 2,
+				"test2.v2.grp1": 3,
+				"test1.v1.grp2": 4,
+				"test1.v1.grp3": 5,
+			},
+			expected: map[string]int{
+				"test1.v1.grp1": 0,
+				"test1.v2.grp1": 0,
+				"test2.v2.grp1": 3,
+				"test1.v1.grp2": 0,
+				"test1.v1.grp3": 0,
+				"":              12,
+			},
+		},
+		{
+			name: "MatchSubresource",
+			rules: []webhookadmission.Rule{
+				rule(resources("test1", "test2/scale", "test3/*", "*/log")),
+			},
+			observations: map[string]int{
+				"test1.v1.group":        11,
+				"test1/status.v1.group": 13,
+				"test2.v1.group":        17,
+				"test2/scale.v1.group":  19,
+				"test2/status.v1.group": 23,
+				"test3.v1.group":        29,
+				"test3/status.v1.group": 31,
+				"test3/scale.v1.group":  37,
+				"test3/log.v1.group":    41,
+				"test4.v1.group":        43,
+				"test4/log.v1.group":    47,
+			},
+			expected: map[string]int{
+				"test1.v1.group":        11,
+				"test1/status.v1.group": 0,
+				"test2.v1.group":        0,
+				"test2/scale.v1.group":  19,
+				"test2/status.v1.group": 0,
+				"test3.v1.group":        0,
+				"test3/status.v1.group": 31,
+				"test3/scale.v1.group":  37,
+				"test3/log.v1.group":    41,
+				"test4.v1.group":        0,
+				"test4/log.v1.group":    47,
+				"":                      13 + 17 + 23 + 29 + 43,
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			Metrics.reset()
+			defer legacyregistry.Reset()
+			// make observations
+			for rsvgn, count := range tc.observations {
+				gvr, ns, subresource := parse(t, rsvgn)
+				attributes := admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, ns, "", gvr, subresource, "CREATE", nil, false, nil)
+				for c := 0; c < count; c++ {
+					observeWebhook(t, tc.rules, attributes)
+				}
+			}
+			// assert the expected metric counts
+			for rsvg, count := range tc.expected {
+				if rsvg == "" {
+					rsvg = "OTHER/OTHER.OTHER.OTHER"
+				}
+				gvr, _, subresource := parse(t, rsvg)
+				expected := map[string]string{
+					"group":       gvr.Group,
+					"version":     gvr.Version,
+					"resource":    gvr.Resource,
+					"subresource": subresource,
+				}
+				expectHistogramCountTotal(t, "apiserver_admission_webhook_admission_slo_duration_seconds", expected, count)
+			}
+		})
+	}
 }
 
 func TestObserveWebhookRejection(t *testing.T) {
