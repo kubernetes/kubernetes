@@ -265,10 +265,6 @@ func (c *Controller) Run(workers int, stopCh <-chan struct{}) {
 		go wait.Until(c.worker, c.workerLoopPeriod, stopCh)
 	}
 
-	go func() {
-		defer utilruntime.HandleCrash()
-	}()
-
 	<-stopCh
 }
 
