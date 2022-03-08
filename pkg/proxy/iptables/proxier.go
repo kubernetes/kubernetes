@@ -119,6 +119,7 @@ type serviceInfo struct {
 	// The following fields are computed and stored for performance reasons.
 	serviceNameString        string
 	servicePortChainName     utiliptables.Chain
+	serviceLocalChainName    utiliptables.Chain
 	serviceFirewallChainName utiliptables.Chain
 	serviceLBChainName       utiliptables.Chain
 }
@@ -133,6 +134,7 @@ func newServiceInfo(port *v1.ServicePort, service *v1.Service, baseInfo *proxy.B
 	protocol := strings.ToLower(string(info.Protocol()))
 	info.serviceNameString = svcPortName.String()
 	info.servicePortChainName = servicePortChainName(info.serviceNameString, protocol)
+	info.serviceLocalChainName = serviceLocalChainName(info.serviceNameString, protocol)
 	info.serviceFirewallChainName = serviceFirewallChainName(info.serviceNameString, protocol)
 	info.serviceLBChainName = serviceLBChainName(info.serviceNameString, protocol)
 
@@ -685,6 +687,7 @@ func portProtoHash(servicePortName string, protocol string) string {
 
 const (
 	servicePortChainNamePrefix         = "KUBE-SVC-"
+	serviceLocalChainNamePrefix        = "KUBE-SVL-"
 	serviceFirewallChainNamePrefix     = "KUBE-FW-"
 	serviceLBChainNamePrefix           = "KUBE-XLB-"
 	servicePortEndpointChainNamePrefix = "KUBE-SEP-"
@@ -696,6 +699,13 @@ func servicePortChainName(servicePortName string, protocol string) utiliptables.
 	return utiliptables.Chain(servicePortChainNamePrefix + portProtoHash(servicePortName, protocol))
 }
 
+// serviceLocalChainName returns the name of the KUBE-SVL-XXXX chain for a service, which
+// handles dispatching to local endpoints when using `Local` traffic policy. This chain only
+// exists if the service has `Local` external traffic policy.
+func serviceLocalChainName(servicePortName string, protocol string) utiliptables.Chain {
+	return utiliptables.Chain(serviceLocalChainNamePrefix + portProtoHash(servicePortName, protocol))
+}
+
 // serviceFirewallChainName returns the name of the KUBE-FW-XXXX chain for a service, which
 // is used to implement the filtering for the LoadBalancerSourceRanges feature.
 func serviceFirewallChainName(servicePortName string, protocol string) utiliptables.Chain {
@@ -703,7 +713,9 @@ func serviceFirewallChainName(servicePortName string, protocol string) utiliptab
 }
 
 // serviceLBChainName returns the name of the KUBE-XLB-XXXX chain for a service, which
-// handles external traffic with `Local` traffic policy.
+// implements "short-circuiting" for internally-originated load balancer traffic when using
+// `Local` external traffic policy. It forwards traffic from local sources to the KUBE-SVC-XXXX
+// chain and traffic from external sources to the KUBE-SVL-XXXX chain.
 func serviceLBChainName(servicePortName string, protocol string) utiliptables.Chain {
 	return utiliptables.Chain(serviceLBChainNamePrefix + portProtoHash(servicePortName, protocol))
 }
@@ -719,6 +731,7 @@ func servicePortEndpointChainName(servicePortName string, protocol string, endpo
 func isServiceChainName(chainString string) bool {
 	prefixes := []string{
 		servicePortChainNamePrefix,
+		serviceLocalChainNamePrefix,
 		servicePortEndpointChainNamePrefix,
 		serviceFirewallChainNamePrefix,
 		serviceLBChainNamePrefix,
@@ -1092,19 +1105,26 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 			activeNATChains[svcChain] = true
 		}
+		externalTrafficChain := svcChain
 
+		svcLocalChain := svcInfo.serviceLocalChainName
 		svcXlbChain := svcInfo.serviceLBChainName
 		if hasEndpoints && svcInfo.NodeLocalExternal() {
-			// Only for services request OnlyLocal traffic
-			// create the per-service LB chain, retaining counters if possible.
-			if lbChain, ok := existingNATChains[svcXlbChain]; ok {
-				proxier.natChains.WriteBytes(lbChain)
+			// create the per-service LB and Local chains, retaining counters if possible.
+			if chain, ok := existingNATChains[svcLocalChain]; ok {
+				proxier.natChains.WriteBytes(chain)
+			} else {
+				proxier.natChains.Write(utiliptables.MakeChainLine(svcLocalChain))
+			}
+			activeNATChains[svcLocalChain] = true
+			if chain, ok := existingNATChains[svcXlbChain]; ok {
+				proxier.natChains.WriteBytes(chain)
 			} else {
 				proxier.natChains.Write(utiliptables.MakeChainLine(svcXlbChain))
 			}
 			activeNATChains[svcXlbChain] = true
 
-			// First rule in the chain redirects all pod -> external VIP
+			// The XLB chain redirects all pod -> external VIP
 			// traffic to the Service's ClusterIP instead. This happens
 			// whether or not we have local endpoints; only if localDetector
 			// is implemented
@@ -1132,6 +1152,13 @@ func (proxier *Proxier) syncProxyRules() {
 				"-m", "comment", "--comment", fmt.Sprintf(`"route LOCAL traffic for %s LB IP to service chain"`, svcNameString),
 				"-m", "addrtype", "--src-type", "LOCAL",
 				"-j", string(svcChain))
+
+			// Everything else goes to the SVL chain
+			proxier.natRules.Write(
+				"-A", string(svcXlbChain),
+				"-j", string(svcLocalChain))
+
+			externalTrafficChain = svcXlbChain
 		}
 
 		// Capture the clusterIP.
@@ -1185,14 +1212,12 @@ func (proxier *Proxier) syncProxyRules() {
 					"--dport", strconv.Itoa(svcInfo.Port()),
 				)
 
-				destChain := svcXlbChain
 				// We have to SNAT packets to external IPs if externalTrafficPolicy is cluster
 				// and the traffic is NOT Local. Local traffic coming from Pods and Nodes will
 				// be always forwarded to the corresponding Service, so no need to SNAT
 				// If we can't differentiate the local traffic we always SNAT.
 				if !svcInfo.NodeLocalExternal() {
 					appendTo := []string{"-A", string(svcChain)}
-					destChain = svcChain
 					// This masquerades off-cluster traffic to a External IP.
 					if proxier.localDetector.IsImplemented() {
 						proxier.natRules.Write(
@@ -1211,7 +1236,7 @@ func (proxier *Proxier) syncProxyRules() {
 				proxier.natRules.Write(
 					"-A", string(kubeServicesChain),
 					args,
-					"-j", string(destChain))
+					"-j", string(externalTrafficChain))
 
 			} else {
 				// No endpoints.
@@ -1256,23 +1281,20 @@ func (proxier *Proxier) syncProxyRules() {
 					"-m", "comment", "--comment", fmt.Sprintf(`"%s loadbalancer IP"`, svcNameString),
 				)
 
-				// Each source match rule in the FW chain may jump to either the SVC or the XLB chain
-				chosenChain := svcXlbChain
 				// If we are proxying globally, we need to masquerade in case we cross nodes.
 				// If we are proxying only locally, we can retain the source IP.
 				if !svcInfo.NodeLocalExternal() {
 					proxier.natRules.Write(args, "-j", string(KubeMarkMasqChain))
-					chosenChain = svcChain
 				}
 
 				if len(svcInfo.LoadBalancerSourceRanges()) == 0 {
 					// allow all sources, so jump directly to the KUBE-SVC or KUBE-XLB chain
-					proxier.natRules.Write(args, "-j", string(chosenChain))
+					proxier.natRules.Write(args, "-j", string(externalTrafficChain))
 				} else {
 					// firewall filter based on each source range
 					allowFromNode := false
 					for _, src := range svcInfo.LoadBalancerSourceRanges() {
-						proxier.natRules.Write(args, "-s", src, "-j", string(chosenChain))
+						proxier.natRules.Write(args, "-s", src, "-j", string(externalTrafficChain))
 						_, cidr, err := netutils.ParseCIDRSloppy(src)
 						if err != nil {
 							klog.ErrorS(err, "Error parsing CIDR in LoadBalancerSourceRanges, dropping it", "cidr", cidr)
@@ -1287,7 +1309,7 @@ func (proxier *Proxier) syncProxyRules() {
 						proxier.natRules.Write(
 							args,
 							"-s", ingress,
-							"-j", string(chosenChain))
+							"-j", string(externalTrafficChain))
 					}
 				}
 
@@ -1324,11 +1346,6 @@ func (proxier *Proxier) syncProxyRules() {
 						"-A", string(svcChain),
 						args,
 						"-j", string(KubeMarkMasqChain))
-					// Jump to the service chain.
-					proxier.natRules.Write(
-						"-A", string(kubeNodePortsChain),
-						args,
-						"-j", string(svcChain))
 				} else {
 					// TODO: Make all nodePorts jump to the firewall chain.
 					// Currently we only create it for loadbalancers (#33586).
@@ -1338,16 +1355,16 @@ func (proxier *Proxier) syncProxyRules() {
 					if isIPv6 {
 						loopback = "::1/128"
 					}
-					appendTo := []string{"-A", string(kubeNodePortsChain)}
 					proxier.natRules.Write(
-						appendTo,
+						"-A", string(kubeNodePortsChain),
 						args,
 						"-s", loopback, "-j", string(KubeMarkMasqChain))
-					proxier.natRules.Write(
-						appendTo,
-						args,
-						"-j", string(svcXlbChain))
 				}
+				// Jump to the service chain.
+				proxier.natRules.Write(
+					"-A", string(kubeNodePortsChain),
+					args,
+					"-j", string(externalTrafficChain))
 			} else {
 				// No endpoints.
 				proxier.filterRules.Write(
@@ -1390,7 +1407,7 @@ func (proxier *Proxier) syncProxyRules() {
 		if numLocalEndpoints == 0 {
 			// Blackhole all traffic since there are no local endpoints
 			args = append(args[:0],
-				"-A", string(svcXlbChain),
+				"-A", string(svcLocalChain),
 				"-m", "comment", "--comment",
 				fmt.Sprintf(`"%s has no local endpoints"`, svcNameString),
 				"-j",
@@ -1398,8 +1415,8 @@ func (proxier *Proxier) syncProxyRules() {
 			)
 			proxier.natRules.Write(args)
 		} else {
-			// Write rules jumping from svcXlbChain to localEndpointChains
-			proxier.writeServiceToEndpointRules(svcNameString, svcInfo, svcXlbChain, localEndpointChains, args)
+			// Write rules jumping from svcLocalChain to localEndpointChains
+			proxier.writeServiceToEndpointRules(svcNameString, svcInfo, svcLocalChain, localEndpointChains, args)
 		}
 	}
 
