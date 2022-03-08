@@ -194,6 +194,7 @@ type volumeToMount struct {
 	desiredSizeLimit *resource.Quantity
 
 	// persistentVolumeSize records desired size of a persistent volume.
+	// Usually this value reflects size recorded in pv.Spec.Capacity
 	persistentVolumeSize *resource.Quantity
 }
 
