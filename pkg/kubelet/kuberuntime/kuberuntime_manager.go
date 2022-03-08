@@ -195,6 +195,8 @@ func NewKubeGenericRuntimeManager(
 	getNodeAllocatable func() v1.ResourceList,
 	memoryThrottlingFactor float64,
 ) (KubeGenericRuntime, error) {
+	runtimeService = newInstrumentedRuntimeService(runtimeService)
+	imageService = newInstrumentedImageManagerService(imageService)
 	kubeRuntimeManager := &kubeGenericRuntimeManager{
 		recorder:               recorder,
 		cpuCFSQuota:            cpuCFSQuota,
@@ -206,8 +208,8 @@ func NewKubeGenericRuntimeManager(
 		machineInfo:            machineInfo,
 		osInterface:            osInterface,
 		runtimeHelper:          runtimeHelper,
-		runtimeService:         newInstrumentedRuntimeService(runtimeService),
-		imageService:           newInstrumentedImageManagerService(imageService),
+		runtimeService:         runtimeService,
+		imageService:           imageService,
 		internalLifecycle:      internalLifecycle,
 		logManager:             logManager,
 		runtimeClassManager:    runtimeClassManager,
