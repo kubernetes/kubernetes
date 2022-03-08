@@ -10,6 +10,7 @@ go_library(
     srcs = [
         "checked.go",
         "enum.go",
+        "equal.go",
         "file.go",
         "pb.go",
         "type.go",
@@ -17,6 +18,7 @@ go_library(
     importpath = "github.com/google/cel-go/common/types/pb",
     deps = [
         "@org_golang_google_genproto//googleapis/api/expr/v1alpha1:go_default_library",
+        "@org_golang_google_protobuf//encoding/protowire:go_default_library",
         "@org_golang_google_protobuf//proto:go_default_library",
         "@org_golang_google_protobuf//reflect/protoreflect:go_default_library",
         "@org_golang_google_protobuf//reflect/protoregistry:go_default_library",
@@ -34,6 +36,7 @@ go_test(
     name = "go_default_test",
     size = "small",
     srcs = [
+        "equal_test.go",
         "file_test.go",
         "pb_test.go",
         "type_test.go",

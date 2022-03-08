@@ -241,6 +241,20 @@ func (p *parserHelper) buildMacroCallArg(expr *exprpb.Expr) *exprpb.Expr {
 				},
 			},
 		}
+	case *exprpb.Expr_ListExpr:
+		listExpr := expr.GetListExpr()
+		macroListArgs := make([]*exprpb.Expr, len(listExpr.GetElements()))
+		for i, elem := range listExpr.GetElements() {
+			macroListArgs[i] = p.buildMacroCallArg(elem)
+		}
+		return &exprpb.Expr{
+			Id: expr.GetId(),
+			ExprKind: &exprpb.Expr_ListExpr{
+				ListExpr: &exprpb.Expr_CreateList{
+					Elements: macroListArgs,
+				},
+			},
+		}
 	}
 
 	return expr
@@ -253,6 +267,8 @@ func (p *parserHelper) addMacroCall(exprID int64, function string, target *exprp
 	if target != nil {
 		if _, found := p.macroCalls[target.GetId()]; found {
 			macroTarget = &exprpb.Expr{Id: target.GetId()}
+		} else {
+			macroTarget = p.buildMacroCallArg(target)
 		}
 	}
 

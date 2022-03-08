@@ -77,6 +77,92 @@ func TestValidationExpressions(t *testing.T) {
 				"self.val7 == 1.0",
 			},
 		},
+		{name: "numeric comparisons",
+			obj: objs(
+				int64(5),      // val1, integer type, integer value
+				int64(10),     // val2, integer type, integer value
+				int64(15),     // val3, integer type, integer value
+				float64(10.0), // val4, number type, parsed from decimal literal
+				float64(10.0), // val5, float type, parsed from decimal literal
+				float64(10.0), // val6, double type, parsed from decimal literal
+				int64(10),     // val7, number type, parsed from integer literal
+				int64(10),     // val8, float type, parsed from integer literal
+				int64(10),     // val9, double type, parsed from integer literal
+			),
+			schema: schemas(integerType, integerType, integerType, numberType, floatType, doubleType, numberType, floatType, doubleType),
+			valid: []string{
+				// xref: https://github.com/google/cel-spec/wiki/proposal-210
+
+				// compare integers with all float types
+				"double(self.val1) < self.val4",
+				"double(self.val1) <= self.val4",
+				"double(self.val2) <= self.val4",
+				"double(self.val2) == self.val4",
+				"double(self.val2) >= self.val4",
+				"double(self.val3) > self.val4",
+				"double(self.val3) >= self.val4",
+
+				"self.val1 < int(self.val4)",
+				"self.val2 == int(self.val4)",
+				"self.val3 > int(self.val4)",
+
+				"double(self.val1) < self.val5",
+				"double(self.val2) == self.val5",
+				"double(self.val3) > self.val5",
+
+				"self.val1 < int(self.val5)",
+				"self.val2 == int(self.val5)",
+				"self.val3 > int(self.val5)",
+
+				"double(self.val1) < self.val6",
+				"double(self.val2) == self.val6",
+				"double(self.val3) > self.val6",
+
+				"self.val1 < int(self.val6)",
+				"self.val2 == int(self.val6)",
+				"self.val3 > int(self.val6)",
+
+				// Also compare with float types backed by integer values,
+				// which is how integer literals are parsed from JSON for custom resources.
+				"double(self.val1) < self.val7",
+				"double(self.val2) == self.val7",
+				"double(self.val3) > self.val7",
+
+				"self.val1 < int(self.val7)",
+				"self.val2 == int(self.val7)",
+				"self.val3 > int(self.val7)",
+
+				"double(self.val1) < self.val8",
+				"double(self.val2) == self.val8",
+				"double(self.val3) > self.val8",
+
+				"self.val1 < int(self.val8)",
+				"self.val2 == int(self.val8)",
+				"self.val3 > int(self.val8)",
+
+				"double(self.val1) < self.val9",
+				"double(self.val2) == self.val9",
+				"double(self.val3) > self.val9",
+
+				"self.val1 < int(self.val9)",
+				"self.val2 == int(self.val9)",
+				"self.val3 > int(self.val9)",
+
+				// compare literal integers and floats
+				"double(5) < 10.0",
+				"double(10) == 10.0",
+				"double(15) > 10.0",
+
+				"5 < int(10.0)",
+				"10 == int(10.0)",
+				"15 > int(10.0)",
+
+				// compare integers with literal floats
+				"double(self.val1) < 10.0",
+				"double(self.val2) == 10.0",
+				"double(self.val3) > 10.0",
+			},
+		},
 		{name: "unicode strings",
 			obj:    objs("Rook takes 👑", "Rook takes 👑"),
 			schema: schemas(stringType, stringType),
@@ -698,17 +784,21 @@ func TestValidationExpressions(t *testing.T) {
 				"something": intOrStringType(),
 			}),
 			valid: []string{
-				// typical int-or-string usage would be to check both types
-				"type(self.something) == int ? self.something == 1 : self.something == '25%'",
-				// to require the value be a particular type, guard it with a runtime type check
+				// In Kubernetes 1.24 and later, the CEL type returns false for an int-or-string comparison against the
+				// other type, making it safe to write validation rules like:
+				"self.something == '25%'",
+				"self.something != 1",
+				"self.something == 1 || self.something == '25%'",
+				"self.something == '25%' || self.something == 1",
+
+				// In Kubernetes 1.23 and earlier, all int-or-string access must be guarded by a type check to prevent
+				// a runtime error attempting an equality check between string and int types.
 				"type(self.something) == string && self.something == '25%'",
-			},
-			errors: map[string]string{
-				// because the type is dynamic type checking fails a runtime even for unrelated types
-				"self.something == ['anything']": "no such overload",
-				// type checking fails a runtime if the value is an int and the expression assumes it is a string
-				// without a type check guard
-				"self.something == 1": "no such overload",
+				"type(self.something) == int ? self.something == 1 : self.something == '25%'",
+
+				// Because the type is dynamic it receives no type checking, and evaluates to false when compared to
+				// other types at runtime.
+				"self.something != ['anything']",
 			},
 		},
 		{name: "int in intOrString",
@@ -719,17 +809,21 @@ func TestValidationExpressions(t *testing.T) {
 				"something": intOrStringType(),
 			}),
 			valid: []string{
-				// typical int-or-string usage would be to check both types
-				"type(self.something) == int ? self.something == 1 : self.something == '25%'",
-				// to require the value be a particular type, guard it with a runtime type check
+				// In Kubernetes 1.24 and later, the CEL type returns false for an int-or-string comparison against the
+				// other type, making it safe to write validation rules like:
+				"self.something == 1",
+				"self.something != 'some string'",
+				"self.something == 1 || self.something == '25%'",
+				"self.something == '25%' || self.something == 1",
+
+				// In Kubernetes 1.23 and earlier, all int-or-string access must be guarded by a type check to prevent
+				// a runtime error attempting an equality check between string and int types.
 				"type(self.something) == int && self.something == 1",
-			},
-			errors: map[string]string{
-				// because the type is dynamic type checking fails a runtime even for unrelated types
-				"self.something == ['anything']": "no such overload",
-				// type checking fails a runtime if the value is an int and the expression assumes it is a string
-				// without a type check guard
-				"self.something == 'anything'": "no such overload",
+				"type(self.something) == int ? self.something == 1 : self.something == '25%'",
+
+				// Because the type is dynamic it receives no type checking, and evaluates to false when compared to
+				// other types at runtime.
+				"self.something != ['anything']",
 			},
 		},
 		{name: "null in intOrString",

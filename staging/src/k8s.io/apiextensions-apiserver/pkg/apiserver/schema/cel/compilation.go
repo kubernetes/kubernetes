@@ -67,7 +67,9 @@ func Compile(s *schema.Structural, isResourceRoot bool) ([]CompilationResult, er
 	var propDecls []*expr.Decl
 	var root *celmodel.DeclType
 	var ok bool
-	env, err := cel.NewEnv()
+	env, err := cel.NewEnv(
+		cel.HomogeneousAggregateLiterals(),
+	)
 	if err != nil {
 		return nil, err
 	}
