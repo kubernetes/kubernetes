@@ -19,9 +19,11 @@ package util
 import (
 	"context"
 	"fmt"
-	"github.com/google/go-cmp/cmp"
+	"strconv"
 	"testing"
 	"time"
+
+	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -123,45 +125,50 @@ func TestMoreImportantPod(t *testing.T) {
 }
 
 func TestRemoveNominatedNodeName(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name                     string
-		currentNominatedNodeName string
+		currentNominatedNodeName []string
 		newNominatedNodeName     string
 		expectedPatchRequests    int
 		expectedPatchData        string
 	}{
 		{
-			name:                     "Should make patch request to clear node name",
-			currentNominatedNodeName: "node1",
-			expectedPatchRequests:    1,
+			name:                     "Should make patch requests to clear node name",
+			currentNominatedNodeName: []string{"node1", "node2"},
+			expectedPatchRequests:    2,
 			expectedPatchData:        `{"status":{"nominatedNodeName":null}}`,
 		},
 		{
 			name:                     "Should not make patch request if nominated node is already cleared",
-			currentNominatedNodeName: "",
+			currentNominatedNodeName: []string{""},
 			expectedPatchRequests:    0,
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			actualPatchRequests := 0
-			var actualPatchData string
+			var actualPatchData []string
 			cs := &clientsetfake.Clientset{}
 			cs.AddReactor("patch", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
 				actualPatchRequests++
 				patch := action.(clienttesting.PatchAction)
-				actualPatchData = string(patch.GetPatch())
+				actualPatchData = append(actualPatchData, string(patch.GetPatch()))
 				// For this test, we don't care about the result of the patched pod, just that we got the expected
 				// patch request, so just returning &v1.Pod{} here is OK because scheduler doesn't use the response.
 				return true, &v1.Pod{}, nil
 			})
 
-			pod := &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Status:     v1.PodStatus{NominatedNodeName: test.currentNominatedNodeName},
+			var pods []*v1.Pod
+			for i, n := range test.currentNominatedNodeName {
+				p := &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "foo" + strconv.Itoa(i)},
+					Status:     v1.PodStatus{NominatedNodeName: n},
+				}
+				pods = append(pods, p)
 			}
 
-			if err := ClearNominatedNodeName(cs, pod); err != nil {
+			if err := ClearNominatedNodeName(cs, pods...); err != nil {
 				t.Fatalf("Error calling removeNominatedNodeName: %v", err)
 			}
 
@@ -169,8 +176,10 @@ func TestRemoveNominatedNodeName(t *testing.T) {
 				t.Fatalf("Actual patch requests (%d) dos not equal expected patch requests (%d)", actualPatchRequests, test.expectedPatchRequests)
 			}
 
-			if test.expectedPatchRequests > 0 && actualPatchData != test.expectedPatchData {
-				t.Fatalf("Patch data mismatch: Actual was %v, but expected %v", actualPatchData, test.expectedPatchData)
+			for _, d := range actualPatchData {
+				if test.expectedPatchRequests > 0 && d != test.expectedPatchData {
+					t.Fatalf("Patch data mismatch: Actual was %v, but expected %v", d, test.expectedPatchData)
+				}
 			}
 		})
 	}
@@ -227,7 +236,6 @@ func TestPatchPodStatus(t *testing.T) {
 			},
 		},
 	}
-
 	client := clientsetfake.NewSimpleClientset()
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
