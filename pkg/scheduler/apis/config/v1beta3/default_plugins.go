@@ -27,9 +27,24 @@ import (
 // getDefaultPlugins returns the default set of plugins.
 func getDefaultPlugins() *v1beta3.Plugins {
 	plugins := &v1beta3.Plugins{
-		MultiPoint: v1beta3.PluginSet{
+		QueueSort: v1beta3.PluginSet{
 			Enabled: []v1beta3.Plugin{
 				{Name: names.PrioritySort},
+			},
+		},
+		PreFilter: v1beta3.PluginSet{
+			Enabled: []v1beta3.Plugin{
+				{Name: names.NodeAffinity, Weight: pointer.Int32(2)},
+				{Name: names.NodePorts},
+				{Name: names.NodeResourcesFit, Weight: pointer.Int32(1)},
+				{Name: names.VolumeRestrictions},
+				{Name: names.VolumeBinding},
+				{Name: names.PodTopologySpread},
+				{Name: names.InterPodAffinity},
+			},
+		},
+		Filter: v1beta3.PluginSet{
+			Enabled: []v1beta3.Plugin{
 				{Name: names.NodeUnschedulable},
 				{Name: names.NodeName},
 				{Name: names.TaintToleration, Weight: pointer.Int32(3)},
@@ -43,16 +58,66 @@ func getDefaultPlugins() *v1beta3.Plugins {
 				{Name: names.AzureDiskLimits},
 				{Name: names.VolumeBinding},
 				{Name: names.VolumeZone},
-				{Name: names.PodTopologySpread, Weight: pointer.Int32(2)},
-				{Name: names.InterPodAffinity, Weight: pointer.Int32(2)},
+				{Name: names.PodTopologySpread},
+				{Name: names.InterPodAffinity},
+			},
+		},
+		PostFilter: v1beta3.PluginSet{
+			Enabled: []v1beta3.Plugin{
 				{Name: names.DefaultPreemption},
-				{Name: names.NodeResourcesBalancedAllocation, Weight: pointer.Int32(1)},
-				{Name: names.ImageLocality, Weight: pointer.Int32(1)},
+			},
+		},
+		PreScore: v1beta3.PluginSet{
+			Enabled: []v1beta3.Plugin{
+				{Name: names.TaintToleration, Weight: pointer.Int32(3)},
+				{Name: names.NodeAffinity, Weight: pointer.Int32(2)},
+				{Name: names.PodTopologySpread},
+				{Name: names.InterPodAffinity},
+			},
+		},
+		Score: v1beta3.PluginSet{
+			Enabled: []v1beta3.Plugin{
+				// Weight is tripled because:
+				// - This is a score coming from user preference.
+				// - Usage of node tainting to group nodes in the cluster is increasing becoming a use-case
+				// for many user workloads
+				{Name: names.TaintToleration, Weight: pointer.Int32Ptr(3)},
+				// Weight is doubled because:
+				// - This is a score coming from user preference.
+				{Name: names.NodeAffinity, Weight: pointer.Int32Ptr(2)},
+				{Name: names.NodeResourcesFit, Weight: pointer.Int32Ptr(1)},
+				// Weight is tripled because:
+				// - This is a score coming from user preference.
+				// - Usage of node tainting to group nodes in the cluster is increasing becoming a use-case
+				//	 for many user workloads
+				{Name: names.VolumeBinding, Weight: pointer.Int32Ptr(1)},
+				// Weight is doubled because:
+				// - This is a score coming from user preference.
+				// - It makes its signal comparable to NodeResourcesLeastAllocated.
+				{Name: names.PodTopologySpread, Weight: pointer.Int32Ptr(2)},
+				// Weight is doubled because:
+				// - This is a score coming from user preference.
+				{Name: names.InterPodAffinity, Weight: pointer.Int32Ptr(2)},
+				{Name: names.NodeResourcesBalancedAllocation, Weight: pointer.Int32Ptr(1)},
+				{Name: names.ImageLocality, Weight: pointer.Int32Ptr(1)},
+			},
+		},
+		Reserve: v1beta3.PluginSet{
+			Enabled: []v1beta3.Plugin{
+				{Name: names.VolumeBinding},
+			},
+		},
+		PreBind: v1beta3.PluginSet{
+			Enabled: []v1beta3.Plugin{
+				{Name: names.VolumeBinding},
+			},
+		},
+		Bind: v1beta3.PluginSet{
+			Enabled: []v1beta3.Plugin{
 				{Name: names.DefaultBinder},
 			},
 		},
 	}
-
 	return plugins
 }
 

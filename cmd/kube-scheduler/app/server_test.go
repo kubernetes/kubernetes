@@ -91,31 +91,30 @@ clientConnection:
   kubeconfig: "%s"
 profiles:
 - plugins:
-    multiPoint:
+    preFilter:
       enabled:
-      - name: DefaultBinder
-      - name: PrioritySort
-      - name: DefaultPreemption
-      - name: VolumeBinding
       - name: NodeResourcesFit
       - name: NodePorts
+      disabled:
+      - name: "*"
+    filter:
+      enabled:
+      - name: NodeResourcesFit
+      - name: NodePorts
+      disabled:
+      - name: "*"
+    preScore:
+      enabled:
       - name: InterPodAffinity
       - name: TaintToleration
       disabled:
       - name: "*"
-    preFilter:
-      disabled:
-      - name: VolumeBinding
-      - name: InterPodAffinity
-    filter:
-      disabled:
-      - name: VolumeBinding
+    score:
+      enabled:
       - name: InterPodAffinity
       - name: TaintToleration
-    score:
       disabled:
-      - name: VolumeBinding
-      - name: NodeResourcesFit
+      - name: "*"
 `, configKubeconfig)), os.FileMode(0600)); err != nil {
 		t.Fatal(err)
 	}
