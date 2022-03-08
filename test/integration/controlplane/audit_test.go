@@ -40,7 +40,6 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/mutating"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	auditv1 "k8s.io/apiserver/pkg/apis/audit/v1"
-	auditv1beta1 "k8s.io/apiserver/pkg/apis/audit/v1beta1"
 	"k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
@@ -108,8 +107,7 @@ rules:
 	patch, _                           = json.Marshal(jsonpatch.Patch{})
 	auditTestUser                      = "system:apiserver"
 	versions                           = map[string]schema.GroupVersion{
-		"audit.k8s.io/v1":      auditv1.SchemeGroupVersion,
-		"audit.k8s.io/v1beta1": auditv1beta1.SchemeGroupVersion,
+		"audit.k8s.io/v1": auditv1.SchemeGroupVersion,
 	}
 
 	expectedEvents = []utils.AuditEvent{

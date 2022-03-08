@@ -90,19 +90,17 @@ var expectedPolicy = &audit.Policy{
 }
 
 func TestParser(t *testing.T) {
-	for _, version := range []string{"v1", "v1alpha1", "v1beta1"} {
-		policyDef := strings.Replace(policyDefPattern, "{version}", version, 1)
-		f, err := writePolicy(t, policyDef)
-		require.NoError(t, err)
-		defer os.Remove(f)
+	policyDef := strings.Replace(policyDefPattern, "{version}", "v1", 1)
+	f, err := writePolicy(t, policyDef)
+	require.NoError(t, err)
+	defer os.Remove(f)
 
-		policy, err := LoadPolicyFromFile(f)
-		require.NoError(t, err)
+	policy, err := LoadPolicyFromFile(f)
+	require.NoError(t, err)
 
-		assert.Len(t, policy.Rules, 3) // Sanity check.
-		if !reflect.DeepEqual(policy, expectedPolicy) {
-			t.Errorf("Unexpected policy! Diff:\n%s", diff.ObjectDiff(policy, expectedPolicy))
-		}
+	assert.Len(t, policy.Rules, 3) // Sanity check.
+	if !reflect.DeepEqual(policy, expectedPolicy) {
+		t.Errorf("Unexpected policy! Diff:\n%s", diff.ObjectDiff(policy, expectedPolicy))
 	}
 }
 
