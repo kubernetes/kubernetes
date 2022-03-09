@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/kubectl/pkg/util/podutils"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -118,6 +119,11 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeAlphaFeature:GracefulNod
 				framework.ExpectEqual(len(list.Items), len(pods), "the number of pods is not as expected")
 
 				for _, pod := range list.Items {
+					if isPodStatusAffectedByIssue108594(&pod) {
+						framework.Logf("Detected invalid pod state for pod %q: pod status: %+v", pod.Name, pod.Status)
+						framework.Failf("failing test due to detecting invalid pod status")
+					}
+
 					if kubelettypes.IsCriticalPod(&pod) {
 						if pod.Status.Phase != v1.PodRunning {
 							framework.Logf("Expecting critcal pod to be running, but it's not currently. Pod: %q, Pod Status Phase: %q, Pod Status Reason: %q", pod.Name, pod.Status.Phase, pod.Status.Reason)
@@ -145,10 +151,15 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeAlphaFeature:GracefulNod
 				framework.ExpectEqual(len(list.Items), len(pods), "the number of pods is not as expected")
 
 				for _, pod := range list.Items {
+					if isPodStatusAffectedByIssue108594(&pod) {
+						framework.Logf("Detected invalid pod state for pod %q: pod status: %+v", pod.Name, pod.Status)
+						framework.Failf("failing test due to detecting invalid pod status")
+					}
 					if pod.Status.Phase != v1.PodFailed || pod.Status.Reason != "Shutdown" {
 						framework.Logf("Expecting pod to be shutdown, but it's not currently: Pod: %q, Pod Status Phase: %q, Pod Status Reason: %q", pod.Name, pod.Status.Phase, pod.Status.Reason)
 						return fmt.Errorf("pod should be shutdown, phase: %s", pod.Status.Phase)
 					}
+
 				}
 				return nil
 			},
@@ -308,4 +319,9 @@ func restoreDbusConfig() error {
 		return err
 	}
 	return systemctlDaemonReload()
+}
+
+// Pods should never report failed phase and have ready condition = true (https://github.com/kubernetes/kubernetes/issues/108594)
+func isPodStatusAffectedByIssue108594(pod *v1.Pod) bool {
+	return pod.Status.Phase == v1.PodFailed && podutils.IsPodReady(pod)
 }
