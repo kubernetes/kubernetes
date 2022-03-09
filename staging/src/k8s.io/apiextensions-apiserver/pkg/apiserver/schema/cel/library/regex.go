@@ -23,6 +23,7 @@ import (
 	"github.com/google/cel-go/checker/decls"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
+	"github.com/google/cel-go/interpreter"
 	"github.com/google/cel-go/interpreter/functions"
 	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )
@@ -155,4 +156,62 @@ func findAll(args ...ref.Val) ref.Val {
 	result := re.FindAllString(str, int(n))
 
 	return types.NewStringList(types.DefaultTypeAdapter, result)
+}
+
+// FindRegexOptimization optimizes the 'find' function by compiling the regex pattern and
+// reporting any compilation errors at program creation time, and using the compiled regex pattern for all function
+// call invocations.
+var FindRegexOptimization = &interpreter.RegexOptimization{
+	Function:   "find",
+	RegexIndex: 1,
+	Factory: func(call interpreter.InterpretableCall, regexPattern string) (interpreter.InterpretableCall, error) {
+		compiledRegex, err := regexp.Compile(regexPattern)
+		if err != nil {
+			return nil, err
+		}
+		return interpreter.NewCall(call.ID(), call.Function(), call.OverloadID(), call.Args(), func(args ...ref.Val) ref.Val {
+			if len(args) != 2 {
+				return types.NoSuchOverloadErr()
+			}
+			in, ok := args[0].Value().(string)
+			if !ok {
+				return types.MaybeNoSuchOverloadErr(args[0])
+			}
+			return types.String(compiledRegex.FindString(in))
+		}), nil
+	},
+}
+
+// FindAllRegexOptimization optimizes the 'findAll' function by compiling the regex pattern and
+// reporting any compilation errors at program creation time, and using the compiled regex pattern for all function
+// call invocations.
+var FindAllRegexOptimization = &interpreter.RegexOptimization{
+	Function:   "findAll",
+	RegexIndex: 1,
+	Factory: func(call interpreter.InterpretableCall, regexPattern string) (interpreter.InterpretableCall, error) {
+		compiledRegex, err := regexp.Compile(regexPattern)
+		if err != nil {
+			return nil, err
+		}
+		return interpreter.NewCall(call.ID(), call.Function(), call.OverloadID(), call.Args(), func(args ...ref.Val) ref.Val {
+			argn := len(args)
+			if argn < 2 || argn > 3 {
+				return types.NoSuchOverloadErr()
+			}
+			str, ok := args[0].Value().(string)
+			if !ok {
+				return types.MaybeNoSuchOverloadErr(args[0])
+			}
+			n := int64(-1)
+			if argn == 3 {
+				n, ok = args[2].Value().(int64)
+				if !ok {
+					return types.MaybeNoSuchOverloadErr(args[2])
+				}
+			}
+
+			result := compiledRegex.FindAllString(str, int(n))
+			return types.NewStringList(types.DefaultTypeAdapter, result)
+		}), nil
+	},
 }
