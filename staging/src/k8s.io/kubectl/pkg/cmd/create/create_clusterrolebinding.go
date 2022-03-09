@@ -59,9 +59,10 @@ type ClusterRoleBindingOptions struct {
 	FieldManager     string
 	CreateAnnotation bool
 
-	Client         rbacclientv1.RbacV1Interface
-	DryRunStrategy cmdutil.DryRunStrategy
-	DryRunVerifier *resource.QueryParamVerifier
+	Client              rbacclientv1.RbacV1Interface
+	DryRunStrategy      cmdutil.DryRunStrategy
+	DryRunVerifier      *resource.QueryParamVerifier
+	ValidationDirective string
 
 	genericclioptions.IOStreams
 }
@@ -149,6 +150,10 @@ func (o *ClusterRoleBindingOptions) Complete(f cmdutil.Factory, cmd *cobra.Comma
 	o.PrintObj = func(obj runtime.Object) error {
 		return printer.PrintObj(obj, o.Out)
 	}
+	o.ValidationDirective, err = cmdutil.GetValidationDirective(cmd)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -169,6 +174,7 @@ func (o *ClusterRoleBindingOptions) Run() error {
 		if o.FieldManager != "" {
 			createOptions.FieldManager = o.FieldManager
 		}
+		createOptions.FieldValidation = o.ValidationDirective
 		if o.DryRunStrategy == cmdutil.DryRunServer {
 			if err := o.DryRunVerifier.HasSupport(clusterRoleBinding.GroupVersionKind()); err != nil {
 				return err

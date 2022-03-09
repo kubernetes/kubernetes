@@ -66,9 +66,10 @@ type QuotaOpts struct {
 	Namespace        string
 	EnforceNamespace bool
 
-	Client         *coreclient.CoreV1Client
-	DryRunStrategy cmdutil.DryRunStrategy
-	DryRunVerifier *resourcecli.QueryParamVerifier
+	Client              *coreclient.CoreV1Client
+	DryRunStrategy      cmdutil.DryRunStrategy
+	DryRunVerifier      *resourcecli.QueryParamVerifier
+	ValidationDirective string
 
 	genericclioptions.IOStreams
 }
@@ -155,6 +156,11 @@ func (o *QuotaOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []strin
 		return printer.PrintObj(obj, o.Out)
 	}
 
+	o.ValidationDirective, err = cmdutil.GetValidationDirective(cmd)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -182,6 +188,7 @@ func (o *QuotaOpts) Run() error {
 		if o.FieldManager != "" {
 			createOptions.FieldManager = o.FieldManager
 		}
+		createOptions.FieldValidation = o.ValidationDirective
 		if o.DryRunStrategy == cmdutil.DryRunServer {
 			if err := o.DryRunVerifier.HasSupport(resourceQuota.GroupVersionKind()); err != nil {
 				return err

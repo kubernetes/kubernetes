@@ -62,6 +62,11 @@ type QueryParamVerifier struct {
 	queryParam    VerifiableQueryParam
 }
 
+// Verifier is the generic verifier interface used for testing QueryParamVerifier
+type Verifier interface {
+	HasSupport(gvk schema.GroupVersionKind) error
+}
+
 // VerifiableQueryParam is a query parameter who's enablement on the
 // apiserver can be determined by evaluating the OpenAPI for a specific
 // GVK.
@@ -72,6 +77,7 @@ const (
 	QueryParamFieldValidation VerifiableQueryParam = "fieldValidation"
 )
 
+// HasSupport checks if the given gvk supports the query param configured on v
 func (v *QueryParamVerifier) HasSupport(gvk schema.GroupVersionKind) error {
 	oapi, err := v.openAPIGetter.OpenAPISchema()
 	if err != nil {
@@ -90,7 +96,7 @@ func (v *QueryParamVerifier) HasSupport(gvk schema.GroupVersionKind) error {
 		}
 	}
 	if !supports {
-		return newParamUnsupportedError(gvk, v.queryParam)
+		return NewParamUnsupportedError(gvk, v.queryParam)
 	}
 	return nil
 }
@@ -100,7 +106,7 @@ type paramUnsupportedError struct {
 	param VerifiableQueryParam
 }
 
-func newParamUnsupportedError(gvk schema.GroupVersionKind, param VerifiableQueryParam) error {
+func NewParamUnsupportedError(gvk schema.GroupVersionKind, param VerifiableQueryParam) error {
 	return &paramUnsupportedError{
 		gvk:   gvk,
 		param: param,

@@ -70,9 +70,10 @@ type PodDisruptionBudgetOpts struct {
 	Namespace        string
 	EnforceNamespace bool
 
-	Client         *policyv1client.PolicyV1Client
-	DryRunStrategy cmdutil.DryRunStrategy
-	DryRunVerifier *resourcecli.QueryParamVerifier
+	Client              *policyv1client.PolicyV1Client
+	DryRunStrategy      cmdutil.DryRunStrategy
+	DryRunVerifier      *resourcecli.QueryParamVerifier
+	ValidationDirective string
 
 	genericclioptions.IOStreams
 }
@@ -165,6 +166,11 @@ func (o *PodDisruptionBudgetOpts) Complete(f cmdutil.Factory, cmd *cobra.Command
 		return printer.PrintObj(obj, o.Out)
 	}
 
+	o.ValidationDirective, err = cmdutil.GetValidationDirective(cmd)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -217,6 +223,7 @@ func (o *PodDisruptionBudgetOpts) Run() error {
 		if o.FieldManager != "" {
 			createOptions.FieldManager = o.FieldManager
 		}
+		createOptions.FieldValidation = o.ValidationDirective
 		if o.DryRunStrategy == cmdutil.DryRunServer {
 			if err := o.DryRunVerifier.HasSupport(podDisruptionBudget.GroupVersionKind()); err != nil {
 				return err

@@ -77,13 +77,14 @@ type ReplaceOptions struct {
 	DeleteFlags   *delete.DeleteFlags
 	DeleteOptions *delete.DeleteOptions
 
-	DryRunStrategy cmdutil.DryRunStrategy
-	DryRunVerifier *resource.QueryParamVerifier
+	DryRunStrategy          cmdutil.DryRunStrategy
+	DryRunVerifier          *resource.QueryParamVerifier
+	FieldValidationVerifier *resource.QueryParamVerifier
+	validationDirective     string
 
 	PrintObj func(obj runtime.Object) error
 
 	createAnnotation bool
-	validate         bool
 
 	Schema      validation.Schema
 	Builder     func() *resource.Builder
@@ -151,7 +152,10 @@ func (o *ReplaceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 		return err
 	}
 
-	o.validate = cmdutil.GetFlagBool(cmd, "validate")
+	o.validationDirective, err = cmdutil.GetValidationDirective(cmd)
+	if err != nil {
+		return err
+	}
 	o.createAnnotation = cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
 
 	o.DryRunStrategy, err = cmdutil.GetDryRunStrategy(cmd)
@@ -163,6 +167,7 @@ func (o *ReplaceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 		return err
 	}
 	o.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
+	o.FieldValidationVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamFieldValidation)
 	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
 
 	printer, err := o.PrintFlags.ToPrinter()
@@ -196,7 +201,7 @@ func (o *ReplaceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 		return err
 	}
 
-	schema, err := f.Validator(o.validate)
+	schema, err := f.Validator(o.validationDirective, o.FieldValidationVerifier)
 	if err != nil {
 		return err
 	}
@@ -306,6 +311,7 @@ func (o *ReplaceOptions) Run(f cmdutil.Factory) error {
 			NewHelper(info.Client, info.Mapping).
 			DryRun(o.DryRunStrategy == cmdutil.DryRunServer).
 			WithFieldManager(o.fieldManager).
+			WithFieldValidation(o.validationDirective).
 			WithSubresource(o.Subresource).
 			Replace(info.Namespace, info.Name, true, info.Object)
 		if err != nil {
@@ -409,6 +415,7 @@ func (o *ReplaceOptions) forceReplace() error {
 
 		obj, err := resource.NewHelper(info.Client, info.Mapping).
 			WithFieldManager(o.fieldManager).
+			WithFieldValidation(o.validationDirective).
 			Create(info.Namespace, true, info.Object)
 		if err != nil {
 			return err

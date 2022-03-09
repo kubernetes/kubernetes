@@ -213,6 +213,7 @@ func (c *CreateClusterRoleOptions) RunCreateRole() error {
 		if c.FieldManager != "" {
 			createOptions.FieldManager = c.FieldManager
 		}
+		createOptions.FieldValidation = c.ValidationDirective
 		if c.DryRunStrategy == cmdutil.DryRunServer {
 			if err := c.DryRunVerifier.HasSupport(clusterRole.GroupVersionKind()); err != nil {
 				return err

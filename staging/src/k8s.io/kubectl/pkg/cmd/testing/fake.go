@@ -499,7 +499,7 @@ func (f *TestFactory) UnstructuredClientForMapping(mapping *meta.RESTMapping) (r
 }
 
 // Validator returns a validation schema
-func (f *TestFactory) Validator(validate bool) (validation.Schema, error) {
+func (f *TestFactory) Validator(validateDirective string, verifier *resource.QueryParamVerifier) (validation.Schema, error) {
 	return validation.NullSchema{}, nil
 }
 

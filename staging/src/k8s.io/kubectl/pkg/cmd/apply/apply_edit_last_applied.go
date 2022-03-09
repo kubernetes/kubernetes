@@ -83,6 +83,7 @@ func NewCmdApplyEditLastApplied(f cmdutil.Factory, ioStreams genericclioptions.I
 	cmd.Flags().BoolVar(&o.WindowsLineEndings, "windows-line-endings", o.WindowsLineEndings,
 		"Defaults to the line ending native to your platform.")
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, FieldManagerClientSideApply)
+	cmdutil.AddValidateFlags(cmd)
 
 	return cmd
 }

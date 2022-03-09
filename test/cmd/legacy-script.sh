@@ -573,6 +573,7 @@ runTests() {
   fi
   if kube::test::if_supports_resource "${deployments}"; then
     record_command run_kubectl_create_kustomization_directory_tests
+    record_command run_kubectl_create_validate_tests
   fi
 
   ######################
