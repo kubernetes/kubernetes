@@ -473,63 +473,6 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 			detectNegAnnotation(f, jig, gceController, ns, name, 0)
 		})
 	})
-
-	// Time: borderline 5m, slow by design
-	ginkgo.Describe("[Slow] Nginx", func() {
-		var nginxController *e2eingress.NginxIngressController
-
-		ginkgo.BeforeEach(func() {
-			// Skip until nginx-ingress controller works against kubernetes 1.22+
-			// Those versions no longer server ingress v1beta1
-			// xref: https://github.com/kubernetes/ingress-nginx/issues/7145
-			e2eskipper.Skipf("Skipping because nginx-controller requires ingress/v1beta1 API")
-
-			e2eskipper.SkipUnlessProviderIs("gce", "gke")
-			ginkgo.By("Initializing nginx controller")
-			jig.Class = "nginx"
-			nginxController = &e2eingress.NginxIngressController{Ns: ns, Client: jig.Client}
-
-			// TODO: This test may fail on other platforms. We can simply skip it
-			// but we want to allow easy testing where a user might've hand
-			// configured firewalls.
-			if framework.ProviderIs("gce", "gke") {
-				framework.ExpectNoError(gce.GcloudComputeResourceCreate("firewall-rules", fmt.Sprintf("ingress-80-443-%v", ns), framework.TestContext.CloudConfig.ProjectID, "--allow", "tcp:80,tcp:443", "--network", framework.TestContext.CloudConfig.Network))
-			} else {
-				framework.Logf("WARNING: Not running on GCE/GKE, cannot create firewall rules for :80, :443. Assuming traffic can reach the external ips of all nodes in cluster on those ports.")
-			}
-
-			nginxController.Init()
-		})
-
-		ginkgo.AfterEach(func() {
-			if framework.ProviderIs("gce", "gke") {
-				framework.ExpectNoError(gce.GcloudComputeResourceDelete("firewall-rules", fmt.Sprintf("ingress-80-443-%v", ns), framework.TestContext.CloudConfig.ProjectID))
-			}
-			if ginkgo.CurrentGinkgoTestDescription().Failed {
-				e2eingress.DescribeIng(ns)
-			}
-			defer nginxController.TearDown()
-			if jig.Ingress == nil {
-				ginkgo.By("No ingress created, no cleanup necessary")
-				return
-			}
-			ginkgo.By("Deleting ingress")
-			jig.TryDeleteIngress()
-		})
-
-		ginkgo.It("should conform to Ingress spec", func() {
-			// Poll more frequently to reduce e2e completion time.
-			// This test runs in presubmit.
-			jig.PollInterval = 5 * time.Second
-			conformanceTests = e2eingress.CreateIngressComformanceTests(jig, ns, map[string]string{})
-			for _, t := range conformanceTests {
-				ginkgo.By(t.EntryLog)
-				t.Execute()
-				ginkgo.By(t.ExitLog)
-				jig.WaitForIngress(false)
-			}
-		})
-	})
 })
 
 func detectNegAnnotation(f *framework.Framework, jig *e2eingress.TestJig, gceController *gce.IngressController, ns, name string, negs int) {
