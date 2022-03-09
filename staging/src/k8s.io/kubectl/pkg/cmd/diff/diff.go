@@ -17,17 +17,21 @@ limitations under the License.
 package diff
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
 
 	"github.com/jonboulle/clockwork"
 	"github.com/spf13/cobra"
-	"k8s.io/apimachinery/pkg/api/errors"
+
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -46,7 +50,6 @@ import (
 	"k8s.io/kubectl/pkg/util/openapi"
 	"k8s.io/kubectl/pkg/util/prune"
 	"k8s.io/kubectl/pkg/util/templates"
-	"k8s.io/utils/exec"
 	"sigs.k8s.io/yaml"
 )
 
@@ -63,6 +66,12 @@ var (
 
 		By default, the "diff" command available in your path will be
 		run with the "-u" (unified diff) and "-N" (treat absent files as empty) options.
+
+		To preserve backwards compatibility, arguments with characters that don't
+		match the regex /^[a-zA-Z0-9-=]+$/ are ignored and a warning is printed.
+
+		To use other characters please use JSON array form.
+		KUBECTL_EXTERNAL_DIFF='["diff", "-I", ".*image"]'
 
 		Exit status:
 		 0
@@ -94,8 +103,8 @@ const (
 
 // diffError returns the ExitError if the status code is less than 1,
 // nil otherwise.
-func diffError(err error) exec.ExitError {
-	if err, ok := err.(exec.ExitError); ok && err.ExitStatus() <= 1 {
+func diffError(err error) *exec.ExitError {
+	if err, ok := err.(*exec.ExitError); ok && err.ExitCode() <= 1 {
 		return err
 	}
 	return nil
@@ -130,7 +139,6 @@ func validateArgs(cmd *cobra.Command, args []string) error {
 func NewDiffOptions(ioStreams genericclioptions.IOStreams) *DiffOptions {
 	return &DiffOptions{
 		Diff: &DiffProgram{
-			Exec:      exec.New(),
 			IOStreams: ioStreams,
 		},
 	}
@@ -155,7 +163,7 @@ func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 			// return 1 if there was a problem.
 			if err := options.Run(); err != nil {
 				if exitErr := diffError(err); exitErr != nil {
-					os.Exit(exitErr.ExitStatus())
+					os.Exit(exitErr.ExitCode())
 				}
 				cmdutil.CheckDiffErr(err)
 			}
@@ -185,40 +193,70 @@ func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 // KUBECTL_EXTERNAL_DIFF environment variable will be used a diff
 // program. By default, `diff(1)` will be used.
 type DiffProgram struct {
-	Exec exec.Interface
 	genericclioptions.IOStreams
 }
 
-func (d *DiffProgram) getCommand(args ...string) (string, exec.Cmd) {
+func (d *DiffProgram) getCommand(from, to string) (string, *exec.Cmd, error) {
 	diff := ""
+	args := make([]string, 0)
 	if envDiff := os.Getenv("KUBECTL_EXTERNAL_DIFF"); envDiff != "" {
-		diffCommand := strings.Split(envDiff, " ")
-		diff = diffCommand[0]
+		diffArgs := make([]string, 0)
 
-		if len(diffCommand) > 1 {
-			// Regex accepts: Alphanumeric (case-insensitive), dash and equal
-			isValidChar := regexp.MustCompile(`^[a-zA-Z0-9-=]+$`).MatchString
-			for i := 1; i < len(diffCommand); i++ {
-				if isValidChar(diffCommand[i]) {
-					args = append(args, diffCommand[i])
+		// attempt to parse args as a json array
+		if strings.HasPrefix(envDiff, "[") && strings.HasSuffix(envDiff, "]") {
+			err := json.Unmarshal([]byte(envDiff), &diffArgs)
+			if err != nil {
+				return "", nil, fmt.Errorf("unable to parse KUBECTL_EXTERNAL_DIFF as JSON: %w", err)
+			}
+			if len(diffArgs) < 1 {
+				return "", nil, errors.New("parsing KUBECTL_EXTERNAL_DIFF as JSON produced an empty array")
+			}
+			diff = diffArgs[0]
+
+			if len(diffArgs) > 1 {
+				args = diffArgs[1:]
+			}
+		} else {
+			// if we don't have json split on space and grab the first as the command
+			diffArgs = strings.Split(envDiff, " ")
+			diff = diffArgs[0]
+
+			if len(diffArgs) > 1 {
+				// Regex accepts: Alphanumeric (case-insensitive), dash and equal
+				isValidChar := regexp.MustCompile(`^[a-zA-Z0-9-=]+$`).MatchString
+				ignoredArgs := make([]string, 0)
+				for i := 1; i < len(diffArgs); i++ {
+					if isValidChar(diffArgs[i]) {
+						args = append(args, diffArgs[i])
+					} else {
+						ignoredArgs = append(ignoredArgs, diffArgs[i])
+					}
+				}
+				if len(ignoredArgs) > 0 {
+					fmt.Fprintf(d.ErrOut, "Warning: arguments with invalid characters are ignored: %q. Please use JSON array form. See kubectl diff --help\n", ignoredArgs)
 				}
 			}
 		}
 	} else {
 		diff = "diff"
-		args = append([]string{"-u", "-N"}, args...)
+		args = []string{"-u", "-N"}
 	}
 
-	cmd := d.Exec.Command(diff, args...)
-	cmd.SetStdout(d.Out)
-	cmd.SetStderr(d.ErrOut)
+	args = append(args, from, to)
 
-	return diff, cmd
+	cmd := exec.Command(diff, args...)
+	cmd.Stdout = d.Out
+	cmd.Stderr = d.ErrOut
+
+	return diff, cmd, nil
 }
 
 // Run runs the detected diff program. `from` and `to` are the directory to diff.
 func (d *DiffProgram) Run(from, to string) error {
-	diff, cmd := d.getCommand(from, to)
+	diff, cmd, err := d.getCommand(from, to)
+	if err != nil {
+		return err
+	}
 	if err := cmd.Run(); err != nil {
 		// Let's not wrap diff errors, or we won't be able to
 		// differentiate them later.
@@ -272,7 +310,7 @@ func (v *DiffVersion) getObject(obj Object) (runtime.Object, error) {
 	case "MERGED":
 		return obj.Merged()
 	}
-	return nil, fmt.Errorf("Unknown version: %v", v.Name)
+	return nil, fmt.Errorf("unknown version: %v", v.Name)
 }
 
 // Print prints the object using the printer into a new file in the directory.
@@ -604,7 +642,7 @@ func (d *Differ) TearDown() {
 }
 
 func isConflict(err error) bool {
-	return err != nil && errors.IsConflict(err)
+	return err != nil && apierrors.IsConflict(err)
 }
 
 func (o *DiffOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
@@ -698,7 +736,7 @@ func (o *DiffOptions) Run() error {
 		local := info.Object.DeepCopyObject()
 		for i := 1; i <= maxRetries; i++ {
 			if err = info.Get(); err != nil {
-				if !errors.IsNotFound(err) {
+				if !apierrors.IsNotFound(err) {
 					return err
 				}
 				info.Object = nil

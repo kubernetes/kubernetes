@@ -22,6 +22,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -30,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/utils/exec"
 )
 
 type FakeObject struct {
@@ -61,33 +61,104 @@ func (f *FakeObject) Live() runtime.Object {
 	return &unstructured.Unstructured{Object: f.live}
 }
 
-func TestDiffProgram(t *testing.T) {
-	externalDiffCommands := [3]string{"diff", "diff -ruN", "diff --report-identical-files"}
+func TestExternalDiff(t *testing.T) {
+	tests := []struct {
+		name            string
+		command         string
+		expectedArgs    []string
+		expectedError   string
+		expectedBin     string
+		expectedWarning string
+	}{
+		{
+			name:         "basic diff",
+			command:      "diff",
+			expectedBin:  "diff",
+			expectedArgs: []string{"diff"},
+		},
+		{
+			name:         "with flags",
+			command:      "diff -ruN",
+			expectedArgs: []string{"diff", "-ruN"},
+			expectedBin:  "diff",
+		},
+		{
+			name:         "long flag",
+			command:      "diff --report-identical-files",
+			expectedArgs: []string{"diff", "--report-identical-files"},
+			expectedBin:  "diff",
+		},
+		{
+			name:            "invalid warning",
+			command:         "diff -I '^ test'",
+			expectedArgs:    []string{"diff", "-I"},
+			expectedBin:     "diff",
+			expectedWarning: "JSON array form",
+		},
+		{
+			name:         "json array",
+			command:      `["diff", "-I", "^ test"]`,
+			expectedArgs: []string{"diff", "-I", "^ test"},
+			expectedBin:  "diff",
+		},
+		{
+			name:          "empty json",
+			command:       `[]`,
+			expectedError: "empty array",
+		},
+		{
+			name:          "json error",
+			command:       `["diff", "-I", ^ test]`,
+			expectedError: "unable to parse",
+		},
+		{
+			name:         "other bin",
+			command:      `myotherdiff --some-flag`,
+			expectedArgs: []string{"myotherdiff", "--some-flag"},
+			expectedBin:  "myotherdiff",
+		},
+	}
 
 	if oriLang := os.Getenv("LANG"); oriLang != "C" {
 		os.Setenv("LANG", "C")
 		defer os.Setenv("LANG", oriLang)
 	}
 
-	for i, c := range externalDiffCommands {
-		os.Setenv("KUBECTL_EXTERNAL_DIFF", c)
-		streams, _, stdout, _ := genericclioptions.NewTestIOStreams()
-		diff := DiffProgram{
-			IOStreams: streams,
-			Exec:      exec.New(),
-		}
-		err := diff.Run("/dev/zero", "/dev/zero")
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		// Testing diff --report-identical-files
-		if i == 2 {
-			output_msg := "Files /dev/zero and /dev/zero are identical\n"
-			if output := stdout.String(); output != output_msg {
-				t.Fatalf(`stdout = %q, expected = %s"`, output, output_msg)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			streams, _, _, errOut := genericclioptions.NewTestIOStreams()
+			diff := DiffProgram{
+				IOStreams: streams,
 			}
-		}
+
+			os.Setenv("KUBECTL_EXTERNAL_DIFF", tc.command)
+
+			bin, cmd, err := diff.getCommand("/dev/zero", "/dev/zero")
+			if err != nil {
+				if tc.expectedError == "" {
+					t.Fatalf("unexpected error: %v", err)
+				} else if m := err.Error(); !strings.Contains(m, tc.expectedError) {
+					t.Fatalf("expected error: %v got: %v", m, tc.expectedError)
+				}
+			}
+			if err == nil && tc.expectedError != "" {
+				t.Fatalf("expected error: %v", tc.expectedError)
+			}
+			if tc.expectedBin != bin {
+				t.Fatalf("unexpected bin: %s", bin)
+			}
+			if w := errOut.String(); !strings.Contains(w, tc.expectedWarning) {
+				t.Fatalf("expected: %q got: %q", tc.expectedWarning, w)
+			}
+			if cmd != nil {
+				cmdArgs := cmd.Args
+				// The last two args are /dev/zero
+				args := cmdArgs[:len(cmdArgs)-2]
+				if !reflect.DeepEqual(tc.expectedArgs, args) {
+					t.Fatalf("expected: %s got: %s", tc.expectedArgs, args)
+				}
+			}
+		})
 	}
 }
 
