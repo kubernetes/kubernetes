@@ -742,7 +742,7 @@ func (o *DebugOptions) waitForContainer(ctx context.Context, ns, podName, contai
 				return true, nil
 			}
 			if !o.Quiet && s.State.Waiting != nil && s.State.Waiting.Message != "" {
-				fmt.Fprintf(o.ErrOut, "Container %s: %s\n", containerName, s.State.Waiting.Message)
+				fmt.Fprintf(o.ErrOut, "Warning: container %s: %s\n", containerName, s.State.Waiting.Message)
 			}
 			return false, nil
 		})
