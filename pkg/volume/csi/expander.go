@@ -82,20 +82,6 @@ func (c *csiPlugin) nodeExpandWithClient(
 		return false, fmt.Errorf("Expander.NodeExpand found CSI plugin %s/%s to not support node expansion", c.GetPluginName(), driverName)
 	}
 
-	// Check whether "STAGE_UNSTAGE_VOLUME" is set
-	stageUnstageSet, err := csClient.NodeSupportsStageUnstage(ctx)
-	if err != nil {
-		return false, fmt.Errorf("Expander.NodeExpand failed to check if plugins supports stage_unstage %v", err)
-	}
-
-	// if plugin does not support STAGE_UNSTAGE but CSI volume path is staged
-	// it must mean this was placeholder staging performed by k8s and not CSI staging
-	// in which case we should return from here so as volume can be node published
-	// before we can resize
-	if !stageUnstageSet && resizeOptions.CSIVolumePhase == volume.CSIVolumeStaged {
-		return false, nil
-	}
-
 	pv := resizeOptions.VolumeSpec.PersistentVolume
 	if pv == nil {
 		return false, fmt.Errorf("Expander.NodeExpand failed to find associated PersistentVolume for plugin %s", c.GetPluginName())
