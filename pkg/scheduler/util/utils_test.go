@@ -300,3 +300,50 @@ func TestDeletePod(t *testing.T) {
 		})
 	}
 }
+
+func TestIsScalarResourceName(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name         string
+		resourceName v1.ResourceName
+		want         bool
+	}{
+		{
+			name:         "Should be true with extended resources name",
+			resourceName: "example.com/foo",
+			want:         true,
+		},
+		{
+			name:         "Should be false with not extended resources name",
+			resourceName: "requests.foo",
+			want:         false,
+		},
+		{
+			name:         "Should be true with hugePage resource name",
+			resourceName: "hugepages-2Mi",
+			want:         true,
+		},
+		{
+			name:         "Should be false with not HugePage resource name",
+			resourceName: "cpu",
+			want:         false,
+		},
+		{
+			name:         "Should be true with native resource name",
+			resourceName: "kubernetes.io/resource-foo",
+			want:         true,
+		},
+		{
+			name:         "Should be true with attachable volume resource name",
+			resourceName: "attachable-volumes-foo",
+			want:         true,
+		},
+	}
+	{
+		for _, test := range tests {
+			if IsScalarResourceName(test.resourceName) != test.want {
+				t.Errorf("%s: expected: %t, got: %t", test.name, test.want, !test.want)
+			}
+		}
+	}
+}
