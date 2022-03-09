@@ -196,6 +196,10 @@ func TestValidationExpressions(t *testing.T) {
 				"self.val1.upperAscii() == 'ROOK TAKES 👑'",
 				"self.val1.lowerAscii() == 'rook takes 👑'",
 			},
+			errors: map[string]string{
+				// Invalid regex with a string constant regex pattern is compile time error
+				"self.val1.matches(')')": "compile error: program instantiation failed: error parsing regexp: unexpected ): `)`",
+			},
 		},
 		{name: "escaped strings",
 			obj:    objs("l1\nl2", "l1\nl2"),
@@ -1637,6 +1641,12 @@ func TestValidationExpressions(t *testing.T) {
 				"self.str.findAll('xyz') == []",
 				"self.str.findAll('xyz', 1) == []",
 			},
+			errors: map[string]string{
+				// Invalid regex with a string constant regex pattern is compile time error
+				"self.str.find(')') == ''":       "compile error: program instantiation failed: error parsing regexp: unexpected ): `)`",
+				"self.str.findAll(')') == []":    "compile error: program instantiation failed: error parsing regexp: unexpected ): `)`",
+				"self.str.findAll(')', 1) == []": "compile error: program instantiation failed: error parsing regexp: unexpected ): `)`",
+			},
 		},
 		{name: "URL parsing",
 			obj: map[string]interface{}{
@@ -2048,6 +2058,22 @@ func withRule(s schema.Structural, rule string) schema.Structural {
 			Rule: rule,
 		},
 	}
+	return s
+}
+
+func withMaxLength(s schema.Structural, maxLength *int64) schema.Structural {
+	if s.ValueValidation == nil {
+		s.ValueValidation = &schema.ValueValidation{}
+	}
+	s.ValueValidation.MaxLength = maxLength
+	return s
+}
+
+func withMaxItems(s schema.Structural, maxItems *int64) schema.Structural {
+	if s.ValueValidation == nil {
+		s.ValueValidation = &schema.ValueValidation{}
+	}
+	s.ValueValidation.MaxItems = maxItems
 	return s
 }
 
