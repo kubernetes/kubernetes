@@ -66,7 +66,7 @@ func TestSupportsDryRun(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		supports, err := supportsDryRun(doc, test.gvk)
+		supports, err := supportsQueryParam(doc, test.gvk, QueryParamDryRun)
 		if supports != test.supports || ((err == nil) != test.success) {
 			errStr := "nil"
 			if test.success == false {
@@ -84,7 +84,7 @@ func TestSupportsDryRun(t *testing.T) {
 var fakeSchema = openapitesting.Fake{Path: filepath.Join("..", "..", "artifacts", "openapi", "swagger.json")}
 
 func TestDryRunVerifier(t *testing.T) {
-	dryRunVerifier := DryRunVerifier{
+	dryRunVerifier := QueryParamVerifier{
 		finder: NewCRDFinder(func() ([]schema.GroupKind, error) {
 			return []schema.GroupKind{
 				{
@@ -98,6 +98,7 @@ func TestDryRunVerifier(t *testing.T) {
 			}, nil
 		}),
 		openAPIGetter: &fakeSchema,
+		queryParam:    QueryParamDryRun,
 	}
 
 	err := dryRunVerifier.HasSupport(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "NodeProxyOptions"})
@@ -128,7 +129,7 @@ func (EmptyOpenAPI) OpenAPISchema() (*openapi_v2.Document, error) {
 }
 
 func TestDryRunVerifierNoOpenAPI(t *testing.T) {
-	dryRunVerifier := DryRunVerifier{
+	dryRunVerifier := QueryParamVerifier{
 		finder: NewCRDFinder(func() ([]schema.GroupKind, error) {
 			return []schema.GroupKind{
 				{
@@ -142,6 +143,7 @@ func TestDryRunVerifierNoOpenAPI(t *testing.T) {
 			}, nil
 		}),
 		openAPIGetter: EmptyOpenAPI{},
+		queryParam:    QueryParamDryRun,
 	}
 
 	err := dryRunVerifier.HasSupport(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Pod"})
