@@ -80,25 +80,27 @@ type ApplyOptions struct {
 
 	DeleteOptions *delete.DeleteOptions
 
-	ServerSideApply bool
-	ForceConflicts  bool
-	FieldManager    string
-	Selector        string
-	DryRunStrategy  cmdutil.DryRunStrategy
-	DryRunVerifier  *resource.QueryParamVerifier
-	Prune           bool
-	PruneResources  []prune.Resource
-	cmdBaseName     string
-	All             bool
-	Overwrite       bool
-	OpenAPIPatch    bool
-	PruneWhitelist  []string
+	ServerSideApply         bool
+	ForceConflicts          bool
+	FieldManager            string
+	Selector                string
+	DryRunStrategy          cmdutil.DryRunStrategy
+	DryRunVerifier          *resource.QueryParamVerifier
+	FieldValidationVerifier *resource.QueryParamVerifier
+	Prune                   bool
+	PruneResources          []prune.Resource
+	cmdBaseName             string
+	All                     bool
+	Overwrite               bool
+	OpenAPIPatch            bool
+	PruneWhitelist          []string
 
-	Validator     validation.Schema
-	Builder       *resource.Builder
-	Mapper        meta.RESTMapper
-	DynamicClient dynamic.Interface
-	OpenAPISchema openapi.Resources
+	ValidationDirective string
+	Validator           validation.Schema
+	Builder             *resource.Builder
+	Mapper              meta.RESTMapper
+	DynamicClient       dynamic.Interface
+	OpenAPISchema       openapi.Resources
 
 	Namespace        string
 	EnforceNamespace bool
@@ -238,6 +240,7 @@ func (flags *ApplyFlags) ToOptions(cmd *cobra.Command, baseName string, args []s
 	}
 
 	dryRunVerifier := resource.NewQueryParamVerifier(dynamicClient, flags.Factory.OpenAPIGetter(), resource.QueryParamDryRun)
+	fieldValidationVerifier := resource.NewQueryParamVerifier(dynamicClient, flags.Factory.OpenAPIGetter(), resource.QueryParamFieldValidation)
 	fieldManager := GetApplyFieldManagerFlag(cmd, serverSideApply)
 
 	// allow for a success message operation to be specified at print time
@@ -264,7 +267,12 @@ func (flags *ApplyFlags) ToOptions(cmd *cobra.Command, baseName string, args []s
 	}
 
 	openAPISchema, _ := flags.Factory.OpenAPISchema()
-	validator, err := flags.Factory.Validator(cmdutil.GetFlagBool(cmd, "validate"))
+
+	validationDirective, err := cmdutil.GetValidationDirective(cmd)
+	if err != nil {
+		return nil, err
+	}
+	validator, err := flags.Factory.Validator(validationDirective, fieldValidationVerifier)
 	if err != nil {
 		return nil, err
 	}
@@ -308,14 +316,15 @@ func (flags *ApplyFlags) ToOptions(cmd *cobra.Command, baseName string, args []s
 		OpenAPIPatch:    flags.OpenAPIPatch,
 		PruneWhitelist:  flags.PruneWhitelist,
 
-		Recorder:         recorder,
-		Namespace:        namespace,
-		EnforceNamespace: enforceNamespace,
-		Validator:        validator,
-		Builder:          builder,
-		Mapper:           mapper,
-		DynamicClient:    dynamicClient,
-		OpenAPISchema:    openAPISchema,
+		Recorder:            recorder,
+		Namespace:           namespace,
+		EnforceNamespace:    enforceNamespace,
+		Validator:           validator,
+		ValidationDirective: validationDirective,
+		Builder:             builder,
+		Mapper:              mapper,
+		DynamicClient:       dynamicClient,
+		OpenAPISchema:       openAPISchema,
 
 		IOStreams: flags.IOStreams,
 
@@ -407,7 +416,6 @@ func (o *ApplyOptions) SetObjects(infos []*resource.Info) {
 
 // Run executes the `apply` command.
 func (o *ApplyOptions) Run() error {
-
 	if o.PreProcessorFn != nil {
 		klog.V(4).Infof("Running apply pre-processor function")
 		if err := o.PreProcessorFn(); err != nil {
@@ -472,7 +480,8 @@ func (o *ApplyOptions) applyOneObject(info *resource.Info) error {
 
 	helper := resource.NewHelper(info.Client, info.Mapping).
 		DryRun(o.DryRunStrategy == cmdutil.DryRunServer).
-		WithFieldManager(o.FieldManager)
+		WithFieldManager(o.FieldManager).
+		WithFieldValidation(o.ValidationDirective)
 
 	if o.DryRunStrategy == cmdutil.DryRunServer {
 		// Ensure the APIServer supports server-side dry-run for the resource,

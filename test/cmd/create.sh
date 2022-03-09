@@ -153,3 +153,62 @@ run_kubectl_create_kustomization_directory_tests() {
   set +o nounset
   set +o errexit
 }
+
+# Runs tests related to kubectl create --validate
+run_kubectl_create_validate_tests() {
+  set -o nounset
+  set -o errexit
+
+  create_and_use_new_namespace
+
+  ## test --validate=true
+  kube::log::status "Testing kubectl create --validate=true"
+  # create and verify
+  output_message=$(! kubectl create -f hack/testdata/invalid-deployment-unknown-and-duplicate-fields.yaml --validate=true 2>&1)
+  kube::test::if_has_string "${output_message}" 'error validating data'
+
+  ## test  --validate=false
+  kube::log::status "Testing kubectl create --validate=false"
+  # create and verify
+  output_message=$(kubectl create -f hack/testdata/invalid-deployment-unknown-and-duplicate-fields.yaml --validate=false)
+  kube::test::if_has_string "${output_message}" "deployment.apps/invalid-nginx-deployment created"
+  # cleanup
+  kubectl delete deployment invalid-nginx-deployment
+
+  ## test --validate=strict
+  kube::log::status "Testing kubectl create --validate=strict"
+  # create and verify
+  output_message=$(! kubectl create -f hack/testdata/invalid-deployment-unknown-and-duplicate-fields.yaml --validate=strict 2>&1)
+  kube::test::if_has_string "${output_message}" 'error validating data'
+
+  ## test --validate=warn
+  kube::log::status "Testing kubectl create --validate=warn"
+  # create and verify
+  output_message=$(kubectl create -f hack/testdata/invalid-deployment-unknown-and-duplicate-fields.yaml --validate=warn)
+  kube::test::if_has_string "${output_message}" "deployment.apps/invalid-nginx-deployment created"
+  # cleanup
+  kubectl delete deployment invalid-nginx-deployment
+
+  ## test  --validate=ignore
+  kube::log::status "Testing kubectl create --validate=ignore"
+  # create and verify
+  output_message=$(kubectl create -f hack/testdata/invalid-deployment-unknown-and-duplicate-fields.yaml --validate=ignore)
+  kube::test::if_has_string "${output_message}" "deployment.apps/invalid-nginx-deployment created"
+  # cleanup
+  kubectl delete deployment invalid-nginx-deployment
+
+  ## test default is strict validation
+  kube::log::status "Testing kubectl create"
+  # create and verify
+  output_message=$(! kubectl create -f hack/testdata/invalid-deployment-unknown-and-duplicate-fields.yaml 2>&1)
+  kube::test::if_has_string "${output_message}" 'error validating data'
+
+  ## test invalid validate value
+  kube::log::status "Testing kubectl create --validate=foo"
+  # create and verify
+  output_message=$(! kubectl create -f hack/testdata/invalid-deployment-unknown-and-duplicate-fields.yaml --validate=foo 2>&1)
+  kube::test::if_has_string "${output_message}" 'invalid - validate option "foo"'
+
+  set +o nounset
+  set +o errexit
+}

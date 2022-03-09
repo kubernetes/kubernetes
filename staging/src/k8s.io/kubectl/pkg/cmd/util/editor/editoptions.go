@@ -68,6 +68,8 @@ type EditOptions struct {
 	WindowsLineEndings bool
 
 	cmdutil.ValidateOptions
+	ValidationDirective     string
+	FieldValidationVerifier *resource.QueryParamVerifier
 
 	OriginalResult *resource.Result
 
@@ -215,6 +217,17 @@ func (o *EditOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Comm
 		return o.PrintFlags.ToPrinter()
 	}
 
+	dynamicClient, err := f.DynamicClient()
+	if err != nil {
+		return err
+	}
+	o.FieldValidationVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamFieldValidation)
+
+	o.ValidationDirective, err = cmdutil.GetValidationDirective(cmd)
+	if err != nil {
+		return err
+	}
+
 	o.CmdNamespace = cmdNamespace
 	o.f = f
 
@@ -309,7 +322,7 @@ func (o *EditOptions) Run() error {
 			klog.V(4).Infof("User edited:\n%s", string(edited))
 
 			// Apply validation
-			schema, err := o.f.Validator(o.EnableValidation)
+			schema, err := o.f.Validator(o.ValidationDirective, o.FieldValidationVerifier)
 			if err != nil {
 				return preservedFile(err, file, o.ErrOut)
 			}
@@ -571,7 +584,10 @@ func (o *EditOptions) annotationPatch(update *resource.Info) error {
 	if err != nil {
 		return err
 	}
-	helper := resource.NewHelper(client, mapping).WithFieldManager(o.FieldManager).WithSubresource(o.Subresource)
+	helper := resource.NewHelper(client, mapping).
+		WithFieldManager(o.FieldManager).
+		WithFieldValidation(o.ValidationDirective).
+		WithSubresource(o.Subresource)
 	_, err = helper.Patch(o.CmdNamespace, update.Name, patchType, patch, nil)
 	if err != nil {
 		return err
@@ -709,7 +725,9 @@ func (o *EditOptions) visitToPatch(originalInfos []*resource.Info, patchVisitor 
 		}
 
 		patched, err := resource.NewHelper(info.Client, info.Mapping).
-			WithFieldManager(o.FieldManager).WithSubresource(o.Subresource).
+			WithFieldManager(o.FieldManager).
+			WithFieldValidation(o.ValidationDirective).
+			WithSubresource(o.Subresource).
 			Patch(info.Namespace, info.Name, patchType, patch, nil)
 		if err != nil {
 			fmt.Fprintln(o.ErrOut, results.addError(err, info))
@@ -729,6 +747,7 @@ func (o *EditOptions) visitToCreate(createVisitor resource.Visitor) error {
 	err := createVisitor.Visit(func(info *resource.Info, incomingErr error) error {
 		obj, err := resource.NewHelper(info.Client, info.Mapping).
 			WithFieldManager(o.FieldManager).
+			WithFieldValidation(o.ValidationDirective).
 			Create(info.Namespace, true, info.Object)
 		if err != nil {
 			return err

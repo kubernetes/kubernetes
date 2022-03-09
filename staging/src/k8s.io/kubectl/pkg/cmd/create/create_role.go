@@ -136,16 +136,17 @@ type CreateRoleOptions struct {
 	Resources     []ResourceOptions
 	ResourceNames []string
 
-	DryRunStrategy   cmdutil.DryRunStrategy
-	DryRunVerifier   *resource.QueryParamVerifier
-	OutputFormat     string
-	Namespace        string
-	EnforceNamespace bool
-	Client           clientgorbacv1.RbacV1Interface
-	Mapper           meta.RESTMapper
-	PrintObj         func(obj runtime.Object) error
-	FieldManager     string
-	CreateAnnotation bool
+	DryRunStrategy      cmdutil.DryRunStrategy
+	DryRunVerifier      *resource.QueryParamVerifier
+	ValidationDirective string
+	OutputFormat        string
+	Namespace           string
+	EnforceNamespace    bool
+	Client              clientgorbacv1.RbacV1Interface
+	Mapper              meta.RESTMapper
+	PrintObj            func(obj runtime.Object) error
+	FieldManager        string
+	CreateAnnotation    bool
 
 	genericclioptions.IOStreams
 }
@@ -271,6 +272,11 @@ func (o *CreateRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args
 		return printer.PrintObj(obj, o.Out)
 	}
 
+	o.ValidationDirective, err = cmdutil.GetValidationDirective(cmd)
+	if err != nil {
+		return err
+	}
+
 	o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
@@ -374,6 +380,7 @@ func (o *CreateRoleOptions) RunCreateRole() error {
 		if o.FieldManager != "" {
 			createOptions.FieldManager = o.FieldManager
 		}
+		createOptions.FieldValidation = o.ValidationDirective
 		if o.DryRunStrategy == cmdutil.DryRunServer {
 			if err := o.DryRunVerifier.HasSupport(role.GroupVersionKind()); err != nil {
 				return err
