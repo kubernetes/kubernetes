@@ -137,7 +137,7 @@ type CreateRoleOptions struct {
 	ResourceNames []string
 
 	DryRunStrategy   cmdutil.DryRunStrategy
-	DryRunVerifier   *resource.DryRunVerifier
+	DryRunVerifier   *resource.QueryParamVerifier
 	OutputFormat     string
 	Namespace        string
 	EnforceNamespace bool
@@ -258,7 +258,7 @@ func (o *CreateRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args
 	if err != nil {
 		return err
 	}
-	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, f.OpenAPIGetter())
+	o.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 	o.OutputFormat = cmdutil.GetFlagString(cmd, "output")
 	o.CreateAnnotation = cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
 

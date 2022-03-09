@@ -64,7 +64,7 @@ type PatchOptions struct {
 	namespace                    string
 	enforceNamespace             bool
 	dryRunStrategy               cmdutil.DryRunStrategy
-	dryRunVerifier               *resource.DryRunVerifier
+	dryRunVerifier               *resource.QueryParamVerifier
 	outputFormat                 string
 	args                         []string
 	builder                      *resource.Builder
@@ -169,7 +169,7 @@ func (o *PatchOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	if err != nil {
 		return err
 	}
-	o.dryRunVerifier = resource.NewDryRunVerifier(dynamicClient, f.OpenAPIGetter())
+	o.dryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 
 	return nil
 }

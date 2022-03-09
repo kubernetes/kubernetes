@@ -85,7 +85,7 @@ type ApplyOptions struct {
 	FieldManager    string
 	Selector        string
 	DryRunStrategy  cmdutil.DryRunStrategy
-	DryRunVerifier  *resource.DryRunVerifier
+	DryRunVerifier  *resource.QueryParamVerifier
 	Prune           bool
 	PruneResources  []prune.Resource
 	cmdBaseName     string
@@ -237,7 +237,7 @@ func (flags *ApplyFlags) ToOptions(cmd *cobra.Command, baseName string, args []s
 		return nil, err
 	}
 
-	dryRunVerifier := resource.NewDryRunVerifier(dynamicClient, flags.Factory.OpenAPIGetter())
+	dryRunVerifier := resource.NewQueryParamVerifier(dynamicClient, flags.Factory.OpenAPIGetter(), resource.QueryParamDryRun)
 	fieldManager := GetApplyFieldManagerFlag(cmd, serverSideApply)
 
 	// allow for a success message operation to be specified at print time

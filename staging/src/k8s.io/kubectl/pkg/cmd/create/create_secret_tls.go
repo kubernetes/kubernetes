@@ -71,7 +71,7 @@ type CreateSecretTLSOptions struct {
 
 	Client         corev1client.CoreV1Interface
 	DryRunStrategy cmdutil.DryRunStrategy
-	DryRunVerifier *resource.DryRunVerifier
+	DryRunVerifier *resource.QueryParamVerifier
 
 	genericclioptions.IOStreams
 }
@@ -151,7 +151,7 @@ func (o *CreateSecretTLSOptions) Complete(f cmdutil.Factory, cmd *cobra.Command,
 		return err
 	}
 
-	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
+	o.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, discoveryClient, resource.QueryParamDryRun)
 
 	o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
