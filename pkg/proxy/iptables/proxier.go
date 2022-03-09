@@ -436,7 +436,7 @@ func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 		// Hunt for service and endpoint chains.
 		for chain := range existingNATChains {
 			chainString := string(chain)
-			if strings.HasPrefix(chainString, "KUBE-SVC-") || strings.HasPrefix(chainString, "KUBE-SEP-") || strings.HasPrefix(chainString, "KUBE-FW-") || strings.HasPrefix(chainString, "KUBE-XLB-") {
+			if isServiceChainName(chainString) {
 				natChains.WriteBytes(existingNATChains[chain]) // flush
 				natRules.Write("-X", chainString)              // delete
 			}
@@ -683,34 +683,53 @@ func portProtoHash(servicePortName string, protocol string) string {
 	return encoded[:16]
 }
 
-// servicePortChainName takes the ServicePortName for a service and
-// returns the associated iptables chain.  This is computed by hashing (sha256)
-// then encoding to base32 and truncating with the prefix "KUBE-SVC-".
+const (
+	servicePortChainNamePrefix         = "KUBE-SVC-"
+	serviceFirewallChainNamePrefix     = "KUBE-FW-"
+	serviceLBChainNamePrefix           = "KUBE-XLB-"
+	servicePortEndpointChainNamePrefix = "KUBE-SEP-"
+)
+
+// servicePortChainName returns the name of the KUBE-SVC-XXXX chain for a service, which is the
+// main iptables chain for that service.
 func servicePortChainName(servicePortName string, protocol string) utiliptables.Chain {
-	return utiliptables.Chain("KUBE-SVC-" + portProtoHash(servicePortName, protocol))
+	return utiliptables.Chain(servicePortChainNamePrefix + portProtoHash(servicePortName, protocol))
 }
 
-// serviceFirewallChainName takes the ServicePortName for a service and
-// returns the associated iptables chain.  This is computed by hashing (sha256)
-// then encoding to base32 and truncating with the prefix "KUBE-FW-".
+// serviceFirewallChainName returns the name of the KUBE-FW-XXXX chain for a service, which
+// is used to implement the filtering for the LoadBalancerSourceRanges feature.
 func serviceFirewallChainName(servicePortName string, protocol string) utiliptables.Chain {
-	return utiliptables.Chain("KUBE-FW-" + portProtoHash(servicePortName, protocol))
+	return utiliptables.Chain(serviceFirewallChainNamePrefix + portProtoHash(servicePortName, protocol))
 }
 
-// serviceLBPortChainName takes the ServicePortName for a service and
-// returns the associated iptables chain.  This is computed by hashing (sha256)
-// then encoding to base32 and truncating with the prefix "KUBE-XLB-".  We do
-// this because IPTables Chain Names must be <= 28 chars long, and the longer
-// they are the harder they are to read.
+// serviceLBChainName returns the name of the KUBE-XLB-XXXX chain for a service, which
+// handles external traffic with `Local` traffic policy.
 func serviceLBChainName(servicePortName string, protocol string) utiliptables.Chain {
-	return utiliptables.Chain("KUBE-XLB-" + portProtoHash(servicePortName, protocol))
+	return utiliptables.Chain(serviceLBChainNamePrefix + portProtoHash(servicePortName, protocol))
 }
 
-// This is the same as servicePortChainName but with the endpoint included.
+// servicePortEndpointChainName returns the name of the KUBE-SEP-XXXX chain for a particular
+// service endpoint.
 func servicePortEndpointChainName(servicePortName string, protocol string, endpoint string) utiliptables.Chain {
 	hash := sha256.Sum256([]byte(servicePortName + protocol + endpoint))
 	encoded := base32.StdEncoding.EncodeToString(hash[:])
-	return utiliptables.Chain("KUBE-SEP-" + encoded[:16])
+	return utiliptables.Chain(servicePortEndpointChainNamePrefix + encoded[:16])
+}
+
+func isServiceChainName(chainString string) bool {
+	prefixes := []string{
+		servicePortChainNamePrefix,
+		servicePortEndpointChainNamePrefix,
+		serviceFirewallChainNamePrefix,
+		serviceLBChainNamePrefix,
+	}
+
+	for _, p := range prefixes {
+		if strings.HasPrefix(chainString, p) {
+			return true
+		}
+	}
+	return false
 }
 
 // After a UDP or SCTP endpoint has been removed, we must flush any pending conntrack entries to it, or else we
@@ -1384,7 +1403,7 @@ func (proxier *Proxier) syncProxyRules() {
 	for chain := range existingNATChains {
 		if !activeNATChains[chain] {
 			chainString := string(chain)
-			if !strings.HasPrefix(chainString, "KUBE-SVC-") && !strings.HasPrefix(chainString, "KUBE-SEP-") && !strings.HasPrefix(chainString, "KUBE-FW-") && !strings.HasPrefix(chainString, "KUBE-XLB-") {
+			if !isServiceChainName(chainString) {
 				// Ignore chains that aren't ours.
 				continue
 			}
