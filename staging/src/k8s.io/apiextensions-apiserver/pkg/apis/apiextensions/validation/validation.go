@@ -40,6 +40,7 @@ import (
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	apiservervalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
+	celschema "k8s.io/apiextensions-apiserver/third_party/forked/celopenapi/model"
 )
 
 var (
@@ -714,7 +715,7 @@ func validateCustomResourceDefinitionValidation(ctx context.Context, customResou
 			requireValidPropertyType: opts.requireValidPropertyType,
 		}
 
-		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema, fldPath.Child("openAPIV3Schema"), openAPIV3Schema, true, &opts)...)
+		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema, fldPath.Child("openAPIV3Schema"), openAPIV3Schema, true, &opts, nil)...)
 
 		if opts.requireStructuralSchema {
 			if ss, err := structuralschema.NewStructural(schema); err != nil {
@@ -742,14 +743,25 @@ func validateCustomResourceDefinitionValidation(ctx context.Context, customResou
 	return allErrs
 }
 
+type schemaTree struct {
+	MaxLength int64
+	Parent    *schemaTree
+	Schema    *apiextensions.JSONSchemaProps
+}
+
 var metaFields = sets.NewString("metadata", "kind", "apiVersion")
 
 // ValidateCustomResourceDefinitionOpenAPISchema statically validates
-func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSchemaProps, fldPath *field.Path, ssv specStandardValidator, isRoot bool, opts *validationOptions) field.ErrorList {
+func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSchemaProps, fldPath *field.Path, ssv specStandardValidator, isRoot bool, opts *validationOptions, parentNode *schemaTree) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if schema == nil {
 		return allErrs
+	}
+
+	treeNode := &schemaTree{
+		Parent: parentNode,
+		Schema: schema,
 	}
 
 	allErrs = append(allErrs, ssv.validate(schema, fldPath)...)
@@ -780,7 +792,7 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 			// we have to forbid defaults inside additionalProperties because pruning without actual value is ambiguous
 			subSsv = ssv.withForbiddenDefaults("inside additionalProperties applying to object metadata")
 		}
-		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.AdditionalProperties.Schema, fldPath.Child("additionalProperties"), subSsv, false, opts)...)
+		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.AdditionalProperties.Schema, fldPath.Child("additionalProperties"), subSsv, false, opts, treeNode)...)
 	}
 
 	if len(schema.Properties) != 0 {
@@ -799,33 +811,33 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 					subSsv = subSsv.withForbiddenDefaults(fmt.Sprintf("in top-level %s", property))
 				}
 			}
-			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("properties").Key(property), subSsv, false, opts)...)
+			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("properties").Key(property), subSsv, false, opts, treeNode)...)
 		}
 	}
 
-	allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.Not, fldPath.Child("not"), ssv, false, opts)...)
+	allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.Not, fldPath.Child("not"), ssv, false, opts, treeNode)...)
 
 	if len(schema.AllOf) != 0 {
 		for i, jsonSchema := range schema.AllOf {
-			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("allOf").Index(i), ssv, false, opts)...)
+			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("allOf").Index(i), ssv, false, opts, treeNode)...)
 		}
 	}
 
 	if len(schema.OneOf) != 0 {
 		for i, jsonSchema := range schema.OneOf {
-			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("oneOf").Index(i), ssv, false, opts)...)
+			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("oneOf").Index(i), ssv, false, opts, treeNode)...)
 		}
 	}
 
 	if len(schema.AnyOf) != 0 {
 		for i, jsonSchema := range schema.AnyOf {
-			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("anyOf").Index(i), ssv, false, opts)...)
+			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("anyOf").Index(i), ssv, false, opts, treeNode)...)
 		}
 	}
 
 	if len(schema.Definitions) != 0 {
 		for definition, jsonSchema := range schema.Definitions {
-			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("definitions").Key(definition), ssv, false, opts)...)
+			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("definitions").Key(definition), ssv, false, opts, treeNode)...)
 		}
 	}
 
@@ -839,17 +851,17 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 			subSsv = subSsv.withForbidOldSelfValidations(fldPath)
 		}
 
-		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.Items.Schema, fldPath.Child("items"), subSsv, false, opts)...)
+		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.Items.Schema, fldPath.Child("items"), subSsv, false, opts, treeNode)...)
 		if len(schema.Items.JSONSchemas) != 0 {
 			for i, jsonSchema := range schema.Items.JSONSchemas {
-				allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("items").Index(i), subSsv, false, opts)...)
+				allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("items").Index(i), subSsv, false, opts, treeNode)...)
 			}
 		}
 	}
 
 	if schema.Dependencies != nil {
 		for dependency, jsonSchemaPropsOrStringArray := range schema.Dependencies {
-			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(jsonSchemaPropsOrStringArray.Schema, fldPath.Child("dependencies").Key(dependency), ssv, false, opts)...)
+			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(jsonSchemaPropsOrStringArray.Schema, fldPath.Child("dependencies").Key(dependency), ssv, false, opts, treeNode)...)
 		}
 	}
 
@@ -952,12 +964,15 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 		}
 
 		structural, err := structuralschema.NewStructural(schema)
+		// TODO(DangerOnTheRanger): how do we meaningfully do something with this cost considering we only return errors from this function?
+		celCRDCost := uint64(0)
 		if err == nil {
 			compResults, err := cel.Compile(structural, isRoot, cel.PerCallLimit)
 			if err != nil {
 				allErrs = append(allErrs, field.InternalError(fldPath.Child("x-kubernetes-validations"), err))
 			} else {
 				for i, cr := range compResults {
+					celCRDCost += getCRDCost(cr.MaxCost, treeNode)
 					if cr.Error != nil {
 						if cr.Error.Type == cel.ErrorTypeRequired {
 							allErrs = append(allErrs, field.Required(fldPath.Child("x-kubernetes-validations").Index(i).Child("rule"), cr.Error.Detail))
@@ -984,6 +999,34 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 	}
 
 	return allErrs
+}
+
+func getCRDCost(baseCost uint64, schemaNode *schemaTree) uint64 {
+	totalCost := baseCost
+	parentNode := schemaNode.Parent
+	for parentNode != nil {
+		parentSchema := parentNode.Schema
+		if parentSchema.Type != "array" {
+			parentNode = parentNode.Parent
+			continue
+		} else if parentNode.MaxLength == 0 {
+			// we haven't calculated a max length for this entry in the map yet
+			if parentSchema.MaxLength != nil {
+				parentNode.MaxLength = int64(*parentSchema.MaxLength)
+			} else {
+				structural, err := structuralschema.NewStructural(parentSchema)
+				if err != nil {
+					// TODO(DangerOnTheRanger): how to add better error handling?
+					return totalCost
+				}
+				celSchema := celschema.SchemaDeclType(structural, false)
+				parentNode.MaxLength = celSchema.MaxLength
+			}
+		}
+		totalCost = totalCost * uint64(parentNode.MaxLength)
+		parentNode = parentNode.Parent
+	}
+	return totalCost
 }
 
 var newlineMatcher = regexp.MustCompile(`[\n\r]+`) // valid newline chars in CEL grammar
