@@ -138,7 +138,7 @@ hack/local-up-cluster.sh cluster will work.
 Instead of trusting the aggregator inside kube-apiserver, the described setup uses local
 client certificate based X.509 authentication and authorization. This means that the client
 certificate is trusted by a CA and the passed certificate contains the group membership
-to the `system:masters` group. As we disable delegated authorization with `--authorization-skip-lookup`,
+to the `system:masters` group. As we disable delegated authorization with `--authentication-skip-lookup`,
 only this superuser group is authorized.
 
 1. First we need a CA to later sign the client certificate:
@@ -176,7 +176,7 @@ only this superuser group is authorized.
    Kubernetes resources. The second kubeconfig passed to
    `--authentication-kubeconfig` is used to satisfy the delegated
    authenticator. The third kubeconfig passed to
-   `--authorized-kubeconfig` is used to satisfy the delegated
+   `--authorization-kubeconfig` is used to satisfy the delegated
    authorizer. Neither the authenticator, nor the authorizer will
    actually be used: due to `--client-ca-file`, our development X.509
    certificate is accepted and authenticates us as `system:masters`
@@ -203,4 +203,34 @@ only this superuser group is authorized.
    http --verify=no --cert client.crt --cert-key client.key \
       https://localhost:8443/apis/wardle.example.com/v1alpha1/namespaces/default/flunders
    ```
+   
+6.  If we construct a `kubeconfig` like the following:
+   
+    ``` shell
+    echo <<EOF >> constructed-kubeconfig 'apiVersion: v1
+    clusters:
+    - cluster:
+        insecure-skip-tls-verify: true
+        server: https://127.0.0.1:8443
+      name: dummy
+    contexts:
+    - context:
+        cluster: dummy
+        user: dummy
+      name: dummy
+    current-context: dummy
+    kind: Config
+    preferences: {}
+    users:
+    - name: dummy
+      user:
+        client-certificate-data: <base64 encoded string of client.crt>
+        client-key-data: <base64 encoded string of client.key>'
+    EOF 
+    ```
+    
+    it is also possible to use `kubectl` against this `stand-alone` setup.
 
+    ```shell
+    kubectl --kubeconfig=constructed-kubeconfig get flunders
+    ```
