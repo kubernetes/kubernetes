@@ -260,3 +260,43 @@ func TestPatchPodStatus(t *testing.T) {
 		})
 	}
 }
+
+func TestDeletePod(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		pod  v1.Pod
+	}{
+		{
+			name: "Should delete pod successfully",
+			pod: v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "ns",
+					Name:      "pod1",
+				},
+				Spec: v1.PodSpec{
+					ImagePullSecrets: []v1.LocalObjectReference{{Name: "foo"}},
+				},
+			},
+		},
+	}
+	client := clientsetfake.NewSimpleClientset()
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := client.CoreV1().Pods(tc.pod.Namespace).Create(context.TODO(), &tc.pod, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			err = DeletePod(client, &tc.pod)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			targetPod, _ := client.CoreV1().Pods(tc.pod.Namespace).Get(context.TODO(), tc.pod.Name, metav1.GetOptions{})
+			if targetPod != nil {
+				t.Fatalf("failed to delete pod: %v", targetPod)
+			}
+		})
+	}
+}
