@@ -94,7 +94,7 @@ func SchemaDeclType(s *schema.Structural, isResourceRoot bool) *DeclType {
 			itemsType := SchemaDeclType(s.Items, s.Items.XEmbeddedResource)
 			var maxItems int64
 			if s.ValueValidation != nil && s.ValueValidation.MaxItems != nil {
-				maxItems = *s.ValueValidation.MaxItems
+				maxItems = zeroIfNegative(*s.ValueValidation.MaxItems)
 			} else {
 				maxItems = estimateMaxArrayItemsPerRequest(s.Items)
 			}
@@ -109,7 +109,7 @@ func SchemaDeclType(s *schema.Structural, isResourceRoot bool) *DeclType {
 			if propsType != nil {
 				var maxProperties int64
 				if s.ValueValidation != nil && s.ValueValidation.MaxProperties != nil {
-					maxProperties = *s.ValueValidation.MaxProperties
+					maxProperties = zeroIfNegative(*s.ValueValidation.MaxProperties)
 				} else {
 					maxProperties = estimateMaxAdditionalPropertiesPerRequest(s.AdditionalProperties.Structural)
 				}
@@ -151,7 +151,7 @@ func SchemaDeclType(s *schema.Structural, isResourceRoot bool) *DeclType {
 			case "byte":
 				byteWithMaxLength := newSimpleType("bytes", decls.Bytes, types.Bytes([]byte{}))
 				if s.ValueValidation.MaxLength != nil {
-					byteWithMaxLength.MaxElements = *s.ValueValidation.MaxLength
+					byteWithMaxLength.MaxElements = zeroIfNegative(*s.ValueValidation.MaxLength)
 				} else {
 					byteWithMaxLength.MaxElements = estimateMaxStringLengthPerRequest(s)
 				}
@@ -172,7 +172,7 @@ func SchemaDeclType(s *schema.Structural, isResourceRoot bool) *DeclType {
 			// we do this because the OpenAPIv3 spec indicates that maxLength is specified in runes/code points,
 			// but we need to reason about length for things like request size, so we use bytes in this code (and an individual
 			// unicode code point can be up to 4 bytes long)
-			strWithMaxLength.MaxElements = *s.ValueValidation.MaxLength * 4
+			strWithMaxLength.MaxElements = zeroIfNegative(*s.ValueValidation.MaxLength) * 4
 		} else {
 			strWithMaxLength.MaxElements = estimateMaxStringLengthPerRequest(s)
 		}
@@ -185,6 +185,13 @@ func SchemaDeclType(s *schema.Structural, isResourceRoot bool) *DeclType {
 		return IntType
 	}
 	return nil
+}
+
+func zeroIfNegative(v int64) int64 {
+	if v < 0 {
+		return 0
+	}
+	return v
 }
 
 // WithTypeAndObjectMeta ensures the kind, apiVersion and
@@ -221,6 +228,16 @@ func WithTypeAndObjectMeta(s *schema.Structural) *schema.Structural {
 	result.Properties = props
 
 	return result
+}
+
+// MaxCardinality returns the maximum number of times data conforming to the schema could possibly exist in
+// an object serialized to JSON. For cases where a schema is contained under map or array schemas of unbounded
+// size, this can be used as an estimate as the worst case number of times data matching the schema could be repeated.
+// Note that this only assumes a single comma between data elements, so if the schema is contained under only maps,
+// this estimates a higher cardinality that would be possible.
+func MaxCardinality(s *schema.Structural) uint64 {
+	sz := estimateMinSizeJSON(s) + 1 // assume at least one comma between elements
+	return uint64(maxRequestSizeBytes / sz)
 }
 
 // estimateMinSizeJSON estimates the minimum size in bytes of the given schema when serialized in JSON.

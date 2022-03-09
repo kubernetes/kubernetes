@@ -751,11 +751,13 @@ var structuralSchemaWithValidators = []byte(`
           },
 		  "assocList": {
 			"type": "array",
+			"maxItems": 10,
 			"items": {
 			  "type": "object",
+			  "maxProperties": 12,
 			  "properties": {
-			    "k": { "type": "string" },
-			    "v": { "type": "string" }
+			    "k": { "type": "string", "maxLength": 3},
+			    "v": { "type": "string", "maxLength": 3}
 			  },
 			  "required": ["k"]
 			},
@@ -1006,12 +1008,13 @@ var structuralSchemaWithDefaultMapKeyTransitionRule = []byte(`
               "k2"
             ],
             "x-kubernetes-list-type": "map",
+            "maxItems": 100,
             "items": {
               "type": "object",
               "properties": {
                 "k1": { "type": "string" },
                 "k2": { "type": "string", "default": "DEFAULT" },
-                "v": { "type": "string" }
+                "v": { "type": "string", "maxLength": 200 }
               },
 			  "required": ["k1"],
 		      "x-kubernetes-validations": [

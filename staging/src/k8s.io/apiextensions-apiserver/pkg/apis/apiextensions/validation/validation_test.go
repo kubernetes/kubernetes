@@ -18,6 +18,7 @@ package validation
 
 import (
 	"context"
+	"math"
 	"math/rand"
 	"reflect"
 	"strings"
@@ -7605,7 +7606,8 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 							XListType: strPtr("atomic"),
 							Items: &apiextensions.JSONSchemaPropsOrArray{
 								Schema: &apiextensions.JSONSchemaProps{
-									Type: "string",
+									Type:      "string",
+									MaxLength: int64ptr(10),
 									XValidations: apiextensions.ValidationRules{
 										{Rule: "self == oldSelf"},
 									},
@@ -7629,7 +7631,8 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 							Type: "array",
 							Items: &apiextensions.JSONSchemaPropsOrArray{
 								Schema: &apiextensions.JSONSchemaProps{
-									Type: "string",
+									Type:      "string",
+									MaxLength: int64ptr(10),
 									XValidations: apiextensions.ValidationRules{
 										{Rule: "self == oldSelf"},
 									},
@@ -7651,6 +7654,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					Properties: map[string]apiextensions.JSONSchemaProps{
 						"value": {
 							Type:      "array",
+							MaxItems:  int64ptr(10),
 							XListType: strPtr("atomic"),
 							Items: &apiextensions.JSONSchemaPropsOrArray{
 								Schema: &apiextensions.JSONSchemaProps{
@@ -7672,10 +7676,12 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					Type: "object",
 					Properties: map[string]apiextensions.JSONSchemaProps{
 						"value": {
-							Type: "array",
+							Type:     "array",
+							MaxItems: int64ptr(10),
 							Items: &apiextensions.JSONSchemaPropsOrArray{
 								Schema: &apiextensions.JSONSchemaProps{
-									Type: "string",
+									Type:      "string",
+									MaxLength: int64ptr(10),
 								},
 							},
 							XValidations: apiextensions.ValidationRules{
@@ -7694,10 +7700,12 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					Properties: map[string]apiextensions.JSONSchemaProps{
 						"value": {
 							Type:      "array",
+							MaxItems:  int64ptr(10),
 							XListType: strPtr("set"),
 							Items: &apiextensions.JSONSchemaPropsOrArray{
 								Schema: &apiextensions.JSONSchemaProps{
-									Type: "string",
+									Type:      "string",
+									MaxLength: int64ptr(10),
 									XValidations: apiextensions.ValidationRules{
 										{Rule: "self == oldSelf"},
 									},
@@ -7719,10 +7727,12 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					Properties: map[string]apiextensions.JSONSchemaProps{
 						"value": {
 							Type:      "array",
+							MaxItems:  int64ptr(10),
 							XListType: strPtr("set"),
 							Items: &apiextensions.JSONSchemaPropsOrArray{
 								Schema: &apiextensions.JSONSchemaProps{
-									Type: "string",
+									Type:      "string",
+									MaxLength: int64ptr(10),
 								},
 							},
 							XValidations: apiextensions.ValidationRules{
@@ -7751,7 +7761,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 									},
 									Required: []string{"name"},
 									Properties: map[string]apiextensions.JSONSchemaProps{
-										"name": {Type: "string"},
+										"name": {Type: "string", MaxLength: int64ptr(5)},
 									},
 								},
 							},
@@ -7768,6 +7778,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					Properties: map[string]apiextensions.JSONSchemaProps{
 						"value": {
 							Type:         "array",
+							MaxItems:     int64ptr(10),
 							XListType:    strPtr("map"),
 							XListMapKeys: []string{"name"},
 							Items: &apiextensions.JSONSchemaPropsOrArray{
@@ -7775,7 +7786,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 									Type:     "object",
 									Required: []string{"name"},
 									Properties: map[string]apiextensions.JSONSchemaProps{
-										"name": {Type: "string"},
+										"name": {Type: "string", MaxLength: int64ptr(5)},
 									},
 								},
 							},
@@ -7798,7 +7809,8 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 							XMapType: strPtr("granular"),
 							Properties: map[string]apiextensions.JSONSchemaProps{
 								"subfield": {
-									Type: "string",
+									Type:      "string",
+									MaxLength: int64ptr(10),
 									XValidations: apiextensions.ValidationRules{
 										{Rule: "self == oldSelf"},
 									},
@@ -7820,7 +7832,8 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 							XMapType: strPtr("future"),
 							Properties: map[string]apiextensions.JSONSchemaProps{
 								"subfield": {
-									Type: "string",
+									Type:      "string",
+									MaxLength: int64ptr(10),
 									XValidations: apiextensions.ValidationRules{
 										{Rule: "self == oldSelf"},
 									},
@@ -7845,7 +7858,8 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 							Type: "object",
 							Properties: map[string]apiextensions.JSONSchemaProps{
 								"subfield": {
-									Type: "string",
+									Type:      "string",
+									MaxLength: int64ptr(10),
 									XValidations: apiextensions.ValidationRules{
 										{Rule: "self == oldSelf"},
 									},
@@ -7927,6 +7941,154 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					},
 				},
 			},
+		},
+		{
+			name: "forbid double-nested rule with no limit set",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"value": {
+							Type: "array",
+							Items: &apiextensions.JSONSchemaPropsOrArray{
+								Schema: &apiextensions.JSONSchemaProps{
+									Type: "object",
+									AdditionalProperties: &apiextensions.JSONSchemaPropsOrBool{
+										Schema: &apiextensions.JSONSchemaProps{
+											Type:     "object",
+											Required: []string{"key"},
+											Properties: map[string]apiextensions.JSONSchemaProps{
+												"key": {Type: "string"},
+											},
+										},
+									},
+								},
+							},
+							XValidations: apiextensions.ValidationRules{
+								{Rule: "self.all(x, x.all(y, x[y].key == x[y].key))"},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: []validationMatch{
+				forbidden("spec.validation.openAPIV3Schema.properties[value].x-kubernetes-validations[0].rule"),
+			},
+		},
+		{
+			name: "forbid double-nested rule with one limit set",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"value": {
+							Type: "array",
+							Items: &apiextensions.JSONSchemaPropsOrArray{
+								Schema: &apiextensions.JSONSchemaProps{
+									Type: "object",
+									AdditionalProperties: &apiextensions.JSONSchemaPropsOrBool{
+										Schema: &apiextensions.JSONSchemaProps{
+											Type:     "object",
+											Required: []string{"key"},
+											Properties: map[string]apiextensions.JSONSchemaProps{
+												"key": {Type: "string", MaxLength: int64ptr(10)},
+											},
+										},
+									},
+								},
+							},
+							XValidations: apiextensions.ValidationRules{
+								{Rule: "self.all(x, x.all(y, x[y].key == x[y].key))"},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: []validationMatch{
+				forbidden("spec.validation.openAPIV3Schema.properties[value].x-kubernetes-validations[0].rule"),
+			},
+		},
+		{
+			name: "allow double-nested rule with three limits set",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"value": {
+							Type:     "array",
+							MaxItems: int64ptr(10),
+							Items: &apiextensions.JSONSchemaPropsOrArray{
+								Schema: &apiextensions.JSONSchemaProps{
+									Type:          "object",
+									MaxProperties: int64ptr(10),
+									AdditionalProperties: &apiextensions.JSONSchemaPropsOrBool{
+										Schema: &apiextensions.JSONSchemaProps{
+											Type:     "object",
+											Required: []string{"key"},
+											Properties: map[string]apiextensions.JSONSchemaProps{
+												"key": {Type: "string", MaxLength: int64ptr(10)},
+											},
+										},
+									},
+								},
+							},
+							XValidations: apiextensions.ValidationRules{
+								{Rule: "self.all(x, x.all(y, x[y].key == x[y].key))"},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: []validationMatch{},
+		},
+		{
+			name: "allow double-nested rule with one limit set on outermost array",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"value": {
+							Type:     "array",
+							MaxItems: int64ptr(4),
+							Items: &apiextensions.JSONSchemaPropsOrArray{
+								Schema: &apiextensions.JSONSchemaProps{
+									Type: "object",
+									AdditionalProperties: &apiextensions.JSONSchemaPropsOrBool{
+										Schema: &apiextensions.JSONSchemaProps{
+											Type:     "object",
+											Required: []string{"key"},
+											Properties: map[string]apiextensions.JSONSchemaProps{
+												"key": {Type: "number"},
+											},
+										},
+									},
+								},
+							},
+							XValidations: apiextensions.ValidationRules{
+								{Rule: "self.all(x, x.all(y, x[y].key == x[y].key))"},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: []validationMatch{},
+		},
+		{
+			name: "check for cardinality of 1 under root object",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"value": {
+							Type: "integer",
+							XValidations: apiextensions.ValidationRules{
+								{Rule: "self < 1024"},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: []validationMatch{},
 		},
 	}
 	for _, tt := range tests {
@@ -8167,4 +8329,140 @@ func Test_validateDeprecationWarning(t *testing.T) {
 			}
 		})
 	}
+}
+
+func genMapSchema() *apiextensions.JSONSchemaProps {
+	return &apiextensions.JSONSchemaProps{
+		Type: "object",
+		AdditionalProperties: &apiextensions.JSONSchemaPropsOrBool{
+			Schema: &apiextensions.JSONSchemaProps{
+				Type: "string",
+			},
+		},
+	}
+}
+
+func withMaxProperties(mapSchema *apiextensions.JSONSchemaProps, maxProps *int64) *apiextensions.JSONSchemaProps {
+	mapSchema.MaxProperties = maxProps
+	return mapSchema
+}
+
+func genArraySchema() *apiextensions.JSONSchemaProps {
+	return &apiextensions.JSONSchemaProps{
+		Type: "array",
+	}
+}
+
+func withMaxItems(arraySchema *apiextensions.JSONSchemaProps, maxItems *int64) *apiextensions.JSONSchemaProps {
+	arraySchema.MaxItems = maxItems
+	return arraySchema
+}
+
+func genObjectSchema() *apiextensions.JSONSchemaProps {
+	return &apiextensions.JSONSchemaProps{
+		Type: "object",
+	}
+}
+
+func TestCostInfo(t *testing.T) {
+	tests := []struct {
+		name                   string
+		schema                 []*apiextensions.JSONSchemaProps
+		expectedMaxCardinality *uint64
+	}{
+		{
+			name: "object",
+			schema: []*apiextensions.JSONSchemaProps{
+				genObjectSchema(),
+			},
+			expectedMaxCardinality: uint64ptr(1),
+		},
+		{
+			name: "array",
+			schema: []*apiextensions.JSONSchemaProps{
+				withMaxItems(genArraySchema(), int64ptr(5)),
+			},
+			expectedMaxCardinality: uint64ptr(5),
+		},
+		{
+			name:                   "unbounded array",
+			schema:                 []*apiextensions.JSONSchemaProps{genArraySchema()},
+			expectedMaxCardinality: nil,
+		},
+		{
+			name:                   "map",
+			schema:                 []*apiextensions.JSONSchemaProps{withMaxProperties(genMapSchema(), int64ptr(10))},
+			expectedMaxCardinality: uint64ptr(10),
+		},
+		{
+			name: "unbounded map",
+			schema: []*apiextensions.JSONSchemaProps{
+				genMapSchema(),
+			},
+			expectedMaxCardinality: nil,
+		},
+		{
+			name: "array inside map",
+			schema: []*apiextensions.JSONSchemaProps{
+				withMaxProperties(genMapSchema(), int64ptr(5)),
+				withMaxItems(genArraySchema(), int64ptr(5)),
+			},
+			expectedMaxCardinality: uint64ptr(25),
+		},
+		{
+			name: "unbounded array inside bounded map",
+			schema: []*apiextensions.JSONSchemaProps{
+				withMaxProperties(genMapSchema(), int64ptr(5)),
+				genArraySchema(),
+			},
+			expectedMaxCardinality: nil,
+		},
+		{
+			name: "object inside array",
+			schema: []*apiextensions.JSONSchemaProps{
+				withMaxItems(genArraySchema(), int64ptr(3)),
+				genObjectSchema(),
+			},
+			expectedMaxCardinality: uint64ptr(3),
+		},
+		{
+			name: "map inside object inside array",
+			schema: []*apiextensions.JSONSchemaProps{
+				withMaxItems(genArraySchema(), int64ptr(2)),
+				genObjectSchema(),
+				withMaxProperties(genMapSchema(), int64ptr(4)),
+			},
+			expectedMaxCardinality: uint64ptr(8),
+		},
+		{
+			name: "integer overflow bounds check",
+			schema: []*apiextensions.JSONSchemaProps{
+				withMaxItems(genArraySchema(), int64ptr(math.MaxInt)),
+				withMaxItems(genArraySchema(), int64ptr(100)),
+			},
+			expectedMaxCardinality: uint64ptr(math.MaxUint),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			curCostInfo := rootCostInfo()
+			// simulate the recursive validation calls
+			for _, schema := range tt.schema {
+				curCostInfo = curCostInfo.MultiplyByElementCost(schema)
+			}
+			if tt.expectedMaxCardinality == nil && curCostInfo.MaxCardinality == nil {
+				// unbounded cardinality case, test ran correctly
+			} else if tt.expectedMaxCardinality == nil && curCostInfo.MaxCardinality != nil {
+				t.Errorf("expected unbounded cardinality (got %d)", curCostInfo.MaxCardinality)
+			} else if tt.expectedMaxCardinality != nil && curCostInfo.MaxCardinality == nil {
+				t.Errorf("expected bounded cardinality of %d but got unbounded cardinality", tt.expectedMaxCardinality)
+			} else if *tt.expectedMaxCardinality != *curCostInfo.MaxCardinality {
+				t.Errorf("wrong cardinality (expected %d, got %d)", *tt.expectedMaxCardinality, curCostInfo.MaxCardinality)
+			}
+		})
+	}
+}
+
+func int64ptr(i int64) *int64 {
+	return &i
 }

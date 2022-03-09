@@ -18,7 +18,6 @@ package cel
 
 import (
 	"fmt"
-	"math"
 	"strings"
 	"testing"
 
@@ -1078,8 +1077,7 @@ func genMapWithCustomItemRule(item *schema.Structural, rule string) func(maxProp
 // if expectedCostExceedsLimit is non-zero. Typically, only expectedCost or expectedCostExceedsLimit is non-zero, not both.
 func schemaChecker(schema *schema.Structural, expectedCost uint64, expectedCostExceedsLimit uint64, t *testing.T) func(t *testing.T) {
 	return func(t *testing.T) {
-		// TODO(DangerOnTheRanger): if perCallLimit in compilation.go changes, this needs to change as well
-		compilationResults, err := Compile(schema, false, uint64(math.MaxInt64))
+		compilationResults, err := Compile(schema, false, PerCallLimit)
 		if err != nil {
 			t.Errorf("Expected no error, got: %v", err)
 		}
