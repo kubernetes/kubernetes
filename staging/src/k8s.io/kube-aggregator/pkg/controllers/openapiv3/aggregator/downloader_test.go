@@ -32,10 +32,12 @@ type handlerTest struct {
 
 var _ http.Handler = handlerTest{}
 
+var groupList = []string{"apis/group/version"}
+
 func (h handlerTest) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Create an APIService with a handler for one group/version
 	group := make(map[string][]string)
-	group["Paths"] = []string{"apis/group/version"}
+	group["Paths"] = groupList
 	j, _ := json.Marshal(group)
 	if r.URL.Path == "/openapi/v3" {
 		w.Write(j)
@@ -84,6 +86,11 @@ func assertDownloadedSpec(gvSpec map[string]*SpecETag, err error, expectedSpecID
 
 func TestDownloadOpenAPISpec(t *testing.T) {
 	s := Downloader{}
+
+	groups, err := s.OpenAPIV3Root(
+		handlerTest{data: []byte(""), etag: ""})
+	assert.NoError(t, err)
+	assert.Equal(t, groups, groupList)
 
 	// Test with eTag
 	gvSpec, err := s.Download(
