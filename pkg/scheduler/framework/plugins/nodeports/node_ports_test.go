@@ -151,7 +151,7 @@ func TestNodePorts(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			p, _ := New(nil, nil)
 			cycleState := framework.NewCycleState()
-			preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(context.Background(), cycleState, test.pod)
+			_, preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(context.Background(), cycleState, test.pod)
 			if !preFilterStatus.IsSuccess() {
 				t.Errorf("prefilter failed with status: %v", preFilterStatus)
 			}

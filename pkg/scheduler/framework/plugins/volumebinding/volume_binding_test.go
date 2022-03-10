@@ -653,7 +653,7 @@ func TestVolumeBinding(t *testing.T) {
 			state := framework.NewCycleState()
 
 			t.Logf("Verify: call PreFilter and check status")
-			gotPreFilterStatus := p.PreFilter(ctx, state, item.pod)
+			_, gotPreFilterStatus := p.PreFilter(ctx, state, item.pod)
 			if !reflect.DeepEqual(gotPreFilterStatus, item.wantPreFilterStatus) {
 				t.Errorf("filter prefilter status does not match: %v, want: %v", gotPreFilterStatus, item.wantPreFilterStatus)
 			}

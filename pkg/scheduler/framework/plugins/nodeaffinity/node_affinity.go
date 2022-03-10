@@ -83,10 +83,10 @@ func (pl *NodeAffinity) EventsToRegister() []framework.ClusterEvent {
 }
 
 // PreFilter builds and writes cycle state used by Filter.
-func (pl *NodeAffinity) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod) *framework.Status {
+func (pl *NodeAffinity) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
 	state := &preFilterState{requiredNodeSelectorAndAffinity: nodeaffinity.GetRequiredNodeAffinity(pod)}
 	cycleState.Write(preFilterStateKey, state)
-	return nil
+	return nil, nil
 }
 
 // PreFilterExtensions not necessary for this plugin as state doesn't depend on pod additions or deletions.

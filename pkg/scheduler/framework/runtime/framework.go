@@ -561,33 +561,46 @@ func (f *frameworkImpl) QueueSortFunc() framework.LessFunc {
 // *Status and its code is set to non-success if any of the plugins returns
 // anything but Success. If a non-success status is returned, then the scheduling
 // cycle is aborted.
-func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod) (status *framework.Status) {
+func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod) (_ *framework.PreFilterResult, status *framework.Status) {
 	startTime := time.Now()
 	defer func() {
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(preFilter, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
+	var result *framework.PreFilterResult
+	var pluginsWithNodes []string
 	for _, pl := range f.preFilterPlugins {
-		status = f.runPreFilterPlugin(ctx, pl, state, pod)
-		if !status.IsSuccess() {
-			status.SetFailedPlugin(pl.Name())
-			if status.IsUnschedulable() {
-				return status
+		r, s := f.runPreFilterPlugin(ctx, pl, state, pod)
+		if !s.IsSuccess() {
+			s.SetFailedPlugin(pl.Name())
+			if s.IsUnschedulable() {
+				return nil, s
 			}
-			return framework.AsStatus(fmt.Errorf("running PreFilter plugin %q: %w", pl.Name(), status.AsError())).WithFailedPlugin(pl.Name())
+			return nil, framework.AsStatus(fmt.Errorf("running PreFilter plugin %q: %w", pl.Name(), status.AsError())).WithFailedPlugin(pl.Name())
 		}
-	}
+		if !r.AllNodes() {
+			pluginsWithNodes = append(pluginsWithNodes, pl.Name())
+		}
+		result = result.Merge(r)
+		if !result.AllNodes() && len(result.NodeNames) == 0 {
+			msg := fmt.Sprintf("node(s) didn't satisfy plugin(s) %v simultaneously", pluginsWithNodes)
+			if len(pluginsWithNodes) == 1 {
+				msg = fmt.Sprintf("node(s) didn't satisfy plugin %v", pluginsWithNodes[0])
+			}
+			return nil, framework.NewStatus(framework.Unschedulable, msg)
+		}
 
-	return nil
+	}
+	return result, nil
 }
 
-func (f *frameworkImpl) runPreFilterPlugin(ctx context.Context, pl framework.PreFilterPlugin, state *framework.CycleState, pod *v1.Pod) *framework.Status {
+func (f *frameworkImpl) runPreFilterPlugin(ctx context.Context, pl framework.PreFilterPlugin, state *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
 	if !state.ShouldRecordPluginMetrics() {
 		return pl.PreFilter(ctx, state, pod)
 	}
 	startTime := time.Now()
-	status := pl.PreFilter(ctx, state, pod)
+	result, status := pl.PreFilter(ctx, state, pod)
 	f.metricsRecorder.observePluginDurationAsync(preFilter, pl.Name(), status, metrics.SinceInSeconds(startTime))
-	return status
+	return result, status
 }
 
 // RunPreFilterExtensionAddPod calls the AddPod interface for the set of configured
