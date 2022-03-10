@@ -102,6 +102,8 @@ func (ed *EvalDetails) State() interpreter.EvalState {
 	return ed.state
 }
 
+// ActualCost returns the tracked cost through the course of execution when `CostTracking` is enabled.
+// Otherwise, returns nil if the cost was not enabled.
 func (ed *EvalDetails) ActualCost() *uint64 {
 	if ed.costTracker == nil {
 		return nil
@@ -291,6 +293,9 @@ func (p *prog) Eval(input interface{}) (v ref.Val, det *EvalDetails, err error) 
 
 // ContextEval implements the Program interface.
 func (p *prog) ContextEval(ctx context.Context, input interface{}) (ref.Val, *EvalDetails, error) {
+	if ctx == nil {
+		return nil, nil, fmt.Errorf("context can not be nil")
+	}
 	// Configure the input, making sure to wrap Activation inputs in the special ctxActivation which
 	// exposes the #interrupted variable and manages rate-limited checks of the ctx.Done() state.
 	var vars interpreter.Activation
@@ -360,16 +365,20 @@ func (gen *progGen) Eval(input interface{}) (ref.Val, *EvalDetails, error) {
 
 // ContextEval implements the Program interface method.
 func (gen *progGen) ContextEval(ctx context.Context, input interface{}) (ref.Val, *EvalDetails, error) {
+	if ctx == nil {
+		return nil, nil, fmt.Errorf("context can not be nil")
+	}
 	// The factory based Eval() differs from the standard evaluation model in that it generates a
 	// new EvalState instance for each call to ensure that unique evaluations yield unique stateful
 	// results.
 	state := interpreter.NewEvalState()
-	det := &EvalDetails{state: state}
+	costTracker := &interpreter.CostTracker{}
+	det := &EvalDetails{state: state, costTracker: costTracker}
 
 	// Generate a new instance of the interpretable using the factory configured during the call to
 	// newProgram(). It is incredibly unlikely that the factory call will generate an error given
 	// the factory test performed within the Program() call.
-	p, err := gen.factory(state, &interpreter.CostTracker{})
+	p, err := gen.factory(state, costTracker)
 	if err != nil {
 		return nil, det, err
 	}
