@@ -19,7 +19,6 @@ package util
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"testing"
 	"time"
 
@@ -127,22 +126,30 @@ func TestMoreImportantPod(t *testing.T) {
 func TestRemoveNominatedNodeName(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name                     string
-		currentNominatedNodeName []string
-		newNominatedNodeName     string
-		expectedPatchRequests    int
-		expectedPatchData        string
+		name                  string
+		pods                  []*v1.Pod
+		expectedPatchRequests int
+		expectedPatchData     string
 	}{
 		{
-			name:                     "Should make patch requests to clear node name",
-			currentNominatedNodeName: []string{"node1", "node2"},
-			expectedPatchRequests:    2,
-			expectedPatchData:        `{"status":{"nominatedNodeName":null}}`,
+			name: "Should make patch requests to clear node name",
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "foo1"},
+					Status:     v1.PodStatus{NominatedNodeName: "node1"},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "foo2"},
+					Status:     v1.PodStatus{NominatedNodeName: "node2"},
+				},
+			},
+			expectedPatchRequests: 2,
+			expectedPatchData:     `{"status":{"nominatedNodeName":null}}`,
 		},
 		{
-			name:                     "Should not make patch request if nominated node is already cleared",
-			currentNominatedNodeName: []string{""},
-			expectedPatchRequests:    0,
+			name:                  "Should not make patch request if nominated node is already cleared",
+			pods:                  []*v1.Pod{},
+			expectedPatchRequests: 0,
 		},
 	}
 	for _, test := range tests {
@@ -159,16 +166,7 @@ func TestRemoveNominatedNodeName(t *testing.T) {
 				return true, &v1.Pod{}, nil
 			})
 
-			var pods []*v1.Pod
-			for i, n := range test.currentNominatedNodeName {
-				p := &v1.Pod{
-					ObjectMeta: metav1.ObjectMeta{Name: "foo" + strconv.Itoa(i)},
-					Status:     v1.PodStatus{NominatedNodeName: n},
-				}
-				pods = append(pods, p)
-			}
-
-			if err := ClearNominatedNodeName(cs, pods...); err != nil {
+			if err := ClearNominatedNodeName(cs, test.pods...); err != nil {
 				t.Fatalf("Error calling removeNominatedNodeName: %v", err)
 			}
 
