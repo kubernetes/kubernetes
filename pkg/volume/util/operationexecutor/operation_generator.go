@@ -710,7 +710,6 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 		}
 		klog.V(verbosity).InfoS(detailedMsg, "pod", klog.KObj(volumeToMount.Pod))
 		resizeOptions.DeviceMountPath = volumeMounter.GetPath()
-		resizeOptions.CSIVolumePhase = volume.CSIVolumePublished
 
 		_, resizeError = og.nodeExpandVolume(volumeToMount, actualStateOfWorld, resizeOptions)
 		if resizeError != nil {
@@ -1204,7 +1203,6 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 		resizeOptions := volume.NodeResizeOptions{
 			DevicePath:      devicePath,
 			DeviceStagePath: stagingPath,
-			CSIVolumePhase:  volume.CSIVolumePublished,
 		}
 		_, resizeError := og.nodeExpandVolume(volumeToMount, actualStateOfWorld, resizeOptions)
 		if resizeError != nil {
@@ -1974,7 +1972,6 @@ func (og *operationGenerator) GenerateExpandInUseVolumeFunc(
 		}
 
 		// if we are doing online expansion then volume is already published
-		resizeOptions.CSIVolumePhase = volume.CSIVolumePublished
 		resizeDone, eventErr, detailedErr = og.doOnlineExpansion(volumeToMount, actualStateOfWorld, resizeOptions)
 		if eventErr != nil || detailedErr != nil {
 			return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
