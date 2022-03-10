@@ -19,6 +19,7 @@ package util
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
@@ -137,7 +138,7 @@ func TestClearNominatedNodeName(t *testing.T) {
 		patchError            error
 		expectedPatchError    utilerrors.Aggregate
 		expectedPatchRequests int
-		expectedPatchData     string
+		expectedPatchData     []string
 	}{
 		{
 			name: "Should make patch requests to clear node name",
@@ -152,7 +153,7 @@ func TestClearNominatedNodeName(t *testing.T) {
 				},
 			},
 			expectedPatchRequests: 2,
-			expectedPatchData:     `{"status":{"nominatedNodeName":null}}`,
+			expectedPatchData:     []string{`{"status":{"nominatedNodeName":null}}`, `{"status":{"nominatedNodeName":null}}`},
 		},
 		{
 			name: "Should make patch request only for pods that have NominatedNodeName",
@@ -167,7 +168,7 @@ func TestClearNominatedNodeName(t *testing.T) {
 				},
 			},
 			expectedPatchRequests: 1,
-			expectedPatchData:     `{"status":{"nominatedNodeName":null}}`,
+			expectedPatchData:     []string{`{"status":{"nominatedNodeName":null}}`},
 		},
 		{
 			name: "Should make patch requests for all pods even if a patch for one pods fails",
@@ -185,7 +186,7 @@ func TestClearNominatedNodeName(t *testing.T) {
 			patchError:            statusErr,
 			expectedPatchError:    utilerrors.NewAggregate([]error{statusErr}),
 			expectedPatchRequests: 2,
-			expectedPatchData:     `{"status":{"nominatedNodeName":null}}`,
+			expectedPatchData:     []string{`{"status":{"nominatedNodeName":null}}`},
 		},
 	}
 	for _, test := range tests {
@@ -215,10 +216,8 @@ func TestClearNominatedNodeName(t *testing.T) {
 				t.Fatalf("Actual patch requests (%d) dos not equal expected patch requests (%d)", actualPatchRequests, test.expectedPatchRequests)
 			}
 
-			for _, d := range actualPatchData {
-				if test.expectedPatchRequests > 0 && d != test.expectedPatchData {
-					t.Fatalf("Patch data mismatch: Actual was %v, but expected %v", d, test.expectedPatchData)
-				}
+			if test.expectedPatchRequests > 0 && !reflect.DeepEqual(actualPatchData, test.expectedPatchData) {
+				t.Fatalf("Patch data mismatch: Actual was %v, but expected %v", actualPatchData, test.expectedPatchData)
 			}
 		})
 	}
