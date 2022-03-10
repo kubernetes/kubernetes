@@ -357,7 +357,7 @@ func (o *DebugOptions) Run(f cmdutil.Factory, cmd *cobra.Command) error {
 			opts.Config = config
 			opts.AttachFunc = attach.DefaultAttachFunc
 
-			if err := handleAttachPod(ctx, f, o.podClient, debugPod.Namespace, debugPod.Name, containerName, opts); err != nil {
+			if err := o.handleAttachPod(ctx, f, debugPod.Namespace, debugPod.Name, containerName, opts); err != nil {
 				return err
 			}
 		}
@@ -701,7 +701,7 @@ func containerNameToRef(pod *corev1.Pod) map[string]*corev1.Container {
 }
 
 // waitForContainer watches the given pod until the container is running
-func waitForContainer(ctx context.Context, podClient corev1client.PodsGetter, ns, podName, containerName string) (*corev1.Pod, error) {
+func (o *DebugOptions) waitForContainer(ctx context.Context, ns, podName, containerName string) (*corev1.Pod, error) {
 	// TODO: expose the timeout
 	ctx, cancel := watchtools.ContextWithOptionalTimeout(ctx, 0*time.Second)
 	defer cancel()
@@ -710,11 +710,11 @@ func waitForContainer(ctx context.Context, podClient corev1client.PodsGetter, ns
 	lw := &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			options.FieldSelector = fieldSelector
-			return podClient.Pods(ns).List(ctx, options)
+			return o.podClient.Pods(ns).List(ctx, options)
 		},
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 			options.FieldSelector = fieldSelector
-			return podClient.Pods(ns).Watch(ctx, options)
+			return o.podClient.Pods(ns).Watch(ctx, options)
 		},
 	}
 
@@ -722,6 +722,7 @@ func waitForContainer(ctx context.Context, podClient corev1client.PodsGetter, ns
 	var result *corev1.Pod
 	err := intr.Run(func() error {
 		ev, err := watchtools.UntilWithSync(ctx, lw, &corev1.Pod{}, nil, func(ev watch.Event) (bool, error) {
+			klog.V(2).Infof("watch received event %q with object %T", ev.Type, ev.Object)
 			switch ev.Type {
 			case watch.Deleted:
 				return false, errors.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
@@ -740,6 +741,9 @@ func waitForContainer(ctx context.Context, podClient corev1client.PodsGetter, ns
 			if s.State.Running != nil || s.State.Terminated != nil {
 				return true, nil
 			}
+			if !o.Quiet && s.State.Waiting != nil && s.State.Waiting.Message != "" {
+				fmt.Fprintf(o.ErrOut, "Warning: container %s: %s\n", containerName, s.State.Waiting.Message)
+			}
 			return false, nil
 		})
 		if ev != nil {
@@ -751,8 +755,8 @@ func waitForContainer(ctx context.Context, podClient corev1client.PodsGetter, ns
 	return result, err
 }
 
-func handleAttachPod(ctx context.Context, f cmdutil.Factory, podClient corev1client.PodsGetter, ns, podName, containerName string, opts *attach.AttachOptions) error {
-	pod, err := waitForContainer(ctx, podClient, ns, podName, containerName)
+func (o *DebugOptions) handleAttachPod(ctx context.Context, f cmdutil.Factory, ns, podName, containerName string, opts *attach.AttachOptions) error {
+	pod, err := o.waitForContainer(ctx, ns, podName, containerName)
 	if err != nil {
 		return err
 	}
