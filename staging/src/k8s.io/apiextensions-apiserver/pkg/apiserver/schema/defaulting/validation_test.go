@@ -17,6 +17,7 @@ limitations under the License.
 package defaulting
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -95,6 +96,7 @@ func TestDefaultValidationWithCostBudget(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		ctx := context.TODO()
 		t.Run(tt.name, func(t *testing.T) {
 			schema := tt.input.OpenAPIV3Schema
 			ss, err := structuralschema.NewStructural(schema)
@@ -105,7 +107,7 @@ func TestDefaultValidationWithCostBudget(t *testing.T) {
 			f := NewRootObjectFunc().WithTypeMeta(metav1.TypeMeta{APIVersion: "validation/v1", Kind: "Validation"})
 
 			// cost budget is large enough to pass all validation rules
-			allErrs, err, _ := validate(field.NewPath("test"), ss, ss, f, false, false, 10)
+			allErrs, err, _ := validate(ctx, field.NewPath("test"), ss, ss, f, false, false, 10)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -115,7 +117,7 @@ func TestDefaultValidationWithCostBudget(t *testing.T) {
 			}
 
 			// cost budget exceeded for the first validation rule
-			allErrs, err, _ = validate(field.NewPath("test"), ss, ss, f, false, false, 0)
+			allErrs, err, _ = validate(ctx, field.NewPath("test"), ss, ss, f, false, false, 0)
 			meet := 0
 			for _, er := range allErrs {
 				if er.Type == field.ErrorTypeInvalid && strings.Contains(er.Error(), "validation failed due to running out of cost budget, no further validation rules will be run") {
@@ -130,7 +132,7 @@ func TestDefaultValidationWithCostBudget(t *testing.T) {
 			}
 
 			// cost budget exceeded for the last validation rule
-			allErrs, err, _ = validate(field.NewPath("test"), ss, ss, f, false, false, 9)
+			allErrs, err, _ = validate(ctx, field.NewPath("test"), ss, ss, f, false, false, 9)
 			meet = 0
 			for _, er := range allErrs {
 				if er.Type == field.ErrorTypeInvalid && strings.Contains(er.Error(), "validation failed due to running out of cost budget, no further validation rules will be run") {

@@ -49,6 +49,10 @@ const (
 	// RuntimeCELCostBudget is the overall cost budget for runtime CEL validation cost per CustomResource
 	// current RuntimeCELCostBudget gives roughly 1 seconds for CR validation
 	RuntimeCELCostBudget = 20000000
+
+	// checkFrequency configures the number of iterations within a comprehension to evaluate
+	// before checking whether the function evaluation has been interrupted
+	checkFrequency = 100
 )
 
 // CompilationResult represents the cel compilation result for one rule
@@ -153,7 +157,7 @@ func compileRule(rule apiextensions.ValidationRule, env *cel.Env, perCallLimit u
 	}
 
 	// TODO: Ideally we could configure the per expression limit at validation time and set it to the remaining overall budget, but we would either need a way to pass in a limit at evaluation time or move program creation to validation time
-	prog, err := env.Program(ast, cel.EvalOptions(cel.OptOptimize, cel.OptTrackCost), cel.CostLimit(perCallLimit))
+	prog, err := env.Program(ast, cel.EvalOptions(cel.OptOptimize, cel.OptTrackCost), cel.CostLimit(perCallLimit), cel.InterruptCheckFrequency(checkFrequency))
 	if err != nil {
 		compilationResult.Error = &Error{ErrorTypeInvalid, "program instantiation failed: " + err.Error()}
 		return

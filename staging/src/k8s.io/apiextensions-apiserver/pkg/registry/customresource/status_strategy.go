@@ -91,7 +91,7 @@ func (a statusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Obj
 
 		// validate x-kubernetes-validations rules
 		if celValidator, ok := a.customResourceStrategy.celValidators[v]; ok {
-			err, _ := celValidator.Validate(nil, a.customResourceStrategy.structuralSchemas[v], u.Object, cel.RuntimeCELCostBudget)
+			err, _ := celValidator.Validate(ctx, nil, a.customResourceStrategy.structuralSchemas[v], u.Object, cel.RuntimeCELCostBudget)
 			errs = append(errs, err...)
 		}
 	}
