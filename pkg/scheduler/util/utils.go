@@ -126,6 +126,7 @@ func DeletePod(cs kubernetes.Interface, pod *v1.Pod) error {
 
 // ClearNominatedNodeName internally submit a patch request to API server
 // to set each <pods[*].Status.NominatedNodeName> to "".
+// It make patch requests for all pods even if a patch for one pods fails
 func ClearNominatedNodeName(cs kubernetes.Interface, pods ...*v1.Pod) utilerrors.Aggregate {
 	var errs []error
 	for _, p := range pods {
