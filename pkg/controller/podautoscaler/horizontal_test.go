@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -756,7 +757,7 @@ func (tc *testCase) runTestWithController(t *testing.T, hpaController *Horizonta
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	informerFactory.Start(ctx.Done())
-	go hpaController.Run(ctx)
+	go hpaController.Run(ctx, 5)
 
 	tc.Lock()
 	shouldWait := tc.verifyEvents
@@ -4179,4 +4180,271 @@ func TestNoScaleDownOneMetricEmpty(t *testing.T) {
 	})
 	tc.testEMClient = testEMClient
 	tc.runTest(t)
+}
+
+func TestMultipleHPAs(t *testing.T) {
+	const hpaCount = 1000
+	const testNamespace = "dummy-namespace"
+
+	processed := make(chan string, hpaCount)
+
+	testClient := &fake.Clientset{}
+	testScaleClient := &scalefake.FakeScaleClient{}
+	testMetricsClient := &metricsfake.Clientset{}
+
+	hpaList := [hpaCount]autoscalingv2.HorizontalPodAutoscaler{}
+	scaleUpEventsMap := map[string][]timestampedScaleEvent{}
+	scaleDownEventsMap := map[string][]timestampedScaleEvent{}
+	scaleList := map[string]*autoscalingv1.Scale{}
+	podList := map[string]*v1.Pod{}
+
+	var minReplicas int32 = 1
+	var cpuTarget int32 = 10
+
+	// generate resources (HPAs, Scales, Pods...)
+	for i := 0; i < hpaCount; i++ {
+		hpaName := fmt.Sprintf("dummy-hpa-%v", i)
+		deploymentName := fmt.Sprintf("dummy-target-%v", i)
+		labelSet := map[string]string{"name": deploymentName}
+		selector := labels.SelectorFromSet(labelSet).String()
+
+		// generate HPAs
+		h := autoscalingv2.HorizontalPodAutoscaler{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      hpaName,
+				Namespace: testNamespace,
+			},
+			Spec: autoscalingv2.HorizontalPodAutoscalerSpec{
+				ScaleTargetRef: autoscalingv2.CrossVersionObjectReference{
+					APIVersion: "apps/v1",
+					Kind:       "Deployment",
+					Name:       deploymentName,
+				},
+				MinReplicas: &minReplicas,
+				MaxReplicas: 10,
+				Behavior: &autoscalingv2.HorizontalPodAutoscalerBehavior{
+					ScaleUp:   generateScalingRules(100, 60, 0, 0, 0),
+					ScaleDown: generateScalingRules(2, 60, 1, 60, 300),
+				},
+				Metrics: []autoscalingv2.MetricSpec{
+					{
+						Type: autoscalingv2.ResourceMetricSourceType,
+						Resource: &autoscalingv2.ResourceMetricSource{
+							Name: v1.ResourceCPU,
+							Target: autoscalingv2.MetricTarget{
+								Type:               autoscalingv2.UtilizationMetricType,
+								AverageUtilization: &cpuTarget,
+							},
+						},
+					},
+				},
+			},
+			Status: autoscalingv2.HorizontalPodAutoscalerStatus{
+				CurrentReplicas: 1,
+				DesiredReplicas: 5,
+				LastScaleTime:   &metav1.Time{Time: time.Now()},
+			},
+		}
+		hpaList[i] = h
+
+		// generate Scale
+		scaleList[deploymentName] = &autoscalingv1.Scale{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      deploymentName,
+				Namespace: testNamespace,
+			},
+			Spec: autoscalingv1.ScaleSpec{
+				Replicas: 1,
+			},
+			Status: autoscalingv1.ScaleStatus{
+				Replicas: 1,
+				Selector: selector,
+			},
+		}
+
+		// generate Pods
+		cpuRequest := resource.MustParse("1.0")
+		pod := v1.Pod{
+			Status: v1.PodStatus{
+				Phase: v1.PodRunning,
+				Conditions: []v1.PodCondition{
+					{
+						Type:   v1.PodReady,
+						Status: v1.ConditionTrue,
+					},
+				},
+				StartTime: &metav1.Time{Time: time.Now().Add(-10 * time.Minute)},
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("%s-0", deploymentName),
+				Namespace: testNamespace,
+				Labels:    labelSet,
+			},
+
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name: "container1",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU: *resource.NewMilliQuantity(cpuRequest.MilliValue()/2, resource.DecimalSI),
+							},
+						},
+					},
+					{
+						Name: "container2",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU: *resource.NewMilliQuantity(cpuRequest.MilliValue()/2, resource.DecimalSI),
+							},
+						},
+					},
+				},
+			},
+		}
+		podList[deploymentName] = &pod
+
+		scaleUpEventsMap[fmt.Sprintf("%s/%s", testNamespace, hpaName)] = generateEventsUniformDistribution([]int{8, 12, 9, 11}, 120)
+		scaleDownEventsMap[fmt.Sprintf("%s/%s", testNamespace, hpaName)] = generateEventsUniformDistribution([]int{10, 10, 10}, 120)
+	}
+
+	testMetricsClient.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		podNamePrefix := ""
+		labelSet := map[string]string{}
+
+		// selector should be in form: "name=dummy-target-X" where X is the number of resource
+		selector := action.(core.ListAction).GetListRestrictions().Labels
+		parsedSelector := strings.Split(selector.String(), "=")
+		if len(parsedSelector) > 1 {
+			labelSet[parsedSelector[0]] = parsedSelector[1]
+			podNamePrefix = parsedSelector[1]
+		}
+
+		podMetric := metricsapi.PodMetrics{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("%s-0", podNamePrefix),
+				Namespace: testNamespace,
+				Labels:    labelSet,
+			},
+			Timestamp: metav1.Time{Time: time.Now()},
+			Window:    metav1.Duration{Duration: time.Minute},
+			Containers: []metricsapi.ContainerMetrics{
+				{
+					Name: "container1",
+					Usage: v1.ResourceList{
+						v1.ResourceCPU: *resource.NewMilliQuantity(
+							int64(200),
+							resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(
+							int64(1024*1024/2),
+							resource.BinarySI),
+					},
+				},
+				{
+					Name: "container2",
+					Usage: v1.ResourceList{
+						v1.ResourceCPU: *resource.NewMilliQuantity(
+							int64(300),
+							resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(
+							int64(1024*1024/2),
+							resource.BinarySI),
+					},
+				},
+			},
+		}
+		metrics := &metricsapi.PodMetricsList{}
+		metrics.Items = append(metrics.Items, podMetric)
+
+		return true, metrics, nil
+	})
+
+	metricsClient := metrics.NewRESTMetricsClient(
+		testMetricsClient.MetricsV1beta1(),
+		&cmfake.FakeCustomMetricsClient{},
+		&emfake.FakeExternalMetricsClient{},
+	)
+
+	testScaleClient.AddReactor("get", "deployments", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		deploymentName := action.(core.GetAction).GetName()
+		obj := scaleList[deploymentName]
+		return true, obj, nil
+	})
+
+	testClient.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		obj := &v1.PodList{}
+
+		// selector should be in form: "name=dummy-target-X" where X is the number of resource
+		selector := action.(core.ListAction).GetListRestrictions().Labels
+		parsedSelector := strings.Split(selector.String(), "=")
+
+		// list with filter
+		if len(parsedSelector) > 1 {
+			obj.Items = append(obj.Items, *podList[parsedSelector[1]])
+		} else {
+			// no filter - return all pods
+			for _, p := range podList {
+				obj.Items = append(obj.Items, *p)
+			}
+		}
+
+		return true, obj, nil
+	})
+
+	testClient.AddReactor("list", "horizontalpodautoscalers", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		obj := &autoscalingv2.HorizontalPodAutoscalerList{
+			Items: hpaList[:],
+		}
+		return true, obj, nil
+	})
+
+	testClient.AddReactor("update", "horizontalpodautoscalers", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		handled, obj, err := func() (handled bool, ret *autoscalingv2.HorizontalPodAutoscaler, err error) {
+			obj := action.(core.UpdateAction).GetObject().(*autoscalingv2.HorizontalPodAutoscaler)
+			assert.Equal(t, testNamespace, obj.Namespace, "the HPA namespace should be as expected")
+
+			return true, obj, nil
+		}()
+		processed <- obj.Name
+
+		return handled, obj, err
+	})
+
+	informerFactory := informers.NewSharedInformerFactory(testClient, controller.NoResyncPeriodFunc())
+
+	hpaController := NewHorizontalController(
+		testClient.CoreV1(),
+		testScaleClient,
+		testClient.AutoscalingV2(),
+		testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme),
+		metricsClient,
+		informerFactory.Autoscaling().V2().HorizontalPodAutoscalers(),
+		informerFactory.Core().V1().Pods(),
+		100*time.Millisecond,
+		5*time.Minute,
+		defaultTestingTolerance,
+		defaultTestingCPUInitializationPeriod,
+		defaultTestingDelayOfInitialReadinessStatus,
+	)
+	hpaController.scaleUpEvents = scaleUpEventsMap
+	hpaController.scaleDownEvents = scaleDownEventsMap
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	informerFactory.Start(ctx.Done())
+	go hpaController.Run(ctx, 5)
+
+	timeoutTime := time.After(15 * time.Second)
+	timeout := false
+	processedHPA := make(map[string]bool)
+	for timeout == false && len(processedHPA) < hpaCount {
+		select {
+		case hpaName := <-processed:
+			processedHPA[hpaName] = true
+		case <-timeoutTime:
+			timeout = true
+		}
+	}
+
+	assert.Equal(t, hpaCount, len(processedHPA), "Expected to process all HPAs")
 }
