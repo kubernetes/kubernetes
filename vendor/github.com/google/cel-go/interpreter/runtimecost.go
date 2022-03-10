@@ -12,10 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package interpreter provides functions to evaluate parsed expressions with
-// the option to augment the evaluation with inputs and functions supplied at
-// evaluation time.
-
 package interpreter
 
 import (
@@ -35,7 +31,7 @@ import (
 // estimate to provide. CEL attempts to provide reasonable estimates for its standard function library, so CallCost
 // should typically not need to provide an estimate for CELs standard function.
 type ActualCostEstimator interface {
-	CallCost(overloadId string, args []ref.Val) *uint64
+	CallCost(function, overloadID string, args []ref.Val, result ref.Val) *uint64
 }
 
 // CostObserver provides an observer that tracks runtime cost.
@@ -46,7 +42,7 @@ func CostObserver(tracker *CostTracker) EvalObserver {
 			// TODO: Push identifiers on to the stack before observing constant qualifiers that apply to them
 			// and enable the below pop. Once enabled this can case can be collapsed into the Qualifier case.
 			//tracker.stack.pop(1)
-			tracker.cost += 1
+			tracker.cost++
 		case InterpretableConst:
 			// zero cost
 		case InterpretableAttribute:
@@ -59,10 +55,10 @@ func CostObserver(tracker *CostTracker) EvalObserver {
 			// Ternary has no direct cost. All cost is from the conditional and the true/false branch expressions.
 		case Qualifier:
 			tracker.stack.pop(1)
-			tracker.cost += 1
+			tracker.cost++
 		case InterpretableCall:
 			if argVals, ok := tracker.stack.pop(len(t.Args())); ok {
-				tracker.cost += tracker.costCall(t, argVals)
+				tracker.cost += tracker.costCall(t, argVals, val)
 			}
 		case InterpretableConstructor:
 			switch t.Type() {
@@ -97,10 +93,10 @@ func (c CostTracker) ActualCost() uint64 {
 	return c.cost
 }
 
-func (c CostTracker) costCall(call InterpretableCall, argValues []ref.Val) uint64 {
+func (c CostTracker) costCall(call InterpretableCall, argValues []ref.Val, result ref.Val) uint64 {
 	var cost uint64
 	if c.Estimator != nil {
-		callCost := c.Estimator.CallCost(call.OverloadID(), argValues)
+		callCost := c.Estimator.CallCost(call.Function(), call.OverloadID(), argValues, result)
 		if callCost != nil {
 			cost += *callCost
 			return cost
@@ -160,7 +156,7 @@ func (c CostTracker) costCall(call InterpretableCall, argValues []ref.Val) uint6
 		// - Computing the size of strings, byte sequences, lists and maps.
 		// - Logical operations and all operators on fixed width scalars (comparisons, equality)
 		// - Any functions that don't have a declared cost either here or in provided ActualCostEstimator.
-		cost += 1
+		cost++
 
 	}
 	return cost
