@@ -54,6 +54,34 @@ type SpecETag struct {
 	etag string
 }
 
+// OpenAPIV3Root downloads the OpenAPI V3 root document from an APIService
+func (s *Downloader) OpenAPIV3Root(handler http.Handler) ([]string, error) {
+	handler = s.handlerWithUser(handler, &user.DefaultInfo{Name: aggregatorUser})
+	handler = http.TimeoutHandler(handler, specDownloadTimeout, "request timed out")
+
+	req, err := http.NewRequest("GET", "/openapi/v3", nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Add("Accept", "application/json")
+
+	writer := newInMemoryResponseWriter()
+	handler.ServeHTTP(writer, req)
+
+	switch writer.respCode {
+	case http.StatusNotFound:
+		// TODO: For APIServices, download the V2 spec and convert to V3
+		return nil, nil
+	case http.StatusOK:
+		groups := gvList{}
+		if err := json.Unmarshal(writer.data, &groups); err != nil {
+			return nil, err
+		}
+		return groups.Paths, nil
+	}
+	return nil, fmt.Errorf("Error, could not get list of group versions for APIService")
+}
+
 // Download downloads OpenAPI v3 for all groups of a given handler
 func (s *Downloader) Download(handler http.Handler, etagList map[string]string) (returnSpec map[string]*SpecETag, err error) {
 	// TODO(jefftree): https://github.com/kubernetes/kubernetes/pull/105945#issuecomment-966455034
