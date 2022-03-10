@@ -48,6 +48,16 @@ const cniConfig = `{
 }
 `
 
+const credentialProviderConfig = `kind: CredentialProviderConfig
+apiVersion: kubelet.config.k8s.io/v1alpha1
+providers:
+  - name: credential-provider
+    apiVersion: credentialprovider.kubelet.k8s.io/v1alpha1
+    matchImages:
+    - "gcr.io"
+    - "*.gcr.io"
+    defaultCacheDuration: 1m`
+
 // Install the cni plugin and add basic bridge configuration to the
 // configuration directory.
 func setupCNI(host, workspace string) error {
@@ -73,6 +83,19 @@ func setupCNI(host, workspace string) error {
 	if output, err := SSH(host, "sh", "-c", cmd); err != nil {
 		return fmt.Errorf("failed to write cni configuration on %q: %v output: %q", host, err, output)
 	}
+	return nil
+}
+
+func configureCredentialProvider(host, workspace string) error {
+	klog.V(2).Infof("Configuring kubelet credential provider on %q", host)
+
+	cmd := getSSHCommand(" ; ",
+		fmt.Sprintf("echo %s > %s", quote(credentialProviderConfig), filepath.Join(workspace, "credential-provider.yaml")),
+	)
+	if output, err := SSH(host, "sh", "-c", cmd); err != nil {
+		return fmt.Errorf("failed to write credential provider configuration on %q: %v output: %q", host, err, output)
+	}
+
 	return nil
 }
 
