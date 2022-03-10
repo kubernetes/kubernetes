@@ -25,6 +25,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
@@ -123,11 +124,17 @@ func TestMoreImportantPod(t *testing.T) {
 	}
 }
 
-func TestRemoveNominatedNodeName(t *testing.T) {
+func TestClearNominatedNodeName(t *testing.T) {
 	t.Parallel()
+	statusErr := &apierrors.StatusError{
+		ErrStatus: metav1.Status{Reason: metav1.StatusReasonUnknown},
+	}
+
 	tests := []struct {
 		name                  string
 		pods                  []*v1.Pod
+		patchError            error
+		expectedPatchErrors   []error
 		expectedPatchRequests int
 		expectedPatchData     string
 	}{
@@ -151,6 +158,34 @@ func TestRemoveNominatedNodeName(t *testing.T) {
 			pods:                  []*v1.Pod{},
 			expectedPatchRequests: 0,
 		},
+		{
+			name: "Should not be patched if NominatedNodeName is empty",
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "foo1"},
+					Status:     v1.PodStatus{NominatedNodeName: ""},
+				},
+			},
+			expectedPatchRequests: 0,
+		},
+		{
+			name: "Should return error if patch fails",
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "foo1"},
+					Status:     v1.PodStatus{NominatedNodeName: "node1"},
+				},
+				{
+					// In this test, the pod named "err1" returns an error in the patch.
+					ObjectMeta: metav1.ObjectMeta{Name: "err1"},
+					Status:     v1.PodStatus{NominatedNodeName: "node1"},
+				},
+			},
+			patchError:            statusErr,
+			expectedPatchErrors:   []error{statusErr},
+			expectedPatchRequests: 2,
+			expectedPatchData:     `{"status":{"nominatedNodeName":null}}`,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -160,14 +195,23 @@ func TestRemoveNominatedNodeName(t *testing.T) {
 			cs.AddReactor("patch", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
 				actualPatchRequests++
 				patch := action.(clienttesting.PatchAction)
-				actualPatchData = append(actualPatchData, string(patch.GetPatch()))
-				// For this test, we don't care about the result of the patched pod, just that we got the expected
-				// patch request, so just returning &v1.Pod{} here is OK because scheduler doesn't use the response.
-				return true, &v1.Pod{}, nil
+				// If the pod name is "err", return an error.
+				if patch.GetName() == "err1" {
+					return true, nil, test.patchError
+				} else {
+					actualPatchData = append(actualPatchData, string(patch.GetPatch()))
+					// For this test, we don't care about the result of the patched pod, just that we got the expected
+					// patch request, so just returning &v1.Pod{} here is OK because scheduler doesn't use the response.
+					return true, &v1.Pod{}, nil
+				}
 			})
 
 			if err := ClearNominatedNodeName(cs, test.pods...); err != nil {
-				t.Fatalf("Error calling removeNominatedNodeName: %v", err)
+				for i, e := range err.Errors() {
+					if e != test.expectedPatchErrors[i] {
+						t.Fatalf("Error calling ClearNominatedNodeName: Actual was %v, but expected %v", e, test.expectedPatchErrors[i])
+					}
+				}
 			}
 
 			if actualPatchRequests != test.expectedPatchRequests {
