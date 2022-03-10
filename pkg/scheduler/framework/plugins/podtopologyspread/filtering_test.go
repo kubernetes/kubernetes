@@ -601,7 +601,7 @@ func TestPreFilterState(t *testing.T) {
 			p.(*PodTopologySpread).enableMinDomainsInPodTopologySpread = tt.enableMinDomains
 
 			cs := framework.NewCycleState()
-			if s := p.(*PodTopologySpread).PreFilter(ctx, cs, tt.pod); !s.IsSuccess() {
+			if _, s := p.(*PodTopologySpread).PreFilter(ctx, cs, tt.pod); !s.IsSuccess() {
 				t.Fatal(s.AsError())
 			}
 			got, err := getPreFilterState(cs)
@@ -910,7 +910,7 @@ func TestPreFilterStateAddPod(t *testing.T) {
 			pl := plugintesting.SetupPlugin(t, topologySpreadFunc, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, snapshot)
 			p := pl.(*PodTopologySpread)
 			cs := framework.NewCycleState()
-			if s := p.PreFilter(ctx, cs, tt.preemptor); !s.IsSuccess() {
+			if _, s := p.PreFilter(ctx, cs, tt.preemptor); !s.IsSuccess() {
 				t.Fatal(s.AsError())
 			}
 			nodeInfo, err := snapshot.Get(tt.nodes[tt.nodeIdx].Name)
@@ -1115,8 +1115,7 @@ func TestPreFilterStateRemovePod(t *testing.T) {
 			pl := plugintesting.SetupPlugin(t, topologySpreadFunc, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, snapshot)
 			p := pl.(*PodTopologySpread)
 			cs := framework.NewCycleState()
-			s := p.PreFilter(ctx, cs, tt.preemptor)
-			if !s.IsSuccess() {
+			if _, s := p.PreFilter(ctx, cs, tt.preemptor); !s.IsSuccess() {
 				t.Fatal(s.AsError())
 			}
 
@@ -1191,8 +1190,7 @@ func BenchmarkFilter(b *testing.B) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				state = framework.NewCycleState()
-				s := p.PreFilter(ctx, state, tt.pod)
-				if !s.IsSuccess() {
+				if _, s := p.PreFilter(ctx, state, tt.pod); !s.IsSuccess() {
 					b.Fatal(s.AsError())
 				}
 				filterNode := func(i int) {
@@ -1631,9 +1629,8 @@ func TestSingleConstraint(t *testing.T) {
 			p := pl.(*PodTopologySpread)
 			p.enableMinDomainsInPodTopologySpread = tt.enableMinDomains
 			state := framework.NewCycleState()
-			preFilterStatus := p.PreFilter(context.Background(), state, tt.pod)
-			if !preFilterStatus.IsSuccess() {
-				t.Errorf("preFilter failed with status: %v", preFilterStatus)
+			if _, s := p.PreFilter(context.Background(), state, tt.pod); !s.IsSuccess() {
+				t.Errorf("preFilter failed with status: %v", s)
 			}
 
 			for _, node := range tt.nodes {
@@ -1858,9 +1855,8 @@ func TestMultipleConstraints(t *testing.T) {
 			pl := plugintesting.SetupPlugin(t, topologySpreadFunc, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, snapshot)
 			p := pl.(*PodTopologySpread)
 			state := framework.NewCycleState()
-			preFilterStatus := p.PreFilter(context.Background(), state, tt.pod)
-			if !preFilterStatus.IsSuccess() {
-				t.Errorf("preFilter failed with status: %v", preFilterStatus)
+			if _, s := p.PreFilter(context.Background(), state, tt.pod); !s.IsSuccess() {
+				t.Errorf("preFilter failed with status: %v", s)
 			}
 
 			for _, node := range tt.nodes {

@@ -120,11 +120,11 @@ func haveOverlap(a1, a2 []string) bool {
 	return false
 }
 
-func (pl *VolumeRestrictions) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod) *framework.Status {
+func (pl *VolumeRestrictions) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
 	if pl.enableReadWriteOncePod {
-		return pl.isReadWriteOncePodAccessModeConflict(ctx, pod)
+		return nil, pl.isReadWriteOncePodAccessModeConflict(ctx, pod)
 	}
-	return framework.NewStatus(framework.Success)
+	return nil, framework.NewStatus(framework.Success)
 }
 
 // isReadWriteOncePodAccessModeConflict checks if a pod uses a PVC with the ReadWriteOncePod access mode.

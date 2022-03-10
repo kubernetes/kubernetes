@@ -855,7 +855,7 @@ func TestNodeAffinity(t *testing.T) {
 			state := framework.NewCycleState()
 			var gotStatus *framework.Status
 			if !test.disablePreFilter {
-				gotStatus = p.(framework.PreFilterPlugin).PreFilter(context.Background(), state, test.pod)
+				_, gotStatus = p.(framework.PreFilterPlugin).PreFilter(context.Background(), state, test.pod)
 				if !gotStatus.IsSuccess() {
 					t.Errorf("unexpected error: %v", gotStatus)
 				}

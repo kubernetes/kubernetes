@@ -140,14 +140,14 @@ type schedulerOptions struct {
 // Option configures a Scheduler
 type Option func(*schedulerOptions)
 
-// ScheduleResult represents the result of one pod scheduled. It will contain
-// the final selected Node, along with the selected intermediate information.
+// ScheduleResult represents the result of scheduling a pod.
 type ScheduleResult struct {
-	// Name of the scheduler suggest host
+	// Name of the selected node.
 	SuggestedHost string
-	// Number of nodes scheduler evaluated on one pod scheduled
+	// The number of nodes the scheduler evaluated the pod against in the filtering
+	// phase and beyond.
 	EvaluatedNodes int
-	// Number of feasible nodes on one pod scheduled
+	// The number of nodes out of the evaluated ones that fit the pod.
 	FeasibleNodes int
 }
 
@@ -900,7 +900,7 @@ func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, fwk framework.F
 	}
 
 	// Run "prefilter" plugins.
-	s := fwk.RunPreFilterPlugins(ctx, state, pod)
+	preRes, s := fwk.RunPreFilterPlugins(ctx, state, pod)
 	allNodes, err := sched.nodeInfoSnapshot.NodeInfos().List()
 	if err != nil {
 		return nil, diagnosis, err
@@ -915,7 +915,9 @@ func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, fwk framework.F
 			diagnosis.NodeToStatusMap[n.Node().Name] = s
 		}
 		// Status satisfying IsUnschedulable() gets injected into diagnosis.UnschedulablePlugins.
-		diagnosis.UnschedulablePlugins.Insert(s.FailedPlugin())
+		if s.FailedPlugin() != "" {
+			diagnosis.UnschedulablePlugins.Insert(s.FailedPlugin())
+		}
 		return nil, diagnosis, nil
 	}
 
@@ -931,7 +933,19 @@ func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, fwk framework.F
 			return feasibleNodes, diagnosis, nil
 		}
 	}
-	feasibleNodes, err := sched.findNodesThatPassFilters(ctx, fwk, state, pod, diagnosis, allNodes)
+
+	nodes := allNodes
+	if !preRes.AllNodes() {
+		nodes = make([]*framework.NodeInfo, 0, len(preRes.NodeNames))
+		for n := range preRes.NodeNames {
+			nInfo, err := sched.nodeInfoSnapshot.NodeInfos().Get(n)
+			if err != nil {
+				return nil, diagnosis, err
+			}
+			nodes = append(nodes, nInfo)
+		}
+	}
+	feasibleNodes, err := sched.findNodesThatPassFilters(ctx, fwk, state, pod, diagnosis, nodes)
 	if err != nil {
 		return nil, diagnosis, err
 	}

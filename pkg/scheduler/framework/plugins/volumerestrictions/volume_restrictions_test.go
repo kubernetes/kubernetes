@@ -366,7 +366,7 @@ func TestAccessModeConflicts(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			p := newPluginWithListers(ctx, t, test.existingPods, test.existingNodes, test.existingPVCs, test.enableReadWriteOncePod)
-			gotStatus := p.(framework.PreFilterPlugin).PreFilter(context.Background(), nil, test.pod)
+			_, gotStatus := p.(framework.PreFilterPlugin).PreFilter(context.Background(), nil, test.pod)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %+v, want: %+v", gotStatus, test.wantStatus)
 			}
