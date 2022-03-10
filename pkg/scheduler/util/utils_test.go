@@ -127,7 +127,6 @@ func TestMoreImportantPod(t *testing.T) {
 }
 
 func TestClearNominatedNodeName(t *testing.T) {
-	t.Parallel()
 	statusErr := &apierrors.StatusError{
 		ErrStatus: metav1.Status{Reason: metav1.StatusReasonUnknown},
 	}
@@ -300,7 +299,6 @@ func TestPatchPodStatus(t *testing.T) {
 }
 
 func TestIsScalarResourceName(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name         string
 		resourceName v1.ResourceName
