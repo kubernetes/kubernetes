@@ -155,25 +155,30 @@ func TestClearNominatedNodeName(t *testing.T) {
 			expectedPatchData:     `{"status":{"nominatedNodeName":null}}`,
 		},
 		{
-			name: "Should not be patched if NominatedNodeName is empty",
+			name: "Should make patch request only for pods that have NominatedNodeName",
 			pods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "foo1"},
 					Status:     v1.PodStatus{NominatedNodeName: ""},
 				},
-			},
-			expectedPatchRequests: 0,
-		},
-		{
-			name: "Should return error if patch fails",
-			pods: []*v1.Pod{
 				{
-					ObjectMeta: metav1.ObjectMeta{Name: "foo1"},
+					ObjectMeta: metav1.ObjectMeta{Name: "foo2"},
 					Status:     v1.PodStatus{NominatedNodeName: "node1"},
 				},
+			},
+			expectedPatchRequests: 1,
+			expectedPatchData:     `{"status":{"nominatedNodeName":null}}`,
+		},
+		{
+			name: "Should make patch requests for all pods even if a patch for one pods fails",
+			pods: []*v1.Pod{
 				{
 					// In this test, the pod named "err" returns an error in the patch.
 					ObjectMeta: metav1.ObjectMeta{Name: "err"},
+					Status:     v1.PodStatus{NominatedNodeName: "node1"},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "foo1"},
 					Status:     v1.PodStatus{NominatedNodeName: "node1"},
 				},
 			},
@@ -192,7 +197,7 @@ func TestClearNominatedNodeName(t *testing.T) {
 				actualPatchRequests++
 				patch := action.(clienttesting.PatchAction)
 				// If the pod name is "err", return an error.
-				if patch.GetName() == "err1" {
+				if patch.GetName() == "err" {
 					return true, nil, test.patchError
 				}
 				actualPatchData = append(actualPatchData, string(patch.GetPatch()))
@@ -202,7 +207,7 @@ func TestClearNominatedNodeName(t *testing.T) {
 
 			})
 
-			if err := ClearNominatedNodeName(cs, test.pods...); err != nil && err != test.expectedPatchError {
+			if err := ClearNominatedNodeName(cs, test.pods...); err != nil && err.Is(test.expectedPatchError) {
 				t.Fatalf("ClearNominatedNodeName's error mismatch: Actual was %v, but expected %v", err, test.expectedPatchError)
 			}
 
