@@ -176,8 +176,8 @@ func TestClearNominatedNodeName(t *testing.T) {
 					Status:     v1.PodStatus{NominatedNodeName: "node1"},
 				},
 				{
-					// In this test, the pod named "err1" returns an error in the patch.
-					ObjectMeta: metav1.ObjectMeta{Name: "err1"},
+					// In this test, the pod named "err" returns an error in the patch.
+					ObjectMeta: metav1.ObjectMeta{Name: "err"},
 					Status:     v1.PodStatus{NominatedNodeName: "node1"},
 				},
 			},
