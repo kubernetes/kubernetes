@@ -37,6 +37,7 @@ import (
 	e2eingress "k8s.io/kubernetes/test/e2e/framework/ingress"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	"k8s.io/kubernetes/test/e2e/network/scale"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 var (
@@ -133,6 +134,10 @@ func main() {
 	ns := &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: testNamespace,
+			Labels: map[string]string{
+				// TODO(https://github.com/kubernetes/kubernetes/issues/108298): route namespace creation via framework.Framework.CreateNamespace in 1.24
+				admissionapi.EnforceLevelLabel: string(admissionapi.LevelPrivileged),
+			},
 		},
 	}
 	klog.Infof("Creating namespace %s...", ns.Name)

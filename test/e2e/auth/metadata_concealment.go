@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ejob "k8s.io/kubernetes/test/e2e/framework/job"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 	imageutil "k8s.io/kubernetes/test/utils/image"
@@ -30,6 +31,7 @@ import (
 
 var _ = SIGDescribe("Metadata Concealment", func() {
 	f := framework.NewDefaultFramework("metadata-concealment")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	ginkgo.It("should run a check-metadata-concealment job to completion", func() {
 		e2eskipper.SkipUnlessProviderIs("gce")

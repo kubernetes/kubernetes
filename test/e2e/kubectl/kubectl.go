@@ -75,6 +75,7 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 	"k8s.io/kubernetes/test/utils/crd"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 	uexec "k8s.io/utils/exec"
 	"k8s.io/utils/pointer"
 
@@ -226,6 +227,7 @@ func runKubectlRetryOrDie(ns string, args ...string) string {
 var _ = SIGDescribe("Kubectl client", func() {
 	defer ginkgo.GinkgoRecover()
 	f := framework.NewDefaultFramework("kubectl")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	// Reusable cluster state function.  This won't be adversely affected by lazy initialization of framework.
 	clusterState := func() *framework.ClusterVerification {

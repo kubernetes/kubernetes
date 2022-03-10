@@ -43,6 +43,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	watch "k8s.io/apimachinery/pkg/watch"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
@@ -742,6 +743,7 @@ func getEndpointNodesWithInternalIP(jig *e2eservice.TestJig) (map[string]string,
 
 var _ = common.SIGDescribe("Services", func() {
 	f := framework.NewDefaultFramework("services")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	var cs clientset.Interface
 	serviceLBNames := []string{}
@@ -3247,6 +3249,7 @@ func restartComponent(cs clientset.Interface, cName, ns string, matchLabels map[
 
 var _ = common.SIGDescribe("SCTP [LinuxOnly]", func() {
 	f := framework.NewDefaultFramework("sctp")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	var cs clientset.Interface
 

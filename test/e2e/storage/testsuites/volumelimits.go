@@ -41,6 +41,7 @@ import (
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	storageutils "k8s.io/kubernetes/test/e2e/storage/utils"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 type volumeLimitsTestSuite struct {
@@ -113,6 +114,7 @@ func (t *volumeLimitsTestSuite) DefineTests(driver storageframework.TestDriver, 
 	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
 	f := framework.NewFrameworkWithCustomTimeouts("volumelimits", storageframework.GetDriverTimeouts(driver))
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	// This checks that CSIMaxVolumeLimitChecker works as expected.
 	// A randomly chosen node should be able to handle as many CSI volumes as

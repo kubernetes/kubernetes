@@ -47,6 +47,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/utils/crd"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 
@@ -78,6 +79,7 @@ const (
 var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 	var certCtx *certContext
 	f := framework.NewDefaultFramework("webhook")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 	servicePort := int32(8443)
 	containerPort := int32(8444)
 
@@ -1155,6 +1157,8 @@ func testWebhook(f *framework.Framework) {
 		Labels: map[string]string{
 			skipNamespaceLabelKey: skipNamespaceLabelValue,
 			f.UniqueName:          "true",
+			// TODO(https://github.com/kubernetes/kubernetes/issues/108298): route namespace creation via framework.Framework.CreateNamespace in 1.24
+			admissionapi.EnforceLevelLabel: string(admissionapi.LevelRestricted),
 		},
 	}})
 	framework.ExpectNoError(err, "creating namespace %q", skippedNamespaceName)
@@ -2369,8 +2373,12 @@ func newMutateConfigMapWebhookFixture(f *framework.Framework, certCtx *certConte
 func createWebhookConfigurationReadyNamespace(f *framework.Framework) {
 	ns, err := f.ClientSet.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:   f.Namespace.Name + "-markers",
-			Labels: map[string]string{f.UniqueName + "-markers": "true"},
+			Name: f.Namespace.Name + "-markers",
+			Labels: map[string]string{
+				f.UniqueName + "-markers": "true",
+				// TODO(https://github.com/kubernetes/kubernetes/issues/108298): route namespace creation via framework.Framework.CreateNamespace in 1.24
+				admissionapi.EnforceLevelLabel: string(admissionapi.LevelRestricted),
+			},
 		},
 	}, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "creating namespace for webhook configuration ready markers")

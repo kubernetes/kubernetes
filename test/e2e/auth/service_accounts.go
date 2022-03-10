@@ -41,6 +41,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 	utilptr "k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo"
@@ -48,6 +49,7 @@ import (
 
 var _ = SIGDescribe("ServiceAccounts", func() {
 	f := framework.NewDefaultFramework("svcaccounts")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	ginkgo.It("should ensure a single API token exists", func() {
 		// wait for the service account to reference a single secret
