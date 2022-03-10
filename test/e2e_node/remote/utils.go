@@ -56,6 +56,8 @@ providers:
     matchImages:
     - "gcr.io"
     - "*.gcr.io"
+    - "container.cloud.google.com"
+    - "*.pkg.dev"
     defaultCacheDuration: 1m`
 
 // Install the cni plugin and add basic bridge configuration to the
