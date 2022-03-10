@@ -154,11 +154,6 @@ func TestClearNominatedNodeName(t *testing.T) {
 			expectedPatchData:     `{"status":{"nominatedNodeName":null}}`,
 		},
 		{
-			name:                  "Should not make patch request if nominated node is already cleared",
-			pods:                  []*v1.Pod{},
-			expectedPatchRequests: 0,
-		},
-		{
 			name: "Should not be patched if NominatedNodeName is empty",
 			pods: []*v1.Pod{
 				{
@@ -198,12 +193,12 @@ func TestClearNominatedNodeName(t *testing.T) {
 				// If the pod name is "err", return an error.
 				if patch.GetName() == "err1" {
 					return true, nil, test.patchError
-				} 
+				}
 				actualPatchData = append(actualPatchData, string(patch.GetPatch()))
 				// For this test, we don't care about the result of the patched pod, just that we got the expected
 				// patch request, so just returning &v1.Pod{} here is OK because scheduler doesn't use the response.
 				return true, &v1.Pod{}, nil
-				
+
 			})
 
 			if err := ClearNominatedNodeName(cs, test.pods...); err != nil {
