@@ -834,6 +834,15 @@ const (
 	//
 	// Enable MinDomains in Pod Topology Spread.
 	MinDomainsInPodTopologySpread featuregate.Feature = "MinDomainsInPodTopologySpread"
+	// owner: @jsafrane
+
+	// kep: http://kep.k8s.io/1710
+	// alpha: v1.24
+	//
+	// Speed up container startup by mounting volumes with the correct SELinux label
+	// instead of changing each file on the volumes recursively.
+	// Initial implementation focused on ReadWriteOncePod volumes.
+	SELinuxMountReadWriteOncePod featuregate.Feature = "SELinuxMountReadWriteOncePod"
 )
 
 func init() {
@@ -956,6 +965,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	GRPCContainerProbe:                             {Default: false, PreRelease: featuregate.Alpha},
 	LegacyServiceAccountTokenNoAutoGeneration:      {Default: true, PreRelease: featuregate.Beta},
 	MinDomainsInPodTopologySpread:                  {Default: false, PreRelease: featuregate.Alpha},
+	SELinuxMountReadWriteOncePod:                   {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
