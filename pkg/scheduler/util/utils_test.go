@@ -198,12 +198,12 @@ func TestClearNominatedNodeName(t *testing.T) {
 				// If the pod name is "err", return an error.
 				if patch.GetName() == "err1" {
 					return true, nil, test.patchError
-				} else {
-					actualPatchData = append(actualPatchData, string(patch.GetPatch()))
-					// For this test, we don't care about the result of the patched pod, just that we got the expected
-					// patch request, so just returning &v1.Pod{} here is OK because scheduler doesn't use the response.
-					return true, &v1.Pod{}, nil
-				}
+				} 
+				actualPatchData = append(actualPatchData, string(patch.GetPatch()))
+				// For this test, we don't care about the result of the patched pod, just that we got the expected
+				// patch request, so just returning &v1.Pod{} here is OK because scheduler doesn't use the response.
+				return true, &v1.Pod{}, nil
+				
 			})
 
 			if err := ClearNominatedNodeName(cs, test.pods...); err != nil {
