@@ -25,16 +25,19 @@ import (
 	openapitesting "k8s.io/kube-openapi/pkg/util/proto/testing"
 )
 
-func TestSupportsDryRun(t *testing.T) {
+var fakeSchema = openapitesting.Fake{Path: filepath.Join("..", "..", "artifacts", "openapi", "swagger.json")}
+
+func TestSupportsQueryParam(t *testing.T) {
 	doc, err := fakeSchema.OpenAPISchema()
 	if err != nil {
 		t.Fatalf("Failed to get OpenAPI Schema: %v", err)
 	}
 
 	tests := []struct {
-		gvk      schema.GroupVersionKind
-		success  bool
-		supports bool
+		gvk        schema.GroupVersionKind
+		success    bool
+		supports   bool
+		queryParam VerifiableQueryParam
 	}{
 		{
 			gvk: schema.GroupVersionKind{
@@ -42,8 +45,19 @@ func TestSupportsDryRun(t *testing.T) {
 				Version: "v1",
 				Kind:    "Pod",
 			},
-			success:  true,
-			supports: true,
+			success:    true,
+			supports:   true,
+			queryParam: QueryParamDryRun,
+		},
+		{
+			gvk: schema.GroupVersionKind{
+				Group:   "",
+				Version: "v1",
+				Kind:    "Pod",
+			},
+			success:    true,
+			supports:   true,
+			queryParam: QueryParamFieldValidation,
 		},
 		{
 			gvk: schema.GroupVersionKind{
@@ -51,8 +65,19 @@ func TestSupportsDryRun(t *testing.T) {
 				Version: "v1",
 				Kind:    "UnknownKind",
 			},
-			success:  false,
-			supports: false,
+			success:    false,
+			supports:   false,
+			queryParam: QueryParamDryRun,
+		},
+		{
+			gvk: schema.GroupVersionKind{
+				Group:   "",
+				Version: "v1",
+				Kind:    "UnknownKind",
+			},
+			success:    false,
+			supports:   false,
+			queryParam: QueryParamFieldValidation,
 		},
 		{
 			gvk: schema.GroupVersionKind{
@@ -60,28 +85,37 @@ func TestSupportsDryRun(t *testing.T) {
 				Version: "v1",
 				Kind:    "NodeProxyOptions",
 			},
-			success:  true,
-			supports: false,
+			success:    true,
+			supports:   false,
+			queryParam: QueryParamDryRun,
+		},
+		{
+			gvk: schema.GroupVersionKind{
+				Group:   "",
+				Version: "v1",
+				Kind:    "NodeProxyOptions",
+			},
+			success:    true,
+			supports:   false,
+			queryParam: QueryParamFieldValidation,
 		},
 	}
 
 	for _, test := range tests {
-		supports, err := supportsQueryParam(doc, test.gvk, QueryParamDryRun)
+		supports, err := supportsQueryParam(doc, test.gvk, test.queryParam)
 		if supports != test.supports || ((err == nil) != test.success) {
 			errStr := "nil"
 			if test.success == false {
 				errStr = "err"
 			}
-			t.Errorf("SupportsDryRun(doc, %v) = (%v, %v), expected (%v, %v)",
-				test.gvk,
+			t.Errorf("SupportsQueryParam(doc, %v, %v) = (%v, %v), expected (%v, %v)",
+				test.gvk, test.queryParam,
 				supports, err,
 				test.supports, errStr,
 			)
 		}
 	}
 }
-
-var fakeSchema = openapitesting.Fake{Path: filepath.Join("..", "..", "artifacts", "openapi", "swagger.json")}
 
 func TestDryRunVerifier(t *testing.T) {
 	dryRunVerifier := QueryParamVerifier{
@@ -122,6 +156,45 @@ func TestDryRunVerifier(t *testing.T) {
 	}
 }
 
+func TestFieldValidationVerifier(t *testing.T) {
+	fieldValidationVerifier := QueryParamVerifier{
+		finder: NewCRDFinder(func() ([]schema.GroupKind, error) {
+			return []schema.GroupKind{
+				{
+					Group: "crd.com",
+					Kind:  "MyCRD",
+				},
+				{
+					Group: "crd.com",
+					Kind:  "MyNewCRD",
+				},
+			}, nil
+		}),
+		openAPIGetter: &fakeSchema,
+		queryParam:    QueryParamFieldValidation,
+	}
+
+	err := fieldValidationVerifier.HasSupport(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "NodeProxyOptions"})
+	if err == nil {
+		t.Fatalf("NodeProxyOptions doesn't support fieldValidation, yet no error found")
+	}
+
+	err = fieldValidationVerifier.HasSupport(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Pod"})
+	if err != nil {
+		t.Fatalf("Pod should support fieldValidation: %v", err)
+	}
+
+	err = fieldValidationVerifier.HasSupport(schema.GroupVersionKind{Group: "crd.com", Version: "v1", Kind: "MyCRD"})
+	if err != nil {
+		t.Fatalf("MyCRD should support fieldValidation: %v", err)
+	}
+
+	err = fieldValidationVerifier.HasSupport(schema.GroupVersionKind{Group: "crd.com", Version: "v1", Kind: "Random"})
+	if err == nil {
+		t.Fatalf("Random doesn't support fieldValidation, yet no error found")
+	}
+}
+
 type EmptyOpenAPI struct{}
 
 func (EmptyOpenAPI) OpenAPISchema() (*openapi_v2.Document, error) {
@@ -154,5 +227,34 @@ func TestDryRunVerifierNoOpenAPI(t *testing.T) {
 	err = dryRunVerifier.HasSupport(schema.GroupVersionKind{Group: "crd.com", Version: "v1", Kind: "MyCRD"})
 	if err == nil {
 		t.Fatalf("MyCRD doesn't support dry-run, yet no error found")
+	}
+}
+
+func TestFieldValidationVerifierNoOpenAPI(t *testing.T) {
+	fieldValidationVerifier := QueryParamVerifier{
+		finder: NewCRDFinder(func() ([]schema.GroupKind, error) {
+			return []schema.GroupKind{
+				{
+					Group: "crd.com",
+					Kind:  "MyCRD",
+				},
+				{
+					Group: "crd.com",
+					Kind:  "MyNewCRD",
+				},
+			}, nil
+		}),
+		openAPIGetter: EmptyOpenAPI{},
+		queryParam:    QueryParamFieldValidation,
+	}
+
+	err := fieldValidationVerifier.HasSupport(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Pod"})
+	if err == nil {
+		t.Fatalf("Pod doesn't support fieldValidation, yet no error found")
+	}
+
+	err = fieldValidationVerifier.HasSupport(schema.GroupVersionKind{Group: "crd.com", Version: "v1", Kind: "MyCRD"})
+	if err == nil {
+		t.Fatalf("MyCRD doesn't support fieldValidation, yet no error found")
 	}
 }
