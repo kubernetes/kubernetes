@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
 	apiv1resource "k8s.io/kubernetes/pkg/api/v1/resource"
+	"k8s.io/kubernetes/pkg/util/mmap"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
@@ -98,6 +99,8 @@ type DesiredStateOfWorld interface {
 	// current desired state of the world.
 	GetVolumesToMount() []VolumeToMount
 
+	GetPodVolumesToMount(podName types.UniquePodName) []VolumeToMount
+
 	// GetPods generates and returns a map of pods in which map is indexed
 	// with pod's unique name. This map can be used to determine which pod is currently
 	// in desired state of world.
@@ -122,6 +125,8 @@ type DesiredStateOfWorld interface {
 	// GetPodsWithErrors returns names of pods that have stored errors.
 	GetPodsWithErrors() []types.UniquePodName
 
+	IsPodsWithErrors(podname types.UniquePodName) bool
+
 	// MarkVolumeAttachability updates the volume's attachability for a given volume
 	MarkVolumeAttachability(volumeName v1.UniqueVolumeName, attachable bool)
 
@@ -140,9 +145,10 @@ type VolumeToMount struct {
 // NewDesiredStateOfWorld returns a new instance of DesiredStateOfWorld.
 func NewDesiredStateOfWorld(volumePluginMgr *volume.VolumePluginMgr) DesiredStateOfWorld {
 	return &desiredStateOfWorld{
-		volumesToMount:  make(map[v1.UniqueVolumeName]volumeToMount),
-		volumePluginMgr: volumePluginMgr,
-		podErrors:       make(map[types.UniquePodName]sets.String),
+		volumesToMount:   make(map[v1.UniqueVolumeName]volumeToMount),
+		podToVolumeNames: mmap.NewMmap2(),
+		volumePluginMgr:  volumePluginMgr,
+		podErrors:        make(map[types.UniquePodName]sets.String),
 	}
 }
 
@@ -152,6 +158,9 @@ type desiredStateOfWorld struct {
 	// the map is the name of the volume and the value is a volume object
 	// containing more information about the volume.
 	volumesToMount map[v1.UniqueVolumeName]volumeToMount
+
+	podToVolumeNames mmap.Mmaper
+
 	// volumePluginMgr is the volume plugin manager used to create volume
 	// plugin objects.
 	volumePluginMgr *volume.VolumePluginMgr
@@ -309,6 +318,8 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 		mountRequestTime = oldPodMount.mountRequestTime
 	}
 
+	dsw.podToVolumeNames.Insert(struct{}{}, podName, volumeName)
+
 	// Create new podToMount object. If it already exists, it is refreshed with
 	// updated values (this is required for volumes that require remounting on
 	// pod update, like Downward API volumes).
@@ -347,6 +358,8 @@ func (dsw *desiredStateOfWorld) DeletePodFromVolume(
 	defer dsw.Unlock()
 
 	delete(dsw.podErrors, podName)
+
+	dsw.podToVolumeNames.Delete(podName, volumeName)
 
 	volumeObj, volumeExists := dsw.volumesToMount[volumeName]
 	if !volumeExists {
@@ -428,11 +441,50 @@ func (dsw *desiredStateOfWorld) GetPods() map[types.UniquePodName]bool {
 	return podList
 }
 
+func (dsw *desiredStateOfWorld) GetPodVolumesToMount(podName types.UniquePodName) []VolumeToMount {
+	volumesToMount := []VolumeToMount{}
+
+	dsw.RLock()
+	defer dsw.RUnlock()
+
+	dsw.podToVolumeNames.Iterate(mmap.LEVEL_1,
+		func(v interface{}, k ...interface{}) (mmap.LEVEL, error) {
+			volumeName := k[0].(v1.UniqueVolumeName)
+			if volumeObj, ok := dsw.volumesToMount[volumeName]; ok {
+				if podObj, ok := volumeObj.podsToMount[podName]; ok {
+					vmt := VolumeToMount{
+						VolumeToMount: operationexecutor.VolumeToMount{
+							VolumeName:              volumeName,
+							PodName:                 podName,
+							Pod:                     podObj.pod,
+							VolumeSpec:              podObj.volumeSpec,
+							PluginIsAttachable:      volumeObj.pluginIsAttachable,
+							PluginIsDeviceMountable: volumeObj.pluginIsDeviceMountable,
+							OuterVolumeSpecName:     podObj.outerVolumeSpecName,
+							VolumeGidValue:          volumeObj.volumeGidValue,
+							ReportedInUse:           volumeObj.reportedInUse,
+							MountRequestTime:        podObj.mountRequestTime,
+							DesiredSizeLimit:        volumeObj.desiredSizeLimit,
+						},
+					}
+					if volumeObj.persistentVolumeSize != nil {
+						vmt.PersistentVolumeSize = volumeObj.persistentVolumeSize.DeepCopy()
+					}
+					volumesToMount = append(volumesToMount, vmt)
+				}
+			}
+			return mmap.LEVEL_0, nil
+		},
+		podName)
+
+	return volumesToMount
+}
+
 func (dsw *desiredStateOfWorld) GetVolumesToMount() []VolumeToMount {
 	dsw.RLock()
 	defer dsw.RUnlock()
 
-	volumesToMount := make([]VolumeToMount, 0 /* len */, len(dsw.volumesToMount) /* cap */)
+	volumesToMount := make([]VolumeToMount, 0 /* len */, dsw.podToVolumeNames.Num() /* cap */)
 	for volumeName, volumeObj := range dsw.volumesToMount {
 		for podName, podObj := range volumeObj.podsToMount {
 			vmt := VolumeToMount{
@@ -492,6 +544,15 @@ func (dsw *desiredStateOfWorld) GetPodsWithErrors() []types.UniquePodName {
 		pods = append(pods, podName)
 	}
 	return pods
+}
+
+func (dsw *desiredStateOfWorld) IsPodsWithErrors(podname types.UniquePodName) bool {
+	dsw.RLock()
+	defer dsw.RUnlock()
+
+	_, ok := dsw.podErrors[podname]
+
+	return ok
 }
 
 func (dsw *desiredStateOfWorld) MarkVolumeAttachability(volumeName v1.UniqueVolumeName, attachable bool) {

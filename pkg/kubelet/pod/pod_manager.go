@@ -29,7 +29,14 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/secret"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/util/observer"
 )
+
+const (
+	POD_MANAGER_CHANGED observer.SubjectEventType = 0
+)
+
+var Observer = observer.NewObserver()
 
 // Manager stores and manages access to pods, maintaining the mappings
 // between static pods and mirror pods.
@@ -90,6 +97,7 @@ type Manager interface {
 	// GetUIDTranslations returns the mappings of static pod UIDs to mirror pod
 	// UIDs and mirror pod UIDs to static pod UIDs.
 	GetUIDTranslations() (podToMirror map[kubetypes.ResolvedPodUID]kubetypes.MirrorPodUID, mirrorToPod map[kubetypes.MirrorPodUID]kubetypes.ResolvedPodUID)
+	GetUIDTranslationsByUID(types.UID) (podToMirror map[kubetypes.ResolvedPodUID]kubetypes.MirrorPodUID, mirrorToPod map[kubetypes.MirrorPodUID]kubetypes.ResolvedPodUID)
 	// IsMirrorPodOf returns true if mirrorPod is a correct representation of
 	// pod; false otherwise.
 	IsMirrorPodOf(mirrorPod, pod *v1.Pod) bool
@@ -192,6 +200,7 @@ func (pm *basicManager) updatePodsInternal(pods ...*v1.Pod) {
 			pm.mirrorPodByFullName[podFullName] = pod
 			if p, ok := pm.podByFullName[podFullName]; ok {
 				pm.translationByUID[mirrorPodUID] = kubetypes.ResolvedPodUID(p.UID)
+				Observer.Notify(POD_MANAGER_CHANGED, p.UID)
 			}
 		} else {
 			resolvedPodUID := kubetypes.ResolvedPodUID(pod.UID)
@@ -201,6 +210,8 @@ func (pm *basicManager) updatePodsInternal(pods ...*v1.Pod) {
 			if mirror, ok := pm.mirrorPodByFullName[podFullName]; ok {
 				pm.translationByUID[kubetypes.MirrorPodUID(mirror.UID)] = resolvedPodUID
 			}
+
+			Observer.Notify(POD_MANAGER_CHANGED, pod.UID)
 		}
 	}
 }
@@ -213,12 +224,16 @@ func (pm *basicManager) DeletePod(pod *v1.Pod) {
 	// It is safe to type convert here due to the IsMirrorPod guard.
 	if kubetypes.IsMirrorPod(pod) {
 		mirrorPodUID := kubetypes.MirrorPodUID(pod.UID)
+		resolvedPodUID := pm.translationByUID[mirrorPodUID]
 		delete(pm.mirrorPodByUID, mirrorPodUID)
 		delete(pm.mirrorPodByFullName, podFullName)
 		delete(pm.translationByUID, mirrorPodUID)
+
+		Observer.Notify(POD_MANAGER_CHANGED, types.UID(resolvedPodUID))
 	} else {
 		delete(pm.podByUID, kubetypes.ResolvedPodUID(pod.UID))
 		delete(pm.podByFullName, podFullName)
+		Observer.Notify(POD_MANAGER_CHANGED, pod.UID)
 	}
 }
 
@@ -291,6 +306,31 @@ func (pm *basicManager) GetUIDTranslations() (podToMirror map[kubetypes.Resolved
 		mirrorToPod[k] = v
 		podToMirror[v] = k
 	}
+	return podToMirror, mirrorToPod
+}
+
+func (pm *basicManager) GetUIDTranslationsByUID(uid types.UID) (podToMirror map[kubetypes.ResolvedPodUID]kubetypes.MirrorPodUID,
+	mirrorToPod map[kubetypes.MirrorPodUID]kubetypes.ResolvedPodUID) {
+	resolvedPodUID := kubetypes.ResolvedPodUID(uid)
+	podToMirror = make(map[kubetypes.ResolvedPodUID]kubetypes.MirrorPodUID)
+	mirrorToPod = make(map[kubetypes.MirrorPodUID]kubetypes.ResolvedPodUID)
+
+	pm.lock.RLock()
+	defer pm.lock.RUnlock()
+
+	// Insert empty translation mapping for all static pods.
+	if pod, ok := pm.podByUID[resolvedPodUID]; ok {
+		if kubetypes.IsStaticPod(pod) {
+			podToMirror[resolvedPodUID] = ""
+			podFullName := kubecontainer.GetPodFullName(pod)
+			if mirror, ok := pm.mirrorPodByFullName[podFullName]; ok {
+				mirrorPodUID := kubetypes.MirrorPodUID(mirror.UID)
+				podToMirror[resolvedPodUID] = mirrorPodUID
+				mirrorToPod[mirrorPodUID] = resolvedPodUID
+			}
+		}
+	}
+
 	return podToMirror, mirrorToPod
 }
 

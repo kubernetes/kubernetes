@@ -61,6 +61,10 @@ for file in $files; do
 done
 
 echo "diffing process started for ${#mock_files[@]} files"
+if [[ ${#mock_files[@]} == 0 ]]; then
+  echo "up to date"
+  exit 0
+fi
 ret=0
 for file in "${mock_files[@]}"; do
   diff -Naupr -B \

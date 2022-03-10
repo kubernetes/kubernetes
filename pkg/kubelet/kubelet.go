@@ -47,7 +47,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
@@ -57,6 +56,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/certificate"
 	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/client-go/util/workqueue"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/component-helpers/apimachinery/lease"
 	internalapi "k8s.io/cri-api/pkg/apis"
@@ -74,6 +74,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/cri/remote"
+	"k8s.io/kubernetes/pkg/kubelet/cribuffer"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/images"
@@ -104,10 +105,10 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/kubelet/util/manager"
-	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
 	"k8s.io/kubernetes/pkg/security/apparmor"
+	"k8s.io/kubernetes/pkg/util/observer"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi"
@@ -129,14 +130,6 @@ const (
 
 	// MaxContainerBackOff is the max backoff period, exported for the e2e test
 	MaxContainerBackOff = 300 * time.Second
-
-	// Period for performing global cleanup tasks.
-	housekeepingPeriod = time.Second * 2
-
-	// Duration at which housekeeping failed to satisfy the invariant that
-	// housekeeping should be fast to avoid blocking pod config (while
-	// housekeeping is running no new pods are started or deleted).
-	housekeepingWarningDuration = time.Second * 15
 
 	// Period for performing eviction monitoring.
 	// ensure this is kept in sync with internal cadvisor housekeeping.
@@ -209,6 +202,7 @@ type Bootstrap interface {
 	ListenAndServePodResources()
 	Run(<-chan kubetypes.PodUpdate)
 	RunOnce(<-chan kubetypes.PodUpdate) ([]RunPodResult, error)
+	InitHousekeeping()
 }
 
 // Dependencies is a bin for things we might consider "injected dependencies" -- objects constructed
@@ -597,18 +591,18 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.containerLogManager = containerLogManager
 
 	klet.reasonCache = NewReasonCache()
-	klet.workQueue = queue.NewBasicWorkQueue(klet.clock)
 	klet.podWorkers = newPodWorkers(
 		klet.syncPod,
 		klet.syncTerminatingPod,
 		klet.syncTerminatedPod,
 
 		kubeDeps.Recorder,
-		klet.workQueue,
 		klet.resyncInterval,
 		backOffPeriod,
 		klet.podCache,
 	)
+
+	klet.podSyncDelay = newPodSyncDelay(klet.podManager, klet.statusManager, klet.clock)
 
 	runtime, err := kuberuntime.NewKubeGenericRuntimeManager(
 		kubecontainer.FilterEventRecorder(kubeDeps.Recorder),
@@ -684,6 +678,8 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	if _, err := klet.updatePodCIDR(kubeCfg.PodCIDR); err != nil {
 		klog.ErrorS(err, "Pod CIDR update failed")
 	}
+
+	cribuffer.CriBuffer = klet.pleg
 
 	// setup containerGC
 	containerGC, err := kubecontainer.NewContainerGC(klet.containerRuntime, containerGCPolicy, klet.sourcesReady)
@@ -764,6 +760,10 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		kubeDeps.Recorder,
 		keepTerminatedPodVolumes,
 		volumepathhandler.NewBlockVolumePathHandler())
+
+	klet.housekeepingQueue = workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+	klet.fixHousekeepingEvent = observer.NewSubjectEvent(klet.handleHousekeepingEvent, nil)
+	klet.podCgroupsRemoving = make(map[types.UID]chan struct{})
 
 	klet.backOff = flowcontrol.NewBackOff(backOffPeriod, MaxContainerBackOff)
 
@@ -871,6 +871,8 @@ type Kubelet struct {
 
 	// podWorkers handle syncing Pods in response to events.
 	podWorkers PodWorkers
+
+	podSyncDelay *podSyncDelay
 
 	// resyncInterval is the interval between periodic full reconciliations of
 	// pods on this node.
@@ -1079,8 +1081,10 @@ type Kubelet struct {
 	// Information about the ports which are opened by daemons on Node running this Kubelet server.
 	daemonEndpoints *v1.NodeDaemonEndpoints
 
-	// A queue used to trigger pod workers.
-	workQueue queue.WorkQueue
+	housekeepingQueue    workqueue.RateLimitingInterface
+	fixHousekeepingEvent observer.SubjectEvent
+	houseKeepingAllSeen  bool
+	podCgroupsRemoving   map[types.UID]chan struct{}
 
 	// oneTimeInitializer is used to initialize modules that are dependent on the runtime to be up.
 	oneTimeInitializer sync.Once
@@ -1881,33 +1885,6 @@ func (kl *Kubelet) syncTerminatedPod(ctx context.Context, pod *v1.Pod, podStatus
 	return nil
 }
 
-// Get pods which should be resynchronized. Currently, the following pod should be resynchronized:
-//   * pod whose work is ready.
-//   * internal modules that request sync of a pod.
-func (kl *Kubelet) getPodsToSync() []*v1.Pod {
-	allPods := kl.podManager.GetPods()
-	podUIDs := kl.workQueue.GetWork()
-	podUIDSet := sets.NewString()
-	for _, podUID := range podUIDs {
-		podUIDSet.Insert(string(podUID))
-	}
-	var podsToSync []*v1.Pod
-	for _, pod := range allPods {
-		if podUIDSet.Has(string(pod.UID)) {
-			// The work of the pod is ready
-			podsToSync = append(podsToSync, pod)
-			continue
-		}
-		for _, podSyncLoopHandler := range kl.PodSyncLoopHandlers {
-			if podSyncLoopHandler.ShouldSync(pod) {
-				podsToSync = append(podsToSync, pod)
-				break
-			}
-		}
-	}
-	return podsToSync
-}
-
 // deletePod deletes the pod from the internal state of the kubelet by:
 // 1.  stopping the associated pod worker asynchronously
 // 2.  signaling to kill the pod by sending on the podKillingCh channel
@@ -1986,10 +1963,6 @@ func (kl *Kubelet) syncLoop(updates <-chan kubetypes.PodUpdate, handler SyncHand
 	// The syncTicker wakes up kubelet to checks if there are any pod workers
 	// that need to be sync'd. A one-second period is sufficient because the
 	// sync interval is defaulted to 10s.
-	syncTicker := time.NewTicker(time.Second)
-	defer syncTicker.Stop()
-	housekeepingTicker := time.NewTicker(housekeepingPeriod)
-	defer housekeepingTicker.Stop()
 	plegCh := kl.pleg.Watch()
 	const (
 		base   = 100 * time.Millisecond
@@ -2004,6 +1977,8 @@ func (kl *Kubelet) syncLoop(updates <-chan kubetypes.PodUpdate, handler SyncHand
 		kl.dnsConfigurer.CheckLimitsForResolvConf()
 	}
 
+	go handler.HandlePodCleanups()
+
 	for {
 		if err := kl.runtimeState.runtimeErrors(); err != nil {
 			klog.ErrorS(err, "Skipping pod synchronization")
@@ -2016,7 +1991,7 @@ func (kl *Kubelet) syncLoop(updates <-chan kubetypes.PodUpdate, handler SyncHand
 		duration = base
 
 		kl.syncLoopMonitor.Store(kl.clock.Now())
-		if !kl.syncLoopIteration(updates, handler, syncTicker.C, housekeepingTicker.C, plegCh) {
+		if !kl.syncLoopIteration(updates, handler, plegCh) {
 			break
 		}
 		kl.syncLoopMonitor.Store(kl.clock.Now())
@@ -2056,7 +2031,7 @@ func (kl *Kubelet) syncLoop(updates <-chan kubetypes.PodUpdate, handler SyncHand
 // * health manager: sync pods that have failed or in which one or more
 //                     containers have failed health checks
 func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handler SyncHandler,
-	syncCh <-chan time.Time, housekeepingCh <-chan time.Time, plegCh <-chan *pleg.PodLifecycleEvent) bool {
+	plegCh <-chan *pleg.PodLifecycleEvent) bool {
 	select {
 	case u, open := <-configCh:
 		// Update from a config source; dispatch it to the right handler
@@ -2119,14 +2094,15 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 				kl.cleanUpContainersInPod(e.ID, containerID)
 			}
 		}
-	case <-syncCh:
-		// Sync pods waiting for sync
-		podsToSync := kl.getPodsToSync()
-		if len(podsToSync) == 0 {
+	case poduid := <-kl.podSyncDelay.watch():
+		pod, exists := kl.podManager.GetPodByUID(poduid)
+		if !exists {
+			klog.V(4).InfoS("podSyncDelay pod is not existed", "podUID", poduid)
+			kl.podWorkers.CompleteTerminatingRuntimePodById(poduid, true)
 			break
 		}
-		klog.V(4).InfoS("SyncLoop (SYNC) pods", "total", len(podsToSync), "pods", klog.KObjs(podsToSync))
-		handler.HandlePodSyncs(podsToSync)
+		klog.V(4).InfoS("SyncLoop (SYNC) pods", "pod", klog.KObj(pod), "podUID", poduid)
+		handler.HandlePodSyncs([]*v1.Pod{pod})
 	case update := <-kl.livenessManager.Updates():
 		if update.Result == proberesults.Failure {
 			handleProbeSync(kl, update, handler, "liveness", "unhealthy")
@@ -2149,23 +2125,6 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 			status = "started"
 		}
 		handleProbeSync(kl, update, handler, "startup", status)
-	case <-housekeepingCh:
-		if !kl.sourcesReady.AllReady() {
-			// If the sources aren't ready or volume manager has not yet synced the states,
-			// skip housekeeping, as we may accidentally delete pods from unready sources.
-			klog.V(4).InfoS("SyncLoop (housekeeping, skipped): sources aren't ready yet")
-		} else {
-			start := time.Now()
-			klog.V(4).InfoS("SyncLoop (housekeeping)")
-			if err := handler.HandlePodCleanups(); err != nil {
-				klog.ErrorS(err, "Failed cleaning pods")
-			}
-			duration := time.Since(start)
-			if duration > housekeepingWarningDuration {
-				klog.ErrorS(fmt.Errorf("housekeeping took too long"), "Housekeeping took longer than 15s", "seconds", duration.Seconds())
-			}
-			klog.V(4).InfoS("SyncLoop (housekeeping) end")
-		}
 	}
 	return true
 }

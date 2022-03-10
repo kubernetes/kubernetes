@@ -238,6 +238,21 @@ func (mr *MockManagerMockRecorder) GetUIDTranslations() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUIDTranslations", reflect.TypeOf((*MockManager)(nil).GetUIDTranslations))
 }
 
+// GetUIDTranslationsByUID mocks base method.
+func (m *MockManager) GetUIDTranslationsByUID(arg0 types.UID) (map[types0.ResolvedPodUID]types0.MirrorPodUID, map[types0.MirrorPodUID]types0.ResolvedPodUID) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetUIDTranslationsByUID", arg0)
+	ret0, _ := ret[0].(map[types0.ResolvedPodUID]types0.MirrorPodUID)
+	ret1, _ := ret[1].(map[types0.MirrorPodUID]types0.ResolvedPodUID)
+	return ret0, ret1
+}
+
+// GetUIDTranslationsByUID indicates an expected call of GetUIDTranslationsByUID.
+func (mr *MockManagerMockRecorder) GetUIDTranslationsByUID(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUIDTranslationsByUID", reflect.TypeOf((*MockManager)(nil).GetUIDTranslationsByUID), arg0)
+}
+
 // IsMirrorPodOf mocks base method.
 func (m *MockManager) IsMirrorPodOf(arg0, arg1 *v1.Pod) bool {
 	m.ctrl.T.Helper()

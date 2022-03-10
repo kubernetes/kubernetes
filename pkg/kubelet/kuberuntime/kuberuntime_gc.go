@@ -21,44 +21,103 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/types"
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/util/workqueue"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/cribuffer"
+	"k8s.io/kubernetes/pkg/kubelet/inits"
+	"k8s.io/kubernetes/pkg/kubelet/pleg"
+	"k8s.io/kubernetes/pkg/kubelet/podworks"
+	"k8s.io/kubernetes/pkg/util/mmap"
+	"k8s.io/kubernetes/pkg/util/observer"
+)
+
+const (
+	containerGCPeriod = time.Minute
 )
 
 // containerGC is the manager of garbage collection.
 type containerGC struct {
-	client           internalapi.RuntimeService
-	manager          *kubeGenericRuntimeManager
-	podStateProvider podStateProvider
+	client                 internalapi.RuntimeService
+	manager                *kubeGenericRuntimeManager
+	podStateProvider       podStateProvider
+	queue                  workqueue.RateLimitingInterface
+	gcPolicy               kubecontainer.GCPolicy
+	gcPolicySet            bool
+	allSourcesReady        bool
+	evictTerminatedPods    bool
+	needEvict              bool
+	evictUnits             mmap.Mmaper
+	sandboxesEvictByPod    mmap.Mmaper
+	aliveContainers        mmap.Mmaper
+	aliveSandboxs          mmap.Mmaper
+	fixEvictContainerEvent observer.SubjectEvent
+	fixEvictSandboxEvent   observer.SubjectEvent
+	fixLogEvent            observer.SubjectEvent
+	fixErrorEvent          observer.SubjectEvent
+	fixDirectGCEvent       observer.SubjectEvent
+}
+
+type directGCEventChannel struct {
+	ch chan struct{}
+}
+
+type directGCEvent struct {
+	allSourcesReady     bool
+	evictTerminatedPods bool
+	channel             *directGCEventChannel
 }
 
 // NewContainerGC creates a new containerGC.
 func newContainerGC(client internalapi.RuntimeService, podStateProvider podStateProvider, manager *kubeGenericRuntimeManager) *containerGC {
-	return &containerGC{
-		client:           client,
-		manager:          manager,
-		podStateProvider: podStateProvider,
+	gc := &containerGC{
+		client:              client,
+		manager:             manager,
+		podStateProvider:    podStateProvider,
+		queue:               workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
+		evictUnits:          mmap.NewMmap3(),
+		sandboxesEvictByPod: mmap.NewMmap2(),
+		aliveContainers:     mmap.NewMmap2(),
+		aliveSandboxs:       mmap.NewMmap2(),
 	}
+
+	gc.fixEvictContainerEvent = observer.NewSubjectEvent(gc.handleEvictContainerEvent, nil)
+
+	gc.fixEvictSandboxEvent = observer.NewSubjectEvent(gc.handleEvictSandboxEvent, nil)
+
+	gc.fixLogEvent = observer.NewSubjectEvent(gc.HandleLogEvict, nil)
+
+	gc.fixErrorEvent = observer.NewSubjectEvent(gc.HandleErrorEvict, nil)
+
+	e := directGCEvent{
+		channel: &directGCEventChannel{make(chan struct{}, 1)},
+	}
+	gc.fixDirectGCEvent = observer.NewSubjectEvent(gc.HandleDirectGCEvent, e)
+
+	inits.SafeInitFuncs.Regist(gc.SafeInit)
+
+	return gc
 }
 
 // containerGCInfo is the internal information kept for containers being considered for GC.
 type containerGCInfo struct {
+	pid types.UID
 	// The ID of the container.
-	id string
+	id           string
+	podSandboxId string
 	// The name of the container.
 	name string
 	// Creation time for the container.
 	createTime time.Time
 	// If true, the container is in unknown state. Garbage collector should try
 	// to stop containers before removal.
-	unknown bool
+	state kubecontainer.State
 }
 
 // sandboxGCInfo is the internal information kept for sandboxes being considered for GC.
@@ -67,33 +126,6 @@ type sandboxGCInfo struct {
 	id string
 	// Creation time for the sandbox.
 	createTime time.Time
-	// If true, the sandbox is ready or still has containers.
-	active bool
-}
-
-// evictUnit is considered for eviction as units of (UID, container name) pair.
-type evictUnit struct {
-	// UID of the pod.
-	uid types.UID
-	// Name of the container in the pod.
-	name string
-}
-
-type containersByEvictUnit map[evictUnit][]containerGCInfo
-type sandboxesByPodUID map[types.UID][]sandboxGCInfo
-
-// NumContainers returns the number of containers in this map.
-func (cu containersByEvictUnit) NumContainers() int {
-	num := 0
-	for key := range cu {
-		num += len(cu[key])
-	}
-	return num
-}
-
-// NumEvictUnits returns the number of pod in this map.
-func (cu containersByEvictUnit) NumEvictUnits() int {
-	return len(cu)
 }
 
 // Newest first.
@@ -110,157 +142,399 @@ func (a sandboxByCreated) Len() int           { return len(a) }
 func (a sandboxByCreated) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a sandboxByCreated) Less(i, j int) bool { return a[i].createTime.After(a[j].createTime) }
 
-// enforceMaxContainersPerEvictUnit enforces MaxPerPodContainer for each evictUnit.
-func (cgc *containerGC) enforceMaxContainersPerEvictUnit(evictUnits containersByEvictUnit, MaxContainers int) {
-	for key := range evictUnits {
-		toRemove := len(evictUnits[key]) - MaxContainers
+func (cgc *containerGC) SafeInit() {
+	cribuffer.CriBuffer.Attach(pleg.CONTAINER_DIED, cgc.SubjectEventAddNotify, cgc.HandleContainerDie)
+	cribuffer.CriBuffer.Attach(pleg.SANDBOX_DIED, cgc.SubjectEventAddNotify, cgc.HandleSandBoxDie)
+	cribuffer.CriBuffer.Attach(pleg.CONTAINER_LIVE, cgc.SubjectEventAddNotify, cgc.HandleContainerLive)
+	cribuffer.CriBuffer.Attach(pleg.SANDBOX_LIVE, cgc.SubjectEventAddNotify, cgc.HandleSandBoxLive)
+	cribuffer.CriBuffer.Attach(pleg.CONTAINER_REMOVED, cgc.SubjectEventAddNotify, cgc.HandleContainerRemove)
+	cribuffer.CriBuffer.Attach(pleg.SANDBOX_REMOVED, cgc.SubjectEventAddNotify, cgc.HandleSandBoxRemove)
 
-		if toRemove > 0 {
-			evictUnits[key] = cgc.removeOldestN(evictUnits[key], toRemove)
+	podworks.Observer.Attach(podworks.POD_REMOVED, cgc.SubjectEventAddNotify, cgc.handlePodRemovedNotify)
+}
+
+func (cgc *containerGC) SubjectEventAddNotify(se observer.SubjectEvent) {
+	cgc.queue.Add(se)
+}
+
+func (cgc *containerGC) handlePodRemovedNotify(_ interface{}) error {
+	cgc.queue.AddAfter(cgc.fixEvictContainerEvent, containerGCPeriod)
+	return nil
+}
+
+func (cgc *containerGC) HandleContainerRemove(event interface{}) error {
+	if e, ok := event.(pleg.PlegSubjectEvent); ok {
+		cgc.aliveContainers.Delete(e.ID, e.Cid)
+
+		containerInfo := containerGCInfo{
+			pid:          e.ID,
+			id:           e.Cid,
+			name:         e.Cname,
+			createTime:   e.CreateTime,
+			state:        e.State,
+			podSandboxId: e.PodSandboxId,
 		}
+
+		cgc.deleteEvictUnits(&containerInfo)
+
+		cgc.tryEvictSandboxByContainer(&containerInfo)
+		cgc.queue.AddAfter(cgc.fixLogEvent, containerGCPeriod)
 	}
+
+	return nil
+}
+
+func (cgc *containerGC) HandleContainerDie(event interface{}) error {
+	if e, ok := event.(pleg.PlegSubjectEvent); ok {
+		cgc.aliveContainers.Delete(e.ID, e.Cid)
+
+		// Separate containers by evict units.
+		containerInfo := containerGCInfo{
+			pid:          e.ID,
+			id:           e.Cid,
+			name:         e.Cname,
+			createTime:   e.CreateTime,
+			state:        e.State,
+			podSandboxId: e.PodSandboxId,
+		}
+
+		cgc.evictUnits.Insert(containerInfo, containerInfo.pid, containerInfo.name, containerInfo.id)
+
+		cgc.queue.AddAfter(cgc.fixEvictContainerEvent, containerGCPeriod)
+	}
+
+	return nil
+}
+
+func (cgc *containerGC) deleteEvictUnits(containerInfo *containerGCInfo) error {
+	//删除evict中的相同容器
+	cgc.evictUnits.Delete(containerInfo.pid, containerInfo.name, containerInfo.id)
+	return nil
+}
+
+func (cgc *containerGC) HandleContainerLive(event interface{}) error {
+	if e, ok := event.(pleg.PlegSubjectEvent); ok {
+		containerInfo := containerGCInfo{
+			pid:          e.ID,
+			id:           e.Cid,
+			name:         e.Cname,
+			createTime:   e.CreateTime,
+			state:        e.State,
+			podSandboxId: e.PodSandboxId,
+		}
+
+		cgc.aliveContainers.Insert(containerInfo, e.ID, e.Cid)
+
+		cgc.deleteEvictUnits(&containerInfo)
+
+	}
+
+	return nil
+}
+
+func (cgc *containerGC) HandleSandBoxRemove(event interface{}) error {
+	if e, ok := event.(pleg.PlegSubjectEvent); ok {
+		cgc.aliveSandboxs.Delete(e.ID, e.Cid)
+
+		cgc.deleteEvictSandbox(&e)
+	}
+
+	return nil
+}
+
+func (cgc *containerGC) HandleSandBoxDie(event interface{}) error {
+	if e, ok := event.(pleg.PlegSubjectEvent); ok {
+		cgc.aliveSandboxs.Delete(e.ID, e.Cid)
+
+		sandboxInfo := sandboxGCInfo{
+			id:         e.Cid,
+			createTime: e.CreateTime,
+		}
+		podUID := types.UID(e.ID)
+		cgc.sandboxesEvictByPod.Insert(sandboxInfo, podUID, sandboxInfo.id)
+
+		cgc.queue.AddAfter(cgc.fixEvictSandboxEvent, containerGCPeriod)
+	}
+
+	return nil
+}
+
+func (cgc *containerGC) deleteEvictSandbox(e *pleg.PlegSubjectEvent) error {
+	cgc.sandboxesEvictByPod.Delete(e.ID, e.Cid)
+	return nil
+}
+
+func (cgc *containerGC) HandleSandBoxLive(event interface{}) error {
+	if e, ok := event.(pleg.PlegSubjectEvent); ok {
+		cgc.aliveSandboxs.Insert(struct{}{}, e.ID, e.Cid)
+
+		cgc.deleteEvictSandbox(&e)
+	}
+
+	return nil
+}
+
+func (cgc *containerGC) handleEvictContainerEvent(_ interface{}) error {
+	cgc.needEvict = false
+	err := cgc.evictContainers()
+	if err == nil && cgc.needEvict {
+		cgc.queue.AddAfter(cgc.fixEvictContainerEvent, containerGCPeriod)
+	}
+
+	return err
+}
+
+func (cgc *containerGC) handleEvictSandboxEvent(_ interface{}) error {
+	return cgc.evictSandboxes()
+}
+
+func (cgc *containerGC) HandleLogEvict(_ interface{}) error {
+	if err := cgc.evictPodLogsDirectories(); err != nil {
+		cgc.queue.AddAfter(cgc.fixLogEvent, containerGCPeriod)
+	}
+
+	return nil
+}
+
+func (cgc *containerGC) HandleErrorEvict(e interface{}) error {
+	if err := cgc.handleEvictContainerEvent(e); err != nil {
+		return err
+	}
+
+	if err := cgc.evictSandboxes(); err != nil {
+		return err
+	}
+
+	if err := cgc.evictPodLogsDirectories(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (cgc *containerGC) HandleDirectGCEvent(event interface{}) error {
+	var err error
+	if e, ok := event.(directGCEvent); ok {
+		allSourcesReady := cgc.allSourcesReady
+		evictTerminatedPods := cgc.evictTerminatedPods
+		cgc.allSourcesReady = e.allSourcesReady
+		cgc.evictTerminatedPods = e.evictTerminatedPods
+
+		err = cgc.HandleErrorEvict(event)
+
+		cgc.allSourcesReady = allSourcesReady
+		cgc.evictTerminatedPods = evictTerminatedPods
+
+		e.channel.ch <- struct{}{}
+	}
+
+	return err
+}
+
+// enforceMaxContainersPerEvictUnit enforces MaxPerPodContainer for each evictUnit.
+func (cgc *containerGC) enforceMaxContainersPerEvictUnit(MaxContainers int) error {
+	visitFunc := func(v interface{}, k ...interface{}) (mmap.LEVEL, error) {
+		unit := []containerGCInfo{}
+		v.(mmap.Mmaper).GetLeafValues(func(v interface{}) {
+			unit = append(unit, v.(containerGCInfo))
+		})
+
+		toRemove := len(unit) - MaxContainers
+		if toRemove > 0 {
+			err := cgc.removeOldestN(unit, toRemove)
+			if err != nil {
+				return mmap.LEVEL_MAX, err
+			}
+		}
+
+		return mmap.LEVEL_0, nil
+	}
+
+	return cgc.evictUnits.Iterate(mmap.LEVEL_2, visitFunc)
 }
 
 // removeOldestN removes the oldest toRemove containers and returns the resulting slice.
-func (cgc *containerGC) removeOldestN(containers []containerGCInfo, toRemove int) []containerGCInfo {
+func (cgc *containerGC) removeOldestN(containers []containerGCInfo, toRemove int) error {
 	// Remove from oldest to newest (last to first).
 	numToKeep := len(containers) - toRemove
 	if numToKeep > 0 {
 		sort.Sort(byCreated(containers))
 	}
+
+	now := time.Now()
+	newestGCTime := now.Add(-cgc.gcPolicy.MinAge)
 	for i := len(containers) - 1; i >= numToKeep; i-- {
-		if containers[i].unknown {
+		container := containers[i]
+		if newestGCTime.Before(container.createTime) && now.After(container.createTime) {
+			cgc.needEvict = true
+			if numToKeep > 0 {
+				break
+			} else {
+				continue
+			}
+		}
+
+		if container.state == kubecontainer.ContainerStateUnknown {
 			// Containers in known state could be running, we should try
 			// to stop it before removal.
 			id := kubecontainer.ContainerID{
 				Type: cgc.manager.runtimeName,
-				ID:   containers[i].id,
+				ID:   container.id,
 			}
 			message := "Container is in unknown state, try killing it before removal"
-			if err := cgc.manager.killContainer(nil, id, containers[i].name, message, reasonUnknown, nil); err != nil {
-				klog.ErrorS(err, "Failed to stop container", "containerID", containers[i].id)
+			if err := cgc.manager.killContainer(nil, id, container.name, message, reasonUnknown, nil); err != nil {
+				klog.ErrorS(err, "Failed to stop container", "containerID", container.id)
+				cgc.needEvict = true
 				continue
 			}
 		}
-		if err := cgc.manager.removeContainer(containers[i].id); err != nil {
-			klog.ErrorS(err, "Failed to remove container", "containerID", containers[i].id)
+		if err := cgc.manager.removeContainer(container.id); err != nil {
+			klog.ErrorS(err, "Failed to remove container", "containerID", container.id)
+			if !strings.Contains(err.Error(), "No such container") {
+				err := fmt.Errorf("Failed to remove container %q: %v", container.id, err)
+				return err
+			}
 		}
+
+		cgc.evictUnits.Delete(container.pid, container.name, container.id)
+		cgc.queue.Add(cgc.fixLogEvent)
+		cgc.tryEvictSandboxByContainer(&container)
 	}
 
 	// Assume we removed the containers so that we're not too aggressive.
-	return containers[:numToKeep]
+	return nil
+}
+
+func (cgc *containerGC) tryEvictSandboxByContainer(container *containerGCInfo) {
+	if cgc.sandboxesEvictByPod.Exist(container.pid) {
+		cgc.queue.Add(cgc.fixEvictSandboxEvent)
+	}
 }
 
 // removeOldestNSandboxes removes the oldest inactive toRemove sandboxes and
 // returns the resulting slice.
-func (cgc *containerGC) removeOldestNSandboxes(sandboxes []sandboxGCInfo, toRemove int) {
+func (cgc *containerGC) removeOldestNSandboxes(podUID types.UID, sandboxes []sandboxGCInfo, toRemove int) error {
 	numToKeep := len(sandboxes) - toRemove
 	if numToKeep > 0 {
 		sort.Sort(sandboxByCreated(sandboxes))
 	}
+
 	// Remove from oldest to newest (last to first).
 	for i := len(sandboxes) - 1; i >= numToKeep; i-- {
-		if !sandboxes[i].active {
-			cgc.removeSandbox(sandboxes[i].id)
+		sandbox := sandboxes[i]
+		if cgc.SandboxShouldBeRemove(podUID, sandbox.id) {
+			if err := cgc.removeSandbox(sandbox.id); err != nil {
+				return err
+			}
+			cgc.sandboxesEvictByPod.Delete(podUID, sandbox.id)
 		}
 	}
+
+	return nil
+}
+
+func (cgc *containerGC) SandboxShouldBeRemove(podUID types.UID, sandboxid string) bool {
+	visitFunc := func(v interface{}, k ...interface{}) (mmap.LEVEL, error) {
+		cinfo := v.(containerGCInfo)
+		if cinfo.podSandboxId == sandboxid {
+			return mmap.LEVEL_MAX, fmt.Errorf("%#v has sandboxid %v", cinfo, sandboxid)
+		}
+
+		return mmap.LEVEL_0, nil
+	}
+
+	if err := cgc.aliveContainers.Iterate(mmap.LEVEL_1, visitFunc, podUID); err != nil {
+		return false
+	}
+
+	if err := cgc.evictUnits.Iterate(mmap.LEVEL_1, visitFunc, podUID); err != nil {
+		return false
+	}
+
+	return true
 }
 
 // removeSandbox removes the sandbox by sandboxID.
-func (cgc *containerGC) removeSandbox(sandboxID string) {
+func (cgc *containerGC) removeSandbox(sandboxID string) error {
 	klog.V(4).InfoS("Removing sandbox", "sandboxID", sandboxID)
 	// In normal cases, kubelet should've already called StopPodSandbox before
 	// GC kicks in. To guard against the rare cases where this is not true, try
 	// stopping the sandbox before removing it.
 	if err := cgc.client.StopPodSandbox(sandboxID); err != nil {
 		klog.ErrorS(err, "Failed to stop sandbox before removing", "sandboxID", sandboxID)
-		return
+		if !strings.Contains(err.Error(), "No such container") {
+			return fmt.Errorf("Failed to stop sandbox %q before removing: %v", sandboxID, err)
+		}
 	}
 	if err := cgc.client.RemovePodSandbox(sandboxID); err != nil {
 		klog.ErrorS(err, "Failed to remove sandbox", "sandboxID", sandboxID)
-	}
-}
-
-// evictableContainers gets all containers that are evictable. Evictable containers are: not running
-// and created more than MinAge ago.
-func (cgc *containerGC) evictableContainers(minAge time.Duration) (containersByEvictUnit, error) {
-	containers, err := cgc.manager.getKubeletContainers(true)
-	if err != nil {
-		return containersByEvictUnit{}, err
+		if !strings.Contains(err.Error(), "No such container") {
+			return fmt.Errorf("Failed to remove sandbox %q: %v", sandboxID, err)
+		}
 	}
 
-	evictUnits := make(containersByEvictUnit)
-	newestGCTime := time.Now().Add(-minAge)
-	for _, container := range containers {
-		// Prune out running containers.
-		if container.State == runtimeapi.ContainerState_CONTAINER_RUNNING {
-			continue
-		}
+	cgc.queue.AddAfter(cgc.fixLogEvent, containerGCPeriod)
 
-		createdAt := time.Unix(0, container.CreatedAt)
-		if newestGCTime.Before(createdAt) {
-			continue
-		}
-
-		labeledInfo := getContainerInfoFromLabels(container.Labels)
-		containerInfo := containerGCInfo{
-			id:         container.Id,
-			name:       container.Metadata.Name,
-			createTime: createdAt,
-			unknown:    container.State == runtimeapi.ContainerState_CONTAINER_UNKNOWN,
-		}
-		key := evictUnit{
-			uid:  labeledInfo.PodUID,
-			name: containerInfo.name,
-		}
-		evictUnits[key] = append(evictUnits[key], containerInfo)
-	}
-
-	return evictUnits, nil
+	return nil
 }
 
 // evict all containers that are evictable
-func (cgc *containerGC) evictContainers(gcPolicy kubecontainer.GCPolicy, allSourcesReady bool, evictNonDeletedPods bool) error {
-	// Separate containers by evict units.
-	evictUnits, err := cgc.evictableContainers(gcPolicy.MinAge)
-	if err != nil {
-		return err
-	}
-
+func (cgc *containerGC) evictContainers() error {
 	// Remove deleted pod containers if all sources are ready.
-	if allSourcesReady {
-		for key, unit := range evictUnits {
-			if cgc.podStateProvider.ShouldPodContentBeRemoved(key.uid) || (evictNonDeletedPods && cgc.podStateProvider.ShouldPodRuntimeBeRemoved(key.uid)) {
-				cgc.removeOldestN(unit, len(unit)) // Remove all.
-				delete(evictUnits, key)
+	if cgc.allSourcesReady {
+		visitFunc := func(v interface{}, k ...interface{}) (mmap.LEVEL, error) {
+			pid := k[0].(types.UID)
+			if cgc.podStateProvider.ShouldPodContentBeRemoved(pid) || (cgc.evictTerminatedPods && cgc.podStateProvider.ShouldPodRuntimeBeRemoved(pid)) {
+				unit := []containerGCInfo{}
+				v.(mmap.Mmaper).GetLeafValues(func(v interface{}) {
+					unit = append(unit, v.(containerGCInfo))
+				})
+				err := cgc.removeOldestN(unit, len(unit))
+				if err != nil {
+					return mmap.LEVEL_MAX, err
+				}
 			}
+
+			return mmap.LEVEL_0, nil
+		}
+
+		if err := cgc.evictUnits.Iterate(mmap.LEVEL_2, visitFunc); err != nil {
+			return err
 		}
 	}
 
 	// Enforce max containers per evict unit.
-	if gcPolicy.MaxPerPodContainer >= 0 {
-		cgc.enforceMaxContainersPerEvictUnit(evictUnits, gcPolicy.MaxPerPodContainer)
+	if cgc.gcPolicy.MaxPerPodContainer >= 0 {
+		if err := cgc.enforceMaxContainersPerEvictUnit(cgc.gcPolicy.MaxPerPodContainer); err != nil {
+			return err
+		}
 	}
 
 	// Enforce max total number of containers.
-	if gcPolicy.MaxContainers >= 0 && evictUnits.NumContainers() > gcPolicy.MaxContainers {
+	evictUnitNum := cgc.evictUnits.GetLevelKeyNum(mmap.LEVEL_2)
+	numContainers := cgc.evictUnits.Num()
+	if cgc.gcPolicy.MaxContainers >= 0 && numContainers > cgc.gcPolicy.MaxContainers {
 		// Leave an equal number of containers per evict unit (min: 1).
-		numContainersPerEvictUnit := gcPolicy.MaxContainers / evictUnits.NumEvictUnits()
+		numContainersPerEvictUnit := cgc.gcPolicy.MaxContainers / evictUnitNum
 		if numContainersPerEvictUnit < 1 {
 			numContainersPerEvictUnit = 1
 		}
-		cgc.enforceMaxContainersPerEvictUnit(evictUnits, numContainersPerEvictUnit)
+		if err := cgc.enforceMaxContainersPerEvictUnit(numContainersPerEvictUnit); err != nil {
+			return err
+		}
 
 		// If we still need to evict, evict oldest first.
-		numContainers := evictUnits.NumContainers()
-		if numContainers > gcPolicy.MaxContainers {
-			flattened := make([]containerGCInfo, 0, numContainers)
-			for key := range evictUnits {
-				flattened = append(flattened, evictUnits[key]...)
-			}
-			sort.Sort(byCreated(flattened))
+		numContainers = cgc.evictUnits.Num()
+		if numContainers > cgc.gcPolicy.MaxContainers {
+			flattened := []containerGCInfo{}
+			cgc.evictUnits.GetLeafValues(func(v interface{}) {
+				flattened = append(flattened, v.(containerGCInfo))
+			})
 
-			cgc.removeOldestN(flattened, numContainers-gcPolicy.MaxContainers)
+			err := cgc.removeOldestN(flattened, numContainers-cgc.gcPolicy.MaxContainers)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -272,63 +546,42 @@ func (cgc *containerGC) evictContainers(gcPolicy kubecontainer.GCPolicy, allSour
 //   2. contains no containers.
 //   3. belong to a non-existent (i.e., already removed) pod, or is not the
 //      most recently created sandbox for the pod.
-func (cgc *containerGC) evictSandboxes(evictNonDeletedPods bool) error {
-	containers, err := cgc.manager.getKubeletContainers(true)
-	if err != nil {
-		return err
-	}
+func (cgc *containerGC) evictSandboxes() error {
+	visitFunc := func(v interface{}, k ...interface{}) (mmap.LEVEL, error) {
+		podUID := k[0].(types.UID)
 
-	sandboxes, err := cgc.manager.getKubeletSandboxes(true)
-	if err != nil {
-		return err
-	}
+		sandboxes := []sandboxGCInfo{}
+		v.(mmap.Mmaper).GetLeafValues(func(v interface{}) {
+			sandboxes = append(sandboxes, v.(sandboxGCInfo))
+		})
 
-	// collect all the PodSandboxId of container
-	sandboxIDs := sets.NewString()
-	for _, container := range containers {
-		sandboxIDs.Insert(container.PodSandboxId)
-	}
+		toRemove := len(sandboxes)
 
-	sandboxesByPod := make(sandboxesByPodUID)
-	for _, sandbox := range sandboxes {
-		podUID := types.UID(sandbox.Metadata.Uid)
-		sandboxInfo := sandboxGCInfo{
-			id:         sandbox.Id,
-			createTime: time.Unix(0, sandbox.CreatedAt),
+		// Keep latest one if the pod still exists.
+		if !cgc.aliveSandboxs.Exist(podUID) {
+			toRemove = toRemove - 1
 		}
 
-		// Set ready sandboxes to be active.
-		if sandbox.State == runtimeapi.PodSandboxState_SANDBOX_READY {
-			sandboxInfo.active = true
+		if cgc.podStateProvider.ShouldPodContentBeRemoved(podUID) || (cgc.evictTerminatedPods && cgc.podStateProvider.ShouldPodRuntimeBeRemoved(podUID)) {
+			toRemove = len(sandboxes)
 		}
 
-		// Set sandboxes that still have containers to be active.
-		if sandboxIDs.Has(sandbox.Id) {
-			sandboxInfo.active = true
+		err := cgc.removeOldestNSandboxes(podUID, sandboxes, toRemove)
+		if err != nil {
+			return mmap.LEVEL_MAX, err
 		}
 
-		sandboxesByPod[podUID] = append(sandboxesByPod[podUID], sandboxInfo)
+		return mmap.LEVEL_0, nil
 	}
 
-	for podUID, sandboxes := range sandboxesByPod {
-		if cgc.podStateProvider.ShouldPodContentBeRemoved(podUID) || (evictNonDeletedPods && cgc.podStateProvider.ShouldPodRuntimeBeRemoved(podUID)) {
-			// Remove all evictable sandboxes if the pod has been removed.
-			// Note that the latest dead sandbox is also removed if there is
-			// already an active one.
-			cgc.removeOldestNSandboxes(sandboxes, len(sandboxes))
-		} else {
-			// Keep latest one if the pod still exists.
-			cgc.removeOldestNSandboxes(sandboxes, len(sandboxes)-1)
-		}
-	}
-	return nil
+	return cgc.sandboxesEvictByPod.Iterate(mmap.LEVEL_2, visitFunc)
 }
 
 // evictPodLogsDirectories evicts all evictable pod logs directories. Pod logs directories
 // are evictable if there are no corresponding pods.
-func (cgc *containerGC) evictPodLogsDirectories(allSourcesReady bool) error {
+func (cgc *containerGC) evictPodLogsDirectories() error {
 	osInterface := cgc.manager.osInterface
-	if allSourcesReady {
+	if cgc.allSourcesReady {
 		// Only remove pod logs directories when all sources are ready.
 		dirs, err := osInterface.ReadDir(podLogsRootDirectory)
 		if err != nil {
@@ -395,6 +648,17 @@ func (cgc *containerGC) evictPodLogsDirectories(allSourcesReady bool) error {
 	return nil
 }
 
+func (cgc *containerGC) DirectGarbageCollect(_ kubecontainer.GCPolicy, allSourcesReady bool, evictTerminatedPods bool) error {
+	de := cgc.fixDirectGCEvent.Event.(directGCEvent)
+	de.allSourcesReady = allSourcesReady
+	de.evictTerminatedPods = evictTerminatedPods
+	cgc.fixDirectGCEvent.Event = de
+	cgc.queue.Add(cgc.fixDirectGCEvent)
+
+	<-de.channel.ch
+	return nil
+}
+
 // GarbageCollect removes dead containers using the specified container gc policy.
 // Note that gc policy is not applied to sandboxes. Sandboxes are only removed when they are
 // not ready and containing no containers.
@@ -406,20 +670,30 @@ func (cgc *containerGC) evictPodLogsDirectories(allSourcesReady bool) error {
 // * gets evictable sandboxes which are not ready and contains no containers.
 // * removes evictable sandboxes.
 func (cgc *containerGC) GarbageCollect(gcPolicy kubecontainer.GCPolicy, allSourcesReady bool, evictNonDeletedPods bool) error {
-	errors := []error{}
-	// Remove evictable containers
-	if err := cgc.evictContainers(gcPolicy, allSourcesReady, evictNonDeletedPods); err != nil {
-		errors = append(errors, err)
+	if !cgc.gcPolicySet {
+		cgc.gcPolicy = gcPolicy
+		cgc.gcPolicySet = true
 	}
 
-	// Remove sandboxes with zero containers
-	if err := cgc.evictSandboxes(evictNonDeletedPods); err != nil {
-		errors = append(errors, err)
+	item, quit := cgc.queue.Get()
+	if quit {
+		return fmt.Errorf("GarbageCollect Queue quit")
 	}
 
-	// Remove pod sandbox log directory
-	if err := cgc.evictPodLogsDirectories(allSourcesReady); err != nil {
-		errors = append(errors, err)
+	defer cgc.queue.Done(item)
+
+	cgc.allSourcesReady = allSourcesReady
+	cgc.evictTerminatedPods = evictNonDeletedPods
+
+	var err error
+
+	if se, ok := item.(observer.SubjectEvent); ok {
+		err = se.Handle()
 	}
-	return utilerrors.NewAggregate(errors)
+
+	if err != nil {
+		cgc.queue.AddAfter(cgc.fixErrorEvent, containerGCPeriod)
+	}
+
+	return err
 }

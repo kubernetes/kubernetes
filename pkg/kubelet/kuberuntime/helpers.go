@@ -21,6 +21,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -93,12 +94,15 @@ func (m *kubeGenericRuntimeManager) toKubeContainer(c *runtimeapi.Container) (*k
 
 	annotatedInfo := getContainerInfoFromAnnotations(c.Annotations)
 	return &kubecontainer.Container{
-		ID:      kubecontainer.ContainerID{Type: m.runtimeName, ID: c.Id},
-		Name:    c.GetMetadata().GetName(),
-		ImageID: c.ImageRef,
-		Image:   c.Image.Image,
-		Hash:    annotatedInfo.Hash,
-		State:   toKubeContainerState(c.State),
+		ID:           kubecontainer.ContainerID{Type: m.runtimeName, ID: c.Id},
+		Name:         c.GetMetadata().GetName(),
+		ImageID:      c.ImageRef,
+		Image:        c.Image.Image,
+		Hash:         annotatedInfo.Hash,
+		State:        toKubeContainerState(c.State),
+		CreatedAt:    time.Unix(0, c.CreatedAt),
+		Labels:       c.Labels,
+		PodSandboxId: c.PodSandboxId,
 	}, nil
 }
 
@@ -112,8 +116,9 @@ func (m *kubeGenericRuntimeManager) sandboxToKubeContainer(s *runtimeapi.PodSand
 	}
 
 	return &kubecontainer.Container{
-		ID:    kubecontainer.ContainerID{Type: m.runtimeName, ID: s.Id},
-		State: kubecontainer.SandboxToContainerState(s.State),
+		ID:        kubecontainer.ContainerID{Type: m.runtimeName, ID: s.Id},
+		State:     kubecontainer.SandboxToContainerState(s.State),
+		CreatedAt: time.Unix(0, s.CreatedAt),
 	}, nil
 }
 

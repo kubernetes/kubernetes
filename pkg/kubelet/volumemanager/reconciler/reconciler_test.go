@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/mount-utils"
 
 	v1 "k8s.io/api/core/v1"
@@ -59,49 +60,24 @@ const (
 	reconcilerSyncWaitDuration   = 10 * time.Second
 )
 
-func hasAddedPods() bool { return true }
+func reconcile(reconciler Reconciler, queue workqueue.RateLimitingInterface) {
+	SendPodChangedEvent := func(poduid k8stypes.UID, duration time.Duration) {
+		if duration == 0 {
+			queue.Add(poduid)
+		} else {
+			queue.AddAfter(poduid, duration)
+		}
+	}
 
-// Calls Run()
-// Verifies there are no calls to attach, detach, mount, unmount, etc.
-func Test_Run_Positive_DoNothing(t *testing.T) {
-	// Arrange
-	volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
-	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
-	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
-	kubeClient := createTestClient()
-	fakeRecorder := &record.FakeRecorder{}
-	fakeHandler := volumetesting.NewBlockVolumePathHandler()
-	oex := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
-		kubeClient,
-		volumePluginMgr,
-		fakeRecorder,
-		fakeHandler,
-	))
-	reconciler := NewReconciler(
-		kubeClient,
-		false, /* controllerAttachDetachEnabled */
-		reconcilerLoopSleepDuration,
-		waitForAttachTimeout,
-		nodeName,
-		dsw,
-		asw,
-		hasAddedPods,
-		oex,
-		mount.NewFakeMounter(nil),
-		hostutil.NewFakeHostUtil(nil),
-		volumePluginMgr,
-		kubeletPodsDir)
-
-	// Act
-	runReconciler(reconciler)
-
-	// Assert
-	assert.NoError(t, volumetesting.VerifyZeroAttachCalls(fakePlugin))
-	assert.NoError(t, volumetesting.VerifyZeroWaitForAttachCallCount(fakePlugin))
-	assert.NoError(t, volumetesting.VerifyZeroMountDeviceCallCount(fakePlugin))
-	assert.NoError(t, volumetesting.VerifyZeroSetUpCallCount(fakePlugin))
-	assert.NoError(t, volumetesting.VerifyZeroTearDownCallCount(fakePlugin))
-	assert.NoError(t, volumetesting.VerifyZeroDetachCallCount(fakePlugin))
+	for {
+		item, quit := queue.Get()
+		if quit {
+			return
+		}
+		podname := types.UniquePodName(item.(k8stypes.UID))
+		reconciler.ReconcilePod(podname, SendPodChangedEvent)
+		queue.Done(item)
+	}
 }
 
 // Populates desiredStateOfWorld cache with one volume/pod.
@@ -128,7 +104,6 @@ func Test_Run_Positive_VolumeAttachAndMount(t *testing.T) {
 		nodeName,
 		dsw,
 		asw,
-		hasAddedPods,
 		oex,
 		mount.NewFakeMounter(nil),
 		hostutil.NewFakeHostUtil(nil),
@@ -163,8 +138,11 @@ func Test_Run_Positive_VolumeAttachAndMount(t *testing.T) {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
 
+	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+	queue.Add(pod.UID)
+
 	// Act
-	runReconciler(reconciler)
+	go reconcile(reconciler, queue)
 	waitForMount(t, fakePlugin, generatedVolumeName, asw)
 	// Assert
 	assert.NoError(t, volumetesting.VerifyAttachCallCount(
@@ -223,7 +201,6 @@ func Test_Run_Positive_VolumeAttachAndMountMigrationEnabled(t *testing.T) {
 		nodeName,
 		dsw,
 		asw,
-		hasAddedPods,
 		oex,
 		mount.NewFakeMounter(nil),
 		hostutil.NewFakeHostUtil(nil),
@@ -264,8 +241,11 @@ func Test_Run_Positive_VolumeAttachAndMountMigrationEnabled(t *testing.T) {
 	}
 	dsw.MarkVolumesReportedInUse([]v1.UniqueVolumeName{generatedVolumeName})
 
+	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+	queue.Add(pod.UID)
+
 	// Act
-	runReconciler(reconciler)
+	go reconcile(reconciler, queue)
 	waitForMount(t, fakePlugin, generatedVolumeName, asw)
 	// Assert
 	assert.NoError(t, volumetesting.VerifyWaitForAttachCallCount(
@@ -317,7 +297,6 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabled(t *testing.T) {
 		nodeName,
 		dsw,
 		asw,
-		hasAddedPods,
 		oex,
 		mount.NewFakeMounter(nil),
 		hostutil.NewFakeHostUtil(nil),
@@ -353,8 +332,10 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabled(t *testing.T) {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
 
+	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+	queue.Add(pod.UID)
 	// Act
-	runReconciler(reconciler)
+	go reconcile(reconciler, queue)
 	waitForMount(t, fakePlugin, generatedVolumeName, asw)
 
 	// Assert
@@ -396,7 +377,6 @@ func Test_Run_Negative_VolumeMountControllerAttachEnabled(t *testing.T) {
 		nodeName,
 		dsw,
 		asw,
-		hasAddedPods,
 		oex,
 		mount.NewFakeMounter(nil),
 		hostutil.NewFakeHostUtil(nil),
@@ -431,8 +411,11 @@ func Test_Run_Negative_VolumeMountControllerAttachEnabled(t *testing.T) {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
 
+	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+	queue.Add(pod.UID)
+
 	// Act
-	runReconciler(reconciler)
+	go reconcile(reconciler, queue)
 	time.Sleep(reconcilerSyncWaitDuration)
 
 	ok := oex.IsOperationSafeToRetry(generatedVolumeName, podName, nodeName, operationexecutor.VerifyControllerAttachedVolumeOpName)
@@ -474,7 +457,6 @@ func Test_Run_Positive_VolumeAttachMountUnmountDetach(t *testing.T) {
 		nodeName,
 		dsw,
 		asw,
-		hasAddedPods,
 		oex,
 		mount.NewFakeMounter(nil),
 		hostutil.NewFakeHostUtil(nil),
@@ -509,8 +491,10 @@ func Test_Run_Positive_VolumeAttachMountUnmountDetach(t *testing.T) {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
 
+	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+	queue.Add(pod.UID)
 	// Act
-	runReconciler(reconciler)
+	go reconcile(reconciler, queue)
 	waitForMount(t, fakePlugin, generatedVolumeName, asw)
 	// Assert
 	assert.NoError(t, volumetesting.VerifyAttachCallCount(
@@ -526,6 +510,7 @@ func Test_Run_Positive_VolumeAttachMountUnmountDetach(t *testing.T) {
 
 	// Act
 	dsw.DeletePodFromVolume(podName, generatedVolumeName)
+	queue.Add(pod.UID)
 	waitForDetach(t, generatedVolumeName, asw)
 
 	// Assert
@@ -576,7 +561,6 @@ func Test_Run_Positive_VolumeUnmountControllerAttachEnabled(t *testing.T) {
 		nodeName,
 		dsw,
 		asw,
-		hasAddedPods,
 		oex,
 		mount.NewFakeMounter(nil),
 		hostutil.NewFakeHostUtil(nil),
@@ -611,10 +595,12 @@ func Test_Run_Positive_VolumeUnmountControllerAttachEnabled(t *testing.T) {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
 
+	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
 	// Act
-	runReconciler(reconciler)
+	go reconcile(reconciler, queue)
 
 	dsw.MarkVolumesReportedInUse([]v1.UniqueVolumeName{generatedVolumeName})
+	queue.Add(pod.UID)
 	waitForMount(t, fakePlugin, generatedVolumeName, asw)
 
 	// Assert
@@ -630,6 +616,7 @@ func Test_Run_Positive_VolumeUnmountControllerAttachEnabled(t *testing.T) {
 
 	// Act
 	dsw.DeletePodFromVolume(podName, generatedVolumeName)
+	queue.Add(pod.UID)
 	waitForDetach(t, generatedVolumeName, asw)
 
 	// Assert
@@ -699,7 +686,6 @@ func Test_Run_Positive_VolumeAttachAndMap(t *testing.T) {
 		nodeName,
 		dsw,
 		asw,
-		hasAddedPods,
 		oex,
 		mount.NewFakeMounter(nil),
 		hostutil.NewFakeHostUtil(nil),
@@ -718,8 +704,11 @@ func Test_Run_Positive_VolumeAttachAndMap(t *testing.T) {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
 
+	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+	queue.Add(pod.UID)
+
 	// Act
-	runReconciler(reconciler)
+	go reconcile(reconciler, queue)
 	waitForMount(t, fakePlugin, generatedVolumeName, asw)
 	// Assert
 	assert.NoError(t, volumetesting.VerifyAttachCallCount(
@@ -814,7 +803,6 @@ func Test_Run_Positive_BlockVolumeMapControllerAttachEnabled(t *testing.T) {
 		nodeName,
 		dsw,
 		asw,
-		hasAddedPods,
 		oex,
 		mount.NewFakeMounter(nil),
 		hostutil.NewFakeHostUtil(nil),
@@ -831,8 +819,10 @@ func Test_Run_Positive_BlockVolumeMapControllerAttachEnabled(t *testing.T) {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
 
+	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+	queue.Add(pod.UID)
 	// Act
-	runReconciler(reconciler)
+	go reconcile(reconciler, queue)
 	waitForMount(t, fakePlugin, generatedVolumeName, asw)
 
 	// Assert
@@ -911,7 +901,6 @@ func Test_Run_Positive_BlockVolumeAttachMapUnmapDetach(t *testing.T) {
 		nodeName,
 		dsw,
 		asw,
-		hasAddedPods,
 		oex,
 		mount.NewFakeMounter(nil),
 		hostutil.NewFakeHostUtil(nil),
@@ -927,8 +916,10 @@ func Test_Run_Positive_BlockVolumeAttachMapUnmapDetach(t *testing.T) {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
 
+	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+	queue.Add(pod.UID)
 	// Act
-	runReconciler(reconciler)
+	go reconcile(reconciler, queue)
 	waitForMount(t, fakePlugin, generatedVolumeName, asw)
 	// Assert
 	assert.NoError(t, volumetesting.VerifyAttachCallCount(
@@ -942,6 +933,7 @@ func Test_Run_Positive_BlockVolumeAttachMapUnmapDetach(t *testing.T) {
 
 	// Act
 	dsw.DeletePodFromVolume(podName, generatedVolumeName)
+	queue.Add(pod.UID)
 	waitForDetach(t, generatedVolumeName, asw)
 
 	// Assert
@@ -1035,7 +1027,6 @@ func Test_Run_Positive_VolumeUnmapControllerAttachEnabled(t *testing.T) {
 		nodeName,
 		dsw,
 		asw,
-		hasAddedPods,
 		oex,
 		mount.NewFakeMounter(nil),
 		hostutil.NewFakeHostUtil(nil),
@@ -1051,10 +1042,13 @@ func Test_Run_Positive_VolumeUnmapControllerAttachEnabled(t *testing.T) {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
 
+	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+
 	// Act
-	runReconciler(reconciler)
+	go reconcile(reconciler, queue)
 
 	dsw.MarkVolumesReportedInUse([]v1.UniqueVolumeName{generatedVolumeName})
+	queue.Add(pod.UID)
 	waitForMount(t, fakePlugin, generatedVolumeName, asw)
 
 	// Assert
@@ -1068,6 +1062,7 @@ func Test_Run_Positive_VolumeUnmapControllerAttachEnabled(t *testing.T) {
 
 	// Act
 	dsw.DeletePodFromVolume(podName, generatedVolumeName)
+	queue.Add(pod.UID)
 	waitForDetach(t, generatedVolumeName, asw)
 
 	// Assert
@@ -1305,7 +1300,6 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 				nodeName,
 				dsw,
 				asw,
-				hasAddedPods,
 				oex,
 				mount.NewFakeMounter(nil),
 				hostutil.NewFakeHostUtil(nil),
@@ -1323,14 +1317,16 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 			dsw.MarkVolumesReportedInUse([]v1.UniqueVolumeName{volumeName})
 
 			// Start the reconciler to fill ASW.
-			stopChan, stoppedChan := make(chan struct{}), make(chan struct{})
+			queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+			stoppedChan := make(chan struct{})
 			go func() {
 				defer close(stoppedChan)
-				reconciler.Run(stopChan)
+				reconcile(reconciler, queue)
 			}()
+			queue.Add(pod.UID)
 			waitForMount(t, fakePlugin, volumeName, asw)
 			// Stop the reconciler.
-			close(stopChan)
+			queue.ShutDown()
 			<-stoppedChan
 
 			// Simulate what DSOWP does
@@ -1351,12 +1347,16 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 				if !cache.IsFSResizeRequiredError(podExistErr) {
 					t.Fatalf("Volume should be marked as fsResizeRequired, but receive unexpected error: %v", podExistErr)
 				}
-				go reconciler.Run(wait.NeverStop)
+
+				queue = workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+				queue.Add(pod.UID)
+				go reconcile(reconciler, queue)
 
 				waitErr := retryWithExponentialBackOff(testOperationBackOffDuration, func() (done bool, err error) {
 					mounted, _, err := asw.PodExistsInVolume(podName, volumeName, newSize)
 					return mounted && err == nil, nil
 				})
+				queue.ShutDown()
 				if waitErr != nil {
 					t.Fatalf("Volume resize should succeeded %v", waitErr)
 				}
@@ -1560,7 +1560,6 @@ func Test_UncertainDeviceGlobalMounts(t *testing.T) {
 					nodeName,
 					dsw,
 					asw,
-					hasAddedPods,
 					oex,
 					&mount.FakeMounter{},
 					hostutil.NewFakeHostUtil(nil),
@@ -1577,10 +1576,10 @@ func Test_UncertainDeviceGlobalMounts(t *testing.T) {
 				dsw.MarkVolumesReportedInUse([]v1.UniqueVolumeName{volumeName})
 
 				// Start the reconciler to fill ASW.
-				stopChan, stoppedChan := make(chan struct{}), make(chan struct{})
+				queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+				queue.Add(pod.UID)
 				go func() {
-					reconciler.Run(stopChan)
-					close(stoppedChan)
+					reconcile(reconciler, queue)
 				}()
 				waitForVolumeToExistInASW(t, volumeName, asw)
 				if tc.volumeName == volumetesting.TimeoutAndFailOnMountDeviceVolumeName {
@@ -1593,6 +1592,7 @@ func Test_UncertainDeviceGlobalMounts(t *testing.T) {
 					// wait for mount and then break it via remount
 					waitForMount(t, fakePlugin, volumeName, asw)
 					asw.MarkRemountRequired(podName)
+					queue.Add(pod.UID)
 					time.Sleep(reconcilerSyncWaitDuration)
 				}
 
@@ -1605,6 +1605,7 @@ func Test_UncertainDeviceGlobalMounts(t *testing.T) {
 				}
 
 				dsw.DeletePodFromVolume(podName, volumeName)
+				queue.Add(pod.UID)
 				waitForDetach(t, volumeName, asw)
 				if mode == v1.PersistentVolumeFilesystem {
 					err = volumetesting.VerifyUnmountDeviceCallCount(tc.unmountDeviceCallCount, fakePlugin)
@@ -1782,7 +1783,6 @@ func Test_UncertainVolumeMountState(t *testing.T) {
 					nodeName,
 					dsw,
 					asw,
-					hasAddedPods,
 					oex,
 					&mount.FakeMounter{},
 					hostutil.NewFakeHostUtil(nil),
@@ -1799,10 +1799,10 @@ func Test_UncertainVolumeMountState(t *testing.T) {
 				dsw.MarkVolumesReportedInUse([]v1.UniqueVolumeName{volumeName})
 
 				// Start the reconciler to fill ASW.
-				stopChan, stoppedChan := make(chan struct{}), make(chan struct{})
+				queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+				queue.Add(pod.UID)
 				go func() {
-					reconciler.Run(stopChan)
-					close(stoppedChan)
+					reconcile(reconciler, queue)
 				}()
 				waitForVolumeToExistInASW(t, volumeName, asw)
 				// all of these tests rely on device to be globally mounted and hence waiting for global
@@ -1818,6 +1818,7 @@ func Test_UncertainVolumeMountState(t *testing.T) {
 					// wait for mount and then break it via remount
 					waitForMount(t, fakePlugin, volumeName, asw)
 					asw.MarkRemountRequired(podName)
+					queue.Add(pod.UID)
 					time.Sleep(reconcilerSyncWaitDuration)
 				}
 
@@ -1830,6 +1831,7 @@ func Test_UncertainVolumeMountState(t *testing.T) {
 				}
 
 				dsw.DeletePodFromVolume(podName, volumeName)
+				queue.Add(pod.UID)
 				waitForDetach(t, volumeName, asw)
 
 				if mode == v1.PersistentVolumeFilesystem {
@@ -1913,7 +1915,7 @@ func waitForUncertainPodMount(t *testing.T, volumeName v1.UniqueVolumeName, podN
 			if mounted || err != nil {
 				return false, nil
 			}
-			allMountedVolumes := asw.GetAllMountedVolumes()
+			allMountedVolumes := asw.GetPossiblyMountedVolumesForPod(podName)
 			for _, v := range allMountedVolumes {
 				if v.VolumeName == volumeName {
 					return true, nil
@@ -2022,10 +2024,6 @@ func createTestClient(attachedVolumes ...v1.AttachedVolume) *fake.Clientset {
 	return fakeClient
 }
 
-func runReconciler(reconciler Reconciler) {
-	go reconciler.Run(wait.NeverStop)
-}
-
 func createtestClientWithPVPVC(pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim, attachedVolumes ...v1.AttachedVolume) *fake.Clientset {
 	fakeClient := &fake.Clientset{}
 	if len(attachedVolumes) == 0 {
@@ -2096,7 +2094,6 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabledRace(t *testing.T) {
 		nodeName,
 		dsw,
 		asw,
-		hasAddedPods,
 		oex,
 		mount.NewFakeMounter(nil),
 		hostutil.NewFakeHostUtil(nil),
@@ -2135,15 +2132,17 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabledRace(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
+	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+	queue.Add(pod.UID)
 	// Start the reconciler to fill ASW.
-	stopChan, stoppedChan := make(chan struct{}), make(chan struct{})
+	stoppedChan := make(chan struct{})
 	go func() {
-		reconciler.Run(stopChan)
+		reconcile(reconciler, queue)
 		close(stoppedChan)
 	}()
 	waitForMount(t, fakePlugin, generatedVolumeName, asw)
 	// Stop the reconciler.
-	close(stopChan)
+	queue.ShutDown()
 	<-stoppedChan
 
 	finished := make(chan interface{})
@@ -2172,11 +2171,14 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabledRace(t *testing.T) {
 	}
 	fakePlugin.Unlock()
 
+	queue = workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
 	// Start the reconciler again.
-	go reconciler.Run(wait.NeverStop)
+	go reconcile(reconciler, queue)
 
 	// 2. Delete the volume from DSW (and wait for callbacks)
 	dsw.DeletePodFromVolume(podName, generatedVolumeName)
+
+	queue.Add(pod.UID)
 
 	<-finished
 	waitForMount(t, fakePlugin, generatedVolumeName, asw)

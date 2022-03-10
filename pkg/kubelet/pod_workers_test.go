@@ -33,8 +33,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/kubelet/util/queue"
-	"k8s.io/utils/clock"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 // fakePodWorkers runs sync pod function in serial, so we can have
@@ -133,6 +132,10 @@ func (f *fakePodWorkers) IsPodForMirrorPodTerminatingByFullName(podFullname stri
 	return f.terminatingStaticPods[podFullname]
 }
 
+func (p *fakePodWorkers) CompleteTerminatingRuntimePodById(poduid types.UID, outer bool) {
+
+}
+
 type TestingInterface interface {
 	Errorf(format string, args ...interface{})
 }
@@ -199,58 +202,12 @@ type FakeQueueItem struct {
 	Delay time.Duration
 }
 
-type fakeQueue struct {
-	lock         sync.Mutex
-	queue        []FakeQueueItem
-	currentStart int
-}
-
-func (q *fakeQueue) Empty() bool {
-	q.lock.Lock()
-	defer q.lock.Unlock()
-	return (len(q.queue) - q.currentStart) == 0
-}
-
-func (q *fakeQueue) Items() []FakeQueueItem {
-	q.lock.Lock()
-	defer q.lock.Unlock()
-	return append(make([]FakeQueueItem, 0, len(q.queue)), q.queue...)
-}
-
-func (q *fakeQueue) Set() sets.String {
-	q.lock.Lock()
-	defer q.lock.Unlock()
-	work := sets.NewString()
-	for _, item := range q.queue[q.currentStart:] {
-		work.Insert(string(item.UID))
-	}
-	return work
-}
-
-func (q *fakeQueue) Enqueue(uid types.UID, delay time.Duration) {
-	q.lock.Lock()
-	defer q.lock.Unlock()
-	q.queue = append(q.queue, FakeQueueItem{UID: uid, Delay: delay})
-}
-
-func (q *fakeQueue) GetWork() []types.UID {
-	q.lock.Lock()
-	defer q.lock.Unlock()
-	work := make([]types.UID, 0, len(q.queue)-q.currentStart)
-	for _, item := range q.queue[q.currentStart:] {
-		work = append(work, item.UID)
-	}
-	q.currentStart = len(q.queue)
-	return work
-}
-
 func createPodWorkers() (*podWorkers, map[types.UID][]syncPodRecord) {
 	lock := sync.Mutex{}
 	processed := make(map[types.UID][]syncPodRecord)
 	fakeRecorder := &record.FakeRecorder{}
 	fakeRuntime := &containertest.FakeRuntime{}
 	fakeCache := containertest.NewFakeCache(fakeRuntime)
-	fakeQueue := &fakeQueue{}
 	w := newPodWorkers(
 		func(ctx context.Context, updateType kubetypes.SyncPodType, pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, error) {
 			func() {
@@ -288,7 +245,6 @@ func createPodWorkers() (*podWorkers, map[types.UID][]syncPodRecord) {
 			return nil
 		},
 		fakeRecorder,
-		fakeQueue,
 		time.Second,
 		time.Millisecond,
 		fakeCache,
@@ -525,14 +481,6 @@ func TestUpdatePodDoesNotForgetSyncPodKill(t *testing.T) {
 	}
 }
 
-func newUIDSet(uids ...types.UID) sets.String {
-	set := sets.NewString()
-	for _, uid := range uids {
-		set.Insert(string(uid))
-	}
-	return set
-}
-
 type terminalPhaseSync struct {
 	lock     sync.Mutex
 	fn       syncPodFnType
@@ -615,6 +563,22 @@ func TestTerminalPhaseTransition(t *testing.T) {
 
 func TestStaticPodExclusion(t *testing.T) {
 	podWorkers, processed := createPodWorkers()
+
+	var clock = testingclock.NewFakeClock(time.Now())
+	var podSyncDelayInst = newPodSyncDelay(nil, nil, clock)
+	getDelayWork := func() sets.String {
+		clock.Step(3 * time.Minute)
+		time.Sleep(1 * time.Second)
+		poduids := sets.NewString()
+		for {
+			select {
+			case poduid := <-podSyncDelayInst.watch():
+				poduids.Insert(string(poduid))
+			default:
+				return poduids
+			}
+		}
+	}
 	var channels WorkChannel
 	podWorkers.workerChannelFn = channels.Intercept
 
@@ -709,13 +673,13 @@ func TestStaticPodExclusion(t *testing.T) {
 	if e, a := map[string][]types.UID{"pod1_test1": {"3-static", "4-static"}}, podWorkers.waitingToStartStaticPodsByFullname; !reflect.DeepEqual(e, a) {
 		t.Fatalf("unexpected waiting static pods: %s", cmp.Diff(e, a))
 	}
+
 	// verify all are enqueued
-	if e, a := sets.NewString("1-normal", "2-static", "4-static", "3-static"), podWorkers.workQueue.(*fakeQueue).Set(); !e.Equal(a) {
+	if e, a := sets.NewString("1-normal", "2-static", "4-static", "3-static"), getDelayWork(); !e.Equal(a) {
 		t.Fatalf("unexpected queued items: %s", cmp.Diff(e, a))
 	}
 
 	// send a basic update for 3-static
-	podWorkers.workQueue.GetWork()
 	podWorkers.UpdatePod(UpdatePodOptions{
 		Pod:        newNamedPod("3-static", "test1", "pod1", true),
 		UpdateType: kubetypes.SyncPodUpdate,
@@ -729,13 +693,13 @@ func TestStaticPodExclusion(t *testing.T) {
 	if e, a := map[string][]types.UID{"pod1_test1": {"3-static", "4-static"}}, podWorkers.waitingToStartStaticPodsByFullname; !reflect.DeepEqual(e, a) {
 		t.Fatalf("unexpected waiting static pods: %s", cmp.Diff(e, a))
 	}
+
 	// the queue should include a single item for 3-static (indicating we need to retry later)
-	if e, a := sets.NewString("3-static"), newUIDSet(podWorkers.workQueue.GetWork()...); !reflect.DeepEqual(e, a) {
+	if e, a := sets.NewString("3-static"), getDelayWork(); !reflect.DeepEqual(e, a) {
 		t.Fatalf("unexpected queued items: %s", cmp.Diff(e, a))
 	}
 
 	// mark 3-static as deleted while 2-static is still running
-	podWorkers.workQueue.GetWork()
 	podWorkers.UpdatePod(UpdatePodOptions{
 		Pod:        newNamedPod("3-static", "test1", "pod1", true),
 		UpdateType: kubetypes.SyncPodKill,
@@ -748,7 +712,7 @@ func TestStaticPodExclusion(t *testing.T) {
 		t.Fatalf("unexpected pod state: %#v", pod3)
 	}
 	// the queue should be empty because the worker is now done
-	if e, a := sets.NewString(), newUIDSet(podWorkers.workQueue.GetWork()...); !reflect.DeepEqual(e, a) {
+	if e, a := sets.NewString(), getDelayWork(); !reflect.DeepEqual(e, a) {
 		t.Fatalf("unexpected queued items: %s", cmp.Diff(e, a))
 	}
 	// 2-static is still running
@@ -979,6 +943,8 @@ func TestStaticPodExclusion(t *testing.T) {
 		processed[types.UID("8-static")]; !reflect.DeepEqual(expected, actual) {
 		t.Fatalf("unexpected sync pod calls: %s", cmp.Diff(expected, actual))
 	}
+
+	podSyncDelayInst.queue.ShutDown()
 }
 
 type WorkChannelItem struct {
@@ -1314,7 +1280,7 @@ func TestFakePodWorkers(t *testing.T) {
 		kubeletForRealWorkers.syncPodWithWaitGroup,
 		kubeletForRealWorkers.syncTerminatingPod,
 		kubeletForRealWorkers.syncTerminatedPod,
-		fakeRecorder, queue.NewBasicWorkQueue(&clock.RealClock{}), time.Second, time.Second, fakeCache)
+		fakeRecorder, time.Second, time.Second, fakeCache)
 	fakePodWorkers := &fakePodWorkers{
 		syncPodFn: kubeletForFakeWorkers.syncPod,
 		cache:     fakeCache,

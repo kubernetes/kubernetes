@@ -33,6 +33,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/cribuffer"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
 )
@@ -222,10 +223,7 @@ func (im *realImageGCManager) detectImages(detectTime time.Time) (sets.String, e
 	if err != nil {
 		return imagesInUse, err
 	}
-	pods, err := im.runtime.GetPods(true)
-	if err != nil {
-		return imagesInUse, err
-	}
+	pods := cribuffer.CriBuffer.GetKubeletPods()
 
 	// Make a set of images in use by containers.
 	for _, pod := range pods {

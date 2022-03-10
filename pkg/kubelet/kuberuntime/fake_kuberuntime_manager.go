@@ -27,15 +27,19 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/component-base/logs/logreduction"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/cribuffer"
 	"k8s.io/kubernetes/pkg/kubelet/images"
+	"k8s.io/kubernetes/pkg/kubelet/inits"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/logs"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
+	"k8s.io/kubernetes/pkg/util/observer"
 )
 
 const (
@@ -56,14 +60,20 @@ func (f *fakeHTTP) Get(url string) (*http.Response, error) {
 }
 
 type fakePodStateProvider struct {
-	terminated map[types.UID]struct{}
-	removed    map[types.UID]struct{}
+	terminated       map[types.UID]struct{}
+	removed          map[types.UID]struct{}
+	isPodSandboxSucc map[types.UID]bool
+	manager          *kubeGenericRuntimeManager
+	observer.Observer
 }
 
-func newFakePodStateProvider() *fakePodStateProvider {
+func newFakePodStateProvider(manager *kubeGenericRuntimeManager) *fakePodStateProvider {
 	return &fakePodStateProvider{
-		terminated: make(map[types.UID]struct{}),
-		removed:    make(map[types.UID]struct{}),
+		terminated:       make(map[types.UID]struct{}),
+		removed:          make(map[types.UID]struct{}),
+		isPodSandboxSucc: make(map[types.UID]bool),
+		manager:          manager,
+		Observer:         observer.NewObserver(),
 	}
 }
 
@@ -80,6 +90,24 @@ func (f *fakePodStateProvider) ShouldPodRuntimeBeRemoved(uid types.UID) bool {
 func (f *fakePodStateProvider) ShouldPodContentBeRemoved(uid types.UID) bool {
 	_, found := f.removed[uid]
 	return found
+}
+
+func (f *fakePodStateProvider) IsPodSandboxSucc(uid types.UID) bool {
+	return f.isPodSandboxSucc[uid]
+}
+
+func (f *fakePodStateProvider) SetPodSandboxSucc(uid types.UID, succ bool) {
+	f.isPodSandboxSucc[uid] = succ
+}
+
+func (f *fakePodStateProvider) GetKubeletPods() []*kubecontainer.Pod {
+	podList, _ := f.manager.GetPods(true)
+	return kubecontainer.Pods(podList)
+}
+
+func (f *fakePodStateProvider) GetKubeletRunningPods() []*kubecontainer.Pod {
+	podList, _ := f.manager.GetPods(false)
+	return kubecontainer.Pods(podList)
 }
 
 func newFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageService internalapi.ImageManagerService, machineInfo *cadvisorapi.MachineInfo, osInterface kubecontainer.OSInterface, runtimeHelper kubecontainer.RuntimeHelper, keyring credentialprovider.DockerKeyring) (*kubeGenericRuntimeManager, error) {
@@ -112,8 +140,9 @@ func newFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageS
 		return nil, err
 	}
 
-	podStateProvider := newFakePodStateProvider()
+	podStateProvider := newFakePodStateProvider(kubeRuntimeManager)
 	kubeRuntimeManager.containerGC = newContainerGC(runtimeService, podStateProvider, kubeRuntimeManager)
+	kubeRuntimeManager.containerGC.queue = workqueue.NewFakeRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
 	kubeRuntimeManager.podStateProvider = podStateProvider
 	kubeRuntimeManager.runtimeName = typedVersion.RuntimeName
 	kubeRuntimeManager.imagePuller = images.NewImageManager(
@@ -135,6 +164,10 @@ func newFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageS
 			v1.ResourceCPU:    resource.MustParse(fakeNodeAllocatableCPU),
 		}
 	}
+
+	cribuffer.CriBuffer = podStateProvider
+
+	inits.SafeInitFuncs.DoInit()
 
 	return kubeRuntimeManager, nil
 }

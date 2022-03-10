@@ -269,7 +269,12 @@ func insert(q *waitForPriorityQueue, knownEntries map[t]*waitFor, entry *waitFor
 	// if the entry already exists, update the time only if it would cause the item to be queued sooner
 	existing, exists := knownEntries[entry.data]
 	if exists {
-		if existing.readyAt.After(entry.readyAt) {
+		isForceFix := false
+		if force, ok := entry.data.(forceFixer); ok {
+			isForceFix = force.ForceFix()
+		}
+
+		if isForceFix || existing.readyAt.After(entry.readyAt) {
 			existing.readyAt = entry.readyAt
 			heap.Fix(q, existing.index)
 		}
@@ -279,4 +284,8 @@ func insert(q *waitForPriorityQueue, knownEntries map[t]*waitFor, entry *waitFor
 
 	heap.Push(q, entry)
 	knownEntries[entry.data] = entry
+}
+
+type forceFixer interface {
+	ForceFix() bool
 }

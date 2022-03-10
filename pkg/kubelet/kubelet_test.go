@@ -44,12 +44,14 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/client-go/util/workqueue"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	"k8s.io/kubernetes/pkg/kubelet/cribuffer"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -60,6 +62,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
+	"k8s.io/kubernetes/pkg/kubelet/podworks"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	probetest "k8s.io/kubernetes/pkg/kubelet/prober/testing"
 	"k8s.io/kubernetes/pkg/kubelet/secret"
@@ -69,9 +72,9 @@ import (
 	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
 	"k8s.io/kubernetes/pkg/kubelet/token"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	kubeletvolume "k8s.io/kubernetes/pkg/kubelet/volumemanager"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/util/observer"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/awsebs"
 	"k8s.io/kubernetes/pkg/volume/azuredd"
@@ -302,9 +305,10 @@ func newTestKubeletWithImageList(
 	kubelet.backOff = flowcontrol.NewBackOff(time.Second, time.Minute)
 	kubelet.backOff.Clock = fakeClock
 	kubelet.resyncInterval = 10 * time.Second
-	kubelet.workQueue = queue.NewBasicWorkQueue(fakeClock)
 	// Relist period does not affect the tests.
-	kubelet.pleg = pleg.NewGenericPLEG(fakeRuntime, 100, time.Hour, kubelet.podCache, clock.RealClock{})
+	kubelet.pleg = pleg.NewGenericPLEG(fakeRuntime, 100, time.Second, kubelet.podCache, clock.RealClock{})
+	kubelet.pleg.Start()
+	cribuffer.CriBuffer = kubelet.pleg
 	kubelet.clock = fakeClock
 
 	nodeRef := &v1.ObjectReference{
@@ -379,6 +383,12 @@ func newTestKubeletWithImageList(
 	kubelet.AddPodSyncLoopHandler(activeDeadlineHandler)
 	kubelet.AddPodSyncHandler(activeDeadlineHandler)
 	kubelet.lastContainerStartedTime = newTimeCache()
+
+	kubelet.housekeepingQueue = workqueue.NewFakeRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+	kubelet.fixHousekeepingEvent = observer.NewSubjectEvent(kubelet.handleHousekeepingEvent, nil)
+	kubelet.podCgroupsRemoving = make(map[types.UID]chan struct{})
+	kubelet.InitHousekeeping()
+
 	return &TestKubelet{kubelet, fakeRuntime, fakeContainerManager, fakeKubeClient, fakeMirrorClient, fakeClock, nil, plug}
 }
 
@@ -402,6 +412,8 @@ func TestSyncLoopAbort(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
+	podSyncDelayInst := newPodSyncDelay(kubelet.podManager, kubelet.statusManager, kubelet.clock)
+	kubelet.podSyncDelay = podSyncDelayInst
 	kubelet.runtimeState.setRuntimeSync(time.Now())
 	// The syncLoop waits on time.After(resyncInterval), set it really big so that we don't race for
 	// the channel close
@@ -411,11 +423,13 @@ func TestSyncLoopAbort(t *testing.T) {
 	close(ch)
 
 	// sanity check (also prevent this test from hanging in the next step)
-	ok := kubelet.syncLoopIteration(ch, kubelet, make(chan time.Time), make(chan time.Time), make(chan *pleg.PodLifecycleEvent, 1))
+	ok := kubelet.syncLoopIteration(ch, kubelet, make(chan *pleg.PodLifecycleEvent, 1))
 	require.False(t, ok, "Expected syncLoopIteration to return !ok since update chan was closed")
 
 	// this should terminate immediately; if it hangs then the syncLoopIteration isn't aborting properly
 	kubelet.syncLoop(ch, kubelet)
+
+	podSyncDelayInst.queue.ShutDown()
 }
 
 func TestSyncPodsStartPod(t *testing.T) {
@@ -444,16 +458,15 @@ func TestHandlePodCleanupsPerQOS(t *testing.T) {
 		Name:      "foo",
 		Namespace: "new",
 		Containers: []*kubecontainer.Container{
-			{Name: "bar"},
+			{Name: "bar", State: kubecontainer.ContainerStateRunning},
 		},
 	}
 
 	fakeRuntime := testKubelet.fakeRuntime
 	fakeContainerManager := testKubelet.fakeContainerManager
 	fakeContainerManager.PodContainerManager.AddPodFromCgroups(pod) // add pod to mock cgroup
-	fakeRuntime.PodList = []*containertest.FakePod{
-		{Pod: pod},
-	}
+	fakeRuntime.AddPod(&containertest.FakePod{Pod: pod}, false)
+	fakeRuntime.AddPod(&containertest.FakePod{Pod: pod}, true)
 	kubelet := testKubelet.kubelet
 	kubelet.cgroupsPerQOS = true // enable cgroupsPerQOS to turn on the cgroups cleanup
 
@@ -462,6 +475,7 @@ func TestHandlePodCleanupsPerQOS(t *testing.T) {
 	// HandlePodCleanups a few more times. We should only see one Destroy() event. podKiller runs
 	// within a goroutine so a two second delay should be enough time to
 	// mark the pod as killed (within this test case).
+	config.Observer.Notify(config.ALL_READY, struct{}{})
 
 	kubelet.HandlePodCleanups()
 
@@ -473,9 +487,11 @@ func TestHandlePodCleanupsPerQOS(t *testing.T) {
 
 	// simulate Runtime.KillPod
 	fakeRuntime.PodList = nil
-
+	podworks.Observer.Notify(podworks.POD_TERMINATED, pod.ID)
 	kubelet.HandlePodCleanups()
+	podworks.Observer.Notify(podworks.POD_TERMINATED, pod.ID)
 	kubelet.HandlePodCleanups()
+	podworks.Observer.Notify(podworks.POD_TERMINATED, pod.ID)
 	kubelet.HandlePodCleanups()
 
 	destroyCount := 0
@@ -641,16 +657,15 @@ func TestHandlePodCleanups(t *testing.T) {
 		Name:      "foo",
 		Namespace: "new",
 		Containers: []*kubecontainer.Container{
-			{Name: "bar"},
+			{Name: "bar", State: kubecontainer.ContainerStateRunning},
 		},
 	}
 
 	fakeRuntime := testKubelet.fakeRuntime
-	fakeRuntime.PodList = []*containertest.FakePod{
-		{Pod: pod},
-	}
+	fakeRuntime.AddPod(&containertest.FakePod{Pod: pod}, false)
+	fakeRuntime.AddPod(&containertest.FakePod{Pod: pod}, true)
 	kubelet := testKubelet.kubelet
-
+	config.Observer.Notify(config.ALL_READY, struct{}{})
 	kubelet.HandlePodCleanups()
 
 	// assert that unwanted pods were queued to kill
@@ -671,7 +686,7 @@ func TestHandlePodRemovesWhenSourcesAreReady(t *testing.T) {
 		Name:      "foo",
 		Namespace: "new",
 		Containers: []*kubecontainer.Container{
-			{Name: "bar"},
+			{Name: "bar", State: kubecontainer.ContainerStateRunning},
 		},
 	}
 
@@ -680,9 +695,8 @@ func TestHandlePodRemovesWhenSourcesAreReady(t *testing.T) {
 	}
 
 	fakeRuntime := testKubelet.fakeRuntime
-	fakeRuntime.PodList = []*containertest.FakePod{
-		{Pod: fakePod},
-	}
+	fakeRuntime.AddPod(&containertest.FakePod{Pod: fakePod}, false)
+	// fakeRuntime.AddPod(&containertest.FakePod{Pod: fakePod}, true)
 	kubelet := testKubelet.kubelet
 	kubelet.sourcesReady = config.NewSourcesReady(func(_ sets.String) bool { return ready })
 
@@ -1134,6 +1148,7 @@ func TestPurgingObsoleteStatusMapEntries(t *testing.T) {
 	}
 	// Sync with empty pods so that the entry in status map will be removed.
 	kl.podManager.SetPods([]*v1.Pod{})
+	config.Observer.Notify(config.ALL_READY, struct{}{})
 	kl.HandlePodCleanups()
 	if _, found := kl.statusManager.GetPodStatus(podToTest.UID); found {
 		t.Fatalf("expected to not have status cached for pod2")
@@ -1413,6 +1428,7 @@ func TestDeleteOrphanedMirrorPods(t *testing.T) {
 	}
 
 	// Sync with an empty pod list to delete all mirror pods.
+	config.Observer.Notify(config.ALL_READY, struct{}{})
 	kl.HandlePodCleanups()
 	assert.Len(t, manager.GetPods(), 0, "Expected 0 mirror pods")
 	for i, pod := range orphanPods {
@@ -1707,6 +1723,7 @@ func TestDeletePodDirsForDeletedPods(t *testing.T) {
 
 	// Pod 1 has been deleted and no longer exists.
 	kl.podManager.SetPods([]*v1.Pod{pods[0]})
+	config.Observer.Notify(config.ALL_READY, struct{}{})
 	kl.HandlePodCleanups()
 	assert.True(t, dirExists(kl.getPodDir(pods[0].UID)), "Expected directory to exist for pod 0")
 	assert.False(t, dirExists(kl.getPodDir(pods[1].UID)), "Expected directory to be deleted for pod 1")
@@ -1718,6 +1735,7 @@ func syncAndVerifyPodDir(t *testing.T, testKubelet *TestKubelet, pods []*v1.Pod,
 
 	kl.podManager.SetPods(pods)
 	kl.HandlePodSyncs(pods)
+	config.Observer.Notify(config.ALL_READY, struct{}{})
 	kl.HandlePodCleanups()
 	for i, pod := range podsToCheck {
 		exist := dirExists(kl.getPodDir(pod.UID))
@@ -1749,6 +1767,9 @@ func TestDoesNotDeletePodDirsIfContainerIsRunning(t *testing.T) {
 		ID:        "12345678",
 		Name:      "pod1",
 		Namespace: "ns",
+		Containers: []*kubecontainer.Container{
+			{Name: "bar", State: kubecontainer.ContainerStateRunning},
+		},
 	}
 	apiPod := podWithUIDNameNs(runningPod.ID, runningPod.Name, runningPod.Namespace)
 
@@ -1761,13 +1782,17 @@ func TestDoesNotDeletePodDirsIfContainerIsRunning(t *testing.T) {
 	// Pretend the pod is deleted from apiserver, but is still active on the node.
 	// The pod directory should not be removed.
 	pods = []*v1.Pod{}
-	testKubelet.fakeRuntime.PodList = []*containertest.FakePod{{Pod: runningPod, NetnsPath: ""}}
+	// testKubelet.fakeRuntime.PodList = []*containertest.FakePod{{Pod: runningPod, NetnsPath: ""}}
+	testKubelet.fakeRuntime.AddPod(&containertest.FakePod{Pod: runningPod, NetnsPath: ""}, false)
+	testKubelet.fakeRuntime.AddPod(&containertest.FakePod{Pod: runningPod, NetnsPath: ""}, true)
 	syncAndVerifyPodDir(t, testKubelet, pods, []*v1.Pod{apiPod}, true)
 
 	// The pod is deleted and also not active on the node. The pod directory
 	// should be removed.
 	pods = []*v1.Pod{}
-	testKubelet.fakeRuntime.PodList = []*containertest.FakePod{}
+	// testKubelet.fakeRuntime.PodList = []*containertest.FakePod{}
+	testKubelet.fakeRuntime.CleanPod(false)
+	testKubelet.fakeRuntime.CleanPod(true)
 	testKubelet.kubelet.podWorkers.(*fakePodWorkers).running = nil
 	syncAndVerifyPodDir(t, testKubelet, pods, []*v1.Pod{apiPod}, false)
 }
@@ -1776,6 +1801,7 @@ func TestGetPodsToSync(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
+	podSyncDelayInst := newPodSyncDelay(kubelet.podManager, kubelet.statusManager, kubelet.clock)
 	clock := testKubelet.fakeClock
 	pods := newTestPods(5)
 
@@ -1788,19 +1814,32 @@ func TestGetPodsToSync(t *testing.T) {
 	pods[1].Spec.ActiveDeadlineSeconds = &notYetActiveDeadlineSeconds
 	pods[2].Status.StartTime = &startTime
 	pods[2].Spec.ActiveDeadlineSeconds = &exceededActiveDeadlineSeconds
-
 	kubelet.podManager.SetPods(pods)
-	kubelet.workQueue.Enqueue(pods[2].UID, 0)
-	kubelet.workQueue.Enqueue(pods[3].UID, 30*time.Second)
-	kubelet.workQueue.Enqueue(pods[4].UID, 2*time.Minute)
+	podworks.Observer.Notify(podworks.POD_SYNC_DELAY, podSyncDelayEvent{pods[3].UID, 30 * time.Second})
+	podworks.Observer.Notify(podworks.POD_SYNC_DELAY, podSyncDelayEvent{pods[4].UID, 2 * time.Minute})
 
 	clock.Step(1 * time.Minute)
-
+	time.Sleep(1 * time.Second)
 	expected := []*v1.Pod{pods[2], pods[3], pods[0]}
-	podsToSync := kubelet.getPodsToSync()
+	podsToSync := []*v1.Pod{}
+	func() {
+		for {
+			select {
+			case poduid := <-podSyncDelayInst.watch():
+				pod, exists := kubelet.podManager.GetPodByUID(poduid)
+				if exists {
+					podsToSync = append(podsToSync, pod)
+				}
+			default:
+				return
+			}
+
+		}
+	}()
 	sort.Sort(podsByUID(expected))
 	sort.Sort(podsByUID(podsToSync))
 	assert.Equal(t, expected, podsToSync)
+	podSyncDelayInst.queue.ShutDown()
 }
 
 func TestGenerateAPIPodStatusWithSortedContainers(t *testing.T) {
@@ -2283,38 +2322,6 @@ func TestHandlePodAdditionsInvokesPodAdmitHandlers(t *testing.T) {
 	// Check pod status stored in the status map.
 	checkPodStatus(t, kl, podToReject, v1.PodFailed)
 	checkPodStatus(t, kl, podToAdmit, v1.PodPending)
-}
-
-// testPodSyncLoopHandler is a lifecycle.PodSyncLoopHandler that is used for testing.
-type testPodSyncLoopHandler struct {
-	// list of pods to sync
-	podsToSync []*v1.Pod
-}
-
-// ShouldSync evaluates if the pod should be synced from the kubelet.
-func (a *testPodSyncLoopHandler) ShouldSync(pod *v1.Pod) bool {
-	for _, podToSync := range a.podsToSync {
-		if podToSync.UID == pod.UID {
-			return true
-		}
-	}
-	return false
-}
-
-// TestGetPodsToSyncInvokesPodSyncLoopHandlers ensures that the get pods to sync routine invokes the handler.
-func TestGetPodsToSyncInvokesPodSyncLoopHandlers(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	defer testKubelet.Cleanup()
-	kubelet := testKubelet.kubelet
-	pods := newTestPods(5)
-	expected := []*v1.Pod{pods[0]}
-	kubelet.AddPodSyncLoopHandler(&testPodSyncLoopHandler{expected})
-	kubelet.podManager.SetPods(pods)
-
-	podsToSync := kubelet.getPodsToSync()
-	sort.Sort(podsByUID(expected))
-	sort.Sort(podsByUID(podsToSync))
-	assert.Equal(t, expected, podsToSync)
 }
 
 // testPodSyncHandler is a lifecycle.PodSyncHandler that is used for testing.

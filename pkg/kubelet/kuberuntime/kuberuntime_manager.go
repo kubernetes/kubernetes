@@ -358,9 +358,11 @@ func (m *kubeGenericRuntimeManager) GetPods(all bool) ([]*kubecontainer.Pod, err
 		podUID := kubetypes.UID(s.Metadata.Uid)
 		if _, ok := pods[podUID]; !ok {
 			pods[podUID] = &kubecontainer.Pod{
-				ID:        podUID,
-				Name:      s.Metadata.Name,
-				Namespace: s.Metadata.Namespace,
+				ID:         podUID,
+				Name:       s.Metadata.Name,
+				Namespace:  s.Metadata.Namespace,
+				Containers: []*kubecontainer.Container{},
+				Sandboxes:  []*kubecontainer.Container{},
 			}
 		}
 		p := pods[podUID]
@@ -1085,6 +1087,10 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(uid kubetypes.UID, name, namesp
 // GarbageCollect removes dead containers using the specified container gc policy.
 func (m *kubeGenericRuntimeManager) GarbageCollect(gcPolicy kubecontainer.GCPolicy, allSourcesReady bool, evictNonDeletedPods bool) error {
 	return m.containerGC.GarbageCollect(gcPolicy, allSourcesReady, evictNonDeletedPods)
+}
+
+func (m *kubeGenericRuntimeManager) DirectGarbageCollect(gcPolicy kubecontainer.GCPolicy, allSourcesReady bool, evictNonDeletedPods bool) error {
+	return m.containerGC.DirectGarbageCollect(gcPolicy, allSourcesReady, evictNonDeletedPods)
 }
 
 // UpdatePodCIDR is just a passthrough method to update the runtimeConfig of the shim

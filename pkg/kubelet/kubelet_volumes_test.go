@@ -29,6 +29,7 @@ import (
 	core "k8s.io/client-go/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/podworks"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -328,6 +329,8 @@ func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 	kubelet.podWorkers.(*fakePodWorkers).setPodRuntimeBeRemoved(pod.UID)
 	kubelet.podManager.SetPods([]*v1.Pod{})
 
+	podworks.Observer.Notify(podworks.POD_TERMINATED, pod.UID)
+
 	assert.NoError(t, kubelet.volumeManager.WaitForUnmount(pod))
 	if actual := kubelet.volumeManager.GetMountedVolumesForPod(util.GetUniquePodName(pod)); len(actual) > 0 {
 		t.Fatalf("expected volume unmount to wait for no volumes: %v", actual)
@@ -519,6 +522,7 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 	// Remove pod
 	kubelet.podWorkers.(*fakePodWorkers).setPodRuntimeBeRemoved(pod.UID)
 	kubelet.podManager.SetPods([]*v1.Pod{})
+	podworks.Observer.Notify(podworks.POD_TERMINATED, pod.UID)
 
 	assert.NoError(t, waitForVolumeUnmount(kubelet.volumeManager, pod))
 

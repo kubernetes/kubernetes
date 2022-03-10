@@ -27,6 +27,7 @@ package nestedpendingoperations
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -46,6 +47,8 @@ const (
 	// EmptyNodeName is a NodeName for empty string
 	EmptyNodeName types.NodeName = types.NodeName("")
 )
+
+type OperationHookFunc func(err *error, d time.Duration)
 
 // NestedPendingOperations defines the supported set of operations.
 type NestedPendingOperations interface {
@@ -93,7 +96,8 @@ type NestedPendingOperations interface {
 		volumeName v1.UniqueVolumeName,
 		podName volumetypes.UniquePodName,
 		nodeName types.NodeName,
-		generatedOperations volumetypes.GeneratedOperations) error
+		generatedOperations volumetypes.GeneratedOperations,
+		hookFuncs ...OperationHookFunc) error
 
 	// Wait blocks until all operations are completed. This is typically
 	// necessary during tests - the test should wait until all operations finish
@@ -143,7 +147,8 @@ func (grm *nestedPendingOperations) Run(
 	volumeName v1.UniqueVolumeName,
 	podName volumetypes.UniquePodName,
 	nodeName types.NodeName,
-	generatedOperations volumetypes.GeneratedOperations) error {
+	generatedOperations volumetypes.GeneratedOperations,
+	hookFuncs ...OperationHookFunc) error {
 	grm.lock.Lock()
 	defer grm.lock.Unlock()
 
@@ -185,8 +190,23 @@ func (grm *nestedPendingOperations) Run(
 	go func() (eventErr, detailedErr error) {
 		// Handle unhandled panics (very unlikely)
 		defer k8sRuntime.HandleCrash()
+
+		// Notice: do not defer in a loop, it's a bad idea.
+		defer func() {
+			if hookFuncs != nil {
+				grm.lock.Lock()
+				duration := grm.getOperationDuration(opKey)
+				grm.lock.Unlock()
+
+				for _, hookFunc := range hookFuncs {
+					hookFunc(&detailedErr, duration)
+				}
+			}
+		}()
+
 		// Handle completion of and error, if any, from operationFunc()
 		defer grm.operationComplete(opKey, &detailedErr)
+
 		return generatedOperations.Run()
 	}()
 
@@ -261,6 +281,15 @@ func (grm *nestedPendingOperations) isOperationExists(key operationKey) (bool, i
 	}
 
 	return false, -1
+}
+
+func (grm *nestedPendingOperations) getOperationDuration(key operationKey) time.Duration {
+	existingOpIndex, getOpErr := grm.getOperation(key)
+	if getOpErr == nil {
+		return grm.operations[existingOpIndex].expBackoff.GetDuration()
+	}
+
+	return 0
 }
 
 func (grm *nestedPendingOperations) getOperation(key operationKey) (uint, error) {

@@ -16,6 +16,10 @@ limitations under the License.
 
 package workqueue
 
+import (
+	"k8s.io/utils/clock"
+)
+
 // RateLimitingInterface is an interface that rate limits items being added to the queue.
 type RateLimitingInterface interface {
 	DelayingInterface
@@ -46,6 +50,13 @@ func NewRateLimitingQueue(rateLimiter RateLimiter) RateLimitingInterface {
 func NewNamedRateLimitingQueue(rateLimiter RateLimiter, name string) RateLimitingInterface {
 	return &rateLimitingType{
 		DelayingInterface: NewNamedDelayingQueue(name),
+		rateLimiter:       rateLimiter,
+	}
+}
+
+func NewRateLimitingQueueWithCustomClock(rateLimiter RateLimiter, clock clock.WithTicker) RateLimitingInterface {
+	return &rateLimitingType{
+		DelayingInterface: NewDelayingQueueWithCustomClock(clock, ""),
 		rateLimiter:       rateLimiter,
 	}
 }

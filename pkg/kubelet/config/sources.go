@@ -21,7 +21,14 @@ import (
 	"sync"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/observer"
 )
+
+const (
+	ALL_READY observer.SubjectEventType = 0
+)
+
+var Observer = observer.NewObserver()
 
 // SourcesReadyFn is function that returns true if the specified sources have been seen.
 type SourcesReadyFn func(sourcesSeen sets.String) bool
@@ -39,6 +46,7 @@ func NewSourcesReady(sourcesReadyFn SourcesReadyFn) SourcesReady {
 	return &sourcesImpl{
 		sourcesSeen:    sets.NewString(),
 		sourcesReadyFn: sourcesReadyFn,
+		already:        false,
 	}
 }
 
@@ -50,6 +58,8 @@ type sourcesImpl struct {
 	sourcesSeen sets.String
 	// sourcesReady is a function that evaluates if the sources are ready.
 	sourcesReadyFn SourcesReadyFn
+
+	already bool
 }
 
 // Add adds the specified source to the set of sources managed.
@@ -57,6 +67,13 @@ func (s *sourcesImpl) AddSource(source string) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	s.sourcesSeen.Insert(source)
+
+	if !s.already {
+		s.already = s.sourcesReadyFn(s.sourcesSeen)
+		if s.already {
+			Observer.Notify(ALL_READY, struct{}{})
+		}
+	}
 }
 
 // AllReady returns true if each configured source is ready.

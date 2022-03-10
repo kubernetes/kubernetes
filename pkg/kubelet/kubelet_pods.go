@@ -30,6 +30,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -50,14 +51,18 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/fieldpath"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/cri/streaming/portforward"
 	remotecommandserver "k8s.io/kubernetes/pkg/kubelet/cri/streaming/remotecommand"
+	"k8s.io/kubernetes/pkg/kubelet/cribuffer"
 	"k8s.io/kubernetes/pkg/kubelet/envvars"
 	"k8s.io/kubernetes/pkg/kubelet/images"
+	"k8s.io/kubernetes/pkg/kubelet/podworks"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util"
+	"k8s.io/kubernetes/pkg/util/observer"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
@@ -70,6 +75,7 @@ import (
 const (
 	managedHostsHeader                = "# Kubernetes-managed hosts file.\n"
 	managedHostsHeaderWithHostNetwork = "# Kubernetes-managed hosts file (host network).\n"
+	housekeepingInterval              = 3 * time.Second
 )
 
 // Container state reason list
@@ -1033,11 +1039,44 @@ func (kl *Kubelet) deleteOrphanedMirrorPods() {
 			_, err := kl.podManager.DeleteMirrorPod(podFullname, nil)
 			if err != nil {
 				klog.ErrorS(err, "Encountered error when deleting mirror pod", "podName", podFullname)
+				kl.subjectEventHousekeeping()
 			} else {
 				klog.V(3).InfoS("Deleted pod", "podName", podFullname)
 			}
 		}
 	}
+}
+
+func (kl *Kubelet) InitHousekeeping() {
+	config.Observer.Attach(config.ALL_READY, kl.subjectEventAddNotify, kl.handleSourceAllReady)
+	podworks.Observer.Attach(podworks.POD_FINISHED, kl.subjectEventAddNotify, kl.handlePodFinishedEvent)
+}
+
+func (kl *Kubelet) subjectEventAddNotify(se observer.SubjectEvent) {
+	kl.housekeepingQueue.Add(se)
+}
+
+func (kl *Kubelet) subjectEventHousekeeping() {
+	kl.housekeepingQueue.AddAfter(kl.fixHousekeepingEvent, housekeepingInterval)
+}
+
+func (kl *Kubelet) handlePodFinishedEvent(_ interface{}) error {
+	if !kl.houseKeepingAllSeen {
+		return nil
+	}
+
+	kl.subjectEventHousekeeping()
+	return nil
+}
+
+func (kl *Kubelet) handleSourceAllReady(_ interface{}) error {
+	kl.houseKeepingAllSeen = true
+
+	return kl.handlePodCleanups()
+}
+
+func (kl *Kubelet) handleHousekeepingEvent(_ interface{}) error {
+	return kl.handlePodCleanups()
 }
 
 // HandlePodCleanups performs a series of cleanup work, including terminating
@@ -1046,7 +1085,29 @@ func (kl *Kubelet) deleteOrphanedMirrorPods() {
 // is executing which means no new pods can appear.
 // NOTE: This function is executed by the main sync loop, so it
 // should not contain any blocking calls.
+
 func (kl *Kubelet) HandlePodCleanups() error {
+	for kl.podCleanupsExcute() {
+	}
+	return nil
+}
+
+func (kl *Kubelet) podCleanupsExcute() bool {
+	item, quit := kl.housekeepingQueue.Get()
+	if quit {
+		return false
+	}
+
+	defer kl.housekeepingQueue.Done(item)
+
+	if se, ok := item.(observer.SubjectEvent); ok {
+		se.Handle()
+	}
+
+	return true
+}
+
+func (kl *Kubelet) handlePodCleanups() error {
 	// The kubelet lacks checkpointing, so we need to introspect the set of pods
 	// in the cgroup tree prior to inspecting the set of pods in our pod manager.
 	// this ensures our view of the cgroup tree does not mistakenly observe pods
@@ -1055,10 +1116,16 @@ func (kl *Kubelet) HandlePodCleanups() error {
 		cgroupPods map[types.UID]cm.CgroupName
 		err        error
 	)
+
+	// Getkubeletrunningpods is a blocking interface,
+	// which must be called first to be consistent with podmanager.
+	runningRuntimePods := cribuffer.CriBuffer.GetKubeletRunningPods()
+
 	if kl.cgroupsPerQOS {
 		pcm := kl.containerManager.NewPodContainerManager()
 		cgroupPods, err = pcm.GetAllPodsFromCgroups()
 		if err != nil {
+			kl.subjectEventHousekeeping()
 			return fmt.Errorf("failed to get list of pods that still exist on cgroup mounts: %v", err)
 		}
 	}
@@ -1110,11 +1177,6 @@ func (kl *Kubelet) HandlePodCleanups() error {
 
 	// Terminate any pods that are observed in the runtime but not
 	// present in the list of known running pods from config.
-	runningRuntimePods, err := kl.runtimeCache.GetPods()
-	if err != nil {
-		klog.ErrorS(err, "Error listing containers")
-		return err
-	}
 	for _, runningPod := range runningRuntimePods {
 		switch workerState, ok := workingPods[runningPod.ID]; {
 		case ok && workerState == SyncPod, ok && workerState == TerminatingPod:
@@ -1148,11 +1210,13 @@ func (kl *Kubelet) HandlePodCleanups() error {
 	// in the cache. We need to bypass the cache to get the latest set of
 	// running pods to clean up the volumes.
 	// TODO: Evaluate the performance impact of bypassing the runtime cache.
-	runningRuntimePods, err = kl.containerRuntime.GetPods(false)
-	if err != nil {
-		klog.ErrorS(err, "Error listing containers")
-		return err
-	}
+	// wait next loop
+	// runningRuntimePods, err = cribuffer.GetKubeletRunningPods(cribuffer.GetKubeletTime())
+	// if err != nil {
+	// 	klog.ErrorS(err, "Error listing containers")
+	// 	kl.subjectEventHousekeeping()
+	// 	return err
+	// }
 
 	// Remove orphaned volumes from pods that are known not to have any
 	// containers. Note that we pass all pods (including terminated pods) to
@@ -1168,6 +1232,7 @@ func (kl *Kubelet) HandlePodCleanups() error {
 		// we just log an error here and continue other cleanup tasks.
 		// This also applies to the other clean up tasks.
 		klog.ErrorS(err, "Failed cleaning up orphaned pod directories")
+		kl.subjectEventHousekeeping()
 	}
 
 	// Remove any orphaned mirror pods (mirror pods are tracked by name via the
@@ -1199,6 +1264,7 @@ func (kl *Kubelet) HandlePodCleanups() error {
 		}
 		if kl.isAdmittedPodTerminal(pod) {
 			klog.V(3).InfoS("Pod is restartable after termination due to UID reuse, but pod phase is terminal", "pod", klog.KObj(pod), "podUID", pod.UID)
+			kl.subjectEventHousekeeping()
 			continue
 		}
 		start := kl.clock.Now()
@@ -1950,6 +2016,13 @@ func (kl *Kubelet) GetPortForward(podName, podNamespace string, podUID types.UID
 // cleanupOrphanedPodCgroups removes cgroups that should no longer exist.
 // it reconciles the cached state of cgroupPods with the specified list of runningPods
 func (kl *Kubelet) cleanupOrphanedPodCgroups(pcm cm.PodContainerManager, cgroupPods map[types.UID]cm.CgroupName, possiblyRunningPods map[types.UID]sets.Empty) {
+	for uid, ch := range kl.podCgroupsRemoving {
+		select {
+		case <-ch:
+			delete(kl.podCgroupsRemoving, uid)
+		default:
+		}
+	}
 	// Iterate over all the found pods to verify if they should be running
 	for uid, val := range cgroupPods {
 		// if the pod is in the running set, its not a candidate for cleanup
@@ -1967,14 +2040,31 @@ func (kl *Kubelet) cleanupOrphanedPodCgroups(pcm cm.PodContainerManager, cgroupP
 			if err := pcm.ReduceCPULimits(val); err != nil {
 				klog.InfoS("Failed to reduce cpu time for pod pending volume cleanup", "podUID", uid, "err", err)
 			}
+			kl.subjectEventHousekeeping()
 			continue
 		}
-		klog.V(3).InfoS("Orphaned pod found, removing pod cgroups", "podUID", uid)
-		// Destroy all cgroups of pod that should not be running,
-		// by first killing all the attached processes to these cgroups.
-		// We ignore errors thrown by the method, as the housekeeping loop would
-		// again try to delete these unwanted pod cgroups
-		go pcm.Destroy(val)
+
+		if _, ok := kl.podCgroupsRemoving[uid]; !ok {
+			ch := make(chan struct{}, 1)
+			kl.podCgroupsRemoving[uid] = ch
+
+			klog.InfoS("Orphaned pod found, removing pod cgroups", "podUID", uid)
+			// Destroy all cgroups of pod that should not be running,
+			// by first killing all the attached processes to these cgroups.
+			// We ignore errors thrown by the method, as the housekeeping loop would
+			// again try to delete these unwanted pod cgroups
+			go func(uid types.UID, val cm.CgroupName, ch chan struct{}) {
+				if err := pcm.Destroy(val); err == nil {
+					klog.InfoS("Orphaned pod found, removed pod cgroups", "pod", uid)
+				} else {
+					klog.ErrorS(err, "Orphaned pod found, removed pod cgroups", "pod", uid)
+				}
+
+				ch <- struct{}{}
+
+				kl.subjectEventHousekeeping()
+			}(uid, val, ch)
+		}
 	}
 }
 

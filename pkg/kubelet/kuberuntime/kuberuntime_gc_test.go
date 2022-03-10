@@ -32,10 +32,6 @@ import (
 )
 
 func TestSandboxGC(t *testing.T) {
-	fakeRuntime, _, m, err := createTestRuntimeManager()
-	assert.NoError(t, err)
-
-	podStateProvider := m.containerGC.podStateProvider.(*fakePodStateProvider)
 	makeGCSandbox := func(pod *v1.Pod, attempt uint32, state runtimeapi.PodSandboxState, hasRunningContainers, isTerminating bool, createdAt int64) sandboxTemplate {
 		return sandboxTemplate{
 			pod:         pod,
@@ -66,6 +62,7 @@ func TestSandboxGC(t *testing.T) {
 		containers           []containerTemplate // templates of containers
 		remain               []int               // template indexes of remaining sandboxes
 		evictTerminatingPods bool
+		policy               *kubecontainer.GCPolicy
 	}{
 		{
 			description: "notready sandboxes without containers for deleted pods should be garbage collected.",
@@ -160,6 +157,10 @@ func TestSandboxGC(t *testing.T) {
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
+			fakeRuntime, _, m, err := createTestRuntimeManager()
+			assert.NoError(t, err)
+			podStateProvider := m.containerGC.podStateProvider.(*fakePodStateProvider)
+
 			podStateProvider.removed = make(map[types.UID]struct{})
 			podStateProvider.terminated = make(map[types.UID]struct{})
 			fakeSandboxes := makeFakePodSandboxes(t, m, test.sandboxes)
@@ -175,8 +176,18 @@ func TestSandboxGC(t *testing.T) {
 			fakeRuntime.SetFakeSandboxes(fakeSandboxes)
 			fakeRuntime.SetFakeContainers(fakeContainers)
 
-			err := m.containerGC.evictSandboxes(test.evictTerminatingPods)
-			assert.NoError(t, err)
+			defaultGCPolicy := kubecontainer.GCPolicy{MinAge: time.Minute, MaxPerPodContainer: 1, MaxContainers: -1}
+			if test.policy == nil {
+				test.policy = &defaultGCPolicy
+			}
+
+			for {
+				m.containerGC.GarbageCollect(*test.policy, true, test.evictTerminatingPods)
+				if m.containerGC.queue.Len() == 0 {
+					break
+				}
+			}
+
 			realRemain, err := fakeRuntime.ListPodSandbox(nil)
 			assert.NoError(t, err)
 			assert.Len(t, realRemain, len(test.remain))
@@ -202,10 +213,6 @@ func makeGCContainer(podName, containerName string, attempt int, createdAt int64
 }
 
 func TestContainerGC(t *testing.T) {
-	fakeRuntime, _, m, err := createTestRuntimeManager()
-	assert.NoError(t, err)
-
-	podStateProvider := m.containerGC.podStateProvider.(*fakePodStateProvider)
 	defaultGCPolicy := kubecontainer.GCPolicy{MinAge: time.Hour, MaxPerPodContainer: 2, MaxContainers: 6}
 
 	for _, test := range []struct {
@@ -387,6 +394,10 @@ func TestContainerGC(t *testing.T) {
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
+			fakeRuntime, _, m, err := createTestRuntimeManager()
+			assert.NoError(t, err)
+
+			podStateProvider := m.containerGC.podStateProvider.(*fakePodStateProvider)
 			podStateProvider.removed = make(map[types.UID]struct{})
 			podStateProvider.terminated = make(map[types.UID]struct{})
 			fakeContainers := makeFakeContainers(t, m, test.containers)
@@ -400,11 +411,26 @@ func TestContainerGC(t *testing.T) {
 			}
 			fakeRuntime.SetFakeContainers(fakeContainers)
 
+			finalCnt := 0
+
 			if test.policy == nil {
 				test.policy = &defaultGCPolicy
 			}
-			err := m.containerGC.evictContainers(*test.policy, test.allSourcesReady, test.evictTerminatingPods)
-			assert.NoError(t, err)
+
+			for {
+				m.containerGC.GarbageCollect(*test.policy, test.allSourcesReady, test.evictTerminatingPods)
+				if m.containerGC.queue.Len() == 0 {
+					break
+				}
+
+				if m.containerGC.queue.Len() == 1 {
+					finalCnt = finalCnt + 1
+					if finalCnt > 1 {
+						break
+					}
+				}
+			}
+
 			realRemain, err := fakeRuntime.ListContainers(nil)
 			assert.NoError(t, err)
 			assert.Len(t, realRemain, len(test.remain))
@@ -449,13 +475,15 @@ func TestPodLogDirectoryGC(t *testing.T) {
 	}
 
 	// allSourcesReady == true, pod log directories without corresponding pod should be removed.
-	err = m.containerGC.evictPodLogsDirectories(true)
+	m.containerGC.allSourcesReady = true
+	err = m.containerGC.evictPodLogsDirectories()
 	assert.NoError(t, err)
 	assert.Equal(t, removed, fakeOS.Removes)
 
 	// allSourcesReady == false, pod log directories should not be removed.
 	fakeOS.Removes = []string{}
-	err = m.containerGC.evictPodLogsDirectories(false)
+	m.containerGC.allSourcesReady = false
+	err = m.containerGC.evictPodLogsDirectories()
 	assert.NoError(t, err)
 	assert.Empty(t, fakeOS.Removes)
 }
@@ -472,8 +500,12 @@ func TestUnknownStateContainerGC(t *testing.T) {
 	})
 	fakeRuntime.SetFakeContainers(fakeContainers)
 
-	err = m.containerGC.evictContainers(defaultGCPolicy, true, false)
-	assert.NoError(t, err)
+	for {
+		m.containerGC.GarbageCollect(defaultGCPolicy, true, false)
+		if m.containerGC.queue.Len() == 0 {
+			break
+		}
+	}
 
 	assert.Contains(t, fakeRuntime.GetCalls(), "StopContainer", "RemoveContainer",
 		"container in unknown state should be stopped before being removed")

@@ -17,6 +17,9 @@ limitations under the License.
 package kuberuntime
 
 import (
+	cadvisorapi "github.com/google/cadvisor/info/v1"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"path/filepath"
 	"reflect"
 	"sort"
@@ -26,14 +29,10 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	cadvisorapi "github.com/google/cadvisor/info/v1"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
+	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/util/flowcontrol"
@@ -45,19 +44,146 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	"k8s.io/kubernetes/pkg/kubelet/cribuffer"
+	"k8s.io/kubernetes/pkg/kubelet/pleg"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
+	"k8s.io/kubernetes/pkg/kubelet/types"
 )
+
+func nofifyCatainerEvent(container *apitest.FakeContainer) {
+	if cribuffer.CriBuffer == nil {
+		return
+	}
+
+	cname := ""
+	if container.Metadata != nil {
+		cname = container.Metadata.Name
+	}
+	pse := pleg.PlegSubjectEvent{
+		ID:           k8stypes.UID(container.Labels[types.KubernetesPodUIDLabel]),
+		Cid:          container.Id,
+		Cname:        cname,
+		CreateTime:   time.Unix(0, container.CreatedAt),
+		State:        toKubeContainerState(container.State),
+		PodSandboxId: container.SandboxID,
+	}
+
+	switch container.State {
+	case runtimeapi.ContainerState_CONTAINER_RUNNING:
+		cribuffer.CriBuffer.Notify(pleg.CONTAINER_LIVE, pse)
+	default:
+		cribuffer.CriBuffer.Notify(pleg.CONTAINER_DIED, pse)
+	}
+}
+
+func nofifySandboxEvent(container *apitest.FakePodSandbox) {
+	if cribuffer.CriBuffer == nil {
+		return
+	}
+
+	pse := pleg.PlegSubjectEvent{
+		ID:         k8stypes.UID(container.Labels[types.KubernetesPodUIDLabel]),
+		Cid:        container.Id,
+		CreateTime: time.Unix(0, container.CreatedAt),
+		State:      kubecontainer.SandboxToContainerState(container.State),
+	}
+
+	switch container.State {
+	case runtimeapi.PodSandboxState_SANDBOX_READY:
+		cribuffer.CriBuffer.Notify(pleg.SANDBOX_LIVE, pse)
+	default:
+		cribuffer.CriBuffer.Notify(pleg.SANDBOX_DIED, pse)
+	}
+}
+
+func nofifyContainerRemoveEvent(container *apitest.FakeContainer) {
+	if cribuffer.CriBuffer == nil {
+		return
+	}
+
+	cname := ""
+	if container.Metadata != nil {
+		cname = container.Metadata.Name
+	}
+
+	pse := pleg.PlegSubjectEvent{
+		ID:           k8stypes.UID(container.Labels[types.KubernetesPodUIDLabel]),
+		Cid:          container.Id,
+		Cname:        cname,
+		CreateTime:   time.Unix(0, container.CreatedAt),
+		State:        toKubeContainerState(container.State),
+		PodSandboxId: container.SandboxID,
+	}
+	cribuffer.CriBuffer.Notify(pleg.CONTAINER_REMOVED, pse)
+}
+
+func nofifySandboxRemoveEvent(container *apitest.FakePodSandbox) {
+	if cribuffer.CriBuffer == nil {
+		return
+	}
+
+	pse := pleg.PlegSubjectEvent{
+		ID:         k8stypes.UID(container.Labels[types.KubernetesPodUIDLabel]),
+		Cid:        container.Id,
+		CreateTime: time.Unix(0, container.CreatedAt),
+		State:      kubecontainer.SandboxToContainerState(container.State),
+	}
+	cribuffer.CriBuffer.Notify(pleg.SANDBOX_REMOVED, pse)
+}
+
+type FakeRuntimeService struct {
+	*apitest.FakeRuntimeService
+}
+
+func (r *FakeRuntimeService) SetFakeSandboxes(sandboxes []*apitest.FakePodSandbox) {
+	r.FakeRuntimeService.SetFakeSandboxes(sandboxes)
+	for _, sandbox := range sandboxes {
+		nofifySandboxEvent(sandbox)
+	}
+}
+
+func (r *FakeRuntimeService) SetFakeContainers(containers []*apitest.FakeContainer) {
+	r.FakeRuntimeService.SetFakeContainers(containers)
+	for _, c := range containers {
+		nofifyCatainerEvent(c)
+	}
+}
+
+func (r *FakeRuntimeService) RemovePodSandbox(podSandboxID string) error {
+	s, ok := r.Sandboxes[podSandboxID]
+	err := r.FakeRuntimeService.RemovePodSandbox(podSandboxID)
+	if ok {
+		nofifySandboxRemoveEvent(s)
+	}
+
+	return err
+}
+
+func (r *FakeRuntimeService) RemoveContainer(containerID string) error {
+	c, ok := r.Containers[containerID]
+	err := r.FakeRuntimeService.RemoveContainer(containerID)
+	if ok {
+		nofifyContainerRemoveEvent(c)
+	}
+	return err
+}
+
+func NewFakeRuntimeService() *FakeRuntimeService {
+	return &FakeRuntimeService{
+		FakeRuntimeService: apitest.NewFakeRuntimeService(),
+	}
+}
 
 var (
 	fakeCreatedAt int64 = 1
 )
 
-func createTestRuntimeManager() (*apitest.FakeRuntimeService, *apitest.FakeImageService, *kubeGenericRuntimeManager, error) {
+func createTestRuntimeManager() (*FakeRuntimeService, *apitest.FakeImageService, *kubeGenericRuntimeManager, error) {
 	return customTestRuntimeManager(&credentialprovider.BasicDockerKeyring{})
 }
 
-func customTestRuntimeManager(keyring *credentialprovider.BasicDockerKeyring) (*apitest.FakeRuntimeService, *apitest.FakeImageService, *kubeGenericRuntimeManager, error) {
-	fakeRuntimeService := apitest.NewFakeRuntimeService()
+func customTestRuntimeManager(keyring *credentialprovider.BasicDockerKeyring) (*FakeRuntimeService, *apitest.FakeImageService, *kubeGenericRuntimeManager, error) {
+	fakeRuntimeService := NewFakeRuntimeService()
 	fakeImageService := apitest.NewFakeImageService()
 	// Only an empty machineInfo is needed here, because in unit test all containers are besteffort,
 	// data in machineInfo is not used. If burstable containers are used in unit test in the future,
@@ -93,7 +219,7 @@ type containerTemplate struct {
 
 // makeAndSetFakePod is a helper function to create and set one fake sandbox for a pod and
 // one fake container for each of its container.
-func makeAndSetFakePod(t *testing.T, m *kubeGenericRuntimeManager, fakeRuntime *apitest.FakeRuntimeService,
+func makeAndSetFakePod(t *testing.T, m *kubeGenericRuntimeManager, fakeRuntime *FakeRuntimeService,
 	pod *v1.Pod) (*apitest.FakePodSandbox, []*apitest.FakeContainer) {
 	sandbox := makeFakePodSandbox(t, m, sandboxTemplate{
 		pod:       pod,
@@ -210,7 +336,7 @@ func makeTestContainer(name, image string) v1.Container {
 func makeTestPod(podName, podNamespace, podUID string, containers []v1.Container) *v1.Pod {
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			UID:       types.UID(podUID),
+			UID:       k8stypes.UID(podUID),
 			Name:      podName,
 			Namespace: podNamespace,
 		},
@@ -241,7 +367,7 @@ func verifyPods(a, b []*kubecontainer.Pod) bool {
 	return reflect.DeepEqual(a, b)
 }
 
-func verifyFakeContainerList(fakeRuntime *apitest.FakeRuntimeService, expected sets.String) (sets.String, bool) {
+func verifyFakeContainerList(fakeRuntime *FakeRuntimeService, expected sets.String) (sets.String, bool) {
 	actual := sets.NewString()
 	for _, c := range fakeRuntime.Containers {
 		actual.Insert(c.Id)
@@ -267,7 +393,7 @@ func (b cRecordList) Less(i, j int) bool {
 	return b[i].attempt < b[j].attempt
 }
 
-func verifyContainerStatuses(t *testing.T, runtime *apitest.FakeRuntimeService, expected []*cRecord, desc string) {
+func verifyContainerStatuses(t *testing.T, runtime *FakeRuntimeService, expected []*cRecord, desc string) {
 	actual := []*cRecord{}
 	for _, cStatus := range runtime.Containers {
 		actual = append(actual, &cRecord{name: cStatus.Metadata.Name, attempt: cStatus.Metadata.Attempt, state: cStatus.State})
@@ -445,13 +571,15 @@ func TestGetPods(t *testing.T) {
 	for i := range containers {
 		fakeContainer := fakeContainers[i]
 		c, err := m.toKubeContainer(&runtimeapi.Container{
-			Id:          fakeContainer.Id,
-			Metadata:    fakeContainer.Metadata,
-			State:       fakeContainer.State,
-			Image:       fakeContainer.Image,
-			ImageRef:    fakeContainer.ImageRef,
-			Labels:      fakeContainer.Labels,
-			Annotations: fakeContainer.Annotations,
+			Id:           fakeContainer.Id,
+			Metadata:     fakeContainer.Metadata,
+			State:        fakeContainer.State,
+			Image:        fakeContainer.Image,
+			ImageRef:     fakeContainer.ImageRef,
+			Labels:       fakeContainer.Labels,
+			Annotations:  fakeContainer.Annotations,
+			PodSandboxId: fakeContainer.SandboxID,
+			CreatedAt:    fakeContainer.CreatedAt,
 		})
 		if err != nil {
 			t.Fatalf("unexpected error %v", err)
@@ -473,7 +601,7 @@ func TestGetPods(t *testing.T) {
 
 	expected := []*kubecontainer.Pod{
 		{
-			ID:         types.UID("12345678"),
+			ID:         k8stypes.UID("12345678"),
 			Name:       "foo",
 			Namespace:  "new",
 			Containers: []*kubecontainer.Container{containers[0], containers[1]},
@@ -1540,7 +1668,7 @@ func TestSyncPodWithSandboxAndDeletedPod(t *testing.T) {
 	}
 
 	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
-	m.podStateProvider.(*fakePodStateProvider).removed = map[types.UID]struct{}{pod.UID: {}}
+	m.podStateProvider.(*fakePodStateProvider).removed = map[k8stypes.UID]struct{}{pod.UID: {}}
 
 	// GetPodStatus and the following SyncPod will not return errors in the
 	// case where the pod has been deleted. We are not adding any pods into

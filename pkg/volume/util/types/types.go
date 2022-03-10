@@ -19,6 +19,7 @@ package types
 
 import (
 	"errors"
+	"time"
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -30,6 +31,8 @@ type UniquePodName types.UID
 
 // UniquePVCName defines the type to key pvc off
 type UniquePVCName types.UID
+
+type PodChangedFunc func(types.UID, time.Duration)
 
 // GeneratedOperations contains the operation that is created as well as
 // supporting functions required for the operation executor

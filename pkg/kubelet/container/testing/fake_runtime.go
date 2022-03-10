@@ -30,6 +30,7 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/util/observer"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -59,6 +60,7 @@ type FakeRuntime struct {
 	InspectErr        error
 	StatusErr         error
 	T                 *testing.T
+	observer.Observer
 }
 
 const FakeHost = "localhost:12345"
@@ -219,7 +221,40 @@ func (f *FakeRuntime) GetPods(all bool) ([]*kubecontainer.Pod, error) {
 			pods = append(pods, fakePod.Pod)
 		}
 	}
+
 	return pods, f.Err
+}
+
+func (f *FakeRuntime) GetKubeletPods() []*kubecontainer.Pod {
+	pods, _ := f.GetPods(true)
+	return pods
+}
+
+func (f *FakeRuntime) GetKubeletRunningPods() []*kubecontainer.Pod {
+	pods, _ := f.GetPods(false)
+	return pods
+}
+
+func (f *FakeRuntime) AddPod(pod *FakePod, all bool) {
+	f.Lock()
+	defer f.Unlock()
+
+	if all {
+		f.AllPodList = append(f.AllPodList, pod)
+	} else {
+		f.PodList = append(f.PodList, pod)
+	}
+}
+
+func (f *FakeRuntime) CleanPod(all bool) {
+	f.Lock()
+	defer f.Unlock()
+
+	if all {
+		f.AllPodList = []*FakePod{}
+	} else {
+		f.PodList = []*FakePod{}
+	}
 }
 
 func (f *FakeRuntime) SyncPod(pod *v1.Pod, _ *kubecontainer.PodStatus, _ []v1.Secret, backOff *flowcontrol.Backoff) (result kubecontainer.PodSyncResult) {
@@ -351,6 +386,14 @@ func (f *FakeRuntime) GarbageCollect(gcPolicy kubecontainer.GCPolicy, ready bool
 	defer f.Unlock()
 
 	f.CalledFunctions = append(f.CalledFunctions, "GarbageCollect")
+	return f.Err
+}
+
+func (f *FakeRuntime) DirectGarbageCollect(gcPolicy kubecontainer.GCPolicy, allSourcesReady bool, evictNonDeletedPods bool) error {
+	f.Lock()
+	defer f.Unlock()
+
+	f.CalledFunctions = append(f.CalledFunctions, "DirectGarbageCollect")
 	return f.Err
 }
 

@@ -94,6 +94,7 @@ type Runtime interface {
 	// will be GC'd.
 	// TODO: Revisit this method and make it cleaner.
 	GarbageCollect(gcPolicy GCPolicy, allSourcesReady bool, evictNonDeletedPods bool) error
+	DirectGarbageCollect(gcPolicy GCPolicy, allSourcesReady bool, evictNonDeletedPods bool) error
 	// SyncPod syncs the running pod into the desired pod.
 	SyncPod(pod *v1.Pod, podStatus *PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) PodSyncResult
 	// KillPod kills all the containers of a pod. Pod may be nil, running pod must not be.
@@ -282,6 +283,11 @@ type Container struct {
 	Hash uint64
 	// State is the state of the container.
 	State State
+
+	// CreatedAt is the time of the container.
+	CreatedAt    time.Time
+	Labels       map[string]string
+	PodSandboxId string
 }
 
 // PodStatus represents the status of the pod and its containers.
@@ -558,6 +564,22 @@ func (p Pods) FindPod(podFullName string, podUID types.UID) Pod {
 		return p.FindPodByFullName(podFullName)
 	}
 	return p.FindPodByID(podUID)
+}
+
+func (p *Pod) HasRunningContainer() bool {
+	for _, c := range p.Containers {
+		if c.State == ContainerStateRunning {
+			return true
+		}
+	}
+
+	for _, c := range p.Sandboxes {
+		if c.State == ContainerStateRunning {
+			return true
+		}
+	}
+
+	return false
 }
 
 // FindContainerByName returns a container in the pod with the given name.

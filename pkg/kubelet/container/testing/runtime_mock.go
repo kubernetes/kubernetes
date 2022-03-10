@@ -140,6 +140,20 @@ func (mr *MockRuntimeMockRecorder) DeleteContainer(containerID interface{}) *gom
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteContainer", reflect.TypeOf((*MockRuntime)(nil).DeleteContainer), containerID)
 }
 
+// DirectGarbageCollect mocks base method.
+func (m *MockRuntime) DirectGarbageCollect(gcPolicy container.GCPolicy, allSourcesReady, evictNonDeletedPods bool) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DirectGarbageCollect", gcPolicy, allSourcesReady, evictNonDeletedPods)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DirectGarbageCollect indicates an expected call of DirectGarbageCollect.
+func (mr *MockRuntimeMockRecorder) DirectGarbageCollect(gcPolicy, allSourcesReady, evictNonDeletedPods interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DirectGarbageCollect", reflect.TypeOf((*MockRuntime)(nil).DirectGarbageCollect), gcPolicy, allSourcesReady, evictNonDeletedPods)
+}
+
 // GarbageCollect mocks base method.
 func (m *MockRuntime) GarbageCollect(gcPolicy container.GCPolicy, allSourcesReady, evictNonDeletedPods bool) error {
 	m.ctrl.T.Helper()

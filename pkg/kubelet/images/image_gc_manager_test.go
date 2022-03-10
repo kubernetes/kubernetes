@@ -29,6 +29,7 @@ import (
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	"k8s.io/kubernetes/pkg/kubelet/cribuffer"
 	stats "k8s.io/kubernetes/pkg/kubelet/server/stats"
 	statstest "k8s.io/kubernetes/pkg/kubelet/server/stats/testing"
 	testingclock "k8s.io/utils/clock/testing"
@@ -39,6 +40,7 @@ var sandboxImage = "registry.k8s.io/pause-amd64:latest"
 
 func newRealImageGCManager(policy ImageGCPolicy, mockStatsProvider stats.Provider) (*realImageGCManager, *containertest.FakeRuntime) {
 	fakeRuntime := &containertest.FakeRuntime{}
+	cribuffer.CriBuffer = fakeRuntime
 	return &realImageGCManager{
 		runtime:       fakeRuntime,
 		policy:        policy,
@@ -586,22 +588,15 @@ func TestGarbageCollectNotEnoughFreed(t *testing.T) {
 }
 
 func TestGarbageCollectImageNotOldEnough(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	mockStatsProvider := statstest.NewMockProvider(mockCtrl)
 	policy := ImageGCPolicy{
 		HighThresholdPercent: 90,
 		LowThresholdPercent:  80,
 		MinAge:               time.Minute * 1,
 	}
-	fakeRuntime := &containertest.FakeRuntime{}
-	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
-	mockStatsProvider := statstest.NewMockProvider(mockCtrl)
-	manager := &realImageGCManager{
-		runtime:       fakeRuntime,
-		policy:        policy,
-		imageRecords:  make(map[string]*imageRecord),
-		statsProvider: mockStatsProvider,
-		recorder:      &record.FakeRecorder{},
-	}
+	manager, fakeRuntime := newRealImageGCManager(policy, mockStatsProvider)
 
 	fakeRuntime.ImageList = []container.Image{
 		makeImage(0, 1024),

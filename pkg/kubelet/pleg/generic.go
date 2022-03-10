@@ -18,6 +18,7 @@ package pleg
 
 import (
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -28,8 +29,27 @@ import (
 	"k8s.io/klog/v2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
+	"k8s.io/kubernetes/pkg/util/observer"
 	"k8s.io/utils/clock"
 )
+
+const (
+	CONTAINER_DIED observer.SubjectEventType = iota
+	SANDBOX_DIED
+	CONTAINER_LIVE
+	SANDBOX_LIVE
+	CONTAINER_REMOVED
+	SANDBOX_REMOVED
+)
+
+type PlegSubjectEvent struct {
+	ID           types.UID
+	Cid          string
+	Cname        string
+	CreateTime   time.Time
+	State        kubecontainer.State
+	PodSandboxId string
+}
 
 // GenericPLEG is an extremely simple generic PLEG that relies solely on
 // periodic listing to discover container changes. It should be used
@@ -47,6 +67,7 @@ import (
 // recommended to set the relist period short and have an auxiliary, longer
 // periodic sync in kubelet as the safety net.
 type GenericPLEG struct {
+	observer.Observer
 	// The period for relisting.
 	relistPeriod time.Duration
 	// The container runtime.
@@ -64,6 +85,14 @@ type GenericPLEG struct {
 	// Pods that failed to have their status retrieved during a relist. These pods will be
 	// retried during the next relisting.
 	podsToReinspect map[types.UID]*kubecontainer.Pod
+
+	lock        sync.Mutex
+	subscribers []*subRecord
+}
+
+type subRecord struct {
+	ch      chan interface{}
+	getfunc func()
 }
 
 // plegContainerState has a one-to-one mapping to the
@@ -100,8 +129,9 @@ func convertState(state kubecontainer.State) plegContainerState {
 }
 
 type podRecord struct {
-	old     *kubecontainer.Pod
-	current *kubecontainer.Pod
+	old      *kubecontainer.Pod
+	current  *kubecontainer.Pod
+	fetchCur *kubecontainer.Pod
 }
 
 type podRecords map[types.UID]*podRecord
@@ -110,10 +140,12 @@ type podRecords map[types.UID]*podRecord
 func NewGenericPLEG(runtime kubecontainer.Runtime, channelCapacity int,
 	relistPeriod time.Duration, cache kubecontainer.Cache, clock clock.Clock) PodLifecycleEventGenerator {
 	return &GenericPLEG{
+		Observer:     observer.NewObserver(),
 		relistPeriod: relistPeriod,
 		runtime:      runtime,
 		eventChannel: make(chan *PodLifecycleEvent, channelCapacity),
 		podRecords:   make(podRecords),
+		subscribers:  []*subRecord{},
 		cache:        cache,
 		clock:        clock,
 	}
@@ -183,6 +215,50 @@ func (g *GenericPLEG) getRelistTime() time.Time {
 
 func (g *GenericPLEG) updateRelistTime(timestamp time.Time) {
 	g.relistTime.Store(timestamp)
+
+	for _, r := range g.subscribers {
+		r.getfunc()
+		close(r.ch)
+	}
+
+	g.subscribers = []*subRecord{}
+
+}
+
+func (g *GenericPLEG) nofifySubjectEvent(oldPod, newPod *kubecontainer.Pod, container *kubecontainer.Container, e *PodLifecycleEvent) {
+	pse := PlegSubjectEvent{
+		ID:           e.ID,
+		Cid:          container.ID.ID,
+		Cname:        container.Name,
+		CreateTime:   container.CreatedAt,
+		State:        container.State,
+		PodSandboxId: container.PodSandboxId,
+	}
+
+	switch e.Type {
+	case ContainerChanged:
+		fallthrough
+	case ContainerDied:
+		if isSandbox(oldPod, newPod, &container.ID) {
+			g.Notify(SANDBOX_DIED, pse)
+		} else {
+			g.Notify(CONTAINER_DIED, pse)
+		}
+
+	case ContainerRemoved:
+		if isSandbox(oldPod, newPod, &container.ID) {
+			g.Notify(SANDBOX_REMOVED, pse)
+		} else {
+			g.Notify(CONTAINER_REMOVED, pse)
+		}
+
+	case ContainerStarted:
+		if isSandbox(oldPod, newPod, &container.ID) {
+			g.Notify(SANDBOX_LIVE, pse)
+		} else {
+			g.Notify(CONTAINER_LIVE, pse)
+		}
+	}
 }
 
 // relist queries the container runtime for list of pods/containers, compare
@@ -206,12 +282,16 @@ func (g *GenericPLEG) relist() {
 		return
 	}
 
-	g.updateRelistTime(timestamp)
-
 	pods := kubecontainer.Pods(podList)
 	// update running pod and container count
 	updateRunningPodAndContainerMetrics(pods)
-	g.podRecords.setCurrent(pods)
+	func() {
+		g.lock.Lock()
+		defer g.lock.Unlock()
+		g.podRecords.setCurrent(pods)
+
+		g.updateRelistTime(timestamp)
+	}()
 
 	// Compare the old and the current pods, and generate events.
 	eventsByPodID := map[types.UID][]*PodLifecycleEvent{}
@@ -219,10 +299,11 @@ func (g *GenericPLEG) relist() {
 		oldPod := g.podRecords.getOld(pid)
 		pod := g.podRecords.getCurrent(pid)
 		// Get all containers in the old and the new pod.
-		allContainers := getContainersFromPods(oldPod, pod)
+		allContainers := getContainersFromPods(pod, oldPod)
 		for _, container := range allContainers {
 			events := computeEvents(oldPod, pod, &container.ID)
 			for _, e := range events {
+				g.nofifySubjectEvent(oldPod, pod, container, e)
 				updateEvents(eventsByPodID, e)
 			}
 		}
@@ -263,9 +344,12 @@ func (g *GenericPLEG) relist() {
 			}
 		}
 		// Update the internal storage and send out the events.
-		g.podRecords.update(pid)
+		func() {
+			g.lock.Lock()
+			defer g.lock.Unlock()
+			g.podRecords.update(pid)
+		}()
 
-		// Map from containerId to exit code; used as a temporary cache for lookup
 		containerExitCode := make(map[string]int)
 
 		for i := range events {
@@ -457,6 +541,25 @@ func getContainerState(pod *kubecontainer.Pod, cid *kubecontainer.ContainerID) p
 	return state
 }
 
+func isSandbox(oldPod, newPod *kubecontainer.Pod, cid *kubecontainer.ContainerID) bool {
+	if newPod != nil {
+		c := newPod.FindSandboxByID(*cid)
+		if c != nil {
+			return true
+		}
+	}
+
+	if oldPod != nil {
+		c := oldPod.FindSandboxByID(*cid)
+		if c != nil {
+			return true
+		}
+	}
+
+	return false
+
+}
+
 func updateRunningPodAndContainerMetrics(pods []*kubecontainer.Pod) {
 	runningSandboxNum := 0
 	// intermediate map to store the count of each "container_state"
@@ -487,6 +590,44 @@ func updateRunningPodAndContainerMetrics(pods []*kubecontainer.Pod) {
 	metrics.RunningPodCount.Set(float64(runningSandboxNum))
 }
 
+func (g *GenericPLEG) GetKubeletTime() time.Time {
+	return g.clock.Now()
+}
+
+func (g *GenericPLEG) GetKubeletPods() []*kubecontainer.Pod {
+	ch := make(chan interface{}, 1)
+
+	getfunc := func() {
+		ch <- g.podRecords.getKubeletPods()
+	}
+
+	func() {
+		g.lock.Lock()
+		defer g.lock.Unlock()
+		g.subscribers = append(g.subscribers, &subRecord{ch: ch, getfunc: getfunc})
+	}()
+
+	pods := <-ch
+	return pods.([]*kubecontainer.Pod)
+}
+
+func (g *GenericPLEG) GetKubeletRunningPods() []*kubecontainer.Pod {
+	ch := make(chan interface{}, 1)
+
+	getfunc := func() {
+		ch <- g.podRecords.getKubeletRunningPods()
+	}
+
+	func() {
+		g.lock.Lock()
+		defer g.lock.Unlock()
+		g.subscribers = append(g.subscribers, &subRecord{ch: ch, getfunc: getfunc})
+	}()
+
+	pods := <-ch
+	return pods.([]*kubecontainer.Pod)
+}
+
 func (pr podRecords) getOld(id types.UID) *kubecontainer.Pod {
 	r, ok := pr[id]
 	if !ok {
@@ -504,14 +645,16 @@ func (pr podRecords) getCurrent(id types.UID) *kubecontainer.Pod {
 }
 
 func (pr podRecords) setCurrent(pods []*kubecontainer.Pod) {
-	for i := range pr {
-		pr[i].current = nil
+	for _, r := range pr {
+		r.current = nil
+		r.fetchCur = nil
 	}
 	for _, pod := range pods {
 		if r, ok := pr[pod.ID]; ok {
 			r.current = pod
+			r.fetchCur = pod
 		} else {
-			pr[pod.ID] = &podRecord{current: pod}
+			pr[pod.ID] = &podRecord{current: pod, fetchCur: pod}
 		}
 	}
 }
@@ -532,4 +675,36 @@ func (pr podRecords) updateInternal(id types.UID, r *podRecord) {
 	}
 	r.old = r.current
 	r.current = nil
+	r.fetchCur = r.old
+}
+
+func (pr podRecords) getKubeletPods() []*kubecontainer.Pod {
+	pods := make([]*kubecontainer.Pod, 0, len(pr))
+
+	for _, p := range pr {
+		cur := p.fetchCur
+		if cur == nil {
+			continue
+		}
+
+		pods = append(pods, cur)
+	}
+
+	return pods
+}
+
+func (pr podRecords) getKubeletRunningPods() []*kubecontainer.Pod {
+	pods := make([]*kubecontainer.Pod, 0, len(pr))
+
+	for _, p := range pr {
+		cur := p.fetchCur
+
+		if cur == nil || !cur.HasRunningContainer() {
+			continue
+		}
+
+		pods = append(pods, cur)
+	}
+
+	return pods
 }

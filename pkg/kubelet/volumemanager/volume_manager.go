@@ -35,14 +35,17 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/workqueue"
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/pod"
+	"k8s.io/kubernetes/pkg/kubelet/podworks"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/populator"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/reconciler"
+	"k8s.io/kubernetes/pkg/util/observer"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -60,12 +63,6 @@ const (
 	// desiredStateOfWorldPopulatorLoopSleepPeriod is the amount of time the
 	// DesiredStateOfWorldPopulator loop waits between successive executions
 	desiredStateOfWorldPopulatorLoopSleepPeriod = 100 * time.Millisecond
-
-	// desiredStateOfWorldPopulatorGetPodStatusRetryDuration is the amount of
-	// time the DesiredStateOfWorldPopulator loop waits between successive pod
-	// cleanup calls (to prevent calling containerruntime.GetPodStatus too
-	// frequently).
-	desiredStateOfWorldPopulatorGetPodStatusRetryDuration = 2 * time.Second
 
 	// podAttachAndMountTimeout is the maximum amount of time the
 	// WaitForAttachAndMount call will wait for all volumes in the specified pod
@@ -193,6 +190,7 @@ func NewVolumeManager(
 			volumePluginMgr,
 			recorder,
 			blockVolumePathHandler)),
+		queue: workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
 	}
 
 	intreeToCSITranslator := csitrans.New()
@@ -203,7 +201,6 @@ func NewVolumeManager(
 	vm.desiredStateOfWorldPopulator = populator.NewDesiredStateOfWorldPopulator(
 		kubeClient,
 		desiredStateOfWorldPopulatorLoopSleepPeriod,
-		desiredStateOfWorldPopulatorGetPodStatusRetryDuration,
 		podManager,
 		podStateProvider,
 		vm.desiredStateOfWorld,
@@ -221,12 +218,16 @@ func NewVolumeManager(
 		nodeName,
 		vm.desiredStateOfWorld,
 		vm.actualStateOfWorld,
-		vm.desiredStateOfWorldPopulator.HasAddedPods,
 		vm.operationExecutor,
 		mounter,
 		hostutil,
 		volumePluginMgr,
 		kubeletPodsDir)
+
+	vm.fixPodChangedEvent = observer.NewSubjectEvent(vm.handlePodChanged, nil)
+	podworks.Observer.AttachSubjectEvent(podworks.POD_ADDED, vm.SubjectEventAddNotify, vm.fixPodChangedEvent)
+	podworks.Observer.AttachSubjectEvent(podworks.POD_TERMINATED, vm.SubjectEventAddNotify, vm.fixPodChangedEvent)
+	config.Observer.Attach(config.ALL_READY, vm.SubjectEventAddNotify, vm.handleSourceAllReady)
 
 	return vm
 }
@@ -273,6 +274,45 @@ type volumeManager struct {
 
 	// intreeToCSITranslator translates in-tree volume specs to CSI
 	intreeToCSITranslator csimigration.InTreeToCSITranslator
+
+	queue workqueue.RateLimitingInterface
+
+	fixPodChangedEvent observer.SubjectEvent
+}
+
+func (vm *volumeManager) SubjectEventAddNotify(se observer.SubjectEvent) {
+	vm.queue.Add(se)
+}
+
+func (vm *volumeManager) handlePodChanged(e interface{}) error {
+	poduid := e.(k8stypes.UID)
+	podname := types.UniquePodName(poduid)
+
+	vm.desiredStateOfWorldPopulator.RemoveDeletedPod(podname)
+
+	vm.desiredStateOfWorldPopulator.AddNewPod(podname)
+
+	vm.reconciler.ReconcilePod(podname, vm.SendPodChangedEvent)
+
+	return nil
+}
+
+func (vm *volumeManager) handleSourceAllReady(e interface{}) error {
+	klog.InfoS("Reconciler: start to sync state")
+	vm.reconciler.Sync(vm.SendPodChangedEvent)
+
+	return nil
+}
+
+func (vm *volumeManager) SendPodChangedEvent(poduid k8stypes.UID, duration time.Duration) {
+	fixPodChangedEvent := vm.fixPodChangedEvent
+
+	fixPodChangedEvent.Event = poduid
+	if duration == 0 {
+		vm.queue.Add(fixPodChangedEvent)
+	} else {
+		vm.queue.AddAfter(fixPodChangedEvent, duration)
+	}
 }
 
 func (vm *volumeManager) Run(sourcesReady config.SourcesReady, stopCh <-chan struct{}) {
@@ -283,16 +323,36 @@ func (vm *volumeManager) Run(sourcesReady config.SourcesReady, stopCh <-chan str
 		go vm.volumePluginMgr.Run(stopCh)
 	}
 
-	go vm.desiredStateOfWorldPopulator.Run(sourcesReady, stopCh)
-	klog.V(2).InfoS("The desired_state_of_world populator starts")
-
-	klog.InfoS("Starting Kubelet Volume Manager")
-	go vm.reconciler.Run(stopCh)
+	go vm.run()
 
 	metrics.Register(vm.actualStateOfWorld, vm.desiredStateOfWorld, vm.volumePluginMgr)
 
 	<-stopCh
 	klog.InfoS("Shutting down Kubelet Volume Manager")
+}
+
+func (vm *volumeManager) run() {
+	for vm.execute() {
+	}
+
+}
+
+func (vm *volumeManager) execute() bool {
+	item, quit := vm.queue.Get()
+	if quit {
+		return false
+	}
+
+	defer vm.queue.Done(item)
+
+	if se, ok := item.(observer.SubjectEvent); ok {
+		err := se.Handle()
+		if err != nil {
+			klog.ErrorS(err, "volumeManager run")
+		}
+	}
+
+	return true
 }
 
 func (vm *volumeManager) GetMountedVolumesForPod(podName types.UniquePodName) container.VolumeMap {
@@ -408,6 +468,7 @@ func (vm *volumeManager) WaitForAttachAndMount(pod *v1.Pod) error {
 	// Remount plugins for which this is true. (Atomically updating volumes,
 	// like Downward API, depend on this to update the contents of the volume).
 	vm.desiredStateOfWorldPopulator.ReprocessPod(uniquePodName)
+	vm.SendPodChangedEvent(k8stypes.UID(uniquePodName), 0)
 
 	err := wait.PollImmediate(
 		podAttachAndMountRetryInterval,

@@ -19,6 +19,7 @@ package kuberuntime
 import (
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -139,11 +140,12 @@ func TestToKubeContainer(t *testing.T) {
 			Type: runtimetesting.FakeRuntimeName,
 			ID:   "test-id",
 		},
-		Name:    "test-name",
-		ImageID: "test-image-ref",
-		Image:   "test-image",
-		Hash:    uint64(0x1234),
-		State:   kubecontainer.ContainerStateRunning,
+		Name:      "test-name",
+		ImageID:   "test-image-ref",
+		Image:     "test-image",
+		Hash:      uint64(0x1234),
+		State:     kubecontainer.ContainerStateRunning,
+		CreatedAt: time.Unix(0, c.CreatedAt),
 	}
 
 	_, _, m, err := createTestRuntimeManager()

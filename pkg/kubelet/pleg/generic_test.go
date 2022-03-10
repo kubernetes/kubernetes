@@ -27,13 +27,13 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
-
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/component-base/metrics/testutil"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
+	"k8s.io/kubernetes/pkg/util/observer"
 	"k8s.io/utils/clock"
 	testingclock "k8s.io/utils/clock/testing"
 )
@@ -60,10 +60,12 @@ func newTestGenericPLEGWithChannelSize(eventChannelCap int) *TestGenericPLEG {
 	// The channel capacity should be large enough to hold all events in a
 	// single test.
 	pleg := &GenericPLEG{
+		Observer:     observer.NewObserver(),
 		relistPeriod: time.Hour,
 		runtime:      fakeRuntime,
 		eventChannel: make(chan *PodLifecycleEvent, eventChannelCap),
 		podRecords:   make(podRecords),
+		subscribers:  []*subRecord{},
 		clock:        clock,
 	}
 	return &TestGenericPLEG{pleg: pleg, runtime: fakeRuntime, clock: clock}
@@ -125,6 +127,7 @@ func TestRelisting(t *testing.T) {
 			},
 		}},
 	}
+
 	pleg.relist()
 	// Report every running/exited container if we see them for the first time.
 	expected := []*PodLifecycleEvent{
@@ -137,7 +140,35 @@ func TestRelisting(t *testing.T) {
 
 	// The second relist should not send out any event because no container has
 	// changed.
+
+	var allpods []*kubecontainer.Pod
+	var runningpods []*kubecontainer.Pod
+	ch1 := make(chan struct{})
+	ch2 := make(chan struct{})
+
+	go func() {
+		allpods = pleg.GetKubeletPods()
+		ch1 <- struct{}{}
+	}()
+
+	go func() {
+		runningpods = pleg.GetKubeletRunningPods()
+		ch2 <- struct{}{}
+	}()
+
+	time.Sleep(1 * time.Second)
 	pleg.relist()
+
+	<-ch1
+	if len(allpods) != 2 {
+		t.Errorf("allpods len %v not 2", len(allpods))
+	}
+
+	<-ch2
+	if len(runningpods) != 1 {
+		t.Errorf("runningpods len %v not 1", len(runningpods))
+	}
+
 	actual = getEventsFromChannel(ch)
 	assert.True(t, len(actual) == 0, "no container has changed, event length should be 0")
 
@@ -314,10 +345,12 @@ func testReportMissingPods(t *testing.T, numRelists int) {
 
 func newTestGenericPLEGWithRuntimeMock(runtimeMock kubecontainer.Runtime) *GenericPLEG {
 	pleg := &GenericPLEG{
+		Observer:     observer.NewObserver(),
 		relistPeriod: time.Hour,
 		runtime:      runtimeMock,
 		eventChannel: make(chan *PodLifecycleEvent, 100),
 		podRecords:   make(podRecords),
+		subscribers:  []*subRecord{},
 		cache:        kubecontainer.NewCache(),
 		clock:        clock.RealClock{},
 	}

@@ -78,10 +78,15 @@ func NewContainerGC(runtime Runtime, policy GCPolicy, sourcesReadyProvider Sourc
 }
 
 func (cgc *realContainerGC) GarbageCollect() error {
-	return cgc.runtime.GarbageCollect(cgc.policy, cgc.sourcesReadyProvider.AllReady(), false)
+	for {
+		err := cgc.runtime.GarbageCollect(cgc.policy, cgc.sourcesReadyProvider.AllReady(), false)
+		if err != nil {
+			return err
+		}
+	}
 }
 
 func (cgc *realContainerGC) DeleteAllUnusedContainers() error {
 	klog.InfoS("Attempting to delete unused containers")
-	return cgc.runtime.GarbageCollect(cgc.policy, cgc.sourcesReadyProvider.AllReady(), true)
+	return cgc.runtime.DirectGarbageCollect(cgc.policy, cgc.sourcesReadyProvider.AllReady(), true)
 }
