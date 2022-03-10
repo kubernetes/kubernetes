@@ -28,6 +28,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
@@ -134,7 +135,7 @@ func TestClearNominatedNodeName(t *testing.T) {
 		name                  string
 		pods                  []*v1.Pod
 		patchError            error
-		expectedPatchErrors   []error
+		expectedPatchError    utilerrors.Aggregate
 		expectedPatchRequests int
 		expectedPatchData     string
 	}{
@@ -177,7 +178,7 @@ func TestClearNominatedNodeName(t *testing.T) {
 				},
 			},
 			patchError:            statusErr,
-			expectedPatchErrors:   []error{statusErr},
+			expectedPatchError:    utilerrors.NewAggregate([]error{statusErr}),
 			expectedPatchRequests: 2,
 			expectedPatchData:     `{"status":{"nominatedNodeName":null}}`,
 		},
@@ -201,12 +202,8 @@ func TestClearNominatedNodeName(t *testing.T) {
 
 			})
 
-			if err := ClearNominatedNodeName(cs, test.pods...); err != nil {
-				for i, e := range err.Errors() {
-					if e != test.expectedPatchErrors[i] {
-						t.Fatalf("Error calling ClearNominatedNodeName: Actual was %v, but expected %v", e, test.expectedPatchErrors[i])
-					}
-				}
+			if err := ClearNominatedNodeName(cs, test.pods...); err != nil && err != test.expectedPatchError {
+				t.Fatalf("ClearNominatedNodeName's error mismatch: Actual was %v, but expected %v", err, test.expectedPatchError)
 			}
 
 			if actualPatchRequests != test.expectedPatchRequests {
