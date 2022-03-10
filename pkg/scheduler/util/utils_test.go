@@ -339,11 +339,9 @@ func TestIsScalarResourceName(t *testing.T) {
 			want:         true,
 		},
 	}
-	{
-		for _, test := range tests {
-			if IsScalarResourceName(test.resourceName) != test.want {
-				t.Errorf("%s: expected: %t, got: %t", test.name, test.want, !test.want)
-			}
+	for _, test := range tests {
+		if IsScalarResourceName(test.resourceName) != test.want {
+			t.Errorf("%s: expected: %t, got: %t", test.name, test.want, !test.want)
 		}
 	}
 }
