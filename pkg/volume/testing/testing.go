@@ -478,12 +478,7 @@ func (plugin *FakeVolumePlugin) NodeExpand(resizeOptions NodeResizeOptions) (boo
 		return false, fmt.Errorf("Test failure: NodeExpand")
 	}
 
-	// Set up fakeVolumePlugin not support STAGE_UNSTAGE for testing the behavior
-	// so as volume can be node published before we can resize
-	if resizeOptions.CSIVolumePhase == volume.CSIVolumeStaged {
-		return false, nil
-	}
-	if resizeOptions.CSIVolumePhase == volume.CSIVolumePublished && resizeOptions.VolumeSpec.Name() == FailVolumeExpansion {
+	if resizeOptions.VolumeSpec.Name() == FailVolumeExpansion {
 		return false, fmt.Errorf("fail volume expansion for volume: %s", FailVolumeExpansion)
 	}
 	return true, nil
