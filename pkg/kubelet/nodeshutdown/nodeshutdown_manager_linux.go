@@ -22,6 +22,7 @@ package nodeshutdown
 
 import (
 	"fmt"
+	"path/filepath"
 	"sort"
 	"sync"
 	"time"
@@ -36,6 +37,7 @@ import (
 	kubeletevents "k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/nodeshutdown/systemd"
 	"k8s.io/kubernetes/pkg/kubelet/prober"
 	"k8s.io/utils/clock"
@@ -47,6 +49,7 @@ const (
 	nodeShutdownNotAdmittedReason  = "NodeShutdown"
 	nodeShutdownNotAdmittedMessage = "Pod was rejected as the node is shutting down."
 	dbusReconnectPeriod            = 1 * time.Second
+	localStorageStateFile          = "graceful_node_shutdown_state"
 )
 
 var systemDbus = func() (dbusInhibiter, error) {
@@ -81,6 +84,9 @@ type managerImpl struct {
 	nodeShuttingDownNow   bool
 
 	clock clock.Clock
+
+	enableMetrics bool
+	storage       storage
 }
 
 // NewManager returns a new node shutdown manager.
@@ -120,6 +126,10 @@ func NewManager(conf *Config) (Manager, lifecycle.PodAdmitHandler) {
 		syncNodeStatus:                   conf.SyncNodeStatusFunc,
 		shutdownGracePeriodByPodPriority: shutdownGracePeriodByPodPriority,
 		clock:                            conf.Clock,
+		enableMetrics:                    utilfeature.DefaultFeatureGate.Enabled(features.GracefulNodeShutdownBasedOnPodPriority),
+		storage: localStorage{
+			Path: filepath.Join(conf.StateDirectory, localStorageStateFile),
+		},
 	}
 	klog.InfoS("Creating node shutdown manager",
 		"shutdownGracePeriodRequested", conf.ShutdownGracePeriodRequested,
@@ -143,6 +153,24 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 	return lifecycle.PodAdmitResult{Admit: true}
 }
 
+// setMetrics sets the metrics for the node shutdown manager.
+func (m *managerImpl) setMetrics() {
+	if m.enableMetrics && m.storage != nil {
+		sta := state{}
+		err := m.storage.Load(&sta)
+		if err != nil {
+			klog.ErrorS(err, "Failed to load graceful shutdown state")
+		} else {
+			if !sta.StartTime.IsZero() {
+				metrics.GracefulShutdownStartTime.Set(timestamp(sta.StartTime))
+			}
+			if !sta.EndTime.IsZero() {
+				metrics.GracefulShutdownEndTime.Set(timestamp(sta.EndTime))
+			}
+		}
+	}
+}
+
 // Start starts the node shutdown manager and will start watching the node for shutdown events.
 func (m *managerImpl) Start() error {
 	stop, err := m.start()
@@ -163,6 +191,8 @@ func (m *managerImpl) Start() error {
 			}
 		}
 	}()
+
+	m.setMetrics()
 	return nil
 }
 
@@ -289,6 +319,32 @@ func (m *managerImpl) processShutdownEvent() error {
 	klog.V(1).InfoS("Shutdown manager processing shutdown event")
 	activePods := m.getPods()
 
+	defer func() {
+		m.dbusCon.ReleaseInhibitLock(m.inhibitLock)
+		klog.V(1).InfoS("Shutdown manager completed processing shutdown event, node will shutdown shortly")
+	}()
+
+	if m.enableMetrics && m.storage != nil {
+		startTime := time.Now()
+		err := m.storage.Store(state{
+			StartTime: startTime,
+		})
+		if err != nil {
+			klog.ErrorS(err, "Failed to store graceful shutdown state")
+		}
+
+		defer func() {
+			endTime := time.Now()
+			err := m.storage.Store(state{
+				StartTime: startTime,
+				EndTime:   endTime,
+			})
+			if err != nil {
+				klog.ErrorS(err, "Failed to store graceful shutdown state")
+			}
+		}()
+	}
+
 	groups := groupByPriority(m.shutdownGracePeriodByPodPriority, activePods)
 	for _, group := range groups {
 		// If there are no pods in a particular range,
@@ -346,9 +402,6 @@ func (m *managerImpl) processShutdownEvent() error {
 			klog.V(1).InfoS("Shutdown manager pod killing time out", "gracePeriod", group.ShutdownGracePeriodSeconds, "priority", group.Priority)
 		}
 	}
-
-	m.dbusCon.ReleaseInhibitLock(m.inhibitLock)
-	klog.V(1).InfoS("Shutdown manager completed processing shutdown event, node will shutdown shortly")
 
 	return nil
 }
