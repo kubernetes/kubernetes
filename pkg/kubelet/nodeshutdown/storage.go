@@ -18,7 +18,10 @@ package nodeshutdown
 
 import (
 	"encoding/json"
+	"io"
+	"io/ioutil"
 	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -36,7 +39,7 @@ func (l localStorage) Store(data interface{}) (err error) {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(l.Path, b, 0644)
+	return atomicWrite(l.Path, b, 0644)
 }
 
 func (l localStorage) Load(data interface{}) (err error) {
@@ -60,4 +63,34 @@ func timestamp(t time.Time) float64 {
 type state struct {
 	StartTime time.Time `json:"startTime"`
 	EndTime   time.Time `json:"endTime"`
+}
+
+// atomicWrite atomically writes data to a file specified by filename.
+func atomicWrite(filename string, data []byte, perm os.FileMode) error {
+	f, err := ioutil.TempFile(filepath.Dir(filename), ".tmp-"+filepath.Base(filename))
+	if err != nil {
+		return err
+	}
+	err = os.Chmod(f.Name(), perm)
+	if err != nil {
+		f.Close()
+		return err
+	}
+	n, err := f.Write(data)
+	if err != nil {
+		f.Close()
+		return err
+	}
+	if n < len(data) {
+		f.Close()
+		return io.ErrShortWrite
+	}
+	if err := f.Sync(); err != nil {
+		f.Close()
+		return err
+	}
+	if err := f.Close(); err != nil {
+		return err
+	}
+	return os.Rename(f.Name(), filename)
 }
