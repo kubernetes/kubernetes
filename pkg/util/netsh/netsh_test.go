@@ -441,27 +441,43 @@ func TestCheckIPExists(t *testing.T) {
 
 func TestGetIP(t *testing.T) {
 	testcases := []struct {
+		name          string
 		showAddress   string
 		expectAddress string
 	}{
 		{
+			name:          "IP address displayed in Chinese",
 			showAddress:   "IP 地址:                           10.96.0.2",
 			expectAddress: "10.96.0.2",
 		},
 		{
+			name:          "IP address displayed in English",
 			showAddress:   "IP Address:                           10.96.0.3",
 			expectAddress: "10.96.0.3",
 		},
 		{
+			name:          "IP address without spaces",
 			showAddress:   "IP Address:10.96.0.4",
 			expectAddress: "10.96.0.4",
+		},
+		{
+			name:          "Only 'IP Address:' field exists",
+			showAddress:   "IP Address:",
+			expectAddress: "",
+		},
+		{
+			name:          "IP address without ':' separator",
+			showAddress:   "IP Address10.6.9.2",
+			expectAddress: "",
 		},
 	}
 
 	for _, tc := range testcases {
-		address := getIP(tc.showAddress)
-		if address != tc.expectAddress {
-			t.Errorf("expected address=%q, got %q", tc.expectAddress, address)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			address := getIP(tc.showAddress)
+			if address != tc.expectAddress {
+				t.Errorf("expected address=%q, got %q", tc.expectAddress, address)
+			}
+		})
 	}
 }
