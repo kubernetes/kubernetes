@@ -176,7 +176,7 @@ var (
 	unschedulableReasons = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
 			Subsystem:      SchedulerSubsystem,
-			Name:           "unschedulable_pods_by_plugin",
+			Name:           "unschedulable_pods",
 			Help:           "The number of unschedulable pods broken down by plugin name. A pod will increment the gauge for all plugins that caused it to not schedule and so this metric have meaning only when broken down by plugin.",
 			StabilityLevel: metrics.ALPHA,
 		}, []string{"plugin", "profile"})

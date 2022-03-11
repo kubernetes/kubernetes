@@ -404,6 +404,9 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(pInfo *framework.QueuedPodI
 
 	// If a move request has been received, move it to the BackoffQ, otherwise move
 	// it to unschedulableQ.
+	for plugin := range pInfo.UnschedulablePlugins {
+		metrics.UnschedulableReason(plugin, pInfo.Pod.Spec.SchedulerName).Inc()
+	}
 	if p.moveRequestCycle >= podSchedulingCycle {
 		if err := p.podBackoffQ.Add(pInfo); err != nil {
 			return fmt.Errorf("error adding pod %v to the backoff queue: %v", pod.Name, err)
@@ -412,10 +415,7 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(pInfo *framework.QueuedPodI
 	} else {
 		p.unschedulableQ.addOrUpdate(pInfo)
 		metrics.SchedulerQueueIncomingPods.WithLabelValues("unschedulable", ScheduleAttemptFailure).Inc()
-		var val = pInfo.UnschedulablePlugins.List()
-		for _, plugin := range val {
-			metrics.UnschedulableReason(plugin, pInfo.Pod.Spec.SchedulerName).Inc()
-		}
+
 	}
 
 	p.PodNominator.AddNominatedPod(pInfo.PodInfo, nil)
@@ -944,8 +944,7 @@ func MakeNextPodFunc(queue SchedulingQueue) func() *framework.QueuedPodInfo {
 		podInfo, err := queue.Pop()
 		if err == nil {
 			klog.V(4).InfoS("About to try and schedule pod", "pod", klog.KObj(podInfo.Pod))
-			var val = podInfo.UnschedulablePlugins.List()
-			for _, plugin := range val {
+			for plugin := range podInfo.UnschedulablePlugins {
 				metrics.UnschedulableReason(plugin, podInfo.Pod.Spec.SchedulerName).Dec()
 			}
 			return podInfo
