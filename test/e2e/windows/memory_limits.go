@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"time"
 
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
@@ -101,64 +100,27 @@ func checkNodeAllocatableTest(f *framework.Framework) {
 // Deploys `allocatablePods + 1` pods, each with a memory limit of `1/allocatablePods` of the total allocatable
 // memory, then confirms that the last pod failed because of failedScheduling
 func overrideAllocatableMemoryTest(f *framework.Framework, allocatablePods int) {
-	const (
-		podType = "memory_limit_test_pod"
-	)
-
-	totalAllocatable := getTotalAllocatableMemory(f)
-
-	memValue := totalAllocatable.Value()
-	memPerPod := memValue / int64(allocatablePods)
-	ginkgo.By(fmt.Sprintf("Deploying %d pods with mem limit %v, then one additional pod", allocatablePods, memPerPod))
-
-	// these should all work
-	pods := newMemLimitTestPods(allocatablePods, imageutils.GetPauseImageName(), podType, strconv.FormatInt(memPerPod, 10))
-	f.PodClient().CreateBatch(pods)
-
-	failurePods := newMemLimitTestPods(1, imageutils.GetPauseImageName(), podType, strconv.FormatInt(memPerPod, 10))
-	f.PodClient().Create(failurePods[0])
-
-	gomega.Eventually(func() bool {
-		eventList, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{})
-		framework.ExpectNoError(err)
-		for _, e := range eventList.Items {
-			// Look for an event that shows FailedScheduling
-			if e.Type == "Warning" && e.Reason == "FailedScheduling" && e.InvolvedObject.Name == failurePods[0].ObjectMeta.Name {
-				framework.Logf("Found %+v event with message %+v", e.Reason, e.Message)
-				return true
-			}
-		}
-		return false
-	}, 3*time.Minute, 10*time.Second).Should(gomega.Equal(true))
-}
-
-// newMemLimitTestPods creates a list of pods (specification) for test.
-func newMemLimitTestPods(numPods int, imageName, podType string, memoryLimit string) []*v1.Pod {
-	var pods []*v1.Pod
-
-	memLimitQuantity, err := resource.ParseQuantity(memoryLimit)
+	selector := labels.Set{"kubernetes.io/os": "windows"}.AsSelector()
+	nodeList, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
+		LabelSelector: selector.String(),
+	})
 	framework.ExpectNoError(err)
 
-	for i := 0; i < numPods; i++ {
-
-		podName := "test-" + string(uuid.NewUUID())
-		pod := v1.Pod{
+	for _, node := range nodeList.Items {
+		status := node.Status
+		podName := "mem-test-" + string(uuid.NewUUID())
+		pod := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: podName,
-				Labels: map[string]string{
-					"type": podType,
-					"name": podName,
-				},
 			},
 			Spec: v1.PodSpec{
-				// Restart policy is always (default).
 				Containers: []v1.Container{
 					{
-						Image: imageName,
 						Name:  podName,
+						Image: imageutils.GetPauseImageName(),
 						Resources: v1.ResourceRequirements{
 							Limits: v1.ResourceList{
-								v1.ResourceMemory: memLimitQuantity,
+								v1.ResourceMemory: status.Allocatable[v1.ResourceMemory],
 							},
 						},
 					},
@@ -166,13 +128,49 @@ func newMemLimitTestPods(numPods int, imageName, podType string, memoryLimit str
 				NodeSelector: map[string]string{
 					"kubernetes.io/os": "windows",
 				},
+				NodeName: node.Name,
 			},
 		}
-
-		pods = append(pods, &pod)
+		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
 	}
+	podName := "mem-failure-pod"
+	failurePod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: podName,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  podName,
+					Image: imageutils.GetPauseImageName(),
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: *resource.NewQuantity(1024*1024*1024, resource.BinarySI),
+						},
+					},
+				},
+			},
+			NodeSelector: map[string]string{
+				"kubernetes.io/os": "windows",
+			},
+		},
+	}
+	failurePod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), failurePod, metav1.CreateOptions{})
+	framework.ExpectNoError(err)
+	gomega.Eventually(func() bool {
+		eventList, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{})
+		framework.ExpectNoError(err)
+		for _, e := range eventList.Items {
+			// Look for an event that shows FailedScheduling
+			if e.Type == "Warning" && e.Reason == "FailedScheduling" && e.InvolvedObject.Name == failurePod.ObjectMeta.Name {
+				framework.Logf("Found %+v event with message %+v", e.Reason, e.Message)
+				return true
+			}
+		}
+		return false
+	}, 3*time.Minute, 10*time.Second).Should(gomega.Equal(true))
 
-	return pods
 }
 
 // getNodeMemory populates a nodeMemory struct with information from the first
@@ -226,27 +224,6 @@ func getNodeMemory(f *framework.Framework) nodeMemory {
 	}
 
 	return nodeMem
-}
-
-// getTotalAllocatableMemory gets the sum of all agent node's allocatable memory
-func getTotalAllocatableMemory(f *framework.Framework) *resource.Quantity {
-	selector := labels.Set{"kubernetes.io/os": "windows"}.AsSelector()
-	nodeList, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
-		LabelSelector: selector.String(),
-	})
-	framework.ExpectNoError(err)
-
-	ginkgo.By("Summing allocatable memory across all agent nodes")
-
-	totalAllocatable := resource.NewQuantity(0, resource.BinarySI)
-
-	for _, node := range nodeList.Items {
-		status := node.Status
-
-		totalAllocatable.Add(status.Allocatable[v1.ResourceMemory])
-	}
-
-	return totalAllocatable
 }
 
 // modified from https://github.com/kubernetes/kubernetes/blob/master/test/e2e/framework/kubelet/config.go#L110
