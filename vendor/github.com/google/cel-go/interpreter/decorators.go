@@ -259,8 +259,6 @@ func maybeOptimizeSetMembership(i Interpretable, inlist InterpretableCall) (Inte
 			if !types.IsError(iv) {
 				valueSet[iv] = types.True
 			}
-		default:
-			break
 		}
 	}
 	return &evalSetMembership{
