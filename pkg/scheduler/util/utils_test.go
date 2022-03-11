@@ -128,7 +128,7 @@ func TestMoreImportantPod(t *testing.T) {
 
 func TestClearNominatedNodeName(t *testing.T) {
 	statusErr := &apierrors.StatusError{
-		ErrStatus: metav1.Status{Reason: metav1.StatusReasonUnknown},
+		ErrStatus: metav1.Status{Reason: metav1.StatusReasonUnknown, Message: "status error"},
 	}
 
 	tests := []struct {
@@ -207,8 +207,8 @@ func TestClearNominatedNodeName(t *testing.T) {
 
 			})
 
-			if err := ClearNominatedNodeName(cs, test.pods...); err != nil && err.Is(test.expectedPatchError) {
-				t.Fatalf("ClearNominatedNodeName's error mismatch: Actual was %v, but expected %v", err, test.expectedPatchError)
+			if err := ClearNominatedNodeName(cs, test.pods...); err != nil && !reflect.DeepEqual(err.Errors(), test.expectedPatchError.Errors()) {
+				t.Fatalf("ClearNominatedNodeName's error mismatch: Actual was %v, but expected %v", err.Errors(), test.expectedPatchError.Errors())
 			}
 
 			if actualPatchRequests != test.expectedPatchRequests {
