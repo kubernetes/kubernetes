@@ -50,6 +50,10 @@ func TestCSIImageConfigs(t *testing.T) {
 		// For some hostpath tests.
 		"socat",
 		"busybox",
+
+		// For AnyVolumeDataSource feature tests.
+		"volume-data-source-validator",
+		"hello-populator",
 	}
 	actualImages := sets.NewString()
 	for _, config := range configs {
