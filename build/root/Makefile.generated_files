@@ -576,19 +576,20 @@ SAMPLEAPISERVER_OPENAPI_OUTPUT_PKG := staging/src/k8s.io/sample-apiserver/pkg/ge
 OPENAPI_TARGETS := KUBE AGGREGATOR APIEXTENSIONS CODEGEN SAMPLEAPISERVER
 
 # Find all the directories that request openapi generation.
+# - required input: $(prefix)
 define OPENAPI_DIR_DEF
 ifeq ($$(DBG_MAKEFILE),1)
     $$(warning ***** finding all +k8s:openapi-gen tags for $(prefix))
 endif
-$(prefix)_OPENAPI_DIRS := $(shell                                            \
-    grep --color=never -l '+k8s:openapi-gen=' $($(prefix)_OPENAPI_TAG_FILES) \
-        | xargs -n1 dirname                                                  \
-        | LC_ALL=C sort -u                                                   \
+$(prefix)_OPENAPI_DIRS := $$(shell                                            \
+    grep --color=never -l '+k8s:openapi-gen=' $$($(prefix)_OPENAPI_TAG_FILES) \
+        | xargs -n1 dirname                                                   \
+        | LC_ALL=C sort -u                                                    \
 )
-ifeq ($(DBG_MAKEFILE),1)
-    $$(warning ***** found $(shell echo $($(prefix)_OPENAPI_TAG_FILES) | wc -w) +k8s:openapi-gen tagged dirs for $(prefix))
+ifeq ($$(DBG_MAKEFILE),1)
+    $$(warning ***** found $$(shell echo $$($(prefix)_OPENAPI_TAG_FILES) | wc -w) +k8s:openapi-gen tagged dirs for $(prefix))
 endif
-endef
+endef # OPENAPI_DIR_DEF
 $(foreach prefix, $(OPENAPI_TARGETS), $(eval $(OPENAPI_DIR_DEF)))
 
 # Compute all openapi output file names
@@ -597,6 +598,7 @@ $(foreach prefix, $(OPENAPI_TARGETS), $(eval                                    
 ))
 
 # For each openapi target compute the spec
+# - required input: $(prefix)
 define OPENAPI_TARGETS_DEF
 # For each dir in $(prefix)_OPENAPI_DIRS, this establishes a dependency
 # between the output file and the input files that should trigger a rebuild.
@@ -606,40 +608,40 @@ define OPENAPI_TARGETS_DEF
 #
 # The 'eval' is needed because this has a different RHS for each LHS, and
 # would otherwise produce results that make can't parse.
-$(foreach dir, $($(prefix)_OPENAPI_DIRS), $(eval                   \
-    $($(prefix)_OPENAPI_OUTFILE): $(GODEPS_$(PRJ_SRC_PATH)/$(dir)) \
+$$(foreach dir, $$($(prefix)_OPENAPI_DIRS), $$(eval                     \
+    $$($(prefix)_OPENAPI_OUTFILE): $$(GODEPS_$$(PRJ_SRC_PATH)/$$(dir))  \
 ))
 
 # When UPDATE_API_KNOWN_VIOLATIONS is set to be true, let the generator to write
 # updated API violations to the known API violation exceptions list.
-ifeq ($(UPDATE_API_KNOWN_VIOLATIONS),true)
-    $(prefix)_REPORT_FILENAME := $($(prefix)_KNOWN_VIOLATION_FILENAME)
+ifeq ($$(UPDATE_API_KNOWN_VIOLATIONS),true)
+    $(prefix)_REPORT_FILENAME := $$($(prefix)_KNOWN_VIOLATION_FILENAME)
     # When UPDATE_API_KNOWN_VIOLATIONS is set to be true, touch the exceptions
     # list so that the $(prefix)_OPENAPI_OUTFILE target re-run instead of being cached.
-    $$(shell touch $($(prefix)_KNOWN_VIOLATION_FILENAME))
+    $$(shell touch $$($(prefix)_KNOWN_VIOLATION_FILENAME))
 else
-    $(prefix)_REPORT_FILENAME := $(OUT_DIR)/$(prefix)_violations.report
+    $(prefix)_REPORT_FILENAME := $$(OUT_DIR)/$(prefix)_violations.report
 endif
 
 # How to regenerate open-api code.  This emits a single file for all results.
 # The Make rule fails if generated API rule violation report differs from the
 # checked-in violation file, and prints error message to request developer to
 # fix either the API source code, or the known API rule violation file.
-$$($(prefix)_OPENAPI_OUTFILE): $(OPENAPI_GEN) $($(prefix)_KNOWN_VIOLATION_FILENAME)
-	kube::log::status "Generating openapi code for $(prefix)";                                 \
-	./hack/run-in-gopath.sh $(OPENAPI_GEN)                                                     \
-	    --v $(KUBE_VERBOSE)                                                                    \
-	    --logtostderr                                                                          \
-	    -i $$$$(echo $(addprefix $(PRJ_SRC_PATH)/, $($(prefix)_OPENAPI_DIRS)) | sed 's/ /,/g') \
-	    -p $(PRJ_SRC_PATH)/$($(prefix)_OPENAPI_OUTPUT_PKG)                                     \
-	    -O $(OPENAPI_BASENAME)                                                                 \
-	    -h $(BOILERPLATE_FILENAME)                                                             \
-	    -r $$($(prefix)_REPORT_FILENAME)                                                       \
+$$($(prefix)_OPENAPI_OUTFILE): $$(OPENAPI_GEN) $$($(prefix)_KNOWN_VIOLATION_FILENAME)
+	kube::log::status "Generating openapi code for $(prefix)";                                   \
+	./hack/run-in-gopath.sh $$(OPENAPI_GEN)                                                      \
+	    --v $$(KUBE_VERBOSE)                                                                     \
+	    --logtostderr                                                                            \
+	    -i $$$$(echo $$(addprefix $(PRJ_SRC_PATH)/, $$($(prefix)_OPENAPI_DIRS)) | sed 's/ /,/g') \
+	    -p $$(PRJ_SRC_PATH)/$$($(prefix)_OPENAPI_OUTPUT_PKG)                                     \
+	    -O $$(OPENAPI_BASENAME)                                                                  \
+	    -h $$(BOILERPLATE_FILENAME)                                                              \
+	    -r $$($(prefix)_REPORT_FILENAME)                                                         \
 	    "$$$$@"
-	test -f $($(prefix)_KNOWN_VIOLATION_FILENAME) || touch $($(prefix)_KNOWN_VIOLATION_FILENAME)
-	diff $$($(prefix)_REPORT_FILENAME) $($(prefix)_KNOWN_VIOLATION_FILENAME) || \
-	(echo -e $(call API_RULE_CHECK_FAILURE_MESSAGE,$(prefix),$($(prefix)_KNOWN_VIOLATION_FILENAME)); exit 1)
-endef
+	test -f $$($(prefix)_KNOWN_VIOLATION_FILENAME) || touch $$($(prefix)_KNOWN_VIOLATION_FILENAME)
+	diff $$($(prefix)_REPORT_FILENAME) $$($(prefix)_KNOWN_VIOLATION_FILENAME) || \
+	(echo -e $$(call API_RULE_CHECK_FAILURE_MESSAGE,$(prefix),$$($(prefix)_KNOWN_VIOLATION_FILENAME)); exit 1)
+endef # OPENAPI_TARGETS_DEF
 $(foreach prefix, $(OPENAPI_TARGETS), $(eval $(OPENAPI_TARGETS_DEF)))
 
 # This rule is the user-friendly entrypoint for openapi generation.
