@@ -192,7 +192,8 @@ var _ = SIGDescribe("Probing container", func() {
 			FailureThreshold:    1,
 		}
 		pod := livenessPodSpec(f.Namespace.Name, nil, livenessProbe)
-		RunLivenessTest(f, pod, 5, time.Minute*5)
+		// ~2 minutes backoff timeouts + 4 minutes defaultObservationTimeout + 2 minutes for each pod restart
+		RunLivenessTest(f, pod, 5, 2*time.Minute+defaultObservationTimeout+4*2*time.Minute)
 	})
 
 	/*
