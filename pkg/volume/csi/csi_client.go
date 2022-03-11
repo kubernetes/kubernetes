@@ -113,11 +113,7 @@ type csiDriverClient struct {
 }
 
 type csiResizeOptions struct {
-	volumeID string
-	// volumePath is path where volume is available. It could be:
-	//   - path where node is staged if NodeExpandVolume is called after NodeStageVolume
-	//   - path where volume is published if NodeExpandVolume is called after NodePublishVolume
-	// DEPRECATION NOTICE: in future NodeExpandVolume will be always called after NodePublish
+	volumeID          string
 	volumePath        string
 	stagingTargetPath string
 	fsType            string

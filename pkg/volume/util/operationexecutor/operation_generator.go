@@ -634,7 +634,6 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			klog.InfoS(volumeToMount.GenerateMsgDetailed("MountVolume.WaitForAttach succeeded", fmt.Sprintf("DevicePath %q", devicePath)), "pod", klog.KObj(volumeToMount.Pod))
 		}
 
-		var resizeDone bool
 		var resizeError error
 		resizeOptions := volume.NodeResizeOptions{
 			DevicePath: devicePath,
@@ -674,35 +673,8 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 				eventErr, detailedErr := volumeToMount.GenerateError("MountVolume.MarkDeviceAsMounted failed", markDeviceMountedErr)
 				return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
 			}
-
-			// If volume expansion is performed after MountDevice but before SetUp then
-			// deviceMountPath and deviceStagePath is going to be the same.
-			// Deprecation: Calling NodeExpandVolume after NodeStage/MountDevice will be deprecated
-			// in a future version of k8s.
-			resizeOptions.DeviceMountPath = deviceMountPath
+			// set staging path for volume expansion
 			resizeOptions.DeviceStagePath = deviceMountPath
-			resizeOptions.CSIVolumePhase = volume.CSIVolumeStaged
-
-			// NodeExpandVolume will resize the file system if user has requested a resize of
-			// underlying persistent volume and is allowed to do so.
-			resizeDone, resizeError = og.nodeExpandVolume(volumeToMount, actualStateOfWorld, resizeOptions)
-
-			if resizeError != nil {
-				klog.Errorf("MountVolume.NodeExpandVolume failed with %v", resizeError)
-
-				// Resize failed. To make sure NodeExpand is re-tried again on the next attempt
-				// *before* SetUp(), mark the mounted device as uncertain.
-				markDeviceUncertainErr := actualStateOfWorld.MarkDeviceAsUncertain(
-					volumeToMount.VolumeName, devicePath, deviceMountPath)
-				if markDeviceUncertainErr != nil {
-					// just log, return the resizeError error instead
-					klog.InfoS(volumeToMount.GenerateMsgDetailed(
-						"MountVolume.MountDevice failed to mark volume as uncertain",
-						markDeviceUncertainErr.Error()), "pod", klog.KObj(volumeToMount.Pod))
-				}
-				eventErr, detailedErr := volumeToMount.GenerateError("MountVolume.MountDevice failed while expanding volume", resizeError)
-				return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
-			}
 		}
 
 		// Execute mount
@@ -738,27 +710,20 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 		}
 		klog.V(verbosity).InfoS(detailedMsg, "pod", klog.KObj(volumeToMount.Pod))
 		resizeOptions.DeviceMountPath = volumeMounter.GetPath()
-		resizeOptions.CSIVolumePhase = volume.CSIVolumePublished
 
-		// We need to call resizing here again in case resizing was not done during device mount. There could be
-		// two reasons of that:
-		//	- Volume does not support DeviceMounter interface.
-		//	- In case of CSI the volume does not have node stage_unstage capability.
-		if !resizeDone {
-			_, resizeError = og.nodeExpandVolume(volumeToMount, actualStateOfWorld, resizeOptions)
-			if resizeError != nil {
-				klog.Errorf("MountVolume.NodeExpandVolume failed with %v", resizeError)
-				eventErr, detailedErr := volumeToMount.GenerateError("MountVolume.Setup failed while expanding volume", resizeError)
-				// At this point, MountVolume.Setup already succeeded, we should add volume into actual state
-				// so that reconciler can clean up volume when needed. However, volume resize failed,
-				// we should not mark the volume as mounted to avoid pod starts using it.
-				// Considering the above situations, we mark volume as uncertain here so that reconciler will tigger
-				// volume tear down when pod is deleted, and also makes sure pod will not start using it.
-				if err := actualStateOfWorld.MarkVolumeMountAsUncertain(markOpts); err != nil {
-					klog.Errorf(volumeToMount.GenerateErrorDetailed("MountVolume.MarkVolumeMountAsUncertain failed", err).Error())
-				}
-				return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
+		_, resizeError = og.nodeExpandVolume(volumeToMount, actualStateOfWorld, resizeOptions)
+		if resizeError != nil {
+			klog.Errorf("MountVolume.NodeExpandVolume failed with %v", resizeError)
+			eventErr, detailedErr := volumeToMount.GenerateError("MountVolume.Setup failed while expanding volume", resizeError)
+			// At this point, MountVolume.Setup already succeeded, we should add volume into actual state
+			// so that reconciler can clean up volume when needed. However, volume resize failed,
+			// we should not mark the volume as mounted to avoid pod starts using it.
+			// Considering the above situations, we mark volume as uncertain here so that reconciler will tigger
+			// volume tear down when pod is deleted, and also makes sure pod will not start using it.
+			if err := actualStateOfWorld.MarkVolumeMountAsUncertain(markOpts); err != nil {
+				klog.Errorf(volumeToMount.GenerateErrorDetailed("MountVolume.MarkVolumeMountAsUncertain failed", err).Error())
 			}
+			return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
 		}
 
 		// record total time it takes to mount a volume. This is end to end time that includes waiting for volume to attach, node to be update
@@ -1238,7 +1203,6 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 		resizeOptions := volume.NodeResizeOptions{
 			DevicePath:      devicePath,
 			DeviceStagePath: stagingPath,
-			CSIVolumePhase:  volume.CSIVolumePublished,
 		}
 		_, resizeError := og.nodeExpandVolume(volumeToMount, actualStateOfWorld, resizeOptions)
 		if resizeError != nil {
@@ -2008,7 +1972,6 @@ func (og *operationGenerator) GenerateExpandInUseVolumeFunc(
 		}
 
 		// if we are doing online expansion then volume is already published
-		resizeOptions.CSIVolumePhase = volume.CSIVolumePublished
 		resizeDone, eventErr, detailedErr = og.doOnlineExpansion(volumeToMount, actualStateOfWorld, resizeOptions)
 		if eventErr != nil || detailedErr != nil {
 			return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
