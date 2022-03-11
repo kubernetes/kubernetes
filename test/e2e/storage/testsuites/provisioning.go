@@ -19,18 +19,22 @@ package testsuites
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -236,6 +240,181 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 			}
 			e2evolume.TestVolumeClientSlow(f, testConfig, nil, "", tests)
 		}
+		l.testCase.TestDynamicProvisioning()
+	})
+
+	ginkgo.It("should provision storage with any volume data source [Serial]", func() {
+		if len(dInfo.InTreePluginName) != 0 {
+			e2eskipper.Skipf("AnyVolumeDataSource feature only works with CSI drivers - skipping")
+		}
+		if pattern.VolMode == v1.PersistentVolumeBlock {
+			e2eskipper.Skipf("Test for Block volumes is not implemented - skipping")
+		}
+
+		init()
+		defer cleanup()
+
+		ginkgo.By("Creating validator namespace")
+		valNamespace, err := f.CreateNamespace(fmt.Sprintf("%s-val", f.Namespace.Name), map[string]string{
+			"e2e-framework":      f.BaseName,
+			"e2e-test-namespace": f.Namespace.Name,
+		})
+		framework.ExpectNoError(err)
+
+		defer func() {
+			f.DeleteNamespace(valNamespace.Name)
+		}()
+
+		ginkgo.By("Deploying validator")
+		valManifests := []string{
+			"test/e2e/testing-manifests/storage-csi/any-volume-datasource/crd/populator.storage.k8s.io_volumepopulators.yaml",
+			"test/e2e/testing-manifests/storage-csi/any-volume-datasource/volume-data-source-validator/rbac-data-source-validator.yaml",
+			"test/e2e/testing-manifests/storage-csi/any-volume-datasource/volume-data-source-validator/setup-data-source-validator.yaml",
+		}
+		valCleanup, err := storageutils.CreateFromManifests(f, valNamespace,
+			func(item interface{}) error { return nil },
+			valManifests...)
+
+		framework.ExpectNoError(err)
+		defer valCleanup()
+
+		ginkgo.By("Creating populator namespace")
+		popNamespace, err := f.CreateNamespace(fmt.Sprintf("%s-pop", f.Namespace.Name), map[string]string{
+			"e2e-framework":      f.BaseName,
+			"e2e-test-namespace": f.Namespace.Name,
+		})
+		framework.ExpectNoError(err)
+
+		defer func() {
+			f.DeleteNamespace(popNamespace.Name)
+		}()
+
+		ginkgo.By("Deploying hello-populator")
+		popManifests := []string{
+			"test/e2e/testing-manifests/storage-csi/any-volume-datasource/crd/hello-populator-crd.yaml",
+			"test/e2e/testing-manifests/storage-csi/any-volume-datasource/hello-populator-deploy.yaml",
+		}
+		popCleanup, err := storageutils.CreateFromManifests(f, popNamespace,
+			func(item interface{}) error {
+				switch item := item.(type) {
+				case *appsv1.Deployment:
+					for i, container := range item.Spec.Template.Spec.Containers {
+						switch container.Name {
+						case "hello":
+							var found bool
+							args := []string{}
+							for _, arg := range container.Args {
+								if strings.HasPrefix(arg, "--namespace=") {
+									args = append(args, fmt.Sprintf("--namespace=%s", popNamespace.Name))
+									found = true
+								} else {
+									args = append(args, arg)
+								}
+							}
+							if !found {
+								args = append(args, fmt.Sprintf("--namespace=%s", popNamespace.Name))
+								framework.Logf("container name: %s", container.Name)
+							}
+							container.Args = args
+							item.Spec.Template.Spec.Containers[i] = container
+						default:
+						}
+					}
+				}
+				return nil
+			},
+			popManifests...)
+
+		framework.ExpectNoError(err)
+		defer popCleanup()
+
+		dc := l.config.Framework.DynamicClient
+
+		// Make hello-populator handle Hello resource in hello.example.com group
+		ginkgo.By("Creating VolumePopulator CR datasource")
+		volumePopulatorGVR := schema.GroupVersionResource{Group: "populator.storage.k8s.io", Version: "v1beta1", Resource: "volumepopulators"}
+		helloPopulatorCR := &unstructured.Unstructured{
+			Object: map[string]interface{}{
+				"kind":       "VolumePopulator",
+				"apiVersion": "populator.storage.k8s.io/v1beta1",
+				"metadata": map[string]interface{}{
+					"name": fmt.Sprintf("%s-%s", "hello-populator", f.Namespace.Name),
+				},
+				"sourceKind": map[string]interface{}{
+					"group": "hello.example.com",
+					"kind":  "Hello",
+				},
+			},
+		}
+
+		_, err = dc.Resource(volumePopulatorGVR).Create(context.TODO(), helloPopulatorCR, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+
+		defer func() {
+			framework.Logf("deleting VolumePopulator CR datasource %q/%q", helloPopulatorCR.GetNamespace(), helloPopulatorCR.GetName())
+			err = dc.Resource(volumePopulatorGVR).Delete(context.TODO(), helloPopulatorCR.GetName(), metav1.DeleteOptions{})
+			if err != nil && !apierrors.IsNotFound(err) {
+				framework.Failf("Error deleting VolumePopulator CR datasource %q. Error: %v", helloPopulatorCR.GetName(), err)
+			}
+		}()
+
+		// Create Hello CR datasource
+		ginkgo.By("Creating Hello CR datasource")
+		helloCRName := "example-hello"
+		fileName := fmt.Sprintf("example-%s.txt", f.Namespace.Name)
+		expectedContent := fmt.Sprintf("Hello from namespace %s", f.Namespace.Name)
+		helloGVR := schema.GroupVersionResource{Group: "hello.example.com", Version: "v1alpha1", Resource: "hellos"}
+		helloCR := &unstructured.Unstructured{
+			Object: map[string]interface{}{
+				"kind":       "Hello",
+				"apiVersion": "hello.example.com/v1alpha1",
+				"metadata": map[string]interface{}{
+					"name":      helloCRName,
+					"namespace": f.Namespace.Name,
+				},
+				"spec": map[string]interface{}{
+					"fileName":     fileName,
+					"fileContents": expectedContent,
+				},
+			},
+		}
+
+		_, err = dc.Resource(helloGVR).Namespace(f.Namespace.Name).Create(context.TODO(), helloCR, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+
+		defer func() {
+			framework.Logf("deleting Hello CR datasource %q/%q", helloCR.GetNamespace(), helloCR.GetName())
+			err = dc.Resource(helloGVR).Namespace(helloCR.GetNamespace()).Delete(context.TODO(), helloCR.GetName(), metav1.DeleteOptions{})
+			if err != nil && !apierrors.IsNotFound(err) {
+				framework.Failf("Error deleting Hello CR datasource %q. Error: %v", helloCR.GetName(), err)
+			}
+		}()
+
+		apiGroup := "hello.example.com"
+		l.pvc.Spec.DataSourceRef = &v1.TypedLocalObjectReference{
+			APIGroup: &apiGroup,
+			Kind:     "Hello",
+			Name:     helloCRName,
+		}
+
+		testConfig := storageframework.ConvertTestConfig(l.config)
+		l.testCase.NodeSelection = testConfig.ClientNodeSelection
+		l.testCase.PvCheck = func(claim *v1.PersistentVolumeClaim) {
+			ginkgo.By("checking whether the created volume has the pre-populated data")
+			tests := []e2evolume.Test{
+				{
+					Volume:          *storageutils.CreateVolumeSource(claim.Name, false /* readOnly */),
+					Mode:            pattern.VolMode,
+					File:            fileName,
+					ExpectedContent: expectedContent,
+				},
+			}
+			e2evolume.TestVolumeClientSlow(f, testConfig, nil, "", tests)
+		}
+
+		_, clearProvisionedStorageClass := SetupStorageClass(l.testCase.Client, l.testCase.Class)
+		defer clearProvisionedStorageClass()
+
 		l.testCase.TestDynamicProvisioning()
 	})
 
