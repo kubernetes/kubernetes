@@ -207,6 +207,16 @@ message Mount {
     MountPropagation propagation = 5;
 }
 
+// IDMapping describes host to container ID mappings for a pod sandbox.
+message IDMapping {
+    // HostId is the id on the host.
+    uint32 host_id = 1;
+    // ContainerId is the id in the container.
+    uint32 container_id = 2;
+    // Length is the size of the range to map.
+    uint32 length = 3;
+}
+
 // A NamespaceMode describes the intended namespace configuration for each
 // of the namespaces (Network, PID, IPC) in NamespaceOption. Runtimes should
 // map these modes as appropriate for the technology underlying the runtime.
@@ -232,6 +242,19 @@ enum NamespaceMode {
     TARGET    = 3;
 }
 
+// UserNamespace describes the intended user namespace configuration for a pod sandbox.
+message UserNamespace {
+    // Mode is the NamespaceMode for this UserNamespace.
+    // Note: NamespaceMode for UserNamespace currently supports only POD and NODE, not CONTAINER OR TARGET.
+    NamespaceMode mode = 1;
+
+    // Uids specifies the UID mappings for the user namespace.
+    repeated IDMapping uids = 2;
+
+    // Gids specifies the GID mappings for the user namespace.
+    repeated IDMapping gids = 3;
+}
+
 // NamespaceOption provides options for Linux namespaces.
 message NamespaceOption {
     // Network namespace for this container/sandbox.
@@ -251,6 +274,12 @@ message NamespaceOption {
     // previously created in the same pod. It is not possible to specify different targets
     // for each namespace.
     string target_id = 4;
+    // UsernsOptions for this pod sandbox.
+    // The Kubelet picks the user namespace configuration to use for the pod sandbox.  The mappings
+    // are specified as part of the UserNamespace struct.  If the struct is nil, then the POD mode
+    // must be assumed.  This is done for backward compatibility with older Kubelet versions that
+    // do not set a user namespace.
+    UserNamespace userns_options = 5;
 }
 
 // Int64Value is the wrapper of int64.
