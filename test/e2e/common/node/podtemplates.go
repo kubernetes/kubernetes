@@ -70,7 +70,7 @@ var _ = SIGDescribe("PodTemplates", func() {
 			Template: v1.PodTemplateSpec{
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
-						{Name: "nginx", Image: "nginx"},
+						{Name: "nginx", Image: imageutils.GetE2EImage(imageutils.Nginx)},
 					},
 				},
 			},

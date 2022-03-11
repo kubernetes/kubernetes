@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes/scheme"
+	commonutils "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 )
@@ -75,8 +76,8 @@ func StatefulSetFromManifest(fileName, ns string) (*appsv1.StatefulSet, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	json, err := utilyaml.ToJSON(data)
+	statefulsetYaml := commonutils.SubstituteImageName(string(data))
+	json, err := utilyaml.ToJSON([]byte(statefulsetYaml))
 	if err != nil {
 		return nil, err
 	}

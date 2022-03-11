@@ -36,6 +36,7 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 var _ = utils.SIGDescribe("Mounted flexvolume volume expand [Slow] [Feature:ExpandInUsePersistentVolumes]", func() {
@@ -221,7 +222,7 @@ func makeNginxPod(ns string, nodeSelector map[string]string, pvclaims []*v1.Pers
 			Containers: []v1.Container{
 				{
 					Name:  "write-pod",
-					Image: "nginx",
+					Image: imageutils.GetE2EImage(imageutils.Nginx),
 					Ports: []v1.ContainerPort{
 						{
 							Name:          "http-server",
