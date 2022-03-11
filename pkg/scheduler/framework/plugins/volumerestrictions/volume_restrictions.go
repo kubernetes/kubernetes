@@ -122,7 +122,7 @@ func haveOverlap(a1, a2 []string) bool {
 
 func (pl *VolumeRestrictions) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod) *framework.Status {
 	if pl.enableReadWriteOncePod {
-		return pl.isReadWriteOncePodAccessModeConflict(pod)
+		return pl.isReadWriteOncePodAccessModeConflict(ctx, pod)
 	}
 	return framework.NewStatus(framework.Success)
 }
@@ -131,7 +131,7 @@ func (pl *VolumeRestrictions) PreFilter(ctx context.Context, cycleState *framewo
 // This access mode restricts volume access to a single pod on a single node. Since only a single pod can
 // use a ReadWriteOncePod PVC, mark any other pods attempting to use this PVC as UnschedulableAndUnresolvable.
 // TODO(#103132): Mark pod as Unschedulable and add preemption logic.
-func (pl *VolumeRestrictions) isReadWriteOncePodAccessModeConflict(pod *v1.Pod) *framework.Status {
+func (pl *VolumeRestrictions) isReadWriteOncePodAccessModeConflict(ctx context.Context, pod *v1.Pod) *framework.Status {
 	nodeInfos, err := pl.nodeInfoLister.NodeInfos().List()
 	if err != nil {
 		return framework.NewStatus(framework.Error, "error while getting node info")
@@ -159,7 +159,7 @@ func (pl *VolumeRestrictions) isReadWriteOncePodAccessModeConflict(pod *v1.Pod) 
 		pvcKeys = append(pvcKeys, key)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	subCtx, cancel := context.WithCancel(ctx)
 	var conflicts uint32
 
 	processNode := func(i int) {
@@ -172,7 +172,7 @@ func (pl *VolumeRestrictions) isReadWriteOncePodAccessModeConflict(pod *v1.Pod) 
 			}
 		}
 	}
-	pl.parallelizer.Until(ctx, len(nodeInfos), processNode)
+	pl.parallelizer.Until(subCtx, len(nodeInfos), processNode)
 
 	// Enforce ReadWriteOncePod access mode. This is also enforced during volume mount in kubelet.
 	if conflicts > 0 {

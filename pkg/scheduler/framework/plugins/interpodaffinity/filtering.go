@@ -152,7 +152,7 @@ func podMatchesAllAffinityTerms(terms []framework.AffinityTerm, pod *v1.Pod) boo
 // calculates the following for each existing pod on each node:
 // (1) Whether it has PodAntiAffinity
 // (2) Whether any AffinityTerm matches the incoming pod
-func (pl *InterPodAffinity) getExistingAntiAffinityCounts(pod *v1.Pod, nsLabels labels.Set, nodes []*framework.NodeInfo) topologyToMatchedTermCount {
+func (pl *InterPodAffinity) getExistingAntiAffinityCounts(ctx context.Context, pod *v1.Pod, nsLabels labels.Set, nodes []*framework.NodeInfo) topologyToMatchedTermCount {
 	topoMaps := make([]topologyToMatchedTermCount, len(nodes))
 	index := int32(-1)
 	processNode := func(i int) {
@@ -170,7 +170,7 @@ func (pl *InterPodAffinity) getExistingAntiAffinityCounts(pod *v1.Pod, nsLabels 
 			topoMaps[atomic.AddInt32(&index, 1)] = topoMap
 		}
 	}
-	pl.parallelizer.Until(context.Background(), len(nodes), processNode)
+	pl.parallelizer.Until(ctx, len(nodes), processNode)
 
 	result := make(topologyToMatchedTermCount)
 	for i := 0; i <= int(index); i++ {
@@ -184,7 +184,7 @@ func (pl *InterPodAffinity) getExistingAntiAffinityCounts(pod *v1.Pod, nsLabels 
 // It returns a topologyToMatchedTermCount that are checked later by the affinity
 // predicate. With this topologyToMatchedTermCount available, the affinity predicate does not
 // need to check all the pods in the cluster.
-func (pl *InterPodAffinity) getIncomingAffinityAntiAffinityCounts(podInfo *framework.PodInfo, allNodes []*framework.NodeInfo) (topologyToMatchedTermCount, topologyToMatchedTermCount) {
+func (pl *InterPodAffinity) getIncomingAffinityAntiAffinityCounts(ctx context.Context, podInfo *framework.PodInfo, allNodes []*framework.NodeInfo) (topologyToMatchedTermCount, topologyToMatchedTermCount) {
 	affinityCounts := make(topologyToMatchedTermCount)
 	antiAffinityCounts := make(topologyToMatchedTermCount)
 	if len(podInfo.RequiredAffinityTerms) == 0 && len(podInfo.RequiredAntiAffinityTerms) == 0 {
@@ -216,7 +216,7 @@ func (pl *InterPodAffinity) getIncomingAffinityAntiAffinityCounts(podInfo *frame
 			antiAffinityCountsList[k] = antiAffinity
 		}
 	}
-	pl.parallelizer.Until(context.Background(), len(allNodes), processNode)
+	pl.parallelizer.Until(ctx, len(allNodes), processNode)
 
 	for i := 0; i <= int(index); i++ {
 		affinityCounts.append(affinityCountsList[i])
@@ -257,8 +257,8 @@ func (pl *InterPodAffinity) PreFilter(ctx context.Context, cycleState *framework
 	}
 	s.namespaceLabels = GetNamespaceLabelsSnapshot(pod.Namespace, pl.nsLister)
 
-	s.existingAntiAffinityCounts = pl.getExistingAntiAffinityCounts(pod, s.namespaceLabels, nodesWithRequiredAntiAffinityPods)
-	s.affinityCounts, s.antiAffinityCounts = pl.getIncomingAffinityAntiAffinityCounts(s.podInfo, allNodes)
+	s.existingAntiAffinityCounts = pl.getExistingAntiAffinityCounts(ctx, pod, s.namespaceLabels, nodesWithRequiredAntiAffinityPods)
+	s.affinityCounts, s.antiAffinityCounts = pl.getIncomingAffinityAntiAffinityCounts(ctx, s.podInfo, allNodes)
 
 	cycleState.Write(preFilterStateKey, s)
 	return nil
