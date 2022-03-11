@@ -12,7 +12,8 @@ require (
 	github.com/google/gofuzz v1.1.0
 	github.com/google/uuid v1.1.2
 	github.com/googleapis/gnostic v0.5.5
-	github.com/spf13/cobra v1.2.1
+	github.com/mitchellh/mapstructure v1.4.1 // indirect
+	github.com/spf13/cobra v1.4.0
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.7.0
 	go.etcd.io/etcd/client/pkg/v3 v3.5.0
