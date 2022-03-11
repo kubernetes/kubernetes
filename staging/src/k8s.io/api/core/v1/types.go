@@ -522,7 +522,6 @@ type PersistentVolumeClaimSpec struct {
 }
 
 // PersistentVolumeClaimConditionType is a valid value of PersistentVolumeClaimCondition.Type
-// +enum
 type PersistentVolumeClaimConditionType string
 
 const (
@@ -2632,7 +2631,6 @@ const (
 )
 
 // PodConditionType is a valid value for PodCondition.Type
-// +enum
 type PodConditionType string
 
 // These are valid conditions of pod.
@@ -5083,7 +5081,6 @@ const (
 	NodeTerminated NodePhase = "Terminated"
 )
 
-// +enum
 type NodeConditionType string
 
 // These are valid conditions of node. Currently, we don't have enough information to decide
@@ -5122,7 +5119,6 @@ type NodeCondition struct {
 	Message string `json:"message,omitempty" protobuf:"bytes,6,opt,name=message"`
 }
 
-// +enum
 type NodeAddressType string
 
 // These are valid address type of node.
@@ -5295,7 +5291,6 @@ const (
 	NamespaceTerminatingCause metav1.CauseType = "NamespaceTerminating"
 )
 
-// +enum
 type NamespaceConditionType string
 
 // These are valid conditions of a namespace.
@@ -5787,7 +5782,6 @@ type EventList struct {
 type List metav1.List
 
 // LimitType is a type of object that is limited
-// +enum
 type LimitType string
 
 const (
