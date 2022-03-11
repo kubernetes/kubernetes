@@ -102,7 +102,7 @@ func NewCmdCreateClusterRoleBinding(f cmdutil.Factory, ioStreams genericclioptio
 	cmd.MarkFlagRequired("clusterrole")
 	cmd.Flags().StringArrayVar(&o.Users, "user", o.Users, "Usernames to bind to the clusterrole")
 	cmd.Flags().StringArrayVar(&o.Groups, "group", o.Groups, "Groups to bind to the clusterrole")
-	cmd.Flags().StringArrayVar(&o.ServiceAccounts, "serviceaccount", o.ServiceAccounts, "Service accounts to bind to the clusterrole, in the format <namespace>:<name>")
+	cmd.Flags().StringArrayVar(&o.ServiceAccounts, "serviceaccount", o.ServiceAccounts, "Service accounts to bind to the clusterrole, in the format <namespace>:<name>. The flag can be repeated to add multiple subjects.")
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
 
 	// Completion for relevant flags
