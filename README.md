@@ -34,7 +34,7 @@ Take a free course on [Scalable Microservices with Kubernetes].
 To use Kubernetes code as a library in other applications, see the [list of published components](https://git.k8s.io/kubernetes/staging/README.md).
 Use of the `k8s.io/kubernetes` module or `k8s.io/kubernetes/...` packages as libraries is not supported.
 
-## To start developing K8s
+## To staxwasrt developing K8s
 
 The [community repository] hosts all information about
 building Kubernetes from source, how to contribute code
