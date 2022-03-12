@@ -33,9 +33,6 @@ ifeq ($(DBG_MAKEFILE),1)
 endif
 
 
-# It's necessary to set this because some environments don't link sh -> bash.
-SHELL := /usr/bin/env bash
-
 # Define variables so `make --warn-undefined-variables` works.
 DBG_CODEGEN ?=
 UPDATE_API_KNOWN_VIOLATIONS ?=
