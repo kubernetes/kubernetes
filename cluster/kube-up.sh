@@ -20,6 +20,7 @@
 # that directly.  If not then we assume we are doing development stuff and take
 # the defaults in the release config.
 
+
 set -o errexit
 set -o nounset
 set -o pipefail
