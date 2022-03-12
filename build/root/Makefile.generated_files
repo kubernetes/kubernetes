@@ -205,9 +205,9 @@ $(foreach dir, $(PRERELEASE_LIFECYCLE_DIRS), $(eval                            \
 $(META_DIR)/$(PRERELEASE_LIFECYCLE_GEN).todo: $(PRERELEASE_LIFECYCLE_FILES)
 
 $(PRERELEASE_LIFECYCLE_FILES): $(PRERELEASE_LIFECYCLE_GEN)
-	if [[ "$(DBG_CODEGEN)" == 1 ]]; then        \
+	if [[ "$(DBG_CODEGEN)" == 1 ]]; then                 \
 	    echo "DBG: prerelease-lifecycle needed $(@D):";  \
-	    ls -lf --full-time $@ $? || true;       \
+	    ls -lf --full-time $@ $? || true;                \
 	fi
 	echo $(PRJ_SRC_PATH)/$(@D) >> $(META_DIR)/$(PRERELEASE_LIFECYCLE_GEN).todo
 
@@ -300,9 +300,9 @@ $(foreach dir, $(DEEPCOPY_DIRS), $(eval                            \
 $(META_DIR)/$(DEEPCOPY_GEN).todo: $(DEEPCOPY_FILES)
 
 $(DEEPCOPY_FILES): $(DEEPCOPY_GEN)
-	if [[ "$(DBG_CODEGEN)" == 1 ]]; then        \
+	if [[ "$(DBG_CODEGEN)" == 1 ]]; then     \
 	    echo "DBG: deepcopy needed $(@D):";  \
-	    ls -lf --full-time $@ $? || true;       \
+	    ls -lf --full-time $@ $? || true;    \
 	fi
 	echo $(PRJ_SRC_PATH)/$(@D) >> $(META_DIR)/$(DEEPCOPY_GEN).todo
 
@@ -515,9 +515,9 @@ $(foreach dir, $(CONVERSION_DIRS), $(eval                            \
 $(META_DIR)/$(CONVERSION_GEN).todo: $(CONVERSION_FILES)
 
 $(CONVERSION_FILES): $(CONVERSION_GEN)
-	if [[ "$(DBG_CODEGEN)" == 1 ]]; then          \
+	if [[ "$(DBG_CODEGEN)" == 1 ]]; then       \
 	    echo "DBG: conversion needed $(@D):";  \
-	    ls -lf --full-time $@ $? || true;         \
+	    ls -lf --full-time $@ $? || true;      \
 	fi
 	echo $(PRJ_SRC_PATH)/$(@D) >> $(META_DIR)/$(CONVERSION_GEN).todo
 
