@@ -418,3 +418,9 @@
 - endpoint: replaceAutoscalingV2NamespacedHorizontalPodAutoscalerStatus
   reason: optional feature
   link: https://github.com/kubernetes/kubernetes/pull/106595#issuecomment-1006015756
+- endpoint: logFileHandler
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/issues/108675
+- endpoint: logFileListHandler
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/issues/108675
