@@ -452,8 +452,7 @@
           "strategy": {
             "$ref": "#/components/schemas/io.k8s.api.apps.v1.DeploymentStrategy",
             "default": {},
-            "description": "The deployment strategy to use to replace existing pods with new ones.",
-            "x-kubernetes-patch-strategy": "retainKeys"
+            "description": "The deployment strategy to use to replace existing pods with new ones."
           },
           "template": {
             "$ref": "#/components/schemas/io.k8s.api.core.v1.PodTemplateSpec",
@@ -534,7 +533,8 @@
             "type": "string"
           }
         },
-        "type": "object"
+        "type": "object",
+        "x-kubernetes-patch-strategy": "retainKeys"
       },
       "io.k8s.api.apps.v1.ReplicaSet": {
         "description": "ReplicaSet ensures that a specified number of pod replicas are running at any given time.",

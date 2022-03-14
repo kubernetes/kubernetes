@@ -3294,11 +3294,6 @@ func schema_k8sio_api_apps_v1_DeploymentSpec(ref common.ReferenceCallback) commo
 						},
 					},
 					"strategy": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-patch-strategy": "retainKeys",
-							},
-						},
 						SchemaProps: spec.SchemaProps{
 							Description: "The deployment strategy to use to replace existing pods with new ones.",
 							Default:     map[string]interface{}{},
@@ -3446,6 +3441,11 @@ func schema_k8sio_api_apps_v1_DeploymentStrategy(ref common.ReferenceCallback) c
 							Ref:         ref("k8s.io/api/apps/v1.RollingUpdateDeployment"),
 						},
 					},
+				},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-patch-strategy": "retainKeys",
 				},
 			},
 		},

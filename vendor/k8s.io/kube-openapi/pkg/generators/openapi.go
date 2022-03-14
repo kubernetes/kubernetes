@@ -48,8 +48,6 @@ const (
 // Used for temporary validation of patch struct tags.
 // TODO: Remove patch struct tag validation because they we are now consuming OpenAPI on server.
 var tempPatchTags = [...]string{
-	"patchMergeKey",
-	"patchStrategy",
 }
 
 func getOpenAPITagValue(comments []string) []string {
