@@ -1417,6 +1417,12 @@ func TestTransform(t *testing.T) {
 	crdGVR := schema.GroupVersionResource{Group: fooCRD.Spec.Group, Version: fooCRD.Spec.Versions[0].Name, Resource: "foos"}
 	crclient := dynamicClient.Resource(crdGVR).Namespace(testNamespace)
 
+	previousList, err := crclient.List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		t.Fatalf("failed to list CRs before test: %v", err)
+	}
+	previousRV := previousList.GetResourceVersion()
+
 	testcases := []struct {
 		name          string
 		accept        string
@@ -1957,21 +1963,29 @@ func TestTransform(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			rv, _ := strconv.Atoi(obj.GetResourceVersion())
-			if rv < 1 {
-				rv = 1
+			var rv string
+			if obj.GetResourceVersion() == "" || obj.GetResourceVersion() == "0" {
+				// no object was created in the preamble to the test, so get recent data
+				rv = "0"
+			} else {
+				// we created an object, and need to list+watch from some time before the creation to see it
+				rv = previousRV
 			}
 
+			ctx, cancel := context.WithTimeout(context.Background(), wait.ForeverTestTimeout)
+			t.Cleanup(func() {
+				cancel()
+			})
 			w, err := client.Get().
 				Resource(resource).NamespaceIfScoped(obj.GetNamespace(), len(obj.GetNamespace()) > 0).
 				SetHeader("Accept", tc.accept).
 				VersionedParams(&metav1.ListOptions{
-					ResourceVersion: strconv.Itoa(rv - 1),
+					ResourceVersion: rv,
 					Watch:           true,
 					FieldSelector:   fields.OneTermEqualSelector("metadata.name", obj.GetName()).String(),
 				}, metav1.ParameterCodec).
 				Param("includeObject", string(tc.includeObject)).
-				Stream(context.TODO())
+				Stream(ctx)
 			if (tc.wantErr != nil) != (err != nil) {
 				t.Fatalf("unexpected error: %v", err)
 			}
