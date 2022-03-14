@@ -637,7 +637,7 @@ func TestCelCompilation(t *testing.T) {
 
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
-			compilationResults, err := Compile(&tt.input, false)
+			compilationResults, err := Compile(&tt.input, false, PerCallLimit)
 			if err != nil {
 				t.Errorf("Expected no error, but got: %v", err)
 			}
