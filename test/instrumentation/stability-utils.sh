@@ -26,7 +26,7 @@ stability_check_setup() {
   kube::golang::verify_go_version
   kube::util::ensure-temp-dir
   cd "${KUBE_ROOT}"
-  kube::golang::setup_env
+  kube::golang::old::setup_env
 }
 
 function find_files_to_check() {

@@ -21,7 +21,7 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
-kube::golang::setup_env
+kube::golang::old::setup_env
 
 # run in module mode to match test command in readme.md
 export GO111MODULE=on

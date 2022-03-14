@@ -23,7 +23,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::util::ensure_clean_working_dir
 # This sets up the environment, like GOCACHE, which keeps the worktree cleaner.
-kube::golang::setup_env
+kube::golang::old::setup_env
 
 _tmpdir="$(kube::realpath "$(mktemp -d -t verify-internal-modules.XXXXXX)")"
 kube::util::trap_add "rm -rf ${_tmpdir:?}" EXIT
