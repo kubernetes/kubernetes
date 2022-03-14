@@ -28,7 +28,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 source "${KUBE_ROOT}/hack/lib/protoc.sh"
 
 kube::protoc::check_protoc
-kube::golang::setup_env
+kube::golang::old::setup_env
 
 GO111MODULE=on GOPROXY=off go install k8s.io/code-generator/cmd/go-to-protobuf
 GO111MODULE=on GOPROXY=off go install k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo

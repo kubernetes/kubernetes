@@ -27,7 +27,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 source "${KUBE_ROOT}/hack/lib/util.sh"
 
 # This sets up the environment, like GOCACHE, which keeps the worktree cleaner.
-kube::golang::setup_env
+kube::golang::old::setup_env
 kube::util::ensure-temp-dir
 
 ARTIFACTS="${ARTIFACTS:-${PWD}/_artifacts}"

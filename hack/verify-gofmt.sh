@@ -30,7 +30,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 cd "${KUBE_ROOT}"
 
-kube::golang::setup_env
+kube::golang::old::setup_env
 
 find_files() {
   find . -not \( \

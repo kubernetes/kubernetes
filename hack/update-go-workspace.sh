@@ -28,7 +28,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 # This sets up the environment, like GOCACHE, which keeps the worktree cleaner.
-kube::golang::setup_env
+kube::golang::new::setup_env
 export GO111MODULE=on
 
 cd "${KUBE_ROOT}"

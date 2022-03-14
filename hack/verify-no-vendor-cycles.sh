@@ -28,7 +28,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 export GO111MODULE=on
 
 kube::golang::verify_go_version
-kube::golang::setup_env
+kube::golang::old::setup_env
 
 staging_repos=()
 kube::util::read-array staging_repos < <(kube::util::list_staging_repos)
