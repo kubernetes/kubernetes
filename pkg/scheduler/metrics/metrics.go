@@ -173,6 +173,14 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		}, []string{"type"})
 
+	unschedulableReasons = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "unschedulable_pods",
+			Help:           "The number of unschedulable pods broken down by plugin name. A pod will increment the gauge for all plugins that caused it to not schedule and so this metric have meaning only when broken down by plugin.",
+			StabilityLevel: metrics.ALPHA,
+		}, []string{"plugin", "profile"})
+
 	metricsList = []metrics.Registerable{
 		scheduleAttempts,
 		e2eSchedulingLatency,
@@ -189,6 +197,7 @@ var (
 		SchedulerGoroutines,
 		PermitWaitDuration,
 		CacheSize,
+		unschedulableReasons,
 	}
 )
 
@@ -234,4 +243,8 @@ func UnschedulablePods() metrics.GaugeMetric {
 // SinceInSeconds gets the time since the specified start in seconds.
 func SinceInSeconds(start time.Time) float64 {
 	return time.Since(start).Seconds()
+}
+
+func UnschedulableReason(plugin string, profile string) metrics.GaugeMetric {
+	return unschedulableReasons.With(metrics.Labels{"plugin": plugin, "profile": profile})
 }
