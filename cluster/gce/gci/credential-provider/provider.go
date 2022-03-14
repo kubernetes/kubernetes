@@ -29,8 +29,6 @@ import (
 )
 
 const (
-	metadataToken = "http://metadata.google.internal./computeMetadata/v1/instance/service-accounts/default/token"
-	metadataEmail = "http://metadata.google.internal./computeMetadata/v1/instance/service-accounts/default/email"
 	maxReadLength = 10 * 1 << 20 // 10MB
 )
 
@@ -57,7 +55,8 @@ type TokenBlob struct {
 }
 
 type provider struct {
-	client *http.Client
+	client        *http.Client
+	tokenEndpoint string
 }
 
 func (p *provider) Provide(image string) (map[string]credentialproviderv1alpha1.AuthConfig, error) {
@@ -91,7 +90,7 @@ func readURL(url string, client *http.Client) (body []byte, err error) {
 		return nil, err
 	}
 
-	rea.Header = &http.Header{
+	req.Header = http.Header{
 		"Metadata-Flavor": []string{"Google"},
 	}
 
