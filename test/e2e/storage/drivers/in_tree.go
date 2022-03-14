@@ -1781,7 +1781,7 @@ func (a *awsDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTe
 
 func (a *awsDriver) CreateVolume(config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
 	zone := getInlineVolumeZone(config.Framework)
-	if volType == storageframework.InlineVolume {
+	if volType == storageframework.InlineVolume || volType == storageframework.PreprovisionedPV {
 		// PD will be created in framework.TestContext.CloudConfig.Zone zone,
 		// so pods should be also scheduled there.
 		config.ClientNodeSelection = e2epod.NodeSelection{
