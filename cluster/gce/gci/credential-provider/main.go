@@ -30,20 +30,23 @@ import (
 	credentialproviderv1alpha1 "k8s.io/kubelet/pkg/apis/credentialprovider/v1alpha1"
 )
 
+const metadataTokenEndpoint = "http://metadata.google.internal./computeMetadata/v1/instance/service-accounts/default/token"
+
 func main() {
-	if err := getCredentials(os.Stdout); err != nil {
+	if err := getCredentials(metadataTokenEndpoint, os.Stdin, os.Stdout); err != nil {
 		klog.Fatalf("failed to get credentials: %v", err)
 	}
 }
 
-func getCredentials(w io.Writer) error {
+func getCredentials(tokenEndpoint string, r io.Reader, w io.Writer) error {
 	provider := &provider{
 		client: &http.Client{
 			Timeout: 10 * time.Second,
 		},
+		tokenEndpoint: tokenEndpoint,
 	}
 
-	data, err := ioutil.ReadAll(os.Stdin)
+	data, err := ioutil.ReadAll(r)
 	if err != nil {
 		return err
 	}
