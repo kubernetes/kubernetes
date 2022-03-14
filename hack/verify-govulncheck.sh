@@ -25,7 +25,7 @@ source "${KUBE_ROOT}/hack/lib/util.sh"
 kube::util::ensure_clean_working_dir
 
 # This sets up the environment, like GOCACHE, which keeps the worktree cleaner.
-kube::golang::setup_env
+kube::golang::old::setup_env
 # Opt into using go modules
 export GO111MODULE=on
 
