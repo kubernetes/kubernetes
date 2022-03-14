@@ -178,6 +178,9 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&s.StorageConfig.HealthcheckTimeout, "etcd-healthcheck-timeout", s.StorageConfig.HealthcheckTimeout,
 		"The timeout to use when checking etcd health.")
 
+	fs.IntVar(&s.StorageConfig.MaximumListEtcdLimit, "default-maximum-list-etcd-limit", s.StorageConfig.MaximumListEtcdLimit,
+		"Maximum list etcd page size limit. If zero, the limit is unbounded")
+
 	fs.Int64Var(&s.StorageConfig.LeaseManagerConfig.ReuseDurationSeconds, "lease-reuse-duration-seconds", s.StorageConfig.LeaseManagerConfig.ReuseDurationSeconds,
 		"The time in seconds that each lease is reused. A lower value could avoid large number of objects reusing the same lease. Notice that a too small value may cause performance problems at storage layer.")
 }
