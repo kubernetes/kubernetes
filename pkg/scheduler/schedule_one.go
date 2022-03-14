@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"os"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -789,13 +790,19 @@ func (sched *Scheduler) extendersBinding(pod *v1.Pod, node string) (bool, error)
 func (sched *Scheduler) finishBinding(fwk framework.Framework, assumed *v1.Pod, targetNode string, err error) {
 	if finErr := sched.Cache.FinishBinding(assumed); finErr != nil {
 		klog.ErrorS(finErr, "Scheduler cache FinishBinding failed")
+		// We're generating event to test the wrong scheduling scenario when the cache is out of sync.
+		fwk.EventRecorder().Eventf(assumed, nil, v1.EventTypeWarning, "Scheduled", "Binding", "Failed updating cache assigned %v/%v to %v", assumed.Namespace, assumed.Name, targetNode)
 	}
 	if err != nil {
 		klog.V(1).InfoS("Failed to bind pod", "pod", klog.KObj(assumed))
 		return
 	}
 
-	fwk.EventRecorder().Eventf(assumed, nil, v1.EventTypeNormal, "Scheduled", "Binding", "Successfully assigned %v/%v to %v", assumed.Namespace, assumed.Name, targetNode)
+	name, err := os.Hostname()
+	if err != nil {
+		klog.V(1).Info("Failed to get host name")
+	}
+	fwk.EventRecorder().Eventf(assumed, nil, v1.EventTypeNormal, "Scheduled", "Binding", "Successfully assigned %v/%v to %v by %v", assumed.Namespace, assumed.Name, targetNode, name)
 }
 
 func getAttemptsLabel(p *framework.QueuedPodInfo) string {
