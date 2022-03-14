@@ -288,7 +288,7 @@ type UncountedTerminatedPods struct {
 
 type JobConditionType string
 
-// These are valid conditions of a job.
+// These are built-in conditions of a job.
 const (
 	// JobSuspended means the job has been suspended.
 	JobSuspended JobConditionType = "Suspended"
