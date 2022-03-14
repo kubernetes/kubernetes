@@ -185,14 +185,14 @@ func (s *Validator) validateExpressions(fldPath *field.Path, sts *schema.Structu
 				// been bypassed. int-or-string is typed as dynamic and so bypasses compiler type checking.
 				errs = append(errs, field.Invalid(fldPath, obj, fmt.Sprintf("'%v': call arguments did not match a supported operator, function or macro signature for rule: %v", err, ruleErrorString(rule))))
 			} else if strings.HasPrefix(err.Error(), "operation cancelled: actual cost limit exceeded") {
-				errs = append(errs, field.Invalid(fldPath, obj, fmt.Sprintf("'%v': call cost exceeds limit for rule: %v", err, ruleErrorString(rule))))
+				errs = append(errs, field.Invalid(fldPath, obj, fmt.Sprintf("'%v': no further validation rules will be run due to call cost exceeds limit for rule: %v", err, ruleErrorString(rule))))
+				return errs, -1
 			} else {
 				// no such key: {key}, index out of bounds: {index}, integer overflow, division by zero, ...
 				errs = append(errs, field.Invalid(fldPath, obj, fmt.Sprintf("%v evaluating rule: %v", err, ruleErrorString(rule))))
 			}
 			continue
 		}
-
 		if evalResult != types.True {
 			if len(rule.Message) != 0 {
 				errs = append(errs, field.Invalid(fldPath, obj, rule.Message))
