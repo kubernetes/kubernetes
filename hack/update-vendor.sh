@@ -39,7 +39,7 @@ if [[ "${GOPROXY:-}" == "off" ]]; then
   exit 1
 fi
 
-kube::golang::setup_env
+kube::golang::new::setup_env
 kube::golang::verify_go_version
 kube::util::require-jq
 

@@ -27,7 +27,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 export GO111MODULE=on
 
 kube::golang::verify_go_version
-kube::golang::setup_env
+kube::golang::old::setup_env
 
 echo 'installing mockgen'
 pushd "${KUBE_ROOT}/hack/tools" >/dev/null

@@ -70,7 +70,7 @@ done
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../../../
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
-kube::golang::setup_env
+kube::golang::old::setup_env
 
 DIR_BASENAME=$(dirname "${BASH_SOURCE[0]}")
 pushd "${DIR_BASENAME}"

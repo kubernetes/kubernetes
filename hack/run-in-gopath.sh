@@ -28,7 +28,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 # This sets up a clean GOPATH and makes sure we are currently in it.
-kube::golang::setup_env
+kube::golang::old::setup_env
 
 # Run the user-provided command.
 "${@}"
