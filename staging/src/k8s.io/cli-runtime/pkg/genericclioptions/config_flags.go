@@ -22,7 +22,6 @@ import (
 	"regexp"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/spf13/pflag"
 
@@ -282,10 +281,9 @@ func (f *ConfigFlags) toDiscoveryClient() (discovery.CachedDiscoveryInterface, e
 	if f.CacheDir != nil {
 		cacheDir = *f.CacheDir
 	}
-	httpCacheDir := filepath.Join(cacheDir, "http")
 	discoveryCacheDir := computeDiscoverCacheDir(filepath.Join(cacheDir, "discovery"), config.Host)
 
-	return diskcached.NewCachedDiscoveryClientForConfig(config, discoveryCacheDir, httpCacheDir, time.Duration(6*time.Hour))
+	return diskcached.NewCachedDiscoveryClientForConfig(config, discoveryCacheDir)
 }
 
 // ToRESTMapper returns a mapper.

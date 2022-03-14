@@ -24,7 +24,6 @@ import (
 	"reflect"
 	"strings"
 	"testing"
-	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
@@ -169,7 +168,7 @@ func TestServerSidePrint(t *testing.T) {
 		os.Remove(cacheDir)
 	}()
 
-	cachedClient, err := diskcached.NewCachedDiscoveryClientForConfig(restConfig, cacheDir, "", time.Duration(10*time.Minute))
+	cachedClient, err := diskcached.NewCachedDiscoveryClientForConfig(restConfig, cacheDir)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

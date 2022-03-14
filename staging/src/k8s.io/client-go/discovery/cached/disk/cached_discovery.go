@@ -17,13 +17,15 @@ limitations under the License.
 package disk
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
-	"time"
 
 	openapi_v2 "github.com/googleapis/gnostic/openapiv2"
 	"k8s.io/klog/v2"
@@ -44,9 +46,6 @@ type CachedDiscoveryClient struct {
 	// cacheDirectory is the directory where discovery docs are held.  It must be unique per host:port combination to work well.
 	cacheDirectory string
 
-	// ttl is how long the cache should be considered valid
-	ttl time.Duration
-
 	// mutex protects the variables below
 	mutex sync.Mutex
 
@@ -56,6 +55,12 @@ type CachedDiscoveryClient struct {
 	invalidated bool
 	// fresh is true if all used cache files were ours
 	fresh bool
+	// etag is the calculated etag value of whole openAPI spec.
+	// If something is changed in openAPI spec, this will be used to invalidate cache.
+	etag string
+	// openAPIEndpoint is used for discriminate between openapi/v2 or openapi/v3 endpoints are enabled in cluster.
+	// Eventually after moving to openapi/v3, there will be no more need for this.
+	openAPIEndpoint string
 }
 
 var _ discovery.CachedDiscoveryInterface = &CachedDiscoveryClient{}
@@ -63,13 +68,15 @@ var _ discovery.CachedDiscoveryInterface = &CachedDiscoveryClient{}
 // ServerResourcesForGroupVersion returns the supported resources for a group and version.
 func (d *CachedDiscoveryClient) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
 	filename := filepath.Join(d.cacheDirectory, groupVersion, "serverresources.json")
-	cachedBytes, err := d.getCachedFile(filename)
-	// don't fail on errors, we either don't have a file or won't be able to run the cached check. Either way we can fallback.
-	if err == nil {
-		cachedResources := &metav1.APIResourceList{}
-		if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), cachedBytes, cachedResources); err == nil {
-			klog.V(10).Infof("returning cached discovery info from %v", filename)
-			return cachedResources, nil
+	if change, err := d.checkETagChange(); !change && err == nil {
+		cachedBytes, err := d.getCachedFile(filename)
+		// don't fail on errors, we either don't have a file or won't be able to run the cached check. Either way we can fallback.
+		if err == nil {
+			cachedResources := &metav1.APIResourceList{}
+			if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), cachedBytes, cachedResources); err == nil {
+				klog.V(10).Infof("returning cached discovery info from %v", filename)
+				return cachedResources, nil
+			}
 		}
 	}
 
@@ -106,13 +113,15 @@ func (d *CachedDiscoveryClient) ServerGroupsAndResources() ([]*metav1.APIGroup, 
 // preferred version.
 func (d *CachedDiscoveryClient) ServerGroups() (*metav1.APIGroupList, error) {
 	filename := filepath.Join(d.cacheDirectory, "servergroups.json")
-	cachedBytes, err := d.getCachedFile(filename)
-	// don't fail on errors, we either don't have a file or won't be able to run the cached check. Either way we can fallback.
-	if err == nil {
-		cachedGroups := &metav1.APIGroupList{}
-		if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), cachedBytes, cachedGroups); err == nil {
-			klog.V(10).Infof("returning cached discovery info from %v", filename)
-			return cachedGroups, nil
+	if change, err := d.checkETagChange(); !change && err == nil {
+		cachedBytes, err := d.getCachedFile(filename)
+		// don't fail on errors, we either don't have a file or won't be able to run the cached check. Either way we can fallback.
+		if err == nil {
+			cachedGroups := &metav1.APIGroupList{}
+			if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), cachedBytes, cachedGroups); err == nil {
+				klog.V(10).Infof("returning cached discovery info from %v", filename)
+				return cachedGroups, nil
+			}
 		}
 	}
 
@@ -148,15 +157,6 @@ func (d *CachedDiscoveryClient) getCachedFile(filename string) ([]byte, error) {
 		return nil, err
 	}
 	defer file.Close()
-
-	fileInfo, err := file.Stat()
-	if err != nil {
-		return nil, err
-	}
-
-	if time.Now().After(fileInfo.ModTime().Add(d.ttl)) {
-		return nil, errors.New("cache expired")
-	}
 
 	// the cache is present and its valid.  Try to read and use it.
 	cachedBytes, err := ioutil.ReadAll(file)
@@ -212,6 +212,155 @@ func (d *CachedDiscoveryClient) writeCachedFile(filename string, obj runtime.Obj
 	return err
 }
 
+func (d *CachedDiscoveryClient) writeEtag(filename, data string) error {
+	if data == "" {
+		return nil
+	}
+
+	if err := os.MkdirAll(filepath.Dir(filename), 0750); err != nil {
+		return err
+	}
+
+	f, err := ioutil.TempFile(filepath.Dir(filename), filepath.Base(filename)+".")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(f.Name())
+	_, err = f.Write([]byte(data))
+	if err != nil {
+		return err
+	}
+
+	err = os.Chmod(f.Name(), 0660)
+	if err != nil {
+		return err
+	}
+
+	name := f.Name()
+	err = f.Close()
+	if err != nil {
+		return err
+	}
+
+	// atomic rename
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+	err = os.Rename(name, filename)
+	d.etag = data
+
+	return err
+}
+
+func (d *CachedDiscoveryClient) getEtag(filename string) string {
+	if d.etag != "" {
+		return d.etag
+	}
+
+	if d.invalidated {
+		return ""
+	}
+
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+	file, err := os.Open(filename)
+	if err != nil {
+		return ""
+	}
+	defer file.Close()
+
+	cachedEtagBytes, err := ioutil.ReadAll(file)
+	if err != nil {
+		return ""
+	}
+	d.fresh = true
+
+	return string(cachedEtagBytes)
+}
+
+func (d *CachedDiscoveryClient) setOpenAPIEndpoint(e string) {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+	d.openAPIEndpoint = e
+}
+
+func (d *CachedDiscoveryClient) setEtag(etag string) {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+	d.etag = etag
+}
+
+// checkETagChange checks the stored in memory or in local file etag
+// with the up to date etag which is gotten from open API endpoint.
+// If the etag is not changed, openapi endpoint will return 304 instead
+// all data. Thus, we can safely rely on our local files.
+// If the etag is changed, openAPI endpoint will return 200 status code
+// and we need to invalidate all local cache to re-fetch everything from scratch.
+func (d *CachedDiscoveryClient) checkETagChange() (bool, error) {
+	if d.openAPIEndpoint == "" {
+		openapiEndpointFile := filepath.Join(d.cacheDirectory, "openapi_endpoint.json")
+		d.setOpenAPIEndpoint(d.getEtag(openapiEndpointFile))
+
+		if d.openAPIEndpoint == "" {
+			res, err := d.RESTClient().Get().AbsPath("/").Do(context.TODO()).Raw()
+			if err != nil {
+				return true, err
+			}
+			if strings.Contains(string(res), "/openapi/v3") {
+				d.setOpenAPIEndpoint("v3")
+			} else if strings.Contains(string(res), "/openapi/v2") {
+				d.setOpenAPIEndpoint("v2")
+			} else {
+				klog.V(10).Infof("openapi endpoint is not enabled for this cluster")
+				return true, nil
+			}
+			err = d.writeEtag(openapiEndpointFile, d.openAPIEndpoint)
+			if err != nil {
+				klog.V(10).Infof("openapi endpoint file write error", err)
+				return true, err
+			}
+		}
+	}
+
+	client := d.RESTClient().(*restclient.RESTClient).Client
+	u := d.RESTClient().Get().AbsPath("openapi", d.openAPIEndpoint).URL()
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return true, err
+	}
+
+	etags := filepath.Join(d.cacheDirectory, "etags.json")
+	d.setEtag(d.getEtag(etags))
+
+	if d.etag != "" {
+		req.Header.Set("If-None-Match", fmt.Sprintf(`"%s"`, d.etag))
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		klog.Infof("openapi spec retrieval error", err)
+		return true, err
+	}
+	defer resp.Body.Close()
+	switch resp.StatusCode {
+	case http.StatusNotModified:
+		return false, nil
+	case http.StatusOK:
+		{
+			if newEtag := resp.Header.Get("Etag"); newEtag != "" {
+				err := d.writeEtag(etags, strings.Trim(newEtag, `"`))
+				if err != nil {
+					klog.V(10).Infof("etag file write error", err)
+					return true, err
+				}
+			}
+			return true, nil
+		}
+	default:
+		klog.V(10).Infof("%s endpoint returned unknown status %d", d.openAPIEndpoint, resp.StatusCode)
+		return true, nil
+	}
+}
+
 // RESTClient returns a RESTClient that is used to communicate with API server
 // by this client implementation.
 func (d *CachedDiscoveryClient) RESTClient() restclient.Interface {
@@ -257,6 +406,8 @@ func (d *CachedDiscoveryClient) Invalidate() {
 	d.ourFiles = map[string]struct{}{}
 	d.fresh = true
 	d.invalidated = true
+	d.etag = ""
+	d.openAPIEndpoint = ""
 }
 
 // NewCachedDiscoveryClientForConfig creates a new DiscoveryClient for the given config, and wraps
@@ -268,30 +419,20 @@ func (d *CachedDiscoveryClient) Invalidate() {
 // CachedDiscoveryClient cache data. If httpCacheDir is empty, the restconfig's transport will not
 // be updated with a roundtripper that understands cache responses.
 // If discoveryCacheDir is empty, cached server resource data will be looked up in the current directory.
-func NewCachedDiscoveryClientForConfig(config *restclient.Config, discoveryCacheDir, httpCacheDir string, ttl time.Duration) (*CachedDiscoveryClient, error) {
-	if len(httpCacheDir) > 0 {
-		// update the given restconfig with a custom roundtripper that
-		// understands how to handle cache responses.
-		config = restclient.CopyConfig(config)
-		config.Wrap(func(rt http.RoundTripper) http.RoundTripper {
-			return newCacheRoundTripper(httpCacheDir, rt)
-		})
-	}
-
+func NewCachedDiscoveryClientForConfig(config *restclient.Config, discoveryCacheDir string) (*CachedDiscoveryClient, error) {
 	discoveryClient, err := discovery.NewDiscoveryClientForConfig(config)
 	if err != nil {
 		return nil, err
 	}
 
-	return newCachedDiscoveryClient(discoveryClient, discoveryCacheDir, ttl), nil
+	return newCachedDiscoveryClient(discoveryClient, discoveryCacheDir), nil
 }
 
 // NewCachedDiscoveryClient creates a new DiscoveryClient.  cacheDirectory is the directory where discovery docs are held.  It must be unique per host:port combination to work well.
-func newCachedDiscoveryClient(delegate discovery.DiscoveryInterface, cacheDirectory string, ttl time.Duration) *CachedDiscoveryClient {
+func newCachedDiscoveryClient(delegate discovery.DiscoveryInterface, cacheDirectory string) *CachedDiscoveryClient {
 	return &CachedDiscoveryClient{
 		delegate:       delegate,
 		cacheDirectory: cacheDirectory,
-		ttl:            ttl,
 		ourFiles:       map[string]struct{}{},
 		fresh:          true,
 	}

@@ -22,7 +22,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
@@ -602,7 +601,7 @@ func (f *TestFactory) DiscoveryClient() (discovery.CachedDiscoveryInterface, err
 	fakeClient := f.Client.(*fake.RESTClient)
 
 	cacheDir := filepath.Join("", ".kube", "cache", "discovery")
-	cachedClient, err := diskcached.NewCachedDiscoveryClientForConfig(f.ClientConfigVal, cacheDir, "", time.Duration(10*time.Minute))
+	cachedClient, err := diskcached.NewCachedDiscoveryClientForConfig(f.ClientConfigVal, cacheDir)
 	if err != nil {
 		return nil, err
 	}

@@ -21,7 +21,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
 	openapi_v2 "github.com/googleapis/gnostic/openapiv2"
 	"github.com/stretchr/testify/assert"
@@ -35,68 +34,6 @@ import (
 	"k8s.io/client-go/rest/fake"
 )
 
-func TestCachedDiscoveryClient_Fresh(t *testing.T) {
-	assert := assert.New(t)
-
-	d, err := ioutil.TempDir("", "")
-	assert.NoError(err)
-	defer os.RemoveAll(d)
-
-	c := fakeDiscoveryClient{}
-	cdc := newCachedDiscoveryClient(&c, d, 60*time.Second)
-	assert.True(cdc.Fresh(), "should be fresh after creation")
-
-	cdc.ServerGroups()
-	assert.True(cdc.Fresh(), "should be fresh after groups call without cache")
-	assert.Equal(c.groupCalls, 1)
-
-	cdc.ServerGroups()
-	assert.True(cdc.Fresh(), "should be fresh after another groups call")
-	assert.Equal(c.groupCalls, 1)
-
-	cdc.ServerResources()
-	assert.True(cdc.Fresh(), "should be fresh after resources call")
-	assert.Equal(c.resourceCalls, 1)
-
-	cdc.ServerResources()
-	assert.True(cdc.Fresh(), "should be fresh after another resources call")
-	assert.Equal(c.resourceCalls, 1)
-
-	cdc = newCachedDiscoveryClient(&c, d, 60*time.Second)
-	cdc.ServerGroups()
-	assert.False(cdc.Fresh(), "should NOT be fresh after recreation with existing groups cache")
-	assert.Equal(c.groupCalls, 1)
-
-	cdc.ServerResources()
-	assert.False(cdc.Fresh(), "should NOT be fresh after recreation with existing resources cache")
-	assert.Equal(c.resourceCalls, 1)
-
-	cdc.Invalidate()
-	assert.True(cdc.Fresh(), "should be fresh after cache invalidation")
-
-	cdc.ServerResources()
-	assert.True(cdc.Fresh(), "should ignore existing resources cache after invalidation")
-	assert.Equal(c.resourceCalls, 2)
-}
-
-func TestNewCachedDiscoveryClient_TTL(t *testing.T) {
-	assert := assert.New(t)
-
-	d, err := ioutil.TempDir("", "")
-	assert.NoError(err)
-	defer os.RemoveAll(d)
-
-	c := fakeDiscoveryClient{}
-	cdc := newCachedDiscoveryClient(&c, d, 1*time.Nanosecond)
-	cdc.ServerGroups()
-	assert.Equal(c.groupCalls, 1)
-
-	time.Sleep(1 * time.Second)
-
-	cdc.ServerGroups()
-	assert.Equal(c.groupCalls, 2)
-}
-
 func TestNewCachedDiscoveryClient_PathPerm(t *testing.T) {
 	assert := assert.New(t)
 
@@ -106,7 +43,7 @@ func TestNewCachedDiscoveryClient_PathPerm(t *testing.T) {
 	defer os.RemoveAll(d)
 
 	c := fakeDiscoveryClient{}
-	cdc := newCachedDiscoveryClient(&c, d, 1*time.Nanosecond)
+	cdc := newCachedDiscoveryClient(&c, d)
 	cdc.ServerGroups()
 
 	err = filepath.Walk(d, func(path string, info os.FileInfo, err error) error {
