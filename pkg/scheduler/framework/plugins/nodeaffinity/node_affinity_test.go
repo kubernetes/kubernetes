@@ -18,12 +18,12 @@ package nodeaffinity
 
 import (
 	"context"
-	"reflect"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
@@ -33,13 +33,15 @@ import (
 // TODO: Add test case for RequiredDuringSchedulingRequiredDuringExecution after it's implemented.
 func TestNodeAffinity(t *testing.T) {
 	tests := []struct {
-		name             string
-		pod              *v1.Pod
-		labels           map[string]string
-		nodeName         string
-		wantStatus       *framework.Status
-		args             config.NodeAffinityArgs
-		disablePreFilter bool
+		name                string
+		pod                 *v1.Pod
+		labels              map[string]string
+		nodeName            string
+		wantStatus          *framework.Status
+		wantPreFilterStatus *framework.Status
+		wantPreFilterResult *framework.PreFilterResult
+		args                config.NodeAffinityArgs
+		disablePreFilter    bool
 	}{
 		{
 			name: "no selector",
@@ -513,7 +515,7 @@ func TestNodeAffinity(t *testing.T) {
 											{
 												Key:      metav1.ObjectNameField,
 												Operator: v1.NodeSelectorOpIn,
-												Values:   []string{"node_1"},
+												Values:   []string{"node1"},
 											},
 										},
 									},
@@ -523,7 +525,8 @@ func TestNodeAffinity(t *testing.T) {
 					},
 				},
 			},
-			nodeName: "node_1",
+			nodeName:            "node1",
+			wantPreFilterResult: &framework.PreFilterResult{NodeNames: sets.NewString("node1")},
 		},
 		{
 			name: "Pod with matchFields using In operator that does not match the existing node",
@@ -538,7 +541,7 @@ func TestNodeAffinity(t *testing.T) {
 											{
 												Key:      metav1.ObjectNameField,
 												Operator: v1.NodeSelectorOpIn,
-												Values:   []string{"node_1"},
+												Values:   []string{"node1"},
 											},
 										},
 									},
@@ -548,8 +551,9 @@ func TestNodeAffinity(t *testing.T) {
 					},
 				},
 			},
-			nodeName:   "node_2",
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
+			nodeName:            "node2",
+			wantStatus:          framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
+			wantPreFilterResult: &framework.PreFilterResult{NodeNames: sets.NewString("node1")},
 		},
 		{
 			name: "Pod with two terms: matchFields does not match, but matchExpressions matches",
@@ -564,7 +568,7 @@ func TestNodeAffinity(t *testing.T) {
 											{
 												Key:      metav1.ObjectNameField,
 												Operator: v1.NodeSelectorOpIn,
-												Values:   []string{"node_1"},
+												Values:   []string{"node1"},
 											},
 										},
 									},
@@ -583,7 +587,7 @@ func TestNodeAffinity(t *testing.T) {
 					},
 				},
 			},
-			nodeName: "node_2",
+			nodeName: "node2",
 			labels:   map[string]string{"foo": "bar"},
 		},
 		{
@@ -599,7 +603,7 @@ func TestNodeAffinity(t *testing.T) {
 											{
 												Key:      metav1.ObjectNameField,
 												Operator: v1.NodeSelectorOpIn,
-												Values:   []string{"node_1"},
+												Values:   []string{"node1"},
 											},
 										},
 										MatchExpressions: []v1.NodeSelectorRequirement{
@@ -616,9 +620,10 @@ func TestNodeAffinity(t *testing.T) {
 					},
 				},
 			},
-			nodeName:   "node_2",
-			labels:     map[string]string{"foo": "bar"},
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
+			nodeName:            "node2",
+			labels:              map[string]string{"foo": "bar"},
+			wantPreFilterResult: &framework.PreFilterResult{NodeNames: sets.NewString("node1")},
+			wantStatus:          framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
 		},
 		{
 			name: "Pod with one term: both matchFields and matchExpressions match",
@@ -633,7 +638,7 @@ func TestNodeAffinity(t *testing.T) {
 											{
 												Key:      metav1.ObjectNameField,
 												Operator: v1.NodeSelectorOpIn,
-												Values:   []string{"node_1"},
+												Values:   []string{"node1"},
 											},
 										},
 										MatchExpressions: []v1.NodeSelectorRequirement{
@@ -650,8 +655,9 @@ func TestNodeAffinity(t *testing.T) {
 					},
 				},
 			},
-			nodeName: "node_1",
-			labels:   map[string]string{"foo": "bar"},
+			nodeName:            "node1",
+			labels:              map[string]string{"foo": "bar"},
+			wantPreFilterResult: &framework.PreFilterResult{NodeNames: sets.NewString("node1")},
 		},
 		{
 			name: "Pod with two terms: both matchFields and matchExpressions do not match",
@@ -666,7 +672,7 @@ func TestNodeAffinity(t *testing.T) {
 											{
 												Key:      metav1.ObjectNameField,
 												Operator: v1.NodeSelectorOpIn,
-												Values:   []string{"node_1"},
+												Values:   []string{"node1"},
 											},
 										},
 									},
@@ -685,9 +691,77 @@ func TestNodeAffinity(t *testing.T) {
 					},
 				},
 			},
-			nodeName:   "node_2",
+			nodeName:   "node2",
 			labels:     map[string]string{"foo": "bar"},
 			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
+		},
+		{
+			name: "Pod with two terms of node.Name affinity",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchFields: []v1.NodeSelectorRequirement{
+											{
+												Key:      metav1.ObjectNameField,
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"node1"},
+											},
+										},
+									},
+									{
+										MatchFields: []v1.NodeSelectorRequirement{
+											{
+												Key:      metav1.ObjectNameField,
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"node2"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			nodeName:            "node2",
+			wantPreFilterResult: &framework.PreFilterResult{NodeNames: sets.NewString("node1", "node2")},
+		},
+		{
+			name: "Pod with two conflicting mach field requirements",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchFields: []v1.NodeSelectorRequirement{
+											{
+												Key:      metav1.ObjectNameField,
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"node1"},
+											},
+											{
+												Key:      metav1.ObjectNameField,
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"node2"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			nodeName:            "node2",
+			labels:              map[string]string{"foo": "bar"},
+			wantPreFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, errReasonConflict),
+			wantStatus:          framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
 		},
 		{
 			name: "Matches added affinity and Pod's node affinity",
@@ -712,7 +786,7 @@ func TestNodeAffinity(t *testing.T) {
 					},
 				},
 			},
-			nodeName: "node_2",
+			nodeName: "node2",
 			labels:   map[string]string{"zone": "foo"},
 			args: config.NodeAffinityArgs{
 				AddedAffinity: &v1.NodeAffinity{
@@ -721,7 +795,7 @@ func TestNodeAffinity(t *testing.T) {
 							MatchFields: []v1.NodeSelectorRequirement{{
 								Key:      metav1.ObjectNameField,
 								Operator: v1.NodeSelectorOpIn,
-								Values:   []string{"node_2"},
+								Values:   []string{"node2"},
 							}},
 						}},
 					},
@@ -751,7 +825,7 @@ func TestNodeAffinity(t *testing.T) {
 					},
 				},
 			},
-			nodeName: "node_2",
+			nodeName: "node2",
 			labels:   map[string]string{"zone": "foo"},
 			args: config.NodeAffinityArgs{
 				AddedAffinity: &v1.NodeAffinity{
@@ -760,7 +834,7 @@ func TestNodeAffinity(t *testing.T) {
 							MatchFields: []v1.NodeSelectorRequirement{{
 								Key:      metav1.ObjectNameField,
 								Operator: v1.NodeSelectorOpIn,
-								Values:   []string{"node_2"},
+								Values:   []string{"node2"},
 							}},
 						}},
 					},
@@ -771,7 +845,7 @@ func TestNodeAffinity(t *testing.T) {
 		{
 			name:     "Doesn't match added affinity",
 			pod:      &v1.Pod{},
-			nodeName: "node_2",
+			nodeName: "node2",
 			labels:   map[string]string{"zone": "foo"},
 			args: config.NodeAffinityArgs{
 				AddedAffinity: &v1.NodeAffinity{
@@ -855,14 +929,17 @@ func TestNodeAffinity(t *testing.T) {
 			state := framework.NewCycleState()
 			var gotStatus *framework.Status
 			if !test.disablePreFilter {
-				_, gotStatus = p.(framework.PreFilterPlugin).PreFilter(context.Background(), state, test.pod)
-				if !gotStatus.IsSuccess() {
-					t.Errorf("unexpected error: %v", gotStatus)
+				gotPreFilterResult, gotStatus := p.(framework.PreFilterPlugin).PreFilter(context.Background(), state, test.pod)
+				if diff := cmp.Diff(test.wantPreFilterStatus, gotStatus); diff != "" {
+					t.Errorf("unexpected PreFilter Status (-want,+got):\n%s", diff)
+				}
+				if diff := cmp.Diff(test.wantPreFilterResult, gotPreFilterResult); diff != "" {
+					t.Errorf("unexpected PreFilterResult (-want,+got):\n%s", diff)
 				}
 			}
 			gotStatus = p.(framework.FilterPlugin).Filter(context.Background(), state, test.pod, nodeInfo)
-			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
-				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
+			if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
+				t.Errorf("unexpected Filter Status (-want,+got):\n%s", diff)
 			}
 		})
 	}
