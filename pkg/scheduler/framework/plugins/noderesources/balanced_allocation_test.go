@@ -376,7 +376,7 @@ func TestNodeResourcesBalancedAllocation(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			snapshot := cache.NewSnapshot(test.pods, test.nodes)
 			fh, _ := runtime.NewFramework(nil, nil, runtime.WithSnapshotSharedLister(snapshot))
-			p, _ := NewBalancedAllocation(&test.args, fh, feature.Features{EnablePodOverhead: true})
+			p, _ := NewBalancedAllocation(&test.args, fh, feature.Features{})
 			for i := range test.nodes {
 				hostResult, err := p.(framework.ScorePlugin).Score(context.Background(), nil, test.pod, test.nodes[i].Name)
 				if err != nil {

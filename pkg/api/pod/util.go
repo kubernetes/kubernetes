@@ -571,11 +571,6 @@ func dropDisabledFields(
 		})
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead) && !overheadInUse(oldPodSpec) {
-		// Set Overhead to nil only if the feature is disabled and it is not used
-		podSpec.Overhead = nil
-	}
-
 	dropDisabledProcMountField(podSpec, oldPodSpec)
 
 	dropDisabledCSIVolumeSourceAlphaFields(podSpec, oldPodSpec)
@@ -657,17 +652,6 @@ func ephemeralContainersInUse(podSpec *api.PodSpec) bool {
 		return false
 	}
 	return len(podSpec.EphemeralContainers) > 0
-}
-
-// overheadInUse returns true if the pod spec is non-nil and has Overhead set
-func overheadInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-	if podSpec.Overhead != nil {
-		return true
-	}
-	return false
 }
 
 // procMountInUse returns true if the pod spec is non-nil and has a SecurityContext's ProcMount field set to a non-default value

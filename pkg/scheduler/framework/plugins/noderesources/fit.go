@@ -78,7 +78,6 @@ var nodeResourceStrategyTypeMap = map[config.ScoringStrategyType]scorer{
 type Fit struct {
 	ignoredResources      sets.String
 	ignoredResourceGroups sets.String
-	enablePodOverhead     bool
 	handle                framework.Handle
 	resourceAllocationScorer
 }
@@ -126,7 +125,6 @@ func NewFit(plArgs runtime.Object, h framework.Handle, fts feature.Features) (fr
 	return &Fit{
 		ignoredResources:         sets.NewString(args.IgnoredResources...),
 		ignoredResourceGroups:    sets.NewString(args.IgnoredResourceGroups...),
-		enablePodOverhead:        fts.EnablePodOverhead,
 		handle:                   h,
 		resourceAllocationScorer: *scorePlugin(args),
 	}, nil
@@ -137,8 +135,7 @@ func NewFit(plArgs runtime.Object, h framework.Handle, fts feature.Features) (fr
 // the max in each dimension iteratively. In contrast, we sum the resource vectors for
 // regular containers since they run simultaneously.
 //
-// If Pod Overhead is specified and the feature gate is set, the resources defined for Overhead
-// are added to the calculated Resource request sum
+// The resources defined for Overhead should be added to the calculated Resource request sum
 //
 // Example:
 //
@@ -159,7 +156,7 @@ func NewFit(plArgs runtime.Object, h framework.Handle, fts feature.Features) (fr
 //       Memory: 1G
 //
 // Result: CPU: 3, Memory: 3G
-func computePodResourceRequest(pod *v1.Pod, enablePodOverhead bool) *preFilterState {
+func computePodResourceRequest(pod *v1.Pod) *preFilterState {
 	result := &preFilterState{}
 	for _, container := range pod.Spec.Containers {
 		result.Add(container.Resources.Requests)
@@ -171,7 +168,7 @@ func computePodResourceRequest(pod *v1.Pod, enablePodOverhead bool) *preFilterSt
 	}
 
 	// If Overhead is being utilized, add to the total requests for the pod
-	if pod.Spec.Overhead != nil && enablePodOverhead {
+	if pod.Spec.Overhead != nil {
 		result.Add(pod.Spec.Overhead)
 	}
 	return result
@@ -179,7 +176,7 @@ func computePodResourceRequest(pod *v1.Pod, enablePodOverhead bool) *preFilterSt
 
 // PreFilter invoked at the prefilter extension point.
 func (f *Fit) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
-	cycleState.Write(preFilterStateKey, computePodResourceRequest(pod, f.enablePodOverhead))
+	cycleState.Write(preFilterStateKey, computePodResourceRequest(pod))
 	return nil, nil
 }
 
@@ -248,8 +245,8 @@ type InsufficientResource struct {
 }
 
 // Fits checks if node have enough resources to host the pod.
-func Fits(pod *v1.Pod, nodeInfo *framework.NodeInfo, enablePodOverhead bool) []InsufficientResource {
-	return fitsRequest(computePodResourceRequest(pod, enablePodOverhead), nodeInfo, nil, nil)
+func Fits(pod *v1.Pod, nodeInfo *framework.NodeInfo) []InsufficientResource {
+	return fitsRequest(computePodResourceRequest(pod), nodeInfo, nil, nil)
 }
 
 func fitsRequest(podRequest *preFilterState, nodeInfo *framework.NodeInfo, ignoredExtendedResources, ignoredResourceGroups sets.String) []InsufficientResource {

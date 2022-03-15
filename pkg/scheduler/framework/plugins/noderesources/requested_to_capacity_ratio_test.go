@@ -121,7 +121,7 @@ func TestRequestedToCapacityRatioScoringStrategy(t *testing.T) {
 						Shape: shape,
 					},
 				},
-			}, fh, plfeature.Features{EnablePodOverhead: true})
+			}, fh, plfeature.Features{})
 
 			if diff := cmp.Diff(test.wantErrs.ToAggregate(), err, ignoreBadValueDetail); diff != "" {
 				t.Fatalf("got err (-want,+got):\n%s", diff)
@@ -340,7 +340,7 @@ func TestResourceBinPackingSingleExtended(t *testing.T) {
 					},
 				},
 			}
-			p, err := NewFit(&args, fh, feature.Features{EnablePodOverhead: true})
+			p, err := NewFit(&args, fh, feature.Features{})
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -588,7 +588,7 @@ func TestResourceBinPackingMultipleExtended(t *testing.T) {
 				},
 			}
 
-			p, err := NewFit(&args, fh, feature.Features{EnablePodOverhead: true})
+			p, err := NewFit(&args, fh, feature.Features{})
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
