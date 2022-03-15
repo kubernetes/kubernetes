@@ -27,10 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
-	"k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/utils/clock"
 	testingclock "k8s.io/utils/clock/testing"
@@ -154,9 +151,8 @@ func TestPodEvaluatorUsage(t *testing.T) {
 	deletionTimestampNotPastGracePeriod := metav1.NewTime(fakeClock.Now())
 
 	testCases := map[string]struct {
-		pod                *api.Pod
-		usage              corev1.ResourceList
-		podOverheadEnabled bool
+		pod   *api.Pod
+		usage corev1.ResourceList
 	}{
 		"init container CPU": {
 			pod: &api.Pod{
@@ -525,41 +521,11 @@ func TestPodEvaluatorUsage(t *testing.T) {
 				corev1.ResourceCPU:         resource.MustParse("2"),
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
 			},
-			podOverheadEnabled: true,
-		},
-		"do not count pod overhead as usage with pod overhead disabled": {
-			pod: &api.Pod{
-				Spec: api.PodSpec{
-					Overhead: api.ResourceList{
-						api.ResourceCPU: resource.MustParse("1"),
-					},
-					Containers: []api.Container{
-						{
-							Resources: api.ResourceRequirements{
-								Requests: api.ResourceList{
-									api.ResourceCPU: resource.MustParse("1"),
-								},
-								Limits: api.ResourceList{
-									api.ResourceCPU: resource.MustParse("2"),
-								},
-							},
-						},
-					},
-				},
-			},
-			usage: corev1.ResourceList{
-				corev1.ResourceRequestsCPU: resource.MustParse("1"),
-				corev1.ResourceLimitsCPU:   resource.MustParse("2"),
-				corev1.ResourcePods:        resource.MustParse("1"),
-				corev1.ResourceCPU:         resource.MustParse("1"),
-				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
-			},
-			podOverheadEnabled: false,
 		},
 	}
+	t.Parallel()
 	for testName, testCase := range testCases {
 		t.Run(testName, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodOverhead, testCase.podOverheadEnabled)()
 			actual, err := evaluator.Usage(testCase.pod)
 			if err != nil {
 				t.Error(err)

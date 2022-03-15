@@ -384,7 +384,7 @@ func TestLeastAllocatedScoringStrategy(t *testing.T) {
 						Type:      config.LeastAllocated,
 						Resources: test.resources,
 					},
-				}, fh, plfeature.Features{EnablePodOverhead: true})
+				}, fh, plfeature.Features{})
 
 			if diff := cmp.Diff(test.wantErrs.ToAggregate(), err, ignoreBadValueDetail); diff != "" {
 				t.Fatalf("got err (-want,+got):\n%s", diff)

@@ -31,10 +31,8 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/component-base/featuregate"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/features"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -321,21 +319,11 @@ func NewObjectInterfacesForTest() admission.ObjectInterfaces {
 }
 
 func newRuntimeClassForTest(
-	featureInspection bool,
 	addLister bool,
 	listerObject *nodev1.RuntimeClass,
 	addClient bool,
 	clientObject *nodev1.RuntimeClass) *RuntimeClass {
 	runtimeClass := NewRuntimeClass()
-
-	if featureInspection {
-		relevantFeatures := map[featuregate.Feature]featuregate.FeatureSpec{
-			features.PodOverhead: {Default: false},
-		}
-		fg := featuregate.NewFeatureGate()
-		fg.Add(relevantFeatures)
-		runtimeClass.InspectFeatureGates(fg)
-	}
 
 	if addLister {
 		informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
@@ -367,22 +355,17 @@ func TestValidateInitialization(t *testing.T) {
 		{
 			name:         "runtimeClass enabled, success",
 			expectError:  false,
-			runtimeClass: newRuntimeClassForTest(true, true, nil, true, nil),
-		},
-		{
-			name:         "runtimeClass enabled, no feature inspection",
-			expectError:  true,
-			runtimeClass: newRuntimeClassForTest(false, true, nil, true, nil),
+			runtimeClass: newRuntimeClassForTest(true, nil, true, nil),
 		},
 		{
 			name:         "runtimeClass enabled, no lister",
 			expectError:  true,
-			runtimeClass: newRuntimeClassForTest(true, false, nil, true, nil),
+			runtimeClass: newRuntimeClassForTest(false, nil, true, nil),
 		},
 		{
 			name:         "runtimeClass enabled, no client",
 			expectError:  true,
-			runtimeClass: newRuntimeClassForTest(true, true, nil, false, nil),
+			runtimeClass: newRuntimeClassForTest(true, nil, false, nil),
 		},
 	}
 
@@ -432,17 +415,17 @@ func TestAdmit(t *testing.T) {
 		{
 			name:         "runtimeClass found by lister",
 			expectError:  false,
-			runtimeClass: newRuntimeClassForTest(true, true, rc, true, nil),
+			runtimeClass: newRuntimeClassForTest(true, rc, true, nil),
 		},
 		{
 			name:         "runtimeClass found by client",
 			expectError:  false,
-			runtimeClass: newRuntimeClassForTest(true, true, nil, true, rc),
+			runtimeClass: newRuntimeClassForTest(true, nil, true, rc),
 		},
 		{
 			name:         "runtimeClass not found by lister nor client",
 			expectError:  true,
-			runtimeClass: newRuntimeClassForTest(true, true, nil, true, nil),
+			runtimeClass: newRuntimeClassForTest(true, nil, true, nil),
 		},
 	}
 
@@ -506,7 +489,6 @@ func TestValidate(t *testing.T) {
 		},
 	}
 	rt := NewRuntimeClass()
-	rt.podOverheadEnabled = true
 	o := NewObjectInterfacesForTest()
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
