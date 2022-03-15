@@ -175,7 +175,7 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 
 	// No potential victims are found, and so we don't need to evaluate the node again since its state didn't change.
 	if len(potentialVictims) == 0 {
-		message := fmt.Sprintf("No victims found on node %v for preemptor pod %v", nodeInfo.Node().Name, pod.Name)
+		message := fmt.Sprintf("No preemption victims found for incoming pod")
 		return nil, 0, framework.NewStatus(framework.UnschedulableAndUnresolvable, message)
 	}
 
