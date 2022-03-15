@@ -31,12 +31,14 @@ import (
 
 type HostNetworkService interface {
 	getNetworkByName(name string) (*hnsNetworkInfo, error)
+	getAllEndpointsByNetwork(networkName string) (map[string]*endpointsInfo, error)
 	getEndpointByID(id string) (*endpointsInfo, error)
 	getEndpointByIpAddress(ip string, networkName string) (*endpointsInfo, error)
 	getEndpointByName(id string) (*endpointsInfo, error)
 	createEndpoint(ep *endpointsInfo, networkName string) (*endpointsInfo, error)
 	deleteEndpoint(hnsID string) error
-	getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFlags, sourceVip string, vip string, protocol uint16, internalPort uint16, externalPort uint16) (*loadBalancerInfo, error)
+	getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFlags, sourceVip string, vip string, protocol uint16, internalPort uint16, externalPort uint16, previousLoadBalancers map[loadBalancerIdentifier]*loadBalancerInfo) (*loadBalancerInfo, error)
+	getAllLoadBalancers() (map[loadBalancerIdentifier]*loadBalancerInfo, error)
 	deleteLoadBalancer(hnsID string) error
 }
 
@@ -56,6 +58,41 @@ func (hns hnsV1) getNetworkByName(name string) (*hnsNetworkInfo, error) {
 		networkType: hnsnetwork.Type,
 	}, nil
 }
+
+func (hns hnsV1) getAllEndpointsByNetwork(networkName string) (map[string]*(endpointsInfo), error) {
+	hnsnetwork, err := hcsshim.GetHNSNetworkByName(networkName)
+	if err != nil {
+		klog.ErrorS(err, "failed to get HNS network by name", "name", networkName)
+		return nil, err
+	}
+	endpoints, err := hcsshim.HNSListEndpointRequest()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list endpoints: %w", err)
+	}
+	endpointInfos := make(map[string]*(endpointsInfo))
+	for _, endpoint := range endpoints {
+		if strings.EqualFold(endpoint.VirtualNetwork, hnsnetwork.Id) {
+			// Add to map with key endpoint ID or IP address
+			// Storing this is expensive in terms of memory, however there is a bug in Windows Server 2019 that can cause two endpoints to be created with the same IP address.
+			// TODO: Store by IP only and remove any lookups by endpoint ID.
+			endpointInfos[endpoint.Id] = &endpointsInfo{
+				ip:         endpoint.IPAddress.String(),
+				isLocal:    !endpoint.IsRemoteEndpoint,
+				macAddress: endpoint.MacAddress,
+				hnsID:      endpoint.Id,
+				hns:        hns,
+				// only ready and not terminating endpoints were added to HNS
+				ready:       true,
+				serving:     true,
+				terminating: false,
+			}
+			endpointInfos[endpoint.IPAddress.String()] = endpointInfos[endpoint.Id]
+		}
+	}
+	klog.V(3).InfoS("Queried endpoints from network", "network", networkName)
+	return endpointInfos, nil
+}
+
 func (hns hnsV1) getEndpointByID(id string) (*endpointsInfo, error) {
 	hnsendpoint, err := hcsshim.GetHNSEndpointByID(id)
 	if err != nil {
@@ -186,38 +223,48 @@ func (hns hnsV1) deleteEndpoint(hnsID string) error {
 	return err
 }
 
-func (hns hnsV1) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFlags, sourceVip string, vip string, protocol uint16, internalPort uint16, externalPort uint16) (*loadBalancerInfo, error) {
+func (hns hnsV1) getAllLoadBalancers() (map[loadBalancerIdentifier]*loadBalancerInfo, error) {
 	plists, err := hcsshim.HNSListPolicyListRequest()
+	var id loadBalancerIdentifier
 	if err != nil {
 		return nil, err
 	}
+	loadBalancers := make(map[loadBalancerIdentifier]*(loadBalancerInfo))
+	for _, plist := range plists {
+		// Validate if input meets any of the policy lists
+		lb := hcsshim.ELBPolicy{}
+		if err = json.Unmarshal(plist.Policies[0], &lb); err != nil {
+			continue
+		}
+		// Policy is ELB policy
+		portMap := lb.LBPolicy
+		if len(lb.VIPs) == 0 {
+			// Leave VIP uninitialized
+			id = loadBalancerIdentifier{protocol: uint16(portMap.Protocol), internalPort: portMap.InternalPort, externalPort: portMap.ExternalPort}
+		} else {
+			id = loadBalancerIdentifier{protocol: portMap.Protocol, internalPort: portMap.InternalPort, externalPort: portMap.ExternalPort, vip: lb.VIPs[0]}
+		}
+		loadBalancers[id] = &loadBalancerInfo{
+			hnsID: plist.ID,
+		}
+	}
+	return loadBalancers, nil
+}
 
+func (hns hnsV1) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFlags, sourceVip string, vip string, protocol uint16, internalPort uint16, externalPort uint16, previousLoadBalancers map[loadBalancerIdentifier]*loadBalancerInfo) (*loadBalancerInfo, error) {
 	if flags.isDSR {
 		klog.V(3).InfoS("DSR is not supported in V1. Using non DSR instead")
 	}
+	var id loadBalancerIdentifier
+	if len(vip) > 0 {
+		id = loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, vip: vip, endpointsCount: len(endpoints)}
+	} else {
+		id = loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, endpointsCount: len(endpoints)}
+	}
 
-	for _, plist := range plists {
-		if len(plist.EndpointReferences) != len(endpoints) {
-			continue
-		}
-		// Validate if input meets any of the policy lists
-		elbPolicy := hcsshim.ELBPolicy{}
-		if err = json.Unmarshal(plist.Policies[0], &elbPolicy); err != nil {
-			continue
-		}
-		if elbPolicy.Protocol == protocol && elbPolicy.InternalPort == internalPort && elbPolicy.ExternalPort == externalPort && elbPolicy.ILB == flags.isILB {
-			if len(vip) > 0 {
-				if len(elbPolicy.VIPs) == 0 || elbPolicy.VIPs[0] != vip {
-					continue
-				}
-			} else if len(elbPolicy.VIPs) != 0 {
-				continue
-			}
-			klog.V(1).InfoS("Found existing Hns loadbalancer policy resource", "policies", plist)
-			return &loadBalancerInfo{
-				hnsID: plist.ID,
-			}, nil
-		}
+	if lb, found := previousLoadBalancers[id]; found {
+		klog.V(1).InfoS("Found existing Hns loadbalancer policy resource", "policies", lb)
+		return lb, nil
 	}
 
 	var hnsEndpoints []hcsshim.HNSEndpoint
@@ -243,9 +290,12 @@ func (hns hnsV1) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFl
 	} else {
 		return nil, err
 	}
-	return &loadBalancerInfo{
+	lbInfo := &loadBalancerInfo{
 		hnsID: lb.ID,
-	}, err
+	}
+	// Add to map of load balancers
+	previousLoadBalancers[id] = lbInfo
+	return lbInfo, err
 }
 func (hns hnsV1) deleteLoadBalancer(hnsID string) error {
 	if len(hnsID) == 0 {
