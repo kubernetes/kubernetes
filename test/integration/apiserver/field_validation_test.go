@@ -507,7 +507,7 @@ func testFieldValidationPost(t *testing.T, client clientset.Interface) {
 		bodyBase               string
 		opts                   metav1.CreateOptions
 		contentType            string
-		strictDecodingErrors   []string
+		strictDecodingError    string
 		strictDecodingWarnings []string
 	}{
 		{
@@ -515,17 +515,8 @@ func testFieldValidationPost(t *testing.T, client clientset.Interface) {
 			opts: metav1.CreateOptions{
 				FieldValidation: "Strict",
 			},
-			bodyBase: invalidBodyJSON,
-			strictDecodingErrors: []string{
-				`unknown field "spec.unknown1"`,
-				`unknown field "spec.unknownDupe"`,
-				`duplicate field "spec.paused"`,
-				// note: fields that are both unknown
-				// and duplicated will only be detected
-				// as unknown for typed resources.
-				`unknown field "spec.template.spec.containers[0].unknownNested"`,
-				`duplicate field "spec.template.spec.containers[0].imagePullPolicy"`,
-			},
+			bodyBase:            invalidBodyJSON,
+			strictDecodingError: `strict decoding error: unknown field "spec.unknown1", unknown field "spec.unknownDupe", duplicate field "spec.paused", unknown field "spec.template.spec.containers[0].unknownNested", duplicate field "spec.template.spec.containers[0].imagePullPolicy"`,
 		},
 		{
 			name: "post-warn-validation",
@@ -572,14 +563,10 @@ func testFieldValidationPost(t *testing.T, client clientset.Interface) {
 			},
 			bodyBase:    invalidBodyYAML,
 			contentType: "application/yaml",
-			strictDecodingErrors: []string{
-				`line 10: key "unknownDupe" already set in map`,
-				`line 12: key "paused" already set in map`,
-				`line 26: key "imagePullPolicy" already set in map`,
-				`unknown field "spec.template.spec.containers[0].unknownNested"`,
-				`unknown field "spec.unknown1"`,
-				`unknown field "spec.unknownDupe"`,
-			},
+			strictDecodingError: `strict decoding error: yaml: unmarshal errors:
+  line 10: key "unknownDupe" already set in map
+  line 12: key "paused" already set in map
+  line 26: key "imagePullPolicy" already set in map, unknown field "spec.template.spec.containers[0].unknownNested", unknown field "spec.unknown1", unknown field "spec.unknownDupe"`,
 		},
 		{
 			name: "post-warn-validation-yaml",
@@ -630,14 +617,11 @@ func testFieldValidationPost(t *testing.T, client clientset.Interface) {
 				SetHeader("Content-Type", tc.contentType).
 				VersionedParams(&tc.opts, metav1.ParameterCodec)
 			result := req.Body(body).Do(context.TODO())
-
-			if result.Error() != nil && len(tc.strictDecodingErrors) == 0 {
-				t.Fatalf("unexpected request err: %v", result.Error())
+			if result.Error() == nil && tc.strictDecodingError != "" {
+				t.Fatalf("received nil error when expecting: %q", tc.strictDecodingError)
 			}
-			for _, strictErr := range tc.strictDecodingErrors {
-				if !strings.Contains(result.Error().Error(), strictErr) {
-					t.Fatalf("missing strict decoding error: %s from error: %v", strictErr, result.Error())
-				}
+			if result.Error() != nil && (tc.strictDecodingError == "" || !strings.HasSuffix(result.Error().Error(), tc.strictDecodingError)) {
+				t.Fatalf("expected error: %q, got: %v", tc.strictDecodingError, result.Error())
 			}
 
 			if len(result.Warnings()) != len(tc.strictDecodingWarnings) {
@@ -674,7 +658,7 @@ func testFieldValidationPut(t *testing.T, client clientset.Interface) {
 		opts                   metav1.UpdateOptions
 		putBodyBase            string
 		contentType            string
-		strictDecodingErrors   []string
+		strictDecodingError    string
 		strictDecodingWarnings []string
 	}{
 		{
@@ -682,17 +666,8 @@ func testFieldValidationPut(t *testing.T, client clientset.Interface) {
 			opts: metav1.UpdateOptions{
 				FieldValidation: "Strict",
 			},
-			putBodyBase: invalidBodyJSON,
-			strictDecodingErrors: []string{
-				`unknown field "spec.unknown1"`,
-				`unknown field "spec.unknownDupe"`,
-				`duplicate field "spec.paused"`,
-				// note: fields that are both unknown
-				// and duplicated will only be detected
-				// as unknown for typed resources.
-				`unknown field "spec.template.spec.containers[0].unknownNested"`,
-				`duplicate field "spec.template.spec.containers[0].imagePullPolicy"`,
-			},
+			putBodyBase:         invalidBodyJSON,
+			strictDecodingError: `strict decoding error: unknown field "spec.unknown1", unknown field "spec.unknownDupe", duplicate field "spec.paused", unknown field "spec.template.spec.containers[0].unknownNested", duplicate field "spec.template.spec.containers[0].imagePullPolicy"`,
 		},
 		{
 			name: "put-warn-validation",
@@ -739,14 +714,10 @@ func testFieldValidationPut(t *testing.T, client clientset.Interface) {
 			},
 			putBodyBase: invalidBodyYAML,
 			contentType: "application/yaml",
-			strictDecodingErrors: []string{
-				`line 10: key "unknownDupe" already set in map`,
-				`line 12: key "paused" already set in map`,
-				`line 26: key "imagePullPolicy" already set in map`,
-				`unknown field "spec.unknown1"`,
-				`unknown field "spec.unknownDupe"`,
-				`unknown field "spec.template.spec.containers[0].unknownNested"`,
-			},
+			strictDecodingError: `strict decoding error: yaml: unmarshal errors:
+  line 10: key "unknownDupe" already set in map
+  line 12: key "paused" already set in map
+  line 26: key "imagePullPolicy" already set in map, unknown field "spec.template.spec.containers[0].unknownNested", unknown field "spec.unknown1", unknown field "spec.unknownDupe"`,
 		},
 		{
 			name: "put-warn-validation-yaml",
@@ -798,14 +769,11 @@ func testFieldValidationPut(t *testing.T, client clientset.Interface) {
 				Name(deployName).
 				VersionedParams(&tc.opts, metav1.ParameterCodec)
 			result := req.Body([]byte(putBody)).Do(context.TODO())
-
-			if result.Error() != nil && len(tc.strictDecodingErrors) == 0 {
-				t.Fatalf("unexpected request err: %v", result.Error())
+			if result.Error() == nil && tc.strictDecodingError != "" {
+				t.Fatalf("received nil error when expecting: %q", tc.strictDecodingError)
 			}
-			for _, strictErr := range tc.strictDecodingErrors {
-				if !strings.Contains(result.Error().Error(), strictErr) {
-					t.Fatalf("missing strict decoding error: %s from error: %s", strictErr, result.Error().Error())
-				}
+			if result.Error() != nil && (tc.strictDecodingError == "" || !strings.HasSuffix(result.Error().Error(), tc.strictDecodingError)) {
+				t.Fatalf("expected error: %q, got: %v", tc.strictDecodingError, result.Error())
 			}
 
 			if len(result.Warnings()) != len(tc.strictDecodingWarnings) {
@@ -896,7 +864,7 @@ func testFieldValidationPatchTyped(t *testing.T, client clientset.Interface) {
 		opts                   metav1.PatchOptions
 		patchType              types.PatchType
 		body                   string
-		strictDecodingErrors   []string
+		strictDecodingError    string
 		strictDecodingWarnings []string
 	}{
 		{
@@ -904,16 +872,9 @@ func testFieldValidationPatchTyped(t *testing.T, client clientset.Interface) {
 			opts: metav1.PatchOptions{
 				FieldValidation: "Strict",
 			},
-			patchType: types.MergePatchType,
-			body:      mergePatchBody,
-			strictDecodingErrors: []string{
-				`duplicate field "spec.unknownDupe"`,
-				`duplicate field "spec.paused"`,
-				`duplicate field "spec.template.spec.containers[0].imagePullPolicy"`,
-				`unknown field "spec.template.spec.containers[0].unknownNested"`,
-				`unknown field "spec.unknown1"`,
-				`unknown field "spec.unknownDupe"`,
-			},
+			patchType:           types.MergePatchType,
+			body:                mergePatchBody,
+			strictDecodingError: `strict decoding error: duplicate field "spec.unknownDupe", duplicate field "spec.paused", duplicate field "spec.template.spec.containers[0].imagePullPolicy", unknown field "spec.template.spec.containers[0].unknownNested", unknown field "spec.unknown1", unknown field "spec.unknownDupe"`,
 		},
 		{
 			name: "merge-patch-warn-validation",
@@ -958,20 +919,8 @@ func testFieldValidationPatchTyped(t *testing.T, client clientset.Interface) {
 			opts: metav1.PatchOptions{
 				FieldValidation: "Strict",
 			},
-			body: jsonPatchBody,
-			strictDecodingErrors: []string{
-				// note: duplicate fields in the patch itself
-				// are dropped by the
-				// evanphx/json-patch library and is expected.
-				// Duplicate fields in the json patch ops
-				// themselves can be detected though
-				`json patch unknown field "[0].foo"`,
-				`json patch duplicate field "[1].path"`,
-				`unknown field "spec.template.spec.containers[0].unknownNested"`,
-				`unknown field "spec.unknown1"`,
-				`unknown field "spec.unknown3"`,
-				`unknown field "spec.unknownDupe"`,
-			},
+			body:                jsonPatchBody,
+			strictDecodingError: `strict decoding error: json patch unknown field "[0].foo", json patch duplicate field "[1].path", unknown field "spec.template.spec.containers[0].unknownNested", unknown field "spec.unknown1", unknown field "spec.unknown3", unknown field "spec.unknownDupe"`,
 		},
 		{
 			name:      "json-patch-warn-validation",
@@ -1025,12 +974,9 @@ func testFieldValidationPatchTyped(t *testing.T, client clientset.Interface) {
 			opts: metav1.PatchOptions{
 				FieldValidation: "Strict",
 			},
-			patchType: types.MergePatchType,
-			body:      nonconflictingMergePatchBody,
-			strictDecodingErrors: []string{
-				`duplicate field "spec.paused"`,
-				`duplicate field "spec.template.spec.containers[0].imagePullPolicy"`,
-			},
+			patchType:           types.MergePatchType,
+			body:                nonconflictingMergePatchBody,
+			strictDecodingError: `strict decoding error: duplicate field "spec.paused", duplicate field "spec.template.spec.containers[0].imagePullPolicy"`,
 		},
 		{
 			name: "nonconflicting-merge-patch-warn-validation",
@@ -1072,14 +1018,11 @@ func testFieldValidationPatchTyped(t *testing.T, client clientset.Interface) {
 				Name(deployName).
 				VersionedParams(&tc.opts, metav1.ParameterCodec)
 			result := req.Body([]byte(tc.body)).Do(context.TODO())
-
-			if result.Error() != nil && len(tc.strictDecodingErrors) == 0 {
-				t.Fatalf("unexpected request err: %v", result.Error())
+			if result.Error() == nil && tc.strictDecodingError != "" {
+				t.Fatalf("received nil error when expecting: %q", tc.strictDecodingError)
 			}
-			for _, strictErr := range tc.strictDecodingErrors {
-				if !strings.Contains(result.Error().Error(), strictErr) {
-					t.Fatalf("missing strict decoding error: %s from error: %s", strictErr, result.Error().Error())
-				}
+			if result.Error() != nil && (tc.strictDecodingError == "" || !strings.HasSuffix(result.Error().Error(), tc.strictDecodingError)) {
+				t.Fatalf("expected error: %q, got: %v", tc.strictDecodingError, result.Error())
 			}
 
 			if len(result.Warnings()) != len(tc.strictDecodingWarnings) {
@@ -1164,7 +1107,7 @@ func testFieldValidationSMP(t *testing.T, client clientset.Interface) {
 		name                   string
 		opts                   metav1.PatchOptions
 		body                   string
-		strictDecodingErrors   []string
+		strictDecodingError    string
 		strictDecodingWarnings []string
 	}{
 		{
@@ -1172,15 +1115,8 @@ func testFieldValidationSMP(t *testing.T, client clientset.Interface) {
 			opts: metav1.PatchOptions{
 				FieldValidation: "Strict",
 			},
-			body: smpBody,
-			strictDecodingErrors: []string{
-				`duplicate field "spec.unknownDupe"`,
-				`duplicate field "spec.paused"`,
-				`duplicate field "spec.template.spec.containers[0].imagePullPolicy"`,
-				`unknown field "spec.template.spec.containers[0].unknownNested"`,
-				`unknown field "spec.unknown1"`,
-				`unknown field "spec.unknownDupe"`,
-			},
+			body:                smpBody,
+			strictDecodingError: `strict decoding error: duplicate field "spec.unknownDupe", duplicate field "spec.paused", duplicate field "spec.template.spec.containers[0].imagePullPolicy", unknown field "spec.template.spec.containers[0].unknownNested", unknown field "spec.unknown1", unknown field "spec.unknownDupe"`,
 		},
 		{
 			name: "smp-warn-validation",
@@ -1221,11 +1157,8 @@ func testFieldValidationSMP(t *testing.T, client clientset.Interface) {
 			opts: metav1.PatchOptions{
 				FieldValidation: "Strict",
 			},
-			body: nonconflictingSMPBody,
-			strictDecodingErrors: []string{
-				`duplicate field "spec.paused"`,
-				`duplicate field "spec.template.spec.containers[0].imagePullPolicy"`,
-			},
+			body:                nonconflictingSMPBody,
+			strictDecodingError: `strict decoding error: duplicate field "spec.paused", duplicate field "spec.template.spec.containers[0].imagePullPolicy"`,
 		},
 		{
 			name: "nonconflicting-smp-warn-validation",
@@ -1278,17 +1211,11 @@ func testFieldValidationSMP(t *testing.T, client clientset.Interface) {
 				Name(tc.name).
 				VersionedParams(&tc.opts, metav1.ParameterCodec)
 			result := req.Body([]byte(tc.body)).Do(context.TODO())
-
-			if result.Error() != nil && len(tc.strictDecodingErrors) == 0 {
-				t.Fatalf("unexpected patch err: %v", result.Error())
+			if result.Error() == nil && tc.strictDecodingError != "" {
+				t.Fatalf("received nil error when expecting: %q", tc.strictDecodingError)
 			}
-			if result.Error() == nil && len(tc.strictDecodingErrors) > 0 {
-				t.Fatalf("unexpected patch succeeded")
-			}
-			for _, strictErr := range tc.strictDecodingErrors {
-				if !strings.Contains(result.Error().Error(), strictErr) {
-					t.Fatalf("missing strict decoding error: %s from error: %s", strictErr, result.Error().Error())
-				}
+			if result.Error() != nil && (tc.strictDecodingError == "" || !strings.HasSuffix(result.Error().Error(), tc.strictDecodingError)) {
+				t.Fatalf("expected error: %q, got: %v", tc.strictDecodingError, result.Error())
 			}
 
 			if len(result.Warnings()) != len(tc.strictDecodingWarnings) {
@@ -1311,7 +1238,7 @@ func testFieldValidationApplyCreate(t *testing.T, client clientset.Interface) {
 	var testcases = []struct {
 		name                   string
 		opts                   metav1.PatchOptions
-		strictDecodingErrors   []string
+		strictDecodingError    string
 		strictDecodingWarnings []string
 	}{
 		{
@@ -1320,10 +1247,9 @@ func testFieldValidationApplyCreate(t *testing.T, client clientset.Interface) {
 				FieldValidation: "Strict",
 				FieldManager:    "mgr",
 			},
-			strictDecodingErrors: []string{
-				`key "paused" already set in map`,
-				`key "imagePullPolicy" already set in map`,
-			},
+			strictDecodingError: `error strict decoding YAML: error converting YAML to JSON: yaml: unmarshal errors:
+  line 10: key "paused" already set in map
+  line 27: key "imagePullPolicy" already set in map`,
 		},
 		{
 			name: "warn-validation",
@@ -1366,14 +1292,11 @@ func testFieldValidationApplyCreate(t *testing.T, client clientset.Interface) {
 				Name(name).
 				VersionedParams(&tc.opts, metav1.ParameterCodec)
 			result := req.Body(body).Do(context.TODO())
-
-			if result.Error() != nil && len(tc.strictDecodingErrors) == 0 {
-				t.Fatalf("unexpected request err: %v", result.Error())
+			if result.Error() == nil && tc.strictDecodingError != "" {
+				t.Fatalf("received nil error when expecting: %q", tc.strictDecodingError)
 			}
-			for _, strictErr := range tc.strictDecodingErrors {
-				if !strings.Contains(result.Error().Error(), strictErr) {
-					t.Fatalf("missing strict decoding error: %s from error: %s", strictErr, result.Error().Error())
-				}
+			if result.Error() != nil && (tc.strictDecodingError == "" || !strings.HasSuffix(result.Error().Error(), tc.strictDecodingError)) {
+				t.Fatalf("expected error: %q, got: %v", tc.strictDecodingError, result.Error())
 			}
 
 			if len(result.Warnings()) != len(tc.strictDecodingWarnings) {
@@ -1395,7 +1318,7 @@ func testFieldValidationApplyUpdate(t *testing.T, client clientset.Interface) {
 	var testcases = []struct {
 		name                   string
 		opts                   metav1.PatchOptions
-		strictDecodingErrors   []string
+		strictDecodingError    string
 		strictDecodingWarnings []string
 	}{
 		{
@@ -1404,10 +1327,9 @@ func testFieldValidationApplyUpdate(t *testing.T, client clientset.Interface) {
 				FieldValidation: "Strict",
 				FieldManager:    "mgr",
 			},
-			strictDecodingErrors: []string{
-				`key "paused" already set in map`,
-				`key "imagePullPolicy" already set in map`,
-			},
+			strictDecodingError: `error strict decoding YAML: error converting YAML to JSON: yaml: unmarshal errors:
+  line 10: key "paused" already set in map
+  line 27: key "imagePullPolicy" already set in map`,
 		},
 		{
 			name: "warn-validation",
@@ -1462,13 +1384,11 @@ func testFieldValidationApplyUpdate(t *testing.T, client clientset.Interface) {
 				Name(name).
 				VersionedParams(&tc.opts, metav1.ParameterCodec)
 			result := updateReq.Body(updateBody).Do(context.TODO())
-			if result.Error() != nil && len(tc.strictDecodingErrors) == 0 {
-				t.Fatalf("unexpected apply err: %v", result.Error())
+			if result.Error() == nil && tc.strictDecodingError != "" {
+				t.Fatalf("received nil error when expecting: %q", tc.strictDecodingError)
 			}
-			for _, strictErr := range tc.strictDecodingErrors {
-				if !strings.Contains(result.Error().Error(), strictErr) {
-					t.Fatalf("missing strict decoding error: %s from error: %s", strictErr, result.Error().Error())
-				}
+			if result.Error() != nil && (tc.strictDecodingError == "" || !strings.HasSuffix(result.Error().Error(), tc.strictDecodingError)) {
+				t.Fatalf("expected error: %q, got: %v", tc.strictDecodingError, result.Error())
 			}
 
 			if len(result.Warnings()) != len(tc.strictDecodingWarnings) {
@@ -1492,7 +1412,7 @@ func testFieldValidationPostCRD(t *testing.T, rest rest.Interface, gvk schema.Gr
 		opts                   metav1.PatchOptions
 		body                   string
 		contentType            string
-		strictDecodingErrors   []string
+		strictDecodingError    string
 		strictDecodingWarnings []string
 	}{
 		{
@@ -1500,15 +1420,8 @@ func testFieldValidationPostCRD(t *testing.T, rest rest.Interface, gvk schema.Gr
 			opts: metav1.PatchOptions{
 				FieldValidation: "Strict",
 			},
-			body: crdInvalidBody,
-			strictDecodingErrors: []string{
-				`duplicate field "spec.ports[0].hostPort"`,
-				`duplicate field "spec.knownField1"`,
-				`duplicate field "spec.unknownDupe"`,
-				`unknown field "spec.ports[0].unknownNested"`,
-				`unknown field "spec.unknown1"`,
-				`unknown field "spec.unknownDupe"`,
-			},
+			body:                crdInvalidBody,
+			strictDecodingError: `strict decoding error: duplicate field "spec.unknownDupe", duplicate field "spec.knownField1", duplicate field "spec.ports[0].hostPort", unknown field "spec.ports[0].unknownNested", unknown field "spec.unknown1", unknown field "spec.unknownDupe"`,
 		},
 		{
 			name: "crd-post-warn-validation",
@@ -1551,14 +1464,10 @@ func testFieldValidationPostCRD(t *testing.T, rest rest.Interface, gvk schema.Gr
 			},
 			body:        crdInvalidBodyYAML,
 			contentType: "application/yaml",
-			strictDecodingErrors: []string{
-				`line 10: key "unknownDupe" already set in map`,
-				`line 12: key "knownField1" already set in map`,
-				`line 18: key "hostPort" already set in map`,
-				`unknown field "spec.ports[0].unknownNested"`,
-				`unknown field "spec.unknown1"`,
-				`unknown field "spec.unknownDupe"`,
-			},
+			strictDecodingError: `strict decoding error: yaml: unmarshal errors:
+  line 10: key "unknownDupe" already set in map
+  line 12: key "knownField1" already set in map
+  line 18: key "hostPort" already set in map, unknown field "spec.ports[0].unknownNested", unknown field "spec.unknown1", unknown field "spec.unknownDupe"`,
 		},
 		{
 			name: "crd-post-warn-validation-yaml",
@@ -1610,19 +1519,11 @@ func testFieldValidationPostCRD(t *testing.T, rest rest.Interface, gvk schema.Gr
 				SetHeader("Content-Type", tc.contentType).
 				VersionedParams(&tc.opts, metav1.ParameterCodec)
 			result := req.Body([]byte(jsonBody)).Do(context.TODO())
-
-			if result.Error() != nil && len(tc.strictDecodingErrors) == 0 {
-				t.Fatalf("unexpected post err: %v", result.Error())
+			if result.Error() == nil && tc.strictDecodingError != "" {
+				t.Fatalf("received nil error when expecting: %q", tc.strictDecodingError)
 			}
-
-			if result.Error() == nil && len(tc.strictDecodingErrors) > 0 {
-				t.Fatalf("unexpected post succeeded")
-			}
-
-			for _, strictErr := range tc.strictDecodingErrors {
-				if !strings.Contains(result.Error().Error(), strictErr) {
-					t.Fatalf("missing strict decoding error: %s from error: %s", strictErr, result.Error().Error())
-				}
+			if result.Error() != nil && (tc.strictDecodingError == "" || !strings.HasSuffix(result.Error().Error(), tc.strictDecodingError)) {
+				t.Fatalf("expected error: %q, got: %v", tc.strictDecodingError, result.Error())
 			}
 
 			if len(result.Warnings()) != len(tc.strictDecodingWarnings) {
@@ -1648,7 +1549,7 @@ func testFieldValidationPostCRDSchemaless(t *testing.T, rest rest.Interface, gvk
 		opts                   metav1.PatchOptions
 		body                   string
 		contentType            string
-		strictDecodingErrors   []string
+		strictDecodingError    string
 		strictDecodingWarnings []string
 	}{
 		{
@@ -1656,13 +1557,8 @@ func testFieldValidationPostCRDSchemaless(t *testing.T, rest rest.Interface, gvk
 			opts: metav1.PatchOptions{
 				FieldValidation: "Strict",
 			},
-			body: crdInvalidBody,
-			strictDecodingErrors: []string{
-				`duplicate field "spec.ports[0].hostPort"`,
-				`duplicate field "spec.knownField1"`,
-				`duplicate field "spec.unknownDupe"`,
-				`unknown field "spec.ports[0].unknownNested"`,
-			},
+			body:                crdInvalidBody,
+			strictDecodingError: `strict decoding error: duplicate field "spec.unknownDupe", duplicate field "spec.knownField1", duplicate field "spec.ports[0].hostPort", unknown field "spec.ports[0].unknownNested"`,
 		},
 		{
 			name: "schemaless-crd-post-warn-validation",
@@ -1701,12 +1597,10 @@ func testFieldValidationPostCRDSchemaless(t *testing.T, rest rest.Interface, gvk
 			},
 			body:        crdInvalidBodyYAML,
 			contentType: "application/yaml",
-			strictDecodingErrors: []string{
-				`line 10: key "unknownDupe" already set in map`,
-				`line 12: key "knownField1" already set in map`,
-				`line 18: key "hostPort" already set in map`,
-				`unknown field "spec.ports[0].unknownNested"`,
-			},
+			strictDecodingError: `strict decoding error: yaml: unmarshal errors:
+  line 10: key "unknownDupe" already set in map
+  line 12: key "knownField1" already set in map
+  line 18: key "hostPort" already set in map, unknown field "spec.ports[0].unknownNested"`,
 		},
 		{
 			name: "schemaless-crd-post-warn-validation-yaml",
@@ -1755,19 +1649,11 @@ func testFieldValidationPostCRDSchemaless(t *testing.T, rest rest.Interface, gvk
 				SetHeader("Content-Type", tc.contentType).
 				VersionedParams(&tc.opts, metav1.ParameterCodec)
 			result := req.Body([]byte(jsonBody)).Do(context.TODO())
-
-			if result.Error() != nil && len(tc.strictDecodingErrors) == 0 {
-				t.Fatalf("unexpected post err: %v", result.Error())
+			if result.Error() == nil && tc.strictDecodingError != "" {
+				t.Fatalf("received nil error when expecting: %q", tc.strictDecodingError)
 			}
-
-			if result.Error() == nil && len(tc.strictDecodingErrors) > 0 {
-				t.Fatalf("unexpected post succeeded")
-			}
-
-			for _, strictErr := range tc.strictDecodingErrors {
-				if !strings.Contains(result.Error().Error(), strictErr) {
-					t.Fatalf("missing strict decoding error: %s from error: %s", strictErr, result.Error().Error())
-				}
+			if result.Error() != nil && (tc.strictDecodingError == "" || !strings.HasSuffix(result.Error().Error(), tc.strictDecodingError)) {
+				t.Fatalf("expected error: %q, got: %v", tc.strictDecodingError, result.Error())
 			}
 
 			if len(result.Warnings()) != len(tc.strictDecodingWarnings) {
@@ -1800,7 +1686,7 @@ func testFieldValidationPutCRD(t *testing.T, rest rest.Interface, gvk schema.Gro
 		opts                   metav1.PatchOptions
 		putBody                string
 		contentType            string
-		strictDecodingErrors   []string
+		strictDecodingError    string
 		strictDecodingWarnings []string
 	}{
 		{
@@ -1808,15 +1694,8 @@ func testFieldValidationPutCRD(t *testing.T, rest rest.Interface, gvk schema.Gro
 			opts: metav1.PatchOptions{
 				FieldValidation: "Strict",
 			},
-			putBody: crdInvalidBody,
-			strictDecodingErrors: []string{
-				`duplicate field "spec.unknownDupe"`,
-				`duplicate field "spec.knownField1"`,
-				`duplicate field "spec.ports[0].hostPort"`,
-				`unknown field "spec.ports[0].unknownNested"`,
-				`unknown field "spec.unknown1"`,
-				`unknown field "spec.unknownDupe"`,
-			},
+			putBody:             crdInvalidBody,
+			strictDecodingError: `strict decoding error: duplicate field "spec.unknownDupe", duplicate field "spec.knownField1", duplicate field "spec.ports[0].hostPort", unknown field "spec.ports[0].unknownNested", unknown field "spec.unknown1", unknown field "spec.unknownDupe"`,
 		},
 		{
 			name: "crd-put-warn-validation",
@@ -1859,14 +1738,10 @@ func testFieldValidationPutCRD(t *testing.T, rest rest.Interface, gvk schema.Gro
 			},
 			putBody:     crdInvalidBodyYAML,
 			contentType: "application/yaml",
-			strictDecodingErrors: []string{
-				`line 10: key "unknownDupe" already set in map`,
-				`line 12: key "knownField1" already set in map`,
-				`line 18: key "hostPort" already set in map`,
-				`unknown field "spec.ports[0].unknownNested"`,
-				`unknown field "spec.unknown1"`,
-				`unknown field "spec.unknownDupe"`,
-			},
+			strictDecodingError: `strict decoding error: yaml: unmarshal errors:
+  line 10: key "unknownDupe" already set in map
+  line 12: key "knownField1" already set in map
+  line 18: key "hostPort" already set in map, unknown field "spec.ports[0].unknownNested", unknown field "spec.unknown1", unknown field "spec.unknownDupe"`,
 		},
 		{
 			name: "crd-put-warn-validation-yaml",
@@ -1933,16 +1808,11 @@ func testFieldValidationPutCRD(t *testing.T, rest rest.Interface, gvk schema.Gro
 				SetHeader("Content-Type", tc.contentType).
 				VersionedParams(&tc.opts, metav1.ParameterCodec)
 			result := putReq.Body([]byte(putBody)).Do(context.TODO())
-			if result.Error() != nil && len(tc.strictDecodingErrors) == 0 {
-				t.Fatalf("unexpected put err: %v", result.Error())
+			if result.Error() == nil && tc.strictDecodingError != "" {
+				t.Fatalf("received nil error when expecting: %q", tc.strictDecodingError)
 			}
-			if result.Error() == nil && len(tc.strictDecodingErrors) > 0 {
-				t.Fatalf("unexpected patch succeeded")
-			}
-			for _, strictErr := range tc.strictDecodingErrors {
-				if !strings.Contains(result.Error().Error(), strictErr) {
-					t.Fatalf("missing strict decoding error: %s from error: %s", strictErr, result.Error().Error())
-				}
+			if result.Error() != nil && (tc.strictDecodingError == "" || !strings.HasSuffix(result.Error().Error(), tc.strictDecodingError)) {
+				t.Fatalf("expected error: %q, got: %v", tc.strictDecodingError, result.Error())
 			}
 
 			if len(result.Warnings()) != len(tc.strictDecodingWarnings) {
@@ -1968,7 +1838,7 @@ func testFieldValidationPutCRDSchemaless(t *testing.T, rest rest.Interface, gvk 
 		opts                   metav1.PatchOptions
 		putBody                string
 		contentType            string
-		strictDecodingErrors   []string
+		strictDecodingError    string
 		strictDecodingWarnings []string
 	}{
 		{
@@ -1976,13 +1846,8 @@ func testFieldValidationPutCRDSchemaless(t *testing.T, rest rest.Interface, gvk 
 			opts: metav1.PatchOptions{
 				FieldValidation: "Strict",
 			},
-			putBody: crdInvalidBody,
-			strictDecodingErrors: []string{
-				`duplicate field "spec.unknownDupe"`,
-				`duplicate field "spec.knownField1"`,
-				`duplicate field "spec.ports[0].hostPort"`,
-				`unknown field "spec.ports[0].unknownNested"`,
-			},
+			putBody:             crdInvalidBody,
+			strictDecodingError: `strict decoding error: duplicate field "spec.unknownDupe", duplicate field "spec.knownField1", duplicate field "spec.ports[0].hostPort", unknown field "spec.ports[0].unknownNested"`,
 		},
 		{
 			name: "schemaless-crd-put-warn-validation",
@@ -2021,12 +1886,10 @@ func testFieldValidationPutCRDSchemaless(t *testing.T, rest rest.Interface, gvk 
 			},
 			putBody:     crdInvalidBodyYAML,
 			contentType: "application/yaml",
-			strictDecodingErrors: []string{
-				`line 10: key "unknownDupe" already set in map`,
-				`line 12: key "knownField1" already set in map`,
-				`line 18: key "hostPort" already set in map`,
-				`unknown field "spec.ports[0].unknownNested"`,
-			},
+			strictDecodingError: `strict decoding error: yaml: unmarshal errors:
+  line 10: key "unknownDupe" already set in map
+  line 12: key "knownField1" already set in map
+  line 18: key "hostPort" already set in map, unknown field "spec.ports[0].unknownNested"`,
 		},
 		{
 			name: "schemaless-crd-put-warn-validation-yaml",
@@ -2089,16 +1952,11 @@ func testFieldValidationPutCRDSchemaless(t *testing.T, rest rest.Interface, gvk 
 				SetHeader("Content-Type", tc.contentType).
 				VersionedParams(&tc.opts, metav1.ParameterCodec)
 			result := putReq.Body([]byte(putBody)).Do(context.TODO())
-			if result.Error() != nil && len(tc.strictDecodingErrors) == 0 {
-				t.Fatalf("unexpected put err: %v", result.Error())
+			if result.Error() == nil && tc.strictDecodingError != "" {
+				t.Fatalf("received nil error when expecting: %q", tc.strictDecodingError)
 			}
-			if result.Error() == nil && len(tc.strictDecodingErrors) > 0 {
-				t.Fatalf("unexpected patch succeeded")
-			}
-			for _, strictErr := range tc.strictDecodingErrors {
-				if !strings.Contains(result.Error().Error(), strictErr) {
-					t.Fatalf("missing strict decoding error: %s from error: %s", strictErr, result.Error().Error())
-				}
+			if result.Error() != nil && (tc.strictDecodingError == "" || !strings.HasSuffix(result.Error().Error(), tc.strictDecodingError)) {
+				t.Fatalf("expected error: %q, got: %v", tc.strictDecodingError, result.Error())
 			}
 
 			if len(result.Warnings()) != len(tc.strictDecodingWarnings) {
@@ -2181,7 +2039,7 @@ spec:
 		patchType              types.PatchType
 		opts                   metav1.PatchOptions
 		body                   string
-		strictDecodingErrors   []string
+		strictDecodingError    string
 		strictDecodingWarnings []string
 	}{
 		{
@@ -2190,15 +2048,8 @@ spec:
 			opts: metav1.PatchOptions{
 				FieldValidation: "Strict",
 			},
-			body: mergePatchBody,
-			strictDecodingErrors: []string{
-				`duplicate field "spec.unknownDupe"`,
-				`duplicate field "spec.knownField1"`,
-				`duplicate field "spec.ports[0].hostPort"`,
-				`unknown field "spec.ports[0].unknownNested"`,
-				`unknown field "spec.unknown1"`,
-				`unknown field "spec.unknownDupe"`,
-			},
+			body:                mergePatchBody,
+			strictDecodingError: `strict decoding error: duplicate field "spec.unknownDupe", duplicate field "spec.knownField1", duplicate field "spec.ports[0].hostPort", unknown field "spec.ports[0].unknownNested", unknown field "spec.unknown1", unknown field "spec.unknownDupe"`,
 		},
 		{
 			name:      "crd-merge-patch-warn-validation",
@@ -2244,19 +2095,12 @@ spec:
 				FieldValidation: "Strict",
 			},
 			body: jsonPatchBody,
-			strictDecodingErrors: []string{
-				// note: duplicate fields in the patch itself
-				// are dropped by the
-				// evanphx/json-patch library and is expected.
-				// Duplicate fields in the json patch ops
-				// themselves can be detected though
-				`json patch unknown field "[0].foo"`,
-				`json patch duplicate field "[1].path"`,
-				`unknown field "spec.ports[0].unknownNested"`,
-				`unknown field "spec.unknown1"`,
-				`unknown field "spec.unknown3"`,
-				`unknown field "spec.unknownDupe"`,
-			},
+			// note: duplicate fields in the patch itself
+			// are dropped by the
+			// evanphx/json-patch library and is expected.
+			// Duplicate fields in the json patch ops
+			// themselves can be detected though
+			strictDecodingError: `strict decoding error: json patch unknown field "[0].foo", json patch duplicate field "[1].path", unknown field "spec.ports[0].unknownNested", unknown field "spec.unknown1", unknown field "spec.unknown3", unknown field "spec.unknownDupe"`,
 		},
 		{
 			name:      "crd-json-patch-warn-validation",
@@ -2328,18 +2172,11 @@ spec:
 				Name(tc.name).
 				VersionedParams(&tc.opts, metav1.ParameterCodec)
 			result := req.Body([]byte(tc.body)).Do(context.TODO())
-
-			if result.Error() != nil && len(tc.strictDecodingErrors) == 0 {
-				t.Fatalf("unexpected patch err: %v", result.Error())
+			if result.Error() == nil && tc.strictDecodingError != "" {
+				t.Fatalf("received nil error when expecting: %q", tc.strictDecodingError)
 			}
-
-			if result.Error() == nil && len(tc.strictDecodingErrors) > 0 {
-				t.Fatalf("unexpected patch succeeded")
-			}
-			for _, strictErr := range tc.strictDecodingErrors {
-				if !strings.Contains(result.Error().Error(), strictErr) {
-					t.Fatalf("missing strict decoding error: %s from error: %s", strictErr, result.Error().Error())
-				}
+			if result.Error() != nil && (tc.strictDecodingError == "" || !strings.HasSuffix(result.Error().Error(), tc.strictDecodingError)) {
+				t.Fatalf("expected error: %q, got: %v", tc.strictDecodingError, result.Error())
 			}
 
 			if len(result.Warnings()) != len(tc.strictDecodingWarnings) {
@@ -2401,7 +2238,7 @@ func testFieldValidationPatchCRDSchemaless(t *testing.T, rest rest.Interface, gv
 		patchType              types.PatchType
 		opts                   metav1.PatchOptions
 		body                   string
-		strictDecodingErrors   []string
+		strictDecodingError    string
 		strictDecodingWarnings []string
 	}{
 		{
@@ -2410,13 +2247,8 @@ func testFieldValidationPatchCRDSchemaless(t *testing.T, rest rest.Interface, gv
 			opts: metav1.PatchOptions{
 				FieldValidation: "Strict",
 			},
-			body: mergePatchBody,
-			strictDecodingErrors: []string{
-				`duplicate field "spec.unknownDupe"`,
-				`duplicate field "spec.knownField1"`,
-				`duplicate field "spec.ports[0].hostPort"`,
-				`unknown field "spec.ports[0].unknownNested"`,
-			},
+			body:                mergePatchBody,
+			strictDecodingError: `strict decoding error: duplicate field "spec.unknownDupe", duplicate field "spec.knownField1", duplicate field "spec.ports[0].hostPort", unknown field "spec.ports[0].unknownNested"`,
 		},
 		{
 			name:      "schemaless-crd-merge-patch-warn-validation",
@@ -2458,16 +2290,12 @@ func testFieldValidationPatchCRDSchemaless(t *testing.T, rest rest.Interface, gv
 				FieldValidation: "Strict",
 			},
 			body: jsonPatchBody,
-			strictDecodingErrors: []string{
-				// note: duplicate fields in the patch itself
-				// are dropped by the
-				// evanphx/json-patch library and is expected.
-				// Duplicate fields in the json patch ops
-				// themselves can be detected though
-				`json patch unknown field "[0].foo"`,
-				`json patch duplicate field "[1].path"`,
-				`unknown field "spec.ports[0].unknownNested"`,
-			},
+			// note: duplicate fields in the patch itself
+			// are dropped by the
+			// evanphx/json-patch library and is expected.
+			// Duplicate fields in the json patch ops
+			// themselves can be detected though
+			strictDecodingError: `strict decoding error: json patch unknown field "[0].foo", json patch duplicate field "[1].path", unknown field "spec.ports[0].unknownNested"`,
 		},
 		{
 			name:      "schemaless-crd-json-patch-warn-validation",
@@ -2533,18 +2361,11 @@ func testFieldValidationPatchCRDSchemaless(t *testing.T, rest rest.Interface, gv
 				Name(tc.name).
 				VersionedParams(&tc.opts, metav1.ParameterCodec)
 			result := req.Body([]byte(tc.body)).Do(context.TODO())
-
-			if result.Error() != nil && len(tc.strictDecodingErrors) == 0 {
-				t.Fatalf("unexpected patch err: %v", result.Error())
+			if result.Error() == nil && tc.strictDecodingError != "" {
+				t.Fatalf("received nil error when expecting: %q", tc.strictDecodingError)
 			}
-
-			if result.Error() == nil && len(tc.strictDecodingErrors) > 0 {
-				t.Fatalf("unexpected patch succeeded")
-			}
-			for _, strictErr := range tc.strictDecodingErrors {
-				if !strings.Contains(result.Error().Error(), strictErr) {
-					t.Fatalf("missing strict decoding error: %s from error: %s", strictErr, result.Error().Error())
-				}
+			if result.Error() != nil && (tc.strictDecodingError == "" || !strings.HasSuffix(result.Error().Error(), tc.strictDecodingError)) {
+				t.Fatalf("expected error: %q, got: %v", tc.strictDecodingError, result.Error())
 			}
 
 			if len(result.Warnings()) != len(tc.strictDecodingWarnings) {
@@ -2569,7 +2390,7 @@ func testFieldValidationApplyCreateCRD(t *testing.T, rest rest.Interface, gvk sc
 	var testcases = []struct {
 		name                   string
 		opts                   metav1.PatchOptions
-		strictDecodingErrors   []string
+		strictDecodingError    string
 		strictDecodingWarnings []string
 	}{
 		{
@@ -2578,10 +2399,9 @@ func testFieldValidationApplyCreateCRD(t *testing.T, rest rest.Interface, gvk sc
 				FieldValidation: "Strict",
 				FieldManager:    "mgr",
 			},
-			strictDecodingErrors: []string{
-				`key "knownField1" already set in map`,
-				`key "hostPort" already set in map`,
-			},
+			strictDecodingError: `error strict decoding YAML: error converting YAML to JSON: yaml: unmarshal errors:
+  line 10: key "knownField1" already set in map
+  line 16: key "hostPort" already set in map`,
 		},
 		{
 			name: "warn-validation",
@@ -2627,16 +2447,11 @@ func testFieldValidationApplyCreateCRD(t *testing.T, rest rest.Interface, gvk sc
 				Name(name).
 				VersionedParams(&tc.opts, metav1.ParameterCodec)
 			result := req.Body(applyCreateBody).Do(context.TODO())
-			if result.Error() != nil && len(tc.strictDecodingErrors) == 0 {
-				t.Fatalf("unexpected apply err: %v", result.Error())
+			if result.Error() == nil && tc.strictDecodingError != "" {
+				t.Fatalf("received nil error when expecting: %q", tc.strictDecodingError)
 			}
-			if result.Error() == nil && len(tc.strictDecodingErrors) > 0 {
-				t.Fatalf("unexpected apply succeeded")
-			}
-			for _, strictErr := range tc.strictDecodingErrors {
-				if !strings.Contains(result.Error().Error(), strictErr) {
-					t.Fatalf("missing strict decoding error: %s from error: %s", strictErr, result.Error().Error())
-				}
+			if result.Error() != nil && (tc.strictDecodingError == "" || !strings.HasSuffix(result.Error().Error(), tc.strictDecodingError)) {
+				t.Fatalf("expected error: %q, got: %v", tc.strictDecodingError, result.Error())
 			}
 
 			if len(result.Warnings()) != len(tc.strictDecodingWarnings) {
@@ -2661,7 +2476,7 @@ func testFieldValidationApplyCreateCRDSchemaless(t *testing.T, rest rest.Interfa
 	var testcases = []struct {
 		name                   string
 		opts                   metav1.PatchOptions
-		strictDecodingErrors   []string
+		strictDecodingError    string
 		strictDecodingWarnings []string
 	}{
 		{
@@ -2670,10 +2485,9 @@ func testFieldValidationApplyCreateCRDSchemaless(t *testing.T, rest rest.Interfa
 				FieldValidation: "Strict",
 				FieldManager:    "mgr",
 			},
-			strictDecodingErrors: []string{
-				`key "knownField1" already set in map`,
-				`key "hostPort" already set in map`,
-			},
+			strictDecodingError: `error strict decoding YAML: error converting YAML to JSON: yaml: unmarshal errors:
+  line 10: key "knownField1" already set in map
+  line 16: key "hostPort" already set in map`,
 		},
 		{
 			name: "schemaless-warn-validation",
@@ -2719,16 +2533,11 @@ func testFieldValidationApplyCreateCRDSchemaless(t *testing.T, rest rest.Interfa
 				Name(name).
 				VersionedParams(&tc.opts, metav1.ParameterCodec)
 			result := req.Body(applyCreateBody).Do(context.TODO())
-			if result.Error() != nil && len(tc.strictDecodingErrors) == 0 {
-				t.Fatalf("unexpected apply err: %v", result.Error())
+			if result.Error() == nil && tc.strictDecodingError != "" {
+				t.Fatalf("received nil error when expecting: %q", tc.strictDecodingError)
 			}
-			if result.Error() == nil && len(tc.strictDecodingErrors) > 0 {
-				t.Fatalf("unexpected apply succeeded")
-			}
-			for _, strictErr := range tc.strictDecodingErrors {
-				if !strings.Contains(result.Error().Error(), strictErr) {
-					t.Fatalf("missing strict decoding error: %s from error: %s", strictErr, result.Error().Error())
-				}
+			if result.Error() != nil && (tc.strictDecodingError == "" || !strings.HasSuffix(result.Error().Error(), tc.strictDecodingError)) {
+				t.Fatalf("expected error: %q, got: %v", tc.strictDecodingError, result.Error())
 			}
 
 			if len(result.Warnings()) != len(tc.strictDecodingWarnings) {
@@ -2752,7 +2561,7 @@ func testFieldValidationApplyUpdateCRD(t *testing.T, rest rest.Interface, gvk sc
 	var testcases = []struct {
 		name                   string
 		opts                   metav1.PatchOptions
-		strictDecodingErrors   []string
+		strictDecodingError    string
 		strictDecodingWarnings []string
 	}{
 		{
@@ -2761,10 +2570,9 @@ func testFieldValidationApplyUpdateCRD(t *testing.T, rest rest.Interface, gvk sc
 				FieldValidation: "Strict",
 				FieldManager:    "mgr",
 			},
-			strictDecodingErrors: []string{
-				`key "knownField1" already set in map`,
-				`key "hostPort" already set in map`,
-			},
+			strictDecodingError: `error strict decoding YAML: error converting YAML to JSON: yaml: unmarshal errors:
+  line 10: key "knownField1" already set in map
+  line 16: key "hostPort" already set in map`,
 		},
 		{
 			name: "warn-validation",
@@ -2819,17 +2627,11 @@ func testFieldValidationApplyUpdateCRD(t *testing.T, rest rest.Interface, gvk sc
 				Name(name).
 				VersionedParams(&tc.opts, metav1.ParameterCodec)
 			result := updateReq.Body(applyUpdateBody).Do(context.TODO())
-
-			if result.Error() != nil && len(tc.strictDecodingErrors) == 0 {
-				t.Fatalf("unexpected apply err: %v", result.Error())
+			if result.Error() == nil && tc.strictDecodingError != "" {
+				t.Fatalf("received nil error when expecting: %q", tc.strictDecodingError)
 			}
-			if result.Error() == nil && len(tc.strictDecodingErrors) > 0 {
-				t.Fatalf("unexpected apply succeeded")
-			}
-			for _, strictErr := range tc.strictDecodingErrors {
-				if !strings.Contains(result.Error().Error(), strictErr) {
-					t.Fatalf("missing strict decoding error: %s from error: %s", strictErr, result.Error().Error())
-				}
+			if result.Error() != nil && (tc.strictDecodingError == "" || !strings.HasSuffix(result.Error().Error(), tc.strictDecodingError)) {
+				t.Fatalf("expected error: %q, got: %v", tc.strictDecodingError, result.Error())
 			}
 
 			if len(result.Warnings()) != len(tc.strictDecodingWarnings) {
@@ -2854,7 +2656,7 @@ func testFieldValidationApplyUpdateCRDSchemaless(t *testing.T, rest rest.Interfa
 	var testcases = []struct {
 		name                   string
 		opts                   metav1.PatchOptions
-		strictDecodingErrors   []string
+		strictDecodingError    string
 		strictDecodingWarnings []string
 	}{
 		{
@@ -2863,10 +2665,9 @@ func testFieldValidationApplyUpdateCRDSchemaless(t *testing.T, rest rest.Interfa
 				FieldValidation: "Strict",
 				FieldManager:    "mgr",
 			},
-			strictDecodingErrors: []string{
-				`key "knownField1" already set in map`,
-				`key "hostPort" already set in map`,
-			},
+			strictDecodingError: `error strict decoding YAML: error converting YAML to JSON: yaml: unmarshal errors:
+  line 10: key "knownField1" already set in map
+  line 16: key "hostPort" already set in map`,
 		},
 		{
 			name: "schemaless-warn-validation",
@@ -2922,16 +2723,11 @@ func testFieldValidationApplyUpdateCRDSchemaless(t *testing.T, rest rest.Interfa
 				VersionedParams(&tc.opts, metav1.ParameterCodec)
 			result := updateReq.Body(applyUpdateBody).Do(context.TODO())
 
-			if result.Error() != nil && len(tc.strictDecodingErrors) == 0 {
-				t.Fatalf("unexpected apply err: %v", result.Error())
+			if result.Error() == nil && tc.strictDecodingError != "" {
+				t.Fatalf("received nil error when expecting: %q", tc.strictDecodingError)
 			}
-			if result.Error() == nil && len(tc.strictDecodingErrors) > 0 {
-				t.Fatalf("unexpected apply succeeded")
-			}
-			for _, strictErr := range tc.strictDecodingErrors {
-				if !strings.Contains(result.Error().Error(), strictErr) {
-					t.Fatalf("missing strict decoding error: %s from error: %s", strictErr, result.Error().Error())
-				}
+			if result.Error() != nil && (tc.strictDecodingError == "" || !strings.HasSuffix(result.Error().Error(), tc.strictDecodingError)) {
+				t.Fatalf("expected error: %q, got: %v", tc.strictDecodingError, result.Error())
 			}
 
 			if len(result.Warnings()) != len(tc.strictDecodingWarnings) {
