@@ -327,6 +327,7 @@ func testDeleteEndpoint(t *testing.T, hns HostNetworkService) {
 
 func testGetLoadBalancerExisting(t *testing.T, hns HostNetworkService) {
 	Network := mustTestNetwork(t)
+	lbs := make(map[loadBalancerIdentifier]*(loadBalancerInfo))
 
 	ipConfig := &hcn.IpConfig{
 		IpAddress: epIpAddress,
@@ -358,13 +359,16 @@ func testGetLoadBalancerExisting(t *testing.T, hns HostNetworkService) {
 	if err != nil {
 		t.Error(err)
 	}
+	// We populate this to ensure we test for getting existing load balancer
+	id := loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, vip: serviceVip, endpointsCount: len(Endpoints)}
+	lbs[id] = &loadBalancerInfo{hnsID: LoadBalancer.Id}
 
 	endpoint := &endpointsInfo{
 		ip:    Endpoint.IpConfigurations[0].IpAddress,
 		hnsID: Endpoint.Id,
 	}
 	endpoints := []endpointsInfo{*endpoint}
-	lb, err := hns.getLoadBalancer(endpoints, loadBalancerFlags{}, sourceVip, serviceVip, protocol, internalPort, externalPort)
+	lb, err := hns.getLoadBalancer(endpoints, loadBalancerFlags{}, sourceVip, serviceVip, protocol, internalPort, externalPort, lbs)
 	if err != nil {
 		t.Error(err)
 	}
@@ -388,6 +392,8 @@ func testGetLoadBalancerExisting(t *testing.T, hns HostNetworkService) {
 }
 func testGetLoadBalancerNew(t *testing.T, hns HostNetworkService) {
 	Network := mustTestNetwork(t)
+	// We keep this empty to ensure we test for new load balancer creation.
+	lbs := make(map[loadBalancerIdentifier]*(loadBalancerInfo))
 
 	ipConfig := &hcn.IpConfig{
 		IpAddress: epIpAddress,
@@ -409,7 +415,7 @@ func testGetLoadBalancerNew(t *testing.T, hns HostNetworkService) {
 		hnsID: Endpoint.Id,
 	}
 	endpoints := []endpointsInfo{*endpoint}
-	lb, err := hns.getLoadBalancer(endpoints, loadBalancerFlags{}, sourceVip, serviceVip, protocol, internalPort, externalPort)
+	lb, err := hns.getLoadBalancer(endpoints, loadBalancerFlags{}, sourceVip, serviceVip, protocol, internalPort, externalPort, lbs)
 	if err != nil {
 		t.Error(err)
 	}
