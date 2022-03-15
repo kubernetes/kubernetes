@@ -171,8 +171,8 @@ func (pl *TestPlugin) ScoreExtensions() framework.ScoreExtensions {
 	return nil
 }
 
-func (pl *TestPlugin) PreFilter(ctx context.Context, state *framework.CycleState, p *v1.Pod) *framework.Status {
-	return framework.NewStatus(framework.Code(pl.inj.PreFilterStatus), "injected status")
+func (pl *TestPlugin) PreFilter(ctx context.Context, state *framework.CycleState, p *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+	return nil, framework.NewStatus(framework.Code(pl.inj.PreFilterStatus), "injected status")
 }
 
 func (pl *TestPlugin) PreFilterExtensions() framework.PreFilterExtensions {
@@ -222,9 +222,9 @@ func (pl *TestPreFilterPlugin) Name() string {
 	return preFilterPluginName
 }
 
-func (pl *TestPreFilterPlugin) PreFilter(ctx context.Context, state *framework.CycleState, p *v1.Pod) *framework.Status {
+func (pl *TestPreFilterPlugin) PreFilter(ctx context.Context, state *framework.CycleState, p *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
 	pl.PreFilterCalled++
-	return nil
+	return nil, nil
 }
 
 func (pl *TestPreFilterPlugin) PreFilterExtensions() framework.PreFilterExtensions {
@@ -242,9 +242,9 @@ func (pl *TestPreFilterWithExtensionsPlugin) Name() string {
 	return preFilterWithExtensionsPluginName
 }
 
-func (pl *TestPreFilterWithExtensionsPlugin) PreFilter(ctx context.Context, state *framework.CycleState, p *v1.Pod) *framework.Status {
+func (pl *TestPreFilterWithExtensionsPlugin) PreFilter(ctx context.Context, state *framework.CycleState, p *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
 	pl.PreFilterCalled++
-	return nil
+	return nil, nil
 }
 
 func (pl *TestPreFilterWithExtensionsPlugin) AddPod(ctx context.Context, state *framework.CycleState, podToSchedule *v1.Pod,
@@ -270,8 +270,8 @@ func (dp *TestDuplicatePlugin) Name() string {
 	return duplicatePluginName
 }
 
-func (dp *TestDuplicatePlugin) PreFilter(ctx context.Context, state *framework.CycleState, p *v1.Pod) *framework.Status {
-	return nil
+func (dp *TestDuplicatePlugin) PreFilter(ctx context.Context, state *framework.CycleState, p *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+	return nil, nil
 }
 
 func (dp *TestDuplicatePlugin) PreFilterExtensions() framework.PreFilterExtensions {

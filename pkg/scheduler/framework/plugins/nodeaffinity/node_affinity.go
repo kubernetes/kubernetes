@@ -20,8 +20,10 @@ import (
 	"context"
 	"fmt"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
@@ -58,6 +60,9 @@ const (
 
 	// errReasonEnforced is the reason for added node affinity not matching.
 	errReasonEnforced = "node(s) didn't match scheduler-enforced node affinity"
+
+	// errReasonConflict is the reason for pod's conflicting affinity rules.
+	errReasonConflict = "pod affinity terms conflict"
 )
 
 // Name returns name of the plugin. It is used in logs, etc.
@@ -83,10 +88,51 @@ func (pl *NodeAffinity) EventsToRegister() []framework.ClusterEvent {
 }
 
 // PreFilter builds and writes cycle state used by Filter.
-func (pl *NodeAffinity) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod) *framework.Status {
+func (pl *NodeAffinity) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
 	state := &preFilterState{requiredNodeSelectorAndAffinity: nodeaffinity.GetRequiredNodeAffinity(pod)}
 	cycleState.Write(preFilterStateKey, state)
-	return nil
+	affinity := pod.Spec.Affinity
+	if affinity == nil ||
+		affinity.NodeAffinity == nil ||
+		affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil ||
+		len(affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms) == 0 {
+		return nil, nil
+	}
+
+	// Check if there is affinity to a specific node and return it.
+	terms := affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms
+	var nodeNames sets.String
+	for _, t := range terms {
+		var termNodeNames sets.String
+		for _, r := range t.MatchFields {
+			if r.Key == metav1.ObjectNameField && r.Operator == v1.NodeSelectorOpIn {
+				// The requirements represent ANDed constraints, and so we need to
+				// find the intersection of nodes.
+				s := sets.NewString(r.Values...)
+				if termNodeNames == nil {
+					termNodeNames = s
+				} else {
+					termNodeNames = termNodeNames.Intersection(s)
+				}
+			}
+		}
+		if termNodeNames == nil {
+			// If this term has no node.Name field affinity,
+			// then all nodes are eligible because the terms are ORed.
+			return nil, nil
+		}
+		// If the set is empty, it means the terms had affinity to different
+		// sets of nodes, and since they are ANDed, then the pod will not match any node.
+		if len(termNodeNames) == 0 {
+			return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, errReasonConflict)
+		}
+		nodeNames = nodeNames.Union(termNodeNames)
+	}
+	if nodeNames != nil {
+		return &framework.PreFilterResult{NodeNames: nodeNames}, nil
+	}
+	return nil, nil
+
 }
 
 // PreFilterExtensions not necessary for this plugin as state doesn't depend on pod additions or deletions.

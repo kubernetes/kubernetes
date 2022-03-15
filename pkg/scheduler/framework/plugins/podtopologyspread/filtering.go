@@ -140,13 +140,13 @@ func (s *preFilterState) updateWithPod(updatedPod, preemptorPod *v1.Pod, node *v
 }
 
 // PreFilter invoked at the prefilter extension point.
-func (pl *PodTopologySpread) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod) *framework.Status {
+func (pl *PodTopologySpread) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
 	s, err := pl.calPreFilterState(ctx, pod)
 	if err != nil {
-		return framework.AsStatus(err)
+		return nil, framework.AsStatus(err)
 	}
 	cycleState.Write(preFilterStateKey, s)
-	return nil
+	return nil, nil
 }
 
 // PreFilterExtensions returns prefilter extensions, pod add and remove.

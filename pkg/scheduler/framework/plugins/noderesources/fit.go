@@ -178,9 +178,9 @@ func computePodResourceRequest(pod *v1.Pod, enablePodOverhead bool) *preFilterSt
 }
 
 // PreFilter invoked at the prefilter extension point.
-func (f *Fit) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod) *framework.Status {
+func (f *Fit) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
 	cycleState.Write(preFilterStateKey, computePodResourceRequest(pod, f.enablePodOverhead))
-	return nil
+	return nil, nil
 }
 
 // PreFilterExtensions returns prefilter extensions, pod add and remove.

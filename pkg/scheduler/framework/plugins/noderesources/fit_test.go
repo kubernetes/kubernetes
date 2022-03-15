@@ -477,7 +477,7 @@ func TestEnoughRequests(t *testing.T) {
 				t.Fatal(err)
 			}
 			cycleState := framework.NewCycleState()
-			preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(context.Background(), cycleState, test.pod)
+			_, preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(context.Background(), cycleState, test.pod)
 			if !preFilterStatus.IsSuccess() {
 				t.Errorf("prefilter failed with status: %v", preFilterStatus)
 			}
@@ -555,7 +555,7 @@ func TestNotEnoughRequests(t *testing.T) {
 				t.Fatal(err)
 			}
 			cycleState := framework.NewCycleState()
-			preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(context.Background(), cycleState, test.pod)
+			_, preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(context.Background(), cycleState, test.pod)
 			if !preFilterStatus.IsSuccess() {
 				t.Errorf("prefilter failed with status: %v", preFilterStatus)
 			}
@@ -627,7 +627,7 @@ func TestStorageRequests(t *testing.T) {
 				t.Fatal(err)
 			}
 			cycleState := framework.NewCycleState()
-			preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(context.Background(), cycleState, test.pod)
+			_, preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(context.Background(), cycleState, test.pod)
 			if !preFilterStatus.IsSuccess() {
 				t.Errorf("prefilter failed with status: %v", preFilterStatus)
 			}

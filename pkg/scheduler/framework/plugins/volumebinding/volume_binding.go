@@ -169,17 +169,17 @@ func (pl *VolumeBinding) podHasPVCs(pod *v1.Pod) (bool, error) {
 // PreFilter invoked at the prefilter extension point to check if pod has all
 // immediate PVCs bound. If not all immediate PVCs are bound, an
 // UnschedulableAndUnresolvable is returned.
-func (pl *VolumeBinding) PreFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod) *framework.Status {
+func (pl *VolumeBinding) PreFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
 	// If pod does not reference any PVC, we don't need to do anything.
 	if hasPVC, err := pl.podHasPVCs(pod); err != nil {
-		return framework.NewStatus(framework.UnschedulableAndUnresolvable, err.Error())
+		return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, err.Error())
 	} else if !hasPVC {
 		state.Write(stateKey, &stateData{skip: true})
-		return nil
+		return nil, nil
 	}
 	boundClaims, claimsToBind, unboundClaimsImmediate, err := pl.Binder.GetPodVolumes(pod)
 	if err != nil {
-		return framework.AsStatus(err)
+		return nil, framework.AsStatus(err)
 	}
 	if len(unboundClaimsImmediate) > 0 {
 		// Return UnschedulableAndUnresolvable error if immediate claims are
@@ -187,10 +187,10 @@ func (pl *VolumeBinding) PreFilter(ctx context.Context, state *framework.CycleSt
 		// claims are bound by PV controller.
 		status := framework.NewStatus(framework.UnschedulableAndUnresolvable)
 		status.AppendReason("pod has unbound immediate PersistentVolumeClaims")
-		return status
+		return nil, status
 	}
 	state.Write(stateKey, &stateData{boundClaims: boundClaims, claimsToBind: claimsToBind, podVolumesByNode: make(map[string]*PodVolumes)})
-	return nil
+	return nil, nil
 }
 
 // PreFilterExtensions returns prefilter extensions, pod add and remove.

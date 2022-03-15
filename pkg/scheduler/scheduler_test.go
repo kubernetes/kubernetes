@@ -64,6 +64,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/profile"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
+	"k8s.io/utils/pointer"
 )
 
 var podTopologySpreadFunc = frameworkruntime.FactoryAdapter(feature.Features{}, podtopologyspread.New)
@@ -1794,14 +1795,15 @@ func TestFindNodesThatPassExtenders(t *testing.T) {
 func TestSchedulerSchedulePod(t *testing.T) {
 	fts := feature.Features{}
 	tests := []struct {
-		name            string
-		registerPlugins []st.RegisterPluginFunc
-		nodes           []string
-		pvcs            []v1.PersistentVolumeClaim
-		pod             *v1.Pod
-		pods            []*v1.Pod
-		expectedHosts   sets.String
-		wErr            error
+		name               string
+		registerPlugins    []st.RegisterPluginFunc
+		nodes              []string
+		pvcs               []v1.PersistentVolumeClaim
+		pod                *v1.Pod
+		pods               []*v1.Pod
+		wantNodes          sets.String
+		wantEvaluatedNodes *int32
+		wErr               error
 	}{
 		{
 			registerPlugins: []st.RegisterPluginFunc{
@@ -1830,11 +1832,11 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
-			nodes:         []string{"machine1", "machine2"},
-			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "ignore", UID: types.UID("ignore")}},
-			expectedHosts: sets.NewString("machine1", "machine2"),
-			name:          "test 2",
-			wErr:          nil,
+			nodes:     []string{"machine1", "machine2"},
+			pod:       &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "ignore", UID: types.UID("ignore")}},
+			wantNodes: sets.NewString("machine1", "machine2"),
+			name:      "test 2",
+			wErr:      nil,
 		},
 		{
 			// Fits on a machine where the pod ID matches the machine name
@@ -1843,11 +1845,11 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				st.RegisterFilterPlugin("MatchFilter", st.NewMatchFilterPlugin),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
-			nodes:         []string{"machine1", "machine2"},
-			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "machine2", UID: types.UID("machine2")}},
-			expectedHosts: sets.NewString("machine2"),
-			name:          "test 3",
-			wErr:          nil,
+			nodes:     []string{"machine1", "machine2"},
+			pod:       &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "machine2", UID: types.UID("machine2")}},
+			wantNodes: sets.NewString("machine2"),
+			name:      "test 3",
+			wErr:      nil,
 		},
 		{
 			registerPlugins: []st.RegisterPluginFunc{
@@ -1856,11 +1858,11 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
-			nodes:         []string{"3", "2", "1"},
-			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "ignore", UID: types.UID("ignore")}},
-			expectedHosts: sets.NewString("3"),
-			name:          "test 4",
-			wErr:          nil,
+			nodes:     []string{"3", "2", "1"},
+			pod:       &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "ignore", UID: types.UID("ignore")}},
+			wantNodes: sets.NewString("3"),
+			name:      "test 4",
+			wErr:      nil,
 		},
 		{
 			registerPlugins: []st.RegisterPluginFunc{
@@ -1869,11 +1871,11 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
-			nodes:         []string{"3", "2", "1"},
-			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
-			expectedHosts: sets.NewString("2"),
-			name:          "test 5",
-			wErr:          nil,
+			nodes:     []string{"3", "2", "1"},
+			pod:       &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
+			wantNodes: sets.NewString("2"),
+			name:      "test 5",
+			wErr:      nil,
 		},
 		{
 			registerPlugins: []st.RegisterPluginFunc{
@@ -1883,11 +1885,11 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				st.RegisterScorePlugin("ReverseNumericMap", newReverseNumericMapPlugin(), 2),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
-			nodes:         []string{"3", "2", "1"},
-			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
-			expectedHosts: sets.NewString("1"),
-			name:          "test 6",
-			wErr:          nil,
+			nodes:     []string{"3", "2", "1"},
+			pod:       &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
+			wantNodes: sets.NewString("1"),
+			name:      "test 6",
+			wErr:      nil,
 		},
 		{
 			registerPlugins: []st.RegisterPluginFunc{
@@ -1976,9 +1978,9 @@ func TestSchedulerSchedulePod(t *testing.T) {
 					},
 				},
 			},
-			expectedHosts: sets.NewString("machine1", "machine2"),
-			name:          "existing PVC",
-			wErr:          nil,
+			wantNodes: sets.NewString("machine1", "machine2"),
+			name:      "existing PVC",
+			wErr:      nil,
 		},
 		{
 			// Pod with non existing PVC
@@ -2136,8 +2138,8 @@ func TestSchedulerSchedulePod(t *testing.T) {
 					},
 				},
 			},
-			expectedHosts: sets.NewString("machine2"),
-			wErr:          nil,
+			wantNodes: sets.NewString("machine2"),
+			wErr:      nil,
 		},
 		{
 			name: "test podtopologyspread plugin - 3 nodes with maxskew=2",
@@ -2201,8 +2203,8 @@ func TestSchedulerSchedulePod(t *testing.T) {
 					},
 				},
 			},
-			expectedHosts: sets.NewString("machine2", "machine3"),
-			wErr:          nil,
+			wantNodes: sets.NewString("machine2", "machine3"),
+			wErr:      nil,
 		},
 		{
 			name: "test with filter plugin returning Unschedulable status",
@@ -2215,9 +2217,9 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
-			nodes:         []string{"3"},
-			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-filter", UID: types.UID("test-filter")}},
-			expectedHosts: nil,
+			nodes:     []string{"3"},
+			pod:       &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-filter", UID: types.UID("test-filter")}},
+			wantNodes: nil,
 			wErr: &framework.FitError{
 				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-filter", UID: types.UID("test-filter")}},
 				NumAllNodes: 1,
@@ -2240,9 +2242,9 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
-			nodes:         []string{"3"},
-			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-filter", UID: types.UID("test-filter")}},
-			expectedHosts: nil,
+			nodes:     []string{"3"},
+			pod:       &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-filter", UID: types.UID("test-filter")}},
+			wantNodes: nil,
 			wErr: &framework.FitError{
 				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-filter", UID: types.UID("test-filter")}},
 				NumAllNodes: 1,
@@ -2265,10 +2267,10 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
-			nodes:         []string{"1", "2"},
-			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-filter", UID: types.UID("test-filter")}},
-			expectedHosts: nil,
-			wErr:          nil,
+			nodes:     []string{"1", "2"},
+			pod:       &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-filter", UID: types.UID("test-filter")}},
+			wantNodes: nil,
+			wErr:      nil,
 		},
 		{
 			name: "test prefilter plugin returning Unschedulable status",
@@ -2276,13 +2278,13 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				st.RegisterPreFilterPlugin(
 					"FakePreFilter",
-					st.NewFakePreFilterPlugin(framework.NewStatus(framework.UnschedulableAndUnresolvable, "injected unschedulable status")),
+					st.NewFakePreFilterPlugin("FakePreFilter", nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, "injected unschedulable status")),
 				),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
-			nodes:         []string{"1", "2"},
-			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-prefilter", UID: types.UID("test-prefilter")}},
-			expectedHosts: nil,
+			nodes:     []string{"1", "2"},
+			pod:       &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-prefilter", UID: types.UID("test-prefilter")}},
+			wantNodes: nil,
 			wErr: &framework.FitError{
 				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-prefilter", UID: types.UID("test-prefilter")}},
 				NumAllNodes: 2,
@@ -2301,14 +2303,97 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				st.RegisterPreFilterPlugin(
 					"FakePreFilter",
-					st.NewFakePreFilterPlugin(framework.NewStatus(framework.Error, "injected error status")),
+					st.NewFakePreFilterPlugin("FakePreFilter", nil, framework.NewStatus(framework.Error, "injected error status")),
 				),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
-			nodes:         []string{"1", "2"},
-			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-prefilter", UID: types.UID("test-prefilter")}},
-			expectedHosts: nil,
-			wErr:          fmt.Errorf(`running PreFilter plugin "FakePreFilter": %w`, errors.New("injected error status")),
+			nodes:     []string{"1", "2"},
+			pod:       &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-prefilter", UID: types.UID("test-prefilter")}},
+			wantNodes: nil,
+			wErr:      fmt.Errorf(`running PreFilter plugin "FakePreFilter": %w`, errors.New("injected error status")),
+		},
+		{
+			name: "test prefilter plugin returning node",
+			registerPlugins: []st.RegisterPluginFunc{
+				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				st.RegisterPreFilterPlugin(
+					"FakePreFilter1",
+					st.NewFakePreFilterPlugin("FakePreFilter1", nil, nil),
+				),
+				st.RegisterPreFilterPlugin(
+					"FakePreFilter2",
+					st.NewFakePreFilterPlugin("FakePreFilter2", &framework.PreFilterResult{NodeNames: sets.NewString("node2")}, nil),
+				),
+				st.RegisterPreFilterPlugin(
+					"FakePreFilter3",
+					st.NewFakePreFilterPlugin("FakePreFilter3", &framework.PreFilterResult{NodeNames: sets.NewString("node1", "node2")}, nil),
+				),
+				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			},
+			nodes:              []string{"node1", "node2", "node3"},
+			pod:                &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-prefilter", UID: types.UID("test-prefilter")}},
+			wantNodes:          sets.NewString("node2"),
+			wantEvaluatedNodes: pointer.Int32Ptr(1),
+		},
+		{
+			name: "test prefilter plugin returning non-intersecting nodes",
+			registerPlugins: []st.RegisterPluginFunc{
+				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				st.RegisterPreFilterPlugin(
+					"FakePreFilter1",
+					st.NewFakePreFilterPlugin("FakePreFilter1", nil, nil),
+				),
+				st.RegisterPreFilterPlugin(
+					"FakePreFilter2",
+					st.NewFakePreFilterPlugin("FakePreFilter2", &framework.PreFilterResult{NodeNames: sets.NewString("node2")}, nil),
+				),
+				st.RegisterPreFilterPlugin(
+					"FakePreFilter3",
+					st.NewFakePreFilterPlugin("FakePreFilter3", &framework.PreFilterResult{NodeNames: sets.NewString("node1")}, nil),
+				),
+				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			},
+			nodes: []string{"node1", "node2", "node3"},
+			pod:   &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-prefilter", UID: types.UID("test-prefilter")}},
+			wErr: &framework.FitError{
+				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-prefilter", UID: types.UID("test-prefilter")}},
+				NumAllNodes: 3,
+				Diagnosis: framework.Diagnosis{
+					NodeToStatusMap: framework.NodeToStatusMap{
+						"node1": framework.NewStatus(framework.Unschedulable, "node(s) didn't satisfy plugin(s) [FakePreFilter2 FakePreFilter3] simultaneously"),
+						"node2": framework.NewStatus(framework.Unschedulable, "node(s) didn't satisfy plugin(s) [FakePreFilter2 FakePreFilter3] simultaneously"),
+						"node3": framework.NewStatus(framework.Unschedulable, "node(s) didn't satisfy plugin(s) [FakePreFilter2 FakePreFilter3] simultaneously"),
+					},
+					UnschedulablePlugins: sets.String{},
+				},
+			},
+		},
+		{
+			name: "test prefilter plugin returning empty node set",
+			registerPlugins: []st.RegisterPluginFunc{
+				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				st.RegisterPreFilterPlugin(
+					"FakePreFilter1",
+					st.NewFakePreFilterPlugin("FakePreFilter1", nil, nil),
+				),
+				st.RegisterPreFilterPlugin(
+					"FakePreFilter2",
+					st.NewFakePreFilterPlugin("FakePreFilter2", &framework.PreFilterResult{NodeNames: sets.NewString()}, nil),
+				),
+				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			},
+			nodes: []string{"node1"},
+			pod:   &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-prefilter", UID: types.UID("test-prefilter")}},
+			wErr: &framework.FitError{
+				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-prefilter", UID: types.UID("test-prefilter")}},
+				NumAllNodes: 1,
+				Diagnosis: framework.Diagnosis{
+					NodeToStatusMap: framework.NodeToStatusMap{
+						"node1": framework.NewStatus(framework.Unschedulable, "node(s) didn't satisfy plugin FakePreFilter2"),
+					},
+					UnschedulablePlugins: sets.String{},
+				},
+			},
 		},
 	}
 	for _, test := range tests {
@@ -2373,11 +2458,15 @@ func TestSchedulerSchedulePod(t *testing.T) {
 					}
 				}
 			}
-			if test.expectedHosts != nil && !test.expectedHosts.Has(result.SuggestedHost) {
-				t.Errorf("Expected: %s, got: %s", test.expectedHosts, result.SuggestedHost)
+			if test.wantNodes != nil && !test.wantNodes.Has(result.SuggestedHost) {
+				t.Errorf("Expected: %s, got: %s", test.wantNodes, result.SuggestedHost)
 			}
-			if test.wErr == nil && len(test.nodes) != result.EvaluatedNodes {
-				t.Errorf("Expected EvaluatedNodes: %d, got: %d", len(test.nodes), result.EvaluatedNodes)
+			wantEvaluatedNodes := len(test.nodes)
+			if test.wantEvaluatedNodes != nil {
+				wantEvaluatedNodes = int(*test.wantEvaluatedNodes)
+			}
+			if test.wErr == nil && wantEvaluatedNodes != result.EvaluatedNodes {
+				t.Errorf("Expected EvaluatedNodes: %d, got: %d", wantEvaluatedNodes, result.EvaluatedNodes)
 			}
 		})
 	}
