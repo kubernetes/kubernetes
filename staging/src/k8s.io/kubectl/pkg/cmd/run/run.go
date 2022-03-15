@@ -109,7 +109,7 @@ type RunOptions struct {
 	DeleteOptions *cmddelete.DeleteOptions
 
 	DryRunStrategy cmdutil.DryRunStrategy
-	DryRunVerifier *resource.DryRunVerifier
+	DryRunVerifier *resource.QueryParamVerifier
 
 	PrintObj func(runtime.Object) error
 	Recorder genericclioptions.Recorder
@@ -218,7 +218,7 @@ func (o *RunOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	if err != nil {
 		return err
 	}
-	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, f.OpenAPIGetter())
+	o.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 
 	attachFlag := cmd.Flags().Lookup("attach")
 	if !attachFlag.Changed && o.Interactive {

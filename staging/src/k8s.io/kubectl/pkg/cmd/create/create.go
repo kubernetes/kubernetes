@@ -52,7 +52,7 @@ type CreateOptions struct {
 	RecordFlags *genericclioptions.RecordFlags
 
 	DryRunStrategy cmdutil.DryRunStrategy
-	DryRunVerifier *resource.DryRunVerifier
+	DryRunVerifier *resource.QueryParamVerifier
 
 	fieldManager string
 
@@ -207,7 +207,7 @@ func (o *CreateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	if err != nil {
 		return err
 	}
-	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, f.OpenAPIGetter())
+	o.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
@@ -344,7 +344,7 @@ type CreateSubcommandOptions struct {
 	// StructuredGenerator is the resource generator for the object being created
 	StructuredGenerator generate.StructuredGenerator
 	DryRunStrategy      cmdutil.DryRunStrategy
-	DryRunVerifier      *resource.DryRunVerifier
+	DryRunVerifier      *resource.QueryParamVerifier
 	CreateAnnotation    bool
 	FieldManager        string
 
@@ -384,7 +384,7 @@ func (o *CreateSubcommandOptions) Complete(f cmdutil.Factory, cmd *cobra.Command
 	if err != nil {
 		return err
 	}
-	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, f.OpenAPIGetter())
+	o.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 	o.CreateAnnotation = cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
 
 	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)

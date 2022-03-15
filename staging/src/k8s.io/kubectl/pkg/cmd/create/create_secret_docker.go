@@ -110,7 +110,7 @@ type CreateSecretDockerRegistryOptions struct {
 
 	Client         corev1client.CoreV1Interface
 	DryRunStrategy cmdutil.DryRunStrategy
-	DryRunVerifier *resource.DryRunVerifier
+	DryRunVerifier *resource.QueryParamVerifier
 
 	genericclioptions.IOStreams
 }
@@ -194,7 +194,7 @@ func (o *CreateSecretDockerRegistryOptions) Complete(f cmdutil.Factory, cmd *cob
 		return err
 	}
 
-	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
+	o.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, discoveryClient, resource.QueryParamDryRun)
 
 	o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
