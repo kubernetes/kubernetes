@@ -18,7 +18,6 @@ package cel
 
 import (
 	"fmt"
-	"math"
 	"strings"
 	"time"
 
@@ -43,12 +42,12 @@ const (
 	OldScopedVarName = "oldSelf"
 
 	// PerCallLimit specify the actual cost limit per CEL validation call
-	//TODO: pick the number for PerCallLimit
-	PerCallLimit = uint64(math.MaxInt64)
+	// current PerCallLimit gives roughly 0.1 second for each expression validation call
+	PerCallLimit = 2000000
 
 	// RuntimeCELCostBudget is the overall cost budget for runtime CEL validation cost per CustomResource
-	//TODO: pick the RuntimeCELCostBudget
-	RuntimeCELCostBudget = math.MaxInt64
+	// current RuntimeCELCostBudget gives roughly 1 seconds for CR validation
+	RuntimeCELCostBudget = 20000000
 )
 
 // CompilationResult represents the cel compilation result for one rule
