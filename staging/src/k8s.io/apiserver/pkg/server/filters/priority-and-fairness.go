@@ -110,7 +110,6 @@ func WithPriorityAndFairness(
 
 			httplog.AddKeyValue(ctx, "apf_pl", truncateLogField(pl.Name))
 			httplog.AddKeyValue(ctx, "apf_fs", truncateLogField(fs.Name))
-			httplog.AddKeyValue(ctx, "apf_fd", truncateLogField(flowDistinguisher))
 		}
 		// estimateWork is called, if at all, after noteFn
 		estimateWork := func() flowcontrolrequest.WorkEstimate {
