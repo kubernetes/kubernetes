@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"reflect"
 	"strings"
@@ -32,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	diskcached "k8s.io/client-go/discovery/cached/disk"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/gengo/examples/set-gen/sets"
@@ -169,7 +171,15 @@ func TestServerSidePrint(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
+	httpClient, err := rest.HTTPClientFor(restConfig)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	configFlags.WithDiscoveryClient(cachedClient)
+	configFlags.WithHTTPClientFunc(func() (*http.Client, error) {
+		return httpClient, nil
+	})
 
 	factory := util.NewFactory(configFlags)
 	mapper, err := factory.ToRESTMapper()
