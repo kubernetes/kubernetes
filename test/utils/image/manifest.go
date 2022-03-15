@@ -158,8 +158,6 @@ const (
 	AuthenticatedWindowsNanoServer
 	// BusyBox image
 	BusyBox
-	// CheckMetadataConcealment image
-	CheckMetadataConcealment
 	// CudaVectorAdd image
 	CudaVectorAdd
 	// CudaVectorAdd2 image
@@ -240,7 +238,6 @@ func initImageConfigs(list RegistryList) (map[int]Config, map[int]Config) {
 	configs[APIServer] = Config{list.PromoterE2eRegistry, "sample-apiserver", "1.17.5"}
 	configs[AppArmorLoader] = Config{list.PromoterE2eRegistry, "apparmor-loader", "1.4"}
 	configs[BusyBox] = Config{list.PromoterE2eRegistry, "busybox", "1.29-2"}
-	configs[CheckMetadataConcealment] = Config{list.PromoterE2eRegistry, "metadata-concealment", "1.6"}
 	configs[CudaVectorAdd] = Config{list.PromoterE2eRegistry, "cuda-vector-add", "1.0"}
 	configs[CudaVectorAdd2] = Config{list.PromoterE2eRegistry, "cuda-vector-add", "2.2"}
 	configs[DebianIptables] = Config{list.BuildImageRegistry, "debian-iptables", "bullseye-v1.1.0"}
