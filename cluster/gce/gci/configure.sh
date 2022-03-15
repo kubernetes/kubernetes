@@ -457,8 +457,10 @@ function try-load-docker-image {
 
   if [[ "${CONTAINER_RUNTIME_NAME:-}" == "containerd" || "${CONTAINERD_TEST:-}"  == "containerd" ]]; then
     load_image_command=${LOAD_IMAGE_COMMAND:-ctr -n=k8s.io images import}
+    tag_image_command=${TAG_IMAGE_COMMAND:-ctr -n=k8s.io images tag}
   else
     load_image_command="${LOAD_IMAGE_COMMAND:-}"
+    tag_image_command="${TAG_IMAGE_COMMAND:-}"
   fi
 
   # Deliberately word split load_image_command
@@ -472,6 +474,15 @@ function try-load-docker-image {
       sleep 5
     fi
   done
+
+  if [[ -n "${KUBE_ADDON_REGISTRY:-}" ]]; then
+    # remove the prefix and suffix from the path to get the container name
+    container=${img##*/}
+    container=${container%.tar}
+    # find the right one for which we will need an additional tag
+    container=$(ctr -n k8s.io images ls | grep "k8s.gcr.io/${container}" | awk '{print $1}' | cut -f 2 -d '/')
+    ${tag_image_command} "k8s.gcr.io/${container}" "${KUBE_ADDON_REGISTRY}/${container}"
+  fi
   # Re-enable errexit.
   set -e
 }
