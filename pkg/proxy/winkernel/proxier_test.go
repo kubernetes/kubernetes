@@ -69,10 +69,30 @@ func (hns fakeHNS) getNetworkByName(name string) (*hnsNetworkInfo, error) {
 	}, nil
 }
 
+func (hns fakeHNS) getAllEndpointsByNetwork(networkName string) (map[string]*(endpointsInfo), error) {
+	return nil, nil
+}
+
 func (hns fakeHNS) getEndpointByID(id string) (*endpointsInfo, error) {
 	return nil, nil
 }
 
+<<<<<<< HEAD
+=======
+func (hns fakeHNS) getEndpointByName(name string) (*endpointsInfo, error) {
+	return &endpointsInfo{
+		isLocal:    true,
+		macAddress: macAddress,
+		hnsID:      guid,
+		hns:        hns,
+	}, nil
+}
+
+func (hns fakeHNS) getAllLoadBalancers() (map[loadBalancerIdentifier]*loadBalancerInfo, error) {
+	return nil, nil
+}
+
+>>>>>>> Winkernel proxier cache HNS data to improve syncProxyRules performance
 func (hns fakeHNS) getEndpointByIpAddress(ip string, networkName string) (*endpointsInfo, error) {
 	_, ipNet, _ := netutils.ParseCIDRSloppy(destinationPrefix)
 
@@ -103,7 +123,7 @@ func (hns fakeHNS) deleteEndpoint(hnsID string) error {
 	return nil
 }
 
-func (hns fakeHNS) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFlags, sourceVip string, vip string, protocol uint16, internalPort uint16, externalPort uint16) (*loadBalancerInfo, error) {
+func (hns fakeHNS) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFlags, sourceVip string, vip string, protocol uint16, internalPort uint16, externalPort uint16, previousLoadBalancers map[loadBalancerIdentifier]*loadBalancerInfo) (*loadBalancerInfo, error) {
 	return &loadBalancerInfo{
 		hnsID: guid,
 	}, nil
