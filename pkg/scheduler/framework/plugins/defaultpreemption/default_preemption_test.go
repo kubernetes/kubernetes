@@ -177,7 +177,7 @@ func TestPostFilter(t *testing.T) {
 				"node1": framework.NewStatus(framework.Unschedulable),
 			},
 			wantResult: framework.NewPostFilterResultWithNominatedNode(""),
-			wantStatus: framework.NewStatus(framework.Unschedulable, "preemption: 0/1 nodes are available: 1 No victims found on node node1 for preemptor pod p."),
+			wantStatus: framework.NewStatus(framework.Unschedulable, "preemption: 0/1 nodes are available: 1 No preemption victims found for incoming pod."),
 		},
 		{
 			name: "preemption should respect filteredNodesStatuses",
@@ -258,17 +258,20 @@ func TestPostFilter(t *testing.T) {
 			pods: []*v1.Pod{
 				st.MakePod().Name("p1").UID("p1").Namespace(v1.NamespaceDefault).Node("node1").Priority(highPriority).Obj(),
 				st.MakePod().Name("p2").UID("p2").Namespace(v1.NamespaceDefault).Node("node2").Obj(),
+				st.MakePod().Name("p3").UID("p3").Namespace(v1.NamespaceDefault).Node("node3").Priority(highPriority).Obj(),
 			},
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Capacity(onePodRes).Obj(), // no pod will be preempted
 				st.MakeNode().Name("node2").Capacity(nodeRes).Obj(),   // no enough CPU resource
+				st.MakeNode().Name("node3").Capacity(onePodRes).Obj(), // no pod will be preempted
 			},
 			filteredNodesStatuses: framework.NodeToStatusMap{
 				"node1": framework.NewStatus(framework.Unschedulable),
 				"node2": framework.NewStatus(framework.Unschedulable),
+				"node3": framework.NewStatus(framework.Unschedulable),
 			},
 			wantResult: framework.NewPostFilterResultWithNominatedNode(""),
-			wantStatus: framework.NewStatus(framework.Unschedulable, "preemption: 0/2 nodes are available: 1 Insufficient cpu, 1 No victims found on node node1 for preemptor pod p."),
+			wantStatus: framework.NewStatus(framework.Unschedulable, "preemption: 0/3 nodes are available: 1 Insufficient cpu, 2 No preemption victims found for incoming pod."),
 		},
 		{
 			name: "no candidate nodes found with mixed reason, 2 UnschedulableAndUnresolvable nodes and 2 nodes don't have enough CPU resource",
