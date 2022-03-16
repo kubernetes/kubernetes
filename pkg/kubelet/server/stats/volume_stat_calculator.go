@@ -177,10 +177,7 @@ func (s *volumeStatCalculator) calcAndStoreStats() {
 // parsePodVolumeStats converts (internal) volume.Metrics to (external) stats.VolumeStats structures
 func (s *volumeStatCalculator) parsePodVolumeStats(podName string, pvcRef *stats.PVCReference, metric *volume.Metrics, volSpec v1.Volume) stats.VolumeStats {
 
-	var (
-		available, capacity, used, inodes, inodesFree, inodesUsed uint64
-	)
-
+	var available, capacity, used, inodes, inodesFree, inodesUsed uint64
 	if metric.Available != nil {
 		available = uint64(metric.Available.Value())
 	}
@@ -200,18 +197,10 @@ func (s *volumeStatCalculator) parsePodVolumeStats(podName string, pvcRef *stats
 		inodesUsed = uint64(metric.InodesUsed.Value())
 	}
 
-	volumeStats := stats.VolumeStats{
+	return stats.VolumeStats{
 		Name:   podName,
 		PVCRef: pvcRef,
 		FsStats: stats.FsStats{Time: metric.Time, AvailableBytes: &available, CapacityBytes: &capacity,
 			UsedBytes: &used, Inodes: &inodes, InodesFree: &inodesFree, InodesUsed: &inodesUsed},
 	}
-
-	if metric.Abnormal != nil {
-		volumeStats.VolumeHealthStats = &stats.VolumeHealthStats{
-			Abnormal: *metric.Abnormal,
-		}
-	}
-
-	return volumeStats
 }
