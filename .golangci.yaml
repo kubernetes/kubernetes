@@ -21,10 +21,17 @@ linters:
   # - structcheck
   # - varcheck
     - ineffassign
+    - misspell
     - staticcheck
     - unused
 
 linters-settings: # please keep this alphabetized
+  misspell:
+    ignore-words:
+      - etc
+      - ect
+      - Creater
+      - creater
   staticcheck:
     go: "1.17"
     checks: [
