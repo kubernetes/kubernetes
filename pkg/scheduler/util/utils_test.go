@@ -19,7 +19,6 @@ package util
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"testing"
 	"time"
 
@@ -207,16 +206,21 @@ func TestClearNominatedNodeName(t *testing.T) {
 
 			})
 
-			if err := ClearNominatedNodeName(cs, test.pods...); err != nil && !reflect.DeepEqual(err.Errors(), test.expectedPatchError.Errors()) {
-				t.Fatalf("ClearNominatedNodeName's error mismatch: Actual was %v, but expected %v", err.Errors(), test.expectedPatchError.Errors())
+			if err := ClearNominatedNodeName(cs, test.pods...); err != nil {
+				if diff := cmp.Diff(err, test.expectedPatchError); diff != "" {
+					t.Fatalf("ClearNominatedNodeName's error mismatch (-want,+got):\n%s", diff)
+				}
+
 			}
 
 			if actualPatchRequests != test.expectedPatchRequests {
 				t.Fatalf("Actual patch requests (%d) dos not equal expected patch requests (%d)", actualPatchRequests, test.expectedPatchRequests)
 			}
 
-			if test.expectedPatchRequests > 0 && !reflect.DeepEqual(actualPatchData, test.expectedPatchData) {
-				t.Fatalf("Patch data mismatch: Actual was %v, but expected %v", actualPatchData, test.expectedPatchData)
+			if test.expectedPatchRequests > 0 {
+				if diff := cmp.Diff(actualPatchData, test.expectedPatchData); diff != "" {
+					t.Fatalf("Patch data mismatch (-want,+got):\n%s", diff)
+				}
 			}
 		})
 	}
