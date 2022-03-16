@@ -58,7 +58,7 @@ const (
 	// We have seen one of these calls take just over 15 seconds, so putting this at 30.
 	proxyHTTPCallTimeout = 30 * time.Second
 	podRetryPeriod       = 1 * time.Second
-	podRetryTimeout      = 1 * time.Minute
+	podRetryTimeout      = 2 * time.Minute
 
 	requestRetryPeriod  = 10 * time.Millisecond
 	requestRetryTimeout = 1 * time.Minute
