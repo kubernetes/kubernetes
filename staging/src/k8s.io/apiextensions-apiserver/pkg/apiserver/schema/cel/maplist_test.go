@@ -25,12 +25,12 @@ import (
 
 func TestMapList(t *testing.T) {
 	for _, tc := range []struct {
-		name        string
-		sts         schema.Structural
-		keyStrategy keyStrategy
-		items       []interface{}
-		query       interface{}
-		expected    interface{}
+		name          string
+		sts           schema.Structural
+		items         []interface{}
+		warmUpQueries []interface{}
+		query         interface{}
+		expected      interface{}
 	}{
 		{
 			name: "default list type",
@@ -109,102 +109,6 @@ func TestMapList(t *testing.T) {
 			},
 		},
 		{
-			name: "single key with faked composite key collision",
-			sts: schema.Structural{
-				Generic: schema.Generic{
-					Type: "array",
-				},
-				Extensions: schema.Extensions{
-					XListType:    &listTypeMap,
-					XListMapKeys: []string{"k"},
-				},
-			},
-			keyStrategy: collisionfulKeyStrategy{},
-			items: []interface{}{
-				map[string]interface{}{
-					"k":  "a",
-					"v1": "a",
-				},
-				map[string]interface{}{
-					"k":  "b",
-					"v1": "b",
-				},
-			},
-			query: map[string]interface{}{
-				"k":  "b",
-				"v1": "B",
-			},
-			expected: map[string]interface{}{
-				"k":  "b",
-				"v1": "b",
-			},
-		},
-		{
-			name: "single key with default",
-			sts: schema.Structural{
-				Generic: schema.Generic{
-					Type: "array",
-				},
-				Extensions: schema.Extensions{
-					XListType:    &listTypeMap,
-					XListMapKeys: []string{"k"},
-				},
-				Properties: map[string]schema.Structural{
-					"k": {
-						Generic: schema.Generic{
-							Default: schema.JSON{Object: "a"},
-						},
-					},
-				},
-			},
-			items: []interface{}{
-				map[string]interface{}{
-					"v1": "a",
-				},
-				map[string]interface{}{
-					"k":  "b",
-					"v1": "b",
-				},
-			},
-			query: map[string]interface{}{
-				"k":  "a",
-				"v1": "A",
-			},
-			expected: map[string]interface{}{
-				"v1": "a",
-			},
-		},
-		{
-			name: "single key with defaulted key missing from query",
-			sts: schema.Structural{
-				Generic: schema.Generic{
-					Type: "array",
-				},
-				Extensions: schema.Extensions{
-					XListType:    &listTypeMap,
-					XListMapKeys: []string{"k"},
-				},
-				Properties: map[string]schema.Structural{
-					"k": {
-						Generic: schema.Generic{
-							Default: schema.JSON{Object: "a"},
-						},
-					},
-				},
-			},
-			items: []interface{}{
-				map[string]interface{}{
-					"v1": "a",
-				},
-			},
-			query: map[string]interface{}{
-				"v1": "A",
-			},
-			expected: map[string]interface{}{
-				"v1": "a",
-			},
-		},
-		{
 			name: "single key ignoring non-map query",
 			sts: schema.Structural{
 				Generic: schema.Generic{
@@ -278,7 +182,7 @@ func TestMapList(t *testing.T) {
 			},
 		},
 		{
-			name: "ignores items with duplicated key",
+			name: "keep first entry when duplicated keys are encountered",
 			sts: schema.Structural{
 				Generic: schema.Generic{
 					Type: "array",
@@ -302,50 +206,52 @@ func TestMapList(t *testing.T) {
 				"k":  "a",
 				"v1": "A",
 			},
-			expected: nil,
+			expected: map[string]interface{}{
+				"k":  "a",
+				"v1": "a",
+			},
 		},
 		{
-			name: "multiple keys with defaults missing from query",
+			name: "keep first entry when duplicated multi-keys are encountered",
 			sts: schema.Structural{
 				Generic: schema.Generic{
 					Type: "array",
 				},
 				Extensions: schema.Extensions{
 					XListType:    &listTypeMap,
-					XListMapKeys: []string{"kb", "kf", "ki", "ks"},
-				},
-				Properties: map[string]schema.Structural{
-					"kb": {
-						Generic: schema.Generic{
-							Default: schema.JSON{Object: true},
-						},
-					},
-					"kf": {
-						Generic: schema.Generic{
-							Default: schema.JSON{Object: float64(2.0)},
-						},
-					},
-					"ki": {
-						Generic: schema.Generic{
-							Default: schema.JSON{Object: int64(42)},
-						},
-					},
-					"ks": {
-						Generic: schema.Generic{
-							Default: schema.JSON{Object: "hello"},
-						},
-					},
+					XListMapKeys: []string{"k1", "k2"},
 				},
 			},
 			items: []interface{}{
 				map[string]interface{}{
+					"k1": "a",
+					"k2": "b",
 					"v1": "a",
+				},
+				map[string]interface{}{
+					"k1": "a",
+					"k2": "b",
+					"v1": "b",
+				},
+				map[string]interface{}{
+					"k1": "x",
+					"k2": "y",
+					"v1": "z",
+				},
+			},
+			warmUpQueries: []interface{}{
+				map[string]interface{}{
+					"k1": "x",
+					"k2": "y",
 				},
 			},
 			query: map[string]interface{}{
-				"v1": "A",
+				"k1": "a",
+				"k2": "b",
 			},
 			expected: map[string]interface{}{
+				"k1": "a",
+				"k2": "b",
 				"v1": "a",
 			},
 		},
@@ -415,20 +321,14 @@ func TestMapList(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			ks := tc.keyStrategy
-			if ks == nil {
-				ks = makeKeyStrategy(&tc.sts)
+			mapList := makeMapList(&tc.sts, tc.items)
+			for _, warmUp := range tc.warmUpQueries {
+				mapList.get(warmUp)
 			}
-			actual := makeMapList(&tc.sts, ks, tc.items).get(tc.query)
+			actual := mapList.get(tc.query)
 			if !reflect.DeepEqual(tc.expected, actual) {
 				t.Errorf("got: %v, expected %v", actual, tc.expected)
 			}
 		})
 	}
-}
-
-type collisionfulKeyStrategy struct{}
-
-func (collisionfulKeyStrategy) CompositeKeyFor(obj map[string]interface{}) (interface{}, bool) {
-	return 7, true
 }

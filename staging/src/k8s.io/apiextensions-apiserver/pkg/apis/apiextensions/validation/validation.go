@@ -787,8 +787,7 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 		for property, jsonSchema := range schema.Properties {
 			subSsv := ssv
 
-			// defensively assumes that a future map type is uncorrelatable
-			if schema.XMapType != nil && (*schema.XMapType != "granular" && *schema.XMapType != "atomic") {
+			if !cel.MapIsCorrelatable(schema.XMapType) {
 				subSsv = subSsv.withForbidOldSelfValidations(fldPath)
 			}
 
