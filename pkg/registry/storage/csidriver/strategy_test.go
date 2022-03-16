@@ -211,18 +211,36 @@ func TestCSIDriverPrepareForUpdate(t *testing.T) {
 			RequiresRepublish: &enabled,
 		},
 	}
+	driverWithSELinuxMountEnabled := &storage.CSIDriver{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foo",
+		},
+		Spec: storage.CSIDriverSpec{
+			SELinuxMount: &enabled,
+		},
+	}
+	driverWithSELinuxMountDisabled := &storage.CSIDriver{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foo",
+		},
+		Spec: storage.CSIDriverSpec{
+			SELinuxMount: &disabled,
+		},
+	}
 
 	resultPersistent := []storage.VolumeLifecycleMode{storage.VolumeLifecyclePersistent}
 
 	tests := []struct {
-		name                   string
-		old, update            *storage.CSIDriver
-		csiInlineVolumeEnabled bool
-		wantCapacity           *bool
-		wantModes              []storage.VolumeLifecycleMode
-		wantTokenRequests      []storage.TokenRequest
-		wantRequiresRepublish  *bool
-		wantGeneration         int64
+		name                                string
+		old, update                         *storage.CSIDriver
+		csiInlineVolumeEnabled              bool
+		seLinuxMountReadWriteOncePodEnabled bool
+		wantCapacity                        *bool
+		wantModes                           []storage.VolumeLifecycleMode
+		wantTokenRequests                   []storage.TokenRequest
+		wantRequiresRepublish               *bool
+		wantGeneration                      int64
+		wantSELinuxMount                    *bool
 	}{
 		{
 			name:         "capacity feature enabled, before: none, update: enabled",
@@ -237,20 +255,20 @@ func TestCSIDriverPrepareForUpdate(t *testing.T) {
 			wantCapacity: &disabled,
 		},
 		{
-			name:                   "inline feature enabled, before: none, update: persitent",
+			name:                   "inline feature enabled, before: none, update: persistent",
 			csiInlineVolumeEnabled: true,
 			old:                    driverWithNothing,
 			update:                 driverWithPersistent,
 			wantModes:              resultPersistent,
 		},
 		{
-			name:      "inline feature disabled, before: none, update: persitent",
+			name:      "inline feature disabled, before: none, update: persistent",
 			old:       driverWithNothing,
 			update:    driverWithPersistent,
 			wantModes: nil,
 		},
 		{
-			name:      "inline feature disabled, before: ephemeral, update: persitent",
+			name:      "inline feature disabled, before: ephemeral, update: persistent",
 			old:       driverWithEphemeral,
 			update:    driverWithPersistent,
 			wantModes: resultPersistent,
@@ -263,11 +281,54 @@ func TestCSIDriverPrepareForUpdate(t *testing.T) {
 			wantRequiresRepublish: &enabled,
 			wantGeneration:        1,
 		},
+		{
+			name:                                "SELinux mount support feature enabled, before: nil, update: on",
+			seLinuxMountReadWriteOncePodEnabled: true,
+			old:                                 driverWithNothing,
+			update:                              driverWithSELinuxMountEnabled,
+			wantSELinuxMount:                    &enabled,
+		},
+		{
+			name:                                "SELinux mount support feature enabled, before: off, update: on",
+			seLinuxMountReadWriteOncePodEnabled: true,
+			old:                                 driverWithSELinuxMountDisabled,
+			update:                              driverWithSELinuxMountEnabled,
+			wantSELinuxMount:                    &enabled,
+		},
+		{
+			name:                                "SELinux mount support feature enabled, before: on, update: off",
+			seLinuxMountReadWriteOncePodEnabled: true,
+			old:                                 driverWithSELinuxMountEnabled,
+			update:                              driverWithSELinuxMountDisabled,
+			wantSELinuxMount:                    &disabled,
+		},
+		{
+			name:                                "SELinux mount support feature disabled, before: nil, update: on",
+			seLinuxMountReadWriteOncePodEnabled: false,
+			old:                                 driverWithNothing,
+			update:                              driverWithSELinuxMountEnabled,
+			wantSELinuxMount:                    nil,
+		},
+		{
+			name:                                "SELinux mount support feature disabled, before: off, update: on",
+			seLinuxMountReadWriteOncePodEnabled: false,
+			old:                                 driverWithSELinuxMountDisabled,
+			update:                              driverWithSELinuxMountEnabled,
+			wantSELinuxMount:                    &enabled,
+		},
+		{
+			name:                                "SELinux mount support feature enabled, before: on, update: off",
+			seLinuxMountReadWriteOncePodEnabled: false,
+			old:                                 driverWithSELinuxMountEnabled,
+			update:                              driverWithSELinuxMountDisabled,
+			wantSELinuxMount:                    &disabled,
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, test.csiInlineVolumeEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, test.seLinuxMountReadWriteOncePodEnabled)()
 
 			csiDriver := test.update.DeepCopy()
 			Strategy.PrepareForUpdate(ctx, csiDriver, test.old)
@@ -276,9 +337,9 @@ func TestCSIDriverPrepareForUpdate(t *testing.T) {
 			require.Equal(t, test.wantModes, csiDriver.Spec.VolumeLifecycleModes)
 			require.Equal(t, test.wantTokenRequests, csiDriver.Spec.TokenRequests)
 			require.Equal(t, test.wantRequiresRepublish, csiDriver.Spec.RequiresRepublish)
+			require.Equal(t, test.wantSELinuxMount, csiDriver.Spec.SELinuxMounted)
 		})
 	}
-
 }
 
 func TestCSIDriverValidation(t *testing.T) {
