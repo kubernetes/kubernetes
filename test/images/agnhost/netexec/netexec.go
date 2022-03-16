@@ -28,9 +28,11 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"os/signal"
 	"strconv"
 	"strings"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/ishidawataru/sctp"
@@ -51,6 +53,7 @@ var (
 	privKeyFile        = ""
 	httpOverride       = ""
 	udpListenAddresses = ""
+	delayShutdown      = 0
 )
 
 const bindToAny = ""
@@ -134,6 +137,7 @@ func init() {
 	CmdNetexec.Flags().IntVar(&sctpPort, "sctp-port", -1, "SCTP Listen Port")
 	CmdNetexec.Flags().StringVar(&httpOverride, "http-override", "", "Override the HTTP handler to always respond as if it were a GET with this path & params")
 	CmdNetexec.Flags().StringVar(&udpListenAddresses, "udp-listen-addresses", "", "A comma separated list of ip addresses the udp servers listen from")
+	CmdNetexec.Flags().IntVar(&delayShutdown, "delay-shutdown", 0, "Number of seconds to delay shutdown when receiving SIGTERM.")
 }
 
 // atomicBool uses load/store operations on an int32 to simulate an atomic boolean.
@@ -157,6 +161,18 @@ func (a *atomicBool) get() bool {
 
 func main(cmd *cobra.Command, args []string) {
 	exitCh := make(chan shutdownRequest)
+
+	if delayShutdown > 0 {
+		termCh := make(chan os.Signal, 1)
+		signal.Notify(termCh, syscall.SIGTERM)
+		go func() {
+			<-termCh
+			log.Printf("Sleeping %d seconds before terminating...", delayShutdown)
+			time.Sleep(time.Duration(delayShutdown) * time.Second)
+			os.Exit(0)
+		}()
+	}
+
 	if httpOverride != "" {
 		mux := http.NewServeMux()
 		addRoutes(mux, exitCh)
