@@ -19,7 +19,6 @@ package admission
 import (
 	"context"
 	"fmt"
-	"sync"
 
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/audit"
@@ -28,9 +27,6 @@ import (
 // auditHandler logs annotations set by other admission handlers
 type auditHandler struct {
 	Interface
-	// TODO: move the lock near the Annotations field of the audit event so it is always protected from concurrent access.
-	// to protect the 'Annotations' map of the audit event from concurrent writes
-	mutex sync.Mutex
 }
 
 var _ Interface = &auditHandler{}
@@ -88,9 +84,6 @@ func ensureAnnotationGetter(a Attributes) error {
 }
 
 func (handler *auditHandler) logAnnotations(ctx context.Context, a Attributes) {
-	handler.mutex.Lock()
-	defer handler.mutex.Unlock()
-
 	auditLevel, ok := audit.GetAuditLevel(ctx)
 	if !ok {
 		// If no level is available, assume the highest level to avoid dropping data.

@@ -18,6 +18,7 @@ package audit
 
 import (
 	"context"
+	"sync"
 
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -38,6 +39,9 @@ const (
 	// auditKey is the context key for storing the audit event that is being
 	// captured and the evaluated policy that applies to the given request.
 	auditKey
+
+	// auditAnnotationsMutexKey is the context key for the audit annotations mutex.
+	auditAnnotationsMutexKey
 )
 
 // annotations = *[]annotation instead of a map to preserve order of insertions
@@ -55,6 +59,7 @@ func WithAuditAnnotations(parent context.Context) context.Context {
 	if _, ok := parent.Value(auditAnnotationsKey).(*[]annotation); ok {
 		return parent
 	}
+	parent = withAuditAnnotationsMutex(parent)
 
 	var annotations []annotation // avoid allocations until we actually need it
 	return genericapirequest.WithValue(parent, auditAnnotationsKey, &annotations)
@@ -65,9 +70,16 @@ func WithAuditAnnotations(parent context.Context) context.Context {
 // The notable exception being that this function must not be called via a
 // defer statement (i.e. after ServeHTTP) in a handler that runs before WithAudit
 // as at that point the audit event has already been sent to the audit sink.
-// Handlers that are unaware of their position in the overall request flow should
-// prefer AddAuditAnnotation over LogAnnotation to avoid dropping annotations.
 func AddAuditAnnotation(ctx context.Context, key, value string) {
+	mutex, ok := auditAnnotationsMutex(ctx)
+	if !ok {
+		klog.Errorf("Attempted to add audit annotation from unsupported request chain: %q=%q", key, value)
+		return
+	}
+
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	// use the audit event directly if we have it
 	if ae := auditEventFrom(ctx); ae != nil {
 		logAnnotation(ae, key, value)
@@ -85,16 +97,48 @@ func AddAuditAnnotation(ctx context.Context, key, value string) {
 // AddAuditAnnotations is the bulk version of AddAuditAnnotation.
 // keysAndValues are the key-value pairs to add, and must have an even number of items.
 func AddAuditAnnotations(ctx context.Context, keysAndValues ...string) {
+	mutex, ok := auditAnnotationsMutex(ctx)
+	if !ok {
+		klog.Errorf("Attempted to add audit annotations from unsupported request chain: %v", keysAndValues)
+		return
+	}
+
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	if len(keysAndValues)%2 != 0 {
 		klog.Errorf("Dropping mismatched audit annotation %q", keysAndValues[len(keysAndValues)-1])
 	}
+
+	// use the audit event directly if we have it
+	if ae := auditEventFrom(ctx); ae != nil {
+		for i := 0; i < len(keysAndValues); i += 2 {
+			logAnnotation(ae, keysAndValues[i], keysAndValues[i+1])
+		}
+		return
+	}
+
+	annotations, ok := ctx.Value(auditAnnotationsKey).(*[]annotation)
+	if !ok {
+		return // adding audit annotation is not supported at this call site
+	}
+
 	for i := 0; i < len(keysAndValues); i += 2 {
-		AddAuditAnnotation(ctx, keysAndValues[i], keysAndValues[i+1])
+		*annotations = append(*annotations, annotation{key: keysAndValues[i], value: keysAndValues[i+1]})
 	}
 }
 
 // This is private to prevent reads/write to the slice from outside of this package.
 func addAuditAnnotationsFrom(ctx context.Context, ev *auditinternal.Event) {
+	mutex, ok := auditAnnotationsMutex(ctx)
+	if !ok {
+		klog.Errorf("Attempted to copy audit annotations from unsupported request chain")
+		return
+	}
+
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	annotations, ok := ctx.Value(auditAnnotationsKey).(*[]annotation)
 	if !ok {
 		return // no annotations to copy
@@ -124,6 +168,7 @@ func logAnnotation(ae *auditinternal.Event, key, value string) {
 // configuration object that applies to the given request and
 // the audit event that is going to be written to the API audit log.
 func WithAuditContext(parent context.Context, ev *AuditContext) context.Context {
+	parent = withAuditAnnotationsMutex(parent)
 	return genericapirequest.WithValue(parent, auditKey, ev)
 }
 
@@ -158,4 +203,19 @@ func GetAuditEventCopy(ctx context.Context) *auditinternal.Event {
 		return e.DeepCopy()
 	}
 	return nil
+}
+
+// WithAuditAnnotationMutex adds a mutex for guarding audit mutations.
+func withAuditAnnotationsMutex(parent context.Context) context.Context {
+	if _, ok := parent.Value(auditAnnotationsMutexKey).(*sync.Mutex); ok {
+		return parent
+	}
+	var mutex sync.Mutex
+	return genericapirequest.WithValue(parent, auditAnnotationsMutexKey, &mutex)
+}
+
+// AuditAnnotationsMutex returns the audit annotations mutex from the context.
+func auditAnnotationsMutex(ctx context.Context) (*sync.Mutex, bool) {
+	mutex, ok := ctx.Value(auditAnnotationsMutexKey).(*sync.Mutex)
+	return mutex, ok
 }

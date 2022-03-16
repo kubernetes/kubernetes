@@ -17,6 +17,8 @@ limitations under the License.
 package audit
 
 import (
+	"context"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -35,4 +37,49 @@ func TestLogAnnotation(t *testing.T) {
 	logAnnotation(ev, "qux", "")
 	logAnnotation(ev, "qux", "baz")
 	assert.Equal(t, "", ev.Annotations["qux"], "audit annotation should not be overwritten.")
+}
+
+func TestAddAuditAnnotations(t *testing.T) {
+	ctxIndividual := WithAuditAnnotations(context.Background())
+	ctxBulk := WithAuditAnnotations(context.Background())
+
+	t.Log("Adding annotations before the event has been registered")
+	var bulkAnnotations []string
+	expectedAnnotations := map[string]string{}
+	for i := 0; i < 10; i++ {
+		key := fmt.Sprintf("pre-event-annotation-%d", i)
+		value := "pre-event-annotation-value"
+
+		expectedAnnotations[key] = value
+		bulkAnnotations = append(bulkAnnotations, key, value)
+		AddAuditAnnotation(ctxIndividual, key, value)
+	}
+	AddAuditAnnotations(ctxBulk, bulkAnnotations...)
+
+	evIndividual := auditinternal.Event{Level: auditinternal.LevelMetadata}
+	addAuditAnnotationsFrom(ctxIndividual, &evIndividual)
+
+	evBulk := auditinternal.Event{Level: auditinternal.LevelMetadata}
+	addAuditAnnotationsFrom(ctxBulk, &evBulk)
+
+	assert.Equal(t, expectedAnnotations, evIndividual.Annotations, "pre-event individual calls")
+	assert.Equal(t, expectedAnnotations, evBulk.Annotations, "pre-event bulk call")
+
+	ctxIndividual = WithAuditContext(ctxIndividual, &AuditContext{Event: &evIndividual})
+	ctxBulk = WithAuditContext(ctxBulk, &AuditContext{Event: &evBulk})
+
+	t.Log("Adding annotations after the event has been registered")
+	bulkAnnotations = []string{}
+	for i := 0; i < 10; i++ {
+		key := fmt.Sprintf("post-event-annotation-%d", i)
+		value := "post-event-annotation-value"
+
+		expectedAnnotations[key] = value
+		bulkAnnotations = append(bulkAnnotations, key, value)
+		AddAuditAnnotation(ctxIndividual, key, value)
+	}
+	AddAuditAnnotations(ctxBulk, bulkAnnotations...)
+
+	assert.Equal(t, expectedAnnotations, GetAuditEventCopy(ctxIndividual).Annotations, "post-event individual calls")
+	assert.Equal(t, expectedAnnotations, GetAuditEventCopy(ctxBulk).Annotations, "post-event bulk call")
 }
