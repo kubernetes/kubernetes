@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	openapi_v2 "github.com/googleapis/gnostic/openapiv2"
+	openapi_v2 "github.com/google/gnostic/openapiv2"
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/apimachinery/pkg/api/errors"

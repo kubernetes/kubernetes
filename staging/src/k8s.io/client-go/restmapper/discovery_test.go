@@ -30,7 +30,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 
-	openapi_v2 "github.com/googleapis/gnostic/openapiv2"
+	openapi_v2 "github.com/google/gnostic/openapiv2"
 	"github.com/stretchr/testify/assert"
 )
 

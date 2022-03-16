@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	openapi_v3 "github.com/googleapis/gnostic/openapiv3"
+	openapi_v3 "github.com/google/gnostic/openapiv3"
 	"google.golang.org/protobuf/proto"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"

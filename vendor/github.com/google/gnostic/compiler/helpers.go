@@ -20,8 +20,9 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/googleapis/gnostic/jsonschema"
 	"gopkg.in/yaml.v3"
+
+	"github.com/google/gnostic/jsonschema"
 )
 
 // compiler helper functions, usually called from generated code

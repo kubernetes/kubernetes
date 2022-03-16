@@ -19,9 +19,7 @@ package handler
 import (
 	"bytes"
 	"compress/gzip"
-	"crypto/sha512"
 	"encoding/json"
-	"fmt"
 	"mime"
 	"net/http"
 	"sync"
@@ -30,12 +28,14 @@ import (
 	"github.com/NYTimes/gziphandler"
 	"github.com/emicklei/go-restful"
 	"github.com/golang/protobuf/proto"
-	openapi_v2 "github.com/googleapis/gnostic/openapiv2"
+	openapi_v2 "github.com/google/gnostic/openapiv2"
 	"github.com/munnerz/goautoneg"
 	"gopkg.in/yaml.v2"
 	klog "k8s.io/klog/v2"
 	"k8s.io/kube-openapi/pkg/builder"
 	"k8s.io/kube-openapi/pkg/common"
+	"k8s.io/kube-openapi/pkg/common/restfuladapter"
+	"k8s.io/kube-openapi/pkg/internal/handler"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
@@ -56,53 +56,14 @@ type OpenAPIService struct {
 
 	lastModified time.Time
 
-	jsonCache  cache
-	protoCache cache
-}
-
-type cache struct {
-	BuildCache func() ([]byte, error)
-	once       sync.Once
-	bytes      []byte
-	etag       string
-	err        error
-}
-
-func (c *cache) Get() ([]byte, string, error) {
-	c.once.Do(func() {
-		bytes, err := c.BuildCache()
-		// if there is an error updating the cache, there can be situations where
-		// c.bytes contains a valid value (carried over from the previous update)
-		// but c.err is also not nil; the cache user is expected to check for this
-		c.err = err
-		if c.err == nil {
-			// don't override previous spec if we had an error
-			c.bytes = bytes
-			c.etag = computeETag(c.bytes)
-		}
-	})
-	return c.bytes, c.etag, c.err
-}
-
-func (c *cache) New(cacheBuilder func() ([]byte, error)) cache {
-	return cache{
-		bytes:      c.bytes,
-		etag:       c.etag,
-		BuildCache: cacheBuilder,
-	}
+	jsonCache  handler.HandlerCache
+	protoCache handler.HandlerCache
 }
 
 func init() {
 	mime.AddExtensionType(".json", mimeJson)
 	mime.AddExtensionType(".pb-v1", mimePb)
 	mime.AddExtensionType(".gz", mimePbGz)
-}
-
-func computeETag(data []byte) string {
-	if data == nil {
-		return ""
-	}
-	return fmt.Sprintf("\"%X\"", sha512.Sum512(data))
 }
 
 // NewOpenAPIService builds an OpenAPIService starting with the given spec.
@@ -276,8 +237,16 @@ func (o *OpenAPIService) RegisterOpenAPIVersionedService(servePath string, handl
 
 // BuildAndRegisterOpenAPIVersionedService builds the spec and registers a handler to provide access to it.
 // Use this method if your OpenAPI spec is static. If you want to update the spec, use BuildOpenAPISpec then RegisterOpenAPIVersionedService.
+//
+// Deprecated: BuildAndRegisterOpenAPIVersionedServiceFromRoutes should be used instead.
 func BuildAndRegisterOpenAPIVersionedService(servePath string, webServices []*restful.WebService, config *common.Config, handler common.PathHandler) (*OpenAPIService, error) {
-	spec, err := builder.BuildOpenAPISpec(webServices, config)
+	return BuildAndRegisterOpenAPIVersionedServiceFromRoutes(servePath, restfuladapter.AdaptWebServices(webServices), config, handler)
+}
+
+// BuildAndRegisterOpenAPIVersionedServiceFromRoutes builds the spec and registers a handler to provide access to it.
+// Use this method if your OpenAPI spec is static. If you want to update the spec, use BuildOpenAPISpec then RegisterOpenAPIVersionedService.
+func BuildAndRegisterOpenAPIVersionedServiceFromRoutes(servePath string, routeContainers []common.RouteContainer, config *common.Config, handler common.PathHandler) (*OpenAPIService, error) {
+	spec, err := builder.BuildOpenAPISpecFromRoutes(routeContainers, config)
 	if err != nil {
 		return nil, err
 	}

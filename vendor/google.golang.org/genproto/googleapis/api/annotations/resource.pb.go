@@ -163,11 +163,7 @@ func (ResourceDescriptor_Style) EnumDescriptor() ([]byte, []int) {
 //       // For Kubernetes resources, the format is {api group}/{kind}.
 //       option (google.api.resource) = {
 //         type: "pubsub.googleapis.com/Topic"
-//         name_descriptor: {
-//           pattern: "projects/{project}/topics/{topic}"
-//           parent_type: "cloudresourcemanager.googleapis.com/Project"
-//           parent_name_extractor: "projects/{project}"
-//         }
+//         pattern: "projects/{project}/topics/{topic}"
 //       };
 //     }
 //
@@ -175,10 +171,7 @@ func (ResourceDescriptor_Style) EnumDescriptor() ([]byte, []int) {
 //
 //     resources:
 //     - type: "pubsub.googleapis.com/Topic"
-//       name_descriptor:
-//         - pattern: "projects/{project}/topics/{topic}"
-//           parent_type: "cloudresourcemanager.googleapis.com/Project"
-//           parent_name_extractor: "projects/{project}"
+//       pattern: "projects/{project}/topics/{topic}"
 //
 // Sometimes, resources have multiple patterns, typically because they can
 // live under multiple parents.
@@ -188,26 +181,10 @@ func (ResourceDescriptor_Style) EnumDescriptor() ([]byte, []int) {
 //     message LogEntry {
 //       option (google.api.resource) = {
 //         type: "logging.googleapis.com/LogEntry"
-//         name_descriptor: {
-//           pattern: "projects/{project}/logs/{log}"
-//           parent_type: "cloudresourcemanager.googleapis.com/Project"
-//           parent_name_extractor: "projects/{project}"
-//         }
-//         name_descriptor: {
-//           pattern: "folders/{folder}/logs/{log}"
-//           parent_type: "cloudresourcemanager.googleapis.com/Folder"
-//           parent_name_extractor: "folders/{folder}"
-//         }
-//         name_descriptor: {
-//           pattern: "organizations/{organization}/logs/{log}"
-//           parent_type: "cloudresourcemanager.googleapis.com/Organization"
-//           parent_name_extractor: "organizations/{organization}"
-//         }
-//         name_descriptor: {
-//           pattern: "billingAccounts/{billing_account}/logs/{log}"
-//           parent_type: "billing.googleapis.com/BillingAccount"
-//           parent_name_extractor: "billingAccounts/{billing_account}"
-//         }
+//         pattern: "projects/{project}/logs/{log}"
+//         pattern: "folders/{folder}/logs/{log}"
+//         pattern: "organizations/{organization}/logs/{log}"
+//         pattern: "billingAccounts/{billing_account}/logs/{log}"
 //       };
 //     }
 //
@@ -215,48 +192,10 @@ func (ResourceDescriptor_Style) EnumDescriptor() ([]byte, []int) {
 //
 //     resources:
 //     - type: 'logging.googleapis.com/LogEntry'
-//       name_descriptor:
-//         - pattern: "projects/{project}/logs/{log}"
-//           parent_type: "cloudresourcemanager.googleapis.com/Project"
-//           parent_name_extractor: "projects/{project}"
-//         - pattern: "folders/{folder}/logs/{log}"
-//           parent_type: "cloudresourcemanager.googleapis.com/Folder"
-//           parent_name_extractor: "folders/{folder}"
-//         - pattern: "organizations/{organization}/logs/{log}"
-//           parent_type: "cloudresourcemanager.googleapis.com/Organization"
-//           parent_name_extractor: "organizations/{organization}"
-//         - pattern: "billingAccounts/{billing_account}/logs/{log}"
-//           parent_type: "billing.googleapis.com/BillingAccount"
-//           parent_name_extractor: "billingAccounts/{billing_account}"
-//
-// For flexible resources, the resource name doesn't contain parent names, but
-// the resource itself has parents for policy evaluation.
-//
-// Example:
-//
-//     message Shelf {
-//       option (google.api.resource) = {
-//         type: "library.googleapis.com/Shelf"
-//         name_descriptor: {
-//           pattern: "shelves/{shelf}"
-//           parent_type: "cloudresourcemanager.googleapis.com/Project"
-//         }
-//         name_descriptor: {
-//           pattern: "shelves/{shelf}"
-//           parent_type: "cloudresourcemanager.googleapis.com/Folder"
-//         }
-//       };
-//     }
-//
-// The ResourceDescriptor Yaml config will look like:
-//
-//     resources:
-//     - type: 'library.googleapis.com/Shelf'
-//       name_descriptor:
-//         - pattern: "shelves/{shelf}"
-//           parent_type: "cloudresourcemanager.googleapis.com/Project"
-//         - pattern: "shelves/{shelf}"
-//           parent_type: "cloudresourcemanager.googleapis.com/Folder"
+//       pattern: "projects/{project}/logs/{log}"
+//       pattern: "folders/{folder}/logs/{log}"
+//       pattern: "organizations/{organization}/logs/{log}"
+//       pattern: "billingAccounts/{billing_account}/logs/{log}"
 type ResourceDescriptor struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
