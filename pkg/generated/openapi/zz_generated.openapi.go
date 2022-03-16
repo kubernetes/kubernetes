@@ -2417,7 +2417,7 @@ func schema_k8sio_api_apiserverinternal_v1alpha1_StorageVersion(ref common.Refer
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "\n Storage version of a specific resource.",
+				Description: "Storage version of a specific resource.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {

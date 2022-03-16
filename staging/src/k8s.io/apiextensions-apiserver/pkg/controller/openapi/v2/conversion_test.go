@@ -25,9 +25,9 @@ import (
 	"testing"
 	"time"
 
+	openapi_v2 "github.com/google/gnostic/openapiv2"
 	"github.com/google/go-cmp/cmp"
 	fuzz "github.com/google/gofuzz"
-	openapi_v2 "github.com/googleapis/gnostic/openapiv2"
 	"gopkg.in/yaml.v2"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"

@@ -390,6 +390,13 @@ github.com/google/cel-go/interpreter
 github.com/google/cel-go/interpreter/functions
 github.com/google/cel-go/parser
 github.com/google/cel-go/parser/gen
+# github.com/google/gnostic v0.5.7-v3refs => github.com/google/gnostic v0.5.7-v3refs
+## explicit
+github.com/google/gnostic/compiler
+github.com/google/gnostic/extensions
+github.com/google/gnostic/jsonschema
+github.com/google/gnostic/openapiv2
+github.com/google/gnostic/openapiv3
 # github.com/google/go-cmp v0.5.5 => github.com/google/go-cmp v0.5.5
 ## explicit
 github.com/google/go-cmp/cmp
@@ -408,13 +415,6 @@ github.com/google/shlex
 github.com/google/uuid
 # github.com/googleapis/gax-go/v2 v2.0.5 => github.com/googleapis/gax-go/v2 v2.0.5
 github.com/googleapis/gax-go/v2
-# github.com/googleapis/gnostic v0.5.5 => github.com/googleapis/gnostic v0.5.5
-## explicit
-github.com/googleapis/gnostic/compiler
-github.com/googleapis/gnostic/extensions
-github.com/googleapis/gnostic/jsonschema
-github.com/googleapis/gnostic/openapiv2
-github.com/googleapis/gnostic/openapiv3
 # github.com/gophercloud/gophercloud v0.1.0 => github.com/gophercloud/gophercloud v0.1.0
 github.com/gophercloud/gophercloud
 github.com/gophercloud/gophercloud/openstack
@@ -1126,7 +1126,7 @@ google.golang.org/appengine/internal/modules
 google.golang.org/appengine/internal/remote_api
 google.golang.org/appengine/internal/urlfetch
 google.golang.org/appengine/urlfetch
-# google.golang.org/genproto v0.0.0-20210831024726-fe130286e0e2 => google.golang.org/genproto v0.0.0-20210831024726-fe130286e0e2
+# google.golang.org/genproto v0.0.0-20220107163113-42d7afdf6368 => google.golang.org/genproto v0.0.0-20220107163113-42d7afdf6368
 ## explicit
 google.golang.org/genproto/googleapis/api/annotations
 google.golang.org/genproto/googleapis/api/expr/v1alpha1
@@ -2048,7 +2048,7 @@ k8s.io/kube-aggregator/pkg/registry/apiservice/rest
 # k8s.io/kube-controller-manager v0.0.0 => ./staging/src/k8s.io/kube-controller-manager
 ## explicit
 k8s.io/kube-controller-manager/config/v1alpha1
-# k8s.io/kube-openapi v0.0.0-20211115234752-e816edb12b65 => k8s.io/kube-openapi v0.0.0-20211115234752-e816edb12b65
+# k8s.io/kube-openapi v0.0.0-20220316025549-ddc66922ab18 => k8s.io/kube-openapi v0.0.0-20220316025549-ddc66922ab18
 ## explicit
 k8s.io/kube-openapi/cmd/openapi-gen
 k8s.io/kube-openapi/cmd/openapi-gen/args
@@ -2056,10 +2056,12 @@ k8s.io/kube-openapi/pkg/aggregator
 k8s.io/kube-openapi/pkg/builder
 k8s.io/kube-openapi/pkg/builder3
 k8s.io/kube-openapi/pkg/common
+k8s.io/kube-openapi/pkg/common/restfuladapter
 k8s.io/kube-openapi/pkg/generators
 k8s.io/kube-openapi/pkg/generators/rules
 k8s.io/kube-openapi/pkg/handler
 k8s.io/kube-openapi/pkg/handler3
+k8s.io/kube-openapi/pkg/internal/handler
 k8s.io/kube-openapi/pkg/schemaconv
 k8s.io/kube-openapi/pkg/schemamutation
 k8s.io/kube-openapi/pkg/spec3
@@ -2535,6 +2537,7 @@ sigs.k8s.io/yaml
 # github.com/google/cadvisor => github.com/google/cadvisor v0.43.0
 # github.com/google/cel-go => github.com/google/cel-go v0.10.1
 # github.com/google/cel-spec => github.com/google/cel-spec v0.6.0
+# github.com/google/gnostic => github.com/google/gnostic v0.5.7-v3refs
 # github.com/google/go-cmp => github.com/google/go-cmp v0.5.5
 # github.com/google/gofuzz => github.com/google/gofuzz v1.1.0
 # github.com/google/martian/v3 => github.com/google/martian/v3 v3.1.0
@@ -2543,7 +2546,6 @@ sigs.k8s.io/yaml
 # github.com/google/shlex => github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 # github.com/google/uuid => github.com/google/uuid v1.1.2
 # github.com/googleapis/gax-go/v2 => github.com/googleapis/gax-go/v2 v2.0.5
-# github.com/googleapis/gnostic => github.com/googleapis/gnostic v0.5.5
 # github.com/gophercloud/gophercloud => github.com/gophercloud/gophercloud v0.1.0
 # github.com/gopherjs/gopherjs => github.com/gopherjs/gopherjs v0.0.0-20200217142428-fce0ec30dd00
 # github.com/gorilla/mux => github.com/gorilla/mux v1.8.0
@@ -2697,7 +2699,7 @@ sigs.k8s.io/yaml
 # gonum.org/v1/plot => gonum.org/v1/plot v0.0.0-20190515093506-e2840ee46a6b
 # google.golang.org/api => google.golang.org/api v0.46.0
 # google.golang.org/appengine => google.golang.org/appengine v1.6.7
-# google.golang.org/genproto => google.golang.org/genproto v0.0.0-20210831024726-fe130286e0e2
+# google.golang.org/genproto => google.golang.org/genproto v0.0.0-20220107163113-42d7afdf6368
 # google.golang.org/grpc => google.golang.org/grpc v1.40.0
 # google.golang.org/protobuf => google.golang.org/protobuf v1.27.1
 # gopkg.in/alecthomas/kingpin.v2 => gopkg.in/alecthomas/kingpin.v2 v2.2.6
@@ -2731,7 +2733,7 @@ sigs.k8s.io/yaml
 # k8s.io/klog/v2 => k8s.io/klog/v2 v2.40.1
 # k8s.io/kube-aggregator => ./staging/src/k8s.io/kube-aggregator
 # k8s.io/kube-controller-manager => ./staging/src/k8s.io/kube-controller-manager
-# k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20211115234752-e816edb12b65
+# k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20220316025549-ddc66922ab18
 # k8s.io/kube-proxy => ./staging/src/k8s.io/kube-proxy
 # k8s.io/kube-scheduler => ./staging/src/k8s.io/kube-scheduler
 # k8s.io/kubectl => ./staging/src/k8s.io/kubectl
