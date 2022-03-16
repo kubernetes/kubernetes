@@ -96,7 +96,7 @@ func NewCBCTransformer(block cipher.Block) value.Transformer {
 }
 
 var (
-	errInvalidBlockSize    = fmt.Errorf("the stored data is not a multiple of the block size")
+	ErrInvalidBlockSize    = fmt.Errorf("the stored data is not a multiple of the block size")
 	errInvalidPKCS7Data    = errors.New("invalid PKCS7 data (empty or not padded)")
 	errInvalidPKCS7Padding = errors.New("invalid padding on input")
 )
@@ -110,7 +110,7 @@ func (t *cbc) TransformFromStorage(ctx context.Context, data []byte, dataCtx val
 	data = data[blockSize:]
 
 	if len(data)%blockSize != 0 {
-		return nil, false, errInvalidBlockSize
+		return nil, false, ErrInvalidBlockSize
 	}
 
 	result := make([]byte, len(data))
