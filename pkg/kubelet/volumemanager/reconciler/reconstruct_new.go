@@ -62,7 +62,7 @@ func (rc *reconciler) reconcileNew() {
 		rc.cleanOrphanVolumes()
 	}
 
-	if !rc.devicePathsReconstructed() {
+	if len(rc.volumesNeedDevicePath) != 0 {
 		rc.updateReconstructedDevicePaths()
 	}
 }
@@ -76,7 +76,7 @@ func (rc *reconciler) readyToUnmount() bool {
 
 	// Allow unmount only when ASW device paths were corrected from node.status to prevent
 	// calling unmount with a wrong devicePath.
-	if !rc.devicePathsReconstructed() {
+	if len(rc.volumesNeedDevicePath) != 0 {
 		return false
 	}
 	return true
@@ -217,8 +217,4 @@ func (rc *reconciler) updateReconstructedDevicePaths() {
 	}
 	klog.V(2).InfoS("DevicePaths of reconstructed volumes updated")
 	rc.volumesNeedDevicePath = nil
-}
-
-func (rc *reconciler) devicePathsReconstructed() bool {
-	return len(rc.volumesNeedDevicePath) == 0
 }
