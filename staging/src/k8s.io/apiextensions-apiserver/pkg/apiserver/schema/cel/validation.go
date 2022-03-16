@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"reflect"
 	"strings"
 
 	"github.com/google/cel-go/common/types"
@@ -126,6 +127,17 @@ func (s *Validator) Validate(ctx context.Context, fldPath *field.Path, sts *sche
 }
 
 func (s *Validator) validateExpressions(ctx context.Context, fldPath *field.Path, sts *schema.Structural, obj, oldObj interface{}, costBudget int64) (errs field.ErrorList, remainingBudget int64) {
+	// guard against oldObj being a non-nil interface with a nil value
+	if oldObj != nil {
+		v := reflect.ValueOf(oldObj)
+		switch v.Kind() {
+		case reflect.Map, reflect.Ptr, reflect.Interface, reflect.Slice:
+			if v.IsNil() {
+				oldObj = nil // +k8s:verify-mutation:reason=clone
+			}
+		}
+	}
+
 	remainingBudget = costBudget
 	if obj == nil {
 		// We only validate non-null values. Rules that need to check for the state of a nullable value or the presence of an optional
@@ -147,10 +159,7 @@ func (s *Validator) validateExpressions(ctx context.Context, fldPath *field.Path
 	if s.isResourceRoot {
 		sts = model.WithTypeAndObjectMeta(sts)
 	}
-	var activation interpreter.Activation = NewValidationActivation(ScopedVarName, obj, sts)
-	if oldObj != nil {
-		activation = interpreter.NewHierarchicalActivation(activation, NewValidationActivation(OldScopedVarName, oldObj, sts))
-	}
+	var activation interpreter.Activation = NewValidationActivation(obj, oldObj, sts)
 	for i, compiled := range s.compiledRules {
 		rule := sts.XValidations[i]
 		if compiled.Error != nil {
@@ -218,23 +227,30 @@ func ruleErrorString(rule apiextensions.ValidationRule) string {
 }
 
 type validationActivation struct {
-	name string
-	val  ref.Val
+	self, oldSelf ref.Val
+	hasOldSelf    bool
 }
 
-func NewValidationActivation(name string, obj interface{}, structural *schema.Structural) *validationActivation {
+func NewValidationActivation(obj, oldObj interface{}, structural *schema.Structural) *validationActivation {
 	va := &validationActivation{
-		name: name,
-		val:  UnstructuredToVal(obj, structural),
+		self: UnstructuredToVal(obj, structural),
+	}
+	if oldObj != nil {
+		va.oldSelf = UnstructuredToVal(oldObj, structural) // +k8s:verify-mutation:reason=clone
+		va.hasOldSelf = true                               // +k8s:verify-mutation:reason=clone
 	}
 	return va
 }
 
 func (a *validationActivation) ResolveName(name string) (interface{}, bool) {
-	if name == a.name {
-		return a.val, true
+	switch name {
+	case ScopedVarName:
+		return a.self, true
+	case OldScopedVarName:
+		return a.oldSelf, a.hasOldSelf
+	default:
+		return nil, false
 	}
-	return nil, false
 }
 
 func (a *validationActivation) Parent() interpreter.Activation {
@@ -250,14 +266,13 @@ func (s *Validator) validateMap(ctx context.Context, fldPath *field.Path, sts *s
 		return nil, remainingBudget
 	}
 
-	// if a third map type is introduced, assume it's not correlatable. granular is the default if unspecified.
-	correlatable := sts.XMapType == nil || *sts.XMapType == "granular" || *sts.XMapType == "atomic"
+	correlatable := MapIsCorrelatable(sts.XMapType)
 
 	if s.AdditionalProperties != nil && sts.AdditionalProperties != nil && sts.AdditionalProperties.Structural != nil {
 		for k, v := range obj {
 			var oldV interface{}
 			if correlatable {
-				oldV = oldObj[k]
+				oldV = oldObj[k] // +k8s:verify-mutation:reason=clone
 			}
 
 			var err field.ErrorList
@@ -275,7 +290,7 @@ func (s *Validator) validateMap(ctx context.Context, fldPath *field.Path, sts *s
 			if ok && stsOk {
 				var oldV interface{}
 				if correlatable {
-					oldV = oldObj[k]
+					oldV = oldObj[k] // +k8s:verify-mutation:reason=clone
 				}
 
 				var err field.ErrorList
@@ -297,11 +312,10 @@ func (s *Validator) validateArray(ctx context.Context, fldPath *field.Path, sts 
 		return errs, remainingBudget
 	}
 
-	// only map-type lists support self-oldSelf correlation for cel rules. if this isn't a
-	// map-type list, then makeMapList returns an implementation that always returns nil
-	correlatableOldItems := makeMapList(sts, makeKeyStrategy(sts), oldObj)
-
 	if s.Items != nil && sts.Items != nil {
+		// only map-type lists support self-oldSelf correlation for cel rules. if this isn't a
+		// map-type list, then makeMapList returns an implementation that always returns nil
+		correlatableOldItems := makeMapList(sts, oldObj)
 		for i := range obj {
 			var err field.ErrorList
 			err, remainingBudget = s.Items.Validate(ctx, fldPath.Index(i), sts.Items, obj[i], correlatableOldItems.get(obj[i]), remainingBudget)
@@ -313,4 +327,11 @@ func (s *Validator) validateArray(ctx context.Context, fldPath *field.Path, sts 
 	}
 
 	return errs, remainingBudget
+}
+
+// MapIsCorrelatable returns true if the mapType can be used to correlate the data elements of a map after an update
+// with the data elements of the map from before the updated.
+func MapIsCorrelatable(mapType *string) bool {
+	// if a third map type is introduced, assume it's not correlatable. granular is the default if unspecified.
+	return mapType == nil || *mapType == "granular" || *mapType == "atomic"
 }

@@ -32,13 +32,15 @@ import (
 // TestValidationExpressions tests CEL integration with custom resource values and OpenAPIv3.
 func TestValidationExpressions(t *testing.T) {
 	tests := []struct {
-		name       string
-		schema     *schema.Structural
-		obj        map[string]interface{}
-		oldObj     map[string]interface{}
-		valid      []string
-		errors     map[string]string // rule -> string that error message must contain
-		costBudget int64
+		name          string
+		schema        *schema.Structural
+		obj           interface{}
+		oldObj        interface{}
+		valid         []string
+		errors        map[string]string // rule -> string that error message must contain
+		costBudget    int64
+		isRoot        bool
+		expectSkipped bool
 	}{
 		// tests where val1 and val2 are equal but val3 is different
 		// equality, comparisons and type specific functions
@@ -627,6 +629,7 @@ func TestValidationExpressions(t *testing.T) {
 			},
 		},
 		{name: "typemeta and objectmeta access not specified",
+			isRoot: true,
 			obj: map[string]interface{}{
 				"apiVersion": "v1",
 				"kind":       "Pod",
@@ -1708,6 +1711,44 @@ func TestValidationExpressions(t *testing.T) {
 				"oldSelf.v == 'old' && self.v == 'new'",
 			},
 		},
+		{name: "skipped transition rule for nil old primitive",
+			expectSkipped: true,
+			obj:           "exists",
+			oldObj:        nil,
+			schema:        &stringType,
+			valid: []string{
+				"oldSelf == self",
+			},
+		},
+		{name: "skipped transition rule for nil old array",
+			expectSkipped: true,
+			obj:           []interface{}{},
+			oldObj:        nil,
+			schema:        listTypePtr(&stringType),
+			valid: []string{
+				"oldSelf == self",
+			},
+		},
+		{name: "skipped transition rule for nil old object",
+			expectSkipped: true,
+			obj:           map[string]interface{}{"f": "exists"},
+			oldObj:        nil,
+			schema: objectTypePtr(map[string]schema.Structural{
+				"f": stringType,
+			}),
+			valid: []string{
+				"oldSelf.f == self.f",
+			},
+		},
+		{name: "skipped transition rule for old with non-nil interface but nil value",
+			expectSkipped: true,
+			obj:           []interface{}{},
+			oldObj:        nilInterfaceOfStringSlice(),
+			schema:        listTypePtr(&stringType),
+			valid: []string{
+				"oldSelf == self",
+			},
+		},
 	}
 
 	for i := range tests {
@@ -1722,13 +1763,20 @@ func TestValidationExpressions(t *testing.T) {
 				t.Run(validRule, func(t *testing.T) {
 					t.Parallel()
 					s := withRule(*tt.schema, validRule)
-					celValidator := NewValidator(&s, PerCallLimit)
+					celValidator := validator(&s, tt.isRoot, PerCallLimit)
 					if celValidator == nil {
 						t.Fatal("expected non nil validator")
 					}
-					errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, tt.oldObj, tt.costBudget)
+					errs, remainingBudget := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, tt.oldObj, tt.costBudget)
 					for _, err := range errs {
 						t.Errorf("unexpected error: %v", err)
+					}
+					if tt.expectSkipped {
+						// Skipped validations should have no cost. The only possible false positive here would be the CEL expression 'true'.
+						if remainingBudget != tt.costBudget {
+							t.Errorf("expected no cost expended for skipped validation, but got %d remaining from %d budget", remainingBudget, tt.costBudget)
+						}
+						return
 					}
 
 					// test with cost budget exceeded
@@ -2106,4 +2154,9 @@ func withNullable(nullable bool, s schema.Structural) schema.Structural {
 func withNullablePtr(nullable bool, s schema.Structural) *schema.Structural {
 	s.Generic.Nullable = nullable
 	return &s
+}
+
+func nilInterfaceOfStringSlice() []interface{} {
+	var slice []interface{} = nil
+	return slice
 }

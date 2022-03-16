@@ -90,7 +90,7 @@ func validate(ctx context.Context, pth *field.Path, s *structuralschema.Structur
 			} else if errs := apiservervalidation.ValidateCustomResource(pth.Child("default"), s.Default.Object, validator); len(errs) > 0 {
 				allErrs = append(allErrs, errs...)
 			} else if celValidator := cel.NewValidator(s, cel.PerCallLimit); celValidator != nil {
-				celErrs, rmCost := celValidator.Validate(ctx, pth.Child("default"), s, s.Default.Object, nil, remainingCost)
+				celErrs, rmCost := celValidator.Validate(ctx, pth.Child("default"), s, s.Default.Object, s.Default.Object, remainingCost)
 				remainingCost = rmCost
 				allErrs = append(allErrs, celErrs...)
 				if remainingCost < 0 {
@@ -115,7 +115,7 @@ func validate(ctx context.Context, pth *field.Path, s *structuralschema.Structur
 			} else if errs := apiservervalidation.ValidateCustomResource(pth.Child("default"), s.Default.Object, validator); len(errs) > 0 {
 				allErrs = append(allErrs, errs...)
 			} else if celValidator := cel.NewValidator(s, cel.PerCallLimit); celValidator != nil {
-				celErrs, rmCost := celValidator.Validate(ctx, pth.Child("default"), s, s.Default.Object, nil, remainingCost)
+				celErrs, rmCost := celValidator.Validate(ctx, pth.Child("default"), s, s.Default.Object, s.Default.Object, remainingCost)
 				remainingCost = rmCost
 				allErrs = append(allErrs, celErrs...)
 				if remainingCost < 0 {

@@ -35,6 +35,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -301,7 +302,7 @@ func TestCustomResourceValidators(t *testing.T) {
 		}
 	})
 	t.Run("Schema with valid transition rule", func(t *testing.T) {
-		structuralWithValidators := crdWithSchema(t, "Structural", structuralSchemaWithValidTransitionRule)
+		structuralWithValidators := crdWithSchema(t, "ValidTransitionRule", structuralSchemaWithValidTransitionRule)
 		crd, err := fixtures.CreateNewV1CustomResourceDefinition(structuralWithValidators, apiExtensionClient, dynamicClient)
 		if err != nil {
 			t.Fatal(err)
@@ -364,13 +365,58 @@ func TestCustomResourceValidators(t *testing.T) {
 	})
 
 	t.Run("CRD creation MUST fail if a x-kubernetes-validations rule contains invalid transition rule", func(t *testing.T) {
-		structuralWithValidators := crdWithSchema(t, "InvalidStructuralMetadata", structuralSchemaWithInvalidTransitionRule)
+		structuralWithValidators := crdWithSchema(t, "InvalidTransitionRule", structuralSchemaWithInvalidTransitionRule)
 		_, err := fixtures.CreateNewV1CustomResourceDefinition(structuralWithValidators, apiExtensionClient, dynamicClient)
 		if err == nil {
 			t.Error("Expected error creating custom resource but got none")
 		} else if !strings.Contains(err.Error(), "oldSelf cannot be used on the uncorrelatable portion of the schema") {
 			t.Errorf("Expected error to contain %s but got %v", "oldSelf cannot be used on the uncorrelatable portion of the schema", err.Error())
 		}
+	})
+	t.Run("Schema with default map key transition rule", func(t *testing.T) {
+		structuralWithValidators := crdWithSchema(t, "DefaultMapKeyTransitionRule", structuralSchemaWithDefaultMapKeyTransitionRule)
+		crd, err := fixtures.CreateNewV1CustomResourceDefinition(structuralWithValidators, apiExtensionClient, dynamicClient)
+		if err != nil {
+			t.Fatal(err)
+		}
+		gvr := schema.GroupVersionResource{
+			Group:    crd.Spec.Group,
+			Version:  crd.Spec.Versions[0].Name,
+			Resource: crd.Spec.Names.Plural,
+		}
+		crClient := dynamicClient.Resource(gvr)
+
+		t.Run("custom resource update MUST fail if a x-kubernetes-validations if a transition rule contained in a mapList with default map keys fails validation", func(t *testing.T) {
+			name1 := names.SimpleNameGenerator.GenerateName("cr-1")
+			cr := &unstructured.Unstructured{Object: map[string]interface{}{
+				"apiVersion": gvr.Group + "/" + gvr.Version,
+				"kind":       crd.Spec.Names.Kind,
+				"metadata": map[string]interface{}{
+					"name": name1,
+				},
+				"spec": map[string]interface{}{
+					"list": []interface{}{
+						map[string]interface{}{
+							"k1": "x",
+							"v":  "value",
+						},
+					},
+				},
+			}}
+			cr, err = crClient.Create(context.TODO(), cr, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("Unexpected error creating custom resource: %v", err)
+			}
+			item := cr.Object["spec"].(map[string]interface{})["list"].([]interface{})[0].(map[string]interface{})
+			item["k2"] = "DEFAULT"
+			item["v"] = "new value"
+			_, err = crClient.Update(context.TODO(), cr, metav1.UpdateOptions{})
+			if err == nil {
+				t.Fatalf("Expected error updating custom resource: %v", err)
+			} else if !strings.Contains(err.Error(), "failed rule: self.v == oldSelf.v") {
+				t.Errorf("Expected error to contain %s but got %v", "failed rule: self.v == oldSelf.v", err.Error())
+			}
+		})
 	})
 }
 
@@ -610,6 +656,47 @@ var structuralSchemaWithInvalidTransitionRule = []byte(`
 		      "x-kubernetes-validations": [
 		        {
 			      "rule": "self == oldSelf"
+                }
+		      ]
+            }
+          }
+	    }
+      },
+      "status": {
+        "type": "object",
+        "properties": {}
+	  }
+    }
+  }
+}`)
+
+var structuralSchemaWithDefaultMapKeyTransitionRule = []byte(`
+{
+  "openAPIV3Schema": {
+    "description": "CRD with CEL validators",
+    "type": "object",
+    "properties": {
+      "spec": {
+        "type": "object",
+        "properties": {
+		  "list": {
+            "type": "array",
+            "x-kubernetes-list-map-keys": [
+              "k1",
+              "k2"
+            ],
+            "x-kubernetes-list-type": "map",
+            "items": {
+              "type": "object",
+              "properties": {
+                "k1": { "type": "string" },
+                "k2": { "type": "string", "default": "DEFAULT" },
+                "v": { "type": "string" }
+              },
+			  "required": ["k1"],
+		      "x-kubernetes-validations": [
+		        {
+			      "rule": "self.v == oldSelf.v"
                 }
 		      ]
             }

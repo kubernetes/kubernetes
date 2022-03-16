@@ -18,16 +18,16 @@ package cel
 
 import (
 	"fmt"
-	"hash/maphash"
+	"strings"
 
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 )
 
 // mapList provides a "lookup by key" operation for lists (arrays) with x-kubernetes-list-type=map.
 type mapList interface {
-	// get returns the unique element having identical values, for all
-	// x-kubernetes-list-map-keys, to the provided object. If no such unique element exists, or
-	// if the provided object isn't itself a valid mapList element, get returns nil.
+	// get returns the first element having given key, for all
+	// x-kubernetes-list-map-keys, to the provided object. If the provided object isn't itself a valid mapList element,
+	// get returns nil.
 	get(interface{}) interface{}
 }
 
@@ -39,16 +39,15 @@ type keyStrategy interface {
 
 // singleKeyStrategy is a cheaper strategy for associative lists that have exactly one key.
 type singleKeyStrategy struct {
-	key     string
-	defawlt interface{} // default is a keyword
+	key string
 }
 
-// CompositeKeyFor directly returns the value of the single key (or its default value, if absent) to
+// CompositeKeyFor directly returns the value of the single key  to
 // use as a composite key.
 func (ks *singleKeyStrategy) CompositeKeyFor(obj map[string]interface{}) (interface{}, bool) {
 	v, ok := obj[ks.key]
 	if !ok {
-		v = ks.defawlt // substitute default value
+		return nil, false
 	}
 
 	switch v.(type) {
@@ -59,38 +58,37 @@ func (ks *singleKeyStrategy) CompositeKeyFor(obj map[string]interface{}) (interf
 	}
 }
 
-// hashKeyStrategy computes a hash of all key values.
-type hashKeyStrategy struct {
-	sts    *schema.Structural
-	hasher maphash.Hash
+// multiKeyStrategy computes a composite key of all key values.
+type multiKeyStrategy struct {
+	sts *schema.Structural
 }
 
-// CompositeKeyFor returns a hash computed from the values (or default values, if absent) of all
+// CompositeKeyFor returns a composite key computed from the values of all
 // keys.
-func (ks *hashKeyStrategy) CompositeKeyFor(obj map[string]interface{}) (interface{}, bool) {
-	const keyDelimiter = "\x00" // 0 byte should never appear in the hash input except as delimiter
+func (ks *multiKeyStrategy) CompositeKeyFor(obj map[string]interface{}) (interface{}, bool) {
+	const keyDelimiter = "\x00" // 0 byte should never appear in the composite key except as delimiter
 
-	ks.hasher.Reset()
+	var delimited strings.Builder
 	for _, key := range ks.sts.XListMapKeys {
 		v, ok := obj[key]
 		if !ok {
-			v = ks.sts.Properties[key].Default.Object
+			return nil, false
 		}
 
 		switch v.(type) {
 		case bool:
-			fmt.Fprintf(&ks.hasher, keyDelimiter+"%t", v)
+			fmt.Fprintf(&delimited, keyDelimiter+"%t", v)
 		case float64:
-			fmt.Fprintf(&ks.hasher, keyDelimiter+"%f", v)
+			fmt.Fprintf(&delimited, keyDelimiter+"%f", v)
 		case int64:
-			fmt.Fprintf(&ks.hasher, keyDelimiter+"%d", v)
+			fmt.Fprintf(&delimited, keyDelimiter+"%d", v)
 		case string:
-			fmt.Fprintf(&ks.hasher, keyDelimiter+"%q", v)
+			fmt.Fprintf(&delimited, keyDelimiter+"%q", v)
 		default:
 			return nil, false // values must be scalars
 		}
 	}
-	return ks.hasher.Sum64(), true
+	return delimited.String(), true
 }
 
 // emptyMapList is a mapList containing no elements.
@@ -101,9 +99,12 @@ func (emptyMapList) get(interface{}) interface{} {
 }
 
 type mapListImpl struct {
-	sts      *schema.Structural
-	ks       keyStrategy
-	elements map[interface{}][]interface{} // composite key -> bucket
+	sts *schema.Structural
+	ks  keyStrategy
+	// keyedItems contains all lazily keyed map items
+	keyedItems map[interface{}]interface{}
+	// unkeyedItems contains all map items that have not yet been keyed
+	unkeyedItems []interface{}
 }
 
 func (a *mapListImpl) get(obj interface{}) interface{} {
@@ -116,76 +117,62 @@ func (a *mapListImpl) get(obj interface{}) interface{} {
 	if !ok {
 		return nil
 	}
+	if match, ok := a.keyedItems[key]; ok {
+		return match
+	}
+	// keep keying items until we either find a match or run out of unkeyed items
+	for len(a.unkeyedItems) > 0 {
+		// dequeue an unkeyed item
+		item := a.unkeyedItems[0]
+		a.unkeyedItems = a.unkeyedItems[1:]
 
-	// Scan bucket to handle key collisions and duplicate key sets:
-	var match interface{}
-	for _, element := range a.elements[key] {
-		all := true
-		for _, key := range a.sts.XListMapKeys {
-			va, ok := element.(map[string]interface{})[key]
-			if !ok {
-				va = a.sts.Properties[key].Default.Object
-			}
-
-			vb, ok := mobj[key]
-			if !ok {
-				vb = a.sts.Properties[key].Default.Object
-			}
-
-			all = all && (va == vb)
-		}
-
-		if !all {
+		// key the item
+		mitem, ok := item.(map[string]interface{})
+		if !ok {
 			continue
 		}
-
-		if match != nil {
-			// Duplicate key set / more than one element matches. This condition should
-			// have generated a validation error elsewhere.
-			return nil
+		itemKey, ok := a.ks.CompositeKeyFor(mitem)
+		if !ok {
+			continue
 		}
-		match = element
+		if _, exists := a.keyedItems[itemKey]; !exists {
+			a.keyedItems[itemKey] = mitem
+		}
+
+		// if it matches, short-circuit
+		if itemKey == key {
+			return mitem
+		}
 	}
-	return match // can be nil
+
+	return nil
 }
 
 func makeKeyStrategy(sts *schema.Structural) keyStrategy {
 	if len(sts.XListMapKeys) == 1 {
 		key := sts.XListMapKeys[0]
 		return &singleKeyStrategy{
-			key:     key,
-			defawlt: sts.Properties[key].Default.Object,
+			key: key,
 		}
 	}
 
-	return &hashKeyStrategy{
+	return &multiKeyStrategy{
 		sts: sts,
 	}
 }
 
 // makeMapList returns a queryable interface over the provided x-kubernetes-list-type=map
-// elements. If the provided schema is _not_ an array with x-kubernetes-list-type=map, returns an
+// keyedItems. If the provided schema is _not_ an array with x-kubernetes-list-type=map, returns an
 // empty mapList.
-func makeMapList(sts *schema.Structural, ks keyStrategy, items []interface{}) (rv mapList) {
+func makeMapList(sts *schema.Structural, items []interface{}) (rv mapList) {
 	if sts.Type != "array" || sts.XListType == nil || *sts.XListType != "map" || len(sts.XListMapKeys) == 0 || len(items) == 0 {
 		return emptyMapList{}
 	}
-
-	elements := make(map[interface{}][]interface{}, len(items))
-
-	for _, item := range items {
-		mitem, ok := item.(map[string]interface{})
-		if !ok {
-			continue
-		}
-		if key, ok := ks.CompositeKeyFor(mitem); ok {
-			elements[key] = append(elements[key], mitem)
-		}
-	}
-
+	ks := makeKeyStrategy(sts)
 	return &mapListImpl{
-		sts:      sts,
-		ks:       ks,
-		elements: elements,
+		sts:          sts,
+		ks:           ks,
+		keyedItems:   map[interface{}]interface{}{},
+		unkeyedItems: items,
 	}
 }

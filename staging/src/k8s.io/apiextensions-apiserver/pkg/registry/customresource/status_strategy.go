@@ -19,11 +19,12 @@ package customresource
 import (
 	"context"
 
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 type statusStrategy struct {
@@ -91,7 +92,7 @@ func (a statusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Obj
 	}
 	uOld, ok := old.(*unstructured.Unstructured)
 	if !ok {
-		return errs
+		uOld = nil // as a safety precaution, continue with validation if uOld self cannot be cast
 	}
 
 	v := obj.GetObjectKind().GroupVersionKind().Version
