@@ -132,6 +132,7 @@ type reconciler struct {
 	timeOfLastSync                time.Time
 	volumesFailedReconstruction   []podVolume
 	volumesNeedDevicePath         []v1.UniqueVolumeName
+	volumesNeedReportedInUse      []v1.UniqueVolumeName
 }
 
 func (rc *reconciler) Run(stopCh <-chan struct{}) {

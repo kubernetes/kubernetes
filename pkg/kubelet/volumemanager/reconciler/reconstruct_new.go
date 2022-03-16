@@ -65,6 +65,13 @@ func (rc *reconciler) reconcileNew() {
 	if len(rc.volumesNeedDevicePath) != 0 {
 		rc.updateReconstructedDevicePaths()
 	}
+
+	if len(rc.volumesNeedReportedInUse) != 0 && rc.populatorHasAddedPods() {
+		// Once DSW is populated, mark all reconstructed as reported in node.status,
+		// so they can proceed with MountDevice / SetUp.
+		rc.desiredStateOfWorld.MarkVolumesReportedInUse(rc.volumesNeedReportedInUse)
+		rc.volumesNeedReportedInUse = nil
+	}
 }
 
 func (rc *reconciler) readyToUnmount() bool {
@@ -119,7 +126,7 @@ func (rc *reconciler) reconstructVolumes() {
 		rc.updateStatesNew(reconstructedVolumes)
 		// The reconstructed volumes are mounted, hence a previous kubelet must have already put it into node.status.volumesInUse.
 		// Remember to update DSW with this information.
-		rc.desiredStateOfWorld.MarkVolumesReportedInUse(reconstructedVolumeNames)
+		rc.volumesNeedReportedInUse = reconstructedVolumeNames
 		// Remember to update devicePath from node.status.volumesAttached
 		rc.volumesNeedDevicePath = reconstructedVolumeNames
 	}
@@ -199,6 +206,7 @@ func (rc *reconciler) updateReconstructedDevicePaths() {
 
 	node, fetchErr := rc.kubeClient.CoreV1().Nodes().Get(context.TODO(), string(rc.nodeName), metav1.GetOptions{})
 	if fetchErr != nil {
+		// This may repeat few times per second until kubelet is able to read its own status for the first time.
 		klog.ErrorS(fetchErr, "Failed to get Node status to reconstruct device paths")
 		return
 	}
