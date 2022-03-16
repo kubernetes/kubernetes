@@ -866,14 +866,12 @@ var _ = SIGDescribe("Pods", func() {
 				}}, metav1.CreateOptions{})
 			framework.ExpectNoError(err, "failed to create pod")
 			framework.Logf("created %v", podTestName)
-			framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, podTestName, f.Namespace.Name))
-			framework.Logf("running and ready %v", podTestName)
 		}
 
-		// wait as required for all 3 pods to be found
-		ginkgo.By("waiting for all 3 pods to be located")
-		err := wait.PollImmediate(podRetryPeriod, podRetryTimeout, checkPodListQuantity(f, "type=Testing", 3))
-		framework.ExpectNoError(err, "3 pods not found")
+		// wait as required for all 3 pods to be running
+		ginkgo.By("waiting for all 3 pods to be running")
+		err := e2epod.WaitForPodsRunningReady(f.ClientSet, f.Namespace.Name, 3, 0, framework.PodStartTimeout, nil)
+		framework.ExpectNoError(err, "3 pods not found running.")
 
 		// delete Collection of pods with a label in the current namespace
 		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).DeleteCollection(context.TODO(), metav1.DeleteOptions{GracePeriodSeconds: &one}, metav1.ListOptions{
