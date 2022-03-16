@@ -324,11 +324,6 @@ func TestIsScalarResourceName(t *testing.T) {
 			want:         true,
 		},
 		{
-			name:         "Should be false with not HugePage resource name",
-			resourceName: "cpu",
-			want:         false,
-		},
-		{
 			name:         "Should be true with native resource name",
 			resourceName: "kubernetes.io/resource-foo",
 			want:         true,
@@ -337,6 +332,21 @@ func TestIsScalarResourceName(t *testing.T) {
 			name:         "Should be true with attachable volume resource name",
 			resourceName: "attachable-volumes-foo",
 			want:         true,
+		},
+		{
+			name:         "Should be false with not ScalarResource name",
+			resourceName: "cpu",
+			want:         false,
+		},
+		{
+			name:         "Should be false with not ScalarResource name",
+			resourceName: "memory",
+			want:         false,
+		},
+		{
+			name:         "Should be false with not ScalarResource name",
+			resourceName: "ephemeral-storage",
+			want:         false,
 		},
 	}
 	for _, test := range tests {
