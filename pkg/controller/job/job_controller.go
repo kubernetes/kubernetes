@@ -151,9 +151,7 @@ func NewController(podInformer coreinformers.PodInformer, jobInformer batchinfor
 			jm.enqueueController(obj, true)
 		},
 		UpdateFunc: jm.updateJob,
-		DeleteFunc: func(obj interface{}) {
-			jm.enqueueController(obj, true)
-		},
+		DeleteFunc: jm.deleteJob,
 	})
 	jm.jobLister = jobInformer.Lister()
 	jm.jobStoreSynced = jobInformer.Informer().HasSynced
@@ -368,6 +366,10 @@ func (jm *Controller) deletePod(obj interface{}, final bool) {
 	controllerRef := metav1.GetControllerOf(pod)
 	if controllerRef == nil {
 		// No controller should care about orphans being deleted.
+		// But this pod might have belonged to a Job and the GC removed the reference.
+		if hasJobTrackingFinalizer(pod) {
+			jm.enqueueOrphanPod(pod)
+		}
 		return
 	}
 	job := jm.resolveControllerRef(pod.Namespace, controllerRef)
@@ -417,6 +419,33 @@ func (jm *Controller) updateJob(old, cur interface{}) {
 			// AddAfter will handle total < passed
 			jm.queue.AddAfter(key, total-passed)
 			klog.V(4).Infof("job %q ActiveDeadlineSeconds updated, will rsync after %d seconds", key, total-passed)
+		}
+	}
+}
+
+// deleteJob enqueues the job and all the pods associated with it that still
+// have a finalizer.
+func (jm *Controller) deleteJob(obj interface{}) {
+	jm.enqueueController(obj, true)
+	jobObj, ok := obj.(*batch.Job)
+	if !ok {
+		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+		if !ok {
+			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %+v", obj))
+			return
+		}
+		jobObj, ok = tombstone.Obj.(*batch.Job)
+		if !ok {
+			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a job %+v", obj))
+			return
+		}
+	}
+	// Listing pods shouldn't really fail, as we are just querying the informer cache.
+	pods, _ := jm.podStore.Pods(jobObj.Namespace).List(labels.Everything())
+	for _, pod := range pods {
+		controllerRef := metav1.GetControllerOf(pod)
+		if (controllerRef == nil || controllerRef.UID == jobObj.UID) && hasJobTrackingFinalizer(pod) {
+			jm.enqueueOrphanPod(pod)
 		}
 	}
 }
