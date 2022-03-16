@@ -26,7 +26,6 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 )
 
@@ -175,7 +174,7 @@ func InitLogs() {
 	if logFlushFreqAdded {
 		// The flag from this file was activated, so use it now.
 		// Otherwise LoggingConfiguration.Apply will do this.
-		go wait.Forever(FlushLogs, logFlushFreq)
+		klog.StartFlushDaemon(logFlushFreq)
 	}
 }
 

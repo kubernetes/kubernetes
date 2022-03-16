@@ -24,6 +24,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/klog/v2"
 )
 
 func TestFlags(t *testing.T) {
@@ -89,6 +90,7 @@ func TestOptions(t *testing.T) {
 				t.Errorf("Wrong Validate() result for %q. expect %v, got %v", tc.name, tc.want, o)
 			}
 			err := o.ValidateAndApply()
+			defer klog.StopFlushDaemon()
 
 			if !assert.ElementsMatch(t, tc.errs.ToAggregate(), err) {
 				t.Errorf("Wrong Validate() result for %q.\n expect:\t%+v\n got:\t%+v", tc.name, tc.errs, err)
