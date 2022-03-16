@@ -228,9 +228,8 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 				}),
 				"VolumeStats": gstruct.MatchAllElements(summaryObjectID, gstruct.Elements{
 					"test-empty-dir": gstruct.MatchAllFields(gstruct.Fields{
-						"Name":              gomega.Equal("test-empty-dir"),
-						"PVCRef":            gomega.BeNil(),
-						"VolumeHealthStats": gomega.BeNil(),
+						"Name":   gomega.Equal("test-empty-dir"),
+						"PVCRef": gomega.BeNil(),
 						"FsStats": gstruct.MatchAllFields(gstruct.Fields{
 							"Time":           recent(maxStatsAge),
 							"AvailableBytes": fsCapacityBounds,
