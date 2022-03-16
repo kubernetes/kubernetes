@@ -41,7 +41,6 @@ const deprecated = "will be removed in a future release, see https://github.com/
 
 var (
 	packageFlags = flag.NewFlagSet("logging", flag.ContinueOnError)
-	logrFlush    func()
 
 	// Periodic flushing gets configured either via the global flag
 	// in this file or via LoggingConfiguration.
@@ -185,9 +184,6 @@ func InitLogs() {
 // are printed before exiting the program.
 func FlushLogs() {
 	klog.Flush()
-	if logrFlush != nil {
-		logrFlush()
-	}
 }
 
 // NewLogger creates a new log.Logger which sends logs to klog.Info.

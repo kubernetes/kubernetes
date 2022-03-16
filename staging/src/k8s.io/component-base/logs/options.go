@@ -82,8 +82,7 @@ func (o *Options) apply() {
 		klog.ClearLogger()
 	} else {
 		log, flush := factory.Create(o.Config.Options)
-		klog.SetLogger(log)
-		logrFlush = flush
+		klog.SetLoggerWithOptions(log, klog.FlushLogger(flush))
 	}
 	if err := loggingFlags.Lookup("v").Value.Set(o.Config.Verbosity.String()); err != nil {
 		panic(fmt.Errorf("internal error while setting klog verbosity: %v", err))
