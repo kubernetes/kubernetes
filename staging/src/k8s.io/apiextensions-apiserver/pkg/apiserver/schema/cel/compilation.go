@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/google/cel-go/cel"
+	"github.com/google/cel-go/checker"
 	"github.com/google/cel-go/checker/decls"
 	expr "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 	"google.golang.org/protobuf/proto"
@@ -54,10 +55,11 @@ const (
 type CompilationResult struct {
 	Program cel.Program
 	Error   *Error
-
 	// If true, the compiled expression contains a reference to the identifier "oldSelf", and its corresponding rule
 	// is implicitly a transition rule.
 	TransitionRule bool
+	// Represents the worst-case cost of the compiled expression in terms of CEL's cost units, as used by cel.EstimateCost.
+	MaxCost uint64
 }
 
 // Compile compiles all the XValidations rules (without recursing into the schema) and returns a slice containing a
@@ -111,17 +113,17 @@ func Compile(s *schema.Structural, isResourceRoot bool, perCallLimit uint64) ([]
 	if err != nil {
 		return nil, err
 	}
-
+	estimator := celEstimator{root: root}
 	// compResults is the return value which saves a list of compilation results in the same order as x-kubernetes-validations rules.
 	compResults := make([]CompilationResult, len(celRules))
 	for i, rule := range celRules {
-		compResults[i] = compileRule(rule, env, perCallLimit)
+		compResults[i] = compileRule(rule, env, perCallLimit, &estimator)
 	}
 
 	return compResults, nil
 }
 
-func compileRule(rule apiextensions.ValidationRule, env *cel.Env, perCallLimit uint64) (compilationResult CompilationResult) {
+func compileRule(rule apiextensions.ValidationRule, env *cel.Env, perCallLimit uint64, estimator *celEstimator) (compilationResult CompilationResult) {
 	if len(strings.TrimSpace(rule.Rule)) == 0 {
 		// include a compilation result, but leave both program and error nil per documented return semantics of this
 		// function
@@ -156,7 +158,12 @@ func compileRule(rule apiextensions.ValidationRule, env *cel.Env, perCallLimit u
 		compilationResult.Error = &Error{ErrorTypeInvalid, "program instantiation failed: " + err.Error()}
 		return
 	}
-
+	costEst, err := env.EstimateCost(ast, estimator)
+	if err != nil {
+		compilationResult.Error = &Error{ErrorTypeInternal, "cost estimation failed: " + err.Error()}
+		return
+	}
+	compilationResult.MaxCost = costEst.Max
 	compilationResult.Program = prog
 	return
 }
@@ -167,4 +174,46 @@ func compileRule(rule apiextensions.ValidationRule, env *cel.Env, perCallLimit u
 // CRD is created or updated.
 func generateUniqueSelfTypeName() string {
 	return fmt.Sprintf("selfType%d", time.Now().Nanosecond())
+}
+
+type celEstimator struct {
+	root *celmodel.DeclType
+}
+
+func (c *celEstimator) EstimateSize(element checker.AstNode) *checker.SizeEstimate {
+	if len(element.Path()) == 0 {
+		// Path() can return an empty list, early exit if it does since we can't
+		// provide size estimates when that happens
+		return nil
+	}
+	currentNode := c.root
+	// cut off "self" from path, since we always start there
+	for _, name := range element.Path()[1:] {
+		switch name {
+		case "@items", "@values":
+			if currentNode.ElemType == nil {
+				return nil
+			}
+			currentNode = currentNode.ElemType
+		case "@keys":
+			if currentNode.KeyType == nil {
+				return nil
+			}
+			currentNode = currentNode.KeyType
+		default:
+			field, ok := currentNode.Fields[name]
+			if !ok {
+				return nil
+			}
+			if field.Type == nil {
+				return nil
+			}
+			currentNode = field.Type
+		}
+	}
+	return &checker.SizeEstimate{Min: 0, Max: uint64(currentNode.MaxElements)}
+}
+
+func (c *celEstimator) EstimateCallCost(function, overloadID string, target *checker.AstNode, args []checker.AstNode) *checker.CallEstimate {
+	return nil
 }

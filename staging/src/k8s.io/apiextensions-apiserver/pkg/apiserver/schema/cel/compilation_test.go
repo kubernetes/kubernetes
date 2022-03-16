@@ -18,11 +18,16 @@ package cel
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"testing"
 
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
+)
+
+const (
+	costLimit = 100000000
 )
 
 type validationMatcher interface {
@@ -655,6 +660,867 @@ func TestCelCompilation(t *testing.T) {
 					t.Errorf("result %d does not match expectation: %v", i+1, expectedResult)
 				}
 			}
+		})
+	}
+}
+
+// take a single rule type in (string/number/map/etc.) and return appropriate values for
+// Type, Format, and XIntOrString
+func parseRuleType(ruleType string) (string, string, bool) {
+	if ruleType == "duration" || ruleType == "date" || ruleType == "date-time" {
+		return "string", ruleType, false
+	}
+	if ruleType == "int-or-string" {
+		return "", "", true
+	}
+	return ruleType, "", false
+}
+
+func genArrayWithRule(arrayType, rule string) func(maxItems *int64) *schema.Structural {
+	passedType, passedFormat, xIntString := parseRuleType(arrayType)
+	return func(maxItems *int64) *schema.Structural {
+		return &schema.Structural{
+			Generic: schema.Generic{
+				Type: "array",
+			},
+			Items: &schema.Structural{
+				Generic: schema.Generic{
+					Type: passedType,
+				},
+				ValueValidation: &schema.ValueValidation{
+					Format: passedFormat,
+				},
+				Extensions: schema.Extensions{
+					XIntOrString: xIntString,
+				},
+			},
+			ValueValidation: &schema.ValueValidation{
+				MaxItems: maxItems,
+			},
+			Extensions: schema.Extensions{
+				XValidations: apiextensions.ValidationRules{
+					{
+						Rule: rule,
+					},
+				},
+			},
+		}
+	}
+}
+
+func genArrayOfArraysWithRule(arrayType, rule string) func(maxItems *int64) *schema.Structural {
+	return func(maxItems *int64) *schema.Structural {
+		return &schema.Structural{
+			Generic: schema.Generic{
+				Type: "array",
+			},
+			Items: &schema.Structural{
+				Generic: schema.Generic{
+					Type: "array",
+				},
+				Items: &schema.Structural{
+					Generic: schema.Generic{
+						Type: arrayType,
+					},
+				},
+			},
+			ValueValidation: &schema.ValueValidation{
+				MaxItems: maxItems,
+			},
+			Extensions: schema.Extensions{
+				XValidations: apiextensions.ValidationRules{
+					{
+						Rule: rule,
+					},
+				},
+			},
+		}
+	}
+}
+
+func genObjectArrayWithRule(rule string) func(maxItems *int64) *schema.Structural {
+	return func(maxItems *int64) *schema.Structural {
+		return &schema.Structural{
+			Generic: schema.Generic{
+				Type: "array",
+			},
+			Items: &schema.Structural{
+				Generic: schema.Generic{
+					Type: "object",
+				},
+				Properties: map[string]schema.Structural{
+					"required": {
+						Generic: schema.Generic{
+							Type: "string",
+						},
+					},
+					"optional": {
+						Generic: schema.Generic{
+							Type: "string",
+						},
+					},
+				},
+				ValueValidation: &schema.ValueValidation{
+					Required: []string{"required"},
+				},
+			},
+			ValueValidation: &schema.ValueValidation{
+				MaxItems: maxItems,
+			},
+			Extensions: schema.Extensions{
+				XValidations: apiextensions.ValidationRules{
+					{
+						Rule: rule,
+					},
+				},
+			},
+		}
+	}
+}
+
+func getMapArrayWithRule(mapType, rule string) func(maxItems *int64) *schema.Structural {
+	return func(maxItems *int64) *schema.Structural {
+		return &schema.Structural{
+			Generic: schema.Generic{
+				Type: "array",
+			},
+			Items: &schema.Structural{
+				Generic: schema.Generic{
+					Type: "object",
+					AdditionalProperties: &schema.StructuralOrBool{Structural: &schema.Structural{
+						Generic: schema.Generic{
+							Type: mapType,
+						},
+					}},
+				},
+			},
+			ValueValidation: &schema.ValueValidation{
+				MaxItems: maxItems,
+			},
+			Extensions: schema.Extensions{
+				XValidations: apiextensions.ValidationRules{
+					{
+						Rule: rule,
+					},
+				},
+			},
+		}
+	}
+}
+
+func genMapWithRule(mapType, rule string) func(maxProperties *int64) *schema.Structural {
+	passedType, passedFormat, xIntString := parseRuleType(mapType)
+	return func(maxProperties *int64) *schema.Structural {
+		return &schema.Structural{
+			Generic: schema.Generic{
+				Type: "object",
+				AdditionalProperties: &schema.StructuralOrBool{Structural: &schema.Structural{
+					Generic: schema.Generic{
+						Type: passedType,
+					},
+					ValueValidation: &schema.ValueValidation{
+						Format: passedFormat,
+					},
+					Extensions: schema.Extensions{
+						XIntOrString: xIntString,
+					},
+				}},
+			},
+			ValueValidation: &schema.ValueValidation{
+				MaxProperties: maxProperties,
+			},
+			Extensions: schema.Extensions{
+				XValidations: apiextensions.ValidationRules{
+					{
+						Rule: rule,
+					},
+				},
+			},
+		}
+	}
+}
+
+func genStringWithRule(rule string) func(maxLength *int64) *schema.Structural {
+	return func(maxLength *int64) *schema.Structural {
+		return &schema.Structural{
+			Generic: schema.Generic{
+				Type: "string",
+			},
+			ValueValidation: &schema.ValueValidation{
+				MaxLength: maxLength,
+			},
+			Extensions: schema.Extensions{
+				XValidations: apiextensions.ValidationRules{
+					{
+						Rule: rule,
+					},
+				},
+			},
+		}
+	}
+}
+
+func genBytesWithRule(rule string) func(maxLength *int64) *schema.Structural {
+	return func(maxLength *int64) *schema.Structural {
+		return &schema.Structural{
+			Generic: schema.Generic{
+				Type: "string",
+			},
+			ValueValidation: &schema.ValueValidation{
+				MaxLength: maxLength,
+				Format:    "byte",
+			},
+			Extensions: schema.Extensions{
+				XValidations: apiextensions.ValidationRules{
+					{
+						Rule: rule,
+					},
+				},
+			},
+		}
+	}
+}
+
+func genNestedSpecWithRule(rule string) func(maxLength *int64) *schema.Structural {
+	return func(maxLength *int64) *schema.Structural {
+		return &schema.Structural{
+			Generic: schema.Generic{
+				Type: "object",
+				AdditionalProperties: &schema.StructuralOrBool{Structural: &schema.Structural{
+					Generic: schema.Generic{
+						Type: "string",
+					},
+					ValueValidation: &schema.ValueValidation{
+						MaxLength: maxLength,
+					},
+				}},
+			},
+			ValueValidation: &schema.ValueValidation{
+				MaxProperties: maxLength,
+			},
+			Extensions: schema.Extensions{
+				XValidations: apiextensions.ValidationRules{
+					{
+						Rule: rule,
+					},
+				},
+			},
+		}
+	}
+}
+
+func genAllMaxNestedSpecWithRootRule(rule string) func(maxLength *int64) *schema.Structural {
+	return func(maxLength *int64) *schema.Structural {
+		return &schema.Structural{
+			Generic: schema.Generic{
+				Type: "array",
+			},
+			Items: &schema.Structural{
+				Generic: schema.Generic{
+					Type: "object",
+					AdditionalProperties: &schema.StructuralOrBool{Structural: &schema.Structural{
+						Generic: schema.Generic{
+							Type: "object",
+						},
+						ValueValidation: &schema.ValueValidation{
+							Required:      []string{"required"},
+							MaxProperties: maxLength,
+						},
+						Properties: map[string]schema.Structural{
+							"required": {
+								Generic: schema.Generic{
+									Type: "string",
+								},
+							},
+							"optional": {
+								Generic: schema.Generic{
+									Type: "string",
+								},
+							},
+						},
+					}},
+				},
+				ValueValidation: &schema.ValueValidation{
+					MaxProperties: maxLength,
+				},
+			},
+			ValueValidation: &schema.ValueValidation{
+				MaxItems: maxLength,
+			},
+			Extensions: schema.Extensions{
+				XValidations: apiextensions.ValidationRules{
+					{
+						Rule: rule,
+					},
+				},
+			},
+		}
+	}
+}
+
+func genOneMaxNestedSpecWithRootRule(rule string) func(maxLength *int64) *schema.Structural {
+	return func(maxLength *int64) *schema.Structural {
+		return &schema.Structural{
+			Generic: schema.Generic{
+				Type: "array",
+			},
+			Items: &schema.Structural{
+				Generic: schema.Generic{
+					Type: "object",
+					AdditionalProperties: &schema.StructuralOrBool{Structural: &schema.Structural{
+						Generic: schema.Generic{
+							Type: "object",
+						},
+						ValueValidation: &schema.ValueValidation{
+							Required: []string{"required"},
+						},
+						Properties: map[string]schema.Structural{
+							"required": {
+								Generic: schema.Generic{
+									Type: "string",
+								},
+							},
+							"optional": {
+								Generic: schema.Generic{
+									Type: "string",
+								},
+							},
+						},
+					}},
+				},
+				ValueValidation: &schema.ValueValidation{
+					MaxProperties: maxLength,
+				},
+			},
+			Extensions: schema.Extensions{
+				XValidations: apiextensions.ValidationRules{
+					{
+						Rule: rule,
+					},
+				},
+			},
+		}
+	}
+}
+
+func genObjectForMap() *schema.Structural {
+	return &schema.Structural{
+		Generic: schema.Generic{
+			Type: "object",
+		},
+		Properties: map[string]schema.Structural{
+			"required": {
+				Generic: schema.Generic{
+					Type: "string",
+				},
+			},
+			"optional": {
+				Generic: schema.Generic{
+					Type: "string",
+				},
+			},
+		},
+		ValueValidation: &schema.ValueValidation{
+			Required: []string{"required"},
+		},
+	}
+}
+
+func genArrayForMap() *schema.Structural {
+	return &schema.Structural{
+		Generic: schema.Generic{
+			Type: "array",
+		},
+		Items: &schema.Structural{
+			Generic: schema.Generic{
+				Type: "number",
+			},
+		},
+	}
+}
+
+func genMapForMap() *schema.Structural {
+	return &schema.Structural{
+		Generic: schema.Generic{
+			Type: "object",
+			AdditionalProperties: &schema.StructuralOrBool{Structural: &schema.Structural{
+				Generic: schema.Generic{
+					Type: "number",
+				},
+			}},
+		},
+	}
+}
+
+func genMapWithCustomItemRule(item *schema.Structural, rule string) func(maxProperties *int64) *schema.Structural {
+	return func(maxProperties *int64) *schema.Structural {
+		return &schema.Structural{
+			Generic: schema.Generic{
+				Type:                 "object",
+				AdditionalProperties: &schema.StructuralOrBool{Structural: item},
+			},
+			ValueValidation: &schema.ValueValidation{
+				MaxProperties: maxProperties,
+			},
+			Extensions: schema.Extensions{
+				XValidations: apiextensions.ValidationRules{
+					{
+						Rule: rule,
+					},
+				},
+			},
+		}
+	}
+}
+
+func schemaChecker(schema *schema.Structural, expectedCost uint64, calcLimit uint64, t *testing.T) func(t *testing.T) {
+	return func(t *testing.T) {
+		// TODO(DangerOnTheRanger): if perCallLimit in compilation.go changes, this needs to change as well
+		compilationResults, err := Compile(schema, false, uint64(math.MaxInt64))
+		if err != nil {
+			t.Errorf("Expected no error, got: %v", err)
+		}
+		if len(compilationResults) != 1 {
+			t.Errorf("Expected one rule, got: %d", len(compilationResults))
+		}
+		result := compilationResults[0]
+		if result.Error != nil {
+			t.Errorf("Expected no compile-time error, got: %v", result.Error)
+		}
+		if calcLimit == 0 {
+			if result.MaxCost != expectedCost {
+				t.Errorf("Wrong cost (expected %d, got %d)", expectedCost, result.MaxCost)
+			}
+		} else {
+			if result.MaxCost < calcLimit {
+				t.Errorf("Cost did not exceed limit as expected (expected more than %d, got %d)", calcLimit, result.MaxCost)
+			}
+		}
+	}
+}
+
+func TestCostEstimation(t *testing.T) {
+	cases := []struct {
+		name                       string
+		schemaGenerator            func(maxLength *int64) *schema.Structural
+		expectedCalcCost           uint64
+		setMaxElements             int64
+		expectedSetCost            uint64
+		expectCalcCostExceedsLimit uint64
+	}{
+		{
+			name:             "number array with all",
+			schemaGenerator:  genArrayWithRule("number", "self.all(x, true)"),
+			expectedCalcCost: 4718591,
+			setMaxElements:   10,
+			expectedSetCost:  32,
+		},
+		{
+			name:             "string array with all",
+			schemaGenerator:  genArrayWithRule("string", "self.all(x, true)"),
+			expectedCalcCost: 3145727,
+			setMaxElements:   20,
+			expectedSetCost:  62,
+		},
+		{
+			name:             "boolean array with all",
+			schemaGenerator:  genArrayWithRule("boolean", "self.all(x, true)"),
+			expectedCalcCost: 1887437,
+			setMaxElements:   5,
+			expectedSetCost:  17,
+		},
+		// all array-of-array tests should have the same expected cost along the same expression,
+		// since arrays-of-arrays are serialized the same in minimized form regardless of item type
+		// of the subarray ([[], [], ...])
+		{
+			name:             "array of number arrays with all",
+			schemaGenerator:  genArrayOfArraysWithRule("number", "self.all(x, true)"),
+			expectedCalcCost: 3145727,
+			setMaxElements:   100,
+			expectedSetCost:  302,
+		},
+		{
+			name:             "array of objects with all",
+			schemaGenerator:  genObjectArrayWithRule("self.all(x, true)"),
+			expectedCalcCost: 555128,
+			setMaxElements:   50,
+			expectedSetCost:  152,
+		},
+		{
+			name:             "map of numbers with all",
+			schemaGenerator:  genMapWithRule("number", "self.all(x, true)"),
+			expectedCalcCost: 1348169,
+			setMaxElements:   10,
+			expectedSetCost:  32,
+		},
+		{
+			name:             "map of numbers with has",
+			schemaGenerator:  genMapWithRule("number", "has(self.x)"),
+			expectedCalcCost: 0,
+			setMaxElements:   100,
+			expectedSetCost:  0,
+		},
+		{
+			name:             "map of strings with all",
+			schemaGenerator:  genMapWithRule("string", "self.all(x, true)"),
+			expectedCalcCost: 1179647,
+			setMaxElements:   3,
+			expectedSetCost:  11,
+		},
+		{
+			name:             "map of strings with has",
+			schemaGenerator:  genMapWithRule("string", "has(self.x)"),
+			expectedCalcCost: 0,
+			setMaxElements:   550,
+			expectedSetCost:  0,
+		},
+		{
+			name:             "map of booleans with all",
+			schemaGenerator:  genMapWithRule("boolean", "self.all(x, true)"),
+			expectedCalcCost: 943718,
+			setMaxElements:   100,
+			expectedSetCost:  302,
+		},
+		{
+			name:             "map of booleans with has",
+			schemaGenerator:  genMapWithRule("boolean", "has(self.x)"),
+			expectedCalcCost: 0,
+			setMaxElements:   1024,
+			expectedSetCost:  0,
+		},
+		{
+			name:             "string with contains",
+			schemaGenerator:  genStringWithRule("self.contains('test')"),
+			expectedCalcCost: 314574,
+			setMaxElements:   10,
+			expectedSetCost:  5,
+		},
+		{
+			name:             "string with startsWith",
+			schemaGenerator:  genStringWithRule("self.startsWith('test')"),
+			expectedCalcCost: 2,
+			setMaxElements:   15,
+			expectedSetCost:  2,
+		},
+		{
+			name:             "string with endsWith",
+			schemaGenerator:  genStringWithRule("self.endsWith('test')"),
+			expectedCalcCost: 2,
+			setMaxElements:   30,
+			expectedSetCost:  2,
+		},
+		{
+			name:             "concat string",
+			schemaGenerator:  genStringWithRule(`size(self + "hello") > size("hello")`),
+			expectedCalcCost: 314578,
+			setMaxElements:   4,
+			expectedSetCost:  7,
+		},
+		{
+			name:             "index of array with numbers",
+			schemaGenerator:  genArrayWithRule("number", "self[1] == 0.0"),
+			expectedCalcCost: 2,
+			setMaxElements:   5000,
+			expectedSetCost:  2,
+		},
+		{
+			name:             "index of array with strings",
+			schemaGenerator:  genArrayWithRule("string", "self[1] == self[1]"),
+			expectedCalcCost: 314577,
+			setMaxElements:   8,
+			expectedSetCost:  314577,
+		},
+		{
+			name:                       "O(n^2) loop with numbers",
+			schemaGenerator:            genArrayWithRule("number", "self.all(x, self.all(y, true))"),
+			expectedCalcCost:           9895601504256,
+			expectCalcCostExceedsLimit: costLimit,
+			setMaxElements:             10,
+			expectedSetCost:            352,
+		},
+		{
+			name:                       "O(n^3) loop with numbers",
+			schemaGenerator:            genArrayWithRule("number", "self.all(x, self.all(y, self.all(z, true)))"),
+			expectedCalcCost:           13499986500008999998,
+			expectCalcCostExceedsLimit: costLimit,
+			setMaxElements:             10,
+			expectedSetCost:            3552,
+		},
+		{
+			name:             "regex matches simple",
+			schemaGenerator:  genStringWithRule(`self.matches("x")`),
+			expectedCalcCost: 314574,
+			setMaxElements:   50,
+			expectedSetCost:  22,
+		},
+		{
+			name:             "regex matches empty string",
+			schemaGenerator:  genStringWithRule(`"".matches("(((((((((())))))))))[0-9]")`),
+			expectedCalcCost: 7,
+			setMaxElements:   10,
+			expectedSetCost:  7,
+		},
+		{
+			name:             "regex matches empty regex",
+			schemaGenerator:  genStringWithRule(`self.matches("")`),
+			expectedCalcCost: 1,
+			setMaxElements:   100,
+			expectedSetCost:  1,
+		},
+		{
+			name:             "map of strings with value length",
+			schemaGenerator:  genNestedSpecWithRule("self.all(x, x.contains(self[x]))"),
+			expectedCalcCost: 2752507,
+			setMaxElements:   10,
+			expectedSetCost:  72,
+		},
+		{
+			name:             "set array maxLength to zero",
+			schemaGenerator:  genArrayWithRule("number", "self[3] == 0.0"),
+			expectedCalcCost: 2,
+			setMaxElements:   0,
+			expectedSetCost:  2,
+		},
+		{
+			name:             "set map maxLength to zero",
+			schemaGenerator:  genMapWithRule("number", `self["x"] == 0.0`),
+			expectedCalcCost: 2,
+			setMaxElements:   0,
+			expectedSetCost:  2,
+		},
+		{
+			name:             "set string maxLength to zero",
+			schemaGenerator:  genStringWithRule(`self == "x"`),
+			expectedCalcCost: 2,
+			setMaxElements:   0,
+			expectedSetCost:  1,
+		},
+		{
+			name:             "set bytes maxLength to zero",
+			schemaGenerator:  genBytesWithRule(`self == b"x"`),
+			expectedCalcCost: 2,
+			setMaxElements:   0,
+			expectedSetCost:  1,
+		},
+		{
+			name:             "set maxLength greater than estimated maxLength",
+			schemaGenerator:  genArrayWithRule("number", "self.all(x, x == 0.0)"),
+			expectedCalcCost: 6291454,
+			setMaxElements:   3 * 1024 * 2048,
+			expectedSetCost:  25165826,
+		},
+		{
+			name:             "nested types with root rule with all supporting maxLength",
+			schemaGenerator:  genAllMaxNestedSpecWithRootRule(`self.all(x, x["y"].required == "z")`),
+			expectedCalcCost: 7340027,
+			setMaxElements:   10,
+			expectedSetCost:  72,
+		},
+		{
+			name:             "nested types with root rule with one supporting maxLength",
+			schemaGenerator:  genOneMaxNestedSpecWithRootRule(`self.all(x, x["y"].required == "z")`),
+			expectedCalcCost: 7340027,
+			setMaxElements:   10,
+			expectedSetCost:  7340027,
+		},
+		{
+			name:             "int-or-string array with all",
+			schemaGenerator:  genArrayWithRule("int-or-string", "self.all(x, true)"),
+			expectedCalcCost: 4718591,
+			setMaxElements:   10,
+			expectedSetCost:  32,
+		},
+		{
+			name:             "index of array with int-or-strings",
+			schemaGenerator:  genArrayWithRule("int-or-string", "self[0] == 5"),
+			expectedCalcCost: 3,
+			setMaxElements:   10,
+			expectedSetCost:  3,
+		},
+		{
+			name:             "index of array with booleans",
+			schemaGenerator:  genArrayWithRule("boolean", "self[0] == false"),
+			expectedCalcCost: 2,
+			setMaxElements:   25,
+			expectedSetCost:  2,
+		},
+		{
+			name:             "index of array of objects",
+			schemaGenerator:  genObjectArrayWithRule("self[0] == null"),
+			expectedCalcCost: 2,
+			setMaxElements:   422,
+			expectedSetCost:  2,
+		},
+		{
+			name:             "index of array of array of numnbers",
+			schemaGenerator:  genArrayOfArraysWithRule("number", "self[0][0] == -1.0"),
+			expectedCalcCost: 3,
+			setMaxElements:   51,
+			expectedSetCost:  3,
+		},
+		{
+			name:             "array of number maps with all",
+			schemaGenerator:  getMapArrayWithRule("number", `self.all(x, x.y == 25.2)`),
+			expectedCalcCost: 6291452,
+			setMaxElements:   12,
+			expectedSetCost:  74,
+		},
+		{
+			name:             "index of array of number maps",
+			schemaGenerator:  getMapArrayWithRule("number", `self[0].x > 2.0`),
+			expectedCalcCost: 4,
+			setMaxElements:   3000,
+			expectedSetCost:  4,
+		},
+		{
+			name:             "duration array with all",
+			schemaGenerator:  genArrayWithRule("duration", "self.all(x, true)"),
+			expectedCalcCost: 2359295,
+			setMaxElements:   5,
+			expectedSetCost:  17,
+		},
+		{
+			name:             "index of duration array",
+			schemaGenerator:  genArrayWithRule("duration", "self[0].getHours() == 2"),
+			expectedCalcCost: 4,
+			setMaxElements:   525,
+			expectedSetCost:  4,
+		},
+		{
+			name:             "date array with all",
+			schemaGenerator:  genArrayWithRule("date", "self.all(x, true)"),
+			expectedCalcCost: 725936,
+			setMaxElements:   15,
+			expectedSetCost:  47,
+		},
+		{
+			name:             "index of date array",
+			schemaGenerator:  genArrayWithRule("date", "self[2].getDayOfMonth() == 13"),
+			expectedCalcCost: 4,
+			setMaxElements:   42,
+			expectedSetCost:  4,
+		},
+		{
+			name:             "date-time array with all",
+			schemaGenerator:  genArrayWithRule("date-time", "self.all(x, true)"),
+			expectedCalcCost: 428963,
+			setMaxElements:   25,
+			expectedSetCost:  77,
+		},
+		{
+			name:             "index of date-time array",
+			schemaGenerator:  genArrayWithRule("date-time", "self[2].getMinutes() == 45"),
+			expectedCalcCost: 4,
+			setMaxElements:   99,
+			expectedSetCost:  4,
+		},
+		{
+			name:             "map of int-or-strings with all",
+			schemaGenerator:  genMapWithRule("int-or-string", "self.all(x, true)"),
+			expectedCalcCost: 1348169,
+			setMaxElements:   15,
+			expectedSetCost:  47,
+		},
+		{
+			name:             "map of int-or-strings with has",
+			schemaGenerator:  genMapWithRule("int-or-string", "has(self.x)"),
+			expectedCalcCost: 0,
+			setMaxElements:   5000,
+			expectedSetCost:  0,
+		},
+		{
+			name:             "map of objects with all",
+			schemaGenerator:  genMapWithCustomItemRule(genObjectForMap(), "self.all(x, true)"),
+			expectedCalcCost: 428963,
+			setMaxElements:   20,
+			expectedSetCost:  62,
+		},
+		{
+			name:             "map of objects with has",
+			schemaGenerator:  genMapWithCustomItemRule(genObjectForMap(), "has(self.x)"),
+			expectedCalcCost: 0,
+			setMaxElements:   9001,
+			expectedSetCost:  0,
+		},
+		{
+			name:             "map of number maps with all",
+			schemaGenerator:  genMapWithCustomItemRule(genMapForMap(), "self.all(x, true)"),
+			expectedCalcCost: 1179647,
+			setMaxElements:   10,
+			expectedSetCost:  32,
+		},
+		{
+			name:             "map of number maps with has",
+			schemaGenerator:  genMapWithCustomItemRule(genMapForMap(), "has(self.x)"),
+			expectedCalcCost: 0,
+			setMaxElements:   101,
+			expectedSetCost:  0,
+		},
+		{
+			name:             "map of number arrays with all",
+			schemaGenerator:  genMapWithCustomItemRule(genArrayForMap(), "self.all(x, true)"),
+			expectedCalcCost: 1179647,
+			setMaxElements:   25,
+			expectedSetCost:  77,
+		},
+		{
+			name:             "map of number arrays with has",
+			schemaGenerator:  genMapWithCustomItemRule(genArrayForMap(), "has(self.x)"),
+			expectedCalcCost: 0,
+			setMaxElements:   40000,
+			expectedSetCost:  0,
+		},
+		{
+			name:             "map of durations with all",
+			schemaGenerator:  genMapWithRule("duration", "self.all(x, true)"),
+			expectedCalcCost: 1048577,
+			setMaxElements:   5,
+			expectedSetCost:  17,
+		},
+		{
+			name:             "map of durations with has",
+			schemaGenerator:  genMapWithRule("duration", "has(self.x)"),
+			expectedCalcCost: 0,
+			setMaxElements:   256,
+			expectedSetCost:  0,
+		},
+		{
+			name:             "map of dates with all",
+			schemaGenerator:  genMapWithRule("date", "self.all(x, true)"),
+			expectedCalcCost: 524288,
+			setMaxElements:   10,
+			expectedSetCost:  32,
+		},
+		{
+			name:             "map of dates with has",
+			schemaGenerator:  genMapWithRule("date", "has(self.x)"),
+			expectedCalcCost: 0,
+			setMaxElements:   65536,
+			expectedSetCost:  0,
+		},
+		{
+			name:             "map of date-times with all",
+			schemaGenerator:  genMapWithRule("date-time", "self.all(x, true)"),
+			expectedCalcCost: 349526,
+			setMaxElements:   25,
+			expectedSetCost:  77,
+		},
+		{
+			name:             "map of date-times with has",
+			schemaGenerator:  genMapWithRule("date-time", "has(self.x)"),
+			expectedCalcCost: 0,
+			setMaxElements:   490,
+			expectedSetCost:  0,
+		},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			// dynamic maxLength case
+			schema := testCase.schemaGenerator(nil)
+			t.Run("calc maxLength", schemaChecker(schema, testCase.expectedCalcCost, testCase.expectCalcCostExceedsLimit, t))
+			// static maxLength case
+			setSchema := testCase.schemaGenerator(&testCase.setMaxElements)
+			t.Run("set maxLength", schemaChecker(setSchema, testCase.expectedSetCost, 0, t))
 		})
 	}
 }
