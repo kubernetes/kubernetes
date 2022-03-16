@@ -290,8 +290,8 @@ func (a *Authenticator) UpdateTransportConfig(c *transport.Config) error {
 	// also configured to allow client certificates for authentication. For requests
 	// like "kubectl get --token (token) pods" we should assume the intention is to
 	// use the provided token for authentication. The same can be said for when the
-	// user specifies basic auth.
-	if c.HasTokenAuth() || c.HasBasicAuth() {
+	// user specifies basic auth or cert auth.
+	if c.HasTokenAuth() || c.HasBasicAuth() || c.HasCertAuth() {
 		return nil
 	}
 
@@ -299,7 +299,7 @@ func (a *Authenticator) UpdateTransportConfig(c *transport.Config) error {
 		return &roundTripper{a, rt}
 	})
 
-	if c.TLS.GetCert != nil {
+	if c.HasCertCallback() {
 		return errors.New("can't add TLS certificate callback: transport.Config.TLS.GetCert already set")
 	}
 	c.TLS.GetCert = a.cert

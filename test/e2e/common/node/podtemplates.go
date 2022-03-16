@@ -70,7 +70,7 @@ var _ = SIGDescribe("PodTemplates", func() {
 			Template: v1.PodTemplateSpec{
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
-						{Name: "nginx", Image: "nginx"},
+						{Name: "nginx", Image: imageutils.GetE2EImage(imageutils.Nginx)},
 					},
 				},
 			},
@@ -164,7 +164,14 @@ var _ = SIGDescribe("PodTemplates", func() {
 
 	})
 
-	ginkgo.It("should replace a pod template", func() {
+	/*
+	   Release: v1.24
+	   Testname: PodTemplate, replace
+	   Description: Attempt to create a PodTemplate which MUST succeed.
+	   Attempt to replace the PodTemplate to include a new annotation
+	   which MUST succeed. The annotation MUST be found in the new PodTemplate.
+	*/
+	framework.ConformanceIt("should replace a pod template", func() {
 		ptClient := f.ClientSet.CoreV1().PodTemplates(f.Namespace.Name)
 		ptName := "podtemplate-" + utilrand.String(5)
 

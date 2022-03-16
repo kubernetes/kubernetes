@@ -15,7 +15,7 @@ type roffRenderer struct {
 	extensions   blackfriday.Extensions
 	listCounters []int
 	firstHeader  bool
-	defineTerm   bool
+	firstDD      bool
 	listDepth    int
 }
 
@@ -42,7 +42,8 @@ const (
 	quoteCloseTag    = "\n.RE\n"
 	listTag          = "\n.RS\n"
 	listCloseTag     = "\n.RE\n"
-	arglistTag       = "\n.TP\n"
+	dtTag            = "\n.TP\n"
+	dd2Tag           = "\n"
 	tableStart       = "\n.TS\nallbox;\n"
 	tableEnd         = ".TE\n"
 	tableCellStart   = "T{\n"
@@ -90,7 +91,7 @@ func (r *roffRenderer) RenderNode(w io.Writer, node *blackfriday.Node, entering 
 
 	switch node.Type {
 	case blackfriday.Text:
-		r.handleText(w, node, entering)
+		escapeSpecialChars(w, node.Literal)
 	case blackfriday.Softbreak:
 		out(w, crTag)
 	case blackfriday.Hardbreak:
@@ -150,38 +151,19 @@ func (r *roffRenderer) RenderNode(w io.Writer, node *blackfriday.Node, entering 
 		out(w, codeCloseTag)
 	case blackfriday.Table:
 		r.handleTable(w, node, entering)
-	case blackfriday.TableCell:
-		r.handleTableCell(w, node, entering)
 	case blackfriday.TableHead:
 	case blackfriday.TableBody:
 	case blackfriday.TableRow:
 		// no action as cell entries do all the nroff formatting
 		return blackfriday.GoToNext
+	case blackfriday.TableCell:
+		r.handleTableCell(w, node, entering)
+	case blackfriday.HTMLSpan:
+		// ignore other HTML tags
 	default:
 		fmt.Fprintln(os.Stderr, "WARNING: go-md2man does not handle node type "+node.Type.String())
 	}
 	return walkAction
-}
-
-func (r *roffRenderer) handleText(w io.Writer, node *blackfriday.Node, entering bool) {
-	var (
-		start, end string
-	)
-	// handle special roff table cell text encapsulation
-	if node.Parent.Type == blackfriday.TableCell {
-		if len(node.Literal) > 30 {
-			start = tableCellStart
-			end = tableCellEnd
-		} else {
-			// end rows that aren't terminated by "tableCellEnd" with a cr if end of row
-			if node.Parent.Next == nil && !node.Parent.IsHeader {
-				end = crTag
-			}
-		}
-	}
-	out(w, start)
-	escapeSpecialChars(w, node.Literal)
-	out(w, end)
 }
 
 func (r *roffRenderer) handleHeading(w io.Writer, node *blackfriday.Node, entering bool) {
@@ -230,15 +212,20 @@ func (r *roffRenderer) handleItem(w io.Writer, node *blackfriday.Node, entering 
 		if node.ListFlags&blackfriday.ListTypeOrdered != 0 {
 			out(w, fmt.Sprintf(".IP \"%3d.\" 5\n", r.listCounters[len(r.listCounters)-1]))
 			r.listCounters[len(r.listCounters)-1]++
+		} else if node.ListFlags&blackfriday.ListTypeTerm != 0 {
+			// DT (definition term): line just before DD (see below).
+			out(w, dtTag)
+			r.firstDD = true
 		} else if node.ListFlags&blackfriday.ListTypeDefinition != 0 {
-			// state machine for handling terms and following definitions
-			// since blackfriday does not distinguish them properly, nor
-			// does it seperate them into separate lists as it should
-			if !r.defineTerm {
-				out(w, arglistTag)
-				r.defineTerm = true
+			// DD (definition description): line that starts with ": ".
+			//
+			// We have to distinguish between the first DD and the
+			// subsequent ones, as there should be no vertical
+			// whitespace between the DT and the first DD.
+			if r.firstDD {
+				r.firstDD = false
 			} else {
-				r.defineTerm = false
+				out(w, dd2Tag)
 			}
 		} else {
 			out(w, ".IP \\(bu 2\n")
@@ -251,7 +238,7 @@ func (r *roffRenderer) handleItem(w io.Writer, node *blackfriday.Node, entering 
 func (r *roffRenderer) handleTable(w io.Writer, node *blackfriday.Node, entering bool) {
 	if entering {
 		out(w, tableStart)
-		//call walker to count cells (and rows?) so format section can be produced
+		// call walker to count cells (and rows?) so format section can be produced
 		columns := countColumns(node)
 		out(w, strings.Repeat("l ", columns)+"\n")
 		out(w, strings.Repeat("l ", columns)+".\n")
@@ -261,26 +248,39 @@ func (r *roffRenderer) handleTable(w io.Writer, node *blackfriday.Node, entering
 }
 
 func (r *roffRenderer) handleTableCell(w io.Writer, node *blackfriday.Node, entering bool) {
-	var (
-		start, end string
-	)
-	if node.IsHeader {
-		start = codespanTag
-		end = codespanCloseTag
-	}
 	if entering {
+		var start string
 		if node.Prev != nil && node.Prev.Type == blackfriday.TableCell {
-			out(w, "\t"+start)
-		} else {
-			out(w, start)
+			start = "\t"
 		}
+		if node.IsHeader {
+			start += codespanTag
+		} else if nodeLiteralSize(node) > 30 {
+			start += tableCellStart
+		}
+		out(w, start)
 	} else {
-		// need to carriage return if we are at the end of the header row
-		if node.IsHeader && node.Next == nil {
-			end = end + crTag
+		var end string
+		if node.IsHeader {
+			end = codespanCloseTag
+		} else if nodeLiteralSize(node) > 30 {
+			end = tableCellEnd
+		}
+		if node.Next == nil && end != tableCellEnd {
+			// Last cell: need to carriage return if we are at the end of the
+			// header row and content isn't wrapped in a "tablecell"
+			end += crTag
 		}
 		out(w, end)
 	}
+}
+
+func nodeLiteralSize(node *blackfriday.Node) int {
+	total := 0
+	for n := node.FirstChild; n != nil; n = n.FirstChild {
+		total += len(n.Literal)
+	}
+	return total
 }
 
 // because roff format requires knowing the column count before outputting any table
@@ -309,15 +309,6 @@ func out(w io.Writer, output string) {
 	io.WriteString(w, output) // nolint: errcheck
 }
 
-func needsBackslash(c byte) bool {
-	for _, r := range []byte("-_&\\~") {
-		if c == r {
-			return true
-		}
-	}
-	return false
-}
-
 func escapeSpecialChars(w io.Writer, text []byte) {
 	for i := 0; i < len(text); i++ {
 		// escape initial apostrophe or period
@@ -328,7 +319,7 @@ func escapeSpecialChars(w io.Writer, text []byte) {
 		// directly copy normal characters
 		org := i
 
-		for i < len(text) && !needsBackslash(text[i]) {
+		for i < len(text) && text[i] != '\\' {
 			i++
 		}
 		if i > org {

@@ -818,11 +818,11 @@ func setCachingObjects(event *watchCacheEvent, versioner storage.Versioner) {
 		// Don't wrap Object for delete events - these are not to deliver any
 		// events. Only wrap PrevObject.
 		if object, err := newCachingObject(event.PrevObject); err == nil {
-			// Update resource version of the underlying object.
+			// Update resource version of the object.
 			// event.PrevObject is used to deliver DELETE watch events and
 			// for them, we set resourceVersion to <current> instead of
 			// the resourceVersion of the last modification of the object.
-			updateResourceVersionIfNeeded(object.object, versioner, event.ResourceVersion)
+			updateResourceVersion(object, versioner, event.ResourceVersion)
 			event.PrevObject = object
 		} else {
 			klog.Errorf("couldn't create cachingObject from: %#v", event.Object)
@@ -851,14 +851,14 @@ func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 		// from it justifies increased memory usage, so for now we drop the cached
 		// serializations after dispatching this event.
 		//
-		// Given the deep-copies that are done to create cachingObjects,
-		// we try to cache serializations only if there are at least 3 watchers.
-		if len(c.watchersBuffer) >= 3 {
-			// Make a shallow copy to allow overwriting Object and PrevObject.
-			wcEvent := *event
-			setCachingObjects(&wcEvent, c.versioner)
-			event = &wcEvent
-		}
+		// Given that CachingObject is just wrapping the object and not perfoming
+		// deep-copying (until some field is explicitly being modified), we create
+		// it unconditionally to ensure safety and reduce deep-copying.
+		//
+		// Make a shallow copy to allow overwriting Object and PrevObject.
+		wcEvent := *event
+		setCachingObjects(&wcEvent, c.versioner)
+		event = &wcEvent
 
 		c.blockedWatchers = c.blockedWatchers[:0]
 		for _, watcher := range c.watchersBuffer {
@@ -1255,20 +1255,17 @@ func (c *cacheWatcher) nextBookmarkTime(now time.Time, bookmarkFrequency time.Du
 	return heartbeatTime, true
 }
 
-func getEventObject(object runtime.Object) runtime.Object {
-	if _, ok := object.(runtime.CacheableObject); ok {
+func getMutableObject(object runtime.Object) runtime.Object {
+	if _, ok := object.(*cachingObject); ok {
 		// It is safe to return without deep-copy, because the underlying
-		// object was already deep-copied during construction.
+		// object will lazily perform deep-copy on the first try to change
+		// any of its fields.
 		return object
 	}
 	return object.DeepCopyObject()
 }
 
-func updateResourceVersionIfNeeded(object runtime.Object, versioner storage.Versioner, resourceVersion uint64) {
-	if _, ok := object.(*cachingObject); ok {
-		// We assume that for cachingObject resourceVersion was already propagated before.
-		return
-	}
+func updateResourceVersion(object runtime.Object, versioner storage.Versioner, resourceVersion uint64) {
 	if err := versioner.UpdateObject(object, resourceVersion); err != nil {
 		utilruntime.HandleError(fmt.Errorf("failure to version api object (%d) %#v: %v", resourceVersion, object, err))
 	}
@@ -1291,13 +1288,17 @@ func (c *cacheWatcher) convertToWatchEvent(event *watchCacheEvent) *watch.Event 
 
 	switch {
 	case curObjPasses && !oldObjPasses:
-		return &watch.Event{Type: watch.Added, Object: getEventObject(event.Object)}
+		return &watch.Event{Type: watch.Added, Object: getMutableObject(event.Object)}
 	case curObjPasses && oldObjPasses:
-		return &watch.Event{Type: watch.Modified, Object: getEventObject(event.Object)}
+		return &watch.Event{Type: watch.Modified, Object: getMutableObject(event.Object)}
 	case !curObjPasses && oldObjPasses:
 		// return a delete event with the previous object content, but with the event's resource version
-		oldObj := getEventObject(event.PrevObject)
-		updateResourceVersionIfNeeded(oldObj, c.versioner, event.ResourceVersion)
+		oldObj := getMutableObject(event.PrevObject)
+		// We know that if oldObj is cachingObject (which can only be set via
+		// setCachingObjects), its resourceVersion is already set correctly and
+		// we don't need to update it. However, since cachingObject efficiently
+		// handles noop updates, we avoid this microoptimization here.
+		updateResourceVersion(oldObj, c.versioner, event.ResourceVersion)
 		return &watch.Event{Type: watch.Deleted, Object: oldObj}
 	}
 

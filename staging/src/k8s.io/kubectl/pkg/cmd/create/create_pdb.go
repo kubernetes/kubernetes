@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/resource"
 	resourcecli "k8s.io/cli-runtime/pkg/resource"
 	policyv1client "k8s.io/client-go/kubernetes/typed/policy/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -71,7 +72,7 @@ type PodDisruptionBudgetOpts struct {
 
 	Client         *policyv1client.PolicyV1Client
 	DryRunStrategy cmdutil.DryRunStrategy
-	DryRunVerifier *resourcecli.DryRunVerifier
+	DryRunVerifier *resourcecli.QueryParamVerifier
 
 	genericclioptions.IOStreams
 }
@@ -146,7 +147,7 @@ func (o *PodDisruptionBudgetOpts) Complete(f cmdutil.Factory, cmd *cobra.Command
 	if err != nil {
 		return err
 	}
-	o.DryRunVerifier = resourcecli.NewDryRunVerifier(dynamicClient, discoveryClient)
+	o.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, discoveryClient, resource.QueryParamDryRun)
 
 	o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {

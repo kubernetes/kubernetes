@@ -36,13 +36,14 @@ type topologySpreadConstraint struct {
 	MaxSkew     int32
 	TopologyKey string
 	Selector    labels.Selector
+	MinDomains  int32
 }
 
 // buildDefaultConstraints builds the constraints for a pod using
 // .DefaultConstraints and the selectors from the services, replication
 // controllers, replica sets and stateful sets that match the pod.
 func (pl *PodTopologySpread) buildDefaultConstraints(p *v1.Pod, action v1.UnsatisfiableConstraintAction) ([]topologySpreadConstraint, error) {
-	constraints, err := filterTopologySpreadConstraints(pl.defaultConstraints, action)
+	constraints, err := filterTopologySpreadConstraints(pl.defaultConstraints, action, pl.enableMinDomainsInPodTopologySpread)
 	if err != nil || len(constraints) == 0 {
 		return nil, err
 	}
@@ -66,7 +67,7 @@ func nodeLabelsMatchSpreadConstraints(nodeLabels map[string]string, constraints 
 	return true
 }
 
-func filterTopologySpreadConstraints(constraints []v1.TopologySpreadConstraint, action v1.UnsatisfiableConstraintAction) ([]topologySpreadConstraint, error) {
+func filterTopologySpreadConstraints(constraints []v1.TopologySpreadConstraint, action v1.UnsatisfiableConstraintAction, enableMinDomainsInPodTopologySpread bool) ([]topologySpreadConstraint, error) {
 	var result []topologySpreadConstraint
 	for _, c := range constraints {
 		if c.WhenUnsatisfiable == action {
@@ -74,11 +75,16 @@ func filterTopologySpreadConstraints(constraints []v1.TopologySpreadConstraint, 
 			if err != nil {
 				return nil, err
 			}
-			result = append(result, topologySpreadConstraint{
+			tsc := topologySpreadConstraint{
 				MaxSkew:     c.MaxSkew,
 				TopologyKey: c.TopologyKey,
 				Selector:    selector,
-			})
+				MinDomains:  1, // if MinDomains is nil, we treat MinDomains as 1.
+			}
+			if enableMinDomainsInPodTopologySpread && c.MinDomains != nil {
+				tsc.MinDomains = *c.MinDomains
+			}
+			result = append(result, tsc)
 		}
 	}
 	return result, nil

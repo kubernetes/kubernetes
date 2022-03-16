@@ -7994,6 +7994,7 @@ func autoConvert_v1_TopologySpreadConstraint_To_core_TopologySpreadConstraint(in
 	out.TopologyKey = in.TopologyKey
 	out.WhenUnsatisfiable = core.UnsatisfiableConstraintAction(in.WhenUnsatisfiable)
 	out.LabelSelector = (*metav1.LabelSelector)(unsafe.Pointer(in.LabelSelector))
+	out.MinDomains = (*int32)(unsafe.Pointer(in.MinDomains))
 	return nil
 }
 
@@ -8007,6 +8008,7 @@ func autoConvert_core_TopologySpreadConstraint_To_v1_TopologySpreadConstraint(in
 	out.TopologyKey = in.TopologyKey
 	out.WhenUnsatisfiable = v1.UnsatisfiableConstraintAction(in.WhenUnsatisfiable)
 	out.LabelSelector = (*metav1.LabelSelector)(unsafe.Pointer(in.LabelSelector))
+	out.MinDomains = (*int32)(unsafe.Pointer(in.MinDomains))
 	return nil
 }
 

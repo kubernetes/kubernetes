@@ -190,7 +190,6 @@ type Proxier struct {
 	mu           sync.Mutex // protects the following fields
 	serviceMap   proxy.ServiceMap
 	endpointsMap proxy.EndpointsMap
-	portsMap     map[netutils.LocalPort]netutils.Closeable
 	nodeLabels   map[string]string
 	// endpointSlicesSynced, and servicesSynced are set to true
 	// when corresponding objects are synced after startup. This is used to avoid
@@ -209,7 +208,6 @@ type Proxier struct {
 	localDetector  proxyutiliptables.LocalTrafficDetector
 	hostname       string
 	nodeIP         net.IP
-	portMapper     netutils.PortOpener
 	recorder       events.EventRecorder
 
 	serviceHealthServer healthcheck.ServiceHealthServer
@@ -299,7 +297,6 @@ func NewProxier(ipt utiliptables.Interface,
 	}
 
 	proxier := &Proxier{
-		portsMap:                 make(map[netutils.LocalPort]netutils.Closeable),
 		serviceMap:               make(proxy.ServiceMap),
 		serviceChanges:           proxy.NewServiceChangeTracker(newServiceInfo, ipFamily, recorder, nil),
 		endpointsMap:             make(proxy.EndpointsMap),
@@ -312,7 +309,6 @@ func NewProxier(ipt utiliptables.Interface,
 		localDetector:            localDetector,
 		hostname:                 hostname,
 		nodeIP:                   nodeIP,
-		portMapper:               &netutils.ListenPortOpener,
 		recorder:                 recorder,
 		serviceHealthServer:      serviceHealthServer,
 		healthzServer:            healthzServer,
@@ -945,9 +941,6 @@ func (proxier *Proxier) syncProxyRules() {
 	// Accumulate NAT chains to keep.
 	activeNATChains := map[utiliptables.Chain]bool{} // use a map as a set
 
-	// Accumulate the set of local ports that we will be holding open once this update is complete
-	replacementPortsMap := map[netutils.LocalPort]netutils.Closeable{}
-
 	// We are creating those slices ones here to avoid memory reallocations
 	// in every loop. Note that reuse the memory, instead of doing:
 	//   slice = <some new slice>
@@ -969,7 +962,6 @@ func (proxier *Proxier) syncProxyRules() {
 		proxier.endpointChainsNumber += len(proxier.endpointsMap[svcName])
 	}
 
-	localAddrSet := utilproxy.GetLocalAddrSet()
 	nodeAddresses, err := utilproxy.GetNodeAddresses(proxier.nodePortAddresses, proxier.networkInterfacer)
 	if err != nil {
 		klog.ErrorS(err, "Failed to get node ip address matching nodeport cidrs, services with nodeport may not work as intended", "CIDRs", proxier.nodePortAddresses)
@@ -993,10 +985,6 @@ func (proxier *Proxier) syncProxyRules() {
 			continue
 		}
 		isIPv6 := netutils.IsIPv6(svcInfo.ClusterIP())
-		localPortIPFamily := netutils.IPv4
-		if isIPv6 {
-			localPortIPFamily = netutils.IPv6
-		}
 		protocol := strings.ToLower(string(svcInfo.Protocol()))
 		svcNameString := svcInfo.serviceNameString
 
@@ -1149,20 +1137,6 @@ func (proxier *Proxier) syncProxyRules() {
 
 		// Capture externalIPs.
 		for _, externalIP := range svcInfo.ExternalIPStrings() {
-			// If the "external" IP happens to be an IP that is local to this
-			// machine, hold the local port open so no other process can open it
-			// (because the socket might open but it would never work).
-			if (svcInfo.Protocol() != v1.ProtocolSCTP) && localAddrSet.Has(netutils.ParseIPSloppy(externalIP)) {
-				lp := netutils.LocalPort{
-					Description: "externalIP for " + svcNameString,
-					IP:          externalIP,
-					IPFamily:    localPortIPFamily,
-					Port:        svcInfo.Port(),
-					Protocol:    netutils.Protocol(svcInfo.Protocol()),
-				}
-				proxier.openPort(lp, replacementPortsMap)
-			}
-
 			if hasEndpoints {
 				args = append(args[:0],
 					"-m", "comment", "--comment", fmt.Sprintf(`"%s external IP"`, svcNameString),
@@ -1295,23 +1269,6 @@ func (proxier *Proxier) syncProxyRules() {
 		// worthwhile to make a new per-service chain for nodeport rules, but
 		// with just 2 rules it ends up being a waste and a cognitive burden.
 		if svcInfo.NodePort() != 0 && len(nodeAddresses) != 0 {
-			// Hold the local port open so no other process can open it
-			// (because the socket might open but it would never work).
-
-			// nodeAddresses only contains the addresses for this proxier's IP family.
-			for address := range nodeAddresses {
-				if utilproxy.IsZeroCIDR(address) {
-					address = ""
-				}
-				lp := netutils.LocalPort{
-					Description: "nodePort for " + svcNameString,
-					IP:          address,
-					IPFamily:    localPortIPFamily,
-					Port:        svcInfo.NodePort(),
-					Protocol:    netutils.Protocol(svcInfo.Protocol()),
-				}
-				proxier.openPort(lp, replacementPortsMap)
-			}
 
 			if hasEndpoints {
 				args = append(args[:0],
@@ -1537,9 +1494,6 @@ func (proxier *Proxier) syncProxyRules() {
 			klog.ErrorS(err, "Failed to execute iptables-restore")
 		}
 		metrics.IptablesRestoreFailuresTotal.Inc()
-		// Revert new local ports.
-		klog.V(2).InfoS("Closing local ports after iptables-restore failure")
-		utilproxy.RevertPorts(replacementPortsMap, proxier.portsMap)
 		return
 	}
 	success = true
@@ -1551,14 +1505,6 @@ func (proxier *Proxier) syncProxyRules() {
 			klog.V(4).InfoS("Network programming", "endpoint", klog.KRef(name.Namespace, name.Name), "elapsed", latency)
 		}
 	}
-
-	// Close old local ports and save new ones.
-	for k, v := range proxier.portsMap {
-		if replacementPortsMap[k] == nil {
-			v.Close()
-		}
-	}
-	proxier.portsMap = replacementPortsMap
 
 	if proxier.healthzServer != nil {
 		proxier.healthzServer.Updated()
@@ -1593,36 +1539,6 @@ func (proxier *Proxier) syncProxyRules() {
 	}
 	klog.V(4).InfoS("Deleting stale endpoint connections", "endpoints", endpointUpdateResult.StaleEndpoints)
 	proxier.deleteEndpointConnections(endpointUpdateResult.StaleEndpoints)
-}
-
-func (proxier *Proxier) openPort(lp netutils.LocalPort, replacementPortsMap map[netutils.LocalPort]netutils.Closeable) {
-	// We don't open ports for SCTP services
-	if lp.Protocol == netutils.Protocol(v1.ProtocolSCTP) {
-		return
-	}
-
-	if proxier.portsMap[lp] != nil {
-		klog.V(4).InfoS("Port was open before and is still needed", "port", lp)
-		replacementPortsMap[lp] = proxier.portsMap[lp]
-		return
-	}
-
-	socket, err := proxier.portMapper.OpenLocalPort(&lp)
-	if err != nil {
-		msg := fmt.Sprintf("can't open port %s, skipping it", lp.String())
-		proxier.recorder.Eventf(
-			&v1.ObjectReference{
-				Kind:      "Node",
-				Name:      proxier.hostname,
-				UID:       types.UID(proxier.hostname),
-				Namespace: "",
-			}, nil, v1.EventTypeWarning, err.Error(), "SyncProxyRules", msg)
-		klog.ErrorS(err, "can't open port, skipping it", "port", lp)
-		return
-	}
-
-	klog.V(2).InfoS("Opened local port", "port", lp)
-	replacementPortsMap[lp] = socket
 }
 
 func (proxier *Proxier) writeServiceToEndpointRules(svcNameString string, svcInfo proxy.ServicePort, svcChain utiliptables.Chain, endpointChains []utiliptables.Chain, args []string) {

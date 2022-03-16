@@ -583,6 +583,35 @@ func dropDisabledFields(
 	if !utilfeature.DefaultFeatureGate.Enabled(features.IdentifyPodOS) && !podOSInUse(oldPodSpec) {
 		podSpec.OS = nil
 	}
+
+	dropDisabledTopologySpreadConstraintsFields(podSpec, oldPodSpec)
+}
+
+// dropDisabledTopologySpreadConstraintsFields removes disabled fields from PodSpec related
+// to TopologySpreadConstraints only if it is not already used by the old spec.
+func dropDisabledTopologySpreadConstraintsFields(podSpec, oldPodSpec *api.PodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.MinDomainsInPodTopologySpread) &&
+		!minDomainsInUse(oldPodSpec) &&
+		podSpec != nil {
+		for i := range podSpec.TopologySpreadConstraints {
+			podSpec.TopologySpreadConstraints[i].MinDomains = nil
+		}
+	}
+}
+
+// minDomainsInUse returns true if the pod spec is non-nil
+// and has non-nil MinDomains field in TopologySpreadConstraints.
+func minDomainsInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+
+	for _, c := range podSpec.TopologySpreadConstraints {
+		if c.MinDomains != nil {
+			return true
+		}
+	}
+	return false
 }
 
 // podOSInUse returns true if the pod spec is non-nil and has OS field set

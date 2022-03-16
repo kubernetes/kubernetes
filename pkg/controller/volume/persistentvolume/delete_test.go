@@ -187,6 +187,17 @@ func TestDeleteSync(t *testing.T) {
 				return testSyncVolume(ctrl, reactor, test)
 			},
 		},
+		{
+			// TODO: Change the expectedVolumes to novolumes after HonorPVReclaimPolicy is enabled by default.
+			// delete success - volume has deletion timestamp before doDelete() starts
+			"8-13 - volume has deletion timestamp and processed",
+			volumesWithFinalizers(withVolumeDeletionTimestamp(newVolumeArray("volume8-13", "1Gi", "uid8-13", "claim8-13", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty, pvutil.AnnBoundByController)), []string{pvutil.PVDeletionInTreeProtectionFinalizer}),
+			volumesWithFinalizers(withVolumeDeletionTimestamp(newVolumeArray("volume8-13", "1Gi", "uid8-13", "claim8-13", v1.VolumeReleased, v1.PersistentVolumeReclaimDelete, classEmpty, pvutil.AnnBoundByController)), []string{pvutil.PVDeletionInTreeProtectionFinalizer}),
+			noclaims,
+			noclaims,
+			noevents, noerrors,
+			wrapTestWithReclaimCalls(operationDelete, []error{nil}, testSyncVolume),
+		},
 	}
 	runSyncTests(t, tests, []*storage.StorageClass{}, []*v1.Pod{})
 }

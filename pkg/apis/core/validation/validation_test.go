@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/pointer"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -676,11 +677,38 @@ func TestValidatePersistentVolumeSourceUpdate(t *testing.T) {
 		Namespace: "default",
 	}
 
+	// shortSecretRef refers to the secretRefs which are validated with IsDNS1035Label
+	shortSecretName := "key-name"
+	shortSecretRef := &core.SecretReference{
+		Name:      shortSecretName,
+		Namespace: "default",
+	}
+
+	//longSecretRef refers to the secretRefs which are validated with IsDNS1123Subdomain
+	longSecretName := "key-name.example.com"
+	longSecretRef := &core.SecretReference{
+		Name:      longSecretName,
+		Namespace: "default",
+	}
+
+	// invalidSecrets missing name, namespace and both
+	inValidSecretRef := &core.SecretReference{
+		Name:      "",
+		Namespace: "",
+	}
+	invalidSecretRefmissingName := &core.SecretReference{
+		Name:      "",
+		Namespace: "default",
+	}
+	invalidSecretRefmissingNamespace := &core.SecretReference{
+		Name:      "invalidnamespace",
+		Namespace: "",
+	}
+
 	scenarios := map[string]struct {
-		isExpectedFailure   bool
-		csiExpansionEnabled bool
-		oldVolume           *core.PersistentVolume
-		newVolume           *core.PersistentVolume
+		isExpectedFailure bool
+		oldVolume         *core.PersistentVolume
+		newVolume         *core.PersistentVolume
 	}{
 		"condition-no-update": {
 			isExpectedFailure: false,
@@ -698,19 +726,137 @@ func TestValidatePersistentVolumeSourceUpdate(t *testing.T) {
 			newVolume:         invalidPvSourceUpdateDeep,
 		},
 		"csi-expansion-enabled-with-pv-secret": {
-			csiExpansionEnabled: true,
-			isExpectedFailure:   false,
-			oldVolume:           validCSIVolume,
-			newVolume:           getCSIVolumeWithSecret(validCSIVolume, expandSecretRef),
+			isExpectedFailure: false,
+			oldVolume:         validCSIVolume,
+			newVolume:         getCSIVolumeWithSecret(validCSIVolume, expandSecretRef, "controllerExpand"),
 		},
 		"csi-expansion-enabled-with-old-pv-secret": {
-			csiExpansionEnabled: true,
-			isExpectedFailure:   true,
-			oldVolume:           getCSIVolumeWithSecret(validCSIVolume, expandSecretRef),
+			isExpectedFailure: true,
+			oldVolume:         getCSIVolumeWithSecret(validCSIVolume, expandSecretRef, "controllerExpand"),
 			newVolume: getCSIVolumeWithSecret(validCSIVolume, &core.SecretReference{
 				Name:      "foo-secret",
 				Namespace: "default",
-			}),
+			}, "controllerExpand"),
+		},
+		"csi-expansion-enabled-with-shortSecretRef": {
+			isExpectedFailure: false,
+			oldVolume:         validCSIVolume,
+			newVolume:         getCSIVolumeWithSecret(validCSIVolume, shortSecretRef, "controllerExpand"),
+		},
+		"csi-expansion-enabled-with-longSecretRef": {
+			isExpectedFailure: true,
+			oldVolume:         validCSIVolume,
+			newVolume:         getCSIVolumeWithSecret(validCSIVolume, longSecretRef, "controllerExpand"),
+		},
+		"csi-expansion-enabled-from-shortSecretRef-to-shortSecretRef": {
+			isExpectedFailure: false,
+			oldVolume:         getCSIVolumeWithSecret(validCSIVolume, shortSecretRef, "controllerExpand"),
+			newVolume:         getCSIVolumeWithSecret(validCSIVolume, shortSecretRef, "controllerExpand"),
+		},
+		"csi-expansion-enabled-from-shortSecretRef-to-longSecretRef": {
+			isExpectedFailure: true,
+			oldVolume:         getCSIVolumeWithSecret(validCSIVolume, shortSecretRef, "controllerExpand"),
+			newVolume:         getCSIVolumeWithSecret(validCSIVolume, longSecretRef, "controllerExpand"),
+		},
+		"csi-expansion-enabled-from-longSecretRef-to-longSecretRef": {
+			isExpectedFailure: true,
+			oldVolume:         getCSIVolumeWithSecret(validCSIVolume, longSecretRef, "controllerExpand"),
+			newVolume:         getCSIVolumeWithSecret(validCSIVolume, longSecretRef, "controllerExpand"),
+		},
+		"csi-cntrlpublish-enabled-with-shortSecretRef": {
+			isExpectedFailure: true, // updating secretRef will fail as the object is immutable eventhough the secretRef is valid
+			oldVolume:         validCSIVolume,
+			newVolume:         getCSIVolumeWithSecret(validCSIVolume, shortSecretRef, "controllerPublish"),
+		},
+		"csi-cntrlpublish-enabled-with-longSecretRef": {
+			isExpectedFailure: true, // updating secretRef will fail as the object is immutable eventhough the secretRef is valid
+			oldVolume:         validCSIVolume,
+			newVolume:         getCSIVolumeWithSecret(validCSIVolume, longSecretRef, "controllerPublish"),
+		},
+		"csi-cntrlpublish-enabled-from-shortSecretRef-to-shortSecretRef": {
+			isExpectedFailure: false,
+			oldVolume:         getCSIVolumeWithSecret(validCSIVolume, shortSecretRef, "controllerPublish"),
+			newVolume:         getCSIVolumeWithSecret(validCSIVolume, shortSecretRef, "controllerPublish"),
+		},
+		"csi-cntrlpublish-enabled-from-shortSecretRef-to-longSecretRef": {
+			isExpectedFailure: true,
+			oldVolume:         getCSIVolumeWithSecret(validCSIVolume, shortSecretRef, "controllerPublish"),
+			newVolume:         getCSIVolumeWithSecret(validCSIVolume, longSecretRef, "controllerPublish"),
+		},
+		"csi-cntrlpublish-enabled-from-longSecretRef-to-longSecretRef": {
+			isExpectedFailure: true,
+			oldVolume:         getCSIVolumeWithSecret(validCSIVolume, longSecretRef, "controllerPublish"),
+			newVolume:         getCSIVolumeWithSecret(validCSIVolume, longSecretRef, "controllerPublish"),
+		},
+		"csi-nodepublish-enabled-with-shortSecretRef": {
+			isExpectedFailure: true, // updating secretRef will fail as the object is immutable eventhough the secretRef is valid
+			oldVolume:         validCSIVolume,
+			newVolume:         getCSIVolumeWithSecret(validCSIVolume, shortSecretRef, "nodePublish"),
+		},
+		"csi-nodepublish-enabled-with-longSecretRef": {
+			isExpectedFailure: true, // updating secretRef will fail as the object is immutable eventhough the secretRef is valid
+			oldVolume:         validCSIVolume,
+			newVolume:         getCSIVolumeWithSecret(validCSIVolume, longSecretRef, "nodePublish"),
+		},
+		"csi-nodepublish-enabled-from-shortSecretRef-to-shortSecretRef": {
+			isExpectedFailure: false,
+			oldVolume:         getCSIVolumeWithSecret(validCSIVolume, shortSecretRef, "nodePublish"),
+			newVolume:         getCSIVolumeWithSecret(validCSIVolume, shortSecretRef, "nodePublish"),
+		},
+		"csi-nodepublish-enabled-from-shortSecretRef-to-longSecretRef": {
+			isExpectedFailure: true,
+			oldVolume:         getCSIVolumeWithSecret(validCSIVolume, shortSecretRef, "nodePublish"),
+			newVolume:         getCSIVolumeWithSecret(validCSIVolume, longSecretRef, "nodePublish"),
+		},
+		"csi-nodepublish-enabled-from-longSecretRef-to-longSecretRef": {
+			isExpectedFailure: true,
+			oldVolume:         getCSIVolumeWithSecret(validCSIVolume, longSecretRef, "nodePublish"),
+			newVolume:         getCSIVolumeWithSecret(validCSIVolume, longSecretRef, "nodePublish"),
+		},
+		"csi-nodestage-enabled-with-shortSecretRef": {
+			isExpectedFailure: true, // updating secretRef will fail as the object is immutable eventhough the secretRef is valid
+			oldVolume:         validCSIVolume,
+			newVolume:         getCSIVolumeWithSecret(validCSIVolume, shortSecretRef, "nodeStage"),
+		},
+		"csi-nodestage-enabled-with-longSecretRef": {
+			isExpectedFailure: true, // updating secretRef will fail as the object is immutable eventhough the secretRef is valid
+			oldVolume:         validCSIVolume,
+			newVolume:         getCSIVolumeWithSecret(validCSIVolume, longSecretRef, "nodeStage"),
+		},
+		"csi-nodestage-enabled-from-shortSecretRef-to-longSecretRef": {
+			isExpectedFailure: true,
+			oldVolume:         getCSIVolumeWithSecret(validCSIVolume, shortSecretRef, "nodeStage"),
+			newVolume:         getCSIVolumeWithSecret(validCSIVolume, longSecretRef, "nodeStage"),
+		},
+
+		// At present, there is no validation exist for nodeStage secretRef in
+		// ValidatePersistentVolumeSpec->validateCSIPersistentVolumeSource, due to that, below
+		// checks/validations pass!
+
+		"csi-nodestage-enabled-from-invalidSecretRef-to-invalidSecretRef": {
+			isExpectedFailure: false,
+			oldVolume:         getCSIVolumeWithSecret(validCSIVolume, inValidSecretRef, "nodeStage"),
+			newVolume:         getCSIVolumeWithSecret(validCSIVolume, inValidSecretRef, "nodeStage"),
+		},
+		"csi-nodestage-enabled-from-invalidSecretRefmissingname-to-invalidSecretRefmissingname": {
+			isExpectedFailure: false,
+			oldVolume:         getCSIVolumeWithSecret(validCSIVolume, invalidSecretRefmissingName, "nodeStage"),
+			newVolume:         getCSIVolumeWithSecret(validCSIVolume, invalidSecretRefmissingName, "nodeStage"),
+		},
+		"csi-nodestage-enabled-from-invalidSecretRefmissingnamespace-to-invalidSecretRefmissingnamespace": {
+			isExpectedFailure: false,
+			oldVolume:         getCSIVolumeWithSecret(validCSIVolume, invalidSecretRefmissingNamespace, "nodeStage"),
+			newVolume:         getCSIVolumeWithSecret(validCSIVolume, invalidSecretRefmissingNamespace, "nodeStage"),
+		},
+		"csi-nodestage-enabled-from-shortSecretRef-to-shortSecretRef": {
+			isExpectedFailure: false,
+			oldVolume:         getCSIVolumeWithSecret(validCSIVolume, shortSecretRef, "nodeStage"),
+			newVolume:         getCSIVolumeWithSecret(validCSIVolume, shortSecretRef, "nodeStage"),
+		},
+		"csi-nodestage-enabled-from-longSecretRef-to-longSecretRef": {
+			isExpectedFailure: false,
+			oldVolume:         getCSIVolumeWithSecret(validCSIVolume, longSecretRef, "nodeStage"),
+			newVolume:         getCSIVolumeWithSecret(validCSIVolume, longSecretRef, "nodeStage"),
 		},
 	}
 	for name, scenario := range scenarios {
@@ -780,6 +926,23 @@ func TestValidationOptionsForPersistentVolume(t *testing.T) {
 	}
 }
 
+func getCSIVolumeWithSecret(pv *core.PersistentVolume, secret *core.SecretReference, secretfield string) *core.PersistentVolume {
+	pvCopy := pv.DeepCopy()
+	switch secretfield {
+	case "controllerExpand":
+		pvCopy.Spec.CSI.ControllerExpandSecretRef = secret
+	case "controllerPublish":
+		pvCopy.Spec.CSI.ControllerPublishSecretRef = secret
+	case "nodePublish":
+		pvCopy.Spec.CSI.NodePublishSecretRef = secret
+	case "nodeStage":
+		pvCopy.Spec.CSI.NodeStageSecretRef = secret
+	default:
+		panic("unknown string")
+	}
+
+	return pvCopy
+}
 func pvWithAccessModes(accessModes []core.PersistentVolumeAccessMode) *core.PersistentVolume {
 	return &core.PersistentVolume{
 		Spec: core.PersistentVolumeSpec{
@@ -802,14 +965,6 @@ func pvcTemplateWithAccessModes(accessModes []core.PersistentVolumeAccessMode) *
 			AccessModes: accessModes,
 		},
 	}
-}
-
-func getCSIVolumeWithSecret(pv *core.PersistentVolume, secret *core.SecretReference) *core.PersistentVolume {
-	pvCopy := pv.DeepCopy()
-	if secret != nil {
-		pvCopy.Spec.CSI.ControllerExpandSecretRef = secret
-	}
-	return pvCopy
 }
 
 func testLocalVolume(path string, affinity *core.VolumeNodeAffinity) core.PersistentVolumeSpec {
@@ -18804,57 +18959,115 @@ func TestAnyDataSource(t *testing.T) {
 }
 
 func TestValidateTopologySpreadConstraints(t *testing.T) {
+	fieldPath := field.NewPath("field")
+	subFldPath0 := fieldPath.Index(0)
+	fieldPathMinDomains := subFldPath0.Child("minDomains")
+	fieldPathMaxSkew := subFldPath0.Child("maxSkew")
+	fieldPathTopologyKey := subFldPath0.Child("topologyKey")
+	fieldPathWhenUnsatisfiable := subFldPath0.Child("whenUnsatisfiable")
+	fieldPathTopologyKeyAndWhenUnsatisfiable := subFldPath0.Child("{topologyKey, whenUnsatisfiable}")
 	testCases := []struct {
-		name        string
-		constraints []core.TopologySpreadConstraint
-		errtype     field.ErrorType
-		errfield    string
+		name            string
+		constraints     []core.TopologySpreadConstraint
+		wantFieldErrors field.ErrorList
 	}{
 		{
 			name: "all required fields ok",
 			constraints: []core.TopologySpreadConstraint{
-				{MaxSkew: 1, TopologyKey: "k8s.io/zone", WhenUnsatisfiable: core.DoNotSchedule},
+				{
+					MaxSkew:           1,
+					TopologyKey:       "k8s.io/zone",
+					WhenUnsatisfiable: core.DoNotSchedule,
+					MinDomains:        pointer.Int32(3),
+				},
 			},
+			wantFieldErrors: field.ErrorList{},
 		},
 		{
 			name: "missing MaxSkew",
 			constraints: []core.TopologySpreadConstraint{
 				{TopologyKey: "k8s.io/zone", WhenUnsatisfiable: core.DoNotSchedule},
 			},
-			errtype:  field.ErrorTypeInvalid,
-			errfield: "maxSkew",
+			wantFieldErrors: []*field.Error{field.Invalid(fieldPathMaxSkew, int32(0), isNotPositiveErrorMsg)},
 		},
 		{
-			name: "invalid MaxSkew",
+			name: "negative MaxSkew",
 			constraints: []core.TopologySpreadConstraint{
-				{MaxSkew: 0, TopologyKey: "k8s.io/zone", WhenUnsatisfiable: core.DoNotSchedule},
+				{MaxSkew: -1, TopologyKey: "k8s.io/zone", WhenUnsatisfiable: core.DoNotSchedule},
 			},
-			errtype:  field.ErrorTypeInvalid,
-			errfield: "maxSkew",
+			wantFieldErrors: []*field.Error{field.Invalid(fieldPathMaxSkew, int32(-1), isNotPositiveErrorMsg)},
+		},
+		{
+			name: "can use MinDomains with ScheduleAnyway, when MinDomains = nil",
+			constraints: []core.TopologySpreadConstraint{
+				{
+					MaxSkew:           1,
+					TopologyKey:       "k8s.io/zone",
+					WhenUnsatisfiable: core.ScheduleAnyway,
+					MinDomains:        nil,
+				},
+			},
+			wantFieldErrors: field.ErrorList{},
+		},
+		{
+			name: "negative minDomains is invalid",
+			constraints: []core.TopologySpreadConstraint{
+				{
+					MaxSkew:           1,
+					TopologyKey:       "k8s.io/zone",
+					WhenUnsatisfiable: core.DoNotSchedule,
+					MinDomains:        pointer.Int32(-1),
+				},
+			},
+			wantFieldErrors: []*field.Error{field.Invalid(fieldPathMinDomains, pointer.Int32(-1), isNotPositiveErrorMsg)},
+		},
+		{
+			name: "cannot use non-nil MinDomains with ScheduleAnyway",
+			constraints: []core.TopologySpreadConstraint{
+				{
+					MaxSkew:           1,
+					TopologyKey:       "k8s.io/zone",
+					WhenUnsatisfiable: core.ScheduleAnyway,
+					MinDomains:        pointer.Int32(10),
+				},
+			},
+			wantFieldErrors: []*field.Error{field.Invalid(fieldPathMinDomains, pointer.Int32(10), fmt.Sprintf("can only use minDomains if whenUnsatisfiable=%s, not %s", string(core.DoNotSchedule), string(core.ScheduleAnyway)))},
+		},
+		{
+			name: "use negative MinDomains with ScheduleAnyway(invalid)",
+			constraints: []core.TopologySpreadConstraint{
+				{
+					MaxSkew:           1,
+					TopologyKey:       "k8s.io/zone",
+					WhenUnsatisfiable: core.ScheduleAnyway,
+					MinDomains:        pointer.Int32(-1),
+				},
+			},
+			wantFieldErrors: []*field.Error{
+				field.Invalid(fieldPathMinDomains, pointer.Int32(-1), isNotPositiveErrorMsg),
+				field.Invalid(fieldPathMinDomains, pointer.Int32(-1), fmt.Sprintf("can only use minDomains if whenUnsatisfiable=%s, not %s", string(core.DoNotSchedule), string(core.ScheduleAnyway))),
+			},
 		},
 		{
 			name: "missing TopologyKey",
 			constraints: []core.TopologySpreadConstraint{
 				{MaxSkew: 1, WhenUnsatisfiable: core.DoNotSchedule},
 			},
-			errtype:  field.ErrorTypeRequired,
-			errfield: "topologyKey",
+			wantFieldErrors: []*field.Error{field.Required(fieldPathTopologyKey, "can not be empty")},
 		},
 		{
 			name: "missing scheduling mode",
 			constraints: []core.TopologySpreadConstraint{
 				{MaxSkew: 1, TopologyKey: "k8s.io/zone"},
 			},
-			errtype:  field.ErrorTypeNotSupported,
-			errfield: "whenUnsatisfiable",
+			wantFieldErrors: []*field.Error{field.NotSupported(fieldPathWhenUnsatisfiable, core.UnsatisfiableConstraintAction(""), supportedScheduleActions.List())},
 		},
 		{
 			name: "unsupported scheduling mode",
 			constraints: []core.TopologySpreadConstraint{
 				{MaxSkew: 1, TopologyKey: "k8s.io/zone", WhenUnsatisfiable: core.UnsatisfiableConstraintAction("N/A")},
 			},
-			errtype:  field.ErrorTypeNotSupported,
-			errfield: "whenUnsatisfiable",
+			wantFieldErrors: []*field.Error{field.NotSupported(fieldPathWhenUnsatisfiable, core.UnsatisfiableConstraintAction("N/A"), supportedScheduleActions.List())},
 		},
 		{
 			name: "multiple constraints ok with all required fields",
@@ -18862,15 +19075,15 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 				{MaxSkew: 1, TopologyKey: "k8s.io/zone", WhenUnsatisfiable: core.DoNotSchedule},
 				{MaxSkew: 2, TopologyKey: "k8s.io/node", WhenUnsatisfiable: core.ScheduleAnyway},
 			},
+			wantFieldErrors: field.ErrorList{},
 		},
 		{
 			name: "multiple constraints missing TopologyKey on partial ones",
 			constraints: []core.TopologySpreadConstraint{
-				{MaxSkew: 1, TopologyKey: "k8s.io/zone", WhenUnsatisfiable: core.DoNotSchedule},
-				{MaxSkew: 2, WhenUnsatisfiable: core.ScheduleAnyway},
+				{MaxSkew: 1, WhenUnsatisfiable: core.ScheduleAnyway},
+				{MaxSkew: 2, TopologyKey: "k8s.io/zone", WhenUnsatisfiable: core.DoNotSchedule},
 			},
-			errtype:  field.ErrorTypeRequired,
-			errfield: "topologyKey",
+			wantFieldErrors: []*field.Error{field.Required(fieldPathTopologyKey, "can not be empty")},
 		},
 		{
 			name: "duplicate constraints",
@@ -18878,25 +19091,19 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 				{MaxSkew: 1, TopologyKey: "k8s.io/zone", WhenUnsatisfiable: core.DoNotSchedule},
 				{MaxSkew: 2, TopologyKey: "k8s.io/zone", WhenUnsatisfiable: core.DoNotSchedule},
 			},
-			errtype:  field.ErrorTypeDuplicate,
-			errfield: "{topologyKey, whenUnsatisfiable}",
+			wantFieldErrors: []*field.Error{
+				field.Duplicate(fieldPathTopologyKeyAndWhenUnsatisfiable, fmt.Sprintf("{%v, %v}", "k8s.io/zone", core.DoNotSchedule)),
+			},
 		},
 	}
 
-	for i, tc := range testCases {
-		errs := validateTopologySpreadConstraints(tc.constraints, field.NewPath("field"))
-
-		if len(errs) > 0 && tc.errtype == "" {
-			t.Errorf("[%d: %q] unexpected error(s): %v", i, tc.name, errs)
-		} else if len(errs) == 0 && tc.errtype != "" {
-			t.Errorf("[%d: %q] expected error type %v", i, tc.name, tc.errtype)
-		} else if len(errs) >= 1 {
-			if errs[0].Type != tc.errtype {
-				t.Errorf("[%d: %q] expected error type %v, got %v", i, tc.name, tc.errtype, errs[0].Type)
-			} else if !strings.HasSuffix(errs[0].Field, "."+tc.errfield) {
-				t.Errorf("[%d: %q] expected error on field %q, got %q", i, tc.name, tc.errfield, errs[0].Field)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := validateTopologySpreadConstraints(tc.constraints, fieldPath)
+			if diff := cmp.Diff(tc.wantFieldErrors, errs); diff != "" {
+				t.Errorf("unexpected field errors (-want, +got):\n%s", diff)
 			}
-		}
+		})
 	}
 }
 

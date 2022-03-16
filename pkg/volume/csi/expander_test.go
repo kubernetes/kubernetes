@@ -32,7 +32,6 @@ func TestNodeExpand(t *testing.T) {
 		name                string
 		nodeExpansion       bool
 		nodeStageSet        bool
-		volumePhase         volume.CSIVolumePhaseType
 		success             bool
 		fsVolume            bool
 		grpcError           error
@@ -47,37 +46,26 @@ func TestNodeExpand(t *testing.T) {
 			name:            "when nodeExpansion=on, nodeStage=on, volumePhase=staged",
 			nodeExpansion:   true,
 			nodeStageSet:    true,
-			volumePhase:     volume.CSIVolumeStaged,
 			success:         true,
 			fsVolume:        true,
 			deviceStagePath: "/foo/bar",
 		},
 		{
-			name:          "when nodeExpansion=on, nodeStage=off, volumePhase=staged",
-			nodeExpansion: true,
-			volumePhase:   volume.CSIVolumeStaged,
-			success:       false,
-			fsVolume:      true,
-		},
-		{
 			name:          "when nodeExpansion=on, nodeStage=on, volumePhase=published",
 			nodeExpansion: true,
 			nodeStageSet:  true,
-			volumePhase:   volume.CSIVolumePublished,
 			success:       true,
 			fsVolume:      true,
 		},
 		{
 			name:          "when nodeExpansion=on, nodeStage=off, volumePhase=published",
 			nodeExpansion: true,
-			volumePhase:   volume.CSIVolumePublished,
 			success:       true,
 			fsVolume:      true,
 		},
 		{
 			name:          "when nodeExpansion=on, nodeStage=off, volumePhase=published, fsVolume=false",
 			nodeExpansion: true,
-			volumePhase:   volume.CSIVolumePublished,
 			success:       true,
 			fsVolume:      false,
 		},
@@ -85,7 +73,6 @@ func TestNodeExpand(t *testing.T) {
 			name:                "when nodeExpansion=on, nodeStage=on, volumePhase=published has grpc volume-in-use error",
 			nodeExpansion:       true,
 			nodeStageSet:        true,
-			volumePhase:         volume.CSIVolumePublished,
 			success:             false,
 			fsVolume:            true,
 			grpcError:           status.Error(codes.FailedPrecondition, "volume-in-use"),
@@ -95,7 +82,6 @@ func TestNodeExpand(t *testing.T) {
 			name:                "when nodeExpansion=on, nodeStage=on, volumePhase=published has other grpc error",
 			nodeExpansion:       true,
 			nodeStageSet:        true,
-			volumePhase:         volume.CSIVolumePublished,
 			success:             false,
 			fsVolume:            true,
 			grpcError:           status.Error(codes.InvalidArgument, "invalid-argument"),
@@ -117,7 +103,6 @@ func TestNodeExpand(t *testing.T) {
 				DeviceMountPath: "/foo/bar",
 				DeviceStagePath: "/foo/bar",
 				DevicePath:      "/mnt/foobar",
-				CSIVolumePhase:  tc.volumePhase,
 			}
 			csiSource, _ := getCSISourceFromSpec(resizeOptions.VolumeSpec)
 			csClient := setupClientWithExpansion(t, tc.nodeStageSet, tc.nodeExpansion)

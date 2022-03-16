@@ -997,7 +997,7 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 			snapshot := cache.NewSnapshot(test.pods, []*v1.Node{test.node})
 			p := plugintesting.SetupPluginWithInformers(ctx, t, New, &config.InterPodAffinityArgs{}, snapshot, namespaces)
 			state := framework.NewCycleState()
-			preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, state, test.pod)
+			_, preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, state, test.pod)
 			if !preFilterStatus.IsSuccess() {
 				if !strings.Contains(preFilterStatus.Message(), test.wantStatus.Message()) {
 					t.Errorf("prefilter failed with status: %v", preFilterStatus)
@@ -1866,7 +1866,7 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 				})
 			for indexNode, node := range test.nodes {
 				state := framework.NewCycleState()
-				preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, state, test.pod)
+				_, preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, state, test.pod)
 				if !preFilterStatus.IsSuccess() {
 					t.Errorf("prefilter failed with status: %v", preFilterStatus)
 				}
@@ -2158,7 +2158,7 @@ func TestPreFilterStateAddRemovePod(t *testing.T) {
 				defer cancel()
 				p := plugintesting.SetupPluginWithInformers(ctx, t, New, &config.InterPodAffinityArgs{}, snapshot, nil)
 				cycleState := framework.NewCycleState()
-				preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pendingPod)
+				_, preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pendingPod)
 				if !preFilterStatus.IsSuccess() {
 					t.Errorf("prefilter failed with status: %v", preFilterStatus)
 				}
@@ -2443,7 +2443,7 @@ func TestGetTPMapMatchingIncomingAffinityAntiAffinity(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			p := plugintesting.SetupPluginWithInformers(ctx, t, New, &config.InterPodAffinityArgs{}, snapshot, nil)
-			gotAffinityPodsMap, gotAntiAffinityPodsMap := p.(*InterPodAffinity).getIncomingAffinityAntiAffinityCounts(framework.NewPodInfo(tt.pod), l)
+			gotAffinityPodsMap, gotAntiAffinityPodsMap := p.(*InterPodAffinity).getIncomingAffinityAntiAffinityCounts(ctx, framework.NewPodInfo(tt.pod), l)
 			if !reflect.DeepEqual(gotAffinityPodsMap, tt.wantAffinityPodsMap) {
 				t.Errorf("getTPMapMatchingIncomingAffinityAntiAffinity() gotAffinityPodsMap = %#v, want %#v", gotAffinityPodsMap, tt.wantAffinityPodsMap)
 			}

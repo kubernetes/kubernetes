@@ -66,7 +66,7 @@ type SubjectOptions struct {
 	Output            string
 	All               bool
 	DryRunStrategy    cmdutil.DryRunStrategy
-	DryRunVerifier    *resource.DryRunVerifier
+	DryRunVerifier    *resource.QueryParamVerifier
 	Local             bool
 	fieldManager      string
 
@@ -132,7 +132,7 @@ func (o *SubjectOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 	if err != nil {
 		return err
 	}
-	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, f.OpenAPIGetter())
+	o.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 
 	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
 	printer, err := o.PrintFlags.ToPrinter()

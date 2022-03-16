@@ -73,7 +73,7 @@ type AutoscaleOptions struct {
 	enforceNamespace bool
 	namespace        string
 	dryRunStrategy   cmdutil.DryRunStrategy
-	dryRunVerifier   *resource.DryRunVerifier
+	dryRunVerifier   *resource.QueryParamVerifier
 	builder          *resource.Builder
 	fieldManager     string
 
@@ -145,7 +145,7 @@ func (o *AutoscaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 	if err != nil {
 		return err
 	}
-	o.dryRunVerifier = resource.NewDryRunVerifier(dynamicClient, f.OpenAPIGetter())
+	o.dryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 	o.createAnnotation = cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
 	o.builder = f.NewBuilder()
 	o.scaleKindResolver = scale.NewDiscoveryScaleKindResolver(discoveryClient)

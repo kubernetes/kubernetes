@@ -132,10 +132,6 @@ function start-kube-apiserver {
       params=$(append-param-if-not-present "${params}" "max-requests-inflight" 1500)
       params=$(append-param-if-not-present "${params}" "max-mutating-requests-inflight" 500)
     fi
-    # Set amount of memory available for apiserver based on number of nodes.
-    # TODO: Once we start setting proper requests and limits for apiserver
-    # we should reuse the same logic here instead of current heuristic.
-    params=$(append-param-if-not-present "${params}" "target-ram-mb" $((NUM_NODES * 60)))
   fi
   if [[ -n "${SERVICE_CLUSTER_IP_RANGE:-}" ]]; then
     params+=" --service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"

@@ -367,6 +367,7 @@ func (s *Server) InstallDefaultHandlers() {
 		cadvisormetrics.NetworkUsageMetrics: struct{}{},
 		cadvisormetrics.AppMetrics:          struct{}{},
 		cadvisormetrics.ProcessMetrics:      struct{}{},
+		cadvisormetrics.OOMMetrics:          struct{}{},
 	}
 
 	// Only add the Accelerator metrics if the feature is inactive

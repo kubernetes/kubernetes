@@ -1370,24 +1370,17 @@ func testCachingObjects(t *testing.T, watchersCount int) {
 			}
 
 			var object runtime.Object
-			if watchersCount >= 3 {
-				if _, ok := event.Object.(runtime.CacheableObject); !ok {
-					t.Fatalf("Object in %s event should support caching: %#v", event.Type, event.Object)
-				}
-				object = event.Object.(runtime.CacheableObject).GetObject()
-			} else {
-				if _, ok := event.Object.(runtime.CacheableObject); ok {
-					t.Fatalf("Object in %s event should not support caching: %#v", event.Type, event.Object)
-				}
-				object = event.Object.DeepCopyObject()
+			if _, ok := event.Object.(runtime.CacheableObject); !ok {
+				t.Fatalf("Object in %s event should support caching: %#v", event.Type, event.Object)
 			}
+			object = event.Object.(runtime.CacheableObject).GetObject()
 
 			if event.Type == watch.Deleted {
 				resourceVersion, err := cacher.versioner.ObjectResourceVersion(cacher.watchCache.cache[index].PrevObject)
 				if err != nil {
 					t.Fatalf("Failed to parse resource version: %v", err)
 				}
-				updateResourceVersionIfNeeded(object, cacher.versioner, resourceVersion)
+				updateResourceVersion(object, cacher.versioner, resourceVersion)
 			}
 
 			var e runtime.Object

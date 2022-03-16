@@ -53,9 +53,6 @@ type ProbeEvent struct {
 	Op         ProbeOperation // The operation to the plugin
 }
 
-// CSIVolumePhaseType stores information about CSI volume path.
-type CSIVolumePhaseType string
-
 const (
 	// Common parameter which can be specified in StorageClass to specify the desired FSType
 	// Provisioners SHOULD implement support for this if they are block device based
@@ -65,8 +62,6 @@ const (
 
 	ProbeAddOrUpdate ProbeOperation = 1 << iota
 	ProbeRemove
-	CSIVolumeStaged    CSIVolumePhaseType = "staged"
-	CSIVolumePublished CSIVolumePhaseType = "published"
 )
 
 var (
@@ -124,9 +119,6 @@ type NodeResizeOptions struct {
 
 	NewSize resource.Quantity
 	OldSize resource.Quantity
-
-	// CSIVolumePhase contains volume phase on the node
-	CSIVolumePhase CSIVolumePhaseType
 }
 
 type DynamicPluginProber interface {

@@ -17,6 +17,12 @@ package cel
 import (
 	"fmt"
 
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protodesc"
+	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/reflect/protoregistry"
+	"google.golang.org/protobuf/types/dynamicpb"
+
 	"github.com/google/cel-go/checker/decls"
 	"github.com/google/cel-go/common/containers"
 	"github.com/google/cel-go/common/types/pb"
@@ -24,11 +30,6 @@ import (
 	"github.com/google/cel-go/interpreter"
 	"github.com/google/cel-go/interpreter/functions"
 	"github.com/google/cel-go/parser"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/reflect/protodesc"
-	"google.golang.org/protobuf/reflect/protoreflect"
-	"google.golang.org/protobuf/reflect/protoregistry"
-	"google.golang.org/protobuf/types/dynamicpb"
 
 	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 	descpb "google.golang.org/protobuf/types/descriptorpb"
@@ -45,7 +46,13 @@ const (
 	// provided as variables to the expression, as well as via conversion
 	// of well-known dynamic types, or with unchecked expressions.
 	// Affects checking.  Provides a subset of standard behavior.
-	FeatureDisableDynamicAggregateLiterals
+	featureDisableDynamicAggregateLiterals
+
+	// Enable the tracking of function call expressions replaced by macros.
+	featureEnableMacroCallTracking
+
+	// Enable the use of cross-type numeric comparisons at the type-checker.
+	featureCrossTypeNumericComparisons
 )
 
 // EnvOption is a functional interface for configuring the environment.
@@ -96,16 +103,6 @@ func Declarations(decls ...*exprpb.Decl) EnvOption {
 	}
 }
 
-// Features sets the given feature flags.  See list of Feature constants above.
-func Features(flags ...int) EnvOption {
-	return func(e *Env) (*Env, error) {
-		for _, flag := range flags {
-			e.SetFeature(flag)
-		}
-		return e, nil
-	}
-}
-
 // HomogeneousAggregateLiterals option ensures that list and map literal entry types must agree
 // during type-checking.
 //
@@ -113,7 +110,7 @@ func Features(flags ...int) EnvOption {
 // expression, as well as via conversion of well-known dynamic types, or with unchecked
 // expressions.
 func HomogeneousAggregateLiterals() EnvOption {
-	return Features(FeatureDisableDynamicAggregateLiterals)
+	return features(featureDisableDynamicAggregateLiterals, true)
 }
 
 // Macros option extends the macro set configured in the environment.
@@ -334,12 +331,21 @@ func Functions(funcs ...*functions.Overload) ProgramOption {
 // The vars value may either be an `interpreter.Activation` instance or a `map[string]interface{}`.
 func Globals(vars interface{}) ProgramOption {
 	return func(p *prog) (*prog, error) {
-		defaultVars, err :=
-			interpreter.NewActivation(vars)
+		defaultVars, err := interpreter.NewActivation(vars)
 		if err != nil {
 			return nil, err
 		}
 		p.defaultVars = defaultVars
+		return p, nil
+	}
+}
+
+// OptimizeRegex provides a way to replace the InterpretableCall for regex functions. This can be used
+// to compile regex string constants at program creation time and report any errors and then use the
+// compiled regex for all regex function invocations.
+func OptimizeRegex(regexOptimizations ...*interpreter.RegexOptimization) ProgramOption {
+	return func(p *prog) (*prog, error) {
+		p.regexOptimizations = append(p.regexOptimizations, regexOptimizations...)
 		return p, nil
 	}
 }
@@ -356,7 +362,9 @@ const (
 	OptExhaustiveEval EvalOption = 1<<iota | OptTrackState
 
 	// OptOptimize precomputes functions and operators with constants as arguments at program
-	// creation time. This flag is useful when the expression will be evaluated repeatedly against
+	// creation time. It also pre-compiles regex pattern constants passed to 'matches', reports any compilation errors
+	// at program creation and uses the compiled regex pattern for all 'matches' function invocations.
+	// This flag is useful when the expression will be evaluated repeatedly against
 	// a series of different inputs.
 	OptOptimize EvalOption = 1 << iota
 
@@ -365,8 +373,12 @@ const (
 	// member graph.
 	//
 	// By itself, OptPartialEval does not change evaluation behavior unless the input to the
-	// Program Eval is an PartialVars.
+	// Program Eval() call is created via PartialVars().
 	OptPartialEval EvalOption = 1 << iota
+
+	// OptTrackCost enables the runtime cost calculation while validation and return cost within evalDetails
+	// cost calculation is available via func ActualCost()
+	OptTrackCost EvalOption = 1 << iota
 )
 
 // EvalOptions sets one or more evaluation options which may affect the evaluation or Result.
@@ -375,6 +387,36 @@ func EvalOptions(opts ...EvalOption) ProgramOption {
 		for _, opt := range opts {
 			p.evalOpts |= opt
 		}
+		return p, nil
+	}
+}
+
+// InterruptCheckFrequency configures the number of iterations within a comprehension to evaluate
+// before checking whether the function evaluation has been interrupted.
+func InterruptCheckFrequency(checkFrequency uint) ProgramOption {
+	return func(p *prog) (*prog, error) {
+		p.interruptCheckFrequency = checkFrequency
+		return p, nil
+	}
+}
+
+// CostTracking enables cost tracking and registers a ActualCostEstimator that can optionally provide a runtime cost estimate for any function calls.
+func CostTracking(costEstimator interpreter.ActualCostEstimator) ProgramOption {
+	return func(p *prog) (*prog, error) {
+		p.callCostEstimator = costEstimator
+		p.evalOpts |= OptTrackCost
+		return p, nil
+	}
+}
+
+// CostLimit enables cost tracking and sets configures program evaluation to exit early with a
+// "runtime cost limit exceeded" error if the runtime cost exceeds the costLimit.
+// The CostLimit is a metric that corresponds to the number and estimated expense of operations
+// performed while evaluating an expression. It is indicative of CPU usage, not memory usage.
+func CostLimit(costLimit uint64) ProgramOption {
+	return func(p *prog) (*prog, error) {
+		p.costLimit = &costLimit
+		p.evalOpts |= OptTrackCost
 		return p, nil
 	}
 }
@@ -411,19 +453,19 @@ func fieldToDecl(field protoreflect.FieldDescriptor) (*exprpb.Decl, error) {
 			return nil, err
 		}
 		return decls.NewVar(name, decls.NewMapType(keyType, valueType)), nil
-	} else if field.IsList() {
+	}
+	if field.IsList() {
 		elemType, err := fieldToCELType(field)
 		if err != nil {
 			return nil, err
 		}
 		return decls.NewVar(name, decls.NewListType(elemType)), nil
-	} else {
-		celType, err := fieldToCELType(field)
-		if err != nil {
-			return nil, err
-		}
-		return decls.NewVar(name, celType), nil
 	}
+	celType, err := fieldToCELType(field)
+	if err != nil {
+		return nil, err
+	}
+	return decls.NewVar(name, celType), nil
 }
 
 // DeclareContextProto returns an option to extend CEL environment with declarations from the given context proto.
@@ -447,5 +489,24 @@ func DeclareContextProto(descriptor protoreflect.MessageDescriptor) EnvOption {
 			return nil, err
 		}
 		return Types(dynamicpb.NewMessage(descriptor))(e)
+	}
+}
+
+// EnableMacroCallTracking ensures that call expressions which are replaced by macros
+// are tracked in the `SourceInfo` of parsed and checked expressions.
+func EnableMacroCallTracking() EnvOption {
+	return features(featureEnableMacroCallTracking, true)
+}
+
+// CrossTypeNumericComparisons makes it possible to compare across numeric types, e.g. double < int
+func CrossTypeNumericComparisons(enabled bool) EnvOption {
+	return features(featureCrossTypeNumericComparisons, enabled)
+}
+
+// features sets the given feature flags.  See list of Feature constants above.
+func features(flag int, enabled bool) EnvOption {
+	return func(e *Env) (*Env, error) {
+		e.features[flag] = enabled
+		return e, nil
 	}
 }

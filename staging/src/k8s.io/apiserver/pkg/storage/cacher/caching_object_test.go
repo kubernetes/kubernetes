@@ -26,6 +26,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -161,4 +162,30 @@ func TestCachingObjectRaces(t *testing.T) {
 		}()
 	}
 	wg.Wait()
+}
+
+func TestCachingObjectLazyDeepCopy(t *testing.T) {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "name",
+			ResourceVersion: "123",
+		},
+	}
+	object, err := newCachingObject(pod)
+	if err != nil {
+		t.Fatalf("couldn't create cachingObject: %v", err)
+	}
+
+	if object.deepCopied != false {
+		t.Errorf("object deep-copied without the need")
+	}
+
+	object.SetResourceVersion("123")
+	if object.deepCopied != false {
+		t.Errorf("object deep-copied on no-op change")
+	}
+	object.SetResourceVersion("234")
+	if object.deepCopied != true {
+		t.Errorf("object not deep-copied on change")
+	}
 }

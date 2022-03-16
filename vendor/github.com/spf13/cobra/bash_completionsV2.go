@@ -138,11 +138,40 @@ __%[1]s_process_completion_results() {
             _filedir -d
         fi
     else
-        __%[1]s_handle_standard_completion_case
+        __%[1]s_handle_completion_types
     fi
 
     __%[1]s_handle_special_char "$cur" :
     __%[1]s_handle_special_char "$cur" =
+}
+
+__%[1]s_handle_completion_types() {
+    __%[1]s_debug "__%[1]s_handle_completion_types: COMP_TYPE is $COMP_TYPE"
+
+    case $COMP_TYPE in
+    37|42)
+        # Type: menu-complete/menu-complete-backward and insert-completions
+        # If the user requested inserting one completion at a time, or all
+        # completions at once on the command-line we must remove the descriptions.
+        # https://github.com/spf13/cobra/issues/1508
+        local tab comp
+        tab=$(printf '\t')
+        while IFS='' read -r comp; do
+            # Strip any description
+            comp=${comp%%%%$tab*}
+            # Only consider the completions that match
+            comp=$(compgen -W "$comp" -- "$cur")
+            if [ -n "$comp" ]; then
+                COMPREPLY+=("$comp")
+            fi
+        done < <(printf "%%s\n" "${out[@]}")
+        ;;
+
+    *)
+        # Type: complete (normal completion)
+        __%[1]s_handle_standard_completion_case
+        ;;
+    esac
 }
 
 __%[1]s_handle_standard_completion_case() {

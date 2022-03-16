@@ -158,8 +158,6 @@ const (
 	AuthenticatedWindowsNanoServer
 	// BusyBox image
 	BusyBox
-	// CheckMetadataConcealment image
-	CheckMetadataConcealment
 	// CudaVectorAdd image
 	CudaVectorAdd
 	// CudaVectorAdd2 image
@@ -240,7 +238,6 @@ func initImageConfigs(list RegistryList) (map[int]Config, map[int]Config) {
 	configs[APIServer] = Config{list.PromoterE2eRegistry, "sample-apiserver", "1.17.5"}
 	configs[AppArmorLoader] = Config{list.PromoterE2eRegistry, "apparmor-loader", "1.4"}
 	configs[BusyBox] = Config{list.PromoterE2eRegistry, "busybox", "1.29-2"}
-	configs[CheckMetadataConcealment] = Config{list.PromoterE2eRegistry, "metadata-concealment", "1.6"}
 	configs[CudaVectorAdd] = Config{list.PromoterE2eRegistry, "cuda-vector-add", "1.0"}
 	configs[CudaVectorAdd2] = Config{list.PromoterE2eRegistry, "cuda-vector-add", "2.2"}
 	configs[DebianIptables] = Config{list.BuildImageRegistry, "debian-iptables", "bullseye-v1.1.0"}
@@ -276,6 +273,11 @@ func initImageConfigs(list RegistryList) (map[int]Config, map[int]Config) {
 	configs[VolumeGlusterServer] = Config{list.PromoterE2eRegistry, "volume/gluster", "1.3"}
 	configs[VolumeRBDServer] = Config{list.PromoterE2eRegistry, "volume/rbd", "1.0.4"}
 	configs[WindowsServer] = Config{list.MicrosoftRegistry, "windows", "1809"}
+
+	// This adds more config entries. Those have no pre-defined index number,
+	// but will be used via ReplaceRegistryInImageURL when deploying
+	// CSI drivers (test/e2e/storage/util/create.go).
+	appendCSIImageConfigs(configs)
 
 	// if requested, map all the SHAs into a known format based on the input
 	originalImageConfigs := configs

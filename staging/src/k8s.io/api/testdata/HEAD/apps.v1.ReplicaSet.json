@@ -1618,7 +1618,8 @@
                   ]
                 }
               ]
-            }
+            },
+            "minDomains": 5
           }
         ],
         "setHostnameAsFQDN": true,

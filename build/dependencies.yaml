@@ -144,7 +144,7 @@ dependencies:
       match: __default_go_runner_version=
 
   - name: "k8s.gcr.io/pause"
-    version: 3.6
+    version: 3.7
     refPaths:
     - path: build/pause/Makefile
       match: TAG\s*\?=
@@ -210,20 +210,6 @@ dependencies:
     refPaths:
     - path: build/common.sh
       match: __default_setcap_version=
-
-  # metadata-concealment: bump this one first
-  - name: "metadata-concealment"
-    version: "1.6"
-    refPaths:
-    - path: test/images/metadata-concealment/VERSION
-      match: \d.\d
-
-  # then after merge and successful postsubmit image push / promotion, bump this
-  - name: "metadata-concealment: dependents"
-    version: "1.6"
-    refPaths:
-    - path: test/utils/image/manifest.go
-      match: configs\[CheckMetadataConcealment\] = Config{list\.PromoterE2eRegistry, "metadata-concealment", "\d+\.\d+"}
 
   # cadvisor
   - name: "gcr.io/cadvisor/cadvisor: dependents"

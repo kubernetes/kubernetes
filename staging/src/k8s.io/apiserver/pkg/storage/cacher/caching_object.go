@@ -64,6 +64,16 @@ type serializationsCache map[runtime.Identifier]*serializationResult
 type cachingObject struct {
 	lock sync.RWMutex
 
+	// deepCopied defines whether the object below has already been
+	// deep copied. The operation is performed lazily on the first
+	// setXxx operation.
+	//
+	// The lazy deep-copy make is useful, as effectively the only
+	// case when we are setting some fields are ResourceVersion for
+	// DELETE events, so in all other cases we can effectively avoid
+	// performing any deep copies.
+	deepCopied bool
+
 	// Object for which serializations are cached.
 	object metaRuntimeInterface
 
@@ -79,7 +89,10 @@ type cachingObject struct {
 // metav1.Object type.
 func newCachingObject(object runtime.Object) (*cachingObject, error) {
 	if obj, ok := object.(metaRuntimeInterface); ok {
-		result := &cachingObject{object: obj.DeepCopyObject().(metaRuntimeInterface)}
+		result := &cachingObject{
+			object:     obj,
+			deepCopied: false,
+		}
 		result.serializations.Store(make(serializationsCache))
 		return result, nil
 	}
@@ -124,6 +137,10 @@ func (o *cachingObject) CacheEncode(id runtime.Identifier, encode func(runtime.O
 	result := o.getSerializationResult(id)
 	result.once.Do(func() {
 		buffer := bytes.NewBuffer(nil)
+		// TODO(wojtek-t): This is currently making a copy to avoid races
+		//   in cases where encoding is making subtle object modifications,
+		//   e.g. #82497
+		//   Figure out if we can somehow avoid this under some conditions.
 		result.err = encode(o.GetObject(), buffer)
 		result.raw = buffer.Bytes()
 	})
@@ -156,7 +173,9 @@ func (o *cachingObject) DeepCopyObject() runtime.Object {
 	// DeepCopyObject on cachingObject is not expected to be called anywhere.
 	// However, to be on the safe-side, we implement it, though given the
 	// cache is only an optimization we ignore copying it.
-	result := &cachingObject{}
+	result := &cachingObject{
+		deepCopied: true,
+	}
 	result.serializations.Store(make(serializationsCache))
 
 	o.lock.RLock()
@@ -213,6 +232,10 @@ func (o *cachingObject) conditionalSet(isNoop func() bool, set func()) {
 	defer o.lock.Unlock()
 	if isNoop() {
 		return
+	}
+	if !o.deepCopied {
+		o.object = o.object.DeepCopyObject().(metaRuntimeInterface)
+		o.deepCopied = true
 	}
 	o.invalidateCacheLocked()
 	set()

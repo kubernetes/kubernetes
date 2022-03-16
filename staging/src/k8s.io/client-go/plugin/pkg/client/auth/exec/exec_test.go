@@ -1206,6 +1206,13 @@ func TestAuthorizationHeaderPresentCancelsExecAction(t *testing.T) {
 				config.Password = "zelda"
 			},
 		},
+		{
+			name: "cert auth",
+			setTransportConfig: func(config *transport.Config) {
+				config.TLS.CertData = []byte("some-cert-data")
+				config.TLS.KeyData = []byte("some-key-data")
+			},
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

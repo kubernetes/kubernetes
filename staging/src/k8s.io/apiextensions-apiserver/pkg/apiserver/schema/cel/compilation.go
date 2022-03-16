@@ -40,6 +40,14 @@ const (
 	// OldScopedVarName is the variable name assigned to the existing value of the locally scoped data element of a
 	// CEL validation expression.
 	OldScopedVarName = "oldSelf"
+
+	// PerCallLimit specify the actual cost limit per CEL validation call
+	// current PerCallLimit gives roughly 0.1 second for each expression validation call
+	PerCallLimit = 2000000
+
+	// RuntimeCELCostBudget is the overall cost budget for runtime CEL validation cost per CustomResource
+	// current RuntimeCELCostBudget gives roughly 1 seconds for CR validation
+	RuntimeCELCostBudget = 20000000
 )
 
 // CompilationResult represents the cel compilation result for one rule
@@ -58,7 +66,8 @@ type CompilationResult struct {
 /// - non-nil Program, nil Error: The program was compiled successfully
 //  - nil Program, non-nil Error: Compilation resulted in an error
 //  - nil Program, nil Error: The provided rule was empty so compilation was not attempted
-func Compile(s *schema.Structural, isResourceRoot bool) ([]CompilationResult, error) {
+// perCallLimit was added for testing purpose only. Callers should always use const PerCallLimit as input.
+func Compile(s *schema.Structural, isResourceRoot bool, perCallLimit uint64) ([]CompilationResult, error) {
 	if len(s.Extensions.XValidations) == 0 {
 		return nil, nil
 	}
@@ -67,7 +76,9 @@ func Compile(s *schema.Structural, isResourceRoot bool) ([]CompilationResult, er
 	var propDecls []*expr.Decl
 	var root *celmodel.DeclType
 	var ok bool
-	env, err := cel.NewEnv()
+	env, err := cel.NewEnv(
+		cel.HomogeneousAggregateLiterals(),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -104,13 +115,13 @@ func Compile(s *schema.Structural, isResourceRoot bool) ([]CompilationResult, er
 	// compResults is the return value which saves a list of compilation results in the same order as x-kubernetes-validations rules.
 	compResults := make([]CompilationResult, len(celRules))
 	for i, rule := range celRules {
-		compResults[i] = compileRule(rule, env)
+		compResults[i] = compileRule(rule, env, perCallLimit)
 	}
 
 	return compResults, nil
 }
 
-func compileRule(rule apiextensions.ValidationRule, env *cel.Env) (compilationResult CompilationResult) {
+func compileRule(rule apiextensions.ValidationRule, env *cel.Env, perCallLimit uint64) (compilationResult CompilationResult) {
 	if len(strings.TrimSpace(rule.Rule)) == 0 {
 		// include a compilation result, but leave both program and error nil per documented return semantics of this
 		// function
@@ -139,7 +150,8 @@ func compileRule(rule apiextensions.ValidationRule, env *cel.Env) (compilationRe
 		}
 	}
 
-	prog, err := env.Program(ast, cel.EvalOptions(cel.OptOptimize))
+	// TODO: Ideally we could configure the per expression limit at validation time and set it to the remaining overall budget, but we would either need a way to pass in a limit at evaluation time or move program creation to validation time
+	prog, err := env.Program(ast, cel.EvalOptions(cel.OptOptimize, cel.OptTrackCost), cel.CostLimit(perCallLimit))
 	if err != nil {
 		compilationResult.Error = &Error{ErrorTypeInvalid, "program instantiation failed: " + err.Error()}
 		return

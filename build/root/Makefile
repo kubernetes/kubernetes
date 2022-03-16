@@ -80,11 +80,10 @@ define ALL_HELP_INFO
 #   make
 #   make all
 #   make all WHAT=cmd/kubelet GOFLAGS=-v
-#   make all GOLDFLAGS=""
-#     Note: Specify GOLDFLAGS as an empty string for building unstripped binaries, which allows
-#           you to use code debugging tools like delve. When GOLDFLAGS is unspecified, it defaults
-#           to "-s -w" which strips debug information. Other flags that can be used for GOLDFLAGS 
-#           are documented at https://golang.org/cmd/link/
+#   make all DBG=1
+#     Note: Specify DBG=1 for building unstripped binaries, which allows you to use code debugging
+#           tools like delve. When DBG is unspecified, it defaults to "-s -w" which strips debug
+#           information.
 endef
 .PHONY: all
 ifeq ($(PRINT_HELP),y)
@@ -526,7 +525,7 @@ generated_files:
 	echo "$$GENERATED_FILES_HELP_INFO"
 else
 generated_files gen_openapi:
-	$(MAKE) -f Makefile.generated_files $@ CALLED_FROM_MAIN_MAKEFILE=1
+	$(MAKE) -f Makefile.generated_files $@ CALLED_FROM_MAIN_MAKEFILE=1 SHELL="$(SHELL)"
 endif
 
 define HELP_INFO
