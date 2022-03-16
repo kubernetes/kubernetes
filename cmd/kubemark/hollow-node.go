@@ -253,7 +253,7 @@ func run(cmd *cobra.Command, config *hollowNodeConfig) error {
 
 		var imageService internalapi.ImageManagerService = fakeRemoteRuntime.ImageService
 		if config.UseHostImageService {
-			imageService, err = remote.NewRemoteImageService(f.RemoteImageEndpoint, 15*time.Second)
+			imageService, err = remote.NewRemoteImageService(c.ContainerRuntimeEndpoint, 15*time.Second)
 			if err != nil {
 				return fmt.Errorf("Failed to init image service, error: %w", err)
 			}

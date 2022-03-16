@@ -444,6 +444,16 @@ type KubeletConfiguration struct {
 	// registerNode enables automatic registration with the apiserver.
 	// +optional
 	RegisterNode bool
+
+	// containerRuntimeEndpoint is the endpoint of container runtime.
+	// unix domain sockets supported on Linux while npipes and tcp endpoints are supported for windows.
+	// Examples:'unix:///path/to/runtime.sock', 'npipe:////./pipe/runtime
+	ContainerRuntimeEndpoint string
+
+	// imageServiceEndpoint is the endpoint of container image service.
+	// If not specified the default value is ContainerRuntimeEndpoint
+	// +optional
+	ImageServiceEndpoint string
 }
 
 // KubeletAuthorizationMode denotes the authorization mode for the kubelet

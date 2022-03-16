@@ -282,24 +282,22 @@ func makePodSourceConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, ku
 }
 
 // PreInitRuntimeService will init runtime service before RunKubelet.
-func PreInitRuntimeService(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
-	kubeDeps *Dependencies,
-	remoteRuntimeEndpoint string,
-	remoteImageEndpoint string) error {
-	// remoteImageEndpoint is same as remoteRuntimeEndpoint if not explicitly specified
-	if remoteRuntimeEndpoint != "" && remoteImageEndpoint == "" {
-		remoteImageEndpoint = remoteRuntimeEndpoint
+func PreInitRuntimeService(kubeCfg *kubeletconfiginternal.KubeletConfiguration, kubeDeps *Dependencies) error {
+	var imageServiceEndpoint string
+	// imageServiceEndpoint is same as containerRuntimeEndpoint if not explicitly specified
+	if kubeCfg.ContainerRuntimeEndpoint != "" && kubeCfg.ImageServiceEndpoint == "" {
+		imageServiceEndpoint = kubeCfg.ContainerRuntimeEndpoint
 	}
 
 	var err error
-	if kubeDeps.RemoteRuntimeService, err = remote.NewRemoteRuntimeService(remoteRuntimeEndpoint, kubeCfg.RuntimeRequestTimeout.Duration); err != nil {
+	if kubeDeps.RemoteRuntimeService, err = remote.NewRemoteRuntimeService(kubeCfg.ContainerRuntimeEndpoint, kubeCfg.RuntimeRequestTimeout.Duration); err != nil {
 		return err
 	}
-	if kubeDeps.RemoteImageService, err = remote.NewRemoteImageService(remoteImageEndpoint, kubeCfg.RuntimeRequestTimeout.Duration); err != nil {
+	if kubeDeps.RemoteImageService, err = remote.NewRemoteImageService(imageServiceEndpoint, kubeCfg.RuntimeRequestTimeout.Duration); err != nil {
 		return err
 	}
 
-	kubeDeps.useLegacyCadvisorStats = cadvisor.UsingLegacyCadvisorStats(remoteRuntimeEndpoint)
+	kubeDeps.useLegacyCadvisorStats = cadvisor.UsingLegacyCadvisorStats(kubeCfg.ContainerRuntimeEndpoint)
 
 	return nil
 }

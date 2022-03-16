@@ -778,6 +778,16 @@ type KubeletConfiguration struct {
 	// Default: true
 	// +optional
 	RegisterNode *bool `json:"registerNode,omitempty"`
+
+	// containerRuntimeEndpoint is the endpoint of container runtime.
+	// unix domain sockets supported on Linux while npipes and tcp endpoints are supported for windows.
+	// Examples:'unix:///path/to/runtime.sock', 'npipe:////./pipe/runtime
+	ContainerRuntimeEndpoint string `json:"containerRuntimeEndpoint"`
+
+	// imageServiceEndpoint is the endpoint of container image service.
+	// If not specified the default value is ContainerRuntimeEndpoint
+	// +optional
+	ImageServiceEndpoint string `json:"imageServiceEndpoint,omitempty"`
 }
 
 type KubeletAuthorizationMode string
