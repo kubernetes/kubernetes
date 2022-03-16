@@ -20,8 +20,8 @@ import (
 	"errors"
 	"fmt"
 
-	openapi_v2 "github.com/googleapis/gnostic/openapiv2"
-	"gopkg.in/yaml.v2"
+	openapi_v2 "github.com/google/gnostic/openapiv2"
+	yaml "gopkg.in/yaml.v2"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"

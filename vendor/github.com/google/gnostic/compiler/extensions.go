@@ -22,8 +22,9 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes/any"
-	extensions "github.com/googleapis/gnostic/extensions"
 	yaml "gopkg.in/yaml.v3"
+
+	extensions "github.com/google/gnostic/extensions"
 )
 
 // ExtensionHandler describes a binary that is called by the compiler to handle specification extensions.

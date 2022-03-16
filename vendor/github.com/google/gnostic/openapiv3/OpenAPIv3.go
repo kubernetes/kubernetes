@@ -18,10 +18,12 @@ package openapi_v3
 
 import (
 	"fmt"
-	"github.com/googleapis/gnostic/compiler"
-	"gopkg.in/yaml.v3"
 	"regexp"
 	"strings"
+
+	"gopkg.in/yaml.v3"
+
+	"github.com/google/gnostic/compiler"
 )
 
 // Version returns the package name (and OpenAPI version).
@@ -3431,6 +3433,24 @@ func NewReference(in *yaml.Node, context *compiler.Context) (*Reference, error) 
 				errors = append(errors, compiler.NewError(context, message))
 			}
 		}
+		// string summary = 2;
+		v2 := compiler.MapValueForKey(m, "summary")
+		if v2 != nil {
+			x.Summary, ok = compiler.StringForScalarNode(v2)
+			if !ok {
+				message := fmt.Sprintf("has unexpected value for summary: %s", compiler.Display(v2))
+				errors = append(errors, compiler.NewError(context, message))
+			}
+		}
+		// string description = 3;
+		v3 := compiler.MapValueForKey(m, "description")
+		if v3 != nil {
+			x.Description, ok = compiler.StringForScalarNode(v3)
+			if !ok {
+				message := fmt.Sprintf("has unexpected value for description: %s", compiler.Display(v3))
+				errors = append(errors, compiler.NewError(context, message))
+			}
+		}
 	}
 	return x, compiler.NewErrorGroupOrNil(errors)
 }
@@ -6187,6 +6207,13 @@ func (m *Reference) ResolveReferences(root string) (*yaml.Node, error) {
 		if err != nil {
 			return nil, err
 		}
+		if info != nil {
+			replacement, err := NewReference(info, nil)
+			if err == nil {
+				*m = *replacement
+				return m.ResolveReferences(root)
+			}
+		}
 		return info, nil
 	}
 	return nil, compiler.NewErrorGroupOrNil(errors)
@@ -7977,6 +8004,14 @@ func (m *Reference) ToRawInfo() *yaml.Node {
 	// always include this required field.
 	info.Content = append(info.Content, compiler.NewScalarNodeForString("$ref"))
 	info.Content = append(info.Content, compiler.NewScalarNodeForString(m.XRef))
+	if m.Summary != "" {
+		info.Content = append(info.Content, compiler.NewScalarNodeForString("summary"))
+		info.Content = append(info.Content, compiler.NewScalarNodeForString(m.Summary))
+	}
+	if m.Description != "" {
+		info.Content = append(info.Content, compiler.NewScalarNodeForString("description"))
+		info.Content = append(info.Content, compiler.NewScalarNodeForString(m.Description))
+	}
 	return info
 }
 
