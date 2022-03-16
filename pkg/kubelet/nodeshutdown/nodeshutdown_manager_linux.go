@@ -332,6 +332,8 @@ func (m *managerImpl) processShutdownEvent() error {
 		if err != nil {
 			klog.ErrorS(err, "Failed to store graceful shutdown state")
 		}
+		metrics.GracefulShutdownStartTime.Set(timestamp(startTime))
+		metrics.GracefulShutdownEndTime.Set(0)
 
 		defer func() {
 			endTime := time.Now()
@@ -342,6 +344,7 @@ func (m *managerImpl) processShutdownEvent() error {
 			if err != nil {
 				klog.ErrorS(err, "Failed to store graceful shutdown state")
 			}
+			metrics.GracefulShutdownStartTime.Set(timestamp(endTime))
 		}()
 	}
 
