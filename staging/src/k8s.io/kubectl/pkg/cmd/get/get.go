@@ -132,7 +132,10 @@ var (
 		kubectl get rc,services
 
 		# List one or more resources by their type and names
-		kubectl get rc/web service/frontend pods/web-pod-13je7`))
+		kubectl get rc/web service/frontend pods/web-pod-13je7
+
+                # List events of all namespace, sorted by creationTimestamp
+		kubectl get -A events --sort-by='.metadata.creationTimestamp'`))
 )
 
 const (
