@@ -116,9 +116,7 @@ func (rc *reconciler) reconstructVolumes() {
 
 	if len(reconstructedVolumes) > 0 {
 		// Add the volumes to ASW
-		if err = rc.updateStatesNew(reconstructedVolumes); err != nil {
-			klog.ErrorS(err, "Error occurred during reconstruct volume from disk")
-		}
+		rc.updateStatesNew(reconstructedVolumes)
 		// The reconstructed volumes are mounted, hence a previous kubelet must have already put it into node.status.volumesInUse.
 		// Remember to update DSW with this information.
 		rc.desiredStateOfWorld.MarkVolumesReportedInUse(reconstructedVolumeNames)
@@ -128,7 +126,7 @@ func (rc *reconciler) reconstructVolumes() {
 	klog.V(2).InfoS("Volume reconstruction finished")
 }
 
-func (rc *reconciler) updateStatesNew(reconstructedVolumes map[v1.UniqueVolumeName]*reconstructedVolume) error {
+func (rc *reconciler) updateStatesNew(reconstructedVolumes map[v1.UniqueVolumeName]*reconstructedVolume) {
 	for _, volume := range reconstructedVolumes {
 		err := rc.actualStateOfWorld.MarkVolumeAsAttached(
 			//TODO: the devicePath might not be correct for some volume plugins: see issue #54108
@@ -169,7 +167,6 @@ func (rc *reconciler) updateStatesNew(reconstructedVolumes map[v1.UniqueVolumeNa
 			klog.V(4).InfoS("Volume is marked device as uncertain and added into the actual state", "pod", klog.KObj(volume.pod), "podName", volume.podName, "volumeName", volume.volumeName)
 		}
 	}
-	return nil
 }
 
 // cleanOrphanVolumes tries to clean up all volumes that failed reconstruction.
