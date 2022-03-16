@@ -816,13 +816,11 @@ func updateDefaultStorageClass(c clientset.Interface, scName string, defaultStr 
 	framework.ExpectNoError(err)
 
 	if defaultStr == "" {
-		delete(sc.Annotations, storageutil.BetaIsDefaultStorageClassAnnotation)
 		delete(sc.Annotations, storageutil.IsDefaultStorageClassAnnotation)
 	} else {
 		if sc.Annotations == nil {
 			sc.Annotations = make(map[string]string)
 		}
-		sc.Annotations[storageutil.BetaIsDefaultStorageClassAnnotation] = defaultStr
 		sc.Annotations[storageutil.IsDefaultStorageClassAnnotation] = defaultStr
 	}
 

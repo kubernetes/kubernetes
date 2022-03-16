@@ -49,10 +49,6 @@ const (
 	// marks a class as the default StorageClass
 	isDefaultStorageClassAnnotation = "storageclass.kubernetes.io/is-default-class"
 
-	// betaIsDefaultStorageClassAnnotation is the beta version of IsDefaultStorageClassAnnotation.
-	// TODO: remove Beta when no longer used
-	betaIsDefaultStorageClassAnnotation = "storageclass.beta.kubernetes.io/is-default-class"
-
 	// volumeGidAnnotationKey is the of the annotation on the PersistentVolume
 	// object that specifies a supplemental GID.
 	// it is copied from k8s.io/kubernetes/pkg/volume/util VolumeGidAnnotationKey
@@ -826,15 +822,10 @@ func GetDefaultStorageClassName(c clientset.Interface) (string, error) {
 
 // isDefaultAnnotation returns a boolean if the default storage class
 // annotation is set
-// TODO: remove Beta when no longer needed
 func isDefaultAnnotation(obj metav1.ObjectMeta) bool {
 	if obj.Annotations[isDefaultStorageClassAnnotation] == "true" {
 		return true
 	}
-	if obj.Annotations[betaIsDefaultStorageClassAnnotation] == "true" {
-		return true
-	}
-
 	return false
 }
 
