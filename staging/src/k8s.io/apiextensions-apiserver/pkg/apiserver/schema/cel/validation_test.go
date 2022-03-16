@@ -1721,7 +1721,7 @@ func TestValidationExpressions(t *testing.T) {
 					}
 					errs, _ = celValidator.Validate(field.NewPath("root"), &s, tt.obj, tt.costBudget)
 					for _, err := range errs {
-						if err.Type == field.ErrorTypeInvalid && strings.Contains(err.Error(), "call cost exceeds limit for rule") {
+						if err.Type == field.ErrorTypeInvalid && strings.Contains(err.Error(), "no further validation rules will be run due to call cost exceeds limit for rule") {
 							found = true
 							break
 						}
