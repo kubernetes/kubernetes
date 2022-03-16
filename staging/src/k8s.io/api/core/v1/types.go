@@ -522,7 +522,6 @@ type PersistentVolumeClaimSpec struct {
 }
 
 // PersistentVolumeClaimConditionType is a valid value of PersistentVolumeClaimCondition.Type
-// +enum
 type PersistentVolumeClaimConditionType string
 
 const (
@@ -2632,10 +2631,9 @@ const (
 )
 
 // PodConditionType is a valid value for PodCondition.Type
-// +enum
 type PodConditionType string
 
-// These are valid conditions of pod.
+// These are built-in conditions of pod. An application may use a custom condition not listed here.
 const (
 	// ContainersReady indicates whether all containers in the pod are ready.
 	ContainersReady PodConditionType = "ContainersReady"
@@ -5083,11 +5081,10 @@ const (
 	NodeTerminated NodePhase = "Terminated"
 )
 
-// +enum
 type NodeConditionType string
 
-// These are valid conditions of node. Currently, we don't have enough information to decide
-// node condition. In the future, we will add more. The proposed set of conditions are:
+// These are valid but not exhaustive conditions of node. A cloud provider may set a condition not listed here.
+// The built-in set of conditions are:
 // NodeReachable, NodeLive, NodeReady, NodeSchedulable, NodeRunnable.
 const (
 	// NodeReady means kubelet is healthy and ready to accept pods.
@@ -5122,10 +5119,9 @@ type NodeCondition struct {
 	Message string `json:"message,omitempty" protobuf:"bytes,6,opt,name=message"`
 }
 
-// +enum
 type NodeAddressType string
 
-// These are valid address type of node.
+// These are built-in addresses type of node. A cloud provider may set a type not listed here.
 const (
 	// NodeHostName identifies a name of the node. Although every node can be assumed
 	// to have a NodeAddress of this type, its exact syntax and semantics are not
@@ -5295,10 +5291,9 @@ const (
 	NamespaceTerminatingCause metav1.CauseType = "NamespaceTerminating"
 )
 
-// +enum
 type NamespaceConditionType string
 
-// These are valid conditions of a namespace.
+// These are built-in conditions of a namespace.
 const (
 	// NamespaceDeletionDiscoveryFailure contains information about namespace deleter errors during resource discovery.
 	NamespaceDeletionDiscoveryFailure NamespaceConditionType = "NamespaceDeletionDiscoveryFailure"
@@ -5786,8 +5781,8 @@ type EventList struct {
 // List holds a list of objects, which may not be known by the server.
 type List metav1.List
 
-// LimitType is a type of object that is limited
-// +enum
+// LimitType is a type of object that is limited. It can be Pod, Container, PersistentVolumeClaim or
+// a fully qualified resource name.
 type LimitType string
 
 const (
