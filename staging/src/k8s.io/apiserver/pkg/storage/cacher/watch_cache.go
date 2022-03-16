@@ -23,6 +23,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/btree"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -90,6 +91,12 @@ type storeElement struct {
 	Labels labels.Set
 	Fields fields.Set
 }
+
+func (t storeElement) Less(than btree.Item) bool {
+	return t.Key < than.(storeElement).Key
+}
+
+var _ btree.Item = storeElement{}
 
 func storeElementKey(obj interface{}) (string, error) {
 	elem, ok := obj.(*storeElement)
@@ -168,7 +175,7 @@ type watchCache struct {
 	// history" i.e. from the moment just after the newest cached watched event.
 	// It is necessary to effectively allow clients to start watching at now.
 	// NOTE: We assume that <store> is thread-safe.
-	store cache.Indexer
+	store btreeIndexer
 
 	// ResourceVersion up to which the watchCache is propagated.
 	resourceVersion uint64
@@ -205,15 +212,16 @@ func newWatchCache(
 	clock clock.Clock,
 	groupResource schema.GroupResource) *watchCache {
 	wc := &watchCache{
-		capacity:            defaultLowerBoundCapacity,
-		keyFunc:             keyFunc,
-		getAttrsFunc:        getAttrsFunc,
-		cache:               make([]*watchCacheEvent, defaultLowerBoundCapacity),
-		lowerBoundCapacity:  defaultLowerBoundCapacity,
-		upperBoundCapacity:  defaultUpperBoundCapacity,
-		startIndex:          0,
-		endIndex:            0,
-		store:               cache.NewIndexer(storeElementKey, storeElementIndexers(indexers)),
+		capacity:           defaultLowerBoundCapacity,
+		keyFunc:            keyFunc,
+		getAttrsFunc:       getAttrsFunc,
+		cache:              make([]*watchCacheEvent, defaultLowerBoundCapacity),
+		lowerBoundCapacity: defaultLowerBoundCapacity,
+		upperBoundCapacity: defaultUpperBoundCapacity,
+		startIndex:         0,
+		endIndex:           0,
+		// store:               cache.NewIndexer(storeElementKey, storeElementIndexers(indexers)),
+		store:               newBtreeStore(2), // TODO: figure out what the degree should be.
 		resourceVersion:     0,
 		listResourceVersion: 0,
 		eventHandler:        eventHandler,
@@ -469,21 +477,31 @@ func (w *watchCache) waitUntilFreshAndBlock(resourceVersion uint64, trace *utilt
 // with their ResourceVersion and the name of the index, if any, that was used.
 func (w *watchCache) WaitUntilFreshAndList(resourceVersion uint64, matchValues []storage.MatchValue, trace *utiltrace.Trace) ([]interface{}, uint64, string, error) {
 	err := w.waitUntilFreshAndBlock(resourceVersion, trace)
-	defer w.RUnlock()
 	if err != nil {
 		return nil, 0, "", err
 	}
+
+	// Perform a clone under the lock, this should be a relatively
+	// inexpensive operation since the implementation of clone uses
+	// copy on write semantics. Once cloned, serve the list from the
+	// cloned copy to avoid building the response under a lock.
+	var storeClone btreeIndexer
+	func() {
+		defer w.RUnlock()
+		storeClone = w.store.Clone()
+	}()
 
 	// This isn't the place where we do "final filtering" - only some "prefiltering" is happening here. So the only
 	// requirement here is to NOT miss anything that should be returned. We can return as many non-matching items as we
 	// want - they will be filtered out later. The fact that we return less things is only further performance improvement.
 	// TODO: if multiple indexes match, return the one with the fewest items, so as to do as much filtering as possible.
 	for _, matchValue := range matchValues {
-		if result, err := w.store.ByIndex(matchValue.IndexName, matchValue.Value); err == nil {
+		if result, err := storeClone.ByIndex(matchValue.IndexName, matchValue.Value); err == nil {
 			return result, w.resourceVersion, matchValue.IndexName, nil
 		}
 	}
-	return w.store.List(), w.resourceVersion, "", nil
+
+	return storeClone.List(), w.resourceVersion, "", nil
 }
 
 // WaitUntilFreshAndGet returns a pointers to <storeElement> object.
