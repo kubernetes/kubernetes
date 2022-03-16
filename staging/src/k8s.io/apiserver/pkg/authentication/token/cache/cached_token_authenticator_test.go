@@ -318,7 +318,7 @@ func TestCachedAuditAnnotations(t *testing.T) {
 				if randomChoice {
 					allAnnotations <- extractAnnotations(ctx)
 				} else {
-					allAnnotations <- audit.AuditEventFrom(ctx).Annotations
+					allAnnotations <- audit.GetAuditEventCopy(ctx).Annotations
 				}
 			}()
 		}

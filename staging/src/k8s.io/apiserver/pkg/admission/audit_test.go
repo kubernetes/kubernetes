@@ -24,9 +24,9 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
+	"k8s.io/apiserver/pkg/audit"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // fakeHandler implements Interface
@@ -142,22 +142,19 @@ func TestWithAudit(t *testing.T) {
 	for tcName, tc := range testCases {
 		var handler Interface = fakeHandler{tc.admit, tc.admitAnnotations, tc.validate, tc.validateAnnotations, tc.handles}
 		ae := &auditinternal.Event{Level: auditinternal.LevelMetadata}
-		auditHandler := WithAudit(handler, ae)
+		ctx := audit.WithAuditContext(context.Background(), &audit.AuditContext{Event: ae})
+		auditHandler := WithAudit(handler)
 		a := attributes()
 
 		assert.Equal(t, handler.Handles(Create), auditHandler.Handles(Create), tcName+": WithAudit decorator should not effect the return value")
 
-		mutator, ok := handler.(MutationInterface)
-		require.True(t, ok)
-		auditMutator, ok := auditHandler.(MutationInterface)
-		require.True(t, ok)
-		assert.Equal(t, mutator.Admit(context.TODO(), a, nil), auditMutator.Admit(context.TODO(), a, nil), tcName+": WithAudit decorator should not effect the return value")
+		mutator := handler.(MutationInterface)
+		auditMutator := auditHandler.(MutationInterface)
+		assert.Equal(t, mutator.Admit(ctx, a, nil), auditMutator.Admit(ctx, a, nil), tcName+": WithAudit decorator should not effect the return value")
 
-		validator, ok := handler.(ValidationInterface)
-		require.True(t, ok)
-		auditValidator, ok := auditHandler.(ValidationInterface)
-		require.True(t, ok)
-		assert.Equal(t, validator.Validate(context.TODO(), a, nil), auditValidator.Validate(context.TODO(), a, nil), tcName+": WithAudit decorator should not effect the return value")
+		validator := handler.(ValidationInterface)
+		auditValidator := auditHandler.(ValidationInterface)
+		assert.Equal(t, validator.Validate(ctx, a, nil), auditValidator.Validate(ctx, a, nil), tcName+": WithAudit decorator should not effect the return value")
 
 		annotations := make(map[string]string, len(tc.admitAnnotations)+len(tc.validateAnnotations))
 		for k, v := range tc.admitAnnotations {
@@ -183,7 +180,8 @@ func TestWithAuditConcurrency(t *testing.T) {
 	}
 	var handler Interface = fakeHandler{admitAnnotations: admitAnnotations, handles: true}
 	ae := &auditinternal.Event{Level: auditinternal.LevelMetadata}
-	auditHandler := WithAudit(handler, ae)
+	ctx := audit.WithAuditContext(context.Background(), &audit.AuditContext{Event: ae})
+	auditHandler := WithAudit(handler)
 	a := attributes()
 
 	// Simulate the scenario store.DeleteCollection
@@ -193,11 +191,9 @@ func TestWithAuditConcurrency(t *testing.T) {
 	for i := 0; i < workers; i++ {
 		go func() {
 			defer wg.Done()
-			mutator, ok := handler.(MutationInterface)
-			require.True(t, ok)
-			auditMutator, ok := auditHandler.(MutationInterface)
-			require.True(t, ok)
-			assert.Equal(t, mutator.Admit(context.TODO(), a, nil), auditMutator.Admit(context.TODO(), a, nil), "WithAudit decorator should not effect the return value")
+			mutator := handler.(MutationInterface)
+			auditMutator := auditHandler.(MutationInterface)
+			assert.Equal(t, mutator.Admit(ctx, a, nil), auditMutator.Admit(ctx, a, nil), "WithAudit decorator should not effect the return value")
 		}()
 	}
 	wg.Wait()

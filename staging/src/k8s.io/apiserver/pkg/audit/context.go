@@ -21,6 +21,7 @@ import (
 
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/klog/v2"
 )
 
 // The key type is unexported to prevent collisions
@@ -68,8 +69,8 @@ func WithAuditAnnotations(parent context.Context) context.Context {
 // prefer AddAuditAnnotation over LogAnnotation to avoid dropping annotations.
 func AddAuditAnnotation(ctx context.Context, key, value string) {
 	// use the audit event directly if we have it
-	if ae := AuditEventFrom(ctx); ae != nil {
-		LogAnnotation(ae, key, value)
+	if ae := auditEventFrom(ctx); ae != nil {
+		logAnnotation(ae, key, value)
 		return
 	}
 
@@ -81,15 +82,42 @@ func AddAuditAnnotation(ctx context.Context, key, value string) {
 	*annotations = append(*annotations, annotation{key: key, value: value})
 }
 
+// AddAuditAnnotations is the bulk version of AddAuditAnnotation.
+// keysAndValues are the key-value pairs to add, and must have an even number of items.
+func AddAuditAnnotations(ctx context.Context, keysAndValues ...string) {
+	if len(keysAndValues)%2 != 0 {
+		klog.Errorf("Dropping mismatched audit annotation %q", keysAndValues[len(keysAndValues)-1])
+	}
+	for i := 0; i < len(keysAndValues); i += 2 {
+		AddAuditAnnotation(ctx, keysAndValues[i], keysAndValues[i+1])
+	}
+}
+
 // This is private to prevent reads/write to the slice from outside of this package.
-// The audit event should be directly read to get access to the annotations.
-func auditAnnotationsFrom(ctx context.Context) []annotation {
+func addAuditAnnotationsFrom(ctx context.Context, ev *auditinternal.Event) {
 	annotations, ok := ctx.Value(auditAnnotationsKey).(*[]annotation)
 	if !ok {
-		return nil // adding audit annotation is not supported at this call site
+		return // no annotations to copy
 	}
 
-	return *annotations
+	for _, kv := range *annotations {
+		logAnnotation(ev, kv.key, kv.value)
+	}
+}
+
+// logAnnotation fills in the Annotations according to the key value pair.
+func logAnnotation(ae *auditinternal.Event, key, value string) {
+	if ae == nil || ae.Level.Less(auditinternal.LevelMetadata) {
+		return
+	}
+	if ae.Annotations == nil {
+		ae.Annotations = make(map[string]string)
+	}
+	if v, ok := ae.Annotations[key]; ok && v != value {
+		klog.Warningf("Failed to set annotations[%q] to %q for audit:%q, it has already been set to %q", key, value, ae.AuditID, ae.Annotations[key])
+		return
+	}
+	ae.Annotations[key] = value
 }
 
 // WithAuditContext returns a new context that stores the pair of the audit
@@ -99,18 +127,35 @@ func WithAuditContext(parent context.Context, ev *AuditContext) context.Context 
 	return genericapirequest.WithValue(parent, auditKey, ev)
 }
 
-// AuditEventFrom returns the audit event struct on the ctx
-func AuditEventFrom(ctx context.Context) *auditinternal.Event {
-	if o := AuditContextFrom(ctx); o != nil {
+// auditEventFrom returns the audit event struct on the ctx
+func auditEventFrom(ctx context.Context) *auditinternal.Event {
+	if o := auditContextFrom(ctx); o != nil {
 		return o.Event
 	}
 	return nil
 }
 
-// AuditContextFrom returns the pair of the audit configuration object
+// auditContextFrom returns the pair of the audit configuration object
 // that applies to the given request and the audit event that is going to
 // be written to the API audit log.
-func AuditContextFrom(ctx context.Context) *AuditContext {
+func auditContextFrom(ctx context.Context) *AuditContext {
 	ev, _ := ctx.Value(auditKey).(*AuditContext)
 	return ev
+}
+
+// GetAuditLevel returns the policy level for the current audit context.
+// If there is not currently an audit context, it returns ("", false).
+func GetAuditLevel(ctx context.Context) (auditinternal.Level, bool) {
+	if e := auditEventFrom(ctx); e != nil {
+		return e.Level, true
+	}
+	return "", false
+}
+
+// GetAuditEventCopy returns a deep copy of the internal audit event.
+func GetAuditEventCopy(ctx context.Context) *auditinternal.Event {
+	if e := auditEventFrom(ctx); e != nil {
+		return e.DeepCopy()
+	}
+	return nil
 }

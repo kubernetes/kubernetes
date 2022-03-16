@@ -281,7 +281,7 @@ func TestAuthenticationAuditAnnotationsDefaultChain(t *testing.T) {
 		audit.AddAuditAnnotation(req.Context(), "pandas", "are awesome")
 
 		// confirm that trying to use the audit event directly would never work
-		if ae := audit.AuditEventFrom(req.Context()); ae != nil {
+		if ae := audit.GetAuditEventCopy(req.Context()); ae != nil {
 			t.Errorf("expected nil audit event, got %v", ae)
 		}
 
@@ -308,13 +308,10 @@ func TestAuthenticationAuditAnnotationsDefaultChain(t *testing.T) {
 		}
 
 		// confirm that we have an audit event
-		ae := audit.AuditEventFrom(r.Context())
+		ae := audit.GetAuditEventCopy(r.Context())
 		if ae == nil {
 			t.Error("unexpected nil audit event")
 		}
-
-		// confirm that the direct way of setting audit annotations later in the chain works as expected
-		audit.LogAnnotation(ae, "snorlax", "is cool too")
 
 		// confirm that the indirect way of setting audit annotations later in the chain also works
 		audit.AddAuditAnnotation(r.Context(), "dogs", "are okay")
@@ -335,7 +332,7 @@ func TestAuthenticationAuditAnnotationsDefaultChain(t *testing.T) {
 		t.Error("expected audit events, got none")
 	}
 	// these should all be the same because the handler chain mutates the event in place
-	want := map[string]string{"pandas": "are awesome", "snorlax": "is cool too", "dogs": "are okay"}
+	want := map[string]string{"pandas": "are awesome", "dogs": "are okay"}
 	for _, event := range backend.events {
 		if event.Stage != auditinternal.StageResponseComplete {
 			t.Errorf("expected event stage to be complete, got: %s", event.Stage)

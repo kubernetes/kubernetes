@@ -31,7 +31,6 @@ type auditHandler struct {
 	// TODO: move the lock near the Annotations field of the audit event so it is always protected from concurrent access.
 	// to protect the 'Annotations' map of the audit event from concurrent writes
 	mutex sync.Mutex
-	ae    *auditinternal.Event
 }
 
 var _ Interface = &auditHandler{}
@@ -39,14 +38,14 @@ var _ MutationInterface = &auditHandler{}
 var _ ValidationInterface = &auditHandler{}
 
 // WithAudit is a decorator for a admission phase. It saves annotations
-// of attribute into the audit event. Attributes passed to the Admit and
+// of attribute into the audit context. Attributes passed to the Admit and
 // Validate function must be instance of privateAnnotationsGetter or
 // AnnotationsGetter, otherwise an error is returned.
-func WithAudit(i Interface, ae *auditinternal.Event) Interface {
-	if i == nil || ae == nil {
+func WithAudit(i Interface) Interface {
+	if i == nil {
 		return i
 	}
-	return &auditHandler{Interface: i, ae: ae}
+	return &auditHandler{Interface: i}
 }
 
 func (handler *auditHandler) Admit(ctx context.Context, a Attributes, o ObjectInterfaces) error {
@@ -59,7 +58,7 @@ func (handler *auditHandler) Admit(ctx context.Context, a Attributes, o ObjectIn
 	var err error
 	if mutator, ok := handler.Interface.(MutationInterface); ok {
 		err = mutator.Admit(ctx, a, o)
-		handler.logAnnotations(a)
+		handler.logAnnotations(ctx, a)
 	}
 	return err
 }
@@ -74,7 +73,7 @@ func (handler *auditHandler) Validate(ctx context.Context, a Attributes, o Objec
 	var err error
 	if validator, ok := handler.Interface.(ValidationInterface); ok {
 		err = validator.Validate(ctx, a, o)
-		handler.logAnnotations(a)
+		handler.logAnnotations(ctx, a)
 	}
 	return err
 }
@@ -88,23 +87,28 @@ func ensureAnnotationGetter(a Attributes) error {
 	return fmt.Errorf("attributes must be an instance of privateAnnotationsGetter or AnnotationsGetter")
 }
 
-func (handler *auditHandler) logAnnotations(a Attributes) {
-	if handler.ae == nil {
-		return
-	}
+func (handler *auditHandler) logAnnotations(ctx context.Context, a Attributes) {
 	handler.mutex.Lock()
 	defer handler.mutex.Unlock()
 
+	auditLevel, ok := audit.GetAuditLevel(ctx)
+	if !ok {
+		// If no level is available, assume the highest level to avoid dropping data.
+		auditLevel = auditinternal.LevelRequestResponse
+	}
+	var annotations []string
 	switch a := a.(type) {
 	case privateAnnotationsGetter:
-		for key, value := range a.getAnnotations(handler.ae.Level) {
-			audit.LogAnnotation(handler.ae, key, value)
+		for key, value := range a.getAnnotations(auditLevel) {
+			annotations = append(annotations, key, value)
 		}
 	case AnnotationsGetter:
-		for key, value := range a.GetAnnotations(handler.ae.Level) {
-			audit.LogAnnotation(handler.ae, key, value)
+		for key, value := range a.GetAnnotations(auditLevel) {
+			annotations = append(annotations, key, value)
 		}
 	default:
 		// this will never happen, because we have already checked it in ensureAnnotationGetter
 	}
+
+	audit.AddAuditAnnotations(ctx, annotations...)
 }

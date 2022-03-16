@@ -411,7 +411,7 @@ func TestWithFailedRequestAudit(t *testing.T) {
 					t.Errorf("expected an http.ResponseWriter of type: %T but got: %T", &auditResponseWriter{}, rwGot)
 				}
 
-				auditEventGot := audit.AuditEventFrom(requestGot.Context())
+				auditEventGot := audit.GetAuditEventCopy(requestGot.Context())
 				if auditEventGot == nil {
 					t.Fatal("expected an audit event object but got nil")
 				}
