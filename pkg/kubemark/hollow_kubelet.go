@@ -158,7 +158,6 @@ func GetHollowKubeletConfig(opt *HollowKubeletOptions) (*options.KubeletFlags, *
 	f.MaxPerPodContainerCount = 2
 	f.NodeLabels = opt.NodeLabels
 	f.RegisterSchedulable = true
-	f.RemoteImageEndpoint = "unix:///run/containerd/containerd.sock"
 
 	// Config struct
 	c, err := options.NewKubeletConfiguration()
@@ -166,6 +165,7 @@ func GetHollowKubeletConfig(opt *HollowKubeletOptions) (*options.KubeletFlags, *
 		panic(err)
 	}
 
+	c.ImageServiceEndpoint = "unix:///run/containerd/containerd.sock"
 	c.StaticPodURL = ""
 	c.EnableServer = true
 	c.Address = "0.0.0.0" /* bind address */
