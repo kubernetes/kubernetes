@@ -30,14 +30,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	certificatesinformers "k8s.io/client-go/informers/certificates/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/certificate/csr"
 	capihelper "k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/controller/certificates"
 	"k8s.io/kubernetes/pkg/controller/certificates/authority"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 type CSRSigningController struct {
@@ -207,10 +205,6 @@ func (s *signer) sign(x509cr *x509.CertificateRequest, usages []capi.KeyUsage, e
 }
 
 func (s *signer) duration(expirationSeconds *int32) time.Duration {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CSRDuration) {
-		return s.certTTL
-	}
-
 	if expirationSeconds == nil {
 		return s.certTTL
 	}
