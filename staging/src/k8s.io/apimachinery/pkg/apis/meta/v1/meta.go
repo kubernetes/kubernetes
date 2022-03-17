@@ -172,8 +172,10 @@ func (meta *ObjectMeta) GetOwnerReferences() []OwnerReference         { return m
 func (meta *ObjectMeta) SetOwnerReferences(references []OwnerReference) {
 	meta.OwnerReferences = references
 }
-func (meta *ObjectMeta) GetZZZ_DeprecatedClusterName() string                 { return meta.ZZZ_DeprecatedClusterName }
-func (meta *ObjectMeta) SetZZZ_DeprecatedClusterName(clusterName string)      { meta.ZZZ_DeprecatedClusterName = clusterName }
+func (meta *ObjectMeta) GetZZZ_DeprecatedClusterName() string { return meta.ZZZ_DeprecatedClusterName }
+func (meta *ObjectMeta) SetZZZ_DeprecatedClusterName(clusterName string) {
+	meta.ZZZ_DeprecatedClusterName = clusterName
+}
 func (meta *ObjectMeta) GetManagedFields() []ManagedFieldsEntry { return meta.ManagedFields }
 func (meta *ObjectMeta) SetManagedFields(managedFields []ManagedFieldsEntry) {
 	meta.ManagedFields = managedFields
