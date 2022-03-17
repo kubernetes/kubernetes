@@ -19,6 +19,11 @@ limitations under the License.
 
 package kubelet
 
+import (
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
+)
+
 // shouldMountHostsFile checks if the nodes /etc/hosts should be mounted
 // Kubernetes only mounts on /etc/hosts if:
 // - container is not an infrastructure (pause) container
