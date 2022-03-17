@@ -39,7 +39,6 @@ type ObjectMetaApplyConfiguration struct {
 	Annotations                map[string]string                  `json:"annotations,omitempty"`
 	OwnerReferences            []OwnerReferenceApplyConfiguration `json:"ownerReferences,omitempty"`
 	Finalizers                 []string                           `json:"finalizers,omitempty"`
-	ClusterName                *string                            `json:"clusterName,omitempty"`
 }
 
 // ObjectMetaApplyConfiguration constructs an declarative configuration of the ObjectMeta type for use with
@@ -168,13 +167,5 @@ func (b *ObjectMetaApplyConfiguration) WithFinalizers(values ...string) *ObjectM
 	for i := range values {
 		b.Finalizers = append(b.Finalizers, values[i])
 	}
-	return b
-}
-
-// WithClusterName sets the ClusterName field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the ClusterName field is set to the value of the last call.
-func (b *ObjectMetaApplyConfiguration) WithClusterName(value string) *ObjectMetaApplyConfiguration {
-	b.ClusterName = &value
 	return b
 }
