@@ -267,7 +267,7 @@ func TestApplyStripsFields(t *testing.T) {
 	newObj.SetName("b")
 	newObj.SetNamespace("b")
 	newObj.SetUID("b")
-	newObj.SetClusterName("b")
+	newObj.SetZZZ_DeprecatedClusterName("b")
 	newObj.SetGeneration(0)
 	newObj.SetResourceVersion("b")
 	newObj.SetCreationTimestamp(metav1.NewTime(time.Now()))

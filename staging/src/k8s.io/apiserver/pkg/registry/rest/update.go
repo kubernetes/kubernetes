@@ -136,9 +136,9 @@ func BeforeUpdate(strategy RESTUpdateStrategy, ctx context.Context, obj, old run
 
 	strategy.PrepareForUpdate(ctx, obj, old)
 
-	// ClusterName is ignored and should not be saved
-	if len(objectMeta.GetClusterName()) > 0 {
-		objectMeta.SetClusterName("")
+	// ZZZ_DeprecatedClusterName is ignored and should not be saved
+	if len(objectMeta.GetZZZ_DeprecatedClusterName()) > 0 {
+		objectMeta.SetZZZ_DeprecatedClusterName("")
 	}
 	// Use the existing UID if none is provided
 	if len(objectMeta.GetUID()) == 0 {

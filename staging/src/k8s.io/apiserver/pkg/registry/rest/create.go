@@ -123,9 +123,9 @@ func BeforeCreate(strategy RESTCreateStrategy, ctx context.Context, obj runtime.
 		objectMeta.SetManagedFields(nil)
 	}
 
-	// ClusterName is ignored and should not be saved
-	if len(objectMeta.GetClusterName()) > 0 {
-		objectMeta.SetClusterName("")
+	// ZZZ_DeprecatedClusterName is ignored and should not be saved
+	if len(objectMeta.GetZZZ_DeprecatedClusterName()) > 0 {
+		objectMeta.SetZZZ_DeprecatedClusterName("")
 	}
 
 	if errs := strategy.Validate(ctx, obj); len(errs) > 0 {
