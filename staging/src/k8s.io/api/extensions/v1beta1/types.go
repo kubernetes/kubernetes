@@ -955,6 +955,9 @@ const (
 	// due to insufficient quota, limit ranges, pod security policy, node selectors, etc. or deleted
 	// due to kubelet being down or finalizers are failing.
 	ReplicaSetReplicaFailure ReplicaSetConditionType = "ReplicaFailure"
+	// ReplicaSetAvailable means the replica set is available, ie. all required replicas are up
+	// and running for at least minReadySeconds.
+	ReplicaSetAvailable ReplicaSetConditionType = "Available"
 )
 
 // ReplicaSetCondition describes the state of a replica set at a certain point.
