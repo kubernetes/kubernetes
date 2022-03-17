@@ -50,7 +50,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		Testname: Pod with the non-existing RuntimeClass is rejected.
 		Description: The Pod requesting the non-existing RuntimeClass must be rejected.
 	*/
-	ginkgo.It("should reject a Pod requesting a non-existent RuntimeClass [NodeConformance]", func() {
+	framework.ConformanceIt("should reject a Pod requesting a non-existent RuntimeClass [NodeConformance]", func() {
 		rcName := f.Namespace.Name + "-nonexistent"
 		expectPodRejection(f, e2enode.NewRuntimeClassPod(rcName))
 	})
@@ -99,7 +99,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		depends on container runtime and preconfigured handler. Runtime-specific functionality
 		is not being tested here.
 	*/
-	ginkgo.It("should schedule a Pod requesting a RuntimeClass without PodOverhead [NodeConformance]", func() {
+	framework.ConformanceIt("should schedule a Pod requesting a RuntimeClass without PodOverhead [NodeConformance]", func() {
 		rcName := createRuntimeClass(f, "preconfigured-handler", e2enode.PreconfiguredRuntimeClassHandler, nil)
 		defer deleteRuntimeClass(f, rcName)
 		pod := f.PodClient().Create(e2enode.NewRuntimeClassPod(rcName))
@@ -124,7 +124,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		depends on container runtime and preconfigured handler. Runtime-specific functionality
 		is not being tested here.
 	*/
-	ginkgo.It("should schedule a Pod requesting a RuntimeClass and initialize its Overhead [NodeConformance]", func() {
+	framework.ConformanceIt("should schedule a Pod requesting a RuntimeClass and initialize its Overhead [NodeConformance]", func() {
 		rcName := createRuntimeClass(f, "preconfigured-handler", e2enode.PreconfiguredRuntimeClassHandler, &nodev1.Overhead{
 			PodFixed: v1.ResourceList{
 				v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10m"),
@@ -151,7 +151,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		Testname: Pod with the deleted RuntimeClass is rejected.
 		Description: Pod requesting the deleted RuntimeClass must be rejected.
 	*/
-	ginkgo.It("should reject a Pod requesting a deleted RuntimeClass [NodeConformance]", func() {
+	framework.ConformanceIt("should reject a Pod requesting a deleted RuntimeClass [NodeConformance]", func() {
 		rcName := createRuntimeClass(f, "delete-me", "runc", nil)
 		rcClient := f.ClientSet.NodeV1().RuntimeClasses()
 
