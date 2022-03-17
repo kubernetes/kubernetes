@@ -1360,7 +1360,7 @@ func testValidatePVC(t *testing.T, ephemeral bool) {
 			isExpectedFailure: ephemeral,
 			claim: func() *core.PersistentVolumeClaim {
 				claim := testVolumeClaim(goodName, goodNS, goodClaimSpec)
-				claim.ClusterName = "foo"
+				claim.ZZZ_DeprecatedClusterName = "foo"
 				return claim
 			}(),
 		},

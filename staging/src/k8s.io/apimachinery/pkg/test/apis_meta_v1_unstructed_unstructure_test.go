@@ -534,7 +534,7 @@ func TestAccessorMethods(t *testing.T) {
 		{accessor: "Annotations", val: map[string]string{"foo": "bar"}},
 		{accessor: "Finalizers", val: []string{"foo"}},
 		{accessor: "OwnerReferences", val: []metav1.OwnerReference{{Name: "foo"}}},
-		{accessor: "ClusterName", val: "foo"},
+		{accessor: "ZZZ_DeprecatedClusterName", val: "foo"},
 	}
 	for i, test := range tests {
 		t.Logf("evaluating test %d (%s)", i, test.accessor)

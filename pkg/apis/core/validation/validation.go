@@ -287,9 +287,6 @@ var ValidateServiceAccountName = apimachineryvalidation.ValidateServiceAccountNa
 // trailing dashes are allowed.
 var ValidateEndpointsName = apimachineryvalidation.NameIsDNSSubdomain
 
-// ValidateClusterName can be used to check whether the given cluster name is valid.
-var ValidateClusterName = apimachineryvalidation.ValidateClusterName
-
 // ValidateClassName can be used to check whether the given class name is valid.
 // It is defined here to avoid import cycle between pkg/apis/storage/validation
 // (where it should be) and this file.
