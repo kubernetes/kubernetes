@@ -46,6 +46,9 @@ import (
 
 // FetchInitConfigurationFromCluster fetches configuration from a ConfigMap in the cluster
 func FetchInitConfigurationFromCluster(client clientset.Interface, printer output.Printer, logPrefix string, newControlPlane, skipComponentConfigs bool) (*kubeadmapi.InitConfiguration, error) {
+	if printer == nil {
+		printer = &output.TextPrinter{}
+	}
 	printer.Printf("[%s] Reading configuration from the cluster...\n", logPrefix)
 	printer.Printf("[%s] FYI: You can look at this config file with 'kubectl -n %s get cm %s -o yaml'\n", logPrefix, metav1.NamespaceSystem, constants.KubeadmConfigConfigMap)
 

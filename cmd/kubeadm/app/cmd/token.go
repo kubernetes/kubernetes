@@ -169,7 +169,7 @@ func newCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 
 			printer, err := outputFlags.ToPrinter()
 			if err != nil {
-				return err
+				return errors.Wrap(err, "could not construct output printer")
 			}
 
 			return RunListTokens(out, errW, client, printer)
@@ -354,7 +354,7 @@ func (ttp *tokenTextPrinter) PrintObj(obj runtime.Object, writer io.Writer) erro
 // tokenTextPrintFlags provides flags necessary for printing bootstrap token in a text form.
 type tokenTextPrintFlags struct{}
 
-// ToPrinter returns kubeadm printer for the text output format
+// ToPrinter returns a kubeadm printer for the text output format
 func (tpf *tokenTextPrintFlags) ToPrinter(outputFormat string) (output.Printer, error) {
 	if outputFormat == output.TextOutput {
 		return &tokenTextPrinter{columns: []string{"TOKEN", "TTL", "EXPIRES", "USAGES", "DESCRIPTION", "EXTRA GROUPS"}}, nil

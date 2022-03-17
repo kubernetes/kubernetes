@@ -39,7 +39,6 @@ import (
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
 var (
@@ -333,7 +332,7 @@ func getInternalCfg(cfgPath string, kubeconfigPath string, cfg kubeadmapiv1.Clus
 	if cfgPath == "" {
 		client, err := kubeconfigutil.ClientSetFromFile(kubeconfigPath)
 		if err == nil {
-			internalcfg, err := configutil.FetchInitConfigurationFromCluster(client, &output.TextPrinter{}, logPrefix, false, false)
+			internalcfg, err := configutil.FetchInitConfigurationFromCluster(client, nil, logPrefix, false, false)
 			if err == nil {
 				fmt.Println() // add empty line to separate the FetchInitConfigurationFromCluster output from the command output
 				return internalcfg, nil

@@ -34,6 +34,7 @@ import (
 	"k8s.io/cli-runtime/pkg/printers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	outputapischeme "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/scheme"
 	outputapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/v1alpha2"
@@ -62,7 +63,7 @@ func newCmdPlan(apf *applyPlanFlags) *cobra.Command {
 		RunE: func(_ *cobra.Command, args []string) error {
 			printer, err := outputFlags.ToPrinter()
 			if err != nil {
-				return err
+				return errors.Wrap(err, "could not construct output printer")
 			}
 
 			return runPlan(flags, args, printer)
@@ -77,21 +78,21 @@ func newCmdPlan(apf *applyPlanFlags) *cobra.Command {
 }
 
 // newComponentUpgradePlan helper creates outputapiv1alpha2.ComponentUpgradePlan object
-func newComponentUpgradePlan(name, currentVersion, newVersion string) *outputapiv1alpha2.ComponentUpgradePlan {
-	return &outputapiv1alpha2.ComponentUpgradePlan{
+func newComponentUpgradePlan(name, currentVersion, newVersion string) outputapiv1alpha2.ComponentUpgradePlan {
+	return outputapiv1alpha2.ComponentUpgradePlan{
 		Name:           name,
 		CurrentVersion: currentVersion,
 		NewVersion:     newVersion,
 	}
 }
 
-// upgradePlanPrintFlags defines printer flag structure for the
+// upgradePlanPrintFlags defines a printer flag structure for the
 // upgrade plan kubeadm command and provides a method
 // of retrieving a known printer based on flag values provided.
 type upgradePlanPrintFlags struct {
-	// JSONYamlPrintFlags provides default flags necessary for json/yaml printing.
+	// JSONYamlPrintFlags provides default flags necessary for json/yaml printing
 	JSONYamlPrintFlags *upgradePlanJSONYamlPrintFlags
-	// TextPrintFlags provides default flags necessary for text printing.
+	// TextPrintFlags provides default flags necessary for text printing
 	TextPrintFlags *upgradePlanTextPrintFlags
 	// TypeSetterPrinter is an implementation of ResourcePrinter that wraps another printer with types set on the objects
 	TypeSetterPrinter *printers.TypeSetterPrinter
@@ -108,7 +109,7 @@ func newUpgradePlanPrintFlags(outputFormat string) *upgradePlanPrintFlags {
 	}
 }
 
-// AllowedFormats returns list of allowed output formats
+// AllowedFormats returns a list of allowed output formats
 func (pf *upgradePlanPrintFlags) AllowedFormats() []string {
 	ret := pf.TextPrintFlags.AllowedFormats()
 	return append(ret, pf.JSONYamlPrintFlags.AllowedFormats()...)
@@ -119,7 +120,9 @@ func (pf *upgradePlanPrintFlags) AllowedFormats() []string {
 func (pf *upgradePlanPrintFlags) AddFlags(cmd *cobra.Command) {
 	pf.TextPrintFlags.AddFlags(cmd)
 	pf.JSONYamlPrintFlags.AddFlags(cmd)
-	cmd.Flags().StringVarP(&pf.OutputFormat, "experimental-output", "o", pf.OutputFormat, fmt.Sprintf("Output format. One of: %s.", strings.Join(pf.AllowedFormats(), "|")))
+	// TODO: once we are confident the feature is graduated we should remove the EXPERIMENTAL text below:
+	// https://github.com/kubernetes/kubeadm/issues/494
+	cmd.Flags().StringVarP(&pf.OutputFormat, "output", "o", pf.OutputFormat, fmt.Sprintf("EXPERIMENTAL: Output format. One of: %s.", strings.Join(pf.AllowedFormats(), "|")))
 }
 
 // ToPrinter receives an outputFormat and returns a printer capable of
@@ -142,7 +145,7 @@ type upgradePlanJSONYamlPrintFlags struct {
 	genericclioptions.JSONYamlPrintFlags
 }
 
-// AllowedFormats returns list of allowed output formats
+// AllowedFormats returns a list of allowed output formats
 func (pf *upgradePlanJSONYamlPrintFlags) AllowedFormats() []string {
 	return []string{output.JSONOutput, output.YAMLOutput}
 }
@@ -150,10 +153,10 @@ func (pf *upgradePlanJSONYamlPrintFlags) AllowedFormats() []string {
 // upgradePlanJSONYAMLPrinter prints upgrade plan in a JSON or YAML format
 type upgradePlanJSONYAMLPrinter struct {
 	output.ResourcePrinterWrapper
-	Buffer []*outputapiv1alpha2.ComponentUpgradePlan
+	Buffer []outputapiv1alpha2.ComponentUpgradePlan
 }
 
-// newUpgradePlanJSONYAMLPrinter creates new upgradePlanJSONYAMLPrinter object
+// newUpgradePlanJSONYAMLPrinter creates a new upgradePlanJSONYAMLPrinter object
 func newUpgradePlanJSONYAMLPrinter(resourcePrinter printers.ResourcePrinter, err error) (output.Printer, error) {
 	if err != nil {
 		return nil, err
@@ -165,18 +168,29 @@ func newUpgradePlanJSONYAMLPrinter(resourcePrinter printers.ResourcePrinter, err
 func (p *upgradePlanJSONYAMLPrinter) PrintObj(obj runtime.Object, writer io.Writer) error {
 	item, ok := obj.(*outputapiv1alpha2.ComponentUpgradePlan)
 	if !ok {
-		return fmt.Errorf("expected ComponentUpgradePlan, but got %+v", obj)
+		return errors.Errorf("expected ComponentUpgradePlan, but got %+v", obj)
 	}
-	p.Buffer = append(p.Buffer, item)
+	p.Buffer = append(p.Buffer, *item)
 	return nil
 }
 
-// Close writes any buffered data and empties list of buffered components
-func (p *upgradePlanJSONYAMLPrinter) Close(writer io.Writer) {
+// Flush writes any buffered data once last object is added
+func (p *upgradePlanJSONYAMLPrinter) Flush(writer io.Writer, last bool) {
+	if !last {
+		return
+	}
+	if len(p.Buffer) == 0 {
+		return
+	}
 	plan := &outputapiv1alpha2.UpgradePlan{Components: p.Buffer}
-	// p.ResourcePrinterWrapper.Printer.PrintObj(plan, writer)
-	p.Printer.PrintObj(plan, writer)
-	p.Buffer = []*outputapiv1alpha2.ComponentUpgradePlan{}
+	if err := p.Printer.PrintObj(plan, writer); err != nil {
+		fmt.Fprintf(os.Stderr, "could not flush output buffer: %v\n", err)
+	}
+}
+
+// Close empties the list of buffered components
+func (p *upgradePlanJSONYAMLPrinter) Close(writer io.Writer) {
+	p.Buffer = p.Buffer[:0]
 }
 
 // upgradePlanTextPrinter prints upgrade plan in a text form
@@ -187,10 +201,11 @@ type upgradePlanTextPrinter struct {
 }
 
 // Flush writes any buffered data
-func (p *upgradePlanTextPrinter) Flush(writer io.Writer) {
+func (p *upgradePlanTextPrinter) Flush(writer io.Writer, last bool) {
 	if p.tabwriter != nil {
 		p.tabwriter.Flush()
 		p.tabwriter = nil
+		p.Fprintln(writer, "")
 	}
 }
 
@@ -204,26 +219,25 @@ func (p *upgradePlanTextPrinter) PrintObj(obj runtime.Object, writer io.Writer) 
 
 	item, ok := obj.(*outputapiv1alpha2.ComponentUpgradePlan)
 	if !ok {
-		return fmt.Errorf("expected ComponentUpgradePlan, but got %+v", obj)
+		return errors.Errorf("expected ComponentUpgradePlan, but got %+v", obj)
 	}
 
 	// Print item
 	fmt.Fprintf(p.tabwriter, "%s\t%s\t%s\n", item.Name, item.CurrentVersion, item.NewVersion)
-
 	return nil
 }
 
-// upgradePlanTextPrintFlags provides flags necessary for printing upgrade plan in a text form.
+// upgradePlanTextPrintFlags provides flags necessary for printing upgrade plan in a text form
 type upgradePlanTextPrintFlags struct{}
 
 func (pf *upgradePlanTextPrintFlags) AddFlags(cmd *cobra.Command) {}
 
-// AllowedFormats returns list of allowed output formats
+// AllowedFormats returns a list of allowed output formats
 func (pf *upgradePlanTextPrintFlags) AllowedFormats() []string {
 	return []string{output.TextOutput}
 }
 
-// ToPrinter returns kubeadm printer for the text output format
+// ToPrinter returns a kubeadm printer for the text output format
 func (pf *upgradePlanTextPrintFlags) ToPrinter(outputFormat string) (output.Printer, error) {
 	if outputFormat == output.TextOutput {
 		return &upgradePlanTextPrinter{columns: []string{"COMPONENT", "CURRENT", "TARGET"}}, nil
@@ -282,15 +296,12 @@ func runPlan(flags *planFlags, args []string, printer output.Printer) error {
 
 	// Finally, print the component config state table
 	printComponentConfigVersionStates(configVersionStates, os.Stdout, printer)
-
-	// Add a newline in the end of this output to leave some space to the next output section
-	klog.V(1).Infoln()
 	return nil
 }
 
 // TODO There is currently no way to cleanly output upgrades that involve adding, removing, or changing components
 // https://github.com/kubernetes/kubeadm/issues/810 was created to track addressing this.
-func appendDNSComponent(components []*outputapiv1alpha2.ComponentUpgradePlan, up *upgrade.Upgrade, name string) []*outputapiv1alpha2.ComponentUpgradePlan {
+func appendDNSComponent(components []outputapiv1alpha2.ComponentUpgradePlan, up *upgrade.Upgrade, name string) []outputapiv1alpha2.ComponentUpgradePlan {
 	beforeVersion := up.Before.DNSVersion
 	afterVersion := up.After.DNSVersion
 
@@ -316,7 +327,7 @@ func genUpgradePlan(up *upgrade.Upgrade, isExternalEtcd bool) (*outputapiv1alpha
 		}
 	}
 
-	components := []*outputapiv1alpha2.ComponentUpgradePlan{}
+	components := []outputapiv1alpha2.ComponentUpgradePlan{}
 
 	if up.CanUpgradeKubelets() {
 		// The map is of the form <old-version>:<node-count>. Here all the keys are put into a slice and sorted
@@ -370,26 +381,26 @@ func printUpgradePlan(up *upgrade.Upgrade, plan *outputapiv1alpha2.UpgradePlan, 
 		} else if component.Name == constants.Kubelet {
 			if printManualUpgradeHeader {
 				printer.Fprintln(writer, "Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':")
-				printer.PrintObj(newComponentUpgradePlan(component.Name, component.CurrentVersion, component.NewVersion), writer)
+				plan := newComponentUpgradePlan(component.Name, component.CurrentVersion, component.NewVersion)
+				printer.PrintObj(&plan, writer)
 				printManualUpgradeHeader = false
 			} else {
-				printer.PrintObj(newComponentUpgradePlan("", component.CurrentVersion, component.NewVersion), writer)
+				plan := newComponentUpgradePlan("", component.CurrentVersion, component.NewVersion)
+				printer.PrintObj(&plan, writer)
 			}
 		} else {
 			if printHeader {
 				// End of manual upgrades table
-				printer.Flush(writer)
-
-				printer.Fprintln(writer, "")
+				printer.Flush(writer, false)
 				printer.Fprintf(writer, "Upgrade to the latest %s:\n", up.Description)
 				printer.Fprintln(writer, "")
 				printHeader = false
 			}
-			printer.PrintObj(newComponentUpgradePlan(component.Name, component.CurrentVersion, component.NewVersion), writer)
+			plan := newComponentUpgradePlan(component.Name, component.CurrentVersion, component.NewVersion)
+			printer.PrintObj(&plan, writer)
 		}
 	}
-	printer.Flush(writer)
-	printer.Fprintln(writer, "")
+	printer.Flush(writer, true)
 
 	printer.Fprintln(writer, "You can now apply the upgrade by executing the following command:")
 	printer.Fprintln(writer, "")
@@ -430,8 +441,7 @@ func yesOrNo(b bool) string {
 }
 
 func printLineSeparator(w io.Writer, printer output.Printer) {
-	printer.Fprintln(w, "_____________________________________________________________________")
-	printer.Fprintln(w, "")
+	printer.Fprintf(w, "_____________________________________________________________________\n\n")
 }
 
 func printComponentConfigVersionStates(versionStates []outputapiv1alpha2.ComponentConfigVersionState, w io.Writer, printer output.Printer) {

@@ -28,14 +28,16 @@ import (
 	"k8s.io/cli-runtime/pkg/printers"
 )
 
-// TextOutput describes the plain text output
-const TextOutput = "text"
+const (
+	// TextOutput describes the plain text output
+	TextOutput = "text"
 
-// JSONOutput describes the JSON output
-const JSONOutput = "json"
+	// JSONOutput describes the JSON output
+	JSONOutput = "json"
 
-// YAMLOutput describes the YAML output
-const YAMLOutput = "yaml"
+	// YAMLOutput describes the YAML output
+	YAMLOutput = "yaml"
+)
 
 // TextPrintFlags is an interface to handle custom text output
 type TextPrintFlags interface {
@@ -58,7 +60,7 @@ type PrintFlags struct {
 	OutputFormat *string
 }
 
-// AllowedFormats returns list of allowed output formats
+// AllowedFormats returns a list of allowed output formats
 func (pf *PrintFlags) AllowedFormats() []string {
 	ret := []string{TextOutput}
 	ret = append(ret, pf.JSONYamlPrintFlags.AllowedFormats()...)
@@ -141,23 +143,14 @@ type Printer interface {
 	Fprintf(writer io.Writer, format string, args ...interface{}) (n int, err error)
 	Fprintln(writer io.Writer, args ...interface{}) (n int, err error)
 	Printf(format string, args ...interface{}) (n int, err error)
+	Println(args ...interface{}) (n int, err error)
 
-	Flush(writer io.Writer)
+	Flush(writer io.Writer, last bool)
 	Close(writer io.Writer)
 }
 
 // TextPrinter implements Printer interface for generic text output
 type TextPrinter struct {
-}
-
-// Flush writes any buffered data
-func (tp *TextPrinter) Flush(writer io.Writer) {
-	return
-}
-
-// Close flushes any buffered data and closes the printer
-func (tp *TextPrinter) Close(writer io.Writer) {
-	return
 }
 
 // PrintObj is an implementation of ResourcePrinter.PrintObj that prints object
@@ -181,6 +174,19 @@ func (tp *TextPrinter) Printf(format string, args ...interface{}) (n int, err er
 	return fmt.Printf(format, args...)
 }
 
+// Println is a wrapper around fmt.Printf
+func (tp *TextPrinter) Println(args ...interface{}) (n int, err error) {
+	return fmt.Println(args...)
+}
+
+// Flush writes any buffered data
+func (tp *TextPrinter) Flush(writer io.Writer, last bool) {
+}
+
+// Close flushes any buffered data and closes the printer
+func (tp *TextPrinter) Close(writer io.Writer) {
+}
+
 // ResourcePrinterWrapper wraps ResourcePrinter and implements Printer interface
 type ResourcePrinterWrapper struct {
 	Printer printers.ResourcePrinter
@@ -195,13 +201,11 @@ func NewResourcePrinterWrapper(resourcePrinter printers.ResourcePrinter, err err
 }
 
 // Flush writes any buffered data
-func (rpw *ResourcePrinterWrapper) Flush(writer io.Writer) {
-	return
+func (rpw *ResourcePrinterWrapper) Flush(writer io.Writer, last bool) {
 }
 
 // Close flushes any buffered data and closes the printer
 func (rpw *ResourcePrinterWrapper) Close(writer io.Writer) {
-	return
 }
 
 // PrintObj is an implementation of ResourcePrinter.PrintObj that calls underlying printer API
@@ -216,7 +220,7 @@ func (rpw *ResourcePrinterWrapper) Fprintf(writer io.Writer, format string, args
 	return 0, nil
 }
 
-// Fprintln is an empty method to satisfy Printer interface
+// Fprintln is an empty method to satisfy the Printer interface
 // and silent info printing for structured output
 // This method is usually redefined for the text output
 func (rpw *ResourcePrinterWrapper) Fprintln(writer io.Writer, args ...interface{}) (n int, err error) {
@@ -227,5 +231,12 @@ func (rpw *ResourcePrinterWrapper) Fprintln(writer io.Writer, args ...interface{
 // and silent info printing for structured output
 // This method is usually redefined for the text output
 func (rpw *ResourcePrinterWrapper) Printf(format string, args ...interface{}) (n int, err error) {
+	return 0, nil
+}
+
+// Println is an empty method to satisfy Printer interface
+// and silent info printing for structured output
+// This method is usually redefined for the text output
+func (rpw *ResourcePrinterWrapper) Println(args ...interface{}) (n int, err error) {
 	return 0, nil
 }

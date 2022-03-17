@@ -268,7 +268,7 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 	}
 
 	// Add a newline in the end of this output to leave some space to the next output section
-	printer.Printf("\n")
+	printer.Println()
 
 	return upgrades, nil
 }
