@@ -49,9 +49,9 @@ const (
 	// DefaultPodMaxUnschedulableQDuration is the default value for the maximum
 	// time a pod can stay in unschedulableQ. If a pod stays in unschedulableQ
 	// for longer than this value, the pod will be moved from unschedulableQ to
-	// backoffQ or activeQ. If this value is empty, the default value (60s)
+	// backoffQ or activeQ. If this value is empty, the default value (5min)
 	// will be used.
-	DefaultPodMaxUnschedulableQDuration time.Duration = 60 * time.Second
+	DefaultPodMaxUnschedulableQDuration time.Duration = 5 * time.Minute
 
 	queueClosed = "scheduling queue is closed"
 )
