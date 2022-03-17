@@ -38,17 +38,17 @@ func TestIgnoreClusterName(t *testing.T) {
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	ns := v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        "test-namespace",
-			ClusterName: "cluster-name-to-ignore",
+			Name:                      "test-namespace",
+			ZZZ_DeprecatedClusterName: "cluster-name-to-ignore",
 		},
 	}
 	nsNew, err := client.CoreV1().Namespaces().Create(context.TODO(), &ns, metav1.CreateOptions{})
 	assert.NoError(t, err)
 	assert.Equal(t, ns.Name, nsNew.Name)
-	assert.Empty(t, nsNew.ClusterName)
+	assert.Empty(t, nsNew.ZZZ_DeprecatedClusterName)
 
 	nsNew, err = client.CoreV1().Namespaces().Update(context.TODO(), &ns, metav1.UpdateOptions{})
 	assert.NoError(t, err)
 	assert.Equal(t, ns.Name, nsNew.Name)
-	assert.Empty(t, nsNew.ClusterName)
+	assert.Empty(t, nsNew.ZZZ_DeprecatedClusterName)
 }

@@ -374,7 +374,7 @@ func TestPriorityQueue_Update(t *testing.T) {
 		t.Error("Expected unschedulableQ to be 1.")
 	}
 	updatedPod := medPriorityPodInfo.Pod.DeepCopy()
-	updatedPod.ClusterName = "test"
+	updatedPod.Annotations["foo"] = "test"
 	q.Update(medPriorityPodInfo.Pod, updatedPod)
 	rawPodInfo, err = q.podBackoffQ.Pop()
 	podGotFromBackoffQ = rawPodInfo.(*framework.QueuedPodInfo).Pod
@@ -389,7 +389,7 @@ func TestPriorityQueue_Update(t *testing.T) {
 		t.Error("Expected unschedulableQ to be 1.")
 	}
 	updatedPod = medPriorityPodInfo.Pod.DeepCopy()
-	updatedPod.ClusterName = "test1"
+	updatedPod.Annotations["foo"] = "test1"
 	// Move clock by podInitialBackoffDuration, so that pods in the unschedulableQ would pass the backing off,
 	// and the pods will be moved into activeQ.
 	c.Step(q.podInitialBackoffDuration)
