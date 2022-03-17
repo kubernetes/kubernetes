@@ -26,6 +26,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -176,7 +177,7 @@ func newApfHandlerWithFilter(t *testing.T, flowControlFilter utilflowcontrol.Int
 		}))
 		apfHandler.ServeHTTP(w, r)
 		postExecute()
-		if atomicReadOnlyExecuting != 0 {
+		if atomic.LoadInt32(&atomicReadOnlyExecuting) != 0 {
 			t.Errorf("Wanted %d requests executing, got %d", 0, atomicReadOnlyExecuting)
 		}
 	}), requestInfoFactory)

@@ -80,7 +80,7 @@ func WithPriorityAndFairness(
 		return handler
 	}
 
-	recordWaitingW := recordWaitingWatermark(watermarkEnabled)
+	recordWaitingW := recordWaitingWatermarkAtomic(watermarkEnabled)
 	recordInFlightW := recordMaxInFlightWatermarkAtomic(watermarkEnabled)
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -289,7 +289,7 @@ func WithPriorityAndFairness(
 	})
 }
 
-func recordWaitingWatermark(watermarkEnabled bool) func(bool, int32) {
+func recordWaitingWatermarkAtomic(watermarkEnabled bool) func(bool, int32) {
 	if !watermarkEnabled {
 		return func(bool, int32) {}
 	}
