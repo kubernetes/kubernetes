@@ -649,7 +649,7 @@ func (h *HumanReadablePrinter) legacyPrinterToTable(obj runtime.Object, handler 
 		if err != nil {
 			return nil, err
 		}
-		for len(data) > 0 {
+		for len(data) > 0 && i < len(items) {
 			cells, remainder := tabbedLineToCells(data, len(table.ColumnDefinitions))
 			table.Rows = append(table.Rows, metav1beta1.TableRow{
 				Cells:  cells,
