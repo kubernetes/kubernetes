@@ -126,6 +126,7 @@ func BeforeCreate(strategy RESTCreateStrategy, ctx context.Context, obj runtime.
 	// ZZZ_DeprecatedClusterName is ignored and should not be saved
 	if len(objectMeta.GetZZZ_DeprecatedClusterName()) > 0 {
 		objectMeta.SetZZZ_DeprecatedClusterName("")
+		warning.AddWarning(ctx, "", "metadata.clusterName was specified. This field is not preserved and will be removed from the schema in 1.25")
 	}
 
 	if errs := strategy.Validate(ctx, obj); len(errs) > 0 {

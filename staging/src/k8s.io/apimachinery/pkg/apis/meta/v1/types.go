@@ -257,10 +257,13 @@ type ObjectMeta struct {
 	// +patchStrategy=merge
 	Finalizers []string `json:"finalizers,omitempty" patchStrategy:"merge" protobuf:"bytes,14,rep,name=finalizers"`
 
-	// ClusterName tombstone. It consumed proto tag 15. We will remove
-	// completely sans a comment here next release (1.25). The name is
-	// changed here for a release to ensure any users (which we do not
-	// expect) will get a compile error before a serialization error.
+	// Deprecated: ClusterName is a legacy field that was always cleared by
+	// the system and never used; it will be removed completely in 1.25.
+	//
+	// The name in the go struct is changed to help clients detect
+	// accidental use.
+	//
+	// +optional
 	ZZZ_DeprecatedClusterName string `json:"clusterName,omitempty" protobuf:"bytes,15,opt,name=clusterName"`
 
 	// ManagedFields maps workflow-id and version to the set of fields
