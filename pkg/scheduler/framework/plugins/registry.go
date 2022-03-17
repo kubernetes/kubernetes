@@ -46,7 +46,6 @@ import (
 func NewInTreeRegistry() runtime.Registry {
 	fts := plfeature.Features{
 		EnablePodDisruptionBudget:           feature.DefaultFeatureGate.Enabled(features.PodDisruptionBudget),
-		EnablePodOverhead:                   feature.DefaultFeatureGate.Enabled(features.PodOverhead),
 		EnableReadWriteOncePod:              feature.DefaultFeatureGate.Enabled(features.ReadWriteOncePod),
 		EnableVolumeCapacityPriority:        feature.DefaultFeatureGate.Enabled(features.VolumeCapacityPriority),
 		EnableCSIStorageCapacity:            feature.DefaultFeatureGate.Enabled(features.CSIStorageCapacity),
