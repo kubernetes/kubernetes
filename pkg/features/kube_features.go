@@ -726,6 +726,7 @@ const (
 
 	// owner: @enj
 	// beta: v1.22
+	// ga: v1.24
 	//
 	// Allows clients to request a duration for certificates issued via the Kubernetes CSR API.
 	CSRDuration featuregate.Feature = "CSRDuration"
@@ -945,7 +946,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	SeccompDefault:                                 {Default: false, PreRelease: featuregate.Alpha},
 	PodSecurity:                                    {Default: true, PreRelease: featuregate.Beta},
 	ReadWriteOncePod:                               {Default: false, PreRelease: featuregate.Alpha},
-	CSRDuration:                                    {Default: true, PreRelease: featuregate.Beta},
+	CSRDuration:                                    {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
 	DelegateFSGroupToCSIDriver:                     {Default: true, PreRelease: featuregate.Beta},
 	KubeletInUserNamespace:                         {Default: false, PreRelease: featuregate.Alpha},
 	MemoryQoS:                                      {Default: false, PreRelease: featuregate.Alpha},
