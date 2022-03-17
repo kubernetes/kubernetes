@@ -646,8 +646,12 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 				Labels: testServiceAccountStaticLabels,
 			},
 		}
-		_, err := f.ClientSet.CoreV1().ServiceAccounts(testNamespaceName).Create(context.TODO(), &testServiceAccount, metav1.CreateOptions{})
+		createdServiceAccount, err := f.ClientSet.CoreV1().ServiceAccounts(testNamespaceName).Create(context.TODO(), &testServiceAccount, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create a ServiceAccount")
+
+		getServiceAccount, err := f.ClientSet.CoreV1().ServiceAccounts(testNamespaceName).Get(context.TODO(), testServiceAccountName, metav1.GetOptions{})
+		framework.ExpectNoError(err, "failed to fetch the created ServiceAccount")
+		framework.ExpectEqual(createdServiceAccount.UID, getServiceAccount.UID)
 
 		ginkgo.By("watching for the ServiceAccount to be added")
 		resourceWatchTimeoutSeconds := int64(180)
