@@ -15,3 +15,23 @@ limitations under the License.
 */
 
 package v1beta1
+
+import (
+	"github.com/google/go-cmp/cmp"
+	"reflect"
+	"testing"
+)
+
+func TestSetDefaults_PodSecurityDefaults(t *testing.T) {
+	input := &PodSecurityDefaults{}
+	expect := &PodSecurityDefaults{
+		Enforce: "privileged", EnforceVersion: "latest",
+		Warn: "privileged", WarnVersion: "latest",
+		Audit: "privileged", AuditVersion: "latest",
+	}
+
+	SetDefaults_PodSecurityDefaults(input)
+	if !reflect.DeepEqual(input, expect) {
+		t.Fatalf("unexpected PodSecurityDefaults:\n%s", cmp.Diff(expect, input))
+	}
+}
