@@ -24,8 +24,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	nodev1 "k8s.io/api/node/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	types "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
@@ -43,14 +45,20 @@ import (
 var _ = SIGDescribe("RuntimeClass", func() {
 	f := framework.NewDefaultFramework("runtimeclass")
 
-	ginkgo.It("should reject a Pod requesting a non-existent RuntimeClass [NodeFeature:RuntimeHandler]", func() {
+	/*
+		Release: v1.20
+		Testname: Pod with the non-existing RuntimeClass is rejected.
+		Description: The Pod requesting the non-existing RuntimeClass must be rejected.
+	*/
+	ginkgo.It("should reject a Pod requesting a non-existent RuntimeClass [NodeConformance]", func() {
 		rcName := f.Namespace.Name + "-nonexistent"
 		expectPodRejection(f, e2enode.NewRuntimeClassPod(rcName))
 	})
 
+	// The test CANNOT be made a Conformance as it depends on a container runtime to have a specific handler not being installed.
 	ginkgo.It("should reject a Pod requesting a RuntimeClass with an unconfigured handler [NodeFeature:RuntimeHandler]", func() {
 		handler := f.Namespace.Name + "-handler"
-		rcName := createRuntimeClass(f, "unconfigured-handler", handler)
+		rcName := createRuntimeClass(f, "unconfigured-handler", handler, nil)
 		defer deleteRuntimeClass(f, rcName)
 		pod := f.PodClient().Create(e2enode.NewRuntimeClassPod(rcName))
 		eventSelector := fields.Set{
@@ -71,19 +79,80 @@ var _ = SIGDescribe("RuntimeClass", func() {
 	})
 
 	// This test requires that the PreconfiguredRuntimeHandler has already been set up on nodes.
+	// The test CANNOT be made a Conformance as it depends on a container runtime to have a specific handler installed and working.
 	ginkgo.It("should run a Pod requesting a RuntimeClass with a configured handler [NodeFeature:RuntimeHandler]", func() {
 		// Requires special setup of test-handler which is only done in GCE kube-up environment
 		// see https://github.com/kubernetes/kubernetes/blob/eb729620c522753bc7ae61fc2c7b7ea19d4aad2f/cluster/gce/gci/configure-helper.sh#L3069-L3076
 		e2eskipper.SkipUnlessProviderIs("gce")
 
-		rcName := createRuntimeClass(f, "preconfigured-handler", e2enode.PreconfiguredRuntimeClassHandler)
+		rcName := createRuntimeClass(f, "preconfigured-handler", e2enode.PreconfiguredRuntimeClassHandler, nil)
 		defer deleteRuntimeClass(f, rcName)
 		pod := f.PodClient().Create(e2enode.NewRuntimeClassPod(rcName))
 		expectPodSuccess(f, pod)
 	})
 
-	ginkgo.It("should reject a Pod requesting a deleted RuntimeClass [NodeFeature:RuntimeHandler]", func() {
-		rcName := createRuntimeClass(f, "delete-me", "runc")
+	/*
+		Release: v1.20
+		Testname: Can schedule a pod requesting existing RuntimeClass.
+		Description: The Pod requesting the existing RuntimeClass must be scheduled.
+		This test doesn't validate that the Pod will actually start because this functionality
+		depends on container runtime and preconfigured handler. Runtime-specific functionality
+		is not being tested here.
+	*/
+	ginkgo.It("should schedule a Pod requesting a RuntimeClass without PodOverhead [NodeConformance]", func() {
+		rcName := createRuntimeClass(f, "preconfigured-handler", e2enode.PreconfiguredRuntimeClassHandler, nil)
+		defer deleteRuntimeClass(f, rcName)
+		pod := f.PodClient().Create(e2enode.NewRuntimeClassPod(rcName))
+		// there is only one pod in the namespace
+		label := labels.SelectorFromSet(labels.Set(map[string]string{}))
+		pods, err := e2epod.WaitForPodsWithLabelScheduled(f.ClientSet, f.Namespace.Name, label)
+		framework.ExpectNoError(err, "Failed to schedule Pod with the RuntimeClass")
+
+		framework.ExpectEqual(len(pods.Items), 1)
+		scheduledPod := &pods.Items[0]
+		framework.ExpectEqual(scheduledPod.Name, pod.Name)
+
+		// Overhead should not be set
+		framework.ExpectEqual(len(scheduledPod.Spec.Overhead), 0)
+	})
+
+	/*
+		Release: v1.24
+		Testname: RuntimeClass Overhead field must be respected.
+		Description: The Pod requesting the existing RuntimeClass must be scheduled.
+		This test doesn't validate that the Pod will actually start because this functionality
+		depends on container runtime and preconfigured handler. Runtime-specific functionality
+		is not being tested here.
+	*/
+	ginkgo.It("should schedule a Pod requesting a RuntimeClass and initialize its Overhead [NodeConformance]", func() {
+		rcName := createRuntimeClass(f, "preconfigured-handler", e2enode.PreconfiguredRuntimeClassHandler, &nodev1.Overhead{
+			PodFixed: v1.ResourceList{
+				v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10m"),
+				v1.ResourceName(v1.ResourceMemory): resource.MustParse("1Mi"),
+			},
+		})
+		defer deleteRuntimeClass(f, rcName)
+		pod := f.PodClient().Create(e2enode.NewRuntimeClassPod(rcName))
+		// there is only one pod in the namespace
+		label := labels.SelectorFromSet(labels.Set(map[string]string{}))
+		pods, err := e2epod.WaitForPodsWithLabelScheduled(f.ClientSet, f.Namespace.Name, label)
+		framework.ExpectNoError(err, "Failed to schedule Pod with the RuntimeClass")
+
+		framework.ExpectEqual(len(pods.Items), 1)
+		scheduledPod := &pods.Items[0]
+		framework.ExpectEqual(scheduledPod.Name, pod.Name)
+
+		framework.ExpectEqual(scheduledPod.Spec.Overhead[v1.ResourceCPU], resource.MustParse("10m"))
+		framework.ExpectEqual(scheduledPod.Spec.Overhead[v1.ResourceMemory], resource.MustParse("1Mi"))
+	})
+
+	/*
+		Release: v1.20
+		Testname: Pod with the deleted RuntimeClass is rejected.
+		Description: Pod requesting the deleted RuntimeClass must be rejected.
+	*/
+	ginkgo.It("should reject a Pod requesting a deleted RuntimeClass [NodeConformance]", func() {
+		rcName := createRuntimeClass(f, "delete-me", "runc", nil)
 		rcClient := f.ClientSet.NodeV1().RuntimeClasses()
 
 		ginkgo.By("Deleting RuntimeClass "+rcName, func() {
@@ -277,9 +346,10 @@ func deleteRuntimeClass(f *framework.Framework, name string) {
 
 // createRuntimeClass generates a RuntimeClass with the desired handler and a "namespaced" name,
 // synchronously creates it, and returns the generated name.
-func createRuntimeClass(f *framework.Framework, name, handler string) string {
+func createRuntimeClass(f *framework.Framework, name, handler string, overhead *nodev1.Overhead) string {
 	uniqueName := fmt.Sprintf("%s-%s", f.Namespace.Name, name)
 	rc := runtimeclasstest.NewRuntimeClass(uniqueName, handler)
+	rc.Overhead = overhead
 	rc, err := f.ClientSet.NodeV1().RuntimeClasses().Create(context.TODO(), rc, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "failed to create RuntimeClass resource")
 	return rc.GetName()
