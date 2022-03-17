@@ -21,7 +21,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/blang/semver"
+	"github.com/blang/semver/v4"
 	"k8s.io/klog/v2"
 )
 
