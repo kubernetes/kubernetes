@@ -114,6 +114,19 @@ func (hns hnsV2) getEndpointByIpAddress(ip string, networkName string) (*endpoin
 
 	return nil, fmt.Errorf("Endpoint %v not found on network %s", ip, networkName)
 }
+func (hns hnsV2) getEndpointByName(name string) (*endpointsInfo, error) {
+	hnsendpoint, err := hcn.GetEndpointByName(name)
+	if err != nil {
+		return nil, err
+	}
+	return &endpointsInfo{ //TODO: fill out PA
+		ip:         hnsendpoint.IpConfigurations[0].IpAddress,
+		isLocal:    uint32(hnsendpoint.Flags&hcn.EndpointFlagsRemoteEndpoint) == 0, //TODO: Change isLocal to isRemote
+		macAddress: hnsendpoint.MacAddress,
+		hnsID:      hnsendpoint.Id,
+		hns:        hns,
+	}, nil
+}
 func (hns hnsV2) createEndpoint(ep *endpointsInfo, networkName string) (*endpointsInfo, error) {
 	hnsNetwork, err := hcn.GetNetworkByName(networkName)
 	if err != nil {
