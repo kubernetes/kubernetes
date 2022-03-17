@@ -858,6 +858,13 @@ const (
 	//
 	// Allow pods to failover to a different node in case of non graceful node shutdown
 	NodeOutOfServiceVolumeDetach featuregate.Feature = "NodeOutOfServiceVolumeDetach"
+
+	// owner: @atiratree
+	// kep: http://kep.k8s.io/2804
+	// alpha: v1.24
+	//
+	// Enable new Conditions in ReplicaSet & ReplicationController, StatefulSet, DaemonSet and Job.
+	ExtendedWorkloadConditions featuregate.Feature = "ExtendedWorkloadConditions"
 )
 
 func init() {
@@ -982,6 +989,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	MinDomainsInPodTopologySpread:                  {Default: false, PreRelease: featuregate.Alpha},
 	ServiceIPStaticSubrange:                        {Default: false, PreRelease: featuregate.Alpha},
 	NodeOutOfServiceVolumeDetach:                   {Default: false, PreRelease: featuregate.Alpha},
+	ExtendedWorkloadConditions:                     {Default: false, PreRelease: featuregate.Alpha},
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
 	genericfeatures.AdvancedAuditing:                    {Default: true, PreRelease: featuregate.GA},
