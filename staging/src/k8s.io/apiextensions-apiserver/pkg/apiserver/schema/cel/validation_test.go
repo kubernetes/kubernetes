@@ -17,10 +17,12 @@ limitations under the License.
 package cel
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"strings"
 	"testing"
+	"time"
 
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
@@ -1686,9 +1688,9 @@ func TestValidationExpressions(t *testing.T) {
 		i := i
 		t.Run(tests[i].name, func(t *testing.T) {
 			t.Parallel()
-			// set costBudget to maxInt64 for current test
 			tt := tests[i]
-			tt.costBudget = math.MaxInt64
+			tt.costBudget = RuntimeCELCostBudget
+			ctx := context.TODO()
 			for j := range tt.valid {
 				validRule := tt.valid[j]
 				t.Run(validRule, func(t *testing.T) {
@@ -1698,13 +1700,13 @@ func TestValidationExpressions(t *testing.T) {
 					if celValidator == nil {
 						t.Fatal("expected non nil validator")
 					}
-					errs, _ := celValidator.Validate(field.NewPath("root"), &s, tt.obj, tt.costBudget)
+					errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, tt.costBudget)
 					for _, err := range errs {
 						t.Errorf("unexpected error: %v", err)
 					}
 
 					// test with cost budget exceeded
-					errs, _ = celValidator.Validate(field.NewPath("root"), &s, tt.obj, 0)
+					errs, _ = celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, 0)
 					var found bool
 					for _, err := range errs {
 						if err.Type == field.ErrorTypeInvalid && strings.Contains(err.Error(), "validation failed due to running out of cost budget, no further validation rules will be run") {
@@ -1724,7 +1726,7 @@ func TestValidationExpressions(t *testing.T) {
 					if celValidator == nil {
 						t.Fatal("expected non nil validator")
 					}
-					errs, _ = celValidator.Validate(field.NewPath("root"), &s, tt.obj, tt.costBudget)
+					errs, _ = celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, tt.costBudget)
 					for _, err := range errs {
 						if err.Type == field.ErrorTypeInvalid && strings.Contains(err.Error(), "no further validation rules will be run due to call cost exceeds limit for rule") {
 							found = true
@@ -1743,7 +1745,7 @@ func TestValidationExpressions(t *testing.T) {
 					if celValidator == nil {
 						t.Fatal("expected non nil validator")
 					}
-					errs, _ := celValidator.Validate(field.NewPath("root"), &s, tt.obj, tt.costBudget)
+					errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, tt.costBudget)
 					if len(errs) == 0 {
 						t.Error("expected validation errors but got none")
 					}
@@ -1754,7 +1756,7 @@ func TestValidationExpressions(t *testing.T) {
 					}
 
 					// test with cost budget exceeded
-					errs, _ = celValidator.Validate(field.NewPath("root"), &s, tt.obj, 0)
+					errs, _ = celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, 0)
 					var found bool
 					for _, err := range errs {
 						if err.Type == field.ErrorTypeInvalid && strings.Contains(err.Error(), "validation failed due to running out of cost budget, no further validation rules will be run") {
@@ -1768,6 +1770,148 @@ func TestValidationExpressions(t *testing.T) {
 						t.Errorf("expect to return cost budget exceed err once")
 					}
 				})
+			}
+		})
+	}
+}
+
+func TestCELValidationContextCancellation(t *testing.T) {
+	items := make([]interface{}, 1000)
+	for i := int64(0); i < 1000; i++ {
+		items[i] = i
+	}
+	tests := []struct {
+		name   string
+		schema *schema.Structural
+		obj    map[string]interface{}
+		rule   string
+	}{
+		{name: "test cel validation with context cancellation",
+			obj: map[string]interface{}{
+				"array": items,
+			},
+			schema: objectTypePtr(map[string]schema.Structural{
+				"array": listType(&integerType),
+			}),
+			rule: "self.array.map(e, e * 20).filter(e, e > 50).exists(e, e == 60)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.TODO()
+			s := withRule(*tt.schema, tt.rule)
+			celValidator := NewValidator(&s, PerCallLimit)
+			if celValidator == nil {
+				t.Fatal("expected non nil validator")
+			}
+			errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, RuntimeCELCostBudget)
+			for _, err := range errs {
+				t.Errorf("unexpected error: %v", err)
+			}
+
+			// test context cancellation
+			found := false
+			evalCtx, cancel := context.WithTimeout(ctx, time.Microsecond)
+			cancel()
+			errs, _ = celValidator.Validate(evalCtx, field.NewPath("root"), &s, tt.obj, RuntimeCELCostBudget)
+			for _, err := range errs {
+				if err.Type == field.ErrorTypeInvalid && strings.Contains(err.Error(), "operation interrupted") {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("expect operation interrupted err but did not find")
+			}
+		})
+	}
+}
+
+func BenchmarkCELValidationWithContext(b *testing.B) {
+	items := make([]interface{}, 1000)
+	for i := int64(0); i < 1000; i++ {
+		items[i] = i
+	}
+	tests := []struct {
+		name   string
+		schema *schema.Structural
+		obj    map[string]interface{}
+		rule   string
+	}{
+		{name: "benchmark for cel validation with context",
+			obj: map[string]interface{}{
+				"array": items,
+			},
+			schema: objectTypePtr(map[string]schema.Structural{
+				"array": listType(&integerType),
+			}),
+			rule: "self.array.map(e, e * 20).filter(e, e > 50).exists(e, e == 60)",
+		},
+	}
+
+	for _, tt := range tests {
+		b.Run(tt.name, func(b *testing.B) {
+			ctx := context.TODO()
+			s := withRule(*tt.schema, tt.rule)
+			celValidator := NewValidator(&s, PerCallLimit)
+			if celValidator == nil {
+				b.Fatal("expected non nil validator")
+			}
+			for i := 0; i < b.N; i++ {
+				errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, RuntimeCELCostBudget)
+				for _, err := range errs {
+					b.Fatalf("validation failed: %v", err)
+				}
+			}
+		})
+	}
+}
+
+func BenchmarkCELValidationWithCancelledContext(b *testing.B) {
+	items := make([]interface{}, 1000)
+	for i := int64(0); i < 1000; i++ {
+		items[i] = i
+	}
+	tests := []struct {
+		name   string
+		schema *schema.Structural
+		obj    map[string]interface{}
+		rule   string
+	}{
+		{name: "benchmark for cel validation with context",
+			obj: map[string]interface{}{
+				"array": items,
+			},
+			schema: objectTypePtr(map[string]schema.Structural{
+				"array": listType(&integerType),
+			}),
+			rule: "self.array.map(e, e * 20).filter(e, e > 50).exists(e, e == 60)",
+		},
+	}
+
+	for _, tt := range tests {
+		b.Run(tt.name, func(b *testing.B) {
+			ctx := context.TODO()
+			s := withRule(*tt.schema, tt.rule)
+			celValidator := NewValidator(&s, PerCallLimit)
+			if celValidator == nil {
+				b.Fatal("expected non nil validator")
+			}
+			for i := 0; i < b.N; i++ {
+				evalCtx, cancel := context.WithTimeout(ctx, time.Microsecond)
+				cancel()
+				errs, _ := celValidator.Validate(evalCtx, field.NewPath("root"), &s, tt.obj, RuntimeCELCostBudget)
+				//found := false
+				//for _, err := range errs {
+				//	if err.Type == field.ErrorTypeInvalid && strings.Contains(err.Error(), "operation interrupted") {
+				//		found = true
+				//		break
+				//	}
+				//}
+				if len(errs) == 0 {
+					b.Errorf("expect operation interrupted err but did not find")
+				}
 			}
 		})
 	}

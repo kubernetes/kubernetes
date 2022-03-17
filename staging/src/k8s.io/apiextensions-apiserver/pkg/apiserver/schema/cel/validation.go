@@ -17,6 +17,7 @@ limitations under the License.
 package cel
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"strings"
@@ -96,32 +97,33 @@ func validator(s *schema.Structural, isResourceRoot bool, perCallLimit uint64) *
 // Validate validates all x-kubernetes-validations rules in Validator against obj and returns any errors.
 // If the validation rules exceed the costBudget, subsequent evaluations will be skipped, the list of errs returned will not be empty, and a negative remainingBudget will be returned.
 // Most callers can ignore the returned remainingBudget value unless another validate call is going to be made
-func (s *Validator) Validate(fldPath *field.Path, sts *schema.Structural, obj interface{}, costBudget int64) (errs field.ErrorList, remainingBudget int64) {
+// context is passed for supporting context cancellation during cel validation
+func (s *Validator) Validate(ctx context.Context, fldPath *field.Path, sts *schema.Structural, obj interface{}, costBudget int64) (errs field.ErrorList, remainingBudget int64) {
 	remainingBudget = costBudget
 	if s == nil || obj == nil {
 		return nil, remainingBudget
 	}
 
-	errs, remainingBudget = s.validateExpressions(fldPath, sts, obj, remainingBudget)
+	errs, remainingBudget = s.validateExpressions(ctx, fldPath, sts, obj, remainingBudget)
 	if remainingBudget < 0 {
 		return errs, remainingBudget
 	}
 	switch obj := obj.(type) {
 	case []interface{}:
 		var arrayErrs field.ErrorList
-		arrayErrs, remainingBudget = s.validateArray(fldPath, sts, obj, remainingBudget)
+		arrayErrs, remainingBudget = s.validateArray(ctx, fldPath, sts, obj, remainingBudget)
 		errs = append(errs, arrayErrs...)
 		return errs, remainingBudget
 	case map[string]interface{}:
 		var mapErrs field.ErrorList
-		mapErrs, remainingBudget = s.validateMap(fldPath, sts, obj, remainingBudget)
+		mapErrs, remainingBudget = s.validateMap(ctx, fldPath, sts, obj, remainingBudget)
 		errs = append(errs, mapErrs...)
 		return errs, remainingBudget
 	}
 	return errs, remainingBudget
 }
 
-func (s *Validator) validateExpressions(fldPath *field.Path, sts *schema.Structural, obj interface{}, costBudget int64) (errs field.ErrorList, remainingBudget int64) {
+func (s *Validator) validateExpressions(ctx context.Context, fldPath *field.Path, sts *schema.Structural, obj interface{}, costBudget int64) (errs field.ErrorList, remainingBudget int64) {
 	remainingBudget = costBudget
 	if obj == nil {
 		// We only validate non-null values. Rules that need to check for the state of a nullable value or the presence of an optional
@@ -159,7 +161,7 @@ func (s *Validator) validateExpressions(fldPath *field.Path, sts *schema.Structu
 			errs = append(errs, field.InternalError(fldPath, fmt.Errorf("oldSelf validation not implemented")))
 			continue // todo: wire oldObj parameter
 		}
-		evalResult, evalDetails, err := compiled.Program.Eval(activation)
+		evalResult, evalDetails, err := compiled.Program.ContextEval(ctx, activation)
 		if evalDetails == nil {
 			errs = append(errs, field.InternalError(fldPath, fmt.Errorf("runtime cost could not be calculated for validation rule: %v, no further validation rules will be run", ruleErrorString(rule))))
 			return errs, -1
@@ -230,7 +232,7 @@ func (a *validationActivation) Parent() interpreter.Activation {
 	return nil
 }
 
-func (s *Validator) validateMap(fldPath *field.Path, sts *schema.Structural, obj map[string]interface{}, costBudget int64) (errs field.ErrorList, remainingBudget int64) {
+func (s *Validator) validateMap(ctx context.Context, fldPath *field.Path, sts *schema.Structural, obj map[string]interface{}, costBudget int64) (errs field.ErrorList, remainingBudget int64) {
 	remainingBudget = costBudget
 	if remainingBudget < 0 {
 		return errs, remainingBudget
@@ -242,7 +244,7 @@ func (s *Validator) validateMap(fldPath *field.Path, sts *schema.Structural, obj
 	if s.AdditionalProperties != nil && sts.AdditionalProperties != nil && sts.AdditionalProperties.Structural != nil {
 		for k, v := range obj {
 			var err field.ErrorList
-			err, remainingBudget = s.AdditionalProperties.Validate(fldPath.Key(k), sts.AdditionalProperties.Structural, v, remainingBudget)
+			err, remainingBudget = s.AdditionalProperties.Validate(ctx, fldPath.Key(k), sts.AdditionalProperties.Structural, v, remainingBudget)
 			errs = append(errs, err...)
 			if remainingBudget < 0 {
 				return errs, remainingBudget
@@ -255,7 +257,7 @@ func (s *Validator) validateMap(fldPath *field.Path, sts *schema.Structural, obj
 			sub, ok := s.Properties[k]
 			if ok && stsOk {
 				var err field.ErrorList
-				err, remainingBudget = sub.Validate(fldPath.Child(k), &stsProp, v, remainingBudget)
+				err, remainingBudget = sub.Validate(ctx, fldPath.Child(k), &stsProp, v, remainingBudget)
 				errs = append(errs, err...)
 				if remainingBudget < 0 {
 					return errs, remainingBudget
@@ -267,7 +269,7 @@ func (s *Validator) validateMap(fldPath *field.Path, sts *schema.Structural, obj
 	return errs, remainingBudget
 }
 
-func (s *Validator) validateArray(fldPath *field.Path, sts *schema.Structural, obj []interface{}, costBudget int64) (errs field.ErrorList, remainingBudget int64) {
+func (s *Validator) validateArray(ctx context.Context, fldPath *field.Path, sts *schema.Structural, obj []interface{}, costBudget int64) (errs field.ErrorList, remainingBudget int64) {
 	remainingBudget = costBudget
 	if remainingBudget < 0 {
 		return errs, remainingBudget
@@ -275,7 +277,7 @@ func (s *Validator) validateArray(fldPath *field.Path, sts *schema.Structural, o
 	if s.Items != nil && sts.Items != nil {
 		for i := range obj {
 			var err field.ErrorList
-			err, remainingBudget = s.Items.Validate(fldPath.Index(i), sts.Items, obj[i], remainingBudget)
+			err, remainingBudget = s.Items.Validate(ctx, fldPath.Index(i), sts.Items, obj[i], remainingBudget)
 			errs = append(errs, err...)
 			if remainingBudget < 0 {
 				return errs, remainingBudget

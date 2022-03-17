@@ -17,6 +17,7 @@ limitations under the License.
 package customresourcedefinition
 
 import (
+	"context"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -182,10 +183,11 @@ func TestValidateAPIApproval(t *testing.T) {
 			}
 
 			var actual field.ErrorList
+			ctx := context.TODO()
 			if oldCRD == nil {
-				actual = validation.ValidateCustomResourceDefinition(crd)
+				actual = validation.ValidateCustomResourceDefinition(ctx, crd)
 			} else {
-				actual = validation.ValidateCustomResourceDefinitionUpdate(crd, oldCRD)
+				actual = validation.ValidateCustomResourceDefinitionUpdate(ctx, crd, oldCRD)
 			}
 			test.validateError(t, actual)
 		})
