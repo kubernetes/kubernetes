@@ -650,6 +650,11 @@ func (h *HumanReadablePrinter) legacyPrinterToTable(obj runtime.Object, handler 
 			return nil, err
 		}
 		for len(data) > 0 {
+			if i >= len(items) {
+				// This should not happen but if it is, instead panicking with
+				// the out of bound error, We need to handle it gracefully.
+				break
+			}
 			cells, remainder := tabbedLineToCells(data, len(table.ColumnDefinitions))
 			table.Rows = append(table.Rows, metav1beta1.TableRow{
 				Cells:  cells,
