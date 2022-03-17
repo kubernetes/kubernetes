@@ -54,7 +54,7 @@ func TestEnforceRequirements(t *testing.T) {
 	}
 	for _, tt := range tcases {
 		t.Run(tt.name, func(t *testing.T) {
-			_, _, _, err := enforceRequirements(&tt.flags, nil, tt.dryRun, false)
+			_, _, _, err := EnforceRequirements(&tt.flags, nil, tt.dryRun, false)
 
 			if err == nil && tt.expectedErr {
 				t.Error("Expected error, but got success")
