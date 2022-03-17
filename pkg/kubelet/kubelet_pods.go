@@ -140,21 +140,6 @@ func (kl *Kubelet) makeBlockVolumes(pod *v1.Pod, container *v1.Container, podVol
 	return devices, nil
 }
 
-// shouldMountHostsFile checks if the nodes /etc/hosts should be mounted
-// Kubernetes only mounts on /etc/hosts if:
-// - container is not an infrastructure (pause) container
-// - container is not already mounting on /etc/hosts
-// Kubernetes will not mount /etc/hosts if:
-// - when the Pod sandbox is being created, its IP is still unknown. Hence, PodIP will not have been set.
-// - Windows pod contains a hostProcess container
-func shouldMountHostsFile(pod *v1.Pod, podIPs []string) bool {
-	shouldMount := len(podIPs) > 0
-	if runtime.GOOS == "windows" && utilfeature.DefaultFeatureGate.Enabled(features.WindowsHostProcessContainers) {
-		return shouldMount && !kubecontainer.HasWindowsHostProcessContainer(pod)
-	}
-	return shouldMount
-}
-
 // makeMounts determines the mount points for the given container.
 func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, hostDomain string, podIPs []string, podVolumes kubecontainer.VolumeMap, hu hostutil.HostUtils, subpather subpath.Interface, expandEnvs []kubecontainer.EnvVar) ([]kubecontainer.Mount, func(), error) {
 	mountEtcHostsFile := shouldMountHostsFile(pod, podIPs)

@@ -23,7 +23,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"runtime"
 	"strings"
 	"time"
 
@@ -46,7 +45,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 	"k8s.io/mount-utils"
-	utilexec "k8s.io/utils/exec"
 	"k8s.io/utils/io"
 	utilstrings "k8s.io/utils/strings"
 )
@@ -654,21 +652,6 @@ func HasMountRefs(mountPath string, mountRefs []string) bool {
 		}
 	}
 	return false
-}
-
-//WriteVolumeCache flush disk data given the spcified mount path
-func WriteVolumeCache(deviceMountPath string, exec utilexec.Interface) error {
-	// If runtime os is windows, execute Write-VolumeCache powershell command on the disk
-	if runtime.GOOS == "windows" {
-		cmd := fmt.Sprintf("Get-Volume -FilePath %s | Write-Volumecache", deviceMountPath)
-		output, err := exec.Command("powershell", "/c", cmd).CombinedOutput()
-		klog.Infof("command (%q) execeuted: %v, output: %q", cmd, err, string(output))
-		if err != nil {
-			return fmt.Errorf("command (%q) failed: %v, output: %q", cmd, err, string(output))
-		}
-	}
-	// For linux runtime, it skips because unmount will automatically flush disk data
-	return nil
 }
 
 // IsMultiAttachAllowed checks if attaching this volume to multiple nodes is definitely not allowed/possible.
