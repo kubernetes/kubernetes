@@ -2112,6 +2112,36 @@
     patch, delete, and deletecollection.'
   release: v1.20
   file: test/e2e/common/node/runtimeclass.go
+- testname: Pod with the deleted RuntimeClass is rejected.
+  codename: '[sig-node] RuntimeClass should reject a Pod requesting a deleted RuntimeClass
+    [NodeConformance] [Conformance]'
+  description: Pod requesting the deleted RuntimeClass must be rejected.
+  release: v1.20
+  file: test/e2e/common/node/runtimeclass.go
+- testname: Pod with the non-existing RuntimeClass is rejected.
+  codename: '[sig-node] RuntimeClass should reject a Pod requesting a non-existent
+    RuntimeClass [NodeConformance] [Conformance]'
+  description: The Pod requesting the non-existing RuntimeClass must be rejected.
+  release: v1.20
+  file: test/e2e/common/node/runtimeclass.go
+- testname: RuntimeClass Overhead field must be respected.
+  codename: '[sig-node] RuntimeClass should schedule a Pod requesting a RuntimeClass
+    and initialize its Overhead [NodeConformance] [Conformance]'
+  description: The Pod requesting the existing RuntimeClass must be scheduled. This
+    test doesn't validate that the Pod will actually start because this functionality
+    depends on container runtime and preconfigured handler. Runtime-specific functionality
+    is not being tested here.
+  release: v1.24
+  file: test/e2e/common/node/runtimeclass.go
+- testname: Can schedule a pod requesting existing RuntimeClass.
+  codename: '[sig-node] RuntimeClass should schedule a Pod requesting a RuntimeClass
+    without PodOverhead [NodeConformance] [Conformance]'
+  description: The Pod requesting the existing RuntimeClass must be scheduled. This
+    test doesn't validate that the Pod will actually start because this functionality
+    depends on container runtime and preconfigured handler. Runtime-specific functionality
+    is not being tested here.
+  release: v1.20
+  file: test/e2e/common/node/runtimeclass.go
 - testname: Secrets, pod environment field
   codename: '[sig-node] Secrets should be consumable from pods in env vars [NodeConformance]
     [Conformance]'
