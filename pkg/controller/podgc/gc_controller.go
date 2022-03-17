@@ -200,7 +200,7 @@ func (gcc *PodGCController) discoverDeletedNodes(ctx context.Context, existingNo
 			exists, err := gcc.checkIfNodeExists(ctx, nodeName)
 			switch {
 			case err != nil:
-				klog.ErrorS(err, "Error while getting node", "node", nodeName)
+				klog.ErrorS(err, "Error while getting node", "node", klog.KRef("", nodeName))
 				// Node will be added back to the queue in the subsequent loop if still needed
 			case !exists:
 				deletedNodesNames.Insert(nodeName)
