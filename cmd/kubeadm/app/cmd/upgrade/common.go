@@ -137,12 +137,12 @@ func enforceRequirements(flags *applyPlanFlags, args []string, dryRun bool, upgr
 		if apierrors.IsNotFound(err) {
 			printer.Printf("[upgrade/config] In order to upgrade, a ConfigMap called %q in the %s namespace must exist.\n", constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
 			printer.Printf("[upgrade/config] Without this information, 'kubeadm upgrade' won't know how to configure your upgraded cluster.\n")
-			printer.Printf("\n")
+			printer.Println()
 			printer.Printf("[upgrade/config] Next steps:\n")
 			printer.Printf("\t- OPTION 1: Run 'kubeadm config upload from-flags' and specify the same CLI arguments you passed to 'kubeadm init' when you created your control-plane.\n")
 			printer.Printf("\t- OPTION 2: Run 'kubeadm config upload from-file' and specify the same config file you passed to 'kubeadm init' when you created your control-plane.\n")
 			printer.Printf("\t- OPTION 3: Pass a config file to 'kubeadm upgrade' using the --config flag.\n")
-			printer.Printf("\n")
+			printer.Println()
 			err = errors.Errorf("the ConfigMap %q in the %s namespace used for getting configuration information was not found", constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
 		}
 		return nil, nil, nil, errors.Wrap(err, "[upgrade/config] FATAL")

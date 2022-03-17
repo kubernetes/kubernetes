@@ -180,7 +180,7 @@ func Convert_output_Images_To_v1alpha2_Images(in *output.Images, out *Images, s 
 }
 
 func autoConvert_v1alpha2_UpgradePlan_To_output_UpgradePlan(in *UpgradePlan, out *output.UpgradePlan, s conversion.Scope) error {
-	out.Components = *(*[]*output.ComponentUpgradePlan)(unsafe.Pointer(&in.Components))
+	out.Components = *(*[]output.ComponentUpgradePlan)(unsafe.Pointer(&in.Components))
 	out.ConfigVersions = *(*[]output.ComponentConfigVersionState)(unsafe.Pointer(&in.ConfigVersions))
 	return nil
 }
@@ -191,7 +191,7 @@ func Convert_v1alpha2_UpgradePlan_To_output_UpgradePlan(in *UpgradePlan, out *ou
 }
 
 func autoConvert_output_UpgradePlan_To_v1alpha2_UpgradePlan(in *output.UpgradePlan, out *UpgradePlan, s conversion.Scope) error {
-	out.Components = *(*[]*ComponentUpgradePlan)(unsafe.Pointer(&in.Components))
+	out.Components = *(*[]ComponentUpgradePlan)(unsafe.Pointer(&in.Components))
 	out.ConfigVersions = *(*[]ComponentConfigVersionState)(unsafe.Pointer(&in.ConfigVersions))
 	return nil
 }
