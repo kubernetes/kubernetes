@@ -168,73 +168,67 @@ func (o *RolloutStatusOptions) Run() error {
 		LabelSelectorParam(o.LabelSelector).
 		FilenameParam(o.EnforceNamespace, o.FilenameOptions).
 		ResourceTypeOrNameArgs(true, o.BuilderArgs...).
-		SingleResourceType().
+		ContinueOnError().
 		Latest().
 		Do()
+
 	err := r.Err()
 	if err != nil {
 		return err
 	}
 
-	infos, err := r.Infos()
-	if err != nil {
-		return err
-	}
-	if len(infos) != 1 {
-		return fmt.Errorf("rollout status is only supported on individual resources and resource collections - %d resources were found", len(infos))
-	}
-	info := infos[0]
-	mapping := info.ResourceMapping()
+	return r.Visit(func(info *resource.Info, err error) error {
+		mapping := info.ResourceMapping()
+		statusViewer, err := o.StatusViewerFn(mapping)
+		if err != nil {
+			return err
+		}
 
-	statusViewer, err := o.StatusViewerFn(mapping)
-	if err != nil {
-		return err
-	}
+		fieldSelector := fields.OneTermEqualSelector("metadata.name", info.Name).String()
+		lw := &cache.ListWatch{
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				options.FieldSelector = fieldSelector
+				return o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).List(context.TODO(), options)
+			},
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				options.FieldSelector = fieldSelector
+				return o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Watch(context.TODO(), options)
+			},
+		}
 
-	fieldSelector := fields.OneTermEqualSelector("metadata.name", info.Name).String()
-	lw := &cache.ListWatch{
-		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-			options.FieldSelector = fieldSelector
-			return o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).List(context.TODO(), options)
-		},
-		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			options.FieldSelector = fieldSelector
-			return o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Watch(context.TODO(), options)
-		},
-	}
+		// if the rollout isn't done yet, keep watching deployment status
+		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), o.Timeout)
+		intr := interrupt.New(nil, cancel)
+		return intr.Run(func() error {
+			_, err = watchtools.UntilWithSync(ctx, lw, &unstructured.Unstructured{}, nil, func(e watch.Event) (bool, error) {
+				switch t := e.Type; t {
+				case watch.Added, watch.Modified:
+					status, done, err := statusViewer.Status(e.Object.(runtime.Unstructured), o.Revision)
+					if err != nil {
+						return false, err
+					}
+					fmt.Fprintf(o.Out, "%s", status)
+					// Quit waiting if the rollout is done
+					if done {
+						return true, nil
+					}
 
-	// if the rollout isn't done yet, keep watching deployment status
-	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), o.Timeout)
-	intr := interrupt.New(nil, cancel)
-	return intr.Run(func() error {
-		_, err = watchtools.UntilWithSync(ctx, lw, &unstructured.Unstructured{}, nil, func(e watch.Event) (bool, error) {
-			switch t := e.Type; t {
-			case watch.Added, watch.Modified:
-				status, done, err := statusViewer.Status(e.Object.(runtime.Unstructured), o.Revision)
-				if err != nil {
-					return false, err
+					shouldWatch := o.Watch
+					if !shouldWatch {
+						return true, nil
+					}
+
+					return false, nil
+
+				case watch.Deleted:
+					// We need to abort to avoid cases of recreation and not to silently watch the wrong (new) object
+					return true, fmt.Errorf("object has been deleted")
+
+				default:
+					return true, fmt.Errorf("internal error: unexpected event %#v", e)
 				}
-				fmt.Fprintf(o.Out, "%s", status)
-				// Quit waiting if the rollout is done
-				if done {
-					return true, nil
-				}
-
-				shouldWatch := o.Watch
-				if !shouldWatch {
-					return true, nil
-				}
-
-				return false, nil
-
-			case watch.Deleted:
-				// We need to abort to avoid cases of recreation and not to silently watch the wrong (new) object
-				return true, fmt.Errorf("object has been deleted")
-
-			default:
-				return true, fmt.Errorf("internal error: unexpected event %#v", e)
-			}
+			})
+			return err
 		})
-		return err
 	})
 }
