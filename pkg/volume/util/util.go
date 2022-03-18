@@ -622,8 +622,7 @@ func GetPodVolumeNames(pod *v1.Pod) (mounts sets.String, devices sets.String) {
 // attributes.
 func FsUserFrom(pod *v1.Pod) *int64 {
 	var fsUser *int64
-	// Exclude ephemeral containers because SecurityContext is not allowed.
-	podutil.VisitContainers(&pod.Spec, podutil.InitContainers|podutil.Containers, func(container *v1.Container, containerType podutil.ContainerType) bool {
+	podutil.VisitContainers(&pod.Spec, podutil.AllFeatureEnabledContainers(), func(container *v1.Container, containerType podutil.ContainerType) bool {
 		runAsUser, ok := securitycontext.DetermineEffectiveRunAsUser(pod, container)
 		// One container doesn't specify user or there are more than one
 		// non-root UIDs.
