@@ -25,7 +25,6 @@ import (
 	"net/http"
 	"os"
 	"path"
-	sysruntime "runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -789,11 +788,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		opt(klet)
 	}
 
-	if sysruntime.GOOS == "linux" {
-		// AppArmor is a Linux kernel security module and it does not support other operating systems.
-		klet.appArmorValidator = apparmor.NewValidator()
-		klet.softAdmitHandlers.AddPodAdmitHandler(lifecycle.NewAppArmorAdmitHandler(klet.appArmorValidator))
-	}
+	klet.setAppArmorIfExists()
 
 	leaseDuration := time.Duration(kubeCfg.NodeLeaseDurationSeconds) * time.Second
 	renewInterval := time.Duration(float64(leaseDuration) * nodeLeaseRenewIntervalFraction)

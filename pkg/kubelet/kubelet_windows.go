@@ -25,3 +25,7 @@ var windowsEtcHostsPath = "C:\\Windows\\System32\\drivers\\etc\\hosts"
 func getContainerEtcHostsPath() string {
 	return windowsEtcHostsPath
 }
+
+// AppArmor is a Linux kernel security module and it does not support other operating systems.
+func (kl *Kubelet) setAppArmorIfExists() {
+}
