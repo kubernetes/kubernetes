@@ -420,7 +420,7 @@ func TestIndexedJob(t *testing.T) {
 			// Disable feature gate and restart controller.
 			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.IndexedJob, false)()
 			cancel()
-			ctx, cancel = startJobController(restConfig, clientSet)
+			ctx, cancel = startJobController(restConfig)
 			events, err := clientSet.EventsV1().Events(ns.Name).Watch(ctx, metav1.ListOptions{})
 			if err != nil {
 				t.Fatal(err)
@@ -439,7 +439,7 @@ func TestIndexedJob(t *testing.T) {
 			// Re-enable feature gate and restart controller. Failed Pod should be recreated now.
 			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.IndexedJob, true)()
 			cancel()
-			ctx, cancel = startJobController(restConfig, clientSet)
+			ctx, cancel = startJobController(restConfig)
 
 			validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
 				Active:    3,
@@ -779,7 +779,7 @@ func TestSuspendJobControllerRestart(t *testing.T) {
 	// Disable feature gate and restart controller to test that pods get created.
 	defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.SuspendJob, false)()
 	cancel()
-	ctx, cancel = startJobController(restConfig, clientSet)
+	ctx, cancel = startJobController(restConfig)
 	job, err = clientSet.BatchV1().Jobs(ns.Name).Get(ctx, job.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Failed to get Job: %v", err)
