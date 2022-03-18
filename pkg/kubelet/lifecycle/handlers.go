@@ -158,6 +158,9 @@ type appArmorAdmitHandler struct {
 }
 
 func (a *appArmorAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
+	if attrs != nil && attrs.Pod != nil {
+		klog.InfoS("AppArmor Admit Handler", "pod", klog.KObj(attrs.Pod), "podUID", attrs.Pod.UID)
+	}
 	// If the pod is already running or terminated, no need to recheck AppArmor.
 	if attrs.Pod.Status.Phase != v1.PodPending {
 		return PodAdmitResult{Admit: true}

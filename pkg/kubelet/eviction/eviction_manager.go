@@ -134,6 +134,9 @@ func NewManager(
 
 // Admit rejects a pod if its not safe to admit for node stability.
 func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+	if attrs != nil && attrs.Pod != nil {
+		klog.InfoS("Eviction Admit Handler", "pod", klog.KObj(attrs.Pod), "podUID", attrs.Pod.UID)
+	}
 	m.RLock()
 	defer m.RUnlock()
 	if len(m.nodeConditions) == 0 {

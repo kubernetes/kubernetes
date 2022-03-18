@@ -684,6 +684,9 @@ type resourceAllocator struct {
 }
 
 func (m *resourceAllocator) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+	if attrs != nil && attrs.Pod != nil {
+		klog.InfoS("Resource Allocator Admit Handler", "pod", klog.KObj(attrs.Pod), "podUID", attrs.Pod.UID)
+	}
 	pod := attrs.Pod
 
 	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {

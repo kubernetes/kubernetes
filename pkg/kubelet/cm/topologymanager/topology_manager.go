@@ -197,7 +197,9 @@ func (m *manager) RemoveContainer(containerID string) error {
 }
 
 func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
-	klog.InfoS("Topology Admit Handler")
+	if attrs != nil && attrs.Pod != nil {
+		klog.InfoS("Topology Admit Handler", "pod", klog.KObj(attrs.Pod), "podUID", attrs.Pod.UID)
+	}
 	pod := attrs.Pod
 
 	return m.scope.Admit(pod)

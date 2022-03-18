@@ -143,6 +143,9 @@ func NewManager(conf *Config) (Manager, lifecycle.PodAdmitHandler) {
 
 // Admit rejects all pods if node is shutting
 func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+	if attrs != nil && attrs.Pod != nil {
+		klog.InfoS("Node Shutdown Admit Handler", "pod", klog.KObj(attrs.Pod), "podUID", attrs.Pod.UID)
+	}
 	nodeShuttingDown := m.ShutdownStatus() != nil
 
 	if nodeShuttingDown {

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	policyvalidation "k8s.io/kubernetes/pkg/apis/policy/validation"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -110,6 +111,9 @@ func (w *patternAllowlist) validateSysctl(sysctl string, hostNet, hostIPC bool) 
 // Admit checks that all sysctls given in pod's security context
 // are valid according to the allowlist.
 func (w *patternAllowlist) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+	if attrs != nil && attrs.Pod != nil {
+		klog.InfoS("Pattern Allow-list Admit Handler", "pod", klog.KObj(attrs.Pod), "podUID", attrs.Pod.UID)
+	}
 	pod := attrs.Pod
 	if pod.Spec.SecurityContext == nil || len(pod.Spec.SecurityContext.Sysctls) == 0 {
 		return lifecycle.PodAdmitResult{

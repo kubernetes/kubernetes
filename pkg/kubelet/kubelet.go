@@ -26,6 +26,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"reflect"
 	sysruntime "runtime"
 	"sort"
 	"strings"
@@ -1966,10 +1967,12 @@ func (kl *Kubelet) canAdmitPod(pods []*v1.Pod, pod *v1.Pod) (bool, string, strin
 	attrs := &lifecycle.PodAdmitAttributes{Pod: pod, OtherPods: pods}
 	for _, podAdmitHandler := range kl.admitHandlers {
 		if result := podAdmitHandler.Admit(attrs); !result.Admit {
+			klog.InfoS("Pod is rejected", "admitHandler", reflect.TypeOf(podAdmitHandler), "pod", klog.KObj(pod), "podUID", pod.UID, "result", result)
 			return false, result.Reason, result.Message
 		}
 	}
 
+	klog.InfoS("Pod Admitted", "pod", klog.KObj(pod), "podUID", pod.UID)
 	return true, "", ""
 }
 
@@ -1980,10 +1983,12 @@ func (kl *Kubelet) canRunPod(pod *v1.Pod) lifecycle.PodAdmitResult {
 
 	for _, handler := range kl.softAdmitHandlers {
 		if result := handler.Admit(attrs); !result.Admit {
+			klog.InfoS("Pod cannot run", "admitHandler", reflect.TypeOf(handler), "pod", klog.KObj(pod), "podUID", pod.UID, "result", result)
 			return result
 		}
 	}
 
+	klog.InfoS("Pod can run", "pod", klog.KObj(pod), "podUID", pod.UID)
 	return lifecycle.PodAdmitResult{Admit: true}
 }
 
