@@ -22,8 +22,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"reflect"
-	"strconv"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"k8s.io/utils/pointer"
@@ -44,14 +44,14 @@ func TestCreateToken(t *testing.T) {
 	tests := []struct {
 		test string
 
-		name              string
-		namespace         string
-		output            string
-		boundObjectKind   string
-		boundObjectName   string
-		boundObjectUID    string
-		audiences         []string
-		expirationSeconds int
+		name            string
+		namespace       string
+		output          string
+		boundObjectKind string
+		boundObjectName string
+		boundObjectUID  string
+		audiences       []string
+		duration        time.Duration
 
 		serverResponseToken string
 		serverResponseError string
@@ -183,16 +183,22 @@ status:
 		},
 
 		{
-			test:              "invalid expiration",
-			name:              "mysa",
-			expirationSeconds: -1,
-			expectStderr:      `error: --expiration-seconds must be positive`,
+			test:         "invalid duration",
+			name:         "mysa",
+			duration:     -1,
+			expectStderr: `error: --duration must be positive`,
 		},
 		{
-			test: "valid expiration",
+			test:         "invalid duration unit",
+			name:         "mysa",
+			duration:     time.Microsecond,
+			expectStderr: `error: --duration cannot be expressed in units less than seconds`,
+		},
+		{
+			test: "valid duration",
 			name: "mysa",
 
-			expirationSeconds: 1000,
+			duration: 1000 * time.Second,
 
 			expectRequestPath: "/api/v1/namespaces/test/serviceaccounts/mysa/token",
 			expectTokenRequest: &authenticationv1.TokenRequest{
@@ -310,8 +316,8 @@ status:
 			for _, aud := range test.audiences {
 				cmd.Flags().Set("audience", aud)
 			}
-			if test.expirationSeconds != 0 {
-				cmd.Flags().Set("expiration-seconds", strconv.Itoa(test.expirationSeconds))
+			if test.duration != 0 {
+				cmd.Flags().Set("duration", test.duration.String())
 			}
 			cmd.Run(cmd, []string{test.name})
 
