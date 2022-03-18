@@ -20,8 +20,10 @@ limitations under the License.
 package kubelet
 
 import (
+	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 // shouldMountHostsFile checks if the nodes /etc/hosts should be mounted
