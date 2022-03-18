@@ -2638,19 +2638,10 @@ func (i *IngressDescriber) describeIngressV1(ing *networkingv1.Ingress, events *
 		def := ing.Spec.DefaultBackend
 		ns := ing.Namespace
 		if def == nil {
-			// Ingresses that don't specify a default backend inherit the
-			// default backend in the kube-system namespace.
-			def = &networkingv1.IngressBackend{
-				Service: &networkingv1.IngressServiceBackend{
-					Name: "default-http-backend",
-					Port: networkingv1.ServiceBackendPort{
-						Number: 80,
-					},
-				},
-			}
-			ns = metav1.NamespaceSystem
+			w.Write(LEVEL_0, "Default backend:\t<default>\n")
+		} else {
+			w.Write(LEVEL_0, "Default backend:\t%s\n", i.describeBackendV1(ns, def))
 		}
-		w.Write(LEVEL_0, "Default backend:\t%s\n", i.describeBackendV1(ns, def))
 		if len(ing.Spec.TLS) != 0 {
 			describeIngressTLSV1(w, ing.Spec.TLS)
 		}
@@ -2699,15 +2690,10 @@ func (i *IngressDescriber) describeIngressV1beta1(ing *networkingv1beta1.Ingress
 		def := ing.Spec.Backend
 		ns := ing.Namespace
 		if def == nil {
-			// Ingresses that don't specify a default backend inherit the
-			// default backend in the kube-system namespace.
-			def = &networkingv1beta1.IngressBackend{
-				ServiceName: "default-http-backend",
-				ServicePort: intstr.IntOrString{Type: intstr.Int, IntVal: 80},
-			}
-			ns = metav1.NamespaceSystem
+			w.Write(LEVEL_0, "Default backend:\t<default>\n")
+		} else {
+			w.Write(LEVEL_0, "Default backend:\t%s\n", i.describeBackendV1beta1(ns, def))
 		}
-		w.Write(LEVEL_0, "Default backend:\t%s (%s)\n", backendStringer(def), i.describeBackendV1beta1(ns, def))
 		if len(ing.Spec.TLS) != 0 {
 			describeIngressTLSV1beta1(w, ing.Spec.TLS)
 		}
@@ -2730,7 +2716,7 @@ func (i *IngressDescriber) describeIngressV1beta1(ing *networkingv1beta1.Ingress
 			}
 		}
 		if count == 0 {
-			w.Write(LEVEL_1, "%s\t%s \t%s (%s)\n", "*", "*", backendStringer(def), i.describeBackendV1beta1(ns, def))
+			w.Write(LEVEL_1, "%s\t%s \t<default>\n", "*", "*")
 		}
 		printAnnotationsMultiline(w, "Annotations", ing.Annotations)
 
