@@ -126,9 +126,9 @@ func (lb *LoadBalancerRR) ServiceHasEndpoints(svcPort proxy.ServicePortName) boo
 	lb.lock.RLock()
 	defer lb.lock.RUnlock()
 	state, exists := lb.services[svcPort]
-    if !exists || state == nil {
-        return false
-    }
+	if !exists || state == nil {
+		return false
+	}
 	return len(state.endpoints) > 0
 }
 
