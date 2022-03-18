@@ -27,7 +27,7 @@ import (
 	codegenutil "k8s.io/code-generator/pkg/util"
 )
 
-// ClientGenArgs is a wrapper for arguments to applyconfiguration-gen.
+// CustomArgs is a wrapper for arguments to applyconfiguration-gen.
 type CustomArgs struct {
 	// ExternalApplyConfigurations provides the locations of externally generated
 	// apply configuration types for types referenced by the go structs provided as input.
