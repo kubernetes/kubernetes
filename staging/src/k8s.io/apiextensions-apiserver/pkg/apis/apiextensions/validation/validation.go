@@ -19,6 +19,7 @@ package validation
 import (
 	"context"
 	"fmt"
+	"math"
 	"reflect"
 	"regexp"
 	"strings"
@@ -47,6 +48,10 @@ var (
 	printerColumnDatatypes                = sets.NewString("integer", "number", "string", "boolean", "date")
 	customResourceColumnDefinitionFormats = sets.NewString("int32", "int64", "float", "double", "byte", "date", "date-time", "password")
 	openapiV3Types                        = sets.NewString("string", "number", "integer", "boolean", "array", "object")
+)
+
+const (
+	unboundedSchemaLength = -1
 )
 
 // ValidateCustomResourceDefinition statically validates
@@ -744,9 +749,10 @@ func validateCustomResourceDefinitionValidation(ctx context.Context, customResou
 }
 
 type schemaTree struct {
-	MaxLength int64
-	Parent    *schemaTree
-	Schema    *apiextensions.JSONSchemaProps
+	MaxLength   int64
+	Cardinality int64
+	Parent      *schemaTree
+	Schema      *apiextensions.JSONSchemaProps
 }
 
 var metaFields = sets.NewString("metadata", "kind", "apiVersion")
@@ -759,9 +765,20 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 		return allErrs
 	}
 
+	var cardinality int64
+	cardinality = extractMaxElements(schema)
+	if parentNode != nil {
+		if parentNode.Cardinality != unboundedSchemaLength {
+			cardinality *= parentNode.Cardinality
+		} else {
+			cardinality = unboundedSchemaLength
+		}
+	}
+
 	treeNode := &schemaTree{
-		Parent: parentNode,
-		Schema: schema,
+		Cardinality: cardinality,
+		Parent:      parentNode,
+		Schema:      schema,
 	}
 
 	allErrs = append(allErrs, ssv.validate(schema, fldPath)...)
@@ -1001,32 +1018,50 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 	return allErrs
 }
 
-func getCRDCost(baseCost uint64, schemaNode *schemaTree) uint64 {
-	totalCost := baseCost
-	parentNode := schemaNode.Parent
-	for parentNode != nil {
-		parentSchema := parentNode.Schema
-		if parentSchema.Type != "array" {
-			parentNode = parentNode.Parent
-			continue
-		} else if parentNode.MaxLength == 0 {
-			// we haven't calculated a max length for this entry in the map yet
-			if parentSchema.MaxLength != nil {
-				parentNode.MaxLength = int64(*parentSchema.MaxLength)
-			} else {
-				structural, err := structuralschema.NewStructural(parentSchema)
-				if err != nil {
-					// TODO(DangerOnTheRanger): how to add better error handling?
-					return totalCost
-				}
-				celSchema := celschema.SchemaDeclType(structural, false)
-				parentNode.MaxLength = celSchema.MaxLength
-			}
+func extractMaxElements(schema *apiextensions.JSONSchemaProps) int64 {
+	switch schema.Type {
+	case "object":
+		if schema.AdditionalProperties != nil {
+			return *schema.MaxProperties
 		}
-		totalCost = totalCost * uint64(parentNode.MaxLength)
-		parentNode = parentNode.Parent
+		// return 1, and not unboundedSchemaLength, because even if we're
+		// not looking at a map here, we can assume the object still preserves
+		// the cardinality of its parents
+		return 1
+	case "array":
+		if schema.MaxItems != nil {
+			return *schema.MaxItems
+		}
+		return unboundedSchemaLength
+	case "string":
+		if schema.MaxLength != nil {
+			return *schema.MaxLength
+		}
+		return unboundedSchemaLength
+	default:
+		// TODO(DangerOnTheRanger): should we give XIntOrString its own case?
+		return unboundedSchemaLength
 	}
-	return totalCost
+}
+
+func getCRDCost(baseCost uint64, schemaNode *schemaTree) uint64 {
+	cardinality := uint64(schemaNode.Cardinality)
+	if schemaNode.Cardinality == unboundedSchemaLength {
+		if schemaNode.Parent == nil {
+			return baseCost
+		}
+		structural, err := structuralschema.NewStructural(schemaNode.Parent.Schema)
+		if err != nil {
+			// TODO(DangerOnTheRanger): how to add better error handling?
+			return math.MaxUint
+		}
+		celSchema := celschema.SchemaDeclType(structural, false)
+		if celSchema == nil {
+			return math.MaxUint
+		}
+		cardinality = uint64(celSchema.MaxElements)
+	}
+	return cardinality * baseCost
 }
 
 var newlineMatcher = regexp.MustCompile(`[\n\r]+`) // valid newline chars in CEL grammar
