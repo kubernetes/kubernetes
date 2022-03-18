@@ -80,7 +80,7 @@ func NewOptions() *Options {
 		Authentication: apiserveroptions.NewDelegatingAuthenticationOptions(),
 		Authorization:  apiserveroptions.NewDelegatingAuthorizationOptions(),
 		Deprecated: &DeprecatedOptions{
-			PodMaxUnschedulableQDuration: 60 * time.Second,
+			PodMaxUnschedulableQDuration: 5 * time.Minute,
 		},
 		LeaderElection: &componentbaseconfig.LeaderElectionConfiguration{
 			LeaderElect:       true,
