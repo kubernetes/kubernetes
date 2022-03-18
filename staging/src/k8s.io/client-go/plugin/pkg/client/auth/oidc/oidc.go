@@ -29,9 +29,10 @@ import (
 	"time"
 
 	"golang.org/x/oauth2"
+	"k8s.io/klog/v2"
+
 	"k8s.io/apimachinery/pkg/util/net"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/klog/v2"
 )
 
 const (
@@ -62,12 +63,20 @@ const expiryDelta = 10 * time.Second
 
 var cache = newClientCache()
 
-// Like TLS transports, keep a cache of OIDC clients indexed by issuer URL. This ensures
-// current requests from different clients don't concurrently attempt to refresh the same
-// set of credentials.
-type clientCache struct {
-	mu sync.RWMutex
+// Calling newOIDCAuthProvider is an expensive operation that requires checking the cache and constructing a new
+// AuthProvider in case of cache miss. Since checking the cache and constructing a new AuthProvider happens
+// in different points in time, we need to guard the whole process with a mutex.
+//
+// In most cases, this mutex will be held for a short period of time - till obtaining an AuthProvider from the cache.
+var newOIDCAuthProviderMutex sync.Mutex
 
+// OIDC clients cache indexed by issuer URL.
+//
+// The cache ensures that requests from different clients don't concurrently attempt to refresh the same
+// set of credentials.
+//
+// The cache is not synchronized in any matter. The synchronization policy is up to the caller.
+type clientCache struct {
 	cache map[cacheKey]*oidcAuthProvider
 }
 
@@ -83,17 +92,20 @@ type cacheKey struct {
 }
 
 func (c *clientCache) getClient(clusterAddress, issuer, clientID string) (*oidcAuthProvider, bool) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
 	client, ok := c.cache[cacheKey{clusterAddress: clusterAddress, issuerURL: issuer, clientID: clientID}]
 	return client, ok
+}
+
+func (c *clientCache) deleteClient(clusterAddress, issuer, clientID string) (*oidcAuthProvider, bool) {
+	client, ok := c.cache[cacheKey{clusterAddress: clusterAddress, issuerURL: issuer, clientID: clientID}]
+	delete(c.cache, cacheKey{clusterAddress: clusterAddress, issuerURL: issuer, clientID: clientID})
+	return client, ok
+
 }
 
 // setClient attempts to put the client in the cache but may return any clients
 // with the same keys set before. This is so there's only ever one client for a provider.
 func (c *clientCache) setClient(clusterAddress, issuer, clientID string, client *oidcAuthProvider) *oidcAuthProvider {
-	c.mu.Lock()
-	defer c.mu.Unlock()
 	key := cacheKey{clusterAddress: clusterAddress, issuerURL: issuer, clientID: clientID}
 
 	// If another client has already initialized a client for the given provider we want
@@ -109,6 +121,8 @@ func (c *clientCache) setClient(clusterAddress, issuer, clientID string, client 
 }
 
 func newOIDCAuthProvider(clusterAddress string, cfg map[string]string, persister restclient.AuthProviderConfigPersister) (restclient.AuthProvider, error) {
+	newOIDCAuthProviderMutex.Lock()
+	defer newOIDCAuthProviderMutex.Unlock()
 	issuer := cfg[cfgIssuerURL]
 	if issuer == "" {
 		return nil, fmt.Errorf("Must provide %s", cfgIssuerURL)
@@ -121,7 +135,13 @@ func newOIDCAuthProvider(clusterAddress string, cfg map[string]string, persister
 
 	// Check cache for existing provider.
 	if provider, ok := cache.getClient(clusterAddress, issuer, clientID); ok {
-		return provider, nil
+		// Return the provider only if the refresh token hasn't changed. Otherwise,
+		// remove the stale client from the cache and let it re-initialize further
+		if cfg[cfgRefreshToken] == provider.cfg[cfgRefreshToken] {
+			//cache.mu.Unlock()
+			return provider, nil
+		}
+		cache.deleteClient(clusterAddress, issuer, clientID)
 	}
 
 	if len(cfg[cfgExtraScopes]) > 0 {
@@ -154,7 +174,7 @@ func newOIDCAuthProvider(clusterAddress string, cfg map[string]string, persister
 	provider := &oidcAuthProvider{
 		client:    hc,
 		now:       time.Now,
-		cfg:       cfg,
+		cfg:       deepCopyStringMap(cfg),
 		persister: persister,
 	}
 
@@ -377,4 +397,12 @@ func (j *jsonTime) UnmarshalJSON(b []byte) error {
 
 func (j jsonTime) MarshalJSON() ([]byte, error) {
 	return json.Marshal(time.Time(j).Unix())
+}
+
+func deepCopyStringMap(m map[string]string) map[string]string {
+	ret := make(map[string]string, len(m))
+	for k, v := range m {
+		ret[k] = v
+	}
+	return ret
 }

@@ -150,6 +150,32 @@ func TestClientCache(t *testing.T) {
 	assertCacheLen(t, cache, 2)
 }
 
+func TestRefreshingToken(t *testing.T) {
+	cfg1 := make(map[string]string)
+	cfg1[cfgIssuerURL] = "issuer1"
+	cfg1[cfgClientID] = "id1"
+	cfg1[cfgRefreshToken] = "refresh1"
+
+	cfg2 := deepCopyStringMap(cfg1)
+	cfg2[cfgRefreshToken] = "refresh2"
+
+	provider1, err := newOIDCAuthProvider("cluster1", cfg1, nil)
+	assertNoError(t, err)
+	provider2, err := newOIDCAuthProvider("cluster1", cfg2, nil)
+	assertNoError(t, err)
+
+	assertCacheLen(t, cache, 1)
+	if provider1 == provider2 {
+		t.Errorf("expected providers to be different got %v and %v", provider1, provider2)
+	}
+}
+
+func assertNoError(t *testing.T, err error) {
+	if err != nil {
+		t.Errorf("expected no error got %v", err)
+	}
+}
+
 func assertCacheLen(t *testing.T, cache *clientCache, length int) {
 	t.Helper()
 	if len(cache.cache) != length {
