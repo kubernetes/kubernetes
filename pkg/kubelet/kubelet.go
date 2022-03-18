@@ -830,6 +830,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		ShutdownGracePeriodCriticalPods:  kubeCfg.ShutdownGracePeriodCriticalPods.Duration,
 		ShutdownGracePeriodByPodPriority: kubeCfg.ShutdownGracePeriodByPodPriority,
 		StateDirectory:                   rootDirectory,
+		GracefulNodeShutdownPodPolicy:    kubeCfg.GracefulNodeShutdownPodPolicy,
 	})
 	klet.shutdownManager = shutdownManager
 	klet.admitHandlers.AddPodAdmitHandler(shutdownAdmitHandler)

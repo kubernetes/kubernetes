@@ -72,6 +72,7 @@ type managerImpl struct {
 	probeManager prober.Manager
 
 	shutdownGracePeriodByPodPriority []kubeletconfig.ShutdownGracePeriodByPodPriority
+	gracefulNodeShutdownPodPolicy    kubeletconfig.GracefulNodeShutdownPodPolicyType
 
 	getPods        eviction.ActivePodsFunc
 	killPodFunc    eviction.KillPodFunc
@@ -130,6 +131,7 @@ func NewManager(conf *Config) (Manager, lifecycle.PodAdmitHandler) {
 		storage: localStorage{
 			Path: filepath.Join(conf.StateDirectory, localStorageStateFile),
 		},
+		gracefulNodeShutdownPodPolicy: conf.GracefulNodeShutdownPodPolicy,
 	}
 	klog.InfoS("Creating node shutdown manager",
 		"shutdownGracePeriodRequested", conf.ShutdownGracePeriodRequested,
@@ -375,12 +377,14 @@ func (m *managerImpl) processShutdownEvent() error {
 				klog.V(1).InfoS("Shutdown manager killing pod with gracePeriod", "pod", klog.KObj(pod), "gracePeriod", gracePeriodOverride)
 
 				if err := m.killPodFunc(pod, false, &gracePeriodOverride, func(status *v1.PodStatus) {
-					// set the pod status to failed (unless it was already in a successful terminal phase)
-					if status.Phase != v1.PodSucceeded {
-						status.Phase = v1.PodFailed
+					if m.gracefulNodeShutdownPodPolicy == kubeletconfig.GracefulNodeShutdownPodPolicySetTerminal {
+						// set the pod status to failed (unless it was already in a successful terminal phase)
+						if status.Phase != v1.PodSucceeded {
+							status.Phase = v1.PodFailed
+						}
+						status.Message = nodeShutdownMessage
+						status.Reason = nodeShutdownReason
 					}
-					status.Message = nodeShutdownMessage
-					status.Reason = nodeShutdownReason
 				}); err != nil {
 					klog.V(1).InfoS("Shutdown manager failed killing pod", "pod", klog.KObj(pod), "err", err)
 				} else {

@@ -44,6 +44,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/config"
@@ -329,6 +330,7 @@ func newTestKubeletWithImageList(
 		SyncNodeStatusFunc:              func() {},
 		ShutdownGracePeriodRequested:    0,
 		ShutdownGracePeriodCriticalPods: 0,
+		GracefulNodeShutdownPodPolicy:   kubeletconfig.GracefulNodeShutdownPodPolicySetTerminal,
 	})
 	kubelet.shutdownManager = shutdownManager
 	kubelet.admitHandlers.AddPodAdmitHandler(shutdownAdmitHandler)
