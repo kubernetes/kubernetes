@@ -59,6 +59,14 @@ echo -e "\n${color_blue}Committing changes${color_norm}"
 git add .
 git commit -a -m "Update kubectl kustomize to kyaml/$LATEST_KYAML, cmd/config/$LATEST_CONFIG, api/$LATEST_API, kustomize/$LATEST_KUSTOMIZE"
 
+echo -e "\n${color_blue:?}Verifying kubectl kustomize version${color_norm:?}"
+make WHAT=cmd/kubectl
+
+if [[ $(_output/bin/kubectl version --client -o json | jq -r '.clientVersion.kustomizeVersion') != "$LATEST_KUSTOMIZE" ]]; then
+  echo -e "${color_red:?}Unexpected kubectl kustomize version${color_norm:?}"
+  exit 1
+fi
+
 echo -e "\n${color_green:?}Update successful${color_norm:?}"
 echo "Note: If any of the integration points changed, you may need to update them manually."
 echo "See https://github.com/kubernetes-sigs/kustomize/tree/master/releasing#update-kustomize-in-kubectl for more information"

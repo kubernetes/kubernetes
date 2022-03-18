@@ -26,6 +26,7 @@
 #    KUBE_GIT_VERSION - "vX.Y" used to indicate the last release version.
 #    KUBE_GIT_MAJOR - The major part of the version
 #    KUBE_GIT_MINOR - The minor component of the version
+#    KUSTOMIZE_VERSION - The semantic version of kustomize embedded in kubectl
 
 # Grovels through git to set a set of env variables.
 #
@@ -114,6 +115,16 @@ kube::version::get_version_vars() {
       fi
     fi
   fi
+
+  kube::version::get_kustomize_version_vars
+}
+
+kube::version::get_kustomize_version_vars() {
+  kustomizeTag=$(awk '/sigs.k8s.io\/kustomize\/kustomize\/v4/ {print $4}' go.mod)
+  if [[ -z "${kustomizeTag}" ]] ; then
+    KUSTOMIZE_VERSION="unknown"
+  fi
+  KUSTOMIZE_VERSION="${kustomizeTag#kustomize/}"
 }
 
 # Saves the environment flags to $1
@@ -130,6 +141,7 @@ KUBE_GIT_TREE_STATE='${KUBE_GIT_TREE_STATE-}'
 KUBE_GIT_VERSION='${KUBE_GIT_VERSION-}'
 KUBE_GIT_MAJOR='${KUBE_GIT_MAJOR-}'
 KUBE_GIT_MINOR='${KUBE_GIT_MINOR-}'
+KUSTOMIZE_VERSION='${KUSTOMIZE_VERSION-}'
 EOF
 }
 
@@ -177,6 +189,11 @@ kube::version::ldflags() {
   if [[ -n ${KUBE_GIT_MAJOR-} && -n ${KUBE_GIT_MINOR-} ]]; then
     add_ldflag "gitMajor" "${KUBE_GIT_MAJOR}"
     add_ldflag "gitMinor" "${KUBE_GIT_MINOR}"
+  fi
+
+  # Add build flags for kubectl kustomize version
+  if [[ -n ${KUSTOMIZE_VERSION-} ]]; then
+    ldflags+=( "-X '${KUBE_GO_PACKAGE}/vendor/sigs.k8s.io/kustomize/api/provenance.version=${KUSTOMIZE_VERSION}'" )
   fi
 
   # The -ldflags parameter takes a single string, so join the output.

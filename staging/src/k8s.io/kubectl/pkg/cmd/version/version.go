@@ -20,8 +20,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
+	kustomizeversion "sigs.k8s.io/kustomize/api/provenance"
 	"sigs.k8s.io/yaml"
 
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
@@ -36,8 +38,18 @@ import (
 
 // Version is a struct for version information
 type Version struct {
-	ClientVersion *apimachineryversion.Info `json:"clientVersion,omitempty" yaml:"clientVersion,omitempty"`
+	ClientVersion KubectlVersion            `json:"clientVersion,omitempty" yaml:"clientVersion,omitempty"`
 	ServerVersion *apimachineryversion.Info `json:"serverVersion,omitempty" yaml:"serverVersion,omitempty"`
+}
+
+type KubectlVersion struct {
+	apimachineryversion.Info
+	KustomizeVersion string `json:"kustomizeVersion,omitempty" yaml:"kustomizeVersion,omitempty"`
+}
+
+// String returns the expected struct-based representation of the version with KustomizeVerison appended
+func (v KubectlVersion) String() string {
+	return strings.Replace(fmt.Sprintf("%#v", v.Info), "}", fmt.Sprintf(", KustomizeVersion:%q}", v.KustomizeVersion), 1)
 }
 
 var (
@@ -121,8 +133,8 @@ func (o *Options) Run() error {
 		versionInfo   Version
 	)
 
-	clientVersion := version.Get()
-	versionInfo.ClientVersion = &clientVersion
+	versionInfo.ClientVersion.Info = version.Get()
+	versionInfo.ClientVersion.KustomizeVersion = kustomizeversion.GetProvenance().Semver()
 
 	if !o.ClientOnly && o.discoveryClient != nil {
 		// Always request fresh data from the server
@@ -134,12 +146,12 @@ func (o *Options) Run() error {
 	switch o.Output {
 	case "":
 		if o.Short {
-			fmt.Fprintf(o.Out, "Client Version: %s\n", clientVersion.GitVersion)
+			fmt.Fprintf(o.Out, "Client Version: %s\n", versionInfo.ClientVersion.GitVersion)
 			if serverVersion != nil {
 				fmt.Fprintf(o.Out, "Server Version: %s\n", serverVersion.GitVersion)
 			}
 		} else {
-			fmt.Fprintf(o.Out, "Client Version: %#v\n", clientVersion)
+			fmt.Fprintf(o.Out, "Client Version: %s\n", versionInfo.ClientVersion)
 			if serverVersion != nil {
 				fmt.Fprintf(o.Out, "Server Version: %#v\n", *serverVersion)
 			}
@@ -163,7 +175,7 @@ func (o *Options) Run() error {
 	}
 
 	if serverVersion != nil {
-		if err := printVersionSkewWarning(o.ErrOut, clientVersion, *serverVersion); err != nil {
+		if err := printVersionSkewWarning(o.ErrOut, versionInfo.ClientVersion.Info, *serverVersion); err != nil {
 			return err
 		}
 	}
