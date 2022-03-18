@@ -542,60 +542,65 @@ func TestDisableJobTrackingWithFinalizers(t *testing.T) {
 
 func TestOrphanPodsFinalizersClearedWithGC(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobTrackingWithFinalizers, true)()
+	for _, policy := range []metav1.DeletionPropagation{metav1.DeletePropagationOrphan, metav1.DeletePropagationBackground} {
+		t.Run(string(policy), func(t *testing.T) {
+			closeFn, restConfig, clientSet, ns := setup(t, "simple")
+			defer closeFn()
+			informerSet := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(restConfig, "controller-informers")), 0)
+			// Make the job controller significantly slower to trigger race condition.
+			restConfig.QPS = 1
+			restConfig.Burst = 1
+			jc, ctx, cancel := createJobControllerWithSharedInformers(restConfig, informerSet)
+			defer cancel()
+			restConfig.QPS = 200
+			restConfig.Burst = 200
+			runGC := createGC(ctx, t, restConfig, informerSet)
+			informerSet.Start(ctx.Done())
+			go jc.Run(ctx, 1)
+			runGC()
 
-	closeFn, restConfig, clientSet, ns := setup(t, "simple")
-	defer closeFn()
-	informerSet := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(restConfig, "controller-informers")), 0)
-	// Make the job controller significantly slower to trigger race condition.
-	restConfig.QPS = 1
-	restConfig.Burst = 1
-	jc, ctx, cancel := createJobControllerWithSharedInformers(restConfig, informerSet)
-	defer cancel()
-	restConfig.QPS = 200
-	restConfig.Burst = 200
-	runGC := createGC(ctx, t, restConfig, informerSet)
-	informerSet.Start(ctx.Done())
-	go jc.Run(ctx, 1)
-	runGC()
-
-	jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
-		Spec: batchv1.JobSpec{
-			Parallelism: pointer.Int32Ptr(5),
-		},
-	})
-	if err != nil {
-		t.Fatalf("Failed to create Job: %v", err)
-	}
-	if !hasJobTrackingAnnotation(jobObj) {
-		t.Error("apiserver didn't add the tracking annotation")
-	}
-	validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
-		Active: 5,
-	}, true)
-
-	// Delete Job. The GC should delete the pods in cascade.
-	err = clientSet.BatchV1().Jobs(jobObj.Namespace).Delete(ctx, jobObj.Name, metav1.DeleteOptions{})
-	if err != nil {
-		t.Fatalf("Failed to delete job: %v", err)
-	}
-	orphanPods := 0
-	if err := wait.Poll(waitInterval, wait.ForeverTestTimeout, func() (done bool, err error) {
-		pods, err := clientSet.CoreV1().Pods(jobObj.Namespace).List(ctx, metav1.ListOptions{
-			LabelSelector: metav1.FormatLabelSelector(jobObj.Spec.Selector),
-		})
-		if err != nil {
-			return false, err
-		}
-		orphanPods = 0
-		for _, pod := range pods.Items {
-			if hasJobTrackingFinalizer(&pod) {
-				orphanPods++
+			jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Parallelism: pointer.Int32Ptr(5),
+				},
+			})
+			if err != nil {
+				t.Fatalf("Failed to create Job: %v", err)
 			}
-		}
-		return orphanPods == 0, nil
-	}); err != nil {
-		t.Errorf("Failed waiting for pods to be freed from finalizer: %v", err)
-		t.Logf("Last saw %d orphan pods", orphanPods)
+			if !hasJobTrackingAnnotation(jobObj) {
+				t.Error("apiserver didn't add the tracking annotation")
+			}
+			validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
+				Active: 5,
+			}, true)
+
+			// Delete Job. The GC should delete the pods in cascade.
+			err = clientSet.BatchV1().Jobs(jobObj.Namespace).Delete(ctx, jobObj.Name, metav1.DeleteOptions{
+				PropagationPolicy: &policy,
+			})
+			if err != nil {
+				t.Fatalf("Failed to delete job: %v", err)
+			}
+			orphanPods := 0
+			if err := wait.Poll(waitInterval, wait.ForeverTestTimeout, func() (done bool, err error) {
+				pods, err := clientSet.CoreV1().Pods(jobObj.Namespace).List(ctx, metav1.ListOptions{
+					LabelSelector: metav1.FormatLabelSelector(jobObj.Spec.Selector),
+				})
+				if err != nil {
+					return false, err
+				}
+				orphanPods = 0
+				for _, pod := range pods.Items {
+					if hasJobTrackingFinalizer(&pod) {
+						orphanPods++
+					}
+				}
+				return orphanPods == 0, nil
+			}); err != nil {
+				t.Errorf("Failed waiting for pods to be freed from finalizer: %v", err)
+				t.Logf("Last saw %d orphan pods", orphanPods)
+			}
+		})
 	}
 }
 
