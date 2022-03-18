@@ -236,7 +236,7 @@ func (jm *Controller) resolveControllerRef(namespace string, controllerRef *meta
 	return job
 }
 
-// When a pod is created, enqueue the controller that manages it and update it's expectations.
+// When a pod is created, enqueue the controller that manages it and update its expectations.
 func (jm *Controller) addPod(obj interface{}) {
 	pod := obj.(*v1.Pod)
 	if pod.DeletionTimestamp != nil {
@@ -261,7 +261,12 @@ func (jm *Controller) addPod(obj interface{}) {
 		return
 	}
 
-	// Otherwise, it's an orphan. Get a list of all matching controllers and sync
+	// Otherwise, it's an orphan.
+	// Clean the finalizer.
+	if hasJobTrackingFinalizer(pod) {
+		jm.enqueueOrphanPod(pod)
+	}
+	// Get a list of all matching controllers and sync
 	// them to see if anyone wants to adopt it.
 	// DO NOT observe creation because no controller should be waiting for an
 	// orphan.
@@ -331,7 +336,12 @@ func (jm *Controller) updatePod(old, cur interface{}) {
 		return
 	}
 
-	// Otherwise, it's an orphan. If anything changed, sync matching controllers
+	// Otherwise, it's an orphan.
+	// Clean the finalizer.
+	if hasJobTrackingFinalizer(curPod) {
+		jm.enqueueOrphanPod(curPod)
+	}
+	// If anything changed, sync matching controllers
 	// to see if anyone wants to adopt it now.
 	labelChanged := !reflect.DeepEqual(curPod.Labels, oldPod.Labels)
 	if labelChanged || controllerRefChanged {
@@ -364,17 +374,18 @@ func (jm *Controller) deletePod(obj interface{}, final bool) {
 	}
 
 	controllerRef := metav1.GetControllerOf(pod)
+	hasFinalizer := hasJobTrackingFinalizer(pod)
 	if controllerRef == nil {
 		// No controller should care about orphans being deleted.
 		// But this pod might have belonged to a Job and the GC removed the reference.
-		if hasJobTrackingFinalizer(pod) {
+		if hasFinalizer {
 			jm.enqueueOrphanPod(pod)
 		}
 		return
 	}
 	job := jm.resolveControllerRef(pod.Namespace, controllerRef)
 	if job == nil {
-		if hasJobTrackingFinalizer(pod) {
+		if hasFinalizer {
 			jm.enqueueOrphanPod(pod)
 		}
 		return
@@ -387,7 +398,7 @@ func (jm *Controller) deletePod(obj interface{}, final bool) {
 
 	// Consider the finalizer removed if this is the final delete. Otherwise,
 	// it's an update for the deletion timestamp, then check finalizer.
-	if final || !hasJobTrackingFinalizer(pod) {
+	if final || !hasFinalizer {
 		jm.finalizerExpectations.finalizerRemovalObserved(jobKey, string(pod.UID))
 	}
 
@@ -441,10 +452,14 @@ func (jm *Controller) deleteJob(obj interface{}) {
 		}
 	}
 	// Listing pods shouldn't really fail, as we are just querying the informer cache.
-	pods, _ := jm.podStore.Pods(jobObj.Namespace).List(labels.Everything())
+	selector, err := metav1.LabelSelectorAsSelector(jobObj.Spec.Selector)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("parsing deleted job selector: %v", err))
+		return
+	}
+	pods, _ := jm.podStore.Pods(jobObj.Namespace).List(selector)
 	for _, pod := range pods {
-		controllerRef := metav1.GetControllerOf(pod)
-		if (controllerRef == nil || controllerRef.UID == jobObj.UID) && hasJobTrackingFinalizer(pod) {
+		if metav1.IsControlledBy(pod, jobObj) && hasJobTrackingFinalizer(pod) {
 			jm.enqueueOrphanPod(pod)
 		}
 	}
@@ -566,6 +581,14 @@ func (jm Controller) syncOrphanPod(ctx context.Context, key string) error {
 			return nil
 		}
 		return err
+	}
+	// Make sure the pod is still orphaned.
+	if controllerRef := metav1.GetControllerOf(sharedPod); controllerRef != nil {
+		job := jm.resolveControllerRef(sharedPod.Namespace, controllerRef)
+		if job != nil {
+			// The pod was adopted. Do not remove finalizer.
+			return nil
+		}
 	}
 	if patch := removeTrackingFinalizerPatch(sharedPod); patch != nil {
 		if err := jm.podControl.PatchPod(ctx, ns, name, patch); err != nil && !apierrors.IsNotFound(err) {
