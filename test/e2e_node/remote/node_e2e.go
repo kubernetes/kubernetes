@@ -60,7 +60,7 @@ func (n *NodeE2ERemote) SetupTestPackage(tardir, systemSpecName string) error {
 	}
 
 	// Copy binaries
-	requiredBins := []string{"kubelet", "e2e_node.test", "ginkgo", "mounter", "credential-provider"}
+	requiredBins := []string{"kubelet", "e2e_node.test", "ginkgo", "mounter", "gcp-credential-provider"}
 	for _, bin := range requiredBins {
 		source := filepath.Join(buildOutputDir, bin)
 		if _, err := os.Stat(source); err != nil {

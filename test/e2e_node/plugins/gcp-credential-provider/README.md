@@ -6,7 +6,7 @@ for testing purposes only. This plugin SHOULD NOT be used in production.
 
 This credential provider is installed and configured in the node e2e tests by:
 
-1. Building the credential-provider binary and including it in the test archive
+1. Building the gcp-credential-provider binary and including it in the test archive
    uploaded to the GCE remote node.
 
 2. Writing the credential provider config into the temporary workspace consumed
@@ -16,7 +16,7 @@ This credential provider is installed and configured in the node e2e tests by:
 kind: CredentialProviderConfig
 apiVersion: kubelet.config.k8s.io/v1alpha1
 providers:
-  - name: credential-provider
+  - name: gcp-credential-provider
     apiVersion: credentialprovider.kubelet.k8s.io/v1alpha1
     matchImages:
     - "gcr.io"
