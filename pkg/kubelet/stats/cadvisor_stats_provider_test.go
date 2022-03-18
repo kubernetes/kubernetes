@@ -46,6 +46,10 @@ func TestFilterTerminatedContainerInfoAndAssembleByPodCgroupKey(t *testing.T) {
 		namespace = "test"
 		pName0    = "pod0"
 		cName00   = "c0"
+		pName1    = "pod1"
+		cName11   = "c1"
+		pName2    = "pod2"
+		cName22   = "c2"
 	)
 	infos := map[string]cadvisorapiv2.ContainerInfo{
 		// ContainerInfo with past creation time and no CPU/memory usage for
@@ -63,16 +67,25 @@ func TestFilterTerminatedContainerInfoAndAssembleByPodCgroupKey(t *testing.T) {
 		// The latest containers, which should be in the results.
 		"/pod0-i":  getTestContainerInfo(seedPod0Infra, pName0, namespace, leaky.PodInfraContainerName),
 		"/pod0-c0": getTestContainerInfo(seedPod0Container0, pName0, namespace, cName00),
+
+		"/pod1-i.slice":  getTestContainerInfo(seedPod0Infra, pName1, namespace, leaky.PodInfraContainerName),
+		"/pod1-c1.slice": getTestContainerInfo(seedPod0Container0, pName1, namespace, cName11),
+
+		"/pod2-i-terminated-1": getTerminatedContainerInfo(seedPastPod0Infra, pName2, namespace, leaky.PodInfraContainerName),
+		// ContainerInfo with past creation time and no CPU/memory usage for
+		// simulating uncleaned cgroups of already terminated containers, which
+		// should not be shown in the results.
+		"/pod2-c0-terminated-1": getTerminatedContainerInfo(seedPastPod0Container0, pName2, namespace, cName22),
 	}
 	filteredInfos, allInfos := filterTerminatedContainerInfoAndAssembleByPodCgroupKey(infos)
-	assert.Len(t, filteredInfos, 2)
-	assert.Len(t, allInfos, 6)
+	assert.Len(t, filteredInfos, 4)
+	assert.Len(t, allInfos, 10)
 	for _, c := range []string{"/pod0-i", "/pod0-c0"} {
 		if _, found := filteredInfos[c]; !found {
 			t.Errorf("%q is expected to be in the output\n", c)
 		}
 	}
-	for _, c := range []string{"pod0-i-terminated-1", "pod0-c0-terminated-1", "pod0-i-terminated-2", "pod0-c0-terminated-2", "pod0-i", "pod0-c0"} {
+	for _, c := range []string{"pod0-i-terminated-1", "pod0-c0-terminated-1", "pod0-i-terminated-2", "pod0-c0-terminated-2", "pod0-i", "pod0-c0", "c1"} {
 		if _, found := allInfos[c]; !found {
 			t.Errorf("%q is expected to be in the output\n", c)
 		}
@@ -302,7 +315,8 @@ func TestCadvisorListPodStats(t *testing.T) {
 
 	ps, found = indexPods[prf3]
 	assert.True(t, found)
-	assert.Len(t, ps.Containers, 2)
+	// /pod3-c0-init has no stats should be filtered
+	assert.Len(t, ps.Containers, 1)
 	indexCon = make(map[string]statsapi.ContainerStats, len(ps.Containers))
 	for _, con := range ps.Containers {
 		indexCon[con.Name] = con
@@ -311,10 +325,6 @@ func TestCadvisorListPodStats(t *testing.T) {
 	assert.Equal(t, cName31, con.Name)
 	checkCPUStats(t, "Pod3Container1", seedPod3Container1, con.CPU)
 	checkMemoryStats(t, "Pod3Container1", seedPod3Container1, infos["/pod3-c1"], con.Memory)
-	con = indexCon[cName30]
-	assert.Equal(t, cName30, con.Name)
-	checkEmptyCPUStats(t, "Pod3Container0", seedPod3Container0, con.CPU)
-	checkEmptyMemoryStats(t, "Pod3Container0", seedPod3Container0, infos["/pod3-c0-init"], con.Memory)
 }
 
 func TestCadvisorListPodCPUAndMemoryStats(t *testing.T) {
