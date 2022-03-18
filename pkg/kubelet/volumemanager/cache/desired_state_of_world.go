@@ -142,6 +142,9 @@ type VolumeToMount struct {
 
 // NewDesiredStateOfWorld returns a new instance of DesiredStateOfWorld.
 func NewDesiredStateOfWorld(volumePluginMgr *volume.VolumePluginMgr) DesiredStateOfWorld {
+	if feature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+		registerSELinuxMetrics()
+	}
 	return &desiredStateOfWorld{
 		volumesToMount:  make(map[v1.UniqueVolumeName]volumeToMount),
 		volumePluginMgr: volumePluginMgr,
@@ -302,10 +305,11 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 					fullErr := fmt.Errorf("failed to construct SELinux label from context %q: %s", containerContext, err)
 					if isRWOP {
 						// Cannot mount with -o context if the context can't be composed.
+						seLinuxContainerContextErrors.Add(1.0)
 						return "", fullErr
 					} else {
 						// This is not an error yet, but it will be when support for RWO and RWX volumes is added
-						// TODO: bump some metric here
+						seLinuxContainerContextWarnings.Add(1.0)
 						klog.V(4).ErrorS(err, "Please report this error in https://github.com/kubernetes/enhancements/issues/1710, together with full Pod yaml file")
 						break
 					}
@@ -317,10 +321,11 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 				if seLinuxFileLabel != newLabel {
 					fullErr := fmt.Errorf("volume %s is used with two different SELinux contexts in the same pod: %q, %q", volumeSpec.Name(), seLinuxFileLabel, newLabel)
 					if isRWOP {
+						seLinuxPodContextMismatchErrors.Add(1.0)
 						return "", fullErr
 					} else {
 						// This is not an error yet, but it will be when support for RWO and RWX volumes is added
-						// TODO: bump some metric here
+						seLinuxPodContextMismatchWarnings.Add(1.0)
 						klog.V(4).ErrorS(err, "Please report this error in https://github.com/kubernetes/enhancements/issues/1710, together with full Pod yaml file")
 						break
 					}
@@ -350,6 +355,9 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 				}
 			}
 		}
+		if seLinuxFileLabel != "" {
+			seLinuxVolumesAdmitted.Add(1.0)
+		}
 		vmt := volumeToMount{
 			volumeName:              volumeName,
 			podsToMount:             make(map[types.UniquePodName]podToMount),
@@ -376,11 +384,16 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 				// TODO: update the error message after tests, e.g. add at least the conflicting pod names.
 				fullErr := fmt.Errorf("conflicting SELinux labels of volume %s: %q and %q", volumeSpec.Name(), vol.seLinuxFileLabel, seLinuxFileLabel)
 				if isRWOP {
+					seLinuxVolumeContextMismatchErrors.Add(1.0)
 					return "", fullErr
 				} else {
 					// This is not an error yet, but it will be when support for RWO and RWX volumes is added
-					// TODO: bump some metric here
+					seLinuxVolumeContextMismatchWarnings.Add(1.0)
 					klog.V(4).ErrorS(err, "Please report this error in https://github.com/kubernetes/enhancements/issues/1710, together with full Pod yaml file")
+				}
+			} else {
+				if seLinuxFileLabel != "" {
+					seLinuxVolumesAdmitted.Add(1.0)
 				}
 			}
 		}
