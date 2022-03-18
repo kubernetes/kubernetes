@@ -749,7 +749,6 @@ func validateCustomResourceDefinitionValidation(ctx context.Context, customResou
 }
 
 type schemaTree struct {
-	MaxLength   int64
 	Cardinality int64
 	Parent      *schemaTree
 	Schema      *apiextensions.JSONSchemaProps
