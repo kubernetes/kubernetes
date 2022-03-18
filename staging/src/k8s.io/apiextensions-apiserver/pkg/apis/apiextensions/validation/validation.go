@@ -52,6 +52,8 @@ var (
 
 const (
 	unboundedSchemaLength = -1
+	// TODO(DangerOnTheRanger): adjust this in response to benchmarking
+	TotalCostLimit = 2000000
 )
 
 // ValidateCustomResourceDefinition statically validates
@@ -989,6 +991,13 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 			} else {
 				for i, cr := range compResults {
 					celCRDCost += getCRDCost(cr.MaxCost, treeNode)
+					if celCRDCost > TotalCostLimit {
+						// TODO(DangerOnTheRanger): consider how to make the error message more informative
+						exceedFactor := float64(celCRDCost) / float64(TotalCostLimit)
+						costErrorMsg := fmt.Sprintf("CEL rule exceeded budget by factor of %vx", exceedFactor)
+						allErrs = append(allErrs, field.Forbidden(fldPath.Child("x-kubernetes-validations").Index(i).Child("rule"), costErrorMsg))
+						// TODO(DangerOnTheRanger): should we early exit here?
+					}
 					if cr.Error != nil {
 						if cr.Error.Type == cel.ErrorTypeRequired {
 							allErrs = append(allErrs, field.Required(fldPath.Child("x-kubernetes-validations").Index(i).Child("rule"), cr.Error.Detail))
