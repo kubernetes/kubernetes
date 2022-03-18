@@ -235,7 +235,7 @@ func (o *ScaleOptions) RunScale() error {
 	}
 
 	counter := 0
-	err = r.Visit(func(info *resource.Info, err error) error {
+	for _, info := range infos {
 		if err != nil {
 			return err
 		}
@@ -263,8 +263,9 @@ func (o *ScaleOptions) RunScale() error {
 			}
 		}
 
-		return o.PrintObj(info.Object, o.Out)
-	})
+		err = o.PrintObj(info.Object, o.Out)
+
+	}
 	if err != nil {
 		return err
 	}
