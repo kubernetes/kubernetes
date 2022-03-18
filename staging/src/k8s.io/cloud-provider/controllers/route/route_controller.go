@@ -292,12 +292,12 @@ func (rc *RouteController) reconcile(ctx context.Context, nodes []*v1.Node, rout
 func (rc *RouteController) updateNetworkingCondition(node *v1.Node, routesCreated bool) error {
 	_, condition := nodeutil.GetNodeCondition(&(node.Status), v1.NodeNetworkUnavailable)
 	if routesCreated && condition != nil && condition.Status == v1.ConditionFalse {
-		klog.V(2).Infof("set node %v with NodeNetworkUnavailable=false was canceled because it is already set", node.Name)
+		klog.V(4).Infof("set node %v with NodeNetworkUnavailable=false was canceled because it is already set", node.Name)
 		return nil
 	}
 
 	if !routesCreated && condition != nil && condition.Status == v1.ConditionTrue {
-		klog.V(2).Infof("set node %v with NodeNetworkUnavailable=true was canceled because it is already set", node.Name)
+		klog.V(4).Infof("set node %v with NodeNetworkUnavailable=true was canceled because it is already set", node.Name)
 		return nil
 	}
 
