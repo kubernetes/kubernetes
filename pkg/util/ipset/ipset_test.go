@@ -888,9 +888,10 @@ func Test_validateProtocol(t *testing.T) {
 
 func TestValidateIPSet(t *testing.T) {
 	testCases := []struct {
-		ipset *IPSet
-		valid bool
-		desc  string
+		ipset      *IPSet
+		valid      bool
+		probReason string
+		desc       string
 	}{
 		{ // case[0]
 			ipset: &IPSet{
@@ -921,8 +922,9 @@ func TestValidateIPSet(t *testing.T) {
 				HashSize:   65535,
 				MaxElem:    2048,
 			},
-			valid: false,
-			desc:  "should specify right port range for bitmap type set",
+			valid:      false,
+			probReason: "Invalid PortRange",
+			desc:       "should specify right port range for bitmap type set",
 		},
 		{ // case[3]
 			ipset: &IPSet{
@@ -932,8 +934,9 @@ func TestValidateIPSet(t *testing.T) {
 				HashSize:   0,
 				MaxElem:    2048,
 			},
-			valid: false,
-			desc:  "wrong hash size number",
+			valid:      false,
+			probReason: "Invalid hashsize value",
+			desc:       "wrong hash size number",
 		},
 		{ // case[4]
 			ipset: &IPSet{
@@ -943,8 +946,9 @@ func TestValidateIPSet(t *testing.T) {
 				HashSize:   1024,
 				MaxElem:    -1,
 			},
-			valid: false,
-			desc:  "wrong hash max elem number",
+			valid:      false,
+			probReason: "Invalid hashsize value",
+			desc:       "wrong hash max elem number",
 		},
 		{ // case[5]
 			ipset: &IPSet{
@@ -954,8 +958,9 @@ func TestValidateIPSet(t *testing.T) {
 				HashSize:   1024,
 				MaxElem:    1024,
 			},
-			valid: false,
-			desc:  "wrong protocol",
+			valid:      false,
+			probReason: "Invalid HashFamily",
+			desc:       "wrong protocol",
 		},
 		{ // case[6]
 			ipset: &IPSet{
@@ -965,14 +970,20 @@ func TestValidateIPSet(t *testing.T) {
 				HashSize:   1024,
 				MaxElem:    1024,
 			},
-			valid: false,
-			desc:  "wrong set type",
+			valid:      false,
+			probReason: "Invalid IPSetType",
+			desc:       "wrong set type",
 		},
 	}
 	for i := range testCases {
-		valid := testCases[i].ipset.Validate()
+		err := testCases[i].ipset.Validate()
+		valid := err == nil
 		if valid != testCases[i].valid {
-			t.Errorf("case [%d]: unexpected mismatch, expect valid[%v], got valid[%v], desc: %s", i, testCases[i].valid, valid, testCases[i].desc)
+			if err.Error() == testCases[i].probReason {
+				t.Errorf("case [%d]: unexpected mismatch, expect valid[%v], got valid[%v], desc: %s", i, testCases[i].valid, valid, testCases[i].desc)
+			} else {
+				t.Errorf("case [%d]: unexpected mismatch, expect probably failed reason[%s], got reason[%s]", i, testCases[i].probReason, err.Error())
+			}
 		}
 	}
 }
