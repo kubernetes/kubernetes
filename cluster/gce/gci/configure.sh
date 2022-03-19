@@ -374,32 +374,6 @@ EOF
   rm -f "${crictl}"
 }
 
-function install-exec-auth-plugin {
-  if [[ ! "${EXEC_AUTH_PLUGIN_URL:-}" ]]; then
-      return
-  fi
-  local -r plugin_url="${EXEC_AUTH_PLUGIN_URL}"
-  local -r plugin_hash="${EXEC_AUTH_PLUGIN_HASH}"
-
-  if is-preloaded "gke-exec-auth-plugin" "${plugin_hash}"; then
-    echo "gke-exec-auth-plugin is preloaded"
-    return
-  fi
-
-  echo "Downloading gke-exec-auth-plugin binary"
-  download-or-bust "${plugin_hash}" "${plugin_url}"
-  mv "${KUBE_HOME}/gke-exec-auth-plugin" "${KUBE_BIN}/gke-exec-auth-plugin"
-  chmod a+x "${KUBE_BIN}/gke-exec-auth-plugin"
-
-  if [[ ! "${EXEC_AUTH_PLUGIN_LICENSE_URL:-}" ]]; then
-      return
-  fi
-  local -r license_url="${EXEC_AUTH_PLUGIN_LICENSE_URL}"
-  echo "Downloading gke-exec-auth-plugin license"
-  download-or-bust "" "${license_url}"
-  mv "${KUBE_HOME}/LICENSES/LICENSE" "${KUBE_BIN}/gke-exec-auth-plugin-license"
-}
-
 function install-kube-manifests {
   # Put kube-system pods manifests in ${KUBE_HOME}/kube-manifests/.
   local dst_dir="${KUBE_HOME}/kube-manifests"
@@ -672,9 +646,6 @@ function install-kube-binary-config {
 
   # Install crictl on each node.
   log-wrap "InstallCrictl" install-crictl
-
-  # TODO(awly): include the binary and license in the OS image.
-  log-wrap "InstallExecAuthPlugin" install-exec-auth-plugin
 
   # Clean up.
   rm -rf "${KUBE_HOME}/kubernetes"

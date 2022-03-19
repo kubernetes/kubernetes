@@ -247,15 +247,6 @@ function start-kube-apiserver {
     params+=" --admission-control-config-file=/etc/srv/kubernetes/admission_controller_config.yaml"
   fi
 
-  # If GKE exec auth support is requested for webhooks, then
-  # gke-exec-auth-plugin needs to be mounted into the kube-apiserver container.
-  local webhook_exec_auth_plugin_mount=""
-  local webhook_exec_auth_plugin_volume=""
-  if [[ -n "${WEBHOOK_GKE_EXEC_AUTH:-}" ]]; then
-    webhook_exec_auth_plugin_mount='{"name": "gkeauth", "mountPath": "/usr/bin/gke-exec-auth-plugin", "readOnly": true},'
-    webhook_exec_auth_plugin_volume='{"name": "gkeauth", "hostPath": {"path": "/home/kubernetes/bin/gke-exec-auth-plugin", "type": "File"}},'
-  fi
-
   if [[ -n "${KUBE_APISERVER_REQUEST_TIMEOUT:-}" ]]; then
     params+=" --min-request-timeout=${KUBE_APISERVER_REQUEST_TIMEOUT}"
   fi
@@ -392,8 +383,6 @@ function start-kube-apiserver {
   sed -i -e "s@{{audit_policy_config_volume}}@${audit_policy_config_volume}@g" "${src_file}"
   sed -i -e "s@{{audit_webhook_config_mount}}@${audit_webhook_config_mount}@g" "${src_file}"
   sed -i -e "s@{{audit_webhook_config_volume}}@${audit_webhook_config_volume}@g" "${src_file}"
-  sed -i -e "s@{{webhook_exec_auth_plugin_mount}}@${webhook_exec_auth_plugin_mount}@g" "${src_file}"
-  sed -i -e "s@{{webhook_exec_auth_plugin_volume}}@${webhook_exec_auth_plugin_volume}@g" "${src_file}"
   sed -i -e "s@{{konnectivity_socket_mount}}@${default_konnectivity_socket_mnt}@g" "${src_file}"
   sed -i -e "s@{{konnectivity_socket_volume}}@${default_konnectivity_socket_vol}@g" "${src_file}"
   sed -i -e "s@{{healthcheck_ip}}@${healthcheck_ip}@g" "${src_file}"
