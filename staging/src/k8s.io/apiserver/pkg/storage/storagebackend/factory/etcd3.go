@@ -112,7 +112,13 @@ func newETCD3HealthCheck(c storagebackend.Config) (func() error, error) {
 	}, nil
 }
 
+var etcdClient *clientv3.Client
+
 func newETCD3Client(c storagebackend.TransportConfig) (*clientv3.Client, error) {
+	if etcdClient != nil {
+		return etcdClient, nil
+	}
+
 	tlsInfo := transport.TLSInfo{
 		CertFile:      c.CertFile,
 		KeyFile:       c.KeyFile,
@@ -181,7 +187,8 @@ func newETCD3Client(c storagebackend.TransportConfig) (*clientv3.Client, error) 
 		TLS:                  tlsConfig,
 	}
 
-	return clientv3.New(cfg)
+	etcdClient, err = clientv3.New(cfg)
+	return etcdClient, err
 }
 
 type runningCompactor struct {
