@@ -187,7 +187,7 @@ func TestCreateWithKeyExist(t *testing.T) {
 	key, _ := testPropogateStore(ctx, t, store, obj)
 	out := &example.Pod{}
 	err := store.Create(ctx, key, obj, out, 0)
-	if err == nil || !storage.IsNodeExist(err) {
+	if err == nil || !storage.IsExist(err) {
 		t.Errorf("expecting key exists error, but get: %s", err)
 	}
 }
