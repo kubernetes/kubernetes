@@ -1117,7 +1117,9 @@ func (proxier *Proxier) syncProxyRules() {
 				// If/when we support "Local" policy for VIPs, we should update this.
 				proxier.natRules.Write(
 					"-A", string(svcChain),
-					proxier.localDetector.JumpIfNotLocal(args, string(KubeMarkMasqChain)))
+					args,
+					proxier.localDetector.IfNotLocal(),
+					"-j", string(KubeMarkMasqChain))
 			}
 			proxier.natRules.Write(
 				"-A", string(kubeServicesChain),
@@ -1157,7 +1159,9 @@ func (proxier *Proxier) syncProxyRules() {
 					if proxier.localDetector.IsImplemented() {
 						proxier.natRules.Write(
 							appendTo,
-							proxier.localDetector.JumpIfNotLocal(args, string(KubeMarkMasqChain)))
+							args,
+							proxier.localDetector.IfNotLocal(),
+							"-j", string(KubeMarkMasqChain))
 					} else {
 						proxier.natRules.Write(
 							appendTo,
@@ -1348,12 +1352,12 @@ func (proxier *Proxier) syncProxyRules() {
 		// Service's ClusterIP instead. This happens whether or not we have local
 		// endpoints; only if localDetector is implemented
 		if proxier.localDetector.IsImplemented() {
-			args = append(args[:0],
+			proxier.natRules.Write(
 				"-A", string(svcXlbChain),
 				"-m", "comment", "--comment",
 				`"Redirect pods trying to reach external loadbalancer VIP to clusterIP"`,
-			)
-			proxier.natRules.Write(proxier.localDetector.JumpIfLocal(args, string(svcChain)))
+				proxier.localDetector.IfLocal(),
+				"-j", string(svcChain))
 		}
 
 		// Next, redirect all src-type=LOCAL -> LB IP to the service chain for externalTrafficPolicy=Local

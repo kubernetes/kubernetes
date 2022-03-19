@@ -19,7 +19,6 @@ package iptables
 import (
 	"fmt"
 
-	"k8s.io/klog/v2"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	netutils "k8s.io/utils/net"
 )
@@ -30,13 +29,11 @@ type LocalTrafficDetector interface {
 	// IsImplemented returns true if the implementation does something, false otherwise
 	IsImplemented() bool
 
-	// JumpIfLocal appends conditions to jump to a target chain if traffic detected to be
-	// of local origin
-	JumpIfLocal(args []string, toChain string) []string
+	// IfLocal returns iptables arguments that will match traffic from a pod
+	IfLocal() []string
 
-	// JumpINotfLocal appends conditions to jump to a target chain if traffic detected not to be
-	// of local origin
-	JumpIfNotLocal(args []string, toChain string) []string
+	// IfNotLocal returns iptables arguments that will match traffic that is not from a pod
+	IfNotLocal() []string
 }
 
 type noOpLocalDetector struct{}
@@ -50,16 +47,17 @@ func (n *noOpLocalDetector) IsImplemented() bool {
 	return false
 }
 
-func (n *noOpLocalDetector) JumpIfLocal(args []string, toChain string) []string {
-	return args // no-op
+func (n *noOpLocalDetector) IfLocal() []string {
+	return nil // no-op; matches all traffic
 }
 
-func (n *noOpLocalDetector) JumpIfNotLocal(args []string, toChain string) []string {
-	return args // no-op
+func (n *noOpLocalDetector) IfNotLocal() []string {
+	return nil // no-op; matches all traffic
 }
 
 type detectLocalByCIDR struct {
-	cidr string
+	ifLocal    []string
+	ifNotLocal []string
 }
 
 // NewDetectLocalByCIDR implements the LocalTrafficDetector interface using a CIDR. This can be used when a single CIDR
@@ -72,21 +70,20 @@ func NewDetectLocalByCIDR(cidr string, ipt utiliptables.Interface) (LocalTraffic
 	if err != nil {
 		return nil, err
 	}
-	return &detectLocalByCIDR{cidr: cidr}, nil
+	return &detectLocalByCIDR{
+		ifLocal:    []string{"-s", cidr},
+		ifNotLocal: []string{"!", "-s", cidr},
+	}, nil
 }
 
 func (d *detectLocalByCIDR) IsImplemented() bool {
 	return true
 }
 
-func (d *detectLocalByCIDR) JumpIfLocal(args []string, toChain string) []string {
-	line := append(args, "-s", d.cidr, "-j", toChain)
-	klog.V(4).InfoS("Detect Local By CIDR", "cidr", d.cidr, "jumpLocal", line)
-	return line
+func (d *detectLocalByCIDR) IfLocal() []string {
+	return d.ifLocal
 }
 
-func (d *detectLocalByCIDR) JumpIfNotLocal(args []string, toChain string) []string {
-	line := append(args, "!", "-s", d.cidr, "-j", toChain)
-	klog.V(4).InfoS("Detect Local By CIDR", "cidr", d.cidr, "jumpNotLocal", line)
-	return line
+func (d *detectLocalByCIDR) IfNotLocal() []string {
+	return d.ifNotLocal
 }
