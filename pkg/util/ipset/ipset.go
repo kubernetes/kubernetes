@@ -92,35 +92,35 @@ type IPSet struct {
 }
 
 // Validate checks if a given ipset is valid or not.
-func (set *IPSet) Validate() bool {
+func (set *IPSet) Validate() error {
 	// Check if protocol is valid for `HashIPPort`, `HashIPPortIP` and `HashIPPortNet` type set.
 	if set.SetType == HashIPPort || set.SetType == HashIPPortIP || set.SetType == HashIPPortNet {
 		if valid := validateHashFamily(set.HashFamily); !valid {
-			return false
+			return fmt.Errorf("Invalid HashFamily")
 		}
 	}
 	// check set type
 	if valid := validateIPSetType(set.SetType); !valid {
-		return false
+		return fmt.Errorf("Invalid IPSetType")
 	}
 	// check port range for bitmap type set
 	if set.SetType == BitmapPort {
 		if valid := validatePortRange(set.PortRange); !valid {
-			return false
+			return fmt.Errorf("Invalid PortRange")
 		}
 	}
 	// check hash size value of ipset
 	if set.HashSize <= 0 {
 		klog.Errorf("Invalid hashsize value %d, should be >0", set.HashSize)
-		return false
+		return fmt.Errorf("Invalid hashsize value")
 	}
 	// check max elem value of ipset
 	if set.MaxElem <= 0 {
 		klog.Errorf("Invalid maxelem value %d, should be >0", set.MaxElem)
-		return false
+		return fmt.Errorf("Invalid hashsize value")
 	}
 
-	return true
+	return nil
 }
 
 //setIPSetDefaults sets some IPSet fields if not present to their default values.
@@ -275,8 +275,7 @@ func (runner *runner) CreateSet(set *IPSet, ignoreExistErr bool) error {
 	set.setIPSetDefaults()
 
 	// Validate ipset before creating
-	valid := set.Validate()
-	if !valid {
+	if err := set.Validate(); err != nil {
 		return fmt.Errorf("error creating ipset since it's invalid")
 	}
 	return runner.createSet(set, ignoreExistErr)
