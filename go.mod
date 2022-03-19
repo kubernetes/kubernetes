@@ -56,6 +56,7 @@ require (
 	github.com/lithammer/dedent v1.1.0
 	github.com/lpabon/godbc v0.1.1 // indirect
 	github.com/moby/ipvs v1.0.1
+	github.com/moby/sys/mountinfo v0.6.0 // indirect
 	github.com/mohae/deepcopy v0.0.0-20170603005431-491d3605edfb // indirect
 	github.com/mrunalp/fileutils v0.5.0
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
@@ -317,7 +318,7 @@ replace (
 	github.com/mitchellh/mapstructure => github.com/mitchellh/mapstructure v1.4.1
 	github.com/moby/ipvs => github.com/moby/ipvs v1.0.1
 	github.com/moby/spdystream => github.com/moby/spdystream v0.2.0
-	github.com/moby/sys/mountinfo => github.com/moby/sys/mountinfo v0.4.1
+	github.com/moby/sys/mountinfo => github.com/moby/sys/mountinfo v0.6.0
 	github.com/moby/term => github.com/moby/term v0.0.0-20210619224110-3f7ff695adc6
 	github.com/modern-go/concurrent => github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd
 	github.com/modern-go/reflect2 => github.com/modern-go/reflect2 v1.0.2
