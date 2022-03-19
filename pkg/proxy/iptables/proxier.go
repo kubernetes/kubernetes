@@ -123,21 +123,27 @@ type serviceInfo struct {
 	serviceLBChainName       utiliptables.Chain
 }
 
+//FIXME:
 // returns a new proxy.ServicePort which abstracts a serviceInfo
-func newServiceInfo(port *v1.ServicePort, service *v1.Service, baseInfo *proxy.BaseServiceInfo) proxy.ServicePort {
-	info := &serviceInfo{BaseServiceInfo: baseInfo}
+func newServiceInfo(hasher hasher) func(port *v1.ServicePort, service *v1.Service, baseInfo *proxy.BaseServiceInfo) proxy.ServicePort {
+	return func(port *v1.ServicePort, service *v1.Service, baseInfo *proxy.BaseServiceInfo) proxy.ServicePort {
+		info := &serviceInfo{BaseServiceInfo: baseInfo}
 
-	// Store the following for performance reasons.
-	svcName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
-	svcPortName := proxy.ServicePortName{NamespacedName: svcName, Port: port.Name}
-	protocol := strings.ToLower(string(info.Protocol()))
-	info.serviceNameString = svcPortName.String()
-	info.servicePortChainName = servicePortChainName(info.serviceNameString, protocol)
-	info.serviceFirewallChainName = serviceFirewallChainName(info.serviceNameString, protocol)
-	info.serviceLBChainName = serviceLBChainName(info.serviceNameString, protocol)
+		// Store the following for performance reasons.
+		svcName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
+		svcPortName := proxy.ServicePortName{NamespacedName: svcName, Port: port.Name}
+		protocol := strings.ToLower(string(info.Protocol()))
+		info.serviceNameString = svcPortName.String()
+		info.servicePortChainName = servicePortChainName(hasher, info.serviceNameString, protocol)
+		info.serviceFirewallChainName = serviceFirewallChainName(hasher, info.serviceNameString, protocol)
+		info.serviceLBChainName = serviceLBChainName(hasher, info.serviceNameString, protocol)
 
-	return info
+		return info
+	}
 }
+
+//FIXME: better name
+type hasher func(input ...string) string
 
 // internal struct for endpoints information
 type endpointsInfo struct {
@@ -147,10 +153,12 @@ type endpointsInfo struct {
 }
 
 // returns a new proxy.Endpoint which abstracts a endpointsInfo
-func newEndpointInfo(baseInfo *proxy.BaseEndpointInfo, svcPortName *proxy.ServicePortName) proxy.Endpoint {
-	return &endpointsInfo{
-		BaseEndpointInfo: baseInfo,
-		ChainName:        servicePortEndpointChainName(svcPortName.String(), strings.ToLower(string(svcPortName.Protocol)), baseInfo.Endpoint),
+func newEndpointInfo(hasher hasher) func(baseInfo *proxy.BaseEndpointInfo, svcPortName *proxy.ServicePortName) proxy.Endpoint {
+	return func(baseInfo *proxy.BaseEndpointInfo, svcPortName *proxy.ServicePortName) proxy.Endpoint {
+		return &endpointsInfo{
+			BaseEndpointInfo: baseInfo,
+			ChainName:        servicePortEndpointChainName(hasher, svcPortName.String(), strings.ToLower(string(svcPortName.Protocol)), baseInfo.Endpoint),
+		}
 	}
 }
 
@@ -286,11 +294,14 @@ func NewProxier(ipt utiliptables.Interface,
 		klog.InfoS("Found node IPs of the wrong family", "ipFamily", ipFamily, "IPs", strings.Join(ips, ","))
 	}
 
+	//FIXME:
+	hasher := iptablesHasher
+
 	proxier := &Proxier{
 		serviceMap:               make(proxy.ServiceMap),
-		serviceChanges:           proxy.NewServiceChangeTracker(newServiceInfo, ipFamily, recorder, nil),
+		serviceChanges:           proxy.NewServiceChangeTracker(newServiceInfo(hasher), ipFamily, recorder, nil),
 		endpointsMap:             make(proxy.EndpointsMap),
-		endpointsChanges:         proxy.NewEndpointChangeTracker(hostname, newEndpointInfo, ipFamily, recorder, nil),
+		endpointsChanges:         proxy.NewEndpointChangeTracker(hostname, newEndpointInfo(hasher), ipFamily, recorder, nil),
 		syncPeriod:               syncPeriod,
 		iptables:                 ipt,
 		masqueradeAll:            masqueradeAll,
@@ -673,12 +684,17 @@ func (proxier *Proxier) OnNodeDelete(node *v1.Node) {
 func (proxier *Proxier) OnNodeSynced() {
 }
 
+//FIXME:
 // portProtoHash takes the ServicePortName and protocol for a service
 // returns the associated 16 character hash. This is computed by hashing (sha256)
 // then encoding to base32 and truncating to 16 chars. We do this because IPTables
 // Chain Names must be <= 28 chars long, and the longer they are the harder they are to read.
-func portProtoHash(servicePortName string, protocol string) string {
-	hash := sha256.Sum256([]byte(servicePortName + protocol))
+func iptablesHasher(input ...string) string {
+	buf := bytes.Buffer{}
+	for _, in := range input {
+		buf.WriteString(in)
+	}
+	hash := sha256.Sum256(buf.Bytes())
 	encoded := base32.StdEncoding.EncodeToString(hash[:])
 	return encoded[:16]
 }
@@ -686,15 +702,15 @@ func portProtoHash(servicePortName string, protocol string) string {
 // servicePortChainName takes the ServicePortName for a service and
 // returns the associated iptables chain.  This is computed by hashing (sha256)
 // then encoding to base32 and truncating with the prefix "KUBE-SVC-".
-func servicePortChainName(servicePortName string, protocol string) utiliptables.Chain {
-	return utiliptables.Chain("KUBE-SVC-" + portProtoHash(servicePortName, protocol))
+func servicePortChainName(hasher hasher, servicePortName string, protocol string) utiliptables.Chain {
+	return utiliptables.Chain("KUBE-SVC-" + hasher(servicePortName, protocol))
 }
 
 // serviceFirewallChainName takes the ServicePortName for a service and
 // returns the associated iptables chain.  This is computed by hashing (sha256)
 // then encoding to base32 and truncating with the prefix "KUBE-FW-".
-func serviceFirewallChainName(servicePortName string, protocol string) utiliptables.Chain {
-	return utiliptables.Chain("KUBE-FW-" + portProtoHash(servicePortName, protocol))
+func serviceFirewallChainName(hasher hasher, servicePortName string, protocol string) utiliptables.Chain {
+	return utiliptables.Chain("KUBE-FW-" + hasher(servicePortName, protocol))
 }
 
 // serviceLBPortChainName takes the ServicePortName for a service and
@@ -702,15 +718,13 @@ func serviceFirewallChainName(servicePortName string, protocol string) utiliptab
 // then encoding to base32 and truncating with the prefix "KUBE-XLB-".  We do
 // this because IPTables Chain Names must be <= 28 chars long, and the longer
 // they are the harder they are to read.
-func serviceLBChainName(servicePortName string, protocol string) utiliptables.Chain {
-	return utiliptables.Chain("KUBE-XLB-" + portProtoHash(servicePortName, protocol))
+func serviceLBChainName(hasher hasher, servicePortName string, protocol string) utiliptables.Chain {
+	return utiliptables.Chain("KUBE-XLB-" + hasher(servicePortName, protocol))
 }
 
 // This is the same as servicePortChainName but with the endpoint included.
-func servicePortEndpointChainName(servicePortName string, protocol string, endpoint string) utiliptables.Chain {
-	hash := sha256.Sum256([]byte(servicePortName + protocol + endpoint))
-	encoded := base32.StdEncoding.EncodeToString(hash[:])
-	return utiliptables.Chain("KUBE-SEP-" + encoded[:16])
+func servicePortEndpointChainName(hasher hasher, servicePortName string, protocol string, endpoint string) utiliptables.Chain {
+	return utiliptables.Chain("KUBE-SEP-" + hasher(servicePortName, protocol, endpoint))
 }
 
 // After a UDP or SCTP endpoint has been removed, we must flush any pending conntrack entries to it, or else we
