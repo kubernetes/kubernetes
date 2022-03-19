@@ -4314,7 +4314,7 @@ func TestInternalTrafficPolicyE2E(t *testing.T) {
 			expectedIPTablesWithSlice: clusterExpectedIPTables,
 		},
 		{
-			name:                  "internalTrafficPolicy is local and there is non-zero local endpoints",
+			name:                  "internalTrafficPolicy is local and there are local endpoints",
 			line:                  getLine(),
 			internalTrafficPolicy: &local,
 			featureGateOn:         true,
@@ -4355,7 +4355,7 @@ func TestInternalTrafficPolicyE2E(t *testing.T) {
 				`),
 		},
 		{
-			name:                  "internalTrafficPolicy is local and there is zero local endpoint",
+			name:                  "internalTrafficPolicy is local and there are no local endpoints",
 			line:                  getLine(),
 			internalTrafficPolicy: &local,
 			featureGateOn:         true,
@@ -4393,7 +4393,7 @@ func TestInternalTrafficPolicyE2E(t *testing.T) {
 				`),
 		},
 		{
-			name:                  "internalTrafficPolicy is local and there is non-zero local endpoint with feature gate off",
+			name:                  "Local internalTrafficPolicy is ignored when feature gate is off",
 			line:                  getLine(),
 			internalTrafficPolicy: &local,
 			featureGateOn:         false,
@@ -4548,7 +4548,7 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 						NodeName: utilpointer.StringPtr(testHostname),
 					},
 					{
-						// this endpoint should be ignored for node ports since there are ready non-terminating endpoints
+						// this endpoint should be ignored for external since there are ready non-terminating endpoints
 						Addresses: []string{"10.0.1.3"},
 						Conditions: discovery.EndpointConditions{
 							Ready:       utilpointer.BoolPtr(false),
@@ -4558,7 +4558,7 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 						NodeName: utilpointer.StringPtr(testHostname),
 					},
 					{
-						// this endpoint should be ignored for node ports since there are ready non-terminating endpoints
+						// this endpoint should be ignored for external since there are ready non-terminating endpoints
 						Addresses: []string{"10.0.1.4"},
 						Conditions: discovery.EndpointConditions{
 							Ready:       utilpointer.BoolPtr(false),
@@ -4568,7 +4568,7 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 						NodeName: utilpointer.StringPtr(testHostname),
 					},
 					{
-						// this endpoint should be ignored for node ports since it's not local
+						// this endpoint should be ignored for external since it's not local
 						Addresses: []string{"10.0.1.5"},
 						Conditions: discovery.EndpointConditions{
 							Ready:       utilpointer.BoolPtr(true),
@@ -4668,7 +4668,7 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 						NodeName: utilpointer.StringPtr(testHostname),
 					},
 					{
-						// this endpoint should be ignored for node ports since there are ready non-terminating endpoints
+						// this endpoint should be ignored since it is not ready and the feature gate is off
 						Addresses: []string{"10.0.1.3"},
 						Conditions: discovery.EndpointConditions{
 							Ready:       utilpointer.BoolPtr(false),
@@ -4678,7 +4678,7 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 						NodeName: utilpointer.StringPtr(testHostname),
 					},
 					{
-						// this endpoint should be ignored for node ports since there are ready non-terminating endpoints
+						// this endpoint should be ignored since it is not ready and the feature gate is off
 						Addresses: []string{"10.0.1.4"},
 						Conditions: discovery.EndpointConditions{
 							Ready:       utilpointer.BoolPtr(false),
@@ -4688,7 +4688,7 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 						NodeName: utilpointer.StringPtr(testHostname),
 					},
 					{
-						// this endpoint should be ignored for node ports since it's not local
+						// this endpoint should be ignored for external since it's not local
 						Addresses: []string{"10.0.1.5"},
 						Conditions: discovery.EndpointConditions{
 							Ready:       utilpointer.BoolPtr(true),
@@ -4800,7 +4800,7 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 						NodeName: utilpointer.StringPtr(testHostname),
 					},
 					{
-						// this endpoint should be ignored for node ports since it's not local
+						// this endpoint should be ignored for external since it's not local
 						Addresses: []string{"10.0.1.5"},
 						Conditions: discovery.EndpointConditions{
 							Ready:       utilpointer.BoolPtr(true),
@@ -4861,7 +4861,7 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 				`),
 		},
 		{
-			name:                   "with ProxyTerminatingEndpoints disabled, only terminating endpoints exist",
+			name:                   "with ProxyTerminatingEndpoints disabled, only non-local and terminating endpoints exist",
 			line:                   getLine(),
 			terminatingFeatureGate: false,
 			endpointslice: &discovery.EndpointSlice{
@@ -5961,7 +5961,7 @@ func TestNoEndpointsMetric(t *testing.T) {
 		expectedSyncProxyRulesNoLocalEndpointsTotalExternal int
 	}{
 		{
-			name:                  "internalTrafficPolicy is set and there is non-zero local endpoints",
+			name:                  "internalTrafficPolicy is set and there are local endpoints",
 			internalTrafficPolicy: &internalTrafficPolicyLocal,
 			endpoints: []endpoint{
 				{"10.0.1.1", testHostname},
@@ -5970,7 +5970,7 @@ func TestNoEndpointsMetric(t *testing.T) {
 			},
 		},
 		{
-			name:                  "externalTrafficPolicy is set and there is non-zero local endpoints",
+			name:                  "externalTrafficPolicy is set and there are local endpoints",
 			externalTrafficPolicy: externalTrafficPolicyLocal,
 			endpoints: []endpoint{
 				{"10.0.1.1", testHostname},
@@ -5979,7 +5979,7 @@ func TestNoEndpointsMetric(t *testing.T) {
 			},
 		},
 		{
-			name:                  "both policies are set and there is non-zero local endpoints",
+			name:                  "both policies are set and there are local endpoints",
 			internalTrafficPolicy: &internalTrafficPolicyLocal,
 			externalTrafficPolicy: externalTrafficPolicyLocal,
 			endpoints: []endpoint{
@@ -5989,7 +5989,7 @@ func TestNoEndpointsMetric(t *testing.T) {
 			},
 		},
 		{
-			name:                  "internalTrafficPolicy is set and there is zero local endpoint",
+			name:                  "internalTrafficPolicy is set and there are no local endpoints",
 			internalTrafficPolicy: &internalTrafficPolicyLocal,
 			endpoints: []endpoint{
 				{"10.0.1.1", "host0"},
@@ -5999,7 +5999,7 @@ func TestNoEndpointsMetric(t *testing.T) {
 			expectedSyncProxyRulesNoLocalEndpointsTotalInternal: 1,
 		},
 		{
-			name:                  "externalTrafficPolicy is set and there is zero local endpoint",
+			name:                  "externalTrafficPolicy is set and there are no local endpoints",
 			externalTrafficPolicy: externalTrafficPolicyLocal,
 			endpoints: []endpoint{
 				{"10.0.1.1", "host0"},
@@ -6009,7 +6009,7 @@ func TestNoEndpointsMetric(t *testing.T) {
 			expectedSyncProxyRulesNoLocalEndpointsTotalExternal: 1,
 		},
 		{
-			name:                  "both policies are set and there is zero local endpoint",
+			name:                  "both policies are set and there are no local endpoints",
 			internalTrafficPolicy: &internalTrafficPolicyLocal,
 			externalTrafficPolicy: externalTrafficPolicyLocal,
 			endpoints: []endpoint{
