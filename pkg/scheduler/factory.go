@@ -33,11 +33,6 @@ import (
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 )
 
-// Binder knows how to write a binding.
-type Binder interface {
-	Bind(binding *v1.Binding) error
-}
-
 func buildExtenders(extenders []schedulerapi.Extender, profiles []schedulerapi.KubeSchedulerProfile) ([]framework.Extender, error) {
 	var fExtenders []framework.Extender
 	if len(extenders) == 0 {
