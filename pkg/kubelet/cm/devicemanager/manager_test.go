@@ -959,6 +959,48 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 
 }
 
+func TestGetDeviceRunContainerOptions(t *testing.T) {
+	res := TestResource{
+		resourceName:     "domain1.com/resource1",
+		resourceQuantity: *resource.NewQuantity(int64(2), resource.DecimalSI),
+		devs:             checkpoint.DevicesPerNUMA{0: []string{"dev1", "dev2"}},
+		topology:         true,
+	}
+	testResources := []TestResource{res}
+	podsStub := activePodsStub{
+		activePods: []*v1.Pod{},
+	}
+	as := require.New(t)
+
+	tmpDir, err := ioutil.TempDir("", "checkpoint")
+	as.Nil(err)
+	defer os.RemoveAll(tmpDir)
+
+	testManager, err := getTestManager(tmpDir, podsStub.getActivePods, testResources)
+	as.Nil(err)
+
+	pod := makePod(v1.ResourceList{v1.ResourceName(res.resourceName): res.resourceQuantity})
+	activePods := []*v1.Pod{pod}
+	podsStub.updateActivePods(activePods)
+
+	err = testManager.Allocate(pod, &pod.Spec.Containers[0])
+	as.Nil(err)
+
+	// when pod is in activePods, GetDeviceRunContainerOptions should return
+	_, err = testManager.GetDeviceRunContainerOptions(pod, &pod.Spec.Containers[0])
+	as.Nil(err)
+
+	activePods = []*v1.Pod{}
+	podsStub.updateActivePods(activePods)
+	// when pod is removed from activePods,G etDeviceRunContainerOptions should return error
+	_, err = testManager.GetDeviceRunContainerOptions(pod, &pod.Spec.Containers[0])
+	expectedErr := fmt.Errorf("pod %v is removed from activePods list", pod.UID)
+	as.NotNil(err)
+	if !reflect.DeepEqual(err, expectedErr) {
+		t.Errorf("GetDeviceRunContainerOptions. expected error: %v but got: %v", expectedErr, err)
+	}
+}
+
 func TestInitContainerDeviceAllocation(t *testing.T) {
 	// Requesting to create a pod that requests resourceName1 in init containers and normal containers
 	// should succeed with devices allocated to init containers reallocated to normal containers.

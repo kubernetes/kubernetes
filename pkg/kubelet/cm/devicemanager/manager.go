@@ -997,11 +997,28 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 	return nil
 }
 
+// checkPodActive checks if the given pod is still in activePods list
+func (m *ManagerImpl) checkPodActive(pod *v1.Pod) bool {
+	activePods := m.activePods()
+	for _, activePod := range activePods {
+		if activePod.UID == pod.UID {
+			return true
+		}
+	}
+
+	return false
+}
+
 // GetDeviceRunContainerOptions checks whether we have cached containerDevices
 // for the passed-in <pod, container> and returns its DeviceRunContainerOptions
 // for the found one. An empty struct is returned in case no cached state is found.
 func (m *ManagerImpl) GetDeviceRunContainerOptions(pod *v1.Pod, container *v1.Container) (*DeviceRunContainerOptions, error) {
 	podUID := string(pod.UID)
+	if !m.checkPodActive(pod) {
+		klog.Warningf("pod %s has been deleted from activePods, skip getting device run options", podUID)
+		return nil, fmt.Errorf("pod %v is removed from activePods list", podUID)
+	}
+
 	contName := container.Name
 	needsReAllocate := false
 	for k, v := range container.Resources.Limits {
