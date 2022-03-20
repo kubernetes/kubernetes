@@ -29,18 +29,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
-	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/events"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
-	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
-	"k8s.io/kubernetes/pkg/scheduler/profile"
 	testingclock "k8s.io/utils/clock/testing"
 )
 
@@ -49,16 +43,6 @@ const (
 	podMaxBackoffDurationSeconds     = 10
 	testSchedulerName                = "test-scheduler"
 )
-
-func TestCreate(t *testing.T) {
-	client := fake.NewSimpleClientset()
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	factory := newConfigFactory(client, stopCh)
-	if _, err := factory.create(); err != nil {
-		t.Error(err)
-	}
-}
 
 func TestDefaultErrorFunc(t *testing.T) {
 	testPod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-pod", Namespace: "default"}}
@@ -258,40 +242,6 @@ func getPodFromPriorityQueue(queue *internalqueue.PriorityQueue, pod *v1.Pod) *v
 	}
 
 	return nil
-}
-
-func newConfigFactoryWithFrameworkRegistry(
-	client clientset.Interface, stopCh <-chan struct{},
-	registry frameworkruntime.Registry) *Configurator {
-	informerFactory := informers.NewSharedInformerFactory(client, 0)
-	snapshot := internalcache.NewEmptySnapshot()
-	recorderFactory := profile.NewRecorderFactory(events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()}))
-	return &Configurator{
-		client:                   client,
-		informerFactory:          informerFactory,
-		percentageOfNodesToScore: schedulerapi.DefaultPercentageOfNodesToScore,
-		podInitialBackoffSeconds: podInitialBackoffDurationSeconds,
-		podMaxBackoffSeconds:     podMaxBackoffDurationSeconds,
-		StopEverything:           stopCh,
-		registry:                 registry,
-		profiles: []schedulerapi.KubeSchedulerProfile{
-			{
-				SchedulerName: testSchedulerName,
-				Plugins: &schedulerapi.Plugins{
-					QueueSort: schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "PrioritySort"}}},
-					Bind:      schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "DefaultBinder"}}},
-				},
-			},
-		},
-		recorderFactory:  recorderFactory,
-		nodeInfoSnapshot: snapshot,
-		clusterEventMap:  make(map[framework.ClusterEvent]sets.String),
-	}
-}
-
-func newConfigFactory(client clientset.Interface, stopCh <-chan struct{}) *Configurator {
-	return newConfigFactoryWithFrameworkRegistry(client, stopCh,
-		frameworkplugins.NewInTreeRegistry())
 }
 
 type fakeExtender struct {
