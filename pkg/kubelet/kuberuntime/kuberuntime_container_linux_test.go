@@ -260,6 +260,29 @@ func TestCalculateLinuxResources(t *testing.T) {
 				MemoryLimitInBytes: 0,
 			},
 		},
+		{
+			name:   "RequestNilCPU",
+			cpuLim: resource.MustParse("2"),
+			memLim: resource.MustParse("0"),
+			expected: &runtimeapi.LinuxContainerResources{
+				CpuPeriod:          100000,
+				CpuQuota:           200000,
+				CpuShares:          2048,
+				MemoryLimitInBytes: 0,
+			},
+		},
+		{
+			name:   "RequestZeroCPU",
+			cpuReq: resource.MustParse("0"),
+			cpuLim: resource.MustParse("2"),
+			memLim: resource.MustParse("0"),
+			expected: &runtimeapi.LinuxContainerResources{
+				CpuPeriod:          100000,
+				CpuQuota:           200000,
+				CpuShares:          2,
+				MemoryLimitInBytes: 0,
+			},
+		},
 	}
 	for _, test := range tests {
 		linuxContainerResources := m.calculateLinuxResources(&test.cpuReq, &test.cpuLim, &test.memLim)
