@@ -106,18 +106,18 @@ func (set *IPSet) Validate() error {
 	// check port range for bitmap type set
 	if set.SetType == BitmapPort {
 		if valid := validatePortRange(set.PortRange); !valid {
-			return fmt.Errorf("Invalid PortRange")
+			return fmt.Errorf("Invalid PortRange for BitmapPort type")
 		}
 	}
 	// check hash size value of ipset
 	if set.HashSize <= 0 {
 		klog.Errorf("Invalid hashsize value %d, should be >0", set.HashSize)
-		return fmt.Errorf("Invalid hashsize value")
+		return fmt.Errorf("Invalid HashSize value")
 	}
 	// check max elem value of ipset
 	if set.MaxElem <= 0 {
 		klog.Errorf("Invalid maxelem value %d, should be >0", set.MaxElem)
-		return fmt.Errorf("Invalid hashsize value")
+		return fmt.Errorf("Invalid MaxElem value")
 	}
 
 	return nil

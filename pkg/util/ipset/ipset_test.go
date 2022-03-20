@@ -18,6 +18,7 @@ package ipset
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -888,12 +889,12 @@ func Test_validateProtocol(t *testing.T) {
 
 func TestValidateIPSet(t *testing.T) {
 	testCases := []struct {
-		ipset      *IPSet
-		valid      bool
-		probReason string
-		desc       string
+		ipset *IPSet
+		valid bool
+		name  string
 	}{
-		{ // case[0]
+		{
+			name: "valid HashIPPort type",
 			ipset: &IPSet{
 				Name:       "test",
 				SetType:    HashIPPort,
@@ -903,7 +904,8 @@ func TestValidateIPSet(t *testing.T) {
 			},
 			valid: true,
 		},
-		{ // case[1]
+		{
+			name: "valid BitmapPort type",
 			ipset: &IPSet{
 				Name:       "SET",
 				SetType:    BitmapPort,
@@ -914,7 +916,8 @@ func TestValidateIPSet(t *testing.T) {
 			},
 			valid: true,
 		},
-		{ // case[2]
+		{
+			name: "Invalid PortRange for BitmapPort type",
 			ipset: &IPSet{
 				Name:       "foo",
 				SetType:    BitmapPort,
@@ -922,11 +925,10 @@ func TestValidateIPSet(t *testing.T) {
 				HashSize:   65535,
 				MaxElem:    2048,
 			},
-			valid:      false,
-			probReason: "Invalid PortRange",
-			desc:       "should specify right port range for bitmap type set",
+			valid: false,
 		},
-		{ // case[3]
+		{
+			name: "Invalid HashSize value for HashIPPort type",
 			ipset: &IPSet{
 				Name:       "bar",
 				SetType:    HashIPPort,
@@ -934,11 +936,10 @@ func TestValidateIPSet(t *testing.T) {
 				HashSize:   0,
 				MaxElem:    2048,
 			},
-			valid:      false,
-			probReason: "Invalid hashsize value",
-			desc:       "wrong hash size number",
+			valid: false,
 		},
-		{ // case[4]
+		{
+			name: "Invalid MaxElem value for HashIPPort type",
 			ipset: &IPSet{
 				Name:       "baz",
 				SetType:    HashIPPort,
@@ -946,11 +947,10 @@ func TestValidateIPSet(t *testing.T) {
 				HashSize:   1024,
 				MaxElem:    -1,
 			},
-			valid:      false,
-			probReason: "Invalid hashsize value",
-			desc:       "wrong hash max elem number",
+			valid: false,
 		},
-		{ // case[5]
+		{
+			name: "Invalid HashFamily",
 			ipset: &IPSet{
 				Name:       "baz",
 				SetType:    HashIPPortNet,
@@ -958,11 +958,10 @@ func TestValidateIPSet(t *testing.T) {
 				HashSize:   1024,
 				MaxElem:    1024,
 			},
-			valid:      false,
-			probReason: "Invalid HashFamily",
-			desc:       "wrong protocol",
+			valid: false,
 		},
-		{ // case[6]
+		{
+			name: "Invalid IPSetType",
 			ipset: &IPSet{
 				Name:       "foo-bar",
 				SetType:    "xxx",
@@ -970,19 +969,19 @@ func TestValidateIPSet(t *testing.T) {
 				HashSize:   1024,
 				MaxElem:    1024,
 			},
-			valid:      false,
-			probReason: "Invalid IPSetType",
-			desc:       "wrong set type",
+			valid: false,
 		},
 	}
 	for i := range testCases {
-		err := testCases[i].ipset.Validate()
-		valid := err == nil
-		if valid != testCases[i].valid {
-			t.Errorf("case [%d]: unexpected mismatch, expect valid[%v], got valid[%v], desc: %s", i, testCases[i].valid, valid, testCases[i].desc)
-		} else if err != nil && err.Error() != testCases[i].probReason {
-			t.Errorf("case [%d]: unexpected mismatch, expect failed reason: %s, got failed reason: %s", i, testCases[i].probReason, err.Error())
-		}
+		t.Run(testCases[i].name, func(t *testing.T) {
+			err := testCases[i].ipset.Validate()
+			valid := err == nil
+			if valid != testCases[i].valid {
+				t.Errorf("unexpected mismatch, expect valid[%v], got valid[%v]", testCases[i].valid, valid)
+			} else if err != nil && strings.Contains(testCases[i].name, err.Error()) != true {
+				t.Errorf("unexpected mismatch, expect failed reason: %s, got failed reason: %s", testCases[i].name, err.Error())
+			}
+		})
 	}
 }
 
