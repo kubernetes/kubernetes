@@ -18,6 +18,7 @@ package scheduler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"strconv"
@@ -49,6 +50,7 @@ import (
 	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
+	cachedebugger "k8s.io/kubernetes/pkg/scheduler/internal/cache/debugger"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
@@ -305,44 +307,75 @@ func New(client clientset.Interface,
 		}
 		options.profiles = cfg.Profiles
 	}
-	schedulerCache := internalcache.New(durationToExpireAssumedPod, stopEverything)
 
 	registry := frameworkplugins.NewInTreeRegistry()
 	if err := registry.Merge(options.frameworkOutOfTreeRegistry); err != nil {
 		return nil, err
 	}
 
+	metrics.Register()
+
+	extenders, err := buildExtenders(options.extenders, options.profiles)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't build extenders: %w", err)
+	}
+
+	podLister := informerFactory.Core().V1().Pods().Lister()
+	nodeLister := informerFactory.Core().V1().Nodes().Lister()
+
+	// The nominator will be passed all the way to framework instantiation.
+	nominator := internalqueue.NewPodNominator(podLister)
 	snapshot := internalcache.NewEmptySnapshot()
 	clusterEventMap := make(map[framework.ClusterEvent]sets.String)
 
-	configurator := &Configurator{
-		componentConfigVersion:       options.componentConfigVersion,
-		client:                       client,
-		kubeConfig:                   options.kubeConfig,
-		recorderFactory:              recorderFactory,
-		informerFactory:              informerFactory,
-		schedulerCache:               schedulerCache,
-		StopEverything:               stopEverything,
-		percentageOfNodesToScore:     options.percentageOfNodesToScore,
-		podInitialBackoffSeconds:     options.podInitialBackoffSeconds,
-		podMaxBackoffSeconds:         options.podMaxBackoffSeconds,
-		podMaxUnschedulableQDuration: options.podMaxUnschedulableQDuration,
-		profiles:                     append([]schedulerapi.KubeSchedulerProfile(nil), options.profiles...),
-		registry:                     registry,
-		nodeInfoSnapshot:             snapshot,
-		extenders:                    options.extenders,
-		frameworkCapturer:            options.frameworkCapturer,
-		parallellism:                 options.parallelism,
-		clusterEventMap:              clusterEventMap,
-	}
-
-	metrics.Register()
-
-	// Create the config from component config
-	sched, err := configurator.create()
+	profiles, err := profile.NewMap(options.profiles, registry, recorderFactory,
+		frameworkruntime.WithComponentConfigVersion(options.componentConfigVersion),
+		frameworkruntime.WithClientSet(client),
+		frameworkruntime.WithKubeConfig(options.kubeConfig),
+		frameworkruntime.WithInformerFactory(informerFactory),
+		frameworkruntime.WithSnapshotSharedLister(snapshot),
+		frameworkruntime.WithPodNominator(nominator),
+		frameworkruntime.WithCaptureProfile(frameworkruntime.CaptureProfile(options.frameworkCapturer)),
+		frameworkruntime.WithClusterEventMap(clusterEventMap),
+		frameworkruntime.WithParallelism(int(options.parallelism)),
+		frameworkruntime.WithExtenders(extenders),
+	)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't create scheduler: %v", err)
+		return nil, fmt.Errorf("initializing profiles: %v", err)
 	}
+
+	if len(profiles) == 0 {
+		return nil, errors.New("at least one profile is required")
+	}
+
+	podQueue := internalqueue.NewSchedulingQueue(
+		profiles[options.profiles[0].SchedulerName].QueueSortFunc(),
+		informerFactory,
+		internalqueue.WithPodInitialBackoffDuration(time.Duration(options.podInitialBackoffSeconds)*time.Second),
+		internalqueue.WithPodMaxBackoffDuration(time.Duration(options.podMaxBackoffSeconds)*time.Second),
+		internalqueue.WithPodNominator(nominator),
+		internalqueue.WithClusterEventMap(clusterEventMap),
+		internalqueue.WithPodMaxUnschedulableQDuration(options.podMaxUnschedulableQDuration),
+	)
+
+	schedulerCache := internalcache.New(durationToExpireAssumedPod, stopEverything)
+
+	// Setup cache debugger.
+	debugger := cachedebugger.New(nodeLister, podLister, schedulerCache, podQueue)
+	debugger.ListenForSignal(stopEverything)
+
+	sched := newScheduler(
+		schedulerCache,
+		extenders,
+		internalqueue.MakeNextPodFunc(podQueue),
+		MakeDefaultErrorFunc(client, podLister, podQueue, schedulerCache),
+		stopEverything,
+		podQueue,
+		profiles,
+		client,
+		snapshot,
+		options.percentageOfNodesToScore,
+	)
 
 	addAllEventHandlers(sched, informerFactory, dynInformerFactory, unionedGVKs(clusterEventMap))
 
