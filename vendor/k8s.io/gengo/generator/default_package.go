@@ -27,6 +27,7 @@ type DefaultPackage struct {
 	// Import path of the package, and the location on disk of the package.
 	PackagePath string
 	// The location of the package on disk.
+	//FIXME: ever used?
 	Source string
 
 	// Emitted at the top of every file.
