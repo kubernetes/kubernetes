@@ -533,17 +533,19 @@ func TestStatefulPodControlUpdatePodClaimForRetentionPolicy(t *testing.T) {
 	// tests the wiring from the pod control to that method.
 	testFn := func(t *testing.T) {
 		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)()
-		fakeClient := &fake.Clientset{}
 		indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 		claimLister := corelisters.NewPersistentVolumeClaimLister(indexer)
 		set := newStatefulSet(3)
 		set.GetObjectMeta().SetUID("set-123")
 		pod := newStatefulSetPod(set, 0)
 		claims := getPersistentVolumeClaims(set, pod)
+		claimObjects := make([]runtime.Object, 0)
 		for k := range claims {
 			claim := claims[k]
 			indexer.Add(&claim)
+			claimObjects = append(claimObjects, &claim)
 		}
+		fakeClient := fake.NewSimpleClientset(claimObjects...)
 		control := NewStatefulPodControl(fakeClient, nil, claimLister, &noopRecorder{})
 		set.Spec.PersistentVolumeClaimRetentionPolicy = &apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
 			WhenDeleted: apps.DeletePersistentVolumeClaimRetentionPolicyType,
@@ -554,7 +556,7 @@ func TestStatefulPodControlUpdatePodClaimForRetentionPolicy(t *testing.T) {
 		}
 		expectRef := utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC)
 		for k := range claims {
-			claim, err := claimLister.PersistentVolumeClaims(claims[k].Namespace).Get(claims[k].Name)
+			claim, err := fakeClient.CoreV1().PersistentVolumeClaims(claims[k].Namespace).Get(context.TODO(), claims[k].Name, metav1.GetOptions{})
 			if err != nil {
 				t.Errorf("Unexpected error getting Claim %s/%s: %v", claim.Namespace, claim.Name, err)
 			}

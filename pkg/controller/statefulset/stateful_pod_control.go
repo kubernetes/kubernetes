@@ -241,9 +241,10 @@ func (spc *StatefulPodControl) UpdatePodClaimForRetentionPolicy(set *apps.Statef
 			return fmt.Errorf("Could not retrieve claim %s not found for %s when checking PVC deletion policy: %w", claimName, pod.Name, err)
 		default:
 			if !claimOwnerMatchesSetAndPod(claim, set, pod) {
-				needsUpdate := updateClaimOwnerRefForSetAndPod(claim, set, pod)
+				claimClone := claim.DeepCopy()
+				needsUpdate := updateClaimOwnerRefForSetAndPod(claimClone, set, pod)
 				if needsUpdate {
-					err := spc.objectMgr.UpdateClaim(claim)
+					err := spc.objectMgr.UpdateClaim(claimClone)
 					if err != nil {
 						return fmt.Errorf("Could not update claim %s for delete policy ownerRefs: %w", claimName, err)
 					}
@@ -340,6 +341,7 @@ func (spc *StatefulPodControl) createPersistentVolumeClaims(set *apps.StatefulSe
 			}
 		}
 		// TODO: Check resource requirements and accessmodes, update if necessary
+		// Don't forget to deep copy this pvc if you need to update it
 	}
 	return errorutils.NewAggregate(errs)
 }
