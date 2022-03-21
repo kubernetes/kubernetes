@@ -59,6 +59,44 @@ func TestStringSet(t *testing.T) {
 	}
 }
 
+func TestGenericStringSet(t *testing.T) {
+	s := Set[string]{}
+	s2 := Set[string]{}
+	if len(s) != 0 {
+		t.Errorf("Expected len=0: %d", len(s))
+	}
+	s.Insert("a", "b")
+	if len(s) != 2 {
+		t.Errorf("Expected len=2: %d", len(s))
+	}
+	s.Insert("c")
+	if s.Has("d") {
+		t.Errorf("Unexpected contents: %#v", s)
+	}
+	if !s.Has("a") {
+		t.Errorf("Missing contents: %#v", s)
+	}
+	s.Delete("a")
+	if s.Has("a") {
+		t.Errorf("Unexpected contents: %#v", s)
+	}
+	s.Insert("a")
+	if s.HasAll("a", "b", "d") {
+		t.Errorf("Unexpected contents: %#v", s)
+	}
+	if !s.HasAll("a", "b") {
+		t.Errorf("Missing contents: %#v", s)
+	}
+	s2.Insert("a", "b", "d")
+	if s.IsSuperset(s2) {
+		t.Errorf("Unexpected contents: %#v", s)
+	}
+	s2.Delete("d")
+	if !s.IsSuperset(s2) {
+		t.Errorf("Missing contents: %#v", s)
+	}
+}
+
 func TestStringSetDeleteMultiples(t *testing.T) {
 	s := String{}
 	s.Insert("a", "b", "c")
@@ -79,7 +117,6 @@ func TestStringSetDeleteMultiples(t *testing.T) {
 	if !s.Has("b") {
 		t.Errorf("Missing contents: %#v", s)
 	}
-
 }
 
 func TestNewStringSet(t *testing.T) {
@@ -265,6 +302,23 @@ func TestStringIntersection(t *testing.T) {
 
 		if !intersection.Equal(test.expected) {
 			t.Errorf("Expected intersection.Equal(expected) but not true.  intersection:%v expected:%v", intersection.List(), test.expected.List())
+		}
+	}
+}
+
+func TestNewSetFromMapKeys(t *testing.T) {
+	m := map[string]string{
+		"hallo":   "world",
+		"goodbye": "and goodnight",
+	}
+	expected := []string{"goodbye", "hallo"}
+	gotList := NewSetFromMapKeys(m).List() // List() returns a sorted list
+	if len(gotList) != len(m) {
+		t.Fatalf("got %v elements, wanted %v", len(gotList), len(m))
+	}
+	for i, entry := range NewSetFromMapKeys(m).List() {
+		if entry != expected[i] {
+			t.Errorf("got %v, expected %v", entry, expected[i])
 		}
 	}
 }
