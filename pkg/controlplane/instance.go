@@ -79,6 +79,7 @@ import (
 	flowcontrolv1beta3 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta3"
 	"k8s.io/kubernetes/pkg/controlplane/controller/apiserverleasegc"
 	"k8s.io/kubernetes/pkg/controlplane/controller/clusterauthenticationtrust"
+	"k8s.io/kubernetes/pkg/controlplane/controller/legacytokentracking"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
@@ -495,6 +496,15 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 			return nil
 		})
 	}
+
+	m.GenericAPIServer.AddPostStartHookOrDie("start-legacy-token-tracking-controller", func(hookContext genericapiserver.PostStartHookContext) error {
+		kubeClient, err := kubernetes.NewForConfig(hookContext.LoopbackClientConfig)
+		if err != nil {
+			return err
+		}
+		go legacytokentracking.NewController(kubeClient).Run(hookContext.StopCh)
+		return nil
+	})
 
 	return m, nil
 }
