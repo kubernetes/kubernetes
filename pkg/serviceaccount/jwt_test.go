@@ -374,6 +374,10 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 			t.Errorf("%s: Expected userUID=%v, got %v", k, tc.ExpectedUserUID, resp.User.GetUID())
 			continue
 		}
+		if val := resp.User.GetExtra()["jwt/audiences"]; len(val) == 0 || val[0] != "api" {
+			t.Errorf("%s: Expected audiences=%v, got %v", k, map[string][]string{"jwt/audiences": auds}, resp.User.GetExtra())
+			continue
+		}
 		if !reflect.DeepEqual(resp.User.GetGroups(), tc.ExpectedGroups) {
 			t.Errorf("%s: Expected groups=%v, got %v", k, tc.ExpectedGroups, resp.User.GetGroups())
 			continue

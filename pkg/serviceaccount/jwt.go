@@ -26,6 +26,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"k8s.io/apiserver/pkg/authentication/user"
 	"strings"
 
 	jose "gopkg.in/square/go-jose.v2"
@@ -316,8 +317,19 @@ func (j *jwtTokenAuthenticator) AuthenticateToken(ctx context.Context, tokenData
 		return nil, false, err
 	}
 
+	userInfo := &user.DefaultInfo{
+		Name:   sa.UserInfo().GetName(),
+		UID:    sa.UserInfo().GetUID(),
+		Groups: sa.UserInfo().GetGroups(),
+		Extra:  sa.UserInfo().GetExtra(),
+	}
+	if userInfo.Extra == nil {
+		userInfo.Extra = map[string][]string{}
+	}
+	userInfo.Extra["jwt/audiences"] = tokenAudiences
+
 	return &authenticator.Response{
-		User:      sa.UserInfo(),
+		User:      userInfo,
 		Audiences: auds,
 	}, true, nil
 }
