@@ -1039,7 +1039,6 @@ func extractMaxElements(schema *apiextensions.JSONSchemaProps) int64 {
 		}
 		return unboundedSchemaLength
 	default:
-		// TODO(DangerOnTheRanger): should we give XIntOrString its own case?
 		return unboundedSchemaLength
 	}
 }
