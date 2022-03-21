@@ -988,7 +988,7 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 				allErrs = append(allErrs, field.InternalError(fldPath.Child("x-kubernetes-validations"), err))
 			} else {
 				for i, cr := range compResults {
-					celCRDCost += getCRDCost(cr.MaxCost, treeNode)
+					celCRDCost += getExpressionCost(cr.MaxCost, treeNode)
 					if celCRDCost > TotalCostLimit {
 						// TODO(DangerOnTheRanger): consider how to make the error message more informative
 						exceedFactor := float64(celCRDCost) / float64(TotalCostLimit)
@@ -1059,7 +1059,7 @@ func cardinalityFromMaxElements(schemaNode *schemaTree) uint64 {
 	return uint64(celSchema.MaxElements)
 }
 
-func getCRDCost(baseCost uint64, schemaNode *schemaTree) uint64 {
+func getExpressionCost(baseCost uint64, schemaNode *schemaTree) uint64 {
 	if schemaNode.Cardinality == unboundedSchemaLength {
 		if schemaNode.Parent == nil {
 			return baseCost
