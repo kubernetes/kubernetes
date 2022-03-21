@@ -56,7 +56,7 @@ func InterpretGetError(err error, qualifiedResource schema.GroupResource, name s
 // operation into the appropriate API error.
 func InterpretCreateError(err error, qualifiedResource schema.GroupResource, name string) error {
 	switch {
-	case storage.IsNodeExist(err):
+	case storage.IsExist(err):
 		return errors.NewAlreadyExists(qualifiedResource, name)
 	case storage.IsUnreachable(err):
 		return errors.NewServerTimeout(qualifiedResource, "create", 2) // TODO: make configurable or handled at a higher level
@@ -71,7 +71,7 @@ func InterpretCreateError(err error, qualifiedResource schema.GroupResource, nam
 // operation into the appropriate API error.
 func InterpretUpdateError(err error, qualifiedResource schema.GroupResource, name string) error {
 	switch {
-	case storage.IsConflict(err), storage.IsNodeExist(err), storage.IsInvalidObj(err):
+	case storage.IsConflict(err), storage.IsExist(err), storage.IsInvalidObj(err):
 		return errors.NewConflict(qualifiedResource, name, err)
 	case storage.IsUnreachable(err):
 		return errors.NewServerTimeout(qualifiedResource, "update", 2) // TODO: make configurable or handled at a higher level
@@ -92,7 +92,7 @@ func InterpretDeleteError(err error, qualifiedResource schema.GroupResource, nam
 		return errors.NewNotFound(qualifiedResource, name)
 	case storage.IsUnreachable(err):
 		return errors.NewServerTimeout(qualifiedResource, "delete", 2) // TODO: make configurable or handled at a higher level
-	case storage.IsConflict(err), storage.IsNodeExist(err), storage.IsInvalidObj(err):
+	case storage.IsConflict(err), storage.IsExist(err), storage.IsInvalidObj(err):
 		return errors.NewConflict(qualifiedResource, name, err)
 	case storage.IsInternalError(err):
 		return errors.NewInternalError(err)
