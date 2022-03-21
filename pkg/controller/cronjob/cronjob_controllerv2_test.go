@@ -32,10 +32,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	_ "k8s.io/kubernetes/pkg/apis/batch/install"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/controller"
@@ -50,6 +53,9 @@ var (
 	errorSchedule = "obvious error schedule"
 	// schedule is hourly on the hour
 	onTheHour = "0 * * * ?"
+
+	errorTimeZone = "bad timezone"
+	newYork       = "America/New_York"
 )
 
 // returns a cronJob with some fields filled in.
@@ -127,6 +133,19 @@ func justAfterTheHour() *time.Time {
 	return &T1
 }
 
+func justAfterTheHourInZone(tz string) time.Time {
+	location, err := time.LoadLocation(tz)
+	if err != nil {
+		panic("tz error: " + err.Error())
+	}
+
+	T1, err := time.ParseInLocation(time.RFC3339, "2016-05-19T10:01:00Z", location)
+	if err != nil {
+		panic("test setup error: " + err.Error())
+	}
+	return T1
+}
+
 func justBeforeTheHour() time.Time {
 	T1, err := time.Parse(time.RFC3339, "2016-05-19T09:59:00Z")
 	if err != nil {
@@ -162,6 +181,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 		concurrencyPolicy batchv1.ConcurrencyPolicy
 		suspend           bool
 		schedule          string
+		timeZone          *string
 		deadline          int64
 
 		// cj status
@@ -173,6 +193,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 		now             time.Time
 		jobCreateError  error
 		jobGetErr       error
+		enableTimeZone  bool
 
 		// expectations
 		expectCreate               bool
@@ -212,6 +233,17 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			expectedWarnings:           1,
 			jobPresentInCJActiveStatus: true,
 		},
+		"never ran, not valid time zone": {
+			concurrencyPolicy:          "Allow",
+			schedule:                   onTheHour,
+			timeZone:                   &errorTimeZone,
+			deadline:                   noDead,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        justBeforeTheHour(),
+			enableTimeZone:             true,
+			expectedWarnings:           1,
+			jobPresentInCJActiveStatus: true,
+		},
 		"never ran, not time, A": {
 			concurrencyPolicy:          "Allow",
 			schedule:                   onTheHour,
@@ -235,6 +267,17 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			deadline:                   noDead,
 			jobCreationTime:            justAfterThePriorHour(),
 			now:                        justBeforeTheHour(),
+			expectRequeueAfter:         true,
+			jobPresentInCJActiveStatus: true,
+		},
+		"never ran, not time in zone": {
+			concurrencyPolicy:          "Allow",
+			schedule:                   onTheHour,
+			timeZone:                   &newYork,
+			deadline:                   noDead,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        justBeforeTheHour(),
+			enableTimeZone:             true,
 			expectRequeueAfter:         true,
 			jobPresentInCJActiveStatus: true,
 		},
@@ -270,6 +313,48 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			now:                        *justAfterTheHour(),
 			expectCreate:               true,
 			expectActive:               1,
+			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
+			jobPresentInCJActiveStatus: true,
+		},
+		"never ran, is time in zone, but time zone disabled": {
+			concurrencyPolicy:          "Allow",
+			schedule:                   onTheHour,
+			timeZone:                   &newYork,
+			deadline:                   noDead,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        justAfterTheHourInZone(newYork),
+			enableTimeZone:             false,
+			expectCreate:               true,
+			expectActive:               1,
+			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
+			jobPresentInCJActiveStatus: true,
+		},
+		"never ran, is time in zone": {
+			concurrencyPolicy:          "Allow",
+			schedule:                   onTheHour,
+			timeZone:                   &newYork,
+			deadline:                   noDead,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        justAfterTheHourInZone(newYork),
+			enableTimeZone:             true,
+			expectCreate:               true,
+			expectActive:               1,
+			expectRequeueAfter:         true,
+			expectUpdateStatus:         true,
+			jobPresentInCJActiveStatus: true,
+		},
+		"never ran, is time in zone, but TZ is also set in schedule": {
+			concurrencyPolicy:          "Allow",
+			schedule:                   "TZ=UTC " + onTheHour,
+			timeZone:                   &newYork,
+			deadline:                   noDead,
+			jobCreationTime:            justAfterThePriorHour(),
+			now:                        justAfterTheHourInZone(newYork),
+			enableTimeZone:             true,
+			expectCreate:               true,
+			expectedWarnings:           1,
 			expectRequeueAfter:         true,
 			expectUpdateStatus:         true,
 			jobPresentInCJActiveStatus: true,
@@ -820,8 +905,13 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			cj.Spec.ConcurrencyPolicy = tc.concurrencyPolicy
 			cj.Spec.Suspend = &tc.suspend
 			cj.Spec.Schedule = tc.schedule
+			cj.Spec.TimeZone = tc.timeZone
 			if tc.deadline != noDead {
 				cj.Spec.StartingDeadlineSeconds = &tc.deadline
+			}
+
+			if tc.enableTimeZone {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.CronJobTimeZone, true)
 			}
 
 			var (

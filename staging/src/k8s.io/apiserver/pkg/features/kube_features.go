@@ -178,6 +178,13 @@ const (
 	//
 	// Enables server-side field validation.
 	ServerSideFieldValidation featuregate.Feature = "ServerSideFieldValidation"
+
+	// owner: @deejross
+	// kep: http://kep.k8s.io/3140
+	// alpha: v1.24
+	//
+	// Enables support for time zones in CronJobs.
+	CronJobTimeZone featuregate.Feature = "CronJobTimeZone"
 )
 
 func init() {
@@ -207,4 +214,5 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CustomResourceValidationExpressions: {Default: false, PreRelease: featuregate.Alpha},
 	OpenAPIV3:                           {Default: false, PreRelease: featuregate.Alpha},
 	ServerSideFieldValidation:           {Default: true, PreRelease: featuregate.Beta},
+	CronJobTimeZone:                     {Default: false, PreRelease: featuregate.Alpha},
 }
