@@ -1420,7 +1420,7 @@ func TestUnReserveBindPlugins(t *testing.T) {
 			}
 
 			if test.plugin.numBindCalled != 1 {
-				t.Errorf("Expected the Prebind plugin to be called.")
+				t.Errorf("Expected the Bind plugin to be called.")
 			}
 
 			testutils.CleanupPods(testCtx.ClientSet, t, []*v1.Pod{pod})
@@ -2448,6 +2448,9 @@ func initRegistryAndConfig(t *testing.T, plugins ...framework.Plugin) (framework
 			pls.PreBind.Enabled = append(pls.PreBind.Enabled, plugin)
 		case *BindPlugin:
 			pls.Bind.Enabled = append(pls.Bind.Enabled, plugin)
+			// It's intentional to disable the DefaultBind plugin. Otherwise, DefaultBinder's failure would fail
+			// a pod's scheduling, as well as the test BindPlugin's execution.
+			pls.Bind.Disabled = []v1beta3.Plugin{{Name: defaultbinder.Name}}
 		case *PostBindPlugin:
 			pls.PostBind.Enabled = append(pls.PostBind.Enabled, plugin)
 		case *PermitPlugin:
