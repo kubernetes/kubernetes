@@ -163,7 +163,7 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 
 	close(errCh)
 	var errList []error
-	if err := clientSet.PolicyV1beta1().PodDisruptionBudgets(ns.Name).Delete(context.TODO(), pdb.Name, deleteOption); err != nil {
+	if err := clientSet.PolicyV1().PodDisruptionBudgets(ns.Name).Delete(context.TODO(), pdb.Name, deleteOption); err != nil {
 		errList = append(errList, fmt.Errorf("Failed to delete PodDisruptionBudget: %v", err))
 	}
 	for err := range errCh {
@@ -220,7 +220,7 @@ func TestTerminalPodEviction(t *testing.T) {
 
 	waitPDBStable(t, clientSet, 1, ns.Name, pdb.Name)
 
-	pdbList, err := clientSet.PolicyV1beta1().PodDisruptionBudgets(ns.Name).List(context.TODO(), metav1.ListOptions{})
+	pdbList, err := clientSet.PolicyV1().PodDisruptionBudgets(ns.Name).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("Error while listing pod disruption budget")
 	}
@@ -242,7 +242,7 @@ func TestTerminalPodEviction(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Eviction of pod failed %v", err)
 	}
-	pdbList, err = clientSet.PolicyV1beta1().PodDisruptionBudgets(ns.Name).List(context.TODO(), metav1.ListOptions{})
+	pdbList, err = clientSet.PolicyV1().PodDisruptionBudgets(ns.Name).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("Error while listing pod disruption budget")
 	}
@@ -252,7 +252,7 @@ func TestTerminalPodEviction(t *testing.T) {
 		t.Fatalf("Expected the pdb generation to be of same value %v but got %v", newPdb.Status.ObservedGeneration, oldPdb.Status.ObservedGeneration)
 	}
 
-	if err := clientSet.PolicyV1beta1().PodDisruptionBudgets(ns.Name).Delete(context.TODO(), pdb.Name, deleteOption); err != nil {
+	if err := clientSet.PolicyV1().PodDisruptionBudgets(ns.Name).Delete(context.TODO(), pdb.Name, deleteOption); err != nil {
 		t.Fatalf("Failed to delete pod disruption budget")
 	}
 }
@@ -481,7 +481,7 @@ func waitToObservePods(t *testing.T, podInformer cache.SharedIndexInformer, podN
 
 func waitPDBStable(t *testing.T, clientSet clientset.Interface, podNum int32, ns, pdbName string) {
 	if err := wait.PollImmediate(2*time.Second, 60*time.Second, func() (bool, error) {
-		pdb, err := clientSet.PolicyV1beta1().PodDisruptionBudgets(ns).Get(context.TODO(), pdbName, metav1.GetOptions{})
+		pdb, err := clientSet.PolicyV1().PodDisruptionBudgets(ns).Get(context.TODO(), pdbName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
