@@ -2142,6 +2142,7 @@ func (og *operationGenerator) nodeExpandVolume(
 
 // legacyCallNodeExpandOnPlugin is old version of calling node expansion on plugin, which does not support
 // recovery from volume expansion failure
+// TODO: Removing this code when RecoverVolumeExpansionFailure feature goes GA.
 func (og *operationGenerator) legacyCallNodeExpandOnPlugin(resizeOp nodeResizeOperationOpts) (bool, error) {
 	pvc := resizeOp.pvc
 	volumeToMount := resizeOp.vmt
