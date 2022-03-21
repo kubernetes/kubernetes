@@ -30,6 +30,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 
@@ -334,10 +335,15 @@ type secretsToAttach struct {
 }
 
 func podWithSecrets(ns, podName string, toAttach secretsToAttach) *v1.Pod {
+	return podWithSecretsAndUID(ns, podName, "", toAttach)
+}
+
+func podWithSecretsAndUID(ns, podName, podUID string, toAttach secretsToAttach) *v1.Pod {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: ns,
 			Name:      podName,
+			UID:       types.UID(podUID),
 		},
 		Spec: v1.PodSpec{},
 	}
@@ -443,7 +449,7 @@ func TestRegisterIdempotence(t *testing.T) {
 	refs := func(ns, name string) int {
 		store.lock.Lock()
 		defer store.lock.Unlock()
-		item, ok := store.items[objectKey{ns, name}]
+		item, ok := store.items[objectKey{namespace: ns, name: name}]
 		if !ok {
 			return 0
 		}
@@ -530,7 +536,7 @@ func TestCacheRefcounts(t *testing.T) {
 	refs := func(ns, name string) int {
 		store.lock.Lock()
 		defer store.lock.Unlock()
-		item, ok := store.items[objectKey{ns, name}]
+		item, ok := store.items[objectKey{namespace: ns, name: name}]
 		if !ok {
 			return 0
 		}
@@ -548,6 +554,42 @@ func TestCacheRefcounts(t *testing.T) {
 	assert.Equal(t, 0, refs("ns1", "s60"))
 	assert.Equal(t, 1, refs("ns1", "s7"))
 	assert.Equal(t, 1, refs("ns1", "s70"))
+
+	// Check the interleaved registerpod/unregisterpod with identical names and different uids scenario
+	secret1 := secretsToAttach{
+		containerEnvSecrets: []envSecrets{
+			{envVarNames: []string{"secret1"}},
+		},
+	}
+	secret2 := secretsToAttach{
+		containerEnvSecrets: []envSecrets{
+			{envVarNames: []string{"secret2"}},
+		},
+	}
+
+	// precondition: no references
+	assert.Equal(t, 0, refs("nsinterleaved", "secret1"))
+	assert.Equal(t, 0, refs("nsinterleaved", "secret2"))
+
+	// add first pod that references secret1 only
+	manager.RegisterPod(podWithSecretsAndUID("nsinterleaved", "pod", "poduid1", secret1))
+	assert.Equal(t, 1, refs("nsinterleaved", "secret1"))
+	assert.Equal(t, 0, refs("nsinterleaved", "secret2"))
+
+	// add second pod that references secret2 only, retain references to secret1
+	manager.RegisterPod(podWithSecretsAndUID("nsinterleaved", "pod", "poduid2", secret2))
+	assert.Equal(t, 1, refs("nsinterleaved", "secret1"))
+	assert.Equal(t, 1, refs("nsinterleaved", "secret2"))
+
+	// remove first pod that references secret1, retain references to secret2
+	manager.UnregisterPod(podWithSecretsAndUID("nsinterleaved", "pod", "poduid1", secretsToAttach{}))
+	assert.Equal(t, 0, refs("nsinterleaved", "secret1"))
+	assert.Equal(t, 1, refs("nsinterleaved", "secret2"))
+
+	// remove second pod that references secret2
+	manager.UnregisterPod(podWithSecretsAndUID("nsinterleaved", "pod", "poduid2", secretsToAttach{}))
+	assert.Equal(t, 0, refs("nsinterleaved", "secret1"))
+	assert.Equal(t, 0, refs("nsinterleaved", "secret2"))
 }
 
 func TestCacheBasedSecretManager(t *testing.T) {
