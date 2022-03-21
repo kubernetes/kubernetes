@@ -351,7 +351,7 @@ func (p *csiPlugin) RequiresRemount(spec *volume.Spec) bool {
 		klog.V(5).Info(log("Failed to mark %q as republish required, err: %v", spec.Name(), err))
 		return false
 	}
-	csiDriver, err := p.csiDriverLister.Get(driverName)
+	csiDriver, err := p.getCSIDriver(driverName)
 	if err != nil {
 		klog.V(5).Info(log("Failed to mark %q as republish required, err: %v", spec.Name(), err))
 		return false
@@ -582,6 +582,20 @@ func (p *csiPlugin) SupportsBulkVolumeVerification() bool {
 }
 
 func (p *csiPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+		driver, err := GetCSIDriverName(spec)
+		if err != nil {
+			return false, err
+		}
+		csiDriver, err := p.getCSIDriver(driver)
+		if err != nil {
+			return false, err
+		}
+		if csiDriver.Spec.SELinuxMount != nil {
+			return *csiDriver.Spec.SELinuxMount, nil
+		}
+		return false, nil
+	}
 	return false, nil
 }
 
@@ -795,17 +809,7 @@ func (p *csiPlugin) ConstructBlockVolumeSpec(podUID types.UID, specVolName, mapP
 // skipAttach looks up CSIDriver object associated with driver name
 // to determine if driver requires attachment volume operation
 func (p *csiPlugin) skipAttach(driver string) (bool, error) {
-	kletHost, ok := p.host.(volume.KubeletVolumeHost)
-	if ok {
-		if err := kletHost.WaitForCacheSync(); err != nil {
-			return false, err
-		}
-	}
-
-	if p.csiDriverLister == nil {
-		return false, errors.New("CSIDriver lister does not exist")
-	}
-	csiDriver, err := p.csiDriverLister.Get(driver)
+	csiDriver, err := p.getCSIDriver(driver)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			// Don't skip attach if CSIDriver does not exist
@@ -817,6 +821,21 @@ func (p *csiPlugin) skipAttach(driver string) (bool, error) {
 		return true, nil
 	}
 	return false, nil
+}
+
+func (p *csiPlugin) getCSIDriver(driver string) (*storage.CSIDriver, error) {
+	kletHost, ok := p.host.(volume.KubeletVolumeHost)
+	if ok {
+		if err := kletHost.WaitForCacheSync(); err != nil {
+			return nil, err
+		}
+	}
+
+	if p.csiDriverLister == nil {
+		return nil, errors.New("CSIDriver lister does not exist")
+	}
+	csiDriver, err := p.csiDriverLister.Get(driver)
+	return csiDriver, err
 }
 
 // supportsVolumeMode checks whether the CSI driver supports a volume in the given mode.
@@ -836,14 +855,7 @@ func (p *csiPlugin) supportsVolumeLifecycleMode(driver string, volumeMode storag
 	// optional), but then only persistent volumes are supported.
 	var csiDriver *storage.CSIDriver
 	if p.csiDriverLister != nil {
-		kletHost, ok := p.host.(volume.KubeletVolumeHost)
-		if ok {
-			if err := kletHost.WaitForCacheSync(); err != nil {
-				return err
-			}
-		}
-
-		c, err := p.csiDriverLister.Get(driver)
+		c, err := p.getCSIDriver(driver)
 		if err != nil && !apierrors.IsNotFound(err) {
 			// Some internal error.
 			return err
@@ -904,14 +916,7 @@ func (p *csiPlugin) getFSGroupPolicy(driver string) (storage.FSGroupPolicy, erro
 	// optional)
 	var csiDriver *storage.CSIDriver
 	if p.csiDriverLister != nil {
-		kletHost, ok := p.host.(volume.KubeletVolumeHost)
-		if ok {
-			if err := kletHost.WaitForCacheSync(); err != nil {
-				return storage.ReadWriteOnceWithFSTypeFSGroupPolicy, err
-			}
-		}
-
-		c, err := p.csiDriverLister.Get(driver)
+		c, err := p.getCSIDriver(driver)
 		if err != nil && !apierrors.IsNotFound(err) {
 			// Some internal error.
 			return storage.ReadWriteOnceWithFSTypeFSGroupPolicy, err
@@ -969,16 +974,7 @@ func (p *csiPlugin) newAttacherDetacher() (*csiAttacher, error) {
 
 // podInfoEnabled  check CSIDriver enabled pod info flag
 func (p *csiPlugin) podInfoEnabled(driverName string) (bool, error) {
-	kletHost, ok := p.host.(volume.KubeletVolumeHost)
-	if ok {
-		kletHost.WaitForCacheSync()
-	}
-
-	if p.csiDriverLister == nil {
-		return false, fmt.Errorf("CSIDriverLister not found")
-	}
-
-	csiDriver, err := p.csiDriverLister.Get(driverName)
+	csiDriver, err := p.getCSIDriver(driverName)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			klog.V(4).Infof(log("CSIDriver %q not found, not adding pod information", driverName))
