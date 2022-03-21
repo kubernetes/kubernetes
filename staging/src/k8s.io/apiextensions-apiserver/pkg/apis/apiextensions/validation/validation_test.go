@@ -7621,6 +7621,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			},
 			expectedErrors: []validationMatch{
 				invalid("spec.validation.openAPIV3Schema.properties[value].items.x-kubernetes-validations[0].rule"),
+				forbidden("spec.validation.openAPIV3Schema.properties[value].items.x-kubernetes-validations[0].rule"),
 			},
 		},
 		{
@@ -7645,6 +7646,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			},
 			expectedErrors: []validationMatch{
 				invalid("spec.validation.openAPIV3Schema.properties[value].items.x-kubernetes-validations[0].rule"),
+				forbidden("spec.validation.openAPIV3Schema.properties[value].items.x-kubernetes-validations[0].rule"),
 			},
 		},
 		{
@@ -7719,6 +7721,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			},
 			expectedErrors: []validationMatch{
 				invalid("spec.validation.openAPIV3Schema.properties[value].items.x-kubernetes-validations[0].rule"),
+				forbidden("spec.validation.openAPIV3Schema.properties[value].items.x-kubernetes-validations[0].rule"),
 			},
 		},
 		{

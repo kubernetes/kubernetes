@@ -52,8 +52,7 @@ var (
 
 const (
 	unboundedSchemaLength = -1
-	// TODO(DangerOnTheRanger): adjust this in response to benchmarking
-	TotalCostLimit = 2000000
+	TotalCostLimit        = 2000000
 )
 
 // ValidateCustomResourceDefinition statically validates
@@ -982,7 +981,6 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 		}
 
 		structural, err := structuralschema.NewStructural(schema)
-		// TODO(DangerOnTheRanger): how do we meaningfully do something with this cost considering we only return errors from this function?
 		celCRDCost := uint64(0)
 		if err == nil {
 			compResults, err := cel.Compile(structural, isRoot, cel.PerCallLimit)
@@ -996,7 +994,6 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 						exceedFactor := float64(celCRDCost) / float64(TotalCostLimit)
 						costErrorMsg := fmt.Sprintf("CEL rule exceeded budget by factor of %vx", exceedFactor)
 						allErrs = append(allErrs, field.Forbidden(fldPath.Child("x-kubernetes-validations").Index(i).Child("rule"), costErrorMsg))
-						// TODO(DangerOnTheRanger): should we early exit here?
 					}
 					if cr.Error != nil {
 						if cr.Error.Type == cel.ErrorTypeRequired {
@@ -1029,7 +1026,7 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 func extractMaxElements(schema *apiextensions.JSONSchemaProps) int64 {
 	switch schema.Type {
 	case "object":
-		if schema.AdditionalProperties != nil {
+		if schema.AdditionalProperties != nil && schema.MaxProperties != nil {
 			return *schema.MaxProperties
 		}
 		// return 1, and not unboundedSchemaLength, because even if we're
@@ -1041,35 +1038,47 @@ func extractMaxElements(schema *apiextensions.JSONSchemaProps) int64 {
 			return *schema.MaxItems
 		}
 		return unboundedSchemaLength
-	case "string":
-		if schema.MaxLength != nil {
-			return *schema.MaxLength
-		}
-		return unboundedSchemaLength
 	default:
 		// TODO(DangerOnTheRanger): should we give XIntOrString its own case?
 		return unboundedSchemaLength
 	}
 }
 
+func cardinalityFromMaxElements(schemaNode *schemaTree) uint64 {
+	if schemaNode.Parent == nil {
+		return 1
+	}
+	structural, err := structuralschema.NewStructural(schemaNode.Parent.Schema)
+	if err != nil {
+		return math.MaxUint
+	}
+	celSchema := celschema.SchemaDeclType(structural, false)
+	if celSchema == nil {
+		return math.MaxUint
+	}
+	return uint64(celSchema.MaxElements)
+}
+
 func getCRDCost(baseCost uint64, schemaNode *schemaTree) uint64 {
-	cardinality := uint64(schemaNode.Cardinality)
 	if schemaNode.Cardinality == unboundedSchemaLength {
 		if schemaNode.Parent == nil {
 			return baseCost
 		}
-		structural, err := structuralschema.NewStructural(schemaNode.Parent.Schema)
-		if err != nil {
-			// TODO(DangerOnTheRanger): how to add better error handling?
-			return math.MaxUint
-		}
-		celSchema := celschema.SchemaDeclType(structural, false)
-		if celSchema == nil {
-			return math.MaxUint
-		}
-		cardinality = uint64(celSchema.MaxElements)
+		return baseCost * cardinalityFromMaxElements(schemaNode)
 	}
-	return cardinality * baseCost
+	maxElementsCost := baseCost * cardinalityFromMaxElements(schemaNode)
+	cardinalityCost := baseCost * uint64(schemaNode.Cardinality)
+	// return the minimum of the two; since maxElementsCost is computed against the 3MB max request size limit,
+	// if cardinalityCost is greater, we can safely assume that the would-be request hitting the cardinalityCost
+	// limit would be greater than 3MB
+	// in all other situations cardinalityCost is to be preferred, since the calculated cardinality limit should
+	// not come close to hitting the 3MB request limit (since it is user-set)
+	if maxElementsCost < cardinalityCost {
+		return maxElementsCost
+	} else {
+		return cardinalityCost
+	}
+
 }
 
 var newlineMatcher = regexp.MustCompile(`[\n\r]+`) // valid newline chars in CEL grammar
