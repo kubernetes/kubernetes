@@ -142,9 +142,9 @@ func (m *kubeGenericRuntimeManager) calculateLinuxResources(cpuRequest, cpuLimit
 	// If request is not specified, but limit is, we want request to default to limit.
 	// API server does this for new containers, but we repeat this logic in Kubelet
 	// for containers running on existing Kubernetes clusters.
-	if cpuRequest == nil && !cpuLimit.IsZero() {
+	if cpuRequest == nil {
 		cpuShares = int64(cm.MilliCPUToShares(cpuLimit.MilliValue()))
-	} else if cpuRequest != nil {
+	} else {
 		// if cpuRequest.Amount is nil, then MilliCPUToShares will return the minimal number
 		// of CPU shares.
 		cpuShares = int64(cm.MilliCPUToShares(cpuRequest.MilliValue()))

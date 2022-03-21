@@ -229,18 +229,23 @@ func TestCalculateLinuxResources(t *testing.T) {
 
 	assert.NoError(t, err)
 
+	generateResourceQuantity := func(str string) *resource.Quantity {
+		quantity := resource.MustParse(str)
+		return &quantity
+	}
+
 	tests := []struct {
 		name     string
-		cpuReq   resource.Quantity
-		cpuLim   resource.Quantity
-		memLim   resource.Quantity
+		cpuReq   *resource.Quantity
+		cpuLim   *resource.Quantity
+		memLim   *resource.Quantity
 		expected *runtimeapi.LinuxContainerResources
 	}{
 		{
 			name:   "Request128MBLimit256MB",
-			cpuReq: resource.MustParse("1"),
-			cpuLim: resource.MustParse("2"),
-			memLim: resource.MustParse("128Mi"),
+			cpuReq: generateResourceQuantity("1"),
+			cpuLim: generateResourceQuantity("2"),
+			memLim: generateResourceQuantity("128Mi"),
 			expected: &runtimeapi.LinuxContainerResources{
 				CpuPeriod:          100000,
 				CpuQuota:           200000,
@@ -250,9 +255,9 @@ func TestCalculateLinuxResources(t *testing.T) {
 		},
 		{
 			name:   "RequestNoMemory",
-			cpuReq: resource.MustParse("2"),
-			cpuLim: resource.MustParse("8"),
-			memLim: resource.MustParse("0"),
+			cpuReq: generateResourceQuantity("2"),
+			cpuLim: generateResourceQuantity("8"),
+			memLim: generateResourceQuantity("0"),
 			expected: &runtimeapi.LinuxContainerResources{
 				CpuPeriod:          100000,
 				CpuQuota:           800000,
@@ -262,8 +267,8 @@ func TestCalculateLinuxResources(t *testing.T) {
 		},
 		{
 			name:   "RequestNilCPU",
-			cpuLim: resource.MustParse("2"),
-			memLim: resource.MustParse("0"),
+			cpuLim: generateResourceQuantity("2"),
+			memLim: generateResourceQuantity("0"),
 			expected: &runtimeapi.LinuxContainerResources{
 				CpuPeriod:          100000,
 				CpuQuota:           200000,
@@ -273,9 +278,9 @@ func TestCalculateLinuxResources(t *testing.T) {
 		},
 		{
 			name:   "RequestZeroCPU",
-			cpuReq: resource.MustParse("0"),
-			cpuLim: resource.MustParse("2"),
-			memLim: resource.MustParse("0"),
+			cpuReq: generateResourceQuantity("0"),
+			cpuLim: generateResourceQuantity("2"),
+			memLim: generateResourceQuantity("0"),
 			expected: &runtimeapi.LinuxContainerResources{
 				CpuPeriod:          100000,
 				CpuQuota:           200000,
@@ -285,7 +290,7 @@ func TestCalculateLinuxResources(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		linuxContainerResources := m.calculateLinuxResources(&test.cpuReq, &test.cpuLim, &test.memLim)
+		linuxContainerResources := m.calculateLinuxResources(test.cpuReq, test.cpuLim, test.memLim)
 		assert.Equal(t, test.expected, linuxContainerResources)
 	}
 }
