@@ -18,6 +18,8 @@ package validation
 
 import (
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/robfig/cron/v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -308,11 +310,14 @@ func ValidateCronJobSpec(spec *batch.CronJobSpec, fldPath *field.Path, opts apiv
 	if len(spec.Schedule) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("schedule"), ""))
 	} else {
-		allErrs = append(allErrs, validateScheduleFormat(spec.Schedule, fldPath.Child("schedule"))...)
+		allErrs = append(allErrs, validateScheduleFormat(spec.Schedule, spec.TimeZone, fldPath.Child("schedule"))...)
 	}
+
 	if spec.StartingDeadlineSeconds != nil {
 		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.StartingDeadlineSeconds), fldPath.Child("startingDeadlineSeconds"))...)
 	}
+
+	allErrs = append(allErrs, validateTimeZone(spec.TimeZone, fldPath.Child("timeZone"))...)
 	allErrs = append(allErrs, validateConcurrencyPolicy(&spec.ConcurrencyPolicy, fldPath.Child("concurrencyPolicy"))...)
 	allErrs = append(allErrs, ValidateJobTemplateSpec(&spec.JobTemplate, fldPath.Child("jobTemplate"), opts)...)
 
@@ -343,10 +348,35 @@ func validateConcurrencyPolicy(concurrencyPolicy *batch.ConcurrencyPolicy, fldPa
 	return allErrs
 }
 
-func validateScheduleFormat(schedule string, fldPath *field.Path) field.ErrorList {
+func validateScheduleFormat(schedule string, timeZone *string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if _, err := cron.ParseStandard(schedule); err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath, schedule, err.Error()))
+	}
+	if strings.Contains(schedule, "TZ") && timeZone != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, schedule, "cannot use both timeZone field and TZ or CRON_TZ in schedule"))
+	}
+
+	return allErrs
+}
+
+func validateTimeZone(timeZone *string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if timeZone == nil {
+		return allErrs
+	}
+
+	if len(*timeZone) == 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath, timeZone, "timeZone must be nil or non-empty string"))
+		return allErrs
+	}
+
+	if strings.EqualFold(*timeZone, "Local") {
+		allErrs = append(allErrs, field.Invalid(fldPath, timeZone, "timeZone must be an explicit time zone as defined in https://www.iana.org/time-zones"))
+	}
+
+	if _, err := time.LoadLocation(*timeZone); err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, timeZone, err.Error()))
 	}
 
 	return allErrs
