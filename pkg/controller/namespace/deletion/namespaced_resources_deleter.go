@@ -523,7 +523,8 @@ func (d *namespacedResourcesDeleter) deleteAllContent(ns *v1.Namespace) (int64, 
 		if err != nil {
 			// If there is an error, hold on to it but proceed with all the remaining
 			// groupVersionResources.
-			errs = append(errs, err)
+			errs = append(errs, fmt.Errorf("(group: %s, resource: %s): %v",
+				gvr.Group, gvr.Resource, err))
 			conditionUpdater.ProcessDeleteContentErr(err)
 		}
 		if gvrDeletionMetadata.finalizerEstimateSeconds > estimate {
