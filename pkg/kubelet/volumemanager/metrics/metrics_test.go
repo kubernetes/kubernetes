@@ -56,7 +56,7 @@ func TestMetricCollection(t *testing.T) {
 	podName := util.GetUniquePodName(pod)
 
 	// Add one volume to DesiredStateOfWorld
-	generatedVolumeName, err := dsw.AddPodToVolume(podName, pod, volumeSpec, volumeSpec.Name(), "", "" /* seLinuxLabel */)
+	generatedVolumeName, err := dsw.AddPodToVolume(podName, pod, volumeSpec, volumeSpec.Name(), "", nil /* seLinuxOptions */)
 	if err != nil {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 	}

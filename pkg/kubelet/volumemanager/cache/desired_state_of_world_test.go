@@ -67,10 +67,10 @@ func Test_AddPodToVolume_Positive_NewPodNewVolume(t *testing.T) {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
 
-	verifyVolumeExistsDsw(t, generatedVolumeName, dsw)
+	verifyVolumeExistsDsw(t, generatedVolumeName, "" /* SELinuxContext */, dsw)
 	verifyVolumeExistsInVolumesToMount(
 		t, generatedVolumeName, false /* expectReportedInUse */, dsw)
-	verifyPodExistsInVolumeDsw(t, podName, generatedVolumeName, dsw)
+	verifyPodExistsInVolumeDsw(t, podName, generatedVolumeName, "" /* SELinuxContext */, dsw)
 	verifyVolumeExistsWithSpecNameInVolumeDsw(t, podName, volumeSpec.Name(), dsw)
 }
 
@@ -112,10 +112,10 @@ func Test_AddPodToVolume_Positive_ExistingPodExistingVolume(t *testing.T) {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
 
-	verifyVolumeExistsDsw(t, generatedVolumeName, dsw)
+	verifyVolumeExistsDsw(t, generatedVolumeName, "" /* SELinuxContext */, dsw)
 	verifyVolumeExistsInVolumesToMount(
 		t, generatedVolumeName, false /* expectReportedInUse */, dsw)
-	verifyPodExistsInVolumeDsw(t, podName, generatedVolumeName, dsw)
+	verifyPodExistsInVolumeDsw(t, podName, generatedVolumeName, "" /* SELinuxContext */, dsw)
 	verifyVolumeExistsWithSpecNameInVolumeDsw(t, podName, volumeSpec.Name(), dsw)
 }
 
@@ -314,18 +314,18 @@ func Test_DeletePodFromVolume_Positive_PodExistsVolumeExists(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
-	verifyVolumeExistsDsw(t, generatedVolumeName, dsw)
+	verifyVolumeExistsDsw(t, generatedVolumeName, "" /* SELinuxContext */, dsw)
 	verifyVolumeExistsInVolumesToMount(
 		t, generatedVolumeName, false /* expectReportedInUse */, dsw)
-	verifyPodExistsInVolumeDsw(t, podName, generatedVolumeName, dsw)
+	verifyPodExistsInVolumeDsw(t, podName, generatedVolumeName, "" /* SELinuxContext */, dsw)
 
 	// Act
 	dsw.DeletePodFromVolume(podName, generatedVolumeName)
 
 	// Assert
-	verifyVolumeDoesntExist(t, generatedVolumeName, dsw)
+	verifyVolumeDoesntExist(t, generatedVolumeName, "" /* SELinuxContext */, dsw)
 	verifyVolumeDoesntExistInVolumesToMount(t, generatedVolumeName, dsw)
-	verifyPodDoesntExistInVolumeDsw(t, podName, generatedVolumeName, dsw)
+	verifyPodDoesntExistInVolumeDsw(t, podName, generatedVolumeName, "" /* SELinuxContext */, dsw)
 	verifyVolumeDoesntExistWithSpecNameInVolumeDsw(t, podName, volumeSpec.Name(), dsw)
 }
 
@@ -430,36 +430,36 @@ func Test_MarkVolumesReportedInUse_Positive_NewPodNewVolume(t *testing.T) {
 	dsw.MarkVolumesReportedInUse(volumesReportedInUse)
 
 	// Assert
-	verifyVolumeExistsDsw(t, generatedVolume1Name, dsw)
+	verifyVolumeExistsDsw(t, generatedVolume1Name, "" /* SELinuxContext */, dsw)
 	verifyVolumeExistsInVolumesToMount(
 		t, generatedVolume1Name, false /* expectReportedInUse */, dsw)
-	verifyPodExistsInVolumeDsw(t, pod1Name, generatedVolume1Name, dsw)
-	verifyVolumeExistsDsw(t, generatedVolume2Name, dsw)
+	verifyPodExistsInVolumeDsw(t, pod1Name, generatedVolume1Name, "" /* SELinuxContext */, dsw)
+	verifyVolumeExistsDsw(t, generatedVolume2Name, "" /* SELinuxContext */, dsw)
 	verifyVolumeExistsInVolumesToMount(
 		t, generatedVolume2Name, true /* expectReportedInUse */, dsw)
-	verifyPodExistsInVolumeDsw(t, pod2Name, generatedVolume2Name, dsw)
-	verifyVolumeExistsDsw(t, generatedVolume3Name, dsw)
+	verifyPodExistsInVolumeDsw(t, pod2Name, generatedVolume2Name, "" /* SELinuxContext */, dsw)
+	verifyVolumeExistsDsw(t, generatedVolume3Name, "" /* SELinuxContext */, dsw)
 	verifyVolumeExistsInVolumesToMount(
 		t, generatedVolume3Name, false /* expectReportedInUse */, dsw)
-	verifyPodExistsInVolumeDsw(t, pod3Name, generatedVolume3Name, dsw)
+	verifyPodExistsInVolumeDsw(t, pod3Name, generatedVolume3Name, "" /* SELinuxContext */, dsw)
 
 	// Act
 	volumesReportedInUse = []v1.UniqueVolumeName{generatedVolume3Name}
 	dsw.MarkVolumesReportedInUse(volumesReportedInUse)
 
 	// Assert
-	verifyVolumeExistsDsw(t, generatedVolume1Name, dsw)
+	verifyVolumeExistsDsw(t, generatedVolume1Name, "" /* SELinuxContext */, dsw)
 	verifyVolumeExistsInVolumesToMount(
 		t, generatedVolume1Name, false /* expectReportedInUse */, dsw)
-	verifyPodExistsInVolumeDsw(t, pod1Name, generatedVolume1Name, dsw)
-	verifyVolumeExistsDsw(t, generatedVolume2Name, dsw)
+	verifyPodExistsInVolumeDsw(t, pod1Name, generatedVolume1Name, "" /* SELinuxContext */, dsw)
+	verifyVolumeExistsDsw(t, generatedVolume2Name, "" /* SELinuxContext */, dsw)
 	verifyVolumeExistsInVolumesToMount(
 		t, generatedVolume2Name, false /* expectReportedInUse */, dsw)
-	verifyPodExistsInVolumeDsw(t, pod2Name, generatedVolume2Name, dsw)
-	verifyVolumeExistsDsw(t, generatedVolume3Name, dsw)
+	verifyPodExistsInVolumeDsw(t, pod2Name, generatedVolume2Name, "" /* SELinuxContext */, dsw)
+	verifyVolumeExistsDsw(t, generatedVolume3Name, "" /* SELinuxContext */, dsw)
 	verifyVolumeExistsInVolumesToMount(
 		t, generatedVolume3Name, true /* expectReportedInUse */, dsw)
-	verifyPodExistsInVolumeDsw(t, pod3Name, generatedVolume3Name, dsw)
+	verifyPodExistsInVolumeDsw(t, pod3Name, generatedVolume3Name, "" /* SELinuxContext */, dsw)
 }
 
 func Test_AddPodToVolume_WithEmptyDirSizeLimit(t *testing.T) {
@@ -598,8 +598,8 @@ func Test_AddPodToVolume_WithEmptyDirSizeLimit(t *testing.T) {
 }
 
 func verifyVolumeExistsDsw(
-	t *testing.T, expectedVolumeName v1.UniqueVolumeName, dsw DesiredStateOfWorld) {
-	volumeExists := dsw.VolumeExists(expectedVolumeName)
+	t *testing.T, expectedVolumeName v1.UniqueVolumeName, expectedSELinuxContext string, dsw DesiredStateOfWorld) {
+	volumeExists := dsw.VolumeExists(expectedVolumeName, expectedSELinuxContext)
 	if !volumeExists {
 		t.Fatalf(
 			"VolumeExists(%q) failed. Expected: <true> Actual: <%v>",
@@ -609,8 +609,8 @@ func verifyVolumeExistsDsw(
 }
 
 func verifyVolumeDoesntExist(
-	t *testing.T, expectedVolumeName v1.UniqueVolumeName, dsw DesiredStateOfWorld) {
-	volumeExists := dsw.VolumeExists(expectedVolumeName)
+	t *testing.T, expectedVolumeName v1.UniqueVolumeName, expectedSELinuxContext string, dsw DesiredStateOfWorld) {
+	volumeExists := dsw.VolumeExists(expectedVolumeName, expectedSELinuxContext)
 	if volumeExists {
 		t.Fatalf(
 			"VolumeExists(%q) returned incorrect value. Expected: <false> Actual: <%v>",
@@ -661,9 +661,10 @@ func verifyPodExistsInVolumeDsw(
 	t *testing.T,
 	expectedPodName volumetypes.UniquePodName,
 	expectedVolumeName v1.UniqueVolumeName,
+	expectedSeLinuxContext string,
 	dsw DesiredStateOfWorld) {
 	if podExistsInVolume := dsw.PodExistsInVolume(
-		expectedPodName, expectedVolumeName); !podExistsInVolume {
+		expectedPodName, expectedVolumeName, expectedSeLinuxContext); !podExistsInVolume {
 		t.Fatalf(
 			"DSW PodExistsInVolume returned incorrect value. Expected: <true> Actual: <%v>",
 			podExistsInVolume)
@@ -674,9 +675,10 @@ func verifyPodDoesntExistInVolumeDsw(
 	t *testing.T,
 	expectedPodName volumetypes.UniquePodName,
 	expectedVolumeName v1.UniqueVolumeName,
+	expectedSeLinuxContext string,
 	dsw DesiredStateOfWorld) {
 	if podExistsInVolume := dsw.PodExistsInVolume(
-		expectedPodName, expectedVolumeName); podExistsInVolume {
+		expectedPodName, expectedVolumeName, expectedSeLinuxContext); podExistsInVolume {
 		t.Fatalf(
 			"DSW PodExistsInVolume returned incorrect value. Expected: <true> Actual: <%v>",
 			podExistsInVolume)

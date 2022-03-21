@@ -243,7 +243,7 @@ func TestFindAndAddNewPods_FindAndRemoveDeletedPods(t *testing.T) {
 		t.Fatalf("Failed to remove pods from desired state of world since they no longer exist")
 	}
 
-	volumeExists := dswp.desiredStateOfWorld.VolumeExists(expectedVolumeName)
+	volumeExists := dswp.desiredStateOfWorld.VolumeExists(expectedVolumeName, "" /* SELinuxContext */)
 	if volumeExists {
 		t.Fatalf(
 			"VolumeExists(%q) failed. Expected: <false> Actual: <%v>",
@@ -252,7 +252,7 @@ func TestFindAndAddNewPods_FindAndRemoveDeletedPods(t *testing.T) {
 	}
 
 	if podExistsInVolume := dswp.desiredStateOfWorld.PodExistsInVolume(
-		podName, expectedVolumeName); podExistsInVolume {
+		podName, expectedVolumeName, "" /* SELinuxContext */); podExistsInVolume {
 		t.Fatalf(
 			"DSW PodExistsInVolume returned incorrect value. Expected: <false> Actual: <%v>",
 			podExistsInVolume)
@@ -283,7 +283,7 @@ func TestFindAndRemoveDeletedPodsWithActualState(t *testing.T) {
 	dswp.findAndRemoveDeletedPods()
 	// Although Pod status is terminated, pod still exists in pod manager and actual state does not has this pod and volume information
 	// desired state populator will fail to delete this pod and volume first
-	volumeExists := dswp.desiredStateOfWorld.VolumeExists(expectedVolumeName)
+	volumeExists := dswp.desiredStateOfWorld.VolumeExists(expectedVolumeName, "" /* SELinuxContext */)
 	if !volumeExists {
 		t.Fatalf(
 			"VolumeExists(%q) failed. Expected: <true> Actual: <%v>",
@@ -292,7 +292,7 @@ func TestFindAndRemoveDeletedPodsWithActualState(t *testing.T) {
 	}
 
 	if podExistsInVolume := dswp.desiredStateOfWorld.PodExistsInVolume(
-		podName, expectedVolumeName); !podExistsInVolume {
+		podName, expectedVolumeName, "" /* SELinuxContext */); !podExistsInVolume {
 		t.Fatalf(
 			"DSW PodExistsInVolume returned incorrect value. Expected: <true> Actual: <%v>",
 			podExistsInVolume)
@@ -302,7 +302,7 @@ func TestFindAndRemoveDeletedPodsWithActualState(t *testing.T) {
 	// desired state populator now can successfully delete the pod and volume
 	reconcileASW(fakeASW, dswp.desiredStateOfWorld, t)
 	dswp.findAndRemoveDeletedPods()
-	if !dswp.desiredStateOfWorld.VolumeExists(expectedVolumeName) {
+	if !dswp.desiredStateOfWorld.VolumeExists(expectedVolumeName, "" /* SELinuxContext */) {
 		t.Fatalf(
 			"VolumeExists(%q) failed. Expected: <false> Actual: <%v>",
 			expectedVolumeName,
@@ -315,7 +315,7 @@ func TestFindAndRemoveDeletedPodsWithActualState(t *testing.T) {
 	// desired state populator now can successfully delete the pod and volume
 	reconcileASW(fakeASW, dswp.desiredStateOfWorld, t)
 	dswp.findAndRemoveDeletedPods()
-	volumeExists = dswp.desiredStateOfWorld.VolumeExists(expectedVolumeName)
+	volumeExists = dswp.desiredStateOfWorld.VolumeExists(expectedVolumeName, "" /* SELinuxContext */)
 	if volumeExists {
 		t.Fatalf(
 			"VolumeExists(%q) failed. Expected: <false> Actual: <%v>",
@@ -324,7 +324,7 @@ func TestFindAndRemoveDeletedPodsWithActualState(t *testing.T) {
 	}
 
 	if podExistsInVolume := dswp.desiredStateOfWorld.PodExistsInVolume(
-		podName, expectedVolumeName); podExistsInVolume {
+		podName, expectedVolumeName, "" /* SELinuxContext */); podExistsInVolume {
 		t.Fatalf(
 			"DSW PodExistsInVolume returned incorrect value. Expected: <false> Actual: <%v>",
 			podExistsInVolume)
@@ -369,7 +369,7 @@ func TestFindAndRemoveDeletedPodsWithUncertain(t *testing.T) {
 		t.Fatalf("Failed to remove pods from desired state of world since they no longer exist")
 	}
 
-	volumeExists := dswp.desiredStateOfWorld.VolumeExists(expectedVolumeName)
+	volumeExists := dswp.desiredStateOfWorld.VolumeExists(expectedVolumeName, "" /* SELinuxContext */)
 	if volumeExists {
 		t.Fatalf(
 			"VolumeExists(%q) failed. Expected: <false> Actual: <%v>",
@@ -378,7 +378,7 @@ func TestFindAndRemoveDeletedPodsWithUncertain(t *testing.T) {
 	}
 
 	if podExistsInVolume := dswp.desiredStateOfWorld.PodExistsInVolume(
-		podName, expectedVolumeName); podExistsInVolume {
+		podName, expectedVolumeName, "" /* SELinuxContext */); podExistsInVolume {
 		t.Fatalf(
 			"DSW PodExistsInVolume returned incorrect value. Expected: <false> Actual: <%v>",
 			podExistsInVolume)
@@ -443,7 +443,7 @@ func prepareDSWPWithPodPV(t *testing.T) (*desiredStateOfWorldPopulator, *fakePod
 
 	expectedVolumeName := v1.UniqueVolumeName(generatedVolumeName)
 
-	volumeExists := fakesDSW.VolumeExists(expectedVolumeName)
+	volumeExists := fakesDSW.VolumeExists(expectedVolumeName, "" /* SELinuxContext */)
 	if !volumeExists {
 		t.Fatalf(
 			"VolumeExists(%q) failed. Expected: <true> Actual: <%v>",
@@ -452,7 +452,7 @@ func prepareDSWPWithPodPV(t *testing.T) (*desiredStateOfWorldPopulator, *fakePod
 	}
 
 	if podExistsInVolume := fakesDSW.PodExistsInVolume(
-		podName, expectedVolumeName); !podExistsInVolume {
+		podName, expectedVolumeName, "" /* SELinuxContext */); !podExistsInVolume {
 		t.Fatalf(
 			"DSW PodExistsInVolume returned incorrect value. Expected: <true> Actual: <%v>",
 			podExistsInVolume)
@@ -514,7 +514,7 @@ func TestFindAndRemoveNonattachableVolumes(t *testing.T) {
 
 	expectedVolumeName := v1.UniqueVolumeName(generatedVolumeName)
 
-	volumeExists := fakesDSW.VolumeExists(expectedVolumeName)
+	volumeExists := fakesDSW.VolumeExists(expectedVolumeName, "" /* SELinuxContext */)
 	if !volumeExists {
 		t.Fatalf(
 			"VolumeExists(%q) failed. Expected: <true> Actual: <%v>",
@@ -614,7 +614,7 @@ func TestFindAndAddNewPods_FindAndRemoveDeletedPods_Valid_Block_VolumeDevices(t 
 
 	expectedVolumeName := v1.UniqueVolumeName(generatedVolumeName)
 
-	volumeExists := fakesDSW.VolumeExists(expectedVolumeName)
+	volumeExists := fakesDSW.VolumeExists(expectedVolumeName, "" /* SELinuxContext */)
 	if !volumeExists {
 		t.Fatalf(
 			"VolumeExists(%q) failed. Expected: <true> Actual: <%v>",
@@ -623,7 +623,7 @@ func TestFindAndAddNewPods_FindAndRemoveDeletedPods_Valid_Block_VolumeDevices(t 
 	}
 
 	if podExistsInVolume := fakesDSW.PodExistsInVolume(
-		podName, expectedVolumeName); !podExistsInVolume {
+		podName, expectedVolumeName, "" /* SELinuxContext */); !podExistsInVolume {
 		t.Fatalf(
 			"DSW PodExistsInVolume returned incorrect value. Expected: <true> Actual: <%v>",
 			podExistsInVolume)
@@ -647,7 +647,7 @@ func TestFindAndAddNewPods_FindAndRemoveDeletedPods_Valid_Block_VolumeDevices(t 
 		t.Fatalf("Failed to remove pods from desired state of world since they no longer exist")
 	}
 
-	volumeExists = fakesDSW.VolumeExists(expectedVolumeName)
+	volumeExists = fakesDSW.VolumeExists(expectedVolumeName, "" /* SELinuxContext */)
 	if volumeExists {
 		t.Fatalf(
 			"VolumeExists(%q) failed. Expected: <false> Actual: <%v>",
@@ -656,7 +656,7 @@ func TestFindAndAddNewPods_FindAndRemoveDeletedPods_Valid_Block_VolumeDevices(t 
 	}
 
 	if podExistsInVolume := fakesDSW.PodExistsInVolume(
-		podName, expectedVolumeName); podExistsInVolume {
+		podName, expectedVolumeName, "" /* SELinuxContext */); podExistsInVolume {
 		t.Fatalf(
 			"DSW PodExistsInVolume returned incorrect value. Expected: <false> Actual: <%v>",
 			podExistsInVolume)
@@ -709,7 +709,7 @@ func TestCreateVolumeSpec_Valid_File_VolumeMounts(t *testing.T) {
 	pod := createPodWithVolume("dswp-test-pod", "dswp-test-volume-name", "file-bound", containers)
 
 	fakePodManager.AddPod(pod)
-	mountsMap, devicesMap := util.GetPodVolumeNames(pod)
+	mountsMap, devicesMap, _ := util.GetPodVolumeNames(pod)
 	_, volumeSpec, _, err :=
 		dswp.createVolumeSpec(pod.Spec.Volumes[0], pod, mountsMap, devicesMap)
 
@@ -755,7 +755,7 @@ func TestCreateVolumeSpec_Valid_Nil_VolumeMounts(t *testing.T) {
 	pod := createPodWithVolume("dswp-test-pod", "dswp-test-volume-name", "file-bound", containers)
 
 	fakePodManager.AddPod(pod)
-	mountsMap, devicesMap := util.GetPodVolumeNames(pod)
+	mountsMap, devicesMap, _ := util.GetPodVolumeNames(pod)
 	_, volumeSpec, _, err :=
 		dswp.createVolumeSpec(pod.Spec.Volumes[0], pod, mountsMap, devicesMap)
 
@@ -801,7 +801,7 @@ func TestCreateVolumeSpec_Valid_Block_VolumeDevices(t *testing.T) {
 	pod := createPodWithVolume("dswp-test-pod", "dswp-test-volume-name", "block-bound", containers)
 
 	fakePodManager.AddPod(pod)
-	mountsMap, devicesMap := util.GetPodVolumeNames(pod)
+	mountsMap, devicesMap, _ := util.GetPodVolumeNames(pod)
 	_, volumeSpec, _, err :=
 		dswp.createVolumeSpec(pod.Spec.Volumes[0], pod, mountsMap, devicesMap)
 
@@ -847,7 +847,7 @@ func TestCreateVolumeSpec_Invalid_File_VolumeDevices(t *testing.T) {
 	pod := createPodWithVolume("dswp-test-pod", "dswp-test-volume-name", "file-bound", containers)
 
 	fakePodManager.AddPod(pod)
-	mountsMap, devicesMap := util.GetPodVolumeNames(pod)
+	mountsMap, devicesMap, _ := util.GetPodVolumeNames(pod)
 	_, volumeSpec, _, err :=
 		dswp.createVolumeSpec(pod.Spec.Volumes[0], pod, mountsMap, devicesMap)
 
@@ -893,7 +893,7 @@ func TestCreateVolumeSpec_Invalid_Block_VolumeMounts(t *testing.T) {
 	pod := createPodWithVolume("dswp-test-pod", "dswp-test-volume-name", "block-bound", containers)
 
 	fakePodManager.AddPod(pod)
-	mountsMap, devicesMap := util.GetPodVolumeNames(pod)
+	mountsMap, devicesMap, _ := util.GetPodVolumeNames(pod)
 	_, volumeSpec, _, err :=
 		dswp.createVolumeSpec(pod.Spec.Volumes[0], pod, mountsMap, devicesMap)
 
@@ -1142,7 +1142,7 @@ func reprocess(dswp *desiredStateOfWorldPopulator, uniquePodName types.UniquePod
 func getResizeRequiredVolumes(dsw cache.DesiredStateOfWorld, asw cache.ActualStateOfWorld, newSize resource.Quantity) []v1.UniqueVolumeName {
 	resizeRequiredVolumes := []v1.UniqueVolumeName{}
 	for _, volumeToMount := range dsw.GetVolumesToMount() {
-		_, _, err := asw.PodExistsInVolume(volumeToMount.PodName, volumeToMount.VolumeName, newSize)
+		_, _, err := asw.PodExistsInVolume(volumeToMount.PodName, volumeToMount.VolumeName, newSize, "" /* SELinuxContext */)
 		if cache.IsFSResizeRequiredError(err) {
 			resizeRequiredVolumes = append(resizeRequiredVolumes, volumeToMount.VolumeName)
 		}

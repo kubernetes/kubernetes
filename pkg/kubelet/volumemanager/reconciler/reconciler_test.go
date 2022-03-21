@@ -260,7 +260,13 @@ func Test_Run_Positive_VolumeAttachAndMountMigrationEnabled(t *testing.T) {
 
 	podName := util.GetUniquePodName(pod)
 	generatedVolumeName, err := dsw.AddPodToVolume(
-		podName, pod, migratedSpec, migratedSpec.Name(), "" /* volumeGidValue */)
+		podName,
+		pod,
+		migratedSpec,
+		migratedSpec.Name(),
+		"",  /* volumeGidValue */
+		nil, /* SELinuxContexts */
+	)
 
 	// Assert
 	if err != nil {
@@ -1340,13 +1346,13 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 			// Simulate what DSOWP does
 			pvWithSize.Spec.Capacity[v1.ResourceStorage] = tc.newPVSize
 			volumeSpec = &volume.Spec{PersistentVolume: pvWithSize}
-			dsw.AddPodToVolume(podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */, nil /* seLinuxLabel */)
+			dsw.AddPodToVolume(podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */, nil /* seLinuxContexts */)
 
 			t.Logf("Changing size of the volume to %s", tc.newPVSize.String())
 			newSize := tc.newPVSize.DeepCopy()
 			dsw.UpdatePersistentVolumeSize(volumeName, &newSize)
 
-			_, _, podExistErr := asw.PodExistsInVolume(podName, volumeName, newSize)
+			_, _, podExistErr := asw.PodExistsInVolume(podName, volumeName, newSize, "" /* SELinuxLabel */)
 			if tc.expansionFailed {
 				if cache.IsFSResizeRequiredError(podExistErr) {
 					t.Fatalf("volume %s should not throw fsResizeRequired error: %v", volumeName, podExistErr)
@@ -1358,7 +1364,7 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 				go reconciler.Run(wait.NeverStop)
 
 				waitErr := retryWithExponentialBackOff(testOperationBackOffDuration, func() (done bool, err error) {
-					mounted, _, err := asw.PodExistsInVolume(podName, volumeName, newSize)
+					mounted, _, err := asw.PodExistsInVolume(podName, volumeName, newSize, "" /* SELinuxContext */)
 					return mounted && err == nil, nil
 				})
 				if waitErr != nil {
@@ -1913,7 +1919,7 @@ func waitForUncertainPodMount(t *testing.T, volumeName v1.UniqueVolumeName, podN
 	err := retryWithExponentialBackOff(
 		testOperationBackOffDuration,
 		func() (bool, error) {
-			mounted, _, err := asw.PodExistsInVolume(podName, volumeName, resource.Quantity{})
+			mounted, _, err := asw.PodExistsInVolume(podName, volumeName, resource.Quantity{}, "" /* SELinuxContext */)
 			if mounted || err != nil {
 				return false, nil
 			}
