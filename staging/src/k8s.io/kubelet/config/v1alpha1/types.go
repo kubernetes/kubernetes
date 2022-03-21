@@ -52,9 +52,9 @@ type CredentialProvider struct {
 	//
 	// Each entry in matchImages is a pattern which can optionally contain a port and a path.
 	// Globs can be used in the domain, but not in the port or the path. Globs are supported
-	// as subdomains like '*.k8s.io' or 'k8s.*.io', and top-level-domains such as 'k8s.*'.
-	// Matching partial subdomains like 'app*.k8s.io' is also supported. Each glob can only match
-	// a single subdomain segment, so *.io does not match *.k8s.io.
+	// as subdomains like `*.k8s.io` or `k8s.*.io`, and top-level-domains such as `k8s.*`.
+	// Matching partial subdomains like `app*.k8s.io` is also supported. Each glob can only match
+	// a single subdomain segment, so `*.io` does not match `*.k8s.io`.
 	//
 	// A match exists between an image and a matchImage when all of the below are true:
 	// - Both contain the same number of domain parts and each part matches.
@@ -62,11 +62,11 @@ type CredentialProvider struct {
 	// - If the imageMatch contains a port, then the port must match in the image as well.
 	//
 	// Example values of matchImages:
-	//   - 123456789.dkr.ecr.us-east-1.amazonaws.com
-	//   - *.azurecr.io
-	//   - gcr.io
-	//   - *.*.registry.io
-	//   - registry.io:8080/path
+	//   - `123456789.dkr.ecr.us-east-1.amazonaws.com`
+	//   - `*.azurecr.io`
+	//   - `gcr.io`
+	//   - `*.*.registry.io`
+	//   - `registry.io:8080/path`
 	MatchImages []string `json:"matchImages"`
 
 	// defaultCacheDuration is the default duration the plugin will cache credentials in-memory
