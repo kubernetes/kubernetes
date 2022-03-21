@@ -1039,6 +1039,9 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/kubelet/config/v1alpha1.CredentialProvider":                                               schema_k8sio_kubelet_config_v1alpha1_CredentialProvider(ref),
 		"k8s.io/kubelet/config/v1alpha1.CredentialProviderConfig":                                         schema_k8sio_kubelet_config_v1alpha1_CredentialProviderConfig(ref),
 		"k8s.io/kubelet/config/v1alpha1.ExecEnvVar":                                                       schema_k8sio_kubelet_config_v1alpha1_ExecEnvVar(ref),
+		"k8s.io/kubelet/config/v1beta1.CredentialProvider":                                                schema_k8sio_kubelet_config_v1beta1_CredentialProvider(ref),
+		"k8s.io/kubelet/config/v1beta1.CredentialProviderConfig":                                          schema_k8sio_kubelet_config_v1beta1_CredentialProviderConfig(ref),
+		"k8s.io/kubelet/config/v1beta1.ExecEnvVar":                                                        schema_k8sio_kubelet_config_v1beta1_ExecEnvVar(ref),
 		"k8s.io/kubelet/config/v1beta1.KubeletAnonymousAuthentication":                                    schema_k8sio_kubelet_config_v1beta1_KubeletAnonymousAuthentication(ref),
 		"k8s.io/kubelet/config/v1beta1.KubeletAuthentication":                                             schema_k8sio_kubelet_config_v1beta1_KubeletAuthentication(ref),
 		"k8s.io/kubelet/config/v1beta1.KubeletAuthorization":                                              schema_k8sio_kubelet_config_v1beta1_KubeletAuthorization(ref),
@@ -52117,6 +52120,160 @@ func schema_k8sio_kubelet_config_v1alpha1_CredentialProviderConfig(ref common.Re
 }
 
 func schema_k8sio_kubelet_config_v1alpha1_ExecEnvVar(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ExecEnvVar is used for setting environment variables when executing an exec-based credential plugin.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Default: "",
+							Type:    []string{"string"},
+							Format:  "",
+						},
+					},
+					"value": {
+						SchemaProps: spec.SchemaProps{
+							Default: "",
+							Type:    []string{"string"},
+							Format:  "",
+						},
+					},
+				},
+				Required: []string{"name", "value"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_kubelet_config_v1beta1_CredentialProvider(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CredentialProvider represents an exec plugin to be invoked by the kubelet. The plugin is only invoked when an image being pulled matches the images handled by the plugin (see matchImages).",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "name is the required name of the credential provider. It must match the name of the provider executable as seen by the kubelet. The executable must be in the kubelet's bin directory (set by the --image-credential-provider-bin-dir flag).",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"matchImages": {
+						SchemaProps: spec.SchemaProps{
+							Description: "matchImages is a required list of strings used to match against images in order to determine if this provider should be invoked. If one of the strings matches the requested image from the kubelet, the plugin will be invoked and given a chance to provide credentials. Images are expected to contain the registry domain and URL path.\n\nEach entry in matchImages is a pattern which can optionally contain a port and a path. Globs can be used in the domain, but not in the port or the path. Globs are supported as subdomains like '*.k8s.io' or 'k8s.*.io', and top-level-domains such as 'k8s.*'. Matching partial subdomains like 'app*.k8s.io' is also supported. Each glob can only match a single subdomain segment, so *.io does not match *.k8s.io.\n\nA match exists between an image and a matchImage when all of the below are true: - Both contain the same number of domain parts and each part matches. - The URL path of an imageMatch must be a prefix of the target image URL path. - If the imageMatch contains a port, then the port must match in the image as well.\n\nExample values of matchImages:\n  - 123456789.dkr.ecr.us-east-1.amazonaws.com\n  - *.azurecr.io\n  - gcr.io\n  - *.*.registry.io\n  - registry.io:8080/path",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"defaultCacheDuration": {
+						SchemaProps: spec.SchemaProps{
+							Description: "defaultCacheDuration is the default duration the plugin will cache credentials in-memory if a cache duration is not provided in the plugin response. This field is required.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Required input version of the exec CredentialProviderRequest. The returned CredentialProviderResponse MUST use the same encoding version as the input. Current supported values are: - credentialprovider.kubelet.k8s.io/v1beta1",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"args": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Arguments to pass to the command when executing it.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"env": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Env defines additional environment variables to expose to the process. These are unioned with the host's environment, as well as variables client-go uses to pass argument to the plugin.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/kubelet/config/v1beta1.ExecEnvVar"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"name", "matchImages", "defaultCacheDuration", "apiVersion"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/apis/meta/v1.Duration", "k8s.io/kubelet/config/v1beta1.ExecEnvVar"},
+	}
+}
+
+func schema_k8sio_kubelet_config_v1beta1_CredentialProviderConfig(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CredentialProviderConfig is the configuration containing information about each exec credential provider. Kubelet reads this configuration from disk and enables each provider as specified by the CredentialProvider type.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"providers": {
+						SchemaProps: spec.SchemaProps{
+							Description: "providers is a list of credential provider plugins that will be enabled by the kubelet. Multiple providers may match against a single image, in which case credentials from all providers will be returned to the kubelet. If multiple providers are called for a single image, the results are combined. If providers return overlapping auth keys, the value from the provider earlier in this list is used.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/kubelet/config/v1beta1.CredentialProvider"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"providers"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/kubelet/config/v1beta1.CredentialProvider"},
+	}
+}
+
+func schema_k8sio_kubelet_config_v1beta1_ExecEnvVar(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
