@@ -29,8 +29,17 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	appsclient "k8s.io/client-go/kubernetes/typed/apps/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/features"
+)
+
+const (
+	// AllReplicasAvailableReason is added in a replica set when all of its replicas are available.
+	AllReplicasAvailableReason = "AllReplicasAvailable"
+	// AllReplicasUnavailableReason is added in a replica set when some of its replicas are unavailable.
+	AllReplicasUnavailableReason = "AllReplicasUnavailable"
 )
 
 // updateReplicaSetStatus attempts to update the Status.Replicas of the given ReplicaSet, with a single GET/PUT retry.
@@ -118,6 +127,15 @@ func calculateStatus(rs *apps.ReplicaSet, filteredPods []*v1.Pod, manageReplicas
 		SetCondition(&newStatus, cond)
 	} else if manageReplicasErr == nil && failureCond != nil {
 		RemoveCondition(&newStatus, apps.ReplicaSetReplicaFailure)
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.ExtendedWorkloadConditions) {
+		if int32(availableReplicasCount) >= *(rs.Spec.Replicas) {
+			cond := NewReplicaSetCondition(apps.ReplicaSetAvailable, v1.ConditionTrue, AllReplicasAvailableReason, "ReplicaSet has full availability.")
+			SetCondition(&newStatus, cond)
+		} else {
+			cond := NewReplicaSetCondition(apps.ReplicaSetAvailable, v1.ConditionFalse, AllReplicasUnavailableReason, "ReplicaSet does not have full availability.")
+			SetCondition(&newStatus, cond)
+		}
 	}
 
 	newStatus.Replicas = int32(len(filteredPods))
