@@ -720,22 +720,22 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 				sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(internalqueue.AssignedPodDelete, nil)
 			}
 			sched.handleSchedulingFailure(fwk, assumedPodInfo, fmt.Errorf("binding rejected: %w", err), SchedulerError, clearNominatedNode)
-		} else {
-			// Calculating nodeResourceString can be heavy. Avoid it if klog verbosity is below 2.
-			klog.V(2).InfoS("Successfully bound pod to node", "pod", klog.KObj(pod), "node", scheduleResult.SuggestedHost, "evaluatedNodes", scheduleResult.EvaluatedNodes, "feasibleNodes", scheduleResult.FeasibleNodes)
-			metrics.PodScheduled(fwk.ProfileName(), metrics.SinceInSeconds(start))
-			metrics.PodSchedulingAttempts.Observe(float64(podInfo.Attempts))
-			metrics.PodSchedulingDuration.WithLabelValues(getAttemptsLabel(podInfo)).Observe(metrics.SinceInSeconds(podInfo.InitialAttemptTimestamp))
+			return
+		}
+		// Calculating nodeResourceString can be heavy. Avoid it if klog verbosity is below 2.
+		klog.V(2).InfoS("Successfully bound pod to node", "pod", klog.KObj(pod), "node", scheduleResult.SuggestedHost, "evaluatedNodes", scheduleResult.EvaluatedNodes, "feasibleNodes", scheduleResult.FeasibleNodes)
+		metrics.PodScheduled(fwk.ProfileName(), metrics.SinceInSeconds(start))
+		metrics.PodSchedulingAttempts.Observe(float64(podInfo.Attempts))
+		metrics.PodSchedulingDuration.WithLabelValues(getAttemptsLabel(podInfo)).Observe(metrics.SinceInSeconds(podInfo.InitialAttemptTimestamp))
 
-			// Run "postbind" plugins.
-			fwk.RunPostBindPlugins(bindingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost)
+		// Run "postbind" plugins.
+		fwk.RunPostBindPlugins(bindingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost)
 
-			// At the end of a successful binding cycle, move up Pods if needed.
-			if len(podsToActivate.Map) != 0 {
-				sched.SchedulingQueue.Activate(podsToActivate.Map)
-				// Unlike the logic in scheduling cycle, we don't bother deleting the entries
-				// as `podsToActivate.Map` is no longer consumed.
-			}
+		// At the end of a successful binding cycle, move up Pods if needed.
+		if len(podsToActivate.Map) != 0 {
+			sched.SchedulingQueue.Activate(podsToActivate.Map)
+			// Unlike the logic in scheduling cycle, we don't bother deleting the entries
+			// as `podsToActivate.Map` is no longer consumed.
 		}
 	}()
 }
