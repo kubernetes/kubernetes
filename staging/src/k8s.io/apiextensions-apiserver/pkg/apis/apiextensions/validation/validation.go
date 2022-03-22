@@ -748,7 +748,7 @@ func validateCustomResourceDefinitionValidation(ctx context.Context, customResou
 }
 
 type costInfo struct {
-	// Cardinality tracks the number of times a rule in the current schema node will actually get executed
+	// Cardinality tracks the largest number of times a rule in the current schema node could possibly get executed
 	// due to being the child of arrays/maps/etc.
 	Cardinality *uint64
 }
