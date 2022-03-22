@@ -719,7 +719,7 @@ func validateCustomResourceDefinitionValidation(ctx context.Context, customResou
 			requireValidPropertyType: opts.requireValidPropertyType,
 		}
 
-		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema, fldPath.Child("openAPIV3Schema"), openAPIV3Schema, true, &opts, getCostInfo(schema, nil))...)
+		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema, fldPath.Child("openAPIV3Schema"), openAPIV3Schema, true, &opts, rootCostInfo())...)
 
 		if opts.requireStructuralSchema {
 			if ss, err := structuralschema.NewStructural(schema); err != nil {
@@ -753,10 +753,30 @@ type costInfo struct {
 	MaxCardinality *uint64
 }
 
+func (c *costInfo) MultiplyByElementCost(schema *apiextensions.JSONSchemaProps) costInfo {
+	if c.MaxCardinality == nil {
+		return costInfo{}
+	}
+	maxElements := extractMaxElements(schema)
+	if maxElements == nil {
+		return costInfo{}
+	}
+	return costInfo{
+		MaxCardinality: multiplyWithOverflowGuard(*c.MaxCardinality, *maxElements),
+	}
+}
+
+func rootCostInfo() costInfo {
+	rootCardinality := uint64(1)
+	return costInfo{
+		MaxCardinality: &rootCardinality,
+	}
+}
+
 var metaFields = sets.NewString("metadata", "kind", "apiVersion")
 
 // ValidateCustomResourceDefinitionOpenAPISchema statically validates
-func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSchemaProps, fldPath *field.Path, ssv specStandardValidator, isRoot bool, opts *validationOptions, nodeCostInfo *costInfo) field.ErrorList {
+func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSchemaProps, fldPath *field.Path, ssv specStandardValidator, isRoot bool, opts *validationOptions, nodeCostInfo costInfo) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if schema == nil {
@@ -791,7 +811,7 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 			subSsv = ssv.withForbiddenDefaults("inside additionalProperties applying to object metadata")
 		}
 		propsSchema := schema.AdditionalProperties.Schema
-		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.AdditionalProperties.Schema, fldPath.Child("additionalProperties"), subSsv, false, opts, getCostInfo(propsSchema, nodeCostInfo))...)
+		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.AdditionalProperties.Schema, fldPath.Child("additionalProperties"), subSsv, false, opts, nodeCostInfo.MultiplyByElementCost(propsSchema))...)
 	}
 
 	if len(schema.Properties) != 0 {
@@ -810,33 +830,33 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 					subSsv = subSsv.withForbiddenDefaults(fmt.Sprintf("in top-level %s", property))
 				}
 			}
-			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("properties").Key(property), subSsv, false, opts, getCostInfo(&jsonSchema, nodeCostInfo))...)
+			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("properties").Key(property), subSsv, false, opts, nodeCostInfo.MultiplyByElementCost(&jsonSchema))...)
 		}
 	}
 
-	allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.Not, fldPath.Child("not"), ssv, false, opts, getCostInfo(schema.Not, nodeCostInfo))...)
+	allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.Not, fldPath.Child("not"), ssv, false, opts, nodeCostInfo.MultiplyByElementCost(schema.Not))...)
 
 	if len(schema.AllOf) != 0 {
 		for i, jsonSchema := range schema.AllOf {
-			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("allOf").Index(i), ssv, false, opts, getCostInfo(&jsonSchema, nodeCostInfo))...)
+			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("allOf").Index(i), ssv, false, opts, nodeCostInfo.MultiplyByElementCost(&jsonSchema))...)
 		}
 	}
 
 	if len(schema.OneOf) != 0 {
 		for i, jsonSchema := range schema.OneOf {
-			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("oneOf").Index(i), ssv, false, opts, getCostInfo(&jsonSchema, nodeCostInfo))...)
+			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("oneOf").Index(i), ssv, false, opts, nodeCostInfo.MultiplyByElementCost(&jsonSchema))...)
 		}
 	}
 
 	if len(schema.AnyOf) != 0 {
 		for i, jsonSchema := range schema.AnyOf {
-			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("anyOf").Index(i), ssv, false, opts, getCostInfo(&jsonSchema, nodeCostInfo))...)
+			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("anyOf").Index(i), ssv, false, opts, nodeCostInfo.MultiplyByElementCost(&jsonSchema))...)
 		}
 	}
 
 	if len(schema.Definitions) != 0 {
 		for definition, jsonSchema := range schema.Definitions {
-			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("definitions").Key(definition), ssv, false, opts, getCostInfo(&jsonSchema, nodeCostInfo))...)
+			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("definitions").Key(definition), ssv, false, opts, nodeCostInfo.MultiplyByElementCost(&jsonSchema))...)
 		}
 	}
 
@@ -850,17 +870,17 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 			subSsv = subSsv.withForbidOldSelfValidations(fldPath)
 		}
 
-		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.Items.Schema, fldPath.Child("items"), subSsv, false, opts, getCostInfo(schema.Items.Schema, nodeCostInfo))...)
+		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.Items.Schema, fldPath.Child("items"), subSsv, false, opts, nodeCostInfo.MultiplyByElementCost(schema.Items.Schema))...)
 		if len(schema.Items.JSONSchemas) != 0 {
 			for i, jsonSchema := range schema.Items.JSONSchemas {
-				allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("items").Index(i), subSsv, false, opts, getCostInfo(&jsonSchema, nodeCostInfo))...)
+				allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("items").Index(i), subSsv, false, opts, nodeCostInfo.MultiplyByElementCost(&jsonSchema))...)
 			}
 		}
 	}
 
 	if schema.Dependencies != nil {
 		for dependency, jsonSchemaPropsOrStringArray := range schema.Dependencies {
-			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(jsonSchemaPropsOrStringArray.Schema, fldPath.Child("dependencies").Key(dependency), ssv, false, opts, getCostInfo(jsonSchemaPropsOrStringArray.Schema, nodeCostInfo))...)
+			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(jsonSchemaPropsOrStringArray.Schema, fldPath.Child("dependencies").Key(dependency), ssv, false, opts, nodeCostInfo.MultiplyByElementCost(jsonSchemaPropsOrStringArray.Schema))...)
 		}
 	}
 
@@ -1003,23 +1023,6 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 	return allErrs
 }
 
-func getCostInfo(schema *apiextensions.JSONSchemaProps, prevCostInfo *costInfo) *costInfo {
-	cardinality := extractMaxElements(schema)
-	if prevCostInfo != nil && cardinality != nil {
-		if prevCostInfo.MaxCardinality != nil {
-			*cardinality = multWithOverflowGuard(*cardinality, *prevCostInfo.MaxCardinality)
-		} else {
-			// we denote that cardinality is unbounded by setting MaxCardiality to nil
-			// note that this is different from schemaCostInfo being nil, which will
-			// happen if we're validating the root node
-			cardinality = nil
-		}
-	}
-	return &costInfo{
-		MaxCardinality: cardinality,
-	}
-}
-
 func extractMaxElements(schema *apiextensions.JSONSchemaProps) *uint64 {
 	switch schema.Type {
 	case "object":
@@ -1046,22 +1049,26 @@ func extractMaxElements(schema *apiextensions.JSONSchemaProps) *uint64 {
 	}
 }
 
-// multWithOverflowGuard returns the product of baseCost and cardinality unless that product
+// multiplyWithOverflowGuard returns the product of baseCost and cardinality unless that product
 // would exceed math.MaxUint, in which case math.MaxUint is returned.
-func multWithOverflowGuard(baseCost, cardinality uint64) uint64 {
+func multiplyWithOverflowGuard(baseCost, cardinality uint64) *uint64 {
+	var resultPtr *uint64
+	var result uint64
 	if baseCost == 0 {
 		// an empty rule can return 0, so guard for that here
-		return 0
+		result = 0
+	} else if math.MaxUint/baseCost < cardinality {
+		result = math.MaxUint
+	} else {
+		result = baseCost * cardinality
 	}
-	if math.MaxUint/baseCost < cardinality {
-		return math.MaxUint
-	}
-	return baseCost * cardinality
+	resultPtr = &result
+	return resultPtr
 }
 
-func getExpressionCost(baseCost uint64, cardinalityCost *costInfo) uint64 {
+func getExpressionCost(baseCost uint64, cardinalityCost costInfo) uint64 {
 	if cardinalityCost.MaxCardinality != nil {
-		return multWithOverflowGuard(baseCost, *cardinalityCost.MaxCardinality)
+		return *multiplyWithOverflowGuard(baseCost, *cardinalityCost.MaxCardinality)
 	}
 	return baseCost
 }

@@ -8321,12 +8321,10 @@ func TestCostInfo(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var prevCostInfo *costInfo
-			var curCostInfo *costInfo
+			curCostInfo := rootCostInfo()
 			// simulate the recursive validation calls
 			for _, schema := range tt.schema {
-				curCostInfo = getCostInfo(schema, prevCostInfo)
-				prevCostInfo = curCostInfo
+				curCostInfo = curCostInfo.MultiplyByElementCost(schema)
 			}
 			if tt.expectedMaxCardinality == nil && curCostInfo.MaxCardinality == nil {
 				// unbounded cardinality case, test ran correctly
