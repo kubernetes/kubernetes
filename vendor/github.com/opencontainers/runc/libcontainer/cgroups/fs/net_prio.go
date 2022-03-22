@@ -1,5 +1,3 @@
-// +build linux
-
 package fs
 
 import (
@@ -13,8 +11,8 @@ func (s *NetPrioGroup) Name() string {
 	return "net_prio"
 }
 
-func (s *NetPrioGroup) Apply(path string, d *cgroupData) error {
-	return join(path, d.pid)
+func (s *NetPrioGroup) Apply(path string, _ *configs.Resources, pid int) error {
+	return apply(path, pid)
 }
 
 func (s *NetPrioGroup) Set(path string, r *configs.Resources) error {

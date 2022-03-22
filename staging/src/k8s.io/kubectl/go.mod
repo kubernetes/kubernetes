@@ -48,7 +48,6 @@ require (
 )
 
 replace (
-	github.com/docker/distribution => github.com/docker/distribution v2.7.1+incompatible
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/cli-runtime => ../cli-runtime

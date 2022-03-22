@@ -1,17 +1,16 @@
-// +build linux
-
 package fs2
 
 import (
+	"errors"
+	"math"
 	"os"
-	"path/filepath"
 	"strings"
+
+	"golang.org/x/sys/unix"
 
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/cgroups/fscommon"
 	"github.com/opencontainers/runc/libcontainer/configs"
-	"github.com/pkg/errors"
-	"golang.org/x/sys/unix"
 )
 
 func isPidsSet(r *configs.Resources) bool {
@@ -53,22 +52,18 @@ func statPids(dirPath string, stats *cgroups.Stats) error {
 		if os.IsNotExist(err) {
 			return statPidsFromCgroupProcs(dirPath, stats)
 		}
-		return errors.Wrap(err, "failed to parse pids.current")
+		return err
 	}
 
-	maxString, err := fscommon.GetCgroupParamString(dirPath, "pids.max")
+	max, err := fscommon.GetCgroupParamUint(dirPath, "pids.max")
 	if err != nil {
-		return errors.Wrap(err, "failed to parse pids.max")
+		return err
 	}
-
-	// Default if pids.max == "max" is 0 -- which represents "no limit".
-	var max uint64
-	if maxString != "max" {
-		max, err = fscommon.ParseUint(maxString, 10, 64)
-		if err != nil {
-			return errors.Wrapf(err, "failed to parse pids.max - unable to parse %q as a uint from Cgroup file %q",
-				maxString, filepath.Join(dirPath, "pids.max"))
-		}
+	// If no limit is set, read from pids.max returns "max", which is
+	// converted to MaxUint64 by GetCgroupParamUint. Historically, we
+	// represent "no limit" for pids as 0, thus this conversion.
+	if max == math.MaxUint64 {
+		max = 0
 	}
 
 	stats.PidsStats.Current = current

@@ -1,9 +1,9 @@
-// +build linux freebsd,cgo openbsd,cgo
+//go:build linux || (freebsd && cgo) || (openbsd && cgo) || (darwin && cgo)
+// +build linux freebsd,cgo openbsd,cgo darwin,cgo
 
 package mountinfo
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -15,10 +15,6 @@ func mountedByStat(path string) (bool, error) {
 	var st unix.Stat_t
 
 	if err := unix.Lstat(path, &st); err != nil {
-		if err == unix.ENOENT {
-			// Treat ENOENT as "not mounted".
-			return false, nil
-		}
 		return false, &os.PathError{Op: "stat", Path: path, Err: err}
 	}
 	dev := st.Dev
@@ -49,14 +45,6 @@ func normalizePath(path string) (realPath string, err error) {
 }
 
 func mountedByMountinfo(path string) (bool, error) {
-	path, err := normalizePath(path)
-	if err != nil {
-		if errors.Is(err, unix.ENOENT) {
-			// treat ENOENT as "not mounted"
-			return false, nil
-		}
-		return false, err
-	}
 	entries, err := GetMounts(SingleEntryFilter(path))
 	if err != nil {
 		return false, err
