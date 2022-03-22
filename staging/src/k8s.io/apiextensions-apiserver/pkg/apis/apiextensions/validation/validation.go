@@ -766,7 +766,7 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 	cardinality := extractMaxElements(schema)
 	if schemaCostInfo != nil && cardinality != nil {
 		if schemaCostInfo.Cardinality != nil {
-			*cardinality *= *schemaCostInfo.Cardinality
+			*cardinality = multWithOverflowGuard(*cardinality, *schemaCostInfo.Cardinality)
 		} else {
 			cardinality = nil
 		}
