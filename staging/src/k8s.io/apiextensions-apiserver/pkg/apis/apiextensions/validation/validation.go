@@ -41,7 +41,6 @@ import (
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	apiservervalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
-	celschema "k8s.io/apiextensions-apiserver/third_party/forked/celopenapi/model"
 )
 
 var (
@@ -51,8 +50,7 @@ var (
 )
 
 const (
-	unboundedSchemaLength = -1
-	TotalCostLimit        = 2000000
+	TotalCostLimit = 2000000
 )
 
 // ValidateCustomResourceDefinition statically validates
@@ -749,36 +747,33 @@ func validateCustomResourceDefinitionValidation(ctx context.Context, customResou
 	return allErrs
 }
 
-type schemaTree struct {
-	Cardinality int64
-	Parent      *schemaTree
-	Schema      *apiextensions.JSONSchemaProps
+type costInfo struct {
+	// Cardinality tracks the number of times a rule in the current schema node will actually get executed
+	// due to being the child of arrays/maps/etc.
+	Cardinality *uint64
 }
 
 var metaFields = sets.NewString("metadata", "kind", "apiVersion")
 
 // ValidateCustomResourceDefinitionOpenAPISchema statically validates
-func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSchemaProps, fldPath *field.Path, ssv specStandardValidator, isRoot bool, opts *validationOptions, parentNode *schemaTree) field.ErrorList {
+func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSchemaProps, fldPath *field.Path, ssv specStandardValidator, isRoot bool, opts *validationOptions, parentNode *costInfo) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if schema == nil {
 		return allErrs
 	}
 
-	var cardinality int64
-	cardinality = extractMaxElements(schema)
-	if parentNode != nil {
-		if parentNode.Cardinality != unboundedSchemaLength {
-			cardinality *= parentNode.Cardinality
+	cardinality := extractMaxElements(schema)
+	if parentNode != nil && cardinality != nil {
+		if parentNode.Cardinality != nil {
+			*cardinality *= *parentNode.Cardinality
 		} else {
-			cardinality = unboundedSchemaLength
+			cardinality = nil
 		}
 	}
 
-	treeNode := &schemaTree{
+	nodeCostInfo := &costInfo{
 		Cardinality: cardinality,
-		Parent:      parentNode,
-		Schema:      schema,
 	}
 
 	allErrs = append(allErrs, ssv.validate(schema, fldPath)...)
@@ -809,7 +804,7 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 			// we have to forbid defaults inside additionalProperties because pruning without actual value is ambiguous
 			subSsv = ssv.withForbiddenDefaults("inside additionalProperties applying to object metadata")
 		}
-		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.AdditionalProperties.Schema, fldPath.Child("additionalProperties"), subSsv, false, opts, treeNode)...)
+		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.AdditionalProperties.Schema, fldPath.Child("additionalProperties"), subSsv, false, opts, nodeCostInfo)...)
 	}
 
 	if len(schema.Properties) != 0 {
@@ -828,33 +823,33 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 					subSsv = subSsv.withForbiddenDefaults(fmt.Sprintf("in top-level %s", property))
 				}
 			}
-			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("properties").Key(property), subSsv, false, opts, treeNode)...)
+			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("properties").Key(property), subSsv, false, opts, nodeCostInfo)...)
 		}
 	}
 
-	allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.Not, fldPath.Child("not"), ssv, false, opts, treeNode)...)
+	allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.Not, fldPath.Child("not"), ssv, false, opts, nodeCostInfo)...)
 
 	if len(schema.AllOf) != 0 {
 		for i, jsonSchema := range schema.AllOf {
-			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("allOf").Index(i), ssv, false, opts, treeNode)...)
+			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("allOf").Index(i), ssv, false, opts, nodeCostInfo)...)
 		}
 	}
 
 	if len(schema.OneOf) != 0 {
 		for i, jsonSchema := range schema.OneOf {
-			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("oneOf").Index(i), ssv, false, opts, treeNode)...)
+			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("oneOf").Index(i), ssv, false, opts, nodeCostInfo)...)
 		}
 	}
 
 	if len(schema.AnyOf) != 0 {
 		for i, jsonSchema := range schema.AnyOf {
-			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("anyOf").Index(i), ssv, false, opts, treeNode)...)
+			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("anyOf").Index(i), ssv, false, opts, nodeCostInfo)...)
 		}
 	}
 
 	if len(schema.Definitions) != 0 {
 		for definition, jsonSchema := range schema.Definitions {
-			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("definitions").Key(definition), ssv, false, opts, treeNode)...)
+			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("definitions").Key(definition), ssv, false, opts, nodeCostInfo)...)
 		}
 	}
 
@@ -868,17 +863,17 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 			subSsv = subSsv.withForbidOldSelfValidations(fldPath)
 		}
 
-		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.Items.Schema, fldPath.Child("items"), subSsv, false, opts, treeNode)...)
+		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.Items.Schema, fldPath.Child("items"), subSsv, false, opts, nodeCostInfo)...)
 		if len(schema.Items.JSONSchemas) != 0 {
 			for i, jsonSchema := range schema.Items.JSONSchemas {
-				allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("items").Index(i), subSsv, false, opts, treeNode)...)
+				allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("items").Index(i), subSsv, false, opts, nodeCostInfo)...)
 			}
 		}
 	}
 
 	if schema.Dependencies != nil {
 		for dependency, jsonSchemaPropsOrStringArray := range schema.Dependencies {
-			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(jsonSchemaPropsOrStringArray.Schema, fldPath.Child("dependencies").Key(dependency), ssv, false, opts, treeNode)...)
+			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(jsonSchemaPropsOrStringArray.Schema, fldPath.Child("dependencies").Key(dependency), ssv, false, opts, nodeCostInfo)...)
 		}
 	}
 
@@ -988,7 +983,7 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 				allErrs = append(allErrs, field.InternalError(fldPath.Child("x-kubernetes-validations"), err))
 			} else {
 				for i, cr := range compResults {
-					celCRDCost += getExpressionCost(cr.MaxCost, treeNode)
+					celCRDCost += getExpressionCost(cr.MaxCost, nodeCostInfo)
 					if celCRDCost > TotalCostLimit {
 						// TODO(DangerOnTheRanger): consider how to make the error message more informative
 						exceedFactor := float64(celCRDCost) / float64(TotalCostLimit)
@@ -1023,61 +1018,50 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 	return allErrs
 }
 
-func extractMaxElements(schema *apiextensions.JSONSchemaProps) int64 {
+func extractMaxElements(schema *apiextensions.JSONSchemaProps) *uint64 {
 	switch schema.Type {
 	case "object":
 		if schema.AdditionalProperties != nil && schema.MaxProperties != nil {
-			return *schema.MaxProperties
+			if schema.MaxProperties != nil {
+				maxProps := uint64(*schema.MaxProperties)
+				return &maxProps
+			}
+			return nil
 		}
-		// return 1, and not unboundedSchemaLength, because even if we're
+		// return 1, and not nil, because even if we're
 		// not looking at a map here, we can assume the object still preserves
 		// the cardinality of its parents
-		return 1
+		cardOne := uint64(1)
+		return &cardOne
 	case "array":
 		if schema.MaxItems != nil {
-			return *schema.MaxItems
+			maxItems := uint64(*schema.MaxItems)
+			return &maxItems
 		}
-		return unboundedSchemaLength
+		return nil
 	default:
-		return unboundedSchemaLength
+		return nil
 	}
 }
 
-func cardinalityFromMaxElements(schemaNode *schemaTree) uint64 {
-	if schemaNode.Parent == nil {
-		return 1
+// multWithOverflowGuard is intended to serve as a convenience function to handle the potential for
+// integer overflow when taking into account a CEL expression's cost and schema cardinality
+func multWithOverflowGuard(baseCost, cardinality uint64) uint64 {
+	if baseCost == 0 {
+		// an empty rule can return 0, so guard for that here
+		return 0
 	}
-	structural, err := structuralschema.NewStructural(schemaNode.Parent.Schema)
-	if err != nil {
+	if math.MaxUint/baseCost < cardinality {
 		return math.MaxUint
 	}
-	celSchema := celschema.SchemaDeclType(structural, false)
-	if celSchema == nil {
-		return math.MaxUint
-	}
-	return uint64(celSchema.MaxElements)
+	return baseCost * cardinality
 }
 
-func getExpressionCost(baseCost uint64, schemaNode *schemaTree) uint64 {
-	if schemaNode.Cardinality == unboundedSchemaLength {
-		if schemaNode.Parent == nil {
-			return baseCost
-		}
-		return baseCost * cardinalityFromMaxElements(schemaNode)
+func getExpressionCost(baseCost uint64, cardinalityCost *costInfo) uint64 {
+	if cardinalityCost.Cardinality != nil {
+		return multWithOverflowGuard(baseCost, *cardinalityCost.Cardinality)
 	}
-	maxElementsCost := baseCost * cardinalityFromMaxElements(schemaNode)
-	cardinalityCost := baseCost * uint64(schemaNode.Cardinality)
-	// return the minimum of the two; since maxElementsCost is computed against the 3MB max request size limit,
-	// if cardinalityCost is greater, we can safely assume that the would-be request hitting the cardinalityCost
-	// limit would be greater than 3MB
-	// in all other situations cardinalityCost is to be preferred, since the calculated cardinality limit should
-	// not come close to hitting the 3MB request limit (since it is user-set)
-	if maxElementsCost < cardinalityCost {
-		return maxElementsCost
-	} else {
-		return cardinalityCost
-	}
-
+	return baseCost
 }
 
 var newlineMatcher = regexp.MustCompile(`[\n\r]+`) // valid newline chars in CEL grammar
