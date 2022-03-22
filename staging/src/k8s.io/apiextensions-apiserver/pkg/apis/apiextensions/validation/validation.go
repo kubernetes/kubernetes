@@ -50,7 +50,7 @@ var (
 )
 
 const (
-	TotalCostLimit = 2000000
+	TotalCostLimit = 10000000
 )
 
 // ValidateCustomResourceDefinition statically validates
