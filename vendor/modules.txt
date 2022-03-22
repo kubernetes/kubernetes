@@ -184,7 +184,8 @@ github.com/container-storage-interface/spec/lib/go/csi
 github.com/containerd/cgroups/stats/v1
 # github.com/containerd/console v1.0.2 => github.com/containerd/console v1.0.2
 github.com/containerd/console
-# github.com/containerd/containerd v1.4.11 => github.com/containerd/containerd v1.4.11
+# github.com/containerd/containerd v1.4.13 => github.com/containerd/containerd v1.4.13
+## explicit
 github.com/containerd/containerd/api/services/containers/v1
 github.com/containerd/containerd/api/services/tasks/v1
 github.com/containerd/containerd/api/services/version/v1
@@ -220,10 +221,12 @@ github.com/cyphar/filepath-securejoin
 github.com/davecgh/go-spew/spew
 # github.com/daviddengcn/go-colortext v0.0.0-20160507010035-511bcaf42ccd => github.com/daviddengcn/go-colortext v0.0.0-20160507010035-511bcaf42ccd
 github.com/daviddengcn/go-colortext
-# github.com/docker/distribution v2.7.1+incompatible => github.com/docker/distribution v2.7.1+incompatible
+# github.com/docker/distribution v2.8.0+incompatible => github.com/docker/distribution v2.7.1+incompatible
 ## explicit
 github.com/docker/distribution/digestset
 github.com/docker/distribution/reference
+# github.com/docker/docker v20.10.13+incompatible => github.com/docker/docker v20.10.13+incompatible
+## explicit
 # github.com/docker/go-units v0.4.0 => github.com/docker/go-units v0.4.0
 ## explicit
 github.com/docker/go-units
@@ -324,7 +327,7 @@ github.com/golang/protobuf/ptypes/timestamp
 github.com/golang/protobuf/ptypes/wrappers
 # github.com/google/btree v1.0.1 => github.com/google/btree v1.0.1
 github.com/google/btree
-# github.com/google/cadvisor v0.43.0 => github.com/google/cadvisor v0.43.0
+# github.com/google/cadvisor v0.44.0 => github.com/google/cadvisor v0.44.0
 ## explicit
 github.com/google/cadvisor/accelerators
 github.com/google/cadvisor/cache/memory
@@ -520,7 +523,7 @@ github.com/moby/ipvs
 # github.com/moby/spdystream v0.2.0 => github.com/moby/spdystream v0.2.0
 github.com/moby/spdystream
 github.com/moby/spdystream/spdy
-# github.com/moby/sys/mountinfo v0.4.1 => github.com/moby/sys/mountinfo v0.4.1
+# github.com/moby/sys/mountinfo v0.5.0 => github.com/moby/sys/mountinfo v0.4.1
 github.com/moby/sys/mountinfo
 # github.com/moby/term v0.0.0-20210619224110-3f7ff695adc6 => github.com/moby/term v0.0.0-20210619224110-3f7ff695adc6
 github.com/moby/term
@@ -597,7 +600,7 @@ github.com/onsi/gomega/matchers/support/goraph/util
 github.com/onsi/gomega/types
 # github.com/opencontainers/go-digest v1.0.0 => github.com/opencontainers/go-digest v1.0.0
 github.com/opencontainers/go-digest
-# github.com/opencontainers/runc v1.0.3 => github.com/opencontainers/runc v1.0.3
+# github.com/opencontainers/runc v1.1.0 => github.com/opencontainers/runc v1.0.3
 ## explicit
 github.com/opencontainers/runc/libcontainer
 github.com/opencontainers/runc/libcontainer/apparmor
@@ -2470,7 +2473,7 @@ sigs.k8s.io/yaml
 # github.com/container-storage-interface/spec => github.com/container-storage-interface/spec v1.5.0
 # github.com/containerd/cgroups => github.com/containerd/cgroups v1.0.1
 # github.com/containerd/console => github.com/containerd/console v1.0.2
-# github.com/containerd/containerd => github.com/containerd/containerd v1.4.11
+# github.com/containerd/containerd => github.com/containerd/containerd v1.4.13
 # github.com/containerd/continuity => github.com/containerd/continuity v0.1.0
 # github.com/containerd/fifo => github.com/containerd/fifo v1.0.0
 # github.com/containerd/go-runc => github.com/containerd/go-runc v1.0.0
@@ -2488,7 +2491,7 @@ sigs.k8s.io/yaml
 # github.com/daviddengcn/go-colortext => github.com/daviddengcn/go-colortext v0.0.0-20160507010035-511bcaf42ccd
 # github.com/dnaeon/go-vcr => github.com/dnaeon/go-vcr v1.0.1
 # github.com/docker/distribution => github.com/docker/distribution v2.7.1+incompatible
-# github.com/docker/docker => github.com/docker/docker v20.10.7+incompatible
+# github.com/docker/docker => github.com/docker/docker v20.10.13+incompatible
 # github.com/docker/go-connections => github.com/docker/go-connections v0.4.0
 # github.com/docker/go-units => github.com/docker/go-units v0.4.0
 # github.com/docopt/docopt-go => github.com/docopt/docopt-go v0.0.0-20180111231733-ee0de3bc6815
@@ -2533,7 +2536,7 @@ sigs.k8s.io/yaml
 # github.com/golang/protobuf => github.com/golang/protobuf v1.5.2
 # github.com/golangplus/testing => github.com/golangplus/testing v0.0.0-20180327235837-af21d9c3145e
 # github.com/google/btree => github.com/google/btree v1.0.1
-# github.com/google/cadvisor => github.com/google/cadvisor v0.43.0
+# github.com/google/cadvisor => github.com/google/cadvisor v0.44.0
 # github.com/google/cel-go => github.com/google/cel-go v0.10.1
 # github.com/google/cel-spec => github.com/google/cel-spec v0.6.0
 # github.com/google/gnostic => github.com/google/gnostic v0.5.7-v3refs

@@ -157,13 +157,14 @@ func diskStatsCopy(blkioStats []cgroups.BlkioStatEntry) (stat []info.PerDiskStat
 }
 
 func NewCgroupManager(name string, paths map[string]string) (cgroups.Manager, error) {
+	config := &configs.Cgroup{
+		Name:      name,
+		Resources: &configs.Resources{},
+	}
 	if cgroups.IsCgroup2UnifiedMode() {
 		path := paths[""]
-		return fs2.NewManager(nil, path, false)
+		return fs2.NewManager(config, path)
 	}
 
-	config := configs.Cgroup{
-		Name: name,
-	}
-	return fs.NewManager(&config, paths, false), nil
+	return fs.NewManager(config, paths)
 }
