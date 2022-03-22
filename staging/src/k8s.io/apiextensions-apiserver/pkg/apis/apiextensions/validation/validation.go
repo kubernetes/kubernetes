@@ -748,9 +748,9 @@ func validateCustomResourceDefinitionValidation(ctx context.Context, customResou
 }
 
 type costInfo struct {
-	// Cardinality tracks the largest number of times a rule in the current schema node could possibly get executed
+	// MaxCardinality tracks the largest number of times a rule in the current schema node could possibly get executed
 	// due to being the child of arrays/maps/etc.
-	Cardinality *uint64
+	MaxCardinality *uint64
 }
 
 var metaFields = sets.NewString("metadata", "kind", "apiVersion")
@@ -765,15 +765,15 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 
 	cardinality := extractMaxElements(schema)
 	if schemaCostInfo != nil && cardinality != nil {
-		if schemaCostInfo.Cardinality != nil {
-			*cardinality = multWithOverflowGuard(*cardinality, *schemaCostInfo.Cardinality)
+		if schemaCostInfo.MaxCardinality != nil {
+			*cardinality = multWithOverflowGuard(*cardinality, *schemaCostInfo.MaxCardinality)
 		} else {
 			cardinality = nil
 		}
 	}
 
 	nodeCostInfo := &costInfo{
-		Cardinality: cardinality,
+		MaxCardinality: cardinality,
 	}
 
 	allErrs = append(allErrs, ssv.validate(schema, fldPath)...)
@@ -1056,8 +1056,8 @@ func multWithOverflowGuard(baseCost, cardinality uint64) uint64 {
 }
 
 func getExpressionCost(baseCost uint64, cardinalityCost *costInfo) uint64 {
-	if cardinalityCost.Cardinality != nil {
-		return multWithOverflowGuard(baseCost, *cardinalityCost.Cardinality)
+	if cardinalityCost.MaxCardinality != nil {
+		return multWithOverflowGuard(baseCost, *cardinalityCost.MaxCardinality)
 	}
 	return baseCost
 }
