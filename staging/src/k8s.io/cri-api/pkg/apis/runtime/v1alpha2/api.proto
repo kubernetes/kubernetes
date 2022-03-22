@@ -879,6 +879,8 @@ message WindowsContainerResources {
     int64 cpu_maximum = 3;
     // Memory limit in bytes. Default: 0 (not specified).
     int64 memory_limit_in_bytes = 4;
+    // Specifies the size of the rootfs / scratch space in bytes to be configured for this container. Default: 0 (not specified).
+    int64 rootfs_size_in_bytes = 5;
 }
 
 // ContainerMetadata holds all necessary information for building the container
