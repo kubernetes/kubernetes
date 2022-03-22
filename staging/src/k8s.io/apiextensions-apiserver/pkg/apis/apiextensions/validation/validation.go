@@ -50,7 +50,8 @@ var (
 )
 
 const (
-	TotalCostLimit = 10000000
+	// ExpressionCostLimit represents the largest-allowed CEL cost on a per-expression basis.
+	ExpressionCostLimit = 10000000
 )
 
 // ValidateCustomResourceDefinition statically validates
@@ -990,9 +991,9 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 			} else {
 				for i, cr := range compResults {
 					expressionCost := getExpressionCost(cr.MaxCost, nodeCostInfo)
-					if expressionCost > TotalCostLimit {
-						exceedFactor := float64(expressionCost) / float64(TotalCostLimit)
-						costErrorMsg := fmt.Sprintf("CEL rule of cost %d exceeded budget of %d by factor of %vx", uint64(expressionCost), TotalCostLimit, exceedFactor)
+					if expressionCost > ExpressionCostLimit {
+						exceedFactor := float64(expressionCost) / float64(ExpressionCostLimit)
+						costErrorMsg := fmt.Sprintf("CEL rule of cost %d exceeded budget of %d by factor of %vx", uint64(expressionCost), ExpressionCostLimit, exceedFactor)
 						allErrs = append(allErrs, field.Forbidden(fldPath.Child("x-kubernetes-validations").Index(i).Child("rule"), costErrorMsg))
 					}
 					if cr.Error != nil {
