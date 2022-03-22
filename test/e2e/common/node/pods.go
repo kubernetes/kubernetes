@@ -32,6 +32,7 @@ import (
 	"golang.org/x/net/websocket"
 
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -948,10 +949,11 @@ var _ = SIGDescribe("Pods", func() {
 			return false, nil
 		})
 		if err != nil {
-			p, _ := f.ClientSet.CoreV1().Pods(testNamespaceName).Get(context.TODO(), testPodName, metav1.GetOptions{})
-			framework.Logf("Pod: %+v", p)
+			framework.Logf("failed to see event that pod is created: %v", err)
 		}
-		framework.ExpectNoError(err, "failed to see Pod %v in namespace %v running", testPod.ObjectMeta.Name, testNamespaceName)
+		p, err := f.ClientSet.CoreV1().Pods(testNamespaceName).Get(context.TODO(), testPodName, metav1.GetOptions{})
+		framework.ExpectNoError(err, "failed to get Pod %v in namespace %v", testPodName, testNamespaceName)
+		framework.ExpectEqual(p.Status.Phase, v1.PodRunning, "failed to see Pod %v in namespace %v running", p.ObjectMeta.Name, testNamespaceName)
 
 		ginkgo.By("patching the Pod with a new Label and updated data")
 		podPatch, err := json.Marshal(v1.Pod{
@@ -984,7 +986,9 @@ var _ = SIGDescribe("Pods", func() {
 			}
 			return false, nil
 		})
-		framework.ExpectNoError(err, "failed to see %v event", watch.Modified)
+		if err != nil {
+			framework.Logf("failed to see %v event: %v", watch.Modified, err)
+		}
 
 		ginkgo.By("getting the Pod and ensuring that it's patched")
 		pod, err := f.ClientSet.CoreV1().Pods(testNamespaceName).Get(context.TODO(), testPodName, metav1.GetOptions{})
@@ -1048,7 +1052,12 @@ var _ = SIGDescribe("Pods", func() {
 			}
 			return false, nil
 		})
-		framework.ExpectNoError(err, "failed to see %v event", watch.Deleted)
+		if err != nil {
+			framework.Logf("failed to see %v event: %v", watch.Deleted, err)
+		}
+		_, err = f.ClientSet.CoreV1().Pods(testNamespaceName).Get(context.TODO(), testPodName, metav1.GetOptions{})
+		framework.ExpectError(err, "pod %v found in namespace %v, but it should be deleted", testPodName, testNamespaceName)
+		framework.ExpectEqual(apierrors.IsNotFound(err), true, fmt.Sprintf("expected IsNotFound error, got %#v", err))
 	})
 })
 
