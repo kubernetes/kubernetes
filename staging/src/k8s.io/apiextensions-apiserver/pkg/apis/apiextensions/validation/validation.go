@@ -755,6 +755,11 @@ type costInfo struct {
 }
 
 func (c *costInfo) MultiplyByElementCost(schema *apiextensions.JSONSchemaProps) costInfo {
+	if schema == nil {
+		// nil schemas can be passed since we call MultiplyByElementCost
+		// before ValidateCustomResourceDefinitionOpenAPISchema performs its nil check
+		return costInfo{}
+	}
 	if c.MaxCardinality == nil {
 		return costInfo{}
 	}
