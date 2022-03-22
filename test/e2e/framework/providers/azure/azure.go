@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/legacy-cloud-providers/azure"
+	"k8s.io/legacy-cloud-providers/azure/clients/fileclient"
 )
 
 func init() {
@@ -82,6 +83,36 @@ func (p *Provider) CreatePD(zone string) (string, error) {
 		volumeOptions.AvailabilityZone = zone
 	}
 	return p.azureCloud.CreateManagedDisk(volumeOptions)
+}
+
+// CreateShare creates a share and return its account name and key.
+func (p *Provider) CreateShare() (string, string, error) {
+	accountOptions := &azure.AccountOptions{
+		Name:                      "",
+		Type:                      string(compute.StandardLRS),
+		ResourceGroup:             p.azureCloud.ResourceGroup,
+		Location:                  p.azureCloud.GetLocation(),
+		EnableHTTPSTrafficOnly:    true,
+		Tags:                      nil,
+		VirtualNetworkResourceIDs: nil,
+	}
+
+	shareOptions := &fileclient.ShareOptions{
+		Name:       fmt.Sprintf("%s-%s", framework.TestContext.Prefix, string(uuid.NewUUID())),
+		RequestGiB: 1,
+	}
+
+	a, b, c := p.azureCloud.CreateFileShare(accountOptions, shareOptions)
+
+	return a, b, c
+}
+
+func (p *Provider) DeleteShare(accountName, shareName string) error {
+	err := p.azureCloud.DeleteFileShare("", accountName, shareName)
+	if err != nil {
+		framework.Logf("failed to delete Azure File share %q: %v", shareName, err)
+	}
+	return err
 }
 
 // DeletePD deletes a persistent volume

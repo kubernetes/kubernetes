@@ -225,6 +225,14 @@ func (p *Provider) DeleteNode(node *v1.Node) error {
 	return p.gceCloud.DeleteInstance(project, zone, node.Name)
 }
 
+func (p *Provider) CreateShare() (string, string, error) {
+	return "", "", nil
+}
+
+func (p *Provider) DeleteShare(accountName, shareName string) error {
+	return nil
+}
+
 // CreatePD creates a persistent volume
 func (p *Provider) CreatePD(zone string) (string, error) {
 	pdName := fmt.Sprintf("%s-%s", framework.TestContext.Prefix, string(uuid.NewUUID()))
