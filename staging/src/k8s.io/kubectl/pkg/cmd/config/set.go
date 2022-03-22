@@ -26,7 +26,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/clientcmd"
 	cliflag "k8s.io/component-base/cli/flag"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -75,7 +74,10 @@ var (
 	kubectl config set users.foo.act-as-groups existingGroup-
 	
 	# Set an exec environment variable with the name test and the value val1
-	kubectl config set users.foo.exec.env.name.test value:val1`)
+	kubectl config set users.foo.exec.env.name.test value:val1
+
+	# Set an exec argument list where the first entry uses a - or --
+	kubectl config set users.foo.exec.args -- "--test-arg,next,thing,-i"`)
 )
 
 // NewCmdConfigSet returns a Command instance for 'config set' sub command
@@ -430,10 +432,10 @@ func editStringSlice(slice []string, input string) []string {
 		input = string(input[:len(input)-1])
 		argSlice := strings.Split(input, ",")
 		slice = append(slice, argSlice...)
-		return sets.NewString(slice...).List()
+		return slice
 
 	default:
 		argSlice := strings.Split(input, ",")
-		return sets.NewString(argSlice...).List()
+		return argSlice
 	}
 }
