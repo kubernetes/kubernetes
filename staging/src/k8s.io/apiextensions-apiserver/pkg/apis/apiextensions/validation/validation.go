@@ -1004,11 +1004,11 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 	return allErrs
 }
 
-func getCostInfo(schema *apiextensions.JSONSchemaProps, schemaCostInfo *costInfo) *costInfo {
+func getCostInfo(schema *apiextensions.JSONSchemaProps, prevCostInfo *costInfo) *costInfo {
 	cardinality := extractMaxElements(schema)
-	if schemaCostInfo != nil && cardinality != nil {
-		if schemaCostInfo.MaxCardinality != nil {
-			*cardinality = multWithOverflowGuard(*cardinality, *schemaCostInfo.MaxCardinality)
+	if prevCostInfo != nil && cardinality != nil {
+		if prevCostInfo.MaxCardinality != nil {
+			*cardinality = multWithOverflowGuard(*cardinality, *prevCostInfo.MaxCardinality)
 		} else {
 			// we denote that cardinality is unbounded by setting MaxCardiality to nil
 			// note that this is different from schemaCostInfo being nil, which will
@@ -1024,7 +1024,7 @@ func getCostInfo(schema *apiextensions.JSONSchemaProps, schemaCostInfo *costInfo
 func extractMaxElements(schema *apiextensions.JSONSchemaProps) *uint64 {
 	switch schema.Type {
 	case "object":
-		if schema.AdditionalProperties != nil && schema.MaxProperties != nil {
+		if schema.AdditionalProperties != nil {
 			if schema.MaxProperties != nil {
 				maxProps := uint64(*schema.MaxProperties)
 				return &maxProps
