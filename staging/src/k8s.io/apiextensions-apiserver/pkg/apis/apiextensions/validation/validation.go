@@ -719,7 +719,7 @@ func validateCustomResourceDefinitionValidation(ctx context.Context, customResou
 			requireValidPropertyType: opts.requireValidPropertyType,
 		}
 
-		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema, fldPath.Child("openAPIV3Schema"), openAPIV3Schema, true, &opts, nil)...)
+		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema, fldPath.Child("openAPIV3Schema"), openAPIV3Schema, true, &opts, getCostInfo(schema, nil))...)
 
 		if opts.requireStructuralSchema {
 			if ss, err := structuralschema.NewStructural(schema); err != nil {
@@ -756,15 +756,13 @@ type costInfo struct {
 var metaFields = sets.NewString("metadata", "kind", "apiVersion")
 
 // ValidateCustomResourceDefinitionOpenAPISchema statically validates
-func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSchemaProps, fldPath *field.Path, ssv specStandardValidator, isRoot bool, opts *validationOptions, schemaCostInfo *costInfo) field.ErrorList {
+func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSchemaProps, fldPath *field.Path, ssv specStandardValidator, isRoot bool, opts *validationOptions, nodeCostInfo *costInfo) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if schema == nil {
 		return allErrs
 	}
 	allErrs = append(allErrs, ssv.validate(schema, fldPath)...)
-
-	nodeCostInfo := getCostInfo(schema, schemaCostInfo)
 
 	if schema.UniqueItems == true {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("uniqueItems"), "uniqueItems cannot be set to true since the runtime complexity becomes quadratic"))
@@ -792,7 +790,8 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 			// we have to forbid defaults inside additionalProperties because pruning without actual value is ambiguous
 			subSsv = ssv.withForbiddenDefaults("inside additionalProperties applying to object metadata")
 		}
-		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.AdditionalProperties.Schema, fldPath.Child("additionalProperties"), subSsv, false, opts, nodeCostInfo)...)
+		propsSchema := schema.AdditionalProperties.Schema
+		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.AdditionalProperties.Schema, fldPath.Child("additionalProperties"), subSsv, false, opts, getCostInfo(propsSchema, nodeCostInfo))...)
 	}
 
 	if len(schema.Properties) != 0 {
@@ -811,33 +810,33 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 					subSsv = subSsv.withForbiddenDefaults(fmt.Sprintf("in top-level %s", property))
 				}
 			}
-			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("properties").Key(property), subSsv, false, opts, nodeCostInfo)...)
+			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("properties").Key(property), subSsv, false, opts, getCostInfo(&jsonSchema, nodeCostInfo))...)
 		}
 	}
 
-	allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.Not, fldPath.Child("not"), ssv, false, opts, nodeCostInfo)...)
+	allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.Not, fldPath.Child("not"), ssv, false, opts, getCostInfo(schema.Not, nodeCostInfo))...)
 
 	if len(schema.AllOf) != 0 {
 		for i, jsonSchema := range schema.AllOf {
-			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("allOf").Index(i), ssv, false, opts, nodeCostInfo)...)
+			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("allOf").Index(i), ssv, false, opts, getCostInfo(&jsonSchema, nodeCostInfo))...)
 		}
 	}
 
 	if len(schema.OneOf) != 0 {
 		for i, jsonSchema := range schema.OneOf {
-			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("oneOf").Index(i), ssv, false, opts, nodeCostInfo)...)
+			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("oneOf").Index(i), ssv, false, opts, getCostInfo(&jsonSchema, nodeCostInfo))...)
 		}
 	}
 
 	if len(schema.AnyOf) != 0 {
 		for i, jsonSchema := range schema.AnyOf {
-			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("anyOf").Index(i), ssv, false, opts, nodeCostInfo)...)
+			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("anyOf").Index(i), ssv, false, opts, getCostInfo(&jsonSchema, nodeCostInfo))...)
 		}
 	}
 
 	if len(schema.Definitions) != 0 {
 		for definition, jsonSchema := range schema.Definitions {
-			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("definitions").Key(definition), ssv, false, opts, nodeCostInfo)...)
+			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("definitions").Key(definition), ssv, false, opts, getCostInfo(&jsonSchema, nodeCostInfo))...)
 		}
 	}
 
@@ -851,17 +850,17 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 			subSsv = subSsv.withForbidOldSelfValidations(fldPath)
 		}
 
-		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.Items.Schema, fldPath.Child("items"), subSsv, false, opts, nodeCostInfo)...)
+		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.Items.Schema, fldPath.Child("items"), subSsv, false, opts, getCostInfo(schema.Items.Schema, nodeCostInfo))...)
 		if len(schema.Items.JSONSchemas) != 0 {
 			for i, jsonSchema := range schema.Items.JSONSchemas {
-				allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("items").Index(i), subSsv, false, opts, nodeCostInfo)...)
+				allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("items").Index(i), subSsv, false, opts, getCostInfo(&jsonSchema, nodeCostInfo))...)
 			}
 		}
 	}
 
 	if schema.Dependencies != nil {
 		for dependency, jsonSchemaPropsOrStringArray := range schema.Dependencies {
-			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(jsonSchemaPropsOrStringArray.Schema, fldPath.Child("dependencies").Key(dependency), ssv, false, opts, nodeCostInfo)...)
+			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(jsonSchemaPropsOrStringArray.Schema, fldPath.Child("dependencies").Key(dependency), ssv, false, opts, getCostInfo(jsonSchemaPropsOrStringArray.Schema, nodeCostInfo))...)
 		}
 	}
 
