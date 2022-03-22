@@ -976,18 +976,16 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 		}
 
 		structural, err := structuralschema.NewStructural(schema)
-		celCRDCost := uint64(0)
 		if err == nil {
 			compResults, err := cel.Compile(structural, isRoot, cel.PerCallLimit)
 			if err != nil {
 				allErrs = append(allErrs, field.InternalError(fldPath.Child("x-kubernetes-validations"), err))
 			} else {
 				for i, cr := range compResults {
-					celCRDCost += getExpressionCost(cr.MaxCost, nodeCostInfo)
-					if celCRDCost > TotalCostLimit {
-						// TODO(DangerOnTheRanger): consider how to make the error message more informative
-						exceedFactor := float64(celCRDCost) / float64(TotalCostLimit)
-						costErrorMsg := fmt.Sprintf("CEL rule of cost %d exceeded budget of %d by factor of %vx", uint64(celCRDCost), TotalCostLimit, exceedFactor)
+					expressionCost := getExpressionCost(cr.MaxCost, nodeCostInfo)
+					if expressionCost > TotalCostLimit {
+						exceedFactor := float64(expressionCost) / float64(TotalCostLimit)
+						costErrorMsg := fmt.Sprintf("CEL rule of cost %d exceeded budget of %d by factor of %vx", uint64(expressionCost), TotalCostLimit, exceedFactor)
 						allErrs = append(allErrs, field.Forbidden(fldPath.Child("x-kubernetes-validations").Index(i).Child("rule"), costErrorMsg))
 					}
 					if cr.Error != nil {
