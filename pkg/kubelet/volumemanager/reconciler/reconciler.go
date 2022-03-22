@@ -604,7 +604,11 @@ func getDeviceMountPath(volume *reconstructedVolume) (string, error) {
 
 func (rc *reconciler) updateStates(volumesNeedUpdate map[v1.UniqueVolumeName]*reconstructedVolume) error {
 	// Get the node status to retrieve volume device path information.
-	rc.updateDevicePath(volumesNeedUpdate)
+	// Skip reporting devicePath in node objects if kubeClient is nil.
+	// In standalone mode, kubelet is not expected to mount any attachable volume types or secret, configmaps etc.
+	if rc.kubeClient != nil {
+		rc.updateDevicePath(volumesNeedUpdate)
+	}
 
 	for _, volume := range volumesNeedUpdate {
 		err := rc.actualStateOfWorld.MarkVolumeAsAttached(
