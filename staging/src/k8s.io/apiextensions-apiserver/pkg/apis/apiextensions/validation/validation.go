@@ -756,7 +756,7 @@ type costInfo struct {
 var metaFields = sets.NewString("metadata", "kind", "apiVersion")
 
 // ValidateCustomResourceDefinitionOpenAPISchema statically validates
-func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSchemaProps, fldPath *field.Path, ssv specStandardValidator, isRoot bool, opts *validationOptions, parentNode *costInfo) field.ErrorList {
+func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSchemaProps, fldPath *field.Path, ssv specStandardValidator, isRoot bool, opts *validationOptions, schemaCostInfo *costInfo) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if schema == nil {
@@ -764,9 +764,9 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 	}
 
 	cardinality := extractMaxElements(schema)
-	if parentNode != nil && cardinality != nil {
-		if parentNode.Cardinality != nil {
-			*cardinality *= *parentNode.Cardinality
+	if schemaCostInfo != nil && cardinality != nil {
+		if schemaCostInfo.Cardinality != nil {
+			*cardinality *= *schemaCostInfo.Cardinality
 		} else {
 			cardinality = nil
 		}
