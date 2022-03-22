@@ -1435,12 +1435,8 @@ func TestSingleConstraint(t *testing.T) {
 			},
 		},
 		{
-			// only node-a and node-y are considered, so pods spread as 2/~1~/~0~/3
-			// ps: '~num~' is a markdown symbol to denote a crossline through 'num'
-			// but in this unit test, we don't run NodeAffinity Predicate, so node-b and node-x are
-			// still expected to be fits;
-			// the fact that node-a fits can prove the underlying logic works
-			name: "incoming pod has nodeAffinity, pods spread as 2/~1~/~0~/3, hence node-a fits",
+			// only node-a and node-y are considered, so pods spread as 2/<excluded>/<excluded>/3
+			name: "incoming pod has nodeAffinity, pods spread as 2/<excluded>/<excluded>/3, hence node-a fits",
 			pod: st.MakePod().Name("p").Label("foo", "").
 				NodeAffinityIn("node", []string{"node-a", "node-y"}).
 				SpreadConstraint(1, "node", v1.DoNotSchedule, st.MakeLabelSelector().Exists("foo").Obj(), nil).
@@ -1461,8 +1457,8 @@ func TestSingleConstraint(t *testing.T) {
 			},
 			wantStatusCode: map[string]framework.Code{
 				"node-a": framework.Success,
-				"node-b": framework.Success, // in real case, it's false
-				"node-x": framework.Success, // in real case, it's false
+				"node-b": framework.Unschedulable,
+				"node-x": framework.Unschedulable,
 				"node-y": framework.Unschedulable,
 			},
 		},
@@ -1485,17 +1481,16 @@ func TestSingleConstraint(t *testing.T) {
 			},
 		},
 		{
-			// In this unit test, NodeAffinity plugin is not involved, so node-b still fits
-			name: "incoming pod has nodeAffinity, pods spread as 0/~2~/0/1, hence node-a fits",
+			name: "incoming pod has nodeAffinity, pods spread as 0/<excluded>/0/1, hence node-a fits",
 			pod: st.MakePod().Name("p").Label("foo", "").
 				NodeAffinityNotIn("node", []string{"node-b"}).
 				SpreadConstraint(1, "zone", v1.DoNotSchedule, st.MakeLabelSelector().Exists("foo").Obj(), nil).
 				Obj(),
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
-				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
-				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
-				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone2").Label("node", "node-b").Obj(),
+				st.MakeNode().Name("node-x").Label("zone", "zone3").Label("node", "node-x").Obj(),
+				st.MakeNode().Name("node-y").Label("zone", "zone3").Label("node", "node-y").Obj(),
 			},
 			existingPods: []*v1.Pod{
 				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
@@ -1504,7 +1499,7 @@ func TestSingleConstraint(t *testing.T) {
 			},
 			wantStatusCode: map[string]framework.Code{
 				"node-a": framework.Success,
-				"node-b": framework.Success, // in real case, it's Unschedulable
+				"node-b": framework.Unschedulable,
 				"node-x": framework.Unschedulable,
 				"node-y": framework.Unschedulable,
 			},

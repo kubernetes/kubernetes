@@ -37,6 +37,8 @@ const (
 	ErrReasonConstraintsNotMatch = "node(s) didn't match pod topology spread constraints"
 	// ErrReasonNodeLabelNotMatch is used when the node doesn't hold the required label.
 	ErrReasonNodeLabelNotMatch = ErrReasonConstraintsNotMatch + " (missing required label)"
+	// ErrNodeShouldBeFilteredOut is used when couldn't get matched Pod count from TpPairToMatchNum.
+	ErrNodeShouldBeFilteredOut = "node should be filtered out by PreFilter"
 )
 
 var systemDefaultConstraints = []v1.TopologySpreadConstraint{

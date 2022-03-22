@@ -348,9 +348,15 @@ func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState *framework.C
 		}
 
 		matchNum := 0
-		if tpCount, ok := s.TpPairToMatchNum[pair]; ok {
-			matchNum = tpCount
+		tpCount, ok := s.TpPairToMatchNum[pair]
+		if !ok {
+			// This should only happen in tests for nodes holding un-exists key of TpPairToMatchNum
+			// should be filtered out in PreFilter already.
+			// But this can't cover all scenarios, e.g.
+			// NodeA and NodeB hold the same lables, NodeA fitted but NodeB is filtered out.
+			return framework.NewStatus(framework.Unschedulable, ErrNodeShouldBeFilteredOut)
 		}
+		matchNum = tpCount
 		skew := matchNum + selfMatchNum - minMatchNum
 		if skew > int(c.MaxSkew) {
 			klog.V(5).InfoS("Node failed spreadConstraint: matchNum + selfMatchNum - minMatchNum > maxSkew", "node", klog.KObj(node), "topologyKey", tpKey, "matchNum", matchNum, "selfMatchNum", selfMatchNum, "minMatchNum", minMatchNum, "maxSkew", c.MaxSkew)
@@ -361,10 +367,10 @@ func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState *framework.C
 	return nil
 }
 
-func sizeHeuristic(nodes int, constraints []topologySpreadConstraint) int {
+func sizeHeuristic(nodesNum int, constraints []topologySpreadConstraint) int {
 	for _, c := range constraints {
 		if c.TopologyKey == v1.LabelHostname {
-			return nodes
+			return nodesNum
 		}
 	}
 	return 0
