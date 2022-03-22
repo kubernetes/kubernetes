@@ -512,19 +512,39 @@ func DropDisabledTemplateFields(podTemplate, oldPodTemplate *api.PodTemplateSpec
 func DropDisabledPodFields(pod, oldPod *api.Pod) {
 	var (
 		podSpec           *api.PodSpec
+		podStatus         *api.PodStatus
 		podAnnotations    map[string]string
 		oldPodSpec        *api.PodSpec
+		oldPodStatus      *api.PodStatus
 		oldPodAnnotations map[string]string
 	)
 	if pod != nil {
 		podSpec = &pod.Spec
 		podAnnotations = pod.Annotations
+		podStatus = &pod.Status
 	}
 	if oldPod != nil {
 		oldPodSpec = &oldPod.Spec
 		oldPodAnnotations = oldPod.Annotations
+		oldPodStatus = &oldPod.Status
 	}
 	dropDisabledFields(podSpec, podAnnotations, oldPodSpec, oldPodAnnotations)
+	dropDisabledStatusFields(podStatus, oldPodStatus)
+}
+
+// dropDisabledStatusFields removes disabled fields from the pod status
+func dropDisabledStatusFields(podStatus *api.PodStatus, oldPodStatus *api.PodStatus) {
+	// drop HostIPs to empty (disable PodHostIPs).
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodHostIPs) && !hostIPsInUse(oldPodStatus) {
+		podStatus.HostIPs = nil
+	}
+}
+
+func hostIPsInUse(podStatus *api.PodStatus) bool {
+	if podStatus == nil {
+		return false
+	}
+	return len(podStatus.HostIPs) > 0
 }
 
 // dropDisabledFields removes disabled fields from the pod metadata and spec.
