@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package ephemeral implements the controller part of
-// https://github.com/kubernetes/enhancements/tree/master/keps/sig-storage/1698-generic-ephemeral-volumes
+// Package resourceclaim implements the controller part of
+// https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/3063-dynamic-resource-allocation
 //
-// It was derived from the expand controller.
-package ephemeral
+// It was derived from the generic ephemeral volume controller.
+package resourceclaim

@@ -23,36 +23,36 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 )
 
-// EphemeralVolumeSubsystem - subsystem name used for Endpoint Slices.
-const EphemeralVolumeSubsystem = "ephemeral_volume_controller"
+// ResourceClaimSubsystem - subsystem name used for ResourceClaim creation
+const ResourceClaimSubsystem = "resourceclaim_controller"
 
 var (
-	// EphemeralVolumeCreateAttempts tracks the number of
-	// PersistentVolumeClaims().Create calls (both successful and unsuccessful)
-	EphemeralVolumeCreateAttempts = metrics.NewCounter(
+	// ResourceClaimCreateAttempts tracks the number of
+	// ResourceClaims().Create calls (both successful and unsuccessful)
+	ResourceClaimCreateAttempts = metrics.NewCounter(
 		&metrics.CounterOpts{
-			Subsystem:      EphemeralVolumeSubsystem,
-			Name:           "create_total",
-			Help:           "Number of PersistenVolumeClaims creation requests",
+			Subsystem:      ResourceClaimSubsystem,
+			Name:           "create_attempts_total",
+			Help:           "Number of ResourceClaims creation requests",
 			StabilityLevel: metrics.ALPHA,
 		})
-	// EphemeralVolumeCreateFailures tracks the number of unsuccessful
-	// PersistentVolumeClaims().Create calls
-	EphemeralVolumeCreateFailures = metrics.NewCounter(
+	// ResourceClaimCreateFailures tracks the number of unsuccessful
+	// ResourceClaims().Create calls
+	ResourceClaimCreateFailures = metrics.NewCounter(
 		&metrics.CounterOpts{
-			Subsystem:      EphemeralVolumeSubsystem,
+			Subsystem:      ResourceClaimSubsystem,
 			Name:           "create_failures_total",
-			Help:           "Number of PersistenVolumeClaims creation requests",
+			Help:           "Number of ResourceClaims creation request failures",
 			StabilityLevel: metrics.ALPHA,
 		})
 )
 
 var registerMetrics sync.Once
 
-// RegisterMetrics registers EphemeralVolume metrics.
+// RegisterMetrics registers ResourceClaim metrics.
 func RegisterMetrics() {
 	registerMetrics.Do(func() {
-		legacyregistry.MustRegister(EphemeralVolumeCreateAttempts)
-		legacyregistry.MustRegister(EphemeralVolumeCreateFailures)
+		legacyregistry.MustRegister(ResourceClaimCreateAttempts)
+		legacyregistry.MustRegister(ResourceClaimCreateFailures)
 	})
 }

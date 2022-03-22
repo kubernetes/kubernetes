@@ -54,6 +54,7 @@ const (
 	extensionsGroup        = "extensions"
 	policyGroup            = "policy"
 	rbacGroup              = "rbac.authorization.k8s.io"
+	resourceGroup          = "resource.k8s.io"
 	storageGroup           = "storage.k8s.io"
 	resMetricsGroup        = "metrics.k8s.io"
 	customMetricsGroup     = "custom.metrics.k8s.io"
