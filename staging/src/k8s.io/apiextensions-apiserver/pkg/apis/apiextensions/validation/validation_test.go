@@ -18,6 +18,7 @@ package validation
 
 import (
 	"context"
+	"math"
 	"math/rand"
 	"reflect"
 	"strings"
@@ -8204,4 +8205,146 @@ func Test_validateDeprecationWarning(t *testing.T) {
 			}
 		})
 	}
+}
+
+func genMapSchema() *apiextensions.JSONSchemaProps {
+	return &apiextensions.JSONSchemaProps{
+		Type: "object",
+		AdditionalProperties: &apiextensions.JSONSchemaPropsOrBool{
+			Schema: &apiextensions.JSONSchemaProps{
+				Type: "string",
+			},
+		},
+	}
+}
+
+func withMaxProperties(mapSchema *apiextensions.JSONSchemaProps, maxProps *int64) *apiextensions.JSONSchemaProps {
+	mapSchema.MaxProperties = maxProps
+	return mapSchema
+}
+
+func genArraySchema() *apiextensions.JSONSchemaProps {
+	return &apiextensions.JSONSchemaProps{
+		Type: "array",
+	}
+}
+
+func withMaxItems(arraySchema *apiextensions.JSONSchemaProps, maxItems *int64) *apiextensions.JSONSchemaProps {
+	arraySchema.MaxItems = maxItems
+	return arraySchema
+}
+
+func genObjectSchema() *apiextensions.JSONSchemaProps {
+	return &apiextensions.JSONSchemaProps{
+		Type: "object",
+	}
+}
+
+func TestCostInfo(t *testing.T) {
+	tests := []struct {
+		name                   string
+		schema                 []*apiextensions.JSONSchemaProps
+		expectedMaxCardinality *uint64
+	}{
+		{
+			name: "object",
+			schema: []*apiextensions.JSONSchemaProps{
+				genObjectSchema(),
+			},
+			expectedMaxCardinality: uint64ptr(1),
+		},
+		{
+			name: "array",
+			schema: []*apiextensions.JSONSchemaProps{
+				withMaxItems(genArraySchema(), int64ptr(5)),
+			},
+			expectedMaxCardinality: uint64ptr(5),
+		},
+		{
+			name:                   "unbounded array",
+			schema:                 []*apiextensions.JSONSchemaProps{genArraySchema()},
+			expectedMaxCardinality: nil,
+		},
+		{
+			name:                   "map",
+			schema:                 []*apiextensions.JSONSchemaProps{withMaxProperties(genMapSchema(), int64ptr(10))},
+			expectedMaxCardinality: uint64ptr(10),
+		},
+		{
+			name: "unbounded map",
+			schema: []*apiextensions.JSONSchemaProps{
+				genMapSchema(),
+			},
+			expectedMaxCardinality: nil,
+		},
+		{
+			name: "array inside map",
+			schema: []*apiextensions.JSONSchemaProps{
+				withMaxProperties(genMapSchema(), int64ptr(5)),
+				withMaxItems(genArraySchema(), int64ptr(5)),
+			},
+			expectedMaxCardinality: uint64ptr(25),
+		},
+		{
+			name: "unbounded array inside bounded map",
+			schema: []*apiextensions.JSONSchemaProps{
+				withMaxProperties(genMapSchema(), int64ptr(5)),
+				genArraySchema(),
+			},
+			expectedMaxCardinality: nil,
+		},
+		{
+			name: "object inside array",
+			schema: []*apiextensions.JSONSchemaProps{
+				withMaxItems(genArraySchema(), int64ptr(3)),
+				genObjectSchema(),
+			},
+			expectedMaxCardinality: uint64ptr(3),
+		},
+		{
+			name: "map inside object inside array",
+			schema: []*apiextensions.JSONSchemaProps{
+				withMaxItems(genArraySchema(), int64ptr(2)),
+				genObjectSchema(),
+				withMaxProperties(genMapSchema(), int64ptr(4)),
+			},
+			expectedMaxCardinality: uint64ptr(8),
+		},
+		{
+			name: "integer overflow bounds check",
+			schema: []*apiextensions.JSONSchemaProps{
+				withMaxItems(genArraySchema(), int64ptr(math.MaxInt)),
+				withMaxItems(genArraySchema(), int64ptr(100)),
+			},
+			expectedMaxCardinality: uint64ptr(math.MaxUint),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var prevCostInfo *costInfo
+			var curCostInfo *costInfo
+			// simulate the recursive validation calls
+			for _, schema := range tt.schema {
+				curCostInfo = getCostInfo(schema, prevCostInfo)
+				prevCostInfo = curCostInfo
+			}
+			if tt.expectedMaxCardinality == nil && curCostInfo.MaxCardinality == nil {
+				// unbounded cardinality case, test ran correctly
+			} else if tt.expectedMaxCardinality == nil && curCostInfo.MaxCardinality != nil {
+				t.Errorf("expected unbounded cardinality (got %d)", curCostInfo.MaxCardinality)
+			} else if tt.expectedMaxCardinality != nil && curCostInfo.MaxCardinality == nil {
+				t.Errorf("expected bounded cardinality of %d but got unbounded cardinality", tt.expectedMaxCardinality)
+			} else if *tt.expectedMaxCardinality != *curCostInfo.MaxCardinality {
+				t.Errorf("wrong cardinality (expected %d, got %d)", *tt.expectedMaxCardinality, curCostInfo.MaxCardinality)
+			}
+		})
+	}
+}
+
+func int64ptr(i int64) *int64 {
+	return &i
+}
+
+func uint64ptr(i uint64) *uint64 {
+	return &i
 }
