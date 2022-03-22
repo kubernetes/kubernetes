@@ -150,18 +150,18 @@ func (l *libcontainerAdapter) newManager(cgroups *libcontainerconfigs.Cgroup, pa
 	switch l.cgroupManagerType {
 	case libcontainerCgroupfs:
 		if libcontainercgroups.IsCgroup2UnifiedMode() {
-			return cgroupfs2.NewManager(cgroups, paths["memory"], false)
+			return cgroupfs2.NewManager(cgroups, paths["memory"])
 		}
-		return cgroupfs.NewManager(cgroups, paths, false), nil
+		return cgroupfs.NewManager(cgroups, paths)
 	case libcontainerSystemd:
 		// this means you asked systemd to manage cgroups, but systemd was not on the host, so all you can do is panic...
 		if !cgroupsystemd.IsRunningSystemd() {
 			panic("systemd cgroup manager not available")
 		}
 		if libcontainercgroups.IsCgroup2UnifiedMode() {
-			return cgroupsystemd.NewUnifiedManager(cgroups, paths["memory"], false), nil
+			return cgroupsystemd.NewUnifiedManager(cgroups, paths["memory"])
 		}
-		return cgroupsystemd.NewLegacyManager(cgroups, paths), nil
+		return cgroupsystemd.NewLegacyManager(cgroups, paths)
 	}
 	return nil, fmt.Errorf("invalid cgroup manager configuration")
 }
@@ -423,7 +423,7 @@ func (m *cgroupManagerImpl) toResources(resourceConfig *ResourceConfig) *libcont
 		pageSizes.Insert(sizeString)
 	}
 	// for each page size omitted, limit to 0
-	for _, pageSize := range cgroupfs.HugePageSizes {
+	for _, pageSize := range libcontainercgroups.HugePageSizes() {
 		if pageSizes.Has(pageSize) {
 			continue
 		}

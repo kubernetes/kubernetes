@@ -383,10 +383,10 @@ func createManager(containerName string) (cgroups.Manager, error) {
 	}
 
 	if cgroups.IsCgroup2UnifiedMode() {
-		return cgroupfs2.NewManager(cg, "", false)
+		return cgroupfs2.NewManager(cg, "")
 
 	}
-	return cgroupfs.NewManager(cg, nil, false), nil
+	return cgroupfs.NewManager(cg, nil)
 }
 
 type KernelTunableBehavior string

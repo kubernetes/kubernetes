@@ -29,7 +29,6 @@ import (
 
 	units "github.com/docker/go-units"
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
-	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
@@ -147,7 +146,7 @@ func (m *qosContainerManagerImpl) Start(getNodeAllocatable func() v1.ResourceLis
 // setHugePagesUnbounded ensures hugetlb is effectively unbounded
 func (m *qosContainerManagerImpl) setHugePagesUnbounded(cgroupConfig *CgroupConfig) error {
 	hugePageLimit := map[int64]int64{}
-	for _, pageSize := range cgroupfs.HugePageSizes {
+	for _, pageSize := range libcontainercgroups.HugePageSizes() {
 		pageSizeBytes, err := units.RAMInBytes(pageSize)
 		if err != nil {
 			return err
