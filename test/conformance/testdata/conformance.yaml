@@ -2387,6 +2387,16 @@
     pod.
   release: v1.19
   file: test/e2e/scheduling/preemption.go
+- testname: CSIStorageCapacity API
+  codename: '[sig-storage] CSIStorageCapacity  should support CSIStorageCapacities
+    API operations [Conformance]'
+  description: ' The storage.k8s.io API group MUST exist in the /apis discovery document.
+    The storage.k8s.io/v1 API group/version MUST exist in the /apis/mode.k8s.io discovery
+    document. The csistoragecapacities resource MUST exist in the /apis/storage.k8s.io/v1
+    discovery document. The csistoragecapacities resource must support create, get,
+    list, watch, update, patch, delete, and deletecollection.'
+  release: v1.24
+  file: test/e2e/storage/csistoragecapacity.go
 - testname: ConfigMap Volume, text data, binary data
   codename: '[sig-storage] ConfigMap binary data should be reflected in volume [NodeConformance]
     [Conformance]'

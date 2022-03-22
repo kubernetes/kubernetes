@@ -43,9 +43,8 @@ var _ = utils.SIGDescribe("CSIStorageCapacity", func() {
 		The storage.k8s.io/v1 API group/version MUST exist in the /apis/mode.k8s.io discovery document.
 		The csistoragecapacities resource MUST exist in the /apis/storage.k8s.io/v1 discovery document.
 		The csistoragecapacities resource must support create, get, list, watch, update, patch, delete, and deletecollection.
-		TODO (pohly): promote to framework.ConformanceIt
 	*/
-	ginkgo.It(" should support CSIStorageCapacities API operations", func() {
+	framework.ConformanceIt(" should support CSIStorageCapacities API operations", func() {
 		// Setup
 		cscVersion := "v1"
 		cscClient := f.ClientSet.StorageV1().CSIStorageCapacities(f.Namespace.Name)
