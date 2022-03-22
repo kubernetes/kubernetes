@@ -3606,11 +3606,15 @@ type PodDNSConfigOption struct {
 	Value *string `json:"value,omitempty" protobuf:"bytes,2,opt,name=value"`
 }
 
-// IP address information for entries in the (plural) PodIPs field.
-// Each entry includes:
-//    IP: An IP address allocated to the pod. Routable at least within the cluster.
+// PodIP address information for entries in the (plural) PodIPs field.
 type PodIP struct {
-	// ip is an IP address (IPv4 or IPv6) assigned to the pod
+	// IP is the IP address assigned to the pod
+	IP string `json:"ip,omitempty" protobuf:"bytes,1,opt,name=ip"`
+}
+
+// HostIP address information for entries in the (plural) HostIPs field.
+type HostIP struct {
+	// IP is the IP address assigned to the host
 	IP string `json:"ip,omitempty" protobuf:"bytes,1,opt,name=ip"`
 }
 
@@ -3831,10 +3835,24 @@ type PodStatus struct {
 	// +optional
 	NominatedNodeName string `json:"nominatedNodeName,omitempty" protobuf:"bytes,11,opt,name=nominatedNodeName"`
 
-	// IP address of the host to which the pod is assigned. Empty if not yet scheduled.
+	// hostIP holds the IP address of the host to which the pod is assigned.
+	// Empty if the pod has not started yet.
+	// A pod can be assigned to a node that has a problem in kubelet which in turns mean that HostIP will
+	// not be updated even if there is node is assigned to pod
 	// +optional
 	HostIP string `json:"hostIP,omitempty" protobuf:"bytes,5,opt,name=hostIP"`
-	// IP address allocated to the pod. Routable at least within the cluster.
+
+	// hostIPs holds the IP addresses allocated to the host. If this field is specified, the first entry must
+	// match the hostIP field. This list is empty if the pod has not started yet.
+	// A pod can be assigned to a node that has a problem in kubelet which in turns means that HostIPs will
+	// not be updated even if there is a node is assigned to this pod.
+	// +optional
+	// +patchStrategy=merge
+	// +patchMergeKey=ip
+	// +listType=set
+	HostIPs []HostIP `json:"hostIPs,omitempty" protobuf:"bytes,14,rep,name=hostIPs" patchStrategy:"merge" patchMergeKey:"ip"`
+
+	// podIP address allocated to the pod. Routable at least within the cluster.
 	// Empty if not yet allocated.
 	// +optional
 	PodIP string `json:"podIP,omitempty" protobuf:"bytes,6,opt,name=podIP"`

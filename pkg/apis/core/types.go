@@ -3213,10 +3213,14 @@ type PodDNSConfigOption struct {
 }
 
 // PodIP represents the IP address of a pod.
-// IP address information. Each entry includes:
-//    IP: An IP address allocated to the pod. Routable at least within
-//        the cluster.
 type PodIP struct {
+	// ip is an IP address assigned to the pod
+	IP string
+}
+
+// HostIP represents the IP address of a host.
+type HostIP struct {
+	// ip is an IP address assigned to the host
 	IP string
 }
 
@@ -3357,8 +3361,21 @@ type PodStatus struct {
 	// give the resources on this node to a higher priority pod that is created after preemption.
 	// +optional
 	NominatedNodeName string
+
+	// HostIP holds the IP address of the host to which the pod is assigned.
+	// Empty if the pod has not started yet.
+	// A pod can be assigned to a node that has a problem in kubelet which in turns mean that HostIP will
+	// not be updated even if there is node is assigned to pod
 	// +optional
 	HostIP string
+
+	// HostIPs holds the IP addresses allocated to the host. If this field is specified, the first entry must
+	// match the hostIP field. This list is empty if the pod has not started yet.
+	// A pod can be assigned to a node that has a problem in kubelet which in turns means that HostIPs will
+	// not be updated even if there is a node is assigned to this pod.
+	// match the hostIP field. This list is empty if no IPs have been allocated yet.
+	// +optional
+	HostIPs []HostIP
 
 	// PodIPs holds all of the known IP addresses allocated to the pod. Pods may be assigned AT MOST
 	// one value for each of IPv4 and IPv6.
