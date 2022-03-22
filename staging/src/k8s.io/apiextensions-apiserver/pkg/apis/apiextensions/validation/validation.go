@@ -1042,8 +1042,8 @@ func extractMaxElements(schema *apiextensions.JSONSchemaProps) *uint64 {
 	}
 }
 
-// multWithOverflowGuard is intended to serve as a convenience function to handle the potential for
-// integer overflow when taking into account a CEL expression's cost and schema cardinality
+// multWithOverflowGuard returns the product of baseCost and cardinality unless that product
+// would exceed math.MaxUint, in which case math.MaxUint is returned.
 func multWithOverflowGuard(baseCost, cardinality uint64) uint64 {
 	if baseCost == 0 {
 		// an empty rule can return 0, so guard for that here
