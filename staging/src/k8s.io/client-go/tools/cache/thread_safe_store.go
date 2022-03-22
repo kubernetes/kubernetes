@@ -281,14 +281,14 @@ func (c *threadSafeMap) updateIndices(oldObj interface{}, newObj interface{}, ke
 		}
 
 		for _, value := range oldIndexValues {
-			// We optimize for the most common case where index returns a single value.
+			// We optimize for the most common case where indexFunc returns a single value.
 			if len(indexValues) == 1 && value == indexValues[0] {
 				continue
 			}
 			c.deleteKeyFromIndex(key, value, index)
 		}
 		for _, value := range indexValues {
-			// We optimize for the most common case where index returns a single value.
+			// We optimize for the most common case where indexFunc returns a single value.
 			if len(oldIndexValues) == 1 && value == oldIndexValues[0] {
 				continue
 			}
