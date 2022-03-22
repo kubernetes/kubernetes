@@ -26,12 +26,14 @@ require (
 	github.com/boltdb/bolt v1.3.1 // indirect
 	github.com/clusterhq/flocker-go v0.0.0-20160920122132-2b8b7259d313
 	github.com/container-storage-interface/spec v1.5.0
+	github.com/containerd/containerd v1.4.13
 	github.com/coredns/corefile-migration v1.0.14
 	github.com/coreos/go-oidc v2.1.0+incompatible
 	github.com/coreos/go-systemd/v22 v22.3.2
 	github.com/cpuguy83/go-md2man/v2 v2.0.1
 	github.com/davecgh/go-spew v1.1.1
 	github.com/docker/distribution v2.7.1+incompatible
+	github.com/docker/docker v20.10.13+incompatible
 	github.com/docker/go-units v0.4.0
 	github.com/elazarl/goproxy v0.0.0-20180725130230-947c36da3153
 	github.com/emicklei/go-restful v2.9.5+incompatible
@@ -44,7 +46,7 @@ require (
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da
 	github.com/golang/mock v1.5.0
 	github.com/golang/protobuf v1.5.2
-	github.com/google/cadvisor v0.43.0
+	github.com/google/cadvisor v0.44.0
 	github.com/google/gnostic v0.5.7-v3refs
 	github.com/google/go-cmp v0.5.5
 	github.com/google/gofuzz v1.1.0
@@ -199,7 +201,7 @@ replace (
 	github.com/container-storage-interface/spec => github.com/container-storage-interface/spec v1.5.0
 	github.com/containerd/cgroups => github.com/containerd/cgroups v1.0.1
 	github.com/containerd/console => github.com/containerd/console v1.0.2
-	github.com/containerd/containerd => github.com/containerd/containerd v1.4.11
+	github.com/containerd/containerd => github.com/containerd/containerd v1.4.13
 	github.com/containerd/continuity => github.com/containerd/continuity v0.1.0
 	github.com/containerd/fifo => github.com/containerd/fifo v1.0.0
 	github.com/containerd/go-runc => github.com/containerd/go-runc v1.0.0
@@ -217,7 +219,7 @@ replace (
 	github.com/daviddengcn/go-colortext => github.com/daviddengcn/go-colortext v0.0.0-20160507010035-511bcaf42ccd
 	github.com/dnaeon/go-vcr => github.com/dnaeon/go-vcr v1.0.1
 	github.com/docker/distribution => github.com/docker/distribution v2.7.1+incompatible
-	github.com/docker/docker => github.com/docker/docker v20.10.7+incompatible
+	github.com/docker/docker => github.com/docker/docker v20.10.13+incompatible
 	github.com/docker/go-connections => github.com/docker/go-connections v0.4.0
 	github.com/docker/go-units => github.com/docker/go-units v0.4.0
 	github.com/docopt/docopt-go => github.com/docopt/docopt-go v0.0.0-20180111231733-ee0de3bc6815
@@ -262,7 +264,7 @@ replace (
 	github.com/golang/protobuf => github.com/golang/protobuf v1.5.2
 	github.com/golangplus/testing => github.com/golangplus/testing v0.0.0-20180327235837-af21d9c3145e
 	github.com/google/btree => github.com/google/btree v1.0.1
-	github.com/google/cadvisor => github.com/google/cadvisor v0.43.0
+	github.com/google/cadvisor => github.com/google/cadvisor v0.44.0
 	github.com/google/cel-go => github.com/google/cel-go v0.10.1
 	github.com/google/cel-spec => github.com/google/cel-spec v0.6.0
 	github.com/google/gnostic => github.com/google/gnostic v0.5.7-v3refs
