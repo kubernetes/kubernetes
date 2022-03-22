@@ -16,10 +16,10 @@ limitations under the License.
 
 package config
 
-// EphemeralVolumeControllerConfiguration contains elements describing EphemeralVolumeController.
-type EphemeralVolumeControllerConfiguration struct {
-	// ConcurrentEphemeralVolumeSyncs is the number of ephemeral volume syncing operations
-	// that will be done concurrently. Larger number = faster ephemeral volume updating,
+// ResourceClaimControllerConfiguration contains elements describing ResourceClaimController.
+type ResourceClaimControllerConfiguration struct {
+	// ConcurrentResourceClaimSyncs is the number of ResourceClaim syncing operations
+	// that will be done concurrently. Larger number = faster ResourceClaim updating,
 	// but more CPU (and network) load.
-	ConcurrentEphemeralVolumeSyncs int32
+	ConcurrentResourceClaimSyncs int32
 }

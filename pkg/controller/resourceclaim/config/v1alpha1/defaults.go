@@ -20,8 +20,8 @@ import (
 	kubectrlmgrconfigv1alpha1 "k8s.io/kube-controller-manager/config/v1alpha1"
 )
 
-// RecommendedDefaultEphemeralVolumeControllerConfiguration defaults a pointer to a
-// EphemeralVolumeControllerConfiguration struct. This will set the recommended default
+// RecommendedDefaultResourceClaimControllerConfiguration defaults a pointer to a
+// ResourceClaimControllerConfiguration struct. This will set the recommended default
 // values, but they may be subject to change between API versions. This function
 // is intentionally not registered in the scheme as a "normal" `SetDefaults_Foo`
 // function to allow consumers of this type to set whatever defaults for their
@@ -29,8 +29,8 @@ import (
 // as defaulting in the scheme is done as part of the conversion, and there would
 // be no easy way to opt-out. Instead, if you want to use this defaulting method
 // run it in your wrapper struct of this type in its `SetDefaults_` method.
-func RecommendedDefaultEphemeralVolumeControllerConfiguration(obj *kubectrlmgrconfigv1alpha1.EphemeralVolumeControllerConfiguration) {
-	if obj.ConcurrentEphemeralVolumeSyncs == 0 {
-		obj.ConcurrentEphemeralVolumeSyncs = 5
+func RecommendedDefaultResourceClaimControllerConfiguration(obj *kubectrlmgrconfigv1alpha1.ResourceClaimControllerConfiguration) {
+	if obj.ConcurrentResourceClaimSyncs == 0 {
+		obj.ConcurrentResourceClaimSyncs = 5
 	}
 }

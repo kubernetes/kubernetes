@@ -1006,6 +1006,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/kube-controller-manager/config/v1alpha1.PodGCControllerConfiguration":                     schema_k8sio_kube_controller_manager_config_v1alpha1_PodGCControllerConfiguration(ref),
 		"k8s.io/kube-controller-manager/config/v1alpha1.ReplicaSetControllerConfiguration":                schema_k8sio_kube_controller_manager_config_v1alpha1_ReplicaSetControllerConfiguration(ref),
 		"k8s.io/kube-controller-manager/config/v1alpha1.ReplicationControllerConfiguration":               schema_k8sio_kube_controller_manager_config_v1alpha1_ReplicationControllerConfiguration(ref),
+		"k8s.io/kube-controller-manager/config/v1alpha1.ResourceClaimControllerConfiguration":             schema_k8sio_kube_controller_manager_config_v1alpha1_ResourceClaimControllerConfiguration(ref),
 		"k8s.io/kube-controller-manager/config/v1alpha1.ResourceQuotaControllerConfiguration":             schema_k8sio_kube_controller_manager_config_v1alpha1_ResourceQuotaControllerConfiguration(ref),
 		"k8s.io/kube-controller-manager/config/v1alpha1.SAControllerConfiguration":                        schema_k8sio_kube_controller_manager_config_v1alpha1_SAControllerConfiguration(ref),
 		"k8s.io/kube-controller-manager/config/v1alpha1.StatefulSetControllerConfiguration":               schema_k8sio_kube_controller_manager_config_v1alpha1_StatefulSetControllerConfiguration(ref),
@@ -49812,12 +49813,19 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_KubeControllerManagerC
 							Ref:         ref("k8s.io/kube-controller-manager/config/v1alpha1.TTLAfterFinishedControllerConfiguration"),
 						},
 					},
+					"ResourceClaimController": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ResourceClaimControllerConfiguration holds configuration for ResourceClaimController related features.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/kube-controller-manager/config/v1alpha1.ResourceClaimControllerConfiguration"),
+						},
+					},
 				},
-				Required: []string{"Generic", "KubeCloudShared", "AttachDetachController", "CSRSigningController", "DaemonSetController", "DeploymentController", "StatefulSetController", "DeprecatedController", "EndpointController", "EndpointSliceController", "EndpointSliceMirroringController", "EphemeralVolumeController", "GarbageCollectorController", "HPAController", "JobController", "CronJobController", "NamespaceController", "NodeIPAMController", "NodeLifecycleController", "PersistentVolumeBinderController", "PodGCController", "ReplicaSetController", "ReplicationController", "ResourceQuotaController", "SAController", "ServiceController", "TTLAfterFinishedController"},
+				Required: []string{"Generic", "KubeCloudShared", "AttachDetachController", "CSRSigningController", "DaemonSetController", "DeploymentController", "StatefulSetController", "DeprecatedController", "EndpointController", "EndpointSliceController", "EndpointSliceMirroringController", "EphemeralVolumeController", "GarbageCollectorController", "HPAController", "JobController", "CronJobController", "NamespaceController", "NodeIPAMController", "NodeLifecycleController", "PersistentVolumeBinderController", "PodGCController", "ReplicaSetController", "ReplicationController", "ResourceQuotaController", "SAController", "ServiceController", "TTLAfterFinishedController", "ResourceClaimController"},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/cloud-provider/config/v1alpha1.KubeCloudSharedConfiguration", "k8s.io/cloud-provider/controllers/service/config/v1alpha1.ServiceControllerConfiguration", "k8s.io/controller-manager/config/v1alpha1.GenericControllerManagerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.AttachDetachControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.CSRSigningControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.CronJobControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.DaemonSetControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.DeploymentControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.DeprecatedControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.EndpointControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.EndpointSliceControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.EndpointSliceMirroringControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.EphemeralVolumeControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.GarbageCollectorControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.HPAControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.JobControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.NamespaceControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.NodeIPAMControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.NodeLifecycleControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.PersistentVolumeBinderControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.PodGCControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.ReplicaSetControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.ReplicationControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.ResourceQuotaControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.SAControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.StatefulSetControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.TTLAfterFinishedControllerConfiguration"},
+			"k8s.io/cloud-provider/config/v1alpha1.KubeCloudSharedConfiguration", "k8s.io/cloud-provider/controllers/service/config/v1alpha1.ServiceControllerConfiguration", "k8s.io/controller-manager/config/v1alpha1.GenericControllerManagerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.AttachDetachControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.CSRSigningControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.CronJobControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.DaemonSetControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.DeploymentControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.DeprecatedControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.EndpointControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.EndpointSliceControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.EndpointSliceMirroringControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.EphemeralVolumeControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.GarbageCollectorControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.HPAControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.JobControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.NamespaceControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.NodeIPAMControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.NodeLifecycleControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.PersistentVolumeBinderControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.PodGCControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.ReplicaSetControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.ReplicationControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.ResourceClaimControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.ResourceQuotaControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.SAControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.StatefulSetControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.TTLAfterFinishedControllerConfiguration"},
 	}
 }
 
@@ -50165,6 +50173,28 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_ReplicationControllerC
 					},
 				},
 				Required: []string{"ConcurrentRCSyncs"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_kube_controller_manager_config_v1alpha1_ResourceClaimControllerConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ResourceClaimControllerConfiguration contains elements describing ResourceClaimController.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"ConcurrentResourceClaimSyncs": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ConcurrentResourceClaimSyncseSyncs is the number of ResourceClaim syncing operations that will be done concurrently. Larger number = faster ResourceClaim updating, but more CPU (and network) load.",
+							Default:     0,
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+				},
+				Required: []string{"ConcurrentResourceClaimSyncs"},
 			},
 		},
 	}

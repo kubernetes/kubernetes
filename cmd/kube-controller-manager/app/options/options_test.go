@@ -53,6 +53,7 @@ import (
 	podgcconfig "k8s.io/kubernetes/pkg/controller/podgc/config"
 	replicasetconfig "k8s.io/kubernetes/pkg/controller/replicaset/config"
 	replicationconfig "k8s.io/kubernetes/pkg/controller/replication/config"
+	resourceclaimconfig "k8s.io/kubernetes/pkg/controller/resourceclaim/config"
 	resourcequotaconfig "k8s.io/kubernetes/pkg/controller/resourcequota/config"
 	serviceaccountconfig "k8s.io/kubernetes/pkg/controller/serviceaccount/config"
 	statefulsetconfig "k8s.io/kubernetes/pkg/controller/statefulset/config"
@@ -85,6 +86,7 @@ var args = []string{
 	"--concurrent-statefulset-syncs=15",
 	"--concurrent-endpoint-syncs=10",
 	"--concurrent-ephemeralvolume-syncs=10",
+	"--concurrent-resource-claim-syncs=10",
 	"--concurrent-service-endpoint-syncs=10",
 	"--concurrent-gc-syncs=30",
 	"--concurrent-namespace-syncs=20",
@@ -288,6 +290,11 @@ func TestAddFlags(t *testing.T) {
 		EphemeralVolumeController: &EphemeralVolumeControllerOptions{
 			&ephemeralvolumeconfig.EphemeralVolumeControllerConfiguration{
 				ConcurrentEphemeralVolumeSyncs: 10,
+			},
+		},
+		ResourceClaimController: &ResourceClaimControllerOptions{
+			&resourceclaimconfig.ResourceClaimControllerConfiguration{
+				ConcurrentResourceClaimSyncs: 10,
 			},
 		},
 		GarbageCollectorController: &GarbageCollectorControllerOptions{
@@ -545,6 +552,9 @@ func TestApplyTo(t *testing.T) {
 			},
 			EphemeralVolumeController: ephemeralvolumeconfig.EphemeralVolumeControllerConfiguration{
 				ConcurrentEphemeralVolumeSyncs: 10,
+			},
+			ResourceClaimController: resourceclaimconfig.ResourceClaimControllerConfiguration{
+				ConcurrentResourceClaimSyncs: 10,
 			},
 			GarbageCollectorController: garbagecollectorconfig.GarbageCollectorControllerConfiguration{
 				ConcurrentGCSyncs: 30,

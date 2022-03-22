@@ -72,6 +72,7 @@ func (in *KubeControllerManagerConfiguration) DeepCopyInto(out *KubeControllerMa
 	out.SAController = in.SAController
 	out.ServiceController = in.ServiceController
 	out.TTLAfterFinishedController = in.TTLAfterFinishedController
+	out.ResourceClaimController = in.ResourceClaimController
 	return
 }
 

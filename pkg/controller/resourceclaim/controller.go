@@ -14,58 +14,61 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package ephemeral
+package resourceclaim
 
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
-	"k8s.io/klog/v2"
-
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	coreinformers "k8s.io/client-go/informers/core/v1"
+	corev1informers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	corelisters "k8s.io/client-go/listers/core/v1"
+	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	kcache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/component-helpers/storage/ephemeral"
-	"k8s.io/kubernetes/pkg/controller/volume/common"
-	ephemeralvolumemetrics "k8s.io/kubernetes/pkg/controller/volume/ephemeral/metrics"
-	"k8s.io/kubernetes/pkg/controller/volume/events"
+	"k8s.io/component-helpers/cdi/resourceclaim"
+	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/controller/resourceclaim/metrics"
 )
 
-// Controller creates PVCs for ephemeral inline volumes in a pod spec.
+const (
+	// podResourceClaimIndex is the lookup name for the index function which indexes by pod ResourceClaim templates.
+	podResourceClaimIndex = "pod-resource-claim-index"
+)
+
+// Controller creates ResourceClaims for ResourceClaimTemplates in a pod spec.
 type Controller interface {
 	Run(ctx context.Context, workers int)
 }
 
-type ephemeralController struct {
-	// kubeClient is the kube API client used by volumehost to communicate with
-	// the API server.
+type resourceClaimController struct {
+	// kubeClient is the kube API client used to communicate with the API
+	// server.
 	kubeClient clientset.Interface
 
-	// pvcLister is the shared PVC lister used to fetch and store PVC
+	// claimLister is the shared ResourceClaim lister used to fetch and store ResourceClaim
 	// objects from the API server. It is shared with other controllers and
-	// therefore the PVC objects in its store should be treated as immutable.
-	pvcLister  corelisters.PersistentVolumeClaimLister
-	pvcsSynced kcache.InformerSynced
+	// therefore the ResourceClaim objects in its store should be treated as immutable.
+	claimLister  corev1listers.ResourceClaimLister
+	claimsSynced kcache.InformerSynced
 
 	// podLister is the shared Pod lister used to fetch Pod
 	// objects from the API server. It is shared with other controllers and
 	// therefore the Pod objects in its store should be treated as immutable.
-	podLister corelisters.PodLister
+	podLister corev1listers.PodLister
 	podSynced kcache.InformerSynced
 
-	// podIndexer has the common PodPVC indexer indexer installed To
+	// podIndexer has the common PodResourceClaim indexer indexer installed To
 	// limit iteration over pods to those of interest.
 	podIndexer cache.Indexer
 
@@ -75,85 +78,101 @@ type ephemeralController struct {
 	queue workqueue.RateLimitingInterface
 }
 
-// NewController creates an ephemeral volume controller.
+const (
+	claimKeyPrefix = "claim:"
+	podKeyPrefix   = "pod:"
+)
+
+// NewController creates a ResourceClaim controller.
 func NewController(
 	kubeClient clientset.Interface,
-	podInformer coreinformers.PodInformer,
-	pvcInformer coreinformers.PersistentVolumeClaimInformer) (Controller, error) {
+	podInformer corev1informers.PodInformer,
+	claimInformer corev1informers.ResourceClaimInformer) (Controller, error) {
 
-	ec := &ephemeralController{
-		kubeClient: kubeClient,
-		podLister:  podInformer.Lister(),
-		podIndexer: podInformer.Informer().GetIndexer(),
-		podSynced:  podInformer.Informer().HasSynced,
-		pvcLister:  pvcInformer.Lister(),
-		pvcsSynced: pvcInformer.Informer().HasSynced,
-		queue:      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ephemeral_volume"),
+	ec := &resourceClaimController{
+		kubeClient:   kubeClient,
+		podLister:    podInformer.Lister(),
+		podIndexer:   podInformer.Informer().GetIndexer(),
+		podSynced:    podInformer.Informer().HasSynced,
+		claimLister:  claimInformer.Lister(),
+		claimsSynced: claimInformer.Informer().HasSynced,
+		queue:        workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "resource_claim"),
 	}
 
-	ephemeralvolumemetrics.RegisterMetrics()
+	metrics.RegisterMetrics()
 
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(klog.Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
-	ec.recorder = eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "ephemeral_volume"})
+	ec.recorder = eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: "resource_claim"})
 
 	podInformer.Informer().AddEventHandler(kcache.ResourceEventHandlerFuncs{
 		AddFunc: ec.enqueuePod,
-		// The pod spec is immutable. Therefore the controller can ignore pod updates
-		// because there cannot be any changes that have to be copied into the generated
-		// PVC.
-		// Deletion of the PVC is handled through the owner reference and garbage collection.
-		// Therefore pod deletions also can be ignored.
+		UpdateFunc: func(old, updated interface{}) {
+			ec.enqueuePod(updated)
+		},
+		DeleteFunc: ec.enqueuePod,
 	})
-	pvcInformer.Informer().AddEventHandler(kcache.ResourceEventHandlerFuncs{
-		DeleteFunc: ec.onPVCDelete,
+	claimInformer.Informer().AddEventHandler(kcache.ResourceEventHandlerFuncs{
+		DeleteFunc: ec.onResourceClaimDelete,
 	})
-	if err := common.AddPodPVCIndexerIfNotPresent(ec.podIndexer); err != nil {
-		return nil, fmt.Errorf("could not initialize pvc protection controller: %w", err)
+	if err := ec.podIndexer.AddIndexers(cache.Indexers{podResourceClaimIndex: podResourceClaimIndexFunc}); err != nil {
+		return nil, fmt.Errorf("could not initialize ResourceClaim controller: %w", err)
 	}
 
 	return ec, nil
 }
 
-func (ec *ephemeralController) enqueuePod(obj interface{}) {
-	pod, ok := obj.(*v1.Pod)
+func (ec *resourceClaimController) enqueuePod(obj interface{}) {
+	if d, ok := obj.(kcache.DeletedFinalStateUnknown); ok {
+		obj = d.Obj
+	}
+	pod, ok := obj.(*corev1.Pod)
 	if !ok {
+		// Not a pod?!
 		return
 	}
 
-	// Ignore pods which are already getting deleted.
-	if pod.DeletionTimestamp != nil {
+	if len(pod.Spec.ResourceClaims) == 0 {
+		// Nothing to do for it at all.
 		return
 	}
 
-	for _, vol := range pod.Spec.Volumes {
-		if vol.Ephemeral != nil {
-			// It has at least one ephemeral inline volume, work on it.
-			key, err := kcache.DeletionHandlingMetaNamespaceKeyFunc(pod)
-			if err != nil {
-				runtime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", pod, err))
-				return
+	// Release reservations of a deleted or completed pod?
+	if pod.DeletionTimestamp != nil && pod.DeletionGracePeriodSeconds != nil && *pod.DeletionGracePeriodSeconds == 0 ||
+		pod.Status.Phase == corev1.PodFailed ||
+		pod.Status.Phase == corev1.PodSucceeded {
+		for _, podClaim := range pod.Spec.ResourceClaims {
+			claimName := resourceclaim.Name(pod, &podClaim)
+			ec.queue.Add(claimKeyPrefix + pod.Namespace + "/" + claimName)
+		}
+	}
+
+	// Create ResourceClaim for inline templates?
+	if pod.DeletionTimestamp == nil {
+		for _, podClaim := range pod.Spec.ResourceClaims {
+			if podClaim.Claim.Template != nil {
+				// It has at least one inline template, work on it.
+				ec.queue.Add(podKeyPrefix + pod.Namespace + "/" + pod.Name)
+				break
 			}
-			ec.queue.Add(key)
-			break
 		}
 	}
 }
 
-func (ec *ephemeralController) onPVCDelete(obj interface{}) {
-	pvc, ok := obj.(*v1.PersistentVolumeClaim)
+func (ec *resourceClaimController) onResourceClaimDelete(obj interface{}) {
+	claim, ok := obj.(*corev1.ResourceClaim)
 	if !ok {
 		return
 	}
 
-	// Someone deleted a PVC, either intentionally or
+	// Someone deleted a ResourceClaim, either intentionally or
 	// accidentally. If there is a pod referencing it because of
-	// an ephemeral volume, then we should re-create the PVC.
+	// an inline resource, then we should re-create the ResourceClaim.
 	// The common indexer does some prefiltering for us by
 	// limiting the list to those pods which reference
-	// the PVC.
-	objs, err := ec.podIndexer.ByIndex(common.PodPVCIndex, fmt.Sprintf("%s/%s", pvc.Namespace, pvc.Name))
+	// the ResourceClaim.
+	objs, err := ec.podIndexer.ByIndex(podResourceClaimIndex, fmt.Sprintf("%s/%s", claim.Namespace, claim.Name))
 	if err != nil {
 		runtime.HandleError(fmt.Errorf("listing pods from cache: %v", err))
 		return
@@ -163,14 +182,14 @@ func (ec *ephemeralController) onPVCDelete(obj interface{}) {
 	}
 }
 
-func (ec *ephemeralController) Run(ctx context.Context, workers int) {
+func (ec *resourceClaimController) Run(ctx context.Context, workers int) {
 	defer runtime.HandleCrash()
 	defer ec.queue.ShutDown()
 
 	klog.Infof("Starting ephemeral volume controller")
 	defer klog.Infof("Shutting down ephemeral volume controller")
 
-	if !cache.WaitForNamedCacheSync("ephemeral", ctx.Done(), ec.podSynced, ec.pvcsSynced) {
+	if !cache.WaitForNamedCacheSync("ephemeral", ctx.Done(), ec.podSynced, ec.claimsSynced) {
 		return
 	}
 
@@ -181,18 +200,20 @@ func (ec *ephemeralController) Run(ctx context.Context, workers int) {
 	<-ctx.Done()
 }
 
-func (ec *ephemeralController) runWorker(ctx context.Context) {
+func (ec *resourceClaimController) runWorker(ctx context.Context) {
 	for ec.processNextWorkItem(ctx) {
 	}
 }
 
-func (ec *ephemeralController) processNextWorkItem(ctx context.Context) bool {
+func (ec *resourceClaimController) processNextWorkItem(ctx context.Context) bool {
 	key, shutdown := ec.queue.Get()
 	if shutdown {
 		return false
 	}
 	defer ec.queue.Done(key)
 
+	logger := klog.FromContext(ctx).WithValues("key", key)
+	ctx = klog.NewContext(ctx, logger)
 	err := ec.syncHandler(ctx, key.(string))
 	if err == nil {
 		ec.queue.Forget(key)
@@ -205,65 +226,84 @@ func (ec *ephemeralController) processNextWorkItem(ctx context.Context) bool {
 	return true
 }
 
-// syncHandler is invoked for each pod which might need to be processed.
-// If an error is returned from this function, the pod will be requeued.
-func (ec *ephemeralController) syncHandler(ctx context.Context, key string) error {
-	namespace, name, err := kcache.SplitMetaNamespaceKey(key)
+// syncHandler is invoked for each work item which might need to be processed.
+// If an error is returned from this function, the item will be requeued.
+func (ec *resourceClaimController) syncHandler(ctx context.Context, key string) error {
+	sep := strings.Index(key, ":")
+	if sep < 0 {
+		return fmt.Errorf("unexpected key: %s", key)
+	}
+	prefix, object := key[0:sep+1], key[sep+1:]
+	namespace, name, err := kcache.SplitMetaNamespaceKey(object)
 	if err != nil {
 		return err
 	}
+
+	switch prefix {
+	case podKeyPrefix:
+		return ec.syncPod(ctx, namespace, name)
+	case claimKeyPrefix:
+		return ec.syncClaim(ctx, namespace, name)
+	default:
+		return fmt.Errorf("unexpected key prefix: %s", prefix)
+	}
+
+}
+
+func (ec *resourceClaimController) syncPod(ctx context.Context, namespace, name string) error {
+	logger := klog.FromContext(ctx)
 	pod, err := ec.podLister.Pods(namespace).Get(name)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			klog.V(5).Infof("ephemeral: nothing to do for pod %s, it is gone", key)
+			logger.V(5).Info("nothing to do for pod %s/%s, it is gone", namespace, name)
 			return nil
 		}
-		klog.V(5).Infof("Error getting pod %s/%s (uid: %q) from informer : %v", pod.Namespace, pod.Name, pod.UID, err)
 		return err
 	}
 
 	// Ignore pods which are already getting deleted.
 	if pod.DeletionTimestamp != nil {
-		klog.V(5).Infof("ephemeral: nothing to do for pod %s, it is marked for deletion", key)
+		logger.V(5).Info("nothing to do for pod %s/%s, it is marked for deletion", name, namespace)
 		return nil
 	}
 
-	for _, vol := range pod.Spec.Volumes {
-		if err := ec.handleVolume(ctx, pod, vol); err != nil {
-			ec.recorder.Event(pod, v1.EventTypeWarning, events.FailedBinding, fmt.Sprintf("ephemeral volume %s: %v", vol.Name, err))
-			return fmt.Errorf("pod %s, ephemeral volume %s: %v", key, vol.Name, err)
+	for _, podClaim := range pod.Spec.ResourceClaims {
+		if err := ec.handleClaim(ctx, pod, podClaim); err != nil {
+			ec.recorder.Event(pod, corev1.EventTypeWarning, "ResourceClaimCreation", fmt.Sprintf("PodResourceClaim %s: %v", podClaim.Name, err))
+			return fmt.Errorf("pod %s/%s, PodResourceClaim %s: %v", namespace, name, podClaim.Name, err)
 		}
 	}
 
 	return nil
 }
 
-// handleEphemeralVolume is invoked for each volume of a pod.
-func (ec *ephemeralController) handleVolume(ctx context.Context, pod *v1.Pod, vol v1.Volume) error {
-	klog.V(5).Infof("ephemeral: checking volume %s", vol.Name)
-	if vol.Ephemeral == nil {
+// handleResourceClaim is invoked for each volume of a pod.
+func (ec *resourceClaimController) handleClaim(ctx context.Context, pod *corev1.Pod, podClaim corev1.PodResourceClaim) error {
+	logger := klog.FromContext(ctx)
+	logger.V(5).Info("checking podClaim %s", podClaim.Name)
+	if podClaim.Claim.Template == nil {
 		return nil
 	}
 
-	pvcName := ephemeral.VolumeClaimName(pod, &vol)
-	pvc, err := ec.pvcLister.PersistentVolumeClaims(pod.Namespace).Get(pvcName)
+	claimName := resourceclaim.Name(pod, &podClaim)
+	claim, err := ec.claimLister.ResourceClaims(pod.Namespace).Get(claimName)
 	if err != nil && !errors.IsNotFound(err) {
 		return err
 	}
-	if pvc != nil {
-		if err := ephemeral.VolumeIsForPod(pod, pvc); err != nil {
+	if claim != nil {
+		if err := resourceclaim.IsForPod(pod, claim); err != nil {
 			return err
 		}
 		// Already created, nothing more to do.
-		klog.V(5).Infof("ephemeral: volume %s: PVC %s already created", vol.Name, pvcName)
+		logger.V(5).Info("podClaim %s: ResourceClaim %s already created", podClaim.Name, claimName)
 		return nil
 	}
 
-	// Create the PVC with pod as owner.
+	// Create the ResourceClaim with pod as owner.
 	isTrue := true
-	pvc = &v1.PersistentVolumeClaim{
+	claim = &corev1.ResourceClaim{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: pvcName,
+			Name: claimName,
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion:         "v1",
@@ -274,16 +314,78 @@ func (ec *ephemeralController) handleVolume(ctx context.Context, pod *v1.Pod, vo
 					BlockOwnerDeletion: &isTrue,
 				},
 			},
-			Annotations: vol.Ephemeral.VolumeClaimTemplate.Annotations,
-			Labels:      vol.Ephemeral.VolumeClaimTemplate.Labels,
+			Annotations: podClaim.Claim.Template.Annotations,
+			Labels:      podClaim.Claim.Template.Labels,
 		},
-		Spec: vol.Ephemeral.VolumeClaimTemplate.Spec,
+		Spec: podClaim.Claim.Template.Spec,
 	}
-	ephemeralvolumemetrics.EphemeralVolumeCreateAttempts.Inc()
-	_, err = ec.kubeClient.CoreV1().PersistentVolumeClaims(pod.Namespace).Create(ctx, pvc, metav1.CreateOptions{})
+	metrics.ResourceClaimCreateAttempts.Inc()
+	_, err = ec.kubeClient.CoreV1().ResourceClaims(pod.Namespace).Create(ctx, claim, metav1.CreateOptions{})
 	if err != nil {
-		ephemeralvolumemetrics.EphemeralVolumeCreateFailures.Inc()
-		return fmt.Errorf("create PVC %s: %v", pvcName, err)
+		metrics.ResourceClaimCreateFailures.Inc()
+		return fmt.Errorf("create ResourceClaim %s: %v", claimName, err)
 	}
 	return nil
+}
+
+func (ec *resourceClaimController) syncClaim(ctx context.Context, namespace, name string) error {
+	logger := klog.FromContext(ctx)
+	claim, err := ec.claimLister.ResourceClaims(namespace).Get(name)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			logger.V(5).Info("nothing to do for claim %s/%s, it is gone", namespace, name)
+			return nil
+		}
+		return err
+	}
+
+	// Check if the ReservedFor entries are all still valid.
+	valid := make([]corev1.ResourceClaimUserReference, 0, len(claim.Status.ReservedFor))
+	for _, reservedFor := range claim.Status.ReservedFor {
+		if reservedFor.Version == "v1" &&
+			reservedFor.Group == "" &&
+			reservedFor.Resource == "pods" {
+			pod, err := ec.podLister.Pods(claim.Namespace).Get(reservedFor.Name)
+			notFound := errors.IsNotFound(err)
+			if err != nil && !notFound {
+				return err
+			}
+			if pod != nil && pod.UID == reservedFor.UID {
+				valid = append(valid, reservedFor)
+			}
+			continue
+		}
+
+		// TODO: support generic object lookup
+		return fmt.Errorf("unsupported ReservedFor entry: %v", reservedFor)
+	}
+
+	if len(valid) < len(claim.Status.ReservedFor) {
+		// TODO: patch
+		claim := claim.DeepCopy()
+		claim.Status.ReservedFor = valid
+		_, err := ec.kubeClient.CoreV1().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// podResourceClaimIndexFunc is an index function that returns ResourceClaim keys (=
+// namespace/name) for ResourceClaimTemplates in a given pod.
+func podResourceClaimIndexFunc(obj interface{}) ([]string, error) {
+	pod, ok := obj.(*corev1.Pod)
+	if !ok {
+		return []string{}, nil
+	}
+	keys := []string{}
+	for _, podClaim := range pod.Spec.ResourceClaims {
+		if podClaim.Claim.Template != nil {
+			claimName := resourceclaim.Name(pod, &podClaim)
+			keys = append(keys, fmt.Sprintf("%s/%s", pod.Namespace, claimName))
+		}
+	}
+	return keys, nil
 }

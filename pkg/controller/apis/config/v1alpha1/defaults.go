@@ -37,6 +37,7 @@ import (
 	podgcconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/podgc/config/v1alpha1"
 	replicasetconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/replicaset/config/v1alpha1"
 	replicationconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/replication/config/v1alpha1"
+	resourceclaimconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/resourceclaim/config/v1alpha1"
 	resourcequotaconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/resourcequota/config/v1alpha1"
 	serviceaccountconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/serviceaccount/config/v1alpha1"
 	statefulsetconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/statefulset/config/v1alpha1"
@@ -110,4 +111,6 @@ func SetDefaults_KubeControllerManagerConfiguration(obj *kubectrlmgrconfigv1alph
 	ttlafterfinishedconfigv1alpha1.RecommendedDefaultTTLAfterFinishedControllerConfiguration(&obj.TTLAfterFinishedController)
 	// Use the default RecommendedDefaultPersistentVolumeBinderControllerConfiguration options
 	persistentvolumeconfigv1alpha1.RecommendedDefaultPersistentVolumeBinderControllerConfiguration(&obj.PersistentVolumeBinderController)
+	// Use the default RecommendedDefaultResourceClaimControllerConfiguration options
+	resourceclaimconfigv1alpha1.RecommendedDefaultResourceClaimControllerConfiguration(&obj.ResourceClaimController)
 }
