@@ -20503,3 +20503,50 @@ func TestValidateAppArmorProfileFormat(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateDownwardAPIHostIPs(t *testing.T) {
+	testCases := []struct {
+		name           string
+		expectError    bool
+		featureEnabled bool
+		fieldSel       *core.ObjectFieldSelector
+	}{
+		{
+			name:           "has no hostIPs field, featuregate enabled",
+			expectError:    false,
+			featureEnabled: true,
+			fieldSel:       &core.ObjectFieldSelector{FieldPath: "status.hostIP"},
+		},
+		{
+			name:           "has hostIPs field, featuregate enabled",
+			expectError:    false,
+			featureEnabled: true,
+			fieldSel:       &core.ObjectFieldSelector{FieldPath: "status.hostIPs"},
+		},
+		{
+			name:           "has no hostIPs field, featuregate disabled",
+			expectError:    false,
+			featureEnabled: false,
+			fieldSel:       &core.ObjectFieldSelector{FieldPath: "status.hostIP"},
+		},
+		{
+			name:           "has hostIPs field, featuregate disabled",
+			expectError:    true,
+			featureEnabled: false,
+			fieldSel:       &core.ObjectFieldSelector{FieldPath: "status.hostIPs"},
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodHostIPs, testCase.featureEnabled)()
+
+			errs := validateDownwardAPIHostIPs(testCase.fieldSel, field.NewPath("fieldSel"), PodValidationOptions{AllowHostIPsField: testCase.featureEnabled})
+			if testCase.expectError && len(errs) == 0 {
+				t.Errorf("Unexpected success")
+			}
+			if !testCase.expectError && len(errs) != 0 {
+				t.Errorf("Unexpected error(s): %v", errs)
+			}
+		})
+	}
+}

@@ -434,6 +434,8 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		AllowExpandedDNSConfig: utilfeature.DefaultFeatureGate.Enabled(features.ExpandedDNSConfig) || haveSameExpandedDNSConfig(podSpec, oldPodSpec),
 		// Allow pod spec to use OS field
 		AllowOSField: utilfeature.DefaultFeatureGate.Enabled(features.IdentifyPodOS),
+		// Allow pod spec to use status.hostIPs in downward API if feature is enabled
+		AllowHostIPsField: utilfeature.DefaultFeatureGate.Enabled(features.PodHostIPs),
 		// The default sysctl value does not contain a forward slash, and in 1.24 we intend to relax this to be true by default
 		AllowSysctlRegexContainSlash: false,
 	}
@@ -454,6 +456,9 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		// if old spec has OS field set, we must allow it
 		opts.AllowOSField = opts.AllowOSField || oldPodSpec.OS != nil
 
+		// if old spec has status.hostIPs downwardAPI set, we must allow it
+		opts.AllowHostIPsField = opts.AllowHostIPsField || hasUsedDownwardAPIFieldPathWithPodSpec(oldPodSpec, "status.hostIPs")
+
 		// if old spec used non-integer multiple of huge page unit size, we must allow it
 		opts.AllowIndivisibleHugePagesValues = usesIndivisibleHugePagesValues(oldPodSpec)
 
@@ -468,6 +473,57 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 	}
 
 	return opts
+}
+
+func hasUsedDownwardAPIFieldPathWithPodSpec(podSpec *api.PodSpec, fieldPath string) bool {
+	if podSpec == nil {
+		return false
+	}
+	for _, vol := range podSpec.Volumes {
+		if hasUsedDownwardAPIFieldPathWithVolume(&vol, fieldPath) {
+			return true
+		}
+	}
+	for _, c := range podSpec.InitContainers {
+		if hasUsedDownwardAPIFieldPathWithContainer(&c, fieldPath) {
+			return true
+		}
+	}
+	for _, c := range podSpec.Containers {
+		if hasUsedDownwardAPIFieldPathWithContainer(&c, fieldPath) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasUsedDownwardAPIFieldPathWithVolume(volume *api.Volume, fieldPath string) bool {
+	if volume == nil {
+		return false
+	}
+	if volume.DownwardAPI != nil {
+		for _, file := range volume.DownwardAPI.Items {
+			if file.FieldRef != nil &&
+				file.FieldRef.FieldPath == fieldPath {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func hasUsedDownwardAPIFieldPathWithContainer(container *api.Container, fieldPath string) bool {
+	if container == nil {
+		return false
+	}
+	for _, env := range container.Env {
+		if env.ValueFrom != nil &&
+			env.ValueFrom.FieldRef != nil &&
+			env.ValueFrom.FieldRef.FieldPath == fieldPath {
+			return true
+		}
+	}
+	return false
 }
 
 // GetValidationOptionsFromPodTemplate will return pod validation options for specified template.
