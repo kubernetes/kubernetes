@@ -248,6 +248,9 @@ func (f *Framework) BeforeEach() {
 			ginkgo.By("Waiting for a default service account to be provisioned in namespace")
 			err = WaitForDefaultServiceAccountInNamespace(f.ClientSet, namespace.Name)
 			ExpectNoError(err)
+			ginkgo.By("Waiting for kube-root-ca.crt to be provisioned in namespace")
+			err = WaitForKubeRootCAInNamespace(f.ClientSet, namespace.Name)
+			ExpectNoError(err)
 		} else {
 			Logf("Skipping waiting for service account")
 		}
