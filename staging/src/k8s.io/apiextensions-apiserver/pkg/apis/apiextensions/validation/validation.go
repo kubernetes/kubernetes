@@ -762,24 +762,9 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 	if schema == nil {
 		return allErrs
 	}
-
-	cardinality := extractMaxElements(schema)
-	if schemaCostInfo != nil && cardinality != nil {
-		if schemaCostInfo.MaxCardinality != nil {
-			*cardinality = multWithOverflowGuard(*cardinality, *schemaCostInfo.MaxCardinality)
-		} else {
-			// we denote that cardinality is unbounded by setting MaxCardiality to nil
-			// note that this is different from schemaCostInfo being nil, which will
-			// happen if we're validating the root node 
-			cardinality = nil
-		}
-	}
-
-	nodeCostInfo := &costInfo{
-		MaxCardinality: cardinality,
-	}
-
 	allErrs = append(allErrs, ssv.validate(schema, fldPath)...)
+
+	nodeCostInfo := getCostInfo(schema, schemaCostInfo)
 
 	if schema.UniqueItems == true {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("uniqueItems"), "uniqueItems cannot be set to true since the runtime complexity becomes quadratic"))
@@ -1017,6 +1002,23 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 	}
 
 	return allErrs
+}
+
+func getCostInfo(schema *apiextensions.JSONSchemaProps, schemaCostInfo *costInfo) *costInfo {
+	cardinality := extractMaxElements(schema)
+	if schemaCostInfo != nil && cardinality != nil {
+		if schemaCostInfo.MaxCardinality != nil {
+			*cardinality = multWithOverflowGuard(*cardinality, *schemaCostInfo.MaxCardinality)
+		} else {
+			// we denote that cardinality is unbounded by setting MaxCardiality to nil
+			// note that this is different from schemaCostInfo being nil, which will
+			// happen if we're validating the root node
+			cardinality = nil
+		}
+	}
+	return &costInfo{
+		MaxCardinality: cardinality,
+	}
 }
 
 func extractMaxElements(schema *apiextensions.JSONSchemaProps) *uint64 {
