@@ -131,6 +131,10 @@ func (IntOrString) OpenAPISchemaType() []string { return []string{"string"} }
 // the OpenAPI spec of this type.
 func (IntOrString) OpenAPISchemaFormat() string { return "int-or-string" }
 
+// OpenAPIV3OneOfTypes is used by the kube-openapi generator when constructing
+// the OpenAPI v3 spec of this type.
+func (IntOrString) OpenAPIV3OneOfTypes() []string { return []string{"integer", "string"} }
+
 func ValueOrDefault(intOrPercent *IntOrString, defaultValue IntOrString) *IntOrString {
 	if intOrPercent == nil {
 		return &defaultValue
