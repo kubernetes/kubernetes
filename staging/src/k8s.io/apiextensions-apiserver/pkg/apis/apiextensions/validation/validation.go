@@ -987,7 +987,7 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 					if celCRDCost > TotalCostLimit {
 						// TODO(DangerOnTheRanger): consider how to make the error message more informative
 						exceedFactor := float64(celCRDCost) / float64(TotalCostLimit)
-						costErrorMsg := fmt.Sprintf("CEL rule exceeded budget by factor of %vx", exceedFactor)
+						costErrorMsg := fmt.Sprintf("CEL rule of cost %d exceeded budget of %d by factor of %vx", uint64(celCRDCost), TotalCostLimit, exceedFactor)
 						allErrs = append(allErrs, field.Forbidden(fldPath.Child("x-kubernetes-validations").Index(i).Child("rule"), costErrorMsg))
 					}
 					if cr.Error != nil {
