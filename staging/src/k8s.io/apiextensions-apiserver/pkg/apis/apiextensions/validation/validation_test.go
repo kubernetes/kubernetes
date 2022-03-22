@@ -8342,7 +8342,3 @@ func TestCostInfo(t *testing.T) {
 func int64ptr(i int64) *int64 {
 	return &i
 }
-
-func uint64ptr(i uint64) *uint64 {
-	return &i
-}

@@ -768,8 +768,12 @@ func (c *costInfo) MultiplyByElementCost(schema *apiextensions.JSONSchemaProps) 
 		return costInfo{}
 	}
 	return costInfo{
-		MaxCardinality: multiplyWithOverflowGuard(*c.MaxCardinality, *maxElements),
+		MaxCardinality: uint64ptr(multiplyWithOverflowGuard(*c.MaxCardinality, *maxElements)),
 	}
+}
+
+func uint64ptr(i uint64) *uint64 {
+	return &i
 }
 
 func rootCostInfo() costInfo {
@@ -1057,24 +1061,19 @@ func extractMaxElements(schema *apiextensions.JSONSchemaProps) *uint64 {
 
 // multiplyWithOverflowGuard returns the product of baseCost and cardinality unless that product
 // would exceed math.MaxUint, in which case math.MaxUint is returned.
-func multiplyWithOverflowGuard(baseCost, cardinality uint64) *uint64 {
-	var resultPtr *uint64
-	var result uint64
+func multiplyWithOverflowGuard(baseCost, cardinality uint64) uint64 {
 	if baseCost == 0 {
 		// an empty rule can return 0, so guard for that here
-		result = 0
+		return 0
 	} else if math.MaxUint/baseCost < cardinality {
-		result = math.MaxUint
-	} else {
-		result = baseCost * cardinality
+		return math.MaxUint
 	}
-	resultPtr = &result
-	return resultPtr
+	return baseCost * cardinality
 }
 
 func getExpressionCost(baseCost uint64, cardinalityCost costInfo) uint64 {
 	if cardinalityCost.MaxCardinality != nil {
-		return *multiplyWithOverflowGuard(baseCost, *cardinalityCost.MaxCardinality)
+		return multiplyWithOverflowGuard(baseCost, *cardinalityCost.MaxCardinality)
 	}
 	return baseCost
 }
