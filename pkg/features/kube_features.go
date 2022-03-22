@@ -626,6 +626,7 @@ const (
 	// kep: http://kep.k8s.io/1959
 	// alpha: v1.21
 	// beta: v1.22
+	// GA: v1.24
 	//
 	// Enable support multiple Service "type: LoadBalancer" implementations in a cluster by specifying LoadBalancerClass
 	ServiceLoadBalancerClass featuregate.Feature = "ServiceLoadBalancerClass"
@@ -926,7 +927,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	StatefulSetAutoDeletePVC:                       {Default: false, PreRelease: featuregate.Alpha},
 	TopologyAwareHints:                             {Default: true, PreRelease: featuregate.Beta},
 	PodAffinityNamespaceSelector:                   {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
-	ServiceLoadBalancerClass:                       {Default: true, PreRelease: featuregate.Beta},
+	ServiceLoadBalancerClass:                       {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
 	IngressClassNamespacedParams:                   {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.25
 	ServiceInternalTrafficPolicy:                   {Default: true, PreRelease: featuregate.Beta},
 	LogarithmicScaleDown:                           {Default: true, PreRelease: featuregate.Beta},

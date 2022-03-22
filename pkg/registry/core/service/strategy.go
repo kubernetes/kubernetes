@@ -174,13 +174,6 @@ func dropServiceDisabledFields(newSvc *api.Service, oldSvc *api.Service) {
 		}
 	}
 
-	// Drop LoadBalancerClass if LoadBalancerClass is not enabled
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceLoadBalancerClass) {
-		if !loadBalancerClassInUse(oldSvc) {
-			newSvc.Spec.LoadBalancerClass = nil
-		}
-	}
-
 	// Clear InternalTrafficPolicy if not enabled
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceInternalTrafficPolicy) {
 		if !serviceInternalTrafficPolicyInUse(oldSvc) {
@@ -208,14 +201,6 @@ func loadBalancerPortsInUse(svc *api.Service) bool {
 		}
 	}
 	return false
-}
-
-// returns true if svc.Spec.LoadBalancerClass field is in use
-func loadBalancerClassInUse(svc *api.Service) bool {
-	if svc == nil {
-		return false
-	}
-	return svc.Spec.LoadBalancerClass != nil
 }
 
 func serviceInternalTrafficPolicyInUse(svc *api.Service) bool {
