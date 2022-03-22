@@ -768,6 +768,9 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 		if schemaCostInfo.MaxCardinality != nil {
 			*cardinality = multWithOverflowGuard(*cardinality, *schemaCostInfo.MaxCardinality)
 		} else {
+			// we denote that cardinality is unbounded by setting MaxCardiality to nil
+			// note that this is different from schemaCostInfo being nil, which will
+			// happen if we're validating the root node 
 			cardinality = nil
 		}
 	}
