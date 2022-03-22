@@ -29,6 +29,8 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/openapi"
+	cachedopenapi "k8s.io/client-go/openapi/cached"
 	restclient "k8s.io/client-go/rest"
 )
 
@@ -49,6 +51,7 @@ type memCacheClient struct {
 	groupToServerResources map[string]*cacheEntry
 	groupList              *metav1.APIGroupList
 	cacheValid             bool
+	openapiClient          openapi.Client
 }
 
 // Error Constants
@@ -143,6 +146,18 @@ func (d *memCacheClient) OpenAPISchema() (*openapi_v2.Document, error) {
 	return d.delegate.OpenAPISchema()
 }
 
+func (d *memCacheClient) OpenAPIV3() openapi.Client {
+	// Must take lock since Invalidate call may modify openapiClient
+	d.lock.Lock()
+	defer d.lock.Unlock()
+
+	if d.openapiClient == nil {
+		d.openapiClient = cachedopenapi.NewClient(d.delegate.OpenAPIV3())
+	}
+
+	return d.openapiClient
+}
+
 func (d *memCacheClient) Fresh() bool {
 	d.lock.RLock()
 	defer d.lock.RUnlock()
@@ -160,6 +175,7 @@ func (d *memCacheClient) Invalidate() {
 	d.cacheValid = false
 	d.groupToServerResources = nil
 	d.groupList = nil
+	d.openapiClient = nil
 }
 
 // refreshLocked refreshes the state of cache. The caller must hold d.lock for

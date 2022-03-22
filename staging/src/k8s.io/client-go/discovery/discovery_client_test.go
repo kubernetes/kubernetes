@@ -28,6 +28,7 @@ import (
 
 	"github.com/gogo/protobuf/proto"
 	openapi_v2 "github.com/google/gnostic/openapiv2"
+	openapi_v3 "github.com/google/gnostic/openapiv3"
 	"github.com/stretchr/testify/assert"
 	golangproto "google.golang.org/protobuf/proto"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/version"
 	restclient "k8s.io/client-go/rest"
+	testutil "k8s.io/client-go/util/testing"
 )
 
 func TestGetServerVersion(t *testing.T) {
@@ -535,6 +537,14 @@ func openapiSchemaFakeServer(t *testing.T) (*httptest.Server, error) {
 	return server, nil
 }
 
+func openapiV3SchemaFakeServer(t *testing.T) (*httptest.Server, map[string]*openapi_v3.Document, error) {
+	res, err := testutil.NewFakeOpenAPIV3Server("testdata")
+	if err != nil {
+		return nil, nil, err
+	}
+	return res.HttpServer, res.ServedDocuments, nil
+}
+
 func TestGetOpenAPISchema(t *testing.T) {
 	server, err := openapiSchemaFakeServer(t)
 	if err != nil {
@@ -549,6 +559,45 @@ func TestGetOpenAPISchema(t *testing.T) {
 	}
 	if e, a := returnedOpenAPI(), got; !golangproto.Equal(e, a) {
 		t.Errorf("expected \n%v, got \n%v", e, a)
+	}
+}
+
+func TestGetOpenAPISchemaV3(t *testing.T) {
+	server, testV3Specs, err := openapiV3SchemaFakeServer(t)
+	if err != nil {
+		t.Errorf("unexpected error starting fake server: %v", err)
+	}
+	defer server.Close()
+
+	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
+	openapiClient := client.OpenAPIV3()
+	paths, err := openapiClient.Paths()
+	if err != nil {
+		t.Fatalf("unexpected error getting openapi: %v", err)
+	}
+
+	for k, v := range paths {
+		actual, err := v.Schema()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		expected := testV3Specs[k]
+		if !golangproto.Equal(expected, actual) {
+			t.Fatalf("expected \n%v\n\ngot:\n%v", expected, actual)
+		}
+
+		// Ensure that fetching schema once again does not return same instance
+		actualAgain, err := v.Schema()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if reflect.ValueOf(actual).Pointer() == reflect.ValueOf(actualAgain).Pointer() {
+			t.Fatal("expected schema not to be cached")
+		} else if !golangproto.Equal(actual, actualAgain) {
+			t.Fatal("expected schema values to be equal")
+		}
 	}
 }
 
