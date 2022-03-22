@@ -611,6 +611,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.GRPCActionApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("HostAlias"):
 		return &applyconfigurationscorev1.HostAliasApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("HostIP"):
+		return &applyconfigurationscorev1.HostIPApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("HostPathVolumeSource"):
 		return &applyconfigurationscorev1.HostPathVolumeSourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("HTTPGetAction"):

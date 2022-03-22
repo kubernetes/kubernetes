@@ -4614,6 +4614,12 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: ip
       type:
         scalar: string
+- name: io.k8s.api.core.v1.HostIP
+  map:
+    fields:
+    - name: ip
+      type:
+        scalar: string
 - name: io.k8s.api.core.v1.HostPathVolumeSource
   map:
     fields:
@@ -5874,6 +5880,12 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: hostIP
       type:
         scalar: string
+    - name: hostIPs
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.core.v1.HostIP
+          elementRelationship: associative
     - name: initContainerStatuses
       type:
         list:
