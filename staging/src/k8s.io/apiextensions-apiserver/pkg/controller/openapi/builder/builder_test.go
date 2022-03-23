@@ -782,6 +782,10 @@ func TestBuildOpenAPIV3(t *testing.T) {
 			}
 
 			gotSchema := *got.Components.Schemas["io.k8s.bar.v1.Foo"]
+			listSchemaRef := got.Components.Schemas["io.k8s.bar.v1.FooList"].Properties["items"].Items.Schema.Ref.String()
+			if strings.Contains(listSchemaRef, "#/definitions/") || !strings.Contains(listSchemaRef, "#/components/schemas/") {
+				t.Errorf("Expected list schema ref to contain #/components/schemas/ prefix. Got %s", listSchemaRef)
+			}
 			gotProperties := properties(gotSchema.Properties)
 			wantedProperties := properties(wantedSchema.Properties)
 			if !gotProperties.Equal(wantedProperties) {
