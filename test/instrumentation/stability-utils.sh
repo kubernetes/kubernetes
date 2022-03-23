@@ -26,13 +26,7 @@ stability_check_setup() {
   kube::golang::verify_go_version
   kube::util::ensure-temp-dir
   cd "${KUBE_ROOT}"
-  export KUBE_EXTRA_GOPATH=$KUBE_TEMP
   kube::golang::setup_env
-  pushd "${KUBE_EXTRA_GOPATH}" >/dev/null
-    touch go.mod
-    GO111MODULE=on go mod edit -module=example.com/mod
-    GO111MODULE=on go get "gopkg.in/yaml.v2"
-  popd >/dev/null
 }
 
 find_files_to_check() {
