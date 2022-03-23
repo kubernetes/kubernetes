@@ -532,6 +532,12 @@ kube::golang::setup_env() {
   GOROOT=$(go env GOROOT)
   export GOROOT
 
+  # TODO(MadhavJivrajani): Temporary fix due to Go 1.18 changes.
+  # Please see https://tip.golang.org/doc/go1.18#sha1
+  GODEBUG=x509sha1=1
+  export GODEBUG
+
+
   # Unset GOBIN in case it already exists in the current session.
   unset GOBIN
 
