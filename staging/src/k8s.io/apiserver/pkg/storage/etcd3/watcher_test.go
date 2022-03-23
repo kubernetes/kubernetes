@@ -300,9 +300,20 @@ func TestWatchDeleteEventObjectHaveLatestRV(t *testing.T) {
 		t.Fatalf("Delete failed: %v", err)
 	}
 
-	e := <-w.ResultChan()
+	var e watch.Event
+	var wres clientv3.WatchResponse
+	watchCtx, _ := context.WithTimeout(ctx, wait.ForeverTestTimeout)
+	select {
+	case e = <-w.ResultChan():
+	case <-watchCtx.Done():
+		t.Fatalf("timed out waiting for watch event")
+	}
+	select {
+	case wres = <-etcdW:
+	case <-watchCtx.Done():
+		t.Fatalf("timed out waiting for raw watch event")
+	}
 	watchedDeleteObj := e.Object.(*example.Pod)
-	wres := <-etcdW
 
 	watchedDeleteRev, err := store.versioner.ParseResourceVersion(watchedDeleteObj.ResourceVersion)
 	if err != nil {
