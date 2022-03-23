@@ -17,9 +17,13 @@ limitations under the License.
 package openapi
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
@@ -91,16 +95,44 @@ var getOpenAPIDefs common.GetOpenAPIDefinitions = func(ref common.ReferenceCallb
 }
 
 func TestGetOpenAPIDefinitionsWithoutDisabledFeatures(t *testing.T) {
-	defs := GetOpenAPIDefinitionsWithoutDisabledFeatures(getOpenAPIDefs)(func(path string) spec.Ref {
-		return spec.Ref{}
-	})
-	def := defs["k8s.io/api/apps/v1.DeploymentCondition"]
-	for _, prop := range def.Schema.Properties {
-		if strings.Contains(prop.Description, "enum") {
-			t.Errorf("enum in description: %s", prop.Description)
-		}
-		if len(prop.Enum) != 0 {
-			t.Errorf("unexpected enum: %v", prop.Enum)
-		}
+	for _, tc := range []struct {
+		enabled        bool
+		shouldHaveEnum bool
+	}{
+		{
+			enabled:        true,
+			shouldHaveEnum: true,
+		},
+		{
+			enabled:        false,
+			shouldHaveEnum: false,
+		},
+	} {
+		t.Run(fmt.Sprintf("enabled=%v", tc.enabled), func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.OpenAPIEnums, tc.enabled)()
+			defs := GetOpenAPIDefinitionsWithoutDisabledFeatures(getOpenAPIDefs)(func(path string) spec.Ref {
+				return spec.Ref{}
+			})
+			def := defs["k8s.io/api/apps/v1.DeploymentCondition"]
+			enumAppeared := false
+			for _, prop := range def.Schema.Properties {
+				if strings.Contains(prop.Description, "enum") {
+					enumAppeared = true
+					if !tc.shouldHaveEnum {
+						t.Errorf("enum appeared, description: %s", prop.Description)
+					}
+				}
+				if len(prop.Enum) != 0 {
+					enumAppeared = true
+					if !tc.shouldHaveEnum {
+						t.Errorf("enum appeared, enum: %v", prop.Enum)
+					}
+				}
+			}
+			if !enumAppeared && tc.shouldHaveEnum {
+				t.Errorf("enum did not appear")
+			}
+		})
 	}
+
 }
