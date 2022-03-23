@@ -75,7 +75,7 @@ func recognizers() []csrRecognizer {
 	return recognizers
 }
 
-func (a *sarApprover) handle(csr *capi.CertificateSigningRequest) error {
+func (a *sarApprover) handle(ctx context.Context, csr *capi.CertificateSigningRequest) error {
 	if len(csr.Status.Certificate) != 0 {
 		return nil
 	}
@@ -96,13 +96,13 @@ func (a *sarApprover) handle(csr *capi.CertificateSigningRequest) error {
 
 		tried = append(tried, r.permission.Subresource)
 
-		approved, err := a.authorize(csr, r.permission)
+		approved, err := a.authorize(ctx, csr, r.permission)
 		if err != nil {
 			return err
 		}
 		if approved {
 			appendApprovalCondition(csr, r.successMessage)
-			_, err = a.client.CertificatesV1().CertificateSigningRequests().UpdateApproval(context.Background(), csr.Name, csr, metav1.UpdateOptions{})
+			_, err = a.client.CertificatesV1().CertificateSigningRequests().UpdateApproval(ctx, csr.Name, csr, metav1.UpdateOptions{})
 			if err != nil {
 				return fmt.Errorf("error updating approval for csr: %v", err)
 			}
@@ -117,7 +117,7 @@ func (a *sarApprover) handle(csr *capi.CertificateSigningRequest) error {
 	return nil
 }
 
-func (a *sarApprover) authorize(csr *capi.CertificateSigningRequest, rattrs authorization.ResourceAttributes) (bool, error) {
+func (a *sarApprover) authorize(ctx context.Context, csr *capi.CertificateSigningRequest, rattrs authorization.ResourceAttributes) (bool, error) {
 	extra := make(map[string]authorization.ExtraValue)
 	for k, v := range csr.Spec.Extra {
 		extra[k] = authorization.ExtraValue(v)
@@ -132,7 +132,7 @@ func (a *sarApprover) authorize(csr *capi.CertificateSigningRequest, rattrs auth
 			ResourceAttributes: &rattrs,
 		},
 	}
-	sar, err := a.client.AuthorizationV1().SubjectAccessReviews().Create(context.TODO(), sar, metav1.CreateOptions{})
+	sar, err := a.client.AuthorizationV1().SubjectAccessReviews().Create(ctx, sar, metav1.CreateOptions{})
 	if err != nil {
 		return false, err
 	}

@@ -41,8 +41,7 @@ func TestCertificateController(t *testing.T) {
 
 	client := fake.NewSimpleClientset(csr)
 	informerFactory := informers.NewSharedInformerFactory(fake.NewSimpleClientset(csr), controller.NoResyncPeriodFunc())
-
-	handler := func(csr *certificates.CertificateSigningRequest) error {
+	handler := func(ctx context.Context, csr *certificates.CertificateSigningRequest) error {
 		csr.Status.Conditions = append(csr.Status.Conditions, certificates.CertificateSigningRequestCondition{
 			Type:    certificates.CertificateApproved,
 			Reason:  "test reason",
@@ -70,8 +69,8 @@ func TestCertificateController(t *testing.T) {
 	wait.PollUntil(10*time.Millisecond, func() (bool, error) {
 		return controller.queue.Len() >= 1, nil
 	}, stopCh)
-
-	controller.processNextWorkItem()
+	ctx := context.TODO()
+	controller.processNextWorkItem(ctx)
 
 	actions := client.Actions()
 	if len(actions) != 1 {
