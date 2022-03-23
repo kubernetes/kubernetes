@@ -78,17 +78,20 @@ const (
 
 	// owner: @gnufied
 	// beta: v1.11
+	// GA: 1.24
 	// Ability to Expand persistent volumes
 	ExpandPersistentVolumes featuregate.Feature = "ExpandPersistentVolumes"
 
-	// owner: @mlmhl
+	// owner: @mlmhl @gnufied
 	// beta: v1.15
+	// GA: 1.24
 	// Ability to expand persistent volumes' file system without unmounting volumes.
 	ExpandInUsePersistentVolumes featuregate.Feature = "ExpandInUsePersistentVolumes"
 
 	// owner: @gnufied
 	// alpha: v1.14
 	// beta: v1.16
+	// GA: 1.24
 	// Ability to expand CSI volumes
 	ExpandCSIVolumes featuregate.Feature = "ExpandCSIVolumes"
 
@@ -856,9 +859,9 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	LocalStorageCapacityIsolation:                  {Default: true, PreRelease: featuregate.Beta},
 	EphemeralContainers:                            {Default: true, PreRelease: featuregate.Beta},
 	QOSReserved:                                    {Default: false, PreRelease: featuregate.Alpha},
-	ExpandPersistentVolumes:                        {Default: true, PreRelease: featuregate.Beta},
-	ExpandInUsePersistentVolumes:                   {Default: true, PreRelease: featuregate.Beta},
-	ExpandCSIVolumes:                               {Default: true, PreRelease: featuregate.Beta},
+	ExpandPersistentVolumes:                        {Default: true, PreRelease: featuregate.GA}, // remove in 1.25
+	ExpandInUsePersistentVolumes:                   {Default: true, PreRelease: featuregate.GA}, // remove in 1.25
+	ExpandCSIVolumes:                               {Default: true, PreRelease: featuregate.GA}, // remove in 1.25
 	CPUManager:                                     {Default: true, PreRelease: featuregate.Beta},
 	MemoryManager:                                  {Default: true, PreRelease: featuregate.Beta},
 	CPUCFSQuotaPeriod:                              {Default: false, PreRelease: featuregate.Alpha},
