@@ -23,13 +23,11 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/http/httptrace"
-	"os"
 	"reflect"
 	"strings"
 	"sync"
@@ -255,42 +253,12 @@ func TestTimeoutHeaders(t *testing.T) {
 	res.Body.Close()
 }
 
-func captureStdErr() (func() string, func(), error) {
-	var buf bytes.Buffer
-	reader, writer, err := os.Pipe()
-	if err != nil {
-		return nil, nil, err
-	}
-	stderr := os.Stderr
-	readerClosedCh := make(chan struct{})
-	stopReadingStdErr := func() string {
-		writer.Close()
-		<-readerClosedCh
-		return buf.String()
-	}
-	klog.LogToStderr(true)
-	cleanUp := func() {
-		os.Stderr = stderr
-		klog.LogToStderr(false)
-		stopReadingStdErr()
-	}
-	os.Stderr = writer
-	go func() {
-		io.Copy(&buf, reader)
-		readerClosedCh <- struct{}{}
-		close(readerClosedCh)
-	}()
-	klog.LogToStderr(true)
-
-	return stopReadingStdErr, cleanUp, nil
-}
-
 func TestErrConnKilled(t *testing.T) {
-	readStdErr, cleanUp, err := captureStdErr()
-	if err != nil {
-		t.Fatalf("unable to setup the test, err %v", err)
-	}
-	defer cleanUp()
+	var buf bytes.Buffer
+	klog.SetOutput(&buf)
+	klog.LogToStderr(false)
+	defer klog.LogToStderr(true)
+
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// this error must be ignored by the WithPanicRecovery handler
 		// it is thrown by WithTimeoutForNonLongRunningRequests handler when a response has been already sent to the client and the handler timed out
@@ -306,12 +274,14 @@ func TestErrConnKilled(t *testing.T) {
 	ts := httptest.NewServer(WithPanicRecovery(handler, resolver))
 	defer ts.Close()
 
-	_, err = http.Get(ts.URL)
+	_, err := http.Get(ts.URL)
 	if err == nil {
 		t.Fatal("expected to receive an error")
 	}
 
-	capturedOutput := readStdErr()
+	klog.Flush()
+	klog.SetOutput(&bytes.Buffer{}) // prevent further writes into buf
+	capturedOutput := buf.String()
 
 	// We don't expect stack trace from the panic to be included in the log.
 	if isStackTraceLoggedByRuntime(capturedOutput) {
@@ -344,11 +314,11 @@ func (t *panicOnNonReuseTransport) GotConn(info httptrace.GotConnInfo) {
 // TestErrConnKilledHTTP2 check if HTTP/2 connection is not closed when an HTTP handler panics
 // The net/http library recovers the panic and sends an HTTP/2 RST_STREAM.
 func TestErrConnKilledHTTP2(t *testing.T) {
-	readStdErr, cleanUp, err := captureStdErr()
-	if err != nil {
-		t.Fatalf("unable to setup the test, err %v", err)
-	}
-	defer cleanUp()
+	var buf bytes.Buffer
+	klog.SetOutput(&buf)
+	klog.LogToStderr(false)
+	defer klog.LogToStderr(true)
+
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// this error must be ignored by the WithPanicRecovery handler
 		// it is thrown by WithTimeoutForNonLongRunningRequests handler when a response has been already sent to the client and the handler timed out
@@ -402,7 +372,9 @@ func TestErrConnKilledHTTP2(t *testing.T) {
 		t.Fatal("expected to receive an error")
 	}
 
-	capturedOutput := readStdErr()
+	klog.Flush()
+	klog.SetOutput(&bytes.Buffer{}) // prevent further writes into buf
+	capturedOutput := buf.String()
 
 	// We don't expect stack trace from the panic to be included in the log.
 	if isStackTraceLoggedByRuntime(capturedOutput) {
