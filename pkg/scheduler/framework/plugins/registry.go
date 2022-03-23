@@ -48,7 +48,6 @@ func NewInTreeRegistry() runtime.Registry {
 		EnablePodDisruptionBudget:           feature.DefaultFeatureGate.Enabled(features.PodDisruptionBudget),
 		EnableReadWriteOncePod:              feature.DefaultFeatureGate.Enabled(features.ReadWriteOncePod),
 		EnableVolumeCapacityPriority:        feature.DefaultFeatureGate.Enabled(features.VolumeCapacityPriority),
-		EnableCSIStorageCapacity:            feature.DefaultFeatureGate.Enabled(features.CSIStorageCapacity),
 		EnableMinDomainsInPodTopologySpread: feature.DefaultFeatureGate.Enabled(features.MinDomainsInPodTopologySpread),
 	}
 

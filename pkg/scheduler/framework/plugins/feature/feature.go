@@ -24,6 +24,5 @@ type Features struct {
 	EnablePodDisruptionBudget           bool
 	EnableReadWriteOncePod              bool
 	EnableVolumeCapacityPriority        bool
-	EnableCSIStorageCapacity            bool
 	EnableMinDomainsInPodTopologySpread bool
 }

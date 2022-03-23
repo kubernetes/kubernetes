@@ -157,6 +157,7 @@ const (
 	// owner: @pohly
 	// alpha: v1.19
 	// beta: v1.21
+	// GA: v1.24
 	//
 	// Enables tracking of available storage capacity that CSI drivers provide.
 	CSIStorageCapacity featuregate.Feature = "CSIStorageCapacity"
@@ -882,7 +883,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CSIMigrationPortworx:                           {Default: false, PreRelease: featuregate.Alpha},                  // Off by default (requires Portworx CSI driver)
 	InTreePluginPortworxUnregister:                 {Default: false, PreRelease: featuregate.Alpha},
 	CSIInlineVolume:                                {Default: true, PreRelease: featuregate.Beta},
-	CSIStorageCapacity:                             {Default: true, PreRelease: featuregate.Beta},
+	CSIStorageCapacity:                             {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
 	CSIServiceAccountToken:                         {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
 	GenericEphemeralVolume:                         {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.25
 	CSIVolumeFSGroupPolicy:                         {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.25

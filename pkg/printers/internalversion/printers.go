@@ -40,14 +40,12 @@ import (
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/util/certificate/csr"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 	"k8s.io/kubernetes/pkg/apis/apiserverinternal"
@@ -68,7 +66,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/printers"
 	"k8s.io/kubernetes/pkg/util/node"
 )
@@ -516,11 +513,7 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "AttachRequired", Type: "boolean", Description: storagev1.CSIDriverSpec{}.SwaggerDoc()["attachRequired"]},
 		{Name: "PodInfoOnMount", Type: "boolean", Description: storagev1.CSIDriverSpec{}.SwaggerDoc()["podInfoOnMount"]},
-	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIStorageCapacity) {
-		csiDriverColumnDefinitions = append(csiDriverColumnDefinitions, metav1.TableColumnDefinition{
-			Name: "StorageCapacity", Type: "boolean", Description: storagev1.CSIDriverSpec{}.SwaggerDoc()["storageCapacity"],
-		})
+		{Name: "StorageCapacity", Type: "boolean", Description: storagev1.CSIDriverSpec{}.SwaggerDoc()["storageCapacity"]},
 	}
 	csiDriverColumnDefinitions = append(csiDriverColumnDefinitions, []metav1.TableColumnDefinition{
 		{Name: "TokenRequests", Type: "string", Description: storagev1.CSIDriverSpec{}.SwaggerDoc()["tokenRequests"]},
@@ -536,8 +529,8 @@ func AddHandlers(h printers.PrintHandler) {
 
 	csiStorageCapacityColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "StorageClassName", Type: "string", Description: storagev1alpha1.CSIStorageCapacity{}.SwaggerDoc()["storageClassName"]},
-		{Name: "Capacity", Type: "string", Description: storagev1alpha1.CSIStorageCapacity{}.SwaggerDoc()["capacity"]},
+		{Name: "StorageClassName", Type: "string", Description: storagev1.CSIStorageCapacity{}.SwaggerDoc()["storageClassName"]},
+		{Name: "Capacity", Type: "string", Description: storagev1.CSIStorageCapacity{}.SwaggerDoc()["capacity"]},
 	}
 	h.TableHandler(csiStorageCapacityColumnDefinitions, printCSIStorageCapacity)
 	h.TableHandler(csiStorageCapacityColumnDefinitions, printCSIStorageCapacityList)
@@ -1413,13 +1406,11 @@ func printCSIDriver(obj *storage.CSIDriver, options printers.GenerateOptions) ([
 	}
 
 	row.Cells = append(row.Cells, obj.Name, attachRequired, podInfoOnMount)
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIStorageCapacity) {
-		storageCapacity := false
-		if obj.Spec.StorageCapacity != nil {
-			storageCapacity = *obj.Spec.StorageCapacity
-		}
-		row.Cells = append(row.Cells, storageCapacity)
+	storageCapacity := false
+	if obj.Spec.StorageCapacity != nil {
+		storageCapacity = *obj.Spec.StorageCapacity
 	}
+	row.Cells = append(row.Cells, storageCapacity)
 
 	tokenRequests := "<unset>"
 	if obj.Spec.TokenRequests != nil {

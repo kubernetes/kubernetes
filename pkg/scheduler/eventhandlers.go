@@ -351,7 +351,7 @@ func addAllEventHandlers(
 				buildEvtResHandler(at, framework.CSIDriver, "CSIDriver"),
 			)
 		case framework.CSIStorageCapacity:
-			informerFactory.Storage().V1beta1().CSIStorageCapacities().Informer().AddEventHandler(
+			informerFactory.Storage().V1().CSIStorageCapacities().Informer().AddEventHandler(
 				buildEvtResHandler(at, framework.CSIStorageCapacity, "CSIStorageCapacity"),
 			)
 		case framework.PersistentVolume:
