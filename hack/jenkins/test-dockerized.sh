@@ -51,5 +51,9 @@ make generated_files
 go install ./cmd/...
 ./hack/install-etcd.sh
 
+  # Temporary fix for https://github.com/kubernetes/kubernetes/issues/108910
+  GODEBUG=x509sha1=1
+  export GODEBUG
+
 make test-cmd
 make test-integration
