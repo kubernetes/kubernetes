@@ -753,7 +753,7 @@ github.com/xiang90/probing
 github.com/xlab/treeprint
 # go.etcd.io/bbolt v1.3.6 => go.etcd.io/bbolt v1.3.6
 go.etcd.io/bbolt
-# go.etcd.io/etcd/api/v3 v3.5.0 => go.etcd.io/etcd/api/v3 v3.5.0
+# go.etcd.io/etcd/api/v3 v3.5.1 => go.etcd.io/etcd/api/v3 v3.5.1
 ## explicit
 go.etcd.io/etcd/api/v3/authpb
 go.etcd.io/etcd/api/v3/etcdserverpb
@@ -762,7 +762,7 @@ go.etcd.io/etcd/api/v3/membershippb
 go.etcd.io/etcd/api/v3/mvccpb
 go.etcd.io/etcd/api/v3/v3rpc/rpctypes
 go.etcd.io/etcd/api/v3/version
-# go.etcd.io/etcd/client/pkg/v3 v3.5.0 => go.etcd.io/etcd/client/pkg/v3 v3.5.0
+# go.etcd.io/etcd/client/pkg/v3 v3.5.1 => go.etcd.io/etcd/client/pkg/v3 v3.5.1
 ## explicit
 go.etcd.io/etcd/client/pkg/v3/fileutil
 go.etcd.io/etcd/client/pkg/v3/logutil
@@ -774,7 +774,7 @@ go.etcd.io/etcd/client/pkg/v3/transport
 go.etcd.io/etcd/client/pkg/v3/types
 # go.etcd.io/etcd/client/v2 v2.305.0 => go.etcd.io/etcd/client/v2 v2.305.0
 go.etcd.io/etcd/client/v2
-# go.etcd.io/etcd/client/v3 v3.5.0 => go.etcd.io/etcd/client/v3 v3.5.0
+# go.etcd.io/etcd/client/v3 v3.5.1 => go.etcd.io/etcd/client/v3 v3.5.1
 ## explicit
 go.etcd.io/etcd/client/v3
 go.etcd.io/etcd/client/v3/concurrency
@@ -2653,10 +2653,10 @@ sigs.k8s.io/yaml
 # github.com/xlab/treeprint => github.com/xlab/treeprint v0.0.0-20181112141820-a009c3971eca
 # github.com/yuin/goldmark => github.com/yuin/goldmark v1.4.1
 # go.etcd.io/bbolt => go.etcd.io/bbolt v1.3.6
-# go.etcd.io/etcd/api/v3 => go.etcd.io/etcd/api/v3 v3.5.0
-# go.etcd.io/etcd/client/pkg/v3 => go.etcd.io/etcd/client/pkg/v3 v3.5.0
+# go.etcd.io/etcd/api/v3 => go.etcd.io/etcd/api/v3 v3.5.1
+# go.etcd.io/etcd/client/pkg/v3 => go.etcd.io/etcd/client/pkg/v3 v3.5.1
 # go.etcd.io/etcd/client/v2 => go.etcd.io/etcd/client/v2 v2.305.0
-# go.etcd.io/etcd/client/v3 => go.etcd.io/etcd/client/v3 v3.5.0
+# go.etcd.io/etcd/client/v3 => go.etcd.io/etcd/client/v3 v3.5.1
 # go.etcd.io/etcd/pkg/v3 => go.etcd.io/etcd/pkg/v3 v3.5.0
 # go.etcd.io/etcd/raft/v3 => go.etcd.io/etcd/raft/v3 v3.5.0
 # go.etcd.io/etcd/server/v3 => go.etcd.io/etcd/server/v3 v3.5.0
