@@ -121,7 +121,8 @@ func TestWatchRestartsIfTimeoutNotReached(t *testing.T) {
 				patch := fmt.Sprintf(`{"metadata": {"annotations": {"count": "%d"}}}`, counter)
 				_, err := c.CoreV1().Secrets(secret.Namespace).Patch(context.TODO(), secret.Name, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{})
 				if err != nil {
-					panic(fmt.Sprintf("Failed to patch secret: %v", err))
+					t.Errorf("Failed to patch secret: %v", err)
+					return
 				}
 
 				*referenceOutput = append(*referenceOutput, fmt.Sprintf("%d", counter))
