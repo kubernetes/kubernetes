@@ -60,7 +60,7 @@ func (n *NodeE2ERemote) SetupTestPackage(tardir, systemSpecName string) error {
 	}
 
 	// Copy binaries
-	requiredBins := []string{"kubelet", "e2e_node.test", "ginkgo", "mounter"}
+	requiredBins := []string{"kubelet", "e2e_node.test", "ginkgo", "mounter", "gcp-credential-provider"}
 	for _, bin := range requiredBins {
 		source := filepath.Join(buildOutputDir, bin)
 		if _, err := os.Stat(source); err != nil {
@@ -102,6 +102,16 @@ func prependMemcgNotificationFlag(args string) string {
 	return "--kubelet-flags=--kernel-memcg-notification=true " + args
 }
 
+// prependGCPCredentialProviderFlag prepends the flags for enabling
+// a credential provider plugin.
+func prependGCPCredentialProviderFlag(args, workspace string) string {
+	credentialProviderConfig := filepath.Join(workspace, "credential-provider.yaml")
+	featureGateFlag := "--kubelet-flags=--feature-gates=DisableKubeletCloudCredentialProviders=true,KubeletCredentialProviders=true"
+	configFlag := fmt.Sprintf("--kubelet-flags=--image-credential-provider-config=%s", credentialProviderConfig)
+	binFlag := fmt.Sprintf("--kubelet-flags=--image-credential-provider-bin-dir=%s", workspace)
+	return fmt.Sprintf("%s %s %s %s", featureGateFlag, configFlag, binFlag, args)
+}
+
 // osSpecificActions takes OS specific actions required for the node tests
 func osSpecificActions(args, host, workspace string) (string, error) {
 	output, err := getOSDistribution(host)
@@ -114,6 +124,7 @@ func osSpecificActions(args, host, workspace string) (string, error) {
 		return args, setKubeletSELinuxLabels(host, workspace)
 	case strings.Contains(output, "gci"), strings.Contains(output, "cos"):
 		args = prependMemcgNotificationFlag(args)
+		args = prependGCPCredentialProviderFlag(args, workspace)
 		return prependCOSMounterFlag(args, host, workspace)
 	case strings.Contains(output, "ubuntu"):
 		return prependMemcgNotificationFlag(args), nil
@@ -163,6 +174,11 @@ func (n *NodeE2ERemote) RunTest(host, workspace, results, imageDesc, junitFilePr
 
 	// Configure iptables firewall rules
 	if err := configureFirewall(host); err != nil {
+		return "", err
+	}
+
+	// Install the kubelet credential provider plugin
+	if err := configureCredentialProvider(host, workspace); err != nil {
 		return "", err
 	}
 
