@@ -89,10 +89,9 @@ func newNavigationSteps(path string) (*navigationSteps, error) {
 			currPartIndex += 1
 
 			// To help users know if they've provided a malformed path, check length
-			nextPart := strings.Join(individualParts[currPartIndex:], ".")
-			if len(strings.Split(nextPart, ".")) > 2 {
+			if len(individualParts[currPartIndex:]) > 2 {
 				return nil, fmt.Errorf("too many steps in path %v", path)
-			} else if len(strings.Split(nextPart, ".")) > 1 {
+			} else if len(individualParts[currPartIndex:]) > 1 {
 				steps = append(steps, navigationStep{individualParts[currPartIndex], reflect.TypeOf("")})
 				currPartIndex += 1
 			}

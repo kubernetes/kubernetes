@@ -26,6 +26,7 @@ import (
 	"reflect"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
@@ -127,9 +128,37 @@ func TestFromNewConfig(t *testing.T) {
 		},
 		{
 			name:        "SetAuthInfoExecArgs",
-			description: "Testing for kubectl config set users.foo.exec.args to test1,test2,test3",
+			description: "Testing for kubectl config set users.foo.exec.args to test3,test2,test1",
 			config:      conf,
-			args:        []string{"users.foo.exec.args", "test1,test2,test3"},
+			args:        []string{"users.foo.exec.args", "test3,test2,test1"},
+			expected:    `Property "users.foo.exec.args" set.` + "\n",
+			expectedConfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"foo": {
+						Exec: &clientcmdapi.ExecConfig{
+							Args: []string{
+								"test3",
+								"test2",
+								"test1",
+							},
+						},
+						Extensions: map[string]runtime.Object{},
+					},
+				},
+				Clusters:   map[string]*clientcmdapi.Cluster{},
+				Contexts:   map[string]*clientcmdapi.Context{},
+				Extensions: map[string]runtime.Object{},
+				Preferences: clientcmdapi.Preferences{
+					Colors:     false,
+					Extensions: map[string]runtime.Object{},
+				},
+			},
+		},
+		{
+			name:        "SetAuthInfoExecArgsDeduplicated",
+			description: "Testing for kubectl config set users.foo.exec.args to test3,test2,test1,test3",
+			config:      conf,
+			args:        []string{"users.foo.exec.args", "--deduplicate", "test3,test2,test1,test3"},
 			expected:    `Property "users.foo.exec.args" set.` + "\n",
 			expectedConfig: clientcmdapi.Config{
 				AuthInfos: map[string]*clientcmdapi.AuthInfo{
@@ -283,9 +312,35 @@ func TestFromNewConfig(t *testing.T) {
 		},
 		{
 			name:        "SetAuthInfoActAsGroups",
-			description: "Testing for kubectl config set users.foo.act-as-groups to test1,test2,test3",
+			description: "Testing for kubectl config set users.foo.act-as-groups to test3,test2,test1",
 			config:      conf,
-			args:        []string{"users.foo.act-as-groups", "test1,test2,test3"},
+			args:        []string{"users.foo.act-as-groups", "test3,test2,test1"},
+			expected:    `Property "users.foo.act-as-groups" set.` + "\n",
+			expectedConfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"foo": {
+						ImpersonateGroups: []string{
+							"test3",
+							"test2",
+							"test1",
+						},
+						Extensions: map[string]runtime.Object{},
+					},
+				},
+				Clusters:   map[string]*clientcmdapi.Cluster{},
+				Contexts:   map[string]*clientcmdapi.Context{},
+				Extensions: map[string]runtime.Object{},
+				Preferences: clientcmdapi.Preferences{
+					Colors:     false,
+					Extensions: map[string]runtime.Object{},
+				},
+			},
+		},
+		{
+			name:        "SetAuthInfoActAsGroupsDeduplicated",
+			description: "Testing for kubectl config set users.foo.act-as-groups to test3,test2,test1,test3",
+			config:      conf,
+			args:        []string{"users.foo.act-as-groups", "--deduplicate", "test3,test2,test1,test3"},
 			expected:    `Property "users.foo.act-as-groups" set.` + "\n",
 			expectedConfig: clientcmdapi.Config{
 				AuthInfos: map[string]*clientcmdapi.AuthInfo{
@@ -309,9 +364,37 @@ func TestFromNewConfig(t *testing.T) {
 		},
 		{
 			name:        "SetAuthInfoActAsUserExtra",
-			description: "Testing for kubectl config set users.foo.act-as-user-extra.test1 to val1,val2,val3",
+			description: "Testing for kubectl config set users.foo.act-as-user-extra.test1 to val3,val2,val1",
 			config:      conf,
-			args:        []string{"users.foo.act-as-user-extra.test1", "val1,val2,val3"},
+			args:        []string{"users.foo.act-as-user-extra.test1", "val3,val2,val1"},
+			expected:    `Property "users.foo.act-as-user-extra.test1" set.` + "\n",
+			expectedConfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"foo": {
+						ImpersonateUserExtra: map[string][]string{
+							"test1": {
+								"val3",
+								"val2",
+								"val1",
+							},
+						},
+						Extensions: map[string]runtime.Object{},
+					},
+				},
+				Clusters:   map[string]*clientcmdapi.Cluster{},
+				Contexts:   map[string]*clientcmdapi.Context{},
+				Extensions: map[string]runtime.Object{},
+				Preferences: clientcmdapi.Preferences{
+					Colors:     false,
+					Extensions: map[string]runtime.Object{},
+				},
+			},
+		},
+		{
+			name:        "SetAuthInfoActAsUserExtraDeduplicate",
+			description: "Testing for kubectl config set users.foo.act-as-user-extra.test1 to val3,val2,val1,val3",
+			config:      conf,
+			args:        []string{"users.foo.act-as-user-extra.test1", "--deduplicate", "val3,val2,val1,val3"},
 			expected:    `Property "users.foo.act-as-user-extra.test1" set.` + "\n",
 			expectedConfig: clientcmdapi.Config{
 				AuthInfos: map[string]*clientcmdapi.AuthInfo{
@@ -662,6 +745,54 @@ func TestFromExistingConfig(t *testing.T) {
 			},
 		},
 		{
+			name:        "AddExecArgDeduplicate",
+			description: "Testing for kubectl config set users.foo.exec.args to test3,test4+",
+			config:      conf,
+			args:        []string{"users.foo.exec.args", "test3,test4+", "--deduplicate"},
+			expected:    `Property "users.foo.exec.args" set.` + "\n",
+			expectedConfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"foo": {
+						Exec: &clientcmdapi.ExecConfig{
+							Args: []string{
+								"test1",
+								"test2",
+								"test3",
+								"test4",
+							},
+							Env: []clientcmdapi.ExecEnvVar{
+								{
+									Name:  "test",
+									Value: "value1",
+								},
+							},
+						},
+						Extensions: map[string]runtime.Object{},
+						ImpersonateGroups: []string{
+							"test1",
+							"test2",
+							"test3",
+						},
+						ImpersonateUserExtra: map[string][]string{
+							"test1": {
+								"val1",
+								"val2",
+								"val3",
+							},
+						},
+					},
+				},
+				Clusters:       map[string]*clientcmdapi.Cluster{},
+				Contexts:       map[string]*clientcmdapi.Context{},
+				CurrentContext: "minikube",
+				Extensions:     map[string]runtime.Object{},
+				Preferences: clientcmdapi.Preferences{
+					Colors:     false,
+					Extensions: map[string]runtime.Object{},
+				},
+			},
+		},
+		{
 			name:        "DeleteExecArg",
 			description: "Testing for kubectl config set users.foo.exec.args to test2-",
 			config:      conf,
@@ -709,9 +840,55 @@ func TestFromExistingConfig(t *testing.T) {
 		},
 		{
 			name:        "UpdateExecArgs",
-			description: "Testing for kubectl config set users.foo.exec.args to test1,test3",
+			description: "Testing for kubectl config set users.foo.exec.args to test5,test4",
 			config:      conf,
-			args:        []string{"users.foo.exec.args", "test4,test5"},
+			args:        []string{"users.foo.exec.args", "test5,test4"},
+			expected:    `Property "users.foo.exec.args" set.` + "\n",
+			expectedConfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"foo": {
+						Exec: &clientcmdapi.ExecConfig{
+							Args: []string{
+								"test5",
+								"test4",
+							},
+							Env: []clientcmdapi.ExecEnvVar{
+								{
+									Name:  "test",
+									Value: "value1",
+								},
+							},
+						},
+						Extensions: map[string]runtime.Object{},
+						ImpersonateGroups: []string{
+							"test1",
+							"test2",
+							"test3",
+						},
+						ImpersonateUserExtra: map[string][]string{
+							"test1": {
+								"val1",
+								"val2",
+								"val3",
+							},
+						},
+					},
+				},
+				Clusters:       map[string]*clientcmdapi.Cluster{},
+				Contexts:       map[string]*clientcmdapi.Context{},
+				CurrentContext: "minikube",
+				Extensions:     map[string]runtime.Object{},
+				Preferences: clientcmdapi.Preferences{
+					Colors:     false,
+					Extensions: map[string]runtime.Object{},
+				},
+			},
+		},
+		{
+			name:        "UpdateExecArgsDeduplication",
+			description: "Testing for kubectl config set users.foo.exec.args to test5,test4,test5",
+			config:      conf,
+			args:        []string{"users.foo.exec.args", "test5,test4,test5", "--deduplicate"},
 			expected:    `Property "users.foo.exec.args" set.` + "\n",
 			expectedConfig: clientcmdapi.Config{
 				AuthInfos: map[string]*clientcmdapi.AuthInfo{
@@ -805,6 +982,54 @@ func TestFromExistingConfig(t *testing.T) {
 			description: "Testing for kubectl config set users.foo.act-as-groups to test4+",
 			config:      conf,
 			args:        []string{"users.foo.act-as-groups", "test4+"},
+			expected:    `Property "users.foo.act-as-groups" set.` + "\n",
+			expectedConfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"foo": {
+						Exec: &clientcmdapi.ExecConfig{
+							Args: []string{
+								"test1",
+								"test2",
+								"test3",
+							},
+							Env: []clientcmdapi.ExecEnvVar{
+								{
+									Name:  "test",
+									Value: "value1",
+								},
+							},
+						},
+						Extensions: map[string]runtime.Object{},
+						ImpersonateGroups: []string{
+							"test1",
+							"test2",
+							"test3",
+							"test4",
+						},
+						ImpersonateUserExtra: map[string][]string{
+							"test1": {
+								"val1",
+								"val2",
+								"val3",
+							},
+						},
+					},
+				},
+				Clusters:       map[string]*clientcmdapi.Cluster{},
+				Contexts:       map[string]*clientcmdapi.Context{},
+				CurrentContext: "minikube",
+				Extensions:     map[string]runtime.Object{},
+				Preferences: clientcmdapi.Preferences{
+					Colors:     false,
+					Extensions: map[string]runtime.Object{},
+				},
+			},
+		},
+		{
+			name:        "AddActAsGroupsDeduplicate",
+			description: "Testing for kubectl config set users.foo.act-as-groups to test3,test4+",
+			config:      conf,
+			args:        []string{"users.foo.act-as-groups", "test3,test4+", "--deduplicate"},
 			expected:    `Property "users.foo.act-as-groups" set.` + "\n",
 			expectedConfig: clientcmdapi.Config{
 				AuthInfos: map[string]*clientcmdapi.AuthInfo{
@@ -945,6 +1170,54 @@ func TestFromExistingConfig(t *testing.T) {
 			description: "Testing for kubectl config set users.foo.act-as-user-extra.test1 to val4+",
 			config:      conf,
 			args:        []string{"users.foo.act-as-user-extra.test1", "val4+"},
+			expected:    `Property "users.foo.act-as-user-extra.test1" set.` + "\n",
+			expectedConfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"foo": {
+						Exec: &clientcmdapi.ExecConfig{
+							Args: []string{
+								"test1",
+								"test2",
+								"test3",
+							},
+							Env: []clientcmdapi.ExecEnvVar{
+								{
+									Name:  "test",
+									Value: "value1",
+								},
+							},
+						},
+						Extensions: map[string]runtime.Object{},
+						ImpersonateGroups: []string{
+							"test1",
+							"test2",
+							"test3",
+						},
+						ImpersonateUserExtra: map[string][]string{
+							"test1": {
+								"val1",
+								"val2",
+								"val3",
+								"val4",
+							},
+						},
+					},
+				},
+				Clusters:       map[string]*clientcmdapi.Cluster{},
+				Contexts:       map[string]*clientcmdapi.Context{},
+				CurrentContext: "minikube",
+				Extensions:     map[string]runtime.Object{},
+				Preferences: clientcmdapi.Preferences{
+					Colors:     false,
+					Extensions: map[string]runtime.Object{},
+				},
+			},
+		},
+		{
+			name:        "AddActAsUserExtraDeduplicate",
+			description: "Testing for kubectl config set users.foo.act-as-user-extra.test1 to val3,val4+",
+			config:      conf,
+			args:        []string{"users.foo.act-as-user-extra.test1", "val3,val4+", "--deduplicate"},
 			expected:    `Property "users.foo.act-as-user-extra.test1" set.` + "\n",
 			expectedConfig: clientcmdapi.Config{
 				AuthInfos: map[string]*clientcmdapi.AuthInfo{
@@ -1138,28 +1411,48 @@ func TestFromExistingConfig(t *testing.T) {
 }
 
 func (test setConfigTest) run(t *testing.T) {
-	fakeKubeFile, err := ioutil.TempFile(os.TempDir(), "")
+	// We must define two sets of path options to get proper test coverage
+	// Define path options for cmd.Execute() run
+	fakeKubeFileCmd, err := ioutil.TempFile(os.TempDir(), "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	defer os.Remove(fakeKubeFile.Name())
-	err = clientcmd.WriteToFile(test.config, fakeKubeFile.Name())
+	defer os.Remove(fakeKubeFileCmd.Name())
+	err = clientcmd.WriteToFile(test.config, fakeKubeFileCmd.Name())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	pathOptions := clientcmd.NewDefaultPathOptions()
-	pathOptions.GlobalFile = fakeKubeFile.Name()
-	pathOptions.EnvVar = ""
+	pathOptionsCmd := clientcmd.NewDefaultPathOptions()
+	pathOptionsCmd.GlobalFile = fakeKubeFileCmd.Name()
+	pathOptionsCmd.EnvVar = ""
+
+	// Define path options for opts.run() execution
+	fakeKubeFileOpts, err := ioutil.TempFile(os.TempDir(), "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer os.Remove(fakeKubeFileOpts.Name())
+	err = clientcmd.WriteToFile(test.config, fakeKubeFileOpts.Name())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	pathOptionsOpts := clientcmd.NewDefaultPathOptions()
+	pathOptionsOpts.GlobalFile = fakeKubeFileOpts.Name()
+	pathOptionsOpts.EnvVar = ""
+
 	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdConfigSet(buf, pathOptions)
+	cmd := NewCmdConfigSet(buf, pathOptionsCmd)
 	cmd.SetArgs(test.args)
 	opts := &setOptions{
-		configAccess:  pathOptions,
+		configAccess:  pathOptionsOpts,
 		propertyName:  test.args[0],
 		propertyValue: test.args[1],
 	}
-	if len(test.args) > 2 {
+	if sets.NewString(test.args...).Has("--set-raw-bytes=true") {
 		opts.setRawBytes = 1
+	}
+	if sets.NewString(test.args...).Has("--deduplicate") {
+		opts.deduplicate = true
 	}
 
 	// Must use opts.run to get error outputs
@@ -1180,7 +1473,7 @@ func (test setConfigTest) run(t *testing.T) {
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("unexpected error executing command: %v", err)
 	}
-	config, err := clientcmd.LoadFromFile(fakeKubeFile.Name())
+	config, err := clientcmd.LoadFromFile(fakeKubeFileCmd.Name())
 	if err != nil {
 		t.Fatalf("unexpected error loading kubeconfig file: %v", err)
 	}

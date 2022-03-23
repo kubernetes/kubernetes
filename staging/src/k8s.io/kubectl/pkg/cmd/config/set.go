@@ -26,6 +26,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/clientcmd"
 	cliflag "k8s.io/component-base/cli/flag"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -38,6 +39,7 @@ type setOptions struct {
 	propertyName  string
 	propertyValue string
 	setRawBytes   cliflag.Tristate
+	deduplicate   bool
 }
 
 var (
@@ -99,6 +101,8 @@ func NewCmdConfigSet(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.
 
 	f := cmd.Flags().VarPF(&options.setRawBytes, "set-raw-bytes", "", "When writing a []byte PROPERTY_VALUE, write the given string directly without base64 decoding.")
 	f.NoOptDefVal = "true"
+	cmd.Flags().BoolVar(&options.deduplicate, "deduplicate", false, "Whether to deduplicate and sort the argument list or not")
+
 	return cmd
 }
 
@@ -122,7 +126,7 @@ func (o setOptions) run() error {
 		setRawBytes = o.setRawBytes.Value()
 	}
 
-	err = modifyConfig(reflect.ValueOf(config), steps, o.propertyValue, false, setRawBytes)
+	err = modifyConfig(reflect.ValueOf(config), steps, o.propertyValue, false, setRawBytes, o.deduplicate)
 	if err != nil {
 		return err
 	}
@@ -157,7 +161,7 @@ func (o setOptions) validate() error {
 	return nil
 }
 
-func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue string, unset bool, setRawBytes bool) error {
+func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue string, unset bool, setRawBytes bool, deduplicate bool) error {
 	currStep := steps.pop()
 
 	actualCurrValue := curr
@@ -192,7 +196,7 @@ func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue stri
 						actualCurrValue.SetMapIndex(mapKey, reflect.Indirect(currMapValue))
 					}
 					currentSliceValue := actualCurrValue.MapIndex(mapKey).Interface().([]string)
-					newSliceValue := editStringSlice(currentSliceValue, propertyValue)
+					newSliceValue := editStringSlice(currentSliceValue, propertyValue, deduplicate)
 					actualCurrValue.SetMapIndex(mapKey, reflect.ValueOf(newSliceValue))
 
 				default:
@@ -216,7 +220,7 @@ func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue stri
 			actualCurrValue.SetMapIndex(mapKey, currMapValue)
 		}
 
-		err := modifyConfig(currMapValue, steps, propertyValue, unset, setRawBytes)
+		err := modifyConfig(currMapValue, steps, propertyValue, unset, setRawBytes, deduplicate)
 		if err != nil {
 			return err
 		}
@@ -237,7 +241,7 @@ func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue stri
 			innerType := actualCurrValue.Type().Elem()
 			if innerType.Kind() == reflect.String {
 				currentSliceValue := actualCurrValue.Interface().([]string)
-				newSliceValue := editStringSlice(currentSliceValue, propertyValue)
+				newSliceValue := editStringSlice(currentSliceValue, propertyValue, deduplicate)
 				actualCurrValue.Set(reflect.ValueOf(newSliceValue))
 			} else if innerType.Kind() == reflect.Struct {
 				// Note this only works for attempting to set struct fields of type string
@@ -332,7 +336,7 @@ func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue stri
 					return nil
 				}
 
-				return modifyConfig(currFieldValue.Addr(), steps, propertyValue, unset, setRawBytes)
+				return modifyConfig(currFieldValue.Addr(), steps, propertyValue, unset, setRawBytes, deduplicate)
 			}
 		}
 
@@ -349,7 +353,7 @@ func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue stri
 			}
 		}
 		steps.currentStepIndex = steps.currentStepIndex - 1
-		return modifyConfig(newActualCurrValue.Addr(), steps, propertyValue, unset, setRawBytes)
+		return modifyConfig(newActualCurrValue.Addr(), steps, propertyValue, unset, setRawBytes, deduplicate)
 
 	}
 
@@ -406,7 +410,7 @@ func getMapFieldTypeYamlName(objValue reflect.Value, fieldIndex int) string {
 	return currFieldTypeYamlName
 }
 
-func editStringSlice(slice []string, input string) []string {
+func editStringSlice(slice []string, input string, deduplicate bool) []string {
 	function := string(input[len(input)-1])
 	switch function {
 	case "-":
@@ -424,6 +428,9 @@ func editStringSlice(slice []string, input string) []string {
 			}
 		}
 
+		if deduplicate {
+			return sets.NewString(slice...).List()
+		}
 		return slice
 
 	case "+":
@@ -432,10 +439,16 @@ func editStringSlice(slice []string, input string) []string {
 		input = string(input[:len(input)-1])
 		argSlice := strings.Split(input, ",")
 		slice = append(slice, argSlice...)
+		if deduplicate {
+			return sets.NewString(slice...).List()
+		}
 		return slice
 
 	default:
 		argSlice := strings.Split(input, ",")
+		if deduplicate {
+			return sets.NewString(argSlice...).List()
+		}
 		return argSlice
 	}
 }
