@@ -135,7 +135,7 @@ func DoHTTPProbe(url *url.URL, headers http.Header, client GetHTTPInterface) (pr
 		return probe.Success, body, nil
 	}
 	klog.V(4).Infof("Probe failed for %s with request headers %v, response body: %v", url.String(), headers, body)
-	return probe.Failure, fmt.Sprintf("HTTP probe failed with statuscode: %d", res.StatusCode), nil
+	return probe.Failure, fmt.Sprintf("HTTP probe failed with statuscode: %d\n%v", res.StatusCode, body), nil
 }
 
 func redirectChecker(followNonLocalRedirects bool) func(*http.Request, []*http.Request) error {
