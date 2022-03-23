@@ -501,7 +501,7 @@ func (b *builder) buildListSchema(v2 bool) *spec.Schema {
 	doc := fmt.Sprintf("List of %s. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md", b.plural)
 	s := new(spec.Schema).WithDescription(fmt.Sprintf("%s is a list of %s", b.listKind, b.kind)).
 		WithRequired("items").
-		SetProperty("items", *spec.ArrayProperty(spec.RefSchema(name)).WithDescription(doc)).
+		SetProperty("items", *spec.ArrayProperty(spec.RefSchema(refForOpenAPIVersion(name, v2))).WithDescription(doc)).
 		SetProperty("metadata", *spec.RefSchema(refForOpenAPIVersion(listMetaSchemaRef, v2)).WithDescription(swaggerPartialObjectMetadataListDescriptions["metadata"]))
 
 	addTypeMetaProperties(s, v2)
