@@ -66,6 +66,10 @@ type Interface interface {
 	ProviderName() string
 	// HasClusterID returns true if a ClusterID is required and set
 	HasClusterID() bool
+	// WantsLoadBalancer return true if a loadbalancer is requested by service and cloud provider implementation can handle it.
+	// Cloudprovider should handle the sevice object if service object meets the prerequisites of cloud provider
+	// e.g service.Spec.LoadBalancerClass falls into the list of allowed loadbalancerclasses.
+	WantsLoadBalancer(svc v1.Service) bool
 }
 
 type InformerUser interface {

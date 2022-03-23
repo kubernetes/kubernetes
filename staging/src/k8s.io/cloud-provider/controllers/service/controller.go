@@ -142,7 +142,7 @@ func New(
 				svc, ok := cur.(*v1.Service)
 				// Check cleanup here can provide a remedy when controller failed to handle
 				// changes before it exiting (e.g. crashing, restart, etc.).
-				if ok && (wantsLoadBalancer(svc) || needsCleanup(svc)) {
+				if ok && (s.wantsLoadBalancer(svc) || needsCleanup(svc)) {
 					s.enqueueService(cur)
 				}
 			},
@@ -376,7 +376,7 @@ func (s *Controller) syncLoadBalancerIfNeeded(ctx context.Context, service *v1.S
 	var op loadBalancerOperation
 	var err error
 
-	if !wantsLoadBalancer(service) || needsCleanup(service) {
+	if !s.wantsLoadBalancer(service) || needsCleanup(service) {
 		// Delete the load balancer if service no longer wants one, or if service needs cleanup.
 		op = deleteLoadBalancer
 		newStatus = &v1.LoadBalancerStatus{}
@@ -539,16 +539,19 @@ func needsCleanup(service *v1.Service) bool {
 
 // needsUpdate checks if load balancer needs to be updated due to change in attributes.
 func (s *Controller) needsUpdate(oldService *v1.Service, newService *v1.Service) bool {
-	if !wantsLoadBalancer(oldService) && !wantsLoadBalancer(newService) {
+	if oldService.Spec.Type != v1.ServiceTypeLoadBalancer && newService.Spec.Type != v1.ServiceTypeLoadBalancer {
 		return false
 	}
-	if wantsLoadBalancer(oldService) != wantsLoadBalancer(newService) {
+	if !s.wantsLoadBalancer(oldService) && !s.wantsLoadBalancer(newService) {
+		return false
+	}
+	if s.wantsLoadBalancer(oldService) != s.wantsLoadBalancer(newService) {
 		s.eventRecorder.Eventf(newService, v1.EventTypeNormal, "Type", "%v -> %v",
 			oldService.Spec.Type, newService.Spec.Type)
 		return true
 	}
 
-	if wantsLoadBalancer(newService) && !reflect.DeepEqual(oldService.Spec.LoadBalancerSourceRanges, newService.Spec.LoadBalancerSourceRanges) {
+	if s.wantsLoadBalancer(newService) && !reflect.DeepEqual(oldService.Spec.LoadBalancerSourceRanges, newService.Spec.LoadBalancerSourceRanges) {
 		s.eventRecorder.Eventf(newService, v1.EventTypeNormal, "LoadBalancerSourceRanges", "%v -> %v",
 			oldService.Spec.LoadBalancerSourceRanges, newService.Spec.LoadBalancerSourceRanges)
 		return true
@@ -751,7 +754,7 @@ func (s *Controller) nodeSyncInternal(ctx context.Context, workers int) {
 
 // nodeSyncService syncs the nodes for one load balancer type service
 func (s *Controller) nodeSyncService(svc *v1.Service) bool {
-	if svc == nil || !wantsLoadBalancer(svc) {
+	if svc == nil || !s.wantsLoadBalancer(svc) {
 		return false
 	}
 	klog.V(4).Infof("nodeSyncService started for service %s/%s", svc.Namespace, svc.Name)
@@ -830,9 +833,11 @@ func (s *Controller) lockedUpdateLoadBalancerHosts(service *v1.Service, hosts []
 	return err
 }
 
-func wantsLoadBalancer(service *v1.Service) bool {
-	// if LoadBalancerClass is set, the user does not want the default cloud-provider Load Balancer
-	return service.Spec.Type == v1.ServiceTypeLoadBalancer && service.Spec.LoadBalancerClass == nil
+func (s *Controller) wantsLoadBalancer(service *v1.Service) bool {
+	if service.Spec.Type == v1.ServiceTypeLoadBalancer {
+		return s.cloud.WantsLoadBalancer(*service)
+	}
+	return false
 }
 
 func loadBalancerIPsAreEqual(oldService, newService *v1.Service) bool {
@@ -887,7 +892,7 @@ func (s *Controller) processServiceDeletion(ctx context.Context, key string) err
 
 func (s *Controller) processLoadBalancerDelete(ctx context.Context, service *v1.Service, key string) error {
 	// delete load balancer info only if the service type is LoadBalancer
-	if !wantsLoadBalancer(service) {
+	if !s.wantsLoadBalancer(service) {
 		return nil
 	}
 	s.eventRecorder.Event(service, v1.EventTypeNormal, "DeletingLoadBalancer", "Deleting load balancer")
