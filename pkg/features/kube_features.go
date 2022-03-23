@@ -557,7 +557,7 @@ const (
 
 	// owner: @wzshiming
 	// alpha: v1.23
-	//
+	// beta:  v1.24
 	// Make the kubelet use shutdown configuration based on pod priority values for graceful shutdown.
 	GracefulNodeShutdownBasedOnPodPriority featuregate.Feature = "GracefulNodeShutdownBasedOnPodPriority"
 
@@ -917,7 +917,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ExecProbeTimeout:                               {Default: true, PreRelease: featuregate.GA}, // lock to default and remove after v1.22 based on KEP #1972 update
 	KubeletCredentialProviders:                     {Default: false, PreRelease: featuregate.Alpha},
 	GracefulNodeShutdown:                           {Default: true, PreRelease: featuregate.Beta},
-	GracefulNodeShutdownBasedOnPodPriority:         {Default: false, PreRelease: featuregate.Alpha},
+	GracefulNodeShutdownBasedOnPodPriority:         {Default: true, PreRelease: featuregate.Beta},
 	ServiceLBNodePortControl:                       {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
 	MixedProtocolLBService:                         {Default: false, PreRelease: featuregate.Alpha},
 	VolumeCapacityPriority:                         {Default: false, PreRelease: featuregate.Alpha},

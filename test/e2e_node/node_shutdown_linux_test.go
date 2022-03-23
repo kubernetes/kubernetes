@@ -408,6 +408,11 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 					return nil
 				}, podStatusUpdateTimeout, pollInterval).Should(gomega.BeNil())
 			}
+
+			ginkgo.By("should have state file")
+			stateFile := "/var/lib/kubelet/graceful_node_shutdown_state"
+			_, err = os.Stat(stateFile)
+			framework.ExpectNoError(err)
 		})
 	})
 })

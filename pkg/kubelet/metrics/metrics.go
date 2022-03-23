@@ -462,6 +462,26 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
+
+	// GracefulShutdownStartTime is a gauge that records the time at which the kubelet started graceful shutdown.
+	GracefulShutdownStartTime = metrics.NewGauge(
+		&metrics.GaugeOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           "graceful_shutdown_start_time_seconds",
+			Help:           "Last graceful shutdown start time since unix epoch in seconds",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
+	// GracefulShutdownEndTime is a gauge that records the time at which the kubelet completed graceful shutdown.
+	GracefulShutdownEndTime = metrics.NewGauge(
+		&metrics.GaugeOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           "graceful_shutdown_end_time_seconds",
+			Help:           "Last graceful shutdown start time since unix epoch in seconds",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
 )
 
 var registerMetrics sync.Once
@@ -504,6 +524,13 @@ func Register(collectors ...metrics.StableCollector) {
 		for _, collector := range collectors {
 			legacyregistry.CustomMustRegister(collector)
 		}
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.GracefulNodeShutdown) &&
+			utilfeature.DefaultFeatureGate.Enabled(features.GracefulNodeShutdownBasedOnPodPriority) {
+			legacyregistry.MustRegister(GracefulShutdownStartTime)
+			legacyregistry.MustRegister(GracefulShutdownEndTime)
+		}
+
 	})
 }
 
