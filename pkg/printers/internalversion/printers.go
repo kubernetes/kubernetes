@@ -27,6 +27,7 @@ import (
 
 	apiserverinternalv1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
+	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2beta1 "k8s.io/api/autoscaling/v2beta1"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
@@ -582,6 +583,13 @@ func AddHandlers(h printers.PrintHandler) {
 	}
 	h.TableHandler(storageVersionColumnDefinitions, printStorageVersion)
 	h.TableHandler(storageVersionColumnDefinitions, printStorageVersionList)
+
+	scaleColumnDefinitions := []metav1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Desired", Type: "integer", Description: autoscalingv1.ScaleSpec{}.SwaggerDoc()["replicas"]},
+		{Name: "Available", Type: "integer", Description: autoscalingv1.ScaleStatus{}.SwaggerDoc()["replicas"]},
+	}
+	h.TableHandler(scaleColumnDefinitions, printScale)
 }
 
 // Pass ports=nil for all ports.
@@ -2613,6 +2621,14 @@ func printPriorityLevelConfigurationList(list *flowcontrol.PriorityLevelConfigur
 		rows = append(rows, r...)
 	}
 	return rows, nil
+}
+
+func printScale(obj *autoscaling.Scale, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	row := metav1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+	row.Cells = append(row.Cells, obj.Name, obj.Spec.Replicas, obj.Status.Replicas)
+	return []metav1.TableRow{row}, nil
 }
 
 func printBoolPtr(value *bool) string {
