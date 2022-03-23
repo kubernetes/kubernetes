@@ -328,12 +328,16 @@ kube::test::if_has_string() {
   local match=$2
 
   if grep -q "${match}" <<< "${message}"; then
+    echo -n "${green}"
     echo "Successful"
+    echo -n "${reset}"
     echo "message:${message}"
     echo "has:${match}"
     return 0
   else
+    echo -n "${bold}${red}"
     echo "FAIL!"
+    echo -n "${reset}"
     echo "message:${message}"
     echo "has not:${match}"
     caller
@@ -346,13 +350,17 @@ kube::test::if_has_not_string() {
   local match=$2
 
   if grep -q "${match}" <<< "${message}"; then
+    echo -n "${bold}${red}"
     echo "FAIL!"
+    echo -n "${reset}"
     echo "message:${message}"
     echo "has:${match}"
     caller
     return 1
   else
+    echo -n "${green}"
     echo "Successful"
+    echo -n "${reset}"
     echo "message:${message}"
     echo "has not:${match}"
     return 0
@@ -362,11 +370,16 @@ kube::test::if_has_not_string() {
 kube::test::if_empty_string() {
   local match=$1
   if [ -n "${match}" ]; then
+    echo -n "${bold}${red}"
+    echo "FAIL!"
     echo "${match} is not empty"
+    echo -n "${reset}"
     caller
     return 1
   else
+    echo -n "${green}"
     echo "Successful"
+    echo -n "${reset}"
     return 0
   fi
 }
