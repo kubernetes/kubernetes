@@ -52,6 +52,7 @@ var (
 const (
 	// ExpressionCostLimit represents the largest-allowed CEL cost on a per-expression basis.
 	ExpressionCostLimit = 10000000
+	CRDCostLimit        = 100000000
 )
 
 // ValidateCustomResourceDefinition statically validates
@@ -719,8 +720,15 @@ func validateCustomResourceDefinitionValidation(ctx context.Context, customResou
 			disallowDefaultsReason:   opts.disallowDefaultsReason,
 			requireValidPropertyType: opts.requireValidPropertyType,
 		}
+		costInfo := rootCostInfo()
 
-		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema, fldPath.Child("openAPIV3Schema"), openAPIV3Schema, true, &opts, rootCostInfo())...)
+		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema, fldPath.Child("openAPIV3Schema"), openAPIV3Schema, true, &opts, costInfo)...)
+
+		if costInfo.CRDCost.TotalCost > CRDCostLimit {
+			mostExpensive := costInfo.CRDCost.MostExpensiveRule
+			costErrorMsg := fmt.Sprintf("CEL rule cost of %d is primary contributor to total cost for all rules of %d exceeding limit of %d", mostExpensive.Cost, costInfo.CRDCost.TotalCost, CRDCostLimit)
+			allErrs = append(allErrs, field.Forbidden(mostExpensive.Path, costErrorMsg))
+		}
 
 		if opts.requireStructuralSchema {
 			if ss, err := structuralschema.NewStructural(schema); err != nil {
@@ -752,24 +760,51 @@ type costInfo struct {
 	// MaxCardinality tracks the largest number of times a rule in the current schema node could possibly get executed
 	// due to being the child of arrays/maps/etc.
 	MaxCardinality *uint64
+
+	// CRDCost tracks the Custom Resource Definition wide CEL cost.
+	CRDCost *crdCost
+}
+
+type crdCost struct {
+	// TotalCost tracks how much of the Custom Resource Definition wide CEL cost budget remains.
+	TotalCost uint64
+
+	// MostExpensiveRule identifies the most expensive rule observed while
+	MostExpensiveRule *expensiveRule // TODO: use a heap instead to track >1 extensive rules
+}
+
+func (c crdCost) observeRuleCost(path *field.Path, cost uint64) {
+	if math.MaxUint64-c.TotalCost < cost {
+		c.TotalCost = math.MaxUint64
+	} else {
+		c.TotalCost += cost
+	}
+	if c.MostExpensiveRule == nil || c.MostExpensiveRule.Cost < cost {
+		c.MostExpensiveRule = &expensiveRule{Path: path, Cost: cost}
+	}
+}
+
+type expensiveRule struct {
+	Path *field.Path
+	Cost uint64
 }
 
 func (c *costInfo) MultiplyByElementCost(schema *apiextensions.JSONSchemaProps) costInfo {
+	result := costInfo{CRDCost: c.CRDCost}
 	if schema == nil {
 		// nil schemas can be passed since we call MultiplyByElementCost
 		// before ValidateCustomResourceDefinitionOpenAPISchema performs its nil check
-		return costInfo{}
+		return result
 	}
 	if c.MaxCardinality == nil {
-		return costInfo{}
+		return result
 	}
 	maxElements := extractMaxElements(schema)
 	if maxElements == nil {
-		return costInfo{}
+		return result
 	}
-	return costInfo{
-		MaxCardinality: uint64ptr(multiplyWithOverflowGuard(*c.MaxCardinality, *maxElements)),
-	}
+	result.MaxCardinality = uint64ptr(multiplyWithOverflowGuard(*c.MaxCardinality, *maxElements))
+	return result
 }
 
 func uint64ptr(i uint64) *uint64 {
@@ -780,6 +815,7 @@ func rootCostInfo() costInfo {
 	rootCardinality := uint64(1)
 	return costInfo{
 		MaxCardinality: &rootCardinality,
+		CRDCost:        &crdCost{},
 	}
 }
 
@@ -1005,6 +1041,7 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 						costErrorMsg := fmt.Sprintf("CEL rule of cost %d exceeded budget of %d by factor of %vx", uint64(expressionCost), ExpressionCostLimit, exceedFactor)
 						allErrs = append(allErrs, field.Forbidden(fldPath.Child("x-kubernetes-validations").Index(i).Child("rule"), costErrorMsg))
 					}
+					nodeCostInfo.CRDCost.observeRuleCost(fldPath.Child("x-kubernetes-validations").Index(i).Child("rule"), expressionCost)
 					if cr.Error != nil {
 						if cr.Error.Type == cel.ErrorTypeRequired {
 							allErrs = append(allErrs, field.Required(fldPath.Child("x-kubernetes-validations").Index(i).Child("rule"), cr.Error.Detail))
