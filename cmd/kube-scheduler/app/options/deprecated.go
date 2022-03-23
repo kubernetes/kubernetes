@@ -33,7 +33,7 @@ type DeprecatedOptions struct {
 	// PodMaxUnschedulableQDuration is the maximum time a pod can stay in
 	// unschedulableQ. If a pod stays in unschedulableQ for longer than this
 	// value, the pod will be moved from unschedulableQ to backoffQ or activeQ.
-	// If this value is empty, the default value (60s) will be used.
+	// If this value is empty, the default value (5min) will be used.
 	PodMaxUnschedulableQDuration time.Duration
 }
 
