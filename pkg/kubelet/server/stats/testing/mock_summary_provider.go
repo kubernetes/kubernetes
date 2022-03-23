@@ -21,35 +21,36 @@ limitations under the License.
 package testing
 
 import (
+	reflect "reflect"
+
 	gomock "github.com/golang/mock/gomock"
 	v1alpha1 "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
-	reflect "reflect"
 )
 
-// MockSummaryProvider is a mock of SummaryProvider interface
+// MockSummaryProvider is a mock of SummaryProvider interface.
 type MockSummaryProvider struct {
 	ctrl     *gomock.Controller
 	recorder *MockSummaryProviderMockRecorder
 }
 
-// MockSummaryProviderMockRecorder is the mock recorder for MockSummaryProvider
+// MockSummaryProviderMockRecorder is the mock recorder for MockSummaryProvider.
 type MockSummaryProviderMockRecorder struct {
 	mock *MockSummaryProvider
 }
 
-// NewMockSummaryProvider creates a new mock instance
+// NewMockSummaryProvider creates a new mock instance.
 func NewMockSummaryProvider(ctrl *gomock.Controller) *MockSummaryProvider {
 	mock := &MockSummaryProvider{ctrl: ctrl}
 	mock.recorder = &MockSummaryProviderMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use
+// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockSummaryProvider) EXPECT() *MockSummaryProviderMockRecorder {
 	return m.recorder
 }
 
-// Get mocks base method
+// Get mocks base method.
 func (m *MockSummaryProvider) Get(updateStats bool) (*v1alpha1.Summary, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Get", updateStats)
@@ -58,13 +59,13 @@ func (m *MockSummaryProvider) Get(updateStats bool) (*v1alpha1.Summary, error) {
 	return ret0, ret1
 }
 
-// Get indicates an expected call of Get
+// Get indicates an expected call of Get.
 func (mr *MockSummaryProviderMockRecorder) Get(updateStats interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockSummaryProvider)(nil).Get), updateStats)
 }
 
-// GetCPUAndMemoryStats mocks base method
+// GetCPUAndMemoryStats mocks base method.
 func (m *MockSummaryProvider) GetCPUAndMemoryStats() (*v1alpha1.Summary, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetCPUAndMemoryStats")
@@ -73,7 +74,7 @@ func (m *MockSummaryProvider) GetCPUAndMemoryStats() (*v1alpha1.Summary, error) 
 	return ret0, ret1
 }
 
-// GetCPUAndMemoryStats indicates an expected call of GetCPUAndMemoryStats
+// GetCPUAndMemoryStats indicates an expected call of GetCPUAndMemoryStats.
 func (mr *MockSummaryProviderMockRecorder) GetCPUAndMemoryStats() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCPUAndMemoryStats", reflect.TypeOf((*MockSummaryProvider)(nil).GetCPUAndMemoryStats))
