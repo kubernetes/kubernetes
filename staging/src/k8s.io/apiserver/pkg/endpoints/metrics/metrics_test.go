@@ -19,10 +19,13 @@ package metrics
 import (
 	"net/http"
 	"net/url"
+	"strings"
 	"testing"
 
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/endpoints/responsewriter"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 )
 
 func TestCleanVerb(t *testing.T) {
@@ -209,5 +212,116 @@ func TestResponseWriterDecorator(t *testing.T) {
 
 	if inner := w.(responsewriter.UserProvidedDecorator).Unwrap(); inner != decorator.ResponseWriter {
 		t.Errorf("Expected the decorator to return the inner http.ResponseWriter object")
+	}
+}
+
+func TestRecordDroppedRequests(t *testing.T) {
+	testedMetrics := []string{
+		"apiserver_request_total",
+		"apiserver_dropped_requests_total",
+	}
+
+	testCases := []struct {
+		desc        string
+		request     *http.Request
+		requestInfo *request.RequestInfo
+		isMutating  bool
+		want        string
+	}{
+		{
+			desc: "list pods",
+			request: &http.Request{
+				Method: "GET",
+				URL: &url.URL{
+					RawPath: "/api/v1/pods",
+				},
+			},
+			requestInfo: &request.RequestInfo{
+				APIGroup:          "",
+				APIVersion:        "v1",
+				Resource:          "pods",
+				IsResourceRequest: true,
+			},
+			isMutating: false,
+			want: `
+			            # HELP apiserver_dropped_requests_total [ALPHA] Number of requests dropped with 'Try again later' response
+			            # TYPE apiserver_dropped_requests_total counter
+			            apiserver_dropped_requests_total{request_kind="readOnly"} 1
+			            # HELP apiserver_request_total [STABLE] Counter of apiserver requests broken out for each verb, dry run value, group, version, resource, scope, component, and HTTP response code.
+			            # TYPE apiserver_request_total counter
+			            apiserver_request_total{code="429",component="apiserver",dry_run="",group="",resource="pods",scope="cluster",subresource="",verb="LIST",version="v1"} 1
+				`,
+		},
+		{
+			desc: "post pods",
+			request: &http.Request{
+				Method: "POST",
+				URL: &url.URL{
+					RawPath: "/api/v1/namespaces/foo/pods",
+				},
+			},
+			requestInfo: &request.RequestInfo{
+				APIGroup:          "",
+				APIVersion:        "v1",
+				Resource:          "pods",
+				IsResourceRequest: true,
+			},
+			isMutating: true,
+			want: `
+			            # HELP apiserver_dropped_requests_total [ALPHA] Number of requests dropped with 'Try again later' response
+			            # TYPE apiserver_dropped_requests_total counter
+			            apiserver_dropped_requests_total{request_kind="mutating"} 1
+			            # HELP apiserver_request_total [STABLE] Counter of apiserver requests broken out for each verb, dry run value, group, version, resource, scope, component, and HTTP response code.
+			            # TYPE apiserver_request_total counter
+			            apiserver_request_total{code="429",component="apiserver",dry_run="",group="",resource="pods",scope="cluster",subresource="",verb="POST",version="v1"} 1
+				`,
+		},
+		{
+			desc: "dry-run patch job status",
+			request: &http.Request{
+				Method: "PATCH",
+				URL: &url.URL{
+					RawPath:  "/apis/batch/v1/namespaces/foo/pods/status",
+					RawQuery: "dryRun=All",
+				},
+			},
+			requestInfo: &request.RequestInfo{
+				APIGroup:          "batch",
+				APIVersion:        "v1",
+				Resource:          "jobs",
+				Subresource:       "status",
+				IsResourceRequest: true,
+			},
+			isMutating: true,
+			want: `
+			            # HELP apiserver_dropped_requests_total [ALPHA] Number of requests dropped with 'Try again later' response
+			            # TYPE apiserver_dropped_requests_total counter
+			            apiserver_dropped_requests_total{request_kind="mutating"} 1
+			            # HELP apiserver_request_total [STABLE] Counter of apiserver requests broken out for each verb, dry run value, group, version, resource, scope, component, and HTTP response code.
+			            # TYPE apiserver_request_total counter
+			            apiserver_request_total{code="429",component="apiserver",dry_run="All",group="batch",resource="jobs",scope="cluster",subresource="status",verb="PATCH",version="v1"} 1
+				`,
+		},
+	}
+
+	// Since prometheus' gatherer is global, other tests may have updated metrics already, so
+	// we need to reset them prior running this test.
+	// This also implies that we can't run this test in parallel with other tests.
+	Register()
+	requestCounter.Reset()
+	droppedRequests.Reset()
+
+	for _, test := range testCases {
+		t.Run(test.desc, func(t *testing.T) {
+			defer requestCounter.Reset()
+			defer droppedRequests.Reset()
+
+			RecordDroppedRequest(test.request, test.requestInfo, APIServerComponent, test.isMutating)
+
+			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(test.want), testedMetrics...); err != nil {
+				t.Fatal(err)
+			}
+
+		})
 	}
 }
