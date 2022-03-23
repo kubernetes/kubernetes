@@ -673,7 +673,7 @@ func createPDWithRetry(zone string) (string, error) {
 	return "", err
 }
 
-func CreateShare() (string, string, error) {
+func CreateShare() (string, string, string, error) {
 	return framework.TestContext.CloudConfig.Provider.CreateShare()
 }
 

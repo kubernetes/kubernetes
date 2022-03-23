@@ -86,7 +86,7 @@ func (p *Provider) CreatePD(zone string) (string, error) {
 }
 
 // CreateShare creates a share and return its account name and key.
-func (p *Provider) CreateShare() (string, string, error) {
+func (p *Provider) CreateShare() (string, string, string, error) {
 	accountOptions := &azure.AccountOptions{
 		Name:                      "",
 		Type:                      string(compute.StandardLRS),
@@ -102,13 +102,16 @@ func (p *Provider) CreateShare() (string, string, error) {
 		RequestGiB: 1,
 	}
 
-	a, b, c := p.azureCloud.CreateFileShare(accountOptions, shareOptions)
+	accountName, accountKey, err := p.azureCloud.CreateFileShare(accountOptions, shareOptions)
+	if err != nil {
+		return "", "", "", err
+	}
 
-	return a, b, c
+	return accountName, accountKey, shareOptions.Name, nil
 }
 
 func (p *Provider) DeleteShare(accountName, shareName string) error {
-	err := p.azureCloud.DeleteFileShare("", accountName, shareName)
+	err := p.azureCloud.DeleteFileShare(p.azureCloud.ResourceGroup, accountName, shareName)
 	if err != nil {
 		framework.Logf("failed to delete Azure File share %q: %v", shareName, err)
 	}

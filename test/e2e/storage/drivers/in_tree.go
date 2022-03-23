@@ -2032,9 +2032,10 @@ type azureFileDriver struct {
 }
 
 type azureFileVolume struct {
-	accountName string
-	shareName   string
-	secretName  string
+	accountName     string
+	shareName       string
+	secretName      string
+	secretNamespace string
 }
 
 var _ storageframework.TestDriver = &azureFileDriver{}
@@ -2096,7 +2097,7 @@ func (a *azureFileDriver) GetPersistentVolumeSource(readOnly bool, fsType string
 		AzureFile: &v1.AzureFilePersistentVolumeSource{
 			SecretName:      av.secretName,
 			ShareName:       av.shareName,
-			SecretNamespace: nil,
+			SecretNamespace: &av.secretNamespace,
 			ReadOnly:        readOnly,
 		},
 	}
@@ -2121,12 +2122,30 @@ func (a *azureFileDriver) PrepareTest(f *framework.Framework) (*storageframework
 
 func (a *azureFileDriver) CreateVolume(config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
 	ginkgo.By("creating a test azure file volume")
-	accountName, shareName, err := e2epv.CreateShare()
+	accountName, accountKey, shareName, err := e2epv.CreateShare()
+	framework.ExpectNoError(err)
+
+	secretName := "azure-storage-account-" + accountName + "-secret"
+	secret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: config.Framework.Namespace.Name,
+			Name:      secretName,
+		},
+
+		Data: map[string][]byte{
+			"azurestorageaccountname": []byte(accountName),
+			"azurestorageaccountkey":  []byte(accountKey),
+		},
+		Type: "Opaque",
+	}
+
+	_, err = config.Framework.ClientSet.CoreV1().Secrets(config.Framework.Namespace.Name).Create(context.TODO(), secret, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 	return &azureFileVolume{
-		accountName: accountName,
-		shareName:   shareName,
-		secretName:  "",
+		accountName:     accountName,
+		shareName:       shareName,
+		secretName:      secretName,
+		secretNamespace: config.Framework.Namespace.Name,
 	}
 }
 

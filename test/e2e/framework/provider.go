@@ -97,7 +97,7 @@ type ProviderInterface interface {
 
 	CreatePD(zone string) (string, error)
 	DeletePD(pdName string) error
-	CreateShare() (string, string, error)
+	CreateShare() (string, string, string, error)
 	DeleteShare(accountName, shareName string) error
 
 	CreatePVSource(zone, diskName string) (*v1.PersistentVolumeSource, error)
@@ -140,8 +140,8 @@ func (n NullProvider) DeleteNode(node *v1.Node) error {
 	return fmt.Errorf("provider does not support DeleteNode")
 }
 
-func (n NullProvider) CreateShare() (string, string, error) {
-	return "", "", fmt.Errorf("provider does not support volume creation")
+func (n NullProvider) CreateShare() (string, string, string, error) {
+	return "", "", "", fmt.Errorf("provider does not support volume creation")
 }
 
 func (n NullProvider) DeleteShare(accountName, shareName string) error {
