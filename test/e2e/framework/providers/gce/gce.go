@@ -225,8 +225,8 @@ func (p *Provider) DeleteNode(node *v1.Node) error {
 	return p.gceCloud.DeleteInstance(project, zone, node.Name)
 }
 
-func (p *Provider) CreateShare() (string, string, error) {
-	return "", "", nil
+func (p *Provider) CreateShare() (string, string, string, error) {
+	return "", "", "", nil
 }
 
 func (p *Provider) DeleteShare(accountName, shareName string) error {

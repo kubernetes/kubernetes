@@ -93,8 +93,8 @@ func (p *Provider) DeleteNode(node *v1.Node) error {
 	return err
 }
 
-func (p *Provider) CreateShare() (string, string, error) {
-	return "", "", nil
+func (p *Provider) CreateShare() (string, string, string, error) {
+	return "", "", "", nil
 }
 
 func (p *Provider) DeleteShare(accountName, shareName string) error {
