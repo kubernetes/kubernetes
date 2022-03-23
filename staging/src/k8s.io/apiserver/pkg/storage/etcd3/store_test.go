@@ -1206,6 +1206,7 @@ func TestList(t *testing.T) {
 		expectError                bool
 		expectRVTooLarge           bool
 		expectRV                   string
+		expectRVFunc               func(string) error
 	}{
 		{
 			name:        "rejects invalid resource version",
@@ -1378,7 +1379,7 @@ func TestList(t *testing.T) {
 			expectContinue:             true,
 			expectedRemainingItemCount: utilpointer.Int64Ptr(1),
 			rv:                         "0",
-			expectRV:                   list.ResourceVersion,
+			expectRVFunc:               resourceVersionNotOlderThan(list.ResourceVersion),
 		},
 		{
 			name:   "test List with limit at resource version 0 match=NotOlderThan",
@@ -1393,7 +1394,7 @@ func TestList(t *testing.T) {
 			expectedRemainingItemCount: utilpointer.Int64Ptr(1),
 			rv:                         "0",
 			rvMatch:                    metav1.ResourceVersionMatchNotOlderThan,
-			expectRV:                   list.ResourceVersion,
+			expectRVFunc:               resourceVersionNotOlderThan(list.ResourceVersion),
 		},
 		{
 			name:   "test List with limit at resource version before first write and match=Exact",
@@ -1603,6 +1604,11 @@ func TestList(t *testing.T) {
 			if tt.expectRV != "" {
 				if tt.expectRV != out.ResourceVersion {
 					t.Errorf("resourceVersion in list response want=%s, got=%s", tt.expectRV, out.ResourceVersion)
+				}
+			}
+			if tt.expectRVFunc != nil {
+				if err := tt.expectRVFunc(out.ResourceVersion); err != nil {
+					t.Errorf("resourceVersion in list response invalid: %v", err)
 				}
 			}
 			if len(tt.expectedOut) != len(out.Items) {
@@ -2087,11 +2093,13 @@ func TestListInconsistentContinuation(t *testing.T) {
 	if len(out.Continue) == 0 {
 		t.Fatalf("No continuation token set")
 	}
+	validateResourceVersion := resourceVersionNotOlderThan(lastRVString)
 	expectNoDiff(t, "incorrect second page", []example.Pod{*preset[1].storedObj}, out.Items)
-	if out.ResourceVersion != lastRVString {
-		t.Fatalf("Expected list resource version to be %s, got %s", lastRVString, out.ResourceVersion)
+	if err := validateResourceVersion(out.ResourceVersion); err != nil {
+		t.Fatal(err)
 	}
 	continueFromThirdItem := out.Continue
+	resolvedResourceVersionFromThirdItem := out.ResourceVersion
 	out = &example.PodList{}
 	options = storage.ListOptions{
 		ResourceVersion: "0",
@@ -2105,8 +2113,8 @@ func TestListInconsistentContinuation(t *testing.T) {
 		t.Fatalf("Unexpected continuation token set")
 	}
 	expectNoDiff(t, "incorrect third page", []example.Pod{*preset[2].storedObj}, out.Items)
-	if out.ResourceVersion != lastRVString {
-		t.Fatalf("Expected list resource version to be %s, got %s", lastRVString, out.ResourceVersion)
+	if out.ResourceVersion != resolvedResourceVersionFromThirdItem {
+		t.Fatalf("Expected list resource version to be %s, got %s", resolvedResourceVersionFromThirdItem, out.ResourceVersion)
 	}
 }
 
