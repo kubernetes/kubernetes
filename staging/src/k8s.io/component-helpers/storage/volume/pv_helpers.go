@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package persistentvolume
+package volume
 
 import (
 	"fmt"
@@ -28,8 +28,6 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/client-go/tools/reference"
-	storagehelpers "k8s.io/component-helpers/storage/volume"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 const (
@@ -95,7 +93,7 @@ func IsDelayBindingProvisioning(claim *v1.PersistentVolumeClaim) bool {
 
 // IsDelayBindingMode checks if claim is in delay binding mode.
 func IsDelayBindingMode(claim *v1.PersistentVolumeClaim, classLister storagelisters.StorageClassLister) (bool, error) {
-	className := storagehelpers.GetPersistentVolumeClaimClass(claim)
+	className := GetPersistentVolumeClaimClass(claim)
 	if className == "" {
 		return false, nil
 	}
@@ -194,7 +192,7 @@ func FindMatchingVolume(
 	var smallestVolume *v1.PersistentVolume
 	var smallestVolumeQty resource.Quantity
 	requestedQty := claim.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
-	requestedClass := storagehelpers.GetPersistentVolumeClaimClass(claim)
+	requestedClass := GetPersistentVolumeClaimClass(claim)
 
 	var selector labels.Selector
 	if claim.Spec.Selector != nil {
@@ -238,9 +236,9 @@ func FindMatchingVolume(
 		if node != nil {
 			// Scheduler path, check that the PV NodeAffinity
 			// is satisfied by the node
-			// volumeutil.CheckNodeAffinity is the most expensive call in this loop.
+			// CheckNodeAffinity is the most expensive call in this loop.
 			// We should check cheaper conditions first or consider optimizing this function.
-			err := volumeutil.CheckNodeAffinity(volume, node.Labels)
+			err := CheckNodeAffinity(volume, node.Labels)
 			if err != nil {
 				nodeAffinityValid = false
 			}
@@ -278,7 +276,7 @@ func FindMatchingVolume(
 		} else if selector != nil && !selector.Matches(labels.Set(volume.Labels)) {
 			continue
 		}
-		if storagehelpers.GetPersistentVolumeClass(volume) != requestedClass {
+		if GetPersistentVolumeClass(volume) != requestedClass {
 			continue
 		}
 		if !nodeAffinityValid {
@@ -341,23 +339,4 @@ func CheckAccessModes(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolu
 
 func claimToClaimKey(claim *v1.PersistentVolumeClaim) string {
 	return fmt.Sprintf("%s/%s", claim.Namespace, claim.Name)
-}
-
-// GetVolumeNodeAffinity returns a VolumeNodeAffinity for given key and value.
-func GetVolumeNodeAffinity(key string, value string) *v1.VolumeNodeAffinity {
-	return &v1.VolumeNodeAffinity{
-		Required: &v1.NodeSelector{
-			NodeSelectorTerms: []v1.NodeSelectorTerm{
-				{
-					MatchExpressions: []v1.NodeSelectorRequirement{
-						{
-							Key:      key,
-							Operator: v1.NodeSelectorOpIn,
-							Values:   []string{value},
-						},
-					},
-				},
-			},
-		},
-	}
 }
