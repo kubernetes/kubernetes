@@ -496,9 +496,6 @@ EOF
 # ${PATH}. It will also check that the Go version is good enough for the
 # Kubernetes build.
 #
-# Inputs:
-#   KUBE_EXTRA_GOPATH - If set, this is included in created GOPATH
-#
 # Outputs:
 #   env-var GOPATH points to our local output dir
 #   env-var GOBIN is unset (we want binaries in a predictable place)
@@ -511,11 +508,6 @@ kube::golang::setup_env() {
 
   export GOPATH="${KUBE_GOPATH}"
   export GOCACHE="${KUBE_GOPATH}/cache"
-
-  # Append KUBE_EXTRA_GOPATH to the GOPATH if it is defined.
-  if [[ -n ${KUBE_EXTRA_GOPATH:-} ]]; then
-    GOPATH="${GOPATH}:${KUBE_EXTRA_GOPATH}"
-  fi
 
   # Make sure our own Go binaries are in PATH.
   export PATH="${KUBE_GOPATH}/bin:${PATH}"
