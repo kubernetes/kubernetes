@@ -1784,6 +1784,67 @@ func TestListContinuation(t *testing.T) {
 	recorder.resetReads()
 }
 
+func TestListPaginationRareObject(t *testing.T) {
+	etcdClient := testserver.RunEtcd(t, nil)
+	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
+	transformer := &prefixTransformer{prefix: []byte(defaultTestPrefix)}
+	recorder := &clientRecorder{KV: etcdClient.KV}
+	etcdClient.KV = recorder
+	store := newStore(etcdClient, codec, newPod, "", schema.GroupResource{Resource: "pods"}, transformer, true, NewDefaultLeaseManagerConfig())
+	ctx := context.Background()
+
+	podCount := 1000
+	var pods []*example.Pod
+	for i := 0; i < podCount; i++ {
+		key := fmt.Sprintf("/one-level/pod-%d", i)
+		obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("pod-%d", i)}}
+		storedObj := &example.Pod{}
+		err := store.Create(ctx, key, obj, storedObj, 0)
+		if err != nil {
+			t.Fatalf("Set failed: %v", err)
+		}
+		pods = append(pods, storedObj)
+	}
+
+	out := &example.PodList{}
+	options := storage.ListOptions{
+		Predicate: storage.SelectionPredicate{
+			Limit: 1,
+			Label: labels.Everything(),
+			Field: fields.OneTermEqualSelector("metadata.name", "pod-999"),
+			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+				pod := obj.(*example.Pod)
+				return nil, fields.Set{"metadata.name": pod.Name}, nil
+			},
+		},
+		Recursive: true,
+	}
+	if err := store.GetList(ctx, "/", options, out); err != nil {
+		t.Fatalf("Unable to get initial list: %v", err)
+	}
+	if len(out.Continue) != 0 {
+		t.Errorf("Unexpected continuation token set")
+	}
+	if len(out.Items) != 1 || !reflect.DeepEqual(&out.Items[0], pods[999]) {
+		t.Fatalf("Unexpected first page: %#v", out.Items)
+	}
+	if transformer.reads != uint64(podCount) {
+		t.Errorf("unexpected reads: %d", transformer.reads)
+	}
+	// We expect that kube-apiserver will be increasing page sizes
+	// if not full pages are received, so we should see significantly less
+	// than 1000 pages (which would be result of talking to etcd with page size
+	// copied from pred.Limit).
+	// The expected number of calls is n+1 where n is the smallest n so that:
+	// pageSize + pageSize * 2 + pageSize * 4 + ... + pageSize * 2^n >= podCount.
+	// For pageSize = 1, podCount = 1000, we get n+1 = 10, 2 ^ 10 = 1024.
+	if recorder.reads != 10 {
+		t.Errorf("unexpected reads: %d", recorder.reads)
+	}
+	transformer.resetReads()
+	recorder.resetReads()
+}
+
 type clientRecorder struct {
 	reads uint64
 	clientv3.KV
