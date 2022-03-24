@@ -1,3 +1,4 @@
+//go:build !windows
 // +build !windows
 
 /*
@@ -67,9 +68,12 @@ var DefaultSysSpec = SysSpec{
 		// The hugetlb cgroup is optional since some kernels are compiled without support for huge pages
 		// and therefore lacks corresponding hugetlb cgroup
 		"hugetlb",
+		// The blkio cgroup is optional since some kernels are compiled without support for block I/O throttling.
+		// Containerd and cri-o will use blkio to track disk I/O and throttling in both cgroup v1 and v2.
+		"blkio",
 	},
 	CgroupsV2:         []string{"cpu", "cpuset", "devices", "freezer", "memory", "pids"},
-	CgroupsV2Optional: []string{"hugetlb"},
+	CgroupsV2Optional: []string{"hugetlb", "blkio"},
 	RuntimeSpec: RuntimeSpec{
 		DockerSpec: &DockerSpec{
 			Version:     []string{`1\.1[1-3]\..*`, `17\.0[3,6,9]\..*`, `18\.0[6,9]\..*`, `19\.03\..*`, `20\.10\..*`},
