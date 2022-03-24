@@ -900,7 +900,10 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 	for name, tc := range testCases {
 		name := name
 		tc := tc
+
 		t.Run(name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.CronJobTimeZone, tc.enableTimeZone)
+
 			cj := cronJob()
 			cj.Spec.ConcurrencyPolicy = tc.concurrencyPolicy
 			cj.Spec.Suspend = &tc.suspend
@@ -908,10 +911,6 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			cj.Spec.TimeZone = tc.timeZone
 			if tc.deadline != noDead {
 				cj.Spec.StartingDeadlineSeconds = &tc.deadline
-			}
-
-			if tc.enableTimeZone {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.CronJobTimeZone, true)
 			}
 
 			var (

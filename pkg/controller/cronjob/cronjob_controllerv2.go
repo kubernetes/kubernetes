@@ -386,8 +386,8 @@ func (jm *ControllerV2) updateCronJob(old interface{}, curr interface{}) {
 	// it will be handled here by the queue. If the next requeue is further than previous schedule,
 	// the sync loop will essentially be a no-op for the already queued key with old schedule.
 	if oldCJ.Spec.Schedule != newCJ.Spec.Schedule || (timeZoneEnabled && !pointer.StringEqual(oldCJ.Spec.TimeZone, newCJ.Spec.TimeZone)) {
-		// schedule changed, change the requeue time
-		sched, err := cron.ParseStandard(formatSchedule(timeZoneEnabled, newCJ, jm.recorder))
+		// schedule changed, change the requeue time, pass nil recorder so that syncCronJob will output any warnings
+		sched, err := cron.ParseStandard(formatSchedule(timeZoneEnabled, newCJ, nil))
 		if err != nil {
 			// this is likely a user error in defining the spec value
 			// we should log the error and not reconcile this cronjob until an update to spec
@@ -752,7 +752,10 @@ func getRef(object runtime.Object) (*corev1.ObjectReference, error) {
 
 func formatSchedule(timeZoneEnabled bool, cj *batchv1.CronJob, recorder record.EventRecorder) string {
 	if strings.Contains(cj.Spec.Schedule, "TZ") {
-		recorder.Eventf(cj, corev1.EventTypeWarning, "UnsupportedSchedule", "CRON_TZ or TZ used in schedule %q is not officially supported, see https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/ for more details", cj.Spec.Schedule)
+		if recorder != nil {
+			recorder.Eventf(cj, corev1.EventTypeWarning, "UnsupportedSchedule", "CRON_TZ or TZ used in schedule %q is not officially supported, see https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/ for more details", cj.Spec.Schedule)
+		}
+
 		return cj.Spec.Schedule
 	}
 
