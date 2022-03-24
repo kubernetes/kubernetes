@@ -37,9 +37,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
@@ -260,8 +258,7 @@ func (rc *reconciler) mountAttachVolumes() {
 					klog.V(5).InfoS(volumeToMount.GenerateMsgDetailed("operationExecutor.MountVolume started", remountingLogStr), "pod", klog.KObj(volumeToMount.Pod))
 				}
 			}
-		} else if cache.IsFSResizeRequiredError(err) &&
-			utilfeature.DefaultFeatureGate.Enabled(features.ExpandInUsePersistentVolumes) {
+		} else if cache.IsFSResizeRequiredError(err) {
 			klog.V(4).InfoS(volumeToMount.GenerateMsgDetailed("Starting operationExecutor.ExpandInUseVolume", ""), "pod", klog.KObj(volumeToMount.Pod))
 			err := rc.operationExecutor.ExpandInUseVolume(
 				volumeToMount.VolumeToMount,
