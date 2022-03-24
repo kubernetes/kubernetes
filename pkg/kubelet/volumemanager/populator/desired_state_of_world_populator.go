@@ -371,7 +371,7 @@ func (dswp *desiredStateOfWorldPopulator) checkVolumeFSResize(
 	dswp.desiredStateOfWorld.UpdatePersistentVolumeSize(uniqueVolumeName, pvCap)
 
 	// in case the actualStateOfWorld was rebuild after kubelet restart ensure that claimSize is set to accurate value
-	dswp.actualStateOfWorld.SetVolumeClaimSize(uniqueVolumeName, pvcStatusCap)
+	dswp.actualStateOfWorld.InitializeClaimSize(uniqueVolumeName, pvcStatusCap)
 }
 
 func getUniqueVolumeName(
