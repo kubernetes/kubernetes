@@ -18,6 +18,7 @@ package apps
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"time"
@@ -27,9 +28,13 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/util/retry"
 	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ejob "k8s.io/kubernetes/test/e2e/framework/job"
@@ -415,6 +420,63 @@ var _ = SIGDescribe("Job", func() {
 		}
 		framework.ExpectEqual(successes, largeCompletions, "expected %d successful job pods, but got  %d", largeCompletions, successes)
 	})
+
+	ginkgo.It("should apply changes to a job status", func() {
+
+		ns := f.Namespace.Name
+		jClient := f.ClientSet.BatchV1().Jobs(ns)
+
+		ginkgo.By("Creating a job")
+		job := e2ejob.NewTestJob("notTerminate", "suspend-false-to-true", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
+		job, err := e2ejob.CreateJob(f.ClientSet, f.Namespace.Name, job)
+		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Ensure pods equal to paralellism count is attached to the job")
+		err = e2ejob.WaitForAllJobPodsRunning(f.ClientSet, f.Namespace.Name, job.Name, parallelism)
+		framework.ExpectNoError(err, "failed to ensure number of pods associated with job %s is equal to parallelism count in namespace: %s", job.Name, f.Namespace.Name)
+
+		// /status subresource operations
+		ginkgo.By("patching /status")
+		// we need to use RFC3339 version since conversion over the wire cuts nanoseconds
+		now1 := metav1.Now().Rfc3339Copy()
+		jStatus := batchv1.JobStatus{
+			StartTime: &now1,
+		}
+
+		jStatusJSON, err := json.Marshal(jStatus)
+		framework.ExpectNoError(err)
+		patchedStatus, err := jClient.Patch(context.TODO(), job.Name, types.MergePatchType,
+			[]byte(`{"metadata":{"annotations":{"patchedstatus":"true"}},"status":`+string(jStatusJSON)+`}`),
+			metav1.PatchOptions{}, "status")
+		framework.ExpectNoError(err)
+		framework.ExpectEqual(patchedStatus.Status.StartTime.Equal(&now1), true, "patched object should have the applied StartTime status")
+		framework.ExpectEqual(patchedStatus.Annotations["patchedstatus"], "true", "patched object should have the applied annotation")
+
+		ginkgo.By("updating /status")
+		// we need to use RFC3339 version since conversion over the wire cuts nanoseconds
+		now2 := metav1.Now().Rfc3339Copy()
+		var statusToUpdate, updatedStatus *batchv1.Job
+		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			statusToUpdate, err = jClient.Get(context.TODO(), job.Name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			statusToUpdate.Status.StartTime = &now2
+			updatedStatus, err = jClient.UpdateStatus(context.TODO(), statusToUpdate, metav1.UpdateOptions{})
+			return err
+		})
+		framework.ExpectNoError(err)
+		framework.ExpectEqual(updatedStatus.Status.StartTime.Equal(&now2), true, fmt.Sprintf("updated object status expected to have updated StartTime %#v, got %#v", statusToUpdate.Status.StartTime, updatedStatus.Status.StartTime))
+
+		ginkgo.By("get /status")
+		jResource := schema.GroupVersionResource{Group: "batch", Version: "v1", Resource: "jobs"}
+		gottenStatus, err := f.DynamicClient.Resource(jResource).Namespace(ns).Get(context.TODO(), job.Name, metav1.GetOptions{}, "status")
+		framework.ExpectNoError(err)
+		statusUID, _, err := unstructured.NestedFieldCopy(gottenStatus.Object, "metadata", "uid")
+		framework.ExpectNoError(err)
+		framework.ExpectEqual(string(job.UID), statusUID, fmt.Sprintf("job.UID: %v expected to match statusUID: %v ", job.UID, statusUID))
+	})
+
 })
 
 // waitForJobFailure uses c to wait for up to timeout for the Job named jobName in namespace ns to fail.
