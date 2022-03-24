@@ -546,7 +546,7 @@ func TestValidateCustomResource(t *testing.T) {
 			},
 			failingObjects: []failingObject{
 				{object: map[string]interface{}{"fieldX": map[string]interface{}{"a": true, "b": true, "c": true}}, expectErrs: []string{
-					`fieldX: Too many: must have at most 2 items`,
+					`fieldX: Too many: 3: must have at most 2 items`,
 				}},
 			},
 		},
@@ -561,7 +561,7 @@ func TestValidateCustomResource(t *testing.T) {
 			},
 			failingObjects: []failingObject{
 				{object: map[string]interface{}{"fieldX": []interface{}{"a", "b", "c"}}, expectErrs: []string{
-					`fieldX: Too many: 3: has too many items`,
+					`fieldX: Too many: 3: must have at most 2 items`,
 				}},
 			},
 		},
@@ -576,7 +576,7 @@ func TestValidateCustomResource(t *testing.T) {
 			},
 			failingObjects: []failingObject{
 				{object: map[string]interface{}{"fieldX": "abc"}, expectErrs: []string{
-					`fieldX: Too long: value is too long`,
+					`fieldX: Too long: may not be longer than 2`,
 				}},
 			},
 		},
