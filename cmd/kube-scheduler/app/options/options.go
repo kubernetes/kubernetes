@@ -80,7 +80,7 @@ func NewOptions() *Options {
 		Authentication: apiserveroptions.NewDelegatingAuthenticationOptions(),
 		Authorization:  apiserveroptions.NewDelegatingAuthorizationOptions(),
 		Deprecated: &DeprecatedOptions{
-			PodMaxUnschedulableQDuration: 5 * time.Minute,
+			PodMaxInUnschedulablePodsDuration: 5 * time.Minute,
 		},
 		LeaderElection: &componentbaseconfig.LeaderElectionConfiguration{
 			LeaderElect:       true,
@@ -236,7 +236,7 @@ func (o *Options) ApplyTo(c *schedulerappconfig.Config) error {
 
 	// Apply value independently instead of using ApplyDeprecated() because it can't be configured via ComponentConfig.
 	if o.Deprecated != nil {
-		c.PodMaxUnschedulableQDuration = o.Deprecated.PodMaxUnschedulableQDuration
+		c.PodMaxInUnschedulablePodsDuration = o.Deprecated.PodMaxInUnschedulablePodsDuration
 	}
 
 	return nil

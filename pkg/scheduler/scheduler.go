@@ -124,12 +124,12 @@ type Scheduler struct {
 }
 
 type schedulerOptions struct {
-	componentConfigVersion       string
-	kubeConfig                   *restclient.Config
-	percentageOfNodesToScore     int32
-	podInitialBackoffSeconds     int64
-	podMaxBackoffSeconds         int64
-	podMaxUnschedulableQDuration time.Duration
+	componentConfigVersion            string
+	kubeConfig                        *restclient.Config
+	percentageOfNodesToScore          int32
+	podInitialBackoffSeconds          int64
+	podMaxBackoffSeconds              int64
+	podMaxInUnschedulablePodsDuration time.Duration
 	// Contains out-of-tree plugins to be merged with the in-tree registry.
 	frameworkOutOfTreeRegistry frameworkruntime.Registry
 	profiles                   []schedulerapi.KubeSchedulerProfile
@@ -215,10 +215,10 @@ func WithPodMaxBackoffSeconds(podMaxBackoffSeconds int64) Option {
 	}
 }
 
-// WithPodMaxUnschedulableQDuration sets PodMaxUnschedulableQDuration for PriorityQueue.
-func WithPodMaxUnschedulableQDuration(duration time.Duration) Option {
+// WithPodMaxInUnschedulablePodsDuration sets podMaxInUnschedulablePodsDuration for PriorityQueue.
+func WithPodMaxInUnschedulablePodsDuration(duration time.Duration) Option {
 	return func(o *schedulerOptions) {
-		o.podMaxUnschedulableQDuration = duration
+		o.podMaxInUnschedulablePodsDuration = duration
 	}
 }
 
@@ -240,11 +240,11 @@ func WithBuildFrameworkCapturer(fc FrameworkCapturer) Option {
 }
 
 var defaultSchedulerOptions = schedulerOptions{
-	percentageOfNodesToScore:     schedulerapi.DefaultPercentageOfNodesToScore,
-	podInitialBackoffSeconds:     int64(internalqueue.DefaultPodInitialBackoffDuration.Seconds()),
-	podMaxBackoffSeconds:         int64(internalqueue.DefaultPodMaxBackoffDuration.Seconds()),
-	podMaxUnschedulableQDuration: internalqueue.DefaultPodMaxUnschedulableQDuration,
-	parallelism:                  int32(parallelize.DefaultParallelism),
+	percentageOfNodesToScore:          schedulerapi.DefaultPercentageOfNodesToScore,
+	podInitialBackoffSeconds:          int64(internalqueue.DefaultPodInitialBackoffDuration.Seconds()),
+	podMaxBackoffSeconds:              int64(internalqueue.DefaultPodMaxBackoffDuration.Seconds()),
+	podMaxInUnschedulablePodsDuration: internalqueue.DefaultPodMaxInUnschedulablePodsDuration,
+	parallelism:                       int32(parallelize.DefaultParallelism),
 	// Ideally we would statically set the default profile here, but we can't because
 	// creating the default profile may require testing feature gates, which may get
 	// set dynamically in tests. Therefore, we delay creating it until New is actually
@@ -355,7 +355,7 @@ func New(client clientset.Interface,
 		internalqueue.WithPodMaxBackoffDuration(time.Duration(options.podMaxBackoffSeconds)*time.Second),
 		internalqueue.WithPodNominator(nominator),
 		internalqueue.WithClusterEventMap(clusterEventMap),
-		internalqueue.WithPodMaxUnschedulableQDuration(options.podMaxUnschedulableQDuration),
+		internalqueue.WithPodMaxInUnschedulablePodsDuration(options.podMaxInUnschedulablePodsDuration),
 	)
 
 	schedulerCache := internalcache.New(durationToExpireAssumedPod, stopEverything)
