@@ -19,14 +19,16 @@ package builder3
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"strings"
+
 	restful "github.com/emicklei/go-restful"
+
 	"k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/common/restfuladapter"
 	"k8s.io/kube-openapi/pkg/spec3"
 	"k8s.io/kube-openapi/pkg/util"
 	"k8s.io/kube-openapi/pkg/validation/spec"
-	"net/http"
-	"strings"
 )
 
 const (
@@ -392,6 +394,8 @@ func (o *openAPI) buildDefinitionRecursively(name string) error {
 				schema.Extensions[k] = v
 			}
 		}
+		// delete the embedded v2 schema if exists, otherwise no-op
+		delete(schema.VendorExtensible.Extensions, common.ExtensionV2Schema)
 		o.spec.Components.Schemas[uniqueName] = schema
 		for _, v := range item.Dependencies {
 			if err := o.buildDefinitionRecursively(v); err != nil {

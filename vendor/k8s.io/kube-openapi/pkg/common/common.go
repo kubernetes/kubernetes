@@ -218,3 +218,11 @@ func EmbedOpenAPIDefinitionIntoV2Extension(main OpenAPIDefinition, embedded Open
 	main.Schema.Extensions[ExtensionV2Schema] = embedded.Schema
 	return main
 }
+
+// GenerateOpenAPIV3OneOfSchema generate the set of schemas that MUST be assigned to SchemaProps.OneOf
+func GenerateOpenAPIV3OneOfSchema(types []string) (oneOf []spec.Schema) {
+	for _, t := range types {
+		oneOf = append(oneOf, spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{t}}})
+	}
+	return
+}
