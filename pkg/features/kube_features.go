@@ -819,9 +819,10 @@ const (
 	// Allow users to recover from volume expansion failure
 	RecoverVolumeExpansionFailure featuregate.Feature = "RecoverVolumeExpansionFailure"
 
-	// owner: @yuzhiquan, @bowei, @PxyUp
+	// owner: @yuzhiquan, @bowei, @PxyUp, @SergeyKanzhelev
 	// kep: http://kep.k8s.io/2727
 	// alpha: v1.23
+	// beta: v1.24
 	//
 	// Enables GRPC probe method for {Liveness,Readiness,Startup}Probe.
 	GRPCContainerProbe featuregate.Feature = "GRPCContainerProbe"
@@ -958,7 +959,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	PodAndContainerStatsFromCRI:                    {Default: false, PreRelease: featuregate.Alpha},
 	HonorPVReclaimPolicy:                           {Default: false, PreRelease: featuregate.Beta},
 	RecoverVolumeExpansionFailure:                  {Default: false, PreRelease: featuregate.Alpha},
-	GRPCContainerProbe:                             {Default: false, PreRelease: featuregate.Alpha},
+	GRPCContainerProbe:                             {Default: true, PreRelease: featuregate.Beta},
 	LegacyServiceAccountTokenNoAutoGeneration:      {Default: true, PreRelease: featuregate.Beta},
 	MinDomainsInPodTopologySpread:                  {Default: false, PreRelease: featuregate.Alpha},
 

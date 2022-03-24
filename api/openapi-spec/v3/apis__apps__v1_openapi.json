@@ -3166,7 +3166,7 @@
           },
           "grpc": {
             "$ref": "#/components/schemas/io.k8s.api.core.v1.GRPCAction",
-            "description": "GRPC specifies an action involving a GRPC port. This is an alpha field and requires enabling GRPCContainerProbe feature gate."
+            "description": "GRPC specifies an action involving a GRPC port. This is a beta field and requires enabling GRPCContainerProbe feature gate."
           },
           "httpGet": {
             "$ref": "#/components/schemas/io.k8s.api.core.v1.HTTPGetAction",
