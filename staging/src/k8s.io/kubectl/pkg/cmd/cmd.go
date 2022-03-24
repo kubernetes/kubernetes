@@ -70,7 +70,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/cmd/version"
 	"k8s.io/kubectl/pkg/cmd/wait"
-	"k8s.io/kubectl/pkg/util"
+	utilcomp "k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/kubectl/pkg/util/term"
@@ -319,6 +319,11 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 	proxyCmd.PreRun = func(cmd *cobra.Command, args []string) {
 		kubeConfigFlags.WrapConfigFn = nil
 	}
+
+	// Avoid import cycle by setting ValidArgsFunction here instead of in NewCmdGet()
+	getCmd := get.NewCmdGet("kubectl", f, o.IOStreams)
+	getCmd.ValidArgsFunction = utilcomp.ResourceTypeAndNameCompletionFunc(f)
+
 	groups := templates.CommandGroups{
 		{
 			Message: "Basic Commands (Beginner):",
@@ -333,7 +338,7 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 			Message: "Basic Commands (Intermediate):",
 			Commands: []*cobra.Command{
 				explain.NewCmdExplain("kubectl", f, o.IOStreams),
-				get.NewCmdGet("kubectl", f, o.IOStreams),
+				getCmd,
 				edit.NewCmdEdit(f, o.IOStreams),
 				delete.NewCmdDelete(f, o.IOStreams),
 			},
@@ -404,7 +409,7 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 
 	templates.ActsAsRootCommand(cmds, filters, groups...)
 
-	util.SetFactoryForCompletion(f)
+	utilcomp.SetFactoryForCompletion(f)
 	registerCompletionFuncForGlobalFlags(cmds, f)
 
 	cmds.AddCommand(alpha)
@@ -474,21 +479,21 @@ func registerCompletionFuncForGlobalFlags(cmd *cobra.Command, f cmdutil.Factory)
 	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"namespace",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return get.CompGetResource(f, cmd, "namespace", toComplete), cobra.ShellCompDirectiveNoFileComp
+			return utilcomp.CompGetResource(f, cmd, "namespace", toComplete), cobra.ShellCompDirectiveNoFileComp
 		}))
 	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"context",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return util.ListContextsInConfig(toComplete), cobra.ShellCompDirectiveNoFileComp
+			return utilcomp.ListContextsInConfig(toComplete), cobra.ShellCompDirectiveNoFileComp
 		}))
 	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"cluster",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return util.ListClustersInConfig(toComplete), cobra.ShellCompDirectiveNoFileComp
+			return utilcomp.ListClustersInConfig(toComplete), cobra.ShellCompDirectiveNoFileComp
 		}))
 	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"user",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return util.ListUsersInConfig(toComplete), cobra.ShellCompDirectiveNoFileComp
+			return utilcomp.ListUsersInConfig(toComplete), cobra.ShellCompDirectiveNoFileComp
 		}))
 }

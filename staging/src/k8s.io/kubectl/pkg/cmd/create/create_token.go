@@ -33,7 +33,7 @@ import (
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
-	"k8s.io/kubectl/pkg/util"
+	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/kubectl/pkg/util/term"
 	"k8s.io/utils/pointer"
@@ -115,7 +115,7 @@ func NewCmdCreateToken(f cmdutil.Factory, ioStreams genericclioptions.IOStreams)
 		Short:                 "Request a service account token",
 		Long:                  tokenLong,
 		Example:               tokenExample,
-		ValidArgsFunction:     util.ResourceNameCompletionFunc(f, "serviceaccount"),
+		ValidArgsFunction:     completion.ResourceNameCompletionFunc(f, "serviceaccount"),
 		Run: func(cmd *cobra.Command, args []string) {
 			if err := o.Complete(f, cmd, args); err != nil {
 				cmdutil.CheckErr(err)
