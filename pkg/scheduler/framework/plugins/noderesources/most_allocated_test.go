@@ -224,8 +224,8 @@ func TestMostAllocatedScoringStrategy(t *testing.T) {
 			resources:      defaultResources,
 		},
 		{
-			// resource with negtive weight is not allowed
-			name: "resource with negtive weight",
+			// resource with negative weight is not allowed
+			name: "resource with negative weight",
 			requestedPod: st.MakePod().
 				Req(map[v1.ResourceName]string{"cpu": "1000", "memory": "2000"}).
 				Req(map[v1.ResourceName]string{"cpu": "2000", "memory": "3000"}).

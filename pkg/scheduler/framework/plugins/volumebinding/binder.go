@@ -390,7 +390,7 @@ func (b *volumeBinder) AssumePodVolumes(assumedPod *v1.Pod, nodeName string, pod
 			b.revertAssumedPVs(newBindings)
 			return false, err
 		}
-		// TODO: can we assume everytime?
+		// TODO: can we assume every time?
 		if dirty {
 			err = b.pvCache.Assume(newPV)
 			if err != nil {

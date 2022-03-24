@@ -929,7 +929,7 @@ func buildNodeInfo(node *v1.Node, pods []*v1.Pod) *framework.NodeInfo {
 // TestNodeOperators tests node operations of cache, including add, update
 // and remove.
 func TestNodeOperators(t *testing.T) {
-	// Test datas
+	// Test data
 	nodeName := "test-node"
 	cpu1 := resource.MustParse("1000m")
 	mem100m := resource.MustParse("100m")
