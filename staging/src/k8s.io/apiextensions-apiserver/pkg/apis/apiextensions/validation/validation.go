@@ -999,7 +999,7 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 				allErrs = append(allErrs, field.InternalError(fldPath.Child("x-kubernetes-validations"), err))
 			} else {
 				for i, cr := range compResults {
-					expressionCost := getExpressionCost(cr.MaxCost, nodeCostInfo)
+					expressionCost := getExpressionCost(cr, nodeCostInfo)
 					if expressionCost > ExpressionCostLimit {
 						exceedFactor := float64(expressionCost) / float64(ExpressionCostLimit)
 						costErrorMsg := fmt.Sprintf("CEL rule of cost %d exceeded budget of %d by factor of %vx", uint64(expressionCost), ExpressionCostLimit, exceedFactor)
@@ -1071,14 +1071,14 @@ func multiplyWithOverflowGuard(baseCost, cardinality uint64) uint64 {
 	return baseCost * cardinality
 }
 
-func getExpressionCost(baseCost uint64, cardinalityCost costInfo) uint64 {
+func getExpressionCost(cr cel.CompilationResult, cardinalityCost costInfo) uint64 {
 	if cardinalityCost.MaxCardinality != nil {
-		return multiplyWithOverflowGuard(baseCost, *cardinalityCost.MaxCardinality)
+		return multiplyWithOverflowGuard(cr.MaxCost, *cardinalityCost.MaxCardinality)
 	}
-	return baseCost
+	return multiplyWithOverflowGuard(cr.MaxCost, cr.MaxCardinality)
 }
 
-var newlineMatcher = regexp.MustCompile(`[\n\r]+`) // valid newline chars in CEL grammar
+var newlineMatcher = regexp.MustCompile(`[\n\r]+`) // valid newline chars in CEL grammar  
 func hasNewlines(s string) bool {
 	return newlineMatcher.MatchString(s)
 }

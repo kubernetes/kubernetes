@@ -64,6 +64,9 @@ type CompilationResult struct {
 	TransitionRule bool
 	// Represents the worst-case cost of the compiled expression in terms of CEL's cost units, as used by cel.EstimateCost.
 	MaxCost uint64
+	// MinCardinality represents the worse case number of times this validation rule could be invoked if contained under an
+	// unbounded map or list in an OpenAPIv3 schema.
+	MaxCardinality uint64
 }
 
 // Compile compiles all the XValidations rules (without recursing into the schema) and returns a slice containing a
@@ -120,14 +123,15 @@ func Compile(s *schema.Structural, isResourceRoot bool, perCallLimit uint64) ([]
 	estimator := newCostEstimator(root)
 	// compResults is the return value which saves a list of compilation results in the same order as x-kubernetes-validations rules.
 	compResults := make([]CompilationResult, len(celRules))
+	maxCardinality := celmodel.MaxCardinality(s)
 	for i, rule := range celRules {
-		compResults[i] = compileRule(rule, env, perCallLimit, estimator)
+		compResults[i] = compileRule(rule, env, perCallLimit, estimator, maxCardinality)
 	}
 
 	return compResults, nil
 }
 
-func compileRule(rule apiextensions.ValidationRule, env *cel.Env, perCallLimit uint64, estimator *library.CostEstimator) (compilationResult CompilationResult) {
+func compileRule(rule apiextensions.ValidationRule, env *cel.Env, perCallLimit uint64, estimator *library.CostEstimator, maxCardinality uint64) (compilationResult CompilationResult) {
 	if len(strings.TrimSpace(rule.Rule)) == 0 {
 		// include a compilation result, but leave both program and error nil per documented return semantics of this
 		// function
@@ -174,6 +178,7 @@ func compileRule(rule apiextensions.ValidationRule, env *cel.Env, perCallLimit u
 		return
 	}
 	compilationResult.MaxCost = costEst.Max
+	compilationResult.MaxCardinality = maxCardinality
 	compilationResult.Program = prog
 	return
 }

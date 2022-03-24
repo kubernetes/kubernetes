@@ -15,6 +15,7 @@
 package model
 
 import (
+	"math"
 	"time"
 
 	"github.com/google/cel-go/checker/decls"
@@ -221,6 +222,19 @@ func WithTypeAndObjectMeta(s *schema.Structural) *schema.Structural {
 	result.Properties = props
 
 	return result
+}
+
+// MaxCardinality returns the maximum number of times data conforming to the schema could possibly exist in
+// an object serialized to JSON. For cases where a schema is contained under map or array schemas of unbounded
+// size, this can be used as an estimate as the worst case number of times data matching the schema could be repeated.
+// Note that this only assumes a single comma between data elements, so if the schema is contained under only maps,
+// this estimates a higher cardinality that would be possible.
+func MaxCardinality(s *schema.Structural) uint64 {
+	sz := estimateMinSizeJSON(s) + 1 // assume at least one comma between elements
+	if sz == 0 {
+		return math.MaxUint64
+	}
+	return uint64(maxRequestSizeBytes / sz)
 }
 
 // estimateMinSizeJSON estimates the minimum size in bytes of the given schema when serialized in JSON.
