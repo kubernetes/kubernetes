@@ -451,7 +451,7 @@ func TestPodGenerateNameWithIndex(t *testing.T) {
 			index:               1,
 			wantPodGenerateName: "indexed-job-1-",
 		},
-		"job name exceeds MaxGeneneratedNameLength": {
+		"job name exceeds MaxGeneratedNameLength": {
 			jobname:             "hhhhhooooohhhhhooooohhhhhooooohhhhhooooohhhhhooooohhhhhooooohhhhhooooo",
 			index:               1,
 			wantPodGenerateName: "hhhhhooooohhhhhooooohhhhhooooohhhhhooooohhhhhooooohhhhh-1-",

@@ -27,7 +27,7 @@ import (
 	"time"
 
 	batch "k8s.io/api/batch/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -1369,7 +1369,11 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, activePods 
 						template = podTemplate.DeepCopy()
 						addCompletionIndexAnnotation(template, completionIndex)
 						template.Spec.Hostname = fmt.Sprintf("%s-%d", job.Name, completionIndex)
-						generateName = podGenerateNameWithIndex(job.Name, completionIndex)
+						podName := job.Name
+						if template.ObjectMeta.Name != "" {
+							podName = template.ObjectMeta.Name
+						}
+						generateName = podGenerateNameWithIndex(podName, completionIndex)
 					}
 					defer wait.Done()
 					err := jm.podControl.CreatePodsWithGenerateName(ctx, job.Namespace, template, job, metav1.NewControllerRef(job, controllerKind), generateName)

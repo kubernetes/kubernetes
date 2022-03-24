@@ -628,7 +628,11 @@ func (jm *ControllerV2) syncCronJob(
 }
 
 func getJobName(cj *batchv1.CronJob, scheduledTime time.Time) string {
-	return fmt.Sprintf("%s-%d", cj.Name, getTimeHashInMinutes(scheduledTime))
+	jobName := cj.Name
+	if cj.Spec.JobTemplate.ObjectMeta.Name != "" {
+		jobName = cj.Spec.JobTemplate.ObjectMeta.Name
+	}
+	return fmt.Sprintf("%s-%d", jobName, getTimeHashInMinutes(scheduledTime))
 }
 
 // nextScheduledTimeDuration returns the time duration to requeue based on
