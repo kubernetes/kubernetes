@@ -969,11 +969,13 @@ func TestValidateIPSet(t *testing.T) {
 			desc:  "wrong set type",
 		},
 	}
-	for i := range testCases {
-		valid := testCases[i].ipset.Validate()
-		if valid != testCases[i].valid {
-			t.Errorf("case [%d]: unexpected mismatch, expect valid[%v], got valid[%v], desc: %s", i, testCases[i].valid, valid, testCases[i].desc)
-		}
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			valid := testCases[i].ipset.Validate()
+			if valid != testCases[i].valid {
+				t.Errorf("case [%d]: unexpected mismatch, expect valid[%v], got valid[%v], desc: %s", i, testCases[i].valid, valid, testCases[i].desc)
+			}
+		})
 	}
 }
 
