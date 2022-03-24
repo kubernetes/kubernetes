@@ -22,43 +22,44 @@ package testing
 
 import (
 	context "context"
-	gomock "github.com/golang/mock/gomock"
 	io "io"
+	url "net/url"
+	reflect "reflect"
+	time "time"
+
+	gomock "github.com/golang/mock/gomock"
 	v1 "k8s.io/api/core/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	remotecommand "k8s.io/client-go/tools/remotecommand"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
 	v10 "k8s.io/cri-api/pkg/apis/runtime/v1"
 	container "k8s.io/kubernetes/pkg/kubelet/container"
-	url "net/url"
-	reflect "reflect"
-	time "time"
 )
 
-// MockVersion is a mock of Version interface
+// MockVersion is a mock of Version interface.
 type MockVersion struct {
 	ctrl     *gomock.Controller
 	recorder *MockVersionMockRecorder
 }
 
-// MockVersionMockRecorder is the mock recorder for MockVersion
+// MockVersionMockRecorder is the mock recorder for MockVersion.
 type MockVersionMockRecorder struct {
 	mock *MockVersion
 }
 
-// NewMockVersion creates a new mock instance
+// NewMockVersion creates a new mock instance.
 func NewMockVersion(ctrl *gomock.Controller) *MockVersion {
 	mock := &MockVersion{ctrl: ctrl}
 	mock.recorder = &MockVersionMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use
+// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockVersion) EXPECT() *MockVersionMockRecorder {
 	return m.recorder
 }
 
-// Compare mocks base method
+// Compare mocks base method.
 func (m *MockVersion) Compare(other string) (int, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Compare", other)
@@ -67,13 +68,13 @@ func (m *MockVersion) Compare(other string) (int, error) {
 	return ret0, ret1
 }
 
-// Compare indicates an expected call of Compare
+// Compare indicates an expected call of Compare.
 func (mr *MockVersionMockRecorder) Compare(other interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Compare", reflect.TypeOf((*MockVersion)(nil).Compare), other)
 }
 
-// String mocks base method
+// String mocks base method.
 func (m *MockVersion) String() string {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "String")
@@ -81,65 +82,36 @@ func (m *MockVersion) String() string {
 	return ret0
 }
 
-// String indicates an expected call of String
+// String indicates an expected call of String.
 func (mr *MockVersionMockRecorder) String() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "String", reflect.TypeOf((*MockVersion)(nil).String))
 }
 
-// MockRuntime is a mock of Runtime interface
+// MockRuntime is a mock of Runtime interface.
 type MockRuntime struct {
 	ctrl     *gomock.Controller
 	recorder *MockRuntimeMockRecorder
 }
 
-// MockRuntimeMockRecorder is the mock recorder for MockRuntime
+// MockRuntimeMockRecorder is the mock recorder for MockRuntime.
 type MockRuntimeMockRecorder struct {
 	mock *MockRuntime
 }
 
-// NewMockRuntime creates a new mock instance
+// NewMockRuntime creates a new mock instance.
 func NewMockRuntime(ctrl *gomock.Controller) *MockRuntime {
 	mock := &MockRuntime{ctrl: ctrl}
 	mock.recorder = &MockRuntimeMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use
+// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockRuntime) EXPECT() *MockRuntimeMockRecorder {
 	return m.recorder
 }
 
-// Type mocks base method
-func (m *MockRuntime) Type() string {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Type")
-	ret0, _ := ret[0].(string)
-	return ret0
-}
-
-// Type indicates an expected call of Type
-func (mr *MockRuntimeMockRecorder) Type() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Type", reflect.TypeOf((*MockRuntime)(nil).Type))
-}
-
-// Version mocks base method
-func (m *MockRuntime) Version() (container.Version, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Version")
-	ret0, _ := ret[0].(container.Version)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// Version indicates an expected call of Version
-func (mr *MockRuntimeMockRecorder) Version() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Version", reflect.TypeOf((*MockRuntime)(nil).Version))
-}
-
-// APIVersion mocks base method
+// APIVersion mocks base method.
 func (m *MockRuntime) APIVersion() (container.Version, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "APIVersion")
@@ -148,114 +120,13 @@ func (m *MockRuntime) APIVersion() (container.Version, error) {
 	return ret0, ret1
 }
 
-// APIVersion indicates an expected call of APIVersion
+// APIVersion indicates an expected call of APIVersion.
 func (mr *MockRuntimeMockRecorder) APIVersion() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "APIVersion", reflect.TypeOf((*MockRuntime)(nil).APIVersion))
 }
 
-// Status mocks base method
-func (m *MockRuntime) Status() (*container.RuntimeStatus, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Status")
-	ret0, _ := ret[0].(*container.RuntimeStatus)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// Status indicates an expected call of Status
-func (mr *MockRuntimeMockRecorder) Status() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Status", reflect.TypeOf((*MockRuntime)(nil).Status))
-}
-
-// GetPods mocks base method
-func (m *MockRuntime) GetPods(all bool) ([]*container.Pod, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetPods", all)
-	ret0, _ := ret[0].([]*container.Pod)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetPods indicates an expected call of GetPods
-func (mr *MockRuntimeMockRecorder) GetPods(all interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPods", reflect.TypeOf((*MockRuntime)(nil).GetPods), all)
-}
-
-// GarbageCollect mocks base method
-func (m *MockRuntime) GarbageCollect(gcPolicy container.GCPolicy, allSourcesReady, evictNonDeletedPods bool) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GarbageCollect", gcPolicy, allSourcesReady, evictNonDeletedPods)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// GarbageCollect indicates an expected call of GarbageCollect
-func (mr *MockRuntimeMockRecorder) GarbageCollect(gcPolicy, allSourcesReady, evictNonDeletedPods interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GarbageCollect", reflect.TypeOf((*MockRuntime)(nil).GarbageCollect), gcPolicy, allSourcesReady, evictNonDeletedPods)
-}
-
-// SyncPod mocks base method
-func (m *MockRuntime) SyncPod(pod *v1.Pod, podStatus *container.PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) container.PodSyncResult {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SyncPod", pod, podStatus, pullSecrets, backOff)
-	ret0, _ := ret[0].(container.PodSyncResult)
-	return ret0
-}
-
-// SyncPod indicates an expected call of SyncPod
-func (mr *MockRuntimeMockRecorder) SyncPod(pod, podStatus, pullSecrets, backOff interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SyncPod", reflect.TypeOf((*MockRuntime)(nil).SyncPod), pod, podStatus, pullSecrets, backOff)
-}
-
-// KillPod mocks base method
-func (m *MockRuntime) KillPod(pod *v1.Pod, runningPod container.Pod, gracePeriodOverride *int64) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "KillPod", pod, runningPod, gracePeriodOverride)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// KillPod indicates an expected call of KillPod
-func (mr *MockRuntimeMockRecorder) KillPod(pod, runningPod, gracePeriodOverride interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "KillPod", reflect.TypeOf((*MockRuntime)(nil).KillPod), pod, runningPod, gracePeriodOverride)
-}
-
-// GetPodStatus mocks base method
-func (m *MockRuntime) GetPodStatus(uid types.UID, name, namespace string) (*container.PodStatus, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetPodStatus", uid, name, namespace)
-	ret0, _ := ret[0].(*container.PodStatus)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetPodStatus indicates an expected call of GetPodStatus
-func (mr *MockRuntimeMockRecorder) GetPodStatus(uid, name, namespace interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPodStatus", reflect.TypeOf((*MockRuntime)(nil).GetPodStatus), uid, name, namespace)
-}
-
-// GetContainerLogs mocks base method
-func (m *MockRuntime) GetContainerLogs(ctx context.Context, pod *v1.Pod, containerID container.ContainerID, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetContainerLogs", ctx, pod, containerID, logOptions, stdout, stderr)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// GetContainerLogs indicates an expected call of GetContainerLogs
-func (mr *MockRuntimeMockRecorder) GetContainerLogs(ctx, pod, containerID, logOptions, stdout, stderr interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetContainerLogs", reflect.TypeOf((*MockRuntime)(nil).GetContainerLogs), ctx, pod, containerID, logOptions, stdout, stderr)
-}
-
-// DeleteContainer mocks base method
+// DeleteContainer mocks base method.
 func (m *MockRuntime) DeleteContainer(containerID container.ContainerID) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DeleteContainer", containerID)
@@ -263,28 +134,41 @@ func (m *MockRuntime) DeleteContainer(containerID container.ContainerID) error {
 	return ret0
 }
 
-// DeleteContainer indicates an expected call of DeleteContainer
+// DeleteContainer indicates an expected call of DeleteContainer.
 func (mr *MockRuntimeMockRecorder) DeleteContainer(containerID interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteContainer", reflect.TypeOf((*MockRuntime)(nil).DeleteContainer), containerID)
 }
 
-// PullImage mocks base method
-func (m *MockRuntime) PullImage(image container.ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *v10.PodSandboxConfig) (string, error) {
+// GarbageCollect mocks base method.
+func (m *MockRuntime) GarbageCollect(gcPolicy container.GCPolicy, allSourcesReady, evictNonDeletedPods bool) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PullImage", image, pullSecrets, podSandboxConfig)
-	ret0, _ := ret[0].(string)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret := m.ctrl.Call(m, "GarbageCollect", gcPolicy, allSourcesReady, evictNonDeletedPods)
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
-// PullImage indicates an expected call of PullImage
-func (mr *MockRuntimeMockRecorder) PullImage(image, pullSecrets, podSandboxConfig interface{}) *gomock.Call {
+// GarbageCollect indicates an expected call of GarbageCollect.
+func (mr *MockRuntimeMockRecorder) GarbageCollect(gcPolicy, allSourcesReady, evictNonDeletedPods interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PullImage", reflect.TypeOf((*MockRuntime)(nil).PullImage), image, pullSecrets, podSandboxConfig)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GarbageCollect", reflect.TypeOf((*MockRuntime)(nil).GarbageCollect), gcPolicy, allSourcesReady, evictNonDeletedPods)
 }
 
-// GetImageRef mocks base method
+// GetContainerLogs mocks base method.
+func (m *MockRuntime) GetContainerLogs(ctx context.Context, pod *v1.Pod, containerID container.ContainerID, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetContainerLogs", ctx, pod, containerID, logOptions, stdout, stderr)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// GetContainerLogs indicates an expected call of GetContainerLogs.
+func (mr *MockRuntimeMockRecorder) GetContainerLogs(ctx, pod, containerID, logOptions, stdout, stderr interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetContainerLogs", reflect.TypeOf((*MockRuntime)(nil).GetContainerLogs), ctx, pod, containerID, logOptions, stdout, stderr)
+}
+
+// GetImageRef mocks base method.
 func (m *MockRuntime) GetImageRef(image container.ImageSpec) (string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetImageRef", image)
@@ -293,42 +177,43 @@ func (m *MockRuntime) GetImageRef(image container.ImageSpec) (string, error) {
 	return ret0, ret1
 }
 
-// GetImageRef indicates an expected call of GetImageRef
+// GetImageRef indicates an expected call of GetImageRef.
 func (mr *MockRuntimeMockRecorder) GetImageRef(image interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetImageRef", reflect.TypeOf((*MockRuntime)(nil).GetImageRef), image)
 }
 
-// ListImages mocks base method
-func (m *MockRuntime) ListImages() ([]container.Image, error) {
+// GetPodStatus mocks base method.
+func (m *MockRuntime) GetPodStatus(uid types.UID, name, namespace string) (*container.PodStatus, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListImages")
-	ret0, _ := ret[0].([]container.Image)
+	ret := m.ctrl.Call(m, "GetPodStatus", uid, name, namespace)
+	ret0, _ := ret[0].(*container.PodStatus)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// ListImages indicates an expected call of ListImages
-func (mr *MockRuntimeMockRecorder) ListImages() *gomock.Call {
+// GetPodStatus indicates an expected call of GetPodStatus.
+func (mr *MockRuntimeMockRecorder) GetPodStatus(uid, name, namespace interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListImages", reflect.TypeOf((*MockRuntime)(nil).ListImages))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPodStatus", reflect.TypeOf((*MockRuntime)(nil).GetPodStatus), uid, name, namespace)
 }
 
-// RemoveImage mocks base method
-func (m *MockRuntime) RemoveImage(image container.ImageSpec) error {
+// GetPods mocks base method.
+func (m *MockRuntime) GetPods(all bool) ([]*container.Pod, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RemoveImage", image)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret := m.ctrl.Call(m, "GetPods", all)
+	ret0, _ := ret[0].([]*container.Pod)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
-// RemoveImage indicates an expected call of RemoveImage
-func (mr *MockRuntimeMockRecorder) RemoveImage(image interface{}) *gomock.Call {
+// GetPods indicates an expected call of GetPods.
+func (mr *MockRuntimeMockRecorder) GetPods(all interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveImage", reflect.TypeOf((*MockRuntime)(nil).RemoveImage), image)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPods", reflect.TypeOf((*MockRuntime)(nil).GetPods), all)
 }
 
-// ImageStats mocks base method
+// ImageStats mocks base method.
 func (m *MockRuntime) ImageStats() (*container.ImageStats, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ImageStats")
@@ -337,13 +222,114 @@ func (m *MockRuntime) ImageStats() (*container.ImageStats, error) {
 	return ret0, ret1
 }
 
-// ImageStats indicates an expected call of ImageStats
+// ImageStats indicates an expected call of ImageStats.
 func (mr *MockRuntimeMockRecorder) ImageStats() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ImageStats", reflect.TypeOf((*MockRuntime)(nil).ImageStats))
 }
 
-// UpdatePodCIDR mocks base method
+// KillPod mocks base method.
+func (m *MockRuntime) KillPod(pod *v1.Pod, runningPod container.Pod, gracePeriodOverride *int64) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "KillPod", pod, runningPod, gracePeriodOverride)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// KillPod indicates an expected call of KillPod.
+func (mr *MockRuntimeMockRecorder) KillPod(pod, runningPod, gracePeriodOverride interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "KillPod", reflect.TypeOf((*MockRuntime)(nil).KillPod), pod, runningPod, gracePeriodOverride)
+}
+
+// ListImages mocks base method.
+func (m *MockRuntime) ListImages() ([]container.Image, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListImages")
+	ret0, _ := ret[0].([]container.Image)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListImages indicates an expected call of ListImages.
+func (mr *MockRuntimeMockRecorder) ListImages() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListImages", reflect.TypeOf((*MockRuntime)(nil).ListImages))
+}
+
+// PullImage mocks base method.
+func (m *MockRuntime) PullImage(image container.ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *v10.PodSandboxConfig) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PullImage", image, pullSecrets, podSandboxConfig)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PullImage indicates an expected call of PullImage.
+func (mr *MockRuntimeMockRecorder) PullImage(image, pullSecrets, podSandboxConfig interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PullImage", reflect.TypeOf((*MockRuntime)(nil).PullImage), image, pullSecrets, podSandboxConfig)
+}
+
+// RemoveImage mocks base method.
+func (m *MockRuntime) RemoveImage(image container.ImageSpec) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RemoveImage", image)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RemoveImage indicates an expected call of RemoveImage.
+func (mr *MockRuntimeMockRecorder) RemoveImage(image interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveImage", reflect.TypeOf((*MockRuntime)(nil).RemoveImage), image)
+}
+
+// Status mocks base method.
+func (m *MockRuntime) Status() (*container.RuntimeStatus, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Status")
+	ret0, _ := ret[0].(*container.RuntimeStatus)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Status indicates an expected call of Status.
+func (mr *MockRuntimeMockRecorder) Status() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Status", reflect.TypeOf((*MockRuntime)(nil).Status))
+}
+
+// SyncPod mocks base method.
+func (m *MockRuntime) SyncPod(pod *v1.Pod, podStatus *container.PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) container.PodSyncResult {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SyncPod", pod, podStatus, pullSecrets, backOff)
+	ret0, _ := ret[0].(container.PodSyncResult)
+	return ret0
+}
+
+// SyncPod indicates an expected call of SyncPod.
+func (mr *MockRuntimeMockRecorder) SyncPod(pod, podStatus, pullSecrets, backOff interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SyncPod", reflect.TypeOf((*MockRuntime)(nil).SyncPod), pod, podStatus, pullSecrets, backOff)
+}
+
+// Type mocks base method.
+func (m *MockRuntime) Type() string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Type")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// Type indicates an expected call of Type.
+func (mr *MockRuntimeMockRecorder) Type() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Type", reflect.TypeOf((*MockRuntime)(nil).Type))
+}
+
+// UpdatePodCIDR mocks base method.
 func (m *MockRuntime) UpdatePodCIDR(podCIDR string) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UpdatePodCIDR", podCIDR)
@@ -351,51 +337,51 @@ func (m *MockRuntime) UpdatePodCIDR(podCIDR string) error {
 	return ret0
 }
 
-// UpdatePodCIDR indicates an expected call of UpdatePodCIDR
+// UpdatePodCIDR indicates an expected call of UpdatePodCIDR.
 func (mr *MockRuntimeMockRecorder) UpdatePodCIDR(podCIDR interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdatePodCIDR", reflect.TypeOf((*MockRuntime)(nil).UpdatePodCIDR), podCIDR)
 }
 
-// MockStreamingRuntime is a mock of StreamingRuntime interface
+// Version mocks base method.
+func (m *MockRuntime) Version() (container.Version, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Version")
+	ret0, _ := ret[0].(container.Version)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Version indicates an expected call of Version.
+func (mr *MockRuntimeMockRecorder) Version() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Version", reflect.TypeOf((*MockRuntime)(nil).Version))
+}
+
+// MockStreamingRuntime is a mock of StreamingRuntime interface.
 type MockStreamingRuntime struct {
 	ctrl     *gomock.Controller
 	recorder *MockStreamingRuntimeMockRecorder
 }
 
-// MockStreamingRuntimeMockRecorder is the mock recorder for MockStreamingRuntime
+// MockStreamingRuntimeMockRecorder is the mock recorder for MockStreamingRuntime.
 type MockStreamingRuntimeMockRecorder struct {
 	mock *MockStreamingRuntime
 }
 
-// NewMockStreamingRuntime creates a new mock instance
+// NewMockStreamingRuntime creates a new mock instance.
 func NewMockStreamingRuntime(ctrl *gomock.Controller) *MockStreamingRuntime {
 	mock := &MockStreamingRuntime{ctrl: ctrl}
 	mock.recorder = &MockStreamingRuntimeMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use
+// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockStreamingRuntime) EXPECT() *MockStreamingRuntimeMockRecorder {
 	return m.recorder
 }
 
-// GetExec mocks base method
-func (m *MockStreamingRuntime) GetExec(id container.ContainerID, cmd []string, stdin, stdout, stderr, tty bool) (*url.URL, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetExec", id, cmd, stdin, stdout, stderr, tty)
-	ret0, _ := ret[0].(*url.URL)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetExec indicates an expected call of GetExec
-func (mr *MockStreamingRuntimeMockRecorder) GetExec(id, cmd, stdin, stdout, stderr, tty interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetExec", reflect.TypeOf((*MockStreamingRuntime)(nil).GetExec), id, cmd, stdin, stdout, stderr, tty)
-}
-
-// GetAttach mocks base method
+// GetAttach mocks base method.
 func (m *MockStreamingRuntime) GetAttach(id container.ContainerID, stdin, stdout, stderr, tty bool) (*url.URL, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetAttach", id, stdin, stdout, stderr, tty)
@@ -404,13 +390,28 @@ func (m *MockStreamingRuntime) GetAttach(id container.ContainerID, stdin, stdout
 	return ret0, ret1
 }
 
-// GetAttach indicates an expected call of GetAttach
+// GetAttach indicates an expected call of GetAttach.
 func (mr *MockStreamingRuntimeMockRecorder) GetAttach(id, stdin, stdout, stderr, tty interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAttach", reflect.TypeOf((*MockStreamingRuntime)(nil).GetAttach), id, stdin, stdout, stderr, tty)
 }
 
-// GetPortForward mocks base method
+// GetExec mocks base method.
+func (m *MockStreamingRuntime) GetExec(id container.ContainerID, cmd []string, stdin, stdout, stderr, tty bool) (*url.URL, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetExec", id, cmd, stdin, stdout, stderr, tty)
+	ret0, _ := ret[0].(*url.URL)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetExec indicates an expected call of GetExec.
+func (mr *MockStreamingRuntimeMockRecorder) GetExec(id, cmd, stdin, stdout, stderr, tty interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetExec", reflect.TypeOf((*MockStreamingRuntime)(nil).GetExec), id, cmd, stdin, stdout, stderr, tty)
+}
+
+// GetPortForward mocks base method.
 func (m *MockStreamingRuntime) GetPortForward(podName, podNamespace string, podUID types.UID, ports []int32) (*url.URL, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetPortForward", podName, podNamespace, podUID, ports)
@@ -419,51 +420,36 @@ func (m *MockStreamingRuntime) GetPortForward(podName, podNamespace string, podU
 	return ret0, ret1
 }
 
-// GetPortForward indicates an expected call of GetPortForward
+// GetPortForward indicates an expected call of GetPortForward.
 func (mr *MockStreamingRuntimeMockRecorder) GetPortForward(podName, podNamespace, podUID, ports interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPortForward", reflect.TypeOf((*MockStreamingRuntime)(nil).GetPortForward), podName, podNamespace, podUID, ports)
 }
 
-// MockImageService is a mock of ImageService interface
+// MockImageService is a mock of ImageService interface.
 type MockImageService struct {
 	ctrl     *gomock.Controller
 	recorder *MockImageServiceMockRecorder
 }
 
-// MockImageServiceMockRecorder is the mock recorder for MockImageService
+// MockImageServiceMockRecorder is the mock recorder for MockImageService.
 type MockImageServiceMockRecorder struct {
 	mock *MockImageService
 }
 
-// NewMockImageService creates a new mock instance
+// NewMockImageService creates a new mock instance.
 func NewMockImageService(ctrl *gomock.Controller) *MockImageService {
 	mock := &MockImageService{ctrl: ctrl}
 	mock.recorder = &MockImageServiceMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use
+// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockImageService) EXPECT() *MockImageServiceMockRecorder {
 	return m.recorder
 }
 
-// PullImage mocks base method
-func (m *MockImageService) PullImage(image container.ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *v10.PodSandboxConfig) (string, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PullImage", image, pullSecrets, podSandboxConfig)
-	ret0, _ := ret[0].(string)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// PullImage indicates an expected call of PullImage
-func (mr *MockImageServiceMockRecorder) PullImage(image, pullSecrets, podSandboxConfig interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PullImage", reflect.TypeOf((*MockImageService)(nil).PullImage), image, pullSecrets, podSandboxConfig)
-}
-
-// GetImageRef mocks base method
+// GetImageRef mocks base method.
 func (m *MockImageService) GetImageRef(image container.ImageSpec) (string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetImageRef", image)
@@ -472,42 +458,13 @@ func (m *MockImageService) GetImageRef(image container.ImageSpec) (string, error
 	return ret0, ret1
 }
 
-// GetImageRef indicates an expected call of GetImageRef
+// GetImageRef indicates an expected call of GetImageRef.
 func (mr *MockImageServiceMockRecorder) GetImageRef(image interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetImageRef", reflect.TypeOf((*MockImageService)(nil).GetImageRef), image)
 }
 
-// ListImages mocks base method
-func (m *MockImageService) ListImages() ([]container.Image, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListImages")
-	ret0, _ := ret[0].([]container.Image)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ListImages indicates an expected call of ListImages
-func (mr *MockImageServiceMockRecorder) ListImages() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListImages", reflect.TypeOf((*MockImageService)(nil).ListImages))
-}
-
-// RemoveImage mocks base method
-func (m *MockImageService) RemoveImage(image container.ImageSpec) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RemoveImage", image)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// RemoveImage indicates an expected call of RemoveImage
-func (mr *MockImageServiceMockRecorder) RemoveImage(image interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveImage", reflect.TypeOf((*MockImageService)(nil).RemoveImage), image)
-}
-
-// ImageStats mocks base method
+// ImageStats mocks base method.
 func (m *MockImageService) ImageStats() (*container.ImageStats, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ImageStats")
@@ -516,36 +473,80 @@ func (m *MockImageService) ImageStats() (*container.ImageStats, error) {
 	return ret0, ret1
 }
 
-// ImageStats indicates an expected call of ImageStats
+// ImageStats indicates an expected call of ImageStats.
 func (mr *MockImageServiceMockRecorder) ImageStats() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ImageStats", reflect.TypeOf((*MockImageService)(nil).ImageStats))
 }
 
-// MockAttacher is a mock of Attacher interface
+// ListImages mocks base method.
+func (m *MockImageService) ListImages() ([]container.Image, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListImages")
+	ret0, _ := ret[0].([]container.Image)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListImages indicates an expected call of ListImages.
+func (mr *MockImageServiceMockRecorder) ListImages() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListImages", reflect.TypeOf((*MockImageService)(nil).ListImages))
+}
+
+// PullImage mocks base method.
+func (m *MockImageService) PullImage(image container.ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *v10.PodSandboxConfig) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PullImage", image, pullSecrets, podSandboxConfig)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PullImage indicates an expected call of PullImage.
+func (mr *MockImageServiceMockRecorder) PullImage(image, pullSecrets, podSandboxConfig interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PullImage", reflect.TypeOf((*MockImageService)(nil).PullImage), image, pullSecrets, podSandboxConfig)
+}
+
+// RemoveImage mocks base method.
+func (m *MockImageService) RemoveImage(image container.ImageSpec) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RemoveImage", image)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RemoveImage indicates an expected call of RemoveImage.
+func (mr *MockImageServiceMockRecorder) RemoveImage(image interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveImage", reflect.TypeOf((*MockImageService)(nil).RemoveImage), image)
+}
+
+// MockAttacher is a mock of Attacher interface.
 type MockAttacher struct {
 	ctrl     *gomock.Controller
 	recorder *MockAttacherMockRecorder
 }
 
-// MockAttacherMockRecorder is the mock recorder for MockAttacher
+// MockAttacherMockRecorder is the mock recorder for MockAttacher.
 type MockAttacherMockRecorder struct {
 	mock *MockAttacher
 }
 
-// NewMockAttacher creates a new mock instance
+// NewMockAttacher creates a new mock instance.
 func NewMockAttacher(ctrl *gomock.Controller) *MockAttacher {
 	mock := &MockAttacher{ctrl: ctrl}
 	mock.recorder = &MockAttacherMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use
+// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockAttacher) EXPECT() *MockAttacherMockRecorder {
 	return m.recorder
 }
 
-// AttachContainer mocks base method
+// AttachContainer mocks base method.
 func (m *MockAttacher) AttachContainer(id container.ContainerID, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AttachContainer", id, stdin, stdout, stderr, tty, resize)
@@ -553,36 +554,36 @@ func (m *MockAttacher) AttachContainer(id container.ContainerID, stdin io.Reader
 	return ret0
 }
 
-// AttachContainer indicates an expected call of AttachContainer
+// AttachContainer indicates an expected call of AttachContainer.
 func (mr *MockAttacherMockRecorder) AttachContainer(id, stdin, stdout, stderr, tty, resize interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AttachContainer", reflect.TypeOf((*MockAttacher)(nil).AttachContainer), id, stdin, stdout, stderr, tty, resize)
 }
 
-// MockCommandRunner is a mock of CommandRunner interface
+// MockCommandRunner is a mock of CommandRunner interface.
 type MockCommandRunner struct {
 	ctrl     *gomock.Controller
 	recorder *MockCommandRunnerMockRecorder
 }
 
-// MockCommandRunnerMockRecorder is the mock recorder for MockCommandRunner
+// MockCommandRunnerMockRecorder is the mock recorder for MockCommandRunner.
 type MockCommandRunnerMockRecorder struct {
 	mock *MockCommandRunner
 }
 
-// NewMockCommandRunner creates a new mock instance
+// NewMockCommandRunner creates a new mock instance.
 func NewMockCommandRunner(ctrl *gomock.Controller) *MockCommandRunner {
 	mock := &MockCommandRunner{ctrl: ctrl}
 	mock.recorder = &MockCommandRunnerMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use
+// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockCommandRunner) EXPECT() *MockCommandRunnerMockRecorder {
 	return m.recorder
 }
 
-// RunInContainer mocks base method
+// RunInContainer mocks base method.
 func (m *MockCommandRunner) RunInContainer(id container.ContainerID, cmd []string, timeout time.Duration) ([]byte, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "RunInContainer", id, cmd, timeout)
@@ -591,7 +592,7 @@ func (m *MockCommandRunner) RunInContainer(id container.ContainerID, cmd []strin
 	return ret0, ret1
 }
 
-// RunInContainer indicates an expected call of RunInContainer
+// RunInContainer indicates an expected call of RunInContainer.
 func (mr *MockCommandRunnerMockRecorder) RunInContainer(id, cmd, timeout interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RunInContainer", reflect.TypeOf((*MockCommandRunner)(nil).RunInContainer), id, cmd, timeout)
