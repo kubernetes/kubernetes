@@ -85,24 +85,32 @@ func ValidateCustomResource(fldPath *field.Path, customResource interface{}, val
 					value = err.Value
 				}
 				max := int64(-1)
-				if i, ok := err.Value.(int64); ok {
+				if i, ok := err.Valid.(int64); ok {
 					max = i
 				}
 				allErrs = append(allErrs, field.TooLongMaxLength(errPath, value, int(max)))
 
 			case openapierrors.MaxItemsFailCode:
-				max := int64(-1)
+				actual := int64(-1)
 				if i, ok := err.Value.(int64); ok {
+					actual = i
+				}
+				max := int64(-1)
+				if i, ok := err.Valid.(int64); ok {
 					max = i
 				}
-				allErrs = append(allErrs, field.TooMany(errPath, int(max), -1))
+				allErrs = append(allErrs, field.TooMany(errPath, int(actual), int(max)))
 
 			case openapierrors.TooManyPropertiesCode:
-				max := int64(-1)
+				actual := int64(-1)
 				if i, ok := err.Value.(int64); ok {
+					actual = i
+				}
+				max := int64(-1)
+				if i, ok := err.Valid.(int64); ok {
 					max = i
 				}
-				allErrs = append(allErrs, field.TooMany(errPath, -1, int(max)))
+				allErrs = append(allErrs, field.TooMany(errPath, int(actual), int(max)))
 
 			case openapierrors.InvalidTypeCode:
 				value := interface{}("")
