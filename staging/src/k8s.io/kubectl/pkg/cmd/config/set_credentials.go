@@ -35,7 +35,7 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
-type createAuthInfoOptions struct {
+type setCredentialsOptions struct {
 	configAccess      clientcmd.ConfigAccess
 	name              string
 	clientCertificate cliflag.StringFlag
@@ -67,7 +67,7 @@ const (
 )
 
 var (
-	createAuthInfoLong = fmt.Sprintf(templates.LongDesc(i18n.T(`
+	setCredentialsLong = fmt.Sprintf(templates.LongDesc(i18n.T(`
 		Set a user entry in kubeconfig.
 
 		Specifying a name that already exists will merge new fields on top of existing values.
@@ -83,7 +83,7 @@ var (
 
 		Bearer token and basic auth are mutually exclusive.`)), clientcmd.FlagCertFile, clientcmd.FlagKeyFile, clientcmd.FlagBearerToken, clientcmd.FlagUsername, clientcmd.FlagPassword)
 
-	createAuthInfoExample = templates.Examples(`
+	setCredentialsExample = templates.Examples(`
 		# Set only the "client-key" field on the "cluster-admin"
 		# entry, without touching other values
 		kubectl config set-credentials cluster-admin --client-key=~/.kube/admin.key
@@ -116,13 +116,19 @@ var (
 		kubectl config set-credentials cluster-admin --exec-env=var-to-remove-`)
 )
 
-// NewCmdConfigSetAuthInfo returns an Command option instance for 'config set-credentials' sub command
-func NewCmdConfigSetAuthInfo(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
-	options := &createAuthInfoOptions{configAccess: configAccess}
-	return newCmdConfigSetAuthInfo(out, options)
+// NewCmdConfigSetCredentials returns a Command instance for 'config set-credentials' sub command
+func NewCmdConfigSetCredentials(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
+	options := &setCredentialsOptions{configAccess: configAccess}
+	return newCmdConfigSetCredentials(out, options)
 }
 
-func newCmdConfigSetAuthInfo(out io.Writer, options *createAuthInfoOptions) *cobra.Command {
+// NewCmdConfigSetAuthInfo returns a Command instance for 'config set-credentials' sub command
+// DEPRECATED: Use NewCmdConfigSetCredentials instead
+func NewCmdConfigSetAuthInfo(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
+	return NewCmdConfigSetCredentials(out, configAccess)
+}
+
+func newCmdConfigSetCredentials(out io.Writer, options *setCredentialsOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: fmt.Sprintf(
 			"set-credentials NAME [--%v=path/to/certfile] "+
@@ -150,10 +156,10 @@ func newCmdConfigSetAuthInfo(out io.Writer, options *createAuthInfoOptions) *cob
 		),
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Set a user entry in kubeconfig"),
-		Long:                  createAuthInfoLong,
-		Example:               createAuthInfoExample,
+		Long:                  setCredentialsLong,
+		Example:               setCredentialsExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := options.complete(cmd, out)
+			err := options.complete(cmd)
 			if err != nil {
 				cmd.Help()
 				cmdutil.CheckErr(err)
@@ -182,7 +188,7 @@ func newCmdConfigSetAuthInfo(out io.Writer, options *createAuthInfoOptions) *cob
 	return cmd
 }
 
-func (o createAuthInfoOptions) run() error {
+func (o setCredentialsOptions) run() error {
 	err := o.validate()
 	if err != nil {
 		return err
@@ -207,8 +213,7 @@ func (o createAuthInfoOptions) run() error {
 	return nil
 }
 
-// authInfo builds an AuthInfo object from the options
-func (o *createAuthInfoOptions) modifyAuthInfo(existingAuthInfo clientcmdapi.AuthInfo) clientcmdapi.AuthInfo {
+func (o *setCredentialsOptions) modifyAuthInfo(existingAuthInfo clientcmdapi.AuthInfo) clientcmdapi.AuthInfo {
 	modifiedAuthInfo := existingAuthInfo
 
 	var setToken, setBasic bool
@@ -356,21 +361,21 @@ func (o *createAuthInfoOptions) modifyAuthInfo(existingAuthInfo clientcmdapi.Aut
 	return modifiedAuthInfo
 }
 
-func (o *createAuthInfoOptions) complete(cmd *cobra.Command, out io.Writer) error {
+func (o *setCredentialsOptions) complete(cmd *cobra.Command) error {
 	args := cmd.Flags().Args()
 	if len(args) != 1 {
-		return fmt.Errorf("Unexpected args: %v", args)
+		return fmt.Errorf("unexpected args: %v", args)
 	}
 
 	authProviderArgs, err := cmd.Flags().GetStringSlice(flagAuthProviderArg)
 	if err != nil {
-		return fmt.Errorf("Error: %s", err)
+		return err
 	}
 
 	if len(authProviderArgs) > 0 {
 		newPairs, removePairs, err := cmdutil.ParsePairs(authProviderArgs, flagAuthProviderArg, true)
 		if err != nil {
-			return fmt.Errorf("Error: %s", err)
+			return err
 		}
 		o.authProviderArgs = newPairs
 		o.authProviderArgsToRemove = removePairs
@@ -378,7 +383,7 @@ func (o *createAuthInfoOptions) complete(cmd *cobra.Command, out io.Writer) erro
 
 	execArgs, err := cmd.Flags().GetStringSlice(flagExecArg)
 	if err != nil {
-		return fmt.Errorf("Error: %s", err)
+		return err
 	}
 	if len(execArgs) > 0 {
 		o.execArgs = execArgs
@@ -386,12 +391,12 @@ func (o *createAuthInfoOptions) complete(cmd *cobra.Command, out io.Writer) erro
 
 	execEnv, err := cmd.Flags().GetStringArray(flagExecEnv)
 	if err != nil {
-		return fmt.Errorf("Error: %s", err)
+		return err
 	}
 	if len(execEnv) > 0 {
 		newPairs, removePairs, err := cmdutil.ParsePairs(execEnv, flagExecEnv, true)
 		if err != nil {
-			return fmt.Errorf("Error: %s", err)
+			return err
 		}
 		o.execEnv = newPairs
 		o.execEnvToRemove = removePairs
@@ -401,7 +406,7 @@ func (o *createAuthInfoOptions) complete(cmd *cobra.Command, out io.Writer) erro
 	return nil
 }
 
-func (o createAuthInfoOptions) validate() error {
+func (o setCredentialsOptions) validate() error {
 	if len(o.name) == 0 {
 		return errors.New("you must specify a non-empty user name")
 	}
