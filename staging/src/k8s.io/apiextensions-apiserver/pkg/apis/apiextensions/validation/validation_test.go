@@ -24,6 +24,8 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/utils/pointer"
+
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsfuzzer "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/fuzzer"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -33,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/utils/pointer"
 )
 
 type validationMatch struct {
@@ -7972,7 +7973,11 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 				},
 			},
 			expectedErrors: []validationMatch{
+				// exceeds per-rule limit and contributes to total limit being exceeded (1 error for each)
 				forbidden("spec.validation.openAPIV3Schema.properties[value].x-kubernetes-validations[0].rule"),
+				forbidden("spec.validation.openAPIV3Schema.properties[value].x-kubernetes-validations[0].rule"),
+				// total limit is exceeded
+				forbidden("spec.validation.openAPIV3Schema"),
 			},
 		},
 		{
@@ -8005,7 +8010,11 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 				},
 			},
 			expectedErrors: []validationMatch{
+				// exceeds per-rule limit and contributes to total limit being exceeded (1 error for each)
 				forbidden("spec.validation.openAPIV3Schema.properties[value].x-kubernetes-validations[0].rule"),
+				forbidden("spec.validation.openAPIV3Schema.properties[value].x-kubernetes-validations[0].rule"),
+				// total limit is exceeded
+				forbidden("spec.validation.openAPIV3Schema"),
 			},
 		},
 		{
@@ -8089,6 +8098,58 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 				},
 			},
 			expectedErrors: []validationMatch{},
+		},
+		{
+			name: "forbid validation rules where cost total exceeds total limit",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"list": {
+							Type:     "array",
+							MaxItems: int64Ptr(100000),
+							Items: &apiextensions.JSONSchemaPropsOrArray{
+								Schema: &apiextensions.JSONSchemaProps{
+									Type:      "string",
+									MaxLength: int64Ptr(5000),
+									XValidations: apiextensions.ValidationRules{
+										{Rule: "self.contains('keyword')"},
+									},
+								},
+							},
+						},
+						"map": {
+							Type:          "object",
+							MaxProperties: int64Ptr(1000),
+							AdditionalProperties: &apiextensions.JSONSchemaPropsOrBool{
+								Allows: true,
+								Schema: &apiextensions.JSONSchemaProps{
+									Type:      "string",
+									MaxLength: int64Ptr(5000),
+									XValidations: apiextensions.ValidationRules{
+										{Rule: "self.contains('keyword')"},
+									},
+								},
+							},
+						},
+						"field": { // include a validation rule that does not contribute to total limit being exceeded (i.e. it is less than 1% of the limit)
+							Type: "integer",
+							XValidations: apiextensions.ValidationRules{
+								{Rule: "self > 50 && self < 100"},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: []validationMatch{
+				// exceeds per-rule limit and contributes to total limit being exceeded (1 error for each)
+				forbidden("spec.validation.openAPIV3Schema.properties[list].items.x-kubernetes-validations[0].rule"),
+				forbidden("spec.validation.openAPIV3Schema.properties[list].items.x-kubernetes-validations[0].rule"),
+				// contributes to total limit being exceeded, but does not exceed per-rule limit
+				forbidden("spec.validation.openAPIV3Schema.properties[map].additionalProperties.x-kubernetes-validations[0].rule"),
+				// total limit is exceeded
+				forbidden("spec.validation.openAPIV3Schema"),
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -8458,6 +8519,83 @@ func TestCostInfo(t *testing.T) {
 				t.Errorf("expected bounded cardinality of %d but got unbounded cardinality", tt.expectedMaxCardinality)
 			} else if *tt.expectedMaxCardinality != *curCostInfo.MaxCardinality {
 				t.Errorf("wrong cardinality (expected %d, got %d)", *tt.expectedMaxCardinality, curCostInfo.MaxCardinality)
+			}
+		})
+	}
+}
+
+func TestPerCRDEstimatedCost(t *testing.T) {
+	tests := []struct {
+		name              string
+		costs             []uint64
+		expectedExpensive []uint64
+		expectedTotal     uint64
+	}{
+		{
+			name:              "no costs",
+			costs:             []uint64{},
+			expectedExpensive: []uint64{},
+			expectedTotal:     uint64(0),
+		},
+		{
+			name:              "one cost",
+			costs:             []uint64{1000000},
+			expectedExpensive: []uint64{1000000},
+			expectedTotal:     uint64(1000000),
+		},
+		{
+			name:              "one cost, ignored", // costs < 1% of the per-CRD cost limit are not considered expensive
+			costs:             []uint64{900000},
+			expectedExpensive: []uint64{},
+			expectedTotal:     uint64(900000),
+		},
+		{
+			name:              "2 costs",
+			costs:             []uint64{5000000, 25000000},
+			expectedExpensive: []uint64{25000000, 5000000},
+			expectedTotal:     uint64(30000000),
+		},
+		{
+			name:              "3 costs, one ignored",
+			costs:             []uint64{5000000, 25000000, 900000},
+			expectedExpensive: []uint64{25000000, 5000000},
+			expectedTotal:     uint64(30900000),
+		},
+		{
+			name:              "4 costs",
+			costs:             []uint64{16000000, 50000000, 34000000, 50000000},
+			expectedExpensive: []uint64{50000000, 50000000, 34000000, 16000000},
+			expectedTotal:     uint64(150000000),
+		},
+		{
+			name:              "5 costs, one trimmed, one ignored", // only the top 4 most expensive are tracked
+			costs:             []uint64{16000000, 50000000, 900000, 34000000, 50000000, 50000001},
+			expectedExpensive: []uint64{50000001, 50000000, 50000000, 34000000},
+			expectedTotal:     uint64(200900001),
+		},
+		{
+			name:              "costs do not overflow",
+			costs:             []uint64{math.MaxUint64 / 2, math.MaxUint64 / 2, 1, 10, 100, 1000},
+			expectedExpensive: []uint64{math.MaxUint64 / 2, math.MaxUint64 / 2},
+			expectedTotal:     uint64(math.MaxUint64),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			crdCost := rootCostInfo().TotalCost
+			for _, cost := range tt.costs {
+				crdCost.observeExpressionCost(nil, cost)
+			}
+			if len(crdCost.mostExpensive) != len(tt.expectedExpensive) {
+				t.Fatalf("expected %d largest costs but got %d: %v", len(tt.expectedExpensive), len(crdCost.mostExpensive), crdCost.mostExpensive)
+			}
+			for i, expensive := range crdCost.mostExpensive {
+				if tt.expectedExpensive[i] != expensive.cost {
+					t.Errorf("expected largest cost of %d at index %d but got %d", tt.expectedExpensive[i], i, expensive.cost)
+				}
+			}
+			if tt.expectedTotal != crdCost.totalCost {
+				t.Errorf("expected total cost of %d but got %d", tt.expectedTotal, crdCost.totalCost)
 			}
 		})
 	}

@@ -22,6 +22,7 @@ import (
 	"math"
 	"reflect"
 	"regexp"
+	"sort"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -52,6 +53,8 @@ var (
 const (
 	// StaticEstimatedCostLimit represents the largest-allowed static CEL cost on a per-expression basis.
 	StaticEstimatedCostLimit = 10000000
+	// StaticEstimatedCRDCostLimit represents the largest-allowed total cost for the x-kubernetes-validations rules of a CRD.
+	StaticEstimatedCRDCostLimit = 100000000
 )
 
 // ValidateCustomResourceDefinition statically validates
@@ -720,7 +723,20 @@ func validateCustomResourceDefinitionValidation(ctx context.Context, customResou
 			requireValidPropertyType: opts.requireValidPropertyType,
 		}
 
-		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema, fldPath.Child("openAPIV3Schema"), openAPIV3Schema, true, &opts, rootCostInfo())...)
+		costInfo := rootCostInfo()
+		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema, fldPath.Child("openAPIV3Schema"), openAPIV3Schema, true, &opts, costInfo)...)
+
+		if costInfo.TotalCost != nil {
+			if costInfo.TotalCost.totalCost > StaticEstimatedCRDCostLimit {
+				for _, expensive := range costInfo.TotalCost.mostExpensive {
+					costErrorMsg := fmt.Sprintf("contributed to estimated rule cost total exceeding cost limit for entire OpenAPIv3 schema")
+					allErrs = append(allErrs, field.Forbidden(expensive.path, costErrorMsg))
+				}
+
+				costErrorMsg := getCostErrorMessage("x-kubernetes-validations estimated rule cost total for entire OpenAPIv3 schema", costInfo.TotalCost.totalCost, StaticEstimatedCRDCostLimit)
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("openAPIV3Schema"), costErrorMsg))
+			}
+		}
 
 		if opts.requireStructuralSchema {
 			if ss, err := structuralschema.NewStructural(schema); err != nil {
@@ -760,6 +776,43 @@ type costInfo struct {
 	// that the parent schemas offer no bound to the number of times a data element for the current
 	// schema can exist.
 	MaxCardinality *uint64
+	// TotalCost accumulates the x-kubernetes-validators estimated rule cost total for an entire custom resource
+	// definition. A single totalCost is allocated for each validation call and passed through the stack as the
+	// custom resource definition's OpenAPIv3 schema is recursively validated.
+	TotalCost *totalCost
+}
+
+type totalCost struct {
+	// totalCost accumulates the x-kubernetes-validators estimated rule cost total.
+	totalCost uint64
+	// mostExpensive accumulates the top 4 most expensive rules contributing to the totalCost. Only rules
+	// that accumulate at least 1% of total cost limit are included.
+	mostExpensive []ruleCost
+}
+
+func (c *totalCost) observeExpressionCost(path *field.Path, cost uint64) {
+	if math.MaxUint64-c.totalCost < cost {
+		c.totalCost = math.MaxUint64
+	} else {
+		c.totalCost += cost
+	}
+
+	if cost < StaticEstimatedCRDCostLimit/100 { // ignore rules that contribute < 1% of total cost limit
+		return
+	}
+	c.mostExpensive = append(c.mostExpensive, ruleCost{path: path, cost: cost})
+	sort.Slice(c.mostExpensive, func(i, j int) bool {
+		// sort in descending order so the most expensive rule is first
+		return c.mostExpensive[i].cost > c.mostExpensive[j].cost
+	})
+	if len(c.mostExpensive) > 4 {
+		c.mostExpensive = c.mostExpensive[:4]
+	}
+}
+
+type ruleCost struct {
+	path *field.Path
+	cost uint64
 }
 
 // MultiplyByElementCost returns a costInfo where the MaxCardinality is multiplied by the
@@ -767,7 +820,7 @@ type costInfo struct {
 // MaxCardinality is unbounded (nil) or the factor that the schema increase the cardinality
 // is unbounded, the resulting costInfo's MaxCardinality is also unbounded.
 func (c *costInfo) MultiplyByElementCost(schema *apiextensions.JSONSchemaProps) costInfo {
-	result := costInfo{MaxCardinality: unbounded}
+	result := costInfo{TotalCost: c.TotalCost, MaxCardinality: unbounded}
 	if schema == nil {
 		// nil schemas can be passed since we call MultiplyByElementCost
 		// before ValidateCustomResourceDefinitionOpenAPISchema performs its nil check
@@ -831,6 +884,7 @@ func rootCostInfo() costInfo {
 	rootCardinality := uint64(1)
 	return costInfo{
 		MaxCardinality: &rootCardinality,
+		TotalCost:      &totalCost{},
 	}
 }
 
@@ -1050,8 +1104,11 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 				for i, cr := range compResults {
 					expressionCost := getExpressionCost(cr, nodeCostInfo)
 					if expressionCost > StaticEstimatedCostLimit {
-						costErrorMsg := getCostErrorMessage(expressionCost, StaticEstimatedCostLimit)
+						costErrorMsg := getCostErrorMessage("estimated rule cost", expressionCost, StaticEstimatedCostLimit)
 						allErrs = append(allErrs, field.Forbidden(fldPath.Child("x-kubernetes-validations").Index(i).Child("rule"), costErrorMsg))
+					}
+					if nodeCostInfo.TotalCost != nil {
+						nodeCostInfo.TotalCost.observeExpressionCost(fldPath.Child("x-kubernetes-validations").Index(i).Child("rule"), expressionCost)
 					}
 					if cr.Error != nil {
 						if cr.Error.Type == cel.ErrorTypeRequired {
@@ -1096,15 +1153,20 @@ func getExpressionCost(cr cel.CompilationResult, cardinalityCost costInfo) uint6
 	return multiplyWithOverflowGuard(cr.MaxCost, cr.MaxCardinality)
 }
 
-func getCostErrorMessage(expressionCost, costLimit uint64) string {
-	exceedFactor := float64(expressionCost) / float64(StaticEstimatedCostLimit)
+func getCostErrorMessage(costName string, expressionCost, costLimit uint64) string {
+	exceedFactor := float64(expressionCost) / float64(costLimit)
+	var factor string
 	if exceedFactor > 100.0 {
 		// if exceedFactor is greater than 2 orders of magnitude, the rule is likely O(n^2) or worse
 		// and will probably never validate without some set limits
 		// also in such cases the cost estimation is generally large enough to not add any value
-		return fmt.Sprintf("CEL rule exceeded budget by more than 100x (try simplifying the rule, or adding maxItems, maxProperties, and maxLength where arrays, maps, and strings are used)")
+		factor = fmt.Sprintf("more than 100x")
+	} else if exceedFactor < 1.5 {
+		factor = fmt.Sprintf("%fx", exceedFactor) // avoid reporting "exceeds budge by a factor of 1.0x"
+	} else {
+		factor = fmt.Sprintf("%.1fx", exceedFactor)
 	}
-	return fmt.Sprintf("CEL rule exceeded budget by factor of %.1fx (try adding maxItems, maxProperties, and maxLength where arrays, maps, and strings are used)", exceedFactor)
+	return fmt.Sprintf("%s exceeds budget by factor of %s (try simplifying the rule, or adding maxItems, maxProperties, and maxLength where arrays, maps, and strings are declared)", costName, factor)
 }
 
 var newlineMatcher = regexp.MustCompile(`[\n\r]+`) // valid newline chars in CEL grammar
