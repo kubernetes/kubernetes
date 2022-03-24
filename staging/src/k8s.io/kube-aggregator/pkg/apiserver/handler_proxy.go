@@ -241,7 +241,10 @@ func (r *proxyHandler) updateAPIService(apiService *apiregistrationv1api.APIServ
 			CAData:     apiService.Spec.CABundle,
 		},
 	}
-	clientConfig.Wrap(x509metrics.NewMissingSANRoundTripperWrapperConstructor(x509MissingSANCounter))
+	clientConfig.Wrap(x509metrics.NewDeprecatedCertificateRoundTripperWrapperConstructor(
+		x509MissingSANCounter,
+		x509InsecureSHA1Counter,
+	))
 
 	newInfo := proxyHandlingInfo{
 		name:             apiService.Name,

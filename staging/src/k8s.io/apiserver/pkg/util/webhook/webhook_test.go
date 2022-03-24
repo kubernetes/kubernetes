@@ -334,11 +334,12 @@ func TestMissingKubeConfigFile(t *testing.T) {
 func TestTLSConfig(t *testing.T) {
 	invalidCert := []byte("invalid")
 	tests := []struct {
-		test                            string
-		clientCert, clientKey, clientCA []byte
-		serverCert, serverKey, serverCA []byte
-		errRegex                        string
-		increaseSANWarnCounter          bool
+		test                             string
+		clientCert, clientKey, clientCA  []byte
+		serverCert, serverKey, serverCA  []byte
+		errRegex                         string
+		increaseSANWarnCounter           bool
+		increaseSHA1SignatureWarnCounter bool
 	}{
 		{
 			test:       "invalid server CA",
@@ -402,8 +403,23 @@ func TestTLSConfig(t *testing.T) {
 			errRegex:               "x509: certificate relies on legacy Common Name field",
 			increaseSANWarnCounter: true,
 		},
+		{
+			test:       "server cert with SHA1 signature",
+			clientCA:   caCert,
+			serverCert: append(append(sha1ServerCertInter, byte('\n')), caCertInter...), serverKey: serverKey,
+			errRegex:                         "x509: cannot verify signature: insecure algorithm SHA1-RSA \\(temporarily override with GODEBUG=x509sha1=1\\)",
+			increaseSHA1SignatureWarnCounter: true,
+		},
+		{
+			test:       "server cert signed by an intermediate CA with SHA1 signature",
+			clientCA:   caCert,
+			serverCert: append(append(serverCertInterSHA1, byte('\n')), caCertInterSHA1...), serverKey: serverKey,
+			errRegex:                         "x509: cannot verify signature: insecure algorithm SHA1-RSA \\(temporarily override with GODEBUG=x509sha1=1\\)",
+			increaseSHA1SignatureWarnCounter: true,
+		},
 	}
 
+	lastSHA1SigCounter := 0
 	for _, tt := range tests {
 		// Use a closure so defer statements trigger between loop iterations.
 		func() {
@@ -482,6 +498,20 @@ func TestTLSConfig(t *testing.T) {
 				if int(errorCounter) != 1 {
 					t.Errorf("expected the x509_common_name_error_count to be 1, but it's %d", errorCounter)
 				}
+			}
+
+			if tt.increaseSHA1SignatureWarnCounter {
+				errorCounter := getSingleCounterValueFromRegistry(t, legacyregistry.DefaultGatherer, "apiserver_webhooks_x509_insecure_sha1_total")
+
+				if errorCounter == -1 {
+					t.Errorf("failed to get the apiserver_webhooks_x509_insecure_sha1_total metrics: %v", err)
+				}
+
+				if int(errorCounter) != lastSHA1SigCounter+1 {
+					t.Errorf("expected the apiserver_webhooks_x509_insecure_sha1_total counter to be 1, but it's %d", errorCounter)
+				}
+
+				lastSHA1SigCounter++
 			}
 		}()
 	}
