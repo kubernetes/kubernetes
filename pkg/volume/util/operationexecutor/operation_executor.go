@@ -246,8 +246,8 @@ type ActualStateOfWorldAttacherUpdater interface {
 	// the node's volumesToReportAsAttached list)
 	AddVolumeToReportAsAttached(volumeName v1.UniqueVolumeName, nodeName types.NodeName)
 
-	// SetVolumeClaimSize sets pvc claim size by reading pvc.Status.Capacity
-	SetVolumeClaimSize(volumeName v1.UniqueVolumeName, claimSize *resource.Quantity)
+	// InitializeClaimSize sets pvc claim size by reading pvc.Status.Capacity
+	InitializeClaimSize(volumeName v1.UniqueVolumeName, claimSize *resource.Quantity)
 }
 
 // VolumeLogger defines a set of operations for generating volume-related logging and error msgs

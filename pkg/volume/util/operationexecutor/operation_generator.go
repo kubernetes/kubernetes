@@ -1507,7 +1507,7 @@ func (og *operationGenerator) GenerateVerifyControllerAttachedVolumeFunc(
 				eventErr, detailedErr := volumeToMount.GenerateError("VerifyControllerAttachedVolume.MarkVolumeAsAttachedByUniqueVolumeName failed", addVolumeNodeErr)
 				return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
 			}
-			actualStateOfWorld.SetVolumeClaimSize(volumeToMount.VolumeName, claimSize)
+			actualStateOfWorld.InitializeClaimSize(volumeToMount.VolumeName, claimSize)
 			return volumetypes.NewOperationContext(nil, nil, migrated)
 		}
 
@@ -1548,7 +1548,7 @@ func (og *operationGenerator) GenerateVerifyControllerAttachedVolumeFunc(
 					eventErr, detailedErr := volumeToMount.GenerateError("VerifyControllerAttachedVolume.MarkVolumeAsAttached failed", addVolumeNodeErr)
 					return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
 				}
-				actualStateOfWorld.SetVolumeClaimSize(volumeToMount.VolumeName, claimSize)
+				actualStateOfWorld.InitializeClaimSize(volumeToMount.VolumeName, claimSize)
 				return volumetypes.NewOperationContext(nil, nil, migrated)
 			}
 		}

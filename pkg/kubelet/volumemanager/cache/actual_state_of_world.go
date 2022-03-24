@@ -599,7 +599,7 @@ func (asw *actualStateOfWorld) SetDeviceMountState(
 	return nil
 }
 
-func (asw *actualStateOfWorld) SetVolumeClaimSize(volumeName v1.UniqueVolumeName, claimSize *resource.Quantity) {
+func (asw *actualStateOfWorld) InitializeClaimSize(volumeName v1.UniqueVolumeName, claimSize *resource.Quantity) {
 	asw.Lock()
 	defer asw.Unlock()
 
