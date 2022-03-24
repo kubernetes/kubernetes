@@ -3042,6 +3042,10 @@ oom_score = -999
   runtime_type = "io.containerd.runc.v2"
 [plugins."io.containerd.grpc.v1.cri".registry.mirrors."docker.io"]
   endpoint = ["https://mirror.gcr.io","https://registry-1.docker.io"]
+# Enable registry.k8s.io as the primary mirror for k8s.gcr.io
+# See: https://github.com/kubernetes/k8s.io/issues/3411
+[plugins."io.containerd.grpc.v1.cri".registry.mirrors."k8s.gcr.io"]
+  endpoint = ["https://registry.k8s.io", "https://k8s.gcr.io",]
 EOF
 
   if [[ "${CONTAINER_RUNTIME_TEST_HANDLER:-}" == "true" ]]; then
