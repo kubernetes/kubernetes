@@ -24,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"os"
 	"reflect"
 	"strconv"
@@ -256,7 +257,7 @@ func TestGet(t *testing.T) {
 		name:             "too high resource version",
 		key:              key,
 		expectRVTooLarge: true,
-		rv:               fmt.Sprintf("%d", lastUpdatedCurrentRV+1),
+		rv:               strconv.FormatInt(math.MaxInt64, 10),
 	}, { // test get on non-existing item with ignoreNotFound=false
 		name:              "get non-existing",
 		key:               "/non-existing",
@@ -611,7 +612,7 @@ func TestGetListNonRecursive(t *testing.T) {
 		key:              key,
 		pred:             storage.Everything,
 		expectedOut:      []*example.Pod{storedObj},
-		rv:               fmt.Sprintf("%d", currentRV+1),
+		rv:               strconv.FormatInt(math.MaxInt64, 10),
 		expectRVTooLarge: true,
 	}, {
 		name:        "non-existing key",
@@ -1235,7 +1236,7 @@ func TestList(t *testing.T) {
 		{
 			name:             "rejects resource version set too high",
 			prefix:           "/",
-			rv:               fmt.Sprintf("%d", continueRV+1),
+			rv:               strconv.FormatInt(math.MaxInt64, 10),
 			expectRVTooLarge: true,
 		},
 		{
