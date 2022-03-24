@@ -110,7 +110,7 @@ func (d *testDecodeCoercion) DeepCopyInto(out *testDecodeCoercion) {
 }
 
 func TestDecode(t *testing.T) {
-	testCases := []struct {
+	type testCase struct {
 		creater runtime.ObjectCreater
 		typer   runtime.ObjectTyper
 		yaml    bool
@@ -124,13 +124,294 @@ func TestDecode(t *testing.T) {
 		errFn          func(error) bool
 		expectedObject runtime.Object
 		expectedGVK    *schema.GroupVersionKind
-	}{
+	}
+
+	testCases := []testCase{
+		// missing metadata without into, typed creater
 		{
 			data: []byte("{}"),
 
 			expectedGVK: &schema.GroupVersionKind{},
 			errFn:       func(err error) bool { return strings.Contains(err.Error(), "Object 'Kind' is missing in") },
 		},
+		{
+			data: []byte("{}"),
+
+			expectedGVK: &schema.GroupVersionKind{},
+			errFn:       func(err error) bool { return strings.Contains(err.Error(), "Object 'Kind' is missing in") },
+			strict:      true,
+		},
+
+		{
+			data: []byte(`{"kind":"Foo"}`),
+
+			expectedGVK: &schema.GroupVersionKind{Kind: "Foo"},
+			errFn:       func(err error) bool { return strings.Contains(err.Error(), "Object 'apiVersion' is missing in") },
+		},
+		{
+			data: []byte(`{"kind":"Foo"}`),
+
+			expectedGVK: &schema.GroupVersionKind{Kind: "Foo"},
+			errFn:       func(err error) bool { return strings.Contains(err.Error(), "Object 'apiVersion' is missing in") },
+			strict:      true,
+		},
+
+		{
+			data: []byte(`{"apiVersion":"foo/v1"}`),
+
+			expectedGVK: &schema.GroupVersionKind{Group: "foo", Version: "v1"},
+			errFn:       func(err error) bool { return strings.Contains(err.Error(), "Object 'Kind' is missing in") },
+		},
+		{
+			data: []byte(`{"apiVersion":"foo/v1"}`),
+
+			expectedGVK: &schema.GroupVersionKind{Group: "foo", Version: "v1"},
+			errFn:       func(err error) bool { return strings.Contains(err.Error(), "Object 'Kind' is missing in") },
+			strict:      true,
+		},
+
+		{
+			data:    []byte(`{"apiVersion":"/v1","kind":"Foo"}`),
+			typer:   &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			creater: &mockCreater{obj: &testDecodable{}},
+
+			expectedObject: &testDecodable{TypeMeta: metav1.TypeMeta{APIVersion: "/v1", Kind: "Foo"}},
+			expectedGVK:    &schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Foo"},
+		},
+		{
+			data:    []byte(`{"apiVersion":"/v1","kind":"Foo"}`),
+			typer:   &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			creater: &mockCreater{obj: &testDecodable{}},
+
+			expectedObject: &testDecodable{TypeMeta: metav1.TypeMeta{APIVersion: "/v1", Kind: "Foo"}},
+			expectedGVK:    &schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Foo"},
+			strict:         true,
+		},
+
+		// missing metadata with unstructured into
+		{
+			data:  []byte("{}"),
+			typer: &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			into:  &unstructured.Unstructured{},
+
+			expectedGVK: &schema.GroupVersionKind{},
+			errFn:       func(err error) bool { return strings.Contains(err.Error(), "Object 'Kind' is missing in") },
+		},
+		{
+			data:  []byte("{}"),
+			typer: &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			into:  &unstructured.Unstructured{},
+
+			expectedGVK: &schema.GroupVersionKind{},
+			errFn:       func(err error) bool { return strings.Contains(err.Error(), "Object 'Kind' is missing in") },
+			strict:      true,
+		},
+
+		{
+			data:  []byte(`{"kind":"Foo"}`),
+			typer: &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			into:  &unstructured.Unstructured{},
+
+			expectedGVK:    &schema.GroupVersionKind{Kind: "Foo"},
+			expectedObject: &unstructured.Unstructured{Object: map[string]interface{}{"kind": "Foo"}},
+			// TODO(109023): expect this to error; unstructured decoding currently only requires kind to be set, not apiVersion
+		},
+		{
+			data:  []byte(`{"kind":"Foo"}`),
+			typer: &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			into:  &unstructured.Unstructured{},
+
+			expectedGVK:    &schema.GroupVersionKind{Kind: "Foo"},
+			expectedObject: &unstructured.Unstructured{Object: map[string]interface{}{"kind": "Foo"}},
+			strict:         true,
+			// TODO(109023): expect this to error; unstructured decoding currently only requires kind to be set, not apiVersion
+		},
+
+		{
+			data:  []byte(`{"apiVersion":"foo/v1"}`),
+			typer: &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			into:  &unstructured.Unstructured{},
+
+			expectedGVK: &schema.GroupVersionKind{Group: "foo", Version: "v1"},
+			errFn:       func(err error) bool { return strings.Contains(err.Error(), "Object 'Kind' is missing in") },
+		},
+		{
+			data:  []byte(`{"apiVersion":"foo/v1"}`),
+			typer: &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			into:  &unstructured.Unstructured{},
+
+			expectedGVK: &schema.GroupVersionKind{Group: "foo", Version: "v1"},
+			errFn:       func(err error) bool { return strings.Contains(err.Error(), "Object 'Kind' is missing in") },
+			strict:      true,
+		},
+
+		{
+			data:  []byte(`{"apiVersion":"/v1","kind":"Foo"}`),
+			typer: &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			into:  &unstructured.Unstructured{},
+
+			expectedGVK:    &schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Foo"},
+			expectedObject: &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "/v1", "kind": "Foo"}},
+		},
+		{
+			data:  []byte(`{"apiVersion":"/v1","kind":"Foo"}`),
+			typer: &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			into:  &unstructured.Unstructured{},
+
+			expectedGVK:    &schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Foo"},
+			expectedObject: &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "/v1", "kind": "Foo"}},
+			strict:         true,
+		},
+
+		// missing metadata with unstructured into providing metadata
+		{
+			data:  []byte("{}"),
+			typer: &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			into:  &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "into/v1", "kind": "Into"}},
+
+			expectedGVK: &schema.GroupVersionKind{},
+			errFn:       func(err error) bool { return strings.Contains(err.Error(), "Object 'Kind' is missing in") },
+		},
+		{
+			data:  []byte("{}"),
+			typer: &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			into:  &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "into/v1", "kind": "Into"}},
+
+			expectedGVK: &schema.GroupVersionKind{},
+			errFn:       func(err error) bool { return strings.Contains(err.Error(), "Object 'Kind' is missing in") },
+			strict:      true,
+		},
+
+		{
+			data:  []byte(`{"kind":"Foo"}`),
+			typer: &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			into:  &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "into/v1", "kind": "Into"}},
+
+			expectedGVK:    &schema.GroupVersionKind{Kind: "Foo"},
+			expectedObject: &unstructured.Unstructured{Object: map[string]interface{}{"kind": "Foo"}},
+			// TODO(109023): expect this to error; unstructured decoding currently only requires kind to be set, not apiVersion
+		},
+		{
+			data:  []byte(`{"kind":"Foo"}`),
+			typer: &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			into:  &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "into/v1", "kind": "Into"}},
+
+			expectedGVK:    &schema.GroupVersionKind{Kind: "Foo"},
+			expectedObject: &unstructured.Unstructured{Object: map[string]interface{}{"kind": "Foo"}},
+			strict:         true,
+			// TODO(109023): expect this to error; unstructured decoding currently only requires kind to be set, not apiVersion
+		},
+
+		{
+			data:  []byte(`{"apiVersion":"foo/v1"}`),
+			typer: &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			into:  &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "into/v1", "kind": "Into"}},
+
+			expectedGVK: &schema.GroupVersionKind{Group: "foo", Version: "v1"},
+			errFn:       func(err error) bool { return strings.Contains(err.Error(), "Object 'Kind' is missing in") },
+		},
+		{
+			data:  []byte(`{"apiVersion":"foo/v1"}`),
+			typer: &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			into:  &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "into/v1", "kind": "Into"}},
+
+			expectedGVK: &schema.GroupVersionKind{Group: "foo", Version: "v1"},
+			errFn:       func(err error) bool { return strings.Contains(err.Error(), "Object 'Kind' is missing in") },
+			strict:      true,
+		},
+
+		{
+			data:  []byte(`{"apiVersion":"/v1","kind":"Foo"}`),
+			typer: &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			into:  &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "into/v1", "kind": "Into"}},
+
+			expectedGVK:    &schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Foo"},
+			expectedObject: &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "/v1", "kind": "Foo"}},
+		},
+		{
+			data:  []byte(`{"apiVersion":"/v1","kind":"Foo"}`),
+			typer: &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			into:  &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "into/v1", "kind": "Into"}},
+
+			expectedGVK:    &schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Foo"},
+			expectedObject: &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "/v1", "kind": "Foo"}},
+			strict:         true,
+		},
+
+		// missing metadata without into, unstructured creater
+		{
+			data:    []byte("{}"),
+			typer:   &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			creater: &mockCreater{obj: &unstructured.Unstructured{}},
+
+			expectedGVK: &schema.GroupVersionKind{},
+			errFn:       func(err error) bool { return strings.Contains(err.Error(), "Object 'Kind' is missing in") },
+		},
+		{
+			data:    []byte("{}"),
+			typer:   &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			creater: &mockCreater{obj: &unstructured.Unstructured{}},
+
+			expectedGVK: &schema.GroupVersionKind{},
+			errFn:       func(err error) bool { return strings.Contains(err.Error(), "Object 'Kind' is missing in") },
+			strict:      true,
+		},
+
+		{
+			data:    []byte(`{"kind":"Foo"}`),
+			typer:   &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			creater: &mockCreater{obj: &unstructured.Unstructured{}},
+
+			expectedGVK: &schema.GroupVersionKind{Kind: "Foo"},
+			errFn:       func(err error) bool { return strings.Contains(err.Error(), "Object 'apiVersion' is missing in") },
+		},
+		{
+			data:    []byte(`{"kind":"Foo"}`),
+			typer:   &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			creater: &mockCreater{obj: &unstructured.Unstructured{}},
+
+			expectedGVK: &schema.GroupVersionKind{Kind: "Foo"},
+			errFn:       func(err error) bool { return strings.Contains(err.Error(), "Object 'apiVersion' is missing in") },
+			strict:      true,
+		},
+
+		{
+			data:    []byte(`{"apiVersion":"foo/v1"}`),
+			typer:   &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			creater: &mockCreater{obj: &unstructured.Unstructured{}},
+
+			expectedGVK: &schema.GroupVersionKind{Group: "foo", Version: "v1"},
+			errFn:       func(err error) bool { return strings.Contains(err.Error(), "Object 'Kind' is missing in") },
+		},
+		{
+			data:    []byte(`{"apiVersion":"foo/v1"}`),
+			typer:   &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			creater: &mockCreater{obj: &unstructured.Unstructured{}},
+
+			expectedGVK: &schema.GroupVersionKind{Group: "foo", Version: "v1"},
+			errFn:       func(err error) bool { return strings.Contains(err.Error(), "Object 'Kind' is missing in") },
+			strict:      true,
+		},
+
+		{
+			data:    []byte(`{"apiVersion":"/v1","kind":"Foo"}`),
+			typer:   &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			creater: &mockCreater{obj: &unstructured.Unstructured{}},
+
+			expectedGVK:    &schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Foo"},
+			expectedObject: &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "/v1", "kind": "Foo"}},
+		},
+		{
+			data:    []byte(`{"apiVersion":"/v1","kind":"Foo"}`),
+			typer:   &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			creater: &mockCreater{obj: &unstructured.Unstructured{}},
+
+			expectedGVK:    &schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Foo"},
+			expectedObject: &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "/v1", "kind": "Foo"}},
+			strict:         true,
+		},
+
+		// creator errors
 		{
 			data:       []byte("{}"),
 			defaultGVK: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
@@ -140,11 +421,28 @@ func TestDecode(t *testing.T) {
 			errFn:       func(err error) bool { return err.Error() == "fake error" },
 		},
 		{
+			data:       []byte("{}"),
+			defaultGVK: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+			creater:    &mockCreater{err: fmt.Errorf("fake error")},
+
+			expectedGVK: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+			errFn:       func(err error) bool { return err.Error() == "fake error" },
+		},
+		// creator typed
+		{
 			data:           []byte("{}"),
 			defaultGVK:     &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
 			creater:        &mockCreater{obj: &testDecodable{}},
 			expectedObject: &testDecodable{},
 			expectedGVK:    &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+		},
+		{
+			data:           []byte("{}"),
+			defaultGVK:     &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+			creater:        &mockCreater{obj: &testDecodable{}},
+			expectedObject: &testDecodable{},
+			expectedGVK:    &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+			strict:         true,
 		},
 
 		// version without group is not defaulted
@@ -415,7 +713,27 @@ func TestDecode(t *testing.T) {
 			yaml:   true,
 			strict: true,
 		},
-
+		// Invalid strict JSON, results in json parse error:
+		{
+			data:  []byte("foo"),
+			into:  &unstructured.Unstructured{},
+			typer: &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			errFn: func(err error) bool {
+				return strings.Contains(err.Error(), `json parse error: invalid character 'o'`)
+			},
+			strict: true,
+		},
+		// empty JSON strict, results in missing kind error
+		{
+			data:        []byte("{}"),
+			into:        &unstructured.Unstructured{},
+			typer:       &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			expectedGVK: &schema.GroupVersionKind{},
+			errFn: func(err error) bool {
+				return strings.Contains(err.Error(), `Object 'Kind' is missing`)
+			},
+			strict: true,
+		},
 		// coerce from null
 		{
 			data:           []byte(`{"bool":null,"int":null,"int32":null,"int64":null,"float32":null,"float64":null,"string":null,"array":null,"map":null,"struct":null}`),
@@ -526,6 +844,10 @@ func TestDecode(t *testing.T) {
 		},
 	}
 
+	logTestCase := func(t *testing.T, tc testCase) {
+		t.Logf("data=%s\n\tinto=%T, yaml=%v, strict=%v", string(tc.data), tc.into, tc.yaml, tc.strict)
+	}
+
 	for i, test := range testCases {
 		var s runtime.Serializer
 		if test.yaml {
@@ -536,32 +858,39 @@ func TestDecode(t *testing.T) {
 		obj, gvk, err := s.Decode([]byte(test.data), test.defaultGVK, test.into)
 
 		if !reflect.DeepEqual(test.expectedGVK, gvk) {
+			logTestCase(t, test)
 			t.Errorf("%d: unexpected GVK: %v", i, gvk)
 		}
 
 		switch {
 		case err == nil && test.errFn != nil:
+			logTestCase(t, test)
 			t.Errorf("%d: failed: not getting the expected error", i)
 			continue
 		case err != nil && test.errFn == nil:
+			logTestCase(t, test)
 			t.Errorf("%d: failed: %v", i, err)
 			continue
 		case err != nil:
 			if !test.errFn(err) {
+				logTestCase(t, test)
 				t.Errorf("%d: failed: %v", i, err)
 			}
 			if !runtime.IsStrictDecodingError(err) && obj != nil {
+				logTestCase(t, test)
 				t.Errorf("%d: should have returned nil object", i)
 			}
 			continue
 		}
 
 		if test.into != nil && test.into != obj {
+			logTestCase(t, test)
 			t.Errorf("%d: expected into to be returned: %v", i, obj)
 			continue
 		}
 
 		if !reflect.DeepEqual(test.expectedObject, obj) {
+			logTestCase(t, test)
 			t.Errorf("%d: unexpected object:\n%s", i, diff.ObjectGoPrintSideBySide(test.expectedObject, obj))
 		}
 	}
