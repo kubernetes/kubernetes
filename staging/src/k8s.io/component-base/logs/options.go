@@ -22,7 +22,6 @@ import (
 	"github.com/spf13/pflag"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/component-base/config"
 	"k8s.io/component-base/config/v1alpha1"
 	"k8s.io/component-base/logs/registry"
@@ -82,8 +81,7 @@ func (o *Options) apply() {
 		klog.ClearLogger()
 	} else {
 		log, flush := factory.Create(o.Config.Options)
-		klog.SetLogger(log)
-		logrFlush = flush
+		klog.SetLoggerWithOptions(log, klog.FlushLogger(flush))
 	}
 	if err := loggingFlags.Lookup("v").Value.Set(o.Config.Verbosity.String()); err != nil {
 		panic(fmt.Errorf("internal error while setting klog verbosity: %v", err))
@@ -91,5 +89,5 @@ func (o *Options) apply() {
 	if err := loggingFlags.Lookup("vmodule").Value.Set(o.Config.VModule.String()); err != nil {
 		panic(fmt.Errorf("internal error while setting klog vmodule: %v", err))
 	}
-	go wait.Forever(FlushLogs, o.Config.FlushFrequency)
+	klog.StartFlushDaemon(o.Config.FlushFrequency)
 }
