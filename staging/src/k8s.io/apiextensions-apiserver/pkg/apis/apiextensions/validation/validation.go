@@ -22,6 +22,7 @@ import (
 	"math"
 	"reflect"
 	"regexp"
+	"sort"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -52,6 +53,8 @@ var (
 const (
 	// ExpressionCostLimit represents the largest-allowed CEL cost on a per-expression basis.
 	ExpressionCostLimit = 10000000
+	// CRDCostLimit represents the largest allowable cost of the sum total of a CRD's expressions.
+	CRDCostLimit = 100000000
 )
 
 // ValidateCustomResourceDefinition statically validates
@@ -720,7 +723,18 @@ func validateCustomResourceDefinitionValidation(ctx context.Context, customResou
 			requireValidPropertyType: opts.requireValidPropertyType,
 		}
 
-		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema, fldPath.Child("openAPIV3Schema"), openAPIV3Schema, true, &opts, rootCostInfo())...)
+		costInfo := rootCostInfo()
+		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema, fldPath.Child("openAPIV3Schema"), openAPIV3Schema, true, &opts, costInfo)...)
+
+		if costInfo.CRDCost.TotalCost > CRDCostLimit {
+			if costInfo.CRDCost.MostExpensive != nil {
+				expensive := costInfo.CRDCost.MostExpensive[0]
+				costErrorMsg := fmt.Sprintf("CEL rule of cost %d is primary contributor to total cost of %d for all rules in custom resource definition exceeding %d limit", expensive.Cost, costInfo.CRDCost.TotalCost, CRDCostLimit)
+				allErrs = append(allErrs, field.Forbidden(expensive.Path, costErrorMsg))
+			}
+			costErrorMsg := fmt.Sprintf("total cost of %d for all rules in custom resource definition exceeding %d limit", costInfo.CRDCost.TotalCost, CRDCostLimit)
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("openAPIV3Schema"), costErrorMsg))
+		}
 
 		if opts.requireStructuralSchema {
 			if ss, err := structuralschema.NewStructural(schema); err != nil {
@@ -752,24 +766,52 @@ type costInfo struct {
 	// MaxCardinality tracks the largest number of times a rule in the current schema node could possibly get executed
 	// due to being the child of arrays/maps/etc.
 	MaxCardinality *uint64
+	CRDCost        *crdCost
+}
+
+type crdCost struct {
+	TotalCost     uint64
+	MostExpensive []ruleCost
+}
+
+func (c *crdCost) observeExpressionCost(path *field.Path, cost uint64) {
+	if math.MaxUint64-c.TotalCost < cost {
+		c.TotalCost = math.MaxUint64
+	} else {
+		c.TotalCost += cost
+	}
+
+	c.MostExpensive = append(c.MostExpensive, ruleCost{Path: path, Cost: cost})
+	sort.Slice(c.MostExpensive, func(i, j int) bool {
+		// sort in descending order so the most expensive rule is first
+		return c.MostExpensive[i].Cost > c.MostExpensive[j].Cost
+	})
+	if len(c.MostExpensive) > 4 {
+		c.MostExpensive = c.MostExpensive[4:]
+	}
+}
+
+type ruleCost struct {
+	Path *field.Path
+	Cost uint64
 }
 
 func (c *costInfo) MultiplyByElementCost(schema *apiextensions.JSONSchemaProps) costInfo {
+	result := costInfo{CRDCost: c.CRDCost}
 	if schema == nil {
 		// nil schemas can be passed since we call MultiplyByElementCost
 		// before ValidateCustomResourceDefinitionOpenAPISchema performs its nil check
-		return costInfo{}
+		return result
 	}
 	if c.MaxCardinality == nil {
-		return costInfo{}
+		return result
 	}
 	maxElements := extractMaxElements(schema)
 	if maxElements == nil {
-		return costInfo{}
+		return result
 	}
-	return costInfo{
-		MaxCardinality: uint64ptr(multiplyWithOverflowGuard(*c.MaxCardinality, *maxElements)),
-	}
+	result.MaxCardinality = uint64ptr(multiplyWithOverflowGuard(*c.MaxCardinality, *maxElements))
+	return result
 }
 
 func uint64ptr(i uint64) *uint64 {
@@ -780,6 +822,7 @@ func rootCostInfo() costInfo {
 	rootCardinality := uint64(1)
 	return costInfo{
 		MaxCardinality: &rootCardinality,
+		CRDCost:        &crdCost{},
 	}
 }
 
@@ -1005,6 +1048,7 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 						costErrorMsg := fmt.Sprintf("CEL rule of cost %d exceeded budget of %d by factor of %vx", uint64(expressionCost), ExpressionCostLimit, exceedFactor)
 						allErrs = append(allErrs, field.Forbidden(fldPath.Child("x-kubernetes-validations").Index(i).Child("rule"), costErrorMsg))
 					}
+					nodeCostInfo.CRDCost.observeExpressionCost(fldPath.Child("x-kubernetes-validations").Index(i).Child("rule"), expressionCost)
 					if cr.Error != nil {
 						if cr.Error.Type == cel.ErrorTypeRequired {
 							allErrs = append(allErrs, field.Required(fldPath.Child("x-kubernetes-validations").Index(i).Child("rule"), cr.Error.Detail))

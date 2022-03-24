@@ -8339,6 +8339,37 @@ func TestCostInfo(t *testing.T) {
 	}
 }
 
+func TestObserveCost(t *testing.T) {
+	tests := []struct {
+		name                string
+		costs               []uint64
+		expectedLargestCost uint64
+	}{
+		{
+			name:                "two costs",
+			costs:               []uint64{5, 25},
+			expectedLargestCost: 25,
+		},
+		{
+			name:                "three costs",
+			costs:               []uint64{16, 50, 34},
+			expectedLargestCost: 50,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			crdCost := rootCostInfo().CRDCost
+			for _, cost := range tt.costs {
+				crdCost.observeExpressionCost(nil, cost)
+			}
+			largestCost := crdCost.MostExpensive[0].Cost
+			if tt.expectedLargestCost != largestCost {
+				t.Errorf("wrong largest cost (expected %d, got %d)", tt.expectedLargestCost, largestCost)
+			}
+		})
+	}
+}
+
 func int64ptr(i int64) *int64 {
 	return &i
 }
