@@ -1460,11 +1460,11 @@ func TestDropNonEphemeralContainerUpdates(t *testing.T) {
 			},
 			newPod: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:            "test-pod",
-					Namespace:       "test-ns",
-					ResourceVersion: "1",
-					Annotations:     map[string]string{"foo": "bar", "whiz": "pop"},
-					ClusterName:     "milo",
+					Name:                      "test-pod",
+					Namespace:                 "test-ns",
+					ResourceVersion:           "1",
+					Annotations:               map[string]string{"foo": "bar", "whiz": "pop"},
+					ZZZ_DeprecatedClusterName: "milo",
 				},
 				Spec: api.PodSpec{
 					Containers: []api.Container{

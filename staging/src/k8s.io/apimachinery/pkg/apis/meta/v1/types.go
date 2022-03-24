@@ -257,11 +257,14 @@ type ObjectMeta struct {
 	// +patchStrategy=merge
 	Finalizers []string `json:"finalizers,omitempty" patchStrategy:"merge" protobuf:"bytes,14,rep,name=finalizers"`
 
-	// The name of the cluster which the object belongs to.
-	// This is used to distinguish resources with same name and namespace in different clusters.
-	// This field is not set anywhere right now and apiserver is going to ignore it if set in create or update request.
+	// Deprecated: ClusterName is a legacy field that was always cleared by
+	// the system and never used; it will be removed completely in 1.25.
+	//
+	// The name in the go struct is changed to help clients detect
+	// accidental use.
+	//
 	// +optional
-	ClusterName string `json:"clusterName,omitempty" protobuf:"bytes,15,opt,name=clusterName"`
+	ZZZ_DeprecatedClusterName string `json:"clusterName,omitempty" protobuf:"bytes,15,opt,name=clusterName"`
 
 	// ManagedFields maps workflow-id and version to the set of fields
 	// that are managed by that workflow. This is mostly for internal
