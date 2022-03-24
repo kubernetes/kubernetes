@@ -2050,7 +2050,7 @@ func InitAzureFileDriver() storageframework.TestDriver {
 		driverInfo: storageframework.DriverInfo{
 			Name:             "azure-file",
 			InTreePluginName: "kubernetes.io/azure-file",
-			MaxFileSize:      storageframework.FileSizeLarge,
+			MaxFileSize:      storageframework.FileSizeMedium,
 			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "1Gi",
 			},
