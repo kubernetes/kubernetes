@@ -296,7 +296,8 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 		if volumeSpec.PersistentVolume != nil {
 			pvCap := volumeSpec.PersistentVolume.Spec.Capacity.Storage()
 			if pvCap != nil {
-				vmt.persistentVolumeSize = pvCap
+				pvCapCopy := pvCap.DeepCopy()
+				vmt.persistentVolumeSize = &pvCapCopy
 			}
 		}
 

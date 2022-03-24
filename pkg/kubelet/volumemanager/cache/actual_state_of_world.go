@@ -281,7 +281,8 @@ type attachedVolume struct {
 	// for this volume and volume expansion on this node should not be retried
 	volumeInUseErrorForExpansion bool
 
-	// persistentVolumeSize records size of the volume when pod was started.
+	// persistentVolumeSize records size of the volume when pod was started or
+	// size after successful completion of volume expansion operation.
 	persistentVolumeSize *resource.Quantity
 }
 
