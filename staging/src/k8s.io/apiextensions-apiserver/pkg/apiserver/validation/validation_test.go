@@ -26,9 +26,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	utilpointer "k8s.io/utils/pointer"
 	kjson "sigs.k8s.io/json"
-
-	kubeopenapispec "k8s.io/kube-openapi/pkg/validation/spec"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsfuzzer "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/fuzzer"
@@ -41,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/sets"
+	kubeopenapispec "k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 // TestRoundTrip checks the conversion to go-openapi types.
@@ -533,6 +533,51 @@ func TestValidateCustomResource(t *testing.T) {
 					expectErrs: []string{
 						`field[0].x: Invalid value: "string": failed rule: self == 'x'`,
 					}},
+			},
+		},
+		{name: "maxProperties",
+			schema: apiextensions.JSONSchemaProps{
+				Properties: map[string]apiextensions.JSONSchemaProps{
+					"fieldX": {
+						Type:          "object",
+						MaxProperties: utilpointer.Int64(2),
+					},
+				},
+			},
+			failingObjects: []failingObject{
+				{object: map[string]interface{}{"fieldX": map[string]interface{}{"a": true, "b": true, "c": true}}, expectErrs: []string{
+					`fieldX: Too many: must have at most 2 items`,
+				}},
+			},
+		},
+		{name: "maxItems",
+			schema: apiextensions.JSONSchemaProps{
+				Properties: map[string]apiextensions.JSONSchemaProps{
+					"fieldX": {
+						Type:     "array",
+						MaxItems: utilpointer.Int64(2),
+					},
+				},
+			},
+			failingObjects: []failingObject{
+				{object: map[string]interface{}{"fieldX": []interface{}{"a", "b", "c"}}, expectErrs: []string{
+					`fieldX: Too many: must have at most 3 items`,
+				}},
+			},
+		},
+		{name: "maxLength",
+			schema: apiextensions.JSONSchemaProps{
+				Properties: map[string]apiextensions.JSONSchemaProps{
+					"fieldX": {
+						Type:      "string",
+						MaxLength: utilpointer.Int64(2),
+					},
+				},
+			},
+			failingObjects: []failingObject{
+				{object: map[string]interface{}{"fieldX": "abc"}, expectErrs: []string{
+					`fieldX: Too long: value is too long`,
+				}},
 			},
 		},
 	}
