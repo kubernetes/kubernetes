@@ -561,7 +561,7 @@ func TestValidateCustomResource(t *testing.T) {
 			},
 			failingObjects: []failingObject{
 				{object: map[string]interface{}{"fieldX": []interface{}{"a", "b", "c"}}, expectErrs: []string{
-					`fieldX: Too many: must have at most 3 items`,
+					`fieldX: Too many: 3: has too many items`,
 				}},
 			},
 		},
