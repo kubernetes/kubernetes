@@ -121,7 +121,7 @@ type SizeEstimate struct {
 }
 
 // Add adds to another SizeEstimate and returns the sum.
-// If add would result in an uint64 overflow, the result is Maxuint64.
+// If add would result in an uint64 overflow, the result is math.MaxUint64.
 func (se SizeEstimate) Add(sizeEstimate SizeEstimate) SizeEstimate {
 	return SizeEstimate{
 		addUint64NoOverflow(se.Min, sizeEstimate.Min),
@@ -130,7 +130,7 @@ func (se SizeEstimate) Add(sizeEstimate SizeEstimate) SizeEstimate {
 }
 
 // Multiply multiplies by another SizeEstimate and returns the product.
-// If multiply would result in an uint64 overflow, the result is Maxuint64.
+// If multiply would result in an uint64 overflow, the result is math.MaxUint64.
 func (se SizeEstimate) Multiply(sizeEstimate SizeEstimate) SizeEstimate {
 	return SizeEstimate{
 		multiplyUint64NoOverflow(se.Min, sizeEstimate.Min),
@@ -148,7 +148,7 @@ func (se SizeEstimate) MultiplyByCostFactor(costPerUnit float64) CostEstimate {
 }
 
 // MultiplyByCost multiplies by the cost and returns the product.
-// If multiply would result in an uint64 overflow, the result is Maxuint64.
+// If multiply would result in an uint64 overflow, the result is math.MaxUint64.
 func (se SizeEstimate) MultiplyByCost(cost CostEstimate) CostEstimate {
 	return CostEstimate{
 		multiplyUint64NoOverflow(se.Min, cost.Min),
@@ -175,7 +175,7 @@ type CostEstimate struct {
 }
 
 // Add adds the costs and returns the sum.
-// If add would result in an uint64 overflow for the min or max, the value is set to Maxuint64.
+// If add would result in an uint64 overflow for the min or max, the value is set to math.MaxUint64.
 func (ce CostEstimate) Add(cost CostEstimate) CostEstimate {
 	return CostEstimate{
 		addUint64NoOverflow(ce.Min, cost.Min),
@@ -184,7 +184,7 @@ func (ce CostEstimate) Add(cost CostEstimate) CostEstimate {
 }
 
 // Multiply multiplies by the cost and returns the product.
-// If multiply would result in an uint64 overflow, the result is Maxuint64.
+// If multiply would result in an uint64 overflow, the result is math.MaxUint64.
 func (ce CostEstimate) Multiply(cost CostEstimate) CostEstimate {
 	return CostEstimate{
 		multiplyUint64NoOverflow(ce.Min, cost.Min),

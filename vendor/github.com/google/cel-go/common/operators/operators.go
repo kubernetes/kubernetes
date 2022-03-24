@@ -14,7 +14,7 @@
 
 // Package operators defines the internal function names of operators.
 //
-// ALl operators in the expression language are modelled as function calls.
+// All operators in the expression language are modelled as function calls.
 package operators
 
 // String "names" for CEL operators.

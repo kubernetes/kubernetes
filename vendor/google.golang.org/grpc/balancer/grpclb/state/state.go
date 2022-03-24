@@ -39,7 +39,7 @@ type State struct {
 // Set returns a copy of the provided state with attributes containing s.  s's
 // data should not be mutated after calling Set.
 func Set(state resolver.State, s *State) resolver.State {
-	state.Attributes = state.Attributes.WithValues(key, s)
+	state.Attributes = state.Attributes.WithValue(key, s)
 	return state
 }
 

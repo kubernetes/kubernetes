@@ -44,7 +44,9 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "cel_example_test.go",
         "cel_test.go",
+        "env_test.go",
         "io_test.go",
     ],
     data = [
@@ -66,6 +68,7 @@ go_test(
         "//test/proto3pb:go_default_library",
         "@io_bazel_rules_go//proto/wkt:descriptor_go_proto",
         "@org_golang_google_genproto//googleapis/api/expr/v1alpha1:go_default_library",
+        "@org_golang_google_protobuf//proto:go_default_library",
         "@org_golang_google_protobuf//types/known/structpb:go_default_library",
     ],
 )

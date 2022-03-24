@@ -107,10 +107,12 @@ func (b *pickfirstBalancer) UpdateSubConnState(sc balancer.SubConn, s balancer.S
 	}
 
 	switch s.ConnectivityState {
-	case connectivity.Ready, connectivity.Idle:
+	case connectivity.Ready:
 		b.cc.UpdateState(balancer.State{ConnectivityState: s.ConnectivityState, Picker: &picker{result: balancer.PickResult{SubConn: sc}}})
 	case connectivity.Connecting:
 		b.cc.UpdateState(balancer.State{ConnectivityState: s.ConnectivityState, Picker: &picker{err: balancer.ErrNoSubConnAvailable}})
+	case connectivity.Idle:
+		b.cc.UpdateState(balancer.State{ConnectivityState: s.ConnectivityState, Picker: &idlePicker{sc: sc}})
 	case connectivity.TransientFailure:
 		b.cc.UpdateState(balancer.State{
 			ConnectivityState: s.ConnectivityState,
@@ -122,6 +124,12 @@ func (b *pickfirstBalancer) UpdateSubConnState(sc balancer.SubConn, s balancer.S
 func (b *pickfirstBalancer) Close() {
 }
 
+func (b *pickfirstBalancer) ExitIdle() {
+	if b.sc != nil && b.state == connectivity.Idle {
+		b.sc.Connect()
+	}
+}
+
 type picker struct {
 	result balancer.PickResult
 	err    error
@@ -129,6 +137,17 @@ type picker struct {
 
 func (p *picker) Pick(info balancer.PickInfo) (balancer.PickResult, error) {
 	return p.result, p.err
+}
+
+// idlePicker is used when the SubConn is IDLE and kicks the SubConn into
+// CONNECTING when Pick is called.
+type idlePicker struct {
+	sc balancer.SubConn
+}
+
+func (i *idlePicker) Pick(info balancer.PickInfo) (balancer.PickResult, error) {
+	i.sc.Connect()
+	return balancer.PickResult{}, balancer.ErrNoSubConnAvailable
 }
 
 func init() {

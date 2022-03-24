@@ -108,7 +108,15 @@ func (p *Predicate) equals(other interface{}) bool {
 }
 
 func (p *Predicate) hash() int {
-	return p.ruleIndex*43 + p.predIndex*47
+	h := murmurInit(0)
+	h = murmurUpdate(h, p.ruleIndex)
+	h = murmurUpdate(h, p.predIndex)
+	if p.isCtxDependent {
+		h = murmurUpdate(h, 1)
+	} else {
+		h = murmurUpdate(h, 0)
+	}
+	return murmurFinish(h, 3)
 }
 
 func (p *Predicate) String() string {
@@ -154,21 +162,24 @@ func (p *PrecedencePredicate) equals(other interface{}) bool {
 }
 
 func (p *PrecedencePredicate) hash() int {
-	return p.precedence * 51
+	h := uint32(1)
+	h = 31*h + uint32(p.precedence)
+	return int(h)
 }
 
 func (p *PrecedencePredicate) String() string {
 	return "{" + strconv.Itoa(p.precedence) + ">=prec}?"
 }
 
-func PrecedencePredicatefilterPrecedencePredicates(set *Set) []*PrecedencePredicate {
+func PrecedencePredicatefilterPrecedencePredicates(set Set) []*PrecedencePredicate {
 	result := make([]*PrecedencePredicate, 0)
 
-	for _, v := range set.values() {
+	set.Each(func(v interface{}) bool {
 		if c2, ok := v.(*PrecedencePredicate); ok {
 			result = append(result, c2)
 		}
-	}
+		return true
+	})
 
 	return result
 }
@@ -182,21 +193,21 @@ type AND struct {
 
 func NewAND(a, b SemanticContext) *AND {
 
-	operands := NewSet(nil, nil)
+	operands := NewArray2DHashSet(nil, nil)
 	if aa, ok := a.(*AND); ok {
 		for _, o := range aa.opnds {
-			operands.add(o)
+			operands.Add(o)
 		}
 	} else {
-		operands.add(a)
+		operands.Add(a)
 	}
 
 	if ba, ok := b.(*AND); ok {
 		for _, o := range ba.opnds {
-			operands.add(o)
+			operands.Add(o)
 		}
 	} else {
-		operands.add(b)
+		operands.Add(b)
 	}
 	precedencePredicates := PrecedencePredicatefilterPrecedencePredicates(operands)
 	if len(precedencePredicates) > 0 {
@@ -209,10 +220,10 @@ func NewAND(a, b SemanticContext) *AND {
 			}
 		}
 
-		operands.add(reduced)
+		operands.Add(reduced)
 	}
 
-	vs := operands.values()
+	vs := operands.Values()
 	opnds := make([]SemanticContext, len(vs))
 	for i, v := range vs {
 		opnds[i] = v.(SemanticContext)
@@ -334,21 +345,21 @@ type OR struct {
 
 func NewOR(a, b SemanticContext) *OR {
 
-	operands := NewSet(nil, nil)
+	operands := NewArray2DHashSet(nil, nil)
 	if aa, ok := a.(*OR); ok {
 		for _, o := range aa.opnds {
-			operands.add(o)
+			operands.Add(o)
 		}
 	} else {
-		operands.add(a)
+		operands.Add(a)
 	}
 
 	if ba, ok := b.(*OR); ok {
 		for _, o := range ba.opnds {
-			operands.add(o)
+			operands.Add(o)
 		}
 	} else {
-		operands.add(b)
+		operands.Add(b)
 	}
 	precedencePredicates := PrecedencePredicatefilterPrecedencePredicates(operands)
 	if len(precedencePredicates) > 0 {
@@ -361,10 +372,10 @@ func NewOR(a, b SemanticContext) *OR {
 			}
 		}
 
-		operands.add(reduced)
+		operands.Add(reduced)
 	}
 
-	vs := operands.values()
+	vs := operands.Values()
 
 	opnds := make([]SemanticContext, len(vs))
 	for i, v := range vs {
