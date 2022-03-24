@@ -39,7 +39,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
-var _ = utils.SIGDescribe("Mounted flexvolume volume expand [Slow] [Feature:ExpandInUsePersistentVolumes]", func() {
+var _ = utils.SIGDescribe("Mounted flexvolume volume expand [Slow]", func() {
 	var (
 		c                 clientset.Interface
 		ns                string
