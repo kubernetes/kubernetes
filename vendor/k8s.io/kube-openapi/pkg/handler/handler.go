@@ -19,9 +19,12 @@ package handler
 import (
 	"bytes"
 	"compress/gzip"
+	"crypto/sha512"
 	"encoding/json"
+	"fmt"
 	"mime"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
@@ -48,6 +51,13 @@ const (
 	mimePbGz = "application/x-gzip"
 )
 
+func computeETag(data []byte) string {
+	if data == nil {
+		return ""
+	}
+	return fmt.Sprintf("%X", sha512.Sum512(data))
+}
+
 // OpenAPIService is the service responsible for serving OpenAPI spec. It has
 // the ability to safely change the spec while serving it.
 type OpenAPIService struct {
@@ -58,6 +68,7 @@ type OpenAPIService struct {
 
 	jsonCache  handler.HandlerCache
 	protoCache handler.HandlerCache
+	etagCache  handler.HandlerCache
 }
 
 func init() {
@@ -78,21 +89,29 @@ func NewOpenAPIService(spec *spec.Swagger) (*OpenAPIService, error) {
 func (o *OpenAPIService) getSwaggerBytes() ([]byte, string, time.Time, error) {
 	o.rwMutex.RLock()
 	defer o.rwMutex.RUnlock()
-	specBytes, etag, err := o.jsonCache.Get()
+	specBytes, err := o.jsonCache.Get()
 	if err != nil {
 		return nil, "", time.Time{}, err
 	}
-	return specBytes, etag, o.lastModified, nil
+	etagBytes, err := o.etagCache.Get()
+	if err != nil {
+		return nil, "", time.Time{}, err
+	}
+	return specBytes, string(etagBytes), o.lastModified, nil
 }
 
 func (o *OpenAPIService) getSwaggerPbBytes() ([]byte, string, time.Time, error) {
 	o.rwMutex.RLock()
 	defer o.rwMutex.RUnlock()
-	specPb, etag, err := o.protoCache.Get()
+	specPb, err := o.protoCache.Get()
 	if err != nil {
 		return nil, "", time.Time{}, err
 	}
-	return specPb, etag, o.lastModified, nil
+	etagBytes, err := o.etagCache.Get()
+	if err != nil {
+		return nil, "", time.Time{}, err
+	}
+	return specPb, string(etagBytes), o.lastModified, nil
 }
 
 func (o *OpenAPIService) UpdateSpec(openapiSpec *spec.Swagger) (err error) {
@@ -102,11 +121,18 @@ func (o *OpenAPIService) UpdateSpec(openapiSpec *spec.Swagger) (err error) {
 		return json.Marshal(openapiSpec)
 	})
 	o.protoCache = o.protoCache.New(func() ([]byte, error) {
-		json, _, err := o.jsonCache.Get()
+		json, err := o.jsonCache.Get()
 		if err != nil {
 			return nil, err
 		}
 		return ToProtoBinary(json)
+	})
+	o.etagCache = o.etagCache.New(func() ([]byte, error) {
+		json, err := o.jsonCache.Get()
+		if err != nil {
+			return nil, err
+		}
+		return []byte(computeETag(json)), nil
 	})
 	o.lastModified = time.Now()
 
@@ -220,7 +246,8 @@ func (o *OpenAPIService) RegisterOpenAPIVersionedService(servePath string, handl
 							return
 						}
 					}
-					w.Header().Set("Etag", etag)
+					// ETag must be enclosed in double quotes: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/ETag
+					w.Header().Set("Etag", strconv.Quote(etag))
 					// ServeContent will take care of caching using eTag.
 					http.ServeContent(w, r, servePath, lastModified, bytes.NewReader(data))
 					return

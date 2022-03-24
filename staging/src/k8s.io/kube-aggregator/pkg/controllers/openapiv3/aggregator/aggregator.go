@@ -21,14 +21,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"sort"
 	"strings"
 	"sync"
 	"time"
 
 	"k8s.io/apiserver/pkg/server"
+	"k8s.io/klog/v2"
 	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	"k8s.io/kube-openapi/pkg/common"
+	"k8s.io/kube-openapi/pkg/handler3"
 )
 
 // SpecProxier proxies OpenAPI V3 requests to their respective APIService
@@ -121,7 +122,7 @@ func (s *specProxier) UpdateAPIServiceSpec(apiServiceName string) error {
 	if err != nil {
 		return err
 	}
-	s.apiServiceInfo[apiServiceName].gvList = gv
+	s.apiServiceInfo[apiServiceName].discovery = gv
 	return nil
 }
 
@@ -141,7 +142,7 @@ var _ SpecProxier = &specProxier{}
 type openAPIV3APIServiceInfo struct {
 	apiService v1.APIService
 	handler    http.Handler
-	gvList     []string
+	discovery  *handler3.OpenAPIV3Discovery
 }
 
 // RemoveAPIServiceSpec removes an api service from the OpenAPI map. If it does not exist, no error is returned.
@@ -149,9 +150,7 @@ type openAPIV3APIServiceInfo struct {
 func (s *specProxier) RemoveAPIServiceSpec(apiServiceName string) {
 	s.rwMutex.Lock()
 	defer s.rwMutex.Unlock()
-	if _, ok := s.apiServiceInfo[apiServiceName]; ok {
-		delete(s.apiServiceInfo, apiServiceName)
-	}
+	delete(s.apiServiceInfo, apiServiceName)
 }
 
 // handleDiscovery is the handler for OpenAPI V3 Discovery
@@ -159,22 +158,24 @@ func (s *specProxier) handleDiscovery(w http.ResponseWriter, r *http.Request) {
 	s.rwMutex.RLock()
 	defer s.rwMutex.RUnlock()
 
-	gvList := make(map[string]bool)
+	merged := handler3.OpenAPIV3Discovery{
+		Paths: make(map[string]handler3.OpenAPIV3DiscoveryGroupVersion),
+	}
+
 	for _, apiServiceInfo := range s.apiServiceInfo {
-		for _, gv := range apiServiceInfo.gvList {
-			gvList[gv] = true
+		if apiServiceInfo.discovery == nil {
+			continue
+		}
+
+		for key, item := range apiServiceInfo.discovery.Paths {
+			merged.Paths[key] = item
 		}
 	}
 
-	keys := make([]string, 0, len(gvList))
-	for k := range gvList {
-		keys = append(keys, k)
-	}
-
-	sort.Strings(keys)
-	output := map[string][]string{"Paths": keys}
-	j, err := json.Marshal(output)
+	j, err := json.Marshal(&merged)
 	if err != nil {
+		w.WriteHeader(500)
+		klog.Errorf("failed to created merged OpenAPIv3 discovery response: %s", err.Error())
 		return
 	}
 
@@ -193,8 +194,12 @@ func (s *specProxier) handleGroupVersion(w http.ResponseWriter, r *http.Request)
 	targetGV := url[3]
 
 	for _, apiServiceInfo := range s.apiServiceInfo {
-		for _, gv := range apiServiceInfo.gvList {
-			if targetGV == gv {
+		if apiServiceInfo.discovery == nil {
+			continue
+		}
+
+		for key := range apiServiceInfo.discovery.Paths {
+			if targetGV == key {
 				apiServiceInfo.handler.ServeHTTP(w, r)
 				return
 			}
