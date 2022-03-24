@@ -127,6 +127,7 @@ func osSpecificActions(args, host, workspace string) (string, error) {
 		args = prependGCPCredentialProviderFlag(args, workspace)
 		return prependCOSMounterFlag(args, host, workspace)
 	case strings.Contains(output, "ubuntu"):
+		args = prependGCPCredentialProviderFlag(args, workspace)
 		return prependMemcgNotificationFlag(args), nil
 	}
 	return args, nil
