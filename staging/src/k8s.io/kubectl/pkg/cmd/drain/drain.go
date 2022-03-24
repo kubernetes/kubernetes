@@ -34,7 +34,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/drain"
 	"k8s.io/kubectl/pkg/scheme"
-	"k8s.io/kubectl/pkg/util"
+	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -69,7 +69,7 @@ func NewCmdCordon(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cob
 		Short:                 i18n.T("Mark node as unschedulable"),
 		Long:                  cordonLong,
 		Example:               cordonExample,
-		ValidArgsFunction:     util.ResourceNameCompletionFunc(f, "node"),
+		ValidArgsFunction:     completion.ResourceNameCompletionFunc(f, "node"),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.RunCordonOrUncordon(true))
@@ -98,7 +98,7 @@ func NewCmdUncordon(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *c
 		Short:                 i18n.T("Mark node as schedulable"),
 		Long:                  uncordonLong,
 		Example:               uncordonExample,
-		ValidArgsFunction:     util.ResourceNameCompletionFunc(f, "node"),
+		ValidArgsFunction:     completion.ResourceNameCompletionFunc(f, "node"),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.RunCordonOrUncordon(false))
@@ -184,7 +184,7 @@ func NewCmdDrain(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 		Short:                 i18n.T("Drain node in preparation for maintenance"),
 		Long:                  drainLong,
 		Example:               drainExample,
-		ValidArgsFunction:     util.ResourceNameCompletionFunc(f, "node"),
+		ValidArgsFunction:     completion.ResourceNameCompletionFunc(f, "node"),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.RunDrain())

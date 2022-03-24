@@ -2150,6 +2150,7 @@ k8s.io/kubectl/pkg/scale
 k8s.io/kubectl/pkg/scheme
 k8s.io/kubectl/pkg/util
 k8s.io/kubectl/pkg/util/certificate
+k8s.io/kubectl/pkg/util/completion
 k8s.io/kubectl/pkg/util/deployment
 k8s.io/kubectl/pkg/util/event
 k8s.io/kubectl/pkg/util/fieldpath

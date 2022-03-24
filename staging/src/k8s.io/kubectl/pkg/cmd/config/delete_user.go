@@ -25,7 +25,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	"k8s.io/kubectl/pkg/util"
+	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -65,7 +65,7 @@ func NewCmdConfigDeleteUser(streams genericclioptions.IOStreams, configAccess cl
 		Short:                 i18n.T("Delete the specified user from the kubeconfig"),
 		Long:                  i18n.T("Delete the specified user from the kubeconfig."),
 		Example:               deleteUserExample,
-		ValidArgsFunction:     util.UserCompletionFunc,
+		ValidArgsFunction:     completion.UserCompletionFunc,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(cmd, args))
 			cmdutil.CheckErr(o.Validate())
