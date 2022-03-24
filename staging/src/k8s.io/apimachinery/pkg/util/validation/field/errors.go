@@ -167,16 +167,6 @@ func (t ErrorType) String() string {
 	}
 }
 
-// TooLongFail returns a *Error indicating "MaxLength exceed".
-func TooLongFail(field *Path, value interface{}, detail string) *Error {
-	return &Error{ErrorTypeTooLong, field.String(), value, detail}
-}
-
-// TooManyFail returns a *Error indicating "MaxItems/MaxProperties exceed"
-func TooManyFail(field *Path, value interface{}, detail string) *Error {
-	return &Error{ErrorTypeTooMany, field.String(), value, detail}
-}
-
 // TypeInvalid returns a *Error indicating "type is invalid"
 func TypeInvalid(field *Path, value interface{}, detail string) *Error {
 	return &Error{ErrorTypeTypeInvalid, field.String(), value, detail}
