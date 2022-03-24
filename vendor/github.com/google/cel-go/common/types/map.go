@@ -105,7 +105,7 @@ var (
 // This interface implements portions of the API surface area required by the traits.Mapper
 // interface.
 type mapAccessor interface {
-	// Find returns a value, if one exists, for the inpput key.
+	// Find returns a value, if one exists, for the input key.
 	//
 	// If the key is not found the function returns (nil, false).
 	Find(ref.Val) (ref.Val, bool)
@@ -429,7 +429,7 @@ func (a *refValMapAccessor) Find(key ref.Val) (ref.Val, bool) {
 	case Double:
 		if ik, ok := doubleToInt64Lossless(float64(k)); ok {
 			if keyVal, found := a.mapVal[Int(ik)]; found {
-				return keyVal, true
+				return keyVal, found
 			}
 		}
 		if uk, ok := doubleToUint64Lossless(float64(k)); ok {
