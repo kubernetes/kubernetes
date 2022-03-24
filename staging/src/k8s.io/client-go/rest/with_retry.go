@@ -179,10 +179,8 @@ func (r *withRetry) prepareForNextRetry(ctx context.Context, request *Request) e
 
 	// Ensure the response body is fully read and closed before
 	// we reconnect, so that we reuse the same TCP connection.
-	if seeker, ok := request.body.(io.Seeker); ok && request.body != nil {
-		if _, err := seeker.Seek(0, 0); err != nil {
-			return fmt.Errorf("can't Seek() back to beginning of body for %T", request)
-		}
+	if request.body != nil {
+		io.Copy(ioutil.Discard, request.body)
 	}
 
 	klog.V(4).Infof("Got a Retry-After %s response for attempt %d to %v", r.retryAfter.Wait, r.retryAfter.Attempt, request.URL().String())
