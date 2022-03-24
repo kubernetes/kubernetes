@@ -133,7 +133,7 @@ require (
 	k8s.io/mount-utils v0.0.0
 	k8s.io/pod-security-admission v0.0.0
 	k8s.io/sample-apiserver v0.0.0
-	k8s.io/system-validators v1.6.0
+	k8s.io/system-validators v1.7.0
 	k8s.io/utils v0.0.0-20220210201930-3a6ce19ff2f9
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.1
 	sigs.k8s.io/yaml v1.2.0
@@ -180,6 +180,7 @@ replace (
 	github.com/beorn7/perks => github.com/beorn7/perks v1.0.1
 	github.com/bits-and-blooms/bitset => github.com/bits-and-blooms/bitset v1.2.0
 	github.com/blang/semver => github.com/blang/semver v3.5.1+incompatible
+	github.com/blang/semver/v4 => github.com/blang/semver/v4 v4.0.0
 	github.com/boltdb/bolt => github.com/boltdb/bolt v1.3.1
 	github.com/census-instrumentation/opencensus-proto => github.com/census-instrumentation/opencensus-proto v0.2.1
 	github.com/certifi/gocertifi => github.com/certifi/gocertifi v0.0.0-20200922220541-2c3bb06c6054
@@ -474,7 +475,7 @@ replace (
 	k8s.io/sample-apiserver => ./staging/src/k8s.io/sample-apiserver
 	k8s.io/sample-cli-plugin => ./staging/src/k8s.io/sample-cli-plugin
 	k8s.io/sample-controller => ./staging/src/k8s.io/sample-controller
-	k8s.io/system-validators => k8s.io/system-validators v1.6.0
+	k8s.io/system-validators => k8s.io/system-validators v1.7.0
 	k8s.io/utils => k8s.io/utils v0.0.0-20220210201930-3a6ce19ff2f9
 	modernc.org/cc => modernc.org/cc v1.0.0
 	modernc.org/golex => modernc.org/golex v1.0.0
