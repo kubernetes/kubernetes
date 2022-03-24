@@ -76,15 +76,13 @@ func TestDropConditions(t *testing.T) {
 		},
 	}
 
-	for _, enabled := range []bool{true, false} {
+	for _, enabled := range []bool{true} {
 		for _, oldPvcInfo := range pvcInfo {
 			for _, newPvcInfo := range pvcInfo {
 				oldPvcHasConditins, oldPvc := oldPvcInfo.hasConditions, oldPvcInfo.pvc()
 				newPvcHasConditions, newPvc := newPvcInfo.hasConditions, newPvcInfo.pvc()
 
 				t.Run(fmt.Sprintf("feature enabled=%v, old pvc %v, new pvc %v", enabled, oldPvcInfo.description, newPvcInfo.description), func(t *testing.T) {
-					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandPersistentVolumes, enabled)()
-
 					StatusStrategy.PrepareForUpdate(ctx, newPvc, oldPvc)
 
 					// old pvc should never be changed

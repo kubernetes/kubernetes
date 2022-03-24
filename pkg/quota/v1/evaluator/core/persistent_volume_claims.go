@@ -94,7 +94,7 @@ func (p *pvcEvaluator) Handles(a admission.Attributes) bool {
 	if op == admission.Create {
 		return true
 	}
-	if op == admission.Update && utilfeature.DefaultFeatureGate.Enabled(k8sfeatures.ExpandPersistentVolumes) {
+	if op == admission.Update {
 		return true
 	}
 	return false

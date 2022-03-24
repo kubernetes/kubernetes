@@ -2108,215 +2108,173 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		isExpectedFailure          bool
 		oldClaim                   *core.PersistentVolumeClaim
 		newClaim                   *core.PersistentVolumeClaim
-		enableResize               bool
 		enableRecoverFromExpansion bool
 	}{
 		"valid-update-volumeName-only": {
 			isExpectedFailure: false,
 			oldClaim:          validClaim,
 			newClaim:          validUpdateClaim,
-			enableResize:      false,
 		},
 		"valid-no-op-update": {
 			isExpectedFailure: false,
 			oldClaim:          validUpdateClaim,
 			newClaim:          validUpdateClaim,
-			enableResize:      false,
 		},
 		"invalid-update-change-resources-on-bound-claim": {
 			isExpectedFailure: true,
 			oldClaim:          validUpdateClaim,
 			newClaim:          invalidUpdateClaimResources,
-			enableResize:      false,
 		},
 		"invalid-update-change-access-modes-on-bound-claim": {
 			isExpectedFailure: true,
 			oldClaim:          validUpdateClaim,
 			newClaim:          invalidUpdateClaimAccessModes,
-			enableResize:      false,
 		},
 		"valid-update-volume-mode-block-to-block": {
 			isExpectedFailure: false,
 			oldClaim:          validClaimVolumeModeBlock,
 			newClaim:          validClaimVolumeModeBlock,
-			enableResize:      false,
 		},
 		"valid-update-volume-mode-file-to-file": {
 			isExpectedFailure: false,
 			oldClaim:          validClaimVolumeModeFile,
 			newClaim:          validClaimVolumeModeFile,
-			enableResize:      false,
 		},
 		"invalid-update-volume-mode-to-block": {
 			isExpectedFailure: true,
 			oldClaim:          validClaimVolumeModeFile,
 			newClaim:          validClaimVolumeModeBlock,
-			enableResize:      false,
 		},
 		"invalid-update-volume-mode-to-file": {
 			isExpectedFailure: true,
 			oldClaim:          validClaimVolumeModeBlock,
 			newClaim:          validClaimVolumeModeFile,
-			enableResize:      false,
 		},
 		"invalid-update-volume-mode-nil-to-file": {
 			isExpectedFailure: true,
 			oldClaim:          invalidClaimVolumeModeNil,
 			newClaim:          validClaimVolumeModeFile,
-			enableResize:      false,
 		},
 		"invalid-update-volume-mode-nil-to-block": {
 			isExpectedFailure: true,
 			oldClaim:          invalidClaimVolumeModeNil,
 			newClaim:          validClaimVolumeModeBlock,
-			enableResize:      false,
 		},
 		"invalid-update-volume-mode-block-to-nil": {
 			isExpectedFailure: true,
 			oldClaim:          validClaimVolumeModeBlock,
 			newClaim:          invalidClaimVolumeModeNil,
-			enableResize:      false,
 		},
 		"invalid-update-volume-mode-file-to-nil": {
 			isExpectedFailure: true,
 			oldClaim:          validClaimVolumeModeFile,
 			newClaim:          invalidClaimVolumeModeNil,
-			enableResize:      false,
 		},
 		"invalid-update-volume-mode-empty-to-mode": {
 			isExpectedFailure: true,
 			oldClaim:          validClaim,
 			newClaim:          validClaimVolumeModeBlock,
-			enableResize:      false,
 		},
 		"invalid-update-volume-mode-mode-to-empty": {
 			isExpectedFailure: true,
 			oldClaim:          validClaimVolumeModeBlock,
 			newClaim:          validClaim,
-			enableResize:      false,
 		},
 		"invalid-update-change-storage-class-annotation-after-creation": {
 			isExpectedFailure: true,
 			oldClaim:          validClaimStorageClass,
 			newClaim:          invalidUpdateClaimStorageClass,
-			enableResize:      false,
 		},
 		"valid-update-mutable-annotation": {
 			isExpectedFailure: false,
 			oldClaim:          validClaimAnnotation,
 			newClaim:          validUpdateClaimMutableAnnotation,
-			enableResize:      false,
 		},
 		"valid-update-add-annotation": {
 			isExpectedFailure: false,
 			oldClaim:          validClaim,
 			newClaim:          validAddClaimAnnotation,
-			enableResize:      false,
 		},
 		"valid-size-update-resize-disabled": {
-			isExpectedFailure: true,
-			oldClaim:          validClaim,
-			newClaim:          validSizeUpdate,
-			enableResize:      false,
+			oldClaim: validClaim,
+			newClaim: validSizeUpdate,
 		},
 		"valid-size-update-resize-enabled": {
 			isExpectedFailure: false,
 			oldClaim:          validClaim,
 			newClaim:          validSizeUpdate,
-			enableResize:      true,
 		},
 		"invalid-size-update-resize-enabled": {
 			isExpectedFailure: true,
 			oldClaim:          validClaim,
 			newClaim:          invalidSizeUpdate,
-			enableResize:      true,
 		},
 		"unbound-size-update-resize-enabled": {
 			isExpectedFailure: true,
 			oldClaim:          validClaim,
 			newClaim:          unboundSizeUpdate,
-			enableResize:      true,
 		},
 		"valid-upgrade-storage-class-annotation-to-spec": {
 			isExpectedFailure: false,
 			oldClaim:          validClaimStorageClass,
 			newClaim:          validClaimStorageClassInSpec,
-			enableResize:      false,
 		},
 		"invalid-upgrade-storage-class-annotation-to-spec": {
 			isExpectedFailure: true,
 			oldClaim:          validClaimStorageClass,
 			newClaim:          invalidClaimStorageClassInSpec,
-			enableResize:      false,
 		},
 		"valid-upgrade-storage-class-annotation-to-annotation-and-spec": {
 			isExpectedFailure: false,
 			oldClaim:          validClaimStorageClass,
 			newClaim:          validClaimStorageClassInAnnotationAndSpec,
-			enableResize:      false,
 		},
 		"invalid-upgrade-storage-class-annotation-to-annotation-and-spec": {
 			isExpectedFailure: true,
 			oldClaim:          validClaimStorageClass,
 			newClaim:          invalidClaimStorageClassInAnnotationAndSpec,
-			enableResize:      false,
 		},
 		"invalid-upgrade-storage-class-in-spec": {
 			isExpectedFailure: true,
 			oldClaim:          validClaimStorageClassInSpec,
 			newClaim:          invalidClaimStorageClassInSpec,
-			enableResize:      false,
 		},
 		"invalid-downgrade-storage-class-spec-to-annotation": {
 			isExpectedFailure: true,
 			oldClaim:          validClaimStorageClassInSpec,
 			newClaim:          validClaimStorageClass,
-			enableResize:      false,
 		},
 		"valid-update-rwop-used-and-rwop-feature-disabled": {
 			isExpectedFailure: false,
 			oldClaim:          validClaimRWOPAccessMode,
 			newClaim:          validClaimRWOPAccessModeAddAnnotation,
-			enableResize:      false,
 		},
 		"valid-expand-shrink-resize-enabled": {
 			oldClaim:                   validClaimShrinkInitial,
 			newClaim:                   validClaimShrink,
-			enableResize:               true,
 			enableRecoverFromExpansion: true,
 		},
 		"invalid-expand-shrink-resize-enabled": {
 			oldClaim:                   validClaimShrinkInitial,
 			newClaim:                   invalidClaimShrink,
-			enableResize:               true,
 			enableRecoverFromExpansion: true,
 			isExpectedFailure:          true,
 		},
 		"invalid-expand-shrink-to-status-resize-enabled": {
 			oldClaim:                   validClaimShrinkInitial,
 			newClaim:                   invalidShrinkToStatus,
-			enableResize:               true,
 			enableRecoverFromExpansion: true,
 			isExpectedFailure:          true,
 		},
 		"invalid-expand-shrink-recover-disabled": {
 			oldClaim:                   validClaimShrinkInitial,
 			newClaim:                   validClaimShrink,
-			enableResize:               true,
 			enableRecoverFromExpansion: false,
-			isExpectedFailure:          true,
-		},
-		"invalid-expand-shrink-resize-disabled": {
-			oldClaim:                   validClaimShrinkInitial,
-			newClaim:                   validClaimShrink,
-			enableResize:               false,
-			enableRecoverFromExpansion: true,
 			isExpectedFailure:          true,
 		},
 		"unbound-size-shrink-resize-enabled": {
 			oldClaim:                   validClaimShrinkInitial,
 			newClaim:                   unboundShrink,
-			enableResize:               true,
 			enableRecoverFromExpansion: true,
 			isExpectedFailure:          true,
 		},
@@ -2324,7 +2282,6 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandPersistentVolumes, scenario.enableResize)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, scenario.enableRecoverFromExpansion)()
 			scenario.oldClaim.ResourceVersion = "1"
 			scenario.newClaim.ResourceVersion = "1"
@@ -2351,7 +2308,6 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 			enableReadWriteOncePod: true,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
 				AllowReadWriteOncePod:             true,
-				EnableExpansion:                   true,
 				EnableRecoverFromExpansionFailure: false,
 			},
 		},
@@ -2360,7 +2316,6 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 			enableReadWriteOncePod: true,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
 				AllowReadWriteOncePod:             true,
-				EnableExpansion:                   true,
 				EnableRecoverFromExpansionFailure: false,
 			},
 		},
@@ -2369,7 +2324,6 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 			enableReadWriteOncePod: false,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
 				AllowReadWriteOncePod:             false,
-				EnableExpansion:                   true,
 				EnableRecoverFromExpansionFailure: false,
 			},
 		},
@@ -2378,7 +2332,6 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 			enableReadWriteOncePod: true,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
 				AllowReadWriteOncePod:             true,
-				EnableExpansion:                   true,
 				EnableRecoverFromExpansionFailure: false,
 			},
 		},
@@ -2387,7 +2340,6 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 			enableReadWriteOncePod: false,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
 				AllowReadWriteOncePod:             true,
-				EnableExpansion:                   true,
 				EnableRecoverFromExpansionFailure: false,
 			},
 		},

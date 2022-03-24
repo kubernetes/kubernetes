@@ -30,15 +30,12 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/plugin/resourcequota"
 	resourcequotaapi "k8s.io/apiserver/pkg/admission/plugin/resourcequota/apis/resourcequota"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	testcore "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/quota/v1/install"
 )
 
@@ -408,8 +405,6 @@ func TestAdmitHandlesNegativePVCUpdates(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandPersistentVolumes, true)()
-
 	kubeClient := fake.NewSimpleClientset(resourceQuota)
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
 
@@ -457,8 +452,6 @@ func TestAdmitHandlesPVCUpdates(t *testing.T) {
 			},
 		},
 	}
-
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandPersistentVolumes, true)()
 
 	// start up quota system
 	stopCh := make(chan struct{})
