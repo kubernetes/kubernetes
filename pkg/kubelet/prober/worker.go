@@ -17,6 +17,7 @@ limitations under the License.
 package prober
 
 import (
+	"fmt"
 	"math/rand"
 	"time"
 
@@ -151,6 +152,7 @@ func (w *worker) run() {
 		ProberResults.Delete(w.proberResultsSuccessfulMetricLabels)
 		ProberResults.Delete(w.proberResultsFailedMetricLabels)
 		ProberResults.Delete(w.proberResultsUnknownMetricLabels)
+		w.probeManager.prober.trace.CleanLogModule(fmt.Sprintf("%s-%s-%s", w.probeType, klog.KObj(w.pod), w.container.Name))
 	}()
 
 probeLoop:

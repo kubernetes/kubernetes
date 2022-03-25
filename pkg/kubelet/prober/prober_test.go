@@ -25,6 +25,8 @@ import (
 	"strings"
 	"testing"
 
+	trace "k8s.io/kubernetes/pkg/kubelet/util/tracelog"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/tools/record"
@@ -286,6 +288,7 @@ func TestProbe(t *testing.T) {
 		for _, probeType := range [...]probeType{liveness, readiness, startup} {
 			prober := &prober{
 				recorder: &record.FakeRecorder{},
+				trace:    trace.NewTraceLog("Prober", verboseLogFrequency),
 			}
 			testID := fmt.Sprintf("%d-%s", i, probeType)
 			testContainer := v1.Container{Env: test.env}

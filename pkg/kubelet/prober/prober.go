@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
+	trace "k8s.io/kubernetes/pkg/kubelet/util/tracelog"
 	"k8s.io/kubernetes/pkg/probe"
 	execprobe "k8s.io/kubernetes/pkg/probe/exec"
 	grpcprobe "k8s.io/kubernetes/pkg/probe/grpc"
@@ -45,7 +46,10 @@ import (
 	"k8s.io/klog/v2"
 )
 
-const maxProbeRetries = 3
+const (
+	maxProbeRetries     = 3
+	verboseLogFrequency = 900 * time.Second
+)
 
 // Prober helps to check the liveness/readiness/startup of a container.
 type prober struct {
@@ -56,6 +60,7 @@ type prober struct {
 	runner kubecontainer.CommandRunner
 
 	recorder record.EventRecorder
+	trace    *trace.TraceLog
 }
 
 // NewProber creates a Prober, it takes a command runner and
@@ -72,6 +77,7 @@ func newProber(
 		grpc:     grpcprobe.New(),
 		runner:   runner,
 		recorder: recorder,
+		trace:    trace.NewTraceLog("Prober", verboseLogFrequency),
 	}
 }
 
@@ -121,6 +127,9 @@ func (pb *prober) probe(probeType probeType, pod *v1.Pod, status v1.PodStatus, c
 		klog.V(3).InfoS("Probe succeeded with a warning", "probeType", probeType, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name, "output", output)
 	} else {
 		klog.V(3).InfoS("Probe succeeded", "probeType", probeType, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name)
+	}
+	if !klog.V(3).Enabled() {
+		pb.trace.LogWithFrequency(fmt.Sprintf("%s-%s-%s", probeType, klog.KObj(pod), container.Name), "Probe succeeded", "probeType", probeType, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name, "output", output)
 	}
 	return results.Success, nil
 }
