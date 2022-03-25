@@ -333,13 +333,9 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(
 
 }
 
-// checkVolumeFSResize checks whether a PVC mounted by the pod requires file
-// system resize or not. If so, marks this volume as fsResizeRequired in ASW.
-// - mountedVolumesForPod stores all mounted volumes in ASW, because online
-//   volume resize only considers mounted volumes.
-// - processedVolumesForFSResize stores all volumes we have checked in current loop,
-//   because file system resize operation is a global operation for volume, so
-//   we only need to check it once if more than one pod use it.
+// checkVolumeFSResize records desired PVC size for a volume mounted by the pod.
+// It is used for comparison with actual size(coming from pvc.Status.Capacity) and calling
+// volume expansion on the node if needed.
 func (dswp *desiredStateOfWorldPopulator) checkVolumeFSResize(
 	pod *v1.Pod,
 	podVolume v1.Volume,

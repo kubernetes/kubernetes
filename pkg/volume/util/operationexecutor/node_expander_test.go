@@ -29,10 +29,14 @@ import (
 
 func TestNodeExpander(t *testing.T) {
 	var tests = []struct {
-		name               string
-		pvc                *v1.PersistentVolumeClaim
-		pv                 *v1.PersistentVolume
-		recoverFeatureGate bool
+		name string
+		pvc  *v1.PersistentVolumeClaim
+		pv   *v1.PersistentVolume
+
+		// desired size, defaults to pv.Spec.Capacity
+		desiredSize *resource.Quantity
+		// actualSize, defaults to pvc.Status.Capacity
+		actualSize *resource.Quantity
 
 		// expectations of test
 		expectedResizeStatus     v1.PersistentVolumeClaimResizeStatus
@@ -42,10 +46,9 @@ func TestNodeExpander(t *testing.T) {
 		expectError              bool
 	}{
 		{
-			name:               "pv.spec.cap > pvc.status.cap, resizeStatus=node_expansion_failed",
-			pvc:                getTestPVC("test-vol0", "2G", "1G", "", v1.PersistentVolumeClaimNodeExpansionFailed),
-			pv:                 getTestPV("test-vol0", "2G"),
-			recoverFeatureGate: true,
+			name: "pv.spec.cap > pvc.status.cap, resizeStatus=node_expansion_failed",
+			pvc:  getTestPVC("test-vol0", "2G", "1G", "", v1.PersistentVolumeClaimNodeExpansionFailed),
+			pv:   getTestPV("test-vol0", "2G"),
 
 			expectedResizeStatus:     v1.PersistentVolumeClaimNodeExpansionFailed,
 			expectResizeCall:         false,
@@ -56,7 +59,6 @@ func TestNodeExpander(t *testing.T) {
 			name:                     "pv.spec.cap > pvc.status.cap, resizeStatus=node_expansion_pending",
 			pvc:                      getTestPVC("test-vol0", "2G", "1G", "2G", v1.PersistentVolumeClaimNodeExpansionPending),
 			pv:                       getTestPV("test-vol0", "2G"),
-			recoverFeatureGate:       true,
 			expectedResizeStatus:     v1.PersistentVolumeClaimNoExpansionInProgress,
 			expectResizeCall:         true,
 			assumeResizeOpAsFinished: true,
@@ -66,19 +68,28 @@ func TestNodeExpander(t *testing.T) {
 			name:                     "pv.spec.cap > pvc.status.cap, resizeStatus=node_expansion_pending, reize_op=failing",
 			pvc:                      getTestPVC(volumetesting.AlwaysFailNodeExpansion, "2G", "1G", "2G", v1.PersistentVolumeClaimNodeExpansionPending),
 			pv:                       getTestPV(volumetesting.AlwaysFailNodeExpansion, "2G"),
-			recoverFeatureGate:       true,
 			expectError:              true,
 			expectedResizeStatus:     v1.PersistentVolumeClaimNodeExpansionFailed,
 			expectResizeCall:         true,
 			assumeResizeOpAsFinished: true,
 			expectedStatusSize:       resource.MustParse("1G"),
 		},
+		{
+			name: "pv.spec.cap = pvc.status.cap, resizeStatus='', desiredSize > actualSize",
+			pvc:  getTestPVC("test-vol0", "2G", "2G", "2G", v1.PersistentVolumeClaimNoExpansionInProgress),
+			pv:   getTestPV("test-vol0", "2G"),
+
+			expectedResizeStatus:     v1.PersistentVolumeClaimNoExpansionInProgress,
+			expectResizeCall:         true,
+			assumeResizeOpAsFinished: true,
+			expectedStatusSize:       resource.MustParse("2G"),
+		},
 	}
 
 	for i := range tests {
 		test := tests[i]
 		t.Run(test.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, test.recoverFeatureGate)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, true)()
 			volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
 
 			pvc := test.pvc
@@ -91,6 +102,14 @@ func TestNodeExpander(t *testing.T) {
 				VolumeName: v1.UniqueVolumeName(pv.Name),
 				VolumeSpec: volume.NewSpecFromPersistentVolume(pv, false),
 			}
+			desiredSize := test.desiredSize
+			if desiredSize == nil {
+				desiredSize = pv.Spec.Capacity.Storage()
+			}
+			actualSize := test.actualSize
+			if actualSize == nil {
+				actualSize = pvc.Status.Capacity.Storage()
+			}
 			resizeOp := nodeResizeOperationOpts{
 				pvc:                pvc,
 				pv:                 pv,
@@ -99,8 +118,8 @@ func TestNodeExpander(t *testing.T) {
 				actualStateOfWorld: nil,
 				pluginResizeOpts: volume.NodeResizeOptions{
 					VolumeSpec: vmt.VolumeSpec,
-					NewSize:    *pv.Spec.Capacity.Storage(),
-					OldSize:    *pvc.Status.Capacity.Storage(),
+					NewSize:    *desiredSize,
+					OldSize:    *actualSize,
 				},
 			}
 			ogInstance, _ := og.(*operationGenerator)
