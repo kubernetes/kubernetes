@@ -434,7 +434,7 @@ func updateMigrationAnnotationsAndFinalizers(cmpm CSIMigratedPluginManager, tran
 			if !claim && utilfeature.DefaultFeatureGate.Enabled(features.HonorPVReclaimPolicy) {
 				modified := false
 				if finalizers == nil {
-					*finalizers = []string{}
+					finalizers = &([]string{})
 				}
 				// Add back the in-tree PV deletion protection finalizer if does not already exists
 				if !slice.ContainsString(*finalizers, storagehelpers.PVDeletionInTreeProtectionFinalizer, nil) {

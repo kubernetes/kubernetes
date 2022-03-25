@@ -188,11 +188,10 @@ func TestDeleteSync(t *testing.T) {
 			},
 		},
 		{
-			// TODO: Change the expectedVolumes to novolumes after HonorPVReclaimPolicy is enabled by default.
 			// delete success - volume has deletion timestamp before doDelete() starts
 			"8-13 - volume has deletion timestamp and processed",
 			volumesWithFinalizers(withVolumeDeletionTimestamp(newVolumeArray("volume8-13", "1Gi", "uid8-13", "claim8-13", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty, volume.AnnBoundByController)), []string{volume.PVDeletionInTreeProtectionFinalizer}),
-			volumesWithFinalizers(withVolumeDeletionTimestamp(newVolumeArray("volume8-13", "1Gi", "uid8-13", "claim8-13", v1.VolumeReleased, v1.PersistentVolumeReclaimDelete, classEmpty, volume.AnnBoundByController)), []string{volume.PVDeletionInTreeProtectionFinalizer}),
+			novolumes,
 			noclaims,
 			noclaims,
 			noevents, noerrors,
@@ -222,7 +221,7 @@ func TestDeleteMultiSync(t *testing.T) {
 			// delete failure - delete returns error. The controller should
 			// try again.
 			"9-1 - delete returns error",
-			newVolumeArray("volume9-1", "1Gi", "uid9-1", "claim9-1", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty),
+			volumesWithFinalizers(newVolumeArray("volume9-1", "1Gi", "uid9-1", "claim9-1", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty), []string{volume.PVDeletionInTreeProtectionFinalizer}),
 			novolumes,
 			noclaims,
 			noclaims,

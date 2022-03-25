@@ -254,6 +254,7 @@ func newVolume(name, capacity, boundToClaimUID, boundToClaimName string, phase v
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            name,
 			ResourceVersion: "1",
+			Finalizers:      []string{storagehelpers.PVDeletionInTreeProtectionFinalizer},
 		},
 		Spec: v1.PersistentVolumeSpec{
 			Capacity: v1.ResourceList{

@@ -1458,6 +1458,12 @@ func (ctrl *PersistentVolumeController) doDeleteVolume(volume *v1.PersistentVolu
 func (ctrl *PersistentVolumeController) removeDeletionProtectionFinalizer(ctx context.Context, volume *v1.PersistentVolume) error {
 	var err error
 	pvUpdateNeeded := false
+	// Retrieve latest version
+	volume, err = ctrl.kubeClient.CoreV1().PersistentVolumes().Get(context.TODO(), volume.Name, metav1.GetOptions{})
+	if err != nil {
+		klog.Errorf("error reading persistent volume %q: %v", volume.Name, err)
+		return err
+	}
 	volumeClone := volume.DeepCopy()
 	pvFinalizers := volumeClone.Finalizers
 	if pvFinalizers != nil && slice.ContainsString(pvFinalizers, storagehelpers.PVDeletionInTreeProtectionFinalizer, nil) {
