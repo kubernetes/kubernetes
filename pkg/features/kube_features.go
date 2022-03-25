@@ -979,7 +979,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	genericfeatures.DryRun:                              {Default: true, PreRelease: featuregate.GA},
 	genericfeatures.ServerSideApply:                     {Default: true, PreRelease: featuregate.GA},
 	genericfeatures.APIPriorityAndFairness:              {Default: true, PreRelease: featuregate.Beta},
-	genericfeatures.OpenAPIEnums:                        {Default: false, PreRelease: featuregate.Alpha},
+	genericfeatures.OpenAPIEnums:                        {Default: true, PreRelease: featuregate.Beta},
 	genericfeatures.CustomResourceValidationExpressions: {Default: false, PreRelease: featuregate.Alpha},
 	genericfeatures.OpenAPIV3:                           {Default: false, PreRelease: featuregate.Alpha},
 	genericfeatures.ServerSideFieldValidation:           {Default: false, PreRelease: featuregate.Alpha},
