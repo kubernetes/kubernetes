@@ -17,11 +17,14 @@ limitations under the License.
 package term
 
 import (
+	"errors"
 	"io"
 	"os"
 
 	wordwrap "github.com/mitchellh/go-wordwrap"
 	"github.com/moby/term"
+
+	"k8s.io/client-go/tools/remotecommand"
 )
 
 type wordWrapWriter struct {
@@ -51,16 +54,7 @@ func NewResponsiveWriter(w io.Writer) io.Writer {
 	if terminalSize == nil {
 		return w
 	}
-
-	var limit uint
-	switch {
-	case terminalSize.Width >= 120:
-		limit = 120
-	case terminalSize.Width >= 100:
-		limit = 100
-	case terminalSize.Width >= 80:
-		limit = 80
-	}
+	limit := getTerminalLimitWidth(terminalSize)
 
 	return NewWordWrapWriter(w, limit)
 }
@@ -72,6 +66,32 @@ func NewWordWrapWriter(w io.Writer, limit uint) io.Writer {
 		limit:  limit,
 		writer: w,
 	}
+}
+
+func getTerminalLimitWidth(terminalSize *remotecommand.TerminalSize) uint {
+	var limit uint
+	switch {
+	case terminalSize.Width >= 120:
+		limit = 120
+	case terminalSize.Width >= 100:
+		limit = 100
+	case terminalSize.Width >= 80:
+		limit = 80
+	}
+	return limit
+}
+
+func GetWordWrapperLimit() (uint, error) {
+	stdout := os.Stdout
+	fd := stdout.Fd()
+	if !term.IsTerminal(fd) {
+		return 0, errors.New("file descriptor is not a terminal")
+	}
+	terminalSize := GetSize(fd)
+	if terminalSize == nil {
+		return 0, errors.New("terminal size is nil")
+	}
+	return getTerminalLimitWidth(terminalSize), nil
 }
 
 func (w wordWrapWriter) Write(p []byte) (nn int, err error) {
