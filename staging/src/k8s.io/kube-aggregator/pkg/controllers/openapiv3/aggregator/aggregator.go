@@ -26,10 +26,14 @@ import (
 	"time"
 
 	"k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/klog/v2"
 	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	"k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/handler3"
+	"k8s.io/kube-openapi/pkg/openapiconv"
+
+	v2aggregator "k8s.io/kube-aggregator/pkg/controllers/openapi/aggregator"
 )
 
 // SpecProxier proxies OpenAPI V3 requests to their respective APIService
@@ -45,6 +49,7 @@ const (
 	specDownloadTimeout           = 60 * time.Second
 	localDelegateChainNamePrefix  = "k8s_internal_local_delegation_chain_"
 	localDelegateChainNamePattern = localDelegateChainNamePrefix + "%010d"
+	openAPIV2Converter            = "openapiv2converter"
 )
 
 // IsLocalAPIService returns true for local specs from delegates.
@@ -87,6 +92,17 @@ func BuildAndRegisterAggregator(downloader Downloader, delegationTarget server.D
 		s.UpdateAPIServiceSpec(apiServiceName)
 		i++
 	}
+
+	handler, err := handler3.NewOpenAPIService(nil)
+	if err != nil {
+		return s, err
+	}
+	s.openAPIV2ConverterHandler = handler
+	openAPIV2ConverterMux := mux.NewPathRecorderMux(openAPIV2Converter)
+	s.openAPIV2ConverterHandler.RegisterOpenAPIV3VersionedService("/openapi/v3", openAPIV2ConverterMux)
+	openAPIV2ConverterAPIService := v1.APIService{}
+	openAPIV2ConverterAPIService.Name = openAPIV2Converter
+	s.AddUpdateAPIService(openAPIV2ConverterMux, &openAPIV2ConverterAPIService)
 	s.register(pathHandler)
 
 	return s, nil
@@ -107,22 +123,51 @@ func (s *specProxier) AddUpdateAPIService(handler http.Handler, apiservice *v1.A
 	}
 }
 
+func getGroupVersionStringFromAPIService(apiService v1.APIService) string {
+	if apiService.Spec.Group == "" && apiService.Spec.Version == "" {
+		return ""
+	}
+	return "apis/" + apiService.Spec.Group + "/" + apiService.Spec.Version
+}
+
 // UpdateAPIServiceSpec updates all the OpenAPI v3 specs that the APIService serves.
 // It is thread safe.
 func (s *specProxier) UpdateAPIServiceSpec(apiServiceName string) error {
 	s.rwMutex.Lock()
 	defer s.rwMutex.Unlock()
+	return s.updateAPIServiceSpecLocked(apiServiceName)
+}
 
+func (s *specProxier) updateAPIServiceSpecLocked(apiServiceName string) error {
 	apiService, exists := s.apiServiceInfo[apiServiceName]
 	if !exists {
 		return fmt.Errorf("APIService %s does not exist for update", apiServiceName)
 	}
 
-	gv, err := s.downloader.OpenAPIV3Root(apiService.handler)
+	if !apiService.isLegacyAPIService {
+		gv, httpStatus, err := s.downloader.OpenAPIV3Root(apiService.handler)
+		if err != nil {
+			return err
+		}
+		if httpStatus == http.StatusNotFound {
+			apiService.isLegacyAPIService = true
+		} else {
+			s.apiServiceInfo[apiServiceName].discovery = gv
+			return nil
+		}
+	}
+
+	newDownloader := v2aggregator.Downloader{}
+	v2Spec, etag, httpStatus, err := newDownloader.Download(apiService.handler, apiService.etag)
 	if err != nil {
 		return err
 	}
-	s.apiServiceInfo[apiServiceName].discovery = gv
+	apiService.etag = etag
+	if httpStatus == http.StatusOK {
+		v3Spec := openapiconv.ConvertV2ToV3(v2Spec)
+		s.openAPIV2ConverterHandler.UpdateGroupVersion(getGroupVersionStringFromAPIService(apiService.apiService), v3Spec)
+		s.updateAPIServiceSpecLocked(openAPIV2Converter)
+	}
 	return nil
 }
 
@@ -135,6 +180,8 @@ type specProxier struct {
 
 	// For downloading the OpenAPI v3 specs from apiservices
 	downloader Downloader
+
+	openAPIV2ConverterHandler *handler3.OpenAPIService
 }
 
 var _ SpecProxier = &specProxier{}
@@ -143,6 +190,12 @@ type openAPIV3APIServiceInfo struct {
 	apiService v1.APIService
 	handler    http.Handler
 	discovery  *handler3.OpenAPIV3Discovery
+
+	// These fields are only used if the /openapi/v3 endpoint is not served by an APIService
+	// Legacy APIService indicates that an APIService does not support OpenAPI V3, and the OpenAPI V2
+	// will be downloaded, converted to V3 (lossy), and served by the aggregator
+	etag               string
+	isLegacyAPIService bool
 }
 
 // RemoveAPIServiceSpec removes an api service from the OpenAPI map. If it does not exist, no error is returned.
@@ -150,11 +203,13 @@ type openAPIV3APIServiceInfo struct {
 func (s *specProxier) RemoveAPIServiceSpec(apiServiceName string) {
 	s.rwMutex.Lock()
 	defer s.rwMutex.Unlock()
-	delete(s.apiServiceInfo, apiServiceName)
+	if apiServiceInfo, ok := s.apiServiceInfo[apiServiceName]; ok {
+		s.openAPIV2ConverterHandler.DeleteGroupVersion(getGroupVersionStringFromAPIService(apiServiceInfo.apiService))
+		delete(s.apiServiceInfo, apiServiceName)
+	}
 }
 
-// handleDiscovery is the handler for OpenAPI V3 Discovery
-func (s *specProxier) handleDiscovery(w http.ResponseWriter, r *http.Request) {
+func (s *specProxier) getOpenAPIV3Root() handler3.OpenAPIV3Discovery {
 	s.rwMutex.RLock()
 	defer s.rwMutex.RUnlock()
 
@@ -171,7 +226,12 @@ func (s *specProxier) handleDiscovery(w http.ResponseWriter, r *http.Request) {
 			merged.Paths[key] = item
 		}
 	}
+	return merged
+}
 
+// handleDiscovery is the handler for OpenAPI V3 Discovery
+func (s *specProxier) handleDiscovery(w http.ResponseWriter, r *http.Request) {
+	merged := s.getOpenAPIV3Root()
 	j, err := json.Marshal(&merged)
 	if err != nil {
 		w.WriteHeader(500)

@@ -18,7 +18,6 @@ package aggregator
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"testing"
 
@@ -65,35 +64,10 @@ func (h handlerTest) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func assertDownloadedSpec(gvSpec map[string]*SpecETag, err error, expectedSpecID string, expectedEtag string) error {
-	if err != nil {
-		return fmt.Errorf("downloadOpenAPISpec failed : %s", err)
-	}
-	specInfo, ok := gvSpec["apis/group/version"]
-	if !ok {
-		if expectedSpecID == "" {
-			return nil
-		}
-		return fmt.Errorf("expected to download spec, no spec downloaded")
-	}
-
-	if specInfo.spec != nil && expectedSpecID == "" {
-		return fmt.Errorf("expected ID %s, actual ID %s", expectedSpecID, specInfo.spec.Version)
-	}
-
-	if specInfo.spec != nil && specInfo.spec.Version != expectedSpecID {
-		return fmt.Errorf("expected ID %s, actual ID %s", expectedSpecID, specInfo.spec.Version)
-	}
-	if specInfo.etag != expectedEtag {
-		return fmt.Errorf("expected ETag '%s', actual ETag '%s'", expectedEtag, specInfo.etag)
-	}
-	return nil
-}
-
 func TestDownloadOpenAPISpec(t *testing.T) {
 	s := Downloader{}
 
-	groups, err := s.OpenAPIV3Root(
+	groups, _, err := s.OpenAPIV3Root(
 		handlerTest{data: []byte(""), etag: ""})
 	assert.NoError(t, err)
 	if assert.NotNil(t, groups) {
@@ -103,18 +77,4 @@ func TestDownloadOpenAPISpec(t *testing.T) {
 		}
 	}
 
-	// Test with eTag
-	gvSpec, err := s.Download(
-		handlerTest{data: []byte("{\"openapi\": \"test\"}"), etag: "etag_test"}, map[string]string{})
-	assert.NoError(t, assertDownloadedSpec(gvSpec, err, "test", "etag_test"))
-
-	// Test not modified
-	gvSpec, err = s.Download(
-		handlerTest{data: []byte("{\"openapi\": \"test\"}"), etag: "etag_test"}, map[string]string{"apis/group/version": "etag_test"})
-	assert.NoError(t, assertDownloadedSpec(gvSpec, err, "", "etag_test"))
-
-	// Test different eTags
-	gvSpec, err = s.Download(
-		handlerTest{data: []byte("{\"openapi\": \"test\"}"), etag: "etag_test1"}, map[string]string{"apis/group/version": "etag_test2"})
-	assert.NoError(t, assertDownloadedSpec(gvSpec, err, "test", "etag_test1"))
 }
