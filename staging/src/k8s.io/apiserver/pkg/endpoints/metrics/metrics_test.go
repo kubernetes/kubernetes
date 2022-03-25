@@ -244,7 +244,7 @@ func TestRecordDroppedRequests(t *testing.T) {
 			},
 			isMutating: false,
 			want: `
-			            # HELP apiserver_dropped_requests_total [ALPHA] Number of requests dropped with 'Try again later' response
+			            # HELP apiserver_dropped_requests_total [ALPHA] Number of requests dropped with 'Try again later' response. Use apiserver_request_total and/or apiserver_request_terminations_total metrics instead.
 			            # TYPE apiserver_dropped_requests_total counter
 			            apiserver_dropped_requests_total{request_kind="readOnly"} 1
 			            # HELP apiserver_request_total [STABLE] Counter of apiserver requests broken out for each verb, dry run value, group, version, resource, scope, component, and HTTP response code.
@@ -268,7 +268,7 @@ func TestRecordDroppedRequests(t *testing.T) {
 			},
 			isMutating: true,
 			want: `
-			            # HELP apiserver_dropped_requests_total [ALPHA] Number of requests dropped with 'Try again later' response
+			            # HELP apiserver_dropped_requests_total [ALPHA] Number of requests dropped with 'Try again later' response. Use apiserver_request_total and/or apiserver_request_terminations_total metrics instead.
 			            # TYPE apiserver_dropped_requests_total counter
 			            apiserver_dropped_requests_total{request_kind="mutating"} 1
 			            # HELP apiserver_request_total [STABLE] Counter of apiserver requests broken out for each verb, dry run value, group, version, resource, scope, component, and HTTP response code.
@@ -294,7 +294,7 @@ func TestRecordDroppedRequests(t *testing.T) {
 			},
 			isMutating: true,
 			want: `
-			            # HELP apiserver_dropped_requests_total [ALPHA] Number of requests dropped with 'Try again later' response
+			            # HELP apiserver_dropped_requests_total [ALPHA] Number of requests dropped with 'Try again later' response. Use apiserver_request_total and/or apiserver_request_terminations_total metrics instead.
 			            # TYPE apiserver_dropped_requests_total counter
 			            apiserver_dropped_requests_total{request_kind="mutating"} 1
 			            # HELP apiserver_request_total [STABLE] Counter of apiserver requests broken out for each verb, dry run value, group, version, resource, scope, component, and HTTP response code.
