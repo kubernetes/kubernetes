@@ -27,7 +27,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
-	credentialproviderv1alpha1 "k8s.io/kubelet/pkg/apis/credentialprovider/v1alpha1"
+	credentialproviderv1beta1 "k8s.io/kubelet/pkg/apis/credentialprovider/v1beta1"
 )
 
 const metadataTokenEndpoint = "http://metadata.google.internal./computeMetadata/v1/instance/service-accounts/default/token"
@@ -51,7 +51,7 @@ func getCredentials(tokenEndpoint string, r io.Reader, w io.Writer) error {
 		return err
 	}
 
-	var authRequest credentialproviderv1alpha1.CredentialProviderRequest
+	var authRequest credentialproviderv1beta1.CredentialProviderRequest
 	err = json.Unmarshal(data, &authRequest)
 	if err != nil {
 		return err
@@ -62,12 +62,12 @@ func getCredentials(tokenEndpoint string, r io.Reader, w io.Writer) error {
 		return err
 	}
 
-	response := &credentialproviderv1alpha1.CredentialProviderResponse{
+	response := &credentialproviderv1beta1.CredentialProviderResponse{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "CredentialProviderResponse",
-			APIVersion: "credentialprovider.kubelet.k8s.io/v1alpha1",
+			APIVersion: "credentialprovider.kubelet.k8s.io/v1beta1",
 		},
-		CacheKeyType: credentialproviderv1alpha1.RegistryPluginCacheKeyType,
+		CacheKeyType: credentialproviderv1beta1.RegistryPluginCacheKeyType,
 		Auth:         auth,
 	}
 
