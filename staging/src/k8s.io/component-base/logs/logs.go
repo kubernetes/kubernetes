@@ -26,7 +26,6 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 )
 
@@ -41,7 +40,6 @@ const deprecated = "will be removed in a future release, see https://github.com/
 
 var (
 	packageFlags = flag.NewFlagSet("logging", flag.ContinueOnError)
-	logrFlush    func()
 
 	// Periodic flushing gets configured either via the global flag
 	// in this file or via LoggingConfiguration.
@@ -176,7 +174,7 @@ func InitLogs() {
 	if logFlushFreqAdded {
 		// The flag from this file was activated, so use it now.
 		// Otherwise LoggingConfiguration.Apply will do this.
-		go wait.Forever(FlushLogs, logFlushFreq)
+		klog.StartFlushDaemon(logFlushFreq)
 	}
 }
 
@@ -185,9 +183,6 @@ func InitLogs() {
 // are printed before exiting the program.
 func FlushLogs() {
 	klog.Flush()
-	if logrFlush != nil {
-		logrFlush()
-	}
 }
 
 // NewLogger creates a new log.Logger which sends logs to klog.Info.

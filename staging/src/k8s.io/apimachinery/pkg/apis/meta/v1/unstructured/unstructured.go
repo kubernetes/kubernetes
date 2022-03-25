@@ -444,11 +444,11 @@ func (u *Unstructured) SetFinalizers(finalizers []string) {
 	u.setNestedStringSlice(finalizers, "metadata", "finalizers")
 }
 
-func (u *Unstructured) GetClusterName() string {
+func (u *Unstructured) GetZZZ_DeprecatedClusterName() string {
 	return getNestedString(u.Object, "metadata", "clusterName")
 }
 
-func (u *Unstructured) SetClusterName(clusterName string) {
+func (u *Unstructured) SetZZZ_DeprecatedClusterName(clusterName string) {
 	if len(clusterName) == 0 {
 		RemoveNestedField(u.Object, "metadata", "clusterName")
 		return

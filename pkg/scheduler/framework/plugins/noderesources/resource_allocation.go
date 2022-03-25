@@ -38,8 +38,6 @@ type resourceAllocationScorer struct {
 	useRequested        bool
 	scorer              func(requested, allocable resourceToValueMap) int64
 	resourceToWeightMap resourceToWeightMap
-
-	enablePodOverhead bool
 }
 
 // resourceToValueMap is keyed with resource name and valued with quantity.
@@ -129,7 +127,7 @@ func (r *resourceAllocationScorer) calculatePodResourceRequest(pod *v1.Pod, reso
 	}
 
 	// If Overhead is being utilized, add to the total requests for the pod
-	if pod.Spec.Overhead != nil && r.enablePodOverhead {
+	if pod.Spec.Overhead != nil {
 		if quantity, found := pod.Spec.Overhead[resource]; found {
 			podRequest += quantity.Value()
 		}

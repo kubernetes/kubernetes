@@ -26,6 +26,7 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	"k8s.io/apiserver/pkg/authorization/union"
+	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/apiserver/plugin/pkg/authorizer/webhook"
 	versionedinformers "k8s.io/client-go/informers"
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
@@ -114,12 +115,16 @@ func (config Config) New() (authorizer.Authorizer, authorizer.RuleResolver, erro
 			if config.WebhookRetryBackoff == nil {
 				return nil, nil, errors.New("retry backoff parameters for authorization webhook has not been specified")
 			}
-			webhookAuthorizer, err := webhook.New(config.WebhookConfigFile,
+			clientConfig, err := webhookutil.LoadKubeconfig(config.WebhookConfigFile, config.CustomDial)
+			if err != nil {
+				return nil, nil, err
+			}
+			webhookAuthorizer, err := webhook.New(clientConfig,
 				config.WebhookVersion,
 				config.WebhookCacheAuthorizedTTL,
 				config.WebhookCacheUnauthorizedTTL,
 				*config.WebhookRetryBackoff,
-				config.CustomDial)
+			)
 			if err != nil {
 				return nil, nil, err
 			}

@@ -3670,7 +3670,6 @@ message PodSpec {
   // set. If RuntimeClass is configured and selected in the PodSpec, Overhead will be set to the value
   // defined in the corresponding RuntimeClass, otherwise it will remain unset and treated as zero.
   // More info: https://git.k8s.io/enhancements/keps/sig-node/688-pod-overhead/README.md
-  // This field is beta-level as of Kubernetes v1.18, and is only honored by servers that enable the PodOverhead feature.
   // +optional
   map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> overhead = 32;
 
@@ -3721,7 +3720,7 @@ message PodSpec {
   // - spec.containers[*].securityContext.runAsUser
   // - spec.containers[*].securityContext.runAsGroup
   // +optional
-  // This is an alpha field and requires the IdentifyPodOS feature
+  // This is a beta field and requires the IdentifyPodOS feature
   optional PodOS os = 36;
 }
 
@@ -4011,7 +4010,7 @@ message ProbeHandler {
   optional TCPSocketAction tcpSocket = 3;
 
   // GRPC specifies an action involving a GRPC port.
-  // This is an alpha field and requires enabling GRPCContainerProbe feature gate.
+  // This is a beta field and requires enabling GRPCContainerProbe feature gate.
   // +featureGate=GRPCContainerProbe
   // +optional
   optional GRPCAction grpc = 4;

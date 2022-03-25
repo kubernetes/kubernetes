@@ -262,6 +262,8 @@ func autoConvert_v1alpha1_KubeProxyWinkernelConfiguration_To_config_KubeProxyWin
 	out.NetworkName = in.NetworkName
 	out.SourceVip = in.SourceVip
 	out.EnableDSR = in.EnableDSR
+	out.RootHnsEndpointName = in.RootHnsEndpointName
+	out.ForwardHealthCheckVip = in.ForwardHealthCheckVip
 	return nil
 }
 
@@ -274,6 +276,8 @@ func autoConvert_config_KubeProxyWinkernelConfiguration_To_v1alpha1_KubeProxyWin
 	out.NetworkName = in.NetworkName
 	out.SourceVip = in.SourceVip
 	out.EnableDSR = in.EnableDSR
+	out.RootHnsEndpointName = in.RootHnsEndpointName
+	out.ForwardHealthCheckVip = in.ForwardHealthCheckVip
 	return nil
 }
 

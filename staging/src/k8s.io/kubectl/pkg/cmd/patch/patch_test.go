@@ -21,6 +21,8 @@ import (
 	"strings"
 	"testing"
 
+	jsonpath "github.com/exponent-io/jsonpath"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/rest/fake"
@@ -188,5 +190,53 @@ func TestPatchObjectFromFileOutput(t *testing.T) {
 	// make sure the value returned by the server is used
 	if !strings.Contains(buf.String(), "post-patch: post-patch-value") {
 		t.Errorf("unexpected output: %s", buf.String())
+	}
+}
+
+func TestPatchSubresource(t *testing.T) {
+	pod := cmdtesting.SubresourceTestData()
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	expectedStatus := corev1.PodRunning
+
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == "/namespaces/test/pods/foo/status" && (m == "PATCH" || m == "GET"):
+				obj := pod
+
+				// ensure patched object reflects successful
+				// patch edits from the client
+				if m == "PATCH" {
+					obj.Status.Phase = expectedStatus
+				}
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, obj)}, nil
+			default:
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+	stream, _, buf, _ := genericclioptions.NewTestIOStreams()
+
+	cmd := NewCmdPatch(tf, stream)
+	cmd.Flags().Set("namespace", "test")
+	cmd.Flags().Set("patch", `{"status":{"phase":"Running"}}`)
+	cmd.Flags().Set("output", "json")
+	cmd.Flags().Set("subresource", "status")
+	cmd.Run(cmd, []string{"pod/foo"})
+
+	decoder := jsonpath.NewDecoder(buf)
+	var actualStatus corev1.PodPhase
+	decoder.SeekTo("status", "phase")
+	decoder.Decode(&actualStatus)
+	// check the status.phase value is updated in the response
+	if actualStatus != expectedStatus {
+		t.Errorf("unexpected pod status to be set to %s got: %s", expectedStatus, actualStatus)
 	}
 }

@@ -20,7 +20,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/binary"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -34,7 +33,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	apitypes "k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -53,6 +51,7 @@ import (
 	"k8s.io/utils/clock"
 
 	flowcontrol "k8s.io/api/flowcontrol/v1beta2"
+	flowcontrolapplyconfiguration "k8s.io/client-go/applyconfigurations/flowcontrol/v1beta2"
 	flowcontrolclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta2"
 	flowcontrollister "k8s.io/client-go/listers/flowcontrol/v1beta2"
 )
@@ -435,18 +434,16 @@ func (cfgCtlr *configController) digestConfigObjects(newPLs []*flowcontrol.Prior
 
 		// if we are going to issue an update, be sure we track every name we update so we know if we update it too often.
 		currResult.updatedItems.Insert(fsu.flowSchema.Name)
-		patchBytes, err := makeFlowSchemaConditionPatch(fsu.condition)
-		if err != nil {
-			// should never happen because these conditions are created here and well formed
-			panic(fmt.Sprintf("Failed to json.Marshall(%#+v): %s", fsu.condition, err.Error()))
-		}
-		if klog.V(4).Enabled() {
-			klog.V(4).Infof("%s writing Condition %s to FlowSchema %s, which had ResourceVersion=%s, because its previous value was %s, diff: %s",
+		if klogV := klog.V(4); klogV.Enabled() {
+			klogV.Infof("%s writing Condition %s to FlowSchema %s, which had ResourceVersion=%s, because its previous value was %s, diff: %s",
 				cfgCtlr.name, fsu.condition, fsu.flowSchema.Name, fsu.flowSchema.ResourceVersion, fcfmt.Fmt(fsu.oldValue), cmp.Diff(fsu.oldValue, fsu.condition))
 		}
 		fsIfc := cfgCtlr.flowcontrolClient.FlowSchemas()
-		patchOptions := metav1.PatchOptions{FieldManager: cfgCtlr.asFieldManager}
-		_, err = fsIfc.Patch(context.TODO(), fsu.flowSchema.Name, apitypes.StrategicMergePatchType, patchBytes, patchOptions, "status")
+		applyOptions := metav1.ApplyOptions{FieldManager: cfgCtlr.asFieldManager, Force: true}
+
+		// the condition field in fsStatusUpdate holds the new condition we want to update.
+		// TODO: this will break when we have multiple conditions for a flowschema
+		_, err := fsIfc.ApplyStatus(context.TODO(), toFlowSchemaApplyConfiguration(fsu), applyOptions)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				// This object has been deleted.  A notification is coming
@@ -462,18 +459,18 @@ func (cfgCtlr *configController) digestConfigObjects(newPLs []*flowcontrol.Prior
 	return suggestedDelay, utilerrors.NewAggregate(errs)
 }
 
-// makeFlowSchemaConditionPatch takes in a condition and returns the patch status as a json.
-func makeFlowSchemaConditionPatch(condition flowcontrol.FlowSchemaCondition) ([]byte, error) {
-	o := struct {
-		Status flowcontrol.FlowSchemaStatus `json:"status"`
-	}{
-		Status: flowcontrol.FlowSchemaStatus{
-			Conditions: []flowcontrol.FlowSchemaCondition{
-				condition,
-			},
-		},
-	}
-	return json.Marshal(o)
+func toFlowSchemaApplyConfiguration(fsUpdate fsStatusUpdate) *flowcontrolapplyconfiguration.FlowSchemaApplyConfiguration {
+	condition := flowcontrolapplyconfiguration.FlowSchemaCondition().
+		WithType(fsUpdate.condition.Type).
+		WithStatus(fsUpdate.condition.Status).
+		WithReason(fsUpdate.condition.Reason).
+		WithLastTransitionTime(fsUpdate.condition.LastTransitionTime).
+		WithMessage(fsUpdate.condition.Message)
+
+	return flowcontrolapplyconfiguration.FlowSchema(fsUpdate.flowSchema.Name).
+		WithStatus(flowcontrolapplyconfiguration.FlowSchemaStatus().
+			WithConditions(condition),
+		)
 }
 
 // shouldDelayUpdate checks to see if a flowschema has been updated too often and returns true if a delay is needed.

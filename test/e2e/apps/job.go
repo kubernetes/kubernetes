@@ -18,6 +18,7 @@ package apps
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"time"
@@ -25,16 +26,22 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/util/retry"
 	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ejob "k8s.io/kubernetes/test/e2e/framework/job"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
+	"k8s.io/kubernetes/test/e2e/scheduling"
 	"k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo"
@@ -45,6 +52,10 @@ var _ = SIGDescribe("Job", func() {
 	f := framework.NewDefaultFramework("job")
 	parallelism := int32(2)
 	completions := int32(4)
+
+	largeParallelism := int32(90)
+	largeCompletions := int32(90)
+
 	backoffLimit := int32(6) // default value
 
 	// Simplest case: N pods succeed
@@ -144,10 +155,12 @@ var _ = SIGDescribe("Job", func() {
 	})
 
 	/*
-		Testcase: Ensure Pods of an Indexed Job get a unique index.
-		Description: Create an Indexed Job, wait for completion, capture the output of the pods and verify that they contain the completion index.
+		  Release: v1.24
+			Testname: Ensure Pods of an Indexed Job get a unique index.
+			Description: Create an Indexed job. Job MUST complete successfully.
+			Ensure that created pods have completion index annotation and environment variable.
 	*/
-	ginkgo.It("should create pods for an Indexed job with completion indexes and specified hostname", func() {
+	framework.ConformanceIt("should create pods for an Indexed job with completion indexes and specified hostname", func() {
 		ginkgo.By("Creating Indexed job")
 		job := e2ejob.NewTestJob("succeed", "indexed-job", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
 		mode := batchv1.IndexedCompletion
@@ -361,6 +374,109 @@ var _ = SIGDescribe("Job", func() {
 			framework.ExpectEqual(pod.Status.Phase, v1.PodFailed)
 		}
 	})
+
+	ginkgo.It("should run a job to completion with CPU requests [Serial]", func() {
+		ginkgo.By("Creating a job that with CPU requests")
+
+		testNodeName := scheduling.GetNodeThatCanRunPod(f)
+		targetNode, err := f.ClientSet.CoreV1().Nodes().Get(context.TODO(), testNodeName, metav1.GetOptions{})
+		framework.ExpectNoError(err, "unable to get node object for node %v", testNodeName)
+
+		cpu, ok := targetNode.Status.Allocatable[v1.ResourceCPU]
+		if !ok {
+			framework.Failf("Unable to get node's %q cpu", targetNode.Name)
+		}
+
+		cpuRequest := fmt.Sprint(int64(0.2 * float64(cpu.Value())))
+
+		backoff := 0
+		ginkgo.By("Creating a job")
+		job := e2ejob.NewTestJob("succeed", "all-succeed", v1.RestartPolicyNever, largeParallelism, largeCompletions, nil, int32(backoff))
+		for i := range job.Spec.Template.Spec.Containers {
+			job.Spec.Template.Spec.Containers[i].Resources = v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU: resource.MustParse(cpuRequest),
+				},
+			}
+			job.Spec.Template.Spec.NodeSelector = map[string]string{"kubernetes.io/hostname": testNodeName}
+		}
+
+		framework.Logf("Creating job %q with a node hostname selector %q wth cpu request %q", job.Name, testNodeName, cpuRequest)
+		job, err = e2ejob.CreateJob(f.ClientSet, f.Namespace.Name, job)
+		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Ensuring job reaches completions")
+		err = e2ejob.WaitForJobComplete(f.ClientSet, f.Namespace.Name, job.Name, largeCompletions)
+		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Ensuring pods for job exist")
+		pods, err := e2ejob.GetJobPods(f.ClientSet, f.Namespace.Name, job.Name)
+		framework.ExpectNoError(err, "failed to get pod list for job in namespace: %s", f.Namespace.Name)
+		successes := int32(0)
+		for _, pod := range pods.Items {
+			if pod.Status.Phase == v1.PodSucceeded {
+				successes++
+			}
+		}
+		framework.ExpectEqual(successes, largeCompletions, "expected %d successful job pods, but got  %d", largeCompletions, successes)
+	})
+
+	ginkgo.It("should apply changes to a job status", func() {
+
+		ns := f.Namespace.Name
+		jClient := f.ClientSet.BatchV1().Jobs(ns)
+
+		ginkgo.By("Creating a job")
+		job := e2ejob.NewTestJob("notTerminate", "suspend-false-to-true", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
+		job, err := e2ejob.CreateJob(f.ClientSet, f.Namespace.Name, job)
+		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Ensure pods equal to paralellism count is attached to the job")
+		err = e2ejob.WaitForAllJobPodsRunning(f.ClientSet, f.Namespace.Name, job.Name, parallelism)
+		framework.ExpectNoError(err, "failed to ensure number of pods associated with job %s is equal to parallelism count in namespace: %s", job.Name, f.Namespace.Name)
+
+		// /status subresource operations
+		ginkgo.By("patching /status")
+		// we need to use RFC3339 version since conversion over the wire cuts nanoseconds
+		now1 := metav1.Now().Rfc3339Copy()
+		jStatus := batchv1.JobStatus{
+			StartTime: &now1,
+		}
+
+		jStatusJSON, err := json.Marshal(jStatus)
+		framework.ExpectNoError(err)
+		patchedStatus, err := jClient.Patch(context.TODO(), job.Name, types.MergePatchType,
+			[]byte(`{"metadata":{"annotations":{"patchedstatus":"true"}},"status":`+string(jStatusJSON)+`}`),
+			metav1.PatchOptions{}, "status")
+		framework.ExpectNoError(err)
+		framework.ExpectEqual(patchedStatus.Status.StartTime.Equal(&now1), true, "patched object should have the applied StartTime status")
+		framework.ExpectEqual(patchedStatus.Annotations["patchedstatus"], "true", "patched object should have the applied annotation")
+
+		ginkgo.By("updating /status")
+		// we need to use RFC3339 version since conversion over the wire cuts nanoseconds
+		now2 := metav1.Now().Rfc3339Copy()
+		var statusToUpdate, updatedStatus *batchv1.Job
+		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			statusToUpdate, err = jClient.Get(context.TODO(), job.Name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			statusToUpdate.Status.StartTime = &now2
+			updatedStatus, err = jClient.UpdateStatus(context.TODO(), statusToUpdate, metav1.UpdateOptions{})
+			return err
+		})
+		framework.ExpectNoError(err)
+		framework.ExpectEqual(updatedStatus.Status.StartTime.Equal(&now2), true, fmt.Sprintf("updated object status expected to have updated StartTime %#v, got %#v", statusToUpdate.Status.StartTime, updatedStatus.Status.StartTime))
+
+		ginkgo.By("get /status")
+		jResource := schema.GroupVersionResource{Group: "batch", Version: "v1", Resource: "jobs"}
+		gottenStatus, err := f.DynamicClient.Resource(jResource).Namespace(ns).Get(context.TODO(), job.Name, metav1.GetOptions{}, "status")
+		framework.ExpectNoError(err)
+		statusUID, _, err := unstructured.NestedFieldCopy(gottenStatus.Object, "metadata", "uid")
+		framework.ExpectNoError(err)
+		framework.ExpectEqual(string(job.UID), statusUID, fmt.Sprintf("job.UID: %v expected to match statusUID: %v ", job.UID, statusUID))
+	})
+
 })
 
 // waitForJobFailure uses c to wait for up to timeout for the Job named jobName in namespace ns to fail.

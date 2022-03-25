@@ -504,7 +504,9 @@ func (r *Request) tryThrottleWithInfo(ctx context.Context, retryInfo string) err
 	now := time.Now()
 
 	err := r.rateLimiter.Wait(ctx)
-
+	if err != nil {
+		err = fmt.Errorf("client rate limiter Wait returned an error: %w", err)
+	}
 	latency := time.Since(now)
 
 	var message string
@@ -1049,13 +1051,13 @@ func truncateBody(body string) string {
 // allocating a new string for the body output unless necessary. Uses a simple heuristic to determine
 // whether the body is printable.
 func glogBody(prefix string, body []byte) {
-	if klog.V(8).Enabled() {
+	if klogV := klog.V(8); klogV.Enabled() {
 		if bytes.IndexFunc(body, func(r rune) bool {
 			return r < 0x0a
 		}) != -1 {
-			klog.Infof("%s:\n%s", prefix, truncateBody(hex.Dump(body)))
+			klogV.Infof("%s:\n%s", prefix, truncateBody(hex.Dump(body)))
 		} else {
-			klog.Infof("%s: %s", prefix, truncateBody(string(body)))
+			klogV.Infof("%s: %s", prefix, truncateBody(string(body)))
 		}
 	}
 }

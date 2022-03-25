@@ -971,10 +971,10 @@ func ignoreExitCodes(err error, ignoredExitCodes ...int) error {
 func execWithLog(b iscsiDiskMounter, cmd string, args ...string) (string, error) {
 	start := time.Now()
 	out, err := b.exec.Command(cmd, args...).CombinedOutput()
-	if klog.V(5).Enabled() {
+	if klogV := klog.V(5); klogV.Enabled() {
 		d := time.Since(start)
-		klog.V(5).Infof("Executed %s %v in %v, err: %v", cmd, args, d, err)
-		klog.V(5).Infof("Output: %s", string(out))
+		klogV.Infof("Executed %s %v in %v, err: %v", cmd, args, d, err)
+		klogV.Infof("Output: %s", string(out))
 	}
 	return string(out), err
 }

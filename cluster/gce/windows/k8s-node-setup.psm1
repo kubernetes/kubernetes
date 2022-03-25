@@ -358,39 +358,6 @@ function Download-HelperScripts {
   }
 }
 
-# Downloads the gke-exec-auth-plugin for TPM-based authentication to the
-# master, if auth plugin support has been requested for this node (see
-# Test-NodeUsesAuthPlugin).
-# https://github.com/kubernetes/cloud-provider-gcp/tree/master/cmd/gke-exec-auth-plugin
-#
-# Required ${kube_env} keys:
-#   EXEC_AUTH_PLUGIN_LICENSE_URL
-#   EXEC_AUTH_PLUGIN_HASH
-#   EXEC_AUTH_PLUGIN_URL
-function DownloadAndInstall-AuthPlugin {
-  if (-not (Test-NodeUsesAuthPlugin ${kube_env})) {
-    Log-Output 'Skipping download of auth plugin'
-    return
-  }
-  if (-not (ShouldWrite-File "${env:NODE_DIR}\gke-exec-auth-plugin.exe")) {
-    return
-  }
-
-  if (-not ($kube_env.ContainsKey('EXEC_AUTH_PLUGIN_LICENSE_URL') -and
-            $kube_env.ContainsKey('EXEC_AUTH_PLUGIN_HASH') -and
-            $kube_env.ContainsKey('EXEC_AUTH_PLUGIN_URL'))) {
-    Log-Output -Fatal ("Missing one or more kube-env keys needed for " +
-                       "downloading auth plugin: $(Out-String $kube_env)")
-  }
-  MustDownload-File `
-      -URLs ${kube_env}['EXEC_AUTH_PLUGIN_URL'] `
-      -Hash ${kube_env}['EXEC_AUTH_PLUGIN_HASH'] `
-      -OutFile "${env:NODE_DIR}\gke-exec-auth-plugin.exe"
-  MustDownload-File `
-      -URLs ${kube_env}['EXEC_AUTH_PLUGIN_LICENSE_URL'] `
-      -OutFile "${env:LICENSE_DIR}\LICENSE_gke-exec-auth-plugin.txt"
-}
-
 # Downloads the Kubernetes binaries from kube-env's NODE_BINARY_TAR_URL and
 # puts them in a subdirectory of $env:K8S_DIR.
 #
@@ -569,15 +536,6 @@ function Create-NodePki {
     Log-Output -Fatal 'CA_CERT not present in kube-env'
   }
 
-  # On nodes that use a plugin to support authentication, KUBELET_CERT and
-  # KUBELET_KEY will not be present - TPM_BOOTSTRAP_CERT and TPM_BOOTSTRAP_KEY
-  # should be set instead.
-  if (Test-NodeUsesAuthPlugin ${kube_env}) {
-    Log-Output ('Skipping KUBELET_CERT and KUBELET_KEY, plugin will be used ' +
-                'for authentication')
-    return
-  }
-
   if ($kube_env.ContainsKey('KUBELET_CERT')) {
     $KUBELET_CERT = ${kube_env}['KUBELET_CERT']
     Write_PkiData "${KUBELET_CERT}" ${env:KUBELET_CERT_PATH}
@@ -668,11 +626,7 @@ function Write_KubeconfigFromMetadata {
 # Required ${kube_env} keys:
 #   KUBERNETES_MASTER_NAME: the apiserver IP address.
 function Create-KubeletKubeconfig {
-  if (Test-NodeUsesAuthPlugin ${kube_env}) {
-    Write_KubeconfigFromMetadata
-  } else {
-    Write_BootstrapKubeconfig
-  }
+  Write_BootstrapKubeconfig
 }
 
 # Creates the kubeconfig user file for applications that communicate with Kubernetes.
@@ -892,8 +846,12 @@ function Configure-HostNetworkingService {
         -Verbose
     $created_hns_network = $true
   }
-
+  # This name of endpoint is referred in pkg/proxy/winkernel/proxier.go as part of
+  # kube-proxy as well. A health check port for every service that is specified as
+  # "externalTrafficPolicy: local" will be added on the endpoint.
+  # PLEASE KEEP THEM CONSISTENT!!!
   $endpoint_name = "cbr0"
+
   $vnic_name = "vEthernet (${endpoint_name})"
 
   $hns_endpoint = Get-HnsEndpoint | Where-Object Name -eq $endpoint_name
@@ -1054,11 +1012,9 @@ function Start-WorkerServices {
   )
 
   $kubelet_args = ${default_kubelet_args} + ${kubelet_args}
-  if (-not (Test-NodeUsesAuthPlugin ${kube_env})) {
-    Log-Output 'Using bootstrap kubeconfig for authentication'
-    $kubelet_args = (${kubelet_args} +
-                     "--bootstrap-kubeconfig=${env:BOOTSTRAP_KUBECONFIG}")
-  }
+  Log-Output 'Using bootstrap kubeconfig for authentication'
+  $kubelet_args = (${kubelet_args} +
+                   "--bootstrap-kubeconfig=${env:BOOTSTRAP_KUBECONFIG}")
   Log-Output "Final kubelet_args: ${kubelet_args}"
 
   # Compute kube-proxy args

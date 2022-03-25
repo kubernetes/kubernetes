@@ -27,19 +27,15 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apiserver/pkg/authentication/user"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	certapi "k8s.io/kubernetes/pkg/apis/certificates"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/pointer"
 )
 
 func TestStrategyCreate(t *testing.T) {
 	tests := map[string]struct {
-		ctx                context.Context
-		disableFeatureGate bool
-		obj                runtime.Object
-		expectedObj        runtime.Object
+		ctx         context.Context
+		obj         runtime.Object
+		expectedObj runtime.Object
 	}{
 		"no user in context, no user in obj": {
 			ctx: genericapirequest.NewContext(),
@@ -119,7 +115,7 @@ func TestStrategyCreate(t *testing.T) {
 				Status: certapi.CertificateSigningRequestStatus{Conditions: []certapi.CertificateSigningRequestCondition{}},
 			},
 		},
-		"expirationSeconds set with gate enabled": {
+		"expirationSeconds set": {
 			ctx: genericapirequest.NewContext(),
 			obj: &certapi.CertificateSigningRequest{
 				Spec: certapi.CertificateSigningRequestSpec{
@@ -133,29 +129,11 @@ func TestStrategyCreate(t *testing.T) {
 				Status: certapi.CertificateSigningRequestStatus{Conditions: []certapi.CertificateSigningRequestCondition{}},
 			},
 		},
-		"expirationSeconds set with gate disabled": {
-			ctx:                genericapirequest.NewContext(),
-			disableFeatureGate: true,
-			obj: &certapi.CertificateSigningRequest{
-				Spec: certapi.CertificateSigningRequestSpec{
-					ExpirationSeconds: pointer.Int32(5678),
-				},
-			},
-			expectedObj: &certapi.CertificateSigningRequest{
-				Spec: certapi.CertificateSigningRequestSpec{
-					ExpirationSeconds: nil,
-				},
-				Status: certapi.CertificateSigningRequestStatus{Conditions: []certapi.CertificateSigningRequestCondition{}},
-			},
-		},
 	}
 
 	for k, tc := range tests {
 		tc := tc
 		t.Run(k, func(t *testing.T) {
-			if tc.disableFeatureGate {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSRDuration, false)()
-			}
 			obj := tc.obj
 			Strategy.PrepareForCreate(tc.ctx, obj)
 			if !reflect.DeepEqual(obj, tc.expectedObj) {

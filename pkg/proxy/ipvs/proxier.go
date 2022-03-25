@@ -1639,14 +1639,19 @@ func (proxier *Proxier) writeIptablesRules() {
 			"-m", "set", "--match-set", proxier.ipsetList[kubeClusterIPSet].Name,
 		)
 		if proxier.masqueradeAll {
-			proxier.natRules.Write(args, "dst,dst", "-j", string(KubeMarkMasqChain))
+			proxier.natRules.Write(
+				args, "dst,dst",
+				"-j", string(KubeMarkMasqChain))
 		} else if proxier.localDetector.IsImplemented() {
 			// This masquerades off-cluster traffic to a service VIP.  The idea
 			// is that you can establish a static route for your Service range,
 			// routing to any node, and that node will bridge into the Service
 			// for you.  Since that might bounce off-node, we masquerade here.
 			// If/when we support "Local" policy for VIPs, we should update this.
-			proxier.natRules.Write(proxier.localDetector.JumpIfNotLocal(append(args, "dst,dst"), string(KubeMarkMasqChain)))
+			proxier.natRules.Write(
+				args, "dst,dst",
+				proxier.localDetector.IfNotLocal(),
+				"-j", string(KubeMarkMasqChain))
 		} else {
 			// Masquerade all OUTPUT traffic coming from a service ip.
 			// The kube dummy interface has all service VIPs assigned which
@@ -1655,7 +1660,9 @@ func (proxier *Proxier) writeIptablesRules() {
 			// VIP:<service port>.
 			// Always masquerading OUTPUT (node-originating) traffic with a VIP
 			// source ip and service port destination fixes the outgoing connections.
-			proxier.natRules.Write(args, "src,dst", "-j", string(KubeMarkMasqChain))
+			proxier.natRules.Write(
+				args, "src,dst",
+				"-j", string(KubeMarkMasqChain))
 		}
 	}
 

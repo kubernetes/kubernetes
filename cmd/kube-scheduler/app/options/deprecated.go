@@ -30,11 +30,11 @@ type DeprecatedOptions struct {
 	componentbaseconfig.ClientConnectionConfiguration
 	// Note that only the deprecated options (lock-object-name and lock-object-namespace) are populated here.
 	componentbaseconfig.LeaderElectionConfiguration
-	// PodMaxUnschedulableQDuration is the maximum time a pod can stay in
-	// unschedulableQ. If a pod stays in unschedulableQ for longer than this
-	// value, the pod will be moved from unschedulableQ to backoffQ or activeQ.
-	// If this value is empty, the default value (60s) will be used.
-	PodMaxUnschedulableQDuration time.Duration
+	// PodMaxInUnschedulablePodsDuration is the maximum time a pod can stay in
+	// unschedulablePods. If a pod stays in unschedulablePods for longer than this
+	// value, the pod will be moved from unschedulablePods to backoffQ or activeQ.
+	// If this value is empty, the default value (5min) will be used.
+	PodMaxInUnschedulablePodsDuration time.Duration
 }
 
 // AddFlags adds flags for the deprecated options.
@@ -51,5 +51,5 @@ func (o *DeprecatedOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.Int32Var(&o.Burst, "kube-api-burst", 100, "DEPRECATED: burst to use while talking with kubernetes apiserver. This parameter is ignored if a config file is specified in --config.")
 	fs.StringVar(&o.ResourceNamespace, "lock-object-namespace", "kube-system", "DEPRECATED: define the namespace of the lock object. Will be removed in favor of leader-elect-resource-namespace. This parameter is ignored if a config file is specified in --config.")
 	fs.StringVar(&o.ResourceName, "lock-object-name", "kube-scheduler", "DEPRECATED: define the name of the lock object. Will be removed in favor of leader-elect-resource-name. This parameter is ignored if a config file is specified in --config.")
-	fs.DurationVar(&o.PodMaxUnschedulableQDuration, "pod-max-unschedulableq-duration", 60*time.Second, "DEPRECATED: the maximum time a pod can stay in unschedulableQ. If a pod stays in unschedulableQ for longer than this value, the pod will be moved from unschedulableQ to backoffQ or activeQ. This flag is deprecated and will be removed in 1.26")
+	fs.DurationVar(&o.PodMaxInUnschedulablePodsDuration, "pod-max-in-unschedulable-pods-duration", 5*time.Minute, "DEPRECATED: the maximum time a pod can stay in unschedulablePods. If a pod stays in unschedulablePods for longer than this value, the pod will be moved from unschedulablePods to backoffQ or activeQ. This flag is deprecated and will be removed in 1.26")
 }

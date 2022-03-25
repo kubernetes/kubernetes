@@ -39,7 +39,7 @@ import (
 	"time"
 
 	"github.com/elazarl/goproxy"
-	openapi_v2 "github.com/googleapis/gnostic/openapiv2"
+	openapi_v2 "github.com/google/gnostic/openapiv2"
 
 	"sigs.k8s.io/yaml"
 

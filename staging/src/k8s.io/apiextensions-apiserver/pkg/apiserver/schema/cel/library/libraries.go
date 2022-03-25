@@ -19,6 +19,7 @@ package library
 import (
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/ext"
+	"github.com/google/cel-go/interpreter"
 )
 
 // ExtensionLibs declares the set of CEL extension libraries available everywhere CEL is used in Kubernetes.
@@ -29,3 +30,5 @@ var k8sExtensionLibs = []cel.EnvOption{
 	Regex(),
 	Lists(),
 }
+
+var ExtensionLibRegexOptimizations = []*interpreter.RegexOptimization{FindRegexOptimization, FindAllRegexOptimization}

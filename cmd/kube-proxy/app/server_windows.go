@@ -24,7 +24,9 @@ package app
 import (
 	"errors"
 	"fmt"
+	"net"
 	goruntime "runtime"
+	"strconv"
 
 	// Enable pprof HTTP handlers.
 	_ "net/http/pprof"
@@ -97,8 +99,11 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 	}
 
 	var healthzServer healthcheck.ProxierHealthUpdater
+	var healthzPort int
 	if len(config.HealthzBindAddress) > 0 {
 		healthzServer = healthcheck.NewProxierHealthServer(config.HealthzBindAddress, 2*config.IPTables.SyncPeriod.Duration, recorder, nodeRef)
+		_, port, _ := net.SplitHostPort(config.HealthzBindAddress)
+		healthzPort, _ = strconv.Atoi(port)
 	}
 
 	var proxier proxy.Provider
@@ -120,6 +125,7 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 				recorder,
 				healthzServer,
 				config.Winkernel,
+				healthzPort,
 			)
 		} else {
 
@@ -134,6 +140,7 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 				recorder,
 				healthzServer,
 				config.Winkernel,
+				healthzPort,
 			)
 
 		}

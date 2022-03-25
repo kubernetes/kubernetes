@@ -2934,7 +2934,7 @@ func makeServiceMap(proxier *Proxier, allServices ...*v1.Service) {
 	proxier.servicesSynced = true
 }
 
-func compareEndpointsMaps(t *testing.T, tci int, newMap proxy.EndpointsMap, expected map[proxy.ServicePortName][]*endpointsInfo) {
+func compareEndpointsMapsExceptChainName(t *testing.T, tci int, newMap proxy.EndpointsMap, expected map[proxy.ServicePortName][]*endpointsInfo) {
 	if len(newMap) != len(expected) {
 		t.Errorf("[%d] expected %d results, got %d: %v", tci, len(expected), len(newMap), newMap)
 	}
@@ -2949,9 +2949,7 @@ func compareEndpointsMaps(t *testing.T, tci int, newMap proxy.EndpointsMap, expe
 					continue
 				}
 				if newEp.Endpoint != expected[x][i].Endpoint ||
-					newEp.IsLocal != expected[x][i].IsLocal ||
-					newEp.protocol != expected[x][i].protocol ||
-					newEp.chainName != expected[x][i].chainName {
+					newEp.IsLocal != expected[x][i].IsLocal {
 					t.Errorf("[%d] expected new[%v][%d] to be %v, got %v", tci, x, i, expected[x][i], newEp)
 				}
 			}
@@ -3717,7 +3715,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 			}
 		}
 		fp.endpointsMap.Update(fp.endpointsChanges)
-		compareEndpointsMaps(t, tci, fp.endpointsMap, tc.oldEndpoints)
+		compareEndpointsMapsExceptChainName(t, tci, fp.endpointsMap, tc.oldEndpoints)
 
 		// Now let's call appropriate handlers to get to state we want to be.
 		if len(tc.previousEndpoints) != len(tc.currentEndpoints) {
@@ -3738,7 +3736,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		}
 		result := fp.endpointsMap.Update(fp.endpointsChanges)
 		newMap := fp.endpointsMap
-		compareEndpointsMaps(t, tci, newMap, tc.expectedResult)
+		compareEndpointsMapsExceptChainName(t, tci, newMap, tc.expectedResult)
 		if len(result.StaleEndpoints) != len(tc.expectedStaleEndpoints) {
 			t.Errorf("[%d] expected %d staleEndpoints, got %d: %v", tci, len(tc.expectedStaleEndpoints), len(result.StaleEndpoints), result.StaleEndpoints)
 		}

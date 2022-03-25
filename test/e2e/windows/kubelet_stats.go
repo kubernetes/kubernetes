@@ -39,6 +39,7 @@ var _ = SIGDescribe("[Feature:Windows] Kubelet-Stats [Serial]", func() {
 	f := framework.NewDefaultFramework("kubelet-stats-test-windows-serial")
 
 	ginkgo.Describe("Kubelet stats collection for Windows nodes", func() {
+
 		ginkgo.Context("when running 10 pods", func() {
 			// 10 seconds is the default scrape timeout for metrics-server and kube-prometheus
 			ginkgo.It("should return within 10 seconds", func() {
@@ -113,6 +114,19 @@ var _ = SIGDescribe("[Feature:Windows] Kubelet-Stats", func() {
 	f := framework.NewDefaultFramework("kubelet-stats-test-windows")
 
 	ginkgo.Describe("Kubelet stats collection for Windows nodes", func() {
+
+		ginkgo.Context("when windows is booted", func() {
+			ginkgo.It("should return bootid within 10 seconds", func() {
+				ginkgo.By("Selecting a Windows node")
+				targetNode, err := findWindowsNode(f)
+				framework.ExpectNoError(err, "Error finding Windows node")
+				framework.Logf("Using node: %v", targetNode.Name)
+
+				ginkgo.By("Getting bootid")
+				framework.ExpectEqual(len(targetNode.Status.NodeInfo.BootID) != 0, true, "Should find bootId in kubelet stats")
+			})
+		})
+
 		ginkgo.Context("when running 3 pods", func() {
 			// 10 seconds is the default scrape timeout for metrics-server and kube-prometheus
 			ginkgo.It("should return within 10 seconds", func() {

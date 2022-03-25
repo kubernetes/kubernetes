@@ -23,7 +23,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/go-cmp/cmp"
 	clientv3 "go.etcd.io/etcd/client/v3"
 
 	"k8s.io/apimachinery/pkg/api/apitesting"
@@ -300,9 +299,20 @@ func TestWatchDeleteEventObjectHaveLatestRV(t *testing.T) {
 		t.Fatalf("Delete failed: %v", err)
 	}
 
-	e := <-w.ResultChan()
+	var e watch.Event
+	var wres clientv3.WatchResponse
+	watchCtx, _ := context.WithTimeout(ctx, wait.ForeverTestTimeout)
+	select {
+	case e = <-w.ResultChan():
+	case <-watchCtx.Done():
+		t.Fatalf("timed out waiting for watch event")
+	}
+	select {
+	case wres = <-etcdW:
+	case <-watchCtx.Done():
+		t.Fatalf("timed out waiting for raw watch event")
+	}
 	watchedDeleteObj := e.Object.(*example.Pod)
-	wres := <-etcdW
 
 	watchedDeleteRev, err := store.versioner.ParseResourceVersion(watchedDeleteObj.ResourceVersion)
 	if err != nil {
@@ -390,9 +400,7 @@ func testCheckResult(t *testing.T, expectEventType watch.EventType, w watch.Inte
 			t.Errorf("event type want=%v, get=%v", expectEventType, res.Type)
 			return
 		}
-		if diff := cmp.Diff(expectObj, res.Object); diff != "" {
-			t.Errorf("incorrect obj: %s", diff)
-		}
+		expectNoDiff(t, "incorrect obj", expectObj, res.Object)
 	case <-time.After(wait.ForeverTestTimeout):
 		t.Errorf("time out after waiting %v on ResultChan", wait.ForeverTestTimeout)
 	}

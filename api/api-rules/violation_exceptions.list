@@ -253,6 +253,7 @@ API rule violation: list_type_missing,k8s.io/api/rbac/v1beta1,Role,Rules
 API rule violation: list_type_missing,k8s.io/api/rbac/v1beta1,RoleBinding,Subjects
 API rule violation: list_type_missing,k8s.io/api/storage/v1,CSINodeDriver,TopologyKeys
 API rule violation: list_type_missing,k8s.io/api/storage/v1,CSINodeSpec,Drivers
+API rule violation: list_type_missing,k8s.io/api/storage/v1,CSIStorageCapacityList,Items
 API rule violation: list_type_missing,k8s.io/api/storage/v1,StorageClass,MountOptions
 API rule violation: list_type_missing,k8s.io/api/storage/v1alpha1,CSIStorageCapacityList,Items
 API rule violation: list_type_missing,k8s.io/api/storage/v1beta1,CSIDriverSpec,VolumeLifecycleModes
@@ -352,6 +353,10 @@ API rule violation: list_type_missing,k8s.io/kubelet/config/v1alpha1,CredentialP
 API rule violation: list_type_missing,k8s.io/kubelet/config/v1alpha1,CredentialProvider,Env
 API rule violation: list_type_missing,k8s.io/kubelet/config/v1alpha1,CredentialProvider,MatchImages
 API rule violation: list_type_missing,k8s.io/kubelet/config/v1alpha1,CredentialProviderConfig,Providers
+API rule violation: list_type_missing,k8s.io/kubelet/config/v1beta1,CredentialProvider,Args
+API rule violation: list_type_missing,k8s.io/kubelet/config/v1beta1,CredentialProvider,Env
+API rule violation: list_type_missing,k8s.io/kubelet/config/v1beta1,CredentialProvider,MatchImages
+API rule violation: list_type_missing,k8s.io/kubelet/config/v1beta1,CredentialProviderConfig,Providers
 API rule violation: list_type_missing,k8s.io/kubelet/config/v1beta1,KubeletConfiguration,AllowedUnsafeSysctls
 API rule violation: list_type_missing,k8s.io/kubelet/config/v1beta1,KubeletConfiguration,ClusterDNS
 API rule violation: list_type_missing,k8s.io/kubelet/config/v1beta1,KubeletConfiguration,EnforceNodeAllocatable
@@ -432,6 +437,7 @@ API rule violation: names_match,k8s.io/apimachinery/pkg/apis/meta/v1,Duration,Du
 API rule violation: names_match,k8s.io/apimachinery/pkg/apis/meta/v1,InternalEvent,Object
 API rule violation: names_match,k8s.io/apimachinery/pkg/apis/meta/v1,InternalEvent,Type
 API rule violation: names_match,k8s.io/apimachinery/pkg/apis/meta/v1,MicroTime,Time
+API rule violation: names_match,k8s.io/apimachinery/pkg/apis/meta/v1,ObjectMeta,ZZZ_DeprecatedClusterName
 API rule violation: names_match,k8s.io/apimachinery/pkg/apis/meta/v1,StatusCause,Type
 API rule violation: names_match,k8s.io/apimachinery/pkg/apis/meta/v1,Time,Time
 API rule violation: names_match,k8s.io/apimachinery/pkg/runtime,Unknown,ContentEncoding

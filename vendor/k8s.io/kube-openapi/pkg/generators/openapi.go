@@ -279,6 +279,16 @@ func hasOpenAPIDefinitionMethods(t *types.Type) bool {
 	return hasSchemaTypeMethod && hasOpenAPISchemaFormat
 }
 
+func hasOpenAPIV3OneOfMethod(t *types.Type) bool {
+	for mn, mt := range t.Methods {
+		if mn != "OpenAPIV3OneOfTypes" {
+			continue
+		}
+		return methodReturnsValue(mt, "", "[]string")
+	}
+	return false
+}
+
 // typeShortName returns short package name (e.g. the name x appears in package x definition) dot type name.
 func typeShortName(t *types.Type) string {
 	return filepath.Base(t.Name.Package) + "." + t.Name.Name
@@ -348,6 +358,7 @@ func (g openAPITypeWriter) generate(t *types.Type) error {
 	case types.Struct:
 		hasV2Definition := hasOpenAPIDefinitionMethod(t)
 		hasV2DefinitionTypeAndFormat := hasOpenAPIDefinitionMethods(t)
+		hasV3OneOfTypes := hasOpenAPIV3OneOfMethod(t)
 		hasV3Definition := hasOpenAPIV3DefinitionMethod(t)
 
 		if hasV2Definition || (hasV3Definition && !hasV2DefinitionTypeAndFormat) {
@@ -369,6 +380,28 @@ func (g openAPITypeWriter) generate(t *types.Type) error {
 				"},\n"+
 				"})\n}\n\n", args)
 			return nil
+		case hasV2DefinitionTypeAndFormat && hasV3OneOfTypes:
+			// generate v3 def.
+			g.Do("return common.EmbedOpenAPIDefinitionIntoV2Extension($.OpenAPIDefinition|raw${\n"+
+				"Schema: spec.Schema{\n"+
+				"SchemaProps: spec.SchemaProps{\n", args)
+			g.generateDescription(t.CommentLines)
+			g.Do("OneOf:common.GenerateOpenAPIV3OneOfSchema($.type|raw${}.OpenAPIV3OneOfTypes()),\n"+
+				"Format:$.type|raw${}.OpenAPISchemaFormat(),\n"+
+				"},\n"+
+				"},\n"+
+				"},", args)
+			// generate v2 def.
+			g.Do("$.OpenAPIDefinition|raw${\n"+
+				"Schema: spec.Schema{\n"+
+				"SchemaProps: spec.SchemaProps{\n", args)
+			g.generateDescription(t.CommentLines)
+			g.Do("Type:$.type|raw${}.OpenAPISchemaType(),\n"+
+				"Format:$.type|raw${}.OpenAPISchemaFormat(),\n"+
+				"},\n"+
+				"},\n"+
+				"})\n}\n\n", args)
+			return nil
 		case hasV2DefinitionTypeAndFormat:
 			g.Do("return $.OpenAPIDefinition|raw${\n"+
 				"Schema: spec.Schema{\n"+
@@ -380,6 +413,9 @@ func (g openAPITypeWriter) generate(t *types.Type) error {
 				"},\n"+
 				"}\n}\n\n", args)
 			return nil
+		case hasV3OneOfTypes:
+			// having v3 oneOf types without custom v2 type or format does not make sense.
+			return fmt.Errorf("type %q has v3 one of types but not v2 type or format", t.Name)
 		}
 		g.Do("return $.OpenAPIDefinition|raw${\nSchema: spec.Schema{\nSchemaProps: spec.SchemaProps{\n", args)
 		g.generateDescription(t.CommentLines)
@@ -603,7 +639,8 @@ func (g openAPITypeWriter) generateDescription(CommentLines []string) {
 		}
 	}
 
-	postDoc := strings.TrimRight(buffer.String(), "\n")
+	postDoc := strings.TrimLeft(buffer.String(), "\n")
+	postDoc = strings.TrimRight(postDoc, "\n")
 	postDoc = strings.Replace(postDoc, "\\\"", "\"", -1) // replace user's \" to "
 	postDoc = strings.Replace(postDoc, "\"", "\\\"", -1) // Escape "
 	postDoc = strings.Replace(postDoc, "\n", "\\n", -1)

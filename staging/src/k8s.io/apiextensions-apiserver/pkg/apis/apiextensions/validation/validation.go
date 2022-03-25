@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"regexp"
@@ -48,7 +49,8 @@ var (
 )
 
 // ValidateCustomResourceDefinition statically validates
-func ValidateCustomResourceDefinition(obj *apiextensions.CustomResourceDefinition) field.ErrorList {
+// context is passed for supporting context cancellation during cel validation when validating defaults
+func ValidateCustomResourceDefinition(ctx context.Context, obj *apiextensions.CustomResourceDefinition) field.ErrorList {
 	nameValidationFn := func(name string, prefix bool) []string {
 		ret := genericvalidation.NameIsDNSSubdomain(name, prefix)
 		requiredName := obj.Spec.Names.Plural + "." + obj.Spec.Group
@@ -71,7 +73,7 @@ func ValidateCustomResourceDefinition(obj *apiextensions.CustomResourceDefinitio
 	}
 
 	allErrs := genericvalidation.ValidateObjectMeta(&obj.ObjectMeta, false, nameValidationFn, field.NewPath("metadata"))
-	allErrs = append(allErrs, validateCustomResourceDefinitionSpec(&obj.Spec, opts, field.NewPath("spec"))...)
+	allErrs = append(allErrs, validateCustomResourceDefinitionSpec(ctx, &obj.Spec, opts, field.NewPath("spec"))...)
 	allErrs = append(allErrs, ValidateCustomResourceDefinitionStatus(&obj.Status, field.NewPath("status"))...)
 	allErrs = append(allErrs, ValidateCustomResourceDefinitionStoredVersions(obj.Status.StoredVersions, obj.Spec.Versions, field.NewPath("status").Child("storedVersions"))...)
 	allErrs = append(allErrs, validateAPIApproval(obj, nil)...)
@@ -106,7 +108,8 @@ type validationOptions struct {
 }
 
 // ValidateCustomResourceDefinitionUpdate statically validates
-func ValidateCustomResourceDefinitionUpdate(obj, oldObj *apiextensions.CustomResourceDefinition) field.ErrorList {
+// context is passed for supporting context cancellation during cel validation when validating defaults
+func ValidateCustomResourceDefinitionUpdate(ctx context.Context, obj, oldObj *apiextensions.CustomResourceDefinition) field.ErrorList {
 	opts := validationOptions{
 		allowDefaults:                            true,
 		requireRecognizedConversionReviewVersion: oldObj.Spec.Conversion == nil || hasValidConversionReviewVersionOrEmpty(oldObj.Spec.Conversion.ConversionReviewVersions),
@@ -120,7 +123,7 @@ func ValidateCustomResourceDefinitionUpdate(obj, oldObj *apiextensions.CustomRes
 	}
 
 	allErrs := genericvalidation.ValidateObjectMetaUpdate(&obj.ObjectMeta, &oldObj.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, validateCustomResourceDefinitionSpecUpdate(&obj.Spec, &oldObj.Spec, opts, field.NewPath("spec"))...)
+	allErrs = append(allErrs, validateCustomResourceDefinitionSpecUpdate(ctx, &obj.Spec, &oldObj.Spec, opts, field.NewPath("spec"))...)
 	allErrs = append(allErrs, ValidateCustomResourceDefinitionStatus(&obj.Status, field.NewPath("status"))...)
 	allErrs = append(allErrs, ValidateCustomResourceDefinitionStoredVersions(obj.Status.StoredVersions, obj.Spec.Versions, field.NewPath("status").Child("storedVersions"))...)
 	allErrs = append(allErrs, validateAPIApproval(obj, oldObj)...)
@@ -163,12 +166,13 @@ func ValidateUpdateCustomResourceDefinitionStatus(obj, oldObj *apiextensions.Cus
 }
 
 // validateCustomResourceDefinitionVersion statically validates.
-func validateCustomResourceDefinitionVersion(version *apiextensions.CustomResourceDefinitionVersion, fldPath *field.Path, statusEnabled bool, opts validationOptions) field.ErrorList {
+// context is passed for supporting context cancellation during cel validation when validating defaults
+func validateCustomResourceDefinitionVersion(ctx context.Context, version *apiextensions.CustomResourceDefinitionVersion, fldPath *field.Path, statusEnabled bool, opts validationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for _, err := range validateDeprecationWarning(version.Deprecated, version.DeprecationWarning) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("deprecationWarning"), version.DeprecationWarning, err))
 	}
-	allErrs = append(allErrs, validateCustomResourceDefinitionValidation(version.Schema, statusEnabled, opts, fldPath.Child("schema"))...)
+	allErrs = append(allErrs, validateCustomResourceDefinitionValidation(ctx, version.Schema, statusEnabled, opts, fldPath.Child("schema"))...)
 	allErrs = append(allErrs, ValidateCustomResourceDefinitionSubresources(version.Subresources, fldPath.Child("subresources"))...)
 	for i := range version.AdditionalPrinterColumns {
 		allErrs = append(allErrs, ValidateCustomResourceColumnDefinition(&version.AdditionalPrinterColumns[i], fldPath.Child("additionalPrinterColumns").Index(i))...)
@@ -206,7 +210,8 @@ func validateDeprecationWarning(deprecated bool, deprecationWarning *string) []s
 	return errors
 }
 
-func validateCustomResourceDefinitionSpec(spec *apiextensions.CustomResourceDefinitionSpec, opts validationOptions, fldPath *field.Path) field.ErrorList {
+// context is passed for supporting context cancellation during cel validation when validating defaults
+func validateCustomResourceDefinitionSpec(ctx context.Context, spec *apiextensions.CustomResourceDefinitionSpec, opts validationOptions, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if len(spec.Group) == 0 {
@@ -270,7 +275,7 @@ func validateCustomResourceDefinitionSpec(spec *apiextensions.CustomResourceDefi
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("versions").Index(i).Child("name"), spec.Versions[i].Name, strings.Join(errs, ",")))
 		}
 		subresources := getSubresourcesForVersion(spec, version.Name)
-		allErrs = append(allErrs, validateCustomResourceDefinitionVersion(&version, fldPath.Child("versions").Index(i), hasStatusEnabled(subresources), opts)...)
+		allErrs = append(allErrs, validateCustomResourceDefinitionVersion(ctx, &version, fldPath.Child("versions").Index(i), hasStatusEnabled(subresources), opts)...)
 	}
 
 	// The top-level and per-version fields are mutual exclusive
@@ -325,7 +330,7 @@ func validateCustomResourceDefinitionSpec(spec *apiextensions.CustomResourceDefi
 	}
 
 	allErrs = append(allErrs, ValidateCustomResourceDefinitionNames(&spec.Names, fldPath.Child("names"))...)
-	allErrs = append(allErrs, validateCustomResourceDefinitionValidation(spec.Validation, hasAnyStatusEnabled(spec), opts, fldPath.Child("validation"))...)
+	allErrs = append(allErrs, validateCustomResourceDefinitionValidation(ctx, spec.Validation, hasAnyStatusEnabled(spec), opts, fldPath.Child("validation"))...)
 	allErrs = append(allErrs, ValidateCustomResourceDefinitionSubresources(spec.Subresources, fldPath.Child("subresources"))...)
 
 	for i := range spec.AdditionalPrinterColumns {
@@ -448,8 +453,9 @@ func validateCustomResourceConversion(conversion *apiextensions.CustomResourceCo
 }
 
 // validateCustomResourceDefinitionSpecUpdate statically validates
-func validateCustomResourceDefinitionSpecUpdate(spec, oldSpec *apiextensions.CustomResourceDefinitionSpec, opts validationOptions, fldPath *field.Path) field.ErrorList {
-	allErrs := validateCustomResourceDefinitionSpec(spec, opts, fldPath)
+// context is passed for supporting context cancellation during cel validation when validating defaults
+func validateCustomResourceDefinitionSpecUpdate(ctx context.Context, spec, oldSpec *apiextensions.CustomResourceDefinitionSpec, opts validationOptions, fldPath *field.Path) field.ErrorList {
+	allErrs := validateCustomResourceDefinitionSpec(ctx, spec, opts, fldPath)
 
 	if opts.requireImmutableNames {
 		// these effect the storage and cannot be changed therefore
@@ -661,7 +667,8 @@ type specStandardValidator interface {
 }
 
 // validateCustomResourceDefinitionValidation statically validates
-func validateCustomResourceDefinitionValidation(customResourceValidation *apiextensions.CustomResourceValidation, statusSubresourceEnabled bool, opts validationOptions, fldPath *field.Path) field.ErrorList {
+// context is passed for supporting context cancellation during cel validation when validating defaults
+func validateCustomResourceDefinitionValidation(ctx context.Context, customResourceValidation *apiextensions.CustomResourceValidation, statusSubresourceEnabled bool, opts validationOptions, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if customResourceValidation == nil {
@@ -717,7 +724,7 @@ func validateCustomResourceDefinitionValidation(customResourceValidation *apiext
 				}
 			} else if validationErrors := structuralschema.ValidateStructural(fldPath.Child("openAPIV3Schema"), ss); len(validationErrors) > 0 {
 				allErrs = append(allErrs, validationErrors...)
-			} else if validationErrors, err := structuraldefaulting.ValidateDefaults(fldPath.Child("openAPIV3Schema"), ss, true, opts.requirePrunedDefaults); err != nil {
+			} else if validationErrors, err := structuraldefaulting.ValidateDefaults(ctx, fldPath.Child("openAPIV3Schema"), ss, true, opts.requirePrunedDefaults); err != nil {
 				// this should never happen
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("openAPIV3Schema"), "", err.Error()))
 			} else {
@@ -780,8 +787,7 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 		for property, jsonSchema := range schema.Properties {
 			subSsv := ssv
 
-			// defensively assumes that a future map type is uncorrelatable
-			if schema.XMapType != nil && (*schema.XMapType != "granular" && *schema.XMapType != "atomic") {
+			if !cel.MapIsCorrelatable(schema.XMapType) {
 				subSsv = subSsv.withForbidOldSelfValidations(fldPath)
 			}
 
@@ -961,10 +967,6 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 					if cr.TransitionRule {
 						if uncorrelatablePath := ssv.forbidOldSelfValidations(); uncorrelatablePath != nil {
 							allErrs = append(allErrs, field.Invalid(fldPath.Child("x-kubernetes-validations").Index(i).Child("rule"), schema.XValidations[i].Rule, fmt.Sprintf("oldSelf cannot be used on the uncorrelatable portion of the schema within %v", uncorrelatablePath)))
-						} else {
-							// todo: remove when transition rule validation is implemented
-							allErrs = append(allErrs, field.Invalid(fldPath.Child("x-kubernetes-validations").Index(i).Child("rule"), schema.XValidations[i].Rule, "validation of rules containing oldSelf is not yet implemented"))
-
 						}
 					}
 				}

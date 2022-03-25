@@ -350,7 +350,7 @@ func (tc *NoExecuteTaintManager) processPodOnNode(
 	}
 	allTolerated, usedTolerations := v1helper.GetMatchingTolerations(taints, tolerations)
 	if !allTolerated {
-		klog.V(2).InfoS("Not all taints are tolerated after update for pod on node", "pod", podNamespacedName.String(), "node", nodeName)
+		klog.V(2).InfoS("Not all taints are tolerated after update for pod on node", "pod", podNamespacedName.String(), "node", klog.KRef("", nodeName))
 		// We're canceling scheduled work (if any), as we're going to delete the Pod right away.
 		tc.cancelWorkWithEvent(podNamespacedName)
 		tc.taintEvictionQueue.AddWork(ctx, NewWorkArgs(podNamespacedName.Name, podNamespacedName.Namespace), time.Now(), time.Now())

@@ -30,6 +30,7 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/kubectl/pkg/util/podutils"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -128,6 +129,11 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 				framework.ExpectEqual(len(list.Items), len(pods), "the number of pods is not as expected")
 
 				for _, pod := range list.Items {
+					if isPodStatusAffectedByIssue108594(&pod) {
+						framework.Logf("Detected invalid pod state for pod %q: pod status: %+v", pod.Name, pod.Status)
+						framework.Failf("failing test due to detecting invalid pod status")
+					}
+
 					if kubelettypes.IsCriticalPod(&pod) {
 						if isPodShutdown(&pod) {
 							framework.Logf("Expecting critical pod to be running, but it's not currently. Pod: %q, Pod Status %+v", pod.Name, pod.Status)
@@ -155,6 +161,10 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 				framework.ExpectEqual(len(list.Items), len(pods), "the number of pods is not as expected")
 
 				for _, pod := range list.Items {
+					if isPodStatusAffectedByIssue108594(&pod) {
+						framework.Logf("Detected invalid pod state for pod %q: pod status: %+v", pod.Name, pod.Status)
+						framework.Failf("failing test due to detecting invalid pod status")
+					}
 					if !isPodShutdown(&pod) {
 						framework.Logf("Expecting pod to be shutdown, but it's not currently: Pod: %q, Pod Status %+v", pod.Name, pod.Status)
 						return fmt.Errorf("pod should be shutdown, phase: %s", pod.Status.Phase)
@@ -398,6 +408,11 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 					return nil
 				}, podStatusUpdateTimeout, pollInterval).Should(gomega.BeNil())
 			}
+
+			ginkgo.By("should have state file")
+			stateFile := "/var/lib/kubelet/graceful_node_shutdown_state"
+			_, err = os.Stat(stateFile)
+			framework.ExpectNoError(err)
 		})
 	})
 })
@@ -540,4 +555,9 @@ func isPodShutdown(pod *v1.Pod) bool {
 	}
 
 	return pod.Status.Message == podShutdownMessage && pod.Status.Reason == podShutdownReason && hasContainersNotReadyCondition && pod.Status.Phase == v1.PodFailed
+}
+
+// Pods should never report failed phase and have ready condition = true (https://github.com/kubernetes/kubernetes/issues/108594)
+func isPodStatusAffectedByIssue108594(pod *v1.Pod) bool {
+	return pod.Status.Phase == v1.PodFailed && podutils.IsPodReady(pod)
 }

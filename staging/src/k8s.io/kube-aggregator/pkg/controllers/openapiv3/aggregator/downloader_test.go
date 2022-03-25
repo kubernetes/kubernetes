@@ -23,6 +23,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"k8s.io/kube-openapi/pkg/handler3"
 )
 
 type handlerTest struct {
@@ -34,10 +36,16 @@ var _ http.Handler = handlerTest{}
 
 func (h handlerTest) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Create an APIService with a handler for one group/version
-	group := make(map[string][]string)
-	group["Paths"] = []string{"apis/group/version"}
-	j, _ := json.Marshal(group)
 	if r.URL.Path == "/openapi/v3" {
+		group := &handler3.OpenAPIV3Discovery{
+			Paths: map[string]handler3.OpenAPIV3DiscoveryGroupVersion{
+				"apis/group/version": {
+					ServerRelativeURL: "/openapi/v3/apis/group/version?hash=" + h.etag,
+				},
+			},
+		}
+
+		j, _ := json.Marshal(group)
 		w.Write(j)
 		return
 	}
@@ -84,6 +92,16 @@ func assertDownloadedSpec(gvSpec map[string]*SpecETag, err error, expectedSpecID
 
 func TestDownloadOpenAPISpec(t *testing.T) {
 	s := Downloader{}
+
+	groups, err := s.OpenAPIV3Root(
+		handlerTest{data: []byte(""), etag: ""})
+	assert.NoError(t, err)
+	if assert.NotNil(t, groups) {
+		assert.Equal(t, len(groups.Paths), 1)
+		if assert.Contains(t, groups.Paths, "apis/group/version") {
+			assert.NotEmpty(t, groups.Paths["apis/group/version"].ServerRelativeURL)
+		}
+	}
 
 	// Test with eTag
 	gvSpec, err := s.Download(

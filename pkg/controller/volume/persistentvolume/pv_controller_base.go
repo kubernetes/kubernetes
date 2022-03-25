@@ -40,11 +40,11 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	cloudprovider "k8s.io/cloud-provider"
+	storagehelpers "k8s.io/component-helpers/storage/volume"
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/volume/common"
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume/metrics"
-	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
 	"k8s.io/kubernetes/pkg/features"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
@@ -389,15 +389,15 @@ func updateMigrationAnnotationsAndFinalizers(cmpm CSIMigratedPluginManager, tran
 	}
 	var provisionerKey string
 	if claim {
-		provisionerKey = pvutil.AnnStorageProvisioner
+		provisionerKey = storagehelpers.AnnStorageProvisioner
 	} else {
-		provisionerKey = pvutil.AnnDynamicallyProvisioned
+		provisionerKey = storagehelpers.AnnDynamicallyProvisioned
 	}
 	provisioner, ok := ann[provisionerKey]
 	if !ok {
 		if claim {
 			// Also check beta AnnStorageProvisioner annontation to make sure
-			provisioner, ok = ann[pvutil.AnnBetaStorageProvisioner]
+			provisioner, ok = ann[storagehelpers.AnnBetaStorageProvisioner]
 			if !ok {
 				return false
 			}
@@ -407,7 +407,7 @@ func updateMigrationAnnotationsAndFinalizers(cmpm CSIMigratedPluginManager, tran
 		}
 	}
 
-	migratedToDriver := ann[pvutil.AnnMigratedTo]
+	migratedToDriver := ann[storagehelpers.AnnMigratedTo]
 	if cmpm.IsMigrationEnabledForPlugin(provisioner) {
 		modified := false
 		csiDriverName, err = translator.GetCSINameFromInTreeName(provisioner)
@@ -416,13 +416,13 @@ func updateMigrationAnnotationsAndFinalizers(cmpm CSIMigratedPluginManager, tran
 			return false
 		}
 		if migratedToDriver != csiDriverName {
-			ann[pvutil.AnnMigratedTo] = csiDriverName
+			ann[storagehelpers.AnnMigratedTo] = csiDriverName
 			modified = true
 		}
 		// Remove in-tree delete finalizer on the PV as migration is enabled.
 		if !claim && utilfeature.DefaultFeatureGate.Enabled(features.HonorPVReclaimPolicy) {
-			if finalizers != nil && slice.ContainsString(*finalizers, pvutil.PVDeletionInTreeProtectionFinalizer, nil) {
-				*finalizers = slice.RemoveString(*finalizers, pvutil.PVDeletionInTreeProtectionFinalizer, nil)
+			if finalizers != nil && slice.ContainsString(*finalizers, storagehelpers.PVDeletionInTreeProtectionFinalizer, nil) {
+				*finalizers = slice.RemoveString(*finalizers, storagehelpers.PVDeletionInTreeProtectionFinalizer, nil)
 				modified = true
 			}
 		}
@@ -430,20 +430,20 @@ func updateMigrationAnnotationsAndFinalizers(cmpm CSIMigratedPluginManager, tran
 	} else {
 		if migratedToDriver != "" {
 			// Migration annotation exists but the driver isn't migrated currently
-			delete(ann, pvutil.AnnMigratedTo)
+			delete(ann, storagehelpers.AnnMigratedTo)
 			if !claim && utilfeature.DefaultFeatureGate.Enabled(features.HonorPVReclaimPolicy) {
 				modified := false
 				if finalizers == nil {
 					*finalizers = []string{}
 				}
 				// Add back the in-tree PV deletion protection finalizer if does not already exists
-				if !slice.ContainsString(*finalizers, pvutil.PVDeletionInTreeProtectionFinalizer, nil) {
-					*finalizers = append(*finalizers, pvutil.PVDeletionInTreeProtectionFinalizer)
+				if !slice.ContainsString(*finalizers, storagehelpers.PVDeletionInTreeProtectionFinalizer, nil) {
+					*finalizers = append(*finalizers, storagehelpers.PVDeletionInTreeProtectionFinalizer)
 					modified = true
 				}
 				// Remove the external PV deletion protection finalizer
-				if slice.ContainsString(*finalizers, pvutil.PVDeletionProtectionFinalizer, nil) {
-					*finalizers = slice.RemoveString(*finalizers, pvutil.PVDeletionProtectionFinalizer, nil)
+				if slice.ContainsString(*finalizers, storagehelpers.PVDeletionProtectionFinalizer, nil) {
+					*finalizers = slice.RemoveString(*finalizers, storagehelpers.PVDeletionProtectionFinalizer, nil)
 					modified = true
 				}
 				return modified
@@ -596,7 +596,7 @@ func (ctrl *PersistentVolumeController) resync() {
 // setClaimProvisioner saves
 // claim.Annotations["volume.kubernetes.io/storage-provisioner"] = class.Provisioner
 func (ctrl *PersistentVolumeController) setClaimProvisioner(ctx context.Context, claim *v1.PersistentVolumeClaim, provisionerName string) (*v1.PersistentVolumeClaim, error) {
-	if val, ok := claim.Annotations[pvutil.AnnStorageProvisioner]; ok && val == provisionerName {
+	if val, ok := claim.Annotations[storagehelpers.AnnStorageProvisioner]; ok && val == provisionerName {
 		// annotation is already set, nothing to do
 		return claim, nil
 	}
@@ -605,8 +605,8 @@ func (ctrl *PersistentVolumeController) setClaimProvisioner(ctx context.Context,
 	// modify these, therefore create a copy.
 	claimClone := claim.DeepCopy()
 	// TODO: remove the beta storage provisioner anno after the deprecation period
-	metav1.SetMetaDataAnnotation(&claimClone.ObjectMeta, pvutil.AnnBetaStorageProvisioner, provisionerName)
-	metav1.SetMetaDataAnnotation(&claimClone.ObjectMeta, pvutil.AnnStorageProvisioner, provisionerName)
+	metav1.SetMetaDataAnnotation(&claimClone.ObjectMeta, storagehelpers.AnnBetaStorageProvisioner, provisionerName)
+	metav1.SetMetaDataAnnotation(&claimClone.ObjectMeta, storagehelpers.AnnStorageProvisioner, provisionerName)
 	updateMigrationAnnotationsAndFinalizers(ctrl.csiMigratedPluginManager, ctrl.translator, claimClone.Annotations, nil, true)
 	newClaim, err := ctrl.kubeClient.CoreV1().PersistentVolumeClaims(claim.Namespace).Update(context.TODO(), claimClone, metav1.UpdateOptions{})
 	if err != nil {
@@ -622,14 +622,14 @@ func (ctrl *PersistentVolumeController) setClaimProvisioner(ctx context.Context,
 // Stateless functions
 
 func getClaimStatusForLogging(claim *v1.PersistentVolumeClaim) string {
-	bound := metav1.HasAnnotation(claim.ObjectMeta, pvutil.AnnBindCompleted)
-	boundByController := metav1.HasAnnotation(claim.ObjectMeta, pvutil.AnnBoundByController)
+	bound := metav1.HasAnnotation(claim.ObjectMeta, storagehelpers.AnnBindCompleted)
+	boundByController := metav1.HasAnnotation(claim.ObjectMeta, storagehelpers.AnnBoundByController)
 
 	return fmt.Sprintf("phase: %s, bound to: %q, bindCompleted: %v, boundByController: %v", claim.Status.Phase, claim.Spec.VolumeName, bound, boundByController)
 }
 
 func getVolumeStatusForLogging(volume *v1.PersistentVolume) string {
-	boundByController := metav1.HasAnnotation(volume.ObjectMeta, pvutil.AnnBoundByController)
+	boundByController := metav1.HasAnnotation(volume.ObjectMeta, storagehelpers.AnnBoundByController)
 	claimName := ""
 	if volume.Spec.ClaimRef != nil {
 		claimName = fmt.Sprintf("%s/%s (uid: %s)", volume.Spec.ClaimRef.Namespace, volume.Spec.ClaimRef.Name, volume.Spec.ClaimRef.UID)

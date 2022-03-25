@@ -35,6 +35,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	volerr "k8s.io/cloud-provider/volume/errors"
+	storagehelpers "k8s.io/component-helpers/storage/volume"
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -2263,7 +2264,7 @@ func checkNodeAffinity(og *operationGenerator, volumeToMount VolumeToMount) erro
 		if err != nil {
 			return err
 		}
-		err = util.CheckNodeAffinity(pv, nodeLabels)
+		err = storagehelpers.CheckNodeAffinity(pv, nodeLabels)
 		if err != nil {
 			return err
 		}

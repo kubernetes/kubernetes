@@ -37,6 +37,7 @@ import (
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	policyv1 "k8s.io/api/policy/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -340,6 +341,74 @@ func TestDescribePodPriority(t *testing.T) {
 	}
 	if !strings.Contains(out, "high-priority") || !strings.Contains(out, "1000") {
 		t.Errorf("unexpected out: %s", out)
+	}
+}
+
+func TestDescribePriorityClass(t *testing.T) {
+	preemptLowerPriority := corev1.PreemptLowerPriority
+	preemptNever := corev1.PreemptNever
+
+	testCases := []struct {
+		name          string
+		priorityClass *schedulingv1.PriorityClass
+		expect        []string
+	}{
+		{
+			name: "test1",
+			priorityClass: &schedulingv1.PriorityClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar",
+				},
+				Value:            10,
+				GlobalDefault:    false,
+				PreemptionPolicy: &preemptLowerPriority,
+				Description:      "test1",
+			},
+			expect: []string{
+				"Name", "bar",
+				"Value", "10",
+				"GlobalDefault", "false",
+				"PreemptionPolicy", "PreemptLowerPriority",
+				"Description", "test1",
+				"Annotations", "",
+			},
+		},
+		{
+			name: "test2",
+			priorityClass: &schedulingv1.PriorityClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar",
+				},
+				Value:            100,
+				GlobalDefault:    true,
+				PreemptionPolicy: &preemptNever,
+				Description:      "test2",
+			},
+			expect: []string{
+				"Name", "bar",
+				"Value", "100",
+				"GlobalDefault", "true",
+				"PreemptionPolicy", "Never",
+				"Description", "test2",
+				"Annotations", "",
+			},
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			fake := fake.NewSimpleClientset(testCase.priorityClass)
+			c := &describeClient{T: t, Interface: fake}
+			d := PriorityClassDescriber{c}
+			out, err := d.Describe("", "bar", DescriberSettings{ShowEvents: true})
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			for _, expected := range testCase.expect {
+				if !strings.Contains(out, expected) {
+					t.Errorf("expected to find %q in output: %q", expected, out)
+				}
+			}
+		})
 	}
 }
 
@@ -2358,7 +2427,7 @@ Labels:           id1=app1
 Namespace:        foo
 Address:          
 Ingress Class:    test
-Default backend:  default-http-backend:80 (<error: endpoints "default-http-backend" not found>)
+Default backend:  <default>
 Rules:
   Host         Path  Backends
   ----         ----  --------
@@ -2374,7 +2443,7 @@ Labels:           <none>
 Namespace:        foo
 Address:          
 Ingress Class:    test
-Default backend:  default-http-backend:80 (<error: endpoints "default-http-backend" not found>)
+Default backend:  <default>
 Rules:
   Host         Path  Backends
   ----         ----  --------
@@ -2413,7 +2482,7 @@ Labels:           <none>
 Namespace:        foo
 Address:          
 Ingress Class:    test
-Default backend:  default-http-backend:80 (<error: endpoints "default-http-backend" not found>)
+Default backend:  <default>
 Rules:
   Host         Path  Backends
   ----         ----  --------
@@ -2452,7 +2521,7 @@ Labels:           <none>
 Namespace:        foo
 Address:          
 Ingress Class:    test
-Default backend:  default-http-backend:80 (<error: endpoints "default-http-backend" not found>)
+Default backend:  <default>
 Rules:
   Host         Path  Backends
   ----         ----  --------

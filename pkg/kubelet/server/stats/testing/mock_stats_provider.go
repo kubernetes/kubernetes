@@ -21,6 +21,8 @@ limitations under the License.
 package testing
 
 import (
+	reflect "reflect"
+
 	gomock "github.com/golang/mock/gomock"
 	v1 "github.com/google/cadvisor/info/v1"
 	v2 "github.com/google/cadvisor/info/v2"
@@ -29,93 +31,47 @@ import (
 	v1alpha1 "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	cm "k8s.io/kubernetes/pkg/kubelet/cm"
 	volume "k8s.io/kubernetes/pkg/volume"
-	reflect "reflect"
 )
 
-// MockProvider is a mock of Provider interface
+// MockProvider is a mock of Provider interface.
 type MockProvider struct {
 	ctrl     *gomock.Controller
 	recorder *MockProviderMockRecorder
 }
 
-// MockProviderMockRecorder is the mock recorder for MockProvider
+// MockProviderMockRecorder is the mock recorder for MockProvider.
 type MockProviderMockRecorder struct {
 	mock *MockProvider
 }
 
-// NewMockProvider creates a new mock instance
+// NewMockProvider creates a new mock instance.
 func NewMockProvider(ctrl *gomock.Controller) *MockProvider {
 	mock := &MockProvider{ctrl: ctrl}
 	mock.recorder = &MockProviderMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use
+// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockProvider) EXPECT() *MockProviderMockRecorder {
 	return m.recorder
 }
 
-// ListPodStats mocks base method
-func (m *MockProvider) ListPodStats() ([]v1alpha1.PodStats, error) {
+// GetCgroupCPUAndMemoryStats mocks base method.
+func (m *MockProvider) GetCgroupCPUAndMemoryStats(cgroupName string, updateStats bool) (*v1alpha1.ContainerStats, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListPodStats")
-	ret0, _ := ret[0].([]v1alpha1.PodStats)
+	ret := m.ctrl.Call(m, "GetCgroupCPUAndMemoryStats", cgroupName, updateStats)
+	ret0, _ := ret[0].(*v1alpha1.ContainerStats)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// ListPodStats indicates an expected call of ListPodStats
-func (mr *MockProviderMockRecorder) ListPodStats() *gomock.Call {
+// GetCgroupCPUAndMemoryStats indicates an expected call of GetCgroupCPUAndMemoryStats.
+func (mr *MockProviderMockRecorder) GetCgroupCPUAndMemoryStats(cgroupName, updateStats interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListPodStats", reflect.TypeOf((*MockProvider)(nil).ListPodStats))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCgroupCPUAndMemoryStats", reflect.TypeOf((*MockProvider)(nil).GetCgroupCPUAndMemoryStats), cgroupName, updateStats)
 }
 
-// ListPodCPUAndMemoryStats mocks base method
-func (m *MockProvider) ListPodCPUAndMemoryStats() ([]v1alpha1.PodStats, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListPodCPUAndMemoryStats")
-	ret0, _ := ret[0].([]v1alpha1.PodStats)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ListPodCPUAndMemoryStats indicates an expected call of ListPodCPUAndMemoryStats
-func (mr *MockProviderMockRecorder) ListPodCPUAndMemoryStats() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListPodCPUAndMemoryStats", reflect.TypeOf((*MockProvider)(nil).ListPodCPUAndMemoryStats))
-}
-
-// ListPodStatsAndUpdateCPUNanoCoreUsage mocks base method
-func (m *MockProvider) ListPodStatsAndUpdateCPUNanoCoreUsage() ([]v1alpha1.PodStats, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListPodStatsAndUpdateCPUNanoCoreUsage")
-	ret0, _ := ret[0].([]v1alpha1.PodStats)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ListPodStatsAndUpdateCPUNanoCoreUsage indicates an expected call of ListPodStatsAndUpdateCPUNanoCoreUsage
-func (mr *MockProviderMockRecorder) ListPodStatsAndUpdateCPUNanoCoreUsage() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListPodStatsAndUpdateCPUNanoCoreUsage", reflect.TypeOf((*MockProvider)(nil).ListPodStatsAndUpdateCPUNanoCoreUsage))
-}
-
-// ImageFsStats mocks base method
-func (m *MockProvider) ImageFsStats() (*v1alpha1.FsStats, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ImageFsStats")
-	ret0, _ := ret[0].(*v1alpha1.FsStats)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ImageFsStats indicates an expected call of ImageFsStats
-func (mr *MockProviderMockRecorder) ImageFsStats() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ImageFsStats", reflect.TypeOf((*MockProvider)(nil).ImageFsStats))
-}
-
-// GetCgroupStats mocks base method
+// GetCgroupStats mocks base method.
 func (m *MockProvider) GetCgroupStats(cgroupName string, updateStats bool) (*v1alpha1.ContainerStats, *v1alpha1.NetworkStats, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetCgroupStats", cgroupName, updateStats)
@@ -125,43 +81,13 @@ func (m *MockProvider) GetCgroupStats(cgroupName string, updateStats bool) (*v1a
 	return ret0, ret1, ret2
 }
 
-// GetCgroupStats indicates an expected call of GetCgroupStats
+// GetCgroupStats indicates an expected call of GetCgroupStats.
 func (mr *MockProviderMockRecorder) GetCgroupStats(cgroupName, updateStats interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCgroupStats", reflect.TypeOf((*MockProvider)(nil).GetCgroupStats), cgroupName, updateStats)
 }
 
-// GetCgroupCPUAndMemoryStats mocks base method
-func (m *MockProvider) GetCgroupCPUAndMemoryStats(cgroupName string, updateStats bool) (*v1alpha1.ContainerStats, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetCgroupCPUAndMemoryStats", cgroupName, updateStats)
-	ret0, _ := ret[0].(*v1alpha1.ContainerStats)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetCgroupCPUAndMemoryStats indicates an expected call of GetCgroupCPUAndMemoryStats
-func (mr *MockProviderMockRecorder) GetCgroupCPUAndMemoryStats(cgroupName, updateStats interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCgroupCPUAndMemoryStats", reflect.TypeOf((*MockProvider)(nil).GetCgroupCPUAndMemoryStats), cgroupName, updateStats)
-}
-
-// RootFsStats mocks base method
-func (m *MockProvider) RootFsStats() (*v1alpha1.FsStats, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RootFsStats")
-	ret0, _ := ret[0].(*v1alpha1.FsStats)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// RootFsStats indicates an expected call of RootFsStats
-func (mr *MockProviderMockRecorder) RootFsStats() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RootFsStats", reflect.TypeOf((*MockProvider)(nil).RootFsStats))
-}
-
-// GetContainerInfo mocks base method
+// GetContainerInfo mocks base method.
 func (m *MockProvider) GetContainerInfo(podFullName string, uid types.UID, containerName string, req *v1.ContainerInfoRequest) (*v1.ContainerInfo, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetContainerInfo", podFullName, uid, containerName, req)
@@ -170,58 +96,13 @@ func (m *MockProvider) GetContainerInfo(podFullName string, uid types.UID, conta
 	return ret0, ret1
 }
 
-// GetContainerInfo indicates an expected call of GetContainerInfo
+// GetContainerInfo indicates an expected call of GetContainerInfo.
 func (mr *MockProviderMockRecorder) GetContainerInfo(podFullName, uid, containerName, req interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetContainerInfo", reflect.TypeOf((*MockProvider)(nil).GetContainerInfo), podFullName, uid, containerName, req)
 }
 
-// GetRawContainerInfo mocks base method
-func (m *MockProvider) GetRawContainerInfo(containerName string, req *v1.ContainerInfoRequest, subcontainers bool) (map[string]*v1.ContainerInfo, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetRawContainerInfo", containerName, req, subcontainers)
-	ret0, _ := ret[0].(map[string]*v1.ContainerInfo)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetRawContainerInfo indicates an expected call of GetRawContainerInfo
-func (mr *MockProviderMockRecorder) GetRawContainerInfo(containerName, req, subcontainers interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRawContainerInfo", reflect.TypeOf((*MockProvider)(nil).GetRawContainerInfo), containerName, req, subcontainers)
-}
-
-// GetRequestedContainersInfo mocks base method
-func (m *MockProvider) GetRequestedContainersInfo(containerName string, options v2.RequestOptions) (map[string]*v1.ContainerInfo, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetRequestedContainersInfo", containerName, options)
-	ret0, _ := ret[0].(map[string]*v1.ContainerInfo)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetRequestedContainersInfo indicates an expected call of GetRequestedContainersInfo
-func (mr *MockProviderMockRecorder) GetRequestedContainersInfo(containerName, options interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRequestedContainersInfo", reflect.TypeOf((*MockProvider)(nil).GetRequestedContainersInfo), containerName, options)
-}
-
-// GetPodByName mocks base method
-func (m *MockProvider) GetPodByName(namespace, name string) (*v10.Pod, bool) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetPodByName", namespace, name)
-	ret0, _ := ret[0].(*v10.Pod)
-	ret1, _ := ret[1].(bool)
-	return ret0, ret1
-}
-
-// GetPodByName indicates an expected call of GetPodByName
-func (mr *MockProviderMockRecorder) GetPodByName(namespace, name interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPodByName", reflect.TypeOf((*MockProvider)(nil).GetPodByName), namespace, name)
-}
-
-// GetNode mocks base method
+// GetNode mocks base method.
 func (m *MockProvider) GetNode() (*v10.Node, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetNode")
@@ -230,13 +111,13 @@ func (m *MockProvider) GetNode() (*v10.Node, error) {
 	return ret0, ret1
 }
 
-// GetNode indicates an expected call of GetNode
+// GetNode indicates an expected call of GetNode.
 func (mr *MockProviderMockRecorder) GetNode() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNode", reflect.TypeOf((*MockProvider)(nil).GetNode))
 }
 
-// GetNodeConfig mocks base method
+// GetNodeConfig mocks base method.
 func (m *MockProvider) GetNodeConfig() cm.NodeConfig {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetNodeConfig")
@@ -244,86 +125,13 @@ func (m *MockProvider) GetNodeConfig() cm.NodeConfig {
 	return ret0
 }
 
-// GetNodeConfig indicates an expected call of GetNodeConfig
+// GetNodeConfig indicates an expected call of GetNodeConfig.
 func (mr *MockProviderMockRecorder) GetNodeConfig() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNodeConfig", reflect.TypeOf((*MockProvider)(nil).GetNodeConfig))
 }
 
-// ListVolumesForPod mocks base method
-func (m *MockProvider) ListVolumesForPod(podUID types.UID) (map[string]volume.Volume, bool) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListVolumesForPod", podUID)
-	ret0, _ := ret[0].(map[string]volume.Volume)
-	ret1, _ := ret[1].(bool)
-	return ret0, ret1
-}
-
-// ListVolumesForPod indicates an expected call of ListVolumesForPod
-func (mr *MockProviderMockRecorder) ListVolumesForPod(podUID interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListVolumesForPod", reflect.TypeOf((*MockProvider)(nil).ListVolumesForPod), podUID)
-}
-
-// ListBlockVolumesForPod mocks base method
-func (m *MockProvider) ListBlockVolumesForPod(podUID types.UID) (map[string]volume.BlockVolume, bool) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListBlockVolumesForPod", podUID)
-	ret0, _ := ret[0].(map[string]volume.BlockVolume)
-	ret1, _ := ret[1].(bool)
-	return ret0, ret1
-}
-
-// ListBlockVolumesForPod indicates an expected call of ListBlockVolumesForPod
-func (mr *MockProviderMockRecorder) ListBlockVolumesForPod(podUID interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListBlockVolumesForPod", reflect.TypeOf((*MockProvider)(nil).ListBlockVolumesForPod), podUID)
-}
-
-// GetPods mocks base method
-func (m *MockProvider) GetPods() []*v10.Pod {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetPods")
-	ret0, _ := ret[0].([]*v10.Pod)
-	return ret0
-}
-
-// GetPods indicates an expected call of GetPods
-func (mr *MockProviderMockRecorder) GetPods() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPods", reflect.TypeOf((*MockProvider)(nil).GetPods))
-}
-
-// RlimitStats mocks base method
-func (m *MockProvider) RlimitStats() (*v1alpha1.RlimitStats, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RlimitStats")
-	ret0, _ := ret[0].(*v1alpha1.RlimitStats)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// RlimitStats indicates an expected call of RlimitStats
-func (mr *MockProviderMockRecorder) RlimitStats() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RlimitStats", reflect.TypeOf((*MockProvider)(nil).RlimitStats))
-}
-
-// GetPodCgroupRoot mocks base method
-func (m *MockProvider) GetPodCgroupRoot() string {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetPodCgroupRoot")
-	ret0, _ := ret[0].(string)
-	return ret0
-}
-
-// GetPodCgroupRoot indicates an expected call of GetPodCgroupRoot
-func (mr *MockProviderMockRecorder) GetPodCgroupRoot() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPodCgroupRoot", reflect.TypeOf((*MockProvider)(nil).GetPodCgroupRoot))
-}
-
-// GetPodByCgroupfs mocks base method
+// GetPodByCgroupfs mocks base method.
 func (m *MockProvider) GetPodByCgroupfs(cgroupfs string) (*v10.Pod, bool) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetPodByCgroupfs", cgroupfs)
@@ -332,8 +140,201 @@ func (m *MockProvider) GetPodByCgroupfs(cgroupfs string) (*v10.Pod, bool) {
 	return ret0, ret1
 }
 
-// GetPodByCgroupfs indicates an expected call of GetPodByCgroupfs
+// GetPodByCgroupfs indicates an expected call of GetPodByCgroupfs.
 func (mr *MockProviderMockRecorder) GetPodByCgroupfs(cgroupfs interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPodByCgroupfs", reflect.TypeOf((*MockProvider)(nil).GetPodByCgroupfs), cgroupfs)
+}
+
+// GetPodByName mocks base method.
+func (m *MockProvider) GetPodByName(namespace, name string) (*v10.Pod, bool) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPodByName", namespace, name)
+	ret0, _ := ret[0].(*v10.Pod)
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
+}
+
+// GetPodByName indicates an expected call of GetPodByName.
+func (mr *MockProviderMockRecorder) GetPodByName(namespace, name interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPodByName", reflect.TypeOf((*MockProvider)(nil).GetPodByName), namespace, name)
+}
+
+// GetPodCgroupRoot mocks base method.
+func (m *MockProvider) GetPodCgroupRoot() string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPodCgroupRoot")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// GetPodCgroupRoot indicates an expected call of GetPodCgroupRoot.
+func (mr *MockProviderMockRecorder) GetPodCgroupRoot() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPodCgroupRoot", reflect.TypeOf((*MockProvider)(nil).GetPodCgroupRoot))
+}
+
+// GetPods mocks base method.
+func (m *MockProvider) GetPods() []*v10.Pod {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPods")
+	ret0, _ := ret[0].([]*v10.Pod)
+	return ret0
+}
+
+// GetPods indicates an expected call of GetPods.
+func (mr *MockProviderMockRecorder) GetPods() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPods", reflect.TypeOf((*MockProvider)(nil).GetPods))
+}
+
+// GetRawContainerInfo mocks base method.
+func (m *MockProvider) GetRawContainerInfo(containerName string, req *v1.ContainerInfoRequest, subcontainers bool) (map[string]*v1.ContainerInfo, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetRawContainerInfo", containerName, req, subcontainers)
+	ret0, _ := ret[0].(map[string]*v1.ContainerInfo)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetRawContainerInfo indicates an expected call of GetRawContainerInfo.
+func (mr *MockProviderMockRecorder) GetRawContainerInfo(containerName, req, subcontainers interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRawContainerInfo", reflect.TypeOf((*MockProvider)(nil).GetRawContainerInfo), containerName, req, subcontainers)
+}
+
+// GetRequestedContainersInfo mocks base method.
+func (m *MockProvider) GetRequestedContainersInfo(containerName string, options v2.RequestOptions) (map[string]*v1.ContainerInfo, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetRequestedContainersInfo", containerName, options)
+	ret0, _ := ret[0].(map[string]*v1.ContainerInfo)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetRequestedContainersInfo indicates an expected call of GetRequestedContainersInfo.
+func (mr *MockProviderMockRecorder) GetRequestedContainersInfo(containerName, options interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRequestedContainersInfo", reflect.TypeOf((*MockProvider)(nil).GetRequestedContainersInfo), containerName, options)
+}
+
+// ImageFsStats mocks base method.
+func (m *MockProvider) ImageFsStats() (*v1alpha1.FsStats, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ImageFsStats")
+	ret0, _ := ret[0].(*v1alpha1.FsStats)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ImageFsStats indicates an expected call of ImageFsStats.
+func (mr *MockProviderMockRecorder) ImageFsStats() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ImageFsStats", reflect.TypeOf((*MockProvider)(nil).ImageFsStats))
+}
+
+// ListBlockVolumesForPod mocks base method.
+func (m *MockProvider) ListBlockVolumesForPod(podUID types.UID) (map[string]volume.BlockVolume, bool) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListBlockVolumesForPod", podUID)
+	ret0, _ := ret[0].(map[string]volume.BlockVolume)
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
+}
+
+// ListBlockVolumesForPod indicates an expected call of ListBlockVolumesForPod.
+func (mr *MockProviderMockRecorder) ListBlockVolumesForPod(podUID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListBlockVolumesForPod", reflect.TypeOf((*MockProvider)(nil).ListBlockVolumesForPod), podUID)
+}
+
+// ListPodCPUAndMemoryStats mocks base method.
+func (m *MockProvider) ListPodCPUAndMemoryStats() ([]v1alpha1.PodStats, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListPodCPUAndMemoryStats")
+	ret0, _ := ret[0].([]v1alpha1.PodStats)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListPodCPUAndMemoryStats indicates an expected call of ListPodCPUAndMemoryStats.
+func (mr *MockProviderMockRecorder) ListPodCPUAndMemoryStats() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListPodCPUAndMemoryStats", reflect.TypeOf((*MockProvider)(nil).ListPodCPUAndMemoryStats))
+}
+
+// ListPodStats mocks base method.
+func (m *MockProvider) ListPodStats() ([]v1alpha1.PodStats, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListPodStats")
+	ret0, _ := ret[0].([]v1alpha1.PodStats)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListPodStats indicates an expected call of ListPodStats.
+func (mr *MockProviderMockRecorder) ListPodStats() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListPodStats", reflect.TypeOf((*MockProvider)(nil).ListPodStats))
+}
+
+// ListPodStatsAndUpdateCPUNanoCoreUsage mocks base method.
+func (m *MockProvider) ListPodStatsAndUpdateCPUNanoCoreUsage() ([]v1alpha1.PodStats, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListPodStatsAndUpdateCPUNanoCoreUsage")
+	ret0, _ := ret[0].([]v1alpha1.PodStats)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListPodStatsAndUpdateCPUNanoCoreUsage indicates an expected call of ListPodStatsAndUpdateCPUNanoCoreUsage.
+func (mr *MockProviderMockRecorder) ListPodStatsAndUpdateCPUNanoCoreUsage() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListPodStatsAndUpdateCPUNanoCoreUsage", reflect.TypeOf((*MockProvider)(nil).ListPodStatsAndUpdateCPUNanoCoreUsage))
+}
+
+// ListVolumesForPod mocks base method.
+func (m *MockProvider) ListVolumesForPod(podUID types.UID) (map[string]volume.Volume, bool) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListVolumesForPod", podUID)
+	ret0, _ := ret[0].(map[string]volume.Volume)
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
+}
+
+// ListVolumesForPod indicates an expected call of ListVolumesForPod.
+func (mr *MockProviderMockRecorder) ListVolumesForPod(podUID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListVolumesForPod", reflect.TypeOf((*MockProvider)(nil).ListVolumesForPod), podUID)
+}
+
+// RlimitStats mocks base method.
+func (m *MockProvider) RlimitStats() (*v1alpha1.RlimitStats, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RlimitStats")
+	ret0, _ := ret[0].(*v1alpha1.RlimitStats)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// RlimitStats indicates an expected call of RlimitStats.
+func (mr *MockProviderMockRecorder) RlimitStats() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RlimitStats", reflect.TypeOf((*MockProvider)(nil).RlimitStats))
+}
+
+// RootFsStats mocks base method.
+func (m *MockProvider) RootFsStats() (*v1alpha1.FsStats, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RootFsStats")
+	ret0, _ := ret[0].(*v1alpha1.FsStats)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// RootFsStats indicates an expected call of RootFsStats.
+func (mr *MockProviderMockRecorder) RootFsStats() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RootFsStats", reflect.TypeOf((*MockProvider)(nil).RootFsStats))
 }

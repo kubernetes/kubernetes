@@ -357,9 +357,6 @@ type CSIDriverSpec struct {
 	//
 	// This field was immutable in Kubernetes <= 1.22 and now is mutable.
 	//
-	// This is a beta field and only available when the CSIStorageCapacity
-	// feature is enabled. The default is false.
-	//
 	// +optional
 	StorageCapacity *bool
 
@@ -575,9 +572,13 @@ type CSINodeList struct {
 //
 // The producer of these objects can decide which approach is more suitable.
 //
-// They are consumed by the kube-scheduler if the CSIStorageCapacity beta feature gate
-// is enabled there and a CSI driver opts into capacity-aware scheduling with
-// CSIDriver.StorageCapacity.
+// They are consumed by the kube-scheduler when a CSI driver opts into
+// capacity-aware scheduling with CSIDriverSpec.StorageCapacity. The scheduler
+// compares the MaximumVolumeSize against the requested size of pending volumes
+// to filter out unsuitable nodes. If MaximumVolumeSize is unset, it falls back
+// to a comparison against the less precise Capacity. If that is also unset,
+// the scheduler assumes that capacity is insufficient and tries some other
+// node.
 type CSIStorageCapacity struct {
 	metav1.TypeMeta
 	// Standard object's metadata. The name has no particular meaning. It must be
@@ -595,7 +596,7 @@ type CSIStorageCapacity struct {
 	// NodeTopology defines which nodes have access to the storage
 	// for which capacity was reported. If not set, the storage is
 	// not accessible from any node in the cluster. If empty, the
-	// storage is accessible from all nodes.  This field is
+	// storage is accessible from all nodes. This field is
 	// immutable.
 	//
 	// +optional
@@ -616,7 +617,7 @@ type CSIStorageCapacity struct {
 	// The semantic is currently (CSI spec 1.2) defined as:
 	// The available capacity, in bytes, of the storage that can be used
 	// to provision volumes. If not set, that information is currently
-	// unavailable and treated like zero capacity.
+	// unavailable.
 	//
 	// +optional
 	Capacity *resource.Quantity

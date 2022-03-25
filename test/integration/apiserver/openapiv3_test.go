@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	openapi_v3 "github.com/googleapis/gnostic/openapiv3"
+	openapi_v3 "github.com/google/gnostic/openapiv3"
 	"google.golang.org/protobuf/proto"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -37,6 +37,7 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kube-openapi/pkg/handler3"
 	"k8s.io/kube-openapi/pkg/spec3"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -135,19 +136,13 @@ func TestAddRemoveGroupVersion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	openAPIv3GV := make(map[string][]string)
+	openAPIv3GV := handler3.OpenAPIV3Discovery{}
 	err = json.Unmarshal(jsonData, &openAPIv3GV)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	paths, ok := openAPIv3GV["Paths"]
-	if !ok {
-		t.Fatal("OpenAPI v3 format error")
-	}
-
 	foundPath := false
-	for _, path := range paths {
+	for path := range openAPIv3GV.Paths {
 		if strings.Contains(path, "mygroup.example.com/v1beta1") {
 			foundPath = true
 		}
@@ -177,17 +172,13 @@ func TestAddRemoveGroupVersion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	openAPIv3GV = handler3.OpenAPIV3Discovery{}
 	err = json.Unmarshal(jsonData, &openAPIv3GV)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	paths, ok = openAPIv3GV["Paths"]
-	if !ok {
-		t.Fatal("OpenAPI v3 format error")
-	}
-
-	for _, path := range paths {
+	for path := range openAPIv3GV.Paths {
 		if strings.Contains(path, "mygroup.example.com") {
 			t.Fatal("Unexpected group version mygroup.example.com in OpenAPI v3 discovery")
 		}

@@ -18,6 +18,7 @@ package generators
 
 import (
 	"io"
+	"strings"
 
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
@@ -129,6 +130,10 @@ func blocklisted(t *types.Type, member types.Member) bool {
 		return true
 	}
 	if objectMeta.Name == t.Name && member.Name == "SelfLink" {
+		return true
+	}
+	// Hide any fields which are en route to deletion.
+	if strings.HasPrefix(member.Name, "ZZZ_") {
 		return true
 	}
 	return false

@@ -26,6 +26,8 @@ import (
 
 	"strings"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 const (
@@ -56,12 +58,12 @@ func TestGetEndpointByID(t *testing.T) {
 	testGetEndpointByID(t, hnsV1)
 	testGetEndpointByID(t, hnsV2)
 }
-func TestGetEndpointByIpAddress(t *testing.T) {
+func TestGetEndpointByIpAddressAndName(t *testing.T) {
 	hnsV1 := hnsV1{}
 	hnsV2 := hnsV2{}
 
-	testGetEndpointByIpAddress(t, hnsV1)
-	testGetEndpointByIpAddress(t, hnsV2)
+	testGetEndpointByIpAddressAndName(t, hnsV1)
+	testGetEndpointByIpAddressAndName(t, hnsV2)
 }
 func TestCreateEndpointLocal(t *testing.T) {
 	hnsV1 := hnsV1{}
@@ -165,7 +167,7 @@ func testGetEndpointByID(t *testing.T, hns HostNetworkService) {
 		t.Error(err)
 	}
 }
-func testGetEndpointByIpAddress(t *testing.T, hns HostNetworkService) {
+func testGetEndpointByIpAddressAndName(t *testing.T, hns HostNetworkService) {
 	Network := mustTestNetwork(t)
 
 	ipConfig := &hcn.IpConfig{
@@ -193,6 +195,15 @@ func testGetEndpointByIpAddress(t *testing.T, hns HostNetworkService) {
 	}
 	if endpoint.ip != Endpoint.IpConfigurations[0].IpAddress {
 		t.Errorf("%v does not match %v", endpoint.ip, Endpoint.IpConfigurations[0].IpAddress)
+	}
+
+	endpoint, err = hns.getEndpointByName(Endpoint.Name)
+	if err != nil {
+		t.Error(err)
+	}
+	diff := cmp.Diff(endpoint, Endpoint)
+	if diff != "" {
+		t.Errorf("getEndpointByName(%s) returned a different endpoint. Diff: %s ", Endpoint.Name, diff)
 	}
 
 	err = Endpoint.Delete()

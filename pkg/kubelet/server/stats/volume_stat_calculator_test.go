@@ -128,9 +128,8 @@ func TestPVCRef(t *testing.T) {
 	assert.Len(t, append(vs.EphemeralVolumes, vs.PersistentVolumes...), 4)
 	// Verify 'vol0' doesn't have a PVC reference
 	assert.Contains(t, append(vs.EphemeralVolumes, vs.PersistentVolumes...), kubestats.VolumeStats{
-		Name:              vol0,
-		FsStats:           expectedFSStats(),
-		VolumeHealthStats: expectedVolumeHealthStats(),
+		Name:    vol0,
+		FsStats: expectedFSStats(),
 	})
 	// Verify 'vol1' has a PVC reference
 	assert.Contains(t, append(vs.EphemeralVolumes, vs.PersistentVolumes...), kubestats.VolumeStats{
@@ -139,18 +138,16 @@ func TestPVCRef(t *testing.T) {
 			Name:      pvcClaimName0,
 			Namespace: namespace0,
 		},
-		FsStats:           expectedFSStats(),
-		VolumeHealthStats: expectedVolumeHealthStats(),
+		FsStats: expectedFSStats(),
 	})
-	// // Verify 'vol2' has a PVC reference
+	// Verify 'vol2' has a PVC reference
 	assert.Contains(t, append(vs.EphemeralVolumes, vs.PersistentVolumes...), kubestats.VolumeStats{
 		Name: vol2,
 		PVCRef: &kubestats.PVCReference{
 			Name:      pvcClaimName1,
 			Namespace: namespace0,
 		},
-		FsStats:           expectedBlockStats(),
-		VolumeHealthStats: expectedVolumeHealthStats(),
+		FsStats: expectedBlockStats(),
 	})
 	// Verify 'vol3' has a PVC reference
 	assert.Contains(t, append(vs.EphemeralVolumes, vs.PersistentVolumes...), kubestats.VolumeStats{
@@ -159,8 +156,7 @@ func TestPVCRef(t *testing.T) {
 			Name:      pName0 + "-" + vol3,
 			Namespace: namespace0,
 		},
-		FsStats:           expectedFSStats(),
-		VolumeHealthStats: expectedVolumeHealthStats(),
+		FsStats: expectedFSStats(),
 	})
 }
 
@@ -267,13 +263,6 @@ func expectedFSStats() kubestats.FsStats {
 	}
 }
 
-func expectedVolumeHealthStats() *kubestats.VolumeHealthStats {
-	metric := expectedMetrics()
-	return &kubestats.VolumeHealthStats{
-		Abnormal: *metric.Abnormal,
-	}
-}
-
 // Fake block-volume/metrics provider, block-devices have no inodes
 var _ volume.BlockVolume = &fakeBlockVolume{}
 
@@ -294,7 +283,6 @@ func expectedBlockMetrics() *volume.Metrics {
 		Available: resource.NewQuantity(available, resource.BinarySI),
 		Capacity:  resource.NewQuantity(capacity, resource.BinarySI),
 		Used:      resource.NewQuantity(available-capacity, resource.BinarySI),
-		Abnormal:  &volumeCondition.Abnormal,
 	}
 }
 

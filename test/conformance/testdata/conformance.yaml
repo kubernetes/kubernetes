@@ -763,6 +763,13 @@
     pod. Modify the labels of one of the Job's Pods. The Job MUST release the Pod.
   release: v1.16
   file: test/e2e/apps/job.go
+- testname: Ensure Pods of an Indexed Job get a unique index.
+  codename: '[sig-apps] Job should create pods for an Indexed job with completion
+    indexes and specified hostname [Conformance]'
+  description: Create an Indexed job. Job MUST complete successfully. Ensure that
+    created pods have completion index annotation and environment variable.
+  release: v1.24
+  file: test/e2e/apps/job.go
 - testname: Jobs, active pods, graceful termination
   codename: '[sig-apps] Job should delete a job [Conformance]'
   description: Create a job. Ensure the active pods reflect paralellism in the namespace
@@ -2110,6 +2117,36 @@
     document. The runtimeclasses resource MUST exist in the /apis/node.k8s.io/v1 discovery
     document. The runtimeclasses resource must support create, get, list, watch, update,
     patch, delete, and deletecollection.'
+  release: v1.20
+  file: test/e2e/common/node/runtimeclass.go
+- testname: Pod with the deleted RuntimeClass is rejected.
+  codename: '[sig-node] RuntimeClass should reject a Pod requesting a deleted RuntimeClass
+    [NodeConformance] [Conformance]'
+  description: Pod requesting the deleted RuntimeClass must be rejected.
+  release: v1.20
+  file: test/e2e/common/node/runtimeclass.go
+- testname: Pod with the non-existing RuntimeClass is rejected.
+  codename: '[sig-node] RuntimeClass should reject a Pod requesting a non-existent
+    RuntimeClass [NodeConformance] [Conformance]'
+  description: The Pod requesting the non-existing RuntimeClass must be rejected.
+  release: v1.20
+  file: test/e2e/common/node/runtimeclass.go
+- testname: RuntimeClass Overhead field must be respected.
+  codename: '[sig-node] RuntimeClass should schedule a Pod requesting a RuntimeClass
+    and initialize its Overhead [NodeConformance] [Conformance]'
+  description: The Pod requesting the existing RuntimeClass must be scheduled. This
+    test doesn't validate that the Pod will actually start because this functionality
+    depends on container runtime and preconfigured handler. Runtime-specific functionality
+    is not being tested here.
+  release: v1.24
+  file: test/e2e/common/node/runtimeclass.go
+- testname: Can schedule a pod requesting existing RuntimeClass.
+  codename: '[sig-node] RuntimeClass should schedule a Pod requesting a RuntimeClass
+    without PodOverhead [NodeConformance] [Conformance]'
+  description: The Pod requesting the existing RuntimeClass must be scheduled. This
+    test doesn't validate that the Pod will actually start because this functionality
+    depends on container runtime and preconfigured handler. Runtime-specific functionality
+    is not being tested here.
   release: v1.20
   file: test/e2e/common/node/runtimeclass.go
 - testname: Secrets, pod environment field

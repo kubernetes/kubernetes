@@ -99,10 +99,6 @@ type frameworkImpl struct {
 	framework.PodNominator
 
 	parallelizer parallelize.Parallelizer
-
-	// Indicates that RunFilterPlugins should accumulate all failed statuses and not return
-	// after the first failure.
-	runAllFilters bool
 }
 
 // extensionPoint encapsulates desired and applied set of plugins at a specific extension
@@ -147,7 +143,6 @@ type frameworkOptions struct {
 	metricsRecorder        *metricsRecorder
 	podNominator           framework.PodNominator
 	extenders              []framework.Extender
-	runAllFilters          bool
 	captureProfile         CaptureProfile
 	clusterEventMap        map[framework.ClusterEvent]sets.String
 	parallelizer           parallelize.Parallelizer
@@ -198,14 +193,6 @@ func WithInformerFactory(informerFactory informers.SharedInformerFactory) Option
 func WithSnapshotSharedLister(snapshotSharedLister framework.SharedLister) Option {
 	return func(o *frameworkOptions) {
 		o.snapshotSharedLister = snapshotSharedLister
-	}
-}
-
-// WithRunAllFilters sets the runAllFilters flag, which means RunFilterPlugins accumulates
-// all failure Statuses.
-func WithRunAllFilters(runAllFilters bool) Option {
-	return func(o *frameworkOptions) {
-		o.runAllFilters = runAllFilters
 	}
 }
 
@@ -274,7 +261,6 @@ func NewFramework(r Registry, profile *config.KubeSchedulerProfile, opts ...Opti
 		eventRecorder:        options.eventRecorder,
 		informerFactory:      options.informerFactory,
 		metricsRecorder:      options.metricsRecorder,
-		runAllFilters:        options.runAllFilters,
 		extenders:            options.extenders,
 		PodNominator:         options.podNominator,
 		parallelizer:         options.parallelizer,
@@ -417,6 +403,37 @@ func getScoreWeights(f *frameworkImpl, pluginsMap map[string]framework.Plugin, p
 	return nil
 }
 
+type orderedSet struct {
+	set         map[string]int
+	list        []string
+	deletionCnt int
+}
+
+func newOrderedSet() *orderedSet {
+	return &orderedSet{set: make(map[string]int)}
+}
+
+func (os *orderedSet) insert(s string) {
+	if os.has(s) {
+		return
+	}
+	os.set[s] = len(os.list)
+	os.list = append(os.list, s)
+}
+
+func (os *orderedSet) has(s string) bool {
+	_, found := os.set[s]
+	return found
+}
+
+func (os *orderedSet) delete(s string) {
+	if i, found := os.set[s]; found {
+		delete(os.set, s)
+		os.list = append(os.list[:i-os.deletionCnt], os.list[i+1-os.deletionCnt:]...)
+		os.deletionCnt++
+	}
+}
+
 func (f *frameworkImpl) expandMultiPointPlugins(profile *config.KubeSchedulerProfile, pluginsMap map[string]framework.Plugin) error {
 	// initialize MultiPoint plugins
 	for _, e := range f.getExtensionPoints(profile.Plugins) {
@@ -424,9 +441,9 @@ func (f *frameworkImpl) expandMultiPointPlugins(profile *config.KubeSchedulerPro
 		pluginType := plugins.Type().Elem()
 		// build enabledSet of plugins already registered via normal extension points
 		// to check double registration
-		enabledSet := sets.NewString()
+		enabledSet := newOrderedSet()
 		for _, plugin := range e.plugins.Enabled {
-			enabledSet.Insert(plugin.Name)
+			enabledSet.insert(plugin.Name)
 		}
 
 		disabledSet := sets.NewString()
@@ -440,8 +457,8 @@ func (f *frameworkImpl) expandMultiPointPlugins(profile *config.KubeSchedulerPro
 
 		// track plugins enabled via multipoint separately from those enabled by specific extensions,
 		// so that we can distinguish between double-registration and explicit overrides
-		multiPointEnabled := sets.NewString()
-
+		multiPointEnabled := newOrderedSet()
+		overridePlugins := newOrderedSet()
 		for _, ep := range profile.Plugins.MultiPoint.Enabled {
 			pg, ok := pluginsMap[ep.Name]
 			if !ok {
@@ -463,23 +480,43 @@ func (f *frameworkImpl) expandMultiPointPlugins(profile *config.KubeSchedulerPro
 			// the user intent is to override the default plugin or make some other explicit setting.
 			// Either way, discard the MultiPoint value for this plugin.
 			// This maintains expected behavior for overriding default plugins (see https://github.com/kubernetes/kubernetes/pull/99582)
-			if enabledSet.Has(ep.Name) {
+			if enabledSet.has(ep.Name) {
+				overridePlugins.insert(ep.Name)
 				klog.InfoS("MultiPoint plugin is explicitly re-configured; overriding", "plugin", ep.Name)
 				continue
 			}
 
 			// if this plugin is already registered via MultiPoint, then this is
 			// a double registration and an error in the config.
-			if multiPointEnabled.Has(ep.Name) {
+			if multiPointEnabled.has(ep.Name) {
 				return fmt.Errorf("plugin %q already registered as %q", ep.Name, pluginType.Name())
 			}
 
 			// we only need to update the multipoint set, since we already have the specific extension set from above
-			multiPointEnabled.Insert(ep.Name)
-
-			newPlugins := reflect.Append(plugins, reflect.ValueOf(pg))
-			plugins.Set(newPlugins)
+			multiPointEnabled.insert(ep.Name)
 		}
+
+		// Reorder plugins. Here is the expected order:
+		// - part 1: overridePlugins. Their order stay intact as how they're specified in regular extension point.
+		// - part 2: multiPointEnabled - i.e., plugin defined in multipoint but not in regular extension point.
+		// - part 3: other plugins (excluded by part 1 & 2) in regular extension point.
+		newPlugins := reflect.New(reflect.TypeOf(e.slicePtr).Elem()).Elem()
+		// part 1
+		for _, name := range enabledSet.list {
+			if overridePlugins.has(name) {
+				newPlugins = reflect.Append(newPlugins, reflect.ValueOf(pluginsMap[name]))
+				enabledSet.delete(name)
+			}
+		}
+		// part 2
+		for _, name := range multiPointEnabled.list {
+			newPlugins = reflect.Append(newPlugins, reflect.ValueOf(pluginsMap[name]))
+		}
+		// part 3
+		for _, name := range enabledSet.list {
+			newPlugins = reflect.Append(newPlugins, reflect.ValueOf(pluginsMap[name]))
+		}
+		plugins.Set(newPlugins)
 	}
 	return nil
 }
@@ -695,10 +732,6 @@ func (f *frameworkImpl) RunFilterPlugins(
 			}
 			pluginStatus.SetFailedPlugin(pl.Name())
 			statuses[pl.Name()] = pluginStatus
-			if !f.runAllFilters {
-				// Exit early if we don't need to run all filters.
-				return statuses
-			}
 		}
 	}
 

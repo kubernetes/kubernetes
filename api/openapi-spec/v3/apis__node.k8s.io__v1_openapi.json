@@ -74,7 +74,7 @@
           },
           "overhead": {
             "$ref": "#/components/schemas/io.k8s.api.node.v1.Overhead",
-            "description": "Overhead represents the resource overhead associated with running a pod for a given RuntimeClass. For more details, see\n https://kubernetes.io/docs/concepts/scheduling-eviction/pod-overhead/\nThis field is in beta starting v1.18 and is only honored by servers that enable the PodOverhead feature."
+            "description": "Overhead represents the resource overhead associated with running a pod for a given RuntimeClass. For more details, see\n https://kubernetes.io/docs/concepts/scheduling-eviction/pod-overhead/"
           },
           "scheduling": {
             "$ref": "#/components/schemas/io.k8s.api.node.v1.Scheduling",
@@ -639,7 +639,7 @@
             "type": "object"
           },
           "clusterName": {
-            "description": "The name of the cluster which the object belongs to. This is used to distinguish resources with same name and namespace in different clusters. This field is not set anywhere right now and apiserver is going to ignore it if set in create or update request.",
+            "description": "Deprecated: ClusterName is a legacy field that was always cleared by the system and never used; it will be removed completely in 1.25.\n\nThe name in the go struct is changed to help clients detect accidental use.",
             "type": "string"
           },
           "creationTimestamp": {

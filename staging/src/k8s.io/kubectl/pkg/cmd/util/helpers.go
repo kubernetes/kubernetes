@@ -93,6 +93,8 @@ func DefaultBehaviorOnFatal() {
 // klog.Fatal is invoked for extended information. This is intended for maintainer
 // debugging and out of a reasonable range for users.
 func fatal(msg string, code int) {
+	// nolint:logcheck // Not using the result of klog.V(99) inside the if
+	// branch is okay, we just use it to determine how to terminate.
 	if klog.V(99).Enabled() {
 		klog.FatalDepth(2, msg)
 	}
@@ -466,6 +468,10 @@ func AddChunkSizeFlag(cmd *cobra.Command, value *int64) {
 
 func AddLabelSelectorFlagVar(cmd *cobra.Command, p *string) {
 	cmd.Flags().StringVarP(p, "selector", "l", *p, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2). Matching objects must satisfy all of the specified label constraints.")
+}
+
+func AddSubresourceFlags(cmd *cobra.Command, subresource *string, usage string, allowedSubresources ...string) {
+	cmd.Flags().StringVar(subresource, "subresource", "", fmt.Sprintf("%s Must be one of %v. This flag is alpha and may change in the future.", usage, allowedSubresources))
 }
 
 type ValidateOptions struct {

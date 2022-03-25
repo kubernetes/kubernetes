@@ -24,6 +24,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/klog/v2"
+	"k8s.io/kube-openapi/pkg/handler3"
 	"k8s.io/kube-openapi/pkg/spec3"
 )
 
@@ -43,15 +44,38 @@ func (s *Downloader) handlerWithUser(handler http.Handler, info user.Info) http.
 	})
 }
 
-// gvList is a struct for the response of the /openapi/v3 endpoint to unmarshal into
-type gvList struct {
-	Paths []string `json:"Paths"`
-}
-
 // SpecETag is a OpenAPI v3 spec and etag pair for the endpoint of each OpenAPI group/version
 type SpecETag struct {
 	spec *spec3.OpenAPI
 	etag string
+}
+
+// OpenAPIV3Root downloads the OpenAPI V3 root document from an APIService
+func (s *Downloader) OpenAPIV3Root(handler http.Handler) (*handler3.OpenAPIV3Discovery, error) {
+	handler = s.handlerWithUser(handler, &user.DefaultInfo{Name: aggregatorUser})
+	handler = http.TimeoutHandler(handler, specDownloadTimeout, "request timed out")
+
+	req, err := http.NewRequest("GET", "/openapi/v3", nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Add("Accept", "application/json")
+
+	writer := newInMemoryResponseWriter()
+	handler.ServeHTTP(writer, req)
+
+	switch writer.respCode {
+	case http.StatusNotFound:
+		// TODO: For APIServices, download the V2 spec and convert to V3
+		return nil, nil
+	case http.StatusOK:
+		groups := handler3.OpenAPIV3Discovery{}
+		if err := json.Unmarshal(writer.data, &groups); err != nil {
+			return nil, err
+		}
+		return &groups, nil
+	}
+	return nil, fmt.Errorf("Error, could not get list of group versions for APIService")
 }
 
 // Download downloads OpenAPI v3 for all groups of a given handler
@@ -75,14 +99,14 @@ func (s *Downloader) Download(handler http.Handler, etagList map[string]string) 
 		// Gracefully skip 404, assuming the server won't provide any spec
 		return nil, nil
 	case http.StatusOK:
-		groups := gvList{}
+		groups := handler3.OpenAPIV3Discovery{}
 		aggregated := make(map[string]*SpecETag)
 
 		if err := json.Unmarshal(writer.data, &groups); err != nil {
 			return nil, err
 		}
-		for _, path := range groups.Paths {
-			reqPath := fmt.Sprintf("/openapi/v3/%s", path)
+		for path, item := range groups.Paths {
+			reqPath := item.ServerRelativeURL
 			req, err := http.NewRequest("GET", reqPath, nil)
 			if err != nil {
 				return nil, err

@@ -24,18 +24,21 @@ import (
 	"fmt"
 	"mime"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
 	"github.com/NYTimes/gziphandler"
 	"github.com/emicklei/go-restful"
 	"github.com/golang/protobuf/proto"
-	openapi_v2 "github.com/googleapis/gnostic/openapiv2"
+	openapi_v2 "github.com/google/gnostic/openapiv2"
 	"github.com/munnerz/goautoneg"
 	"gopkg.in/yaml.v2"
 	klog "k8s.io/klog/v2"
 	"k8s.io/kube-openapi/pkg/builder"
 	"k8s.io/kube-openapi/pkg/common"
+	"k8s.io/kube-openapi/pkg/common/restfuladapter"
+	"k8s.io/kube-openapi/pkg/internal/handler"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
@@ -48,6 +51,13 @@ const (
 	mimePbGz = "application/x-gzip"
 )
 
+func computeETag(data []byte) string {
+	if data == nil {
+		return ""
+	}
+	return fmt.Sprintf("%X", sha512.Sum512(data))
+}
+
 // OpenAPIService is the service responsible for serving OpenAPI spec. It has
 // the ability to safely change the spec while serving it.
 type OpenAPIService struct {
@@ -56,53 +66,15 @@ type OpenAPIService struct {
 
 	lastModified time.Time
 
-	jsonCache  cache
-	protoCache cache
-}
-
-type cache struct {
-	BuildCache func() ([]byte, error)
-	once       sync.Once
-	bytes      []byte
-	etag       string
-	err        error
-}
-
-func (c *cache) Get() ([]byte, string, error) {
-	c.once.Do(func() {
-		bytes, err := c.BuildCache()
-		// if there is an error updating the cache, there can be situations where
-		// c.bytes contains a valid value (carried over from the previous update)
-		// but c.err is also not nil; the cache user is expected to check for this
-		c.err = err
-		if c.err == nil {
-			// don't override previous spec if we had an error
-			c.bytes = bytes
-			c.etag = computeETag(c.bytes)
-		}
-	})
-	return c.bytes, c.etag, c.err
-}
-
-func (c *cache) New(cacheBuilder func() ([]byte, error)) cache {
-	return cache{
-		bytes:      c.bytes,
-		etag:       c.etag,
-		BuildCache: cacheBuilder,
-	}
+	jsonCache  handler.HandlerCache
+	protoCache handler.HandlerCache
+	etagCache  handler.HandlerCache
 }
 
 func init() {
 	mime.AddExtensionType(".json", mimeJson)
 	mime.AddExtensionType(".pb-v1", mimePb)
 	mime.AddExtensionType(".gz", mimePbGz)
-}
-
-func computeETag(data []byte) string {
-	if data == nil {
-		return ""
-	}
-	return fmt.Sprintf("\"%X\"", sha512.Sum512(data))
 }
 
 // NewOpenAPIService builds an OpenAPIService starting with the given spec.
@@ -117,21 +89,29 @@ func NewOpenAPIService(spec *spec.Swagger) (*OpenAPIService, error) {
 func (o *OpenAPIService) getSwaggerBytes() ([]byte, string, time.Time, error) {
 	o.rwMutex.RLock()
 	defer o.rwMutex.RUnlock()
-	specBytes, etag, err := o.jsonCache.Get()
+	specBytes, err := o.jsonCache.Get()
 	if err != nil {
 		return nil, "", time.Time{}, err
 	}
-	return specBytes, etag, o.lastModified, nil
+	etagBytes, err := o.etagCache.Get()
+	if err != nil {
+		return nil, "", time.Time{}, err
+	}
+	return specBytes, string(etagBytes), o.lastModified, nil
 }
 
 func (o *OpenAPIService) getSwaggerPbBytes() ([]byte, string, time.Time, error) {
 	o.rwMutex.RLock()
 	defer o.rwMutex.RUnlock()
-	specPb, etag, err := o.protoCache.Get()
+	specPb, err := o.protoCache.Get()
 	if err != nil {
 		return nil, "", time.Time{}, err
 	}
-	return specPb, etag, o.lastModified, nil
+	etagBytes, err := o.etagCache.Get()
+	if err != nil {
+		return nil, "", time.Time{}, err
+	}
+	return specPb, string(etagBytes), o.lastModified, nil
 }
 
 func (o *OpenAPIService) UpdateSpec(openapiSpec *spec.Swagger) (err error) {
@@ -141,11 +121,18 @@ func (o *OpenAPIService) UpdateSpec(openapiSpec *spec.Swagger) (err error) {
 		return json.Marshal(openapiSpec)
 	})
 	o.protoCache = o.protoCache.New(func() ([]byte, error) {
-		json, _, err := o.jsonCache.Get()
+		json, err := o.jsonCache.Get()
 		if err != nil {
 			return nil, err
 		}
 		return ToProtoBinary(json)
+	})
+	o.etagCache = o.etagCache.New(func() ([]byte, error) {
+		json, err := o.jsonCache.Get()
+		if err != nil {
+			return nil, err
+		}
+		return []byte(computeETag(json)), nil
 	})
 	o.lastModified = time.Now()
 
@@ -259,7 +246,8 @@ func (o *OpenAPIService) RegisterOpenAPIVersionedService(servePath string, handl
 							return
 						}
 					}
-					w.Header().Set("Etag", etag)
+					// ETag must be enclosed in double quotes: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/ETag
+					w.Header().Set("Etag", strconv.Quote(etag))
 					// ServeContent will take care of caching using eTag.
 					http.ServeContent(w, r, servePath, lastModified, bytes.NewReader(data))
 					return
@@ -276,8 +264,16 @@ func (o *OpenAPIService) RegisterOpenAPIVersionedService(servePath string, handl
 
 // BuildAndRegisterOpenAPIVersionedService builds the spec and registers a handler to provide access to it.
 // Use this method if your OpenAPI spec is static. If you want to update the spec, use BuildOpenAPISpec then RegisterOpenAPIVersionedService.
+//
+// Deprecated: BuildAndRegisterOpenAPIVersionedServiceFromRoutes should be used instead.
 func BuildAndRegisterOpenAPIVersionedService(servePath string, webServices []*restful.WebService, config *common.Config, handler common.PathHandler) (*OpenAPIService, error) {
-	spec, err := builder.BuildOpenAPISpec(webServices, config)
+	return BuildAndRegisterOpenAPIVersionedServiceFromRoutes(servePath, restfuladapter.AdaptWebServices(webServices), config, handler)
+}
+
+// BuildAndRegisterOpenAPIVersionedServiceFromRoutes builds the spec and registers a handler to provide access to it.
+// Use this method if your OpenAPI spec is static. If you want to update the spec, use BuildOpenAPISpec then RegisterOpenAPIVersionedService.
+func BuildAndRegisterOpenAPIVersionedServiceFromRoutes(servePath string, routeContainers []common.RouteContainer, config *common.Config, handler common.PathHandler) (*OpenAPIService, error) {
+	spec, err := builder.BuildOpenAPISpecFromRoutes(routeContainers, config)
 	if err != nil {
 		return nil, err
 	}

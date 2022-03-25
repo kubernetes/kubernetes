@@ -228,9 +228,8 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 				}),
 				"VolumeStats": gstruct.MatchAllElements(summaryObjectID, gstruct.Elements{
 					"test-empty-dir": gstruct.MatchAllFields(gstruct.Fields{
-						"Name":              gomega.Equal("test-empty-dir"),
-						"PVCRef":            gomega.BeNil(),
-						"VolumeHealthStats": gomega.BeNil(),
+						"Name":   gomega.Equal("test-empty-dir"),
+						"PVCRef": gomega.BeNil(),
 						"FsStats": gstruct.MatchAllFields(gstruct.Fields{
 							"Time":           recent(maxStatsAge),
 							"AvailableBytes": fsCapacityBounds,
@@ -412,7 +411,7 @@ func recent(d time.Duration) types.GomegaMatcher {
 	}, gomega.And(
 		gomega.BeTemporally(">=", time.Now().Add(-d)),
 		// Now() is the test start time, not the match time, so permit a few extra minutes.
-		gomega.BeTemporally("<", time.Now().Add(2*time.Minute))))
+		gomega.BeTemporally("<", time.Now().Add(3*time.Minute))))
 }
 
 func recordSystemCgroupProcesses() {

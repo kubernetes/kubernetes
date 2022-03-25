@@ -1029,36 +1029,6 @@ EOF
     fi
   fi
 
-  if [[ -n "${WEBHOOK_GKE_EXEC_AUTH:-}" ]]; then
-    if [[ -z "${EXEC_AUTH_PLUGIN_URL:-}" ]]; then
-      1>&2 echo "You requested GKE exec auth support for webhooks, but EXEC_AUTH_PLUGIN_URL was not specified.  This configuration depends on gke-exec-auth-plugin for authenticating to the webhook endpoint."
-      exit 1
-    fi
-
-    if [[ -z "${TOKEN_URL:-}" || -z "${TOKEN_BODY:-}" || -z "${TOKEN_BODY_UNQUOTED:-}" ]]; then
-      1>&2 echo "You requested GKE exec auth support for webhooks, but TOKEN_URL, TOKEN_BODY, and TOKEN_BODY_UNQUOTED were not provided.  gke-exec-auth-plugin requires these values for its configuration."
-      exit 1
-    fi
-
-    # kubeconfig to be used by webhooks with GKE exec auth support.  Note that
-    # the path to gke-exec-auth-plugin is the path when mounted inside the
-    # kube-apiserver pod.
-    cat <<EOF >/etc/srv/kubernetes/webhook.kubeconfig
-apiVersion: v1
-kind: Config
-users:
-- name: '*.googleapis.com'
-  user:
-    exec:
-      apiVersion: "client.authentication.k8s.io/v1alpha1"
-      command: /usr/bin/gke-exec-auth-plugin
-      args:
-      - --mode=alt-token
-      - --alt-token-url=${TOKEN_URL}
-      - --alt-token-body=${TOKEN_BODY_UNQUOTED}
-EOF
-  fi
-
   if [[ -n "${ADMISSION_CONTROL:-}" ]]; then
     # Emit a basic admission control configuration file, with no plugins specified.
     cat <<EOF >/etc/srv/kubernetes/admission_controller_config.yaml
@@ -1089,8 +1059,7 @@ EOF
 
       1>&2 echo "ImagePolicyWebhook admission control plugin requested.  Configuring it to point at ${GCP_IMAGE_VERIFICATION_URL}"
 
-      # ImagePolicyWebhook does not use gke-exec-auth-plugin for authenticating
-      # to the webhook endpoint.  Emit its special kubeconfig.
+      # ImagePolicyWebhook needs special kubeconfig for authenticating to the webhook endpoint.
       cat <<EOF >/etc/srv/kubernetes/gcp_image_review.kubeconfig
 clusters:
   - name: gcp-image-review-server
@@ -1120,23 +1089,6 @@ EOF
       denyTTL: 30
       retryBackoff: 500
       defaultAllow: true
-EOF
-    fi
-
-    # If GKE exec auth for webhooks has been requested, then
-    # ValidatingAdmissionWebhook should use it.  Otherwise, run with the default
-    # config.
-    if [[ -n "${WEBHOOK_GKE_EXEC_AUTH:-}" ]]; then
-      1>&2 echo "ValidatingAdmissionWebhook requested, and WEBHOOK_GKE_EXEC_AUTH specified.  Configuring ValidatingAdmissionWebhook to use gke-exec-auth-plugin."
-
-      # Append config for ValidatingAdmissionWebhook to the shared admission
-      # controller configuration file.
-      cat <<EOF >>/etc/srv/kubernetes/admission_controller_config.yaml
-- name: ValidatingAdmissionWebhook
-  configuration:
-    apiVersion: apiserver.config.k8s.io/v1alpha1
-    kind: WebhookAdmission
-    kubeConfigFile: /etc/srv/kubernetes/webhook.kubeconfig
 EOF
     fi
   fi
@@ -3146,6 +3098,10 @@ oom_score = -999
   runtime_type = "io.containerd.runc.v2"
 [plugins."io.containerd.grpc.v1.cri".registry.mirrors."docker.io"]
   endpoint = ["https://mirror.gcr.io","https://registry-1.docker.io"]
+# Enable registry.k8s.io as the primary mirror for k8s.gcr.io
+# See: https://github.com/kubernetes/k8s.io/issues/3411
+[plugins."io.containerd.grpc.v1.cri".registry.mirrors."k8s.gcr.io"]
+  endpoint = ["https://registry.k8s.io", "https://k8s.gcr.io",]
 EOF
 
   if [[ "${CONTAINER_RUNTIME_TEST_HANDLER:-}" == "true" ]]; then

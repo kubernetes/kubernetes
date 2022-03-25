@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -35,6 +36,7 @@ import (
 	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/kubectl/pkg/util/term"
+	"k8s.io/utils/pointer"
 )
 
 // TokenOptions is the data required to perform a token request operation.
@@ -57,8 +59,8 @@ type TokenOptions struct {
 	// Audiences indicate the valid audiences for the requested token. If unset, defaults to the Kubernetes API server audiences.
 	Audiences []string
 
-	// ExpirationSeconds is the requested token lifetime. Optional.
-	ExpirationSeconds int64
+	// Duration is the requested token lifetime. Optional.
+	Duration time.Duration
 
 	// CoreClient is the API client used to request the token. Required.
 	CoreClient corev1client.CoreV1Interface
@@ -78,7 +80,7 @@ var (
 		kubectl create token myapp --namespace myns
 
 		# Request a token with a custom expiration
-		kubectl create token myapp --expiration-seconds 600
+		kubectl create token myapp --duration 10m
 
 		# Request a token with a custom audience
 		kubectl create token myapp --audience https://example.com
@@ -134,7 +136,7 @@ func NewCmdCreateToken(f cmdutil.Factory, ioStreams genericclioptions.IOStreams)
 
 	cmd.Flags().StringArrayVar(&o.Audiences, "audience", o.Audiences, "Audience of the requested token. If unset, defaults to requesting a token for use with the Kubernetes API server. May be repeated to request a token valid for multiple audiences.")
 
-	cmd.Flags().Int64Var(&o.ExpirationSeconds, "expiration-seconds", o.ExpirationSeconds, "Requested lifetime of the issued token. The server may return a token with a longer or shorter lifetime.")
+	cmd.Flags().DurationVar(&o.Duration, "duration", o.Duration, "Requested lifetime of the issued token. The server may return a token with a longer or shorter lifetime.")
 
 	cmd.Flags().StringVar(&o.BoundObjectKind, "bound-object-kind", o.BoundObjectKind, "Kind of an object to bind the token to. "+
 		"Supported kinds are "+strings.Join(sets.StringKeySet(boundObjectKindToAPIVersion).List(), ", ")+". "+
@@ -192,8 +194,11 @@ func (o *TokenOptions) Validate() error {
 	if len(o.Namespace) == 0 {
 		return fmt.Errorf("--namespace is required")
 	}
-	if o.ExpirationSeconds < 0 {
-		return fmt.Errorf("--expiration-seconds must be positive")
+	if o.Duration < 0 {
+		return fmt.Errorf("--duration must be positive")
+	}
+	if o.Duration%time.Second != 0 {
+		return fmt.Errorf("--duration cannot be expressed in units less than seconds")
 	}
 	for _, aud := range o.Audiences {
 		if len(aud) == 0 {
@@ -227,8 +232,8 @@ func (o *TokenOptions) Run() error {
 			Audiences: o.Audiences,
 		},
 	}
-	if o.ExpirationSeconds > 0 {
-		request.Spec.ExpirationSeconds = &o.ExpirationSeconds
+	if o.Duration > 0 {
+		request.Spec.ExpirationSeconds = pointer.Int64(int64(o.Duration / time.Second))
 	}
 	if len(o.BoundObjectKind) > 0 {
 		request.Spec.BoundObjectRef = &authenticationv1.BoundObjectReference{

@@ -142,16 +142,16 @@ func newServiceInfo(port *v1.ServicePort, service *v1.Service, baseInfo *proxy.B
 // internal struct for endpoints information
 type endpointsInfo struct {
 	*proxy.BaseEndpointInfo
-	// The following fields we lazily compute and store here for performance
-	// reasons. If the protocol is the same as you expect it to be, then the
-	// chainName can be reused, otherwise it should be recomputed.
-	protocol  string
-	chainName utiliptables.Chain
+
+	ChainName utiliptables.Chain
 }
 
 // returns a new proxy.Endpoint which abstracts a endpointsInfo
-func newEndpointInfo(baseInfo *proxy.BaseEndpointInfo) proxy.Endpoint {
-	return &endpointsInfo{BaseEndpointInfo: baseInfo}
+func newEndpointInfo(baseInfo *proxy.BaseEndpointInfo, svcPortName *proxy.ServicePortName) proxy.Endpoint {
+	return &endpointsInfo{
+		BaseEndpointInfo: baseInfo,
+		ChainName:        servicePortEndpointChainName(svcPortName.String(), strings.ToLower(string(svcPortName.Protocol)), baseInfo.Endpoint),
+	}
 }
 
 // Equal overrides the Equal() function implemented by proxy.BaseEndpointInfo.
@@ -163,18 +163,8 @@ func (e *endpointsInfo) Equal(other proxy.Endpoint) bool {
 	}
 	return e.Endpoint == o.Endpoint &&
 		e.IsLocal == o.IsLocal &&
-		e.protocol == o.protocol &&
-		e.chainName == o.chainName &&
+		e.ChainName == o.ChainName &&
 		e.Ready == o.Ready
-}
-
-// Returns the endpoint chain name for a given endpointsInfo.
-func (e *endpointsInfo) endpointChain(svcNameString, protocol string) utiliptables.Chain {
-	if e.protocol != protocol {
-		e.protocol = protocol
-		e.chainName = servicePortEndpointChainName(svcNameString, protocol, e.Endpoint)
-	}
-	return e.chainName
 }
 
 // Proxier is an iptables based proxy for connections between a localhost:lport
@@ -1026,7 +1016,7 @@ func (proxier *Proxier) syncProxyRules() {
 				continue
 			}
 
-			endpointChain := epInfo.endpointChain(svcNameString, protocol)
+			endpointChain := epInfo.ChainName
 			endpointInUse := false
 
 			if epInfo.Ready {
@@ -1117,7 +1107,9 @@ func (proxier *Proxier) syncProxyRules() {
 				// If/when we support "Local" policy for VIPs, we should update this.
 				proxier.natRules.Write(
 					"-A", string(svcChain),
-					proxier.localDetector.JumpIfNotLocal(args, string(KubeMarkMasqChain)))
+					args,
+					proxier.localDetector.IfNotLocal(),
+					"-j", string(KubeMarkMasqChain))
 			}
 			proxier.natRules.Write(
 				"-A", string(kubeServicesChain),
@@ -1157,7 +1149,9 @@ func (proxier *Proxier) syncProxyRules() {
 					if proxier.localDetector.IsImplemented() {
 						proxier.natRules.Write(
 							appendTo,
-							proxier.localDetector.JumpIfNotLocal(args, string(KubeMarkMasqChain)))
+							args,
+							proxier.localDetector.IfNotLocal(),
+							"-j", string(KubeMarkMasqChain))
 					} else {
 						proxier.natRules.Write(
 							appendTo,
@@ -1348,12 +1342,12 @@ func (proxier *Proxier) syncProxyRules() {
 		// Service's ClusterIP instead. This happens whether or not we have local
 		// endpoints; only if localDetector is implemented
 		if proxier.localDetector.IsImplemented() {
-			args = append(args[:0],
+			proxier.natRules.Write(
 				"-A", string(svcXlbChain),
 				"-m", "comment", "--comment",
 				`"Redirect pods trying to reach external loadbalancer VIP to clusterIP"`,
-			)
-			proxier.natRules.Write(proxier.localDetector.JumpIfLocal(args, string(svcChain)))
+				proxier.localDetector.IfLocal(),
+				"-j", string(svcChain))
 		}
 
 		// Next, redirect all src-type=LOCAL -> LB IP to the service chain for externalTrafficPolicy=Local

@@ -42,5 +42,7 @@ showHiddenMetricsForVersion: ""
 udpIdleTimeout: 250ms
 winkernel:
   enableDSR: false
+  forwardHealthCheckVip: false
   networkName: ""
+  rootHnsEndpointName: ""
   sourceVip: ""
