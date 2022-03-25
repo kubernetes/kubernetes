@@ -93,21 +93,9 @@ type DeviceRunContainerOptions struct {
 	Annotations []kubecontainer.Annotation
 }
 
-// TODO: evaluate whether we need these error definitions.
+// TODO: evaluate whether we need this error definition.
 const (
-	// errFailedToDialDevicePlugin is the error raised when the device plugin could not be
-	// reached on the registered socket
-	errFailedToDialDevicePlugin = "failed to dial device plugin:"
-	// errUnsupportedVersion is the error raised when the device plugin uses an API version not
-	// supported by the Kubelet registry
-	errUnsupportedVersion = "requested API version %q is not supported by kubelet. Supported version is %q"
-	// errInvalidResourceName is the error raised when a device plugin is registering
-	// itself with an invalid ResourceName
-	errInvalidResourceName = "the ResourceName %q is invalid"
-	// errEndpointStopped indicates that the endpoint has been stopped
 	errEndpointStopped = "endpoint %v has been stopped"
-	// errBadSocket is the error raised when the registry socket path is not absolute
-	errBadSocket = "bad socketPath, must be an absolute path:"
 )
 
 // endpointStopGracePeriod indicates the grace period after an endpoint is stopped
