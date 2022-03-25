@@ -44,23 +44,22 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
-	"path"
 	"regexp"
 	"strings"
 	"time"
 
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-
-	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 const (
@@ -77,7 +76,6 @@ const (
 	gmsaCustomResourceName = "gmsa-e2e"
 
 	// gmsaWebhookDeployScriptURL is the URL of the deploy script for the GMSA webook
-	// TODO(wk8): we should pin versions.
 	gmsaWebhookDeployScriptURL = "https://raw.githubusercontent.com/kubernetes-sigs/windows-gmsa/master/admission-webhook/deploy/deploy-gmsa-webhook.sh"
 
 	// output from the nltest /query command should have this in it
@@ -107,15 +105,8 @@ var _ = SIGDescribe("[Feature:Windows] GMSA Full [Serial] [Slow]", func() {
 			ginkgo.By("retrieving the contents of the GMSACredentialSpec custom resource manifest from the node")
 			crdManifestContents := retrieveCRDManifestFileContents(f, node)
 
-			ginkgo.By("downloading the GMSA webhook deploy script")
-			deployScriptPath, err := downloadFile(gmsaWebhookDeployScriptURL)
-			defer func() { os.Remove(deployScriptPath) }()
-			if err != nil {
-				framework.Failf(err.Error())
-			}
-
 			ginkgo.By("deploying the GMSA webhook")
-			webhookCleanUp, err := deployGmsaWebhook(f, deployScriptPath)
+			webhookCleanUp, err := deployGmsaWebhook(f)
 			defer webhookCleanUp()
 			if err != nil {
 				framework.Failf(err.Error())
@@ -184,15 +175,8 @@ var _ = SIGDescribe("[Feature:Windows] GMSA Full [Serial] [Slow]", func() {
 			ginkgo.By("retrieving the contents of the GMSACredentialSpec custom resource manifest from the node")
 			crdManifestContents := retrieveCRDManifestFileContents(f, node)
 
-			ginkgo.By("downloading the GMSA webhook deploy script")
-			deployScriptPath, err := downloadFile(gmsaWebhookDeployScriptURL)
-			defer func() { os.Remove(deployScriptPath) }()
-			if err != nil {
-				framework.Failf(err.Error())
-			}
-
 			ginkgo.By("deploying the GMSA webhook")
-			webhookCleanUp, err := deployGmsaWebhook(f, deployScriptPath)
+			webhookCleanUp, err := deployGmsaWebhook(f)
 			defer webhookCleanUp()
 			if err != nil {
 				framework.Failf(err.Error())
@@ -236,6 +220,7 @@ var _ = SIGDescribe("[Feature:Windows] GMSA Full [Serial] [Slow]", func() {
 				}
 				return strings.Contains(output, "This is a test file.")
 			}, 1*time.Minute, 1*time.Second).Should(gomega.BeTrue())
+
 		})
 	})
 })
@@ -315,40 +300,81 @@ func retrieveCRDManifestFileContents(f *framework.Framework, node v1.Node) strin
 // deployGmsaWebhook deploys the GMSA webhook, and returns a cleanup function
 // to be called when done with testing, that removes the temp files it's created
 // on disks as well as the API resources it's created.
-func deployGmsaWebhook(f *framework.Framework, deployScriptPath string) (func(), error) {
-	cleanUpFunc := func() {}
-
-	tempDir, err := os.MkdirTemp("", "")
-	if err != nil {
-		return cleanUpFunc, fmt.Errorf("unable to create temp dir: %w", err)
-	}
-
-	manifestsFile := path.Join(tempDir, "manifests.yml")
-	name := "gmsa-webhook"
-	namespace := f.Namespace.Name + "-webhook"
-	certsDir := path.Join(tempDir, "certs")
+func deployGmsaWebhook(f *framework.Framework) (func(), error) {
+	deployerName := "webhook-deployer"
+	deployerNamespace := f.Namespace.Name
+	webHookName := "gmsa-webhook"
+	webHookNamespace := deployerNamespace + "-webhook"
 
 	// regardless of whether the deployment succeeded, let's do a best effort at cleanup
-	cleanUpFunc = func() {
-		framework.RunKubectl(f.Namespace.Name, "delete", "--filename", manifestsFile)
-		framework.RunKubectl(f.Namespace.Name, "delete", "CustomResourceDefinition", "gmsacredentialspecs.windows.k8s.io")
-		framework.RunKubectl(f.Namespace.Name, "delete", "CertificateSigningRequest", fmt.Sprintf("%s.%s", name, namespace))
-		os.RemoveAll(tempDir)
+	cleanUpFunc := func() {
+		framework.Logf("Best effort clean up of the webhook:\n")
+		stdout, err := framework.RunKubectl("", "delete", "CustomResourceDefinition", "gmsacredentialspecs.windows.k8s.io")
+		framework.Logf("stdout:%s\nerror:%s", stdout, err)
+
+		stdout, err = framework.RunKubectl("", "delete", "CertificateSigningRequest", fmt.Sprintf("%s.%s", webHookName, webHookNamespace))
+		framework.Logf("stdout:%s\nerror:%s", stdout, err)
+
+		stdout, err = runKubectlExecInNamespace(deployerNamespace, deployerName, "--", "kubectl", "delete", "-f", "/manifests.yml")
+		framework.Logf("stdout:%s\nerror:%s", stdout, err)
 	}
 
-	cmd := exec.Command("bash", deployScriptPath,
-		"--file", manifestsFile,
-		"--name", name,
-		"--namespace", namespace,
-		"--certs-dir", certsDir,
-		"--tolerate-master")
+	// ensure the deployer has ability to approve certificatesigningrequests to install the webhook
+	s := createServiceAccount(f)
+	bindClusterRBACRoleToServiceAccount(f, s, "cluster-admin")
 
-	output, err := cmd.CombinedOutput()
+	installSteps := []string{
+		"echo \"@testing http://dl-cdn.alpinelinux.org/alpine/edge/testing/\" >> /etc/apk/repositories",
+		"&& apk add kubectl@testing gettext openssl",
+		"&& apk add --update coreutils",
+		fmt.Sprintf("&& curl %s > gmsa.sh", gmsaWebhookDeployScriptURL),
+		"&& chmod +x gmsa.sh",
+		fmt.Sprintf("&& ./gmsa.sh --file %s --name %s --namespace %s --certs-dir %s --tolerate-master", "/manifests.yml", webHookName, webHookNamespace, "certs"),
+		"&& /agnhost pause",
+	}
+	installCommand := strings.Join(installSteps, " ")
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      deployerName,
+			Namespace: deployerNamespace,
+		},
+		Spec: v1.PodSpec{
+			ServiceAccountName: s,
+			NodeSelector: map[string]string{
+				"kubernetes.io/os": "linux",
+			},
+			Containers: []v1.Container{
+				{
+					Name:    deployerName,
+					Image:   imageutils.GetE2EImage(imageutils.Agnhost),
+					Command: []string{"bash", "-c"},
+					Args:    []string{installCommand},
+				},
+			},
+			Tolerations: []v1.Toleration{
+				{
+					Operator: v1.TolerationOpExists,
+					Effect:   v1.TaintEffectNoSchedule,
+				},
+			},
+		},
+	}
+	f.PodClient().CreateSync(pod)
+
+	// Wait for the Webhook deployment to become ready. The deployer pod takes a few seconds to initialize and create resources
+	err := waitForDeployment(func() (*appsv1.Deployment, error) {
+		return f.ClientSet.AppsV1().Deployments(webHookNamespace).Get(context.TODO(), webHookName, metav1.GetOptions{})
+	}, 10*time.Second, f.Timeouts.PodStart)
 	if err == nil {
-		framework.Logf("GMSA webhook successfully deployed, output:\n%s", string(output))
+		framework.Logf("GMSA webhook successfully deployed")
 	} else {
-		err = fmt.Errorf("unable to deploy GMSA webhook, output:\n%s: %w", string(output), err)
+		err = fmt.Errorf("GMSA webhook did not become ready: %w", err)
 	}
+
+	// Dump deployer logs
+	logs, _ := e2epod.GetPodLogs(f.ClientSet, deployerNamespace, deployerName, deployerName)
+	framework.Logf("GMSA deployment logs:\n%s", logs)
 
 	return cleanUpFunc, err
 }
@@ -419,7 +445,7 @@ func createRBACRoleForGmsa(f *framework.Framework) (string, func(), error) {
 
 // createServiceAccount creates a service account, and returns its name.
 func createServiceAccount(f *framework.Framework) string {
-	accountName := f.Namespace.Name + "-sa"
+	accountName := f.Namespace.Name + "-sa-" + string(uuid.NewUUID())
 	account := &v1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      accountName,
@@ -453,6 +479,28 @@ func bindRBACRoleToServiceAccount(f *framework.Framework, serviceAccountName, rb
 		},
 	}
 	f.ClientSet.RbacV1().RoleBindings(f.Namespace.Name).Create(context.TODO(), binding, metav1.CreateOptions{})
+}
+
+func bindClusterRBACRoleToServiceAccount(f *framework.Framework, serviceAccountName, rbacRoleName string) {
+	binding := &rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      f.Namespace.Name + "-rbac-binding",
+			Namespace: f.Namespace.Name,
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:      "ServiceAccount",
+				Name:      serviceAccountName,
+				Namespace: f.Namespace.Name,
+			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "ClusterRole",
+			Name:     rbacRoleName,
+		},
+	}
+	f.ClientSet.RbacV1().ClusterRoleBindings().Create(context.TODO(), binding, metav1.CreateOptions{})
 }
 
 // createPodWithGmsa creates a pod using the test GMSA cred spec, and returns its name.
