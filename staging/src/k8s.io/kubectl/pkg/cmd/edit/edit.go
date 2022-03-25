@@ -53,11 +53,11 @@ var (
 		saved copy to include the latest resource version.`))
 
 	editExample = templates.Examples(i18n.T(`
-		# Edit the service named 'docker-registry'
-		kubectl edit svc/docker-registry
+		# Edit the service named 'registry'
+		kubectl edit svc/registry
 
 		# Use an alternative editor
-		KUBE_EDITOR="nano" kubectl edit svc/docker-registry
+		KUBE_EDITOR="nano" kubectl edit svc/registry
 
 		# Edit the job 'myjob' in JSON using the v1 API format
 		kubectl edit job.v1.batch/myjob -o json
