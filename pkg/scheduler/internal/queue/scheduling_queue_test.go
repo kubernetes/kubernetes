@@ -439,7 +439,7 @@ func TestPriorityQueue_Activate(t *testing.T) {
 			name:               "pod already in activeQ",
 			qPodInfoInActiveQ:  []*framework.QueuedPodInfo{{PodInfo: highPriNominatedPodInfo}},
 			qPodInfoToActivate: &framework.QueuedPodInfo{PodInfo: highPriNominatedPodInfo},
-			want:               []*framework.QueuedPodInfo{{PodInfo: highPriNominatedPodInfo}}, // 1 already actived
+			want:               []*framework.QueuedPodInfo{{PodInfo: highPriNominatedPodInfo}}, // 1 already active
 		},
 		{
 			name:               "pod not in unschedulablePods/podBackoffQ",
@@ -2206,7 +2206,7 @@ func TestMoveAllToActiveOrBackoffQueue_PreEnqueueChecks(t *testing.T) {
 				}
 				queuedPodInfo, ok := obj.(*framework.QueuedPodInfo)
 				if !ok {
-					t.Fatalf("Fail to covert popped obj (type %T) to *framework.QueuedPodInfo", obj)
+					t.Fatalf("Fail to convert popped obj (type %T) to *framework.QueuedPodInfo", obj)
 				}
 				got = append(got, queuedPodInfo.Pod.Name)
 			}

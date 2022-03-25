@@ -1286,7 +1286,7 @@ func TestFilterPlugins(t *testing.T) {
 				"TestPlugin": framework.NewStatus(framework.UnschedulableAndUnresolvable, "injected filter status").WithFailedPlugin("TestPlugin"),
 			},
 		},
-		// followings tests cover multiple-plugins scenarios
+		// following tests cover multiple-plugins scenarios
 		{
 			name: "ErrorAndErrorFilters",
 			plugins: []*TestPlugin{
