@@ -160,6 +160,8 @@ type OperationGenerator interface {
 	GenerateExpandAndRecoverVolumeFunc(*v1.PersistentVolumeClaim, *v1.PersistentVolume, string) (volumetypes.GeneratedOperations, error)
 
 	// Generates the volume file system resize function, which can resize volume's file system to expected size without unmounting the volume.
+	// Along with volumeToMount and actualStateOfWorld, the function expects current size of volume on the node as an argument. The current
+	// size here always refers to capacity last recorded in actualStateOfWorld from pvc.Status.Capacity
 	GenerateExpandInUseVolumeFunc(volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater, currentSize resource.Quantity) (volumetypes.GeneratedOperations, error)
 }
 
