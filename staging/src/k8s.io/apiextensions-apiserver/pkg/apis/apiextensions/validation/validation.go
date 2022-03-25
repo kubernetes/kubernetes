@@ -787,8 +787,7 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 		for property, jsonSchema := range schema.Properties {
 			subSsv := ssv
 
-			// defensively assumes that a future map type is uncorrelatable
-			if schema.XMapType != nil && (*schema.XMapType != "granular" && *schema.XMapType != "atomic") {
+			if !cel.MapIsCorrelatable(schema.XMapType) {
 				subSsv = subSsv.withForbidOldSelfValidations(fldPath)
 			}
 
@@ -968,10 +967,6 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 					if cr.TransitionRule {
 						if uncorrelatablePath := ssv.forbidOldSelfValidations(); uncorrelatablePath != nil {
 							allErrs = append(allErrs, field.Invalid(fldPath.Child("x-kubernetes-validations").Index(i).Child("rule"), schema.XValidations[i].Rule, fmt.Sprintf("oldSelf cannot be used on the uncorrelatable portion of the schema within %v", uncorrelatablePath)))
-						} else {
-							// todo: remove when transition rule validation is implemented
-							allErrs = append(allErrs, field.Invalid(fldPath.Child("x-kubernetes-validations").Index(i).Child("rule"), schema.XValidations[i].Rule, "validation of rules containing oldSelf is not yet implemented"))
-
 						}
 					}
 				}
