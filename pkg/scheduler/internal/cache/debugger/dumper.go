@@ -44,10 +44,12 @@ func (d *CacheDumper) DumpAll() {
 // dumpNodes writes NodeInfo to the scheduler logs.
 func (d *CacheDumper) dumpNodes() {
 	dump := d.cache.Dump()
-	klog.InfoS("Dump of cached NodeInfo")
+	nodeInfos := make([]string, 0, len(dump.Nodes))
 	for name, nodeInfo := range dump.Nodes {
-		klog.Info(d.printNodeInfo(name, nodeInfo))
+		nodeInfos = append(nodeInfos, d.printNodeInfo(name, nodeInfo))
 	}
+	// Extra blank line added between node entries for readability.
+	klog.InfoS("Dump of cached NodeInfo", "nodes", strings.Join(nodeInfos, "\n\n"))
 }
 
 // dumpSchedulingQueue writes pods in the scheduling queue to the scheduler logs.
@@ -57,13 +59,13 @@ func (d *CacheDumper) dumpSchedulingQueue() {
 	for _, p := range pendingPods {
 		podData.WriteString(printPod(p))
 	}
-	klog.Infof("Dump of scheduling queue:\n%s", podData.String())
+	klog.InfoS("Dump of scheduling queue", "pods", podData.String())
 }
 
 // printNodeInfo writes parts of NodeInfo to a string.
 func (d *CacheDumper) printNodeInfo(name string, n *framework.NodeInfo) string {
 	var nodeData strings.Builder
-	nodeData.WriteString(fmt.Sprintf("\nNode name: %s\nDeleted: %t\nRequested Resources: %+v\nAllocatable Resources:%+v\nScheduled Pods(number: %v):\n",
+	nodeData.WriteString(fmt.Sprintf("Node name: %s\nDeleted: %t\nRequested Resources: %+v\nAllocatable Resources:%+v\nScheduled Pods(number: %v):\n",
 		name, n.Node() == nil, n.Requested, n.Allocatable, len(n.Pods)))
 	// Dumping Pod Info
 	for _, p := range n.Pods {

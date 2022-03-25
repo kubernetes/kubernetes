@@ -399,7 +399,7 @@ func (i *scaleUpdatedObjectInfo) UpdatedObject(ctx context.Context, oldObj runti
 		if _, ok := replicasPathInDeployment[requestGroupVersion.String()]; ok {
 			groupVersion = requestGroupVersion
 		} else {
-			klog.Fatal("Unrecognized group/version in request info %q", requestGroupVersion.String())
+			klog.Fatalf("Unrecognized group/version in request info %q", requestGroupVersion.String())
 		}
 	}
 
