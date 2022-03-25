@@ -631,9 +631,19 @@ func (r *Request) Watch(ctx context.Context) (watch.Interface, error) {
 		}
 
 		done, transformErr := func() (bool, error) {
-			defer readAndCloseResponseBody(resp)
+			// make sure we always drain and close
+			closer := &responseCloser{resp: resp}
+			defer closer.DrainAndClose()
 
-			if r.retry.IsNextRetry(ctx, r, req, resp, err, isErrRetryableFunc) {
+			// get the result out of the response if provided *before* IsNextRetry,
+			// since that has to drain/close the response before resetting the request body
+			var result Result
+			if resp != nil {
+				result = r.transformResponse(resp, req)
+			}
+
+			// see if we should retry
+			if r.retry.IsNextRetry(ctx, r, req, resp, closer, err, isErrRetryableFunc) {
 				return false, nil
 			}
 
@@ -641,7 +651,7 @@ func (r *Request) Watch(ctx context.Context) (watch.Interface, error) {
 				// the server must have sent us an error in 'err'
 				return true, nil
 			}
-			if result := r.transformResponse(resp, req); result.err != nil {
+			if result.err != nil {
 				return true, result.err
 			}
 			return true, fmt.Errorf("for request %s, got status: %v", url, resp.StatusCode)
@@ -749,12 +759,21 @@ func (r *Request) Stream(ctx context.Context) (io.ReadCloser, error) {
 
 		default:
 			done, transformErr := func() (bool, error) {
-				defer resp.Body.Close()
+				// make sure we always drain and close
+				closer := &responseCloser{resp: resp}
+				defer closer.DrainAndClose()
 
-				if r.retry.IsNextRetry(ctx, r, req, resp, err, neverRetryError) {
+				// get the result out of the response if provided *before* IsNextRetry,
+				// since that has to drain/close the response before resetting the request body
+				var result Result
+				if resp != nil {
+					result = r.transformResponse(resp, req)
+				}
+
+				// see if we should retry
+				if r.retry.IsNextRetry(ctx, r, req, resp, closer, err, neverRetryError) {
 					return false, nil
 				}
-				result := r.transformResponse(resp, req)
 				if err := result.Error(); err != nil {
 					return true, err
 				}
@@ -877,8 +896,11 @@ func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Resp
 		r.retry.After(ctx, r, resp, err)
 
 		done := func() bool {
-			defer readAndCloseResponseBody(resp)
+			// make sure we always drain and close
+			closer := &responseCloser{resp: resp}
+			defer closer.DrainAndClose()
 
+			// TODO: we have to do this *before* IsNextRetry or the response body could be drained/closed when we return ...
 			// if the the server returns an error in err, the response will be nil.
 			f := func(req *http.Request, resp *http.Response) {
 				if resp == nil {
@@ -887,7 +909,7 @@ func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Resp
 				fn(req, resp)
 			}
 
-			if r.retry.IsNextRetry(ctx, r, req, resp, err, isErrRetryableFunc) {
+			if r.retry.IsNextRetry(ctx, r, req, resp, closer, err, isErrRetryableFunc) {
 				return false
 			}
 

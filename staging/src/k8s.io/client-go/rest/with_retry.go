@@ -22,6 +22,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"sync"
 	"time"
 
 	"k8s.io/klog/v2"
@@ -74,7 +75,7 @@ type WithRetry interface {
 	// err: the server sent this error to us, if err is set then resp is nil.
 	// f: a IsRetryableErrorFunc function provided by the client that determines
 	//    if the err sent by the server is retryable.
-	IsNextRetry(ctx context.Context, restReq *Request, httpReq *http.Request, resp *http.Response, err error, f IsRetryableErrorFunc) bool
+	IsNextRetry(ctx context.Context, restReq *Request, httpReq *http.Request, resp *http.Response, closer *responseCloser, err error, f IsRetryableErrorFunc) bool
 
 	// Before should be invoked prior to each attempt, including
 	// the first one. if an error is returned, the request
@@ -120,7 +121,7 @@ func (r *withRetry) SetMaxRetries(maxRetries int) {
 	r.maxRetries = maxRetries
 }
 
-func (r *withRetry) IsNextRetry(ctx context.Context, restReq *Request, httpReq *http.Request, resp *http.Response, err error, f IsRetryableErrorFunc) bool {
+func (r *withRetry) IsNextRetry(ctx context.Context, restReq *Request, httpReq *http.Request, resp *http.Response, closer *responseCloser, err error, f IsRetryableErrorFunc) bool {
 	if httpReq == nil || (resp == nil && err == nil) {
 		// bad input, we do nothing.
 		return false
@@ -157,7 +158,7 @@ func (r *withRetry) IsNextRetry(ctx context.Context, restReq *Request, httpReq *
 	r.retryAfter.Wait = time.Duration(seconds) * time.Second
 	r.retryAfter.Reason = getRetryReason(r.attempts, seconds, resp, err)
 
-	if err := r.prepareForNextRetry(ctx, restReq); err != nil {
+	if err := r.prepareForNextRetry(ctx, restReq, closer); err != nil {
 		klog.V(4).Infof("Could not retry request - %v", err)
 		return false
 	}
@@ -172,14 +173,17 @@ func (r *withRetry) IsNextRetry(ctx context.Context, restReq *Request, httpReq *
 // - we need to seek to the beginning of the request body before we
 //   initiate the next retry, the function should return an error if
 //   it fails to do so.
-func (r *withRetry) prepareForNextRetry(ctx context.Context, request *Request) error {
+func (r *withRetry) prepareForNextRetry(ctx context.Context, request *Request, closer *responseCloser) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
 
-	// Ensure the response body is fully read and closed before
-	// we reconnect, so that we reuse the same TCP connection.
 	if seeker, ok := request.body.(io.Seeker); ok && request.body != nil {
+		// Ensure the response body is fully read and closed before
+		// we reconnect, so that we reuse the same TCP connection.
+		if err := closer.DrainAndClose(); err != nil {
+			return fmt.Errorf("can't read and close response to retry %T", request)
+		}
 		if _, err := seeker.Seek(0, 0); err != nil {
 			return fmt.Errorf("can't Seek() back to beginning of body for %T", request)
 		}
@@ -278,20 +282,31 @@ func getRetryReason(retries, seconds int, resp *http.Response, err error) string
 	}
 }
 
-func readAndCloseResponseBody(resp *http.Response) {
-	if resp == nil {
-		return
-	}
+type responseCloser struct {
+	once sync.Once
+	resp *http.Response
+	err  error
+}
 
-	// Ensure the response body is fully read and closed
-	// before we reconnect, so that we reuse the same TCP
-	// connection.
-	const maxBodySlurpSize = 2 << 10
-	defer resp.Body.Close()
+func (d *responseCloser) DrainAndClose() (err error) {
+	d.once.Do(func() {
+		if d.resp == nil || d.resp.Body == nil {
+			return
+		}
 
-	if resp.ContentLength <= maxBodySlurpSize {
-		io.Copy(ioutil.Discard, &io.LimitedReader{R: resp.Body, N: maxBodySlurpSize})
-	}
+		// Ensure the response body is fully read and closed
+		// before we reconnect, so that we reuse the same TCP
+		// connection.
+		const maxBodySlurpSize = 2 << 10
+		defer func() {
+			d.err = d.resp.Body.Close()
+		}()
+
+		if d.resp.ContentLength <= maxBodySlurpSize {
+			io.Copy(ioutil.Discard, &io.LimitedReader{R: d.resp.Body, N: maxBodySlurpSize})
+		}
+	})
+	return d.err
 }
 
 func retryAfterResponse() *http.Response {

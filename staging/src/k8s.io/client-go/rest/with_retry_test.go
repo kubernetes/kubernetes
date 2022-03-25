@@ -215,11 +215,12 @@ func TestIsNextRetry(t *testing.T) {
 				},
 			}
 			r := &withRetry{maxRetries: test.maxRetries}
+			closer := &responseCloser{resp: test.response}
 
 			retryGot := make([]bool, 0)
 			retryAfterGot := make([]*RetryAfter, 0)
 			for i := 0; i < test.attempts; i++ {
-				retry := r.IsNextRetry(context.TODO(), restReq, test.request, test.response, test.err, test.retryableErrFunc)
+				retry := r.IsNextRetry(context.TODO(), restReq, test.request, test.response, closer, test.err, test.retryableErrFunc)
 				retryGot = append(retryGot, retry)
 				retryAfterGot = append(retryAfterGot, r.retryAfter)
 			}
