@@ -133,14 +133,12 @@ var (
 		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component"},
 	)
 	// droppedRequests is a number of requests dropped with 'Try again later' response"
-	//
-	// TODO(wojtek-t): This metric can be inferred both from requestTerminationsTotal as well as
-	// from requestCounter. We should deprecate and remove it.
 	droppedRequests = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
-			Name:           "apiserver_dropped_requests_total",
-			Help:           "Number of requests dropped with 'Try again later' response",
-			StabilityLevel: compbasemetrics.ALPHA,
+			Name:              "apiserver_dropped_requests_total",
+			Help:              "Number of requests dropped with 'Try again later' response. Use apiserver_request_total and/or apiserver_request_terminations_total metrics instead.",
+			StabilityLevel:    compbasemetrics.ALPHA,
+			DeprecatedVersion: "1.24.0",
 		},
 		[]string{"request_kind"},
 	)
