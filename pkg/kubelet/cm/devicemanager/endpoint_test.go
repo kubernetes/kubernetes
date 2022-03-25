@@ -19,13 +19,52 @@ package devicemanager
 import (
 	"fmt"
 	"path"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
+	plugin "k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/plugin/v1beta1"
 )
+
+// monitorCallback is the function called when a device's health state changes,
+// or new devices are reported, or old devices are deleted.
+// Updated contains the most recent state of the Device.
+type monitorCallback func(resourceName string, devices []pluginapi.Device)
+
+func newMockPluginManager() *mockPluginManager {
+	return &mockPluginManager{
+		func(string) error { return nil },
+		func(string, plugin.DevicePlugin) error { return nil },
+		func(string) {},
+		func(string, *pluginapi.ListAndWatchResponse) {},
+	}
+}
+
+type mockPluginManager struct {
+	cleanupPluginDirectory     func(string) error
+	pluginConnected            func(string, plugin.DevicePlugin) error
+	pluginDisconnected         func(string)
+	pluginListAndWatchReceiver func(string, *pluginapi.ListAndWatchResponse)
+}
+
+func (m *mockPluginManager) CleanupPluginDirectory(r string) error {
+	return m.cleanupPluginDirectory(r)
+}
+
+func (m *mockPluginManager) PluginConnected(r string, p plugin.DevicePlugin) error {
+	return m.pluginConnected(r, p)
+}
+
+func (m *mockPluginManager) PluginDisconnected(r string) {
+	m.pluginDisconnected(r)
+}
+
+func (m *mockPluginManager) PluginListAndWatchReceiver(r string, lr *pluginapi.ListAndWatchResponse) {
+	m.pluginListAndWatchReceiver(r, lr)
+}
 
 func esocketName() string {
 	return fmt.Sprintf("mock%d.sock", time.Now().UnixNano())
@@ -95,7 +134,7 @@ func TestRun(t *testing.T) {
 	p, e := esetup(t, devs, socket, "mock", callback)
 	defer ecleanup(t, p, e)
 
-	go e.run()
+	go e.client.Run()
 	// Wait for the first callback to be issued.
 	<-callbackChan
 
@@ -146,7 +185,7 @@ func TestAllocate(t *testing.T) {
 		return resp, nil
 	})
 
-	go e.run()
+	go e.client.Run()
 	// Wait for the callback to be issued.
 	select {
 	case <-callbackChan:
@@ -180,7 +219,7 @@ func TestGetPreferredAllocation(t *testing.T) {
 		return resp, nil
 	})
 
-	go e.run()
+	go e.client.Run()
 	// Wait for the callback to be issued.
 	select {
 	case <-callbackChan:
@@ -194,19 +233,47 @@ func TestGetPreferredAllocation(t *testing.T) {
 	require.Equal(t, resp, respOut)
 }
 
-func esetup(t *testing.T, devs []*pluginapi.Device, socket, resourceName string, callback monitorCallback) (*Stub, *endpointImpl) {
-	p := NewDevicePluginStub(devs, socket, resourceName, false, false)
+func esetup(t *testing.T, devs []*pluginapi.Device, socket, resourceName string, callback monitorCallback) (*plugin.Stub, *endpointImpl) {
+	m := newMockPluginManager()
 
+	m.pluginListAndWatchReceiver = func(r string, resp *pluginapi.ListAndWatchResponse) {
+		var newDevs []pluginapi.Device
+		for _, d := range resp.Devices {
+			newDevs = append(newDevs, *d)
+		}
+		callback(resourceName, newDevs)
+	}
+
+	var dp plugin.DevicePlugin
+	var wg sync.WaitGroup
+	wg.Add(1)
+	m.pluginConnected = func(r string, c plugin.DevicePlugin) error {
+		dp = c
+		wg.Done()
+		return nil
+	}
+
+	p := plugin.NewDevicePluginStub(devs, socket, resourceName, false, false)
 	err := p.Start()
 	require.NoError(t, err)
 
-	e, err := newEndpointImpl(socket, resourceName, callback)
+	c := plugin.NewPluginClient(resourceName, socket, m)
+	err = c.Connect()
 	require.NoError(t, err)
+
+	wg.Wait()
+
+	e := newEndpointImpl(dp)
+	e.client = c
+
+	m.pluginDisconnected = func(r string) {
+		e.setStopTime(time.Now())
+	}
 
 	return p, e
 }
 
-func ecleanup(t *testing.T, p *Stub, e *endpointImpl) {
+func ecleanup(t *testing.T, p *plugin.Stub, e *endpointImpl) {
 	p.Stop()
-	e.stop()
+	e.client.Disconnect()
 }
