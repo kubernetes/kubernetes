@@ -22,6 +22,7 @@ package nodeshutdown
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -251,6 +252,7 @@ func TestManager(t *testing.T) {
 				ShutdownGracePeriodRequested:    tc.shutdownGracePeriodRequested,
 				ShutdownGracePeriodCriticalPods: tc.shutdownGracePeriodCriticalPods,
 				Clock:                           testingclock.NewFakeClock(time.Now()),
+				StateDirectory:                  os.TempDir(),
 			})
 
 			err := manager.Start()
@@ -345,8 +347,8 @@ func TestFeatureEnabled(t *testing.T) {
 				SyncNodeStatusFunc:              func() {},
 				ShutdownGracePeriodRequested:    tc.shutdownGracePeriodRequested,
 				ShutdownGracePeriodCriticalPods: 0,
+				StateDirectory:                  os.TempDir(),
 			})
-
 			assert.Equal(t, tc.expectEnabled, manager != managerStub{})
 		})
 	}
@@ -399,6 +401,7 @@ func TestRestart(t *testing.T) {
 		SyncNodeStatusFunc:              syncNodeStatus,
 		ShutdownGracePeriodRequested:    shutdownGracePeriodRequested,
 		ShutdownGracePeriodCriticalPods: shutdownGracePeriodCriticalPods,
+		StateDirectory:                  os.TempDir(),
 	})
 
 	err := manager.Start()
