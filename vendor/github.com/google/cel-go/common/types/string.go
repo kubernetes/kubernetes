@@ -167,7 +167,7 @@ func (s String) Match(pattern ref.Val) ref.Val {
 	return Bool(matched)
 }
 
-// Receive implements traits.Reciever.Receive.
+// Receive implements traits.Receiver.Receive.
 func (s String) Receive(function string, overload string, args []ref.Val) ref.Val {
 	switch len(args) {
 	case 1:

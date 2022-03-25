@@ -58,9 +58,15 @@ func calculateHash(parent PredictionContext, returnState int) int {
 	return murmurFinish(h, 2)
 }
 
+var _emptyPredictionContextHash int
+
+func init() {
+	_emptyPredictionContextHash = murmurInit(1)
+	_emptyPredictionContextHash = murmurFinish(_emptyPredictionContextHash, 0)
+}
+
 func calculateEmptyHash() int {
-	h := murmurInit(1)
-	return murmurFinish(h, 0)
+	return _emptyPredictionContextHash
 }
 
 // Used to cache {@link BasePredictionContext} objects. Its used for the shared
@@ -113,15 +119,15 @@ type BaseSingletonPredictionContext struct {
 }
 
 func NewBaseSingletonPredictionContext(parent PredictionContext, returnState int) *BaseSingletonPredictionContext {
+	var cachedHash int
+	if parent != nil {
+		cachedHash = calculateHash(parent, returnState)
+	} else {
+		cachedHash = calculateEmptyHash()
+	}
 
 	s := new(BaseSingletonPredictionContext)
-	s.BasePredictionContext = NewBasePredictionContext(37)
-
-	if parent != nil {
-		s.cachedHash = calculateHash(parent, returnState)
-	} else {
-		s.cachedHash = calculateEmptyHash()
-	}
+	s.BasePredictionContext = NewBasePredictionContext(cachedHash)
 
 	s.parentCtx = parent
 	s.returnState = returnState
@@ -175,15 +181,7 @@ func (b *BaseSingletonPredictionContext) equals(other PredictionContext) bool {
 }
 
 func (b *BaseSingletonPredictionContext) hash() int {
-	h := murmurInit(1)
-
-	if b.parentCtx == nil {
-		return murmurFinish(h, 0)
-	}
-
-	h = murmurUpdate(h, b.parentCtx.hash())
-	h = murmurUpdate(h, b.returnState)
-	return murmurFinish(h, 2)
+	return b.cachedHash
 }
 
 func (b *BaseSingletonPredictionContext) String() string {
@@ -253,13 +251,20 @@ func NewArrayPredictionContext(parents []PredictionContext, returnStates []int) 
 	// from {@link //EMPTY} and non-empty. We merge {@link //EMPTY} by using
 	// nil parent and
 	// returnState == {@link //EmptyReturnState}.
+	hash := murmurInit(1)
+
+	for _, parent := range parents {
+		hash = murmurUpdate(hash, parent.hash())
+	}
+
+	for _, returnState := range returnStates {
+		hash = murmurUpdate(hash, returnState)
+	}
+
+	hash = murmurFinish(hash, len(parents)<<1)
 
 	c := new(ArrayPredictionContext)
-	c.BasePredictionContext = NewBasePredictionContext(37)
-
-	for i := range parents {
-		c.cachedHash += calculateHash(parents[i], returnStates[i])
-	}
+	c.BasePredictionContext = NewBasePredictionContext(hash)
 
 	c.parents = parents
 	c.returnStates = returnStates
@@ -305,17 +310,7 @@ func (a *ArrayPredictionContext) equals(other PredictionContext) bool {
 }
 
 func (a *ArrayPredictionContext) hash() int {
-	h := murmurInit(1)
-
-	for _, p := range a.parents {
-		h = murmurUpdate(h, p.hash())
-	}
-
-	for _, r := range a.returnStates {
-		h = murmurUpdate(h, r)
-	}
-
-	return murmurFinish(h, 2 * len(a.parents))
+	return a.BasePredictionContext.cachedHash
 }
 
 func (a *ArrayPredictionContext) String() string {

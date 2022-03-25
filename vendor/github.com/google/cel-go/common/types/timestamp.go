@@ -138,7 +138,7 @@ func (t Timestamp) Equal(other ref.Val) ref.Val {
 	return Bool(ok && t.Time.Equal(otherTime.Time))
 }
 
-// Receive implements traits.Reciever.Receive.
+// Receive implements traits.Receiver.Receive.
 func (t Timestamp) Receive(function string, overload string, args []ref.Val) ref.Val {
 	switch len(args) {
 	case 0:
