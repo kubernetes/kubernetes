@@ -588,6 +588,11 @@ func (asw *actualStateOfWorld) InitializeClaimSize(volumeName v1.UniqueVolumeNam
 	klog.V(5).Infof("no-op InitializeClaimSize call in attach-detach controller.")
 }
 
+func (asw *actualStateOfWorld) GetClaimSize(volumeName v1.UniqueVolumeName) *resource.Quantity {
+	// not needed in attach-detach controller
+	return nil
+}
+
 func (asw *actualStateOfWorld) GetAttachedVolumes() []AttachedVolume {
 	asw.RLock()
 	defer asw.RUnlock()

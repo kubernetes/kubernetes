@@ -248,6 +248,8 @@ type ActualStateOfWorldAttacherUpdater interface {
 
 	// InitializeClaimSize sets pvc claim size by reading pvc.Status.Capacity
 	InitializeClaimSize(volumeName v1.UniqueVolumeName, claimSize *resource.Quantity)
+
+	GetClaimSize(volumeName v1.UniqueVolumeName) *resource.Quantity
 }
 
 // VolumeLogger defines a set of operations for generating volume-related logging and error msgs
