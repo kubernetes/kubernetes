@@ -67,12 +67,6 @@ type SpdyRoundTripper struct {
 	// Used primarily for mocking the proxy discovery in tests.
 	proxier func(req *http.Request) (*url.URL, error)
 
-	// followRedirects indicates if the round tripper should examine responses for redirects and
-	// follow them.
-	followRedirects bool
-	// requireSameHostRedirects restricts redirect following to only follow redirects to the same host
-	// as the original request.
-	requireSameHostRedirects bool
 	// pingPeriod is a period for sending Ping frames over established
 	// connections.
 	pingPeriod time.Duration
@@ -84,22 +78,18 @@ var _ utilnet.Dialer = &SpdyRoundTripper{}
 
 // NewRoundTripper creates a new SpdyRoundTripper that will use the specified
 // tlsConfig.
-func NewRoundTripper(tlsConfig *tls.Config, followRedirects, requireSameHostRedirects bool) *SpdyRoundTripper {
+func NewRoundTripper(tlsConfig *tls.Config) *SpdyRoundTripper {
 	return NewRoundTripperWithConfig(RoundTripperConfig{
-		TLS:                      tlsConfig,
-		FollowRedirects:          followRedirects,
-		RequireSameHostRedirects: requireSameHostRedirects,
+		TLS: tlsConfig,
 	})
 }
 
 // NewRoundTripperWithProxy creates a new SpdyRoundTripper that will use the
 // specified tlsConfig and proxy func.
-func NewRoundTripperWithProxy(tlsConfig *tls.Config, followRedirects, requireSameHostRedirects bool, proxier func(*http.Request) (*url.URL, error)) *SpdyRoundTripper {
+func NewRoundTripperWithProxy(tlsConfig *tls.Config, proxier func(*http.Request) (*url.URL, error)) *SpdyRoundTripper {
 	return NewRoundTripperWithConfig(RoundTripperConfig{
-		TLS:                      tlsConfig,
-		FollowRedirects:          followRedirects,
-		RequireSameHostRedirects: requireSameHostRedirects,
-		Proxier:                  proxier,
+		TLS:     tlsConfig,
+		Proxier: proxier,
 	})
 }
 
@@ -110,11 +100,9 @@ func NewRoundTripperWithConfig(cfg RoundTripperConfig) *SpdyRoundTripper {
 		cfg.Proxier = utilnet.NewProxierWithNoProxyCIDR(http.ProxyFromEnvironment)
 	}
 	return &SpdyRoundTripper{
-		tlsConfig:                cfg.TLS,
-		followRedirects:          cfg.FollowRedirects,
-		requireSameHostRedirects: cfg.RequireSameHostRedirects,
-		proxier:                  cfg.Proxier,
-		pingPeriod:               cfg.PingPeriod,
+		tlsConfig:  cfg.TLS,
+		proxier:    cfg.Proxier,
+		pingPeriod: cfg.PingPeriod,
 	}
 }
 
@@ -127,9 +115,6 @@ type RoundTripperConfig struct {
 	// PingPeriod is a period for sending SPDY Pings on the connection.
 	// Optional.
 	PingPeriod time.Duration
-
-	FollowRedirects          bool
-	RequireSameHostRedirects bool
 }
 
 // TLSClientConfig implements pkg/util/net.TLSClientConfigHolder for proper TLS checking during
@@ -365,13 +350,9 @@ func (s *SpdyRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) 
 		err         error
 	)
 
-	if s.followRedirects {
-		conn, rawResponse, err = utilnet.ConnectWithRedirects(req.Method, req.URL, header, req.Body, s, s.requireSameHostRedirects)
-	} else {
-		clone := utilnet.CloneRequest(req)
-		clone.Header = header
-		conn, err = s.Dial(clone)
-	}
+	clone := utilnet.CloneRequest(req)
+	clone.Header = header
+	conn, err = s.Dial(clone)
 	if err != nil {
 		return nil, err
 	}
