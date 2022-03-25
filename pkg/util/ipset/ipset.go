@@ -277,7 +277,7 @@ func (runner *runner) CreateSet(set *IPSet, ignoreExistErr bool) error {
 	// Validate ipset before creating
 	err := set.Validate()
 	if err != nil {
-		return fmt.Errorf("error creating ipset since it's invalid")
+		return fmt.Errorf("error creating ipset since it's invalid, error: %s", err.Error())
 	}
 	return runner.createSet(set, ignoreExistErr)
 }
