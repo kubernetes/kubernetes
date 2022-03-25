@@ -148,8 +148,8 @@ func friendlyName(name string) string {
 
 func typeName(t reflect.Type) string {
 	path := t.PkgPath()
-	if strings.Contains(path, "/vendor/") {
-		path = path[strings.Index(path, "/vendor/")+len("/vendor/"):]
+	if _, after, found := strings.Cut(path, "/vendor/"); found {
+		path = after
 	}
 	return fmt.Sprintf("%s.%s", path, t.Name())
 }

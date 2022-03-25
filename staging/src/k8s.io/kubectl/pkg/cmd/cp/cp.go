@@ -166,19 +166,15 @@ var (
 )
 
 func extractFileSpec(arg string) (fileSpec, error) {
-	i := strings.Index(arg, ":")
-
-	// filespec starting with a semicolon is invalid
-	if i == 0 {
+	if strings.HasPrefix(arg, ":") {
 		return fileSpec{}, errFileSpecDoesntMatchFormat
 	}
-	if i == -1 {
+	pod, file, found := strings.Cut(arg, ":")
+	if !found {
 		return fileSpec{
 			File: newLocalPath(arg),
 		}, nil
 	}
-
-	pod, file := arg[:i], arg[i+1:]
 	pieces := strings.Split(pod, "/")
 	switch len(pieces) {
 	case 1:

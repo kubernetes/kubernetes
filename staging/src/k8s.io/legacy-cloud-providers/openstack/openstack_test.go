@@ -715,8 +715,8 @@ func clearEnviron(t *testing.T) []string {
 	env := os.Environ()
 	for _, pair := range env {
 		if strings.HasPrefix(pair, "OS_") {
-			i := strings.Index(pair, "=") + 1
-			os.Unsetenv(pair[:i-1])
+			before, _, _ := strings.Cut(pair, "=")
+			os.Unsetenv(before)
 		}
 	}
 	return env
@@ -724,9 +724,9 @@ func clearEnviron(t *testing.T) []string {
 func resetEnviron(t *testing.T, items []string) {
 	for _, pair := range items {
 		if strings.HasPrefix(pair, "OS_") {
-			i := strings.Index(pair, "=") + 1
-			if err := os.Setenv(pair[:i-1], pair[i:]); err != nil {
-				t.Errorf("Setenv(%q, %q) failed during reset: %v", pair[:i-1], pair[i:], err)
+			key, value, _ := strings.Cut(pair, "=")
+			if err := os.Setenv(key, value); err != nil {
+				t.Errorf("Setenv(%q, %q) failed during reset: %v", key, value, err)
 			}
 		}
 	}

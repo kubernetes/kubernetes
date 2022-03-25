@@ -799,11 +799,10 @@ func extractIface(mntPath string) (string, bool) {
 }
 
 func extractPortalAndIqn(device string) (string, string, error) {
-	ind1 := strings.Index(device, "-")
-	if ind1 < 0 {
+	portal, _, found := strings.Cut(device, "-")
+	if !found {
 		return "", "", fmt.Errorf("iscsi detach disk: no portal in %s", device)
 	}
-	portal := device[0:ind1]
 	ind2 := strings.Index(device, "iqn.")
 	if ind2 < 0 {
 		ind2 = strings.Index(device, "eui.")

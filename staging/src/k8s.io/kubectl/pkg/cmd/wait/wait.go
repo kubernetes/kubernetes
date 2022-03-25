@@ -191,9 +191,9 @@ func conditionFuncFor(condition string, errOut io.Writer) (ConditionFunc, error)
 	if strings.HasPrefix(condition, "condition=") {
 		conditionName := condition[len("condition="):]
 		conditionValue := "true"
-		if equalsIndex := strings.Index(conditionName, "="); equalsIndex != -1 {
-			conditionValue = conditionName[equalsIndex+1:]
-			conditionName = conditionName[0:equalsIndex]
+		if before, after, found := strings.Cut(conditionName, "="); found {
+			conditionValue = after
+			conditionName = before
 		}
 
 		return ConditionalWait{

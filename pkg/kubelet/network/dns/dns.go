@@ -326,8 +326,8 @@ func getPodDNSType(pod *v1.Pod) (podDNSType, error) {
 func mergeDNSOptions(existingDNSConfigOptions []string, dnsConfigOptions []v1.PodDNSConfigOption) []string {
 	optionsMap := make(map[string]string)
 	for _, op := range existingDNSConfigOptions {
-		if index := strings.Index(op, ":"); index != -1 {
-			optionsMap[op[:index]] = op[index+1:]
+		if before, after, found := strings.Cut(op, ":"); found {
+			optionsMap[before] = after
 		} else {
 			optionsMap[op] = ""
 		}

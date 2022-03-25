@@ -749,11 +749,11 @@ func (m *mockCSIDriver) GetCalls() ([]MockCSICall, error) {
 	logLines := strings.Split(log, "\n")
 	var calls []MockCSICall
 	for _, line := range logLines {
-		index := strings.Index(line, grpcCallPrefix)
-		if index == -1 {
+		_, after, found := strings.Cut(line, grpcCallPrefix)
+		if !found {
 			continue
 		}
-		line = line[index+len(grpcCallPrefix):]
+		line = after
 		call := MockCSICall{
 			json: string(line),
 		}

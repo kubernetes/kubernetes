@@ -114,8 +114,8 @@ func readEnv(r io.Reader, envVarType string) ([]v1.EnvVar, error) {
 	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
 		envSpec := scanner.Text()
-		if pos := strings.Index(envSpec, "#"); pos != -1 {
-			envSpec = envSpec[:pos]
+		if before, _, found := strings.Cut(envSpec, "#"); found {
+			envSpec = before
 		}
 
 		if strings.Contains(envSpec, "=") {

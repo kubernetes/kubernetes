@@ -164,13 +164,7 @@ func negotiateContentEncoding(req *http.Request) string {
 	}
 	for len(encoding) > 0 {
 		var token string
-		if next := strings.Index(encoding, ","); next != -1 {
-			token = encoding[:next]
-			encoding = encoding[next+1:]
-		} else {
-			token = encoding
-			encoding = ""
-		}
+		token, encoding, _ = strings.Cut(encoding, ",")
 		switch strings.TrimSpace(token) {
 		case "gzip":
 			return "gzip"

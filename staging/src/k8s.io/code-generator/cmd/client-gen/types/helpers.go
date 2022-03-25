@@ -38,8 +38,8 @@ func ToGroupVersion(gv string) (GroupVersion, error) {
 	case 0:
 		return GroupVersion{Group(gv), ""}, nil
 	case 1:
-		i := strings.Index(gv, "/")
-		return GroupVersion{Group(gv[:i]), Version(gv[i+1:])}, nil
+		group, version, _ := strings.Cut(gv, "/")
+		return GroupVersion{Group(group), Version(version)}, nil
 	default:
 		return GroupVersion{}, fmt.Errorf("unexpected GroupVersion string: %v", gv)
 	}

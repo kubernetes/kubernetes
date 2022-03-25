@@ -561,9 +561,9 @@ func resourceCovers(resource string, action Action) bool {
 		return true
 	}
 
-	if index := strings.Index(resource, "/"); index != -1 &&
-		resource[:index] == action.GetResource().Resource &&
-		resource[index+1:] == action.GetSubresource() {
+	if resource, subresource, found := strings.Cut(resource, "/"); found &&
+		resource == action.GetResource().Resource &&
+		subresource == action.GetSubresource() {
 		return true
 	}
 

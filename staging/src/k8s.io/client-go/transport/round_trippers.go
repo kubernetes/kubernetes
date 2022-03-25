@@ -439,12 +439,7 @@ func maskValue(key string, value string) string {
 	if len(value) == 0 {
 		return ""
 	}
-	var authType string
-	if i := strings.Index(value, " "); i > 0 {
-		authType = value[0:i]
-	} else {
-		authType = value
-	}
+	authType, _, _ := strings.Cut(value, " ")
 	if !knownAuthTypes[strings.ToLower(authType)] {
 		return "<masked>"
 	}

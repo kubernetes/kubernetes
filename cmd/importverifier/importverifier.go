@@ -141,12 +141,11 @@ func (i *ImportRestriction) forbiddenImportsFor(pkg Package) []string {
 
 // extractVendorPath removes a vendor prefix if one exists
 func extractVendorPath(path string) string {
-	vendorPath := "/vendor/"
-	if !strings.Contains(path, vendorPath) {
+	_, after, found := strings.Cut(path, "/vendor/")
+	if !found {
 		return path
 	}
-
-	return path[strings.Index(path, vendorPath)+len(vendorPath):]
+	return after
 }
 
 // isForbidden determines if an import is forbidden,

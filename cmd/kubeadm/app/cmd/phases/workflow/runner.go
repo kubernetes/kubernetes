@@ -477,8 +477,6 @@ func addPhaseRunner(e *Runner, parentRunner *phaseRunner, phase Phase) {
 // and removing args descriptors, if any
 func cleanName(name string) string {
 	ret := strings.ToLower(name)
-	if pos := strings.Index(ret, " "); pos != -1 {
-		ret = ret[:pos]
-	}
+	ret, _, _ = strings.Cut(ret, " ")
 	return ret
 }

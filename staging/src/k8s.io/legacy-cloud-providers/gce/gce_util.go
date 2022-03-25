@@ -192,10 +192,7 @@ func firewallToGcloudArgs(fw *compute.Firewall, projectID string) string {
 // to the GCE API client library.  Basically this means reducing 'kubernetes-
 // node-2.c.my-proj.internal' to 'kubernetes-node-2' if necessary.
 func canonicalizeInstanceName(name string) string {
-	ix := strings.Index(name, ".")
-	if ix != -1 {
-		name = name[:ix]
-	}
+	name, _, _ = strings.Cut(name, ".")
 	return name
 }
 

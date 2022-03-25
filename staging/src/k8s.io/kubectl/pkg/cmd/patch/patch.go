@@ -323,8 +323,7 @@ func getPatchedJSON(patchType types.PatchType, originalJS, patchJS []byte, gvk s
 		// TODO: This is pretty hacky, we need a better structured error from the json-patch
 		if err != nil && strings.Contains(err.Error(), "doc is missing key") {
 			msg := err.Error()
-			ix := strings.Index(msg, "key:")
-			key := msg[ix+5:]
+			_, key, _ := strings.Cut(msg, "key: ")
 			return bytes, fmt.Errorf("Object to be patched is missing field (%s)", key)
 		}
 		return bytes, err

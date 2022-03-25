@@ -360,12 +360,10 @@ func (BasicPod) Generate(genericParams map[string]interface{}) (runtime.Object, 
 func parseEnvs(envArray []string) ([]v1.EnvVar, error) {
 	envs := make([]v1.EnvVar, 0, len(envArray))
 	for _, env := range envArray {
-		pos := strings.Index(env, "=")
-		if pos == -1 {
+		name, value, found := strings.Cut(env, "=")
+		if !found {
 			return nil, fmt.Errorf("invalid env: %v", env)
 		}
-		name := env[:pos]
-		value := env[pos+1:]
 		if len(name) == 0 {
 			return nil, fmt.Errorf("invalid env: %v", env)
 		}

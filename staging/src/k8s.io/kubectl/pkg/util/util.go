@@ -83,11 +83,9 @@ func ParseLiteralSource(source string) (keyName, value string, err error) {
 	if strings.Index(source, "=") == 0 {
 		return "", "", fmt.Errorf("invalid literal source %v, expected key=value", source)
 	}
-	// split after the first equal (so values can have the = character)
-	items := strings.SplitN(source, "=", 2)
-	if len(items) != 2 {
+	keyName, value, found := strings.Cut(source, "=")
+	if !found {
 		return "", "", fmt.Errorf("invalid literal source %v, expected key=value", source)
 	}
-
-	return items[0], items[1], nil
+	return
 }
