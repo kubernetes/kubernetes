@@ -32,8 +32,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubectl/pkg/cmd/exec"
-	"k8s.io/kubectl/pkg/cmd/get"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -102,20 +102,20 @@ func NewCmdCp(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.C
 			if len(args) == 0 {
 				if strings.IndexAny(toComplete, "/.~") == 0 {
 					// Looks like a path, do nothing
-				} else if strings.Index(toComplete, ":") != -1 {
+				} else if strings.Contains(toComplete, ":") {
 					// TODO: complete remote files in the pod
 				} else if idx := strings.Index(toComplete, "/"); idx > 0 {
 					// complete <namespace>/<pod>
 					namespace := toComplete[:idx]
 					template := "{{ range .items }}{{ .metadata.namespace }}/{{ .metadata.name }}: {{ end }}"
-					comps = get.CompGetFromTemplate(&template, f, namespace, cmd, []string{"pod"}, toComplete)
+					comps = completion.CompGetFromTemplate(&template, f, namespace, cmd, []string{"pod"}, toComplete)
 				} else {
 					// Complete namespaces followed by a /
-					for _, ns := range get.CompGetResource(f, cmd, "namespace", toComplete) {
+					for _, ns := range completion.CompGetResource(f, cmd, "namespace", toComplete) {
 						comps = append(comps, fmt.Sprintf("%s/", ns))
 					}
 					// Complete pod names followed by a :
-					for _, pod := range get.CompGetResource(f, cmd, "pod", toComplete) {
+					for _, pod := range completion.CompGetResource(f, cmd, "pod", toComplete) {
 						comps = append(comps, fmt.Sprintf("%s:", pod))
 					}
 

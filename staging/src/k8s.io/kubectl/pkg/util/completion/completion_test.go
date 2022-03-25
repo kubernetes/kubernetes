@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package completion
 
 import (
 	"net/http"
@@ -127,6 +127,25 @@ func TestResourceTypeAndNameCompletionFuncRepeating(t *testing.T) {
 	checkCompletion(t, comps, []string{"foo"}, directive, cobra.ShellCompDirectiveNoFileComp)
 }
 
+func TestResourceTypeAndNameCompletionFuncJointForm(t *testing.T) {
+	tf, cmd := prepareCompletionTest()
+	addPodsToFactory(tf)
+
+	compFunc := ResourceTypeAndNameCompletionFunc(tf)
+	comps, directive := compFunc(cmd, []string{}, "pod/b")
+	checkCompletion(t, comps, []string{"pod/bar"}, directive, cobra.ShellCompDirectiveNoFileComp)
+}
+
+func TestResourceTypeAndNameCompletionFuncJointFormRepeating(t *testing.T) {
+	tf, cmd := prepareCompletionTest()
+	addPodsToFactory(tf)
+
+	compFunc := ResourceTypeAndNameCompletionFunc(tf)
+	comps, directive := compFunc(cmd, []string{"pod/bar"}, "pod/")
+	// The other pods should be completed, but not the already specified ones
+	checkCompletion(t, comps, []string{"pod/foo"}, directive, cobra.ShellCompDirectiveNoFileComp)
+}
+
 func TestSpecifiedResourceTypeAndNameCompletionFuncNoArgs(t *testing.T) {
 	tf, cmd := prepareCompletionTest()
 	addPodsToFactory(tf)
@@ -155,6 +174,24 @@ func TestSpecifiedResourceTypeAndNameCompletionFuncRepeating(t *testing.T) {
 	checkCompletion(t, comps, []string{"foo"}, directive, cobra.ShellCompDirectiveNoFileComp)
 }
 
+func TestSpecifiedResourceTypeAndNameCompletionFuncJointFormOneArg(t *testing.T) {
+	tf, cmd := prepareCompletionTest()
+	addPodsToFactory(tf)
+
+	compFunc := SpecifiedResourceTypeAndNameCompletionFunc(tf, []string{"pod"})
+	comps, directive := compFunc(cmd, []string{}, "pod/b")
+	checkCompletion(t, comps, []string{"pod/bar"}, directive, cobra.ShellCompDirectiveNoFileComp)
+}
+
+func TestSpecifiedResourceTypeAndNameCompletionFuncJointFormRepeating(t *testing.T) {
+	tf, cmd := prepareCompletionTest()
+	addPodsToFactory(tf)
+
+	compFunc := SpecifiedResourceTypeAndNameCompletionFunc(tf, []string{"pod"})
+	comps, directive := compFunc(cmd, []string{"pod/bar"}, "pod/")
+	// The other pods should be completed, but not the already specified ones
+	checkCompletion(t, comps, []string{"pod/foo"}, directive, cobra.ShellCompDirectiveNoFileComp)
+}
 func TestSpecifiedResourceTypeAndNameCompletionNoRepeatFuncOneArg(t *testing.T) {
 	tf, cmd := prepareCompletionTest()
 	addPodsToFactory(tf)
@@ -170,6 +207,25 @@ func TestSpecifiedResourceTypeAndNameCompletionNoRepeatFuncMultiArg(t *testing.T
 
 	compFunc := SpecifiedResourceTypeAndNameNoRepeatCompletionFunc(tf, []string{"pod"})
 	comps, directive := compFunc(cmd, []string{"pod", "bar"}, "")
+	// There should not be any more pods shown as this function should not repeat the completion
+	checkCompletion(t, comps, []string{}, directive, cobra.ShellCompDirectiveNoFileComp)
+}
+
+func TestSpecifiedResourceTypeAndNameCompletionNoRepeatFuncJointFormOneArg(t *testing.T) {
+	tf, cmd := prepareCompletionTest()
+	addPodsToFactory(tf)
+
+	compFunc := SpecifiedResourceTypeAndNameNoRepeatCompletionFunc(tf, []string{"pod"})
+	comps, directive := compFunc(cmd, []string{}, "pod/b")
+	checkCompletion(t, comps, []string{"pod/bar"}, directive, cobra.ShellCompDirectiveNoFileComp)
+}
+
+func TestSpecifiedResourceTypeAndNameCompletionNoRepeatFuncJointFormMultiArg(t *testing.T) {
+	tf, cmd := prepareCompletionTest()
+	addPodsToFactory(tf)
+
+	compFunc := SpecifiedResourceTypeAndNameNoRepeatCompletionFunc(tf, []string{"pod"})
+	comps, directive := compFunc(cmd, []string{"pod/bar"}, "pod/")
 	// There should not be any more pods shown as this function should not repeat the completion
 	checkCompletion(t, comps, []string{}, directive, cobra.ShellCompDirectiveNoFileComp)
 }
@@ -192,7 +248,65 @@ func TestResourceNameCompletionFuncTooManyArgs(t *testing.T) {
 	checkCompletion(t, comps, []string{}, directive, cobra.ShellCompDirectiveNoFileComp)
 }
 
-func TestPodResourceNameAndContainerCompletionFuncNoArgs(t *testing.T) {
+func TestResourceNameCompletionFuncJointFormNoArgs(t *testing.T) {
+	tf, cmd := prepareCompletionTest()
+	addPodsToFactory(tf)
+
+	compFunc := ResourceNameCompletionFunc(tf, "pod")
+	comps, directive := compFunc(cmd, []string{}, "pod/b")
+	// The <type>/<name> should NOT be supported by this function
+	checkCompletion(t, comps, []string{}, directive, cobra.ShellCompDirectiveNoFileComp)
+}
+
+func TestPodResourceNameCompletionFuncNoArgsPodName(t *testing.T) {
+	tf, cmd := prepareCompletionTest()
+	addPodsToFactory(tf)
+
+	compFunc := PodResourceNameCompletionFunc(tf)
+	comps, directive := compFunc(cmd, []string{}, "b")
+	checkCompletion(t, comps, []string{"bar"}, directive, cobra.ShellCompDirectiveNoFileComp)
+}
+
+func TestPodResourceNameCompletionFuncNoArgsResources(t *testing.T) {
+	tf, cmd := prepareCompletionTest()
+	addPodsToFactory(tf)
+
+	compFunc := PodResourceNameCompletionFunc(tf)
+	comps, directive := compFunc(cmd, []string{}, "d")
+	checkCompletion(
+		t, comps, []string{"daemonsets/", "deployments/"},
+		directive, cobra.ShellCompDirectiveNoFileComp|cobra.ShellCompDirectiveNoSpace)
+}
+
+func TestPodResourceNameCompletionFuncTooManyArgs(t *testing.T) {
+	tf, cmd := prepareCompletionTest()
+	addPodsToFactory(tf)
+
+	compFunc := PodResourceNameCompletionFunc(tf)
+	comps, directive := compFunc(cmd, []string{"pod-name"}, "")
+	checkCompletion(t, comps, []string{}, directive, cobra.ShellCompDirectiveNoFileComp)
+}
+
+func TestPodResourceNameCompletionFuncJointFormNoArgs(t *testing.T) {
+	tf, cmd := prepareCompletionTest()
+	addPodsToFactory(tf)
+
+	compFunc := PodResourceNameCompletionFunc(tf)
+	comps, directive := compFunc(cmd, []string{}, "pod/b")
+	// The <type>/<name> SHOULD be supported by this function
+	checkCompletion(t, comps, []string{"pod/bar"}, directive, cobra.ShellCompDirectiveNoFileComp)
+}
+
+func TestPodResourceNameCompletionFuncJointFormTooManyArgs(t *testing.T) {
+	tf, cmd := prepareCompletionTest()
+	addPodsToFactory(tf)
+
+	compFunc := PodResourceNameCompletionFunc(tf)
+	comps, directive := compFunc(cmd, []string{"pod/name"}, "pod/b")
+	checkCompletion(t, comps, []string{}, directive, cobra.ShellCompDirectiveNoFileComp)
+}
+
+func TestPodResourceNameAndContainerCompletionFuncNoArgsPodName(t *testing.T) {
 	tf, cmd := prepareCompletionTest()
 	addPodsToFactory(tf)
 
@@ -201,12 +315,42 @@ func TestPodResourceNameAndContainerCompletionFuncNoArgs(t *testing.T) {
 	checkCompletion(t, comps, []string{"bar"}, directive, cobra.ShellCompDirectiveNoFileComp)
 }
 
+func TestPodResourceNameAndContainerCompletionFuncNoArgsResources(t *testing.T) {
+	tf, cmd := prepareCompletionTest()
+	addPodsToFactory(tf)
+
+	compFunc := PodResourceNameAndContainerCompletionFunc(tf)
+	comps, directive := compFunc(cmd, []string{}, "s")
+	checkCompletion(
+		t, comps, []string{"services/", "statefulsets/"},
+		directive, cobra.ShellCompDirectiveNoFileComp|cobra.ShellCompDirectiveNoSpace)
+
+}
+
 func TestPodResourceNameAndContainerCompletionFuncTooManyArgs(t *testing.T) {
 	tf, cmd := prepareCompletionTest()
 	addPodsToFactory(tf)
 
 	compFunc := PodResourceNameAndContainerCompletionFunc(tf)
 	comps, directive := compFunc(cmd, []string{"pod-name", "container-name"}, "")
+	checkCompletion(t, comps, []string{}, directive, cobra.ShellCompDirectiveNoFileComp)
+}
+
+func TestPodResourceNameAndContainerCompletionFuncJointFormNoArgs(t *testing.T) {
+	tf, cmd := prepareCompletionTest()
+	addPodsToFactory(tf)
+
+	compFunc := PodResourceNameAndContainerCompletionFunc(tf)
+	comps, directive := compFunc(cmd, []string{}, "pod/b")
+	checkCompletion(t, comps, []string{"pod/bar"}, directive, cobra.ShellCompDirectiveNoFileComp)
+}
+
+func TestPodResourceNameAndContainerCompletionFuncJointFormTooManyArgs(t *testing.T) {
+	tf, cmd := prepareCompletionTest()
+	addPodsToFactory(tf)
+
+	compFunc := PodResourceNameAndContainerCompletionFunc(tf)
+	comps, directive := compFunc(cmd, []string{"pod/pod-name", "container-name"}, "")
 	checkCompletion(t, comps, []string{}, directive, cobra.ShellCompDirectiveNoFileComp)
 }
 

@@ -23,7 +23,7 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/client-go/tools/clientcmd"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	"k8s.io/kubectl/pkg/util"
+	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -42,7 +42,7 @@ func NewCmdConfigDeleteCluster(out io.Writer, configAccess clientcmd.ConfigAcces
 		Short:                 i18n.T("Delete the specified cluster from the kubeconfig"),
 		Long:                  i18n.T("Delete the specified cluster from the kubeconfig."),
 		Example:               deleteClusterExample,
-		ValidArgsFunction:     util.ClusterCompletionFunc,
+		ValidArgsFunction:     completion.ClusterCompletionFunc,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(runDeleteCluster(out, configAccess, cmd))
 		},

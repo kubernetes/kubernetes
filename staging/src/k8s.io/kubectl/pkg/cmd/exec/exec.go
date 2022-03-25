@@ -37,7 +37,7 @@ import (
 	"k8s.io/kubectl/pkg/cmd/util/podcmd"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubectl/pkg/scheme"
-	"k8s.io/kubectl/pkg/util"
+	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/interrupt"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -89,7 +89,7 @@ func NewCmdExec(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		Short:                 i18n.T("Execute a command in a container"),
 		Long:                  i18n.T("Execute a command in a container."),
 		Example:               execExample,
-		ValidArgsFunction:     util.ResourceNameCompletionFunc(f, "pod"),
+		ValidArgsFunction:     completion.PodResourceNameCompletionFunc(f),
 		Run: func(cmd *cobra.Command, args []string) {
 			argsLenAtDash := cmd.ArgsLenAtDash()
 			cmdutil.CheckErr(options.Complete(f, cmd, args, argsLenAtDash))
@@ -101,6 +101,8 @@ func NewCmdExec(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	cmdutil.AddJsonFilenameFlag(cmd.Flags(), &options.FilenameOptions.Filenames, "to use to exec into the resource")
 	// TODO support UID
 	cmdutil.AddContainerVarFlags(cmd, &options.ContainerName, options.ContainerName)
+	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc("container", completion.ContainerCompletionFunc(f)))
+
 	cmd.Flags().BoolVarP(&options.Stdin, "stdin", "i", options.Stdin, "Pass stdin to the container")
 	cmd.Flags().BoolVarP(&options.TTY, "tty", "t", options.TTY, "Stdin is a TTY")
 	cmd.Flags().BoolVarP(&options.Quiet, "quiet", "q", options.Quiet, "Only print output from the remote session")
