@@ -889,8 +889,8 @@ func Test_validateProtocol(t *testing.T) {
 func TestValidateIPSet(t *testing.T) {
 	testCases := []struct {
 		ipset *IPSet
-		valid bool
-		desc  string
+		err   string
+		name  string
 	}{
 		{ // case[0]
 			ipset: &IPSet{
@@ -900,7 +900,7 @@ func TestValidateIPSet(t *testing.T) {
 				HashSize:   1024,
 				MaxElem:    1024,
 			},
-			valid: true,
+			name: "HashIPPort IPV4 valid ",
 		},
 		{ // case[1]
 			ipset: &IPSet{
@@ -911,7 +911,7 @@ func TestValidateIPSet(t *testing.T) {
 				MaxElem:    2048,
 				PortRange:  DefaultPortRange,
 			},
-			valid: true,
+			name: "BitmapPort IPV6 valid ",
 		},
 		{ // case[2]
 			ipset: &IPSet{
@@ -921,8 +921,8 @@ func TestValidateIPSet(t *testing.T) {
 				HashSize:   65535,
 				MaxElem:    2048,
 			},
-			valid: false,
-			desc:  "should specify right port range for bitmap type set",
+			err:  "unuspported Port Range: ",
+			name: "should specify right port range for bitmap type set",
 		},
 		{ // case[3]
 			ipset: &IPSet{
@@ -932,8 +932,8 @@ func TestValidateIPSet(t *testing.T) {
 				HashSize:   0,
 				MaxElem:    2048,
 			},
-			valid: false,
-			desc:  "wrong hash size number",
+			err:  "invalid hashsize value: 0",
+			name: "wrong hash size number",
 		},
 		{ // case[4]
 			ipset: &IPSet{
@@ -943,8 +943,8 @@ func TestValidateIPSet(t *testing.T) {
 				HashSize:   1024,
 				MaxElem:    -1,
 			},
-			valid: false,
-			desc:  "wrong hash max elem number",
+			err:  "invalid maxelem value: -1",
+			name: "wrong hash max elem number",
 		},
 		{ // case[5]
 			ipset: &IPSet{
@@ -954,8 +954,8 @@ func TestValidateIPSet(t *testing.T) {
 				HashSize:   1024,
 				MaxElem:    1024,
 			},
-			valid: false,
-			desc:  "wrong protocol",
+			err:  "unuspported IP family: ip",
+			name: "wrong protocol",
 		},
 		{ // case[6]
 			ipset: &IPSet{
@@ -965,15 +965,18 @@ func TestValidateIPSet(t *testing.T) {
 				HashSize:   1024,
 				MaxElem:    1024,
 			},
-			valid: false,
-			desc:  "wrong set type",
+			err:  "unuspported IP type: xxx",
+			name: "wrong set type",
 		},
 	}
-	for i := range testCases {
-		valid := testCases[i].ipset.Validate()
-		if valid != testCases[i].valid {
-			t.Errorf("case [%d]: unexpected mismatch, expect valid[%v], got valid[%v], desc: %s", i, testCases[i].valid, valid, testCases[i].desc)
-		}
+
+	for i, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			err := test.ipset.Validate()
+			if err != nil && err.Error() != test.err || err == nil && test.err != "" {
+				t.Errorf("case [%d]: unexpected mismatch, expect err[%v], got err[%v], desc: %s", i, test.err, err, test.name)
+			}
+		})
 	}
 }
 
