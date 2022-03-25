@@ -841,6 +841,12 @@ const (
 	//
 	// Enable MinDomains in Pod Topology Spread.
 	MinDomainsInPodTopologySpread featuregate.Feature = "MinDomainsInPodTopologySpread"
+	// owner: @aojea
+	// kep: http://kep.k8s.io/3070
+	// alpha: v1.24
+	//
+	// Subdivide the ClusterIP range for dynamic and static IP allocation.
+	ServiceIPStaticSubrange featuregate.Feature = "ServiceIPStaticSubrange"
 )
 
 func init() {
@@ -963,6 +969,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	GRPCContainerProbe:                             {Default: true, PreRelease: featuregate.Beta},
 	LegacyServiceAccountTokenNoAutoGeneration:      {Default: true, PreRelease: featuregate.Beta},
 	MinDomainsInPodTopologySpread:                  {Default: false, PreRelease: featuregate.Alpha},
+	ServiceIPStaticSubrange:                        {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
