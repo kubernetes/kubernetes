@@ -44,7 +44,7 @@ func CheckedExprToAst(checkedExpr *exprpb.CheckedExpr) *Ast {
 // through future calls.
 //
 // Prefer CheckedExprToAst if loading expressions from storage.
-func CheckedExprToAstWithSource(checkedExpr *exprpb.CheckedExpr, src Source) *Ast {
+func CheckedExprToAstWithSource(checkedExpr *exprpb.CheckedExpr, src common.Source) *Ast {
 	refMap := checkedExpr.GetReferenceMap()
 	if refMap == nil {
 		refMap = map[int64]*exprpb.Reference{}
@@ -96,7 +96,7 @@ func ParsedExprToAst(parsedExpr *exprpb.ParsedExpr) *Ast {
 // expression, or if you need to separately check a subset of an expression.
 //
 // Prefer ParsedExprToAst if loading expressions from storage.
-func ParsedExprToAstWithSource(parsedExpr *exprpb.ParsedExpr, src Source) *Ast {
+func ParsedExprToAstWithSource(parsedExpr *exprpb.ParsedExpr, src common.Source) *Ast {
 	si := parsedExpr.GetSourceInfo()
 	if si == nil {
 		si = &exprpb.SourceInfo{}

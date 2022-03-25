@@ -41,42 +41,26 @@ func CostObserver(tracker *CostTracker) EvalObserver {
 		case ConstantQualifier:
 			// TODO: Push identifiers on to the stack before observing constant qualifiers that apply to them
 			// and enable the below pop. Once enabled this can case can be collapsed into the Qualifier case.
+			//tracker.stack.pop(1)
 			tracker.cost++
 		case InterpretableConst:
 			// zero cost
 		case InterpretableAttribute:
-			switch a := t.Attr().(type) {
-			case *conditionalAttribute:
-				// Ternary has no direct cost. All cost is from the conditional and the true/false branch expressions.
-				tracker.stack.drop(a.falsy.ID(), a.truthy.ID(), a.expr.ID())
-			default:
-				tracker.stack.drop(t.Attr().ID())
+			// Ternary has no direct cost. All cost is from the conditional and the true/false branch expressions.
+			_, isConditional := t.Attr().(*conditionalAttribute)
+			if !isConditional {
 				tracker.cost += common.SelectAndIdentCost
 			}
-		case *evalExhaustiveConditional:
+		case *evalExhaustiveConditional, *evalOr, *evalAnd, *evalExhaustiveOr, *evalExhaustiveAnd:
 			// Ternary has no direct cost. All cost is from the conditional and the true/false branch expressions.
-			tracker.stack.drop(t.attr.falsy.ID(), t.attr.truthy.ID(), t.attr.expr.ID())
-
-		// While the field names are identical, the boolean operation eval structs do not share an interface and so
-		// must be handled individually.
-		case *evalOr:
-			tracker.stack.drop(t.rhs.ID(), t.lhs.ID())
-		case *evalAnd:
-			tracker.stack.drop(t.rhs.ID(), t.lhs.ID())
-		case *evalExhaustiveOr:
-			tracker.stack.drop(t.rhs.ID(), t.lhs.ID())
-		case *evalExhaustiveAnd:
-			tracker.stack.drop(t.rhs.ID(), t.lhs.ID())
-		case *evalFold:
-			tracker.stack.drop(t.iterRange.ID())
 		case Qualifier:
+			tracker.stack.pop(1)
 			tracker.cost++
 		case InterpretableCall:
-			if argVals, ok := tracker.stack.dropArgs(t.Args()); ok {
+			if argVals, ok := tracker.stack.pop(len(t.Args())); ok {
 				tracker.cost += tracker.costCall(t, argVals, val)
 			}
 		case InterpretableConstructor:
-			tracker.stack.dropArgs(t.InitVals())
 			switch t.Type() {
 			case types.ListType:
 				tracker.cost += common.ListCreateBaseCost
@@ -86,7 +70,7 @@ func CostObserver(tracker *CostTracker) EvalObserver {
 				tracker.cost += common.StructCreateBaseCost
 			}
 		}
-		tracker.stack.push(val, id)
+		tracker.stack.push(val)
 
 		if tracker.Limit != nil && tracker.cost > *tracker.Limit {
 			panic(EvalCancelledError{Cause: CostLimitExceeded, Message: "operation cancelled: actual cost limit exceeded"})
@@ -186,56 +170,19 @@ func (c CostTracker) actualSize(value ref.Val) uint64 {
 	return 1
 }
 
-type stackVal struct {
-	Val ref.Val
-	ID  int64
-}
-
 // refValStack keeps track of values of the stack for cost calculation purposes
-type refValStack []stackVal
+type refValStack []ref.Val
 
-func (s *refValStack) push(val ref.Val, id int64) {
-	value := stackVal{Val: val, ID: id}
+func (s *refValStack) push(value ref.Val) {
 	*s = append(*s, value)
 }
 
-// TODO: Allowing drop and dropArgs to remove stack items above the IDs they are provided is a workaround. drop and dropArgs
-// should find and remove only the stack items matching the provided IDs once all attributes are properly pushed and popped from stack.
-
-// drop searches the stack for each ID and removes the ID and all stack items above it.
-// If none of the IDs are found, the stack is not modified.
-// WARNING: It is possible for multiple expressions with the same ID to exist (due to how macros are implemented) so it's
-// possible that a dropped ID will remain on the stack.  They should be removed when IDs on the stack are popped.
-func (s *refValStack) drop(ids ...int64) {
-	for _, id := range ids {
-		for idx := len(*s) - 1; idx >= 0; idx-- {
-			if (*s)[idx].ID == id {
-				*s = (*s)[:idx]
-				break
-			}
-		}
-	}
-}
-
-// dropArgs searches the stack for all the args by their IDs, accumulates their associated ref.Vals and drops any
-// stack items above any of the arg IDs. If any of the IDs are not found the stack, false is returned.
-// Args are assumed to be found in the stack in reverse order, i.e. the last arg is expected to be found highest in
-// the stack.
-// WARNING: It is possible for multiple expressions with the same ID to exist (due to how macros are implemented) so it's
-// possible that a dropped ID will remain on the stack.  They should be removed when IDs on the stack are popped.
-func (s *refValStack) dropArgs(args []Interpretable) ([]ref.Val, bool) {
-	result := make([]ref.Val, len(args))
-argloop:
-	for nIdx := len(args) - 1; nIdx >= 0; nIdx-- {
-		for idx := len(*s) - 1; idx >= 0; idx-- {
-			if (*s)[idx].ID == args[nIdx].ID() {
-				el := (*s)[idx]
-				*s = (*s)[:idx]
-				result[nIdx] = el.Val
-				continue argloop
-			}
-		}
+func (s *refValStack) pop(count int) ([]ref.Val, bool) {
+	if len(*s) < count {
 		return nil, false
 	}
-	return result, true
+	idx := len(*s) - count
+	el := (*s)[idx:]
+	*s = (*s)[:idx]
+	return el, true
 }

@@ -414,9 +414,10 @@ func (l *LexerIndexedCustomAction) execute(lexer Lexer) {
 
 func (l *LexerIndexedCustomAction) hash() int {
 	h := murmurInit(0)
+	h = murmurUpdate(h, l.actionType)
 	h = murmurUpdate(h, l.offset)
 	h = murmurUpdate(h, l.lexerAction.hash())
-	return murmurFinish(h, 2)
+	return murmurFinish(h, 3)
 }
 
 func (l *LexerIndexedCustomAction) equals(other LexerAction) bool {

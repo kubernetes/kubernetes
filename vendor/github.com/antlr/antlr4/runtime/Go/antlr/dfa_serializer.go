@@ -7,7 +7,6 @@ package antlr
 import (
 	"fmt"
 	"strconv"
-	"strings"
 )
 
 // DFASerializer is a DFA walker that knows how to dump them to serialized
@@ -113,12 +112,7 @@ func NewLexerDFASerializer(dfa *DFA) *LexerDFASerializer {
 }
 
 func (l *LexerDFASerializer) getEdgeLabel(i int) string {
-	var sb strings.Builder
-	sb.Grow(6)
-	sb.WriteByte('\'')
-	sb.WriteRune(rune(i))
-	sb.WriteByte('\'')
-	return sb.String()
+	return "'" + string(i) + "'"
 }
 
 func (l *LexerDFASerializer) String() string {

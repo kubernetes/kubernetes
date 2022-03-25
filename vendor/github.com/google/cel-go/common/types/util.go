@@ -18,10 +18,10 @@ import (
 	"github.com/google/cel-go/common/types/ref"
 )
 
-// IsUnknownOrError returns whether the input element ref.Val is an ErrType or UnknownType.
+// IsUnknownOrError returns whether the input element ref.Val is an ErrType or UnknonwType.
 func IsUnknownOrError(val ref.Val) bool {
-	switch val.(type) {
-	case Unknown, *Err:
+	switch val.Type() {
+	case UnknownType, ErrType:
 		return true
 	}
 	return false

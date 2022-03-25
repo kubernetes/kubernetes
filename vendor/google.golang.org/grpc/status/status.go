@@ -29,7 +29,6 @@ package status
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	spb "google.golang.org/genproto/googleapis/rpc/status"
@@ -74,16 +73,11 @@ func FromProto(s *spb.Status) *Status {
 	return status.FromProto(s)
 }
 
-// FromError returns a Status representation of err.
-//
-// - If err was produced by this package or implements the method `GRPCStatus()
-//   *Status`, the appropriate Status is returned.
-//
-// - If err is nil, a Status is returned with codes.OK and no message.
-//
-// - Otherwise, err is an error not compatible with this package.  In this
-//   case, a Status is returned with codes.Unknown and err's Error() message,
-//   and ok is false.
+// FromError returns a Status representing err if it was produced by this
+// package or has a method `GRPCStatus() *Status`.
+// If err is nil, a Status is returned with codes.OK and no message.
+// Otherwise, ok is false and a Status is returned with codes.Unknown and
+// the original error message.
 func FromError(err error) (s *Status, ok bool) {
 	if err == nil {
 		return nil, true
@@ -118,18 +112,18 @@ func Code(err error) codes.Code {
 	return codes.Unknown
 }
 
-// FromContextError converts a context error or wrapped context error into a
-// Status.  It returns a Status with codes.OK if err is nil, or a Status with
-// codes.Unknown if err is non-nil and not a context error.
+// FromContextError converts a context error into a Status.  It returns a
+// Status with codes.OK if err is nil, or a Status with codes.Unknown if err is
+// non-nil and not a context error.
 func FromContextError(err error) *Status {
-	if err == nil {
+	switch err {
+	case nil:
 		return nil
-	}
-	if errors.Is(err, context.DeadlineExceeded) {
+	case context.DeadlineExceeded:
 		return New(codes.DeadlineExceeded, err.Error())
-	}
-	if errors.Is(err, context.Canceled) {
+	case context.Canceled:
 		return New(codes.Canceled, err.Error())
+	default:
+		return New(codes.Unknown, err.Error())
 	}
-	return New(codes.Unknown, err.Error())
 }

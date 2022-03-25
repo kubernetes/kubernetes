@@ -73,7 +73,6 @@ go_test(
         "timestamp_test.go",
         "type_test.go",
         "uint_test.go",
-        "util_test.go",
     ],
     embed = [":go_default_library"],
     deps = [

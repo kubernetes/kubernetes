@@ -149,6 +149,21 @@ func isEqualOrLessSpecific(t1 *exprpb.Type, t2 *exprpb.Type) bool {
 			}
 		}
 		return true
+	case kindFunction:
+		fn1 := t1.GetFunction()
+		fn2 := t2.GetFunction()
+		if len(fn1.ArgTypes) != len(fn2.ArgTypes) {
+			return false
+		}
+		if !isEqualOrLessSpecific(fn1.ResultType, fn2.ResultType) {
+			return false
+		}
+		for i, a1 := range fn1.ArgTypes {
+			if !isEqualOrLessSpecific(a1, fn2.ArgTypes[i]) {
+				return false
+			}
+		}
+		return true
 	case kindList:
 		return isEqualOrLessSpecific(t1.GetListType().ElemType, t2.GetListType().ElemType)
 	case kindMap:
@@ -165,26 +180,43 @@ func isEqualOrLessSpecific(t1 *exprpb.Type, t2 *exprpb.Type) bool {
 
 /// internalIsAssignable returns true if t1 is assignable to t2.
 func internalIsAssignable(m *mapping, t1 *exprpb.Type, t2 *exprpb.Type) bool {
+	// A type is always assignable to itself.
+	// Early terminate the call to avoid cases of infinite recursion.
+	if proto.Equal(t1, t2) {
+		return true
+	}
 	// Process type parameters.
 	kind1, kind2 := kindOf(t1), kindOf(t2)
 	if kind2 == kindTypeParam {
-		// If t2 is a valid type substitution for t1, return true.
-		valid, t2HasSub := isValidTypeSubstitution(m, t1, t2)
-		if valid {
+		if t2Sub, found := m.find(t2); found {
+			// If the types are compatible, pick the more general type and return true
+			if !internalIsAssignable(m, t1, t2Sub) {
+				return false
+			}
+			m.add(t2, mostGeneral(t1, t2Sub))
 			return true
 		}
-		// If t2 is not a valid type sub for t1, and already has a known substitution return false
-		// since it is not possible for t1 to be a substitution for t2.
-		if !valid && t2HasSub {
-			return false
+		if notReferencedIn(m, t2, t1) {
+			m.add(t2, t1)
+			return true
 		}
-		// Otherwise, fall through to check whether t1 is a possible substitution for t2.
 	}
 	if kind1 == kindTypeParam {
-		// Return whether t1 is a valid substitution for t2. If not, do no additional checks as the
-		// possible type substitutions have been searched in both directions.
-		valid, _ := isValidTypeSubstitution(m, t2, t1)
-		return valid
+		// For the lower type bound, we currently do not perform adjustment. The restricted
+		// way we use type parameters in lower type bounds, it is not necessary, but may
+		// become if we generalize type unification.
+		if t1Sub, found := m.find(t1); found {
+			// If the types are compatible, pick the more general type and return true
+			if !internalIsAssignable(m, t1Sub, t2) {
+				return false
+			}
+			m.add(t1, mostGeneral(t1Sub, t2))
+			return true
+		}
+		if notReferencedIn(m, t1, t2) {
+			m.add(t1, t2)
+			return true
+		}
 	}
 
 	// Next check for wildcard types.
@@ -230,40 +262,18 @@ func internalIsAssignable(m *mapping, t1 *exprpb.Type, t2 *exprpb.Type) bool {
 	}
 }
 
-// isValidTypeSubstitution returns whether t2 (or its type substitution) is a valid type
-// substitution for t1, and whether t2 has a type substitution in mapping m.
-//
-// The type t2 is a valid substitution for t1 if any of the following statements is true
-// - t2 has a type substitition (t2sub) equal to t1
-// - t2 has a type substitution (t2sub) assignable to t1
-// - t2 does not occur within t1.
-func isValidTypeSubstitution(m *mapping, t1, t2 *exprpb.Type) (valid, hasSub bool) {
-	if t2Sub, found := m.find(t2); found {
-		kind1, kind2 := kindOf(t1), kindOf(t2)
-		if kind1 == kind2 && proto.Equal(t1, t2Sub) {
-			return true, true
-		}
-		// If the types are compatible, pick the more general type and return true
-		if internalIsAssignable(m, t1, t2Sub) {
-			m.add(t2, mostGeneral(t1, t2Sub))
-			return true, true
-		}
-		return false, true
-	}
-	if notReferencedIn(m, t2, t1) {
-		m.add(t2, t1)
-		return true, false
-	}
-	return false, false
-}
-
 // internalIsAssignableAbstractType returns true if the abstract type names agree and all type
 // parameters are assignable.
 func internalIsAssignableAbstractType(m *mapping,
 	a1 *exprpb.Type_AbstractType,
 	a2 *exprpb.Type_AbstractType) bool {
-	return a1.GetName() == a2.GetName() &&
-		internalIsAssignableList(m, a1.GetParameterTypes(), a2.GetParameterTypes())
+	if a1.GetName() != a2.GetName() {
+		return false
+	}
+	if internalIsAssignableList(m, a1.GetParameterTypes(), a2.GetParameterTypes()) {
+		return true
+	}
+	return false
 }
 
 // internalIsAssignableFunction returns true if the function return type and arg types are
@@ -411,6 +421,15 @@ func notReferencedIn(m *mapping, t *exprpb.Type, withinType *exprpb.Type) bool {
 			}
 		}
 		return true
+	case kindFunction:
+		fn := withinType.GetFunction()
+		types := flattenFunctionTypes(fn)
+		for _, a := range types {
+			if !notReferencedIn(m, t, a) {
+				return false
+			}
+		}
+		return true
 	case kindList:
 		return notReferencedIn(m, t, withinType.GetListType().ElemType)
 	case kindMap:
@@ -435,6 +454,7 @@ func substitute(m *mapping, t *exprpb.Type, typeParamToDyn bool) *exprpb.Type {
 	}
 	switch kind {
 	case kindAbstract:
+		// TODO: implement!
 		at := t.GetAbstractType()
 		params := make([]*exprpb.Type, len(at.GetParameterTypes()))
 		for i, p := range at.GetParameterTypes() {

@@ -162,7 +162,7 @@ type exprInterpreter struct {
 }
 
 // NewInterpreter builds an Interpreter from a Dispatcher and TypeProvider which will be used
-// throughout the Eval of all Interpretable instances generated from it.
+// throughout the Eval of all Interpretable instances gerenated from it.
 func NewInterpreter(dispatcher Dispatcher,
 	container *containers.Container,
 	provider ref.TypeProvider,
