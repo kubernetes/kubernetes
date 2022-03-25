@@ -90,6 +90,10 @@ func (t *timeoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// resultCh is used as both errCh and stopCh
 	resultCh := make(chan interface{})
 	tw := newTimeoutWriter(w)
+
+	// Make a copy of request and work on it in new goroutine
+	// to avoid race condition when accessing/modifying request (e.g. headers)
+	rCopy := r.Clone(r.Context())
 	go func() {
 		defer func() {
 			err := recover()
@@ -104,7 +108,7 @@ func (t *timeoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 			resultCh <- err
 		}()
-		t.handler.ServeHTTP(tw, r)
+		t.handler.ServeHTTP(tw, rCopy)
 	}()
 	select {
 	case err := <-resultCh:
