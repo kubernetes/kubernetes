@@ -52,7 +52,6 @@ import (
 // can't reliably simulate periodic sync of volumes/claims - it would be
 // either very timing-sensitive or slow to wait for real periodic sync.
 func TestControllerSync(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HonorPVReclaimPolicy, true)()
 	tests := []controllerTest{
 		// [Unit test set 5] - controller tests.
 		// We test the controller as if
@@ -612,7 +611,6 @@ func TestUpdateFinalizer(t *testing.T) {
 	// This set of tests ensures that protection finalizer is removed when CSI migration is disabled
 	// and PV controller needs to remove finalizers added by the external-provisioner.
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationGCE, false)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HonorPVReclaimPolicy, true)()
 	const gcePlugin = "kubernetes.io/gce-pd"
 	const gceDriver = "pd.csi.storage.gke.io"
 	const customFinalizer = "test.volume.kubernetes.io/finalizer"
