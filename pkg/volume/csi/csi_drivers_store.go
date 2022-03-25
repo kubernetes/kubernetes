@@ -27,6 +27,7 @@ import (
 type Driver struct {
 	endpoint                string
 	highestSupportedVersion *utilversion.Version
+	supportsStageUnstage    bool
 }
 
 // DriversStore holds a list of CSI Drivers

@@ -35,7 +35,7 @@ import (
 )
 
 func prepareBlockMapperTest(plug *csiPlugin, specVolumeName string, t *testing.T) (*csiBlockMapper, *volume.Spec, *api.PersistentVolume, error) {
-	registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
+	registerFakePlugin(t, testDriver, "endpoint", []string{"1.0.0"}, true)
 	pv := makeTestPV(specVolumeName, 10, testDriver, testVol)
 	spec := volume.NewSpecFromPersistentVolume(pv, pv.Spec.PersistentVolumeSource.CSI.ReadOnly)
 	mapper, err := plug.NewBlockVolumeMapper(

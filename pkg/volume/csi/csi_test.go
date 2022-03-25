@@ -246,6 +246,8 @@ func TestCSI_VolumeAll(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, !test.disableFSGroupPolicyFeatureGate)()
 
+			registerFakePlugin(t, test.driver, "", []string{"1.0.0"}, true)
+
 			tmpDir, err := utiltesting.MkTmpdir("csi-test")
 			if err != nil {
 				t.Fatalf("can't create temp dir: %v", err)

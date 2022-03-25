@@ -132,6 +132,23 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
 	defer cancel()
 
+	supportsStageUnstage, err := csi.NodeSupportsVolumeStats(ctx)
+	if err != nil {
+		if unregErr := unregisterDriver(pluginName); unregErr != nil {
+			klog.Error(log("registrationHandler.RegisterPlugin failed to unregister plugin due to previous error: %v", unregErr))
+		}
+		return err
+	}
+
+	csiDrivers.Set(pluginName, Driver{
+		endpoint:                endpoint,
+		highestSupportedVersion: highestSupportedVersion,
+		supportsStageUnstage:    supportsStageUnstage,
+	})
+
+	ctx, cancel = context.WithTimeout(context.Background(), csiTimeout)
+	defer cancel()
+
 	driverNodeID, maxVolumePerNode, accessibleTopology, err := csi.NodeGetInfo(ctx)
 	if err != nil {
 		if unregErr := unregisterDriver(pluginName); unregErr != nil {
@@ -631,6 +648,15 @@ func (p *csiPlugin) CanAttach(spec *volume.Spec) (bool, error) {
 
 // CanDeviceMount returns true if the spec supports device mount
 func (p *csiPlugin) CanDeviceMount(spec *volume.Spec) (bool, error) {
+	supportsStageUnstage, err := p.getSupportsStageUnstage(spec)
+	if err != nil {
+		return false, err
+	}
+
+	if !supportsStageUnstage {
+		return false, nil
+	}
+
 	inlineEnabled := utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume)
 	if !inlineEnabled {
 		// No need to check anything, we assume it is a persistent volume.
@@ -891,6 +917,20 @@ func (p *csiPlugin) getVolumeLifecycleMode(spec *volume.Spec) (storage.VolumeLif
 		return storage.VolumeLifecycleEphemeral, nil
 	}
 	return storage.VolumeLifecyclePersistent, nil
+}
+
+func (p *csiPlugin) getSupportsStageUnstage(spec *volume.Spec) (bool, error) {
+	driverName, err := GetCSIDriverName(spec)
+	if err != nil {
+		return false, fmt.Errorf(log("failed to get csi driver name from spec: %v", err))
+	}
+
+	driver, ok := csiDrivers.Get(driverName)
+	if !ok {
+		return false, fmt.Errorf(log("driver name %s not found in the list of registered CSI drivers", driverName))
+	}
+
+	return driver.supportsStageUnstage, nil
 }
 
 // getFSGroupPolicy returns if the CSI driver supports a volume in the given mode.

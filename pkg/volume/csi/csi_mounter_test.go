@@ -86,7 +86,7 @@ func TestMounterGetPath(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Logf("test case: %s", tc.name)
-		registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
+		registerFakePlugin(t, testDriver, "endpoint", []string{"1.0.0"}, true)
 		pv := makeTestPV(tc.specVolumeName, 10, testDriver, testVol)
 		spec := volume.NewSpecFromPersistentVolume(pv, pv.Spec.PersistentVolumeSource.CSI.ReadOnly)
 		mounter, err := plug.NewMounter(
@@ -178,7 +178,7 @@ func TestMounterSetUp(t *testing.T) {
 			plug, tmpDir := newTestPlugin(t, fakeClient)
 			defer os.RemoveAll(tmpDir)
 
-			registerFakePlugin(test.driver, "endpoint", []string{"1.0.0"}, t)
+			registerFakePlugin(t, test.driver, "endpoint", []string{"1.0.0"}, true)
 			pv := makeTestPV("test-pv", 10, test.driver, testVol)
 			pv.Spec.CSI.VolumeAttributes = test.volumeContext
 			pv.Spec.MountOptions = []string{"foo=bar", "baz=qux"}
@@ -324,7 +324,7 @@ func TestMounterSetUpSimple(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
+		registerFakePlugin(t, testDriver, "endpoint", []string{"1.0.0"}, true)
 		t.Run(tc.name, func(t *testing.T) {
 			mounter, err := plug.NewMounter(
 				tc.spec(tc.fsType, tc.options),
@@ -458,7 +458,7 @@ func TestMounterSetupWithStatusTracking(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
+		registerFakePlugin(t, testDriver, "endpoint", []string{"1.0.0"}, true)
 		t.Run(tc.name, func(t *testing.T) {
 			mounter, err := plug.NewMounter(
 				tc.spec("ext4", []string{}),
@@ -561,7 +561,7 @@ func TestMounterSetUpWithInline(t *testing.T) {
 		fakeClient := fakeclient.NewSimpleClientset(driver)
 		plug, tmpDir := newTestPlugin(t, fakeClient)
 		defer os.RemoveAll(tmpDir)
-		registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
+		registerFakePlugin(t, testDriver, "endpoint", []string{"1.0.0"}, true)
 		t.Run(tc.name, func(t *testing.T) {
 			mounter, err := plug.NewMounter(
 				tc.spec(tc.fsType, tc.options),
@@ -831,7 +831,7 @@ func TestMounterSetUpWithFSGroup(t *testing.T) {
 		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DelegateFSGroupToCSIDriver, tc.delegateFSGroupFeatureGate)()
 
 		volName := fmt.Sprintf("test-vol-%d", i)
-		registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
+		registerFakePlugin(t, testDriver, "endpoint", []string{"1.0.0"}, true)
 		pv := makeTestPV("test-pv", 10, testDriver, volName)
 		pv.Spec.AccessModes = tc.accessModes
 		pvName := pv.GetName()
@@ -901,7 +901,7 @@ func TestMounterSetUpWithFSGroup(t *testing.T) {
 func TestUnmounterTeardown(t *testing.T) {
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
-	registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
+	registerFakePlugin(t, testDriver, "endpoint", []string{"1.0.0"}, true)
 	pv := makeTestPV("test-pv", 10, testDriver, testVol)
 
 	// save the data file prior to unmount
@@ -1039,7 +1039,7 @@ func TestPodServiceAccountTokenAttrs(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
+			registerFakePlugin(t, testDriver, "endpoint", []string{"1.0.0"}, true)
 			client := fakeclient.NewSimpleClientset()
 			if test.driver != nil {
 				test.driver.Spec.VolumeLifecycleModes = []storage.VolumeLifecycleMode{

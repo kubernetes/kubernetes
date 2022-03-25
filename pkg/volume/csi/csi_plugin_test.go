@@ -141,7 +141,7 @@ func newTestPluginWithVolumeHost(t *testing.T, client *fakeclient.Clientset, hos
 	return csiPlug, tmpDir
 }
 
-func registerFakePlugin(pluginName, endpoint string, versions []string, t *testing.T) {
+func registerFakePlugin(t *testing.T, pluginName, endpoint string, versions []string, supportsStageUnstage bool) {
 	highestSupportedVersions, err := highestSupportedVersion(versions)
 	if err != nil {
 		t.Fatalf("unexpected error parsing versions (%v) for pluginName %q endpoint %q: %#v", versions, pluginName, endpoint, err)
@@ -151,6 +151,7 @@ func registerFakePlugin(pluginName, endpoint string, versions []string, t *testi
 	csiDrivers.Set(pluginName, Driver{
 		endpoint:                endpoint,
 		highestSupportedVersion: highestSupportedVersions,
+		supportsStageUnstage:    supportsStageUnstage,
 	})
 }
 
@@ -200,7 +201,7 @@ func TestPluginGetFSGroupPolicy(t *testing.T) {
 		fakeClient := fakeclient.NewSimpleClientset(driver)
 		plug, tmpDir := newTestPlugin(t, fakeClient)
 		defer os.RemoveAll(tmpDir)
-		registerFakePlugin(testDriver, "endpoint", []string{"1.3.0"}, t)
+		registerFakePlugin(t, testDriver, "endpoint", []string{"1.3.0"}, true)
 
 		// Check to see if we can obtain the CSIDriver, along with examining its FSGroupPolicy
 		fsGroup, err := plug.getFSGroupPolicy(testDriver)
@@ -263,7 +264,7 @@ func TestPluginGetVolumeName(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Logf("testing: %s", tc.name)
-		registerFakePlugin(tc.driverName, "endpoint", []string{"1.3.0"}, t)
+		registerFakePlugin(t, tc.driverName, "endpoint", []string{"1.3.0"}, true)
 		name, err := plug.GetVolumeName(tc.spec)
 		if tc.shouldFail != (err != nil) {
 			t.Fatal("shouldFail does match expected error")
@@ -316,7 +317,7 @@ func TestPluginGetVolumeNameWithInline(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Logf("testing: %s", tc.name)
-		registerFakePlugin(tc.driverName, "endpoint", []string{"1.3.0"}, t)
+		registerFakePlugin(t, tc.driverName, "endpoint", []string{"1.3.0"}, true)
 		name, err := plug.GetVolumeName(tc.spec)
 		if tc.shouldFail != (err != nil) {
 			t.Fatal("shouldFail does match expected error")
@@ -357,7 +358,7 @@ func TestPluginCanSupport(t *testing.T) {
 
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
-	registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
+	registerFakePlugin(t, testDriver, "endpoint", []string{"1.0.0"}, true)
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -396,7 +397,7 @@ func TestPluginCanSupportWithInline(t *testing.T) {
 
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
-	registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
+	registerFakePlugin(t, testDriver, "endpoint", []string{"1.0.0"}, true)
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -444,7 +445,7 @@ func TestPluginConstructVolumeSpec(t *testing.T) {
 		},
 	}
 
-	registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
+	registerFakePlugin(t, testDriver, "endpoint", []string{"1.0.0"}, true)
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -570,7 +571,7 @@ func TestPluginConstructVolumeSpecWithInline(t *testing.T) {
 		},
 	}
 
-	registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
+	registerFakePlugin(t, testDriver, "endpoint", []string{"1.0.0"}, true)
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -679,7 +680,7 @@ func TestPluginNewMounter(t *testing.T) {
 			plug, tmpDir := newTestPlugin(t, nil)
 			defer os.RemoveAll(tmpDir)
 
-			registerFakePlugin(testDriver, "endpoint", []string{"1.2.0"}, t)
+			registerFakePlugin(t, testDriver, "endpoint", []string{"1.2.0"}, true)
 			mounter, err := plug.NewMounter(
 				test.spec,
 				&api.Pod{ObjectMeta: meta.ObjectMeta{UID: test.podUID, Namespace: test.namespace}},
@@ -812,7 +813,7 @@ func TestPluginNewMounterWithInline(t *testing.T) {
 				plug, tmpDir := newTestPlugin(t, fakeClient)
 				defer os.RemoveAll(tmpDir)
 
-				registerFakePlugin(testDriver, "endpoint", []string{"1.2.0"}, t)
+				registerFakePlugin(t, testDriver, "endpoint", []string{"1.2.0"}, true)
 
 				mounter, err := plug.NewMounter(
 					test.spec,
@@ -908,7 +909,7 @@ func TestPluginNewUnmounter(t *testing.T) {
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
 
-	registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
+	registerFakePlugin(t, testDriver, "endpoint", []string{"1.0.0"}, true)
 	pv := makeTestPV("test-pv", 10, testDriver, testVol)
 
 	// save the data file to re-create client
@@ -1126,41 +1127,55 @@ func TestPluginFindAttachablePlugin(t *testing.T) {
 func TestPluginCanDeviceMount(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
 	tests := []struct {
-		name           string
-		driverName     string
-		spec           *volume.Spec
-		canDeviceMount bool
-		shouldFail     bool
+		name                 string
+		driverName           string
+		spec                 *volume.Spec
+		supportsStageUnstage bool
+		canDeviceMount       bool
+		shouldFail           bool
 	}{
 		{
-			name:           "non device mountable inline",
-			driverName:     "inline-driver",
-			spec:           volume.NewSpecFromVolume(makeTestVol("test-vol", "inline-driver")),
-			canDeviceMount: false,
+			name:                 "non device mountable inline",
+			driverName:           "inline-driver",
+			spec:                 volume.NewSpecFromVolume(makeTestVol("test-vol", "inline-driver")),
+			supportsStageUnstage: true,
+			canDeviceMount:       false,
 		},
 		{
-			name:           "device mountable PV",
-			driverName:     "device-mountable-pv",
-			spec:           volume.NewSpecFromPersistentVolume(makeTestPV("test-vol", 20, "device-mountable-pv", testVol), true),
-			canDeviceMount: true,
+			name:                 "device mountable PV",
+			driverName:           "device-mountable-pv",
+			spec:                 volume.NewSpecFromPersistentVolume(makeTestPV("test-vol", 20, "device-mountable-pv", testVol), true),
+			supportsStageUnstage: true,
+			canDeviceMount:       true,
 		},
 		{
-			name:           "incomplete spec",
-			driverName:     "device-unmountable",
-			spec:           &volume.Spec{ReadOnly: true},
-			canDeviceMount: false,
-			shouldFail:     true,
+			name:                 "non device mountable PV",
+			driverName:           "non-device-mountable-pv",
+			spec:                 volume.NewSpecFromPersistentVolume(makeTestPV("test-vol", 20, "non-device-mountable-pv", testVol), true),
+			supportsStageUnstage: false,
+			canDeviceMount:       false,
 		},
 		{
-			name:           "missing spec",
-			driverName:     "device-unmountable",
-			canDeviceMount: false,
-			shouldFail:     true,
+			name:                 "incomplete spec",
+			driverName:           "device-unmountable",
+			spec:                 &volume.Spec{ReadOnly: true},
+			supportsStageUnstage: true,
+			canDeviceMount:       false,
+			shouldFail:           true,
+		},
+		{
+			name:                 "missing spec",
+			driverName:           "device-unmountable",
+			supportsStageUnstage: true,
+			canDeviceMount:       false,
+			shouldFail:           true,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			registerFakePlugin(t, test.driverName, "", []string{"1.0.0"}, test.supportsStageUnstage)
+
 			plug, tmpDir := newTestPlugin(t, nil)
 			defer os.RemoveAll(tmpDir)
 
@@ -1169,7 +1184,7 @@ func TestPluginCanDeviceMount(t *testing.T) {
 				t.Fatalf("unexpected error in plug.CanDeviceMount: %s", err)
 			}
 			if pluginCanDeviceMount != test.canDeviceMount {
-				t.Fatalf("expecting plugin.CanAttach %t got %t", test.canDeviceMount, pluginCanDeviceMount)
+				t.Fatalf("expecting plugin.CanDeviceMount %t got %t", test.canDeviceMount, pluginCanDeviceMount)
 			}
 		})
 	}
@@ -1178,41 +1193,55 @@ func TestPluginCanDeviceMount(t *testing.T) {
 func TestPluginFindDeviceMountablePluginBySpec(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
 	tests := []struct {
-		name           string
-		driverName     string
-		spec           *volume.Spec
-		canDeviceMount bool
-		shouldFail     bool
+		name                 string
+		driverName           string
+		spec                 *volume.Spec
+		supportsStageUnstage bool
+		canDeviceMount       bool
+		shouldFail           bool
 	}{
 		{
-			name:           "non device mountable inline",
-			driverName:     "inline-driver",
-			spec:           volume.NewSpecFromVolume(makeTestVol("test-vol", "inline-driver")),
-			canDeviceMount: false,
+			name:                 "non device mountable inline",
+			driverName:           "inline-driver",
+			spec:                 volume.NewSpecFromVolume(makeTestVol("test-vol", "inline-driver")),
+			supportsStageUnstage: true,
+			canDeviceMount:       false,
 		},
 		{
-			name:           "device mountable PV",
-			driverName:     "device-mountable-pv",
-			spec:           volume.NewSpecFromPersistentVolume(makeTestPV("test-vol", 20, "device-mountable-pv", testVol), true),
-			canDeviceMount: true,
+			name:                 "device mountable PV",
+			driverName:           "device-mountable-pv",
+			spec:                 volume.NewSpecFromPersistentVolume(makeTestPV("test-vol", 20, "device-mountable-pv", testVol), true),
+			supportsStageUnstage: true,
+			canDeviceMount:       true,
 		},
 		{
-			name:           "incomplete spec",
-			driverName:     "device-unmountable",
-			spec:           &volume.Spec{ReadOnly: true},
-			canDeviceMount: false,
-			shouldFail:     true,
+			name:                 "non device mountable PV",
+			driverName:           "non-device-mountable-pv",
+			spec:                 volume.NewSpecFromPersistentVolume(makeTestPV("test-vol", 20, "non-device-mountable-pv", testVol), true),
+			supportsStageUnstage: false,
+			canDeviceMount:       false,
 		},
 		{
-			name:           "missing spec",
-			driverName:     "device-unmountable",
-			canDeviceMount: false,
-			shouldFail:     true,
+			name:                 "incomplete spec",
+			driverName:           "device-unmountable",
+			spec:                 &volume.Spec{ReadOnly: true},
+			supportsStageUnstage: true,
+			canDeviceMount:       false,
+			shouldFail:           true,
+		},
+		{
+			name:                 "missing spec",
+			driverName:           "device-unmountable",
+			supportsStageUnstage: true,
+			canDeviceMount:       false,
+			shouldFail:           true,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			registerFakePlugin(t, test.driverName, "endpoint", []string{"1.0.0"}, test.supportsStageUnstage)
+
 			tmpDir, err := utiltesting.MkTmpdir("csi-test")
 			if err != nil {
 				t.Fatalf("can't create temp dir: %v", err)
@@ -1244,7 +1273,7 @@ func TestPluginNewBlockMapper(t *testing.T) {
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
 
-	registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
+	registerFakePlugin(t, testDriver, "endpoint", []string{"1.0.0"}, true)
 	pv := makeTestPV("test-block-pv", 10, testDriver, testVol)
 	mounter, err := plug.NewBlockVolumeMapper(
 		volume.NewSpecFromPersistentVolume(pv, pv.Spec.PersistentVolumeSource.CSI.ReadOnly),
@@ -1291,7 +1320,7 @@ func TestPluginNewUnmapper(t *testing.T) {
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
 
-	registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
+	registerFakePlugin(t, testDriver, "endpoint", []string{"1.0.0"}, true)
 	pv := makeTestPV("test-pv", 10, testDriver, testVol)
 
 	// save the data file to re-create client
