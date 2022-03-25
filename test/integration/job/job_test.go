@@ -540,7 +540,7 @@ func TestOrphanPodsFinalizersClearedWithGC(t *testing.T) {
 
 			jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					Parallelism: pointer.Int32Ptr(5),
+					Parallelism: pointer.Int32Ptr(2),
 				},
 			})
 			if err != nil {
@@ -550,7 +550,7 @@ func TestOrphanPodsFinalizersClearedWithGC(t *testing.T) {
 				t.Error("apiserver didn't add the tracking annotation")
 			}
 			validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
-				Active: 5,
+				Active: 2,
 			}, true)
 
 			// Delete Job. The GC should delete the pods in cascade.
