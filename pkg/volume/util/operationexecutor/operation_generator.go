@@ -1480,9 +1480,10 @@ func (og *operationGenerator) GenerateVerifyControllerAttachedVolumeFunc(
 
 	verifyControllerAttachedVolumeFunc := func() volumetypes.OperationContext {
 		migrated := getMigratedStatusBySpec(volumeToMount.VolumeSpec)
-		var claimSize *resource.Quantity
+		claimSize := actualStateOfWorld.GetClaimSize(volumeToMount.VolumeName)
 
-		if volumeToMount.VolumeSpec.PersistentVolume != nil {
+		// only fetch claimSize if it was not set previously
+		if volumeToMount.VolumeSpec.PersistentVolume != nil && claimSize == nil {
 			pv := volumeToMount.VolumeSpec.PersistentVolume
 			pvc, err := og.kubeClient.CoreV1().PersistentVolumeClaims(pv.Spec.ClaimRef.Namespace).Get(context.TODO(), pv.Spec.ClaimRef.Name, metav1.GetOptions{})
 			if err != nil {

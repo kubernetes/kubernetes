@@ -613,6 +613,17 @@ func (asw *actualStateOfWorld) InitializeClaimSize(volumeName v1.UniqueVolumeNam
 	}
 }
 
+func (asw *actualStateOfWorld) GetClaimSize(volumeName v1.UniqueVolumeName) *resource.Quantity {
+	asw.RLock()
+	defer asw.RUnlock()
+
+	volumeObj, ok := asw.attachedVolumes[volumeName]
+	if ok {
+		return volumeObj.persistentVolumeSize
+	}
+	return nil
+}
+
 func (asw *actualStateOfWorld) DeletePodFromVolume(
 	podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName) error {
 	asw.Lock()
