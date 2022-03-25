@@ -49,10 +49,10 @@ const cniConfig = `{
 `
 
 const credentialProviderConfig = `kind: CredentialProviderConfig
-apiVersion: kubelet.config.k8s.io/v1alpha1
+apiVersion: kubelet.config.k8s.io/v1beta1
 providers:
   - name: gcp-credential-provider
-    apiVersion: credentialprovider.kubelet.k8s.io/v1alpha1
+    apiVersion: credentialprovider.kubelet.k8s.io/v1beta1
     matchImages:
     - "gcr.io"
     - "*.gcr.io"
