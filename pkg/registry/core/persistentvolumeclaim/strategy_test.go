@@ -76,45 +76,35 @@ func TestDropConditions(t *testing.T) {
 		},
 	}
 
-	for _, enabled := range []bool{true} {
-		for _, oldPvcInfo := range pvcInfo {
-			for _, newPvcInfo := range pvcInfo {
-				oldPvcHasConditins, oldPvc := oldPvcInfo.hasConditions, oldPvcInfo.pvc()
-				newPvcHasConditions, newPvc := newPvcInfo.hasConditions, newPvcInfo.pvc()
+	for _, oldPvcInfo := range pvcInfo {
+		for _, newPvcInfo := range pvcInfo {
+			oldPvcHasConditins, oldPvc := oldPvcInfo.hasConditions, oldPvcInfo.pvc()
+			newPvcHasConditions, newPvc := newPvcInfo.hasConditions, newPvcInfo.pvc()
 
-				t.Run(fmt.Sprintf("feature enabled=%v, old pvc %v, new pvc %v", enabled, oldPvcInfo.description, newPvcInfo.description), func(t *testing.T) {
-					StatusStrategy.PrepareForUpdate(ctx, newPvc, oldPvc)
+			t.Run(fmt.Sprintf("old pvc %s, new pvc %s", oldPvcInfo.description, newPvcInfo.description), func(t *testing.T) {
+				StatusStrategy.PrepareForUpdate(ctx, newPvc, oldPvc)
 
-					// old pvc should never be changed
-					if !reflect.DeepEqual(oldPvc, oldPvcInfo.pvc()) {
-						t.Errorf("old pvc changed: %v", diff.ObjectReflectDiff(oldPvc, oldPvcInfo.pvc()))
+				// old pvc should never be changed
+				if !reflect.DeepEqual(oldPvc, oldPvcInfo.pvc()) {
+					t.Errorf("old pvc changed: %v", diff.ObjectReflectDiff(oldPvc, oldPvcInfo.pvc()))
+				}
+
+				switch {
+				case oldPvcHasConditins || newPvcHasConditions:
+					// new pvc should not be changed if the feature is enabled, or if the old pvc had Conditions
+					if !reflect.DeepEqual(newPvc, newPvcInfo.pvc()) {
+						t.Errorf("new pvc changed: %v", diff.ObjectReflectDiff(newPvc, newPvcInfo.pvc()))
 					}
-
-					switch {
-					case enabled || oldPvcHasConditins:
-						// new pvc should not be changed if the feature is enabled, or if the old pvc had Conditions
-						if !reflect.DeepEqual(newPvc, newPvcInfo.pvc()) {
-							t.Errorf("new pvc changed: %v", diff.ObjectReflectDiff(newPvc, newPvcInfo.pvc()))
-						}
-					case newPvcHasConditions:
-						// new pvc should be changed
-						if reflect.DeepEqual(newPvc, newPvcInfo.pvc()) {
-							t.Errorf("new pvc was not changed")
-						}
-						// new pvc should not have Conditions
-						if !reflect.DeepEqual(newPvc, pvcWithoutConditions()) {
-							t.Errorf("new pvc had Conditions: %v", diff.ObjectReflectDiff(newPvc, pvcWithoutConditions()))
-						}
-					default:
-						// new pvc should not need to be changed
-						if !reflect.DeepEqual(newPvc, newPvcInfo.pvc()) {
-							t.Errorf("new pvc changed: %v", diff.ObjectReflectDiff(newPvc, newPvcInfo.pvc()))
-						}
+				default:
+					// new pvc should not need to be changed
+					if !reflect.DeepEqual(newPvc, newPvcInfo.pvc()) {
+						t.Errorf("new pvc changed: %v", diff.ObjectReflectDiff(newPvc, newPvcInfo.pvc()))
 					}
-				})
-			}
+				}
+			})
 		}
 	}
+
 }
 
 func TestPrepareForCreate(t *testing.T) {
