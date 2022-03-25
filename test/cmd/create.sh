@@ -72,18 +72,6 @@ run_kubectl_create_error_tests() {
   # Passing no arguments to create is an error
   ! kubectl create || exit 1
 
-  ## kubectl create should not panic on empty string lists in a template
-  ERROR_FILE="${KUBE_TEMP}/validation-error"
-  kubectl create -f hack/testdata/invalid-rc-with-empty-args.yaml "${kube_flags[@]}" 2> "${ERROR_FILE}" || true
-  # Post-condition: should get an error reporting the empty string
-  if grep -q "unknown object type \"nil\" in ReplicationController" "${ERROR_FILE}"; then
-    kube::log::status "\"kubectl create with empty string list returns error as expected: $(cat "${ERROR_FILE}")"
-  else
-    kube::log::status "\"kubectl create with empty string list returns unexpected error or non-error: $(cat "${ERROR_FILE}")"
-    exit 1
-  fi
-  rm "${ERROR_FILE}"
-
   # Posting a pod to namespaces should fail.  Also tests --raw forcing the post location
   grep -q 'the object provided is unrecognized (must be of type Namespace)' <<< "$( kubectl create "${kube_flags[@]}" --raw /api/v1/namespaces -f test/fixtures/doc-yaml/admin/limitrange/valid-pod.yaml --v=8 2>&1 )"
 

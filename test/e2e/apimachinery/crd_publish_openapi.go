@@ -95,19 +95,19 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 
 		ginkgo.By("client-side validation (kubectl create and apply) rejects request with unknown properties when disallowed by the schema")
 		unknownCR := fmt.Sprintf(`{%s,"spec":{"foo":true}}`, meta)
-		if _, err := framework.RunKubectlInput(f.Namespace.Name, unknownCR, ns, "create", "-f", "-"); err == nil || !strings.Contains(err.Error(), `unknown field "foo"`) {
+		if _, err := framework.RunKubectlInput(f.Namespace.Name, unknownCR, ns, "create", "-f", "-"); err == nil || (!strings.Contains(err.Error(), `unknown field "foo"`) && !strings.Contains(err.Error(), `unknown field "spec.foo"`)) {
 			framework.Failf("unexpected no error when creating CR with unknown field: %v", err)
 		}
-		if _, err := framework.RunKubectlInput(f.Namespace.Name, unknownCR, ns, "apply", "-f", "-"); err == nil || !strings.Contains(err.Error(), `unknown field "foo"`) {
+		if _, err := framework.RunKubectlInput(f.Namespace.Name, unknownCR, ns, "apply", "-f", "-"); err == nil || (!strings.Contains(err.Error(), `unknown field "foo"`) && !strings.Contains(err.Error(), `unknown field "spec.foo"`)) {
 			framework.Failf("unexpected no error when applying CR with unknown field: %v", err)
 		}
 
 		ginkgo.By("client-side validation (kubectl create and apply) rejects request without required properties")
 		noRequireCR := fmt.Sprintf(`{%s,"spec":{"bars":[{"age":"10"}]}}`, meta)
-		if _, err := framework.RunKubectlInput(f.Namespace.Name, noRequireCR, ns, "create", "-f", "-"); err == nil || !strings.Contains(err.Error(), `missing required field "name"`) {
+		if _, err := framework.RunKubectlInput(f.Namespace.Name, noRequireCR, ns, "create", "-f", "-"); err == nil || (!strings.Contains(err.Error(), `missing required field "name"`) && !strings.Contains(err.Error(), `spec.bars[0].name: Required value`)) {
 			framework.Failf("unexpected no error when creating CR without required field: %v", err)
 		}
-		if _, err := framework.RunKubectlInput(f.Namespace.Name, noRequireCR, ns, "apply", "-f", "-"); err == nil || !strings.Contains(err.Error(), `missing required field "name"`) {
+		if _, err := framework.RunKubectlInput(f.Namespace.Name, noRequireCR, ns, "apply", "-f", "-"); err == nil || (!strings.Contains(err.Error(), `missing required field "name"`) && !strings.Contains(err.Error(), `spec.bars[0].name: Required value`)) {
 			framework.Failf("unexpected no error when applying CR without required field: %v", err)
 		}
 
