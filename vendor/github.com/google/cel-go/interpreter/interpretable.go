@@ -677,19 +677,7 @@ func (m *evalMap) Eval(ctx Activation) ref.Val {
 }
 
 func (m *evalMap) InitVals() []Interpretable {
-	if len(m.keys) != len(m.vals) {
-		return nil
-	}
-	result := make([]Interpretable, len(m.keys)+len(m.vals))
-	idx := 0
-	for i, k := range m.keys {
-		v := m.vals[i]
-		result[idx] = k
-		idx++
-		result[idx] = v
-		idx++
-	}
-	return result
+	return append(m.keys, m.vals...)
 }
 
 func (m *evalMap) Type() ref.Type {
@@ -864,7 +852,7 @@ func (fold *evalFold) Cost() (min, max int64) {
 		iMax + aMax + cMax*rangeCnt + sMax*rangeCnt + rMax
 }
 
-// Optional Interpretable implementations that specialize, subsume, or extend the core evaluation
+// Optional Intepretable implementations that specialize, subsume, or extend the core evaluation
 // plan via decorators.
 
 // evalSetMembership is an Interpretable implementation which tests whether an input value
@@ -981,7 +969,7 @@ func (e *evalWatchConstQual) Qualify(vars Activation, obj interface{}) (interfac
 	return out, err
 }
 
-// QualifierValueEquals tests whether the incoming value is equal to the qualifying constant.
+// QualifierValueEquals tests whether the incoming value is equal to the qualificying constant.
 func (e *evalWatchConstQual) QualifierValueEquals(value interface{}) bool {
 	qve, ok := e.ConstantQualifier.(qualifierValueEquator)
 	return ok && qve.QualifierValueEquals(value)

@@ -27,7 +27,7 @@ type SourceLocation struct {
 }
 
 var (
-	// Location implements the SourceLocation interface.
+	// Location implements the SourcceLocation interface.
 	_ Location = &SourceLocation{}
 	// NoLocation is a particular illegal location.
 	NoLocation = &SourceLocation{-1, -1}

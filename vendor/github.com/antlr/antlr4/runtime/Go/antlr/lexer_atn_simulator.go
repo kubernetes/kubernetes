@@ -7,7 +7,6 @@ package antlr
 import (
 	"fmt"
 	"strconv"
-	"strings"
 )
 
 var (
@@ -207,7 +206,7 @@ func (l *LexerATNSimulator) getExistingTargetState(s *DFAState, t int) *DFAState
 		return nil
 	}
 
-	target := s.getIthEdge(t - LexerATNSimulatorMinDFAEdge)
+	target := s.getIthEdge(t-LexerATNSimulatorMinDFAEdge)
 	if LexerATNSimulatorDebug && target != nil {
 		fmt.Println("reuse state " + strconv.Itoa(s.stateNumber) + " edge to " + strconv.Itoa(target.stateNumber))
 	}
@@ -300,7 +299,7 @@ func (l *LexerATNSimulator) getReachableConfigSet(input CharStream, closure ATNC
 
 func (l *LexerATNSimulator) accept(input CharStream, lexerActionExecutor *LexerActionExecutor, startIndex, index, line, charPos int) {
 	if LexerATNSimulatorDebug {
-		fmt.Printf("ACTION %v\n", lexerActionExecutor)
+		fmt.Printf("ACTION %s\n", lexerActionExecutor)
 	}
 	// seek to after last char in token
 	input.Seek(index)
@@ -631,13 +630,7 @@ func (l *LexerATNSimulator) GetTokenName(tt int) string {
 		return "EOF"
 	}
 
-	var sb strings.Builder
-	sb.Grow(6)
-	sb.WriteByte('\'')
-	sb.WriteRune(rune(tt))
-	sb.WriteByte('\'')
-
-	return sb.String()
+	return "'" + string(tt) + "'"
 }
 
 func resetSimState(sim *SimState) {

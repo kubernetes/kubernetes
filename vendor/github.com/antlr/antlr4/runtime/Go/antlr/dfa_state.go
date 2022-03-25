@@ -50,8 +50,8 @@ type DFAState struct {
 
 	// edges elements point to the target of the symbol. Shift up by 1 so (-1)
 	// Token.EOF maps to the first element.
-	edges   []*DFAState
-	edgesMu sync.RWMutex
+	edges []*DFAState
+	edgesMu	sync.RWMutex
 
 	isAcceptState bool
 
@@ -92,16 +92,16 @@ func NewDFAState(stateNumber int, configs ATNConfigSet) *DFAState {
 }
 
 // GetAltSet gets the set of all alts mentioned by all ATN configurations in d.
-func (d *DFAState) GetAltSet() Set {
-	alts := NewArray2DHashSet(nil, nil)
+func (d *DFAState) GetAltSet() *Set {
+	alts := NewSet(nil, nil)
 
 	if d.configs != nil {
 		for _, c := range d.configs.GetItems() {
-			alts.Add(c.GetAlt())
+			alts.add(c.GetAlt())
 		}
 	}
 
-	if alts.Len() == 0 {
+	if alts.length() == 0 {
 		return nil
 	}
 
@@ -173,11 +173,26 @@ func (d *DFAState) String() string {
 		}
 	}
 
-	return fmt.Sprintf("%d:%s%s", d.stateNumber, fmt.Sprint(d.configs), s)
+	return fmt.Sprintf("%d:%s%s", fmt.Sprint(d.configs), s)
 }
 
 func (d *DFAState) hash() int {
-	h := murmurInit(7)
+	h := murmurInit(11)
+
+	c := 1
+	if d.isAcceptState {
+		if d.predicates != nil {
+			for _, p := range d.predicates {
+				h = murmurUpdate(h, p.alt)
+				h = murmurUpdate(h, p.pred.hash())
+				c += 2
+			}
+		} else {
+			h = murmurUpdate(h, d.prediction)
+			c += 1
+		}
+	}
+
 	h = murmurUpdate(h, d.configs.hash())
-	return murmurFinish(h, 1)
+	return murmurFinish(h, c)
 }

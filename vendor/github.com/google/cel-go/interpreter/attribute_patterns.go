@@ -105,7 +105,7 @@ func (apat *AttributePattern) QualifierPatterns() []*AttributeQualifierPattern {
 	return apat.qualifierPatterns
 }
 
-// AttributeQualifierPattern holds a wildcard or valued qualifier pattern.
+// AttributeQualifierPattern holds a wilcard or valued qualifier pattern.
 type AttributeQualifierPattern struct {
 	wildcard bool
 	value    interface{}
@@ -125,7 +125,7 @@ func (qpat *AttributeQualifierPattern) Matches(q Qualifier) bool {
 // type, is equal to the value held in the Qualifier. This interface is used by the
 // AttributeQualifierPattern to determine pattern matches for non-wildcard qualifier patterns.
 //
-// Note: Attribute values are also Qualifier values; however, Attributes are resolved before
+// Note: Attribute values are also Qualifier values; however, Attriutes are resolved before
 // qualification happens. This is an implementation detail, but one relevant to why the Attribute
 // types do not surface in the list of implementations.
 //
@@ -206,7 +206,7 @@ func (fac *partialAttributeFactory) AbsoluteAttribute(id int64, names ...string)
 }
 
 // MaybeAttribute implementation of the AttributeFactory interface which ensure that the set of
-// 'maybe' NamespacedAttribute values are produced using the partialAttributeFactory rather than
+// 'maybe' NamespacedAttribute values are produced using the PartialAttributeFactory rather than
 // the base AttributeFactory implementation.
 func (fac *partialAttributeFactory) MaybeAttribute(id int64, name string) Attribute {
 	return &maybeAttribute{

@@ -47,6 +47,35 @@ func (s *IntStack) Push(e int) {
 	*s = append(*s, e)
 }
 
+type Set struct {
+	data             map[int][]interface{}
+	hashcodeFunction func(interface{}) int
+	equalsFunction   func(interface{}, interface{}) bool
+}
+
+func NewSet(
+	hashcodeFunction func(interface{}) int,
+	equalsFunction func(interface{}, interface{}) bool) *Set {
+
+	s := new(Set)
+
+	s.data = make(map[int][]interface{})
+
+	if hashcodeFunction != nil {
+		s.hashcodeFunction = hashcodeFunction
+	} else {
+		s.hashcodeFunction = standardHashFunction
+	}
+
+	if equalsFunction == nil {
+		s.equalsFunction = standardEqualsFunction
+	} else {
+		s.equalsFunction = equalsFunction
+	}
+
+	return s
+}
+
 func standardEqualsFunction(a interface{}, b interface{}) bool {
 
 	ac, oka := a.(comparable)
@@ -69,6 +98,72 @@ func standardHashFunction(a interface{}) int {
 
 type hasher interface {
 	hash() int
+}
+
+func (s *Set) length() int {
+	return len(s.data)
+}
+
+func (s *Set) add(value interface{}) interface{} {
+
+	key := s.hashcodeFunction(value)
+
+	values := s.data[key]
+
+	if s.data[key] != nil {
+		for i := 0; i < len(values); i++ {
+			if s.equalsFunction(value, values[i]) {
+				return values[i]
+			}
+		}
+
+		s.data[key] = append(s.data[key], value)
+		return value
+	}
+
+	v := make([]interface{}, 1, 10)
+	v[0] = value
+	s.data[key] = v
+
+	return value
+}
+
+func (s *Set) contains(value interface{}) bool {
+
+	key := s.hashcodeFunction(value)
+
+	values := s.data[key]
+
+	if s.data[key] != nil {
+		for i := 0; i < len(values); i++ {
+			if s.equalsFunction(value, values[i]) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (s *Set) values() []interface{} {
+	var l []interface{}
+
+	for _, v := range s.data {
+		l = append(l, v...)
+	}
+
+	return l
+}
+
+func (s *Set) String() string {
+	r := ""
+
+	for _, av := range s.data {
+		for _, v := range av {
+			r += fmt.Sprint(v)
+		}
+	}
+
+	return r
 }
 
 type BitSet struct {
@@ -258,38 +353,65 @@ func PrintArrayJavaStyle(sa []string) string {
 	return buffer.String()
 }
 
+// The following routines were lifted from bits.rotate* available in Go 1.9.
+
+const uintSize = 32 << (^uint(0) >> 32 & 1) // 32 or 64
+
+// rotateLeft returns the value of x rotated left by (k mod UintSize) bits.
+// To rotate x right by k bits, call RotateLeft(x, -k).
+func rotateLeft(x uint, k int) uint {
+	if uintSize == 32 {
+		return uint(rotateLeft32(uint32(x), k))
+	}
+	return uint(rotateLeft64(uint64(x), k))
+}
+
+// rotateLeft32 returns the value of x rotated left by (k mod 32) bits.
+func rotateLeft32(x uint32, k int) uint32 {
+	const n = 32
+	s := uint(k) & (n - 1)
+	return x<<s | x>>(n-s)
+}
+
+// rotateLeft64 returns the value of x rotated left by (k mod 64) bits.
+func rotateLeft64(x uint64, k int) uint64 {
+	const n = 64
+	s := uint(k) & (n - 1)
+	return x<<s | x>>(n-s)
+}
+
+
 // murmur hash
+const (
+	c1_32 uint = 0xCC9E2D51
+	c2_32 uint = 0x1B873593
+	n1_32 uint = 0xE6546B64
+)
+
 func murmurInit(seed int) int {
 	return seed
 }
 
-func murmurUpdate(h int, value int) int {
-	const c1 uint32 = 0xCC9E2D51
-	const c2 uint32 = 0x1B873593
-	const r1 uint32 = 15
-	const r2 uint32 = 13
-	const m uint32 = 5
-	const n uint32 = 0xE6546B64
+func murmurUpdate(h1 int, k1 int) int {
+	var k1u uint
+	k1u = uint(k1) * c1_32
+	k1u = rotateLeft(k1u, 15)
+	k1u *= c2_32
 
-	k := uint32(value)
-	k *= c1
-	k = (k << r1) | (k >> (32 - r1))
-	k *= c2
-
-	hash := uint32(h) ^ k
-	hash = (hash << r2) | (hash >> (32 - r2))
-	hash = hash*m + n
-	return int(hash)
+	var h1u = uint(h1) ^ k1u
+	k1u = rotateLeft(k1u, 13)
+	h1u = h1u*5 + 0xe6546b64
+	return int(h1u)
 }
 
-func murmurFinish(h int, numberOfWords int) int {
-	var hash = uint32(h)
-	hash ^= uint32(numberOfWords) << 2
-	hash ^= hash >> 16
-	hash *= 0x85ebca6b
-	hash ^= hash >> 13
-	hash *= 0xc2b2ae35
-	hash ^= hash >> 16
+func murmurFinish(h1 int, numberOfWords int) int {
+	var h1u uint = uint(h1)
+	h1u ^= uint(numberOfWords * 4)
+	h1u ^= h1u >> 16
+	h1u *= uint(0x85ebca6b)
+	h1u ^= h1u >> 13
+	h1u *= 0xc2b2ae35
+	h1u ^= h1u >> 16
 
-	return int(hash)
+	return int(h1u)
 }

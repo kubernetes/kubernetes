@@ -96,16 +96,14 @@ func NewJSONList(adapter ref.TypeAdapter, l *structpb.ListValue) traits.Lister {
 }
 
 // NewMutableList creates a new mutable list whose internal state can be modified.
-func NewMutableList(adapter ref.TypeAdapter) traits.MutableLister {
-	var mutableValues []ref.Val
+//
+// The mutable list only handles `Add` calls correctly as it is intended only for use within
+// comprehension loops which generate an immutable result upon completion.
+func NewMutableList(adapter ref.TypeAdapter) traits.Lister {
 	return &mutableList{
-		baseList: &baseList{
-			TypeAdapter: adapter,
-			value:       mutableValues,
-			size:        0,
-			get:         func(i int) interface{} { return mutableValues[i] },
-		},
-		mutableValues: mutableValues,
+		TypeAdapter:   adapter,
+		baseList:      nil,
+		mutableValues: []ref.Val{},
 	}
 }
 
@@ -240,14 +238,16 @@ func (l *baseList) Equal(other ref.Val) ref.Val {
 
 // Get implements the traits.Indexer interface method.
 func (l *baseList) Get(index ref.Val) ref.Val {
-	ind, err := indexOrError(index)
-	if err != nil {
-		return ValOrErr(index, err.Error())
+	i, ok := index.(Int)
+	if !ok {
+		return ValOrErr(index, "unsupported index type '%s' in list", index.Type())
 	}
-	if ind < 0 || ind >= l.size {
-		return NewErr("index '%d' out of range in list size '%d'", ind, l.Size())
+	iv := int(i)
+	if iv < 0 || iv >= l.size {
+		return NewErr("index '%d' out of range in list size '%d'", i, l.Size())
 	}
-	return l.NativeToValue(l.get(ind))
+	elem := l.get(iv)
+	return l.NativeToValue(elem)
 }
 
 // Iterator implements the traits.Iterable interface method.
@@ -272,24 +272,19 @@ func (l *baseList) Value() interface{} {
 
 // mutableList aggregates values into its internal storage. For use with internal CEL variables only.
 type mutableList struct {
+	ref.TypeAdapter
 	*baseList
 	mutableValues []ref.Val
 }
 
 // Add copies elements from the other list into the internal storage of the mutable list.
-// The ref.Val returned by Add is the receiver.
 func (l *mutableList) Add(other ref.Val) ref.Val {
-	switch otherList := other.(type) {
-	case *mutableList:
-		l.mutableValues = append(l.mutableValues, otherList.mutableValues...)
-		l.size += len(otherList.mutableValues)
-	case traits.Lister:
-		for i := IntZero; i < otherList.Size().(Int); i++ {
-			l.size++
-			l.mutableValues = append(l.mutableValues, otherList.Get(i))
-		}
-	default:
+	otherList, ok := other.(traits.Lister)
+	if !ok {
 		return MaybeNoSuchOverloadErr(otherList)
+	}
+	for i := IntZero; i < otherList.Size().(Int); i++ {
+		l.mutableValues = append(l.mutableValues, otherList.Get(i))
 	}
 	return l
 }
@@ -328,7 +323,7 @@ func (l *concatList) Add(other ref.Val) ref.Val {
 		nextList:    otherList}
 }
 
-// Contains implements the traits.Container interface method.
+// Contains implments the traits.Container interface method.
 func (l *concatList) Contains(elem ref.Val) ref.Val {
 	// The concat list relies on the IsErrorOrUnknown checks against the input element to be
 	// performed by the `prevList` and/or `nextList`.
@@ -396,11 +391,10 @@ func (l *concatList) Equal(other ref.Val) ref.Val {
 
 // Get implements the traits.Indexer interface method.
 func (l *concatList) Get(index ref.Val) ref.Val {
-	ind, err := indexOrError(index)
-	if err != nil {
-		return ValOrErr(index, err.Error())
+	i, ok := index.(Int)
+	if !ok {
+		return MaybeNoSuchOverloadErr(index)
 	}
-	i := Int(ind)
 	if i < l.prevList.Size().(Int) {
 		return l.prevList.Get(i)
 	}
@@ -467,23 +461,4 @@ func (it *listIterator) Next() ref.Val {
 		return it.listValue.Get(index)
 	}
 	return nil
-}
-
-func indexOrError(index ref.Val) (int, error) {
-	switch iv := index.(type) {
-	case Int:
-		return int(iv), nil
-	case Double:
-		if ik, ok := doubleToInt64Lossless(float64(iv)); ok {
-			return int(ik), nil
-		}
-		return -1, fmt.Errorf("unsupported index value %v in list", index)
-	case Uint:
-		if ik, ok := uint64ToInt64Lossless(uint64(iv)); ok {
-			return int(ik), nil
-		}
-		return -1, fmt.Errorf("unsupported index value %v in list", index)
-	default:
-		return -1, fmt.Errorf("unsupported index type '%s' in list", index.Type())
-	}
 }

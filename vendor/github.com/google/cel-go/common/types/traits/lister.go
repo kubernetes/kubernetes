@@ -28,6 +28,5 @@ type Lister interface {
 
 // MutableLister interface which emits an immutable result after an intermediate computation.
 type MutableLister interface {
-	Lister
 	ToImmutableList() Lister
 }

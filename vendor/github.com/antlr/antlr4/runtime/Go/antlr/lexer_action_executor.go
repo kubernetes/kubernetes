@@ -161,13 +161,10 @@ func (l *LexerActionExecutor) hash() int {
 func (l *LexerActionExecutor) equals(other interface{}) bool {
 	if l == other {
 		return true
-	}
-	othert, ok := other.(*LexerActionExecutor)
-	if !ok {
+	} else if _, ok := other.(*LexerActionExecutor); !ok {
 		return false
+	} else {
+		return l.cachedHash == other.(*LexerActionExecutor).cachedHash &&
+			&l.lexerActions == &other.(*LexerActionExecutor).lexerActions
 	}
-	if othert == nil {
-		return false
-	}
-	return l.cachedHash == othert.cachedHash && &l.lexerActions == &othert.lexerActions
 }

@@ -16,8 +16,6 @@ package types
 
 import (
 	"math"
-
-	"github.com/google/cel-go/common/types/ref"
 )
 
 func compareDoubleInt(d Double, i Int) Int {
@@ -76,7 +74,7 @@ func compareDouble(a, b Double) Int {
 	return IntZero
 }
 
-func compareInt(a, b Int) ref.Val {
+func compareInt(a, b Int) Int {
 	if a < b {
 		return IntNegOne
 	}
@@ -86,7 +84,7 @@ func compareInt(a, b Int) ref.Val {
 	return IntZero
 }
 
-func compareUint(a, b Uint) ref.Val {
+func compareUint(a, b Uint) Int {
 	if a < b {
 		return IntNegOne
 	}

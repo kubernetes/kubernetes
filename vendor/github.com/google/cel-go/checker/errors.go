@@ -29,6 +29,10 @@ func (e *typeErrors) undeclaredReference(l common.Location, container string, na
 	e.ReportError(l, "undeclared reference to '%s' (in container '%s')", name, container)
 }
 
+func (e *typeErrors) expressionDoesNotSelectField(l common.Location) {
+	e.ReportError(l, "expression does not select a field")
+}
+
 func (e *typeErrors) typeDoesNotSupportFieldSelection(l common.Location, t *exprpb.Type) {
 	e.ReportError(l, "type '%s' does not support field selection", t)
 }

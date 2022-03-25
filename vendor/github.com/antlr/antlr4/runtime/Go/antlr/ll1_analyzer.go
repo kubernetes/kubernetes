@@ -38,7 +38,7 @@ func (la *LL1Analyzer) getDecisionLookahead(s ATNState) []*IntervalSet {
 	look := make([]*IntervalSet, count)
 	for alt := 0; alt < count; alt++ {
 		look[alt] = NewIntervalSet()
-		lookBusy := NewArray2DHashSet(nil, nil)
+		lookBusy := NewSet(nil, nil)
 		seeThruPreds := false // fail to get lookahead upon pred
 		la.look1(s.GetTransitions()[alt].getTarget(), nil, BasePredictionContextEMPTY, look[alt], lookBusy, NewBitSet(), seeThruPreds, false)
 		// Wipe out lookahead for la alternative if we found nothing
@@ -75,7 +75,7 @@ func (la *LL1Analyzer) Look(s, stopState ATNState, ctx RuleContext) *IntervalSet
 	if ctx != nil {
 		lookContext = predictionContextFromRuleContext(s.GetATN(), ctx)
 	}
-	la.look1(s, stopState, lookContext, r, NewArray2DHashSet(nil, nil), NewBitSet(), seeThruPreds, true)
+	la.look1(s, stopState, lookContext, r, NewSet(nil, nil), NewBitSet(), seeThruPreds, true)
 	return r
 }
 
@@ -109,22 +109,22 @@ func (la *LL1Analyzer) Look(s, stopState ATNState, ctx RuleContext) *IntervalSet
 // outermost context is reached. This parameter has no effect if {@code ctx}
 // is {@code nil}.
 
-func (la *LL1Analyzer) look2(s, stopState ATNState, ctx PredictionContext, look *IntervalSet, lookBusy Set, calledRuleStack *BitSet, seeThruPreds, addEOF bool, i int) {
+func (la *LL1Analyzer) look2(s, stopState ATNState, ctx PredictionContext, look *IntervalSet, lookBusy *Set, calledRuleStack *BitSet, seeThruPreds, addEOF bool, i int) {
 
 	returnState := la.atn.states[ctx.getReturnState(i)]
 	la.look1(returnState, stopState, ctx.GetParent(i), look, lookBusy, calledRuleStack, seeThruPreds, addEOF)
 
 }
 
-func (la *LL1Analyzer) look1(s, stopState ATNState, ctx PredictionContext, look *IntervalSet, lookBusy Set, calledRuleStack *BitSet, seeThruPreds, addEOF bool) {
+func (la *LL1Analyzer) look1(s, stopState ATNState, ctx PredictionContext, look *IntervalSet, lookBusy *Set, calledRuleStack *BitSet, seeThruPreds, addEOF bool) {
 
 	c := NewBaseATNConfig6(s, 0, ctx)
 
-	if lookBusy.Contains(c) {
+	if lookBusy.contains(c) {
 		return
 	}
 
-	lookBusy.Add(c)
+	lookBusy.add(c)
 
 	if s == stopState {
 		if ctx == nil {
@@ -148,13 +148,13 @@ func (la *LL1Analyzer) look1(s, stopState ATNState, ctx PredictionContext, look 
 		}
 
 		if ctx != BasePredictionContextEMPTY {
-			removed := calledRuleStack.contains(s.GetRuleIndex())
-			defer func() {
-				if removed {
-					calledRuleStack.add(s.GetRuleIndex())
-				}
-			}()
-			calledRuleStack.remove(s.GetRuleIndex())
+	        removed := calledRuleStack.contains(s.GetRuleIndex())
+            defer func() {
+                if removed {
+                    calledRuleStack.add(s.GetRuleIndex())
+                }
+            }()
+        	calledRuleStack.remove(s.GetRuleIndex())
 			// run thru all possible stack tops in ctx
 			for i := 0; i < ctx.length(); i++ {
 				returnState := la.atn.states[ctx.getReturnState(i)]
@@ -198,7 +198,7 @@ func (la *LL1Analyzer) look1(s, stopState ATNState, ctx PredictionContext, look 
 	}
 }
 
-func (la *LL1Analyzer) look3(stopState ATNState, ctx PredictionContext, look *IntervalSet, lookBusy Set, calledRuleStack *BitSet, seeThruPreds, addEOF bool, t1 *RuleTransition) {
+func (la *LL1Analyzer) look3(stopState ATNState, ctx PredictionContext, look *IntervalSet, lookBusy *Set, calledRuleStack *BitSet, seeThruPreds, addEOF bool, t1 *RuleTransition) {
 
 	newContext := SingletonBasePredictionContextCreate(ctx, t1.followState.GetStateNumber())
 

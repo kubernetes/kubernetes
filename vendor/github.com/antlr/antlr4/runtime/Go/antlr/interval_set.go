@@ -226,28 +226,16 @@ func (i *IntervalSet) StringVerbose(literalNames []string, symbolicNames []strin
 func (i *IntervalSet) toCharString() string {
 	names := make([]string, len(i.intervals))
 
-	var sb strings.Builder
-
 	for j := 0; j < len(i.intervals); j++ {
 		v := i.intervals[j]
 		if v.Stop == v.Start+1 {
 			if v.Start == TokenEOF {
 				names = append(names, "<EOF>")
 			} else {
-				sb.WriteByte('\'')
-				sb.WriteRune(rune(v.Start))
-				sb.WriteByte('\'')
-				names = append(names, sb.String())
-				sb.Reset()
+				names = append(names, ("'" + string(v.Start) + "'"))
 			}
 		} else {
-			sb.WriteByte('\'')
-			sb.WriteRune(rune(v.Start))
-			sb.WriteString("'..'")
-			sb.WriteRune(rune(v.Stop - 1))
-			sb.WriteByte('\'')
-			names = append(names, sb.String())
-			sb.Reset()
+			names = append(names, "'"+string(v.Start)+"'..'"+string(v.Stop-1)+"'")
 		}
 	}
 	if len(names) > 1 {

@@ -49,7 +49,7 @@ type Program interface {
 	// to support cancellation and timeouts. This method must be used in conjunction with the
 	// InterruptCheckFrequency() option for cancellation interrupts to be impact evaluation.
 	//
-	// The vars value may either be an `interpreter.Activation` or `map[string]interface{}`.
+	// The vars value may eitehr be an `interpreter.Activation` or `map[string]interface{}`.
 	//
 	// The output contract for `ContextEval` is otherwise identical to the `Eval` method.
 	ContextEval(context.Context, interface{}) (ref.Val, *EvalDetails, error)

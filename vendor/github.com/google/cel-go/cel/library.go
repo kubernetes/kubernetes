@@ -20,14 +20,14 @@ import (
 	"github.com/google/cel-go/parser"
 )
 
-// Library provides a collection of EnvOption and ProgramOption values used to configure a CEL
+// Library provides a collection of EnvOption and ProgramOption values used to confiugre a CEL
 // environment for a particular use case or with a related set of functionality.
 //
 // Note, the ProgramOption values provided by a library are expected to be static and not vary
 // between calls to Env.Program(). If there is a need for such dynamic configuration, prefer to
 // configure these options outside the Library and within the Env.Program() call directly.
 type Library interface {
-	// CompileOptions returns a collection of functional options for configuring the Parse / Check
+	// CompileOptions returns a collection of funcitional options for configuring the Parse / Check
 	// environment.
 	CompileOptions() []EnvOption
 

@@ -98,7 +98,7 @@ func decDisableShortcircuits() InterpretableDecorator {
 }
 
 // decOptimize optimizes the program plan by looking for common evaluation patterns and
-// conditionally precomputing the result.
+// conditionally precomputating the result.
 // - build list and map values with constant elements.
 // - convert 'in' operations to set membership tests if possible.
 func decOptimize() InterpretableDecorator {

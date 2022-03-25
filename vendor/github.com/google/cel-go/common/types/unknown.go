@@ -34,12 +34,12 @@ func (u Unknown) ConvertToNative(typeDesc reflect.Type) (interface{}, error) {
 	return u.Value(), nil
 }
 
-// ConvertToType is an identity function since unknown values cannot be modified.
+// ConvertToType implements ref.Val.ConvertToType.
 func (u Unknown) ConvertToType(typeVal ref.Type) ref.Val {
 	return u
 }
 
-// Equal is an identity function since unknown values cannot be modified.
+// Equal implements ref.Val.Equal.
 func (u Unknown) Equal(other ref.Val) ref.Val {
 	return u
 }
@@ -57,10 +57,5 @@ func (u Unknown) Value() interface{} {
 // IsUnknown returns whether the element ref.Type or ref.Val is equal to the
 // UnknownType singleton.
 func IsUnknown(val ref.Val) bool {
-	switch val.(type) {
-	case Unknown:
-		return true
-	default:
-		return false
-	}
+	return val.Type() == UnknownType
 }
