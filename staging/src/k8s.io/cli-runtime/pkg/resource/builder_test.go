@@ -150,6 +150,14 @@ func streamTestData() (io.Reader, *v1.PodList, *v1.ServiceList) {
 	return r, pods, svc
 }
 
+func subresourceTestData(name string) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "test", ResourceVersion: "10"},
+		Spec:       V1DeepEqualSafePodSpec(),
+		Status:     V1DeepEqualSafePodStatus(),
+	}
+}
+
 func JSONToYAMLOrDie(in []byte) []byte {
 	data, err := yaml.JSONToYAML(in)
 	if err != nil {
@@ -915,6 +923,37 @@ func TestResourceByName(t *testing.T) {
 		t.Errorf("unexpected resource mapping: %#v", mapping)
 	}
 }
+func TestSubresourceByName(t *testing.T) {
+	pod := subresourceTestData("foo")
+	b := newDefaultBuilderWith(fakeClientWith("", t, map[string]string{
+		"/namespaces/test/pods/foo/status": runtime.EncodeOrDie(corev1Codec, pod),
+	})).NamespaceParam("test")
+
+	test := &testVisitor{}
+	singleItemImplied := false
+
+	if b.Do().Err() == nil {
+		t.Errorf("unexpected non-error")
+	}
+
+	b.ResourceTypeOrNameArgs(true, "pods", "foo").Subresource("status")
+
+	err := b.Do().IntoSingleItemImplied(&singleItemImplied).Visit(test.Handle)
+	if err != nil || !singleItemImplied || len(test.Infos) != 1 {
+		t.Fatalf("unexpected response: %v %t %#v", err, singleItemImplied, test.Infos)
+	}
+	if !apiequality.Semantic.DeepEqual(pod, test.Objects()[0]) {
+		t.Errorf("unexpected object: %#v", test.Objects()[0])
+	}
+
+	mapping, err := b.Do().ResourceMapping()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if mapping.Resource != (schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}) {
+		t.Errorf("unexpected resource mapping: %#v", mapping)
+	}
+}
 
 func TestRestMappingErrors(t *testing.T) {
 	pods, _ := testData()
@@ -1260,8 +1299,9 @@ func TestResourceTuple(t *testing.T) {
 	expectNoErr := func(err error) bool { return err == nil }
 	expectErr := func(err error) bool { return err != nil }
 	testCases := map[string]struct {
-		args  []string
-		errFn func(error) bool
+		args        []string
+		subresource string
+		errFn       func(error) bool
 	}{
 		"valid": {
 			args:  []string{"pods/foo"},
@@ -1303,6 +1343,16 @@ func TestResourceTuple(t *testing.T) {
 			args:  []string{"bar/"},
 			errFn: expectErr,
 		},
+		"valid status subresource": {
+			args:        []string{"pods/foo"},
+			subresource: "status",
+			errFn:       expectNoErr,
+		},
+		"valid status subresource for multiple with name indirection": {
+			args:        []string{"pods/foo", "pod/bar"},
+			subresource: "status",
+			errFn:       expectNoErr,
+		},
 	}
 	for k, tt := range testCases {
 		t.Run("using default namespace", func(t *testing.T) {
@@ -1311,14 +1361,18 @@ func TestResourceTuple(t *testing.T) {
 				if requireObject {
 					pods, _ := testData()
 					expectedRequests = map[string]string{
-						"/namespaces/test/pods/foo": runtime.EncodeOrDie(corev1Codec, &pods.Items[0]),
-						"/namespaces/test/pods/bar": runtime.EncodeOrDie(corev1Codec, &pods.Items[0]),
-						"/nodes/foo":                runtime.EncodeOrDie(corev1Codec, &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}),
+						"/namespaces/test/pods/foo":        runtime.EncodeOrDie(corev1Codec, &pods.Items[0]),
+						"/namespaces/test/pods/bar":        runtime.EncodeOrDie(corev1Codec, &pods.Items[0]),
+						"/namespaces/test/pods/foo/status": runtime.EncodeOrDie(corev1Codec, subresourceTestData("foo")),
+						"/namespaces/test/pods/bar/status": runtime.EncodeOrDie(corev1Codec, subresourceTestData("bar")),
+						"/nodes/foo":                       runtime.EncodeOrDie(corev1Codec, &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}),
 					}
 				}
 				b := newDefaultBuilderWith(fakeClientWith(k, t, expectedRequests)).
 					NamespaceParam("test").DefaultNamespace().
-					ResourceTypeOrNameArgs(true, tt.args...).RequireObject(requireObject)
+					ResourceTypeOrNameArgs(true, tt.args...).
+					RequireObject(requireObject).
+					Subresource(tt.subresource)
 
 				r := b.Do()
 
@@ -1554,6 +1608,23 @@ func TestListObjectWithDifferentVersions(t *testing.T) {
 	// resource version differs between type lists, so it's not possible to get a single version.
 	if list.ResourceVersion != "" || len(list.Items) != 3 {
 		t.Errorf("unexpected list: %#v", list)
+	}
+}
+
+func TestListObjectSubresource(t *testing.T) {
+	pods, _ := testData()
+	labelKey := metav1.LabelSelectorQueryParam(corev1GV.String())
+	b := newDefaultBuilderWith(fakeClientWith("", t, map[string]string{
+		"/namespaces/test/pods?" + labelKey: runtime.EncodeOrDie(corev1Codec, pods),
+	})).
+		NamespaceParam("test").
+		ResourceTypeOrNameArgs(true, "pods").
+		Subresource("status").
+		Flatten()
+
+	_, err := b.Do().Object()
+	if err == nil || !strings.Contains(err.Error(), "subresource cannot be used when bulk resources are specified") {
+		t.Fatalf("unexpected response: %v", err)
 	}
 }
 
