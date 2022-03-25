@@ -36,7 +36,7 @@ func Test_getCredentials(t *testing.T) {
 	server := httptest.NewServer(&fakeTokenServer{token: "abc123"})
 	defer server.Close()
 
-	in := bytes.NewBuffer([]byte(`{"kind":"CredentialProviderRequest","apiVersion":"credentialprovider.kubelet.k8s.io/v1alpha1","image":"gcr.io/foobar"}`))
+	in := bytes.NewBuffer([]byte(`{"kind":"CredentialProviderRequest","apiVersion":"credentialprovider.kubelet.k8s.io/v1beta1","image":"gcr.io/foobar"}`))
 	out := bytes.NewBuffer(nil)
 
 	err := getCredentials(server.URL, in, out)
@@ -44,7 +44,7 @@ func Test_getCredentials(t *testing.T) {
 		t.Fatalf("unexpected error running getCredentials: %v", err)
 	}
 
-	expected := `{"kind":"CredentialProviderResponse","apiVersion":"credentialprovider.kubelet.k8s.io/v1alpha1","cacheKeyType":"Registry","auth":{"*.gcr.io":{"username":"_token","password":"abc123"},"*.pkg.dev":{"username":"_token","password":"abc123"},"container.cloud.google.com":{"username":"_token","password":"abc123"},"gcr.io":{"username":"_token","password":"abc123"}}}
+	expected := `{"kind":"CredentialProviderResponse","apiVersion":"credentialprovider.kubelet.k8s.io/v1beta1","cacheKeyType":"Registry","auth":{"*.gcr.io":{"username":"_token","password":"abc123"},"*.pkg.dev":{"username":"_token","password":"abc123"},"container.cloud.google.com":{"username":"_token","password":"abc123"},"gcr.io":{"username":"_token","password":"abc123"}}}
 `
 
 	if out.String() != expected {
