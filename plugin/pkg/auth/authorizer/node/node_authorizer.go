@@ -32,7 +32,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	storageapi "k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
 	"k8s.io/kubernetes/third_party/forked/gonum/graph"
 	"k8s.io/kubernetes/third_party/forked/gonum/graph/traverse"
@@ -112,10 +111,8 @@ func (r *NodeAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attribu
 		case configMapResource:
 			return r.authorizeReadNamespacedObject(nodeName, configMapVertexType, attrs)
 		case pvcResource:
-			if r.features.Enabled(features.ExpandPersistentVolumes) {
-				if attrs.GetSubresource() == "status" {
-					return r.authorizeStatusUpdate(nodeName, pvcVertexType, attrs)
-				}
+			if attrs.GetSubresource() == "status" {
+				return r.authorizeStatusUpdate(nodeName, pvcVertexType, attrs)
 			}
 			return r.authorizeGet(nodeName, pvcVertexType, attrs)
 		case pvResource:

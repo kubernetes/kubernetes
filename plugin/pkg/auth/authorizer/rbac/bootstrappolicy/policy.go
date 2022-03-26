@@ -24,9 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/apiserver/pkg/authentication/user"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	rbacv1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // Write and other vars are slices of the allowed verbs.
@@ -161,12 +159,10 @@ func NodeRules() []rbacv1.PolicyRule {
 		rbacv1helpers.NewRule("create").Groups(legacyGroup).Resources("serviceaccounts/token").RuleOrDie(),
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) {
-		// Use the Node authorization mode to limit a node to update status of pvc objects referenced by pods bound to itself.
-		// Use the NodeRestriction admission plugin to limit a node to just update the status stanza.
-		pvcStatusPolicyRule := rbacv1helpers.NewRule("get", "update", "patch").Groups(legacyGroup).Resources("persistentvolumeclaims/status").RuleOrDie()
-		nodePolicyRules = append(nodePolicyRules, pvcStatusPolicyRule)
-	}
+	// Use the Node authorization mode to limit a node to update status of pvc objects referenced by pods bound to itself.
+	// Use the NodeRestriction admission plugin to limit a node to just update the status stanza.
+	pvcStatusPolicyRule := rbacv1helpers.NewRule("get", "update", "patch").Groups(legacyGroup).Resources("persistentvolumeclaims/status").RuleOrDie()
+	nodePolicyRules = append(nodePolicyRules, pvcStatusPolicyRule)
 
 	// CSI
 	csiDriverRule := rbacv1helpers.NewRule("get", "watch", "list").Groups("storage.k8s.io").Resources("csidrivers").RuleOrDie()

@@ -39,7 +39,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
-var _ = utils.SIGDescribe("Mounted flexvolume volume expand [Slow] [Feature:ExpandInUsePersistentVolumes]", func() {
+var _ = utils.SIGDescribe("[Feature:Flexvolumes] Mounted flexvolume volume expand [Slow]", func() {
 	var (
 		c                 clientset.Interface
 		ns                string
@@ -51,7 +51,7 @@ var _ = utils.SIGDescribe("Mounted flexvolume volume expand [Slow] [Feature:Expa
 		nodeKeyValueLabel map[string]string
 		nodeLabelValue    string
 		nodeKey           string
-		nodeList          *v1.NodeList
+		node              *v1.Node
 	)
 
 	f := framework.NewDefaultFramework("mounted-flexvolume-expand")
@@ -63,8 +63,9 @@ var _ = utils.SIGDescribe("Mounted flexvolume volume expand [Slow] [Feature:Expa
 		c = f.ClientSet
 		ns = f.Namespace.Name
 		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
+		var err error
 
-		node, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
+		node, err = e2enode.GetRandomReadySchedulableNode(f.ClientSet)
 		framework.ExpectNoError(err)
 		nodeName = node.Name
 
@@ -125,9 +126,8 @@ var _ = utils.SIGDescribe("Mounted flexvolume volume expand [Slow] [Feature:Expa
 
 		driver := "dummy-attachable"
 
-		node := nodeList.Items[0]
 		ginkgo.By(fmt.Sprintf("installing flexvolume %s on node %s as %s", path.Join(driverDir, driver), node.Name, driver))
-		installFlex(c, &node, "k8s", driver, path.Join(driverDir, driver))
+		installFlex(c, node, "k8s", driver, path.Join(driverDir, driver))
 		ginkgo.By(fmt.Sprintf("installing flexvolume %s on (master) node %s as %s", path.Join(driverDir, driver), node.Name, driver))
 		installFlex(c, nil, "k8s", driver, path.Join(driverDir, driver))
 

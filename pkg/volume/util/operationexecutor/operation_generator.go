@@ -2026,10 +2026,6 @@ func (og *operationGenerator) nodeExpandVolume(
 	volumeToMount VolumeToMount,
 	actualStateOfWorld ActualStateOfWorldMounterUpdater,
 	rsOpts volume.NodeResizeOptions) (bool, error) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) {
-		klog.V(4).Infof("Resizing is not enabled for this volume %s", volumeToMount.VolumeName)
-		return true, nil
-	}
 
 	if volumeToMount.VolumeSpec != nil &&
 		volumeToMount.VolumeSpec.InlineVolumeSpecForCSIMigration {

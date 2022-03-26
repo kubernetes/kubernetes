@@ -23,9 +23,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	api "k8s.io/api/core/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
@@ -34,13 +32,6 @@ import (
 var _ volume.NodeExpandableVolumePlugin = &csiPlugin{}
 
 func (c *csiPlugin) RequiresFSResize() bool {
-	// We could check plugin's node capability but we instead are going to rely on
-	// NodeExpand to do the right thing and return early if plugin does not have
-	// node expansion capability.
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ExpandCSIVolumes) {
-		klog.V(4).Infof("Resizing is not enabled for CSI volume")
-		return false
-	}
 	return true
 }
 

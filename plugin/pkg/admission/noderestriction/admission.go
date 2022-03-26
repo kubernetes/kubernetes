@@ -71,8 +71,7 @@ type Plugin struct {
 	podsGetter     corev1lister.PodLister
 	nodesGetter    corev1lister.NodeLister
 
-	expandPersistentVolumesEnabled bool
-	expansionRecoveryEnabled       bool
+	expansionRecoveryEnabled bool
 }
 
 var (
@@ -83,7 +82,6 @@ var (
 
 // InspectFeatureGates allows setting bools without taking a dep on a global variable
 func (p *Plugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
-	p.expandPersistentVolumesEnabled = featureGates.Enabled(features.ExpandPersistentVolumes)
 	p.expansionRecoveryEnabled = featureGates.Enabled(features.RecoverVolumeExpansionFailure)
 }
 
@@ -336,10 +334,6 @@ func (p *Plugin) admitPodEviction(nodeName string, a admission.Attributes) error
 func (p *Plugin) admitPVCStatus(nodeName string, a admission.Attributes) error {
 	switch a.GetOperation() {
 	case admission.Update:
-		if !p.expandPersistentVolumesEnabled {
-			return admission.NewForbidden(a, fmt.Errorf("node %q is not allowed to update persistentvolumeclaim metadata", nodeName))
-		}
-
 		oldPVC, ok := a.GetOldObject().(*api.PersistentVolumeClaim)
 		if !ok {
 			return admission.NewForbidden(a, fmt.Errorf("unexpected type %T", a.GetOldObject()))
