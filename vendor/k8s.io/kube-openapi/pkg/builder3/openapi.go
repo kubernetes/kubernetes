@@ -193,10 +193,16 @@ func newOpenAPI(config *common.Config) openAPI {
 		}
 	}
 
-	o.definitions = o.config.GetDefinitions(func(name string) spec.Ref {
-		defName, _ := o.config.GetDefinitionName(name)
-		return spec.MustCreateRef("#/components/schemas/" + common.EscapeJsonPointer(defName))
-	})
+	if config.Definitions != nil {
+		o.definitions = config.Definitions
+	} else {
+		o.definitions = o.config.GetDefinitions(func(name string) spec.Ref {
+			defName, _ := o.config.GetDefinitionName(name)
+			return spec.MustCreateRef("#/components/schemas/" + common.EscapeJsonPointer(defName))
+		})
+
+		config.Definitions = o.definitions
+	}
 
 	return o
 }

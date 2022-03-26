@@ -91,6 +91,7 @@ type Config struct {
 	// OpenAPIDefinitions should provide definition for all models used by routes. Failure to provide this map
 	// or any of the models will result in spec generation failure.
 	GetDefinitions GetOpenAPIDefinitions
+	Definitions    map[string]OpenAPIDefinition
 
 	// GetOperationIDAndTags returns operation id and tags for a restful route. It is an optional function to customize operation IDs.
 	//
