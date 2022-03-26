@@ -438,7 +438,7 @@ func TestOneNodeDaemonLaunchesPod(t *testing.T) {
 		setupScheduler(ctx, t, clientset, informers)
 
 		informers.Start(ctx.Done())
-		go dc.Run(ctx, 5)
+		go dc.Run(ctx, 2)
 
 		ds := newDaemonSet("foo", ns.Name)
 		ds.Spec.UpdateStrategy = *strategy
@@ -474,7 +474,7 @@ func TestSimpleDaemonSetLaunchesPods(t *testing.T) {
 		defer cancel()
 
 		informers.Start(ctx.Done())
-		go dc.Run(ctx, 5)
+		go dc.Run(ctx, 2)
 
 		// Start Scheduler
 		setupScheduler(ctx, t, clientset, informers)
@@ -510,7 +510,7 @@ func TestDaemonSetWithNodeSelectorLaunchesPods(t *testing.T) {
 		defer cancel()
 
 		informers.Start(ctx.Done())
-		go dc.Run(ctx, 5)
+		go dc.Run(ctx, 2)
 
 		// Start Scheduler
 		setupScheduler(ctx, t, clientset, informers)
@@ -579,7 +579,7 @@ func TestNotReadyNodeDaemonDoesLaunchPod(t *testing.T) {
 		defer cancel()
 
 		informers.Start(ctx.Done())
-		go dc.Run(ctx, 5)
+		go dc.Run(ctx, 2)
 
 		// Start Scheduler
 		setupScheduler(ctx, t, clientset, informers)
@@ -626,7 +626,7 @@ func TestInsufficientCapacityNode(t *testing.T) {
 		defer cancel()
 
 		informers.Start(ctx.Done())
-		go dc.Run(ctx, 5)
+		go dc.Run(ctx, 2)
 
 		// Start Scheduler
 		setupScheduler(ctx, t, clientset, informers)
@@ -689,7 +689,7 @@ func TestLaunchWithHashCollision(t *testing.T) {
 	defer cancel()
 
 	informers.Start(ctx.Done())
-	go dc.Run(ctx, 5)
+	go dc.Run(ctx, 2)
 
 	// Start Scheduler
 	setupScheduler(ctx, t, clientset, informers)
@@ -800,7 +800,7 @@ func TestDSCUpdatesPodLabelAfterDedupCurHistories(t *testing.T) {
 	defer cancel()
 
 	informers.Start(ctx.Done())
-	go dc.Run(ctx, 5)
+	go dc.Run(ctx, 2)
 
 	// Start Scheduler
 	setupScheduler(ctx, t, clientset, informers)
@@ -929,7 +929,7 @@ func TestTaintedNode(t *testing.T) {
 		defer cancel()
 
 		informers.Start(ctx.Done())
-		go dc.Run(ctx, 5)
+		go dc.Run(ctx, 2)
 
 		// Start Scheduler
 		setupScheduler(ctx, t, clientset, informers)
@@ -994,7 +994,7 @@ func TestUnschedulableNodeDaemonDoesLaunchPod(t *testing.T) {
 		defer cancel()
 
 		informers.Start(ctx.Done())
-		go dc.Run(ctx, 5)
+		go dc.Run(ctx, 2)
 
 		// Start Scheduler
 		setupScheduler(ctx, t, clientset, informers)
