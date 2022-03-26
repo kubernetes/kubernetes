@@ -956,6 +956,7 @@ var _ = SIGDescribe("Pods", func() {
 		framework.ExpectEqual(p.Status.Phase, v1.PodRunning, "failed to see Pod %v in namespace %v running", p.ObjectMeta.Name, testNamespaceName)
 
 		ginkgo.By("patching the Pod with a new Label and updated data")
+		prePatchResourceVersion := p.ResourceVersion
 		podPatch, err := json.Marshal(v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: map[string]string{"test-pod": "patched"},
@@ -973,7 +974,7 @@ var _ = SIGDescribe("Pods", func() {
 		framework.ExpectNoError(err, "failed to patch Pod %s in namespace %s", testPodName, testNamespaceName)
 		ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		_, err = watchtools.Until(ctx, podsList.ResourceVersion, w, func(event watch.Event) (bool, error) {
+		_, err = watchtools.Until(ctx, prePatchResourceVersion, w, func(event watch.Event) (bool, error) {
 			switch event.Type {
 			case watch.Modified:
 				if pod, ok := event.Object.(*v1.Pod); ok {
@@ -1033,19 +1034,22 @@ var _ = SIGDescribe("Pods", func() {
 		framework.ExpectEqual(podStatusFieldPatchCount, podStatusFieldPatchCountTotal, "failed to update PodStatus - field patch count doesn't match the total")
 
 		ginkgo.By("deleting the Pod via a Collection with a LabelSelector")
+		preDeleteResourceVersion := podStatusUpdate.ResourceVersion
 		err = f.ClientSet.CoreV1().Pods(testNamespaceName).DeleteCollection(context.TODO(), metav1.DeleteOptions{GracePeriodSeconds: &one}, metav1.ListOptions{LabelSelector: testPodLabelsFlat})
 		framework.ExpectNoError(err, "failed to delete Pod by collection")
 
 		ginkgo.By("watching for the Pod to be deleted")
 		ctx, cancel = context.WithTimeout(context.Background(), 1*time.Minute)
 		defer cancel()
-		_, err = watchtools.Until(ctx, podsList.ResourceVersion, w, func(event watch.Event) (bool, error) {
+		_, err = watchtools.Until(ctx, preDeleteResourceVersion, w, func(event watch.Event) (bool, error) {
 			switch event.Type {
 			case watch.Deleted:
 				if pod, ok := event.Object.(*v1.Pod); ok {
 					found := pod.ObjectMeta.Name == pod.Name &&
 						pod.Labels["test-pod-static"] == "true"
 					return found, nil
+				} else {
+					framework.Logf("observed event type %v that was not a pod: %T", event.Type, event.Object)
 				}
 			default:
 				framework.Logf("observed event type %v", event.Type)
@@ -1055,8 +1059,12 @@ var _ = SIGDescribe("Pods", func() {
 		if err != nil {
 			framework.Logf("failed to see %v event: %v", watch.Deleted, err)
 		}
-		_, err = f.ClientSet.CoreV1().Pods(testNamespaceName).Get(context.TODO(), testPodName, metav1.GetOptions{})
-		framework.ExpectError(err, "pod %v found in namespace %v, but it should be deleted", testPodName, testNamespaceName)
+		postDeletePod, err := f.ClientSet.CoreV1().Pods(testNamespaceName).Get(context.TODO(), testPodName, metav1.GetOptions{})
+		var postDeletePodJSON []byte
+		if postDeletePod != nil {
+			postDeletePodJSON, _ = json.Marshal(postDeletePod)
+		}
+		framework.ExpectError(err, "pod %v found in namespace %v, but it should be deleted: %s", testPodName, testNamespaceName, string(postDeletePodJSON))
 		framework.ExpectEqual(apierrors.IsNotFound(err), true, fmt.Sprintf("expected IsNotFound error, got %#v", err))
 	})
 })
