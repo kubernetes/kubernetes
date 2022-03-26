@@ -23,7 +23,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -33,11 +32,11 @@ import (
 // field and drop on read, but for compatibility reasons we still accept the field.
 func Test_ExternalNameServiceStopsDefaultingInternalTrafficPolicy(t *testing.T) {
 	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	_, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
+	m, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()
 
-	config := restclient.Config{Host: server.URL}
-	client, err := clientset.NewForConfig(&config)
+	config := m.GenericAPIServer.LoopbackClientConfig
+	client, err := clientset.NewForConfig(config)
 	if err != nil {
 		t.Fatalf("Error creating clientset: %v", err)
 	}
@@ -79,11 +78,11 @@ func Test_ExternalNameServiceStopsDefaultingInternalTrafficPolicy(t *testing.T) 
 // in older versions. New versions stop defauting the field and drop on read, but for compatibility reasons we still accept the field.
 func Test_ExternalNameServiceDropsInternalTrafficPolicy(t *testing.T) {
 	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	_, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
+	m, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()
 
-	config := restclient.Config{Host: server.URL}
-	client, err := clientset.NewForConfig(&config)
+	config := m.GenericAPIServer.LoopbackClientConfig
+	client, err := clientset.NewForConfig(config)
 	if err != nil {
 		t.Fatalf("Error creating clientset: %v", err)
 	}
@@ -128,11 +127,11 @@ func Test_ExternalNameServiceDropsInternalTrafficPolicy(t *testing.T) {
 // we still accept the field.
 func Test_ConvertingToExternalNameServiceDropsInternalTrafficPolicy(t *testing.T) {
 	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	_, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
+	m, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()
 
-	config := restclient.Config{Host: server.URL}
-	client, err := clientset.NewForConfig(&config)
+	config := m.GenericAPIServer.LoopbackClientConfig
+	client, err := clientset.NewForConfig(config)
 	if err != nil {
 		t.Fatalf("Error creating clientset: %v", err)
 	}

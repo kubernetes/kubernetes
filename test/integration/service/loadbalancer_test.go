@@ -26,7 +26,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
-	restclient "k8s.io/client-go/rest"
 	servicecontroller "k8s.io/cloud-provider/controllers/service"
 	fakecloud "k8s.io/cloud-provider/fake"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -36,13 +35,12 @@ import (
 // Test_ServiceLoadBalancerAllocateNodePorts tests that a Service with spec.allocateLoadBalancerNodePorts=false
 // does not allocate node ports for the Service.
 func Test_ServiceLoadBalancerDisableAllocateNodePorts(t *testing.T) {
-
 	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	_, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
+	m, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()
 
-	config := restclient.Config{Host: server.URL}
-	client, err := clientset.NewForConfig(&config)
+	config := m.GenericAPIServer.LoopbackClientConfig
+	client, err := clientset.NewForConfig(config)
 	if err != nil {
 		t.Fatalf("Error creating clientset: %v", err)
 	}
@@ -79,13 +77,12 @@ func Test_ServiceLoadBalancerDisableAllocateNodePorts(t *testing.T) {
 // Test_ServiceUpdateLoadBalancerAllocateNodePorts tests that a Service that is updated from ClusterIP to LoadBalancer
 // with spec.allocateLoadBalancerNodePorts=false does not allocate node ports for the Service
 func Test_ServiceUpdateLoadBalancerDisableAllocateNodePorts(t *testing.T) {
-
 	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	_, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
+	m, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()
 
-	config := restclient.Config{Host: server.URL}
-	client, err := clientset.NewForConfig(&config)
+	config := m.GenericAPIServer.LoopbackClientConfig
+	client, err := clientset.NewForConfig(config)
 	if err != nil {
 		t.Fatalf("Error creating clientset: %v", err)
 	}
@@ -132,13 +129,12 @@ func Test_ServiceUpdateLoadBalancerDisableAllocateNodePorts(t *testing.T) {
 // Test_ServiceLoadBalancerSwitchToDeallocatedNodePorts test that switching a Service
 // to spec.allocateLoadBalancerNodePorts=false, does not de-allocate existing node ports.
 func Test_ServiceLoadBalancerEnableThenDisableAllocatedNodePorts(t *testing.T) {
-
 	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	_, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
+	m, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()
 
-	config := restclient.Config{Host: server.URL}
-	client, err := clientset.NewForConfig(&config)
+	config := m.GenericAPIServer.LoopbackClientConfig
+	client, err := clientset.NewForConfig(config)
 	if err != nil {
 		t.Fatalf("Error creating clientset: %v", err)
 	}
@@ -185,13 +181,12 @@ func Test_ServiceLoadBalancerEnableThenDisableAllocatedNodePorts(t *testing.T) {
 // Test_ServiceLoadBalancerDisableThenEnableAllocatedNodePorts test that switching a Service
 // to spec.allocateLoadBalancerNodePorts=true from false, allocate new node ports.
 func Test_ServiceLoadBalancerDisableThenEnableAllocatedNodePorts(t *testing.T) {
-
 	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	_, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
+	m, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()
 
-	config := restclient.Config{Host: server.URL}
-	client, err := clientset.NewForConfig(&config)
+	config := m.GenericAPIServer.LoopbackClientConfig
+	client, err := clientset.NewForConfig(config)
 	if err != nil {
 		t.Fatalf("Error creating clientset: %v", err)
 	}
@@ -248,13 +243,12 @@ func serviceHasNodePorts(svc *corev1.Service) bool {
 // Test_ServiceLoadBalancerEnableLoadBalancerClass tests that when a LoadBalancer
 // type of service has spec.LoadBalancerClass set, cloud provider should not create default load balancer.
 func Test_ServiceLoadBalancerEnableLoadBalancerClass(t *testing.T) {
-
 	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	_, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
+	m, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()
 
-	config := restclient.Config{Host: server.URL}
-	client, err := clientset.NewForConfig(&config)
+	config := m.GenericAPIServer.LoopbackClientConfig
+	client, err := clientset.NewForConfig(config)
 	if err != nil {
 		t.Fatalf("Error creating clientset: %v", err)
 	}
@@ -297,13 +291,12 @@ func Test_ServiceLoadBalancerEnableLoadBalancerClass(t *testing.T) {
 // type of service has spec.LoadBalancerClass set, it should be immutable as long as the service type
 // is still LoadBalancer.
 func Test_SetLoadBalancerClassThenUpdateLoadBalancerClass(t *testing.T) {
-
 	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	_, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
+	m, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()
 
-	config := restclient.Config{Host: server.URL}
-	client, err := clientset.NewForConfig(&config)
+	config := m.GenericAPIServer.LoopbackClientConfig
+	client, err := clientset.NewForConfig(config)
 	if err != nil {
 		t.Fatalf("Error creating clientset: %v", err)
 	}
@@ -351,13 +344,12 @@ func Test_SetLoadBalancerClassThenUpdateLoadBalancerClass(t *testing.T) {
 // Test_UpdateLoadBalancerWithLoadBalancerClass tests that when a Load Balancer type of Service that
 // is updated from non loadBalancerClass set to loadBalancerClass set, it should be not allowed.
 func Test_UpdateLoadBalancerWithLoadBalancerClass(t *testing.T) {
-
 	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	_, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
+	m, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()
 
-	config := restclient.Config{Host: server.URL}
-	client, err := clientset.NewForConfig(&config)
+	config := m.GenericAPIServer.LoopbackClientConfig
+	client, err := clientset.NewForConfig(config)
 	if err != nil {
 		t.Fatalf("Error creating clientset: %v", err)
 	}
