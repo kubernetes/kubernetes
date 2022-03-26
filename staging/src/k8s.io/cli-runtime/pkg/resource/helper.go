@@ -54,6 +54,10 @@ type Helper struct {
 	// FieldManager is the name associated with the actor or entity that is making
 	// changes.
 	FieldManager string
+
+	// FieldValidation is the directive used to indicate how the server should perform
+	// field validation (Ignore, Warn, or Strict)
+	FieldValidation string
 }
 
 // NewHelper creates a Helper from a ResourceMapping
@@ -76,6 +80,13 @@ func (m *Helper) DryRun(dryRun bool) *Helper {
 // that is making changes in a create or update operation.
 func (m *Helper) WithFieldManager(fieldManager string) *Helper {
 	m.FieldManager = fieldManager
+	return m
+}
+
+// WithFieldValidation sets the field validation option to indicate
+// how the server should perform field validation (Ignore, Warn, or Strict).
+func (m *Helper) WithFieldValidation(validationDirective string) *Helper {
+	m.FieldValidation = validationDirective
 	return m
 }
 
@@ -206,6 +217,9 @@ func (m *Helper) CreateWithOptions(namespace string, modify bool, obj runtime.Ob
 	if m.FieldManager != "" {
 		options.FieldManager = m.FieldManager
 	}
+	if m.FieldValidation != "" {
+		options.FieldValidation = m.FieldValidation
+	}
 	if modify {
 		// Attempt to version the object based on client logic.
 		version, err := metadataAccessor.ResourceVersion(obj)
@@ -242,6 +256,9 @@ func (m *Helper) Patch(namespace, name string, pt types.PatchType, data []byte, 
 	if m.FieldManager != "" {
 		options.FieldManager = m.FieldManager
 	}
+	if m.FieldValidation != "" {
+		options.FieldValidation = m.FieldValidation
+	}
 	return m.RESTClient.Patch(pt).
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
@@ -261,6 +278,9 @@ func (m *Helper) Replace(namespace, name string, overwrite bool, obj runtime.Obj
 	}
 	if m.FieldManager != "" {
 		options.FieldManager = m.FieldManager
+	}
+	if m.FieldValidation != "" {
+		options.FieldValidation = m.FieldValidation
 	}
 
 	// Attempt to version the object based on client logic.

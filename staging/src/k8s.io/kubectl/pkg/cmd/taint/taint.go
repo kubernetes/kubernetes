@@ -47,8 +47,9 @@ type TaintOptions struct {
 	PrintFlags *genericclioptions.PrintFlags
 	ToPrinter  func(string) (printers.ResourcePrinter, error)
 
-	DryRunStrategy cmdutil.DryRunStrategy
-	DryRunVerifier *resource.QueryParamVerifier
+	DryRunStrategy      cmdutil.DryRunStrategy
+	DryRunVerifier      *resource.QueryParamVerifier
+	ValidationDirective string
 
 	resources      []string
 	taintsToAdd    []v1.Taint
@@ -149,6 +150,11 @@ func (o *TaintOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	}
 	o.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
+
+	o.ValidationDirective, err = cmdutil.GetValidationDirective(cmd)
+	if err != nil {
+		return err
+	}
 
 	// retrieves resource and taint args from args
 	// also checks args to verify that all resources are specified before taints
@@ -337,8 +343,9 @@ func (o TaintOptions) RunTaint() error {
 		}
 		helper := resource.
 			NewHelper(client, mapping).
+			DryRun(o.DryRunStrategy == cmdutil.DryRunServer).
 			WithFieldManager(o.fieldManager).
-			DryRun(o.DryRunStrategy == cmdutil.DryRunServer)
+			WithFieldValidation(o.ValidationDirective)
 
 		var outputObj runtime.Object
 		if createdPatch {

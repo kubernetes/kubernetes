@@ -51,11 +51,12 @@ type ServiceAccountOpts struct {
 	PrintFlags *genericclioptions.PrintFlags
 	PrintObj   func(obj runtime.Object) error
 	// Name of resource being created
-	Name             string
-	DryRunStrategy   cmdutil.DryRunStrategy
-	DryRunVerifier   *resource.QueryParamVerifier
-	CreateAnnotation bool
-	FieldManager     string
+	Name                string
+	DryRunStrategy      cmdutil.DryRunStrategy
+	DryRunVerifier      *resource.QueryParamVerifier
+	ValidationDirective string
+	CreateAnnotation    bool
+	FieldManager        string
 
 	Namespace        string
 	EnforceNamespace bool
@@ -146,6 +147,11 @@ func (o *ServiceAccountOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 		return printer.PrintObj(obj, o.Out)
 	}
 
+	o.ValidationDirective, err = cmdutil.GetValidationDirective(cmd)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -173,6 +179,7 @@ func (o *ServiceAccountOpts) Run() error {
 		if o.FieldManager != "" {
 			createOptions.FieldManager = o.FieldManager
 		}
+		createOptions.FieldValidation = o.ValidationDirective
 		if o.DryRunStrategy == cmdutil.DryRunServer {
 			if err := o.DryRunVerifier.HasSupport(serviceAccount.GroupVersionKind()); err != nil {
 				return err
