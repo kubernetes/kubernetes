@@ -47,6 +47,9 @@ func required(path ...string) validationMatch {
 func invalid(path ...string) validationMatch {
 	return validationMatch{path: field.NewPath(path[0], path[1:]...), errorType: field.ErrorTypeInvalid}
 }
+func invalidtypecode(path ...string) validationMatch {
+	return validationMatch{path: field.NewPath(path[0], path[1:]...), errorType: field.ErrorTypeTypeInvalid}
+}
 func invalidIndex(index int, path ...string) validationMatch {
 	return validationMatch{path: field.NewPath(path[0], path[1:]...).Index(index), errorType: field.ErrorTypeInvalid}
 }
@@ -2101,7 +2104,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 			},
 			errors: []validationMatch{
 				invalid("spec", "validation", "openAPIV3Schema", "properties[a]", "default"),
-				invalid("spec", "validation", "openAPIV3Schema", "properties[c]", "default", "foo"),
+				invalidtypecode("spec", "validation", "openAPIV3Schema", "properties[c]", "default", "foo"),
 				invalid("spec", "validation", "openAPIV3Schema", "properties[d]", "default", "bad"),
 				// we also expected unpruned and valid defaults under x-kubernetes-preserve-unknown-fields. We could be more
 				// strict here, but want to encourage proper specifications by forbidding other defaults.
