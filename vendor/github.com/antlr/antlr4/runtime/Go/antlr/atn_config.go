@@ -251,7 +251,7 @@ func (l *LexerATNConfig) hash() int {
 		f = 0
 	}
 	h := murmurInit(7)
-	h = murmurUpdate(h, l.state.GetStateNumber())
+	h = murmurUpdate(h, l.state.hash())
 	h = murmurUpdate(h, l.alt)
 	h = murmurUpdate(h, l.context.hash())
 	h = murmurUpdate(h, l.semanticContext.hash())

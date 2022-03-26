@@ -41,6 +41,8 @@ vetdeps:
 	clean \
 	proto \
 	test \
+	testappengine \
+	testappenginedeps \
 	testrace \
 	vet \
 	vetdeps

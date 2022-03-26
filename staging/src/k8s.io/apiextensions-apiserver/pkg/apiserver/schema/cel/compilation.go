@@ -19,7 +19,6 @@ package cel
 import (
 	"fmt"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/google/cel-go/cel"
@@ -67,27 +66,6 @@ type CompilationResult struct {
 	MaxCost uint64
 }
 
-var (
-	initEnvOnce sync.Once
-	initEnv     *cel.Env
-	initEnvErr  error
-)
-
-func getBaseEnv() (*cel.Env, error) {
-	initEnvOnce.Do(func() {
-		var opts []cel.EnvOption
-		opts = append(opts, cel.HomogeneousAggregateLiterals())
-		// Validate function declarations once during base env initialization,
-		// so they don't need to be evaluated each time a CEL rule is compiled.
-		// This is a relatively expensive operation.
-		opts = append(opts, cel.EagerlyValidateDeclarations(true))
-		opts = append(opts, library.ExtensionLibs...)
-
-		initEnv, initEnvErr = cel.NewEnv(opts...)
-	})
-	return initEnv, initEnvErr
-}
-
 // Compile compiles all the XValidations rules (without recursing into the schema) and returns a slice containing a
 // CompilationResult for each ValidationRule, or an error.
 // Each CompilationResult may contain:
@@ -104,11 +82,13 @@ func Compile(s *schema.Structural, isResourceRoot bool, perCallLimit uint64) ([]
 	var propDecls []*expr.Decl
 	var root *celmodel.DeclType
 	var ok bool
-	baseEnv, err := getBaseEnv()
+	env, err := cel.NewEnv(
+		cel.HomogeneousAggregateLiterals(),
+	)
 	if err != nil {
 		return nil, err
 	}
-	reg := celmodel.NewRegistry(baseEnv)
+	reg := celmodel.NewRegistry(env)
 	scopedTypeName := generateUniqueSelfTypeName()
 	rt, err := celmodel.NewRuleTypes(scopedTypeName, s, isResourceRoot, reg)
 	if err != nil {
@@ -117,7 +97,7 @@ func Compile(s *schema.Structural, isResourceRoot bool, perCallLimit uint64) ([]
 	if rt == nil {
 		return nil, nil
 	}
-	opts, err := rt.EnvOptions(baseEnv.TypeProvider())
+	opts, err := rt.EnvOptions(env.TypeProvider())
 	if err != nil {
 		return nil, err
 	}
@@ -131,8 +111,9 @@ func Compile(s *schema.Structural, isResourceRoot bool, perCallLimit uint64) ([]
 	}
 	propDecls = append(propDecls, decls.NewVar(ScopedVarName, root.ExprType()))
 	propDecls = append(propDecls, decls.NewVar(OldScopedVarName, root.ExprType()))
-	opts = append(opts, cel.Declarations(propDecls...))
-	env, err := baseEnv.Extend(opts...)
+	opts = append(opts, cel.Declarations(propDecls...), cel.HomogeneousAggregateLiterals())
+	opts = append(opts, library.ExtensionLibs...)
+	env, err = env.Extend(opts...)
 	if err != nil {
 		return nil, err
 	}
