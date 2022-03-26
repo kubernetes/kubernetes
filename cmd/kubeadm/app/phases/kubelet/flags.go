@@ -50,7 +50,7 @@ type kubeletFlagsOpts struct {
 // (from lower to higher):
 // - actual hostname
 // - NodeRegistrationOptions.Name (same as "--node-name" passed to "kubeadm init/join")
-// - "hostname-overide" flag in NodeRegistrationOptions.KubeletExtraArgs
+// - "hostname-override" flag in NodeRegistrationOptions.KubeletExtraArgs
 // It also returns the hostname or an error if getting the hostname failed.
 func GetNodeNameAndHostname(cfg *kubeadmapi.NodeRegistrationOptions) (string, string, error) {
 	hostname, err := kubeadmutil.GetHostname("")
