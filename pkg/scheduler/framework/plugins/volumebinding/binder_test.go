@@ -333,56 +333,56 @@ func (env *testEnv) initVolumes(cachedPVs []*v1.PersistentVolume, apiPVs []*v1.P
 
 }
 
-func (env *testEnv) updateVolumes(t *testing.T, pvs []*v1.PersistentVolume, waitCache bool) {
-	for _, pv := range pvs {
-		if _, err := env.client.CoreV1().PersistentVolumes().Update(context.TODO(), pv, metav1.UpdateOptions{}); err != nil {
-			t.Fatalf("failed to update PV %q", pv.Name)
+func (env *testEnv) updateVolumes(pvs []*v1.PersistentVolume) error {
+	for i, pv := range pvs {
+		newPv, err := env.client.CoreV1().PersistentVolumes().Update(context.TODO(), pv, metav1.UpdateOptions{})
+		if err != nil {
+			return err
 		}
+		pvs[i] = newPv
 	}
-	if waitCache {
-		wait.Poll(100*time.Millisecond, 3*time.Second, func() (bool, error) {
-			for _, pv := range pvs {
-				obj, err := env.internalPVCache.GetAPIObj(pv.Name)
-				if obj == nil || err != nil {
-					return false, nil
-				}
-				pvInCache, ok := obj.(*v1.PersistentVolume)
-				if !ok {
-					return false, fmt.Errorf("PV %s invalid object", pvInCache.Name)
-				}
-				if versioner.CompareResourceVersion(pvInCache, pv) != 0 {
-					return false, nil
-				}
+	return wait.Poll(100*time.Millisecond, 3*time.Second, func() (bool, error) {
+		for _, pv := range pvs {
+			obj, err := env.internalPVCache.GetAPIObj(pv.Name)
+			if obj == nil || err != nil {
+				return false, nil
 			}
-			return true, nil
-		})
-	}
+			pvInCache, ok := obj.(*v1.PersistentVolume)
+			if !ok {
+				return false, fmt.Errorf("PV %s invalid object", pvInCache.Name)
+			}
+			if versioner.CompareResourceVersion(pvInCache, pv) != 0 {
+				return false, nil
+			}
+		}
+		return true, nil
+	})
 }
 
-func (env *testEnv) updateClaims(t *testing.T, pvcs []*v1.PersistentVolumeClaim, waitCache bool) {
-	for _, pvc := range pvcs {
-		if _, err := env.client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Update(context.TODO(), pvc, metav1.UpdateOptions{}); err != nil {
-			t.Fatalf("failed to update PVC %q", getPVCName(pvc))
+func (env *testEnv) updateClaims(pvcs []*v1.PersistentVolumeClaim) error {
+	for i, pvc := range pvcs {
+		newPvc, err := env.client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Update(context.TODO(), pvc, metav1.UpdateOptions{})
+		if err != nil {
+			return err
 		}
+		pvcs[i] = newPvc
 	}
-	if waitCache {
-		wait.Poll(100*time.Millisecond, 3*time.Second, func() (bool, error) {
-			for _, pvc := range pvcs {
-				obj, err := env.internalPVCCache.GetAPIObj(getPVCName(pvc))
-				if obj == nil || err != nil {
-					return false, nil
-				}
-				pvcInCache, ok := obj.(*v1.PersistentVolumeClaim)
-				if !ok {
-					return false, fmt.Errorf("PVC %s invalid object", pvcInCache.Name)
-				}
-				if versioner.CompareResourceVersion(pvcInCache, pvc) != 0 {
-					return false, nil
-				}
+	return wait.Poll(100*time.Millisecond, 3*time.Second, func() (bool, error) {
+		for _, pvc := range pvcs {
+			obj, err := env.internalPVCCache.GetAPIObj(getPVCName(pvc))
+			if obj == nil || err != nil {
+				return false, nil
 			}
-			return true, nil
-		})
-	}
+			pvcInCache, ok := obj.(*v1.PersistentVolumeClaim)
+			if !ok {
+				return false, fmt.Errorf("PVC %s invalid object", pvcInCache.Name)
+			}
+			if versioner.CompareResourceVersion(pvcInCache, pvc) != 0 {
+				return false, nil
+			}
+		}
+		return true, nil
+	})
 }
 
 func (env *testEnv) deleteVolumes(pvs []*v1.PersistentVolume) {
@@ -1727,12 +1727,16 @@ func TestCheckBindings(t *testing.T) {
 		if scenario.deletePVs {
 			testEnv.deleteVolumes(scenario.initPVs)
 		} else {
-			testEnv.updateVolumes(t, scenario.apiPVs, true)
+			if err := testEnv.updateVolumes(scenario.apiPVs); err != nil {
+				t.Errorf("Failed to update PVs: %v", err)
+			}
 		}
 		if scenario.deletePVCs {
 			testEnv.deleteClaims(scenario.initPVCs)
 		} else {
-			testEnv.updateClaims(t, scenario.apiPVCs, true)
+			if err := testEnv.updateClaims(scenario.apiPVCs); err != nil {
+				t.Errorf("Failed to update PVCs: %v", err)
+			}
 		}
 
 		// Execute
@@ -1856,8 +1860,12 @@ func TestCheckBindingsWithCSIMigration(t *testing.T) {
 		testEnv.assumeVolumes(t, "node1", pod, scenario.bindings, scenario.provisionedPVCs)
 
 		// Before execute
-		testEnv.updateVolumes(t, scenario.apiPVs, true)
-		testEnv.updateClaims(t, scenario.apiPVCs, true)
+		if err := testEnv.updateVolumes(scenario.apiPVs); err != nil {
+			t.Errorf("Failed to update PVs: %v", err)
+		}
+		if err := testEnv.updateClaims(scenario.apiPVCs); err != nil {
+			t.Errorf("Failed to update PVCs: %v", err)
+		}
 
 		// Execute
 		allBound, err := testEnv.internalBinder.checkBindings(pod, scenario.bindings, scenario.provisionedPVCs)
