@@ -1003,7 +1003,7 @@ func (proxier *Proxier) syncProxyRules() {
 		allEndpoints := proxier.endpointsMap[svcName]
 
 		// Figure out the endpoints for Cluster and Local traffic policy.
-		// allLocallyReachableEndpoints is the set of all endpoints that can be reached
+		// allLocallyReachableEndpoints is the set of all endpoints that can be routed to
 		// from this node, given the service's traffic policies. hasEndpoints is true
 		// if the service has any usable endpoints on any node, not just this one.
 		clusterEndpoints, localEndpoints, allLocallyReachableEndpoints, hasEndpoints := proxy.CategorizeEndpoints(allEndpoints, svcInfo, proxier.nodeLabels)
@@ -1042,15 +1042,15 @@ func (proxier *Proxier) syncProxyRules() {
 			proxier.natRules.Write(args)
 		}
 
-		svcChain := svcInfo.servicePortChainName
-		svcLocalChain := svcInfo.serviceLocalChainName
+		policyClusterChain := svcInfo.servicePortChainName
+		policyLocalChain := svcInfo.serviceLocalChainName
 		svcXlbChain := svcInfo.serviceLBChainName
 
-		internalTrafficChain := svcChain
-		externalTrafficChain := svcChain
+		internalTrafficChain := policyClusterChain
+		externalTrafficChain := policyClusterChain
 
 		if svcInfo.NodeLocalInternal() {
-			internalTrafficChain = svcLocalChain
+			internalTrafficChain = policyLocalChain
 		}
 		if svcInfo.NodeLocalExternal() {
 			externalTrafficChain = svcXlbChain
@@ -1058,12 +1058,12 @@ func (proxier *Proxier) syncProxyRules() {
 
 		if hasEndpoints && svcInfo.UsesClusterEndpoints() {
 			// Create the Cluster traffic policy chain, retaining counters if possible.
-			if chain, ok := existingNATChains[svcChain]; ok {
+			if chain, ok := existingNATChains[policyClusterChain]; ok {
 				proxier.natChains.WriteBytes(chain)
 			} else {
-				proxier.natChains.Write(utiliptables.MakeChainLine(svcChain))
+				proxier.natChains.Write(utiliptables.MakeChainLine(policyClusterChain))
 			}
-			activeNATChains[svcChain] = true
+			activeNATChains[policyClusterChain] = true
 		}
 
 		if hasEndpoints && svcInfo.ExternallyAccessible() && svcInfo.NodeLocalExternal() {
@@ -1084,7 +1084,7 @@ func (proxier *Proxier) syncProxyRules() {
 					"-m", "comment", "--comment",
 					`"Redirect pods trying to reach external loadbalancer VIP to clusterIP"`,
 					proxier.localDetector.IfLocal(),
-					"-j", string(svcChain))
+					"-j", string(policyClusterChain))
 			}
 
 			// Next, redirect all src-type=LOCAL -> LB IP to the service chain
@@ -1101,21 +1101,21 @@ func (proxier *Proxier) syncProxyRules() {
 				"-A", string(svcXlbChain),
 				"-m", "comment", "--comment", fmt.Sprintf(`"route LOCAL traffic for %s LB IP to service chain"`, svcNameString),
 				"-m", "addrtype", "--src-type", "LOCAL",
-				"-j", string(svcChain))
+				"-j", string(policyClusterChain))
 
 			// Everything else goes to the SVL chain
 			proxier.natRules.Write(
 				"-A", string(svcXlbChain),
-				"-j", string(svcLocalChain))
+				"-j", string(policyLocalChain))
 		}
 
 		if hasEndpoints && svcInfo.UsesLocalEndpoints() {
-			if chain, ok := existingNATChains[svcLocalChain]; ok {
+			if chain, ok := existingNATChains[policyLocalChain]; ok {
 				proxier.natChains.WriteBytes(chain)
 			} else {
-				proxier.natChains.Write(utiliptables.MakeChainLine(svcLocalChain))
+				proxier.natChains.Write(utiliptables.MakeChainLine(policyLocalChain))
 			}
-			activeNATChains[svcLocalChain] = true
+			activeNATChains[policyLocalChain] = true
 		}
 
 		// Capture the clusterIP.
@@ -1136,7 +1136,6 @@ func (proxier *Proxier) syncProxyRules() {
 				// is that you can establish a static route for your Service range,
 				// routing to any node, and that node will bridge into the Service
 				// for you.  Since that might bounce off-node, we masquerade here.
-				// If/when we support "Local" policy for VIPs, we should update this.
 				proxier.natRules.Write(
 					"-A", string(internalTrafficChain),
 					args,
@@ -1174,7 +1173,7 @@ func (proxier *Proxier) syncProxyRules() {
 				// be always forwarded to the corresponding Service, so no need to SNAT
 				// If we can't differentiate the local traffic we always SNAT.
 				if !svcInfo.NodeLocalExternal() {
-					appendTo := []string{"-A", string(svcChain)}
+					appendTo := []string{"-A", string(policyClusterChain)}
 					// This masquerades off-cluster traffic to a External IP.
 					if proxier.localDetector.IsImplemented() {
 						proxier.natRules.Write(
@@ -1299,7 +1298,7 @@ func (proxier *Proxier) syncProxyRules() {
 				if !svcInfo.NodeLocalExternal() {
 					// Nodeports need SNAT, unless they're local.
 					proxier.natRules.Write(
-						"-A", string(svcChain),
+						"-A", string(policyClusterChain),
 						args,
 						"-j", string(KubeMarkMasqChain))
 				} else {
@@ -1347,24 +1346,26 @@ func (proxier *Proxier) syncProxyRules() {
 			)
 		}
 
-		if len(clusterEndpoints) != 0 {
-			// Write rules jumping from svcChain to clusterEndpoints
-			proxier.writeServiceToEndpointRules(svcNameString, svcInfo, svcChain, clusterEndpoints, args)
+		if svcInfo.UsesClusterEndpoints() {
+			// Write rules jumping from policyClusterChain to clusterEndpoints
+			proxier.writeServiceToEndpointRules(svcNameString, svcInfo, policyClusterChain, clusterEndpoints, args)
 		}
 
-		if len(localEndpoints) != 0 {
-			// Write rules jumping from svcLocalChain to localEndpointChains
-			proxier.writeServiceToEndpointRules(svcNameString, svcInfo, svcLocalChain, localEndpoints, args)
-		} else if hasEndpoints && svcInfo.UsesLocalEndpoints() {
-			// Blackhole all traffic since there are no local endpoints
-			args = append(args[:0],
-				"-A", string(svcLocalChain),
-				"-m", "comment", "--comment",
-				fmt.Sprintf(`"%s has no local endpoints"`, svcNameString),
-				"-j",
-				string(KubeMarkDropChain),
-			)
-			proxier.natRules.Write(args)
+		if svcInfo.UsesLocalEndpoints() {
+			if len(localEndpoints) != 0 {
+				// Write rules jumping from policyLocalChain to localEndpointChains
+				proxier.writeServiceToEndpointRules(svcNameString, svcInfo, policyLocalChain, localEndpoints, args)
+			} else if hasEndpoints {
+				// Blackhole all traffic since there are no local endpoints
+				args = append(args[:0],
+					"-A", string(policyLocalChain),
+					"-m", "comment", "--comment",
+					fmt.Sprintf(`"%s has no local endpoints"`, svcNameString),
+					"-j",
+					string(KubeMarkDropChain),
+				)
+				proxier.natRules.Write(args)
+			}
 		}
 	}
 
