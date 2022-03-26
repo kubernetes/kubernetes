@@ -29,6 +29,7 @@ import (
 	"github.com/google/uuid"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 	authauthenticator "k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
@@ -156,9 +157,12 @@ func startAPIServerOrDie(controlPlaneConfig *controlplane.Config, incomingServer
 	if incomingServer != nil {
 		s = incomingServer
 	} else {
-		s = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		s = httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			m.GenericAPIServer.Handler.ServeHTTP(w, req)
 		}))
+
+		s.EnableHTTP2 = true
+		s.StartTLS()
 	}
 
 	stopCh := make(chan struct{})
@@ -177,7 +181,20 @@ func startAPIServerOrDie(controlPlaneConfig *controlplane.Config, incomingServer
 
 	// set the loopback client config
 	if controlPlaneConfig.GenericConfig.LoopbackClientConfig == nil {
-		controlPlaneConfig.GenericConfig.LoopbackClientConfig = &restclient.Config{QPS: 50, Burst: 100, ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs}}
+		controlPlaneConfig.GenericConfig.LoopbackClientConfig = &restclient.Config{
+			QPS:   50,
+			Burst: 100,
+			ContentConfig: restclient.ContentConfig{
+				NegotiatedSerializer: legacyscheme.Codecs,
+			},
+		}
+		transport, ok := s.Client().Transport.(*http.Transport)
+		if ok {
+			controlPlaneConfig.GenericConfig.LoopbackClientConfig.Transport = utilnet.SetTransportDefaults(transport)
+		} else {
+			controlPlaneConfig.GenericConfig.LoopbackClientConfig.Transport = s.Client().Transport
+		}
+
 	}
 	controlPlaneConfig.GenericConfig.LoopbackClientConfig.Host = s.URL
 
