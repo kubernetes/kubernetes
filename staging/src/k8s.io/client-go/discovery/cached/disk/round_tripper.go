@@ -18,14 +18,12 @@ package disk
 
 import (
 	"net/http"
-	"os"
-	"path/filepath"
 
 	"github.com/gregjones/httpcache"
-	"github.com/gregjones/httpcache/diskcache"
-	"github.com/peterbourgon/diskv"
 	"k8s.io/klog/v2"
 )
+
+const maxDiskCacheSize = 100 * 1024 * 1024 // 100 MB
 
 type cacheRoundTripper struct {
 	rt *httpcache.Transport
@@ -35,13 +33,9 @@ type cacheRoundTripper struct {
 // response headers and send the If-None-Match header on subsequent
 // corresponding requests.
 func newCacheRoundTripper(cacheDir string, rt http.RoundTripper) http.RoundTripper {
-	d := diskv.New(diskv.Options{
-		PathPerm: os.FileMode(0750),
-		FilePerm: os.FileMode(0660),
-		BasePath: cacheDir,
-		TempDir:  filepath.Join(cacheDir, ".diskv-temp"),
-	})
-	t := httpcache.NewTransport(diskcache.NewWithDiskv(d))
+	// Ensure the number of bytes stored on disk in cache does not exceed
+	// maxDiskCacheSize. Deletes oldest files to stay under size limit.
+	t := httpcache.NewTransport(NewSizeLimitedDiskCache(maxDiskCacheSize, cacheDir))
 	t.Transport = rt
 
 	return &cacheRoundTripper{rt: t}
