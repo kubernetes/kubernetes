@@ -614,10 +614,10 @@ func countEndpoints(eps *corev1.Endpoints) int {
 }
 
 func TestAPIServerService(t *testing.T) {
-	_, s, closeFn := framework.RunAnAPIServer(framework.NewIntegrationTestControlPlaneConfig())
+	m, _, closeFn := framework.RunAnAPIServer(framework.NewIntegrationTestControlPlaneConfig())
 	defer closeFn()
 
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
+	client := clientset.NewForConfigOrDie(m.GenericAPIServer.LoopbackClientConfig)
 
 	err := wait.Poll(time.Second, time.Minute, func() (bool, error) {
 		svcList, err := client.CoreV1().Services(metav1.NamespaceDefault).List(context.TODO(), metav1.ListOptions{})
@@ -656,10 +656,10 @@ func TestServiceAlloc(t *testing.T) {
 		t.Fatalf("bad cidr: %v", err)
 	}
 	cfg.ExtraConfig.ServiceIPRange = *cidr
-	_, s, closeFn := framework.RunAnAPIServer(cfg)
+	m, _, closeFn := framework.RunAnAPIServer(framework.NewIntegrationTestControlPlaneConfig())
 	defer closeFn()
 
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
+	client := clientset.NewForConfigOrDie(m.GenericAPIServer.LoopbackClientConfig)
 
 	svc := func(i int) *corev1.Service {
 		return &corev1.Service{

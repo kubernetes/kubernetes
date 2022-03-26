@@ -32,7 +32,6 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
-	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/pkg/controller/endpointslice"
 	"k8s.io/kubernetes/pkg/controller/endpointslicemirroring"
@@ -41,11 +40,11 @@ import (
 
 func TestEndpointSliceMirroring(t *testing.T) {
 	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	_, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
+	m, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()
 
-	config := restclient.Config{Host: server.URL}
-	client, err := clientset.NewForConfig(&config)
+	config := m.GenericAPIServer.LoopbackClientConfig
+	client, err := clientset.NewForConfig(config)
 	if err != nil {
 		t.Fatalf("Error creating clientset: %v", err)
 	}
@@ -235,11 +234,11 @@ func TestEndpointSliceMirroring(t *testing.T) {
 
 func TestEndpointSliceMirroringUpdates(t *testing.T) {
 	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	_, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
+	m, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()
 
-	config := restclient.Config{Host: server.URL}
-	client, err := clientset.NewForConfig(&config)
+	config := m.GenericAPIServer.LoopbackClientConfig
+	client, err := clientset.NewForConfig(config)
 	if err != nil {
 		t.Fatalf("Error creating clientset: %v", err)
 	}
@@ -411,11 +410,11 @@ func TestEndpointSliceMirroringUpdates(t *testing.T) {
 
 func TestEndpointSliceMirroringSelectorTransition(t *testing.T) {
 	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	_, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
+	m, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()
 
-	config := restclient.Config{Host: server.URL}
-	client, err := clientset.NewForConfig(&config)
+	config := m.GenericAPIServer.LoopbackClientConfig
+	client, err := clientset.NewForConfig(config)
 	if err != nil {
 		t.Fatalf("Error creating clientset: %v", err)
 	}
