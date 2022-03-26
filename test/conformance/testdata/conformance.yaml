@@ -251,8 +251,8 @@
     works for CRD preserving unknown fields at the schema root [Conformance]'
   description: Register a custom resource definition with x-preserve-unknown-fields
     in the schema root. Attempt to create and apply a change a custom resource, via
-    kubectl; client-side validation MUST accept unknown properties. Attempt kubectl
-    explain; the output MUST show the custom resource KIND.
+    kubectl; kubectl validation MUST accept unknown properties. Attempt kubectl explain;
+    the output MUST show the custom resource KIND.
   release: v1.16
   file: test/e2e/apimachinery/crd_publish_openapi.go
 - testname: Custom Resource OpenAPI Publish, with x-preserve-unknown-fields in embedded
@@ -261,7 +261,7 @@
     works for CRD preserving unknown fields in an embedded object [Conformance]'
   description: Register a custom resource definition with x-preserve-unknown-fields
     in an embedded object. Attempt to create and apply a change a custom resource,
-    via kubectl; client-side validation MUST accept unknown properties. Attempt kubectl
+    via kubectl; kubectl validation MUST accept unknown properties. Attempt kubectl
     explain; the output MUST show that x-preserve-unknown-properties is used on the
     nested field.
   release: v1.16
@@ -271,12 +271,12 @@
     works for CRD with validation schema [Conformance]'
   description: Register a custom resource definition with a validating schema consisting
     of objects, arrays and primitives. Attempt to create and apply a change a custom
-    resource using valid properties, via kubectl; client-side validation MUST pass.
-    Attempt both operations with unknown properties and without required properties;
-    client-side validation MUST reject the operations. Attempt kubectl explain; the
-    output MUST explain the custom resource properties. Attempt kubectl explain on
-    custom resource properties; the output MUST explain the nested custom resource
-    properties.
+    resource using valid properties, via kubectl; kubectl validation MUST pass. Attempt
+    both operations with unknown properties and without required properties; kubectl
+    validation MUST reject the operations. Attempt kubectl explain; the output MUST
+    explain the custom resource properties. Attempt kubectl explain on custom resource
+    properties; the output MUST explain the nested custom resource properties. All
+    validation should be the same.
   release: v1.16
   file: test/e2e/apimachinery/crd_publish_openapi.go
 - testname: Custom Resource OpenAPI Publish, with x-preserve-unknown-fields in object
@@ -284,7 +284,7 @@
     works for CRD without validation schema [Conformance]'
   description: Register a custom resource definition with x-preserve-unknown-fields
     in the top level object. Attempt to create and apply a change a custom resource,
-    via kubectl; client-side validation MUST accept unknown properties. Attempt kubectl
+    via kubectl; kubectl validation MUST accept unknown properties. Attempt kubectl
     explain; the output MUST contain a valid DESCRIPTION stanza.
   release: v1.16
   file: test/e2e/apimachinery/crd_publish_openapi.go
