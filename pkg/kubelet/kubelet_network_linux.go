@@ -31,6 +31,10 @@ import (
 )
 
 const (
+	// KubeIPTablesHintChain is the chain whose existence in either iptables-legacy
+	// or iptables-nft indicates which version of iptables the system is using
+	KubeIPTablesHintChain utiliptables.Chain = "KUBE-IPTABLES-HINT"
+
 	// KubeMarkMasqChain is the mark-for-masquerade chain
 	// TODO: clean up this logic in kube-proxy
 	KubeMarkMasqChain utiliptables.Chain = "KUBE-MARK-MASQ"
@@ -181,6 +185,13 @@ func (kl *Kubelet) syncNetworkUtil(iptClient utiliptables.Interface) bool {
 	}
 	if _, err := iptClient.EnsureRule(utiliptables.Append, utiliptables.TableNAT, KubePostroutingChain, masqRule...); err != nil {
 		klog.ErrorS(err, "Failed to ensure SNAT rule for packets marked by KUBE-MARK-MASQ chain in nat table KUBE-POSTROUTING chain")
+		return false
+	}
+
+	// Create hint chain so other components can see whether we are using iptables-legacy
+	// or iptables-nft.
+	if _, err := iptClient.EnsureChain(utiliptables.TableMangle, KubeIPTablesHintChain); err != nil {
+		klog.ErrorS(err, "Failed to ensure that iptables hint chain exists")
 		return false
 	}
 
