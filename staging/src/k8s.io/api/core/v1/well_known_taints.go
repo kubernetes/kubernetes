@@ -45,4 +45,8 @@ const (
 	// TaintNodePIDPressure will be added when node has pid pressure
 	// and removed when node has enough pid.
 	TaintNodePIDPressure = "node.kubernetes.io/pid-pressure"
+
+	// TaintNodeOutOfService can be added when node is out of service in case of
+	// a non-graceful shutdown
+	TaintNodeOutOfService = "node.kubernetes.io/out-of-service"
 )

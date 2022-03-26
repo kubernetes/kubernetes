@@ -844,12 +844,20 @@ const (
 	//
 	// Enable MinDomains in Pod Topology Spread.
 	MinDomainsInPodTopologySpread featuregate.Feature = "MinDomainsInPodTopologySpread"
+
 	// owner: @aojea
 	// kep: http://kep.k8s.io/3070
 	// alpha: v1.24
 	//
 	// Subdivide the ClusterIP range for dynamic and static IP allocation.
 	ServiceIPStaticSubrange featuregate.Feature = "ServiceIPStaticSubrange"
+
+	// owner: @xing-yang @sonasingh46
+	// kep: http://kep.k8s.io/2268
+	// alpha: v1.24
+	//
+	// Allow pods to failover to a different node in case of non graceful node shutdown
+	NodeOutOfServiceVolumeDetach featuregate.Feature = "NodeOutOfServiceVolumeDetach"
 )
 
 func init() {
@@ -973,7 +981,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	LegacyServiceAccountTokenNoAutoGeneration:      {Default: true, PreRelease: featuregate.Beta},
 	MinDomainsInPodTopologySpread:                  {Default: false, PreRelease: featuregate.Alpha},
 	ServiceIPStaticSubrange:                        {Default: false, PreRelease: featuregate.Alpha},
-
+	NodeOutOfServiceVolumeDetach:                   {Default: false, PreRelease: featuregate.Alpha},
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
 	genericfeatures.AdvancedAuditing:                    {Default: true, PreRelease: featuregate.GA},

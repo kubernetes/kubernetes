@@ -29,14 +29,17 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
-
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
+	nodeutil "k8s.io/kubernetes/pkg/util/node"
+	"k8s.io/kubernetes/pkg/util/taints"
 )
 
 const (
@@ -113,6 +116,9 @@ func (gcc *PodGCController) gc(ctx context.Context) {
 	if gcc.terminatedPodThreshold > 0 {
 		gcc.gcTerminated(pods)
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.NodeOutOfServiceVolumeDetach) {
+		gcc.gcTerminating(pods)
+	}
 	gcc.gcOrphaned(ctx, pods, nodes)
 	gcc.gcUnscheduledTerminating(pods)
 }
@@ -122,6 +128,53 @@ func isPodTerminated(pod *v1.Pod) bool {
 		return true
 	}
 	return false
+}
+
+// isPodTerminating returns true if the pod is terminating.
+func isPodTerminating(pod *v1.Pod) bool {
+	return pod.ObjectMeta.DeletionTimestamp != nil
+}
+
+func (gcc *PodGCController) gcTerminating(pods []*v1.Pod) {
+	klog.V(4).Info("GC'ing terminating pods that are on out-of-service nodes")
+	terminatingPods := []*v1.Pod{}
+	for _, pod := range pods {
+		if isPodTerminating(pod) {
+			node, err := gcc.nodeLister.Get(string(pod.Spec.NodeName))
+			if err != nil {
+				klog.Errorf("failed to get node %s : %s", string(pod.Spec.NodeName), err)
+				continue
+			}
+			// Add this pod to terminatingPods list only if the following conditions are met:
+			// 1. Node is not ready.
+			// 2. Node has `node.kubernetes.io/out-of-service` taint.
+			if !nodeutil.IsNodeReady(node) && taints.TaintKeyExists(node.Spec.Taints, v1.TaintNodeOutOfService) {
+				klog.V(4).Infof("garbage collecting pod %s that is terminating. Phase [%v]", pod.Name, pod.Status.Phase)
+				terminatingPods = append(terminatingPods, pod)
+			}
+		}
+	}
+
+	deleteCount := len(terminatingPods)
+	if deleteCount == 0 {
+		return
+	}
+
+	klog.V(4).Infof("Garbage collecting %v pods that are terminating on node tainted with node.kubernetes.io/out-of-service", deleteCount)
+	// sort only when necessary
+	sort.Sort(byCreationTimestamp(terminatingPods))
+	var wait sync.WaitGroup
+	for i := 0; i < deleteCount; i++ {
+		wait.Add(1)
+		go func(namespace string, name string) {
+			defer wait.Done()
+			if err := gcc.deletePod(namespace, name); err != nil {
+				// ignore not founds
+				utilruntime.HandleError(err)
+			}
+		}(terminatingPods[i].Namespace, terminatingPods[i].Name)
+	}
+	wait.Wait()
 }
 
 func (gcc *PodGCController) gcTerminated(pods []*v1.Pod) {
