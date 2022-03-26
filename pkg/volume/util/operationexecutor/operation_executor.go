@@ -925,11 +925,13 @@ func (oe *operationExecutor) MountVolume(
 	if err != nil {
 		return err
 	}
-	// Avoid executing mount/map from multiple pods referencing the
-	// same volume in parallel
+	// Avoid executing mount/map from multiple pods referencing the same volume
+	// in parallel if it is attachable or device mountable
 	podName := nestedpendingoperations.EmptyUniquePodName
 
-	// TODO: remove this -- not necessary
+	// TODO: if MountDevice is ever split from MountVolume (to be like
+	// UnmountDevice and UnmountVolume) then MountDevice should index operations
+	// by empty pod name but MountVolume should not since it can be parallel
 	if !volumeToMount.PluginIsAttachable && !volumeToMount.PluginIsDeviceMountable {
 		// volume plugins which are Non-attachable and Non-deviceMountable can execute mount for multiple pods
 		// referencing the same volume in parallel
