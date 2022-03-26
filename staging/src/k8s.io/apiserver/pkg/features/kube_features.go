@@ -204,6 +204,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	APIServerTracing:                    {Default: false, PreRelease: featuregate.Alpha},
 	OpenAPIEnums:                        {Default: true, PreRelease: featuregate.Beta},
 	CustomResourceValidationExpressions: {Default: false, PreRelease: featuregate.Alpha},
-	OpenAPIV3:                           {Default: false, PreRelease: featuregate.Alpha},
+	OpenAPIV3:                           {Default: true, PreRelease: featuregate.Beta},
 	ServerSideFieldValidation:           {Default: false, PreRelease: featuregate.Alpha},
 }
