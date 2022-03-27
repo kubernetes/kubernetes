@@ -985,6 +985,57 @@ func TestFromExistingConfig(t *testing.T) {
 			},
 		},
 		{
+			name:        "AddNewExecEnvVar",
+			description: "Testing for kubectl config set users.foo.exec.env.name.test1 to value:value2",
+			config:      conf,
+			args:        []string{"users.foo.exec.env.name.test1", "value:value2"},
+			expected:    `Property "users.foo.exec.env.name.test1" set.` + "\n",
+			expectedConfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"foo": {
+						Exec: &clientcmdapi.ExecConfig{
+							Args: []string{
+								"test1",
+								"test2",
+								"test3",
+							},
+							Env: []clientcmdapi.ExecEnvVar{
+								{
+									Name:  "test",
+									Value: "value1",
+								},
+								{
+									Name:  "test1",
+									Value: "value2",
+								},
+							},
+						},
+						Extensions: map[string]runtime.Object{},
+						ImpersonateGroups: []string{
+							"test1",
+							"test2",
+							"test3",
+						},
+						ImpersonateUserExtra: map[string][]string{
+							"test1": {
+								"val1",
+								"val2",
+								"val3",
+							},
+						},
+					},
+				},
+				Clusters:       map[string]*clientcmdapi.Cluster{},
+				Contexts:       map[string]*clientcmdapi.Context{},
+				CurrentContext: "minikube",
+				Extensions:     map[string]runtime.Object{},
+				Preferences: clientcmdapi.Preferences{
+					Colors:     false,
+					Extensions: map[string]runtime.Object{},
+				},
+			},
+		},
+		{
 			name:        "AddActAsGroups",
 			description: "Testing for kubectl config set users.foo.act-as-groups to test4+",
 			config:      conf,
