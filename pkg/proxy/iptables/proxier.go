@@ -1524,10 +1524,12 @@ func (proxier *Proxier) writeServiceToEndpointRules(svcNameString string, svcInf
 			if !ok {
 				continue
 			}
+			comment := fmt.Sprintf(`"%s -> %s"`, svcNameString, epInfo.Endpoint)
+
 			args = append(args[:0],
 				"-A", string(svcChain),
 			)
-			args = proxier.appendServiceCommentLocked(args, svcNameString)
+			args = proxier.appendServiceCommentLocked(args, comment)
 			args = append(args,
 				"-m", "recent", "--name", string(epInfo.ChainName),
 				"--rcheck", "--seconds", strconv.Itoa(svcInfo.StickyMaxAgeSeconds()), "--reap",
@@ -1544,9 +1546,10 @@ func (proxier *Proxier) writeServiceToEndpointRules(svcNameString string, svcInf
 		if !ok {
 			continue
 		}
+		comment := fmt.Sprintf(`"%s -> %s"`, svcNameString, epInfo.Endpoint)
 
 		args = append(args[:0], "-A", string(svcChain))
-		args = proxier.appendServiceCommentLocked(args, svcNameString)
+		args = proxier.appendServiceCommentLocked(args, comment)
 		if i < (numEndpoints - 1) {
 			// Each rule is a probabilistic match.
 			args = append(args,
