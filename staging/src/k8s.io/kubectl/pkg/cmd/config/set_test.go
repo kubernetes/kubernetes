@@ -247,7 +247,7 @@ func TestFromNewConfig(t *testing.T) {
 			description: "Testing for kubectl config set users.foo.exec.env.name.test to value2",
 			config:      conf,
 			args:        []string{"users.foo.exec.env.name.test", "value2"},
-			expectedErr: `error parsing field name for value, should be of format fieldName:fieldValue`,
+			expectedErr: `error parsing field name for value, should be of format fieldName:fieldValue[:action]`,
 		},
 		{
 			name:        "SetAuthInfoExecInstallHint",
@@ -1009,6 +1009,48 @@ func TestFromExistingConfig(t *testing.T) {
 									Value: "value2",
 								},
 							},
+						},
+						Extensions: map[string]runtime.Object{},
+						ImpersonateGroups: []string{
+							"test1",
+							"test2",
+							"test3",
+						},
+						ImpersonateUserExtra: map[string][]string{
+							"test1": {
+								"val1",
+								"val2",
+								"val3",
+							},
+						},
+					},
+				},
+				Clusters:       map[string]*clientcmdapi.Cluster{},
+				Contexts:       map[string]*clientcmdapi.Context{},
+				CurrentContext: "minikube",
+				Extensions:     map[string]runtime.Object{},
+				Preferences: clientcmdapi.Preferences{
+					Colors:     false,
+					Extensions: map[string]runtime.Object{},
+				},
+			},
+		},
+		{
+			name:        "DeleteExecEnvVar",
+			description: "Testing for kubectl config set users.foo.exec.env.name.test to value:value1:del",
+			config:      conf,
+			args:        []string{"users.foo.exec.env.name.test", "value:value1:-"},
+			expected:    `Property "users.foo.exec.env.name.test" set.` + "\n",
+			expectedConfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"foo": {
+						Exec: &clientcmdapi.ExecConfig{
+							Args: []string{
+								"test1",
+								"test2",
+								"test3",
+							},
+							Env: []clientcmdapi.ExecEnvVar{},
 						},
 						Extensions: map[string]runtime.Object{},
 						ImpersonateGroups: []string{
