@@ -206,8 +206,10 @@ func TestAbnormalVolumeEvent(t *testing.T) {
 	}
 
 	// Calculate stats for pod
-	volumeCondition.Message = "The target path of the volume doesn't exist"
-	volumeCondition.Abnormal = true
+	if volumeCondition != nil {
+		volumeCondition.Message = "The target path of the volume doesn't exist"
+		volumeCondition.Abnormal = true
+	}
 	statsCalculator := newVolumeStatCalculator(mockStats, time.Minute, fakePod, &fakeEventRecorder)
 	statsCalculator.calcAndStoreStats()
 
@@ -237,16 +239,21 @@ func (v *fakeVolume) GetMetrics() (*volume.Metrics, error) {
 }
 
 func expectedMetrics() *volume.Metrics {
-	return &volume.Metrics{
+	vMetrics := &volume.Metrics{
 		Available:  resource.NewQuantity(available, resource.BinarySI),
 		Capacity:   resource.NewQuantity(capacity, resource.BinarySI),
 		Used:       resource.NewQuantity(available-capacity, resource.BinarySI),
 		Inodes:     resource.NewQuantity(inodesTotal, resource.BinarySI),
 		InodesFree: resource.NewQuantity(inodesFree, resource.BinarySI),
 		InodesUsed: resource.NewQuantity(inodesTotal-inodesFree, resource.BinarySI),
-		Message:    &volumeCondition.Message,
-		Abnormal:   &volumeCondition.Abnormal,
 	}
+
+	if volumeCondition != nil {
+		vMetrics.Message = &volumeCondition.Message
+		vMetrics.Abnormal = &volumeCondition.Abnormal
+	}
+
+	return vMetrics
 }
 
 func expectedFSStats() kubestats.FsStats {
@@ -269,9 +276,13 @@ func expectedFSStats() kubestats.FsStats {
 
 func expectedVolumeHealthStats() *kubestats.VolumeHealthStats {
 	metric := expectedMetrics()
-	return &kubestats.VolumeHealthStats{
-		Abnormal: *metric.Abnormal,
+	hs := &kubestats.VolumeHealthStats{}
+
+	if metric != nil && metric.Abnormal != nil {
+		hs.Abnormal = *metric.Abnormal
 	}
+
+	return hs
 }
 
 // Fake block-volume/metrics provider, block-devices have no inodes
@@ -290,12 +301,17 @@ func (v *fakeBlockVolume) GetMetrics() (*volume.Metrics, error) {
 }
 
 func expectedBlockMetrics() *volume.Metrics {
-	return &volume.Metrics{
+	vMetrics := &volume.Metrics{
 		Available: resource.NewQuantity(available, resource.BinarySI),
 		Capacity:  resource.NewQuantity(capacity, resource.BinarySI),
 		Used:      resource.NewQuantity(available-capacity, resource.BinarySI),
-		Abnormal:  &volumeCondition.Abnormal,
 	}
+
+	if volumeCondition != nil {
+		vMetrics.Abnormal = &volumeCondition.Abnormal
+	}
+
+	return vMetrics
 }
 
 func expectedBlockStats() kubestats.FsStats {
