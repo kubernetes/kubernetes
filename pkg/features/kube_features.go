@@ -308,6 +308,7 @@ const (
 	// owner: @gjkim42
 	// kep: https://kep.k8s.io/2595
 	// alpha: v1.22
+	// beta: v1.26
 	//
 	// Enables apiserver and kubelet to allow up to 32 DNSSearchPaths and up to 2048 DNSSearchListChars.
 	ExpandedDNSConfig featuregate.Feature = "ExpandedDNSConfig"
@@ -877,7 +878,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	ExpandPersistentVolumes: {Default: true, PreRelease: featuregate.GA}, // remove in 1.26
 
-	ExpandedDNSConfig: {Default: false, PreRelease: featuregate.Alpha},
+	ExpandedDNSConfig: {Default: true, PreRelease: featuregate.Beta},
 
 	ExperimentalHostUserNamespaceDefaultingGate: {Default: false, PreRelease: featuregate.Beta},
 
