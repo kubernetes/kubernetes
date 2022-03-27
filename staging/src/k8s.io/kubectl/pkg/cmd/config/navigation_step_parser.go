@@ -88,14 +88,6 @@ func newNavigationSteps(path string) (*navigationSteps, error) {
 			steps = append(steps, navigationStep{individualParts[currPartIndex], reflect.TypeOf("")})
 			currPartIndex += 1
 
-			// To help users know if they've provided a malformed path, check length
-			if len(individualParts[currPartIndex:]) > 2 {
-				return nil, fmt.Errorf("too many steps in path %v", path)
-			} else if len(individualParts[currPartIndex:]) > 1 {
-				steps = append(steps, navigationStep{individualParts[currPartIndex], reflect.TypeOf("")})
-				currPartIndex += 1
-			}
-
 		default:
 			return nil, fmt.Errorf("unable to parse one or more field values of %v", path)
 		}
