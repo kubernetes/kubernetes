@@ -1054,10 +1054,10 @@ func (proxier *Proxier) syncProxyRules() {
 		// external-destination traffic.
 		internalPolicyChain := clusterPolicyChain
 		externalPolicyChain := clusterPolicyChain
-		if svcInfo.NodeLocalInternal() {
+		if svcInfo.InternalPolicyLocal() {
 			internalPolicyChain = localPolicyChain
 		}
-		if svcInfo.NodeLocalExternal() {
+		if svcInfo.ExternalPolicyLocal() {
 			externalPolicyChain = localPolicyChain
 		}
 
@@ -1101,7 +1101,7 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 			activeNATChains[externalTrafficChain] = true
 
-			if !svcInfo.NodeLocalExternal() {
+			if !svcInfo.ExternalPolicyLocal() {
 				// If we are using non-local endpoints we need to masquerade,
 				// in case we cross nodes.
 				proxier.natRules.Write(

@@ -120,7 +120,7 @@ func TestCategorizeEndpoints(t *testing.T) {
 		name:         "externalTrafficPolicy: Local, topology ignored for Local endpoints",
 		hintsEnabled: true,
 		nodeLabels:   map[string]string{v1.LabelTopologyZone: "zone-a"},
-		serviceInfo:  &BaseServiceInfo{nodeLocalExternal: true, nodePort: 8080, hintsAnnotation: "auto"},
+		serviceInfo:  &BaseServiceInfo{externalPolicyLocal: true, nodePort: 8080, hintsAnnotation: "auto"},
 		endpoints: []Endpoint{
 			&BaseEndpointInfo{Endpoint: "10.1.2.3:80", ZoneHints: sets.NewString("zone-a"), Ready: true, IsLocal: true},
 			&BaseEndpointInfo{Endpoint: "10.1.2.4:80", ZoneHints: sets.NewString("zone-b"), Ready: true, IsLocal: true},
@@ -134,7 +134,7 @@ func TestCategorizeEndpoints(t *testing.T) {
 		name:         "internalTrafficPolicy: Local, topology ignored for Local endpoints",
 		hintsEnabled: true,
 		nodeLabels:   map[string]string{v1.LabelTopologyZone: "zone-a"},
-		serviceInfo:  &BaseServiceInfo{nodeLocalInternal: true, hintsAnnotation: "auto", nodeLocalExternal: false, nodePort: 8080},
+		serviceInfo:  &BaseServiceInfo{internalPolicyLocal: true, hintsAnnotation: "auto", externalPolicyLocal: false, nodePort: 8080},
 		endpoints: []Endpoint{
 			&BaseEndpointInfo{Endpoint: "10.1.2.3:80", ZoneHints: sets.NewString("zone-a"), Ready: true, IsLocal: true},
 			&BaseEndpointInfo{Endpoint: "10.1.2.4:80", ZoneHints: sets.NewString("zone-b"), Ready: true, IsLocal: true},
@@ -282,7 +282,7 @@ func TestCategorizeEndpoints(t *testing.T) {
 		name:         "conflicting topology and localness require merging allEndpoints",
 		hintsEnabled: true,
 		nodeLabels:   map[string]string{v1.LabelTopologyZone: "zone-a"},
-		serviceInfo:  &BaseServiceInfo{nodeLocalInternal: false, nodeLocalExternal: true, nodePort: 8080, hintsAnnotation: "auto"},
+		serviceInfo:  &BaseServiceInfo{internalPolicyLocal: false, externalPolicyLocal: true, nodePort: 8080, hintsAnnotation: "auto"},
 		endpoints: []Endpoint{
 			&BaseEndpointInfo{Endpoint: "10.0.0.0:80", ZoneHints: sets.NewString("zone-a"), Ready: true, IsLocal: true},
 			&BaseEndpointInfo{Endpoint: "10.0.0.1:80", ZoneHints: sets.NewString("zone-b"), Ready: true, IsLocal: true},
@@ -294,13 +294,13 @@ func TestCategorizeEndpoints(t *testing.T) {
 		allEndpoints:     sets.NewString("10.0.0.0:80", "10.0.0.1:80", "10.0.0.2:80"),
 	}, {
 		name:             "internalTrafficPolicy: Local, with empty endpoints",
-		serviceInfo:      &BaseServiceInfo{nodeLocalInternal: true},
+		serviceInfo:      &BaseServiceInfo{internalPolicyLocal: true},
 		endpoints:        []Endpoint{},
 		clusterEndpoints: nil,
 		localEndpoints:   sets.NewString(),
 	}, {
 		name:        "internalTrafficPolicy: Local, but all endpoints are remote",
-		serviceInfo: &BaseServiceInfo{nodeLocalInternal: true},
+		serviceInfo: &BaseServiceInfo{internalPolicyLocal: true},
 		endpoints: []Endpoint{
 			&BaseEndpointInfo{Endpoint: "10.0.0.0:80", Ready: true, IsLocal: false},
 			&BaseEndpointInfo{Endpoint: "10.0.0.1:80", Ready: true, IsLocal: false},
@@ -310,7 +310,7 @@ func TestCategorizeEndpoints(t *testing.T) {
 		onlyRemoteEndpoints: true,
 	}, {
 		name:        "internalTrafficPolicy: Local, all endpoints are local",
-		serviceInfo: &BaseServiceInfo{nodeLocalInternal: true},
+		serviceInfo: &BaseServiceInfo{internalPolicyLocal: true},
 		endpoints: []Endpoint{
 			&BaseEndpointInfo{Endpoint: "10.0.0.0:80", Ready: true, IsLocal: true},
 			&BaseEndpointInfo{Endpoint: "10.0.0.1:80", Ready: true, IsLocal: true},
@@ -319,7 +319,7 @@ func TestCategorizeEndpoints(t *testing.T) {
 		localEndpoints:   sets.NewString("10.0.0.0:80", "10.0.0.1:80"),
 	}, {
 		name:        "internalTrafficPolicy: Local, some endpoints are local",
-		serviceInfo: &BaseServiceInfo{nodeLocalInternal: true},
+		serviceInfo: &BaseServiceInfo{internalPolicyLocal: true},
 		endpoints: []Endpoint{
 			&BaseEndpointInfo{Endpoint: "10.0.0.0:80", Ready: true, IsLocal: true},
 			&BaseEndpointInfo{Endpoint: "10.0.0.1:80", Ready: true, IsLocal: false},
@@ -366,7 +366,7 @@ func TestCategorizeEndpoints(t *testing.T) {
 		localEndpoints:   nil,
 	}, {
 		name:        "iTP: Local, eTP: Cluster, some endpoints local",
-		serviceInfo: &BaseServiceInfo{nodeLocalInternal: true, nodeLocalExternal: false, nodePort: 8080},
+		serviceInfo: &BaseServiceInfo{internalPolicyLocal: true, externalPolicyLocal: false, nodePort: 8080},
 		endpoints: []Endpoint{
 			&BaseEndpointInfo{Endpoint: "10.0.0.0:80", Ready: true, IsLocal: true},
 			&BaseEndpointInfo{Endpoint: "10.0.0.1:80", Ready: true, IsLocal: false},
@@ -376,7 +376,7 @@ func TestCategorizeEndpoints(t *testing.T) {
 		allEndpoints:     sets.NewString("10.0.0.0:80", "10.0.0.1:80"),
 	}, {
 		name:        "iTP: Cluster, eTP: Local, some endpoints local",
-		serviceInfo: &BaseServiceInfo{nodeLocalInternal: false, nodeLocalExternal: true, nodePort: 8080},
+		serviceInfo: &BaseServiceInfo{internalPolicyLocal: false, externalPolicyLocal: true, nodePort: 8080},
 		endpoints: []Endpoint{
 			&BaseEndpointInfo{Endpoint: "10.0.0.0:80", Ready: true, IsLocal: true},
 			&BaseEndpointInfo{Endpoint: "10.0.0.1:80", Ready: true, IsLocal: false},
@@ -386,7 +386,7 @@ func TestCategorizeEndpoints(t *testing.T) {
 		allEndpoints:     sets.NewString("10.0.0.0:80", "10.0.0.1:80"),
 	}, {
 		name:        "iTP: Local, eTP: Local, some endpoints local",
-		serviceInfo: &BaseServiceInfo{nodeLocalInternal: true, nodeLocalExternal: true, nodePort: 8080},
+		serviceInfo: &BaseServiceInfo{internalPolicyLocal: true, externalPolicyLocal: true, nodePort: 8080},
 		endpoints: []Endpoint{
 			&BaseEndpointInfo{Endpoint: "10.0.0.0:80", Ready: true, IsLocal: true},
 			&BaseEndpointInfo{Endpoint: "10.0.0.1:80", Ready: true, IsLocal: false},
@@ -396,7 +396,7 @@ func TestCategorizeEndpoints(t *testing.T) {
 		allEndpoints:     sets.NewString("10.0.0.0:80", "10.0.0.1:80"),
 	}, {
 		name:        "iTP: Local, eTP: Local, all endpoints remote",
-		serviceInfo: &BaseServiceInfo{nodeLocalInternal: true, nodeLocalExternal: true, nodePort: 8080},
+		serviceInfo: &BaseServiceInfo{internalPolicyLocal: true, externalPolicyLocal: true, nodePort: 8080},
 		endpoints: []Endpoint{
 			&BaseEndpointInfo{Endpoint: "10.0.0.0:80", Ready: true, IsLocal: false},
 			&BaseEndpointInfo{Endpoint: "10.0.0.1:80", Ready: true, IsLocal: false},
@@ -406,7 +406,7 @@ func TestCategorizeEndpoints(t *testing.T) {
 		allEndpoints:     sets.NewString("10.0.0.0:80", "10.0.0.1:80"),
 	}, {
 		name:        "iTP: Local, eTP: Local, PTE disabled, all endpoints remote and terminating",
-		serviceInfo: &BaseServiceInfo{nodeLocalInternal: true, nodeLocalExternal: true, nodePort: 8080},
+		serviceInfo: &BaseServiceInfo{internalPolicyLocal: true, externalPolicyLocal: true, nodePort: 8080},
 		endpoints: []Endpoint{
 			&BaseEndpointInfo{Endpoint: "10.0.0.0:80", Ready: false, Serving: true, Terminating: true, IsLocal: false},
 			&BaseEndpointInfo{Endpoint: "10.0.0.1:80", Ready: false, Serving: true, Terminating: true, IsLocal: false},
@@ -417,7 +417,7 @@ func TestCategorizeEndpoints(t *testing.T) {
 	}, {
 		name:        "iTP: Local, eTP: Local, PTE enabled, all endpoints remote and terminating",
 		pteEnabled:  true,
-		serviceInfo: &BaseServiceInfo{nodeLocalInternal: true, nodeLocalExternal: true, nodePort: 8080},
+		serviceInfo: &BaseServiceInfo{internalPolicyLocal: true, externalPolicyLocal: true, nodePort: 8080},
 		endpoints: []Endpoint{
 			&BaseEndpointInfo{Endpoint: "10.0.0.0:80", Ready: false, Serving: true, Terminating: true, IsLocal: false},
 			&BaseEndpointInfo{Endpoint: "10.0.0.1:80", Ready: false, Serving: true, Terminating: true, IsLocal: false},
@@ -428,7 +428,7 @@ func TestCategorizeEndpoints(t *testing.T) {
 		onlyRemoteEndpoints: true,
 	}, {
 		name:        "iTP: Cluster, eTP: Local, PTE disabled, with terminating endpoints",
-		serviceInfo: &BaseServiceInfo{nodeLocalInternal: false, nodeLocalExternal: true, nodePort: 8080},
+		serviceInfo: &BaseServiceInfo{internalPolicyLocal: false, externalPolicyLocal: true, nodePort: 8080},
 		endpoints: []Endpoint{
 			&BaseEndpointInfo{Endpoint: "10.0.0.0:80", Ready: true, IsLocal: false},
 			&BaseEndpointInfo{Endpoint: "10.0.0.1:80", Ready: false, Serving: false, IsLocal: true},
@@ -441,7 +441,7 @@ func TestCategorizeEndpoints(t *testing.T) {
 	}, {
 		name:        "iTP: Cluster, eTP: Local, PTE enabled, with terminating endpoints",
 		pteEnabled:  true,
-		serviceInfo: &BaseServiceInfo{nodeLocalInternal: false, nodeLocalExternal: true, nodePort: 8080},
+		serviceInfo: &BaseServiceInfo{internalPolicyLocal: false, externalPolicyLocal: true, nodePort: 8080},
 		endpoints: []Endpoint{
 			&BaseEndpointInfo{Endpoint: "10.0.0.0:80", Ready: true, IsLocal: false},
 			&BaseEndpointInfo{Endpoint: "10.0.0.1:80", Ready: false, Serving: false, IsLocal: true},
@@ -453,7 +453,7 @@ func TestCategorizeEndpoints(t *testing.T) {
 		allEndpoints:     sets.NewString("10.0.0.0:80", "10.0.0.2:80"),
 	}, {
 		name:        "externalTrafficPolicy ignored if not externally accessible",
-		serviceInfo: &BaseServiceInfo{nodeLocalExternal: true},
+		serviceInfo: &BaseServiceInfo{externalPolicyLocal: true},
 		endpoints: []Endpoint{
 			&BaseEndpointInfo{Endpoint: "10.0.0.0:80", Ready: true, IsLocal: false},
 			&BaseEndpointInfo{Endpoint: "10.0.0.1:80", Ready: true, IsLocal: true},
@@ -463,7 +463,7 @@ func TestCategorizeEndpoints(t *testing.T) {
 		allEndpoints:     sets.NewString("10.0.0.0:80", "10.0.0.1:80"),
 	}, {
 		name:        "no cluster endpoints for iTP:Local internal-only service",
-		serviceInfo: &BaseServiceInfo{nodeLocalInternal: true},
+		serviceInfo: &BaseServiceInfo{internalPolicyLocal: true},
 		endpoints: []Endpoint{
 			&BaseEndpointInfo{Endpoint: "10.0.0.0:80", Ready: true, IsLocal: false},
 			&BaseEndpointInfo{Endpoint: "10.0.0.1:80", Ready: true, IsLocal: true},

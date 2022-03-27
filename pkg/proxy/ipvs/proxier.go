@@ -1202,7 +1202,7 @@ func (proxier *Proxier) syncProxyRules() {
 			// ExternalTrafficPolicy only works for NodePort and external LB traffic, does not affect ClusterIP
 			// So we still need clusterIP rules in onlyNodeLocalEndpoints mode.
 			internalNodeLocal := false
-			if utilfeature.DefaultFeatureGate.Enabled(features.ServiceInternalTrafficPolicy) && svcInfo.NodeLocalInternal() {
+			if utilfeature.DefaultFeatureGate.Enabled(features.ServiceInternalTrafficPolicy) && svcInfo.InternalPolicyLocal() {
 				internalNodeLocal = true
 			}
 			if err := proxier.syncEndpoint(svcName, internalNodeLocal, serv); err != nil {
@@ -1222,7 +1222,7 @@ func (proxier *Proxier) syncProxyRules() {
 				SetType:  utilipset.HashIPPort,
 			}
 
-			if svcInfo.NodeLocalExternal() {
+			if svcInfo.ExternalPolicyLocal() {
 				if valid := proxier.ipsetList[kubeExternalIPLocalSet].validateEntry(entry); !valid {
 					klog.ErrorS(nil, "Error adding entry to ipset", "entry", entry, "ipset", proxier.ipsetList[kubeExternalIPLocalSet].Name)
 					continue
@@ -1252,7 +1252,7 @@ func (proxier *Proxier) syncProxyRules() {
 				activeIPVSServices[serv.String()] = true
 				activeBindAddrs[serv.Address.String()] = true
 
-				if err := proxier.syncEndpoint(svcName, svcInfo.NodeLocalExternal(), serv); err != nil {
+				if err := proxier.syncEndpoint(svcName, svcInfo.ExternalPolicyLocal(), serv); err != nil {
 					klog.ErrorS(err, "Failed to sync endpoint for service", "serviceName", svcName, "virtualServer", serv)
 				}
 			} else {
@@ -1279,7 +1279,7 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 			proxier.ipsetList[kubeLoadBalancerSet].activeEntries.Insert(entry.String())
 			// insert loadbalancer entry to lbIngressLocalSet if service externaltrafficpolicy=local
-			if svcInfo.NodeLocalExternal() {
+			if svcInfo.ExternalPolicyLocal() {
 				if valid := proxier.ipsetList[kubeLoadBalancerLocalSet].validateEntry(entry); !valid {
 					klog.ErrorS(nil, "Error adding entry to ipset", "entry", entry, "ipset", proxier.ipsetList[kubeLoadBalancerLocalSet].Name)
 					continue
@@ -1351,7 +1351,7 @@ func (proxier *Proxier) syncProxyRules() {
 			if err := proxier.syncService(svcNameString, serv, true, bindedAddresses); err == nil {
 				activeIPVSServices[serv.String()] = true
 				activeBindAddrs[serv.Address.String()] = true
-				if err := proxier.syncEndpoint(svcName, svcInfo.NodeLocalExternal(), serv); err != nil {
+				if err := proxier.syncEndpoint(svcName, svcInfo.ExternalPolicyLocal(), serv); err != nil {
 					klog.ErrorS(err, "Failed to sync endpoint for service", "serviceName", svcName, "virtualServer", serv)
 				}
 			} else {
@@ -1449,7 +1449,7 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 
 			// Add externaltrafficpolicy=local type nodeport entry
-			if svcInfo.NodeLocalExternal() {
+			if svcInfo.ExternalPolicyLocal() {
 				var nodePortLocalSet *IPSet
 				switch protocol {
 				case utilipset.ProtocolTCP:
@@ -1494,7 +1494,7 @@ func (proxier *Proxier) syncProxyRules() {
 				// There is no need to bind Node IP to dummy interface, so set parameter `bindAddr` to `false`.
 				if err := proxier.syncService(svcNameString, serv, false, bindedAddresses); err == nil {
 					activeIPVSServices[serv.String()] = true
-					if err := proxier.syncEndpoint(svcName, svcInfo.NodeLocalExternal(), serv); err != nil {
+					if err := proxier.syncEndpoint(svcName, svcInfo.ExternalPolicyLocal(), serv); err != nil {
 						klog.ErrorS(err, "Failed to sync endpoint for service", "serviceName", svcName, "virtualServer", serv)
 					}
 				} else {
