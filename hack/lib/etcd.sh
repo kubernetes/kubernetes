@@ -22,7 +22,7 @@ ETCD_PORT=${ETCD_PORT:-2379}
 # This is intentionally not called ETCD_LOG_LEVEL:
 # etcd checks that and compains when it is set in addition
 # to the command line argument, even when both have the same value.
-ETCD_LOGLEVEL=${ETCD_LOGLEVEL:-debug}
+ETCD_LOGLEVEL=${ETCD_LOGLEVEL:-warn}
 export KUBE_INTEGRATION_ETCD_URL="http://${ETCD_HOST}:${ETCD_PORT}"
 
 kube::etcd::validate() {
