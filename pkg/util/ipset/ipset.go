@@ -169,6 +169,11 @@ func (e *Entry) Validate(set *IPSet) bool {
 		return false
 	}
 	switch e.SetType {
+	case HashIP:
+		//check if IP of Entry is valid.
+		if valid := e.checkIP(set); !valid {
+			return false
+		}
 	case HashIPPort:
 		//check if IP and Protocol of Entry is valid.
 		if valid := e.checkIPandProtocol(set); !valid {
@@ -219,6 +224,9 @@ func (e *Entry) Validate(set *IPSet) bool {
 // String returns the string format for ipset entry.
 func (e *Entry) String() string {
 	switch e.SetType {
+	case HashIP:
+		// Entry{192.168.1.1} -> 192.168.1.1
+		return fmt.Sprintf("%s", e.IP)
 	case HashIPPort:
 		// Entry{192.168.1.1, udp, 53} -> 192.168.1.1,udp:53
 		// Entry{192.168.1.2, tcp, 8080} -> 192.168.1.2,tcp:8080
@@ -247,7 +255,11 @@ func (e *Entry) checkIPandProtocol(set *IPSet) bool {
 	} else if !validateProtocol(e.Protocol) {
 		return false
 	}
+	return e.checkIP(set)
+}
 
+// checkIP checks if IP of Entry is valid.
+func (e *Entry) checkIP(set *IPSet) bool {
 	if netutils.ParseIPSloppy(e.IP) == nil {
 		klog.Errorf("Error parsing entry %v ip address %v for ipset %v", e, e.IP, set)
 		return false
@@ -283,7 +295,7 @@ func (runner *runner) CreateSet(set *IPSet, ignoreExistErr bool) error {
 // otherwise raised when the same set (setname and create parameters are identical) already exists.
 func (runner *runner) createSet(set *IPSet, ignoreExistErr bool) error {
 	args := []string{"create", set.Name, string(set.SetType)}
-	if set.SetType == HashIPPortIP || set.SetType == HashIPPort || set.SetType == HashIPPortNet {
+	if set.SetType == HashIPPortIP || set.SetType == HashIPPort || set.SetType == HashIPPortNet || set.SetType == HashIP {
 		args = append(args,
 			"family", set.HashFamily,
 			"hashsize", strconv.Itoa(set.HashSize),

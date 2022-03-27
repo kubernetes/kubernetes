@@ -35,6 +35,8 @@ const (
 	// BitmapPort represents the `bitmap:port` type ipset.  The bitmap:port set type uses a memory range, where each bit
 	// represents one TCP/UDP port.  A bitmap:port type of set can store up to 65535 ports.
 	BitmapPort Type = "bitmap:port"
+	// HashIP represents the `hash:ip` type ipset.
+	HashIP Type = "hash:ip"
 )
 
 // DefaultPortRange defines the default bitmap:port valid port range.
@@ -59,4 +61,5 @@ var ValidIPSetTypes = []Type{
 	HashIPPortIP,
 	BitmapPort,
 	HashIPPortNet,
+	HashIP,
 }
