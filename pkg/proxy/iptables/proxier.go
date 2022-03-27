@@ -1000,7 +1000,6 @@ func (proxier *Proxier) syncProxyRules() {
 			klog.ErrorS(nil, "Failed to cast serviceInfo", "serviceName", svcName)
 			continue
 		}
-		isIPv6 := netutils.IsIPv6(svcInfo.ClusterIP())
 		protocol := strings.ToLower(string(svcInfo.Protocol()))
 		svcNameString := svcInfo.nameString
 
@@ -1302,33 +1301,17 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 		}
 
-		// Capture nodeports.  If we had more than 2 rules it might be
-		// worthwhile to make a new per-service chain for nodeport rules, but
-		// with just 2 rules it ends up being a waste and a cognitive burden.
+		// Capture nodeports.
 		if svcInfo.NodePort() != 0 && len(nodeAddresses) != 0 {
 			if hasEndpoints {
-				args = append(args[:0],
-					"-m", "comment", "--comment", svcNameString,
-					"-m", protocol, "-p", protocol,
-					"--dport", strconv.Itoa(svcInfo.NodePort()),
-				)
-				if svcInfo.NodeLocalExternal() {
-					// Fix localhost martian source error
-					loopback := "127.0.0.0/8"
-					if isIPv6 {
-						loopback = "::1/128"
-					}
-					proxier.natRules.Write(
-						"-A", string(kubeNodePortsChain),
-						args,
-						"-s", loopback, "-j", string(KubeMarkMasqChain))
-				}
 				// Jump to the external destination chain.  For better or for
 				// worse, nodeports are not subect to loadBalancerSourceRanges,
 				// and we can't change that.
 				proxier.natRules.Write(
 					"-A", string(kubeNodePortsChain),
-					args,
+					"-m", "comment", "--comment", svcNameString,
+					"-m", protocol, "-p", protocol,
+					"--dport", strconv.Itoa(svcInfo.NodePort()),
 					"-j", string(externalTrafficChain))
 			} else {
 				// No endpoints.
