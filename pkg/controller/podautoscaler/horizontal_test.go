@@ -3029,7 +3029,7 @@ func TestConvertDesiredReplicasWithRules(t *testing.T) {
 func TestCalculateScaleUpLimitWithScalingRules(t *testing.T) {
 	policy := autoscalingv2.MinChangePolicySelect
 
-	calculated := calculateScaleUpLimitWithScalingRules(1, []timestampedScaleEvent{}, &autoscalingv2.HPAScalingRules{
+	calculated := calculateScaleUpLimitWithScalingRules(1, []timestampedScaleEvent{}, []timestampedScaleEvent{}, &autoscalingv2.HPAScalingRules{
 		StabilizationWindowSeconds: utilpointer.Int32Ptr(300),
 		SelectPolicy:               &policy,
 		Policies: []autoscalingv2.HPAScalingPolicy{
@@ -3051,7 +3051,7 @@ func TestCalculateScaleUpLimitWithScalingRules(t *testing.T) {
 func TestCalculateScaleDownLimitWithBehaviors(t *testing.T) {
 	policy := autoscalingv2.MinChangePolicySelect
 
-	calculated := calculateScaleDownLimitWithBehaviors(5, []timestampedScaleEvent{}, &autoscalingv2.HPAScalingRules{
+	calculated := calculateScaleDownLimitWithBehaviors(5, []timestampedScaleEvent{}, []timestampedScaleEvent{}, &autoscalingv2.HPAScalingRules{
 		StabilizationWindowSeconds: utilpointer.Int32Ptr(300),
 		SelectPolicy:               &policy,
 		Policies: []autoscalingv2.HPAScalingPolicy{
@@ -3485,6 +3485,18 @@ func TestScalingWithRules(t *testing.T) {
 			expectedReplicas:             255, // (100 - 15) + 200%
 			expectedCondition:            "ScaleUpLimit",
 		},
+		{
+			name:                         "scaleUp with percent policy and previous scale up and down events",
+			scaleUpEvents:                generateEventsUniformDistribution([]int{4}, 120),
+			scaleDownEvents:              generateEventsUniformDistribution([]int{2}, 120),
+			specMinReplicas:              1,
+			specMaxReplicas:              1000,
+			scaleUpRules:                 generateScalingRules(0, 0, 300, 300, 0),
+			currentReplicas:              6,
+			prenormalizedDesiredReplicas: 24,
+			expectedReplicas:             16,
+			expectedCondition:            "ScaleUpLimit",
+		},
 		// ScaleDown with PeriodSeconds usage
 		{
 			name:                         "scaleDown with default policy and previous events",
@@ -3549,6 +3561,18 @@ func TestScalingWithRules(t *testing.T) {
 			currentReplicas:              100,
 			prenormalizedDesiredReplicas: 0,
 			expectedReplicas:             56, // (100 + 12) - 50%
+			expectedCondition:            "ScaleDownLimit",
+		},
+		{
+			name:                         "scaleDown with percent policy and previous scale up and down events",
+			scaleUpEvents:                generateEventsUniformDistribution([]int{2}, 120),
+			scaleDownEvents:              generateEventsUniformDistribution([]int{4}, 120),
+			specMinReplicas:              1,
+			specMaxReplicas:              1000,
+			scaleDownRules:               generateScalingRules(0, 0, 50, 180, 0),
+			currentReplicas:              10,
+			prenormalizedDesiredReplicas: 1,
+			expectedReplicas:             6,
 			expectedCondition:            "ScaleDownLimit",
 		},
 		{
