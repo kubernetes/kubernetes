@@ -959,6 +959,69 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 
 }
 
+func TestGetDeviceRunContainerOptions(t *testing.T) {
+	res1 := TestResource{
+		resourceName:     "domain1.com/resource1",
+		resourceQuantity: *resource.NewQuantity(int64(2), resource.DecimalSI),
+		devs:             checkpoint.DevicesPerNUMA{0: []string{"dev1", "dev2"}},
+		topology:         true,
+	}
+	res2 := TestResource{
+		resourceName:     "domain2.com/resource2",
+		resourceQuantity: *resource.NewQuantity(int64(1), resource.DecimalSI),
+		devs:             checkpoint.DevicesPerNUMA{0: []string{"dev3", "dev4"}},
+		topology:         false,
+	}
+
+	testResources := make([]TestResource, 2)
+	testResources = append(testResources, res1)
+	testResources = append(testResources, res2)
+
+	podsStub := activePodsStub{
+		activePods: []*v1.Pod{},
+	}
+	as := require.New(t)
+
+	tmpDir, err := ioutil.TempDir("", "checkpoint")
+	as.Nil(err)
+	defer os.RemoveAll(tmpDir)
+
+	testManager, err := getTestManager(tmpDir, podsStub.getActivePods, testResources)
+	as.Nil(err)
+
+	pod1 := makePod(v1.ResourceList{
+		v1.ResourceName(res1.resourceName): res1.resourceQuantity,
+		v1.ResourceName(res2.resourceName): res2.resourceQuantity,
+	})
+	pod2 := makePod(v1.ResourceList{
+		v1.ResourceName(res2.resourceName): res2.resourceQuantity,
+	})
+
+	activePods := []*v1.Pod{pod1, pod2}
+	podsStub.updateActivePods(activePods)
+
+	err = testManager.Allocate(pod1, &pod1.Spec.Containers[0])
+	as.Nil(err)
+	err = testManager.Allocate(pod2, &pod2.Spec.Containers[0])
+	as.Nil(err)
+
+	// when pod is in activePods, GetDeviceRunContainerOptions should return
+	runContainerOpts, err := testManager.GetDeviceRunContainerOptions(pod1, &pod1.Spec.Containers[0])
+	as.Nil(err)
+	as.Equal(len(runContainerOpts.Devices), 3)
+	as.Equal(len(runContainerOpts.Mounts), 2)
+	as.Equal(len(runContainerOpts.Envs), 2)
+
+	activePods = []*v1.Pod{pod2}
+	podsStub.updateActivePods(activePods)
+	testManager.UpdateAllocatedDevices()
+
+	// when pod is removed from activePods,G etDeviceRunContainerOptions should return error
+	runContainerOpts, err = testManager.GetDeviceRunContainerOptions(pod1, &pod1.Spec.Containers[0])
+	as.Nil(err)
+	as.Nil(runContainerOpts)
+}
+
 func TestInitContainerDeviceAllocation(t *testing.T) {
 	// Requesting to create a pod that requests resourceName1 in init containers and normal containers
 	// should succeed with devices allocated to init containers reallocated to normal containers.

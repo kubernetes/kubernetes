@@ -997,6 +997,18 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 	return nil
 }
 
+// checkPodActive checks if the given pod is still in activePods list
+func (m *ManagerImpl) checkPodActive(pod *v1.Pod) bool {
+	activePods := m.activePods()
+	for _, activePod := range activePods {
+		if activePod.UID == pod.UID {
+			return true
+		}
+	}
+
+	return false
+}
+
 // GetDeviceRunContainerOptions checks whether we have cached containerDevices
 // for the passed-in <pod, container> and returns its DeviceRunContainerOptions
 // for the found one. An empty struct is returned in case no cached state is found.
@@ -1013,6 +1025,12 @@ func (m *ManagerImpl) GetDeviceRunContainerOptions(pod *v1.Pod, container *v1.Co
 		if err != nil {
 			return nil, err
 		}
+
+		if !m.checkPodActive(pod) {
+			klog.ErrorS(nil, "pod deleted from activePods, skip to reAllocate", "podUID", podUID)
+			continue
+		}
+
 		// This is a device plugin resource yet we don't have cached
 		// resource state. This is likely due to a race during node
 		// restart. We re-issue allocate request to cover this race.
