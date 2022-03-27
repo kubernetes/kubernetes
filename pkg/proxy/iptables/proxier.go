@@ -119,7 +119,7 @@ type serviceInfo struct {
 	clusterPolicyChainName utiliptables.Chain
 	localPolicyChainName   utiliptables.Chain
 	firewallChainName      utiliptables.Chain
-	xlbChainName           utiliptables.Chain
+	externalChainName      utiliptables.Chain
 }
 
 // returns a new proxy.ServicePort which abstracts a serviceInfo
@@ -134,7 +134,7 @@ func newServiceInfo(port *v1.ServicePort, service *v1.Service, baseInfo *proxy.B
 	info.clusterPolicyChainName = servicePortPolicyClusterChain(info.nameString, protocol)
 	info.localPolicyChainName = servicePortPolicyLocalChainName(info.nameString, protocol)
 	info.firewallChainName = serviceFirewallChainName(info.nameString, protocol)
-	info.xlbChainName = serviceLBChainName(info.nameString, protocol)
+	info.externalChainName = serviceExternalChainName(info.nameString, protocol)
 
 	return info
 }
@@ -687,8 +687,11 @@ const (
 	servicePortPolicyClusterChainNamePrefix = "KUBE-SVC-"
 	servicePortPolicyLocalChainNamePrefix   = "KUBE-SVL-"
 	serviceFirewallChainNamePrefix          = "KUBE-FW-"
-	serviceLBChainNamePrefix                = "KUBE-XLB-"
+	serviceExternalChainNamePrefix          = "KUBE-EXT-"
 	servicePortEndpointChainNamePrefix      = "KUBE-SEP-"
+
+	// For cleanup.  This can be removed after 1.26 is released.
+	deprecatedServiceLBChainNamePrefix = "KUBE-XLB-"
 )
 
 // servicePortPolicyClusterChain returns the name of the KUBE-SVC-XXXX chain for a service, which is the
@@ -711,12 +714,12 @@ func serviceFirewallChainName(servicePortName string, protocol string) utiliptab
 	return utiliptables.Chain(serviceFirewallChainNamePrefix + portProtoHash(servicePortName, protocol))
 }
 
-// serviceLBChainName returns the name of the KUBE-XLB-XXXX chain for a service, which
+// serviceExternalChainName returns the name of the KUBE-EXT-XXXX chain for a service, which
 // implements "short-circuiting" for internally-originated external-destination traffic when using
 // `Local` external traffic policy.  It forwards traffic from local sources to the KUBE-SVC-XXXX
 // chain and traffic from external sources to the KUBE-SVL-XXXX chain.
-func serviceLBChainName(servicePortName string, protocol string) utiliptables.Chain {
-	return utiliptables.Chain(serviceLBChainNamePrefix + portProtoHash(servicePortName, protocol))
+func serviceExternalChainName(servicePortName string, protocol string) utiliptables.Chain {
+	return utiliptables.Chain(serviceExternalChainNamePrefix + portProtoHash(servicePortName, protocol))
 }
 
 // servicePortEndpointChainName returns the name of the KUBE-SEP-XXXX chain for a particular
@@ -733,7 +736,8 @@ func isServiceChainName(chainString string) bool {
 		servicePortPolicyLocalChainNamePrefix,
 		servicePortEndpointChainNamePrefix,
 		serviceFirewallChainNamePrefix,
-		serviceLBChainNamePrefix,
+		serviceExternalChainNamePrefix,
+		deprecatedServiceLBChainNamePrefix,
 	}
 
 	for _, p := range prefixes {
@@ -1063,7 +1067,7 @@ func (proxier *Proxier) syncProxyRules() {
 		// "internal" while NodePort, LoadBalancer, and ExternalIPs traffic is
 		// considered "external".
 		internalTrafficChain := internalPolicyChain
-		externalTrafficChain := svcInfo.xlbChainName // eventually jumps to externalPolicyChain
+		externalTrafficChain := svcInfo.externalChainName // eventually jumps to externalPolicyChain
 
 		// Declare the clusterPolicyChain if needed.
 		if hasEndpoints && svcInfo.UsesClusterEndpoints() {
