@@ -975,7 +975,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	ExpandPersistentVolumes: {Default: true, PreRelease: featuregate.GA}, // remove in 1.26
 
-	ExpandedDNSConfig: {Default: false, PreRelease: featuregate.Alpha},
+	ExpandedDNSConfig: {Default: true, PreRelease: featuregate.Beta},
 
 	ExperimentalHostUserNamespaceDefaultingGate: {Default: false, PreRelease: featuregate.Beta},
 
