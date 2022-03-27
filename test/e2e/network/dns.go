@@ -569,6 +569,47 @@ var _ = common.SIGDescribe("DNS", func() {
 		// TODO: Add more test cases for other DNSPolicies.
 	})
 
+	ginkgo.It("should work with the pod containing more than 6 DNS search paths and longer than 256 search list characters", func() {
+		ginkgo.By("Getting the kube-dns IP")
+		svc, err := f.ClientSet.CoreV1().Services("kube-system").Get(context.TODO(), "kube-dns", metav1.GetOptions{})
+		framework.ExpectNoError(err, "Failed to get kube-dns service")
+		kubednsIP := svc.Spec.ClusterIP
+
+		// All the names we need to be able to resolve.
+		namesToResolve := []string{
+			"kubernetes.default",
+			"kubernetes.default.svc",
+		}
+		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.%s", dnsTestPodHostName, dnsTestServiceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
+		hostEntries := []string{hostFQDN, dnsTestPodHostName}
+		// TODO: Validate both IPv4 and IPv6 families for dual-stack
+		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, hostEntries, "", "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
+		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, hostEntries, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
+		ginkgo.By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
+		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
+
+		ginkgo.By("Creating a pod with expanded DNS configuration to probe DNS")
+		testNdotsValue := "5"
+		testSearchPaths := append(
+			newSearchPaths(6, 64),
+			fmt.Sprintf("svc.%s", framework.TestContext.ClusterDNSDomain),
+			framework.TestContext.ClusterDNSDomain,
+		)
+		pod := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, dnsTestPodHostName, dnsTestServiceName)
+		pod.Spec.DNSPolicy = v1.DNSNone
+		pod.Spec.DNSConfig = &v1.PodDNSConfig{
+			Nameservers: []string{kubednsIP},
+			Searches:    testSearchPaths,
+			Options: []v1.PodDNSConfigOption{
+				{
+					Name:  "ndots",
+					Value: &testNdotsValue,
+				},
+			},
+		}
+		validateDNSResults(f, pod, append(wheezyFileNames, jessieFileNames...))
+	})
+
 })
 
 var _ = common.SIGDescribe("DNS HostNetwork", func() {
@@ -616,3 +657,15 @@ var _ = common.SIGDescribe("DNS HostNetwork", func() {
 	})
 
 })
+
+func newSearchPaths(n, pathLen int) []string {
+	paths := make([]string, n)
+	for i := 0; i < n; i++ {
+		path := ""
+		for j := 0; j < pathLen; j++ {
+			path += "a"
+		}
+		paths[i] = path
+	}
+	return paths
+}
