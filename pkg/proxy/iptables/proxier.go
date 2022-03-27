@@ -115,11 +115,11 @@ const sysctlBridgeCallIPTables = "net/bridge/bridge-nf-call-iptables"
 type serviceInfo struct {
 	*proxy.BaseServiceInfo
 	// The following fields are computed and stored for performance reasons.
-	serviceNameString        string
-	servicePortChainName     utiliptables.Chain
-	serviceLocalChainName    utiliptables.Chain
-	serviceFirewallChainName utiliptables.Chain
-	serviceLBChainName       utiliptables.Chain
+	nameString             string
+	policyClusterChainName utiliptables.Chain
+	policyLocalChainName   utiliptables.Chain
+	firewallChainName      utiliptables.Chain
+	xlbChainName           utiliptables.Chain
 }
 
 // returns a new proxy.ServicePort which abstracts a serviceInfo
@@ -130,11 +130,11 @@ func newServiceInfo(port *v1.ServicePort, service *v1.Service, baseInfo *proxy.B
 	svcName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
 	svcPortName := proxy.ServicePortName{NamespacedName: svcName, Port: port.Name}
 	protocol := strings.ToLower(string(info.Protocol()))
-	info.serviceNameString = svcPortName.String()
-	info.servicePortChainName = servicePortChainName(info.serviceNameString, protocol)
-	info.serviceLocalChainName = serviceLocalChainName(info.serviceNameString, protocol)
-	info.serviceFirewallChainName = serviceFirewallChainName(info.serviceNameString, protocol)
-	info.serviceLBChainName = serviceLBChainName(info.serviceNameString, protocol)
+	info.nameString = svcPortName.String()
+	info.policyClusterChainName = servicePortPolicyClusterChain(info.nameString, protocol)
+	info.policyLocalChainName = servicePortPolicyLocalChainName(info.nameString, protocol)
+	info.firewallChainName = serviceFirewallChainName(info.nameString, protocol)
+	info.xlbChainName = serviceLBChainName(info.nameString, protocol)
 
 	return info
 }
@@ -684,25 +684,25 @@ func portProtoHash(servicePortName string, protocol string) string {
 }
 
 const (
-	servicePortChainNamePrefix         = "KUBE-SVC-"
-	serviceLocalChainNamePrefix        = "KUBE-SVL-"
-	serviceFirewallChainNamePrefix     = "KUBE-FW-"
-	serviceLBChainNamePrefix           = "KUBE-XLB-"
-	servicePortEndpointChainNamePrefix = "KUBE-SEP-"
+	servicePortPolicyClusterChainNamePrefix = "KUBE-SVC-"
+	servicePortPolicyLocalChainNamePrefix   = "KUBE-SVL-"
+	serviceFirewallChainNamePrefix          = "KUBE-FW-"
+	serviceLBChainNamePrefix                = "KUBE-XLB-"
+	servicePortEndpointChainNamePrefix      = "KUBE-SEP-"
 )
 
-// servicePortChainName returns the name of the KUBE-SVC-XXXX chain for a service, which is the
+// servicePortPolicyClusterChain returns the name of the KUBE-SVC-XXXX chain for a service, which is the
 // main iptables chain for that service, used for dispatching to endpoints when using `Cluster`
 // traffic policy.
-func servicePortChainName(servicePortName string, protocol string) utiliptables.Chain {
-	return utiliptables.Chain(servicePortChainNamePrefix + portProtoHash(servicePortName, protocol))
+func servicePortPolicyClusterChain(servicePortName string, protocol string) utiliptables.Chain {
+	return utiliptables.Chain(servicePortPolicyClusterChainNamePrefix + portProtoHash(servicePortName, protocol))
 }
 
-// serviceLocalChainName returns the name of the KUBE-SVL-XXXX chain for a service, which
+// servicePortPolicyLocalChainName returns the name of the KUBE-SVL-XXXX chain for a service, which
 // handles dispatching to local endpoints when using `Local` traffic policy. This chain only
 // exists if the service has `Local` internal or external traffic policy.
-func serviceLocalChainName(servicePortName string, protocol string) utiliptables.Chain {
-	return utiliptables.Chain(serviceLocalChainNamePrefix + portProtoHash(servicePortName, protocol))
+func servicePortPolicyLocalChainName(servicePortName string, protocol string) utiliptables.Chain {
+	return utiliptables.Chain(servicePortPolicyLocalChainNamePrefix + portProtoHash(servicePortName, protocol))
 }
 
 // serviceFirewallChainName returns the name of the KUBE-FW-XXXX chain for a service, which
@@ -729,8 +729,8 @@ func servicePortEndpointChainName(servicePortName string, protocol string, endpo
 
 func isServiceChainName(chainString string) bool {
 	prefixes := []string{
-		servicePortChainNamePrefix,
-		serviceLocalChainNamePrefix,
+		servicePortPolicyClusterChainNamePrefix,
+		servicePortPolicyLocalChainNamePrefix,
 		servicePortEndpointChainNamePrefix,
 		serviceFirewallChainNamePrefix,
 		serviceLBChainNamePrefix,
@@ -998,7 +998,7 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 		isIPv6 := netutils.IsIPv6(svcInfo.ClusterIP())
 		protocol := strings.ToLower(string(svcInfo.Protocol()))
-		svcNameString := svcInfo.serviceNameString
+		svcNameString := svcInfo.nameString
 
 		allEndpoints := proxier.endpointsMap[svcName]
 
@@ -1042,9 +1042,9 @@ func (proxier *Proxier) syncProxyRules() {
 			proxier.natRules.Write(args)
 		}
 
-		policyClusterChain := svcInfo.servicePortChainName
-		policyLocalChain := svcInfo.serviceLocalChainName
-		svcXlbChain := svcInfo.serviceLBChainName
+		policyClusterChain := svcInfo.policyClusterChainName
+		policyLocalChain := svcInfo.policyLocalChainName
+		svcXlbChain := svcInfo.xlbChainName
 
 		internalTrafficChain := policyClusterChain
 		externalTrafficChain := policyClusterChain
@@ -1208,7 +1208,7 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		// Capture load-balancer ingress.
-		fwChain := svcInfo.serviceFirewallChainName
+		fwChain := svcInfo.firewallChainName
 		for _, ingress := range svcInfo.LoadBalancerIPStrings() {
 			if hasEndpoints {
 				// create service firewall chain
