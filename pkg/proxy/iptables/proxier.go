@@ -1381,7 +1381,6 @@ func (proxier *Proxier) syncProxyRules() {
 	// Finally, tail-call to the nodeports chain.  This needs to be after all
 	// other service portal rules.
 	for address := range nodeAddresses {
-		// TODO(thockin, m1093782566): If/when we have dual-stack support we will want to distinguish v4 from v6 zero-CIDRs.
 		if utilproxy.IsZeroCIDR(address) {
 			args = append(args[:0],
 				"-A", string(kubeServicesChain),
