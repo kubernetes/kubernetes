@@ -1221,28 +1221,29 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		// Capture load-balancer ingress.
-		fwChain := svcInfo.firewallChainName
-		for _, ingress := range svcInfo.LoadBalancerIPStrings() {
-			if hasEndpoints {
-				// create service firewall chain
-				if chain, ok := existingNATChains[fwChain]; ok {
-					proxier.natChains.WriteBytes(chain)
-				} else {
-					proxier.natChains.Write(utiliptables.MakeChainLine(fwChain))
-				}
-				activeNATChains[fwChain] = true
-				// The service firewall rules are created based on ServiceSpec.loadBalancerSourceRanges field.
-				// This currently works for loadbalancers that preserves source ips.
-				// For loadbalancers which direct traffic to service NodePort, the firewall rules will not apply.
+		if len(svcInfo.LoadBalancerIPStrings()) > 0 && hasEndpoints {
+			// We could elide the firewall chain when loadBalancerSourceRanges
+			// is empty, but that adds code and makes the flow harder to reason
+			// about, for not much gain.
+			fwChain := svcInfo.firewallChainName
 
+			// create service firewall chain
+			if chain, ok := existingNATChains[fwChain]; ok {
+				proxier.natChains.WriteBytes(chain)
+			} else {
+				proxier.natChains.Write(utiliptables.MakeChainLine(fwChain))
+			}
+			activeNATChains[fwChain] = true
+
+			for _, lbip := range svcInfo.LoadBalancerIPStrings() {
 				args = append(args[:0],
 					"-A", string(kubeServicesChain),
 					"-m", "comment", "--comment", fmt.Sprintf(`"%s loadbalancer IP"`, svcNameString),
 					"-m", protocol, "-p", protocol,
-					"-d", ingress,
+					"-d", lbip,
 					"--dport", strconv.Itoa(svcInfo.Port()),
 				)
-				// jump to service firewall chain
+				// LBIP matches jump to the firewall chain first.
 				proxier.natRules.Write(args, "-j", string(fwChain))
 
 				args = append(args[:0],
@@ -1250,6 +1251,11 @@ func (proxier *Proxier) syncProxyRules() {
 					"-m", "comment", "--comment", fmt.Sprintf(`"%s loadbalancer IP"`, svcNameString),
 				)
 
+				// The service firewall rules are created based on the
+				// loadBalancerSourceRanges field.  This only works for
+				// VIP-like loadbalancers that preserve source IPs.  For
+				// loadbalancers which direct traffic to service NodePort, the
+				// firewall rules will not apply.
 				if len(svcInfo.LoadBalancerSourceRanges()) == 0 {
 					// allow all sources, so jump directly to the next chain
 					proxier.natRules.Write(args, "-j", string(externalTrafficChain))
@@ -1265,27 +1271,31 @@ func (proxier *Proxier) syncProxyRules() {
 							allowFromNode = true
 						}
 					}
-					// generally, ip route rule was added to intercept request to loadbalancer vip from the
-					// loadbalancer's backend hosts. In this case, request will not hit the loadbalancer but loop back directly.
-					// Need to add the following rule to allow request on host.
+					// For VIP-like LBs, the VIP is often added as a local
+					// address (via an IP route rule).  In that case, a request
+					// from a node to the VIP will not hit the loadbalancer but
+					// will loop back with the source IP set to the VIP.  We
+					// need the following rule to allow requests from this node.
 					if allowFromNode {
 						proxier.natRules.Write(
 							args,
-							"-s", ingress,
+							"-s", lbip,
 							"-j", string(externalTrafficChain))
 					}
+					// If the packet was able to reach the end of firewall chain,
+					// then it did not get DNATed.  It means the packet cannot go
+					// thru the firewall, then mark it for DROP.
+					proxier.natRules.Write(args, "-j", string(KubeMarkDropChain))
 				}
-
-				// If the packet was able to reach the end of firewall chain, then it did not get DNATed.
-				// It means the packet cannot go thru the firewall, then mark it for DROP
-				proxier.natRules.Write(args, "-j", string(KubeMarkDropChain))
-			} else {
-				// No endpoints.
+			}
+		} else {
+			// No endpoints.
+			for _, lbip := range svcInfo.LoadBalancerIPStrings() {
 				proxier.filterRules.Write(
 					"-A", string(kubeExternalServicesChain),
 					"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints"`, svcNameString),
 					"-m", protocol, "-p", protocol,
-					"-d", ingress,
+					"-d", lbip,
 					"--dport", strconv.Itoa(svcInfo.Port()),
 					"-j", "REJECT",
 				)
