@@ -255,40 +255,53 @@ func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue stri
 				}
 
 				// Set struct field and value we will be setting
-				if len(strings.Split(propertyValue, ":")) != 2 {
+				valueSlice := strings.Split(propertyValue, ":")
+				if len(valueSlice) != 2 {
 					return fmt.Errorf("error parsing field name for value, should be of format fieldName:fieldValue")
 				}
-				setField := strings.Split(propertyValue, ":")[0]
-				setValue := strings.Split(propertyValue, ":")[1]
+				setField := valueSlice[0]
+				setValue := valueSlice[1]
 
-				targetStructIndex := getStructByFieldName(actualCurrValue, searchField, searchValue)
+				targetStructIndex := 0
 
-				if targetStructIndex < 0 {
+				if actualCurrValue.IsZero() {
 					// Set new inner struct value, then outer slice value, then set
 					// new struct into new slice and pass to actual curr value
 					newSliceValue := reflect.MakeSlice(actualCurrValue.Type(), 0, 0)
 					actualCurrValue.Set(reflect.Indirect(newSliceValue))
-					targetStructIndex = 0
 					newValue := reflect.New(innerType)
 					actualCurrValue.Set(reflect.Append(actualCurrValue, reflect.Indirect(newValue)))
 					if !steps.moreStepsRemaining() && unset {
 						return nil
 					}
+
+					err := setStructInSlice(actualCurrValue, targetStructIndex, searchField, searchValue, setField, setValue)
+					if err != nil {
+						return err
+					}
+					return nil
 				}
 
-				targetStruct := actualCurrValue.Index(targetStructIndex)
-				searchFieldIndex := getStructFieldIndexByName(targetStruct, searchField)
-				if searchFieldIndex < 0 {
-					return fmt.Errorf("could not find field in struct with name %v", searchField)
-				}
-				actualCurrValue.Index(targetStructIndex).FieldByIndex([]int{searchFieldIndex}).Set(reflect.ValueOf(searchValue))
+				targetStructIndex = getStructByFieldName(actualCurrValue, searchField, searchValue)
 
-				setFieldIndex := getStructFieldIndexByName(targetStruct, setField)
-				if setFieldIndex < 0 {
-					return fmt.Errorf("could not find field in struct with name %v", setField)
-				}
-				actualCurrValue.Index(targetStructIndex).FieldByIndex([]int{setFieldIndex}).Set(reflect.ValueOf(setValue))
+				if targetStructIndex < 0 {
+					targetStructIndex = actualCurrValue.Len()
 
+					// Just set the new inner struct value
+					newValue := reflect.Indirect(reflect.New(innerType))
+					actualCurrValue.Set(reflect.Append(actualCurrValue, newValue))
+
+					err := setStructInSlice(actualCurrValue, targetStructIndex, searchField, searchValue, setField, setValue)
+					if err != nil {
+						return err
+					}
+					return nil
+				}
+
+				err := setStructInSlice(actualCurrValue, targetStructIndex, searchField, searchValue, setField, setValue)
+				if err != nil {
+					return err
+				}
 				return nil
 
 			} else {
@@ -366,18 +379,14 @@ func getStructByFieldName(v reflect.Value, name, value string) int {
 		return -1
 	}
 
-	// Pull slice value out of value object
-	slice, ok := v.Interface().([]interface{})
-	if !ok {
-		return -1
-	}
-
-	// Iterate through slice of ExecEnvVars and check for a matching Name key, return when found
-	for i, obj := range slice {
-		objValue := reflect.ValueOf(obj)
-		for fieldIndex := 0; fieldIndex < objValue.NumField(); fieldIndex++ {
-			currFieldValue := objValue.Field(fieldIndex)
-			currFieldTypeYamlName := getMapFieldTypeYamlName(objValue, fieldIndex)
+	// Iterate through slice of structs and check for a matching Name key, return when found
+	sliceLen := v.Len()
+	for i := 0; i < sliceLen; i++ {
+		searchStructValue := v.Index(i)
+		structPropFieldIndex := getStructFieldIndexByName(searchStructValue, name)
+		if structPropFieldIndex >= 0 {
+			currFieldValue := searchStructValue.Field(structPropFieldIndex)
+			currFieldTypeYamlName := getMapFieldTypeYamlName(searchStructValue, structPropFieldIndex)
 
 			if currFieldTypeYamlName == name && currFieldValue.String() == value {
 				return i
@@ -451,4 +460,21 @@ func editStringSlice(slice []string, input string, deduplicate bool) []string {
 		}
 		return argSlice
 	}
+}
+
+func setStructInSlice(currSliceValue reflect.Value, structIndex int, searchField, searchValue, setField, setValue string) error {
+	targetStruct := currSliceValue.Index(structIndex)
+	searchFieldIndex := getStructFieldIndexByName(targetStruct, searchField)
+	if searchFieldIndex < 0 {
+		return fmt.Errorf("could not find field in struct with name %v", searchField)
+	}
+	currSliceValue.Index(structIndex).FieldByIndex([]int{searchFieldIndex}).Set(reflect.ValueOf(searchValue))
+
+	setFieldIndex := getStructFieldIndexByName(targetStruct, setField)
+	if setFieldIndex < 0 {
+		return fmt.Errorf("could not find field in struct with name %v", setField)
+	}
+	currSliceValue.Index(structIndex).FieldByIndex([]int{setFieldIndex}).Set(reflect.ValueOf(setValue))
+
+	return nil
 }
