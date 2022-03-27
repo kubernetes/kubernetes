@@ -312,7 +312,7 @@ func (sched *Scheduler) schedulePod(ctx context.Context, fwk framework.Framework
 	trace := utiltrace.New("Scheduling", utiltrace.Field{Key: "namespace", Value: pod.Namespace}, utiltrace.Field{Key: "name", Value: pod.Name})
 	defer trace.LogIfLong(100 * time.Millisecond)
 
-	if err := sched.snapshot(); err != nil {
+	if err := sched.Cache.UpdateSnapshot(sched.nodeInfoSnapshot); err != nil {
 		return result, err
 	}
 	trace.Step("Snapshotting scheduler cache and node infos done")
@@ -357,13 +357,6 @@ func (sched *Scheduler) schedulePod(ctx context.Context, fwk framework.Framework
 		EvaluatedNodes: len(feasibleNodes) + len(diagnosis.NodeToStatusMap),
 		FeasibleNodes:  len(feasibleNodes),
 	}, err
-}
-
-// snapshot snapshots scheduler cache and node infos for all fit and priority
-// functions.
-func (sched *Scheduler) snapshot() error {
-	// Used for all fit and priority funcs.
-	return sched.Cache.UpdateSnapshot(sched.nodeInfoSnapshot)
 }
 
 // Filters the nodes to find the ones that fit the pod based on the framework
