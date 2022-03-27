@@ -45,6 +45,13 @@ func TestFromNewConfig(t *testing.T) {
 	conf := *clientcmdapi.NewConfig()
 	tests := []setConfigTest{
 		{
+			name:        "Set with bad key",
+			description: "Testing for kubectl config set users.foo.exec.fake.key to test",
+			config:      conf,
+			args:        []string{"users.foo.exec.fake.key", "test"},
+			expectedErr: "unable to locate path fake",
+		},
+		{
 			name:        "SetAuthProviderName",
 			description: "Testing for kubectl config set users.foo.auth-provider.name to oidc",
 			config:      conf,
