@@ -240,6 +240,9 @@ func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue stri
 		} else {
 			innerType := actualCurrValue.Type().Elem()
 			if innerType.Kind() == reflect.String {
+				if currStep.stepValue != "" {
+					return fmt.Errorf("unable to locate path %v", currStep.stepValue)
+				}
 				currentSliceValue := actualCurrValue.Interface().([]string)
 				newSliceValue := editStringSlice(currentSliceValue, propertyValue, deduplicate)
 				actualCurrValue.Set(reflect.ValueOf(newSliceValue))
@@ -247,6 +250,11 @@ func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue stri
 				// Note this only works for attempting to set struct fields of type string
 				// Set struct field we are searching on and value we will be searching for
 				stepSearchValue := steps.pop()
+				if steps.moreStepsRemaining() {
+					errorStep := steps.pop()
+					return fmt.Errorf("unable to locate path %v", errorStep.stepValue)
+				}
+
 				searchField := currStep.stepValue
 				searchValue := stepSearchValue.stepValue
 
@@ -365,7 +373,7 @@ func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue stri
 				return nil
 			}
 		}
-		steps.currentStepIndex = steps.currentStepIndex - 1
+		steps.currentStepIndex -= 1
 		return modifyConfig(newActualCurrValue.Addr(), steps, propertyValue, unset, setRawBytes, deduplicate)
 
 	}
