@@ -960,13 +960,23 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 }
 
 func TestGetDeviceRunContainerOptions(t *testing.T) {
-	res := TestResource{
+	res1 := TestResource{
 		resourceName:     "domain1.com/resource1",
 		resourceQuantity: *resource.NewQuantity(int64(2), resource.DecimalSI),
 		devs:             checkpoint.DevicesPerNUMA{0: []string{"dev1", "dev2"}},
 		topology:         true,
 	}
-	testResources := []TestResource{res}
+	res2 := TestResource{
+		resourceName:     "domain2.com/resource2",
+		resourceQuantity: *resource.NewQuantity(int64(1), resource.DecimalSI),
+		devs:             checkpoint.DevicesPerNUMA{0: []string{"dev3", "dev4"}},
+		topology:         false,
+	}
+
+	testResources := make([]TestResource, 2)
+	testResources = append(testResources, res1)
+	testResources = append(testResources, res2)
+
 	podsStub := activePodsStub{
 		activePods: []*v1.Pod{},
 	}
@@ -979,26 +989,37 @@ func TestGetDeviceRunContainerOptions(t *testing.T) {
 	testManager, err := getTestManager(tmpDir, podsStub.getActivePods, testResources)
 	as.Nil(err)
 
-	pod := makePod(v1.ResourceList{v1.ResourceName(res.resourceName): res.resourceQuantity})
-	activePods := []*v1.Pod{pod}
+	pod1 := makePod(v1.ResourceList{
+		v1.ResourceName(res1.resourceName): res1.resourceQuantity,
+		v1.ResourceName(res2.resourceName): res2.resourceQuantity,
+	})
+	pod2 := makePod(v1.ResourceList{
+		v1.ResourceName(res2.resourceName): res2.resourceQuantity,
+	})
+
+	activePods := []*v1.Pod{pod1, pod2}
 	podsStub.updateActivePods(activePods)
 
-	err = testManager.Allocate(pod, &pod.Spec.Containers[0])
+	err = testManager.Allocate(pod1, &pod1.Spec.Containers[0])
+	as.Nil(err)
+	err = testManager.Allocate(pod2, &pod2.Spec.Containers[0])
 	as.Nil(err)
 
 	// when pod is in activePods, GetDeviceRunContainerOptions should return
-	_, err = testManager.GetDeviceRunContainerOptions(pod, &pod.Spec.Containers[0])
+	runContainerOpts, err := testManager.GetDeviceRunContainerOptions(pod1, &pod1.Spec.Containers[0])
 	as.Nil(err)
+	as.Equal(len(runContainerOpts.Devices), 3)
+	as.Equal(len(runContainerOpts.Mounts), 2)
+	as.Equal(len(runContainerOpts.Envs), 2)
 
-	activePods = []*v1.Pod{}
+	activePods = []*v1.Pod{pod2}
 	podsStub.updateActivePods(activePods)
+	testManager.UpdateAllocatedDevices()
+
 	// when pod is removed from activePods,G etDeviceRunContainerOptions should return error
-	_, err = testManager.GetDeviceRunContainerOptions(pod, &pod.Spec.Containers[0])
-	expectedErr := fmt.Errorf("pod %v is removed from activePods list", pod.UID)
-	as.NotNil(err)
-	if !reflect.DeepEqual(err, expectedErr) {
-		t.Errorf("GetDeviceRunContainerOptions. expected error: %v but got: %v", expectedErr, err)
-	}
+	runContainerOpts, err = testManager.GetDeviceRunContainerOptions(pod1, &pod1.Spec.Containers[0])
+	as.Nil(err)
+	as.Nil(runContainerOpts)
 }
 
 func TestInitContainerDeviceAllocation(t *testing.T) {
