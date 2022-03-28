@@ -141,6 +141,25 @@ func DefaultOpenAPIConfig() *openapicommon.Config {
 	return openAPIConfig
 }
 
+// DefaultOpenAPIV3Config returns an openapicommon.Config initialized to default values.
+func DefaultOpenAPIV3Config() *openapicommon.Config {
+	openAPIConfig := genericapiserver.DefaultOpenAPIV3Config(openapi.GetOpenAPIDefinitions, openapinamer.NewDefinitionNamer(legacyscheme.Scheme))
+	openAPIConfig.Info = &spec.Info{
+		InfoProps: spec.InfoProps{
+			Title:   "Kubernetes",
+			Version: "unversioned",
+		},
+	}
+	openAPIConfig.DefaultResponse = &spec.Response{
+		ResponseProps: spec.ResponseProps{
+			Description: "Default Response.",
+		},
+	}
+	openAPIConfig.GetDefinitions = utilopenapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(openapi.GetOpenAPIDefinitions)
+
+	return openAPIConfig
+}
+
 // startAPIServerOrDie starts a kubernetes API server and an httpserver to handle api requests
 func startAPIServerOrDie(controlPlaneConfig *controlplane.Config, incomingServer *httptest.Server, apiServerReceiver APIServerReceiver) (*controlplane.Instance, *httptest.Server, CloseFunc) {
 	var m *controlplane.Instance
