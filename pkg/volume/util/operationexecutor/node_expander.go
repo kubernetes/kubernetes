@@ -18,6 +18,7 @@ package operationexecutor
 
 import (
 	"fmt"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	clientset "k8s.io/client-go/kubernetes"
@@ -100,6 +101,7 @@ func (ne *NodeExpander) expandOnPlugin() (bool, error, testResponseData) {
 	}
 
 	var err error
+	nodeName := ne.vmt.Pod.Spec.NodeName
 
 	if !ne.pvcAlreadyUpdated {
 		ne.pvc, err = util.MarkNodeExpansionInProgress(ne.pvc, ne.kubeClient)
@@ -130,7 +132,7 @@ func (ne *NodeExpander) expandOnPlugin() (bool, error, testResponseData) {
 		}
 		return false, resizeErr, testResponseData{assumeResizeFinished: true, resizeCalledOnPlugin: true}
 	}
-	simpleMsg, detailedMsg := ne.vmt.GenerateMsg("MountVolume.NodeExpandVolume succeeded", "")
+	simpleMsg, detailedMsg := ne.vmt.GenerateMsg("MountVolume.NodeExpandVolume succeeded", nodeName)
 	ne.recorder.Eventf(ne.vmt.Pod, v1.EventTypeNormal, kevents.FileSystemResizeSuccess, simpleMsg)
 	ne.recorder.Eventf(ne.pvc, v1.EventTypeNormal, kevents.FileSystemResizeSuccess, simpleMsg)
 	klog.InfoS(detailedMsg, "pod", klog.KObj(ne.vmt.Pod))
