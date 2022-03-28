@@ -142,6 +142,9 @@ type ActualStateOfWorld interface {
 
 	// GetNodesToUpdateStatusFor returns the map of nodeNames to nodeToUpdateStatusFor
 	GetNodesToUpdateStatusFor() map[types.NodeName]nodeToUpdateStatusFor
+
+	// SetVolumeSpec set volumeSpec for specified attachedVolume
+	SetVolumeSpec(volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec)
 }
 
 // AttachedVolume represents a volume that is attached to a node.
@@ -726,4 +729,16 @@ func getAttachedVolume(
 		},
 		MountedByNode:       nodeAttachedTo.mountedByNode,
 		DetachRequestedTime: nodeAttachedTo.detachRequestedTime}
+}
+
+func (asw *actualStateOfWorld) SetVolumeSpec(
+	volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec) {
+	asw.Lock()
+	defer asw.Unlock()
+
+	volumeObj, volumeExists := asw.attachedVolumes[volumeName]
+	if volumeExists {
+		volumeObj.spec = volumeSpec
+		asw.attachedVolumes[volumeName] = volumeObj
+	}
 }

@@ -265,6 +265,15 @@ func (rc *reconciler) reconcile() {
 					klog.ErrorS(err, "attacherDetacher.DetachVolume failed to start", "volume", attachedVolume)
 				}
 			}
+		} else {
+			// The volumespec in ASW may be nil when restoring ASW on attach/detach controller startup. In this case it should be detached.
+			// But if detach fails, spec will always be nil, which will cause VerifyVolumesAreAttached to fail.
+			// Here, replace nil spec in ASW with the volumeSpec found in DSW.
+			if attachedVolume.VolumeSpec == nil {
+				klog.Infof("Update nil spec for volume %v in actualStateOfWorld with volumeSpec in desiredStateOfWorld", attachedVolume.VolumeName)
+				volumeSpec := rc.desiredStateOfWorld.GetVolumeSpec(attachedVolume.NodeName, attachedVolume.VolumeName)
+				rc.actualStateOfWorld.SetVolumeSpec(attachedVolume.VolumeName, volumeSpec)
+			}
 		}
 	}
 

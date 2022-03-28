@@ -109,6 +109,9 @@ type DesiredStateOfWorld interface {
 	// GetPodsOnNodes returns list of pods ("namespace/name") that require
 	// given volume on given nodes.
 	GetVolumePodsOnNodes(nodes []k8stypes.NodeName, volumeName v1.UniqueVolumeName) []*v1.Pod
+
+	// GetVolumeSpec returns the volumeSpec for the given volume on the given node
+	GetVolumeSpec(nodeName k8stypes.NodeName, volumeName v1.UniqueVolumeName) *volume.Spec
 }
 
 // VolumeToAttach represents a volume that should be attached to a node.
@@ -440,4 +443,20 @@ func (dsw *desiredStateOfWorld) GetVolumePodsOnNodes(nodes []k8stypes.NodeName, 
 		}
 	}
 	return pods
+}
+
+func (dsw *desiredStateOfWorld) GetVolumeSpec(nodeName k8stypes.NodeName, volumeName v1.UniqueVolumeName) *volume.Spec {
+	dsw.RLock()
+	defer dsw.RUnlock()
+
+	node, ok := dsw.nodesManaged[nodeName]
+	if !ok {
+		return nil
+	}
+	volume, ok := node.volumesToAttach[volumeName]
+	if !ok {
+		return nil
+	}
+
+	return volume.spec
 }
