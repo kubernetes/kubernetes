@@ -247,7 +247,7 @@ func TestFromNewConfig(t *testing.T) {
 			description: "Testing for kubectl config set users.foo.exec.env.name.test to value2",
 			config:      conf,
 			args:        []string{"users.foo.exec.env.name.test", "value2"},
-			expectedErr: `error parsing field name for value, should be of format fieldName:fieldValue[:action]`,
+			expectedErr: `error parsing field name for value, should be of format fieldName:fieldValue`,
 		},
 		{
 			name:        "SetAuthInfoExecInstallHint",
@@ -1037,9 +1037,9 @@ func TestFromExistingConfig(t *testing.T) {
 		},
 		{
 			name:        "DeleteExecEnvVar",
-			description: "Testing for kubectl config set users.foo.exec.env.name.test to value:value1:del",
+			description: "Testing for kubectl config set users.foo.exec.env.name.test to value:",
 			config:      conf,
-			args:        []string{"users.foo.exec.env.name.test", "value:value1:-"},
+			args:        []string{"users.foo.exec.env.name.test", "value:"},
 			expected:    `Property "users.foo.exec.env.name.test" set.` + "\n",
 			expectedConfig: clientcmdapi.Config{
 				AuthInfos: map[string]*clientcmdapi.AuthInfo{

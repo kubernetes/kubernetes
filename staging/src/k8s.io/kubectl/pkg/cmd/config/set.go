@@ -54,7 +54,7 @@ var (
 
 	When configuring a list of structs, you will need to specify a structs field and value pair to search for in the dot notation in form of field.value. The value will need to be set by specifying the field you are editing and the value to set it to, separated by a :. e.g. kubectl config set users.foo.exec.env.name.test value:val1
 
-	To delete an existing struct in a list of structs you will follow the same format and add :del to the end, e.g. kubectl config set users.foo.exec.env.name.test value:val1:-
+	To delete an existing struct in a list of structs you will leave the value field blank, e.g. kubectl config set users.foo.exec.env.name.test value:
 
 	Specifying an attribute name that already exists will merge new fields on top of existing values.`))
 
@@ -80,8 +80,8 @@ var (
 	# Set an exec environment variable with the name test and the value val1
 	kubectl config set users.foo.exec.env.name.test value:val1
 
-	# Delete an exec environment variable with the name test and the value val1
-	kubectl config set users.foo.exec.env.name.test value:val1:-
+	# Delete an exec environment variable with the name test
+	kubectl config set users.foo.exec.env.name.test value:
 
 	# Set an exec argument list where the first entry uses a - or --
 	kubectl config set users.foo.exec.args -- "--test-arg,next,thing,-i"`)
@@ -269,23 +269,27 @@ func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue stri
 
 				// Set struct field and value we will be setting
 				valueSlice := strings.Split(propertyValue, ":")
-				if !(len(valueSlice) > 1 && len(valueSlice) < 4) {
-					return fmt.Errorf("error parsing field name for value, should be of format fieldName:fieldValue[:action]")
+				if len(valueSlice) != 2 {
+					return fmt.Errorf("error parsing field name for value, should be of format fieldName:fieldValue")
 				}
 				setField := valueSlice[0]
 				setValue := valueSlice[1]
-				setAction := "+"
-				if len(valueSlice) == 3 {
-					setAction = valueSlice[2]
-				}
 
-				if setAction == "-" {
+				if setValue == "" {
 					targetStructIndex := getStructByFieldName(actualCurrValue, searchField, searchValue)
 					if targetStructIndex < 0 {
 						return nil
 					}
-					newValueFirstHalf := actualCurrValue.Slice(0, targetStructIndex)
-					newValueSecondHalf := actualCurrValue.Slice(targetStructIndex, actualCurrValue.Len()-1)
+					newValueFirstHalf := reflect.MakeSlice(actualCurrValue.Type(), 0, 0)
+					if targetStructIndex != 0 {
+						newValueFirstHalf = actualCurrValue.Slice(0, targetStructIndex)
+					}
+					newValueSecondHalf := reflect.MakeSlice(actualCurrValue.Type(), 0, 0)
+					if targetStructIndex != actualCurrValue.Len() {
+						newValueSecondHalf = actualCurrValue.Slice(targetStructIndex+1, actualCurrValue.Len())
+					} else {
+						newValueSecondHalf = actualCurrValue.Slice(targetStructIndex+1, actualCurrValue.Len()-1)
+					}
 					actualCurrValue.Set(reflect.AppendSlice(newValueFirstHalf, newValueSecondHalf))
 					return nil
 				}
