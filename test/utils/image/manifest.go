@@ -231,7 +231,7 @@ const (
 
 func initImageConfigs(list RegistryList) (map[int]Config, map[int]Config) {
 	configs := map[int]Config{}
-	configs[Agnhost] = Config{list.PromoterE2eRegistry, "agnhost", "2.33"}
+	configs[Agnhost] = Config{list.PromoterE2eRegistry, "agnhost", "2.36"}
 	configs[AgnhostPrivate] = Config{list.PrivateRegistry, "agnhost", "2.6"}
 	configs[AuthenticatedAlpine] = Config{list.GcAuthenticatedRegistry, "alpine", "3.7"}
 	configs[AuthenticatedWindowsNanoServer] = Config{list.GcAuthenticatedRegistry, "windows-nanoserver", "v1"}
