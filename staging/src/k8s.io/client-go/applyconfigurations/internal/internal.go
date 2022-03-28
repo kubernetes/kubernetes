@@ -2947,6 +2947,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: suspend
       type:
         scalar: boolean
+    - name: timeZone
+      type:
+        scalar: string
 - name: io.k8s.api.batch.v1.CronJobStatus
   map:
     fields:
@@ -3148,6 +3151,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: suspend
       type:
         scalar: boolean
+    - name: timeZone
+      type:
+        scalar: string
 - name: io.k8s.api.batch.v1beta1.CronJobStatus
   map:
     fields:
