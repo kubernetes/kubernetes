@@ -234,13 +234,13 @@ func coreRelocate(local, target *Spec, relos coreRelos) (COREFixups, error) {
 		}
 
 		localType := local.types[id]
-		named, ok := localType.(namedType)
-		if !ok || named.name() == "" {
+		named, ok := localType.(NamedType)
+		if !ok || named.TypeName() == "" {
 			return nil, fmt.Errorf("relocate unnamed or anonymous type %s: %w", localType, ErrNotSupported)
 		}
 
 		relos := relosByID[id]
-		targets := target.namedTypes[named.essentialName()]
+		targets := target.namedTypes[essentialName(named.TypeName())]
 		fixups, err := coreCalculateFixups(localType, targets, relos)
 		if err != nil {
 			return nil, fmt.Errorf("relocate %s: %w", localType, err)
@@ -262,7 +262,7 @@ var errImpossibleRelocation = errors.New("impossible relocation")
 //
 // The best target is determined by scoring: the less poisoning we have to do
 // the better the target is.
-func coreCalculateFixups(local Type, targets []namedType, relos coreRelos) ([]COREFixup, error) {
+func coreCalculateFixups(local Type, targets []NamedType, relos coreRelos) ([]COREFixup, error) {
 	localID := local.ID()
 	local, err := copyType(local, skipQualifierAndTypedef)
 	if err != nil {
@@ -467,8 +467,8 @@ func parseCoreAccessor(accessor string) (coreAccessor, error) {
 		return nil, fmt.Errorf("empty accessor")
 	}
 
-	var result coreAccessor
 	parts := strings.Split(accessor, ":")
+	result := make(coreAccessor, 0, len(parts))
 	for _, part := range parts {
 		// 31 bits to avoid overflowing int on 32 bit platforms.
 		index, err := strconv.ParseUint(part, 10, 31)
@@ -564,7 +564,7 @@ func coreFindField(local Type, localAcc coreAccessor, target Type) (_, _ coreFie
 
 				// This is an anonymous struct or union, ignore it.
 				local = localMember.Type
-				localOffset += localMember.Offset
+				localOffset += localMember.OffsetBits
 				localMaybeFlex = false
 				continue
 			}
@@ -585,10 +585,10 @@ func coreFindField(local Type, localAcc coreAccessor, target Type) (_, _ coreFie
 
 			local = localMember.Type
 			localMaybeFlex = acc == len(localMembers)-1
-			localOffset += localMember.Offset
+			localOffset += localMember.OffsetBits
 			target = targetMember.Type
 			targetMaybeFlex = last
-			targetOffset += targetMember.Offset
+			targetOffset += targetMember.OffsetBits
 
 		case *Array:
 			// For arrays, acc is the index in the target.
@@ -639,7 +639,7 @@ func coreFindField(local Type, localAcc coreAccessor, target Type) (_, _ coreFie
 
 // coreFindMember finds a member in a composite type while handling anonymous
 // structs and unions.
-func coreFindMember(typ composite, name Name) (Member, bool, error) {
+func coreFindMember(typ composite, name string) (Member, bool, error) {
 	if name == "" {
 		return Member{}, false, errors.New("can't search for anonymous member")
 	}
@@ -670,7 +670,7 @@ func coreFindMember(typ composite, name Name) (Member, bool, error) {
 		for j, member := range members {
 			if member.Name == name {
 				// NB: This is safe because member is a copy.
-				member.Offset += target.offset
+				member.OffsetBits += target.offset
 				return member, j == len(members)-1, nil
 			}
 
@@ -685,7 +685,7 @@ func coreFindMember(typ composite, name Name) (Member, bool, error) {
 				return Member{}, false, fmt.Errorf("anonymous non-composite type %T not allowed", member.Type)
 			}
 
-			targets = append(targets, offsetTarget{comp, target.offset + member.Offset})
+			targets = append(targets, offsetTarget{comp, target.offset + member.OffsetBits})
 		}
 	}
 
@@ -704,9 +704,9 @@ func coreFindEnumValue(local Type, localAcc coreAccessor, target Type) (localVal
 		return nil, nil, errImpossibleRelocation
 	}
 
-	localName := localValue.Name.essentialName()
+	localName := essentialName(localValue.Name)
 	for i, targetValue := range targetEnum.Values {
-		if targetValue.Name.essentialName() != localName {
+		if essentialName(targetValue.Name) != localName {
 			continue
 		}
 
@@ -813,6 +813,7 @@ func coreAreTypesCompatible(localType Type, targetType Type) error {
  *     least one of enums should be anonymous;
  *   - for ENUMs, check sizes, names are ignored;
  *   - for INT, size and signedness are ignored;
+ *   - any two FLOATs are always compatible;
  *   - for ARRAY, dimensionality is ignored, element types are checked for
  *     compatibility recursively;
  *     [ NB: coreAreMembersCompatible doesn't recurse, this check is done
@@ -848,16 +849,16 @@ func coreAreMembersCompatible(localType Type, targetType Type) error {
 	}
 
 	switch lv := localType.(type) {
-	case *Array, *Pointer:
+	case *Array, *Pointer, *Float:
 		return nil
 
 	case *Enum:
 		tv := targetType.(*Enum)
-		return doNamesMatch(lv.name(), tv.name())
+		return doNamesMatch(lv.Name, tv.Name)
 
 	case *Fwd:
 		tv := targetType.(*Fwd)
-		return doNamesMatch(lv.name(), tv.name())
+		return doNamesMatch(lv.Name, tv.Name)
 
 	case *Int:
 		tv := targetType.(*Int)
