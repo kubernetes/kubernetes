@@ -2155,6 +2155,8 @@ func (og *operationGenerator) legacyCallNodeExpandOnPlugin(resizeOp nodeResizeOp
 
 	pvcStatusCap := pvc.Status.Capacity[v1.ResourceStorage]
 
+	nodeName := volumeToMount.Pod.Spec.NodeName
+
 	var err error
 
 	// File system resize was requested, proceed
@@ -2175,7 +2177,7 @@ func (og *operationGenerator) legacyCallNodeExpandOnPlugin(resizeOp nodeResizeOp
 		return false, resizeErr
 	}
 
-	simpleMsg, detailedMsg := volumeToMount.GenerateMsg("MountVolume.NodeExpandVolume succeeded", "")
+	simpleMsg, detailedMsg := volumeToMount.GenerateMsg("MountVolume.NodeExpandVolume succeeded", nodeName)
 	og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeNormal, kevents.FileSystemResizeSuccess, simpleMsg)
 	og.recorder.Eventf(pvc, v1.EventTypeNormal, kevents.FileSystemResizeSuccess, simpleMsg)
 	klog.InfoS(detailedMsg, "pod", klog.KObj(volumeToMount.Pod))
