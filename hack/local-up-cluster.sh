@@ -1046,10 +1046,10 @@ function install_cni {
     && echo "${CNI_PLUGINS_AMD64_SHA256SUM}  /tmp/cni.amd64.tgz" | tee /tmp/cni.sha256 \
     && sha256sum --ignore-missing -c /tmp/cni.sha256 \
     && rm -f /tmp/cni.sha256 \
-    && mkdir -p /opt/cni/bin \
-    && tar -C /opt/cni/bin -xzvf /tmp/cni."${CNI_TARGETARCH}".tgz \
+    && sudo mkdir -p /opt/cni/bin \
+    && sudo tar -C /opt/cni/bin -xzvf /tmp/cni."${CNI_TARGETARCH}".tgz \
     && rm -rf /tmp/cni."${CNI_TARGETARCH}".tgz \
-    && find /opt/cni/bin -type f -not \( \
+    && sudo find /opt/cni/bin -type f -not \( \
          -iname host-local \
          -o -iname bridge \
          -o -iname portmap \
@@ -1059,8 +1059,8 @@ function install_cni {
 
   # containerd 1.4.12 installed by docker in kubekins supports CNI version 0.4.0
   echo "Configuring cni"
-  mkdir -p "$CNI_CONFIG_DIR"
-  cat << EOF | tee "$CNI_CONFIG_DIR"/10-containerd-net.conflist
+  sudo mkdir -p "$CNI_CONFIG_DIR"
+  cat << EOF | sudo tee "$CNI_CONFIG_DIR"/10-containerd-net.conflist
 {
   "cniVersion": "0.4.0",
   "name": "containerd-net",
