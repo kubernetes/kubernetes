@@ -92,6 +92,15 @@ message PodDisruptionBudgetSpec {
   // by specifying 0. This is a mutually exclusive setting with "minAvailable".
   // +optional
   optional k8s.io.apimachinery.pkg.util.intstr.IntOrString maxUnavailable = 3;
+
+  // PodHealthyPolicy defines the criteria for when the disruption controller
+  // should consider a pod to be healthy.
+  // If no policy is specified, the legacy behavior will be used. It means
+  // only pods that are Running and Ready will be considered when the disruption
+  // controller computes "disruptionsAllowed", but all pods in the Running phase
+  // will be subject to the PDB on eviction.
+  // +optional
+  optional string podHealthyPolicy = 4;
 }
 
 // PodDisruptionBudgetStatus represents information about the status of a

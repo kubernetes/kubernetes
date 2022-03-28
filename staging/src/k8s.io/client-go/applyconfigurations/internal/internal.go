@@ -9816,6 +9816,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: minAvailable
       type:
         namedType: io.k8s.apimachinery.pkg.util.intstr.IntOrString
+    - name: podHealthyPolicy
+      type:
+        scalar: string
     - name: selector
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector
@@ -9957,6 +9960,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: minAvailable
       type:
         namedType: io.k8s.apimachinery.pkg.util.intstr.IntOrString
+    - name: podHealthyPolicy
+      type:
+        scalar: string
     - name: selector
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector

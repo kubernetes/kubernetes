@@ -35272,6 +35272,13 @@ func schema_k8sio_api_policy_v1_PodDisruptionBudgetSpec(ref common.ReferenceCall
 							Ref:         ref("k8s.io/apimachinery/pkg/util/intstr.IntOrString"),
 						},
 					},
+					"podHealthyPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PodHealthyPolicy defines the criteria for when the disruption controller should consider a pod to be healthy. If no policy is specified, the legacy behavior will be used. It means only pods that are Running and Ready will be considered when the disruption controller computes \"disruptionsAllowed\", but all pods in the Running phase will be subject to the PDB on eviction.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
 			},
 		},
@@ -35707,6 +35714,13 @@ func schema_k8sio_api_policy_v1beta1_PodDisruptionBudgetSpec(ref common.Referenc
 						SchemaProps: spec.SchemaProps{
 							Description: "An eviction is allowed if at most \"maxUnavailable\" pods selected by \"selector\" are unavailable after the eviction, i.e. even in absence of the evicted pod. For example, one can prevent all voluntary evictions by specifying 0. This is a mutually exclusive setting with \"minAvailable\".",
 							Ref:         ref("k8s.io/apimachinery/pkg/util/intstr.IntOrString"),
+						},
+					},
+					"podHealthyPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PodHealthyPolicy defines the criteria for when the disruption controller should consider a pod to be healthy. If no policy is specified, the legacy behavior will be used. It means only pods that are Running and Ready will be considered when the disruption controller computes \"disruptionsAllowed\", but all pods in the Running phase will be subject to the PDB on eviction.",
+							Type:        []string{"string"},
+							Format:      "",
 						},
 					},
 				},

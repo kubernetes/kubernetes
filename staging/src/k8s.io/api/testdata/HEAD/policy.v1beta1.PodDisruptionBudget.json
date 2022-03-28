@@ -60,7 +60,8 @@
         }
       ]
     },
-    "maxUnavailable": "maxUnavailableValue"
+    "maxUnavailable": "maxUnavailableValue",
+    "podHealthyPolicy": "podHealthyPolicyValue"
   },
   "status": {
     "observedGeneration": 1,

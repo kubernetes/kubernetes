@@ -36,6 +36,7 @@ metadata:
 spec:
   maxUnavailable: maxUnavailableValue
   minAvailable: minAvailableValue
+  podHealthyPolicy: podHealthyPolicyValue
   selector:
     matchExpressions:
     - key: keyValue

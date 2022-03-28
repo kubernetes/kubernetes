@@ -19,6 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	v1beta1 "k8s.io/api/policy/v1beta1"
 	intstr "k8s.io/apimachinery/pkg/util/intstr"
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
@@ -26,9 +27,10 @@ import (
 // PodDisruptionBudgetSpecApplyConfiguration represents an declarative configuration of the PodDisruptionBudgetSpec type for use
 // with apply.
 type PodDisruptionBudgetSpecApplyConfiguration struct {
-	MinAvailable   *intstr.IntOrString                 `json:"minAvailable,omitempty"`
-	Selector       *v1.LabelSelectorApplyConfiguration `json:"selector,omitempty"`
-	MaxUnavailable *intstr.IntOrString                 `json:"maxUnavailable,omitempty"`
+	MinAvailable     *intstr.IntOrString                 `json:"minAvailable,omitempty"`
+	Selector         *v1.LabelSelectorApplyConfiguration `json:"selector,omitempty"`
+	MaxUnavailable   *intstr.IntOrString                 `json:"maxUnavailable,omitempty"`
+	PodHealthyPolicy *v1beta1.PodHealthyPolicy           `json:"podHealthyPolicy,omitempty"`
 }
 
 // PodDisruptionBudgetSpecApplyConfiguration constructs an declarative configuration of the PodDisruptionBudgetSpec type for use with
@@ -58,5 +60,13 @@ func (b *PodDisruptionBudgetSpecApplyConfiguration) WithSelector(value *v1.Label
 // If called multiple times, the MaxUnavailable field is set to the value of the last call.
 func (b *PodDisruptionBudgetSpecApplyConfiguration) WithMaxUnavailable(value intstr.IntOrString) *PodDisruptionBudgetSpecApplyConfiguration {
 	b.MaxUnavailable = &value
+	return b
+}
+
+// WithPodHealthyPolicy sets the PodHealthyPolicy field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the PodHealthyPolicy field is set to the value of the last call.
+func (b *PodDisruptionBudgetSpecApplyConfiguration) WithPodHealthyPolicy(value v1beta1.PodHealthyPolicy) *PodDisruptionBudgetSpecApplyConfiguration {
+	b.PodHealthyPolicy = &value
 	return b
 }

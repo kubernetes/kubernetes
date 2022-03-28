@@ -59,10 +59,11 @@ func (PodDisruptionBudgetList) SwaggerDoc() map[string]string {
 }
 
 var map_PodDisruptionBudgetSpec = map[string]string{
-	"":               "PodDisruptionBudgetSpec is a description of a PodDisruptionBudget.",
-	"minAvailable":   "An eviction is allowed if at least \"minAvailable\" pods selected by \"selector\" will still be available after the eviction, i.e. even in the absence of the evicted pod.  So for example you can prevent all voluntary evictions by specifying \"100%\".",
-	"selector":       "Label query over pods whose evictions are managed by the disruption budget. A null selector will match no pods, while an empty ({}) selector will select all pods within the namespace.",
-	"maxUnavailable": "An eviction is allowed if at most \"maxUnavailable\" pods selected by \"selector\" are unavailable after the eviction, i.e. even in absence of the evicted pod. For example, one can prevent all voluntary evictions by specifying 0. This is a mutually exclusive setting with \"minAvailable\".",
+	"":                 "PodDisruptionBudgetSpec is a description of a PodDisruptionBudget.",
+	"minAvailable":     "An eviction is allowed if at least \"minAvailable\" pods selected by \"selector\" will still be available after the eviction, i.e. even in the absence of the evicted pod.  So for example you can prevent all voluntary evictions by specifying \"100%\".",
+	"selector":         "Label query over pods whose evictions are managed by the disruption budget. A null selector will match no pods, while an empty ({}) selector will select all pods within the namespace.",
+	"maxUnavailable":   "An eviction is allowed if at most \"maxUnavailable\" pods selected by \"selector\" are unavailable after the eviction, i.e. even in absence of the evicted pod. For example, one can prevent all voluntary evictions by specifying 0. This is a mutually exclusive setting with \"minAvailable\".",
+	"podHealthyPolicy": "PodHealthyPolicy defines the criteria for when the disruption controller should consider a pod to be healthy. If no policy is specified, the legacy behavior will be used. It means only pods that are Running and Ready will be considered when the disruption controller computes \"disruptionsAllowed\", but all pods in the Running phase will be subject to the PDB on eviction.",
 }
 
 func (PodDisruptionBudgetSpec) SwaggerDoc() map[string]string {
