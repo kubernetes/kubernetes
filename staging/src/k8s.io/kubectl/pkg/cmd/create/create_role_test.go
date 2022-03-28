@@ -680,27 +680,34 @@ func TestComplete(t *testing.T) {
 }
 
 func TestAddSpecialVerb(t *testing.T) {
-	resource := schema.GroupResource{
-		Group:    "my.custom.io",
-		Resource: "things",
+	testCases := map[string]struct {
+		verb     string
+		resource schema.GroupResource
+	}{
+		"existing verb": {
+			verb:     "use",
+			resource: schema.GroupResource{Group: "my.custom.io", Resource: "one"},
+		},
+		"new verb": {
+			verb:     "new",
+			resource: schema.GroupResource{Group: "my.custom.io", Resource: "two"},
+		},
 	}
 
-	AddSpecialVerb("use", resource)
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			AddSpecialVerb(tc.verb, tc.resource)
+			resources, ok := specialVerbs[tc.verb]
+			if !ok {
+				t.Errorf("missing expected verb: %s", tc.verb)
+			}
 
-	found := false
-	resources, ok := specialVerbs["use"]
-	if !ok {
-		t.Errorf("expected resources for verb: use, found none\n")
-	}
-
-	for _, res := range resources {
-		if reflect.DeepEqual(resource, res) {
-			found = true
-			break
-		}
-	}
-
-	if !found {
-		t.Errorf("expected resource:\n%v\nnot found", resource)
+			for _, res := range resources {
+				if reflect.DeepEqual(tc.resource, res) {
+					return
+				}
+			}
+			t.Errorf("missing expected resource:%#v", tc.resource)
+		})
 	}
 }
