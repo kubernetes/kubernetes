@@ -458,7 +458,7 @@ func parseIPTablesData(ruleData string) (map[string][]string, error) {
 	return tables, nil
 }
 
-func Test_parseIPTablesData(t *testing.T) {
+func TestParseIPTablesData(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		input  string
@@ -775,7 +775,7 @@ func checkIPTablesRuleJumps(ruleData string) error {
 	return nil
 }
 
-func Test_checkIPTablesRuleJumps(t *testing.T) {
+func TestCheckIPTablesRuleJumps(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
 		input string
@@ -969,7 +969,7 @@ func sortIPTablesRules(ruleData string) (string, error) {
 	return strings.Join(output, "\n"), nil
 }
 
-func Test_sortIPTablesRules(t *testing.T) {
+func TestSortIPTablesRules(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		input  string
@@ -2989,7 +2989,7 @@ func compareEndpointsMapsExceptChainName(t *testing.T, tci int, newMap proxy.End
 	}
 }
 
-func Test_updateEndpointsMap(t *testing.T) {
+func TestUpdateEndpointsMap(t *testing.T) {
 	var nodeName = testHostname
 	udpProtocol := v1.ProtocolUDP
 
@@ -4013,8 +4013,8 @@ func TestHealthCheckNodePortE2E(t *testing.T) {
 	assertIPTablesRulesNotEqual(t, getLine(), expectedIPTables, fp.iptablesData.String())
 }
 
-// Test_HealthCheckNodePortWhenTerminating tests that health check node ports are not enabled when all local endpoints are terminating
-func Test_HealthCheckNodePortWhenTerminating(t *testing.T) {
+// TestHealthCheckNodePortWhenTerminating tests that health check node ports are not enabled when all local endpoints are terminating
+func TestHealthCheckNodePortWhenTerminating(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
 	fp.OnServiceSynced()
@@ -4580,9 +4580,9 @@ func TestInternalTrafficPolicyE2E(t *testing.T) {
 	}
 }
 
-// Test_EndpointSliceWithTerminatingEndpointsTrafficPolicyLocal tests that when there are local ready and ready + terminating
+// TestEndpointSliceWithTerminatingEndpointsTrafficPolicyLocal tests that when there are local ready and ready + terminating
 // endpoints, only the ready endpoints are used.
-func Test_EndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
+func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 	tcpProtocol := v1.ProtocolTCP
 	timeout := v1.DefaultClientIPServiceAffinitySeconds
 	service := &v1.Service{
@@ -5252,9 +5252,9 @@ func Test_EndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) 
 	}
 }
 
-// Test_EndpointSliceWithTerminatingEndpointsTrafficPolicyCluster tests that when there are cluster-wide ready and ready + terminating
+// TestEndpointSliceWithTerminatingEndpointsTrafficPolicyCluster tests that when there are cluster-wide ready and ready + terminating
 // endpoints, only the ready endpoints are used.
-func Test_EndpointSliceWithTerminatingEndpointsTrafficPolicyCluster(t *testing.T) {
+func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyCluster(t *testing.T) {
 	tcpProtocol := v1.ProtocolTCP
 	timeout := v1.DefaultClientIPServiceAffinitySeconds
 	service := &v1.Service{
