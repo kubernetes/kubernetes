@@ -152,10 +152,8 @@ github.com/aws/aws-sdk-go/service/sts/stsiface
 github.com/beorn7/perks/quantile
 # github.com/bits-and-blooms/bitset v1.2.0 => github.com/bits-and-blooms/bitset v1.2.0
 github.com/bits-and-blooms/bitset
-# github.com/blang/semver v3.5.1+incompatible => github.com/blang/semver v3.5.1+incompatible
-## explicit
-github.com/blang/semver
 # github.com/blang/semver/v4 v4.0.0 => github.com/blang/semver/v4 v4.0.0
+## explicit
 github.com/blang/semver/v4
 # github.com/boltdb/bolt v1.3.1 => github.com/boltdb/bolt v1.3.1
 ## explicit
