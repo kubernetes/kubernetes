@@ -19,15 +19,15 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	v1 "k8s.io/client-go/applyconfigurations/core/v1"
 )
 
 // ClusterCIDRConfigSpecApplyConfiguration represents an declarative configuration of the ClusterCIDRConfigSpec type for use
 // with apply.
 type ClusterCIDRConfigSpecApplyConfiguration struct {
-	NodeSelector *v1.LabelSelectorApplyConfiguration `json:"nodeSelector,omitempty"`
-	IPv4         *CIDRConfigApplyConfiguration       `json:"ipv4,omitempty"`
-	IPv6         *CIDRConfigApplyConfiguration       `json:"ipv6,omitempty"`
+	NodeSelector *v1.NodeSelectorApplyConfiguration `json:"nodeSelector,omitempty"`
+	IPv4         *CIDRConfigApplyConfiguration      `json:"ipv4,omitempty"`
+	IPv6         *CIDRConfigApplyConfiguration      `json:"ipv6,omitempty"`
 }
 
 // ClusterCIDRConfigSpecApplyConfiguration constructs an declarative configuration of the ClusterCIDRConfigSpec type for use with
@@ -39,7 +39,7 @@ func ClusterCIDRConfigSpec() *ClusterCIDRConfigSpecApplyConfiguration {
 // WithNodeSelector sets the NodeSelector field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the NodeSelector field is set to the value of the last call.
-func (b *ClusterCIDRConfigSpecApplyConfiguration) WithNodeSelector(value *v1.LabelSelectorApplyConfiguration) *ClusterCIDRConfigSpecApplyConfiguration {
+func (b *ClusterCIDRConfigSpecApplyConfiguration) WithNodeSelector(value *v1.NodeSelectorApplyConfiguration) *ClusterCIDRConfigSpecApplyConfiguration {
 	b.NodeSelector = value
 	return b
 }

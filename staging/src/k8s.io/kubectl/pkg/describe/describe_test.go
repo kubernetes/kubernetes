@@ -5255,14 +5255,27 @@ func TestDescribeClusterCIDRConfig(t *testing.T) {
 						CIDR:            "fd00:1:1::/64",
 						PerNodeMaskSize: int32(120),
 					},
-					NodeSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+					NodeSelector: &corev1.NodeSelector{
+						NodeSelectorTerms: []corev1.NodeSelectorTerm{
+							{
+								MatchExpressions: []corev1.NodeSelectorRequirement{
+									{
+										Key:      "foo",
+										Operator: "In",
+										Values:   []string{"bar"}},
+								},
+							},
+						},
+					},
 				},
 			}),
 
-			output: `Name:          foo.123
-Labels:        <none>
-Annotations:   <none>
-NodeSelector:  foo=bar
+			output: `Name:         foo.123
+Labels:       <none>
+Annotations:  <none>
+NodeSelector:
+  NodeSelector Terms:
+    Term 0:  foo in [bar]
 IPv4:
   CIDR:             10.1.0.0/16
   PerNodeMaskSize:  24

@@ -110,7 +110,7 @@ func (in *ClusterCIDRConfigSpec) DeepCopyInto(out *ClusterCIDRConfigSpec) {
 	*out = *in
 	if in.NodeSelector != nil {
 		in, out := &in.NodeSelector, &out.NodeSelector
-		*out = new(v1.LabelSelector)
+		*out = new(core.NodeSelector)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.IPv4 != nil {

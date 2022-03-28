@@ -1,6 +1,83 @@
 {
   "components": {
     "schemas": {
+      "io.k8s.api.core.v1.NodeSelector": {
+        "description": "A node selector represents the union of the results of one or more label queries over a set of nodes; that is, it represents the OR of the selectors represented by the node selector terms.",
+        "properties": {
+          "nodeSelectorTerms": {
+            "description": "Required. A list of node selector terms. The terms are ORed.",
+            "items": {
+              "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeSelectorTerm",
+              "default": {}
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "nodeSelectorTerms"
+        ],
+        "type": "object",
+        "x-kubernetes-map-type": "atomic"
+      },
+      "io.k8s.api.core.v1.NodeSelectorRequirement": {
+        "description": "A node selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
+        "properties": {
+          "key": {
+            "default": "",
+            "description": "The label key that the selector applies to.",
+            "type": "string"
+          },
+          "operator": {
+            "default": "",
+            "description": "Represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt.\n\nPossible enum values:\n - `\"DoesNotExist\"`\n - `\"Exists\"`\n - `\"Gt\"`\n - `\"In\"`\n - `\"Lt\"`\n - `\"NotIn\"`",
+            "enum": [
+              "DoesNotExist",
+              "Exists",
+              "Gt",
+              "In",
+              "Lt",
+              "NotIn"
+            ],
+            "type": "string"
+          },
+          "values": {
+            "description": "An array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. If the operator is Gt or Lt, the values array must have a single element, which will be interpreted as an integer. This array is replaced during a strategic merge patch.",
+            "items": {
+              "default": "",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "key",
+          "operator"
+        ],
+        "type": "object"
+      },
+      "io.k8s.api.core.v1.NodeSelectorTerm": {
+        "description": "A null or empty node selector term matches no objects. The requirements of them are ANDed. The TopologySelectorTerm type implements a subset of the NodeSelectorTerm.",
+        "properties": {
+          "matchExpressions": {
+            "description": "A list of node selector requirements by node's labels.",
+            "items": {
+              "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeSelectorRequirement",
+              "default": {}
+            },
+            "type": "array"
+          },
+          "matchFields": {
+            "description": "A list of node selector requirements by node's fields.",
+            "items": {
+              "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeSelectorRequirement",
+              "default": {}
+            },
+            "type": "array"
+          }
+        },
+        "type": "object",
+        "x-kubernetes-map-type": "atomic"
+      },
       "io.k8s.api.networking.v1alpha1.CIDRConfig": {
         "description": "CIDRConfig defines the CIDR and Mask size per IP Family(IPv4/IPv6).",
         "properties": {
@@ -107,7 +184,7 @@
             "description": "IPv6 defines the IPv6 CIDR and the PerNodeMaskSize. Atleast one of the IPv4 or IPv6 must be provided."
           },
           "nodeSelector": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector",
+            "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeSelector",
             "description": "NodeSelector defines which nodes the config is applicable to. An empty or nil NodeSelector functions as a default that applies to all nodes."
           }
         },
@@ -591,59 +668,6 @@
       },
       "io.k8s.apimachinery.pkg.apis.meta.v1.FieldsV1": {
         "description": "FieldsV1 stores a set of fields in a data structure like a Trie, in JSON format.\n\nEach key is either a '.' representing the field itself, and will always map to an empty set, or a string representing a sub-field or item. The string will follow one of these four formats: 'f:<name>', where <name> is the name of a field in a struct, or key in a map 'v:<value>', where <value> is the exact json formatted value of a list item 'i:<index>', where <index> is position of a item in a list 'k:<keys>', where <keys> is a map of  a list item's key fields to their unique values If a key maps to an empty Fields value, the field that key represents is part of the set.\n\nThe exact format is defined in sigs.k8s.io/structured-merge-diff",
-        "type": "object"
-      },
-      "io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector": {
-        "description": "A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.",
-        "properties": {
-          "matchExpressions": {
-            "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
-            "items": {
-              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelectorRequirement",
-              "default": {}
-            },
-            "type": "array"
-          },
-          "matchLabels": {
-            "additionalProperties": {
-              "default": "",
-              "type": "string"
-            },
-            "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is \"key\", the operator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
-            "type": "object"
-          }
-        },
-        "type": "object",
-        "x-kubernetes-map-type": "atomic"
-      },
-      "io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelectorRequirement": {
-        "description": "A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
-        "properties": {
-          "key": {
-            "default": "",
-            "description": "key is the label key that the selector applies to.",
-            "type": "string",
-            "x-kubernetes-patch-merge-key": "key",
-            "x-kubernetes-patch-strategy": "merge"
-          },
-          "operator": {
-            "default": "",
-            "description": "operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.",
-            "type": "string"
-          },
-          "values": {
-            "description": "values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.",
-            "items": {
-              "default": "",
-              "type": "string"
-            },
-            "type": "array"
-          }
-        },
-        "required": [
-          "key",
-          "operator"
-        ],
         "type": "object"
       },
       "io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta": {

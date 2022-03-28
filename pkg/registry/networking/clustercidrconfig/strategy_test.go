@@ -21,6 +21,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/networking"
 )
 
@@ -38,7 +39,19 @@ func newClusterCIDRConfig() networking.ClusterCIDRConfig {
 				CIDR:            "fd00:1:1::/64",
 				PerNodeMaskSize: int32(120),
 			},
-			NodeSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+			NodeSelector: &api.NodeSelector{
+				NodeSelectorTerms: []api.NodeSelectorTerm{
+					{
+						MatchExpressions: []api.NodeSelectorRequirement{
+							{
+								Key:      "foo",
+								Operator: api.NodeSelectorOpIn,
+								Values:   []string{"bar"},
+							},
+						},
+					},
+				},
+			},
 		},
 	}
 }

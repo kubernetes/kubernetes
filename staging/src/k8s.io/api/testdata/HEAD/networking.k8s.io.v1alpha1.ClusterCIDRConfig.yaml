@@ -41,13 +41,17 @@ spec:
     cidr: cidrValue
     perNodeMaskSize: 2
   nodeSelector:
-    matchExpressions:
-    - key: keyValue
-      operator: operatorValue
-      values:
-      - valuesValue
-    matchLabels:
-      matchLabelsKey: matchLabelsValue
+    nodeSelectorTerms:
+    - matchExpressions:
+      - key: keyValue
+        operator: operatorValue
+        values:
+        - valuesValue
+      matchFields:
+      - key: keyValue
+        operator: operatorValue
+        values:
+        - valuesValue
 status:
   conditions:
   - lastTransitionTime: "2004-01-01T01:01:01Z"

@@ -617,7 +617,9 @@ func ValidateClusterCIDRConfig(ccc *networking.ClusterCIDRConfig) field.ErrorLis
 // ValidateClusterCIDRConfigSpec validates clusterCIDRConfig Spec.
 func ValidateClusterCIDRConfigSpec(spec *networking.ClusterCIDRConfigSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(spec.NodeSelector, fldPath.Child("nodeSelector"))...)
+	if spec.NodeSelector != nil {
+		allErrs = append(allErrs, apivalidation.ValidateNodeSelector(spec.NodeSelector, fldPath.Child("nodeSelector"))...)
+	}
 
 	maxIPv4PerNodeMaskSize := int32(32)
 	maxIPv6PerNodeMaskSize := int32(128)

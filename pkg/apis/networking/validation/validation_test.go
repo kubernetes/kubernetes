@@ -1990,7 +1990,7 @@ func TestValidateIngressStatusUpdate(t *testing.T) {
 func makeValidClusterCIDRConfig() *networking.ClusterCIDRConfig {
 	return &networking.ClusterCIDRConfig{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "foo",
+			Name:            "foo",
 			ResourceVersion: "9",
 		},
 		Spec: networking.ClusterCIDRConfigSpec{
@@ -2002,7 +2002,19 @@ func makeValidClusterCIDRConfig() *networking.ClusterCIDRConfig {
 				CIDR:            "fd00:1:1::/64",
 				PerNodeMaskSize: int32(120),
 			},
-			NodeSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+			NodeSelector: &api.NodeSelector{
+				NodeSelectorTerms: []api.NodeSelectorTerm{
+					{
+						MatchExpressions: []api.NodeSelectorRequirement{
+							{
+								Key:      "foo",
+								Operator: api.NodeSelectorOpIn,
+								Values:   []string{"bar"},
+							},
+						},
+					},
+				},
+			},
 		},
 	}
 }
@@ -2024,6 +2036,22 @@ func makeCIDRConfig(cidr string, perNodeMaskSize int32) *networking.CIDRConfig {
 	}
 }
 
+func makeNodeSelector(key string, op api.NodeSelectorOperator, values []string) *api.NodeSelector {
+	return &api.NodeSelector{
+		NodeSelectorTerms: []api.NodeSelectorTerm{
+			{
+				MatchExpressions: []api.NodeSelectorRequirement{
+					{
+						Key:      key,
+						Operator: op,
+						Values:   values,
+					},
+				},
+			},
+		},
+	}
+}
+
 func TestValidateClusterCIDRConfig(t *testing.T) {
 	// Tweaks used below.
 	setIPv4CIDR := func(cidrConfig *networking.CIDRConfig) cccTweak {
@@ -2038,11 +2066,13 @@ func TestValidateClusterCIDRConfig(t *testing.T) {
 		}
 	}
 
-	setNodeSelector := func(labels map[string]string) cccTweak {
+	setNodeSelector := func(nodeSelector *api.NodeSelector) cccTweak {
 		return func(ccc *networking.ClusterCIDRConfig) {
-			ccc.Spec.NodeSelector = &metav1.LabelSelector{MatchLabels: labels}
+			ccc.Spec.NodeSelector = nodeSelector
 		}
 	}
+
+	validNodeSelector := makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})
 
 	successCases := map[string]*networking.ClusterCIDRConfig{
 		"valid IPv6 only ClusterCIDRConfig":                      makeClusterCIDRConfigCustom(setIPv4CIDR(nil)),
@@ -2051,7 +2081,7 @@ func TestValidateClusterCIDRConfig(t *testing.T) {
 		"32 - IPv4.PerNodeMaskSize == 128 - IPv6.PerNodeMaskSize": makeClusterCIDRConfigCustom(
 			setIPv4CIDR(makeCIDRConfig("10.2.0.0/16", 24)),
 			setIPv6CIDR(makeCIDRConfig("fd00::/112", 120))),
-		"valid NodeSelector": makeClusterCIDRConfigCustom(setNodeSelector(map[string]string{"foo": "bar"})),
+		"valid NodeSelector": makeClusterCIDRConfigCustom(setNodeSelector(validNodeSelector)),
 	}
 
 	// Success cases are expected to pass validation.
@@ -2062,14 +2092,14 @@ func TestValidateClusterCIDRConfig(t *testing.T) {
 		}
 	}
 
-	invalidSelector := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
+	invalidNodeSelector := makeNodeSelector("NoUppercaseOrSpecialCharsLike=Equals", api.NodeSelectorOpIn, []string{"bar"})
 
 	errorCases := map[string]*networking.ClusterCIDRConfig{
 		// Config test.
 		"nil spec.IPv4 and spec.IPv6": makeClusterCIDRConfigCustom(
 			setIPv4CIDR(nil), setIPv6CIDR(nil)),
 		"invalid spec.NodeSelector": makeClusterCIDRConfigCustom(
-			setNodeSelector(invalidSelector)),
+			setNodeSelector(invalidNodeSelector)),
 
 		// IPv4 tests.
 		"empty spec.IPv4.CIDR": makeClusterCIDRConfigCustom(
@@ -2111,10 +2141,6 @@ func TestValidateClusterCIDRConfig(t *testing.T) {
 
 func TestValidateClusterConfigUpdate(t *testing.T) {
 	oldCCC := makeValidClusterCIDRConfig()
-	//oldCCC.ObjectMeta = metav1.ObjectMeta{
-	//	Name:            "foo",
-	//	ResourceVersion: "9",
-	//}
 
 	// Tweaks used below.
 	setIPv4CIDR := func(cidrConfig *networking.CIDRConfig) cccTweak {
@@ -2129,11 +2155,13 @@ func TestValidateClusterConfigUpdate(t *testing.T) {
 		}
 	}
 
-	setNodeSelector := func(labels map[string]string) cccTweak {
+	setNodeSelector := func(nodeSelector *api.NodeSelector) cccTweak {
 		return func(ccc *networking.ClusterCIDRConfig) {
-			ccc.Spec.NodeSelector = &metav1.LabelSelector{MatchLabels: labels}
+			ccc.Spec.NodeSelector = nodeSelector
 		}
 	}
+
+	updateNodeSelector := makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar2"})
 
 	errorCases := map[string]*networking.ClusterCIDRConfig{
 		"update spec.IPv4": makeClusterCIDRConfigCustom(setIPv4CIDR(
@@ -2141,7 +2169,7 @@ func TestValidateClusterConfigUpdate(t *testing.T) {
 		"update spec.IPv6": makeClusterCIDRConfigCustom(setIPv6CIDR(
 			makeCIDRConfig("fd00:2:/112", 120))),
 		"update spec.NodeSelector": makeClusterCIDRConfigCustom(setNodeSelector(
-			map[string]string{"foo": "bar2"})),
+			updateNodeSelector)),
 	}
 
 	// Error cases are not expected to pass validation.

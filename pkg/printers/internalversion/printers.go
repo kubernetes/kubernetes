@@ -2655,16 +2655,32 @@ func printClusterCIDRConfig(obj *networking.ClusterCIDRConfig, options printers.
 	if options.Wide {
 		ipv4PerNodeMaskSize := "<none>"
 		ipv6PerNodeMaskSize := "<none>"
+		nodeSelector := "<none>"
 		if obj.Spec.IPv4 != nil {
 			ipv4PerNodeMaskSize = strconv.Itoa(int(obj.Spec.IPv4.PerNodeMaskSize))
 		}
 		if obj.Spec.IPv6 != nil {
 			ipv6PerNodeMaskSize = strconv.Itoa(int(obj.Spec.IPv6.PerNodeMaskSize))
 		}
+		if obj.Spec.NodeSelector != nil {
+			allTerms := make([]string, 0)
+			for _, term := range obj.Spec.NodeSelector.NodeSelectorTerms {
+				if len(term.MatchExpressions) > 0 {
+					matchExpressions := fmt.Sprintf("MatchExpressions: %v", term.MatchExpressions)
+					allTerms = append(allTerms, matchExpressions)
+				}
+
+				if len(term.MatchFields) > 0 {
+					matchFields := fmt.Sprintf("MatchFields: %v", term.MatchFields)
+					allTerms = append(allTerms, matchFields)
+				}
+			}
+			nodeSelector = strings.Join(allTerms, ",")
+		}
 
 		row.Cells = append(row.Cells, ipv4PerNodeMaskSize)
 		row.Cells = append(row.Cells, ipv6PerNodeMaskSize)
-		row.Cells = append(row.Cells, metav1.FormatLabelSelector(obj.Spec.NodeSelector))
+		row.Cells = append(row.Cells, nodeSelector)
 	}
 
 	return []metav1.TableRow{row}, nil

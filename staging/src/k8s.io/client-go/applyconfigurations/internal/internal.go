@@ -9574,7 +9574,7 @@ var schemaYAML = typed.YAMLObject(`types:
         namedType: io.k8s.api.networking.v1alpha1.CIDRConfig
     - name: nodeSelector
       type:
-        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector
+        namedType: io.k8s.api.core.v1.NodeSelector
 - name: io.k8s.api.networking.v1alpha1.ClusterCIDRConfigStatus
   map:
     fields:

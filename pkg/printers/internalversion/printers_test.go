@@ -5898,7 +5898,7 @@ func TestPrintClusterCIDRConfig(t *testing.T) {
 						PerNodeMaskSize: ipv4PerNodeMaskSize,
 					},
 					// Does NOT get printed.
-					NodeSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+					NodeSelector: makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"}),
 				},
 			},
 			options: printers.GenerateOptions{},
@@ -5929,12 +5929,12 @@ func TestPrintClusterCIDRConfig(t *testing.T) {
 						CIDR:            ipv4CIDR,
 						PerNodeMaskSize: ipv4PerNodeMaskSize,
 					},
-					NodeSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+					NodeSelector: makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"}),
 				},
 			},
 			options: printers.GenerateOptions{Wide: true},
 			// Columns: Name, IPv4, IPv6, Age, IPv4-PerNodeMaskSize, IPv6-PerNodeMaskSize, NodeSelector.
-			expected: []metav1.TableRow{{Cells: []interface{}{"test4", ipv4CIDR, "<none>", "<unknown>", strconv.Itoa(int(ipv4PerNodeMaskSize)), "<none>", "foo=bar"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"test4", ipv4CIDR, "<none>", "<unknown>", strconv.Itoa(int(ipv4PerNodeMaskSize)), "<none>", "MatchExpressions: [{foo In [bar]}]"}}},
 		},
 		{
 			// Test name, IPv6 only with no node selector.
@@ -5961,7 +5961,7 @@ func TestPrintClusterCIDRConfig(t *testing.T) {
 						PerNodeMaskSize: ipv6PerNodeMaskSize,
 					},
 					// Does NOT get printed.
-					NodeSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+					NodeSelector: makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"}),
 				},
 			},
 			options: printers.GenerateOptions{},
@@ -5992,12 +5992,12 @@ func TestPrintClusterCIDRConfig(t *testing.T) {
 						CIDR:            ipv6CIDR,
 						PerNodeMaskSize: ipv6PerNodeMaskSize,
 					},
-					NodeSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+					NodeSelector: makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"}),
 				},
 			},
 			options: printers.GenerateOptions{Wide: true},
 			// Columns: Name, IPv4, IPv6, Age, IPv4-PerNodeMaskSize, IPv6-PerNodeMaskSize, NodeSelector.
-			expected: []metav1.TableRow{{Cells: []interface{}{"test8", "<none>", ipv6CIDR, "<unknown>", "<none>", strconv.Itoa(int(ipv6PerNodeMaskSize)), "foo=bar"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"test8", "<none>", ipv6CIDR, "<unknown>", "<none>", strconv.Itoa(int(ipv6PerNodeMaskSize)), "MatchExpressions: [{foo In [bar]}]"}}},
 		},
 		{
 			// Test name, DualStack with no node selector.
@@ -6032,7 +6032,7 @@ func TestPrintClusterCIDRConfig(t *testing.T) {
 						PerNodeMaskSize: ipv6PerNodeMaskSize,
 					},
 					// Does NOT get printed.
-					NodeSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+					NodeSelector: makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"}),
 				},
 			},
 			options: printers.GenerateOptions{},
@@ -6071,12 +6071,12 @@ func TestPrintClusterCIDRConfig(t *testing.T) {
 						CIDR:            ipv6CIDR,
 						PerNodeMaskSize: ipv6PerNodeMaskSize,
 					},
-					NodeSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+					NodeSelector: makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"}),
 				},
 			},
 			options: printers.GenerateOptions{Wide: true},
 			// Columns: Name, IPv4, IPv6, Age, IPv4-PerNodeMaskSize, IPv6-PerNodeMaskSize, NodeSelector.
-			expected: []metav1.TableRow{{Cells: []interface{}{"test12", ipv4CIDR, ipv6CIDR, "<unknown>", strconv.Itoa(int(ipv4PerNodeMaskSize)), strconv.Itoa(int(ipv6PerNodeMaskSize)), "foo=bar"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"test12", ipv4CIDR, ipv6CIDR, "<unknown>", strconv.Itoa(int(ipv4PerNodeMaskSize)), strconv.Itoa(int(ipv6PerNodeMaskSize)), "MatchExpressions: [{foo In [bar]}]"}}},
 		},
 	}
 
@@ -6091,6 +6091,22 @@ func TestPrintClusterCIDRConfig(t *testing.T) {
 		if !reflect.DeepEqual(test.expected, rows) {
 			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
 		}
+	}
+}
+
+func makeNodeSelector(key string, op api.NodeSelectorOperator, values []string) *api.NodeSelector {
+	return &api.NodeSelector{
+		NodeSelectorTerms: []api.NodeSelectorTerm{
+			{
+				MatchExpressions: []api.NodeSelectorRequirement{
+					{
+						Key:      key,
+						Operator: op,
+						Values:   values,
+					},
+				},
+			},
+		},
 	}
 }
 
@@ -6109,7 +6125,7 @@ func TestPrintClusterCIDRConfigList(t *testing.T) {
 						CIDR:            "fd00:1:1::/64",
 						PerNodeMaskSize: int32(120),
 					},
-					NodeSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+					NodeSelector: makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"}),
 				},
 			},
 			{
@@ -6123,7 +6139,7 @@ func TestPrintClusterCIDRConfigList(t *testing.T) {
 						CIDR:            "fd00:2:1::/64",
 						PerNodeMaskSize: int32(120),
 					},
-					NodeSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+					NodeSelector: makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"}),
 				},
 			},
 		},
@@ -6147,8 +6163,8 @@ func TestPrintClusterCIDRConfigList(t *testing.T) {
 			options: printers.GenerateOptions{Wide: true},
 			expected: []metav1.TableRow{
 				// Columns: Name, IPv4, IPv6, Age, IPv4-PerNodeMaskSize, IPv6-PerNodeMaskSize, NodeSelector.
-				{Cells: []interface{}{"ccc1", "10.1.0.0/16", "fd00:1:1::/64", "<unknown>", "24", "120", "foo=bar"}},
-				{Cells: []interface{}{"ccc2", "10.2.0.0/16", "fd00:2:1::/64", "<unknown>", "24", "120", "foo=bar"}},
+				{Cells: []interface{}{"ccc1", "10.1.0.0/16", "fd00:1:1::/64", "<unknown>", "24", "120", "MatchExpressions: [{foo In [bar]}]"}},
+				{Cells: []interface{}{"ccc2", "10.2.0.0/16", "fd00:2:1::/64", "<unknown>", "24", "120", "MatchExpressions: [{foo In [bar]}]"}},
 			},
 		},
 	}

@@ -26,6 +26,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
 	"k8s.io/kubernetes/pkg/apis/networking"
 	_ "k8s.io/kubernetes/pkg/apis/networking/install"
@@ -67,7 +68,19 @@ func newClusterCIDRConfig() *networking.ClusterCIDRConfig {
 				CIDR:            "fd00:1:1::/64",
 				PerNodeMaskSize: int32(120),
 			},
-			NodeSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+			NodeSelector: &api.NodeSelector{
+				NodeSelectorTerms: []api.NodeSelectorTerm{
+					{
+						MatchExpressions: []api.NodeSelectorRequirement{
+							{
+								Key:      "foo",
+								Operator: api.NodeSelectorOpIn,
+								Values:   []string{"bar"},
+							},
+						},
+					},
+				},
+			},
 		},
 	}
 }

@@ -605,7 +605,7 @@ type ClusterCIDRConfigSpec struct {
 	// NodeSelector defines which nodes the config is applicable to.
 	// An empty or nil NodeSelector functions as a default that applies to all nodes.
 	// +optional
-	NodeSelector *metav1.LabelSelector
+	NodeSelector *api.NodeSelector
 
 	// IPv4 defines the IPv4 CIDR and the PerNodeMaskSize.
 	// At least one of the IPv4 or IPv6 must be provided.

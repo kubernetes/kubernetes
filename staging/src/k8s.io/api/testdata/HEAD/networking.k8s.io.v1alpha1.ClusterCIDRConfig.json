@@ -46,15 +46,25 @@
   },
   "spec": {
     "nodeSelector": {
-      "matchLabels": {
-        "matchLabelsKey": "matchLabelsValue"
-      },
-      "matchExpressions": [
+      "nodeSelectorTerms": [
         {
-          "key": "keyValue",
-          "operator": "operatorValue",
-          "values": [
-            "valuesValue"
+          "matchExpressions": [
+            {
+              "key": "keyValue",
+              "operator": "operatorValue",
+              "values": [
+                "valuesValue"
+              ]
+            }
+          ],
+          "matchFields": [
+            {
+              "key": "keyValue",
+              "operator": "operatorValue",
+              "values": [
+                "valuesValue"
+              ]
+            }
           ]
         }
       ]

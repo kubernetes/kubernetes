@@ -2845,7 +2845,19 @@ func (c *ClusterCIDRConfigDescriber) describeClusterCIDRConfigV1alpha1(ccc *netw
 		w.Write(LEVEL_0, "Name:\t%v\n", ccc.Name)
 		printLabelsMultiline(w, "Labels", ccc.Labels)
 		printAnnotationsMultiline(w, "Annotations", ccc.Annotations)
-		w.Write(LEVEL_0, "NodeSelector:\t%s\n", labels.FormatLabels(ccc.Spec.NodeSelector.MatchLabels))
+
+		w.Write(LEVEL_0, "NodeSelector:\n")
+		if ccc.Spec.NodeSelector != nil {
+			w.Write(LEVEL_1, "NodeSelector Terms:")
+			if len(ccc.Spec.NodeSelector.NodeSelectorTerms) == 0 {
+				w.WriteLine("<none>")
+			} else {
+				w.WriteLine("")
+				for i, term := range ccc.Spec.NodeSelector.NodeSelectorTerms {
+					printNodeSelectorTermsMultilineWithIndent(w, LEVEL_2, fmt.Sprintf("Term %v", i), "\t", term.MatchExpressions)
+				}
+			}
+		}
 
 		if ccc.Spec.IPv4 != nil {
 			w.Write(LEVEL_0, "IPv4:\n")

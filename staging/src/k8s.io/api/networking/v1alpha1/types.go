@@ -16,7 +16,10 @@ limitations under the License.
 
 package v1alpha1
 
-import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+import (
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
 
 // +genclient
 // +genclient:nonNamespaced
@@ -76,7 +79,7 @@ type ClusterCIDRConfigSpec struct {
 	// NodeSelector defines which nodes the config is applicable to.
 	// An empty or nil NodeSelector functions as a default that applies to all nodes.
 	// +optional
-	NodeSelector *metav1.LabelSelector `json:"nodeSelector,omitempty" protobuf:"bytes,1,opt,name=nodeSelector"`
+	NodeSelector *v1.NodeSelector `json:"nodeSelector,omitempty" protobuf:"bytes,1,opt,name=nodeSelector"`
 
 	// IPv4 defines the IPv4 CIDR and the PerNodeMaskSize.
 	// Atleast one of the IPv4 or IPv6 must be provided.

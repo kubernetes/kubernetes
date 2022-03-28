@@ -24,10 +24,12 @@ package v1alpha1
 import (
 	unsafe "unsafe"
 
+	v1 "k8s.io/api/core/v1"
 	v1alpha1 "k8s.io/api/networking/v1alpha1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	core "k8s.io/kubernetes/pkg/apis/core"
 	networking "k8s.io/kubernetes/pkg/apis/networking"
 )
 
@@ -168,7 +170,7 @@ func Convert_networking_ClusterCIDRConfigList_To_v1alpha1_ClusterCIDRConfigList(
 }
 
 func autoConvert_v1alpha1_ClusterCIDRConfigSpec_To_networking_ClusterCIDRConfigSpec(in *v1alpha1.ClusterCIDRConfigSpec, out *networking.ClusterCIDRConfigSpec, s conversion.Scope) error {
-	out.NodeSelector = (*v1.LabelSelector)(unsafe.Pointer(in.NodeSelector))
+	out.NodeSelector = (*core.NodeSelector)(unsafe.Pointer(in.NodeSelector))
 	out.IPv4 = (*networking.CIDRConfig)(unsafe.Pointer(in.IPv4))
 	out.IPv6 = (*networking.CIDRConfig)(unsafe.Pointer(in.IPv6))
 	return nil
@@ -180,7 +182,7 @@ func Convert_v1alpha1_ClusterCIDRConfigSpec_To_networking_ClusterCIDRConfigSpec(
 }
 
 func autoConvert_networking_ClusterCIDRConfigSpec_To_v1alpha1_ClusterCIDRConfigSpec(in *networking.ClusterCIDRConfigSpec, out *v1alpha1.ClusterCIDRConfigSpec, s conversion.Scope) error {
-	out.NodeSelector = (*v1.LabelSelector)(unsafe.Pointer(in.NodeSelector))
+	out.NodeSelector = (*v1.NodeSelector)(unsafe.Pointer(in.NodeSelector))
 	out.IPv4 = (*v1alpha1.CIDRConfig)(unsafe.Pointer(in.IPv4))
 	out.IPv6 = (*v1alpha1.CIDRConfig)(unsafe.Pointer(in.IPv6))
 	return nil
@@ -192,7 +194,7 @@ func Convert_networking_ClusterCIDRConfigSpec_To_v1alpha1_ClusterCIDRConfigSpec(
 }
 
 func autoConvert_v1alpha1_ClusterCIDRConfigStatus_To_networking_ClusterCIDRConfigStatus(in *v1alpha1.ClusterCIDRConfigStatus, out *networking.ClusterCIDRConfigStatus, s conversion.Scope) error {
-	out.Conditions = *(*[]v1.Condition)(unsafe.Pointer(&in.Conditions))
+	out.Conditions = *(*[]metav1.Condition)(unsafe.Pointer(&in.Conditions))
 	return nil
 }
 
@@ -202,7 +204,7 @@ func Convert_v1alpha1_ClusterCIDRConfigStatus_To_networking_ClusterCIDRConfigSta
 }
 
 func autoConvert_networking_ClusterCIDRConfigStatus_To_v1alpha1_ClusterCIDRConfigStatus(in *networking.ClusterCIDRConfigStatus, out *v1alpha1.ClusterCIDRConfigStatus, s conversion.Scope) error {
-	out.Conditions = *(*[]v1.Condition)(unsafe.Pointer(&in.Conditions))
+	out.Conditions = *(*[]metav1.Condition)(unsafe.Pointer(&in.Conditions))
 	return nil
 }
 

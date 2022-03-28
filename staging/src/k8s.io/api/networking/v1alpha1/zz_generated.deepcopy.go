@@ -22,7 +22,8 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -108,7 +109,7 @@ func (in *ClusterCIDRConfigSpec) DeepCopyInto(out *ClusterCIDRConfigSpec) {
 	*out = *in
 	if in.NodeSelector != nil {
 		in, out := &in.NodeSelector, &out.NodeSelector
-		*out = new(v1.LabelSelector)
+		*out = new(v1.NodeSelector)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.IPv4 != nil {
@@ -139,7 +140,7 @@ func (in *ClusterCIDRConfigStatus) DeepCopyInto(out *ClusterCIDRConfigStatus) {
 	*out = *in
 	if in.Conditions != nil {
 		in, out := &in.Conditions, &out.Conditions
-		*out = make([]v1.Condition, len(*in))
+		*out = make([]metav1.Condition, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}

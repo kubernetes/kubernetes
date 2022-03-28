@@ -34282,7 +34282,7 @@ func schema_k8sio_api_networking_v1alpha1_ClusterCIDRConfigSpec(ref common.Refer
 					"nodeSelector": {
 						SchemaProps: spec.SchemaProps{
 							Description: "NodeSelector defines which nodes the config is applicable to. An empty or nil NodeSelector functions as a default that applies to all nodes.",
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector"),
+							Ref:         ref("k8s.io/api/core/v1.NodeSelector"),
 						},
 					},
 					"ipv4": {
@@ -34301,7 +34301,7 @@ func schema_k8sio_api_networking_v1alpha1_ClusterCIDRConfigSpec(ref common.Refer
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/networking/v1alpha1.CIDRConfig", "k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector"},
+			"k8s.io/api/core/v1.NodeSelector", "k8s.io/api/networking/v1alpha1.CIDRConfig"},
 	}
 }
 
