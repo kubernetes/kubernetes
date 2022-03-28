@@ -104,6 +104,8 @@ func NewCmdBuild(
 	AddFlagEnablePlugins(cmd.Flags())
 	AddFlagReorderOutput(cmd.Flags())
 	AddFlagEnableManagedbyLabel(cmd.Flags())
+	cmd.Flags().MarkDeprecated(managedByFlag,
+		"The flag `enable-managedby-label` has been deprecated. Use the `managedByLabel` option in the `buildMetadata` field instead.")
 	AddFlagEnableHelm(cmd.Flags())
 	return cmd
 }
