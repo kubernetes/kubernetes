@@ -1515,12 +1515,12 @@ func (test setConfigTest) run(t *testing.T) {
 	// Define path options for cmd.Execute() run
 	fakeKubeFileCmd, err := ioutil.TempFile(os.TempDir(), "")
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Errorf("Failed in: %q\n unexpected error: %v", test.name, err)
 	}
 	defer os.Remove(fakeKubeFileCmd.Name())
 	err = clientcmd.WriteToFile(test.config, fakeKubeFileCmd.Name())
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Errorf("Failed in: %q\n unexpected error: %v", test.name, err)
 	}
 	pathOptionsCmd := clientcmd.NewDefaultPathOptions()
 	pathOptionsCmd.GlobalFile = fakeKubeFileCmd.Name()
@@ -1529,12 +1529,12 @@ func (test setConfigTest) run(t *testing.T) {
 	// Define path options for opts.run() execution
 	fakeKubeFileOpts, err := ioutil.TempFile(os.TempDir(), "")
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Errorf("Failed in: %q\n unexpected error: %v", test.name, err)
 	}
 	defer os.Remove(fakeKubeFileOpts.Name())
 	err = clientcmd.WriteToFile(test.config, fakeKubeFileOpts.Name())
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Errorf("Failed in: %q\n unexpected error: %v", test.name, err)
 	}
 	pathOptionsOpts := clientcmd.NewDefaultPathOptions()
 	pathOptionsOpts.GlobalFile = fakeKubeFileOpts.Name()
@@ -1558,24 +1558,24 @@ func (test setConfigTest) run(t *testing.T) {
 	// Must use opts.run to get error outputs
 	err = opts.run()
 	if test.expectedErr == "" && err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Errorf("Failed in: %q\n unexpected error: %v", test.name, err)
 	}
 
 	// Check for expected error message
 	if test.expectedErr != "" {
 		if err != nil && err.Error() != test.expectedErr {
-			t.Fatalf("expected error:\n %v\nbut got error:\n%v", test.expectedErr, err)
+			t.Errorf("Failed in: %q\n expected error:\n %v\nbut got error:\n%v", test.name, test.expectedErr, err)
 		}
 		return
 	}
 
 	// Must use cmd.Execute to get stdout output
 	if err := cmd.Execute(); err != nil {
-		t.Fatalf("unexpected error executing command: %v", err)
+		t.Errorf("Failed in: %q\n unexpected error executing command: %v", test.name, err)
 	}
 	config, err := clientcmd.LoadFromFile(fakeKubeFileCmd.Name())
 	if err != nil {
-		t.Fatalf("unexpected error loading kubeconfig file: %v", err)
+		t.Errorf("Failed in: %q\n unexpected error loading kubeconfig file: %v", test.name, err)
 	}
 
 	// Must manually set LocationOfOrigin field of AuthInfos if they exists
@@ -1584,17 +1584,17 @@ func (test setConfigTest) run(t *testing.T) {
 			if test.expectedConfig.AuthInfos[k] != nil && config.AuthInfos[k] != nil {
 				test.expectedConfig.AuthInfos[k].LocationOfOrigin = config.AuthInfos[k].LocationOfOrigin
 			} else {
-				t.Errorf("Failed in:%q\n cannot find key %v in AuthInfos map for expectedConfig and/or config", test.description, k)
+				t.Errorf("Failed in: %q\n cannot find key %v in AuthInfos map for expectedConfig and/or config", test.name, k)
 			}
 		}
 	}
 
 	if len(test.expected) != 0 {
 		if buf.String() != test.expected {
-			t.Errorf("Failed in:%q\n expected %v\n but got %v", test.description, test.expected, buf.String())
+			t.Errorf("Failed in: %q\n expected %v\n but got %v", test.name, test.expected, buf.String())
 		}
 	}
 	if !reflect.DeepEqual(*config, test.expectedConfig) {
-		t.Errorf("%v\nconfig want/got mismatch (-want +got):\n%s", test.name, cmp.Diff(test.expectedConfig, *config))
+		t.Errorf("Failed in: %q\nconfig want/got mismatch (-want +got):\n%s", test.name, cmp.Diff(test.expectedConfig, *config))
 	}
 }
