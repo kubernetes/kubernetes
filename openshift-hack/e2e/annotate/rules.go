@@ -207,7 +207,12 @@ var (
 		// These are skipped explicitly by openshift-hack/test-kubernetes-e2e.sh,
 		// but will also be skipped by openshift-tests in jobs that use openshift-sdn.
 		"[Skipped:Network/OpenShiftSDN]": {
+			`NetworkPolicy.*IPBlock`,    // feature is not supported by openshift-sdn
+			`NetworkPolicy.*[Ee]gress`,  // feature is not supported by openshift-sdn
 			`NetworkPolicy.*named port`, // feature is not supported by openshift-sdn
+
+			`NetworkPolicy between server and client should support a 'default-deny-all' policy`,            // uses egress feature
+			`NetworkPolicy between server and client should stop enforcing policies after they are deleted`, // uses egress feature
 		},
 	}
 
