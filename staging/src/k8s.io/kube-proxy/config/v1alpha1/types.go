@@ -103,6 +103,18 @@ type KubeProxyWinkernelConfiguration struct {
 	ForwardHealthCheckVip bool `json:"forwardHealthCheckVip"`
 }
 
+// DetectLocalConfiguration contains optional settings related to DetectLocalMode option
+type DetectLocalConfiguration struct {
+	// BridgeInterface is a string argument which represents a single bridge interface name.
+	// Kube-proxy considers traffic as local if originating from this given bridge.
+	// This argument should be set if DetectLocalMode is set to LocalModeBridgeInterface.
+	BridgeInterface string `json:"bridgeInterface"`
+	// InterfaceNamePrefix is a string argument which represents a single interface prefix name.
+	// Kube-proxy considers traffic as local if originating from one or more interfaces which match
+	// the given prefix. This argument should be set if DetectLocalMode is set to LocalModeInterfaceNamePrefix.
+	InterfaceNamePrefix string `json:"interfaceNamePrefix"`
+}
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // KubeProxyConfiguration contains everything necessary to configure the
@@ -170,6 +182,8 @@ type KubeProxyConfiguration struct {
 	ShowHiddenMetricsForVersion string `json:"showHiddenMetricsForVersion"`
 	// DetectLocalMode determines mode to use for detecting local traffic, defaults to LocalModeClusterCIDR
 	DetectLocalMode LocalMode `json:"detectLocalMode"`
+	// DetectLocal contains optional configuration settings related to DetectLocalMode.
+	DetectLocal DetectLocalConfiguration `json:"detectLocal"`
 }
 
 // ProxyMode represents modes used by the Kubernetes proxy server.

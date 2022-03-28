@@ -144,3 +144,135 @@ func TestDetectLocalByCIDR(t *testing.T) {
 		}
 	}
 }
+
+func TestNewDetectLocalByBridgeInterface(t *testing.T) {
+	cases := []struct {
+		ifaceName   string
+		errExpected bool
+	}{
+		{
+			ifaceName:   "avz",
+			errExpected: false,
+		},
+		{
+			ifaceName:   "",
+			errExpected: true,
+		},
+	}
+	for i, c := range cases {
+		r, err := NewDetectLocalByBridgeInterface(c.ifaceName)
+		if c.errExpected {
+			if err == nil {
+				t.Errorf("Case[%d] expected error, but succeeded with: %q", i, r)
+			}
+			continue
+		}
+		if err != nil {
+			t.Errorf("Case[%d] failed with error: %v", i, err)
+		}
+	}
+}
+
+func TestNewDetectLocalByInterfaceNamePrefix(t *testing.T) {
+	cases := []struct {
+		ifacePrefix string
+		errExpected bool
+	}{
+		{
+			ifacePrefix: "veth",
+			errExpected: false,
+		},
+		{
+			ifacePrefix: "cbr0",
+			errExpected: false,
+		},
+		{
+			ifacePrefix: "",
+			errExpected: true,
+		},
+	}
+	for i, c := range cases {
+		r, err := NewDetectLocalByInterfaceNamePrefix(c.ifacePrefix)
+		if c.errExpected {
+			if err == nil {
+				t.Errorf("Case[%d] expected error, but succeeded with: %q", i, r)
+			}
+			continue
+		}
+		if err != nil {
+			t.Errorf("Case[%d] failed with error: %v", i, err)
+		}
+	}
+}
+
+func TestDetectLocalByBridgeInterface(t *testing.T) {
+	cases := []struct {
+		ifaceName               string
+		expectedJumpIfOutput    []string
+		expectedJumpIfNotOutput []string
+	}{
+		{
+			ifaceName:               "eth0",
+			expectedJumpIfOutput:    []string{"-i", "eth0"},
+			expectedJumpIfNotOutput: []string{"!", "-i", "eth0"},
+		},
+	}
+	for _, c := range cases {
+		localDetector, err := NewDetectLocalByBridgeInterface(c.ifaceName)
+		if err != nil {
+			t.Errorf("Error initializing localDetector: %v", err)
+			continue
+		}
+		if !localDetector.IsImplemented() {
+			t.Error("DetectLocalByBridgeInterface returns false for IsImplemented")
+		}
+
+		ifLocal := localDetector.IfLocal()
+		ifNotLocal := localDetector.IfNotLocal()
+
+		if !reflect.DeepEqual(ifLocal, c.expectedJumpIfOutput) {
+			t.Errorf("IfLocal, expected: '%v', but got: '%v'", c.expectedJumpIfOutput, ifLocal)
+		}
+
+		if !reflect.DeepEqual(ifNotLocal, c.expectedJumpIfNotOutput) {
+			t.Errorf("IfNotLocal, expected: '%v', but got: '%v'", c.expectedJumpIfNotOutput, ifNotLocal)
+		}
+	}
+}
+
+func TestDetectLocalByInterfaceNamePrefix(t *testing.T) {
+	cases := []struct {
+		ifacePrefix             string
+		chain                   string
+		args                    []string
+		expectedJumpIfOutput    []string
+		expectedJumpIfNotOutput []string
+	}{
+		{
+			ifacePrefix:             "eth0",
+			expectedJumpIfOutput:    []string{"-i", "eth0+"},
+			expectedJumpIfNotOutput: []string{"!", "-i", "eth0+"},
+		},
+	}
+	for _, c := range cases {
+		localDetector, err := NewDetectLocalByInterfaceNamePrefix(c.ifacePrefix)
+		if err != nil {
+			t.Errorf("Error initializing localDetector: %v", err)
+			continue
+		}
+		if !localDetector.IsImplemented() {
+			t.Error("DetectLocalByInterfaceNamePrefix returns false for IsImplemented")
+		}
+
+		ifLocal := localDetector.IfLocal()
+		ifNotLocal := localDetector.IfNotLocal()
+
+		if !reflect.DeepEqual(ifLocal, c.expectedJumpIfOutput) {
+			t.Errorf("IfLocal, expected: '%v', but got: '%v'", c.expectedJumpIfOutput, ifLocal)
+		}
+
+		if !reflect.DeepEqual(ifNotLocal, c.expectedJumpIfNotOutput) {
+			t.Errorf("IfNotLocal, expected: '%v', but got: '%v'", c.expectedJumpIfNotOutput, ifNotLocal)
+		}
+	}
+}
