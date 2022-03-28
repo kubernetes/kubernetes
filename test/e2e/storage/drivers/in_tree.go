@@ -2025,3 +2025,131 @@ func cleanUpVolumeServerWithSecret(f *framework.Framework, serverPod *v1.Pod, se
 		framework.Logf("Server pod delete failed: %v", err)
 	}
 }
+
+// Azure File
+type azureFileDriver struct {
+	driverInfo storageframework.DriverInfo
+}
+
+type azureFileVolume struct {
+	accountName     string
+	shareName       string
+	secretName      string
+	secretNamespace string
+}
+
+var _ storageframework.TestDriver = &azureFileDriver{}
+var _ storageframework.PreprovisionedVolumeTestDriver = &azureFileDriver{}
+var _ storageframework.InlineVolumeTestDriver = &azureFileDriver{}
+var _ storageframework.PreprovisionedPVTestDriver = &azureFileDriver{}
+var _ storageframework.DynamicPVTestDriver = &azureFileDriver{}
+
+// InitAzureFileDriver returns azureFileDriver that implements TestDriver interface
+func InitAzureFileDriver() storageframework.TestDriver {
+	return &azureFileDriver{
+		driverInfo: storageframework.DriverInfo{
+			Name:             "azure-file",
+			InTreePluginName: "kubernetes.io/azure-file",
+			MaxFileSize:      storageframework.FileSizeMedium,
+			SupportedSizeRange: e2evolume.SizeRange{
+				Min: "1Gi",
+			},
+			SupportedFsType: sets.NewString(
+				"", // Default fsType
+			),
+			Capabilities: map[storageframework.Capability]bool{
+				storageframework.CapPersistence:         true,
+				storageframework.CapExec:                true,
+				storageframework.CapRWX:                 true,
+				storageframework.CapMultiPODs:           true,
+				storageframework.CapControllerExpansion: true,
+				storageframework.CapNodeExpansion:       true,
+			},
+		},
+	}
+}
+
+func (a *azureFileDriver) GetDriverInfo() *storageframework.DriverInfo {
+	return &a.driverInfo
+}
+
+func (a *azureFileDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) {
+	e2eskipper.SkipUnlessProviderIs("azure")
+}
+
+func (a *azureFileDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) *v1.VolumeSource {
+	av, ok := e2evolume.(*azureFileVolume)
+	framework.ExpectEqual(ok, true, "Failed to cast test volume to Azure test volume")
+	volSource := v1.VolumeSource{
+		AzureFile: &v1.AzureFileVolumeSource{
+			SecretName: av.secretName,
+			ShareName:  av.shareName,
+			ReadOnly:   readOnly,
+		},
+	}
+	return &volSource
+}
+
+func (a *azureFileDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
+	av, ok := e2evolume.(*azureFileVolume)
+	framework.ExpectEqual(ok, true, "Failed to cast test volume to Azure test volume")
+	pvSource := v1.PersistentVolumeSource{
+		AzureFile: &v1.AzureFilePersistentVolumeSource{
+			SecretName:      av.secretName,
+			ShareName:       av.shareName,
+			SecretNamespace: &av.secretNamespace,
+			ReadOnly:        readOnly,
+		},
+	}
+	return &pvSource, nil
+}
+
+func (a *azureFileDriver) GetDynamicProvisionStorageClass(config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
+	provisioner := "kubernetes.io/azure-file"
+	parameters := map[string]string{}
+	ns := config.Framework.Namespace.Name
+	immediateBinding := storagev1.VolumeBindingImmediate
+	return storageframework.GetStorageClass(provisioner, parameters, &immediateBinding, ns)
+}
+
+func (a *azureFileDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTestConfig, func()) {
+	return &storageframework.PerTestConfig{
+		Driver:    a,
+		Prefix:    "azure-file",
+		Framework: f,
+	}, func() {}
+}
+
+func (a *azureFileDriver) CreateVolume(config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
+	ginkgo.By("creating a test azure file volume")
+	accountName, accountKey, shareName, err := e2epv.CreateShare()
+	framework.ExpectNoError(err)
+
+	secretName := "azure-storage-account-" + accountName + "-secret"
+	secret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: config.Framework.Namespace.Name,
+			Name:      secretName,
+		},
+
+		Data: map[string][]byte{
+			"azurestorageaccountname": []byte(accountName),
+			"azurestorageaccountkey":  []byte(accountKey),
+		},
+		Type: "Opaque",
+	}
+
+	_, err = config.Framework.ClientSet.CoreV1().Secrets(config.Framework.Namespace.Name).Create(context.TODO(), secret, metav1.CreateOptions{})
+	framework.ExpectNoError(err)
+	return &azureFileVolume{
+		accountName:     accountName,
+		shareName:       shareName,
+		secretName:      secretName,
+		secretNamespace: config.Framework.Namespace.Name,
+	}
+}
+
+func (v *azureFileVolume) DeleteVolume() {
+	err := e2epv.DeleteShare(v.accountName, v.shareName)
+	framework.ExpectNoError(err)
+}
