@@ -17,6 +17,7 @@ limitations under the License.
 package scheduler
 
 import (
+//	"bytes"
 	"context"
 	"fmt"
 	"math/rand"
@@ -597,6 +598,8 @@ func findNodesThatPassExtenders(extenders []framework.Extender, pod *v1.Pod, fea
 	return feasibleNodes, nil
 }
 
+//var buffer = bytes.NewBuffer(nil)
+
 // prioritizeNodes prioritizes the nodes by running the score plugins,
 // which return a score for each node from the call to RunScorePlugins().
 // The scores from each plugin are added together to make the score for that node, then
@@ -648,12 +651,31 @@ func prioritizeNodes(
 	// Summarize all scores.
 	result := make(framework.NodeScoreList, 0, len(nodes))
 
+//	scores := [3]int64{}
+//	buffer.Reset()
+
 	for i := range nodes {
+		// DEBUG ONLY - DO NOT MERGE
+
 		result = append(result, framework.NodeScore{Name: nodes[i].Name, Score: 0})
 		for j := range scoresMap {
+/*			switch j {
+			case "NodeResourcesFit":
+				scores[0]=scoresMap[j][i].Score
+			case "PodTopologySpread":
+				scores[1]=scoresMap[j][i].Score
+			case "NodeResourcesBalancedAllocation":
+				scores[2]=scoresMap[j][i].Score
+			}*/
 			result[i].Score += scoresMap[j][i].Score
 		}
+
+/*		if _, err := fmt.Fprintf(buffer, "LLL: pod=%s/%s node=%s - NR=%d TS=%d BA=%d", pod.Namespace, pod.Name, nodes[i].Name, scores[0], scores[1], scores[2]); err != nil {
+			klog.InfoS("XXX write error: %v", err)
+		}
+		buffer.WriteByte('\n')*/
 	}
+//	klog.Info(buffer.String())
 
 	if len(extenders) != 0 && nodes != nil {
 		var mu sync.Mutex
