@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math"
 	"os"
 	"reflect"
@@ -27,12 +26,15 @@ var (
 	ErrNoExtendedInfo = errors.New("no extended info")
 )
 
+// ID represents the unique ID of a BTF object.
+type ID uint32
+
 // Spec represents decoded BTF.
 type Spec struct {
 	rawTypes   []rawType
 	strings    stringTable
 	types      []Type
-	namedTypes map[string][]namedType
+	namedTypes map[string][]NamedType
 	funcInfos  map[string]extInfo
 	lineInfos  map[string]extInfo
 	coreRelos  map[string]coreRelos
@@ -61,15 +63,6 @@ func LoadSpecFromReader(rd io.ReaderAt) (*Spec, error) {
 	}
 	defer file.Close()
 
-	btfSection, btfExtSection, sectionSizes, err := findBtfSections(file)
-	if err != nil {
-		return nil, err
-	}
-
-	if btfSection == nil {
-		return nil, fmt.Errorf("btf: %w", ErrNotFound)
-	}
-
 	symbols, err := file.Symbols()
 	if err != nil {
 		return nil, fmt.Errorf("can't read symbols: %v", err)
@@ -87,10 +80,6 @@ func LoadSpecFromReader(rd io.ReaderAt) (*Spec, error) {
 		}
 
 		secName := file.Sections[symbol.Section].Name
-		if _, ok := sectionSizes[secName]; !ok {
-			continue
-		}
-
 		if symbol.Value > math.MaxUint32 {
 			return nil, fmt.Errorf("section %s: symbol %s: size exceeds maximum", secName, symbol.Name)
 		}
@@ -98,24 +87,10 @@ func LoadSpecFromReader(rd io.ReaderAt) (*Spec, error) {
 		variableOffsets[variable{secName, symbol.Name}] = uint32(symbol.Value)
 	}
 
-	spec, err := loadNakedSpec(btfSection.Open(), file.ByteOrder, sectionSizes, variableOffsets)
-	if err != nil {
-		return nil, err
-	}
-
-	if btfExtSection == nil {
-		return spec, nil
-	}
-
-	spec.funcInfos, spec.lineInfos, spec.coreRelos, err = parseExtInfos(btfExtSection.Open(), file.ByteOrder, spec.strings)
-	if err != nil {
-		return nil, fmt.Errorf("can't read ext info: %w", err)
-	}
-
-	return spec, nil
+	return loadSpecFromELF(file, variableOffsets)
 }
 
-func findBtfSections(file *internal.SafeELFFile) (*elf.Section, *elf.Section, map[string]uint32, error) {
+func loadSpecFromELF(file *internal.SafeELFFile, variableOffsets map[variable]uint32) (*Spec, error) {
 	var (
 		btfSection    *elf.Section
 		btfExtSection *elf.Section
@@ -134,33 +109,45 @@ func findBtfSections(file *internal.SafeELFFile) (*elf.Section, *elf.Section, ma
 			}
 
 			if sec.Size > math.MaxUint32 {
-				return nil, nil, nil, fmt.Errorf("section %s exceeds maximum size", sec.Name)
+				return nil, fmt.Errorf("section %s exceeds maximum size", sec.Name)
 			}
 
 			sectionSizes[sec.Name] = uint32(sec.Size)
 		}
 	}
-	return btfSection, btfExtSection, sectionSizes, nil
-}
 
-func loadSpecFromVmlinux(rd io.ReaderAt) (*Spec, error) {
-	file, err := internal.NewSafeELFFile(rd)
+	if btfSection == nil {
+		return nil, fmt.Errorf("btf: %w", ErrNotFound)
+	}
+
+	spec, err := loadRawSpec(btfSection.Open(), file.ByteOrder, sectionSizes, variableOffsets)
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
 
-	btfSection, _, _, err := findBtfSections(file)
+	if btfExtSection == nil {
+		return spec, nil
+	}
+
+	spec.funcInfos, spec.lineInfos, spec.coreRelos, err = parseExtInfos(btfExtSection.Open(), file.ByteOrder, spec.strings)
 	if err != nil {
-		return nil, fmt.Errorf(".BTF ELF section: %s", err)
+		return nil, fmt.Errorf("can't read ext info: %w", err)
 	}
-	if btfSection == nil {
-		return nil, fmt.Errorf("unable to find .BTF ELF section")
-	}
-	return loadNakedSpec(btfSection.Open(), file.ByteOrder, nil, nil)
+
+	return spec, nil
 }
 
-func loadNakedSpec(btf io.ReadSeeker, bo binary.ByteOrder, sectionSizes map[string]uint32, variableOffsets map[variable]uint32) (*Spec, error) {
+// LoadRawSpec reads a blob of BTF data that isn't wrapped in an ELF file.
+//
+// Prefer using LoadSpecFromReader, since this function only supports a subset
+// of BTF.
+func LoadRawSpec(btf io.Reader, bo binary.ByteOrder) (*Spec, error) {
+	// This will return an error if we encounter a Datasec, since we can't fix
+	// it up.
+	return loadRawSpec(btf, bo, nil, nil)
+}
+
+func loadRawSpec(btf io.Reader, bo binary.ByteOrder, sectionSizes map[string]uint32, variableOffsets map[variable]uint32) (*Spec, error) {
 	rawTypes, rawStrings, err := parseBTF(btf, bo)
 	if err != nil {
 		return nil, err
@@ -217,7 +204,7 @@ func loadKernelSpec() (*Spec, error) {
 	if err == nil {
 		defer fh.Close()
 
-		return loadNakedSpec(fh, internal.NativeEndian, nil, nil)
+		return LoadRawSpec(fh, internal.NativeEndian)
 	}
 
 	// use same list of locations as libbpf
@@ -241,14 +228,20 @@ func loadKernelSpec() (*Spec, error) {
 		}
 		defer fh.Close()
 
-		return loadSpecFromVmlinux(fh)
+		file, err := internal.NewSafeELFFile(fh)
+		if err != nil {
+			return nil, err
+		}
+		defer file.Close()
+
+		return loadSpecFromELF(file, nil)
 	}
 
 	return nil, fmt.Errorf("no BTF for kernel version %s: %w", release, internal.ErrNotSupported)
 }
 
-func parseBTF(btf io.ReadSeeker, bo binary.ByteOrder) ([]rawType, stringTable, error) {
-	rawBTF, err := ioutil.ReadAll(btf)
+func parseBTF(btf io.Reader, bo binary.ByteOrder) ([]rawType, stringTable, error) {
+	rawBTF, err := io.ReadAll(btf)
 	if err != nil {
 		return nil, nil, fmt.Errorf("can't read BTF: %v", err)
 	}
@@ -357,6 +350,30 @@ func fixupDatasec(rawTypes []rawType, rawStrings stringTable, sectionSizes map[s
 	return nil
 }
 
+// Copy creates a copy of Spec.
+func (s *Spec) Copy() *Spec {
+	types, _ := copyTypes(s.types, nil)
+	namedTypes := make(map[string][]NamedType)
+	for _, typ := range types {
+		if named, ok := typ.(NamedType); ok {
+			name := essentialName(named.TypeName())
+			namedTypes[name] = append(namedTypes[name], named)
+		}
+	}
+
+	// NB: Other parts of spec are not copied since they are immutable.
+	return &Spec{
+		s.rawTypes,
+		s.strings,
+		types,
+		namedTypes,
+		s.funcInfos,
+		s.lineInfos,
+		s.coreRelos,
+		s.byteOrder,
+	}
+}
+
 type marshalOpts struct {
 	ByteOrder        binary.ByteOrder
 	StripFuncLinkage bool
@@ -447,36 +464,37 @@ func (s *Spec) Program(name string, length uint64) (*Program, error) {
 	return &Program{s, length, funcInfos, lineInfos, relos}, nil
 }
 
-// Datasec returns the BTF required to create maps which represent data sections.
-func (s *Spec) Datasec(name string) (*Map, error) {
-	var datasec Datasec
-	if err := s.FindType(name, &datasec); err != nil {
-		return nil, fmt.Errorf("data section %s: can't get BTF: %w", name, err)
-	}
-
-	m := NewMap(s, &Void{}, &datasec)
-	return &m, nil
-}
-
 // FindType searches for a type with a specific name.
 //
-// hint determines the type of the returned Type.
+// Called T a type that satisfies Type, typ must be a non-nil **T.
+// On success, the address of the found type will be copied in typ.
 //
 // Returns an error wrapping ErrNotFound if no matching
 // type exists in spec.
-func (s *Spec) FindType(name string, typ Type) error {
-	var (
-		wanted    = reflect.TypeOf(typ)
-		candidate Type
-	)
+func (s *Spec) FindType(name string, typ interface{}) error {
+	typValue := reflect.ValueOf(typ)
+	if typValue.Kind() != reflect.Ptr {
+		return fmt.Errorf("%T is not a pointer", typ)
+	}
 
+	typPtr := typValue.Elem()
+	if !typPtr.CanSet() {
+		return fmt.Errorf("%T cannot be set", typ)
+	}
+
+	wanted := typPtr.Type()
+	if !wanted.AssignableTo(reflect.TypeOf((*Type)(nil)).Elem()) {
+		return fmt.Errorf("%T does not satisfy Type interface", typ)
+	}
+
+	var candidate Type
 	for _, typ := range s.namedTypes[essentialName(name)] {
 		if reflect.TypeOf(typ) != wanted {
 			continue
 		}
 
 		// Match against the full name, not just the essential one.
-		if typ.name() != name {
+		if typ.TypeName() != name {
 			continue
 		}
 
@@ -491,15 +509,15 @@ func (s *Spec) FindType(name string, typ Type) error {
 		return fmt.Errorf("type %s: %w", name, ErrNotFound)
 	}
 
-	cpy, _ := copyType(candidate, nil)
-	value := reflect.Indirect(reflect.ValueOf(cpy))
-	reflect.Indirect(reflect.ValueOf(typ)).Set(value)
+	typPtr.Set(reflect.ValueOf(candidate))
+
 	return nil
 }
 
 // Handle is a reference to BTF loaded into the kernel.
 type Handle struct {
-	fd *internal.FD
+	spec *Spec
+	fd   *internal.FD
 }
 
 // NewHandle loads BTF into the kernel.
@@ -541,7 +559,32 @@ func NewHandle(spec *Spec) (*Handle, error) {
 		return nil, internal.ErrorWithLog(err, logBuf, logErr)
 	}
 
-	return &Handle{fd}, nil
+	return &Handle{spec.Copy(), fd}, nil
+}
+
+// NewHandleFromID returns the BTF handle for a given id.
+//
+// Returns ErrNotExist, if there is no BTF with the given id.
+//
+// Requires CAP_SYS_ADMIN.
+func NewHandleFromID(id ID) (*Handle, error) {
+	fd, err := internal.BPFObjGetFDByID(internal.BPF_BTF_GET_FD_BY_ID, uint32(id))
+	if err != nil {
+		return nil, fmt.Errorf("get BTF by id: %w", err)
+	}
+
+	info, err := newInfoFromFd(fd)
+	if err != nil {
+		_ = fd.Close()
+		return nil, fmt.Errorf("get BTF spec for handle: %w", err)
+	}
+
+	return &Handle{info.BTF, fd}, nil
+}
+
+// Spec returns the Spec that defined the BTF loaded into the kernel.
+func (h *Handle) Spec() *Spec {
+	return h.spec
 }
 
 // Close destroys the handle.
@@ -563,43 +606,8 @@ func (h *Handle) FD() int {
 
 // Map is the BTF for a map.
 type Map struct {
-	spec       *Spec
-	key, value Type
-}
-
-// NewMap returns a new Map containing the given values.
-// The key and value arguments are initialized to Void if nil values are given.
-func NewMap(spec *Spec, key Type, value Type) Map {
-	if key == nil {
-		key = &Void{}
-	}
-	if value == nil {
-		value = &Void{}
-	}
-
-	return Map{
-		spec:  spec,
-		key:   key,
-		value: value,
-	}
-}
-
-// MapSpec should be a method on Map, but is a free function
-// to hide it from users of the ebpf package.
-func MapSpec(m *Map) *Spec {
-	return m.spec
-}
-
-// MapKey should be a method on Map, but is a free function
-// to hide it from users of the ebpf package.
-func MapKey(m *Map) Type {
-	return m.key
-}
-
-// MapValue should be a method on Map, but is a free function
-// to hide it from users of the ebpf package.
-func MapValue(m *Map) Type {
-	return m.value
+	Spec       *Spec
+	Key, Value Type
 }
 
 // Program is the BTF information for a stream of instructions.
@@ -610,68 +618,59 @@ type Program struct {
 	coreRelos            coreRelos
 }
 
-// ProgramSpec returns the Spec needed for loading function and line infos into the kernel.
-//
-// This is a free function instead of a method to hide it from users
-// of package ebpf.
-func ProgramSpec(s *Program) *Spec {
-	return s.spec
+// Spec returns the BTF spec of this program.
+func (p *Program) Spec() *Spec {
+	return p.spec
 }
 
-// ProgramAppend the information from other to the Program.
-//
-// This is a free function instead of a method to hide it from users
-// of package ebpf.
-func ProgramAppend(s, other *Program) error {
-	funcInfos, err := s.funcInfos.append(other.funcInfos, s.length)
+// Append the information from other to the Program.
+func (p *Program) Append(other *Program) error {
+	if other.spec != p.spec {
+		return fmt.Errorf("can't append program with different BTF specs")
+	}
+
+	funcInfos, err := p.funcInfos.append(other.funcInfos, p.length)
 	if err != nil {
 		return fmt.Errorf("func infos: %w", err)
 	}
 
-	lineInfos, err := s.lineInfos.append(other.lineInfos, s.length)
+	lineInfos, err := p.lineInfos.append(other.lineInfos, p.length)
 	if err != nil {
 		return fmt.Errorf("line infos: %w", err)
 	}
 
-	s.funcInfos = funcInfos
-	s.lineInfos = lineInfos
-	s.coreRelos = s.coreRelos.append(other.coreRelos, s.length)
-	s.length += other.length
+	p.funcInfos = funcInfos
+	p.lineInfos = lineInfos
+	p.coreRelos = p.coreRelos.append(other.coreRelos, p.length)
+	p.length += other.length
 	return nil
 }
 
-// ProgramFuncInfos returns the binary form of BTF function infos.
-//
-// This is a free function instead of a method to hide it from users
-// of package ebpf.
-func ProgramFuncInfos(s *Program) (recordSize uint32, bytes []byte, err error) {
-	bytes, err = s.funcInfos.MarshalBinary()
+// FuncInfos returns the binary form of BTF function infos.
+func (p *Program) FuncInfos() (recordSize uint32, bytes []byte, err error) {
+	bytes, err = p.funcInfos.MarshalBinary()
 	if err != nil {
-		return 0, nil, err
+		return 0, nil, fmt.Errorf("func infos: %w", err)
 	}
 
-	return s.funcInfos.recordSize, bytes, nil
+	return p.funcInfos.recordSize, bytes, nil
 }
 
-// ProgramLineInfos returns the binary form of BTF line infos.
-//
-// This is a free function instead of a method to hide it from users
-// of package ebpf.
-func ProgramLineInfos(s *Program) (recordSize uint32, bytes []byte, err error) {
-	bytes, err = s.lineInfos.MarshalBinary()
+// LineInfos returns the binary form of BTF line infos.
+func (p *Program) LineInfos() (recordSize uint32, bytes []byte, err error) {
+	bytes, err = p.lineInfos.MarshalBinary()
 	if err != nil {
-		return 0, nil, err
+		return 0, nil, fmt.Errorf("line infos: %w", err)
 	}
 
-	return s.lineInfos.recordSize, bytes, nil
+	return p.lineInfos.recordSize, bytes, nil
 }
 
-// ProgramFixups returns the changes required to adjust the program to the target.
+// Fixups returns the changes required to adjust the program to the target.
 //
-// This is a free function instead of a method to hide it from users
-// of package ebpf.
-func ProgramFixups(s *Program, target *Spec) (COREFixups, error) {
-	if len(s.coreRelos) == 0 {
+// Passing a nil target will relocate against the running kernel.
+func (p *Program) Fixups(target *Spec) (COREFixups, error) {
+	if len(p.coreRelos) == 0 {
 		return nil, nil
 	}
 
@@ -683,7 +682,7 @@ func ProgramFixups(s *Program, target *Spec) (COREFixups, error) {
 		}
 	}
 
-	return coreRelocate(s.spec, target, s.coreRelos)
+	return coreRelocate(p.spec, target, p.coreRelos)
 }
 
 type bpfLoadBTFAttr struct {

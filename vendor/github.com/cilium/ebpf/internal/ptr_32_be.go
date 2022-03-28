@@ -1,3 +1,4 @@
+//go:build armbe || mips || mips64p32
 // +build armbe mips mips64p32
 
 package internal
