@@ -511,7 +511,7 @@ func TestCustomResourceValidatorsWithBlockingErrors(t *testing.T) {
 				"spec": map[string]interface{}{
 					"x":     int64(2),
 					"y":     int64(2),
-					"extra": "skipValidation?",
+					"extra": strings.Repeat("x", 201),
 					"floatMap": map[string]interface{}{
 						"key1": 0.2,
 						"key2": 0.3,
@@ -541,18 +541,18 @@ func TestCustomResourceValidatorsWithBlockingErrors(t *testing.T) {
 						"key1": 0.2,
 						"key2": 0.3,
 					},
-					"assocList": []interface{}{
-						map[string]interface{}{
-							"k": "a",
-							"v": "1",
-						},
-						map[string]interface{}{
-							"a": "a",
-						},
-					},
-					"limit": nil,
+					"assocList": []interface{}{},
+					"limit":     nil,
 				},
 			}}
+			assocList := cr.Object["spec"].(map[string]interface{})["assocList"].([]interface{})
+			for i := 1; i <= 101; i++ {
+				assocList = append(assocList, map[string]interface{}{
+					"k": "a",
+					"v": fmt.Sprintf("%d", i),
+				})
+			}
+			cr.Object["spec"].(map[string]interface{})["assocList"] = assocList
 
 			_, err = crClient.Create(context.TODO(), cr, metav1.CreateOptions{})
 			if err == nil || !strings.Contains(err.Error(), "some validation rules were not checked because the object was invalid; correct the existing errors to complete validation") {
@@ -569,13 +569,9 @@ func TestCustomResourceValidatorsWithBlockingErrors(t *testing.T) {
 					"name": name2,
 				},
 				"spec": map[string]interface{}{
-					"x": int64(2),
-					"y": int64(2),
-					"floatMap": map[string]interface{}{
-						"key1": 0.2,
-						"key2": 0.3,
-						"key3": 0.4,
-					},
+					"x":        int64(2),
+					"y":        int64(2),
+					"floatMap": map[string]interface{}{},
 					"assocList": []interface{}{
 						map[string]interface{}{
 							"k": "a",
@@ -585,6 +581,10 @@ func TestCustomResourceValidatorsWithBlockingErrors(t *testing.T) {
 					"limit": nil,
 				},
 			}}
+			floatMap := cr.Object["spec"].(map[string]interface{})["floatMap"].(map[string]interface{})
+			for i := 1; i <= 101; i++ {
+				floatMap[fmt.Sprintf("key%d", i)] = float64(i) / 10
+			}
 
 			_, err = crClient.Create(context.TODO(), cr, metav1.CreateOptions{})
 			if err == nil || !strings.Contains(err.Error(), "some validation rules were not checked because the object was invalid; correct the existing errors to complete validation") {
@@ -751,13 +751,12 @@ var structuralSchemaWithValidators = []byte(`
           },
 		  "assocList": {
 			"type": "array",
-			"maxItems": 10,
+			"maxItems": 100,
 			"items": {
 			  "type": "object",
-			  "maxProperties": 12,
 			  "properties": {
-			    "k": { "type": "string", "maxLength": 3},
-			    "v": { "type": "string", "maxLength": 3}
+			    "k": { "type": "string", "maxLength": 200},
+			    "v": { "type": "string", "maxLength": 200}
 			  },
 			  "required": ["k"]
 			},
@@ -817,7 +816,7 @@ var structuralSchemaWithBlockingErr = []byte(`
           },
           "extra": {
 			"type": "string",
-            "maxLength": 0,
+            "maxLength": 200,
 			"x-kubernetes-validations": [
 			  {
 				"rule": "self.startsWith('anything')"
@@ -826,7 +825,7 @@ var structuralSchemaWithBlockingErr = []byte(`
           },
 		  "floatMap": {
 			"type": "object",
-            "maxProperties": 2,
+            "maxProperties": 100,
 			"additionalProperties": { "type": "number" },
 			"x-kubernetes-validations": [
 			  {
@@ -836,10 +835,9 @@ var structuralSchemaWithBlockingErr = []byte(`
           },
 		  "assocList": {
 			"type": "array",
-            "maxItems": 1,
+            "maxItems": 100,
 			"items": {
 			  "type": "object",
-              "maxItems": 1,
 			  "properties": {
 			    "k": { "type": "string" },
 			    "v": { "type": "string" }
@@ -1008,7 +1006,7 @@ var structuralSchemaWithDefaultMapKeyTransitionRule = []byte(`
               "k2"
             ],
             "x-kubernetes-list-type": "map",
-            "maxItems": 100,
+            "maxItems": 1000,
             "items": {
               "type": "object",
               "properties": {
