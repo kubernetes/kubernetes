@@ -100,6 +100,7 @@ func (s *sourceFile) run() {
 		for {
 			select {
 			case <-listTicker.C:
+				listTicker.Stop()
 				if err := s.listConfig(); err != nil {
 					klog.ErrorS(err, "Unable to read config path", "path", s.path)
 				}
