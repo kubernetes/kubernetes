@@ -284,7 +284,7 @@ func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue stri
 					if targetStructIndex != 0 {
 						newValueFirstHalf = actualCurrValue.Slice(0, targetStructIndex)
 					}
-					newValueSecondHalf := reflect.MakeSlice(actualCurrValue.Type(), 0, 0)
+					var newValueSecondHalf reflect.Value
 					if targetStructIndex != actualCurrValue.Len() {
 						newValueSecondHalf = actualCurrValue.Slice(targetStructIndex+1, actualCurrValue.Len())
 					} else {
