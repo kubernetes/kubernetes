@@ -625,6 +625,88 @@ func TestDirectoryBuilder(t *testing.T) {
 	}
 }
 
+func TestFilePatternBuilderWhenPatternYieldsNoResult(t *testing.T) {
+	const pathPattern = "../../artifacts/_does_not_exist_/*.yaml"
+	b := newDefaultBuilder().
+		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{pathPattern}}).
+		NamespaceParam("test").DefaultNamespace()
+
+	test := &testVisitor{}
+	singleItemImplied := false
+
+	err := b.Do().IntoSingleItemImplied(&singleItemImplied).Visit(test.Handle)
+	if err == nil {
+		t.Fatalf("unexpected response: error is nil")
+	}
+	const expectedErrorMsg = "no match"
+	if !strings.Contains(err.Error(), expectedErrorMsg) {
+		t.Fatalf("expected %s but got %s", expectedErrorMsg, err.Error())
+	}
+	if !strings.Contains(err.Error(), pathPattern) {
+		t.Fatalf("expected %s but got %s", pathPattern, err.Error())
+	}
+}
+
+func TestFilePatternBuilderWhenFileLiteralExists(t *testing.T) {
+	const pathPattern = "../../artifacts/oddly-named-file[x].yaml"
+	b := newDefaultBuilder().
+		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{pathPattern}}).
+		NamespaceParam("test").DefaultNamespace()
+
+	test := &testVisitor{}
+	singleItemImplied := false
+
+	err := b.Do().IntoSingleItemImplied(&singleItemImplied).Visit(test.Handle)
+	if err != nil || !singleItemImplied || len(test.Infos) != 1 {
+		t.Fatalf("unexpected result: %v %t %#v", err, singleItemImplied, test.Infos)
+	}
+	if !strings.Contains(test.Infos[0].Source, "oddly-named-file[x]") {
+		t.Errorf("unexpected file name: %#v", test.Infos[0].Source)
+	}
+}
+
+func TestFilePatternBuilderWhenBadPatternUsesRawInput(t *testing.T) {
+	const pathPattern = "../../artifacts/[a-z*.yaml" // missing closing bracket, "[a-z]*.yaml"
+	b := newDefaultBuilder().
+		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{pathPattern}}).
+		NamespaceParam("test").DefaultNamespace()
+
+	test := &testVisitor{}
+	singleItemImplied := false
+
+	err := b.Do().IntoSingleItemImplied(&singleItemImplied).Visit(test.Handle)
+	if err == nil {
+		t.Fatalf("unexpected response: error is nil")
+	}
+	const expectedErrorMsg = "does not exist"
+	if !strings.Contains(err.Error(), expectedErrorMsg) {
+		t.Fatalf("expected %s but got %s", expectedErrorMsg, err.Error())
+	}
+	if !strings.Contains(err.Error(), pathPattern) {
+		t.Fatalf("expected %s but got %s", pathPattern, err.Error())
+	}
+}
+
+func TestFilePatternBuilder(t *testing.T) {
+	b := newDefaultBuilder().
+		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{"../../artifacts/guestbook/redis-*.yaml"}}).
+		NamespaceParam("test").DefaultNamespace()
+
+	test := &testVisitor{}
+	singleItemImplied := false
+
+	err := b.Do().IntoSingleItemImplied(&singleItemImplied).Visit(test.Handle)
+	if err != nil || singleItemImplied || len(test.Infos) < 3 {
+		t.Fatalf("unexpected response: %v %t %#v", err, singleItemImplied, test.Infos)
+	}
+
+	for _, info := range test.Infos {
+		if strings.Index(info.Name, "redis-") != 0 {
+			t.Errorf("unexpected response: %#v", info.Name)
+		}
+	}
+}
+
 func setupKustomizeDirectory() (string, error) {
 	path, err := ioutil.TempDir("/tmp", "")
 	if err != nil {
