@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/client-go/util/workqueue"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/cli-runtime/pkg/printers"
@@ -43,6 +44,7 @@ var serverPrintVersion = utilversion.MustParseSemantic("v1.10.0")
 
 var _ = SIGDescribe("Servers with support for Table transformation", func() {
 	f := framework.NewDefaultFramework("tables")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	ginkgo.BeforeEach(func() {
 		e2eskipper.SkipUnlessServerVersionGTE(serverPrintVersion, f.ClientSet.Discovery())

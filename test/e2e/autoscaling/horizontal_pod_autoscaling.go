@@ -17,6 +17,7 @@ limitations under the License.
 package autoscaling
 
 import (
+	"k8s.io/pod-security-admission/api"
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -30,6 +31,7 @@ import (
 //
 var _ = SIGDescribe("[Feature:HPA] Horizontal pod autoscaling (scale resource: CPU)", func() {
 	f := framework.NewDefaultFramework("horizontal-pod-autoscaling")
+	f.NamespacePodSecurityEnforceLevel = api.LevelBaseline
 
 	titleUp := "Should scale from 1 pod to 3 pods and from 3 to 5"
 	titleDown := "Should scale from 5 pods to 3 pods and from 3 to 1"

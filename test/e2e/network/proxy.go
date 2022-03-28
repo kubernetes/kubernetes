@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/network/common"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -75,6 +76,7 @@ var _ = common.SIGDescribe("Proxy", func() {
 			ClientQPS: -1.0,
 		}
 		f := framework.NewFramework("proxy", options, nil)
+		f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 		prefix := "/api/" + version
 
 		/*

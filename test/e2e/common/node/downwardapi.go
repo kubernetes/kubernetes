@@ -28,12 +28,14 @@ import (
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 )
 
 var _ = SIGDescribe("Downward API", func() {
 	f := framework.NewDefaultFramework("downward-api")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	/*
 	   Release: v1.9
@@ -287,6 +289,7 @@ var _ = SIGDescribe("Downward API", func() {
 
 var _ = SIGDescribe("Downward API [Serial] [Disruptive] [NodeFeature:DownwardAPIHugePages]", func() {
 	f := framework.NewDefaultFramework("downward-api")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Context("Downward API tests for hugepages", func() {
 		ginkgo.BeforeEach(func() {
