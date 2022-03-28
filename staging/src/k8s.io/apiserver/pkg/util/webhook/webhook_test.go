@@ -421,8 +421,8 @@ func TestTLSConfig(t *testing.T) {
 
 	lastSHA1SigCounter := 0
 	for _, tt := range tests {
-		// Use a closure so defer statements trigger between loop iterations.
-		func() {
+		t.Run(tt.test, func(t *testing.T) {
+			// Use a closure so defer statements trigger between loop iterations.
 			// Create and start a simple HTTPS server
 			server, err := newTestServer(tt.serverCert, tt.serverKey, tt.serverCA, nil)
 			if err != nil {
@@ -513,7 +513,7 @@ func TestTLSConfig(t *testing.T) {
 
 				lastSHA1SigCounter++
 			}
-		}()
+		})
 	}
 }
 
