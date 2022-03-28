@@ -9577,15 +9577,16 @@ var schemaYAML = typed.YAMLObject(`types:
         namedType: io.k8s.api.core.v1.NodeSelector
 - name: io.k8s.api.networking.v1alpha1.ClusterCIDRConfigStatus
   map:
-    fields:
-    - name: conditions
-      type:
-        list:
-          elementType:
-            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Condition
-          elementRelationship: associative
-          keys:
-          - type
+    elementType:
+      scalar: untyped
+      list:
+        elementType:
+          namedType: __untyped_atomic_
+        elementRelationship: atomic
+      map:
+        elementType:
+          namedType: __untyped_deduced_
+        elementRelationship: separable
 - name: io.k8s.api.networking.v1beta1.HTTPIngressPath
   map:
     fields:

@@ -45,6 +45,45 @@ type ClusterCIDRConfig struct {
 	Status ClusterCIDRConfigStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
+// ClusterCIDRConfigSpec defines the desired state of ClusterCIDRConfig.
+type ClusterCIDRConfigSpec struct {
+	// NodeSelector defines which nodes the config is applicable to.
+	// An empty or nil NodeSelector functions as a default that applies to all nodes.
+	// This field is immutable.
+	// +optional
+	NodeSelector *v1.NodeSelector `json:"nodeSelector,omitempty" protobuf:"bytes,1,opt,name=nodeSelector"`
+
+	// IPv4 defines the IPv4 CIDR and the PerNodeMaskSize.
+	// At least one of IPv4 or IPv6 must be provided. If both are
+	// provided, the number of IPs allocated to each must be the same
+	// (32 - ipv4.perNodeMaskSize).
+	// This field is immutable.
+	// +optional
+	IPv4 *CIDRConfig `json:"ipv4,omitempty" protobuf:"bytes,2,opt,name=ipv4"`
+
+	// IPv6 defines the IPv4 CIDR and the PerNodeMaskSize.
+	// At least one of IPv4 or IPv6 must be provided. If both are
+	// provided, the number of IPs allocated to each must be the same
+	// (128 - ipv6.perNodeMaskSize).
+	// This field is immutable.
+	// +optional
+	IPv6 *CIDRConfig `json:"ipv6,omitempty" protobuf:"bytes,3,opt,name=ipv6"`
+}
+
+// CIDRConfig defines the CIDR and Mask size per IP Family(IPv4/IPv6).
+type CIDRConfig struct {
+	// An IP block in CIDR notation ("10.0.0.0/8", "fd12:3456:789a:1::/64").
+	CIDR string `json:"cidr" protobuf:"bytes,1,name=cidr"`
+
+	// PerNodeMaskSize is the mask size for node cidr.
+	// IPv4/IPv6 Netmask size (e.g. 25 -> "/25" or 112 -> "/112") to allocate to a node.
+	PerNodeMaskSize int32 `json:"perNodeMaskSize" protobuf:"bytes,2,name=perNodeMaskSize"`
+}
+
+// ClusterCIDRConfigStatus defines the observed state of ClusterCIDRConfig.
+type ClusterCIDRConfigStatus struct {
+}
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.24
 
@@ -58,48 +97,4 @@ type ClusterCIDRConfigList struct {
 
 	// Items is the list of ClusterCIDRConfigs.
 	Items []ClusterCIDRConfig `json:"items" protobuf:"bytes,2,rep,name=items"`
-}
-
-// CIDRConfig defines the CIDR and Mask size per IP Family(IPv4/IPv6).
-type CIDRConfig struct {
-	// Nodes may only have 1 range from each family.
-	// An IP block in CIDR notation ("10.0.0.0/8", "fd12:3456:789a:1::/64").
-	CIDR string `json:"cidr" protobuf:"bytes,1,name=cidr"`
-
-	// PerNodeMaskSize is the mask size for node cidr.
-	// IPv4/IPv6 Netmask size (e.g. 25 -> "/25" or 112 -> "/112") to allocate to a node.
-	// Users would have to ensure that the kubelet doesn't try to schedule
-	// more pods than are supported by the node's netmask (i.e. the kubelet's
-	// --max-pods flag).
-	PerNodeMaskSize int32 `json:"perNodeMaskSize" protobuf:"bytes,2,name=perNodeMaskSize"`
-}
-
-// ClusterCIDRConfigSpec defines the desired state of ClusterCIDRConfig.
-type ClusterCIDRConfigSpec struct {
-	// NodeSelector defines which nodes the config is applicable to.
-	// An empty or nil NodeSelector functions as a default that applies to all nodes.
-	// +optional
-	NodeSelector *v1.NodeSelector `json:"nodeSelector,omitempty" protobuf:"bytes,1,opt,name=nodeSelector"`
-
-	// IPv4 defines the IPv4 CIDR and the PerNodeMaskSize.
-	// Atleast one of the IPv4 or IPv6 must be provided.
-	// +optional
-	IPv4 *CIDRConfig `json:"ipv4,omitempty" protobuf:"bytes,2,opt,name=ipv4"`
-
-	// IPv6 defines the IPv6 CIDR and the PerNodeMaskSize.
-	// Atleast one of the IPv4 or IPv6 must be provided.
-	// +optional
-	IPv6 *CIDRConfig `json:"ipv6,omitempty" protobuf:"bytes,3,opt,name=ipv6"`
-}
-
-// ClusterCIDRConfigStatus defines the observed state of ClusterCIDRConfig.
-type ClusterCIDRConfigStatus struct {
-	// Conditions contain details for the last reported state of ClusterCIDRConfig.
-	//
-	// +patchMergeKey=type
-	// +patchStrategy=merge
-	// +listType=map
-	// +listMapKey=type
-	// +optional
-	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 }

@@ -1209,8 +1209,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsnetworkingv1alpha1.ClusterCIDRConfigApplyConfiguration{}
 	case networkingv1alpha1.SchemeGroupVersion.WithKind("ClusterCIDRConfigSpec"):
 		return &applyconfigurationsnetworkingv1alpha1.ClusterCIDRConfigSpecApplyConfiguration{}
-	case networkingv1alpha1.SchemeGroupVersion.WithKind("ClusterCIDRConfigStatus"):
-		return &applyconfigurationsnetworkingv1alpha1.ClusterCIDRConfigStatusApplyConfiguration{}
 
 		// Group=networking.k8s.io, Version=v1beta1
 	case networkingv1beta1.SchemeGroupVersion.WithKind("HTTPIngressPath"):

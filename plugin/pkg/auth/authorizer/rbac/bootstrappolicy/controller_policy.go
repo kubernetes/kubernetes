@@ -251,7 +251,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			// used for pod eviction
 			rbacv1helpers.NewRule("update").Groups(legacyGroup).Resources("pods/status").RuleOrDie(),
 			rbacv1helpers.NewRule("list", "delete").Groups(legacyGroup).Resources("pods").RuleOrDie(),
-			rbacv1helpers.NewRule("get", "list", "create", "watch", "update", "delete", "patch").Groups(networkingGroup).Resources("clustercidrconfigs").RuleOrDie(),
+			rbacv1helpers.NewRule("get", "list").Groups(networkingGroup).Resources("clustercidrconfigs").RuleOrDie(),
 			eventsRule(),
 		},
 	})

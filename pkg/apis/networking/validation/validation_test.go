@@ -2163,6 +2163,18 @@ func TestValidateClusterConfigUpdate(t *testing.T) {
 
 	updateNodeSelector := makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar2"})
 
+	successCases := map[string]*networking.ClusterCIDRConfig{
+		"update with no tweaks": makeClusterCIDRConfigCustom(),
+	}
+
+	// Error cases are not expected to pass validation.
+	for testName, ccc := range successCases {
+		errs := ValidateClusterCIDRConfigUpdate(ccc, oldCCC)
+		if len(errs) != 0 {
+			t.Errorf("Expected success for test '%s', got %v", testName, errs)
+		}
+	}
+
 	errorCases := map[string]*networking.ClusterCIDRConfig{
 		"update spec.IPv4": makeClusterCIDRConfigCustom(setIPv4CIDR(
 			makeCIDRConfig("10.2.0.0/16", 24))),

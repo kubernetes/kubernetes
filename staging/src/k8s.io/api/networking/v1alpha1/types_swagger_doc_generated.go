@@ -29,8 +29,8 @@ package v1alpha1
 // AUTO-GENERATED FUNCTIONS START HERE. DO NOT EDIT.
 var map_CIDRConfig = map[string]string{
 	"":                "CIDRConfig defines the CIDR and Mask size per IP Family(IPv4/IPv6).",
-	"cidr":            "Nodes may only have 1 range from each family. An IP block in CIDR notation (\"10.0.0.0/8\", \"fd12:3456:789a:1::/64\").",
-	"perNodeMaskSize": "PerNodeMaskSize is the mask size for node cidr. IPv4/IPv6 Netmask size (e.g. 25 -> \"/25\" or 112 -> \"/112\") to allocate to a node. Users would have to ensure that the kubelet doesn't try to schedule more pods than are supported by the node's netmask (i.e. the kubelet's --max-pods flag).",
+	"cidr":            "An IP block in CIDR notation (\"10.0.0.0/8\", \"fd12:3456:789a:1::/64\").",
+	"perNodeMaskSize": "PerNodeMaskSize is the mask size for node cidr. IPv4/IPv6 Netmask size (e.g. 25 -> \"/25\" or 112 -> \"/112\") to allocate to a node.",
 }
 
 func (CIDRConfig) SwaggerDoc() map[string]string {
@@ -60,9 +60,9 @@ func (ClusterCIDRConfigList) SwaggerDoc() map[string]string {
 
 var map_ClusterCIDRConfigSpec = map[string]string{
 	"":             "ClusterCIDRConfigSpec defines the desired state of ClusterCIDRConfig.",
-	"nodeSelector": "NodeSelector defines which nodes the config is applicable to. An empty or nil NodeSelector functions as a default that applies to all nodes.",
-	"ipv4":         "IPv4 defines the IPv4 CIDR and the PerNodeMaskSize. Atleast one of the IPv4 or IPv6 must be provided.",
-	"ipv6":         "IPv6 defines the IPv6 CIDR and the PerNodeMaskSize. Atleast one of the IPv4 or IPv6 must be provided.",
+	"nodeSelector": "NodeSelector defines which nodes the config is applicable to. An empty or nil NodeSelector functions as a default that applies to all nodes. This field is immutable.",
+	"ipv4":         "IPv4 defines the IPv4 CIDR and the PerNodeMaskSize. At least one of IPv4 or IPv6 must be provided. If both are provided, the number of IPs allocated to each must be the same (32 - ipv4.perNodeMaskSize). This field is immutable.",
+	"ipv6":         "IPv6 defines the IPv4 CIDR and the PerNodeMaskSize. At least one of IPv4 or IPv6 must be provided. If both are provided, the number of IPs allocated to each must be the same (128 - ipv6.perNodeMaskSize). This field is immutable.",
 }
 
 func (ClusterCIDRConfigSpec) SwaggerDoc() map[string]string {
@@ -70,8 +70,7 @@ func (ClusterCIDRConfigSpec) SwaggerDoc() map[string]string {
 }
 
 var map_ClusterCIDRConfigStatus = map[string]string{
-	"":           "ClusterCIDRConfigStatus defines the observed state of ClusterCIDRConfig.",
-	"conditions": "Conditions contain details for the last reported state of ClusterCIDRConfig.",
+	"": "ClusterCIDRConfigStatus defines the observed state of ClusterCIDRConfig.",
 }
 
 func (ClusterCIDRConfigStatus) SwaggerDoc() map[string]string {

@@ -32,8 +32,8 @@ import (
 type ClusterCIDRConfigApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *ClusterCIDRConfigSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *ClusterCIDRConfigStatusApplyConfiguration `json:"status,omitempty"`
+	Spec                             *ClusterCIDRConfigSpecApplyConfiguration    `json:"spec,omitempty"`
+	Status                           *networkingv1alpha1.ClusterCIDRConfigStatus `json:"status,omitempty"`
 }
 
 // ClusterCIDRConfig constructs an declarative configuration of the ClusterCIDRConfig type for use with
@@ -233,15 +233,6 @@ func (b *ClusterCIDRConfigApplyConfiguration) WithFinalizers(values ...string) *
 	return b
 }
 
-// WithClusterName sets the ClusterName field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the ClusterName field is set to the value of the last call.
-func (b *ClusterCIDRConfigApplyConfiguration) WithClusterName(value string) *ClusterCIDRConfigApplyConfiguration {
-	b.ensureObjectMetaApplyConfigurationExists()
-	b.ClusterName = &value
-	return b
-}
-
 func (b *ClusterCIDRConfigApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
 		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
@@ -259,7 +250,7 @@ func (b *ClusterCIDRConfigApplyConfiguration) WithSpec(value *ClusterCIDRConfigS
 // WithStatus sets the Status field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Status field is set to the value of the last call.
-func (b *ClusterCIDRConfigApplyConfiguration) WithStatus(value *ClusterCIDRConfigStatusApplyConfiguration) *ClusterCIDRConfigApplyConfiguration {
-	b.Status = value
+func (b *ClusterCIDRConfigApplyConfiguration) WithStatus(value networkingv1alpha1.ClusterCIDRConfigStatus) *ClusterCIDRConfigApplyConfiguration {
+	b.Status = &value
 	return b
 }

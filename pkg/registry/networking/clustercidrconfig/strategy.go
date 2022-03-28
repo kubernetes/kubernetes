@@ -42,19 +42,10 @@ func (clusterCIDRConfigStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears the status of a ClusterCIDRConfig before creation.
-func (clusterCIDRConfigStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
-	clusterCIDRConfig := obj.(*networking.ClusterCIDRConfig)
-	clusterCIDRConfig.Generation = 1
-}
+func (clusterCIDRConfigStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {}
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (clusterCIDRConfigStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
-	newClusterCIDRConfig := obj.(*networking.ClusterCIDRConfig)
-	oldClusterCIDRConfig := old.(*networking.ClusterCIDRConfig)
-
-	// ClusterCIDRConfig spec is immutable, update is not allowed.
-	newClusterCIDRConfig.Spec = oldClusterCIDRConfig.Spec
-}
+func (clusterCIDRConfigStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {}
 
 // Validate validates a new ClusterCIDRConfig.
 func (clusterCIDRConfigStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {

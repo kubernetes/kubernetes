@@ -83,12 +83,12 @@
         "properties": {
           "cidr": {
             "default": "",
-            "description": "Nodes may only have 1 range from each family. An IP block in CIDR notation (\"10.0.0.0/8\", \"fd12:3456:789a:1::/64\").",
+            "description": "An IP block in CIDR notation (\"10.0.0.0/8\", \"fd12:3456:789a:1::/64\").",
             "type": "string"
           },
           "perNodeMaskSize": {
             "default": 0,
-            "description": "PerNodeMaskSize is the mask size for node cidr. IPv4/IPv6 Netmask size (e.g. 25 -> \"/25\" or 112 -> \"/112\") to allocate to a node. Users would have to ensure that the kubelet doesn't try to schedule more pods than are supported by the node's netmask (i.e. the kubelet's --max-pods flag).",
+            "description": "PerNodeMaskSize is the mask size for node cidr. IPv4/IPv6 Netmask size (e.g. 25 -> \"/25\" or 112 -> \"/112\") to allocate to a node.",
             "format": "int32",
             "type": "integer"
           }
@@ -177,37 +177,21 @@
         "properties": {
           "ipv4": {
             "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.CIDRConfig",
-            "description": "IPv4 defines the IPv4 CIDR and the PerNodeMaskSize. Atleast one of the IPv4 or IPv6 must be provided."
+            "description": "IPv4 defines the IPv4 CIDR and the PerNodeMaskSize. At least one of IPv4 or IPv6 must be provided. If both are provided, the number of IPs allocated to each must be the same (32 - ipv4.perNodeMaskSize). This field is immutable."
           },
           "ipv6": {
             "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.CIDRConfig",
-            "description": "IPv6 defines the IPv6 CIDR and the PerNodeMaskSize. Atleast one of the IPv4 or IPv6 must be provided."
+            "description": "IPv6 defines the IPv4 CIDR and the PerNodeMaskSize. At least one of IPv4 or IPv6 must be provided. If both are provided, the number of IPs allocated to each must be the same (128 - ipv6.perNodeMaskSize). This field is immutable."
           },
           "nodeSelector": {
             "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeSelector",
-            "description": "NodeSelector defines which nodes the config is applicable to. An empty or nil NodeSelector functions as a default that applies to all nodes."
+            "description": "NodeSelector defines which nodes the config is applicable to. An empty or nil NodeSelector functions as a default that applies to all nodes. This field is immutable."
           }
         },
         "type": "object"
       },
       "io.k8s.api.networking.v1alpha1.ClusterCIDRConfigStatus": {
         "description": "ClusterCIDRConfigStatus defines the observed state of ClusterCIDRConfig.",
-        "properties": {
-          "conditions": {
-            "description": "Conditions contain details for the last reported state of ClusterCIDRConfig.",
-            "items": {
-              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Condition",
-              "default": {}
-            },
-            "type": "array",
-            "x-kubernetes-list-map-keys": [
-              "type"
-            ],
-            "x-kubernetes-list-type": "map",
-            "x-kubernetes-patch-merge-key": "type",
-            "x-kubernetes-patch-strategy": "merge"
-          }
-        },
         "type": "object"
       },
       "io.k8s.apimachinery.pkg.apis.meta.v1.APIResource": {
@@ -316,49 +300,6 @@
             "version": "v1"
           }
         ]
-      },
-      "io.k8s.apimachinery.pkg.apis.meta.v1.Condition": {
-        "description": "Condition contains details for one aspect of the current state of this API Resource.",
-        "properties": {
-          "lastTransitionTime": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time",
-            "default": {},
-            "description": "lastTransitionTime is the last time the condition transitioned from one status to another. This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable."
-          },
-          "message": {
-            "default": "",
-            "description": "message is a human readable message indicating details about the transition. This may be an empty string.",
-            "type": "string"
-          },
-          "observedGeneration": {
-            "description": "observedGeneration represents the .metadata.generation that the condition was set based upon. For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date with respect to the current state of the instance.",
-            "format": "int64",
-            "type": "integer"
-          },
-          "reason": {
-            "default": "",
-            "description": "reason contains a programmatic identifier indicating the reason for the condition's last transition. Producers of specific condition types may define expected values and meanings for this field, and whether the values are considered a guaranteed API. The value should be a CamelCase string. This field may not be empty.",
-            "type": "string"
-          },
-          "status": {
-            "default": "",
-            "description": "status of the condition, one of True, False, Unknown.",
-            "type": "string"
-          },
-          "type": {
-            "default": "",
-            "description": "type of condition in CamelCase or in foo.example.com/CamelCase.",
-            "type": "string"
-          }
-        },
-        "required": [
-          "type",
-          "status",
-          "lastTransitionTime",
-          "reason",
-          "message"
-        ],
-        "type": "object"
       },
       "io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions": {
         "description": "DeleteOptions may be provided when deleting an API object.",
@@ -739,7 +680,7 @@
             "type": "object"
           },
           "clusterName": {
-            "description": "The name of the cluster which the object belongs to. This is used to distinguish resources with same name and namespace in different clusters. This field is not set anywhere right now and apiserver is going to ignore it if set in create or update request.",
+            "description": "Deprecated: ClusterName is a legacy field that was always cleared by the system and never used; it will be removed completely in 1.25.\n\nThe name in the go struct is changed to help clients detect accidental use.",
             "type": "string"
           },
           "creationTimestamp": {

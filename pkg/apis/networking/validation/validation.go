@@ -629,37 +629,17 @@ func ValidateClusterCIDRConfigSpec(spec *networking.ClusterCIDRConfigSpec, fldPa
 
 	// Validate if CIDR is configured for at least one IP Family(IPv4/IPv6).
 	if !hasIPv4 && !hasIPv6 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("ipv4", "ipv6"), *spec, "either IPv4 or IPv6 CIDR must be configured, both cannot be empty"))
+		allErrs = append(allErrs, field.Required(fldPath, "one or both of `ipv4` and `ipv6` must be configured"))
 	}
 
 	// Validate configured IPv4 CIDR and PerNodeMaskSize.
 	if hasIPv4 {
-		if !netutils.IsIPv4CIDRString(spec.IPv4.CIDR) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("ipv4", "cidr"), *spec.IPv4, "provided CIDR is not a valid IPv4 CIDR"))
-		}
-		if cidrs, err := netutils.ParseCIDRs([]string{spec.IPv4.CIDR}); err != nil {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("ipv4", "cidr"), *spec.IPv4, "provided CIDR is not a valid CIDR"))
-		} else {
-			maskSize, _ := cidrs[0].Mask.Size()
-			if spec.IPv4.PerNodeMaskSize < int32(maskSize) || spec.IPv4.PerNodeMaskSize > maxIPv4PerNodeMaskSize {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("ipv4", "perNodeMaskSize"), *spec.IPv4, fmt.Sprintf("provided IPv4 PerNodeMaskSize is invalid, Valid values: [%d,32]", maskSize)))
-			}
-		}
+		allErrs = append(allErrs, validateCIDRConfig(spec.IPv4, fldPath, maxIPv4PerNodeMaskSize, "ipv4")...)
 	}
 
 	// Validate configured IPv6 CIDR and PerNodeMaskSize.
 	if hasIPv6 {
-		if !netutils.IsIPv6CIDRString(spec.IPv6.CIDR) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("ipv6", "cidr"), *spec.IPv6, "provided CIDR is not a valid IPv6 CIDR"))
-		}
-		if cidrs, err := netutils.ParseCIDRs([]string{spec.IPv6.CIDR}); err != nil {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("ipv6", "cidr"), *spec.IPv6, "provided CIDR is not a valid CIDR"))
-		} else {
-			maskSize, _ := cidrs[0].Mask.Size()
-			if spec.IPv6.PerNodeMaskSize < int32(maskSize) || spec.IPv6.PerNodeMaskSize > maxIPv6PerNodeMaskSize {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("ipv6", "perNodeMaskSize"), *spec.IPv6, fmt.Sprintf("provided IPv6 PerNodeMaskSize is invalid, Valid values: [%d,128]", maskSize)))
-			}
-		}
+		allErrs = append(allErrs, validateCIDRConfig(spec.IPv6, fldPath, maxIPv6PerNodeMaskSize, "ipv6")...)
 	}
 
 	// Validate PerNodeMaskSize if both IPv4 and IPv6 CIDRs are configured.
@@ -670,9 +650,42 @@ func ValidateClusterCIDRConfigSpec(spec *networking.ClusterCIDRConfigSpec, fldPa
 	// necessary to have equal number of allocatable IP addresses per node.
 	if hasIPv4 && hasIPv6 {
 		if maxIPv4PerNodeMaskSize-spec.IPv4.PerNodeMaskSize != maxIPv6PerNodeMaskSize-spec.IPv6.PerNodeMaskSize {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("ipv4", "ipv6", "perNodeMaskSize"), *spec, "provided IPv4 and IPv6 PerNodeMaskSizes are invalid, Valid Values: 32 - IPv4.PerNodeMaskSize == 128 - IPv6.PerNodeMaskSize"))
+			allErrs = append(allErrs, field.Invalid(fldPath, *spec, "ipv4.perNodeMaskSize and ipv6.perNodeMaskSize must allocate the same number of IPs"))
 		}
 	}
+	return allErrs
+}
+
+func validateCIDRConfig(cidrConfig *networking.CIDRConfig, fldPath *field.Path, maxPerNodeMaskSize int32, ipFamily string) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if cidrConfig.CIDR == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child(ipFamily, "cidr"), ""))
+		return allErrs
+	} else {
+		switch ipFamily {
+		case "ipv4":
+			if !netutils.IsIPv4CIDRString(cidrConfig.CIDR) {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child(ipFamily, "cidr"), *cidrConfig, "must be a valid IPv4 CIDR"))
+				return allErrs
+			}
+		case "ipv6":
+			if !netutils.IsIPv6CIDRString(cidrConfig.CIDR) {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child(ipFamily, "cidr"), *cidrConfig, "must be a valid IPv6 CIDR"))
+				return allErrs
+			}
+		}
+	}
+
+	if cidrConfig.PerNodeMaskSize == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child(ipFamily, "perNodeMaskSize"), ""))
+	} else {
+		_, cidr, _ := netutils.ParseCIDRSloppy(cidrConfig.CIDR)
+		maskSize, _ := cidr.Mask.Size()
+		if cidrConfig.PerNodeMaskSize < int32(maskSize) || cidrConfig.PerNodeMaskSize > maxPerNodeMaskSize {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child(ipFamily, "perNodeMaskSize"), *cidrConfig, fmt.Sprintf("must be greater than %d and less than or equal to %d", maskSize, maxPerNodeMaskSize)))
+		}
+	}
+
 	return allErrs
 }
 
@@ -687,7 +700,7 @@ func ValidateClusterCIDRConfigUpdate(update, old *networking.ClusterCIDRConfig) 
 func validateClusterCIDRConfigUpdateSpec(update, old *networking.ClusterCIDRConfigSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.NodeSelector, old.NodeSelector, fldPath.Child("nodeselector"))...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.NodeSelector, old.NodeSelector, fldPath.Child("nodeSelector"))...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.IPv4, old.IPv4, fldPath.Child("ipv4"))...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.IPv6, old.IPv6, fldPath.Child("ipv6"))...)
 

@@ -78,16 +78,5 @@
       "perNodeMaskSize": 2
     }
   },
-  "status": {
-    "conditions": [
-      {
-        "type": "typeValue",
-        "status": "statusValue",
-        "observedGeneration": 3,
-        "lastTransitionTime": "2004-01-01T01:01:01Z",
-        "reason": "reasonValue",
-        "message": "messageValue"
-      }
-    ]
-  }
+  "status": {}
 }

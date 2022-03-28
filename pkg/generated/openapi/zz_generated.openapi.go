@@ -34150,7 +34150,7 @@ func schema_k8sio_api_networking_v1alpha1_CIDRConfig(ref common.ReferenceCallbac
 				Properties: map[string]spec.Schema{
 					"cidr": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Nodes may only have 1 range from each family. An IP block in CIDR notation (\"10.0.0.0/8\", \"fd12:3456:789a:1::/64\").",
+							Description: "An IP block in CIDR notation (\"10.0.0.0/8\", \"fd12:3456:789a:1::/64\").",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -34158,7 +34158,7 @@ func schema_k8sio_api_networking_v1alpha1_CIDRConfig(ref common.ReferenceCallbac
 					},
 					"perNodeMaskSize": {
 						SchemaProps: spec.SchemaProps{
-							Description: "PerNodeMaskSize is the mask size for node cidr. IPv4/IPv6 Netmask size (e.g. 25 -> \"/25\" or 112 -> \"/112\") to allocate to a node. Users would have to ensure that the kubelet doesn't try to schedule more pods than are supported by the node's netmask (i.e. the kubelet's --max-pods flag).",
+							Description: "PerNodeMaskSize is the mask size for node cidr. IPv4/IPv6 Netmask size (e.g. 25 -> \"/25\" or 112 -> \"/112\") to allocate to a node.",
 							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int32",
@@ -34281,19 +34281,19 @@ func schema_k8sio_api_networking_v1alpha1_ClusterCIDRConfigSpec(ref common.Refer
 				Properties: map[string]spec.Schema{
 					"nodeSelector": {
 						SchemaProps: spec.SchemaProps{
-							Description: "NodeSelector defines which nodes the config is applicable to. An empty or nil NodeSelector functions as a default that applies to all nodes.",
+							Description: "NodeSelector defines which nodes the config is applicable to. An empty or nil NodeSelector functions as a default that applies to all nodes. This field is immutable.",
 							Ref:         ref("k8s.io/api/core/v1.NodeSelector"),
 						},
 					},
 					"ipv4": {
 						SchemaProps: spec.SchemaProps{
-							Description: "IPv4 defines the IPv4 CIDR and the PerNodeMaskSize. Atleast one of the IPv4 or IPv6 must be provided.",
+							Description: "IPv4 defines the IPv4 CIDR and the PerNodeMaskSize. At least one of IPv4 or IPv6 must be provided. If both are provided, the number of IPs allocated to each must be the same (32 - ipv4.perNodeMaskSize). This field is immutable.",
 							Ref:         ref("k8s.io/api/networking/v1alpha1.CIDRConfig"),
 						},
 					},
 					"ipv6": {
 						SchemaProps: spec.SchemaProps{
-							Description: "IPv6 defines the IPv6 CIDR and the PerNodeMaskSize. Atleast one of the IPv4 or IPv6 must be provided.",
+							Description: "IPv6 defines the IPv4 CIDR and the PerNodeMaskSize. At least one of IPv4 or IPv6 must be provided. If both are provided, the number of IPs allocated to each must be the same (128 - ipv6.perNodeMaskSize). This field is immutable.",
 							Ref:         ref("k8s.io/api/networking/v1alpha1.CIDRConfig"),
 						},
 					},
@@ -34311,36 +34311,8 @@ func schema_k8sio_api_networking_v1alpha1_ClusterCIDRConfigStatus(ref common.Ref
 			SchemaProps: spec.SchemaProps{
 				Description: "ClusterCIDRConfigStatus defines the observed state of ClusterCIDRConfig.",
 				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"conditions": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-map-keys": []interface{}{
-									"type",
-								},
-								"x-kubernetes-list-type":       "map",
-								"x-kubernetes-patch-merge-key": "type",
-								"x-kubernetes-patch-strategy":  "merge",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "Conditions contain details for the last reported state of ClusterCIDRConfig.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.Condition"),
-									},
-								},
-							},
-						},
-					},
-				},
 			},
 		},
-		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.Condition"},
 	}
 }
 

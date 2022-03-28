@@ -586,50 +586,6 @@ type ServiceBackendPort struct {
 	Number int32
 }
 
-// CIDRConfig defines the CIDR and Mask size per IP Family(IPv4/IPv6).
-type CIDRConfig struct {
-	// Nodes may only have 1 range from each family.
-	// An IP block in CIDR notation ("10.0.0.0/8", "fd12:3456:789a:1::/64").
-	CIDR string
-
-	// PerNodeMaskSize is the mask size for node cidr.
-	// IPv4/IPv6 Netmask size (e.g. 25 -> "/25" or 112 -> "/112") to allocate to a node.
-	// Users would have to ensure that the kubelet doesn't try to schedule
-	// more pods than are supported by the node's netmask (i.e. the kubelet's
-	// --max-pods flag).
-	PerNodeMaskSize int32
-}
-
-// ClusterCIDRConfigSpec defines the desired state of ClusterCIDRConfig.
-type ClusterCIDRConfigSpec struct {
-	// NodeSelector defines which nodes the config is applicable to.
-	// An empty or nil NodeSelector functions as a default that applies to all nodes.
-	// +optional
-	NodeSelector *api.NodeSelector
-
-	// IPv4 defines the IPv4 CIDR and the PerNodeMaskSize.
-	// At least one of the IPv4 or IPv6 must be provided.
-	// +optional
-	IPv4 *CIDRConfig
-
-	// IPv6 defines the IPv6 CIDR and the PerNodeMaskSize.
-	// At least one of the IPv4 or IPv6 must be provided.
-	// +optional
-	IPv6 *CIDRConfig
-}
-
-// ClusterCIDRConfigStatus defines the observed state of ClusterCIDRConfig.
-type ClusterCIDRConfigStatus struct {
-	// Conditions contain details for the last reported state of ClusterCIDRConfig.
-	//
-	// +patchMergeKey=type
-	// +patchStrategy=merge
-	// +listType=map
-	// +listMapKey=type
-	// +optional
-	Conditions []metav1.Condition
-}
-
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -641,6 +597,45 @@ type ClusterCIDRConfig struct {
 
 	Spec   ClusterCIDRConfigSpec
 	Status ClusterCIDRConfigStatus
+}
+
+// ClusterCIDRConfigSpec defines the desired state of ClusterCIDRConfig.
+type ClusterCIDRConfigSpec struct {
+	// NodeSelector defines which nodes the config is applicable to.
+	// An empty or nil NodeSelector functions as a default that applies to all nodes.
+	// This field is immutable.
+	// +optional
+	NodeSelector *api.NodeSelector
+
+	// IPv4 defines the IPv4 CIDR and the PerNodeMaskSize.
+	// At least one of IPv4 or IPv6 must be provided. If both are
+	// provided, the number of IPs allocated to each must be the same
+	// (32 - ipv4.perNodeMaskSize).
+	// This field is immutable.
+	// +optional
+	IPv4 *CIDRConfig
+
+	// IPv6 defines the IPv4 CIDR and the PerNodeMaskSize.
+	// At least one of IPv4 or IPv6 must be provided. If both are
+	// provided, the number of IPs allocated to each must be the same
+	// (128 - ipv6.perNodeMaskSize).
+	// This field is immutable.
+	// +optional
+	IPv6 *CIDRConfig
+}
+
+// CIDRConfig defines the CIDR and Mask size per IP Family(IPv4/IPv6).
+type CIDRConfig struct {
+	// An IP block in CIDR notation ("10.0.0.0/8", "fd12:3456:789a:1::/64").
+	CIDR string
+
+	// PerNodeMaskSize is the mask size for node cidr.
+	// IPv4/IPv6 Netmask size (e.g. 25 -> "/25" or 112 -> "/112") to allocate to a node.
+	PerNodeMaskSize int32
+}
+
+// ClusterCIDRConfigStatus defines the observed state of ClusterCIDRConfig.
+type ClusterCIDRConfigStatus struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

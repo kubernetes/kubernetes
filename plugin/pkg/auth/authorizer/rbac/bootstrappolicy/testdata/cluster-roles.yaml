@@ -223,7 +223,6 @@ items:
   - apiGroups:
     - networking.k8s.io
     resources:
-    - clustercidrconfigs
     - ingresses
     - networkpolicies
     verbs:
@@ -362,7 +361,6 @@ items:
   - apiGroups:
     - networking.k8s.io
     resources:
-    - clustercidrconfigs
     - ingresses
     - ingresses/status
     - networkpolicies
