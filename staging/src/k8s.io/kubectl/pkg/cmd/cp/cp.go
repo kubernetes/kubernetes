@@ -373,7 +373,7 @@ func (t *TarPipe) initReadFrom(n uint64) {
 		Command:  []string{"tar", "cf", "-", t.src.File.String()},
 		Executor: &exec.DefaultRemoteExecutor{},
 	}
-	if t.o.MaxTries > 0 {
+	if t.o.MaxTries != 0 {
 		options.Command = []string{"sh", "-c", fmt.Sprintf("tar cf - %s | tail -c+%d", t.src.File, n)}
 	}
 
@@ -387,10 +387,10 @@ func (t *TarPipe) Read(p []byte) (n int, err error) {
 	n, err = t.reader.Read(p)
 	if err != nil {
 		if t.o.MaxTries < 0 || t.retries < t.o.MaxTries {
+			t.retries++
 			fmt.Printf("Resuming copy at %d bytes, retry %d/%d\n", t.bytesRead, t.retries, t.o.MaxTries)
 			t.initReadFrom(t.bytesRead + 1)
 			err = nil
-			t.retries++
 		} else {
 			fmt.Printf("Dropping out copy after %d retries\n", t.retries)
 		}
