@@ -40,7 +40,7 @@ export ARTIFACTS=${ARTIFACTS:-"${WORKSPACE}/artifacts"}
 # Produce a JUnit-style XML test report
 export KUBE_JUNIT_REPORT_DIR="${ARTIFACTS}"
 
-export LOG_LEVEL=4
+export LOG_LEVEL=2
 
 cd "${GOPATH}/src/k8s.io/kubernetes"
 
