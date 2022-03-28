@@ -87,9 +87,7 @@ func NewEventFromRequest(req *http.Request, requestReceivedTimestamp time.Time, 
 		}
 	}
 
-	for _, kv := range auditAnnotationsFrom(req.Context()) {
-		LogAnnotation(ev, kv.key, kv.value)
-	}
+	addAuditAnnotationsFrom(req.Context(), ev)
 
 	return ev, nil
 }
