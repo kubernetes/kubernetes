@@ -1192,18 +1192,14 @@ func (proxier *Proxier) syncProxyRules() {
 		// Capture externalIPs.
 		for _, externalIP := range svcInfo.ExternalIPStrings() {
 			if hasEndpoints {
-				args = append(args[:0],
-					"-m", "comment", "--comment", fmt.Sprintf(`"%s external IP"`, svcNameString),
-					"-m", protocol, "-p", protocol,
-					"-d", externalIP,
-					"--dport", strconv.Itoa(svcInfo.Port()),
-				)
-
 				// Send traffic bound for external IPs to the "external
 				// destinations" chain.
 				proxier.natRules.Write(
 					"-A", string(kubeServicesChain),
-					args,
+					"-m", "comment", "--comment", fmt.Sprintf(`"%s external IP"`, svcNameString),
+					"-m", protocol, "-p", protocol,
+					"-d", externalIP,
+					"--dport", strconv.Itoa(svcInfo.Port()),
 					"-j", string(externalTrafficChain))
 
 			} else {
@@ -1235,15 +1231,13 @@ func (proxier *Proxier) syncProxyRules() {
 			activeNATChains[fwChain] = true
 
 			for _, lbip := range svcInfo.LoadBalancerIPStrings() {
-				args = append(args[:0],
+				proxier.natRules.Write(
 					"-A", string(kubeServicesChain),
 					"-m", "comment", "--comment", fmt.Sprintf(`"%s loadbalancer IP"`, svcNameString),
 					"-m", protocol, "-p", protocol,
 					"-d", lbip,
 					"--dport", strconv.Itoa(svcInfo.Port()),
-				)
-				// LBIP matches jump to the firewall chain first.
-				proxier.natRules.Write(args, "-j", string(fwChain))
+					"-j", string(fwChain))
 
 				args = append(args[:0],
 					"-A", string(fwChain),
@@ -1382,12 +1376,11 @@ func (proxier *Proxier) syncProxyRules() {
 	// other service portal rules.
 	for address := range nodeAddresses {
 		if utilproxy.IsZeroCIDR(address) {
-			args = append(args[:0],
+			proxier.natRules.Write(
 				"-A", string(kubeServicesChain),
 				"-m", "comment", "--comment", `"kubernetes service nodeports; NOTE: this must be the last rule in this chain"`,
 				"-m", "addrtype", "--dst-type", "LOCAL",
 				"-j", string(kubeNodePortsChain))
-			proxier.natRules.Write(args)
 			// Nothing else matters after the zero CIDR.
 			break
 		}
@@ -1397,12 +1390,11 @@ func (proxier *Proxier) syncProxyRules() {
 			continue
 		}
 		// create nodeport rules for each IP one by one
-		args = append(args[:0],
+		proxier.natRules.Write(
 			"-A", string(kubeServicesChain),
 			"-m", "comment", "--comment", `"kubernetes service nodeports; NOTE: this must be the last rule in this chain"`,
 			"-d", address,
 			"-j", string(kubeNodePortsChain))
-		proxier.natRules.Write(args)
 	}
 
 	// Drop the packets in INVALID state, which would potentially cause
