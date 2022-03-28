@@ -909,14 +909,15 @@ type StartupInfoEx struct {
 
 // ProcThreadAttributeList is a placeholder type to represent a PROC_THREAD_ATTRIBUTE_LIST.
 //
-// To create a *ProcThreadAttributeList, use NewProcThreadAttributeList, and
-// free its memory using ProcThreadAttributeList.Delete.
-type ProcThreadAttributeList struct {
-	// This is of type unsafe.Pointer, not of type byte or uintptr, because
-	// the contents of it is mostly a list of pointers, and in most cases,
-	// that's a list of pointers to Go-allocated objects. In order to keep
-	// the GC from collecting these objects, we declare this as unsafe.Pointer.
-	_ [1]unsafe.Pointer
+// To create a *ProcThreadAttributeList, use NewProcThreadAttributeList, update
+// it with ProcThreadAttributeListContainer.Update, free its memory using
+// ProcThreadAttributeListContainer.Delete, and access the list itself using
+// ProcThreadAttributeListContainer.List.
+type ProcThreadAttributeList struct{}
+
+type ProcThreadAttributeListContainer struct {
+	data            *ProcThreadAttributeList
+	heapAllocations []uintptr
 }
 
 type ProcessInformation struct {
