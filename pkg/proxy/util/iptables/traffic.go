@@ -120,6 +120,18 @@ func (d *detectLocalByBridgeInterface) IfNotLocal() []string {
 	return d.ifNotLocal
 }
 
+// Backport 1.23
+func (d *detectLocalByBridgeInterface) JumpIfLocal(args []string, toChain string) []string {
+	line := append(args, d.ifLocal...)
+	return append(line, "-j", toChain)
+}
+
+// Backport 1.23
+func (d *detectLocalByBridgeInterface) JumpIfNotLocal(args []string, toChain string) []string {
+	line := append(args, d.ifNotLocal...)
+	return append(line, "-j", toChain)
+}
+
 type detectLocalByInterfaceNamePrefix struct {
 	ifLocal    []string
 	ifNotLocal []string
@@ -148,4 +160,16 @@ func (d *detectLocalByInterfaceNamePrefix) IfLocal() []string {
 
 func (d *detectLocalByInterfaceNamePrefix) IfNotLocal() []string {
 	return d.ifNotLocal
+}
+
+// Backport 1.23
+func (d *detectLocalByInterfaceNamePrefix) JumpIfLocal(args []string, toChain string) []string {
+	line := append(args, d.ifLocal...)
+	return append(line, "-j", toChain)
+}
+
+// Backport 1.23
+func (d *detectLocalByInterfaceNamePrefix) JumpIfNotLocal(args []string, toChain string) []string {
+	line := append(args, d.ifNotLocal...)
+	return append(line, "-j", toChain)
 }

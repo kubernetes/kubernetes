@@ -230,13 +230,17 @@ func TestNewDetectLocalByInterfaceNamePrefix(t *testing.T) {
 func TestDetectLocalByBridgeInterface(t *testing.T) {
 	cases := []struct {
 		ifaceName               string
+		chain                   string
+		args                    []string
 		expectedJumpIfOutput    []string
 		expectedJumpIfNotOutput []string
 	}{
 		{
+			chain:                   "TEST",
+			args:                    []string{"arg1", "arg2"},
 			ifaceName:               "eth0",
-			expectedJumpIfOutput:    []string{"-i", "eth0"},
-			expectedJumpIfNotOutput: []string{"!", "-i", "eth0"},
+			expectedJumpIfOutput:    []string{"arg1", "arg2", "-i", "eth0", "-j", "TEST"},
+			expectedJumpIfNotOutput: []string{"arg1", "arg2", "!", "-i", "eth0", "-j", "TEST"},
 		},
 	}
 	for _, c := range cases {
@@ -249,8 +253,8 @@ func TestDetectLocalByBridgeInterface(t *testing.T) {
 			t.Error("DetectLocalByBridgeInterface returns false for IsImplemented")
 		}
 
-		ifLocal := localDetector.IfLocal()
-		ifNotLocal := localDetector.IfNotLocal()
+		ifLocal := localDetector.JumpIfLocal(c.args, c.chain)
+		ifNotLocal := localDetector.JumpIfNotLocal(c.args, c.chain)
 
 		if !reflect.DeepEqual(ifLocal, c.expectedJumpIfOutput) {
 			t.Errorf("IfLocal, expected: '%v', but got: '%v'", c.expectedJumpIfOutput, ifLocal)
@@ -271,9 +275,11 @@ func TestDetectLocalByInterfaceNamePrefix(t *testing.T) {
 		expectedJumpIfNotOutput []string
 	}{
 		{
+			chain:                   "TEST",
+			args:                    []string{"arg1", "arg2"},
 			ifacePrefix:             "eth0",
-			expectedJumpIfOutput:    []string{"-i", "eth0+"},
-			expectedJumpIfNotOutput: []string{"!", "-i", "eth0+"},
+			expectedJumpIfOutput:    []string{"arg1", "arg2", "-i", "eth0+", "-j", "TEST"},
+			expectedJumpIfNotOutput: []string{"arg1", "arg2", "!", "-i", "eth0+", "-j", "TEST"},
 		},
 	}
 	for _, c := range cases {
@@ -286,8 +292,8 @@ func TestDetectLocalByInterfaceNamePrefix(t *testing.T) {
 			t.Error("DetectLocalByInterfaceNamePrefix returns false for IsImplemented")
 		}
 
-		ifLocal := localDetector.IfLocal()
-		ifNotLocal := localDetector.IfNotLocal()
+		ifLocal := localDetector.JumpIfLocal(c.args, c.chain)
+		ifNotLocal := localDetector.JumpIfNotLocal(c.args, c.chain)
 
 		if !reflect.DeepEqual(ifLocal, c.expectedJumpIfOutput) {
 			t.Errorf("IfLocal, expected: '%v', but got: '%v'", c.expectedJumpIfOutput, ifLocal)
