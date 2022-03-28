@@ -149,6 +149,9 @@ var (
 		# Apply the JSON passed into stdin to a pod
 		cat pod.json | kubectl apply -f -
 
+		# Apply the configuration from all files that end with '.json' - i.e. expand wildcard characters in file names
+		kubectl apply -f '*.json'
+
 		# Note: --prune is still in Alpha
 		# Apply the configuration in manifest.yaml that matches label app=nginx and delete all other resources that are not in the file and match label app=nginx
 		kubectl apply --prune -f manifest.yaml -l app=nginx
