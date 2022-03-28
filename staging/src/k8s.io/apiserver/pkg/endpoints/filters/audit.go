@@ -177,10 +177,8 @@ func writeLatencyToAnnotation(ctx context.Context, ev *auditinternal.Event) {
 	}
 
 	// record the total latency for this request, for convenience.
-	audit.LogAnnotation(ev, "apiserver.latency.k8s.io/total", latency.String())
-	for k, v := range layerLatencies {
-		audit.LogAnnotation(ev, k, v)
-	}
+	layerLatencies["apiserver.latency.k8s.io/total"] = latency.String()
+	audit.AddAuditAnnotationsMap(ctx, layerLatencies)
 }
 
 func processAuditEvent(ctx context.Context, sink audit.Sink, ev *auditinternal.Event, omitStages []auditinternal.Stage) bool {

@@ -243,21 +243,6 @@ func encodeObject(obj runtime.Object, gv schema.GroupVersion, serializer runtime
 	}, nil
 }
 
-// LogAnnotation fills in the Annotations according to the key value pair.
-func LogAnnotation(ae *auditinternal.Event, key, value string) {
-	if ae == nil || ae.Level.Less(auditinternal.LevelMetadata) {
-		return
-	}
-	if ae.Annotations == nil {
-		ae.Annotations = make(map[string]string)
-	}
-	if v, ok := ae.Annotations[key]; ok && v != value {
-		klog.Warningf("Failed to set annotations[%q] to %q for audit:%q, it has already been set to %q", key, value, ae.AuditID, ae.Annotations[key])
-		return
-	}
-	ae.Annotations[key] = value
-}
-
 // truncate User-Agent if too long, otherwise return it directly.
 func maybeTruncateUserAgent(req *http.Request) string {
 	ua := req.UserAgent()

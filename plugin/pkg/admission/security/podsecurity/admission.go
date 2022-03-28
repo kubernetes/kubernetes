@@ -190,8 +190,14 @@ func (p *Plugin) Validate(ctx context.Context, a admission.Attributes, o admissi
 	for _, w := range result.Warnings {
 		warning.AddWarning(ctx, "", w)
 	}
-	for k, v := range result.AuditAnnotations {
-		audit.AddAuditAnnotation(ctx, podsecurityadmissionapi.AuditAnnotationPrefix+k, v)
+	if len(result.AuditAnnotations) > 0 {
+		annotations := make([]string, len(result.AuditAnnotations)*2)
+		i := 0
+		for k, v := range result.AuditAnnotations {
+			annotations[i], annotations[i+1] = podsecurityadmissionapi.AuditAnnotationPrefix+k, v
+			i += 2
+		}
+		audit.AddAuditAnnotations(ctx, annotations...)
 	}
 	if !result.Allowed {
 		// start with a generic forbidden error
