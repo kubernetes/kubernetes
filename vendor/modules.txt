@@ -1830,6 +1830,8 @@ k8s.io/client-go/metadata
 k8s.io/client-go/metadata/fake
 k8s.io/client-go/metadata/metadatainformer
 k8s.io/client-go/metadata/metadatalister
+k8s.io/client-go/openapi
+k8s.io/client-go/openapi/cached
 k8s.io/client-go/pkg/apis/clientauthentication
 k8s.io/client-go/pkg/apis/clientauthentication/install
 k8s.io/client-go/pkg/apis/clientauthentication/v1

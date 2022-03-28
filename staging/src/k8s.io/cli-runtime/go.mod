@@ -7,8 +7,6 @@ go 1.16
 require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/evanphx/json-patch v4.12.0+incompatible
-	github.com/go-openapi/jsonreference v0.19.5 // indirect
-	github.com/go-openapi/swag v0.19.14 // indirect
 	github.com/google/gnostic v0.5.7-v3refs
 	github.com/google/uuid v1.1.2
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de
