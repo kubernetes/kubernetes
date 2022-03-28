@@ -66,8 +66,6 @@ func (networkPolicyStrategy) PrepareForCreate(ctx context.Context, obj runtime.O
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.NetworkPolicyStatus) {
 		// Create does not set a status when operation is not directed to status subresource
-		// This is not feature gated, as the field is there, and we just copy it
-		// when the operation is over spec and not status
 		networkPolicy.Status = networking.NetworkPolicyStatus{}
 	}
 
@@ -87,8 +85,6 @@ func (networkPolicyStrategy) PrepareForUpdate(ctx context.Context, obj, old runt
 	// As soon as the FeatureGate is removed, the whole if statement should be removed as well
 	if utilfeature.DefaultFeatureGate.Enabled(features.NetworkPolicyStatus) || len(oldNetworkPolicy.Status.Conditions) > 0 {
 		// Update is not allowed to set status when the operation is not directed to status subresource
-		// This is not feature gated, as the field is there, and we just copy it
-		// when the operation is over spec and not status
 		newNetworkPolicy.Status = oldNetworkPolicy.Status
 	}
 
@@ -172,7 +168,7 @@ func (networkPolicyStatusStrategy) PrepareForUpdate(ctx context.Context, obj, ol
 		// As network policy status is composed only of an array of conditions, we can say that the status
 		// is in use if the condition array is bigger than 0.
 		// quoting @thockin: "we generally keep data in this case, but no updates except to clear it"
-		if len(newNetworkPolicy.Status.Conditions) < 1 {
+		if len(newNetworkPolicy.Status.Conditions) == 0 {
 			newNetworkPolicy.Status = networking.NetworkPolicyStatus{}
 		} else {
 			// keep the old status in case of the update is not to clear it
@@ -183,11 +179,8 @@ func (networkPolicyStatusStrategy) PrepareForUpdate(ctx context.Context, obj, ol
 
 // ValidateUpdate is the default update validation for an end user updating status
 func (networkPolicyStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	if utilfeature.DefaultFeatureGate.Enabled(features.NetworkPolicyStatus) {
-		return validation.ValidateNetworkPolicyStatusUpdate(obj.(*networking.NetworkPolicy).Status,
-			old.(*networking.NetworkPolicy).Status, field.NewPath("status"))
-	}
-	return nil
+	return validation.ValidateNetworkPolicyStatusUpdate(obj.(*networking.NetworkPolicy).Status,
+		old.(*networking.NetworkPolicy).Status, field.NewPath("status"))
 }
 
 // WarningsOnUpdate returns warnings for the given update.

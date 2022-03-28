@@ -17,6 +17,9 @@ limitations under the License.
 package storage
 
 import (
+	"testing"
+	"time"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -34,8 +37,6 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/networking/install"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
-	"testing"
-	"time"
 )
 
 func newStorage(t *testing.T) (*REST, *StatusREST, *etcd3testing.EtcdTestServer) {

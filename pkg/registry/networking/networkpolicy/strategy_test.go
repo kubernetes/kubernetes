@@ -19,10 +19,11 @@ package networkpolicy
 import (
 	"context"
 	"fmt"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"reflect"
 	"testing"
 	"time"
+
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"

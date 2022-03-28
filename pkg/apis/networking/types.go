@@ -228,10 +228,6 @@ const (
 	// NetworkPolicyConditionReasonFeatureNotSupported represents a reason where the Network Policy may not have been
 	// implemented in the cluster due to a lack of some feature not supported by the Network Policy provider
 	NetworkPolicyConditionReasonFeatureNotSupported NetworkPolicyConditionReason = "FeatureNotSupported"
-
-	// NetworkPolicyConditionReasonInvalidRule represents a reason where the Network Policy may not have been
-	// implemented in the cluster due to the specified rule being invalid
-	NetworkPolicyConditionReasonInvalidRule NetworkPolicyConditionReason = "InvalidRule"
 )
 
 // NetworkPolicyStatus describe the current state of the NetworkPolicy.

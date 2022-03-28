@@ -514,7 +514,7 @@ func TestValidateNetworkPolicyStatusUpdate(t *testing.T) {
 						LastTransitionTime: metav1.Time{
 							Time: time.Now().Add(-5 * time.Minute),
 						},
-						Reason:             string(networking.NetworkPolicyConditionReasonInvalidRule),
+						Reason:             string(networking.NetworkPolicyConditionReasonFeatureNotSupported),
 						Message:            "endport is not supported",
 						ObservedGeneration: 2,
 					},
