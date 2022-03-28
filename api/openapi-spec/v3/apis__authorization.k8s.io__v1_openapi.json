@@ -13,17 +13,29 @@
             "type": "string"
           },
           "metadata": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+              }
+            ],
             "default": {},
             "description": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
           },
           "spec": {
-            "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReviewSpec",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReviewSpec"
+              }
+            ],
             "default": {},
             "description": "Spec holds information about the request being evaluated.  spec.namespace must be equal to the namespace you made the request against.  If empty, it is defaulted."
           },
           "status": {
-            "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReviewStatus",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReviewStatus"
+              }
+            ],
             "default": {},
             "description": "Status is filled in by the server and indicates whether the request is allowed or not"
           }
@@ -166,17 +178,29 @@
             "type": "string"
           },
           "metadata": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+              }
+            ],
             "default": {},
             "description": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
           },
           "spec": {
-            "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReviewSpec",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReviewSpec"
+              }
+            ],
             "default": {},
             "description": "Spec holds information about the request being evaluated.  user and groups must be empty"
           },
           "status": {
-            "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReviewStatus",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReviewStatus"
+              }
+            ],
             "default": {},
             "description": "Status is filled in by the server and indicates whether the request is allowed or not"
           }
@@ -197,11 +221,19 @@
         "description": "SelfSubjectAccessReviewSpec is a description of the access request.  Exactly one of ResourceAuthorizationAttributes and NonResourceAuthorizationAttributes must be set",
         "properties": {
           "nonResourceAttributes": {
-            "$ref": "#/components/schemas/io.k8s.api.authorization.v1.NonResourceAttributes",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.authorization.v1.NonResourceAttributes"
+              }
+            ],
             "description": "NonResourceAttributes describes information for a non-resource access request"
           },
           "resourceAttributes": {
-            "$ref": "#/components/schemas/io.k8s.api.authorization.v1.ResourceAttributes",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.authorization.v1.ResourceAttributes"
+              }
+            ],
             "description": "ResourceAuthorizationAttributes describes information for a resource access request"
           }
         },
@@ -219,17 +251,29 @@
             "type": "string"
           },
           "metadata": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+              }
+            ],
             "default": {},
             "description": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
           },
           "spec": {
-            "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReviewSpec",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReviewSpec"
+              }
+            ],
             "default": {},
             "description": "Spec holds information about the request being evaluated."
           },
           "status": {
-            "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectRulesReviewStatus",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectRulesReviewStatus"
+              }
+            ],
             "default": {},
             "description": "Status is filled in by the server and indicates the set of actions a user can perform."
           }
@@ -268,17 +312,29 @@
             "type": "string"
           },
           "metadata": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+              }
+            ],
             "default": {},
             "description": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
           },
           "spec": {
-            "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReviewSpec",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReviewSpec"
+              }
+            ],
             "default": {},
             "description": "Spec holds information about the request being evaluated"
           },
           "status": {
-            "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReviewStatus",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReviewStatus"
+              }
+            ],
             "default": {},
             "description": "Status is filled in by the server and indicates whether the request is allowed or not"
           }
@@ -318,11 +374,19 @@
             "type": "array"
           },
           "nonResourceAttributes": {
-            "$ref": "#/components/schemas/io.k8s.api.authorization.v1.NonResourceAttributes",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.authorization.v1.NonResourceAttributes"
+              }
+            ],
             "description": "NonResourceAttributes describes information for a non-resource access request"
           },
           "resourceAttributes": {
-            "$ref": "#/components/schemas/io.k8s.api.authorization.v1.ResourceAttributes",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.authorization.v1.ResourceAttributes"
+              }
+            ],
             "description": "ResourceAuthorizationAttributes describes information for a resource access request"
           },
           "uid": {
@@ -377,7 +441,11 @@
           "nonResourceRules": {
             "description": "NonResourceRules is the list of actions the subject is allowed to perform on non-resources. The list ordering isn't significant, may contain duplicates, and possibly be incomplete.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.api.authorization.v1.NonResourceRule",
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.NonResourceRule"
+                }
+              ],
               "default": {}
             },
             "type": "array"
@@ -385,7 +453,11 @@
           "resourceRules": {
             "description": "ResourceRules is the list of actions the subject is allowed to perform on resources. The list ordering isn't significant, may contain duplicates, and possibly be incomplete.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.api.authorization.v1.ResourceRule",
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.ResourceRule"
+                }
+              ],
               "default": {}
             },
             "type": "array"
@@ -486,7 +558,11 @@
           "resources": {
             "description": "resources contains the name of the resources and if they are namespaced.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResource",
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResource"
+                }
+              ],
               "default": {}
             },
             "type": "array"
@@ -521,7 +597,11 @@
             "type": "string"
           },
           "fieldsV1": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.FieldsV1",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.FieldsV1"
+              }
+            ],
             "description": "FieldsV1 holds the first JSON version format as described in the \"FieldsV1\" type."
           },
           "manager": {
@@ -537,7 +617,11 @@
             "type": "string"
           },
           "time": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+              }
+            ],
             "description": "Time is the timestamp of when the ManagedFields entry was added. The timestamp will also be updated if a field is added, the manager changes any of the owned fields value or removes a field. The timestamp does not update when a field is removed from the entry because another manager took it over."
           }
         },
@@ -559,7 +643,11 @@
             "type": "string"
           },
           "creationTimestamp": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+              }
+            ],
             "default": {},
             "description": "CreationTimestamp is a timestamp representing the server time when this object was created. It is not guaranteed to be set in happens-before order across separate operations. Clients may not set this value. It is represented in RFC3339 form and is in UTC.\n\nPopulated by the system. Read-only. Null for lists. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
           },
@@ -569,7 +657,11 @@
             "type": "integer"
           },
           "deletionTimestamp": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+              }
+            ],
             "description": "DeletionTimestamp is RFC 3339 date and time at which this resource will be deleted. This field is set by the server when a graceful deletion is requested by the user, and is not directly settable by a client. The resource is expected to be deleted (no longer visible from resource lists, and not reachable by name) after the time in this field, once the finalizers list is empty. As long as the finalizers list contains items, deletion is blocked. Once the deletionTimestamp is set, this value may not be unset or be set further into the future, although it may be shortened or the resource may be deleted prior to this time. For example, a user may request that a pod is deleted in 30 seconds. The Kubelet will react by sending a graceful termination signal to the containers in the pod. After that 30 seconds, the Kubelet will send a hard termination signal (SIGKILL) to the container and after cleanup, remove the pod from the API. In the presence of network partitions, this object may still exist after this timestamp, until an administrator or automated process can determine the resource is fully terminated. If not set, graceful deletion of the object has not been requested.\n\nPopulated by the system when a graceful deletion is requested. Read-only. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
           },
           "finalizers": {
@@ -601,7 +693,11 @@
           "managedFields": {
             "description": "ManagedFields maps workflow-id and version to the set of fields that are managed by that workflow. This is mostly for internal housekeeping, and users typically shouldn't need to set or understand this field. A workflow can be the user's name, a controller's name, or the name of a specific apply path like \"ci-cd\". The set of fields is always in the version that the workflow used when modifying the object.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ManagedFieldsEntry",
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ManagedFieldsEntry"
+                }
+              ],
               "default": {}
             },
             "type": "array"
@@ -617,7 +713,11 @@
           "ownerReferences": {
             "description": "List of objects depended by this object. If ALL objects in the list have been deleted, this object will be garbage collected. If this object is managed by a controller, then an entry in this list will point to this controller, with the controller field set to true. There cannot be more than one managing controller.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.OwnerReference",
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.OwnerReference"
+                }
+              ],
               "default": {}
             },
             "type": "array",
@@ -685,6 +785,14 @@
         "format": "date-time",
         "type": "string"
       }
+    },
+    "securitySchemes": {
+      "BearerToken": {
+        "description": "Bearer Token authentication",
+        "in": "header",
+        "name": "authorization",
+        "type": "apiKey"
+      }
     }
   },
   "info": {
@@ -717,6 +825,9 @@
               }
             },
             "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         },
         "tags": [
@@ -778,7 +889,7 @@
         "operationId": "createAuthorizationV1NamespacedLocalSubjectAccessReview",
         "requestBody": {
           "content": {
-            "application/json": {
+            "*/*": {
               "schema": {
                 "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
               }
@@ -845,11 +956,20 @@
               }
             },
             "description": "Accepted"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         },
         "tags": [
           "authorization_v1"
-        ]
+        ],
+        "x-kubernetes-action": "post",
+        "x-kubernetes-group-version-kind": {
+          "group": "authorization.k8s.io",
+          "kind": "LocalSubjectAccessReview",
+          "version": "v1"
+        }
       }
     },
     "/apis/authorization.k8s.io/v1/selfsubjectaccessreviews": {
@@ -896,7 +1016,7 @@
         "operationId": "createAuthorizationV1SelfSubjectAccessReview",
         "requestBody": {
           "content": {
-            "application/json": {
+            "*/*": {
               "schema": {
                 "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
               }
@@ -963,11 +1083,20 @@
               }
             },
             "description": "Accepted"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         },
         "tags": [
           "authorization_v1"
-        ]
+        ],
+        "x-kubernetes-action": "post",
+        "x-kubernetes-group-version-kind": {
+          "group": "authorization.k8s.io",
+          "kind": "SelfSubjectAccessReview",
+          "version": "v1"
+        }
       }
     },
     "/apis/authorization.k8s.io/v1/selfsubjectrulesreviews": {
@@ -1014,7 +1143,7 @@
         "operationId": "createAuthorizationV1SelfSubjectRulesReview",
         "requestBody": {
           "content": {
-            "application/json": {
+            "*/*": {
               "schema": {
                 "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
               }
@@ -1081,11 +1210,20 @@
               }
             },
             "description": "Accepted"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         },
         "tags": [
           "authorization_v1"
-        ]
+        ],
+        "x-kubernetes-action": "post",
+        "x-kubernetes-group-version-kind": {
+          "group": "authorization.k8s.io",
+          "kind": "SelfSubjectRulesReview",
+          "version": "v1"
+        }
       }
     },
     "/apis/authorization.k8s.io/v1/subjectaccessreviews": {
@@ -1132,7 +1270,7 @@
         "operationId": "createAuthorizationV1SubjectAccessReview",
         "requestBody": {
           "content": {
-            "application/json": {
+            "*/*": {
               "schema": {
                 "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
               }
@@ -1199,11 +1337,20 @@
               }
             },
             "description": "Accepted"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         },
         "tags": [
           "authorization_v1"
-        ]
+        ],
+        "x-kubernetes-action": "post",
+        "x-kubernetes-group-version-kind": {
+          "group": "authorization.k8s.io",
+          "kind": "SubjectAccessReview",
+          "version": "v1"
+        }
       }
     }
   }

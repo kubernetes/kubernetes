@@ -71,7 +71,11 @@
           "ranges": {
             "description": "ranges are the allowed ranges of fs groups.  If you would like to force a single fs group then supply a single range with the same start and end. Required for MustRunAs.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.api.policy.v1beta1.IDRange",
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.policy.v1beta1.IDRange"
+                }
+              ],
               "default": {}
             },
             "type": "array"
@@ -139,17 +143,29 @@
             "type": "string"
           },
           "metadata": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+              }
+            ],
             "default": {},
             "description": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
           },
           "spec": {
-            "$ref": "#/components/schemas/io.k8s.api.policy.v1beta1.PodDisruptionBudgetSpec",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.policy.v1beta1.PodDisruptionBudgetSpec"
+              }
+            ],
             "default": {},
             "description": "Specification of the desired behavior of the PodDisruptionBudget."
           },
           "status": {
-            "$ref": "#/components/schemas/io.k8s.api.policy.v1beta1.PodDisruptionBudgetStatus",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.policy.v1beta1.PodDisruptionBudgetStatus"
+              }
+            ],
             "default": {},
             "description": "Most recently observed status of the PodDisruptionBudget."
           }
@@ -173,7 +189,11 @@
           "items": {
             "description": "items list individual PodDisruptionBudget objects",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.api.policy.v1beta1.PodDisruptionBudget",
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.policy.v1beta1.PodDisruptionBudget"
+                }
+              ],
               "default": {}
             },
             "type": "array"
@@ -183,7 +203,11 @@
             "type": "string"
           },
           "metadata": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
+              }
+            ],
             "default": {},
             "description": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
           }
@@ -204,15 +228,27 @@
         "description": "PodDisruptionBudgetSpec is a description of a PodDisruptionBudget.",
         "properties": {
           "maxUnavailable": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.util.intstr.IntOrString",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.util.intstr.IntOrString"
+              }
+            ],
             "description": "An eviction is allowed if at most \"maxUnavailable\" pods selected by \"selector\" are unavailable after the eviction, i.e. even in absence of the evicted pod. For example, one can prevent all voluntary evictions by specifying 0. This is a mutually exclusive setting with \"minAvailable\"."
           },
           "minAvailable": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.util.intstr.IntOrString",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.util.intstr.IntOrString"
+              }
+            ],
             "description": "An eviction is allowed if at least \"minAvailable\" pods selected by \"selector\" will still be available after the eviction, i.e. even in the absence of the evicted pod.  So for example you can prevent all voluntary evictions by specifying \"100%\"."
           },
           "selector": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"
+              }
+            ],
             "description": "Label query over pods whose evictions are managed by the disruption budget. A null selector selects no pods. An empty selector ({}) also selects no pods, which differs from standard behavior of selecting all pods. In policy/v1, an empty selector will select all pods in the namespace."
           }
         },
@@ -224,7 +260,11 @@
           "conditions": {
             "description": "Conditions contain conditions for PDB. The disruption controller sets the DisruptionAllowed condition. The following are known values for the reason field (additional reasons could be added in the future): - SyncFailed: The controller encountered an error and wasn't able to compute\n              the number of allowed disruptions. Therefore no disruptions are\n              allowed and the status of the condition will be False.\n- InsufficientPods: The number of pods are either at or below the number\n                    required by the PodDisruptionBudget. No disruptions are\n                    allowed and the status of the condition will be False.\n- SufficientPods: There are more pods than required by the PodDisruptionBudget.\n                  The condition will be True, and the number of allowed\n                  disruptions are provided by the disruptionsAllowed property.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Condition",
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Condition"
+                }
+              ],
               "default": {}
             },
             "type": "array",
@@ -249,7 +289,11 @@
           },
           "disruptedPods": {
             "additionalProperties": {
-              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time",
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+                }
+              ],
               "default": {}
             },
             "description": "DisruptedPods contains information about pods whose eviction was processed by the API server eviction subresource handler but has not yet been observed by the PodDisruptionBudget controller. A pod will be in this map from the time when the API server processed the eviction request to the time when the pod is seen by PDB controller as having been marked for deletion (or after a timeout). The key in the map is the name of the pod and the value is the time when the API server processed the eviction request. If the deletion didn't occur and a pod is still there it will be removed from the list automatically by PodDisruptionBudget controller after some time. If everything goes smooth this map should be empty for the most of the time. Large number of entries in the map may indicate problems with pod deletions.",
@@ -293,12 +337,20 @@
             "type": "string"
           },
           "metadata": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+              }
+            ],
             "default": {},
             "description": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
           },
           "spec": {
-            "$ref": "#/components/schemas/io.k8s.api.policy.v1beta1.PodSecurityPolicySpec",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.policy.v1beta1.PodSecurityPolicySpec"
+              }
+            ],
             "default": {},
             "description": "spec defines the policy enforced."
           }
@@ -322,7 +374,11 @@
           "items": {
             "description": "items is a list of schema objects.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.api.policy.v1beta1.PodSecurityPolicy",
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.policy.v1beta1.PodSecurityPolicy"
+                }
+              ],
               "default": {}
             },
             "type": "array"
@@ -332,7 +388,11 @@
             "type": "string"
           },
           "metadata": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
+              }
+            ],
             "default": {},
             "description": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
           }
@@ -359,7 +419,11 @@
           "allowedCSIDrivers": {
             "description": "AllowedCSIDrivers is an allowlist of inline CSI drivers that must be explicitly set to be embedded within a pod spec. An empty value indicates that any CSI driver can be used for inline ephemeral volumes. This is a beta field, and is only honored if the API server enables the CSIInlineVolume feature gate.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.api.policy.v1beta1.AllowedCSIDriver",
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.policy.v1beta1.AllowedCSIDriver"
+                }
+              ],
               "default": {}
             },
             "type": "array"
@@ -375,7 +439,11 @@
           "allowedFlexVolumes": {
             "description": "allowedFlexVolumes is an allowlist of Flexvolumes.  Empty or nil indicates that all Flexvolumes may be used.  This parameter is effective only when the usage of the Flexvolumes is allowed in the \"volumes\" field.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.api.policy.v1beta1.AllowedFlexVolume",
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.policy.v1beta1.AllowedFlexVolume"
+                }
+              ],
               "default": {}
             },
             "type": "array"
@@ -383,7 +451,11 @@
           "allowedHostPaths": {
             "description": "allowedHostPaths is an allowlist of host paths. Empty indicates that all host paths may be used.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.api.policy.v1beta1.AllowedHostPath",
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.policy.v1beta1.AllowedHostPath"
+                }
+              ],
               "default": {}
             },
             "type": "array"
@@ -425,7 +497,11 @@
             "type": "array"
           },
           "fsGroup": {
-            "$ref": "#/components/schemas/io.k8s.api.policy.v1beta1.FSGroupStrategyOptions",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.policy.v1beta1.FSGroupStrategyOptions"
+              }
+            ],
             "default": {},
             "description": "fsGroup is the strategy that will dictate what fs group is used by the SecurityContext."
           },
@@ -444,7 +520,11 @@
           "hostPorts": {
             "description": "hostPorts determines which host port ranges are allowed to be exposed.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.api.policy.v1beta1.HostPortRange",
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.policy.v1beta1.HostPortRange"
+                }
+              ],
               "default": {}
             },
             "type": "array"
@@ -466,25 +546,45 @@
             "type": "array"
           },
           "runAsGroup": {
-            "$ref": "#/components/schemas/io.k8s.api.policy.v1beta1.RunAsGroupStrategyOptions",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.policy.v1beta1.RunAsGroupStrategyOptions"
+              }
+            ],
             "description": "RunAsGroup is the strategy that will dictate the allowable RunAsGroup values that may be set. If this field is omitted, the pod's RunAsGroup can take any value. This field requires the RunAsGroup feature gate to be enabled."
           },
           "runAsUser": {
-            "$ref": "#/components/schemas/io.k8s.api.policy.v1beta1.RunAsUserStrategyOptions",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.policy.v1beta1.RunAsUserStrategyOptions"
+              }
+            ],
             "default": {},
             "description": "runAsUser is the strategy that will dictate the allowable RunAsUser values that may be set."
           },
           "runtimeClass": {
-            "$ref": "#/components/schemas/io.k8s.api.policy.v1beta1.RuntimeClassStrategyOptions",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.policy.v1beta1.RuntimeClassStrategyOptions"
+              }
+            ],
             "description": "runtimeClass is the strategy that will dictate the allowable RuntimeClasses for a pod. If this field is omitted, the pod's runtimeClassName field is unrestricted. Enforcement of this field depends on the RuntimeClass feature gate being enabled."
           },
           "seLinux": {
-            "$ref": "#/components/schemas/io.k8s.api.policy.v1beta1.SELinuxStrategyOptions",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.policy.v1beta1.SELinuxStrategyOptions"
+              }
+            ],
             "default": {},
             "description": "seLinux is the strategy that will dictate the allowable labels that may be set."
           },
           "supplementalGroups": {
-            "$ref": "#/components/schemas/io.k8s.api.policy.v1beta1.SupplementalGroupsStrategyOptions",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.policy.v1beta1.SupplementalGroupsStrategyOptions"
+              }
+            ],
             "default": {},
             "description": "supplementalGroups is the strategy that will dictate what supplemental groups are used by the SecurityContext."
           },
@@ -511,7 +611,11 @@
           "ranges": {
             "description": "ranges are the allowed ranges of gids that may be used. If you would like to force a single gid then supply a single range with the same start and end. Required for MustRunAs.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.api.policy.v1beta1.IDRange",
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.policy.v1beta1.IDRange"
+                }
+              ],
               "default": {}
             },
             "type": "array"
@@ -533,7 +637,11 @@
           "ranges": {
             "description": "ranges are the allowed ranges of uids that may be used. If you would like to force a single uid then supply a single range with the same start and end. Required for MustRunAs.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.api.policy.v1beta1.IDRange",
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.policy.v1beta1.IDRange"
+                }
+              ],
               "default": {}
             },
             "type": "array"
@@ -579,7 +687,11 @@
             "type": "string"
           },
           "seLinuxOptions": {
-            "$ref": "#/components/schemas/io.k8s.api.core.v1.SELinuxOptions",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.SELinuxOptions"
+              }
+            ],
             "description": "seLinuxOptions required to run as; required for MustRunAs More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/"
           }
         },
@@ -594,7 +706,11 @@
           "ranges": {
             "description": "ranges are the allowed ranges of supplemental groups.  If you would like to force a single supplemental group then supply a single range with the same start and end. Required for MustRunAs.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.api.policy.v1beta1.IDRange",
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.policy.v1beta1.IDRange"
+                }
+              ],
               "default": {}
             },
             "type": "array"
@@ -694,7 +810,11 @@
           "resources": {
             "description": "resources contains the name of the resources and if they are namespaced.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResource",
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResource"
+                }
+              ],
               "default": {}
             },
             "type": "array"
@@ -717,7 +837,11 @@
         "description": "Condition contains details for one aspect of the current state of this API Resource.",
         "properties": {
           "lastTransitionTime": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+              }
+            ],
             "default": {},
             "description": "lastTransitionTime is the last time the condition transitioned from one status to another. This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable."
           },
@@ -785,7 +909,11 @@
             "type": "boolean"
           },
           "preconditions": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Preconditions",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Preconditions"
+              }
+            ],
             "description": "Must be fulfilled before a deletion is carried out. If not possible, a 409 Conflict status will be returned."
           },
           "propagationPolicy": {
@@ -1067,7 +1195,11 @@
           "matchExpressions": {
             "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelectorRequirement",
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelectorRequirement"
+                }
+              ],
               "default": {}
             },
             "type": "array"
@@ -1149,7 +1281,11 @@
             "type": "string"
           },
           "fieldsV1": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.FieldsV1",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.FieldsV1"
+              }
+            ],
             "description": "FieldsV1 holds the first JSON version format as described in the \"FieldsV1\" type."
           },
           "manager": {
@@ -1165,7 +1301,11 @@
             "type": "string"
           },
           "time": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+              }
+            ],
             "description": "Time is the timestamp of when the ManagedFields entry was added. The timestamp will also be updated if a field is added, the manager changes any of the owned fields value or removes a field. The timestamp does not update when a field is removed from the entry because another manager took it over."
           }
         },
@@ -1187,7 +1327,11 @@
             "type": "string"
           },
           "creationTimestamp": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+              }
+            ],
             "default": {},
             "description": "CreationTimestamp is a timestamp representing the server time when this object was created. It is not guaranteed to be set in happens-before order across separate operations. Clients may not set this value. It is represented in RFC3339 form and is in UTC.\n\nPopulated by the system. Read-only. Null for lists. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
           },
@@ -1197,7 +1341,11 @@
             "type": "integer"
           },
           "deletionTimestamp": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+              }
+            ],
             "description": "DeletionTimestamp is RFC 3339 date and time at which this resource will be deleted. This field is set by the server when a graceful deletion is requested by the user, and is not directly settable by a client. The resource is expected to be deleted (no longer visible from resource lists, and not reachable by name) after the time in this field, once the finalizers list is empty. As long as the finalizers list contains items, deletion is blocked. Once the deletionTimestamp is set, this value may not be unset or be set further into the future, although it may be shortened or the resource may be deleted prior to this time. For example, a user may request that a pod is deleted in 30 seconds. The Kubelet will react by sending a graceful termination signal to the containers in the pod. After that 30 seconds, the Kubelet will send a hard termination signal (SIGKILL) to the container and after cleanup, remove the pod from the API. In the presence of network partitions, this object may still exist after this timestamp, until an administrator or automated process can determine the resource is fully terminated. If not set, graceful deletion of the object has not been requested.\n\nPopulated by the system when a graceful deletion is requested. Read-only. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
           },
           "finalizers": {
@@ -1229,7 +1377,11 @@
           "managedFields": {
             "description": "ManagedFields maps workflow-id and version to the set of fields that are managed by that workflow. This is mostly for internal housekeeping, and users typically shouldn't need to set or understand this field. A workflow can be the user's name, a controller's name, or the name of a specific apply path like \"ci-cd\". The set of fields is always in the version that the workflow used when modifying the object.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ManagedFieldsEntry",
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ManagedFieldsEntry"
+                }
+              ],
               "default": {}
             },
             "type": "array"
@@ -1245,7 +1397,11 @@
           "ownerReferences": {
             "description": "List of objects depended by this object. If ALL objects in the list have been deleted, this object will be garbage collected. If this object is managed by a controller, then an entry in this list will point to this controller, with the controller field set to true. There cannot be more than one managing controller.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.OwnerReference",
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.OwnerReference"
+                }
+              ],
               "default": {}
             },
             "type": "array",
@@ -1339,7 +1495,11 @@
             "type": "integer"
           },
           "details": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.StatusDetails",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.StatusDetails"
+              }
+            ],
             "description": "Extended data associated with the reason.  Each reason may define its own extended details. This field is optional and the data returned is not guaranteed to conform to any schema except that defined by the reason type."
           },
           "kind": {
@@ -1351,7 +1511,11 @@
             "type": "string"
           },
           "metadata": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
+              }
+            ],
             "default": {},
             "description": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds"
           },
@@ -1397,7 +1561,11 @@
           "causes": {
             "description": "The Causes array includes more details associated with the StatusReason failure. Not all StatusReasons may provide detailed causes.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.StatusCause",
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.StatusCause"
+                }
+              ],
               "default": {}
             },
             "type": "array"
@@ -1435,7 +1603,11 @@
         "description": "Event represents a single event to a watched resource.",
         "properties": {
           "object": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.runtime.RawExtension",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.runtime.RawExtension"
+              }
+            ],
             "default": {},
             "description": "Object is:\n * If Type is Added or Modified: the new state of the object.\n * If Type is Deleted: the state of the object immediately before deletion.\n * If Type is Error: *Status is recommended; other types may make sense\n   depending on context."
           },
@@ -1721,6 +1893,14 @@
         "format": "int-or-string",
         "type": "string"
       }
+    },
+    "securitySchemes": {
+      "BearerToken": {
+        "description": "Bearer Token authentication",
+        "in": "header",
+        "name": "authorization",
+        "type": "apiKey"
+      }
     }
   },
   "info": {
@@ -1753,6 +1933,9 @@
               }
             },
             "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         },
         "tags": [
@@ -1766,9 +1949,54 @@
         "operationId": "deletePolicyV1beta1CollectionNamespacedPodDisruptionBudget",
         "parameters": [
           {
+            "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server, the server will respond with a 410 ResourceExpired error together with a continue token. If the client needs a consistent list, it must restart their list without the continue field. Otherwise, the client may send another list request with the token received with the 410 error, the server will respond with a list starting from the next key, but from the latest snapshot, which is inconsistent from the previous list results - objects that are created, modified, or deleted after the first list request will be included in the response, as long as their keys are after the \"next key\".\n\nThis field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
+            "in": "query",
+            "name": "continue",
+            "schema": {
+              "type": "string",
+              "uniqueItems": true
+            }
+          },
+          {
+            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+            "in": "query",
+            "name": "dryRun",
+            "schema": {
+              "type": "string",
+              "uniqueItems": true
+            }
+          },
+          {
+            "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+            "in": "query",
+            "name": "fieldSelector",
+            "schema": {
+              "type": "string",
+              "uniqueItems": true
+            }
+          },
+          {
             "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
             "in": "query",
             "name": "gracePeriodSeconds",
+            "schema": {
+              "type": "integer",
+              "uniqueItems": true
+            }
+          },
+          {
+            "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+            "in": "query",
+            "name": "labelSelector",
+            "schema": {
+              "type": "string",
+              "uniqueItems": true
+            }
+          },
+          {
+            "description": "limit is a maximum number of responses to return for a list call. If more items exist, the server will set the `continue` field on the list metadata to a value that can be used with the same initial query to retrieve the next set of results. Setting a limit may return fewer than the requested amount of items (up to zero items) in the event all requested objects are filtered out and clients should only use the presence of the continue field to determine whether more results are available. Servers may choose not to support the limit argument and will return all of the available results. If limit is specified and the continue field is empty, clients may assume that no more results are available. This field is not supported if watch is true.\n\nThe server guarantees that the objects returned when using continue will be identical to issuing a single list call without a limit - that is, no objects created, modified, or deleted after the first request is issued will be included in any subsequent continued requests. This is sometimes referred to as a consistent snapshot, and ensures that a client that is using limit to receive smaller chunks of a very large result can ensure they see all possible objects. If objects are updated during a chunked list the version of the object that was present at the time the first list result was calculated is returned.",
+            "in": "query",
+            "name": "limit",
             "schema": {
               "type": "integer",
               "uniqueItems": true
@@ -1787,33 +2015,6 @@
             "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy. Acceptable values are: 'Orphan' - orphan the dependents; 'Background' - allow the garbage collector to delete the dependents in the background; 'Foreground' - a cascading policy that deletes all dependents in the foreground.",
             "in": "query",
             "name": "propagationPolicy",
-            "schema": {
-              "type": "string",
-              "uniqueItems": true
-            }
-          },
-          {
-            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
-            "in": "query",
-            "name": "dryRun",
-            "schema": {
-              "type": "string",
-              "uniqueItems": true
-            }
-          },
-          {
-            "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
-            "in": "query",
-            "name": "labelSelector",
-            "schema": {
-              "type": "string",
-              "uniqueItems": true
-            }
-          },
-          {
-            "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
-            "in": "query",
-            "name": "fieldSelector",
             "schema": {
               "type": "string",
               "uniqueItems": true
@@ -1845,29 +2046,11 @@
               "type": "integer",
               "uniqueItems": true
             }
-          },
-          {
-            "description": "limit is a maximum number of responses to return for a list call. If more items exist, the server will set the `continue` field on the list metadata to a value that can be used with the same initial query to retrieve the next set of results. Setting a limit may return fewer than the requested amount of items (up to zero items) in the event all requested objects are filtered out and clients should only use the presence of the continue field to determine whether more results are available. Servers may choose not to support the limit argument and will return all of the available results. If limit is specified and the continue field is empty, clients may assume that no more results are available. This field is not supported if watch is true.\n\nThe server guarantees that the objects returned when using continue will be identical to issuing a single list call without a limit - that is, no objects created, modified, or deleted after the first request is issued will be included in any subsequent continued requests. This is sometimes referred to as a consistent snapshot, and ensures that a client that is using limit to receive smaller chunks of a very large result can ensure they see all possible objects. If objects are updated during a chunked list the version of the object that was present at the time the first list result was calculated is returned.",
-            "in": "query",
-            "name": "limit",
-            "schema": {
-              "type": "integer",
-              "uniqueItems": true
-            }
-          },
-          {
-            "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server, the server will respond with a 410 ResourceExpired error together with a continue token. If the client needs a consistent list, it must restart their list without the continue field. Otherwise, the client may send another list request with the token received with the 410 error, the server will respond with a list starting from the next key, but from the latest snapshot, which is inconsistent from the previous list results - objects that are created, modified, or deleted after the first list request will be included in the response, as long as their keys are after the \"next key\".\n\nThis field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
-            "in": "query",
-            "name": "continue",
-            "schema": {
-              "type": "string",
-              "uniqueItems": true
-            }
           }
         ],
         "requestBody": {
           "content": {
-            "application/json": {
+            "*/*": {
               "schema": {
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
               }
@@ -1894,20 +2077,38 @@
               }
             },
             "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         },
         "tags": [
           "policy_v1beta1"
-        ]
+        ],
+        "x-kubernetes-action": "deletecollection",
+        "x-kubernetes-group-version-kind": {
+          "group": "policy",
+          "kind": "PodDisruptionBudget",
+          "version": "v1beta1"
+        }
       },
       "get": {
         "description": "list or watch objects of kind PodDisruptionBudget",
         "operationId": "listPolicyV1beta1NamespacedPodDisruptionBudget",
         "parameters": [
           {
-            "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+            "description": "allowWatchBookmarks requests watch events with type \"BOOKMARK\". Servers that do not implement bookmarks may ignore this flag and bookmarks are sent at the server's discretion. Clients should not assume bookmarks are returned at any specific interval, nor may they assume the server will send any BOOKMARK event during a session. If this is not a watch, this field is ignored.",
             "in": "query",
-            "name": "labelSelector",
+            "name": "allowWatchBookmarks",
+            "schema": {
+              "type": "boolean",
+              "uniqueItems": true
+            }
+          },
+          {
+            "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server, the server will respond with a 410 ResourceExpired error together with a continue token. If the client needs a consistent list, it must restart their list without the continue field. Otherwise, the client may send another list request with the token received with the 410 error, the server will respond with a list starting from the next key, but from the latest snapshot, which is inconsistent from the previous list results - objects that are created, modified, or deleted after the first list request will be included in the response, as long as their keys are after the \"next key\".\n\nThis field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
+            "in": "query",
+            "name": "continue",
             "schema": {
               "type": "string",
               "uniqueItems": true
@@ -1923,20 +2124,20 @@
             }
           },
           {
-            "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+            "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
             "in": "query",
-            "name": "watch",
+            "name": "labelSelector",
             "schema": {
-              "type": "boolean",
+              "type": "string",
               "uniqueItems": true
             }
           },
           {
-            "description": "allowWatchBookmarks requests watch events with type \"BOOKMARK\". Servers that do not implement bookmarks may ignore this flag and bookmarks are sent at the server's discretion. Clients should not assume bookmarks are returned at any specific interval, nor may they assume the server will send any BOOKMARK event during a session. If this is not a watch, this field is ignored.",
+            "description": "limit is a maximum number of responses to return for a list call. If more items exist, the server will set the `continue` field on the list metadata to a value that can be used with the same initial query to retrieve the next set of results. Setting a limit may return fewer than the requested amount of items (up to zero items) in the event all requested objects are filtered out and clients should only use the presence of the continue field to determine whether more results are available. Servers may choose not to support the limit argument and will return all of the available results. If limit is specified and the continue field is empty, clients may assume that no more results are available. This field is not supported if watch is true.\n\nThe server guarantees that the objects returned when using continue will be identical to issuing a single list call without a limit - that is, no objects created, modified, or deleted after the first request is issued will be included in any subsequent continued requests. This is sometimes referred to as a consistent snapshot, and ensures that a client that is using limit to receive smaller chunks of a very large result can ensure they see all possible objects. If objects are updated during a chunked list the version of the object that was present at the time the first list result was calculated is returned.",
             "in": "query",
-            "name": "allowWatchBookmarks",
+            "name": "limit",
             "schema": {
-              "type": "boolean",
+              "type": "integer",
               "uniqueItems": true
             }
           },
@@ -1968,20 +2169,11 @@
             }
           },
           {
-            "description": "limit is a maximum number of responses to return for a list call. If more items exist, the server will set the `continue` field on the list metadata to a value that can be used with the same initial query to retrieve the next set of results. Setting a limit may return fewer than the requested amount of items (up to zero items) in the event all requested objects are filtered out and clients should only use the presence of the continue field to determine whether more results are available. Servers may choose not to support the limit argument and will return all of the available results. If limit is specified and the continue field is empty, clients may assume that no more results are available. This field is not supported if watch is true.\n\nThe server guarantees that the objects returned when using continue will be identical to issuing a single list call without a limit - that is, no objects created, modified, or deleted after the first request is issued will be included in any subsequent continued requests. This is sometimes referred to as a consistent snapshot, and ensures that a client that is using limit to receive smaller chunks of a very large result can ensure they see all possible objects. If objects are updated during a chunked list the version of the object that was present at the time the first list result was calculated is returned.",
+            "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
             "in": "query",
-            "name": "limit",
+            "name": "watch",
             "schema": {
-              "type": "integer",
-              "uniqueItems": true
-            }
-          },
-          {
-            "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server, the server will respond with a 410 ResourceExpired error together with a continue token. If the client needs a consistent list, it must restart their list without the continue field. Otherwise, the client may send another list request with the token received with the 410 error, the server will respond with a list starting from the next key, but from the latest snapshot, which is inconsistent from the previous list results - objects that are created, modified, or deleted after the first list request will be included in the response, as long as their keys are after the \"next key\".\n\nThis field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
-            "in": "query",
-            "name": "continue",
-            "schema": {
-              "type": "string",
+              "type": "boolean",
               "uniqueItems": true
             }
           }
@@ -2016,11 +2208,20 @@
               }
             },
             "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         },
         "tags": [
           "policy_v1beta1"
-        ]
+        ],
+        "x-kubernetes-action": "list",
+        "x-kubernetes-group-version-kind": {
+          "group": "policy",
+          "kind": "PodDisruptionBudget",
+          "version": "v1beta1"
+        }
       },
       "parameters": [
         {
@@ -2077,7 +2278,7 @@
         ],
         "requestBody": {
           "content": {
-            "application/json": {
+            "*/*": {
               "schema": {
                 "$ref": "#/components/schemas/io.k8s.api.policy.v1beta1.PodDisruptionBudget"
               }
@@ -2144,11 +2345,20 @@
               }
             },
             "description": "Accepted"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         },
         "tags": [
           "policy_v1beta1"
-        ]
+        ],
+        "x-kubernetes-action": "post",
+        "x-kubernetes-group-version-kind": {
+          "group": "policy",
+          "kind": "PodDisruptionBudget",
+          "version": "v1beta1"
+        }
       }
     },
     "/apis/policy/v1beta1/namespaces/{namespace}/poddisruptionbudgets/{name}": {
@@ -2156,6 +2366,15 @@
         "description": "delete a PodDisruptionBudget",
         "operationId": "deletePolicyV1beta1NamespacedPodDisruptionBudget",
         "parameters": [
+          {
+            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+            "in": "query",
+            "name": "dryRun",
+            "schema": {
+              "type": "string",
+              "uniqueItems": true
+            }
+          },
           {
             "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
             "in": "query",
@@ -2182,20 +2401,11 @@
               "type": "string",
               "uniqueItems": true
             }
-          },
-          {
-            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
-            "in": "query",
-            "name": "dryRun",
-            "schema": {
-              "type": "string",
-              "uniqueItems": true
-            }
           }
         ],
         "requestBody": {
           "content": {
-            "application/json": {
+            "*/*": {
               "schema": {
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
               }
@@ -2242,11 +2452,20 @@
               }
             },
             "description": "Accepted"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         },
         "tags": [
           "policy_v1beta1"
-        ]
+        ],
+        "x-kubernetes-action": "delete",
+        "x-kubernetes-group-version-kind": {
+          "group": "policy",
+          "kind": "PodDisruptionBudget",
+          "version": "v1beta1"
+        }
       },
       "get": {
         "description": "read the specified PodDisruptionBudget",
@@ -2271,11 +2490,20 @@
               }
             },
             "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         },
         "tags": [
           "policy_v1beta1"
-        ]
+        ],
+        "x-kubernetes-action": "get",
+        "x-kubernetes-group-version-kind": {
+          "group": "policy",
+          "kind": "PodDisruptionBudget",
+          "version": "v1beta1"
+        }
       },
       "parameters": [
         {
@@ -2322,15 +2550,6 @@
             }
           },
           {
-            "description": "Force is going to \"force\" Apply requests. It means user will re-acquire conflicting fields owned by other people. Force flag must be unset for non-apply patch requests.",
-            "in": "query",
-            "name": "force",
-            "schema": {
-              "type": "boolean",
-              "uniqueItems": true
-            }
-          },
-          {
             "description": "fieldManager is a name associated with the actor or entity that is making these changes. The value must be less than or 128 characters long, and only contain printable characters, as defined by https://golang.org/pkg/unicode/#IsPrint. This field is required for apply requests (application/apply-patch) but optional for non-apply patch types (JsonPatch, MergePatch, StrategicMergePatch).",
             "in": "query",
             "name": "fieldManager",
@@ -2347,11 +2566,35 @@
               "type": "string",
               "uniqueItems": true
             }
+          },
+          {
+            "description": "Force is going to \"force\" Apply requests. It means user will re-acquire conflicting fields owned by other people. Force flag must be unset for non-apply patch requests.",
+            "in": "query",
+            "name": "force",
+            "schema": {
+              "type": "boolean",
+              "uniqueItems": true
+            }
           }
         ],
         "requestBody": {
           "content": {
-            "application/json": {
+            "application/apply-patch+yaml": {
+              "schema": {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+              }
+            },
+            "application/json-patch+json": {
+              "schema": {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+              }
+            },
+            "application/merge-patch+json": {
+              "schema": {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+              }
+            },
+            "application/strategic-merge-patch+json": {
               "schema": {
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
@@ -2398,11 +2641,20 @@
               }
             },
             "description": "Created"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         },
         "tags": [
           "policy_v1beta1"
-        ]
+        ],
+        "x-kubernetes-action": "patch",
+        "x-kubernetes-group-version-kind": {
+          "group": "policy",
+          "kind": "PodDisruptionBudget",
+          "version": "v1beta1"
+        }
       },
       "put": {
         "description": "replace the specified PodDisruptionBudget",
@@ -2438,7 +2690,7 @@
         ],
         "requestBody": {
           "content": {
-            "application/json": {
+            "*/*": {
               "schema": {
                 "$ref": "#/components/schemas/io.k8s.api.policy.v1beta1.PodDisruptionBudget"
               }
@@ -2485,11 +2737,20 @@
               }
             },
             "description": "Created"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         },
         "tags": [
           "policy_v1beta1"
-        ]
+        ],
+        "x-kubernetes-action": "put",
+        "x-kubernetes-group-version-kind": {
+          "group": "policy",
+          "kind": "PodDisruptionBudget",
+          "version": "v1beta1"
+        }
       }
     },
     "/apis/policy/v1beta1/namespaces/{namespace}/poddisruptionbudgets/{name}/status": {
@@ -2516,11 +2777,20 @@
               }
             },
             "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         },
         "tags": [
           "policy_v1beta1"
-        ]
+        ],
+        "x-kubernetes-action": "get",
+        "x-kubernetes-group-version-kind": {
+          "group": "policy",
+          "kind": "PodDisruptionBudget",
+          "version": "v1beta1"
+        }
       },
       "parameters": [
         {
@@ -2567,15 +2837,6 @@
             }
           },
           {
-            "description": "Force is going to \"force\" Apply requests. It means user will re-acquire conflicting fields owned by other people. Force flag must be unset for non-apply patch requests.",
-            "in": "query",
-            "name": "force",
-            "schema": {
-              "type": "boolean",
-              "uniqueItems": true
-            }
-          },
-          {
             "description": "fieldManager is a name associated with the actor or entity that is making these changes. The value must be less than or 128 characters long, and only contain printable characters, as defined by https://golang.org/pkg/unicode/#IsPrint. This field is required for apply requests (application/apply-patch) but optional for non-apply patch types (JsonPatch, MergePatch, StrategicMergePatch).",
             "in": "query",
             "name": "fieldManager",
@@ -2592,11 +2853,35 @@
               "type": "string",
               "uniqueItems": true
             }
+          },
+          {
+            "description": "Force is going to \"force\" Apply requests. It means user will re-acquire conflicting fields owned by other people. Force flag must be unset for non-apply patch requests.",
+            "in": "query",
+            "name": "force",
+            "schema": {
+              "type": "boolean",
+              "uniqueItems": true
+            }
           }
         ],
         "requestBody": {
           "content": {
-            "application/json": {
+            "application/apply-patch+yaml": {
+              "schema": {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+              }
+            },
+            "application/json-patch+json": {
+              "schema": {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+              }
+            },
+            "application/merge-patch+json": {
+              "schema": {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+              }
+            },
+            "application/strategic-merge-patch+json": {
               "schema": {
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
@@ -2643,11 +2928,20 @@
               }
             },
             "description": "Created"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         },
         "tags": [
           "policy_v1beta1"
-        ]
+        ],
+        "x-kubernetes-action": "patch",
+        "x-kubernetes-group-version-kind": {
+          "group": "policy",
+          "kind": "PodDisruptionBudget",
+          "version": "v1beta1"
+        }
       },
       "put": {
         "description": "replace status of the specified PodDisruptionBudget",
@@ -2683,7 +2977,7 @@
         ],
         "requestBody": {
           "content": {
-            "application/json": {
+            "*/*": {
               "schema": {
                 "$ref": "#/components/schemas/io.k8s.api.policy.v1beta1.PodDisruptionBudget"
               }
@@ -2730,11 +3024,20 @@
               }
             },
             "description": "Created"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         },
         "tags": [
           "policy_v1beta1"
-        ]
+        ],
+        "x-kubernetes-action": "put",
+        "x-kubernetes-group-version-kind": {
+          "group": "policy",
+          "kind": "PodDisruptionBudget",
+          "version": "v1beta1"
+        }
       }
     },
     "/apis/policy/v1beta1/poddisruptionbudgets": {
@@ -2771,11 +3074,20 @@
               }
             },
             "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         },
         "tags": [
           "policy_v1beta1"
-        ]
+        ],
+        "x-kubernetes-action": "list",
+        "x-kubernetes-group-version-kind": {
+          "group": "policy",
+          "kind": "PodDisruptionBudget",
+          "version": "v1beta1"
+        }
       },
       "parameters": [
         {
@@ -2876,9 +3188,54 @@
         "operationId": "deletePolicyV1beta1CollectionPodSecurityPolicy",
         "parameters": [
           {
+            "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server, the server will respond with a 410 ResourceExpired error together with a continue token. If the client needs a consistent list, it must restart their list without the continue field. Otherwise, the client may send another list request with the token received with the 410 error, the server will respond with a list starting from the next key, but from the latest snapshot, which is inconsistent from the previous list results - objects that are created, modified, or deleted after the first list request will be included in the response, as long as their keys are after the \"next key\".\n\nThis field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
+            "in": "query",
+            "name": "continue",
+            "schema": {
+              "type": "string",
+              "uniqueItems": true
+            }
+          },
+          {
+            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+            "in": "query",
+            "name": "dryRun",
+            "schema": {
+              "type": "string",
+              "uniqueItems": true
+            }
+          },
+          {
+            "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+            "in": "query",
+            "name": "fieldSelector",
+            "schema": {
+              "type": "string",
+              "uniqueItems": true
+            }
+          },
+          {
             "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
             "in": "query",
             "name": "gracePeriodSeconds",
+            "schema": {
+              "type": "integer",
+              "uniqueItems": true
+            }
+          },
+          {
+            "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+            "in": "query",
+            "name": "labelSelector",
+            "schema": {
+              "type": "string",
+              "uniqueItems": true
+            }
+          },
+          {
+            "description": "limit is a maximum number of responses to return for a list call. If more items exist, the server will set the `continue` field on the list metadata to a value that can be used with the same initial query to retrieve the next set of results. Setting a limit may return fewer than the requested amount of items (up to zero items) in the event all requested objects are filtered out and clients should only use the presence of the continue field to determine whether more results are available. Servers may choose not to support the limit argument and will return all of the available results. If limit is specified and the continue field is empty, clients may assume that no more results are available. This field is not supported if watch is true.\n\nThe server guarantees that the objects returned when using continue will be identical to issuing a single list call without a limit - that is, no objects created, modified, or deleted after the first request is issued will be included in any subsequent continued requests. This is sometimes referred to as a consistent snapshot, and ensures that a client that is using limit to receive smaller chunks of a very large result can ensure they see all possible objects. If objects are updated during a chunked list the version of the object that was present at the time the first list result was calculated is returned.",
+            "in": "query",
+            "name": "limit",
             "schema": {
               "type": "integer",
               "uniqueItems": true
@@ -2897,33 +3254,6 @@
             "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy. Acceptable values are: 'Orphan' - orphan the dependents; 'Background' - allow the garbage collector to delete the dependents in the background; 'Foreground' - a cascading policy that deletes all dependents in the foreground.",
             "in": "query",
             "name": "propagationPolicy",
-            "schema": {
-              "type": "string",
-              "uniqueItems": true
-            }
-          },
-          {
-            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
-            "in": "query",
-            "name": "dryRun",
-            "schema": {
-              "type": "string",
-              "uniqueItems": true
-            }
-          },
-          {
-            "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
-            "in": "query",
-            "name": "labelSelector",
-            "schema": {
-              "type": "string",
-              "uniqueItems": true
-            }
-          },
-          {
-            "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
-            "in": "query",
-            "name": "fieldSelector",
             "schema": {
               "type": "string",
               "uniqueItems": true
@@ -2955,29 +3285,11 @@
               "type": "integer",
               "uniqueItems": true
             }
-          },
-          {
-            "description": "limit is a maximum number of responses to return for a list call. If more items exist, the server will set the `continue` field on the list metadata to a value that can be used with the same initial query to retrieve the next set of results. Setting a limit may return fewer than the requested amount of items (up to zero items) in the event all requested objects are filtered out and clients should only use the presence of the continue field to determine whether more results are available. Servers may choose not to support the limit argument and will return all of the available results. If limit is specified and the continue field is empty, clients may assume that no more results are available. This field is not supported if watch is true.\n\nThe server guarantees that the objects returned when using continue will be identical to issuing a single list call without a limit - that is, no objects created, modified, or deleted after the first request is issued will be included in any subsequent continued requests. This is sometimes referred to as a consistent snapshot, and ensures that a client that is using limit to receive smaller chunks of a very large result can ensure they see all possible objects. If objects are updated during a chunked list the version of the object that was present at the time the first list result was calculated is returned.",
-            "in": "query",
-            "name": "limit",
-            "schema": {
-              "type": "integer",
-              "uniqueItems": true
-            }
-          },
-          {
-            "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server, the server will respond with a 410 ResourceExpired error together with a continue token. If the client needs a consistent list, it must restart their list without the continue field. Otherwise, the client may send another list request with the token received with the 410 error, the server will respond with a list starting from the next key, but from the latest snapshot, which is inconsistent from the previous list results - objects that are created, modified, or deleted after the first list request will be included in the response, as long as their keys are after the \"next key\".\n\nThis field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
-            "in": "query",
-            "name": "continue",
-            "schema": {
-              "type": "string",
-              "uniqueItems": true
-            }
           }
         ],
         "requestBody": {
           "content": {
-            "application/json": {
+            "*/*": {
               "schema": {
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
               }
@@ -3004,20 +3316,38 @@
               }
             },
             "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         },
         "tags": [
           "policy_v1beta1"
-        ]
+        ],
+        "x-kubernetes-action": "deletecollection",
+        "x-kubernetes-group-version-kind": {
+          "group": "policy",
+          "kind": "PodSecurityPolicy",
+          "version": "v1beta1"
+        }
       },
       "get": {
         "description": "list or watch objects of kind PodSecurityPolicy",
         "operationId": "listPolicyV1beta1PodSecurityPolicy",
         "parameters": [
           {
-            "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+            "description": "allowWatchBookmarks requests watch events with type \"BOOKMARK\". Servers that do not implement bookmarks may ignore this flag and bookmarks are sent at the server's discretion. Clients should not assume bookmarks are returned at any specific interval, nor may they assume the server will send any BOOKMARK event during a session. If this is not a watch, this field is ignored.",
             "in": "query",
-            "name": "labelSelector",
+            "name": "allowWatchBookmarks",
+            "schema": {
+              "type": "boolean",
+              "uniqueItems": true
+            }
+          },
+          {
+            "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server, the server will respond with a 410 ResourceExpired error together with a continue token. If the client needs a consistent list, it must restart their list without the continue field. Otherwise, the client may send another list request with the token received with the 410 error, the server will respond with a list starting from the next key, but from the latest snapshot, which is inconsistent from the previous list results - objects that are created, modified, or deleted after the first list request will be included in the response, as long as their keys are after the \"next key\".\n\nThis field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
+            "in": "query",
+            "name": "continue",
             "schema": {
               "type": "string",
               "uniqueItems": true
@@ -3033,20 +3363,20 @@
             }
           },
           {
-            "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+            "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
             "in": "query",
-            "name": "watch",
+            "name": "labelSelector",
             "schema": {
-              "type": "boolean",
+              "type": "string",
               "uniqueItems": true
             }
           },
           {
-            "description": "allowWatchBookmarks requests watch events with type \"BOOKMARK\". Servers that do not implement bookmarks may ignore this flag and bookmarks are sent at the server's discretion. Clients should not assume bookmarks are returned at any specific interval, nor may they assume the server will send any BOOKMARK event during a session. If this is not a watch, this field is ignored.",
+            "description": "limit is a maximum number of responses to return for a list call. If more items exist, the server will set the `continue` field on the list metadata to a value that can be used with the same initial query to retrieve the next set of results. Setting a limit may return fewer than the requested amount of items (up to zero items) in the event all requested objects are filtered out and clients should only use the presence of the continue field to determine whether more results are available. Servers may choose not to support the limit argument and will return all of the available results. If limit is specified and the continue field is empty, clients may assume that no more results are available. This field is not supported if watch is true.\n\nThe server guarantees that the objects returned when using continue will be identical to issuing a single list call without a limit - that is, no objects created, modified, or deleted after the first request is issued will be included in any subsequent continued requests. This is sometimes referred to as a consistent snapshot, and ensures that a client that is using limit to receive smaller chunks of a very large result can ensure they see all possible objects. If objects are updated during a chunked list the version of the object that was present at the time the first list result was calculated is returned.",
             "in": "query",
-            "name": "allowWatchBookmarks",
+            "name": "limit",
             "schema": {
-              "type": "boolean",
+              "type": "integer",
               "uniqueItems": true
             }
           },
@@ -3078,20 +3408,11 @@
             }
           },
           {
-            "description": "limit is a maximum number of responses to return for a list call. If more items exist, the server will set the `continue` field on the list metadata to a value that can be used with the same initial query to retrieve the next set of results. Setting a limit may return fewer than the requested amount of items (up to zero items) in the event all requested objects are filtered out and clients should only use the presence of the continue field to determine whether more results are available. Servers may choose not to support the limit argument and will return all of the available results. If limit is specified and the continue field is empty, clients may assume that no more results are available. This field is not supported if watch is true.\n\nThe server guarantees that the objects returned when using continue will be identical to issuing a single list call without a limit - that is, no objects created, modified, or deleted after the first request is issued will be included in any subsequent continued requests. This is sometimes referred to as a consistent snapshot, and ensures that a client that is using limit to receive smaller chunks of a very large result can ensure they see all possible objects. If objects are updated during a chunked list the version of the object that was present at the time the first list result was calculated is returned.",
+            "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
             "in": "query",
-            "name": "limit",
+            "name": "watch",
             "schema": {
-              "type": "integer",
-              "uniqueItems": true
-            }
-          },
-          {
-            "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server, the server will respond with a 410 ResourceExpired error together with a continue token. If the client needs a consistent list, it must restart their list without the continue field. Otherwise, the client may send another list request with the token received with the 410 error, the server will respond with a list starting from the next key, but from the latest snapshot, which is inconsistent from the previous list results - objects that are created, modified, or deleted after the first list request will be included in the response, as long as their keys are after the \"next key\".\n\nThis field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
-            "in": "query",
-            "name": "continue",
-            "schema": {
-              "type": "string",
+              "type": "boolean",
               "uniqueItems": true
             }
           }
@@ -3126,11 +3447,20 @@
               }
             },
             "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         },
         "tags": [
           "policy_v1beta1"
-        ]
+        ],
+        "x-kubernetes-action": "list",
+        "x-kubernetes-group-version-kind": {
+          "group": "policy",
+          "kind": "PodSecurityPolicy",
+          "version": "v1beta1"
+        }
       },
       "parameters": [
         {
@@ -3177,7 +3507,7 @@
         ],
         "requestBody": {
           "content": {
-            "application/json": {
+            "*/*": {
               "schema": {
                 "$ref": "#/components/schemas/io.k8s.api.policy.v1beta1.PodSecurityPolicy"
               }
@@ -3244,11 +3574,20 @@
               }
             },
             "description": "Accepted"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         },
         "tags": [
           "policy_v1beta1"
-        ]
+        ],
+        "x-kubernetes-action": "post",
+        "x-kubernetes-group-version-kind": {
+          "group": "policy",
+          "kind": "PodSecurityPolicy",
+          "version": "v1beta1"
+        }
       }
     },
     "/apis/policy/v1beta1/podsecuritypolicies/{name}": {
@@ -3256,6 +3595,15 @@
         "description": "delete a PodSecurityPolicy",
         "operationId": "deletePolicyV1beta1PodSecurityPolicy",
         "parameters": [
+          {
+            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+            "in": "query",
+            "name": "dryRun",
+            "schema": {
+              "type": "string",
+              "uniqueItems": true
+            }
+          },
           {
             "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
             "in": "query",
@@ -3282,20 +3630,11 @@
               "type": "string",
               "uniqueItems": true
             }
-          },
-          {
-            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
-            "in": "query",
-            "name": "dryRun",
-            "schema": {
-              "type": "string",
-              "uniqueItems": true
-            }
           }
         ],
         "requestBody": {
           "content": {
-            "application/json": {
+            "*/*": {
               "schema": {
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
               }
@@ -3342,11 +3681,20 @@
               }
             },
             "description": "Accepted"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         },
         "tags": [
           "policy_v1beta1"
-        ]
+        ],
+        "x-kubernetes-action": "delete",
+        "x-kubernetes-group-version-kind": {
+          "group": "policy",
+          "kind": "PodSecurityPolicy",
+          "version": "v1beta1"
+        }
       },
       "get": {
         "description": "read the specified PodSecurityPolicy",
@@ -3371,11 +3719,20 @@
               }
             },
             "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         },
         "tags": [
           "policy_v1beta1"
-        ]
+        ],
+        "x-kubernetes-action": "get",
+        "x-kubernetes-group-version-kind": {
+          "group": "policy",
+          "kind": "PodSecurityPolicy",
+          "version": "v1beta1"
+        }
       },
       "parameters": [
         {
@@ -3412,15 +3769,6 @@
             }
           },
           {
-            "description": "Force is going to \"force\" Apply requests. It means user will re-acquire conflicting fields owned by other people. Force flag must be unset for non-apply patch requests.",
-            "in": "query",
-            "name": "force",
-            "schema": {
-              "type": "boolean",
-              "uniqueItems": true
-            }
-          },
-          {
             "description": "fieldManager is a name associated with the actor or entity that is making these changes. The value must be less than or 128 characters long, and only contain printable characters, as defined by https://golang.org/pkg/unicode/#IsPrint. This field is required for apply requests (application/apply-patch) but optional for non-apply patch types (JsonPatch, MergePatch, StrategicMergePatch).",
             "in": "query",
             "name": "fieldManager",
@@ -3437,11 +3785,35 @@
               "type": "string",
               "uniqueItems": true
             }
+          },
+          {
+            "description": "Force is going to \"force\" Apply requests. It means user will re-acquire conflicting fields owned by other people. Force flag must be unset for non-apply patch requests.",
+            "in": "query",
+            "name": "force",
+            "schema": {
+              "type": "boolean",
+              "uniqueItems": true
+            }
           }
         ],
         "requestBody": {
           "content": {
-            "application/json": {
+            "application/apply-patch+yaml": {
+              "schema": {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+              }
+            },
+            "application/json-patch+json": {
+              "schema": {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+              }
+            },
+            "application/merge-patch+json": {
+              "schema": {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+              }
+            },
+            "application/strategic-merge-patch+json": {
               "schema": {
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
@@ -3488,11 +3860,20 @@
               }
             },
             "description": "Created"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         },
         "tags": [
           "policy_v1beta1"
-        ]
+        ],
+        "x-kubernetes-action": "patch",
+        "x-kubernetes-group-version-kind": {
+          "group": "policy",
+          "kind": "PodSecurityPolicy",
+          "version": "v1beta1"
+        }
       },
       "put": {
         "description": "replace the specified PodSecurityPolicy",
@@ -3528,7 +3909,7 @@
         ],
         "requestBody": {
           "content": {
-            "application/json": {
+            "*/*": {
               "schema": {
                 "$ref": "#/components/schemas/io.k8s.api.policy.v1beta1.PodSecurityPolicy"
               }
@@ -3575,11 +3956,20 @@
               }
             },
             "description": "Created"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         },
         "tags": [
           "policy_v1beta1"
-        ]
+        ],
+        "x-kubernetes-action": "put",
+        "x-kubernetes-group-version-kind": {
+          "group": "policy",
+          "kind": "PodSecurityPolicy",
+          "version": "v1beta1"
+        }
       }
     },
     "/apis/policy/v1beta1/watch/namespaces/{namespace}/poddisruptionbudgets": {
@@ -3616,11 +4006,20 @@
               }
             },
             "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         },
         "tags": [
           "policy_v1beta1"
-        ]
+        ],
+        "x-kubernetes-action": "watchlist",
+        "x-kubernetes-group-version-kind": {
+          "group": "policy",
+          "kind": "PodDisruptionBudget",
+          "version": "v1beta1"
+        }
       },
       "parameters": [
         {
@@ -3759,11 +4158,20 @@
               }
             },
             "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         },
         "tags": [
           "policy_v1beta1"
-        ]
+        ],
+        "x-kubernetes-action": "watch",
+        "x-kubernetes-group-version-kind": {
+          "group": "policy",
+          "kind": "PodDisruptionBudget",
+          "version": "v1beta1"
+        }
       },
       "parameters": [
         {
@@ -3912,11 +4320,20 @@
               }
             },
             "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         },
         "tags": [
           "policy_v1beta1"
-        ]
+        ],
+        "x-kubernetes-action": "watchlist",
+        "x-kubernetes-group-version-kind": {
+          "group": "policy",
+          "kind": "PodDisruptionBudget",
+          "version": "v1beta1"
+        }
       },
       "parameters": [
         {
@@ -4045,11 +4462,20 @@
               }
             },
             "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         },
         "tags": [
           "policy_v1beta1"
-        ]
+        ],
+        "x-kubernetes-action": "watchlist",
+        "x-kubernetes-group-version-kind": {
+          "group": "policy",
+          "kind": "PodSecurityPolicy",
+          "version": "v1beta1"
+        }
       },
       "parameters": [
         {
@@ -4178,11 +4604,20 @@
               }
             },
             "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         },
         "tags": [
           "policy_v1beta1"
-        ]
+        ],
+        "x-kubernetes-action": "watch",
+        "x-kubernetes-group-version-kind": {
+          "group": "policy",
+          "kind": "PodSecurityPolicy",
+          "version": "v1beta1"
+        }
       },
       "parameters": [
         {
