@@ -1170,6 +1170,7 @@ spec:
   startingDeadlineSeconds: 2
   successfulJobsHistoryLimit: 6
   suspend: true
+  timeZone: timeZoneValue
 status:
   active:
   - apiVersion: apiVersionValue

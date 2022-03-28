@@ -46,6 +46,7 @@
   },
   "spec": {
     "schedule": "scheduleValue",
+    "timeZone": "timeZoneValue",
     "startingDeadlineSeconds": 2,
     "concurrencyPolicy": "concurrencyPolicyValue",
     "suspend": true,
