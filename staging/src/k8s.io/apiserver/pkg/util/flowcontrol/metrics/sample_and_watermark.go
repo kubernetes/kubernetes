@@ -34,31 +34,30 @@ const (
 	labelValueExecuting = "executing"
 )
 
-// SampleAndWaterMarkPairGenerator makes pairs of RatioedChangeObservers that
-// track samples and watermarks.
-type SampleAndWaterMarkPairGenerator struct {
-	urGenerator SampleAndWaterMarkObserverGenerator
+// ratioedChangeObserverPairGenerator makes pairs of RatioedChangeObservers using an underlying generator
+type DelegatingRatioedChangeObserverPairGenerator struct {
+	urGenerator RatioedChangeObserverGenerator
 }
 
-var _ RatioedChangeObserverPairGenerator = SampleAndWaterMarkPairGenerator{}
+var _ RatioedChangeObserverPairGenerator = DelegatingRatioedChangeObserverPairGenerator{}
 
 // NewSampleAndWaterMarkHistogramsPairGenerator makes a new pair generator
-func NewSampleAndWaterMarkHistogramsPairGenerator(clock clock.PassiveClock, samplePeriod time.Duration, sampleOpts, waterMarkOpts *compbasemetrics.HistogramOpts, labelNames []string) SampleAndWaterMarkPairGenerator {
-	return SampleAndWaterMarkPairGenerator{
+func NewSampleAndWaterMarkHistogramsPairGenerator(clock clock.PassiveClock, samplePeriod time.Duration, sampleOpts, waterMarkOpts *compbasemetrics.HistogramOpts, labelNames []string) DelegatingRatioedChangeObserverPairGenerator {
+	return DelegatingRatioedChangeObserverPairGenerator{
 		urGenerator: NewSampleAndWaterMarkHistogramsGenerator(clock, samplePeriod, sampleOpts, waterMarkOpts, append([]string{labelNamePhase}, labelNames...)),
 	}
 }
 
 // Generate makes a new pair
-func (spg SampleAndWaterMarkPairGenerator) Generate(initialWaitingDenominator, initialExecutingDenominator float64, labelValues []string) RatioedChangeObserverPair {
+func (spg DelegatingRatioedChangeObserverPairGenerator) Generate(initialWaitingDenominator, initialExecutingDenominator float64, labelValues []string) RatioedChangeObserverPair {
 	return RatioedChangeObserverPair{
 		RequestsWaiting:   spg.urGenerator.Generate(0, initialWaitingDenominator, append([]string{labelValueWaiting}, labelValues...)),
 		RequestsExecuting: spg.urGenerator.Generate(0, initialExecutingDenominator, append([]string{labelValueExecuting}, labelValues...)),
 	}
 }
 
-func (spg SampleAndWaterMarkPairGenerator) metrics() Registerables {
-	return spg.urGenerator.metrics()
+func (spg DelegatingRatioedChangeObserverPairGenerator) Metrics() Registerables {
+	return spg.urGenerator.Metrics()
 }
 
 // SampleAndWaterMarkObserverGenerator creates RatioedChangeObservers that
@@ -117,7 +116,7 @@ func (swg *sampleAndWaterMarkObserverGenerator) Generate(initialNumerator, initi
 		}}
 }
 
-func (swg *sampleAndWaterMarkObserverGenerator) metrics() Registerables {
+func (swg *sampleAndWaterMarkObserverGenerator) Metrics() Registerables {
 	return Registerables{swg.samples, swg.waterMarks}
 }
 

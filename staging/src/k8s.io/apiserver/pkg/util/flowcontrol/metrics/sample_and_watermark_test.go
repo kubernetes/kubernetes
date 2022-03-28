@@ -61,7 +61,7 @@ func TestSampler(t *testing.T) {
 		&compbasemetrics.HistogramOpts{Name: "marks", Buckets: buckets},
 		[]string{})
 	saw := gen.Generate(0, 1, []string{})
-	toRegister := gen.metrics()
+	toRegister := gen.Metrics()
 	registry := compbasemetrics.NewKubeRegistry()
 	for _, reg := range toRegister {
 		registry.MustRegister(reg)

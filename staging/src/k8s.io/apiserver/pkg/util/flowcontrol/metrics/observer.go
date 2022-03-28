@@ -45,7 +45,11 @@ type RatioedChangeObserver interface {
 // RatioedChangeObserverGenerator creates related observers that are
 // differentiated by a series of label values
 type RatioedChangeObserverGenerator interface {
+	// Generate makes one observer
 	Generate(initialNumerator, initialDenominator float64, labelValues []string) RatioedChangeObserver
+
+	// Metrics is for initialization
+	Metrics() Registerables
 }
 
 // RatioedChangeObserverPair is a corresponding pair of observers, one for the
@@ -61,5 +65,9 @@ type RatioedChangeObserverPair struct {
 
 // RatioedChangeObserverPairGenerator generates pairs
 type RatioedChangeObserverPairGenerator interface {
+	// Generate makes one pair
 	Generate(initialWaitingDenominator, initialExecutingDenominator float64, labelValues []string) RatioedChangeObserverPair
+
+	// Metrics is for initialization
+	Metrics() Registerables
 }
