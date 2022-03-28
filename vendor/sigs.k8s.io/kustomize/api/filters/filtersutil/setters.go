@@ -21,13 +21,46 @@ func SetEntry(key, value, tag string) SetFn {
 		Value: value,
 		Tag:   tag,
 	}
-	if tag == yaml.NodeTagString && yaml.IsYaml1_1NonString(n) {
-		n.Style = yaml.DoubleQuotedStyle
-	}
 	return func(node *yaml.RNode) error {
 		return node.PipeE(yaml.FieldSetter{
 			Name:  key,
 			Value: yaml.NewRNode(n),
 		})
+	}
+}
+
+type TrackableSetter struct {
+	// SetValueCallback will be invoked each time a field is set
+	setValueCallback func(key, value, tag string, node *yaml.RNode)
+}
+
+// WithMutationTracker registers a callback which will be invoked each time a field is mutated
+func (s *TrackableSetter) WithMutationTracker(callback func(key, value, tag string, node *yaml.RNode)) {
+	s.setValueCallback = callback
+}
+
+// SetScalar returns a SetFn to set a scalar value
+// if a mutation tracker has been registered, the tracker will be invoked each
+// time a scalar is set
+func (s TrackableSetter) SetScalar(value string) SetFn {
+	origSetScalar := SetScalar(value)
+	return func(node *yaml.RNode) error {
+		if s.setValueCallback != nil {
+			s.setValueCallback("", value, "", node)
+		}
+		return origSetScalar(node)
+	}
+}
+
+// SetEntry returns a SetFn to set an entry in a map
+// if a mutation tracker has been registered, the tracker will be invoked each
+// time an entry is set
+func (s TrackableSetter) SetEntry(key, value, tag string) SetFn {
+	origSetEntry := SetEntry(key, value, tag)
+	return func(node *yaml.RNode) error {
+		if s.setValueCallback != nil {
+			s.setValueCallback(key, value, tag, node)
+		}
+		return origSetEntry(node)
 	}
 }

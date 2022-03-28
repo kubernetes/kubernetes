@@ -3,6 +3,7 @@ package utils
 import "sigs.k8s.io/kustomize/api/konfig"
 
 const (
+	// build annotations
 	BuildAnnotationPreviousKinds      = konfig.ConfigAnnoDomain + "/previousKinds"
 	BuildAnnotationPreviousNames      = konfig.ConfigAnnoDomain + "/previousNames"
 	BuildAnnotationPrefixes           = konfig.ConfigAnnoDomain + "/prefixes"
@@ -17,7 +18,9 @@ const (
 	BuildAnnotationAllowNameChange = konfig.ConfigAnnoDomain + "/allowNameChange"
 	BuildAnnotationAllowKindChange = konfig.ConfigAnnoDomain + "/allowKindChange"
 
-	OriginAnnotation = "config.kubernetes.io/origin"
+	// for keeping track of origin and transformer data
+	OriginAnnotationKey      = "config.kubernetes.io/origin"
+	TransformerAnnotationKey = "alpha.config.kubernetes.io/transformations"
 
 	Enabled = "enabled"
 )

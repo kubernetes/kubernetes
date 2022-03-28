@@ -294,7 +294,7 @@ func (r *ByteReader) decode(originalYAML string, index int, decoder *yaml.Decode
 		return nil, io.EOF
 	}
 	if err != nil {
-		return nil, errors.Wrap(err)
+		return nil, errors.WrapPrefixf(err, "MalformedYAMLError")
 	}
 
 	if yaml.IsYNodeEmptyDoc(node) {

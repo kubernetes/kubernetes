@@ -1,7 +1,7 @@
-// Copyright 2019 The Kubernetes Authors.
+// Copyright 2021 The Kubernetes Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-package prefixsuffix
+package suffix
 
 import (
 	"fmt"
@@ -13,15 +13,22 @@ import (
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 )
 
-// Filter applies resource name prefix's and suffix's using the fieldSpecs
+// Filter applies resource name suffix's using the fieldSpecs
 type Filter struct {
-	Prefix string `json:"prefix,omitempty" yaml:"prefix,omitempty"`
 	Suffix string `json:"suffix,omitempty" yaml:"suffix,omitempty"`
 
 	FieldSpec types.FieldSpec `json:"fieldSpec,omitempty" yaml:"fieldSpec,omitempty"`
+
+	trackableSetter filtersutil.TrackableSetter
 }
 
 var _ kio.Filter = Filter{}
+var _ kio.TrackableFilter = &Filter{}
+
+// WithMutationTracker registers a callback which will be invoked each time a field is mutated
+func (f *Filter) WithMutationTracker(callback func(key, value, tag string, node *yaml.RNode)) {
+	f.trackableSetter.WithMutationTracker(callback)
+}
 
 func (f Filter) Filter(nodes []*yaml.RNode) ([]*yaml.RNode, error) {
 	return kio.FilterAll(yaml.FilterFunc(f.run)).Filter(nodes)
@@ -38,6 +45,6 @@ func (f Filter) run(node *yaml.RNode) (*yaml.RNode, error) {
 }
 
 func (f Filter) evaluateField(node *yaml.RNode) error {
-	return filtersutil.SetScalar(fmt.Sprintf(
-		"%s%s%s", f.Prefix, node.YNode().Value, f.Suffix))(node)
+	return f.trackableSetter.SetScalar(fmt.Sprintf(
+		"%s%s", node.YNode().Value, f.Suffix))(node)
 }
