@@ -24,7 +24,7 @@ import (
 
 	restful "github.com/emicklei/go-restful"
 
-	builderutil "k8s.io/kube-openapi/pkg/builder3/util"
+	// builderutil "k8s.io/kube-openapi/pkg/builder3/util"
 	"k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/common/restfuladapter"
 	"k8s.io/kube-openapi/pkg/spec3"
@@ -432,7 +432,7 @@ func (o *openAPI) buildDefinitionRecursively(name string) error {
 		}
 		// delete the embedded v2 schema if exists, otherwise no-op
 		delete(schema.VendorExtensible.Extensions, common.ExtensionV2Schema)
-		schema = builderutil.WrapRefs(schema)
+		// schema = builderutil.WrapRefs(schema)
 		o.spec.Components.Schemas[uniqueName] = schema
 		for _, v := range item.Dependencies {
 			if err := o.buildDefinitionRecursively(v); err != nil {
