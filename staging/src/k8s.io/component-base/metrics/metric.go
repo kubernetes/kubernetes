@@ -22,6 +22,7 @@ import (
 	"github.com/blang/semver"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
+	thprom "k8s.io/component-base/metrics/prometheusextension"
 
 	"k8s.io/klog/v2"
 )
@@ -203,6 +204,7 @@ func (c *selfCollector) Collect(ch chan<- prometheus.Metric) {
 // no-op vecs for convenience
 var noopCounterVec = &prometheus.CounterVec{}
 var noopHistogramVec = &prometheus.HistogramVec{}
+var noopTimingHistogramVec = &thprom.TimingHistogramVec{}
 var noopGaugeVec = &prometheus.GaugeVec{}
 var noopObserverVec = &noopObserverVector{}
 

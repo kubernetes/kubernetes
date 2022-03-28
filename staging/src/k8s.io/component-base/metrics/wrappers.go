@@ -70,6 +70,15 @@ type ObserverMetric interface {
 	Observe(float64)
 }
 
+// WritableVariable is a `float64`-valued variable that can be written to.
+type WritableVariable interface {
+	// Set the variable to the given value.
+	Set(float64)
+
+	// Add the given change to the variable
+	Add(float64)
+}
+
 // PromRegistry is an interface which implements a subset of prometheus.Registerer and
 // prometheus.Gatherer interfaces
 type PromRegistry interface {
