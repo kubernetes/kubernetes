@@ -22,6 +22,7 @@ import (
 	"os"
 	"strings"
 
+	"k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 	"k8s.io/kubernetes/pkg/generated/openapi"
 )
@@ -42,6 +43,18 @@ func output() error {
 	defs := openapi.GetOpenAPIDefinitions(refFunc)
 	schemaDefs := make(map[string]spec.Schema, len(defs))
 	for k, v := range defs {
+		// Replace top-level schema with v2 if a v2 schema is embedded
+		// so that the output of this program is always in OpenAPI v2.
+		// This is done by looking up an extension that marks the embedded v2
+		// schema, and, if the v2 schema is found, make it the resulting schema for
+		// the type.
+		if schema, ok := v.Schema.Extensions[common.ExtensionV2Schema]; ok {
+			if v2Schema, isOpenAPISchema := schema.(spec.Schema); isOpenAPISchema {
+				schemaDefs[friendlyName(k)] = v2Schema
+				continue
+			}
+		}
+
 		schemaDefs[friendlyName(k)] = v.Schema
 	}
 	data, err := json.Marshal(&spec.Swagger{
