@@ -114,10 +114,12 @@ var (
 
 // AddSpecialVerb allows the addition of items to the `specialVerbs` map for non-k8s native resources.
 func AddSpecialVerb(verb string, gr schema.GroupResource) {
-	if resources, ok := specialVerbs[verb]; ok {
-		resources = append(resources, gr)
-		specialVerbs[verb] = resources
+	resources, ok := specialVerbs[verb]
+	if !ok {
+		resources = make([]schema.GroupResource, 1)
 	}
+	resources = append(resources, gr)
+	specialVerbs[verb] = resources
 }
 
 // ResourceOptions holds the related options for '--resource' option
