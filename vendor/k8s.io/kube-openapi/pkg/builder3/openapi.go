@@ -24,6 +24,7 @@ import (
 
 	restful "github.com/emicklei/go-restful"
 
+	builderutil "k8s.io/kube-openapi/pkg/builder3/util"
 	"k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/common/restfuladapter"
 	"k8s.io/kube-openapi/pkg/spec3"
@@ -36,7 +37,7 @@ const (
 )
 
 type openAPI struct {
-	config      *common.Config
+	config      *common.OpenAPIV3Config
 	spec        *spec3.OpenAPI
 	definitions map[string]common.OpenAPIDefinition
 }
@@ -83,6 +84,15 @@ func (o *openAPI) buildOperations(route common.Route, inPathCommonParamsMap map[
 			},
 		},
 	}
+	for k, v := range route.Metadata() {
+		if strings.HasPrefix(k, common.ExtensionPrefix) {
+			if ret.Extensions == nil {
+				ret.Extensions = spec.Extensions{}
+			}
+			ret.Extensions.Add(k, v)
+		}
+	}
+
 	var err error
 	if ret.OperationId, ret.Tags, err = o.config.GetOperationIDAndTagsFromRoute(route); err != nil {
 		return ret, err
@@ -104,9 +114,16 @@ func (o *openAPI) buildOperations(route common.Route, inPathCommonParamsMap map[
 		}
 	}
 
-	// TODO: Default response if needed. Common Response config
+	for code, resp := range o.config.CommonResponses {
+		if _, exists := ret.Responses.StatusCodeResponses[code]; !exists {
+			ret.Responses.StatusCodeResponses[code] = resp
+		}
+	}
 
-	ret.Parameters = make([]*spec3.Parameter, 0)
+	if len(ret.Responses.StatusCodeResponses) == 0 {
+		ret.Responses.Default = o.config.DefaultResponse
+	}
+
 	params := route.Parameters()
 	for _, param := range params {
 		_, isCommon := inPathCommonParamsMap[mapKeyFromParam(param)]
@@ -119,7 +136,7 @@ func (o *openAPI) buildOperations(route common.Route, inPathCommonParamsMap map[
 		}
 	}
 
-	body, err := o.buildRequestBody(params, route.RequestPayloadSample())
+	body, err := o.buildRequestBody(params, route.Consumes(), route.RequestPayloadSample())
 	if err != nil {
 		return nil, err
 	}
@@ -130,7 +147,7 @@ func (o *openAPI) buildOperations(route common.Route, inPathCommonParamsMap map[
 	return ret, nil
 }
 
-func (o *openAPI) buildRequestBody(parameters []common.Parameter, bodySample interface{}) (*spec3.RequestBody, error) {
+func (o *openAPI) buildRequestBody(parameters []common.Parameter, consumes []string, bodySample interface{}) (*spec3.RequestBody, error) {
 	for _, param := range parameters {
 		if param.Kind() == common.BodyParameterKind && bodySample != nil {
 			schema, err := o.toSchema(util.GetCanonicalTypeName(bodySample))
@@ -139,14 +156,15 @@ func (o *openAPI) buildRequestBody(parameters []common.Parameter, bodySample int
 			}
 			r := &spec3.RequestBody{
 				RequestBodyProps: spec3.RequestBodyProps{
-					Content: map[string]*spec3.MediaType{
-						"application/json": &spec3.MediaType{
-							MediaTypeProps: spec3.MediaTypeProps{
-								Schema: schema,
-							},
-						},
-					},
+					Content: map[string]*spec3.MediaType{},
 				},
+			}
+			for _, consume := range consumes {
+				r.Content[consume] = &spec3.MediaType{
+					MediaTypeProps: spec3.MediaTypeProps{
+						Schema: schema,
+					},
+				}
 			}
 			return r, nil
 		}
@@ -156,7 +174,7 @@ func (o *openAPI) buildRequestBody(parameters []common.Parameter, bodySample int
 
 func newOpenAPI(config *common.Config) openAPI {
 	o := openAPI{
-		config: config,
+		config: common.ConvertConfigToV3(config),
 		spec: &spec3.OpenAPI{
 			Version: "3.0.0",
 			Info:    config.Info,
@@ -167,6 +185,21 @@ func newOpenAPI(config *common.Config) openAPI {
 				Schemas: map[string]*spec.Schema{},
 			},
 		},
+	}
+	if len(o.config.ResponseDefinitions) > 0 {
+		o.spec.Components.Responses = make(map[string]*spec3.Response)
+
+	}
+	for k, response := range o.config.ResponseDefinitions {
+		o.spec.Components.Responses[k] = response
+	}
+
+	if len(o.config.SecuritySchemes) > 0 {
+		o.spec.Components.SecuritySchemes = make(spec3.SecuritySchemes)
+
+	}
+	for k, securityScheme := range o.config.SecuritySchemes {
+		o.spec.Components.SecuritySchemes[k] = securityScheme
 	}
 
 	if o.config.GetOperationIDAndTagsFromRoute == nil {
@@ -193,15 +226,13 @@ func newOpenAPI(config *common.Config) openAPI {
 		}
 	}
 
-	if config.Definitions != nil {
-		o.definitions = config.Definitions
+	if o.config.Definitions != nil {
+		o.definitions = o.config.Definitions
 	} else {
 		o.definitions = o.config.GetDefinitions(func(name string) spec.Ref {
 			defName, _ := o.config.GetDefinitionName(name)
 			return spec.MustCreateRef("#/components/schemas/" + common.EscapeJsonPointer(defName))
 		})
-
-		config.Definitions = o.definitions
 	}
 
 	return o
@@ -241,9 +272,7 @@ func (o *openAPI) buildOpenAPISpec(webServices []common.RouteContainer) error {
 			}
 
 			pathItem = &spec3.Path{
-				PathProps: spec3.PathProps{
-					Parameters: make([]*spec3.Parameter, 0),
-				},
+				PathProps: spec3.PathProps{},
 			}
 
 			// add web services's parameters as well as any parameters appears in all ops, as common parameters
@@ -255,6 +284,7 @@ func (o *openAPI) buildOpenAPISpec(webServices []common.RouteContainer) error {
 
 			for _, route := range routes {
 				op, _ := o.buildOperations(route, inPathCommonParamsMap)
+				sortParameters(op.Parameters)
 
 				switch strings.ToUpper(route.Method()) {
 				case "GET":
@@ -402,6 +432,7 @@ func (o *openAPI) buildDefinitionRecursively(name string) error {
 		}
 		// delete the embedded v2 schema if exists, otherwise no-op
 		delete(schema.VendorExtensible.Extensions, common.ExtensionV2Schema)
+		schema = builderutil.WrapRefs(schema)
 		o.spec.Components.Schemas[uniqueName] = schema
 		for _, v := range item.Dependencies {
 			if err := o.buildDefinitionRecursively(v); err != nil {
