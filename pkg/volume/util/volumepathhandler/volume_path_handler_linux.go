@@ -37,7 +37,7 @@ import (
 // AttachFileDevice takes a path to a regular file and makes it available as an
 // attached block device.
 func (v VolumePathHandler) AttachFileDevice(path string) (string, error) {
-	blockDevicePath, err := v.GetLoopDevice(path)
+	blockDevicePath, err := v.GetLoopDevice(path, false)
 	if err != nil && err.Error() != ErrDeviceNotFound {
 		return "", fmt.Errorf("GetLoopDevice failed for path %s: %v", path, err)
 	}
@@ -56,7 +56,7 @@ func (v VolumePathHandler) AttachFileDevice(path string) (string, error) {
 // DetachFileDevice takes a path to the attached block device and
 // detach it from block device.
 func (v VolumePathHandler) DetachFileDevice(path string) error {
-	loopPath, err := v.GetLoopDevice(path)
+	loopPath, err := v.GetLoopDevice(path, true)
 	if err != nil {
 		if err.Error() == ErrDeviceNotFound {
 			klog.Warningf("couldn't find loopback device which takes file descriptor lock. Skip detaching device. device path: %q", path)
@@ -75,7 +75,7 @@ func (v VolumePathHandler) DetachFileDevice(path string) error {
 }
 
 // GetLoopDevice returns the full path to the loop device associated with the given path.
-func (v VolumePathHandler) GetLoopDevice(path string) (string, error) {
+func (v VolumePathHandler) GetLoopDevice(path string, detectDeletedDevice bool) (string, error) {
 	_, err := os.Stat(path)
 	if os.IsNotExist(err) {
 		return "", errors.New(ErrDeviceNotFound)
@@ -84,7 +84,7 @@ func (v VolumePathHandler) GetLoopDevice(path string) (string, error) {
 		return "", fmt.Errorf("not attachable: %v", err)
 	}
 
-	return getLoopDeviceFromSysfs(path)
+	return getLoopDeviceFromSysfs(path, detectDeletedDevice)
 }
 
 func makeLoopDevice(path string) (string, error) {
@@ -97,7 +97,7 @@ func makeLoopDevice(path string) (string, error) {
 		return "", fmt.Errorf("losetup %s failed: %v", strings.Join(args, " "), err)
 	}
 
-	return getLoopDeviceFromSysfs(path)
+	return getLoopDeviceFromSysfs(path, false)
 }
 
 // removeLoopDevice removes specified loopback device
@@ -117,7 +117,7 @@ func removeLoopDevice(device string) error {
 
 // getLoopDeviceFromSysfs finds the backing file for a loop
 // device from sysfs via "/sys/block/loop*/loop/backing_file".
-func getLoopDeviceFromSysfs(path string) (string, error) {
+func getLoopDeviceFromSysfs(path string, detectDeletedDevice bool) (string, error) {
 	// If the file is a symlink.
 	realPath, err := filepath.EvalSymlinks(path)
 	if err != nil {
@@ -140,6 +140,9 @@ func getLoopDeviceFromSysfs(path string) (string, error) {
 
 		// Return the first match.
 		backingFilePath := strings.TrimSpace(string(data))
+		if detectDeletedDevice && strings.HasSuffix(backingFilePath, " (deleted)") {
+			backingFilePath = strings.TrimSuffix(backingFilePath, " (deleted)")
+		}
 		if backingFilePath == path || backingFilePath == realPath {
 			return fmt.Sprintf("/dev/%s", filepath.Base(device)), nil
 		}

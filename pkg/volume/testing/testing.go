@@ -1230,7 +1230,7 @@ func (fv *FakeVolumePathHandler) DetachFileDevice(path string) error {
 	return nil
 }
 
-func (fv *FakeVolumePathHandler) GetLoopDevice(path string) (string, error) {
+func (fv *FakeVolumePathHandler) GetLoopDevice(path string, detectDeletedDevice bool) (string, error) {
 	// nil is success, else error
 	return "/dev/loop1", nil
 }

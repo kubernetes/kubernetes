@@ -58,7 +58,7 @@ type BlockVolumePathHandler interface {
 	// detach it from block device.
 	DetachFileDevice(path string) error
 	// GetLoopDevice returns the full path to the loop device associated with the given path.
-	GetLoopDevice(path string) (string, error)
+	GetLoopDevice(path string, detectDeletedDevice bool) (string, error)
 }
 
 // NewBlockVolumePathHandler returns a new instance of BlockVolumeHandler.

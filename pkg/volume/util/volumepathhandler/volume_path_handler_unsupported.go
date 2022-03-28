@@ -38,7 +38,7 @@ func (v VolumePathHandler) DetachFileDevice(path string) error {
 }
 
 // GetLoopDevice returns the full path to the loop device associated with the given path.
-func (v VolumePathHandler) GetLoopDevice(path string) (string, error) {
+func (v VolumePathHandler) GetLoopDevice(path string, detectDeletedDevice bool) (string, error) {
 	return "", fmt.Errorf("GetLoopDevice not supported for this build.")
 }
 
