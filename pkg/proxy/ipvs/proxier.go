@@ -1951,14 +1951,6 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 
 	// curEndpoints represents IPVS destinations listed from current system.
 	curEndpoints := sets.NewString()
-	// readyEndpoints represents Endpoints watched from API Server.
-	readyEndpoints := sets.NewString()
-	// localReadyEndpoints represents local endpoints that are ready and NOT terminating.
-	localReadyEndpoints := sets.NewString()
-	// localReadyTerminatingEndpoints represents local endpoints that are ready AND terminating.
-	// Fall back to these endpoints if no non-terminating ready endpoints exist for node-local traffic.
-	localReadyTerminatingEndpoints := sets.NewString()
-
 	curDests, err := proxier.ipvs.GetRealServers(appliedVirtualServer)
 	if err != nil {
 		klog.ErrorS(err, "Failed to list IPVS destinations")
@@ -1978,32 +1970,17 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 	if !ok {
 		klog.InfoS("Unable to filter endpoints due to missing service info", "servicePortName", svcPortName)
 	} else {
-		endpoints = proxy.FilterEndpoints(endpoints, svcInfo, proxier.nodeLabels)
+		clusterEndpoints, localEndpoints, _, _ := proxy.CategorizeEndpoints(endpoints, svcInfo, proxier.nodeLabels)
+		if onlyNodeLocalEndpoints {
+			endpoints = localEndpoints
+		} else {
+			endpoints = clusterEndpoints
+		}
 	}
 
+	newEndpoints := sets.NewString()
 	for _, epInfo := range endpoints {
-		if epInfo.IsReady() {
-			readyEndpoints.Insert(epInfo.String())
-		}
-
-		if onlyNodeLocalEndpoints && epInfo.GetIsLocal() {
-			if epInfo.IsReady() {
-				localReadyEndpoints.Insert(epInfo.String())
-			} else if epInfo.IsServing() && epInfo.IsTerminating() {
-				localReadyTerminatingEndpoints.Insert(epInfo.String())
-			}
-		}
-	}
-
-	newEndpoints := readyEndpoints
-	if onlyNodeLocalEndpoints {
-		newEndpoints = localReadyEndpoints
-
-		if utilfeature.DefaultFeatureGate.Enabled(features.ProxyTerminatingEndpoints) {
-			if len(newEndpoints) == 0 && localReadyTerminatingEndpoints.Len() > 0 {
-				newEndpoints = localReadyTerminatingEndpoints
-			}
-		}
+		newEndpoints.Insert(epInfo.String())
 	}
 
 	// Create new endpoints
