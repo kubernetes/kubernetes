@@ -18,6 +18,7 @@ package audit
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
@@ -30,10 +31,7 @@ type key int
 
 const (
 	// auditAnnotationsKey is the context key for the audit annotations.
-	// TODO: it's wasteful to store the audit annotations under a separate key, we
-	//  copy the request context twice for audit purposes. We should move the audit
-	//  annotations under AuditContext so we can get rid of the additional request
-	//  context copy.
+	// TODO: consolidate all audit info under the AuditContext, rather than storing 3 separate keys.
 	auditAnnotationsKey key = iota
 
 	// auditKey is the context key for storing the audit event that is being
@@ -75,25 +73,80 @@ func WithAuditAnnotations(parent context.Context) context.Context {
 func AddAuditAnnotation(ctx context.Context, key, value string) {
 	mutex, ok := auditAnnotationsMutex(ctx)
 	if !ok {
-		klog.Errorf("Attempted to add audit annotation from unsupported request chain: %q=%q", key, value)
+		klog.ErrorS(nil, "Attempted to add audit annotations from unsupported request chain", "annotation", fmt.Sprintf("%s=%s", key, value))
 		return
 	}
 
 	mutex.Lock()
 	defer mutex.Unlock()
 
-	// use the audit event directly if we have it
-	if ae := AuditEventFrom(ctx); ae != nil {
-		LogAnnotation(ae, key, value)
+	ae := AuditEventFrom(ctx)
+	var ctxAnnotations *[]annotation
+	if ae == nil {
+		ctxAnnotations, _ = ctx.Value(auditAnnotationsKey).(*[]annotation)
+	}
+
+	addAuditAnnotationLocked(ae, ctxAnnotations, key, value)
+}
+
+// AddAuditAnnotations is a bulk version of AddAuditAnnotation. Refer to AddAuditAnnotation for
+// restrictions on when this can be called.
+// keysAndValues are the key-value pairs to add, and must have an even number of items.
+func AddAuditAnnotations(ctx context.Context, keysAndValues ...string) {
+	mutex, ok := auditAnnotationsMutex(ctx)
+	if !ok {
+		klog.ErrorS(nil, "Attempted to add audit annotations from unsupported request chain", "annotations", keysAndValues)
 		return
 	}
 
-	annotations, ok := ctx.Value(auditAnnotationsKey).(*[]annotation)
-	if !ok {
-		return // adding audit annotation is not supported at this call site
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	ae := AuditEventFrom(ctx)
+	var ctxAnnotations *[]annotation
+	if ae == nil {
+		ctxAnnotations, _ = ctx.Value(auditAnnotationsKey).(*[]annotation)
 	}
 
-	*annotations = append(*annotations, annotation{key: key, value: value})
+	if len(keysAndValues)%2 != 0 {
+		klog.Errorf("Dropping mismatched audit annotation %q", keysAndValues[len(keysAndValues)-1])
+	}
+	for i := 0; i < len(keysAndValues); i += 2 {
+		addAuditAnnotationLocked(ae, ctxAnnotations, keysAndValues[i], keysAndValues[i+1])
+	}
+}
+
+// AddAuditAnnotationsMap is a bulk version of AddAuditAnnotation. Refer to AddAuditAnnotation for
+// restrictions on when this can be called.
+func AddAuditAnnotationsMap(ctx context.Context, annotations map[string]string) {
+	mutex, ok := auditAnnotationsMutex(ctx)
+	if !ok {
+		klog.ErrorS(nil, "Attempted to add audit annotations from unsupported request chain", "annotations", annotations)
+		return
+	}
+
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	ae := AuditEventFrom(ctx)
+	var ctxAnnotations *[]annotation
+	if ae == nil {
+		ctxAnnotations, _ = ctx.Value(auditAnnotationsKey).(*[]annotation)
+	}
+
+	for k, v := range annotations {
+		addAuditAnnotationLocked(ae, ctxAnnotations, k, v)
+	}
+}
+
+// addAuditAnnotationLocked is the shared code for recording an audit annotation. This method should
+// only be called while the auditAnnotationsMutex is locked.
+func addAuditAnnotationLocked(ae *auditinternal.Event, annotations *[]annotation, key, value string) {
+	if ae != nil {
+		logAnnotation(ae, key, value)
+	} else if annotations != nil {
+		*annotations = append(*annotations, annotation{key: key, value: value})
+	}
 }
 
 // This is private to prevent reads/write to the slice from outside of this package.
@@ -114,8 +167,23 @@ func addAuditAnnotationsFrom(ctx context.Context, ev *auditinternal.Event) {
 	}
 
 	for _, kv := range *annotations {
-		LogAnnotation(ev, kv.key, kv.value)
+		logAnnotation(ev, kv.key, kv.value)
 	}
+}
+
+// LogAnnotation fills in the Annotations according to the key value pair.
+func logAnnotation(ae *auditinternal.Event, key, value string) {
+	if ae == nil || ae.Level.Less(auditinternal.LevelMetadata) {
+		return
+	}
+	if ae.Annotations == nil {
+		ae.Annotations = make(map[string]string)
+	}
+	if v, ok := ae.Annotations[key]; ok && v != value {
+		klog.Warningf("Failed to set annotations[%q] to %q for audit:%q, it has already been set to %q", key, value, ae.AuditID, ae.Annotations[key])
+		return
+	}
+	ae.Annotations[key] = value
 }
 
 // WithAuditContext returns a new context that stores the pair of the audit

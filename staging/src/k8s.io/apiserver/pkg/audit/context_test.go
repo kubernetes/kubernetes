@@ -97,6 +97,20 @@ func TestAddAuditAnnotation(t *testing.T) {
 	}
 }
 
+func TestLogAnnotation(t *testing.T) {
+	ev := &auditinternal.Event{
+		Level:   auditinternal.LevelMetadata,
+		AuditID: "fake id",
+	}
+	logAnnotation(ev, "foo", "bar")
+	logAnnotation(ev, "foo", "baz")
+	assert.Equal(t, "bar", ev.Annotations["foo"], "audit annotation should not be overwritten.")
+
+	logAnnotation(ev, "qux", "")
+	logAnnotation(ev, "qux", "baz")
+	assert.Equal(t, "", ev.Annotations["qux"], "audit annotation should not be overwritten.")
+}
+
 func newAuditContext(l auditinternal.Level) *AuditContext {
 	return &AuditContext{
 		Event: &auditinternal.Event{
