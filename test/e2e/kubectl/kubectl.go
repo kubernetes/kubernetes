@@ -1003,7 +1003,7 @@ metadata:
 		return nil
 	}
 
-	ginkgo.Describe("Kubectl client-side validation", func() {
+	ginkgo.Describe("Kubectl validation", func() {
 		ginkgo.It("should create/apply a CR with unknown fields for CRD with no validation schema", func() {
 			ginkgo.By("create CRD with no validation schema")
 			crd, err := crd.CreateTestCRD(f)
@@ -1048,7 +1048,7 @@ metadata:
 			}
 		})
 
-		ginkgo.It("should create/apply a valid CR with arbitrary-extra properties for CRD with partially-specified validation schema", func() {
+		ginkgo.It("should create/apply an invalid/valid CR with arbitrary-extra properties for CRD with partially-specified validation schema", func() {
 			ginkgo.By("prepare CRD with partially-specified validation schema")
 			crd, err := crd.CreateTestCRD(f, func(crd *apiextensionsv1.CustomResourceDefinition) {
 				props := &apiextensionsv1.JSONSchemaProps{}
@@ -1073,6 +1073,15 @@ metadata:
 			framework.ExpectNotEqual(schema, nil, "retrieving a schema for the crd")
 
 			meta := fmt.Sprintf(metaPattern, crd.Crd.Spec.Names.Kind, crd.Crd.Spec.Group, crd.Crd.Spec.Versions[0].Name, "test-cr")
+
+			// XPreserveUnknownFields is defined on the root of the schema so unknown fields within the spec
+			// are still considered invalid
+			invalidArbitraryCR := fmt.Sprintf(`{%s,"spec":{"bars":[{"name":"test-bar"}],"extraProperty":"arbitrary-value"}}`, meta)
+			err = createApplyCustomResource(invalidArbitraryCR, f.Namespace.Name, "test-cr", crd)
+			framework.ExpectError(err, "creating custom resource")
+			if !strings.Contains(err.Error(), `unknown field "spec.extraProperty"`) {
+				framework.Failf("incorrect error from createApplyCustomResource: %v", err)
+			}
 
 			// unknown fields on the root are considered valid
 			validArbitraryCR := fmt.Sprintf(`{%s,"spec":{"bars":[{"name":"test-bar"}]},"extraProperty":"arbitrary-value"}`, meta)
@@ -2153,7 +2162,7 @@ func startLocalProxy() (srv *httptest.Server, logs *bytes.Buffer) {
 }
 
 // createApplyCustomResource asserts that given CustomResource be created and applied
-// without being rejected by client-side validation
+// without being rejected by kubectl validation
 func createApplyCustomResource(resource, namespace, name string, crd *crd.TestCrd) error {
 	ginkgo.By("successfully create CR")
 	if _, err := framework.RunKubectlInput(namespace, resource, "create", "--validate=true", "-f", "-"); err != nil {
