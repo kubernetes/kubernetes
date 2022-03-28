@@ -4835,6 +4835,183 @@ func TestTestInternalTrafficPolicyE2E(t *testing.T) {
 	}
 }
 
+// Test_EndpointSliceReadyAndTerminatingCluster tests that when there are ready and ready + terminating
+// endpoints and the traffic policy is "Cluster", only the ready endpoints are used.
+func Test_EndpointSliceReadyAndTerminatingCluster(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ProxyTerminatingEndpoints, true)()
+
+	ipt := iptablestest.NewFake()
+	ipvs := ipvstest.NewFake()
+	ipset := ipsettest.NewFake(testIPSetVersion)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
+	fp.servicesSynced = true
+	// fp.endpointsSynced = true
+	fp.endpointSlicesSynced = true
+
+	clusterInternalTrafficPolicy := v1.ServiceInternalTrafficPolicyCluster
+
+	serviceName := "svc1"
+	// Add initial service
+	namespaceName := "ns1"
+	fp.OnServiceAdd(&v1.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: namespaceName},
+		Spec: v1.ServiceSpec{
+			ClusterIP:             "172.20.1.1",
+			Selector:              map[string]string{"foo": "bar"},
+			Type:                  v1.ServiceTypeNodePort,
+			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+			InternalTrafficPolicy: &clusterInternalTrafficPolicy,
+			ExternalIPs: []string{
+				"1.2.3.4",
+			},
+			Ports: []v1.ServicePort{
+				{
+					Name:       "",
+					Port:       80,
+					TargetPort: intstr.FromInt(80),
+					Protocol:   v1.ProtocolTCP,
+				},
+			},
+		},
+	})
+
+	// Add initial endpoint slice
+	tcpProtocol := v1.ProtocolTCP
+	endpointSlice := &discovery.EndpointSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-1", serviceName),
+			Namespace: namespaceName,
+			Labels:    map[string]string{discovery.LabelServiceName: serviceName},
+		},
+		Ports: []discovery.EndpointPort{{
+			Name:     utilpointer.StringPtr(""),
+			Port:     utilpointer.Int32Ptr(80),
+			Protocol: &tcpProtocol,
+		}},
+		AddressType: discovery.AddressTypeIPv4,
+		Endpoints: []discovery.Endpoint{
+			{
+				Addresses: []string{"10.0.1.1"},
+				Conditions: discovery.EndpointConditions{
+					Ready:       utilpointer.BoolPtr(true),
+					Serving:     utilpointer.BoolPtr(true),
+					Terminating: utilpointer.BoolPtr(false),
+				},
+				NodeName: utilpointer.StringPtr(testHostname),
+			},
+			{
+				Addresses: []string{"10.0.1.2"},
+				Conditions: discovery.EndpointConditions{
+					Ready:       utilpointer.BoolPtr(true),
+					Serving:     utilpointer.BoolPtr(true),
+					Terminating: utilpointer.BoolPtr(false),
+				},
+				NodeName: utilpointer.StringPtr(testHostname),
+			},
+			{
+				Addresses: []string{"10.0.1.3"},
+				Conditions: discovery.EndpointConditions{
+					Ready:       utilpointer.BoolPtr(false),
+					Serving:     utilpointer.BoolPtr(true),
+					Terminating: utilpointer.BoolPtr(true),
+				},
+				NodeName: utilpointer.StringPtr(testHostname),
+			},
+			{
+				Addresses: []string{"10.0.1.4"},
+				Conditions: discovery.EndpointConditions{
+					Ready:       utilpointer.BoolPtr(false),
+					Serving:     utilpointer.BoolPtr(false),
+					Terminating: utilpointer.BoolPtr(true),
+				},
+				NodeName: utilpointer.StringPtr(testHostname),
+			},
+			{
+				Addresses: []string{"10.0.1.5"},
+				Conditions: discovery.EndpointConditions{
+					Ready:       utilpointer.BoolPtr(true),
+					Serving:     utilpointer.BoolPtr(true),
+					Terminating: utilpointer.BoolPtr(false),
+				},
+				NodeName: utilpointer.StringPtr("another-host"),
+			},
+		},
+	}
+
+	fp.OnEndpointSliceAdd(endpointSlice)
+	fp.syncProxyRules()
+
+	// Ensure that Proxier updates ipvs appropriately after EndpointSlice update
+	assert.NotNil(t, fp.ipsetList["KUBE-LOOP-BACK"])
+	activeEntries1 := fp.ipsetList["KUBE-LOOP-BACK"].activeEntries
+	assert.Equal(t, 4, activeEntries1.Len(), "Expected 4 active entry in KUBE-LOOP-BACK")
+	assert.Equal(t, true, activeEntries1.Has("10.0.1.1,tcp:80,10.0.1.1"), "Expected activeEntries to reference first pod")
+	assert.Equal(t, true, activeEntries1.Has("10.0.1.2,tcp:80,10.0.1.2"), "Expected activeEntries to reference second pod")
+	assert.Equal(t, true, activeEntries1.Has("10.0.1.3,tcp:80,10.0.1.3"), "Expected activeEntries to reference third pod")
+	assert.Equal(t, true, activeEntries1.Has("10.0.1.4,tcp:80,10.0.1.4"), "Expected activeEntries to reference fourth pod")
+
+	virtualServers, vsErr := ipvs.GetVirtualServers()
+	assert.Nil(t, vsErr, "Expected no error getting virtual servers")
+	assert.Len(t, virtualServers, 2, "Expected 2 virtual server")
+
+	var clusterIPServer, externalIPServer *utilipvs.VirtualServer
+	for _, virtualServer := range virtualServers {
+		if virtualServer.Address.String() == "172.20.1.1" {
+			clusterIPServer = virtualServer
+		}
+
+		if virtualServer.Address.String() == "1.2.3.4" {
+			externalIPServer = virtualServer
+		}
+	}
+
+	// clusterIP should route to cluster-wide ready endpoints
+	realServers1, rsErr1 := ipvs.GetRealServers(clusterIPServer)
+	assert.Nil(t, rsErr1, "Expected no error getting real servers")
+	assert.Len(t, realServers1, 3, "Expected 3 real servers")
+	assert.Equal(t, realServers1[0].String(), "10.0.1.1:80")
+	assert.Equal(t, realServers1[1].String(), "10.0.1.2:80")
+	assert.Equal(t, realServers1[2].String(), "10.0.1.5:80")
+
+	// externalIP should route to cluster-wide ready endpoints
+	realServers2, rsErr2 := ipvs.GetRealServers(externalIPServer)
+	assert.Nil(t, rsErr2, "Expected no error getting real servers")
+	assert.Len(t, realServers2, 3, "Expected 3 real servers")
+	assert.Equal(t, realServers2[0].String(), "10.0.1.1:80")
+	assert.Equal(t, realServers2[1].String(), "10.0.1.2:80")
+	assert.Equal(t, realServers1[2].String(), "10.0.1.5:80")
+
+	fp.OnEndpointSliceDelete(endpointSlice)
+	fp.syncProxyRules()
+
+	// Ensure that Proxier updates ipvs appropriately after EndpointSlice delete
+	assert.NotNil(t, fp.ipsetList["KUBE-LOOP-BACK"])
+	activeEntries2 := fp.ipsetList["KUBE-LOOP-BACK"].activeEntries
+	assert.Equal(t, 0, activeEntries2.Len(), "Expected 0 active entries in KUBE-LOOP-BACK")
+
+	virtualServers, vsErr = ipvs.GetVirtualServers()
+	assert.Nil(t, vsErr, "Expected no error getting virtual servers")
+	assert.Len(t, virtualServers, 2, "Expected 1 virtual server")
+
+	for _, virtualServer := range virtualServers {
+		if virtualServer.Address.String() == "172.20.1.1" {
+			clusterIPServer = virtualServer
+		}
+
+		if virtualServer.Address.String() == "1.2.3.4" {
+			externalIPServer = virtualServer
+		}
+	}
+
+	realServers1, rsErr1 = ipvs.GetRealServers(clusterIPServer)
+	assert.Nil(t, rsErr1, "Expected no error getting real servers")
+	assert.Len(t, realServers1, 0, "Expected 0 real servers")
+
+	realServers2, rsErr2 = ipvs.GetRealServers(externalIPServer)
+	assert.Nil(t, rsErr2, "Expected no error getting real servers")
+	assert.Len(t, realServers2, 0, "Expected 0 real servers")
+}
+
 // Test_EndpointSliceReadyAndTerminatingLocal tests that when there are local ready and ready + terminating
 // endpoints, only the ready endpoints are used.
 func Test_EndpointSliceReadyAndTerminatingLocal(t *testing.T) {
@@ -4979,6 +5156,182 @@ func Test_EndpointSliceReadyAndTerminatingLocal(t *testing.T) {
 	assert.Len(t, realServers2, 2, "Expected 2 real servers")
 	assert.Equal(t, realServers2[0].String(), "10.0.1.1:80")
 	assert.Equal(t, realServers2[1].String(), "10.0.1.2:80")
+
+	fp.OnEndpointSliceDelete(endpointSlice)
+	fp.syncProxyRules()
+
+	// Ensure that Proxier updates ipvs appropriately after EndpointSlice delete
+	assert.NotNil(t, fp.ipsetList["KUBE-LOOP-BACK"])
+	activeEntries2 := fp.ipsetList["KUBE-LOOP-BACK"].activeEntries
+	assert.Equal(t, 0, activeEntries2.Len(), "Expected 0 active entries in KUBE-LOOP-BACK")
+
+	virtualServers, vsErr = ipvs.GetVirtualServers()
+	assert.Nil(t, vsErr, "Expected no error getting virtual servers")
+	assert.Len(t, virtualServers, 2, "Expected 1 virtual server")
+
+	for _, virtualServer := range virtualServers {
+		if virtualServer.Address.String() == "172.20.1.1" {
+			clusterIPServer = virtualServer
+		}
+
+		if virtualServer.Address.String() == "1.2.3.4" {
+			externalIPServer = virtualServer
+		}
+	}
+
+	realServers1, rsErr1 = ipvs.GetRealServers(clusterIPServer)
+	assert.Nil(t, rsErr1, "Expected no error getting real servers")
+	assert.Len(t, realServers1, 0, "Expected 0 real servers")
+
+	realServers2, rsErr2 = ipvs.GetRealServers(externalIPServer)
+	assert.Nil(t, rsErr2, "Expected no error getting real servers")
+	assert.Len(t, realServers2, 0, "Expected 0 real servers")
+}
+
+// Test_EndpointSliceOnlyReadyTerminatingCluster tests that when there are only ready terminating
+// endpoints and the traffic policy is "Cluster",  we fall back to terminating endpoints.
+func Test_EndpointSliceOnlyReadyAndTerminatingCluster(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ProxyTerminatingEndpoints, true)()
+
+	ipt := iptablestest.NewFake()
+	ipvs := ipvstest.NewFake()
+	ipset := ipsettest.NewFake(testIPSetVersion)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
+	fp.servicesSynced = true
+	// fp.endpointsSynced = true
+	fp.endpointSlicesSynced = true
+
+	clusterInternalTrafficPolicy := v1.ServiceInternalTrafficPolicyCluster
+
+	// Add initial service
+	serviceName := "svc1"
+	namespaceName := "ns1"
+	fp.OnServiceAdd(&v1.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: namespaceName},
+		Spec: v1.ServiceSpec{
+			ClusterIP:             "172.20.1.1",
+			Selector:              map[string]string{"foo": "bar"},
+			Type:                  v1.ServiceTypeNodePort,
+			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+			InternalTrafficPolicy: &clusterInternalTrafficPolicy,
+			ExternalIPs: []string{
+				"1.2.3.4",
+			},
+			Ports: []v1.ServicePort{
+				{
+					Name:       "",
+					Port:       80,
+					TargetPort: intstr.FromInt(80),
+					Protocol:   v1.ProtocolTCP,
+				},
+			},
+		},
+	})
+
+	// Add initial endpoint slice
+	tcpProtocol := v1.ProtocolTCP
+	endpointSlice := &discovery.EndpointSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-1", serviceName),
+			Namespace: namespaceName,
+			Labels:    map[string]string{discovery.LabelServiceName: serviceName},
+		},
+		Ports: []discovery.EndpointPort{{
+			Name:     utilpointer.StringPtr(""),
+			Port:     utilpointer.Int32Ptr(80),
+			Protocol: &tcpProtocol,
+		}},
+		AddressType: discovery.AddressTypeIPv4,
+		Endpoints: []discovery.Endpoint{
+			{
+				Addresses: []string{"10.0.1.1"},
+				Conditions: discovery.EndpointConditions{
+					Ready:       utilpointer.BoolPtr(false),
+					Serving:     utilpointer.BoolPtr(true),
+					Terminating: utilpointer.BoolPtr(true),
+				},
+				NodeName: utilpointer.StringPtr(testHostname),
+			},
+			{
+				Addresses: []string{"10.0.1.2"},
+				Conditions: discovery.EndpointConditions{
+					Ready:       utilpointer.BoolPtr(false),
+					Serving:     utilpointer.BoolPtr(true),
+					Terminating: utilpointer.BoolPtr(true),
+				},
+				NodeName: utilpointer.StringPtr(testHostname),
+			},
+			{
+				Addresses: []string{"10.0.1.3"},
+				Conditions: discovery.EndpointConditions{
+					Ready:       utilpointer.BoolPtr(false),
+					Serving:     utilpointer.BoolPtr(false),
+					Terminating: utilpointer.BoolPtr(true),
+				},
+				NodeName: utilpointer.StringPtr(testHostname),
+			},
+			{
+				Addresses: []string{"10.0.1.4"},
+				Conditions: discovery.EndpointConditions{
+					Ready:       utilpointer.BoolPtr(false),
+					Serving:     utilpointer.BoolPtr(true),
+					Terminating: utilpointer.BoolPtr(true),
+				},
+				NodeName: utilpointer.StringPtr("another-host"),
+			},
+			{
+				Addresses: []string{"10.0.1.5"},
+				Conditions: discovery.EndpointConditions{
+					Ready:       utilpointer.BoolPtr(false),
+					Serving:     utilpointer.BoolPtr(false),
+					Terminating: utilpointer.BoolPtr(false),
+				},
+				NodeName: utilpointer.StringPtr("another-host"),
+			},
+		},
+	}
+
+	fp.OnEndpointSliceAdd(endpointSlice)
+	fp.syncProxyRules()
+
+	// Ensure that Proxier updates ipvs appropriately after EndpointSlice update
+	assert.NotNil(t, fp.ipsetList["KUBE-LOOP-BACK"])
+	activeEntries1 := fp.ipsetList["KUBE-LOOP-BACK"].activeEntries
+	assert.Equal(t, 3, activeEntries1.Len(), "Expected 3 active entry in KUBE-LOOP-BACK")
+	assert.Equal(t, true, activeEntries1.Has("10.0.1.1,tcp:80,10.0.1.1"), "Expected activeEntries to reference first (local) pod")
+	assert.Equal(t, true, activeEntries1.Has("10.0.1.2,tcp:80,10.0.1.2"), "Expected activeEntries to reference second (local) pod")
+	assert.Equal(t, true, activeEntries1.Has("10.0.1.3,tcp:80,10.0.1.3"), "Expected activeEntries to reference second (local) pod")
+
+	virtualServers, vsErr := ipvs.GetVirtualServers()
+	assert.Nil(t, vsErr, "Expected no error getting virtual servers")
+	assert.Len(t, virtualServers, 2, "Expected 2 virtual server")
+
+	var clusterIPServer, externalIPServer *utilipvs.VirtualServer
+	for _, virtualServer := range virtualServers {
+		if virtualServer.Address.String() == "172.20.1.1" {
+			clusterIPServer = virtualServer
+		}
+
+		if virtualServer.Address.String() == "1.2.3.4" {
+			externalIPServer = virtualServer
+		}
+	}
+
+	// clusterIP should fall back to cluster-wide ready + terminating endpoints
+	realServers1, rsErr1 := ipvs.GetRealServers(clusterIPServer)
+	assert.Nil(t, rsErr1, "Expected no error getting real servers")
+	assert.Len(t, realServers1, 3, "Expected 1 real servers")
+	assert.Equal(t, realServers1[0].String(), "10.0.1.1:80")
+	assert.Equal(t, realServers1[1].String(), "10.0.1.2:80")
+	assert.Equal(t, realServers1[2].String(), "10.0.1.4:80")
+
+	// externalIP should fall back to ready + terminating endpoints
+	realServers2, rsErr2 := ipvs.GetRealServers(externalIPServer)
+	assert.Nil(t, rsErr2, "Expected no error getting real servers")
+	assert.Len(t, realServers2, 3, "Expected 2 real servers")
+	assert.Equal(t, realServers2[0].String(), "10.0.1.1:80")
+	assert.Equal(t, realServers2[1].String(), "10.0.1.2:80")
+	assert.Equal(t, realServers2[2].String(), "10.0.1.4:80")
 
 	fp.OnEndpointSliceDelete(endpointSlice)
 	fp.syncProxyRules()
