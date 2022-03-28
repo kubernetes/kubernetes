@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/utils/pointer"
 )
 
 // maxParallelismForIndexJob is the maximum parallelism that an Indexed Job
@@ -279,11 +280,11 @@ func ValidateJobStatusUpdate(status, oldStatus batch.JobStatus) field.ErrorList 
 	return allErrs
 }
 
-// ValidateCronJob validates a CronJob and returns an ErrorList with any errors.
-func ValidateCronJob(cronJob *batch.CronJob, opts apivalidation.PodValidationOptions) field.ErrorList {
+// ValidateCronJobCreate validates a CronJob on creation and returns an ErrorList with any errors.
+func ValidateCronJobCreate(cronJob *batch.CronJob, opts apivalidation.PodValidationOptions) field.ErrorList {
 	// CronJobs and rcs have the same name validation
 	allErrs := apivalidation.ValidateObjectMeta(&cronJob.ObjectMeta, true, apivalidation.ValidateReplicationControllerName, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateCronJobSpec(&cronJob.Spec, field.NewPath("spec"), opts)...)
+	allErrs = append(allErrs, validateCronJobSpec(&cronJob.Spec, nil, field.NewPath("spec"), opts)...)
 	if len(cronJob.ObjectMeta.Name) > apimachineryvalidation.DNS1035LabelMaxLength-11 {
 		// The cronjob controller appends a 11-character suffix to the cronjob (`-$TIMESTAMP`) when
 		// creating a job. The job name length limit is 63 characters.
@@ -297,14 +298,15 @@ func ValidateCronJob(cronJob *batch.CronJob, opts apivalidation.PodValidationOpt
 // ValidateCronJobUpdate validates an update to a CronJob and returns an ErrorList with any errors.
 func ValidateCronJobUpdate(job, oldJob *batch.CronJob, opts apivalidation.PodValidationOptions) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&job.ObjectMeta, &oldJob.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateCronJobSpec(&job.Spec, field.NewPath("spec"), opts)...)
+	allErrs = append(allErrs, validateCronJobSpec(&job.Spec, &oldJob.Spec, field.NewPath("spec"), opts)...)
+
 	// skip the 52-character name validation limit on update validation
 	// to allow old cronjobs with names > 52 chars to be updated/deleted
 	return allErrs
 }
 
-// ValidateCronJobSpec validates a CronJobSpec and returns an ErrorList with any errors.
-func ValidateCronJobSpec(spec *batch.CronJobSpec, fldPath *field.Path, opts apivalidation.PodValidationOptions) field.ErrorList {
+// validateCronJobSpec validates a CronJobSpec and returns an ErrorList with any errors.
+func validateCronJobSpec(spec, oldSpec *batch.CronJobSpec, fldPath *field.Path, opts apivalidation.PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if len(spec.Schedule) == 0 {
@@ -317,7 +319,10 @@ func ValidateCronJobSpec(spec *batch.CronJobSpec, fldPath *field.Path, opts apiv
 		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.StartingDeadlineSeconds), fldPath.Child("startingDeadlineSeconds"))...)
 	}
 
-	allErrs = append(allErrs, validateTimeZone(spec.TimeZone, fldPath.Child("timeZone"))...)
+	if oldSpec == nil || !pointer.StringEqual(oldSpec.TimeZone, spec.TimeZone) {
+		allErrs = append(allErrs, validateTimeZone(spec.TimeZone, fldPath.Child("timeZone"))...)
+	}
+
 	allErrs = append(allErrs, validateConcurrencyPolicy(&spec.ConcurrencyPolicy, fldPath.Child("concurrencyPolicy"))...)
 	allErrs = append(allErrs, ValidateJobTemplateSpec(&spec.JobTemplate, fldPath.Child("jobTemplate"), opts)...)
 

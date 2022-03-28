@@ -902,7 +902,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 		tc := tc
 
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.CronJobTimeZone, tc.enableTimeZone)
+			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.CronJobTimeZone, tc.enableTimeZone)()
 
 			cj := cronJob()
 			cj.Spec.ConcurrencyPolicy = tc.concurrencyPolicy
@@ -1147,6 +1147,63 @@ func TestControllerV2UpdateCronJob(t *testing.T) {
 			},
 			expectedDelay: 1*time.Second + nextScheduleDelta,
 		},
+		{
+			name: "spec.timeZone not changed",
+			oldCronJob: &batchv1.CronJob{
+				Spec: batchv1.CronJobSpec{
+					TimeZone: &newYork,
+					JobTemplate: batchv1.JobTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels:      map[string]string{"a": "b"},
+							Annotations: map[string]string{"x": "y"},
+						},
+						Spec: jobSpec(),
+					},
+				},
+			},
+			newCronJob: &batchv1.CronJob{
+				Spec: batchv1.CronJobSpec{
+					TimeZone: &newYork,
+					JobTemplate: batchv1.JobTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels:      map[string]string{"a": "foo"},
+							Annotations: map[string]string{"x": "y"},
+						},
+						Spec: jobSpec(),
+					},
+				},
+			},
+			expectedDelay: 0 * time.Second,
+		},
+		{
+			name: "spec.timeZone changed",
+			oldCronJob: &batchv1.CronJob{
+				Spec: batchv1.CronJobSpec{
+					TimeZone: &newYork,
+					JobTemplate: batchv1.JobTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels:      map[string]string{"a": "b"},
+							Annotations: map[string]string{"x": "y"},
+						},
+						Spec: jobSpec(),
+					},
+				},
+			},
+			newCronJob: &batchv1.CronJob{
+				Spec: batchv1.CronJobSpec{
+					TimeZone: nil,
+					JobTemplate: batchv1.JobTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels:      map[string]string{"a": "foo"},
+							Annotations: map[string]string{"x": "y"},
+						},
+						Spec: jobSpec(),
+					},
+				},
+			},
+			expectedDelay: 0 * time.Second,
+		},
+
 		// TODO: Add more test cases for updating scheduling.
 	}
 	for _, tt := range tests {
