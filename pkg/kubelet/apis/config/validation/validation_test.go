@@ -62,6 +62,7 @@ var (
 		TopologyManagerPolicy:           kubeletconfig.SingleNumaNodeTopologyManagerPolicy,
 		ShutdownGracePeriod:             metav1.Duration{Duration: 30 * time.Second},
 		ShutdownGracePeriodCriticalPods: metav1.Duration{Duration: 10 * time.Second},
+		GracefulNodeShutdownPodPolicy:   kubeletconfig.GracefulNodeShutdownPodPolicySetTerminal,
 		MemoryThrottlingFactor:          utilpointer.Float64Ptr(0.8),
 		FeatureGates: map[string]bool{
 			"CustomCPUCFSQuotaPeriod": true,
@@ -380,6 +381,17 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 				return conf
 			},
 			errMsg: "invalid configuration: specifying shutdownGracePeriod or shutdownGracePeriodCriticalPods requires feature gate GracefulNodeShutdown",
+		},
+		{
+			name: "GracefulNodeShutdownPodPolicy is invalid value",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.FeatureGates = map[string]bool{"GracefulNodeShutdown": true}
+				conf.ShutdownGracePeriod = metav1.Duration{Duration: 10 * time.Second}
+				conf.ShutdownGracePeriodCriticalPods = metav1.Duration{Duration: 5 * time.Second}
+				conf.GracefulNodeShutdownPodPolicy = "invalid-behavior"
+				return conf
+			},
+			errMsg: "invalid configuration: GracefulNodeShutdownPodPolicy \"invalid-behavior\" must be one of: \"SetTerminal\", or \"LeaveRunning\"",
 		},
 		{
 			name: "invalid MemorySwap.SwapBehavior",

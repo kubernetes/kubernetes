@@ -165,6 +165,13 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 		if kc.ShutdownGracePeriodCriticalPods.Duration < 0 || (kc.ShutdownGracePeriodCriticalPods.Duration > 0 && kc.ShutdownGracePeriodCriticalPods.Duration < time.Second) {
 			allErrors = append(allErrors, fmt.Errorf("invalid configuration: shutdownGracePeriodCriticalPods %v must be either zero or otherwise >= 1 sec", kc.ShutdownGracePeriodCriticalPods))
 		}
+		switch kc.GracefulNodeShutdownPodPolicy {
+		case kubeletconfig.GracefulNodeShutdownPodPolicySetTerminal:
+		case kubeletconfig.GracefulNodeShutdownPodPolicyLeaveRunning:
+		default:
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: GracefulNodeShutdownPodPolicy %q must be one of: %q, or %q", kc.GracefulNodeShutdownPodPolicy, kubeletconfig.GracefulNodeShutdownPodPolicySetTerminal, kubeletconfig.GracefulNodeShutdownPodPolicyLeaveRunning))
+		}
+
 	}
 	if (kc.ShutdownGracePeriod.Duration > 0 || kc.ShutdownGracePeriodCriticalPods.Duration > 0) && !localFeatureGate.Enabled(features.GracefulNodeShutdown) {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: specifying shutdownGracePeriod or shutdownGracePeriodCriticalPods requires feature gate GracefulNodeShutdown"))
