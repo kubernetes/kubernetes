@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 
 	e2eginkgowrapper "k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
 )

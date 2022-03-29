@@ -630,13 +630,6 @@ github.com/nxadm/tail/winfile
 ## explicit; go 1.13
 github.com/onsi/ginkgo
 github.com/onsi/ginkgo/config
-github.com/onsi/ginkgo/ginkgo
-github.com/onsi/ginkgo/ginkgo/convert
-github.com/onsi/ginkgo/ginkgo/interrupthandler
-github.com/onsi/ginkgo/ginkgo/nodot
-github.com/onsi/ginkgo/ginkgo/testrunner
-github.com/onsi/ginkgo/ginkgo/testsuite
-github.com/onsi/ginkgo/ginkgo/watch
 github.com/onsi/ginkgo/internal/codelocation
 github.com/onsi/ginkgo/internal/containernode
 github.com/onsi/ginkgo/internal/failer
@@ -654,6 +647,18 @@ github.com/onsi/ginkgo/reporters/stenographer
 github.com/onsi/ginkgo/reporters/stenographer/support/go-colorable
 github.com/onsi/ginkgo/reporters/stenographer/support/go-isatty
 github.com/onsi/ginkgo/types
+# github.com/onsi/ginkgo/v2 v2.1.4 => github.com/onsi/ginkgo/v2 v2.1.4
+## explicit; go 1.18
+github.com/onsi/ginkgo/v2
+github.com/onsi/ginkgo/v2/config
+github.com/onsi/ginkgo/v2/formatter
+github.com/onsi/ginkgo/v2/internal
+github.com/onsi/ginkgo/v2/internal/global
+github.com/onsi/ginkgo/v2/internal/interrupt_handler
+github.com/onsi/ginkgo/v2/internal/parallel_support
+github.com/onsi/ginkgo/v2/internal/testingtproxy
+github.com/onsi/ginkgo/v2/reporters
+github.com/onsi/ginkgo/v2/types
 # github.com/onsi/gomega v1.19.0 => github.com/onsi/gomega v1.19.0
 ## explicit; go 1.18
 github.com/onsi/gomega

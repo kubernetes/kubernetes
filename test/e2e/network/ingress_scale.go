@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/network/scale"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 var _ = common.SIGDescribe("Loadbalancing: L7 Scalability", func() {

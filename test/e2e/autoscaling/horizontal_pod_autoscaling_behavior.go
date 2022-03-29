@@ -23,7 +23,7 @@ import (
 	e2eautoscaling "k8s.io/kubernetes/test/e2e/framework/autoscaling"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (non-default behavior)", func() {

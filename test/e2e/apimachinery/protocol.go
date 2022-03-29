@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	g "github.com/onsi/ginkgo"
+	g "github.com/onsi/ginkgo/v2"
 	o "github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"

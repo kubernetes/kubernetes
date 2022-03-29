@@ -34,7 +34,7 @@ import (
 
 	"gopkg.in/yaml.v2"
 
-	"github.com/onsi/ginkgo/types"
+	"github.com/onsi/ginkgo/v2/types"
 )
 
 // ConformanceData describes the structure of the conformance.yaml file

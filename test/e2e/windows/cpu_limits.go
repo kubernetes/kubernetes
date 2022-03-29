@@ -29,7 +29,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 var _ = SIGDescribe("[Feature:Windows] Cpu Resources [Serial]", func() {

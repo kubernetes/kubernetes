@@ -27,7 +27,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 // TestFixture is a simple helper class to avoid too much boilerplate in tests

@@ -43,7 +43,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 

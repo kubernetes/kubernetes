@@ -23,8 +23,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/onsi/ginkgo/config"
-	"github.com/onsi/ginkgo/types"
+	"github.com/onsi/ginkgo/v2/config"
+	"github.com/onsi/ginkgo/v2/types"
 	"k8s.io/klog/v2"
 )
 

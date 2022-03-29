@@ -26,7 +26,7 @@ import (
 	"runtime/debug"
 	"strings"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 // FailurePanic is the value that will be panicked from Fail.
@@ -69,7 +69,7 @@ func Fail(message string, callerSkip ...int) {
 
 // ginkgo adds a lot of test running infrastructure to the stack, so
 // we filter those out
-var stackSkipPattern = regexp.MustCompile(`onsi/ginkgo`)
+var stackSkipPattern = regexp.MustCompile(`onsi/ginkgo/v2`)
 
 func pruneStack(skip int) string {
 	skip += 2 // one for pruneStack and one for debug.Stack

@@ -33,7 +33,7 @@ import (
 	"k8s.io/mount-utils"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 const (
