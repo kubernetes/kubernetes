@@ -167,7 +167,7 @@ func runCompletionBash(out io.Writer, boilerPlate string, kubectl *cobra.Command
 		return err
 	}
 
-	return kubectl.GenBashCompletionV2(out, false) // TODO: Upgrade to Cobra 1.3.0 or later before including descriptions (See https://github.com/spf13/cobra/pull/1509)
+	return kubectl.GenBashCompletionV2(out, false)
 }
 
 func runCompletionZsh(out io.Writer, boilerPlate string, kubectl *cobra.Command) error {
