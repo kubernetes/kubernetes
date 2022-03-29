@@ -716,10 +716,10 @@ func (a *Admission) prioritizePods(pods []*corev1.Pod) []*corev1.Pod {
 }
 
 func containsString(needle string, haystack []string) bool {
-	for _, s := range haystack {
-		if s == needle {
-			return true
-		}
+	sort.Strings(haystack)
+	index := sort.SearchStrings(haystack, needle)
+	if index < len(haystack) && haystack[index] == needle {
+		return true
 	}
 	return false
 }
