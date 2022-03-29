@@ -34,12 +34,8 @@ metadata:
   selfLink: selfLinkValue
   uid: uidValue
 spec:
-  ipv4:
-    cidr: cidrValue
-    perNodeMaskSize: 2
-  ipv6:
-    cidr: cidrValue
-    perNodeMaskSize: 2
+  ipv4CIDR: ipv4CIDRValue
+  ipv6CIDR: ipv6CIDRValue
   nodeSelector:
     nodeSelectorTerms:
     - matchExpressions:
@@ -52,4 +48,5 @@ spec:
         operator: operatorValue
         values:
         - valuesValue
+  perNodeHostBits: 2
 status: {}

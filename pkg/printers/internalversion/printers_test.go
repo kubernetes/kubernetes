@@ -19,7 +19,6 @@ package internalversion
 import (
 	"math"
 	"reflect"
-	"strconv"
 	"testing"
 	"time"
 
@@ -5864,9 +5863,8 @@ func TestPrintScale(t *testing.T) {
 
 func TestPrintClusterCIDRConfig(t *testing.T) {
 	ipv4CIDR := "10.1.0.0/16"
-	ipv4PerNodeMaskSize := int32(24)
+	perNodeHostBits := int32(8)
 	ipv6CIDR := "fd00:1:1::/64"
-	ipv6PerNodeMaskSize := int32(120)
 
 	tests := []struct {
 		ccc      networking.ClusterCIDRConfig
@@ -5878,205 +5876,169 @@ func TestPrintClusterCIDRConfig(t *testing.T) {
 			ccc: networking.ClusterCIDRConfig{
 				ObjectMeta: metav1.ObjectMeta{Name: "test1"},
 				Spec: networking.ClusterCIDRConfigSpec{
-					IPv4: &networking.CIDRConfig{
-						CIDR:            ipv4CIDR,
-						PerNodeMaskSize: ipv4PerNodeMaskSize,
-					},
+					PerNodeHostBits: perNodeHostBits,
+					IPv4CIDR:        ipv4CIDR,
 				},
 			},
 			options: printers.GenerateOptions{},
-			// Columns: Name, IPv4, IPv6, Age.
-			expected: []metav1.TableRow{{Cells: []interface{}{"test1", ipv4CIDR, "<none>", "<unknown>"}}},
+			// Columns: Name, PerNodeHostBits, IPv4, IPv6, Age.
+			expected: []metav1.TableRow{{Cells: []interface{}{"test1", "8", ipv4CIDR, "<none>", "<unknown>"}}},
 		},
 		{
 			// Test name, IPv4 only with node selector, Not wide.
 			ccc: networking.ClusterCIDRConfig{
 				ObjectMeta: metav1.ObjectMeta{Name: "test2"},
 				Spec: networking.ClusterCIDRConfigSpec{
-					IPv4: &networking.CIDRConfig{
-						CIDR:            ipv4CIDR,
-						PerNodeMaskSize: ipv4PerNodeMaskSize,
-					},
+					PerNodeHostBits: perNodeHostBits,
+					IPv4CIDR:        ipv4CIDR,
 					// Does NOT get printed.
 					NodeSelector: makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"}),
 				},
 			},
 			options: printers.GenerateOptions{},
-			// Columns: Name, IPv4, IPv6, Age.
-			expected: []metav1.TableRow{{Cells: []interface{}{"test2", ipv4CIDR, "<none>", "<unknown>"}}},
+			// Columns: Name, PerNodeHostBits, IPv4, IPv6, Age.
+			expected: []metav1.TableRow{{Cells: []interface{}{"test2", "8", ipv4CIDR, "<none>", "<unknown>"}}},
 		},
 		{
 			// Test name, IPv4 only with no node selector, wide.
 			ccc: networking.ClusterCIDRConfig{
 				ObjectMeta: metav1.ObjectMeta{Name: "test3"},
 				Spec: networking.ClusterCIDRConfigSpec{
-					IPv4: &networking.CIDRConfig{
-						CIDR:            ipv4CIDR,
-						PerNodeMaskSize: ipv4PerNodeMaskSize,
-					},
+					PerNodeHostBits: perNodeHostBits,
+					IPv4CIDR:        ipv4CIDR,
 				},
 			},
 			options: printers.GenerateOptions{Wide: true},
-			// Columns: Name, IPv4, IPv6, Age, IPv4-PerNodeMaskSize, IPv6-PerNodeMaskSize, NodeSelector.
-			expected: []metav1.TableRow{{Cells: []interface{}{"test3", ipv4CIDR, "<none>", "<unknown>", strconv.Itoa(int(ipv4PerNodeMaskSize)), "<none>", "<none>"}}},
+			// Columns: Name, PerNodeHostBits, IPv4, IPv6, Age, NodeSelector .
+			expected: []metav1.TableRow{{Cells: []interface{}{"test3", "8", ipv4CIDR, "<none>", "<unknown>", "<none>"}}},
 		},
 		{
 			// Test name, IPv4 only with node selector, wide.
 			ccc: networking.ClusterCIDRConfig{
 				ObjectMeta: metav1.ObjectMeta{Name: "test4"},
 				Spec: networking.ClusterCIDRConfigSpec{
-					IPv4: &networking.CIDRConfig{
-						CIDR:            ipv4CIDR,
-						PerNodeMaskSize: ipv4PerNodeMaskSize,
-					},
-					NodeSelector: makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"}),
+					PerNodeHostBits: perNodeHostBits,
+					IPv4CIDR:        ipv4CIDR,
+					NodeSelector:    makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"}),
 				},
 			},
 			options: printers.GenerateOptions{Wide: true},
-			// Columns: Name, IPv4, IPv6, Age, IPv4-PerNodeMaskSize, IPv6-PerNodeMaskSize, NodeSelector.
-			expected: []metav1.TableRow{{Cells: []interface{}{"test4", ipv4CIDR, "<none>", "<unknown>", strconv.Itoa(int(ipv4PerNodeMaskSize)), "<none>", "MatchExpressions: [{foo In [bar]}]"}}},
+			// Columns: Name, PerNodeHostBits, IPv4, IPv6, Age, NodeSelector .
+			expected: []metav1.TableRow{{Cells: []interface{}{"test4", "8", ipv4CIDR, "<none>", "<unknown>", "MatchExpressions: [{foo In [bar]}]"}}},
 		},
 		{
 			// Test name, IPv6 only with no node selector.
 			ccc: networking.ClusterCIDRConfig{
 				ObjectMeta: metav1.ObjectMeta{Name: "test5"},
 				Spec: networking.ClusterCIDRConfigSpec{
-					IPv6: &networking.CIDRConfig{
-						CIDR:            ipv6CIDR,
-						PerNodeMaskSize: ipv6PerNodeMaskSize,
-					},
+					PerNodeHostBits: perNodeHostBits,
+					IPv6CIDR:        ipv6CIDR,
 				},
 			},
 			options: printers.GenerateOptions{},
-			// Columns: Name, IPv4, IPv6, Age
-			expected: []metav1.TableRow{{Cells: []interface{}{"test5", "<none>", ipv6CIDR, "<unknown>"}}},
+			// Columns: Name, PerNodeHostBits, IPv4, IPv6, Age
+			expected: []metav1.TableRow{{Cells: []interface{}{"test5", "8", "<none>", ipv6CIDR, "<unknown>"}}},
 		},
 		{
 			// Test name, IPv6 only with node selector, Not wide.
 			ccc: networking.ClusterCIDRConfig{
 				ObjectMeta: metav1.ObjectMeta{Name: "test6"},
 				Spec: networking.ClusterCIDRConfigSpec{
-					IPv6: &networking.CIDRConfig{
-						CIDR:            ipv6CIDR,
-						PerNodeMaskSize: ipv6PerNodeMaskSize,
-					},
+					PerNodeHostBits: perNodeHostBits,
+					IPv6CIDR:        ipv6CIDR,
 					// Does NOT get printed.
 					NodeSelector: makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"}),
 				},
 			},
 			options: printers.GenerateOptions{},
-			// Columns: Name, IPv4, IPv6, Age.
-			expected: []metav1.TableRow{{Cells: []interface{}{"test6", "<none>", ipv6CIDR, "<unknown>"}}},
+			// Columns: Name, PerNodeHostBits, IPv4, IPv6, Age.
+			expected: []metav1.TableRow{{Cells: []interface{}{"test6", "8", "<none>", ipv6CIDR, "<unknown>"}}},
 		},
 		{
 			// Test name, IPv6 only with no node selector, wide.
 			ccc: networking.ClusterCIDRConfig{
 				ObjectMeta: metav1.ObjectMeta{Name: "test7"},
 				Spec: networking.ClusterCIDRConfigSpec{
-					IPv6: &networking.CIDRConfig{
-						CIDR:            ipv6CIDR,
-						PerNodeMaskSize: ipv6PerNodeMaskSize,
-					},
+					PerNodeHostBits: perNodeHostBits,
+					IPv6CIDR:        ipv6CIDR,
 				},
 			},
 			options: printers.GenerateOptions{Wide: true},
-			// Columns: Name, IPv4, IPv6, Age, IPv4-PerNodeMaskSize, IPv6-PerNodeMaskSize, NodeSelector.
-			expected: []metav1.TableRow{{Cells: []interface{}{"test7", "<none>", ipv6CIDR, "<unknown>", "<none>", strconv.Itoa(int(ipv6PerNodeMaskSize)), "<none>"}}},
+			// Columns: Name, PerNodeHostBits, IPv4, IPv6, Age, NodeSelector .
+			expected: []metav1.TableRow{{Cells: []interface{}{"test7", "8", "<none>", ipv6CIDR, "<unknown>", "<none>"}}},
 		},
 		{
 			// Test name, IPv6 only with node selector, wide.
 			ccc: networking.ClusterCIDRConfig{
 				ObjectMeta: metav1.ObjectMeta{Name: "test8"},
 				Spec: networking.ClusterCIDRConfigSpec{
-					IPv6: &networking.CIDRConfig{
-						CIDR:            ipv6CIDR,
-						PerNodeMaskSize: ipv6PerNodeMaskSize,
-					},
-					NodeSelector: makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"}),
+					PerNodeHostBits: perNodeHostBits,
+					IPv6CIDR:        ipv6CIDR,
+					NodeSelector:    makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"}),
 				},
 			},
 			options: printers.GenerateOptions{Wide: true},
-			// Columns: Name, IPv4, IPv6, Age, IPv4-PerNodeMaskSize, IPv6-PerNodeMaskSize, NodeSelector.
-			expected: []metav1.TableRow{{Cells: []interface{}{"test8", "<none>", ipv6CIDR, "<unknown>", "<none>", strconv.Itoa(int(ipv6PerNodeMaskSize)), "MatchExpressions: [{foo In [bar]}]"}}},
+			// Columns: Name, PerNodeHostBits, IPv4, IPv6, Age, NodeSelector .
+			expected: []metav1.TableRow{{Cells: []interface{}{"test8", "8", "<none>", ipv6CIDR, "<unknown>", "MatchExpressions: [{foo In [bar]}]"}}},
 		},
 		{
 			// Test name, DualStack with no node selector.
 			ccc: networking.ClusterCIDRConfig{
 				ObjectMeta: metav1.ObjectMeta{Name: "test9"},
 				Spec: networking.ClusterCIDRConfigSpec{
-					IPv4: &networking.CIDRConfig{
-						CIDR:            ipv4CIDR,
-						PerNodeMaskSize: ipv4PerNodeMaskSize,
-					},
-					IPv6: &networking.CIDRConfig{
-						CIDR:            ipv6CIDR,
-						PerNodeMaskSize: ipv6PerNodeMaskSize,
-					},
+					PerNodeHostBits: perNodeHostBits,
+					IPv4CIDR:        ipv4CIDR,
+					IPv6CIDR:        ipv6CIDR,
 				},
 			},
 			options: printers.GenerateOptions{},
-			// Columns: Name, IPv4, IPv6, Age.
-			expected: []metav1.TableRow{{Cells: []interface{}{"test9", ipv4CIDR, ipv6CIDR, "<unknown>"}}},
+			// Columns: Name, PerNodeHostBits, IPv4, IPv6, Age.
+			expected: []metav1.TableRow{{Cells: []interface{}{"test9", "8", ipv4CIDR, ipv6CIDR, "<unknown>"}}},
 		},
 		{
 			// Test name,DualStack with node selector, Not wide.
 			ccc: networking.ClusterCIDRConfig{
 				ObjectMeta: metav1.ObjectMeta{Name: "test10"},
 				Spec: networking.ClusterCIDRConfigSpec{
-					IPv4: &networking.CIDRConfig{
-						CIDR:            ipv4CIDR,
-						PerNodeMaskSize: ipv4PerNodeMaskSize,
-					},
-					IPv6: &networking.CIDRConfig{
-						CIDR:            ipv6CIDR,
-						PerNodeMaskSize: ipv6PerNodeMaskSize,
-					},
+					PerNodeHostBits: perNodeHostBits,
+					IPv4CIDR:        ipv4CIDR,
+					IPv6CIDR:        ipv6CIDR,
 					// Does NOT get printed.
 					NodeSelector: makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"}),
 				},
 			},
 			options: printers.GenerateOptions{},
-			// Columns: Name, IPv4, IPv6, Age.
-			expected: []metav1.TableRow{{Cells: []interface{}{"test10", ipv4CIDR, ipv6CIDR, "<unknown>"}}},
+			// Columns: Name, PerNodeHostBits, IPv4, IPv6, Age.
+			expected: []metav1.TableRow{{Cells: []interface{}{"test10", "8", ipv4CIDR, ipv6CIDR, "<unknown>"}}},
 		},
 		{
 			// Test name, DualStack with no node selector, wide.
 			ccc: networking.ClusterCIDRConfig{
 				ObjectMeta: metav1.ObjectMeta{Name: "test11"},
 				Spec: networking.ClusterCIDRConfigSpec{
-					IPv4: &networking.CIDRConfig{
-						CIDR:            ipv4CIDR,
-						PerNodeMaskSize: ipv4PerNodeMaskSize,
-					},
-					IPv6: &networking.CIDRConfig{
-						CIDR:            ipv6CIDR,
-						PerNodeMaskSize: ipv6PerNodeMaskSize,
-					},
+					PerNodeHostBits: perNodeHostBits,
+					IPv4CIDR:        ipv4CIDR,
+					IPv6CIDR:        ipv6CIDR,
 				},
 			},
 			options: printers.GenerateOptions{Wide: true},
-			// Columns: Name, IPv4, IPv6, Age, IPv4-PerNodeMaskSize, IPv6-PerNodeMaskSize, NodeSelector.
-			expected: []metav1.TableRow{{Cells: []interface{}{"test11", ipv4CIDR, ipv6CIDR, "<unknown>", strconv.Itoa(int(ipv4PerNodeMaskSize)), strconv.Itoa(int(ipv6PerNodeMaskSize)), "<none>"}}},
+			// Columns: Name, PerNodeHostBits, IPv4, IPv6, Age, NodeSelector.
+			expected: []metav1.TableRow{{Cells: []interface{}{"test11", "8", ipv4CIDR, ipv6CIDR, "<unknown>", "<none>"}}},
 		},
 		{
 			// Test name, DualStack with node selector, wide.
 			ccc: networking.ClusterCIDRConfig{
 				ObjectMeta: metav1.ObjectMeta{Name: "test12"},
 				Spec: networking.ClusterCIDRConfigSpec{
-					IPv4: &networking.CIDRConfig{
-						CIDR:            ipv4CIDR,
-						PerNodeMaskSize: ipv4PerNodeMaskSize,
-					},
-					IPv6: &networking.CIDRConfig{
-						CIDR:            ipv6CIDR,
-						PerNodeMaskSize: ipv6PerNodeMaskSize,
-					},
-					NodeSelector: makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"}),
+					PerNodeHostBits: perNodeHostBits,
+					IPv4CIDR:        ipv4CIDR,
+					IPv6CIDR:        ipv6CIDR,
+					NodeSelector:    makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"}),
 				},
 			},
 			options: printers.GenerateOptions{Wide: true},
-			// Columns: Name, IPv4, IPv6, Age, IPv4-PerNodeMaskSize, IPv6-PerNodeMaskSize, NodeSelector.
-			expected: []metav1.TableRow{{Cells: []interface{}{"test12", ipv4CIDR, ipv6CIDR, "<unknown>", strconv.Itoa(int(ipv4PerNodeMaskSize)), strconv.Itoa(int(ipv6PerNodeMaskSize)), "MatchExpressions: [{foo In [bar]}]"}}},
+			// Columns: Name, PerNodeHostBits, IPv4, IPv6, Age, NodeSelector .
+			expected: []metav1.TableRow{{Cells: []interface{}{"test12", "8", ipv4CIDR, ipv6CIDR, "<unknown>", "MatchExpressions: [{foo In [bar]}]"}}},
 		},
 	}
 
@@ -6117,29 +6079,19 @@ func TestPrintClusterCIDRConfigList(t *testing.T) {
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: "ccc1"},
 				Spec: networking.ClusterCIDRConfigSpec{
-					IPv4: &networking.CIDRConfig{
-						CIDR:            "10.1.0.0/16",
-						PerNodeMaskSize: int32(24),
-					},
-					IPv6: &networking.CIDRConfig{
-						CIDR:            "fd00:1:1::/64",
-						PerNodeMaskSize: int32(120),
-					},
-					NodeSelector: makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"}),
+					PerNodeHostBits: int32(8),
+					IPv4CIDR:        "10.1.0.0/16",
+					IPv6CIDR:        "fd00:1:1::/64",
+					NodeSelector:    makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"}),
 				},
 			},
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: "ccc2"},
 				Spec: networking.ClusterCIDRConfigSpec{
-					IPv4: &networking.CIDRConfig{
-						CIDR:            "10.2.0.0/16",
-						PerNodeMaskSize: int32(24),
-					},
-					IPv6: &networking.CIDRConfig{
-						CIDR:            "fd00:2:1::/64",
-						PerNodeMaskSize: int32(120),
-					},
-					NodeSelector: makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"}),
+					PerNodeHostBits: int32(8),
+					IPv4CIDR:        "10.2.0.0/16",
+					IPv6CIDR:        "fd00:2:1::/64",
+					NodeSelector:    makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"}),
 				},
 			},
 		},
@@ -6153,18 +6105,18 @@ func TestPrintClusterCIDRConfigList(t *testing.T) {
 			// Test name, DualStack with node selector, wide.
 			options: printers.GenerateOptions{Wide: false},
 			expected: []metav1.TableRow{
-				// Columns: Name, IPv4, IPv6, Age, IPv4-PerNodeMaskSize, IPv6-PerNodeMaskSize, NodeSelector.
-				{Cells: []interface{}{"ccc1", "10.1.0.0/16", "fd00:1:1::/64", "<unknown>"}},
-				{Cells: []interface{}{"ccc2", "10.2.0.0/16", "fd00:2:1::/64", "<unknown>"}},
+				// Columns: Name, PerNodeHostBits, IPv4, IPv6, Age.
+				{Cells: []interface{}{"ccc1", "8", "10.1.0.0/16", "fd00:1:1::/64", "<unknown>"}},
+				{Cells: []interface{}{"ccc2", "8", "10.2.0.0/16", "fd00:2:1::/64", "<unknown>"}},
 			},
 		},
 		{
 			// Test name, DualStack with node selector, wide.
 			options: printers.GenerateOptions{Wide: true},
 			expected: []metav1.TableRow{
-				// Columns: Name, IPv4, IPv6, Age, IPv4-PerNodeMaskSize, IPv6-PerNodeMaskSize, NodeSelector.
-				{Cells: []interface{}{"ccc1", "10.1.0.0/16", "fd00:1:1::/64", "<unknown>", "24", "120", "MatchExpressions: [{foo In [bar]}]"}},
-				{Cells: []interface{}{"ccc2", "10.2.0.0/16", "fd00:2:1::/64", "<unknown>", "24", "120", "MatchExpressions: [{foo In [bar]}]"}},
+				// Columns: Name, PerNodeHostBits, IPv4, IPv6, Age, NodeSelector.
+				{Cells: []interface{}{"ccc1", "8", "10.1.0.0/16", "fd00:1:1::/64", "<unknown>", "MatchExpressions: [{foo In [bar]}]"}},
+				{Cells: []interface{}{"ccc2", "8", "10.2.0.0/16", "fd00:2:1::/64", "<unknown>", "MatchExpressions: [{foo In [bar]}]"}},
 			},
 		},
 	}

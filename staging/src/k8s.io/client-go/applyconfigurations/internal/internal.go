@@ -9531,17 +9531,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: number
       type:
         scalar: numeric
-- name: io.k8s.api.networking.v1alpha1.CIDRConfig
-  map:
-    fields:
-    - name: cidr
-      type:
-        scalar: string
-      default: ""
-    - name: perNodeMaskSize
-      type:
-        scalar: numeric
-      default: 0
 - name: io.k8s.api.networking.v1alpha1.ClusterCIDRConfig
   map:
     fields:
@@ -9566,15 +9555,21 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.networking.v1alpha1.ClusterCIDRConfigSpec
   map:
     fields:
-    - name: ipv4
+    - name: ipv4CIDR
       type:
-        namedType: io.k8s.api.networking.v1alpha1.CIDRConfig
-    - name: ipv6
+        scalar: string
+      default: ""
+    - name: ipv6CIDR
       type:
-        namedType: io.k8s.api.networking.v1alpha1.CIDRConfig
+        scalar: string
+      default: ""
     - name: nodeSelector
       type:
         namedType: io.k8s.api.core.v1.NodeSelector
+    - name: perNodeHostBits
+      type:
+        scalar: numeric
+      default: 0
 - name: io.k8s.api.networking.v1alpha1.ClusterCIDRConfigStatus
   map:
     elementType:

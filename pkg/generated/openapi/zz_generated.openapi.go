@@ -684,7 +684,6 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/networking/v1.NetworkPolicySpec":                                                      schema_k8sio_api_networking_v1_NetworkPolicySpec(ref),
 		"k8s.io/api/networking/v1.NetworkPolicyStatus":                                                    schema_k8sio_api_networking_v1_NetworkPolicyStatus(ref),
 		"k8s.io/api/networking/v1.ServiceBackendPort":                                                     schema_k8sio_api_networking_v1_ServiceBackendPort(ref),
-		"k8s.io/api/networking/v1alpha1.CIDRConfig":                                                       schema_k8sio_api_networking_v1alpha1_CIDRConfig(ref),
 		"k8s.io/api/networking/v1alpha1.ClusterCIDRConfig":                                                schema_k8sio_api_networking_v1alpha1_ClusterCIDRConfig(ref),
 		"k8s.io/api/networking/v1alpha1.ClusterCIDRConfigList":                                            schema_k8sio_api_networking_v1alpha1_ClusterCIDRConfigList(ref),
 		"k8s.io/api/networking/v1alpha1.ClusterCIDRConfigSpec":                                            schema_k8sio_api_networking_v1alpha1_ClusterCIDRConfigSpec(ref),
@@ -34141,36 +34140,6 @@ func schema_k8sio_api_networking_v1_ServiceBackendPort(ref common.ReferenceCallb
 	}
 }
 
-func schema_k8sio_api_networking_v1alpha1_CIDRConfig(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "CIDRConfig defines the CIDR and Mask size per IP Family(IPv4/IPv6).",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"cidr": {
-						SchemaProps: spec.SchemaProps{
-							Description: "An IP block in CIDR notation (\"10.0.0.0/8\", \"fd12:3456:789a:1::/64\").",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"perNodeMaskSize": {
-						SchemaProps: spec.SchemaProps{
-							Description: "PerNodeMaskSize is the mask size for node cidr. IPv4/IPv6 Netmask size (e.g. 25 -> \"/25\" or 112 -> \"/112\") to allocate to a node.",
-							Default:     0,
-							Type:        []string{"integer"},
-							Format:      "int32",
-						},
-					},
-				},
-				Required: []string{"cidr", "perNodeMaskSize"},
-			},
-		},
-	}
-}
-
 func schema_k8sio_api_networking_v1alpha1_ClusterCIDRConfig(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -34285,23 +34254,35 @@ func schema_k8sio_api_networking_v1alpha1_ClusterCIDRConfigSpec(ref common.Refer
 							Ref:         ref("k8s.io/api/core/v1.NodeSelector"),
 						},
 					},
-					"ipv4": {
+					"perNodeHostBits": {
 						SchemaProps: spec.SchemaProps{
-							Description: "IPv4 defines the IPv4 CIDR and the PerNodeMaskSize. At least one of IPv4 or IPv6 must be provided. If both are provided, the number of IPs allocated to each must be the same (32 - ipv4.perNodeMaskSize). This field is immutable.",
-							Ref:         ref("k8s.io/api/networking/v1alpha1.CIDRConfig"),
+							Description: "PerNodeHostBits defines the number of host bits to be configured per node. A subnet mask determines how much of the address is used for network bits and host bits. For example and IPv4 address of 192.168.0.0/24, splits the address into 24 bits for the network portion and 8 bits for the host portion. For a /24 mask for IPv4 or a /120 for IPv6, configure PerNodeHostBits=8 This field is immutable.",
+							Default:     0,
+							Type:        []string{"integer"},
+							Format:      "int32",
 						},
 					},
-					"ipv6": {
+					"ipv4CIDR": {
 						SchemaProps: spec.SchemaProps{
-							Description: "IPv6 defines the IPv4 CIDR and the PerNodeMaskSize. At least one of IPv4 or IPv6 must be provided. If both are provided, the number of IPs allocated to each must be the same (128 - ipv6.perNodeMaskSize). This field is immutable.",
-							Ref:         ref("k8s.io/api/networking/v1alpha1.CIDRConfig"),
+							Description: "IPv4CIDR defines an IPv4 IP block in CIDR notation(e.g. \"10.0.0.0/8\"). This field is immutable.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"ipv6CIDR": {
+						SchemaProps: spec.SchemaProps{
+							Description: "IPv6CIDR defines an IPv6 IP block in CIDR notation(e.g. \"fd12:3456:789a:1::/64\"). This field is immutable.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/core/v1.NodeSelector", "k8s.io/api/networking/v1alpha1.CIDRConfig"},
+			"k8s.io/api/core/v1.NodeSelector"},
 	}
 }
 

@@ -31,14 +31,9 @@ func newClusterCIDRConfig() networking.ClusterCIDRConfig {
 			Name: "foo",
 		},
 		Spec: networking.ClusterCIDRConfigSpec{
-			IPv4: &networking.CIDRConfig{
-				CIDR:            "10.1.0.0/16",
-				PerNodeMaskSize: int32(24),
-			},
-			IPv6: &networking.CIDRConfig{
-				CIDR:            "fd00:1:1::/64",
-				PerNodeMaskSize: int32(120),
-			},
+			PerNodeHostBits: int32(8),
+			IPv4CIDR:        "10.1.0.0/16",
+			IPv6CIDR:        "fd00:1:1::/64",
 			NodeSelector: &api.NodeSelector{
 				NodeSelectorTerms: []api.NodeSelectorTerm{
 					{

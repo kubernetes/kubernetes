@@ -2859,16 +2859,16 @@ func (c *ClusterCIDRConfigDescriber) describeClusterCIDRConfigV1alpha1(ccc *netw
 			}
 		}
 
-		if ccc.Spec.IPv4 != nil {
-			w.Write(LEVEL_0, "IPv4:\n")
-			w.Write(LEVEL_1, "CIDR:\t%s\n", ccc.Spec.IPv4.CIDR)
-			w.Write(LEVEL_1, "PerNodeMaskSize:\t%d\n", ccc.Spec.IPv4.PerNodeMaskSize)
+		if ccc.Spec.PerNodeHostBits != 0 {
+			w.Write(LEVEL_0, "PerNodeHostBits:\t%s\n", fmt.Sprint(ccc.Spec.PerNodeHostBits))
 		}
 
-		if ccc.Spec.IPv6 != nil {
-			w.Write(LEVEL_0, "IPv6:\n")
-			w.Write(LEVEL_1, "CIDR:\t%s\n", ccc.Spec.IPv6.CIDR)
-			w.Write(LEVEL_1, "PerNodeMaskSize:\t%d\n", ccc.Spec.IPv6.PerNodeMaskSize)
+		if ccc.Spec.IPv4CIDR != "" {
+			w.Write(LEVEL_0, "IPv4CIDR:\t%s\n", ccc.Spec.IPv4CIDR)
+		}
+
+		if ccc.Spec.IPv6CIDR != "" {
+			w.Write(LEVEL_0, "IPv6CIDR:\t%s\n", ccc.Spec.IPv6CIDR)
 		}
 
 		if events != nil {

@@ -1994,14 +1994,9 @@ func makeValidClusterCIDRConfig() *networking.ClusterCIDRConfig {
 			ResourceVersion: "9",
 		},
 		Spec: networking.ClusterCIDRConfigSpec{
-			IPv4: &networking.CIDRConfig{
-				CIDR:            "10.1.0.0/16",
-				PerNodeMaskSize: int32(24),
-			},
-			IPv6: &networking.CIDRConfig{
-				CIDR:            "fd00:1:1::/64",
-				PerNodeMaskSize: int32(120),
-			},
+			PerNodeHostBits: int32(8),
+			IPv4CIDR:        "10.1.0.0/16",
+			IPv6CIDR:        "fd00:1:1::/64",
 			NodeSelector: &api.NodeSelector{
 				NodeSelectorTerms: []api.NodeSelectorTerm{
 					{
@@ -2029,13 +2024,6 @@ func makeClusterCIDRConfigCustom(tweaks ...cccTweak) *networking.ClusterCIDRConf
 	return ccc
 }
 
-func makeCIDRConfig(cidr string, perNodeMaskSize int32) *networking.CIDRConfig {
-	return &networking.CIDRConfig{
-		CIDR:            cidr,
-		PerNodeMaskSize: perNodeMaskSize,
-	}
-}
-
 func makeNodeSelector(key string, op api.NodeSelectorOperator, values []string) *api.NodeSelector {
 	return &api.NodeSelector{
 		NodeSelectorTerms: []api.NodeSelectorTerm{
@@ -2054,15 +2042,17 @@ func makeNodeSelector(key string, op api.NodeSelectorOperator, values []string) 
 
 func TestValidateClusterCIDRConfig(t *testing.T) {
 	// Tweaks used below.
-	setIPv4CIDR := func(cidrConfig *networking.CIDRConfig) cccTweak {
+	setIPv4CIDR := func(perNodeHostBits int32, ipv4CIDR string) cccTweak {
 		return func(ccc *networking.ClusterCIDRConfig) {
-			ccc.Spec.IPv4 = cidrConfig
+			ccc.Spec.IPv4CIDR = ipv4CIDR
+			ccc.Spec.PerNodeHostBits = perNodeHostBits
 		}
 	}
 
-	setIPv6CIDR := func(cidrConfig *networking.CIDRConfig) cccTweak {
+	setIPv6CIDR := func(perNodeHostBits int32, ipv6CIDR string) cccTweak {
 		return func(ccc *networking.ClusterCIDRConfig) {
-			ccc.Spec.IPv6 = cidrConfig
+			ccc.Spec.IPv6CIDR = ipv6CIDR
+			ccc.Spec.PerNodeHostBits = perNodeHostBits
 		}
 	}
 
@@ -2075,13 +2065,10 @@ func TestValidateClusterCIDRConfig(t *testing.T) {
 	validNodeSelector := makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})
 
 	successCases := map[string]*networking.ClusterCIDRConfig{
-		"valid IPv6 only ClusterCIDRConfig":                      makeClusterCIDRConfigCustom(setIPv4CIDR(nil)),
-		"valid IPv4 only ClusterCIDRConfig":                      makeClusterCIDRConfigCustom(setIPv6CIDR(nil)),
+		"valid IPv6 only ClusterCIDRConfig":                      makeClusterCIDRConfigCustom(setIPv4CIDR(8, "")),
+		"valid IPv4 only ClusterCIDRConfig":                      makeClusterCIDRConfigCustom(setIPv6CIDR(8, "")),
 		"valid DualStack ClusterCIDRConfig with no NodeSelector": makeClusterCIDRConfigCustom(setNodeSelector(nil)),
-		"32 - IPv4.PerNodeMaskSize == 128 - IPv6.PerNodeMaskSize": makeClusterCIDRConfigCustom(
-			setIPv4CIDR(makeCIDRConfig("10.2.0.0/16", 24)),
-			setIPv6CIDR(makeCIDRConfig("fd00::/112", 120))),
-		"valid NodeSelector": makeClusterCIDRConfigCustom(setNodeSelector(validNodeSelector)),
+		"valid NodeSelector":                                     makeClusterCIDRConfigCustom(setNodeSelector(validNodeSelector)),
 	}
 
 	// Success cases are expected to pass validation.
@@ -2096,39 +2083,30 @@ func TestValidateClusterCIDRConfig(t *testing.T) {
 
 	errorCases := map[string]*networking.ClusterCIDRConfig{
 		// Config test.
-		"nil spec.IPv4 and spec.IPv6": makeClusterCIDRConfigCustom(
-			setIPv4CIDR(nil), setIPv6CIDR(nil)),
+		"empty spec.IPv4CIDR and spec.IPv6CIDR": makeClusterCIDRConfigCustom(
+			setIPv4CIDR(8, ""), setIPv6CIDR(8, "")),
 		"invalid spec.NodeSelector": makeClusterCIDRConfigCustom(
 			setNodeSelector(invalidNodeSelector)),
 
 		// IPv4 tests.
-		"empty spec.IPv4.CIDR": makeClusterCIDRConfigCustom(
-			setIPv4CIDR(makeCIDRConfig("", 24))),
-		"invalid spec.IPv4.CIDR": makeClusterCIDRConfigCustom(
-			setIPv4CIDR(makeCIDRConfig("test", 24))),
-		"valid IPv6 CIDR in spec.IPv4.CIDR": makeClusterCIDRConfigCustom(
-			setIPv4CIDR(makeCIDRConfig("fd00::/120", 24))),
-		"invalid spec.IPv4.PerNodeMaskSize": makeClusterCIDRConfigCustom(
-			setIPv4CIDR(makeCIDRConfig("10.2.0.0/16", 100))),
-		"invalid spec.IPv4.PerNodeMaskSize < CIDR Mask": makeClusterCIDRConfigCustom(
-			setIPv4CIDR(makeCIDRConfig("10.2.0.0/16", 12))),
+		"invalid spec.IPv4CIDR": makeClusterCIDRConfigCustom(
+			setIPv4CIDR(8, "test")),
+		"valid IPv6 CIDR in spec.IPv4CIDR": makeClusterCIDRConfigCustom(
+			setIPv4CIDR(8, "fd00::/120")),
+		"invalid spec.PerNodeHostBits with IPv4 CIDR": makeClusterCIDRConfigCustom(
+			setIPv4CIDR(100, "10.2.0.0/16")),
+		"invalid spec.IPv4.PerNodeHostBits > CIDR Host Bits": makeClusterCIDRConfigCustom(
+			setIPv4CIDR(24, "10.2.0.0/16")),
 
 		// IPv6 tests.
-		"empty spec.IPv6.CIDR": makeClusterCIDRConfigCustom(
-			setIPv6CIDR(makeCIDRConfig("", 120))),
-		"invalid spec.IPv6.CIDR": makeClusterCIDRConfigCustom(
-			setIPv6CIDR(makeCIDRConfig("testv6", 120))),
-		"valid IPv4 CIDR in spec.IPv6.CIDR": makeClusterCIDRConfigCustom(
-			setIPv6CIDR(makeCIDRConfig("10.2.0.0/16", 24))),
-		"invalid spec.IPv6.PerNodeMaskSize": makeClusterCIDRConfigCustom(
-			setIPv6CIDR(makeCIDRConfig("fd00::/120", 1000))),
+		"invalid spec.IPv6CIDR": makeClusterCIDRConfigCustom(
+			setIPv6CIDR(8, "testv6")),
+		"valid IPv4 CIDR in spec.IPv6CIDR": makeClusterCIDRConfigCustom(
+			setIPv6CIDR(8, "10.2.0.0/16")),
+		"invalid spec.PerNodeHostBits with IPv6 CIDR": makeClusterCIDRConfigCustom(
+			setIPv6CIDR(1000, "fd00::/120")),
 		"invalid spec.IPv6.PerNodeMaskSize < CIDR Mask": makeClusterCIDRConfigCustom(
-			setIPv6CIDR(makeCIDRConfig("fd00::/120", 119))),
-
-		// DualStack test.
-		"32 - IPv4.PerNodeMaskSize != 128 - IPv6.PerNodeMaskSize": makeClusterCIDRConfigCustom(
-			setIPv4CIDR(makeCIDRConfig("10.2.0.0/16", 24)),
-			setIPv6CIDR(makeCIDRConfig("fd00::/120", 112))),
+			setIPv6CIDR(12, "fd00::/120")),
 	}
 
 	// Error cases are not expected to pass validation.
@@ -2143,15 +2121,17 @@ func TestValidateClusterConfigUpdate(t *testing.T) {
 	oldCCC := makeValidClusterCIDRConfig()
 
 	// Tweaks used below.
-	setIPv4CIDR := func(cidrConfig *networking.CIDRConfig) cccTweak {
+	setIPv4CIDR := func(perNodeHostBits int32, ipv4CIDR string) cccTweak {
 		return func(ccc *networking.ClusterCIDRConfig) {
-			ccc.Spec.IPv4 = cidrConfig
+			ccc.Spec.IPv4CIDR = ipv4CIDR
+			ccc.Spec.PerNodeHostBits = perNodeHostBits
 		}
 	}
 
-	setIPv6CIDR := func(cidrConfig *networking.CIDRConfig) cccTweak {
+	setIPv6CIDR := func(perNodeHostBits int32, ipv6CIDR string) cccTweak {
 		return func(ccc *networking.ClusterCIDRConfig) {
-			ccc.Spec.IPv6 = cidrConfig
+			ccc.Spec.IPv6CIDR = ipv6CIDR
+			ccc.Spec.PerNodeHostBits = perNodeHostBits
 		}
 	}
 
@@ -2176,10 +2156,8 @@ func TestValidateClusterConfigUpdate(t *testing.T) {
 	}
 
 	errorCases := map[string]*networking.ClusterCIDRConfig{
-		"update spec.IPv4": makeClusterCIDRConfigCustom(setIPv4CIDR(
-			makeCIDRConfig("10.2.0.0/16", 24))),
-		"update spec.IPv6": makeClusterCIDRConfigCustom(setIPv6CIDR(
-			makeCIDRConfig("fd00:2:/112", 120))),
+		"update spec.IPv4": makeClusterCIDRConfigCustom(setIPv4CIDR(8, "10.2.0.0/16")),
+		"update spec.IPv6": makeClusterCIDRConfigCustom(setIPv6CIDR(8, "fd00:2:/112")),
 		"update spec.NodeSelector": makeClusterCIDRConfigCustom(setNodeSelector(
 			updateNodeSelector)),
 	}

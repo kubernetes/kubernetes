@@ -5247,14 +5247,9 @@ func TestDescribeClusterCIDRConfig(t *testing.T) {
 					Name: "foo.123",
 				},
 				Spec: networkingv1alpha1.ClusterCIDRConfigSpec{
-					IPv4: &networkingv1alpha1.CIDRConfig{
-						CIDR:            "10.1.0.0/16",
-						PerNodeMaskSize: int32(24),
-					},
-					IPv6: &networkingv1alpha1.CIDRConfig{
-						CIDR:            "fd00:1:1::/64",
-						PerNodeMaskSize: int32(120),
-					},
+					PerNodeHostBits: int32(8),
+					IPv4CIDR:        "10.1.0.0/16",
+					IPv6CIDR:        "fd00:1:1::/64",
 					NodeSelector: &corev1.NodeSelector{
 						NodeSelectorTerms: []corev1.NodeSelectorTerm{
 							{
@@ -5275,14 +5270,11 @@ Labels:       <none>
 Annotations:  <none>
 NodeSelector:
   NodeSelector Terms:
-    Term 0:  foo in [bar]
-IPv4:
-  CIDR:             10.1.0.0/16
-  PerNodeMaskSize:  24
-IPv6:
-  CIDR:             fd00:1:1::/64
-  PerNodeMaskSize:  120
-Events:             <none>` + "\n",
+    Term 0:       foo in [bar]
+PerNodeHostBits:  8
+IPv4CIDR:         10.1.0.0/16
+IPv6CIDR:         fd00:1:1::/64
+Events:           <none>` + "\n",
 		},
 	}
 

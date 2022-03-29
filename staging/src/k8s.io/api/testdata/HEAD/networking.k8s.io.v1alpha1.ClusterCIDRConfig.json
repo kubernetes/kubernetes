@@ -69,14 +69,9 @@
         }
       ]
     },
-    "ipv4": {
-      "cidr": "cidrValue",
-      "perNodeMaskSize": 2
-    },
-    "ipv6": {
-      "cidr": "cidrValue",
-      "perNodeMaskSize": 2
-    }
+    "perNodeHostBits": 2,
+    "ipv4CIDR": "ipv4CIDRValue",
+    "ipv6CIDR": "ipv6CIDRValue"
   },
   "status": {}
 }

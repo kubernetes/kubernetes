@@ -25,9 +25,10 @@ import (
 // ClusterCIDRConfigSpecApplyConfiguration represents an declarative configuration of the ClusterCIDRConfigSpec type for use
 // with apply.
 type ClusterCIDRConfigSpecApplyConfiguration struct {
-	NodeSelector *v1.NodeSelectorApplyConfiguration `json:"nodeSelector,omitempty"`
-	IPv4         *CIDRConfigApplyConfiguration      `json:"ipv4,omitempty"`
-	IPv6         *CIDRConfigApplyConfiguration      `json:"ipv6,omitempty"`
+	NodeSelector    *v1.NodeSelectorApplyConfiguration `json:"nodeSelector,omitempty"`
+	PerNodeHostBits *int32                             `json:"perNodeHostBits,omitempty"`
+	IPv4CIDR        *string                            `json:"ipv4CIDR,omitempty"`
+	IPv6CIDR        *string                            `json:"ipv6CIDR,omitempty"`
 }
 
 // ClusterCIDRConfigSpecApplyConfiguration constructs an declarative configuration of the ClusterCIDRConfigSpec type for use with
@@ -44,18 +45,26 @@ func (b *ClusterCIDRConfigSpecApplyConfiguration) WithNodeSelector(value *v1.Nod
 	return b
 }
 
-// WithIPv4 sets the IPv4 field in the declarative configuration to the given value
+// WithPerNodeHostBits sets the PerNodeHostBits field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the IPv4 field is set to the value of the last call.
-func (b *ClusterCIDRConfigSpecApplyConfiguration) WithIPv4(value *CIDRConfigApplyConfiguration) *ClusterCIDRConfigSpecApplyConfiguration {
-	b.IPv4 = value
+// If called multiple times, the PerNodeHostBits field is set to the value of the last call.
+func (b *ClusterCIDRConfigSpecApplyConfiguration) WithPerNodeHostBits(value int32) *ClusterCIDRConfigSpecApplyConfiguration {
+	b.PerNodeHostBits = &value
 	return b
 }
 
-// WithIPv6 sets the IPv6 field in the declarative configuration to the given value
+// WithIPv4CIDR sets the IPv4CIDR field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the IPv6 field is set to the value of the last call.
-func (b *ClusterCIDRConfigSpecApplyConfiguration) WithIPv6(value *CIDRConfigApplyConfiguration) *ClusterCIDRConfigSpecApplyConfiguration {
-	b.IPv6 = value
+// If called multiple times, the IPv4CIDR field is set to the value of the last call.
+func (b *ClusterCIDRConfigSpecApplyConfiguration) WithIPv4CIDR(value string) *ClusterCIDRConfigSpecApplyConfiguration {
+	b.IPv4CIDR = &value
+	return b
+}
+
+// WithIPv6CIDR sets the IPv6CIDR field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the IPv6CIDR field is set to the value of the last call.
+func (b *ClusterCIDRConfigSpecApplyConfiguration) WithIPv6CIDR(value string) *ClusterCIDRConfigSpecApplyConfiguration {
+	b.IPv6CIDR = &value
 	return b
 }

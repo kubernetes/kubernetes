@@ -595,11 +595,10 @@ func AddHandlers(h printers.PrintHandler) {
 
 	clusterCIDRConfigColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "IPv4", Type: "string", Description: networkingv1alpha1.ClusterCIDRConfigSpec{}.SwaggerDoc()["ipv4"]},
-		{Name: "IPv6", Type: "string", Description: networkingv1alpha1.ClusterCIDRConfigSpec{}.SwaggerDoc()["ipv6"]},
+		{Name: "PerNodeHostBits", Type: "string", Description: networkingv1alpha1.ClusterCIDRConfigSpec{}.SwaggerDoc()["perNodeHostBits"]},
+		{Name: "IPv4CIDR", Type: "string", Description: networkingv1alpha1.ClusterCIDRConfigSpec{}.SwaggerDoc()["ipv4CIDR"]},
+		{Name: "IPv6CIDR", Type: "string", Description: networkingv1alpha1.ClusterCIDRConfigSpec{}.SwaggerDoc()["ipv6CIDR"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
-		{Name: "IPv4-PerNodeMaskSize", Type: "string", Description: "Per Node Mask Size for IPv4 CIDR"},
-		{Name: "IPv6-PerNodeMaskSize", Type: "string", Description: "Per Node Mask Size for IPv6 CIDR"},
 		{Name: "NodeSelector", Type: "string", Priority: 1, Description: networkingv1alpha1.ClusterCIDRConfigSpec{}.SwaggerDoc()["nodeSelector"]},
 	}
 
@@ -2644,24 +2643,17 @@ func printClusterCIDRConfig(obj *networking.ClusterCIDRConfig, options printers.
 	}
 	ipv4 := "<none>"
 	ipv6 := "<none>"
-	if obj.Spec.IPv4 != nil {
-		ipv4 = obj.Spec.IPv4.CIDR
+
+	if obj.Spec.IPv4CIDR != "" {
+		ipv4 = obj.Spec.IPv4CIDR
 	}
-	if obj.Spec.IPv6 != nil {
-		ipv6 = obj.Spec.IPv6.CIDR
+	if obj.Spec.IPv6CIDR != "" {
+		ipv6 = obj.Spec.IPv6CIDR
 	}
 
-	row.Cells = append(row.Cells, obj.Name, ipv4, ipv6, translateTimestampSince(obj.CreationTimestamp))
+	row.Cells = append(row.Cells, obj.Name, fmt.Sprint(obj.Spec.PerNodeHostBits), ipv4, ipv6, translateTimestampSince(obj.CreationTimestamp))
 	if options.Wide {
-		ipv4PerNodeMaskSize := "<none>"
-		ipv6PerNodeMaskSize := "<none>"
 		nodeSelector := "<none>"
-		if obj.Spec.IPv4 != nil {
-			ipv4PerNodeMaskSize = strconv.Itoa(int(obj.Spec.IPv4.PerNodeMaskSize))
-		}
-		if obj.Spec.IPv6 != nil {
-			ipv6PerNodeMaskSize = strconv.Itoa(int(obj.Spec.IPv6.PerNodeMaskSize))
-		}
 		if obj.Spec.NodeSelector != nil {
 			allTerms := make([]string, 0)
 			for _, term := range obj.Spec.NodeSelector.NodeSelectorTerms {
@@ -2678,8 +2670,6 @@ func printClusterCIDRConfig(obj *networking.ClusterCIDRConfig, options printers.
 			nodeSelector = strings.Join(allTerms, ",")
 		}
 
-		row.Cells = append(row.Cells, ipv4PerNodeMaskSize)
-		row.Cells = append(row.Cells, ipv6PerNodeMaskSize)
 		row.Cells = append(row.Cells, nodeSelector)
 	}
 

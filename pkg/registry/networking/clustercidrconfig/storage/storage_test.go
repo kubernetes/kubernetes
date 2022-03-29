@@ -60,14 +60,9 @@ func newClusterCIDRConfig() *networking.ClusterCIDRConfig {
 			Namespace: namespace,
 		},
 		Spec: networking.ClusterCIDRConfigSpec{
-			IPv4: &networking.CIDRConfig{
-				CIDR:            "10.1.0.0/16",
-				PerNodeMaskSize: int32(24),
-			},
-			IPv6: &networking.CIDRConfig{
-				CIDR:            "fd00:1:1::/64",
-				PerNodeMaskSize: int32(120),
-			},
+			PerNodeHostBits: int32(8),
+			IPv4CIDR:        "10.1.0.0/16",
+			IPv6CIDR:        "fd00:1:1::/64",
 			NodeSelector: &api.NodeSelector{
 				NodeSelectorTerms: []api.NodeSelectorTerm{
 					{
@@ -98,19 +93,19 @@ func TestCreate(t *testing.T) {
 	test = test.ClusterScope()
 	validCCC := validClusterCIDRConfig()
 	noCIDRCCC := validClusterCIDRConfig()
-	noCIDRCCC.Spec.IPv4 = nil
-	noCIDRCCC.Spec.IPv6 = nil
-	invalidCCCNodeMask := validClusterCIDRConfig()
-	invalidCCCNodeMask.Spec.IPv4.PerNodeMaskSize = 100
+	noCIDRCCC.Spec.IPv4CIDR = ""
+	noCIDRCCC.Spec.IPv6CIDR = ""
+	invalidCCCPerNodeHostBits := validClusterCIDRConfig()
+	invalidCCCPerNodeHostBits.Spec.PerNodeHostBits = 100
 	invalidCCCCIDR := validClusterCIDRConfig()
-	invalidCCCCIDR.Spec.IPv6.CIDR = "10.1.0.0/16"
+	invalidCCCCIDR.Spec.IPv6CIDR = "10.1.0.0/16"
 
 	test.TestCreate(
 		// valid
 		validCCC,
 		//invalid
 		noCIDRCCC,
-		invalidCCCNodeMask,
+		invalidCCCPerNodeHostBits,
 		invalidCCCCIDR,
 	)
 }

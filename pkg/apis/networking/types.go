@@ -607,31 +607,24 @@ type ClusterCIDRConfigSpec struct {
 	// +optional
 	NodeSelector *api.NodeSelector
 
-	// IPv4 defines the IPv4 CIDR and the PerNodeMaskSize.
-	// At least one of IPv4 or IPv6 must be provided. If both are
-	// provided, the number of IPs allocated to each must be the same
-	// (32 - ipv4.perNodeMaskSize).
+	// PerNodeHostBits defines the number of host bits to be configured per node.
+	// A subnet mask determines how much of the address is used for network bits
+	// and host bits. For example and IPv4 address of 192.168.0.0/24, splits the
+	// address into 24 bits for the network portion and 8 bits for the host portion.
+	// For a /24 mask for IPv4 or a /120 for IPv6, configure PerNodeHostBits=8
 	// This field is immutable.
 	// +optional
-	IPv4 *CIDRConfig
+	PerNodeHostBits int32
 
-	// IPv6 defines the IPv4 CIDR and the PerNodeMaskSize.
-	// At least one of IPv4 or IPv6 must be provided. If both are
-	// provided, the number of IPs allocated to each must be the same
-	// (128 - ipv6.perNodeMaskSize).
+	// IPv4CIDR defines an IPv4 IP block in CIDR notation(e.g. "10.0.0.0/8").
 	// This field is immutable.
 	// +optional
-	IPv6 *CIDRConfig
-}
+	IPv4CIDR string
 
-// CIDRConfig defines the CIDR and Mask size per IP Family(IPv4/IPv6).
-type CIDRConfig struct {
-	// An IP block in CIDR notation ("10.0.0.0/8", "fd12:3456:789a:1::/64").
-	CIDR string
-
-	// PerNodeMaskSize is the mask size for node cidr.
-	// IPv4/IPv6 Netmask size (e.g. 25 -> "/25" or 112 -> "/112") to allocate to a node.
-	PerNodeMaskSize int32
+	// IPv6CIDR defines an IPv6 IP block in CIDR notation(e.g. "fd12:3456:789a:1::/64").
+	// This field is immutable.
+	// +optional
+	IPv6CIDR string
 }
 
 // ClusterCIDRConfigStatus defines the observed state of ClusterCIDRConfig.
