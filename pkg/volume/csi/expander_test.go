@@ -17,26 +17,34 @@ limitations under the License.
 package csi
 
 import (
+	"context"
 	"os"
 	"testing"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
 
 func TestNodeExpand(t *testing.T) {
 	tests := []struct {
-		name                string
-		nodeExpansion       bool
-		nodeStageSet        bool
-		success             bool
-		fsVolume            bool
-		grpcError           error
-		hasVolumeInUseError bool
-		deviceStagePath     string
+		name                      string
+		nodeExpansion             bool
+		nodeStageSet              bool
+		success                   bool
+		fsVolume                  bool
+		grpcError                 error
+		hasVolumeInUseError       bool
+		deviceStagePath           string
+		enableCSINodeExpandSecret bool
+		secret                    *api.Secret
 	}{
 		{
 			name:    "when node expansion is not set",
@@ -87,13 +95,39 @@ func TestNodeExpand(t *testing.T) {
 			grpcError:           status.Error(codes.InvalidArgument, "invalid-argument"),
 			hasVolumeInUseError: false,
 		},
+		{
+			name:                      "when nodeExpansion=on, nodeStage=on, volumePhase=staged",
+			nodeExpansion:             true,
+			nodeStageSet:              true,
+			success:                   true,
+			fsVolume:                  true,
+			deviceStagePath:           "/foo/bar",
+			enableCSINodeExpandSecret: true,
+			secret: &api.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "expand-secret",
+					Namespace: "default",
+				},
+				Data: map[string][]byte{
+					"apiUsername": []byte("csiusername"),
+					"apiPassword": []byte("csipassword"),
+				},
+			},
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSINodeExpandSecret, tc.enableCSINodeExpandSecret)()
 			plug, tmpDir := newTestPlugin(t, nil)
 			defer os.RemoveAll(tmpDir)
 
 			spec := volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, "expandable", "test-vol"), false)
+			if tc.enableCSINodeExpandSecret {
+				spec.PersistentVolume.Spec.CSI.NodeExpandSecretRef = &api.SecretReference{
+					Name:      tc.secret.Name,
+					Namespace: tc.secret.Namespace,
+				}
+			}
 
 			newSize, _ := resource.ParseQuantity("20Gi")
 
@@ -109,6 +143,13 @@ func TestNodeExpand(t *testing.T) {
 
 			fakeCSIClient, _ := csClient.(*fakeCsiDriverClient)
 			fakeNodeClient := fakeCSIClient.nodeClient
+
+			if tc.enableCSINodeExpandSecret {
+				_, err := plug.host.GetKubeClient().CoreV1().Secrets(tc.secret.Namespace).Create(context.TODO(), tc.secret, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
 
 			if tc.grpcError != nil {
 				fakeNodeClient.SetNextError(tc.grpcError)
