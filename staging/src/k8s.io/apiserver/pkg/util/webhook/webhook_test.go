@@ -50,7 +50,7 @@ const (
 	errBadCertificate    = "Get .*: remote error: tls: bad certificate"
 	errNoConfiguration   = "invalid configuration: no configuration has been provided"
 	errMissingCertPath   = "invalid configuration: unable to read %s %s for %s due to open %s: .*"
-	errSignedByUnknownCA = "Get .*: x509: certificate signed by unknown authority"
+	errSignedByUnknownCA = "Get .*: x509: .*(unknown authority|not standards compliant|not trusted)"
 )
 
 var (
