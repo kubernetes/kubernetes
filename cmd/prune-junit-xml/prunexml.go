@@ -19,6 +19,7 @@ package main
 import (
 	"encoding/xml"
 	"flag"
+	"fmt"
 	"io"
 	"os"
 )
@@ -76,6 +77,7 @@ func main() {
 
 	if flag.NArg() > 0 {
 		for _, path := range flag.Args() {
+			fmt.Printf("processing junit xml file : %s\n", path)
 			xmlReader, err := os.Open(path)
 			if err != nil {
 				panic(err)
@@ -97,6 +99,7 @@ func main() {
 			if err != nil {
 				panic(err)
 			}
+			fmt.Println("done.")
 		}
 	}
 }
@@ -106,12 +109,14 @@ func pruneXML(suites *JUnitTestSuites, maxBytes int) {
 		for _, testcase := range suite.TestCases {
 			if testcase.SkipMessage != nil {
 				if len(testcase.SkipMessage.Message) > maxBytes {
+					fmt.Printf("clipping skip message in test case : %s\n", testcase.Name)
 					testcase.SkipMessage.Message = "[... clipped...]" +
 						testcase.SkipMessage.Message[len(testcase.SkipMessage.Message)-maxBytes:]
 				}
 			}
 			if testcase.Failure != nil {
 				if len(testcase.Failure.Contents) > maxBytes {
+					fmt.Printf("clipping failure message in test case : %s\n", testcase.Name)
 					testcase.Failure.Contents = "[... clipped...]" +
 						testcase.Failure.Contents[len(testcase.Failure.Contents)-maxBytes:]
 				}
