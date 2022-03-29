@@ -40,8 +40,6 @@ func newGroupVersion(client *client, item handler3.OpenAPIV3DiscoveryGroupVersio
 }
 
 func (g *groupversion) Schema() (*openapi_v3.Document, error) {
-	// Check if this GVK is in the discovery map, if it is not, then it is not
-	// available. No point making the request.
 	data, err := g.client.restClient.Get().
 		RequestURI(g.item.ServerRelativeURL).
 		SetHeader("Accept", openAPIV3mimePb).

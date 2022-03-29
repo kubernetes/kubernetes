@@ -59,7 +59,7 @@ type CachedDiscoveryClient struct {
 	// fresh is true if all used cache files were ours
 	fresh bool
 
-	///
+	// caching openapi v3 client which wraps the delegate's client
 	openapiClient openapi.Client
 }
 
