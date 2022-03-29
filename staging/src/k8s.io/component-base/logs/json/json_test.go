@@ -38,6 +38,7 @@ func TestZapLoggerInfo(t *testing.T) {
 		msg        string
 		format     string
 		keysValues []interface{}
+		names      []string
 	}{
 		{
 			msg:        "test",
@@ -59,12 +60,21 @@ func TestZapLoggerInfo(t *testing.T) {
 			format:     "{\"ts\":%f,\"caller\":\"json/json_test.go:%d\",\"msg\":\"test for duration value argument\",\"v\":0,\"duration\":\"5s\"}\n",
 			keysValues: []interface{}{"duration", time.Duration(5 * time.Second)},
 		},
+		{
+			msg:   "test for WithName",
+			names: []string{"hello", "world"},
+			// TODO: log names
+			format: "{\"ts\":%f,\"caller\":\"json/json_test.go:%d\",\"msg\":\"test for WithName\",\"v\":0}\n",
+		},
 	}
 
 	for _, data := range testDataInfo {
 		var buffer bytes.Buffer
 		writer := zapcore.AddSync(&buffer)
 		sampleInfoLogger, _ := NewJSONLogger(writer, nil, nil)
+		for _, name := range data.names {
+			sampleInfoLogger = sampleInfoLogger.WithName(name)
+		}
 		// nolint:logcheck // The linter cannot and doesn't need to check the key/value pairs.
 		sampleInfoLogger.Info(data.msg, data.keysValues...)
 		logStr := buffer.String()
