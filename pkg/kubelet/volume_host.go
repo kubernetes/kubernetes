@@ -19,7 +19,6 @@ package kubelet
 import (
 	"fmt"
 	"net"
-	// "runtime"
 
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
@@ -129,9 +128,6 @@ func (kvh *kubeletVolumeHost) GetPodsDir() string {
 
 func (kvh *kubeletVolumeHost) GetPodVolumeDir(podUID types.UID, pluginName string, volumeName string) string {
 	dir := getPodHostsPath(kvh, podUID, pluginName, volumeName);
-	// if runtime.GOOS == "windows" {
-	// 	dir = util.GetWindowsPath(dir)
-	// }
 	return dir
 }
 
