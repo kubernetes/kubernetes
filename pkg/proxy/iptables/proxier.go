@@ -1217,18 +1217,26 @@ func (proxier *Proxier) syncProxyRules() {
 
 		// Capture load-balancer ingress.
 		if len(svcInfo.LoadBalancerIPStrings()) > 0 && hasEndpoints {
-			// We could elide the firewall chain when loadBalancerSourceRanges
-			// is empty, but that adds code and makes the flow harder to reason
-			// about, for not much gain.
-			fwChain := svcInfo.firewallChainName
+			// Normally we send LB matches to the "external destination" chain.
+			nextChain := externalTrafficChain
 
-			// create service firewall chain
-			if chain, ok := existingNATChains[fwChain]; ok {
-				proxier.natChains.WriteBytes(chain)
-			} else {
-				proxier.natChains.Write(utiliptables.MakeChainLine(fwChain))
+			// If the service specifies any LB source ranges, we need to insert
+			// a firewall chain first.
+			if len(svcInfo.LoadBalancerSourceRanges()) > 0 {
+				fwChain := svcInfo.firewallChainName
+
+				// Declare the service firewall chain.
+				if chain, ok := existingNATChains[fwChain]; ok {
+					proxier.natChains.WriteBytes(chain)
+				} else {
+					proxier.natChains.Write(utiliptables.MakeChainLine(fwChain))
+				}
+				activeNATChains[fwChain] = true
+
+				// The firewall chain will jump to the "external destination"
+				// chain.
+				nextChain = svcInfo.firewallChainName
 			}
-			activeNATChains[fwChain] = true
 
 			for _, lbip := range svcInfo.LoadBalancerIPStrings() {
 				proxier.natRules.Write(
@@ -1237,22 +1245,19 @@ func (proxier *Proxier) syncProxyRules() {
 					"-m", protocol, "-p", protocol,
 					"-d", lbip,
 					"--dport", strconv.Itoa(svcInfo.Port()),
-					"-j", string(fwChain))
-
-				args = append(args[:0],
-					"-A", string(fwChain),
-					"-m", "comment", "--comment", fmt.Sprintf(`"%s loadbalancer IP"`, svcNameString),
-				)
+					"-j", string(nextChain))
 
 				// The service firewall rules are created based on the
 				// loadBalancerSourceRanges field.  This only works for
 				// VIP-like loadbalancers that preserve source IPs.  For
 				// loadbalancers which direct traffic to service NodePort, the
 				// firewall rules will not apply.
-				if len(svcInfo.LoadBalancerSourceRanges()) == 0 {
-					// allow all sources, so jump directly to the next chain
-					proxier.natRules.Write(args, "-j", string(externalTrafficChain))
-				} else {
+				if len(svcInfo.LoadBalancerSourceRanges()) > 0 {
+					args = append(args[:0],
+						"-A", string(nextChain),
+						"-m", "comment", "--comment", fmt.Sprintf(`"%s loadbalancer IP"`, svcNameString),
+					)
+
 					// firewall filter based on each source range
 					allowFromNode := false
 					for _, src := range svcInfo.LoadBalancerSourceRanges() {
