@@ -614,15 +614,14 @@ func (r *Request) Watch(ctx context.Context) (watch.Interface, error) {
 	}
 	url := r.URL().String()
 	for {
-		req, err := r.newHTTPRequest(ctx)
-		if err != nil {
-			return nil, err
-		}
-
 		if err := r.retry.Before(ctx, r); err != nil {
 			return nil, r.retry.WrapPreviousError(err)
 		}
 
+		req, err := r.newHTTPRequest(ctx)
+		if err != nil {
+			return nil, err
+		}
 		resp, err := client.Do(req)
 		updateURLMetrics(ctx, r, resp, err)
 		r.retry.After(ctx, r, resp, err)
@@ -722,6 +721,10 @@ func (r *Request) Stream(ctx context.Context) (io.ReadCloser, error) {
 
 	url := r.URL().String()
 	for {
+		if err := r.retry.Before(ctx, r); err != nil {
+			return nil, err
+		}
+
 		req, err := r.newHTTPRequest(ctx)
 		if err != nil {
 			return nil, err
@@ -729,11 +732,6 @@ func (r *Request) Stream(ctx context.Context) (io.ReadCloser, error) {
 		if r.body != nil {
 			req.Body = ioutil.NopCloser(r.body)
 		}
-
-		if err := r.retry.Before(ctx, r); err != nil {
-			return nil, err
-		}
-
 		resp, err := client.Do(req)
 		updateURLMetrics(ctx, r, resp, err)
 		r.retry.After(ctx, r, resp, err)
@@ -859,13 +857,12 @@ func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Resp
 
 	// Right now we make about ten retry attempts if we get a Retry-After response.
 	for {
+		if err := r.retry.Before(ctx, r); err != nil {
+			return r.retry.WrapPreviousError(err)
+		}
 		req, err := r.newHTTPRequest(ctx)
 		if err != nil {
 			return err
-		}
-
-		if err := r.retry.Before(ctx, r); err != nil {
-			return r.retry.WrapPreviousError(err)
 		}
 		resp, err := client.Do(req)
 		updateURLMetrics(ctx, r, resp, err)
