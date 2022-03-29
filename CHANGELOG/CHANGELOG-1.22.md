@@ -1150,6 +1150,10 @@ If CSIMigrationvSphere feature gate is enabled, user should not upgrade to Kuber
 
 1.22 addressed a long-standing issue in the Kubelet where terminating pods were [vulnerable to race conditions](https://github.com/kubernetes/kubernetes/pull/102344) leading to early shutdown, resource leaks, or long delays in actually completing pod shutdown. As a consequence of this change the Kubelet now correctly takes into account the resources of running and terminating pods when deciding to accept new pods, since terminating pods are still holding on to those resources. This stricter handling may surface to end users as pod rejections when creating pods that are scheduled to mostly full nodes that have other terminating pods holding the resources the new pods need. The most likely error would be a pod set to `Failed` phase with reason set to `OutOfCpu` or `OutOfMemory`, but any resource on the node that has some fixed limit (including persistent volume counts on cloud nodes, exclusive CPU cores, or unique hardware devices) could trigger the failure. While this behavior is correct it reduces the throughput of pod execution and creates user-visible warnings - [future versions of Kubernetes will minimize the likelihood users see pod failures due to this issue](https://github.com/kubernetes/kubernetes/issues/106884). In general, any automation that creates pods [must take Kubelet rejections into account](https://kubernetes.io/docs/concepts/scheduling-eviction/#pod-disruption), and should be designed to retry and backoff where necessary.
 
+### Etcd v3.5.[0-2] data corruption
+
+Data corruption issue was found in etcd v3.5.0 release that was shipped with 1.22 Kubernetes release. Please read up-to-date [production recommendations for etcd](https://github.com/etcd-io/etcd/tree/main/CHANGELOG).
+
 ## Urgent Upgrade Notes 
 
 ### (No, really, you MUST read this before you upgrade)
