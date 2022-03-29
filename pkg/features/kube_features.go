@@ -864,6 +864,13 @@ const (
 	//
 	// Enables maxUnavailable for StatefulSet
 	MaxUnavailableStatefulSet featuregate.Feature = "MaxUnavailableStatefulSet"
+
+	// owner: @rikatz
+	// kep: http://kep.k8s.io/2943
+	// alpha: v1.24
+	//
+	// Enables NetworkPolicy status subresource
+	NetworkPolicyStatus featuregate.Feature = "NetworkPolicyStatus"
 )
 
 func init() {
@@ -989,6 +996,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ServiceIPStaticSubrange:                        {Default: false, PreRelease: featuregate.Alpha},
 	NodeOutOfServiceVolumeDetach:                   {Default: false, PreRelease: featuregate.Alpha},
 	MaxUnavailableStatefulSet:                      {Default: false, PreRelease: featuregate.Alpha},
+	NetworkPolicyStatus:                            {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

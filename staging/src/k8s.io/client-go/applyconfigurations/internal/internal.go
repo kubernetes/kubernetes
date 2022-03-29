@@ -7847,6 +7847,10 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.extensions.v1beta1.NetworkPolicySpec
       default: {}
+    - name: status
+      type:
+        namedType: io.k8s.api.extensions.v1beta1.NetworkPolicyStatus
+      default: {}
 - name: io.k8s.api.extensions.v1beta1.NetworkPolicyEgressRule
   map:
     fields:
@@ -7926,6 +7930,17 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             scalar: string
           elementRelationship: atomic
+- name: io.k8s.api.extensions.v1beta1.NetworkPolicyStatus
+  map:
+    fields:
+    - name: conditions
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Condition
+          elementRelationship: associative
+          keys:
+          - type
 - name: io.k8s.api.extensions.v1beta1.PodSecurityPolicy
   map:
     fields:
@@ -9395,6 +9410,10 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.networking.v1.NetworkPolicySpec
       default: {}
+    - name: status
+      type:
+        namedType: io.k8s.api.networking.v1.NetworkPolicyStatus
+      default: {}
 - name: io.k8s.api.networking.v1.NetworkPolicyEgressRule
   map:
     fields:
@@ -9474,6 +9493,17 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             scalar: string
           elementRelationship: atomic
+- name: io.k8s.api.networking.v1.NetworkPolicyStatus
+  map:
+    fields:
+    - name: conditions
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Condition
+          elementRelationship: associative
+          keys:
+          - type
 - name: io.k8s.api.networking.v1.ServiceBackendPort
   map:
     fields:
