@@ -16,7 +16,7 @@ spec:
           matchLabels:
             team: devops
   containers:
-  - image: k8s.gcr.io/pause:3.6
+  - image: k8s.gcr.io/pause:3.7
     name: pause
     ports:
     - containerPort: 80

@@ -150,7 +150,7 @@ dependencies:
       match: TAG\s*\?=
 
   - name: "k8s.gcr.io/pause: dependents"
-    version: 3.6
+    version: 3.7
     refPaths:
     - path: cluster/gce/config-common.sh
       match: k8s.gcr.io\/pause:\d+\.\d+
