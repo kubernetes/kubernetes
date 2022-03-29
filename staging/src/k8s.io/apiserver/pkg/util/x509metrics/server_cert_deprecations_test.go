@@ -30,6 +30,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	auditapi "k8s.io/apiserver/pkg/apis/audit"
+	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/testutil"
 )
@@ -243,11 +245,17 @@ func TestCheckForHostnameError(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to create an http request: %v", err)
 			}
+			auditCtx := &audit.AuditContext{Event: &auditapi.Event{Level: auditapi.LevelMetadata}}
+			req = req.WithContext(audit.WithAuditContext(req.Context(), auditCtx))
 
 			_, err = client.Transport.RoundTrip(req)
 
 			if sanChecker.CheckRoundTripError(err) {
 				sanChecker.IncreaseMetricsCounter(req)
+
+				if len(auditCtx.Event.Annotations["missing-san.invalid-cert.kubernetes.io/"+req.URL.Hostname()]) == 0 {
+					t.Errorf("expected audit annotations, got %#v", auditCtx.Event.Annotations)
+				}
 			}
 
 			errorCounterVal := getSingleCounterValueFromRegistry(t, registry, "Test_checkForHostnameError")
@@ -379,6 +387,8 @@ func TestCheckForInsecureAlgorithmError(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to create an http request: %v", err)
 			}
+			auditCtx := &audit.AuditContext{Event: &auditapi.Event{Level: auditapi.LevelMetadata}}
+			req = req.WithContext(audit.WithAuditContext(req.Context(), auditCtx))
 
 			// can't use tlsServer.Client() as it contains the server certificate
 			// in tls.Config.Certificates. The signatures are, however, only checked
@@ -402,6 +412,10 @@ func TestCheckForInsecureAlgorithmError(t *testing.T) {
 
 			if sha1checker.CheckRoundTripError(err) {
 				sha1checker.IncreaseMetricsCounter(req)
+
+				if len(auditCtx.Event.Annotations["insecure-sha1.invalid-cert.kubernetes.io/"+req.URL.Hostname()]) == 0 {
+					t.Errorf("expected audit annotations, got %#v", auditCtx.Event.Annotations)
+				}
 			}
 
 			errorCounterVal := getSingleCounterValueFromRegistry(t, registry, "Test_checkForInsecureAlgorithmError")
@@ -511,28 +525,28 @@ func Test_x509DeprecatedCertificateMetricsRTWrapper_RoundTrip(t *testing.T) {
 	}{
 		{
 			name:     "no error, resp w/ cert, no counter increase",
-			checkers: []deprecatedCertificateAttributeChecker{&testNegativeChecker{counterRaiser{testCounter, ""}}},
+			checkers: []deprecatedCertificateAttributeChecker{&testNegativeChecker{counterRaiser{testCounter, "", ""}}},
 			resp:     httpResponseWithCert(),
 		},
 		{
 			name:     "no error, resp w/o cert, no counter increase",
-			checkers: []deprecatedCertificateAttributeChecker{&testPositiveChecker{counterRaiser{testCounter, ""}}},
+			checkers: []deprecatedCertificateAttributeChecker{&testPositiveChecker{counterRaiser{testCounter, "", ""}}},
 			resp:     httpResponseNoCert(),
 		},
 		{
 			name:            "no error, resp w/ cert, counter increase",
-			checkers:        []deprecatedCertificateAttributeChecker{&testPositiveChecker{counterRaiser{testCounter, ""}}},
+			checkers:        []deprecatedCertificateAttributeChecker{&testPositiveChecker{counterRaiser{testCounter, "", ""}}},
 			resp:            httpResponseWithCert(),
 			counterIncrease: true,
 		},
 		{
 			name:     "unrelated error, no resp, no counter increase",
-			checkers: []deprecatedCertificateAttributeChecker{&testNegativeChecker{counterRaiser{testCounter, ""}}},
+			checkers: []deprecatedCertificateAttributeChecker{&testNegativeChecker{counterRaiser{testCounter, "", ""}}},
 			err:      fmt.Errorf("error"),
 		},
 		{
 			name:            "related error, no resp,  counter increase",
-			checkers:        []deprecatedCertificateAttributeChecker{&testPositiveChecker{counterRaiser{testCounter, ""}}},
+			checkers:        []deprecatedCertificateAttributeChecker{&testPositiveChecker{counterRaiser{testCounter, "", ""}}},
 			err:             fmt.Errorf("error"),
 			counterIncrease: true,
 		},

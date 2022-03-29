@@ -19,11 +19,13 @@ package x509metrics
 import (
 	"crypto/x509"
 	"errors"
+	"fmt"
 	"net/http"
 	"reflect"
 	"strings"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/component-base/metrics"
 	"k8s.io/klog/v2"
 )
@@ -53,13 +55,18 @@ type deprecatedCertificateAttributeChecker interface {
 // it does not have to be reimplemented.
 type counterRaiser struct {
 	counter *metrics.Counter
-	reason  string
+	// programmatic id used in log and audit annotations prefixes
+	id string
+	// human readable explanation
+	reason string
 }
 
 func (c *counterRaiser) IncreaseMetricsCounter(req *http.Request) {
 	if req != nil && req.URL != nil {
 		if hostname := req.URL.Hostname(); len(hostname) > 0 {
-			klog.Infof("invalid certificate detected while connecting to %q: %s", req.URL.Hostname(), c.reason)
+			prefix := fmt.Sprintf("%s.invalid-cert.kubernetes.io", c.id)
+			klog.Infof("%s: invalid certificate detected connecting to %q: %s", prefix, hostname, c.reason)
+			audit.AddAuditAnnotation(req.Context(), prefix+"/"+hostname, c.reason)
 		}
 	}
 	c.counter.Inc()
@@ -127,6 +134,7 @@ func NewSANDeprecatedChecker(counter *metrics.Counter) *missingSANChecker {
 	return &missingSANChecker{
 		counterRaiser: counterRaiser{
 			counter: counter,
+			id:      "missing-san",
 			reason:  "relies on a legacy Common Name field instead of the SAN extension for subject validation",
 		},
 	}
@@ -174,6 +182,7 @@ func NewSHA1SignatureDeprecatedChecker(counter *metrics.Counter) *sha1SignatureC
 	return &sha1SignatureChecker{
 		counterRaiser: &counterRaiser{
 			counter: counter,
+			id:      "insecure-sha1",
 			reason:  "uses an insecure SHA-1 signature",
 		},
 	}
