@@ -894,7 +894,6 @@ func TestRequestWatch(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run("", func(t *testing.T) {
 			testCase.Request.backoff = &NoBackoff{}
-			testCase.Request.retry = &withRetry{}
 			watch, err := testCase.Request.Watch(context.Background())
 			hasErr := err != nil
 			if hasErr != testCase.Err {
@@ -996,10 +995,8 @@ func TestRequestStream(t *testing.T) {
 			},
 		},
 	}
-
 	for i, testCase := range testCases {
 		testCase.Request.backoff = &NoBackoff{}
-		testCase.Request.retry = &withRetry{maxRetries: 0}
 		body, err := testCase.Request.Stream(context.Background())
 		hasErr := err != nil
 		if hasErr != testCase.Err {
@@ -1044,7 +1041,6 @@ func TestRequestDo(t *testing.T) {
 	}
 	for i, testCase := range testCases {
 		testCase.Request.backoff = &NoBackoff{}
-		testCase.Request.retry = &withRetry{}
 		body, err := testCase.Request.Do(context.Background()).Raw()
 		hasErr := err != nil
 		if hasErr != testCase.Err {
@@ -1209,8 +1205,8 @@ func TestConnectionResetByPeerIsRetried(t *testing.T) {
 				return nil, &net.OpError{Err: syscall.ECONNRESET}
 			}),
 		},
-		backoff: backoff,
-		retry:   &withRetry{maxRetries: 10},
+		backoff:    backoff,
+		maxRetries: 10,
 	}
 	// We expect two retries of "connection reset by peer" and the success.
 	_, err := req.Do(context.Background()).Raw()
@@ -2086,288 +2082,6 @@ func TestRequestMaxRetries(t *testing.T) {
 			hasError := err != nil
 			if testCase.expectError != hasError {
 				t.Error(" failed checking error")
-			}
-		})
-	}
-}
-
-type responseErr struct {
-	response *http.Response
-	err      error
-}
-
-type seek struct {
-	offset int64
-	whence int
-}
-
-type count struct {
-	// keeps track of the number of Seek(offset, whence) calls.
-	seeks []seek
-	// how many times {Request|Response}.Body.Close() has been invoked
-	closes int
-}
-
-// used to track {Request|Response}.Body
-type readTracker struct {
-	count     *count
-	delegated io.Reader
-}
-
-func (r *readTracker) Seek(offset int64, whence int) (int64, error) {
-	if seeker, ok := r.delegated.(io.Seeker); ok {
-		r.count.seeks = append(r.count.seeks, seek{offset: offset, whence: whence})
-		return seeker.Seek(offset, whence)
-	}
-	return 0, io.EOF
-}
-
-func (r *readTracker) Read(p []byte) (n int, err error) {
-	return r.delegated.Read(p)
-}
-
-func (r *readTracker) Close() error {
-	if closer, ok := r.delegated.(io.Closer); ok {
-		r.count.closes++
-		return closer.Close()
-	}
-	return nil
-}
-
-func newReadTracker(count *count) *readTracker {
-	return &readTracker{
-		count: count,
-	}
-}
-
-func newCount() *count {
-	return &count{
-		closes: 0,
-		seeks:  make([]seek, 0),
-	}
-}
-
-type readSeeker struct{ err error }
-
-func (rs readSeeker) Read([]byte) (int, error)       { return 0, rs.err }
-func (rs readSeeker) Seek(int64, int) (int64, error) { return 0, rs.err }
-
-func unWrap(err error) error {
-	if uerr, ok := err.(*url.Error); ok {
-		return uerr.Err
-	}
-	return err
-}
-
-// noSleepBackOff is a NoBackoff except it does not sleep,
-// used for faster execution of the unit tests.
-type noSleepBackOff struct {
-	*NoBackoff
-}
-
-func (n *noSleepBackOff) Sleep(d time.Duration) {}
-
-func TestRequestWithRetry(t *testing.T) {
-	tests := []struct {
-		name                         string
-		body                         io.Reader
-		serverReturns                responseErr
-		errExpected                  error
-		transformFuncInvokedExpected int
-		roundTripInvokedExpected     int
-	}{
-		{
-			name:                         "server returns retry-after response, request body is not io.Seeker, retry goes ahead",
-			body:                         ioutil.NopCloser(bytes.NewReader([]byte{})),
-			serverReturns:                responseErr{response: retryAfterResponse(), err: nil},
-			errExpected:                  nil,
-			transformFuncInvokedExpected: 1,
-			roundTripInvokedExpected:     2,
-		},
-		{
-			name:                         "server returns retry-after response, request body Seek returns error, retry aborted",
-			body:                         &readSeeker{err: io.EOF},
-			serverReturns:                responseErr{response: retryAfterResponse(), err: nil},
-			errExpected:                  nil,
-			transformFuncInvokedExpected: 1,
-			roundTripInvokedExpected:     1,
-		},
-		{
-			name:                         "server returns retry-after response, request body Seek returns no error, retry goes ahead",
-			body:                         &readSeeker{err: nil},
-			serverReturns:                responseErr{response: retryAfterResponse(), err: nil},
-			errExpected:                  nil,
-			transformFuncInvokedExpected: 1,
-			roundTripInvokedExpected:     2,
-		},
-		{
-			name:                         "server returns retryable err, request body is not io.Seek, retry goes ahead",
-			body:                         ioutil.NopCloser(bytes.NewReader([]byte{})),
-			serverReturns:                responseErr{response: nil, err: io.ErrUnexpectedEOF},
-			errExpected:                  io.ErrUnexpectedEOF,
-			transformFuncInvokedExpected: 0,
-			roundTripInvokedExpected:     2,
-		},
-		{
-			name:                         "server returns retryable err, request body Seek returns error, retry aborted",
-			body:                         &readSeeker{err: io.EOF},
-			serverReturns:                responseErr{response: nil, err: io.ErrUnexpectedEOF},
-			errExpected:                  io.ErrUnexpectedEOF,
-			transformFuncInvokedExpected: 0,
-			roundTripInvokedExpected:     1,
-		},
-		{
-			name:                         "server returns retryable err, request body Seek returns no err, retry goes ahead",
-			body:                         &readSeeker{err: nil},
-			serverReturns:                responseErr{response: nil, err: io.ErrUnexpectedEOF},
-			errExpected:                  io.ErrUnexpectedEOF,
-			transformFuncInvokedExpected: 0,
-			roundTripInvokedExpected:     2,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			var roundTripInvoked int
-			client := clientForFunc(func(req *http.Request) (*http.Response, error) {
-				roundTripInvoked++
-				return test.serverReturns.response, test.serverReturns.err
-			})
-
-			req := &Request{
-				verb: "GET",
-				body: test.body,
-				c: &RESTClient{
-					Client: client,
-				},
-				backoff: &noSleepBackOff{},
-				retry:   &withRetry{maxRetries: 1},
-			}
-
-			var transformFuncInvoked int
-			err := req.request(context.Background(), func(request *http.Request, response *http.Response) {
-				transformFuncInvoked++
-			})
-
-			if test.roundTripInvokedExpected != roundTripInvoked {
-				t.Errorf("Expected RoundTrip to be invoked %d times, but got: %d", test.roundTripInvokedExpected, roundTripInvoked)
-			}
-			if test.transformFuncInvokedExpected != transformFuncInvoked {
-				t.Errorf("Expected transform func to be invoked %d times, but got: %d", test.transformFuncInvokedExpected, transformFuncInvoked)
-			}
-			if test.errExpected != unWrap(err) {
-				t.Errorf("Expected error: %v, but got: %v", test.errExpected, unWrap(err))
-			}
-		})
-	}
-}
-
-func TestRequestDoWithRetry(t *testing.T) {
-	testRequestWithRetry(t, func(ctx context.Context, r *Request) {
-		r.Do(ctx)
-	})
-}
-
-func TestRequestDORawWithRetry(t *testing.T) {
-	testRequestWithRetry(t, func(ctx context.Context, r *Request) {
-		r.DoRaw(ctx)
-	})
-}
-
-func testRequestWithRetry(t *testing.T, doFunc func(ctx context.Context, r *Request)) {
-	tests := []struct {
-		name              string
-		verb              string
-		body              func() io.Reader
-		maxRetries        int
-		serverReturns     []responseErr
-		reqCountExpected  *count
-		respCountExpected *count
-	}{
-		{
-			name:       "server always returns retry-after response",
-			verb:       "GET",
-			body:       func() io.Reader { return bytes.NewReader([]byte{}) },
-			maxRetries: 2,
-			serverReturns: []responseErr{
-				{response: retryAfterResponse(), err: nil},
-				{response: retryAfterResponse(), err: nil},
-				{response: retryAfterResponse(), err: nil},
-			},
-			reqCountExpected:  &count{closes: 0, seeks: make([]seek, 2)},
-			respCountExpected: &count{closes: 3, seeks: []seek{}},
-		},
-		{
-			name:       "server always returns retryable error",
-			verb:       "GET",
-			body:       func() io.Reader { return bytes.NewReader([]byte{}) },
-			maxRetries: 2,
-			serverReturns: []responseErr{
-				{response: nil, err: io.EOF},
-				{response: nil, err: io.EOF},
-				{response: nil, err: io.EOF},
-			},
-			reqCountExpected:  &count{closes: 0, seeks: make([]seek, 2)},
-			respCountExpected: &count{closes: 0, seeks: []seek{}},
-		},
-		{
-			name:       "server returns success on the final retry",
-			verb:       "GET",
-			body:       func() io.Reader { return bytes.NewReader([]byte{}) },
-			maxRetries: 2,
-			serverReturns: []responseErr{
-				{response: retryAfterResponse(), err: nil},
-				{response: nil, err: io.EOF},
-				{response: &http.Response{StatusCode: http.StatusOK}, err: nil},
-			},
-			reqCountExpected:  &count{closes: 0, seeks: make([]seek, 2)},
-			respCountExpected: &count{closes: 2, seeks: []seek{}},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			respCountGot := newCount()
-			responseRecorder := newReadTracker(respCountGot)
-			var attempts int
-			client := clientForFunc(func(req *http.Request) (*http.Response, error) {
-				defer func() {
-					attempts++
-				}()
-
-				resp := test.serverReturns[attempts].response
-				if resp != nil {
-					responseRecorder.delegated = ioutil.NopCloser(bytes.NewReader([]byte{}))
-					resp.Body = responseRecorder
-				}
-				return resp, test.serverReturns[attempts].err
-			})
-
-			reqCountGot := newCount()
-			reqRecorder := newReadTracker(reqCountGot)
-			reqRecorder.delegated = test.body()
-
-			req := &Request{
-				verb: test.verb,
-				body: reqRecorder,
-				c: &RESTClient{
-					Client: client,
-				},
-				backoff: &noSleepBackOff{},
-				retry:   &withRetry{maxRetries: test.maxRetries},
-			}
-
-			doFunc(context.Background(), req)
-
-			attemptsExpected := test.maxRetries + 1
-			if attemptsExpected != attempts {
-				t.Errorf("Expected retries: %d, but got: %d", attemptsExpected, attempts)
-			}
-			if !reflect.DeepEqual(test.reqCountExpected.seeks, reqCountGot.seeks) {
-				t.Errorf("Expected request body to have seek invocation: %v, but got: %v", test.reqCountExpected.seeks, reqCountGot.seeks)
-			}
-			if test.respCountExpected.closes != respCountGot.closes {
-				t.Errorf("Expected response body Close to be invoked %d times, but got: %d", test.respCountExpected.closes, respCountGot.closes)
 			}
 		})
 	}
