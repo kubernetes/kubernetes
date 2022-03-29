@@ -23,7 +23,6 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
-	"errors"
 	"math"
 	"math/big"
 	"os"
@@ -136,9 +135,7 @@ func TestCertRotationContinuousRequests(t *testing.T) {
 	for range time.Tick(time.Second) {
 		_, err := client.CoreV1().ServiceAccounts("default").List(ctx, v1.ListOptions{})
 		if err != nil {
-			// client may wrap the context.Canceled error, so we can't
-			// do 'err == ctx.Err()', instead use 'errors.Is'.
-			if errors.Is(err, context.Canceled) {
+			if err == ctx.Err() {
 				return
 			}
 
