@@ -129,10 +129,25 @@ func New(cfg aws.Config, clientInfo metadata.ClientInfo, handlers Handlers,
 	httpReq, _ := http.NewRequest(method, "", nil)
 
 	var err error
-	httpReq.URL, err = url.Parse(clientInfo.Endpoint + operation.HTTPPath)
+	httpReq.URL, err = url.Parse(clientInfo.Endpoint)
 	if err != nil {
 		httpReq.URL = &url.URL{}
 		err = awserr.New("InvalidEndpointURL", "invalid endpoint uri", err)
+	}
+
+	if len(operation.HTTPPath) != 0 {
+		opHTTPPath := operation.HTTPPath
+		var opQueryString string
+		if idx := strings.Index(opHTTPPath, "?"); idx >= 0 {
+			opQueryString = opHTTPPath[idx+1:]
+			opHTTPPath = opHTTPPath[:idx]
+		}
+
+		if strings.HasSuffix(httpReq.URL.Path, "/") && strings.HasPrefix(opHTTPPath, "/") {
+			opHTTPPath = opHTTPPath[1:]
+		}
+		httpReq.URL.Path += opHTTPPath
+		httpReq.URL.RawQuery = opQueryString
 	}
 
 	r := &Request{

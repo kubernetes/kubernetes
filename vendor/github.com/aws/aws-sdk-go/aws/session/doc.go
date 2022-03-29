@@ -283,7 +283,85 @@ component must be enclosed in square brackets.
 The custom EC2 IMDS endpoint can also be specified via the Session options.
 
   sess, err := session.NewSessionWithOptions(session.Options{
-      EC2IMDSEndpoint: "http://[::1]",
+      EC2MetadataEndpoint: "http://[::1]",
+  })
+
+FIPS and DualStack Endpoints
+
+The SDK can be configured to resolve an endpoint with certain capabilities such as FIPS and DualStack.
+
+You can configure a FIPS endpoint using an environment variable, shared config ($HOME/.aws/config),
+or programmatically.
+
+To configure a FIPS endpoint set the environment variable set the AWS_USE_FIPS_ENDPOINT to true or false to enable
+or disable FIPS endpoint resolution.
+
+  AWS_USE_FIPS_ENDPOINT=true
+
+To configure a FIPS endpoint using shared config, set use_fips_endpoint to true or false to enable
+or disable FIPS endpoint resolution.
+
+  [profile myprofile]
+  region=us-west-2
+  use_fips_endpoint=true
+
+To configure a FIPS endpoint programmatically
+
+  // Option 1: Configure it on a session for all clients
+  sess, err := session.NewSessionWithOptions(session.Options{
+      UseFIPSEndpoint: endpoints.FIPSEndpointStateEnabled,
+  })
+  if err != nil {
+      // handle error
+  }
+
+  client := s3.New(sess)
+
+  // Option 2: Configure it per client
+  sess, err := session.NewSession()
+  if err != nil {
+      // handle error
+  }
+
+  client := s3.New(sess, &aws.Config{
+      UseFIPSEndpoint: endpoints.FIPSEndpointStateEnabled,
+  })
+
+You can configure a DualStack endpoint using an environment variable, shared config ($HOME/.aws/config),
+or programmatically.
+
+To configure a DualStack endpoint set the environment variable set the AWS_USE_DUALSTACK_ENDPOINT to true or false to
+enable or disable DualStack endpoint resolution.
+
+  AWS_USE_DUALSTACK_ENDPOINT=true
+
+To configure a DualStack endpoint using shared config, set use_dualstack_endpoint to true or false to enable
+or disable DualStack endpoint resolution.
+
+  [profile myprofile]
+  region=us-west-2
+  use_dualstack_endpoint=true
+
+To configure a DualStack endpoint programmatically
+
+  // Option 1: Configure it on a session for all clients
+  sess, err := session.NewSessionWithOptions(session.Options{
+      UseDualStackEndpoint: endpoints.DualStackEndpointStateEnabled,
+  })
+  if err != nil {
+      // handle error
+  }
+
+  client := s3.New(sess)
+
+  // Option 2: Configure it per client
+  sess, err := session.NewSession()
+  if err != nil {
+      // handle error
+  }
+
+  client := s3.New(sess, &aws.Config{
+      UseDualStackEndpoint: endpoints.DualStackEndpointStateEnabled,
   })
 */
 package session

@@ -8,6 +8,41 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 )
 
+// A Logger is a minimalistic interface for the SDK to log messages to.
+type Logger interface {
+	Log(...interface{})
+}
+
+// DualStackEndpointState is a constant to describe the dual-stack endpoint resolution
+// behavior.
+type DualStackEndpointState uint
+
+const (
+	// DualStackEndpointStateUnset is the default value behavior for dual-stack endpoint
+	// resolution.
+	DualStackEndpointStateUnset DualStackEndpointState = iota
+
+	// DualStackEndpointStateEnabled enable dual-stack endpoint resolution for endpoints.
+	DualStackEndpointStateEnabled
+
+	// DualStackEndpointStateDisabled disables dual-stack endpoint resolution for endpoints.
+	DualStackEndpointStateDisabled
+)
+
+// FIPSEndpointState is a constant to describe the FIPS endpoint resolution behavior.
+type FIPSEndpointState uint
+
+const (
+	// FIPSEndpointStateUnset is the default value behavior for FIPS endpoint resolution.
+	FIPSEndpointStateUnset FIPSEndpointState = iota
+
+	// FIPSEndpointStateEnabled enables FIPS endpoint resolution for service endpoints.
+	FIPSEndpointStateEnabled
+
+	// FIPSEndpointStateDisabled disables FIPS endpoint resolution for endpoints.
+	FIPSEndpointStateDisabled
+)
+
 // Options provide the configuration needed to direct how the
 // endpoints will be resolved.
 type Options struct {
@@ -21,7 +56,18 @@ type Options struct {
 	// be returned. This endpoint may not be valid. If StrictMatching is
 	// enabled only services that are known to support dualstack will return
 	// dualstack endpoints.
+	//
+	// Deprecated: This option will continue to function for S3 and S3 Control for backwards compatibility.
+	// UseDualStackEndpoint should be used to enable usage of a service's dual-stack endpoint for all service clients
+	// moving forward. For S3 and S3 Control, when UseDualStackEndpoint is set to a non-zero value it takes higher
+	// precedence then this option.
 	UseDualStack bool
+
+	// Sets the resolver to resolve a dual-stack endpoint for the service.
+	UseDualStackEndpoint DualStackEndpointState
+
+	// UseFIPSEndpoint specifies the resolver must resolve a FIPS endpoint.
+	UseFIPSEndpoint FIPSEndpointState
 
 	// Enables strict matching of services and regions resolved endpoints.
 	// If the partition doesn't enumerate the exact service and region an
@@ -48,11 +94,65 @@ type Options struct {
 	// This option is ignored if StrictMatching is enabled.
 	ResolveUnknownService bool
 
+	// Specifies the EC2 Instance Metadata Service default endpoint selection mode (IPv4 or IPv6)
+	EC2MetadataEndpointMode EC2IMDSEndpointModeState
+
 	// STS Regional Endpoint flag helps with resolving the STS endpoint
 	STSRegionalEndpoint STSRegionalEndpoint
 
 	// S3 Regional Endpoint flag helps with resolving the S3 endpoint
 	S3UsEast1RegionalEndpoint S3UsEast1RegionalEndpoint
+
+	// ResolvedRegion is the resolved region string. If provided (non-zero length) it takes priority
+	// over the region name passed to the ResolveEndpoint call.
+	ResolvedRegion string
+
+	// Logger is the logger that will be used to log messages.
+	Logger Logger
+
+	// Determines whether logging of deprecated endpoints usage is enabled.
+	LogDeprecated bool
+}
+
+func (o Options) getEndpointVariant(service string) (v endpointVariant) {
+	const s3 = "s3"
+	const s3Control = "s3-control"
+
+	if (o.UseDualStackEndpoint == DualStackEndpointStateEnabled) ||
+		((service == s3 || service == s3Control) && (o.UseDualStackEndpoint == DualStackEndpointStateUnset && o.UseDualStack)) {
+		v |= dualStackVariant
+	}
+	if o.UseFIPSEndpoint == FIPSEndpointStateEnabled {
+		v |= fipsVariant
+	}
+	return v
+}
+
+// EC2IMDSEndpointModeState is an enum configuration variable describing the client endpoint mode.
+type EC2IMDSEndpointModeState uint
+
+// Enumeration values for EC2IMDSEndpointModeState
+const (
+	EC2IMDSEndpointModeStateUnset EC2IMDSEndpointModeState = iota
+	EC2IMDSEndpointModeStateIPv4
+	EC2IMDSEndpointModeStateIPv6
+)
+
+// SetFromString sets the EC2IMDSEndpointModeState based on the provided string value. Unknown values will default to EC2IMDSEndpointModeStateUnset
+func (e *EC2IMDSEndpointModeState) SetFromString(v string) error {
+	v = strings.TrimSpace(v)
+
+	switch {
+	case len(v) == 0:
+		*e = EC2IMDSEndpointModeStateUnset
+	case strings.EqualFold(v, "IPv6"):
+		*e = EC2IMDSEndpointModeStateIPv6
+	case strings.EqualFold(v, "IPv4"):
+		*e = EC2IMDSEndpointModeStateIPv4
+	default:
+		return fmt.Errorf("unknown EC2 IMDS endpoint mode, must be either IPv6 or IPv4")
+	}
+	return nil
 }
 
 // STSRegionalEndpoint is an enum for the states of the STS Regional Endpoint
@@ -166,8 +266,23 @@ func DisableSSLOption(o *Options) {
 
 // UseDualStackOption sets the UseDualStack option. Can be used as a functional
 // option when resolving endpoints.
+//
+// Deprecated: UseDualStackEndpointOption should be used to enable usage of a service's dual-stack endpoint.
+// When DualStackEndpointState is set to a non-zero value it takes higher precedence then this option.
 func UseDualStackOption(o *Options) {
 	o.UseDualStack = true
+}
+
+// UseDualStackEndpointOption sets the UseDualStackEndpoint option to enabled. Can be used as a functional
+// option when resolving endpoints.
+func UseDualStackEndpointOption(o *Options) {
+	o.UseDualStackEndpoint = DualStackEndpointStateEnabled
+}
+
+// UseFIPSEndpointOption sets the UseFIPSEndpoint option to enabled. Can be used as a functional
+// option when resolving endpoints.
+func UseFIPSEndpointOption(o *Options) {
+	o.UseFIPSEndpoint = FIPSEndpointStateEnabled
 }
 
 // StrictMatchingOption sets the StrictMatching option. Can be used as a functional
@@ -247,7 +362,7 @@ func RegionsForService(ps []Partition, partitionID, serviceID string) (map[strin
 		if p.ID() != partitionID {
 			continue
 		}
-		if _, ok := p.p.Services[serviceID]; !ok {
+		if _, ok := p.p.Services[serviceID]; !(ok || serviceID == Ec2metadataServiceID) {
 			break
 		}
 
@@ -333,9 +448,19 @@ func (p Partition) Regions() map[string]Region {
 // enumerating over the services in a partition.
 func (p Partition) Services() map[string]Service {
 	ss := make(map[string]Service, len(p.p.Services))
+
 	for id := range p.p.Services {
 		ss[id] = Service{
 			id: id,
+			p:  p.p,
+		}
+	}
+
+	// Since we have removed the customization that injected this into the model
+	// we still need to pretend that this is a modeled service.
+	if _, ok := ss[Ec2metadataServiceID]; !ok {
+		ss[Ec2metadataServiceID] = Service{
+			id: Ec2metadataServiceID,
 			p:  p.p,
 		}
 	}
@@ -367,7 +492,7 @@ func (r Region) ResolveEndpoint(service string, opts ...func(*Options)) (Resolve
 func (r Region) Services() map[string]Service {
 	ss := map[string]Service{}
 	for id, s := range r.p.Services {
-		if _, ok := s.Endpoints[r.id]; ok {
+		if _, ok := s.Endpoints[endpointKey{Region: r.id}]; ok {
 			ss[id] = Service{
 				id: id,
 				p:  r.p,
@@ -400,10 +525,24 @@ func (s Service) ResolveEndpoint(region string, opts ...func(*Options)) (Resolve
 // an URL that can be resolved to a instance of a service.
 func (s Service) Regions() map[string]Region {
 	rs := map[string]Region{}
-	for id := range s.p.Services[s.id].Endpoints {
-		if r, ok := s.p.Regions[id]; ok {
-			rs[id] = Region{
-				id:   id,
+
+	service, ok := s.p.Services[s.id]
+
+	// Since ec2metadata customization has been removed we need to check
+	// if it was defined in non-standard endpoints.json file. If it's not
+	// then we can return the empty map as there is no regional-endpoints for IMDS.
+	// Otherwise, we iterate need to iterate the non-standard model.
+	if s.id == Ec2metadataServiceID && !ok {
+		return rs
+	}
+
+	for id := range service.Endpoints {
+		if id.Variant != 0 {
+			continue
+		}
+		if r, ok := s.p.Regions[id.Region]; ok {
+			rs[id.Region] = Region{
+				id:   id.Region,
 				desc: r.Description,
 				p:    s.p,
 			}
@@ -421,8 +560,11 @@ func (s Service) Regions() map[string]Region {
 func (s Service) Endpoints() map[string]Endpoint {
 	es := make(map[string]Endpoint, len(s.p.Services[s.id].Endpoints))
 	for id := range s.p.Services[s.id].Endpoints {
-		es[id] = Endpoint{
-			id:        id,
+		if id.Variant != 0 {
+			continue
+		}
+		es[id.Region] = Endpoint{
+			id:        id.Region,
 			serviceID: s.id,
 			p:         s.p,
 		}

@@ -90,7 +90,7 @@ const (
 )
 
 var ignoredHeaders = rules{
-	blacklist{
+	excludeList{
 		mapRule{
 			authorizationHeader: struct{}{},
 			"User-Agent":        struct{}{},
@@ -99,9 +99,9 @@ var ignoredHeaders = rules{
 	},
 }
 
-// requiredSignedHeaders is a whitelist for build canonical headers.
+// requiredSignedHeaders is a allow list for build canonical headers.
 var requiredSignedHeaders = rules{
-	whitelist{
+	allowList{
 		mapRule{
 			"Cache-Control":                         struct{}{},
 			"Content-Disposition":                   struct{}{},
@@ -145,12 +145,13 @@ var requiredSignedHeaders = rules{
 		},
 	},
 	patterns{"X-Amz-Meta-"},
+	patterns{"X-Amz-Object-Lock-"},
 }
 
-// allowedHoisting is a whitelist for build query headers. The boolean value
+// allowedHoisting is a allow list for build query headers. The boolean value
 // represents whether or not it is a pattern.
 var allowedQueryHoisting = inclusiveRules{
-	blacklist{requiredSignedHeaders},
+	excludeList{requiredSignedHeaders},
 	patterns{"X-Amz-"},
 }
 
@@ -417,7 +418,7 @@ var SignRequestHandler = request.NamedHandler{
 // request handler should only be used with the SDK's built in service client's
 // API operation requests.
 //
-// This function should not be used on its on its own, but in conjunction with
+// This function should not be used on its own, but in conjunction with
 // an AWS service client's API operation call. To sign a standalone request
 // not created by a service client's API operation method use the "Sign" or
 // "Presign" functions of the "Signer" type.
@@ -633,21 +634,25 @@ func (ctx *signingCtx) buildCanonicalHeaders(r rule, header http.Header) {
 		ctx.Query.Set("X-Amz-SignedHeaders", ctx.signedHeaders)
 	}
 
-	headerValues := make([]string, len(headers))
+	headerItems := make([]string, len(headers))
 	for i, k := range headers {
 		if k == "host" {
 			if ctx.Request.Host != "" {
-				headerValues[i] = "host:" + ctx.Request.Host
+				headerItems[i] = "host:" + ctx.Request.Host
 			} else {
-				headerValues[i] = "host:" + ctx.Request.URL.Host
+				headerItems[i] = "host:" + ctx.Request.URL.Host
 			}
 		} else {
-			headerValues[i] = k + ":" +
-				strings.Join(ctx.SignedHeaderVals[k], ",")
+			headerValues := make([]string, len(ctx.SignedHeaderVals[k]))
+			for i, v := range ctx.SignedHeaderVals[k] {
+				headerValues[i] = strings.TrimSpace(v)
+			}
+			headerItems[i] = k + ":" +
+				strings.Join(headerValues, ",")
 		}
 	}
-	stripExcessSpaces(headerValues)
-	ctx.canonicalHeaders = strings.Join(headerValues, "\n")
+	stripExcessSpaces(headerItems)
+	ctx.canonicalHeaders = strings.Join(headerItems, "\n")
 }
 
 func (ctx *signingCtx) buildCanonicalString() {

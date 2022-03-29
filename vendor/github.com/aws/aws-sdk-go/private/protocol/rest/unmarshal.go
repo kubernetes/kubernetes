@@ -140,7 +140,7 @@ func unmarshalLocationElements(resp *http.Response, v reflect.Value, lowerCaseHe
 				prefix := field.Tag.Get("locationName")
 				err := unmarshalHeaderMap(m, resp.Header, prefix, lowerCaseHeaderMaps)
 				if err != nil {
-					awserr.New(request.ErrCodeSerialization, "failed to decode REST response", err)
+					return awserr.New(request.ErrCodeSerialization, "failed to decode REST response", err)
 				}
 			}
 		}

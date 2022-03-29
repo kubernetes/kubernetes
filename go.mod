@@ -21,7 +21,7 @@ require (
 	github.com/armon/circbuf v0.0.0-20150827004946-bbbad097214e
 	github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
 	github.com/auth0/go-jwt-middleware v1.0.1 // indirect
-	github.com/aws/aws-sdk-go v1.38.49
+	github.com/aws/aws-sdk-go v1.42.25
 	github.com/blang/semver/v4 v4.0.0
 	github.com/boltdb/bolt v1.3.1 // indirect
 	github.com/clusterhq/flocker-go v0.0.0-20160920122132-2b8b7259d313
@@ -175,7 +175,7 @@ replace (
 	github.com/armon/go-socks5 => github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
 	github.com/asaskevich/govalidator => github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a
 	github.com/auth0/go-jwt-middleware => github.com/auth0/go-jwt-middleware v1.0.1
-	github.com/aws/aws-sdk-go => github.com/aws/aws-sdk-go v1.38.49
+	github.com/aws/aws-sdk-go => github.com/aws/aws-sdk-go v1.42.25
 	github.com/benbjohnson/clock => github.com/benbjohnson/clock v1.1.0
 	github.com/beorn7/perks => github.com/beorn7/perks v1.0.1
 	github.com/blang/semver => github.com/blang/semver v3.5.1+incompatible

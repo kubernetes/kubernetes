@@ -13,7 +13,6 @@ package ec2metadata
 
 import (
 	"bytes"
-	"errors"
 	"io"
 	"net/http"
 	"net/url"
@@ -234,7 +233,8 @@ func unmarshalError(r *request.Request) {
 
 	// Response body format is not consistent between metadata endpoints.
 	// Grab the error message as a string and include that as the source error
-	r.Error = awserr.NewRequestFailure(awserr.New("EC2MetadataError", "failed to make EC2Metadata request", errors.New(b.String())),
+	r.Error = awserr.NewRequestFailure(
+		awserr.New("EC2MetadataError", "failed to make EC2Metadata request\n"+b.String(), nil),
 		r.HTTPResponse.StatusCode, r.RequestID)
 }
 

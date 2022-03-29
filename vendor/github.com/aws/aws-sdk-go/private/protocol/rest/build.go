@@ -98,7 +98,7 @@ func buildLocationElements(r *request.Request, v reflect.Value, buildGETQuery bo
 
 			// Support the ability to customize values to be marshaled as a
 			// blob even though they were modeled as a string. Required for S3
-			// API operations like SSECustomerKey is modeled as stirng but
+			// API operations like SSECustomerKey is modeled as string but
 			// required to be base64 encoded in request.
 			if field.Tag.Get("marshal-as") == "blob" {
 				m = m.Convert(byteSliceType)
