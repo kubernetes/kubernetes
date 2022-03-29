@@ -164,10 +164,11 @@ func (ca *cloudCIDRAllocator) worker(stopChan <-chan struct{}) {
 				klog.Errorf("Error updating CIDR for %q: %v", workItem, err)
 				if canRetry, timeout := ca.retryParams(workItem); canRetry {
 					klog.V(2).Infof("Retrying update for %q after %v", workItem, timeout)
-					time.AfterFunc(timeout, func() {
+					timer := time.AfterFunc(timeout, func() {
 						// Requeue the failed node for update again.
 						ca.nodeUpdateChannel <- workItem
 					})
+					timer.Stop()
 					continue
 				}
 				klog.Errorf("Exceeded retry count for %q, dropping from queue", workItem)
