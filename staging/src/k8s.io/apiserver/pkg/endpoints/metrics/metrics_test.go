@@ -204,6 +204,62 @@ func TestCleanScope(t *testing.T) {
 	}
 }
 
+func TestCleanFieldValidation(t *testing.T) {
+	testCases := []struct {
+		name                    string
+		url                     *url.URL
+		expectedFieldValidation string
+	}{
+		{
+			name:                    "empty field validation",
+			url:                     &url.URL{},
+			expectedFieldValidation: "",
+		},
+		{
+			name: "ignore field validation",
+			url: &url.URL{
+				RawQuery: "fieldValidation=Ignore",
+			},
+			expectedFieldValidation: "Ignore",
+		},
+		{
+			name: "warn field validation",
+			url: &url.URL{
+				RawQuery: "fieldValidation=Warn",
+			},
+			expectedFieldValidation: "Warn",
+		},
+		{
+			name: "strict field validation",
+			url: &url.URL{
+				RawQuery: "fieldValidation=Strict",
+			},
+			expectedFieldValidation: "Strict",
+		},
+		{
+			name: "invalid field validation",
+			url: &url.URL{
+				RawQuery: "fieldValidation=foo",
+			},
+			expectedFieldValidation: "invalid",
+		},
+		{
+			name: "multiple field validation",
+			url: &url.URL{
+				RawQuery: "fieldValidation=Strict&fieldValidation=Ignore",
+			},
+			expectedFieldValidation: "invalid",
+		},
+	}
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			if fieldValidation := cleanFieldValidation(test.url); fieldValidation != test.expectedFieldValidation {
+				t.Errorf("failed to clean field validation, expected: %s, got: %s", test.expectedFieldValidation, fieldValidation)
+			}
+		})
+	}
+}
+
 func TestResponseWriterDecorator(t *testing.T) {
 	decorator := &ResponseWriterDelegator{
 		ResponseWriter: &responsewriter.FakeResponseWriter{},

@@ -122,6 +122,19 @@ var (
 		},
 		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component"},
 	)
+	fieldValidationRequestLatencies = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Name: "field_validation_request_duration_seconds",
+			Help: "Response latency distribution in seconds for each field validation value and whether field validation is enabled or not",
+			// This metric is supplementary to the requestLatencies metric.
+			// It measures request durations for the various field validation
+			// values.
+			Buckets: []float64{0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0, 1.25, 1.5, 2, 3,
+				4, 5, 6, 8, 10, 15, 20, 30, 45, 60},
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"field_validation", "enabled"},
+	)
 	responseSizes = compbasemetrics.NewHistogramVec(
 		&compbasemetrics.HistogramOpts{
 			Name: "apiserver_response_sizes",
@@ -261,6 +274,7 @@ var (
 		longRunningRequestGauge,
 		requestLatencies,
 		requestSloLatencies,
+		fieldValidationRequestLatencies,
 		responseSizes,
 		droppedRequests,
 		TLSHandshakeErrors,
@@ -510,6 +524,10 @@ func MonitorRequest(req *http.Request, verb, group, version, resource, subresour
 		}
 	}
 	requestLatencies.WithContext(req.Context()).WithLabelValues(reportedVerb, dryRun, group, version, resource, subresource, scope, component).Observe(elapsedSeconds)
+	fieldValidation := cleanFieldValidation(req.URL)
+	fieldValidationEnabled := strconv.FormatBool(utilfeature.DefaultFeatureGate.Enabled(features.ServerSideFieldValidation))
+	fieldValidationRequestLatencies.WithContext(req.Context()).WithLabelValues(fieldValidation, fieldValidationEnabled)
+
 	if wd, ok := request.LatencyTrackersFrom(req.Context()); ok {
 		sloLatency := elapsedSeconds - (wd.MutatingWebhookTracker.GetLatency() + wd.ValidatingWebhookTracker.GetLatency()).Seconds()
 		requestSloLatencies.WithContext(req.Context()).WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component).Observe(sloLatency)
@@ -648,6 +666,21 @@ func cleanDryRun(u *url.URL) string {
 	// TODO: this is a fairly large allocation for what it does, consider
 	//   a sort and dedup in a single pass
 	return strings.Join(utilsets.NewString(dryRun...).List(), ",")
+}
+
+func cleanFieldValidation(u *url.URL) string {
+	// avoid allocating when we don't see dryRun in the query
+	if !strings.Contains(u.RawQuery, "fieldValidation") {
+		return ""
+	}
+	fieldValidation := u.Query()["fieldValidation"]
+	if len(fieldValidation) != 1 {
+		return "invalid"
+	}
+	if errs := validation.ValidateFieldValidation(nil, fieldValidation[0]); len(errs) > 0 {
+		return "invalid"
+	}
+	return fieldValidation[0]
 }
 
 var _ http.ResponseWriter = (*ResponseWriterDelegator)(nil)
