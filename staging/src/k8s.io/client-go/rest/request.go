@@ -620,7 +620,7 @@ func (r *Request) Watch(ctx context.Context) (watch.Interface, error) {
 		}
 
 		if err := r.retry.Before(ctx, r); err != nil {
-			return nil, r.retry.WrapPreviousError(err)
+			return nil, err
 		}
 
 		resp, err := client.Do(req)
@@ -655,7 +655,7 @@ func (r *Request) Watch(ctx context.Context) (watch.Interface, error) {
 				// we need to return the error object from that.
 				err = transformErr
 			}
-			return nil, r.retry.WrapPreviousError(err)
+			return nil, err
 		}
 	}
 }
@@ -865,7 +865,7 @@ func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Resp
 		}
 
 		if err := r.retry.Before(ctx, r); err != nil {
-			return r.retry.WrapPreviousError(err)
+			return err
 		}
 		resp, err := client.Do(req)
 		updateURLMetrics(ctx, r, resp, err)
@@ -895,7 +895,7 @@ func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Resp
 			return true
 		}()
 		if done {
-			return r.retry.WrapPreviousError(err)
+			return err
 		}
 	}
 }

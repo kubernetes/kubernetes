@@ -22,7 +22,6 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"net/url"
 	"time"
 
 	"k8s.io/klog/v2"
@@ -84,22 +83,6 @@ type WithRetry interface {
 
 	// After should be invoked immediately after an attempt is made.
 	After(ctx context.Context, r *Request, resp *http.Response, err error)
-
-	// WrapPreviousError wraps the error from any previous attempt into
-	// the final error specified in 'finalErr', so the user has more
-	// context why the request failed.
-	// For example, if a request times out after multiple retries then
-	// we see a generic context.Canceled or context.DeadlineExceeded
-	// error which is not very useful in debugging. This function can
-	// wrap any error from previous attempt(s) to provide more context to
-	// the user. The error returned in 'err' must satisfy the
-	// following conditions:
-	//  a: errors.Unwrap(err) = errors.Unwrap(finalErr) if finalErr
-	//     implements Unwrap
-	//  b: errors.Unwrap(err) = finalErr if finalErr does not
-	//     implements Unwrap
-	//  c: errors.Is(err, otherErr) = errors.Is(finalErr, otherErr)
-	WrapPreviousError(finalErr error) (err error)
 }
 
 // RetryAfter holds information associated with the next retry.
@@ -128,16 +111,6 @@ type withRetry struct {
 	//  - for consecutive attempts, it is non nil and holds the
 	//    retry after parameters for the next attempt to be made.
 	retryAfter *RetryAfter
-
-	// we keep track of two most recent errors, if the most
-	// recent attempt is labeled as 'N' then:
-	//  - currentErr represents the error returned by attempt N, it
-	//    can be nil if attempt N did not return an error.
-	//  - previousErr represents an error from an attempt 'M' which
-	//    precedes attempt 'N' (N - M >= 1), it is non nil only when:
-	//      - for a sequence of attempt(s) 1..n (n>1), there
-	//        is an attempt k (k<n) that returned an error.
-	previousErr, currentErr error
 }
 
 func (r *withRetry) SetMaxRetries(maxRetries int) {
@@ -147,17 +120,7 @@ func (r *withRetry) SetMaxRetries(maxRetries int) {
 	r.maxRetries = maxRetries
 }
 
-func (r *withRetry) trackPreviousError(err error) {
-	// keep track of two most recent errors
-	if r.currentErr != nil {
-		r.previousErr = r.currentErr
-	}
-	r.currentErr = err
-}
-
 func (r *withRetry) IsNextRetry(ctx context.Context, restReq *Request, httpReq *http.Request, resp *http.Response, err error, f IsRetryableErrorFunc) bool {
-	defer r.trackPreviousError(err)
-
 	if httpReq == nil || (resp == nil && err == nil) {
 		// bad input, we do nothing.
 		return false
@@ -228,7 +191,6 @@ func (r *withRetry) prepareForNextRetry(ctx context.Context, request *Request) e
 
 func (r *withRetry) Before(ctx context.Context, request *Request) error {
 	if ctx.Err() != nil {
-		r.trackPreviousError(ctx.Err())
 		return ctx.Err()
 	}
 
@@ -259,7 +221,6 @@ func (r *withRetry) Before(ctx context.Context, request *Request) error {
 	// apiserver at least once before. This request should
 	// also be throttled with the client-internal rate limiter.
 	if err := request.tryThrottleWithInfo(ctx, r.retryAfter.Reason); err != nil {
-		r.trackPreviousError(ctx.Err())
 		return err
 	}
 
@@ -282,45 +243,6 @@ func (r *withRetry) After(ctx context.Context, request *Request, resp *http.Resp
 			request.backoff.UpdateBackoff(request.URL(), err, resp.StatusCode)
 		}
 	}
-}
-
-func (r *withRetry) WrapPreviousError(currentErr error) error {
-	if currentErr == nil || r.previousErr == nil {
-		return currentErr
-	}
-
-	// if both previous and current error objects represent the error,
-	// then there is no need to wrap the previous error.
-	if currentErr.Error() == r.previousErr.Error() {
-		return currentErr
-	}
-
-	previousErr := r.previousErr
-	// net/http wraps the underlying error with an url.Error, if the
-	// previous err object is an instance of url.Error, then we can
-	// unwrap it to get to the inner error object, this is so we can
-	// avoid error message like:
-	//  Error: Get "http://foo.bar/api/v1": context deadline exceeded - error \
-	//  from a previous attempt: Error: Get "http://foo.bar/api/v1": EOF
-	if urlErr, ok := r.previousErr.(*url.Error); ok && urlErr != nil {
-		if urlErr.Unwrap() != nil {
-			previousErr = urlErr.Unwrap()
-		}
-	}
-
-	return &wrapPreviousError{
-		currentErr:    currentErr,
-		previousError: previousErr,
-	}
-}
-
-type wrapPreviousError struct {
-	currentErr, previousError error
-}
-
-func (w *wrapPreviousError) Unwrap() error { return w.currentErr }
-func (w *wrapPreviousError) Error() string {
-	return fmt.Sprintf("%s - error from a previous attempt: %s", w.currentErr.Error(), w.previousError.Error())
 }
 
 // checkWait returns true along with a number of seconds if
