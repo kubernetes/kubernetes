@@ -52,12 +52,6 @@ var neverRetryError = IsRetryableErrorFunc(func(_ *http.Request, _ error) bool {
 // Note that WithRetry is not safe for concurrent use by multiple
 // goroutines without additional locking or coordination.
 type WithRetry interface {
-	// SetMaxRetries makes the request use the specified integer as a ceiling
-	// for retries upon receiving a 429 status code  and the "Retry-After" header
-	// in the response.
-	// A zero maxRetries should prevent from doing any retry and return immediately.
-	SetMaxRetries(maxRetries int)
-
 	// IsNextRetry advances the retry counter appropriately
 	// and returns true if the request should be retried,
 	// otherwise it returns false, if:
@@ -142,13 +136,6 @@ type withRetry struct {
 	//      - for a sequence of attempt(s) 1..n (n>1), there
 	//        is an attempt k (k<n) that returned an error.
 	previousErr, currentErr error
-}
-
-func (r *withRetry) SetMaxRetries(maxRetries int) {
-	if maxRetries < 0 {
-		maxRetries = 0
-	}
-	r.maxRetries = maxRetries
 }
 
 func (r *withRetry) trackPreviousError(err error) {

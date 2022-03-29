@@ -998,7 +998,8 @@ func TestRequestWatch(t *testing.T) {
 				c.Client = client
 			}
 			testCase.Request.backoff = &noSleepBackOff{}
-			testCase.Request.retry = &withRetry{maxRetries: testCase.maxRetries}
+			testCase.Request.maxRetries = testCase.maxRetries
+			testCase.Request.retryFn = defaultRequestRetryFn
 
 			watch, err := testCase.Request.Watch(context.Background())
 
@@ -1211,7 +1212,8 @@ func TestRequestStream(t *testing.T) {
 				c.Client = client
 			}
 			testCase.Request.backoff = &noSleepBackOff{}
-			testCase.Request.retry = &withRetry{maxRetries: testCase.maxRetries}
+			testCase.Request.maxRetries = testCase.maxRetries
+			testCase.Request.retryFn = defaultRequestRetryFn
 
 			body, err := testCase.Request.Stream(context.Background())
 
@@ -1266,7 +1268,7 @@ func TestRequestDo(t *testing.T) {
 	}
 	for i, testCase := range testCases {
 		testCase.Request.backoff = &NoBackoff{}
-		testCase.Request.retry = &withRetry{}
+		testCase.Request.retryFn = defaultRequestRetryFn
 		body, err := testCase.Request.Do(context.Background()).Raw()
 		hasErr := err != nil
 		if hasErr != testCase.Err {
@@ -1429,8 +1431,9 @@ func TestConnectionResetByPeerIsRetried(t *testing.T) {
 				return nil, &net.OpError{Err: syscall.ECONNRESET}
 			}),
 		},
-		backoff: backoff,
-		retry:   &withRetry{maxRetries: 10},
+		backoff:    backoff,
+		maxRetries: 10,
+		retryFn:    defaultRequestRetryFn,
 	}
 	// We expect two retries of "connection reset by peer" and the success.
 	_, err := req.Do(context.Background()).Raw()
@@ -2504,8 +2507,9 @@ func TestRequestWithRetry(t *testing.T) {
 				c: &RESTClient{
 					Client: client,
 				},
-				backoff: &noSleepBackOff{},
-				retry:   &withRetry{maxRetries: 1},
+				backoff:    &noSleepBackOff{},
+				maxRetries: 1,
+				retryFn:    defaultRequestRetryFn,
 			}
 
 			var transformFuncInvoked int
@@ -2782,8 +2786,9 @@ func testRequestWithRetry(t *testing.T, key string, doFunc func(ctx context.Cont
 					content: defaultContentConfig(),
 					Client:  client,
 				},
-				backoff: &noSleepBackOff{},
-				retry:   &withRetry{maxRetries: test.maxRetries},
+				backoff:    &noSleepBackOff{},
+				maxRetries: test.maxRetries,
+				retryFn:    defaultRequestRetryFn,
 			}
 
 			doFunc(context.Background(), req)
@@ -3006,7 +3011,8 @@ func testRetryWithRateLimiterBackoffAndMetrics(t *testing.T, key string, doFunc 
 				pathPrefix:  "/api/v1",
 				rateLimiter: interceptor,
 				backoff:     interceptor,
-				retry:       &withRetry{maxRetries: test.maxRetries},
+				maxRetries:  test.maxRetries,
+				retryFn:     defaultRequestRetryFn,
 			}
 
 			doFunc(ctx, req)
@@ -3140,7 +3146,7 @@ func testWithRetryInvokeOrder(t *testing.T, key string, doFunc func(ctx context.
 				pathPrefix:  "/api/v1",
 				rateLimiter: flowcontrol.NewFakeAlwaysRateLimiter(),
 				backoff:     &NoBackoff{},
-				retry:       interceptor,
+				retryFn:     func(_ int) WithRetry { return interceptor },
 			}
 
 			doFunc(context.Background(), req)
@@ -3315,7 +3321,8 @@ func testWithWrapPreviousError(t *testing.T, doFunc func(ctx context.Context, r 
 				pathPrefix:  "/api/v1",
 				rateLimiter: flowcontrol.NewFakeAlwaysRateLimiter(),
 				backoff:     &noSleepBackOff{},
-				retry:       &withRetry{maxRetries: test.maxRetries},
+				maxRetries:  test.maxRetries,
+				retryFn:     defaultRequestRetryFn,
 			}
 
 			err = doFunc(context.Background(), req)
@@ -3618,8 +3625,9 @@ func TestRequestBodyResetOrder(t *testing.T) {
 			content: defaultContentConfig(),
 			Client:  client,
 		},
-		backoff: &noSleepBackOff{},
-		retry:   &withRetry{maxRetries: 1},
+		backoff:    &noSleepBackOff{},
+		maxRetries: 1,
+		retryFn:    defaultRequestRetryFn,
 	}
 
 	req.Do(context.Background())
