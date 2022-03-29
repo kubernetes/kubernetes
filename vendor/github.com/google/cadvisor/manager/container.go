@@ -64,6 +64,7 @@ type containerInfo struct {
 }
 
 type containerData struct {
+	oomEvents                uint64
 	handler                  container.ContainerHandler
 	info                     containerInfo
 	memoryCache              *memory.InMemoryCache
@@ -103,8 +104,6 @@ type containerData struct {
 
 	// resctrlCollector updates stats for resctrl controller.
 	resctrlCollector stats.Collector
-
-	oomEvents uint64
 }
 
 // jitter returns a time.Duration between duration and duration + maxFactor * duration,

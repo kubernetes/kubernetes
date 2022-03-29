@@ -86,8 +86,13 @@ type UsageInfo struct {
 	Inodes uint64
 }
 
-// ErrNoSuchDevice is the error indicating the requested device does not exist.
-var ErrNoSuchDevice = errors.New("cadvisor: no such device")
+var (
+	// ErrNoSuchDevice is the error indicating the requested device does not exist.
+	ErrNoSuchDevice = errors.New("cadvisor: no such device")
+
+	// ErrDeviceNotInPartitionsMap is the error resulting if a device could not be found in the partitions map.
+	ErrDeviceNotInPartitionsMap = errors.New("could not find device in cached partitions map")
+)
 
 type FsInfo interface {
 	// Returns capacity and free space, in bytes, of all the ext2, ext3, ext4 filesystems on the host.
