@@ -156,7 +156,7 @@ func (c *FakeDiscovery) OpenAPISchema() (*openapi_v2.Document, error) {
 }
 
 func (c *FakeDiscovery) OpenAPIV3() openapi.Client {
-	panic("implement me")
+	panic("unimplemented")
 }
 
 // RESTClient returns a RESTClient that is used to communicate with API server
