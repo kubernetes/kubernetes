@@ -23,12 +23,12 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/onsi/ginkgo"
-	"github.com/onsi/ginkgo/config"
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/ginkgo/v2/config"
 	"github.com/onsi/gomega"
 	"github.com/spf13/pflag"
 
-	morereporters "github.com/onsi/ginkgo/reporters"
+	morereporters "github.com/onsi/ginkgo/v2/reporters"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 )

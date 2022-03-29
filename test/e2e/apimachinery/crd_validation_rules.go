@@ -20,7 +20,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"

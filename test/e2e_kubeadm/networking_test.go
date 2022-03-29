@@ -26,7 +26,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 	netutils "k8s.io/utils/net"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 var (

@@ -46,7 +46,7 @@ import (
 	e2ereplicaset "k8s.io/kubernetes/test/e2e/framework/replicaset"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
 	// ensure libs have a chance to initialize

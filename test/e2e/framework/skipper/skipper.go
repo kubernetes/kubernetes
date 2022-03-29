@@ -26,7 +26,7 @@ import (
 	"runtime/debug"
 	"strings"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -88,7 +88,7 @@ func skip(message string, callerSkip ...int) {
 
 // ginkgo adds a lot of test running infrastructure to the stack, so
 // we filter those out
-var stackSkipPattern = regexp.MustCompile(`onsi/ginkgo`)
+var stackSkipPattern = regexp.MustCompile(`onsi/ginkgo/v2`)
 
 func pruneStack(skip int) string {
 	skip += 2 // one for pruneStack and one for debug.Stack

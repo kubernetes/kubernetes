@@ -27,8 +27,8 @@ import (
 
 	"k8s.io/klog/v2"
 
-	"github.com/onsi/ginkgo/config"
-	"github.com/onsi/ginkgo/types"
+	"github.com/onsi/ginkgo/v2/config"
+	"github.com/onsi/ginkgo/v2/types"
 )
 
 // ProgressReporter is a ginkgo reporter which tracks the total number of tests to be run/passed/failed/skipped.

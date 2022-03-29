@@ -36,7 +36,7 @@ import (
 	gcecloud "k8s.io/legacy-cloud-providers/gce"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 var _ = common.SIGDescribe("Services GCE [Slow]", func() {

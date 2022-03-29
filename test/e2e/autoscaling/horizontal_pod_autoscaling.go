@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eautoscaling "k8s.io/kubernetes/test/e2e/framework/autoscaling"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 // These tests don't seem to be running properly in parallel: issue: #20338.

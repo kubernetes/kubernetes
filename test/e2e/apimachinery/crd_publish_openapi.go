@@ -26,7 +26,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	openapiutil "k8s.io/kube-openapi/pkg/util"
 	kubeopenapispec "k8s.io/kube-openapi/pkg/validation/spec"
 	"k8s.io/utils/pointer"

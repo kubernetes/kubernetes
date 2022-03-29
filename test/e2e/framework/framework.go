@@ -49,7 +49,7 @@ import (
 	scaleclient "k8s.io/client-go/scale"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
 	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
@@ -194,7 +194,7 @@ func (f *Framework) BeforeEach() {
 	f.beforeEachStarted = true
 
 	// The fact that we need this feels like a bug in ginkgo.
-	// https://github.com/onsi/ginkgo/issues/222
+	// https://github.com/onsi/ginkgo/v2/issues/222
 	f.cleanupHandle = AddCleanupAction(f.AfterEach)
 	if f.ClientSet == nil {
 		ginkgo.By("Creating a kubernetes client")

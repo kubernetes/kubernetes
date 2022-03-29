@@ -29,7 +29,7 @@ import (
 
 	"fmt"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 var _ = SIGDescribe("Kubelet Volume Manager", func() {
