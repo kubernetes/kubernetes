@@ -132,7 +132,7 @@ func ValidateNoNewFinalizers(newFinalizers []string, oldFinalizers []string, fld
 func ValidateImmutableField(newVal, oldVal interface{}, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if !apiequality.Semantic.DeepEqual(oldVal, newVal) {
-		allErrs = append(allErrs, field.Invalid(fldPath, newVal, FieldImmutableErrorMsg))
+		allErrs = append(allErrs, field.ChangeForbidden(fldPath, newVal, FieldImmutableErrorMsg))
 	}
 	return allErrs
 }

@@ -995,6 +995,9 @@ const (
 	// CauseTypeResourceVersionTooLarge is used to report that the requested resource version
 	// is newer than the data observed by the API server, so the request cannot be served.
 	CauseTypeResourceVersionTooLarge CauseType = "ResourceVersionTooLarge"
+	// CauseTypeFieldChangeForbidden is used to report when errors are caused due to forbidden transitions,
+	// as a result informing the cause of error is because of changes relative to the existing persisted object.
+	CauseTypeFieldChangeForbidden CauseType = "FieldChangeForbidden"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

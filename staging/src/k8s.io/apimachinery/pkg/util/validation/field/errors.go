@@ -137,6 +137,9 @@ const (
 	ErrorTypeInternal ErrorType = "InternalError"
 	// ErrorTypeTypeInvalid is for the value did not match the schema type for that field
 	ErrorTypeTypeInvalid ErrorType = "FieldValueTypeInvalid"
+	// ErrorTypeChangeForbidden is used to report errors which are caused
+	// due to forbidden transitions. See ChangeForbidden().
+	ErrorTypeChangeForbidden ErrorType = "FieldChangeForbidden"
 )
 
 // String converts a ErrorType into its corresponding canonical error message.
@@ -271,6 +274,11 @@ func InternalError(field *Path, err error) *Error {
 	return &Error{ErrorTypeInternal, field.String(), nil, err.Error()}
 }
 
+// ChangeForbidden returns a *Error indicating field change is disallowed*. This is
+// used to inform callers that their proposed value would be a forbidden mutation.
+func ChangeForbidden(field *Path, value interface{}, detail string) *Error {
+	return &Error{ErrorTypeChangeForbidden, field.String(), value, detail}
+}
 // ErrorList holds a set of Errors.  It is plausible that we might one day have
 // non-field errors in this same umbrella package, but for now we don't, so
 // we can keep it simple and leave ErrorList here.
