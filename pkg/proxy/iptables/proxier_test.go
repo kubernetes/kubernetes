@@ -6050,3 +6050,135 @@ func TestEndpointCommentElision(t *testing.T) {
 		t.Errorf("numComments (%d) != 0 when numEndpoints (%d) > threshold (%d)", numComments, numEndpoints, endpointChainsNumberThreshold)
 	}
 }
+
+func TestNoEndpointsMetric(t *testing.T) {
+	type endpoint struct {
+		ip       string
+		hostname string
+	}
+
+	internalTrafficPolicyLocal := v1.ServiceInternalTrafficPolicyLocal
+	externalTrafficPolicyLocal := v1.ServiceExternalTrafficPolicyTypeLocal
+
+	metrics.RegisterMetrics()
+	testCases := []struct {
+		name                                                string
+		internalTrafficPolicy                               *v1.ServiceInternalTrafficPolicyType
+		externalTrafficPolicy                               v1.ServiceExternalTrafficPolicyType
+		endpoints                                           []endpoint
+		expectedSyncProxyRulesNoLocalEndpointsTotalInternal int
+		expectedSyncProxyRulesNoLocalEndpointsTotalExternal int
+	}{
+		{
+			name:                  "internalTrafficPolicy is set and there is non-zero local endpoints",
+			internalTrafficPolicy: &internalTrafficPolicyLocal,
+			endpoints: []endpoint{
+				{"10.0.1.1", testHostname},
+				{"10.0.1.2", "host1"},
+				{"10.0.1.3", "host2"},
+			},
+		},
+		{
+			name:                  "externalTrafficPolicy is set and there is non-zero local endpoints",
+			externalTrafficPolicy: externalTrafficPolicyLocal,
+			endpoints: []endpoint{
+				{"10.0.1.1", testHostname},
+				{"10.0.1.2", "host1"},
+				{"10.0.1.3", "host2"},
+			},
+		},
+		{
+			name:                  "internalTrafficPolicy is set and there is zero local endpoint",
+			internalTrafficPolicy: &internalTrafficPolicyLocal,
+			endpoints: []endpoint{
+				{"10.0.1.1", "host0"},
+				{"10.0.1.2", "host1"},
+				{"10.0.1.3", "host2"},
+			},
+			expectedSyncProxyRulesNoLocalEndpointsTotalInternal: 1,
+		},
+		{
+			name:                  "externalTrafficPolicy is set and there is zero local endpoint",
+			externalTrafficPolicy: externalTrafficPolicyLocal,
+			endpoints: []endpoint{
+				{"10.0.1.1", "host0"},
+				{"10.0.1.2", "host1"},
+				{"10.0.1.3", "host2"},
+			},
+			expectedSyncProxyRulesNoLocalEndpointsTotalExternal: 1,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceInternalTrafficPolicy, true)()
+			ipt := iptablestest.NewFake()
+			fp := NewFakeProxier(ipt)
+			fp.OnServiceSynced()
+			fp.OnEndpointSlicesSynced()
+
+			serviceName := "svc1"
+			namespaceName := "ns1"
+
+			svc := &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: namespaceName},
+				Spec: v1.ServiceSpec{
+					ClusterIP: "172.30.1.1",
+					Selector:  map[string]string{"foo": "bar"},
+					Ports:     []v1.ServicePort{{Name: "", Port: 80, Protocol: v1.ProtocolTCP, NodePort: 123}},
+				},
+			}
+			if tc.internalTrafficPolicy != nil {
+				svc.Spec.InternalTrafficPolicy = tc.internalTrafficPolicy
+			}
+			if tc.externalTrafficPolicy != "" {
+				svc.Spec.Type = v1.ServiceTypeNodePort
+				svc.Spec.ExternalTrafficPolicy = tc.externalTrafficPolicy
+			}
+
+			fp.OnServiceAdd(svc)
+
+			tcpProtocol := v1.ProtocolTCP
+			endpointSlice := &discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      fmt.Sprintf("%s-1", serviceName),
+					Namespace: namespaceName,
+					Labels:    map[string]string{discovery.LabelServiceName: serviceName},
+				},
+				Ports: []discovery.EndpointPort{{
+					Name:     utilpointer.StringPtr(""),
+					Port:     utilpointer.Int32Ptr(80),
+					Protocol: &tcpProtocol,
+				}},
+				AddressType: discovery.AddressTypeIPv4,
+			}
+			for _, ep := range tc.endpoints {
+				endpointSlice.Endpoints = append(endpointSlice.Endpoints, discovery.Endpoint{
+					Addresses:  []string{ep.ip},
+					Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+					NodeName:   utilpointer.StringPtr(ep.hostname),
+				})
+			}
+
+			fp.OnEndpointSliceAdd(endpointSlice)
+			fp.syncProxyRules()
+			syncProxyRulesNoLocalEndpointsTotalInternal, err := testutil.GetGaugeMetricValue(metrics.SyncProxyRulesNoLocalEndpointsTotal.WithLabelValues("internal"))
+			if err != nil {
+				t.Errorf("failed to get %s value, err: %v", metrics.SyncProxyRulesNoLocalEndpointsTotal.Name, err)
+			}
+
+			if tc.expectedSyncProxyRulesNoLocalEndpointsTotalInternal != int(syncProxyRulesNoLocalEndpointsTotalInternal) {
+				t.Errorf("sync_proxy_rules_no_endpoints_total metric mismatch(internal): got=%d, expected %d", int(syncProxyRulesNoLocalEndpointsTotalInternal), tc.expectedSyncProxyRulesNoLocalEndpointsTotalInternal)
+			}
+
+			syncProxyRulesNoLocalEndpointsTotalExternal, err := testutil.GetGaugeMetricValue(metrics.SyncProxyRulesNoLocalEndpointsTotal.WithLabelValues("external"))
+			if err != nil {
+				t.Errorf("failed to get %s value(external), err: %v", metrics.SyncProxyRulesNoLocalEndpointsTotal.Name, err)
+			}
+
+			if tc.expectedSyncProxyRulesNoLocalEndpointsTotalExternal != int(syncProxyRulesNoLocalEndpointsTotalExternal) {
+				t.Errorf("sync_proxy_rules_no_endpoints_total metric mismatch(internal): got=%d, expected %d", int(syncProxyRulesNoLocalEndpointsTotalExternal), tc.expectedSyncProxyRulesNoLocalEndpointsTotalExternal)
+			}
+		})
+	}
+}
