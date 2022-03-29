@@ -40,6 +40,7 @@ evictionHard:
 evictionPressureTransitionPeriod: 5m0s
 failSwapOn: true
 fileCheckFrequency: 20s
+gracefulNodeShutdownPodPolicy: SetTerminal
 hairpinMode: promiscuous-bridge
 healthzBindAddress: 127.0.0.1
 healthzPort: 10248

@@ -280,5 +280,6 @@ var (
 		"ShutdownGracePeriod.Duration",
 		"ShutdownGracePeriodCriticalPods.Duration",
 		"MemoryThrottlingFactor",
+		"GracefulNodeShutdownPodPolicy",
 	)
 )

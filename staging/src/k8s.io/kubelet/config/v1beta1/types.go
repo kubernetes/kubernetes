@@ -82,6 +82,22 @@ const (
 	StaticMemoryManagerPolicy = "Static"
 )
 
+type GracefulNodeShutdownPodPolicyType string
+
+const (
+	// GracefulNodeShutdownPodPolicySetTerminal is Graceful Node Shutdown policy type,
+	// which will ensure that during graceful node shutdown, pods will be terminated by kubelet and
+	// placed into terminal Failed phase on API server,
+	// and as a result, will not start again if nodes becomes ready again.
+	GracefulNodeShutdownPodPolicySetTerminal = "SetTerminal"
+
+	// GracefulNodeShutdownPodPolicyLeaveRunning is Graceful Node Shutdown policy type,
+	// which will ensure that during graceful node shutdown,
+	// pods will be terminated by kubelet, but left running on API server,
+	// and a result, will start again if the node becomes ready again.
+	GracefulNodeShutdownPodPolicyLeaveRunning = "LeaveRunning"
+)
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // KubeletConfiguration contains the configuration for the Kubelet
@@ -726,6 +742,19 @@ type KubeletConfiguration struct {
 	// +featureGate=GracefulNodeShutdownBasedOnPodPriority
 	// +optional
 	ShutdownGracePeriodByPodPriority []ShutdownGracePeriodByPodPriority `json:"shutdownGracePeriodByPodPriority,omitempty"`
+	// GracefulNodeShutdownPodPolicy defines the policy for how pods are handled during graceful shutdown.
+	// GracefulNodeShutdownPodPolicy will only take affect if kubelet graceful node shutdown is enabled (i.e. `ShutdownGracePeriod` is set or `ShutdownGracePeriodByPodPriority` is set.)
+	// The policy types available are `SetTerminal` or `LeaveRunning`.
+	// `SetTerminal` will result in pods being set to terminal phase during shutdown. `SetTerminal` is the default policy if graceful node shutdown is enabled.
+	// If a node becomes ready again after graceful node shutdown (e.g. a reboot), it will result in pods not being started on the same node
+	// since the pods will be placed into the `Failed` terminal phase on the API server.
+	// `LeaveRunning` policy, in contrast, will result in pods not being placed in terminal phase,
+	// and as result they will resume to run if the node becomes ready again (for example after a reboot).
+	// This was the default behavior in kubernetes prior to when graceful node shutdown was introduced.
+	// Default: SetTerminal
+	// +featureGate=GracefulNodeShutdown
+	// +optional
+	GracefulNodeShutdownPodPolicy GracefulNodeShutdownPodPolicyType `json:"gracefulNodeShutdownPodPolicy,omitempty"`
 	// reservedMemory specifies a comma-separated list of memory reservations for NUMA nodes.
 	// The parameter makes sense only in the context of the memory manager feature.
 	// The memory manager will not allocate reserved memory for container workloads.

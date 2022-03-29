@@ -53440,6 +53440,13 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							},
 						},
 					},
+					"gracefulNodeShutdownPodPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "GracefulNodeShutdownPodPolicy defines the policy for how pods are handled during graceful shutdown. GracefulNodeShutdownPodPolicy will only take affect if kubelet graceful node shutdown is enabled (i.e. `ShutdownGracePeriod` is set or `ShutdownGracePeriodByPodPriority` is set.) The policy types available are `SetTerminal` or `LeaveRunning`. `SetTerminal` will result in pods being set to terminal phase during shutdown. `SetTerminal` is the default policy if graceful node shutdown is enabled. If a node becomes ready again after graceful node shutdown (e.g. a reboot), it will result in pods not being started on the same node since the pods will be placed into the `Failed` terminal phase on the API server. `LeaveRunning` policy, in contrast, will result in pods not being placed in terminal phase, and as result they will resume to run if the node becomes ready again (for example after a reboot). This was the default behavior in kubernetes prior to when graceful node shutdown was introduced. Default: SetTerminal",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 					"reservedMemory": {
 						SchemaProps: spec.SchemaProps{
 							Description: "reservedMemory specifies a comma-separated list of memory reservations for NUMA nodes. The parameter makes sense only in the context of the memory manager feature. The memory manager will not allocate reserved memory for container workloads. For example, if you have a NUMA0 with 10Gi of memory and the reservedMemory was specified to reserve 1Gi of memory at NUMA0, the memory manager will assume that only 9Gi is available for allocation. You can specify a different amount of NUMA node and memory types. You can omit this parameter at all, but you should be aware that the amount of reserved memory from all NUMA nodes should be equal to the amount of memory specified by the [node allocatable](https://kubernetes.io/docs/tasks/administer-cluster/reserve-compute-resources/#node-allocatable). If at least one node allocatable parameter has a non-zero value, you will need to specify at least one NUMA node. Also, avoid specifying:\n\n1. Duplicates, the same NUMA node, and memory type, but with a different value. 2. zero limits for any memory type. 3. NUMAs nodes IDs that do not exist under the machine. 4. memory types except for memory and hugepages-<size>\n\nDefault: nil",

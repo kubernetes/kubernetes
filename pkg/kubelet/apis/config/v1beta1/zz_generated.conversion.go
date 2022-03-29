@@ -494,6 +494,7 @@ func autoConvert_v1beta1_KubeletConfiguration_To_config_KubeletConfiguration(in 
 	out.ShutdownGracePeriod = in.ShutdownGracePeriod
 	out.ShutdownGracePeriodCriticalPods = in.ShutdownGracePeriodCriticalPods
 	out.ShutdownGracePeriodByPodPriority = *(*[]config.ShutdownGracePeriodByPodPriority)(unsafe.Pointer(&in.ShutdownGracePeriodByPodPriority))
+	out.GracefulNodeShutdownPodPolicy = config.GracefulNodeShutdownPodPolicyType(in.GracefulNodeShutdownPodPolicy)
 	out.ReservedMemory = *(*[]config.MemoryReservation)(unsafe.Pointer(&in.ReservedMemory))
 	if err := v1.Convert_Pointer_bool_To_bool(&in.EnableProfilingHandler, &out.EnableProfilingHandler, s); err != nil {
 		return err
@@ -670,6 +671,7 @@ func autoConvert_config_KubeletConfiguration_To_v1beta1_KubeletConfiguration(in 
 	out.ShutdownGracePeriod = in.ShutdownGracePeriod
 	out.ShutdownGracePeriodCriticalPods = in.ShutdownGracePeriodCriticalPods
 	out.ShutdownGracePeriodByPodPriority = *(*[]v1beta1.ShutdownGracePeriodByPodPriority)(unsafe.Pointer(&in.ShutdownGracePeriodByPodPriority))
+	out.GracefulNodeShutdownPodPolicy = v1beta1.GracefulNodeShutdownPodPolicyType(in.GracefulNodeShutdownPodPolicy)
 	out.ReservedMemory = *(*[]v1beta1.MemoryReservation)(unsafe.Pointer(&in.ReservedMemory))
 	if err := v1.Convert_bool_To_Pointer_bool(&in.EnableProfilingHandler, &out.EnableProfilingHandler, s); err != nil {
 		return err

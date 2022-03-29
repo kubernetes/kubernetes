@@ -264,4 +264,9 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	if obj.RegisterNode == nil {
 		obj.RegisterNode = utilpointer.BoolPtr(true)
 	}
+	if obj.ShutdownGracePeriod != zeroDuration || len(obj.ShutdownGracePeriodByPodPriority) != 0 {
+		if obj.GracefulNodeShutdownPodPolicy == "" {
+			obj.GracefulNodeShutdownPodPolicy = kubeletconfigv1beta1.GracefulNodeShutdownPodPolicySetTerminal
+		}
+	}
 }

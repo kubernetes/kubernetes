@@ -239,6 +239,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				EnableSystemLogHandler:          utilpointer.Bool(false),
 				ShutdownGracePeriod:             zeroDuration,
 				ShutdownGracePeriodCriticalPods: zeroDuration,
+				GracefulNodeShutdownPodPolicy:   v1beta1.GracefulNodeShutdownPodPolicyLeaveRunning,
 				ReservedMemory:                  []v1beta1.MemoryReservation{},
 				EnableProfilingHandler:          utilpointer.Bool(false),
 				EnableDebugFlagsHandler:         utilpointer.Bool(false),
@@ -333,13 +334,14 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 					Format:         "text",
 					FlushFrequency: 5 * time.Second,
 				},
-				EnableSystemLogHandler:  utilpointer.Bool(false),
-				ReservedMemory:          []v1beta1.MemoryReservation{},
-				EnableProfilingHandler:  utilpointer.Bool(false),
-				EnableDebugFlagsHandler: utilpointer.Bool(false),
-				SeccompDefault:          utilpointer.Bool(false),
-				MemoryThrottlingFactor:  utilpointer.Float64(0),
-				RegisterNode:            utilpointer.BoolPtr(false),
+				EnableSystemLogHandler:        utilpointer.Bool(false),
+				ReservedMemory:                []v1beta1.MemoryReservation{},
+				EnableProfilingHandler:        utilpointer.Bool(false),
+				EnableDebugFlagsHandler:       utilpointer.Bool(false),
+				SeccompDefault:                utilpointer.Bool(false),
+				MemoryThrottlingFactor:        utilpointer.Float64(0),
+				RegisterNode:                  utilpointer.BoolPtr(false),
+				GracefulNodeShutdownPodPolicy: v1beta1.GracefulNodeShutdownPodPolicyLeaveRunning,
 			},
 		},
 		{
@@ -475,6 +477,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				EnableSystemLogHandler:          utilpointer.Bool(true),
 				ShutdownGracePeriod:             metav1.Duration{Duration: 60 * time.Second},
 				ShutdownGracePeriodCriticalPods: metav1.Duration{Duration: 60 * time.Second},
+				GracefulNodeShutdownPodPolicy:   v1beta1.GracefulNodeShutdownPodPolicySetTerminal,
 				ReservedMemory: []v1beta1.MemoryReservation{
 					{
 						NumaNode: 1,
@@ -618,6 +621,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				EnableSystemLogHandler:          utilpointer.Bool(true),
 				ShutdownGracePeriod:             metav1.Duration{Duration: 60 * time.Second},
 				ShutdownGracePeriodCriticalPods: metav1.Duration{Duration: 60 * time.Second},
+				GracefulNodeShutdownPodPolicy:   v1beta1.GracefulNodeShutdownPodPolicySetTerminal,
 				ReservedMemory: []v1beta1.MemoryReservation{
 					{
 						NumaNode: 1,
