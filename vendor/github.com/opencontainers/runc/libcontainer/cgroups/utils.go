@@ -55,12 +55,12 @@ func IsCgroup2HybridMode() bool {
 		var st unix.Statfs_t
 		err := unix.Statfs(hybridMountpoint, &st)
 		if err != nil {
-			if os.IsNotExist(err) {
-				// ignore the "not found" error
-				isHybrid = false
-				return
+			isHybrid = false
+			if !os.IsNotExist(err) {
+				// Report unexpected errors.
+				logrus.WithError(err).Debugf("statfs(%q) failed", hybridMountpoint)
 			}
-			panic(fmt.Sprintf("cannot statfs cgroup root: %s", err))
+			return
 		}
 		isHybrid = st.Type == unix.CGROUP2_SUPER_MAGIC
 	})

@@ -8,7 +8,6 @@ import (
 	"io"
 	"net"
 	"os"
-	"strconv"
 	"strings"
 	"unsafe"
 
@@ -406,40 +405,36 @@ func fixStdioPermissions(u *user.ExecUser) error {
 	if err := unix.Stat("/dev/null", &null); err != nil {
 		return &os.PathError{Op: "stat", Path: "/dev/null", Err: err}
 	}
-	for _, fd := range []uintptr{
-		os.Stdin.Fd(),
-		os.Stderr.Fd(),
-		os.Stdout.Fd(),
-	} {
+	for _, file := range []*os.File{os.Stdin, os.Stdout, os.Stderr} {
 		var s unix.Stat_t
-		if err := unix.Fstat(int(fd), &s); err != nil {
-			return &os.PathError{Op: "fstat", Path: "fd " + strconv.Itoa(int(fd)), Err: err}
+		if err := unix.Fstat(int(file.Fd()), &s); err != nil {
+			return &os.PathError{Op: "fstat", Path: file.Name(), Err: err}
 		}
 
-		// Skip chown of /dev/null if it was used as one of the STDIO fds.
-		if s.Rdev == null.Rdev {
+		// Skip chown if uid is already the one we want.
+		if int(s.Uid) == u.Uid {
 			continue
 		}
 
-		// We only change the uid owner (as it is possible for the mount to
+		// We only change the uid (as it is possible for the mount to
 		// prefer a different gid, and there's no reason for us to change it).
 		// The reason why we don't just leave the default uid=X mount setup is
 		// that users expect to be able to actually use their console. Without
 		// this code, you couldn't effectively run as a non-root user inside a
 		// container and also have a console set up.
-		if err := unix.Fchown(int(fd), u.Uid, int(s.Gid)); err != nil {
+		if err := file.Chown(u.Uid, int(s.Gid)); err != nil {
 			// If we've hit an EINVAL then s.Gid isn't mapped in the user
 			// namespace. If we've hit an EPERM then the inode's current owner
 			// is not mapped in our user namespace (in particular,
-			// privileged_wrt_inode_uidgid() has failed). In either case, we
-			// are in a configuration where it's better for us to just not
-			// touch the stdio rather than bail at this point.
+			// privileged_wrt_inode_uidgid() has failed). Read-only
+			// /dev can result in EROFS error. In any case, it's
+			// better for us to just not touch the stdio rather
+			// than bail at this point.
 
-			// nolint:errorlint // unix errors are bare
-			if err == unix.EINVAL || err == unix.EPERM {
+			if errors.Is(err, unix.EINVAL) || errors.Is(err, unix.EPERM) || errors.Is(err, unix.EROFS) {
 				continue
 			}
-			return &os.PathError{Op: "fchown", Path: "fd " + strconv.Itoa(int(fd)), Err: err}
+			return err
 		}
 	}
 	return nil
