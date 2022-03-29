@@ -288,7 +288,7 @@ var (
 			Buckets:        requestDurationSecondsBuckets,
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
-		[]string{priorityLevel, flowSchema, "type"},
+		[]string{priorityLevel, flowSchema, "type", "verb", "resource", "subresource"},
 	)
 	watchCountSamples = compbasemetrics.NewHistogramVec(
 		&compbasemetrics.HistogramOpts{
@@ -419,10 +419,16 @@ func ObserveWaitingDuration(ctx context.Context, priorityLevel, flowSchema, exec
 // ObserveExecutionDuration observes the execution duration for flow control
 func ObserveExecutionDuration(ctx context.Context, priorityLevel, flowSchema string, executionTime time.Duration) {
 	reqType := "regular"
-	if requestInfo, ok := apirequest.RequestInfoFrom(ctx); ok && requestInfo.Verb == "watch" {
-		reqType = requestInfo.Verb
+	var verb, resource, subresource string
+	if requestInfo, ok := apirequest.RequestInfoFrom(ctx); ok {
+		if requestInfo.Verb == "watch" {
+			reqType = requestInfo.Verb
+		}
+		verb = requestInfo.Verb
+		resource = requestInfo.Resource
+		subresource = requestInfo.Subresource
 	}
-	apiserverRequestExecutionSeconds.WithContext(ctx).WithLabelValues(priorityLevel, flowSchema, reqType).Observe(executionTime.Seconds())
+	apiserverRequestExecutionSeconds.WithContext(ctx).WithLabelValues(priorityLevel, flowSchema, reqType, verb, resource, subresource).Observe(executionTime.Seconds())
 }
 
 // ObserveWatchCount notes a sampling of a watch count
