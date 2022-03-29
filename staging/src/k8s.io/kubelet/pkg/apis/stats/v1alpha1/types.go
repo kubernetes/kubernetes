@@ -230,6 +230,8 @@ type MemoryStats struct {
 	// +optional
 	RSSBytes *uint64 `json:"rssBytes,omitempty"`
 	// The amount of swap currently used.
+	// +phase=alpha
+	// +featureGate=NodeSwap
 	// +optional
 	SwapBytes *uint64 `json:"swapBytes,omitempty"`
 	// Cumulative number of minor page faults.
