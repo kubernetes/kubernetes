@@ -825,6 +825,15 @@ func (HostAlias) SwaggerDoc() map[string]string {
 	return map_HostAlias
 }
 
+var map_HostIP = map[string]string{
+	"":   "HostIP address information for entries in the (plural) HostIPs field.",
+	"ip": "IP is the IP address assigned to the host",
+}
+
+func (HostIP) SwaggerDoc() map[string]string {
+	return map_HostIP
+}
+
 var map_HostPathVolumeSource = map[string]string{
 	"":     "Represents a host path mapped into a pod. Host path volumes do not support ownership management or SELinux relabeling.",
 	"path": "path of the directory on the host. If the path is a symlink, it will follow the link to the real path. More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath",
@@ -1534,8 +1543,8 @@ func (PodExecOptions) SwaggerDoc() map[string]string {
 }
 
 var map_PodIP = map[string]string{
-	"":   "IP address information for entries in the (plural) PodIPs field. Each entry includes:\n   IP: An IP address allocated to the pod. Routable at least within the cluster.",
-	"ip": "ip is an IP address (IPv4 or IPv6) assigned to the pod",
+	"":   "PodIP address information for entries in the (plural) PodIPs field.",
+	"ip": "IP is the IP address assigned to the pod",
 }
 
 func (PodIP) SwaggerDoc() map[string]string {
@@ -1683,8 +1692,9 @@ var map_PodStatus = map[string]string{
 	"message":                    "A human readable message indicating details about why the pod is in this condition.",
 	"reason":                     "A brief CamelCase message indicating details about why the pod is in this state. e.g. 'Evicted'",
 	"nominatedNodeName":          "nominatedNodeName is set only when this pod preempts other pods on the node, but it cannot be scheduled right away as preemption victims receive their graceful termination periods. This field does not guarantee that the pod will be scheduled on this node. Scheduler may decide to place the pod elsewhere if other nodes become available sooner. Scheduler may also decide to give the resources on this node to a higher priority pod that is created after preemption. As a result, this field may be different than PodSpec.nodeName when the pod is scheduled.",
-	"hostIP":                     "IP address of the host to which the pod is assigned. Empty if not yet scheduled.",
-	"podIP":                      "IP address allocated to the pod. Routable at least within the cluster. Empty if not yet allocated.",
+	"hostIP":                     "hostIP holds the IP address of the host to which the pod is assigned. Empty if the pod has not started yet. A pod can be assigned to a node that has a problem in kubelet which in turns mean that HostIP will not be updated even if there is node is assigned to pod",
+	"hostIPs":                    "hostIPs holds the IP addresses allocated to the host. If this field is specified, the first entry must match the hostIP field. This list is empty if the pod has not started yet. A pod can be assigned to a node that has a problem in kubelet which in turns means that HostIPs will not be updated even if there is a node is assigned to this pod.",
+	"podIP":                      "podIP address allocated to the pod. Routable at least within the cluster. Empty if not yet allocated.",
 	"podIPs":                     "podIPs holds the IP addresses allocated to the pod. If this field is specified, the 0th entry must match the podIP field. Pods may be allocated at most 1 value for each of IPv4 and IPv6. This list is empty if no IPs have been allocated yet.",
 	"startTime":                  "RFC 3339 date and time at which the object was acknowledged by the Kubelet. This is before the Kubelet pulled the container image(s) for the pod.",
 	"initContainerStatuses":      "The list has one entry per init container in the manifest. The most recent successful init container will have ready = true, the most recently started container will have startTime set. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-and-container-status",
