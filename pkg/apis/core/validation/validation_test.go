@@ -2898,6 +2898,22 @@ func TestValidateCSIPersistentVolumeSource(t *testing.T) {
 			errtype:  field.ErrorTypeRequired,
 			errfield: "nodePublishSecretRef.namespace",
 		},
+		{
+			name:     "nodeExpandSecretRef: invalid name missing",
+			csi:      &core.CSIPersistentVolumeSource{Driver: "com.google.gcepd", VolumeHandle: "foobar", NodeExpandSecretRef: &core.SecretReference{Namespace: "default"}},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "nodeExpandSecretRef.name",
+		},
+		{
+			name:     "nodeExpandSecretRef: invalid namespace missing",
+			csi:      &core.CSIPersistentVolumeSource{Driver: "com.google.gcepd", VolumeHandle: "foobar", NodeExpandSecretRef: &core.SecretReference{Name: "foobar"}},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "nodeExpandSecretRef.namespace",
+		},
+		{
+			name: "valid nodeExpandSecretRef",
+			csi:  &core.CSIPersistentVolumeSource{Driver: "com.google.gcepd", VolumeHandle: "foobar", NodeExpandSecretRef: &core.SecretReference{Name: "foobar", Namespace: "default"}},
+		},
 	}
 
 	for i, tc := range testCases {
