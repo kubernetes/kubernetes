@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/version"
 	. "k8s.io/client-go/discovery"
+	"k8s.io/client-go/openapi"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 
@@ -417,6 +418,10 @@ func (*fakeFailingDiscovery) OpenAPISchema() (*openapi_v2.Document, error) {
 	panic("implement me")
 }
 
+func (c *fakeFailingDiscovery) OpenAPIV3() openapi.Client {
+	panic("implement me")
+}
+
 type fakeCachedDiscoveryInterface struct {
 	invalidateCalls int
 	fresh           bool
@@ -488,6 +493,10 @@ func (c *fakeCachedDiscoveryInterface) ServerVersion() (*version.Info, error) {
 
 func (c *fakeCachedDiscoveryInterface) OpenAPISchema() (*openapi_v2.Document, error) {
 	return &openapi_v2.Document{}, nil
+}
+
+func (c *fakeCachedDiscoveryInterface) OpenAPIV3() openapi.Client {
+	panic("implement me")
 }
 
 var (

@@ -23,9 +23,14 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	errorsutil "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/discovery/fake"
+	"k8s.io/client-go/rest"
+	testutil "k8s.io/client-go/util/testing"
 )
 
 type resourceMapEntry struct {
@@ -388,5 +393,62 @@ func TestPartialRetryableFailure(t *testing.T) {
 	}
 	if e, a := fake.resourceMap["astronomy/v8beta1"].list, r; !reflect.DeepEqual(e, a) {
 		t.Errorf("Expected %#v, got %#v", e, a)
+	}
+}
+
+// Tests that schema instances returned by openapi cached and returned after
+// successive calls
+func TestOpenAPIMemCache(t *testing.T) {
+	fakeServer, err := testutil.NewFakeOpenAPIV3Server("../../testdata")
+	require.NoError(t, err)
+	defer fakeServer.HttpServer.Close()
+
+	require.Greater(t, len(fakeServer.ServedDocuments), 0)
+
+	client := NewMemCacheClient(
+		discovery.NewDiscoveryClientForConfigOrDie(
+			&rest.Config{Host: fakeServer.HttpServer.URL},
+		),
+	)
+	openapiClient := client.OpenAPIV3()
+
+	paths, err := openapiClient.Paths()
+	require.NoError(t, err)
+
+	for k, v := range paths {
+		original, err := v.Schema()
+		if !assert.NoError(t, err) {
+			continue
+		}
+
+		pathsAgain, err := openapiClient.Paths()
+		if !assert.NoError(t, err) {
+			continue
+		}
+
+		schemaAgain, err := pathsAgain[k].Schema()
+		if !assert.NoError(t, err) {
+			continue
+		}
+
+		assert.True(t, reflect.ValueOf(paths).Pointer() == reflect.ValueOf(pathsAgain).Pointer())
+		assert.True(t, reflect.ValueOf(original).Pointer() == reflect.ValueOf(schemaAgain).Pointer())
+
+		// Invalidate and try again. This time pointers should not be equal
+		client.Invalidate()
+
+		pathsAgain, err = client.OpenAPIV3().Paths()
+		if !assert.NoError(t, err) {
+			continue
+		}
+
+		schemaAgain, err = pathsAgain[k].Schema()
+		if !assert.NoError(t, err) {
+			continue
+		}
+
+		assert.True(t, reflect.ValueOf(paths).Pointer() != reflect.ValueOf(pathsAgain).Pointer())
+		assert.True(t, reflect.ValueOf(original).Pointer() != reflect.ValueOf(schemaAgain).Pointer())
+		assert.Equal(t, original, schemaAgain)
 	}
 }
