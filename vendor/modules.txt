@@ -1955,6 +1955,7 @@ k8s.io/component-base/metrics/prometheus/ratelimiter
 k8s.io/component-base/metrics/prometheus/restclient
 k8s.io/component-base/metrics/prometheus/version
 k8s.io/component-base/metrics/prometheus/workqueue
+k8s.io/component-base/metrics/prometheusextension
 k8s.io/component-base/metrics/testutil
 k8s.io/component-base/term
 k8s.io/component-base/traces
