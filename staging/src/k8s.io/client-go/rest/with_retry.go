@@ -78,7 +78,7 @@ type WithRetry interface {
 	IsNextRetry(ctx context.Context, restReq *Request, httpReq *http.Request, resp *http.Response, err error, f IsRetryableErrorFunc) bool
 
 	// Before should be invoked prior to each attempt, including
-	// the first one. if an error is returned, the request
+	// the first one. if an error is returned, or the request
 	// should be aborted immediately.
 	Before(ctx context.Context, r *Request) error
 
@@ -194,42 +194,31 @@ func (r *withRetry) IsNextRetry(ctx context.Context, restReq *Request, httpReq *
 	r.retryAfter.Wait = time.Duration(seconds) * time.Second
 	r.retryAfter.Reason = getRetryReason(r.attempts, seconds, resp, err)
 
-	if err := r.prepareForNextRetry(ctx, restReq); err != nil {
-		klog.V(4).Infof("Could not retry request - %v", err)
-		return false
-	}
-
 	return true
 }
 
-// prepareForNextRetry is responsible for carrying out operations that need
-// to be completed before the next retry is initiated:
 // - if the request context is already canceled there is no need to
 //   retry, the function will return ctx.Err().
 // - we need to seek to the beginning of the request body before we
 //   initiate the next retry, the function should return an error if
 //   it fails to do so.
-func (r *withRetry) prepareForNextRetry(ctx context.Context, request *Request) error {
-	if ctx.Err() != nil {
-		return ctx.Err()
-	}
-
-	// Ensure the response body is fully read and closed before
-	// we reconnect, so that we reuse the same TCP connection.
-	if seeker, ok := request.body.(io.Seeker); ok && request.body != nil {
-		if _, err := seeker.Seek(0, 0); err != nil {
-			return fmt.Errorf("can't Seek() back to beginning of body for %T", request)
-		}
-	}
-
-	klog.V(4).Infof("Got a Retry-After %s response for attempt %d to %v", r.retryAfter.Wait, r.retryAfter.Attempt, request.URL().String())
-	return nil
-}
-
 func (r *withRetry) Before(ctx context.Context, request *Request) error {
 	if ctx.Err() != nil {
 		r.trackPreviousError(ctx.Err())
 		return ctx.Err()
+	}
+
+	if r.retryAfter != nil {
+		// at this point, the response body has been fully read and closed,
+		// so it is safe to reset the request body before we we reconnect,
+		// so that we reuse the same TCP connection.
+		if seeker, ok := request.body.(io.Seeker); ok && request.body != nil {
+			if _, err := seeker.Seek(0, 0); err != nil {
+				err = fmt.Errorf("can't Seek() back to beginning of body for %T - %w", request, err)
+				r.trackPreviousError(err)
+				return err
+			}
+		}
 	}
 
 	url := request.URL()
@@ -263,6 +252,7 @@ func (r *withRetry) Before(ctx context.Context, request *Request) error {
 		return err
 	}
 
+	klog.V(4).Infof("Got a Retry-After %s response for attempt %d to %v", r.retryAfter.Wait, r.retryAfter.Attempt, request.URL().String())
 	return nil
 }
 

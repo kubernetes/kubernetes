@@ -938,7 +938,10 @@ func TestRequestWatch(t *testing.T) {
 			},
 			Err: true,
 			ErrFn: func(err error) bool {
-				return apierrors.IsInternalError(err)
+				if !strings.Contains(err.Error(), "can't Seek() back to beginning of body for *rest.Request - EOF") {
+					return false
+				}
+				return true
 			},
 		},
 		{
@@ -954,7 +957,13 @@ func TestRequestWatch(t *testing.T) {
 			serverReturns: []responseErr{
 				{response: nil, err: io.EOF},
 			},
-			Empty: true,
+			Err: true,
+			ErrFn: func(err error) bool {
+				if !strings.Contains(err.Error(), "can't Seek() back to beginning of body for *rest.Request - EOF") {
+					return false
+				}
+				return true
+			},
 		},
 		{
 			name: "max retries 2, server always returns a response with Retry-After header",
@@ -1130,7 +1139,10 @@ func TestRequestStream(t *testing.T) {
 			},
 			Err: true,
 			ErrFn: func(err error) bool {
-				return apierrors.IsInternalError(err)
+				if !strings.Contains(err.Error(), "can't Seek() back to beginning of body for *rest.Request - EOF") {
+					return false
+				}
+				return true
 			},
 		},
 		{
@@ -1372,7 +1384,7 @@ func (b *testBackoffManager) Sleep(d time.Duration) {
 
 func TestCheckRetryClosesBody(t *testing.T) {
 	// unblock CI until http://issue.k8s.io/108906 is resolved in 1.24
-	t.Skip("http://issue.k8s.io/108906")
+	// t.Skip("http://issue.k8s.io/108906")
 	count := 0
 	ch := make(chan struct{})
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -2435,6 +2447,7 @@ func TestRequestWithRetry(t *testing.T) {
 		body                         io.Reader
 		serverReturns                responseErr
 		errExpected                  error
+		errContains                  string
 		transformFuncInvokedExpected int
 		roundTripInvokedExpected     int
 	}{
@@ -2451,7 +2464,7 @@ func TestRequestWithRetry(t *testing.T) {
 			body:                         &readSeeker{err: io.EOF},
 			serverReturns:                responseErr{response: retryAfterResponse(), err: nil},
 			errExpected:                  nil,
-			transformFuncInvokedExpected: 1,
+			transformFuncInvokedExpected: 0,
 			roundTripInvokedExpected:     1,
 		},
 		{
@@ -2474,7 +2487,7 @@ func TestRequestWithRetry(t *testing.T) {
 			name:                         "server returns retryable err, request body Seek returns error, retry aborted",
 			body:                         &readSeeker{err: io.EOF},
 			serverReturns:                responseErr{response: nil, err: io.ErrUnexpectedEOF},
-			errExpected:                  io.ErrUnexpectedEOF,
+			errContains:                  "can't Seek() back to beginning of body for *rest.Request - EOF",
 			transformFuncInvokedExpected: 0,
 			roundTripInvokedExpected:     1,
 		},
@@ -2517,8 +2530,15 @@ func TestRequestWithRetry(t *testing.T) {
 			if test.transformFuncInvokedExpected != transformFuncInvoked {
 				t.Errorf("Expected transform func to be invoked %d times, but got: %d", test.transformFuncInvokedExpected, transformFuncInvoked)
 			}
-			if test.errExpected != unWrap(err) {
-				t.Errorf("Expected error: %v, but got: %v", test.errExpected, unWrap(err))
+			switch {
+			case test.errExpected != nil:
+				if test.errExpected != unWrap(err) {
+					t.Errorf("Expected error: %v, but got: %v", test.errExpected, unWrap(err))
+				}
+			case len(test.errContains) > 0:
+				if !strings.Contains(err.Error(), test.errContains) {
+					t.Errorf("Expected error message to caontain: %q, but got: %q", test.errContains, err.Error())
+				}
 			}
 		})
 	}
