@@ -218,7 +218,7 @@ github.com/cyphar/filepath-securejoin
 github.com/davecgh/go-spew/spew
 # github.com/daviddengcn/go-colortext v0.0.0-20160507010035-511bcaf42ccd => github.com/daviddengcn/go-colortext v0.0.0-20160507010035-511bcaf42ccd
 github.com/daviddengcn/go-colortext
-# github.com/docker/distribution v2.8.0+incompatible => github.com/docker/distribution v2.8.0+incompatible
+# github.com/docker/distribution v2.8.1+incompatible => github.com/docker/distribution v2.8.1+incompatible
 ## explicit
 github.com/docker/distribution/digestset
 github.com/docker/distribution/reference
@@ -2495,7 +2495,7 @@ sigs.k8s.io/yaml
 # github.com/davecgh/go-spew => github.com/davecgh/go-spew v1.1.1
 # github.com/daviddengcn/go-colortext => github.com/daviddengcn/go-colortext v0.0.0-20160507010035-511bcaf42ccd
 # github.com/dnaeon/go-vcr => github.com/dnaeon/go-vcr v1.0.1
-# github.com/docker/distribution => github.com/docker/distribution v2.8.0+incompatible
+# github.com/docker/distribution => github.com/docker/distribution v2.8.1+incompatible
 # github.com/docker/docker => github.com/docker/docker v20.10.12+incompatible
 # github.com/docker/go-connections => github.com/docker/go-connections v0.4.0
 # github.com/docker/go-units => github.com/docker/go-units v0.4.0
