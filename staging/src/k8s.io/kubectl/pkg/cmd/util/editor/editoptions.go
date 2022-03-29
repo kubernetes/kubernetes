@@ -923,6 +923,7 @@ func hashOnLineBreak(s string) string {
 func editorEnvs() []string {
 	return []string{
 		"KUBE_EDITOR",
+		"VISUAL",
 		"EDITOR",
 	}
 }
