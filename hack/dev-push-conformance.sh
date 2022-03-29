@@ -42,7 +42,7 @@ IMAGE="${REGISTRY}/conformance-amd64:${VERSION}"
 
 kube::build::verify_prereqs
 kube::build::build_image
-kube::build::run_build_command make WHAT="github.com/onsi/ginkgo/ginkgo test/e2e/e2e.test cmd/kubectl test/conformance/image/go-runner"
+kube::build::run_build_command make WHAT="github.com/onsi/ginkgo/v2/ginkgo test/e2e/e2e.test cmd/kubectl test/conformance/image/go-runner"
 kube::build::copy_output
 
 make -C "${KUBE_ROOT}/test/conformance/image" build
