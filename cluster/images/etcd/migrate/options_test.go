@@ -24,7 +24,7 @@ import (
 func setEnvVar(t *testing.T, env, val string, exists bool) {
 	if exists {
 		if err := os.Setenv(env, val); err != nil {
-			t.Errorf("could't set env %s: %v", env, err)
+			t.Errorf("couldn't set env %s: %v", env, err)
 		}
 		return
 	}

@@ -20,7 +20,7 @@ ETCD_VERSION=${ETCD_VERSION:-3.5.1}
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
 ETCD_PORT=${ETCD_PORT:-2379}
 # This is intentionally not called ETCD_LOG_LEVEL:
-# etcd checks that and compains when it is set in addition
+# etcd checks that and complains when it is set in addition
 # to the command line argument, even when both have the same value.
 ETCD_LOGLEVEL=${ETCD_LOGLEVEL:-warn}
 export KUBE_INTEGRATION_ETCD_URL="http://${ETCD_HOST}:${ETCD_PORT}"

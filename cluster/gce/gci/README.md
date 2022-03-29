@@ -1,7 +1,7 @@
 # Container-Optimized OS
 
 [Container-Optimized OS](https://cloud.google.com/container-optimized-os/docs),
-(previously Google Container-VM image a.k.a GCI) is a container-optimized OS image for the Google Cloud Platform (GCP). It is
+(previously Google Container-VM image a.k.a. GCI) is a container-optimized OS image for the Google Cloud Platform (GCP). It is
 primarily for running Google services on GCP. Container-Optimized OS is an open
 source OS based on
 the open source [ChromiumOS project](https://www.chromium.org/chromium-os), allowing us greater control over the build management,
@@ -31,7 +31,7 @@ There are three ways to specify an image used by each testing suite: `image`,
   * `image` is preferred, but manual updates are needed to use a newly released
     COS image, so the test suites don't use deprecated images. This will result
     to frequent yaml configuration file update everytime COS releases new
-    image.One future option is to use an autobumper robot to update COS image
+    image. One future option is to use an autobumper robot to update COS image
     automatically. e.g:
 ```
   cos-stable:
@@ -40,7 +40,7 @@ There are three ways to specify an image used by each testing suite: `image`,
     metadata: "user-data</go/src/github.com/containerd/cri/test/e2e_node/init.yaml,containerd-configure-sh</go/src/github.com/containerd/cri/cluster/gce/configure.sh,containerd-extra-init-sh</go/src/github.com/containerd/cri/test/e2e_node/gci-init.sh,containerd-env</workspace/test-infra/jobs/e2e_node/containerd/cri-master/env,gci-update-strategy=update_disabled"
 ```
 
-  * `image_family` should be used if you always want to use latest image in the
+  * `image_family` should be used if you always want to use the latest image in the
     same family. Tests will start to use new images once COS releases
     new image. This is not predictable and test can potentially be broken because of this. The probability of a
     breakage due to the OS itself is low for LTS or stable image, but high for dev or beta image.
@@ -75,15 +75,15 @@ following guidelines are proposed for image choice in E2E testing.
 
   * To run presubmit, postsubmit or periodic tests, the latest LTS images are
     preferred. If tests need two images, you can use the latest two LTS images.
-    LTS images are stable and usually include latest bug and security fix.
+    LTS images are stable and usually include the latest bug and security fix.
     'image' should be used to specify the image.
 
   * To integrate continuously with other container
-    related technologies like runc, containerd, docker and kubernertes, the
+    related technologies like runc, containerd, docker and kubernetes, the
     latest LTS or stable images are preferred. 'image_family' should be used to
     specify the image.
 
-  * To try out latest COS features, the latest dev or beta or stable images are preferred.
+  * To try out the latest COS features, the latest dev or beta or stable images are preferred.
     'image' or 'image_family' should be used to specify the image.
 
 ### How to find current COS image in each channel
@@ -102,7 +102,7 @@ cos-stable-81-12871-119-0                             cos-cloud          cos-sta
 ```
 
 COS image will experience dev, beta, stable and LTS stage. Before LTS stage, image is named with its
-family as a prefix, e.g cos-dev, cos-beta, cos-stable. However, the milestone
+family as a prefix, e.g. cos-dev, cos-beta, cos-stable. However, the milestone
 number in those families may change when channel promotions happen. Only when a milestone becomes LTS, the
 image will have a new family, and the milestone number in the image name stays the same. The image
 will be always there even after the milestone is deprecated.

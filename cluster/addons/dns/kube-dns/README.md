@@ -18,7 +18,7 @@ kubectl --namespace=kube-system scale deployment kube-dns --replicas=<NUM_YOU_WA
 ```
 
 Do not use `kubectl edit` to modify kube-dns Deployment object if it is
-controlled by [Addon Manager](../../addon-manager/). Otherwise the modifications
+controlled by [Addon Manager](../../addon-manager/). Otherwise, the modifications
 will be clobbered, in addition the replicas count for kube-dns Deployment will
 be reset to 1. See [Cluster add-ons README](../../README.md) and
 [#36411](https://github.com/kubernetes/kubernetes/issues/36411) for reference.

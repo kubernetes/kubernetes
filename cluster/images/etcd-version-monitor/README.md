@@ -21,7 +21,7 @@ To run this tool as a docker container:
 - docker run --net=host -i -t staging-k8s.gcr.io/etcd-version-monitor:0.1.3 /etcd-version-monitor
 
 To run this as a pod on the kubernetes cluster:
-- Place the 'etcd-version-monitor.yaml' in the manifests directory of
+- Place the 'etcd-version-monitor.yaml' in the manifest's directory of
   kubelet on the master machine.
 
 *Note*: This tool has to run on the same machine as etcd, as communication

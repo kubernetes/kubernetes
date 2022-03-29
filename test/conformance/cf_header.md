@@ -23,7 +23,7 @@ framework.ConformanceIt("should print the output to logs [NodeConformance]", fun
 ```
 
 would generate the following documentation for the test. Note that the "TestName" from the Documentation above will
-be used to document the test which make it more human readable. The "Description" field will be used as the
+be used to document the test which make it more human-readable. The "Description" field will be used as the
 documentation for that test.
 
 ### **Output:**
@@ -32,9 +32,9 @@ documentation for that test.
 - Added to conformance in release v1.13
 - Defined in code as: [k8s.io] Kubelet when scheduling a busybox command in a pod should print the output to logs [NodeConformance] [Conformance]
 
-By default the stdout and stderr from the process being executed in a pod MUST be sent to the pod's logs.
+By default, the stdout and stderr from the process being executed in a pod MUST be sent to the pod's logs.
 
-Notational Conventions when documenting the tests with the key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "MAY", and "OPTIONAL" are to be interpreted as described in [RFC 2119](https://tools.ietf.org/html/rfc2119).
+Notational Conventions when documenting the tests with the keywords "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "MAY", and "OPTIONAL" are to be interpreted as described in [RFC 2119](https://tools.ietf.org/html/rfc2119).
 
 Note: Please see the Summary at the end of this document to find the number of tests documented for conformance.
 

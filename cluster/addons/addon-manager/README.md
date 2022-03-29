@@ -21,7 +21,7 @@ In future release (after one year), Addon Manager may not respect it anymore. Ad
 have this label but without `addonmanager.kubernetes.io/mode=EnsureExists` will be
 treated as "reconcile class addons" for now.
 - Resources under `$ADDON_PATH` need to have either one of these two labels.
-Otherwise it will be omitted.
+Otherwise, it will be omitted.
 
 #### Images
 

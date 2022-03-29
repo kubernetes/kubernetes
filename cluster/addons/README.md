@@ -21,7 +21,7 @@ by the initial config. In order to make Horizontal / Vertical Auto-scaling funct
 the related fields in config should be left unset. More specifically, leave `replicas`
 in `ReplicationController` / `Deployment` / `ReplicaSet` unset for Horizontal Scaling,
 leave `resources` for container unset for Vertical Scaling. The periodic reconcile
-won't clobbered these fields, hence they could be managed by Horizontal / Vertical
+won't clobber these fields, hence they could be managed by Horizontal / Vertical
 Auto-scaler.
 
 ## Add-on naming

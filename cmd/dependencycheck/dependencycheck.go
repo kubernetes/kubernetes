@@ -49,7 +49,7 @@ func main() {
 	args := flag.Args()
 
 	if len(args) != 1 {
-		log.Fatalf("usage: dependencycheck <json-dep-file> (e.g. 'go list -mod=vendor -test -deps -json ./vendor/...')")
+		log.Fatalf("usage: dependency check <json-dep-file> (e.g. 'go list -mod=vendor -test -deps -json ./vendor/...')")
 	}
 	if *restrict == "" {
 		log.Fatalf("Must specify restricted regex pattern")
@@ -78,7 +78,7 @@ func main() {
 			if err == io.EOF {
 				break
 			}
-			log.Fatalf("Error unmarshaling dependencies file: %v", err)
+			log.Fatalf("Error unmarshalling dependencies file: %v", err)
 		}
 		packages = append(packages, pkg)
 	}

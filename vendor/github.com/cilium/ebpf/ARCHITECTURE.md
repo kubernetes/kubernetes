@@ -19,7 +19,7 @@ is tested against the Linux selftests and avoids introducing custom behaviour
 if possible.
 
 The output of the ELF reader is a `CollectionSpec` which encodes
-all of the information contained in the ELF in a form that is easy to work with
+all the information contained in the ELF in a form that is easy to work with
 in Go.
 
 ### BTF
