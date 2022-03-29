@@ -835,7 +835,13 @@ After migration, Kubernetes users may continue to rely on all the functionality 
  - Support for the seccomp annotations `seccomp.security.alpha.kubernetes.io/pod` and `container.seccomp.security.alpha.kubernetes.io/[name]` has been deprecated since 1.19, will be dropped in 1.25. Transition to using the `seccompProfile` API field. ([#104389](https://github.com/kubernetes/kubernetes/pull/104389), [@saschagrunert](https://github.com/saschagrunert))
  - [kube-log-runner](https://github.com/kubernetes/kubernetes/tree/master/staging/src/k8s.io/component-base/logs/kube-log-runner) is included in release tar balls. It can be used to replace the deprecated `--log-file` parameter. ([#106123](https://github.com/kubernetes/kubernetes/pull/106123), [@pohly](https://github.com/pohly)) [SIG API Machinery, Architecture, Cloud Provider, Cluster Lifecycle and Instrumentation]
  - Kubernetes is built using golang 1.17. This version of go removes the ability to use a `GODEBUG=x509ignoreCN=0` environment setting to re-enable deprecated legacy behavior of treating the CommonName of X.509 serving certificates as a host name. This behavior has been disabled by default since Kubernetes 1.19 / go 1.15. Serving certificates used by admission webhooks, custom resource conversion webhooks, and aggregated API servers must now include valid Subject Alternative Names. If you are running Kubernetes 1.22 with `GODEBUG=x509ignoreCN=0` set, check the `apiserver_kube_aggregator_x509_missing_san_total` and `apiserver_webhooks_x509_missing_san_total` metrics for non-zero values to see if the API server is connecting to webhooks or aggregated API servers using certificates that will be considered invalid in Kubernetes 1.23+.
- 
+
+## Known Issues
+
+### Etcd v3.5.[0-2] data corruption
+
+Data corruption issue was found in etcd v3.5.0 release that was shipped with 1.22 Kubernetes release. Please read up-to-date [production recommendations for etcd](https://github.com/etcd-io/etcd/tree/main/CHANGELOG).
+
 ## Changes by Kind
 
 ### Deprecation
