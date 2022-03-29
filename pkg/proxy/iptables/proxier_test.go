@@ -22,6 +22,7 @@ import (
 	"net"
 	"reflect"
 	"regexp"
+	stdruntime "runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -1307,9 +1308,20 @@ func Test_sortIPTablesRules(t *testing.T) {
 	}
 }
 
+// getLine returns the line number of the caller, if possible.  This is useful in
+// tests with a large number of cases - when something goes wrong you can find
+// which case more easily.
+func getLine() int {
+	_, _, line, ok := stdruntime.Caller(1)
+	if ok {
+		return line
+	}
+	return 0
+}
+
 // assertIPTablesRulesEqual asserts that the generated rules in result match the rules in
 // expected, ignoring irrelevant ordering differences.
-func assertIPTablesRulesEqual(t *testing.T, expected, result string) {
+func assertIPTablesRulesEqual(t *testing.T, line int, expected, result string) {
 	expected = strings.TrimLeft(expected, " \t\n")
 
 	result, err := sortIPTablesRules(strings.TrimLeft(result, " \t\n"))
@@ -1317,8 +1329,12 @@ func assertIPTablesRulesEqual(t *testing.T, expected, result string) {
 		t.Fatalf("%s", err)
 	}
 
+	lineStr := ""
+	if line != 0 {
+		lineStr = fmt.Sprintf(" (from line %d)", line)
+	}
 	if diff := cmp.Diff(expected, result); diff != "" {
-		t.Errorf("rules do not match:\ndiff:\n%s\nfull result:\n```\n%s```", diff, result)
+		t.Errorf("rules do not match%s:\ndiff:\n%s\nfull result:\n```\n%s```", lineStr, diff, result)
 	}
 
 	err = checkIPTablesRuleJumps(expected)
@@ -1329,7 +1345,7 @@ func assertIPTablesRulesEqual(t *testing.T, expected, result string) {
 
 // assertIPTablesRulesNotEqual asserts that the generated rules in result DON'T match the
 // rules in expected, ignoring irrelevant ordering differences.
-func assertIPTablesRulesNotEqual(t *testing.T, expected, result string) {
+func assertIPTablesRulesNotEqual(t *testing.T, line int, expected, result string) {
 	expected = strings.TrimLeft(expected, " \t\n")
 
 	result, err := sortIPTablesRules(strings.TrimLeft(result, " \t\n"))
@@ -1337,8 +1353,12 @@ func assertIPTablesRulesNotEqual(t *testing.T, expected, result string) {
 		t.Fatalf("%s", err)
 	}
 
+	lineStr := ""
+	if line != 0 {
+		lineStr = fmt.Sprintf(" (from line %d)", line)
+	}
 	if cmp.Equal(expected, result) {
-		t.Errorf("rules do not differ:\nfull result:\n```\n%s```", result)
+		t.Errorf("rules do not differ%s:\nfull result:\n```\n%s```", lineStr, result)
 	}
 
 	err = checkIPTablesRuleJumps(expected)
@@ -1588,7 +1608,7 @@ func TestOverallIPTablesRulesWithMultipleServices(t *testing.T) {
 		COMMIT
 		`)
 
-	assertIPTablesRulesEqual(t, expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
 
 	natRulesMetric, err := testutil.GetGaugeMetricValue(metrics.IptablesRulesTotal.WithLabelValues(string(utiliptables.TableNAT)))
 	if err != nil {
@@ -1649,7 +1669,7 @@ func TestClusterIPReject(t *testing.T) {
 		COMMIT
 		`)
 
-	assertIPTablesRulesEqual(t, expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
 }
 
 func TestClusterIPEndpointsJump(t *testing.T) {
@@ -1721,7 +1741,7 @@ func TestClusterIPEndpointsJump(t *testing.T) {
 		-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment ns1/svc1:p80 -j KUBE-SEP-SXIVWICOYRO3J4NJ
 		COMMIT
 		`)
-	assertIPTablesRulesEqual(t, expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
 }
 
 func TestLoadBalancer(t *testing.T) {
@@ -1811,7 +1831,7 @@ func TestLoadBalancer(t *testing.T) {
 		COMMIT
 		`)
 
-	assertIPTablesRulesEqual(t, expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
 }
 
 func TestNodePort(t *testing.T) {
@@ -1888,7 +1908,7 @@ func TestNodePort(t *testing.T) {
 		-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment ns1/svc1:p80 -j KUBE-SEP-SXIVWICOYRO3J4NJ
 		COMMIT
 		`)
-	assertIPTablesRulesEqual(t, expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
 }
 
 func TestHealthCheckNodePort(t *testing.T) {
@@ -1949,7 +1969,7 @@ func TestHealthCheckNodePort(t *testing.T) {
 		COMMIT
 		`)
 
-	assertIPTablesRulesEqual(t, expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
 }
 
 func TestMasqueradeRule(t *testing.T) {
@@ -1986,7 +2006,7 @@ func TestMasqueradeRule(t *testing.T) {
 		} else {
 			expected = fmt.Sprintf(expectedFmt, "")
 		}
-		assertIPTablesRulesEqual(t, expected, fp.iptablesData.String())
+		assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
 	}
 }
 
@@ -2041,7 +2061,7 @@ func TestExternalIPsReject(t *testing.T) {
 		-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
 		COMMIT
 		`)
-	assertIPTablesRulesEqual(t, expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
 }
 
 func TestOnlyLocalExternalIPs(t *testing.T) {
@@ -2132,7 +2152,7 @@ func TestOnlyLocalExternalIPs(t *testing.T) {
 		-A KUBE-XLB-XPGD46QRK7WJZT7O -j KUBE-SVL-XPGD46QRK7WJZT7O
 		COMMIT
 		`)
-	assertIPTablesRulesEqual(t, expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
 }
 
 // TestNonLocalExternalIPs tests if we add the masquerade rule into svcChain in order to
@@ -2218,7 +2238,7 @@ func TestNonLocalExternalIPs(t *testing.T) {
 		-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment ns1/svc1:p80 -j KUBE-SEP-ZX7GRIZKSNUQ3LAJ
 		COMMIT
 		`)
-	assertIPTablesRulesEqual(t, expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
 }
 
 func TestNodePortReject(t *testing.T) {
@@ -2271,7 +2291,7 @@ func TestNodePortReject(t *testing.T) {
 		-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
 		COMMIT
 		`)
-	assertIPTablesRulesEqual(t, expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
 }
 
 func TestLoadBalancerReject(t *testing.T) {
@@ -2338,7 +2358,7 @@ func TestLoadBalancerReject(t *testing.T) {
 		-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
 		COMMIT
 		`)
-	assertIPTablesRulesEqual(t, expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
 }
 
 func TestOnlyLocalLoadBalancing(t *testing.T) {
@@ -2450,7 +2470,7 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 		-A KUBE-XLB-XPGD46QRK7WJZT7O -j KUBE-SVL-XPGD46QRK7WJZT7O
 		COMMIT
 		`)
-	assertIPTablesRulesEqual(t, expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
 }
 
 func TestOnlyLocalNodePortsNoClusterCIDR(t *testing.T) {
@@ -2499,7 +2519,7 @@ func TestOnlyLocalNodePortsNoClusterCIDR(t *testing.T) {
 		-A KUBE-XLB-XPGD46QRK7WJZT7O -j KUBE-SVL-XPGD46QRK7WJZT7O
 		COMMIT
 		`)
-	onlyLocalNodePorts(t, fp, ipt, expected)
+	onlyLocalNodePorts(t, fp, ipt, expected, getLine())
 }
 
 func TestOnlyLocalNodePorts(t *testing.T) {
@@ -2549,10 +2569,10 @@ func TestOnlyLocalNodePorts(t *testing.T) {
 		-A KUBE-XLB-XPGD46QRK7WJZT7O -j KUBE-SVL-XPGD46QRK7WJZT7O
 		COMMIT
 		`)
-	onlyLocalNodePorts(t, fp, ipt, expected)
+	onlyLocalNodePorts(t, fp, ipt, expected, getLine())
 }
 
-func onlyLocalNodePorts(t *testing.T, fp *Proxier, ipt *iptablestest.FakeIPTables, expected string) {
+func onlyLocalNodePorts(t *testing.T, fp *Proxier, ipt *iptablestest.FakeIPTables, expected string, line int) {
 	svcIP := "172.30.0.41"
 	svcPort := 80
 	svcNodePort := 3001
@@ -2599,7 +2619,7 @@ func onlyLocalNodePorts(t *testing.T, fp *Proxier, ipt *iptablestest.FakeIPTable
 
 	fp.syncProxyRules()
 
-	assertIPTablesRulesEqual(t, expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, line, expected, fp.iptablesData.String())
 }
 
 func TestComputeProbability(t *testing.T) {
@@ -3875,11 +3895,11 @@ func TestEndpointSliceE2E(t *testing.T) {
 
 	fp.OnEndpointSliceAdd(endpointSlice)
 	fp.syncProxyRules()
-	assertIPTablesRulesEqual(t, expectedIPTablesWithSlice, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), expectedIPTablesWithSlice, fp.iptablesData.String())
 
 	fp.OnEndpointSliceDelete(endpointSlice)
 	fp.syncProxyRules()
-	assertIPTablesRulesNotEqual(t, expectedIPTablesWithSlice, fp.iptablesData.String())
+	assertIPTablesRulesNotEqual(t, getLine(), expectedIPTablesWithSlice, fp.iptablesData.String())
 }
 
 func TestHealthCheckNodePortE2E(t *testing.T) {
@@ -3985,11 +4005,11 @@ func TestHealthCheckNodePortE2E(t *testing.T) {
 	}
 	fp.OnEndpointSliceAdd(endpointSlice)
 	fp.syncProxyRules()
-	assertIPTablesRulesEqual(t, expectedIPTables, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), expectedIPTables, fp.iptablesData.String())
 
 	fp.OnServiceDelete(svc)
 	fp.syncProxyRules()
-	assertIPTablesRulesNotEqual(t, expectedIPTables, fp.iptablesData.String())
+	assertIPTablesRulesNotEqual(t, getLine(), expectedIPTables, fp.iptablesData.String())
 }
 
 // Test_HealthCheckNodePortWhenTerminating tests that health check node ports are not enabled when all local endpoints are terminating
@@ -4385,6 +4405,7 @@ func TestInternalTrafficPolicyE2E(t *testing.T) {
 
 	testCases := []struct {
 		name                      string
+		line                      int
 		internalTrafficPolicy     *v1.ServiceInternalTrafficPolicyType
 		featureGateOn             bool
 		endpoints                 []endpoint
@@ -4393,6 +4414,7 @@ func TestInternalTrafficPolicyE2E(t *testing.T) {
 	}{
 		{
 			name:                  "internalTrafficPolicy is cluster",
+			line:                  getLine(),
 			internalTrafficPolicy: &cluster,
 			featureGateOn:         true,
 			endpoints: []endpoint{
@@ -4405,6 +4427,7 @@ func TestInternalTrafficPolicyE2E(t *testing.T) {
 		},
 		{
 			name:                  "internalTrafficPolicy is local and there is non-zero local endpoints",
+			line:                  getLine(),
 			internalTrafficPolicy: &local,
 			featureGateOn:         true,
 			endpoints: []endpoint{
@@ -4445,6 +4468,7 @@ func TestInternalTrafficPolicyE2E(t *testing.T) {
 		},
 		{
 			name:                  "internalTrafficPolicy is local and there is zero local endpoint",
+			line:                  getLine(),
 			internalTrafficPolicy: &local,
 			featureGateOn:         true,
 			endpoints: []endpoint{
@@ -4482,6 +4506,7 @@ func TestInternalTrafficPolicyE2E(t *testing.T) {
 		},
 		{
 			name:                  "internalTrafficPolicy is local and there is non-zero local endpoint with feature gate off",
+			line:                  getLine(),
 			internalTrafficPolicy: &local,
 			featureGateOn:         false,
 			endpoints: []endpoint{
@@ -4543,12 +4568,12 @@ func TestInternalTrafficPolicyE2E(t *testing.T) {
 
 			fp.OnEndpointSliceAdd(endpointSlice)
 			fp.syncProxyRules()
-			assertIPTablesRulesEqual(t, tc.expectedIPTablesWithSlice, fp.iptablesData.String())
+			assertIPTablesRulesEqual(t, tc.line, tc.expectedIPTablesWithSlice, fp.iptablesData.String())
 
 			if tc.expectEndpointRule {
 				fp.OnEndpointSliceDelete(endpointSlice)
 				fp.syncProxyRules()
-				assertIPTablesRulesNotEqual(t, tc.expectedIPTablesWithSlice, fp.iptablesData.String())
+				assertIPTablesRulesNotEqual(t, tc.line, tc.expectedIPTablesWithSlice, fp.iptablesData.String())
 			}
 		})
 	}
@@ -4593,6 +4618,7 @@ func Test_EndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) 
 
 	testcases := []struct {
 		name                   string
+		line                   int
 		terminatingFeatureGate bool
 		endpointslice          *discovery.EndpointSlice
 		expectedIPTables       string
@@ -4600,6 +4626,7 @@ func Test_EndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) 
 	}{
 		{
 			name:                   "feature gate ProxyTerminatingEndpoints enabled, ready endpoints exist",
+			line:                   getLine(),
 			terminatingFeatureGate: true,
 			endpointslice: &discovery.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
@@ -4722,6 +4749,7 @@ func Test_EndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) 
 		},
 		{
 			name:                   "feature gate ProxyTerminatingEndpoints disabled, ready endpoints exist",
+			line:                   getLine(),
 			terminatingFeatureGate: false,
 			endpointslice: &discovery.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
@@ -4844,6 +4872,7 @@ func Test_EndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) 
 		},
 		{
 			name:                   "feature gate ProxyTerminatingEndpoints enabled, only terminating endpoints exist",
+			line:                   getLine(),
 			terminatingFeatureGate: true,
 			endpointslice: &discovery.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
@@ -4954,6 +4983,7 @@ func Test_EndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) 
 		},
 		{
 			name:                   "with ProxyTerminatingEndpoints disabled, only terminating endpoints exist",
+			line:                   getLine(),
 			terminatingFeatureGate: false,
 			endpointslice: &discovery.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
@@ -5060,6 +5090,7 @@ func Test_EndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) 
 		},
 		{
 			name:                   "ProxyTerminatingEndpoints enabled, terminating endpoints on remote node",
+			line:                   getLine(),
 			terminatingFeatureGate: true,
 			endpointslice: &discovery.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
@@ -5132,6 +5163,7 @@ func Test_EndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) 
 		},
 		{
 			name:                   "no usable endpoints on any node",
+			line:                   getLine(),
 			terminatingFeatureGate: true,
 			endpointslice: &discovery.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
@@ -5210,15 +5242,15 @@ func Test_EndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) 
 
 			fp.OnEndpointSliceAdd(testcase.endpointslice)
 			fp.syncProxyRules()
-			assertIPTablesRulesEqual(t, testcase.expectedIPTables, fp.iptablesData.String())
+			assertIPTablesRulesEqual(t, testcase.line, testcase.expectedIPTables, fp.iptablesData.String())
 
 			fp.OnEndpointSliceDelete(testcase.endpointslice)
 			fp.syncProxyRules()
 			if testcase.noUsableEndpoints {
 				// Deleting the EndpointSlice should have had no effect
-				assertIPTablesRulesEqual(t, testcase.expectedIPTables, fp.iptablesData.String())
+				assertIPTablesRulesEqual(t, testcase.line, testcase.expectedIPTables, fp.iptablesData.String())
 			} else {
-				assertIPTablesRulesNotEqual(t, testcase.expectedIPTables, fp.iptablesData.String())
+				assertIPTablesRulesNotEqual(t, testcase.line, testcase.expectedIPTables, fp.iptablesData.String())
 			}
 		})
 	}
@@ -5263,6 +5295,7 @@ func Test_EndpointSliceWithTerminatingEndpointsTrafficPolicyCluster(t *testing.T
 
 	testcases := []struct {
 		name                   string
+		line                   int
 		terminatingFeatureGate bool
 		endpointslice          *discovery.EndpointSlice
 		expectedIPTables       string
@@ -5270,6 +5303,7 @@ func Test_EndpointSliceWithTerminatingEndpointsTrafficPolicyCluster(t *testing.T
 	}{
 		{
 			name:                   "feature gate ProxyTerminatingEndpoints enabled, ready endpoints exist",
+			line:                   getLine(),
 			terminatingFeatureGate: true,
 			endpointslice: &discovery.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
@@ -5381,6 +5415,7 @@ func Test_EndpointSliceWithTerminatingEndpointsTrafficPolicyCluster(t *testing.T
 		},
 		{
 			name:                   "feature gate ProxyTerminatingEndpoints disabled, ready endpoints exist",
+			line:                   getLine(),
 			terminatingFeatureGate: false,
 			endpointslice: &discovery.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
@@ -5492,6 +5527,7 @@ func Test_EndpointSliceWithTerminatingEndpointsTrafficPolicyCluster(t *testing.T
 		},
 		{
 			name:                   "feature gate ProxyTerminatingEndpoints enabled, only terminating endpoints exist",
+			line:                   getLine(),
 			terminatingFeatureGate: true,
 			endpointslice: &discovery.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
@@ -5596,6 +5632,7 @@ func Test_EndpointSliceWithTerminatingEndpointsTrafficPolicyCluster(t *testing.T
 		},
 		{
 			name:                   "with ProxyTerminatingEndpoints disabled, only terminating endpoints exist",
+			line:                   getLine(),
 			terminatingFeatureGate: false,
 			endpointslice: &discovery.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
@@ -5685,6 +5722,7 @@ func Test_EndpointSliceWithTerminatingEndpointsTrafficPolicyCluster(t *testing.T
 		},
 		{
 			name:                   "ProxyTerminatingEndpoints enabled, terminating endpoints on remote node",
+			line:                   getLine(),
 			terminatingFeatureGate: true,
 			endpointslice: &discovery.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
@@ -5748,6 +5786,7 @@ func Test_EndpointSliceWithTerminatingEndpointsTrafficPolicyCluster(t *testing.T
 		},
 		{
 			name:                   "no usable endpoints on any node",
+			line:                   getLine(),
 			terminatingFeatureGate: true,
 			endpointslice: &discovery.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
@@ -5825,15 +5864,15 @@ func Test_EndpointSliceWithTerminatingEndpointsTrafficPolicyCluster(t *testing.T
 
 			fp.OnEndpointSliceAdd(testcase.endpointslice)
 			fp.syncProxyRules()
-			assertIPTablesRulesEqual(t, testcase.expectedIPTables, fp.iptablesData.String())
+			assertIPTablesRulesEqual(t, testcase.line, testcase.expectedIPTables, fp.iptablesData.String())
 
 			fp.OnEndpointSliceDelete(testcase.endpointslice)
 			fp.syncProxyRules()
 			if testcase.noUsableEndpoints {
 				// Deleting the EndpointSlice should have had no effect
-				assertIPTablesRulesEqual(t, testcase.expectedIPTables, fp.iptablesData.String())
+				assertIPTablesRulesEqual(t, testcase.line, testcase.expectedIPTables, fp.iptablesData.String())
 			} else {
-				assertIPTablesRulesNotEqual(t, testcase.expectedIPTables, fp.iptablesData.String())
+				assertIPTablesRulesNotEqual(t, testcase.line, testcase.expectedIPTables, fp.iptablesData.String())
 			}
 		})
 	}
@@ -5913,7 +5952,7 @@ func TestMasqueradeAll(t *testing.T) {
 		-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment ns1/svc1:p80 -j KUBE-SEP-SXIVWICOYRO3J4NJ
 		COMMIT
 		`)
-	assertIPTablesRulesEqual(t, expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
 }
 
 func countEndpointsAndComments(iptablesData string, matchEndpoint string) (string, int, int) {
