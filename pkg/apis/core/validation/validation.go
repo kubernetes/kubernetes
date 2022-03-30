@@ -1044,7 +1044,6 @@ func validateDownwardAPIVolumeFile(file *core.DownwardAPIVolumeFile, fldPath *fi
 		if file.ResourceFieldRef != nil {
 			allErrs = append(allErrs, field.Invalid(fldPath, "resource", "fieldRef and resourceFieldRef can not be specified simultaneously"))
 		}
-		allErrs = append(allErrs, validateDownwardAPIHostIPs(file.FieldRef, fldPath.Child("fieldRef"), opts)...)
 	} else if file.ResourceFieldRef != nil {
 		localValidContainerResourceFieldPathPrefixes := validContainerResourceFieldPathPrefixes
 		if opts.AllowDownwardAPIHugePages {
@@ -2330,10 +2329,8 @@ var validEnvDownwardAPIFieldPathExpressions = sets.NewString(
 	"spec.nodeName",
 	"spec.serviceAccountName",
 	"status.hostIP",
-	"status.hostIPs",
 	"status.podIP",
-	"status.podIPs",
-)
+	"status.podIPs")
 
 var validContainerResourceFieldPathExpressions = sets.NewString("limits.cpu", "limits.memory", "limits.ephemeral-storage", "requests.cpu", "requests.memory", "requests.ephemeral-storage")
 
@@ -2356,7 +2353,6 @@ func validateEnvVarValueFrom(ev core.EnvVar, fldPath *field.Path, opts PodValida
 	if ev.ValueFrom.FieldRef != nil {
 		numSources++
 		allErrs = append(allErrs, validateObjectFieldSelector(ev.ValueFrom.FieldRef, &validEnvDownwardAPIFieldPathExpressions, fldPath.Child("fieldRef"))...)
-		allErrs = append(allErrs, validateDownwardAPIHostIPs(ev.ValueFrom.FieldRef, fldPath.Child("fieldRef"), opts)...)
 	}
 	if ev.ValueFrom.ResourceFieldRef != nil {
 		numSources++
@@ -2424,16 +2420,6 @@ func validateObjectFieldSelector(fs *core.ObjectFieldSelector, expressions *sets
 		return allErrs
 	}
 
-	return allErrs
-}
-
-func validateDownwardAPIHostIPs(fieldSel *core.ObjectFieldSelector, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
-	allErrs := field.ErrorList{}
-	if !opts.AllowHostIPsField {
-		if fieldSel.FieldPath == "status.hostIPs" {
-			allErrs = append(allErrs, field.Invalid(fldPath, "status.hostIPs", "not allowed when feature gate 'PodHostIPs' is not enabled"))
-		}
-	}
 	return allErrs
 }
 
@@ -3429,8 +3415,6 @@ type PodValidationOptions struct {
 	AllowExpandedDNSConfig bool
 	// Allow OSField to be set in the pod spec
 	AllowOSField bool
-	// Allow pod spec to use status.hostIPs in downward API
-	AllowHostIPsField bool
 	// Allow sysctl name to contain a slash
 	AllowSysctlRegexContainSlash bool
 }

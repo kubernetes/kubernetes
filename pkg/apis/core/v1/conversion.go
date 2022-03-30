@@ -270,17 +270,6 @@ func Convert_v1_PodStatus_To_core_PodStatus(in *v1.PodStatus, out *core.PodStatu
 			},
 		}
 	}
-
-	// If both fields (v1.HostIPs and v1.HostIP) are provided and differ, then HostIP is authoritative for compatibility with older kubelets
-	if (len(in.HostIP) > 0 && len(in.HostIPs) > 0) && (in.HostIP != in.HostIPs[0].IP) {
-		out.HostIPs = []core.HostIP{{IP: in.HostIP}}
-	}
-	// at the this point, autoConvert copied v1.HostIPs -> core.HostIPs
-	// if v1.HostIPs was empty but v1.HostIP is not, then set core.HostIPs[0] with v1.HostIP
-	if len(in.HostIP) > 0 && len(in.HostIPs) == 0 {
-		out.HostIPs = []core.HostIP{{IP: in.HostIP}}
-	}
-
 	return nil
 }
 
@@ -293,11 +282,6 @@ func Convert_core_PodStatus_To_v1_PodStatus(in *core.PodStatus, out *v1.PodStatu
 	// be set with core.PodIPs[0]
 	if len(in.PodIPs) > 0 {
 		out.PodIP = in.PodIPs[0].IP
-	}
-
-	// at the this point autoConvert copied core.HostIPs -> v1.HostIPs
-	if len(in.HostIPs) > 0 {
-		out.HostIP = in.HostIPs[0].IP
 	}
 	return nil
 }

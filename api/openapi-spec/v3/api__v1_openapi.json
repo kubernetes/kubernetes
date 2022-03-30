@@ -2609,16 +2609,6 @@
         },
         "type": "object"
       },
-      "io.k8s.api.core.v1.HostIP": {
-        "description": "HostIP address information for entries in the (plural) HostIPs field.",
-        "properties": {
-          "ip": {
-            "description": "IP is the IP address assigned to the host",
-            "type": "string"
-          }
-        },
-        "type": "object"
-      },
       "io.k8s.api.core.v1.HostPathVolumeSource": {
         "description": "Represents a host path mapped into a pod. Host path volumes do not support ownership management or SELinux relabeling.",
         "properties": {
@@ -4854,10 +4844,10 @@
         "type": "object"
       },
       "io.k8s.api.core.v1.PodIP": {
-        "description": "PodIP address information for entries in the (plural) PodIPs field.",
+        "description": "IP address information for entries in the (plural) PodIPs field. Each entry includes:\n   IP: An IP address allocated to the pod. Routable at least within the cluster.",
         "properties": {
           "ip": {
-            "description": "IP is the IP address assigned to the pod",
+            "description": "ip is an IP address (IPv4 or IPv6) assigned to the pod",
             "type": "string"
           }
         },
@@ -5339,23 +5329,8 @@
             "type": "array"
           },
           "hostIP": {
-            "description": "hostIP holds the IP address of the host to which the pod is assigned. Empty if the pod has not started yet. A pod can be assigned to a node that has a problem in kubelet which in turns mean that HostIP will not be updated even if there is node is assigned to pod",
+            "description": "IP address of the host to which the pod is assigned. Empty if not yet scheduled.",
             "type": "string"
-          },
-          "hostIPs": {
-            "description": "hostIPs holds the IP addresses allocated to the host. If this field is specified, the first entry must match the hostIP field. This list is empty if the pod has not started yet. A pod can be assigned to a node that has a problem in kubelet which in turns means that HostIPs will not be updated even if there is a node is assigned to this pod.",
-            "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.core.v1.HostIP"
-                }
-              ],
-              "default": {}
-            },
-            "type": "array",
-            "x-kubernetes-list-type": "set",
-            "x-kubernetes-patch-merge-key": "ip",
-            "x-kubernetes-patch-strategy": "merge"
           },
           "initContainerStatuses": {
             "description": "The list has one entry per init container in the manifest. The most recent successful init container will have ready = true, the most recently started container will have startTime set. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-and-container-status",
@@ -5389,7 +5364,7 @@
             "type": "string"
           },
           "podIP": {
-            "description": "podIP address allocated to the pod. Routable at least within the cluster. Empty if not yet allocated.",
+            "description": "IP address allocated to the pod. Routable at least within the cluster. Empty if not yet allocated.",
             "type": "string"
           },
           "podIPs": {
