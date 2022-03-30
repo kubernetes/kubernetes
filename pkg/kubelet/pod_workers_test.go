@@ -414,13 +414,15 @@ func TestUpdatePodWithTerminatedPod(t *testing.T) {
 		RunningPod: runningPod,
 	})
 
+	drainAllWorkers(podWorkers)
+
 	if podWorkers.IsPodKnownTerminated(pod.UID) == true {
 		t.Errorf("podWorker state should not be terminated")
 	}
 	if podWorkers.IsPodKnownTerminated(terminatedPod.UID) == false {
 		t.Errorf("podWorker state should be terminated")
 	}
-	if podWorkers.IsPodKnownTerminated(runningPod.ID) == true {
+	if podWorkers.IsPodKnownTerminated(runningPod.ID) == false {
 		t.Errorf("podWorker state should not be marked terminated for a running pod")
 	}
 }
