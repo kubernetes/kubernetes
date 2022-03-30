@@ -496,7 +496,6 @@ API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,C
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,CronJobControllerConfiguration,ConcurrentCronJobSyncs
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,DaemonSetControllerConfiguration,ConcurrentDaemonSetSyncs
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,DeploymentControllerConfiguration,ConcurrentDeploymentSyncs
-API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,DeploymentControllerConfiguration,DeploymentControllerSyncPeriod
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,DeprecatedControllerConfiguration,DeletingPodsBurst
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,DeprecatedControllerConfiguration,DeletingPodsQPS
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,DeprecatedControllerConfiguration,RegisterRetryCount
