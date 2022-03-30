@@ -273,16 +273,20 @@ type Proxier struct {
 	// Inject for test purpose.
 	networkInterfacer     utilproxy.NetworkInterfacer
 	gracefuldeleteManager *GracefulTerminationManager
-	// serviceNoLocalEndpointsInternal is a map of services that couldn't have their rules applied
-	// due to the absence of local endpoints when the internal traffic policy label set to "Local".
+	// serviceNoLocalEndpointsInternal represents the set of services that couldn't be applied
+	// due to the absence of local endpoints when the internal traffic policy is "Local".
 	// It is used to publish the sync_proxy_rules_no_endpoints_total
 	// metric with the traffic_policy label set to "internal".
-	serviceNoLocalEndpointsInternal map[proxy.ServicePortName]bool
-	// serviceNoLocalEndpointsExternal is a map of services that couldn't have their rules applied
+	// sets.String is used here since we end up calculating endpoint topology multiple times for the same Service
+	// if it has mulitple ports but each Service should only be counted once.
+	serviceNoLocalEndpointsInternal sets.String
+	// serviceNoLocalEndpointsExternal irepresents the set of services that couldn't be applied
 	// due to the absence of any endpoints when the external traffic policy is "Local".
 	// It is used to publish the sync_proxy_rules_no_endpoints_total
 	// metric with the traffic_policy label set to "external".
-	serviceNoLocalEndpointsExternal map[proxy.ServicePortName]bool
+	// sets.String is used here since we end up calculating endpoint topology multiple times for the same Service
+	// if it has mulitple ports but each Service should only be counted once.
+	serviceNoLocalEndpointsExternal sets.String
 }
 
 // IPGetter helps get node network interface IP and IPs binded to the IPVS dummy interface
@@ -1037,8 +1041,8 @@ func (proxier *Proxier) syncProxyRules() {
 
 	klog.V(3).InfoS("Syncing ipvs proxier rules")
 
-	proxier.serviceNoLocalEndpointsInternal = make(map[proxy.ServicePortName]bool)
-	proxier.serviceNoLocalEndpointsExternal = make(map[proxy.ServicePortName]bool)
+	proxier.serviceNoLocalEndpointsInternal = sets.NewString()
+	proxier.serviceNoLocalEndpointsExternal = sets.NewString()
 	// Begin install iptables
 
 	// Reset all buffers used later.
@@ -1612,23 +1616,8 @@ func (proxier *Proxier) syncProxyRules() {
 	}
 	proxier.deleteEndpointConnections(endpointUpdateResult.StaleEndpoints)
 
-	serviceNoLocalEndpointsInternalTotal := 0
-	serviceNoLocalEndpointsExternalTotal := 0
-
-	for _, v := range proxier.serviceNoLocalEndpointsInternal {
-		if v {
-			serviceNoLocalEndpointsInternalTotal++
-		}
-	}
-
-	for _, v := range proxier.serviceNoLocalEndpointsExternal {
-		if v {
-			serviceNoLocalEndpointsExternalTotal++
-		}
-	}
-
-	metrics.SyncProxyRulesNoLocalEndpointsTotal.WithLabelValues("internal").Set(float64(serviceNoLocalEndpointsInternalTotal))
-	metrics.SyncProxyRulesNoLocalEndpointsTotal.WithLabelValues("external").Set(float64(serviceNoLocalEndpointsExternalTotal))
+	metrics.SyncProxyRulesNoLocalEndpointsTotal.WithLabelValues("internal").Set(float64(proxier.serviceNoLocalEndpointsInternal.Len()))
+	metrics.SyncProxyRulesNoLocalEndpointsTotal.WithLabelValues("external").Set(float64(proxier.serviceNoLocalEndpointsExternal.Len()))
 }
 
 // writeIptablesRules write all iptables rules to proxier.natRules or proxier.FilterRules that ipvs proxier needed
@@ -1992,7 +1981,6 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 
 	endpoints := proxier.endpointsMap[svcPortName]
 
-	localEndpoints := []proxy.Endpoint{}
 	// Filtering for topology aware endpoints. This function will only
 	// filter endpoints if appropriate feature gates are enabled and the
 	// Service does not have conflicting configuration such as
@@ -2001,8 +1989,7 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 	if !ok {
 		klog.InfoS("Unable to filter endpoints due to missing service info", "servicePortName", svcPortName)
 	} else {
-		var clusterEndpoints []proxy.Endpoint
-		clusterEndpoints, localEndpoints, _, _ = proxy.CategorizeEndpoints(endpoints, svcInfo, proxier.nodeLabels)
+		clusterEndpoints, localEndpoints, _, _ := proxy.CategorizeEndpoints(endpoints, svcInfo, proxier.nodeLabels)
 		if onlyNodeLocalEndpoints {
 			if len(localEndpoints) > 0 {
 				endpoints = localEndpoints
@@ -2022,13 +2009,13 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 	for _, epInfo := range endpoints {
 		newEndpoints.Insert(epInfo.String())
 	}
-	if svcInfo.UsesLocalEndpoints() && len(localEndpoints) == 0 {
+	if onlyNodeLocalEndpoints && len(newEndpoints) == 0 {
 		if svcInfo.NodeLocalInternal() && utilfeature.DefaultFeatureGate.Enabled(features.ServiceInternalTrafficPolicy) {
-			proxier.serviceNoLocalEndpointsInternal[svcPortName] = true
+			proxier.serviceNoLocalEndpointsInternal.Insert(svcPortName.NamespacedName.String())
 		}
 
 		if svcInfo.NodeLocalExternal() {
-			proxier.serviceNoLocalEndpointsExternal[svcPortName] = true
+			proxier.serviceNoLocalEndpointsExternal.Insert(svcPortName.NamespacedName.String())
 		}
 	}
 
