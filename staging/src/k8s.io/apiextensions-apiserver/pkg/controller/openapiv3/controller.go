@@ -178,6 +178,7 @@ func (c *Controller) deleteCRD(name string) {
 			if len(crdListForGV) == 0 {
 				delete(c.specsByGVandName, gv)
 			}
+			regenerationCounter.With(map[string]string{"group": gv.Group, "version": gv.Version, "crd": name, "reason": "remove"})
 			c.updateGroupVersion(gv)
 		}
 	}
@@ -210,7 +211,9 @@ func (c *Controller) updateCRDSpec(crd *apiextensionsv1.CustomResourceDefinition
 	}
 
 	_, ok := c.specsByGVandName[gv]
+	reason := "update"
 	if !ok {
+		reason = "add"
 		c.specsByGVandName[gv] = map[string]*spec3.OpenAPI{}
 	}
 
@@ -222,7 +225,7 @@ func (c *Controller) updateCRDSpec(crd *apiextensionsv1.CustomResourceDefinition
 		}
 	}
 	c.specsByGVandName[gv][name] = v3
-
+	regenerationCounter.With(map[string]string{"crd": name, "group": gv.Group, "version": gv.Version, "reason": reason})
 	return c.updateGroupVersion(gv)
 }
 
