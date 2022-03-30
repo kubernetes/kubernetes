@@ -26,7 +26,7 @@ import (
 var writer = zapcore.AddSync(&writeSyncer{})
 
 func BenchmarkInfoLoggerInfo(b *testing.B) {
-	logger, _ := NewJSONLogger(writer, nil, nil)
+	logger, _ := NewJSONLogger(0, writer, nil, nil)
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
@@ -55,7 +55,7 @@ func BenchmarkInfoLoggerInfo(b *testing.B) {
 }
 
 func BenchmarkZapLoggerError(b *testing.B) {
-	logger, _ := NewJSONLogger(writer, nil, nil)
+	logger, _ := NewJSONLogger(0, writer, nil, nil)
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
@@ -85,7 +85,7 @@ func BenchmarkZapLoggerError(b *testing.B) {
 }
 
 func BenchmarkZapLoggerV(b *testing.B) {
-	logger, _ := NewJSONLogger(writer, nil, nil)
+	logger, _ := NewJSONLogger(1, writer, nil, nil)
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
