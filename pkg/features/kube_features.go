@@ -770,6 +770,7 @@ const (
 	// owner: @jiahuif
 	// alpha: v1.21
 	// beta:  v1.22
+	// GA:    v1.24
 	//
 	// Enables Leader Migration for kube-controller-manager and cloud-controller-manager
 	ControllerManagerLeaderMigration featuregate.Feature = "ControllerManagerLeaderMigration"
@@ -993,7 +994,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	KubeletInUserNamespace:                         {Default: false, PreRelease: featuregate.Alpha},
 	MemoryQoS:                                      {Default: false, PreRelease: featuregate.Alpha},
 	CPUManagerPolicyOptions:                        {Default: true, PreRelease: featuregate.Beta},
-	ControllerManagerLeaderMigration:               {Default: true, PreRelease: featuregate.Beta},
+	ControllerManagerLeaderMigration:               {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
 	CPUManagerPolicyAlphaOptions:                   {Default: false, PreRelease: featuregate.Alpha},
 	CPUManagerPolicyBetaOptions:                    {Default: true, PreRelease: featuregate.Beta},
 	JobMutableNodeSchedulingDirectives:             {Default: true, PreRelease: featuregate.Beta},
