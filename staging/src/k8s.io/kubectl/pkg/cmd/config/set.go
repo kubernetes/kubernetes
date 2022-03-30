@@ -234,10 +234,13 @@ func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue stri
 
 	case reflect.String:
 		if steps.moreStepsRemaining() {
-			return fmt.Errorf("can't have more steps after a string. %v", steps)
+			return fmt.Errorf("unable to locate path %v", currStep.stepValue)
 		}
-		actualCurrValue.SetString(propertyValue)
-		return nil
+		if actualCurrValue.CanAddr() {
+			actualCurrValue.SetString(propertyValue)
+			return nil
+		}
+		return fmt.Errorf("unable to locate path %v", currStep.stepValue)
 
 	case reflect.Slice:
 		if setRawBytes {
@@ -348,7 +351,7 @@ func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue stri
 
 	case reflect.Bool:
 		if steps.moreStepsRemaining() {
-			return fmt.Errorf("can't have more steps after a bool. %v", steps)
+			return fmt.Errorf("unable to locate path %v", currStep.stepValue)
 		}
 		boolValue, err := toBool(propertyValue)
 		if err != nil {
@@ -363,7 +366,7 @@ func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue stri
 			currFieldTypeYamlName := getMapFieldTypeYamlName(actualCurrValue, fieldIndex)
 
 			if currFieldTypeYamlName == currStep.stepValue {
-				thisMapHasNoValue := (currFieldValue.Kind() == reflect.Map && currFieldValue.IsNil())
+				thisMapHasNoValue := currFieldValue.Kind() == reflect.Map && currFieldValue.IsNil()
 
 				if thisMapHasNoValue {
 					newValue := reflect.MakeMap(currFieldValue.Type())
