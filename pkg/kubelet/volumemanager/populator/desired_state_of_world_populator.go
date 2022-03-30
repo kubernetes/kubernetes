@@ -195,13 +195,12 @@ func (dswp *desiredStateOfWorldPopulator) findAndAddNewPods() {
 		mountedVolumes[mountedVolume.OuterVolumeSpecName] = mountedVolume
 	}
 
-	processedVolumesForFSResize := sets.NewString()
 	for _, pod := range dswp.podManager.GetPods() {
 		if dswp.podStateProvider.ShouldPodContainersBeTerminating(pod.UID) {
 			// Do not (re)add volumes for pods that can't also be starting containers
 			continue
 		}
-		dswp.processPodVolumes(pod, mountedVolumesForPod, processedVolumesForFSResize)
+		dswp.processPodVolumes(pod, mountedVolumesForPod)
 	}
 }
 
@@ -270,8 +269,7 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 // desired state of the world.
 func (dswp *desiredStateOfWorldPopulator) processPodVolumes(
 	pod *v1.Pod,
-	mountedVolumesForPod map[volumetypes.UniquePodName]map[string]cache.MountedVolume,
-	processedVolumesForFSResize sets.String) {
+	mountedVolumesForPod map[volumetypes.UniquePodName]map[string]cache.MountedVolume) {
 	if pod == nil {
 		return
 	}
@@ -314,9 +312,7 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(
 		// sync reconstructed volume
 		dswp.actualStateOfWorld.SyncReconstructedVolume(uniqueVolumeName, uniquePodName, podVolume.Name)
 
-		dswp.checkVolumeFSResize(pod, podVolume, pvc, volumeSpec,
-			uniquePodName, mountedVolumesForPod, processedVolumesForFSResize)
-
+		dswp.checkVolumeFSResize(pod, podVolume, pvc, volumeSpec, uniquePodName, mountedVolumesForPod)
 	}
 
 	// some of the volume additions may have failed, should not mark this pod as fully processed
@@ -337,21 +333,16 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(
 
 }
 
-// checkVolumeFSResize checks whether a PVC mounted by the pod requires file
-// system resize or not. If so, marks this volume as fsResizeRequired in ASW.
-// - mountedVolumesForPod stores all mounted volumes in ASW, because online
-//   volume resize only considers mounted volumes.
-// - processedVolumesForFSResize stores all volumes we have checked in current loop,
-//   because file system resize operation is a global operation for volume, so
-//   we only need to check it once if more than one pod use it.
+// checkVolumeFSResize records desired PVC size for a volume mounted by the pod.
+// It is used for comparison with actual size(coming from pvc.Status.Capacity) and calling
+// volume expansion on the node if needed.
 func (dswp *desiredStateOfWorldPopulator) checkVolumeFSResize(
 	pod *v1.Pod,
 	podVolume v1.Volume,
 	pvc *v1.PersistentVolumeClaim,
 	volumeSpec *volume.Spec,
 	uniquePodName volumetypes.UniquePodName,
-	mountedVolumesForPod map[volumetypes.UniquePodName]map[string]cache.MountedVolume,
-	processedVolumesForFSResize sets.String) {
+	mountedVolumesForPod map[volumetypes.UniquePodName]map[string]cache.MountedVolume) {
 	if podVolume.PersistentVolumeClaim == nil {
 		// Only PVC supports resize operation.
 		return
@@ -363,11 +354,6 @@ func (dswp *desiredStateOfWorldPopulator) checkVolumeFSResize(
 		// or online resize in subsequent loop(after we confirm it has been mounted).
 		return
 	}
-	if processedVolumesForFSResize.Has(string(uniqueVolumeName)) {
-		// File system resize operation is a global operation for volume,
-		// so we only need to check it once if more than one pod use it.
-		return
-	}
 	// volumeSpec.ReadOnly is the value that determines if volume could be formatted when being mounted.
 	// This is the same flag that determines filesystem resizing behaviour for offline resizing and hence
 	// we should use it here. This value comes from Pod.spec.volumes.persistentVolumeClaim.readOnly.
@@ -376,10 +362,12 @@ func (dswp *desiredStateOfWorldPopulator) checkVolumeFSResize(
 		klog.V(5).InfoS("Skip file system resize check for the volume, as the volume is mounted as readonly", "pod", klog.KObj(pod), "volumeName", podVolume.Name)
 		return
 	}
-	if volumeRequiresFSResize(pvc, volumeSpec.PersistentVolume) {
-		dswp.actualStateOfWorld.MarkFSResizeRequired(uniqueVolumeName, uniquePodName)
-	}
-	processedVolumesForFSResize.Insert(string(uniqueVolumeName))
+	pvCap := volumeSpec.PersistentVolume.Spec.Capacity.Storage()
+	pvcStatusCap := pvc.Status.Capacity.Storage()
+	dswp.desiredStateOfWorld.UpdatePersistentVolumeSize(uniqueVolumeName, pvCap)
+
+	// in case the actualStateOfWorld was rebuild after kubelet restart ensure that claimSize is set to accurate value
+	dswp.actualStateOfWorld.InitializeClaimSize(uniqueVolumeName, pvcStatusCap)
 }
 
 func getUniqueVolumeName(
@@ -395,12 +383,6 @@ func getUniqueVolumeName(
 		return "", false
 	}
 	return mountedVolume.VolumeName, true
-}
-
-func volumeRequiresFSResize(pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume) bool {
-	capacity := pvc.Status.Capacity[v1.ResourceStorage]
-	requested := pv.Spec.Capacity[v1.ResourceStorage]
-	return requested.Cmp(capacity) > 0
 }
 
 // podPreviouslyProcessed returns true if the volumes for this pod have already

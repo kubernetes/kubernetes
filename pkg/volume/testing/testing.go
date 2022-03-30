@@ -175,6 +175,7 @@ type FakeVolumePlugin struct {
 	LastProvisionerOptions VolumeOptions
 	NewAttacherCallCount   int
 	NewDetacherCallCount   int
+	NodeExpandCallCount    int
 	VolumeLimits           map[string]int64
 	VolumeLimitsError      error
 	LimitKey               string
@@ -471,6 +472,7 @@ func (plugin *FakeVolumePlugin) RequiresFSResize() bool {
 }
 
 func (plugin *FakeVolumePlugin) NodeExpand(resizeOptions NodeResizeOptions) (bool, error) {
+	plugin.NodeExpandCallCount++
 	if resizeOptions.VolumeSpec.Name() == FailWithInUseVolumeName {
 		return false, volumetypes.NewFailedPreconditionError("volume-in-use")
 	}

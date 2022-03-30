@@ -26,6 +26,8 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/resource"
+
 	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
@@ -579,6 +581,16 @@ func (asw *actualStateOfWorld) GetAttachState(
 	}
 
 	return AttachStateDetached
+}
+
+// SetVolumeClaimSize sets size of the volume. But this function should not be used from attach_detach controller.
+func (asw *actualStateOfWorld) InitializeClaimSize(volumeName v1.UniqueVolumeName, claimSize *resource.Quantity) {
+	klog.V(5).Infof("no-op InitializeClaimSize call in attach-detach controller.")
+}
+
+func (asw *actualStateOfWorld) GetClaimSize(volumeName v1.UniqueVolumeName) *resource.Quantity {
+	// not needed in attach-detach controller
+	return nil
 }
 
 func (asw *actualStateOfWorld) GetAttachedVolumes() []AttachedVolume {

@@ -1161,57 +1161,9 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			pv := &v1.PersistentVolume{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: tc.pvName,
-					UID:  "pvuid",
-				},
-				Spec: v1.PersistentVolumeSpec{
-					ClaimRef:   &v1.ObjectReference{Name: "pvc"},
-					VolumeMode: tc.volumeMode,
-					Capacity: v1.ResourceList{
-						v1.ResourceStorage: tc.oldPVSize,
-					},
-				},
-			}
-			pvc := &v1.PersistentVolumeClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "pvc",
-					UID:  "pvcuid",
-				},
-				Spec: v1.PersistentVolumeClaimSpec{
-					Resources: v1.ResourceRequirements{
-						Requests: v1.ResourceList{
-							v1.ResourceStorage: tc.pvcSize,
-						},
-					},
-					VolumeName: "pv",
-					VolumeMode: tc.volumeMode,
-				},
-				Status: v1.PersistentVolumeClaimStatus{
-					Capacity: v1.ResourceList{
-						v1.ResourceStorage: tc.pvcStatusSize,
-					},
-				},
-			}
-			pod := &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "pod1",
-					UID:  "pod1uid",
-				},
-				Spec: v1.PodSpec{
-					Volumes: []v1.Volume{
-						{
-							Name: "volume-name",
-							VolumeSource: v1.VolumeSource{
-								PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-									ClaimName: pvc.Name,
-								},
-							},
-						},
-					},
-				},
-			}
+			pv := getTestPV(tc.pvName, tc.volumeMode, tc.oldPVSize)
+			pvc := getTestPVC("pv", tc.volumeMode, tc.pvcSize, tc.pvcStatusSize)
+			pod := getTestPod(pvc.Name)
 
 			// deep copy before reconciler runs to avoid data race.
 			pvWithSize := pv.DeepCopy()
@@ -1284,10 +1236,12 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 			pvWithSize.Spec.Capacity[v1.ResourceStorage] = tc.newPVSize
 			volumeSpec = &volume.Spec{PersistentVolume: pvWithSize}
 			dsw.AddPodToVolume(podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
-			// mark volume as resize required
-			asw.MarkFSResizeRequired(volumeName, podName)
 
-			_, _, podExistErr := asw.PodExistsInVolume(podName, volumeName)
+			t.Logf("Changing size of the volume to %s", tc.newPVSize.String())
+			newSize := tc.newPVSize.DeepCopy()
+			dsw.UpdatePersistentVolumeSize(volumeName, &newSize)
+
+			_, _, podExistErr := asw.PodExistsInVolume(podName, volumeName, newSize)
 			if tc.expansionFailed {
 				if cache.IsFSResizeRequiredError(podExistErr) {
 					t.Fatalf("volume %s should not throw fsResizeRequired error: %v", volumeName, podExistErr)
@@ -1299,7 +1253,7 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 				go reconciler.Run(wait.NeverStop)
 
 				waitErr := retryWithExponentialBackOff(testOperationBackOffDuration, func() (done bool, err error) {
-					mounted, _, err := asw.PodExistsInVolume(podName, volumeName)
+					mounted, _, err := asw.PodExistsInVolume(podName, volumeName, newSize)
 					return mounted && err == nil, nil
 				})
 				if waitErr != nil {
@@ -1309,6 +1263,69 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 
 		})
 	}
+}
+
+func getTestPVC(pvName string, volumeMode *v1.PersistentVolumeMode, specSize, statusSize resource.Quantity) *v1.PersistentVolumeClaim {
+	pvc := &v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pvc",
+			UID:  "pvcuid",
+		},
+		Spec: v1.PersistentVolumeClaimSpec{
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceStorage: specSize,
+				},
+			},
+			VolumeName: pvName,
+			VolumeMode: volumeMode,
+		},
+		Status: v1.PersistentVolumeClaimStatus{
+			Capacity: v1.ResourceList{
+				v1.ResourceStorage: statusSize,
+			},
+		},
+	}
+	return pvc
+}
+
+func getTestPV(pvName string, volumeMode *v1.PersistentVolumeMode, pvSize resource.Quantity) *v1.PersistentVolume {
+	pv := &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: pvName,
+			UID:  "pvuid",
+		},
+		Spec: v1.PersistentVolumeSpec{
+			ClaimRef:   &v1.ObjectReference{Name: "pvc"},
+			VolumeMode: volumeMode,
+			Capacity: v1.ResourceList{
+				v1.ResourceStorage: pvSize,
+			},
+		},
+	}
+	return pv
+}
+
+func getTestPod(claimName string) *v1.Pod {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pod1",
+			UID:  "pod1uid",
+		},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					Name: "volume-name",
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: claimName,
+						},
+					},
+				},
+			},
+		},
+	}
+	return pod
 }
 
 func Test_UncertainDeviceGlobalMounts(t *testing.T) {
@@ -1791,7 +1808,7 @@ func waitForUncertainPodMount(t *testing.T, volumeName v1.UniqueVolumeName, podN
 	err := retryWithExponentialBackOff(
 		testOperationBackOffDuration,
 		func() (bool, error) {
-			mounted, _, err := asw.PodExistsInVolume(podName, volumeName)
+			mounted, _, err := asw.PodExistsInVolume(podName, volumeName, resource.Quantity{})
 			if mounted || err != nil {
 				return false, nil
 			}
