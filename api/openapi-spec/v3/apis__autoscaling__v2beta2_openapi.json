@@ -15,7 +15,11 @@
             "type": "string"
           },
           "target": {
-            "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.MetricTarget",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.MetricTarget"
+              }
+            ],
             "default": {},
             "description": "target specifies the target value for the given metric"
           }
@@ -36,7 +40,11 @@
             "type": "string"
           },
           "current": {
-            "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.MetricValueStatus",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.MetricValueStatus"
+              }
+            ],
             "default": {},
             "description": "current contains the current value for the given metric"
           },
@@ -81,12 +89,20 @@
         "description": "ExternalMetricSource indicates how to scale on a metric not associated with any Kubernetes object (for example length of queue in cloud messaging service, or QPS from loadbalancer running outside of cluster).",
         "properties": {
           "metric": {
-            "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.MetricIdentifier",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.MetricIdentifier"
+              }
+            ],
             "default": {},
             "description": "metric identifies the target metric by name and selector"
           },
           "target": {
-            "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.MetricTarget",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.MetricTarget"
+              }
+            ],
             "default": {},
             "description": "target specifies the target value for the given metric"
           }
@@ -101,12 +117,20 @@
         "description": "ExternalMetricStatus indicates the current value of a global metric not associated with any Kubernetes object.",
         "properties": {
           "current": {
-            "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.MetricValueStatus",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.MetricValueStatus"
+              }
+            ],
             "default": {},
             "description": "current contains the current value for the given metric"
           },
           "metric": {
-            "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.MetricIdentifier",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.MetricIdentifier"
+              }
+            ],
             "default": {},
             "description": "metric identifies the target metric by name and selector"
           }
@@ -151,7 +175,11 @@
           "policies": {
             "description": "policies is a list of potential scaling polices which can be used during scaling. At least one policy must be specified, otherwise the HPAScalingRules will be discarded as invalid",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.HPAScalingPolicy",
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.HPAScalingPolicy"
+                }
+              ],
               "default": {}
             },
             "type": "array"
@@ -180,17 +208,29 @@
             "type": "string"
           },
           "metadata": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+              }
+            ],
             "default": {},
             "description": "metadata is the standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
           },
           "spec": {
-            "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.HorizontalPodAutoscalerSpec",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.HorizontalPodAutoscalerSpec"
+              }
+            ],
             "default": {},
             "description": "spec is the specification for the behaviour of the autoscaler. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status."
           },
           "status": {
-            "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.HorizontalPodAutoscalerStatus",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.HorizontalPodAutoscalerStatus"
+              }
+            ],
             "default": {},
             "description": "status is the current information about the autoscaler."
           }
@@ -208,11 +248,19 @@
         "description": "HorizontalPodAutoscalerBehavior configures the scaling behavior of the target in both Up and Down directions (scaleUp and scaleDown fields respectively).",
         "properties": {
           "scaleDown": {
-            "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.HPAScalingRules",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.HPAScalingRules"
+              }
+            ],
             "description": "scaleDown is scaling policy for scaling Down. If not set, the default value is to allow to scale down to minReplicas pods, with a 300 second stabilization window (i.e., the highest recommendation for the last 300sec is used)."
           },
           "scaleUp": {
-            "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.HPAScalingRules",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.HPAScalingRules"
+              }
+            ],
             "description": "scaleUp is scaling policy for scaling Up. If not set, the default value is the higher of:\n  * increase no more than 4 pods per 60 seconds\n  * double the number of pods per 60 seconds\nNo stabilization is used."
           }
         },
@@ -222,7 +270,11 @@
         "description": "HorizontalPodAutoscalerCondition describes the state of a HorizontalPodAutoscaler at a certain point.",
         "properties": {
           "lastTransitionTime": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+              }
+            ],
             "default": {},
             "description": "lastTransitionTime is the last time the condition transitioned from one status to another"
           },
@@ -261,7 +313,11 @@
           "items": {
             "description": "items is the list of horizontal pod autoscaler objects.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.HorizontalPodAutoscaler",
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.HorizontalPodAutoscaler"
+                }
+              ],
               "default": {}
             },
             "type": "array"
@@ -271,7 +327,11 @@
             "type": "string"
           },
           "metadata": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
+              }
+            ],
             "default": {},
             "description": "metadata is the standard list metadata."
           }
@@ -292,7 +352,11 @@
         "description": "HorizontalPodAutoscalerSpec describes the desired functionality of the HorizontalPodAutoscaler.",
         "properties": {
           "behavior": {
-            "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.HorizontalPodAutoscalerBehavior",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.HorizontalPodAutoscalerBehavior"
+              }
+            ],
             "description": "behavior configures the scaling behavior of the target in both Up and Down directions (scaleUp and scaleDown fields respectively). If not set, the default HPAScalingRules for scale up and scale down are used."
           },
           "maxReplicas": {
@@ -304,7 +368,11 @@
           "metrics": {
             "description": "metrics contains the specifications for which to use to calculate the desired replica count (the maximum replica count across all metrics will be used).  The desired replica count is calculated multiplying the ratio between the target value and the current value by the current number of pods.  Ergo, metrics used must decrease as the pod count is increased, and vice-versa.  See the individual metric source types for more information about how each type of metric must respond. If not set, the default metric will be set to 80% average CPU utilization.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.MetricSpec",
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.MetricSpec"
+                }
+              ],
               "default": {}
             },
             "type": "array"
@@ -315,7 +383,11 @@
             "type": "integer"
           },
           "scaleTargetRef": {
-            "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.CrossVersionObjectReference",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.CrossVersionObjectReference"
+              }
+            ],
             "default": {},
             "description": "scaleTargetRef points to the target resource to scale, and is used to the pods for which metrics should be collected, as well as to actually change the replica count."
           }
@@ -332,7 +404,11 @@
           "conditions": {
             "description": "conditions is the set of conditions required for this autoscaler to scale its target, and indicates whether or not those conditions are met.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.HorizontalPodAutoscalerCondition",
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.HorizontalPodAutoscalerCondition"
+                }
+              ],
               "default": {}
             },
             "type": "array"
@@ -340,7 +416,11 @@
           "currentMetrics": {
             "description": "currentMetrics is the last read state of the metrics used by this autoscaler.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.MetricStatus",
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.MetricStatus"
+                }
+              ],
               "default": {}
             },
             "type": "array"
@@ -358,7 +438,11 @@
             "type": "integer"
           },
           "lastScaleTime": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+              }
+            ],
             "description": "lastScaleTime is the last time the HorizontalPodAutoscaler scaled the number of pods, used by the autoscaler to control how often the number of pods is changed."
           },
           "observedGeneration": {
@@ -382,7 +466,11 @@
             "type": "string"
           },
           "selector": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"
+              }
+            ],
             "description": "selector is the string-encoded form of a standard kubernetes label selector for the given metric When set, it is passed as an additional parameter to the metrics server for more specific metrics scoping. When unset, just the metricName will be used to gather metrics."
           }
         },
@@ -395,23 +483,43 @@
         "description": "MetricSpec specifies how to scale based on a single metric (only `type` and one other matching field should be set at once).",
         "properties": {
           "containerResource": {
-            "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.ContainerResourceMetricSource",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.ContainerResourceMetricSource"
+              }
+            ],
             "description": "container resource refers to a resource metric (such as those specified in requests and limits) known to Kubernetes describing a single container in each pod of the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source. This is an alpha feature and can be enabled by the HPAContainerMetrics feature flag."
           },
           "external": {
-            "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.ExternalMetricSource",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.ExternalMetricSource"
+              }
+            ],
             "description": "external refers to a global metric that is not associated with any Kubernetes object. It allows autoscaling based on information coming from components running outside of cluster (for example length of queue in cloud messaging service, or QPS from loadbalancer running outside of cluster)."
           },
           "object": {
-            "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.ObjectMetricSource",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.ObjectMetricSource"
+              }
+            ],
             "description": "object refers to a metric describing a single kubernetes object (for example, hits-per-second on an Ingress object)."
           },
           "pods": {
-            "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.PodsMetricSource",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.PodsMetricSource"
+              }
+            ],
             "description": "pods refers to a metric describing each pod in the current scale target (for example, transactions-processed-per-second).  The values will be averaged together before being compared to the target value."
           },
           "resource": {
-            "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.ResourceMetricSource",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.ResourceMetricSource"
+              }
+            ],
             "description": "resource refers to a resource metric (such as those specified in requests and limits) known to Kubernetes describing each pod in the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source."
           },
           "type": {
@@ -429,23 +537,43 @@
         "description": "MetricStatus describes the last-read state of a single metric.",
         "properties": {
           "containerResource": {
-            "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.ContainerResourceMetricStatus",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.ContainerResourceMetricStatus"
+              }
+            ],
             "description": "container resource refers to a resource metric (such as those specified in requests and limits) known to Kubernetes describing a single container in each pod in the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source."
           },
           "external": {
-            "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.ExternalMetricStatus",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.ExternalMetricStatus"
+              }
+            ],
             "description": "external refers to a global metric that is not associated with any Kubernetes object. It allows autoscaling based on information coming from components running outside of cluster (for example length of queue in cloud messaging service, or QPS from loadbalancer running outside of cluster)."
           },
           "object": {
-            "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.ObjectMetricStatus",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.ObjectMetricStatus"
+              }
+            ],
             "description": "object refers to a metric describing a single kubernetes object (for example, hits-per-second on an Ingress object)."
           },
           "pods": {
-            "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.PodsMetricStatus",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.PodsMetricStatus"
+              }
+            ],
             "description": "pods refers to a metric describing each pod in the current scale target (for example, transactions-processed-per-second).  The values will be averaged together before being compared to the target value."
           },
           "resource": {
-            "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.ResourceMetricStatus",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.ResourceMetricStatus"
+              }
+            ],
             "description": "resource refers to a resource metric (such as those specified in requests and limits) known to Kubernetes describing each pod in the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source."
           },
           "type": {
@@ -468,7 +596,11 @@
             "type": "integer"
           },
           "averageValue": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
+              }
+            ],
             "description": "averageValue is the target value of the average of the metric across all relevant pods (as a quantity)"
           },
           "type": {
@@ -477,7 +609,11 @@
             "type": "string"
           },
           "value": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
+              }
+            ],
             "description": "value is the target value of the metric (as a quantity)."
           }
         },
@@ -495,11 +631,19 @@
             "type": "integer"
           },
           "averageValue": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
+              }
+            ],
             "description": "averageValue is the current value of the average of the metric across all relevant pods (as a quantity)"
           },
           "value": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
+              }
+            ],
             "description": "value is the current value of the metric (as a quantity)."
           }
         },
@@ -509,16 +653,28 @@
         "description": "ObjectMetricSource indicates how to scale on a metric describing a kubernetes object (for example, hits-per-second on an Ingress object).",
         "properties": {
           "describedObject": {
-            "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.CrossVersionObjectReference",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.CrossVersionObjectReference"
+              }
+            ],
             "default": {}
           },
           "metric": {
-            "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.MetricIdentifier",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.MetricIdentifier"
+              }
+            ],
             "default": {},
             "description": "metric identifies the target metric by name and selector"
           },
           "target": {
-            "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.MetricTarget",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.MetricTarget"
+              }
+            ],
             "default": {},
             "description": "target specifies the target value for the given metric"
           }
@@ -534,16 +690,28 @@
         "description": "ObjectMetricStatus indicates the current value of a metric describing a kubernetes object (for example, hits-per-second on an Ingress object).",
         "properties": {
           "current": {
-            "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.MetricValueStatus",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.MetricValueStatus"
+              }
+            ],
             "default": {},
             "description": "current contains the current value for the given metric"
           },
           "describedObject": {
-            "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.CrossVersionObjectReference",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.CrossVersionObjectReference"
+              }
+            ],
             "default": {}
           },
           "metric": {
-            "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.MetricIdentifier",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.MetricIdentifier"
+              }
+            ],
             "default": {},
             "description": "metric identifies the target metric by name and selector"
           }
@@ -559,12 +727,20 @@
         "description": "PodsMetricSource indicates how to scale on a metric describing each pod in the current scale target (for example, transactions-processed-per-second). The values will be averaged together before being compared to the target value.",
         "properties": {
           "metric": {
-            "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.MetricIdentifier",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.MetricIdentifier"
+              }
+            ],
             "default": {},
             "description": "metric identifies the target metric by name and selector"
           },
           "target": {
-            "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.MetricTarget",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.MetricTarget"
+              }
+            ],
             "default": {},
             "description": "target specifies the target value for the given metric"
           }
@@ -579,12 +755,20 @@
         "description": "PodsMetricStatus indicates the current value of a metric describing each pod in the current scale target (for example, transactions-processed-per-second).",
         "properties": {
           "current": {
-            "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.MetricValueStatus",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.MetricValueStatus"
+              }
+            ],
             "default": {},
             "description": "current contains the current value for the given metric"
           },
           "metric": {
-            "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.MetricIdentifier",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.MetricIdentifier"
+              }
+            ],
             "default": {},
             "description": "metric identifies the target metric by name and selector"
           }
@@ -604,7 +788,11 @@
             "type": "string"
           },
           "target": {
-            "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.MetricTarget",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.MetricTarget"
+              }
+            ],
             "default": {},
             "description": "target specifies the target value for the given metric"
           }
@@ -619,7 +807,11 @@
         "description": "ResourceMetricStatus indicates the current value of a resource metric known to Kubernetes, as specified in requests and limits, describing each pod in the current scale target (e.g. CPU or memory).  Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.",
         "properties": {
           "current": {
-            "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.MetricValueStatus",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.MetricValueStatus"
+              }
+            ],
             "default": {},
             "description": "current contains the current value for the given metric"
           },
@@ -734,7 +926,11 @@
           "resources": {
             "description": "resources contains the name of the resources and if they are namespaced.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResource",
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResource"
+                }
+              ],
               "default": {}
             },
             "type": "array"
@@ -782,7 +978,11 @@
             "type": "boolean"
           },
           "preconditions": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Preconditions",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Preconditions"
+              }
+            ],
             "description": "Must be fulfilled before a deletion is carried out. If not possible, a 409 Conflict status will be returned."
           },
           "propagationPolicy": {
@@ -1064,7 +1264,11 @@
           "matchExpressions": {
             "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelectorRequirement",
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelectorRequirement"
+                }
+              ],
               "default": {}
             },
             "type": "array"
@@ -1146,7 +1350,11 @@
             "type": "string"
           },
           "fieldsV1": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.FieldsV1",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.FieldsV1"
+              }
+            ],
             "description": "FieldsV1 holds the first JSON version format as described in the \"FieldsV1\" type."
           },
           "manager": {
@@ -1162,7 +1370,11 @@
             "type": "string"
           },
           "time": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+              }
+            ],
             "description": "Time is the timestamp of when the ManagedFields entry was added. The timestamp will also be updated if a field is added, the manager changes any of the owned fields value or removes a field. The timestamp does not update when a field is removed from the entry because another manager took it over."
           }
         },
@@ -1184,7 +1396,11 @@
             "type": "string"
           },
           "creationTimestamp": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+              }
+            ],
             "default": {},
             "description": "CreationTimestamp is a timestamp representing the server time when this object was created. It is not guaranteed to be set in happens-before order across separate operations. Clients may not set this value. It is represented in RFC3339 form and is in UTC.\n\nPopulated by the system. Read-only. Null for lists. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
           },
@@ -1194,7 +1410,11 @@
             "type": "integer"
           },
           "deletionTimestamp": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+              }
+            ],
             "description": "DeletionTimestamp is RFC 3339 date and time at which this resource will be deleted. This field is set by the server when a graceful deletion is requested by the user, and is not directly settable by a client. The resource is expected to be deleted (no longer visible from resource lists, and not reachable by name) after the time in this field, once the finalizers list is empty. As long as the finalizers list contains items, deletion is blocked. Once the deletionTimestamp is set, this value may not be unset or be set further into the future, although it may be shortened or the resource may be deleted prior to this time. For example, a user may request that a pod is deleted in 30 seconds. The Kubelet will react by sending a graceful termination signal to the containers in the pod. After that 30 seconds, the Kubelet will send a hard termination signal (SIGKILL) to the container and after cleanup, remove the pod from the API. In the presence of network partitions, this object may still exist after this timestamp, until an administrator or automated process can determine the resource is fully terminated. If not set, graceful deletion of the object has not been requested.\n\nPopulated by the system when a graceful deletion is requested. Read-only. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
           },
           "finalizers": {
@@ -1226,7 +1446,11 @@
           "managedFields": {
             "description": "ManagedFields maps workflow-id and version to the set of fields that are managed by that workflow. This is mostly for internal housekeeping, and users typically shouldn't need to set or understand this field. A workflow can be the user's name, a controller's name, or the name of a specific apply path like \"ci-cd\". The set of fields is always in the version that the workflow used when modifying the object.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ManagedFieldsEntry",
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ManagedFieldsEntry"
+                }
+              ],
               "default": {}
             },
             "type": "array"
@@ -1242,7 +1466,11 @@
           "ownerReferences": {
             "description": "List of objects depended by this object. If ALL objects in the list have been deleted, this object will be garbage collected. If this object is managed by a controller, then an entry in this list will point to this controller, with the controller field set to true. There cannot be more than one managing controller.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.OwnerReference",
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.OwnerReference"
+                }
+              ],
               "default": {}
             },
             "type": "array",
@@ -1336,7 +1564,11 @@
             "type": "integer"
           },
           "details": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.StatusDetails",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.StatusDetails"
+              }
+            ],
             "description": "Extended data associated with the reason.  Each reason may define its own extended details. This field is optional and the data returned is not guaranteed to conform to any schema except that defined by the reason type."
           },
           "kind": {
@@ -1348,7 +1580,11 @@
             "type": "string"
           },
           "metadata": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
+              }
+            ],
             "default": {},
             "description": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds"
           },
@@ -1394,7 +1630,11 @@
           "causes": {
             "description": "The Causes array includes more details associated with the StatusReason failure. Not all StatusReasons may provide detailed causes.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.StatusCause",
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.StatusCause"
+                }
+              ],
               "default": {}
             },
             "type": "array"
@@ -1432,7 +1672,11 @@
         "description": "Event represents a single event to a watched resource.",
         "properties": {
           "object": {
-            "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.runtime.RawExtension",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.runtime.RawExtension"
+              }
+            ],
             "default": {},
             "description": "Object is:\n * If Type is Added or Modified: the new state of the object.\n * If Type is Deleted: the state of the object immediately before deletion.\n * If Type is Error: *Status is recommended; other types may make sense\n   depending on context."
           },
@@ -1713,6 +1957,14 @@
         "description": "RawExtension is used to hold extensions in external versions.\n\nTo use this, make a field which has RawExtension as its type in your external, versioned struct, and Object in your internal struct. You also need to register your various plugin types.\n\n// Internal package: type MyAPIObject struct {\n\truntime.TypeMeta `json:\",inline\"`\n\tMyPlugin runtime.Object `json:\"myPlugin\"`\n} type PluginA struct {\n\tAOption string `json:\"aOption\"`\n}\n\n// External package: type MyAPIObject struct {\n\truntime.TypeMeta `json:\",inline\"`\n\tMyPlugin runtime.RawExtension `json:\"myPlugin\"`\n} type PluginA struct {\n\tAOption string `json:\"aOption\"`\n}\n\n// On the wire, the JSON will look something like this: {\n\t\"kind\":\"MyAPIObject\",\n\t\"apiVersion\":\"v1\",\n\t\"myPlugin\": {\n\t\t\"kind\":\"PluginA\",\n\t\t\"aOption\":\"foo\",\n\t},\n}\n\nSo what happens? Decode first uses json or yaml to unmarshal the serialized data into your external MyAPIObject. That causes the raw JSON to be stored, but not unpacked. The next step is to copy (using pkg/conversion) into the internal struct. The runtime package's DefaultScheme has conversion functions installed which will unpack the JSON stored in RawExtension, turning it into the correct object type, and storing it in the Object. (TODO: In the case where the object is of an unknown type, a runtime.Unknown object will be created and stored.)",
         "type": "object"
       }
+    },
+    "securitySchemes": {
+      "BearerToken": {
+        "description": "Bearer Token authentication",
+        "in": "header",
+        "name": "authorization",
+        "type": "apiKey"
+      }
     }
   },
   "info": {
@@ -1745,6 +1997,9 @@
               }
             },
             "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         },
         "tags": [
@@ -1786,11 +2041,20 @@
               }
             },
             "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         },
         "tags": [
           "autoscaling_v2beta2"
-        ]
+        ],
+        "x-kubernetes-action": "list",
+        "x-kubernetes-group-version-kind": {
+          "group": "autoscaling",
+          "kind": "HorizontalPodAutoscaler",
+          "version": "v2beta2"
+        }
       },
       "parameters": [
         {
@@ -1891,9 +2155,54 @@
         "operationId": "deleteAutoscalingV2beta2CollectionNamespacedHorizontalPodAutoscaler",
         "parameters": [
           {
+            "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server, the server will respond with a 410 ResourceExpired error together with a continue token. If the client needs a consistent list, it must restart their list without the continue field. Otherwise, the client may send another list request with the token received with the 410 error, the server will respond with a list starting from the next key, but from the latest snapshot, which is inconsistent from the previous list results - objects that are created, modified, or deleted after the first list request will be included in the response, as long as their keys are after the \"next key\".\n\nThis field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
+            "in": "query",
+            "name": "continue",
+            "schema": {
+              "type": "string",
+              "uniqueItems": true
+            }
+          },
+          {
+            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+            "in": "query",
+            "name": "dryRun",
+            "schema": {
+              "type": "string",
+              "uniqueItems": true
+            }
+          },
+          {
+            "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+            "in": "query",
+            "name": "fieldSelector",
+            "schema": {
+              "type": "string",
+              "uniqueItems": true
+            }
+          },
+          {
             "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
             "in": "query",
             "name": "gracePeriodSeconds",
+            "schema": {
+              "type": "integer",
+              "uniqueItems": true
+            }
+          },
+          {
+            "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+            "in": "query",
+            "name": "labelSelector",
+            "schema": {
+              "type": "string",
+              "uniqueItems": true
+            }
+          },
+          {
+            "description": "limit is a maximum number of responses to return for a list call. If more items exist, the server will set the `continue` field on the list metadata to a value that can be used with the same initial query to retrieve the next set of results. Setting a limit may return fewer than the requested amount of items (up to zero items) in the event all requested objects are filtered out and clients should only use the presence of the continue field to determine whether more results are available. Servers may choose not to support the limit argument and will return all of the available results. If limit is specified and the continue field is empty, clients may assume that no more results are available. This field is not supported if watch is true.\n\nThe server guarantees that the objects returned when using continue will be identical to issuing a single list call without a limit - that is, no objects created, modified, or deleted after the first request is issued will be included in any subsequent continued requests. This is sometimes referred to as a consistent snapshot, and ensures that a client that is using limit to receive smaller chunks of a very large result can ensure they see all possible objects. If objects are updated during a chunked list the version of the object that was present at the time the first list result was calculated is returned.",
+            "in": "query",
+            "name": "limit",
             "schema": {
               "type": "integer",
               "uniqueItems": true
@@ -1912,33 +2221,6 @@
             "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy. Acceptable values are: 'Orphan' - orphan the dependents; 'Background' - allow the garbage collector to delete the dependents in the background; 'Foreground' - a cascading policy that deletes all dependents in the foreground.",
             "in": "query",
             "name": "propagationPolicy",
-            "schema": {
-              "type": "string",
-              "uniqueItems": true
-            }
-          },
-          {
-            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
-            "in": "query",
-            "name": "dryRun",
-            "schema": {
-              "type": "string",
-              "uniqueItems": true
-            }
-          },
-          {
-            "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
-            "in": "query",
-            "name": "labelSelector",
-            "schema": {
-              "type": "string",
-              "uniqueItems": true
-            }
-          },
-          {
-            "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
-            "in": "query",
-            "name": "fieldSelector",
             "schema": {
               "type": "string",
               "uniqueItems": true
@@ -1970,29 +2252,11 @@
               "type": "integer",
               "uniqueItems": true
             }
-          },
-          {
-            "description": "limit is a maximum number of responses to return for a list call. If more items exist, the server will set the `continue` field on the list metadata to a value that can be used with the same initial query to retrieve the next set of results. Setting a limit may return fewer than the requested amount of items (up to zero items) in the event all requested objects are filtered out and clients should only use the presence of the continue field to determine whether more results are available. Servers may choose not to support the limit argument and will return all of the available results. If limit is specified and the continue field is empty, clients may assume that no more results are available. This field is not supported if watch is true.\n\nThe server guarantees that the objects returned when using continue will be identical to issuing a single list call without a limit - that is, no objects created, modified, or deleted after the first request is issued will be included in any subsequent continued requests. This is sometimes referred to as a consistent snapshot, and ensures that a client that is using limit to receive smaller chunks of a very large result can ensure they see all possible objects. If objects are updated during a chunked list the version of the object that was present at the time the first list result was calculated is returned.",
-            "in": "query",
-            "name": "limit",
-            "schema": {
-              "type": "integer",
-              "uniqueItems": true
-            }
-          },
-          {
-            "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server, the server will respond with a 410 ResourceExpired error together with a continue token. If the client needs a consistent list, it must restart their list without the continue field. Otherwise, the client may send another list request with the token received with the 410 error, the server will respond with a list starting from the next key, but from the latest snapshot, which is inconsistent from the previous list results - objects that are created, modified, or deleted after the first list request will be included in the response, as long as their keys are after the \"next key\".\n\nThis field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
-            "in": "query",
-            "name": "continue",
-            "schema": {
-              "type": "string",
-              "uniqueItems": true
-            }
           }
         ],
         "requestBody": {
           "content": {
-            "application/json": {
+            "*/*": {
               "schema": {
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
               }
@@ -2019,20 +2283,38 @@
               }
             },
             "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         },
         "tags": [
           "autoscaling_v2beta2"
-        ]
+        ],
+        "x-kubernetes-action": "deletecollection",
+        "x-kubernetes-group-version-kind": {
+          "group": "autoscaling",
+          "kind": "HorizontalPodAutoscaler",
+          "version": "v2beta2"
+        }
       },
       "get": {
         "description": "list or watch objects of kind HorizontalPodAutoscaler",
         "operationId": "listAutoscalingV2beta2NamespacedHorizontalPodAutoscaler",
         "parameters": [
           {
-            "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+            "description": "allowWatchBookmarks requests watch events with type \"BOOKMARK\". Servers that do not implement bookmarks may ignore this flag and bookmarks are sent at the server's discretion. Clients should not assume bookmarks are returned at any specific interval, nor may they assume the server will send any BOOKMARK event during a session. If this is not a watch, this field is ignored.",
             "in": "query",
-            "name": "labelSelector",
+            "name": "allowWatchBookmarks",
+            "schema": {
+              "type": "boolean",
+              "uniqueItems": true
+            }
+          },
+          {
+            "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server, the server will respond with a 410 ResourceExpired error together with a continue token. If the client needs a consistent list, it must restart their list without the continue field. Otherwise, the client may send another list request with the token received with the 410 error, the server will respond with a list starting from the next key, but from the latest snapshot, which is inconsistent from the previous list results - objects that are created, modified, or deleted after the first list request will be included in the response, as long as their keys are after the \"next key\".\n\nThis field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
+            "in": "query",
+            "name": "continue",
             "schema": {
               "type": "string",
               "uniqueItems": true
@@ -2048,20 +2330,20 @@
             }
           },
           {
-            "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+            "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
             "in": "query",
-            "name": "watch",
+            "name": "labelSelector",
             "schema": {
-              "type": "boolean",
+              "type": "string",
               "uniqueItems": true
             }
           },
           {
-            "description": "allowWatchBookmarks requests watch events with type \"BOOKMARK\". Servers that do not implement bookmarks may ignore this flag and bookmarks are sent at the server's discretion. Clients should not assume bookmarks are returned at any specific interval, nor may they assume the server will send any BOOKMARK event during a session. If this is not a watch, this field is ignored.",
+            "description": "limit is a maximum number of responses to return for a list call. If more items exist, the server will set the `continue` field on the list metadata to a value that can be used with the same initial query to retrieve the next set of results. Setting a limit may return fewer than the requested amount of items (up to zero items) in the event all requested objects are filtered out and clients should only use the presence of the continue field to determine whether more results are available. Servers may choose not to support the limit argument and will return all of the available results. If limit is specified and the continue field is empty, clients may assume that no more results are available. This field is not supported if watch is true.\n\nThe server guarantees that the objects returned when using continue will be identical to issuing a single list call without a limit - that is, no objects created, modified, or deleted after the first request is issued will be included in any subsequent continued requests. This is sometimes referred to as a consistent snapshot, and ensures that a client that is using limit to receive smaller chunks of a very large result can ensure they see all possible objects. If objects are updated during a chunked list the version of the object that was present at the time the first list result was calculated is returned.",
             "in": "query",
-            "name": "allowWatchBookmarks",
+            "name": "limit",
             "schema": {
-              "type": "boolean",
+              "type": "integer",
               "uniqueItems": true
             }
           },
@@ -2093,20 +2375,11 @@
             }
           },
           {
-            "description": "limit is a maximum number of responses to return for a list call. If more items exist, the server will set the `continue` field on the list metadata to a value that can be used with the same initial query to retrieve the next set of results. Setting a limit may return fewer than the requested amount of items (up to zero items) in the event all requested objects are filtered out and clients should only use the presence of the continue field to determine whether more results are available. Servers may choose not to support the limit argument and will return all of the available results. If limit is specified and the continue field is empty, clients may assume that no more results are available. This field is not supported if watch is true.\n\nThe server guarantees that the objects returned when using continue will be identical to issuing a single list call without a limit - that is, no objects created, modified, or deleted after the first request is issued will be included in any subsequent continued requests. This is sometimes referred to as a consistent snapshot, and ensures that a client that is using limit to receive smaller chunks of a very large result can ensure they see all possible objects. If objects are updated during a chunked list the version of the object that was present at the time the first list result was calculated is returned.",
+            "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
             "in": "query",
-            "name": "limit",
+            "name": "watch",
             "schema": {
-              "type": "integer",
-              "uniqueItems": true
-            }
-          },
-          {
-            "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server, the server will respond with a 410 ResourceExpired error together with a continue token. If the client needs a consistent list, it must restart their list without the continue field. Otherwise, the client may send another list request with the token received with the 410 error, the server will respond with a list starting from the next key, but from the latest snapshot, which is inconsistent from the previous list results - objects that are created, modified, or deleted after the first list request will be included in the response, as long as their keys are after the \"next key\".\n\nThis field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
-            "in": "query",
-            "name": "continue",
-            "schema": {
-              "type": "string",
+              "type": "boolean",
               "uniqueItems": true
             }
           }
@@ -2141,11 +2414,20 @@
               }
             },
             "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         },
         "tags": [
           "autoscaling_v2beta2"
-        ]
+        ],
+        "x-kubernetes-action": "list",
+        "x-kubernetes-group-version-kind": {
+          "group": "autoscaling",
+          "kind": "HorizontalPodAutoscaler",
+          "version": "v2beta2"
+        }
       },
       "parameters": [
         {
@@ -2202,7 +2484,7 @@
         ],
         "requestBody": {
           "content": {
-            "application/json": {
+            "*/*": {
               "schema": {
                 "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.HorizontalPodAutoscaler"
               }
@@ -2269,11 +2551,20 @@
               }
             },
             "description": "Accepted"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         },
         "tags": [
           "autoscaling_v2beta2"
-        ]
+        ],
+        "x-kubernetes-action": "post",
+        "x-kubernetes-group-version-kind": {
+          "group": "autoscaling",
+          "kind": "HorizontalPodAutoscaler",
+          "version": "v2beta2"
+        }
       }
     },
     "/apis/autoscaling/v2beta2/namespaces/{namespace}/horizontalpodautoscalers/{name}": {
@@ -2281,6 +2572,15 @@
         "description": "delete a HorizontalPodAutoscaler",
         "operationId": "deleteAutoscalingV2beta2NamespacedHorizontalPodAutoscaler",
         "parameters": [
+          {
+            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+            "in": "query",
+            "name": "dryRun",
+            "schema": {
+              "type": "string",
+              "uniqueItems": true
+            }
+          },
           {
             "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
             "in": "query",
@@ -2307,20 +2607,11 @@
               "type": "string",
               "uniqueItems": true
             }
-          },
-          {
-            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
-            "in": "query",
-            "name": "dryRun",
-            "schema": {
-              "type": "string",
-              "uniqueItems": true
-            }
           }
         ],
         "requestBody": {
           "content": {
-            "application/json": {
+            "*/*": {
               "schema": {
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
               }
@@ -2367,11 +2658,20 @@
               }
             },
             "description": "Accepted"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         },
         "tags": [
           "autoscaling_v2beta2"
-        ]
+        ],
+        "x-kubernetes-action": "delete",
+        "x-kubernetes-group-version-kind": {
+          "group": "autoscaling",
+          "kind": "HorizontalPodAutoscaler",
+          "version": "v2beta2"
+        }
       },
       "get": {
         "description": "read the specified HorizontalPodAutoscaler",
@@ -2396,11 +2696,20 @@
               }
             },
             "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         },
         "tags": [
           "autoscaling_v2beta2"
-        ]
+        ],
+        "x-kubernetes-action": "get",
+        "x-kubernetes-group-version-kind": {
+          "group": "autoscaling",
+          "kind": "HorizontalPodAutoscaler",
+          "version": "v2beta2"
+        }
       },
       "parameters": [
         {
@@ -2447,15 +2756,6 @@
             }
           },
           {
-            "description": "Force is going to \"force\" Apply requests. It means user will re-acquire conflicting fields owned by other people. Force flag must be unset for non-apply patch requests.",
-            "in": "query",
-            "name": "force",
-            "schema": {
-              "type": "boolean",
-              "uniqueItems": true
-            }
-          },
-          {
             "description": "fieldManager is a name associated with the actor or entity that is making these changes. The value must be less than or 128 characters long, and only contain printable characters, as defined by https://golang.org/pkg/unicode/#IsPrint. This field is required for apply requests (application/apply-patch) but optional for non-apply patch types (JsonPatch, MergePatch, StrategicMergePatch).",
             "in": "query",
             "name": "fieldManager",
@@ -2472,11 +2772,35 @@
               "type": "string",
               "uniqueItems": true
             }
+          },
+          {
+            "description": "Force is going to \"force\" Apply requests. It means user will re-acquire conflicting fields owned by other people. Force flag must be unset for non-apply patch requests.",
+            "in": "query",
+            "name": "force",
+            "schema": {
+              "type": "boolean",
+              "uniqueItems": true
+            }
           }
         ],
         "requestBody": {
           "content": {
-            "application/json": {
+            "application/apply-patch+yaml": {
+              "schema": {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+              }
+            },
+            "application/json-patch+json": {
+              "schema": {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+              }
+            },
+            "application/merge-patch+json": {
+              "schema": {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+              }
+            },
+            "application/strategic-merge-patch+json": {
               "schema": {
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
@@ -2523,11 +2847,20 @@
               }
             },
             "description": "Created"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         },
         "tags": [
           "autoscaling_v2beta2"
-        ]
+        ],
+        "x-kubernetes-action": "patch",
+        "x-kubernetes-group-version-kind": {
+          "group": "autoscaling",
+          "kind": "HorizontalPodAutoscaler",
+          "version": "v2beta2"
+        }
       },
       "put": {
         "description": "replace the specified HorizontalPodAutoscaler",
@@ -2563,7 +2896,7 @@
         ],
         "requestBody": {
           "content": {
-            "application/json": {
+            "*/*": {
               "schema": {
                 "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.HorizontalPodAutoscaler"
               }
@@ -2610,11 +2943,20 @@
               }
             },
             "description": "Created"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         },
         "tags": [
           "autoscaling_v2beta2"
-        ]
+        ],
+        "x-kubernetes-action": "put",
+        "x-kubernetes-group-version-kind": {
+          "group": "autoscaling",
+          "kind": "HorizontalPodAutoscaler",
+          "version": "v2beta2"
+        }
       }
     },
     "/apis/autoscaling/v2beta2/namespaces/{namespace}/horizontalpodautoscalers/{name}/status": {
@@ -2641,11 +2983,20 @@
               }
             },
             "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         },
         "tags": [
           "autoscaling_v2beta2"
-        ]
+        ],
+        "x-kubernetes-action": "get",
+        "x-kubernetes-group-version-kind": {
+          "group": "autoscaling",
+          "kind": "HorizontalPodAutoscaler",
+          "version": "v2beta2"
+        }
       },
       "parameters": [
         {
@@ -2692,15 +3043,6 @@
             }
           },
           {
-            "description": "Force is going to \"force\" Apply requests. It means user will re-acquire conflicting fields owned by other people. Force flag must be unset for non-apply patch requests.",
-            "in": "query",
-            "name": "force",
-            "schema": {
-              "type": "boolean",
-              "uniqueItems": true
-            }
-          },
-          {
             "description": "fieldManager is a name associated with the actor or entity that is making these changes. The value must be less than or 128 characters long, and only contain printable characters, as defined by https://golang.org/pkg/unicode/#IsPrint. This field is required for apply requests (application/apply-patch) but optional for non-apply patch types (JsonPatch, MergePatch, StrategicMergePatch).",
             "in": "query",
             "name": "fieldManager",
@@ -2717,11 +3059,35 @@
               "type": "string",
               "uniqueItems": true
             }
+          },
+          {
+            "description": "Force is going to \"force\" Apply requests. It means user will re-acquire conflicting fields owned by other people. Force flag must be unset for non-apply patch requests.",
+            "in": "query",
+            "name": "force",
+            "schema": {
+              "type": "boolean",
+              "uniqueItems": true
+            }
           }
         ],
         "requestBody": {
           "content": {
-            "application/json": {
+            "application/apply-patch+yaml": {
+              "schema": {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+              }
+            },
+            "application/json-patch+json": {
+              "schema": {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+              }
+            },
+            "application/merge-patch+json": {
+              "schema": {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+              }
+            },
+            "application/strategic-merge-patch+json": {
               "schema": {
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
               }
@@ -2768,11 +3134,20 @@
               }
             },
             "description": "Created"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         },
         "tags": [
           "autoscaling_v2beta2"
-        ]
+        ],
+        "x-kubernetes-action": "patch",
+        "x-kubernetes-group-version-kind": {
+          "group": "autoscaling",
+          "kind": "HorizontalPodAutoscaler",
+          "version": "v2beta2"
+        }
       },
       "put": {
         "description": "replace status of the specified HorizontalPodAutoscaler",
@@ -2808,7 +3183,7 @@
         ],
         "requestBody": {
           "content": {
-            "application/json": {
+            "*/*": {
               "schema": {
                 "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2beta2.HorizontalPodAutoscaler"
               }
@@ -2855,11 +3230,20 @@
               }
             },
             "description": "Created"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         },
         "tags": [
           "autoscaling_v2beta2"
-        ]
+        ],
+        "x-kubernetes-action": "put",
+        "x-kubernetes-group-version-kind": {
+          "group": "autoscaling",
+          "kind": "HorizontalPodAutoscaler",
+          "version": "v2beta2"
+        }
       }
     },
     "/apis/autoscaling/v2beta2/watch/horizontalpodautoscalers": {
@@ -2896,11 +3280,20 @@
               }
             },
             "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         },
         "tags": [
           "autoscaling_v2beta2"
-        ]
+        ],
+        "x-kubernetes-action": "watchlist",
+        "x-kubernetes-group-version-kind": {
+          "group": "autoscaling",
+          "kind": "HorizontalPodAutoscaler",
+          "version": "v2beta2"
+        }
       },
       "parameters": [
         {
@@ -3029,11 +3422,20 @@
               }
             },
             "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         },
         "tags": [
           "autoscaling_v2beta2"
-        ]
+        ],
+        "x-kubernetes-action": "watchlist",
+        "x-kubernetes-group-version-kind": {
+          "group": "autoscaling",
+          "kind": "HorizontalPodAutoscaler",
+          "version": "v2beta2"
+        }
       },
       "parameters": [
         {
@@ -3172,11 +3574,20 @@
               }
             },
             "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         },
         "tags": [
           "autoscaling_v2beta2"
-        ]
+        ],
+        "x-kubernetes-action": "watch",
+        "x-kubernetes-group-version-kind": {
+          "group": "autoscaling",
+          "kind": "HorizontalPodAutoscaler",
+          "version": "v2beta2"
+        }
       },
       "parameters": [
         {

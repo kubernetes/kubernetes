@@ -23,10 +23,15 @@ import (
 
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/klog/v2"
 	"k8s.io/kube-openapi/pkg/handler3"
-	"k8s.io/kube-openapi/pkg/spec3"
 )
+
+type NotFoundError struct {
+}
+
+func (e *NotFoundError) Error() string {
+	return ""
+}
 
 // Downloader is the OpenAPI downloader type. It will try to download spec from /openapi/v3 and /openap/v3/<group>/<version> endpoints.
 type Downloader struct {
@@ -44,112 +49,29 @@ func (s *Downloader) handlerWithUser(handler http.Handler, info user.Info) http.
 	})
 }
 
-// SpecETag is a OpenAPI v3 spec and etag pair for the endpoint of each OpenAPI group/version
-type SpecETag struct {
-	spec *spec3.OpenAPI
-	etag string
-}
-
 // OpenAPIV3Root downloads the OpenAPI V3 root document from an APIService
-func (s *Downloader) OpenAPIV3Root(handler http.Handler) (*handler3.OpenAPIV3Discovery, error) {
+func (s *Downloader) OpenAPIV3Root(handler http.Handler) (*handler3.OpenAPIV3Discovery, int, error) {
 	handler = s.handlerWithUser(handler, &user.DefaultInfo{Name: aggregatorUser})
 	handler = http.TimeoutHandler(handler, specDownloadTimeout, "request timed out")
 
 	req, err := http.NewRequest("GET", "/openapi/v3", nil)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	req.Header.Add("Accept", "application/json")
-
 	writer := newInMemoryResponseWriter()
 	handler.ServeHTTP(writer, req)
 
 	switch writer.respCode {
 	case http.StatusNotFound:
-		// TODO: For APIServices, download the V2 spec and convert to V3
-		return nil, nil
+		return nil, writer.respCode, nil
 	case http.StatusOK:
 		groups := handler3.OpenAPIV3Discovery{}
 		if err := json.Unmarshal(writer.data, &groups); err != nil {
-			return nil, err
+			return nil, writer.respCode, err
 		}
-		return &groups, nil
+		return &groups, writer.respCode, nil
 	}
-	return nil, fmt.Errorf("Error, could not get list of group versions for APIService")
-}
-
-// Download downloads OpenAPI v3 for all groups of a given handler
-func (s *Downloader) Download(handler http.Handler, etagList map[string]string) (returnSpec map[string]*SpecETag, err error) {
-	// TODO(jefftree): https://github.com/kubernetes/kubernetes/pull/105945#issuecomment-966455034
-	// Move to proxy request in the aggregator and let the APIServices serve the OpenAPI directly
-	handler = s.handlerWithUser(handler, &user.DefaultInfo{Name: aggregatorUser})
-	handler = http.TimeoutHandler(handler, specDownloadTimeout, "request timed out")
-
-	req, err := http.NewRequest("GET", "/openapi/v3", nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Add("Accept", "application/json")
-
-	writer := newInMemoryResponseWriter()
-	handler.ServeHTTP(writer, req)
-
-	switch writer.respCode {
-	case http.StatusNotFound:
-		// Gracefully skip 404, assuming the server won't provide any spec
-		return nil, nil
-	case http.StatusOK:
-		groups := handler3.OpenAPIV3Discovery{}
-		aggregated := make(map[string]*SpecETag)
-
-		if err := json.Unmarshal(writer.data, &groups); err != nil {
-			return nil, err
-		}
-		for path, item := range groups.Paths {
-			reqPath := item.ServerRelativeURL
-			req, err := http.NewRequest("GET", reqPath, nil)
-			if err != nil {
-				return nil, err
-			}
-			req.Header.Add("Accept", "application/json")
-			oldEtag, ok := etagList[path]
-			if ok {
-				req.Header.Add("If-None-Match", oldEtag)
-			}
-			openAPIWriter := newInMemoryResponseWriter()
-			handler.ServeHTTP(openAPIWriter, req)
-
-			switch openAPIWriter.respCode {
-			case http.StatusNotFound:
-				continue
-			case http.StatusNotModified:
-				aggregated[path] = &SpecETag{
-					etag: oldEtag,
-				}
-			case http.StatusOK:
-				var spec spec3.OpenAPI
-				// TODO|jefftree: For OpenAPI v3 Beta, if the v3 spec is empty then
-				// we should request the v2 endpoint and convert it to v3
-				if len(openAPIWriter.data) > 0 {
-					err = json.Unmarshal(openAPIWriter.data, &spec)
-					if err != nil {
-						return nil, err
-					}
-					etag := openAPIWriter.Header().Get("Etag")
-					aggregated[path] = &SpecETag{
-						spec: &spec,
-						etag: etag,
-					}
-				}
-			default:
-				klog.Errorf("Error: unknown status %v", openAPIWriter.respCode)
-			}
-		}
-
-		return aggregated, nil
-	default:
-		return nil, fmt.Errorf("failed to retrieve openAPI spec, http error: %s", writer.String())
-	}
+	return nil, writer.respCode, fmt.Errorf("Error, could not get list of group versions for APIService")
 }
 
 // inMemoryResponseWriter is a http.Writer that keep the response in memory.
