@@ -17,6 +17,7 @@ limitations under the License.
 package encryptionconfig
 
 import (
+	"context"
 	"crypto/aes"
 	"crypto/cipher"
 	"encoding/base64"
@@ -32,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
 	apiserverconfigv1 "k8s.io/apiserver/pkg/apis/config/v1"
 	"k8s.io/apiserver/pkg/apis/config/validation"
@@ -365,7 +367,13 @@ func secretboxPrefixTransformer(config *apiserverconfig.SecretboxConfiguration) 
 }
 
 func envelopePrefixTransformer(config *apiserverconfig.KMSConfiguration, envelopeService envelope.Service, prefix string) (value.PrefixTransformer, error) {
-	envelopeTransformer, err := envelope.NewEnvelopeTransformer(envelopeService, int(*config.CacheSize), aestransformer.NewCBCTransformer)
+	baseTransformerFunc := func(block cipher.Block) value.Transformer {
+		// v1.24: write using AES-CBC only but support reads via AES-CBC and AES-GCM (so we can move to AES-GCM)
+		// TODO(aramase): swap this ordering in v1.25
+		return unionTransformers{aestransformer.NewCBCTransformer(block), aestransformer.NewGCMTransformer(block)}
+	}
+
+	envelopeTransformer, err := envelope.NewEnvelopeTransformer(envelopeService, int(*config.CacheSize), baseTransformerFunc)
 	if err != nil {
 		return value.PrefixTransformer{}, err
 	}
@@ -373,4 +381,28 @@ func envelopePrefixTransformer(config *apiserverconfig.KMSConfiguration, envelop
 		Transformer: envelopeTransformer,
 		Prefix:      []byte(prefix + config.Name + ":"),
 	}, nil
+}
+
+type unionTransformers []value.Transformer
+
+func (u unionTransformers) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) (out []byte, stale bool, err error) {
+	var errs []error
+	for i, transformer := range u {
+		result, stale, err := transformer.TransformFromStorage(ctx, data, dataCtx)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		// when i != 0, we have transformed the data from storage using the new transformer,
+		// we want to issue a write to etcd even if the contents of the data haven't changed
+		return result, stale || i != 0, nil
+	}
+	if err := utilerrors.Reduce(utilerrors.NewAggregate(errs)); err != nil {
+		return nil, false, err
+	}
+	return nil, false, fmt.Errorf("unionTransformers: unable to transform from storage")
+}
+
+func (u unionTransformers) TransformToStorage(ctx context.Context, data []byte, dataCtx value.Context) (out []byte, err error) {
+	return u[0].TransformToStorage(ctx, data, dataCtx)
 }
