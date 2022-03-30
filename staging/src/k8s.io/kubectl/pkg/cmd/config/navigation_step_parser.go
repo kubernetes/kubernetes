@@ -50,6 +50,12 @@ func newNavigationSteps(path string) (*navigationSteps, error) {
 			// store them as a single step.  In order to do that, we need to determine what set of tokens is a legal step AFTER the name of the map key
 			// This set of reflective code pulls the type of the map values, uses that type to look up the set of legal tags.  Those legal tags are used to
 			// walk the list of remaining parts until we find a match to a legal tag or the end of the string.  That name is used to burn all the used parts.
+			if currType.Elem().Kind() == reflect.String {
+				nextPart := individualParts[currPartIndex]
+				steps = append(steps, navigationStep{nextPart, reflect.TypeOf("")})
+				currPartIndex += len(strings.Split(nextPart, "."))
+				break
+			}
 			mapValueType := currType.Elem().Elem()
 
 			var nextPart string
@@ -77,16 +83,38 @@ func newNavigationSteps(path string) (*navigationSteps, error) {
 			}
 			fieldType, exists := options[nextPart]
 			if !exists {
-				return nil, fmt.Errorf("unable to parse %v after %v at %v", path, steps, currType)
+				return nil, fmt.Errorf("unable to parse %v at %v", path, currType)
 			}
 
 			steps = append(steps, navigationStep{nextPart, fieldType})
 			currPartIndex += len(strings.Split(nextPart, "."))
 			currType = fieldType
 
-		case reflect.Ptr:
+		case reflect.Slice:
+			nextPart := individualParts[currPartIndex]
+
+			if currType.Elem().Kind() != reflect.Struct && currType.Elem().Kind() != reflect.String {
+				return nil, fmt.Errorf("unable to parse %v at %v", path, currType)
+			}
 			steps = append(steps, navigationStep{individualParts[currPartIndex], reflect.TypeOf("")})
-			currPartIndex += 1
+			currPartIndex += len(strings.Split(nextPart, "."))
+			steps = append(steps, navigationStep{individualParts[currPartIndex], reflect.TypeOf("")})
+			currPartIndex += len(strings.Split(nextPart, "."))
+
+		case reflect.Ptr:
+			nextPart := individualParts[currPartIndex]
+
+			options, err := getPotentialTypeValues(currType)
+			if err != nil {
+				return nil, err
+			}
+			fieldType, exists := options[nextPart]
+			if !exists {
+				return nil, fmt.Errorf("unable to parse %v at %v", path, individualParts[currPartIndex])
+			}
+			steps = append(steps, navigationStep{individualParts[currPartIndex], fieldType})
+			currPartIndex += len(strings.Split(nextPart, "."))
+			currType = fieldType
 
 		default:
 			return nil, fmt.Errorf("unable to parse one or more field values of %v", path)
