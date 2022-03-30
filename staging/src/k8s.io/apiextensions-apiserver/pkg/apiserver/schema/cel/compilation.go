@@ -44,11 +44,11 @@ const (
 
 	// PerCallLimit specify the actual cost limit per CEL validation call
 	// current PerCallLimit gives roughly 0.1 second for each expression validation call
-	PerCallLimit = 2000000
+	PerCallLimit = 1000000
 
 	// RuntimeCELCostBudget is the overall cost budget for runtime CEL validation cost per CustomResource
 	// current RuntimeCELCostBudget gives roughly 1 seconds for CR validation
-	RuntimeCELCostBudget = 20000000
+	RuntimeCELCostBudget = 10000000
 
 	// checkFrequency configures the number of iterations within a comprehension to evaluate
 	// before checking whether the function evaluation has been interrupted
