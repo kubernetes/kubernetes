@@ -295,7 +295,7 @@ func NewFramework(r Registry, profile *config.KubeSchedulerProfile, opts ...Opti
 	pluginsMap := make(map[string]framework.Plugin)
 	for name, factory := range r {
 		// initialize only needed plugins.
-		if _, ok := pg[name]; !ok {
+		if !pg.Has(name) {
 			continue
 		}
 
