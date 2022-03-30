@@ -446,7 +446,7 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(ctx context.Context, cl
 			} else {
 				// User asked for a PV that is claimed by someone else
 				// OBSERVATION: pvc is "Pending", pv is "Bound"
-				if !metav1.HasAnnotation(claim.ObjectMeta, storagehelpers.AnnBoundByController) {
+				if !metav1.HasAnnotation(volume.ObjectMeta, storagehelpers.AnnBoundByController) {
 					klog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: volume already bound to different claim by user, will retry later", claimToClaimKey(claim))
 					claimMsg := fmt.Sprintf("volume %q already bound to a different claim.", volume.Name)
 					ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, events.FailedBinding, claimMsg)
@@ -457,7 +457,7 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(ctx context.Context, cl
 					return nil
 				} else {
 					// This should never happen because someone had to remove
-					// AnnBindCompleted annotation on the claim.
+					// AnnBoundByController annotation on the volume.
 					klog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: volume already bound to different claim %q by controller, THIS SHOULD NEVER HAPPEN", claimToClaimKey(claim), claimrefToClaimKey(volume.Spec.ClaimRef))
 					claimMsg := fmt.Sprintf("volume %q already bound to a different claim.", volume.Name)
 					ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, events.FailedBinding, claimMsg)
