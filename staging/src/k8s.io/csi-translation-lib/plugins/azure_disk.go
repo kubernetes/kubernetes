@@ -45,6 +45,7 @@ var (
 	managedDiskPathRE   = regexp.MustCompile(`.*/subscriptions/(?:.*)/resourceGroups/(?:.*)/providers/Microsoft.Compute/disks/(.+)`)
 	unmanagedDiskPathRE = regexp.MustCompile(`http(?:.*)://(?:.*)/vhds/(.+)`)
 	managed             = string(v1.AzureManagedDisk)
+	unzonedCSIRegionRE  = regexp.MustCompile(`^[0-9]+$`)
 )
 
 var _ InTreePlugin = &azureDiskCSITranslator{}
@@ -86,6 +87,7 @@ func (t *azureDiskCSITranslator) TranslateInTreeStorageClassToCSI(sc *storage.St
 		}
 		sc.AllowedTopologies = newTopologies
 	}
+	sc.AllowedTopologies = t.replaceFailureDomainsToCSI(sc.AllowedTopologies)
 
 	sc.Parameters = params
 
@@ -272,4 +274,35 @@ func getDiskName(diskURI string) (string, error) {
 		return "", fmt.Errorf("could not get disk name from %s, correct format: %s", diskURI, diskPathRE)
 	}
 	return matches[1], nil
+}
+
+// Replace topology values for failure domains ("<number>") to "",
+// as it's the value that the CSI driver expects.
+func (t *azureDiskCSITranslator) replaceFailureDomainsToCSI(terms []v1.TopologySelectorTerm) []v1.TopologySelectorTerm {
+	if terms == nil {
+		return nil
+	}
+
+	newTopologies := []v1.TopologySelectorTerm{}
+	for _, term := range terms {
+		newTerm := term.DeepCopy()
+		for i := range newTerm.MatchLabelExpressions {
+			exp := &newTerm.MatchLabelExpressions[i]
+			if exp.Key == AzureDiskTopologyKey {
+				for j := range exp.Values {
+					if unzonedCSIRegionRE.Match([]byte(exp.Values[j])) {
+						// Topologies "0", "1" etc are used when in-tree topology is translated to CSI in Azure
+						// regions that don't have availability zones. E.g.:
+						//    topology.kubernetes.io/region: westus
+						//    topology.kubernetes.io/zone: "0"
+						// The CSI driver uses zone "" instead of "0" in this case.
+						//    topology.disk.csi.azure.com/zone": ""
+						exp.Values[j] = ""
+					}
+				}
+			}
+		}
+		newTopologies = append(newTopologies, *newTerm)
+	}
+	return newTopologies
 }
