@@ -26,7 +26,6 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptrace"
-	"os"
 	"reflect"
 	"sync"
 	"testing"
@@ -36,16 +35,10 @@ import (
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
-	"k8s.io/klog/v2"
 
 	"github.com/google/go-cmp/cmp"
 	"golang.org/x/net/http2"
 )
-
-func TestMain(m *testing.M) {
-	klog.InitFlags(nil)
-	os.Exit(m.Run())
-}
 
 // doer sends a request to the server
 type doer func(client *http.Client, gci func(httptrace.GotConnInfo), path string, timeout time.Duration) result
@@ -427,63 +420,6 @@ func TestMuxAndDiscoveryComplete(t *testing.T) {
 		t.Fatalf("%s wasn't closed", s.lifecycleSignals.MuxAndDiscoveryComplete.Name())
 	}
 }
-
-func TestPreShutdownHooks(t *testing.T) {
-	s := newGenericAPIServer(t, true)
-	doer := setupDoer(t, s.SecureServingInfo)
-
-	preShutdownHookErrCh := make(chan error)
-	err := s.AddPreShutdownHook("test-backend", func() error {
-		// this pre-shutdown hook waits for the requests in flight to drain
-		// and then send a series of requests to the apiserver, and
-		// we expect these series of requests to be completed successfully
-		<-s.lifecycleSignals.InFlightRequestsDrained.Signaled()
-
-		// we send 5 requests, once every second
-		var r result
-		client := newClient(true)
-		for i := 0; i < 5; i++ {
-			r = doer.Do(client, func(httptrace.GotConnInfo) {}, fmt.Sprintf("/echo?message=attempt-%d", i), 100*time.Millisecond)
-			if r.err != nil {
-				break
-			}
-			time.Sleep(time.Second)
-		}
-		preShutdownHookErrCh <- r.err
-		return nil
-	})
-	if err != nil {
-		t.Fatalf("Failed to add pre-shutdown hook - %v", err)
-	}
-
-	// start the API server
-	stopCh, runCompletedCh := make(chan struct{}), make(chan struct{})
-	go func() {
-		defer func() {
-			// this test has an inherent race condition when we wait for two go routines
-			// to finish - the Run method and the pre-shutdown hook, each running in
-			// its own goroutine, give it a second before unblocking the test assert
-			<-time.After(time.Second)
-			close(runCompletedCh)
-		}()
-		s.PrepareRun().Run(stopCh)
-	}()
-	waitForAPIServerStarted(t, doer)
-
-	close(stopCh)
-
-	select {
-	case err := <-preShutdownHookErrCh:
-		if err != nil {
-			t.Fatalf("PreSHutdown hook can not access the API server - %v", err)
-		}
-	case <-runCompletedCh:
-		t.Fatalf("API Server exited without running the PreShutdown hooks")
-	case <-time.After(15 * time.Second):
-		t.Fatalf("test timed out after 15 seconds")
-	}
-}
-
 func shouldReuseConnection(t *testing.T) func(httptrace.GotConnInfo) {
 	return func(ci httptrace.GotConnInfo) {
 		if !ci.Reused {
