@@ -636,7 +636,11 @@ func (c *linuxContainer) newSetnsProcess(p *Process, cmd *exec.Cmd, messageSockP
 			// cgroup v1: using the same path for all controllers.
 			// cgroup v2: the only possible way.
 			for k := range proc.cgroupPaths {
-				proc.cgroupPaths[k] = path.Join(proc.cgroupPaths[k], add)
+				subPath := path.Join(proc.cgroupPaths[k], add)
+				if !strings.HasPrefix(subPath, proc.cgroupPaths[k]) {
+					return nil, fmt.Errorf("%s is not a sub cgroup path", add)
+				}
+				proc.cgroupPaths[k] = subPath
 			}
 			// cgroup v2: do not try to join init process's cgroup
 			// as a fallback (see (*setnsProcess).start).
@@ -645,7 +649,11 @@ func (c *linuxContainer) newSetnsProcess(p *Process, cmd *exec.Cmd, messageSockP
 			// Per-controller paths.
 			for ctrl, add := range p.SubCgroupPaths {
 				if val, ok := proc.cgroupPaths[ctrl]; ok {
-					proc.cgroupPaths[ctrl] = path.Join(val, add)
+					subPath := path.Join(val, add)
+					if !strings.HasPrefix(subPath, val) {
+						return nil, fmt.Errorf("%s is not a sub cgroup path", add)
+					}
+					proc.cgroupPaths[ctrl] = subPath
 				} else {
 					return nil, fmt.Errorf("unknown controller %s in SubCgroupPaths", ctrl)
 				}

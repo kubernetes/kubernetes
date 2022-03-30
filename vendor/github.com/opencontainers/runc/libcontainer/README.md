@@ -1,6 +1,6 @@
 # libcontainer
 
-[![GoDoc](https://godoc.org/github.com/opencontainers/runc/libcontainer?status.svg)](https://godoc.org/github.com/opencontainers/runc/libcontainer)
+[![Go Reference](https://pkg.go.dev/badge/github.com/opencontainers/runc/libcontainer.svg)](https://pkg.go.dev/github.com/opencontainers/runc/libcontainer)
 
 Libcontainer provides a native Go implementation for creating containers
 with namespaces, cgroups, capabilities, and filesystem access controls.

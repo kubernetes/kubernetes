@@ -2,6 +2,7 @@ package systemd
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -292,6 +293,12 @@ func (m *unifiedManager) Apply(pid int) error {
 	}
 
 	if c.OwnerUID != nil {
+		// The directory itself must be chowned.
+		err := os.Chown(m.path, *c.OwnerUID, -1)
+		if err != nil {
+			return err
+		}
+
 		filesToChown, err := cgroupFilesToChown()
 		if err != nil {
 			return err
@@ -299,7 +306,8 @@ func (m *unifiedManager) Apply(pid int) error {
 
 		for _, v := range filesToChown {
 			err := os.Chown(m.path+"/"+v, *c.OwnerUID, -1)
-			if err != nil {
+			// Some files might not be present.
+			if err != nil && !errors.Is(err, os.ErrNotExist) {
 				return err
 			}
 		}
@@ -312,21 +320,23 @@ func (m *unifiedManager) Apply(pid int) error {
 // uid in /sys/kernel/cgroup/delegate.  If the file is not present
 // (Linux < 4.15), use the initial values mentioned in cgroups(7).
 func cgroupFilesToChown() ([]string, error) {
-	filesToChown := []string{"."} // the directory itself must be chowned
 	const cgroupDelegateFile = "/sys/kernel/cgroup/delegate"
+
 	f, err := os.Open(cgroupDelegateFile)
-	if err == nil {
-		defer f.Close()
-		scanner := bufio.NewScanner(f)
-		for scanner.Scan() {
-			filesToChown = append(filesToChown, scanner.Text())
-		}
-		if err := scanner.Err(); err != nil {
-			return nil, fmt.Errorf("error reading %s: %w", cgroupDelegateFile, err)
-		}
-	} else {
-		filesToChown = append(filesToChown, "cgroup.procs", "cgroup.subtree_control", "cgroup.threads")
+	if err != nil {
+		return []string{"cgroup.procs", "cgroup.subtree_control", "cgroup.threads"}, nil
 	}
+	defer f.Close()
+
+	filesToChown := []string{}
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		filesToChown = append(filesToChown, scanner.Text())
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("error reading %s: %w", cgroupDelegateFile, err)
+	}
+
 	return filesToChown, nil
 }
 
