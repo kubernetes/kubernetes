@@ -125,10 +125,12 @@ func (o *OpenAPIService) getGroupBytes() ([]byte, error) {
 	sort.Strings(keys)
 	discovery := &OpenAPIV3Discovery{Paths: make(map[string]OpenAPIV3DiscoveryGroupVersion)}
 	for gvString, groupVersion := range o.v3Schema {
-		etagBytes, err := groupVersion.etagCache.Get()
-		if err != nil {
-			return nil, err
-		}
+		_ = groupVersion
+		etagBytes := ""
+		// etagBytes, err := groupVersion.etagCache.Get()
+		// if err != nil {
+			// return nil, err
+		// }
 		discovery.Paths[gvString] = OpenAPIV3DiscoveryGroupVersion{
 			ServerRelativeURL: constructServerRelativeURL(gvString, string(etagBytes)),
 		}
