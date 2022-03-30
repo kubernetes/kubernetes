@@ -156,6 +156,10 @@ func DefaultOpenAPIV3Config() *openapicommon.Config {
 		},
 	}
 	openAPIConfig.GetDefinitions = utilopenapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(openapi.GetOpenAPIDefinitions)
+	openAPIConfig.Definitions = openAPIConfig.GetDefinitions(func(name string) spec.Ref {
+		defName, _ := openAPIConfig.GetDefinitionName(name)
+		return spec.MustCreateRef("#/components/schemas/" + openapicommon.EscapeJsonPointer(defName))
+	})
 
 	return openAPIConfig
 }
