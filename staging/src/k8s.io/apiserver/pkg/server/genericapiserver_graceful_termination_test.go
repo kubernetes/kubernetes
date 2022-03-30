@@ -443,7 +443,7 @@ func TestPreShutdownHooks(t *testing.T) {
 		var r result
 		client := newClient(true)
 		for i := 0; i < 5; i++ {
-			r = doer.Do(client, func(httptrace.GotConnInfo) {}, fmt.Sprintf("/echo?message=attempt-%d", i), 1*time.Second)
+			r = doer.Do(client, func(httptrace.GotConnInfo) {}, fmt.Sprintf("/echo?message=attempt-%d", i), 100*time.Millisecond)
 			if r.err != nil {
 				break
 			}
