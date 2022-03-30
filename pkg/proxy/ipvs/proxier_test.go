@@ -5865,7 +5865,7 @@ func TestNoEndpointsMetric(t *testing.T) {
 		ipt := iptablestest.NewFake()
 		ipvs := ipvstest.NewFake()
 		ipset := ipsettest.NewFake(testIPSetVersion)
-		fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
+		fp := NewFakeProxier(ipt, ipvs, ipset, []net.IP{netutils.ParseIPSloppy("10.0.0.1")}, nil, v1.IPv4Protocol)
 		fp.servicesSynced = true
 		// fp.endpointsSynced = true
 		fp.endpointSlicesSynced = true
@@ -5879,7 +5879,7 @@ func TestNoEndpointsMetric(t *testing.T) {
 			Spec: v1.ServiceSpec{
 				ClusterIP: "172.20.1.1",
 				Selector:  map[string]string{"foo": "bar"},
-				Ports:     []v1.ServicePort{{Name: "", TargetPort: intstr.FromInt(80), Protocol: v1.ProtocolTCP, NodePort: 123}},
+				Ports:     []v1.ServicePort{{Name: "p80", Port: 80, TargetPort: intstr.FromInt(80), Protocol: v1.ProtocolTCP, NodePort: 30000}},
 			},
 		}
 		if tc.internalTrafficPolicy != nil {
@@ -5901,7 +5901,7 @@ func TestNoEndpointsMetric(t *testing.T) {
 				Labels:    map[string]string{discovery.LabelServiceName: serviceName},
 			},
 			Ports: []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr(""),
+				Name:     utilpointer.StringPtr("p80"),
 				Port:     utilpointer.Int32Ptr(80),
 				Protocol: &tcpProtocol,
 			}},
@@ -5934,7 +5934,7 @@ func TestNoEndpointsMetric(t *testing.T) {
 		}
 
 		if tc.expectedSyncProxyRulesNoLocalEndpointsTotalExternal != int(syncProxyRulesNoLocalEndpointsTotalExternal) {
-			t.Errorf("sync_proxy_rules_no_endpoints_total metric mismatch(internal): got=%d, expected %d", int(syncProxyRulesNoLocalEndpointsTotalExternal), tc.expectedSyncProxyRulesNoLocalEndpointsTotalExternal)
+			t.Errorf("sync_proxy_rules_no_endpoints_total metric mismatch(external): got=%d, expected %d", int(syncProxyRulesNoLocalEndpointsTotalExternal), tc.expectedSyncProxyRulesNoLocalEndpointsTotalExternal)
 		}
 	}
 }
