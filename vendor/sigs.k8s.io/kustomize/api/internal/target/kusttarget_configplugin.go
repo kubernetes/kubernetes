@@ -5,11 +5,14 @@ package target
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"sigs.k8s.io/kustomize/api/internal/plugins/builtinconfig"
 	"sigs.k8s.io/kustomize/api/internal/plugins/builtinhelpers"
 	"sigs.k8s.io/kustomize/api/resmap"
+	"sigs.k8s.io/kustomize/api/resource"
 	"sigs.k8s.io/kustomize/api/types"
+	"sigs.k8s.io/kustomize/kyaml/yaml"
 )
 
 // Functions dedicated to configuring the builtin
@@ -28,7 +31,7 @@ import (
 // N plugin instances with differing configurations.
 
 func (kt *KustTarget) configureBuiltinGenerators() (
-	result []resmap.Generator, err error) {
+	result []*resmap.GeneratorWithProperties, err error) {
 	for _, bpt := range []builtinhelpers.BuiltinPluginType{
 		builtinhelpers.ConfigMapGenerator,
 		builtinhelpers.SecretGenerator,
@@ -39,19 +42,38 @@ func (kt *KustTarget) configureBuiltinGenerators() (
 		if err != nil {
 			return nil, err
 		}
-		result = append(result, r...)
+
+		var generatorOrigin *resource.Origin
+		if kt.origin != nil {
+			generatorOrigin = &resource.Origin{
+				Repo:         kt.origin.Repo,
+				Ref:          kt.origin.Ref,
+				ConfiguredIn: filepath.Join(kt.origin.Path, kt.kustFileName),
+				ConfiguredBy: yaml.ResourceIdentifier{
+					TypeMeta: yaml.TypeMeta{
+						APIVersion: "builtin",
+						Kind:       bpt.String(),
+					},
+				},
+			}
+		}
+
+		for i := range r {
+			result = append(result, &resmap.GeneratorWithProperties{Generator: r[i], Origin: generatorOrigin})
+		}
 	}
 	return result, nil
 }
 
 func (kt *KustTarget) configureBuiltinTransformers(
 	tc *builtinconfig.TransformerConfig) (
-	result []resmap.Transformer, err error) {
+	result []*resmap.TransformerWithProperties, err error) {
 	for _, bpt := range []builtinhelpers.BuiltinPluginType{
 		builtinhelpers.PatchStrategicMergeTransformer,
 		builtinhelpers.PatchTransformer,
 		builtinhelpers.NamespaceTransformer,
-		builtinhelpers.PrefixSuffixTransformer,
+		builtinhelpers.PrefixTransformer,
+		builtinhelpers.SuffixTransformer,
 		builtinhelpers.LabelTransformer,
 		builtinhelpers.AnnotationsTransformer,
 		builtinhelpers.PatchJson6902Transformer,
@@ -64,7 +86,23 @@ func (kt *KustTarget) configureBuiltinTransformers(
 		if err != nil {
 			return nil, err
 		}
-		result = append(result, r...)
+		var transformerOrigin *resource.Origin
+		if kt.origin != nil {
+			transformerOrigin = &resource.Origin{
+				Repo:         kt.origin.Repo,
+				Ref:          kt.origin.Ref,
+				ConfiguredIn: filepath.Join(kt.origin.Path, kt.kustFileName),
+				ConfiguredBy: yaml.ResourceIdentifier{
+					TypeMeta: yaml.TypeMeta{
+						APIVersion: "builtin",
+						Kind:       bpt.String(),
+					},
+				},
+			}
+		}
+		for i := range r {
+			result = append(result, &resmap.TransformerWithProperties{Transformer: r[i], Origin: transformerOrigin})
+		}
 	}
 	return result, nil
 }
@@ -147,6 +185,9 @@ var transformerConfigurators = map[builtinhelpers.BuiltinPluginType]func(
 	builtinhelpers.NamespaceTransformer: func(
 		kt *KustTarget, bpt builtinhelpers.BuiltinPluginType, f tFactory, tc *builtinconfig.TransformerConfig) (
 		result []resmap.Transformer, err error) {
+		if kt.kustomization.Namespace == "" {
+			return
+		}
 		var c struct {
 			types.ObjectMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 			FieldSpecs       []types.FieldSpec
@@ -230,6 +271,9 @@ var transformerConfigurators = map[builtinhelpers.BuiltinPluginType]func(
 	builtinhelpers.LabelTransformer: func(
 		kt *KustTarget, bpt builtinhelpers.BuiltinPluginType, f tFactory, tc *builtinconfig.TransformerConfig) (
 		result []resmap.Transformer, err error) {
+		if len(kt.kustomization.Labels) == 0 && len(kt.kustomization.CommonLabels) == 0 {
+			return
+		}
 		for _, label := range kt.kustomization.Labels {
 			var c struct {
 				Labels     map[string]string
@@ -272,6 +316,9 @@ var transformerConfigurators = map[builtinhelpers.BuiltinPluginType]func(
 	builtinhelpers.AnnotationsTransformer: func(
 		kt *KustTarget, bpt builtinhelpers.BuiltinPluginType, f tFactory, tc *builtinconfig.TransformerConfig) (
 		result []resmap.Transformer, err error) {
+		if len(kt.kustomization.CommonAnnotations) == 0 {
+			return
+		}
 		var c struct {
 			Annotations map[string]string
 			FieldSpecs  []types.FieldSpec
@@ -286,17 +333,38 @@ var transformerConfigurators = map[builtinhelpers.BuiltinPluginType]func(
 		result = append(result, p)
 		return
 	},
-	builtinhelpers.PrefixSuffixTransformer: func(
+	builtinhelpers.PrefixTransformer: func(
 		kt *KustTarget, bpt builtinhelpers.BuiltinPluginType, f tFactory, tc *builtinconfig.TransformerConfig) (
 		result []resmap.Transformer, err error) {
+		if kt.kustomization.NamePrefix == "" {
+			return
+		}
 		var c struct {
-			Prefix     string
-			Suffix     string
-			FieldSpecs []types.FieldSpec
+			Prefix     string            `json:"prefix,omitempty" yaml:"prefix,omitempty"`
+			FieldSpecs []types.FieldSpec `json:"fieldSpecs,omitempty" yaml:"fieldSpecs,omitempty"`
 		}
 		c.Prefix = kt.kustomization.NamePrefix
-		c.Suffix = kt.kustomization.NameSuffix
 		c.FieldSpecs = tc.NamePrefix
+		p := f()
+		err = kt.configureBuiltinPlugin(p, c, bpt)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, p)
+		return
+	},
+	builtinhelpers.SuffixTransformer: func(
+		kt *KustTarget, bpt builtinhelpers.BuiltinPluginType, f tFactory, tc *builtinconfig.TransformerConfig) (
+		result []resmap.Transformer, err error) {
+		if kt.kustomization.NameSuffix == "" {
+			return
+		}
+		var c struct {
+			Suffix     string            `json:"suffix,omitempty" yaml:"suffix,omitempty"`
+			FieldSpecs []types.FieldSpec `json:"fieldSpecs,omitempty" yaml:"fieldSpecs,omitempty"`
+		}
+		c.Suffix = kt.kustomization.NameSuffix
+		c.FieldSpecs = tc.NameSuffix
 		p := f()
 		err = kt.configureBuiltinPlugin(p, c, bpt)
 		if err != nil {
@@ -327,6 +395,9 @@ var transformerConfigurators = map[builtinhelpers.BuiltinPluginType]func(
 	builtinhelpers.ReplacementTransformer: func(
 		kt *KustTarget, bpt builtinhelpers.BuiltinPluginType, f tFactory, _ *builtinconfig.TransformerConfig) (
 		result []resmap.Transformer, err error) {
+		if len(kt.kustomization.Replacements) == 0 {
+			return
+		}
 		var c struct {
 			Replacements []types.ReplacementField
 		}
