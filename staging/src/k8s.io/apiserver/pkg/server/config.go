@@ -39,6 +39,7 @@ import (
 	utilwaitgroup "k8s.io/apimachinery/pkg/util/waitgroup"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/admission"
+	builderutil "k8s.io/kube-openapi/pkg/builder3/util"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
@@ -412,6 +413,10 @@ func DefaultOpenAPIV3Config(getDefinitions openapicommon.GetOpenAPIDefinitions, 
 		defName, _ := defaultConfig.GetDefinitionName(name)
 		return spec.MustCreateRef("#/components/schemas/" + openapicommon.EscapeJsonPointer(defName))
 	})
+
+	for _, b := range defaultConfig.Definitions {
+		b.Schema = *builderutil.WrapRefs(&b.Schema)
+	}
 
 	return defaultConfig
 }
