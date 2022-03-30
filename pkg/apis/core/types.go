@@ -3641,27 +3641,33 @@ const (
 	ServiceTypeExternalName ServiceType = "ExternalName"
 )
 
-// ServiceInternalTrafficPolicyType describes the type of traffic routing for
-// internal traffic
+// ServiceInternalTrafficPolicyType describes the endpoint-selection policy for
+// traffic sent to the ClusterIP.
 type ServiceInternalTrafficPolicyType string
 
 const (
-	// ServiceInternalTrafficPolicyCluster routes traffic to all endpoints
+	// ServiceInternalTrafficPolicyCluster routes traffic to all endpoints.
 	ServiceInternalTrafficPolicyCluster ServiceInternalTrafficPolicyType = "Cluster"
 
-	// ServiceInternalTrafficPolicyLocal only routes to node-local
-	// endpoints, otherwise drops the traffic
+	// ServiceInternalTrafficPolicyLocal routes traffic only to endpoints on the same
+	// node as the traffic was received on (dropping the traffic if there are no
+	// local endpoints).
 	ServiceInternalTrafficPolicyLocal ServiceInternalTrafficPolicyType = "Local"
 )
 
-// ServiceExternalTrafficPolicyType string
+// ServiceExternalTrafficPolicyType describes the endpoint-selection policy for
+// traffic to external service entrypoints (NodePorts, ExternalIPs, and
+// LoadBalancer IPs).
 type ServiceExternalTrafficPolicyType string
 
 const (
-	// ServiceExternalTrafficPolicyTypeLocal specifies node-local endpoints behavior.
-	ServiceExternalTrafficPolicyTypeLocal ServiceExternalTrafficPolicyType = "Local"
-	// ServiceExternalTrafficPolicyTypeCluster specifies cluster-wide (legacy) behavior.
+	// ServiceExternalTrafficPolicyTypeCluster routes traffic to all endpoints.
 	ServiceExternalTrafficPolicyTypeCluster ServiceExternalTrafficPolicyType = "Cluster"
+
+	// ServiceExternalTrafficPolicyTypeLocal preserves the source IP of the traffic by
+	// routing only to endpoints on the same node as the traffic was received on
+	// (dropping the traffic if there are no local endpoints).
+	ServiceExternalTrafficPolicyTypeLocal ServiceExternalTrafficPolicyType = "Local"
 )
 
 // These are the valid conditions of a service.
@@ -3853,12 +3859,19 @@ type ServiceSpec struct {
 	// +optional
 	LoadBalancerSourceRanges []string
 
-	// externalTrafficPolicy denotes if this Service desires to route external
-	// traffic to node-local or cluster-wide endpoints. "Local" preserves the
-	// client source IP and avoids a second hop for LoadBalancer and Nodeport
-	// type services, but risks potentially imbalanced traffic spreading.
-	// "Cluster" obscures the client source IP and may cause a second hop to
-	// another node, but should have good overall load-spreading.
+	// externalTrafficPolicy describes how nodes distribute service traffic they
+	// receive on one of the Service's "externally-facing" addresses (NodePorts,
+	// ExternalIPs, and LoadBalancer IPs). If set to "Local", the proxy will configure
+	// the service in a way that assumes that external load balancers will take care
+	// of balancing the service traffic between nodes, and so each node will deliver
+	// traffic only to the node-local endpoints of the service, without masquerading
+	// the client source IP. (Traffic mistakenly sent to a node with no endpoints will
+	// be dropped.) The default value, "Cluster", uses the standard behavior of
+	// routing to all endpoints evenly (possibly modified by topology and other
+	// features). Note that traffic sent to an External IP or LoadBalancer IP from
+	// within the cluster will always get "Cluster" semantics, but clients sending to
+	// a NodePort from within the cluster may need to take traffic policy into account
+	// when picking a node.
 	// +optional
 	ExternalTrafficPolicy ServiceExternalTrafficPolicyType
 
@@ -3905,12 +3918,12 @@ type ServiceSpec struct {
 	// +optional
 	LoadBalancerClass *string
 
-	// InternalTrafficPolicy specifies if the cluster internal traffic
-	// should be routed to all endpoints or node-local endpoints only.
-	// "Cluster" routes internal traffic to a Service to all endpoints.
-	// "Local" routes traffic to node-local endpoints only, traffic is
-	// dropped if no node-local endpoints are ready.
-	// The default value is "Cluster".
+	// InternalTrafficPolicy describes how nodes distribute service traffic they
+	// receive on the ClusterIP. If set to "Local", the proxy will assume that pods
+	// only want to talk to endpoints of the service on the same node as the pod,
+	// dropping the traffic if there are no local endpoints. The default value,
+	// "Cluster", uses the standard behavior of routing to all endpoints evenly
+	// (possibly modified by topology and other features).
 	// +featureGate=ServiceInternalTrafficPolicy
 	// +optional
 	InternalTrafficPolicy *ServiceInternalTrafficPolicyType
