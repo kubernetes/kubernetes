@@ -36,7 +36,7 @@ import (
 
 var _ = SIGDescribe("Security Context", func() {
 	f := framework.NewDefaultFramework("security-context-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var podClient *framework.PodClient
 	ginkgo.BeforeEach(func() {
 		podClient = f.PodClient()
