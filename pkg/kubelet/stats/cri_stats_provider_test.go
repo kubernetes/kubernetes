@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -586,7 +587,7 @@ func makeFakePodSandbox(name, uid, namespace string, terminated bool) *critest.F
 	if terminated {
 		p.PodSandboxStatus.State = runtimeapi.PodSandboxState_SANDBOX_NOTREADY
 	}
-	p.PodSandboxStatus.Id = string(uuid.NewUUID())
+	p.PodSandboxStatus.Id = strings.ReplaceAll(string(uuid.NewUUID()), "-", "")
 	return p
 }
 
@@ -612,7 +613,7 @@ func makeFakeContainer(sandbox *critest.FakePodSandbox, name string, attempt uin
 	} else {
 		c.ContainerStatus.State = runtimeapi.ContainerState_CONTAINER_RUNNING
 	}
-	c.ContainerStatus.Id = string(uuid.NewUUID())
+	c.ContainerStatus.Id = strings.ReplaceAll(string(uuid.NewUUID()), "-", "")
 	return c
 }
 
@@ -960,5 +961,30 @@ func TestGetContainerUsageNanoCores(t *testing.T) {
 		// After the update, the cached value should be up-to-date
 		cached = provider.getContainerUsageNanoCores(test.stats)
 		assert.Equal(t, test.expected, cached, test.desc)
+	}
+}
+
+func TestExtractIDFromCgroupPath(t *testing.T) {
+	tests := []struct {
+		cgroupPath string
+		expected   string
+	}{
+		{
+			cgroupPath: "/kubepods/burstable/pod2fc932ce-fdcc-454b-97bd-aadfdeb4c340/9be25294016e2dc0340dd605ce1f57b492039b267a6a618a7ad2a7a58a740f32",
+			expected:   "9be25294016e2dc0340dd605ce1f57b492039b267a6a618a7ad2a7a58a740f32",
+		},
+		{
+			cgroupPath: "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod2fc932ce_fdcc_454b_97bd_aadfdeb4c340.slice/cri-containerd-aaefb9d8feed2d453b543f6d928cede7a4dbefa6a0ae7c9b990dd234c56e93b9.scope",
+			expected:   "aaefb9d8feed2d453b543f6d928cede7a4dbefa6a0ae7c9b990dd234c56e93b9",
+		},
+		{
+			cgroupPath: "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod2fc932ce_fdcc_454b_97bd_aadfdeb4c340.slice/cri-o-aaefb9d8feed2d453b543f6d928cede7a4dbefa6a0ae7c9b990dd234c56e93b9.scope",
+			expected:   "aaefb9d8feed2d453b543f6d928cede7a4dbefa6a0ae7c9b990dd234c56e93b9",
+		},
+	}
+
+	for _, test := range tests {
+		id := extractIDFromCgroupPath(test.cgroupPath)
+		assert.Equal(t, test.expected, id)
 	}
 }
