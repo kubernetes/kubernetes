@@ -613,7 +613,6 @@ EOF
     if [[ -z "${AUTH_ARGS}" ]]; then
         AUTH_ARGS="--client-key=${CERT_DIR}/client-admin.key --client-certificate=${CERT_DIR}/client-admin.crt"
     fi
-
     # Grant apiserver permission to speak to the kubelet
     ${KUBECTL} --kubeconfig "${CERT_DIR}/admin.kubeconfig" create clusterrolebinding kube-apiserver-kubelet-admin --clusterrole=system:kubelet-api-admin --user=kube-apiserver
 
@@ -621,7 +620,7 @@ EOF
     ${KUBECTL} --kubeconfig "${CERT_DIR}/admin.kubeconfig" create clusterrolebinding kubelet-csr --clusterrole=system:certificates.k8s.io:certificatesigningrequests:selfnodeclient --group=system:nodes
 
     ${CONTROLPLANE_SUDO} cp "${CERT_DIR}/admin.kubeconfig" "${CERT_DIR}/admin-kube-aggregator.kubeconfig"
-    ${CONTROLPLANE_SUDO} chown "$(whoami)" "${CERT_DIR}/admin-kube-aggregator.kubeconfig"
+    ${CONTROLPLANE_SUDO} chown -R "$(whoami)" "${CERT_DIR}"
     ${KUBECTL} config set-cluster local-up-cluster --kubeconfig="${CERT_DIR}/admin-kube-aggregator.kubeconfig" --server="https://${API_HOST_IP}:31090"
     echo "use 'kubectl --kubeconfig=${CERT_DIR}/admin-kube-aggregator.kubeconfig' to use the aggregated API server"
 
@@ -1046,10 +1045,10 @@ function install_cni {
     && echo "${CNI_PLUGINS_AMD64_SHA256SUM}  /tmp/cni.amd64.tgz" | tee /tmp/cni.sha256 \
     && sha256sum --ignore-missing -c /tmp/cni.sha256 \
     && rm -f /tmp/cni.sha256 \
-    && mkdir -p /opt/cni/bin \
-    && tar -C /opt/cni/bin -xzvf /tmp/cni."${CNI_TARGETARCH}".tgz \
+    && sudo mkdir -p /opt/cni/bin \
+    && sudo tar -C /opt/cni/bin -xzvf /tmp/cni."${CNI_TARGETARCH}".tgz \
     && rm -rf /tmp/cni."${CNI_TARGETARCH}".tgz \
-    && find /opt/cni/bin -type f -not \( \
+    && sudo find /opt/cni/bin -type f -not \( \
          -iname host-local \
          -o -iname bridge \
          -o -iname portmap \
@@ -1059,8 +1058,8 @@ function install_cni {
 
   # containerd 1.4.12 installed by docker in kubekins supports CNI version 0.4.0
   echo "Configuring cni"
-  mkdir -p "$CNI_CONFIG_DIR"
-  cat << EOF | tee "$CNI_CONFIG_DIR"/10-containerd-net.conflist
+  sudo mkdir -p "$CNI_CONFIG_DIR"
+  cat << EOF | sudo tee "$CNI_CONFIG_DIR"/10-containerd-net.conflist
 {
   "cniVersion": "0.4.0",
   "name": "containerd-net",
