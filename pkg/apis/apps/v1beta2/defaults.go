@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/pointer"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -73,8 +74,7 @@ func SetDefaults_StatefulSet(obj *appsv1beta2.StatefulSet) {
 		obj.Spec.UpdateStrategy.RollingUpdate != nil {
 
 		if obj.Spec.UpdateStrategy.RollingUpdate.Partition == nil {
-			obj.Spec.UpdateStrategy.RollingUpdate.Partition = new(int32)
-			*obj.Spec.UpdateStrategy.RollingUpdate.Partition = 0
+			obj.Spec.UpdateStrategy.RollingUpdate.Partition = pointer.Int32(0)
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.MaxUnavailableStatefulSet) {
 			if obj.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable == nil {
