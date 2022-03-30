@@ -278,14 +278,14 @@ type Proxier struct {
 	// It is used to publish the sync_proxy_rules_no_endpoints_total
 	// metric with the traffic_policy label set to "internal".
 	// sets.String is used here since we end up calculating endpoint topology multiple times for the same Service
-	// if it has mulitple ports but each Service should only be counted once.
+	// if it has multiple ports but each Service should only be counted once.
 	serviceNoLocalEndpointsInternal sets.String
 	// serviceNoLocalEndpointsExternal irepresents the set of services that couldn't be applied
 	// due to the absence of any endpoints when the external traffic policy is "Local".
 	// It is used to publish the sync_proxy_rules_no_endpoints_total
 	// metric with the traffic_policy label set to "external".
 	// sets.String is used here since we end up calculating endpoint topology multiple times for the same Service
-	// if it has mulitple ports but each Service should only be counted once.
+	// if it has multiple ports but each Service should only be counted once.
 	serviceNoLocalEndpointsExternal sets.String
 }
 
