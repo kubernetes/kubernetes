@@ -36,7 +36,7 @@ type navigationStep struct {
 }
 
 func newNavigationSteps(path string) (*navigationSteps, error) {
-	steps := []navigationStep{}
+	var steps []navigationStep
 	individualParts := strings.Split(path, ".")
 
 	currType := reflect.TypeOf(clientcmdapi.Config{})
@@ -83,7 +83,7 @@ func newNavigationSteps(path string) (*navigationSteps, error) {
 			}
 			fieldType, exists := options[nextPart]
 			if !exists {
-				return nil, fmt.Errorf("unable to parse %v at %v", path, currType)
+				return nil, fmt.Errorf("unable to parse %v at %v", path, individualParts[currPartIndex])
 			}
 
 			steps = append(steps, navigationStep{nextPart, fieldType})
@@ -94,7 +94,7 @@ func newNavigationSteps(path string) (*navigationSteps, error) {
 			nextPart := individualParts[currPartIndex]
 
 			if currType.Elem().Kind() != reflect.Struct && currType.Elem().Kind() != reflect.String {
-				return nil, fmt.Errorf("unable to parse %v at %v", path, currType)
+				return nil, fmt.Errorf("unable to parse %v at %v", path, individualParts[currPartIndex])
 			}
 			steps = append(steps, navigationStep{individualParts[currPartIndex], reflect.TypeOf("")})
 			currPartIndex += len(strings.Split(nextPart, "."))
@@ -110,14 +110,14 @@ func newNavigationSteps(path string) (*navigationSteps, error) {
 			}
 			fieldType, exists := options[nextPart]
 			if !exists {
-				return nil, fmt.Errorf("unable to parse %v at %v", path, individualParts[currPartIndex])
+				return nil, fmt.Errorf("unable to parse path %v at %v", path, individualParts[currPartIndex])
 			}
 			steps = append(steps, navigationStep{individualParts[currPartIndex], fieldType})
 			currPartIndex += len(strings.Split(nextPart, "."))
 			currType = fieldType
 
 		default:
-			return nil, fmt.Errorf("unable to parse one or more field values of %v", path)
+			return nil, fmt.Errorf("unable to parse path %v at %v", path, individualParts[currPartIndex])
 		}
 	}
 

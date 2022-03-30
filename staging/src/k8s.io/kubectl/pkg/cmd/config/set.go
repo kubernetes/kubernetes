@@ -501,13 +501,13 @@ func setStructInSlice(currSliceValue reflect.Value, structIndex int, searchField
 	targetStruct := currSliceValue.Index(structIndex)
 	searchFieldIndex := getStructFieldIndexByName(targetStruct, searchField)
 	if searchFieldIndex < 0 {
-		return fmt.Errorf("could not find field in struct with name %v", searchField)
+		return fmt.Errorf("could not find field in struct with name %v, please see help text for proper formatting", searchField)
 	}
 	currSliceValue.Index(structIndex).FieldByIndex([]int{searchFieldIndex}).Set(reflect.ValueOf(searchValue))
 
 	setFieldIndex := getStructFieldIndexByName(targetStruct, setField)
 	if setFieldIndex < 0 {
-		return fmt.Errorf("could not find field in struct with name %v", setField)
+		return fmt.Errorf("could not find field in struct with name %v, please see help text for proper formatting", setField)
 	}
 	currSliceValue.Index(structIndex).FieldByIndex([]int{setFieldIndex}).Set(reflect.ValueOf(setValue))
 

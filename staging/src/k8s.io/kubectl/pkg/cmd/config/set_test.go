@@ -49,7 +49,7 @@ func TestFromNewConfig(t *testing.T) {
 			description: "Testing for kubectl config set users.foo.exec.fake.key to test",
 			config:      conf,
 			args:        []string{"users.foo.exec.fake.key", "test"},
-			expectedErr: "unable to parse users.foo.exec.fake.key at fake",
+			expectedErr: "unable to parse path users.foo.exec.fake.key at fake",
 		},
 		{
 			name:        "SetAuthProviderName",
