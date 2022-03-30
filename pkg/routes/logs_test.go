@@ -19,6 +19,7 @@ package routes
 import (
 	"fmt"
 	"os"
+	"syscall"
 	"testing"
 )
 
@@ -27,12 +28,16 @@ func TestPreCheckLogFileNameLength(t *testing.T) {
 	normalFileName := fmt.Sprintf("%0255s", "a")
 
 	// check file with oversize name.
-	if !logFileNameIsTooLong(oversizeFileName) {
-		t.Error("failed to check oversize filename")
+	if tooLong, err := logFileNameIsTooLong(oversizeFileName); !tooLong {
+		// if file doesn't exists, should be ignored
+		if e, ok := err.(*os.PathError); ok && e.Err == syscall.ENOENT {
+		} else {
+			t.Error("failed to check oversize filename")
+		}
 	}
 
 	// check file with normal name which doesn't exist.
-	if logFileNameIsTooLong(normalFileName) {
+	if tooLong, _ := logFileNameIsTooLong(normalFileName); tooLong {
 		t.Error("failed to check normal filename")
 	}
 
@@ -42,7 +47,7 @@ func TestPreCheckLogFileNameLength(t *testing.T) {
 		t.Error("failed to create test file")
 	}
 	defer os.Remove(normalFileName)
-	if logFileNameIsTooLong(normalFileName) {
+	if tooLong, _ := logFileNameIsTooLong(normalFileName); tooLong {
 		t.Error("failed to check normal filename")
 	}
 }
