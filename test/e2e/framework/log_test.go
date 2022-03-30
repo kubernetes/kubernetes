@@ -36,20 +36,20 @@ import (
 //
 //
 //
-//
-//
-//
-//
-// This must be line #43.
+// This must be line #39.
 
-func runTests(t *testing.T, reporter ginkgo.Reporter) {
-	// This source code line will be part of the stack dump comparison.
-	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "Logging Suite", []ginkgo.Reporter{reporter})
+// This is included in a stack backtrace.
+func failHelper(msg string) {
+	framework.Fail(msg)
 }
 
 var _ = ginkgo.Describe("log", func() {
 	ginkgo.BeforeEach(func() {
 		framework.Logf("before")
+	})
+	ginkgo.AfterEach(func() {
+		framework.Logf("after")
+		framework.ExpectEqual(true, false, "true is never false either")
 	})
 	ginkgo.It("fails", func() {
 		func() {
@@ -66,16 +66,14 @@ var _ = ginkgo.Describe("log", func() {
 	ginkgo.It("equal", func() {
 		framework.ExpectEqual(0, 1, "of course it's not equal...")
 	})
-	ginkgo.AfterEach(func() {
-		framework.Logf("after")
-		framework.ExpectEqual(true, false, "true is never false either")
+	ginkgo.It("fails with helper", func() {
+		failHelper("I'm failing with helper.")
 	})
 })
 
 func TestFailureOutput(t *testing.T) {
 	// output from AfterEach
 	commonOutput := `
-
 INFO: after
 FAIL: true is never false either
 Expected
@@ -84,17 +82,14 @@ to equal
     <bool>: false
 
 Full Stack Trace
-k8s.io/kubernetes/test/e2e/framework_test.glob..func1.6()
-	log_test.go:71
-k8s.io/kubernetes/test/e2e/framework_test.runTests()
-	log_test.go:47
-
+k8s.io/kubernetes/test/e2e/framework_test.glob..func1.2()
+	log_test.go:52
 `
 
 	// Sorted by name!
 	expected := output.SuiteResults{
 		output.TestResult{
-			Name: "[Top Level] log asserts",
+			Name: "log asserts",
 			Output: `INFO: before
 FAIL: false is never true
 Expected
@@ -103,23 +98,18 @@ to equal
     <bool>: true
 
 Full Stack Trace
-k8s.io/kubernetes/test/e2e/framework_test.glob..func1.3()
-	log_test.go:60
-k8s.io/kubernetes/test/e2e/framework_test.runTests()
-	log_test.go:47` + commonOutput,
+k8s.io/kubernetes/test/e2e/framework_test.glob..func1.4()
+	log_test.go:60` + commonOutput,
 			Failure: `false is never true
 Expected
     <bool>: false
 to equal
     <bool>: true`,
-			Stack: `k8s.io/kubernetes/test/e2e/framework_test.glob..func1.3()
-	log_test.go:60
-k8s.io/kubernetes/test/e2e/framework_test.runTests()
-	log_test.go:47
-`,
+			Stack: `k8s.io/kubernetes/test/e2e/framework_test.glob..func1.4()
+	log_test.go:60`,
 		},
 		output.TestResult{
-			Name: "[Top Level] log equal",
+			Name: "log equal",
 			Output: `INFO: before
 FAIL: of course it's not equal...
 Expected
@@ -128,23 +118,18 @@ to equal
     <int>: 1
 
 Full Stack Trace
-k8s.io/kubernetes/test/e2e/framework_test.glob..func1.5()
-	log_test.go:67
-k8s.io/kubernetes/test/e2e/framework_test.runTests()
-	log_test.go:47` + commonOutput,
+k8s.io/kubernetes/test/e2e/framework_test.glob..func1.6()
+	log_test.go:67` + commonOutput,
 			Failure: `of course it's not equal...
 Expected
     <int>: 0
 to equal
     <int>: 1`,
-			Stack: `k8s.io/kubernetes/test/e2e/framework_test.glob..func1.5()
-	log_test.go:67
-k8s.io/kubernetes/test/e2e/framework_test.runTests()
-	log_test.go:47
-`,
+			Stack: `k8s.io/kubernetes/test/e2e/framework_test.glob..func1.6()
+	log_test.go:67`,
 		},
 		output.TestResult{
-			Name: "[Top Level] log error",
+			Name: "log error",
 			Output: `INFO: before
 INFO: Unexpected error: hard-coded error: 
     <*errors.errorString>: {
@@ -153,35 +138,41 @@ INFO: Unexpected error: hard-coded error:
 FAIL: hard-coded error: an error with a long, useless description
 
 Full Stack Trace
-k8s.io/kubernetes/test/e2e/framework_test.glob..func1.4()
-	log_test.go:64
-k8s.io/kubernetes/test/e2e/framework_test.runTests()
-	log_test.go:47` + commonOutput,
+k8s.io/kubernetes/test/e2e/framework_test.glob..func1.5()
+	log_test.go:64` + commonOutput,
 			Failure: `hard-coded error: an error with a long, useless description`,
-			Stack: `k8s.io/kubernetes/test/e2e/framework_test.glob..func1.4()
-	log_test.go:64
-k8s.io/kubernetes/test/e2e/framework_test.runTests()
-	log_test.go:47
-`,
+			Stack: `k8s.io/kubernetes/test/e2e/framework_test.glob..func1.5()
+	log_test.go:64`,
 		},
 		output.TestResult{
-			Name: "[Top Level] log fails",
+			Name: "log fails",
 			Output: `INFO: before
 FAIL: I'm failing.
 
 Full Stack Trace
-k8s.io/kubernetes/test/e2e/framework_test.glob..func1.2()
-	log_test.go:57
-k8s.io/kubernetes/test/e2e/framework_test.runTests()
-	log_test.go:47` + commonOutput,
+k8s.io/kubernetes/test/e2e/framework_test.glob..func1.3()
+	log_test.go:57` + commonOutput,
 			Failure: "I'm failing.",
-			Stack: `k8s.io/kubernetes/test/e2e/framework_test.glob..func1.2()
-	log_test.go:57
-k8s.io/kubernetes/test/e2e/framework_test.runTests()
-	log_test.go:47
-`,
+			Stack: `k8s.io/kubernetes/test/e2e/framework_test.glob..func1.3()
+	log_test.go:57`,
+		},
+		output.TestResult{
+			Name: "log fails with helper",
+			Output: `INFO: before
+FAIL: I'm failing with helper.
+
+Full Stack Trace
+k8s.io/kubernetes/test/e2e/framework_test.failHelper()
+	log_test.go:43
+k8s.io/kubernetes/test/e2e/framework_test.glob..func1.7()
+	log_test.go:70` + commonOutput,
+			Failure: "I'm failing with helper.",
+			Stack: `k8s.io/kubernetes/test/e2e/framework_test.failHelper()
+	log_test.go:43
+k8s.io/kubernetes/test/e2e/framework_test.glob..func1.7()
+	log_test.go:70`,
 		},
 	}
 
-	output.TestGinkgoOutput(t, runTests, expected)
+	output.TestGinkgoOutput(t, expected)
 }
