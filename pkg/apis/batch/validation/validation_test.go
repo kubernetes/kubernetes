@@ -31,6 +31,18 @@ import (
 	"k8s.io/utils/pointer"
 )
 
+var (
+	timeZoneEmpty         = ""
+	timeZoneLocal         = "LOCAL"
+	timeZoneUTC           = "UTC"
+	timeZoneCorrectCasing = "America/New_York"
+	timeZoneBadCasing     = "AMERICA/new_york"
+	timeZoneBadPrefix     = " America/New_York"
+	timeZoneBadSuffix     = "America/New_York "
+	timeZoneBadName       = "America/New York"
+	timeZoneEmptySpace    = " "
+)
+
 var ignoreErrValueDetail = cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail")
 
 func getValidManualSelector() *metav1.LabelSelector {
@@ -902,9 +914,26 @@ func TestValidateCronJob(t *testing.T) {
 				},
 			},
 		},
+		"correct timeZone value casing": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mycronjob",
+				Namespace: metav1.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.CronJobSpec{
+				Schedule:          "0 * * * *",
+				TimeZone:          &timeZoneCorrectCasing,
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+		},
 	}
 	for k, v := range successCases {
-		if errs := ValidateCronJob(&v, corevalidation.PodValidationOptions{}); len(errs) != 0 {
+		if errs := ValidateCronJobCreate(&v, corevalidation.PodValidationOptions{}); len(errs) != 0 {
 			t.Errorf("expected success for %s: %v", k, errs)
 		}
 
@@ -945,6 +974,142 @@ func TestValidateCronJob(t *testing.T) {
 			},
 			Spec: batch.CronJobSpec{
 				Schedule:          "",
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+		},
+		"spec.schedule: cannot use both timeZone field and TZ or CRON_TZ in schedule": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mycronjob",
+				Namespace: metav1.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.CronJobSpec{
+				Schedule:          "TZ=UTC 0 * * * *",
+				TimeZone:          &timeZoneUTC,
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+		},
+		"spec.timeZone: timeZone must be nil or non-empty string": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mycronjob",
+				Namespace: metav1.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.CronJobSpec{
+				Schedule:          "0 * * * *",
+				TimeZone:          &timeZoneEmpty,
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+		},
+		"spec.timeZone: timeZone must be an explicit time zone as defined in https://www.iana.org/time-zones": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mycronjob",
+				Namespace: metav1.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.CronJobSpec{
+				Schedule:          "0 * * * *",
+				TimeZone:          &timeZoneLocal,
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+		},
+		"spec.timeZone: Invalid value: \"AMERICA/new_york\": unknown time zone AMERICA/new_york": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mycronjob",
+				Namespace: metav1.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.CronJobSpec{
+				Schedule:          "0 * * * *",
+				TimeZone:          &timeZoneBadCasing,
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+		},
+		"spec.timeZone: Invalid value: \" America/New_York\": unknown time zone  America/New_York": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mycronjob",
+				Namespace: metav1.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.CronJobSpec{
+				Schedule:          "0 * * * *",
+				TimeZone:          &timeZoneBadPrefix,
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+		},
+		"spec.timeZone: Invalid value: \"America/New_York \": unknown time zone America/New_York ": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mycronjob",
+				Namespace: metav1.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.CronJobSpec{
+				Schedule:          "0 * * * *",
+				TimeZone:          &timeZoneBadSuffix,
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+		},
+		"spec.timeZone: Invalid value: \"America/New York\": unknown time zone  America/New York": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mycronjob",
+				Namespace: metav1.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.CronJobSpec{
+				Schedule:          "0 * * * *",
+				TimeZone:          &timeZoneBadName,
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+		},
+		"spec.timeZone: Invalid value: \" \": unknown time zone  ": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mycronjob",
+				Namespace: metav1.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.CronJobSpec{
+				Schedule:          "0 * * * *",
+				TimeZone:          &timeZoneEmptySpace,
 				ConcurrencyPolicy: batch.AllowConcurrent,
 				JobTemplate: batch.JobTemplateSpec{
 					Spec: batch.JobSpec{
@@ -1185,7 +1350,7 @@ func TestValidateCronJob(t *testing.T) {
 	}
 
 	for k, v := range errorCases {
-		errs := ValidateCronJob(&v, corevalidation.PodValidationOptions{})
+		errs := ValidateCronJobCreate(&v, corevalidation.PodValidationOptions{})
 		if len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		} else {
@@ -1198,9 +1363,14 @@ func TestValidateCronJob(t *testing.T) {
 
 		// Update validation should fail all failure cases other than the 52 character name limit
 		// copy to avoid polluting the testcase object, set a resourceVersion to allow validating update, and test a no-op update
-		v = *v.DeepCopy()
-		v.ResourceVersion = "1"
-		errs = ValidateCronJobUpdate(&v, &v, corevalidation.PodValidationOptions{})
+		oldSpec := *v.DeepCopy()
+		oldSpec.ResourceVersion = "1"
+		oldSpec.Spec.TimeZone = nil
+
+		newSpec := *v.DeepCopy()
+		newSpec.ResourceVersion = "2"
+
+		errs = ValidateCronJobUpdate(&newSpec, &oldSpec, corevalidation.PodValidationOptions{})
 		if len(errs) == 0 {
 			if k == "metadata.name: must be no more than 52 characters" {
 				continue
@@ -1212,6 +1382,208 @@ func TestValidateCronJob(t *testing.T) {
 			if err.Field != s[0] || !strings.Contains(err.Error(), s[1]) {
 				t.Errorf("unexpected error: %v, expected: %s", err, k)
 			}
+		}
+	}
+}
+
+func TestValidateCronJobSpec(t *testing.T) {
+	validPodTemplateSpec := getValidPodTemplateSpecForGenerated(getValidGeneratedSelector())
+	validPodTemplateSpec.Labels = map[string]string{}
+
+	type testCase struct {
+		old       *batch.CronJobSpec
+		new       *batch.CronJobSpec
+		expectErr bool
+	}
+
+	cases := map[string]testCase{
+		"no validation because timeZone is nil for old and new": {
+			old: &batch.CronJobSpec{
+				Schedule:          "0 * * * *",
+				TimeZone:          nil,
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+			new: &batch.CronJobSpec{
+				Schedule:          "0 * * * *",
+				TimeZone:          nil,
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+		},
+		"check validation because timeZone is different for new": {
+			old: &batch.CronJobSpec{
+				Schedule:          "0 * * * *",
+				TimeZone:          nil,
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+			new: &batch.CronJobSpec{
+				Schedule:          "0 * * * *",
+				TimeZone:          pointer.String("America/New_York"),
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+		},
+		"check validation because timeZone is different for new and invalid": {
+			old: &batch.CronJobSpec{
+				Schedule:          "0 * * * *",
+				TimeZone:          nil,
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+			new: &batch.CronJobSpec{
+				Schedule:          "0 * * * *",
+				TimeZone:          pointer.String("broken"),
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+			expectErr: true,
+		},
+		"old timeZone and new timeZone are valid": {
+			old: &batch.CronJobSpec{
+				Schedule:          "0 * * * *",
+				TimeZone:          pointer.String("America/New_York"),
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+			new: &batch.CronJobSpec{
+				Schedule:          "0 * * * *",
+				TimeZone:          pointer.String("America/Chicago"),
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+		},
+		"old timeZone is valid, but new timeZone is invalid": {
+			old: &batch.CronJobSpec{
+				Schedule:          "0 * * * *",
+				TimeZone:          pointer.String("America/New_York"),
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+			new: &batch.CronJobSpec{
+				Schedule:          "0 * * * *",
+				TimeZone:          pointer.String("broken"),
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+			expectErr: true,
+		},
+		"old timeZone and new timeZone are invalid, but unchanged": {
+			old: &batch.CronJobSpec{
+				Schedule:          "0 * * * *",
+				TimeZone:          pointer.String("broken"),
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+			new: &batch.CronJobSpec{
+				Schedule:          "0 * * * *",
+				TimeZone:          pointer.String("broken"),
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+		},
+		"old timeZone and new timeZone are invalid, but different": {
+			old: &batch.CronJobSpec{
+				Schedule:          "0 * * * *",
+				TimeZone:          pointer.String("broken"),
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+			new: &batch.CronJobSpec{
+				Schedule:          "0 * * * *",
+				TimeZone:          pointer.String("still broken"),
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+			expectErr: true,
+		},
+		"old timeZone is invalid, but new timeZone is valid": {
+			old: &batch.CronJobSpec{
+				Schedule:          "0 * * * *",
+				TimeZone:          pointer.String("broken"),
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+			new: &batch.CronJobSpec{
+				Schedule:          "0 * * * *",
+				TimeZone:          pointer.String("America/New_York"),
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+		},
+	}
+
+	for k, v := range cases {
+		errs := validateCronJobSpec(v.new, v.old, field.NewPath("spec"), corevalidation.PodValidationOptions{})
+		if len(errs) > 0 && !v.expectErr {
+			t.Errorf("unexpected error for %s: %v", k, errs)
+		} else if len(errs) == 0 && v.expectErr {
+			t.Errorf("expected error for %s but got nil", k)
 		}
 	}
 }
