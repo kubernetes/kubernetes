@@ -66,7 +66,7 @@ func TestParseWithBadValue(t *testing.T) {
 		expectedNavigationSteps: navigationSteps{
 			steps: []navigationStep{},
 		},
-		expectedError: "unable to parse user.bad after [] at api.Config",
+		expectedError: "unable to parse user.bad at user",
 	}
 
 	test.run(t)
