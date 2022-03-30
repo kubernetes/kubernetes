@@ -1281,7 +1281,8 @@ func newV1beta1WebhookHandler(t *testing.T, holder *holder, phase string, conver
 		}
 
 		if review.GetObjectKind().GroupVersionKind() != gvk("admission.k8s.io", "v1beta1", "AdmissionReview") {
-			t.Errorf("Invalid admission review kind: %#v", review.GetObjectKind().GroupVersionKind())
+			err := fmt.Errorf("Invalid admission review kind: %#v", review.GetObjectKind().GroupVersionKind())
+			t.Error(err)
 			http.Error(w, err.Error(), 400)
 			return
 		}
