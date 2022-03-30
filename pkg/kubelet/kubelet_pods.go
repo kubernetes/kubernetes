@@ -826,19 +826,6 @@ func (kl *Kubelet) podFieldSelectorRuntimeValue(fs *v1.ObjectFieldSelector, pod 
 			return "", err
 		}
 		return hostIPs[0].String(), nil
-	case "status.hostIPs":
-		if !utilfeature.DefaultFeatureGate.Enabled(features.PodHostIPs) {
-			return "", nil
-		}
-		hostIPs, err := kl.getHostIPsAnyWay()
-		if err != nil {
-			return "", err
-		}
-		ips := make([]string, 0, len(hostIPs))
-		for _, ip := range hostIPs {
-			ips = append(ips, ip.String())
-		}
-		return strings.Join(ips, ","), nil
 	case "status.podIP":
 		return podIP, nil
 	case "status.podIPs":
@@ -1530,13 +1517,6 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 			klog.V(4).InfoS("Cannot get host IPs", "err", err)
 		} else {
 			s.HostIP = hostIPs[0].String()
-			if utilfeature.DefaultFeatureGate.Enabled(features.PodHostIPs) {
-				ips := make([]v1.HostIP, 0, len(hostIPs))
-				for _, hostIP := range hostIPs {
-					ips = append(ips, v1.HostIP{IP: hostIP.String()})
-				}
-				s.HostIPs = ips
-			}
 			// HostNetwork Pods inherit the node IPs as PodIPs. They are immutable once set,
 			// other than that if the node becomes dual-stack, we add the secondary IP.
 			if kubecontainer.IsHostNetworkPod(pod) {

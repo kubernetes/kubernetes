@@ -1159,8 +1159,6 @@ status:
         message: messageValue
         reason: reasonValue
   hostIP: hostIPValue
-  hostIPs:
-  - ip: ipValue
   initContainerStatuses:
   - containerID: containerIDValue
     image: imageValue

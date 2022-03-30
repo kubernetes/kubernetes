@@ -88,7 +88,6 @@ func ConvertDownwardAPIFieldLabel(version, label, value string) (string, string,
 		"spec.schedulerName",
 		"status.phase",
 		"status.hostIP",
-		"status.hostIPs",
 		"status.podIP",
 		"status.podIPs":
 		return label, value, nil

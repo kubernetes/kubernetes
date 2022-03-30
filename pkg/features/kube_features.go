@@ -412,13 +412,6 @@ const (
 	// Enables ipv6 dual stack
 	IPv6DualStack featuregate.Feature = "IPv6DualStack"
 
-	// owner: @wzshiming
-	// kep: http://kep.k8s.io/2681
-	// alpha: v1.24
-	//
-	// Adds pod.status.hostIPs and downward API
-	PodHostIPs featuregate.Feature = "PodHostIPs"
-
 	// owner: @robscott @freehan
 	// kep: http://kep.k8s.io/752
 	// alpha: v1.16
@@ -943,7 +936,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	NonPreemptingPriority:                          {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.25
 	PodOverhead:                                    {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
 	IPv6DualStack:                                  {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.25
-	PodHostIPs:                                     {Default: false, PreRelease: featuregate.Alpha},
 	EndpointSlice:                                  {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.25
 	EndpointSliceProxying:                          {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.25
 	EndpointSliceTerminatingCondition:              {Default: true, PreRelease: featuregate.Beta},
