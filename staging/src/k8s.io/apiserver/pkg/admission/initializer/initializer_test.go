@@ -65,6 +65,18 @@ func TestWantsExternalKubeInformerFactory(t *testing.T) {
 	}
 }
 
+// TestWantsShutdownSignal ensures that the shutdown signal is injected
+// when the WantsShutdownSignal interface is implemented by a plugin.
+func TestWantsShutdownSignal(t *testing.T) {
+	stopCh := make(chan struct{})
+	target := initializer.New(nil, nil, &TestAuthorizer{}, nil, stopCh)
+	wantShutdownSignalAdmission := &WantShutdownSignalAdmission{}
+	target.Initialize(wantShutdownSignalAdmission)
+	if wantShutdownSignalAdmission.stopCh != stopCh {
+		t.Errorf("expected shutdown signal to be initialized")
+	}
+}
+
 // WantExternalKubeInformerFactory is a test stub that fulfills the WantsExternalKubeInformerFactory interface
 type WantExternalKubeInformerFactory struct {
 	sf informers.SharedInformerFactory
@@ -113,6 +125,22 @@ func (self *WantAuthorizerAdmission) ValidateInitialization() error      { retur
 
 var _ admission.Interface = &WantAuthorizerAdmission{}
 var _ initializer.WantsAuthorizer = &WantAuthorizerAdmission{}
+
+type WantShutdownSignalAdmission struct {
+	stopCh <-chan struct{}
+}
+
+func (self *WantShutdownSignalAdmission) SetShutdownSignal(stopCh <-chan struct{}) {
+	self.stopCh = stopCh
+}
+func (self *WantShutdownSignalAdmission) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
+	return nil
+}
+func (self *WantShutdownSignalAdmission) Handles(o admission.Operation) bool { return false }
+func (self *WantShutdownSignalAdmission) ValidateInitialization() error      { return nil }
+
+var _ admission.Interface = &WantShutdownSignalAdmission{}
+var _ initializer.WantsShutdownSignal = &WantShutdownSignalAdmission{}
 
 // TestAuthorizer is a test stub that fulfills the WantsAuthorizer interface.
 type TestAuthorizer struct{}

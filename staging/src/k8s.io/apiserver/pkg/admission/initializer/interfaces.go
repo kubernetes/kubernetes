@@ -59,3 +59,9 @@ type WantsFeatures interface {
 	InspectFeatureGates(featuregate.FeatureGate)
 	admission.InitializationValidator
 }
+
+// WantsShutdownSignal defines a function which sets stop chan for admission plugins that need it.
+type WantsShutdownSignal interface {
+	SetShutdownSignal(<-chan struct{})
+	admission.InitializationValidator
+}

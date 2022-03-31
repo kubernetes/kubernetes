@@ -70,6 +70,10 @@ func (i pluginInitializer) Initialize(plugin admission.Interface) {
 	if wants, ok := plugin.(WantsAuthorizer); ok {
 		wants.SetAuthorizer(i.authorizer)
 	}
+
+	if wants, ok := plugin.(WantsShutdownSignal); ok {
+		wants.SetShutdownSignal(i.stopCh)
+	}
 }
 
 var _ admission.PluginInitializer = pluginInitializer{}
