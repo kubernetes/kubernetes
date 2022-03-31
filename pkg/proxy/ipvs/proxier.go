@@ -2010,11 +2010,11 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 		newEndpoints.Insert(epInfo.String())
 	}
 	if onlyNodeLocalEndpoints && len(newEndpoints) == 0 {
-		if svcInfo.NodeLocalInternal() && utilfeature.DefaultFeatureGate.Enabled(features.ServiceInternalTrafficPolicy) {
+		if svcInfo.InternalPolicyLocal() && utilfeature.DefaultFeatureGate.Enabled(features.ServiceInternalTrafficPolicy) {
 			proxier.serviceNoLocalEndpointsInternal.Insert(svcPortName.NamespacedName.String())
 		}
 
-		if svcInfo.NodeLocalExternal() {
+		if svcInfo.ExternalPolicyLocal() {
 			proxier.serviceNoLocalEndpointsExternal.Insert(svcPortName.NamespacedName.String())
 		}
 	}
