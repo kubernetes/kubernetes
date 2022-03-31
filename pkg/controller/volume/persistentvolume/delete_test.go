@@ -18,6 +18,9 @@ package persistentvolume
 
 import (
 	"errors"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -31,6 +34,9 @@ import (
 // 2. Call the syncVolume *once*.
 // 3. Compare resulting volumes with expected volumes.
 func TestDeleteSync(t *testing.T) {
+	const gceDriver = "pd.csi.storage.gke.io"
+	// Default enable the HonorPVReclaimPolicy feature gate.
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HonorPVReclaimPolicy, true)()
 	tests := []controllerTest{
 		{
 			// delete volume bound by controller
@@ -132,8 +138,8 @@ func TestDeleteSync(t *testing.T) {
 		{
 			// PV requires external deleter
 			"8-10 - external deleter",
-			newVolumeArray("volume8-10", "1Gi", "uid10-1", "claim10-1", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty, volume.AnnBoundByController),
-			newVolumeArray("volume8-10", "1Gi", "uid10-1", "claim10-1", v1.VolumeReleased, v1.PersistentVolumeReclaimDelete, classEmpty, volume.AnnBoundByController),
+			[]*v1.PersistentVolume{newExternalProvisionedVolume("volume8-10", "1Gi", "uid10-1", "claim10-1", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty, gceDriver, nil, volume.AnnBoundByController)},
+			[]*v1.PersistentVolume{newExternalProvisionedVolume("volume8-10", "1Gi", "uid10-1", "claim10-1", v1.VolumeReleased, v1.PersistentVolumeReclaimDelete, classEmpty, gceDriver, nil, volume.AnnBoundByController)},
 			noclaims,
 			noclaims,
 			noevents, noerrors,
@@ -169,12 +175,12 @@ func TestDeleteSync(t *testing.T) {
 			// external provisioner.
 			"8-12 - two PVs externally provisioned for a single claim",
 			[]*v1.PersistentVolume{
-				newVolume("volume8-12-1", "1Gi", "uid8-12", "claim8-12", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty, volume.AnnDynamicallyProvisioned),
-				newVolume("volume8-12-2", "1Gi", "uid8-12", "claim8-12", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty, volume.AnnDynamicallyProvisioned),
+				newExternalProvisionedVolume("volume8-12-1", "1Gi", "uid8-12", "claim8-12", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty, gceDriver, nil, volume.AnnDynamicallyProvisioned),
+				newExternalProvisionedVolume("volume8-12-2", "1Gi", "uid8-12", "claim8-12", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty, gceDriver, nil, volume.AnnDynamicallyProvisioned),
 			},
 			[]*v1.PersistentVolume{
-				newVolume("volume8-12-1", "1Gi", "uid8-12", "claim8-12", v1.VolumeReleased, v1.PersistentVolumeReclaimDelete, classEmpty, volume.AnnDynamicallyProvisioned),
-				newVolume("volume8-12-2", "1Gi", "uid8-12", "claim8-12", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty, volume.AnnDynamicallyProvisioned),
+				newExternalProvisionedVolume("volume8-12-1", "1Gi", "uid8-12", "claim8-12", v1.VolumeReleased, v1.PersistentVolumeReclaimDelete, classEmpty, gceDriver, nil, volume.AnnDynamicallyProvisioned),
+				newExternalProvisionedVolume("volume8-12-2", "1Gi", "uid8-12", "claim8-12", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty, gceDriver, nil, volume.AnnDynamicallyProvisioned),
 			},
 			// the claim is bound to volume8-12-2 -> volume8-12-1 has lost the race and will be "Released"
 			newClaimArray("claim8-12", "uid8-12", "10Gi", "volume8-12-2", v1.ClaimBound, nil),
