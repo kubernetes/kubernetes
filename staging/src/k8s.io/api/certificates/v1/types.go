@@ -212,7 +212,6 @@ type CertificateSigningRequestStatus struct {
 }
 
 // RequestConditionType is the type of a CertificateSigningRequestCondition
-// +enum
 type RequestConditionType string
 
 // Well-known condition types for certificate requests.
