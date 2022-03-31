@@ -23,6 +23,7 @@ import (
 
 	jsonpath "github.com/exponent-io/jsonpath"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/rest/fake"
@@ -238,5 +239,52 @@ func TestPatchSubresource(t *testing.T) {
 	// check the status.phase value is updated in the response
 	if actualStatus != expectedStatus {
 		t.Errorf("unexpected pod status to be set to %s got: %s", expectedStatus, actualStatus)
+	}
+}
+
+func TestPatchIgnoreNotFound(t *testing.T) {
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	ns := &corev1.NamespaceList{
+		ListMeta: metav1.ListMeta{
+			ResourceVersion: "1",
+		},
+		Items: []corev1.Namespace{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "testns", Namespace: "test", ResourceVersion: "11"},
+				Spec:       corev1.NamespaceSpec{},
+			},
+		},
+	}
+
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == "/namespaces/test/pods/nonexistentpod" && (m == "PATCH" || m == "GET"):
+				return &http.Response{StatusCode: http.StatusNotFound, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.StringBody("")}, nil
+			case p == "/api/v1/namespaces/test" && m == "GET":
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &ns.Items[0])}, nil
+			default:
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+	stream, _, buf, _ := genericclioptions.NewTestIOStreams()
+
+	cmd := NewCmdPatch(tf, stream)
+	cmd.Flags().Set("namespace", "test")
+	cmd.Flags().Set("ignore-not-found", "true")
+	cmd.Flags().Set("patch", `{"spec":{"type":"NodePort"}}`)
+	cmd.Flags().Set("output", "name")
+	cmd.Run(cmd, []string{"pod/nonexistentpod"})
+
+	// uses the name from the response
+	if buf.String() != "" {
+		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
