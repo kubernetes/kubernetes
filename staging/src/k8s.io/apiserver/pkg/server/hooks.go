@@ -73,6 +73,10 @@ type PostStartHookConfigEntry struct {
 	originatingStack string
 }
 
+type PreShutdownHookConfigEntry struct {
+	hook PreShutdownHookFunc
+}
+
 type preShutdownHookEntry struct {
 	hook PreShutdownHookFunc
 }

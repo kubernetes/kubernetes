@@ -128,7 +128,8 @@ type Config struct {
 
 	DisabledPostStartHooks sets.String
 	// done values in this values for this map are ignored.
-	PostStartHooks map[string]PostStartHookConfigEntry
+	PostStartHooks   map[string]PostStartHookConfigEntry
+	PreShutdownHooks map[string]PreShutdownHookConfigEntry
 
 	// Version will enable the /version endpoint if non-nil
 	Version *version.Info
@@ -335,6 +336,7 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 		LegacyAPIGroupPrefixes:      sets.NewString(DefaultLegacyAPIPrefix),
 		DisabledPostStartHooks:      sets.NewString(),
 		PostStartHooks:              map[string]PostStartHookConfigEntry{},
+		PreShutdownHooks:            map[string]PreShutdownHookConfigEntry{},
 		HealthzChecks:               append([]healthz.HealthChecker{}, defaultHealthChecks...),
 		ReadyzChecks:                append([]healthz.HealthChecker{}, defaultHealthChecks...),
 		LivezChecks:                 append([]healthz.HealthChecker{}, defaultHealthChecks...),
@@ -533,6 +535,32 @@ func (c *Config) StopNotify() <-chan struct{} {
 	return c.lifecycleSignals.ShutdownInitiated.Signaled()
 }
 
+// AddPreShutdownHook allows you to add a PreShutdownHook that will later be added to the server itself in a New call.
+// Name conflicts will cause an error.
+func (c *Config) AddPreShutdownHook(name string, hook PreShutdownHookFunc) error {
+	if len(name) == 0 {
+		return fmt.Errorf("missing name")
+	}
+	if hook == nil {
+		return fmt.Errorf("hook func may not be nil: %q", name)
+	}
+
+	if _, exists := c.PreShutdownHooks[name]; exists {
+		// this is programmer error, but it can be hard to debug
+		return fmt.Errorf("unable to add %q because it is already registered", name)
+	}
+	c.PreShutdownHooks[name] = PreShutdownHookConfigEntry{hook: hook}
+
+	return nil
+}
+
+// AddPreShutdownHookOrDie allows you to add a PreShutdownHook, but dies on failure.
+func (c *Config) AddPreShutdownHookOrDie(name string, hook PreShutdownHookFunc) {
+	if err := c.AddPreShutdownHook(name, hook); err != nil {
+		klog.Fatalf("Error registering PreShutdownHook %q: %v", name, err)
+	}
+}
+
 // Complete fills in any fields not set that are required to have valid data and can be derived
 // from other fields. If you're going to `ApplyOptions`, do that first. It's mutating the receiver.
 func (c *Config) Complete(informers informers.SharedInformerFactory) CompletedConfig {
@@ -684,6 +712,13 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 	// add poststarthooks that were preconfigured.  Using the add method will give us an error if the same name has already been registered.
 	for name, preconfiguredPostStartHook := range c.PostStartHooks {
 		if err := s.AddPostStartHook(name, preconfiguredPostStartHook.hook); err != nil {
+			return nil, err
+		}
+	}
+
+	// add preshutdownhooks that were preconfigured.  Using the add method will give us an error if the same name has already been registered.
+	for name, preconfiguredPreShutdownHook := range c.PreShutdownHooks {
+		if err := s.AddPreShutdownHook(name, preconfiguredPreShutdownHook.hook); err != nil {
 			return nil, err
 		}
 	}

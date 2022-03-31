@@ -50,6 +50,7 @@ func createAPIExtensionsConfig(
 	// most of the config actually remains the same.  We only need to mess with a couple items related to the particulars of the apiextensions
 	genericConfig := kubeAPIServerConfig
 	genericConfig.PostStartHooks = map[string]genericapiserver.PostStartHookConfigEntry{}
+	genericConfig.PreShutdownHooks = map[string]genericapiserver.PreShutdownHookConfigEntry{}
 	genericConfig.RESTOptionsGetter = nil
 
 	// override genericConfig.AdmissionControl with apiextensions' scheme,
@@ -94,8 +95,9 @@ func createAPIExtensionsConfig(
 		},
 	}
 
-	// we need to clear the poststarthooks so we don't add them multiple times to all the servers (that fails)
+	// we need to clear the poststarthooks & preshutdownhooks so we don't add them multiple times to all the servers (that fails)
 	apiextensionsConfig.GenericConfig.PostStartHooks = map[string]genericapiserver.PostStartHookConfigEntry{}
+	apiextensionsConfig.GenericConfig.PreShutdownHooks = map[string]genericapiserver.PreShutdownHookConfigEntry{}
 
 	return apiextensionsConfig, nil
 }

@@ -65,6 +65,7 @@ func createAggregatorConfig(
 	// most of the config actually remains the same.  We only need to mess with a couple items related to the particulars of the aggregator
 	genericConfig := kubeAPIServerConfig
 	genericConfig.PostStartHooks = map[string]genericapiserver.PostStartHookConfigEntry{}
+	genericConfig.PreShutdownHooks = map[string]genericapiserver.PreShutdownHookConfigEntry{}
 	genericConfig.RESTOptionsGetter = nil
 	// prevent generic API server from installing the OpenAPI handler. Aggregator server
 	// has its own customized OpenAPI handler.
@@ -118,8 +119,9 @@ func createAggregatorConfig(
 		},
 	}
 
-	// we need to clear the poststarthooks so we don't add them multiple times to all the servers (that fails)
+	// we need to clear the poststarthooks & preshutdownhooks so we don't add them multiple times to all the servers (that fails)
 	aggregatorConfig.GenericConfig.PostStartHooks = map[string]genericapiserver.PostStartHookConfigEntry{}
+	aggregatorConfig.GenericConfig.PreShutdownHooks = map[string]genericapiserver.PreShutdownHookConfigEntry{}
 
 	return aggregatorConfig, nil
 }
