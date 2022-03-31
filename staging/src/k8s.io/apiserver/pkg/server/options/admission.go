@@ -143,7 +143,16 @@ func (a *AdmissionOptions) ApplyTo(
 	if err != nil {
 		return err
 	}
-	genericInitializer := initializer.New(clientset, informers, c.Authorization.Authorizer, features)
+
+	stopCh := make(chan struct{})
+	if err := c.AddPreShutdownHook("start-admission-uninitializer", func() error {
+		close(stopCh)
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	genericInitializer := initializer.New(clientset, informers, c.Authorization.Authorizer, features, stopCh)
 	initializersChain := admission.PluginInitializers{}
 	pluginInitializers = append(pluginInitializers, genericInitializer)
 	initializersChain = append(initializersChain, pluginInitializers...)

@@ -29,6 +29,7 @@ type pluginInitializer struct {
 	externalInformers informers.SharedInformerFactory
 	authorizer        authorizer.Authorizer
 	featureGates      featuregate.FeatureGate
+	stopCh            <-chan struct{}
 }
 
 // New creates an instance of admission plugins initializer.
@@ -39,12 +40,14 @@ func New(
 	extInformers informers.SharedInformerFactory,
 	authz authorizer.Authorizer,
 	featureGates featuregate.FeatureGate,
+	stopCh <-chan struct{},
 ) pluginInitializer {
 	return pluginInitializer{
 		externalClient:    extClientset,
 		externalInformers: extInformers,
 		authorizer:        authz,
 		featureGates:      featureGates,
+		stopCh:            stopCh,
 	}
 }
 
