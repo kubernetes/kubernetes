@@ -32,7 +32,6 @@ type PodStatusApplyConfiguration struct {
 	Reason                     *string                             `json:"reason,omitempty"`
 	NominatedNodeName          *string                             `json:"nominatedNodeName,omitempty"`
 	HostIP                     *string                             `json:"hostIP,omitempty"`
-	HostIPs                    []HostIPApplyConfiguration          `json:"hostIPs,omitempty"`
 	PodIP                      *string                             `json:"podIP,omitempty"`
 	PodIPs                     []PodIPApplyConfiguration           `json:"podIPs,omitempty"`
 	StartTime                  *metav1.Time                        `json:"startTime,omitempty"`
@@ -98,19 +97,6 @@ func (b *PodStatusApplyConfiguration) WithNominatedNodeName(value string) *PodSt
 // If called multiple times, the HostIP field is set to the value of the last call.
 func (b *PodStatusApplyConfiguration) WithHostIP(value string) *PodStatusApplyConfiguration {
 	b.HostIP = &value
-	return b
-}
-
-// WithHostIPs adds the given value to the HostIPs field in the declarative configuration
-// and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the HostIPs field.
-func (b *PodStatusApplyConfiguration) WithHostIPs(values ...*HostIPApplyConfiguration) *PodStatusApplyConfiguration {
-	for i := range values {
-		if values[i] == nil {
-			panic("nil value passed to WithHostIPs")
-		}
-		b.HostIPs = append(b.HostIPs, *values[i])
-	}
 	return b
 }
 

@@ -38,10 +38,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	netutils "k8s.io/utils/net"
 
 	// TODO: remove this import if
@@ -49,7 +47,6 @@ import (
 	// to "v1"?
 
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
-	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cri/streaming/portforward"
@@ -2473,10 +2470,6 @@ func TestConvertToAPIContainerStatuses(t *testing.T) {
 }
 
 func Test_generateAPIPodStatus(t *testing.T) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PodHostIPs) {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodHostIPs, true)()
-	}
-
 	desiredState := v1.PodSpec{
 		NodeName: "machine",
 		Containers: []v1.Container{
@@ -2517,7 +2510,6 @@ func Test_generateAPIPodStatus(t *testing.T) {
 			expected: v1.PodStatus{
 				Phase:    v1.PodRunning,
 				HostIP:   "127.0.0.1",
-				HostIPs:  []v1.HostIP{{IP: "127.0.0.1"}},
 				QOSClass: v1.PodQOSBestEffort,
 				Conditions: []v1.PodCondition{
 					{Type: v1.PodInitialized, Status: v1.ConditionTrue},
@@ -2552,7 +2544,6 @@ func Test_generateAPIPodStatus(t *testing.T) {
 			expected: v1.PodStatus{
 				Phase:    v1.PodRunning,
 				HostIP:   "127.0.0.1",
-				HostIPs:  []v1.HostIP{{IP: "127.0.0.1"}},
 				QOSClass: v1.PodQOSBestEffort,
 				Conditions: []v1.PodCondition{
 					{Type: v1.PodInitialized, Status: v1.ConditionTrue},
@@ -2588,7 +2579,6 @@ func Test_generateAPIPodStatus(t *testing.T) {
 			expected: v1.PodStatus{
 				Phase:    v1.PodSucceeded,
 				HostIP:   "127.0.0.1",
-				HostIPs:  []v1.HostIP{{IP: "127.0.0.1"}},
 				QOSClass: v1.PodQOSBestEffort,
 				Conditions: []v1.PodCondition{
 					{Type: v1.PodInitialized, Status: v1.ConditionTrue, Reason: "PodCompleted"},
@@ -2628,7 +2618,6 @@ func Test_generateAPIPodStatus(t *testing.T) {
 			expected: v1.PodStatus{
 				Phase:    v1.PodSucceeded,
 				HostIP:   "127.0.0.1",
-				HostIPs:  []v1.HostIP{{IP: "127.0.0.1"}},
 				QOSClass: v1.PodQOSBestEffort,
 				Conditions: []v1.PodCondition{
 					{Type: v1.PodInitialized, Status: v1.ConditionTrue, Reason: "PodCompleted"},
@@ -2677,7 +2666,6 @@ func Test_generateAPIPodStatus(t *testing.T) {
 			expected: v1.PodStatus{
 				Phase:    v1.PodSucceeded,
 				HostIP:   "127.0.0.1",
-				HostIPs:  []v1.HostIP{{IP: "127.0.0.1"}},
 				QOSClass: v1.PodQOSBestEffort,
 				Conditions: []v1.PodCondition{
 					{Type: v1.PodInitialized, Status: v1.ConditionTrue, Reason: "PodCompleted"},
@@ -2715,7 +2703,6 @@ func Test_generateAPIPodStatus(t *testing.T) {
 			expected: v1.PodStatus{
 				Phase:    v1.PodPending,
 				HostIP:   "127.0.0.1",
-				HostIPs:  []v1.HostIP{{IP: "127.0.0.1"}},
 				QOSClass: v1.PodQOSBestEffort,
 				Conditions: []v1.PodCondition{
 					{Type: v1.PodInitialized, Status: v1.ConditionTrue},
@@ -2765,7 +2752,6 @@ func Test_generateAPIPodStatus(t *testing.T) {
 				Reason:   "Test",
 				Message:  "test",
 				HostIP:   "127.0.0.1",
-				HostIPs:  []v1.HostIP{{IP: "127.0.0.1"}},
 				QOSClass: v1.PodQOSBestEffort,
 				Conditions: []v1.PodCondition{
 					{Type: v1.PodInitialized, Status: v1.ConditionTrue},
@@ -2819,7 +2805,6 @@ func Test_generateAPIPodStatus(t *testing.T) {
 			expected: v1.PodStatus{
 				Phase:    v1.PodRunning,
 				HostIP:   "127.0.0.1",
-				HostIPs:  []v1.HostIP{{IP: "127.0.0.1"}},
 				QOSClass: v1.PodQOSBestEffort,
 				Conditions: []v1.PodCondition{
 					{Type: v1.PodInitialized, Status: v1.ConditionTrue},

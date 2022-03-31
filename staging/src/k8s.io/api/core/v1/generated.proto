@@ -1767,12 +1767,6 @@ message HostAlias {
   repeated string hostnames = 2;
 }
 
-// HostIP address information for entries in the (plural) HostIPs field.
-message HostIP {
-  // IP is the IP address assigned to the host
-  optional string ip = 1;
-}
-
 // Represents a host path mapped into a pod.
 // Host path volumes do not support ownership management or SELinux relabeling.
 message HostPathVolumeSource {
@@ -3236,9 +3230,11 @@ message PodExecOptions {
   repeated string command = 6;
 }
 
-// PodIP address information for entries in the (plural) PodIPs field.
+// IP address information for entries in the (plural) PodIPs field.
+// Each entry includes:
+//    IP: An IP address allocated to the pod. Routable at least within the cluster.
 message PodIP {
-  // IP is the IP address assigned to the pod
+  // ip is an IP address (IPv4 or IPv6) assigned to the pod
   optional string ip = 1;
 }
 
@@ -3778,24 +3774,11 @@ message PodStatus {
   // +optional
   optional string nominatedNodeName = 11;
 
-  // hostIP holds the IP address of the host to which the pod is assigned.
-  // Empty if the pod has not started yet.
-  // A pod can be assigned to a node that has a problem in kubelet which in turns mean that HostIP will
-  // not be updated even if there is node is assigned to pod
+  // IP address of the host to which the pod is assigned. Empty if not yet scheduled.
   // +optional
   optional string hostIP = 5;
 
-  // hostIPs holds the IP addresses allocated to the host. If this field is specified, the first entry must
-  // match the hostIP field. This list is empty if the pod has not started yet.
-  // A pod can be assigned to a node that has a problem in kubelet which in turns means that HostIPs will
-  // not be updated even if there is a node is assigned to this pod.
-  // +optional
-  // +patchStrategy=merge
-  // +patchMergeKey=ip
-  // +listType=set
-  repeated HostIP hostIPs = 14;
-
-  // podIP address allocated to the pod. Routable at least within the cluster.
+  // IP address allocated to the pod. Routable at least within the cluster.
   // Empty if not yet allocated.
   // +optional
   optional string podIP = 6;
