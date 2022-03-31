@@ -52,6 +52,8 @@ import (
 // can't reliably simulate periodic sync of volumes/claims - it would be
 // either very timing-sensitive or slow to wait for real periodic sync.
 func TestControllerSync(t *testing.T) {
+	// Default enable the HonorPVReclaimPolicy feature gate.
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HonorPVReclaimPolicy, true)()
 	tests := []controllerTest{
 		// [Unit test set 5] - controller tests.
 		// We test the controller as if
@@ -162,10 +164,8 @@ func TestControllerSync(t *testing.T) {
 			// deleteClaim with a bound claim makes bound volume released with external deleter pending
 			// there should be an entry in operation timestamps cache in controller
 			"5-6 - delete claim and waiting for external volume deletion",
-			volumesWithAnnotation(volume.AnnDynamicallyProvisioned, "gcr.io/vendor-csi",
-				newVolumeArray("volume5-6", "10Gi", "uid5-6", "claim5-6", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classExternal, volume.AnnBoundByController)),
-			volumesWithAnnotation(volume.AnnDynamicallyProvisioned, "gcr.io/vendor-csi",
-				newVolumeArray("volume5-6", "10Gi", "uid5-6", "claim5-6", v1.VolumeReleased, v1.PersistentVolumeReclaimDelete, classExternal, volume.AnnBoundByController)),
+			volumesWithAnnotation(volume.AnnDynamicallyProvisioned, "gcr.io/vendor-csi", []*v1.PersistentVolume{newExternalProvisionedVolume("volume5-6", "10Gi", "uid5-6", "claim5-6", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classExternal, "fake.driver.csi", nil, volume.AnnBoundByController)}),
+			volumesWithAnnotation(volume.AnnDynamicallyProvisioned, "gcr.io/vendor-csi", []*v1.PersistentVolume{newExternalProvisionedVolume("volume5-6", "10Gi", "uid5-6", "claim5-6", v1.VolumeReleased, v1.PersistentVolumeReclaimDelete, classExternal, "fake.driver.csi", nil, volume.AnnBoundByController)}),
 			claimWithAnnotation(volume.AnnStorageProvisioner, "gcr.io/vendor-csi",
 				newClaimArray("claim5-6", "uid5-6", "1Gi", "volume5-6", v1.ClaimBound, &classExternal, volume.AnnBoundByController, volume.AnnBindCompleted)),
 			noclaims,
@@ -288,7 +288,7 @@ func TestControllerSync(t *testing.T) {
 		{
 			// Test that the finalizer gets removed if CSI migration is disabled. The in-tree finalizer is added
 			// back on the PV since migration is disabled.
-			"5-9 - volume has its PV deletion protection finalizer removed as CSI migration is disabled",
+			"5-9 - volume has its external PV deletion protection finalizer removed as CSI migration is disabled",
 			volumesWithFinalizers(
 				volumesWithAnnotation(volume.AnnMigratedTo, "pd.csi.storage.gke.io",
 					newVolumeArray("volume-5-9", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimDelete, classEmpty, volume.AnnDynamicallyProvisioned)),
@@ -590,14 +590,14 @@ func TestAnnealMigrationAnnotations(t *testing.T) {
 			}
 			if tc.volumeAnnotations != nil {
 				ann := tc.volumeAnnotations
-				updateMigrationAnnotationsAndFinalizers(cmpm, translator, ann, nil, false)
+				updateMigrationAnnotations(cmpm, translator, ann, false)
 				if !reflect.DeepEqual(tc.expVolumeAnnotations, ann) {
 					t.Errorf("got volume annoations: %v, but expected: %v", ann, tc.expVolumeAnnotations)
 				}
 			}
 			if tc.claimAnnotations != nil {
 				ann := tc.claimAnnotations
-				updateMigrationAnnotationsAndFinalizers(cmpm, translator, ann, nil, true)
+				updateMigrationAnnotations(cmpm, translator, ann, true)
 				if !reflect.DeepEqual(tc.expClaimAnnotations, ann) {
 					t.Errorf("got volume annoations: %v, but expected: %v", ann, tc.expVolumeAnnotations)
 				}
@@ -607,26 +607,26 @@ func TestAnnealMigrationAnnotations(t *testing.T) {
 	}
 }
 
-func TestUpdateFinalizer(t *testing.T) {
+func TestModifyDeletionFinalizers(t *testing.T) {
 	// This set of tests ensures that protection finalizer is removed when CSI migration is disabled
 	// and PV controller needs to remove finalizers added by the external-provisioner.
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationGCE, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HonorPVReclaimPolicy, true)()
 	const gcePlugin = "kubernetes.io/gce-pd"
 	const gceDriver = "pd.csi.storage.gke.io"
 	const customFinalizer = "test.volume.kubernetes.io/finalizer"
 	tests := []struct {
 		name                string
+		initialVolume       *v1.PersistentVolume
 		volumeAnnotations   map[string]string
-		volumeFinalizers    []string
 		expVolumeFinalizers []string
 		expModified         bool
 		migratedDriverGates []featuregate.Feature
 	}{
 		{
-			// Represents a volume provisioned through external-provisioner
+			// Represents a CSI volume provisioned through external-provisioner, no CSI migration enabled.
 			name:                "13-1 migration was never enabled, volume has the finalizer",
-			volumeAnnotations:   map[string]string{volume.AnnDynamicallyProvisioned: gceDriver},
-			volumeFinalizers:    []string{volume.PVDeletionProtectionFinalizer},
+			initialVolume:       newExternalProvisionedVolume("volume-13-1", "1Gi", "uid11-23", "claim11-23", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classCopper, gceDriver, []string{volume.PVDeletionProtectionFinalizer}, volume.AnnDynamicallyProvisioned, volume.AnnBoundByController),
 			expVolumeFinalizers: []string{volume.PVDeletionProtectionFinalizer},
 			expModified:         false,
 			migratedDriverGates: []featuregate.Feature{},
@@ -635,8 +635,7 @@ func TestUpdateFinalizer(t *testing.T) {
 			// Represents a volume provisioned through external-provisioner but the external-provisioner has
 			// yet to sync the volume to add the new finalizer
 			name:                "13-2 migration was never enabled, volume does not have the finalizer",
-			volumeAnnotations:   map[string]string{volume.AnnDynamicallyProvisioned: gceDriver},
-			volumeFinalizers:    nil,
+			initialVolume:       newExternalProvisionedVolume("volume-13-2", "1Gi", "uid11-23", "claim11-23", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classCopper, gceDriver, nil, volume.AnnDynamicallyProvisioned, volume.AnnBoundByController),
 			expVolumeFinalizers: nil,
 			expModified:         false,
 			migratedDriverGates: []featuregate.Feature{},
@@ -647,17 +646,15 @@ func TestUpdateFinalizer(t *testing.T) {
 			// pre-existing finalizer, for example the pv-protection finalizer. When csi-migration is disabled,
 			// the migrated-to annotation will be removed shortly when updateVolumeMigrationAnnotationsAndFinalizers
 			// is called followed by adding back the in-tree pv protection finalizer.
-			name:                "13-3 migration was disabled but still has migrated-to annotation, volume does not have pv deletion protection finalizer",
-			volumeAnnotations:   map[string]string{volume.AnnDynamicallyProvisioned: gcePlugin, volume.AnnMigratedTo: gceDriver},
-			volumeFinalizers:    []string{customFinalizer},
+			name:                "13-3 migration was disabled, volume has existing custom finalizer, does not have in-tree pv deletion protection finalizer",
+			initialVolume:       newVolumeWithFinalizers("volume-13-3", "1Gi", "uid11-23", "claim11-23", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classCopper, []string{customFinalizer}, volume.AnnDynamicallyProvisioned, volume.AnnBoundByController),
 			expVolumeFinalizers: []string{customFinalizer, volume.PVDeletionInTreeProtectionFinalizer},
 			expModified:         true,
 			migratedDriverGates: []featuregate.Feature{},
 		},
 		{
-			name:                "13-4 migration was disabled but still has migrated-to annotation, volume has no finalizers",
-			volumeAnnotations:   map[string]string{volume.AnnDynamicallyProvisioned: gcePlugin, volume.AnnMigratedTo: gceDriver},
-			volumeFinalizers:    nil,
+			name:                "13-4 migration was disabled, volume has no finalizers",
+			initialVolume:       newVolumeWithFinalizers("volume-13-4", "1Gi", "uid11-23", "claim11-23", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classCopper, nil, volume.AnnDynamicallyProvisioned, volume.AnnBoundByController),
 			expVolumeFinalizers: []string{volume.PVDeletionInTreeProtectionFinalizer},
 			expModified:         true,
 			migratedDriverGates: []featuregate.Feature{},
@@ -666,9 +663,8 @@ func TestUpdateFinalizer(t *testing.T) {
 			// Represents roll back scenario where the external-provisioner has added the pv deletion protection
 			// finalizer and later the csi migration was disabled. The pv deletion protection finalizer added through
 			// external-provisioner will be removed and the in-tree pv deletion protection finalizer will be added.
-			name:                "13-5 migration was disabled as it has the migrated-to annotation, volume has the finalizer",
-			volumeAnnotations:   map[string]string{volume.AnnDynamicallyProvisioned: gcePlugin, volume.AnnMigratedTo: gceDriver},
-			volumeFinalizers:    []string{volume.PVDeletionProtectionFinalizer},
+			name:                "13-5 migration was disabled, volume has external PV deletion finalizer",
+			initialVolume:       newVolumeWithFinalizers("volume-13-5", "1Gi", "uid11-23", "claim11-23", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classCopper, []string{volume.PVDeletionProtectionFinalizer}, volume.AnnDynamicallyProvisioned, volume.AnnBoundByController),
 			expVolumeFinalizers: []string{volume.PVDeletionInTreeProtectionFinalizer},
 			expModified:         true,
 			migratedDriverGates: []featuregate.Feature{},
@@ -677,9 +673,8 @@ func TestUpdateFinalizer(t *testing.T) {
 			// Represents roll-back of csi-migration as 13-5, here there are multiple finalizers, only the pv deletion
 			// protection finalizer added by external-provisioner will be removed and the in-tree pv deletion protection
 			// finalizer will be added.
-			name:                "13-6 migration was disabled as it has the migrated-to annotation, volume has multiple finalizers",
-			volumeAnnotations:   map[string]string{volume.AnnDynamicallyProvisioned: gcePlugin, volume.AnnMigratedTo: gceDriver},
-			volumeFinalizers:    []string{volume.PVDeletionProtectionFinalizer, customFinalizer},
+			name:                "13-6 migration was disabled, volume has multiple finalizers",
+			initialVolume:       newVolumeWithFinalizers("volume-13-6", "1Gi", "uid11-23", "claim11-23", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classCopper, []string{volume.PVDeletionProtectionFinalizer, customFinalizer}, volume.AnnDynamicallyProvisioned, volume.AnnBoundByController),
 			expVolumeFinalizers: []string{customFinalizer, volume.PVDeletionInTreeProtectionFinalizer},
 			expModified:         true,
 			migratedDriverGates: []featuregate.Feature{},
@@ -687,9 +682,9 @@ func TestUpdateFinalizer(t *testing.T) {
 		{
 			// csi migration is enabled, the pv controller should not delete the finalizer added by the
 			// external-provisioner and the in-tree finalizer should be deleted.
-			name:                "13-7 migration is enabled, has the migrated-to annotation, volume has the finalizer",
+			name:                "13-7 migration is enabled, volume has both the in-tree and external PV deletion protection finalizer",
+			initialVolume:       newVolumeWithFinalizers("volume-13-7", "1Gi", "uid11-23", "claim11-23", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classCopper, []string{volume.PVDeletionProtectionFinalizer, volume.PVDeletionInTreeProtectionFinalizer}, volume.AnnDynamicallyProvisioned, volume.AnnBoundByController),
 			volumeAnnotations:   map[string]string{volume.AnnDynamicallyProvisioned: gcePlugin, volume.AnnMigratedTo: gceDriver},
-			volumeFinalizers:    []string{volume.PVDeletionProtectionFinalizer, volume.PVDeletionInTreeProtectionFinalizer},
 			expVolumeFinalizers: []string{volume.PVDeletionProtectionFinalizer},
 			expModified:         true,
 			migratedDriverGates: []featuregate.Feature{features.CSIMigration, features.CSIMigrationGCE},
@@ -697,9 +692,8 @@ func TestUpdateFinalizer(t *testing.T) {
 		{
 			// csi-migration is not completely enabled as the specific plugin feature is not present. This is equivalent
 			// of disabled csi-migration.
-			name:                "13-8 migration is enabled but plugin migration feature is disabled, has the migrated-to annotation, volume has the finalizer",
-			volumeAnnotations:   map[string]string{volume.AnnDynamicallyProvisioned: gcePlugin, volume.AnnMigratedTo: gceDriver},
-			volumeFinalizers:    []string{volume.PVDeletionProtectionFinalizer},
+			name:                "13-8 migration is enabled but plugin migration feature is disabled, volume has the external PV deletion protection finalizer",
+			initialVolume:       newVolumeWithFinalizers("volume-13-8", "1Gi", "uid11-23", "claim11-23", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classCopper, []string{volume.PVDeletionProtectionFinalizer}, volume.AnnDynamicallyProvisioned, volume.AnnBoundByController),
 			expVolumeFinalizers: []string{volume.PVDeletionInTreeProtectionFinalizer},
 			expModified:         true,
 			migratedDriverGates: []featuregate.Feature{features.CSIMigration},
@@ -707,9 +701,8 @@ func TestUpdateFinalizer(t *testing.T) {
 		{
 			// same as 13-8 but multiple finalizers exists, only the pv deletion protection finalizer needs to be
 			// removed and the in-tree pv deletion protection finalizer needs to be added.
-			name:                "13-9 migration is enabled but plugin migration feature is disabled, has the migrated-to annotation, volume has multiple finalizers",
-			volumeAnnotations:   map[string]string{volume.AnnDynamicallyProvisioned: gcePlugin, volume.AnnMigratedTo: gceDriver},
-			volumeFinalizers:    []string{volume.PVDeletionProtectionFinalizer, customFinalizer},
+			name:                "13-9 migration is enabled but plugin migration feature is disabled, volume has multiple finalizers including external PV deletion protection finalizer",
+			initialVolume:       newVolumeWithFinalizers("volume-13-9", "1Gi", "uid11-23", "claim11-23", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classCopper, []string{volume.PVDeletionProtectionFinalizer, customFinalizer}, volume.AnnDynamicallyProvisioned, volume.AnnBoundByController),
 			expVolumeFinalizers: []string{customFinalizer, volume.PVDeletionInTreeProtectionFinalizer},
 			expModified:         true,
 			migratedDriverGates: []featuregate.Feature{features.CSIMigration},
@@ -717,37 +710,49 @@ func TestUpdateFinalizer(t *testing.T) {
 		{
 			// corner error case.
 			name:                "13-10 missing annotations but finalizers exist",
-			volumeAnnotations:   nil,
-			volumeFinalizers:    []string{volume.PVDeletionProtectionFinalizer},
+			initialVolume:       newVolumeWithFinalizers("volume-13-10", "1Gi", "uid11-23", "claim11-23", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classCopper, []string{volume.PVDeletionProtectionFinalizer}),
 			expVolumeFinalizers: []string{volume.PVDeletionProtectionFinalizer},
 			expModified:         false,
 			migratedDriverGates: []featuregate.Feature{},
 		},
 		{
 			name:                "13-11 missing annotations and finalizers",
-			volumeAnnotations:   nil,
-			volumeFinalizers:    nil,
+			initialVolume:       newVolumeWithFinalizers("volume-13-11", "1Gi", "uid11-23", "claim11-23", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classCopper, nil),
 			expVolumeFinalizers: nil,
 			expModified:         false,
 			migratedDriverGates: []featuregate.Feature{},
 		},
 		{
-			// corner error case
-			name:                "13-12 missing provisioned-by annotation, existing finalizers",
-			volumeAnnotations:   map[string]string{"fake": gcePlugin},
-			volumeFinalizers:    []string{volume.PVDeletionProtectionFinalizer},
-			expVolumeFinalizers: []string{volume.PVDeletionProtectionFinalizer},
+			// When ReclaimPolicy is Retain ensure that in-tree pv deletion protection finalizer is not added.
+			name:                "13-12 migration is disabled, volume has no finalizers, reclaimPolicy is Retain",
+			initialVolume:       newVolumeWithFinalizers("volume-13-12", "1Gi", "uid11-23", "claim11-23", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classCopper, nil, volume.AnnDynamicallyProvisioned, volume.AnnBoundByController),
+			expVolumeFinalizers: nil,
 			expModified:         false,
 			migratedDriverGates: []featuregate.Feature{},
 		},
 		{
-			// csi migration is enabled, the pv controller should delete the in-tree finalizer
-			name:                "13-13 migration is enabled, has the migrated-to annotation, volume has the in-tree finalizer",
-			volumeAnnotations:   map[string]string{volume.AnnDynamicallyProvisioned: gcePlugin, volume.AnnMigratedTo: gceDriver},
-			volumeFinalizers:    []string{volume.PVDeletionInTreeProtectionFinalizer},
+			// When ReclaimPolicy is Recycle ensure that in-tree pv deletion protection finalizer is not added.
+			name:                "13-13 migration is disabled, volume has no finalizers, reclaimPolicy is Recycle",
+			initialVolume:       newVolumeWithFinalizers("volume-13-13", "1Gi", "uid11-23", "claim11-23", v1.VolumeBound, v1.PersistentVolumeReclaimRecycle, classCopper, nil, volume.AnnDynamicallyProvisioned, volume.AnnBoundByController),
+			expVolumeFinalizers: nil,
+			expModified:         false,
+			migratedDriverGates: []featuregate.Feature{},
+		},
+		{
+			// When ReclaimPolicy is Retain ensure that in-tree pv deletion protection finalizer present is removed.
+			name:                "13-14 migration is disabled, volume has in-tree pv deletion finalizers, reclaimPolicy is Retain",
+			initialVolume:       newVolumeWithFinalizers("volume-13-14", "1Gi", "uid11-23", "claim11-23", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classCopper, []string{volume.PVDeletionInTreeProtectionFinalizer}, volume.AnnDynamicallyProvisioned, volume.AnnBoundByController),
 			expVolumeFinalizers: nil,
 			expModified:         true,
-			migratedDriverGates: []featuregate.Feature{features.CSIMigration, features.CSIMigrationGCE},
+			migratedDriverGates: []featuregate.Feature{},
+		},
+		{
+			// Statically provisioned volumes should not have the in-tree pv deletion protection finalizer
+			name:                "13-15 migration is disabled, statically provisioned PV",
+			initialVolume:       newVolumeWithFinalizers("volume-13-14", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimDelete, classCopper, nil),
+			expVolumeFinalizers: nil,
+			expModified:         false,
+			migratedDriverGates: []featuregate.Feature{},
 		},
 	}
 
@@ -760,15 +765,14 @@ func TestUpdateFinalizer(t *testing.T) {
 				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, f, true)()
 			}
 			if tc.volumeAnnotations != nil {
-				ann := tc.volumeAnnotations
-				finalizers := tc.volumeFinalizers
-				modified := updateMigrationAnnotationsAndFinalizers(cmpm, translator, ann, &finalizers, false)
-				if modified != tc.expModified {
-					t.Errorf("got modified: %v, but expected: %v", modified, tc.expModified)
-				}
-				if !reflect.DeepEqual(tc.expVolumeFinalizers, finalizers) {
-					t.Errorf("got volume finaliers: %v, but expected: %v", finalizers, tc.expVolumeFinalizers)
-				}
+				tc.initialVolume.SetAnnotations(tc.volumeAnnotations)
+			}
+			modifiedFinalizers, modified := modifyDeletionFinalizers(cmpm, tc.initialVolume)
+			if modified != tc.expModified {
+				t.Errorf("got modified: %v, but expected: %v", modified, tc.expModified)
+			}
+			if !reflect.DeepEqual(tc.expVolumeFinalizers, modifiedFinalizers) {
+				t.Errorf("got volume finaliers: %v, but expected: %v", modifiedFinalizers, tc.expVolumeFinalizers)
 			}
 
 		})

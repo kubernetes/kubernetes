@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -334,7 +335,7 @@ func (ctrl *PersistentVolumeController) updateClaimMigrationAnnotations(ctx cont
 	// when no modifications are required this function could sometimes return a
 	// copy of the volume and sometimes return a ref to the original
 	claimClone := claim.DeepCopy()
-	modified := updateMigrationAnnotationsAndFinalizers(ctrl.csiMigratedPluginManager, ctrl.translator, claimClone.Annotations, nil, true)
+	modified := updateMigrationAnnotations(ctrl.csiMigratedPluginManager, ctrl.translator, claimClone.Annotations, true)
 	if !modified {
 		return claimClone, nil
 	}
@@ -352,10 +353,13 @@ func (ctrl *PersistentVolumeController) updateClaimMigrationAnnotations(ctx cont
 func (ctrl *PersistentVolumeController) updateVolumeMigrationAnnotationsAndFinalizers(ctx context.Context,
 	volume *v1.PersistentVolume) (*v1.PersistentVolume, error) {
 	volumeClone := volume.DeepCopy()
-	modified := updateMigrationAnnotationsAndFinalizers(ctrl.csiMigratedPluginManager, ctrl.translator,
-		volumeClone.Annotations, &volumeClone.Finalizers, false)
-	if !modified {
+	annModified := updateMigrationAnnotations(ctrl.csiMigratedPluginManager, ctrl.translator, volumeClone.Annotations, false)
+	modifiedFinalizers, finalizersModified := modifyDeletionFinalizers(ctrl.csiMigratedPluginManager, volumeClone)
+	if !annModified && !finalizersModified {
 		return volumeClone, nil
+	}
+	if finalizersModified {
+		volumeClone.ObjectMeta.SetFinalizers(modifiedFinalizers)
 	}
 	newVol, err := ctrl.kubeClient.CoreV1().PersistentVolumes().Update(ctx, volumeClone, metav1.UpdateOptions{})
 	if err != nil {
@@ -368,17 +372,68 @@ func (ctrl *PersistentVolumeController) updateVolumeMigrationAnnotationsAndFinal
 	return newVol, nil
 }
 
-// updateMigrationAnnotationsAndFinalizers takes an Annotations map and finalizers slice and checks for a
-// provisioner name depending if the annotation came from a PVC or not.
-// It will then add a "pv.kubernetes.io/migrated-to" annotation if migration with
-// the CSI driver name for that provisioner is "on" based on feature flags, it will also
-// remove the PV deletion protection finalizer and "pv.kubernetes.io/migrated-to" annotation
-// if migration is "off" for that provisioner in rollback scenarios. Returns true if the annotations
-// map or finalizers were modified and false otherwise.
-// Parameters:
-// - claim: true means the ann came from a PVC, false means the ann came from a PV
-func updateMigrationAnnotationsAndFinalizers(cmpm CSIMigratedPluginManager, translator CSINameTranslator,
-	ann map[string]string, finalizers *[]string, claim bool) bool {
+// modifyDeletionFinalizers updates the finalizers based on the reclaim policy and if it is a in-tree volume or not.
+// The in-tree PV deletion protection finalizer is only added if the reclaimPolicy associated with the PV is `Delete`.
+// The in-tree PV deletion protection finalizer is removed if the reclaimPolicy associated with the PV is `Retain` or
+// `Recycle`, removing the finalizer is necessary to reflect the recalimPolicy updates on the PV.
+// The method also removes any external PV Deletion Protection finalizers added on the PV, this represents CSI migration
+// rollback/disable scenarios.
+func modifyDeletionFinalizers(cmpm CSIMigratedPluginManager, volume *v1.PersistentVolume) ([]string, bool) {
+	modified := false
+	var outFinalizers []string
+	if !utilfeature.DefaultFeatureGate.Enabled(features.HonorPVReclaimPolicy) {
+		return volume.Finalizers, false
+	}
+	if !metav1.HasAnnotation(volume.ObjectMeta, storagehelpers.AnnDynamicallyProvisioned) {
+		// PV deletion protection finalizer is currently supported only for dynamically
+		// provisioned volumes.
+		return volume.Finalizers, false
+	}
+	if volume.Finalizers != nil {
+		outFinalizers = append(outFinalizers, volume.Finalizers...)
+	}
+	provisioner := volume.Annotations[storagehelpers.AnnDynamicallyProvisioned]
+	if cmpm.IsMigrationEnabledForPlugin(provisioner) {
+		// Remove in-tree delete finalizer on the PV as migration is enabled.
+		if slice.ContainsString(outFinalizers, storagehelpers.PVDeletionInTreeProtectionFinalizer, nil) {
+			outFinalizers = slice.RemoveString(outFinalizers, storagehelpers.PVDeletionInTreeProtectionFinalizer, nil)
+			modified = true
+		}
+		return outFinalizers, modified
+	}
+	// Check if it is a in-tree volume.
+	if !strings.HasPrefix(provisioner, "kubernetes.io/") {
+		// The provision plugin does not begin with known in-tree plugin volume prefix annotation.
+		return volume.Finalizers, false
+	}
+	reclaimPolicy := volume.Spec.PersistentVolumeReclaimPolicy
+	// Add back the in-tree PV deletion protection finalizer if does not already exists
+	if reclaimPolicy == v1.PersistentVolumeReclaimDelete && !slice.ContainsString(outFinalizers, storagehelpers.PVDeletionInTreeProtectionFinalizer, nil) {
+		klog.V(4).Infof("Adding in-tree pv deletion protection finalizer on %s", volume.Name)
+		outFinalizers = append(outFinalizers, storagehelpers.PVDeletionInTreeProtectionFinalizer)
+		modified = true
+	} else if (reclaimPolicy == v1.PersistentVolumeReclaimRetain || reclaimPolicy == v1.PersistentVolumeReclaimRecycle) && slice.ContainsString(outFinalizers, storagehelpers.PVDeletionInTreeProtectionFinalizer, nil) {
+		// Remove the in-tree PV deletion protection finalizer if the reclaim policy is 'Retain' or 'Recycle'
+		klog.V(4).Infof("Removing in-tree pv deletion protection finalizer on %s", volume.Name)
+		outFinalizers = slice.RemoveString(outFinalizers, storagehelpers.PVDeletionInTreeProtectionFinalizer, nil)
+		modified = true
+	}
+	// Remove the external PV deletion protection finalizer
+	if slice.ContainsString(outFinalizers, storagehelpers.PVDeletionProtectionFinalizer, nil) {
+		klog.V(4).Infof("Removing external pv deletion protection finalizer on %s", volume.Name)
+		outFinalizers = slice.RemoveString(outFinalizers, storagehelpers.PVDeletionProtectionFinalizer, nil)
+		modified = true
+	}
+	return outFinalizers, modified
+}
+
+// updateMigrationAnnotations takes an Annotations map and checks for a
+// provisioner name using the provisionerKey. It will then add a
+// "pv.kubernetes.io/migrated-to" annotation if migration with the CSI
+// driver name for that provisioner is "on" based on feature flags, it will also
+// remove the annotation is migration is "off" for that provisioner in rollback
+// scenarios. Returns true if the annotations map was modified and false otherwise.
+func updateMigrationAnnotations(cmpm CSIMigratedPluginManager, translator CSINameTranslator, ann map[string]string, claim bool) bool {
 	var csiDriverName string
 	var err error
 
@@ -402,14 +457,13 @@ func updateMigrationAnnotationsAndFinalizers(cmpm CSIMigratedPluginManager, tran
 				return false
 			}
 		} else {
-			// Volume not dynamically provisioned. Ignore
+			// Volume Statically provisioned.
 			return false
 		}
 	}
 
 	migratedToDriver := ann[storagehelpers.AnnMigratedTo]
 	if cmpm.IsMigrationEnabledForPlugin(provisioner) {
-		modified := false
 		csiDriverName, err = translator.GetCSINameFromInTreeName(provisioner)
 		if err != nil {
 			klog.Errorf("Could not update volume migration annotations. Migration enabled for plugin %s but could not find corresponding driver name: %v", provisioner, err)
@@ -417,37 +471,13 @@ func updateMigrationAnnotationsAndFinalizers(cmpm CSIMigratedPluginManager, tran
 		}
 		if migratedToDriver != csiDriverName {
 			ann[storagehelpers.AnnMigratedTo] = csiDriverName
-			modified = true
+			return true
 		}
-		// Remove in-tree delete finalizer on the PV as migration is enabled.
-		if !claim && utilfeature.DefaultFeatureGate.Enabled(features.HonorPVReclaimPolicy) {
-			if finalizers != nil && slice.ContainsString(*finalizers, storagehelpers.PVDeletionInTreeProtectionFinalizer, nil) {
-				*finalizers = slice.RemoveString(*finalizers, storagehelpers.PVDeletionInTreeProtectionFinalizer, nil)
-				modified = true
-			}
-		}
-		return modified
 	} else {
 		if migratedToDriver != "" {
 			// Migration annotation exists but the driver isn't migrated currently
 			delete(ann, storagehelpers.AnnMigratedTo)
-			if !claim && utilfeature.DefaultFeatureGate.Enabled(features.HonorPVReclaimPolicy) {
-				modified := false
-				if finalizers == nil {
-					finalizers = &([]string{})
-				}
-				// Add back the in-tree PV deletion protection finalizer if does not already exists
-				if !slice.ContainsString(*finalizers, storagehelpers.PVDeletionInTreeProtectionFinalizer, nil) {
-					*finalizers = append(*finalizers, storagehelpers.PVDeletionInTreeProtectionFinalizer)
-					modified = true
-				}
-				// Remove the external PV deletion protection finalizer
-				if slice.ContainsString(*finalizers, storagehelpers.PVDeletionProtectionFinalizer, nil) {
-					*finalizers = slice.RemoveString(*finalizers, storagehelpers.PVDeletionProtectionFinalizer, nil)
-					modified = true
-				}
-				return modified
-			}
+			return true
 		}
 	}
 	return false
@@ -607,7 +637,7 @@ func (ctrl *PersistentVolumeController) setClaimProvisioner(ctx context.Context,
 	// TODO: remove the beta storage provisioner anno after the deprecation period
 	metav1.SetMetaDataAnnotation(&claimClone.ObjectMeta, storagehelpers.AnnBetaStorageProvisioner, provisionerName)
 	metav1.SetMetaDataAnnotation(&claimClone.ObjectMeta, storagehelpers.AnnStorageProvisioner, provisionerName)
-	updateMigrationAnnotationsAndFinalizers(ctrl.csiMigratedPluginManager, ctrl.translator, claimClone.Annotations, nil, true)
+	updateMigrationAnnotations(ctrl.csiMigratedPluginManager, ctrl.translator, claimClone.Annotations, true)
 	newClaim, err := ctrl.kubeClient.CoreV1().PersistentVolumeClaims(claim.Namespace).Update(context.TODO(), claimClone, metav1.UpdateOptions{})
 	if err != nil {
 		return newClaim, err
