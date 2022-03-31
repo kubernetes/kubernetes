@@ -1459,11 +1459,12 @@ func (ctrl *PersistentVolumeController) removeDeletionProtectionFinalizer(ctx co
 	var err error
 	pvUpdateNeeded := false
 	// Retrieve latest version
-	volume, err = ctrl.kubeClient.CoreV1().PersistentVolumes().Get(context.TODO(), volume.Name, metav1.GetOptions{})
+	newVolume, err := ctrl.kubeClient.CoreV1().PersistentVolumes().Get(ctx, volume.Name, metav1.GetOptions{})
 	if err != nil {
 		klog.Errorf("error reading persistent volume %q: %v", volume.Name, err)
 		return err
 	}
+	volume = newVolume
 	volumeClone := volume.DeepCopy()
 	pvFinalizers := volumeClone.Finalizers
 	if pvFinalizers != nil && slice.ContainsString(pvFinalizers, storagehelpers.PVDeletionInTreeProtectionFinalizer, nil) {
@@ -1661,8 +1662,10 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(
 	metav1.SetMetaDataAnnotation(&volume.ObjectMeta, storagehelpers.AnnDynamicallyProvisioned, plugin.GetPluginName())
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.HonorPVReclaimPolicy) {
-		// Add finalizer here
-		volume.SetFinalizers([]string{storagehelpers.PVDeletionInTreeProtectionFinalizer})
+		if volume.Spec.PersistentVolumeReclaimPolicy == v1.PersistentVolumeReclaimDelete {
+			// Add In-Tree protection finalizer here only when the reclaim policy is `Delete`
+			volume.SetFinalizers([]string{storagehelpers.PVDeletionInTreeProtectionFinalizer})
+		}
 	}
 
 	// Try to create the PV object several times
