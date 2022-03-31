@@ -827,7 +827,7 @@ func buildKubeletClientConfig(ctx context.Context, s *options.KubeletServer, nod
 		}
 
 		legacyregistry.RawMustRegister(metrics.NewGaugeFunc(
-			metrics.GaugeOpts{
+			&metrics.GaugeOpts{
 				Subsystem: kubeletmetrics.KubeletSubsystem,
 				Name:      "certificate_manager_client_ttl_seconds",
 				Help: "Gauge of the TTL (time-to-live) of the Kubelet's client certificate. " +
