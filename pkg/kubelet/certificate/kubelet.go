@@ -130,7 +130,7 @@ func NewKubeletServerCertificateManager(kubeClient clientset.Interface, kubeCfg 
 		return nil, fmt.Errorf("failed to initialize server certificate manager: %v", err)
 	}
 	legacyregistry.RawMustRegister(compbasemetrics.NewGaugeFunc(
-		compbasemetrics.GaugeOpts{
+		&compbasemetrics.GaugeOpts{
 			Subsystem: metrics.KubeletSubsystem,
 			Name:      "certificate_manager_server_ttl_seconds",
 			Help: "Gauge of the shortest TTL (time-to-live) of " +

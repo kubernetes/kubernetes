@@ -83,7 +83,7 @@ var (
 	execPluginCertTTLAdapter = &expiryToTTLAdapter{}
 
 	execPluginCertTTL = k8smetrics.NewGaugeFunc(
-		k8smetrics.GaugeOpts{
+		&k8smetrics.GaugeOpts{
 			Name: "rest_client_exec_plugin_ttl_seconds",
 			Help: "Gauge of the shortest TTL (time-to-live) of the client " +
 				"certificate(s) managed by the auth exec plugin. The value " +
