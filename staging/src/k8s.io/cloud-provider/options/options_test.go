@@ -40,8 +40,7 @@ func TestDefaultFlags(t *testing.T) {
 	expected := &CloudControllerManagerOptions{
 		Generic: &cmoptions.GenericControllerManagerConfigurationOptions{
 			GenericControllerManagerConfiguration: &cmconfig.GenericControllerManagerConfiguration{
-				Port:            DefaultInsecureCloudControllerManagerPort, // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
-				Address:         "0.0.0.0",                                 // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
+				Address:         "0.0.0.0",
 				MinResyncPeriod: metav1.Duration{Duration: 12 * time.Hour},
 				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
 					ContentType: "application/vnd.kubernetes.protobuf",
@@ -99,11 +98,6 @@ func TestDefaultFlags(t *testing.T) {
 			},
 			HTTP2MaxStreamsPerConnection: 0,
 		}).WithLoopback(),
-		InsecureServing: (&apiserveroptions.DeprecatedInsecureServingOptions{
-			BindAddress: netutils.ParseIPSloppy("0.0.0.0"),
-			BindPort:    int(0),
-			BindNetwork: "tcp",
-		}).WithLoopback(),
 		Authentication: &apiserveroptions.DelegatingAuthenticationOptions{
 			CacheTTL:            10 * time.Second,
 			TokenRequestTimeout: 10 * time.Second,
@@ -136,13 +130,16 @@ func TestDefaultFlags(t *testing.T) {
 
 func TestAddFlags(t *testing.T) {
 	fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
-	s, _ := NewCloudControllerManagerOptions()
+	s, err := NewCloudControllerManagerOptions()
+	if err != nil {
+		t.Errorf("unexpected err: %v", err)
+	}
+
 	for _, f := range s.Flags([]string{""}, []string{""}).FlagSets {
 		fs.AddFlagSet(f)
 	}
 
 	args := []string{
-		"--address=192.168.4.10",
 		"--allocate-node-cidrs=true",
 		"--authorization-always-allow-paths=", // this proves that we can clear the default
 		"--bind-address=192.168.4.21",
@@ -168,19 +165,20 @@ func TestAddFlags(t *testing.T) {
 		"--master=192.168.4.20",
 		"--min-resync-period=100m",
 		"--node-status-update-frequency=10m",
-		"--port=10000",
 		"--profiling=false",
 		"--route-reconciliation-period=30s",
 		"--secure-port=10001",
 		"--use-service-account-credentials=false",
 	}
-	fs.Parse(args)
+	err = fs.Parse(args)
+	if err != nil {
+		t.Errorf("unexpected err: %v", err)
+	}
 
 	expected := &CloudControllerManagerOptions{
 		Generic: &cmoptions.GenericControllerManagerConfigurationOptions{
 			GenericControllerManagerConfiguration: &cmconfig.GenericControllerManagerConfiguration{
-				Port:            DefaultInsecureCloudControllerManagerPort, // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
-				Address:         "0.0.0.0",                                 // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
+				Address:         "0.0.0.0",
 				MinResyncPeriod: metav1.Duration{Duration: 100 * time.Minute},
 				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
 					ContentType: "application/vnd.kubernetes.protobuf",
@@ -237,11 +235,6 @@ func TestAddFlags(t *testing.T) {
 				PairName:      "cloud-controller-manager",
 			},
 			HTTP2MaxStreamsPerConnection: 47,
-		}).WithLoopback(),
-		InsecureServing: (&apiserveroptions.DeprecatedInsecureServingOptions{
-			BindAddress: netutils.ParseIPSloppy("192.168.4.10"),
-			BindPort:    int(10000),
-			BindNetwork: "tcp",
 		}).WithLoopback(),
 		Authentication: &apiserveroptions.DelegatingAuthenticationOptions{
 			CacheTTL:            10 * time.Second,

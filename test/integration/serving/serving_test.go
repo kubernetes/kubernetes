@@ -164,7 +164,7 @@ users:
 		insecureDisabled bool
 	}{
 		{"kube-controller-manager", kubeControllerManagerTester{}, nil, true},
-		{"cloud-controller-manager", cloudControllerManagerTester{}, []string{"--cloud-provider=fake"}, false},
+		{"cloud-controller-manager", cloudControllerManagerTester{}, []string{"--cloud-provider=fake"}, true},
 		{"kube-scheduler", kubeSchedulerTester{}, nil, true},
 	}
 

@@ -106,18 +106,12 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 
 	commandArgs := []string{}
 	listeners := []net.Listener{}
-	disableInsecure := false
 	disableSecure := false
 	for _, arg := range customFlags {
 		if strings.HasPrefix(arg, "--secure-port=") {
 			if arg == "--secure-port=0" {
 				commandArgs = append(commandArgs, arg)
 				disableSecure = true
-			}
-		} else if strings.HasPrefix(arg, "--port=") {
-			if arg == "--port=0" {
-				commandArgs = append(commandArgs, arg)
-				disableInsecure = true
 			}
 		} else if strings.HasPrefix(arg, "--cert-dir=") {
 			// skip it
@@ -134,16 +128,6 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 		listeners = append(listeners, listener)
 		commandArgs = append(commandArgs, fmt.Sprintf("--secure-port=%d", bindPort))
 		commandArgs = append(commandArgs, fmt.Sprintf("--cert-dir=%s", result.TmpDir))
-
-		t.Logf("cloud-controller-manager will listen securely on port %d...", bindPort)
-	}
-	if !disableInsecure {
-		listener, bindPort, err := createListenerOnFreePort()
-		if err != nil {
-			return result, fmt.Errorf("failed to create listener: %v", err)
-		}
-		listeners = append(listeners, listener)
-		commandArgs = append(commandArgs, fmt.Sprintf("--port=%d", bindPort))
 
 		t.Logf("cloud-controller-manager will listen securely on port %d...", bindPort)
 	}
