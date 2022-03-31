@@ -31,14 +31,14 @@ func TestGauge(t *testing.T) {
 	v115 := semver.MustParse("1.15.0")
 	var tests = []struct {
 		desc string
-		GaugeOpts
+		*GaugeOpts
 		registryVersion     *semver.Version
 		expectedMetricCount int
 		expectedHelp        string
 	}{
 		{
 			desc: "Test non deprecated",
-			GaugeOpts: GaugeOpts{
+			GaugeOpts: &GaugeOpts{
 				Namespace: "namespace",
 				Name:      "metric_test_name",
 				Subsystem: "subsystem",
@@ -50,7 +50,7 @@ func TestGauge(t *testing.T) {
 		},
 		{
 			desc: "Test deprecated",
-			GaugeOpts: GaugeOpts{
+			GaugeOpts: &GaugeOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
 				Subsystem:         "subsystem",
@@ -63,7 +63,7 @@ func TestGauge(t *testing.T) {
 		},
 		{
 			desc: "Test hidden",
-			GaugeOpts: GaugeOpts{
+			GaugeOpts: &GaugeOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
 				Subsystem:         "subsystem",
@@ -83,7 +83,7 @@ func TestGauge(t *testing.T) {
 				Minor:      "15",
 				GitVersion: "v1.15.0-alpha-1.12345",
 			})
-			c := NewGauge(&test.GaugeOpts)
+			c := NewGauge(test.GaugeOpts)
 			registry.MustRegister(c)
 
 			ms, err := registry.Gather()
@@ -115,7 +115,7 @@ func TestGaugeVec(t *testing.T) {
 	v115 := semver.MustParse("1.15.0")
 	var tests = []struct {
 		desc string
-		GaugeOpts
+		*GaugeOpts
 		labels              []string
 		registryVersion     *semver.Version
 		expectedMetricCount int
@@ -123,7 +123,7 @@ func TestGaugeVec(t *testing.T) {
 	}{
 		{
 			desc: "Test non deprecated",
-			GaugeOpts: GaugeOpts{
+			GaugeOpts: &GaugeOpts{
 				Namespace: "namespace",
 				Name:      "metric_test_name",
 				Subsystem: "subsystem",
@@ -136,7 +136,7 @@ func TestGaugeVec(t *testing.T) {
 		},
 		{
 			desc: "Test deprecated",
-			GaugeOpts: GaugeOpts{
+			GaugeOpts: &GaugeOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
 				Subsystem:         "subsystem",
@@ -150,7 +150,7 @@ func TestGaugeVec(t *testing.T) {
 		},
 		{
 			desc: "Test hidden",
-			GaugeOpts: GaugeOpts{
+			GaugeOpts: &GaugeOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
 				Subsystem:         "subsystem",
@@ -171,7 +171,7 @@ func TestGaugeVec(t *testing.T) {
 				Minor:      "15",
 				GitVersion: "v1.15.0-alpha-1.12345",
 			})
-			c := NewGaugeVec(&test.GaugeOpts, test.labels)
+			c := NewGaugeVec(test.GaugeOpts, test.labels)
 			registry.MustRegister(c)
 			c.WithLabelValues("1", "2").Set(1.0)
 			ms, err := registry.Gather()
@@ -207,12 +207,12 @@ func TestGaugeFunc(t *testing.T) {
 
 	var tests = []struct {
 		desc string
-		GaugeOpts
+		*GaugeOpts
 		expectedMetrics string
 	}{
 		{
 			desc: "Test non deprecated",
-			GaugeOpts: GaugeOpts{
+			GaugeOpts: &GaugeOpts{
 				Namespace: "namespace",
 				Subsystem: "subsystem",
 				Name:      "metric_non_deprecated",
@@ -226,7 +226,7 @@ namespace_subsystem_metric_non_deprecated 1
 		},
 		{
 			desc: "Test deprecated",
-			GaugeOpts: GaugeOpts{
+			GaugeOpts: &GaugeOpts{
 				Namespace:         "namespace",
 				Subsystem:         "subsystem",
 				Name:              "metric_deprecated",
@@ -241,7 +241,7 @@ namespace_subsystem_metric_deprecated 1
 		},
 		{
 			desc: "Test hidden",
-			GaugeOpts: GaugeOpts{
+			GaugeOpts: &GaugeOpts{
 				Namespace:         "namespace",
 				Subsystem:         "subsystem",
 				Name:              "metric_hidden",

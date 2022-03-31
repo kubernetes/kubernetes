@@ -199,13 +199,13 @@ func (v *HistogramVec) Reset() {
 func (v *HistogramVec) WithContext(ctx context.Context) *HistogramVecWithContext {
 	return &HistogramVecWithContext{
 		ctx:          ctx,
-		HistogramVec: *v,
+		HistogramVec: v,
 	}
 }
 
 // HistogramVecWithContext is the wrapper of HistogramVec with context.
 type HistogramVecWithContext struct {
-	HistogramVec
+	*HistogramVec
 	ctx context.Context
 }
 

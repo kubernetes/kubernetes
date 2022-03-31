@@ -169,8 +169,8 @@ func (r *lazyMetric) ClearState() {
 	r.isDeprecated = false
 	r.isHidden = false
 	r.isCreated = false
-	r.markDeprecationOnce = *(new(sync.Once))
-	r.createOnce = *(new(sync.Once))
+	r.markDeprecationOnce = sync.Once{}
+	r.createOnce = sync.Once{}
 }
 
 // FQName returns the fully-qualified metric name of the collector.

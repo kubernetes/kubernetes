@@ -29,14 +29,14 @@ func TestSummary(t *testing.T) {
 	v115 := semver.MustParse("1.15.0")
 	var tests = []struct {
 		desc string
-		SummaryOpts
+		*SummaryOpts
 		registryVersion     *semver.Version
 		expectedMetricCount int
 		expectedHelp        string
 	}{
 		{
 			desc: "Test non deprecated",
-			SummaryOpts: SummaryOpts{
+			SummaryOpts: &SummaryOpts{
 				Namespace:      "namespace",
 				Name:           "metric_test_name",
 				Subsystem:      "subsystem",
@@ -49,7 +49,7 @@ func TestSummary(t *testing.T) {
 		},
 		{
 			desc: "Test deprecated",
-			SummaryOpts: SummaryOpts{
+			SummaryOpts: &SummaryOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
 				Subsystem:         "subsystem",
@@ -63,7 +63,7 @@ func TestSummary(t *testing.T) {
 		},
 		{
 			desc: "Test hidden",
-			SummaryOpts: SummaryOpts{
+			SummaryOpts: &SummaryOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
 				Subsystem:         "subsystem",
@@ -83,7 +83,7 @@ func TestSummary(t *testing.T) {
 				Minor:      "15",
 				GitVersion: "v1.15.0-alpha-1.12345",
 			})
-			c := NewSummary(&test.SummaryOpts)
+			c := NewSummary(test.SummaryOpts)
 			registry.MustRegister(c)
 
 			ms, err := registry.Gather()
@@ -116,7 +116,7 @@ func TestSummaryVec(t *testing.T) {
 	v115 := semver.MustParse("1.15.0")
 	var tests = []struct {
 		desc string
-		SummaryOpts
+		*SummaryOpts
 		labels              []string
 		registryVersion     *semver.Version
 		expectedMetricCount int
@@ -124,7 +124,7 @@ func TestSummaryVec(t *testing.T) {
 	}{
 		{
 			desc: "Test non deprecated",
-			SummaryOpts: SummaryOpts{
+			SummaryOpts: &SummaryOpts{
 				Namespace: "namespace",
 				Name:      "metric_test_name",
 				Subsystem: "subsystem",
@@ -137,7 +137,7 @@ func TestSummaryVec(t *testing.T) {
 		},
 		{
 			desc: "Test deprecated",
-			SummaryOpts: SummaryOpts{
+			SummaryOpts: &SummaryOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
 				Subsystem:         "subsystem",
@@ -151,7 +151,7 @@ func TestSummaryVec(t *testing.T) {
 		},
 		{
 			desc: "Test hidden",
-			SummaryOpts: SummaryOpts{
+			SummaryOpts: &SummaryOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
 				Subsystem:         "subsystem",
@@ -172,7 +172,7 @@ func TestSummaryVec(t *testing.T) {
 				Minor:      "15",
 				GitVersion: "v1.15.0-alpha-1.12345",
 			})
-			c := NewSummaryVec(&test.SummaryOpts, test.labels)
+			c := NewSummaryVec(test.SummaryOpts, test.labels)
 			registry.MustRegister(c)
 			c.WithLabelValues("1", "2").Observe(1.0)
 			ms, err := registry.Gather()

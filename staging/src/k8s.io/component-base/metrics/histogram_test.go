@@ -30,14 +30,14 @@ func TestHistogram(t *testing.T) {
 	v115 := semver.MustParse("1.15.0")
 	var tests = []struct {
 		desc string
-		HistogramOpts
+		*HistogramOpts
 		registryVersion     *semver.Version
 		expectedMetricCount int
 		expectedHelp        string
 	}{
 		{
 			desc: "Test non deprecated",
-			HistogramOpts: HistogramOpts{
+			HistogramOpts: &HistogramOpts{
 				Namespace: "namespace",
 				Name:      "metric_test_name",
 				Subsystem: "subsystem",
@@ -50,7 +50,7 @@ func TestHistogram(t *testing.T) {
 		},
 		{
 			desc: "Test deprecated",
-			HistogramOpts: HistogramOpts{
+			HistogramOpts: &HistogramOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
 				Subsystem:         "subsystem",
@@ -64,7 +64,7 @@ func TestHistogram(t *testing.T) {
 		},
 		{
 			desc: "Test hidden",
-			HistogramOpts: HistogramOpts{
+			HistogramOpts: &HistogramOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
 				Subsystem:         "subsystem",
@@ -85,7 +85,7 @@ func TestHistogram(t *testing.T) {
 				Minor:      "15",
 				GitVersion: "v1.15.0-alpha-1.12345",
 			})
-			c := NewHistogram(&test.HistogramOpts)
+			c := NewHistogram(test.HistogramOpts)
 			registry.MustRegister(c)
 
 			ms, err := registry.Gather()
@@ -118,7 +118,7 @@ func TestHistogramVec(t *testing.T) {
 	v115 := semver.MustParse("1.15.0")
 	var tests = []struct {
 		desc string
-		HistogramOpts
+		*HistogramOpts
 		labels              []string
 		registryVersion     *semver.Version
 		expectedMetricCount int
@@ -126,7 +126,7 @@ func TestHistogramVec(t *testing.T) {
 	}{
 		{
 			desc: "Test non deprecated",
-			HistogramOpts: HistogramOpts{
+			HistogramOpts: &HistogramOpts{
 				Namespace: "namespace",
 				Name:      "metric_test_name",
 				Subsystem: "subsystem",
@@ -140,7 +140,7 @@ func TestHistogramVec(t *testing.T) {
 		},
 		{
 			desc: "Test deprecated",
-			HistogramOpts: HistogramOpts{
+			HistogramOpts: &HistogramOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
 				Subsystem:         "subsystem",
@@ -155,7 +155,7 @@ func TestHistogramVec(t *testing.T) {
 		},
 		{
 			desc: "Test hidden",
-			HistogramOpts: HistogramOpts{
+			HistogramOpts: &HistogramOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
 				Subsystem:         "subsystem",
@@ -177,7 +177,7 @@ func TestHistogramVec(t *testing.T) {
 				Minor:      "15",
 				GitVersion: "v1.15.0-alpha-1.12345",
 			})
-			c := NewHistogramVec(&test.HistogramOpts, test.labels)
+			c := NewHistogramVec(test.HistogramOpts, test.labels)
 			registry.MustRegister(c)
 			c.WithLabelValues("1", "2").Observe(1.0)
 			ms, err := registry.Gather()
