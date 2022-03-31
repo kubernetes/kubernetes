@@ -1355,6 +1355,9 @@ func newV1beta1WebhookHandler(t *testing.T, holder *holder, phase string, conver
 		if err := json.NewEncoder(w).Encode(review); err != nil {
 			t.Errorf("Marshal of response failed with error: %v", err)
 		}
+		// TODO: temporary hold the request to avoid TCP collisions on the client
+		// xref: https://github.com/kubernetes/kubernetes/issues/109022#issuecomment-1083362211
+		time.Sleep(500 * time.Millisecond)
 	})
 }
 
@@ -1449,6 +1452,9 @@ func newV1WebhookHandler(t *testing.T, holder *holder, phase string, converted b
 		if err := json.NewEncoder(w).Encode(review); err != nil {
 			t.Errorf("Marshal of response failed with error: %v", err)
 		}
+		// TODO: temporary hold the request to avoid TCP collisions on the client
+		// xref: https://github.com/kubernetes/kubernetes/issues/109022#issuecomment-1083362211
+		time.Sleep(500 * time.Millisecond)
 	})
 }
 
