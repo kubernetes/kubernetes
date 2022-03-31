@@ -25,6 +25,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
@@ -34,6 +35,7 @@ import (
 	discoveryv1 "k8s.io/api/discovery/v1"
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
+	networkingv1alpha1 "k8s.io/api/networking/v1alpha1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	policyv1 "k8s.io/api/policy/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
@@ -5228,6 +5230,64 @@ Events:         <none>` + "\n",
 			if out != tc.output {
 				t.Logf(out)
 				t.Errorf("expected :\n%s\nbut got output:\n%s", tc.output, out)
+			}
+		})
+	}
+}
+
+func TestDescribeClusterCIDRConfig(t *testing.T) {
+
+	testcases := map[string]struct {
+		input  *fake.Clientset
+		output string
+	}{
+		"ClusterCIDRConfig v1alpha1": {
+			input: fake.NewSimpleClientset(&networkingv1alpha1.ClusterCIDRConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo.123",
+				},
+				Spec: networkingv1alpha1.ClusterCIDRConfigSpec{
+					PerNodeHostBits: int32(8),
+					IPv4CIDR:        "10.1.0.0/16",
+					IPv6CIDR:        "fd00:1:1::/64",
+					NodeSelector: &corev1.NodeSelector{
+						NodeSelectorTerms: []corev1.NodeSelectorTerm{
+							{
+								MatchExpressions: []corev1.NodeSelectorRequirement{
+									{
+										Key:      "foo",
+										Operator: "In",
+										Values:   []string{"bar"}},
+								},
+							},
+						},
+					},
+				},
+			}),
+
+			output: `Name:         foo.123
+Labels:       <none>
+Annotations:  <none>
+NodeSelector:
+  NodeSelector Terms:
+    Term 0:       foo in [bar]
+PerNodeHostBits:  8
+IPv4CIDR:         10.1.0.0/16
+IPv6CIDR:         fd00:1:1::/64
+Events:           <none>` + "\n",
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			c := &describeClient{T: t, Namespace: "foo", Interface: tc.input}
+			d := ClusterCIDRConfigDescriber{c}
+			out, err := d.Describe("bar", "foo.123", DescriberSettings{ShowEvents: true})
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if out != tc.output {
+				t.Errorf("expected :\n%s\nbut got output:\n%s diff:\n%s", tc.output, out, cmp.Diff(tc.output, out))
 			}
 		})
 	}
