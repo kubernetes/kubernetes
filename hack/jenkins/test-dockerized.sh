@@ -53,7 +53,7 @@ go install ./cmd/...
 
 # TODO(MadhavJivrajani): Temporary fix due to Go 1.18 changes.
 # Please see https://tip.golang.org/doc/go1.18#sha1
-GODEBUG=x509sha1=1
+GODEBUG=x509sha1=1,madvdontneed=1
 export GODEBUG
 
 make test-cmd
