@@ -897,7 +897,7 @@ func (oe *operationExecutor) VerifyVolumesAreAttachedPerNode(
 	}
 
 	// Give an empty UniqueVolumeName so that this operation could be executed concurrently.
-	return oe.pendingOperations.Run("" /* volumeName */, "" /* podName */, "" /* nodeName */, generatedOperations)
+	return oe.pendingOperations.Run("" /* volumeName */, "" /* podName */, nodeName /* nodeName */, generatedOperations)
 }
 
 func (oe *operationExecutor) MountVolume(

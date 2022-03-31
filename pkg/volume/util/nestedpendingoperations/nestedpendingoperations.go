@@ -45,6 +45,9 @@ const (
 
 	// EmptyNodeName is a NodeName for empty string
 	EmptyNodeName types.NodeName = types.NodeName("")
+
+	// EmptyOperationName for a placeholder
+	EmptyOperationName = "placeholder"
 )
 
 // NestedPendingOperations defines the supported set of operations.
@@ -57,8 +60,8 @@ type NestedPendingOperations interface {
 	// volumeName, podName, and nodeName collectively form the operation key.
 	// The following forms of operation keys are supported (two keys are designed
 	// to be "matched" if we want to serialize their operations):
-	// - volumeName empty, podName and nodeName could be anything
-	//   This key does not match with any keys.
+	// - volumeName empty, podName empty, nodeName exists
+	//   This key matches the same nodeName, but empty volumeName and podName
 	// - volumeName exists, podName empty, nodeName empty
 	//   This key matches all other keys with the same volumeName.
 	// - volumeName exists, podName exists, nodeName empty
@@ -68,7 +71,7 @@ type NestedPendingOperations interface {
 	// - volumeName exists, podName empty, nodeName exists
 	//   This key matches with:
 	//   - the same volumeName and nodeName
-	//   - the same volumeName but empty nodeName
+	//   - the same volumeName, but empty nodeName
 
 	// If there is no operation with a matching key, the operation is allowed to
 	// proceed.
@@ -118,7 +121,10 @@ type NestedPendingOperations interface {
 // NewNestedPendingOperations returns a new instance of NestedPendingOperations.
 func NewNestedPendingOperations(exponentialBackOffOnError bool) NestedPendingOperations {
 	g := &nestedPendingOperations{
-		operations:                []operation{},
+		operations: &operationsCache{
+			pendingOps: make(map[v1.UniqueVolumeName]*volumeRelatedOperation),
+			allOps:     make(map[operationKey]*operation),
+		},
 		exponentialBackOffOnError: exponentialBackOffOnError,
 	}
 	g.cond = sync.NewCond(&g.lock)
@@ -126,10 +132,37 @@ func NewNestedPendingOperations(exponentialBackOffOnError bool) NestedPendingOpe
 }
 
 type nestedPendingOperations struct {
-	operations                []operation
+	operations                *operationsCache
 	exponentialBackOffOnError bool
 	cond                      *sync.Cond
 	lock                      sync.RWMutex
+}
+
+type operationsCache struct {
+	// recording pending operations, while the operation completes whenever success or not,
+	// it will be always removed from here.
+	pendingOps map[v1.UniqueVolumeName]*volumeRelatedOperation
+	// stores operations with unique volumeName, podName, nodeName and operationName key
+	allOps map[operationKey]*operation
+}
+
+type volumeRelatedOperation struct {
+	// operationName for the volume without related pod or node
+	operationName string
+	// stores pending operations for the volume with related node
+	nodeRelated map[types.NodeName]*nodeRelatedOperation
+}
+
+type nodeRelatedOperation struct {
+	// operationName for the volume with related node
+	operationName string
+	// stores pending operations for the volume with related pod
+	podRelated map[volumetypes.UniquePodName]*podRelatedOperation
+}
+
+type podRelatedOperation struct {
+	// operationName for the volume with related node and pod
+	operationName string
 }
 
 type operation struct {
@@ -137,6 +170,13 @@ type operation struct {
 	operationName    string
 	operationPending bool
 	expBackoff       exponentialbackoff.ExponentialBackoff
+}
+
+type operationKey struct {
+	volumeName    v1.UniqueVolumeName
+	podName       volumetypes.UniquePodName
+	nodeName      types.NodeName
+	operationName string
 }
 
 func (grm *nestedPendingOperations) Run(
@@ -147,39 +187,28 @@ func (grm *nestedPendingOperations) Run(
 	grm.lock.Lock()
 	defer grm.lock.Unlock()
 
-	opKey := operationKey{volumeName, podName, nodeName}
+	opKey := operationKey{volumeName, podName, nodeName, generatedOperations.OperationName}
 
-	opExists, previousOpIndex := grm.isOperationExists(opKey)
+	if grm.operations.hasOperationPending(volumeName, podName, nodeName) {
+		return NewAlreadyExistsError(opKey)
+	}
+
+	opExists, op := grm.operations.isOperationExists(opKey)
 	if opExists {
-		previousOp := grm.operations[previousOpIndex]
-		// Operation already exists
-		if previousOp.operationPending {
-			// Operation is pending
-			return NewAlreadyExistsError(opKey)
-		}
-
-		backOffErr := previousOp.expBackoff.SafeToRetry(fmt.Sprintf("%+v", opKey))
+		backOffErr := op.expBackoff.SafeToRetry(fmt.Sprintf("%+v", opKey))
 		if backOffErr != nil {
-			if previousOp.operationName == generatedOperations.OperationName {
-				return backOffErr
-			}
-			// previous operation and new operation are different. reset op. name and exp. backoff
-			grm.operations[previousOpIndex].operationName = generatedOperations.OperationName
-			grm.operations[previousOpIndex].expBackoff = exponentialbackoff.ExponentialBackoff{}
+			return backOffErr
 		}
-
 		// Update existing operation to mark as pending.
-		grm.operations[previousOpIndex].operationPending = true
-		grm.operations[previousOpIndex].key = opKey
+		grm.operations.updateOperation(opKey, true, false, nil)
 	} else {
 		// Create a new operation
-		grm.operations = append(grm.operations,
-			operation{
-				key:              opKey,
-				operationPending: true,
-				operationName:    generatedOperations.OperationName,
-				expBackoff:       exponentialbackoff.ExponentialBackoff{},
-			})
+		grm.operations.addOperation(&operation{
+			key:              opKey,
+			operationPending: true,
+			operationName:    generatedOperations.OperationName,
+			expBackoff:       exponentialbackoff.ExponentialBackoff{},
+		})
 	}
 
 	go func() (eventErr, detailedErr error) {
@@ -201,20 +230,17 @@ func (grm *nestedPendingOperations) IsOperationSafeToRetry(
 	grm.lock.RLock()
 	defer grm.lock.RUnlock()
 
-	opKey := operationKey{volumeName, podName, nodeName}
-	exist, previousOpIndex := grm.isOperationExists(opKey)
-	if !exist {
+	opKey := operationKey{volumeName, podName, nodeName, operationName}
+	exists, op := grm.operations.isOperationExists(opKey)
+	if !exists {
 		return true
 	}
-	previousOp := grm.operations[previousOpIndex]
-	if previousOp.operationPending {
+	if op.operationPending {
 		return false
 	}
-	backOffErr := previousOp.expBackoff.SafeToRetry(fmt.Sprintf("%+v", opKey))
+	backOffErr := op.expBackoff.SafeToRetry(fmt.Sprintf("%+v", opKey))
 	if backOffErr != nil {
-		if previousOp.operationName == operationName {
-			return false
-		}
+		return false
 	}
 
 	return true
@@ -228,75 +254,8 @@ func (grm *nestedPendingOperations) IsOperationPending(
 	grm.lock.RLock()
 	defer grm.lock.RUnlock()
 
-	opKey := operationKey{volumeName, podName, nodeName}
-	exist, previousOpIndex := grm.isOperationExists(opKey)
-	if exist && grm.operations[previousOpIndex].operationPending {
-		return true
-	}
-	return false
-}
+	return grm.operations.hasOperationPending(volumeName, podName, nodeName)
 
-// This is an internal function and caller should acquire and release the lock
-func (grm *nestedPendingOperations) isOperationExists(key operationKey) (bool, int) {
-
-	// If volumeName is empty, operation can be executed concurrently
-	if key.volumeName == EmptyUniqueVolumeName {
-		return false, -1
-	}
-
-	for previousOpIndex, previousOp := range grm.operations {
-		volumeNameMatch := previousOp.key.volumeName == key.volumeName
-
-		podNameMatch := previousOp.key.podName == EmptyUniquePodName ||
-			key.podName == EmptyUniquePodName ||
-			previousOp.key.podName == key.podName
-
-		nodeNameMatch := previousOp.key.nodeName == EmptyNodeName ||
-			key.nodeName == EmptyNodeName ||
-			previousOp.key.nodeName == key.nodeName
-
-		if volumeNameMatch && podNameMatch && nodeNameMatch {
-			return true, previousOpIndex
-		}
-	}
-
-	return false, -1
-}
-
-func (grm *nestedPendingOperations) getOperation(key operationKey) (uint, error) {
-	// Assumes lock has been acquired by caller.
-
-	for i, op := range grm.operations {
-		if op.key.volumeName == key.volumeName &&
-			op.key.podName == key.podName &&
-			op.key.nodeName == key.nodeName {
-			return uint(i), nil
-		}
-	}
-
-	return 0, fmt.Errorf("operation %+v not found", key)
-}
-
-func (grm *nestedPendingOperations) deleteOperation(key operationKey) {
-	// Assumes lock has been acquired by caller.
-
-	opIndex := -1
-	for i, op := range grm.operations {
-		if op.key.volumeName == key.volumeName &&
-			op.key.podName == key.podName &&
-			op.key.nodeName == key.nodeName {
-			opIndex = i
-			break
-		}
-	}
-
-	if opIndex < 0 {
-		return
-	}
-
-	// Delete index without preserving order
-	grm.operations[opIndex] = grm.operations[len(grm.operations)-1]
-	grm.operations = grm.operations[:len(grm.operations)-1]
 }
 
 func (grm *nestedPendingOperations) operationComplete(key operationKey, err *error) {
@@ -310,7 +269,7 @@ func (grm *nestedPendingOperations) operationComplete(key operationKey, err *err
 
 	if *err == nil || !grm.exponentialBackOffOnError {
 		// Operation completed without error, or exponentialBackOffOnError disabled
-		grm.deleteOperation(key)
+		grm.operations.deleteOperation(key)
 		if *err != nil {
 			// Log error
 			klog.Errorf("operation %+v failed with: %v", key, *err)
@@ -319,20 +278,21 @@ func (grm *nestedPendingOperations) operationComplete(key operationKey, err *err
 	}
 
 	// Operation completed with error and exponentialBackOffOnError Enabled
-	existingOpIndex, getOpErr := grm.getOperation(key)
+	existingOp, getOpErr := grm.operations.getOperation(key)
 	if getOpErr != nil {
 		// Failed to find existing operation
 		klog.Errorf("Operation %+v completed. error: %v. exponentialBackOffOnError is enabled, but failed to get operation to update.",
 			key,
 			*err)
+		// Clear pending state
+		grm.operations.updateOperation(key, false, false, nil)
 		return
 	}
-
-	grm.operations[existingOpIndex].expBackoff.Update(err)
-	grm.operations[existingOpIndex].operationPending = false
+	// Update backoff and clear pending state
+	grm.operations.updateOperation(key, false, true, err)
 
 	// Log error
-	klog.Errorf("%v", grm.operations[existingOpIndex].expBackoff.
+	klog.Errorf("%v", existingOp.expBackoff.
 		GenerateNoRetriesPermittedMsg(fmt.Sprintf("%+v", key)))
 }
 
@@ -340,15 +300,162 @@ func (grm *nestedPendingOperations) Wait() {
 	grm.lock.Lock()
 	defer grm.lock.Unlock()
 
-	for len(grm.operations) > 0 {
+	for grm.operations.len() > 0 {
 		grm.cond.Wait()
 	}
 }
 
-type operationKey struct {
-	volumeName v1.UniqueVolumeName
-	podName    volumetypes.UniquePodName
-	nodeName   types.NodeName
+func (o *operationsCache) addPending(opKey operationKey) {
+	// Add pending record
+	operName := opKey.operationName
+	if len(operName) == 0 {
+		operName = EmptyOperationName
+	}
+	if _, ok := o.pendingOps[opKey.volumeName]; !ok {
+		o.pendingOps[opKey.volumeName] = &volumeRelatedOperation{
+			operationName: "",
+			nodeRelated:   make(map[types.NodeName]*nodeRelatedOperation),
+		}
+	}
+	vro := o.pendingOps[opKey.volumeName]
+	if opKey.podName != EmptyUniquePodName || opKey.nodeName != EmptyNodeName {
+		if _, ok := vro.nodeRelated[opKey.nodeName]; !ok {
+			vro.nodeRelated[opKey.nodeName] = &nodeRelatedOperation{
+				operationName: "",
+				podRelated:    make(map[volumetypes.UniquePodName]*podRelatedOperation),
+			}
+		}
+		nro := vro.nodeRelated[opKey.nodeName]
+		if opKey.podName != EmptyUniquePodName {
+			pro := &podRelatedOperation{
+				operationName: operName,
+			}
+			nro.podRelated[opKey.podName] = pro
+			return
+		}
+		nro.operationName = operName
+		return
+	}
+	// podName and nodeName both empty
+	vro.operationName = operName
+}
+
+func (o *operationsCache) addOperation(op *operation) {
+	// Assumes lock has been acquired by caller.
+	opKey := op.key
+	// Add operation
+	o.allOps[opKey] = op
+	// Add pending recored
+	o.addPending(opKey)
+}
+
+func (o *operationsCache) getOperation(opKey operationKey) (*operation, error) {
+	// Assumes lock has been acquired by caller.
+	if op, ok := o.allOps[opKey]; ok {
+		return op, nil
+	}
+	return nil, fmt.Errorf("operation %+v not found", opKey)
+}
+
+func (o *operationsCache) deletePending(opKey operationKey) {
+	// Remove pending records
+	if volumePendingOp, ok := o.pendingOps[opKey.volumeName]; ok {
+		if opKey.podName != EmptyUniquePodName {
+			if nodePendingOp, ok := volumePendingOp.nodeRelated[opKey.nodeName]; ok {
+				delete(nodePendingOp.podRelated, opKey.podName)
+				if len(nodePendingOp.podRelated) == 0 {
+					delete(volumePendingOp.nodeRelated, opKey.nodeName)
+				}
+			}
+		} else if opKey.nodeName != EmptyNodeName {
+			delete(volumePendingOp.nodeRelated, opKey.nodeName)
+		} else {
+			volumePendingOp.operationName = ""
+		}
+		// Cleanup pendings
+		if len(volumePendingOp.operationName) == 0 && len(volumePendingOp.nodeRelated) == 0 {
+			delete(o.pendingOps, opKey.volumeName)
+		}
+	}
+}
+
+func (o *operationsCache) deleteOperation(opKey operationKey) {
+	// Assumes lock has been acquired by caller.
+
+	// Remove pending records
+	o.deletePending(opKey)
+	// Remove operation
+	delete(o.allOps, opKey)
+}
+
+func (o *operationsCache) updateOperation(opKey operationKey, isPending, isUpdateBackoff bool, backOffErr *error) {
+	// Assumes lock has been acquired by caller.
+	if op, ok := o.allOps[opKey]; ok {
+		if isUpdateBackoff {
+			op.expBackoff.Update(backOffErr)
+		}
+		op.operationPending = isPending
+	}
+	if isPending {
+		o.addPending(opKey)
+	} else {
+		o.deletePending(opKey)
+	}
+}
+
+func (o *operationsCache) isOperationExists(opKey operationKey) (bool, *operation) {
+	// Assumes lock has been acquired by caller.
+	if op, ok := o.allOps[opKey]; ok {
+		return ok, op
+	}
+	return false, nil
+}
+
+func (o *operationsCache) hasOperationPending(volumeName v1.UniqueVolumeName,
+	podName volumetypes.UniquePodName,
+	nodeName types.NodeName) bool {
+	// Assumes lock has been acquired by caller.
+	if volumeName == EmptyUniqueVolumeName {
+		// volumeName empty for verifyVolumesAreAttachedPerNode
+		// which can running concurrently
+		return false
+	}
+	vro, exists := o.pendingOps[volumeName]
+	if !exists {
+		return false
+	}
+
+	if len(vro.operationName) > 0 {
+		// previous operation with node and pod both empty
+		return true
+	}
+	if podName != EmptyUniquePodName || nodeName != EmptyNodeName {
+		if nro, ok := vro.nodeRelated[nodeName]; ok {
+			if len(nro.operationName) > 0 {
+				return true
+			}
+			if podName != EmptyUniquePodName {
+				if _, ok := nro.podRelated[podName]; ok {
+					return true
+				}
+			} else {
+				if len(nro.podRelated) > 0 {
+					return true
+				}
+			}
+		}
+	} else {
+		// pod empty and node empty
+		if len(vro.nodeRelated) > 0 {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (o *operationsCache) len() int {
+	return len(o.allOps)
 }
 
 // NewAlreadyExistsError returns a new instance of AlreadyExists error.

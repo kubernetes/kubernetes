@@ -22,6 +22,9 @@ import (
 	"strings"
 	"time"
 
+	batchv1 "k8s.io/api/batch/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+
 	"github.com/onsi/ginkgo"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -30,6 +33,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ejob "k8s.io/kubernetes/test/e2e/framework/job"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2estatefulset "k8s.io/kubernetes/test/e2e/framework/statefulset"
@@ -41,7 +45,7 @@ import (
 
 // Validate PV/PVC, create and verify writer pod, delete the PVC, and validate the PV's
 // phase. Note: the PV is deleted in the AfterEach, not here.
-func completeTest(f *framework.Framework, c clientset.Interface, ns string, pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim) {
+func completeTest(f *framework.Framework, c clientset.Interface, ns string, pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim, act func(c clientset.Interface, t *framework.TimeoutContext, ns string, pvc *v1.PersistentVolumeClaim, command string) error) {
 	// 1. verify that the PV and PVC have bound correctly
 	ginkgo.By("Validating the PV-PVC binding")
 	framework.ExpectNoError(e2epv.WaitOnPVandPVC(c, f.Timeouts, ns, pv, pvc))
@@ -49,7 +53,7 @@ func completeTest(f *framework.Framework, c clientset.Interface, ns string, pv *
 	// 2. create the nfs writer pod, test if the write was successful,
 	//    then delete the pod and verify that it was deleted
 	ginkgo.By("Checking pod has write access to PersistentVolume")
-	framework.ExpectNoError(createWaitAndDeletePod(c, f.Timeouts, ns, pvc, "touch /mnt/volume1/SUCCESS && (id -G | grep -E '\\b777\\b')"))
+	framework.ExpectNoError(act(c, f.Timeouts, ns, pvc, "touch /mnt/volume1/SUCCESS && (id -G | grep -E '\\b777\\b')"))
 
 	// 3. delete the PVC, wait for PV to become "Released"
 	ginkgo.By("Deleting the PVC to invoke the reclaim policy.")
@@ -171,7 +175,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			ginkgo.It("should create a non-pre-bound PV and PVC: test write access ", func() {
 				pv, pvc, err = e2epv.CreatePVPVC(c, f.Timeouts, pvConfig, pvcConfig, ns, false)
 				framework.ExpectNoError(err)
-				completeTest(f, c, ns, pv, pvc)
+				completeTest(f, c, ns, pv, pvc, createWaitAndDeletePod)
 			})
 
 			// Create a claim first, then a nfs PV that matches the claim, and a
@@ -180,7 +184,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			ginkgo.It("create a PVC and non-pre-bound PV: test write access", func() {
 				pv, pvc, err = e2epv.CreatePVCPV(c, f.Timeouts, pvConfig, pvcConfig, ns, false)
 				framework.ExpectNoError(err)
-				completeTest(f, c, ns, pv, pvc)
+				completeTest(f, c, ns, pv, pvc, createWaitAndDeletePod)
 			})
 
 			// Create a claim first, then a pre-bound nfs PV that matches the claim,
@@ -189,7 +193,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			ginkgo.It("create a PVC and a pre-bound PV: test write access", func() {
 				pv, pvc, err = e2epv.CreatePVCPV(c, f.Timeouts, pvConfig, pvcConfig, ns, true)
 				framework.ExpectNoError(err)
-				completeTest(f, c, ns, pv, pvc)
+				completeTest(f, c, ns, pv, pvc, createWaitAndDeletePod)
 			})
 
 			// Create a nfs PV first, then a pre-bound PVC that matches the PV,
@@ -198,7 +202,16 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			ginkgo.It("create a PV and a pre-bound PVC: test write access", func() {
 				pv, pvc, err = e2epv.CreatePVPVC(c, f.Timeouts, pvConfig, pvcConfig, ns, true)
 				framework.ExpectNoError(err)
-				completeTest(f, c, ns, pv, pvc)
+				completeTest(f, c, ns, pv, pvc, createWaitAndDeletePod)
+			})
+
+			// Create a claim first, then a pre-bound nfs PV that matches the claim, and spawn multi
+			// job pods that contains the same claim. Verify that the PV and PVC bind
+			// correctly, and that all pods can be created successfully and write to the nfs volume.
+			ginkgo.It("create a PVC and a pre-bound PV: test spawn multi job pods that contains the same claim", func() {
+				pv, pvc, err = e2epv.CreatePVCPV(c, f.Timeouts, pvConfig, pvcConfig, ns, true)
+				framework.ExpectNoError(err)
+				completeTest(f, c, ns, pv, pvc, createWaitAndDeleteJob)
 			})
 		})
 
@@ -440,6 +453,50 @@ func makeStatefulSetWithPVCs(ns, cmd string, mounts []v1.VolumeMount, claims []v
 	}
 }
 
+func makeJobWithPVCs(ns string, pvc *v1.PersistentVolumeClaim, command string) *batchv1.Job {
+	parallelism := int32(50)
+	completions := int32(50)
+	pod := e2epod.MakePod(ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, command)
+	return &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "job-with-pvc-test",
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind: "Job",
+		},
+		Spec: batchv1.JobSpec{
+			Parallelism: &parallelism,
+			Completions: &completions,
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{},
+				Spec:       pod.Spec,
+			},
+		},
+	}
+}
+
+// createWaitAndDeleteJob creates the test job, wait for (hopefully) success, and then delete the job.
+func createWaitAndDeleteJob(c clientset.Interface, t *framework.TimeoutContext, ns string, pvc *v1.PersistentVolumeClaim, command string) (err error) {
+	framework.Logf("Creating nfs test job")
+	job := makeJobWithPVCs(ns, pvc, command)
+	runJob, err := c.BatchV1().Jobs(ns).Create(context.TODO(), job, metav1.CreateOptions{})
+	if err != nil {
+		return fmt.Errorf("job Create API error: %v", err)
+	}
+	defer func() {
+		delErr := deleteJobWithWait(c, t, ns, runJob.Name)
+		if err == nil { // don't override previous err value
+			err = delErr // assign to returned err, can be nil
+		}
+	}()
+
+	err = testJobSuccessOrFail(c, ns, runJob)
+	if err != nil {
+		return fmt.Errorf("job %q did not exit with Success: %v", job.Name, err)
+	}
+	return // note: named return value
+}
+
 // createWaitAndDeletePod creates the test pod, wait for (hopefully) success, and then delete the pod.
 // Note: need named return value so that the err assignment in the defer sets the returned error.
 //       Has been shown to be necessary using Go 1.7.
@@ -471,5 +528,33 @@ func testPodSuccessOrFail(c clientset.Interface, t *framework.TimeoutContext, ns
 		return fmt.Errorf("pod %q failed to reach Success: %v", pod.Name, err)
 	}
 	framework.Logf("Pod %v succeeded ", pod.Name)
+	return nil
+}
+
+// testJobSuccessOrFail tests whether the job completes.
+func testJobSuccessOrFail(c clientset.Interface, ns string, job *batchv1.Job) error {
+	framework.Logf("Job should complete with %v Succeeded", *job.Spec.Completions)
+	if err := e2ejob.WaitForJobComplete(c, ns, job.Name, *job.Spec.Completions); err != nil {
+		return fmt.Errorf("job %q failed to reach Success: %v", job.Name, err)
+	}
+	framework.Logf("job %v succeeded ", job.Name)
+	return nil
+}
+
+// deleteJobWithWait deletes the named and namespaced job and waits for the job to be terminated. Resilient to the job
+// not existing.
+func deleteJobWithWait(c clientset.Interface, t *framework.TimeoutContext, ns, jobName string) error {
+	jobDeletePropagationPolicy := metav1.DeletePropagationForeground
+	if err := c.BatchV1().Jobs(ns).Delete(context.TODO(), jobName, metav1.DeleteOptions{PropagationPolicy: &jobDeletePropagationPolicy}); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil // assume job was already deleted
+		}
+		return fmt.Errorf("job Delete API error: %v", err)
+	}
+	framework.Logf("Wait up to %v for job %q to be fully deleted", t.PodDelete, jobName)
+	if err := e2ejob.WaitForJobGone(c, ns, jobName, t.PodDelete); err != nil {
+		return fmt.Errorf("job %q was not deleted: %v", jobName, err)
+	}
+	framework.Logf("job %v deleted ", jobName)
 	return nil
 }
