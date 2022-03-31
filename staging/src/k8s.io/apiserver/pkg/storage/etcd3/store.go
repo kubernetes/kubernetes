@@ -50,11 +50,10 @@ import (
 )
 
 const (
-	DefaultListEtcdMaxLimit = 500
-	// maxLimitOnFieldSelectorList is a maximum page limit increase used when fetching objects from etcd with field selector.
-	// This limit is used only for increasing page size by kube-apiserver. If request
+	// fieldSelectorListMaxLimit is a maximum page limit increase used when fetching objects from etcd.
+	// This limit is used only for increasing page size by kube-apiserver with field selector. If request
 	// specifies larger limit initially, it won't be changed.
-	FieldSelectorListMaxLimit = 10000
+	fieldSelectorListMaxLimit = 10000
 )
 
 // authenticatedDataString satisfies the value.Context interface. It uses the key to
@@ -571,7 +570,7 @@ type clientPagingConfig struct {
 	remainingCnt    int64
 }
 
-func (s *store) paginatedList(ctx context.Context, key, end string, rev int64, fromRev *uint64,
+func (s *store) paginatedList(ctx context.Context, trace *utiltrace.Trace, key, end string, rev int64, fromRev *uint64,
 	v reflect.Value, typeName string, pred storage.SelectionPredicate, newItemFunc func() runtime.Object) (pcfg *clientPagingConfig, err error) {
 	pcfg = &clientPagingConfig{}
 	maximumLimit := int64(s.maximumListLimit)
@@ -591,7 +590,16 @@ func (s *store) paginatedList(ctx context.Context, key, end string, rev int64, f
 	var pages float64
 	// Because these metrics are for understanding the costs of handling LIST requests,
 	// get them recorded even in error cases.
+	start := time.Now()
 	defer func() {
+		if err == nil {
+			// quantify the list from storage latency
+			metrics.RecordListStorageLatency(s.groupResourceString, int(pages), start)
+		}
+		// only log number of pages if the request is slow >= 500ms
+		trace.Step("fetched all pages from etcd", utiltrace.Field{Key: "page-count", Value: pages})
+		// Because these metrics are for understanding the costs of handling LIST requests,
+		// get them recorded even in error cases.
 		numReturn := v.Len()
 		metrics.RecordStorageListMetrics(s.groupResourceString, numFetched, numEvald, numReturn)
 	}()
@@ -606,8 +614,8 @@ func (s *store) paginatedList(ctx context.Context, key, end string, rev int64, f
 			// We got incomplete result due to field/label selector dropping the object.
 			// Double page size to reduce total number of calls to etcd.
 			limit = pred.Limit * int64(math.Pow(2, pages))
-			if FieldSelectorListMaxLimit > limit {
-				limit = FieldSelectorListMaxLimit
+			if fieldSelectorListMaxLimit > limit {
+				limit = fieldSelectorListMaxLimit
 			}
 		}
 
@@ -792,7 +800,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		}
 	}
 
-	pcfg, err := s.paginatedList(ctx, key, rangeEnd, withRev, fromRV, v, getTypeName(listObj), opts.Predicate, newItemFunc)
+	pcfg, err := s.paginatedList(ctx, trace, key, rangeEnd, withRev, fromRV, v, getTypeName(listObj), opts.Predicate, newItemFunc)
 	if err != nil {
 		return interpretListError(err, len(pred.Continue) > 0, continueKey, keyPrefix)
 	}

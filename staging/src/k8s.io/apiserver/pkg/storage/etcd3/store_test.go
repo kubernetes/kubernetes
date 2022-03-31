@@ -63,7 +63,10 @@ import (
 var scheme = runtime.NewScheme()
 var codecs = serializer.NewCodecFactory(scheme)
 
-const defaultTestPrefix = "test!"
+const (
+	defaultTestPrefix       = "test!"
+	defaultListEtcdMaxLimit = 500
+)
 
 func init() {
 	metav1.AddToGroupVersion(scheme, metav1.SchemeGroupVersion)
@@ -1036,7 +1039,7 @@ func TestGuaranteedUpdateWithSuggestionAndConflict(t *testing.T) {
 func TestTransformationFailure(t *testing.T) {
 	client := testserver.RunEtcd(t, nil)
 	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
-	store := newStore(client, codec, newPod, "", schema.GroupResource{Resource: "pods"}, &prefixTransformer{prefix: []byte(defaultTestPrefix)}, false, newTestLeaseManagerConfig(), DefaultListEtcdMaxLimit)
+	store := newStore(client, codec, newPod, "", schema.GroupResource{Resource: "pods"}, &prefixTransformer{prefix: []byte(defaultTestPrefix)}, false, newTestLeaseManagerConfig(), defaultListEtcdMaxLimit)
 	ctx := context.Background()
 
 	preset := []struct {
@@ -1116,8 +1119,8 @@ func TestList(t *testing.T) {
 	client := testserver.RunEtcd(t, nil)
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RemainingItemCount, true)()
 	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
-	store := newStore(client, codec, newPod, "", schema.GroupResource{Resource: "pods"}, &prefixTransformer{prefix: []byte(defaultTestPrefix)}, true, newTestLeaseManagerConfig(), DefaultListEtcdMaxLimit)
-	disablePagingStore := newStore(client, codec, newPod, "", schema.GroupResource{Resource: "pods"}, &prefixTransformer{prefix: []byte(defaultTestPrefix)}, false, newTestLeaseManagerConfig(), DefaultListEtcdMaxLimit)
+	store := newStore(client, codec, newPod, "", schema.GroupResource{Resource: "pods"}, &prefixTransformer{prefix: []byte(defaultTestPrefix)}, true, newTestLeaseManagerConfig(), defaultListEtcdMaxLimit)
+	disablePagingStore := newStore(client, codec, newPod, "", schema.GroupResource{Resource: "pods"}, &prefixTransformer{prefix: []byte(defaultTestPrefix)}, false, newTestLeaseManagerConfig(), defaultListEtcdMaxLimit)
 	ctx := context.Background()
 
 	// Setup storage with the following structure:
@@ -1632,7 +1635,7 @@ func TestListPaginationWithEnforcedLimit(t *testing.T) {
 	transformer := &prefixTransformer{prefix: []byte(defaultTestPrefix)}
 	recorder := &clientRecorder{KV: etcdClient.KV}
 	etcdClient.KV = recorder
-	store := newStore(etcdClient, codec, newPod, "", schema.GroupResource{Resource: "pods"}, transformer, true, NewDefaultLeaseManagerConfig(), DefaultListEtcdMaxLimit)
+	store := newStore(etcdClient, codec, newPod, "", schema.GroupResource{Resource: "pods"}, transformer, true, NewDefaultLeaseManagerConfig(), defaultListEtcdMaxLimit)
 	ctx := context.Background()
 
 	podCount := 1000
@@ -1708,7 +1711,7 @@ func TestListContinuation(t *testing.T) {
 	transformer := &prefixTransformer{prefix: []byte(defaultTestPrefix)}
 	recorder := &clientRecorder{KV: etcdClient.KV}
 	etcdClient.KV = recorder
-	store := newStore(etcdClient, codec, newPod, "", schema.GroupResource{Resource: "pods"}, transformer, true, newTestLeaseManagerConfig(), DefaultListEtcdMaxLimit)
+	store := newStore(etcdClient, codec, newPod, "", schema.GroupResource{Resource: "pods"}, transformer, true, newTestLeaseManagerConfig(), defaultListEtcdMaxLimit)
 	ctx := context.Background()
 
 	// Setup storage with the following structure:
@@ -1866,7 +1869,7 @@ func TestListPaginationRareObject(t *testing.T) {
 	transformer := &prefixTransformer{prefix: []byte(defaultTestPrefix)}
 	recorder := &clientRecorder{KV: etcdClient.KV}
 	etcdClient.KV = recorder
-	store := newStore(etcdClient, codec, newPod, "", schema.GroupResource{Resource: "pods"}, transformer, true, newTestLeaseManagerConfig(), DefaultListEtcdMaxLimit)
+	store := newStore(etcdClient, codec, newPod, "", schema.GroupResource{Resource: "pods"}, transformer, true, newTestLeaseManagerConfig(), defaultListEtcdMaxLimit)
 	ctx := context.Background()
 
 	podCount := 1000
@@ -1941,7 +1944,7 @@ func TestListContinuationWithFilter(t *testing.T) {
 	transformer := &prefixTransformer{prefix: []byte(defaultTestPrefix)}
 	recorder := &clientRecorder{KV: etcdClient.KV}
 	etcdClient.KV = recorder
-	store := newStore(etcdClient, codec, newPod, "", schema.GroupResource{Resource: "pods"}, transformer, true, newTestLeaseManagerConfig(), DefaultListEtcdMaxLimit)
+	store := newStore(etcdClient, codec, newPod, "", schema.GroupResource{Resource: "pods"}, transformer, true, newTestLeaseManagerConfig(), defaultListEtcdMaxLimit)
 	ctx := context.Background()
 
 	preset := []struct {
@@ -2049,7 +2052,7 @@ func TestListContinuationWithFilter(t *testing.T) {
 func TestListInconsistentContinuation(t *testing.T) {
 	client := testserver.RunEtcd(t, nil)
 	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
-	store := newStore(client, codec, newPod, "", schema.GroupResource{Resource: "pods"}, &prefixTransformer{prefix: []byte(defaultTestPrefix)}, true, newTestLeaseManagerConfig(), DefaultListEtcdMaxLimit)
+	store := newStore(client, codec, newPod, "", schema.GroupResource{Resource: "pods"}, &prefixTransformer{prefix: []byte(defaultTestPrefix)}, true, newTestLeaseManagerConfig(), defaultListEtcdMaxLimit)
 	ctx := context.Background()
 
 	// Setup storage with the following structure:
@@ -2217,7 +2220,7 @@ func newTestLeaseManagerConfig() LeaseManagerConfig {
 func testSetup(t *testing.T) (context.Context, *store, *clientv3.Client) {
 	client := testserver.RunEtcd(t, nil)
 	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
-	store := newStore(client, codec, newPod, "", schema.GroupResource{Resource: "pods"}, &prefixTransformer{prefix: []byte(defaultTestPrefix)}, true, newTestLeaseManagerConfig(), DefaultListEtcdMaxLimit)
+	store := newStore(client, codec, newPod, "", schema.GroupResource{Resource: "pods"}, &prefixTransformer{prefix: []byte(defaultTestPrefix)}, true, newTestLeaseManagerConfig(), defaultListEtcdMaxLimit)
 	ctx := context.Background()
 	return ctx, store, client
 }
@@ -2258,7 +2261,7 @@ func TestPrefix(t *testing.T) {
 		"/registry":         "/registry",
 	}
 	for configuredPrefix, effectivePrefix := range testcases {
-		store := newStore(client, codec, nil, configuredPrefix, schema.GroupResource{Resource: "widgets"}, transformer, true, newTestLeaseManagerConfig(), DefaultListEtcdMaxLimit)
+		store := newStore(client, codec, nil, configuredPrefix, schema.GroupResource{Resource: "widgets"}, transformer, true, newTestLeaseManagerConfig(), defaultListEtcdMaxLimit)
 		if store.pathPrefix != effectivePrefix {
 			t.Errorf("configured prefix of %s, expected effective prefix of %s, got %s", configuredPrefix, effectivePrefix, store.pathPrefix)
 		}
@@ -2424,7 +2427,7 @@ func TestConsistentList(t *testing.T) {
 	transformer := &fancyTransformer{
 		transformer: &prefixTransformer{prefix: []byte(defaultTestPrefix)},
 	}
-	store := newStore(client, codec, newPod, "", schema.GroupResource{Resource: "pods"}, transformer, true, newTestLeaseManagerConfig(), DefaultListEtcdMaxLimit)
+	store := newStore(client, codec, newPod, "", schema.GroupResource{Resource: "pods"}, transformer, true, newTestLeaseManagerConfig(), defaultListEtcdMaxLimit)
 	transformer.store = store
 
 	for i := 0; i < 5; i++ {
@@ -2532,7 +2535,7 @@ func TestLeaseMaxObjectCount(t *testing.T) {
 	store := newStore(client, codec, newPod, "", schema.GroupResource{Resource: "pods"}, &prefixTransformer{prefix: []byte(defaultTestPrefix)}, true, LeaseManagerConfig{
 		ReuseDurationSeconds: defaultLeaseReuseDurationSeconds,
 		MaxObjectCount:       2,
-	}, DefaultListEtcdMaxLimit)
+	}, defaultListEtcdMaxLimit)
 	ctx := context.Background()
 
 	obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
