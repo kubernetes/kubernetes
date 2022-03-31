@@ -68,6 +68,7 @@ if [[ ! -f "${SERVICE_ACCOUNT_KEY}" ]]; then
 fi
 
 # Start kube-apiserver
+# omit enums from static openapi snapshots used to generate clients until #109177 is resolved
 kube::log::status "Starting kube-apiserver"
 "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
   --bind-address="${API_HOST}" \
@@ -75,7 +76,7 @@ kube::log::status "Starting kube-apiserver"
   --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
   --advertise-address="10.10.10.10" \
   --cert-dir="${TMP_DIR}/certs" \
-  --feature-gates=AllAlpha=true \
+  --feature-gates=AllAlpha=true,OpenAPIEnums=false \
   --runtime-config="api/all=true" \
   --token-auth-file="${TMP_DIR}/tokenauth.csv" \
   --authorization-mode=RBAC \
