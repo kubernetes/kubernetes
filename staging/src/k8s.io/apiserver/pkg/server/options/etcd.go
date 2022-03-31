@@ -270,8 +270,10 @@ func (f *SimpleRestOptionsFactory) GetRESTOptions(resource schema.GroupResource)
 			klog.Warningf("Dropping watch-cache-size for %v - watchCache size is now dynamic", resource)
 		}
 		if ok && size <= 0 {
+			klog.V(3).InfoS("Not using watch cache", "resource", resource)
 			ret.Decorator = generic.UndecoratedStorage
 		} else {
+			klog.V(3).InfoS("Using watch cache", "resource", resource)
 			ret.Decorator = genericregistry.StorageWithCacher()
 		}
 	}
