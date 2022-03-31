@@ -209,13 +209,10 @@ func (o *ScaleOptions) RunScale() error {
 		return err
 	}
 
-	infos := []*resource.Info{}
-	r.Visit(func(info *resource.Info, err error) error {
-		if err == nil {
-			infos = append(infos, info)
-		}
-		return nil
-	})
+	infos, err := r.Infos()
+	if err != nil {
+		return err
+	}
 
 	if len(o.ResourceVersion) != 0 && len(infos) > 1 {
 		return fmt.Errorf("cannot use --resource-version with multiple resources")
@@ -236,9 +233,6 @@ func (o *ScaleOptions) RunScale() error {
 
 	counter := 0
 	for _, info := range infos {
-		if err != nil {
-			return err
-		}
 		counter++
 
 		mapping := info.ResourceMapping()
@@ -263,7 +257,7 @@ func (o *ScaleOptions) RunScale() error {
 			}
 		}
 
-		err = o.PrintObj(info.Object, o.Out)
+		return o.PrintObj(info.Object, o.Out)
 
 	}
 	if err != nil {
