@@ -18,7 +18,6 @@ package audit
 
 import (
 	"context"
-	"fmt"
 	"sync"
 
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
@@ -73,7 +72,7 @@ func WithAuditAnnotations(parent context.Context) context.Context {
 func AddAuditAnnotation(ctx context.Context, key, value string) {
 	mutex, ok := auditAnnotationsMutex(ctx)
 	if !ok {
-		klog.ErrorS(nil, "Attempted to add audit annotations from unsupported request chain", "annotation", fmt.Sprintf("%s=%s", key, value))
+		// auditing is not enabled
 		return
 	}
 
@@ -95,7 +94,7 @@ func AddAuditAnnotation(ctx context.Context, key, value string) {
 func AddAuditAnnotations(ctx context.Context, keysAndValues ...string) {
 	mutex, ok := auditAnnotationsMutex(ctx)
 	if !ok {
-		klog.ErrorS(nil, "Attempted to add audit annotations from unsupported request chain", "annotations", keysAndValues)
+		// auditing is not enabled
 		return
 	}
 
@@ -121,7 +120,7 @@ func AddAuditAnnotations(ctx context.Context, keysAndValues ...string) {
 func AddAuditAnnotationsMap(ctx context.Context, annotations map[string]string) {
 	mutex, ok := auditAnnotationsMutex(ctx)
 	if !ok {
-		klog.ErrorS(nil, "Attempted to add audit annotations from unsupported request chain", "annotations", annotations)
+		// auditing is not enabled
 		return
 	}
 
@@ -154,7 +153,7 @@ func addAuditAnnotationLocked(ae *auditinternal.Event, annotations *[]annotation
 func addAuditAnnotationsFrom(ctx context.Context, ev *auditinternal.Event) {
 	mutex, ok := auditAnnotationsMutex(ctx)
 	if !ok {
-		klog.Errorf("Attempted to copy audit annotations from unsupported request chain")
+		// auditing is not enabled
 		return
 	}
 
