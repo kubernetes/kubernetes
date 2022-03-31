@@ -19,6 +19,7 @@
 
 set -o errexit
 set -o pipefail
+set -o nounset
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
@@ -39,4 +40,4 @@ popd >/dev/null
 LEVEE_BIN="$(which levee)"
 CONFIG_FILE="${KUBE_ROOT}/hack/testdata/levee/levee-config.yaml"
 
-"${KUBE_ROOT}"/hack/verify-govet.sh -vettool="${LEVEE_BIN}" -config="${CONFIG_FILE}"
+make --no-print-directory -C "${KUBE_ROOT}" vet WHAT="$*" ARGS="-vettool=${LEVEE_BIN} -config=${CONFIG_FILE}"

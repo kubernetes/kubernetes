@@ -351,10 +351,11 @@ define VET_HELP_INFO
 #   WHAT: Directory names to vet.  All *.go files under these
 #     directories will be vetted.  If not specified, "everything" will be
 #     vetted.
+#   ARGS: goflags to pass to go vet command.
 #
 # Example:
 #   make vet
-#   make vet WHAT=./pkg/kubelet
+#   make vet WHAT=./pkg/kubelet ARGS="-json -vettool=$(which customvettool)"
 endef
 .PHONY: vet
 ifeq ($(PRINT_HELP),y)
@@ -362,7 +363,7 @@ vet:
 	echo "$$VET_HELP_INFO"
 else
 vet: generated_files
-	CALLED_FROM_MAIN_MAKEFILE=1 hack/make-rules/vet.sh $(WHAT)
+	CALLED_FROM_MAIN_MAKEFILE=1 hack/make-rules/vet.sh $(WHAT) $(ARGS)
 endif
 
 define RELEASE_HELP_INFO
