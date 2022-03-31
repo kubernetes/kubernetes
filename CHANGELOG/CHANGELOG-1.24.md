@@ -1,35 +1,34 @@
 <!-- BEGIN MUNGE: GENERATED_TOC -->
 
-- [v1.24.0-alpha.4](#v1240-alpha4)
-  - [Downloads for v1.24.0-alpha.4](#downloads-for-v1240-alpha4)
+- [v1.24.0-beta.0](#v1240-beta0)
+  - [Downloads for v1.24.0-beta.0](#downloads-for-v1240-beta0)
     - [Source Code](#source-code)
     - [Client Binaries](#client-binaries)
     - [Server Binaries](#server-binaries)
     - [Node Binaries](#node-binaries)
     - [Container Images](#container-images)
-  - [Changelog since v1.24.0-alpha.3](#changelog-since-v1240-alpha3)
-  - [Urgent Upgrade Notes](#urgent-upgrade-notes)
-    - [(No, really, you MUST read this before you upgrade)](#no-really-you-must-read-this-before-you-upgrade)
+  - [Changelog since v1.24.0-alpha.4](#changelog-since-v1240-alpha4)
   - [Changes by Kind](#changes-by-kind)
     - [Deprecation](#deprecation)
     - [API Change](#api-change)
     - [Feature](#feature)
     - [Bug or Regression](#bug-or-regression)
     - [Other (Cleanup or Flake)](#other-cleanup-or-flake)
+    - [Uncategorized](#uncategorized)
   - [Dependencies](#dependencies)
     - [Added](#added)
     - [Changed](#changed)
     - [Removed](#removed)
-- [v1.24.0-alpha.3](#v1240-alpha3)
-  - [Downloads for v1.24.0-alpha.3](#downloads-for-v1240-alpha3)
+- [v1.24.0-alpha.4](#v1240-alpha4)
+  - [Downloads for v1.24.0-alpha.4](#downloads-for-v1240-alpha4)
     - [Source Code](#source-code-1)
     - [Client Binaries](#client-binaries-1)
     - [Server Binaries](#server-binaries-1)
     - [Node Binaries](#node-binaries-1)
     - [Container Images](#container-images-1)
-  - [Changelog since v1.24.0-alpha.2](#changelog-since-v1240-alpha2)
-  - [Urgent Upgrade Notes](#urgent-upgrade-notes-1)
-    - [(No, really, you MUST read this before you upgrade)](#no-really-you-must-read-this-before-you-upgrade-1)
+  - [Changelog since v1.24.0-alpha.3](#changelog-since-v1240-alpha3)
+  - [Urgent Upgrade Notes](#urgent-upgrade-notes)
+    - [(No, really, you MUST read this before you upgrade)](#no-really-you-must-read-this-before-you-upgrade)
   - [Changes by Kind](#changes-by-kind-1)
     - [Deprecation](#deprecation-1)
     - [API Change](#api-change-1)
@@ -40,16 +39,16 @@
     - [Added](#added-1)
     - [Changed](#changed-1)
     - [Removed](#removed-1)
-- [v1.24.0-alpha.2](#v1240-alpha2)
-  - [Downloads for v1.24.0-alpha.2](#downloads-for-v1240-alpha2)
+- [v1.24.0-alpha.3](#v1240-alpha3)
+  - [Downloads for v1.24.0-alpha.3](#downloads-for-v1240-alpha3)
     - [Source Code](#source-code-2)
     - [Client Binaries](#client-binaries-2)
     - [Server Binaries](#server-binaries-2)
     - [Node Binaries](#node-binaries-2)
     - [Container Images](#container-images-2)
-  - [Changelog since v1.24.0-alpha.1](#changelog-since-v1240-alpha1)
-  - [Urgent Upgrade Notes](#urgent-upgrade-notes-2)
-    - [(No, really, you MUST read this before you upgrade)](#no-really-you-must-read-this-before-you-upgrade-2)
+  - [Changelog since v1.24.0-alpha.2](#changelog-since-v1240-alpha2)
+  - [Urgent Upgrade Notes](#urgent-upgrade-notes-1)
+    - [(No, really, you MUST read this before you upgrade)](#no-really-you-must-read-this-before-you-upgrade-1)
   - [Changes by Kind](#changes-by-kind-2)
     - [Deprecation](#deprecation-2)
     - [API Change](#api-change-2)
@@ -60,16 +59,19 @@
     - [Added](#added-2)
     - [Changed](#changed-2)
     - [Removed](#removed-2)
-- [v1.24.0-alpha.1](#v1240-alpha1)
-  - [Downloads for v1.24.0-alpha.1](#downloads-for-v1240-alpha1)
+- [v1.24.0-alpha.2](#v1240-alpha2)
+  - [Downloads for v1.24.0-alpha.2](#downloads-for-v1240-alpha2)
     - [Source Code](#source-code-3)
     - [Client Binaries](#client-binaries-3)
     - [Server Binaries](#server-binaries-3)
     - [Node Binaries](#node-binaries-3)
-  - [Changelog since v1.23.0](#changelog-since-v1230)
-  - [Urgent Upgrade Notes](#urgent-upgrade-notes-3)
-    - [(No, really, you MUST read this before you upgrade)](#no-really-you-must-read-this-before-you-upgrade-3)
+    - [Container Images](#container-images-3)
+  - [Changelog since v1.24.0-alpha.1](#changelog-since-v1240-alpha1)
+  - [Urgent Upgrade Notes](#urgent-upgrade-notes-2)
+    - [(No, really, you MUST read this before you upgrade)](#no-really-you-must-read-this-before-you-upgrade-2)
   - [Changes by Kind](#changes-by-kind-3)
+    - [Deprecation](#deprecation-3)
+    - [API Change](#api-change-3)
     - [Feature](#feature-3)
     - [Bug or Regression](#bug-or-regression-3)
     - [Other (Cleanup or Flake)](#other-cleanup-or-flake-3)
@@ -77,8 +79,261 @@
     - [Added](#added-3)
     - [Changed](#changed-3)
     - [Removed](#removed-3)
+- [v1.24.0-alpha.1](#v1240-alpha1)
+  - [Downloads for v1.24.0-alpha.1](#downloads-for-v1240-alpha1)
+    - [Source Code](#source-code-4)
+    - [Client Binaries](#client-binaries-4)
+    - [Server Binaries](#server-binaries-4)
+    - [Node Binaries](#node-binaries-4)
+  - [Changelog since v1.23.0](#changelog-since-v1230)
+  - [Urgent Upgrade Notes](#urgent-upgrade-notes-3)
+    - [(No, really, you MUST read this before you upgrade)](#no-really-you-must-read-this-before-you-upgrade-3)
+  - [Changes by Kind](#changes-by-kind-4)
+    - [Feature](#feature-4)
+    - [Bug or Regression](#bug-or-regression-4)
+    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-4)
+  - [Dependencies](#dependencies-4)
+    - [Added](#added-4)
+    - [Changed](#changed-4)
+    - [Removed](#removed-4)
 
 <!-- END MUNGE: GENERATED_TOC -->
+
+# v1.24.0-beta.0
+
+
+## Downloads for v1.24.0-beta.0
+
+
+
+### Source Code
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes.tar.gz](https://dl.k8s.io/v1.24.0-beta.0/kubernetes.tar.gz) | fee35c2c970d740f4d1cd06ab8f661a025d03639e30ea9d88c711a6e5292396499fd57519297669e6643a56a80ae5770786f7bea105b5c5d5fc5b7835fa00a3b
+[kubernetes-src.tar.gz](https://dl.k8s.io/v1.24.0-beta.0/kubernetes-src.tar.gz) | 79a8ebfe8d822e8e4b5fa888d37b078ac8b19641692364058a274dc63a3dd0f7fc6ad2dcbca72c4e8bf72fead3a89e0feb207dc7459d0e9cb6b28e1cd4b2e532
+
+### Client Binaries
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes-client-darwin-amd64.tar.gz](https://dl.k8s.io/v1.24.0-beta.0/kubernetes-client-darwin-amd64.tar.gz) | ee6f396270db71e7a74545a2868705985a59edc400951f4c368e4471f152b1dd2456de26dcdc187d066e1e0747ddbcf9e4eb4737c5f03dc9b38ddf48d2c15aa4
+[kubernetes-client-darwin-arm64.tar.gz](https://dl.k8s.io/v1.24.0-beta.0/kubernetes-client-darwin-arm64.tar.gz) | dd08e3148f184410a865356754b1b1be21afecb3b671aff52b2b7d037da22cde8ec4cc5e53c01f418e281f00e8c978bb22c59a1c03c5ed79505824d9c00c29ab
+[kubernetes-client-linux-386.tar.gz](https://dl.k8s.io/v1.24.0-beta.0/kubernetes-client-linux-386.tar.gz) | bc10a3b0b81a0dde4fb1c1d9dfe5c6ec81122c71bd215b1da629a94993fed2e55e8367f7e916557a69bcba08cccec2301500ebf62e6dbb34b2c200cac545ce73
+[kubernetes-client-linux-amd64.tar.gz](https://dl.k8s.io/v1.24.0-beta.0/kubernetes-client-linux-amd64.tar.gz) | f8ce5bd528b0d31b98164d03b2d1906dce61747e9d64632064000fe872384d6abca66b3dfe8023ec492ae8b2589d8d79db06be56951e48ff52cc9f9871035408
+[kubernetes-client-linux-arm.tar.gz](https://dl.k8s.io/v1.24.0-beta.0/kubernetes-client-linux-arm.tar.gz) | 044005bed2812d80bd90bcd5bf015082af54f4d02218f137d304d0d2b2933bac904bdc5d63695d786e9bb04d4115157ea28be676c2da064c48ca16fe803fb6bd
+[kubernetes-client-linux-arm64.tar.gz](https://dl.k8s.io/v1.24.0-beta.0/kubernetes-client-linux-arm64.tar.gz) | 886604d1f21486fb78a8053c43e58c5753a058d6f67c554c072cf8d6c061cd007a1648bb013956901a913a80d90c336c0990b1d9bf810663ad0b1dd03f4855d9
+[kubernetes-client-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.24.0-beta.0/kubernetes-client-linux-ppc64le.tar.gz) | f6c84131ee7a6f1561b2000073841387846d1c457d489d2d6f86dbafdeba2b131ee7bec460e321b8857ea60fb5706b02988f612d40c3d73638410c46db1e2976
+[kubernetes-client-linux-s390x.tar.gz](https://dl.k8s.io/v1.24.0-beta.0/kubernetes-client-linux-s390x.tar.gz) | a6fce005a85893bb9618e8e7f51f052625b42098fe30561b32031edf2f5b815ac951249651ede1c74cf8ce7585baf15f37b651b6ef7d84ffb77b0f85736803a6
+[kubernetes-client-windows-386.tar.gz](https://dl.k8s.io/v1.24.0-beta.0/kubernetes-client-windows-386.tar.gz) | 62aaf0a58ca5182a22e4eae4fcb4f69a8bc415d28a54dce6386784cf396ffa61f95f9c0232d876b7b81a49138c6fdf0ed95e4d817169fff4f20b463e40cbea7d
+[kubernetes-client-windows-amd64.tar.gz](https://dl.k8s.io/v1.24.0-beta.0/kubernetes-client-windows-amd64.tar.gz) | 658bf802631693d14fcf25546af4e1d7040e535d4915d6fde3e6ba84e404221142a26b41b2c91579374340317c6b9545da67d40170d099797d4359e6899209f7
+[kubernetes-client-windows-arm64.tar.gz](https://dl.k8s.io/v1.24.0-beta.0/kubernetes-client-windows-arm64.tar.gz) | 7f7ee26073c736ca0ffe09f169d51169ecb753eecc4969d369460d7b867ec1a0f17a2606b908d457d5f6c56befc82fec56dc7702d0a59fcb7c76d4bb680bfa83
+
+### Server Binaries
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes-server-linux-amd64.tar.gz](https://dl.k8s.io/v1.24.0-beta.0/kubernetes-server-linux-amd64.tar.gz) | 579e5574f0dc7ac8f2c628474dddf2c61146a696c12344bebeb7dd2ba615f81b08c4710a61ada7151f7146ce0e7c86e2a3c4aa5a3ae5cf8e701289a23faa8e30
+[kubernetes-server-linux-arm.tar.gz](https://dl.k8s.io/v1.24.0-beta.0/kubernetes-server-linux-arm.tar.gz) | 22d3da15193ad6fa9ad4261ab7eba6465a6b7bf444bc30b2aad71c3e40da2b3540c44d27556b8eb1ec94782fcaeec9bb0c6f0aeea8494ccefa9640ca7b750599
+[kubernetes-server-linux-arm64.tar.gz](https://dl.k8s.io/v1.24.0-beta.0/kubernetes-server-linux-arm64.tar.gz) | 15d643d90c0d64303946a7493ac48f8331933f59418b4dc0e2bd7ebbf3f7979f8f1915b82e05eb8d070dbb88581c4a8e7e11f06128c0305b591178c6db735ad3
+[kubernetes-server-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.24.0-beta.0/kubernetes-server-linux-ppc64le.tar.gz) | e89646d4056cd82fb0b84b3e44dc93878f92800113220d2b4354c37d99ef82b4b62eb370406ef503565031b9370a135ee97931673950b6f7b94b8bedc4e068bb
+[kubernetes-server-linux-s390x.tar.gz](https://dl.k8s.io/v1.24.0-beta.0/kubernetes-server-linux-s390x.tar.gz) | 321a31f3a8e4aea274943d5cfb0fd41dd40e785cf7d90efd80e4fe9dc45f8e1138685a0637538f7c115954500730e6ef0f03c0aaada982b1474aea5c91f91a50
+
+### Node Binaries
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes-node-linux-amd64.tar.gz](https://dl.k8s.io/v1.24.0-beta.0/kubernetes-node-linux-amd64.tar.gz) | 26c94e60a56ae3c56f3882745cb2cab76d1ffdd9a5a7539491e181431040f5a471e31bf30b496c7bb972bc9df1d01d92ae1d1e82e4012fca8dbb528b81e08817
+[kubernetes-node-linux-arm.tar.gz](https://dl.k8s.io/v1.24.0-beta.0/kubernetes-node-linux-arm.tar.gz) | 7112ff9f692f8f8e65211d86ce35581c2a48cd849982112018d6f9d8bea1cd49211333571de0958a86b7b14940b9704e724765116ae26c157283b6506502c0f2
+[kubernetes-node-linux-arm64.tar.gz](https://dl.k8s.io/v1.24.0-beta.0/kubernetes-node-linux-arm64.tar.gz) | 58df66e532c1a3f668cf414bd11da72926cc95e28491528b4f618710b16e577d557d89f43a3c4891ca53ec415ed13b5695d9701ae3694d18437eea66603a2e29
+[kubernetes-node-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.24.0-beta.0/kubernetes-node-linux-ppc64le.tar.gz) | 0a58004da31b1407e2299a74664d94500fd2afe726dd76713f0bfbd36713621d23ac450b8c3cee4528a16e32b3b78c9b269b3d213045d06e0dd4746fc3404e82
+[kubernetes-node-linux-s390x.tar.gz](https://dl.k8s.io/v1.24.0-beta.0/kubernetes-node-linux-s390x.tar.gz) | ac5895babb4b19e301c65bcf03913408ee887f217efe47710bbed9e885e4191171e182fc394610f5d7bb98e4cf2adcdc6246d5053b6e8902eb287f7be64a5e55
+[kubernetes-node-windows-amd64.tar.gz](https://dl.k8s.io/v1.24.0-beta.0/kubernetes-node-windows-amd64.tar.gz) | ee512b1144c33bd8b503ce6de43fe22543988cfd7665d2048588c7367bdacda31761fe4c93b3c1c13a6e3e78286b31560410e1a5fe93bcc852853a1af4bb48e0
+
+### Container Images
+
+All container images are available as manifest lists and support the described
+architectures. It is also possible to pull a specific architecture directly by
+adding the "-$ARCH" suffix  to the container image name.
+
+name | architectures
+---- | -------------
+[k8s.gcr.io/conformance:v1.24.0-beta.0](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/conformance) | [amd64](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/conformance-amd64), [arm](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/conformance-arm), [arm64](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/conformance-arm64), [ppc64le](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/conformance-ppc64le), [s390x](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/conformance-s390x)
+[k8s.gcr.io/kube-apiserver:v1.24.0-beta.0](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-apiserver) | [amd64](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-apiserver-amd64), [arm](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-apiserver-arm), [arm64](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-apiserver-arm64), [ppc64le](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-apiserver-ppc64le), [s390x](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-apiserver-s390x)
+[k8s.gcr.io/kube-controller-manager:v1.24.0-beta.0](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-controller-manager) | [amd64](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-controller-manager-amd64), [arm](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-controller-manager-arm), [arm64](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-controller-manager-arm64), [ppc64le](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-controller-manager-ppc64le), [s390x](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-controller-manager-s390x)
+[k8s.gcr.io/kube-proxy:v1.24.0-beta.0](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-proxy) | [amd64](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-proxy-amd64), [arm](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-proxy-arm), [arm64](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-proxy-arm64), [ppc64le](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-proxy-ppc64le), [s390x](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-proxy-s390x)
+[k8s.gcr.io/kube-scheduler:v1.24.0-beta.0](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-scheduler) | [amd64](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-scheduler-amd64), [arm](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-scheduler-arm), [arm64](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-scheduler-arm64), [ppc64le](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-scheduler-ppc64le), [s390x](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-scheduler-s390x)
+
+## Changelog since v1.24.0-alpha.4
+
+## Changes by Kind
+
+### Deprecation
+
+- Remove insecure serving configuration from cloud-provider package, which is consumed by cloud-controller-managers. ([#108953](https://github.com/kubernetes/kubernetes/pull/108953), [@nckturner](https://github.com/nckturner)) [SIG Cloud Provider and Testing]
+- The metadata.clusterName field is deprecated. This field has always been unwritable and always blank, but its presence is confusing, so we will remove it next release. Out of an abundance of caution, this release we have merely changed the name in the go struct to ensure any accidental client uses are found before complete removal. ([#108717](https://github.com/kubernetes/kubernetes/pull/108717), [@lavalamp](https://github.com/lavalamp)) [SIG API Machinery, Apps, Auth, Scheduling and Testing]
+- VSphere releases less than 7.0u2 are deprecated as of v1.24. Please consider upgrading vSphere to 7.0u2 or above. vSphere CSI Driver requires minimum vSphere 7.0u2.
+  
+  General Support for vSphere 6.7 will end on October 15, 2022. vSphere 6.7 Update 3 is deprecated in Kubernetes v1.24.  Customers are recommended to upgrade vSphere (both ESXi and vCenter) to 7.0u2 or above.  vSphere CSI Driver 2.2.3 and higher supports CSI Migration.
+  
+  Support for these deprecations will be available till October 15, 2022. ([#109089](https://github.com/kubernetes/kubernetes/pull/109089), [@deepakkinni](https://github.com/deepakkinni)) [SIG Cloud Provider]
+
+### API Change
+
+- Adds a new Status subresource in Network Policy objects ([#107963](https://github.com/kubernetes/kubernetes/pull/107963), [@rikatz](https://github.com/rikatz)) [SIG API Machinery, Apps, Network and Testing]
+- Adds support for "InterfaceNamePrefix" and "BridgeInterface" as arguments to --detect-local-mode option and also introduces a new optional `--pod-interface-name-prefix` and `--pod-bridge-interface` flags to kube-proxy. ([#95400](https://github.com/kubernetes/kubernetes/pull/95400), [@tssurya](https://github.com/tssurya)) [SIG API Machinery and Network]
+- CEL CRD validation expressions may now reference existing object state using the identifier `oldSelf`. ([#108073](https://github.com/kubernetes/kubernetes/pull/108073), [@benluddy](https://github.com/benluddy)) [SIG API Machinery and Testing]
+- CSIStorageCapacity.storage.k8s.io: The v1beta1 version of this API is deprecated in favor of v1, and will be removed in v1.27. If a CSI driver supports storage capacity tracking, then it must get deployed with a release of external-provisioner that supports the v1 API. ([#108445](https://github.com/kubernetes/kubernetes/pull/108445), [@pohly](https://github.com/pohly)) [SIG API Machinery, Architecture, Auth, Scheduling, Storage and Testing]
+- Custom resource requests with fieldValidation=Strict consistently require apiVersion and kind, matching non-strict requests ([#109019](https://github.com/kubernetes/kubernetes/pull/109019), [@liggitt](https://github.com/liggitt)) [SIG API Machinery]
+- Improve kubectl's user help commands readability ([#104736](https://github.com/kubernetes/kubernetes/pull/104736), [@lauchokyip](https://github.com/lauchokyip)) [SIG API Machinery, Apps, Architecture, Auth, Autoscaling, CLI, Cloud Provider, Cluster Lifecycle, Contributor Experience, Instrumentation, Network, Node, Release, Scalability, Scheduling, Security, Storage, Testing and Windows]
+- Indexed Jobs graduates to stable ([#107395](https://github.com/kubernetes/kubernetes/pull/107395), [@alculquicondor](https://github.com/alculquicondor)) [SIG Apps, Architecture and Testing]
+- Introduce a v1alpha1 networking API for ClusterCIDRConfig ([#108290](https://github.com/kubernetes/kubernetes/pull/108290), [@sarveshr7](https://github.com/sarveshr7)) [SIG API Machinery, Apps, Auth, CLI, Cloud Provider, Instrumentation, Network and Testing]
+- JobReadyPods graduates to Beta and it's enabled by default. ([#107476](https://github.com/kubernetes/kubernetes/pull/107476), [@alculquicondor](https://github.com/alculquicondor)) [SIG API Machinery, Apps and Testing]
+- Kubelet external Credential Provider feature is moved to Beta.  Credential Provider Plugin and Credential Provider Config API's updated from v1alpha1 to v1beta1 with no API changes. ([#108847](https://github.com/kubernetes/kubernetes/pull/108847), [@adisky](https://github.com/adisky)) [SIG API Machinery and Node]
+- MaxUnavailable for StatefulSets, allows faster RollingUpdate by taking down more than 1 pod at a time. The number of pods you want to take down during a RollingUpdate is configurable using maxUnavailable parameter. ([#82162](https://github.com/kubernetes/kubernetes/pull/82162), [@krmayankk](https://github.com/krmayankk)) [SIG API Machinery and Apps]
+- Non graceful node shutdown handling. ([#108486](https://github.com/kubernetes/kubernetes/pull/108486), [@sonasingh46](https://github.com/sonasingh46)) [SIG Apps, Node and Storage]
+- OpenAPI V3 is turned on by default ([#109031](https://github.com/kubernetes/kubernetes/pull/109031), [@Jefftree](https://github.com/Jefftree)) [SIG API Machinery, Apps, Architecture, Auth, Autoscaling, CLI, Cloud Provider, Cluster Lifecycle, Instrumentation, Network, Node, Scheduling, Storage and Testing]
+- Promote IdentifyPodOS feature to beta. ([#107859](https://github.com/kubernetes/kubernetes/pull/107859), [@ravisantoshgudimetla](https://github.com/ravisantoshgudimetla)) [SIG API Machinery, Apps, Node, Testing and Windows]
+- Skip x-kubernetes-validations rules if having fundamental error against OpenAPIv3 schema. ([#108859](https://github.com/kubernetes/kubernetes/pull/108859), [@cici37](https://github.com/cici37)) [SIG API Machinery and Testing]
+- Support for gRPC probes is now in beta. GRPCContainerProbe feature gate is enabled by default. ([#108522](https://github.com/kubernetes/kubernetes/pull/108522), [@SergeyKanzhelev](https://github.com/SergeyKanzhelev)) [SIG API Machinery, Apps, Node and Testing]
+- The AnyVolumeDataSource feature is now beta, and the feature gate is enabled by default. In order to provide user feedback on PVCs with data sources, deployers must install the VolumePopulators CRD and the data-source-validator controller. ([#108736](https://github.com/kubernetes/kubernetes/pull/108736), [@bswartz](https://github.com/bswartz)) [SIG Apps, Storage and Testing]
+- The `ServerSideFieldValidation` feature has graduated to beta and is now enabled by default. Kubectl 1.24 and newer will use server-side validation instead of client-side validation when writing to API servers with the feature enabled. ([#108889](https://github.com/kubernetes/kubernetes/pull/108889), [@kevindelgado](https://github.com/kevindelgado)) [SIG API Machinery, Architecture, CLI and Testing]
+- The infrastructure for contextual logging is complete (feature gate implemented, JSON backend ready). ([#108995](https://github.com/kubernetes/kubernetes/pull/108995), [@pohly](https://github.com/pohly)) [SIG API Machinery, Architecture, Auth, CLI, Cloud Provider, Cluster Lifecycle, Instrumentation, Network, Node, Scheduling and Testing]
+- This adds an optional `timeZone` field as part of the CronJob spec to support running cron jobs in a specific time zone. ([#108032](https://github.com/kubernetes/kubernetes/pull/108032), [@deejross](https://github.com/deejross)) [SIG API Machinery and Apps]
+
+### Feature
+
+- **Additional documentation e.g., KEPs (Kubernetes Enhancement Proposals), usage docs, etc.**:
+  
+  <!--
+  This section can be blank if this pull request does not require a release note.
+  
+  When adding links which point to resources within git repositories, like
+  KEPs or supporting documentation, please reference a specific commit and avoid
+  linking directly to the master branch. This ensures that links reference a
+  specific point in time, rather than a document that may change over time.
+  
+  See here for guidance on getting permanent links to files: https://help.github.com/en/articles/getting-permanent-links-to-files
+  
+  Please use the following format for linking documentation:
+  - [KEP]: <link>
+  - [Usage]: <link>
+  - [Other doc]: <link>
+  --> ([#109024](https://github.com/kubernetes/kubernetes/pull/109024), [@stlaz](https://github.com/stlaz)) [SIG API Machinery and Instrumentation]
+- Adds `OpenAPIV3SchemaInterface` to `DiscoveryClient` and its variants for fetching OpenAPI v3 schema documents. ([#108992](https://github.com/kubernetes/kubernetes/pull/108992), [@alexzielenski](https://github.com/alexzielenski)) [SIG API Machinery, Architecture, CLI, Cloud Provider, Cluster Lifecycle and Instrumentation]
+- Allow kubectl to manage resources by filename patterns without the shell expanding it first ([#102265](https://github.com/kubernetes/kubernetes/pull/102265), [@danielrodriguez](https://github.com/danielrodriguez)) [SIG CLI]
+- An alpha flag --subresource is added to get, patch, edit replace kubectl commands to fetch and update status and scale subresources. ([#99556](https://github.com/kubernetes/kubernetes/pull/99556), [@nikhita](https://github.com/nikhita)) [SIG API Machinery, CLI and Testing]
+- Apiextensions_openapi_v3_regeneration_count metric (alpha) will be emitted for OpenAPI V3. ([#109128](https://github.com/kubernetes/kubernetes/pull/109128), [@Jefftree](https://github.com/Jefftree)) [SIG API Machinery and Instrumentation]
+- Apply ProxyTerminatingEndpoints to all traffic policies (external, internal, cluster, local). ([#108691](https://github.com/kubernetes/kubernetes/pull/108691), [@andrewsykim](https://github.com/andrewsykim)) [SIG Network and Testing]
+- CEL regex patterns in x-kubernetes-valiation rules are compiled when CRDs are created/updated if the pattern is provided as a string constant in the expression. Any regex compile errors are reported as a CRD create/update validation error. ([#108617](https://github.com/kubernetes/kubernetes/pull/108617), [@jpbetz](https://github.com/jpbetz)) [SIG API Machinery, Architecture, Auth, CLI, Cloud Provider, Cluster Lifecycle, Instrumentation, Node and Storage]
+- Changes the kubectl --validate flag from a bool to a string that accepts the values {true, strict, warn, false, ignore}
+  - true/strict - perform validation and error the request on any invalid fields in the ojbect. It will attempt to perform server-side validation if it is enabled on the apiserver, otherwise it will fall back to client-side validation.
+  - warn - perform server-side validation and warn on any invalid fields (but ultimately let the request succeed by dropping any invalid fields from the object). If validation is not available on the server, perform no validation.
+  - false/ignore - perform no validation, silently dropping invalid fields from the object. ([#108350](https://github.com/kubernetes/kubernetes/pull/108350), [@kevindelgado](https://github.com/kevindelgado)) [SIG API Machinery, CLI, Node and Testing]
+- CycleState is now optimized for "write once and read many times". ([#108724](https://github.com/kubernetes/kubernetes/pull/108724), [@sanposhiho](https://github.com/sanposhiho)) [SIG Scheduling]
+- Enable beta feature HonorPVReclaimPolicy by default. ([#109035](https://github.com/kubernetes/kubernetes/pull/109035), [@deepakkinni](https://github.com/deepakkinni)) [SIG Apps and Storage]
+- Kube-apiserver: Subresources such as 'status' and 'scale' now support tabular output content types. ([#103516](https://github.com/kubernetes/kubernetes/pull/103516), [@ykakarap](https://github.com/ykakarap)) [SIG API Machinery, Auth and Testing]
+- Kubeadm: add the flag "--experimental-initial-corrupt-check" to etcd static Pod manifests to ensure etcd member data consistency ([#109074](https://github.com/kubernetes/kubernetes/pull/109074), [@neolit123](https://github.com/neolit123)) [SIG Cluster Lifecycle]
+- Kubectl now supports shell completion for the <type>/<name> format for specifying resources.
+  
+  kubectl now provides shell completion for container names following the --container/-c flag of the exec command.
+  
+  kubectl's shell completion now suggests resource types for commands that only apply to pods. ([#108493](https://github.com/kubernetes/kubernetes/pull/108493), [@marckhouzam](https://github.com/marckhouzam)) [SIG CLI]
+- Kubelet now creates an iptables chain named `KUBE-IPTABLES-HINT` in
+  the `mangle` table. Containerized components that need to modify iptables
+  rules in the host network namespace can use the existence of this chain
+  to more-reliably determine whether the system is using iptables-legacy or
+  iptables-nft. ([#109059](https://github.com/kubernetes/kubernetes/pull/109059), [@danwinship](https://github.com/danwinship)) [SIG Network and Node]
+- Kubernetes 1.24 bumped version of golang it is compiled with to go1.18, which introduced significant changes to its garbage collection algorithm. As a result, we observed an increase in memory usage for kube-apiserver in larger an heavily loaded clusters up to ~25% (with the benefit of API call latencies drop by up to 10x on 99th percentiles). If the memory increase is not acceptable for you you can mitigate by setting GOGC env variable (for our tests using GOGC=63 brings memory usage back to original value, although the exact value may depend on usage patterns on your cluster). ([#108870](https://github.com/kubernetes/kubernetes/pull/108870), [@dims](https://github.com/dims)) [SIG Architecture, Release and Testing]
+- Leader Migration is now GA. All new configuration files onwards should use version v1. ([#109072](https://github.com/kubernetes/kubernetes/pull/109072), [@jiahuif](https://github.com/jiahuif)) [SIG Cloud Provider]
+- Mark AzureDisk CSI migration as GA ([#107681](https://github.com/kubernetes/kubernetes/pull/107681), [@andyzhangx](https://github.com/andyzhangx)) [SIG Cloud Provider and Storage]
+- Move volume expansion feature to GA ([#108929](https://github.com/kubernetes/kubernetes/pull/108929), [@gnufied](https://github.com/gnufied)) [SIG API Machinery, Apps, Auth, Node, Storage and Testing]
+- New "field_validation_request_duration_seconds" metric, measures how long requests take, indicating the value of the fieldValidation query parameter and whether or not server-side field validation is enabled on the apiserver ([#109120](https://github.com/kubernetes/kubernetes/pull/109120), [@kevindelgado](https://github.com/kevindelgado)) [SIG API Machinery and Instrumentation]
+- New feature gate, ServiceIPStaticSubrange, to enable the new strategy in the Service IP allocators, so the IP range is subdivided and dynamic allocated ClusterIP addresses for Services are allocated preferently from the upper range. ([#106792](https://github.com/kubernetes/kubernetes/pull/106792), [@aojea](https://github.com/aojea)) [SIG Instrumentation]
+- OpenAPI definitions served by kube-api-server now include enum types by default. ([#108898](https://github.com/kubernetes/kubernetes/pull/108898), [@jiahuif](https://github.com/jiahuif)) [SIG API Machinery]
+- Promote graceful shutdown based on pod priority to beta ([#107986](https://github.com/kubernetes/kubernetes/pull/107986), [@wzshiming](https://github.com/wzshiming)) [SIG Instrumentation, Node and Testing]
+- Update the k8s.io/system-validators library to v1.7.0 ([#108988](https://github.com/kubernetes/kubernetes/pull/108988), [@neolit123](https://github.com/neolit123)) [SIG Cluster Lifecycle]
+- Updates `kubectl kustomize` and `kubectl apply -k` to Kustomize v4.5.4 ([#108994](https://github.com/kubernetes/kubernetes/pull/108994), [@KnVerey](https://github.com/KnVerey)) [SIG CLI]
+- `kubectl version` now includes information on the embedded version of Kustomize ([#108817](https://github.com/kubernetes/kubernetes/pull/108817), [@KnVerey](https://github.com/KnVerey)) [SIG CLI and Testing]
+
+### Bug or Regression
+
+- A node IP provided to kublet via `--node-ip` will now be preferred for
+  when determining the node's primary IP and using the external cloud provider
+  (CCM). ([#107750](https://github.com/kubernetes/kubernetes/pull/107750), [@stephenfin](https://github.com/stephenfin)) [SIG Cloud Provider and Node]
+- Add one metrics(`kubelet_volume_stats_health_abnormal`) of volume health state to kubelet ([#108758](https://github.com/kubernetes/kubernetes/pull/108758), [@fengzixu](https://github.com/fengzixu)) [SIG Instrumentation, Node, Storage and Testing]
+- CEL validation failure returns object type instead of object. ([#107090](https://github.com/kubernetes/kubernetes/pull/107090), [@cici37](https://github.com/cici37)) [SIG API Machinery]
+- Call NodeExpand on all nodes in case of RWX volumes ([#108693](https://github.com/kubernetes/kubernetes/pull/108693), [@gnufied](https://github.com/gnufied)) [SIG Apps, Node and Storage]
+- Failure to start a container cannot accidentally result in the pod being considered "Succeeded" in the presence of deletion. ([#107845](https://github.com/kubernetes/kubernetes/pull/107845), [@smarterclayton](https://github.com/smarterclayton)) [SIG Node]
+- Fix --retries functionality for negative values in kubectl cp ([#108748](https://github.com/kubernetes/kubernetes/pull/108748), [@atiratree](https://github.com/atiratree)) [SIG CLI]
+- Fix a bug that out-of-tree plugin is misplaced when using scheduler v1beta3 config ([#108613](https://github.com/kubernetes/kubernetes/pull/108613), [@Huang-Wei](https://github.com/Huang-Wei)) [SIG Scheduling and Testing]
+- Fix a race in timeout handler that could lead to kube-apiserver crashes ([#108455](https://github.com/kubernetes/kubernetes/pull/108455), [@Argh4k](https://github.com/Argh4k)) [SIG API Machinery]
+- Fix indexer bug that resulted in incorrect index updates if number of index values for a given object was changing during update ([#109137](https://github.com/kubernetes/kubernetes/pull/109137), [@wojtek-t](https://github.com/wojtek-t)) [SIG API Machinery]
+- Fix issue where the job controller might not remove the job tracking finalizer from pods when deleting a job, or when the pod is orphan ([#108752](https://github.com/kubernetes/kubernetes/pull/108752), [@alculquicondor](https://github.com/alculquicondor)) [SIG Apps and Testing]
+- Kubelet now checks "NoExecute" taint/toleration before accepting pods, except for static pods. ([#101218](https://github.com/kubernetes/kubernetes/pull/101218), [@gjkim42](https://github.com/gjkim42)) [SIG Node]
+- Re-adds response status and headers on verbose kubectl responses ([#108505](https://github.com/kubernetes/kubernetes/pull/108505), [@rikatz](https://github.com/rikatz)) [SIG API Machinery and CLI]
+- Record requests rejected with 429 in the apiserver_request_total metric ([#108927](https://github.com/kubernetes/kubernetes/pull/108927), [@wojtek-t](https://github.com/wojtek-t)) [SIG API Machinery and Instrumentation]
+- Services with "internalTrafficPolicy: Local" now behave more like
+  "externalTrafficPolicy: Local". Also, "internalTrafficPolicy: Local,
+  externalTrafficPolicy: Cluster" is now implemented correctly. ([#106497](https://github.com/kubernetes/kubernetes/pull/106497), [@danwinship](https://github.com/danwinship)) [SIG Network]
+- Skip re-allocate logic if pod is already removed to avoid panic ([#108831](https://github.com/kubernetes/kubernetes/pull/108831), [@waynepeking348](https://github.com/waynepeking348)) [SIG Node]
+- Updating kubelet permissions check for Windows nodes to see if process is elevated instead of checking if process owner is in Administrators group ([#108146](https://github.com/kubernetes/kubernetes/pull/108146), [@marosset](https://github.com/marosset)) [SIG Node and Windows]
+
+### Other (Cleanup or Flake)
+
+- Add PreemptionPolicy in PriorityClass describe ([#108701](https://github.com/kubernetes/kubernetes/pull/108701), [@denkensk](https://github.com/denkensk)) [SIG CLI and Scheduling]
+- Deprecate apiserver_dropped_requests_total metric. The same data can be read from apiserver_request_terminations_total metric. ([#109018](https://github.com/kubernetes/kubernetes/pull/109018), [@wojtek-t](https://github.com/wojtek-t)) [SIG API Machinery and Instrumentation]
+- Migrate statefulset files to structured logging ([#106109](https://github.com/kubernetes/kubernetes/pull/106109), [@h4ghhh](https://github.com/h4ghhh)) [SIG Apps and Instrumentation]
+- Remove deprecated `--serviceaccount`, `--hostport`, `--requests` and `--limits` from kubectl run. ([#108820](https://github.com/kubernetes/kubernetes/pull/108820), [@mozillazg](https://github.com/mozillazg)) [SIG CLI]
+- Remove deprecated generator and container-port flags ([#106824](https://github.com/kubernetes/kubernetes/pull/106824), [@lauchokyip](https://github.com/lauchokyip)) [SIG CLI]
+- Rename unschedulableQ to unschedulablePods ([#108919](https://github.com/kubernetes/kubernetes/pull/108919), [@denkensk](https://github.com/denkensk)) [SIG Instrumentation, Scheduling and Testing]
+- SPDY transport in client-go will no longer follow redirects. ([#108531](https://github.com/kubernetes/kubernetes/pull/108531), [@tallclair](https://github.com/tallclair)) [SIG API Machinery and Node]
+- ServerResources was deprecated in February 2019 (https://github.com/kubernetes/kubernetes/commit/618050e) and now it's being removed and ServerGroupsAndResources is suggested to be used instead ([#107180](https://github.com/kubernetes/kubernetes/pull/107180), [@ardaguclu](https://github.com/ardaguclu)) [SIG API Machinery, Apps and CLI]
+- Update runc to 1.1.0
+  Update cadvisor to 0.44.0 ([#109029](https://github.com/kubernetes/kubernetes/pull/109029), [@ehashman](https://github.com/ehashman)) [SIG CLI, Node and Testing]
+- Update runc to 1.1.1 ([#109104](https://github.com/kubernetes/kubernetes/pull/109104), [@kolyshkin](https://github.com/kolyshkin)) [SIG Node]
+- Users who look at iptables dumps will see some changes in the naming and structure of rules. ([#109060](https://github.com/kubernetes/kubernetes/pull/109060), [@thockin](https://github.com/thockin)) [SIG Network and Testing]
+
+### Uncategorized
+
+- Deprecate kubectl version long output, will be replaced with kubectl version --short. Users requiring full output should use --output=yaml|json instead. ([#108987](https://github.com/kubernetes/kubernetes/pull/108987), [@soltysh](https://github.com/soltysh)) [SIG CLI]
+
+## Dependencies
+
+### Added
+- github.com/blang/semver/v4: [v4.0.0](https://github.com/blang/semver/v4/tree/v4.0.0)
+
+### Changed
+- github.com/checkpoint-restore/go-criu/v5: [v5.0.0 → v5.3.0](https://github.com/checkpoint-restore/go-criu/v5/compare/v5.0.0...v5.3.0)
+- github.com/cilium/ebpf: [v0.6.2 → v0.7.0](https://github.com/cilium/ebpf/compare/v0.6.2...v0.7.0)
+- github.com/containerd/console: [v1.0.2 → v1.0.3](https://github.com/containerd/console/compare/v1.0.2...v1.0.3)
+- github.com/containerd/containerd: [v1.4.11 → v1.4.12](https://github.com/containerd/containerd/compare/v1.4.11...v1.4.12)
+- github.com/cyphar/filepath-securejoin: [v0.2.2 → v0.2.3](https://github.com/cyphar/filepath-securejoin/compare/v0.2.2...v0.2.3)
+- github.com/docker/distribution: [v2.7.1+incompatible → v2.8.1+incompatible](https://github.com/docker/distribution/compare/v2.7.1...v2.8.1)
+- github.com/docker/docker: [v20.10.7+incompatible → v20.10.12+incompatible](https://github.com/docker/docker/compare/v20.10.7...v20.10.12)
+- github.com/godbus/dbus/v5: [v5.0.4 → v5.0.6](https://github.com/godbus/dbus/v5/compare/v5.0.4...v5.0.6)
+- github.com/golang/mock: [v1.5.0 → v1.6.0](https://github.com/golang/mock/compare/v1.5.0...v1.6.0)
+- github.com/google/cadvisor: [v0.43.0 → v0.44.0](https://github.com/google/cadvisor/compare/v0.43.0...v0.44.0)
+- github.com/moby/sys/mountinfo: [v0.4.1 → v0.6.0](https://github.com/moby/sys/mountinfo/compare/v0.4.1...v0.6.0)
+- github.com/opencontainers/image-spec: [v1.0.1 → v1.0.2](https://github.com/opencontainers/image-spec/compare/v1.0.1...v1.0.2)
+- github.com/opencontainers/runc: [v1.0.3 → v1.1.1](https://github.com/opencontainers/runc/compare/v1.0.3...v1.1.1)
+- github.com/opencontainers/selinux: [v1.8.2 → v1.10.0](https://github.com/opencontainers/selinux/compare/v1.8.2...v1.10.0)
+- github.com/seccomp/libseccomp-golang: [v0.9.1 → 3879420](https://github.com/seccomp/libseccomp-golang/compare/v0.9.1...3879420)
+- go.etcd.io/etcd/api/v3: v3.5.0 → v3.5.1
+- go.etcd.io/etcd/client/pkg/v3: v3.5.0 → v3.5.1
+- go.etcd.io/etcd/client/v3: v3.5.0 → v3.5.1
+- k8s.io/klog/v2: v2.40.1 → v2.60.1
+- k8s.io/kube-openapi: ddc6692 → 3ee0da9
+- k8s.io/system-validators: v1.6.0 → v1.7.0
+- sigs.k8s.io/kustomize/api: v0.10.1 → v0.11.4
+- sigs.k8s.io/kustomize/cmd/config: v0.10.2 → v0.10.6
+- sigs.k8s.io/kustomize/kustomize/v4: v4.4.1 → v4.5.4
+- sigs.k8s.io/kustomize/kyaml: v0.13.0 → v0.13.6
+
+### Removed
+- github.com/bits-and-blooms/bitset: [v1.2.0](https://github.com/bits-and-blooms/bitset/tree/v1.2.0)
+
+
 
 # v1.24.0-alpha.4
 
