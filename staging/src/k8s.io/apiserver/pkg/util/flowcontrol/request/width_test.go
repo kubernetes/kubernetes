@@ -125,7 +125,7 @@ func TestWorkEstimator(t *testing.T) {
 				Resource: "events",
 			},
 			countErr:             ObjectCountNotFoundErr,
-			initialSeatsExpected: maximumSeats,
+			initialSeatsExpected: minimumSeats,
 		},
 		{
 			name:       "request verb is list, continuation is set",
@@ -214,7 +214,7 @@ func TestWorkEstimator(t *testing.T) {
 				Resource: "events",
 			},
 			countErr:             ObjectCountNotFoundErr,
-			initialSeatsExpected: maximumSeats,
+			initialSeatsExpected: minimumSeats,
 		},
 		{
 			name:       "request verb is list, object count is stale",
@@ -239,7 +239,7 @@ func TestWorkEstimator(t *testing.T) {
 				Resource: "events",
 			},
 			countErr:             ObjectCountNotFoundErr,
-			initialSeatsExpected: maximumSeats,
+			initialSeatsExpected: minimumSeats,
 		},
 		{
 			name:       "request verb is list, count getter throws unknown error",
