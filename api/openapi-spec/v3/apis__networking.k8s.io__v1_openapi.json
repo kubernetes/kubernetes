@@ -52,12 +52,7 @@
           },
           "protocol": {
             "default": "",
-            "description": "Protocol is the protocol of the service port of which status is recorded here The supported values are: \"TCP\", \"UDP\", \"SCTP\"\n\nPossible enum values:\n - `\"SCTP\"` is the SCTP protocol.\n - `\"TCP\"` is the TCP protocol.\n - `\"UDP\"` is the UDP protocol.",
-            "enum": [
-              "SCTP",
-              "TCP",
-              "UDP"
-            ],
+            "description": "Protocol is the protocol of the service port of which status is recorded here The supported values are: \"TCP\", \"UDP\", \"SCTP\"\n\n",
             "type": "string"
           }
         },
