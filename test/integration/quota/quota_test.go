@@ -71,7 +71,7 @@ func TestQuota(t *testing.T) {
 	admissionCh := make(chan struct{})
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{QPS: -1, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	config := &resourcequotaapi.Configuration{}
-	admission, err := resourcequota.NewResourceQuota(config, 5, admissionCh)
+	admission, err := resourcequota.NewResourceQuota(config, 5)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -80,6 +80,7 @@ func TestQuota(t *testing.T) {
 	admission.SetExternalKubeInformerFactory(internalInformers)
 	qca := quotainstall.NewQuotaConfigurationForAdmission()
 	admission.SetQuotaConfiguration(qca)
+	admission.SetShutdownSignal(admissionCh)
 	defer close(admissionCh)
 
 	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
@@ -305,7 +306,7 @@ func TestQuotaLimitedResourceDenial(t *testing.T) {
 		},
 	}
 	qca := quotainstall.NewQuotaConfigurationForAdmission()
-	admission, err := resourcequota.NewResourceQuota(config, 5, admissionCh)
+	admission, err := resourcequota.NewResourceQuota(config, 5)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -313,6 +314,7 @@ func TestQuotaLimitedResourceDenial(t *testing.T) {
 	externalInformers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
 	admission.SetExternalKubeInformerFactory(externalInformers)
 	admission.SetQuotaConfiguration(qca)
+	admission.SetShutdownSignal(admissionCh)
 	defer close(admissionCh)
 
 	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
@@ -434,7 +436,7 @@ func TestQuotaLimitService(t *testing.T) {
 		},
 	}
 	qca := quotainstall.NewQuotaConfigurationForAdmission()
-	admission, err := resourcequota.NewResourceQuota(config, 5, admissionCh)
+	admission, err := resourcequota.NewResourceQuota(config, 5)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -442,6 +444,7 @@ func TestQuotaLimitService(t *testing.T) {
 	externalInformers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
 	admission.SetExternalKubeInformerFactory(externalInformers)
 	admission.SetQuotaConfiguration(qca)
+	admission.SetShutdownSignal(admissionCh)
 	defer close(admissionCh)
 
 	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()

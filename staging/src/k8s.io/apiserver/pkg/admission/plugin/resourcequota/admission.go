@@ -54,7 +54,7 @@ func Register(plugins *admission.Plugins) {
 					return nil, errs.ToAggregate()
 				}
 			}
-			return NewResourceQuota(configuration, 5, make(chan struct{}))
+			return NewResourceQuota(configuration, 5)
 		})
 }
 
@@ -62,7 +62,6 @@ func Register(plugins *admission.Plugins) {
 type QuotaAdmission struct {
 	*admission.Handler
 	config             *resourcequotaapi.Configuration
-	stopCh             <-chan struct{}
 	quotaConfiguration quota.Configuration
 	numEvaluators      int
 	quotaAccessor      *quotaAccessor
@@ -73,6 +72,7 @@ var _ admission.ValidationInterface = &QuotaAdmission{}
 var _ = genericadmissioninitializer.WantsExternalKubeInformerFactory(&QuotaAdmission{})
 var _ = genericadmissioninitializer.WantsExternalKubeClientSet(&QuotaAdmission{})
 var _ = genericadmissioninitializer.WantsQuotaConfiguration(&QuotaAdmission{})
+var _ = genericadmissioninitializer.WantsShutdownSignal(&QuotaAdmission{})
 
 type liveLookupEntry struct {
 	expiry time.Time
@@ -82,7 +82,7 @@ type liveLookupEntry struct {
 // NewResourceQuota configures an admission controller that can enforce quota constraints
 // using the provided registry.  The registry must have the capability to handle group/kinds that
 // are persisted by the server this admission controller is intercepting
-func NewResourceQuota(config *resourcequotaapi.Configuration, numEvaluators int, stopCh <-chan struct{}) (*QuotaAdmission, error) {
+func NewResourceQuota(config *resourcequotaapi.Configuration, numEvaluators int) (*QuotaAdmission, error) {
 	quotaAccessor, err := newQuotaAccessor()
 	if err != nil {
 		return nil, err
@@ -90,7 +90,6 @@ func NewResourceQuota(config *resourcequotaapi.Configuration, numEvaluators int,
 
 	return &QuotaAdmission{
 		Handler:       admission.NewHandler(admission.Create, admission.Update),
-		stopCh:        stopCh,
 		numEvaluators: numEvaluators,
 		config:        config,
 		quotaAccessor: quotaAccessor,
@@ -110,7 +109,11 @@ func (a *QuotaAdmission) SetExternalKubeInformerFactory(f informers.SharedInform
 // SetQuotaConfiguration assigns and initializes configuration and evaluator for QuotaAdmission
 func (a *QuotaAdmission) SetQuotaConfiguration(c quota.Configuration) {
 	a.quotaConfiguration = c
-	a.evaluator = NewQuotaEvaluator(a.quotaAccessor, a.quotaConfiguration.IgnoredResources(), generic.NewRegistry(a.quotaConfiguration.Evaluators()), nil, a.config, a.numEvaluators, a.stopCh)
+	a.evaluator = NewQuotaEvaluator(a.quotaAccessor, a.quotaConfiguration.IgnoredResources(), generic.NewRegistry(a.quotaConfiguration.Evaluators()), nil, a.config, a.numEvaluators)
+}
+
+func (a *QuotaAdmission) SetShutdownSignal(stopCh <-chan struct{}) {
+	a.evaluator.(*quotaEvaluator).stopCh = stopCh
 }
 
 // ValidateInitialization ensures an authorizer is set.
@@ -129,6 +132,9 @@ func (a *QuotaAdmission) ValidateInitialization() error {
 	}
 	if a.evaluator == nil {
 		return fmt.Errorf("missing evaluator")
+	}
+	if a.evaluator.(*quotaEvaluator).stopCh == nil {
+		return fmt.Errorf("missing stopCh")
 	}
 	return nil
 }

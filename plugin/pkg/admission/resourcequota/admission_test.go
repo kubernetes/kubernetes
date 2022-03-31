@@ -99,13 +99,14 @@ func createHandlerWithConfig(kubeClient kubernetes.Interface, informerFactory in
 	}
 	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
 
-	handler, err := resourcequota.NewResourceQuota(config, 5, stopCh)
+	handler, err := resourcequota.NewResourceQuota(config, 5)
 	if err != nil {
 		return nil, err
 	}
 	handler.SetExternalKubeClientSet(kubeClient)
 	handler.SetExternalKubeInformerFactory(informerFactory)
 	handler.SetQuotaConfiguration(quotaConfiguration)
+	handler.SetShutdownSignal(stopCh)
 
 	return handler, nil
 }
