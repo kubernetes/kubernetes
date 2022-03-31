@@ -76,9 +76,9 @@ type watchCountGetterFunc func(*apirequest.RequestInfo) int
 // NewWorkEstimator estimates the work that will be done by a given request,
 // if no WorkEstimatorFunc matches the given request then the default
 // work estimate of 1 seat is allocated to the request.
-func NewWorkEstimator(objectCountFn objectCountGetterFunc, watchCountFn watchCountGetterFunc) WorkEstimatorFunc {
+func NewWorkEstimator(objectCountFn objectCountGetterFunc, watchCountFn watchCountGetterFunc, isDelegatedFn IsDelegatedFunc) WorkEstimatorFunc {
 	estimator := &workEstimator{
-		listWorkEstimator:     newListWorkEstimator(objectCountFn),
+		listWorkEstimator:     newListWorkEstimator(objectCountFn, isDelegatedFn),
 		mutatingWorkEstimator: newMutatingWorkEstimator(watchCountFn),
 	}
 	return estimator.estimate

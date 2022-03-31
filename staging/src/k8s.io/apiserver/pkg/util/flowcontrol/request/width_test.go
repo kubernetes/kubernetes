@@ -25,6 +25,12 @@ import (
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 )
 
+const fakeDelegatedUrl = "/apis/delegated/api/call"
+
+func isDelegatedFn(url string) bool {
+	return url == fakeDelegatedUrl
+}
+
 func TestWorkEstimator(t *testing.T) {
 	tests := []struct {
 		name                      string
@@ -242,6 +248,17 @@ func TestWorkEstimator(t *testing.T) {
 			initialSeatsExpected: maximumSeats,
 		},
 		{
+			name:       "request verb is delegated list, object count is not found",
+			requestURI: "http://server" + fakeDelegatedUrl,
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "list",
+				APIGroup: "foo.bar",
+				Resource: "events",
+			},
+			countErr:             ObjectCountNotFoundErr,
+			initialSeatsExpected: minimumSeats,
+		},
+		{
 			name:       "request verb is list, count getter throws unknown error",
 			requestURI: "http://server/apis/foo.bar/v1/events?limit=499",
 			requestInfo: &apirequest.RequestInfo{
@@ -396,7 +413,7 @@ func TestWorkEstimator(t *testing.T) {
 			// TODO(wojtek-t): Simplify it once we enable mutating work estimator
 			// by default.
 			testEstimator := &workEstimator{
-				listWorkEstimator:     newListWorkEstimator(countsFn),
+				listWorkEstimator:     newListWorkEstimator(countsFn, isDelegatedFn),
 				mutatingWorkEstimator: newTestMutatingWorkEstimator(watchCountsFn, true),
 			}
 			estimator := WorkEstimatorFunc(testEstimator.estimate)

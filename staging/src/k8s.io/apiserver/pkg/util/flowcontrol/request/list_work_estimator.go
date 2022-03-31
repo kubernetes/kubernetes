@@ -29,15 +29,17 @@ import (
 	"k8s.io/klog/v2"
 )
 
-func newListWorkEstimator(countFn objectCountGetterFunc) WorkEstimatorFunc {
+func newListWorkEstimator(countFn objectCountGetterFunc, isDelegatedFn IsDelegatedFunc) WorkEstimatorFunc {
 	estimator := &listWorkEstimator{
 		countGetterFn: countFn,
+		isDelegatedFn: isDelegatedFn,
 	}
 	return estimator.estimate
 }
 
 type listWorkEstimator struct {
 	countGetterFn objectCountGetterFunc
+	isDelegatedFn IsDelegatedFunc
 }
 
 func (e *listWorkEstimator) estimate(r *http.Request, flowSchemaName, priorityLevelName string) WorkEstimate {
@@ -46,6 +48,11 @@ func (e *listWorkEstimator) estimate(r *http.Request, flowSchemaName, priorityLe
 		// no RequestInfo should never happen, but to be on the safe side
 		// let's return maximumSeats
 		return WorkEstimate{InitialSeats: maximumSeats}
+	}
+
+	if e.isDelegatedFn(r.URL.Path) {
+		// If a request is delegated by kube-aggregator to external service, it's cheap for us.
+		return WorkEstimate{InitialSeats: minimumSeats}
 	}
 
 	query := r.URL.Query()

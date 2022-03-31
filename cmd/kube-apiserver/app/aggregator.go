@@ -130,6 +130,10 @@ func createAggregatorServer(aggregatorConfig *aggregatorapiserver.Config, delega
 		return nil, err
 	}
 
+	if err := aggregatorConfig.GenericConfig.DelegatedRequestsTracker.Bind(aggregatorServer.GenericAPIServer.Handler.NonGoRestfulMux.IsHandledPath); err != nil {
+		return nil, err
+	}
+
 	// create controllers for auto-registration
 	apiRegistrationClient, err := apiregistrationclient.NewForConfig(aggregatorConfig.GenericConfig.LoopbackClientConfig)
 	if err != nil {

@@ -232,6 +232,9 @@ type Config struct {
 	// in the storage per resource, so we can estimate width of incoming requests.
 	StorageObjectCountTracker flowcontrolrequest.StorageObjectCountTracker
 
+	// DelegatedRequestsTracker is used to determine which requests are handled by aggregated apiserver.
+	DelegatedRequestsTracker *flowcontrolrequest.DelegatedRequestsTracker
+
 	// ShutdownSendRetryAfter dictates when to initiate shutdown of the HTTP
 	// Server during the graceful termination of the apiserver. If true, we wait
 	// for non longrunning requests in flight to be drained and then initiate a
@@ -371,6 +374,7 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 		LongRunningFunc:           genericfilters.BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString()),
 		lifecycleSignals:          lifecycleSignals,
 		StorageObjectCountTracker: flowcontrolrequest.NewStorageObjectCountTracker(lifecycleSignals.ShutdownInitiated.Signaled()),
+		DelegatedRequestsTracker:  &flowcontrolrequest.DelegatedRequestsTracker{},
 
 		APIServerID:           id,
 		StorageVersionManager: storageversion.NewDefaultManager(),
@@ -791,7 +795,7 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	handler = filterlatency.TrackStarted(handler, "authorization")
 
 	if c.FlowControl != nil {
-		requestWorkEstimator := flowcontrolrequest.NewWorkEstimator(c.StorageObjectCountTracker.Get, c.FlowControl.GetInterestedWatchCount)
+		requestWorkEstimator := flowcontrolrequest.NewWorkEstimator(c.StorageObjectCountTracker.Get, c.FlowControl.GetInterestedWatchCount, c.DelegatedRequestsTracker.IsDelegated)
 		handler = filterlatency.TrackCompleted(handler)
 		handler = genericfilters.WithPriorityAndFairness(handler, c.LongRunningFunc, c.FlowControl, requestWorkEstimator)
 		handler = filterlatency.TrackStarted(handler, "priorityandfairness")

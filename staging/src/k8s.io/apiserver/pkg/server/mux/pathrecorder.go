@@ -235,20 +235,32 @@ func (m *PathRecorderMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	m.mux.Load().(*pathHandler).ServeHTTP(w, r)
 }
 
-// ServeHTTP makes it an http.Handler
-func (h *pathHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if exactHandler, ok := h.pathToHandler[r.URL.Path]; ok {
-		klog.V(5).Infof("%v: %q satisfied by exact match", h.muxName, r.URL.Path)
-		exactHandler.ServeHTTP(w, r)
-		return
+// IsHandledPath returns true if a given path is handled by any registered handler (other than notFound handler).
+func (m *PathRecorderMux) IsHandledPath(url string) bool {
+	return m.mux.Load().(*pathHandler).handler(url) != nil
+}
+
+func (h *pathHandler) handler(url string) http.Handler {
+	if exactHandler, ok := h.pathToHandler[url]; ok {
+		klog.V(5).Infof("%v: %q satisfied by exact match", h.muxName, url)
+		return exactHandler
 	}
 
 	for _, prefixHandler := range h.prefixHandlers {
-		if strings.HasPrefix(r.URL.Path, prefixHandler.prefix) {
-			klog.V(5).Infof("%v: %q satisfied by prefix %v", h.muxName, r.URL.Path, prefixHandler.prefix)
-			prefixHandler.handler.ServeHTTP(w, r)
-			return
+		if strings.HasPrefix(url, prefixHandler.prefix) {
+			klog.V(5).Infof("%v: %q satisfied by prefix %v", h.muxName, url, prefixHandler.prefix)
+			return prefixHandler.handler
 		}
+	}
+	return nil
+}
+
+// ServeHTTP makes it an http.Handler
+func (h *pathHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	handler := h.handler(r.URL.Path)
+	if handler != nil {
+		handler.ServeHTTP(w, r)
+		return
 	}
 
 	klog.V(5).Infof("%v: %q satisfied by NotFoundHandler", h.muxName, r.URL.Path)
