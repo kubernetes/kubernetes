@@ -3565,6 +3565,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: fsType
       type:
         scalar: string
+    - name: nodeExpandSecretRef
+      type:
+        namedType: io.k8s.api.core.v1.SecretReference
     - name: nodePublishSecretRef
       type:
         namedType: io.k8s.api.core.v1.SecretReference

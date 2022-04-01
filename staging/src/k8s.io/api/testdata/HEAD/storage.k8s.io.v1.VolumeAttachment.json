@@ -255,6 +255,10 @@
           "controllerExpandSecretRef": {
             "name": "nameValue",
             "namespace": "namespaceValue"
+          },
+          "nodeExpandSecretRef": {
+            "name": "nameValue",
+            "namespace": "namespaceValue"
           }
         },
         "accessModes": [
