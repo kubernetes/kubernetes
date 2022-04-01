@@ -93,6 +93,9 @@ spec:
           namespace: namespaceValue
         driver: driverValue
         fsType: fsTypeValue
+        nodeExpandSecretRef:
+          name: nameValue
+          namespace: namespaceValue
         nodePublishSecretRef:
           name: nameValue
           namespace: namespaceValue
