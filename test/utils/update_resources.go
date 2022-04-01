@@ -17,11 +17,16 @@ limitations under the License.
 package utils
 
 import (
+	"context"
 	"fmt"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
+	clientset "k8s.io/client-go/kubernetes"
 	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/kubectl/pkg/scale"
 )
@@ -58,4 +63,18 @@ func ScaleResourceWithRetries(scalesGetter scaleclient.ScalesGetter, namespace, 
 		return fmt.Errorf("error while scaling %s to %d replicas: %v", name, size, err)
 	}
 	return nil
+}
+
+func UpdatePodWithRetries(c clientset.Interface, pod *v1.Pod) error {
+	if pod == nil {
+		return fmt.Errorf("object provided to update is empty")
+	}
+	updateFunc := func() (bool, error) {
+		_, err := c.CoreV1().Pods(pod.Namespace).Update(context.TODO(), pod, metav1.UpdateOptions{})
+		if err == nil || apierrors.IsAlreadyExists(err) {
+			return true, nil
+		}
+		return false, fmt.Errorf("failed to update pod with non-retriable error: %v ", err)
+	}
+	return RetryWithExponentialBackOff(updateFunc)
 }
