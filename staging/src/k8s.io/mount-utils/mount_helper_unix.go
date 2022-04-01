@@ -27,6 +27,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"k8s.io/klog/v2"
 	utilio "k8s.io/utils/io"
@@ -59,6 +60,42 @@ func IsCorruptedMnt(err error) bool {
 	}
 
 	return underlyingError == syscall.ENOTCONN || underlyingError == syscall.ESTALE || underlyingError == syscall.EIO || underlyingError == syscall.EACCES || underlyingError == syscall.EHOSTDOWN
+}
+
+// CleanupMountPoint unmounts the given path and deletes the remaining
+// directory if successful. extensiveMountPointCheck is ignored because:
+// assuming that the Linux implementation of Unmount will not error if the
+// mountPath is not actually a mount point, there is no need to do a mount
+// point check here.
+func CleanupMountPoint(mountPath string, mounter Interface, extensiveMountPointCheck bool) error {
+	pathExists, pathErr := PathExists(mountPath)
+	if !pathExists && pathErr == nil {
+		klog.Warningf("Warning: Unmount skipped because path does not exist: %v", mountPath)
+		return nil
+	}
+	klog.V(4).Infof("%q exists, unmounting", mountPath)
+	if err := mounter.Unmount(mountPath); err != nil {
+		return err
+	}
+	return os.Remove(mountPath)
+}
+
+// CleanupMountWithForce unmounts the given path with force and deletes
+// the remaining directory if successful. extensiveMountPointCheck is ignored
+// because: assuming that the Linux implementation of Unmount will not error if
+// the mountPath is not actually a mount point, there is no need to do a mount
+// point check here.
+func CleanupMountWithForce(mountPath string, mounter MounterForceUnmounter, extensiveMountPointCheck bool, umountTimeout time.Duration) error {
+	pathExists, pathErr := PathExists(mountPath)
+	if !pathExists && pathErr == nil {
+		klog.Warningf("Warning: Unmount skipped because path does not exist: %v", mountPath)
+		return nil
+	}
+	klog.V(4).Infof("%q exists, unmounting with force", mountPath)
+	if err := mounter.UnmountWithForce(mountPath, umountTimeout); err != nil {
+		return err
+	}
+	return os.Remove(mountPath)
 }
 
 // MountInfo represents a single line in /proc/<pid>/mountinfo.

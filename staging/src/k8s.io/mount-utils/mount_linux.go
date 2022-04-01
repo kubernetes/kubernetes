@@ -303,6 +303,13 @@ func (mounter *Mounter) Unmount(target string) error {
 			// Rewrite err with the actual exit error of the process.
 			err = &exec.ExitError{ProcessState: command.ProcessState}
 		}
+		if strings.Contains(string(output), "not mounted") {
+			// "umount" checks if the target is a mount point and errors and prints
+			// "not mounted" if not. Ignore this error
+			// https://github.com/util-linux/util-linux/blob/v2.2/mount/umount.c#L179
+			return nil
+		}
+
 		return fmt.Errorf("unmount failed: %v\nUnmounting arguments: %s\nOutput: %s", err, target, string(output))
 	}
 	return nil
@@ -653,6 +660,12 @@ func tryUnmount(path string, unmountTimeout time.Duration) error {
 	}
 
 	if cmderr != nil {
+		if strings.Contains(string(out), "not mounted") {
+			// "umount" checks if the target is a mount point and errors and prints
+			// "not mounted" if not. Ignore this error
+			// https://github.com/util-linux/util-linux/blob/v2.2/mount/umount.c#L179
+			return nil
+		}
 		return fmt.Errorf("unmount failed: %v\nUnmounting arguments: %s\nOutput: %s", cmderr, path, string(out))
 	}
 	return nil
