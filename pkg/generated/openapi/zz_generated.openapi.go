@@ -4165,7 +4165,7 @@ func schema_k8sio_api_apps_v1_StatefulSetStatus(ref common.ReferenceCallback) co
 						},
 					},
 				},
-				Required: []string{"replicas", "availableReplicas"},
+				Required: []string{"replicas"},
 			},
 		},
 		Dependencies: []string{
@@ -5273,7 +5273,7 @@ func schema_k8sio_api_apps_v1beta1_StatefulSetStatus(ref common.ReferenceCallbac
 						},
 					},
 				},
-				Required: []string{"replicas", "availableReplicas"},
+				Required: []string{"replicas"},
 			},
 		},
 		Dependencies: []string{
@@ -6930,7 +6930,7 @@ func schema_k8sio_api_apps_v1beta2_StatefulSetStatus(ref common.ReferenceCallbac
 						},
 					},
 				},
-				Required: []string{"replicas", "availableReplicas"},
+				Required: []string{"replicas"},
 			},
 		},
 		Dependencies: []string{

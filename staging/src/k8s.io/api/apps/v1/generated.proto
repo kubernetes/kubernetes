@@ -759,6 +759,7 @@ message StatefulSetStatus {
 
   // Total number of available pods (ready for at least minReadySeconds) targeted by this statefulset.
   // This is a beta field and enabled/disabled by StatefulSetMinReadySeconds feature gate.
+  // +optional
   optional int32 availableReplicas = 11;
 }
 
