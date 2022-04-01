@@ -109,7 +109,7 @@ kube::etcd::start_scraping() {
   kube::log::info "Periodically scraping etcd to ${ETCD_SCRAPE_DIR} ."
   mkdir -p "${ETCD_SCRAPE_DIR}"
   (
-    while sleep 30; do
+    while sleep 10; do
       kube::etcd::scrape
     done
   ) &
@@ -118,6 +118,8 @@ kube::etcd::start_scraping() {
 
 kube::etcd::scrape() {
     curl -s -S "${KUBE_INTEGRATION_ETCD_URL}/metrics" > "${ETCD_SCRAPE_DIR}/next" && mv "${ETCD_SCRAPE_DIR}/next" "${ETCD_SCRAPE_DIR}/$(date +%s).scrape"
+    top -b -n1 >> "${ARTIFACTS}/top.txt"
+    ss -pano 'dport = 2379'  >> "${ARTIFACTS}/ss.txt"
 }
 
 
