@@ -282,6 +282,7 @@ type StatefulSetStatus struct {
 
 	// Total number of available pods (ready for at least minReadySeconds) targeted by this statefulset.
 	// This is a beta field and enabled/disabled by StatefulSetMinReadySeconds feature gate.
+	// +optional
 	AvailableReplicas int32 `json:"availableReplicas" protobuf:"varint,11,opt,name=availableReplicas"`
 }
 
