@@ -66,7 +66,7 @@ dependencies:
       match: ETCD_VERSION=
     - path: staging/src/k8s.io/sample-apiserver/artifacts/example/deployment.yaml
       match: quay.io/coreos/etcd
-    - path: test/e2e/framework/nodes_util.go
+    - path: test/e2e/framework/utils/nodes_util.go
       match: const etcdImage
     - path: test/utils/image/manifest.go
       match: configs\[Etcd\] = Config{list\.GcEtcdRegistry, "etcd", "\d+\.\d+.\d+(-(alpha|beta|rc).\d+)?(-\d+)?"}
