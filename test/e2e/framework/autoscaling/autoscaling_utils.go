@@ -197,7 +197,6 @@ func newResourceConsumer(name, nsName string, kind schema.GroupVersionKind, repl
 
 	go rc.makeConsumeCPURequests()
 	rc.ConsumeCPU(initCPUTotal)
-
 	go rc.makeConsumeMemRequests()
 	rc.ConsumeMem(initMemoryTotal)
 	go rc.makeConsumeCustomMetric()
@@ -232,10 +231,16 @@ func (rc *ResourceConsumer) makeConsumeCPURequests() {
 	for {
 		select {
 		case millicores = <-rc.cpu:
-			framework.Logf("RC %s: setting consumption to %v millicores in total", rc.name, millicores)
+			if millicores != 0 {
+				framework.Logf("RC %s: setting consumption to %v millicores in total", rc.name, millicores)
+			} else {
+				framework.Logf("RC %s: disabling CPU consumption", rc.name)
+			}
 		case <-tick:
-			framework.Logf("RC %s: sending request to consume %d millicores", rc.name, millicores)
-			rc.sendConsumeCPURequest(millicores)
+			if millicores != 0 {
+				framework.Logf("RC %s: sending request to consume %d millicores", rc.name, millicores)
+				rc.sendConsumeCPURequest(millicores)
+			}
 			tick = time.After(rc.sleepTime)
 		case <-rc.stopCPU:
 			framework.Logf("RC %s: stopping CPU consumer", rc.name)
@@ -253,10 +258,16 @@ func (rc *ResourceConsumer) makeConsumeMemRequests() {
 	for {
 		select {
 		case megabytes = <-rc.mem:
-			framework.Logf("RC %s: setting consumption to %v MB in total", rc.name, megabytes)
+			if megabytes != 0 {
+				framework.Logf("RC %s: setting consumption to %v MB in total", rc.name, megabytes)
+			} else {
+				framework.Logf("RC %s: disabling mem consumption", rc.name)
+			}
 		case <-tick:
-			framework.Logf("RC %s: sending request to consume %d MB", rc.name, megabytes)
-			rc.sendConsumeMemRequest(megabytes)
+			if megabytes != 0 {
+				framework.Logf("RC %s: sending request to consume %d MB", rc.name, megabytes)
+				rc.sendConsumeMemRequest(megabytes)
+			}
 			tick = time.After(rc.sleepTime)
 		case <-rc.stopMem:
 			framework.Logf("RC %s: stopping mem consumer", rc.name)
@@ -274,10 +285,16 @@ func (rc *ResourceConsumer) makeConsumeCustomMetric() {
 	for {
 		select {
 		case delta = <-rc.customMetric:
-			framework.Logf("RC %s: setting bump of metric %s to %d in total", rc.name, customMetricName, delta)
+			if delta != 0 {
+				framework.Logf("RC %s: setting bump of metric %s to %d in total", rc.name, customMetricName, delta)
+			} else {
+				framework.Logf("RC %s: disabling consumption of custom metric %s", rc.name, customMetricName)
+			}
 		case <-tick:
-			framework.Logf("RC %s: sending request to consume %d of custom metric %s", rc.name, delta, customMetricName)
-			rc.sendConsumeCustomMetric(delta)
+			if delta != 0 {
+				framework.Logf("RC %s: sending request to consume %d of custom metric %s", rc.name, delta, customMetricName)
+				rc.sendConsumeCustomMetric(delta)
+			}
 			tick = time.After(rc.sleepTime)
 		case <-rc.stopCustomMetric:
 			framework.Logf("RC %s: stopping metric consumer", rc.name)
