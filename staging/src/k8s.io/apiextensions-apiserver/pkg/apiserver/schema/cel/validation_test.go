@@ -1849,6 +1849,71 @@ func TestValidationExpressions(t *testing.T) {
 	}
 }
 
+func TestCELValidationLimit(t *testing.T) {
+	tests := []struct {
+		name   string
+		schema *schema.Structural
+		obj    interface{}
+		valid  []string
+	}{
+		{
+			name:   "test limit",
+			obj:    objs(math.MaxInt64),
+			schema: schemas(integerType),
+			valid: []string{
+				"self.val1 > 0",
+			}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.TODO()
+			for j := range tt.valid {
+				validRule := tt.valid[j]
+				t.Run(validRule, func(t *testing.T) {
+					t.Parallel()
+					s := withRule(*tt.schema, validRule)
+					celValidator := validator(&s, false, PerCallLimit)
+
+					// test with cost budget exceeded
+					errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, 0)
+					var found bool
+					for _, err := range errs {
+						if err.Type == field.ErrorTypeInvalid && strings.Contains(err.Error(), "validation failed due to running out of cost budget, no further validation rules will be run") {
+							found = true
+						} else {
+							t.Errorf("unexpected err: %v", err)
+						}
+					}
+					if !found {
+						t.Errorf("expect cost limit exceed err but did not find")
+					}
+					if len(errs) > 1 {
+						t.Errorf("expect to only return cost budget exceed err once but got: %v", len(errs))
+					}
+
+					// test with PerCallLimit exceeded
+					found = false
+					celValidator = NewValidator(&s, 0)
+					if celValidator == nil {
+						t.Fatal("expected non nil validator")
+					}
+					errs, _ = celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, RuntimeCELCostBudget)
+					for _, err := range errs {
+						if err.Type == field.ErrorTypeInvalid && strings.Contains(err.Error(), "no further validation rules will be run due to call cost exceeds limit for rule") {
+							found = true
+							break
+						}
+					}
+					if !found {
+						t.Errorf("expect PerCostLimit exceed err but did not find")
+					}
+				})
+			}
+		})
+	}
+
+}
+
 func TestCELValidationContextCancellation(t *testing.T) {
 	items := make([]interface{}, 1000)
 	for i := int64(0); i < 1000; i++ {
