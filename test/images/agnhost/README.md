@@ -402,6 +402,7 @@ Starts a HTTP(S) server on given port with the following endpoints:
   - `protocol`: The protocol which will be used when making the request. Default value: `http`.
     Acceptable values: `http`, `udp`, `sctp`.
   - `tries`: The number of times the request will be performed. Default value: `1`.
+  - `resolve`: If set to false, this will run a GET request against the host URL. Otherwise, this will run a GET request against the host's resolved IP address. Default value: `true`.
 - `/echo`: Returns the given `msg` (`/echo?msg=echoed_msg`), with the optional status `code`.
 - `/exit`: Closes the server with the given code and graceful shutdown. The endpoint's parameters
 	are:

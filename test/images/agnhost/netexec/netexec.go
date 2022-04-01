@@ -357,7 +357,8 @@ func dialHandler(w http.ResponseWriter, r *http.Request) {
 	request := values.Query().Get("request") // hostName
 	protocol := values.Query().Get("protocol")
 	tryParam := values.Query().Get("tries")
-	log.Printf("GET /dial?host=%s&protocol=%s&port=%s&request=%s&tries=%s", host, protocol, port, request, tryParam)
+	resolveParam := values.Query().Get("resolve")
+	log.Printf("GET /dial?host=%s&protocol=%s&port=%s&request=%s&tries=%s&resolve=%s", host, protocol, port, request, tryParam, resolveParam)
 	tries := 1
 	if len(tryParam) > 0 {
 		tries, err = strconv.Atoi(tryParam)
@@ -370,6 +371,13 @@ func dialHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("request parameter not specified. %v", err), http.StatusBadRequest)
 		return
 	}
+	resolve := true
+	if resolveParam == "false" {
+		resolve = false
+	} else if len(resolveParam) > 0 && resolveParam != "true" {
+		http.Error(w, fmt.Sprintf("resolve parameter is invalid, must be 'true' or 'false'. %v", err), http.StatusBadRequest)
+		return
+	}
 
 	hostPort := net.JoinHostPort(host, port)
 	var addr net.Addr
@@ -377,7 +385,12 @@ func dialHandler(w http.ResponseWriter, r *http.Request) {
 	switch strings.ToLower(protocol) {
 	case "", "http":
 		dialer = dialHTTP
-		addr, err = net.ResolveTCPAddr("tcp", hostPort)
+		if resolve {
+			addr, err = net.ResolveTCPAddr("tcp", hostPort)
+		} else {
+			addr = httpAddr(hostPort)
+			err = nil
+		}
 	case "udp":
 		dialer = dialUDP
 		addr, err = net.ResolveUDPAddr("udp", hostPort)
@@ -712,3 +725,8 @@ func parseAddresses(addresses string) ([]string, error) {
 	set := sets.NewString(res...)
 	return set.List(), nil
 }
+
+type httpAddr string
+
+func (h httpAddr) Network() string { return "tcp" }
+func (h httpAddr) String() string  { return string(h) }
