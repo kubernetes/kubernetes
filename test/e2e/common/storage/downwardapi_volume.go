@@ -40,12 +40,8 @@ var _ = SIGDescribe("Downward API volume", func() {
 	// How long to wait for a log pod to be displayed
 	const podLogTimeout = 3 * time.Minute
 	f := framework.NewDefaultFramework("downward-api")
-<<<<<<< HEAD
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
-	var podClient *framework.PodClient
-=======
 	var podClient *e2eutils.PodClient
->>>>>>> fcf4212fb3d (restructure e2e framework and its sub-packages to solve potential  cycle imports.)
 	ginkgo.BeforeEach(func() {
 		podClient = f.PodClient()
 	})

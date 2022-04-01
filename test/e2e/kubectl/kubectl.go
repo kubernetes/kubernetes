@@ -1081,9 +1081,9 @@ metadata:
 			// are still considered invalid
 			invalidArbitraryCR := fmt.Sprintf(`{%s,"spec":{"bars":[{"name":"test-bar"}],"extraProperty":"arbitrary-value"}}`, meta)
 			err = createApplyCustomResource(invalidArbitraryCR, f.Namespace.Name, "test-cr", crd)
-			framework.ExpectError(err, "creating custom resource")
+			e2eutils.ExpectError(err, "creating custom resource")
 			if !strings.Contains(err.Error(), `unknown field "spec.extraProperty"`) {
-				framework.Failf("incorrect error from createApplyCustomResource: %v", err)
+				e2eutils.Failf("incorrect error from createApplyCustomResource: %v", err)
 			}
 
 			// unknown fields on the root are considered valid

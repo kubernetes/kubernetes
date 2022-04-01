@@ -38,12 +38,13 @@ package drivers
 import (
 	"context"
 	"fmt"
-	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
-	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 	"os/exec"
 	"strconv"
 	"strings"
 	"time"
+
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
@@ -2081,7 +2082,7 @@ func (a *azureFileDriver) SkipUnsupportedTest(pattern storageframework.TestPatte
 
 func (a *azureFileDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) *v1.VolumeSource {
 	av, ok := e2evolume.(*azureFileVolume)
-	framework.ExpectEqual(ok, true, "Failed to cast test volume to Azure test volume")
+	e2eutils.ExpectEqual(ok, true, "Failed to cast test volume to Azure test volume")
 	volSource := v1.VolumeSource{
 		AzureFile: &v1.AzureFileVolumeSource{
 			SecretName: av.secretName,
@@ -2094,7 +2095,7 @@ func (a *azureFileDriver) GetVolumeSource(readOnly bool, fsType string, e2evolum
 
 func (a *azureFileDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	av, ok := e2evolume.(*azureFileVolume)
-	framework.ExpectEqual(ok, true, "Failed to cast test volume to Azure test volume")
+	e2eutils.ExpectEqual(ok, true, "Failed to cast test volume to Azure test volume")
 	pvSource := v1.PersistentVolumeSource{
 		AzureFile: &v1.AzureFilePersistentVolumeSource{
 			SecretName:      av.secretName,
@@ -2125,7 +2126,7 @@ func (a *azureFileDriver) PrepareTest(f *framework.Framework) (*storageframework
 func (a *azureFileDriver) CreateVolume(config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
 	ginkgo.By("creating a test azure file volume")
 	accountName, accountKey, shareName, err := e2epv.CreateShare()
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	secretName := "azure-storage-account-" + accountName + "-secret"
 	secret := &v1.Secret{
@@ -2142,7 +2143,7 @@ func (a *azureFileDriver) CreateVolume(config *storageframework.PerTestConfig, v
 	}
 
 	_, err = config.Framework.ClientSet.CoreV1().Secrets(config.Framework.Namespace.Name).Create(context.TODO(), secret, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	return &azureFileVolume{
 		accountName:     accountName,
 		shareName:       shareName,
@@ -2153,5 +2154,5 @@ func (a *azureFileDriver) CreateVolume(config *storageframework.PerTestConfig, v
 
 func (v *azureFileVolume) DeleteVolume() {
 	err := e2epv.DeleteShare(v.accountName, v.shareName)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 }

@@ -27,12 +27,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 
 	v1 "k8s.io/api/core/v1"
-<<<<<<< HEAD
-	"k8s.io/kubernetes/test/e2e/framework"
-=======
 	"k8s.io/kubernetes/test/e2e/framework/config"
 	"k8s.io/kubernetes/test/e2e/framework/providers"
->>>>>>> fcf4212fb3d (restructure e2e framework and its sub-packages to solve potential  cycle imports.)
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/framework/utils"
 	awscloud "k8s.io/legacy-cloud-providers/aws"

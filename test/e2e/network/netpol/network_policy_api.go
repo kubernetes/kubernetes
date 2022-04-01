@@ -303,7 +303,7 @@ var _ = common.SIGDescribe("Netpol API", func() {
 			SetSpecIngressRules(ingressRule))
 		newNetPol, err := npClient.Create(context.TODO(), npTemplate, metav1.CreateOptions{})
 
-		framework.ExpectNoError(err, "request template:%v", npTemplate)
+		e2eutils.ExpectNoError(err, "request template:%v", npTemplate)
 
 		condition := metav1.Condition{
 			Type:               string(networkingv1.NetworkPolicyConditionStatusAccepted),
@@ -324,24 +324,24 @@ var _ = common.SIGDescribe("Netpol API", func() {
 		newNetPol.Status = status
 
 		_, err = npClient.UpdateStatus(context.TODO(), newNetPol, metav1.UpdateOptions{})
-		framework.ExpectNoError(err, "request template:%v", newNetPol)
+		e2eutils.ExpectNoError(err, "request template:%v", newNetPol)
 
 		ginkgo.By("NetworkPolicy should not support status condition without reason field")
 		newNetPol.Status.Conditions[0].Reason = ""
 		_, err = npClient.UpdateStatus(context.TODO(), newNetPol, metav1.UpdateOptions{})
-		framework.ExpectError(err, "request template:%v", newNetPol)
+		e2eutils.ExpectError(err, "request template:%v", newNetPol)
 
 		ginkgo.By("NetworkPolicy should not support status condition with duplicated types")
 		newNetPol.Status.Conditions = []metav1.Condition{condition, condition}
 		newNetPol.Status.Conditions[1].Status = metav1.ConditionFalse
 		_, err = npClient.UpdateStatus(context.TODO(), newNetPol, metav1.UpdateOptions{})
-		framework.ExpectError(err, "request template:%v", newNetPol)
+		e2eutils.ExpectError(err, "request template:%v", newNetPol)
 
 		ginkgo.By("deleting all test collection")
 		err = npClient.DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		nps, err := npClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(nps.Items), 0, "filtered list should be 0 items")
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectEqual(len(nps.Items), 0, "filtered list should be 0 items")
 	})
 })

@@ -21,12 +21,14 @@ import (
 	"fmt"
 	"os"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework/config"
-	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 	"k8s.io/kubernetes/test/e2e/framework/providers"
 	"k8s.io/kubernetes/test/e2e/framework/utils"
 	"k8s.io/legacy-cloud-providers/azure"
@@ -101,7 +103,7 @@ func (p *Provider) CreateShare() (string, string, string, error) {
 	}
 
 	shareOptions := &fileclient.ShareOptions{
-		Name:       fmt.Sprintf("%s-%s", framework.TestContext.Prefix, string(uuid.NewUUID())),
+		Name:       fmt.Sprintf("%s-%s", e2econfig.TestContext.Prefix, string(uuid.NewUUID())),
 		RequestGiB: 1,
 	}
 
@@ -116,7 +118,7 @@ func (p *Provider) CreateShare() (string, string, string, error) {
 func (p *Provider) DeleteShare(accountName, shareName string) error {
 	err := p.azureCloud.DeleteFileShare(p.azureCloud.ResourceGroup, accountName, shareName)
 	if err != nil {
-		framework.Logf("failed to delete Azure File share %q: %v", shareName, err)
+		e2eutils.Logf("failed to delete Azure File share %q: %v", shareName, err)
 	}
 	return err
 }
