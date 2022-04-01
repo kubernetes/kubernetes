@@ -21,13 +21,14 @@ import (
 	"flag"
 	"strings"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/component-base/metrics/testutil"
 	csitrans "k8s.io/csi-translation-lib"
-	"k8s.io/kubernetes/test/e2e/framework"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
@@ -108,7 +109,7 @@ func getVolumeOpsFromMetricsForPlugin(ms testutil.Metrics, pluginName string) op
 }
 
 func getVolumeOpCounts(c clientset.Interface, config *rest.Config, pluginName string) opCounts {
-	if !framework.ProviderIs("gce", "gke", "aws") {
+	if !e2eutils.ProviderIs("gce", "gke", "aws") {
 		return opCounts{}
 	}
 
@@ -117,32 +118,32 @@ func getVolumeOpCounts(c clientset.Interface, config *rest.Config, pluginName st
 	metricsGrabber, err := e2emetrics.NewMetricsGrabber(c, nil, config, true, false, true, false, false, false)
 
 	if err != nil {
-		framework.ExpectNoError(err, "Error creating metrics grabber: %v", err)
+		e2eutils.ExpectNoError(err, "Error creating metrics grabber: %v", err)
 	}
 
 	if !metricsGrabber.HasControlPlanePods() {
-		framework.Logf("Warning: Environment does not support getting controller-manager metrics")
+		e2eutils.Logf("Warning: Environment does not support getting controller-manager metrics")
 		return opCounts{}
 	}
 
 	controllerMetrics, err := metricsGrabber.GrabFromControllerManager()
-	framework.ExpectNoError(err, "Error getting c-m metrics : %v", err)
+	e2eutils.ExpectNoError(err, "Error getting c-m metrics : %v", err)
 	totOps := getVolumeOpsFromMetricsForPlugin(testutil.Metrics(controllerMetrics), pluginName)
 
-	framework.Logf("Node name not specified for getVolumeOpCounts, falling back to listing nodes from API Server")
+	e2eutils.Logf("Node name not specified for getVolumeOpCounts, falling back to listing nodes from API Server")
 	nodes, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
-	framework.ExpectNoError(err, "Error listing nodes: %v", err)
+	e2eutils.ExpectNoError(err, "Error listing nodes: %v", err)
 	if len(nodes.Items) <= nodeLimit {
 		// For large clusters with > nodeLimit nodes it is too time consuming to
 		// gather metrics from all nodes. We just ignore the node metrics
 		// for those clusters
 		for _, node := range nodes.Items {
 			nodeMetrics, err := metricsGrabber.GrabFromKubelet(node.GetName())
-			framework.ExpectNoError(err, "Error getting Kubelet %v metrics: %v", node.GetName(), err)
+			e2eutils.ExpectNoError(err, "Error getting Kubelet %v metrics: %v", node.GetName(), err)
 			totOps = addOpCounts(totOps, getVolumeOpsFromMetricsForPlugin(testutil.Metrics(nodeMetrics), pluginName))
 		}
 	} else {
-		framework.Logf("Skipping operation metrics gathering from nodes in getVolumeOpCounts, greater than %v nodes", nodeLimit)
+		e2eutils.Logf("Skipping operation metrics gathering from nodes in getVolumeOpCounts, greater than %v nodes", nodeLimit)
 	}
 
 	return totOps
@@ -169,7 +170,7 @@ func getMigrationVolumeOpCounts(cs clientset.Interface, config *rest.Config, plu
 		l := csitrans.New()
 		csiName, err := l.GetCSINameFromInTreeName(pluginName)
 		if err != nil {
-			framework.Logf("Could not find CSI Name for in-tree plugin %v", pluginName)
+			e2eutils.Logf("Could not find CSI Name for in-tree plugin %v", pluginName)
 			migratedOps = opCounts{}
 		} else {
 			csiName = "kubernetes.io/csi:" + csiName
@@ -178,7 +179,7 @@ func getMigrationVolumeOpCounts(cs clientset.Interface, config *rest.Config, plu
 		return getVolumeOpCounts(cs, config, pluginName), migratedOps
 	}
 	// Not an in-tree driver
-	framework.Logf("Test running for native CSI Driver, not checking metrics")
+	e2eutils.Logf("Test running for native CSI Driver, not checking metrics")
 	return opCounts{}, opCounts{}
 }
 
@@ -196,7 +197,7 @@ func newMigrationOpCheck(cs clientset.Interface, config *rest.Config, pluginName
 
 	if !sets.NewString(strings.Split(*migratedPlugins, ",")...).Has(pluginName) {
 		// In-tree plugin is not migrated
-		framework.Logf("In-tree plugin %v is not migrated, not validating any metrics", pluginName)
+		e2eutils.Logf("In-tree plugin %v is not migrated, not validating any metrics", pluginName)
 
 		// We don't check in-tree plugin metrics because some negative test
 		// cases may not do any volume operations and therefore not emit any
@@ -217,7 +218,7 @@ func newMigrationOpCheck(cs clientset.Interface, config *rest.Config, pluginName
 
 	// TODO: temporarily skip metrics check due to issue #[102893](https://github.com/kubernetes/kubernetes/issues/102893)
 	// Will remove it once the issue is fixed
-	if framework.NodeOSDistroIs("windows") {
+	if e2eutils.NodeOSDistroIs("windows") {
 		moc.skipCheck = true
 		return &moc
 	}
@@ -235,7 +236,7 @@ func (moc *migrationOpCheck) validateMigrationVolumeOpCounts() {
 
 	for op, count := range newInTreeOps {
 		if count != moc.oldInTreeOps[op] {
-			framework.Failf("In-tree plugin %v migrated to CSI Driver, however found %v %v metrics for in-tree plugin", moc.pluginName, count-moc.oldInTreeOps[op], op)
+			e2eutils.Failf("In-tree plugin %v migrated to CSI Driver, however found %v %v metrics for in-tree plugin", moc.pluginName, count-moc.oldInTreeOps[op], op)
 		}
 	}
 	// We don't check for migrated metrics because some negative test cases

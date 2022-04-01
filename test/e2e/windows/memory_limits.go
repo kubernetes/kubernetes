@@ -22,6 +22,9 @@ import (
 	"fmt"
 	"time"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeletconfigscheme "k8s.io/kubernetes/pkg/kubelet/apis/config/scheme"
@@ -56,7 +59,7 @@ var _ = SIGDescribe("[Feature:Windows] Memory Limits [Serial] [Slow]", func() {
 
 	ginkgo.Context("attempt to deploy past allocatable memory limits", func() {
 		ginkgo.It("should fail deployments of pods once there isn't enough memory", func() {
-			overrideAllocatableMemoryTest(f, framework.TestContext.CloudConfig.NumNodes)
+			overrideAllocatableMemoryTest(f, e2econfig.TestContext.CloudConfig.NumNodes)
 		})
 	})
 
@@ -82,7 +85,7 @@ type nodeMemory struct {
 func checkNodeAllocatableTest(f *framework.Framework) {
 
 	nodeMem := getNodeMemory(f)
-	framework.Logf("nodeMem says: %+v", nodeMem)
+	e2eutils.Logf("nodeMem says: %+v", nodeMem)
 
 	// calculate the allocatable mem based on capacity - reserved amounts
 	calculatedNodeAlloc := nodeMem.capacity.DeepCopy()
@@ -94,7 +97,7 @@ func checkNodeAllocatableTest(f *framework.Framework) {
 	ginkgo.By(fmt.Sprintf("Checking stated allocatable memory %v against calculated allocatable memory %v", &nodeMem.allocatable, calculatedNodeAlloc))
 
 	// sanity check against stated allocatable
-	framework.ExpectEqual(calculatedNodeAlloc.Cmp(nodeMem.allocatable), 0)
+	e2eutils.ExpectEqual(calculatedNodeAlloc.Cmp(nodeMem.allocatable), 0)
 }
 
 // Deploys `allocatablePods + 1` pods, each with a memory limit of `1/allocatablePods` of the total allocatable
@@ -104,7 +107,7 @@ func overrideAllocatableMemoryTest(f *framework.Framework, allocatablePods int) 
 	nodeList, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
 		LabelSelector: selector.String(),
 	})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	for _, node := range nodeList.Items {
 		status := node.Status
@@ -132,7 +135,7 @@ func overrideAllocatableMemoryTest(f *framework.Framework, allocatablePods int) 
 			},
 		}
 		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 	}
 	podName := "mem-failure-pod"
 	failurePod := &v1.Pod{
@@ -157,14 +160,14 @@ func overrideAllocatableMemoryTest(f *framework.Framework, allocatablePods int) 
 		},
 	}
 	failurePod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), failurePod, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	gomega.Eventually(func() bool {
 		eventList, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		for _, e := range eventList.Items {
 			// Look for an event that shows FailedScheduling
 			if e.Type == "Warning" && e.Reason == "FailedScheduling" && e.InvolvedObject.Name == failurePod.ObjectMeta.Name {
-				framework.Logf("Found %+v event with message %+v", e.Reason, e.Message)
+				e2eutils.Logf("Found %+v event with message %+v", e.Reason, e.Message)
 				return true
 			}
 		}
@@ -179,22 +182,22 @@ func getNodeMemory(f *framework.Framework) nodeMemory {
 	nodeList, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
 		LabelSelector: selector.String(),
 	})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	// Assuming that agent nodes have the same config
 	// Make sure there is >0 agent nodes, then use the first one for info
-	framework.ExpectNotEqual(nodeList.Size(), 0)
+	e2eutils.ExpectNotEqual(nodeList.Size(), 0)
 
 	ginkgo.By("Getting memory details from node status and kubelet config")
 	status := nodeList.Items[0].Status
 	nodeName := nodeList.Items[0].ObjectMeta.Name
 
-	framework.Logf("Getting configuration details for node %s", nodeName)
+	e2eutils.Logf("Getting configuration details for node %s", nodeName)
 	request := f.ClientSet.CoreV1().RESTClient().Get().Resource("nodes").Name(nodeName).SubResource("proxy").Suffix("configz")
 	rawbytes, err := request.DoRaw(context.Background())
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	kubeletConfig, err := decodeConfigz(rawbytes)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	systemReserve, err := resource.ParseQuantity(kubeletConfig.SystemReserved["memory"])
 	if err != nil {

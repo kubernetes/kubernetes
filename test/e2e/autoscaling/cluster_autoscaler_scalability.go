@@ -20,6 +20,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 	"math"
 	"strings"
 	"time"
@@ -81,33 +83,33 @@ var _ = SIGDescribe("Cluster size autoscaler scalability [Slow]", func() {
 		if originalSizes == nil {
 			originalSizes = make(map[string]int)
 			sum = 0
-			for _, mig := range strings.Split(framework.TestContext.CloudConfig.NodeInstanceGroup, ",") {
+			for _, mig := range strings.Split(e2econfig.TestContext.CloudConfig.NodeInstanceGroup, ",") {
 				size, err := framework.GroupSize(mig)
-				framework.ExpectNoError(err)
+				e2eutils.ExpectNoError(err)
 				ginkgo.By(fmt.Sprintf("Initial size of %s: %d", mig, size))
 				originalSizes[mig] = size
 				sum += size
 			}
 		}
 
-		framework.ExpectNoError(e2enode.WaitForReadyNodes(c, sum, scaleUpTimeout))
+		e2eutils.ExpectNoError(e2enode.WaitForReadyNodes(c, sum, scaleUpTimeout))
 
 		nodes, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		nodeCount = len(nodes.Items)
 		cpu := nodes.Items[0].Status.Capacity[v1.ResourceCPU]
 		mem := nodes.Items[0].Status.Capacity[v1.ResourceMemory]
 		coresPerNode = int((&cpu).MilliValue() / 1000)
 		memCapacityMb = int((&mem).Value() / 1024 / 1024)
 
-		framework.ExpectEqual(nodeCount, sum)
+		e2eutils.ExpectEqual(nodeCount, sum)
 
-		if framework.ProviderIs("gke") {
+		if e2eutils.ProviderIs("gke") {
 			val, err := isAutoscalerEnabled(3)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			if !val {
 				err = enableAutoscaler("default-pool", 3, 5)
-				framework.ExpectNoError(err)
+				e2eutils.ExpectNoError(err)
 			}
 		}
 	})
@@ -115,9 +117,9 @@ var _ = SIGDescribe("Cluster size autoscaler scalability [Slow]", func() {
 	ginkgo.AfterEach(func() {
 		ginkgo.By(fmt.Sprintf("Restoring initial size of the cluster"))
 		setMigSizes(originalSizes)
-		framework.ExpectNoError(e2enode.WaitForReadyNodes(c, nodeCount, scaleDownTimeout))
+		e2eutils.ExpectNoError(e2enode.WaitForReadyNodes(c, nodeCount, scaleDownTimeout))
 		nodes, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		s := time.Now()
 	makeSchedulableLoop:
 		for start := time.Now(); time.Since(start) < makeSchedulableTimeout; time.Sleep(makeSchedulableDelay) {
@@ -127,7 +129,7 @@ var _ = SIGDescribe("Cluster size autoscaler scalability [Slow]", func() {
 				case CriticalAddonsOnlyError:
 					continue makeSchedulableLoop
 				default:
-					framework.ExpectNoError(err)
+					e2eutils.ExpectNoError(err)
 				}
 			}
 			break
@@ -146,7 +148,7 @@ var _ = SIGDescribe("Cluster size autoscaler scalability [Slow]", func() {
 		// saturate cluster
 		reservationCleanup := ReserveMemory(f, "some-pod", nodeCount*2, nodeCount*perNodeReservation, true, memoryReservationTimeout)
 		defer reservationCleanup()
-		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
+		e2eutils.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
 
 		// configure pending pods & expected scale up
 		rcConfig := reserveMemoryRCConfig(f, "extra-pod-1", replicas, additionalReservation, largeScaleUpTimeout)
@@ -176,7 +178,7 @@ var _ = SIGDescribe("Cluster size autoscaler scalability [Slow]", func() {
 		initialReplicas := nodeCount
 		reservationCleanup := ReserveMemory(f, "some-pod", initialReplicas, nodeCount*perNodeReservation, true, memoryReservationTimeout)
 		defer reservationCleanup()
-		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
+		e2eutils.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
 
 		klog.Infof("Reserved successfully")
 
@@ -217,7 +219,7 @@ var _ = SIGDescribe("Cluster size autoscaler scalability [Slow]", func() {
 			anyKey(originalSizes): totalNodes,
 		}
 		setMigSizes(newSizes)
-		framework.ExpectNoError(e2enode.WaitForReadyNodes(f.ClientSet, totalNodes, largeResizeTimeout))
+		e2eutils.ExpectNoError(e2enode.WaitForReadyNodes(f.ClientSet, totalNodes, largeResizeTimeout))
 
 		// run replicas
 		rcConfig := reserveMemoryRCConfig(f, "some-pod", replicas, replicas*perNodeReservation, largeScaleUpTimeout)
@@ -229,7 +231,7 @@ var _ = SIGDescribe("Cluster size autoscaler scalability [Slow]", func() {
 		defer testCleanup()
 
 		// check if empty nodes are scaled down
-		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
+		e2eutils.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
 			func(size int) bool {
 				return size <= replicas+3 // leaving space for non-evictable kube-system pods
 			}, scaleDownTimeout))
@@ -251,7 +253,7 @@ var _ = SIGDescribe("Cluster size autoscaler scalability [Slow]", func() {
 		}
 		setMigSizes(newSizes)
 
-		framework.ExpectNoError(e2enode.WaitForReadyNodes(f.ClientSet, totalNodes, largeResizeTimeout))
+		e2eutils.ExpectNoError(e2enode.WaitForReadyNodes(f.ClientSet, totalNodes, largeResizeTimeout))
 
 		// annotate all nodes with no-scale-down
 		ScaleDownDisabledKey := "cluster-autoscaler.kubernetes.io/scale-down-disabled"
@@ -262,8 +264,8 @@ var _ = SIGDescribe("Cluster size autoscaler scalability [Slow]", func() {
 			}.AsSelector().String(),
 		})
 
-		framework.ExpectNoError(err)
-		framework.ExpectNoError(addAnnotation(f, nodes.Items, ScaleDownDisabledKey, "true"))
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectNoError(addAnnotation(f, nodes.Items, ScaleDownDisabledKey, "true"))
 
 		// distribute pods using replication controllers taking up space that should
 		// be empty after pods are distributed
@@ -279,7 +281,7 @@ var _ = SIGDescribe("Cluster size autoscaler scalability [Slow]", func() {
 		defer cleanup()
 
 		// enable scale down again
-		framework.ExpectNoError(addAnnotation(f, nodes.Items, ScaleDownDisabledKey, "false"))
+		e2eutils.ExpectNoError(addAnnotation(f, nodes.Items, ScaleDownDisabledKey, "false"))
 
 		// wait for scale down to start. Node deletion takes a long time, so we just
 		// wait for maximum of 30 nodes deleted
@@ -289,7 +291,7 @@ var _ = SIGDescribe("Cluster size autoscaler scalability [Slow]", func() {
 		}
 		expectedSize := totalNodes - nodesToScaleDownCount
 		timeout := time.Duration(nodesToScaleDownCount)*time.Minute + scaleDownTimeout
-		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet, func(size int) bool {
+		e2eutils.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet, func(size int) bool {
 			return size <= expectedSize
 		}, timeout))
 	})
@@ -305,7 +307,7 @@ var _ = SIGDescribe("Cluster size autoscaler scalability [Slow]", func() {
 			anyKey(originalSizes): totalNodes,
 		}
 		setMigSizes(newSizes)
-		framework.ExpectNoError(e2enode.WaitForReadyNodes(f.ClientSet, totalNodes, largeResizeTimeout))
+		e2eutils.ExpectNoError(e2enode.WaitForReadyNodes(f.ClientSet, totalNodes, largeResizeTimeout))
 		divider := int(float64(totalNodes) * 0.7)
 		fullNodesCount := divider
 		underutilizedNodesCount := totalNodes - fullNodesCount
@@ -327,9 +329,9 @@ var _ = SIGDescribe("Cluster size autoscaler scalability [Slow]", func() {
 
 		ginkgo.By("Checking if the number of nodes is as expected")
 		nodes, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		klog.Infof("Nodes: %v, expected: %v", len(nodes.Items), totalNodes)
-		framework.ExpectEqual(len(nodes.Items), totalNodes)
+		e2eutils.ExpectEqual(len(nodes.Items), totalNodes)
 	})
 
 	ginkgo.Specify("CA ignores unschedulable pods while scheduling schedulable pods [Feature:ClusterAutoscalerScalability6]", func() {
@@ -340,7 +342,7 @@ var _ = SIGDescribe("Cluster size autoscaler scalability [Slow]", func() {
 		initialPodsTotalMemory := nodeCount * perNodeReservation
 		reservationCleanup := ReserveMemory(f, "initial-pod", initialPodReplicas, initialPodsTotalMemory, true /* wait for pods to run */, memoryReservationTimeout)
 		defer reservationCleanup()
-		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
+		e2eutils.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
 
 		// Configure a number of unschedulable pods.
 		unschedulableMemReservation := memCapacityMb * 2
@@ -353,7 +355,7 @@ var _ = SIGDescribe("Cluster size autoscaler scalability [Slow]", func() {
 
 		// Ensure that no new nodes have been added so far.
 		readyNodeCount, _ := e2enode.TotalReady(f.ClientSet)
-		framework.ExpectEqual(readyNodeCount, nodeCount)
+		e2eutils.ExpectEqual(readyNodeCount, nodeCount)
 
 		// Start a number of schedulable pods to ensure CA reacts.
 		additionalNodes := maxNodes - nodeCount
@@ -382,21 +384,21 @@ func simpleScaleUpTestWithTolerance(f *framework.Framework, config *scaleUpTestC
 	// run rc based on config
 	ginkgo.By(fmt.Sprintf("Running RC %v from config", config.extraPods.Name))
 	start := time.Now()
-	framework.ExpectNoError(e2erc.RunRC(*config.extraPods))
+	e2eutils.ExpectNoError(e2erc.RunRC(*config.extraPods))
 	// check results
 	if tolerateMissingNodeCount > 0 {
 		// Tolerate some number of nodes not to be created.
 		minExpectedNodeCount := config.expectedResult.nodes - tolerateMissingNodeCount
-		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
+		e2eutils.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
 			func(size int) bool { return size >= minExpectedNodeCount }, scaleUpTimeout))
 	} else {
-		framework.ExpectNoError(e2enode.WaitForReadyNodes(f.ClientSet, config.expectedResult.nodes, scaleUpTimeout))
+		e2eutils.ExpectNoError(e2enode.WaitForReadyNodes(f.ClientSet, config.expectedResult.nodes, scaleUpTimeout))
 	}
 	klog.Infof("cluster is increased")
 	if tolerateMissingPodCount > 0 {
-		framework.ExpectNoError(waitForCaPodsReadyInNamespace(f, f.ClientSet, tolerateMissingPodCount))
+		e2eutils.ExpectNoError(waitForCaPodsReadyInNamespace(f, f.ClientSet, tolerateMissingPodCount))
 	} else {
-		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, f.ClientSet))
+		e2eutils.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, f.ClientSet))
 	}
 	timeTrack(start, fmt.Sprintf("Scale up to %v", config.expectedResult.nodes))
 	return func() error {
@@ -479,7 +481,7 @@ func createHostPortPodsWithMemory(f *framework.Framework, id string, replicas, p
 		MemRequest: request,
 	}
 	err := e2erc.RunRC(*config)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	return func() error {
 		return e2erc.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, id)
 	}
@@ -515,11 +517,11 @@ func distributeLoad(f *framework.Framework, namespace string, id string, podDist
 		cleanup := createHostPortPodsWithMemory(f, fmt.Sprintf("load-distribution%d", i), replicas, port, remainingMem*replicas, timeout)
 		defer cleanup()
 	}
-	framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, f.ClientSet))
+	e2eutils.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, f.ClientSet))
 	// Create the target RC
 	rcConfig := reserveMemoryRCConfig(f, id, totalPods, totalPods*podMemRequestMegabytes, timeout)
-	framework.ExpectNoError(e2erc.RunRC(*rcConfig))
-	framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, f.ClientSet))
+	e2eutils.ExpectNoError(e2erc.RunRC(*rcConfig))
+	e2eutils.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, f.ClientSet))
 	return func() error {
 		return e2erc.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, id)
 	}

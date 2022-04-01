@@ -23,6 +23,8 @@ import (
 	"fmt"
 	"math/rand"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 
 	v1 "k8s.io/api/core/v1"
@@ -132,19 +134,19 @@ func (t *topologyTestSuite) DefineTests(driver storageframework.TestDriver, patt
 		// We collect 1 additional topology, if possible, for the conflicting topology test
 		// case, but it's not needed for the positive test
 		l.allTopologies, err = t.getCurrentTopologies(cs, keys, dInfo.NumAllowedTopologies+1)
-		framework.ExpectNoError(err, "failed to get current driver topologies")
+		e2eutils.ExpectNoError(err, "failed to get current driver topologies")
 		if len(l.allTopologies) < dInfo.NumAllowedTopologies {
 			e2eskipper.Skipf("Not enough topologies in cluster -- skipping")
 		}
 
 		l.resource.Sc = dDriver.GetDynamicProvisionStorageClass(l.config, pattern.FsType)
-		framework.ExpectNotEqual(l.resource.Sc, nil, "driver failed to provide a StorageClass")
+		e2eutils.ExpectNotEqual(l.resource.Sc, nil, "driver failed to provide a StorageClass")
 		l.resource.Sc.VolumeBindingMode = &pattern.BindingMode
 
 		testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
 		driverVolumeSizeRange := dDriver.GetDriverInfo().SupportedSizeRange
 		claimSize, err := storageutils.GetSizeRangesIntersection(testVolumeSizeRange, driverVolumeSizeRange)
-		framework.ExpectNoError(err, "determine intersection of test size range %+v and driver size range %+v", testVolumeSizeRange, driverVolumeSizeRange)
+		e2eutils.ExpectNoError(err, "determine intersection of test size range %+v and driver size range %+v", testVolumeSizeRange, driverVolumeSizeRange)
 		l.resource.Pvc = e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 			ClaimSize:        claimSize,
 			StorageClassName: &(l.resource.Sc.Name),
@@ -158,7 +160,7 @@ func (t *topologyTestSuite) DefineTests(driver storageframework.TestDriver, patt
 		t.CleanupResources(cs, &l)
 		err := storageutils.TryFunc(l.driverCleanup)
 		l.driverCleanup = nil
-		framework.ExpectNoError(err, "while cleaning up driver")
+		e2eutils.ExpectNoError(err, "while cleaning up driver")
 
 		l.migrationCheck.validateMigrationVolumeOpCounts()
 	}
@@ -179,14 +181,14 @@ func (t *topologyTestSuite) DefineTests(driver storageframework.TestDriver, patt
 		t.createResources(cs, &l, nil)
 
 		err = e2epod.WaitTimeoutForPodRunningInNamespace(cs, l.pod.Name, l.pod.Namespace, f.Timeouts.PodStart)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		ginkgo.By("Verifying pod scheduled to correct node")
 		pod, err := cs.CoreV1().Pods(l.pod.Namespace).Get(context.TODO(), l.pod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		node, err := cs.CoreV1().Nodes().Get(context.TODO(), pod.Spec.NodeName, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		t.verifyNodeTopology(node, allowedTopologies)
 	})
@@ -232,7 +234,7 @@ func (t *topologyTestSuite) DefineTests(driver storageframework.TestDriver, patt
 		// With delayed binding, the scheduler errors before provisioning
 		// With immediate binding, the volume gets provisioned but cannot be scheduled
 		err = e2epod.WaitForPodNameUnschedulableInNamespace(cs, l.pod.Name, l.pod.Namespace)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 	})
 }
 
@@ -264,7 +266,7 @@ func (t *topologyTestSuite) getCurrentTopologies(cs clientset.Interface, keys []
 			}
 		}
 		if !found {
-			framework.Logf("found topology %v", topo)
+			e2eutils.Logf("found topology %v", topo)
 			topos = append(topos, topo)
 		}
 		if len(topos) >= maxCount {
@@ -319,20 +321,20 @@ func (t *topologyTestSuite) verifyNodeTopology(node *v1.Node, allowedTopos []top
 			}
 		}
 	}
-	framework.Failf("node %v topology labels %+v doesn't match allowed topologies +%v", node.Name, node.Labels, allowedTopos)
+	e2eutils.Failf("node %v topology labels %+v doesn't match allowed topologies +%v", node.Name, node.Labels, allowedTopos)
 }
 
 func (t *topologyTestSuite) createResources(cs clientset.Interface, l *topologyTest, affinity *v1.Affinity) {
 	var err error
-	framework.Logf("Creating storage class object and pvc object for driver - sc: %v, pvc: %v", l.resource.Sc, l.resource.Pvc)
+	e2eutils.Logf("Creating storage class object and pvc object for driver - sc: %v, pvc: %v", l.resource.Sc, l.resource.Pvc)
 
 	ginkgo.By("Creating sc")
 	l.resource.Sc, err = cs.StorageV1().StorageClasses().Create(context.TODO(), l.resource.Sc, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	ginkgo.By("Creating pvc")
 	l.resource.Pvc, err = cs.CoreV1().PersistentVolumeClaims(l.resource.Pvc.Namespace).Create(context.TODO(), l.resource.Pvc, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	ginkgo.By("Creating pod")
 	podConfig := e2epod.Config{
@@ -343,18 +345,18 @@ func (t *topologyTestSuite) createResources(cs clientset.Interface, l *topologyT
 		ImageID:       e2epod.GetDefaultTestImageID(),
 	}
 	l.pod, err = e2epod.MakeSecPod(&podConfig)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	l.pod, err = cs.CoreV1().Pods(l.pod.Namespace).Create(context.TODO(), l.pod, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 }
 
 func (t *topologyTestSuite) CleanupResources(cs clientset.Interface, l *topologyTest) {
 	if l.pod != nil {
 		ginkgo.By("Deleting pod")
 		err := e2epod.DeletePodWithWait(cs, l.pod)
-		framework.ExpectNoError(err, "while deleting pod")
+		e2eutils.ExpectNoError(err, "while deleting pod")
 	}
 
 	err := l.resource.CleanupResource()
-	framework.ExpectNoError(err, "while clean up resource")
+	e2eutils.ExpectNoError(err, "while clean up resource")
 }

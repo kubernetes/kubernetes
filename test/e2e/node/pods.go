@@ -29,6 +29,8 @@ import (
 	"sync"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -55,7 +57,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	ginkgo.Describe("Delete Grace Period", func() {
-		var podClient *framework.PodClient
+		var podClient *e2eutils.PodClient
 		ginkgo.BeforeEach(func() {
 			podClient = f.PodClient()
 		})
@@ -79,8 +81,8 @@ var _ = SIGDescribe("Pods Extended", func() {
 			selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 			options := metav1.ListOptions{LabelSelector: selector.String()}
 			pods, err := podClient.List(context.TODO(), options)
-			framework.ExpectNoError(err, "failed to query for pod")
-			framework.ExpectEqual(len(pods.Items), 0)
+			e2eutils.ExpectNoError(err, "failed to query for pod")
+			e2eutils.ExpectEqual(len(pods.Items), 0)
 
 			ginkgo.By("submitting the pod to kubernetes")
 			podClient.Create(pod)
@@ -89,22 +91,22 @@ var _ = SIGDescribe("Pods Extended", func() {
 			selector = labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 			options = metav1.ListOptions{LabelSelector: selector.String()}
 			pods, err = podClient.List(context.TODO(), options)
-			framework.ExpectNoError(err, "failed to query for pod")
-			framework.ExpectEqual(len(pods.Items), 1)
+			e2eutils.ExpectNoError(err, "failed to query for pod")
+			e2eutils.ExpectEqual(len(pods.Items), 1)
 
 			// We need to wait for the pod to be running, otherwise the deletion
 			// may be carried out immediately rather than gracefully.
-			framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name))
+			e2eutils.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name))
 			// save the running pod
 			pod, err = podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err, "failed to GET scheduled pod")
+			e2eutils.ExpectNoError(err, "failed to GET scheduled pod")
 
 			ginkgo.By("deleting the pod gracefully")
 			var lastPod v1.Pod
 			var statusCode int
 			err = f.ClientSet.CoreV1().RESTClient().Delete().AbsPath("/api/v1/namespaces", pod.Namespace, "pods", pod.Name).Param("gracePeriodSeconds", "30").Do(context.TODO()).StatusCode(&statusCode).Into(&lastPod)
-			framework.ExpectNoError(err, "failed to use http client to send delete")
-			framework.ExpectEqual(statusCode, http.StatusOK, "failed to delete gracefully by client request")
+			e2eutils.ExpectNoError(err, "failed to use http client to send delete")
+			e2eutils.ExpectEqual(statusCode, http.StatusOK, "failed to delete gracefully by client request")
 
 			ginkgo.By("verifying the kubelet observed the termination notice")
 
@@ -115,7 +117,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 			err = wait.Poll(time.Second*5, time.Second*30*3, func() (bool, error) {
 				podList, err := e2ekubelet.GetKubeletPods(f.ClientSet, pod.Spec.NodeName)
 				if err != nil {
-					framework.Logf("Unable to retrieve kubelet pods for node %v: %v", pod.Spec.NodeName, err)
+					e2eutils.Logf("Unable to retrieve kubelet pods for node %v: %v", pod.Spec.NodeName, err)
 					return false, nil
 				}
 				for _, kubeletPod := range podList.Items {
@@ -123,32 +125,32 @@ var _ = SIGDescribe("Pods Extended", func() {
 						continue
 					}
 					if kubeletPod.ObjectMeta.DeletionTimestamp == nil {
-						framework.Logf("deletion has not yet been observed")
+						e2eutils.Logf("deletion has not yet been observed")
 						return false, nil
 					}
 					data, _ := json.Marshal(kubeletPod)
-					framework.Logf("start=%s, now=%s, kubelet pod: %s", start, time.Now(), string(data))
+					e2eutils.Logf("start=%s, now=%s, kubelet pod: %s", start, time.Now(), string(data))
 					return false, nil
 				}
-				framework.Logf("no pod exists with the name we were looking for, assuming the termination request was observed and completed")
+				e2eutils.Logf("no pod exists with the name we were looking for, assuming the termination request was observed and completed")
 				return true, nil
 			})
-			framework.ExpectNoError(err, "kubelet never observed the termination notice")
+			e2eutils.ExpectNoError(err, "kubelet never observed the termination notice")
 
-			framework.ExpectNotEqual(lastPod.DeletionTimestamp, nil)
-			framework.ExpectNotEqual(lastPod.Spec.TerminationGracePeriodSeconds, 0)
+			e2eutils.ExpectNotEqual(lastPod.DeletionTimestamp, nil)
+			e2eutils.ExpectNotEqual(lastPod.Spec.TerminationGracePeriodSeconds, 0)
 
 			selector = labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 			options = metav1.ListOptions{LabelSelector: selector.String()}
 			pods, err = podClient.List(context.TODO(), options)
-			framework.ExpectNoError(err, "failed to query for pods")
-			framework.ExpectEqual(len(pods.Items), 0)
+			e2eutils.ExpectNoError(err, "failed to query for pods")
+			e2eutils.ExpectEqual(len(pods.Items), 0)
 
 		})
 	})
 
 	ginkgo.Describe("Pods Set QOS Class", func() {
-		var podClient *framework.PodClient
+		var podClient *e2eutils.PodClient
 		ginkgo.BeforeEach(func() {
 			podClient = f.PodClient()
 		})
@@ -194,13 +196,13 @@ var _ = SIGDescribe("Pods Extended", func() {
 
 			ginkgo.By("verifying QOS class is set on the pod")
 			pod, err := podClient.Get(context.TODO(), name, metav1.GetOptions{})
-			framework.ExpectNoError(err, "failed to query for pod")
-			framework.ExpectEqual(pod.Status.QOSClass, v1.PodQOSGuaranteed)
+			e2eutils.ExpectNoError(err, "failed to query for pod")
+			e2eutils.ExpectEqual(pod.Status.QOSClass, v1.PodQOSGuaranteed)
 		})
 	})
 
 	ginkgo.Describe("Pod Container Status", func() {
-		var podClient *framework.PodClient
+		var podClient *e2eutils.PodClient
 		ginkgo.BeforeEach(func() {
 			podClient = f.PodClient()
 		})
@@ -224,7 +226,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 	})
 
 	ginkgo.Describe("Pod Container lifecycle", func() {
-		var podClient *framework.PodClient
+		var podClient *e2eutils.PodClient
 		ginkgo.BeforeEach(func() {
 			podClient = f.PodClient()
 		})
@@ -268,12 +270,12 @@ var _ = SIGDescribe("Pods Extended", func() {
 				podClient.Delete(context.TODO(), pod.Name, metav1.DeleteOptions{})
 			}()
 
-			framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, f.Namespace.Name))
+			e2eutils.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, f.Namespace.Name))
 
 			var eventList *v1.EventList
 			var err error
 			ginkgo.By("Getting events about the pod")
-			framework.ExpectNoError(wait.Poll(time.Second*2, time.Second*60, func() (bool, error) {
+			e2eutils.ExpectNoError(wait.Poll(time.Second*2, time.Second*60, func() (bool, error) {
 				selector := fields.Set{
 					"involvedObject.kind":      "Pod",
 					"involvedObject.uid":       string(createdPod.UID),
@@ -294,7 +296,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 			ginkgo.By("Checking events about the pod")
 			for _, event := range eventList.Items {
 				if event.Reason == events.SandboxChanged {
-					framework.Fail("Unexpected SandboxChanged event")
+					e2eutils.Fail("Unexpected SandboxChanged event")
 				}
 			}
 		})
@@ -332,7 +334,7 @@ func createAndTestPodRepeatedly(workers, iterations int, scenario podScenario, p
 				// create the pod, capture the change events, then delete the pod
 				start := time.Now()
 				created, err := podClient.Create(context.TODO(), pod, metav1.CreateOptions{})
-				framework.ExpectNoError(err, "failed to create pod")
+				e2eutils.ExpectNoError(err, "failed to create pod")
 
 				ch := make(chan []watch.Event)
 				waitForWatch := make(chan struct{})
@@ -344,7 +346,7 @@ func createAndTestPodRepeatedly(workers, iterations int, scenario podScenario, p
 						FieldSelector:   fmt.Sprintf("metadata.name=%s", pod.Name),
 					})
 					if err != nil {
-						framework.Logf("Unable to watch pod %s: %v", pod.Name, err)
+						e2eutils.Logf("Unable to watch pod %s: %v", pod.Name, err)
 						return
 					}
 					defer w.Stop()
@@ -355,10 +357,10 @@ func createAndTestPodRepeatedly(workers, iterations int, scenario podScenario, p
 					for event := range w.ResultChan() {
 						events = append(events, event)
 						if event.Type == watch.Error {
-							framework.Logf("watch error seen for %s: %#v", pod.Name, event.Object)
+							e2eutils.Logf("watch error seen for %s: %#v", pod.Name, event.Object)
 						}
 						if scenario.IsLastEvent(event) {
-							framework.Logf("watch last event seen for %s", pod.Name)
+							e2eutils.Logf("watch last event seen for %s", pod.Name)
 							break
 						}
 					}
@@ -371,7 +373,7 @@ func createAndTestPodRepeatedly(workers, iterations int, scenario podScenario, p
 				}
 
 				verifier, scenario, err := scenario.Action(pod)
-				framework.ExpectNoError(err, "failed to take action")
+				e2eutils.ExpectNoError(err, "failed to take action")
 
 				var (
 					events []watch.Event
@@ -383,10 +385,10 @@ func createAndTestPodRepeatedly(workers, iterations int, scenario podScenario, p
 						continue
 					}
 					if len(events) < 2 {
-						framework.Fail("only got a single event")
+						e2eutils.Fail("only got a single event")
 					}
 				case <-time.After(5 * time.Minute):
-					framework.Failf("timed out waiting for watch events for %s", pod.Name)
+					e2eutils.Failf("timed out waiting for watch events for %s", pod.Name)
 				}
 
 				end := time.Now()
@@ -429,14 +431,14 @@ func createAndTestPodRepeatedly(workers, iterations int, scenario podScenario, p
 		for _, err := range errs {
 			messages = append(messages, err.Error())
 		}
-		framework.Failf("%d errors:\n%v", len(errs), strings.Join(messages, "\n"))
+		e2eutils.Failf("%d errors:\n%v", len(errs), strings.Join(messages, "\n"))
 	}
 	values, _ := r.Gather()
 	var buf bytes.Buffer
 	for _, m := range values {
 		expfmt.MetricFamilyToText(&buf, m)
 	}
-	framework.Logf("Summary of latencies:\n%s", buf.String())
+	e2eutils.Logf("Summary of latencies:\n%s", buf.String())
 }
 
 type podScenario interface {
@@ -575,7 +577,7 @@ func (v *podStartVerifier) Verify(event watch.Event) error {
 	var ok bool
 	pod, ok := event.Object.(*v1.Pod)
 	if !ok {
-		framework.Logf("Unexpected event object: %s %#v", event.Type, event.Object)
+		e2eutils.Logf("Unexpected event object: %s %#v", event.Type, event.Object)
 		return nil
 	}
 	v.pod = pod
@@ -649,10 +651,10 @@ func (v *podStartVerifier) Verify(event watch.Event) error {
 			// expected, pod was force-killed after grace period
 		case t.ExitCode == 128 && (t.Reason == "StartError" || t.Reason == "ContainerCannotRun") && reBug88766.MatchString(t.Message):
 			// pod volume teardown races with container start in CRI, which reports a failure
-			framework.Logf("pod %s on node %s failed with the symptoms of https://github.com/kubernetes/kubernetes/issues/88766", pod.Name, pod.Spec.NodeName)
+			e2eutils.Logf("pod %s on node %s failed with the symptoms of https://github.com/kubernetes/kubernetes/issues/88766", pod.Name, pod.Spec.NodeName)
 		default:
 			data, _ := json.MarshalIndent(pod.Status, "", "  ")
-			framework.Logf("pod %s on node %s had incorrect final status:\n%s", pod.Name, pod.Spec.NodeName, string(data))
+			e2eutils.Logf("pod %s on node %s had incorrect final status:\n%s", pod.Name, pod.Spec.NodeName, string(data))
 			return fmt.Errorf("pod %s on node %s container unexpected exit code %d: start=%s end=%s reason=%s message=%s", pod.Name, pod.Spec.NodeName, t.ExitCode, t.StartedAt, t.FinishedAt, t.Reason, t.Message)
 		}
 		switch {
@@ -696,7 +698,7 @@ func (v *podStartVerifier) VerifyFinal(scenario string, total time.Duration) (*v
 		errs = append(errs, fmt.Errorf("pod %s on node %s had running or unknown container status before being deleted:\n%s", pod.Name, pod.Spec.NodeName, string(data)))
 	}
 
-	framework.Logf("Pod %s on node %s %s total=%s run=%s execute=%s", pod.Name, pod.Spec.NodeName, scenario, total, v.completeDuration, v.duration)
+	e2eutils.Logf("Pod %s on node %s %s total=%s run=%s execute=%s", pod.Name, pod.Spec.NodeName, scenario, total, v.completeDuration, v.duration)
 	return pod, errs
 }
 

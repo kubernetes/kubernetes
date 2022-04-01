@@ -28,6 +28,8 @@ import (
 	"sync"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -202,7 +204,7 @@ var _ = SIGDescribe("Density [Serial] [Slow]", func() {
 				// Here we set API QPS limit from default 5 to 60 in order to test real Kubelet performance.
 				// Note that it will cause higher resource usage.
 				tempSetCurrentKubeletConfig(f, func(cfg *kubeletconfig.KubeletConfiguration) {
-					framework.Logf("Old QPS limit is: %d", cfg.KubeAPIQPS)
+					e2eutils.Logf("Old QPS limit is: %d", cfg.KubeAPIQPS)
 					// Set new API QPS limit
 					cfg.KubeAPIQPS = int32(itArg.APIQPSLimit)
 				})
@@ -362,7 +364,7 @@ func runDensityBatchTest(f *framework.Framework, rc *ResourceCollector, testArg 
 	}, 10*time.Minute, 10*time.Second).Should(gomega.BeTrue())
 
 	if len(watchTimes) < testArg.podsNr {
-		framework.Failf("Timeout reached waiting for all Pods to be observed by the watch.")
+		e2eutils.Failf("Timeout reached waiting for all Pods to be observed by the watch.")
 	}
 
 	// Analyze results
@@ -375,7 +377,7 @@ func runDensityBatchTest(f *framework.Framework, rc *ResourceCollector, testArg 
 
 	for name, create := range createTimes {
 		watch, ok := watchTimes[name]
-		framework.ExpectEqual(ok, true)
+		e2eutils.ExpectEqual(ok, true)
 
 		e2eLags = append(e2eLags,
 			e2emetrics.PodLatencyData{Name: name, Latency: watch.Time.Sub(create.Time)})
@@ -460,7 +462,7 @@ func createBatchPodWithRateControl(f *framework.Framework, pods []*v1.Pod, inter
 func getPodStartLatency(node string) (e2emetrics.KubeletLatencyMetrics, error) {
 	latencyMetrics := e2emetrics.KubeletLatencyMetrics{}
 	ms, err := e2emetrics.GrabKubeletMetricsWithoutProxy(node, "/metrics")
-	framework.ExpectNoError(err, "Failed to get kubelet metrics without proxy in node %s", node)
+	e2eutils.ExpectNoError(err, "Failed to get kubelet metrics without proxy in node %s", node)
 
 	for _, samples := range ms {
 		for _, sample := range samples {
@@ -509,12 +511,12 @@ func newInformerWatchPod(f *framework.Framework, mutex *sync.Mutex, watchTimes m
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				p, ok := obj.(*v1.Pod)
-				framework.ExpectEqual(ok, true)
+				e2eutils.ExpectEqual(ok, true)
 				go checkPodRunning(p)
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
 				p, ok := newObj.(*v1.Pod)
-				framework.ExpectEqual(ok, true)
+				e2eutils.ExpectEqual(ok, true)
 				go checkPodRunning(p)
 			},
 		},
@@ -565,8 +567,8 @@ func extractLatencyMetrics(latencies []e2emetrics.PodLatencyData) e2emetrics.Lat
 // printLatencies outputs latencies to log with readable format.
 func printLatencies(latencies []e2emetrics.PodLatencyData, header string) {
 	metrics := extractLatencyMetrics(latencies)
-	framework.Logf("10%% %s: %v", header, latencies[(len(latencies)*9)/10:])
-	framework.Logf("perc50: %v, perc90: %v, perc99: %v", metrics.Perc50, metrics.Perc90, metrics.Perc99)
+	e2eutils.Logf("10%% %s: %v", header, latencies[(len(latencies)*9)/10:])
+	e2eutils.Logf("perc50: %v, perc90: %v, perc99: %v", metrics.Perc50, metrics.Perc90, metrics.Perc99)
 }
 
 // logAndVerifyLatency verifies that whether pod creation latency satisfies the limit.
@@ -576,7 +578,7 @@ func logAndVerifyLatency(batchLag time.Duration, e2eLags []e2emetrics.PodLatency
 
 	// TODO(coufon): do not trust 'kubelet' metrics since they are not reset!
 	latencyMetrics, _ := getPodStartLatency(kubeletAddr)
-	framework.Logf("Kubelet Prometheus metrics (not reset):\n%s", framework.PrettyPrintJSON(latencyMetrics))
+	e2eutils.Logf("Kubelet Prometheus metrics (not reset):\n%s", e2eutils.PrettyPrintJSON(latencyMetrics))
 
 	podStartupLatency := extractLatencyMetrics(e2eLags)
 
@@ -585,11 +587,11 @@ func logAndVerifyLatency(batchLag time.Duration, e2eLags []e2emetrics.PodLatency
 
 	if isVerify {
 		// check whether e2e pod startup time is acceptable.
-		framework.ExpectNoError(verifyLatencyWithinThreshold(podStartupLimits, podStartupLatency, "pod startup"))
+		e2eutils.ExpectNoError(verifyLatencyWithinThreshold(podStartupLimits, podStartupLatency, "pod startup"))
 
 		// check bactch pod creation latency
 		if podBatchStartupLimit > 0 {
-			framework.ExpectEqual(batchLag <= podBatchStartupLimit, true, "Batch creation startup time %v exceed limit %v",
+			e2eutils.ExpectEqual(batchLag <= podBatchStartupLimit, true, "Batch creation startup time %v exceed limit %v",
 				batchLag, podBatchStartupLimit)
 		}
 	}

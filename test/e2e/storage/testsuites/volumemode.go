@@ -22,6 +22,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 
@@ -169,7 +171,7 @@ func (t *volumeModeTestSuite) DefineTests(driver storageframework.TestDriver, pa
 				testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
 				driverVolumeSizeRange := dInfo.SupportedSizeRange
 				claimSize, err := storageutils.GetSizeRangesIntersection(testVolumeSizeRange, driverVolumeSizeRange)
-				framework.ExpectNoError(err, "determine intersection of test size range %+v and driver size range %+v", testVolumeSizeRange, driverVolumeSizeRange)
+				e2eutils.ExpectNoError(err, "determine intersection of test size range %+v and driver size range %+v", testVolumeSizeRange, driverVolumeSizeRange)
 
 				l.Pvc = e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 					ClaimSize:        claimSize,
@@ -178,7 +180,7 @@ func (t *volumeModeTestSuite) DefineTests(driver storageframework.TestDriver, pa
 				}, l.ns.Name)
 			}
 		default:
-			framework.Failf("Volume mode test doesn't support: %s", pattern.VolType)
+			e2eutils.Failf("Volume mode test doesn't support: %s", pattern.VolType)
 		}
 	}
 
@@ -187,7 +189,7 @@ func (t *volumeModeTestSuite) DefineTests(driver storageframework.TestDriver, pa
 		errs = append(errs, l.CleanupResource())
 		errs = append(errs, storageutils.TryFunc(l.driverCleanup))
 		l.driverCleanup = nil
-		framework.ExpectNoError(errors.NewAggregate(errs), "while cleaning up resource")
+		e2eutils.ExpectNoError(errors.NewAggregate(errs), "while cleaning up resource")
 		l.migrationCheck.validateMigrationVolumeOpCounts()
 	}
 
@@ -204,18 +206,18 @@ func (t *volumeModeTestSuite) DefineTests(driver storageframework.TestDriver, pa
 
 				ginkgo.By("Creating sc")
 				l.Sc, err = l.cs.StorageV1().StorageClasses().Create(context.TODO(), l.Sc, metav1.CreateOptions{})
-				framework.ExpectNoError(err, "Failed to create sc")
+				e2eutils.ExpectNoError(err, "Failed to create sc")
 
 				ginkgo.By("Creating pv and pvc")
 				l.Pv, err = l.cs.CoreV1().PersistentVolumes().Create(context.TODO(), l.Pv, metav1.CreateOptions{})
-				framework.ExpectNoError(err, "Failed to create pv")
+				e2eutils.ExpectNoError(err, "Failed to create pv")
 
 				// Prebind pv
 				l.Pvc.Spec.VolumeName = l.Pv.Name
 				l.Pvc, err = l.cs.CoreV1().PersistentVolumeClaims(l.ns.Name).Create(context.TODO(), l.Pvc, metav1.CreateOptions{})
-				framework.ExpectNoError(err, "Failed to create pvc")
+				e2eutils.ExpectNoError(err, "Failed to create pvc")
 
-				framework.ExpectNoError(e2epv.WaitOnPVandPVC(l.cs, f.Timeouts, l.ns.Name, l.Pv, l.Pvc), "Failed to bind pv and pvc")
+				e2eutils.ExpectNoError(e2epv.WaitOnPVandPVC(l.cs, f.Timeouts, l.ns.Name, l.Pv, l.Pvc), "Failed to bind pv and pvc")
 
 				ginkgo.By("Creating pod")
 				podConfig := e2epod.Config{
@@ -226,12 +228,12 @@ func (t *volumeModeTestSuite) DefineTests(driver storageframework.TestDriver, pa
 					ImageID:       e2epod.GetDefaultTestImageID(),
 				}
 				pod, err := e2epod.MakeSecPod(&podConfig)
-				framework.ExpectNoError(err, "Failed to create pod")
+				e2eutils.ExpectNoError(err, "Failed to create pod")
 
 				pod, err = l.cs.CoreV1().Pods(l.ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
-				framework.ExpectNoError(err, "Failed to create pod")
+				e2eutils.ExpectNoError(err, "Failed to create pod")
 				defer func() {
-					framework.ExpectNoError(e2epod.DeletePodWithWait(l.cs, pod), "Failed to delete pod")
+					e2eutils.ExpectNoError(e2epod.DeletePodWithWait(l.cs, pod), "Failed to delete pod")
 				}()
 
 				eventSelector := fields.Set{
@@ -245,13 +247,13 @@ func (t *volumeModeTestSuite) DefineTests(driver storageframework.TestDriver, pa
 				err = e2eevents.WaitTimeoutForEvent(l.cs, l.ns.Name, eventSelector, msg, f.Timeouts.PodStart)
 				// Events are unreliable, don't depend on the event. It's used only to speed up the test.
 				if err != nil {
-					framework.Logf("Warning: did not get event about FailedMountVolume")
+					e2eutils.Logf("Warning: did not get event about FailedMountVolume")
 				}
 
 				// Check the pod is still not running
 				p, err := l.cs.CoreV1().Pods(l.ns.Name).Get(context.TODO(), pod.Name, metav1.GetOptions{})
-				framework.ExpectNoError(err, "could not re-read the pod after event (or timeout)")
-				framework.ExpectEqual(p.Status.Phase, v1.PodPending, "Pod phase isn't pending")
+				e2eutils.ExpectNoError(err, "could not re-read the pod after event (or timeout)")
+				e2eutils.ExpectEqual(p.Status.Phase, v1.PodPending, "Pod phase isn't pending")
 			})
 		}
 
@@ -265,11 +267,11 @@ func (t *volumeModeTestSuite) DefineTests(driver storageframework.TestDriver, pa
 
 				ginkgo.By("Creating sc")
 				l.Sc, err = l.cs.StorageV1().StorageClasses().Create(context.TODO(), l.Sc, metav1.CreateOptions{})
-				framework.ExpectNoError(err, "Failed to create sc")
+				e2eutils.ExpectNoError(err, "Failed to create sc")
 
 				ginkgo.By("Creating pv and pvc")
 				l.Pvc, err = l.cs.CoreV1().PersistentVolumeClaims(l.ns.Name).Create(context.TODO(), l.Pvc, metav1.CreateOptions{})
-				framework.ExpectNoError(err, "Failed to create pvc")
+				e2eutils.ExpectNoError(err, "Failed to create pvc")
 
 				eventSelector := fields.Set{
 					"involvedObject.kind":      "PersistentVolumeClaim",
@@ -283,17 +285,17 @@ func (t *volumeModeTestSuite) DefineTests(driver storageframework.TestDriver, pa
 				err = e2eevents.WaitTimeoutForEvent(l.cs, l.ns.Name, eventSelector, msg, f.Timeouts.ClaimProvision)
 				// Events are unreliable, don't depend on the event. It's used only to speed up the test.
 				if err != nil {
-					framework.Logf("Warning: did not get event about provisioing failed")
+					e2eutils.Logf("Warning: did not get event about provisioing failed")
 				}
 
 				// Check the pvc is still pending
 				pvc, err := l.cs.CoreV1().PersistentVolumeClaims(l.ns.Name).Get(context.TODO(), l.Pvc.Name, metav1.GetOptions{})
-				framework.ExpectNoError(err, "Failed to re-read the pvc after event (or timeout)")
-				framework.ExpectEqual(pvc.Status.Phase, v1.ClaimPending, "PVC phase isn't pending")
+				e2eutils.ExpectNoError(err, "Failed to re-read the pvc after event (or timeout)")
+				e2eutils.ExpectEqual(pvc.Status.Phase, v1.ClaimPending, "PVC phase isn't pending")
 			})
 		}
 	default:
-		framework.Failf("Volume mode test doesn't support volType: %v", pattern.VolType)
+		e2eutils.Failf("Volume mode test doesn't support volType: %v", pattern.VolType)
 	}
 
 	ginkgo.It("should fail to use a volume in a pod with mismatched mode [Slow]", func() {
@@ -312,16 +314,16 @@ func (t *volumeModeTestSuite) DefineTests(driver storageframework.TestDriver, pa
 			ImageID:      e2epod.GetDefaultTestImageID(),
 		}
 		pod, err := e2epod.MakeSecPod(&podConfig)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		// Change volumeMounts to volumeDevices and the other way around
 		pod = swapVolumeMode(pod)
 
 		// Run the pod
 		pod, err = l.cs.CoreV1().Pods(l.ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "Failed to create pod")
+		e2eutils.ExpectNoError(err, "Failed to create pod")
 		defer func() {
-			framework.ExpectNoError(e2epod.DeletePodWithWait(l.cs, pod), "Failed to delete pod")
+			e2eutils.ExpectNoError(e2epod.DeletePodWithWait(l.cs, pod), "Failed to delete pod")
 		}()
 
 		ginkgo.By("Waiting for the pod to fail")
@@ -342,13 +344,13 @@ func (t *volumeModeTestSuite) DefineTests(driver storageframework.TestDriver, pa
 		err = e2eevents.WaitTimeoutForEvent(l.cs, l.ns.Name, eventSelector, msg, f.Timeouts.PodStart)
 		// Events are unreliable, don't depend on them. They're used only to speed up the test.
 		if err != nil {
-			framework.Logf("Warning: did not get event about mismatched volume use")
+			e2eutils.Logf("Warning: did not get event about mismatched volume use")
 		}
 
 		// Check the pod is still not running
 		p, err := l.cs.CoreV1().Pods(l.ns.Name).Get(context.TODO(), pod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err, "could not re-read the pod after event (or timeout)")
-		framework.ExpectEqual(p.Status.Phase, v1.PodPending, "Pod phase isn't pending")
+		e2eutils.ExpectNoError(err, "could not re-read the pod after event (or timeout)")
+		e2eutils.ExpectEqual(p.Status.Phase, v1.PodPending, "Pod phase isn't pending")
 	})
 
 	ginkgo.It("should not mount / map unused volumes in a pod [LinuxOnly]", func() {
@@ -369,7 +371,7 @@ func (t *volumeModeTestSuite) DefineTests(driver storageframework.TestDriver, pa
 			ImageID:      e2epod.GetDefaultTestImageID(),
 		}
 		pod, err := e2epod.MakeSecPod(&podConfig)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		for i := range pod.Spec.Containers {
 			pod.Spec.Containers[i].VolumeDevices = nil
@@ -378,26 +380,26 @@ func (t *volumeModeTestSuite) DefineTests(driver storageframework.TestDriver, pa
 
 		// Run the pod
 		pod, err = l.cs.CoreV1().Pods(l.ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		defer func() {
-			framework.ExpectNoError(e2epod.DeletePodWithWait(l.cs, pod))
+			e2eutils.ExpectNoError(e2epod.DeletePodWithWait(l.cs, pod))
 		}()
 
 		err = e2epod.WaitForPodNameRunningInNamespace(l.cs, pod.Name, pod.Namespace)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		// Reload the pod to get its node
 		pod, err = l.cs.CoreV1().Pods(l.ns.Name).Get(context.TODO(), pod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
-		framework.ExpectNotEqual(pod.Spec.NodeName, "", "pod should be scheduled to a node")
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectNotEqual(pod.Spec.NodeName, "", "pod should be scheduled to a node")
 		node, err := l.cs.CoreV1().Nodes().Get(context.TODO(), pod.Spec.NodeName, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		ginkgo.By("Listing mounted volumes in the pod")
 		hostExec := storageutils.NewHostExec(f)
 		defer hostExec.Cleanup()
 		volumePaths, devicePaths, err := listPodVolumePluginDirectory(hostExec, pod, node)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		driverInfo := driver.GetDriverInfo()
 		volumePlugin := driverInfo.InTreePluginName

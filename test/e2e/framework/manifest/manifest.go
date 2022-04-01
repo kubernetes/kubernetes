@@ -23,14 +23,14 @@ import (
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes/scheme"
 	commonutils "k8s.io/kubernetes/test/e2e/common"
-	"k8s.io/kubernetes/test/e2e/framework"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
+	"k8s.io/kubernetes/test/e2e/framework/utils"
 )
 
 // PodFromManifest reads a .json/yaml file and returns the pod in it.
@@ -95,7 +95,7 @@ func StatefulSetFromManifest(fileName, ns string) (*appsv1.StatefulSet, error) {
 
 // DaemonSetFromURL reads from a url and returns the daemonset in it.
 func DaemonSetFromURL(url string) (*appsv1.DaemonSet, error) {
-	framework.Logf("Parsing ds from %v", url)
+	utils.Logf("Parsing ds from %v", url)
 
 	var response *http.Response
 	var err error

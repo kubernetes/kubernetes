@@ -18,10 +18,10 @@ package job
 
 import (
 	batchv1 "k8s.io/api/batch/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
-	"k8s.io/kubernetes/test/e2e/framework"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 )
 
 // NewTestJob returns a Job which does one of several testing behaviors. notTerminate starts a Job that will run
@@ -69,7 +69,7 @@ func NewTestJobOnNode(behavior, name string, rPol v1.RestartPolicy, parallelism,
 					Containers: []v1.Container{
 						{
 							Name:    "c",
-							Image:   framework.BusyBoxImage,
+							Image:   e2eutils.BusyBoxImage,
 							Command: []string{},
 							VolumeMounts: []v1.VolumeMount{
 								{
@@ -110,7 +110,7 @@ func NewTestJobOnNode(behavior, name string, rPol v1.RestartPolicy, parallelism,
 			// Tests involving r/w operations on hostPath volume needs to run in
 			// privileged mode for SELinux enabled distro, while Windows platform
 			// neither supports nor needs privileged mode.
-			privileged := !framework.NodeOSDistroIs("windows")
+			privileged := !e2eutils.NodeOSDistroIs("windows")
 			job.Spec.Template.Spec.Containers[0].SecurityContext.Privileged = &privileged
 		}
 		job.Spec.Template.Spec.Containers[0].Command = []string{"/bin/sh", "-c", "if [[ -r /data/foo ]] ; then exit 0 ; else touch /data/foo ; exit 1 ; fi"}

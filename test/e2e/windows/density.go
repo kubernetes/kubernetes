@@ -23,6 +23,8 @@ import (
 	"sync"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -116,7 +118,7 @@ func runDensityBatchTest(f *framework.Framework, testArg densityTest) (time.Dura
 	}, 10*time.Minute, 10*time.Second).Should(gomega.BeTrue())
 
 	if len(watchTimes) < testArg.podsNr {
-		framework.Failf("Timeout reached waiting for all Pods to be observed by the watch.")
+		e2eutils.Failf("Timeout reached waiting for all Pods to be observed by the watch.")
 	}
 
 	// Analyze results
@@ -129,7 +131,7 @@ func runDensityBatchTest(f *framework.Framework, testArg densityTest) (time.Dura
 
 	for name, create := range createTimes {
 		watch, ok := watchTimes[name]
-		framework.ExpectEqual(ok, true)
+		e2eutils.ExpectEqual(ok, true)
 
 		e2eLags = append(e2eLags,
 			e2emetrics.PodLatencyData{Name: name, Latency: watch.Time.Sub(create.Time)})
@@ -199,12 +201,12 @@ func newInformerWatchPod(f *framework.Framework, mutex *sync.Mutex, watchTimes m
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				p, ok := obj.(*v1.Pod)
-				framework.ExpectEqual(ok, true)
+				e2eutils.ExpectEqual(ok, true)
 				go checkPodRunning(p)
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
 				p, ok := newObj.(*v1.Pod)
-				framework.ExpectEqual(ok, true)
+				e2eutils.ExpectEqual(ok, true)
 				go checkPodRunning(p)
 			},
 		},
@@ -266,11 +268,11 @@ func deletePodsSync(f *framework.Framework, pods []*v1.Pod) {
 			defer wg.Done()
 
 			err := f.PodClient().Delete(context.TODO(), pod.ObjectMeta.Name, *metav1.NewDeleteOptions(30))
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 
 			err = e2epod.WaitForPodToDisappear(f.ClientSet, f.Namespace.Name, pod.ObjectMeta.Name, labels.Everything(),
 				30*time.Second, 10*time.Minute)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 		}(pod)
 	}
 	wg.Wait()

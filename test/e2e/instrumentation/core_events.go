@@ -21,6 +21,8 @@ import (
 	"encoding/json"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -66,14 +68,14 @@ var _ = common.SIGDescribe("Events", func() {
 				Namespace: f.Namespace.Name,
 			},
 		}, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create test event")
+		e2eutils.ExpectNoError(err, "failed to create test event")
 
 		ginkgo.By("listing all events in all namespaces")
 		// get a list of Events in all namespaces to ensure endpoint coverage
 		eventsList, err := f.ClientSet.CoreV1().Events("").List(context.TODO(), metav1.ListOptions{
 			LabelSelector: "testevent-constant=true",
 		})
-		framework.ExpectNoError(err, "failed list all events")
+		e2eutils.ExpectNoError(err, "failed list all events")
 
 		foundCreatedEvent := false
 		var eventCreatedName string
@@ -85,7 +87,7 @@ var _ = common.SIGDescribe("Events", func() {
 			}
 		}
 		if !foundCreatedEvent {
-			framework.Failf("unable to find test event %s in namespace %s, full list of events is %+v", eventTestName, f.Namespace.Name, eventsList.Items)
+			e2eutils.Failf("unable to find test event %s in namespace %s, full list of events is %+v", eventTestName, f.Namespace.Name, eventsList.Items)
 		}
 
 		ginkgo.By("patching the test event")
@@ -94,28 +96,28 @@ var _ = common.SIGDescribe("Events", func() {
 		eventPatch, err := json.Marshal(map[string]interface{}{
 			"message": eventPatchMessage,
 		})
-		framework.ExpectNoError(err, "failed to marshal the patch JSON payload")
+		e2eutils.ExpectNoError(err, "failed to marshal the patch JSON payload")
 
 		_, err = f.ClientSet.CoreV1().Events(f.Namespace.Name).Patch(context.TODO(), eventTestName, types.StrategicMergePatchType, []byte(eventPatch), metav1.PatchOptions{})
-		framework.ExpectNoError(err, "failed to patch the test event")
+		e2eutils.ExpectNoError(err, "failed to patch the test event")
 
 		ginkgo.By("fetching the test event")
 		// get event by name
 		event, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).Get(context.TODO(), eventCreatedName, metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to fetch the test event")
-		framework.ExpectEqual(event.Message, eventPatchMessage, "test event message does not match patch message")
+		e2eutils.ExpectNoError(err, "failed to fetch the test event")
+		e2eutils.ExpectEqual(event.Message, eventPatchMessage, "test event message does not match patch message")
 
 		ginkgo.By("deleting the test event")
 		// delete original event
 		err = f.ClientSet.CoreV1().Events(f.Namespace.Name).Delete(context.TODO(), eventCreatedName, metav1.DeleteOptions{})
-		framework.ExpectNoError(err, "failed to delete the test event")
+		e2eutils.ExpectNoError(err, "failed to delete the test event")
 
 		ginkgo.By("listing all events in all namespaces")
 		// get a list of Events list namespace
 		eventsList, err = f.ClientSet.CoreV1().Events("").List(context.TODO(), metav1.ListOptions{
 			LabelSelector: "testevent-constant=true",
 		})
-		framework.ExpectNoError(err, "fail to list all events")
+		e2eutils.ExpectNoError(err, "fail to list all events")
 		foundCreatedEvent = false
 		for _, val := range eventsList.Items {
 			if val.ObjectMeta.Name == eventTestName && val.ObjectMeta.Namespace == f.Namespace.Name {
@@ -124,7 +126,7 @@ var _ = common.SIGDescribe("Events", func() {
 			}
 		}
 		if foundCreatedEvent {
-			framework.Failf("Should not have found test event %s in namespace %s, full list of events %+v", eventTestName, f.Namespace.Name, eventsList.Items)
+			e2eutils.Failf("Should not have found test event %s in namespace %s, full list of events %+v", eventTestName, f.Namespace.Name, eventsList.Items)
 		}
 	})
 
@@ -155,8 +157,8 @@ var _ = common.SIGDescribe("Events", func() {
 					Namespace: f.Namespace.Name,
 				},
 			}, metav1.CreateOptions{})
-			framework.ExpectNoError(err, "failed to create event")
-			framework.Logf("created %v", eventTestName)
+			e2eutils.ExpectNoError(err, "failed to create event")
+			e2eutils.Logf("created %v", eventTestName)
 		}
 
 		ginkgo.By("get a list of Events with a label in the current namespace")
@@ -164,22 +166,22 @@ var _ = common.SIGDescribe("Events", func() {
 		eventList, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{
 			LabelSelector: "testevent-set=true",
 		})
-		framework.ExpectNoError(err, "failed to get a list of events")
+		e2eutils.ExpectNoError(err, "failed to get a list of events")
 
-		framework.ExpectEqual(len(eventList.Items), len(eventTestNames), "looking for expected number of pod templates events")
+		e2eutils.ExpectEqual(len(eventList.Items), len(eventTestNames), "looking for expected number of pod templates events")
 
 		ginkgo.By("delete collection of events")
 		// delete collection
 
-		framework.Logf("requesting DeleteCollection of events")
+		e2eutils.Logf("requesting DeleteCollection of events")
 		err = f.ClientSet.CoreV1().Events(f.Namespace.Name).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{
 			LabelSelector: "testevent-set=true"})
-		framework.ExpectNoError(err, "failed to delete the test event")
+		e2eutils.ExpectNoError(err, "failed to delete the test event")
 
 		ginkgo.By("check that the list of events matches the requested quantity")
 
 		err = wait.PollImmediate(eventRetryPeriod, eventRetryTimeout, checkEventListQuantity(f, "testevent-set=true", 0))
-		framework.ExpectNoError(err, "failed to count required events")
+		e2eutils.ExpectNoError(err, "failed to count required events")
 	})
 
 })
@@ -188,7 +190,7 @@ func checkEventListQuantity(f *framework.Framework, label string, quantity int) 
 	return func() (bool, error) {
 		var err error
 
-		framework.Logf("requesting list of events to confirm quantity")
+		e2eutils.Logf("requesting list of events to confirm quantity")
 
 		eventList, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{
 			LabelSelector: label})

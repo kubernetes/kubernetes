@@ -25,10 +25,11 @@ import (
 	"path/filepath"
 	"strings"
 
+	v1 "k8s.io/api/core/v1"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
-	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 // LocalVolumeType represents type of local volume, e.g. tmpfs, directory,
@@ -102,7 +103,7 @@ func (l *ltrMgr) setupLocalVolumeTmpfs(node *v1.Node, parameters map[string]stri
 	hostDir := l.getTestDir()
 	ginkgo.By(fmt.Sprintf("Creating tmpfs mount point on node %q at path %q", node.Name, hostDir))
 	err := l.hostExec.IssueCommand(fmt.Sprintf("mkdir -p %q && mount -t tmpfs -o size=10m tmpfs-%q %q", hostDir, hostDir, hostDir), node)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	return &LocalTestResource{
 		Node: node,
 		Path: hostDir,
@@ -112,11 +113,11 @@ func (l *ltrMgr) setupLocalVolumeTmpfs(node *v1.Node, parameters map[string]stri
 func (l *ltrMgr) cleanupLocalVolumeTmpfs(ltr *LocalTestResource) {
 	ginkgo.By(fmt.Sprintf("Unmount tmpfs mount point on node %q at path %q", ltr.Node.Name, ltr.Path))
 	err := l.hostExec.IssueCommand(fmt.Sprintf("umount %q", ltr.Path), ltr.Node)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	ginkgo.By("Removing the test directory")
 	err = l.hostExec.IssueCommand(fmt.Sprintf("rm -r %s", ltr.Path), ltr.Node)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 }
 
 // createAndSetupLoopDevice creates an empty file and associates a loop devie with it.
@@ -131,14 +132,14 @@ func (l *ltrMgr) createAndSetupLoopDevice(dir string, node *v1.Node, size int) {
 	ddCmd := fmt.Sprintf("dd if=/dev/zero of=%s/file bs=4096 count=%d", dir, count)
 	losetupCmd := fmt.Sprintf("losetup -f %s/file", dir)
 	err := l.hostExec.IssueCommand(fmt.Sprintf("%s && %s && %s", mkdirCmd, ddCmd, losetupCmd), node)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 }
 
 // findLoopDevice finds loop device path by its associated storage directory.
 func (l *ltrMgr) findLoopDevice(dir string, node *v1.Node) string {
 	cmd := fmt.Sprintf("E2E_LOOP_DEV=$(losetup | grep %s/file | awk '{ print $1 }') 2>&1 > /dev/null && echo ${E2E_LOOP_DEV}", dir)
 	loopDevResult, err := l.hostExec.IssueCommandWithResult(cmd, node)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	return strings.TrimSpace(loopDevResult)
 }
 
@@ -159,7 +160,7 @@ func (l *ltrMgr) teardownLoopDevice(dir string, node *v1.Node) {
 	ginkgo.By(fmt.Sprintf("Tear down block device %q on node %q at path %s/file", loopDev, node.Name, dir))
 	losetupDeleteCmd := fmt.Sprintf("losetup -d %s", loopDev)
 	err := l.hostExec.IssueCommand(losetupDeleteCmd, node)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	return
 }
 
@@ -168,7 +169,7 @@ func (l *ltrMgr) cleanupLocalVolumeBlock(ltr *LocalTestResource) {
 	ginkgo.By(fmt.Sprintf("Removing the test directory %s", ltr.loopDir))
 	removeCmd := fmt.Sprintf("rm -r %s", ltr.loopDir)
 	err := l.hostExec.IssueCommand(removeCmd, ltr.Node)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 }
 
 func (l *ltrMgr) setupLocalVolumeBlockFS(node *v1.Node, parameters map[string]string) *LocalTestResource {
@@ -178,7 +179,7 @@ func (l *ltrMgr) setupLocalVolumeBlockFS(node *v1.Node, parameters map[string]st
 	// Format and mount at loopDir and give others rwx for read/write testing
 	cmd := fmt.Sprintf("mkfs -t ext4 %s && mount -t ext4 %s %s && chmod o+rwx %s", loopDev, loopDev, loopDir, loopDir)
 	err := l.hostExec.IssueCommand(cmd, node)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	return &LocalTestResource{
 		Node:    node,
 		Path:    loopDir,
@@ -189,7 +190,7 @@ func (l *ltrMgr) setupLocalVolumeBlockFS(node *v1.Node, parameters map[string]st
 func (l *ltrMgr) cleanupLocalVolumeBlockFS(ltr *LocalTestResource) {
 	umountCmd := fmt.Sprintf("umount %s", ltr.Path)
 	err := l.hostExec.IssueCommand(umountCmd, ltr.Node)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	l.cleanupLocalVolumeBlock(ltr)
 }
 
@@ -197,7 +198,7 @@ func (l *ltrMgr) setupLocalVolumeDirectory(node *v1.Node, parameters map[string]
 	hostDir := l.getTestDir()
 	mkdirCmd := fmt.Sprintf("mkdir -p %s", hostDir)
 	err := l.hostExec.IssueCommand(mkdirCmd, node)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	return &LocalTestResource{
 		Node: node,
 		Path: hostDir,
@@ -208,7 +209,7 @@ func (l *ltrMgr) cleanupLocalVolumeDirectory(ltr *LocalTestResource) {
 	ginkgo.By("Removing the test directory")
 	removeCmd := fmt.Sprintf("rm -r %s", ltr.Path)
 	err := l.hostExec.IssueCommand(removeCmd, ltr.Node)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 }
 
 func (l *ltrMgr) setupLocalVolumeDirectoryLink(node *v1.Node, parameters map[string]string) *LocalTestResource {
@@ -216,7 +217,7 @@ func (l *ltrMgr) setupLocalVolumeDirectoryLink(node *v1.Node, parameters map[str
 	hostDirBackend := hostDir + "-backend"
 	cmd := fmt.Sprintf("mkdir %s && ln -s %s %s", hostDirBackend, hostDirBackend, hostDir)
 	err := l.hostExec.IssueCommand(cmd, node)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	return &LocalTestResource{
 		Node: node,
 		Path: hostDir,
@@ -229,14 +230,14 @@ func (l *ltrMgr) cleanupLocalVolumeDirectoryLink(ltr *LocalTestResource) {
 	hostDirBackend := hostDir + "-backend"
 	removeCmd := fmt.Sprintf("rm -r %s && rm -r %s", hostDir, hostDirBackend)
 	err := l.hostExec.IssueCommand(removeCmd, ltr.Node)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 }
 
 func (l *ltrMgr) setupLocalVolumeDirectoryBindMounted(node *v1.Node, parameters map[string]string) *LocalTestResource {
 	hostDir := l.getTestDir()
 	cmd := fmt.Sprintf("mkdir %s && mount --bind %s %s", hostDir, hostDir, hostDir)
 	err := l.hostExec.IssueCommand(cmd, node)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	return &LocalTestResource{
 		Node: node,
 		Path: hostDir,
@@ -248,7 +249,7 @@ func (l *ltrMgr) cleanupLocalVolumeDirectoryBindMounted(ltr *LocalTestResource) 
 	hostDir := ltr.Path
 	removeCmd := fmt.Sprintf("umount %s && rm -r %s", hostDir, hostDir)
 	err := l.hostExec.IssueCommand(removeCmd, ltr.Node)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 }
 
 func (l *ltrMgr) setupLocalVolumeDirectoryLinkBindMounted(node *v1.Node, parameters map[string]string) *LocalTestResource {
@@ -256,7 +257,7 @@ func (l *ltrMgr) setupLocalVolumeDirectoryLinkBindMounted(node *v1.Node, paramet
 	hostDirBackend := hostDir + "-backend"
 	cmd := fmt.Sprintf("mkdir %s && mount --bind %s %s && ln -s %s %s", hostDirBackend, hostDirBackend, hostDirBackend, hostDirBackend, hostDir)
 	err := l.hostExec.IssueCommand(cmd, node)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	return &LocalTestResource{
 		Node: node,
 		Path: hostDir,
@@ -269,12 +270,12 @@ func (l *ltrMgr) cleanupLocalVolumeDirectoryLinkBindMounted(ltr *LocalTestResour
 	hostDirBackend := hostDir + "-backend"
 	removeCmd := fmt.Sprintf("rm %s && umount %s && rm -r %s", hostDir, hostDirBackend, hostDirBackend)
 	err := l.hostExec.IssueCommand(removeCmd, ltr.Node)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 }
 
 func (l *ltrMgr) setupLocalVolumeGCELocalSSD(node *v1.Node, parameters map[string]string) *LocalTestResource {
 	res, err := l.hostExec.IssueCommandWithResult("ls /mnt/disks/by-uuid/google-local-ssds-scsi-fs/", node)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	dirName := strings.Fields(res)[0]
 	hostDir := "/mnt/disks/by-uuid/google-local-ssds-scsi-fs/" + dirName
 	return &LocalTestResource{
@@ -287,7 +288,7 @@ func (l *ltrMgr) cleanupLocalVolumeGCELocalSSD(ltr *LocalTestResource) {
 	// This filesystem is attached in cluster initialization, we clean all files to make it reusable.
 	removeCmd := fmt.Sprintf("find '%s' -mindepth 1 -maxdepth 1 -print0 | xargs -r -0 rm -rf", ltr.Path)
 	err := l.hostExec.IssueCommand(removeCmd, ltr.Node)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 }
 
 func (l *ltrMgr) expandLocalVolumeBlockFS(ltr *LocalTestResource, mbToAdd int) error {
@@ -325,11 +326,11 @@ func (l *ltrMgr) Create(node *v1.Node, volumeType LocalVolumeType, parameters ma
 	case LocalVolumeGCELocalSSD:
 		ltr = l.setupLocalVolumeGCELocalSSD(node, parameters)
 	default:
-		framework.Failf("Failed to create local test resource on node %q, unsupported volume type: %v is specified", node.Name, volumeType)
+		e2eutils.Failf("Failed to create local test resource on node %q, unsupported volume type: %v is specified", node.Name, volumeType)
 		return nil
 	}
 	if ltr == nil {
-		framework.Failf("Failed to create local test resource on node %q, volume type: %v, parameters: %v", node.Name, volumeType, parameters)
+		e2eutils.Failf("Failed to create local test resource on node %q, volume type: %v, parameters: %v", node.Name, volumeType, parameters)
 	}
 	ltr.VolumeType = volumeType
 	return ltr
@@ -354,7 +355,7 @@ func (l *ltrMgr) Remove(ltr *LocalTestResource) {
 	case LocalVolumeGCELocalSSD:
 		l.cleanupLocalVolumeGCELocalSSD(ltr)
 	default:
-		framework.Failf("Failed to remove local test resource, unsupported volume type: %v is specified", ltr.VolumeType)
+		e2eutils.Failf("Failed to remove local test resource, unsupported volume type: %v is specified", ltr.VolumeType)
 	}
 	return
 }

@@ -24,7 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2eframework "k8s.io/kubernetes/test/e2e/framework"
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 )
 
@@ -54,7 +54,7 @@ func PatchCSIDeployment(f *framework.Framework, o PatchCSIOptions, object interf
 		o.OldDriverName != o.NewDriverName
 
 	substKubeletRootDir := func(s string) string {
-		return strings.ReplaceAll(s, "/var/lib/kubelet/", e2eframework.TestContext.KubeletRootDir+"/")
+		return strings.ReplaceAll(s, "/var/lib/kubelet/", e2econfig.TestContext.KubeletRootDir+"/")
 	}
 
 	patchVolumes := func(volumes []v1.Volume) {

@@ -18,10 +18,12 @@ package apps
 
 import (
 	"context"
+
 	"github.com/onsi/ginkgo"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 
 	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/version"
 
@@ -86,12 +88,12 @@ func (t *StatefulSetUpgradeTest) Setup(f *framework.Framework) {
 
 	ginkgo.By("Creating service " + headlessSvcName + " in namespace " + ns)
 	_, err := f.ClientSet.CoreV1().Services(ns).Create(context.TODO(), t.service, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
 	*(t.set.Spec.Replicas) = 3
 	_, err = f.ClientSet.AppsV1().StatefulSets(ns).Create(context.TODO(), t.set, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	ginkgo.By("Saturating stateful set " + t.set.Name)
 	e2estatefulset.Saturate(f.ClientSet, t.set)
@@ -113,17 +115,17 @@ func (t *StatefulSetUpgradeTest) Teardown(f *framework.Framework) {
 
 func (t *StatefulSetUpgradeTest) verify(f *framework.Framework) {
 	ginkgo.By("Verifying statefulset mounted data directory is usable")
-	framework.ExpectNoError(e2estatefulset.CheckMount(f.ClientSet, t.set, "/data"))
+	e2eutils.ExpectNoError(e2estatefulset.CheckMount(f.ClientSet, t.set, "/data"))
 
 	ginkgo.By("Verifying statefulset provides a stable hostname for each pod")
-	framework.ExpectNoError(e2estatefulset.CheckHostname(f.ClientSet, t.set))
+	e2eutils.ExpectNoError(e2estatefulset.CheckHostname(f.ClientSet, t.set))
 
 	ginkgo.By("Verifying statefulset set proper service name")
-	framework.ExpectNoError(e2estatefulset.CheckServiceName(t.set, t.set.Spec.ServiceName))
+	e2eutils.ExpectNoError(e2estatefulset.CheckServiceName(t.set, t.set.Spec.ServiceName))
 
 	cmd := "echo $(hostname) > /data/hostname; sync;"
 	ginkgo.By("Running " + cmd + " in all stateful pods")
-	framework.ExpectNoError(e2estatefulset.ExecInStatefulPods(f.ClientSet, t.set, cmd))
+	e2eutils.ExpectNoError(e2estatefulset.ExecInStatefulPods(f.ClientSet, t.set, cmd))
 }
 
 func (t *StatefulSetUpgradeTest) restart(f *framework.Framework) {

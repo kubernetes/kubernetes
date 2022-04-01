@@ -19,6 +19,7 @@ package node
 import (
 	"k8s.io/kubernetes/test/e2e/cloud/gcp/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 	"k8s.io/kubernetes/test/e2e/upgrades"
 	"k8s.io/kubernetes/test/e2e/upgrades/node"
 	"k8s.io/kubernetes/test/utils/junit"
@@ -37,7 +38,7 @@ var _ = SIGDescribe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 	ginkgo.Describe("master upgrade", func() {
 		ginkgo.It("should NOT disrupt gpu pod [Feature:GPUMasterUpgrade]", func() {
 			upgCtx, err := common.GetUpgradeContext(f.ClientSet.Discovery())
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "GPU master upgrade"}
 			gpuUpgradeTest := &junit.TestCase{Name: "[sig-node] gpu-master-upgrade", Classname: "upgrade_tests"}
@@ -50,7 +51,7 @@ var _ = SIGDescribe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 	ginkgo.Describe("cluster upgrade", func() {
 		ginkgo.It("should be able to run gpu pod after upgrade [Feature:GPUClusterUpgrade]", func() {
 			upgCtx, err := common.GetUpgradeContext(f.ClientSet.Discovery())
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "GPU cluster upgrade"}
 			gpuUpgradeTest := &junit.TestCase{Name: "[sig-node] gpu-cluster-upgrade", Classname: "upgrade_tests"}
@@ -63,7 +64,7 @@ var _ = SIGDescribe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 	ginkgo.Describe("cluster downgrade", func() {
 		ginkgo.It("should be able to run gpu pod after downgrade [Feature:GPUClusterDowngrade]", func() {
 			upgCtx, err := common.GetUpgradeContext(f.ClientSet.Discovery())
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "GPU cluster downgrade"}
 			gpuDowngradeTest := &junit.TestCase{Name: "[sig-node] gpu-cluster-downgrade", Classname: "upgrade_tests"}

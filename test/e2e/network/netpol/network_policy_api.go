@@ -20,6 +20,8 @@ import (
 	"context"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -72,7 +74,7 @@ var _ = common.SIGDescribe("Netpol API", func() {
 		ginkgo.By("getting /apis")
 		{
 			discoveryGroups, err := f.ClientSet.Discovery().ServerGroups()
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			found := false
 			for _, group := range discoveryGroups.Groups {
 				if group.Name == networkingv1.GroupName {
@@ -85,14 +87,14 @@ var _ = common.SIGDescribe("Netpol API", func() {
 				}
 			}
 			if !found {
-				framework.Failf("expected networking API group/version, got %#v", discoveryGroups.Groups)
+				e2eutils.Failf("expected networking API group/version, got %#v", discoveryGroups.Groups)
 			}
 		}
 		ginkgo.By("getting /apis/networking.k8s.io")
 		{
 			group := &metav1.APIGroup{}
 			err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis/networking.k8s.io").Do(context.TODO()).Into(group)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			found := false
 			for _, version := range group.Versions {
 				if version.Version == npVersion {
@@ -101,13 +103,13 @@ var _ = common.SIGDescribe("Netpol API", func() {
 				}
 			}
 			if !found {
-				framework.Failf("expected networking API version, got %#v", group.Versions)
+				e2eutils.Failf("expected networking API version, got %#v", group.Versions)
 			}
 		}
 		ginkgo.By("getting /apis/networking.k8s.io" + npVersion)
 		{
 			resources, err := f.ClientSet.Discovery().ServerResourcesForGroupVersion(networkingv1.SchemeGroupVersion.String())
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			foundNetPol := false
 			for _, resource := range resources.APIResources {
 				switch resource.Name {
@@ -116,97 +118,97 @@ var _ = common.SIGDescribe("Netpol API", func() {
 				}
 			}
 			if !foundNetPol {
-				framework.Failf("expected networkpolicies, got %#v", resources.APIResources)
+				e2eutils.Failf("expected networkpolicies, got %#v", resources.APIResources)
 			}
 		}
 		// NetPol resource create/read/update/watch verbs
 		ginkgo.By("creating")
 		_, err := npClient.Create(context.TODO(), npTemplate, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		_, err = npClient.Create(context.TODO(), npTemplate, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		createdNetPol, err := npClient.Create(context.TODO(), npTemplate, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		ginkgo.By("getting")
 		gottenNetPol, err := npClient.Get(context.TODO(), createdNetPol.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(gottenNetPol.UID, createdNetPol.UID)
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectEqual(gottenNetPol.UID, createdNetPol.UID)
 
 		ginkgo.By("listing")
 		nps, err := npClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(nps.Items), 3, "filtered list should have 3 items")
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectEqual(len(nps.Items), 3, "filtered list should have 3 items")
 
 		ginkgo.By("watching")
-		framework.Logf("starting watch")
+		e2eutils.Logf("starting watch")
 		npWatch, err := npClient.Watch(context.TODO(), metav1.ListOptions{ResourceVersion: nps.ResourceVersion, LabelSelector: "special-label=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		// Test cluster-wide list and watch
 		clusterNPClient := f.ClientSet.NetworkingV1().NetworkPolicies("")
 		ginkgo.By("cluster-wide listing")
 		clusterNPs, err := clusterNPClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(clusterNPs.Items), 3, "filtered list should have 3 items")
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectEqual(len(clusterNPs.Items), 3, "filtered list should have 3 items")
 
 		ginkgo.By("cluster-wide watching")
-		framework.Logf("starting watch")
+		e2eutils.Logf("starting watch")
 		_, err = clusterNPClient.Watch(context.TODO(), metav1.ListOptions{ResourceVersion: nps.ResourceVersion, LabelSelector: "special-label=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		ginkgo.By("patching")
 		patchedNetPols, err := npClient.Patch(context.TODO(), createdNetPol.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"patched":"true"}}}`), metav1.PatchOptions{})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(patchedNetPols.Annotations["patched"], "true", "patched object should have the applied annotation")
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectEqual(patchedNetPols.Annotations["patched"], "true", "patched object should have the applied annotation")
 
 		ginkgo.By("updating")
 		npToUpdate := patchedNetPols.DeepCopy()
 		npToUpdate.Annotations["updated"] = "true"
 		updatedNetPols, err := npClient.Update(context.TODO(), npToUpdate, metav1.UpdateOptions{})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(updatedNetPols.Annotations["updated"], "true", "updated object should have the applied annotation")
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectEqual(updatedNetPols.Annotations["updated"], "true", "updated object should have the applied annotation")
 
-		framework.Logf("waiting for watch events with expected annotations")
+		e2eutils.Logf("waiting for watch events with expected annotations")
 		for sawAnnotations := false; !sawAnnotations; {
 			select {
 			case evt, ok := <-npWatch.ResultChan():
 				if !ok {
-					framework.Fail("watch channel should not close")
+					e2eutils.Fail("watch channel should not close")
 				}
-				framework.ExpectEqual(evt.Type, watch.Modified)
+				e2eutils.ExpectEqual(evt.Type, watch.Modified)
 				watchedNetPol, isNetPol := evt.Object.(*networkingv1.NetworkPolicy)
 				if !isNetPol {
-					framework.Failf("expected NetworkPolicy, got %T", evt.Object)
+					e2eutils.Failf("expected NetworkPolicy, got %T", evt.Object)
 				}
 				if watchedNetPol.Annotations["patched"] == "true" && watchedNetPol.Annotations["updated"] == "true" {
-					framework.Logf("saw patched and updated annotations")
+					e2eutils.Logf("saw patched and updated annotations")
 					sawAnnotations = true
 					npWatch.Stop()
 				} else {
-					framework.Logf("missing expected annotations, waiting: %#v", watchedNetPol.Annotations)
+					e2eutils.Logf("missing expected annotations, waiting: %#v", watchedNetPol.Annotations)
 				}
 			case <-time.After(wait.ForeverTestTimeout):
-				framework.Fail("timed out waiting for watch event")
+				e2eutils.Fail("timed out waiting for watch event")
 			}
 		}
 		// NetPol resource delete operations
 		ginkgo.By("deleting")
 		err = npClient.Delete(context.TODO(), createdNetPol.Name, metav1.DeleteOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		_, err = npClient.Get(context.TODO(), createdNetPol.Name, metav1.GetOptions{})
 		if !apierrors.IsNotFound(err) {
-			framework.Failf("expected 404, got %#v", err)
+			e2eutils.Failf("expected 404, got %#v", err)
 		}
 		nps, err = npClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(nps.Items), 2, "filtered list should have 2 items")
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectEqual(len(nps.Items), 2, "filtered list should have 2 items")
 
 		ginkgo.By("deleting a collection")
 		err = npClient.DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		nps, err = npClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(nps.Items), 0, "filtered list should have 0 items")
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectEqual(len(nps.Items), 0, "filtered list should have 0 items")
 	})
 
 	/*
@@ -230,14 +232,14 @@ var _ = common.SIGDescribe("Netpol API", func() {
 			SetSpecPodSelectorMatchLabels(map[string]string{"pod-name": "test-pod"}),
 			SetSpecEgressRules(egressRule))
 		_, err := npClient.Create(context.TODO(), npTemplate, metav1.CreateOptions{})
-		framework.ExpectError(err, "request template:%v", npTemplate)
+		e2eutils.ExpectError(err, "request template:%v", npTemplate)
 
 		ginkgo.By("EndPort field cannot be defined if the Port field is defined as a named (string) port.")
 		egressRule = networkingv1.NetworkPolicyEgressRule{}
 		egressRule.Ports = append(egressRule.Ports, networkingv1.NetworkPolicyPort{Port: &intstr.IntOrString{Type: intstr.String, StrVal: "serve-80"}, EndPort: &endport})
 		npTemplate.Spec.Egress = []networkingv1.NetworkPolicyEgressRule{egressRule}
 		_, err = npClient.Create(context.TODO(), npTemplate, metav1.CreateOptions{})
-		framework.ExpectError(err, "request template:%v", npTemplate)
+		e2eutils.ExpectError(err, "request template:%v", npTemplate)
 
 		ginkgo.By("EndPort field must be equal or greater than port.")
 		ginkgo.By("When EndPort field is smaller than port, it will failed")
@@ -245,27 +247,27 @@ var _ = common.SIGDescribe("Netpol API", func() {
 		egressRule.Ports = append(egressRule.Ports, networkingv1.NetworkPolicyPort{Port: &intstr.IntOrString{Type: intstr.Int, IntVal: 30000}, EndPort: &endport})
 		npTemplate.Spec.Egress = []networkingv1.NetworkPolicyEgressRule{egressRule}
 		_, err = npClient.Create(context.TODO(), npTemplate, metav1.CreateOptions{})
-		framework.ExpectError(err, "request template:%v", npTemplate)
+		e2eutils.ExpectError(err, "request template:%v", npTemplate)
 
 		ginkgo.By("EndPort field is equal with port.")
 		egressRule.Ports[0].Port = &intstr.IntOrString{Type: intstr.Int, IntVal: 20000}
 		npTemplate.Spec.Egress = []networkingv1.NetworkPolicyEgressRule{egressRule}
 		_, err = npClient.Create(context.TODO(), npTemplate, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "request template:%v", npTemplate)
+		e2eutils.ExpectNoError(err, "request template:%v", npTemplate)
 
 		ginkgo.By("EndPort field is greater than port.")
 		egressRule = networkingv1.NetworkPolicyEgressRule{}
 		egressRule.Ports = append(egressRule.Ports, networkingv1.NetworkPolicyPort{Port: &intstr.IntOrString{Type: intstr.Int, IntVal: 10000}, EndPort: &endport})
 		npTemplate.Spec.Egress = []networkingv1.NetworkPolicyEgressRule{egressRule}
 		_, err = npClient.Create(context.TODO(), npTemplate, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "request template:%v", npTemplate)
+		e2eutils.ExpectNoError(err, "request template:%v", npTemplate)
 
 		ginkgo.By("deleting all test collection")
 		err = npClient.DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		nps, err := npClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(nps.Items), 0, "filtered list should be 0 items")
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectEqual(len(nps.Items), 0, "filtered list should be 0 items")
 	})
 
 	/*

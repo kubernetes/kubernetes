@@ -28,8 +28,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/config"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	"k8s.io/kubernetes/test/e2e/framework/utils"
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
@@ -87,7 +88,7 @@ func UpdateService(c clientset.Interface, namespace, serviceName string, update 
 
 // CleanupServiceResources cleans up service Type=LoadBalancer resources.
 func CleanupServiceResources(c clientset.Interface, loadBalancerName, region, zone string) {
-	framework.TestContext.CloudConfig.Provider.CleanupServiceResources(c, loadBalancerName, region, zone)
+	config.TestContext.CloudConfig.Provider.CleanupServiceResources(c, loadBalancerName, region, zone)
 }
 
 // GetIngressPoint returns a host on which ingress serves.
@@ -102,7 +103,7 @@ func GetIngressPoint(ing *v1.LoadBalancerIngress) string {
 // GetServiceLoadBalancerCreationTimeout returns a timeout value for creating a load balancer of a service.
 func GetServiceLoadBalancerCreationTimeout(cs clientset.Interface) time.Duration {
 	nodes, err := e2enode.GetReadySchedulableNodes(cs)
-	framework.ExpectNoError(err)
+	utils.ExpectNoError(err)
 	if len(nodes.Items) > LargeClusterMinNodesNumber {
 		return loadBalancerCreateTimeoutLarge
 	}
@@ -112,7 +113,7 @@ func GetServiceLoadBalancerCreationTimeout(cs clientset.Interface) time.Duration
 // GetServiceLoadBalancerPropagationTimeout returns a timeout value for propagating a load balancer of a service.
 func GetServiceLoadBalancerPropagationTimeout(cs clientset.Interface) time.Duration {
 	nodes, err := e2enode.GetReadySchedulableNodes(cs)
-	framework.ExpectNoError(err)
+	utils.ExpectNoError(err)
 	if len(nodes.Items) > LargeClusterMinNodesNumber {
 		return loadBalancerPropagationTimeoutLarge
 	}
@@ -151,7 +152,7 @@ func CreateServiceForSimpleApp(c clientset.Interface, contPort, svcPort int, nam
 			TargetPort: intstr.FromInt(contPort),
 		}}
 	}
-	framework.Logf("Creating a service-for-%v for selecting app=%v-pod", appName, appName)
+	utils.Logf("Creating a service-for-%v for selecting app=%v-pod", appName, appName)
 	service, err := c.CoreV1().Services(namespace).Create(context.TODO(), &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "service-for-" + appName,
@@ -164,6 +165,6 @@ func CreateServiceForSimpleApp(c clientset.Interface, contPort, svcPort int, nam
 			Selector: serviceSelector,
 		},
 	}, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	utils.ExpectNoError(err)
 	return service
 }

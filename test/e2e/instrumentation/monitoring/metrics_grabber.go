@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	clientset "k8s.io/client-go/kubernetes"
@@ -55,7 +57,7 @@ var _ = instrumentation.SIGDescribe("MetricsGrabber", func() {
 		if errors.Is(err, e2emetrics.MetricsGrabbingDisabledError) {
 			e2eskipper.Skipf("%v", err)
 		}
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		gomega.Expect(response).NotTo(gomega.BeEmpty())
 	})
 
@@ -65,9 +67,9 @@ var _ = instrumentation.SIGDescribe("MetricsGrabber", func() {
 		if errors.Is(err, e2emetrics.MetricsGrabbingDisabledError) {
 			e2eskipper.Skipf("%v", err)
 		}
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		response, err := grabber.GrabFromKubelet(node.Name)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		gomega.Expect(response).NotTo(gomega.BeEmpty())
 	})
 
@@ -77,7 +79,7 @@ var _ = instrumentation.SIGDescribe("MetricsGrabber", func() {
 		if errors.Is(err, e2emetrics.MetricsGrabbingDisabledError) {
 			e2eskipper.Skipf("%v", err)
 		}
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		gomega.Expect(response).NotTo(gomega.BeEmpty())
 	})
 
@@ -87,7 +89,7 @@ var _ = instrumentation.SIGDescribe("MetricsGrabber", func() {
 		if errors.Is(err, e2emetrics.MetricsGrabbingDisabledError) {
 			e2eskipper.Skipf("%v", err)
 		}
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		gomega.Expect(response).NotTo(gomega.BeEmpty())
 	})
 })

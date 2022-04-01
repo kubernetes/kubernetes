@@ -19,6 +19,7 @@ package node
 import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ejob "k8s.io/kubernetes/test/e2e/framework/job"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 	"k8s.io/kubernetes/test/e2e/scheduling"
 	"k8s.io/kubernetes/test/e2e/upgrades"
 
@@ -53,8 +54,8 @@ func (t *NvidiaGPUUpgradeTest) Test(f *framework.Framework, done <-chan struct{}
 	if upgrade == upgrades.MasterUpgrade || upgrade == upgrades.ClusterUpgrade {
 		// MasterUpgrade should be totally hitless.
 		job, err := e2ejob.GetJob(f.ClientSet, f.Namespace.Name, "cuda-add")
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(job.Status.Failed, 0, "Job pods failed during master upgrade: %v", job.Status.Failed)
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectEqual(job.Status.Failed, 0, "Job pods failed during master upgrade: %v", job.Status.Failed)
 	}
 }
 

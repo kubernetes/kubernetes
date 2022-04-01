@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -53,7 +55,7 @@ var _ = SIGDescribe("PodSecurityPolicy [Feature:PodSecurityPolicy]", func() {
 	var ns string // Test namespace, for convenience
 	ginkgo.BeforeEach(func() {
 		if !framework.IsPodSecurityPolicyEnabled(f.ClientSet) {
-			framework.Failf("PodSecurityPolicy not enabled")
+			e2eutils.Failf("PodSecurityPolicy not enabled")
 			return
 		}
 		if !e2eauth.IsRBACEnabled(f.ClientSet.RbacV1()) {
@@ -62,19 +64,19 @@ var _ = SIGDescribe("PodSecurityPolicy [Feature:PodSecurityPolicy]", func() {
 		ns = f.Namespace.Name
 
 		ginkgo.By("Creating a kubernetes client that impersonates the default service account")
-		config, err := framework.LoadConfig()
-		framework.ExpectNoError(err)
+		config, err := e2eutils.LoadConfig()
+		e2eutils.ExpectNoError(err)
 		config.Impersonate = restclient.ImpersonationConfig{
 			UserName: serviceaccount.MakeUsername(ns, "default"),
 			Groups:   serviceaccount.MakeGroupNames(ns),
 		}
 		c, err = clientset.NewForConfig(config)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		ginkgo.By("Binding the edit role to the default SA")
 		err = e2eauth.BindClusterRole(f.ClientSet.RbacV1(), "edit", ns,
 			rbacv1.Subject{Kind: rbacv1.ServiceAccountKind, Namespace: ns, Name: "default"})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 	})
 
 	ginkgo.It("should forbid pod creation when no PSP is available", func() {
@@ -90,8 +92,8 @@ var _ = SIGDescribe("PodSecurityPolicy [Feature:PodSecurityPolicy]", func() {
 
 		ginkgo.By("Running a restricted pod")
 		pod, err := c.CoreV1().Pods(ns).Create(context.TODO(), restrictedPod("allowed"), metav1.CreateOptions{})
-		framework.ExpectNoError(err)
-		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(c, pod.Name, pod.Namespace))
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(c, pod.Name, pod.Namespace))
 
 		testPrivilegedPods(func(pod *v1.Pod) {
 			_, err := c.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
@@ -109,22 +111,22 @@ var _ = SIGDescribe("PodSecurityPolicy [Feature:PodSecurityPolicy]", func() {
 
 		testPrivilegedPods(func(pod *v1.Pod) {
 			p, err := c.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
-			framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(c, p.Name, p.Namespace))
+			e2eutils.ExpectNoError(err)
+			e2eutils.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(c, p.Name, p.Namespace))
 
 			// Verify expected PSP was used.
 			p, err = c.CoreV1().Pods(ns).Get(context.TODO(), p.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			validated, found := p.Annotations[psputil.ValidatedPSPAnnotation]
-			framework.ExpectEqual(found, true, "PSP annotation not found")
-			framework.ExpectEqual(validated, expectedPSP.Name, "Unexpected validated PSP")
+			e2eutils.ExpectEqual(found, true, "PSP annotation not found")
+			e2eutils.ExpectEqual(validated, expectedPSP.Name, "Unexpected validated PSP")
 		})
 	})
 })
 
 func expectForbidden(err error) {
-	framework.ExpectError(err, "should be forbidden")
-	framework.ExpectEqual(apierrors.IsForbidden(err), true, "should be forbidden error")
+	e2eutils.ExpectError(err, "should be forbidden")
+	e2eutils.ExpectEqual(apierrors.IsForbidden(err), true, "should be forbidden error")
 }
 
 func testPrivilegedPods(tester func(pod *v1.Pod)) {
@@ -207,7 +209,7 @@ func createAndBindPSP(f *framework.Framework, pspTemplate *policyv1beta1.PodSecu
 	name := fmt.Sprintf("%s-%s", ns, psp.Name)
 	psp.Name = name
 	psp, err := f.ClientSet.PolicyV1beta1().PodSecurityPolicies().Create(context.TODO(), psp, metav1.CreateOptions{})
-	framework.ExpectNoError(err, "Failed to create PSP")
+	e2eutils.ExpectNoError(err, "Failed to create PSP")
 
 	// Create the Role to bind it to the namespace.
 	_, err = f.ClientSet.RbacV1().Roles(ns).Create(context.TODO(), &rbacv1.Role{
@@ -221,7 +223,7 @@ func createAndBindPSP(f *framework.Framework, pspTemplate *policyv1beta1.PodSecu
 			Verbs:         []string{"use"},
 		}},
 	}, metav1.CreateOptions{})
-	framework.ExpectNoError(err, "Failed to create PSP role")
+	e2eutils.ExpectNoError(err, "Failed to create PSP role")
 
 	// Bind the role to the namespace.
 	err = e2eauth.BindRoleInNamespace(f.ClientSet.RbacV1(), name, ns, rbacv1.Subject{
@@ -229,9 +231,9 @@ func createAndBindPSP(f *framework.Framework, pspTemplate *policyv1beta1.PodSecu
 		Namespace: ns,
 		Name:      "default",
 	})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
-	framework.ExpectNoError(e2eauth.WaitForNamedAuthorizationUpdate(f.ClientSet.AuthorizationV1(),
+	e2eutils.ExpectNoError(e2eauth.WaitForNamedAuthorizationUpdate(f.ClientSet.AuthorizationV1(),
 		serviceaccount.MakeUsername(ns, "default"), ns, "use", name,
 		schema.GroupResource{Group: "policy", Resource: "podsecuritypolicies"}, true))
 

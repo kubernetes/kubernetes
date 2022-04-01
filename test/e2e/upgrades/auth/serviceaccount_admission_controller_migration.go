@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -63,19 +65,19 @@ func (t *ServiceAccountAdmissionControllerMigrationTest) Test(f *framework.Frame
 	ginkgo.By("Starting post-upgrade check")
 	ginkgo.By("Checking pod-before-migration makes successful requests using in cluster config")
 	podBeforeMigration, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), podBeforeMigrationName, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	if podBeforeMigration.GetUID() != t.pod.GetUID() {
-		framework.Failf("Pod %q GetUID() = %q, want %q.", podBeforeMigration.Name, podBeforeMigration.GetUID(), t.pod.GetUID())
+		e2eutils.Failf("Pod %q GetUID() = %q, want %q.", podBeforeMigration.Name, podBeforeMigration.GetUID(), t.pod.GetUID())
 	}
 	if podBeforeMigration.Status.ContainerStatuses[0].RestartCount != 0 {
-		framework.Failf("Pod %q RestartCount = %d, want 0.", podBeforeMigration.Name, podBeforeMigration.Status.ContainerStatuses[0].RestartCount)
+		e2eutils.Failf("Pod %q RestartCount = %d, want 0.", podBeforeMigration.Name, podBeforeMigration.Status.ContainerStatuses[0].RestartCount)
 	}
 	inClusterClientMustWork(f, podBeforeMigration)
 
 	ginkgo.By("Checking pod-after-migration makes successful requests using in cluster config")
 	podAfterMigration := createPod(f, podAfterMigrationName)
 	if len(podAfterMigration.Spec.Volumes) != 1 || podAfterMigration.Spec.Volumes[0].Projected == nil {
-		framework.Failf("Pod %q Volumes[0].Projected.Sources = nil, want non-nil.", podAfterMigration.Name)
+		e2eutils.Failf("Pod %q Volumes[0].Projected.Sources = nil, want non-nil.", podAfterMigration.Name)
 	}
 	inClusterClientMustWork(f, podAfterMigration)
 
@@ -91,24 +93,24 @@ func inClusterClientMustWork(f *framework.Framework, pod *v1.Pod) {
 	var logs string
 	since := time.Now()
 	if err := wait.PollImmediate(15*time.Second, 5*time.Minute, func() (done bool, err error) {
-		framework.Logf("Polling logs")
+		e2eutils.Logf("Polling logs")
 		logs, err = e2epod.GetPodLogsSince(f.ClientSet, pod.Namespace, pod.Name, "inclusterclient", since)
 		if err != nil {
-			framework.Logf("Error pulling logs: %v", err)
+			e2eutils.Logf("Error pulling logs: %v", err)
 			return false, nil
 		}
 		numTokens, err := e2eauth.ParseInClusterClientLogs(logs)
 		if err != nil {
-			framework.Logf("Error parsing inclusterclient logs: %v", err)
+			e2eutils.Logf("Error parsing inclusterclient logs: %v", err)
 			return false, fmt.Errorf("inclusterclient reported an error: %v", err)
 		}
 		if numTokens == 0 {
-			framework.Logf("No authenticated API calls found")
+			e2eutils.Logf("No authenticated API calls found")
 			return false, nil
 		}
 		return true, nil
 	}); err != nil {
-		framework.Failf("Unexpected error: %v\n%s", err, logs)
+		e2eutils.Failf("Unexpected error: %v\n%s", err, logs)
 	}
 }
 
@@ -130,11 +132,11 @@ func createPod(f *framework.Framework, podName string) *v1.Pod {
 	}
 
 	createdPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
-	framework.Logf("Created pod %s", podName)
+	e2eutils.ExpectNoError(err)
+	e2eutils.Logf("Created pod %s", podName)
 
 	if !e2epod.CheckPodsRunningReady(f.ClientSet, f.Namespace.Name, []string{pod.Name}, time.Minute) {
-		framework.Failf("Pod %q/%q never became ready", createdPod.Namespace, createdPod.Name)
+		e2eutils.Failf("Pod %q/%q never became ready", createdPod.Namespace, createdPod.Name)
 	}
 
 	return createdPod

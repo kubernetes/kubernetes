@@ -21,7 +21,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/features"
@@ -45,7 +45,7 @@ func runOneQuotaTest(f *framework.Framework, quotasRequested bool) {
 	useOverLimit := 101 /* Mb */
 	useUnderLimit := 99 /* Mb */
 	// TODO: remove hardcoded kubelet volume directory path
-	// framework.TestContext.KubeVolumeDir is currently not populated for node e2e
+	// e2econfig.TestContext.KubeVolumeDir is currently not populated for node e2e
 	// As for why we do this: see comment below at isXfs.
 	if isXfs("/var/lib/kubelet") {
 		useUnderLimit = 50 /* Mb */
@@ -58,7 +58,7 @@ func runOneQuotaTest(f *framework.Framework, quotasRequested bool) {
 		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
 			defer withFeatureGate(LSCIQuotaFeature, quotasRequested)()
 			// TODO: remove hardcoded kubelet volume directory path
-			// framework.TestContext.KubeVolumeDir is currently not populated for node e2e
+			// e2econfig.TestContext.KubeVolumeDir is currently not populated for node e2e
 			if quotasRequested && !supportsQuotas("/var/lib/kubelet") {
 				// No point in running this as a positive test if quotas are not
 				// enabled on the underlying filesystem.

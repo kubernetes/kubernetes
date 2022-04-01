@@ -17,8 +17,9 @@ limitations under the License.
 package e2enode
 
 import (
-	"k8s.io/kubernetes/test/e2e/framework"
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 )
 
 const (
@@ -34,15 +35,15 @@ const (
 
 func requireSRIOVDevices() {
 	sriovdevCount, err := countSRIOVDevices()
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	if sriovdevCount > 0 {
 		return // all good
 	}
 
 	msg := "this test is meant to run on a system with at least one configured VF from SRIOV device"
-	if framework.TestContext.RequireDevices {
-		framework.Failf(msg)
+	if e2econfig.TestContext.RequireDevices {
+		e2eutils.Failf(msg)
 	} else {
 		e2eskipper.Skipf(msg)
 	}

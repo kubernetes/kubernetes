@@ -26,6 +26,9 @@ import (
 	"strings"
 	"time"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletpodresourcesv1 "k8s.io/kubelet/pkg/apis/podresources/v1"
@@ -60,7 +63,7 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 				e2eskipper.Skipf("this test is meant to run on a system with at least one configured VF from SRIOV device")
 			}
 
-			configMap := getSRIOVDevicePluginConfigMap(framework.TestContext.SriovdpConfigMapFile)
+			configMap := getSRIOVDevicePluginConfigMap(e2econfig.TestContext.SriovdpConfigMapFile)
 			sd := setupSRIOVConfigOrFail(f, configMap)
 
 			waitForSRIOVResources(f, sd)
@@ -81,7 +84,7 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 			}
 
 			podName := "gu-pod-rec-pre-1"
-			framework.Logf("creating pod %s attrs %v", podName, ctnAttrs)
+			e2eutils.Logf("creating pod %s attrs %v", podName, ctnAttrs)
 			pod := makeTopologyManagerTestPod(podName, ctnAttrs, initCtnAttrs)
 			pod = f.PodClient().CreateSync(pod)
 
@@ -104,7 +107,7 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 			err := rewriteCheckpointAsV1(devicePluginDir, checkpointName)
 			// make sure we remove any leftovers
 			defer os.Remove(checkpointFullPath)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 
 			// this mimics a kubelet restart after the upgrade
 			// TODO: is SIGTERM (less brutal) good enough?
@@ -115,7 +118,7 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 			// Wait for the Kubelet to be ready.
 			gomega.Eventually(func() bool {
 				nodes, err := e2enode.TotalReady(f.ClientSet)
-				framework.ExpectNoError(err)
+				e2eutils.ExpectNoError(err)
 				return nodes == 1
 			}, time.Minute, time.Second).Should(gomega.BeTrue())
 
@@ -126,7 +129,7 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 			// The simplest and safest way to reproduce is just avoid to run the device plugin again
 
 			podName = "gu-pod-rec-post-2"
-			framework.Logf("creating pod %s attrs %v", podName, ctnAttrs)
+			e2eutils.Logf("creating pod %s attrs %v", podName, ctnAttrs)
 			pod = makeTopologyManagerTestPod(podName, ctnAttrs, initCtnAttrs)
 
 			pod = f.PodClient().Create(pod)
@@ -136,17 +139,17 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 				}
 				return false, nil
 			})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			pod, err = f.PodClient().Get(context.TODO(), pod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 
 			if pod.Status.Phase != v1.PodFailed {
-				framework.Failf("pod %s not failed: %v", pod.Name, pod.Status)
+				e2eutils.Failf("pod %s not failed: %v", pod.Name, pod.Status)
 			}
 
-			framework.Logf("checking pod %s status reason (%s)", pod.Name, pod.Status.Reason)
+			e2eutils.Logf("checking pod %s status reason (%s)", pod.Name, pod.Status.Reason)
 			if !isUnexpectedAdmissionError(pod) {
-				framework.Failf("pod %s failed for wrong reason: %q", pod.Name, pod.Status.Reason)
+				e2eutils.Failf("pod %s failed for wrong reason: %q", pod.Name, pod.Status.Reason)
 			}
 
 			deletePodSyncByName(f, pod.Name)
@@ -158,19 +161,19 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 			}
 
 			endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 
-			configMap := getSRIOVDevicePluginConfigMap(framework.TestContext.SriovdpConfigMapFile)
+			configMap := getSRIOVDevicePluginConfigMap(e2econfig.TestContext.SriovdpConfigMapFile)
 
 			sd := setupSRIOVConfigOrFail(f, configMap)
 			waitForSRIOVResources(f, sd)
 
 			cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 
 			resp, err := cli.GetAllocatableResources(context.TODO(), &kubeletpodresourcesv1.AllocatableResourcesRequest{})
 			conn.Close()
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 
 			suitableDevs := 0
 			for _, dev := range resp.GetDevices() {
@@ -201,7 +204,7 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 			}
 
 			podName := "gu-pod-rec-pre-1"
-			framework.Logf("creating pod %s attrs %v", podName, ctnAttrs)
+			e2eutils.Logf("creating pod %s attrs %v", podName, ctnAttrs)
 			pod := makeTopologyManagerTestPod(podName, ctnAttrs, initCtnAttrs)
 			pod = f.PodClient().CreateSync(pod)
 
@@ -224,7 +227,7 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 			err = rewriteCheckpointAsV1(devicePluginDir, checkpointName)
 			// make sure we remove any leftovers
 			defer os.Remove(checkpointFullPath)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 
 			// this mimics a kubelet restart after the upgrade
 			// TODO: is SIGTERM (less brutal) good enough?
@@ -235,7 +238,7 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 			// Wait for the Kubelet to be ready.
 			gomega.Eventually(func() bool {
 				nodes, err := e2enode.TotalReady(f.ClientSet)
-				framework.ExpectNoError(err)
+				e2eutils.ExpectNoError(err)
 				return nodes == 1
 			}, time.Minute, time.Second).Should(gomega.BeTrue())
 
@@ -250,16 +253,16 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 			compareSRIOVResources(sd, sd2)
 
 			cli, conn, err = podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			defer conn.Close()
 
 			resp2, err := cli.GetAllocatableResources(context.TODO(), &kubeletpodresourcesv1.AllocatableResourcesRequest{})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 
 			cntDevs := stringifyContainerDevices(resp.GetDevices())
 			cntDevs2 := stringifyContainerDevices(resp2.GetDevices())
 			if cntDevs != cntDevs2 {
-				framework.Failf("different allocatable resources expected %v got %v", cntDevs, cntDevs2)
+				e2eutils.Failf("different allocatable resources expected %v got %v", cntDevs, cntDevs2)
 			}
 		})
 
@@ -268,10 +271,10 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 
 func compareSRIOVResources(expected, got *sriovData) {
 	if expected.resourceName != got.resourceName {
-		framework.Failf("different SRIOV resource name: expected %q got %q", expected.resourceName, got.resourceName)
+		e2eutils.Failf("different SRIOV resource name: expected %q got %q", expected.resourceName, got.resourceName)
 	}
 	if expected.resourceAmount != got.resourceAmount {
-		framework.Failf("different SRIOV resource amount: expected %d got %d", expected.resourceAmount, got.resourceAmount)
+		e2eutils.Failf("different SRIOV resource amount: expected %d got %d", expected.resourceAmount, got.resourceAmount)
 	}
 }
 

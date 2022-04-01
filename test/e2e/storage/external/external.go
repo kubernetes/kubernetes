@@ -37,6 +37,7 @@ import (
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
@@ -276,20 +277,20 @@ func (d *driverDefinition) GetDynamicProvisionStorageClass(e2econfig *storagefra
 		sc = &storagev1.StorageClass{Provisioner: d.DriverInfo.Name}
 	case d.StorageClass.FromExistingClassName != "":
 		sc, err = f.ClientSet.StorageV1().StorageClasses().Get(context.TODO(), d.StorageClass.FromExistingClassName, metav1.GetOptions{})
-		framework.ExpectNoError(err, "getting storage class %s", d.StorageClass.FromExistingClassName)
+		e2eutils.ExpectNoError(err, "getting storage class %s", d.StorageClass.FromExistingClassName)
 	case d.StorageClass.FromFile != "":
 		var ok bool
 		items, err := utils.LoadFromManifests(d.StorageClass.FromFile)
-		framework.ExpectNoError(err, "load storage class from %s", d.StorageClass.FromFile)
-		framework.ExpectEqual(len(items), 1, "exactly one item from %s", d.StorageClass.FromFile)
+		e2eutils.ExpectNoError(err, "load storage class from %s", d.StorageClass.FromFile)
+		e2eutils.ExpectEqual(len(items), 1, "exactly one item from %s", d.StorageClass.FromFile)
 		err = utils.PatchItems(f, f.Namespace, items...)
-		framework.ExpectNoError(err, "patch items")
+		e2eutils.ExpectNoError(err, "patch items")
 
 		sc, ok = items[0].(*storagev1.StorageClass)
-		framework.ExpectEqual(ok, true, "storage class from %s", d.StorageClass.FromFile)
+		e2eutils.ExpectEqual(ok, true, "storage class from %s", d.StorageClass.FromFile)
 	}
 
-	framework.ExpectNotEqual(sc, nil, "storage class is unexpectantly nil")
+	e2eutils.ExpectNotEqual(sc, nil, "storage class is unexpectantly nil")
 
 	if fsType != "" {
 		if sc.Parameters == nil {
@@ -302,8 +303,8 @@ func (d *driverDefinition) GetDynamicProvisionStorageClass(e2econfig *storagefra
 	return storageframework.CopyStorageClass(sc, f.Namespace.Name, "e2e-sc")
 }
 
-func (d *driverDefinition) GetTimeouts() *framework.TimeoutContext {
-	timeouts := framework.NewTimeoutContextWithDefaults()
+func (d *driverDefinition) GetTimeouts() *e2econfig.TimeoutContext {
+	timeouts := e2econfig.NewTimeoutContextWithDefaults()
 	if d.Timeouts == nil {
 		return timeouts
 	}
@@ -366,7 +367,7 @@ func (d *driverDefinition) GetSnapshotClass(e2econfig *storageframework.PerTestC
 		// Do nothing (just use empty parameters)
 	case d.SnapshotClass.FromExistingClassName != "":
 		snapshotClass, err := f.DynamicClient.Resource(utils.SnapshotClassGVR).Get(context.TODO(), d.SnapshotClass.FromExistingClassName, metav1.GetOptions{})
-		framework.ExpectNoError(err, "getting snapshot class %s", d.SnapshotClass.FromExistingClassName)
+		e2eutils.ExpectNoError(err, "getting snapshot class %s", d.SnapshotClass.FromExistingClassName)
 
 		if params, ok := snapshotClass.Object["parameters"].(map[string]interface{}); ok {
 			for k, v := range params {
@@ -379,7 +380,7 @@ func (d *driverDefinition) GetSnapshotClass(e2econfig *storageframework.PerTestC
 		}
 	case d.SnapshotClass.FromFile != "":
 		snapshotClass, err := loadSnapshotClass(d.SnapshotClass.FromFile)
-		framework.ExpectNoError(err, "load snapshot class from %s", d.SnapshotClass.FromFile)
+		e2eutils.ExpectNoError(err, "load snapshot class from %s", d.SnapshotClass.FromFile)
 
 		if params, ok := snapshotClass.Object["parameters"].(map[string]interface{}); ok {
 			for k, v := range params {

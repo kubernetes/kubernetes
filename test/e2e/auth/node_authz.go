@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -52,24 +54,24 @@ var _ = SIGDescribe("[Feature:NodeAuthorizer]", func() {
 		ns = f.Namespace.Name
 
 		nodeList, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
-		framework.ExpectNoError(err, "failed to list nodes in namespace: %s", ns)
-		framework.ExpectNotEqual(len(nodeList.Items), 0)
+		e2eutils.ExpectNoError(err, "failed to list nodes in namespace: %s", ns)
+		e2eutils.ExpectNotEqual(len(nodeList.Items), 0)
 		nodeName = nodeList.Items[0].Name
 		asUser = nodeNamePrefix + nodeName
 		ginkgo.By("Creating a kubernetes client that impersonates a node")
-		config, err := framework.LoadConfig()
-		framework.ExpectNoError(err, "failed to load kubernetes client config")
+		config, err := e2eutils.LoadConfig()
+		e2eutils.ExpectNoError(err, "failed to load kubernetes client config")
 		config.Impersonate = restclient.ImpersonationConfig{
 			UserName: asUser,
 			Groups:   []string{nodesGroup},
 		}
 		c, err = clientset.NewForConfig(config)
-		framework.ExpectNoError(err, "failed to create Clientset for the given config: %+v", *config)
+		e2eutils.ExpectNoError(err, "failed to create Clientset for the given config: %+v", *config)
 
 	})
 	ginkgo.It("Getting a non-existent secret should exit with the Forbidden error, not a NotFound error", func() {
 		_, err := c.CoreV1().Secrets(ns).Get(context.TODO(), "foo", metav1.GetOptions{})
-		framework.ExpectEqual(apierrors.IsForbidden(err), true)
+		e2eutils.ExpectEqual(apierrors.IsForbidden(err), true)
 	})
 
 	ginkgo.It("Getting an existing secret should exit with the Forbidden error", func() {
@@ -82,14 +84,14 @@ var _ = SIGDescribe("[Feature:NodeAuthorizer]", func() {
 			StringData: map[string]string{},
 		}
 		_, err := f.ClientSet.CoreV1().Secrets(ns).Create(context.TODO(), secret, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create secret (%s:%s) %+v", ns, secret.Name, *secret)
+		e2eutils.ExpectNoError(err, "failed to create secret (%s:%s) %+v", ns, secret.Name, *secret)
 		_, err = c.CoreV1().Secrets(ns).Get(context.TODO(), secret.Name, metav1.GetOptions{})
-		framework.ExpectEqual(apierrors.IsForbidden(err), true)
+		e2eutils.ExpectEqual(apierrors.IsForbidden(err), true)
 	})
 
 	ginkgo.It("Getting a non-existent configmap should exit with the Forbidden error, not a NotFound error", func() {
 		_, err := c.CoreV1().ConfigMaps(ns).Get(context.TODO(), "foo", metav1.GetOptions{})
-		framework.ExpectEqual(apierrors.IsForbidden(err), true)
+		e2eutils.ExpectEqual(apierrors.IsForbidden(err), true)
 	})
 
 	ginkgo.It("Getting an existing configmap should exit with the Forbidden error", func() {
@@ -104,9 +106,9 @@ var _ = SIGDescribe("[Feature:NodeAuthorizer]", func() {
 			},
 		}
 		_, err := f.ClientSet.CoreV1().ConfigMaps(ns).Create(context.TODO(), configmap, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create configmap (%s:%s) %+v", ns, configmap.Name, *configmap)
+		e2eutils.ExpectNoError(err, "failed to create configmap (%s:%s) %+v", ns, configmap.Name, *configmap)
 		_, err = c.CoreV1().ConfigMaps(ns).Get(context.TODO(), configmap.Name, metav1.GetOptions{})
-		framework.ExpectEqual(apierrors.IsForbidden(err), true)
+		e2eutils.ExpectEqual(apierrors.IsForbidden(err), true)
 	})
 
 	ginkgo.It("Getting a secret for a workload the node has access to should succeed", func() {
@@ -121,11 +123,11 @@ var _ = SIGDescribe("[Feature:NodeAuthorizer]", func() {
 			},
 		}
 		_, err := f.ClientSet.CoreV1().Secrets(ns).Create(context.TODO(), secret, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create secret (%s:%s)", ns, secret.Name)
+		e2eutils.ExpectNoError(err, "failed to create secret (%s:%s)", ns, secret.Name)
 
 		ginkgo.By("Node should not get the secret")
 		_, err = c.CoreV1().Secrets(ns).Get(context.TODO(), secret.Name, metav1.GetOptions{})
-		framework.ExpectEqual(apierrors.IsForbidden(err), true)
+		e2eutils.ExpectEqual(apierrors.IsForbidden(err), true)
 
 		ginkgo.By("Create a pod that use the secret")
 		pod := &v1.Pod{
@@ -154,20 +156,20 @@ var _ = SIGDescribe("[Feature:NodeAuthorizer]", func() {
 		}
 
 		_, err = f.ClientSet.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create pod (%s:%s)", ns, pod.Name)
+		e2eutils.ExpectNoError(err, "failed to create pod (%s:%s)", ns, pod.Name)
 
 		ginkgo.By("The node should able to access the secret")
-		itv := framework.Poll
+		itv := e2eutils.Poll
 		dur := 1 * time.Minute
 		err = wait.Poll(itv, dur, func() (bool, error) {
 			_, err = c.CoreV1().Secrets(ns).Get(context.TODO(), secret.Name, metav1.GetOptions{})
 			if err != nil {
-				framework.Logf("Failed to get secret %v, err: %v", secret.Name, err)
+				e2eutils.Logf("Failed to get secret %v, err: %v", secret.Name, err)
 				return false, nil
 			}
 			return true, nil
 		})
-		framework.ExpectNoError(err, "failed to get secret after trying every %v for %v (%s:%s)", itv, dur, ns, secret.Name)
+		e2eutils.ExpectNoError(err, "failed to get secret after trying every %v for %v (%s:%s)", itv, dur, ns, secret.Name)
 	})
 
 	ginkgo.It("A node shouldn't be able to create another node", func() {
@@ -187,12 +189,12 @@ var _ = SIGDescribe("[Feature:NodeAuthorizer]", func() {
 		defer func() {
 			f.ClientSet.CoreV1().Nodes().Delete(context.TODO(), node.Name, metav1.DeleteOptions{})
 		}()
-		framework.ExpectEqual(apierrors.IsForbidden(err), true)
+		e2eutils.ExpectEqual(apierrors.IsForbidden(err), true)
 	})
 
 	ginkgo.It("A node shouldn't be able to delete another node", func() {
 		ginkgo.By(fmt.Sprintf("Create node foo by user: %v", asUser))
 		err := c.CoreV1().Nodes().Delete(context.TODO(), "foo", metav1.DeleteOptions{})
-		framework.ExpectEqual(apierrors.IsForbidden(err), true)
+		e2eutils.ExpectEqual(apierrors.IsForbidden(err), true)
 	})
 })

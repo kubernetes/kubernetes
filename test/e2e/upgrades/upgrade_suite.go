@@ -26,6 +26,8 @@ import (
 	"sync"
 	"time"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+
 	"k8s.io/kubernetes/test/e2e/chaosmonkey"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eginkgowrapper "k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
@@ -136,8 +138,8 @@ func RunUpgradeSuite(
 	defer func() {
 		testSuite.Update()
 		testSuite.Time = time.Since(start).Seconds()
-		if framework.TestContext.ReportDir != "" {
-			fname := filepath.Join(framework.TestContext.ReportDir, fmt.Sprintf("junit_%supgrades.xml", framework.TestContext.ReportPrefix))
+		if e2econfig.TestContext.ReportDir != "" {
+			fname := filepath.Join(e2econfig.TestContext.ReportDir, fmt.Sprintf("junit_%supgrades.xml", e2econfig.TestContext.ReportPrefix))
 			f, err := os.Create(fname)
 			if err != nil {
 				return

@@ -25,6 +25,8 @@ import (
 	"strings"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -88,7 +90,7 @@ func deletePodSyncByName(f *framework.Framework, podName string) {
 	delOpts := metav1.DeleteOptions{
 		GracePeriodSeconds: &gp,
 	}
-	f.PodClient().DeleteSync(podName, delOpts, framework.DefaultPodDeletionTimeout)
+	f.PodClient().DeleteSync(podName, delOpts, e2eutils.DefaultPodDeletionTimeout)
 }
 
 func deletePods(f *framework.Framework, podNames []string) {
@@ -113,7 +115,7 @@ func getLocalNodeCPUDetails(f *framework.Framework) (cpuCapVal int64, cpuAllocVa
 
 func waitForContainerRemoval(containerName, podName, podNS string) {
 	rs, _, err := getCRIClient()
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	gomega.Eventually(func() bool {
 		containers, err := rs.ListContainers(&runtimeapi.ContainerFilter{
 			LabelSelector: map[string]string{
@@ -132,7 +134,7 @@ func waitForContainerRemoval(containerName, podName, podNS string) {
 func waitForStateFileCleanedUp() {
 	gomega.Eventually(func() bool {
 		restoredState, err := cpumanagerstate.NewCheckpointState("/var/lib/kubelet", "cpu_manager_state", "static", nil)
-		framework.ExpectNoError(err, "failed to create testing cpumanager state instance")
+		e2eutils.ExpectNoError(err, "failed to create testing cpumanager state instance")
 		assignments := restoredState.GetCPUAssignments()
 		if len(assignments) == 0 {
 			return true
@@ -143,20 +145,20 @@ func waitForStateFileCleanedUp() {
 
 func isHTEnabled() bool {
 	outData, err := exec.Command("/bin/sh", "-c", "lscpu | grep \"Thread(s) per core:\" | cut -d \":\" -f 2").Output()
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	threadsPerCore, err := strconv.Atoi(strings.TrimSpace(string(outData)))
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	return threadsPerCore > 1
 }
 
 func isMultiNUMA() bool {
 	outData, err := exec.Command("/bin/sh", "-c", "lscpu | grep \"NUMA node(s):\" | cut -d \":\" -f 2").Output()
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	numaNodes, err := strconv.Atoi(strings.TrimSpace(string(outData)))
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	return numaNodes > 1
 }
@@ -164,23 +166,23 @@ func isMultiNUMA() bool {
 func getSMTLevel() int {
 	cpuID := 0 // this is just the most likely cpu to be present in a random system. No special meaning besides this.
 	out, err := exec.Command("/bin/sh", "-c", fmt.Sprintf("cat /sys/devices/system/cpu/cpu%d/topology/thread_siblings_list | tr -d \"\n\r\"", cpuID)).Output()
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	// how many thread sibling you have = SMT level
 	// example: 2-way SMT means 2 threads sibling for each thread
 	cpus, err := cpuset.Parse(strings.TrimSpace(string(out)))
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	return cpus.Size()
 }
 
 func getCPUSiblingList(cpuRes int64) string {
 	out, err := exec.Command("/bin/sh", "-c", fmt.Sprintf("cat /sys/devices/system/cpu/cpu%d/topology/thread_siblings_list | tr -d \"\n\r\"", cpuRes)).Output()
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	return string(out)
 }
 
 func getCoreSiblingList(cpuRes int64) string {
 	out, err := exec.Command("/bin/sh", "-c", fmt.Sprintf("cat /sys/devices/system/cpu/cpu%d/topology/core_siblings_list | tr -d \"\n\r\"", cpuRes)).Output()
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	return string(out)
 }
 
@@ -213,7 +215,7 @@ func configureCPUManagerInKubelet(oldCfg *kubeletconfig.KubeletConfiguration, ku
 
 	if kubeletArguments.reservedSystemCPUs.Size() > 0 {
 		cpus := kubeletArguments.reservedSystemCPUs.String()
-		framework.Logf("configureCPUManagerInKubelet: using reservedSystemCPUs=%q", cpus)
+		e2eutils.Logf("configureCPUManagerInKubelet: using reservedSystemCPUs=%q", cpus)
 		newCfg.ReservedSystemCPUs = cpus
 	} else {
 		// The Kubelet panics if either kube-reserved or system-reserved is not set
@@ -250,13 +252,13 @@ func runGuPodTest(f *framework.Framework, cpuCount int) {
 		ginkgo.By(fmt.Sprintf("validating the container %s on Gu pod %s", cnt.Name, pod.Name))
 
 		logs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, cnt.Name)
-		framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]", cnt.Name, pod.Name)
+		e2eutils.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]", cnt.Name, pod.Name)
 
-		framework.Logf("got pod logs: %v", logs)
+		e2eutils.Logf("got pod logs: %v", logs)
 		cpus, err := cpuset.Parse(strings.TrimSpace(logs))
-		framework.ExpectNoError(err, "parsing cpuset from logs for [%s] of pod [%s]", cnt.Name, pod.Name)
+		e2eutils.ExpectNoError(err, "parsing cpuset from logs for [%s] of pod [%s]", cnt.Name, pod.Name)
 
-		framework.ExpectEqual(cpus.Size(), cpuCount, "expected cpu set size == %d, got %q", cpuCount, cpus.String())
+		e2eutils.ExpectEqual(cpus.Size(), cpuCount, "expected cpu set size == %d, got %q", cpuCount, cpus.String())
 	}
 
 	ginkgo.By("by deleting the pods and waiting for container removal")
@@ -287,7 +289,7 @@ func runNonGuPodTest(f *framework.Framework, cpuCap int64) {
 		expAllowedCPUsListRegex = "^0\n$"
 	}
 	err = f.PodClient().MatchContainerOutput(pod.Name, pod.Spec.Containers[0].Name, expAllowedCPUsListRegex)
-	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
+	e2eutils.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
 		pod.Spec.Containers[0].Name, pod.Name)
 
 	ginkgo.By("by deleting the pods and waiting for container removal")
@@ -337,7 +339,7 @@ func runMultipleGuNonGuPods(f *framework.Framework, cpuCap int64, cpuAlloc int64
 	}
 	expAllowedCPUsListRegex = fmt.Sprintf("^%d\n$", cpu1)
 	err = f.PodClient().MatchContainerOutput(pod1.Name, pod1.Spec.Containers[0].Name, expAllowedCPUsListRegex)
-	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
+	e2eutils.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
 		pod1.Spec.Containers[0].Name, pod1.Name)
 
 	cpuListString = "0"
@@ -347,7 +349,7 @@ func runMultipleGuNonGuPods(f *framework.Framework, cpuCap int64, cpuAlloc int64
 	}
 	expAllowedCPUsListRegex = fmt.Sprintf("^%s\n$", cpuListString)
 	err = f.PodClient().MatchContainerOutput(pod2.Name, pod2.Spec.Containers[0].Name, expAllowedCPUsListRegex)
-	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
+	e2eutils.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
 		pod2.Spec.Containers[0].Name, pod2.Name)
 	ginkgo.By("by deleting the pods and waiting for container removal")
 	deletePods(f, []string{pod1.Name, pod2.Name})
@@ -394,7 +396,7 @@ func runMultipleCPUGuPod(f *framework.Framework) {
 	}
 	expAllowedCPUsListRegex = fmt.Sprintf("^%s\n$", cpuListString)
 	err = f.PodClient().MatchContainerOutput(pod.Name, pod.Spec.Containers[0].Name, expAllowedCPUsListRegex)
-	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
+	e2eutils.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
 		pod.Spec.Containers[0].Name, pod.Name)
 
 	ginkgo.By("by deleting the pods and waiting for container removal")
@@ -445,11 +447,11 @@ func runMultipleCPUContainersGuPod(f *framework.Framework) {
 	}
 	expAllowedCPUsListRegex = fmt.Sprintf("^%d|%d\n$", cpu1, cpu2)
 	err = f.PodClient().MatchContainerOutput(pod.Name, pod.Spec.Containers[0].Name, expAllowedCPUsListRegex)
-	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
+	e2eutils.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
 		pod.Spec.Containers[0].Name, pod.Name)
 
 	err = f.PodClient().MatchContainerOutput(pod.Name, pod.Spec.Containers[1].Name, expAllowedCPUsListRegex)
-	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
+	e2eutils.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
 		pod.Spec.Containers[1].Name, pod.Name)
 
 	ginkgo.By("by deleting the pods and waiting for container removal")
@@ -507,12 +509,12 @@ func runMultipleGuPods(f *framework.Framework) {
 	}
 	expAllowedCPUsListRegex = fmt.Sprintf("^%d\n$", cpu1)
 	err = f.PodClient().MatchContainerOutput(pod1.Name, pod1.Spec.Containers[0].Name, expAllowedCPUsListRegex)
-	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
+	e2eutils.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
 		pod1.Spec.Containers[0].Name, pod1.Name)
 
 	expAllowedCPUsListRegex = fmt.Sprintf("^%d\n$", cpu2)
 	err = f.PodClient().MatchContainerOutput(pod2.Name, pod2.Spec.Containers[0].Name, expAllowedCPUsListRegex)
-	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
+	e2eutils.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
 		pod2.Spec.Containers[0].Name, pod2.Name)
 	ginkgo.By("by deleting the pods and waiting for container removal")
 	deletePods(f, []string{pod1.Name, pod2.Name})
@@ -534,7 +536,7 @@ func runCPUManagerTests(f *framework.Framework) {
 		var err error
 		if oldCfg == nil {
 			oldCfg, err = getCurrentKubeletConfig()
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 		}
 	})
 
@@ -608,7 +610,7 @@ func runCPUManagerTests(f *framework.Framework) {
 		}
 		expAllowedCPUsListRegex = fmt.Sprintf("^%d\n$", cpu1)
 		err = f.PodClient().MatchContainerOutput(pod.Name, pod.Spec.Containers[0].Name, expAllowedCPUsListRegex)
-		framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
+		e2eutils.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
 			pod.Spec.Containers[0].Name, pod.Name)
 
 		ginkgo.By("disable cpu manager in kubelet")
@@ -651,7 +653,7 @@ func runCPUManagerTests(f *framework.Framework) {
 			e2eskipper.Skipf("Skipping CPU Manager %s tests since the CPU capacity < 4", fullCPUsOnlyOpt)
 		}
 
-		framework.Logf("SMT level %d", smtLevel)
+		e2eutils.Logf("SMT level %d", smtLevel)
 
 		// TODO: we assume the first available CPUID is 0, which is pretty fair, but we should probably
 		// check what we do have in the node.
@@ -698,15 +700,15 @@ func runSMTAlignmentNegativeTests(f *framework.Framework) {
 		}
 		return false, nil
 	})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	pod, err = f.PodClient().Get(context.TODO(), pod.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	if pod.Status.Phase != v1.PodFailed {
-		framework.Failf("pod %s not failed: %v", pod.Name, pod.Status)
+		e2eutils.Failf("pod %s not failed: %v", pod.Name, pod.Status)
 	}
 	if !isSMTAlignmentError(pod) {
-		framework.Failf("pod %s failed for wrong reason: %q", pod.Name, pod.Status.Reason)
+		e2eutils.Failf("pod %s failed for wrong reason: %q", pod.Name, pod.Status.Reason)
 	}
 
 	deletePodSyncByName(f, pod.Name)
@@ -736,11 +738,11 @@ func runSMTAlignmentPositiveTests(f *framework.Framework, smtLevel int) {
 		ginkgo.By(fmt.Sprintf("validating the container %s on Gu pod %s", cnt.Name, pod.Name))
 
 		logs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, cnt.Name)
-		framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]", cnt.Name, pod.Name)
+		e2eutils.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]", cnt.Name, pod.Name)
 
-		framework.Logf("got pod logs: %v", logs)
+		e2eutils.Logf("got pod logs: %v", logs)
 		cpus, err := cpuset.Parse(strings.TrimSpace(logs))
-		framework.ExpectNoError(err, "parsing cpuset from logs for [%s] of pod [%s]", cnt.Name, pod.Name)
+		e2eutils.ExpectNoError(err, "parsing cpuset from logs for [%s] of pod [%s]", cnt.Name, pod.Name)
 
 		validateSMTAlignment(cpus, smtLevel, pod, &cnt)
 	}
@@ -753,10 +755,10 @@ func runSMTAlignmentPositiveTests(f *framework.Framework, smtLevel int) {
 }
 
 func validateSMTAlignment(cpus cpuset.CPUSet, smtLevel int, pod *v1.Pod, cnt *v1.Container) {
-	framework.Logf("validating cpus: %v", cpus)
+	e2eutils.Logf("validating cpus: %v", cpus)
 
 	if cpus.Size()%smtLevel != 0 {
-		framework.Failf("pod %q cnt %q received non-smt-multiple cpuset %v (SMT level %d)", pod.Name, cnt.Name, cpus, smtLevel)
+		e2eutils.Failf("pod %q cnt %q received non-smt-multiple cpuset %v (SMT level %d)", pod.Name, cnt.Name, cpus, smtLevel)
 	}
 
 	// now check all the given cpus are thread siblings.
@@ -765,14 +767,14 @@ func validateSMTAlignment(cpus cpuset.CPUSet, smtLevel int, pod *v1.Pod, cnt *v1
 	b := cpuset.NewBuilder()
 	for _, cpuID := range cpus.ToSliceNoSort() {
 		threadSiblings, err := cpuset.Parse(strings.TrimSpace(getCPUSiblingList(int64(cpuID))))
-		framework.ExpectNoError(err, "parsing cpuset from logs for [%s] of pod [%s]", cnt.Name, pod.Name)
+		e2eutils.ExpectNoError(err, "parsing cpuset from logs for [%s] of pod [%s]", cnt.Name, pod.Name)
 		b.Add(threadSiblings.ToSliceNoSort()...)
 	}
 	siblingsCPUs := b.Result()
 
-	framework.Logf("siblings cpus: %v", siblingsCPUs)
+	e2eutils.Logf("siblings cpus: %v", siblingsCPUs)
 	if !siblingsCPUs.Equals(cpus) {
-		framework.Failf("pod %q cnt %q received non-smt-aligned cpuset %v (expected %v)", pod.Name, cnt.Name, cpus, siblingsCPUs)
+		e2eutils.Failf("pod %q cnt %q received non-smt-aligned cpuset %v (expected %v)", pod.Name, cnt.Name, cpus, siblingsCPUs)
 	}
 }
 

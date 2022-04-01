@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/version"
@@ -77,7 +79,7 @@ var _ = Describe("kubelet-config ConfigMap", func() {
 		k8sVersionString := m["kubernetesVersion"].(string)
 		k8sVersion, err := version.ParseSemantic(k8sVersionString)
 		if err != nil {
-			framework.Failf("error reading kubernetesVersion from %s ConfigMap: %v", kubeadmConfigName, err)
+			e2eutils.Failf("error reading kubernetesVersion from %s ConfigMap: %v", kubeadmConfigName, err)
 		}
 
 		kubeletConfigConfigMapName = "kubelet-config"
@@ -99,7 +101,7 @@ var _ = Describe("kubelet-config ConfigMap", func() {
 			cm, err = f.ClientSet.CoreV1().
 				ConfigMaps(kubeSystemNamespace).
 				Get(context.TODO(), kubeletConfigConfigMapNameVersioned, metav1.GetOptions{})
-			framework.ExpectNoError(err, "error getting ConfigMap %q or %q from namespace %q",
+			e2eutils.ExpectNoError(err, "error getting ConfigMap %q or %q from namespace %q",
 				kubeletConfigConfigMapName, kubeletConfigConfigMapNameVersioned, kubeSystemNamespace)
 		}
 		gomega.Expect(cm.Data).To(gomega.HaveKey(kubeletConfigConfigMapKey))
@@ -115,7 +117,7 @@ var _ = Describe("kubelet-config ConfigMap", func() {
 			_, err = f.ClientSet.RbacV1().
 				Roles(kubeSystemNamespace).
 				Get(context.TODO(), kubeletConfigRoleNameVersioned, metav1.GetOptions{})
-			framework.ExpectNoError(err, "error getting Role %q or %q from namespace %q",
+			e2eutils.ExpectNoError(err, "error getting Role %q or %q from namespace %q",
 				kubeletConfigRoleName, kubeletConfigRoleNameVersioned, kubeSystemNamespace)
 		}
 		_, err = f.ClientSet.RbacV1().
@@ -125,7 +127,7 @@ var _ = Describe("kubelet-config ConfigMap", func() {
 			_, err = f.ClientSet.RbacV1().
 				Roles(kubeSystemNamespace).
 				Get(context.TODO(), kubeletConfigRoleBindingNameVersioned, metav1.GetOptions{})
-			framework.ExpectNoError(err, "error getting RoleBinding %q or %q from namespace %q",
+			e2eutils.ExpectNoError(err, "error getting RoleBinding %q or %q from namespace %q",
 				kubeletConfigRoleBindingName, kubeletConfigRoleBindingNameVersioned, kubeSystemNamespace)
 		}
 	})

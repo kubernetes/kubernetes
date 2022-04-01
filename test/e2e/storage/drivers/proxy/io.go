@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 	"k8s.io/kubernetes/test/e2e/storage/drivers/csi-test/mock/service"
 )
 
@@ -70,7 +71,7 @@ func (p PodDirIO) RemoveAll(path string) error {
 }
 
 func (p PodDirIO) execute(command []string) (string, string, error) {
-	return p.F.ExecWithOptions(framework.ExecOptions{
+	return e2eutils.ExecWithOptions(p.F.ClientSet, e2eutils.ExecOptions{
 		Command:       command,
 		Namespace:     p.Namespace,
 		PodName:       p.PodName,

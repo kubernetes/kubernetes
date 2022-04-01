@@ -25,7 +25,7 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/kubernetes/test/e2e/framework"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 )
 
 const (
@@ -66,7 +66,7 @@ func (i *IPerfResults) Add(ipr *IPerfCSVResult) {
 // ToTSV exports an easily readable tab delimited format of all IPerfResults.
 func (i *IPerfResults) ToTSV() string {
 	if len(i.BandwidthMap) < 1 {
-		framework.Logf("Warning: no data in bandwidth map")
+		e2eutils.Logf("Warning: no data in bandwidth map")
 	}
 
 	var buffer bytes.Buffer
@@ -114,7 +114,7 @@ func (s StrSlice) get(i int) string {
 func intOrFail(debugName string, rawValue string) int64 {
 	value, err := strconv.ParseInt(rawValue, 10, 64)
 	if err != nil {
-		framework.Failf("Failed parsing value %v from the string '%v' as an integer", debugName, rawValue)
+		e2eutils.Failf("Failed parsing value %v from the string '%v' as an integer", debugName, rawValue)
 	}
 	return value
 }

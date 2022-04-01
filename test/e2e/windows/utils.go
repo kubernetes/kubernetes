@@ -19,11 +19,12 @@ package windows
 import (
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	appsv1 "k8s.io/api/apps/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
-	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 // waits for a deployment to be created and the desired replicas
@@ -33,14 +34,14 @@ func waitForDeployment(getDeploymentFunc func() (*appsv1.Deployment, error), int
 		deployment, err := getDeploymentFunc()
 		if err != nil {
 			if apierrors.IsNotFound(err) {
-				framework.Logf("deployment not found, continue waiting: %s", err)
+				e2eutils.Logf("deployment not found, continue waiting: %s", err)
 				return false, nil
 			}
 
-			framework.Logf("error while deploying, error %s", err)
+			e2eutils.Logf("error while deploying, error %s", err)
 			return false, err
 		}
-		framework.Logf("deployment status %s", &deployment.Status)
+		e2eutils.Logf("deployment status %s", &deployment.Status)
 		return util.DeploymentComplete(deployment, &deployment.Status), nil
 	})
 }

@@ -22,6 +22,8 @@ import (
 	"strings"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
@@ -68,33 +70,33 @@ var _ = SIGDescribe("[Feature:Windows] SecurityContext", func() {
 		// See https://github.com/kubernetes/kubernetes/issues/104635
 		// Not all runtimes use the sandbox information.  This means the test needs to check if the pod
 		// sandbox failed or workload pod failed.
-		framework.Logf("Waiting for pod %s to enter the error state.", podInvalid.Name)
+		e2eutils.Logf("Waiting for pod %s to enter the error state.", podInvalid.Name)
 		gomega.Eventually(func() bool {
 			failedSandbox, err := eventOccurred(f.ClientSet, podInvalid.Namespace, failedSandboxEventSelector, hcsschimError)
 			if err != nil {
-				framework.Logf("Error retrieving events for pod. Ignoring...")
+				e2eutils.Logf("Error retrieving events for pod. Ignoring...")
 			}
 			if failedSandbox {
-				framework.Logf("Found Expected Event 'Failed to Create Pod Sandbox' with message containing: %s", hcsschimError)
+				e2eutils.Logf("Found Expected Event 'Failed to Create Pod Sandbox' with message containing: %s", hcsschimError)
 				return true
 			}
 
-			framework.Logf("No Sandbox error found. Looking for failure in workload pods")
+			e2eutils.Logf("No Sandbox error found. Looking for failure in workload pods")
 			pod, err := f.PodClient().Get(context.Background(), podInvalid.Name, metav1.GetOptions{})
 			if err != nil {
-				framework.Logf("Error retrieving pod: %s", err)
+				e2eutils.Logf("Error retrieving pod: %s", err)
 				return false
 			}
 
 			podTerminatedReason := testutils.TerminatedContainers(pod)[runAsUserNameContainerName]
 			podFailedToStart := podTerminatedReason == "ContainerCannotRun" || podTerminatedReason == "StartError"
 			if pod.Status.Phase == v1.PodFailed && podFailedToStart {
-				framework.Logf("Found terminated workload Pod that could not start")
+				e2eutils.Logf("Found terminated workload Pod that could not start")
 				return true
 			}
 
 			return false
-		}, framework.PodStartTimeout, 1*time.Second).Should(gomega.BeTrue())
+		}, e2eutils.PodStartTimeout, 1*time.Second).Should(gomega.BeTrue())
 	})
 
 	ginkgo.It("should not be able to create pods with unknown usernames at Container level", func() {
@@ -103,13 +105,13 @@ var _ = SIGDescribe("[Feature:Windows] SecurityContext", func() {
 		p.Spec.SecurityContext.WindowsOptions.RunAsUserName = toPtr("ContainerUser")
 		podInvalid := f.PodClient().Create(p)
 
-		framework.Logf("Waiting for pod %s to enter the error state.", podInvalid.Name)
-		framework.ExpectNoError(e2epod.WaitForPodTerminatedInNamespace(f.ClientSet, podInvalid.Name, "", f.Namespace.Name))
+		e2eutils.Logf("Waiting for pod %s to enter the error state.", podInvalid.Name)
+		e2eutils.ExpectNoError(e2epod.WaitForPodTerminatedInNamespace(f.ClientSet, podInvalid.Name, "", f.Namespace.Name))
 
 		podInvalid, _ = f.PodClient().Get(context.TODO(), podInvalid.Name, metav1.GetOptions{})
 		podTerminatedReason := testutils.TerminatedContainers(podInvalid)[runAsUserNameContainerName]
 		if podTerminatedReason != "ContainerCannotRun" && podTerminatedReason != "StartError" {
-			framework.Failf("The container terminated reason was supposed to be: 'ContainerCannotRun' or 'StartError', not: '%q'", podTerminatedReason)
+			e2eutils.Failf("The container terminated reason was supposed to be: 'ContainerCannotRun' or 'StartError', not: '%q'", podTerminatedReason)
 		}
 	})
 
@@ -146,9 +148,9 @@ var _ = SIGDescribe("[Feature:Windows] SecurityContext", func() {
 		windowsPodWithSELinux.Spec.Tolerations = []v1.Toleration{{Key: "os", Value: "Windows"}}
 		windowsPodWithSELinux, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(),
 			windowsPodWithSELinux, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
-		framework.Logf("Created pod %v", windowsPodWithSELinux)
-		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, windowsPodWithSELinux.Name,
+		e2eutils.ExpectNoError(err)
+		e2eutils.Logf("Created pod %v", windowsPodWithSELinux)
+		e2eutils.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, windowsPodWithSELinux.Name,
 			f.Namespace.Name), "failed to wait for pod %s to be running", windowsPodWithSELinux.Name)
 	})
 })

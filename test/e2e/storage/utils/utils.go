@@ -28,6 +28,9 @@ import (
 	"strings"
 	"time"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 
@@ -73,11 +76,11 @@ const (
 // VerifyFSGroupInPod verifies that the passed in filePath contains the expectedFSGroup
 func VerifyFSGroupInPod(f *framework.Framework, filePath, expectedFSGroup string, pod *v1.Pod) {
 	cmd := fmt.Sprintf("ls -l %s", filePath)
-	stdout, stderr, err := e2evolume.PodExec(f, pod, cmd)
-	framework.ExpectNoError(err)
-	framework.Logf("pod %s/%s exec for cmd %s, stdout: %s, stderr: %s", pod.Namespace, pod.Name, cmd, stdout, stderr)
+	stdout, stderr, err := e2evolume.PodExec(f.ClientSet, f.Namespace.Name, pod, cmd)
+	e2eutils.ExpectNoError(err)
+	e2eutils.Logf("pod %s/%s exec for cmd %s, stdout: %s, stderr: %s", pod.Namespace, pod.Name, cmd, stdout, stderr)
 	fsGroupResult := strings.Fields(stdout)[3]
-	framework.ExpectEqual(expectedFSGroup, fsGroupResult,
+	e2eutils.ExpectEqual(expectedFSGroup, fsGroupResult,
 		"Expected fsGroup of %s, got %s", expectedFSGroup, fsGroupResult)
 }
 
@@ -92,9 +95,9 @@ func getKubeletMainPid(nodeIP string, sudoPresent bool, systemctlPresent bool) s
 	if sudoPresent {
 		command = fmt.Sprintf("sudo %s", command)
 	}
-	framework.Logf("Attempting `%s`", command)
-	sshResult, err := e2essh.SSH(command, nodeIP, framework.TestContext.Provider)
-	framework.ExpectNoError(err, fmt.Sprintf("SSH to Node %q errored.", nodeIP))
+	e2eutils.Logf("Attempting `%s`", command)
+	sshResult, err := e2essh.SSH(command, nodeIP, e2econfig.TestContext.Provider)
+	e2eutils.ExpectNoError(err, fmt.Sprintf("SSH to Node %q errored.", nodeIP))
 	e2essh.LogResult(sshResult)
 	gomega.Expect(sshResult.Code).To(gomega.BeZero(), "Failed to get kubelet PID")
 	gomega.Expect(sshResult.Stdout).NotTo(gomega.BeEmpty(), "Kubelet Main PID should not be Empty")
@@ -116,7 +119,7 @@ func TestKubeletRestartsAndRestoresMount(c clientset.Interface, f *framework.Fra
 	ginkgo.By("Testing that written file is accessible.")
 	CheckReadFromPath(f, clientPod, v1.PersistentVolumeFilesystem, false, path, byteLen, seed)
 
-	framework.Logf("Volume mount detected on pod %s and written file %s is readable post-restart.", clientPod.Name, path)
+	e2eutils.Logf("Volume mount detected on pod %s and written file %s is readable post-restart.", clientPod.Name, path)
 }
 
 // TestKubeletRestartsAndRestoresMap tests that a volume mapped to a pod remains mapped after a kubelet restarts
@@ -134,7 +137,7 @@ func TestKubeletRestartsAndRestoresMap(c clientset.Interface, f *framework.Frame
 	ginkgo.By("Testing that written pv is accessible.")
 	CheckReadFromPath(f, clientPod, v1.PersistentVolumeBlock, false, path, byteLen, seed)
 
-	framework.Logf("Volume map detected on pod %s and written data %s is readable post-restart.", clientPod.Name, path)
+	e2eutils.Logf("Volume map detected on pod %s and written data %s is readable post-restart.", clientPod.Name, path)
 }
 
 // TestVolumeUnmountsFromDeletedPodWithForceOption tests that a volume unmounts if the client pod was deleted while the kubelet was down.
@@ -142,21 +145,21 @@ func TestKubeletRestartsAndRestoresMap(c clientset.Interface, f *framework.Frame
 // checkSubpath is true indicating whether the subpath should be checked.
 func TestVolumeUnmountsFromDeletedPodWithForceOption(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod, forceDelete bool, checkSubpath bool) {
 	nodeIP, err := getHostAddress(c, clientPod)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	nodeIP = nodeIP + ":22"
 
 	ginkgo.By("Expecting the volume mount to be found.")
-	result, err := e2essh.SSH(fmt.Sprintf("mount | grep %s | grep -v volume-subpaths", clientPod.UID), nodeIP, framework.TestContext.Provider)
+	result, err := e2essh.SSH(fmt.Sprintf("mount | grep %s | grep -v volume-subpaths", clientPod.UID), nodeIP, e2econfig.TestContext.Provider)
 	e2essh.LogResult(result)
-	framework.ExpectNoError(err, "Encountered SSH error.")
-	framework.ExpectEqual(result.Code, 0, fmt.Sprintf("Expected grep exit code of 0, got %d", result.Code))
+	e2eutils.ExpectNoError(err, "Encountered SSH error.")
+	e2eutils.ExpectEqual(result.Code, 0, fmt.Sprintf("Expected grep exit code of 0, got %d", result.Code))
 
 	if checkSubpath {
 		ginkgo.By("Expecting the volume subpath mount to be found.")
-		result, err := e2essh.SSH(fmt.Sprintf("cat /proc/self/mountinfo | grep %s | grep volume-subpaths", clientPod.UID), nodeIP, framework.TestContext.Provider)
+		result, err := e2essh.SSH(fmt.Sprintf("cat /proc/self/mountinfo | grep %s | grep volume-subpaths", clientPod.UID), nodeIP, e2econfig.TestContext.Provider)
 		e2essh.LogResult(result)
-		framework.ExpectNoError(err, "Encountered SSH error.")
-		framework.ExpectEqual(result.Code, 0, fmt.Sprintf("Expected grep exit code of 0, got %d", result.Code))
+		e2eutils.ExpectNoError(err, "Encountered SSH error.")
+		e2eutils.ExpectEqual(result.Code, 0, fmt.Sprintf("Expected grep exit code of 0, got %d", result.Code))
 	}
 
 	// This command is to make sure kubelet is started after test finishes no matter it fails or not.
@@ -172,13 +175,13 @@ func TestVolumeUnmountsFromDeletedPodWithForceOption(c clientset.Interface, f *f
 	} else {
 		err = c.CoreV1().Pods(clientPod.Namespace).Delete(context.TODO(), clientPod.Name, metav1.DeleteOptions{})
 	}
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	ginkgo.By("Starting the kubelet and waiting for pod to delete.")
 	KubeletCommand(KStart, c, clientPod)
 	err = e2epod.WaitForPodNotFoundInNamespace(f.ClientSet, clientPod.Name, f.Namespace.Name, f.Timeouts.PodDelete)
 	if err != nil {
-		framework.ExpectNoError(err, "Expected pod to be not found.")
+		e2eutils.ExpectNoError(err, "Expected pod to be not found.")
 	}
 
 	if forceDelete {
@@ -188,19 +191,19 @@ func TestVolumeUnmountsFromDeletedPodWithForceOption(c clientset.Interface, f *f
 	}
 
 	ginkgo.By("Expecting the volume mount not to be found.")
-	result, err = e2essh.SSH(fmt.Sprintf("mount | grep %s | grep -v volume-subpaths", clientPod.UID), nodeIP, framework.TestContext.Provider)
+	result, err = e2essh.SSH(fmt.Sprintf("mount | grep %s | grep -v volume-subpaths", clientPod.UID), nodeIP, e2econfig.TestContext.Provider)
 	e2essh.LogResult(result)
-	framework.ExpectNoError(err, "Encountered SSH error.")
+	e2eutils.ExpectNoError(err, "Encountered SSH error.")
 	gomega.Expect(result.Stdout).To(gomega.BeEmpty(), "Expected grep stdout to be empty (i.e. no mount found).")
-	framework.Logf("Volume unmounted on node %s", clientPod.Spec.NodeName)
+	e2eutils.Logf("Volume unmounted on node %s", clientPod.Spec.NodeName)
 
 	if checkSubpath {
 		ginkgo.By("Expecting the volume subpath mount not to be found.")
-		result, err = e2essh.SSH(fmt.Sprintf("cat /proc/self/mountinfo | grep %s | grep volume-subpaths", clientPod.UID), nodeIP, framework.TestContext.Provider)
+		result, err = e2essh.SSH(fmt.Sprintf("cat /proc/self/mountinfo | grep %s | grep volume-subpaths", clientPod.UID), nodeIP, e2econfig.TestContext.Provider)
 		e2essh.LogResult(result)
-		framework.ExpectNoError(err, "Encountered SSH error.")
+		e2eutils.ExpectNoError(err, "Encountered SSH error.")
 		gomega.Expect(result.Stdout).To(gomega.BeEmpty(), "Expected grep stdout to be empty (i.e. no subpath mount found).")
-		framework.Logf("Subpath volume unmounted on node %s", clientPod.Spec.NodeName)
+		e2eutils.Logf("Subpath volume unmounted on node %s", clientPod.Spec.NodeName)
 	}
 }
 
@@ -218,32 +221,32 @@ func TestVolumeUnmountsFromForceDeletedPod(c clientset.Interface, f *framework.F
 // forceDelete is true indicating whether the pod is forcefully deleted.
 func TestVolumeUnmapsFromDeletedPodWithForceOption(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod, forceDelete bool) {
 	nodeIP, err := getHostAddress(c, clientPod)
-	framework.ExpectNoError(err, "Failed to get nodeIP.")
+	e2eutils.ExpectNoError(err, "Failed to get nodeIP.")
 	nodeIP = nodeIP + ":22"
 
 	// Creating command to check whether path exists
 	podDirectoryCmd := fmt.Sprintf("ls /var/lib/kubelet/pods/%s/volumeDevices/*/ | grep '.'", clientPod.UID)
-	if isSudoPresent(nodeIP, framework.TestContext.Provider) {
+	if isSudoPresent(nodeIP, e2econfig.TestContext.Provider) {
 		podDirectoryCmd = fmt.Sprintf("sudo sh -c \"%s\"", podDirectoryCmd)
 	}
 	// Directories in the global directory have unpredictable names, however, device symlinks
 	// have the same name as pod.UID. So just find anything with pod.UID name.
 	globalBlockDirectoryCmd := fmt.Sprintf("find /var/lib/kubelet/plugins -name %s", clientPod.UID)
-	if isSudoPresent(nodeIP, framework.TestContext.Provider) {
+	if isSudoPresent(nodeIP, e2econfig.TestContext.Provider) {
 		globalBlockDirectoryCmd = fmt.Sprintf("sudo sh -c \"%s\"", globalBlockDirectoryCmd)
 	}
 
 	ginkgo.By("Expecting the symlinks from PodDeviceMapPath to be found.")
-	result, err := e2essh.SSH(podDirectoryCmd, nodeIP, framework.TestContext.Provider)
+	result, err := e2essh.SSH(podDirectoryCmd, nodeIP, e2econfig.TestContext.Provider)
 	e2essh.LogResult(result)
-	framework.ExpectNoError(err, "Encountered SSH error.")
-	framework.ExpectEqual(result.Code, 0, fmt.Sprintf("Expected grep exit code of 0, got %d", result.Code))
+	e2eutils.ExpectNoError(err, "Encountered SSH error.")
+	e2eutils.ExpectEqual(result.Code, 0, fmt.Sprintf("Expected grep exit code of 0, got %d", result.Code))
 
 	ginkgo.By("Expecting the symlinks from global map path to be found.")
-	result, err = e2essh.SSH(globalBlockDirectoryCmd, nodeIP, framework.TestContext.Provider)
+	result, err = e2essh.SSH(globalBlockDirectoryCmd, nodeIP, e2econfig.TestContext.Provider)
 	e2essh.LogResult(result)
-	framework.ExpectNoError(err, "Encountered SSH error.")
-	framework.ExpectEqual(result.Code, 0, fmt.Sprintf("Expected find exit code of 0, got %d", result.Code))
+	e2eutils.ExpectNoError(err, "Encountered SSH error.")
+	e2eutils.ExpectEqual(result.Code, 0, fmt.Sprintf("Expected find exit code of 0, got %d", result.Code))
 
 	// This command is to make sure kubelet is started after test finishes no matter it fails or not.
 	defer func() {
@@ -258,12 +261,12 @@ func TestVolumeUnmapsFromDeletedPodWithForceOption(c clientset.Interface, f *fra
 	} else {
 		err = c.CoreV1().Pods(clientPod.Namespace).Delete(context.TODO(), clientPod.Name, metav1.DeleteOptions{})
 	}
-	framework.ExpectNoError(err, "Failed to delete pod.")
+	e2eutils.ExpectNoError(err, "Failed to delete pod.")
 
 	ginkgo.By("Starting the kubelet and waiting for pod to delete.")
 	KubeletCommand(KStart, c, clientPod)
 	err = e2epod.WaitForPodNotFoundInNamespace(f.ClientSet, clientPod.Name, f.Namespace.Name, f.Timeouts.PodDelete)
-	framework.ExpectNoError(err, "Expected pod to be not found.")
+	e2eutils.ExpectNoError(err, "Expected pod to be not found.")
 
 	if forceDelete {
 		// With forceDelete, since pods are immediately deleted from API server, there is no way to be sure when volumes are torn down
@@ -272,18 +275,18 @@ func TestVolumeUnmapsFromDeletedPodWithForceOption(c clientset.Interface, f *fra
 	}
 
 	ginkgo.By("Expecting the symlink from PodDeviceMapPath not to be found.")
-	result, err = e2essh.SSH(podDirectoryCmd, nodeIP, framework.TestContext.Provider)
+	result, err = e2essh.SSH(podDirectoryCmd, nodeIP, e2econfig.TestContext.Provider)
 	e2essh.LogResult(result)
-	framework.ExpectNoError(err, "Encountered SSH error.")
+	e2eutils.ExpectNoError(err, "Encountered SSH error.")
 	gomega.Expect(result.Stdout).To(gomega.BeEmpty(), "Expected grep stdout to be empty.")
 
 	ginkgo.By("Expecting the symlinks from global map path not to be found.")
-	result, err = e2essh.SSH(globalBlockDirectoryCmd, nodeIP, framework.TestContext.Provider)
+	result, err = e2essh.SSH(globalBlockDirectoryCmd, nodeIP, e2econfig.TestContext.Provider)
 	e2essh.LogResult(result)
-	framework.ExpectNoError(err, "Encountered SSH error.")
+	e2eutils.ExpectNoError(err, "Encountered SSH error.")
 	gomega.Expect(result.Stdout).To(gomega.BeEmpty(), "Expected find stdout to be empty.")
 
-	framework.Logf("Volume unmaped on node %s", clientPod.Spec.NodeName)
+	e2eutils.Logf("Volume unmaped on node %s", clientPod.Spec.NodeName)
 }
 
 // TestVolumeUnmapsFromDeletedPod tests that a volume unmaps if the client pod was deleted while the kubelet was down.
@@ -297,7 +300,7 @@ func TestVolumeUnmapsFromForceDeletedPod(c clientset.Interface, f *framework.Fra
 }
 
 // RunInPodWithVolume runs a command in a pod with given claim mounted to /mnt directory.
-func RunInPodWithVolume(c clientset.Interface, t *framework.TimeoutContext, ns, claimName, command string) {
+func RunInPodWithVolume(c clientset.Interface, t *e2econfig.TimeoutContext, ns, claimName, command string) {
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
@@ -336,11 +339,11 @@ func RunInPodWithVolume(c clientset.Interface, t *framework.TimeoutContext, ns, 
 		},
 	}
 	pod, err := c.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
-	framework.ExpectNoError(err, "Failed to create pod: %v", err)
+	e2eutils.ExpectNoError(err, "Failed to create pod: %v", err)
 	defer func() {
 		e2epod.DeletePodOrFail(c, ns, pod.Name)
 	}()
-	framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespaceTimeout(c, pod.Name, pod.Namespace, t.PodStartSlow))
+	e2eutils.ExpectNoError(e2epod.WaitForPodSuccessInNamespaceTimeout(c, pod.Name, pod.Namespace, t.PodStartSlow))
 }
 
 // StartExternalProvisioner create external provisioner pod
@@ -406,13 +409,13 @@ func StartExternalProvisioner(c clientset.Interface, ns string, externalPluginNa
 		},
 	}
 	provisionerPod, err := podClient.Create(context.TODO(), provisionerPod, metav1.CreateOptions{})
-	framework.ExpectNoError(err, "Failed to create %s pod: %v", provisionerPod.Name, err)
+	e2eutils.ExpectNoError(err, "Failed to create %s pod: %v", provisionerPod.Name, err)
 
-	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(c, provisionerPod))
+	e2eutils.ExpectNoError(e2epod.WaitForPodRunningInNamespace(c, provisionerPod))
 
 	ginkgo.By("locating the provisioner pod")
 	pod, err := podClient.Get(context.TODO(), provisionerPod.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err, "Cannot locate the provisioner pod %v: %v", provisionerPod.Name, err)
+	e2eutils.ExpectNoError(err, "Cannot locate the provisioner pod %v: %v", provisionerPod.Name, err)
 
 	return pod
 }
@@ -453,22 +456,22 @@ func PrivilegedTestPSPClusterRoleBinding(client clientset.Interface,
 			_, err := roleBindingClient.Get(context.TODO(), binding.GetName(), metav1.GetOptions{})
 			return apierrors.IsNotFound(err), nil
 		})
-		framework.ExpectNoError(err, "Timed out waiting for RBAC binding %s deletion: %v", binding.GetName(), err)
+		e2eutils.ExpectNoError(err, "Timed out waiting for RBAC binding %s deletion: %v", binding.GetName(), err)
 
 		if teardown {
 			continue
 		}
 
 		_, err = roleBindingClient.Create(context.TODO(), binding, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "Failed to create %s role binding: %v", binding.GetName(), err)
+		e2eutils.ExpectNoError(err, "Failed to create %s role binding: %v", binding.GetName(), err)
 
 	}
 }
 
 func isSudoPresent(nodeIP string, provider string) bool {
-	framework.Logf("Checking if sudo command is present")
+	e2eutils.Logf("Checking if sudo command is present")
 	sshResult, err := e2essh.SSH("sudo --version", nodeIP, provider)
-	framework.ExpectNoError(err, "SSH to %q errored.", nodeIP)
+	e2eutils.ExpectNoError(err, "SSH to %q errored.", nodeIP)
 	if !strings.Contains(sshResult.Stderr, "command not found") {
 		return true
 	}
@@ -479,30 +482,30 @@ func isSudoPresent(nodeIP string, provider string) bool {
 func CheckReadWriteToPath(f *framework.Framework, pod *v1.Pod, volMode v1.PersistentVolumeMode, path string) {
 	if volMode == v1.PersistentVolumeBlock {
 		// random -> file1
-		e2evolume.VerifyExecInPodSucceed(f, pod, "dd if=/dev/urandom of=/tmp/file1 bs=64 count=1")
+		e2evolume.VerifyExecInPodSucceed(f.ClientSet, f.Namespace.Name, pod, "dd if=/dev/urandom of=/tmp/file1 bs=64 count=1")
 		// file1 -> dev (write to dev)
-		e2evolume.VerifyExecInPodSucceed(f, pod, fmt.Sprintf("dd if=/tmp/file1 of=%s bs=64 count=1", path))
+		e2evolume.VerifyExecInPodSucceed(f.ClientSet, f.Namespace.Name, pod, fmt.Sprintf("dd if=/tmp/file1 of=%s bs=64 count=1", path))
 		// dev -> file2 (read from dev)
-		e2evolume.VerifyExecInPodSucceed(f, pod, fmt.Sprintf("dd if=%s of=/tmp/file2 bs=64 count=1", path))
+		e2evolume.VerifyExecInPodSucceed(f.ClientSet, f.Namespace.Name, pod, fmt.Sprintf("dd if=%s of=/tmp/file2 bs=64 count=1", path))
 		// file1 == file2 (check contents)
-		e2evolume.VerifyExecInPodSucceed(f, pod, "diff /tmp/file1 /tmp/file2")
+		e2evolume.VerifyExecInPodSucceed(f.ClientSet, f.Namespace.Name, pod, "diff /tmp/file1 /tmp/file2")
 		// Clean up temp files
-		e2evolume.VerifyExecInPodSucceed(f, pod, "rm -f /tmp/file1 /tmp/file2")
+		e2evolume.VerifyExecInPodSucceed(f.ClientSet, f.Namespace.Name, pod, "rm -f /tmp/file1 /tmp/file2")
 
 		// Check that writing file to block volume fails
-		e2evolume.VerifyExecInPodFail(f, pod, fmt.Sprintf("echo 'Hello world.' > %s/file1.txt", path), 1)
+		e2evolume.VerifyExecInPodFail(f.ClientSet, f.Namespace.Name, pod, fmt.Sprintf("echo 'Hello world.' > %s/file1.txt", path), 1)
 	} else {
 		// text -> file1 (write to file)
-		e2evolume.VerifyExecInPodSucceed(f, pod, fmt.Sprintf("echo 'Hello world.' > %s/file1.txt", path))
+		e2evolume.VerifyExecInPodSucceed(f.ClientSet, f.Namespace.Name, pod, fmt.Sprintf("echo 'Hello world.' > %s/file1.txt", path))
 		// grep file1 (read from file and check contents)
-		e2evolume.VerifyExecInPodSucceed(f, pod, readFile("Hello word.", path))
+		e2evolume.VerifyExecInPodSucceed(f.ClientSet, f.Namespace.Name, pod, readFile("Hello word.", path))
 		// Check that writing to directory as block volume fails
-		e2evolume.VerifyExecInPodFail(f, pod, fmt.Sprintf("dd if=/dev/urandom of=%s bs=64 count=1", path), 1)
+		e2evolume.VerifyExecInPodFail(f.ClientSet, f.Namespace.Name, pod, fmt.Sprintf("dd if=/dev/urandom of=%s bs=64 count=1", path), 1)
 	}
 }
 
 func readFile(content, path string) string {
-	if framework.NodeOSDistroIs("windows") {
+	if e2eutils.NodeOSDistroIs("windows") {
 		return fmt.Sprintf("Select-String '%s' %s/file1.txt", content, path)
 	}
 	return fmt.Sprintf("grep 'Hello world.' %s/file1.txt", path)
@@ -543,8 +546,8 @@ func CheckReadFromPath(f *framework.Framework, pod *v1.Pod, volMode v1.Persisten
 
 	sum := sha256.Sum256(genBinDataFromSeed(len, seed))
 
-	e2evolume.VerifyExecInPodSucceed(f, pod, fmt.Sprintf("dd if=%s %s bs=%d count=1 | sha256sum", pathForVolMode, iflag, len))
-	e2evolume.VerifyExecInPodSucceed(f, pod, fmt.Sprintf("dd if=%s %s bs=%d count=1 | sha256sum | grep -Fq %x", pathForVolMode, iflag, len, sum))
+	e2evolume.VerifyExecInPodSucceed(f.ClientSet, f.Namespace.Name, pod, fmt.Sprintf("dd if=%s %s bs=%d count=1 | sha256sum", pathForVolMode, iflag, len))
+	e2evolume.VerifyExecInPodSucceed(f.ClientSet, f.Namespace.Name, pod, fmt.Sprintf("dd if=%s %s bs=%d count=1 | sha256sum | grep -Fq %x", pathForVolMode, iflag, len, sum))
 }
 
 // CheckWriteToPath that file can be properly written.
@@ -568,16 +571,16 @@ func CheckWriteToPath(f *framework.Framework, pod *v1.Pod, volMode v1.Persistent
 
 	encoded := base64.StdEncoding.EncodeToString(genBinDataFromSeed(len, seed))
 
-	e2evolume.VerifyExecInPodSucceed(f, pod, fmt.Sprintf("echo %s | base64 -d | sha256sum", encoded))
-	e2evolume.VerifyExecInPodSucceed(f, pod, fmt.Sprintf("echo %s | base64 -d | dd of=%s %s bs=%d count=1", encoded, pathForVolMode, oflag, len))
+	e2evolume.VerifyExecInPodSucceed(f.ClientSet, f.Namespace.Name, pod, fmt.Sprintf("echo %s | base64 -d | sha256sum", encoded))
+	e2evolume.VerifyExecInPodSucceed(f.ClientSet, f.Namespace.Name, pod, fmt.Sprintf("echo %s | base64 -d | dd of=%s %s bs=%d count=1", encoded, pathForVolMode, oflag, len))
 }
 
 // GetSectorSize returns the sector size of the device.
 func GetSectorSize(f *framework.Framework, pod *v1.Pod, device string) int {
-	stdout, _, err := e2evolume.PodExec(f, pod, fmt.Sprintf("blockdev --getss %s", device))
-	framework.ExpectNoError(err, "Failed to get sector size of %s", device)
+	stdout, _, err := e2evolume.PodExec(f.ClientSet, f.Namespace.Name, pod, fmt.Sprintf("blockdev --getss %s", device))
+	e2eutils.ExpectNoError(err, "Failed to get sector size of %s", device)
 	ss, err := strconv.Atoi(stdout)
-	framework.ExpectNoError(err, "Sector size returned by blockdev command isn't integer value.")
+	e2eutils.ExpectNoError(err, "Sector size returned by blockdev command isn't integer value.")
 
 	return ss
 }
@@ -585,7 +588,7 @@ func GetSectorSize(f *framework.Framework, pod *v1.Pod, device string) int {
 // findMountPoints returns all mount points on given node under specified directory.
 func findMountPoints(hostExec HostExec, node *v1.Node, dir string) []string {
 	result, err := hostExec.IssueCommandWithResult(fmt.Sprintf(`find %s -type d -exec mountpoint {} \; | grep 'is a mountpoint$' || true`, dir), node)
-	framework.ExpectNoError(err, "Encountered HostExec error.")
+	e2eutils.ExpectNoError(err, "Encountered HostExec error.")
 	var mountPoints []string
 	if err != nil {
 		for _, line := range strings.Split(result, "\n") {
@@ -612,31 +615,31 @@ func CreateDriverNamespace(f *framework.Framework) *v1.Namespace {
 		"e2e-framework":      f.BaseName,
 		"e2e-test-namespace": f.Namespace.Name,
 	})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
-	if framework.TestContext.VerifyServiceAccount {
+	if e2econfig.TestContext.VerifyServiceAccount {
 		ginkgo.By("Waiting for a default service account to be provisioned in namespace")
-		err = framework.WaitForDefaultServiceAccountInNamespace(f.ClientSet, namespace.Name)
-		framework.ExpectNoError(err)
+		err = e2eutils.WaitForDefaultServiceAccountInNamespace(f.ClientSet, namespace.Name)
+		e2eutils.ExpectNoError(err)
 	} else {
-		framework.Logf("Skipping waiting for service account")
+		e2eutils.Logf("Skipping waiting for service account")
 	}
 	return namespace
 }
 
 // WaitForGVRDeletion waits until a non-namespaced object has been deleted
 func WaitForGVRDeletion(c dynamic.Interface, gvr schema.GroupVersionResource, objectName string, poll, timeout time.Duration) error {
-	framework.Logf("Waiting up to %v for %s %s to be deleted", timeout, gvr.Resource, objectName)
+	e2eutils.Logf("Waiting up to %v for %s %s to be deleted", timeout, gvr.Resource, objectName)
 
 	if successful := WaitUntil(poll, timeout, func() bool {
 		_, err := c.Resource(gvr).Get(context.TODO(), objectName, metav1.GetOptions{})
 		if err != nil && apierrors.IsNotFound(err) {
-			framework.Logf("%s %v is not found and has been deleted", gvr.Resource, objectName)
+			e2eutils.Logf("%s %v is not found and has been deleted", gvr.Resource, objectName)
 			return true
 		} else if err != nil {
-			framework.Logf("Get %s returned an error: %v", objectName, err.Error())
+			e2eutils.Logf("Get %s returned an error: %v", objectName, err.Error())
 		} else {
-			framework.Logf("%s %v has been found and is not deleted", gvr.Resource, objectName)
+			e2eutils.Logf("%s %v has been found and is not deleted", gvr.Resource, objectName)
 		}
 
 		return false
@@ -649,17 +652,17 @@ func WaitForGVRDeletion(c dynamic.Interface, gvr schema.GroupVersionResource, ob
 
 // WaitForNamespacedGVRDeletion waits until a namespaced object has been deleted
 func WaitForNamespacedGVRDeletion(c dynamic.Interface, gvr schema.GroupVersionResource, ns, objectName string, poll, timeout time.Duration) error {
-	framework.Logf("Waiting up to %v for %s %s to be deleted", timeout, gvr.Resource, objectName)
+	e2eutils.Logf("Waiting up to %v for %s %s to be deleted", timeout, gvr.Resource, objectName)
 
 	if successful := WaitUntil(poll, timeout, func() bool {
 		_, err := c.Resource(gvr).Namespace(ns).Get(context.TODO(), objectName, metav1.GetOptions{})
 		if err != nil && apierrors.IsNotFound(err) {
-			framework.Logf("%s %s is not found in namespace %s and has been deleted", gvr.Resource, objectName, ns)
+			e2eutils.Logf("%s %s is not found in namespace %s and has been deleted", gvr.Resource, objectName, ns)
 			return true
 		} else if err != nil {
-			framework.Logf("Get %s in namespace %s returned an error: %v", objectName, ns, err.Error())
+			e2eutils.Logf("Get %s in namespace %s returned an error: %v", objectName, ns, err.Error())
 		} else {
-			framework.Logf("%s %s has been found in namespace %s and is not deleted", gvr.Resource, objectName, ns)
+			e2eutils.Logf("%s %s has been found in namespace %s and is not deleted", gvr.Resource, objectName, ns)
 		}
 
 		return false
@@ -674,19 +677,19 @@ func WaitForNamespacedGVRDeletion(c dynamic.Interface, gvr schema.GroupVersionRe
 func WaitUntil(poll, timeout time.Duration, checkDone func() bool) bool {
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
 		if checkDone() {
-			framework.Logf("WaitUntil finished successfully after %v", time.Since(start))
+			e2eutils.Logf("WaitUntil finished successfully after %v", time.Since(start))
 			return true
 		}
 	}
 
-	framework.Logf("WaitUntil failed after reaching the timeout %v", timeout)
+	e2eutils.Logf("WaitUntil failed after reaching the timeout %v", timeout)
 	return false
 }
 
 // WaitForGVRFinalizer waits until a object from a given GVR contains a finalizer
 // If namespace is empty, assume it is a non-namespaced object
 func WaitForGVRFinalizer(ctx context.Context, c dynamic.Interface, gvr schema.GroupVersionResource, objectName, objectNamespace, finalizer string, poll, timeout time.Duration) error {
-	framework.Logf("Waiting up to %v for object %s %s of resource %s to contain finalizer %s", timeout, objectNamespace, objectName, gvr.Resource, finalizer)
+	e2eutils.Logf("Waiting up to %v for object %s %s of resource %s to contain finalizer %s", timeout, objectNamespace, objectName, gvr.Resource, finalizer)
 	var (
 		err      error
 		resource *unstructured.Unstructured
@@ -699,7 +702,7 @@ func WaitForGVRFinalizer(ctx context.Context, c dynamic.Interface, gvr schema.Gr
 			resource, err = c.Resource(gvr).Namespace(objectNamespace).Get(ctx, objectName, metav1.GetOptions{})
 		}
 		if err != nil {
-			framework.Logf("Failed to get object %s %s with err: %v. Will retry in %v", objectNamespace, objectName, err, timeout)
+			e2eutils.Logf("Failed to get object %s %s with err: %v. Will retry in %v", objectNamespace, objectName, err, timeout)
 			return false
 		}
 		for _, f := range resource.GetFinalizers() {
@@ -720,19 +723,19 @@ func WaitForGVRFinalizer(ctx context.Context, c dynamic.Interface, gvr schema.Gr
 // VerifyFilePathGidInPod verfies expected GID of the target filepath
 func VerifyFilePathGidInPod(f *framework.Framework, filePath, expectedGid string, pod *v1.Pod) {
 	cmd := fmt.Sprintf("ls -l %s", filePath)
-	stdout, stderr, err := e2evolume.PodExec(f, pod, cmd)
-	framework.ExpectNoError(err)
-	framework.Logf("pod %s/%s exec for cmd %s, stdout: %s, stderr: %s", pod.Namespace, pod.Name, cmd, stdout, stderr)
+	stdout, stderr, err := e2evolume.PodExec(f.ClientSet, f.Namespace.Name, pod, cmd)
+	e2eutils.ExpectNoError(err)
+	e2eutils.Logf("pod %s/%s exec for cmd %s, stdout: %s, stderr: %s", pod.Namespace, pod.Name, cmd, stdout, stderr)
 	ll := strings.Fields(stdout)
-	framework.Logf("stdout split: %v, expected gid: %v", ll, expectedGid)
-	framework.ExpectEqual(ll[3], expectedGid)
+	e2eutils.Logf("stdout split: %v, expected gid: %v", ll, expectedGid)
+	e2eutils.ExpectEqual(ll[3], expectedGid)
 }
 
 // ChangeFilePathGidInPod changes the GID of the target filepath.
 func ChangeFilePathGidInPod(f *framework.Framework, filePath, targetGid string, pod *v1.Pod) {
 	cmd := fmt.Sprintf("chgrp %s %s", targetGid, filePath)
-	_, _, err := e2evolume.PodExec(f, pod, cmd)
-	framework.ExpectNoError(err)
+	_, _, err := e2evolume.PodExec(f.ClientSet, f.Namespace.Name, pod, cmd)
+	e2eutils.ExpectNoError(err)
 	VerifyFilePathGidInPod(f, filePath, targetGid, pod)
 }
 

@@ -22,6 +22,9 @@ import (
 	"strings"
 	"time"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -100,7 +103,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		ns = fr.Namespace.Name
 
 		nodes, err := e2enode.GetBoundedReadySchedulableNodes(cs, 2)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		if len(nodes.Items) < 2 {
 			e2eskipper.Skipf(
 				"Test requires >= 2 Ready nodes, but there are only %v nodes",
@@ -108,12 +111,12 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		}
 
 		family := v1.IPv4Protocol
-		if framework.TestContext.ClusterIsIPv6() {
+		if e2econfig.TestContext.ClusterIsIPv6() {
 			family = v1.IPv6Protocol
 		}
 
 		ips := e2enode.GetAddressesByTypeAndFamily(&nodes.Items[0], v1.NodeInternalIP, family)
-		framework.ExpectNotEqual(len(ips), 0)
+		e2eutils.ExpectNotEqual(len(ips), 0)
 
 		clientNodeInfo = nodeInfo{
 			name:   nodes.Items[0].Name,
@@ -121,7 +124,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		}
 
 		ips = e2enode.GetAddressesByTypeAndFamily(&nodes.Items[1], v1.NodeInternalIP, family)
-		framework.ExpectNotEqual(len(ips), 0)
+		e2eutils.ExpectNotEqual(len(ips), 0)
 
 		serverNodeInfo = nodeInfo{
 			name:   nodes.Items[1].Name,
@@ -140,7 +143,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 				{Port: 80, Name: "udp", Protocol: v1.ProtocolUDP, TargetPort: intstr.FromInt(80)},
 			}
 		})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		// Create a pod in one node to create the UDP traffic against the NodePort service every 5 seconds
 		ginkgo.By("creating a client pod for probing the service " + serviceName)
@@ -154,8 +157,8 @@ var _ = common.SIGDescribe("Conntrack", func() {
 
 		// Read the client pod logs
 		logs, err := e2epod.GetPodLogs(cs, ns, podClient, podClient)
-		framework.ExpectNoError(err)
-		framework.Logf("Pod client logs: %s", logs)
+		e2eutils.ExpectNoError(err)
+		e2eutils.Logf("Pod client logs: %s", logs)
 
 		// Add a backend pod to the service in the other node
 		ginkgo.By("creating a backend pod " + podBackend1 + " for the service " + serviceName)
@@ -175,9 +178,9 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		ginkgo.By("checking client pod connected to the backend 1 on Node IP " + serverNodeInfo.nodeIP)
 		if err := wait.PollImmediate(5*time.Second, time.Minute, logContainsFn(podBackend1, podClient)); err != nil {
 			logs, err = e2epod.GetPodLogs(cs, ns, podClient, podClient)
-			framework.ExpectNoError(err)
-			framework.Logf("Pod client logs: %s", logs)
-			framework.Failf("Failed to connect to backend 1")
+			e2eutils.ExpectNoError(err)
+			e2eutils.Logf("Pod client logs: %s", logs)
+			e2eutils.Failf("Failed to connect to backend 1")
 		}
 
 		// Create a second pod
@@ -189,8 +192,8 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		fr.PodClient().CreateSync(serverPod2)
 
 		// and delete the first pod
-		framework.Logf("Cleaning up %s pod", podBackend1)
-		fr.PodClient().DeleteSync(podBackend1, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+		e2eutils.Logf("Cleaning up %s pod", podBackend1)
+		fr.PodClient().DeleteSync(podBackend1, metav1.DeleteOptions{}, e2eutils.DefaultPodDeletionTimeout)
 
 		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{podBackend2: {80}})
 
@@ -199,9 +202,9 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		ginkgo.By("checking client pod connected to the backend 2 on Node IP " + serverNodeInfo.nodeIP)
 		if err := wait.PollImmediate(5*time.Second, time.Minute, logContainsFn(podBackend2, podClient)); err != nil {
 			logs, err = e2epod.GetPodLogs(cs, ns, podClient, podClient)
-			framework.ExpectNoError(err)
-			framework.Logf("Pod client logs: %s", logs)
-			framework.Failf("Failed to connect to backend 2")
+			e2eutils.ExpectNoError(err)
+			e2eutils.Logf("Pod client logs: %s", logs)
+			e2eutils.Failf("Failed to connect to backend 2")
 		}
 	})
 
@@ -216,7 +219,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 				{Port: 80, Name: "udp", Protocol: v1.ProtocolUDP, TargetPort: intstr.FromInt(80)},
 			}
 		})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		// Create a pod in one node to create the UDP traffic against the ClusterIP service every 5 seconds
 		ginkgo.By("creating a client pod for probing the service " + serviceName)
@@ -230,8 +233,8 @@ var _ = common.SIGDescribe("Conntrack", func() {
 
 		// Read the client pod logs
 		logs, err := e2epod.GetPodLogs(cs, ns, podClient, podClient)
-		framework.ExpectNoError(err)
-		framework.Logf("Pod client logs: %s", logs)
+		e2eutils.ExpectNoError(err)
+		e2eutils.Logf("Pod client logs: %s", logs)
 
 		// Add a backend pod to the service in the other node
 		ginkgo.By("creating a backend pod " + podBackend1 + " for the service " + serviceName)
@@ -251,9 +254,9 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		ginkgo.By("checking client pod connected to the backend 1 on Node IP " + serverNodeInfo.nodeIP)
 		if err := wait.PollImmediate(5*time.Second, time.Minute, logContainsFn(podBackend1, podClient)); err != nil {
 			logs, err = e2epod.GetPodLogs(cs, ns, podClient, podClient)
-			framework.ExpectNoError(err)
-			framework.Logf("Pod client logs: %s", logs)
-			framework.Failf("Failed to connect to backend 1")
+			e2eutils.ExpectNoError(err)
+			e2eutils.Logf("Pod client logs: %s", logs)
+			e2eutils.Failf("Failed to connect to backend 1")
 		}
 
 		// Create a second pod
@@ -265,8 +268,8 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		fr.PodClient().CreateSync(serverPod2)
 
 		// and delete the first pod
-		framework.Logf("Cleaning up %s pod", podBackend1)
-		fr.PodClient().DeleteSync(podBackend1, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+		e2eutils.Logf("Cleaning up %s pod", podBackend1)
+		fr.PodClient().DeleteSync(podBackend1, metav1.DeleteOptions{}, e2eutils.DefaultPodDeletionTimeout)
 
 		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{podBackend2: {80}})
 
@@ -275,9 +278,9 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		ginkgo.By("checking client pod connected to the backend 2 on Node IP " + serverNodeInfo.nodeIP)
 		if err := wait.PollImmediate(5*time.Second, time.Minute, logContainsFn(podBackend2, podClient)); err != nil {
 			logs, err = e2epod.GetPodLogs(cs, ns, podClient, podClient)
-			framework.ExpectNoError(err)
-			framework.Logf("Pod client logs: %s", logs)
-			framework.Failf("Failed to connect to backend 2")
+			e2eutils.ExpectNoError(err)
+			e2eutils.Logf("Pod client logs: %s", logs)
+			e2eutils.Failf("Failed to connect to backend 2")
 		}
 	})
 
@@ -303,7 +306,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 				{Port: 80, Name: "udp", Protocol: v1.ProtocolUDP, TargetPort: intstr.FromInt(80)},
 			}
 		})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		// Create a pod in one node to create the UDP traffic against the ClusterIP service every 5 seconds
 		ginkgo.By("creating a client pod for probing the service " + serviceName)
@@ -317,8 +320,8 @@ var _ = common.SIGDescribe("Conntrack", func() {
 
 		// Read the client pod logs
 		logs, err := e2epod.GetPodLogs(cs, ns, podClient, podClient)
-		framework.ExpectNoError(err)
-		framework.Logf("Pod client logs: %s", logs)
+		e2eutils.ExpectNoError(err)
+		e2eutils.Logf("Pod client logs: %s", logs)
 
 		// Add a backend pod to the service in the other node
 		ginkgo.By("creating a backend pod " + podBackend1 + " for the service " + serviceName)
@@ -347,9 +350,9 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		ginkgo.By("checking client pod connected to the backend on Node IP " + serverNodeInfo.nodeIP)
 		if err := wait.PollImmediate(5*time.Second, time.Minute, logContainsFn(podBackend1, podClient)); err != nil {
 			logs, err = e2epod.GetPodLogs(cs, ns, podClient, podClient)
-			framework.ExpectNoError(err)
-			framework.Logf("Pod client logs: %s", logs)
-			framework.Failf("Failed to connect to backend pod")
+			e2eutils.ExpectNoError(err)
+			e2eutils.Logf("Pod client logs: %s", logs)
+			e2eutils.Failf("Failed to connect to backend pod")
 		}
 
 	})
@@ -429,7 +432,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 			},
 		}
 		_, err := fr.ClientSet.CoreV1().Services(fr.Namespace.Name).Create(context.TODO(), svc, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		ginkgo.By("Server service created")
 
@@ -464,18 +467,18 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		ginkgo.By("checking client pod does not RST the TCP connection because it receives an INVALID packet")
 		if err := wait.PollImmediate(5*time.Second, time.Minute, logContainsFn("ERROR", "boom-server")); err == nil {
 			logs, err := e2epod.GetPodLogs(cs, ns, "boom-server", "boom-server")
-			framework.ExpectNoError(err)
-			framework.Logf("boom-server pod logs: %s", logs)
-			framework.Failf("boom-server pod received a RST from the client")
+			e2eutils.ExpectNoError(err)
+			e2eutils.Logf("boom-server pod logs: %s", logs)
+			e2eutils.Failf("boom-server pod received a RST from the client")
 		}
 
 		logs, err := e2epod.GetPodLogs(cs, ns, "boom-server", "boom-server")
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		if !strings.Contains(string(logs), "connection established") {
-			framework.Logf("boom-server pod logs: %s", logs)
-			framework.Failf("boom-server pod did not send any bad packet to the client")
+			e2eutils.Logf("boom-server pod logs: %s", logs)
+			e2eutils.Failf("boom-server pod did not send any bad packet to the client")
 		}
-		framework.Logf("boom-server pod logs: %s", logs)
-		framework.Logf("boom-server OK: did not receive any RST packet")
+		e2eutils.Logf("boom-server pod logs: %s", logs)
+		e2eutils.Logf("boom-server OK: did not receive any RST packet")
 	})
 })

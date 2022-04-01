@@ -18,9 +18,10 @@ package netpol
 
 import (
 	"fmt"
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/kubernetes/test/e2e/framework"
 	"strings"
+
+	v1 "k8s.io/api/core/v1"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 )
 
 // TestCase describes the data for a netpol test
@@ -46,7 +47,7 @@ func (pod PodString) String() string {
 func (pod PodString) split() (string, string) {
 	pieces := strings.Split(string(pod), "/")
 	if len(pieces) != 2 {
-		framework.Failf("expected ns/pod, found %+v", pieces)
+		e2eutils.Failf("expected ns/pod, found %+v", pieces)
 	}
 	return pieces[0], pieces[1]
 }
@@ -116,7 +117,7 @@ func (r *Reachability) Expect(from PodString, to PodString, isConnected bool) {
 func (r *Reachability) ExpectAllIngress(pod PodString, connected bool) {
 	r.Expected.SetAllTo(string(pod), connected)
 	if !connected {
-		framework.Logf("Denying all traffic *to* %s", pod)
+		e2eutils.Logf("Denying all traffic *to* %s", pod)
 	}
 }
 
@@ -124,7 +125,7 @@ func (r *Reachability) ExpectAllIngress(pod PodString, connected bool) {
 func (r *Reachability) ExpectAllEgress(pod PodString, connected bool) {
 	r.Expected.SetAllFrom(string(pod), connected)
 	if !connected {
-		framework.Logf("Denying all traffic *from* %s", pod)
+		e2eutils.Logf("Denying all traffic *from* %s", pod)
 	}
 }
 
@@ -150,7 +151,7 @@ func (r *Reachability) Observe(fromPod PodString, toPod PodString, isConnected b
 func (r *Reachability) Summary(ignoreLoopback bool) (trueObs int, falseObs int, ignoredObs int, comparison *TruthTable) {
 	comparison = r.Expected.Compare(r.Observed)
 	if !comparison.IsComplete() {
-		framework.Failf("observations not complete!")
+		e2eutils.Failf("observations not complete!")
 	}
 	falseObs, trueObs, ignoredObs = 0, 0, 0
 	for from, dict := range comparison.Values {
@@ -172,16 +173,16 @@ func (r *Reachability) Summary(ignoreLoopback bool) (trueObs int, falseObs int, 
 func (r *Reachability) PrintSummary(printExpected bool, printObserved bool, printComparison bool) {
 	right, wrong, ignored, comparison := r.Summary(ignoreLoopback)
 	if ignored > 0 {
-		framework.Logf("warning: this test doesn't take into consideration hairpin traffic, i.e. traffic whose source and destination is the same pod: %d cases ignored", ignored)
+		e2eutils.Logf("warning: this test doesn't take into consideration hairpin traffic, i.e. traffic whose source and destination is the same pod: %d cases ignored", ignored)
 	}
-	framework.Logf("reachability: correct:%v, incorrect:%v, result=%t\n\n", right, wrong, wrong == 0)
+	e2eutils.Logf("reachability: correct:%v, incorrect:%v, result=%t\n\n", right, wrong, wrong == 0)
 	if printExpected {
-		framework.Logf("expected:\n\n%s\n\n\n", r.Expected.PrettyPrint(""))
+		e2eutils.Logf("expected:\n\n%s\n\n\n", r.Expected.PrettyPrint(""))
 	}
 	if printObserved {
-		framework.Logf("observed:\n\n%s\n\n\n", r.Observed.PrettyPrint(""))
+		e2eutils.Logf("observed:\n\n%s\n\n\n", r.Observed.PrettyPrint(""))
 	}
 	if printComparison {
-		framework.Logf("comparison:\n\n%s\n\n\n", comparison.PrettyPrint(""))
+		e2eutils.Logf("comparison:\n\n%s\n\n\n", comparison.PrettyPrint(""))
 	}
 }

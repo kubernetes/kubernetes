@@ -19,9 +19,11 @@ package framework
 import (
 	"fmt"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 
-	"k8s.io/kubernetes/test/e2e/framework"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 )
@@ -120,10 +122,10 @@ func SkipInvalidDriverPatternCombination(driver TestDriver, pattern TestPattern)
 	if !dInfo.SupportedFsType.Has(pattern.FsType) {
 		e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.FsType)
 	}
-	if pattern.FsType == "xfs" && framework.NodeOSDistroIs("windows") {
+	if pattern.FsType == "xfs" && e2eutils.NodeOSDistroIs("windows") {
 		e2eskipper.Skipf("Distro doesn't support xfs -- skipping")
 	}
-	if pattern.FsType == "ntfs" && !framework.NodeOSDistroIs("windows") {
-		e2eskipper.Skipf("Distro %s doesn't support ntfs -- skipping", framework.TestContext.NodeOSDistro)
+	if pattern.FsType == "ntfs" && !e2eutils.NodeOSDistroIs("windows") {
+		e2eskipper.Skipf("Distro %s doesn't support ntfs -- skipping", e2econfig.TestContext.NodeOSDistro)
 	}
 }

@@ -21,11 +21,12 @@ import (
 	"fmt"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/test/e2e/framework"
 	"sigs.k8s.io/yaml"
 )
 
@@ -37,38 +38,38 @@ const (
 // prettyPrint a networkPolicy
 func prettyPrint(policy *networkingv1.NetworkPolicy) string {
 	raw, err := yaml.Marshal(policy)
-	framework.ExpectNoError(err, "marshal network policy to yaml")
+	e2eutils.ExpectNoError(err, "marshal network policy to yaml")
 	return string(raw)
 }
 
 // CreatePolicy creates a policy in the given namespace
 func CreatePolicy(k8s *kubeManager, policy *networkingv1.NetworkPolicy, namespace string) {
 	if isVerbose {
-		framework.Logf("****************************************************************")
-		framework.Logf("Network Policy creating %s/%s \n%s", namespace, policy.Name, prettyPrint(policy))
-		framework.Logf("****************************************************************")
+		e2eutils.Logf("****************************************************************")
+		e2eutils.Logf("Network Policy creating %s/%s \n%s", namespace, policy.Name, prettyPrint(policy))
+		e2eutils.Logf("****************************************************************")
 	}
 
 	_, err := k8s.createNetworkPolicy(namespace, policy)
-	framework.ExpectNoError(err, "Unable to create netpol %s/%s", namespace, policy.Name)
+	e2eutils.ExpectNoError(err, "Unable to create netpol %s/%s", namespace, policy.Name)
 }
 
 // UpdatePolicy updates a networkpolicy
 func UpdatePolicy(k8s *kubeManager, policy *networkingv1.NetworkPolicy, namespace string) {
 	if isVerbose {
-		framework.Logf("****************************************************************")
-		framework.Logf("Network Policy updating %s/%s \n%s", namespace, policy.Name, prettyPrint(policy))
-		framework.Logf("****************************************************************")
+		e2eutils.Logf("****************************************************************")
+		e2eutils.Logf("Network Policy updating %s/%s \n%s", namespace, policy.Name, prettyPrint(policy))
+		e2eutils.Logf("****************************************************************")
 	}
 
 	_, err := k8s.updateNetworkPolicy(namespace, policy)
-	framework.ExpectNoError(err, "Unable to update netpol %s/%s", namespace, policy.Name)
+	e2eutils.ExpectNoError(err, "Unable to update netpol %s/%s", namespace, policy.Name)
 }
 
 // waitForHTTPServers waits for all webservers to be up, on all protocols sent in the input,  and then validates them using the same probe logic as the rest of the suite.
 func waitForHTTPServers(k *kubeManager, model *Model) error {
 	const maxTries = 10
-	framework.Logf("waiting for HTTP servers (ports 80 and/or 81) to become ready")
+	e2eutils.Logf("waiting for HTTP servers (ports 80 and/or 81) to become ready")
 
 	testCases := map[string]*TestCase{}
 	for _, port := range model.Ports {
@@ -92,10 +93,10 @@ func waitForHTTPServers(k *kubeManager, model *Model) error {
 				ProbePodToPodConnectivity(k, model, testCase)
 				_, wrong, _, _ := reachability.Summary(ignoreLoopback)
 				if wrong == 0 {
-					framework.Logf("server %s is ready", caseName)
+					e2eutils.Logf("server %s is ready", caseName)
 					delete(notReady, caseName)
 				} else {
-					framework.Logf("server %s is not ready", caseName)
+					e2eutils.Logf("server %s is not ready", caseName)
 				}
 			}
 		}
@@ -116,25 +117,25 @@ func ValidateOrFail(k8s *kubeManager, model *Model, testCase *TestCase) {
 	ProbePodToPodConnectivity(k8s, model, testCase)
 	// 2nd try, in case first one failed
 	if _, wrong, _, _ := testCase.Reachability.Summary(ignoreLoopback); wrong != 0 {
-		framework.Logf("failed first probe %d wrong results ... retrying (SECOND TRY)", wrong)
+		e2eutils.Logf("failed first probe %d wrong results ... retrying (SECOND TRY)", wrong)
 		ProbePodToPodConnectivity(k8s, model, testCase)
 	}
 
 	// at this point we know if we passed or failed, print final matrix and pass/fail the test.
 	if _, wrong, _, _ := testCase.Reachability.Summary(ignoreLoopback); wrong != 0 {
 		testCase.Reachability.PrintSummary(true, true, true)
-		framework.Failf("Had %d wrong results in reachability matrix", wrong)
+		e2eutils.Failf("Had %d wrong results in reachability matrix", wrong)
 	}
 	if isVerbose {
 		testCase.Reachability.PrintSummary(true, true, true)
 	}
-	framework.Logf("VALIDATION SUCCESSFUL")
+	e2eutils.Logf("VALIDATION SUCCESSFUL")
 }
 
 // UpdateNamespaceLabels sets the labels for a namespace
 func UpdateNamespaceLabels(k8s *kubeManager, ns string, newNsLabel map[string]string) {
 	err := k8s.setNamespaceLabels(ns, newNsLabel)
-	framework.ExpectNoError(err, "Update namespace %s labels", ns)
+	e2eutils.ExpectNoError(err, "Update namespace %s labels", ns)
 	err = wait.PollImmediate(waitInterval, waitTimeout, func() (done bool, err error) {
 		namespace, err := k8s.getNamespace(ns)
 		if err != nil {
@@ -147,13 +148,13 @@ func UpdateNamespaceLabels(k8s *kubeManager, ns string, newNsLabel map[string]st
 		}
 		return true, nil
 	})
-	framework.ExpectNoError(err, "Unable to wait for ns %s to update labels", ns)
+	e2eutils.ExpectNoError(err, "Unable to wait for ns %s to update labels", ns)
 }
 
 // AddPodLabels adds new labels to a deployment's template
 func AddPodLabels(k8s *kubeManager, pod *Pod, newPodLabels map[string]string) {
 	kubePod, err := k8s.clientSet.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err, "Unable to get pod %s/%s", pod.Namespace, pod.Name)
+	e2eutils.ExpectNoError(err, "Unable to get pod %s/%s", pod.Namespace, pod.Name)
 	if kubePod.Labels == nil {
 		kubePod.Labels = map[string]string{}
 	}
@@ -161,7 +162,7 @@ func AddPodLabels(k8s *kubeManager, pod *Pod, newPodLabels map[string]string) {
 		kubePod.Labels[key] = val
 	}
 	_, err = k8s.clientSet.CoreV1().Pods(pod.Namespace).Update(context.TODO(), kubePod, metav1.UpdateOptions{})
-	framework.ExpectNoError(err, "Unable to add pod %s/%s labels", pod.Namespace, pod.Name)
+	e2eutils.ExpectNoError(err, "Unable to add pod %s/%s labels", pod.Namespace, pod.Name)
 
 	err = wait.PollImmediate(waitInterval, waitTimeout, func() (done bool, err error) {
 		waitForPod, err := k8s.getPod(pod.Namespace, pod.Name)
@@ -175,7 +176,7 @@ func AddPodLabels(k8s *kubeManager, pod *Pod, newPodLabels map[string]string) {
 		}
 		return true, nil
 	})
-	framework.ExpectNoError(err, "Unable to wait for pod %s/%s to update labels", pod.Namespace, pod.Name)
+	e2eutils.ExpectNoError(err, "Unable to wait for pod %s/%s to update labels", pod.Namespace, pod.Name)
 }
 
 // ResetNamespaceLabels resets the labels for a namespace
@@ -186,10 +187,10 @@ func ResetNamespaceLabels(k8s *kubeManager, ns string) {
 // ResetPodLabels resets the labels for a deployment's template
 func ResetPodLabels(k8s *kubeManager, pod *Pod) {
 	kubePod, err := k8s.clientSet.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err, "Unable to get pod %s/%s", pod.Namespace, pod.Name)
+	e2eutils.ExpectNoError(err, "Unable to get pod %s/%s", pod.Namespace, pod.Name)
 	kubePod.Labels = pod.LabelSelector()
 	_, err = k8s.clientSet.CoreV1().Pods(pod.Namespace).Update(context.TODO(), kubePod, metav1.UpdateOptions{})
-	framework.ExpectNoError(err, "Unable to add pod %s/%s labels", pod.Namespace, pod.Name)
+	e2eutils.ExpectNoError(err, "Unable to add pod %s/%s labels", pod.Namespace, pod.Name)
 
 	err = wait.PollImmediate(waitInterval, waitTimeout, func() (done bool, err error) {
 		waitForPod, err := k8s.getPod(pod.Namespace, pod.Name)
@@ -203,5 +204,5 @@ func ResetPodLabels(k8s *kubeManager, pod *Pod) {
 		}
 		return true, nil
 	})
-	framework.ExpectNoError(err, "Unable to wait for pod %s/%s to update labels", pod.Namespace, pod.Name)
+	e2eutils.ExpectNoError(err, "Unable to wait for pod %s/%s to update labels", pod.Namespace, pod.Name)
 }

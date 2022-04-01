@@ -26,7 +26,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/daemon"
-	"k8s.io/kubernetes/test/e2e/framework"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 )
 
 func NewDaemonSet(dsName, image string, labels map[string]string, volumes []v1.Volume, mounts []v1.VolumeMount, ports []v1.ContainerPort, args ...string) *appsv1.DaemonSet {
@@ -62,9 +62,9 @@ func NewDaemonSet(dsName, image string, labels map[string]string, volumes []v1.V
 	}
 }
 
-func CheckRunningOnAllNodes(f *framework.Framework, ds *appsv1.DaemonSet) (bool, error) {
-	nodeNames := SchedulableNodes(f.ClientSet, ds)
-	return CheckDaemonPodOnNodes(f, ds, nodeNames)()
+func CheckRunningOnAllNodes(c clientset.Interface, ns string, ds *appsv1.DaemonSet) (bool, error) {
+	nodeNames := SchedulableNodes(c, ds)
+	return CheckDaemonPodOnNodes(c, ns, ds, nodeNames)()
 }
 
 // CheckPresentOnNodes will check that the daemonset will be present on at least the given number of
@@ -81,12 +81,12 @@ func CheckPresentOnNodes(c clientset.Interface, ds *appsv1.DaemonSet, ns string,
 
 func SchedulableNodes(c clientset.Interface, ds *appsv1.DaemonSet) []string {
 	nodeList, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	nodeNames := make([]string, 0)
 	for _, node := range nodeList.Items {
 		shouldRun, _ := daemon.NodeShouldRunDaemonPod(&node, ds)
 		if !shouldRun {
-			framework.Logf("DaemonSet pods can't tolerate node %s with taints %+v, skip checking this node", node.Name, node.Spec.Taints)
+			e2eutils.Logf("DaemonSet pods can't tolerate node %s with taints %+v, skip checking this node", node.Name, node.Spec.Taints)
 			continue
 		}
 		nodeNames = append(nodeNames, node.Name)
@@ -94,9 +94,9 @@ func SchedulableNodes(c clientset.Interface, ds *appsv1.DaemonSet) []string {
 	return nodeNames
 }
 
-func CheckDaemonPodOnNodes(f *framework.Framework, ds *appsv1.DaemonSet, nodeNames []string) func() (bool, error) {
+func CheckDaemonPodOnNodes(c clientset.Interface, ns string, ds *appsv1.DaemonSet, nodeNames []string) func() (bool, error) {
 	return func() (bool, error) {
-		return checkDaemonPodStateOnNodes(f.ClientSet, ds, f.Namespace.Name, nodeNames, func(pod *v1.Pod) bool {
+		return checkDaemonPodStateOnNodes(c, ds, ns, nodeNames, func(pod *v1.Pod) bool {
 			return podutil.IsPodAvailable(pod, ds.Spec.MinReadySeconds, metav1.Now())
 		})
 	}
@@ -105,7 +105,7 @@ func CheckDaemonPodOnNodes(f *framework.Framework, ds *appsv1.DaemonSet, nodeNam
 func checkDaemonPodStateOnNodes(c clientset.Interface, ds *appsv1.DaemonSet, ns string, nodeNames []string, stateChecker func(*v1.Pod) bool) (bool, error) {
 	podList, err := c.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
-		framework.Logf("could not get the pod list: %v", err)
+		e2eutils.Logf("could not get the pod list: %v", err)
 		return false, nil
 	}
 	pods := podList.Items
@@ -122,25 +122,25 @@ func checkDaemonPodStateOnNodes(c clientset.Interface, ds *appsv1.DaemonSet, ns 
 			nodesToPodCount[pod.Spec.NodeName]++
 		}
 	}
-	framework.Logf("Number of nodes with available pods controlled by daemonset %s: %d", ds.Name, len(nodesToPodCount))
+	e2eutils.Logf("Number of nodes with available pods controlled by daemonset %s: %d", ds.Name, len(nodesToPodCount))
 
 	// Ensure that exactly 1 pod is running on all nodes in nodeNames.
 	for _, nodeName := range nodeNames {
 		if nodesToPodCount[nodeName] != 1 {
-			framework.Logf("Node %s is running %d daemon pod, expected 1", nodeName, nodesToPodCount[nodeName])
+			e2eutils.Logf("Node %s is running %d daemon pod, expected 1", nodeName, nodesToPodCount[nodeName])
 			return false, nil
 		}
 	}
 
-	framework.Logf("Number of running nodes: %d, number of available pods: %d in daemonset %s", len(nodeNames), len(nodesToPodCount), ds.Name)
+	e2eutils.Logf("Number of running nodes: %d, number of available pods: %d in daemonset %s", len(nodeNames), len(nodesToPodCount), ds.Name)
 	// Ensure that sizes of the lists are the same. We've verified that every element of nodeNames is in
 	// nodesToPodCount, so verifying the lengths are equal ensures that there aren't pods running on any
 	// other nodes.
 	return len(nodesToPodCount) == len(nodeNames), nil
 }
 
-func CheckDaemonStatus(f *framework.Framework, dsName string) error {
-	ds, err := f.ClientSet.AppsV1().DaemonSets(f.Namespace.Name).Get(context.TODO(), dsName, metav1.GetOptions{})
+func CheckDaemonStatus(c clientset.Interface, ns, dsName string) error {
+	ds, err := c.AppsV1().DaemonSets(ns).Get(context.TODO(), dsName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}

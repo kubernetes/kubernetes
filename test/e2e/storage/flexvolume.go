@@ -21,6 +21,9 @@ import (
 	"net"
 	"path"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"time"
 
 	"github.com/onsi/ginkgo"
@@ -64,7 +67,7 @@ func testFlexVolume(driver string, config e2evolume.TestConfig, f *framework.Fra
 			ExpectedContent: "Hello from flexvolume!",
 		},
 	}
-	e2evolume.TestVolumeClient(f, config, nil, "" /* fsType */, tests)
+	e2evolume.TestVolumeClient(f.ClientSet, f.Namespace.Name, f.Timeouts, config, nil, "" /* fsType */, tests)
 }
 
 // installFlex installs the driver found at filePath on the node, and restarts
@@ -82,19 +85,19 @@ func installFlex(c clientset.Interface, node *v1.Node, vendor, driver, filePath 
 			host, err = e2enode.GetInternalIP(node)
 		}
 	} else {
-		instanceWithPort := framework.APIAddress()
+		instanceWithPort := e2eutils.APIAddress()
 		hostName := getHostFromHostPort(instanceWithPort)
 		host = net.JoinHostPort(hostName, e2essh.SSHPort)
 	}
 
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	cmd := fmt.Sprintf("sudo mkdir -p %s", flexDir)
 	sshAndLog(cmd, host, true /*failOnError*/)
 
 	data, err := e2etestfiles.Read(filePath)
 	if err != nil {
-		framework.Fail(err.Error())
+		e2eutils.Fail(err.Error())
 	}
 	cmd = fmt.Sprintf("sudo tee <<'EOF' %s\n%s\nEOF", flexFile, string(data))
 	sshAndLog(cmd, host, true /*failOnError*/)
@@ -114,13 +117,13 @@ func uninstallFlex(c clientset.Interface, node *v1.Node, vendor, driver string) 
 			host, err = e2enode.GetInternalIP(node)
 		}
 	} else {
-		instanceWithPort := framework.APIAddress()
+		instanceWithPort := e2eutils.APIAddress()
 		hostName := getHostFromHostPort(instanceWithPort)
 		host = net.JoinHostPort(hostName, e2essh.SSHPort)
 	}
 
 	if host == "" {
-		framework.Failf("Error getting node ip : %v", err)
+		e2eutils.Failf("Error getting node ip : %v", err)
 	}
 
 	cmd := fmt.Sprintf("sudo rm -r %s", flexDir)
@@ -129,7 +132,7 @@ func uninstallFlex(c clientset.Interface, node *v1.Node, vendor, driver string) 
 
 func getFlexDir(c clientset.Interface, node *v1.Node, vendor, driver string) string {
 	volumePluginDir := defaultVolumePluginDir
-	if framework.ProviderIs("gce") {
+	if e2eutils.ProviderIs("gce") {
 		volumePluginDir = gciVolumePluginDir
 	}
 	flexDir := path.Join(volumePluginDir, fmt.Sprintf("/%s~%s/", vendor, driver))
@@ -137,11 +140,11 @@ func getFlexDir(c clientset.Interface, node *v1.Node, vendor, driver string) str
 }
 
 func sshAndLog(cmd, host string, failOnError bool) {
-	result, err := e2essh.SSH(cmd, host, framework.TestContext.Provider)
+	result, err := e2essh.SSH(cmd, host, e2econfig.TestContext.Provider)
 	e2essh.LogResult(result)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	if result.Code != 0 && failOnError {
-		framework.Failf("%s returned non-zero, stderr: %s", cmd, result.Stderr)
+		e2eutils.Failf("%s returned non-zero, stderr: %s", cmd, result.Stderr)
 	}
 }
 
@@ -178,7 +181,7 @@ var _ = utils.SIGDescribe("Flexvolumes", func() {
 		ns = f.Namespace
 		var err error
 		node, err = e2enode.GetRandomReadySchedulableNode(f.ClientSet)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		config = e2evolume.TestConfig{
 			Namespace:           ns.Name,
 			Prefix:              "flex",
@@ -198,7 +201,7 @@ var _ = utils.SIGDescribe("Flexvolumes", func() {
 
 		ginkgo.By("waiting for flex client pod to terminate")
 		if err := e2epod.WaitForPodTerminatedInNamespace(f.ClientSet, config.Prefix+"-client", "", f.Namespace.Name); !apierrors.IsNotFound(err) {
-			framework.ExpectNoError(err, "Failed to wait client pod terminated: %v", err)
+			e2eutils.ExpectNoError(err, "Failed to wait client pod terminated: %v", err)
 		}
 
 		ginkgo.By(fmt.Sprintf("uninstalling flexvolume %s from node %s", driverInstallAs, node.Name))
@@ -218,7 +221,7 @@ var _ = utils.SIGDescribe("Flexvolumes", func() {
 
 		ginkgo.By("waiting for flex client pod to terminate")
 		if err := e2epod.WaitForPodTerminatedInNamespace(f.ClientSet, config.Prefix+"-client", "", f.Namespace.Name); !apierrors.IsNotFound(err) {
-			framework.ExpectNoError(err, "Failed to wait client pod terminated: %v", err)
+			e2eutils.ExpectNoError(err, "Failed to wait client pod terminated: %v", err)
 		}
 
 		// Detach might occur after pod deletion. Wait before deleting driver.

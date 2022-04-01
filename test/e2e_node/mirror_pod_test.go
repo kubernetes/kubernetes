@@ -24,6 +24,9 @@ import (
 	"path/filepath"
 	"time"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -50,14 +53,14 @@ var _ = SIGDescribe("MirrorPod", func() {
 		ginkgo.BeforeEach(func() {
 			ns = f.Namespace.Name
 			staticPodName = "static-pod-" + string(uuid.NewUUID())
-			mirrorPodName = staticPodName + "-" + framework.TestContext.NodeName
+			mirrorPodName = staticPodName + "-" + e2econfig.TestContext.NodeName
 
-			podPath = framework.TestContext.KubeletConfig.StaticPodPath
+			podPath = e2econfig.TestContext.KubeletConfig.StaticPodPath
 
 			ginkgo.By("create the static pod")
 			err := createStaticPod(podPath, staticPodName, ns,
 				imageutils.GetE2EImage(imageutils.Nginx), v1.RestartPolicyAlways)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 
 			ginkgo.By("wait for the mirror pod to be running")
 			gomega.Eventually(func() error {
@@ -72,13 +75,13 @@ var _ = SIGDescribe("MirrorPod", func() {
 		ginkgo.It("should be updated when static pod updated [NodeConformance]", func() {
 			ginkgo.By("get mirror pod uid")
 			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(context.TODO(), mirrorPodName, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			uid := pod.UID
 
 			ginkgo.By("update the static pod container image")
 			image := imageutils.GetPauseImageName()
 			err = createStaticPod(podPath, staticPodName, ns, image, v1.RestartPolicyAlways)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 
 			ginkgo.By("wait for the mirror pod to be updated")
 			gomega.Eventually(func() error {
@@ -87,9 +90,9 @@ var _ = SIGDescribe("MirrorPod", func() {
 
 			ginkgo.By("check the mirror pod container image is updated")
 			pod, err = f.ClientSet.CoreV1().Pods(ns).Get(context.TODO(), mirrorPodName, metav1.GetOptions{})
-			framework.ExpectNoError(err)
-			framework.ExpectEqual(len(pod.Spec.Containers), 1)
-			framework.ExpectEqual(pod.Spec.Containers[0].Image, image)
+			e2eutils.ExpectNoError(err)
+			e2eutils.ExpectEqual(len(pod.Spec.Containers), 1)
+			e2eutils.ExpectEqual(pod.Spec.Containers[0].Image, image)
 		})
 		/*
 			Release: v1.9
@@ -99,12 +102,12 @@ var _ = SIGDescribe("MirrorPod", func() {
 		ginkgo.It("should be recreated when mirror pod gracefully deleted [NodeConformance]", func() {
 			ginkgo.By("get mirror pod uid")
 			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(context.TODO(), mirrorPodName, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			uid := pod.UID
 
 			ginkgo.By("delete the mirror pod with grace period 30s")
 			err = f.ClientSet.CoreV1().Pods(ns).Delete(context.TODO(), mirrorPodName, *metav1.NewDeleteOptions(30))
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 
 			ginkgo.By("wait for the mirror pod to be recreated")
 			gomega.Eventually(func() error {
@@ -119,12 +122,12 @@ var _ = SIGDescribe("MirrorPod", func() {
 		ginkgo.It("should be recreated when mirror pod forcibly deleted [NodeConformance]", func() {
 			ginkgo.By("get mirror pod uid")
 			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(context.TODO(), mirrorPodName, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			uid := pod.UID
 
 			ginkgo.By("delete the mirror pod with grace period 0s")
 			err = f.ClientSet.CoreV1().Pods(ns).Delete(context.TODO(), mirrorPodName, *metav1.NewDeleteOptions(0))
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 
 			ginkgo.By("wait for the mirror pod to be recreated")
 			gomega.Eventually(func() error {
@@ -134,7 +137,7 @@ var _ = SIGDescribe("MirrorPod", func() {
 		ginkgo.AfterEach(func() {
 			ginkgo.By("delete the static pod")
 			err := deleteStaticPod(podPath, staticPodName, ns)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 
 			ginkgo.By("wait for the mirror pod to disappear")
 			gomega.Eventually(func() error {
@@ -154,13 +157,13 @@ var _ = SIGDescribe("MirrorPod", func() {
 		ginkgo.It("should successfully recreate when file is removed and recreated [NodeConformance]", func() {
 			ns = f.Namespace.Name
 			staticPodName = "static-pod-" + string(uuid.NewUUID())
-			mirrorPodName = staticPodName + "-" + framework.TestContext.NodeName
+			mirrorPodName = staticPodName + "-" + e2econfig.TestContext.NodeName
 
-			podPath = framework.TestContext.KubeletConfig.StaticPodPath
+			podPath = e2econfig.TestContext.KubeletConfig.StaticPodPath
 			ginkgo.By("create the static pod")
 			err := createStaticPod(podPath, staticPodName, ns,
 				imageutils.GetE2EImage(imageutils.Nginx), v1.RestartPolicyAlways)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 
 			ginkgo.By("wait for the mirror pod to be running")
 			gomega.Eventually(func() error {
@@ -169,12 +172,12 @@ var _ = SIGDescribe("MirrorPod", func() {
 
 			ginkgo.By("delete the pod manifest from disk")
 			err = deleteStaticPod(podPath, staticPodName, ns)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 
 			ginkgo.By("recreate the file")
 			err = createStaticPod(podPath, staticPodName, ns,
 				imageutils.GetE2EImage(imageutils.Nginx), v1.RestartPolicyAlways)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 
 			ginkgo.By("mirror pod should restart with count 1")
 			gomega.Eventually(func() error {
@@ -188,7 +191,7 @@ var _ = SIGDescribe("MirrorPod", func() {
 
 			ginkgo.By("delete the static pod")
 			err = deleteStaticPod(podPath, staticPodName, ns)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 
 			ginkgo.By("wait for the mirror pod to disappear")
 			gomega.Eventually(func() error {
@@ -326,7 +329,7 @@ func validateMirrorPod(cl clientset.Interface, mirrorPod *v1.Pod) error {
 	if len(mirrorPod.OwnerReferences) != 1 {
 		return fmt.Errorf("expected mirror pod %q to have a single owner reference: got %d", mirrorPod.Name, len(mirrorPod.OwnerReferences))
 	}
-	node, err := cl.CoreV1().Nodes().Get(context.TODO(), framework.TestContext.NodeName, metav1.GetOptions{})
+	node, err := cl.CoreV1().Nodes().Get(context.TODO(), e2econfig.TestContext.NodeName, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to fetch test node: %v", err)
 	}
@@ -335,7 +338,7 @@ func validateMirrorPod(cl clientset.Interface, mirrorPod *v1.Pod) error {
 	expectedOwnerRef := metav1.OwnerReference{
 		APIVersion: "v1",
 		Kind:       "Node",
-		Name:       framework.TestContext.NodeName,
+		Name:       e2econfig.TestContext.NodeName,
 		UID:        node.UID,
 		Controller: &controller,
 	}

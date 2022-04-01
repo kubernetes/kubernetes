@@ -22,6 +22,9 @@ import (
 	"strings"
 	"time"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -44,16 +47,16 @@ import (
 func completeTest(f *framework.Framework, c clientset.Interface, ns string, pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim) {
 	// 1. verify that the PV and PVC have bound correctly
 	ginkgo.By("Validating the PV-PVC binding")
-	framework.ExpectNoError(e2epv.WaitOnPVandPVC(c, f.Timeouts, ns, pv, pvc))
+	e2eutils.ExpectNoError(e2epv.WaitOnPVandPVC(c, f.Timeouts, ns, pv, pvc))
 
 	// 2. create the nfs writer pod, test if the write was successful,
 	//    then delete the pod and verify that it was deleted
 	ginkgo.By("Checking pod has write access to PersistentVolume")
-	framework.ExpectNoError(createWaitAndDeletePod(c, f.Timeouts, ns, pvc, "touch /mnt/volume1/SUCCESS && (id -G | grep -E '\\b777\\b')"))
+	e2eutils.ExpectNoError(createWaitAndDeletePod(c, f.Timeouts, ns, pvc, "touch /mnt/volume1/SUCCESS && (id -G | grep -E '\\b777\\b')"))
 
 	// 3. delete the PVC, wait for PV to become "Released"
 	ginkgo.By("Deleting the PVC to invoke the reclaim policy.")
-	framework.ExpectNoError(e2epv.DeletePVCandValidatePV(c, f.Timeouts, ns, pvc, pv, v1.VolumeReleased))
+	e2eutils.ExpectNoError(e2epv.DeletePVCandValidatePV(c, f.Timeouts, ns, pvc, pv, v1.VolumeReleased))
 }
 
 // Validate pairs of PVs and PVCs, create and verify writer pod, delete PVC and validate
@@ -148,7 +151,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 		})
 
 		ginkgo.AfterEach(func() {
-			framework.ExpectNoError(e2epod.DeletePodWithWait(c, nfsServerPod), "AfterEach: Failed to delete pod ", nfsServerPod.Name)
+			e2eutils.ExpectNoError(e2epod.DeletePodWithWait(c, nfsServerPod), "AfterEach: Failed to delete pod ", nfsServerPod.Name)
 			pv, pvc = nil, nil
 			pvConfig, pvcConfig = e2epv.PersistentVolumeConfig{}, e2epv.PersistentVolumeClaimConfig{}
 		})
@@ -156,9 +159,9 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 		ginkgo.Context("with Single PV - PVC pairs", func() {
 			// Note: this is the only code where the pv is deleted.
 			ginkgo.AfterEach(func() {
-				framework.Logf("AfterEach: Cleaning up test resources.")
+				e2eutils.Logf("AfterEach: Cleaning up test resources.")
 				if errs := e2epv.PVPVCCleanup(c, ns, pv, pvc); len(errs) > 0 {
-					framework.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
+					e2eutils.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
 				}
 			})
 
@@ -169,7 +172,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			// that the pod can write to the nfs volume.
 			ginkgo.It("should create a non-pre-bound PV and PVC: test write access ", func() {
 				pv, pvc, err = e2epv.CreatePVPVC(c, f.Timeouts, pvConfig, pvcConfig, ns, false)
-				framework.ExpectNoError(err)
+				e2eutils.ExpectNoError(err)
 				completeTest(f, c, ns, pv, pvc)
 			})
 
@@ -178,7 +181,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			// correctly, and that the pod can write to the nfs volume.
 			ginkgo.It("create a PVC and non-pre-bound PV: test write access", func() {
 				pv, pvc, err = e2epv.CreatePVCPV(c, f.Timeouts, pvConfig, pvcConfig, ns, false)
-				framework.ExpectNoError(err)
+				e2eutils.ExpectNoError(err)
 				completeTest(f, c, ns, pv, pvc)
 			})
 
@@ -187,7 +190,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			// correctly, and that the pod can write to the nfs volume.
 			ginkgo.It("create a PVC and a pre-bound PV: test write access", func() {
 				pv, pvc, err = e2epv.CreatePVCPV(c, f.Timeouts, pvConfig, pvcConfig, ns, true)
-				framework.ExpectNoError(err)
+				e2eutils.ExpectNoError(err)
 				completeTest(f, c, ns, pv, pvc)
 			})
 
@@ -196,7 +199,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			// correctly, and that the pod can write to the nfs volume.
 			ginkgo.It("create a PV and a pre-bound PVC: test write access", func() {
 				pv, pvc, err = e2epv.CreatePVPVC(c, f.Timeouts, pvConfig, pvcConfig, ns, true)
-				framework.ExpectNoError(err)
+				e2eutils.ExpectNoError(err)
 				completeTest(f, c, ns, pv, pvc)
 			})
 		})
@@ -218,14 +221,14 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			var claims e2epv.PVCMap
 
 			ginkgo.AfterEach(func() {
-				framework.Logf("AfterEach: deleting %v PVCs and %v PVs...", len(claims), len(pvols))
+				e2eutils.Logf("AfterEach: deleting %v PVCs and %v PVs...", len(claims), len(pvols))
 				errs := e2epv.PVPVCMapCleanup(c, ns, pvols, claims)
 				if len(errs) > 0 {
 					errmsg := []string{}
 					for _, e := range errs {
 						errmsg = append(errmsg, e.Error())
 					}
-					framework.Failf("AfterEach: Failed to delete 1 or more PVs/PVCs. Errors: %v", strings.Join(errmsg, "; "))
+					e2eutils.Failf("AfterEach: Failed to delete 1 or more PVs/PVCs. Errors: %v", strings.Join(errmsg, "; "))
 				}
 			})
 
@@ -234,9 +237,9 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			ginkgo.It("should create 2 PVs and 4 PVCs: test write access", func() {
 				numPVs, numPVCs := 2, 4
 				pvols, claims, err = e2epv.CreatePVsPVCs(numPVs, numPVCs, c, f.Timeouts, ns, pvConfig, pvcConfig)
-				framework.ExpectNoError(err)
-				framework.ExpectNoError(e2epv.WaitAndVerifyBinds(c, f.Timeouts, ns, pvols, claims, true))
-				framework.ExpectNoError(completeMultiTest(f, c, ns, pvols, claims, v1.VolumeReleased))
+				e2eutils.ExpectNoError(err)
+				e2eutils.ExpectNoError(e2epv.WaitAndVerifyBinds(c, f.Timeouts, ns, pvols, claims, true))
+				e2eutils.ExpectNoError(completeMultiTest(f, c, ns, pvols, claims, v1.VolumeReleased))
 			})
 
 			// Create 3 PVs and 3 PVCs.
@@ -244,9 +247,9 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			ginkgo.It("should create 3 PVs and 3 PVCs: test write access", func() {
 				numPVs, numPVCs := 3, 3
 				pvols, claims, err = e2epv.CreatePVsPVCs(numPVs, numPVCs, c, f.Timeouts, ns, pvConfig, pvcConfig)
-				framework.ExpectNoError(err)
-				framework.ExpectNoError(e2epv.WaitAndVerifyBinds(c, f.Timeouts, ns, pvols, claims, true))
-				framework.ExpectNoError(completeMultiTest(f, c, ns, pvols, claims, v1.VolumeReleased))
+				e2eutils.ExpectNoError(err)
+				e2eutils.ExpectNoError(e2epv.WaitAndVerifyBinds(c, f.Timeouts, ns, pvols, claims, true))
+				e2eutils.ExpectNoError(completeMultiTest(f, c, ns, pvols, claims, v1.VolumeReleased))
 			})
 
 			// Create 4 PVs and 2 PVCs.
@@ -254,9 +257,9 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			ginkgo.It("should create 4 PVs and 2 PVCs: test write access [Slow]", func() {
 				numPVs, numPVCs := 4, 2
 				pvols, claims, err = e2epv.CreatePVsPVCs(numPVs, numPVCs, c, f.Timeouts, ns, pvConfig, pvcConfig)
-				framework.ExpectNoError(err)
-				framework.ExpectNoError(e2epv.WaitAndVerifyBinds(c, f.Timeouts, ns, pvols, claims, true))
-				framework.ExpectNoError(completeMultiTest(f, c, ns, pvols, claims, v1.VolumeReleased))
+				e2eutils.ExpectNoError(err)
+				e2eutils.ExpectNoError(e2epv.WaitAndVerifyBinds(c, f.Timeouts, ns, pvols, claims, true))
+				e2eutils.ExpectNoError(completeMultiTest(f, c, ns, pvols, claims, v1.VolumeReleased))
 			})
 		})
 
@@ -267,14 +270,14 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			ginkgo.BeforeEach(func() {
 				pvConfig.ReclaimPolicy = v1.PersistentVolumeReclaimRecycle
 				pv, pvc, err = e2epv.CreatePVPVC(c, f.Timeouts, pvConfig, pvcConfig, ns, false)
-				framework.ExpectNoError(err, "BeforeEach: Failed to create PV/PVC")
-				framework.ExpectNoError(e2epv.WaitOnPVandPVC(c, f.Timeouts, ns, pv, pvc), "BeforeEach: WaitOnPVandPVC failed")
+				e2eutils.ExpectNoError(err, "BeforeEach: Failed to create PV/PVC")
+				e2eutils.ExpectNoError(e2epv.WaitOnPVandPVC(c, f.Timeouts, ns, pv, pvc), "BeforeEach: WaitOnPVandPVC failed")
 			})
 
 			ginkgo.AfterEach(func() {
-				framework.Logf("AfterEach: Cleaning up test resources.")
+				e2eutils.Logf("AfterEach: Cleaning up test resources.")
 				if errs := e2epv.PVPVCCleanup(c, ns, pv, pvc); len(errs) > 0 {
-					framework.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
+					e2eutils.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
 				}
 			})
 
@@ -285,33 +288,33 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 				ginkgo.By("Writing to the volume.")
 				pod := e2epod.MakePod(ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, "touch /mnt/volume1/SUCCESS && (id -G | grep -E '\\b777\\b')")
 				pod, err = c.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
-				framework.ExpectNoError(err)
-				framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespaceTimeout(c, pod.Name, ns, f.Timeouts.PodStart))
+				e2eutils.ExpectNoError(err)
+				e2eutils.ExpectNoError(e2epod.WaitForPodSuccessInNamespaceTimeout(c, pod.Name, ns, f.Timeouts.PodStart))
 
 				ginkgo.By("Deleting the claim")
-				framework.ExpectNoError(e2epod.DeletePodWithWait(c, pod))
-				framework.ExpectNoError(e2epv.DeletePVCandValidatePV(c, f.Timeouts, ns, pvc, pv, v1.VolumeAvailable))
+				e2eutils.ExpectNoError(e2epod.DeletePodWithWait(c, pod))
+				e2eutils.ExpectNoError(e2epv.DeletePVCandValidatePV(c, f.Timeouts, ns, pvc, pv, v1.VolumeAvailable))
 
 				ginkgo.By("Re-mounting the volume.")
 				pvc = e2epv.MakePersistentVolumeClaim(pvcConfig, ns)
 				pvc, err = e2epv.CreatePVC(c, ns, pvc)
-				framework.ExpectNoError(err)
-				framework.ExpectNoError(e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, pvc.Name, 2*time.Second, 60*time.Second), "Failed to reach 'Bound' for PVC ", pvc.Name)
+				e2eutils.ExpectNoError(err)
+				e2eutils.ExpectNoError(e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, pvc.Name, 2*time.Second, 60*time.Second), "Failed to reach 'Bound' for PVC ", pvc.Name)
 
 				// If a file is detected in /mnt, fail the pod and do not restart it.
 				ginkgo.By("Verifying the mount has been cleaned.")
 				mount := pod.Spec.Containers[0].VolumeMounts[0].MountPath
 				pod = e2epod.MakePod(ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, fmt.Sprintf("[ $(ls -A %s | wc -l) -eq 0 ] && exit 0 || exit 1", mount))
 				pod, err = c.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
-				framework.ExpectNoError(err)
-				framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespaceTimeout(c, pod.Name, ns, f.Timeouts.PodStart))
+				e2eutils.ExpectNoError(err)
+				e2eutils.ExpectNoError(e2epod.WaitForPodSuccessInNamespaceTimeout(c, pod.Name, ns, f.Timeouts.PodStart))
 
-				framework.ExpectNoError(e2epod.DeletePodWithWait(c, pod))
-				framework.Logf("Pod exited without failure; the volume has been recycled.")
+				e2eutils.ExpectNoError(e2epod.DeletePodWithWait(c, pod))
+				e2eutils.Logf("Pod exited without failure; the volume has been recycled.")
 
 				// Delete the PVC and wait for the recycler to finish before the NFS server gets shutdown during cleanup.
-				framework.Logf("Removing second PVC, waiting for the recycler to finish before cleanup.")
-				framework.ExpectNoError(e2epv.DeletePVCandValidatePV(c, f.Timeouts, ns, pvc, pv, v1.VolumeAvailable))
+				e2eutils.Logf("Removing second PVC, waiting for the recycler to finish before cleanup.")
+				e2eutils.ExpectNoError(e2epv.DeletePVCandValidatePV(c, f.Timeouts, ns, pvc, pv, v1.VolumeAvailable))
 				pvc = nil
 			})
 		})
@@ -365,16 +368,16 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 
 				spec := makeStatefulSetWithPVCs(ns, writeCmd, mounts, claims, probe)
 				ss, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), spec, metav1.CreateOptions{})
-				framework.ExpectNoError(err)
+				e2eutils.ExpectNoError(err)
 				e2estatefulset.WaitForRunningAndReady(c, 1, ss)
 
 				ginkgo.By("Deleting the StatefulSet but not the volumes")
 				// Scale down to 0 first so that the Delete is quick
 				ss, err = e2estatefulset.Scale(c, ss, 0)
-				framework.ExpectNoError(err)
+				e2eutils.ExpectNoError(err)
 				e2estatefulset.WaitForStatusReplicas(c, ss, 0)
 				err = c.AppsV1().StatefulSets(ns).Delete(context.TODO(), ss.Name, metav1.DeleteOptions{})
-				framework.ExpectNoError(err)
+				e2eutils.ExpectNoError(err)
 
 				ginkgo.By("Creating a new Statefulset and validating the data")
 				validateCmd := "true"
@@ -385,7 +388,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 
 				spec = makeStatefulSetWithPVCs(ns, validateCmd, mounts, claims, probe)
 				ss, err = c.AppsV1().StatefulSets(ns).Create(context.TODO(), spec, metav1.CreateOptions{})
-				framework.ExpectNoError(err)
+				e2eutils.ExpectNoError(err)
 				e2estatefulset.WaitForRunningAndReady(c, 1, ss)
 			})
 		})
@@ -442,8 +445,8 @@ func makeStatefulSetWithPVCs(ns, cmd string, mounts []v1.VolumeMount, claims []v
 // createWaitAndDeletePod creates the test pod, wait for (hopefully) success, and then delete the pod.
 // Note: need named return value so that the err assignment in the defer sets the returned error.
 //       Has been shown to be necessary using Go 1.7.
-func createWaitAndDeletePod(c clientset.Interface, t *framework.TimeoutContext, ns string, pvc *v1.PersistentVolumeClaim, command string) (err error) {
-	framework.Logf("Creating nfs test pod")
+func createWaitAndDeletePod(c clientset.Interface, t *e2econfig.TimeoutContext, ns string, pvc *v1.PersistentVolumeClaim, command string) (err error) {
+	e2eutils.Logf("Creating nfs test pod")
 	pod := e2epod.MakePod(ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, command)
 	runPod, err := c.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 	if err != nil {
@@ -464,11 +467,11 @@ func createWaitAndDeletePod(c clientset.Interface, t *framework.TimeoutContext, 
 }
 
 // testPodSuccessOrFail tests whether the pod's exit code is zero.
-func testPodSuccessOrFail(c clientset.Interface, t *framework.TimeoutContext, ns string, pod *v1.Pod) error {
-	framework.Logf("Pod should terminate with exitcode 0 (success)")
+func testPodSuccessOrFail(c clientset.Interface, t *e2econfig.TimeoutContext, ns string, pod *v1.Pod) error {
+	e2eutils.Logf("Pod should terminate with exitcode 0 (success)")
 	if err := e2epod.WaitForPodSuccessInNamespaceTimeout(c, pod.Name, ns, t.PodStart); err != nil {
 		return fmt.Errorf("pod %q failed to reach Success: %v", pod.Name, err)
 	}
-	framework.Logf("Pod %v succeeded ", pod.Name)
+	e2eutils.Logf("Pod %v succeeded ", pod.Name)
 	return nil
 }

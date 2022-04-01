@@ -20,7 +20,9 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -60,7 +62,7 @@ func (t *ConfigMapUpgradeTest) Setup(f *framework.Framework) {
 	ginkgo.By("Creating a ConfigMap")
 	var err error
 	if t.configMap, err = f.ClientSet.CoreV1().ConfigMaps(ns.Name).Create(context.TODO(), t.configMap, metav1.CreateOptions{}); err != nil {
-		framework.Failf("unable to create test ConfigMap %s: %v", t.configMap.Name, err)
+		e2eutils.Failf("unable to create test ConfigMap %s: %v", t.configMap.Name, err)
 	}
 
 	ginkgo.By("Making sure the ConfigMap is consumable")

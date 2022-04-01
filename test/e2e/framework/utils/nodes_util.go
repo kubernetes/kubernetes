@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package framework
+package utils
 
 import (
 	"fmt"
@@ -30,6 +30,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 
 	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
+	"k8s.io/kubernetes/test/e2e/framework/config"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 )
@@ -38,11 +39,11 @@ const etcdImage = "3.5.1-0"
 
 // EtcdUpgrade upgrades etcd on GCE.
 func EtcdUpgrade(targetStorage, targetVersion string) error {
-	switch TestContext.Provider {
+	switch config.TestContext.Provider {
 	case "gce":
 		return etcdUpgradeGCE(targetStorage, targetVersion)
 	default:
-		return fmt.Errorf("EtcdUpgrade() is not implemented for provider %s", TestContext.Provider)
+		return fmt.Errorf("EtcdUpgrade() is not implemented for provider %s", config.TestContext.Provider)
 	}
 }
 
@@ -59,16 +60,16 @@ func etcdUpgradeGCE(targetStorage, targetVersion string) error {
 
 // LocationParamGKE returns parameter related to location for gcloud command.
 func LocationParamGKE() string {
-	if TestContext.CloudConfig.MultiMaster {
+	if config.TestContext.CloudConfig.MultiMaster {
 		// GKE Regional Clusters are being tested.
-		return fmt.Sprintf("--region=%s", TestContext.CloudConfig.Region)
+		return fmt.Sprintf("--region=%s", config.TestContext.CloudConfig.Region)
 	}
-	return fmt.Sprintf("--zone=%s", TestContext.CloudConfig.Zone)
+	return fmt.Sprintf("--zone=%s", config.TestContext.CloudConfig.Zone)
 }
 
 // AppendContainerCommandGroupIfNeeded returns container command group parameter if necessary.
 func AppendContainerCommandGroupIfNeeded(args []string) []string {
-	if TestContext.CloudConfig.Region != "" {
+	if config.TestContext.CloudConfig.Region != "" {
 		// TODO(wojtek-t): Get rid of it once Regional Clusters go to GA.
 		return append([]string{"beta"}, args...)
 	}
@@ -81,10 +82,10 @@ func MasterUpgradeGKE(namespace string, v string) error {
 	args := []string{
 		"container",
 		"clusters",
-		fmt.Sprintf("--project=%s", TestContext.CloudConfig.ProjectID),
+		fmt.Sprintf("--project=%s", config.TestContext.CloudConfig.ProjectID),
 		LocationParamGKE(),
 		"upgrade",
-		TestContext.CloudConfig.Cluster,
+		config.TestContext.CloudConfig.Cluster,
 		"--master",
 		fmt.Sprintf("--cluster-version=%s", v),
 		"--quiet",
@@ -101,10 +102,10 @@ func MasterUpgradeGKE(namespace string, v string) error {
 
 // GCEUpgradeScript returns path of script for upgrading on GCE.
 func GCEUpgradeScript() string {
-	if len(TestContext.GCEUpgradeScript) == 0 {
-		return path.Join(TestContext.RepoRoot, "cluster/gce/upgrade.sh")
+	if len(config.TestContext.GCEUpgradeScript) == 0 {
+		return path.Join(config.TestContext.RepoRoot, "cluster/gce/upgrade.sh")
 	}
-	return TestContext.GCEUpgradeScript
+	return config.TestContext.GCEUpgradeScript
 }
 
 // WaitForSSHTunnels waits for establishing SSH tunnel to busybox pod.
@@ -126,13 +127,13 @@ func WaitForSSHTunnels(namespace string) {
 
 // NodeKiller is a utility to simulate node failures.
 type NodeKiller struct {
-	config   NodeKillerConfig
+	config   config.NodeKillerConfig
 	client   clientset.Interface
 	provider string
 }
 
 // NewNodeKiller creates new NodeKiller.
-func NewNodeKiller(config NodeKillerConfig, client clientset.Interface, provider string) *NodeKiller {
+func NewNodeKiller(config config.NodeKillerConfig, client clientset.Interface, provider string) *NodeKiller {
 	config.NodeKillerStopCh = make(chan struct{})
 	return &NodeKiller{config, client, provider}
 }

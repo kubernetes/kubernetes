@@ -22,6 +22,8 @@ import (
 	"strings"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/types"
@@ -104,7 +106,7 @@ func (p *capacityTestSuite) DefineTests(driver storageframework.TestDriver, patt
 	cleanup := func() {
 		err := storageutils.TryFunc(driverCleanup)
 		driverCleanup = nil
-		framework.ExpectNoError(err, "while cleaning up driver")
+		e2eutils.ExpectNoError(err, "while cleaning up driver")
 	}
 
 	ginkgo.It("provides storage capacity information", func() {

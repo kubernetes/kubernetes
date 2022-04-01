@@ -25,23 +25,26 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/config"
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	"k8s.io/kubernetes/test/e2e/framework/providers"
+	"k8s.io/kubernetes/test/e2e/framework/utils"
 	"k8s.io/legacy-cloud-providers/azure"
 	"k8s.io/legacy-cloud-providers/azure/clients/fileclient"
 )
 
 func init() {
-	framework.RegisterProvider("azure", newProvider)
+	providers.RegisterProvider("azure", newProvider)
 }
 
-func newProvider() (framework.ProviderInterface, error) {
-	if framework.TestContext.CloudConfig.ConfigFile == "" {
+func newProvider() (providers.ProviderInterface, error) {
+	if e2econfig.TestContext.CloudConfig.ConfigFile == "" {
 		return nil, fmt.Errorf("config-file must be specified for Azure")
 	}
-	config, err := os.Open(framework.TestContext.CloudConfig.ConfigFile)
+	config, err := os.Open(config.TestContext.CloudConfig.ConfigFile)
 	if err != nil {
-		framework.Logf("Couldn't open cloud provider configuration %s: %#v",
-			framework.TestContext.CloudConfig.ConfigFile, err)
+		utils.Logf("Couldn't open cloud provider configuration %s: %#v",
+			e2econfig.TestContext.CloudConfig.ConfigFile, err)
 	} else {
 		defer config.Close()
 	}
@@ -53,7 +56,7 @@ func newProvider() (framework.ProviderInterface, error) {
 
 //Provider is a structure to handle Azure clouds for e2e testing
 type Provider struct {
-	framework.NullProvider
+	providers.NullProvider
 
 	azureCloud *azure.Cloud
 }
@@ -65,7 +68,7 @@ func (p *Provider) DeleteNode(node *v1.Node) error {
 
 // CreatePD creates a persistent volume
 func (p *Provider) CreatePD(zone string) (string, error) {
-	pdName := fmt.Sprintf("%s-%s", framework.TestContext.Prefix, string(uuid.NewUUID()))
+	pdName := fmt.Sprintf("%s-%s", config.TestContext.Prefix, string(uuid.NewUUID()))
 
 	volumeOptions := &azure.ManagedDiskOptions{
 		DiskName:           pdName,
@@ -121,7 +124,7 @@ func (p *Provider) DeleteShare(accountName, shareName string) error {
 // DeletePD deletes a persistent volume
 func (p *Provider) DeletePD(pdName string) error {
 	if err := p.azureCloud.DeleteManagedDisk(pdName); err != nil {
-		framework.Logf("failed to delete Azure volume %q: %v", pdName, err)
+		utils.Logf("failed to delete Azure volume %q: %v", pdName, err)
 		return err
 	}
 	return nil

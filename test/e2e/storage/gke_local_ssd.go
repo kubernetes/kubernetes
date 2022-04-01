@@ -20,7 +20,10 @@ import (
 	"fmt"
 	"os/exec"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -39,23 +42,23 @@ var _ = utils.SIGDescribe("GKE local SSD [Feature:GKELocalSSD]", func() {
 	})
 
 	ginkgo.It("should write and read from node local SSD [Feature:GKELocalSSD]", func() {
-		framework.Logf("Start local SSD test")
+		e2eutils.Logf("Start local SSD test")
 		createNodePoolWithLocalSsds("np-ssd")
 		doTestWriteAndReadToLocalSsd(f)
 	})
 })
 
 func createNodePoolWithLocalSsds(nodePoolName string) {
-	framework.Logf("Create node pool: %s with local SSDs in cluster: %s ",
-		nodePoolName, framework.TestContext.CloudConfig.Cluster)
+	e2eutils.Logf("Create node pool: %s with local SSDs in cluster: %s ",
+		nodePoolName, e2econfig.TestContext.CloudConfig.Cluster)
 	out, err := exec.Command("gcloud", "alpha", "container", "node-pools", "create",
 		nodePoolName,
-		fmt.Sprintf("--cluster=%s", framework.TestContext.CloudConfig.Cluster),
+		fmt.Sprintf("--cluster=%s", e2econfig.TestContext.CloudConfig.Cluster),
 		"--local-ssd-count=1").CombinedOutput()
 	if err != nil {
-		framework.Failf("Failed to create node pool %s: Err: %v\n%v", nodePoolName, err, string(out))
+		e2eutils.Failf("Failed to create node pool %s: Err: %v\n%v", nodePoolName, err, string(out))
 	}
-	framework.Logf("Successfully created node pool %s:\n%v", nodePoolName, string(out))
+	e2eutils.Logf("Successfully created node pool %s:\n%v", nodePoolName, string(out))
 }
 
 func doTestWriteAndReadToLocalSsd(f *framework.Framework) {

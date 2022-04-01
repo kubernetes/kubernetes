@@ -23,6 +23,8 @@ import (
 	"strings"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 
@@ -160,7 +162,7 @@ func initContainersInvariants(pod *v1.Pod) error {
 var _ = SIGDescribe("InitContainer [NodeConformance]", func() {
 	f := framework.NewDefaultFramework("init-container")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
-	var podClient *framework.PodClient
+	var podClient *e2eutils.PodClient
 	ginkgo.BeforeEach(func() {
 		podClient = f.PodClient()
 	})
@@ -208,7 +210,7 @@ var _ = SIGDescribe("InitContainer [NodeConformance]", func() {
 				},
 			},
 		}
-		framework.Logf("PodSpec: initContainers in spec.initContainers")
+		e2eutils.Logf("PodSpec: initContainers in spec.initContainers")
 		startedPod := podClient.Create(pod)
 
 		fieldSelector := fields.OneTermEqualSelector("metadata.name", startedPod.Name).String()
@@ -219,23 +221,23 @@ var _ = SIGDescribe("InitContainer [NodeConformance]", func() {
 			},
 		}
 		var events []watch.Event
-		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), framework.PodStartTimeout)
+		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), e2eutils.PodStartTimeout)
 		defer cancel()
 		event, err := watchtools.Until(ctx, startedPod.ResourceVersion, w,
 			recordEvents(events, conditions.PodCompleted),
 		)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		checkInvariants(events, containerInitInvariant)
 		endPod := event.Object.(*v1.Pod)
-		framework.ExpectEqual(endPod.Status.Phase, v1.PodSucceeded)
+		e2eutils.ExpectEqual(endPod.Status.Phase, v1.PodSucceeded)
 		_, init := podutil.GetPodCondition(&endPod.Status, v1.PodInitialized)
 		gomega.Expect(init).NotTo(gomega.BeNil())
-		framework.ExpectEqual(init.Status, v1.ConditionTrue)
+		e2eutils.ExpectEqual(init.Status, v1.ConditionTrue)
 
-		framework.ExpectEqual(len(endPod.Status.InitContainerStatuses), 2)
+		e2eutils.ExpectEqual(len(endPod.Status.InitContainerStatuses), 2)
 		for _, status := range endPod.Status.InitContainerStatuses {
-			framework.ExpectEqual(status.Ready, true)
+			e2eutils.ExpectEqual(status.Ready, true)
 			gomega.Expect(status.State.Terminated).NotTo(gomega.BeNil())
 			gomega.Expect(status.State.Terminated.ExitCode).To(gomega.BeZero())
 		}
@@ -287,7 +289,7 @@ var _ = SIGDescribe("InitContainer [NodeConformance]", func() {
 				},
 			},
 		}
-		framework.Logf("PodSpec: initContainers in spec.initContainers")
+		e2eutils.Logf("PodSpec: initContainers in spec.initContainers")
 		startedPod := podClient.Create(pod)
 
 		fieldSelector := fields.OneTermEqualSelector("metadata.name", startedPod.Name).String()
@@ -298,21 +300,21 @@ var _ = SIGDescribe("InitContainer [NodeConformance]", func() {
 			},
 		}
 		var events []watch.Event
-		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), framework.PodStartTimeout)
+		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), e2eutils.PodStartTimeout)
 		defer cancel()
 		event, err := watchtools.Until(ctx, startedPod.ResourceVersion, w, recordEvents(events, conditions.PodRunning))
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		checkInvariants(events, containerInitInvariant)
 		endPod := event.Object.(*v1.Pod)
-		framework.ExpectEqual(endPod.Status.Phase, v1.PodRunning)
+		e2eutils.ExpectEqual(endPod.Status.Phase, v1.PodRunning)
 		_, init := podutil.GetPodCondition(&endPod.Status, v1.PodInitialized)
 		gomega.Expect(init).NotTo(gomega.BeNil())
-		framework.ExpectEqual(init.Status, v1.ConditionTrue)
+		e2eutils.ExpectEqual(init.Status, v1.ConditionTrue)
 
-		framework.ExpectEqual(len(endPod.Status.InitContainerStatuses), 2)
+		e2eutils.ExpectEqual(len(endPod.Status.InitContainerStatuses), 2)
 		for _, status := range endPod.Status.InitContainerStatuses {
-			framework.ExpectEqual(status.Ready, true)
+			e2eutils.ExpectEqual(status.Ready, true)
 			gomega.Expect(status.State.Terminated).NotTo(gomega.BeNil())
 			gomega.Expect(status.State.Terminated.ExitCode).To(gomega.BeZero())
 		}
@@ -365,7 +367,7 @@ var _ = SIGDescribe("InitContainer [NodeConformance]", func() {
 				},
 			},
 		}
-		framework.Logf("PodSpec: initContainers in spec.initContainers")
+		e2eutils.Logf("PodSpec: initContainers in spec.initContainers")
 		startedPod := podClient.Create(pod)
 
 		fieldSelector := fields.OneTermEqualSelector("metadata.name", startedPod.Name).String()
@@ -377,7 +379,7 @@ var _ = SIGDescribe("InitContainer [NodeConformance]", func() {
 		}
 
 		var events []watch.Event
-		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), framework.PodStartTimeout)
+		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), e2eutils.PodStartTimeout)
 		defer cancel()
 		event, err := watchtools.Until(
 			ctx,
@@ -423,7 +425,7 @@ var _ = SIGDescribe("InitContainer [NodeConformance]", func() {
 					if status.RestartCount < 3 {
 						return false, nil
 					}
-					framework.Logf("init container has failed twice: %#v", t)
+					e2eutils.Logf("init container has failed twice: %#v", t)
 					// TODO: more conditions
 					return true, nil
 				default:
@@ -431,17 +433,17 @@ var _ = SIGDescribe("InitContainer [NodeConformance]", func() {
 				}
 			},
 		)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		checkInvariants(events, containerInitInvariant)
 		endPod := event.Object.(*v1.Pod)
-		framework.ExpectEqual(endPod.Status.Phase, v1.PodPending)
+		e2eutils.ExpectEqual(endPod.Status.Phase, v1.PodPending)
 		_, init := podutil.GetPodCondition(&endPod.Status, v1.PodInitialized)
 		gomega.Expect(init).NotTo(gomega.BeNil())
-		framework.ExpectEqual(init.Status, v1.ConditionFalse)
-		framework.ExpectEqual(init.Reason, "ContainersNotInitialized")
-		framework.ExpectEqual(init.Message, "containers with incomplete status: [init1 init2]")
-		framework.ExpectEqual(len(endPod.Status.InitContainerStatuses), 2)
+		e2eutils.ExpectEqual(init.Status, v1.ConditionFalse)
+		e2eutils.ExpectEqual(init.Reason, "ContainersNotInitialized")
+		e2eutils.ExpectEqual(init.Message, "containers with incomplete status: [init1 init2]")
+		e2eutils.ExpectEqual(len(endPod.Status.InitContainerStatuses), 2)
 	})
 
 	/*
@@ -490,7 +492,7 @@ var _ = SIGDescribe("InitContainer [NodeConformance]", func() {
 				},
 			},
 		}
-		framework.Logf("PodSpec: initContainers in spec.initContainers")
+		e2eutils.Logf("PodSpec: initContainers in spec.initContainers")
 		startedPod := podClient.Create(pod)
 
 		fieldSelector := fields.OneTermEqualSelector("metadata.name", startedPod.Name).String()
@@ -502,7 +504,7 @@ var _ = SIGDescribe("InitContainer [NodeConformance]", func() {
 		}
 
 		var events []watch.Event
-		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), framework.PodStartTimeout)
+		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), e2eutils.PodStartTimeout)
 		defer cancel()
 		event, err := watchtools.Until(
 			ctx, startedPod.ResourceVersion, w,
@@ -546,18 +548,18 @@ var _ = SIGDescribe("InitContainer [NodeConformance]", func() {
 				}),
 			recordEvents(events, conditions.PodCompleted),
 		)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		checkInvariants(events, containerInitInvariant)
 		endPod := event.Object.(*v1.Pod)
 
-		framework.ExpectEqual(endPod.Status.Phase, v1.PodFailed)
+		e2eutils.ExpectEqual(endPod.Status.Phase, v1.PodFailed)
 		_, init := podutil.GetPodCondition(&endPod.Status, v1.PodInitialized)
 		gomega.Expect(init).NotTo(gomega.BeNil())
-		framework.ExpectEqual(init.Status, v1.ConditionFalse)
-		framework.ExpectEqual(init.Reason, "ContainersNotInitialized")
-		framework.ExpectEqual(init.Message, "containers with incomplete status: [init2]")
-		framework.ExpectEqual(len(endPod.Status.InitContainerStatuses), 2)
+		e2eutils.ExpectEqual(init.Status, v1.ConditionFalse)
+		e2eutils.ExpectEqual(init.Reason, "ContainersNotInitialized")
+		e2eutils.ExpectEqual(init.Message, "containers with incomplete status: [init2]")
+		e2eutils.ExpectEqual(len(endPod.Status.InitContainerStatuses), 2)
 		gomega.Expect(endPod.Status.ContainerStatuses[0].State.Waiting).ToNot(gomega.BeNil())
 	})
 })

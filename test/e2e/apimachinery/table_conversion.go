@@ -22,6 +22,8 @@ import (
 	"fmt"
 	"text/tabwriter"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 
@@ -55,26 +57,26 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 		c := f.ClientSet
 
 		podName := "pod-1"
-		framework.Logf("Creating pod %s", podName)
+		e2eutils.Logf("Creating pod %s", podName)
 
 		_, err := c.CoreV1().Pods(ns).Create(context.TODO(), newTablePod(ns, podName), metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create pod %s in namespace: %s", podName, ns)
+		e2eutils.ExpectNoError(err, "failed to create pod %s in namespace: %s", podName, ns)
 
 		table := &metav1beta1.Table{}
 		err = c.CoreV1().RESTClient().Get().Resource("pods").Namespace(ns).Name(podName).SetHeader("Accept", "application/json;as=Table;v=v1beta1;g=meta.k8s.io").Do(context.TODO()).Into(table)
-		framework.ExpectNoError(err, "failed to get pod %s in Table form in namespace: %s", podName, ns)
-		framework.Logf("Table: %#v", table)
+		e2eutils.ExpectNoError(err, "failed to get pod %s in Table form in namespace: %s", podName, ns)
+		e2eutils.Logf("Table: %#v", table)
 
 		gomega.Expect(len(table.ColumnDefinitions)).To(gomega.BeNumerically(">", 2))
-		framework.ExpectEqual(len(table.Rows), 1)
-		framework.ExpectEqual(len(table.Rows[0].Cells), len(table.ColumnDefinitions))
-		framework.ExpectEqual(table.ColumnDefinitions[0].Name, "Name")
-		framework.ExpectEqual(table.Rows[0].Cells[0], podName)
+		e2eutils.ExpectEqual(len(table.Rows), 1)
+		e2eutils.ExpectEqual(len(table.Rows[0].Cells), len(table.ColumnDefinitions))
+		e2eutils.ExpectEqual(table.ColumnDefinitions[0].Name, "Name")
+		e2eutils.ExpectEqual(table.Rows[0].Cells[0], podName)
 
 		out := printTable(table)
 		gomega.Expect(out).To(gomega.MatchRegexp("^NAME\\s"))
 		gomega.Expect(out).To(gomega.MatchRegexp("\npod-1\\s"))
-		framework.Logf("Table:\n%s", out)
+		e2eutils.Logf("Table:\n%s", out)
 	})
 
 	ginkgo.It("should return chunks of table results for list calls", func() {
@@ -100,9 +102,9 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 				if err == nil {
 					return
 				}
-				framework.Logf("Got an error creating template %d: %v", i, err)
+				e2eutils.Logf("Got an error creating template %d: %v", i, err)
 			}
-			framework.Failf("Unable to create template %d, exiting", i)
+			e2eutils.Failf("Unable to create template %d, exiting", i)
 		})
 
 		pagedTable := &metav1beta1.Table{}
@@ -110,20 +112,20 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 			VersionedParams(&metav1.ListOptions{Limit: 2}, metav1.ParameterCodec).
 			SetHeader("Accept", "application/json;as=Table;v=v1beta1;g=meta.k8s.io").
 			Do(context.TODO()).Into(pagedTable)
-		framework.ExpectNoError(err, "failed to get pod templates in Table form in namespace: %s", ns)
-		framework.ExpectEqual(len(pagedTable.Rows), 2)
-		framework.ExpectNotEqual(pagedTable.ResourceVersion, "")
-		framework.ExpectNotEqual(pagedTable.Continue, "")
-		framework.ExpectEqual(pagedTable.Rows[0].Cells[0], "template-0000")
-		framework.ExpectEqual(pagedTable.Rows[1].Cells[0], "template-0001")
+		e2eutils.ExpectNoError(err, "failed to get pod templates in Table form in namespace: %s", ns)
+		e2eutils.ExpectEqual(len(pagedTable.Rows), 2)
+		e2eutils.ExpectNotEqual(pagedTable.ResourceVersion, "")
+		e2eutils.ExpectNotEqual(pagedTable.Continue, "")
+		e2eutils.ExpectEqual(pagedTable.Rows[0].Cells[0], "template-0000")
+		e2eutils.ExpectEqual(pagedTable.Rows[1].Cells[0], "template-0001")
 
 		err = c.CoreV1().RESTClient().Get().Namespace(ns).Resource("podtemplates").
 			VersionedParams(&metav1.ListOptions{Continue: pagedTable.Continue}, metav1.ParameterCodec).
 			SetHeader("Accept", "application/json;as=Table;v=v1beta1;g=meta.k8s.io").
 			Do(context.TODO()).Into(pagedTable)
-		framework.ExpectNoError(err, "failed to get pod templates in Table form in namespace: %s", ns)
+		e2eutils.ExpectNoError(err, "failed to get pod templates in Table form in namespace: %s", ns)
 		gomega.Expect(len(pagedTable.Rows)).To(gomega.BeNumerically(">", 0))
-		framework.ExpectEqual(pagedTable.Rows[0].Cells[0], "template-0002")
+		e2eutils.ExpectEqual(pagedTable.Rows[0].Cells[0], "template-0002")
 	})
 
 	ginkgo.It("should return generic metadata details across all namespaces for nodes", func() {
@@ -131,18 +133,18 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 
 		table := &metav1beta1.Table{}
 		err := c.CoreV1().RESTClient().Get().Resource("nodes").SetHeader("Accept", "application/json;as=Table;v=v1beta1;g=meta.k8s.io").Do(context.TODO()).Into(table)
-		framework.ExpectNoError(err, "failed to get nodes in Table form across all namespaces")
-		framework.Logf("Table: %#v", table)
+		e2eutils.ExpectNoError(err, "failed to get nodes in Table form across all namespaces")
+		e2eutils.Logf("Table: %#v", table)
 
 		gomega.Expect(len(table.ColumnDefinitions)).To(gomega.BeNumerically(">=", 2))
 		gomega.Expect(len(table.Rows)).To(gomega.BeNumerically(">=", 1))
-		framework.ExpectEqual(len(table.Rows[0].Cells), len(table.ColumnDefinitions))
-		framework.ExpectEqual(table.ColumnDefinitions[0].Name, "Name")
-		framework.ExpectNotEqual(table.ResourceVersion, "")
+		e2eutils.ExpectEqual(len(table.Rows[0].Cells), len(table.ColumnDefinitions))
+		e2eutils.ExpectEqual(table.ColumnDefinitions[0].Name, "Name")
+		e2eutils.ExpectNotEqual(table.ResourceVersion, "")
 
 		out := printTable(table)
 		gomega.Expect(out).To(gomega.MatchRegexp("^NAME\\s"))
-		framework.Logf("Table:\n%s", out)
+		e2eutils.Logf("Table:\n%s", out)
 	})
 
 	/*
@@ -164,8 +166,8 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 			},
 		}
 		err := c.AuthorizationV1().RESTClient().Post().Resource("selfsubjectaccessreviews").SetHeader("Accept", "application/json;as=Table;v=v1;g=meta.k8s.io").Body(sar).Do(context.TODO()).Into(table)
-		framework.ExpectError(err, "failed to return error when posting self subject access review: %+v, to a backend that does not implement metadata", sar)
-		framework.ExpectEqual(err.(apierrors.APIStatus).Status().Code, int32(406))
+		e2eutils.ExpectError(err, "failed to return error when posting self subject access review: %+v, to a backend that does not implement metadata", sar)
+		e2eutils.ExpectEqual(err.(apierrors.APIStatus).Status().Code, int32(406))
 	})
 })
 
@@ -174,7 +176,7 @@ func printTable(table *metav1beta1.Table) string {
 	tw := tabwriter.NewWriter(buf, 5, 8, 1, ' ', 0)
 	printer := printers.NewTablePrinter(printers.PrintOptions{})
 	err := printer.PrintObj(table, tw)
-	framework.ExpectNoError(err, "failed to print table: %+v", table)
+	e2eutils.ExpectNoError(err, "failed to print table: %+v", table)
 	tw.Flush()
 	return buf.String()
 }

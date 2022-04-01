@@ -27,6 +27,8 @@ import (
 	"strings"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"k8s.io/client-go/util/retry"
 
 	"golang.org/x/net/websocket"
@@ -66,7 +68,7 @@ const (
 )
 
 // testHostIP tests that a pod gets a host IP
-func testHostIP(podClient *framework.PodClient, pod *v1.Pod) {
+func testHostIP(podClient *e2eutils.PodClient, pod *v1.Pod) {
 	ginkgo.By("creating pod")
 	podClient.CreateSync(pod)
 
@@ -75,21 +77,21 @@ func testHostIP(podClient *framework.PodClient, pod *v1.Pod) {
 	t := time.Now()
 	for {
 		p, err := podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err, "Failed to get pod %q", pod.Name)
+		e2eutils.ExpectNoError(err, "Failed to get pod %q", pod.Name)
 		if p.Status.HostIP != "" {
-			framework.Logf("Pod %s has hostIP: %s", p.Name, p.Status.HostIP)
+			e2eutils.Logf("Pod %s has hostIP: %s", p.Name, p.Status.HostIP)
 			break
 		}
 		if time.Since(t) >= hostIPTimeout {
-			framework.Failf("Gave up waiting for hostIP of pod %s after %v seconds",
+			e2eutils.Failf("Gave up waiting for hostIP of pod %s after %v seconds",
 				p.Name, time.Since(t).Seconds())
 		}
-		framework.Logf("Retrying to get the hostIP of pod %s", p.Name)
+		e2eutils.Logf("Retrying to get the hostIP of pod %s", p.Name)
 		time.Sleep(5 * time.Second)
 	}
 }
 
-func startPodAndGetBackOffs(podClient *framework.PodClient, pod *v1.Pod, sleepAmount time.Duration) (time.Duration, time.Duration) {
+func startPodAndGetBackOffs(podClient *e2eutils.PodClient, pod *v1.Pod, sleepAmount time.Duration) (time.Duration, time.Duration) {
 	podClient.CreateSync(pod)
 	time.Sleep(sleepAmount)
 	gomega.Expect(pod.Spec.Containers).NotTo(gomega.BeEmpty())
@@ -99,40 +101,40 @@ func startPodAndGetBackOffs(podClient *framework.PodClient, pod *v1.Pod, sleepAm
 	ginkgo.By("getting restart delay-0")
 	_, err := getRestartDelay(podClient, podName, containerName)
 	if err != nil {
-		framework.Failf("timed out waiting for container restart in pod=%s/%s", podName, containerName)
+		e2eutils.Failf("timed out waiting for container restart in pod=%s/%s", podName, containerName)
 	}
 
 	ginkgo.By("getting restart delay-1")
 	delay1, err := getRestartDelay(podClient, podName, containerName)
 	if err != nil {
-		framework.Failf("timed out waiting for container restart in pod=%s/%s", podName, containerName)
+		e2eutils.Failf("timed out waiting for container restart in pod=%s/%s", podName, containerName)
 	}
 
 	ginkgo.By("getting restart delay-2")
 	delay2, err := getRestartDelay(podClient, podName, containerName)
 	if err != nil {
-		framework.Failf("timed out waiting for container restart in pod=%s/%s", podName, containerName)
+		e2eutils.Failf("timed out waiting for container restart in pod=%s/%s", podName, containerName)
 	}
 	return delay1, delay2
 }
 
-func getRestartDelay(podClient *framework.PodClient, podName string, containerName string) (time.Duration, error) {
+func getRestartDelay(podClient *e2eutils.PodClient, podName string, containerName string) (time.Duration, error) {
 	beginTime := time.Now()
 	var previousRestartCount int32 = -1
 	var previousFinishedAt time.Time
 	for time.Since(beginTime) < (2 * maxBackOffTolerance) { // may just miss the 1st MaxContainerBackOff delay
 		time.Sleep(time.Second)
 		pod, err := podClient.Get(context.TODO(), podName, metav1.GetOptions{})
-		framework.ExpectNoError(err, fmt.Sprintf("getting pod %s", podName))
+		e2eutils.ExpectNoError(err, fmt.Sprintf("getting pod %s", podName))
 		status, ok := podutil.GetContainerStatus(pod.Status.ContainerStatuses, containerName)
 		if !ok {
-			framework.Logf("getRestartDelay: status missing")
+			e2eutils.Logf("getRestartDelay: status missing")
 			continue
 		}
 
 		// the only case this happens is if this is the first time the Pod is running and there is no "Last State".
 		if status.LastTerminationState.Terminated == nil {
-			framework.Logf("Container's last state is not \"Terminated\".")
+			e2eutils.Logf("Container's last state is not \"Terminated\".")
 			continue
 		}
 
@@ -159,7 +161,7 @@ func getRestartDelay(podClient *framework.PodClient, podName string, containerNa
 			} else {
 				startedAt = status.LastTerminationState.Terminated.StartedAt.Time
 			}
-			framework.Logf("getRestartDelay: restartCount = %d, finishedAt=%s restartedAt=%s (%s)", status.RestartCount, previousFinishedAt, startedAt, startedAt.Sub(previousFinishedAt))
+			e2eutils.Logf("getRestartDelay: restartCount = %d, finishedAt=%s restartedAt=%s (%s)", status.RestartCount, previousFinishedAt, startedAt, startedAt.Sub(previousFinishedAt))
 			return startedAt.Sub(previousFinishedAt), nil
 		}
 	}
@@ -174,7 +176,7 @@ func expectNoErrorWithRetries(fn func() error, maxRetries int, explain ...interf
 		if err == nil {
 			return
 		}
-		framework.Logf("(Attempt %d of %d) Unexpected error occurred: %v", i+1, maxRetries, err)
+		e2eutils.Logf("(Attempt %d of %d) Unexpected error occurred: %v", i+1, maxRetries, err)
 	}
 	if err != nil {
 		debug.PrintStack()
@@ -185,7 +187,7 @@ func expectNoErrorWithRetries(fn func() error, maxRetries int, explain ...interf
 var _ = SIGDescribe("Pods", func() {
 	f := framework.NewDefaultFramework("pods")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
-	var podClient *framework.PodClient
+	var podClient *e2eutils.PodClient
 	var dc dynamic.Interface
 
 	ginkgo.BeforeEach(func() {
@@ -246,8 +248,8 @@ var _ = SIGDescribe("Pods", func() {
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 		options := metav1.ListOptions{LabelSelector: selector.String()}
 		pods, err := podClient.List(context.TODO(), options)
-		framework.ExpectNoError(err, "failed to query for pods")
-		framework.ExpectEqual(len(pods.Items), 0)
+		e2eutils.ExpectNoError(err, "failed to query for pods")
+		e2eutils.ExpectEqual(len(pods.Items), 0)
 
 		listCompleted := make(chan bool, 1)
 		lw := &cache.ListWatch{
@@ -257,10 +259,10 @@ var _ = SIGDescribe("Pods", func() {
 				if err == nil {
 					select {
 					case listCompleted <- true:
-						framework.Logf("observed the pod list")
+						e2eutils.Logf("observed the pod list")
 						return podList, err
 					default:
-						framework.Logf("channel blocked")
+						e2eutils.Logf("channel blocked")
 					}
 				}
 				return podList, err
@@ -280,8 +282,8 @@ var _ = SIGDescribe("Pods", func() {
 		selector = labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 		options = metav1.ListOptions{LabelSelector: selector.String()}
 		pods, err = podClient.List(context.TODO(), options)
-		framework.ExpectNoError(err, "failed to query for pods")
-		framework.ExpectEqual(len(pods.Items), 1)
+		e2eutils.ExpectNoError(err, "failed to query for pods")
+		e2eutils.ExpectEqual(len(pods.Items), 1)
 
 		ginkgo.By("verifying pod creation was observed")
 		select {
@@ -289,30 +291,30 @@ var _ = SIGDescribe("Pods", func() {
 			select {
 			case event := <-w.ResultChan():
 				if event.Type != watch.Added {
-					framework.Failf("Failed to observe pod creation: %v", event)
+					e2eutils.Failf("Failed to observe pod creation: %v", event)
 				}
-			case <-time.After(framework.PodStartTimeout):
-				framework.Failf("Timeout while waiting for pod creation")
+			case <-time.After(e2eutils.PodStartTimeout):
+				e2eutils.Failf("Timeout while waiting for pod creation")
 			}
 		case <-time.After(10 * time.Second):
-			framework.Failf("Timeout while waiting to observe pod list")
+			e2eutils.Failf("Timeout while waiting to observe pod list")
 		}
 
 		// We need to wait for the pod to be running, otherwise the deletion
 		// may be carried out immediately rather than gracefully.
-		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name))
+		e2eutils.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name))
 		// save the running pod
 		pod, err = podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to GET scheduled pod")
+		e2eutils.ExpectNoError(err, "failed to GET scheduled pod")
 
 		ginkgo.By("deleting the pod gracefully")
 		err = podClient.Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(30))
-		framework.ExpectNoError(err, "failed to delete pod")
+		e2eutils.ExpectNoError(err, "failed to delete pod")
 
 		ginkgo.By("verifying pod deletion was observed")
 		deleted := false
 		var lastPod *v1.Pod
-		timer := time.After(framework.DefaultPodDeletionTimeout)
+		timer := time.After(e2eutils.DefaultPodDeletionTimeout)
 		for !deleted {
 			select {
 			case event := <-w.ResultChan():
@@ -321,15 +323,15 @@ var _ = SIGDescribe("Pods", func() {
 					lastPod = event.Object.(*v1.Pod)
 					deleted = true
 				case watch.Error:
-					framework.Logf("received a watch error: %v", event.Object)
-					framework.Failf("watch closed with error")
+					e2eutils.Logf("received a watch error: %v", event.Object)
+					e2eutils.Failf("watch closed with error")
 				}
 			case <-timer:
-				framework.Failf("timed out waiting for pod deletion")
+				e2eutils.Failf("timed out waiting for pod deletion")
 			}
 		}
 		if !deleted {
-			framework.Failf("Failed to observe pod deletion")
+			e2eutils.Failf("Failed to observe pod deletion")
 		}
 
 		gomega.Expect(lastPod.DeletionTimestamp).ToNot(gomega.BeNil())
@@ -338,8 +340,8 @@ var _ = SIGDescribe("Pods", func() {
 		selector = labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 		options = metav1.ListOptions{LabelSelector: selector.String()}
 		pods, err = podClient.List(context.TODO(), options)
-		framework.ExpectNoError(err, "failed to query for pods")
-		framework.ExpectEqual(len(pods.Items), 0)
+		e2eutils.ExpectNoError(err, "failed to query for pods")
+		e2eutils.ExpectEqual(len(pods.Items), 0)
 	})
 
 	/*
@@ -376,8 +378,8 @@ var _ = SIGDescribe("Pods", func() {
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 		options := metav1.ListOptions{LabelSelector: selector.String()}
 		pods, err := podClient.List(context.TODO(), options)
-		framework.ExpectNoError(err, "failed to query for pods")
-		framework.ExpectEqual(len(pods.Items), 1)
+		e2eutils.ExpectNoError(err, "failed to query for pods")
+		e2eutils.ExpectEqual(len(pods.Items), 1)
 
 		ginkgo.By("updating the pod")
 		podClient.Update(name, func(pod *v1.Pod) {
@@ -385,15 +387,15 @@ var _ = SIGDescribe("Pods", func() {
 			pod.Labels["time"] = value
 		})
 
-		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name))
+		e2eutils.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name))
 
 		ginkgo.By("verifying the updated pod is in kubernetes")
 		selector = labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 		options = metav1.ListOptions{LabelSelector: selector.String()}
 		pods, err = podClient.List(context.TODO(), options)
-		framework.ExpectNoError(err, "failed to query for pods")
-		framework.ExpectEqual(len(pods.Items), 1)
-		framework.Logf("Pod update OK")
+		e2eutils.ExpectNoError(err, "failed to query for pods")
+		e2eutils.ExpectEqual(len(pods.Items), 1)
+		e2eutils.Logf("Pod update OK")
 	})
 
 	/*
@@ -430,8 +432,8 @@ var _ = SIGDescribe("Pods", func() {
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 		options := metav1.ListOptions{LabelSelector: selector.String()}
 		pods, err := podClient.List(context.TODO(), options)
-		framework.ExpectNoError(err, "failed to query for pods")
-		framework.ExpectEqual(len(pods.Items), 1)
+		e2eutils.ExpectNoError(err, "failed to query for pods")
+		e2eutils.ExpectEqual(len(pods.Items), 1)
 
 		ginkgo.By("updating the pod")
 		podClient.Update(name, func(pod *v1.Pod) {
@@ -439,7 +441,7 @@ var _ = SIGDescribe("Pods", func() {
 			pod.Spec.ActiveDeadlineSeconds = &newDeadline
 		})
 
-		framework.ExpectNoError(e2epod.WaitForPodTerminatedInNamespace(f.ClientSet, pod.Name, "DeadlineExceeded", f.Namespace.Name))
+		e2eutils.ExpectNoError(e2epod.WaitForPodTerminatedInNamespace(f.ClientSet, pod.Name, "DeadlineExceeded", f.Namespace.Name))
 	})
 
 	/*
@@ -460,7 +462,7 @@ var _ = SIGDescribe("Pods", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "srv",
-						Image: framework.ServeHostnameImage,
+						Image: e2eutils.ServeHostnameImage,
 						Ports: []v1.ContainerPort{{ContainerPort: 9376}},
 					},
 				},
@@ -494,7 +496,7 @@ var _ = SIGDescribe("Pods", func() {
 			},
 		}
 		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), svc, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create service")
+		e2eutils.ExpectNoError(err, "failed to create service")
 
 		// Make a client pod that verifies that it has the service environment variables.
 		podName := "client-envvars-" + string(uuid.NewUUID())
@@ -529,7 +531,7 @@ var _ = SIGDescribe("Pods", func() {
 			"FOOSERVICE_PORT_8765_TCP_ADDR=",
 		}
 		expectNoErrorWithRetries(func() error {
-			return f.MatchContainerOutput(pod, containerName, expectedVars, gomega.ContainSubstring)
+			return e2eutils.MatchContainerOutput(f.ClientSet, f.Namespace.Name, pod, containerName, f.Timeouts.PodStart, expectedVars, gomega.ContainSubstring)
 		}, maxRetries, "Container should have service environment variables set")
 	})
 
@@ -540,8 +542,8 @@ var _ = SIGDescribe("Pods", func() {
 		Message retrieved form Websocket MUST match with expected exec command output.
 	*/
 	framework.ConformanceIt("should support remote command execution over websockets [NodeConformance]", func() {
-		config, err := framework.LoadConfig()
-		framework.ExpectNoError(err, "unable to get base config")
+		config, err := e2eutils.LoadConfig()
+		e2eutils.ExpectNoError(err, "unable to get base config")
 
 		ginkgo.By("creating the pod")
 		name := "pod-exec-websocket-" + string(uuid.NewUUID())
@@ -577,7 +579,7 @@ var _ = SIGDescribe("Pods", func() {
 		url := req.URL()
 		ws, err := e2ewebsocket.OpenWebSocketForURL(url, config, []string{"channel.k8s.io"})
 		if err != nil {
-			framework.Failf("Failed to open websocket to %s: %v", url.String(), err)
+			e2eutils.Failf("Failed to open websocket to %s: %v", url.String(), err)
 		}
 		defer ws.Close()
 
@@ -589,7 +591,7 @@ var _ = SIGDescribe("Pods", func() {
 					if err == io.EOF {
 						break
 					}
-					framework.Failf("Failed to read completely from websocket %s: %v", url.String(), err)
+					e2eutils.Failf("Failed to read completely from websocket %s: %v", url.String(), err)
 				}
 				if len(msg) == 0 {
 					continue
@@ -599,7 +601,7 @@ var _ = SIGDescribe("Pods", func() {
 						// skip an empty message on stream other than stdout
 						continue
 					} else {
-						framework.Failf("Got message from server that didn't start with channel 1 (STDOUT): %v", msg)
+						e2eutils.Failf("Got message from server that didn't start with channel 1 (STDOUT): %v", msg)
 					}
 
 				}
@@ -622,8 +624,8 @@ var _ = SIGDescribe("Pods", func() {
 		Message retrieved form Websocket MUST match with container's output.
 	*/
 	framework.ConformanceIt("should support retrieving logs from the container over websockets [NodeConformance]", func() {
-		config, err := framework.LoadConfig()
-		framework.ExpectNoError(err, "unable to get base config")
+		config, err := e2eutils.LoadConfig()
+		e2eutils.ExpectNoError(err, "unable to get base config")
 
 		ginkgo.By("creating the pod")
 		name := "pod-logs-websocket-" + string(uuid.NewUUID())
@@ -656,7 +658,7 @@ var _ = SIGDescribe("Pods", func() {
 
 		ws, err := e2ewebsocket.OpenWebSocketForURL(url, config, []string{"binary.k8s.io"})
 		if err != nil {
-			framework.Failf("Failed to open websocket to %s: %v", url.String(), err)
+			e2eutils.Failf("Failed to open websocket to %s: %v", url.String(), err)
 		}
 		defer ws.Close()
 		buf := &bytes.Buffer{}
@@ -666,7 +668,7 @@ var _ = SIGDescribe("Pods", func() {
 				if err == io.EOF {
 					break
 				}
-				framework.Failf("Failed to read completely from websocket %s: %v", url.String(), err)
+				e2eutils.Failf("Failed to read completely from websocket %s: %v", url.String(), err)
 			}
 			if len(strings.TrimSpace(string(msg))) == 0 {
 				continue
@@ -674,7 +676,7 @@ var _ = SIGDescribe("Pods", func() {
 			buf.Write(msg)
 		}
 		if buf.String() != "container is alive\n" {
-			framework.Failf("Unexpected websocket logs:\n%s", buf.String())
+			e2eutils.Failf("Unexpected websocket logs:\n%s", buf.String())
 		}
 	})
 
@@ -706,16 +708,16 @@ var _ = SIGDescribe("Pods", func() {
 		})
 
 		time.Sleep(syncLoopFrequency)
-		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name))
+		e2eutils.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name))
 
 		ginkgo.By("get restart delay after image update")
 		delayAfterUpdate, err := getRestartDelay(podClient, podName, containerName)
 		if err != nil {
-			framework.Failf("timed out waiting for container restart in pod=%s/%s", podName, containerName)
+			e2eutils.Failf("timed out waiting for container restart in pod=%s/%s", podName, containerName)
 		}
 
 		if delayAfterUpdate > 2*delay2 || delayAfterUpdate > 2*delay1 {
-			framework.Failf("updating image did not reset the back-off value in pod=%s/%s d3=%s d2=%s d1=%s", podName, containerName, delayAfterUpdate, delay1, delay2)
+			e2eutils.Failf("updating image did not reset the back-off value in pod=%s/%s d3=%s d2=%s d1=%s", podName, containerName, delayAfterUpdate, delay1, delay2)
 		}
 	})
 
@@ -751,7 +753,7 @@ var _ = SIGDescribe("Pods", func() {
 		for i := 0; i < 3; i++ {
 			delay1, err = getRestartDelay(podClient, podName, containerName)
 			if err != nil {
-				framework.Failf("timed out waiting for container restart in pod=%s/%s", podName, containerName)
+				e2eutils.Failf("timed out waiting for container restart in pod=%s/%s", podName, containerName)
 			}
 
 			if delay1 < kubelet.MaxContainerBackOff {
@@ -760,17 +762,17 @@ var _ = SIGDescribe("Pods", func() {
 		}
 
 		if (delay1 < kubelet.MaxContainerBackOff) || (delay1 > maxBackOffTolerance) {
-			framework.Failf("expected %s back-off got=%s in delay1", kubelet.MaxContainerBackOff, delay1)
+			e2eutils.Failf("expected %s back-off got=%s in delay1", kubelet.MaxContainerBackOff, delay1)
 		}
 
 		ginkgo.By("getting restart delay after a capped delay")
 		delay2, err := getRestartDelay(podClient, podName, containerName)
 		if err != nil {
-			framework.Failf("timed out waiting for container restart in pod=%s/%s", podName, containerName)
+			e2eutils.Failf("timed out waiting for container restart in pod=%s/%s", podName, containerName)
 		}
 
 		if delay2 < kubelet.MaxContainerBackOff || delay2 > maxBackOffTolerance { // syncloop cumulative drift
-			framework.Failf("expected %s back-off got=%s on delay2", kubelet.MaxContainerBackOff, delay2)
+			e2eutils.Failf("expected %s back-off got=%s on delay2", kubelet.MaxContainerBackOff, delay2)
 		}
 	})
 
@@ -802,38 +804,38 @@ var _ = SIGDescribe("Pods", func() {
 		validatePodReadiness := func(expectReady bool) {
 			err := wait.Poll(time.Second, time.Minute, func() (bool, error) {
 				pod, err := podClient.Get(context.TODO(), podName, metav1.GetOptions{})
-				framework.ExpectNoError(err)
+				e2eutils.ExpectNoError(err)
 				podReady := podutils.IsPodReady(pod)
 				res := expectReady == podReady
 				if !res {
-					framework.Logf("Expect the Ready condition of pod %q to be %v, but got %v (pod status %#v)", podName, expectReady, podReady, pod.Status)
+					e2eutils.Logf("Expect the Ready condition of pod %q to be %v, but got %v (pod status %#v)", podName, expectReady, podReady, pod.Status)
 				}
 				return res, nil
 			})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 		}
 
 		ginkgo.By("submitting the pod to kubernetes")
 		f.PodClient().Create(pod)
 		e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
-		framework.ExpectEqual(podClient.PodIsReady(podName), false, "Expect pod's Ready condition to be false initially.")
+		e2eutils.ExpectEqual(podClient.PodIsReady(podName), false, "Expect pod's Ready condition to be false initially.")
 
 		ginkgo.By(fmt.Sprintf("patching pod status with condition %q to true", readinessGate1))
 		_, err := podClient.Patch(context.TODO(), podName, types.StrategicMergePatchType, []byte(fmt.Sprintf(patchStatusFmt, readinessGate1, "True")), metav1.PatchOptions{}, "status")
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		// Sleep for 10 seconds.
 		time.Sleep(syncLoopFrequency)
 		// Verify the pod is still not ready
-		framework.ExpectEqual(podClient.PodIsReady(podName), false, "Expect pod's Ready condition to be false with only one condition in readinessGates equal to True")
+		e2eutils.ExpectEqual(podClient.PodIsReady(podName), false, "Expect pod's Ready condition to be false with only one condition in readinessGates equal to True")
 
 		ginkgo.By(fmt.Sprintf("patching pod status with condition %q to true", readinessGate2))
 		_, err = podClient.Patch(context.TODO(), podName, types.StrategicMergePatchType, []byte(fmt.Sprintf(patchStatusFmt, readinessGate2, "True")), metav1.PatchOptions{}, "status")
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		validatePodReadiness(true)
 
 		ginkgo.By(fmt.Sprintf("patching pod status with condition %q to false", readinessGate1))
 		_, err = podClient.Patch(context.TODO(), podName, types.StrategicMergePatchType, []byte(fmt.Sprintf(patchStatusFmt, readinessGate1, "False")), metav1.PatchOptions{}, "status")
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		validatePodReadiness(false)
 
 	})
@@ -866,24 +868,24 @@ var _ = SIGDescribe("Pods", func() {
 					}},
 					RestartPolicy: v1.RestartPolicyNever,
 				}}, metav1.CreateOptions{})
-			framework.ExpectNoError(err, "failed to create pod")
-			framework.Logf("created %v", podTestName)
+			e2eutils.ExpectNoError(err, "failed to create pod")
+			e2eutils.Logf("created %v", podTestName)
 		}
 
 		// wait as required for all 3 pods to be running
 		ginkgo.By("waiting for all 3 pods to be running")
 		err := e2epod.WaitForPodsRunningReady(f.ClientSet, f.Namespace.Name, 3, 0, f.Timeouts.PodStart, nil)
-		framework.ExpectNoError(err, "3 pods not found running.")
+		e2eutils.ExpectNoError(err, "3 pods not found running.")
 
 		// delete Collection of pods with a label in the current namespace
 		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).DeleteCollection(context.TODO(), metav1.DeleteOptions{GracePeriodSeconds: &one}, metav1.ListOptions{
 			LabelSelector: "type=Testing"})
-		framework.ExpectNoError(err, "failed to delete collection of pods")
+		e2eutils.ExpectNoError(err, "failed to delete collection of pods")
 
 		// wait for all pods to be deleted
 		ginkgo.By("waiting for all pods to be deleted")
 		err = wait.PollImmediate(podRetryPeriod, f.Timeouts.PodDelete, checkPodListQuantity(f, "type=Testing", 0))
-		framework.ExpectNoError(err, "found a pod(s)")
+		e2eutils.ExpectNoError(err, "found a pod(s)")
 	})
 
 	/*
@@ -910,7 +912,7 @@ var _ = SIGDescribe("Pods", func() {
 			},
 		}
 		podsList, err := f.ClientSet.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{LabelSelector: testPodLabelsFlat})
-		framework.ExpectNoError(err, "failed to list Pods")
+		e2eutils.ExpectNoError(err, "failed to list Pods")
 
 		testPod := v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -929,7 +931,7 @@ var _ = SIGDescribe("Pods", func() {
 		}
 		ginkgo.By("creating a Pod with a static label")
 		_, err = f.ClientSet.CoreV1().Pods(testNamespaceName).Create(context.TODO(), &testPod, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create Pod %v in namespace %v", testPod.ObjectMeta.Name, testNamespaceName)
+		e2eutils.ExpectNoError(err, "failed to create Pod %v in namespace %v", testPod.ObjectMeta.Name, testNamespaceName)
 
 		ginkgo.By("watching for Pod to be ready")
 		ctx, cancel := context.WithTimeout(context.Background(), f.Timeouts.PodStart)
@@ -941,21 +943,21 @@ var _ = SIGDescribe("Pods", func() {
 					pod.Labels["test-pod-static"] == "true" &&
 					pod.Status.Phase == v1.PodRunning
 				if !found {
-					framework.Logf("observed Pod %v in namespace %v in phase %v with labels: %v & conditions %v", pod.ObjectMeta.Name, pod.ObjectMeta.Namespace, pod.Status.Phase, pod.Labels, pod.Status.Conditions)
+					e2eutils.Logf("observed Pod %v in namespace %v in phase %v with labels: %v & conditions %v", pod.ObjectMeta.Name, pod.ObjectMeta.Namespace, pod.Status.Phase, pod.Labels, pod.Status.Conditions)
 					return false, nil
 				}
-				framework.Logf("Found Pod %v in namespace %v in phase %v with labels: %v & conditions %v", pod.ObjectMeta.Name, pod.ObjectMeta.Namespace, pod.Status.Phase, pod.Labels, pod.Status.Conditions)
+				e2eutils.Logf("Found Pod %v in namespace %v in phase %v with labels: %v & conditions %v", pod.ObjectMeta.Name, pod.ObjectMeta.Namespace, pod.Status.Phase, pod.Labels, pod.Status.Conditions)
 				return found, nil
 			}
-			framework.Logf("Observed event: %+v", event.Object)
+			e2eutils.Logf("Observed event: %+v", event.Object)
 			return false, nil
 		})
 		if err != nil {
-			framework.Logf("failed to see event that pod is created: %v", err)
+			e2eutils.Logf("failed to see event that pod is created: %v", err)
 		}
 		p, err := f.ClientSet.CoreV1().Pods(testNamespaceName).Get(context.TODO(), testPodName, metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to get Pod %v in namespace %v", testPodName, testNamespaceName)
-		framework.ExpectEqual(p.Status.Phase, v1.PodRunning, "failed to see Pod %v in namespace %v running", p.ObjectMeta.Name, testNamespaceName)
+		e2eutils.ExpectNoError(err, "failed to get Pod %v in namespace %v", testPodName, testNamespaceName)
+		e2eutils.ExpectEqual(p.Status.Phase, v1.PodRunning, "failed to see Pod %v in namespace %v running", p.ObjectMeta.Name, testNamespaceName)
 
 		ginkgo.By("patching the Pod with a new Label and updated data")
 		prePatchResourceVersion := p.ResourceVersion
@@ -971,9 +973,9 @@ var _ = SIGDescribe("Pods", func() {
 				}},
 			},
 		})
-		framework.ExpectNoError(err, "failed to marshal JSON patch for Pod")
+		e2eutils.ExpectNoError(err, "failed to marshal JSON patch for Pod")
 		_, err = f.ClientSet.CoreV1().Pods(testNamespaceName).Patch(context.TODO(), testPodName, types.StrategicMergePatchType, []byte(podPatch), metav1.PatchOptions{})
-		framework.ExpectNoError(err, "failed to patch Pod %s in namespace %s", testPodName, testNamespaceName)
+		e2eutils.ExpectNoError(err, "failed to patch Pod %s in namespace %s", testPodName, testNamespaceName)
 		ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 		_, err = watchtools.Until(ctx, prePatchResourceVersion, w, func(event watch.Event) (bool, error) {
@@ -985,31 +987,31 @@ var _ = SIGDescribe("Pods", func() {
 					return found, nil
 				}
 			default:
-				framework.Logf("observed event type %v", event.Type)
+				e2eutils.Logf("observed event type %v", event.Type)
 			}
 			return false, nil
 		})
 		if err != nil {
-			framework.Logf("failed to see %v event: %v", watch.Modified, err)
+			e2eutils.Logf("failed to see %v event: %v", watch.Modified, err)
 		}
 
 		ginkgo.By("getting the Pod and ensuring that it's patched")
 		pod, err := f.ClientSet.CoreV1().Pods(testNamespaceName).Get(context.TODO(), testPodName, metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to fetch Pod %s in namespace %s", testPodName, testNamespaceName)
-		framework.ExpectEqual(pod.ObjectMeta.Labels["test-pod"], "patched", "failed to patch Pod - missing label")
-		framework.ExpectEqual(pod.Spec.Containers[0].Image, testPodImage2, "failed to patch Pod - wrong image")
+		e2eutils.ExpectNoError(err, "failed to fetch Pod %s in namespace %s", testPodName, testNamespaceName)
+		e2eutils.ExpectEqual(pod.ObjectMeta.Labels["test-pod"], "patched", "failed to patch Pod - missing label")
+		e2eutils.ExpectEqual(pod.Spec.Containers[0].Image, testPodImage2, "failed to patch Pod - wrong image")
 
 		ginkgo.By("replacing the Pod's status Ready condition to False")
 		var podStatusUpdate *v1.Pod
 
 		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			podStatusUnstructured, err := dc.Resource(podResource).Namespace(testNamespaceName).Get(context.TODO(), testPodName, metav1.GetOptions{}, "status")
-			framework.ExpectNoError(err, "failed to fetch PodStatus of Pod %s in namespace %s", testPodName, testNamespaceName)
+			e2eutils.ExpectNoError(err, "failed to fetch PodStatus of Pod %s in namespace %s", testPodName, testNamespaceName)
 			podStatusBytes, err := json.Marshal(podStatusUnstructured)
-			framework.ExpectNoError(err, "failed to marshal unstructured response")
+			e2eutils.ExpectNoError(err, "failed to marshal unstructured response")
 			var podStatus v1.Pod
 			err = json.Unmarshal(podStatusBytes, &podStatus)
-			framework.ExpectNoError(err, "failed to unmarshal JSON bytes to a Pod object type")
+			e2eutils.ExpectNoError(err, "failed to unmarshal JSON bytes to a Pod object type")
 			podStatusUpdated := podStatus
 			podStatusFieldPatchCount := 0
 			podStatusFieldPatchCountTotal := 2
@@ -1019,11 +1021,11 @@ var _ = SIGDescribe("Pods", func() {
 					podStatusFieldPatchCount++
 				}
 			}
-			framework.ExpectEqual(podStatusFieldPatchCount, podStatusFieldPatchCountTotal, "failed to patch all relevant Pod conditions")
+			e2eutils.ExpectEqual(podStatusFieldPatchCount, podStatusFieldPatchCountTotal, "failed to patch all relevant Pod conditions")
 			podStatusUpdate, err = f.ClientSet.CoreV1().Pods(testNamespaceName).UpdateStatus(context.TODO(), &podStatusUpdated, metav1.UpdateOptions{})
 			return err
 		})
-		framework.ExpectNoError(err, "failed to update PodStatus of Pod %s in namespace %s", testPodName, testNamespaceName)
+		e2eutils.ExpectNoError(err, "failed to update PodStatus of Pod %s in namespace %s", testPodName, testNamespaceName)
 
 		ginkgo.By("check the Pod again to ensure its Ready conditions are False")
 		podStatusFieldPatchCount := 0
@@ -1033,12 +1035,12 @@ var _ = SIGDescribe("Pods", func() {
 				podStatusFieldPatchCount++
 			}
 		}
-		framework.ExpectEqual(podStatusFieldPatchCount, podStatusFieldPatchCountTotal, "failed to update PodStatus - field patch count doesn't match the total")
+		e2eutils.ExpectEqual(podStatusFieldPatchCount, podStatusFieldPatchCountTotal, "failed to update PodStatus - field patch count doesn't match the total")
 
 		ginkgo.By("deleting the Pod via a Collection with a LabelSelector")
 		preDeleteResourceVersion := podStatusUpdate.ResourceVersion
 		err = f.ClientSet.CoreV1().Pods(testNamespaceName).DeleteCollection(context.TODO(), metav1.DeleteOptions{GracePeriodSeconds: &one}, metav1.ListOptions{LabelSelector: testPodLabelsFlat})
-		framework.ExpectNoError(err, "failed to delete Pod by collection")
+		e2eutils.ExpectNoError(err, "failed to delete Pod by collection")
 
 		ginkgo.By("watching for the Pod to be deleted")
 		ctx, cancel = context.WithTimeout(context.Background(), 1*time.Minute)
@@ -1051,23 +1053,23 @@ var _ = SIGDescribe("Pods", func() {
 						pod.Labels["test-pod-static"] == "true"
 					return found, nil
 				} else {
-					framework.Logf("observed event type %v that was not a pod: %T", event.Type, event.Object)
+					e2eutils.Logf("observed event type %v that was not a pod: %T", event.Type, event.Object)
 				}
 			default:
-				framework.Logf("observed event type %v", event.Type)
+				e2eutils.Logf("observed event type %v", event.Type)
 			}
 			return false, nil
 		})
 		if err != nil {
-			framework.Logf("failed to see %v event: %v", watch.Deleted, err)
+			e2eutils.Logf("failed to see %v event: %v", watch.Deleted, err)
 		}
 		postDeletePod, err := f.ClientSet.CoreV1().Pods(testNamespaceName).Get(context.TODO(), testPodName, metav1.GetOptions{})
 		var postDeletePodJSON []byte
 		if postDeletePod != nil {
 			postDeletePodJSON, _ = json.Marshal(postDeletePod)
 		}
-		framework.ExpectError(err, "pod %v found in namespace %v, but it should be deleted: %s", testPodName, testNamespaceName, string(postDeletePodJSON))
-		framework.ExpectEqual(apierrors.IsNotFound(err), true, fmt.Sprintf("expected IsNotFound error, got %#v", err))
+		e2eutils.ExpectError(err, "pod %v found in namespace %v, but it should be deleted: %s", testPodName, testNamespaceName, string(postDeletePodJSON))
+		e2eutils.ExpectEqual(apierrors.IsNotFound(err), true, fmt.Sprintf("expected IsNotFound error, got %#v", err))
 	})
 })
 
@@ -1083,7 +1085,7 @@ func checkPodListQuantity(f *framework.Framework, label string, quantity int) fu
 		}
 
 		if len(list.Items) != quantity {
-			framework.Logf("Pod quantity %d is different from expected quantity %d", len(list.Items), quantity)
+			e2eutils.Logf("Pod quantity %d is different from expected quantity %d", len(list.Items), quantity)
 			return false, err
 		}
 		return true, nil

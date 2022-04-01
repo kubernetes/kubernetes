@@ -21,6 +21,9 @@ import (
 	"os"
 	"time"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -60,15 +63,15 @@ var _ = instrumentation.SIGDescribe("Stackdriver Monitoring", func() {
 })
 
 func testStackdriverAcceleratorMonitoring(f *framework.Framework) {
-	projectID := framework.TestContext.CloudConfig.ProjectID
+	projectID := e2econfig.TestContext.CloudConfig.ProjectID
 
 	ctx := context.Background()
 	client, err := google.DefaultClient(ctx, gcm.CloudPlatformScope)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	gcmService, err := gcm.NewService(ctx, option.WithHTTPClient(client))
 
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	// set this env var if accessing Stackdriver test endpoint (default is prod):
 	// $ export STACKDRIVER_API_ENDPOINT_OVERRIDE=https://test-monitoring.sandbox.googleapis.com/
@@ -105,9 +108,9 @@ func testStackdriverAcceleratorMonitoring(f *framework.Framework) {
 	pollingFunction := checkForAcceleratorMetrics(projectID, gcmService, time.Now(), metricsMap)
 	err = wait.Poll(pollFrequency, pollTimeout, pollingFunction)
 	if err != nil {
-		framework.Logf("Missing metrics: %+v", metricsMap)
+		e2eutils.Logf("Missing metrics: %+v", metricsMap)
 	}
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 }
 
 func checkForAcceleratorMetrics(projectID string, gcmService *gcm.Service, start time.Time, metricsMap map[string]bool) func() (bool, error) {
@@ -119,13 +122,13 @@ func checkForAcceleratorMetrics(projectID string, gcmService *gcm.Service, start
 		for _, metric := range acceleratorMetrics {
 			// TODO: check only for metrics from this cluster
 			ts, err := fetchTimeSeries(projectID, gcmService, metric, start, time.Now())
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			if len(ts) > 0 {
 				counter = counter + 1
 				metricsMap[metric] = true
-				framework.Logf("Received %v timeseries for metric %v", len(ts), metric)
+				e2eutils.Logf("Received %v timeseries for metric %v", len(ts), metric)
 			} else {
-				framework.Logf("No timeseries for metric %v", metric)
+				e2eutils.Logf("No timeseries for metric %v", metric)
 			}
 		}
 		if counter < 3 {

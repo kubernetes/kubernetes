@@ -24,6 +24,9 @@ import (
 	"strings"
 	"time"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -53,7 +56,7 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 
 	ginkgo.It("should set TCP CLOSE_WAIT timeout [Privileged]", func() {
 		nodes, err := e2enode.GetBoundedReadySchedulableNodes(fr.ClientSet, 2)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		if len(nodes.Items) < 2 {
 			e2eskipper.Skipf(
 				"Test requires >= 2 Ready nodes, but there are only %v nodes",
@@ -67,14 +70,14 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 		}
 
 		var family v1.IPFamily
-		if framework.TestContext.ClusterIsIPv6() {
+		if e2econfig.TestContext.ClusterIsIPv6() {
 			family = v1.IPv6Protocol
 		} else {
 			family = v1.IPv4Protocol
 		}
 
 		ips := e2enode.GetAddressesByTypeAndFamily(&nodes.Items[0], v1.NodeInternalIP, family)
-		framework.ExpectNotEqual(len(ips), 0)
+		e2eutils.ExpectNotEqual(len(ips), 0)
 
 		clientNodeInfo := NodeInfo{
 			node:   &nodes.Items[0],
@@ -83,7 +86,7 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 		}
 
 		ips = e2enode.GetAddressesByTypeAndFamily(&nodes.Items[1], v1.NodeInternalIP, family)
-		framework.ExpectNotEqual(len(ips), 0)
+		e2eutils.ExpectNotEqual(len(ips), 0)
 
 		serverNodeInfo := NodeInfo{
 			node:   &nodes.Items[1],
@@ -187,8 +190,8 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 		fr.PodClient().CreateSync(serverPodSpec)
 
 		// The server should be listening before spawning the client pod
-		if readyErr := e2epod.WaitTimeoutForPodReadyInNamespace(fr.ClientSet, serverPodSpec.Name, fr.Namespace.Name, framework.PodStartTimeout); readyErr != nil {
-			framework.Failf("error waiting for server pod %s to be ready: %v", serverPodSpec.Name, readyErr)
+		if readyErr := e2epod.WaitTimeoutForPodReadyInNamespace(fr.ClientSet, serverPodSpec.Name, fr.Namespace.Name, e2eutils.PodStartTimeout); readyErr != nil {
+			e2eutils.Failf("error waiting for server pod %s to be ready: %v", serverPodSpec.Name, readyErr)
 		}
 		// Connect to the server and leak the connection
 		ginkgo.By(fmt.Sprintf(
@@ -217,13 +220,13 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 			"| grep -m 1 'CLOSE_WAIT.*dport=%v' ",
 			ipFamily, ip, testDaemonTCPPort)
 		if err := wait.PollImmediate(2*time.Second, epsilonSeconds*time.Second, func() (bool, error) {
-			result, err := framework.RunHostCmd(fr.Namespace.Name, "e2e-net-exec", cmd)
+			result, err := e2eutils.RunHostCmd(fr.Namespace.Name, "e2e-net-exec", cmd)
 			// retry if we can't obtain the conntrack entry
 			if err != nil {
-				framework.Logf("failed to obtain conntrack entry: %v %v", result, err)
+				e2eutils.Logf("failed to obtain conntrack entry: %v %v", result, err)
 				return false, nil
 			}
-			framework.Logf("conntrack entry for node %v and port %v:  %v", serverNodeInfo.nodeIP, testDaemonTCPPort, result)
+			e2eutils.Logf("conntrack entry for node %v and port %v:  %v", serverNodeInfo.nodeIP, testDaemonTCPPort, result)
 			// Timeout in seconds is available as the third column of the matched entry
 			line := strings.Fields(result)
 			if len(line) < 3 {
@@ -239,12 +242,12 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 			return false, fmt.Errorf("wrong TCP CLOSE_WAIT timeout: %v expected: %v", timeoutSeconds, expectedTimeoutSeconds)
 		}); err != nil {
 			// Dump all conntrack entries for debugging
-			result, err2 := framework.RunHostCmd(fr.Namespace.Name, "e2e-net-exec", "conntrack -L")
+			result, err2 := e2eutils.RunHostCmd(fr.Namespace.Name, "e2e-net-exec", "conntrack -L")
 			if err2 != nil {
-				framework.Logf("failed to obtain conntrack entry: %v %v", result, err2)
+				e2eutils.Logf("failed to obtain conntrack entry: %v %v", result, err2)
 			}
-			framework.Logf("conntrack entries for node %v:  %v", serverNodeInfo.nodeIP, result)
-			framework.Failf("no valid conntrack entry for port %d on node %s: %v", testDaemonTCPPort, serverNodeInfo.nodeIP, err)
+			e2eutils.Logf("conntrack entries for node %v:  %v", serverNodeInfo.nodeIP, result)
+			e2eutils.Failf("no valid conntrack entry for port %d on node %s: %v", testDaemonTCPPort, serverNodeInfo.nodeIP, err)
 		}
 	})
 

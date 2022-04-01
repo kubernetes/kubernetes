@@ -20,6 +20,8 @@ import (
 	"strings"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -137,18 +139,18 @@ func assertManagedStatus(
 	}
 
 	if expectedIsManaged {
-		framework.Failf(
+		e2eutils.Failf(
 			"/etc/hosts file should be kubelet managed (name: %s, retries: %d). /etc/hosts contains %q",
 			name, retryCount, etcHostsContent)
 	} else {
-		framework.Failf(
+		e2eutils.Failf(
 			"/etc/hosts file should no be kubelet managed (name: %s, retries: %d). /etc/hosts contains %q",
 			name, retryCount, etcHostsContent)
 	}
 }
 
 func (config *KubeletManagedHostConfig) getFileContents(podName, containerName, path string) string {
-	return config.f.ExecCommandInContainer(podName, containerName, "cat", path)
+	return e2eutils.ExecCommandInContainer(config.f.ClientSet, config.f.Namespace.Name, podName, containerName, "cat", path)
 }
 
 func (config *KubeletManagedHostConfig) createPodSpec(podName string) *v1.Pod {

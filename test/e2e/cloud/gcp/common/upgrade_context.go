@@ -21,9 +21,10 @@ import (
 	"path"
 	"strings"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/client-go/discovery"
-	"k8s.io/kubernetes/test/e2e/framework"
 	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 	"k8s.io/kubernetes/test/e2e/upgrades"
 )
@@ -49,7 +50,7 @@ func GetUpgradeContext(c discovery.DiscoveryInterface) (*upgrades.UpgradeContext
 		Versions: []upgrades.VersionContext{
 			{
 				Version:   *curVer,
-				NodeImage: framework.TestContext.NodeOSDistro,
+				NodeImage: e2econfig.TestContext.NodeOSDistro,
 			},
 		},
 	}
@@ -79,11 +80,11 @@ func GetUpgradeContext(c discovery.DiscoveryInterface) (*upgrades.UpgradeContext
 // realVersion turns a version constants into a version string deployable on
 // GKE.  See hack/get-build.sh for more information.
 func realVersion(s string) (string, error) {
-	framework.Logf("Getting real version for %q", s)
-	v, _, err := framework.RunCmd(path.Join(framework.TestContext.RepoRoot, "hack/get-build.sh"), "-v", s)
+	e2eutils.Logf("Getting real version for %q", s)
+	v, _, err := e2eutils.RunCmd(path.Join(e2econfig.TestContext.RepoRoot, "hack/get-build.sh"), "-v", s)
 	if err != nil {
 		return v, fmt.Errorf("error getting real version for %q: %v", s, err)
 	}
-	framework.Logf("Version for %q is %q", s, v)
+	e2eutils.Logf("Version for %q is %q", s, v)
 	return strings.TrimPrefix(strings.TrimSpace(v), "v"), nil
 }

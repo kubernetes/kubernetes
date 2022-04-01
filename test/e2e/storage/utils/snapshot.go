@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 const (
@@ -49,27 +50,27 @@ var (
 
 // WaitForSnapshotReady waits for a VolumeSnapshot to be ready to use or until timeout occurs, whichever comes first.
 func WaitForSnapshotReady(c dynamic.Interface, ns string, snapshotName string, poll, timeout time.Duration) error {
-	framework.Logf("Waiting up to %v for VolumeSnapshot %s to become ready", timeout, snapshotName)
+	e2eutils.Logf("Waiting up to %v for VolumeSnapshot %s to become ready", timeout, snapshotName)
 
 	if successful := WaitUntil(poll, timeout, func() bool {
 		snapshot, err := c.Resource(SnapshotGVR).Namespace(ns).Get(context.TODO(), snapshotName, metav1.GetOptions{})
 		if err != nil {
-			framework.Logf("Failed to get snapshot %q, retrying in %v. Error: %v", snapshotName, poll, err)
+			e2eutils.Logf("Failed to get snapshot %q, retrying in %v. Error: %v", snapshotName, poll, err)
 			return false
 		}
 
 		status := snapshot.Object["status"]
 		if status == nil {
-			framework.Logf("VolumeSnapshot %s found but is not ready.", snapshotName)
+			e2eutils.Logf("VolumeSnapshot %s found but is not ready.", snapshotName)
 			return false
 		}
 		value := status.(map[string]interface{})
 		if value["readyToUse"] == true {
-			framework.Logf("VolumeSnapshot %s found and is ready", snapshotName)
+			e2eutils.Logf("VolumeSnapshot %s found and is ready", snapshotName)
 			return true
 		}
 
-		framework.Logf("VolumeSnapshot %s found but is not ready.", snapshotName)
+		e2eutils.Logf("VolumeSnapshot %s found but is not ready.", snapshotName)
 		return false
 	}); successful {
 		return nil
@@ -82,19 +83,19 @@ func WaitForSnapshotReady(c dynamic.Interface, ns string, snapshotName string, p
 // given VolumeSnapshot
 func GetSnapshotContentFromSnapshot(dc dynamic.Interface, snapshot *unstructured.Unstructured) *unstructured.Unstructured {
 	defer ginkgo.GinkgoRecover()
-	err := WaitForSnapshotReady(dc, snapshot.GetNamespace(), snapshot.GetName(), framework.Poll, framework.SnapshotCreateTimeout)
-	framework.ExpectNoError(err)
+	err := WaitForSnapshotReady(dc, snapshot.GetNamespace(), snapshot.GetName(), e2eutils.Poll, e2eutils.SnapshotCreateTimeout)
+	e2eutils.ExpectNoError(err)
 
 	vs, err := dc.Resource(SnapshotGVR).Namespace(snapshot.GetNamespace()).Get(context.TODO(), snapshot.GetName(), metav1.GetOptions{})
 
 	snapshotStatus := vs.Object["status"].(map[string]interface{})
 	snapshotContentName := snapshotStatus["boundVolumeSnapshotContentName"].(string)
-	framework.Logf("received snapshotStatus %v", snapshotStatus)
-	framework.Logf("snapshotContentName %s", snapshotContentName)
-	framework.ExpectNoError(err)
+	e2eutils.Logf("received snapshotStatus %v", snapshotStatus)
+	e2eutils.Logf("snapshotContentName %s", snapshotContentName)
+	e2eutils.ExpectNoError(err)
 
 	vscontent, err := dc.Resource(SnapshotContentGVR).Get(context.TODO(), snapshotContentName, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	return vscontent
 

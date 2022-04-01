@@ -21,6 +21,8 @@ import (
 	"net/http"
 	"strings"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 	"k8s.io/client-go/rest"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -38,16 +40,16 @@ var _ = SIGDescribe("Server request timeout", func() {
 		req := newRequest(f, "invalid")
 
 		response, err := rt.RoundTrip(req)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		defer response.Body.Close()
 
 		if response.StatusCode != http.StatusBadRequest {
-			framework.Failf("expected HTTP status code: %d, but got: %d", http.StatusBadRequest, response.StatusCode)
+			e2eutils.Failf("expected HTTP status code: %d, but got: %d", http.StatusBadRequest, response.StatusCode)
 		}
 
 		messageGot := readBody(response)
 		if !strings.Contains(messageGot, invalidTimeoutMessageExpected) {
-			framework.Failf("expected HTTP status message to contain: %s, but got: %s", invalidTimeoutMessageExpected, messageGot)
+			e2eutils.Failf("expected HTTP status message to contain: %s, but got: %s", invalidTimeoutMessageExpected, messageGot)
 		}
 	})
 
@@ -57,11 +59,11 @@ var _ = SIGDescribe("Server request timeout", func() {
 		req := newRequest(f, "3m")
 
 		response, err := rt.RoundTrip(req)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		defer response.Body.Close()
 
 		if response.StatusCode != http.StatusOK {
-			framework.Failf("expected HTTP status code: %d, but got: %d", http.StatusOK, response.StatusCode)
+			e2eutils.Failf("expected HTTP status code: %d, but got: %d", http.StatusOK, response.StatusCode)
 		}
 	})
 
@@ -70,11 +72,11 @@ var _ = SIGDescribe("Server request timeout", func() {
 		req := newRequest(f, "0s")
 
 		response, err := rt.RoundTrip(req)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		defer response.Body.Close()
 
 		if response.StatusCode != http.StatusOK {
-			framework.Failf("expected HTTP status code: %d, but got: %d", http.StatusOK, response.StatusCode)
+			e2eutils.Failf("expected HTTP status code: %d, but got: %d", http.StatusOK, response.StatusCode)
 		}
 	})
 })
@@ -86,7 +88,7 @@ func getRoundTripper(f *framework.Framework) http.RoundTripper {
 	config.Timeout = 0
 
 	roundTripper, err := rest.TransportFor(config)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	return roundTripper
 }
@@ -94,14 +96,14 @@ func getRoundTripper(f *framework.Framework) http.RoundTripper {
 func newRequest(f *framework.Framework, timeout string) *http.Request {
 	req, err := http.NewRequest(http.MethodGet, f.ClientSet.CoreV1().RESTClient().Get().
 		Param("timeout", timeout).AbsPath("version").URL().String(), nil)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	return req
 }
 
 func readBody(response *http.Response) string {
 	raw, err := io.ReadAll(response.Body)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	return string(raw)
 }

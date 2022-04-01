@@ -24,7 +24,10 @@ import (
 	"reflect"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -59,7 +62,7 @@ var _ = instrumentation.SIGDescribe("Stackdriver Monitoring", func() {
 })
 
 func testAgent(f *framework.Framework, kubeClient clientset.Interface) {
-	projectID := framework.TestContext.CloudConfig.ProjectID
+	projectID := e2econfig.TestContext.CloudConfig.ProjectID
 	resourceType := "k8s_container"
 	uniqueContainerName := fmt.Sprintf("test-container-%v", time.Now().Unix())
 	endpoint := fmt.Sprintf(
@@ -70,7 +73,7 @@ func testAgent(f *framework.Framework, kubeClient clientset.Interface) {
 
 	oauthClient, err := google.DefaultClient(context.Background(), MonitoringScope)
 	if err != nil {
-		framework.Failf("Failed to create oauth client: %s", err)
+		e2eutils.Failf("Failed to create oauth client: %s", err)
 	}
 
 	// Create test pod with unique name.
@@ -84,22 +87,22 @@ func testAgent(f *framework.Framework, kubeClient clientset.Interface) {
 
 	resp, err := oauthClient.Get(endpoint)
 	if err != nil {
-		framework.Failf("Failed to call Stackdriver Metadata API %s", err)
+		e2eutils.Failf("Failed to call Stackdriver Metadata API %s", err)
 	}
 	if resp.StatusCode != 200 {
-		framework.Failf("Stackdriver Metadata API returned error status: %s", resp.Status)
+		e2eutils.Failf("Stackdriver Metadata API returned error status: %s", resp.Status)
 	}
 	metadataAPIResponse, err := io.ReadAll(resp.Body)
 	if err != nil {
-		framework.Failf("Failed to read response from Stackdriver Metadata API: %s", err)
+		e2eutils.Failf("Failed to read response from Stackdriver Metadata API: %s", err)
 	}
 
 	exists, err := verifyPodExists(metadataAPIResponse, uniqueContainerName)
 	if err != nil {
-		framework.Failf("Failed to process response from Stackdriver Metadata API: %s", err)
+		e2eutils.Failf("Failed to process response from Stackdriver Metadata API: %s", err)
 	}
 	if !exists {
-		framework.Failf("Missing Metadata for container %q", uniqueContainerName)
+		e2eutils.Failf("Missing Metadata for container %q", uniqueContainerName)
 	}
 }
 

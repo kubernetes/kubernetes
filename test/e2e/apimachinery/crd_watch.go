@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 
 	"github.com/onsi/ginkgo"
 )
@@ -53,75 +54,75 @@ var _ = SIGDescribe("CustomResourceDefinition Watch [Privileged:ClusterAdmin]", 
 				watchCRNameB = "name2"
 			)
 
-			config, err := framework.LoadConfig()
+			config, err := e2eutils.LoadConfig()
 			if err != nil {
-				framework.Failf("failed to load config: %v", err)
+				e2eutils.Failf("failed to load config: %v", err)
 			}
 
 			apiExtensionClient, err := clientset.NewForConfig(config)
 			if err != nil {
-				framework.Failf("failed to initialize apiExtensionClient: %v", err)
+				e2eutils.Failf("failed to initialize apiExtensionClient: %v", err)
 			}
 
 			noxuDefinition := fixtures.NewNoxuV1CustomResourceDefinition(apiextensionsv1.ClusterScoped)
 			noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, f.DynamicClient)
 			if err != nil {
-				framework.Failf("failed to create CustomResourceDefinition: %v", err)
+				e2eutils.Failf("failed to create CustomResourceDefinition: %v", err)
 			}
 
 			defer func() {
 				err = fixtures.DeleteV1CustomResourceDefinition(noxuDefinition, apiExtensionClient)
 				if err != nil {
-					framework.Failf("failed to delete CustomResourceDefinition: %v", err)
+					e2eutils.Failf("failed to delete CustomResourceDefinition: %v", err)
 				}
 			}()
 
 			ns := ""
 			noxuResourceClient, err := newNamespacedCustomResourceClient(ns, f.DynamicClient, noxuDefinition)
-			framework.ExpectNoError(err, "creating custom resource client")
+			e2eutils.ExpectNoError(err, "creating custom resource client")
 
 			watchA, err := watchCRWithName(noxuResourceClient, watchCRNameA)
-			framework.ExpectNoError(err, "failed to watch custom resource: %s", watchCRNameA)
+			e2eutils.ExpectNoError(err, "failed to watch custom resource: %s", watchCRNameA)
 
 			watchB, err := watchCRWithName(noxuResourceClient, watchCRNameB)
-			framework.ExpectNoError(err, "failed to watch custom resource: %s", watchCRNameB)
+			e2eutils.ExpectNoError(err, "failed to watch custom resource: %s", watchCRNameB)
 
 			testCrA := fixtures.NewNoxuInstance(ns, watchCRNameA)
 			testCrB := fixtures.NewNoxuInstance(ns, watchCRNameB)
 
 			ginkgo.By("Creating first CR ")
 			testCrA, err = instantiateCustomResource(testCrA, noxuResourceClient, noxuDefinition)
-			framework.ExpectNoError(err, "failed to instantiate custom resource: %+v", testCrA)
+			e2eutils.ExpectNoError(err, "failed to instantiate custom resource: %+v", testCrA)
 			expectEvent(watchA, watch.Added, testCrA)
 			expectNoEvent(watchB, watch.Added, testCrA)
 
 			ginkgo.By("Creating second CR")
 			testCrB, err = instantiateCustomResource(testCrB, noxuResourceClient, noxuDefinition)
-			framework.ExpectNoError(err, "failed to instantiate custom resource: %+v", testCrB)
+			e2eutils.ExpectNoError(err, "failed to instantiate custom resource: %+v", testCrB)
 			expectEvent(watchB, watch.Added, testCrB)
 			expectNoEvent(watchA, watch.Added, testCrB)
 
 			ginkgo.By("Modifying first CR")
 			err = patchCustomResource(noxuResourceClient, watchCRNameA)
-			framework.ExpectNoError(err, "failed to patch custom resource: %s", watchCRNameA)
+			e2eutils.ExpectNoError(err, "failed to patch custom resource: %s", watchCRNameA)
 			expectEvent(watchA, watch.Modified, nil)
 			expectNoEvent(watchB, watch.Modified, nil)
 
 			ginkgo.By("Modifying second CR")
 			err = patchCustomResource(noxuResourceClient, watchCRNameB)
-			framework.ExpectNoError(err, "failed to patch custom resource: %s", watchCRNameB)
+			e2eutils.ExpectNoError(err, "failed to patch custom resource: %s", watchCRNameB)
 			expectEvent(watchB, watch.Modified, nil)
 			expectNoEvent(watchA, watch.Modified, nil)
 
 			ginkgo.By("Deleting first CR")
 			err = deleteCustomResource(noxuResourceClient, watchCRNameA)
-			framework.ExpectNoError(err, "failed to delete custom resource: %s", watchCRNameA)
+			e2eutils.ExpectNoError(err, "failed to delete custom resource: %s", watchCRNameA)
 			expectEvent(watchA, watch.Deleted, nil)
 			expectNoEvent(watchB, watch.Deleted, nil)
 
 			ginkgo.By("Deleting second CR")
 			err = deleteCustomResource(noxuResourceClient, watchCRNameB)
-			framework.ExpectNoError(err, "failed to delete custom resource: %s", watchCRNameB)
+			e2eutils.ExpectNoError(err, "failed to delete custom resource: %s", watchCRNameB)
 			expectEvent(watchB, watch.Deleted, nil)
 			expectNoEvent(watchA, watch.Deleted, nil)
 		})

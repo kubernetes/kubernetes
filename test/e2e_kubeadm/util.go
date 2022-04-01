@@ -18,13 +18,14 @@ package kubeadm
 
 import (
 	"context"
+
 	appsv1 "k8s.io/api/apps/v1"
 	authv1 "k8s.io/api/authorization/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/test/e2e/framework"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/gstruct"
@@ -37,7 +38,7 @@ func ExpectServiceAccount(c clientset.Interface, namespace, name string) {
 	_, err := c.CoreV1().
 		ServiceAccounts(namespace).
 		Get(context.TODO(), name, metav1.GetOptions{})
-	framework.ExpectNoError(err, "error getting ServiceAccount %q from namespace %q", name, namespace)
+	e2eutils.ExpectNoError(err, "error getting ServiceAccount %q from namespace %q", name, namespace)
 }
 
 // Secret utils
@@ -47,7 +48,7 @@ func GetSecret(c clientset.Interface, namespace, name string) *corev1.Secret {
 	r, err := c.CoreV1().
 		Secrets(namespace).
 		Get(context.TODO(), name, metav1.GetOptions{})
-	framework.ExpectNoError(err, "error getting Secret %q from namespace %q", name, namespace)
+	e2eutils.ExpectNoError(err, "error getting Secret %q from namespace %q", name, namespace)
 	return r
 }
 
@@ -58,7 +59,7 @@ func GetConfigMap(c clientset.Interface, namespace, name string) *corev1.ConfigM
 	r, err := c.CoreV1().
 		ConfigMaps(namespace).
 		Get(context.TODO(), name, metav1.GetOptions{})
-	framework.ExpectNoError(err, "error getting ConfigMap %q from namespace %q", name, namespace)
+	e2eutils.ExpectNoError(err, "error getting ConfigMap %q from namespace %q", name, namespace)
 	return r
 }
 
@@ -69,7 +70,7 @@ func ExpectService(c clientset.Interface, namespace, name string) {
 	_, err := c.CoreV1().
 		Services(namespace).
 		Get(context.TODO(), name, metav1.GetOptions{})
-	framework.ExpectNoError(err, "error getting Service %q from namespace %q", name, namespace)
+	e2eutils.ExpectNoError(err, "error getting Service %q from namespace %q", name, namespace)
 }
 
 // Deployments utils
@@ -79,7 +80,7 @@ func GetDeployment(c clientset.Interface, namespace, name string) *appsv1.Deploy
 	r, err := c.AppsV1().
 		Deployments(namespace).
 		Get(context.TODO(), name, metav1.GetOptions{})
-	framework.ExpectNoError(err, "error getting Deployment %q from namespace %q", name, namespace)
+	e2eutils.ExpectNoError(err, "error getting Deployment %q from namespace %q", name, namespace)
 	return r
 }
 
@@ -90,7 +91,7 @@ func GetDaemonSet(c clientset.Interface, namespace, name string) *appsv1.DaemonS
 	r, err := c.AppsV1().
 		DaemonSets(namespace).
 		Get(context.TODO(), name, metav1.GetOptions{})
-	framework.ExpectNoError(err, "error getting DaemonSet %q from namespace %q", name, namespace)
+	e2eutils.ExpectNoError(err, "error getting DaemonSet %q from namespace %q", name, namespace)
 	return r
 }
 
@@ -101,7 +102,7 @@ func ExpectRole(c clientset.Interface, namespace, name string) {
 	_, err := c.RbacV1().
 		Roles(namespace).
 		Get(context.TODO(), name, metav1.GetOptions{})
-	framework.ExpectNoError(err, "error getting Role %q from namespace %q", name, namespace)
+	e2eutils.ExpectNoError(err, "error getting Role %q from namespace %q", name, namespace)
 }
 
 // ExpectRoleBinding expects to be able to get the RoleBinding with specific name from the namespace
@@ -109,7 +110,7 @@ func ExpectRoleBinding(c clientset.Interface, namespace, name string) {
 	_, err := c.RbacV1().
 		RoleBindings(namespace).
 		Get(context.TODO(), name, metav1.GetOptions{})
-	framework.ExpectNoError(err, "error getting RoleBinding %q from namespace %q", name, namespace)
+	e2eutils.ExpectNoError(err, "error getting RoleBinding %q from namespace %q", name, namespace)
 }
 
 // ExpectClusterRole expects to be able to get the ClusterRole with specific name
@@ -117,7 +118,7 @@ func ExpectClusterRole(c clientset.Interface, name string) {
 	_, err := c.RbacV1().
 		ClusterRoles().
 		Get(context.TODO(), name, metav1.GetOptions{})
-	framework.ExpectNoError(err, "error getting ClusterRole %q", name)
+	e2eutils.ExpectNoError(err, "error getting ClusterRole %q", name)
 }
 
 // ExpectClusterRoleBinding expects to be able to get the ClusterRoleBinding with specific name
@@ -125,7 +126,7 @@ func ExpectClusterRoleBinding(c clientset.Interface, name string) {
 	_, err := c.RbacV1().
 		ClusterRoleBindings().
 		Get(context.TODO(), name, metav1.GetOptions{})
-	framework.ExpectNoError(err, "error getting ClusterRoleBindings %q", name)
+	e2eutils.ExpectNoError(err, "error getting ClusterRoleBindings %q", name)
 }
 
 // ExpectClusterRoleBindingWithSubjectAndRole expects to be able to get the ClusterRoleBinding with specific name, subject and role
@@ -133,7 +134,7 @@ func ExpectClusterRoleBindingWithSubjectAndRole(c clientset.Interface, name, sub
 	binding, err := c.RbacV1().
 		ClusterRoleBindings().
 		Get(context.TODO(), name, metav1.GetOptions{})
-	framework.ExpectNoError(err, "error getting ClusterRoleBindings %q", name)
+	e2eutils.ExpectNoError(err, "error getting ClusterRoleBindings %q", name)
 	gomega.Expect(binding.Subjects).To(
 		gomega.ContainElement(subjectMatcher(
 			subject,
@@ -168,11 +169,11 @@ func ExpectSubjectHasAccessToResource(c clientset.Interface, subjectKind, subjec
 			},
 		}
 	default:
-		framework.Failf("invalid subjectKind %s", subjectKind)
+		e2eutils.Failf("invalid subjectKind %s", subjectKind)
 	}
 
 	s, err := c.AuthorizationV1().SubjectAccessReviews().Create(context.TODO(), sar, metav1.CreateOptions{})
-	framework.ExpectNoError(err, "error getting SubjectAccessReview for %s %s to resource %+v", subjectKind, subject, *sar.Spec.ResourceAttributes)
+	e2eutils.ExpectNoError(err, "error getting SubjectAccessReview for %s %s to resource %+v", subjectKind, subject, *sar.Spec.ResourceAttributes)
 
 	gomega.Expect(s.Status.Allowed).Should(gomega.BeTrue(), "%s %s has no access to resource %+v", subjectKind, subject, *sar.Spec.ResourceAttributes)
 }

@@ -19,6 +19,8 @@ package apimachinery
 import (
 	"regexp"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -40,21 +42,21 @@ var _ = SIGDescribe("server version", func() {
 
 		var version *version.Info
 		version, err := f.ClientSet.Discovery().ServerVersion()
-		framework.ExpectNoError(err, "Fail to access ServerVersion")
+		e2eutils.ExpectNoError(err, "Fail to access ServerVersion")
 
 		ginkgo.By("Confirm major version")
 		re := regexp.MustCompile("[1-9]")
-		framework.ExpectEqual(re.FindString(version.Major), version.Major, "unable to find major version")
-		framework.Logf("Major version: %v", version.Major)
+		e2eutils.ExpectEqual(re.FindString(version.Major), version.Major, "unable to find major version")
+		e2eutils.Logf("Major version: %v", version.Major)
 
 		ginkgo.By("Confirm minor version")
 
 		re = regexp.MustCompile("[^0-9]+")
 		cleanMinorVersion := re.ReplaceAllString(version.Minor, "")
-		framework.Logf("cleanMinorVersion: %v", cleanMinorVersion)
+		e2eutils.Logf("cleanMinorVersion: %v", cleanMinorVersion)
 
 		re = regexp.MustCompile("[0-9]+")
-		framework.ExpectEqual(re.FindString(version.Minor), cleanMinorVersion, "unable to find minor version")
-		framework.Logf("Minor version: %v", version.Minor)
+		e2eutils.ExpectEqual(re.FindString(version.Minor), cleanMinorVersion, "unable to find minor version")
+		e2eutils.Logf("Minor version: %v", version.Minor)
 	})
 })

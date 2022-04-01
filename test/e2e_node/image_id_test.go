@@ -18,10 +18,12 @@ package e2enode
 
 import (
 	"context"
-	"k8s.io/api/core/v1"
+
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/onsi/ginkgo"
@@ -51,15 +53,15 @@ var _ = SIGDescribe("ImageID [NodeFeature: ImageID]", func() {
 
 		pod := f.PodClient().Create(podDesc)
 
-		framework.ExpectNoError(e2epod.WaitTimeoutForPodNoLongerRunningInNamespace(
-			f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout))
+		e2eutils.ExpectNoError(e2epod.WaitTimeoutForPodNoLongerRunningInNamespace(
+			f.ClientSet, pod.Name, f.Namespace.Name, e2eutils.PodStartTimeout))
 		runningPod, err := f.PodClient().Get(context.TODO(), pod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		status := runningPod.Status
 
 		if len(status.ContainerStatuses) == 0 {
-			framework.Failf("Unexpected pod status; %s", spew.Sdump(status))
+			e2eutils.Failf("Unexpected pod status; %s", spew.Sdump(status))
 			return
 		}
 

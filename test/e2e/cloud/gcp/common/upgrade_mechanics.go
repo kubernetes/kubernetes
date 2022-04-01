@@ -23,6 +23,9 @@ import (
 	"strings"
 	"time"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/version"
 	clientset "k8s.io/client-go/kubernetes"
@@ -38,8 +41,8 @@ func ControlPlaneUpgradeFunc(f *framework.Framework, upgCtx *upgrades.UpgradeCon
 		start := time.Now()
 		defer upgrades.FinalizeUpgradeTest(start, testCase)
 		target := upgCtx.Versions[1].Version.String()
-		framework.ExpectNoError(controlPlaneUpgrade(f, target, controlPlaneExtraEnvs))
-		framework.ExpectNoError(checkControlPlaneVersion(f.ClientSet, target))
+		e2eutils.ExpectNoError(controlPlaneUpgrade(f, target, controlPlaneExtraEnvs))
+		e2eutils.ExpectNoError(checkControlPlaneVersion(f.ClientSet, target))
 	}
 }
 
@@ -50,10 +53,10 @@ func ClusterUpgradeFunc(f *framework.Framework, upgCtx *upgrades.UpgradeContext,
 		defer upgrades.FinalizeUpgradeTest(start, testCase)
 		target := upgCtx.Versions[1].Version.String()
 		image := upgCtx.Versions[1].NodeImage
-		framework.ExpectNoError(controlPlaneUpgrade(f, target, controlPlaneExtraEnvs))
-		framework.ExpectNoError(checkControlPlaneVersion(f.ClientSet, target))
-		framework.ExpectNoError(nodeUpgrade(f, target, image, nodeExtraEnvs))
-		framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
+		e2eutils.ExpectNoError(controlPlaneUpgrade(f, target, controlPlaneExtraEnvs))
+		e2eutils.ExpectNoError(checkControlPlaneVersion(f.ClientSet, target))
+		e2eutils.ExpectNoError(nodeUpgrade(f, target, image, nodeExtraEnvs))
+		e2eutils.ExpectNoError(checkNodesVersions(f.ClientSet, target))
 	}
 }
 
@@ -65,10 +68,10 @@ func ClusterDowngradeFunc(f *framework.Framework, upgCtx *upgrades.UpgradeContex
 		target := upgCtx.Versions[1].Version.String()
 		image := upgCtx.Versions[1].NodeImage
 		// Yes this really is a downgrade. And nodes must downgrade first.
-		framework.ExpectNoError(nodeUpgrade(f, target, image, nodeExtraEnvs))
-		framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
-		framework.ExpectNoError(controlPlaneUpgrade(f, target, controlPlaneExtraEnvs))
-		framework.ExpectNoError(checkControlPlaneVersion(f.ClientSet, target))
+		e2eutils.ExpectNoError(nodeUpgrade(f, target, image, nodeExtraEnvs))
+		e2eutils.ExpectNoError(checkNodesVersions(f.ClientSet, target))
+		e2eutils.ExpectNoError(controlPlaneUpgrade(f, target, controlPlaneExtraEnvs))
+		e2eutils.ExpectNoError(checkControlPlaneVersion(f.ClientSet, target))
 	}
 }
 
@@ -76,23 +79,23 @@ const etcdImage = "3.4.9-1"
 
 // controlPlaneUpgrade upgrades control plane node on GCE/GKE.
 func controlPlaneUpgrade(f *framework.Framework, v string, extraEnvs []string) error {
-	switch framework.TestContext.Provider {
+	switch e2econfig.TestContext.Provider {
 	case "gce":
 		return controlPlaneUpgradeGCE(v, extraEnvs)
 	case "gke":
-		return framework.MasterUpgradeGKE(f.Namespace.Name, v)
+		return e2eutils.MasterUpgradeGKE(f.Namespace.Name, v)
 	default:
-		return fmt.Errorf("controlPlaneUpgrade() is not implemented for provider %s", framework.TestContext.Provider)
+		return fmt.Errorf("controlPlaneUpgrade() is not implemented for provider %s", e2econfig.TestContext.Provider)
 	}
 }
 
 func controlPlaneUpgradeGCE(rawV string, extraEnvs []string) error {
 	env := append(os.Environ(), extraEnvs...)
 	// TODO: Remove these variables when they're no longer needed for downgrades.
-	if framework.TestContext.EtcdUpgradeVersion != "" && framework.TestContext.EtcdUpgradeStorage != "" {
+	if e2econfig.TestContext.EtcdUpgradeVersion != "" && e2econfig.TestContext.EtcdUpgradeStorage != "" {
 		env = append(env,
-			"TEST_ETCD_VERSION="+framework.TestContext.EtcdUpgradeVersion,
-			"STORAGE_BACKEND="+framework.TestContext.EtcdUpgradeStorage,
+			"TEST_ETCD_VERSION="+e2econfig.TestContext.EtcdUpgradeVersion,
+			"STORAGE_BACKEND="+e2econfig.TestContext.EtcdUpgradeStorage,
 			"TEST_ETCD_IMAGE="+etcdImage)
 	} else {
 		// In e2e tests, we skip the confirmation prompt about
@@ -101,29 +104,29 @@ func controlPlaneUpgradeGCE(rawV string, extraEnvs []string) error {
 	}
 
 	v := "v" + rawV
-	_, _, err := framework.RunCmdEnv(env, framework.GCEUpgradeScript(), "-M", v)
+	_, _, err := e2eutils.RunCmdEnv(env, e2eutils.GCEUpgradeScript(), "-M", v)
 	return err
 }
 
 func traceRouteToControlPlane() {
 	traceroute, err := exec.LookPath("traceroute")
 	if err != nil {
-		framework.Logf("Could not find traceroute program")
+		e2eutils.Logf("Could not find traceroute program")
 		return
 	}
-	cmd := exec.Command(traceroute, "-I", framework.APIAddress())
+	cmd := exec.Command(traceroute, "-I", e2eutils.APIAddress())
 	out, err := cmd.Output()
 	if len(out) != 0 {
-		framework.Logf(string(out))
+		e2eutils.Logf(string(out))
 	}
 	if exiterr, ok := err.(*exec.ExitError); err != nil && ok {
-		framework.Logf("Error while running traceroute: %s", exiterr.Stderr)
+		e2eutils.Logf("Error while running traceroute: %s", exiterr.Stderr)
 	}
 }
 
 // checkControlPlaneVersion validates the control plane version
 func checkControlPlaneVersion(c clientset.Interface, want string) error {
-	framework.Logf("Checking control plane version")
+	e2eutils.Logf("Checking control plane version")
 	var err error
 	var v *version.Info
 	waitErr := wait.PollImmediate(5*time.Second, 2*time.Minute, func() (bool, error) {
@@ -144,7 +147,7 @@ func checkControlPlaneVersion(c clientset.Interface, want string) error {
 	if !strings.HasPrefix(got, want) {
 		return fmt.Errorf("control plane had kube-apiserver version %s which does not start with %s", got, want)
 	}
-	framework.Logf("Control plane is at version %s", want)
+	e2eutils.Logf("Control plane is at version %s", want)
 	return nil
 }
 
@@ -152,13 +155,13 @@ func checkControlPlaneVersion(c clientset.Interface, want string) error {
 func nodeUpgrade(f *framework.Framework, v string, img string, extraEnvs []string) error {
 	// Perform the upgrade.
 	var err error
-	switch framework.TestContext.Provider {
+	switch e2econfig.TestContext.Provider {
 	case "gce":
 		err = nodeUpgradeGCE(v, img, extraEnvs)
 	case "gke":
 		err = nodeUpgradeGKE(f.Namespace.Name, v, img)
 	default:
-		err = fmt.Errorf("nodeUpgrade() is not implemented for provider %s", framework.TestContext.Provider)
+		err = fmt.Errorf("nodeUpgrade() is not implemented for provider %s", e2econfig.TestContext.Provider)
 	}
 	if err != nil {
 		return err
@@ -172,28 +175,28 @@ func nodeUpgradeGCE(rawV, img string, extraEnvs []string) error {
 	env := append(os.Environ(), extraEnvs...)
 	if img != "" {
 		env = append(env, "KUBE_NODE_OS_DISTRIBUTION="+img)
-		_, _, err := framework.RunCmdEnv(env, framework.GCEUpgradeScript(), "-N", "-o", v)
+		_, _, err := e2eutils.RunCmdEnv(env, e2eutils.GCEUpgradeScript(), "-N", "-o", v)
 		return err
 	}
-	_, _, err := framework.RunCmdEnv(env, framework.GCEUpgradeScript(), "-N", v)
+	_, _, err := e2eutils.RunCmdEnv(env, e2eutils.GCEUpgradeScript(), "-N", v)
 	return err
 }
 
 func nodeUpgradeGKE(namespace string, v string, img string) error {
-	framework.Logf("Upgrading nodes to version %q and image %q", v, img)
+	e2eutils.Logf("Upgrading nodes to version %q and image %q", v, img)
 	nps, err := nodePoolsGKE()
 	if err != nil {
 		return err
 	}
-	framework.Logf("Found node pools %v", nps)
+	e2eutils.Logf("Found node pools %v", nps)
 	for _, np := range nps {
 		args := []string{
 			"container",
 			"clusters",
-			fmt.Sprintf("--project=%s", framework.TestContext.CloudConfig.ProjectID),
-			framework.LocationParamGKE(),
+			fmt.Sprintf("--project=%s", e2econfig.TestContext.CloudConfig.ProjectID),
+			e2eutils.LocationParamGKE(),
 			"upgrade",
-			framework.TestContext.CloudConfig.Cluster,
+			e2econfig.TestContext.CloudConfig.Cluster,
 			fmt.Sprintf("--node-pool=%s", np),
 			fmt.Sprintf("--cluster-version=%s", v),
 			"--quiet",
@@ -201,13 +204,13 @@ func nodeUpgradeGKE(namespace string, v string, img string) error {
 		if len(img) > 0 {
 			args = append(args, fmt.Sprintf("--image-type=%s", img))
 		}
-		_, _, err = framework.RunCmd("gcloud", framework.AppendContainerCommandGroupIfNeeded(args)...)
+		_, _, err = e2eutils.RunCmd("gcloud", e2eutils.AppendContainerCommandGroupIfNeeded(args)...)
 
 		if err != nil {
 			return err
 		}
 
-		framework.WaitForSSHTunnels(namespace)
+		e2eutils.WaitForSSHTunnels(namespace)
 	}
 	return nil
 }
@@ -216,13 +219,13 @@ func nodePoolsGKE() ([]string, error) {
 	args := []string{
 		"container",
 		"node-pools",
-		fmt.Sprintf("--project=%s", framework.TestContext.CloudConfig.ProjectID),
-		framework.LocationParamGKE(),
+		fmt.Sprintf("--project=%s", e2econfig.TestContext.CloudConfig.ProjectID),
+		e2eutils.LocationParamGKE(),
 		"list",
-		fmt.Sprintf("--cluster=%s", framework.TestContext.CloudConfig.Cluster),
+		fmt.Sprintf("--cluster=%s", e2econfig.TestContext.CloudConfig.Cluster),
 		"--format=get(name)",
 	}
-	stdout, _, err := framework.RunCmd("gcloud", framework.AppendContainerCommandGroupIfNeeded(args)...)
+	stdout, _, err := e2eutils.RunCmd("gcloud", e2eutils.AppendContainerCommandGroupIfNeeded(args)...)
 	if err != nil {
 		return nil, err
 	}
@@ -241,8 +244,8 @@ func waitForNodesReadyAfterUpgrade(f *framework.Framework) error {
 	if err != nil {
 		return fmt.Errorf("couldn't detect number of nodes")
 	}
-	framework.Logf("Waiting up to %v for all %d nodes to be ready after the upgrade", framework.RestartNodeReadyAgainTimeout, numNodes)
-	if _, err := e2enode.CheckReady(f.ClientSet, numNodes, framework.RestartNodeReadyAgainTimeout); err != nil {
+	e2eutils.Logf("Waiting up to %v for all %d nodes to be ready after the upgrade", e2eutils.RestartNodeReadyAgainTimeout, numNodes)
+	if _, err := e2enode.CheckReady(f.ClientSet, numNodes, e2eutils.RestartNodeReadyAgainTimeout); err != nil {
 		return err
 	}
 	return nil

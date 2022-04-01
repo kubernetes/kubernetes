@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"strconv"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
 	errors "k8s.io/apimachinery/pkg/util/errors"
@@ -131,7 +133,7 @@ func (s *fsGroupChangePolicyTestSuite) DefineTests(driver storageframework.TestD
 			l.driverCleanup = nil
 		}
 
-		framework.ExpectNoError(errors.NewAggregate(errs), "while cleanup resource")
+		e2eutils.ExpectNoError(errors.NewAggregate(errs), "while cleanup resource")
 	}
 
 	tests := []struct {
@@ -246,13 +248,13 @@ func (s *fsGroupChangePolicyTestSuite) DefineTests(driver storageframework.TestD
 			}
 
 			ginkgo.By(fmt.Sprintf("Deleting Pod %s/%s", pod.Namespace, pod.Name))
-			framework.ExpectNoError(e2epod.DeletePodWithWait(f.ClientSet, pod))
+			e2eutils.ExpectNoError(e2epod.DeletePodWithWait(f.ClientSet, pod))
 
 			// Create a second pod with existing volume and verify the contents ownership.
 			podConfig.FsGroup = utilpointer.Int64Ptr(int64(test.secondPodFsGroup))
 			pod = createPodAndVerifyContentGid(l.config.Framework, &podConfig, false /* createInitialFiles */, strconv.Itoa(test.finalExpectedRootDirFileOwnership), strconv.Itoa(test.finalExpectedSubDirFileOwnership))
 			ginkgo.By(fmt.Sprintf("Deleting Pod %s/%s", pod.Namespace, pod.Name))
-			framework.ExpectNoError(e2epod.DeletePodWithWait(f.ClientSet, pod))
+			e2eutils.ExpectNoError(e2epod.DeletePodWithWait(f.ClientSet, pod))
 		})
 	}
 }
@@ -261,23 +263,23 @@ func createPodAndVerifyContentGid(f *framework.Framework, podConfig *e2epod.Conf
 	podFsGroup := strconv.FormatInt(*podConfig.FsGroup, 10)
 	ginkgo.By(fmt.Sprintf("Creating Pod in namespace %s with fsgroup %s", podConfig.NS, podFsGroup))
 	pod, err := e2epod.CreateSecPodWithNodeSelection(f.ClientSet, podConfig, f.Timeouts.PodStart)
-	framework.ExpectNoError(err)
-	framework.Logf("Pod %s/%s started successfully", pod.Namespace, pod.Name)
+	e2eutils.ExpectNoError(err)
+	e2eutils.Logf("Pod %s/%s started successfully", pod.Namespace, pod.Name)
 
 	if createInitialFiles {
 		ginkgo.By(fmt.Sprintf("Creating a sub-directory and file, and verifying their ownership is %s", podFsGroup))
 		cmd := fmt.Sprintf("touch %s", rootDirFilePath)
 		var err error
-		_, _, err = e2evolume.PodExec(f, pod, cmd)
-		framework.ExpectNoError(err)
+		_, _, err = e2evolume.PodExec(f.ClientSet, f.Namespace.Name, pod, cmd)
+		e2eutils.ExpectNoError(err)
 		storageutils.VerifyFilePathGidInPod(f, rootDirFilePath, podFsGroup, pod)
 
 		cmd = fmt.Sprintf("mkdir %s", subdir)
-		_, _, err = e2evolume.PodExec(f, pod, cmd)
-		framework.ExpectNoError(err)
+		_, _, err = e2evolume.PodExec(f.ClientSet, f.Namespace.Name, pod, cmd)
+		e2eutils.ExpectNoError(err)
 		cmd = fmt.Sprintf("touch %s", subDirFilePath)
-		_, _, err = e2evolume.PodExec(f, pod, cmd)
-		framework.ExpectNoError(err)
+		_, _, err = e2evolume.PodExec(f.ClientSet, f.Namespace.Name, pod, cmd)
+		e2eutils.ExpectNoError(err)
 		storageutils.VerifyFilePathGidInPod(f, subDirFilePath, podFsGroup, pod)
 		return pod
 	}

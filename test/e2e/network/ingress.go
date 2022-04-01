@@ -23,6 +23,9 @@ import (
 	"path/filepath"
 	"time"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -69,12 +72,12 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 		// lying around so we don't have to race any caches
 		err := e2eauth.BindClusterRole(jig.Client.RbacV1(), "cluster-admin", f.Namespace.Name,
 			rbacv1.Subject{Kind: rbacv1.ServiceAccountKind, Namespace: f.Namespace.Name, Name: "default"})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		err = e2eauth.WaitForAuthorizationUpdate(jig.Client.AuthorizationV1(),
 			serviceaccount.MakeUsername(f.Namespace.Name, "default"),
 			"", "create", schema.GroupResource{Resource: "pods"}, true)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 	})
 
 	// Before enabling this loadbalancer test in any other test list you must
@@ -94,10 +97,10 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 			gceController = &gce.IngressController{
 				Ns:     ns,
 				Client: jig.Client,
-				Cloud:  framework.TestContext.CloudConfig,
+				Cloud:  e2econfig.TestContext.CloudConfig,
 			}
 			err := gceController.Init()
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 		})
 
 		// Platform specific cleanup
@@ -114,7 +117,7 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 
 			ginkgo.By("Cleaning up cloud resources")
 			err := gceController.CleanupIngressController()
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 		})
 
 		ginkgo.It("should conform to Ingress spec", func() {
@@ -139,10 +142,10 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 			gceController = &gce.IngressController{
 				Ns:     ns,
 				Client: jig.Client,
-				Cloud:  framework.TestContext.CloudConfig,
+				Cloud:  e2econfig.TestContext.CloudConfig,
 			}
 			err := gceController.Init()
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 		})
 
 		// Platform specific cleanup
@@ -159,7 +162,7 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 
 			ginkgo.By("Cleaning up cloud resources")
 			err := gceController.CleanupIngressController()
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 		})
 
 		ginkgo.It("should conform to Ingress spec", func() {
@@ -173,7 +176,7 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 				ginkgo.By(t.ExitLog)
 				jig.WaitForIngress(true)
 				err := gceController.WaitForNegBackendService(jig.GetServicePorts(false))
-				framework.ExpectNoError(err)
+				e2eutils.ExpectNoError(err)
 			}
 		})
 
@@ -184,42 +187,42 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 			jig.CreateIngress(filepath.Join(e2eingress.IngressManifestPath, "neg"), ns, map[string]string{}, map[string]string{})
 			jig.WaitForIngress(true)
 			err = gceController.WaitForNegBackendService(jig.GetServicePorts(false))
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 
 			ginkgo.By("Switch backend service to use IG")
 			svcList, err := f.ClientSet.CoreV1().Services(ns).List(context.TODO(), metav1.ListOptions{})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			for _, svc := range svcList.Items {
 				svc.Annotations[e2eingress.NEGAnnotation] = `{"ingress": false}`
 				_, err = f.ClientSet.CoreV1().Services(ns).Update(context.TODO(), &svc, metav1.UpdateOptions{})
-				framework.ExpectNoError(err)
+				e2eutils.ExpectNoError(err)
 			}
 			err = wait.Poll(5*time.Second, propagationTimeout, func() (bool, error) {
 				if err := gceController.BackendServiceUsingIG(jig.GetServicePorts(false)); err != nil {
-					framework.Logf("ginkgo.Failed to verify IG backend service: %v", err)
+					e2eutils.Logf("ginkgo.Failed to verify IG backend service: %v", err)
 					return false, nil
 				}
 				return true, nil
 			})
-			framework.ExpectNoError(err, "Expect backend service to target IG, but failed to observe")
+			e2eutils.ExpectNoError(err, "Expect backend service to target IG, but failed to observe")
 			jig.WaitForIngress(true)
 
 			ginkgo.By("Switch backend service to use NEG")
 			svcList, err = f.ClientSet.CoreV1().Services(ns).List(context.TODO(), metav1.ListOptions{})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			for _, svc := range svcList.Items {
 				svc.Annotations[e2eingress.NEGAnnotation] = `{"ingress": true}`
 				_, err = f.ClientSet.CoreV1().Services(ns).Update(context.TODO(), &svc, metav1.UpdateOptions{})
-				framework.ExpectNoError(err)
+				e2eutils.ExpectNoError(err)
 			}
 			err = wait.Poll(5*time.Second, propagationTimeout, func() (bool, error) {
 				if err := gceController.BackendServiceUsingNEG(jig.GetServicePorts(false)); err != nil {
-					framework.Logf("ginkgo.Failed to verify NEG backend service: %v", err)
+					e2eutils.Logf("ginkgo.Failed to verify NEG backend service: %v", err)
 					return false, nil
 				}
 				return true, nil
 			})
-			framework.ExpectNoError(err, "Expect backend service to target NEG, but failed to observe")
+			e2eutils.ExpectNoError(err, "Expect backend service to target NEG, but failed to observe")
 			jig.WaitForIngress(true)
 		})
 
@@ -229,11 +232,11 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 			jig.WaitForIngress(true)
 			svcPorts := jig.GetServicePorts(false)
 			err := gceController.WaitForNegBackendService(svcPorts)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 
 			// ClusterIP ServicePorts have no NodePort
 			for _, sp := range svcPorts {
-				framework.ExpectEqual(sp.NodePort, int32(0))
+				e2eutils.ExpectEqual(sp.NodePort, int32(0))
 			}
 		})
 
@@ -241,22 +244,22 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 			name := "hostname"
 			scaleAndValidateNEG := func(num int) {
 				scale, err := f.ClientSet.AppsV1().Deployments(ns).GetScale(context.TODO(), name, metav1.GetOptions{})
-				framework.ExpectNoError(err)
+				e2eutils.ExpectNoError(err)
 				if scale.Spec.Replicas != int32(num) {
 					scale.ResourceVersion = "" // indicate the scale update should be unconditional
 					scale.Spec.Replicas = int32(num)
 					_, err = f.ClientSet.AppsV1().Deployments(ns).UpdateScale(context.TODO(), name, scale, metav1.UpdateOptions{})
-					framework.ExpectNoError(err)
+					e2eutils.ExpectNoError(err)
 				}
 				err = wait.Poll(10*time.Second, negUpdateTimeout, func() (bool, error) {
 					res, err := jig.GetDistinctResponseFromIngress()
 					if err != nil {
 						return false, nil
 					}
-					framework.Logf("Expecting %d backends, got %d", num, res.Len())
+					e2eutils.Logf("Expecting %d backends, got %d", num, res.Len())
 					return res.Len() == num, nil
 				})
-				framework.ExpectNoError(err)
+				e2eutils.ExpectNoError(err)
 			}
 
 			ginkgo.By("Create a basic HTTP ingress using NEG")
@@ -264,7 +267,7 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 			jig.WaitForIngress(true)
 			jig.WaitForIngressToStable()
 			err := gceController.WaitForNegBackendService(jig.GetServicePorts(false))
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			// initial replicas number is 1
 			scaleAndValidateNEG(1)
 
@@ -289,15 +292,15 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 			jig.WaitForIngress(true)
 			jig.WaitForIngressToStable()
 			err := gceController.WaitForNegBackendService(jig.GetServicePorts(false))
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 
 			ginkgo.By(fmt.Sprintf("Scale backend replicas to %d", replicas))
 			scale, err := f.ClientSet.AppsV1().Deployments(ns).GetScale(context.TODO(), name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			scale.ResourceVersion = "" // indicate the scale update should be unconditional
 			scale.Spec.Replicas = int32(replicas)
 			_, err = f.ClientSet.AppsV1().Deployments(ns).UpdateScale(context.TODO(), name, scale, metav1.UpdateOptions{})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 
 			propagationTimeout := e2eservice.GetServiceLoadBalancerPropagationTimeout(f.ClientSet)
 			err = wait.Poll(10*time.Second, propagationTimeout, func() (bool, error) {
@@ -307,33 +310,33 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 				}
 				return res.Len() == replicas, nil
 			})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 
 			ginkgo.By("Trigger rolling update and observe service disruption")
 			deploy, err := f.ClientSet.AppsV1().Deployments(ns).Get(context.TODO(), name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			// trigger by changing graceful termination period to 60 seconds
 			gracePeriod := int64(60)
 			deploy.Spec.Template.Spec.TerminationGracePeriodSeconds = &gracePeriod
 			_, err = f.ClientSet.AppsV1().Deployments(ns).Update(context.TODO(), deploy, metav1.UpdateOptions{})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			err = wait.Poll(10*time.Second, propagationTimeout, func() (bool, error) {
 				res, err := jig.GetDistinctResponseFromIngress()
-				framework.ExpectNoError(err)
+				e2eutils.ExpectNoError(err)
 				deploy, err := f.ClientSet.AppsV1().Deployments(ns).Get(context.TODO(), name, metav1.GetOptions{})
-				framework.ExpectNoError(err)
+				e2eutils.ExpectNoError(err)
 				if int(deploy.Status.UpdatedReplicas) == replicas {
 					if res.Len() == replicas {
 						return true, nil
 					}
-					framework.Logf("Expecting %d different responses, but got %d.", replicas, res.Len())
+					e2eutils.Logf("Expecting %d different responses, but got %d.", replicas, res.Len())
 					return false, nil
 
 				}
-				framework.Logf("Waiting for rolling update to finished. Keep sending traffic.")
+				e2eutils.Logf("Waiting for rolling update to finished. Keep sending traffic.")
 				return false, nil
 			})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 		})
 
 		ginkgo.It("should sync endpoints for both Ingress-referenced NEG and standalone NEG", func() {
@@ -342,68 +345,68 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 
 			scaleAndValidateExposedNEG := func(num int) {
 				scale, err := f.ClientSet.AppsV1().Deployments(ns).GetScale(context.TODO(), name, metav1.GetOptions{})
-				framework.ExpectNoError(err)
+				e2eutils.ExpectNoError(err)
 				if scale.Spec.Replicas != int32(num) {
 					scale.ResourceVersion = "" // indicate the scale update should be unconditional
 					scale.Spec.Replicas = int32(num)
 					_, err = f.ClientSet.AppsV1().Deployments(ns).UpdateScale(context.TODO(), name, scale, metav1.UpdateOptions{})
-					framework.ExpectNoError(err)
+					e2eutils.ExpectNoError(err)
 				}
 				err = wait.Poll(10*time.Second, negUpdateTimeout, func() (bool, error) {
 					svc, err := f.ClientSet.CoreV1().Services(ns).Get(context.TODO(), name, metav1.GetOptions{})
-					framework.ExpectNoError(err)
+					e2eutils.ExpectNoError(err)
 
 					var status e2eingress.NegStatus
 					v, ok := svc.Annotations[e2eingress.NEGStatusAnnotation]
 					if !ok {
 						// Wait for NEG sync loop to find NEGs
-						framework.Logf("Waiting for %v, got: %+v", e2eingress.NEGStatusAnnotation, svc.Annotations)
+						e2eutils.Logf("Waiting for %v, got: %+v", e2eingress.NEGStatusAnnotation, svc.Annotations)
 						return false, nil
 					}
 					err = json.Unmarshal([]byte(v), &status)
 					if err != nil {
-						framework.Logf("Error in parsing Expose NEG annotation: %v", err)
+						e2eutils.Logf("Error in parsing Expose NEG annotation: %v", err)
 						return false, nil
 					}
-					framework.Logf("Got %v: %v", e2eingress.NEGStatusAnnotation, v)
+					e2eutils.Logf("Got %v: %v", e2eingress.NEGStatusAnnotation, v)
 
 					// Expect 2 NEGs to be created based on the test setup (neg-exposed)
 					if len(status.NetworkEndpointGroups) != 2 {
-						framework.Logf("Expected 2 NEGs, got %d", len(status.NetworkEndpointGroups))
+						e2eutils.Logf("Expected 2 NEGs, got %d", len(status.NetworkEndpointGroups))
 						return false, nil
 					}
 
 					for _, port := range expectedKeys {
 						if _, ok := status.NetworkEndpointGroups[port]; !ok {
-							framework.Logf("Expected ServicePort key %v, but does not exist", port)
+							e2eutils.Logf("Expected ServicePort key %v, but does not exist", port)
 						}
 					}
 
 					if len(status.NetworkEndpointGroups) != len(expectedKeys) {
-						framework.Logf("Expected length of %+v to equal length of %+v, but does not", status.NetworkEndpointGroups, expectedKeys)
+						e2eutils.Logf("Expected length of %+v to equal length of %+v, but does not", status.NetworkEndpointGroups, expectedKeys)
 					}
 
 					gceCloud, err := gce.GetGCECloud()
-					framework.ExpectNoError(err)
+					e2eutils.ExpectNoError(err)
 					for _, neg := range status.NetworkEndpointGroups {
 						networkEndpoints, err := gceCloud.ListNetworkEndpoints(neg, gceController.Cloud.Zone, false)
-						framework.ExpectNoError(err)
+						e2eutils.ExpectNoError(err)
 						if len(networkEndpoints) != num {
-							framework.Logf("Expect number of endpoints to be %d, but got %d", num, len(networkEndpoints))
+							e2eutils.Logf("Expect number of endpoints to be %d, but got %d", num, len(networkEndpoints))
 							return false, nil
 						}
 					}
 
 					return true, nil
 				})
-				framework.ExpectNoError(err)
+				e2eutils.ExpectNoError(err)
 			}
 
 			ginkgo.By("Create a basic HTTP ingress using NEG")
 			jig.CreateIngress(filepath.Join(e2eingress.IngressManifestPath, "neg-exposed"), ns, map[string]string{}, map[string]string{})
 			jig.WaitForIngress(true)
 			err := gceController.WaitForNegBackendService(jig.GetServicePorts(false))
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			// initial replicas number is 1
 			scaleAndValidateExposedNEG(1)
 
@@ -431,46 +434,46 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 			// Add Ingress annotation - NEGs should stay the same.
 			ginkgo.By("Adding NEG Ingress annotation")
 			svcList, err := f.ClientSet.CoreV1().Services(ns).List(context.TODO(), metav1.ListOptions{})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			for _, svc := range svcList.Items {
 				svc.Annotations[e2eingress.NEGAnnotation] = `{"ingress":true,"exposed_ports":{"80":{},"443":{}}}`
 				_, err = f.ClientSet.CoreV1().Services(ns).Update(context.TODO(), &svc, metav1.UpdateOptions{})
-				framework.ExpectNoError(err)
+				e2eutils.ExpectNoError(err)
 			}
 			detectNegAnnotation(f, jig, gceController, ns, name, 2)
 
 			// Modify exposed NEG annotation, but keep ingress annotation
 			ginkgo.By("Modifying exposed NEG annotation, but keep Ingress annotation")
 			svcList, err = f.ClientSet.CoreV1().Services(ns).List(context.TODO(), metav1.ListOptions{})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			for _, svc := range svcList.Items {
 				svc.Annotations[e2eingress.NEGAnnotation] = `{"ingress":true,"exposed_ports":{"443":{}}}`
 				_, err = f.ClientSet.CoreV1().Services(ns).Update(context.TODO(), &svc, metav1.UpdateOptions{})
-				framework.ExpectNoError(err)
+				e2eutils.ExpectNoError(err)
 			}
 			detectNegAnnotation(f, jig, gceController, ns, name, 2)
 
 			// Remove Ingress annotation. Expect 1 NEG
 			ginkgo.By("Disabling Ingress annotation, but keeping one standalone NEG")
 			svcList, err = f.ClientSet.CoreV1().Services(ns).List(context.TODO(), metav1.ListOptions{})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			for _, svc := range svcList.Items {
 				svc.Annotations[e2eingress.NEGAnnotation] = `{"ingress":false,"exposed_ports":{"443":{}}}`
 				_, err = f.ClientSet.CoreV1().Services(ns).Update(context.TODO(), &svc, metav1.UpdateOptions{})
-				framework.ExpectNoError(err)
+				e2eutils.ExpectNoError(err)
 			}
 			detectNegAnnotation(f, jig, gceController, ns, name, 1)
 
 			// Remove NEG annotation entirely. Expect 0 NEGs.
 			ginkgo.By("Removing NEG annotation")
 			svcList, err = f.ClientSet.CoreV1().Services(ns).List(context.TODO(), metav1.ListOptions{})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			for _, svc := range svcList.Items {
 				delete(svc.Annotations, e2eingress.NEGAnnotation)
 				// Service cannot be ClusterIP if it's using Instance Groups.
 				svc.Spec.Type = v1.ServiceTypeNodePort
 				_, err = f.ClientSet.CoreV1().Services(ns).Update(context.TODO(), &svc, metav1.UpdateOptions{})
-				framework.ExpectNoError(err)
+				e2eutils.ExpectNoError(err)
 			}
 			detectNegAnnotation(f, jig, gceController, ns, name, 0)
 		})
@@ -488,7 +491,7 @@ func detectNegAnnotation(f *framework.Framework, jig *e2eingress.TestJig, gceCon
 		if negs == 0 {
 			err := gceController.BackendServiceUsingIG(jig.GetServicePorts(false))
 			if err != nil {
-				framework.Logf("ginkgo.Failed to validate IG backend service: %v", err)
+				e2eutils.Logf("ginkgo.Failed to validate IG backend service: %v", err)
 				return false, nil
 			}
 			return true, nil
@@ -497,41 +500,41 @@ func detectNegAnnotation(f *framework.Framework, jig *e2eingress.TestJig, gceCon
 		var status e2eingress.NegStatus
 		v, ok := svc.Annotations[e2eingress.NEGStatusAnnotation]
 		if !ok {
-			framework.Logf("Waiting for %v, got: %+v", e2eingress.NEGStatusAnnotation, svc.Annotations)
+			e2eutils.Logf("Waiting for %v, got: %+v", e2eingress.NEGStatusAnnotation, svc.Annotations)
 			return false, nil
 		}
 
 		err = json.Unmarshal([]byte(v), &status)
 		if err != nil {
-			framework.Logf("Error in parsing Expose NEG annotation: %v", err)
+			e2eutils.Logf("Error in parsing Expose NEG annotation: %v", err)
 			return false, nil
 		}
-		framework.Logf("Got %v: %v", e2eingress.NEGStatusAnnotation, v)
+		e2eutils.Logf("Got %v: %v", e2eingress.NEGStatusAnnotation, v)
 
 		if len(status.NetworkEndpointGroups) != negs {
-			framework.Logf("Expected %d NEGs, got %d", negs, len(status.NetworkEndpointGroups))
+			e2eutils.Logf("Expected %d NEGs, got %d", negs, len(status.NetworkEndpointGroups))
 			return false, nil
 		}
 
 		gceCloud, err := gce.GetGCECloud()
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		for _, neg := range status.NetworkEndpointGroups {
 			networkEndpoints, err := gceCloud.ListNetworkEndpoints(neg, gceController.Cloud.Zone, false)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			if len(networkEndpoints) != 1 {
-				framework.Logf("Expect NEG %s to exist, but got %d", neg, len(networkEndpoints))
+				e2eutils.Logf("Expect NEG %s to exist, but got %d", neg, len(networkEndpoints))
 				return false, nil
 			}
 		}
 
 		err = gceController.BackendServiceUsingNEG(jig.GetServicePorts(false))
 		if err != nil {
-			framework.Logf("ginkgo.Failed to validate NEG backend service: %v", err)
+			e2eutils.Logf("ginkgo.Failed to validate NEG backend service: %v", err)
 			return false, nil
 		}
 		return true, nil
 	}); err != nil {
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 	}
 }
 
@@ -609,7 +612,7 @@ var _ = common.SIGDescribe("Ingress API", func() {
 		ginkgo.By("getting /apis")
 		{
 			discoveryGroups, err := f.ClientSet.Discovery().ServerGroups()
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			found := false
 			for _, group := range discoveryGroups.Groups {
 				if group.Name == networkingv1.GroupName {
@@ -622,7 +625,7 @@ var _ = common.SIGDescribe("Ingress API", func() {
 				}
 			}
 			if !found {
-				framework.Failf("expected networking API group/version, got %#v", discoveryGroups.Groups)
+				e2eutils.Failf("expected networking API group/version, got %#v", discoveryGroups.Groups)
 			}
 		}
 
@@ -630,7 +633,7 @@ var _ = common.SIGDescribe("Ingress API", func() {
 		{
 			group := &metav1.APIGroup{}
 			err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis/networking.k8s.io").Do(context.TODO()).Into(group)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			found := false
 			for _, version := range group.Versions {
 				if version.Version == ingVersion {
@@ -639,14 +642,14 @@ var _ = common.SIGDescribe("Ingress API", func() {
 				}
 			}
 			if !found {
-				framework.Failf("expected networking API version, got %#v", group.Versions)
+				e2eutils.Failf("expected networking API version, got %#v", group.Versions)
 			}
 		}
 
 		ginkgo.By("getting /apis/networking.k8s.io" + ingVersion)
 		{
 			resources, err := f.ClientSet.Discovery().ServerResourcesForGroupVersion(networkingv1.SchemeGroupVersion.String())
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			foundIngress := false
 			for _, resource := range resources.APIResources {
 				switch resource.Name {
@@ -655,50 +658,50 @@ var _ = common.SIGDescribe("Ingress API", func() {
 				}
 			}
 			if !foundIngress {
-				framework.Failf("expected ingresses, got %#v", resources.APIResources)
+				e2eutils.Failf("expected ingresses, got %#v", resources.APIResources)
 			}
 		}
 
 		// Ingress resource create/read/update/watch verbs
 		ginkgo.By("creating")
 		_, err := ingClient.Create(context.TODO(), ingress1, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		_, err = ingClient.Create(context.TODO(), ingress2, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		createdIngress, err := ingClient.Create(context.TODO(), ingress3, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		ginkgo.By("getting")
 		gottenIngress, err := ingClient.Get(context.TODO(), createdIngress.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(gottenIngress.UID, createdIngress.UID)
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectEqual(gottenIngress.UID, createdIngress.UID)
 
 		ginkgo.By("listing")
 		ings, err := ingClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(ings.Items), 3, "filtered list should have 3 items")
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectEqual(len(ings.Items), 3, "filtered list should have 3 items")
 
 		ginkgo.By("watching")
-		framework.Logf("starting watch")
+		e2eutils.Logf("starting watch")
 		ingWatch, err := ingClient.Watch(context.TODO(), metav1.ListOptions{ResourceVersion: ings.ResourceVersion, LabelSelector: "special-label=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		// Test cluster-wide list and watch
 		clusterIngClient := f.ClientSet.NetworkingV1().Ingresses("")
 		ginkgo.By("cluster-wide listing")
 		clusterIngs, err := clusterIngClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(clusterIngs.Items), 3, "filtered list should have 3 items")
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectEqual(len(clusterIngs.Items), 3, "filtered list should have 3 items")
 
 		ginkgo.By("cluster-wide watching")
-		framework.Logf("starting watch")
+		e2eutils.Logf("starting watch")
 		_, err = clusterIngClient.Watch(context.TODO(), metav1.ListOptions{ResourceVersion: ings.ResourceVersion, LabelSelector: "special-label=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		ginkgo.By("patching")
 		patchedIngress, err := ingClient.Patch(context.TODO(), createdIngress.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"patched":"true"}}}`), metav1.PatchOptions{})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(patchedIngress.Annotations["patched"], "true", "patched object should have the applied annotation")
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectEqual(patchedIngress.Annotations["patched"], "true", "patched object should have the applied annotation")
 
 		ginkgo.By("updating")
 		var ingToUpdate, updatedIngress *networkingv1.Ingress
@@ -711,30 +714,30 @@ var _ = common.SIGDescribe("Ingress API", func() {
 			updatedIngress, err = ingClient.Update(context.TODO(), ingToUpdate, metav1.UpdateOptions{})
 			return err
 		})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(updatedIngress.Annotations["updated"], "true", "updated object should have the applied annotation")
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectEqual(updatedIngress.Annotations["updated"], "true", "updated object should have the applied annotation")
 
-		framework.Logf("waiting for watch events with expected annotations")
+		e2eutils.Logf("waiting for watch events with expected annotations")
 		for sawAnnotations := false; !sawAnnotations; {
 			select {
 			case evt, ok := <-ingWatch.ResultChan():
 				if !ok {
-					framework.Fail("watch channel should not close")
+					e2eutils.Fail("watch channel should not close")
 				}
-				framework.ExpectEqual(evt.Type, watch.Modified)
+				e2eutils.ExpectEqual(evt.Type, watch.Modified)
 				watchedIngress, isIngress := evt.Object.(*networkingv1.Ingress)
 				if !isIngress {
-					framework.Failf("expected Ingress, got %T", evt.Object)
+					e2eutils.Failf("expected Ingress, got %T", evt.Object)
 				}
 				if watchedIngress.Annotations["patched"] == "true" {
-					framework.Logf("saw patched and updated annotations")
+					e2eutils.Logf("saw patched and updated annotations")
 					sawAnnotations = true
 					ingWatch.Stop()
 				} else {
-					framework.Logf("missing expected annotations, waiting: %#v", watchedIngress.Annotations)
+					e2eutils.Logf("missing expected annotations, waiting: %#v", watchedIngress.Annotations)
 				}
 			case <-time.After(wait.ForeverTestTimeout):
-				framework.Fail("timed out waiting for watch event")
+				e2eutils.Fail("timed out waiting for watch event")
 			}
 		}
 
@@ -744,13 +747,13 @@ var _ = common.SIGDescribe("Ingress API", func() {
 			Ingress: []v1.LoadBalancerIngress{{IP: "169.1.1.1"}},
 		}
 		lbStatusJSON, err := json.Marshal(lbStatus)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		patchedStatus, err := ingClient.Patch(context.TODO(), createdIngress.Name, types.MergePatchType,
 			[]byte(`{"metadata":{"annotations":{"patchedstatus":"true"}},"status":{"loadBalancer":`+string(lbStatusJSON)+`}}`),
 			metav1.PatchOptions{}, "status")
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(patchedStatus.Status.LoadBalancer, lbStatus, "patched object should have the applied loadBalancer status")
-		framework.ExpectEqual(patchedStatus.Annotations["patchedstatus"], "true", "patched object should have the applied annotation")
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectEqual(patchedStatus.Status.LoadBalancer, lbStatus, "patched object should have the applied loadBalancer status")
+		e2eutils.ExpectEqual(patchedStatus.Annotations["patchedstatus"], "true", "patched object should have the applied annotation")
 
 		ginkgo.By("updating /status")
 		var statusToUpdate, updatedStatus *networkingv1.Ingress
@@ -765,43 +768,43 @@ var _ = common.SIGDescribe("Ingress API", func() {
 			updatedStatus, err = ingClient.UpdateStatus(context.TODO(), statusToUpdate, metav1.UpdateOptions{})
 			return err
 		})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(updatedStatus.Status.LoadBalancer, statusToUpdate.Status.LoadBalancer, fmt.Sprintf("updated object expected to have updated loadbalancer status %#v, got %#v", statusToUpdate.Status.LoadBalancer, updatedStatus.Status.LoadBalancer))
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectEqual(updatedStatus.Status.LoadBalancer, statusToUpdate.Status.LoadBalancer, fmt.Sprintf("updated object expected to have updated loadbalancer status %#v, got %#v", statusToUpdate.Status.LoadBalancer, updatedStatus.Status.LoadBalancer))
 
 		ginkgo.By("get /status")
 		ingResource := schema.GroupVersionResource{Group: "networking.k8s.io", Version: ingVersion, Resource: "ingresses"}
 		gottenStatus, err := f.DynamicClient.Resource(ingResource).Namespace(ns).Get(context.TODO(), createdIngress.Name, metav1.GetOptions{}, "status")
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		statusUID, _, err := unstructured.NestedFieldCopy(gottenStatus.Object, "metadata", "uid")
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(string(createdIngress.UID), statusUID, fmt.Sprintf("createdIngress.UID: %v expected to match statusUID: %v ", createdIngress.UID, statusUID))
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectEqual(string(createdIngress.UID), statusUID, fmt.Sprintf("createdIngress.UID: %v expected to match statusUID: %v ", createdIngress.UID, statusUID))
 
 		// Ingress resource delete operations
 		ginkgo.By("deleting")
 
 		expectFinalizer := func(ing *networkingv1.Ingress, msg string) {
-			framework.ExpectNotEqual(ing.DeletionTimestamp, nil, fmt.Sprintf("expected deletionTimestamp, got nil on step: %q, ingress: %+v", msg, ing))
+			e2eutils.ExpectNotEqual(ing.DeletionTimestamp, nil, fmt.Sprintf("expected deletionTimestamp, got nil on step: %q, ingress: %+v", msg, ing))
 			if len(ing.Finalizers) == 0 {
-				framework.Failf("expected finalizers on ingress, got none on step: %q, ingress: %+v", msg, ing)
+				e2eutils.Failf("expected finalizers on ingress, got none on step: %q, ingress: %+v", msg, ing)
 			}
 		}
 
 		err = ingClient.Delete(context.TODO(), createdIngress.Name, metav1.DeleteOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		ing, err := ingClient.Get(context.TODO(), createdIngress.Name, metav1.GetOptions{})
 		// If ingress controller does not support finalizers, we expect a 404.  Otherwise we validate finalizer behavior.
 		if err == nil {
 			expectFinalizer(ing, "deleting createdIngress")
 		} else {
 			if !apierrors.IsNotFound(err) {
-				framework.Failf("expected 404, got %v", err)
+				e2eutils.Failf("expected 404, got %v", err)
 			}
 		}
 		ings, err = ingClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		// Should have <= 3 items since some ingresses might not have been deleted yet due to finalizers
 		if len(ings.Items) > 3 {
-			framework.Fail("filtered list should have <= 3 items")
+			e2eutils.Fail("filtered list should have <= 3 items")
 		}
 		// Validate finalizer on the deleted ingress
 		for _, ing := range ings.Items {
@@ -812,12 +815,12 @@ var _ = common.SIGDescribe("Ingress API", func() {
 
 		ginkgo.By("deleting a collection")
 		err = ingClient.DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		ings, err = ingClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		// Should have <= 3 items since some ingresses might not have been deleted yet due to finalizers
 		if len(ings.Items) > 3 {
-			framework.Fail("filtered list should have <= 3 items")
+			e2eutils.Fail("filtered list should have <= 3 items")
 		}
 		// Validate finalizers
 		for _, ing := range ings.Items {

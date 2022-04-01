@@ -23,6 +23,8 @@ import (
 	"sync"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -40,7 +42,7 @@ import (
 )
 
 const (
-	serverStartTimeout = framework.PodStartTimeout + 3*time.Minute
+	serverStartTimeout = e2eutils.PodStartTimeout + 3*time.Minute
 )
 
 var _ = SIGDescribe("[Feature:Example]", func() {
@@ -57,12 +59,12 @@ var _ = SIGDescribe("[Feature:Example]", func() {
 		// lying around so we don't have to race any caches
 		err := e2eauth.BindClusterRoleInNamespace(c.RbacV1(), "edit", f.Namespace.Name,
 			rbacv1.Subject{Kind: rbacv1.ServiceAccountKind, Namespace: f.Namespace.Name, Name: "default"})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		err = e2eauth.WaitForAuthorizationUpdate(c.AuthorizationV1(),
 			serviceaccount.MakeUsername(f.Namespace.Name, "default"),
 			f.Namespace.Name, "create", schema.GroupResource{Resource: "pods"}, true)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 	})
 
 	ginkgo.Describe("Liveness", func() {
@@ -71,27 +73,27 @@ var _ = SIGDescribe("[Feature:Example]", func() {
 			execYaml := readFile(test, "exec-liveness.yaml.in")
 			httpYaml := readFile(test, "http-liveness.yaml.in")
 
-			framework.RunKubectlOrDieInput(ns, execYaml, "create", "-f", "-")
-			framework.RunKubectlOrDieInput(ns, httpYaml, "create", "-f", "-")
+			e2eutils.RunKubectlOrDieInput(ns, execYaml, "create", "-f", "-")
+			e2eutils.RunKubectlOrDieInput(ns, httpYaml, "create", "-f", "-")
 
 			// Since both containers start rapidly, we can easily run this test in parallel.
 			var wg sync.WaitGroup
 			passed := true
 			checkRestart := func(podName string, timeout time.Duration) {
 				err := e2epod.WaitForPodNameRunningInNamespace(c, podName, ns)
-				framework.ExpectNoError(err)
-				for t := time.Now(); time.Since(t) < timeout; time.Sleep(framework.Poll) {
+				e2eutils.ExpectNoError(err)
+				for t := time.Now(); time.Since(t) < timeout; time.Sleep(e2eutils.Poll) {
 					pod, err := c.CoreV1().Pods(ns).Get(context.TODO(), podName, metav1.GetOptions{})
-					framework.ExpectNoError(err, fmt.Sprintf("getting pod %s", podName))
+					e2eutils.ExpectNoError(err, fmt.Sprintf("getting pod %s", podName))
 					stat := podutil.GetExistingContainerStatus(pod.Status.ContainerStatuses, podName)
-					framework.Logf("Pod: %s, restart count:%d", stat.Name, stat.RestartCount)
+					e2eutils.Logf("Pod: %s, restart count:%d", stat.Name, stat.RestartCount)
 					if stat.RestartCount > 0 {
-						framework.Logf("Saw %v restart, succeeded...", podName)
+						e2eutils.Logf("Saw %v restart, succeeded...", podName)
 						wg.Done()
 						return
 					}
 				}
-				framework.Logf("Failed waiting for %v restart! ", podName)
+				e2eutils.Logf("Failed waiting for %v restart! ", podName)
 				passed = false
 				wg.Done()
 			}
@@ -107,7 +109,7 @@ var _ = SIGDescribe("[Feature:Example]", func() {
 			}
 			wg.Wait()
 			if !passed {
-				framework.Failf("At least one liveness example failed.  See the logs above.")
+				e2eutils.Failf("At least one liveness example failed.  See the logs above.")
 			}
 		})
 	})
@@ -121,14 +123,14 @@ var _ = SIGDescribe("[Feature:Example]", func() {
 			podName := "secret-test-pod"
 
 			ginkgo.By("creating secret and pod")
-			framework.RunKubectlOrDieInput(ns, secretYaml, "create", "-f", "-")
-			framework.RunKubectlOrDieInput(ns, podYaml, "create", "-f", "-")
+			e2eutils.RunKubectlOrDieInput(ns, secretYaml, "create", "-f", "-")
+			e2eutils.RunKubectlOrDieInput(ns, podYaml, "create", "-f", "-")
 			err := e2epod.WaitForPodNoLongerRunningInNamespace(c, podName, ns)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 
 			ginkgo.By("checking if secret was read correctly")
-			_, err = framework.LookForStringInLog(ns, "secret-test-pod", "test-container", "value-1", serverStartTimeout)
-			framework.ExpectNoError(err)
+			_, err = e2eutils.LookForStringInLog(ns, "secret-test-pod", "test-container", "value-1", serverStartTimeout)
+			e2eutils.ExpectNoError(err)
 		})
 	})
 
@@ -139,15 +141,15 @@ var _ = SIGDescribe("[Feature:Example]", func() {
 			podName := "dapi-test-pod"
 
 			ginkgo.By("creating the pod")
-			framework.RunKubectlOrDieInput(ns, podYaml, "create", "-f", "-")
+			e2eutils.RunKubectlOrDieInput(ns, podYaml, "create", "-f", "-")
 			err := e2epod.WaitForPodNoLongerRunningInNamespace(c, podName, ns)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 
 			ginkgo.By("checking if name and namespace were passed correctly")
-			_, err = framework.LookForStringInLog(ns, podName, "test-container", fmt.Sprintf("MY_POD_NAMESPACE=%v", ns), serverStartTimeout)
-			framework.ExpectNoError(err)
-			_, err = framework.LookForStringInLog(ns, podName, "test-container", fmt.Sprintf("MY_POD_NAME=%v", podName), serverStartTimeout)
-			framework.ExpectNoError(err)
+			_, err = e2eutils.LookForStringInLog(ns, podName, "test-container", fmt.Sprintf("MY_POD_NAMESPACE=%v", ns), serverStartTimeout)
+			e2eutils.ExpectNoError(err)
+			_, err = e2eutils.LookForStringInLog(ns, podName, "test-container", fmt.Sprintf("MY_POD_NAME=%v", podName), serverStartTimeout)
+			e2eutils.ExpectNoError(err)
 		})
 	})
 })
@@ -156,7 +158,7 @@ func readFile(test, file string) string {
 	from := filepath.Join(test, file)
 	data, err := e2etestfiles.Read(from)
 	if err != nil {
-		framework.Fail(err.Error())
+		e2eutils.Fail(err.Error())
 	}
 	return commonutils.SubstituteImageName(string(data))
 }

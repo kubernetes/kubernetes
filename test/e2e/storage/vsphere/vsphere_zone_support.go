@@ -22,6 +22,9 @@ import (
 	"strings"
 	"time"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 
@@ -122,7 +125,7 @@ var _ = utils.SIGDescribe("Zone Support [Feature:vsphere]", func() {
 		scParameters = make(map[string]string)
 		zones = make([]string, 0)
 		_, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 	})
 
 	ginkgo.It("Verify dynamically created pv with allowed zones specified in storage class, shows the right zone information on its labels", func() {
@@ -142,10 +145,10 @@ var _ = utils.SIGDescribe("Zone Support [Feature:vsphere]", func() {
 		ginkgo.By(fmt.Sprintf("Creating storage class with unknown zone : %s", invalidZone))
 		zones = append(zones, invalidZone)
 		err := verifyPVCCreationFails(client, namespace, nil, zones, "")
-		framework.ExpectError(err)
+		e2eutils.ExpectError(err)
 		errorMsg := "Failed to find a shared datastore matching zone [" + invalidZone + "]"
 		if !strings.Contains(err.Error(), errorMsg) {
-			framework.ExpectNoError(err, errorMsg)
+			e2eutils.ExpectNoError(err, errorMsg)
 		}
 	})
 
@@ -176,7 +179,7 @@ var _ = utils.SIGDescribe("Zone Support [Feature:vsphere]", func() {
 		err := verifyPVCCreationFails(client, namespace, scParameters, zones, "")
 		errorMsg := "No matching datastores found in the kubernetes cluster for zone " + zoneC
 		if !strings.Contains(err.Error(), errorMsg) {
-			framework.ExpectNoError(err, errorMsg)
+			e2eutils.ExpectNoError(err, errorMsg)
 		}
 	})
 
@@ -201,7 +204,7 @@ var _ = utils.SIGDescribe("Zone Support [Feature:vsphere]", func() {
 		err := verifyPVCCreationFails(client, namespace, scParameters, zones, "")
 		errorMsg := "No compatible datastores found that satisfy the storage policy requirements"
 		if !strings.Contains(err.Error(), errorMsg) {
-			framework.ExpectNoError(err, errorMsg)
+			e2eutils.ExpectNoError(err, errorMsg)
 		}
 	})
 
@@ -221,7 +224,7 @@ var _ = utils.SIGDescribe("Zone Support [Feature:vsphere]", func() {
 		err := verifyPVCCreationFails(client, namespace, scParameters, zones, "")
 		errorMsg := "User specified datastore is not compatible with the storagePolicy: \\\"" + nonCompatPolicy + "\\\"."
 		if !strings.Contains(err.Error(), errorMsg) {
-			framework.ExpectNoError(err, errorMsg)
+			e2eutils.ExpectNoError(err, errorMsg)
 		}
 	})
 
@@ -233,7 +236,7 @@ var _ = utils.SIGDescribe("Zone Support [Feature:vsphere]", func() {
 		err := verifyPVCCreationFails(client, namespace, scParameters, zones, "")
 		errorMsg := "No matching datastores found in the kubernetes cluster for zone " + zoneC
 		if !strings.Contains(err.Error(), errorMsg) {
-			framework.ExpectNoError(err, errorMsg)
+			e2eutils.ExpectNoError(err, errorMsg)
 		}
 	})
 
@@ -242,7 +245,7 @@ var _ = utils.SIGDescribe("Zone Support [Feature:vsphere]", func() {
 		err := verifyPVCCreationFails(client, namespace, nil, nil, "")
 		errorMsg := "No shared datastores found in the Kubernetes cluster"
 		if !strings.Contains(err.Error(), errorMsg) {
-			framework.ExpectNoError(err, errorMsg)
+			e2eutils.ExpectNoError(err, errorMsg)
 		}
 	})
 
@@ -252,7 +255,7 @@ var _ = utils.SIGDescribe("Zone Support [Feature:vsphere]", func() {
 		err := verifyPVCCreationFails(client, namespace, scParameters, nil, "")
 		errorMsg := "No shared datastores found in the Kubernetes cluster"
 		if !strings.Contains(err.Error(), errorMsg) {
-			framework.ExpectNoError(err, errorMsg)
+			e2eutils.ExpectNoError(err, errorMsg)
 		}
 	})
 
@@ -262,7 +265,7 @@ var _ = utils.SIGDescribe("Zone Support [Feature:vsphere]", func() {
 		err := verifyPVCCreationFails(client, namespace, scParameters, nil, "")
 		errorMsg := "No shared datastores found in the Kubernetes cluster"
 		if !strings.Contains(err.Error(), errorMsg) {
-			framework.ExpectNoError(err, errorMsg)
+			e2eutils.ExpectNoError(err, errorMsg)
 		}
 	})
 
@@ -273,7 +276,7 @@ var _ = utils.SIGDescribe("Zone Support [Feature:vsphere]", func() {
 		err := verifyPVCCreationFails(client, namespace, scParameters, nil, "")
 		errorMsg := "No shared datastores found in the Kubernetes cluster"
 		if !strings.Contains(err.Error(), errorMsg) {
-			framework.ExpectNoError(err, errorMsg)
+			e2eutils.ExpectNoError(err, errorMsg)
 		}
 	})
 
@@ -283,7 +286,7 @@ var _ = utils.SIGDescribe("Zone Support [Feature:vsphere]", func() {
 		err := verifyPVCCreationFails(client, namespace, nil, zones, "")
 		errorMsg := "No matching datastores found in the kubernetes cluster for zone " + zoneC
 		if !strings.Contains(err.Error(), errorMsg) {
-			framework.ExpectNoError(err, errorMsg)
+			e2eutils.ExpectNoError(err, errorMsg)
 		}
 	})
 
@@ -294,7 +297,7 @@ var _ = utils.SIGDescribe("Zone Support [Feature:vsphere]", func() {
 		err := verifyPVCCreationFails(client, namespace, nil, zones, "")
 		errorMsg := "No matching datastores found in the kubernetes cluster for zone " + zoneC
 		if !strings.Contains(err.Error(), errorMsg) {
-			framework.ExpectNoError(err, errorMsg)
+			e2eutils.ExpectNoError(err, errorMsg)
 		}
 	})
 
@@ -305,7 +308,7 @@ var _ = utils.SIGDescribe("Zone Support [Feature:vsphere]", func() {
 		err := verifyPVCCreationFails(client, namespace, scParameters, zones, "")
 		errorMsg := "Invalid value for " + PolicyHostFailuresToTolerate + "."
 		if !strings.Contains(err.Error(), errorMsg) {
-			framework.ExpectNoError(err, errorMsg)
+			e2eutils.ExpectNoError(err, errorMsg)
 		}
 	})
 
@@ -356,10 +359,10 @@ var _ = utils.SIGDescribe("Zone Support [Feature:vsphere]", func() {
 		zones = append(zones, zoneA)
 		zones = append(zones, zoneC)
 		err := verifyPodAndPvcCreationFailureOnWaitForFirstConsumerMode(client, namespace, nil, zones)
-		framework.ExpectError(err)
+		e2eutils.ExpectError(err)
 		errorMsg := "No matching datastores found in the kubernetes cluster for zone " + zoneC
 		if !strings.Contains(err.Error(), errorMsg) {
-			framework.ExpectNoError(err, errorMsg)
+			e2eutils.ExpectNoError(err, errorMsg)
 		}
 	})
 
@@ -376,14 +379,14 @@ var _ = utils.SIGDescribe("Zone Support [Feature:vsphere]", func() {
 	})
 })
 
-func verifyPVCAndPodCreationSucceeds(client clientset.Interface, timeouts *framework.TimeoutContext, namespace string, scParameters map[string]string, zones []string, volumeBindingMode storagev1.VolumeBindingMode) {
+func verifyPVCAndPodCreationSucceeds(client clientset.Interface, timeouts *e2econfig.TimeoutContext, namespace string, scParameters map[string]string, zones []string, volumeBindingMode storagev1.VolumeBindingMode) {
 	storageclass, err := client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec("zone-sc", scParameters, zones, volumeBindingMode), metav1.CreateOptions{})
-	framework.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
+	e2eutils.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
 	defer client.StorageV1().StorageClasses().Delete(context.TODO(), storageclass.Name, metav1.DeleteOptions{})
 
 	ginkgo.By("Creating PVC using the Storage Class")
 	pvclaim, err := e2epv.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass))
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	defer e2epv.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
 
 	var pvclaims []*v1.PersistentVolumeClaim
@@ -397,7 +400,7 @@ func verifyPVCAndPodCreationSucceeds(client clientset.Interface, timeouts *frame
 
 	ginkgo.By("Creating pod to attach PV to the node")
 	pod, err := e2epod.CreatePod(client, namespace, nil, pvclaims, false, "")
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	if volumeBindingMode == storagev1.VolumeBindingWaitForFirstConsumer {
 		persistentvolumes = waitForPVClaimBoundPhase(client, pvclaims, timeouts.ClaimProvision)
@@ -420,12 +423,12 @@ func verifyPVCAndPodCreationSucceeds(client clientset.Interface, timeouts *frame
 
 func verifyPodAndPvcCreationFailureOnWaitForFirstConsumerMode(client clientset.Interface, namespace string, scParameters map[string]string, zones []string) error {
 	storageclass, err := client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec("zone-sc", scParameters, zones, storagev1.VolumeBindingWaitForFirstConsumer), metav1.CreateOptions{})
-	framework.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
+	e2eutils.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
 	defer client.StorageV1().StorageClasses().Delete(context.TODO(), storageclass.Name, metav1.DeleteOptions{})
 
 	ginkgo.By("Creating PVC using the Storage Class")
 	pvclaim, err := e2epv.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass))
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	defer e2epv.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
 
 	var pvclaims []*v1.PersistentVolumeClaim
@@ -434,15 +437,15 @@ func verifyPodAndPvcCreationFailureOnWaitForFirstConsumerMode(client clientset.I
 	ginkgo.By("Creating a pod")
 	pod := e2epod.MakePod(namespace, nil, pvclaims, false, "")
 	pod, err = client.CoreV1().Pods(namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	defer e2epod.DeletePodWithWait(client, pod)
 
 	ginkgo.By("Waiting for claim to be in bound phase")
-	err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, pvclaim.Namespace, pvclaim.Name, framework.Poll, 2*time.Minute)
-	framework.ExpectError(err)
+	err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, pvclaim.Namespace, pvclaim.Name, e2eutils.Poll, 2*time.Minute)
+	e2eutils.ExpectError(err)
 
 	eventList, err := client.CoreV1().Events(pvclaim.Namespace).List(context.TODO(), metav1.ListOptions{})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	// Look for PVC ProvisioningFailed event and return the message.
 	for _, event := range eventList.Items {
@@ -456,18 +459,18 @@ func verifyPodAndPvcCreationFailureOnWaitForFirstConsumerMode(client clientset.I
 func waitForPVClaimBoundPhase(client clientset.Interface, pvclaims []*v1.PersistentVolumeClaim, timeout time.Duration) []*v1.PersistentVolume {
 	ginkgo.By("Waiting for claim to be in bound phase")
 	persistentvolumes, err := e2epv.WaitForPVClaimBoundPhase(client, pvclaims, timeout)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	return persistentvolumes
 }
 
 func verifyPodSchedulingFails(client clientset.Interface, namespace string, nodeSelector map[string]string, scParameters map[string]string, zones []string, volumeBindingMode storagev1.VolumeBindingMode) {
 	storageclass, err := client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec("zone-sc", scParameters, zones, volumeBindingMode), metav1.CreateOptions{})
-	framework.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
+	e2eutils.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
 	defer client.StorageV1().StorageClasses().Delete(context.TODO(), storageclass.Name, metav1.DeleteOptions{})
 
 	ginkgo.By("Creating PVC using the Storage Class")
 	pvclaim, err := e2epv.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass))
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	defer e2epv.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
 
 	var pvclaims []*v1.PersistentVolumeClaim
@@ -475,46 +478,46 @@ func verifyPodSchedulingFails(client clientset.Interface, namespace string, node
 
 	ginkgo.By("Creating a pod")
 	pod, err := e2epod.CreateUnschedulablePod(client, namespace, nodeSelector, pvclaims, false, "")
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	defer e2epod.DeletePodWithWait(client, pod)
 }
 
 func verifyPVCCreationFails(client clientset.Interface, namespace string, scParameters map[string]string, zones []string, volumeBindingMode storagev1.VolumeBindingMode) error {
 	storageclass, err := client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec("zone-sc", scParameters, zones, volumeBindingMode), metav1.CreateOptions{})
-	framework.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
+	e2eutils.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
 	defer client.StorageV1().StorageClasses().Delete(context.TODO(), storageclass.Name, metav1.DeleteOptions{})
 
 	ginkgo.By("Creating PVC using the Storage Class")
 	pvclaim, err := e2epv.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass))
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	defer e2epv.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
 
 	ginkgo.By("Waiting for claim to be in bound phase")
-	err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, pvclaim.Namespace, pvclaim.Name, framework.Poll, 2*time.Minute)
-	framework.ExpectError(err)
+	err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, pvclaim.Namespace, pvclaim.Name, e2eutils.Poll, 2*time.Minute)
+	e2eutils.ExpectError(err)
 
 	eventList, err := client.CoreV1().Events(pvclaim.Namespace).List(context.TODO(), metav1.ListOptions{})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
-	framework.Logf("Failure message : %+q", eventList.Items[0].Message)
+	e2eutils.Logf("Failure message : %+q", eventList.Items[0].Message)
 	return fmt.Errorf("Failure message: %+q", eventList.Items[0].Message)
 }
 
-func verifyPVZoneLabels(client clientset.Interface, timeouts *framework.TimeoutContext, namespace string, scParameters map[string]string, zones []string) {
+func verifyPVZoneLabels(client clientset.Interface, timeouts *e2econfig.TimeoutContext, namespace string, scParameters map[string]string, zones []string) {
 	storageclass, err := client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec("zone-sc", nil, zones, ""), metav1.CreateOptions{})
-	framework.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
+	e2eutils.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
 	defer client.StorageV1().StorageClasses().Delete(context.TODO(), storageclass.Name, metav1.DeleteOptions{})
 
 	ginkgo.By("Creating PVC using the storage class")
 	pvclaim, err := e2epv.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass))
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	defer e2epv.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
 
 	var pvclaims []*v1.PersistentVolumeClaim
 	pvclaims = append(pvclaims, pvclaim)
 	ginkgo.By("Waiting for claim to be in bound phase")
 	persistentvolumes, err := e2epv.WaitForPVClaimBoundPhase(client, pvclaims, timeouts.ClaimProvision)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	ginkgo.By("Verify zone information is present in the volume labels")
 	for _, pv := range persistentvolumes {

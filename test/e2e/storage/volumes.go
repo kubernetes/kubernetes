@@ -21,6 +21,8 @@ package storage
 import (
 	"context"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -67,7 +69,7 @@ var _ = utils.SIGDescribe("Volumes", func() {
 				},
 			}
 			if _, err := cs.CoreV1().ConfigMaps(namespace.Name).Create(context.TODO(), configMap, metav1.CreateOptions{}); err != nil {
-				framework.Failf("unable to create test configmap: %v", err)
+				e2eutils.Failf("unable to create test configmap: %v", err)
 			}
 			defer func() {
 				_ = cs.CoreV1().ConfigMaps(namespace.Name).Delete(context.TODO(), configMap.Name, metav1.DeleteOptions{})
@@ -110,7 +112,7 @@ var _ = utils.SIGDescribe("Volumes", func() {
 					ExpectedContent: "this is the second file",
 				},
 			}
-			e2evolume.TestVolumeClient(f, config, nil, "" /* fsType */, tests)
+			e2evolume.TestVolumeClient(f.ClientSet, f.Namespace.Name, f.Timeouts, config, nil, "" /* fsType */, tests)
 		})
 	})
 })

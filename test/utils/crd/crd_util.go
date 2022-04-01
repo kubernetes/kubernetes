@@ -19,6 +19,8 @@ package crd
 import (
 	"fmt"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"k8s.io/utils/pointer"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -46,25 +48,25 @@ type Option func(crd *apiextensionsv1.CustomResourceDefinition)
 
 // CreateMultiVersionTestCRD creates a new CRD specifically for the calling test.
 func CreateMultiVersionTestCRD(f *framework.Framework, group string, opts ...Option) (*TestCrd, error) {
-	suffix := framework.RandomSuffix()
+	suffix := e2eutils.RandomSuffix()
 	name := fmt.Sprintf("e2e-test-%s-%s-crd", f.BaseName, suffix)
 	kind := fmt.Sprintf("e2e-test-%s-%s-crd", f.BaseName, suffix)
 	testcrd := &TestCrd{}
 
 	// Creating a custom resource definition for use by assorted tests.
-	config, err := framework.LoadConfig()
+	config, err := e2eutils.LoadConfig()
 	if err != nil {
-		framework.Failf("failed to load config: %v", err)
+		e2eutils.Failf("failed to load config: %v", err)
 		return nil, err
 	}
 	apiExtensionClient, err := crdclientset.NewForConfig(config)
 	if err != nil {
-		framework.Failf("failed to initialize apiExtensionClient: %v", err)
+		e2eutils.Failf("failed to initialize apiExtensionClient: %v", err)
 		return nil, err
 	}
 	dynamicClient, err := dynamic.NewForConfig(config)
 	if err != nil {
-		framework.Failf("failed to initialize dynamic client: %v", err)
+		e2eutils.Failf("failed to initialize dynamic client: %v", err)
 		return nil, err
 	}
 
@@ -96,7 +98,7 @@ func CreateMultiVersionTestCRD(f *framework.Framework, group string, opts ...Opt
 	//create CRD and waits for the resource to be recognized and available.
 	crd, err = fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
 	if err != nil {
-		framework.Failf("failed to create CustomResourceDefinition: %v", err)
+		e2eutils.Failf("failed to create CustomResourceDefinition: %v", err)
 		return nil, err
 	}
 
@@ -114,7 +116,7 @@ func CreateMultiVersionTestCRD(f *framework.Framework, group string, opts ...Opt
 	testcrd.CleanUp = func() error {
 		err := fixtures.DeleteV1CustomResourceDefinition(crd, apiExtensionClient)
 		if err != nil {
-			framework.Failf("failed to delete CustomResourceDefinition(%s): %v", name, err)
+			e2eutils.Failf("failed to delete CustomResourceDefinition(%s): %v", name, err)
 		}
 		return err
 	}

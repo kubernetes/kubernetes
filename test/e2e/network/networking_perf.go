@@ -22,6 +22,9 @@ import (
 	"fmt"
 	"time"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -57,7 +60,7 @@ const (
 )
 
 func iperf2ServerDeployment(client clientset.Interface, namespace string, isIPV6 bool) (*appsv1.Deployment, error) {
-	framework.Logf("deploying iperf2 server")
+	e2eutils.Logf("deploying iperf2 server")
 	one := int64(1)
 	replicas := int32(1)
 	labels := map[string]string{labelKey: serverLabelValue}
@@ -86,7 +89,7 @@ func iperf2ServerDeployment(client clientset.Interface, namespace string, isIPV6
 	if err != nil {
 		return nil, fmt.Errorf("deployment %q Create API error: %v", deploymentSpec.Name, err)
 	}
-	framework.Logf("Waiting for deployment %q to complete", deploymentSpec.Name)
+	e2eutils.Logf("Waiting for deployment %q to complete", deploymentSpec.Name)
 	err = e2edeployment.WaitForDeploymentComplete(client, deployment)
 	if err != nil {
 		return nil, fmt.Errorf("deployment %q failed to complete: %v", deploymentSpec.Name, err)
@@ -142,10 +145,10 @@ var _ = common.SIGDescribe("Networking IPerf2 [Feature:Networking-Performance]",
 
 	ginkgo.It(fmt.Sprintf("should run iperf2"), func() {
 		readySchedulableNodes, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		familyStr := ""
-		if framework.TestContext.ClusterIsIPv6() {
+		if e2econfig.TestContext.ClusterIsIPv6() {
 			familyStr = "-V "
 		}
 
@@ -154,38 +157,38 @@ var _ = common.SIGDescribe("Networking IPerf2 [Feature:Networking-Performance]",
 		}
 
 		// Step 1: set up iperf2 server -- a single pod on any node
-		_, err = iperf2ServerDeployment(f.ClientSet, f.Namespace.Name, framework.TestContext.ClusterIsIPv6())
-		framework.ExpectNoError(err, "deploy iperf2 server deployment")
+		_, err = iperf2ServerDeployment(f.ClientSet, f.Namespace.Name, e2econfig.TestContext.ClusterIsIPv6())
+		e2eutils.ExpectNoError(err, "deploy iperf2 server deployment")
 
 		_, err = iperf2ServerService(f.ClientSet, f.Namespace.Name)
-		framework.ExpectNoError(err, "deploy iperf2 server service")
+		e2eutils.ExpectNoError(err, "deploy iperf2 server service")
 
 		// Step 2: set up iperf2 client daemonset
 		//   initially, the clients don't do anything -- they simply pause until they're called
 		_, err = iperf2ClientDaemonSet(f.ClientSet, f.Namespace.Name)
-		framework.ExpectNoError(err, "deploy iperf2 client daemonset")
+		e2eutils.ExpectNoError(err, "deploy iperf2 client daemonset")
 
 		// Make sure the server is ready to go
-		framework.Logf("waiting for iperf2 server endpoints")
+		e2eutils.Logf("waiting for iperf2 server endpoints")
 		err = wait.Poll(2*time.Second, largeClusterTimeout, func() (done bool, err error) {
 			listOptions := metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", discoveryv1.LabelServiceName, serverServiceName)}
 			esList, err := f.ClientSet.DiscoveryV1().EndpointSlices(f.Namespace.Name).List(context.TODO(), listOptions)
-			framework.ExpectNoError(err, "Error fetching EndpointSlice for Service %s/%s", f.Namespace.Name, serverServiceName)
+			e2eutils.ExpectNoError(err, "Error fetching EndpointSlice for Service %s/%s", f.Namespace.Name, serverServiceName)
 
 			if len(esList.Items) == 0 {
-				framework.Logf("EndpointSlice for Service %s/%s not found", f.Namespace.Name, serverServiceName)
+				e2eutils.Logf("EndpointSlice for Service %s/%s not found", f.Namespace.Name, serverServiceName)
 				return false, nil
 			}
 			return true, nil
 		})
-		framework.ExpectNoError(err, "unable to wait for endpoints for the iperf service")
-		framework.Logf("found iperf2 server endpoints")
+		e2eutils.ExpectNoError(err, "unable to wait for endpoints for the iperf service")
+		e2eutils.Logf("found iperf2 server endpoints")
 
 		clientPodsListOptions := metav1.ListOptions{
 			LabelSelector: fmt.Sprintf("%s=%s", labelKey, clientLabelValue),
 		}
 
-		framework.Logf("waiting for client pods to be running")
+		e2eutils.Logf("waiting for client pods to be running")
 		var clientPodList *v1.PodList
 		err = wait.Poll(2*time.Second, largeClusterTimeout, func() (done bool, err error) {
 			clientPodList, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(context.TODO(), clientPodsListOptions)
@@ -202,25 +205,25 @@ var _ = common.SIGDescribe("Networking IPerf2 [Feature:Networking-Performance]",
 			}
 			return true, nil
 		})
-		framework.ExpectNoError(err, "unable to wait for client pods to come up")
-		framework.Logf("all client pods are ready: %d pods", len(clientPodList.Items))
+		e2eutils.ExpectNoError(err, "unable to wait for client pods to come up")
+		e2eutils.Logf("all client pods are ready: %d pods", len(clientPodList.Items))
 
 		// Get a reference to the server pod for later
 		serverPodList, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(context.TODO(), serverPodsListOptions)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		if len(serverPodList.Items) != 1 {
-			framework.Failf("expected 1 server pod, found %d", len(serverPodList.Items))
+			e2eutils.Failf("expected 1 server pod, found %d", len(serverPodList.Items))
 		}
 		serverPod := serverPodList.Items[0]
-		framework.Logf("server pod phase %s", serverPod.Status.Phase)
+		e2eutils.Logf("server pod phase %s", serverPod.Status.Phase)
 		for i, condition := range serverPod.Status.Conditions {
-			framework.Logf("server pod condition %d: %+v", i, condition)
+			e2eutils.Logf("server pod condition %d: %+v", i, condition)
 		}
 		for i, cont := range serverPod.Status.ContainerStatuses {
-			framework.Logf("server pod container status %d: %+v", i, cont)
+			e2eutils.Logf("server pod container status %d: %+v", i, cont)
 		}
 
-		framework.Logf("found %d matching client pods", len(clientPodList.Items))
+		e2eutils.Logf("found %d matching client pods", len(clientPodList.Items))
 
 		nodeResults := &IPerf2NodeToNodeCSVResults{
 			ServerNode: serverPod.Spec.NodeName,
@@ -233,8 +236,8 @@ var _ = common.SIGDescribe("Networking IPerf2 [Feature:Networking-Performance]",
 			podName := pod.Name
 			nodeName := pod.Spec.NodeName
 
-			iperfVersion := f.ExecShellInPod(podName, "iperf -v || true")
-			framework.Logf("iperf version: %s", iperfVersion)
+			iperfVersion := e2eutils.ExecShellInPod(f.ClientSet, f.Namespace.Name, podName, "iperf -v || true")
+			e2eutils.Logf("iperf version: %s", iperfVersion)
 
 			for try := 0; ; try++ {
 				/* iperf2 command parameters:
@@ -245,18 +248,18 @@ var _ = common.SIGDescribe("Networking IPerf2 [Feature:Networking-Performance]",
 				 *  -c %s: run in client mode, connecting to <host>
 				 */
 				command := fmt.Sprintf(`iperf %s -e -p %d --reportstyle C -i 1 -c %s && sleep 5`, familyStr, iperf2Port, serverServiceName)
-				framework.Logf("attempting to run command '%s' in client pod %s (node %s)", command, podName, nodeName)
-				output := f.ExecShellInPod(podName, command)
-				framework.Logf("output from exec on client pod %s (node %s): \n%s\n", podName, nodeName, output)
+				e2eutils.Logf("attempting to run command '%s' in client pod %s (node %s)", command, podName, nodeName)
+				output := e2eutils.ExecShellInPod(f.ClientSet, f.Namespace.Name, podName, command)
+				e2eutils.Logf("output from exec on client pod %s (node %s): \n%s\n", podName, nodeName, output)
 
 				results, err := ParseIPerf2EnhancedResultsFromCSV(output)
 				if err == nil {
 					nodeResults.Results[nodeName] = results
 					break
 				} else if try == 2 {
-					framework.ExpectNoError(err, "unable to parse iperf2 output from client pod %s (node %s)", pod.Name, nodeName)
+					e2eutils.ExpectNoError(err, "unable to parse iperf2 output from client pod %s (node %s)", pod.Name, nodeName)
 				} else {
-					framework.Logf("Retrying: IPerf run failed: %+v", err)
+					e2eutils.Logf("Retrying: IPerf run failed: %+v", err)
 				}
 			}
 		}
@@ -271,14 +274,14 @@ var _ = common.SIGDescribe("Networking IPerf2 [Feature:Networking-Performance]",
 			Dec 22 07:52:41.102: INFO:             three-node-ipv6-worker3            three-node-ipv6-worker2                3123
 
 		*/
-		framework.Logf("%35s%35s%20s", "From", "To", "Bandwidth (MB/s)")
+		e2eutils.Logf("%35s%35s%20s", "From", "To", "Bandwidth (MB/s)")
 		for nodeFrom, results := range nodeResults.Results {
-			framework.Logf("%35s%35s%20d", nodeFrom, nodeResults.ServerNode, results.Total.bandwidthMB())
+			e2eutils.Logf("%35s%35s%20d", nodeFrom, nodeResults.ServerNode, results.Total.bandwidthMB())
 		}
 		for clientNode, results := range nodeResults.Results {
 			megabytesPerSecond := results.Total.bandwidthMB()
 			if megabytesPerSecond < iperf2BaselineBandwidthMegabytesPerSecond {
-				framework.Failf("iperf2 MB/s received below baseline of %d for client %s to server %s: %d", iperf2BaselineBandwidthMegabytesPerSecond, clientNode, nodeResults.ServerNode, megabytesPerSecond)
+				e2eutils.Failf("iperf2 MB/s received below baseline of %d for client %s to server %s: %d", iperf2BaselineBandwidthMegabytesPerSecond, clientNode, nodeResults.ServerNode, megabytesPerSecond)
 			}
 		}
 	})

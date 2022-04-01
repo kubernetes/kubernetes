@@ -20,7 +20,9 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -58,7 +60,7 @@ func (t *SecretUpgradeTest) Setup(f *framework.Framework) {
 	ginkgo.By("Creating a secret")
 	var err error
 	if t.secret, err = f.ClientSet.CoreV1().Secrets(ns.Name).Create(context.TODO(), t.secret, metav1.CreateOptions{}); err != nil {
-		framework.Failf("unable to create test secret %s: %v", t.secret.Name, err)
+		e2eutils.Failf("unable to create test secret %s: %v", t.secret.Name, err)
 	}
 
 	ginkgo.By("Making sure the secret is consumable")

@@ -23,6 +23,9 @@ import (
 	"strings"
 	"time"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -76,7 +79,7 @@ var _ = common.SIGDescribe("CVE-2021-29923", func() {
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	ginkgo.BeforeEach(func() {
-		if framework.TestContext.ClusterIsIPv6() {
+		if e2econfig.TestContext.ClusterIsIPv6() {
 			e2eskipper.Skipf("The test doesn't apply to IPv6 addresses, only IPv4 addresses are affected by CVE-2021-29923")
 		}
 		ns = f.Namespace.Name
@@ -108,18 +111,18 @@ var _ = common.SIGDescribe("CVE-2021-29923", func() {
 				{Port: int32(servicePort), Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt(9376)},
 			}
 		})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		err = jig.CreateServicePods(1)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		execPod := e2epod.CreateExecPodOrFail(cs, ns, "execpod", nil)
 		ip := netutils.ParseIPSloppy(clusterIPZero)
 		cmd := fmt.Sprintf("echo hostName | nc -v -t -w 2 %s %v", ip.String(), servicePort)
 		err = wait.PollImmediate(1*time.Second, e2eservice.ServiceReachabilityShortPollTimeout, func() (bool, error) {
-			stdout, err := framework.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
+			stdout, err := e2eutils.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
 			if err != nil {
-				framework.Logf("Service reachability failing with error: %v\nRetrying...", err)
+				e2eutils.Logf("Service reachability failing with error: %v\nRetrying...", err)
 				return false, nil
 			}
 			trimmed := strings.TrimSpace(stdout)
@@ -136,9 +139,9 @@ var _ = common.SIGDescribe("CVE-2021-29923", func() {
 		// We have to check that the Service is not reachable in the address interpreted as decimal.
 		cmd = fmt.Sprintf("echo hostName | nc -v -t -w 2 %s %v", clusterIPOctal, servicePort)
 		err = wait.PollImmediate(1*time.Second, e2eservice.ServiceReachabilityShortPollTimeout, func() (bool, error) {
-			stdout, err := framework.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
+			stdout, err := e2eutils.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
 			if err != nil {
-				framework.Logf("Service reachability failing with error: %v\nRetrying...", err)
+				e2eutils.Logf("Service reachability failing with error: %v\nRetrying...", err)
 				return false, nil
 			}
 			trimmed := strings.TrimSpace(stdout)
@@ -149,9 +152,9 @@ var _ = common.SIGDescribe("CVE-2021-29923", func() {
 		})
 		// Ouch, Service has worked on IP interpreted as octal.
 		if err == nil {
-			framework.Failf("WARNING: Your Cluster interprets Service ClusterIP %s as %s, please see https://nvd.nist.gov/vuln/detail/CVE-2021-29923", clusterIPZero, clusterIPOctal)
+			e2eutils.Failf("WARNING: Your Cluster interprets Service ClusterIP %s as %s, please see https://nvd.nist.gov/vuln/detail/CVE-2021-29923", clusterIPZero, clusterIPOctal)
 		}
-		framework.Logf("Service reachability failing for Service against ClusterIP %s and %s, most probably leading zeros on IPs are not supported by the cluster proxy", clusterIPZero, clusterIPOctal)
+		e2eutils.Logf("Service reachability failing for Service against ClusterIP %s and %s, most probably leading zeros on IPs are not supported by the cluster proxy", clusterIPZero, clusterIPOctal)
 	})
 
 })
@@ -164,7 +167,7 @@ func getServiceIPWithLeadingZeros(cs clientset.Interface) (string, string) {
 	var clusterIPPrefix string
 	// Dump all the IPs and look for the ones we want.
 	list, err := cs.CoreV1().Services(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	for _, svc := range list.Items {
 		if len(svc.Spec.ClusterIP) == 0 || svc.Spec.ClusterIP == v1.ClusterIPNone {
 			continue

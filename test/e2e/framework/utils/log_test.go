@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package framework_test
+package utils
 
 import (
 	"errors"
@@ -27,8 +27,6 @@ import (
 	"github.com/onsi/ginkgo/config"
 	"github.com/onsi/ginkgo/reporters"
 	"github.com/onsi/gomega"
-
-	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 // The line number of the following code is checked in TestFailureOutput below.
@@ -49,26 +47,26 @@ func runTests(t *testing.T, reporter ginkgo.Reporter) {
 
 var _ = ginkgo.Describe("log", func() {
 	ginkgo.BeforeEach(func() {
-		framework.Logf("before")
+		Logf("before")
 	})
 	ginkgo.It("fails", func() {
 		func() {
-			framework.Failf("I'm failing.")
+			Failf("I'm failing.")
 		}()
 	})
 	ginkgo.It("asserts", func() {
-		framework.ExpectEqual(false, true, "false is never true")
+		ExpectEqual(false, true, "false is never true")
 	})
 	ginkgo.It("error", func() {
 		err := errors.New("an error with a long, useless description")
-		framework.ExpectNoError(err, "hard-coded error")
+		ExpectNoError(err, "hard-coded error")
 	})
 	ginkgo.It("equal", func() {
-		framework.ExpectEqual(0, 1, "of course it's not equal...")
+		ExpectEqual(0, 1, "of course it's not equal...")
 	})
 	ginkgo.AfterEach(func() {
-		framework.Logf("after")
-		framework.ExpectEqual(true, false, "true is never false either")
+		Logf("after")
+		ExpectEqual(true, false, "true is never false either")
 	})
 })
 
@@ -77,7 +75,7 @@ func TestFailureOutput(t *testing.T) {
 	// reporter in adddition to the default one. To see what the full
 	// Ginkgo report looks like, run this test with "go test -v".
 	config.DefaultReporterConfig.FullTrace = true
-	gomega.RegisterFailHandler(framework.Fail)
+	gomega.RegisterFailHandler(Fail)
 	fakeT := &testing.T{}
 	reporter := reporters.NewFakeReporter()
 	runTests(fakeT, reporter)
@@ -116,16 +114,16 @@ func TestFailureOutput(t *testing.T) {
 		},
 	}
 	// Compare individual fields. Comparing the slices leads to unreadable error output when there is any mismatch.
-	framework.ExpectEqual(len(actual), len(expected), "%d entries in %v", len(expected), actual)
+	ExpectEqual(len(actual), len(expected), "%d entries in %v", len(expected), actual)
 	for i, a := range actual {
 		b := expected[i]
-		framework.ExpectEqual(a.name, b.name, "name in %d", i)
-		framework.ExpectEqual(a.output, b.output, "output in %d", i)
-		framework.ExpectEqual(a.failure, b.failure, "failure in %d", i)
+		ExpectEqual(a.name, b.name, "name in %d", i)
+		ExpectEqual(a.output, b.output, "output in %d", i)
+		ExpectEqual(a.failure, b.failure, "failure in %d", i)
 		// There may be additional stack entries from the "testing" package at the
 		// end. We ignore those in the comparison because the line number in them
 		// varies.
-		framework.ExpectEqual(a.stack, b.stack, "stack in %d: %s", i, a.stack)
+		ExpectEqual(a.stack, b.stack, "stack in %d: %s", i, a.stack)
 	}
 }
 

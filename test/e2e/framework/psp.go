@@ -36,6 +36,7 @@ import (
 
 	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
 	e2eauth "k8s.io/kubernetes/test/e2e/framework/auth"
+	"k8s.io/kubernetes/test/e2e/framework/utils"
 )
 
 const (
@@ -93,14 +94,14 @@ func IsPodSecurityPolicyEnabled(kubeClient clientset.Interface) bool {
 	isPSPEnabledOnce.Do(func() {
 		psps, err := kubeClient.PolicyV1beta1().PodSecurityPolicies().List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
-			Logf("Error listing PodSecurityPolicies; assuming PodSecurityPolicy is disabled: %v", err)
+			utils.Logf("Error listing PodSecurityPolicies; assuming PodSecurityPolicy is disabled: %v", err)
 			return
 		}
 		if psps == nil || len(psps.Items) == 0 {
-			Logf("No PodSecurityPolicies found; assuming PodSecurityPolicy is disabled.")
+			utils.Logf("No PodSecurityPolicies found; assuming PodSecurityPolicy is disabled.")
 			return
 		}
-		Logf("Found PodSecurityPolicies; testing pod creation to see if PodSecurityPolicy is enabled")
+		utils.Logf("Found PodSecurityPolicies; testing pod creation to see if PodSecurityPolicy is enabled")
 		testPod := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{GenerateName: "psp-test-pod-"},
 			Spec:       v1.PodSpec{Containers: []v1.Container{{Name: "test", Image: imageutils.GetPauseImageName()}}},
@@ -108,19 +109,19 @@ func IsPodSecurityPolicyEnabled(kubeClient clientset.Interface) bool {
 		dryRunPod, err := kubeClient.CoreV1().Pods("kube-system").Create(context.TODO(), testPod, metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
 		if err != nil {
 			if strings.Contains(err.Error(), "PodSecurityPolicy") {
-				Logf("PodSecurityPolicy error creating dryrun pod; assuming PodSecurityPolicy is enabled: %v", err)
+				utils.Logf("PodSecurityPolicy error creating dryrun pod; assuming PodSecurityPolicy is enabled: %v", err)
 				isPSPEnabled = true
 			} else {
-				Logf("Error creating dryrun pod; assuming PodSecurityPolicy is disabled: %v", err)
+				utils.Logf("Error creating dryrun pod; assuming PodSecurityPolicy is disabled: %v", err)
 			}
 			return
 		}
 		pspAnnotation, pspAnnotationExists := dryRunPod.Annotations["kubernetes.io/psp"]
 		if !pspAnnotationExists {
-			Logf("No PSP annotation exists on dry run pod; assuming PodSecurityPolicy is disabled")
+			utils.Logf("No PSP annotation exists on dry run pod; assuming PodSecurityPolicy is disabled")
 			return
 		}
-		Logf("PSP annotation exists on dry run pod: %q; assuming PodSecurityPolicy is enabled", pspAnnotation)
+		utils.Logf("PSP annotation exists on dry run pod: %q; assuming PodSecurityPolicy is enabled", pspAnnotation)
 		isPSPEnabled = true
 	})
 	return isPSPEnabled
@@ -140,14 +141,14 @@ func CreatePrivilegedPSPBinding(kubeClient clientset.Interface, namespace string
 		_, err := kubeClient.PolicyV1beta1().PodSecurityPolicies().Get(context.TODO(), podSecurityPolicyPrivileged, metav1.GetOptions{})
 		if !apierrors.IsNotFound(err) {
 			// Privileged PSP was already created.
-			ExpectNoError(err, "Failed to get PodSecurityPolicy %s", podSecurityPolicyPrivileged)
+			utils.ExpectNoError(err, "Failed to get PodSecurityPolicy %s", podSecurityPolicyPrivileged)
 			return
 		}
 
 		psp := privilegedPSP(podSecurityPolicyPrivileged)
 		_, err = kubeClient.PolicyV1beta1().PodSecurityPolicies().Create(context.TODO(), psp, metav1.CreateOptions{})
 		if !apierrors.IsAlreadyExists(err) {
-			ExpectNoError(err, "Failed to create PSP %s", podSecurityPolicyPrivileged)
+			utils.ExpectNoError(err, "Failed to create PSP %s", podSecurityPolicyPrivileged)
 		}
 
 		if e2eauth.IsRBACEnabled(kubeClient.RbacV1()) {
@@ -162,7 +163,7 @@ func CreatePrivilegedPSPBinding(kubeClient clientset.Interface, namespace string
 				}},
 			}, metav1.CreateOptions{})
 			if !apierrors.IsAlreadyExists(err) {
-				ExpectNoError(err, "Failed to create PSP role")
+				utils.ExpectNoError(err, "Failed to create PSP role")
 			}
 		}
 	})
@@ -184,8 +185,8 @@ func CreatePrivilegedPSPBinding(kubeClient clientset.Interface, namespace string
 				Name:     "system:serviceaccounts:" + namespace,
 			},
 		)
-		ExpectNoError(err)
-		ExpectNoError(e2eauth.WaitForNamedAuthorizationUpdate(kubeClient.AuthorizationV1(),
+		utils.ExpectNoError(err)
+		utils.ExpectNoError(e2eauth.WaitForNamedAuthorizationUpdate(kubeClient.AuthorizationV1(),
 			serviceaccount.MakeUsername(namespace, "default"), namespace, "use", podSecurityPolicyPrivileged,
 			schema.GroupResource{Group: "extensions", Resource: "podsecuritypolicies"}, true))
 	}

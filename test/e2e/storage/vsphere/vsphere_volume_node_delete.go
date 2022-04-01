@@ -19,6 +19,9 @@ package vsphere
 import (
 	"context"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	"github.com/vmware/govmomi/object"
@@ -44,16 +47,16 @@ var _ = utils.SIGDescribe("Node Unregister [Feature:vsphere] [Slow] [Disruptive]
 		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
-		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(client, framework.TestContext.NodeSchedulableTimeout))
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(e2eutils.WaitForAllNodesSchedulable(client, e2econfig.TestContext.NodeSchedulableTimeout))
+		e2eutils.ExpectNoError(err)
 		workingDir = GetAndExpectStringEnvVar("VSPHERE_WORKING_DIR")
 	})
 
 	ginkgo.It("node unregister", func() {
 		ginkgo.By("Get total Ready nodes")
 		nodeList, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(nodeList.Items) > 1, true, "At least 2 nodes are required for this test")
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectEqual(len(nodeList.Items) > 1, true, "At least 2 nodes are required for this test")
 
 		totalNodesCount := len(nodeList.Items)
 		nodeVM := nodeList.Items[0]
@@ -69,10 +72,10 @@ var _ = utils.SIGDescribe("Node Unregister [Feature:vsphere] [Slow] [Disruptive]
 		defer cancel()
 
 		vmHost, err := vmObject.HostSystem(ctx)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		vmPool, err := vmObject.ResourcePool(ctx)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		// Unregister Node VM
 		ginkgo.By("Unregister a node VM")
@@ -80,10 +83,10 @@ var _ = utils.SIGDescribe("Node Unregister [Feature:vsphere] [Slow] [Disruptive]
 
 		// Ready nodes should be 1 less
 		ginkgo.By("Verifying the ready node counts")
-		framework.ExpectEqual(verifyReadyNodeCount(f.ClientSet, totalNodesCount-1), true, "Unable to verify expected ready node count")
+		e2eutils.ExpectEqual(verifyReadyNodeCount(f.ClientSet, totalNodesCount-1), true, "Unable to verify expected ready node count")
 
 		nodeList, err = e2enode.GetReadySchedulableNodes(client)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		var nodeNameList []string
 		for _, node := range nodeList.Items {
@@ -97,10 +100,10 @@ var _ = utils.SIGDescribe("Node Unregister [Feature:vsphere] [Slow] [Disruptive]
 
 		// Ready nodes should be equal to earlier count
 		ginkgo.By("Verifying the ready node counts")
-		framework.ExpectEqual(verifyReadyNodeCount(f.ClientSet, totalNodesCount), true, "Unable to verify expected ready node count")
+		e2eutils.ExpectEqual(verifyReadyNodeCount(f.ClientSet, totalNodesCount), true, "Unable to verify expected ready node count")
 
 		nodeList, err = e2enode.GetReadySchedulableNodes(client)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		nodeNameList = nodeNameList[:0]
 		for _, node := range nodeList.Items {

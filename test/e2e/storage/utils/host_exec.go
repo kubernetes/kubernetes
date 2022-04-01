@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/exec"
@@ -39,10 +41,10 @@ type Result struct {
 // LogResult records result log
 func LogResult(result Result) {
 	remote := result.Host
-	framework.Logf("exec %s: command:   %s", remote, result.Cmd)
-	framework.Logf("exec %s: stdout:    %q", remote, result.Stdout)
-	framework.Logf("exec %s: stderr:    %q", remote, result.Stderr)
-	framework.Logf("exec %s: exit code: %d", remote, result.Code)
+	e2eutils.Logf("exec %s: command:   %s", remote, result.Cmd)
+	e2eutils.Logf("exec %s: stdout:    %q", remote, result.Stdout)
+	e2eutils.Logf("exec %s: stderr:    %q", remote, result.Stderr)
+	e2eutils.Logf("exec %s: exit code: %d", remote, result.Code)
 }
 
 // HostExec represents interface we require to execute commands on remote host.
@@ -105,9 +107,9 @@ func (h *hostExecutor) launchNodeExecPod(node string) *v1.Pod {
 		}(true),
 	}
 	pod, err := cs.CoreV1().Pods(ns.Name).Create(context.TODO(), hostExecPod, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	err = e2epod.WaitTimeoutForPodRunningInNamespace(cs, pod.Name, pod.Namespace, f.Timeouts.PodStart)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	return pod
 }
 
@@ -149,7 +151,7 @@ func (h *hostExecutor) exec(cmd string, node *v1.Node) (Result, error) {
 	}
 	containerName := pod.Spec.Containers[0].Name
 	var err error
-	result.Stdout, result.Stderr, err = h.Framework.ExecWithOptions(framework.ExecOptions{
+	result.Stdout, result.Stderr, err = e2eutils.ExecWithOptions(h.Framework.ClientSet, e2eutils.ExecOptions{
 		Command:            args,
 		Namespace:          pod.Namespace,
 		PodName:            pod.Name,

@@ -20,6 +20,8 @@ import (
 	"context"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -93,7 +95,7 @@ var _ = SIGDescribe("[Feature:GPUDevicePlugin] Device Plugin", func() {
 
 		sysNs := "kube-system"
 		_, err := cs.AppsV1().DaemonSets(sysNs).Create(context.TODO(), ds, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		ginkgo.By("creating Windows testing Pod")
 		windowsPod := createTestPod(f, imageutils.GetE2EImage(imageutils.WindowsServer), windowsOS)
@@ -102,10 +104,10 @@ var _ = SIGDescribe("[Feature:GPUDevicePlugin] Device Plugin", func() {
 			"microsoft.com/directx": resource.MustParse("1"),
 		}
 		windowsPod, err = cs.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), windowsPod, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		ginkgo.By("Waiting for the pod Running")
-		err = e2epod.WaitTimeoutForPodRunningInNamespace(cs, windowsPod.Name, f.Namespace.Name, testSlowMultiplier*framework.PodStartTimeout)
-		framework.ExpectNoError(err)
+		err = e2epod.WaitTimeoutForPodRunningInNamespace(cs, windowsPod.Name, f.Namespace.Name, testSlowMultiplier*e2eutils.PodStartTimeout)
+		e2eutils.ExpectNoError(err)
 
 		ginkgo.By("verifying device access in Windows testing Pod")
 		dxdiagCommand := []string{"cmd.exe", "/c", "dxdiag", "/t", "dxdiag_output.txt", "&", "type", "dxdiag_output.txt"}
@@ -113,20 +115,20 @@ var _ = SIGDescribe("[Feature:GPUDevicePlugin] Device Plugin", func() {
 		//based on  the windows version running the test.
 		dxdiagDirectxVersion := "DirectX Version: DirectX 12"
 		defaultNs := f.Namespace.Name
-		_, dxdiagDirectxVersionErr := framework.LookForStringInPodExec(defaultNs, windowsPod.Name, dxdiagCommand, dxdiagDirectxVersion, time.Minute)
-		framework.ExpectNoError(dxdiagDirectxVersionErr, "failed: didn't find directX version dxdiag output.")
+		_, dxdiagDirectxVersionErr := e2eutils.LookForStringInPodExec(defaultNs, windowsPod.Name, dxdiagCommand, dxdiagDirectxVersion, time.Minute)
+		e2eutils.ExpectNoError(dxdiagDirectxVersionErr, "failed: didn't find directX version dxdiag output.")
 
 		dxdiagDdiVersion := "DDI Version: 12"
-		_, dxdiagDdiVersionErr := framework.LookForStringInPodExec(defaultNs, windowsPod.Name, dxdiagCommand, dxdiagDdiVersion, time.Minute)
-		framework.ExpectNoError(dxdiagDdiVersionErr, "failed: didn't find DDI version in dxdiag output.")
+		_, dxdiagDdiVersionErr := e2eutils.LookForStringInPodExec(defaultNs, windowsPod.Name, dxdiagCommand, dxdiagDdiVersion, time.Minute)
+		e2eutils.ExpectNoError(dxdiagDdiVersionErr, "failed: didn't find DDI version in dxdiag output.")
 
 		dxdiagVendorID := "Vendor ID: 0x"
-		_, dxdiagVendorIDErr := framework.LookForStringInPodExec(defaultNs, windowsPod.Name, dxdiagCommand, dxdiagVendorID, time.Minute)
-		framework.ExpectNoError(dxdiagVendorIDErr, "failed: didn't find vendorID in dxdiag output.")
+		_, dxdiagVendorIDErr := e2eutils.LookForStringInPodExec(defaultNs, windowsPod.Name, dxdiagCommand, dxdiagVendorID, time.Minute)
+		e2eutils.ExpectNoError(dxdiagVendorIDErr, "failed: didn't find vendorID in dxdiag output.")
 
 		envVarCommand := []string{"cmd.exe", "/c", "set", "DIRECTX_GPU_Name"}
 		envVarDirectxGpuName := "DIRECTX_GPU_Name="
-		_, envVarDirectxGpuNameErr := framework.LookForStringInPodExec(defaultNs, windowsPod.Name, envVarCommand, envVarDirectxGpuName, time.Minute)
-		framework.ExpectNoError(envVarDirectxGpuNameErr, "failed: didn't find expected environment variable.")
+		_, envVarDirectxGpuNameErr := e2eutils.LookForStringInPodExec(defaultNs, windowsPod.Name, envVarCommand, envVarDirectxGpuName, time.Minute)
+		e2eutils.ExpectNoError(envVarDirectxGpuNameErr, "failed: didn't find expected environment variable.")
 	})
 })

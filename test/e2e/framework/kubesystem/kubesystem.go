@@ -22,22 +22,23 @@ import (
 	"strconv"
 	"time"
 
-	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/config"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 )
 
 // RestartControllerManager restarts the kube-controller-manager.
 func RestartControllerManager() error {
 	// TODO: Make it work for all providers and distros.
-	if !framework.ProviderIs("gce", "aws") {
-		return fmt.Errorf("unsupported provider for RestartControllerManager: %s", framework.TestContext.Provider)
+	if !e2eutils.ProviderIs("gce", "aws") {
+		return fmt.Errorf("unsupported provider for RestartControllerManager: %s", config.TestContext.Provider)
 	}
-	if framework.ProviderIs("gce") && !framework.MasterOSDistroIs("gci") {
-		return fmt.Errorf("unsupported master OS distro: %s", framework.TestContext.MasterOSDistro)
+	if e2eutils.ProviderIs("gce") && !e2eutils.MasterOSDistroIs("gci") {
+		return fmt.Errorf("unsupported master OS distro: %s", config.TestContext.MasterOSDistro)
 	}
 	cmd := "pidof kube-controller-manager | xargs sudo kill"
-	framework.Logf("Restarting controller-manager via ssh, running: %v", cmd)
-	result, err := e2essh.SSH(cmd, net.JoinHostPort(framework.APIAddress(), e2essh.SSHPort), framework.TestContext.Provider)
+	e2eutils.Logf("Restarting controller-manager via ssh, running: %v", cmd)
+	result, err := e2essh.SSH(cmd, net.JoinHostPort(e2eutils.APIAddress(), e2essh.SSHPort), config.TestContext.Provider)
 	if err != nil || result.Code != 0 {
 		e2essh.LogResult(result)
 		return fmt.Errorf("couldn't restart controller-manager: %v", err)
@@ -47,9 +48,9 @@ func RestartControllerManager() error {
 
 // WaitForControllerManagerUp waits for the kube-controller-manager to be up.
 func WaitForControllerManagerUp() error {
-	cmd := "curl -k https://localhost:" + strconv.Itoa(framework.KubeControllerManagerPort) + "/healthz"
+	cmd := "curl -k https://localhost:" + strconv.Itoa(config.KubeControllerManagerPort) + "/healthz"
 	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
-		result, err := e2essh.SSH(cmd, net.JoinHostPort(framework.APIAddress(), e2essh.SSHPort), framework.TestContext.Provider)
+		result, err := e2essh.SSH(cmd, net.JoinHostPort(e2eutils.APIAddress(), e2essh.SSHPort), config.TestContext.Provider)
 		if err != nil || result.Code != 0 {
 			e2essh.LogResult(result)
 		}

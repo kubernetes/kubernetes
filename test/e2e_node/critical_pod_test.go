@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -75,21 +77,21 @@ var _ = SIGDescribe("CriticalPod [Serial] [Disruptive] [NodeFeature:CriticalPod]
 
 			// Check that non-critical pods other than the besteffort have been evicted
 			updatedPodList, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			for _, p := range updatedPodList.Items {
 				if p.Name == nonCriticalBestEffort.Name {
-					framework.ExpectEqual(p.Status.Phase, v1.PodRunning, fmt.Sprintf("pod: %v should not be preempted with status: %#v", p.Name, p.Status))
+					e2eutils.ExpectEqual(p.Status.Phase, v1.PodRunning, fmt.Sprintf("pod: %v should not be preempted with status: %#v", p.Name, p.Status))
 				} else {
-					framework.ExpectEqual(p.Status.Phase, v1.PodFailed, fmt.Sprintf("pod: %v should be preempted with status: %#v", p.Name, p.Status))
+					e2eutils.ExpectEqual(p.Status.Phase, v1.PodFailed, fmt.Sprintf("pod: %v should be preempted with status: %#v", p.Name, p.Status))
 				}
 			}
 		})
 		ginkgo.AfterEach(func() {
 			// Delete Pods
-			f.PodClient().DeleteSync(guaranteedPodName, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
-			f.PodClient().DeleteSync(burstablePodName, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
-			f.PodClient().DeleteSync(bestEffortPodName, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
-			f.PodClientNS(kubeapi.NamespaceSystem).DeleteSync(criticalPodName, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+			f.PodClient().DeleteSync(guaranteedPodName, metav1.DeleteOptions{}, e2eutils.DefaultPodDeletionTimeout)
+			f.PodClient().DeleteSync(burstablePodName, metav1.DeleteOptions{}, e2eutils.DefaultPodDeletionTimeout)
+			f.PodClient().DeleteSync(bestEffortPodName, metav1.DeleteOptions{}, e2eutils.DefaultPodDeletionTimeout)
+			f.PodClientNS(kubeapi.NamespaceSystem).DeleteSync(criticalPodName, metav1.DeleteOptions{}, e2eutils.DefaultPodDeletionTimeout)
 			// Log Events
 			logPodEvents(f)
 			logNodeEvents(f)
@@ -100,9 +102,9 @@ var _ = SIGDescribe("CriticalPod [Serial] [Disruptive] [NodeFeature:CriticalPod]
 
 func getNodeCPUAndMemoryCapacity(f *framework.Framework) v1.ResourceList {
 	nodeList, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	// Assuming that there is only one node, because this is a node e2e test.
-	framework.ExpectEqual(len(nodeList.Items), 1)
+	e2eutils.ExpectEqual(len(nodeList.Items), 1)
 	capacity := nodeList.Items[0].Status.Allocatable
 	return v1.ResourceList{
 		v1.ResourceCPU:    capacity[v1.ResourceCPU],
@@ -112,9 +114,9 @@ func getNodeCPUAndMemoryCapacity(f *framework.Framework) v1.ResourceList {
 
 func getNodeName(f *framework.Framework) string {
 	nodeList, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	// Assuming that there is only one node, because this is a node e2e test.
-	framework.ExpectEqual(len(nodeList.Items), 1)
+	e2eutils.ExpectEqual(len(nodeList.Items), 1)
 	return nodeList.Items[0].GetName()
 }
 
@@ -143,9 +145,9 @@ func getTestPod(critical bool, name string, resources v1.ResourceRequirements, n
 		}
 		pod.Spec.PriorityClassName = scheduling.SystemNodeCritical
 
-		framework.ExpectEqual(kubelettypes.IsCriticalPod(pod), true, "pod should be a critical pod")
+		e2eutils.ExpectEqual(kubelettypes.IsCriticalPod(pod), true, "pod should be a critical pod")
 	} else {
-		framework.ExpectEqual(kubelettypes.IsCriticalPod(pod), false, "pod should not be a critical pod")
+		e2eutils.ExpectEqual(kubelettypes.IsCriticalPod(pod), false, "pod should not be a critical pod")
 	}
 	return pod
 }

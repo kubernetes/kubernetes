@@ -21,6 +21,8 @@ import (
 	"encoding/json"
 	"fmt"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -47,7 +49,7 @@ var _ = SIGDescribe("ConfigMap", func() {
 		ginkgo.By(fmt.Sprintf("Creating configMap %v/%v", f.Namespace.Name, configMap.Name))
 		var err error
 		if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), configMap, metav1.CreateOptions{}); err != nil {
-			framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
+			e2eutils.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 		}
 
 		pod := &v1.Pod{
@@ -95,7 +97,7 @@ var _ = SIGDescribe("ConfigMap", func() {
 		ginkgo.By(fmt.Sprintf("Creating configMap %v/%v", f.Namespace.Name, configMap.Name))
 		var err error
 		if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), configMap, metav1.CreateOptions{}); err != nil {
-			framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
+			e2eutils.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 		}
 
 		pod := &v1.Pod{
@@ -136,7 +138,7 @@ var _ = SIGDescribe("ConfigMap", func() {
 	*/
 	framework.ConformanceIt("should fail to create ConfigMap with empty key", func() {
 		configMap, err := newConfigMapWithEmptyKey(f)
-		framework.ExpectError(err, "created configMap %q with empty key in namespace %q", configMap.Name, f.Namespace.Name)
+		e2eutils.ExpectError(err, "created configMap %q with empty key in namespace %q", configMap.Name, f.Namespace.Name)
 	})
 
 	ginkgo.It("should update ConfigMap successfully", func() {
@@ -144,19 +146,19 @@ var _ = SIGDescribe("ConfigMap", func() {
 		configMap := newConfigMap(f, name)
 		ginkgo.By(fmt.Sprintf("Creating ConfigMap %v/%v", f.Namespace.Name, configMap.Name))
 		_, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), configMap, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create ConfigMap")
+		e2eutils.ExpectNoError(err, "failed to create ConfigMap")
 
 		configMap.Data = map[string]string{
 			"data": "value",
 		}
 		ginkgo.By(fmt.Sprintf("Updating configMap %v/%v", f.Namespace.Name, configMap.Name))
 		_, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Update(context.TODO(), configMap, metav1.UpdateOptions{})
-		framework.ExpectNoError(err, "failed to update ConfigMap")
+		e2eutils.ExpectNoError(err, "failed to update ConfigMap")
 
 		configMapFromUpdate, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Get(context.TODO(), name, metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to get ConfigMap")
+		e2eutils.ExpectNoError(err, "failed to get ConfigMap")
 		ginkgo.By(fmt.Sprintf("Verifying update of ConfigMap %v/%v", f.Namespace.Name, configMap.Name))
-		framework.ExpectEqual(configMapFromUpdate.Data, configMap.Data)
+		e2eutils.ExpectEqual(configMapFromUpdate.Data, configMap.Data)
 	})
 
 	/*
@@ -183,13 +185,13 @@ var _ = SIGDescribe("ConfigMap", func() {
 
 		ginkgo.By("creating a ConfigMap")
 		_, err := f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).Create(context.TODO(), &testConfigMap, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create ConfigMap")
+		e2eutils.ExpectNoError(err, "failed to create ConfigMap")
 
 		ginkgo.By("fetching the ConfigMap")
 		configMap, err := f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).Get(context.TODO(), testConfigMapName, metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to get ConfigMap")
-		framework.ExpectEqual(configMap.Data["valueName"], testConfigMap.Data["valueName"])
-		framework.ExpectEqual(configMap.Labels["test-configmap-static"], testConfigMap.Labels["test-configmap-static"])
+		e2eutils.ExpectNoError(err, "failed to get ConfigMap")
+		e2eutils.ExpectEqual(configMap.Data["valueName"], testConfigMap.Data["valueName"])
+		e2eutils.ExpectEqual(configMap.Labels["test-configmap-static"], testConfigMap.Labels["test-configmap-static"])
 
 		configMapPatchPayload, err := json.Marshal(v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
@@ -201,17 +203,17 @@ var _ = SIGDescribe("ConfigMap", func() {
 				"valueName": "value1",
 			},
 		})
-		framework.ExpectNoError(err, "failed to marshal patch data")
+		e2eutils.ExpectNoError(err, "failed to marshal patch data")
 
 		ginkgo.By("patching the ConfigMap")
 		_, err = f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).Patch(context.TODO(), testConfigMapName, types.StrategicMergePatchType, []byte(configMapPatchPayload), metav1.PatchOptions{})
-		framework.ExpectNoError(err, "failed to patch ConfigMap")
+		e2eutils.ExpectNoError(err, "failed to patch ConfigMap")
 
 		ginkgo.By("listing all ConfigMaps in all namespaces with a label selector")
 		configMapList, err := f.ClientSet.CoreV1().ConfigMaps("").List(context.TODO(), metav1.ListOptions{
 			LabelSelector: "test-configmap=patched",
 		})
-		framework.ExpectNoError(err, "failed to list ConfigMaps with LabelSelector")
+		e2eutils.ExpectNoError(err, "failed to list ConfigMaps with LabelSelector")
 		testConfigMapFound := false
 		for _, cm := range configMapList.Items {
 			if cm.ObjectMeta.Name == testConfigMap.ObjectMeta.Name &&
@@ -223,20 +225,20 @@ var _ = SIGDescribe("ConfigMap", func() {
 				break
 			}
 		}
-		framework.ExpectEqual(testConfigMapFound, true, "failed to find ConfigMap by label selector")
+		e2eutils.ExpectEqual(testConfigMapFound, true, "failed to find ConfigMap by label selector")
 
 		ginkgo.By("deleting the ConfigMap by collection with a label selector")
 		err = f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{
 			LabelSelector: "test-configmap-static=true",
 		})
-		framework.ExpectNoError(err, "failed to delete ConfigMap collection with LabelSelector")
+		e2eutils.ExpectNoError(err, "failed to delete ConfigMap collection with LabelSelector")
 
 		ginkgo.By("listing all ConfigMaps in test namespace")
 		configMapList, err = f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).List(context.TODO(), metav1.ListOptions{
 			LabelSelector: "test-configmap-static=true",
 		})
-		framework.ExpectNoError(err, "failed to list ConfigMap by LabelSelector")
-		framework.ExpectEqual(len(configMapList.Items), 0, "ConfigMap is still present after being deleted by collection")
+		e2eutils.ExpectNoError(err, "failed to list ConfigMap by LabelSelector")
+		e2eutils.ExpectEqual(len(configMapList.Items), 0, "ConfigMap is still present after being deleted by collection")
 	})
 })
 

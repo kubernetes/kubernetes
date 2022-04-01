@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package framework
+package config
 
 // NOTE: constants in this file are copied from pkg/cluster/ports/ports.go
 

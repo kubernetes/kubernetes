@@ -20,6 +20,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 	"path"
 	"regexp"
 	"strings"
@@ -58,8 +60,8 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			ginkgo.By("ensuring no secret-based service account token exists")
 			time.Sleep(10 * time.Second)
 			sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Get(context.TODO(), "default", metav1.GetOptions{})
-			framework.ExpectNoError(err)
-			framework.ExpectEmpty(sa.Secrets)
+			e2eutils.ExpectNoError(err)
+			e2eutils.ExpectEmpty(sa.Secrets)
 		}
 	})
 
@@ -74,7 +76,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 	*/
 	framework.ConformanceIt("should mount an API token into pods ", func() {
 		sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Create(context.TODO(), &v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "mount-test"}}, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		zero := int64(0)
 		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), &v1.Pod{
@@ -92,34 +94,34 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 				RestartPolicy:                 v1.RestartPolicyNever,
 			},
 		}, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
-		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(f.ClientSet, pod))
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectNoError(e2epod.WaitForPodRunningInNamespace(f.ClientSet, pod))
 
-		tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, f.Namespace.Name)
+		tk := e2ekubectl.NewTestKubeconfig(e2econfig.TestContext.CertDir, e2econfig.TestContext.Host, e2econfig.TestContext.KubeConfig, e2econfig.TestContext.KubeContext, e2econfig.TestContext.KubectlPath, f.Namespace.Name)
 		mountedToken, err := tk.ReadFileViaContainer(pod.Name, pod.Spec.Containers[0].Name, path.Join(serviceaccount.DefaultAPITokenMountPath, v1.ServiceAccountTokenKey))
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		mountedCA, err := tk.ReadFileViaContainer(pod.Name, pod.Spec.Containers[0].Name, path.Join(serviceaccount.DefaultAPITokenMountPath, v1.ServiceAccountRootCAKey))
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		mountedNamespace, err := tk.ReadFileViaContainer(pod.Name, pod.Spec.Containers[0].Name, path.Join(serviceaccount.DefaultAPITokenMountPath, v1.ServiceAccountNamespaceKey))
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		// CA and namespace should be identical
 		rootCA, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Get(context.TODO(), rootCAConfigMapName, metav1.GetOptions{})
-		framework.ExpectNoError(err)
-		framework.Logf("Got root ca configmap in namespace %q", f.Namespace.Name)
-		framework.ExpectEqual(mountedCA, rootCA.Data["ca.crt"])
-		framework.ExpectEqual(mountedNamespace, f.Namespace.Name)
+		e2eutils.ExpectNoError(err)
+		e2eutils.Logf("Got root ca configmap in namespace %q", f.Namespace.Name)
+		e2eutils.ExpectEqual(mountedCA, rootCA.Data["ca.crt"])
+		e2eutils.ExpectEqual(mountedNamespace, f.Namespace.Name)
 		// Token should be a valid credential that identifies the pod's service account
 		tokenReview := &authenticationv1.TokenReview{Spec: authenticationv1.TokenReviewSpec{Token: mountedToken}}
 		tokenReview, err = f.ClientSet.AuthenticationV1().TokenReviews().Create(context.TODO(), tokenReview, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(tokenReview.Status.Authenticated, true)
-		framework.ExpectEqual(tokenReview.Status.Error, "")
-		framework.ExpectEqual(tokenReview.Status.User.Username, "system:serviceaccount:"+f.Namespace.Name+":"+sa.Name)
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectEqual(tokenReview.Status.Authenticated, true)
+		e2eutils.ExpectEqual(tokenReview.Status.Error, "")
+		e2eutils.ExpectEqual(tokenReview.Status.User.Username, "system:serviceaccount:"+f.Namespace.Name+":"+sa.Name)
 		groups := sets.NewString(tokenReview.Status.User.Groups...)
-		framework.ExpectEqual(groups.Has("system:authenticated"), true, fmt.Sprintf("expected system:authenticated group, had %v", groups.List()))
-		framework.ExpectEqual(groups.Has("system:serviceaccounts"), true, fmt.Sprintf("expected system:serviceaccounts group, had %v", groups.List()))
-		framework.ExpectEqual(groups.Has("system:serviceaccounts:"+f.Namespace.Name), true, fmt.Sprintf("expected system:serviceaccounts:"+f.Namespace.Name+" group, had %v", groups.List()))
+		e2eutils.ExpectEqual(groups.Has("system:authenticated"), true, fmt.Sprintf("expected system:authenticated group, had %v", groups.List()))
+		e2eutils.ExpectEqual(groups.Has("system:serviceaccounts"), true, fmt.Sprintf("expected system:serviceaccounts group, had %v", groups.List()))
+		e2eutils.ExpectEqual(groups.Has("system:serviceaccounts:"+f.Namespace.Name), true, fmt.Sprintf("expected system:serviceaccounts:"+f.Namespace.Name+" group, had %v", groups.List()))
 	})
 
 	/*
@@ -155,9 +157,9 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		mountSA := &v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "mount"}, AutomountServiceAccountToken: &trueValue}
 		nomountSA := &v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "nomount"}, AutomountServiceAccountToken: &falseValue}
 		mountSA, err = f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Create(context.TODO(), mountSA, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		nomountSA, err = f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Create(context.TODO(), nomountSA, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		testcases := []struct {
 			PodName            string
@@ -236,8 +238,8 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 				},
 			}
 			createdPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
-			framework.Logf("created pod %s", tc.PodName)
+			e2eutils.ExpectNoError(err)
+			e2eutils.Logf("created pod %s", tc.PodName)
 
 			hasServiceAccountTokenVolume := false
 			for _, c := range createdPod.Spec.Containers {
@@ -249,9 +251,9 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			}
 
 			if hasServiceAccountTokenVolume != tc.ExpectTokenVolume {
-				framework.Failf("%s: expected volume=%v, got %v (%#v)", tc.PodName, tc.ExpectTokenVolume, hasServiceAccountTokenVolume, createdPod)
+				e2eutils.Failf("%s: expected volume=%v, got %v (%#v)", tc.PodName, tc.ExpectTokenVolume, hasServiceAccountTokenVolume, createdPod)
 			} else {
-				framework.Logf("pod %s service account token volume mount: %v", tc.PodName, hasServiceAccountTokenVolume)
+				e2eutils.Logf("pod %s service account token volume mount: %v", tc.PodName, hasServiceAccountTokenVolume)
 			}
 		}
 	})
@@ -479,21 +481,21 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			},
 		}
 		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
-		framework.Logf("created pod")
+		e2eutils.Logf("created pod")
 		if !e2epod.CheckPodsRunningReady(f.ClientSet, f.Namespace.Name, []string{pod.Name}, time.Minute) {
-			framework.Failf("pod %q in ns %q never became ready", pod.Name, f.Namespace.Name)
+			e2eutils.Failf("pod %q in ns %q never became ready", pod.Name, f.Namespace.Name)
 		}
 
-		framework.Logf("pod is ready")
+		e2eutils.Logf("pod is ready")
 
 		var logs string
 		if err := wait.Poll(1*time.Minute, 20*time.Minute, func() (done bool, err error) {
-			framework.Logf("polling logs")
+			e2eutils.Logf("polling logs")
 			logs, err = e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, "inclusterclient", "inclusterclient")
 			if err != nil {
-				framework.Logf("Error pulling logs: %v", err)
+				e2eutils.Logf("Error pulling logs: %v", err)
 				return false, nil
 			}
 			tokenCount, err := ParseInClusterClientLogs(logs)
@@ -501,12 +503,12 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 				return false, fmt.Errorf("inclusterclient reported an error: %v", err)
 			}
 			if tokenCount < 2 {
-				framework.Logf("Retrying. Still waiting to see more unique tokens: got=%d, want=2", tokenCount)
+				e2eutils.Logf("Retrying. Still waiting to see more unique tokens: got=%d, want=2", tokenCount)
 				return false, nil
 			}
 			return true, nil
 		}); err != nil {
-			framework.Failf("Unexpected error: %v\n%s", err, logs)
+			e2eutils.Failf("Unexpected error: %v\n%s", err, logs)
 		}
 	})
 
@@ -548,10 +550,10 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			},
 			metav1.CreateOptions{}); err != nil {
 			// Tolerate RBAC not being enabled
-			framework.Logf("error granting ClusterRoleBinding %s: %v", crbName, err)
+			e2eutils.Logf("error granting ClusterRoleBinding %s: %v", crbName, err)
 		} else {
 			defer func() {
-				framework.ExpectNoError(
+				e2eutils.ExpectNoError(
 					f.ClientSet.RbacV1().ClusterRoleBindings().Delete(
 						context.TODO(),
 						crb.Name, metav1.DeleteOptions{}))
@@ -602,29 +604,29 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			},
 		}
 		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
-		framework.Logf("created pod")
+		e2eutils.Logf("created pod")
 		podErr := e2epod.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
 
 		// Get the logs before calling ExpectNoError, so we can debug any errors.
 		var logs string
 		if err := wait.Poll(30*time.Second, 2*time.Minute, func() (done bool, err error) {
-			framework.Logf("polling logs")
+			e2eutils.Logf("polling logs")
 			logs, err = e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
 			if err != nil {
-				framework.Logf("Error pulling logs: %v", err)
+				e2eutils.Logf("Error pulling logs: %v", err)
 				return false, nil
 			}
 			return true, nil
 		}); err != nil {
-			framework.Failf("Unexpected error getting pod logs: %v\n%s", err, logs)
+			e2eutils.Failf("Unexpected error getting pod logs: %v\n%s", err, logs)
 		} else {
-			framework.Logf("Pod logs: \n%v", logs)
+			e2eutils.Logf("Pod logs: \n%v", logs)
 		}
 
-		framework.ExpectNoError(podErr)
-		framework.Logf("completed pod")
+		e2eutils.ExpectNoError(podErr)
+		e2eutils.Logf("completed pod")
 	})
 
 	/*
@@ -649,11 +651,11 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			},
 		}
 		createdServiceAccount, err := f.ClientSet.CoreV1().ServiceAccounts(testNamespaceName).Create(context.TODO(), &testServiceAccount, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create a ServiceAccount")
+		e2eutils.ExpectNoError(err, "failed to create a ServiceAccount")
 
 		getServiceAccount, err := f.ClientSet.CoreV1().ServiceAccounts(testNamespaceName).Get(context.TODO(), testServiceAccountName, metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to fetch the created ServiceAccount")
-		framework.ExpectEqual(createdServiceAccount.UID, getServiceAccount.UID)
+		e2eutils.ExpectNoError(err, "failed to fetch the created ServiceAccount")
+		e2eutils.ExpectEqual(createdServiceAccount.UID, getServiceAccount.UID)
 
 		ginkgo.By("watching for the ServiceAccount to be added")
 		resourceWatchTimeoutSeconds := int64(180)
@@ -671,16 +673,16 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 				break
 			}
 		}
-		framework.ExpectEqual(eventFound, true, "failed to find %v event", watch.Added)
+		e2eutils.ExpectEqual(eventFound, true, "failed to find %v event", watch.Added)
 
 		ginkgo.By("patching the ServiceAccount")
 		boolFalse := false
 		testServiceAccountPatchData, err := json.Marshal(v1.ServiceAccount{
 			AutomountServiceAccountToken: &boolFalse,
 		})
-		framework.ExpectNoError(err, "failed to marshal JSON patch for the ServiceAccount")
+		e2eutils.ExpectNoError(err, "failed to marshal JSON patch for the ServiceAccount")
 		_, err = f.ClientSet.CoreV1().ServiceAccounts(testNamespaceName).Patch(context.TODO(), testServiceAccountName, types.StrategicMergePatchType, []byte(testServiceAccountPatchData), metav1.PatchOptions{})
-		framework.ExpectNoError(err, "failed to patch the ServiceAccount")
+		e2eutils.ExpectNoError(err, "failed to patch the ServiceAccount")
 		eventFound = false
 		for watchEvent := range resourceWatchChan {
 			if watchEvent.Type == watch.Modified {
@@ -688,11 +690,11 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 				break
 			}
 		}
-		framework.ExpectEqual(eventFound, true, "failed to find %v event", watch.Modified)
+		e2eutils.ExpectEqual(eventFound, true, "failed to find %v event", watch.Modified)
 
 		ginkgo.By("finding ServiceAccount in list of all ServiceAccounts (by LabelSelector)")
 		serviceAccountList, err := f.ClientSet.CoreV1().ServiceAccounts("").List(context.TODO(), metav1.ListOptions{LabelSelector: testServiceAccountStaticLabelsFlat})
-		framework.ExpectNoError(err, "failed to list ServiceAccounts by LabelSelector")
+		e2eutils.ExpectNoError(err, "failed to list ServiceAccounts by LabelSelector")
 		foundServiceAccount := false
 		for _, serviceAccountItem := range serviceAccountList.Items {
 			if serviceAccountItem.ObjectMeta.Name == testServiceAccountName && serviceAccountItem.ObjectMeta.Namespace == testNamespaceName && *serviceAccountItem.AutomountServiceAccountToken == boolFalse {
@@ -700,11 +702,11 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 				break
 			}
 		}
-		framework.ExpectEqual(foundServiceAccount, true, "failed to find the created ServiceAccount")
+		e2eutils.ExpectEqual(foundServiceAccount, true, "failed to find the created ServiceAccount")
 
 		ginkgo.By("deleting the ServiceAccount")
 		err = f.ClientSet.CoreV1().ServiceAccounts(testNamespaceName).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
-		framework.ExpectNoError(err, "failed to delete the ServiceAccount by Collection")
+		e2eutils.ExpectNoError(err, "failed to delete the ServiceAccount by Collection")
 		eventFound = false
 		for watchEvent := range resourceWatchChan {
 			if watchEvent.Type == watch.Deleted {
@@ -712,7 +714,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 				break
 			}
 		}
-		framework.ExpectEqual(eventFound, true, "failed to find %v event", watch.Deleted)
+		e2eutils.ExpectEqual(eventFound, true, "failed to find %v event", watch.Deleted)
 	})
 
 	/*
@@ -724,7 +726,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			3. Reconciled if modified
 	*/
 	framework.ConformanceIt("should guarantee kube-root-ca.crt exist in any namespace", func() {
-		framework.ExpectNoError(wait.PollImmediate(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+		e2eutils.ExpectNoError(wait.PollImmediate(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
 			_, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Get(context.TODO(), rootCAConfigMapName, metav1.GetOptions{})
 			if err == nil {
 				return true, nil
@@ -735,12 +737,12 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			}
 			return false, err
 		}))
-		framework.Logf("Got root ca configmap in namespace %q", f.Namespace.Name)
+		e2eutils.Logf("Got root ca configmap in namespace %q", f.Namespace.Name)
 
-		framework.ExpectNoError(f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Delete(context.TODO(), rootCAConfigMapName, metav1.DeleteOptions{GracePeriodSeconds: utilptr.Int64Ptr(0)}))
-		framework.Logf("Deleted root ca configmap in namespace %q", f.Namespace.Name)
+		e2eutils.ExpectNoError(f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Delete(context.TODO(), rootCAConfigMapName, metav1.DeleteOptions{GracePeriodSeconds: utilptr.Int64Ptr(0)}))
+		e2eutils.Logf("Deleted root ca configmap in namespace %q", f.Namespace.Name)
 
-		framework.ExpectNoError(wait.Poll(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+		e2eutils.ExpectNoError(wait.Poll(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
 			ginkgo.By("waiting for a new root ca configmap created")
 			_, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Get(context.TODO(), rootCAConfigMapName, metav1.GetOptions{})
 			if err == nil {
@@ -752,7 +754,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			}
 			return false, err
 		}))
-		framework.Logf("Recreated root ca configmap in namespace %q", f.Namespace.Name)
+		e2eutils.Logf("Recreated root ca configmap in namespace %q", f.Namespace.Name)
 
 		_, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Update(context.TODO(), &v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
@@ -762,10 +764,10 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 				"ca.crt": "",
 			},
 		}, metav1.UpdateOptions{})
-		framework.ExpectNoError(err)
-		framework.Logf("Updated root ca configmap in namespace %q", f.Namespace.Name)
+		e2eutils.ExpectNoError(err)
+		e2eutils.Logf("Updated root ca configmap in namespace %q", f.Namespace.Name)
 
-		framework.ExpectNoError(wait.Poll(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+		e2eutils.ExpectNoError(wait.Poll(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
 			ginkgo.By("waiting for the root ca configmap reconciled")
 			cm, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Get(context.TODO(), rootCAConfigMapName, metav1.GetOptions{})
 			if err != nil {
@@ -781,7 +783,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			}
 			return true, nil
 		}))
-		framework.Logf("Reconciled root ca configmap in namespace %q", f.Namespace.Name)
+		e2eutils.Logf("Reconciled root ca configmap in namespace %q", f.Namespace.Name)
 	})
 })
 

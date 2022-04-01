@@ -24,8 +24,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	"k8s.io/kubernetes/test/e2e/framework/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -47,7 +47,7 @@ func LoadAppArmorProfiles(nsName string, clientset clientset.Interface) {
 // CreateAppArmorTestPod creates a pod that tests apparmor profile enforcement. The pod exits with
 // an error code if the profile is incorrectly enforced. If runOnce is true the pod will exit after
 // a single test, otherwise it will repeat the test every 1 second until failure.
-func CreateAppArmorTestPod(nsName string, clientset clientset.Interface, podClient *framework.PodClient, unconfined bool, runOnce bool) *v1.Pod {
+func CreateAppArmorTestPod(nsName string, clientset clientset.Interface, podClient *utils.PodClient, unconfined bool, runOnce bool) *v1.Pod {
 	profile := "localhost/" + appArmorProfilePrefix + nsName
 	testCmd := fmt.Sprintf(`
 if touch %[1]s; then
@@ -116,19 +116,19 @@ done`, testCmd)
 
 	if runOnce {
 		pod = podClient.Create(pod)
-		framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(
+		utils.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(
 			clientset, pod.Name, nsName))
 		var err error
 		pod, err = podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		utils.ExpectNoError(err)
 	} else {
 		pod = podClient.CreateSync(pod)
-		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(clientset, pod.Name, nsName, framework.PodStartTimeout))
+		utils.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(clientset, pod.Name, nsName, utils.PodStartTimeout))
 	}
 
 	// Verify Pod affinity colocated the Pods.
 	loader := getRunningLoaderPod(nsName, clientset)
-	framework.ExpectEqual(pod.Spec.NodeName, loader.Spec.NodeName)
+	utils.ExpectEqual(pod.Spec.NodeName, loader.Spec.NodeName)
 
 	return pod
 }
@@ -156,7 +156,7 @@ profile %s flags=(attach_disconnected) {
 		},
 	}
 	_, err := clientset.CoreV1().ConfigMaps(nsName).Create(context.TODO(), cm, metav1.CreateOptions{})
-	framework.ExpectNoError(err, "Failed to create apparmor-profiles ConfigMap")
+	utils.ExpectNoError(err, "Failed to create apparmor-profiles ConfigMap")
 }
 
 func createAppArmorProfileLoader(nsName string, clientset clientset.Interface) {
@@ -224,7 +224,7 @@ func createAppArmorProfileLoader(nsName string, clientset clientset.Interface) {
 		},
 	}
 	_, err := clientset.CoreV1().ReplicationControllers(nsName).Create(context.TODO(), loader, metav1.CreateOptions{})
-	framework.ExpectNoError(err, "Failed to create apparmor-loader ReplicationController")
+	utils.ExpectNoError(err, "Failed to create apparmor-loader ReplicationController")
 
 	// Wait for loader to be ready.
 	getRunningLoaderPod(nsName, clientset)
@@ -233,8 +233,8 @@ func createAppArmorProfileLoader(nsName string, clientset clientset.Interface) {
 func getRunningLoaderPod(nsName string, clientset clientset.Interface) *v1.Pod {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{loaderLabelKey: loaderLabelValue}))
 	pods, err := e2epod.WaitForPodsWithLabelScheduled(clientset, nsName, label)
-	framework.ExpectNoError(err, "Failed to schedule apparmor-loader Pod")
+	utils.ExpectNoError(err, "Failed to schedule apparmor-loader Pod")
 	pod := &pods.Items[0]
-	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(clientset, pod), "Failed to run apparmor-loader Pod")
+	utils.ExpectNoError(e2epod.WaitForPodRunningInNamespace(clientset, pod), "Failed to run apparmor-loader Pod")
 	return pod
 }

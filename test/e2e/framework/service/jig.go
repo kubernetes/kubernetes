@@ -42,10 +42,11 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/config"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
+	"k8s.io/kubernetes/test/e2e/framework/utils"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	netutils "k8s.io/utils/net"
@@ -328,25 +329,25 @@ func (j *TestJig) GetEndpointNodeNames() (sets.String, error) {
 
 // WaitForEndpointOnNode waits for a service endpoint on the given node.
 func (j *TestJig) WaitForEndpointOnNode(nodeName string) error {
-	return wait.PollImmediate(framework.Poll, KubeProxyLagTimeout, func() (bool, error) {
+	return wait.PollImmediate(utils.Poll, KubeProxyLagTimeout, func() (bool, error) {
 		endpoints, err := j.Client.CoreV1().Endpoints(j.Namespace).Get(context.TODO(), j.Name, metav1.GetOptions{})
 		if err != nil {
-			framework.Logf("Get endpoints for service %s/%s failed (%s)", j.Namespace, j.Name, err)
+			utils.Logf("Get endpoints for service %s/%s failed (%s)", j.Namespace, j.Name, err)
 			return false, nil
 		}
 		if len(endpoints.Subsets) == 0 {
-			framework.Logf("Expect endpoints with subsets, got none.")
+			utils.Logf("Expect endpoints with subsets, got none.")
 			return false, nil
 		}
 		// TODO: Handle multiple endpoints
 		if len(endpoints.Subsets[0].Addresses) == 0 {
-			framework.Logf("Expected Ready endpoints - found none")
+			utils.Logf("Expected Ready endpoints - found none")
 			return false, nil
 		}
 		epHostName := *endpoints.Subsets[0].Addresses[0].NodeName
-		framework.Logf("Pod for service %s/%s is on node %s", j.Namespace, j.Name, epHostName)
+		utils.Logf("Pod for service %s/%s is on node %s", j.Namespace, j.Name, epHostName)
 		if epHostName != nodeName {
-			framework.Logf("Found endpoint on wrong node, expected %v, got %v", nodeName, epHostName)
+			utils.Logf("Found endpoint on wrong node, expected %v, got %v", nodeName, epHostName)
 			return false, nil
 		}
 		return true, nil
@@ -537,7 +538,7 @@ func (j *TestJig) UpdateService(update func(*v1.Service)) (*v1.Service, error) {
 
 // WaitForNewIngressIP waits for the given service to get a new ingress IP, or returns an error after the given timeout
 func (j *TestJig) WaitForNewIngressIP(existingIP string, timeout time.Duration) (*v1.Service, error) {
-	framework.Logf("Waiting up to %v for service %q to get a new ingress IP", timeout, j.Name)
+	utils.Logf("Waiting up to %v for service %q to get a new ingress IP", timeout, j.Name)
 	service, err := j.waitForCondition(timeout, "have a new ingress IP", func(svc *v1.Service) bool {
 		if len(svc.Status.LoadBalancer.Ingress) == 0 {
 			return false
@@ -566,7 +567,7 @@ func (j *TestJig) ChangeServiceNodePort(initial int) (*v1.Service, error) {
 			s.Spec.Ports[0].NodePort = int32(newPort)
 		})
 		if err != nil && strings.Contains(err.Error(), errAllocated.Error()) {
-			framework.Logf("tried nodePort %d, but it is in use, will try another", newPort)
+			utils.Logf("tried nodePort %d, but it is in use, will try another", newPort)
 			continue
 		}
 		// Otherwise err was nil or err was a real error
@@ -577,7 +578,7 @@ func (j *TestJig) ChangeServiceNodePort(initial int) (*v1.Service, error) {
 
 // WaitForLoadBalancer waits the given service to have a LoadBalancer, or returns an error after the given timeout
 func (j *TestJig) WaitForLoadBalancer(timeout time.Duration) (*v1.Service, error) {
-	framework.Logf("Waiting up to %v for service %q to have a LoadBalancer", timeout, j.Name)
+	utils.Logf("Waiting up to %v for service %q to have a LoadBalancer", timeout, j.Name)
 	service, err := j.waitForCondition(timeout, "have a load balancer", func(svc *v1.Service) bool {
 		return len(svc.Status.LoadBalancer.Ingress) > 0
 	})
@@ -598,12 +599,12 @@ func (j *TestJig) WaitForLoadBalancer(timeout time.Duration) (*v1.Service, error
 func (j *TestJig) WaitForLoadBalancerDestroy(ip string, port int, timeout time.Duration) (*v1.Service, error) {
 	// TODO: once support ticket 21807001 is resolved, reduce this timeout back to something reasonable
 	defer func() {
-		if err := framework.EnsureLoadBalancerResourcesDeleted(ip, strconv.Itoa(port)); err != nil {
-			framework.Logf("Failed to delete cloud resources for service: %s %d (%v)", ip, port, err)
+		if err := utils.EnsureLoadBalancerResourcesDeleted(ip, strconv.Itoa(port)); err != nil {
+			utils.Logf("Failed to delete cloud resources for service: %s %d (%v)", ip, port, err)
 		}
 	}()
 
-	framework.Logf("Waiting up to %v for service %q to have no LoadBalancer", timeout, j.Name)
+	utils.Logf("Waiting up to %v for service %q to have no LoadBalancer", timeout, j.Name)
 	service, err := j.waitForCondition(timeout, "have no load balancer", func(svc *v1.Service) bool {
 		return len(svc.Status.LoadBalancer.Ingress) == 0
 	})
@@ -618,7 +619,7 @@ func (j *TestJig) waitForCondition(timeout time.Duration, message string, condit
 	pollFunc := func() (bool, error) {
 		svc, err := j.Client.CoreV1().Services(j.Namespace).Get(context.TODO(), j.Name, metav1.GetOptions{})
 		if err != nil {
-			framework.Logf("Retrying .... error trying to get Service %s: %v", j.Name, err)
+			utils.Logf("Retrying .... error trying to get Service %s: %v", j.Name, err)
 			return false, nil
 		}
 		if conditionFn(svc) {
@@ -627,7 +628,7 @@ func (j *TestJig) waitForCondition(timeout time.Duration, message string, condit
 		}
 		return false, nil
 	}
-	if err := wait.PollImmediate(framework.Poll, timeout, pollFunc); err != nil {
+	if err := wait.PollImmediate(utils.Poll, timeout, pollFunc); err != nil {
 		return nil, fmt.Errorf("timed out waiting for service %q to %s: %w", j.Name, message, err)
 	}
 	return service, nil
@@ -798,7 +799,7 @@ func (j *TestJig) waitForPodsCreated(replicas int) ([]string, error) {
 	timeout := 2 * time.Minute
 	// List the pods, making sure we observe all the replicas.
 	label := labels.SelectorFromSet(labels.Set(j.Labels))
-	framework.Logf("Waiting up to %v for %d pods to be created", timeout, replicas)
+	utils.Logf("Waiting up to %v for %d pods to be created", timeout, replicas)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(2 * time.Second) {
 		options := metav1.ListOptions{LabelSelector: label.String()}
 		pods, err := j.Client.CoreV1().Pods(j.Namespace).List(context.TODO(), options)
@@ -814,10 +815,10 @@ func (j *TestJig) waitForPodsCreated(replicas int) ([]string, error) {
 			found = append(found, pod.Name)
 		}
 		if len(found) == replicas {
-			framework.Logf("Found all %d pods", replicas)
+			utils.Logf("Found all %d pods", replicas)
 			return found, nil
 		}
-		framework.Logf("Found %d/%d pods - will retry", len(found), replicas)
+		utils.Logf("Found %d/%d pods - will retry", len(found), replicas)
 	}
 	return nil, fmt.Errorf("timeout waiting for %d pods to be created", replicas)
 }
@@ -854,12 +855,12 @@ func testReachabilityOverNodePorts(nodes *v1.NodeList, sp v1.ServicePort, pod *v
 		// If the node's internal address points to localhost, then we are not
 		// able to test the service reachability via that address
 		if isInvalidOrLocalhostAddress(internalAddr) {
-			framework.Logf("skipping testEndpointReachability() for internal adddress %s", internalAddr)
+			utils.Logf("skipping testEndpointReachability() for internal adddress %s", internalAddr)
 			continue
 		}
 		// Check service reachability on the node internalIP which is same family as clusterIP
 		if isClusterIPV4 != netutils.IsIPv4String(internalAddr) {
-			framework.Logf("skipping testEndpointReachability() for internal adddress %s as it does not match clusterIP (%s) family", internalAddr, clusterIP)
+			utils.Logf("skipping testEndpointReachability() for internal adddress %s as it does not match clusterIP (%s) family", internalAddr, clusterIP)
 			continue
 		}
 
@@ -872,7 +873,7 @@ func testReachabilityOverNodePorts(nodes *v1.NodeList, sp v1.ServicePort, pod *v
 		externalAddrs := e2enode.CollectAddresses(nodes, v1.NodeExternalIP)
 		for _, externalAddr := range externalAddrs {
 			if isClusterIPV4 != netutils.IsIPv4String(externalAddr) {
-				framework.Logf("skipping testEndpointReachability() for external adddress %s as it does not match clusterIP (%s) family", externalAddr, clusterIP)
+				utils.Logf("skipping testEndpointReachability() for external adddress %s as it does not match clusterIP (%s) family", externalAddr, clusterIP)
 				continue
 			}
 			err := testEndpointReachability(externalAddr, sp.NodePort, sp.Protocol, pod)
@@ -910,9 +911,9 @@ func testEndpointReachability(endpoint string, port int32, protocol v1.Protocol,
 	}
 
 	err := wait.PollImmediate(1*time.Second, ServiceReachabilityShortPollTimeout, func() (bool, error) {
-		stdout, err := framework.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
+		stdout, err := utils.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
 		if err != nil {
-			framework.Logf("Service reachability failing with error: %v\nRetrying...", err)
+			utils.Logf("Service reachability failing with error: %v\nRetrying...", err)
 			return false, nil
 		}
 		trimmed := strings.TrimSpace(stdout)
@@ -1002,15 +1003,15 @@ func (j *TestJig) checkNodePortServiceReachability(svc *v1.Service, pod *v1.Pod)
 // FQDN of kubernetes is used as externalName(for air tight platforms).
 func (j *TestJig) checkExternalServiceReachability(svc *v1.Service, pod *v1.Pod) error {
 	// NOTE(claudiub): Windows does not support PQDN.
-	svcName := fmt.Sprintf("%s.%s.svc.%s", svc.Name, svc.Namespace, framework.TestContext.ClusterDNSDomain)
+	svcName := fmt.Sprintf("%s.%s.svc.%s", svc.Name, svc.Namespace, config.TestContext.ClusterDNSDomain)
 	// Service must resolve to IP
 	cmd := fmt.Sprintf("nslookup %s", svcName)
-	return wait.PollImmediate(framework.Poll, ServiceReachabilityShortPollTimeout, func() (done bool, err error) {
-		_, stderr, err := framework.RunHostCmdWithFullOutput(pod.Namespace, pod.Name, cmd)
+	return wait.PollImmediate(utils.Poll, ServiceReachabilityShortPollTimeout, func() (done bool, err error) {
+		_, stderr, err := utils.RunHostCmdWithFullOutput(pod.Namespace, pod.Name, cmd)
 		// NOTE(claudiub): nslookup may return 0 on Windows, even though the DNS name was not found. In this case,
 		// we can check stderr for the error.
-		if err != nil || (framework.NodeOSDistroIs("windows") && strings.Contains(stderr, fmt.Sprintf("can't find %s", svcName))) {
-			framework.Logf("ExternalName service %q failed to resolve to IP", pod.Namespace+"/"+pod.Name)
+		if err != nil || (utils.NodeOSDistroIs("windows") && strings.Contains(stderr, fmt.Sprintf("can't find %s", svcName))) {
+			utils.Logf("ExternalName service %q failed to resolve to IP", pod.Namespace+"/"+pod.Name)
 			return false, nil
 		}
 		return true, nil
@@ -1043,12 +1044,12 @@ func (j *TestJig) CreateServicePods(replica int) error {
 	config := testutils.RCConfig{
 		Client:       j.Client,
 		Name:         j.Name,
-		Image:        framework.ServeHostnameImage,
+		Image:        utils.ServeHostnameImage,
 		Command:      []string{"/agnhost", "serve-hostname", "--http=false", "--tcp", "--udp"},
 		Namespace:    j.Namespace,
 		Labels:       j.Labels,
 		PollInterval: 3 * time.Second,
-		Timeout:      framework.PodReadyBeforeTimeout,
+		Timeout:      utils.PodReadyBeforeTimeout,
 		Replicas:     replica,
 	}
 	return e2erc.RunRC(config)

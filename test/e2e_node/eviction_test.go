@@ -24,6 +24,9 @@ import (
 	"strings"
 	"time"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -354,11 +357,11 @@ var _ = SIGDescribe("PriorityMemoryEvictionOrdering [Slow] [Serial] [Disruptive]
 		})
 		ginkgo.BeforeEach(func() {
 			_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(context.TODO(), &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: highPriorityClassName}, Value: highPriority}, metav1.CreateOptions{})
-			framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
+			e2eutils.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
 		})
 		ginkgo.AfterEach(func() {
 			err := f.ClientSet.SchedulingV1().PriorityClasses().Delete(context.TODO(), highPriorityClassName, metav1.DeleteOptions{})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 		})
 		specs := []podEvictSpec{
 			{
@@ -411,11 +414,11 @@ var _ = SIGDescribe("PriorityLocalStorageEvictionOrdering [Slow] [Serial] [Disru
 		})
 		ginkgo.BeforeEach(func() {
 			_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(context.TODO(), &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: highPriorityClassName}, Value: highPriority}, metav1.CreateOptions{})
-			framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
+			e2eutils.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
 		})
 		ginkgo.AfterEach(func() {
 			err := f.ClientSet.SchedulingV1().PriorityClasses().Delete(context.TODO(), highPriorityClassName, metav1.DeleteOptions{})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 		})
 		specs := []podEvictSpec{
 			{
@@ -464,11 +467,11 @@ var _ = SIGDescribe("PriorityPidEvictionOrdering [Slow] [Serial] [Disruptive][No
 		})
 		ginkgo.BeforeEach(func() {
 			_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(context.TODO(), &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: highPriorityClassName}, Value: highPriority}, metav1.CreateOptions{})
-			framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
+			e2eutils.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
 		})
 		ginkgo.AfterEach(func() {
 			err := f.ClientSet.SchedulingV1().PriorityClasses().Delete(context.TODO(), highPriorityClassName, metav1.DeleteOptions{})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 		})
 		specs := []podEvictSpec{
 			{
@@ -536,9 +539,9 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 			gomega.Eventually(func() error {
 				if expectedNodeCondition != noPressure {
 					if hasNodeCondition(f, expectedNodeCondition) {
-						framework.Logf("Node has %s", expectedNodeCondition)
+						e2eutils.Logf("Node has %s", expectedNodeCondition)
 					} else {
-						framework.Logf("Node does NOT have %s", expectedNodeCondition)
+						e2eutils.Logf("Node does NOT have %s", expectedNodeCondition)
 					}
 				}
 				logKubeletLatencyMetrics(kubeletmetrics.EvictionStatsAgeKey)
@@ -578,7 +581,7 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 
 		ginkgo.AfterEach(func() {
 			prePullImagesIfNeccecary := func() {
-				if expectedNodeCondition == v1.NodeDiskPressure && framework.TestContext.PrepullImages {
+				if expectedNodeCondition == v1.NodeDiskPressure && e2econfig.TestContext.PrepullImages {
 					// The disk eviction test may cause the prepulled images to be evicted,
 					// prepull those images again to ensure this test not affect following tests.
 					PrePullAllImages()
@@ -634,7 +637,7 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 			})
 
 			if ginkgo.CurrentGinkgoTestDescription().Failed {
-				if framework.TestContext.DumpLogsOnFailure {
+				if e2econfig.TestContext.DumpLogsOnFailure {
 					logPodEvents(f)
 					logNodeEvents(f)
 				}
@@ -653,7 +656,7 @@ func verifyEvictionOrdering(f *framework.Framework, testSpecs []podEvictSpec) er
 	}
 	updatedPods := updatedPodList.Items
 	for _, p := range updatedPods {
-		framework.Logf("fetching pod %s; phase= %v", p.Name, p.Status.Phase)
+		e2eutils.Logf("fetching pod %s; phase= %v", p.Name, p.Status.Phase)
 	}
 
 	ginkgo.By("checking eviction ordering and ensuring important pods don't fail")
@@ -667,7 +670,7 @@ func verifyEvictionOrdering(f *framework.Framework, testSpecs []podEvictSpec) er
 			}
 		}
 		gomega.Expect(priorityPod).NotTo(gomega.BeNil())
-		framework.ExpectNotEqual(priorityPod.Status.Phase, v1.PodSucceeded,
+		e2eutils.ExpectNotEqual(priorityPod.Status.Phase, v1.PodSucceeded,
 			fmt.Sprintf("pod: %s succeeded unexpectedly", priorityPod.Name))
 
 		// Check eviction ordering.
@@ -682,20 +685,20 @@ func verifyEvictionOrdering(f *framework.Framework, testSpecs []podEvictSpec) er
 			}
 			gomega.Expect(lowPriorityPod).NotTo(gomega.BeNil())
 			if priorityPodSpec.evictionPriority < lowPriorityPodSpec.evictionPriority && lowPriorityPod.Status.Phase == v1.PodRunning {
-				framework.ExpectNotEqual(priorityPod.Status.Phase, v1.PodFailed,
+				e2eutils.ExpectNotEqual(priorityPod.Status.Phase, v1.PodFailed,
 					fmt.Sprintf("priority %d pod: %s failed before priority %d pod: %s",
 						priorityPodSpec.evictionPriority, priorityPodSpec.pod.Name, lowPriorityPodSpec.evictionPriority, lowPriorityPodSpec.pod.Name))
 			}
 		}
 
 		if priorityPod.Status.Phase == v1.PodFailed {
-			framework.ExpectEqual(priorityPod.Status.Reason, eviction.Reason, "pod %s failed; expected Status.Reason to be %s, but got %s",
+			e2eutils.ExpectEqual(priorityPod.Status.Reason, eviction.Reason, "pod %s failed; expected Status.Reason to be %s, but got %s",
 				priorityPod.Name, eviction.Reason, priorityPod.Status.Reason)
 		}
 
 		// EvictionPriority 0 pods should not fail
 		if priorityPodSpec.evictionPriority == 0 {
-			framework.ExpectNotEqual(priorityPod.Status.Phase, v1.PodFailed,
+			e2eutils.ExpectNotEqual(priorityPod.Status.Phase, v1.PodFailed,
 				fmt.Sprintf("priority 0 pod: %s failed", priorityPod.Name))
 		}
 
@@ -723,41 +726,41 @@ func verifyEvictionEvents(f *framework.Framework, testSpecs []podEvictSpec, expe
 			}.AsSelector().String()
 			podEvictEvents, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{FieldSelector: selector})
 			gomega.Expect(err).To(gomega.BeNil(), "Unexpected error getting events during eviction test: %v", err)
-			framework.ExpectEqual(len(podEvictEvents.Items), 1, "Expected to find 1 eviction event for pod %s, got %d", pod.Name, len(podEvictEvents.Items))
+			e2eutils.ExpectEqual(len(podEvictEvents.Items), 1, "Expected to find 1 eviction event for pod %s, got %d", pod.Name, len(podEvictEvents.Items))
 			event := podEvictEvents.Items[0]
 
 			if expectedStarvedResource != noStarvedResource {
 				// Check the eviction.StarvedResourceKey
 				starved, found := event.Annotations[eviction.StarvedResourceKey]
-				framework.ExpectEqual(found, true, "Expected to find an annotation on the eviction event for pod %s containing the starved resource %s, but it was not found",
+				e2eutils.ExpectEqual(found, true, "Expected to find an annotation on the eviction event for pod %s containing the starved resource %s, but it was not found",
 					pod.Name, expectedStarvedResource)
 				starvedResource := v1.ResourceName(starved)
-				framework.ExpectEqual(starvedResource, expectedStarvedResource, "Expected to the starved_resource annotation on pod %s to contain %s, but got %s instead",
+				e2eutils.ExpectEqual(starvedResource, expectedStarvedResource, "Expected to the starved_resource annotation on pod %s to contain %s, but got %s instead",
 					pod.Name, expectedStarvedResource, starvedResource)
 
 				// We only check these keys for memory, because ephemeral storage evictions may be due to volume usage, in which case these values are not present
 				if expectedStarvedResource == v1.ResourceMemory {
 					// Check the eviction.OffendingContainersKey
 					offendersString, found := event.Annotations[eviction.OffendingContainersKey]
-					framework.ExpectEqual(found, true, "Expected to find an annotation on the eviction event for pod %s containing the offending containers, but it was not found",
+					e2eutils.ExpectEqual(found, true, "Expected to find an annotation on the eviction event for pod %s containing the offending containers, but it was not found",
 						pod.Name)
 					offendingContainers := strings.Split(offendersString, ",")
-					framework.ExpectEqual(len(offendingContainers), 1, "Expected to find the offending container's usage in the %s annotation, but no container was found",
+					e2eutils.ExpectEqual(len(offendingContainers), 1, "Expected to find the offending container's usage in the %s annotation, but no container was found",
 						eviction.OffendingContainersKey)
-					framework.ExpectEqual(offendingContainers[0], pod.Spec.Containers[0].Name, "Expected to find the offending container: %s's usage in the %s annotation, but found %s instead",
+					e2eutils.ExpectEqual(offendingContainers[0], pod.Spec.Containers[0].Name, "Expected to find the offending container: %s's usage in the %s annotation, but found %s instead",
 						pod.Spec.Containers[0].Name, eviction.OffendingContainersKey, offendingContainers[0])
 
 					// Check the eviction.OffendingContainersUsageKey
 					offendingUsageString, found := event.Annotations[eviction.OffendingContainersUsageKey]
-					framework.ExpectEqual(found, true, "Expected to find an annotation on the eviction event for pod %s containing the offending containers' usage, but it was not found",
+					e2eutils.ExpectEqual(found, true, "Expected to find an annotation on the eviction event for pod %s containing the offending containers' usage, but it was not found",
 						pod.Name)
 					offendingContainersUsage := strings.Split(offendingUsageString, ",")
-					framework.ExpectEqual(len(offendingContainersUsage), 1, "Expected to find the offending container's usage in the %s annotation, but found %+v",
+					e2eutils.ExpectEqual(len(offendingContainersUsage), 1, "Expected to find the offending container's usage in the %s annotation, but found %+v",
 						eviction.OffendingContainersUsageKey, offendingContainersUsage)
 					usageQuantity, err := resource.ParseQuantity(offendingContainersUsage[0])
 					gomega.Expect(err).To(gomega.BeNil(), "Expected to be able to parse pod %s's %s annotation as a quantity, but got err: %v", pod.Name, eviction.OffendingContainersUsageKey, err)
 					request := pod.Spec.Containers[0].Resources.Requests[starvedResource]
-					framework.ExpectEqual(usageQuantity.Cmp(request), 1, "Expected usage of offending container: %s in pod %s to exceed its request %s",
+					e2eutils.ExpectEqual(usageQuantity.Cmp(request), 1, "Expected usage of offending container: %s in pod %s to exceed its request %s",
 						usageQuantity.String(), pod.Name, request.String())
 				}
 			}
@@ -776,25 +779,25 @@ func hasNodeCondition(f *framework.Framework, expectedNodeCondition v1.NodeCondi
 func logInodeMetrics() {
 	summary, err := getNodeSummary()
 	if err != nil {
-		framework.Logf("Error getting summary: %v", err)
+		e2eutils.Logf("Error getting summary: %v", err)
 		return
 	}
 	if summary.Node.Runtime != nil && summary.Node.Runtime.ImageFs != nil && summary.Node.Runtime.ImageFs.Inodes != nil && summary.Node.Runtime.ImageFs.InodesFree != nil {
-		framework.Logf("imageFsInfo.Inodes: %d, imageFsInfo.InodesFree: %d", *summary.Node.Runtime.ImageFs.Inodes, *summary.Node.Runtime.ImageFs.InodesFree)
+		e2eutils.Logf("imageFsInfo.Inodes: %d, imageFsInfo.InodesFree: %d", *summary.Node.Runtime.ImageFs.Inodes, *summary.Node.Runtime.ImageFs.InodesFree)
 	}
 	if summary.Node.Fs != nil && summary.Node.Fs.Inodes != nil && summary.Node.Fs.InodesFree != nil {
-		framework.Logf("rootFsInfo.Inodes: %d, rootFsInfo.InodesFree: %d", *summary.Node.Fs.Inodes, *summary.Node.Fs.InodesFree)
+		e2eutils.Logf("rootFsInfo.Inodes: %d, rootFsInfo.InodesFree: %d", *summary.Node.Fs.Inodes, *summary.Node.Fs.InodesFree)
 	}
 	for _, pod := range summary.Pods {
-		framework.Logf("Pod: %s", pod.PodRef.Name)
+		e2eutils.Logf("Pod: %s", pod.PodRef.Name)
 		for _, container := range pod.Containers {
 			if container.Rootfs != nil && container.Rootfs.InodesUsed != nil {
-				framework.Logf("--- summary Container: %s inodeUsage: %d", container.Name, *container.Rootfs.InodesUsed)
+				e2eutils.Logf("--- summary Container: %s inodeUsage: %d", container.Name, *container.Rootfs.InodesUsed)
 			}
 		}
 		for _, volume := range pod.VolumeStats {
 			if volume.FsStats.InodesUsed != nil {
-				framework.Logf("--- summary Volume: %s inodeUsage: %d", volume.Name, *volume.FsStats.InodesUsed)
+				e2eutils.Logf("--- summary Volume: %s inodeUsage: %d", volume.Name, *volume.FsStats.InodesUsed)
 			}
 		}
 	}
@@ -803,25 +806,25 @@ func logInodeMetrics() {
 func logDiskMetrics() {
 	summary, err := getNodeSummary()
 	if err != nil {
-		framework.Logf("Error getting summary: %v", err)
+		e2eutils.Logf("Error getting summary: %v", err)
 		return
 	}
 	if summary.Node.Runtime != nil && summary.Node.Runtime.ImageFs != nil && summary.Node.Runtime.ImageFs.CapacityBytes != nil && summary.Node.Runtime.ImageFs.AvailableBytes != nil {
-		framework.Logf("imageFsInfo.CapacityBytes: %d, imageFsInfo.AvailableBytes: %d", *summary.Node.Runtime.ImageFs.CapacityBytes, *summary.Node.Runtime.ImageFs.AvailableBytes)
+		e2eutils.Logf("imageFsInfo.CapacityBytes: %d, imageFsInfo.AvailableBytes: %d", *summary.Node.Runtime.ImageFs.CapacityBytes, *summary.Node.Runtime.ImageFs.AvailableBytes)
 	}
 	if summary.Node.Fs != nil && summary.Node.Fs.CapacityBytes != nil && summary.Node.Fs.AvailableBytes != nil {
-		framework.Logf("rootFsInfo.CapacityBytes: %d, rootFsInfo.AvailableBytes: %d", *summary.Node.Fs.CapacityBytes, *summary.Node.Fs.AvailableBytes)
+		e2eutils.Logf("rootFsInfo.CapacityBytes: %d, rootFsInfo.AvailableBytes: %d", *summary.Node.Fs.CapacityBytes, *summary.Node.Fs.AvailableBytes)
 	}
 	for _, pod := range summary.Pods {
-		framework.Logf("Pod: %s", pod.PodRef.Name)
+		e2eutils.Logf("Pod: %s", pod.PodRef.Name)
 		for _, container := range pod.Containers {
 			if container.Rootfs != nil && container.Rootfs.UsedBytes != nil {
-				framework.Logf("--- summary Container: %s UsedBytes: %d", container.Name, *container.Rootfs.UsedBytes)
+				e2eutils.Logf("--- summary Container: %s UsedBytes: %d", container.Name, *container.Rootfs.UsedBytes)
 			}
 		}
 		for _, volume := range pod.VolumeStats {
 			if volume.FsStats.InodesUsed != nil {
-				framework.Logf("--- summary Volume: %s UsedBytes: %d", volume.Name, *volume.FsStats.UsedBytes)
+				e2eutils.Logf("--- summary Volume: %s UsedBytes: %d", volume.Name, *volume.FsStats.UsedBytes)
 			}
 		}
 	}
@@ -830,22 +833,22 @@ func logDiskMetrics() {
 func logMemoryMetrics() {
 	summary, err := getNodeSummary()
 	if err != nil {
-		framework.Logf("Error getting summary: %v", err)
+		e2eutils.Logf("Error getting summary: %v", err)
 		return
 	}
 	if summary.Node.Memory != nil && summary.Node.Memory.WorkingSetBytes != nil && summary.Node.Memory.AvailableBytes != nil {
-		framework.Logf("Node.Memory.WorkingSetBytes: %d, Node.Memory.AvailableBytes: %d", *summary.Node.Memory.WorkingSetBytes, *summary.Node.Memory.AvailableBytes)
+		e2eutils.Logf("Node.Memory.WorkingSetBytes: %d, Node.Memory.AvailableBytes: %d", *summary.Node.Memory.WorkingSetBytes, *summary.Node.Memory.AvailableBytes)
 	}
 	for _, sysContainer := range summary.Node.SystemContainers {
 		if sysContainer.Name == kubeletstatsv1alpha1.SystemContainerPods && sysContainer.Memory != nil && sysContainer.Memory.WorkingSetBytes != nil && sysContainer.Memory.AvailableBytes != nil {
-			framework.Logf("Allocatable.Memory.WorkingSetBytes: %d, Allocatable.Memory.AvailableBytes: %d", *sysContainer.Memory.WorkingSetBytes, *sysContainer.Memory.AvailableBytes)
+			e2eutils.Logf("Allocatable.Memory.WorkingSetBytes: %d, Allocatable.Memory.AvailableBytes: %d", *sysContainer.Memory.WorkingSetBytes, *sysContainer.Memory.AvailableBytes)
 		}
 	}
 	for _, pod := range summary.Pods {
-		framework.Logf("Pod: %s", pod.PodRef.Name)
+		e2eutils.Logf("Pod: %s", pod.PodRef.Name)
 		for _, container := range pod.Containers {
 			if container.Memory != nil && container.Memory.WorkingSetBytes != nil {
-				framework.Logf("--- summary Container: %s WorkingSetBytes: %d", container.Name, *container.Memory.WorkingSetBytes)
+				e2eutils.Logf("--- summary Container: %s WorkingSetBytes: %d", container.Name, *container.Memory.WorkingSetBytes)
 			}
 		}
 	}
@@ -854,11 +857,11 @@ func logMemoryMetrics() {
 func logPidMetrics() {
 	summary, err := getNodeSummary()
 	if err != nil {
-		framework.Logf("Error getting summary: %v", err)
+		e2eutils.Logf("Error getting summary: %v", err)
 		return
 	}
 	if summary.Node.Rlimit != nil && summary.Node.Rlimit.MaxPID != nil && summary.Node.Rlimit.NumOfRunningProcesses != nil {
-		framework.Logf("Node.Rlimit.MaxPID: %d, Node.Rlimit.RunningProcesses: %d", *summary.Node.Rlimit.MaxPID, *summary.Node.Rlimit.NumOfRunningProcesses)
+		e2eutils.Logf("Node.Rlimit.MaxPID: %d, Node.Rlimit.RunningProcesses: %d", *summary.Node.Rlimit.MaxPID, *summary.Node.Rlimit.NumOfRunningProcesses)
 	}
 }
 

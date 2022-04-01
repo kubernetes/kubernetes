@@ -39,6 +39,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 )
 
 var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin]", func() {
@@ -55,20 +56,20 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 		*/
 		framework.ConformanceIt("creating/deleting custom resource definition objects works ", func() {
 
-			config, err := framework.LoadConfig()
-			framework.ExpectNoError(err, "loading config")
+			config, err := e2eutils.LoadConfig()
+			e2eutils.ExpectNoError(err, "loading config")
 			apiExtensionClient, err := clientset.NewForConfig(config)
-			framework.ExpectNoError(err, "initializing apiExtensionClient")
+			e2eutils.ExpectNoError(err, "initializing apiExtensionClient")
 
 			randomDefinition := fixtures.NewRandomNameV1CustomResourceDefinition(v1.ClusterScoped)
 
 			// Create CRD and waits for the resource to be recognized and available.
 			randomDefinition, err = fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(randomDefinition, apiExtensionClient)
-			framework.ExpectNoError(err, "creating CustomResourceDefinition")
+			e2eutils.ExpectNoError(err, "creating CustomResourceDefinition")
 
 			defer func() {
 				err = fixtures.DeleteV1CustomResourceDefinition(randomDefinition, apiExtensionClient)
-				framework.ExpectNoError(err, "deleting CustomResourceDefinition")
+				e2eutils.ExpectNoError(err, "deleting CustomResourceDefinition")
 			}()
 		})
 
@@ -82,10 +83,10 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 		*/
 		framework.ConformanceIt("listing custom resource definition objects works ", func() {
 			testListSize := 10
-			config, err := framework.LoadConfig()
-			framework.ExpectNoError(err, "loading config")
+			config, err := e2eutils.LoadConfig()
+			e2eutils.ExpectNoError(err, "loading config")
 			apiExtensionClient, err := clientset.NewForConfig(config)
-			framework.ExpectNoError(err, "initializing apiExtensionClient")
+			e2eutils.ExpectNoError(err, "initializing apiExtensionClient")
 
 			// Label the CRDs we create so we can list only them even though they are cluster scoped
 			testUUID := string(uuid.NewUUID())
@@ -96,23 +97,23 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 				crd := fixtures.NewRandomNameV1CustomResourceDefinition(v1.ClusterScoped)
 				crd.Labels = map[string]string{"e2e-list-test-uuid": testUUID}
 				crd, err = fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
-				framework.ExpectNoError(err, "creating CustomResourceDefinition")
+				e2eutils.ExpectNoError(err, "creating CustomResourceDefinition")
 				crds[i] = crd
 			}
 
 			// Create a crd w/o the label to ensure the label selector matching works correctly
 			crd := fixtures.NewRandomNameV1CustomResourceDefinition(v1.ClusterScoped)
 			crd, err = fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
-			framework.ExpectNoError(err, "creating CustomResourceDefinition")
+			e2eutils.ExpectNoError(err, "creating CustomResourceDefinition")
 			defer func() {
 				err = fixtures.DeleteV1CustomResourceDefinition(crd, apiExtensionClient)
-				framework.ExpectNoError(err, "deleting CustomResourceDefinition")
+				e2eutils.ExpectNoError(err, "deleting CustomResourceDefinition")
 			}()
 
 			selectorListOpts := metav1.ListOptions{LabelSelector: "e2e-list-test-uuid=" + testUUID}
 			list, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().List(context.TODO(), selectorListOpts)
-			framework.ExpectNoError(err, "listing CustomResourceDefinitions")
-			framework.ExpectEqual(len(list.Items), testListSize)
+			e2eutils.ExpectNoError(err, "listing CustomResourceDefinitions")
+			e2eutils.ExpectEqual(len(list.Items), testListSize)
 			for _, actual := range list.Items {
 				var expected *v1.CustomResourceDefinition
 				for _, e := range crds {
@@ -120,18 +121,18 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 						expected = e
 					}
 				}
-				framework.ExpectNotEqual(expected, nil)
+				e2eutils.ExpectNotEqual(expected, nil)
 				if !equality.Semantic.DeepEqual(actual.Spec, expected.Spec) {
-					framework.Failf("Expected CustomResourceDefinition in list with name %s to match crd created with same name, but got different specs:\n%s",
+					e2eutils.Failf("Expected CustomResourceDefinition in list with name %s to match crd created with same name, but got different specs:\n%s",
 						actual.Name, diff.ObjectReflectDiff(expected.Spec, actual.Spec))
 				}
 			}
 
 			// Use delete collection to remove the CRDs
 			err = fixtures.DeleteV1CustomResourceDefinitions(selectorListOpts, apiExtensionClient)
-			framework.ExpectNoError(err, "deleting CustomResourceDefinitions")
+			e2eutils.ExpectNoError(err, "deleting CustomResourceDefinitions")
 			_, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), crd.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err, "getting remaining CustomResourceDefinition")
+			e2eutils.ExpectNoError(err, "getting remaining CustomResourceDefinition")
 		})
 
 		/*
@@ -141,22 +142,22 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 			all mutating sub-resource operations MUST be visible to subsequent reads.
 		*/
 		framework.ConformanceIt("getting/updating/patching custom resource definition status sub-resource works ", func() {
-			config, err := framework.LoadConfig()
-			framework.ExpectNoError(err, "loading config")
+			config, err := e2eutils.LoadConfig()
+			e2eutils.ExpectNoError(err, "loading config")
 			apiExtensionClient, err := clientset.NewForConfig(config)
-			framework.ExpectNoError(err, "initializing apiExtensionClient")
+			e2eutils.ExpectNoError(err, "initializing apiExtensionClient")
 			dynamicClient, err := dynamic.NewForConfig(config)
-			framework.ExpectNoError(err, "initializing dynamic client")
+			e2eutils.ExpectNoError(err, "initializing dynamic client")
 			gvr := v1.SchemeGroupVersion.WithResource("customresourcedefinitions")
 			resourceClient := dynamicClient.Resource(gvr)
 
 			// Create CRD and waits for the resource to be recognized and available.
 			crd := fixtures.NewRandomNameV1CustomResourceDefinition(v1.ClusterScoped)
 			crd, err = fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
-			framework.ExpectNoError(err, "creating CustomResourceDefinition")
+			e2eutils.ExpectNoError(err, "creating CustomResourceDefinition")
 			defer func() {
 				err = fixtures.DeleteV1CustomResourceDefinition(crd, apiExtensionClient)
-				framework.ExpectNoError(err, "deleting CustomResourceDefinition")
+				e2eutils.ExpectNoError(err, "deleting CustomResourceDefinition")
 			}()
 
 			var updated *v1.CustomResourceDefinition
@@ -164,16 +165,16 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 			err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 				// Use dynamic client to read the status sub-resource since typed client does not expose it.
 				u, err := resourceClient.Get(context.TODO(), crd.GetName(), metav1.GetOptions{}, "status")
-				framework.ExpectNoError(err, "getting CustomResourceDefinition status")
+				e2eutils.ExpectNoError(err, "getting CustomResourceDefinition status")
 				status := unstructuredToCRD(u)
 				if !equality.Semantic.DeepEqual(status.Spec, crd.Spec) {
-					framework.Failf("Expected CustomResourceDefinition Spec to match status sub-resource Spec, but got:\n%s", diff.ObjectReflectDiff(status.Spec, crd.Spec))
+					e2eutils.Failf("Expected CustomResourceDefinition Spec to match status sub-resource Spec, but got:\n%s", diff.ObjectReflectDiff(status.Spec, crd.Spec))
 				}
 				status.Status.Conditions = append(status.Status.Conditions, updateCondition)
 				updated, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().UpdateStatus(context.TODO(), status, metav1.UpdateOptions{})
 				return err
 			})
-			framework.ExpectNoError(err, "updating CustomResourceDefinition status")
+			e2eutils.ExpectNoError(err, "updating CustomResourceDefinition status")
 			expectCondition(updated.Status.Conditions, updateCondition)
 
 			patchCondition := v1.CustomResourceDefinitionCondition{Message: "patched"}
@@ -181,7 +182,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 				types.JSONPatchType,
 				[]byte(`[{"op": "add", "path": "/status/conditions", "value": [{"message": "patched"}]}]`), metav1.PatchOptions{},
 				"status")
-			framework.ExpectNoError(err, "patching CustomResourceDefinition status")
+			e2eutils.ExpectNoError(err, "patching CustomResourceDefinition status")
 			expectCondition(updated.Status.Conditions, updateCondition)
 			expectCondition(patched.Status.Conditions, patchCondition)
 		})
@@ -198,7 +199,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 			ginkgo.By("fetching the /apis discovery document")
 			apiGroupList := &metav1.APIGroupList{}
 			err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis").Do(context.TODO()).Into(apiGroupList)
-			framework.ExpectNoError(err, "fetching /apis")
+			e2eutils.ExpectNoError(err, "fetching /apis")
 
 			ginkgo.By("finding the apiextensions.k8s.io API group in the /apis discovery document")
 			var group *metav1.APIGroup
@@ -208,7 +209,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 					break
 				}
 			}
-			framework.ExpectNotEqual(group, nil, "apiextensions.k8s.io API group not found in /apis discovery document")
+			e2eutils.ExpectNotEqual(group, nil, "apiextensions.k8s.io API group not found in /apis discovery document")
 
 			ginkgo.By("finding the apiextensions.k8s.io/v1 API group/version in the /apis discovery document")
 			var version *metav1.GroupVersionForDiscovery
@@ -218,15 +219,15 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 					break
 				}
 			}
-			framework.ExpectNotEqual(version, nil, "apiextensions.k8s.io/v1 API group version not found in /apis discovery document")
+			e2eutils.ExpectNotEqual(version, nil, "apiextensions.k8s.io/v1 API group version not found in /apis discovery document")
 		}
 
 		{
 			ginkgo.By("fetching the /apis/apiextensions.k8s.io discovery document")
 			group := &metav1.APIGroup{}
 			err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis/apiextensions.k8s.io").Do(context.TODO()).Into(group)
-			framework.ExpectNoError(err, "fetching /apis/apiextensions.k8s.io")
-			framework.ExpectEqual(group.Name, v1.GroupName, "verifying API group name in /apis/apiextensions.k8s.io discovery document")
+			e2eutils.ExpectNoError(err, "fetching /apis/apiextensions.k8s.io")
+			e2eutils.ExpectEqual(group.Name, v1.GroupName, "verifying API group name in /apis/apiextensions.k8s.io discovery document")
 
 			ginkgo.By("finding the apiextensions.k8s.io/v1 API group/version in the /apis/apiextensions.k8s.io discovery document")
 			var version *metav1.GroupVersionForDiscovery
@@ -236,15 +237,15 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 					break
 				}
 			}
-			framework.ExpectNotEqual(version, nil, "apiextensions.k8s.io/v1 API group version not found in /apis/apiextensions.k8s.io discovery document")
+			e2eutils.ExpectNotEqual(version, nil, "apiextensions.k8s.io/v1 API group version not found in /apis/apiextensions.k8s.io discovery document")
 		}
 
 		{
 			ginkgo.By("fetching the /apis/apiextensions.k8s.io/v1 discovery document")
 			apiResourceList := &metav1.APIResourceList{}
 			err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis/apiextensions.k8s.io/v1").Do(context.TODO()).Into(apiResourceList)
-			framework.ExpectNoError(err, "fetching /apis/apiextensions.k8s.io/v1")
-			framework.ExpectEqual(apiResourceList.GroupVersion, v1.SchemeGroupVersion.String(), "verifying API group/version in /apis/apiextensions.k8s.io/v1 discovery document")
+			e2eutils.ExpectNoError(err, "fetching /apis/apiextensions.k8s.io/v1")
+			e2eutils.ExpectEqual(apiResourceList.GroupVersion, v1.SchemeGroupVersion.String(), "verifying API group/version in /apis/apiextensions.k8s.io/v1 discovery document")
 
 			ginkgo.By("finding customresourcedefinitions resources in the /apis/apiextensions.k8s.io/v1 discovery document")
 			var crdResource *metav1.APIResource
@@ -253,7 +254,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 					crdResource = &apiResourceList.APIResources[i]
 				}
 			}
-			framework.ExpectNotEqual(crdResource, nil, "customresourcedefinitions resource not found in /apis/apiextensions.k8s.io/v1 discovery document")
+			e2eutils.ExpectNotEqual(crdResource, nil, "customresourcedefinitions resource not found in /apis/apiextensions.k8s.io/v1 discovery document")
 		}
 	})
 
@@ -265,12 +266,12 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 		new field is defaulted, but old default stays.
 	*/
 	framework.ConformanceIt("custom resource defaulting for requests and from storage works ", func() {
-		config, err := framework.LoadConfig()
-		framework.ExpectNoError(err, "loading config")
+		config, err := e2eutils.LoadConfig()
+		e2eutils.ExpectNoError(err, "loading config")
 		apiExtensionClient, err := clientset.NewForConfig(config)
-		framework.ExpectNoError(err, "initializing apiExtensionClient")
+		e2eutils.ExpectNoError(err, "initializing apiExtensionClient")
 		dynamicClient, err := dynamic.NewForConfig(config)
-		framework.ExpectNoError(err, "initializing dynamic client")
+		e2eutils.ExpectNoError(err, "initializing dynamic client")
 
 		// Create CRD without default and waits for the resource to be recognized and available.
 		crd := fixtures.NewRandomNameV1CustomResourceDefinition(v1.ClusterScoped)
@@ -280,10 +281,10 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 		crd.Spec.Versions[0].Schema.OpenAPIV3Schema.Properties["a"] = v1.JSONSchemaProps{Type: "string"}
 		crd.Spec.Versions[0].Schema.OpenAPIV3Schema.Properties["b"] = v1.JSONSchemaProps{Type: "string"}
 		crd, err = fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
-		framework.ExpectNoError(err, "creating CustomResourceDefinition")
+		e2eutils.ExpectNoError(err, "creating CustomResourceDefinition")
 		defer func() {
 			err = fixtures.DeleteV1CustomResourceDefinition(crd, apiExtensionClient)
-			framework.ExpectNoError(err, "deleting CustomResourceDefinition")
+			e2eutils.ExpectNoError(err, "deleting CustomResourceDefinition")
 		}()
 
 		// create CR without default in storage
@@ -301,13 +302,13 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 				"name": name1,
 			},
 		}}, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "creating CR")
+		e2eutils.ExpectNoError(err, "creating CR")
 
 		// Setting default for a to "A" and waiting for the CR to get defaulted on read
 		crd, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Patch(context.TODO(), crd.Name, types.JSONPatchType, []byte(`[
 			{"op":"add","path":"/spec/versions/0/schema/openAPIV3Schema/properties/a/default", "value": "A"}
 		]`), metav1.PatchOptions{})
-		framework.ExpectNoError(err, "setting default for a to \"A\" in schema")
+		e2eutils.ExpectNoError(err, "setting default for a to \"A\" in schema")
 
 		err = wait.PollImmediate(time.Millisecond*100, wait.ForeverTestTimeout, func() (bool, error) {
 			u1, err := crClient.Get(context.TODO(), name1, metav1.GetOptions{})
@@ -326,7 +327,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 			}
 			return true, nil
 		})
-		framework.ExpectNoError(err, "waiting for CR to be defaulted on read")
+		e2eutils.ExpectNoError(err, "waiting for CR to be defaulted on read")
 
 		// create CR with default in storage
 		name2 := names.SimpleNameGenerator.GenerateName("cr-2")
@@ -337,19 +338,19 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 				"name": name2,
 			},
 		}}, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "creating CR")
+		e2eutils.ExpectNoError(err, "creating CR")
 		v, found, err := unstructured.NestedFieldNoCopy(u2.Object, "a")
 		if !found {
-			framework.Failf("field `a` should have been defaulted in %+v", u2.Object)
+			e2eutils.Failf("field `a` should have been defaulted in %+v", u2.Object)
 		}
-		framework.ExpectEqual(v, "A", "\"a\" is defaulted to \"A\"")
+		e2eutils.ExpectEqual(v, "A", "\"a\" is defaulted to \"A\"")
 
 		// Deleting default for a, adding default "B" for b and waiting for the CR to get defaulted on read for b
 		crd, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Patch(context.TODO(), crd.Name, types.JSONPatchType, []byte(`[
 			{"op":"remove","path":"/spec/versions/0/schema/openAPIV3Schema/properties/a/default"},
 			{"op":"add","path":"/spec/versions/0/schema/openAPIV3Schema/properties/b/default", "value": "B"}
 		]`), metav1.PatchOptions{})
-		framework.ExpectNoError(err, "setting default for b to \"B\" and remove default for a")
+		e2eutils.ExpectNoError(err, "setting default for b to \"B\" and remove default for a")
 
 		err = wait.PollImmediate(time.Millisecond*100, wait.ForeverTestTimeout, func() (bool, error) {
 			u2, err := crClient.Get(context.TODO(), name2, metav1.GetOptions{})
@@ -378,7 +379,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 			}
 			return true, nil
 		})
-		framework.ExpectNoError(err, "waiting for CR to be defaulted on read for b and a staying the same")
+		e2eutils.ExpectNoError(err, "waiting for CR to be defaulted on read for b and a staying the same")
 	})
 
 })
@@ -386,7 +387,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 func unstructuredToCRD(obj *unstructured.Unstructured) *v1.CustomResourceDefinition {
 	crd := new(v1.CustomResourceDefinition)
 	err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, crd)
-	framework.ExpectNoError(err, "converting unstructured to CustomResourceDefinition")
+	e2eutils.ExpectNoError(err, "converting unstructured to CustomResourceDefinition")
 	return crd
 }
 
@@ -396,5 +397,5 @@ func expectCondition(conditions []v1.CustomResourceDefinitionCondition, expected
 			return
 		}
 	}
-	framework.Failf("Condition %#v not found in conditions %#v", expected, conditions)
+	e2eutils.Failf("Condition %#v not found in conditions %#v", expected, conditions)
 }

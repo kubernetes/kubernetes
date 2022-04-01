@@ -19,6 +19,8 @@ package autoscaling
 import (
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eautoscaling "k8s.io/kubernetes/test/e2e/framework/autoscaling"
 
@@ -78,10 +80,10 @@ var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (n
 			timeWaited := time.Now().Sub(waitStart)
 
 			ginkgo.By("verifying time waited for a scale down")
-			framework.Logf("time waited for scale down: %s", timeWaited)
-			framework.ExpectEqual(timeWaited > downScaleStabilization, true, "waited %s, wanted more than %s", timeWaited, downScaleStabilization)
+			e2eutils.Logf("time waited for scale down: %s", timeWaited)
+			e2eutils.ExpectEqual(timeWaited > downScaleStabilization, true, "waited %s, wanted more than %s", timeWaited, downScaleStabilization)
 			deadline := downScaleStabilization + maxHPAReactionTime + maxResourceConsumerDelay
-			framework.ExpectEqual(timeWaited < deadline, true, "waited %s, wanted less than %s", timeWaited, deadline)
+			e2eutils.ExpectEqual(timeWaited < deadline, true, "waited %s, wanted less than %s", timeWaited, deadline)
 		})
 	})
 })

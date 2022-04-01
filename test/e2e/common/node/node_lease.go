@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	coordinationv1 "k8s.io/api/coordination/v1"
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -42,7 +44,7 @@ var _ = SIGDescribe("NodeLease", func() {
 
 	ginkgo.BeforeEach(func() {
 		node, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		nodeName = node.Name
 	})
 
@@ -103,9 +105,9 @@ var _ = SIGDescribe("NodeLease", func() {
 			for i := range leaseList.Items {
 				lease := &leaseList.Items[i]
 				ownerRefs := lease.ObjectMeta.OwnerReferences
-				framework.ExpectEqual(len(ownerRefs), 1)
-				framework.ExpectEqual(ownerRefs[0].Kind, v1.SchemeGroupVersion.WithKind("Node").Kind)
-				framework.ExpectEqual(ownerRefs[0].APIVersion, v1.SchemeGroupVersion.WithKind("Node").Version)
+				e2eutils.ExpectEqual(len(ownerRefs), 1)
+				e2eutils.ExpectEqual(ownerRefs[0].Kind, v1.SchemeGroupVersion.WithKind("Node").Kind)
+				e2eutils.ExpectEqual(ownerRefs[0].APIVersion, v1.SchemeGroupVersion.WithKind("Node").Version)
 			}
 		})
 
@@ -141,23 +143,23 @@ var _ = SIGDescribe("NodeLease", func() {
 				if currentHeartbeatTime == lastHeartbeatTime {
 					if currentObserved.Sub(lastObserved) > 2*leaseDuration {
 						// heartbeat hasn't changed while watching for at least 2*leaseDuration, success!
-						framework.Logf("node status heartbeat is unchanged for %s, was waiting for at least %s, success!", currentObserved.Sub(lastObserved), 2*leaseDuration)
+						e2eutils.Logf("node status heartbeat is unchanged for %s, was waiting for at least %s, success!", currentObserved.Sub(lastObserved), 2*leaseDuration)
 						return true, nil
 					}
-					framework.Logf("node status heartbeat is unchanged for %s, waiting for %s", currentObserved.Sub(lastObserved), 2*leaseDuration)
+					e2eutils.Logf("node status heartbeat is unchanged for %s, waiting for %s", currentObserved.Sub(lastObserved), 2*leaseDuration)
 					return false, nil
 				}
 
 				if currentHeartbeatTime.Sub(lastHeartbeatTime) >= leaseDuration {
 					// heartbeat time changed, but the diff was greater than leaseDuration, success!
-					framework.Logf("node status heartbeat changed in %s, was waiting for at least %s, success!", currentHeartbeatTime.Sub(lastHeartbeatTime), leaseDuration)
+					e2eutils.Logf("node status heartbeat changed in %s, was waiting for at least %s, success!", currentHeartbeatTime.Sub(lastHeartbeatTime), leaseDuration)
 					return true, nil
 				}
 
 				if !apiequality.Semantic.DeepEqual(lastStatus, currentStatus) {
 					// heartbeat time changed, but there were relevant changes in the status, keep waiting
-					framework.Logf("node status heartbeat changed in %s (with other status changes), waiting for %s", currentHeartbeatTime.Sub(lastHeartbeatTime), leaseDuration)
-					framework.Logf("%s", diff.ObjectReflectDiff(lastStatus, currentStatus))
+					e2eutils.Logf("node status heartbeat changed in %s (with other status changes), waiting for %s", currentHeartbeatTime.Sub(lastHeartbeatTime), leaseDuration)
+					e2eutils.Logf("%s", diff.ObjectReflectDiff(lastStatus, currentStatus))
 					lastHeartbeatTime = currentHeartbeatTime
 					lastObserved = currentObserved
 					lastStatus = currentStatus
@@ -169,7 +171,7 @@ var _ = SIGDescribe("NodeLease", func() {
 			})
 			// a timeout is acceptable, since it means we waited 5 minutes and didn't see any unwarranted node status updates
 			if err != nil && err != wait.ErrWaitTimeout {
-				framework.ExpectNoError(err, "error waiting for infrequent nodestatus update")
+				e2eutils.ExpectNoError(err, "error waiting for infrequent nodestatus update")
 			}
 
 			ginkgo.By("verify node is still in ready status even though node status report is infrequent")
@@ -177,18 +179,18 @@ var _ = SIGDescribe("NodeLease", func() {
 			// running as cluster e2e test, because node e2e test does not create and
 			// run controller manager, i.e., no node lifecycle controller.
 			node, err := f.ClientSet.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			_, readyCondition := testutils.GetNodeCondition(&node.Status, v1.NodeReady)
-			framework.ExpectEqual(readyCondition.Status, v1.ConditionTrue)
+			e2eutils.ExpectEqual(readyCondition.Status, v1.ConditionTrue)
 		})
 	})
 })
 
 func getHeartbeatTimeAndStatus(clientSet clientset.Interface, nodeName string) (time.Time, v1.NodeStatus) {
 	node, err := clientSet.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	_, readyCondition := testutils.GetNodeCondition(&node.Status, v1.NodeReady)
-	framework.ExpectEqual(readyCondition.Status, v1.ConditionTrue)
+	e2eutils.ExpectEqual(readyCondition.Status, v1.ConditionTrue)
 	heartbeatTime := readyCondition.LastHeartbeatTime.Time
 	readyCondition.LastHeartbeatTime = metav1.Time{}
 	return heartbeatTime, node.Status

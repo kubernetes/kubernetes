@@ -26,8 +26,7 @@ import (
 	"time"
 
 	"k8s.io/klog/v2"
-
-	"k8s.io/kubernetes/test/e2e/framework"
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 	"k8s.io/kubernetes/test/e2e_node/builder"
 	"k8s.io/kubernetes/test/utils"
 )
@@ -281,7 +280,7 @@ func (c *ConformanceRemote) RunTest(host, workspace, results, imageDesc, junitFi
 		return "", err
 	}
 
-	bearerToken, err := framework.GenerateSecureToken(16)
+	bearerToken, err := e2econfig.GenerateSecureToken(16)
 	if err != nil {
 		return "", err
 	}

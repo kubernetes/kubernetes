@@ -20,6 +20,9 @@ import (
 	"context"
 	"fmt"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 
@@ -129,7 +132,7 @@ func (p *ephemeralTestSuite) DefineTests(driver storageframework.TestDriver, pat
 			// perhaps this test is run against an older Kubernetes
 			// where the feature might be disabled.
 			enabled, err := GenericEphemeralVolumesEnabled(f.ClientSet, f.Timeouts, f.Namespace.Name)
-			framework.ExpectNoError(err, "check GenericEphemeralVolume feature")
+			e2eutils.ExpectNoError(err, "check GenericEphemeralVolume feature")
 			if !enabled {
 				e2eskipper.Skipf("Cluster doesn't support %q volumes -- skipping", pattern.VolType)
 			}
@@ -169,7 +172,7 @@ func (p *ephemeralTestSuite) DefineTests(driver storageframework.TestDriver, pat
 		cleanUpErrs = append(cleanUpErrs, l.resource.CleanupResource())
 		cleanUpErrs = append(cleanUpErrs, storageutils.TryFunc(l.driverCleanup))
 		err := utilerrors.NewAggregate(cleanUpErrs)
-		framework.ExpectNoError(err, "while cleaning up")
+		e2eutils.ExpectNoError(err, "while cleaning up")
 	}
 
 	ginkgo.It("should create read-only inline ephemeral volume", func() {
@@ -183,11 +186,11 @@ func (p *ephemeralTestSuite) DefineTests(driver storageframework.TestDriver, pat
 		l.testCase.ReadOnly = true
 		l.testCase.RunningPodCheck = func(pod *v1.Pod) interface{} {
 			command := "mount | grep /mnt/test | grep ro,"
-			if framework.NodeOSDistroIs("windows") {
+			if e2eutils.NodeOSDistroIs("windows") {
 				// attempt to create a dummy file and expect for it not to be created
 				command = "ls /mnt/test* && (touch /mnt/test-0/hello-world || true) && [ ! -f /mnt/test-0/hello-world ]"
 			}
-			e2evolume.VerifyExecInPodSucceed(f, pod, command)
+			e2evolume.VerifyExecInPodSucceed(f.ClientSet, f.Namespace.Name, pod, command)
 			return nil
 		}
 		l.testCase.TestEphemeral()
@@ -200,14 +203,14 @@ func (p *ephemeralTestSuite) DefineTests(driver storageframework.TestDriver, pat
 		l.testCase.ReadOnly = false
 		l.testCase.RunningPodCheck = func(pod *v1.Pod) interface{} {
 			command := "mount | grep /mnt/test | grep rw,"
-			if framework.NodeOSDistroIs("windows") {
+			if e2eutils.NodeOSDistroIs("windows") {
 				// attempt to create a dummy file and expect for it to be created
 				command = "ls /mnt/test* && touch /mnt/test-0/hello-world && [ -f /mnt/test-0/hello-world ]"
 			}
 			if pattern.VolMode == v1.PersistentVolumeBlock {
 				command = "if ! [ -b /mnt/test-0 ]; then echo /mnt/test-0 is not a block device; exit 1; fi"
 			}
-			e2evolume.VerifyExecInPodSucceed(f, pod, command)
+			e2evolume.VerifyExecInPodSucceed(f.ClientSet, f.Namespace.Name, pod, command)
 			return nil
 		}
 		l.testCase.TestEphemeral()
@@ -231,7 +234,7 @@ func (p *ephemeralTestSuite) DefineTests(driver storageframework.TestDriver, pat
 				[]v1.VolumeSource{pod.Spec.Volumes[0].VolumeSource},
 				readOnly,
 				l.testCase.Node)
-			framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod2.Name, pod2.Namespace, f.Timeouts.PodStartSlow), "waiting for second pod with inline volume")
+			e2eutils.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod2.Name, pod2.Namespace, f.Timeouts.PodStartSlow), "waiting for second pod with inline volume")
 
 			// If (and only if) we were able to mount
 			// read/write and volume data is not shared
@@ -240,8 +243,8 @@ func (p *ephemeralTestSuite) DefineTests(driver storageframework.TestDriver, pat
 			// visible in the other.
 			if pattern.VolMode != v1.PersistentVolumeBlock && !readOnly && !shared {
 				ginkgo.By("writing data in one pod and checking the second does not see it (it should get its own volume)")
-				e2evolume.VerifyExecInPodSucceed(f, pod, "touch /mnt/test-0/hello-world")
-				e2evolume.VerifyExecInPodSucceed(f, pod2, "[ ! -f /mnt/test-0/hello-world ]")
+				e2evolume.VerifyExecInPodSucceed(f.ClientSet, f.Namespace.Name, pod, "touch /mnt/test-0/hello-world")
+				e2evolume.VerifyExecInPodSucceed(f.ClientSet, f.Namespace.Name, pod2, "[ ! -f /mnt/test-0/hello-world ]")
 			}
 
 			defer StopPodAndDependents(f.ClientSet, f.Timeouts, pod2)
@@ -269,7 +272,7 @@ func (p *ephemeralTestSuite) DefineTests(driver storageframework.TestDriver, pat
 // Not all parameters are used by all tests.
 type EphemeralTest struct {
 	Client     clientset.Interface
-	Timeouts   *framework.TimeoutContext
+	Timeouts   *e2econfig.TimeoutContext
 	Namespace  string
 	DriverName string
 	VolSource  *v1.VolumeSource
@@ -339,7 +342,7 @@ func (t EphemeralTest) TestEphemeral() {
 		case t.VolSource != nil:
 			volume = *t.VolSource
 		default:
-			framework.Failf("EphemeralTest has neither GetVolume nor VolSource")
+			e2eutils.Failf("EphemeralTest has neither GetVolume nor VolSource")
 		}
 		volumes = append(volumes, volume)
 	}
@@ -348,9 +351,9 @@ func (t EphemeralTest) TestEphemeral() {
 		// pod might be nil now.
 		StopPodAndDependents(client, t.Timeouts, pod)
 	}()
-	framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(client, pod.Name, pod.Namespace, t.Timeouts.PodStartSlow), "waiting for pod with inline volume")
+	e2eutils.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(client, pod.Name, pod.Namespace, t.Timeouts.PodStartSlow), "waiting for pod with inline volume")
 	runningPod, err := client.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err, "get pod")
+	e2eutils.ExpectNoError(err, "get pod")
 	actualNodeName := runningPod.Spec.NodeName
 
 	// Run the checker of the running pod.
@@ -365,7 +368,7 @@ func (t EphemeralTest) TestEphemeral() {
 	// There should be no dangling PVCs in the namespace now. There might be for
 	// generic ephemeral volumes, if something went wrong...
 	pvcs, err := client.CoreV1().PersistentVolumeClaims(t.Namespace).List(context.TODO(), metav1.ListOptions{})
-	framework.ExpectNoError(err, "list PVCs")
+	e2eutils.ExpectNoError(err, "list PVCs")
 	gomega.Expect(pvcs.Items).Should(gomega.BeEmpty(), "no dangling PVCs")
 
 	if t.StoppedPodCheck != nil {
@@ -427,13 +430,13 @@ func StartInPodWithInlineVolume(c clientset.Interface, ns, podName, command stri
 	}
 
 	pod, err := c.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
-	framework.ExpectNoError(err, "failed to create pod")
+	e2eutils.ExpectNoError(err, "failed to create pod")
 	return pod
 }
 
 // CSIInlineVolumesEnabled checks whether the running cluster has the CSIInlineVolumes feature gate enabled.
 // It does that by trying to create a pod that uses that feature.
-func CSIInlineVolumesEnabled(c clientset.Interface, t *framework.TimeoutContext, ns string) (bool, error) {
+func CSIInlineVolumesEnabled(c clientset.Interface, t *e2econfig.TimeoutContext, ns string) (bool, error) {
 	return VolumeSourceEnabled(c, t, ns, v1.VolumeSource{
 		CSI: &v1.CSIVolumeSource{
 			Driver: "no-such-driver.example.com",
@@ -443,7 +446,7 @@ func CSIInlineVolumesEnabled(c clientset.Interface, t *framework.TimeoutContext,
 
 // GenericEphemeralVolumesEnabled checks whether the running cluster has the GenericEphemeralVolume feature gate enabled.
 // It does that by trying to create a pod that uses that feature.
-func GenericEphemeralVolumesEnabled(c clientset.Interface, t *framework.TimeoutContext, ns string) (bool, error) {
+func GenericEphemeralVolumesEnabled(c clientset.Interface, t *e2econfig.TimeoutContext, ns string) (bool, error) {
 	storageClassName := "no-such-storage-class"
 	return VolumeSourceEnabled(c, t, ns, v1.VolumeSource{
 		Ephemeral: &v1.EphemeralVolumeSource{
@@ -464,7 +467,7 @@ func GenericEphemeralVolumesEnabled(c clientset.Interface, t *framework.TimeoutC
 
 // VolumeSourceEnabled checks whether a certain kind of volume source is enabled by trying
 // to create a pod that uses it.
-func VolumeSourceEnabled(c clientset.Interface, t *framework.TimeoutContext, ns string, volume v1.VolumeSource) (bool, error) {
+func VolumeSourceEnabled(c clientset.Interface, t *e2econfig.TimeoutContext, ns string, volume v1.VolumeSource) (bool, error) {
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",

@@ -18,7 +18,9 @@ package network
 
 import (
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 	"k8s.io/kubernetes/test/e2e/network/common"
 	"k8s.io/kubernetes/test/e2e/network/scale"
 
@@ -44,21 +46,21 @@ var _ = common.SIGDescribe("Loadbalancing: L7 Scalability", func() {
 		ginkgo.BeforeEach(func() {
 			e2eskipper.SkipUnlessProviderIs("gce", "gke")
 
-			scaleFramework = scale.NewIngressScaleFramework(f.ClientSet, ns, framework.TestContext.CloudConfig)
+			scaleFramework = scale.NewIngressScaleFramework(f.ClientSet, ns, e2econfig.TestContext.CloudConfig)
 			if err := scaleFramework.PrepareScaleTest(); err != nil {
-				framework.Failf("Unexpected error while preparing ingress scale test: %v", err)
+				e2eutils.Failf("Unexpected error while preparing ingress scale test: %v", err)
 			}
 		})
 
 		ginkgo.AfterEach(func() {
 			if errs := scaleFramework.CleanupScaleTest(); len(errs) != 0 {
-				framework.Failf("Unexpected error while cleaning up ingress scale test: %v", errs)
+				e2eutils.Failf("Unexpected error while cleaning up ingress scale test: %v", errs)
 			}
 		})
 
 		ginkgo.It("Creating and updating ingresses should happen promptly with small/medium/large amount of ingresses", func() {
 			if errs := scaleFramework.RunScaleTest(); len(errs) != 0 {
-				framework.Failf("Unexpected error while running ingress scale test: %v", errs)
+				e2eutils.Failf("Unexpected error while running ingress scale test: %v", errs)
 			}
 
 		})

@@ -38,6 +38,8 @@ package drivers
 import (
 	"context"
 	"fmt"
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -125,7 +127,7 @@ func (n *nfsDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) {
 
 func (n *nfsDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) *v1.VolumeSource {
 	nv, ok := e2evolume.(*nfsVolume)
-	framework.ExpectEqual(ok, true, "Failed to cast test volume to NFS test volume")
+	e2eutils.ExpectEqual(ok, true, "Failed to cast test volume to NFS test volume")
 	return &v1.VolumeSource{
 		NFS: &v1.NFSVolumeSource{
 			Server:   nv.serverHost,
@@ -137,7 +139,7 @@ func (n *nfsDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume stor
 
 func (n *nfsDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	nv, ok := e2evolume.(*nfsVolume)
-	framework.ExpectEqual(ok, true, "Failed to cast test volume to NFS test volume")
+	e2eutils.ExpectEqual(ok, true, "Failed to cast test volume to NFS test volume")
 	return &v1.PersistentVolumeSource{
 		NFS: &v1.NFSVolumeSource{
 			Server:   nv.serverHost,
@@ -164,12 +166,12 @@ func (n *nfsDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTe
 	// is not enough. We should create new clusterrole for testing.
 	err := e2eauth.BindClusterRole(cs.RbacV1(), "cluster-admin", ns.Name,
 		rbacv1.Subject{Kind: rbacv1.ServiceAccountKind, Namespace: ns.Name, Name: "default"})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	err = e2eauth.WaitForAuthorizationUpdate(cs.AuthorizationV1(),
 		serviceaccount.MakeUsername(ns.Name, "default"),
 		"", "get", schema.GroupResource{Group: "storage.k8s.io", Resource: "storageclasses"}, true)
-	framework.ExpectNoError(err, "Failed to update authorization: %v", err)
+	e2eutils.ExpectNoError(err, "Failed to update authorization: %v", err)
 
 	ginkgo.By("creating an external dynamic provisioner pod")
 	n.externalProvisionerPod = utils.StartExternalProvisioner(cs, ns.Name, n.externalPluginName)
@@ -179,7 +181,7 @@ func (n *nfsDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTe
 			Prefix:    "nfs",
 			Framework: f,
 		}, func() {
-			framework.ExpectNoError(e2epod.DeletePodWithWait(cs, n.externalProvisionerPod))
+			e2eutils.ExpectNoError(e2epod.DeletePodWithWait(cs, n.externalProvisionerPod))
 			clusterRoleBindingName := ns.Name + "--" + "cluster-admin"
 			cs.RbacV1().ClusterRoleBindings().Delete(context.TODO(), clusterRoleBindingName, *metav1.NewDeleteOptions(0))
 		}
@@ -207,7 +209,7 @@ func (n *nfsDriver) CreateVolume(config *storageframework.PerTestConfig, volType
 	case storageframework.DynamicPV:
 		// Do nothing
 	default:
-		framework.Failf("Unsupported volType:%v is specified", volType)
+		e2eutils.Failf("Unsupported volType:%v is specified", volType)
 	}
 	return nil
 }
@@ -265,7 +267,7 @@ func (g *glusterFSDriver) SkipUnsupportedTest(pattern storageframework.TestPatte
 
 func (g *glusterFSDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) *v1.VolumeSource {
 	gv, ok := e2evolume.(*glusterVolume)
-	framework.ExpectEqual(ok, true, "Failed to cast test volume to Gluster test volume")
+	e2eutils.ExpectEqual(ok, true, "Failed to cast test volume to Gluster test volume")
 
 	name := gv.prefix + "-server"
 	return &v1.VolumeSource{
@@ -280,7 +282,7 @@ func (g *glusterFSDriver) GetVolumeSource(readOnly bool, fsType string, e2evolum
 
 func (g *glusterFSDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	gv, ok := e2evolume.(*glusterVolume)
-	framework.ExpectEqual(ok, true, "Failed to cast test volume to Gluster test volume")
+	e2eutils.ExpectEqual(ok, true, "Failed to cast test volume to Gluster test volume")
 
 	name := gv.prefix + "-server"
 	return &v1.PersistentVolumeSource{
@@ -324,28 +326,28 @@ func (v *glusterVolume) DeleteVolume() {
 
 	nameSpaceName := fmt.Sprintf("%s/%s", ns.Name, name)
 
-	framework.Logf("Deleting Gluster endpoints %s...", nameSpaceName)
+	e2eutils.Logf("Deleting Gluster endpoints %s...", nameSpaceName)
 	err := cs.CoreV1().Endpoints(ns.Name).Delete(context.TODO(), name, metav1.DeleteOptions{})
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
-			framework.Failf("Gluster deleting endpoint %s failed: %v", nameSpaceName, err)
+			e2eutils.Failf("Gluster deleting endpoint %s failed: %v", nameSpaceName, err)
 		}
-		framework.Logf("Gluster endpoints %q not found, assuming deleted", nameSpaceName)
+		e2eutils.Logf("Gluster endpoints %q not found, assuming deleted", nameSpaceName)
 	}
 
-	framework.Logf("Deleting Gluster service %s...", nameSpaceName)
+	e2eutils.Logf("Deleting Gluster service %s...", nameSpaceName)
 	err = cs.CoreV1().Services(ns.Name).Delete(context.TODO(), name, metav1.DeleteOptions{})
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
-			framework.Failf("Gluster deleting service %s failed: %v", nameSpaceName, err)
+			e2eutils.Failf("Gluster deleting service %s failed: %v", nameSpaceName, err)
 		}
-		framework.Logf("Gluster service %q not found, assuming deleted", nameSpaceName)
+		e2eutils.Logf("Gluster service %q not found, assuming deleted", nameSpaceName)
 	}
 
-	framework.Logf("Deleting Gluster server pod %q...", v.serverPod.Name)
+	e2eutils.Logf("Deleting Gluster server pod %q...", v.serverPod.Name)
 	err = e2epod.DeletePodWithWait(cs, v.serverPod)
 	if err != nil {
-		framework.Failf("Gluster server pod delete failed: %v", err)
+		e2eutils.Failf("Gluster server pod delete failed: %v", err)
 	}
 }
 
@@ -400,7 +402,7 @@ func (i *iSCSIDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) 
 
 func (i *iSCSIDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) *v1.VolumeSource {
 	iv, ok := e2evolume.(*iSCSIVolume)
-	framework.ExpectEqual(ok, true, "Failed to cast test volume to iSCSI test volume")
+	e2eutils.ExpectEqual(ok, true, "Failed to cast test volume to iSCSI test volume")
 
 	volSource := v1.VolumeSource{
 		ISCSI: &v1.ISCSIVolumeSource{
@@ -418,7 +420,7 @@ func (i *iSCSIDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume st
 
 func (i *iSCSIDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	iv, ok := e2evolume.(*iSCSIVolume)
-	framework.ExpectEqual(ok, true, "Failed to cast test volume to iSCSI test volume")
+	e2eutils.ExpectEqual(ok, true, "Failed to cast test volume to iSCSI test volume")
 
 	pvSource := v1.PersistentVolumeSource{
 		ISCSI: &v1.ISCSIPersistentVolumeSource{
@@ -515,7 +517,7 @@ func newRBDServer(cs clientset.Interface, namespace string) (config e2evolume.Te
 
 	secret, err := cs.CoreV1().Secrets(config.Namespace).Create(context.TODO(), secret, metav1.CreateOptions{})
 	if err != nil {
-		framework.Failf("Failed to create secrets for Ceph RBD: %v", err)
+		e2eutils.Failf("Failed to create secrets for Ceph RBD: %v", err)
 	}
 
 	return config, pod, secret, ip
@@ -577,7 +579,7 @@ func (r *rbdDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) {
 
 func (r *rbdDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) *v1.VolumeSource {
 	rv, ok := e2evolume.(*rbdVolume)
-	framework.ExpectEqual(ok, true, "Failed to cast test volume to RBD test volume")
+	e2eutils.ExpectEqual(ok, true, "Failed to cast test volume to RBD test volume")
 
 	volSource := v1.VolumeSource{
 		RBD: &v1.RBDVolumeSource{
@@ -599,7 +601,7 @@ func (r *rbdDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume stor
 
 func (r *rbdDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	rv, ok := e2evolume.(*rbdVolume)
-	framework.ExpectEqual(ok, true, "Failed to cast test volume to RBD test volume")
+	e2eutils.ExpectEqual(ok, true, "Failed to cast test volume to RBD test volume")
 
 	f := rv.f
 	ns := f.Namespace
@@ -700,7 +702,7 @@ func (c *cephFSDriver) SkipUnsupportedTest(pattern storageframework.TestPattern)
 
 func (c *cephFSDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) *v1.VolumeSource {
 	cv, ok := e2evolume.(*cephVolume)
-	framework.ExpectEqual(ok, true, "Failed to cast test volume to Ceph test volume")
+	e2eutils.ExpectEqual(ok, true, "Failed to cast test volume to Ceph test volume")
 
 	return &v1.VolumeSource{
 		CephFS: &v1.CephFSVolumeSource{
@@ -716,7 +718,7 @@ func (c *cephFSDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume s
 
 func (c *cephFSDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	cv, ok := e2evolume.(*cephVolume)
-	framework.ExpectEqual(ok, true, "Failed to cast test volume to Ceph test volume")
+	e2eutils.ExpectEqual(ok, true, "Failed to cast test volume to Ceph test volume")
 
 	ns := cv.f.Namespace
 
@@ -823,7 +825,7 @@ func (h *hostPathDriver) CreateVolume(config *storageframework.PerTestConfig, vo
 
 	// pods should be scheduled on the node
 	node, err := e2enode.GetRandomReadySchedulableNode(cs)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	config.ClientNodeSelection = e2epod.NodeSelection{Name: node.Name}
 	return nil
 }
@@ -874,7 +876,7 @@ func (h *hostPathSymlinkDriver) SkipUnsupportedTest(pattern storageframework.Tes
 
 func (h *hostPathSymlinkDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) *v1.VolumeSource {
 	hv, ok := e2evolume.(*hostPathSymlinkVolume)
-	framework.ExpectEqual(ok, true, "Failed to cast test volume to Hostpath Symlink test volume")
+	e2eutils.ExpectEqual(ok, true, "Failed to cast test volume to Hostpath Symlink test volume")
 
 	// hostPathSymlink doesn't support readOnly volume
 	if readOnly {
@@ -905,7 +907,7 @@ func (h *hostPathSymlinkDriver) CreateVolume(config *storageframework.PerTestCon
 
 	// pods should be scheduled on the node
 	node, err := e2enode.GetRandomReadySchedulableNode(cs)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	config.ClientNodeSelection = e2epod.NodeSelection{Name: node.Name}
 
 	cmd := fmt.Sprintf("mkdir %v -m 777 && ln -s %v %v", sourcePath, sourcePath, targetPath)
@@ -949,13 +951,13 @@ func (h *hostPathSymlinkDriver) CreateVolume(config *storageframework.PerTestCon
 	}
 	// h.prepPod will be reused in cleanupDriver.
 	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), prepPod, metav1.CreateOptions{})
-	framework.ExpectNoError(err, "while creating hostPath init pod")
+	e2eutils.ExpectNoError(err, "while creating hostPath init pod")
 
 	err = e2epod.WaitForPodSuccessInNamespaceTimeout(f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodStart)
-	framework.ExpectNoError(err, "while waiting for hostPath init pod to succeed")
+	e2eutils.ExpectNoError(err, "while waiting for hostPath init pod to succeed")
 
 	err = e2epod.DeletePodWithWait(f.ClientSet, pod)
-	framework.ExpectNoError(err, "while deleting hostPath init pod")
+	e2eutils.ExpectNoError(err, "while deleting hostPath init pod")
 	return &hostPathSymlinkVolume{
 		sourcePath: sourcePath,
 		targetPath: targetPath,
@@ -971,13 +973,13 @@ func (v *hostPathSymlinkVolume) DeleteVolume() {
 	v.prepPod.Spec.Containers[0].Command = []string{"/bin/sh", "-ec", cmd}
 
 	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), v.prepPod, metav1.CreateOptions{})
-	framework.ExpectNoError(err, "while creating hostPath teardown pod")
+	e2eutils.ExpectNoError(err, "while creating hostPath teardown pod")
 
 	err = e2epod.WaitForPodSuccessInNamespaceTimeout(f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodStart)
-	framework.ExpectNoError(err, "while waiting for hostPath teardown pod to succeed")
+	e2eutils.ExpectNoError(err, "while waiting for hostPath teardown pod to succeed")
 
 	err = e2epod.DeletePodWithWait(f.ClientSet, pod)
-	framework.ExpectNoError(err, "while deleting hostPath teardown pod")
+	e2eutils.ExpectNoError(err, "while deleting hostPath teardown pod")
 }
 
 // emptydir
@@ -1094,7 +1096,7 @@ func (c *cinderDriver) SkipUnsupportedTest(pattern storageframework.TestPattern)
 
 func (c *cinderDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) *v1.VolumeSource {
 	cv, ok := e2evolume.(*cinderVolume)
-	framework.ExpectEqual(ok, true, "Failed to cast test volume to Cinder test volume")
+	e2eutils.ExpectEqual(ok, true, "Failed to cast test volume to Cinder test volume")
 
 	volSource := v1.VolumeSource{
 		Cinder: &v1.CinderVolumeSource{
@@ -1110,7 +1112,7 @@ func (c *cinderDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume s
 
 func (c *cinderDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	cv, ok := e2evolume.(*cinderVolume)
-	framework.ExpectEqual(ok, true, "Failed to cast test volume to Cinder test volume")
+	e2eutils.ExpectEqual(ok, true, "Failed to cast test volume to Cinder test volume")
 
 	pvSource := v1.PersistentVolumeSource{
 		Cinder: &v1.CinderPersistentVolumeSource{
@@ -1152,8 +1154,8 @@ func (c *cinderDriver) CreateVolume(config *storageframework.PerTestConfig, volT
 	ginkgo.By("creating a test Cinder volume")
 	output, err := exec.Command("cinder", "create", "--display-name="+volumeName, "1").CombinedOutput()
 	outputString := string(output[:])
-	framework.Logf("cinder output:\n%s", outputString)
-	framework.ExpectNoError(err)
+	e2eutils.Logf("cinder output:\n%s", outputString)
+	e2eutils.ExpectNoError(err)
 
 	// Parse 'id'' from stdout. Expected format:
 	// |     attachments     |                  []                  |
@@ -1172,8 +1174,8 @@ func (c *cinderDriver) CreateVolume(config *storageframework.PerTestConfig, volT
 		volumeID = fields[3]
 		break
 	}
-	framework.Logf("Volume ID: %s", volumeID)
-	framework.ExpectNotEqual(volumeID, "")
+	e2eutils.Logf("Volume ID: %s", volumeID)
+	e2eutils.ExpectNotEqual(volumeID, "")
 	return &cinderVolume{
 		volumeName: volumeName,
 		volumeID:   volumeID,
@@ -1190,23 +1192,23 @@ func (v *cinderVolume) DeleteVolume() {
 	var err error
 	timeout := time.Second * 120
 
-	framework.Logf("Waiting up to %v for removal of cinder volume %s / %s", timeout, id, name)
+	e2eutils.Logf("Waiting up to %v for removal of cinder volume %s / %s", timeout, id, name)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(5 * time.Second) {
 		output, err = exec.Command("cinder", "delete", id).CombinedOutput()
 		if err == nil {
-			framework.Logf("Cinder volume %s deleted", id)
+			e2eutils.Logf("Cinder volume %s deleted", id)
 			return
 		}
-		framework.Logf("Failed to delete volume %s / %s: %v\n%s", id, name, err, string(output))
+		e2eutils.Logf("Failed to delete volume %s / %s: %v\n%s", id, name, err, string(output))
 	}
 	// Timed out, try to get "cinder show <volume>" output for easier debugging
 	showOutput, showErr := exec.Command("cinder", "show", id).CombinedOutput()
 	if showErr != nil {
-		framework.Logf("Failed to show volume %s / %s: %v\n%s", id, name, showErr, string(showOutput))
+		e2eutils.Logf("Failed to show volume %s / %s: %v\n%s", id, name, showErr, string(showOutput))
 	} else {
-		framework.Logf("Volume %s / %s:\n%s", id, name, string(showOutput))
+		e2eutils.Logf("Volume %s / %s:\n%s", id, name, string(showOutput))
 	}
-	framework.Failf("Failed to delete pre-provisioned volume %s / %s: %v\n%s", id, name, err, string(output[:]))
+	e2eutils.Failf("Failed to delete pre-provisioned volume %s / %s: %v\n%s", id, name, err, string(output[:]))
 }
 
 // GCE
@@ -1307,7 +1309,7 @@ func (g *gcePdDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) 
 
 func (g *gcePdDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) *v1.VolumeSource {
 	gv, ok := e2evolume.(*gcePdVolume)
-	framework.ExpectEqual(ok, true, "Failed to cast test volume to GCE PD test volume")
+	e2eutils.ExpectEqual(ok, true, "Failed to cast test volume to GCE PD test volume")
 	volSource := v1.VolumeSource{
 		GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
 			PDName:   gv.volumeName,
@@ -1322,7 +1324,7 @@ func (g *gcePdDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume st
 
 func (g *gcePdDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	gv, ok := e2evolume.(*gcePdVolume)
-	framework.ExpectEqual(ok, true, "Failed to cast test volume to GCE PD test volume")
+	e2eutils.ExpectEqual(ok, true, "Failed to cast test volume to GCE PD test volume")
 	pvSource := v1.PersistentVolumeSource{
 		GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
 			PDName:   gv.volumeName,
@@ -1354,7 +1356,7 @@ func (g *gcePdDriver) PrepareTest(f *framework.Framework) (*storageframework.Per
 		Framework: f,
 	}
 
-	if framework.NodeOSDistroIs("windows") {
+	if e2eutils.NodeOSDistroIs("windows") {
 		config.ClientNodeSelection = e2epod.NodeSelection{
 			Selector: map[string]string{
 				"kubernetes.io/os": "windows",
@@ -1368,7 +1370,7 @@ func (g *gcePdDriver) PrepareTest(f *framework.Framework) (*storageframework.Per
 func (g *gcePdDriver) CreateVolume(config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
 	zone := getInlineVolumeZone(config.Framework)
 	if volType == storageframework.InlineVolume {
-		// PD will be created in framework.TestContext.CloudConfig.Zone zone,
+		// PD will be created in e2econfig.TestContext.CloudConfig.Zone zone,
 		// so pods should be also scheduled there.
 		config.ClientNodeSelection = e2epod.NodeSelection{
 			Selector: map[string]string{
@@ -1378,7 +1380,7 @@ func (g *gcePdDriver) CreateVolume(config *storageframework.PerTestConfig, volTy
 	}
 	ginkgo.By("creating a test gce pd volume")
 	vname, err := e2epv.CreatePDWithRetryAndZone(zone)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	return &gcePdVolume{
 		volumeName: vname,
 	}
@@ -1440,7 +1442,7 @@ func (v *vSphereDriver) SkipUnsupportedTest(pattern storageframework.TestPattern
 
 func (v *vSphereDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) *v1.VolumeSource {
 	vsv, ok := e2evolume.(*vSphereVolume)
-	framework.ExpectEqual(ok, true, "Failed to cast test volume to vSphere test volume")
+	e2eutils.ExpectEqual(ok, true, "Failed to cast test volume to vSphere test volume")
 
 	// vSphere driver doesn't seem to support readOnly volume
 	// TODO: check if it is correct
@@ -1460,7 +1462,7 @@ func (v *vSphereDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume 
 
 func (v *vSphereDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	vsv, ok := e2evolume.(*vSphereVolume)
-	framework.ExpectEqual(ok, true, "Failed to cast test volume to vSphere test volume")
+	e2eutils.ExpectEqual(ok, true, "Failed to cast test volume to vSphere test volume")
 
 	// vSphere driver doesn't seem to support readOnly volume
 	// TODO: check if it is correct
@@ -1511,7 +1513,7 @@ func (v *vSphereDriver) CreateVolume(config *storageframework.PerTestConfig, vol
 	vspheretest.Bootstrap(f)
 	nodeInfo := vspheretest.GetReadySchedulableRandomNodeInfo()
 	volumePath, err := nodeInfo.VSphere.CreateVolume(&vspheretest.VolumeOptions{}, nodeInfo.DataCenterRef)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	return &vSphereVolume{
 		volumePath: volumePath,
 		nodeInfo:   nodeInfo,
@@ -1578,7 +1580,7 @@ func (a *azureDiskDriver) SkipUnsupportedTest(pattern storageframework.TestPatte
 
 func (a *azureDiskDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) *v1.VolumeSource {
 	av, ok := e2evolume.(*azureDiskVolume)
-	framework.ExpectEqual(ok, true, "Failed to cast test volume to Azure test volume")
+	e2eutils.ExpectEqual(ok, true, "Failed to cast test volume to Azure test volume")
 	diskName := av.volumeName[(strings.LastIndex(av.volumeName, "/") + 1):]
 
 	kind := v1.AzureManagedDisk
@@ -1598,7 +1600,7 @@ func (a *azureDiskDriver) GetVolumeSource(readOnly bool, fsType string, e2evolum
 
 func (a *azureDiskDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	av, ok := e2evolume.(*azureDiskVolume)
-	framework.ExpectEqual(ok, true, "Failed to cast test volume to Azure test volume")
+	e2eutils.ExpectEqual(ok, true, "Failed to cast test volume to Azure test volume")
 
 	diskName := av.volumeName[(strings.LastIndex(av.volumeName, "/") + 1):]
 
@@ -1641,7 +1643,7 @@ func (a *azureDiskDriver) CreateVolume(config *storageframework.PerTestConfig, v
 	ginkgo.By("creating a test azure disk volume")
 	zone := getInlineVolumeZone(config.Framework)
 	if volType == storageframework.InlineVolume {
-		// PD will be created in framework.TestContext.CloudConfig.Zone zone,
+		// PD will be created in e2econfig.TestContext.CloudConfig.Zone zone,
 		// so pods should be also scheduled there.
 		config.ClientNodeSelection = e2epod.NodeSelection{
 			Selector: map[string]string{
@@ -1650,7 +1652,7 @@ func (a *azureDiskDriver) CreateVolume(config *storageframework.PerTestConfig, v
 		}
 	}
 	volumeName, err := e2epv.CreatePDWithRetryAndZone(zone)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	return &azureDiskVolume{
 		volumeName: volumeName,
 	}
@@ -1722,7 +1724,7 @@ func (a *awsDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) {
 
 func (a *awsDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) *v1.VolumeSource {
 	av, ok := e2evolume.(*awsVolume)
-	framework.ExpectEqual(ok, true, "Failed to cast test volume to AWS test volume")
+	e2eutils.ExpectEqual(ok, true, "Failed to cast test volume to AWS test volume")
 	volSource := v1.VolumeSource{
 		AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
 			VolumeID: av.volumeName,
@@ -1737,7 +1739,7 @@ func (a *awsDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume stor
 
 func (a *awsDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	av, ok := e2evolume.(*awsVolume)
-	framework.ExpectEqual(ok, true, "Failed to cast test volume to AWS test volume")
+	e2eutils.ExpectEqual(ok, true, "Failed to cast test volume to AWS test volume")
 	pvSource := v1.PersistentVolumeSource{
 		AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
 			VolumeID: av.volumeName,
@@ -1769,7 +1771,7 @@ func (a *awsDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTe
 		Framework: f,
 	}
 
-	if framework.NodeOSDistroIs("windows") {
+	if e2eutils.NodeOSDistroIs("windows") {
 		config.ClientNodeSelection = e2epod.NodeSelection{
 			Selector: map[string]string{
 				"kubernetes.io/os": "windows",
@@ -1782,7 +1784,7 @@ func (a *awsDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTe
 func (a *awsDriver) CreateVolume(config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
 	zone := getInlineVolumeZone(config.Framework)
 	if volType == storageframework.InlineVolume {
-		// PD will be created in framework.TestContext.CloudConfig.Zone zone,
+		// PD will be created in e2econfig.TestContext.CloudConfig.Zone zone,
 		// so pods should be also scheduled there.
 		config.ClientNodeSelection = e2epod.NodeSelection{
 			Selector: map[string]string{
@@ -1792,7 +1794,7 @@ func (a *awsDriver) CreateVolume(config *storageframework.PerTestConfig, volType
 	}
 	ginkgo.By("creating a test aws volume")
 	vname, err := e2epv.CreatePDWithRetryAndZone(zone)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	return &awsVolume{
 		volumeName: vname,
 	}
@@ -1901,7 +1903,7 @@ func (l *localDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) 
 func (l *localDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTestConfig, func()) {
 	var err error
 	l.node, err = e2enode.GetRandomReadySchedulableNode(f.ClientSet)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	l.hostExec = utils.NewHostExec(f)
 	l.ltrMgr = utils.NewLocalResourceManager("local-driver", l.hostExec, "/tmp")
@@ -1912,9 +1914,9 @@ func (l *localDriver) PrepareTest(f *framework.Framework) (*storageframework.Per
 		filesystemType := "fs"
 		ssdCmd := fmt.Sprintf("ls -1 /mnt/disks/by-uuid/google-local-ssds-%s-%s/ | wc -l", ssdInterface, filesystemType)
 		res, err := l.hostExec.IssueCommandWithResult(ssdCmd, l.node)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		num, err := strconv.Atoi(strings.TrimSpace(res))
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		if num < 1 {
 			e2eskipper.Skipf("Requires at least 1 %s %s localSSD ", ssdInterface, filesystemType)
 		}
@@ -1941,7 +1943,7 @@ func (l *localDriver) CreateVolume(config *storageframework.PerTestConfig, volTy
 			ltr:    l.ltrMgr.Create(node, l.volumeType, nil),
 		}
 	default:
-		framework.Failf("Unsupported volType: %v is specified", volType)
+		e2eutils.Failf("Unsupported volType: %v is specified", volType)
 	}
 	return nil
 }
@@ -1953,11 +1955,11 @@ func (v *localVolume) DeleteVolume() {
 func (l *localDriver) nodeAffinityForNode(node *v1.Node) *v1.VolumeNodeAffinity {
 	nodeKey := "kubernetes.io/hostname"
 	if node.Labels == nil {
-		framework.Failf("Node does not have labels")
+		e2eutils.Failf("Node does not have labels")
 	}
 	nodeValue, found := node.Labels[nodeKey]
 	if !found {
-		framework.Failf("Node does not have required label %q", nodeKey)
+		e2eutils.Failf("Node does not have required label %q", nodeKey)
 	}
 	return &v1.VolumeNodeAffinity{
 		Required: &v1.NodeSelector{
@@ -1978,7 +1980,7 @@ func (l *localDriver) nodeAffinityForNode(node *v1.Node) *v1.VolumeNodeAffinity 
 
 func (l *localDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	lv, ok := e2evolume.(*localVolume)
-	framework.ExpectEqual(ok, true, "Failed to cast test volume to local test volume")
+	e2eutils.ExpectEqual(ok, true, "Failed to cast test volume to local test volume")
 	return &v1.PersistentVolumeSource{
 		Local: &v1.LocalVolumeSource{
 			Path:   lv.ltr.Path,
@@ -1993,12 +1995,12 @@ func cleanUpVolumeServer(f *framework.Framework, serverPod *v1.Pod) {
 }
 
 func getInlineVolumeZone(f *framework.Framework) string {
-	if framework.TestContext.CloudConfig.Zone != "" {
-		return framework.TestContext.CloudConfig.Zone
+	if e2econfig.TestContext.CloudConfig.Zone != "" {
+		return e2econfig.TestContext.CloudConfig.Zone
 	}
 	// if zone is not specified we will randomly pick a zone from schedulable nodes for inline tests
 	node, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	zone, ok := node.Labels[v1.LabelFailureDomainBetaZone]
 	if ok {
 		return zone
@@ -2012,17 +2014,17 @@ func cleanUpVolumeServerWithSecret(f *framework.Framework, serverPod *v1.Pod, se
 	ns := f.Namespace
 
 	if secret != nil {
-		framework.Logf("Deleting server secret %q...", secret.Name)
+		e2eutils.Logf("Deleting server secret %q...", secret.Name)
 		err := cs.CoreV1().Secrets(ns.Name).Delete(context.TODO(), secret.Name, metav1.DeleteOptions{})
 		if err != nil {
-			framework.Logf("Delete secret failed: %v", err)
+			e2eutils.Logf("Delete secret failed: %v", err)
 		}
 	}
 
-	framework.Logf("Deleting server pod %q...", serverPod.Name)
+	e2eutils.Logf("Deleting server pod %q...", serverPod.Name)
 	err := e2epod.DeletePodWithWait(cs, serverPod)
 	if err != nil {
-		framework.Logf("Server pod delete failed: %v", err)
+		e2eutils.Logf("Server pod delete failed: %v", err)
 	}
 }
 

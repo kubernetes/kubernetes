@@ -27,6 +27,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 	"github.com/prometheus/common/expfmt"
 	"github.com/prometheus/common/model"
@@ -74,19 +76,19 @@ var _ = SIGDescribe("API priority and fairness", func() {
 		ginkgo.By("response headers should contain the UID of the appropriate FlowSchema and PriorityLevelConfiguration for a matching user")
 		response = makeRequest(f, matchingUsername)
 		if plUIDWant, plUIDGot := string(createdPriorityLevel.UID), getPriorityLevelUID(response); plUIDWant != plUIDGot {
-			framework.Failf("expected PriorityLevelConfiguration UID in the response header: %s, but got: %s, response header: %#v", plUIDWant, plUIDGot, response.Header)
+			e2eutils.Failf("expected PriorityLevelConfiguration UID in the response header: %s, but got: %s, response header: %#v", plUIDWant, plUIDGot, response.Header)
 		}
 		if fsUIDWant, fsUIDGot := string(createdFlowSchema.UID), getFlowSchemaUID(response); fsUIDWant != fsUIDGot {
-			framework.Failf("expected FlowSchema UID in the response header: %s, but got: %s, response header: %#v", fsUIDWant, fsUIDGot, response.Header)
+			e2eutils.Failf("expected FlowSchema UID in the response header: %s, but got: %s, response header: %#v", fsUIDWant, fsUIDGot, response.Header)
 		}
 
 		ginkgo.By("response headers should contain non-empty UID of FlowSchema and PriorityLevelConfiguration for a non-matching user")
 		response = makeRequest(f, nonMatchingUsername)
 		if plUIDGot := getPriorityLevelUID(response); plUIDGot == "" {
-			framework.Failf("expected a non-empty PriorityLevelConfiguration UID in the response header, but got: %s, response header: %#v", plUIDGot, response.Header)
+			e2eutils.Failf("expected a non-empty PriorityLevelConfiguration UID in the response header, but got: %s, response header: %#v", plUIDGot, response.Header)
 		}
 		if fsUIDGot := getFlowSchemaUID(response); fsUIDGot == "" {
-			framework.Failf("expected a non-empty FlowSchema UID in the response header but got: %s, response header: %#v", fsUIDGot, response.Header)
+			e2eutils.Failf("expected a non-empty FlowSchema UID in the response header but got: %s, response header: %#v", fsUIDGot, response.Header)
 		}
 	})
 
@@ -129,12 +131,12 @@ var _ = SIGDescribe("API priority and fairness", func() {
 		ginkgo.By("creating test priority levels and flow schemas")
 		for i := range clients {
 			clients[i].priorityLevelName = fmt.Sprintf("%s-%s", priorityLevelNamePrefix, clients[i].username)
-			framework.Logf("creating PriorityLevel %q", clients[i].priorityLevelName)
+			e2eutils.Logf("creating PriorityLevel %q", clients[i].priorityLevelName)
 			_, cleanup := createPriorityLevel(f, clients[i].priorityLevelName, 1)
 			defer cleanup()
 
 			clients[i].flowSchemaName = fmt.Sprintf("%s-%s", flowSchemaNamePrefix, clients[i].username)
-			framework.Logf("creating FlowSchema %q", clients[i].flowSchemaName)
+			e2eutils.Logf("creating FlowSchema %q", clients[i].flowSchemaName)
 			_, cleanup = createFlowSchema(f, clients[i].flowSchemaName, clients[i].matchingPrecedence, clients[i].priorityLevelName, []string{clients[i].username})
 			defer cleanup()
 
@@ -145,12 +147,12 @@ var _ = SIGDescribe("API priority and fairness", func() {
 		ginkgo.By("getting request concurrency from metrics")
 		for i := range clients {
 			realConcurrency, err := getPriorityLevelConcurrency(f.ClientSet, clients[i].priorityLevelName)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			clients[i].concurrency = int32(float64(realConcurrency) * clients[i].concurrencyMultiplier)
 			if clients[i].concurrency < 1 {
 				clients[i].concurrency = 1
 			}
-			framework.Logf("request concurrency for %q will be %d (that is %d times client multiplier)", clients[i].username, clients[i].concurrency, realConcurrency)
+			e2eutils.Logf("request concurrency for %q will be %d (that is %d times client multiplier)", clients[i].username, clients[i].concurrency, realConcurrency)
 		}
 
 		ginkgo.By(fmt.Sprintf("starting uniform QPS load for %s", loadDuration.String()))
@@ -159,7 +161,7 @@ var _ = SIGDescribe("API priority and fairness", func() {
 			wg.Add(1)
 			go func(c *client) {
 				defer wg.Done()
-				framework.Logf("starting uniform QPS load for %q: concurrency=%d, qps=%.1f", c.username, c.concurrency, c.qps)
+				e2eutils.Logf("starting uniform QPS load for %q: concurrency=%d, qps=%.1f", c.username, c.concurrency, c.qps)
 				c.completedRequests = uniformQPSLoadConcurrent(f, c.username, c.concurrency, c.qps, loadDuration)
 			}(&clients[i])
 		}
@@ -170,9 +172,9 @@ var _ = SIGDescribe("API priority and fairness", func() {
 			// Each client should have 95% of its ideal number of completed requests.
 			maxCompletedRequests := float64(client.concurrency) * client.qps * loadDuration.Seconds()
 			fractionCompleted := float64(client.completedRequests) / maxCompletedRequests
-			framework.Logf("client %q completed %d/%d requests (%.1f%%)", client.username, client.completedRequests, int32(maxCompletedRequests), 100*fractionCompleted)
+			e2eutils.Logf("client %q completed %d/%d requests (%.1f%%)", client.username, client.completedRequests, int32(maxCompletedRequests), 100*fractionCompleted)
 			if fractionCompleted < client.expectedCompletedPercentage {
-				framework.Failf("client %q: got %.1f%% completed requests, want at least %.1f%%", client.username, 100*fractionCompleted, 100*client.expectedCompletedPercentage)
+				e2eutils.Failf("client %q: got %.1f%% completed requests, want at least %.1f%%", client.username, 100*fractionCompleted, 100*client.expectedCompletedPercentage)
 			}
 		}
 	})
@@ -190,13 +192,13 @@ var _ = SIGDescribe("API priority and fairness", func() {
 		flowSchemaName := "e2e-testing-flowschema-" + f.UniqueName
 		loadDuration := 10 * time.Second
 
-		framework.Logf("creating PriorityLevel %q", priorityLevelName)
+		e2eutils.Logf("creating PriorityLevel %q", priorityLevelName)
 		_, cleanup := createPriorityLevel(f, priorityLevelName, 1)
 		defer cleanup()
 
 		highQPSClientName := "highqps-" + f.UniqueName
 		lowQPSClientName := "lowqps-" + f.UniqueName
-		framework.Logf("creating FlowSchema %q", flowSchemaName)
+		e2eutils.Logf("creating FlowSchema %q", flowSchemaName)
 		_, cleanup = createFlowSchema(f, flowSchemaName, 1000, priorityLevelName, []string{highQPSClientName, lowQPSClientName})
 		defer cleanup()
 
@@ -216,15 +218,15 @@ var _ = SIGDescribe("API priority and fairness", func() {
 			{username: lowQPSClientName, qps: 4, concurrencyMultiplier: 0.5, expectedCompletedPercentage: 0.90},
 		}
 
-		framework.Logf("getting real concurrency")
+		e2eutils.Logf("getting real concurrency")
 		realConcurrency, err := getPriorityLevelConcurrency(f.ClientSet, priorityLevelName)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		for i := range clients {
 			clients[i].concurrency = int32(float64(realConcurrency) * clients[i].concurrencyMultiplier)
 			if clients[i].concurrency < 1 {
 				clients[i].concurrency = 1
 			}
-			framework.Logf("request concurrency for %q will be %d", clients[i].username, clients[i].concurrency)
+			e2eutils.Logf("request concurrency for %q will be %d", clients[i].username, clients[i].concurrency)
 		}
 
 		ginkgo.By(fmt.Sprintf("starting uniform QPS load for %s", loadDuration.String()))
@@ -233,7 +235,7 @@ var _ = SIGDescribe("API priority and fairness", func() {
 			wg.Add(1)
 			go func(c *client) {
 				defer wg.Done()
-				framework.Logf("starting uniform QPS load for %q: concurrency=%d, qps=%.1f", c.username, c.concurrency, c.qps)
+				e2eutils.Logf("starting uniform QPS load for %q: concurrency=%d, qps=%.1f", c.username, c.concurrency, c.qps)
 				c.completedRequests = uniformQPSLoadConcurrent(f, c.username, c.concurrency, c.qps, loadDuration)
 			}(&clients[i])
 		}
@@ -244,9 +246,9 @@ var _ = SIGDescribe("API priority and fairness", func() {
 			// Each client should have 95% of its ideal number of completed requests.
 			maxCompletedRequests := float64(client.concurrency) * client.qps * float64(loadDuration/time.Second)
 			fractionCompleted := float64(client.completedRequests) / maxCompletedRequests
-			framework.Logf("client %q completed %d/%d requests (%.1f%%)", client.username, client.completedRequests, int32(maxCompletedRequests), 100*fractionCompleted)
+			e2eutils.Logf("client %q completed %d/%d requests (%.1f%%)", client.username, client.completedRequests, int32(maxCompletedRequests), 100*fractionCompleted)
 			if fractionCompleted < client.expectedCompletedPercentage {
-				framework.Failf("client %q: got %.1f%% completed requests, want at least %.1f%%", client.username, 100*fractionCompleted, 100*client.expectedCompletedPercentage)
+				e2eutils.Failf("client %q: got %.1f%% completed requests, want at least %.1f%%", client.username, 100*fractionCompleted, 100*client.expectedCompletedPercentage)
 			}
 		}
 	})
@@ -272,9 +274,9 @@ func createPriorityLevel(f *framework.Framework, priorityLevelName string, assur
 			},
 		},
 		metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	return createdPriorityLevel, func() {
-		framework.ExpectNoError(f.ClientSet.FlowcontrolV1beta2().PriorityLevelConfigurations().Delete(context.TODO(), priorityLevelName, metav1.DeleteOptions{}))
+		e2eutils.ExpectNoError(f.ClientSet.FlowcontrolV1beta2().PriorityLevelConfigurations().Delete(context.TODO(), priorityLevelName, metav1.DeleteOptions{}))
 	}
 }
 
@@ -350,9 +352,9 @@ func createFlowSchema(f *framework.Framework, flowSchemaName string, matchingPre
 			},
 		},
 		metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	return createdFlowSchema, func() {
-		framework.ExpectNoError(f.ClientSet.FlowcontrolV1beta2().FlowSchemas().Delete(context.TODO(), flowSchemaName, metav1.DeleteOptions{}))
+		e2eutils.ExpectNoError(f.ClientSet.FlowcontrolV1beta2().FlowSchemas().Delete(context.TODO(), flowSchemaName, metav1.DeleteOptions{}))
 	}
 }
 
@@ -361,7 +363,7 @@ func createFlowSchema(f *framework.Framework, flowSchemaName string, matchingPre
 // by checking: (1) the dangling priority level reference condition in the flow
 // schema status, and (2) metrics. The function times out after 30 seconds.
 func waitForSteadyState(f *framework.Framework, flowSchemaName string, priorityLevelName string) {
-	framework.ExpectNoError(wait.Poll(time.Second, 30*time.Second, func() (bool, error) {
+	e2eutils.ExpectNoError(wait.Poll(time.Second, 30*time.Second, func() (bool, error) {
 		fs, err := f.ClientSet.FlowcontrolV1beta2().FlowSchemas().Get(context.TODO(), flowSchemaName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -392,13 +394,13 @@ func makeRequest(f *framework.Framework, username string) *http.Response {
 	config.RateLimiter = clientsideflowcontrol.NewFakeAlwaysRateLimiter()
 	config.Impersonate.Groups = []string{"system:authenticated"}
 	roundTripper, err := rest.TransportFor(config)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	req, err := http.NewRequest(http.MethodGet, f.ClientSet.CoreV1().RESTClient().Get().AbsPath("version").URL().String(), nil)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	response, err := roundTripper.RoundTrip(req)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	return response
 }
 

@@ -25,6 +25,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -68,9 +69,9 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 				if err == nil {
 					return
 				}
-				framework.Logf("Got an error creating template %d: %v", i, err)
+				e2eutils.Logf("Got an error creating template %d: %v", i, err)
 			}
-			framework.Failf("Unable to create template %d, exiting", i)
+			e2eutils.Failf("Unable to create template %d, exiting", i)
 		})
 	})
 
@@ -86,14 +87,14 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 			for {
 				opts.Limit = int64(rand.Int31n(numberOfTotalResources/10) + 1)
 				list, err := client.List(context.TODO(), opts)
-				framework.ExpectNoError(err, "failed to list pod templates in namespace: %s, given limit: %d", ns, opts.Limit)
-				framework.Logf("Retrieved %d/%d results with rv %s and continue %s", len(list.Items), opts.Limit, list.ResourceVersion, list.Continue)
+				e2eutils.ExpectNoError(err, "failed to list pod templates in namespace: %s, given limit: %d", ns, opts.Limit)
+				e2eutils.Logf("Retrieved %d/%d results with rv %s and continue %s", len(list.Items), opts.Limit, list.ResourceVersion, list.Continue)
 				gomega.Expect(len(list.Items)).To(gomega.BeNumerically("<=", opts.Limit))
 
 				if len(lastRV) == 0 {
 					lastRV = list.ResourceVersion
 				}
-				framework.ExpectEqual(list.ResourceVersion, lastRV)
+				e2eutils.ExpectEqual(list.ResourceVersion, lastRV)
 				if shouldCheckRemainingItem() {
 					if list.GetContinue() == "" {
 						gomega.Expect(list.GetRemainingItemCount()).To(gomega.BeNil())
@@ -103,7 +104,7 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 					}
 				}
 				for _, item := range list.Items {
-					framework.ExpectEqual(item.Name, fmt.Sprintf("template-%04d", found))
+					e2eutils.ExpectEqual(item.Name, fmt.Sprintf("template-%04d", found))
 					found++
 				}
 				if len(list.Continue) == 0 {
@@ -117,7 +118,7 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 		ginkgo.By("retrieving those results all at once")
 		opts := metav1.ListOptions{Limit: numberOfTotalResources + 1}
 		list, err := client.List(context.TODO(), opts)
-		framework.ExpectNoError(err, "failed to list pod templates in namespace: %s, given limit: %d", ns, opts.Limit)
+		e2eutils.ExpectNoError(err, "failed to list pod templates in namespace: %s, given limit: %d", ns, opts.Limit)
 		gomega.Expect(list.Items).To(gomega.HaveLen(numberOfTotalResources))
 	})
 
@@ -131,7 +132,7 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 		opts := metav1.ListOptions{}
 		opts.Limit = oneTenth
 		list, err := client.List(context.TODO(), opts)
-		framework.ExpectNoError(err, "failed to list pod templates in namespace: %s, given limit: %d", ns, opts.Limit)
+		e2eutils.ExpectNoError(err, "failed to list pod templates in namespace: %s, given limit: %d", ns, opts.Limit)
 		firstToken := list.Continue
 		firstRV := list.ResourceVersion
 		if shouldCheckRemainingItem() {
@@ -142,7 +143,7 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 				gomega.Expect(int(*list.GetRemainingItemCount()) + len(list.Items)).To(gomega.BeNumerically("==", numberOfTotalResources))
 			}
 		}
-		framework.Logf("Retrieved %d/%d results with rv %s and continue %s", len(list.Items), opts.Limit, list.ResourceVersion, firstToken)
+		e2eutils.Logf("Retrieved %d/%d results with rv %s and continue %s", len(list.Items), opts.Limit, list.ResourceVersion, firstToken)
 
 		ginkgo.By("retrieving the second page until the token expires")
 		opts.Continue = firstToken
@@ -150,13 +151,13 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 		wait.Poll(20*time.Second, 2*storagebackend.DefaultCompactInterval, func() (bool, error) {
 			_, err := client.List(context.TODO(), opts)
 			if err == nil {
-				framework.Logf("Token %s has not expired yet", firstToken)
+				e2eutils.Logf("Token %s has not expired yet", firstToken)
 				return false, nil
 			}
 			if err != nil && !apierrors.IsResourceExpired(err) {
 				return false, err
 			}
-			framework.Logf("got error %s", err)
+			e2eutils.Logf("got error %s", err)
 			status, ok := err.(apierrors.APIStatus)
 			if !ok {
 				return false, fmt.Errorf("expect error to implement the APIStatus interface, got %v", reflect.TypeOf(err))
@@ -165,15 +166,15 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 			if len(inconsistentToken) == 0 {
 				return false, fmt.Errorf("expect non empty continue token")
 			}
-			framework.Logf("Retrieved inconsistent continue %s", inconsistentToken)
+			e2eutils.Logf("Retrieved inconsistent continue %s", inconsistentToken)
 			return true, nil
 		})
 
 		ginkgo.By("retrieving the second page again with the token received with the error message")
 		opts.Continue = inconsistentToken
 		list, err = client.List(context.TODO(), opts)
-		framework.ExpectNoError(err, "failed to list pod templates in namespace: %s, given inconsistent continue token %s and limit: %d", ns, opts.Continue, opts.Limit)
-		framework.ExpectNotEqual(list.ResourceVersion, firstRV)
+		e2eutils.ExpectNoError(err, "failed to list pod templates in namespace: %s, given inconsistent continue token %s and limit: %d", ns, opts.Continue, opts.Limit)
+		e2eutils.ExpectNotEqual(list.ResourceVersion, firstRV)
 		gomega.Expect(len(list.Items)).To(gomega.BeNumerically("==", opts.Limit))
 		found := int(oneTenth)
 
@@ -186,7 +187,7 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 			}
 		}
 		for _, item := range list.Items {
-			framework.ExpectEqual(item.Name, fmt.Sprintf("template-%04d", found))
+			e2eutils.ExpectEqual(item.Name, fmt.Sprintf("template-%04d", found))
 			found++
 		}
 
@@ -195,7 +196,7 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 		lastRV := list.ResourceVersion
 		for {
 			list, err := client.List(context.TODO(), opts)
-			framework.ExpectNoError(err, "failed to list pod templates in namespace: %s, given limit: %d", ns, opts.Limit)
+			e2eutils.ExpectNoError(err, "failed to list pod templates in namespace: %s, given limit: %d", ns, opts.Limit)
 			if shouldCheckRemainingItem() {
 				if list.GetContinue() == "" {
 					gomega.Expect(list.GetRemainingItemCount()).To(gomega.BeNil())
@@ -204,11 +205,11 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 					gomega.Expect(int(*list.GetRemainingItemCount()) + len(list.Items) + found).To(gomega.BeNumerically("==", numberOfTotalResources))
 				}
 			}
-			framework.Logf("Retrieved %d/%d results with rv %s and continue %s", len(list.Items), opts.Limit, list.ResourceVersion, list.Continue)
+			e2eutils.Logf("Retrieved %d/%d results with rv %s and continue %s", len(list.Items), opts.Limit, list.ResourceVersion, list.Continue)
 			gomega.Expect(len(list.Items)).To(gomega.BeNumerically("<=", opts.Limit))
-			framework.ExpectEqual(list.ResourceVersion, lastRV)
+			e2eutils.ExpectEqual(list.ResourceVersion, lastRV)
 			for _, item := range list.Items {
-				framework.ExpectEqual(item.Name, fmt.Sprintf("template-%04d", found))
+				e2eutils.ExpectEqual(item.Name, fmt.Sprintf("template-%04d", found))
 				found++
 			}
 			if len(list.Continue) == 0 {

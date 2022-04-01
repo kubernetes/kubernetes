@@ -21,8 +21,9 @@ import (
 	"strings"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 // LogChecker is an interface for an entity that can check whether logging
@@ -195,14 +196,14 @@ func getFullIngestionTimeout(podsMap map[string]FiniteLoggingPod, slack float64)
 			totalWant += want
 		}
 		if len(lossMsgs) > 0 {
-			framework.Logf("Still missing logs from:\n%s", strings.Join(lossMsgs, "\n"))
+			e2eutils.Logf("Still missing logs from:\n%s", strings.Join(lossMsgs, "\n"))
 		}
 		lostFrac := 1 - float64(totalGot)/float64(totalWant)
 		if lostFrac > slack {
 			return fmt.Errorf("still missing %.2f%% of logs, only %.2f%% is tolerable",
 				lostFrac*100, slack*100)
 		}
-		framework.Logf("Missing %.2f%% of logs, which is lower than the threshold %.2f%%",
+		e2eutils.Logf("Missing %.2f%% of logs, which is lower than the threshold %.2f%%",
 			lostFrac*100, slack*100)
 		return nil
 	}

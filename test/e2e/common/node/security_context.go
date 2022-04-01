@@ -21,6 +21,8 @@ import (
 	"strings"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -44,7 +46,7 @@ var (
 var _ = SIGDescribe("Security Context", func() {
 	f := framework.NewDefaultFramework("security-context-test")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
-	var podClient *framework.PodClient
+	var podClient *e2eutils.PodClient
 	ginkgo.BeforeEach(func() {
 		podClient = f.PodClient()
 	})
@@ -73,12 +75,12 @@ var _ = SIGDescribe("Security Context", func() {
 		createAndWaitUserPod := func(userid int64) {
 			podName := fmt.Sprintf("busybox-user-%d-%s", userid, uuid.NewUUID())
 			podClient.Create(makeUserPod(podName,
-				framework.BusyBoxImage,
+				e2eutils.BusyBoxImage,
 				[]string{"sh", "-c", fmt.Sprintf("test $(id -u) -eq %d", userid)},
 				userid,
 			))
 
-			podClient.WaitForSuccess(podName, framework.PodStartTimeout)
+			podClient.WaitForSuccess(podName, e2eutils.PodStartTimeout)
 		}
 
 		/*
@@ -135,8 +137,8 @@ var _ = SIGDescribe("Security Context", func() {
 			pod := makeNonRootPod(name, rootImage, pointer.Int64Ptr(nonRootTestUserID))
 			podClient.Create(pod)
 
-			podClient.WaitForSuccess(name, framework.PodStartTimeout)
-			framework.ExpectNoError(podClient.MatchContainerOutput(name, name, "1000"))
+			podClient.WaitForSuccess(name, e2eutils.PodStartTimeout)
+			e2eutils.ExpectNoError(podClient.MatchContainerOutput(name, name, "1000"))
 		})
 		ginkgo.It("should not run with an explicit root user ID [LinuxOnly]", func() {
 			// creates a pod with RunAsUser, which is not supported on Windows.
@@ -146,17 +148,17 @@ var _ = SIGDescribe("Security Context", func() {
 			pod = podClient.Create(pod)
 
 			ev, err := podClient.WaitForErrorEventOrSuccess(pod)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			gomega.Expect(ev).NotTo(gomega.BeNil())
-			framework.ExpectEqual(ev.Reason, events.FailedToCreateContainer)
+			e2eutils.ExpectEqual(ev.Reason, events.FailedToCreateContainer)
 		})
 		ginkgo.It("should run with an image specified user ID", func() {
 			name := "implicit-nonroot-uid"
 			pod := makeNonRootPod(name, nonRootImage, nil)
 			podClient.Create(pod)
 
-			podClient.WaitForSuccess(name, framework.PodStartTimeout)
-			framework.ExpectNoError(podClient.MatchContainerOutput(name, name, "1234"))
+			podClient.WaitForSuccess(name, e2eutils.PodStartTimeout)
+			e2eutils.ExpectNoError(podClient.MatchContainerOutput(name, name, "1234"))
 		})
 		ginkgo.It("should not run without a specified user ID", func() {
 			name := "implicit-root-uid"
@@ -164,9 +166,9 @@ var _ = SIGDescribe("Security Context", func() {
 			pod = podClient.Create(pod)
 
 			ev, err := podClient.WaitForErrorEventOrSuccess(pod)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			gomega.Expect(ev).NotTo(gomega.BeNil())
-			framework.ExpectEqual(ev.Reason, events.FailedToCreateContainer)
+			e2eutils.ExpectEqual(ev.Reason, events.FailedToCreateContainer)
 		})
 	})
 
@@ -194,15 +196,15 @@ var _ = SIGDescribe("Security Context", func() {
 		createAndWaitUserPod := func(readOnlyRootFilesystem bool) string {
 			podName := fmt.Sprintf("busybox-readonly-%v-%s", readOnlyRootFilesystem, uuid.NewUUID())
 			podClient.Create(makeUserPod(podName,
-				framework.BusyBoxImage,
+				e2eutils.BusyBoxImage,
 				[]string{"sh", "-c", "touch checkfile"},
 				readOnlyRootFilesystem,
 			))
 
 			if readOnlyRootFilesystem {
-				waitForFailure(f, podName, framework.PodStartTimeout)
+				waitForFailure(f, podName, e2eutils.PodStartTimeout)
 			} else {
-				podClient.WaitForSuccess(podName, framework.PodStartTimeout)
+				podClient.WaitForSuccess(podName, e2eutils.PodStartTimeout)
 			}
 
 			return podName
@@ -255,11 +257,11 @@ var _ = SIGDescribe("Security Context", func() {
 		createAndWaitUserPod := func(privileged bool) string {
 			podName := fmt.Sprintf("busybox-privileged-%v-%s", privileged, uuid.NewUUID())
 			podClient.Create(makeUserPod(podName,
-				framework.BusyBoxImage,
+				e2eutils.BusyBoxImage,
 				[]string{"sh", "-c", "ip link add dummy0 type dummy || true"},
 				privileged,
 			))
-			podClient.WaitForSuccess(podName, framework.PodStartTimeout)
+			podClient.WaitForSuccess(podName, e2eutils.PodStartTimeout)
 			return podName
 		}
 		/*
@@ -272,12 +274,12 @@ var _ = SIGDescribe("Security Context", func() {
 			podName := createAndWaitUserPod(false)
 			logs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, podName)
 			if err != nil {
-				framework.Failf("GetPodLogs for pod %q failed: %v", podName, err)
+				e2eutils.Failf("GetPodLogs for pod %q failed: %v", podName, err)
 			}
 
-			framework.Logf("Got logs for pod %q: %q", podName, logs)
+			e2eutils.Logf("Got logs for pod %q: %q", podName, logs)
 			if !strings.Contains(logs, "Operation not permitted") {
-				framework.Failf("unprivileged container shouldn't be able to create dummy device")
+				e2eutils.Failf("unprivileged container shouldn't be able to create dummy device")
 			}
 		})
 
@@ -285,12 +287,12 @@ var _ = SIGDescribe("Security Context", func() {
 			podName := createAndWaitUserPod(true)
 			logs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, podName)
 			if err != nil {
-				framework.Failf("GetPodLogs for pod %q failed: %v", podName, err)
+				e2eutils.Failf("GetPodLogs for pod %q failed: %v", podName, err)
 			}
 
-			framework.Logf("Got logs for pod %q: %q", podName, logs)
+			e2eutils.Logf("Got logs for pod %q: %q", podName, logs)
 			if strings.Contains(logs, "Operation not permitted") {
-				framework.Failf("privileged container should be able to create dummy device")
+				e2eutils.Failf("privileged container should be able to create dummy device")
 			}
 		})
 	})
@@ -321,7 +323,7 @@ var _ = SIGDescribe("Security Context", func() {
 				allowPrivilegeEscalation,
 				uid,
 			))
-			podClient.WaitForSuccess(podName, framework.PodStartTimeout)
+			podClient.WaitForSuccess(podName, e2eutils.PodStartTimeout)
 			return podClient.MatchContainerOutput(podName, podName, output)
 		}
 
@@ -337,7 +339,7 @@ var _ = SIGDescribe("Security Context", func() {
 		ginkgo.It("should allow privilege escalation when not explicitly set and uid != 0 [LinuxOnly] [NodeConformance]", func() {
 			podName := "alpine-nnp-nil-" + string(uuid.NewUUID())
 			if err := createAndMatchOutput(podName, "Effective uid: 0", nil, nonRootTestUserID); err != nil {
-				framework.Failf("Match output for pod %q failed: %v", podName, err)
+				e2eutils.Failf("Match output for pod %q failed: %v", podName, err)
 			}
 		})
 
@@ -353,7 +355,7 @@ var _ = SIGDescribe("Security Context", func() {
 			podName := "alpine-nnp-false-" + string(uuid.NewUUID())
 			apeFalse := false
 			if err := createAndMatchOutput(podName, fmt.Sprintf("Effective uid: %d", nonRootTestUserID), &apeFalse, nonRootTestUserID); err != nil {
-				framework.Failf("Match output for pod %q failed: %v", podName, err)
+				e2eutils.Failf("Match output for pod %q failed: %v", podName, err)
 			}
 		})
 
@@ -370,7 +372,7 @@ var _ = SIGDescribe("Security Context", func() {
 			podName := "alpine-nnp-true-" + string(uuid.NewUUID())
 			apeTrue := true
 			if err := createAndMatchOutput(podName, "Effective uid: 0", &apeTrue, nonRootTestUserID); err != nil {
-				framework.Failf("Match output for pod %q failed: %v", podName, err)
+				e2eutils.Failf("Match output for pod %q failed: %v", podName, err)
 			}
 		})
 	})

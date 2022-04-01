@@ -35,6 +35,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -122,12 +123,12 @@ var _ = SIGDescribe("ServerSideApply", func() {
 				Do(context.TODO()).
 				Get()
 			if err != nil {
-				framework.Failf("Failed to create object using Apply patch: %v", err)
+				e2eutils.Failf("Failed to create object using Apply patch: %v", err)
 			}
 
 			_, err = client.CoreV1().RESTClient().Get().Namespace(ns).Resource(tc.resource).Name(tc.name).Do(context.TODO()).Get()
 			if err != nil {
-				framework.Failf("Failed to retrieve object: %v", err)
+				e2eutils.Failf("Failed to retrieve object: %v", err)
 			}
 
 			// Test that we can re apply with a different field manager and don't get conflicts
@@ -140,17 +141,17 @@ var _ = SIGDescribe("ServerSideApply", func() {
 				Do(context.TODO()).
 				Get()
 			if err != nil {
-				framework.Failf("Failed to re-apply object using Apply patch: %v", err)
+				e2eutils.Failf("Failed to re-apply object using Apply patch: %v", err)
 			}
 
 			// Verify that both appliers own the fields
 			accessor, err := meta.Accessor(obj)
-			framework.ExpectNoError(err, "getting ObjectMeta")
+			e2eutils.ExpectNoError(err, "getting ObjectMeta")
 			managedFields := accessor.GetManagedFields()
 			for _, entry := range managedFields {
 				if entry.Manager == "apply_test_2" || entry.Manager == "apply_test" {
 					if entry.FieldsV1.String() != tc.managedFields {
-						framework.Failf("Expected managed fields %s, got %s", tc.managedFields, entry.FieldsV1.String())
+						e2eutils.Failf("Expected managed fields %s, got %s", tc.managedFields, entry.FieldsV1.String())
 					}
 				}
 			}
@@ -206,12 +207,12 @@ var _ = SIGDescribe("ServerSideApply", func() {
 					Do(context.TODO()).
 					Get()
 				if err != nil {
-					framework.Failf("Failed to create object using Apply patch: %v", err)
+					e2eutils.Failf("Failed to create object using Apply patch: %v", err)
 				}
 
 				_, err = client.CoreV1().RESTClient().Get().Namespace(ns).Resource(tc.resource).Name(tc.name).Do(context.TODO()).Get()
 				if err != nil {
-					framework.Failf("Failed to retrieve object: %v", err)
+					e2eutils.Failf("Failed to retrieve object: %v", err)
 				}
 
 				// Test that apply does not update subresources unless directed at a subresource endpoint
@@ -224,13 +225,13 @@ var _ = SIGDescribe("ServerSideApply", func() {
 					Do(context.TODO()).
 					Get()
 				if err != nil {
-					framework.Failf("Failed to Apply Status using Apply patch: %v", err)
+					e2eutils.Failf("Failed to Apply Status using Apply patch: %v", err)
 				}
 				pod, err := client.CoreV1().Pods(ns).Get(context.TODO(), "test-pod", metav1.GetOptions{})
-				framework.ExpectNoError(err, "retrieving test pod")
+				e2eutils.ExpectNoError(err, "retrieving test pod")
 				for _, c := range pod.Status.Conditions {
 					if c.Type == "MyStatus" {
-						framework.Failf("Apply should not update subresources unless the endpoint is specifically specified")
+						e2eutils.Failf("Apply should not update subresources unless the endpoint is specifically specified")
 					}
 				}
 
@@ -245,11 +246,11 @@ var _ = SIGDescribe("ServerSideApply", func() {
 					Do(context.TODO()).
 					Get()
 				if err != nil {
-					framework.Failf("Failed to Apply Status using Apply patch: %v", err)
+					e2eutils.Failf("Failed to Apply Status using Apply patch: %v", err)
 				}
 
 				pod, err = client.CoreV1().Pods(ns).Get(context.TODO(), "test-pod", metav1.GetOptions{})
-				framework.ExpectNoError(err, "retrieving test pod")
+				e2eutils.ExpectNoError(err, "retrieving test pod")
 
 				myStatusFound := false
 				for _, c := range pod.Status.Conditions {
@@ -259,7 +260,7 @@ var _ = SIGDescribe("ServerSideApply", func() {
 					}
 				}
 				if myStatusFound == false {
-					framework.Failf("Expected pod to have applied status")
+					e2eutils.Failf("Expected pod to have applied status")
 				}
 			}
 		}
@@ -313,7 +314,7 @@ var _ = SIGDescribe("ServerSideApply", func() {
 			Param("fieldManager", "apply_test").
 			Body(obj).Do(context.TODO()).Get()
 		if err != nil {
-			framework.Failf("Failed to create object using Apply patch: %v", err)
+			e2eutils.Failf("Failed to create object using Apply patch: %v", err)
 		}
 
 		obj = []byte(`{
@@ -354,16 +355,16 @@ var _ = SIGDescribe("ServerSideApply", func() {
 			Param("fieldManager", "apply_test").
 			Body(obj).Do(context.TODO()).Get()
 		if err != nil {
-			framework.Failf("Failed to remove container port using Apply patch: %v", err)
+			e2eutils.Failf("Failed to remove container port using Apply patch: %v", err)
 		}
 
 		deployment, err := client.AppsV1().Deployments(ns).Get(context.TODO(), "deployment", metav1.GetOptions{})
 		if err != nil {
-			framework.Failf("Failed to retrieve object: %v", err)
+			e2eutils.Failf("Failed to retrieve object: %v", err)
 		}
 
 		if len(deployment.Spec.Template.Spec.Containers[0].Ports) > 0 {
-			framework.Failf("Expected no container ports but got: %v, object: \n%#v", deployment.Spec.Template.Spec.Containers[0].Ports, deployment)
+			e2eutils.Failf("Expected no container ports but got: %v, object: \n%#v", deployment.Spec.Template.Spec.Containers[0].Ports, deployment)
 		}
 
 	})
@@ -418,7 +419,7 @@ var _ = SIGDescribe("ServerSideApply", func() {
 				Do(context.TODO()).
 				Get()
 			if err != nil {
-				framework.Failf("Failed to create object using Apply patch: %v", err)
+				e2eutils.Failf("Failed to create object using Apply patch: %v", err)
 			}
 		}
 
@@ -462,18 +463,18 @@ var _ = SIGDescribe("ServerSideApply", func() {
 			Do(context.TODO()).
 			Get()
 		if err != nil {
-			framework.Failf("Failed to create object using Apply patch: %v", err)
+			e2eutils.Failf("Failed to create object using Apply patch: %v", err)
 		}
 
 		deployment, ok := patched.(*appsv1.Deployment)
 		if !ok {
-			framework.Failf("Failed to convert response object to Deployment")
+			e2eutils.Failf("Failed to convert response object to Deployment")
 		}
 		if *deployment.Spec.Replicas != 3 {
-			framework.Failf("Expected deployment.spec.replicas to be 3, but got %d", deployment.Spec.Replicas)
+			e2eutils.Failf("Expected deployment.spec.replicas to be 3, but got %d", deployment.Spec.Replicas)
 		}
 		if deployment.Spec.Template.Spec.Hostname != "test-hostname" {
-			framework.Failf("Expected deployment.spec.template.spec.hostname to be \"test-hostname\", but got %s", deployment.Spec.Template.Spec.Hostname)
+			e2eutils.Failf("Expected deployment.spec.template.spec.hostname to be \"test-hostname\", but got %s", deployment.Spec.Template.Spec.Hostname)
 		}
 	})
 
@@ -520,7 +521,7 @@ var _ = SIGDescribe("ServerSideApply", func() {
 			Param("fieldManager", "apply_test").
 			Body(obj).Do(context.TODO()).Get()
 		if err != nil {
-			framework.Failf("Failed to create object using Apply patch: %v", err)
+			e2eutils.Failf("Failed to create object using Apply patch: %v", err)
 		}
 
 		_, err = client.CoreV1().RESTClient().Patch(types.MergePatchType).
@@ -530,7 +531,7 @@ var _ = SIGDescribe("ServerSideApply", func() {
 			Name("deployment").
 			Body([]byte(`{"spec":{"replicas": 5}}`)).Do(context.TODO()).Get()
 		if err != nil {
-			framework.Failf("Failed to patch object: %v", err)
+			e2eutils.Failf("Failed to patch object: %v", err)
 		}
 
 		_, err = client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
@@ -541,14 +542,14 @@ var _ = SIGDescribe("ServerSideApply", func() {
 			Param("fieldManager", "apply_test").
 			Body([]byte(obj)).Do(context.TODO()).Get()
 		if err == nil {
-			framework.Failf("Expecting to get conflicts when applying object")
+			e2eutils.Failf("Expecting to get conflicts when applying object")
 		}
 		status, ok := err.(*apierrors.StatusError)
 		if !(ok && apierrors.IsConflict(status)) {
-			framework.Failf("Expecting to get conflicts as API error")
+			e2eutils.Failf("Expecting to get conflicts as API error")
 		}
 		if len(status.Status().Details.Causes) < 1 {
-			framework.Failf("Expecting to get at least one conflict when applying object, got: %v", status.Status().Details.Causes)
+			e2eutils.Failf("Expecting to get at least one conflict when applying object, got: %v", status.Status().Details.Causes)
 		}
 
 		_, err = client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
@@ -560,7 +561,7 @@ var _ = SIGDescribe("ServerSideApply", func() {
 			Param("fieldManager", "apply_test").
 			Body([]byte(obj)).Do(context.TODO()).Get()
 		if err != nil {
-			framework.Failf("Failed to apply object with force: %v", err)
+			e2eutils.Failf("Failed to apply object with force: %v", err)
 		}
 	})
 
@@ -570,17 +571,17 @@ var _ = SIGDescribe("ServerSideApply", func() {
 		Description: Create a CRD and apply a CRD resource. Subsequent apply requests that do not conflict with the previous ones should update the object. Apply requests that cause conflicts should fail.
 	*/
 	ginkgo.It("should work for CRDs", func() {
-		config, err := framework.LoadConfig()
+		config, err := e2eutils.LoadConfig()
 		if err != nil {
-			framework.Failf("%s", err)
+			e2eutils.Failf("%s", err)
 		}
 		apiExtensionClient, err := apiextensionclientset.NewForConfig(config)
 		if err != nil {
-			framework.Failf("%s", err)
+			e2eutils.Failf("%s", err)
 		}
 		dynamicClient, err := dynamic.NewForConfig(config)
 		if err != nil {
-			framework.Failf("%s", err)
+			e2eutils.Failf("%s", err)
 		}
 
 		noxuDefinition := fixtures.NewRandomNameMultipleVersionCustomResourceDefinition(apiextensionsv1.ClusterScoped)
@@ -638,7 +639,7 @@ var _ = SIGDescribe("ServerSideApply", func() {
 		}
 	}`), &c)
 		if err != nil {
-			framework.Failf("%s", err)
+			e2eutils.Failf("%s", err)
 		}
 		for i := range noxuDefinition.Spec.Versions {
 			noxuDefinition.Spec.Versions[i].Schema = &c
@@ -646,12 +647,12 @@ var _ = SIGDescribe("ServerSideApply", func() {
 
 		noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 		if err != nil {
-			framework.Failf("cannot create crd %s", err)
+			e2eutils.Failf("cannot create crd %s", err)
 		}
 
 		defer func() {
 			err = fixtures.DeleteV1CustomResourceDefinition(noxuDefinition, apiExtensionClient)
-			framework.ExpectNoError(err, "deleting CustomResourceDefinition")
+			e2eutils.ExpectNoError(err, "deleting CustomResourceDefinition")
 		}()
 
 		kind := noxuDefinition.Spec.Names.Kind
@@ -680,7 +681,7 @@ spec:
 			Body(yamlBody).
 			DoRaw(context.TODO())
 		if err != nil {
-			framework.Failf("failed to create custom resource with apply: %v:\n%v", err, string(result))
+			e2eutils.Failf("failed to create custom resource with apply: %v:\n%v", err, string(result))
 		}
 		verifyNumFinalizers(result, 1)
 		verifyFinalizersIncludes(result, "test-finalizer")
@@ -708,7 +709,7 @@ spec:
 			Body(yamlBodyBeta).
 			DoRaw(context.TODO())
 		if err != nil {
-			framework.Failf("failed to create custom resource with apply: %v:\n%v", err, string(result))
+			e2eutils.Failf("failed to create custom resource with apply: %v:\n%v", err, string(result))
 		}
 		verifyReplicas(result, 1)
 		verifyNumPorts(result, 1)
@@ -721,7 +722,7 @@ spec:
 				Body([]byte(`{"metadata":{"finalizers":[]}}`)).
 				DoRaw(context.TODO())
 			if err != nil {
-				framework.Failf("failed to reset finalizers: %v:\n%v", err, string(result))
+				e2eutils.Failf("failed to reset finalizers: %v:\n%v", err, string(result))
 			}
 		}()
 
@@ -732,7 +733,7 @@ spec:
 			Body([]byte(`{"metadata":{"finalizers":["test-finalizer","another-one"]}}`)).
 			DoRaw(context.TODO())
 		if err != nil {
-			framework.Failf("failed to add finalizer with merge patch: %v:\n%v", err, string(result))
+			e2eutils.Failf("failed to add finalizer with merge patch: %v:\n%v", err, string(result))
 		}
 		verifyNumFinalizers(result, 2)
 		verifyFinalizersIncludes(result, "test-finalizer")
@@ -747,7 +748,7 @@ spec:
 			Body(yamlBody).
 			DoRaw(context.TODO())
 		if err != nil {
-			framework.Failf("failed to apply same config after adding a finalizer: %v:\n%v", err, string(result))
+			e2eutils.Failf("failed to apply same config after adding a finalizer: %v:\n%v", err, string(result))
 		}
 		verifyNumFinalizers(result, 2)
 		verifyFinalizersIncludes(result, "test-finalizer")
@@ -760,7 +761,7 @@ spec:
 			Body([]byte(`{"spec":{"replicas": 5}}`)).
 			DoRaw(context.TODO())
 		if err != nil {
-			framework.Failf("failed to update number of replicas with merge patch: %v:\n%v", err, string(result))
+			e2eutils.Failf("failed to update number of replicas with merge patch: %v:\n%v", err, string(result))
 		}
 		verifyReplicas(result, 5)
 
@@ -772,14 +773,14 @@ spec:
 			Body(yamlBody).
 			DoRaw(context.TODO())
 		if err == nil {
-			framework.Failf("Expecting to get conflicts when applying object after updating replicas, got no error: %s", result)
+			e2eutils.Failf("Expecting to get conflicts when applying object after updating replicas, got no error: %s", result)
 		}
 		status, ok := err.(*apierrors.StatusError)
 		if !ok {
-			framework.Failf("Expecting to get conflicts as API error")
+			e2eutils.Failf("Expecting to get conflicts as API error")
 		}
 		if len(status.Status().Details.Causes) != 1 {
-			framework.Failf("Expecting to get one conflict when applying object after updating replicas, got: %v", status.Status().Details.Causes)
+			e2eutils.Failf("Expecting to get one conflict when applying object after updating replicas, got: %v", status.Status().Details.Causes)
 		}
 
 		// Re-apply with force, should work fine.
@@ -791,7 +792,7 @@ spec:
 			Body(yamlBody).
 			DoRaw(context.TODO())
 		if err != nil {
-			framework.Failf("failed to apply object with force after updating replicas: %v:\n%v", err, string(result))
+			e2eutils.Failf("failed to apply object with force after updating replicas: %v:\n%v", err, string(result))
 		}
 		verifyReplicas(result, 1)
 
@@ -812,14 +813,14 @@ spec:
     protocol: TCP`, apiVersion, kind, name))).
 			DoRaw(context.TODO())
 		if err == nil {
-			framework.Failf("Expecting to get conflicts when a different applier updates existing list item, got no error: %s", result)
+			e2eutils.Failf("Expecting to get conflicts when a different applier updates existing list item, got no error: %s", result)
 		}
 		status, ok = err.(*apierrors.StatusError)
 		if !ok {
-			framework.Failf("Expecting to get conflicts as API error")
+			e2eutils.Failf("Expecting to get conflicts as API error")
 		}
 		if len(status.Status().Details.Causes) != 1 {
-			framework.Failf("Expecting to get one conflict when a different applier updates existing list item, got: %v", status.Status().Details.Causes)
+			e2eutils.Failf("Expecting to get one conflict when a different applier updates existing list item, got: %v", status.Status().Details.Causes)
 		}
 
 		// New applier tries to add a new list item, should work fine.
@@ -840,7 +841,7 @@ spec:
 			SetHeader("Accept", "application/json").
 			DoRaw(context.TODO())
 		if err != nil {
-			framework.Failf("failed to add a new list item to the object as a different applier: %v:\n%v", err, string(result))
+			e2eutils.Failf("failed to add a new list item to the object as a different applier: %v:\n%v", err, string(result))
 		}
 		verifyNumPorts(result, 2)
 
@@ -874,7 +875,7 @@ spec:
 			Body(notExistingYAMLBody).
 			DoRaw(context.TODO())
 		if !apierrors.IsNotFound(err) {
-			framework.Failf("create on update should fail with notFound, got %v", err)
+			e2eutils.Failf("create on update should fail with notFound, got %v", err)
 		}
 
 		// Create a CRD to test atomic lists
@@ -900,7 +901,7 @@ spec:
 		}
 	}`), &c)
 		if err != nil {
-			framework.Failf("%s", err)
+			e2eutils.Failf("%s", err)
 		}
 		for i := range crd.Spec.Versions {
 			crd.Spec.Versions[i].Schema = &c
@@ -908,12 +909,12 @@ spec:
 
 		crd, err = fixtures.CreateNewV1CustomResourceDefinition(crd, apiExtensionClient, dynamicClient)
 		if err != nil {
-			framework.Failf("cannot create crd %s", err)
+			e2eutils.Failf("cannot create crd %s", err)
 		}
 
 		defer func() {
 			err = fixtures.DeleteV1CustomResourceDefinition(crd, apiExtensionClient)
-			framework.ExpectNoError(err, "deleting CustomResourceDefinition")
+			e2eutils.ExpectNoError(err, "deleting CustomResourceDefinition")
 		}()
 
 		crdKind := crd.Spec.Names.Kind
@@ -934,7 +935,7 @@ spec:
 			Body(crdYamlBody).
 			DoRaw(context.TODO())
 		if err != nil {
-			framework.Failf("failed to create custom resource with apply: %v:\n%v", err, string(result))
+			e2eutils.Failf("failed to create custom resource with apply: %v:\n%v", err, string(result))
 		}
 
 		verifyList(result, []interface{}{"item1"})
@@ -955,7 +956,7 @@ spec:
 			Body(crdYamlBody).
 			DoRaw(context.TODO())
 		if err != nil {
-			framework.Failf("failed to create custom resource with apply: %v:\n%v", err, string(result))
+			e2eutils.Failf("failed to create custom resource with apply: %v:\n%v", err, string(result))
 		}
 
 		// Since the list is atomic the contents of the list must completely be replaced by the latest apply
@@ -1009,14 +1010,14 @@ spec:
 			Do(context.TODO()).
 			Get()
 		if err != nil {
-			framework.Failf("Failed to create object using Apply patch: %v", err)
+			e2eutils.Failf("Failed to create object using Apply patch: %v", err)
 		}
 
 		replicas := int32(4)
 		_, err = e2edeployment.UpdateDeploymentWithRetries(client, ns, "deployment-shared-map-item-removal", func(update *appsv1.Deployment) {
 			update.Spec.Replicas = &replicas
 		})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		// applier omits replicas
 		apply = []byte(`{
@@ -1058,16 +1059,16 @@ spec:
 			Do(context.TODO()).
 			Get()
 		if err != nil {
-			framework.Failf("Failed to create object using Apply patch: %v", err)
+			e2eutils.Failf("Failed to create object using Apply patch: %v", err)
 		}
 
 		// ensure the container is deleted even though a controller updated a field of the container
 		deployment, ok := patched.(*appsv1.Deployment)
 		if !ok {
-			framework.Failf("Failed to convert response object to Deployment")
+			e2eutils.Failf("Failed to convert response object to Deployment")
 		}
 		if *deployment.Spec.Replicas != 4 {
-			framework.Failf("Expected deployment.spec.replicas to be 4, but got %d", deployment.Spec.Replicas)
+			e2eutils.Failf("Expected deployment.spec.replicas to be 4, but got %d", deployment.Spec.Replicas)
 		}
 	})
 })
@@ -1077,10 +1078,10 @@ func verifyNumFinalizers(b []byte, n int) {
 	obj := unstructured.Unstructured{}
 	err := obj.UnmarshalJSON(b)
 	if err != nil {
-		framework.Failf("failed to unmarshal response: %v", err)
+		e2eutils.Failf("failed to unmarshal response: %v", err)
 	}
 	if actual, expected := len(obj.GetFinalizers()), n; actual != expected {
-		framework.Failf("expected %v finalizers but got %v:\n%v", expected, actual, string(b))
+		e2eutils.Failf("expected %v finalizers but got %v:\n%v", expected, actual, string(b))
 	}
 }
 
@@ -1089,14 +1090,14 @@ func verifyFinalizersIncludes(b []byte, e string) {
 	obj := unstructured.Unstructured{}
 	err := obj.UnmarshalJSON(b)
 	if err != nil {
-		framework.Failf("failed to unmarshal response: %v", err)
+		e2eutils.Failf("failed to unmarshal response: %v", err)
 	}
 	for _, a := range obj.GetFinalizers() {
 		if a == e {
 			return
 		}
 	}
-	framework.Failf("expected finalizers to include %q but got: %v", e, obj.GetFinalizers())
+	e2eutils.Failf("expected finalizers to include %q but got: %v", e, obj.GetFinalizers())
 }
 
 // verifyReplicas checks that .spec.replicas == r
@@ -1104,26 +1105,26 @@ func verifyReplicas(b []byte, r int) {
 	obj := unstructured.Unstructured{}
 	err := obj.UnmarshalJSON(b)
 	if err != nil {
-		framework.Failf("failed to find replicas number in response: %v:\n%v", err, string(b))
+		e2eutils.Failf("failed to find replicas number in response: %v:\n%v", err, string(b))
 	}
 	spec, ok := obj.Object["spec"]
 	if !ok {
-		framework.Failf("failed to find replicas number in response:\n%v", string(b))
+		e2eutils.Failf("failed to find replicas number in response:\n%v", string(b))
 	}
 	specMap, ok := spec.(map[string]interface{})
 	if !ok {
-		framework.Failf("failed to find replicas number in response:\n%v", string(b))
+		e2eutils.Failf("failed to find replicas number in response:\n%v", string(b))
 	}
 	replicas, ok := specMap["replicas"]
 	if !ok {
-		framework.Failf("failed to find replicas number in response:\n%v", string(b))
+		e2eutils.Failf("failed to find replicas number in response:\n%v", string(b))
 	}
 	replicasNumber, ok := replicas.(int64)
 	if !ok {
-		framework.Failf("failed to find replicas number in response: expected int64 but got: %v", reflect.TypeOf(replicas))
+		e2eutils.Failf("failed to find replicas number in response: expected int64 but got: %v", reflect.TypeOf(replicas))
 	}
 	if actual, expected := replicasNumber, int64(r); actual != expected {
-		framework.Failf("expected %v ports but got %v:\n%v", expected, actual, string(b))
+		e2eutils.Failf("expected %v ports but got %v:\n%v", expected, actual, string(b))
 	}
 }
 
@@ -1132,26 +1133,26 @@ func verifyNumPorts(b []byte, n int) {
 	obj := unstructured.Unstructured{}
 	err := obj.UnmarshalJSON(b)
 	if err != nil {
-		framework.Failf("failed to find ports list in response: %v:\n%v", err, string(b))
+		e2eutils.Failf("failed to find ports list in response: %v:\n%v", err, string(b))
 	}
 	spec, ok := obj.Object["spec"]
 	if !ok {
-		framework.Failf("failed to find ports list in response:\n%v", string(b))
+		e2eutils.Failf("failed to find ports list in response:\n%v", string(b))
 	}
 	specMap, ok := spec.(map[string]interface{})
 	if !ok {
-		framework.Failf("failed to find ports list in response:\n%v", string(b))
+		e2eutils.Failf("failed to find ports list in response:\n%v", string(b))
 	}
 	ports, ok := specMap["ports"]
 	if !ok {
-		framework.Failf("failed to find ports list in response:\n%v", string(b))
+		e2eutils.Failf("failed to find ports list in response:\n%v", string(b))
 	}
 	portsList, ok := ports.([]interface{})
 	if !ok {
-		framework.Failf("failed to find ports list in response: expected array but got: %v", reflect.TypeOf(ports))
+		e2eutils.Failf("failed to find ports list in response: expected array but got: %v", reflect.TypeOf(ports))
 	}
 	if actual, expected := len(portsList), n; actual != expected {
-		framework.Failf("expected %v ports but got %v:\n%v", expected, actual, string(b))
+		e2eutils.Failf("expected %v ports but got %v:\n%v", expected, actual, string(b))
 	}
 }
 
@@ -1160,25 +1161,25 @@ func verifyList(b []byte, expectedList []interface{}) {
 	obj := unstructured.Unstructured{}
 	err := obj.UnmarshalJSON(b)
 	if err != nil {
-		framework.Failf("failed to find atomicList in response: %v:\n%v", err, string(b))
+		e2eutils.Failf("failed to find atomicList in response: %v:\n%v", err, string(b))
 	}
 	spec, ok := obj.Object["spec"]
 	if !ok {
-		framework.Failf("failed to find atomicList in response:\n%v", string(b))
+		e2eutils.Failf("failed to find atomicList in response:\n%v", string(b))
 	}
 	specMap, ok := spec.(map[string]interface{})
 	if !ok {
-		framework.Failf("failed to find atomicList in response:\n%v", string(b))
+		e2eutils.Failf("failed to find atomicList in response:\n%v", string(b))
 	}
 	list, ok := specMap["atomicList"]
 	if !ok {
-		framework.Failf("failed to find atomicList in response:\n%v", string(b))
+		e2eutils.Failf("failed to find atomicList in response:\n%v", string(b))
 	}
 	listString, ok := list.([]interface{})
 	if !ok {
-		framework.Failf("failed to find atomicList in response:\n%v", string(b))
+		e2eutils.Failf("failed to find atomicList in response:\n%v", string(b))
 	}
 	if !reflect.DeepEqual(listString, expectedList) {
-		framework.Failf("Expected list %s, got %s", expectedList, listString)
+		e2eutils.Failf("Expected list %s, got %s", expectedList, listString)
 	}
 }

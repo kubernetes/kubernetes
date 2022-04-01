@@ -24,6 +24,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/google/uuid"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -85,7 +87,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			nodeCopy := node.DeepCopy()
 			delete(nodeCopy.Status.Capacity, testExtendedResource)
 			err := patchNode(cs, &node, nodeCopy)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 		}
 	})
 
@@ -97,22 +99,22 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 		for _, pair := range priorityPairs {
 			_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(context.TODO(), &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: pair.name}, Value: pair.value}, metav1.CreateOptions{})
 			if err != nil && !apierrors.IsAlreadyExists(err) {
-				framework.Failf("expected 'alreadyExists' as error, got instead: %v", err)
+				e2eutils.Failf("expected 'alreadyExists' as error, got instead: %v", err)
 			}
 		}
 
 		e2enode.WaitForTotalHealthy(cs, time.Minute)
 		nodeList, err = e2enode.GetReadySchedulableNodes(cs)
 		if err != nil {
-			framework.Logf("Unexpected error occurred: %v", err)
+			e2eutils.Logf("Unexpected error occurred: %v", err)
 		}
-		framework.ExpectNoErrorWithOffset(0, err)
+		e2eutils.ExpectNoErrorWithOffset(0, err)
 		for _, n := range nodeList.Items {
 			workerNodes.Insert(n.Name)
 		}
 
-		err = framework.CheckTestingNSDeletedExcept(cs, ns)
-		framework.ExpectNoError(err)
+		err = e2eutils.CheckTestingNSDeletedExcept(cs, ns)
+		e2eutils.ExpectNoError(err)
 	})
 
 	/*
@@ -135,7 +137,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			nodeCopy := node.DeepCopy()
 			nodeCopy.Status.Capacity[testExtendedResource] = resource.MustParse("5")
 			err := patchNode(cs, &node, nodeCopy)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 
 			for j := 0; j < 2; j++ {
 				// Request 2 of the available resources for the victim pods
@@ -169,16 +171,16 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 					},
 				})
 				pods = append(pods, pausePod)
-				framework.Logf("Created pod: %v", pausePod.Name)
+				e2eutils.Logf("Created pod: %v", pausePod.Name)
 			}
 		}
 		if len(pods) < 2 {
-			framework.Failf("We need at least two pods to be created but " +
+			e2eutils.Failf("We need at least two pods to be created but " +
 				"all nodes are already heavily utilized, so preemption tests cannot be run")
 		}
 		ginkgo.By("Wait for pods to be scheduled.")
 		for _, pod := range pods {
-			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(cs, pod))
+			e2eutils.ExpectNoError(e2epod.WaitForPodRunningInNamespace(cs, pod))
 		}
 
 		// Set the pod request to the first pod's resources (should be low priority pod)
@@ -193,17 +195,17 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 				Requests: podRes,
 				Limits:   podRes,
 			},
-		}, framework.PodStartShortTimeout)
+		}, e2eutils.PodStartShortTimeout)
 
 		preemptedPod, err := cs.CoreV1().Pods(pods[0].Namespace).Get(context.TODO(), pods[0].Name, metav1.GetOptions{})
 		podPreempted := (err != nil && apierrors.IsNotFound(err)) ||
 			(err == nil && preemptedPod.DeletionTimestamp != nil)
 		if !podPreempted {
-			framework.Failf("expected pod to be preempted, instead got pod %+v and error %v", preemptedPod, err)
+			e2eutils.Failf("expected pod to be preempted, instead got pod %+v and error %v", preemptedPod, err)
 		}
 		for i := 1; i < len(pods); i++ {
 			livePod, err := cs.CoreV1().Pods(pods[i].Namespace).Get(context.TODO(), pods[i].Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			gomega.Expect(livePod.DeletionTimestamp).To(gomega.BeNil())
 		}
 	})
@@ -225,7 +227,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			nodeCopy := node.DeepCopy()
 			nodeCopy.Status.Capacity[testExtendedResource] = resource.MustParse("5")
 			err := patchNode(cs, &node, nodeCopy)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 
 			for j := 0; j < 2; j++ {
 				// Request 2 of the available resources for the victim pods
@@ -259,16 +261,16 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 					},
 				})
 				pods = append(pods, pausePod)
-				framework.Logf("Created pod: %v", pausePod.Name)
+				e2eutils.Logf("Created pod: %v", pausePod.Name)
 			}
 		}
 		if len(pods) < 2 {
-			framework.Failf("We need at least two pods to be created but " +
+			e2eutils.Failf("We need at least two pods to be created but " +
 				"all nodes are already heavily utilized, so preemption tests cannot be run")
 		}
 		ginkgo.By("Wait for pods to be scheduled.")
 		for _, pod := range pods {
-			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(cs, pod))
+			e2eutils.ExpectNoError(e2epod.WaitForPodRunningInNamespace(cs, pod))
 		}
 
 		// We want this pod to be preempted
@@ -280,7 +282,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			// Always run cleanup to make sure the pod is properly cleaned up.
 			err := f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Delete(context.TODO(), "critical-pod", *metav1.NewDeleteOptions(0))
 			if err != nil && !apierrors.IsNotFound(err) {
-				framework.Failf("Error cleanup pod `%s/%s`: %v", metav1.NamespaceSystem, "critical-pod", err)
+				e2eutils.Failf("Error cleanup pod `%s/%s`: %v", metav1.NamespaceSystem, "critical-pod", err)
 			}
 		}()
 		runPausePodWithTimeout(f, pausePodConfig{
@@ -291,12 +293,12 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 				Requests: podRes,
 				Limits:   podRes,
 			},
-		}, framework.PodStartShortTimeout)
+		}, e2eutils.PodStartShortTimeout)
 
 		defer func() {
 			// Clean-up the critical pod
 			err := f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Delete(context.TODO(), "critical-pod", *metav1.NewDeleteOptions(0))
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 		}()
 		// Make sure that the lowest priority pod is deleted.
 		preemptedPod, err := cs.CoreV1().Pods(pods[0].Namespace).Get(context.TODO(), pods[0].Name, metav1.GetOptions{})
@@ -304,12 +306,12 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			(err == nil && preemptedPod.DeletionTimestamp != nil)
 		for i := 1; i < len(pods); i++ {
 			livePod, err := cs.CoreV1().Pods(pods[i].Namespace).Get(context.TODO(), pods[i].Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			gomega.Expect(livePod.DeletionTimestamp).To(gomega.BeNil())
 		}
 
 		if !podPreempted {
-			framework.Failf("expected pod to be preempted, instead got pod %+v and error %v", preemptedPod, err)
+			e2eutils.Failf("expected pod to be preempted, instead got pod %+v and error %v", preemptedPod, err)
 		}
 	})
 
@@ -327,28 +329,28 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			nodeNames = Get2NodesThatCanRunPod(f)
 			ginkgo.By(fmt.Sprintf("Apply dedicated topologyKey %v for this test on the 2 nodes.", topologyKey))
 			for _, nodeName := range nodeNames {
-				framework.AddOrUpdateLabelOnNode(cs, nodeName, topologyKey, nodeName)
+				e2eutils.AddOrUpdateLabelOnNode(cs, nodeName, topologyKey, nodeName)
 
 				node, err := cs.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
-				framework.ExpectNoError(err)
+				e2eutils.ExpectNoError(err)
 				// update Node API object with a fake resource
 				ginkgo.By(fmt.Sprintf("Apply 10 fake resource to node %v.", node.Name))
 				nodeCopy := node.DeepCopy()
 				nodeCopy.Status.Capacity[fakeRes] = resource.MustParse("10")
 				err = patchNode(cs, node, nodeCopy)
-				framework.ExpectNoError(err)
+				e2eutils.ExpectNoError(err)
 				nodes = append(nodes, node)
 			}
 		})
 		ginkgo.AfterEach(func() {
 			for _, nodeName := range nodeNames {
-				framework.RemoveLabelOffNode(cs, nodeName, topologyKey)
+				e2eutils.RemoveLabelOffNode(cs, nodeName, topologyKey)
 			}
 			for _, node := range nodes {
 				nodeCopy := node.DeepCopy()
 				delete(nodeCopy.Status.Capacity, fakeRes)
 				err := patchNode(cs, node, nodeCopy)
-				framework.ExpectNoError(err)
+				e2eutils.ExpectNoError(err)
 			}
 		})
 
@@ -439,8 +441,8 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 
 			// Wait until the number of pods stabilizes. Note that `medium` pod can get scheduled once the
 			// second low priority pod is marked as terminating.
-			pods, err := e2epod.WaitForNumberOfPods(cs, ns, 3, framework.PollShortTimeout)
-			framework.ExpectNoError(err)
+			pods, err := e2epod.WaitForNumberOfPods(cs, ns, 3, e2eutils.PollShortTimeout)
+			e2eutils.ExpectNoError(err)
 
 			for _, pod := range pods.Items {
 				// Remove the ordinal index for low pod.
@@ -449,7 +451,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 					ginkgo.By(fmt.Sprintf("Pod %q is as expected to be running.", pod.Name))
 					wantPods.Delete(podName)
 				} else {
-					framework.Failf("Pod %q conflicted with expected PodSet %v", podName, wantPods)
+					e2eutils.Failf("Pod %q conflicted with expected PodSet %v", podName, wantPods)
 				}
 			}
 		})
@@ -473,11 +475,11 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 				// List existing PriorityClasses.
 				priorityList, err := cs.SchedulingV1().PriorityClasses().List(context.TODO(), metav1.ListOptions{})
 				if err != nil {
-					framework.Logf("Unable to list PriorityClasses: %v", err)
+					e2eutils.Logf("Unable to list PriorityClasses: %v", err)
 				} else {
-					framework.Logf("List existing PriorityClasses:")
+					e2eutils.Logf("List existing PriorityClasses:")
 					for _, p := range priorityList.Items {
-						framework.Logf("%v/%v created at %v", p.Name, p.Value, p.CreationTimestamp)
+						e2eutils.Logf("%v/%v created at %v", p.Name, p.Value, p.CreationTimestamp)
 					}
 				}
 			}
@@ -486,7 +488,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 				nodeCopy := node.DeepCopy()
 				delete(nodeCopy.Status.Capacity, fakecpu)
 				err := patchNode(cs, node, nodeCopy)
-				framework.ExpectNoError(err)
+				e2eutils.ExpectNoError(err)
 			}
 			for _, pair := range priorityPairs {
 				cs.SchedulingV1().PriorityClasses().Delete(context.TODO(), pair.name, *metav1.NewDeleteOptions(0))
@@ -500,25 +502,25 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			// find an available node
 			ginkgo.By("Finding an available node")
 			nodeName := GetNodeThatCanRunPod(f)
-			framework.Logf("found a healthy node: %s", nodeName)
+			e2eutils.Logf("found a healthy node: %s", nodeName)
 
 			// get the node API object
 			var err error
 			node, err = cs.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 			if err != nil {
-				framework.Failf("error getting node %q: %v", nodeName, err)
+				e2eutils.Failf("error getting node %q: %v", nodeName, err)
 			}
 			var ok bool
 			nodeHostNameLabel, ok = node.GetObjectMeta().GetLabels()["kubernetes.io/hostname"]
 			if !ok {
-				framework.Failf("error getting kubernetes.io/hostname label on node %s", nodeName)
+				e2eutils.Failf("error getting kubernetes.io/hostname label on node %s", nodeName)
 			}
 
 			// update Node API object with a fake resource
 			nodeCopy := node.DeepCopy()
 			nodeCopy.Status.Capacity[fakecpu] = resource.MustParse("1000")
 			err = patchNode(cs, node, nodeCopy)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 
 			// create four PriorityClass: p1, p2, p3, p4
 			for i := 1; i <= 4; i++ {
@@ -527,10 +529,10 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 				priorityPairs = append(priorityPairs, priorityPair{name: priorityName, value: priorityVal})
 				_, err := cs.SchedulingV1().PriorityClasses().Create(context.TODO(), &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: priorityName}, Value: priorityVal}, metav1.CreateOptions{})
 				if err != nil {
-					framework.Logf("Failed to create priority '%v/%v'. Reason: %v. Msg: %v", priorityName, priorityVal, apierrors.ReasonForError(err), err)
+					e2eutils.Logf("Failed to create priority '%v/%v'. Reason: %v. Msg: %v", priorityName, priorityVal, apierrors.ReasonForError(err), err)
 				}
 				if err != nil && !apierrors.IsAlreadyExists(err) {
-					framework.Failf("expected 'alreadyExists' as error, got instead: %v", err)
+					e2eutils.Failf("expected 'alreadyExists' as error, got instead: %v", err)
 				}
 			}
 		})
@@ -624,8 +626,8 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 				runPauseRS(f, rsConfs[i])
 			}
 
-			framework.Logf("pods created so far: %v", podNamesSeen)
-			framework.Logf("length of pods created so far: %v", len(podNamesSeen))
+			e2eutils.Logf("pods created so far: %v", podNamesSeen)
+			e2eutils.Logf("length of pods created so far: %v", len(podNamesSeen))
 
 			// create a Preemptor Pod
 			preemptorPodConf := pausePodConfig{
@@ -640,20 +642,20 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 				},
 			}
 			preemptorPod := createPod(f, preemptorPodConf)
-			waitForPreemptingWithTimeout(f, preemptorPod, framework.PodGetTimeout)
+			waitForPreemptingWithTimeout(f, preemptorPod, e2eutils.PodGetTimeout)
 
-			framework.Logf("pods created so far: %v", podNamesSeen)
+			e2eutils.Logf("pods created so far: %v", podNamesSeen)
 
 			// count pods number of ReplicaSet{1,2,3}:
 			// - if it's more than expected replicas, it denotes its pods have been over-preempted
 			// - if it's less than expected replicas, it denotes its pods are under-preempted
 			// "*2" means pods of ReplicaSet{1,2} are expected to be only preempted once.
 			expectedRSPods := []int32{1 * 2, 1 * 2, 1}
-			err := wait.Poll(framework.Poll, framework.PollShortTimeout, func() (bool, error) {
+			err := wait.Poll(e2eutils.Poll, e2eutils.PollShortTimeout, func() (bool, error) {
 				for i := 0; i < len(podNamesSeen); i++ {
 					got := atomic.LoadInt32(&podNamesSeen[i])
 					if got < expectedRSPods[i] {
-						framework.Logf("waiting for rs%d to observe %d pod creations, got %d", i+1, expectedRSPods[i], got)
+						e2eutils.Logf("waiting for rs%d to observe %d pod creations, got %d", i+1, expectedRSPods[i], got)
 						return false, nil
 					} else if got > expectedRSPods[i] {
 						return false, fmt.Errorf("rs%d had more than %d pods created: %d", i+1, expectedRSPods[i], got)
@@ -662,8 +664,8 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 				return true, nil
 			})
 			if err != nil {
-				framework.Logf("pods created so far: %v", podNamesSeen)
-				framework.Failf("failed pod observation expectations: %v", err)
+				e2eutils.Logf("pods created so far: %v", podNamesSeen)
+				e2eutils.Failf("failed pod observation expectations: %v", err)
 			}
 
 			// If logic continues to here, we should do a final check to ensure within a time period,
@@ -672,9 +674,9 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			for i := 0; i < len(podNamesSeen); i++ {
 				got := atomic.LoadInt32(&podNamesSeen[i])
 				if got < expectedRSPods[i] {
-					framework.Failf("pods of ReplicaSet%d have been under-preempted: expect %v pod names, but got %d", i+1, expectedRSPods[i], got)
+					e2eutils.Failf("pods of ReplicaSet%d have been under-preempted: expect %v pod names, but got %d", i+1, expectedRSPods[i], got)
 				} else if got > expectedRSPods[i] {
-					framework.Failf("pods of ReplicaSet%d have been over-preempted: expect %v pod names, but got %d", i+1, expectedRSPods[i], got)
+					e2eutils.Failf("pods of ReplicaSet%d have been over-preempted: expect %v pod names, but got %d", i+1, expectedRSPods[i], got)
 				}
 			}
 		})
@@ -693,10 +695,10 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 				name, val := fmt.Sprintf("p%d", i), int32(i)
 				pc, err := cs.SchedulingV1().PriorityClasses().Create(context.TODO(), &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: name, Labels: map[string]string{"e2e": testUUID}}, Value: val}, metav1.CreateOptions{})
 				if err != nil {
-					framework.Logf("Failed to create priority '%v/%v'. Reason: %v. Msg: %v", name, val, apierrors.ReasonForError(err), err)
+					e2eutils.Logf("Failed to create priority '%v/%v'. Reason: %v. Msg: %v", name, val, apierrors.ReasonForError(err), err)
 				}
 				if err != nil && !apierrors.IsAlreadyExists(err) {
-					framework.Failf("expected 'alreadyExists' as error, got instead: %v", err)
+					e2eutils.Failf("expected 'alreadyExists' as error, got instead: %v", err)
 				}
 				pcs = append(pcs, pc)
 			}
@@ -708,18 +710,18 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 				// List existing PriorityClasses.
 				priorityList, err := cs.SchedulingV1().PriorityClasses().List(context.TODO(), metav1.ListOptions{})
 				if err != nil {
-					framework.Logf("Unable to list PriorityClasses: %v", err)
+					e2eutils.Logf("Unable to list PriorityClasses: %v", err)
 				} else {
-					framework.Logf("List existing PriorityClasses:")
+					e2eutils.Logf("List existing PriorityClasses:")
 					for _, p := range priorityList.Items {
-						framework.Logf("%v/%v created at %v", p.Name, p.Value, p.CreationTimestamp)
+						e2eutils.Logf("%v/%v created at %v", p.Name, p.Value, p.CreationTimestamp)
 					}
 				}
 			}
 
 			// Collection deletion on created PriorityClasses.
 			err := cs.SchedulingV1().PriorityClasses().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: fmt.Sprintf("e2e=%v", testUUID)})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 		})
 
 		/*
@@ -734,37 +736,37 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			pcCopy := pcs[0].DeepCopy()
 			pcCopy.Value = pcCopy.Value * 10
 			err := patchPriorityClass(cs, pcs[0], pcCopy)
-			framework.ExpectError(err, "expect a patch error on an immutable field")
-			framework.Logf("%v", err)
+			e2eutils.ExpectError(err, "expect a patch error on an immutable field")
+			e2eutils.Logf("%v", err)
 
 			pcCopy = pcs[1].DeepCopy()
 			pcCopy.Value = pcCopy.Value * 10
 			_, err = cs.SchedulingV1().PriorityClasses().Update(context.TODO(), pcCopy, metav1.UpdateOptions{})
-			framework.ExpectError(err, "expect an update error on an immutable field")
-			framework.Logf("%v", err)
+			e2eutils.ExpectError(err, "expect an update error on an immutable field")
+			e2eutils.Logf("%v", err)
 
 			// 2. Patch/Update on mutable fields will succeed.
 			newDesc := "updated description"
 			pcCopy = pcs[0].DeepCopy()
 			pcCopy.Description = newDesc
 			err = patchPriorityClass(cs, pcs[0], pcCopy)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 
 			pcCopy = pcs[1].DeepCopy()
 			pcCopy.Description = newDesc
 			_, err = cs.SchedulingV1().PriorityClasses().Update(context.TODO(), pcCopy, metav1.UpdateOptions{})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 
 			// 3. List existing PriorityClasses.
 			_, err = cs.SchedulingV1().PriorityClasses().List(context.TODO(), metav1.ListOptions{})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 
 			// 4. Verify fields of updated PriorityClasses.
 			for _, pc := range pcs {
 				livePC, err := cs.SchedulingV1().PriorityClasses().Get(context.TODO(), pc.Name, metav1.GetOptions{})
-				framework.ExpectNoError(err)
-				framework.ExpectEqual(livePC.Value, pc.Value)
-				framework.ExpectEqual(livePC.Description, newDesc)
+				e2eutils.ExpectNoError(err)
+				e2eutils.ExpectEqual(livePC.Value, pc.Value)
+				e2eutils.ExpectEqual(livePC.Description, newDesc)
 			}
 		})
 	})
@@ -802,13 +804,13 @@ func createPauseRS(f *framework.Framework, conf pauseRSConfig) *appsv1.ReplicaSe
 		namespace = f.Namespace.Name
 	}
 	rs, err := f.ClientSet.AppsV1().ReplicaSets(namespace).Create(context.TODO(), initPauseRS(f, conf), metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	return rs
 }
 
 func runPauseRS(f *framework.Framework, conf pauseRSConfig) *appsv1.ReplicaSet {
 	rs := createPauseRS(f, conf)
-	framework.ExpectNoError(e2ereplicaset.WaitForReplicaSetTargetAvailableReplicasWithTimeout(f.ClientSet, rs, conf.Replicas, framework.PodGetTimeout))
+	e2eutils.ExpectNoError(e2ereplicaset.WaitForReplicaSetTargetAvailableReplicasWithTimeout(f.ClientSet, rs, conf.Replicas, e2eutils.PodGetTimeout))
 	return rs
 }
 
@@ -818,7 +820,7 @@ func createPod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 		namespace = f.Namespace.Name
 	}
 	pod, err := f.ClientSet.CoreV1().Pods(namespace).Create(context.TODO(), initPausePod(f, conf), metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	return pod
 }
 
@@ -835,7 +837,7 @@ func waitForPreemptingWithTimeout(f *framework.Framework, pod *v1.Pod, timeout t
 		}
 		return false, err
 	})
-	framework.ExpectNoError(err, "pod %v/%v failed to preempt other pods", pod.Namespace, pod.Name)
+	e2eutils.ExpectNoError(err, "pod %v/%v failed to preempt other pods", pod.Namespace, pod.Name)
 }
 
 func patchNode(client clientset.Interface, old *v1.Node, new *v1.Node) error {

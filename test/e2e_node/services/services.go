@@ -23,10 +23,10 @@ import (
 	"path"
 	"testing"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
-
-	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 // E2EServices starts and stops e2e services in a separate process. The test
@@ -68,7 +68,7 @@ func (e *E2EServices) Start() error {
 	}
 	klog.Infof("Node services started.")
 	// running the kubelet depends on whether we are running conformance test-suite
-	if framework.TestContext.NodeConformance {
+	if e2econfig.TestContext.NodeConformance {
 		klog.Info("nothing to do in node-e2e-services, running conformance suite")
 	} else {
 		// Start kubelet
@@ -84,7 +84,7 @@ func (e *E2EServices) Start() error {
 // Stop stops the e2e services.
 func (e *E2EServices) Stop() {
 	defer func() {
-		if !framework.TestContext.NodeConformance {
+		if !e2econfig.TestContext.NodeConformance {
 			// Collect log files.
 			e.collectLogFiles()
 		}
@@ -112,7 +112,7 @@ func (e *E2EServices) Stop() {
 func RunE2EServices(t *testing.T) {
 	// Populate global DefaultFeatureGate with value from TestContext.FeatureGates.
 	// This way, statically-linked components see the same feature gate config as the test context.
-	if err := utilfeature.DefaultMutableFeatureGate.SetFromMap(framework.TestContext.FeatureGates); err != nil {
+	if err := utilfeature.DefaultMutableFeatureGate.SetFromMap(e2econfig.TestContext.FeatureGates); err != nil {
 		t.Fatal(err)
 	}
 	e := newE2EServices()
@@ -137,7 +137,7 @@ func (e *E2EServices) startInternalServices() (*server, error) {
 	// Pass all flags into the child process, so that it will see the same flag set.
 	startCmd := exec.Command(testBin,
 		append(
-			[]string{"--run-services-mode", fmt.Sprintf("--bearer-token=%s", framework.TestContext.BearerToken)},
+			[]string{"--run-services-mode", fmt.Sprintf("--bearer-token=%s", e2econfig.TestContext.BearerToken)},
 			os.Args[1:]...,
 		)...)
 	server := newServer("services", startCmd, nil, nil, getServicesHealthCheckURLs(), servicesLogFile, e.monitorParent, false)
@@ -149,13 +149,13 @@ func (e *E2EServices) startInternalServices() (*server, error) {
 // treated as normal files and file contents will be copied over.
 func (e *E2EServices) collectLogFiles() {
 	// Nothing to do if report dir is not specified.
-	if framework.TestContext.ReportDir == "" {
+	if e2econfig.TestContext.ReportDir == "" {
 		return
 	}
 	klog.Info("Fetching log files...")
 	journaldFound := isJournaldAvailable()
 	for targetFileName, log := range e.logs {
-		targetLink := path.Join(framework.TestContext.ReportDir, targetFileName)
+		targetLink := path.Join(e2econfig.TestContext.ReportDir, targetFileName)
 		if journaldFound {
 			// Skip log files that do not have an equivalent in journald-based machines.
 			if len(log.JournalctlCommand) == 0 {

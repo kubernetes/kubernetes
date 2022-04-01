@@ -19,10 +19,11 @@ package framework
 import (
 	"fmt"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/storage/names"
-	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 // GetDriverNameWithFeatureTags returns driver name with feature tags
@@ -45,7 +46,7 @@ func CreateVolume(driver TestDriver, config *PerTestConfig, volType TestVolType)
 	case CSIInlineVolume, GenericEphemeralVolume, DynamicPV:
 		// No need to create volume
 	default:
-		framework.Failf("Invalid volType specified: %v", volType)
+		e2eutils.Failf("Invalid volType specified: %v", volType)
 	}
 	return nil
 }

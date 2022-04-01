@@ -23,6 +23,9 @@ import (
 	"os"
 	"time"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eautoscaling "k8s.io/kubernetes/test/e2e/framework/autoscaling"
@@ -73,11 +76,11 @@ var _ = instrumentation.SIGDescribe("Stackdriver Monitoring", func() {
 })
 
 func testStackdriverMonitoring(f *framework.Framework, pods, allPodsCPU int, perPodCPU int64) {
-	projectID := framework.TestContext.CloudConfig.ProjectID
+	projectID := e2econfig.TestContext.CloudConfig.ProjectID
 
 	ctx := context.Background()
 	client, err := google.DefaultClient(ctx, gcm.CloudPlatformScope)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	// Hack for running tests locally
 	// If this is your use case, create application default credentials:
@@ -85,9 +88,9 @@ func testStackdriverMonitoring(f *framework.Framework, pods, allPodsCPU int, per
 	// and uncomment following lines (comment out the two lines above): (DON'T set the env var below)
 	/*
 		ts, err := google.DefaultTokenSource(oauth2.NoContext)
-		framework.Logf("Couldn't get application default credentials, %v", err)
+		e2eutils.Logf("Couldn't get application default credentials, %v", err)
 		if err != nil {
-			framework.Failf("Error accessing application default credentials, %v", err)
+			e2eutils.Failf("Error accessing application default credentials, %v", err)
 		}
 		client := oauth2.NewClient(oauth2.NoContext, ts)
 	*/
@@ -101,7 +104,7 @@ func testStackdriverMonitoring(f *framework.Framework, pods, allPodsCPU int, per
 		gcmService.BasePath = basePathOverride
 	}
 
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	rc := e2eautoscaling.NewDynamicResourceConsumer(rcName, f.Namespace.Name, e2eautoscaling.KindDeployment, pods, allPodsCPU, memoryUsed, 0, perPodCPU, memoryLimit, f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle)
 	defer rc.CleanUp()
@@ -112,9 +115,9 @@ func testStackdriverMonitoring(f *framework.Framework, pods, allPodsCPU int, per
 	pollingFunction := checkForMetrics(projectID, gcmService, time.Now(), metricsMap, allPodsCPU, perPodCPU)
 	err = wait.Poll(pollFrequency, pollTimeout, pollingFunction)
 	if err != nil {
-		framework.Logf("Missing metrics: %+v\n", metricsMap)
+		e2eutils.Logf("Missing metrics: %+v\n", metricsMap)
 	}
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 }
 
 func checkForMetrics(projectID string, gcmService *gcm.Service, start time.Time, metricsMap map[string]bool, cpuUsed int, cpuLimit int64) func() (bool, error) {
@@ -127,13 +130,13 @@ func checkForMetrics(projectID string, gcmService *gcm.Service, start time.Time,
 		for _, metric := range stackdriverMetrics {
 			// TODO: check only for metrics from this cluster
 			ts, err := fetchTimeSeries(projectID, gcmService, metric, start, time.Now())
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			if len(ts) > 0 {
 				counter = counter + 1
 				metricsMap[metric] = true
-				framework.Logf("Received %v timeseries for metric %v\n", len(ts), metric)
+				e2eutils.Logf("Received %v timeseries for metric %v\n", len(ts), metric)
 			} else {
-				framework.Logf("No timeseries for metric %v\n", metric)
+				e2eutils.Logf("No timeseries for metric %v\n", metric)
 			}
 
 			var sum float64
@@ -150,10 +153,10 @@ func checkForMetrics(projectID string, gcmService *gcm.Service, start time.Time,
 						}
 					}
 					sum = sum + *max.Value.DoubleValue
-					framework.Logf("Received %v points for metric %v\n",
+					e2eutils.Logf("Received %v points for metric %v\n",
 						len(t.Points), metric)
 				}
-				framework.Logf("Most recent cpu/utilization sum*cpu/limit: %v\n", sum*float64(cpuLimit))
+				e2eutils.Logf("Most recent cpu/utilization sum*cpu/limit: %v\n", sum*float64(cpuLimit))
 				if math.Abs(sum*float64(cpuLimit)-float64(cpuUsed)) > tolerance*float64(cpuUsed) {
 					return false, nil
 				}

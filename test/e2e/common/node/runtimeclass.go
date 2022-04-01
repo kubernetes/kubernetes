@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	nodev1 "k8s.io/api/node/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -70,14 +72,14 @@ var _ = SIGDescribe("RuntimeClass", func() {
 			"reason":                   events.FailedCreatePodSandBox,
 		}.AsSelector().String()
 		// Events are unreliable, don't depend on the event. It's used only to speed up the test.
-		err := e2eevents.WaitTimeoutForEvent(f.ClientSet, f.Namespace.Name, eventSelector, handler, framework.PodEventTimeout)
+		err := e2eevents.WaitTimeoutForEvent(f.ClientSet, f.Namespace.Name, eventSelector, handler, e2eutils.PodEventTimeout)
 		if err != nil {
-			framework.Logf("Warning: did not get event about FailedCreatePodSandBox. Err: %v", err)
+			e2eutils.Logf("Warning: did not get event about FailedCreatePodSandBox. Err: %v", err)
 		}
 		// Check the pod is still not running
 		p, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), pod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err, "could not re-read the pod after event (or timeout)")
-		framework.ExpectEqual(p.Status.Phase, v1.PodPending, "Pod phase isn't pending")
+		e2eutils.ExpectNoError(err, "could not re-read the pod after event (or timeout)")
+		e2eutils.ExpectEqual(p.Status.Phase, v1.PodPending, "Pod phase isn't pending")
 	})
 
 	// This test requires that the PreconfiguredRuntimeHandler has already been set up on nodes.
@@ -108,14 +110,14 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		// there is only one pod in the namespace
 		label := labels.SelectorFromSet(labels.Set(map[string]string{}))
 		pods, err := e2epod.WaitForPodsWithLabelScheduled(f.ClientSet, f.Namespace.Name, label)
-		framework.ExpectNoError(err, "Failed to schedule Pod with the RuntimeClass")
+		e2eutils.ExpectNoError(err, "Failed to schedule Pod with the RuntimeClass")
 
-		framework.ExpectEqual(len(pods.Items), 1)
+		e2eutils.ExpectEqual(len(pods.Items), 1)
 		scheduledPod := &pods.Items[0]
-		framework.ExpectEqual(scheduledPod.Name, pod.Name)
+		e2eutils.ExpectEqual(scheduledPod.Name, pod.Name)
 
 		// Overhead should not be set
-		framework.ExpectEqual(len(scheduledPod.Spec.Overhead), 0)
+		e2eutils.ExpectEqual(len(scheduledPod.Spec.Overhead), 0)
 	})
 
 	/*
@@ -138,14 +140,14 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		// there is only one pod in the namespace
 		label := labels.SelectorFromSet(labels.Set(map[string]string{}))
 		pods, err := e2epod.WaitForPodsWithLabelScheduled(f.ClientSet, f.Namespace.Name, label)
-		framework.ExpectNoError(err, "Failed to schedule Pod with the RuntimeClass")
+		e2eutils.ExpectNoError(err, "Failed to schedule Pod with the RuntimeClass")
 
-		framework.ExpectEqual(len(pods.Items), 1)
+		e2eutils.ExpectEqual(len(pods.Items), 1)
 		scheduledPod := &pods.Items[0]
-		framework.ExpectEqual(scheduledPod.Name, pod.Name)
+		e2eutils.ExpectEqual(scheduledPod.Name, pod.Name)
 
-		framework.ExpectEqual(scheduledPod.Spec.Overhead[v1.ResourceCPU], resource.MustParse("10m"))
-		framework.ExpectEqual(scheduledPod.Spec.Overhead[v1.ResourceMemory], resource.MustParse("1Mi"))
+		e2eutils.ExpectEqual(scheduledPod.Spec.Overhead[v1.ResourceCPU], resource.MustParse("10m"))
+		e2eutils.ExpectEqual(scheduledPod.Spec.Overhead[v1.ResourceMemory], resource.MustParse("1Mi"))
 	})
 
 	/*
@@ -159,10 +161,10 @@ var _ = SIGDescribe("RuntimeClass", func() {
 
 		ginkgo.By("Deleting RuntimeClass "+rcName, func() {
 			err := rcClient.Delete(context.TODO(), rcName, metav1.DeleteOptions{})
-			framework.ExpectNoError(err, "failed to delete RuntimeClass %s", rcName)
+			e2eutils.ExpectNoError(err, "failed to delete RuntimeClass %s", rcName)
 
 			ginkgo.By("Waiting for the RuntimeClass to disappear")
-			framework.ExpectNoError(wait.PollImmediate(framework.Poll, time.Minute, func() (bool, error) {
+			e2eutils.ExpectNoError(wait.PollImmediate(e2eutils.Poll, time.Minute, func() (bool, error) {
 				_, err := rcClient.Get(context.TODO(), rcName, metav1.GetOptions{})
 				if apierrors.IsNotFound(err) {
 					return true, nil // done
@@ -207,7 +209,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		ginkgo.By("getting /apis")
 		{
 			discoveryGroups, err := f.ClientSet.Discovery().ServerGroups()
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			found := false
 			for _, group := range discoveryGroups.Groups {
 				if group.Name == nodev1.GroupName {
@@ -219,14 +221,14 @@ var _ = SIGDescribe("RuntimeClass", func() {
 					}
 				}
 			}
-			framework.ExpectEqual(found, true, fmt.Sprintf("expected RuntimeClass API group/version, got %#v", discoveryGroups.Groups))
+			e2eutils.ExpectEqual(found, true, fmt.Sprintf("expected RuntimeClass API group/version, got %#v", discoveryGroups.Groups))
 		}
 
 		ginkgo.By("getting /apis/node.k8s.io")
 		{
 			group := &metav1.APIGroup{}
 			err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis/node.k8s.io").Do(context.TODO()).Into(group)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			found := false
 			for _, version := range group.Versions {
 				if version.Version == rcVersion {
@@ -234,13 +236,13 @@ var _ = SIGDescribe("RuntimeClass", func() {
 					break
 				}
 			}
-			framework.ExpectEqual(found, true, fmt.Sprintf("expected RuntimeClass API version, got %#v", group.Versions))
+			e2eutils.ExpectEqual(found, true, fmt.Sprintf("expected RuntimeClass API version, got %#v", group.Versions))
 		}
 
 		ginkgo.By("getting /apis/node.k8s.io/" + rcVersion)
 		{
 			resources, err := f.ClientSet.Discovery().ServerResourcesForGroupVersion(nodev1.SchemeGroupVersion.String())
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			found := false
 			for _, resource := range resources.APIResources {
 				switch resource.Name {
@@ -248,75 +250,75 @@ var _ = SIGDescribe("RuntimeClass", func() {
 					found = true
 				}
 			}
-			framework.ExpectEqual(found, true, fmt.Sprintf("expected runtimeclasses, got %#v", resources.APIResources))
+			e2eutils.ExpectEqual(found, true, fmt.Sprintf("expected runtimeclasses, got %#v", resources.APIResources))
 		}
 
 		// Main resource create/read/update/watch operations
 
 		ginkgo.By("creating")
 		createdRC, err := rcClient.Create(context.TODO(), rc, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		_, err = rcClient.Create(context.TODO(), rc, metav1.CreateOptions{})
-		framework.ExpectEqual(apierrors.IsAlreadyExists(err), true, fmt.Sprintf("expected 409, got %#v", err))
+		e2eutils.ExpectEqual(apierrors.IsAlreadyExists(err), true, fmt.Sprintf("expected 409, got %#v", err))
 		_, err = rcClient.Create(context.TODO(), rc2, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		ginkgo.By("watching")
-		framework.Logf("starting watch")
+		e2eutils.Logf("starting watch")
 		rcWatch, err := rcClient.Watch(context.TODO(), metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		// added for a watch
 		_, err = rcClient.Create(context.TODO(), rc3, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		ginkgo.By("getting")
 		gottenRC, err := rcClient.Get(context.TODO(), rc.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(gottenRC.UID, createdRC.UID)
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectEqual(gottenRC.UID, createdRC.UID)
 
 		ginkgo.By("listing")
 		rcs, err := rcClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(rcs.Items), 3, "filtered list should have 3 items")
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectEqual(len(rcs.Items), 3, "filtered list should have 3 items")
 
 		ginkgo.By("patching")
 		patchedRC, err := rcClient.Patch(context.TODO(), createdRC.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"patched":"true"}}}`), metav1.PatchOptions{})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(patchedRC.Annotations["patched"], "true", "patched object should have the applied annotation")
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectEqual(patchedRC.Annotations["patched"], "true", "patched object should have the applied annotation")
 
 		ginkgo.By("updating")
 		csrToUpdate := patchedRC.DeepCopy()
 		csrToUpdate.Annotations["updated"] = "true"
 		updatedRC, err := rcClient.Update(context.TODO(), csrToUpdate, metav1.UpdateOptions{})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(updatedRC.Annotations["updated"], "true", "updated object should have the applied annotation")
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectEqual(updatedRC.Annotations["updated"], "true", "updated object should have the applied annotation")
 
-		framework.Logf("waiting for watch events with expected annotations")
+		e2eutils.Logf("waiting for watch events with expected annotations")
 		for sawAdded, sawPatched, sawUpdated := false, false, false; !sawAdded && !sawPatched && !sawUpdated; {
 			select {
 			case evt, ok := <-rcWatch.ResultChan():
-				framework.ExpectEqual(ok, true, "watch channel should not close")
+				e2eutils.ExpectEqual(ok, true, "watch channel should not close")
 				if evt.Type == watch.Modified {
 					watchedRC, isRC := evt.Object.(*nodev1.RuntimeClass)
-					framework.ExpectEqual(isRC, true, fmt.Sprintf("expected RC, got %T", evt.Object))
+					e2eutils.ExpectEqual(isRC, true, fmt.Sprintf("expected RC, got %T", evt.Object))
 					if watchedRC.Annotations["patched"] == "true" {
-						framework.Logf("saw patched annotations")
+						e2eutils.Logf("saw patched annotations")
 						sawPatched = true
 					} else if watchedRC.Annotations["updated"] == "true" {
-						framework.Logf("saw updated annotations")
+						e2eutils.Logf("saw updated annotations")
 						sawUpdated = true
 					} else {
-						framework.Logf("missing expected annotations, waiting: %#v", watchedRC.Annotations)
+						e2eutils.Logf("missing expected annotations, waiting: %#v", watchedRC.Annotations)
 					}
 				} else if evt.Type == watch.Added {
 					_, isRC := evt.Object.(*nodev1.RuntimeClass)
-					framework.ExpectEqual(isRC, true, fmt.Sprintf("expected RC, got %T", evt.Object))
+					e2eutils.ExpectEqual(isRC, true, fmt.Sprintf("expected RC, got %T", evt.Object))
 					sawAdded = true
 				}
 
 			case <-time.After(wait.ForeverTestTimeout):
-				framework.Fail("timed out waiting for watch event")
+				e2eutils.Fail("timed out waiting for watch event")
 			}
 		}
 		rcWatch.Stop()
@@ -325,25 +327,25 @@ var _ = SIGDescribe("RuntimeClass", func() {
 
 		ginkgo.By("deleting")
 		err = rcClient.Delete(context.TODO(), createdRC.Name, metav1.DeleteOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		_, err = rcClient.Get(context.TODO(), createdRC.Name, metav1.GetOptions{})
-		framework.ExpectEqual(apierrors.IsNotFound(err), true, fmt.Sprintf("expected 404, got %#v", err))
+		e2eutils.ExpectEqual(apierrors.IsNotFound(err), true, fmt.Sprintf("expected 404, got %#v", err))
 		rcs, err = rcClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(rcs.Items), 2, "filtered list should have 2 items")
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectEqual(len(rcs.Items), 2, "filtered list should have 2 items")
 
 		ginkgo.By("deleting a collection")
 		err = rcClient.DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		rcs, err = rcClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(rcs.Items), 0, "filtered list should have 0 items")
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectEqual(len(rcs.Items), 0, "filtered list should have 0 items")
 	})
 })
 
 func deleteRuntimeClass(f *framework.Framework, name string) {
 	err := f.ClientSet.NodeV1().RuntimeClasses().Delete(context.TODO(), name, metav1.DeleteOptions{})
-	framework.ExpectNoError(err, "failed to delete RuntimeClass resource")
+	e2eutils.ExpectNoError(err, "failed to delete RuntimeClass resource")
 }
 
 // createRuntimeClass generates a RuntimeClass with the desired handler and a "namespaced" name,
@@ -353,18 +355,18 @@ func createRuntimeClass(f *framework.Framework, name, handler string, overhead *
 	rc := runtimeclasstest.NewRuntimeClass(uniqueName, handler)
 	rc.Overhead = overhead
 	rc, err := f.ClientSet.NodeV1().RuntimeClasses().Create(context.TODO(), rc, metav1.CreateOptions{})
-	framework.ExpectNoError(err, "failed to create RuntimeClass resource")
+	e2eutils.ExpectNoError(err, "failed to create RuntimeClass resource")
 	return rc.GetName()
 }
 
 func expectPodRejection(f *framework.Framework, pod *v1.Pod) {
 	_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
-	framework.ExpectError(err, "should be forbidden")
-	framework.ExpectEqual(apierrors.IsForbidden(err), true, "should be forbidden error")
+	e2eutils.ExpectError(err, "should be forbidden")
+	e2eutils.ExpectEqual(apierrors.IsForbidden(err), true, "should be forbidden error")
 }
 
 // expectPodSuccess waits for the given pod to terminate successfully.
 func expectPodSuccess(f *framework.Framework, pod *v1.Pod) {
-	framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(
+	e2eutils.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(
 		f.ClientSet, pod.Name, f.Namespace.Name))
 }

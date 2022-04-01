@@ -23,6 +23,9 @@ import (
 	"path"
 	"time"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -52,7 +55,7 @@ var _ = SIGDescribe("Container Runtime", func() {
 				restartCountVolumeName := "restart-count"
 				restartCountVolumePath := "/restart-count"
 				testContainer := v1.Container{
-					Image: framework.BusyBoxImage,
+					Image: e2eutils.BusyBoxImage,
 					VolumeMounts: []v1.VolumeMount{
 						{
 							MountPath: restartCountVolumePath,
@@ -117,14 +120,14 @@ while true; do sleep 1; done
 
 					ginkgo.By(fmt.Sprintf("Container '%s': should get the expected 'Ready' condition", testContainer.Name))
 					isReady, err := terminateContainer.IsReady()
-					framework.ExpectEqual(isReady, testCase.Ready)
-					framework.ExpectNoError(err)
+					e2eutils.ExpectEqual(isReady, testCase.Ready)
+					e2eutils.ExpectNoError(err)
 
 					status, err := terminateContainer.GetStatus()
-					framework.ExpectNoError(err)
+					e2eutils.ExpectNoError(err)
 
 					ginkgo.By(fmt.Sprintf("Container '%s': should get the expected 'State'", testContainer.Name))
-					framework.ExpectEqual(GetContainerState(status.State), testCase.State)
+					e2eutils.ExpectEqual(GetContainerState(status.State), testCase.State)
 
 					ginkgo.By(fmt.Sprintf("Container '%s': should be possible to delete [NodeConformance]", testContainer.Name))
 					gomega.Expect(terminateContainer.Delete()).To(gomega.Succeed())
@@ -157,13 +160,13 @@ while true; do sleep 1; done
 
 				ginkgo.By("get the container status")
 				status, err := c.GetStatus()
-				framework.ExpectNoError(err)
+				e2eutils.ExpectNoError(err)
 
 				ginkgo.By("the container should be terminated")
-				framework.ExpectEqual(GetContainerState(status.State), ContainerStateTerminated)
+				e2eutils.ExpectEqual(GetContainerState(status.State), ContainerStateTerminated)
 
 				ginkgo.By("the termination message should be set")
-				framework.Logf("Expected: %v to match Container's Termination Message: %v --", expectedMsg, status.State.Terminated.Message)
+				e2eutils.Logf("Expected: %v to match Container's Termination Message: %v --", expectedMsg, status.State.Terminated.Message)
 				gomega.Expect(status.State.Terminated.Message).Should(expectedMsg)
 
 				ginkgo.By("delete the container")
@@ -172,13 +175,13 @@ while true; do sleep 1; done
 
 			ginkgo.It("should report termination message if TerminationMessagePath is set [NodeConformance]", func() {
 				container := v1.Container{
-					Image:                  framework.BusyBoxImage,
+					Image:                  e2eutils.BusyBoxImage,
 					Command:                []string{"/bin/sh", "-c"},
 					Args:                   []string{"/bin/echo -n DONE > /dev/termination-log"},
 					TerminationMessagePath: "/dev/termination-log",
 					SecurityContext:        &v1.SecurityContext{},
 				}
-				if framework.NodeOSDistroIs("windows") {
+				if e2eutils.NodeOSDistroIs("windows") {
 					container.SecurityContext.WindowsOptions = &v1.WindowsSecurityContextOptions{RunAsUserName: &adminUserName}
 				} else {
 					container.SecurityContext.RunAsUser = &rootUser
@@ -196,13 +199,13 @@ while true; do sleep 1; done
 				// TODO(claudiub): Remove [LinuxOnly] tag once Containerd becomes the default
 				// container runtime on Windows
 				container := v1.Container{
-					Image:                  framework.BusyBoxImage,
+					Image:                  e2eutils.BusyBoxImage,
 					Command:                []string{"/bin/sh", "-c"},
 					Args:                   []string{"/bin/echo -n DONE > /dev/termination-custom-log"},
 					TerminationMessagePath: "/dev/termination-custom-log",
 					SecurityContext:        &v1.SecurityContext{},
 				}
-				if framework.NodeOSDistroIs("windows") {
+				if e2eutils.NodeOSDistroIs("windows") {
 					container.SecurityContext.WindowsOptions = &v1.WindowsSecurityContextOptions{RunAsUserName: &nonAdminUserName}
 				} else {
 					container.SecurityContext.RunAsUser = &nonRootUser
@@ -217,7 +220,7 @@ while true; do sleep 1; done
 			*/
 			framework.ConformanceIt("should report termination message from log output if TerminationMessagePolicy FallbackToLogsOnError is set [NodeConformance]", func() {
 				container := v1.Container{
-					Image:                    framework.BusyBoxImage,
+					Image:                    e2eutils.BusyBoxImage,
 					Command:                  []string{"/bin/sh", "-c"},
 					Args:                     []string{"/bin/echo -n DONE; /bin/false"},
 					TerminationMessagePath:   "/dev/termination-log",
@@ -233,7 +236,7 @@ while true; do sleep 1; done
 			*/
 			framework.ConformanceIt("should report termination message as empty when pod succeeds and TerminationMessagePolicy FallbackToLogsOnError is set [NodeConformance]", func() {
 				container := v1.Container{
-					Image:                    framework.BusyBoxImage,
+					Image:                    e2eutils.BusyBoxImage,
 					Command:                  []string{"/bin/sh", "-c"},
 					Args:                     []string{"/bin/echo -n DONE; /bin/true"},
 					TerminationMessagePath:   "/dev/termination-log",
@@ -249,7 +252,7 @@ while true; do sleep 1; done
 			*/
 			framework.ConformanceIt("should report termination message from file when pod succeeds and TerminationMessagePolicy FallbackToLogsOnError is set [NodeConformance]", func() {
 				container := v1.Container{
-					Image:                    framework.BusyBoxImage,
+					Image:                    e2eutils.BusyBoxImage,
 					Command:                  []string{"/bin/sh", "-c"},
 					Args:                     []string{"/bin/echo -n OK > /dev/termination-log; /bin/echo DONE; /bin/true"},
 					TerminationMessagePath:   "/dev/termination-log",
@@ -292,9 +295,9 @@ while true; do sleep 1; done
 	}
 }`
 					// we might be told to use a different docker config JSON.
-					if framework.TestContext.DockerConfigFile != "" {
-						contents, err := os.ReadFile(framework.TestContext.DockerConfigFile)
-						framework.ExpectNoError(err)
+					if e2econfig.TestContext.DockerConfigFile != "" {
+						contents, err := os.ReadFile(e2econfig.TestContext.DockerConfigFile)
+						e2eutils.ExpectNoError(err)
 						auth = string(contents)
 					}
 					secret := &v1.Secret{
@@ -304,7 +307,7 @@ while true; do sleep 1; done
 					secret.Name = "image-pull-secret-" + string(uuid.NewUUID())
 					ginkgo.By("create image pull secret")
 					_, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(context.TODO(), secret, metav1.CreateOptions{})
-					framework.ExpectNoError(err)
+					e2eutils.ExpectNoError(err)
 					defer f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Delete(context.TODO(), secret.Name, metav1.DeleteOptions{})
 					container.ImagePullSecrets = []string{secret.Name}
 				}
@@ -363,9 +366,9 @@ while true; do sleep 1; done
 						break
 					}
 					if i < flakeRetry {
-						framework.Logf("No.%d attempt failed: %v, retrying...", i, err)
+						e2eutils.Logf("No.%d attempt failed: %v, retrying...", i, err)
 					} else {
-						framework.Failf("All %d attempts failed: %v", flakeRetry, err)
+						e2eutils.Failf("All %d attempts failed: %v", flakeRetry, err)
 					}
 				}
 			}
@@ -389,7 +392,7 @@ while true; do sleep 1; done
 			ginkgo.It("should be able to pull from private registry with secret [NodeConformance]", func() {
 				image := imageutils.GetE2EImage(imageutils.AuthenticatedAlpine)
 				isWindows := false
-				if framework.NodeOSDistroIs("windows") {
+				if e2eutils.NodeOSDistroIs("windows") {
 					image = imageutils.GetE2EImage(imageutils.AuthenticatedWindowsNanoServer)
 					isWindows = true
 				}

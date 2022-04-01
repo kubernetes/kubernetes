@@ -19,6 +19,8 @@ package e2enode
 import (
 	"context"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -39,7 +41,7 @@ const (
 var _ = SIGDescribe("ContainerLogPath [NodeConformance]", func() {
 	f := framework.NewDefaultFramework("kubelet-container-log-path")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
-	var podClient *framework.PodClient
+	var podClient *e2eutils.PodClient
 
 	ginkgo.Describe("Pod with a container", func() {
 		ginkgo.Context("printed log to stdout", func() {
@@ -120,7 +122,7 @@ var _ = SIGDescribe("ContainerLogPath [NodeConformance]", func() {
 				podClient = f.PodClient()
 				logPodName = "log-pod-" + string(uuid.NewUUID())
 				err := createAndWaitPod(makeLogPod(logPodName, logString))
-				framework.ExpectNoError(err, "Failed waiting for pod: %s to enter success state", logPodName)
+				e2eutils.ExpectNoError(err, "Failed waiting for pod: %s to enter success state", logPodName)
 			})
 			ginkgo.It("should print log to correct log path", func() {
 
@@ -129,14 +131,14 @@ var _ = SIGDescribe("ContainerLogPath [NodeConformance]", func() {
 				// get containerID from created Pod
 				createdLogPod, err := podClient.Get(context.TODO(), logPodName, metav1.GetOptions{})
 				logContainerID := kubecontainer.ParseContainerID(createdLogPod.Status.ContainerStatuses[0].ContainerID)
-				framework.ExpectNoError(err, "Failed to get pod: %s", logPodName)
+				e2eutils.ExpectNoError(err, "Failed to get pod: %s", logPodName)
 
 				// build log file path
 				expectedlogFile := logDir + "/" + logPodName + "_" + f.Namespace.Name + "_" + logContainerName + "-" + logContainerID.ID + ".log"
 
 				logCheckPodName := "log-check-" + string(uuid.NewUUID())
 				err = createAndWaitPod(makeLogCheckPod(logCheckPodName, logString, expectedlogFile))
-				framework.ExpectNoError(err, "Failed waiting for pod: %s to enter success state", logCheckPodName)
+				e2eutils.ExpectNoError(err, "Failed waiting for pod: %s to enter success state", logCheckPodName)
 			})
 
 			ginkgo.It("should print log to correct cri log path", func() {
@@ -145,7 +147,7 @@ var _ = SIGDescribe("ContainerLogPath [NodeConformance]", func() {
 
 				// get podID from created Pod
 				createdLogPod, err := podClient.Get(context.TODO(), logPodName, metav1.GetOptions{})
-				framework.ExpectNoError(err, "Failed to get pod: %s", logPodName)
+				e2eutils.ExpectNoError(err, "Failed to get pod: %s", logPodName)
 				podNs := createdLogPod.Namespace
 				podName := createdLogPod.Name
 				podID := string(createdLogPod.UID)
@@ -155,7 +157,7 @@ var _ = SIGDescribe("ContainerLogPath [NodeConformance]", func() {
 
 				logCRICheckPodName := "log-cri-check-" + string(uuid.NewUUID())
 				err = createAndWaitPod(makeLogCheckPod(logCRICheckPodName, logString, expectedCRILogFile))
-				framework.ExpectNoError(err, "Failed waiting for pod: %s to enter success state", logCRICheckPodName)
+				e2eutils.ExpectNoError(err, "Failed waiting for pod: %s to enter success state", logCRICheckPodName)
 			})
 		})
 	})

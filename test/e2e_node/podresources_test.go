@@ -24,6 +24,9 @@ import (
 	"strings"
 	"time"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -114,18 +117,18 @@ func logPodResources(podIdx int, pr *kubeletpodresourcesv1.PodResources) {
 	ns := pr.GetNamespace()
 	cnts := pr.GetContainers()
 	if len(cnts) == 0 {
-		framework.Logf("#%02d/%02d/%02d - %s/%s/%s   No containers", podIdx, 0, 0, ns, pr.GetName(), "_")
+		e2eutils.Logf("#%02d/%02d/%02d - %s/%s/%s   No containers", podIdx, 0, 0, ns, pr.GetName(), "_")
 		return
 	}
 
 	for cntIdx, cnt := range cnts {
 		if len(cnt.Devices) == 0 {
-			framework.Logf("#%02d/%02d/%02d - %s/%s/%s   cpus -> %v   resources -> none", podIdx, cntIdx, 0, ns, pr.GetName(), cnt.Name, cnt.CpuIds)
+			e2eutils.Logf("#%02d/%02d/%02d - %s/%s/%s   cpus -> %v   resources -> none", podIdx, cntIdx, 0, ns, pr.GetName(), cnt.Name, cnt.CpuIds)
 			continue
 		}
 
 		for devIdx, dev := range cnt.Devices {
-			framework.Logf("#%02d/%02d/%02d - %s/%s/%s   cpus -> %v   %s -> %s", podIdx, cntIdx, devIdx, ns, pr.GetName(), cnt.Name, cnt.CpuIds, dev.ResourceName, strings.Join(dev.DeviceIds, ", "))
+			e2eutils.Logf("#%02d/%02d/%02d - %s/%s/%s   cpus -> %v   %s -> %s", podIdx, cntIdx, devIdx, ns, pr.GetName(), cnt.Name, cnt.CpuIds, dev.ResourceName, strings.Join(dev.DeviceIds, ", "))
 		}
 	}
 }
@@ -134,7 +137,7 @@ type podResMap map[string]map[string]kubeletpodresourcesv1.ContainerResources
 
 func getPodResources(cli kubeletpodresourcesv1.PodResourcesListerClient) podResMap {
 	resp, err := cli.List(context.TODO(), &kubeletpodresourcesv1.ListPodResourcesRequest{})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	res := make(map[string]map[string]kubeletpodresourcesv1.ContainerResources)
 	for idx, podResource := range resp.GetPodResources() {
@@ -165,7 +168,7 @@ func (tpd *testPodData) createPodsForTest(f *framework.Framework, podReqs []podD
 		pod := makePodResourcesTestPod(podReq)
 		pod = f.PodClient().CreateSync(pod)
 
-		framework.Logf("created pod %s", podReq.podName)
+		e2eutils.Logf("created pod %s", podReq.podName)
 		tpd.PodMap[podReq.podName] = pod
 	}
 }
@@ -196,7 +199,7 @@ func findContainerDeviceByName(devs []*kubeletpodresourcesv1.ContainerDevices, r
 
 func matchPodDescWithResources(expected []podDesc, found podResMap) error {
 	for _, podReq := range expected {
-		framework.Logf("matching: %#v", podReq)
+		e2eutils.Logf("matching: %#v", podReq)
 
 		podInfo, ok := found[podReq.podName]
 		if !ok {
@@ -516,7 +519,7 @@ func podresourcesListTests(f *framework.Framework, cli kubeletpodresourcesv1.Pod
 func podresourcesGetAllocatableResourcesTests(cli kubeletpodresourcesv1.PodResourcesListerClient, sd *sriovData, onlineCPUs, reservedSystemCPUs cpuset.CPUSet) {
 	ginkgo.By("checking the devices known to the kubelet")
 	resp, err := cli.GetAllocatableResources(context.TODO(), &kubeletpodresourcesv1.AllocatableResourcesRequest{})
-	framework.ExpectNoErrorWithOffset(1, err)
+	e2eutils.ExpectNoErrorWithOffset(1, err)
 	devs := resp.GetDevices()
 	allocatableCPUs := cpuset.NewCPUSetInt64(resp.GetCpuIds()...)
 
@@ -543,7 +546,7 @@ func podresourcesGetAllocatableResourcesTests(cli kubeletpodresourcesv1.PodResou
 	ginkgo.By(fmt.Sprintf("expecting some %q devices reported", sd.resourceName))
 	gomega.ExpectWithOffset(1, devs).ToNot(gomega.BeEmpty())
 	for _, dev := range devs {
-		framework.ExpectEqual(dev.ResourceName, sd.resourceName)
+		e2eutils.ExpectEqual(dev.ResourceName, sd.resourceName)
 		gomega.ExpectWithOffset(1, dev.DeviceIds).ToNot(gomega.BeEmpty())
 	}
 }
@@ -579,25 +582,25 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 					initialConfig.CPUManagerReconcilePeriod = metav1.Duration{Duration: 1 * time.Second}
 
 					cpus := reservedSystemCPUs.String()
-					framework.Logf("configurePodResourcesInKubelet: using reservedSystemCPUs=%q", cpus)
+					e2eutils.Logf("configurePodResourcesInKubelet: using reservedSystemCPUs=%q", cpus)
 					initialConfig.ReservedSystemCPUs = cpus
 				})
 
 				ginkgo.It("should return the expected responses", func() {
 					onlineCPUs, err := getOnlineCPUs()
-					framework.ExpectNoError(err)
+					e2eutils.ExpectNoError(err)
 
-					configMap := getSRIOVDevicePluginConfigMap(framework.TestContext.SriovdpConfigMapFile)
+					configMap := getSRIOVDevicePluginConfigMap(e2econfig.TestContext.SriovdpConfigMapFile)
 					sd := setupSRIOVConfigOrFail(f, configMap)
 					defer teardownSRIOVConfigOrFail(f, sd)
 
 					waitForSRIOVResources(f, sd)
 
 					endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
-					framework.ExpectNoError(err)
+					e2eutils.ExpectNoError(err)
 
 					cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
-					framework.ExpectNoError(err)
+					e2eutils.ExpectNoError(err)
 					defer conn.Close()
 
 					waitForSRIOVResources(f, sd)
@@ -616,17 +619,17 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 
 				requireSRIOVDevices()
 
-				configMap := getSRIOVDevicePluginConfigMap(framework.TestContext.SriovdpConfigMapFile)
+				configMap := getSRIOVDevicePluginConfigMap(e2econfig.TestContext.SriovdpConfigMapFile)
 				sd := setupSRIOVConfigOrFail(f, configMap)
 				defer teardownSRIOVConfigOrFail(f, sd)
 
 				waitForSRIOVResources(f, sd)
 
 				endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
-				framework.ExpectNoError(err)
+				e2eutils.ExpectNoError(err)
 
 				cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
-				framework.ExpectNoError(err)
+				e2eutils.ExpectNoError(err)
 				defer conn.Close()
 
 				waitForSRIOVResources(f, sd)
@@ -663,19 +666,19 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 					initialConfig.CPUManagerReconcilePeriod = metav1.Duration{Duration: 1 * time.Second}
 
 					cpus := reservedSystemCPUs.String()
-					framework.Logf("configurePodResourcesInKubelet: using reservedSystemCPUs=%q", cpus)
+					e2eutils.Logf("configurePodResourcesInKubelet: using reservedSystemCPUs=%q", cpus)
 					initialConfig.ReservedSystemCPUs = cpus
 				})
 
 				ginkgo.It("should return the expected responses", func() {
 					onlineCPUs, err := getOnlineCPUs()
-					framework.ExpectNoError(err)
+					e2eutils.ExpectNoError(err)
 
 					endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
-					framework.ExpectNoError(err)
+					e2eutils.ExpectNoError(err)
 
 					cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
-					framework.ExpectNoError(err)
+					e2eutils.ExpectNoError(err)
 					defer conn.Close()
 
 					podresourcesListTests(f, cli, nil)
@@ -687,10 +690,10 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 		ginkgo.Context("with CPU manager None policy", func() {
 			ginkgo.It("should return the expected responses", func() {
 				endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
-				framework.ExpectNoError(err)
+				e2eutils.ExpectNoError(err)
 
 				cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
-				framework.ExpectNoError(err)
+				e2eutils.ExpectNoError(err)
 				defer conn.Close()
 
 				// intentionally passing empty cpuset instead of onlineCPUs because with none policy
@@ -709,16 +712,16 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 
 			ginkgo.It("should return the expected error with the feature gate disabled", func() {
 				endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
-				framework.ExpectNoError(err)
+				e2eutils.ExpectNoError(err)
 
 				cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
-				framework.ExpectNoError(err)
+				e2eutils.ExpectNoError(err)
 				defer conn.Close()
 
 				ginkgo.By("checking GetAllocatableResources fail if the feature gate is not enabled")
 				allocatableRes, err := cli.GetAllocatableResources(context.TODO(), &kubeletpodresourcesv1.AllocatableResourcesRequest{})
-				framework.Logf("GetAllocatableResources result: %v, err: %v", allocatableRes, err)
-				framework.ExpectError(err, "With feature gate disabled, the call must fail")
+				e2eutils.Logf("GetAllocatableResources result: %v, err: %v", allocatableRes, err)
+				e2eutils.ExpectError(err, "With feature gate disabled, the call must fail")
 			})
 		})
 	})
@@ -751,7 +754,7 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 					initialConfig.CPUManagerReconcilePeriod = metav1.Duration{Duration: 1 * time.Second}
 
 					cpus := reservedSystemCPUs.String()
-					framework.Logf("configurePodResourcesInKubelet: using reservedSystemCPUs=%q", cpus)
+					e2eutils.Logf("configurePodResourcesInKubelet: using reservedSystemCPUs=%q", cpus)
 					initialConfig.ReservedSystemCPUs = cpus
 				})
 
@@ -762,10 +765,10 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 					waitForKubeVirtResources(f, dpPod)
 
 					endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
-					framework.ExpectNoError(err)
+					e2eutils.ExpectNoError(err)
 
 					cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
-					framework.ExpectNoError(err)
+					e2eutils.ExpectNoError(err)
 					defer conn.Close()
 
 					ginkgo.By("checking List and resources kubevirt resource should be without topology")
@@ -776,7 +779,7 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 							continue
 						}
 
-						framework.ExpectEqual(dev.Topology == nil, true, "Topology is expected to be empty for kubevirt resources")
+						e2eutils.ExpectEqual(dev.Topology == nil, true, "Topology is expected to be empty for kubevirt resources")
 					}
 
 					// Run pod which requires KubeVirtResourceName
@@ -803,15 +806,15 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 					// the podresources endpoint again. Otherwise we will have false negatives.
 					ginkgo.By("Wait for node to be ready")
 					gomega.Eventually(func() bool {
-						node, err := f.ClientSet.CoreV1().Nodes().Get(context.TODO(), framework.TestContext.NodeName, metav1.GetOptions{})
-						framework.ExpectNoError(err)
+						node, err := f.ClientSet.CoreV1().Nodes().Get(context.TODO(), e2econfig.TestContext.NodeName, metav1.GetOptions{})
+						e2eutils.ExpectNoError(err)
 						for _, cond := range node.Status.Conditions {
 							if cond.Type == v1.NodeReady && cond.Status == v1.ConditionTrue && cond.LastHeartbeatTime.After(restartTime) {
 								return true
 							}
 						}
 						return false
-					}, 5*time.Minute, framework.Poll).Should(gomega.BeTrue())
+					}, 5*time.Minute, e2eutils.Poll).Should(gomega.BeTrue())
 
 					expectPodResources(1, cli, []podDesc{desc})
 					tpd.deletePodsForTest(f)
@@ -836,20 +839,20 @@ func getOnlineCPUs() (cpuset.CPUSet, error) {
 }
 
 func setupKubeVirtDevicePluginOrFail(f *framework.Framework) *v1.Pod {
-	e2enode.WaitForNodeToBeReady(f.ClientSet, framework.TestContext.NodeName, 5*time.Minute)
+	e2enode.WaitForNodeToBeReady(f.ClientSet, e2econfig.TestContext.NodeName, 5*time.Minute)
 
 	dp := getKubeVirtDevicePluginPod()
-	dp.Spec.NodeName = framework.TestContext.NodeName
+	dp.Spec.NodeName = e2econfig.TestContext.NodeName
 
 	ginkgo.By("Create KubeVirt device plugin pod")
 
 	dpPod, err := f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Create(context.TODO(), dp, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	if err = e2epod.WaitForPodCondition(f.ClientSet, metav1.NamespaceSystem, dp.Name, "Ready", 120*time.Second, testutils.PodRunningReady); err != nil {
-		framework.Logf("KubeVirt Pod %v took too long to enter running/ready: %v", dp.Name, err)
+		e2eutils.Logf("KubeVirt Pod %v took too long to enter running/ready: %v", dp.Name, err)
 	}
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	return dpPod
 }
@@ -862,12 +865,12 @@ func teardownKubeVirtDevicePluginOrFail(f *framework.Framework, pod *v1.Pod) {
 	ginkgo.By(fmt.Sprintf("Delete KubeVirt device plugin pod %s/%s", pod.Namespace, pod.Name))
 	err := f.ClientSet.CoreV1().Pods(pod.Namespace).Delete(context.TODO(), pod.Name, deleteOptions)
 
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	waitForAllContainerRemoval(pod.Name, pod.Namespace)
 }
 
 func findKubeVirtResource(node *v1.Node) int64 {
-	framework.Logf("Node status allocatable: %v", node.Status.Allocatable)
+	e2eutils.Logf("Node status allocatable: %v", node.Status.Allocatable)
 	for key, val := range node.Status.Allocatable {
 		if string(key) == KubeVirtResourceName {
 			v := val.Value()
@@ -886,14 +889,14 @@ func waitForKubeVirtResources(f *framework.Framework, pod *v1.Pod) {
 		node := getLocalNode(f)
 		kubeVirtResourceAmount := findKubeVirtResource(node)
 		return kubeVirtResourceAmount != 0
-	}, 2*time.Minute, framework.Poll).Should(gomega.BeTrue())
+	}, 2*time.Minute, e2eutils.Poll).Should(gomega.BeTrue())
 }
 
 // getKubeVirtDevicePluginPod returns the Device Plugin pod for kube resources in e2e tests.
 func getKubeVirtDevicePluginPod() *v1.Pod {
 	data, err := e2etestfiles.Read(KubeVirtDevicePluginDSYAML)
 	if err != nil {
-		framework.Fail(err.Error())
+		e2eutils.Fail(err.Error())
 	}
 
 	ds := readDaemonSetV1OrDie(data)

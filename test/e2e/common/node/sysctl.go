@@ -19,6 +19,8 @@ package node
 import (
 	"context"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -41,7 +43,7 @@ var _ = SIGDescribe("Sysctls [LinuxOnly] [NodeConformance]", func() {
 
 	f := framework.NewDefaultFramework("sysctl")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
-	var podClient *framework.PodClient
+	var podClient *e2eutils.PodClient
 
 	testPod := func() *v1.Pod {
 		podName := "sysctl-" + string(uuid.NewUUID())
@@ -94,21 +96,21 @@ var _ = SIGDescribe("Sysctls [LinuxOnly] [NodeConformance]", func() {
 		// failed pods without running containers. This would create a race as the pod
 		// might have already been deleted here.
 		ev, err := f.PodClient().WaitForErrorEventOrSuccess(pod)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		gomega.Expect(ev).To(gomega.BeNil())
 
 		ginkgo.By("Waiting for pod completion")
 		err = e2epod.WaitForPodNoLongerRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		pod, err = podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		ginkgo.By("Checking that the pod succeeded")
-		framework.ExpectEqual(pod.Status.Phase, v1.PodSucceeded)
+		e2eutils.ExpectEqual(pod.Status.Phase, v1.PodSucceeded)
 
 		ginkgo.By("Getting logs from the pod")
 		log, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		ginkgo.By("Checking that the sysctl is actually updated")
 		gomega.Expect(log).To(gomega.ContainSubstring("kernel.shm_rmid_forced = 1"))
@@ -173,6 +175,6 @@ var _ = SIGDescribe("Sysctls [LinuxOnly] [NodeConformance]", func() {
 		ginkgo.By("Wait for pod failed reason")
 		// watch for pod failed reason instead of termination of pod
 		err := e2epod.WaitForPodFailedReason(f.ClientSet, pod, "SysctlForbidden", f.Timeouts.PodStart)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 	})
 })

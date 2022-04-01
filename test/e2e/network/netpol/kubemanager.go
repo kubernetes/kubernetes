@@ -23,6 +23,8 @@ import (
 	"strconv"
 	"strings"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	netutils "k8s.io/utils/net"
 
@@ -72,7 +74,7 @@ func (k *kubeManager) initializeCluster(model *Model) error {
 		}
 
 		for _, pod := range ns.Pods {
-			framework.Logf("creating/updating pod %s/%s", ns.Name, pod.Name)
+			e2eutils.Logf("creating/updating pod %s/%s", ns.Name, pod.Name)
 
 			// note that we defer the logic of pod (i.e. node selector) specifics to the model
 			// which is aware of linux vs windows pods
@@ -133,7 +135,7 @@ func (k *kubeManager) probeConnectivity(args *probeConnectivityArgs) (bool, stri
 	if args.addrTo == "" {
 		return false, "no IP provided", fmt.Errorf("empty addrTo field")
 	}
-	framework.Logf("Starting probe from pod %v to %v", args.podFrom, args.addrTo)
+	e2eutils.Logf("Starting probe from pod %v to %v", args.podFrom, args.addrTo)
 	var cmd []string
 	timeout := fmt.Sprintf("--timeout=%vs", args.timeoutSeconds)
 
@@ -144,17 +146,17 @@ func (k *kubeManager) probeConnectivity(args *probeConnectivityArgs) (bool, stri
 		cmd = []string{"/agnhost", "connect", net.JoinHostPort(args.addrTo, port), timeout, "--protocol=tcp"}
 	case v1.ProtocolUDP:
 		cmd = []string{"/agnhost", "connect", net.JoinHostPort(args.addrTo, port), timeout, "--protocol=udp"}
-		if framework.NodeOSDistroIs("windows") {
-			framework.Logf("probing UDP for windows may result in cluster instability for certain windows nodes with low CPU/Memory, depending on CRI version")
+		if e2eutils.NodeOSDistroIs("windows") {
+			e2eutils.Logf("probing UDP for windows may result in cluster instability for certain windows nodes with low CPU/Memory, depending on CRI version")
 		}
 	default:
-		framework.Failf("protocol %s not supported", args.protocol)
+		e2eutils.Failf("protocol %s not supported", args.protocol)
 	}
 
 	commandDebugString := fmt.Sprintf("kubectl exec %s -c %s -n %s -- %s", args.podFrom, args.containerFrom, args.nsFrom, strings.Join(cmd, " "))
 	stdout, stderr, err := k.executeRemoteCommand(args.nsFrom, args.podFrom, args.containerFrom, cmd)
 	if err != nil {
-		framework.Logf("%s/%s -> %s: error when running command: err - %v /// stdout - %s /// stderr - %s", args.nsFrom, args.podFrom, args.addrTo, err, stdout, stderr)
+		e2eutils.Logf("%s/%s -> %s: error when running command: err - %v /// stdout - %s /// stderr - %s", args.nsFrom, args.podFrom, args.addrTo, err, stdout, stderr)
 		return false, commandDebugString, nil
 	}
 	return true, commandDebugString, nil
@@ -162,7 +164,7 @@ func (k *kubeManager) probeConnectivity(args *probeConnectivityArgs) (bool, stri
 
 // executeRemoteCommand executes a remote shell command on the given pod.
 func (k *kubeManager) executeRemoteCommand(namespace string, pod string, containerName string, command []string) (string, string, error) {
-	return k.framework.ExecWithOptions(framework.ExecOptions{
+	return e2eutils.ExecWithOptions(k.framework.ClientSet, e2eutils.ExecOptions{
 		Command:            command,
 		Namespace:          namespace,
 		PodName:            pod,
@@ -199,7 +201,7 @@ func (k *kubeManager) createService(service *v1.Service) (*v1.Service, error) {
 // createPod is a convenience function for pod setup.
 func (k *kubeManager) createPod(pod *v1.Pod) (*v1.Pod, error) {
 	ns := pod.Namespace
-	framework.Logf("creating pod %s/%s", ns, pod.Name)
+	e2eutils.Logf("creating pod %s/%s", ns, pod.Name)
 
 	createdPod, err := k.clientSet.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 	if err != nil {
@@ -211,13 +213,13 @@ func (k *kubeManager) createPod(pod *v1.Pod) (*v1.Pod, error) {
 // cleanNetworkPolicies is a convenience function for deleting network policies before startup of any new test.
 func (k *kubeManager) cleanNetworkPolicies(namespaces []string) error {
 	for _, ns := range namespaces {
-		framework.Logf("deleting policies in %s ..........", ns)
+		e2eutils.Logf("deleting policies in %s ..........", ns)
 		l, err := k.clientSet.NetworkingV1().NetworkPolicies(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return fmt.Errorf("unable to list network policies in ns %s: %w", ns, err)
 		}
 		for _, np := range l.Items {
-			framework.Logf("deleting network policy %s/%s", ns, np.Name)
+			e2eutils.Logf("deleting network policy %s/%s", ns, np.Name)
 			err = k.clientSet.NetworkingV1().NetworkPolicies(ns).Delete(context.TODO(), np.Name, metav1.DeleteOptions{})
 			if err != nil {
 				return fmt.Errorf("unable to delete network policy %s/%s: %w", ns, np.Name, err)
@@ -229,7 +231,7 @@ func (k *kubeManager) cleanNetworkPolicies(namespaces []string) error {
 
 // createNetworkPolicy is a convenience function for creating network policies.
 func (k *kubeManager) createNetworkPolicy(ns string, netpol *networkingv1.NetworkPolicy) (*networkingv1.NetworkPolicy, error) {
-	framework.Logf("creating network policy %s/%s", ns, netpol.Name)
+	e2eutils.Logf("creating network policy %s/%s", ns, netpol.Name)
 	netpol.ObjectMeta.Namespace = ns
 	np, err := k.clientSet.NetworkingV1().NetworkPolicies(ns).Create(context.TODO(), netpol, metav1.CreateOptions{})
 	if err != nil {
@@ -240,7 +242,7 @@ func (k *kubeManager) createNetworkPolicy(ns string, netpol *networkingv1.Networ
 
 // updateNetworkPolicy is a convenience function for updating network policies.
 func (k *kubeManager) updateNetworkPolicy(ns string, netpol *networkingv1.NetworkPolicy) (*networkingv1.NetworkPolicy, error) {
-	framework.Logf("updating network policy %s/%s", ns, netpol.Name)
+	e2eutils.Logf("updating network policy %s/%s", ns, netpol.Name)
 	netpol.ObjectMeta.Namespace = ns
 	np, err := k.clientSet.NetworkingV1().NetworkPolicies(ns).Update(context.TODO(), netpol, metav1.UpdateOptions{})
 	if err != nil {

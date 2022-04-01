@@ -29,6 +29,8 @@ import (
 	"sync"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -131,7 +133,7 @@ var _ = common.SIGDescribe("Proxy", func() {
 					},
 				},
 			}, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 
 			// Make an RC with a single pod. The 'porter' image is
 			// a simple server which serves the values of the
@@ -177,11 +179,11 @@ var _ = common.SIGDescribe("Proxy", func() {
 				CreatedPods: &pods,
 			}
 			err = e2erc.RunRC(cfg)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			defer e2erc.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, cfg.Name)
 
 			err = waitForEndpoint(f.ClientSet, f.Namespace.Name, service.Name)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 
 			// table constructors
 			// Try proxying through the service and directly to through the pod.
@@ -227,7 +229,7 @@ var _ = common.SIGDescribe("Proxy", func() {
 				errs = append(errs, s)
 			}
 			d := time.Since(start)
-			framework.Logf("setup took %v, starting test cases", d)
+			e2eutils.Logf("setup took %v, starting test cases", d)
 			numberTestCases := len(expectations)
 			totalAttempts := numberTestCases * proxyAttempts
 			ginkgo.By(fmt.Sprintf("running %v cases, %v attempts per case, %v total attempts", numberTestCases, proxyAttempts, totalAttempts))
@@ -266,12 +268,12 @@ var _ = common.SIGDescribe("Proxy", func() {
 			if len(errs) != 0 {
 				body, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).GetLogs(pods[0].Name, &v1.PodLogOptions{}).Do(context.TODO()).Raw()
 				if err != nil {
-					framework.Logf("Error getting logs for pod %s: %v", pods[0].Name, err)
+					e2eutils.Logf("Error getting logs for pod %s: %v", pods[0].Name, err)
 				} else {
-					framework.Logf("Pod %s has the following error logs: %s", pods[0].Name, body)
+					e2eutils.Logf("Pod %s has the following error logs: %s", pods[0].Name, body)
 				}
 
-				framework.Failf(strings.Join(errs, "\n"))
+				e2eutils.Failf(strings.Join(errs, "\n"))
 			}
 		})
 
@@ -290,7 +292,7 @@ var _ = common.SIGDescribe("Proxy", func() {
 			testSvcName := "test-service"
 			testSvcLabels := map[string]string{"test": "response"}
 
-			framework.Logf("Creating pod...")
+			e2eutils.Logf("Creating pod...")
 			pod := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "agnhost",
@@ -311,10 +313,10 @@ var _ = common.SIGDescribe("Proxy", func() {
 					RestartPolicy: v1.RestartPolicyNever,
 				}}
 			_, err := f.ClientSet.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
-			framework.ExpectNoError(err, "failed to create pod")
-			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(f.ClientSet, pod), "Pod didn't start within time out period")
+			e2eutils.ExpectNoError(err, "failed to create pod")
+			e2eutils.ExpectNoError(e2epod.WaitForPodRunningInNamespace(f.ClientSet, pod), "Pod didn't start within time out period")
 
-			framework.Logf("Creating service...")
+			e2eutils.Logf("Creating service...")
 			_, err = f.ClientSet.CoreV1().Services(ns).Create(context.TODO(), &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      testSvcName,
@@ -331,12 +333,12 @@ var _ = common.SIGDescribe("Proxy", func() {
 						"test": "response",
 					},
 				}}, metav1.CreateOptions{})
-			framework.ExpectNoError(err, "Failed to create the service")
+			e2eutils.ExpectNoError(err, "Failed to create the service")
 
 			transportCfg, err := f.ClientConfig().TransportConfig()
-			framework.ExpectNoError(err, "Error creating transportCfg")
+			e2eutils.ExpectNoError(err, "Error creating transportCfg")
 			restTransport, err := transport.New(transportCfg)
-			framework.ExpectNoError(err, "Error creating restTransport")
+			e2eutils.ExpectNoError(err, "Error creating restTransport")
 
 			client := &http.Client{
 				CheckRedirect: func(req *http.Request, via []*http.Request) error {
@@ -351,10 +353,10 @@ var _ = common.SIGDescribe("Proxy", func() {
 			for _, httpVerb := range httpVerbs {
 
 				urlString := f.ClientConfig().Host + "/api/v1/namespaces/" + ns + "/pods/agnhost/proxy/some/path/with/" + httpVerb
-				framework.Logf("Starting http.Client for %s", urlString)
+				e2eutils.Logf("Starting http.Client for %s", urlString)
 
 				pollErr := wait.PollImmediate(requestRetryPeriod, requestRetryTimeout, validateProxyVerbRequest(client, urlString, httpVerb, msg))
-				framework.ExpectNoError(err, "Service didn't start within time out period. %v", pollErr)
+				e2eutils.ExpectNoError(err, "Service didn't start within time out period. %v", pollErr)
 			}
 
 			// All methods for Service ProxyWithPath return 200
@@ -362,10 +364,10 @@ var _ = common.SIGDescribe("Proxy", func() {
 			for _, httpVerb := range httpVerbs {
 
 				urlString := f.ClientConfig().Host + "/api/v1/namespaces/" + ns + "/services/test-service/proxy/some/path/with/" + httpVerb
-				framework.Logf("Starting http.Client for %s", urlString)
+				e2eutils.Logf("Starting http.Client for %s", urlString)
 
 				pollErr := wait.PollImmediate(requestRetryPeriod, requestRetryTimeout, validateProxyVerbRequest(client, urlString, httpVerb, msg))
-				framework.ExpectNoError(err, "Service didn't start within time out period. %v", pollErr)
+				e2eutils.ExpectNoError(err, "Service didn't start within time out period. %v", pollErr)
 			}
 		})
 
@@ -384,7 +386,7 @@ var _ = common.SIGDescribe("Proxy", func() {
 			testSvcName := "e2e-proxy-test-service"
 			testSvcLabels := map[string]string{"e2e-test": "proxy-endpoints"}
 
-			framework.Logf("Creating pod...")
+			e2eutils.Logf("Creating pod...")
 			pod := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "agnhost",
@@ -405,10 +407,10 @@ var _ = common.SIGDescribe("Proxy", func() {
 					RestartPolicy: v1.RestartPolicyNever,
 				}}
 			_, err := f.ClientSet.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
-			framework.ExpectNoError(err, "failed to create pod")
-			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(f.ClientSet, pod), "Pod didn't start within time out period")
+			e2eutils.ExpectNoError(err, "failed to create pod")
+			e2eutils.ExpectNoError(e2epod.WaitForPodRunningInNamespace(f.ClientSet, pod), "Pod didn't start within time out period")
 
-			framework.Logf("Creating service...")
+			e2eutils.Logf("Creating service...")
 			_, err = f.ClientSet.CoreV1().Services(ns).Create(context.TODO(), &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      testSvcName,
@@ -425,12 +427,12 @@ var _ = common.SIGDescribe("Proxy", func() {
 						"e2e-test": "proxy-endpoints",
 					},
 				}}, metav1.CreateOptions{})
-			framework.ExpectNoError(err, "Failed to create the service")
+			e2eutils.ExpectNoError(err, "Failed to create the service")
 
 			transportCfg, err := f.ClientConfig().TransportConfig()
-			framework.ExpectNoError(err, "Error creating transportCfg")
+			e2eutils.ExpectNoError(err, "Error creating transportCfg")
 			restTransport, err := transport.New(transportCfg)
-			framework.ExpectNoError(err, "Error creating restTransport")
+			e2eutils.ExpectNoError(err, "Error creating restTransport")
 
 			client := &http.Client{
 				CheckRedirect: func(req *http.Request, via []*http.Request) error {
@@ -445,10 +447,10 @@ var _ = common.SIGDescribe("Proxy", func() {
 			for _, httpVerb := range httpVerbs {
 
 				urlString := f.ClientConfig().Host + "/api/v1/namespaces/" + ns + "/pods/agnhost/proxy?method=" + httpVerb
-				framework.Logf("Starting http.Client for %s", urlString)
+				e2eutils.Logf("Starting http.Client for %s", urlString)
 
 				pollErr := wait.PollImmediate(requestRetryPeriod, requestRetryTimeout, validateProxyVerbRequest(client, urlString, httpVerb, msg))
-				framework.ExpectNoError(pollErr, "Pod didn't start within time out period. %v", pollErr)
+				e2eutils.ExpectNoError(pollErr, "Pod didn't start within time out period. %v", pollErr)
 			}
 
 			// All methods for Service Proxy return 200
@@ -456,10 +458,10 @@ var _ = common.SIGDescribe("Proxy", func() {
 			for _, httpVerb := range httpVerbs {
 
 				urlString := f.ClientConfig().Host + "/api/v1/namespaces/" + ns + "/services/" + testSvcName + "/proxy?method=" + httpVerb
-				framework.Logf("Starting http.Client for %s", urlString)
+				e2eutils.Logf("Starting http.Client for %s", urlString)
 
 				pollErr := wait.PollImmediate(requestRetryPeriod, requestRetryTimeout, validateProxyVerbRequest(client, urlString, httpVerb, msg))
-				framework.ExpectNoError(pollErr, "Service didn't start within time out period. %v", pollErr)
+				e2eutils.ExpectNoError(pollErr, "Service didn't start within time out period. %v", pollErr)
 			}
 
 			// Test that each method returns 301 for both pod and service endpoints
@@ -476,16 +478,16 @@ var _ = common.SIGDescribe("Proxy", func() {
 })
 
 func validateRedirectRequest(client *http.Client, redirectVerb string, urlString string) {
-	framework.Logf("Starting http.Client for %s", urlString)
+	e2eutils.Logf("Starting http.Client for %s", urlString)
 	request, err := http.NewRequest(redirectVerb, urlString, nil)
-	framework.ExpectNoError(err, "processing request")
+	e2eutils.ExpectNoError(err, "processing request")
 
 	resp, err := client.Do(request)
-	framework.ExpectNoError(err, "processing response")
+	e2eutils.ExpectNoError(err, "processing response")
 	defer resp.Body.Close()
 
-	framework.Logf("http.Client request:%s StatusCode:%d", redirectVerb, resp.StatusCode)
-	framework.ExpectEqual(resp.StatusCode, 301, "The resp.StatusCode returned: %d", resp.StatusCode)
+	e2eutils.Logf("http.Client request:%s StatusCode:%d", redirectVerb, resp.StatusCode)
+	e2eutils.ExpectEqual(resp.StatusCode, 301, "The resp.StatusCode returned: %d", resp.StatusCode)
 }
 
 // validateProxyVerbRequest checks that a http request to a pod
@@ -497,13 +499,13 @@ func validateProxyVerbRequest(client *http.Client, urlString string, httpVerb st
 
 		request, err := http.NewRequest(httpVerb, urlString, nil)
 		if err != nil {
-			framework.Logf("Failed to get a new request. %v", err)
+			e2eutils.Logf("Failed to get a new request. %v", err)
 			return false, nil
 		}
 
 		resp, err := client.Do(request)
 		if err != nil {
-			framework.Logf("Failed to get a response. %v", err)
+			e2eutils.Logf("Failed to get a response. %v", err)
 			return false, nil
 		}
 		defer resp.Body.Close()
@@ -514,7 +516,7 @@ func validateProxyVerbRequest(client *http.Client, urlString string, httpVerb st
 
 		switch httpVerb {
 		case "HEAD":
-			framework.Logf("http.Client request:%s | StatusCode:%d", httpVerb, resp.StatusCode)
+			e2eutils.Logf("http.Client request:%s | StatusCode:%d", httpVerb, resp.StatusCode)
 			if resp.StatusCode != 200 {
 				return false, nil
 			}
@@ -523,11 +525,11 @@ func validateProxyVerbRequest(client *http.Client, urlString string, httpVerb st
 			var jr *jsonResponse
 			err = json.Unmarshal([]byte(response), &jr)
 			if err != nil {
-				framework.Logf("Failed to process jsonResponse. %v", err)
+				e2eutils.Logf("Failed to process jsonResponse. %v", err)
 				return false, nil
 			}
 
-			framework.Logf("http.Client request:%s | StatusCode:%d | Response:%s | Method:%s", httpVerb, resp.StatusCode, jr.Body, jr.Method)
+			e2eutils.Logf("http.Client request:%s | StatusCode:%d | Response:%s | Method:%s", httpVerb, resp.StatusCode, jr.Body, jr.Method)
 			if resp.StatusCode != 200 {
 				return false, nil
 			}
@@ -555,9 +557,9 @@ func doProxy(f *framework.Framework, path string, i int) (body []byte, statusCod
 	body, err = f.ClientSet.CoreV1().RESTClient().Get().AbsPath(path).Do(context.TODO()).StatusCode(&statusCode).Raw()
 	d = time.Since(start)
 	if len(body) > 0 {
-		framework.Logf("(%v) %v: %s (%v; %v)", i, path, truncate(body, maxDisplayBodyLen), statusCode, d)
+		e2eutils.Logf("(%v) %v: %s (%v; %v)", i, path, truncate(body, maxDisplayBodyLen), statusCode, d)
 	} else {
-		framework.Logf("%v: %s (%v; %v)", path, "no body", statusCode, d)
+		e2eutils.Logf("%v: %s (%v; %v)", path, "no body", statusCode, d)
 	}
 	return
 }
@@ -574,7 +576,7 @@ func truncate(b []byte, maxLen int) []byte {
 func nodeProxyTest(f *framework.Framework, prefix, nodeDest string) {
 	// TODO: investigate why it doesn't work on master Node.
 	node, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	// TODO: Change it to test whether all requests succeeded when requests
 	// not reaching Kubelet issue is debugged.
@@ -582,17 +584,17 @@ func nodeProxyTest(f *framework.Framework, prefix, nodeDest string) {
 	for i := 0; i < proxyAttempts; i++ {
 		_, status, d, err := doProxy(f, prefix+node.Name+nodeDest, i)
 		if status == http.StatusServiceUnavailable {
-			framework.Logf("ginkgo.Failed proxying node logs due to service unavailable: %v", err)
+			e2eutils.Logf("ginkgo.Failed proxying node logs due to service unavailable: %v", err)
 			time.Sleep(time.Second)
 			serviceUnavailableErrors++
 		} else {
-			framework.ExpectNoError(err)
-			framework.ExpectEqual(status, http.StatusOK)
+			e2eutils.ExpectNoError(err)
+			e2eutils.ExpectEqual(status, http.StatusOK)
 			gomega.Expect(d).To(gomega.BeNumerically("<", proxyHTTPCallTimeout))
 		}
 	}
 	if serviceUnavailableErrors > 0 {
-		framework.Logf("error: %d requests to proxy node logs failed", serviceUnavailableErrors)
+		e2eutils.Logf("error: %d requests to proxy node logs failed", serviceUnavailableErrors)
 	}
 	maxFailures := int(math.Floor(0.1 * float64(proxyAttempts)))
 	gomega.Expect(serviceUnavailableErrors).To(gomega.BeNumerically("<", maxFailures))
@@ -602,15 +604,15 @@ func nodeProxyTest(f *framework.Framework, prefix, nodeDest string) {
 func waitForEndpoint(c clientset.Interface, ns, name string) error {
 	// registerTimeout is how long to wait for an endpoint to be registered.
 	registerTimeout := time.Minute
-	for t := time.Now(); time.Since(t) < registerTimeout; time.Sleep(framework.Poll) {
+	for t := time.Now(); time.Since(t) < registerTimeout; time.Sleep(e2eutils.Poll) {
 		endpoint, err := c.CoreV1().Endpoints(ns).Get(context.TODO(), name, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
-			framework.Logf("Endpoint %s/%s is not ready yet", ns, name)
+			e2eutils.Logf("Endpoint %s/%s is not ready yet", ns, name)
 			continue
 		}
-		framework.ExpectNoError(err, "Failed to get endpoints for %s/%s", ns, name)
+		e2eutils.ExpectNoError(err, "Failed to get endpoints for %s/%s", ns, name)
 		if len(endpoint.Subsets) == 0 || len(endpoint.Subsets[0].Addresses) == 0 {
-			framework.Logf("Endpoint %s/%s is not ready yet", ns, name)
+			e2eutils.Logf("Endpoint %s/%s is not ready yet", ns, name)
 			continue
 		}
 		return nil

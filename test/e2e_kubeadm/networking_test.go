@@ -20,6 +20,8 @@ import (
 	"context"
 	"strings"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -88,10 +90,10 @@ var _ = Describe("networking [setup-networking]", func() {
 					if ps, ok := netCC["podSubnet"]; ok {
 						// Check that the pod CIDR allocated to the node(s) is within the kubeadm-config podCIDR.
 						nodes, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
-						framework.ExpectNoError(err, "error listing nodes")
+						e2eutils.ExpectNoError(err, "error listing nodes")
 						for _, node := range nodes.Items {
 							if !subnetWithinSubnet(ps.(string), node.Spec.PodCIDR) {
-								framework.Failf("failed due to node(%v) IP %v not inside configured pod subnet: %s", node.Name, node.Spec.PodCIDR, ps)
+								e2eutils.Failf("failed due to node(%v) IP %v not inside configured pod subnet: %s", node.Name, node.Spec.PodCIDR, ps)
 							}
 						}
 					}
@@ -113,9 +115,9 @@ var _ = Describe("networking [setup-networking]", func() {
 						// Get the kubernetes service in the default namespace.
 						// Check that service CIDR allocated is within the serviceSubnet range.
 						svc, err := f.ClientSet.CoreV1().Services("default").Get(context.TODO(), "kubernetes", metav1.GetOptions{})
-						framework.ExpectNoError(err, "error getting Service %q from namespace %q", "kubernetes", "default")
+						e2eutils.ExpectNoError(err, "error getting Service %q from namespace %q", "kubernetes", "default")
 						if !ipWithinSubnet(ss.(string), svc.Spec.ClusterIP) {
-							framework.Failf("failed due to service(%v) cluster-IP %v not inside configured service subnet: %s", svc.Name, svc.Spec.ClusterIP, ss)
+							e2eutils.Failf("failed due to service(%v) cluster-IP %v not inside configured service subnet: %s", svc.Name, svc.Spec.ClusterIP, ss)
 						}
 					}
 				}
@@ -136,7 +138,7 @@ var _ = Describe("networking [setup-networking]", func() {
 					netCC := cc["networking"].(map[interface{}]interface{})
 					if ps, ok := netCC["podSubnet"]; ok {
 						nodes, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
-						framework.ExpectNoError(err, "error listing nodes")
+						e2eutils.ExpectNoError(err, "error listing nodes")
 						// Check that the pod CIDRs allocated to the node(s) are within the kubeadm-config podCIDR.
 						var found bool
 						configCIDRs := strings.Split(ps.(string), ",")
@@ -150,7 +152,7 @@ var _ = Describe("networking [setup-networking]", func() {
 									}
 								}
 								if !found {
-									framework.Failf("failed due to the PodCIDRs (%v) of Node %q not being inside the configuration podSubnet CIDR %q", node.Spec.PodCIDRs, node.Name, configCIDRs)
+									e2eutils.Failf("failed due to the PodCIDRs (%v) of Node %q not being inside the configuration podSubnet CIDR %q", node.Spec.PodCIDRs, node.Name, configCIDRs)
 								}
 							}
 						}

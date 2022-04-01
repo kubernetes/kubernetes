@@ -24,6 +24,8 @@ import (
 	"strings"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -39,7 +41,7 @@ const secondNodePortSvcName = "second-node-port-service"
 // GetHTTPContent returns the content of the given url by HTTP.
 func GetHTTPContent(host string, port int, timeout time.Duration, url string) (string, error) {
 	var body bytes.Buffer
-	pollErr := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
+	pollErr := wait.PollImmediate(e2eutils.Poll, timeout, func() (bool, error) {
 		result := e2enetwork.PokeHTTP(host, port, url, nil)
 		if result.Status == e2enetwork.HTTPSuccess {
 			body.Write(result.Body)
@@ -48,7 +50,7 @@ func GetHTTPContent(host string, port int, timeout time.Duration, url string) (s
 		return false, nil
 	})
 	if pollErr != nil {
-		framework.Logf("Could not reach HTTP service through %v:%v%v after %v: %v", host, port, url, timeout, pollErr)
+		e2eutils.Logf("Could not reach HTTP service through %v:%v%v after %v: %v", host, port, url, timeout, pollErr)
 	}
 	return body.String(), pollErr
 }
@@ -64,7 +66,7 @@ func GetHTTPContentFromTestContainer(config *e2enetwork.NetworkingTestConfig, ho
 		body = resp.Responses[0]
 		return true, nil
 	}
-	if pollErr := wait.PollImmediate(framework.Poll, timeout, pollFn); pollErr != nil {
+	if pollErr := wait.PollImmediate(e2eutils.Poll, timeout, pollFn); pollErr != nil {
 		return "", pollErr
 	}
 	return body, nil
@@ -72,10 +74,10 @@ func GetHTTPContentFromTestContainer(config *e2enetwork.NetworkingTestConfig, ho
 
 // DescribeSvc logs the output of kubectl describe svc for the given namespace
 func DescribeSvc(ns string) {
-	framework.Logf("\nOutput of kubectl describe svc:\n")
-	desc, _ := framework.RunKubectl(
+	e2eutils.Logf("\nOutput of kubectl describe svc:\n")
+	desc, _ := e2eutils.RunKubectl(
 		ns, "describe", "svc", fmt.Sprintf("--namespace=%v", ns))
-	framework.Logf(desc)
+	e2eutils.Logf(desc)
 }
 
 // CheckSCTPModuleLoadedOnNodes checks whether any node on the list has the
@@ -89,18 +91,18 @@ func CheckSCTPModuleLoadedOnNodes(f *framework.Framework, nodes *v1.NodeList) bo
 	re := regexp.MustCompile(`^\s*sctp\s+`)
 	cmd := "lsmod | grep sctp"
 	for _, node := range nodes.Items {
-		framework.Logf("Executing cmd %q on node %v", cmd, node.Name)
+		e2eutils.Logf("Executing cmd %q on node %v", cmd, node.Name)
 		result, err := hostExec.IssueCommandWithResult(cmd, &node)
 		if err != nil {
-			framework.Logf("sctp module is not loaded or error occurred while executing command %s on node: %v", cmd, err)
+			e2eutils.Logf("sctp module is not loaded or error occurred while executing command %s on node: %v", cmd, err)
 		}
 		for _, line := range strings.Split(result, "\n") {
 			if found := re.Find([]byte(line)); found != nil {
-				framework.Logf("the sctp module is loaded on node: %v", node.Name)
+				e2eutils.Logf("the sctp module is loaded on node: %v", node.Name)
 				return true
 			}
 		}
-		framework.Logf("the sctp module is not loaded on node: %v", node.Name)
+		e2eutils.Logf("the sctp module is not loaded on node: %v", node.Name)
 	}
 	return false
 }
@@ -114,29 +116,29 @@ func execSourceIPTest(sourcePod v1.Pod, targetAddr string) (string, string) {
 		timeout = 2 * time.Minute
 	)
 
-	framework.Logf("Waiting up to %v to get response from %s", timeout, targetAddr)
+	e2eutils.Logf("Waiting up to %v to get response from %s", timeout, targetAddr)
 	cmd := fmt.Sprintf(`curl -q -s --connect-timeout 30 %s/clientip`, targetAddr)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(2 * time.Second) {
-		stdout, err = framework.RunHostCmd(sourcePod.Namespace, sourcePod.Name, cmd)
+		stdout, err = e2eutils.RunHostCmd(sourcePod.Namespace, sourcePod.Name, cmd)
 		if err != nil {
-			framework.Logf("got err: %v, retry until timeout", err)
+			e2eutils.Logf("got err: %v, retry until timeout", err)
 			continue
 		}
 		// Need to check output because it might omit in case of error.
 		if strings.TrimSpace(stdout) == "" {
-			framework.Logf("got empty stdout, retry until timeout")
+			e2eutils.Logf("got empty stdout, retry until timeout")
 			continue
 		}
 		break
 	}
 
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	// The stdout return from RunHostCmd is in this format: x.x.x.x:port or [xx:xx:xx::x]:port
 	host, _, err := net.SplitHostPort(stdout)
 	if err != nil {
 		// ginkgo.Fail the test if output format is unexpected.
-		framework.Failf("exec pod returned unexpected stdout: [%v]\n", stdout)
+		e2eutils.Failf("exec pod returned unexpected stdout: [%v]\n", stdout)
 	}
 	return sourcePod.Status.PodIP, host
 }
@@ -152,17 +154,17 @@ func execHostnameTest(sourcePod v1.Pod, targetAddr, targetHostname string) {
 		timeout = 2 * time.Minute
 	)
 
-	framework.Logf("Waiting up to %v to get response from %s", timeout, targetAddr)
+	e2eutils.Logf("Waiting up to %v to get response from %s", timeout, targetAddr)
 	cmd := fmt.Sprintf(`curl -q -s --connect-timeout 30 %s/hostname`, targetAddr)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(2 * time.Second) {
-		stdout, err = framework.RunHostCmd(sourcePod.Namespace, sourcePod.Name, cmd)
+		stdout, err = e2eutils.RunHostCmd(sourcePod.Namespace, sourcePod.Name, cmd)
 		if err != nil {
-			framework.Logf("got err: %v, retry until timeout", err)
+			e2eutils.Logf("got err: %v, retry until timeout", err)
 			continue
 		}
 		// Need to check output because it might omit in case of error.
 		if strings.TrimSpace(stdout) == "" {
-			framework.Logf("got empty stdout, retry until timeout")
+			e2eutils.Logf("got empty stdout, retry until timeout")
 			continue
 		}
 		break
@@ -172,8 +174,8 @@ func execHostnameTest(sourcePod v1.Pod, targetAddr, targetHostname string) {
 	targetHostname = strings.Split(targetHostname, ".")[0]
 	hostname := strings.TrimSpace(strings.Split(stdout, ".")[0])
 
-	framework.ExpectNoError(err)
-	framework.ExpectEqual(hostname, targetHostname)
+	e2eutils.ExpectNoError(err)
+	e2eutils.ExpectEqual(hostname, targetHostname)
 }
 
 // createSecondNodePortService creates a service with the same selector as config.NodePortService and same HTTP Port
@@ -198,8 +200,8 @@ func createSecondNodePortService(f *framework.Framework, config *e2enetwork.Netw
 
 	createdService := config.CreateService(svc)
 
-	err := framework.WaitForServiceEndpointsNum(f.ClientSet, config.Namespace, secondNodePortSvcName, len(config.EndpointPods), time.Second, wait.ForeverTestTimeout)
-	framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", secondNodePortSvcName, config.Namespace)
+	err := e2eutils.WaitForServiceEndpointsNum(f.ClientSet, config.Namespace, secondNodePortSvcName, len(config.EndpointPods), time.Second, wait.ForeverTestTimeout)
+	e2eutils.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", secondNodePortSvcName, config.Namespace)
 
 	var httpPort int
 	for _, p := range createdService.Spec.Ports {

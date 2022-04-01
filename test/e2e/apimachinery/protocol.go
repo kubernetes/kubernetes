@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	g "github.com/onsi/ginkgo"
 	o "github.com/onsi/gomega"
 
@@ -50,23 +52,23 @@ var _ = SIGDescribe("client-go should negotiate", func() {
 			configMapName := "e2e-client-go-test-negotiation"
 			testConfigMap := &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: configMapName}}
 			before, err := client.List(context.TODO(), metav1.ListOptions{})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			_, err = client.Create(context.TODO(), testConfigMap, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			opts := metav1.ListOptions{
 				ResourceVersion: before.ResourceVersion,
 				FieldSelector:   fields.SelectorFromSet(fields.Set{"metadata.name": configMapName}).String(),
 			}
 
 			g.By("watching for changes on the object")
-			cfg, err := framework.LoadConfig()
-			framework.ExpectNoError(err)
+			cfg, err := e2eutils.LoadConfig()
+			e2eutils.ExpectNoError(err)
 
 			cfg.AcceptContentTypes = accept
 
 			c := kubernetes.NewForConfigOrDie(cfg)
 			w, err := c.CoreV1().ConfigMaps(ns).Watch(context.TODO(), opts)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			defer w.Stop()
 
 			evt, ok := <-w.ResultChan()

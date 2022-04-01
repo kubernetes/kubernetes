@@ -22,6 +22,8 @@ import (
 	"strings"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -64,7 +66,7 @@ var _ = utils.SIGDescribe("Volume Provisioning on Datastore [Feature:vsphere]", 
 		namespace = f.Namespace.Name
 		scParameters = make(map[string]string)
 		_, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		vSphereCSIMigrationEnabled = GetAndExpectBoolEnvVar(VSphereCSIMigrationEnabled)
 	})
 
@@ -73,7 +75,7 @@ var _ = utils.SIGDescribe("Volume Provisioning on Datastore [Feature:vsphere]", 
 		scParameters[Datastore] = invalidDatastore
 		scParameters[DiskFormat] = ThinDisk
 		err := invokeInvalidDatastoreTestNeg(client, namespace, scParameters)
-		framework.ExpectError(err)
+		e2eutils.ExpectError(err)
 		var errorMsg string
 		if !vSphereCSIMigrationEnabled {
 			errorMsg = `Failed to provision volume with StorageClass \"` + datastoreSCName + `\": Datastore '` + invalidDatastore + `' not found`
@@ -81,7 +83,7 @@ var _ = utils.SIGDescribe("Volume Provisioning on Datastore [Feature:vsphere]", 
 			errorMsg = `failed to find datastoreURL for datastore name: \"` + invalidDatastore + `\"`
 		}
 		if !strings.Contains(err.Error(), errorMsg) {
-			framework.ExpectNoError(err, errorMsg)
+			e2eutils.ExpectNoError(err, errorMsg)
 		}
 	})
 })
@@ -89,20 +91,20 @@ var _ = utils.SIGDescribe("Volume Provisioning on Datastore [Feature:vsphere]", 
 func invokeInvalidDatastoreTestNeg(client clientset.Interface, namespace string, scParameters map[string]string) error {
 	ginkgo.By("Creating Storage Class With Invalid Datastore")
 	storageclass, err := client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec(datastoreSCName, scParameters, nil, ""), metav1.CreateOptions{})
-	framework.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
+	e2eutils.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
 	defer client.StorageV1().StorageClasses().Delete(context.TODO(), storageclass.Name, metav1.DeleteOptions{})
 
 	ginkgo.By("Creating PVC using the Storage Class")
 	pvclaim, err := e2epv.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass))
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	defer e2epv.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
 
 	ginkgo.By("Expect claim to fail provisioning volume")
-	err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, pvclaim.Namespace, pvclaim.Name, framework.Poll, 2*time.Minute)
-	framework.ExpectError(err)
+	err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, pvclaim.Namespace, pvclaim.Name, e2eutils.Poll, 2*time.Minute)
+	e2eutils.ExpectError(err)
 
 	eventList, err := client.CoreV1().Events(pvclaim.Namespace).List(context.TODO(), metav1.ListOptions{})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	var eventErrorMessages string
 	for _, event := range eventList.Items {

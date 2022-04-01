@@ -18,6 +18,7 @@ package e2enode
 
 import (
 	"github.com/onsi/ginkgo"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,7 +29,7 @@ import (
 
 var _ = SIGDescribe("ImageCredentialProvider [Feature:KubeletCredentialProviders]", func() {
 	f := framework.NewDefaultFramework("image-credential-provider")
-	var podClient *framework.PodClient
+	var podClient *e2eutils.PodClient
 
 	ginkgo.BeforeEach(func() {
 		podClient = f.PodClient()

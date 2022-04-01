@@ -23,6 +23,9 @@ import (
 	"net"
 	"strconv"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -64,22 +67,22 @@ var _ = common.SIGDescribe("HostPort", func() {
 
 		localhost := "127.0.0.1"
 		family := v1.IPv4Protocol
-		if framework.TestContext.ClusterIsIPv6() {
+		if e2econfig.TestContext.ClusterIsIPv6() {
 			localhost = "::1"
 			family = v1.IPv6Protocol
 		}
 		// Get a node where to schedule the pods
 		nodes, err := e2enode.GetBoundedReadySchedulableNodes(cs, 1)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		if len(nodes.Items) == 0 {
-			framework.Failf("No nodes available")
+			e2eutils.Failf("No nodes available")
 
 		}
 		randomNode := &nodes.Items[rand.Intn(len(nodes.Items))]
 
 		ips := e2enode.GetAddressesByTypeAndFamily(randomNode, v1.NodeInternalIP, family)
 		if len(ips) == 0 {
-			framework.Failf("Failed to get NodeIP")
+			e2eutils.Failf("Failed to get NodeIP")
 		}
 		hostIP := ips[0]
 		port := int32(54323)
@@ -124,33 +127,33 @@ var _ = common.SIGDescribe("HostPort", func() {
 		for i := 0; i < 5; i++ {
 			// check pod1
 			ginkgo.By(fmt.Sprintf("checking connectivity from pod %s to serverIP: %s, port: %d", hostExecPod.Name, localhost, port))
-			hostname1, _, err := f.ExecCommandInContainerWithFullOutput(hostExecPod.Name, "e2e-host-exec", cmdPod1...)
+			hostname1, _, err := e2eutils.ExecCommandInContainerWithFullOutput(f.ClientSet, f.Namespace.Name, hostExecPod.Name, "e2e-host-exec", cmdPod1...)
 			if err != nil {
-				framework.Logf("Can not connect from %s to pod(pod1) to serverIP: %s, port: %d", hostExecPod.Name, localhost, port)
+				e2eutils.Logf("Can not connect from %s to pod(pod1) to serverIP: %s, port: %d", hostExecPod.Name, localhost, port)
 				continue
 			}
 			// check pod2
 			ginkgo.By(fmt.Sprintf("checking connectivity from pod %s to serverIP: %s, port: %d", hostExecPod.Name, hostIP, port))
-			hostname2, _, err := f.ExecCommandInContainerWithFullOutput(hostExecPod.Name, "e2e-host-exec", cmdPod2...)
+			hostname2, _, err := e2eutils.ExecCommandInContainerWithFullOutput(f.ClientSet, f.Namespace.Name, hostExecPod.Name, "e2e-host-exec", cmdPod2...)
 			if err != nil {
-				framework.Logf("Can not connect from %s to pod(pod2) to serverIP: %s, port: %d", hostExecPod.Name, hostIP, port)
+				e2eutils.Logf("Can not connect from %s to pod(pod2) to serverIP: %s, port: %d", hostExecPod.Name, hostIP, port)
 				continue
 			}
 			// the hostname returned has to be different because we are exposing the same port to two different pods
 			if hostname1 == hostname2 {
-				framework.Logf("pods must have different hostname: pod1 has hostname %s, pod2 has hostname %s", hostname1, hostname2)
+				e2eutils.Logf("pods must have different hostname: pod1 has hostname %s, pod2 has hostname %s", hostname1, hostname2)
 				continue
 			}
 			// check pod3
 			ginkgo.By(fmt.Sprintf("checking connectivity from pod %s to serverIP: %s, port: %d UDP", hostExecPod.Name, hostIP, port))
-			_, _, err = f.ExecCommandInContainerWithFullOutput(hostExecPod.Name, "e2e-host-exec", cmdPod3...)
+			_, _, err = e2eutils.ExecCommandInContainerWithFullOutput(f.ClientSet, f.Namespace.Name, hostExecPod.Name, "e2e-host-exec", cmdPod3...)
 			if err != nil {
-				framework.Logf("Can not connect from %s to pod(pod2) to serverIP: %s, port: %d", hostExecPod.Name, hostIP, port)
+				e2eutils.Logf("Can not connect from %s to pod(pod2) to serverIP: %s, port: %d", hostExecPod.Name, hostIP, port)
 				continue
 			}
 			return
 		}
-		framework.Failf("Failed to connect to exposed host ports")
+		e2eutils.Failf("Failed to connect to exposed host ports")
 	})
 })
 
@@ -192,10 +195,10 @@ func createHostPortPodOnNode(f *framework.Framework, podName, ns, hostIP string,
 		},
 	}
 	if _, err := f.ClientSet.CoreV1().Pods(ns).Create(context.TODO(), hostPortPod, metav1.CreateOptions{}); err != nil {
-		framework.Failf("error creating pod %s, err:%v", podName, err)
+		e2eutils.Failf("error creating pod %s, err:%v", podName, err)
 	}
 
-	if err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podName, ns, framework.PodStartTimeout); err != nil {
-		framework.Failf("wait for pod %s timeout, err:%v", podName, err)
+	if err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podName, ns, e2eutils.PodStartTimeout); err != nil {
+		e2eutils.Failf("wait for pod %s timeout, err:%v", podName, err)
 	}
 }

@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"path"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -287,8 +289,8 @@ var _ = SIGDescribe("EmptyDir volumes", func() {
 		e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
 
 		ginkgo.By("Reading file content from the nginx-container")
-		result := f.ExecShellInContainer(pod.Name, busyBoxMainContainerName, fmt.Sprintf("cat %s", busyBoxMainVolumeFilePath))
-		framework.ExpectEqual(result, message, "failed to match expected string %s with %s", message, resultString)
+		result := e2eutils.ExecShellInContainer(f.ClientSet, f.Namespace.Name, pod.Name, busyBoxMainContainerName, fmt.Sprintf("cat %s", busyBoxMainVolumeFilePath))
+		e2eutils.ExpectEqual(result, message, "failed to match expected string %s with %s", message, resultString)
 	})
 
 	/*
@@ -350,15 +352,15 @@ var _ = SIGDescribe("EmptyDir volumes", func() {
 
 		ginkgo.By("Waiting for the pod running")
 		err = e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
-		framework.ExpectNoError(err, "failed to deploy pod %s", pod.Name)
+		e2eutils.ExpectNoError(err, "failed to deploy pod %s", pod.Name)
 
 		ginkgo.By("Getting the pod")
 		pod, err = f.PodClient().Get(context.TODO(), pod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to get pod %s", pod.Name)
+		e2eutils.ExpectNoError(err, "failed to get pod %s", pod.Name)
 
 		ginkgo.By("Reading empty dir size")
-		result := f.ExecShellInContainer(pod.Name, busyBoxMainContainerName, fmt.Sprintf("df | grep %s | awk '{print $2}'", busyBoxMainVolumeMountPath))
-		framework.ExpectEqual(result, expectedResult, "failed to match expected string %s with %s", expectedResult, result)
+		result := e2eutils.ExecShellInContainer(f.ClientSet, f.Namespace.Name, pod.Name, busyBoxMainContainerName, fmt.Sprintf("df | grep %s | awk '{print $2}'", busyBoxMainVolumeMountPath))
+		e2eutils.ExpectEqual(result, expectedResult, "failed to match expected string %s with %s", expectedResult, result)
 	})
 })
 

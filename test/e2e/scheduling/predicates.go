@@ -21,6 +21,9 @@ import (
 	"fmt"
 	"time"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	nodev1 "k8s.io/api/node/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -85,7 +88,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		if err == nil && *(rc.Spec.Replicas) != 0 {
 			ginkgo.By("Cleaning up the replication controller")
 			err := e2erc.DeleteRCAndWaitForGC(f.ClientSet, ns, RCName)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 		}
 	})
 
@@ -95,22 +98,22 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		nodeList = &v1.NodeList{}
 		var err error
 
-		framework.AllNodesReady(cs, time.Minute)
+		e2eutils.AllNodesReady(cs, time.Minute)
 
 		nodeList, err = e2enode.GetReadySchedulableNodes(cs)
 		if err != nil {
-			framework.Logf("Unexpected error occurred: %v", err)
+			e2eutils.Logf("Unexpected error occurred: %v", err)
 		}
-		framework.ExpectNoErrorWithOffset(0, err)
+		e2eutils.ExpectNoErrorWithOffset(0, err)
 		for _, n := range nodeList.Items {
 			workerNodes.Insert(n.Name)
 		}
 
-		err = framework.CheckTestingNSDeletedExcept(cs, ns)
-		framework.ExpectNoError(err)
+		err = e2eutils.CheckTestingNSDeletedExcept(cs, ns)
+		e2eutils.ExpectNoError(err)
 
 		for _, node := range nodeList.Items {
-			framework.Logf("\nLogging pods the apiserver thinks is on node %v before test", node.Name)
+			e2eutils.Logf("\nLogging pods the apiserver thinks is on node %v before test", node.Name)
 			printAllPodsOnNode(cs, node.Name)
 		}
 
@@ -129,7 +132,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		for _, node := range nodeList.Items {
 			allocatable, found := node.Status.Allocatable[v1.ResourceEphemeralStorage]
 			if !found {
-				framework.Failf("node.Status.Allocatable %v does not contain entry %v", node.Status.Allocatable, v1.ResourceEphemeralStorage)
+				e2eutils.Failf("node.Status.Allocatable %v does not contain entry %v", node.Status.Allocatable, v1.ResourceEphemeralStorage)
 			}
 			nodeToAllocatableMap[node.Name] = allocatable.Value()
 			if nodeMaxAllocatable < allocatable.Value() {
@@ -139,11 +142,11 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		WaitForStableCluster(cs, workerNodes)
 
 		pods, err := cs.CoreV1().Pods(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		for _, pod := range pods.Items {
 			_, found := nodeToAllocatableMap[pod.Spec.NodeName]
 			if found && pod.Status.Phase != v1.PodSucceeded && pod.Status.Phase != v1.PodFailed {
-				framework.Logf("Pod %v requesting local ephemeral resource =%v on Node %v", pod.Name, getRequestedStorageEphemeralStorage(pod), pod.Spec.NodeName)
+				e2eutils.Logf("Pod %v requesting local ephemeral resource =%v on Node %v", pod.Name, getRequestedStorageEphemeralStorage(pod), pod.Spec.NodeName)
 				nodeToAllocatableMap[pod.Spec.NodeName] -= getRequestedStorageEphemeralStorage(pod)
 			}
 		}
@@ -151,9 +154,9 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		var podsNeededForSaturation int
 		ephemeralStoragePerPod := nodeMaxAllocatable / maxNumberOfPods
 
-		framework.Logf("Using pod capacity: %v", ephemeralStoragePerPod)
+		e2eutils.Logf("Using pod capacity: %v", ephemeralStoragePerPod)
 		for name, leftAllocatable := range nodeToAllocatableMap {
-			framework.Logf("Node: %v has local ephemeral resource allocatable: %v", name, leftAllocatable)
+			e2eutils.Logf("Node: %v has local ephemeral resource allocatable: %v", name, leftAllocatable)
 			podsNeededForSaturation += (int)(leftAllocatable / ephemeralStoragePerPod)
 		}
 
@@ -164,7 +167,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		// and there is no need to create additional pods.
 		// StartPods requires at least one pod to replicate.
 		if podsNeededForSaturation > 0 {
-			framework.ExpectNoError(testutils.StartPods(cs, podsNeededForSaturation, ns, "overcommit",
+			e2eutils.ExpectNoError(testutils.StartPods(cs, podsNeededForSaturation, ns, "overcommit",
 				*initPausePod(f, pausePodConfig{
 					Name:   "",
 					Labels: map[string]string{"name": ""},
@@ -176,7 +179,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 							v1.ResourceEphemeralStorage: *resource.NewQuantity(ephemeralStoragePerPod, "DecimalSI"),
 						},
 					},
-				}), true, framework.Logf))
+				}), true, e2eutils.Logf))
 		}
 		podName := "additional-pod"
 		conf := pausePodConfig{
@@ -222,7 +225,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 
 			// Get node object:
 			node, err := cs.CoreV1().Nodes().Get(context.TODO(), testNodeName, metav1.GetOptions{})
-			framework.ExpectNoError(err, "unable to get node object for node %v", testNodeName)
+			e2eutils.ExpectNoError(err, "unable to get node object for node %v", testNodeName)
 
 			// update Node API object with a fake resource
 			nodeCopy := node.DeepCopy()
@@ -230,7 +233,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 
 			nodeCopy.Status.Capacity[beardsecond] = resource.MustParse("1000")
 			_, err = cs.CoreV1().Nodes().UpdateStatus(context.TODO(), nodeCopy, metav1.UpdateOptions{})
-			framework.ExpectNoError(err, "unable to apply fake resource to %v", testNodeName)
+			e2eutils.ExpectNoError(err, "unable to apply fake resource to %v", testNodeName)
 
 			// Register a runtimeClass with overhead set as 25% of the available beard-seconds
 			handler = e2enode.PreconfiguredRuntimeClassHandler
@@ -245,7 +248,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 				},
 			}
 			_, err = cs.NodeV1().RuntimeClasses().Create(context.TODO(), rc, metav1.CreateOptions{})
-			framework.ExpectNoError(err, "failed to create RuntimeClass resource")
+			e2eutils.ExpectNoError(err, "failed to create RuntimeClass resource")
 		})
 
 		ginkgo.AfterEach(func() {
@@ -254,14 +257,14 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 			if testNodeName != "" {
 				// Get node object:
 				node, err := cs.CoreV1().Nodes().Get(context.TODO(), testNodeName, metav1.GetOptions{})
-				framework.ExpectNoError(err, "unable to get node object for node %v", testNodeName)
+				e2eutils.ExpectNoError(err, "unable to get node object for node %v", testNodeName)
 
 				nodeCopy := node.DeepCopy()
 				// force it to update
 				nodeCopy.ResourceVersion = "0"
 				delete(nodeCopy.Status.Capacity, beardsecond)
 				_, err = cs.CoreV1().Nodes().UpdateStatus(context.TODO(), nodeCopy, metav1.UpdateOptions{})
-				framework.ExpectNoError(err, "unable to update node %v", testNodeName)
+				e2eutils.ExpectNoError(err, "unable to update node %v", testNodeName)
 			}
 
 			// remove RuntimeClass
@@ -270,7 +273,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 
 		ginkgo.It("verify pod overhead is accounted for", func() {
 			if testNodeName == "" {
-				framework.Fail("unable to find a node which can run a pod")
+				e2eutils.Fail("unable to find a node which can run a pod")
 			}
 
 			ginkgo.By("Starting Pod to consume most of the node's resource.")
@@ -285,7 +288,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 			})
 
 			// Wait for filler pod to schedule.
-			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(cs, fillerPod))
+			e2eutils.ExpectNoError(e2epod.WaitForPodRunningInNamespace(cs, fillerPod))
 
 			ginkgo.By("Creating another pod that requires unavailable amount of resources.")
 			// Create another pod that requires 20% of available beard-seconds, but utilizes the RuntimeClass
@@ -339,12 +342,12 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 				continue
 			}
 			// Apply node label to each node
-			framework.AddOrUpdateLabelOnNode(cs, node.Name, "node", node.Name)
-			framework.ExpectNodeHasLabel(cs, node.Name, "node", node.Name)
+			e2eutils.AddOrUpdateLabelOnNode(cs, node.Name, "node", node.Name)
+			e2eutils.ExpectNodeHasLabel(cs, node.Name, "node", node.Name)
 			// Find allocatable amount of CPU.
 			allocatable, found := node.Status.Allocatable[v1.ResourceCPU]
 			if !found {
-				framework.Failf("node.Status.Allocatable %v does not contain entry %v", node.Status.Allocatable, v1.ResourceCPU)
+				e2eutils.Failf("node.Status.Allocatable %v does not contain entry %v", node.Status.Allocatable, v1.ResourceCPU)
 			}
 			nodeToAllocatableMap[node.Name] = allocatable.MilliValue()
 			if nodeMaxAllocatable < allocatable.MilliValue() {
@@ -354,16 +357,16 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		// Clean up added labels after this test.
 		defer func() {
 			for nodeName := range nodeToAllocatableMap {
-				framework.RemoveLabelOffNode(cs, nodeName, "node")
+				e2eutils.RemoveLabelOffNode(cs, nodeName, "node")
 			}
 		}()
 
 		pods, err := cs.CoreV1().Pods(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		for _, pod := range pods.Items {
 			_, found := nodeToAllocatableMap[pod.Spec.NodeName]
 			if found && pod.Status.Phase != v1.PodSucceeded && pod.Status.Phase != v1.PodFailed {
-				framework.Logf("Pod %v requesting resource cpu=%vm on Node %v", pod.Name, getRequestedCPU(pod), pod.Spec.NodeName)
+				e2eutils.Logf("Pod %v requesting resource cpu=%vm on Node %v", pod.Name, getRequestedCPU(pod), pod.Spec.NodeName)
 				nodeToAllocatableMap[pod.Spec.NodeName] -= getRequestedCPU(pod)
 			}
 		}
@@ -373,7 +376,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		fillerPods := []*v1.Pod{}
 		for nodeName, cpu := range nodeToAllocatableMap {
 			requestedCPU := cpu * 7 / 10
-			framework.Logf("Creating a pod which consumes cpu=%vm on Node %v", requestedCPU, nodeName)
+			e2eutils.Logf("Creating a pod which consumes cpu=%vm on Node %v", requestedCPU, nodeName)
 			fillerPods = append(fillerPods, createPausePod(f, pausePodConfig{
 				Name: "filler-pod-" + string(uuid.NewUUID()),
 				Resources: &v1.ResourceRequirements{
@@ -405,7 +408,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		}
 		// Wait for filler pods to schedule.
 		for _, pod := range fillerPods {
-			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(cs, pod))
+			e2eutils.ExpectNoError(e2epod.WaitForPodRunningInNamespace(cs, pod))
 		}
 		ginkgo.By("Creating another pod that requires unavailable amount of CPU.")
 		// Create another pod that requires 50% of the largest node CPU resources.
@@ -464,9 +467,9 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		ginkgo.By("Trying to apply a random label on the found node.")
 		k := fmt.Sprintf("kubernetes.io/e2e-%s", string(uuid.NewUUID()))
 		v := "42"
-		framework.AddOrUpdateLabelOnNode(cs, nodeName, k, v)
-		framework.ExpectNodeHasLabel(cs, nodeName, k, v)
-		defer framework.RemoveLabelOffNode(cs, nodeName, k)
+		e2eutils.AddOrUpdateLabelOnNode(cs, nodeName, k, v)
+		e2eutils.ExpectNodeHasLabel(cs, nodeName, k, v)
+		defer e2eutils.RemoveLabelOffNode(cs, nodeName, k)
 
 		ginkgo.By("Trying to relaunch the pod, now with labels.")
 		labelPodName := "with-labels"
@@ -482,10 +485,10 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		// kubelet and the scheduler: the scheduler might have scheduled a pod
 		// already when the kubelet does not know about its new label yet. The
 		// kubelet will then refuse to launch the pod.
-		framework.ExpectNoError(e2epod.WaitForPodNotPending(cs, ns, labelPodName))
+		e2eutils.ExpectNoError(e2epod.WaitForPodNotPending(cs, ns, labelPodName))
 		labelPod, err := cs.CoreV1().Pods(ns).Get(context.TODO(), labelPodName, metav1.GetOptions{})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(labelPod.Spec.NodeName, nodeName)
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectEqual(labelPod.Spec.NodeName, nodeName)
 	})
 
 	// Test Nodes does not have any label, hence it should be impossible to schedule Pod with
@@ -537,9 +540,9 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		ginkgo.By("Trying to apply a random label on the found node.")
 		k := fmt.Sprintf("kubernetes.io/e2e-%s", string(uuid.NewUUID()))
 		v := "42"
-		framework.AddOrUpdateLabelOnNode(cs, nodeName, k, v)
-		framework.ExpectNodeHasLabel(cs, nodeName, k, v)
-		defer framework.RemoveLabelOffNode(cs, nodeName, k)
+		e2eutils.AddOrUpdateLabelOnNode(cs, nodeName, k, v)
+		e2eutils.ExpectNodeHasLabel(cs, nodeName, k, v)
+		defer e2eutils.RemoveLabelOffNode(cs, nodeName, k)
 
 		ginkgo.By("Trying to relaunch the pod, now with labels.")
 		labelPodName := "with-labels"
@@ -569,10 +572,10 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		// kubelet and the scheduler: the scheduler might have scheduled a pod
 		// already when the kubelet does not know about its new label yet. The
 		// kubelet will then refuse to launch the pod.
-		framework.ExpectNoError(e2epod.WaitForPodNotPending(cs, ns, labelPodName))
+		e2eutils.ExpectNoError(e2epod.WaitForPodNotPending(cs, ns, labelPodName))
 		labelPod, err := cs.CoreV1().Pods(ns).Get(context.TODO(), labelPodName, metav1.GetOptions{})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(labelPod.Spec.NodeName, nodeName)
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectEqual(labelPod.Spec.NodeName, nodeName)
 	})
 
 	// 1. Run a pod to get an available node, then delete the pod
@@ -589,15 +592,15 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 			Effect: v1.TaintEffectNoSchedule,
 		}
 		e2enode.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
-		framework.ExpectNodeHasTaint(cs, nodeName, &testTaint)
+		e2eutils.ExpectNodeHasTaint(cs, nodeName, &testTaint)
 		defer e2enode.RemoveTaintOffNode(cs, nodeName, testTaint)
 
 		ginkgo.By("Trying to apply a random label on the found node.")
 		labelKey := fmt.Sprintf("kubernetes.io/e2e-label-key-%s", string(uuid.NewUUID()))
 		labelValue := "testing-label-value"
-		framework.AddOrUpdateLabelOnNode(cs, nodeName, labelKey, labelValue)
-		framework.ExpectNodeHasLabel(cs, nodeName, labelKey, labelValue)
-		defer framework.RemoveLabelOffNode(cs, nodeName, labelKey)
+		e2eutils.AddOrUpdateLabelOnNode(cs, nodeName, labelKey, labelValue)
+		e2eutils.ExpectNodeHasLabel(cs, nodeName, labelKey, labelValue)
+		defer e2eutils.RemoveLabelOffNode(cs, nodeName, labelKey)
 
 		ginkgo.By("Trying to relaunch the pod, now with tolerations.")
 		tolerationPodName := "with-tolerations"
@@ -612,10 +615,10 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		// kubelet and the scheduler: the scheduler might have scheduled a pod
 		// already when the kubelet does not know about its new taint yet. The
 		// kubelet will then refuse to launch the pod.
-		framework.ExpectNoError(e2epod.WaitForPodNotPending(cs, ns, tolerationPodName))
+		e2eutils.ExpectNoError(e2epod.WaitForPodNotPending(cs, ns, tolerationPodName))
 		deployedPod, err := cs.CoreV1().Pods(ns).Get(context.TODO(), tolerationPodName, metav1.GetOptions{})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(deployedPod.Spec.NodeName, nodeName)
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectEqual(deployedPod.Spec.NodeName, nodeName)
 	})
 
 	// 1. Run a pod to get an available node, then delete the pod
@@ -632,15 +635,15 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 			Effect: v1.TaintEffectNoSchedule,
 		}
 		e2enode.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
-		framework.ExpectNodeHasTaint(cs, nodeName, &testTaint)
+		e2eutils.ExpectNodeHasTaint(cs, nodeName, &testTaint)
 		defer e2enode.RemoveTaintOffNode(cs, nodeName, testTaint)
 
 		ginkgo.By("Trying to apply a random label on the found node.")
 		labelKey := fmt.Sprintf("kubernetes.io/e2e-label-key-%s", string(uuid.NewUUID()))
 		labelValue := "testing-label-value"
-		framework.AddOrUpdateLabelOnNode(cs, nodeName, labelKey, labelValue)
-		framework.ExpectNodeHasLabel(cs, nodeName, labelKey, labelValue)
-		defer framework.RemoveLabelOffNode(cs, nodeName, labelKey)
+		e2eutils.AddOrUpdateLabelOnNode(cs, nodeName, labelKey, labelValue)
+		e2eutils.ExpectNodeHasLabel(cs, nodeName, labelKey, labelValue)
+		defer e2eutils.RemoveLabelOffNode(cs, nodeName, labelKey)
 
 		ginkgo.By("Trying to relaunch the pod, still no tolerations.")
 		podNameNoTolerations := "still-no-tolerations"
@@ -661,7 +664,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 
 		nodeName := GetNodeThatCanRunPod(f)
 		localhost := "127.0.0.1"
-		if framework.TestContext.ClusterIsIPv6() {
+		if e2econfig.TestContext.ClusterIsIPv6() {
 			localhost = "::1"
 		}
 		hostIP := getNodeHostIP(f, nodeName)
@@ -674,9 +677,9 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		nodeSelector := make(map[string]string)
 		nodeSelector[k] = v
 
-		framework.AddOrUpdateLabelOnNode(cs, nodeName, k, v)
-		framework.ExpectNodeHasLabel(cs, nodeName, k, v)
-		defer framework.RemoveLabelOffNode(cs, nodeName, k)
+		e2eutils.AddOrUpdateLabelOnNode(cs, nodeName, k, v)
+		e2eutils.ExpectNodeHasLabel(cs, nodeName, k, v)
+		defer e2eutils.RemoveLabelOffNode(cs, nodeName, k)
 
 		port := int32(54321)
 		ginkgo.By(fmt.Sprintf("Trying to create a pod(pod1) with hostport %v and hostIP %s and expect scheduled", port, localhost))
@@ -707,9 +710,9 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		nodeSelector := make(map[string]string)
 		nodeSelector[k] = v
 
-		framework.AddOrUpdateLabelOnNode(cs, nodeName, k, v)
-		framework.ExpectNodeHasLabel(cs, nodeName, k, v)
-		defer framework.RemoveLabelOffNode(cs, nodeName, k)
+		e2eutils.AddOrUpdateLabelOnNode(cs, nodeName, k, v)
+		e2eutils.ExpectNodeHasLabel(cs, nodeName, k, v)
+		defer e2eutils.RemoveLabelOffNode(cs, nodeName, k)
 
 		port := int32(54322)
 		ginkgo.By(fmt.Sprintf("Trying to create a pod(pod4) with hostport %v and hostIP 0.0.0.0(empty string here) and expect scheduled", port))
@@ -731,12 +734,12 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 			nodeNames = Get2NodesThatCanRunPod(f)
 			ginkgo.By(fmt.Sprintf("Apply dedicated topologyKey %v for this test on the 2 nodes.", topologyKey))
 			for _, nodeName := range nodeNames {
-				framework.AddOrUpdateLabelOnNode(cs, nodeName, topologyKey, nodeName)
+				e2eutils.AddOrUpdateLabelOnNode(cs, nodeName, topologyKey, nodeName)
 			}
 		})
 		ginkgo.AfterEach(func() {
 			for _, nodeName := range nodeNames {
-				framework.RemoveLabelOffNode(cs, nodeName, topologyKey)
+				e2eutils.RemoveLabelOffNode(cs, nodeName, topologyKey)
 			}
 		})
 
@@ -785,7 +788,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 			}
 			runPauseRS(f, rsConfig)
 			podList, err := cs.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			numInNode1, numInNode2 := 0, 0
 			for _, pod := range podList.Items {
 				if pod.Spec.NodeName == nodeNames[0] {
@@ -795,8 +798,8 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 				}
 			}
 			expected := replicas / len(nodeNames)
-			framework.ExpectEqual(numInNode1, expected, fmt.Sprintf("Pods are not distributed as expected on node %q", nodeNames[0]))
-			framework.ExpectEqual(numInNode2, expected, fmt.Sprintf("Pods are not distributed as expected on node %q", nodeNames[1]))
+			e2eutils.ExpectEqual(numInNode1, expected, fmt.Sprintf("Pods are not distributed as expected on node %q", nodeNames[0]))
+			e2eutils.ExpectEqual(numInNode2, expected, fmt.Sprintf("Pods are not distributed as expected on node %q", nodeNames[1]))
 		})
 	})
 })
@@ -805,13 +808,13 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 func printAllPodsOnNode(c clientset.Interface, nodeName string) {
 	podList, err := c.CoreV1().Pods(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{FieldSelector: "spec.nodeName=" + nodeName})
 	if err != nil {
-		framework.Logf("Unable to retrieve pods for node %v: %v", nodeName, err)
+		e2eutils.Logf("Unable to retrieve pods for node %v: %v", nodeName, err)
 		return
 	}
 	for _, p := range podList.Items {
-		framework.Logf("%v from %v started at %v (%d container statuses recorded)", p.Name, p.Namespace, p.Status.StartTime, len(p.Status.ContainerStatuses))
+		e2eutils.Logf("%v from %v started at %v (%d container statuses recorded)", p.Name, p.Namespace, p.Status.StartTime, len(p.Status.ContainerStatuses))
 		for _, c := range p.Status.ContainerStatuses {
-			framework.Logf("\tContainer %v ready: %v, restart count %v",
+			e2eutils.Logf("\tContainer %v ready: %v, restart count %v",
 				c.Name, c.Ready, c.RestartCount)
 		}
 	}
@@ -870,19 +873,19 @@ func createPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 		namespace = f.Namespace.Name
 	}
 	pod, err := f.ClientSet.CoreV1().Pods(namespace).Create(context.TODO(), initPausePod(f, conf), metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	return pod
 }
 
 func runPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
-	return runPausePodWithTimeout(f, conf, framework.PollShortTimeout)
+	return runPausePodWithTimeout(f, conf, e2eutils.PollShortTimeout)
 }
 
 func runPausePodWithTimeout(f *framework.Framework, conf pausePodConfig, timeout time.Duration) *v1.Pod {
 	pod := createPausePod(f, conf)
-	framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, timeout))
+	e2eutils.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, timeout))
 	pod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(context.TODO(), conf.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	return pod
 }
 
@@ -895,7 +898,7 @@ func runPodAndGetNodeName(f *framework.Framework, conf pausePodConfig) string {
 
 	ginkgo.By("Explicitly delete pod here to free the resource it takes.")
 	err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(0))
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	return pod.Spec.NodeName
 }
@@ -941,23 +944,23 @@ func WaitForSchedulerAfterAction(f *framework.Framework, action Action, ns, podN
 		predicate = scheduleSuccessEvent(ns, podName, "" /* any node */)
 	}
 	observed, err := observeEventAfterAction(f.ClientSet, f.Namespace.Name, predicate, action)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	if expectSuccess && !observed {
-		framework.Failf("Did not observe success event after performing the supplied action for pod %v", podName)
+		e2eutils.Failf("Did not observe success event after performing the supplied action for pod %v", podName)
 	}
 	if !expectSuccess && !observed {
-		framework.Failf("Did not observe failed event after performing the supplied action for pod %v", podName)
+		e2eutils.Failf("Did not observe failed event after performing the supplied action for pod %v", podName)
 	}
 }
 
 // TODO: upgrade calls in PodAffinity tests when we're able to run them
 func verifyResult(c clientset.Interface, expectedScheduled int, expectedNotScheduled int, ns string) {
 	allPods, err := c.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	scheduledPods, notScheduledPods := GetPodsScheduled(workerNodes, allPods)
 
-	framework.ExpectEqual(len(notScheduledPods), expectedNotScheduled, fmt.Sprintf("Not scheduled Pods: %#v", notScheduledPods))
-	framework.ExpectEqual(len(scheduledPods), expectedScheduled, fmt.Sprintf("Scheduled Pods: %#v", scheduledPods))
+	e2eutils.ExpectEqual(len(notScheduledPods), expectedNotScheduled, fmt.Sprintf("Not scheduled Pods: %#v", notScheduledPods))
+	e2eutils.ExpectEqual(len(scheduledPods), expectedScheduled, fmt.Sprintf("Scheduled Pods: %#v", scheduledPods))
 }
 
 // GetNodeThatCanRunPod trying to launch a pod without a label to get a node which can launch it
@@ -1009,7 +1012,7 @@ func CreateHostPortPods(f *framework.Framework, id string, replicas int, expectR
 	}
 	err := e2erc.RunRC(*config)
 	if expectRunning {
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 	}
 }
 
@@ -1072,11 +1075,11 @@ func createHostPortPodOnNode(f *framework.Framework, podName, ns, hostIP string,
 		},
 	}
 	_, err := f.ClientSet.CoreV1().Pods(ns).Create(context.TODO(), hostPortPod, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	err = e2epod.WaitForPodNotPending(f.ClientSet, ns, podName)
 	if expectScheduled {
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 	}
 }
 
@@ -1086,10 +1089,10 @@ func GetPodsScheduled(workerNodes sets.String, pods *v1.PodList) (scheduledPods,
 		if pod.Spec.NodeName != "" && workerNodes.Has(pod.Spec.NodeName) {
 			_, scheduledCondition := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
 			if scheduledCondition == nil {
-				framework.Failf("Did not find 'scheduled' condition for pod %+v", podName)
+				e2eutils.Failf("Did not find 'scheduled' condition for pod %+v", podName)
 			}
 			if scheduledCondition.Status != v1.ConditionTrue {
-				framework.Failf("PodStatus isn't 'true' for pod %+v", podName)
+				e2eutils.Failf("PodStatus isn't 'true' for pod %+v", podName)
 			}
 			scheduledPods = append(scheduledPods, pod)
 		} else if pod.Spec.NodeName == "" {
@@ -1103,12 +1106,12 @@ func GetPodsScheduled(workerNodes sets.String, pods *v1.PodList) (scheduledPods,
 func getNodeHostIP(f *framework.Framework, nodeName string) string {
 	// Get the internal HostIP of the node
 	family := v1.IPv4Protocol
-	if framework.TestContext.ClusterIsIPv6() {
+	if e2econfig.TestContext.ClusterIsIPv6() {
 		family = v1.IPv6Protocol
 	}
 	node, err := f.ClientSet.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	ips := e2enode.GetAddressesByTypeAndFamily(node, v1.NodeInternalIP, family)
-	framework.ExpectNotEqual(len(ips), 0)
+	e2eutils.ExpectNotEqual(len(ips), 0)
 	return ips[0]
 }

@@ -20,6 +20,8 @@ import (
 	"context"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -70,29 +72,29 @@ var _ = utils.SIGDescribe("Volume Disk Size [Feature:vsphere]", func() {
 
 		ginkgo.By("Creating Storage Class")
 		storageclass, err := client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec(diskSizeSCName, scParameters, nil, ""), metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		defer client.StorageV1().StorageClasses().Delete(context.TODO(), storageclass.Name, metav1.DeleteOptions{})
 
 		ginkgo.By("Creating PVC using the Storage Class")
 		pvclaim, err := e2epv.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, diskSize, storageclass))
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		defer e2epv.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
 
 		ginkgo.By("Waiting for claim to be in bound phase")
-		err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, pvclaim.Namespace, pvclaim.Name, framework.Poll, 2*time.Minute)
-		framework.ExpectNoError(err)
+		err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, pvclaim.Namespace, pvclaim.Name, e2eutils.Poll, 2*time.Minute)
+		e2eutils.ExpectNoError(err)
 
 		ginkgo.By("Getting new copy of PVC")
 		pvclaim, err = client.CoreV1().PersistentVolumeClaims(pvclaim.Namespace).Get(context.TODO(), pvclaim.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		ginkgo.By("Getting PV created")
 		pv, err := client.CoreV1().PersistentVolumes().Get(context.TODO(), pvclaim.Spec.VolumeName, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		ginkgo.By("Verifying if provisioned PV has the correct size")
 		expectedCapacity := resource.MustParse(expectedDiskSize)
 		pvCapacity := pv.Spec.Capacity[v1.ResourceName(v1.ResourceStorage)]
-		framework.ExpectEqual(pvCapacity.Value(), expectedCapacity.Value())
+		e2eutils.ExpectEqual(pvCapacity.Value(), expectedCapacity.Value())
 	})
 })

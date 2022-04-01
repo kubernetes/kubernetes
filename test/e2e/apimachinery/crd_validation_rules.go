@@ -32,6 +32,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 )
 
 var _ = SIGDescribe("CustomResourceValidationRules [Privileged:ClusterAdmin][Alpha][Feature:CustomResourceValidationExpressions]", func() {
@@ -41,7 +42,7 @@ var _ = SIGDescribe("CustomResourceValidationRules [Privileged:ClusterAdmin][Alp
 	ginkgo.BeforeEach(func() {
 		var err error
 		apiExtensionClient, err = clientset.NewForConfig(f.ClientConfig())
-		framework.ExpectNoError(err, "initializing apiExtensionClient")
+		e2eutils.ExpectNoError(err, "initializing apiExtensionClient")
 	})
 
 	customResourceClient := func(crd *v1.CustomResourceDefinition) (dynamic.NamespaceableResourceInterface, schema.GroupVersionResource) {
@@ -55,7 +56,7 @@ var _ = SIGDescribe("CustomResourceValidationRules [Privileged:ClusterAdmin][Alp
 	unmarshallSchema := func(schemaJson []byte) *v1.JSONSchemaProps {
 		var c v1.JSONSchemaProps
 		err := json.Unmarshal(schemaJson, &c)
-		framework.ExpectNoError(err, "unmarshalling OpenAPIv3 schema")
+		e2eutils.ExpectNoError(err, "unmarshalling OpenAPIv3 schema")
 		return &c
 	}
 
@@ -87,10 +88,10 @@ var _ = SIGDescribe("CustomResourceValidationRules [Privileged:ClusterAdmin][Alp
 		ginkgo.By("Creating a custom resource definition with validation rules")
 		crd := fixtures.NewRandomNameV1CustomResourceDefinitionWithSchema(v1.NamespaceScoped, schemaWithValidationExpression, false)
 		crd, err := fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
-		framework.ExpectNoError(err, "creating CustomResourceDefinition")
+		e2eutils.ExpectNoError(err, "creating CustomResourceDefinition")
 		defer func() {
 			err = fixtures.DeleteV1CustomResourceDefinition(crd, apiExtensionClient)
-			framework.ExpectNoError(err, "deleting CustomResourceDefinition")
+			e2eutils.ExpectNoError(err, "deleting CustomResourceDefinition")
 		}()
 
 		ginkgo.By("Creating a custom resource with values that are allowed by the validation rules set on the custom resource definition")
@@ -108,16 +109,16 @@ var _ = SIGDescribe("CustomResourceValidationRules [Privileged:ClusterAdmin][Alp
 				"y": int64(0),
 			},
 		}}, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "validation rules satisfied")
+		e2eutils.ExpectNoError(err, "validation rules satisfied")
 	})
 	ginkgo.It("MUST fail validation for create of a custom resource that does not satisfy the x-kubernetes-validator rules", func() {
 		ginkgo.By("Creating a custom resource definition with validation rules")
 		crd := fixtures.NewRandomNameV1CustomResourceDefinitionWithSchema(v1.NamespaceScoped, schemaWithValidationExpression, false)
 		crd, err := fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
-		framework.ExpectNoError(err, "creating CustomResourceDefinition")
+		e2eutils.ExpectNoError(err, "creating CustomResourceDefinition")
 		defer func() {
 			err = fixtures.DeleteV1CustomResourceDefinition(crd, apiExtensionClient)
-			framework.ExpectNoError(err, "deleting CustomResourceDefinition")
+			e2eutils.ExpectNoError(err, "deleting CustomResourceDefinition")
 		}()
 
 		ginkgo.By("Creating a custom resource with values that fail the validation rules set on the custom resource definition")
@@ -135,10 +136,10 @@ var _ = SIGDescribe("CustomResourceValidationRules [Privileged:ClusterAdmin][Alp
 				"y": int64(0),
 			},
 		}}, metav1.CreateOptions{})
-		framework.ExpectError(err, "validation rules not satisfied")
+		e2eutils.ExpectError(err, "validation rules not satisfied")
 		expectedErrMsg := "failed rule"
 		if !strings.Contains(err.Error(), expectedErrMsg) {
-			framework.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())
+			e2eutils.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())
 		}
 	})
 
@@ -160,10 +161,10 @@ var _ = SIGDescribe("CustomResourceValidationRules [Privileged:ClusterAdmin][Alp
 		}`))
 		crd := fixtures.NewRandomNameV1CustomResourceDefinitionWithSchema(v1.NamespaceScoped, schemaWithInvalidValidationRule, false)
 		_, err := fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
-		framework.ExpectError(err, "creating CustomResourceDefinition with a validation rule that refers to a property that do not exist")
+		e2eutils.ExpectError(err, "creating CustomResourceDefinition with a validation rule that refers to a property that do not exist")
 		expectedErrMsg := "undefined field 'z'"
 		if !strings.Contains(err.Error(), expectedErrMsg) {
-			framework.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())
+			e2eutils.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())
 		}
 	})
 })

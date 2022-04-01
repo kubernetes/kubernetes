@@ -38,14 +38,15 @@ import (
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/component-base/featuregate"
-	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/config"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
+	"k8s.io/kubernetes/test/e2e/framework/utils"
 )
 
 func skipInternalf(caller int, format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
-	framework.Logf(msg)
+	utils.Logf(msg)
 	skip(msg, caller+1)
 }
 
@@ -151,35 +152,35 @@ func SkipIfMissingResource(dynamicClient dynamic.Interface, gvr schema.GroupVers
 		if apierrors.IsMethodNotSupported(err) || apierrors.IsNotFound(err) || apierrors.IsForbidden(err) {
 			skipInternalf(1, "Could not find %s resource, skipping test: %#v", gvr, err)
 		}
-		framework.Failf("Unexpected error getting %v: %v", gvr, err)
+		utils.Failf("Unexpected error getting %v: %v", gvr, err)
 	}
 }
 
 // SkipUnlessNodeCountIsAtLeast skips if the number of nodes is less than the minNodeCount.
 func SkipUnlessNodeCountIsAtLeast(minNodeCount int) {
-	if framework.TestContext.CloudConfig.NumNodes < minNodeCount {
-		skipInternalf(1, "Requires at least %d nodes (not %d)", minNodeCount, framework.TestContext.CloudConfig.NumNodes)
+	if config.TestContext.CloudConfig.NumNodes < minNodeCount {
+		skipInternalf(1, "Requires at least %d nodes (not %d)", minNodeCount, config.TestContext.CloudConfig.NumNodes)
 	}
 }
 
 // SkipUnlessNodeCountIsAtMost skips if the number of nodes is greater than the maxNodeCount.
 func SkipUnlessNodeCountIsAtMost(maxNodeCount int) {
-	if framework.TestContext.CloudConfig.NumNodes > maxNodeCount {
-		skipInternalf(1, "Requires at most %d nodes (not %d)", maxNodeCount, framework.TestContext.CloudConfig.NumNodes)
+	if config.TestContext.CloudConfig.NumNodes > maxNodeCount {
+		skipInternalf(1, "Requires at most %d nodes (not %d)", maxNodeCount, config.TestContext.CloudConfig.NumNodes)
 	}
 }
 
 // SkipIfProviderIs skips if the provider is included in the unsupportedProviders.
 func SkipIfProviderIs(unsupportedProviders ...string) {
-	if framework.ProviderIs(unsupportedProviders...) {
-		skipInternalf(1, "Not supported for providers %v (found %s)", unsupportedProviders, framework.TestContext.Provider)
+	if utils.ProviderIs(unsupportedProviders...) {
+		skipInternalf(1, "Not supported for providers %v (found %s)", unsupportedProviders, config.TestContext.Provider)
 	}
 }
 
 // SkipUnlessProviderIs skips if the provider is not included in the supportedProviders.
 func SkipUnlessProviderIs(supportedProviders ...string) {
-	if !framework.ProviderIs(supportedProviders...) {
-		skipInternalf(1, "Only supported for providers %v (not %s)", supportedProviders, framework.TestContext.Provider)
+	if !utils.ProviderIs(supportedProviders...) {
+		skipInternalf(1, "Only supported for providers %v (not %s)", supportedProviders, config.TestContext.Provider)
 	}
 }
 
@@ -207,29 +208,29 @@ func SkipIfMultizone(c clientset.Interface) {
 
 // SkipUnlessMasterOSDistroIs skips if the master OS distro is not included in the supportedMasterOsDistros.
 func SkipUnlessMasterOSDistroIs(supportedMasterOsDistros ...string) {
-	if !framework.MasterOSDistroIs(supportedMasterOsDistros...) {
-		skipInternalf(1, "Only supported for master OS distro %v (not %s)", supportedMasterOsDistros, framework.TestContext.MasterOSDistro)
+	if !utils.MasterOSDistroIs(supportedMasterOsDistros...) {
+		skipInternalf(1, "Only supported for master OS distro %v (not %s)", supportedMasterOsDistros, config.TestContext.MasterOSDistro)
 	}
 }
 
 // SkipUnlessNodeOSDistroIs skips if the node OS distro is not included in the supportedNodeOsDistros.
 func SkipUnlessNodeOSDistroIs(supportedNodeOsDistros ...string) {
-	if !framework.NodeOSDistroIs(supportedNodeOsDistros...) {
-		skipInternalf(1, "Only supported for node OS distro %v (not %s)", supportedNodeOsDistros, framework.TestContext.NodeOSDistro)
+	if !utils.NodeOSDistroIs(supportedNodeOsDistros...) {
+		skipInternalf(1, "Only supported for node OS distro %v (not %s)", supportedNodeOsDistros, config.TestContext.NodeOSDistro)
 	}
 }
 
 // SkipUnlessNodeOSArchIs skips if the node OS distro is not included in the supportedNodeOsArchs.
 func SkipUnlessNodeOSArchIs(supportedNodeOsArchs ...string) {
-	if !framework.NodeOSArchIs(supportedNodeOsArchs...) {
-		skipInternalf(1, "Only supported for node OS arch %v (not %s)", supportedNodeOsArchs, framework.TestContext.NodeOSArch)
+	if !utils.NodeOSArchIs(supportedNodeOsArchs...) {
+		skipInternalf(1, "Only supported for node OS arch %v (not %s)", supportedNodeOsArchs, config.TestContext.NodeOSArch)
 	}
 }
 
 // SkipIfNodeOSDistroIs skips if the node OS distro is included in the unsupportedNodeOsDistros.
 func SkipIfNodeOSDistroIs(unsupportedNodeOsDistros ...string) {
-	if framework.NodeOSDistroIs(unsupportedNodeOsDistros...) {
-		skipInternalf(1, "Not supported for node OS distro %v (is %s)", unsupportedNodeOsDistros, framework.TestContext.NodeOSDistro)
+	if utils.NodeOSDistroIs(unsupportedNodeOsDistros...) {
+		skipInternalf(1, "Not supported for node OS distro %v (is %s)", unsupportedNodeOsDistros, config.TestContext.NodeOSDistro)
 	}
 }
 
@@ -237,7 +238,7 @@ func SkipIfNodeOSDistroIs(unsupportedNodeOsDistros ...string) {
 func SkipUnlessServerVersionGTE(v *utilversion.Version, c discovery.ServerVersionInterface) {
 	gte, err := serverVersionGTE(v, c)
 	if err != nil {
-		framework.Failf("Failed to get server version: %v", err)
+		utils.Failf("Failed to get server version: %v", err)
 	}
 	if !gte {
 		skipInternalf(1, "Not supported for server versions before %q", v)
@@ -246,8 +247,8 @@ func SkipUnlessServerVersionGTE(v *utilversion.Version, c discovery.ServerVersio
 
 // SkipUnlessSSHKeyPresent skips if no SSH key is found.
 func SkipUnlessSSHKeyPresent() {
-	if _, err := e2essh.GetSigner(framework.TestContext.Provider); err != nil {
-		skipInternalf(1, "No SSH Key for provider %s: '%v'", framework.TestContext.Provider, err)
+	if _, err := e2essh.GetSigner(config.TestContext.Provider); err != nil {
+		skipInternalf(1, "No SSH Key for provider %s: '%v'", config.TestContext.Provider, err)
 	}
 }
 
@@ -275,11 +276,11 @@ func SkipIfAppArmorNotSupported() {
 // RunIfSystemSpecNameIs runs if the system spec name is included in the names.
 func RunIfSystemSpecNameIs(names ...string) {
 	for _, name := range names {
-		if name == framework.TestContext.SystemSpecName {
+		if name == config.TestContext.SystemSpecName {
 			return
 		}
 	}
-	skipInternalf(1, "Skipped because system spec name %q is not in %v", framework.TestContext.SystemSpecName, names)
+	skipInternalf(1, "Skipped because system spec name %q is not in %v", config.TestContext.SystemSpecName, names)
 }
 
 // SkipUnlessComponentRunsAsPodsAndClientCanDeleteThem run if the component run as pods and client can delete them
@@ -288,7 +289,7 @@ func SkipUnlessComponentRunsAsPodsAndClientCanDeleteThem(componentName string, c
 	label := labels.SelectorFromSet(labelSet)
 	listOpts := metav1.ListOptions{LabelSelector: label.String()}
 	pods, err := c.CoreV1().Pods(ns).List(context.TODO(), listOpts)
-	framework.Logf("SkipUnlessComponentRunsAsPodsAndClientCanDeleteThem: %v, %v", pods, err)
+	utils.Logf("SkipUnlessComponentRunsAsPodsAndClientCanDeleteThem: %v, %v", pods, err)
 	if err != nil {
 		skipInternalf(1, "Skipped because client failed to get component:%s pod err:%v", componentName, err)
 	}
@@ -306,7 +307,7 @@ func SkipUnlessComponentRunsAsPodsAndClientCanDeleteThem(componentName string, c
 
 // SkipIfIPv6 skips if the cluster IP family is IPv6 and the provider is included in the unsupportedProviders.
 func SkipIfIPv6(unsupportedProviders ...string) {
-	if framework.TestContext.ClusterIsIPv6() && framework.ProviderIs(unsupportedProviders...) {
-		skipInternalf(1, "Not supported for IPv6 clusters and providers %v (found %s)", unsupportedProviders, framework.TestContext.Provider)
+	if config.TestContext.ClusterIsIPv6() && utils.ProviderIs(unsupportedProviders...) {
+		skipInternalf(1, "Not supported for IPv6 clusters and providers %v (found %s)", unsupportedProviders, config.TestContext.Provider)
 	}
 }

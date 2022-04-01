@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -54,16 +56,16 @@ func cleanupJob(f *framework.Framework, job *batchv1.Job) {
 	ns := f.Namespace.Name
 	c := f.ClientSet
 
-	framework.Logf("Remove the Job's dummy finalizer; the Job should be deleted cascadingly")
+	e2eutils.Logf("Remove the Job's dummy finalizer; the Job should be deleted cascadingly")
 	removeFinalizerFunc := func(j *batchv1.Job) {
 		j.ObjectMeta.Finalizers = slice.RemoveString(j.ObjectMeta.Finalizers, dummyFinalizer, nil)
 	}
 	_, err := updateJobWithRetries(c, ns, job.Name, removeFinalizerFunc)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	e2ejob.WaitForJobGone(c, ns, job.Name, wait.ForeverTestTimeout)
 
 	err = e2ejob.WaitForAllJobPodsGone(c, ns, job.Name)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 }
 
 func testFinishedJob(f *framework.Framework) {
@@ -80,30 +82,30 @@ func testFinishedJob(f *framework.Framework) {
 	job.ObjectMeta.Finalizers = []string{dummyFinalizer}
 	defer cleanupJob(f, job)
 
-	framework.Logf("Create a Job %s/%s with TTL", ns, job.Name)
+	e2eutils.Logf("Create a Job %s/%s with TTL", ns, job.Name)
 	job, err := e2ejob.CreateJob(c, ns, job)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
-	framework.Logf("Wait for the Job to finish")
+	e2eutils.Logf("Wait for the Job to finish")
 	err = e2ejob.WaitForJobFinish(c, ns, job.Name)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
-	framework.Logf("Wait for TTL after finished controller to delete the Job")
+	e2eutils.Logf("Wait for TTL after finished controller to delete the Job")
 	err = waitForJobDeleting(c, ns, job.Name)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
-	framework.Logf("Check Job's deletionTimestamp and compare with the time when the Job finished")
+	e2eutils.Logf("Check Job's deletionTimestamp and compare with the time when the Job finished")
 	job, err = e2ejob.GetJob(c, ns, job.Name)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	jobFinishTime := finishTime(job)
 	finishTimeUTC := jobFinishTime.UTC()
-	framework.ExpectNotEqual(jobFinishTime.IsZero(), true)
+	e2eutils.ExpectNotEqual(jobFinishTime.IsZero(), true)
 
 	deleteAtUTC := job.ObjectMeta.DeletionTimestamp.UTC()
-	framework.ExpectNotEqual(deleteAtUTC, nil)
+	e2eutils.ExpectNotEqual(deleteAtUTC, nil)
 
 	expireAtUTC := finishTimeUTC.Add(time.Duration(ttl) * time.Second)
-	framework.ExpectEqual(deleteAtUTC.Before(expireAtUTC), false)
+	e2eutils.ExpectEqual(deleteAtUTC.Before(expireAtUTC), false)
 }
 
 // finishTime returns finish time of the specified job.
@@ -121,14 +123,14 @@ func finishTime(finishedJob *batchv1.Job) metav1.Time {
 func updateJobWithRetries(c clientset.Interface, namespace, name string, applyUpdate func(*batchv1.Job)) (job *batchv1.Job, err error) {
 	jobs := c.BatchV1().Jobs(namespace)
 	var updateErr error
-	pollErr := wait.PollImmediate(framework.Poll, JobTimeout, func() (bool, error) {
+	pollErr := wait.PollImmediate(e2eutils.Poll, JobTimeout, func() (bool, error) {
 		if job, err = jobs.Get(context.TODO(), name, metav1.GetOptions{}); err != nil {
 			return false, err
 		}
 		// Apply the update, then attempt to push it to the apiserver.
 		applyUpdate(job)
 		if job, err = jobs.Update(context.TODO(), job, metav1.UpdateOptions{}); err == nil {
-			framework.Logf("Updating job %s", name)
+			e2eutils.Logf("Updating job %s", name)
 			return true, nil
 		}
 		updateErr = err
@@ -143,7 +145,7 @@ func updateJobWithRetries(c clientset.Interface, namespace, name string, applyUp
 // waitForJobDeleting uses c to wait for the Job jobName in namespace ns to have
 // a non-nil deletionTimestamp (i.e. being deleted).
 func waitForJobDeleting(c clientset.Interface, ns, jobName string) error {
-	return wait.PollImmediate(framework.Poll, JobTimeout, func() (bool, error) {
+	return wait.PollImmediate(e2eutils.Poll, JobTimeout, func() (bool, error) {
 		curr, err := c.BatchV1().Jobs(ns).Get(context.TODO(), jobName, metav1.GetOptions{})
 		if err != nil {
 			return false, err

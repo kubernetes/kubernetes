@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubectl/pkg/util/podutils"
-	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/utils"
 )
 
 // WaitForRunning waits for numPodsRunning in ss to be Running and for the first
@@ -37,7 +37,7 @@ func WaitForRunning(c clientset.Interface, numPodsRunning, numPodsReady int32, s
 			podList := GetPodList(c, ss)
 			SortStatefulPods(podList)
 			if int32(len(podList.Items)) < numPodsRunning {
-				framework.Logf("Found %d stateful pods, waiting for %d", len(podList.Items), numPodsRunning)
+				utils.Logf("Found %d stateful pods, waiting for %d", len(podList.Items), numPodsRunning)
 				return false, nil
 			}
 			if int32(len(podList.Items)) > numPodsRunning {
@@ -47,7 +47,7 @@ func WaitForRunning(c clientset.Interface, numPodsRunning, numPodsReady int32, s
 				shouldBeReady := getStatefulPodOrdinal(&p) < int(numPodsReady)
 				isReady := podutils.IsPodReady(&p)
 				desiredReadiness := shouldBeReady == isReady
-				framework.Logf("Waiting for pod %v to enter %v - Ready=%v, currently %v - Ready=%v", p.Name, v1.PodRunning, shouldBeReady, p.Status.Phase, isReady)
+				utils.Logf("Waiting for pod %v to enter %v - Ready=%v, currently %v - Ready=%v", p.Name, v1.PodRunning, shouldBeReady, p.Status.Phase, isReady)
 				if p.Status.Phase != v1.PodRunning || !desiredReadiness {
 					return false, nil
 				}
@@ -55,7 +55,7 @@ func WaitForRunning(c clientset.Interface, numPodsRunning, numPodsReady int32, s
 			return true, nil
 		})
 	if pollErr != nil {
-		framework.Failf("Failed waiting for pods to enter running: %v", pollErr)
+		utils.Failf("Failed waiting for pods to enter running: %v", pollErr)
 	}
 }
 
@@ -71,7 +71,7 @@ func WaitForState(c clientset.Interface, ss *appsv1.StatefulSet, until func(*app
 			return until(ssGet, podList)
 		})
 	if pollErr != nil {
-		framework.Failf("Failed waiting for state update: %v", pollErr)
+		utils.Failf("Failed waiting for state update: %v", pollErr)
 	}
 }
 
@@ -98,7 +98,7 @@ func WaitForPodReady(c clientset.Interface, set *appsv1.StatefulSet, podName str
 
 // WaitForStatusReadyReplicas waits for the ss.Status.ReadyReplicas to be equal to expectedReplicas
 func WaitForStatusReadyReplicas(c clientset.Interface, ss *appsv1.StatefulSet, expectedReplicas int32) {
-	framework.Logf("Waiting for statefulset status.replicas updated to %d", expectedReplicas)
+	utils.Logf("Waiting for statefulset status.replicas updated to %d", expectedReplicas)
 
 	ns, name := ss.Namespace, ss.Name
 	pollErr := wait.PollImmediate(StatefulSetPoll, StatefulSetTimeout,
@@ -111,19 +111,19 @@ func WaitForStatusReadyReplicas(c clientset.Interface, ss *appsv1.StatefulSet, e
 				return false, nil
 			}
 			if ssGet.Status.ReadyReplicas != expectedReplicas {
-				framework.Logf("Waiting for stateful set status.readyReplicas to become %d, currently %d", expectedReplicas, ssGet.Status.ReadyReplicas)
+				utils.Logf("Waiting for stateful set status.readyReplicas to become %d, currently %d", expectedReplicas, ssGet.Status.ReadyReplicas)
 				return false, nil
 			}
 			return true, nil
 		})
 	if pollErr != nil {
-		framework.Failf("Failed waiting for stateful set status.readyReplicas updated to %d: %v", expectedReplicas, pollErr)
+		utils.Failf("Failed waiting for stateful set status.readyReplicas updated to %d: %v", expectedReplicas, pollErr)
 	}
 }
 
 // WaitForStatusAvailableReplicas waits for the ss.Status.Available to be equal to expectedReplicas
 func WaitForStatusAvailableReplicas(c clientset.Interface, ss *appsv1.StatefulSet, expectedReplicas int32) {
-	framework.Logf("Waiting for statefulset status.AvailableReplicas updated to %d", expectedReplicas)
+	utils.Logf("Waiting for statefulset status.AvailableReplicas updated to %d", expectedReplicas)
 
 	ns, name := ss.Namespace, ss.Name
 	pollErr := wait.PollImmediate(StatefulSetPoll, StatefulSetTimeout,
@@ -136,19 +136,19 @@ func WaitForStatusAvailableReplicas(c clientset.Interface, ss *appsv1.StatefulSe
 				return false, nil
 			}
 			if ssGet.Status.AvailableReplicas != expectedReplicas {
-				framework.Logf("Waiting for stateful set status.AvailableReplicas to become %d, currently %d", expectedReplicas, ssGet.Status.AvailableReplicas)
+				utils.Logf("Waiting for stateful set status.AvailableReplicas to become %d, currently %d", expectedReplicas, ssGet.Status.AvailableReplicas)
 				return false, nil
 			}
 			return true, nil
 		})
 	if pollErr != nil {
-		framework.Failf("Failed waiting for stateful set status.AvailableReplicas updated to %d: %v", expectedReplicas, pollErr)
+		utils.Failf("Failed waiting for stateful set status.AvailableReplicas updated to %d: %v", expectedReplicas, pollErr)
 	}
 }
 
 // WaitForStatusReplicas waits for the ss.Status.Replicas to be equal to expectedReplicas
 func WaitForStatusReplicas(c clientset.Interface, ss *appsv1.StatefulSet, expectedReplicas int32) {
-	framework.Logf("Waiting for statefulset status.replicas updated to %d", expectedReplicas)
+	utils.Logf("Waiting for statefulset status.replicas updated to %d", expectedReplicas)
 
 	ns, name := ss.Namespace, ss.Name
 	pollErr := wait.PollImmediate(StatefulSetPoll, StatefulSetTimeout,
@@ -161,13 +161,13 @@ func WaitForStatusReplicas(c clientset.Interface, ss *appsv1.StatefulSet, expect
 				return false, nil
 			}
 			if ssGet.Status.Replicas != expectedReplicas {
-				framework.Logf("Waiting for stateful set status.replicas to become %d, currently %d", expectedReplicas, ssGet.Status.Replicas)
+				utils.Logf("Waiting for stateful set status.replicas to become %d, currently %d", expectedReplicas, ssGet.Status.Replicas)
 				return false, nil
 			}
 			return true, nil
 		})
 	if pollErr != nil {
-		framework.Failf("Failed waiting for stateful set status.replicas updated to %d: %v", expectedReplicas, pollErr)
+		utils.Failf("Failed waiting for stateful set status.replicas updated to %d: %v", expectedReplicas, pollErr)
 	}
 }
 
@@ -175,9 +175,9 @@ func WaitForStatusReplicas(c clientset.Interface, ss *appsv1.StatefulSet, expect
 func Saturate(c clientset.Interface, ss *appsv1.StatefulSet) {
 	var i int32
 	for i = 0; i < *(ss.Spec.Replicas); i++ {
-		framework.Logf("Waiting for stateful pod at index %v to enter Running", i)
+		utils.Logf("Waiting for stateful pod at index %v to enter Running", i)
 		WaitForRunning(c, i+1, i, ss)
-		framework.Logf("Resuming stateful pod at index %v", i)
+		utils.Logf("Resuming stateful pod at index %v", i)
 		ResumeNextPod(c, ss)
 	}
 }

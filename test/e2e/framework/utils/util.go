@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package framework
+package utils
 
 import (
 	"bytes"
@@ -37,7 +37,6 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
-	gomegatypes "github.com/onsi/gomega/types"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -66,6 +65,7 @@ import (
 	netutils "k8s.io/utils/net"
 
 	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
+	"k8s.io/kubernetes/test/e2e/framework/config"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -82,6 +82,23 @@ const (
 	// AllContainers specifies that all containers be visited
 	// Copied from pkg/api/v1/pod to avoid pulling extra dependencies
 	AllContainers = InitContainers | Containers | EphemeralContainers
+)
+
+const (
+	// DefaultPodDeletionTimeout is the default timeout for deleting pod
+	DefaultPodDeletionTimeout = 3 * time.Minute
+
+	// the status of container event, copied from k8s.io/kubernetes/pkg/kubelet/events
+	KillingContainer = "Killing"
+
+	// the status of container event, copied from k8s.io/kubernetes/pkg/kubelet/events
+	FailedToCreateContainer = "Failed"
+
+	// the status of container event, copied from k8s.io/kubernetes/pkg/kubelet/events
+	StartedContainer = "Started"
+
+	// it is copied from k8s.io/kubernetes/pkg/kubelet/sysctl
+	ForbiddenReason = "SysctlForbidden"
 )
 
 // DEPRECATED constants. Use the timeouts in framework.Framework instead.
@@ -168,12 +185,9 @@ var (
 // Beware that this ID is not the same for all tests in the e2e run, because each Ginkgo node creates it separately.
 var RunID = uuid.NewUUID()
 
-// CreateTestingNSFn is a func that is responsible for creating namespace used for executing e2e tests.
-type CreateTestingNSFn func(baseName string, c clientset.Interface, labels map[string]string) (*v1.Namespace, error)
-
 // APIAddress returns a address of an instance.
 func APIAddress() string {
-	instanceURL, err := url.Parse(TestContext.Host)
+	instanceURL, err := url.Parse(config.TestContext.Host)
 	ExpectNoError(err)
 	return instanceURL.Hostname()
 }
@@ -181,7 +195,7 @@ func APIAddress() string {
 // ProviderIs returns true if the provider is included is the providers. Otherwise false.
 func ProviderIs(providers ...string) bool {
 	for _, provider := range providers {
-		if strings.EqualFold(provider, TestContext.Provider) {
+		if strings.EqualFold(provider, config.TestContext.Provider) {
 			return true
 		}
 	}
@@ -191,7 +205,7 @@ func ProviderIs(providers ...string) bool {
 // MasterOSDistroIs returns true if the master OS distro is included in the supportedMasterOsDistros. Otherwise false.
 func MasterOSDistroIs(supportedMasterOsDistros ...string) bool {
 	for _, distro := range supportedMasterOsDistros {
-		if strings.EqualFold(distro, TestContext.MasterOSDistro) {
+		if strings.EqualFold(distro, config.TestContext.MasterOSDistro) {
 			return true
 		}
 	}
@@ -201,7 +215,7 @@ func MasterOSDistroIs(supportedMasterOsDistros ...string) bool {
 // NodeOSDistroIs returns true if the node OS distro is included in the supportedNodeOsDistros. Otherwise false.
 func NodeOSDistroIs(supportedNodeOsDistros ...string) bool {
 	for _, distro := range supportedNodeOsDistros {
-		if strings.EqualFold(distro, TestContext.NodeOSDistro) {
+		if strings.EqualFold(distro, config.TestContext.NodeOSDistro) {
 			return true
 		}
 	}
@@ -211,7 +225,7 @@ func NodeOSDistroIs(supportedNodeOsDistros ...string) bool {
 // NodeOSArchIs returns true if the node OS arch is included in the supportedNodeOsArchs. Otherwise false.
 func NodeOSArchIs(supportedNodeOsArchs ...string) bool {
 	for _, arch := range supportedNodeOsArchs {
-		if strings.EqualFold(arch, TestContext.NodeOSArch) {
+		if strings.EqualFold(arch, config.TestContext.NodeOSArch) {
 			return true
 		}
 	}
@@ -389,7 +403,7 @@ func CreateTestingNS(baseName string, c clientset.Interface, labels map[string]s
 		return nil, err
 	}
 
-	if TestContext.VerifyServiceAccount {
+	if config.TestContext.VerifyServiceAccount {
 		if err := WaitForDefaultServiceAccountInNamespace(c, got.Name); err != nil {
 			// Even if we fail to create serviceAccount in the namespace,
 			// we have successfully create a namespace.
@@ -467,11 +481,11 @@ func countEndpointsNum(e *v1.Endpoints) int {
 
 // restclientConfig returns a config holds the information needed to build connection to kubernetes clusters.
 func restclientConfig(kubeContext string) (*clientcmdapi.Config, error) {
-	Logf(">>> kubeConfig: %s", TestContext.KubeConfig)
-	if TestContext.KubeConfig == "" {
+	Logf(">>> kubeConfig: %s", config.TestContext.KubeConfig)
+	if config.TestContext.KubeConfig == "" {
 		return nil, fmt.Errorf("KubeConfig must be specified to load client config")
 	}
-	c, err := clientcmd.LoadFromFile(TestContext.KubeConfig)
+	c, err := clientcmd.LoadFromFile(config.TestContext.KubeConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error loading KubeConfig: %v", err.Error())
 	}
@@ -486,44 +500,44 @@ func restclientConfig(kubeContext string) (*clientcmdapi.Config, error) {
 type ClientConfigGetter func() (*restclient.Config, error)
 
 // LoadConfig returns a config for a rest client with the UserAgent set to include the current test name.
-func LoadConfig() (config *restclient.Config, err error) {
+func LoadConfig() (conf *restclient.Config, err error) {
 	defer func() {
-		if err == nil && config != nil {
+		if err == nil && conf != nil {
 			testDesc := ginkgo.CurrentGinkgoTestDescription()
 			if len(testDesc.ComponentTexts) > 0 {
 				componentTexts := strings.Join(testDesc.ComponentTexts, " ")
-				config.UserAgent = fmt.Sprintf("%s -- %s", rest.DefaultKubernetesUserAgent(), componentTexts)
+				conf.UserAgent = fmt.Sprintf("%s -- %s", rest.DefaultKubernetesUserAgent(), componentTexts)
 			}
 		}
 	}()
 
-	if TestContext.NodeE2E {
+	if config.TestContext.NodeE2E {
 		// This is a node e2e test, apply the node e2e configuration
 		return &restclient.Config{
-			Host:        TestContext.Host,
-			BearerToken: TestContext.BearerToken,
+			Host:        config.TestContext.Host,
+			BearerToken: config.TestContext.BearerToken,
 			TLSClientConfig: restclient.TLSClientConfig{
 				Insecure: true,
 			},
 		}, nil
 	}
-	c, err := restclientConfig(TestContext.KubeContext)
+	c, err := restclientConfig(config.TestContext.KubeContext)
 	if err != nil {
-		if TestContext.KubeConfig == "" {
+		if config.TestContext.KubeConfig == "" {
 			return restclient.InClusterConfig()
 		}
 		return nil, err
 	}
 	// In case Host is not set in TestContext, sets it as
 	// CurrentContext Server for k8s API client to connect to.
-	if TestContext.Host == "" && c.Clusters != nil {
+	if config.TestContext.Host == "" && c.Clusters != nil {
 		currentContext, ok := c.Clusters[c.CurrentContext]
 		if ok {
-			TestContext.Host = currentContext.Server
+			config.TestContext.Host = currentContext.Server
 		}
 	}
 
-	return clientcmd.NewDefaultClientConfig(*c, &clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: TestContext.Host}}).ClientConfig()
+	return clientcmd.NewDefaultClientConfig(*c, &clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: config.TestContext.Host}}).ClientConfig()
 }
 
 // LoadClientset returns clientset for connecting to kubernetes clusters.
@@ -586,7 +600,7 @@ type KubectlBuilder struct {
 // NewKubectlCommand returns a KubectlBuilder for running kubectl.
 func NewKubectlCommand(namespace string, args ...string) *KubectlBuilder {
 	b := new(KubectlBuilder)
-	tk := e2ekubectl.NewTestKubeconfig(TestContext.CertDir, TestContext.Host, TestContext.KubeConfig, TestContext.KubeContext, TestContext.KubectlPath, namespace)
+	tk := e2ekubectl.NewTestKubeconfig(config.TestContext.CertDir, config.TestContext.Host, config.TestContext.KubeConfig, config.TestContext.KubeContext, config.TestContext.KubectlPath, namespace)
 	b.cmd = tk.KubectlCmd(args...)
 	return b
 }
@@ -715,8 +729,8 @@ func RunKubectlInput(namespace string, data string, args ...string) (string, err
 
 // RunKubemciWithKubeconfig is a convenience wrapper over RunKubemciCmd
 func RunKubemciWithKubeconfig(args ...string) (string, error) {
-	if TestContext.KubeConfig != "" {
-		args = append(args, "--"+clientcmd.RecommendedConfigPathFlag+"="+TestContext.KubeConfig)
+	if config.TestContext.KubeConfig != "" {
+		args = append(args, "--"+clientcmd.RecommendedConfigPathFlag+"="+config.TestContext.KubeConfig)
 	}
 	return RunKubemciCmd(args...)
 }
@@ -727,7 +741,7 @@ func RunKubemciCmd(args ...string) (string, error) {
 	// kubemci is assumed to be in PATH.
 	kubemci := "kubemci"
 	b := new(KubectlBuilder)
-	args = append(args, "--gcp-project="+TestContext.CloudConfig.ProjectID)
+	args = append(args, "--gcp-project="+config.TestContext.CloudConfig.ProjectID)
 
 	b.cmd = exec.Command(kubemci, args...)
 	return b.Exec()
@@ -755,21 +769,6 @@ func TryKill(cmd *exec.Cmd) {
 	}
 }
 
-// testContainerOutputMatcher runs the given pod in the given namespace and waits
-// for all of the containers in the podSpec to move into the 'Success' status, and tests
-// the specified container log against the given expected output using the given matcher.
-func (f *Framework) testContainerOutputMatcher(scenarioName string,
-	pod *v1.Pod,
-	containerIndex int,
-	expectedOutput []string,
-	matcher func(string, ...interface{}) gomegatypes.GomegaMatcher) {
-	ginkgo.By(fmt.Sprintf("Creating a pod to test %v", scenarioName))
-	if containerIndex < 0 || containerIndex >= len(pod.Spec.Containers) {
-		Failf("Invalid container index: %d", containerIndex)
-	}
-	ExpectNoError(f.MatchContainerOutput(pod, pod.Spec.Containers[containerIndex].Name, expectedOutput, matcher))
-}
-
 // ContainerType signifies container type
 type ContainerType int
 
@@ -787,7 +786,7 @@ const (
 // allFeatureEnabledContainers returns a ContainerType mask which includes all container
 // types except for the ones guarded by feature gate.
 // Copied from pkg/api/v1/pod to avoid pulling extra dependencies
-func allFeatureEnabledContainers() ContainerType {
+func AllFeatureEnabledContainers() ContainerType {
 	containerType := AllContainers
 	if !utilfeature.DefaultFeatureGate.Enabled(FeatureEphemeralContainers) {
 		containerType &= ^EphemeralContainers
@@ -805,7 +804,7 @@ type ContainerVisitor func(container *v1.Container, containerType ContainerType)
 // visiting is short-circuited. visitContainers returns true if visiting completes,
 // false if visiting was short-circuited.
 // Copied from pkg/api/v1/pod to avoid pulling extra dependencies
-func visitContainers(podSpec *v1.PodSpec, mask ContainerType, visitor ContainerVisitor) bool {
+func VisitContainers(podSpec *v1.PodSpec, mask ContainerType, visitor ContainerVisitor) bool {
 	if mask&InitContainers != 0 {
 		for i := range podSpec.InitContainers {
 			if !visitor(&podSpec.InitContainers[i], InitContainers) {
@@ -828,73 +827,6 @@ func visitContainers(podSpec *v1.PodSpec, mask ContainerType, visitor ContainerV
 		}
 	}
 	return true
-}
-
-// MatchContainerOutput creates a pod and waits for all it's containers to exit with success.
-// It then tests that the matcher with each expectedOutput matches the output of the specified container.
-func (f *Framework) MatchContainerOutput(
-	pod *v1.Pod,
-	containerName string,
-	expectedOutput []string,
-	matcher func(string, ...interface{}) gomegatypes.GomegaMatcher) error {
-	ns := pod.ObjectMeta.Namespace
-	if ns == "" {
-		ns = f.Namespace.Name
-	}
-	podClient := f.PodClientNS(ns)
-
-	createdPod := podClient.Create(pod)
-	defer func() {
-		ginkgo.By("delete the pod")
-		podClient.DeleteSync(createdPod.Name, metav1.DeleteOptions{}, DefaultPodDeletionTimeout)
-	}()
-
-	// Wait for client pod to complete.
-	podErr := e2epod.WaitForPodSuccessInNamespaceTimeout(f.ClientSet, createdPod.Name, ns, f.Timeouts.PodStart)
-
-	// Grab its logs.  Get host first.
-	podStatus, err := podClient.Get(context.TODO(), createdPod.Name, metav1.GetOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to get pod status: %v", err)
-	}
-
-	if podErr != nil {
-		// Pod failed. Dump all logs from all containers to see what's wrong
-		_ = visitContainers(&podStatus.Spec, allFeatureEnabledContainers(), func(c *v1.Container, containerType ContainerType) bool {
-			logs, err := e2epod.GetPodLogs(f.ClientSet, ns, podStatus.Name, c.Name)
-			if err != nil {
-				Logf("Failed to get logs from node %q pod %q container %q: %v",
-					podStatus.Spec.NodeName, podStatus.Name, c.Name, err)
-			} else {
-				Logf("Output of node %q pod %q container %q: %s", podStatus.Spec.NodeName, podStatus.Name, c.Name, logs)
-			}
-			return true
-		})
-		return fmt.Errorf("expected pod %q success: %v", createdPod.Name, podErr)
-	}
-
-	Logf("Trying to get logs from node %s pod %s container %s: %v",
-		podStatus.Spec.NodeName, podStatus.Name, containerName, err)
-
-	// Sometimes the actual containers take a second to get started, try to get logs for 60s
-	logs, err := e2epod.GetPodLogs(f.ClientSet, ns, podStatus.Name, containerName)
-	if err != nil {
-		Logf("Failed to get logs from node %q pod %q container %q. %v",
-			podStatus.Spec.NodeName, podStatus.Name, containerName, err)
-		return fmt.Errorf("failed to get logs from %s for %s: %v", podStatus.Name, containerName, err)
-	}
-
-	for _, expected := range expectedOutput {
-		m := matcher(expected)
-		matches, err := m.Match(logs)
-		if err != nil {
-			return fmt.Errorf("expected %q in container output: %v", expected, err)
-		} else if !matches {
-			return fmt.Errorf("expected %q in container output: %s", expected, m.FailureMessage(logs))
-		}
-	}
-
-	return nil
 }
 
 // EventsLister is a func that lists events.
@@ -926,13 +858,13 @@ func DumpAllNamespaceInfo(c clientset.Interface, namespace string) {
 		return c.CoreV1().Events(ns).List(context.TODO(), opts)
 	}, namespace)
 
-	e2epod.DumpAllPodInfoForNamespace(c, namespace, TestContext.ReportDir)
+	e2epod.DumpAllPodInfoForNamespace(c, namespace, config.TestContext.ReportDir)
 
 	// If cluster is large, then the following logs are basically useless, because:
 	// 1. it takes tens of minutes or hours to grab all of them
 	// 2. there are so many of them that working with them are mostly impossible
 	// So we dump them only if the cluster is relatively small.
-	maxNodesForDump := TestContext.MaxNodesToGather
+	maxNodesForDump := config.TestContext.MaxNodesToGather
 	nodes, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		Logf("unable to fetch node list: %v", err)
@@ -1012,7 +944,7 @@ func getKubeletPods(c clientset.Interface, node string) (*v1.PodList, error) {
 		client = c.CoreV1().RESTClient().Get().
 			Resource("nodes").
 			SubResource("proxy").
-			Name(fmt.Sprintf("%v:%v", node, KubeletPort)).
+			Name(fmt.Sprintf("%v:%v", node, config.KubeletPort)).
 			Suffix("pods").
 			Do(context.TODO())
 
@@ -1050,17 +982,17 @@ func getNodeEvents(c clientset.Interface, nodeName string) []v1.Event {
 }
 
 // WaitForAllNodesSchedulable waits up to timeout for all
-// (but TestContext.AllowedNotReadyNodes) to become schedulable.
+// (but config.TestContext.AllowedNotReadyNodes) to become schedulable.
 func WaitForAllNodesSchedulable(c clientset.Interface, timeout time.Duration) error {
-	if TestContext.AllowedNotReadyNodes == -1 {
+	if config.TestContext.AllowedNotReadyNodes == -1 {
 		return nil
 	}
 
-	Logf("Waiting up to %v for all (but %d) nodes to be schedulable", timeout, TestContext.AllowedNotReadyNodes)
+	Logf("Waiting up to %v for all (but %d) nodes to be schedulable", timeout, config.TestContext.AllowedNotReadyNodes)
 	return wait.PollImmediate(
 		30*time.Second,
 		timeout,
-		e2enode.CheckReadyForTests(c, TestContext.NonblockingTaints, TestContext.AllowedNotReadyNodes, largeClusterThreshold),
+		e2enode.CheckReadyForTests(c, config.TestContext.NonblockingTaints, config.TestContext.AllowedNotReadyNodes, largeClusterThreshold),
 	)
 }
 
@@ -1150,16 +1082,16 @@ func RunHostCmdWithRetries(ns, name, cmd string, interval, timeout time.Duration
 }
 
 // AllNodesReady checks whether all registered nodes are ready. Setting -1 on
-// TestContext.AllowedNotReadyNodes will bypass the post test node readiness check.
+// config.TestContext.AllowedNotReadyNodes will bypass the post test node readiness check.
 // TODO: we should change the AllNodesReady call in AfterEach to WaitForAllNodesHealthy,
 // and figure out how to do it in a configurable way, as we can't expect all setups to run
 // default test add-ons.
 func AllNodesReady(c clientset.Interface, timeout time.Duration) error {
-	if TestContext.AllowedNotReadyNodes == -1 {
+	if config.TestContext.AllowedNotReadyNodes == -1 {
 		return nil
 	}
 
-	Logf("Waiting up to %v for all (but %d) nodes to be ready", timeout, TestContext.AllowedNotReadyNodes)
+	Logf("Waiting up to %v for all (but %d) nodes to be ready", timeout, config.TestContext.AllowedNotReadyNodes)
 
 	var notReady []*v1.Node
 	err := wait.PollImmediate(Poll, timeout, func() (bool, error) {
@@ -1175,19 +1107,19 @@ func AllNodesReady(c clientset.Interface, timeout time.Duration) error {
 				notReady = append(notReady, node)
 			}
 		}
-		// Framework allows for <TestContext.AllowedNotReadyNodes> nodes to be non-ready,
+		// Framework allows for <config.TestContext.AllowedNotReadyNodes> nodes to be non-ready,
 		// to make it possible e.g. for incorrect deployment of some small percentage
 		// of nodes (which we allow in cluster validation). Some nodes that are not
 		// provisioned correctly at startup will never become ready (e.g. when something
 		// won't install correctly), so we can't expect them to be ready at any point.
-		return len(notReady) <= TestContext.AllowedNotReadyNodes, nil
+		return len(notReady) <= config.TestContext.AllowedNotReadyNodes, nil
 	})
 
 	if err != nil && err != wait.ErrWaitTimeout {
 		return err
 	}
 
-	if len(notReady) > TestContext.AllowedNotReadyNodes {
+	if len(notReady) > config.TestContext.AllowedNotReadyNodes {
 		msg := ""
 		for _, node := range notReady {
 			msg = fmt.Sprintf("%s, %s", msg, node.Name)
@@ -1207,26 +1139,26 @@ func LookForStringInLog(ns, podName, container, expectedString string, timeout t
 // EnsureLoadBalancerResourcesDeleted ensures that cloud load balancer resources that were created
 // are actually cleaned up.  Currently only implemented for GCE/GKE.
 func EnsureLoadBalancerResourcesDeleted(ip, portRange string) error {
-	return TestContext.CloudConfig.Provider.EnsureLoadBalancerResourcesDeleted(ip, portRange)
+	return config.TestContext.CloudConfig.Provider.EnsureLoadBalancerResourcesDeleted(ip, portRange)
 }
 
 // CoreDump SSHs to the master and all nodes and dumps their logs into dir.
 // It shells out to cluster/log-dump/log-dump.sh to accomplish this.
 func CoreDump(dir string) {
-	if TestContext.DisableLogDump {
+	if config.TestContext.DisableLogDump {
 		Logf("Skipping dumping logs from cluster")
 		return
 	}
 	var cmd *exec.Cmd
-	if TestContext.LogexporterGCSPath != "" {
-		Logf("Dumping logs from nodes to GCS directly at path: %s", TestContext.LogexporterGCSPath)
-		cmd = exec.Command(path.Join(TestContext.RepoRoot, "cluster", "log-dump", "log-dump.sh"), dir, TestContext.LogexporterGCSPath)
+	if config.TestContext.LogexporterGCSPath != "" {
+		Logf("Dumping logs from nodes to GCS directly at path: %s", config.TestContext.LogexporterGCSPath)
+		cmd = exec.Command(path.Join(config.TestContext.RepoRoot, "cluster", "log-dump", "log-dump.sh"), dir, config.TestContext.LogexporterGCSPath)
 	} else {
 		Logf("Dumping logs locally to: %s", dir)
-		cmd = exec.Command(path.Join(TestContext.RepoRoot, "cluster", "log-dump", "log-dump.sh"), dir)
+		cmd = exec.Command(path.Join(config.TestContext.RepoRoot, "cluster", "log-dump", "log-dump.sh"), dir)
 	}
-	cmd.Env = append(os.Environ(), fmt.Sprintf("LOG_DUMP_SYSTEMD_SERVICES=%s", parseSystemdServices(TestContext.SystemdServices)))
-	cmd.Env = append(os.Environ(), fmt.Sprintf("LOG_DUMP_SYSTEMD_JOURNAL=%v", TestContext.DumpSystemdJournal))
+	cmd.Env = append(os.Environ(), fmt.Sprintf("LOG_DUMP_SYSTEMD_SERVICES=%s", parseSystemdServices(config.TestContext.SystemdServices)))
+	cmd.Env = append(os.Environ(), fmt.Sprintf("LOG_DUMP_SYSTEMD_JOURNAL=%v", config.TestContext.DumpSystemdJournal))
 
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -1289,7 +1221,7 @@ func getControlPlaneAddresses(c clientset.Interface) ([]string, []string, []stri
 	}
 
 	// Populate the external IP/hostname.
-	hostURL, err := url.Parse(TestContext.Host)
+	hostURL, err := url.Parse(config.TestContext.Host)
 	if err != nil {
 		Failf("Failed to parse hostname: %v", err)
 	}
@@ -1310,7 +1242,7 @@ func GetControlPlaneAddresses(c clientset.Interface) []string {
 	externalIPs, internalIPs, _ := getControlPlaneAddresses(c)
 
 	ips := sets.NewString()
-	switch TestContext.Provider {
+	switch config.TestContext.Provider {
 	case "gce", "gke":
 		for _, ip := range externalIPs {
 			ips.Insert(ip)
@@ -1321,7 +1253,7 @@ func GetControlPlaneAddresses(c clientset.Interface) []string {
 	case "aws":
 		ips.Insert(awsMasterIP)
 	default:
-		Failf("This test is not supported for provider %s and should be disabled", TestContext.Provider)
+		Failf("This test is not supported for provider %s and should be disabled", config.TestContext.Provider)
 	}
 	return ips.List()
 }

@@ -26,6 +26,9 @@ import (
 	"math/big"
 	"time"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -116,7 +119,7 @@ var _ = SIGDescribe("Hostname of Pod [NodeConformance]", func() {
 		// Set PodSpec subdomain field to generate FQDN for pod
 		pod.Spec.Subdomain = subdomain
 		// Expected Pod FQDN
-		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.%s", pod.ObjectMeta.Name, subdomain, f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
+		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.%s", pod.ObjectMeta.Name, subdomain, f.Namespace.Name, e2econfig.TestContext.ClusterDNSDomain)
 		output := []string{fmt.Sprintf("%s;%s;", pod.ObjectMeta.Name, hostFQDN)}
 		// Create Pod
 		f.TestContainerOutput("shortname and fqdn", pod, 0, output)
@@ -138,10 +141,10 @@ var _ = SIGDescribe("Hostname of Pod [NodeConformance]", func() {
 		setHostnameAsFQDN := true
 		pod.Spec.SetHostnameAsFQDN = &setHostnameAsFQDN
 		// Expected Pod FQDN
-		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.%s", pod.ObjectMeta.Name, subdomain, f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
+		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.%s", pod.ObjectMeta.Name, subdomain, f.Namespace.Name, e2econfig.TestContext.ClusterDNSDomain)
 		// Fail if FQDN is longer than 64 characters, otherwise the Pod will remain pending until test timeout.
 		// In Linux, 64 characters is the limit of the hostname kernel field, which this test sets to the pod FQDN.
-		framework.ExpectEqual(len(hostFQDN) < 65, true, fmt.Sprintf("The FQDN of the Pod cannot be longer than 64 characters, requested %s which is %d characters long.", hostFQDN, len(hostFQDN)))
+		e2eutils.ExpectEqual(len(hostFQDN) < 65, true, fmt.Sprintf("The FQDN of the Pod cannot be longer than 64 characters, requested %s which is %d characters long.", hostFQDN, len(hostFQDN)))
 		output := []string{fmt.Sprintf("%s;%s;", hostFQDN, hostFQDN)}
 		// Create Pod
 		f.TestContainerOutput("fqdn and fqdn", pod, 0, output)
@@ -172,18 +175,18 @@ var _ = SIGDescribe("Hostname of Pod [NodeConformance]", func() {
 		// Create Pod
 		launchedPod := f.PodClient().Create(pod)
 		// Ensure we delete pod
-		defer f.PodClient().DeleteSync(launchedPod.Name, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+		defer f.PodClient().DeleteSync(launchedPod.Name, metav1.DeleteOptions{}, e2eutils.DefaultPodDeletionTimeout)
 
 		// Pod should remain in the pending state generating events with reason FailedCreatePodSandBox
 		// Expected Message Error Event
 		expectedMessage := "Failed to create pod sandbox: failed " +
 			"to construct FQDN from pod hostname and cluster domain, FQDN "
-		framework.Logf("Waiting for Pod to generate FailedCreatePodSandBox event.")
+		e2eutils.Logf("Waiting for Pod to generate FailedCreatePodSandBox event.")
 		// Wait for event with reason FailedCreatePodSandBox
 		expectSandboxFailureEvent(f, launchedPod, expectedMessage)
 		// Check Pod is in Pending Phase
 		err := checkPodIsPending(f, launchedPod.ObjectMeta.Name, launchedPod.ObjectMeta.Namespace)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 	})
 })
@@ -197,8 +200,8 @@ func expectSandboxFailureEvent(f *framework.Framework, pod *v1.Pod, msg string) 
 		"involvedObject.namespace": f.Namespace.Name,
 		"reason":                   events.FailedCreatePodSandBox,
 	}.AsSelector().String()
-	framework.ExpectNoError(e2eevents.WaitTimeoutForEvent(
-		f.ClientSet, f.Namespace.Name, eventSelector, msg, framework.PodEventTimeout))
+	e2eutils.ExpectNoError(e2eevents.WaitTimeoutForEvent(
+		f.ClientSet, f.Namespace.Name, eventSelector, msg, e2eutils.PodEventTimeout))
 }
 
 func checkPodIsPending(f *framework.Framework, podName, namespace string) error {

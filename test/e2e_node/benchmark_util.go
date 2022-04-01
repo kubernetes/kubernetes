@@ -28,7 +28,10 @@ import (
 	"strconv"
 	"time"
 
-	"k8s.io/api/core/v1"
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
@@ -48,20 +51,20 @@ const (
 // data for the test into the file with the specified prefix.
 func dumpDataToFile(data interface{}, labels map[string]string, prefix string) {
 	testName := labels["test"]
-	fileName := path.Join(framework.TestContext.ReportDir, fmt.Sprintf("%s-%s-%s.json", prefix, framework.TestContext.ReportPrefix, testName))
+	fileName := path.Join(e2econfig.TestContext.ReportDir, fmt.Sprintf("%s-%s-%s.json", prefix, e2econfig.TestContext.ReportPrefix, testName))
 	labels["timestamp"] = strconv.FormatInt(time.Now().UTC().Unix(), 10)
-	framework.Logf("Dumping perf data for test %q to %q.", testName, fileName)
-	if err := os.WriteFile(fileName, []byte(framework.PrettyPrintJSON(data)), 0644); err != nil {
-		framework.Logf("Failed to write perf data for test %q to %q: %v", testName, fileName, err)
+	e2eutils.Logf("Dumping perf data for test %q to %q.", testName, fileName)
+	if err := os.WriteFile(fileName, []byte(e2eutils.PrettyPrintJSON(data)), 0644); err != nil {
+		e2eutils.Logf("Failed to write perf data for test %q to %q: %v", testName, fileName, err)
 	}
 }
 
 // logPerfData writes the perf data to a standalone json file if the
-// framework.TestContext.ReportDir is non-empty, or to the general build log
+// e2econfig.TestContext.ReportDir is non-empty, or to the general build log
 // otherwise. The perfType identifies which type of the perf data it is, such
 // as "cpu" and "memory". If an error occurs, no perf data will be logged.
 func logPerfData(p *perftype.PerfData, perfType string) {
-	if framework.TestContext.ReportDir == "" {
+	if e2econfig.TestContext.ReportDir == "" {
 		printPerfData(p)
 		return
 	}
@@ -69,7 +72,7 @@ func logPerfData(p *perftype.PerfData, perfType string) {
 }
 
 // logDensityTimeSeries writes the time series data of operation and resource
-// usage to a standalone json file if the framework.TestContext.ReportDir is
+// usage to a standalone json file if the e2econfig.TestContext.ReportDir is
 // non-empty, or to the general build log otherwise. If an error occurs,
 // no perf data will be logged.
 func logDensityTimeSeries(rc *ResourceCollector, create, watch map[string]metav1.Time, testInfo map[string]string) {
@@ -85,8 +88,8 @@ func logDensityTimeSeries(rc *ResourceCollector, create, watch map[string]metav1
 	// Attach resource time series.
 	timeSeries.ResourceData = rc.GetResourceTimeSeries()
 
-	if framework.TestContext.ReportDir == "" {
-		framework.Logf("%s %s\n%s", TimeSeriesTag, framework.PrettyPrintJSON(timeSeries), TimeSeriesEnd)
+	if e2econfig.TestContext.ReportDir == "" {
+		e2eutils.Logf("%s %s\n%s", TimeSeriesTag, e2eutils.PrettyPrintJSON(timeSeries), TimeSeriesEnd)
 		return
 	}
 	dumpDataToFile(timeSeries, timeSeries.Labels, "time_series")
@@ -157,33 +160,33 @@ func getThroughputPerfData(batchLag time.Duration, e2eLags []e2emetrics.PodLaten
 // description, the name of the node on which the test will be run, the image
 // name of the node, and the node capacities.
 func getTestNodeInfo(f *framework.Framework, testName, testDesc string) map[string]string {
-	nodeName := framework.TestContext.NodeName
+	nodeName := e2econfig.TestContext.NodeName
 	node, err := f.ClientSet.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	cpu, ok := node.Status.Capacity[v1.ResourceCPU]
 	if !ok {
-		framework.Failf("Fail to fetch CPU capacity value of test node.")
+		e2eutils.Failf("Fail to fetch CPU capacity value of test node.")
 	}
 
 	memory, ok := node.Status.Capacity[v1.ResourceMemory]
 	if !ok {
-		framework.Failf("Fail to fetch Memory capacity value of test node.")
+		e2eutils.Failf("Fail to fetch Memory capacity value of test node.")
 	}
 
 	cpuValue, ok := cpu.AsInt64()
 	if !ok {
-		framework.Failf("Fail to fetch CPU capacity value as Int64.")
+		e2eutils.Failf("Fail to fetch CPU capacity value as Int64.")
 	}
 
 	memoryValue, ok := memory.AsInt64()
 	if !ok {
-		framework.Failf("Fail to fetch Memory capacity value as Int64.")
+		e2eutils.Failf("Fail to fetch Memory capacity value as Int64.")
 	}
 
 	image := node.Status.NodeInfo.OSImage
-	if framework.TestContext.ImageDescription != "" {
-		image = fmt.Sprintf("%s (%s)", image, framework.TestContext.ImageDescription)
+	if e2econfig.TestContext.ImageDescription != "" {
+		image = fmt.Sprintf("%s (%s)", image, e2econfig.TestContext.ImageDescription)
 	}
 	return map[string]string{
 		"node":    nodeName,
@@ -198,7 +201,7 @@ func getTestNodeInfo(f *framework.Framework, testName, testDesc string) map[stri
 // If an error occurs, nothing will be printed.
 func printPerfData(p *perftype.PerfData) {
 	// Notice that we must make sure the perftype.PerfResultEnd is in a new line.
-	if str := framework.PrettyPrintJSON(p); str != "" {
-		framework.Logf("%s %s\n%s", perftype.PerfResultTag, str, perftype.PerfResultEnd)
+	if str := e2eutils.PrettyPrintJSON(p); str != "" {
+		e2eutils.Logf("%s %s\n%s", perftype.PerfResultTag, str, perftype.PerfResultEnd)
 	}
 }

@@ -20,9 +20,10 @@ import (
 	"fmt"
 	"strings"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -61,7 +62,7 @@ func NewModel(namespaces []string, podNames []string, ports []int32, protocols [
 		Protocols:      protocols,
 		DNSDomain:      dnsDomain,
 	}
-	framework.Logf("DnsDomain %v", model.DNSDomain)
+	e2eutils.Logf("DnsDomain %v", model.DNSDomain)
 
 	// build the entire "model" for the overall test, which means, building
 	// namespaces, pods, containers for each protocol.
@@ -91,7 +92,7 @@ func NewModel(namespaces []string, podNames []string, ports []int32, protocols [
 // GetProbeTimeoutSeconds returns a timeout for how long the probe should work before failing a check, and takes windows heuristics into account, where requests can take longer sometimes.
 func (m *Model) GetProbeTimeoutSeconds() int {
 	timeoutSeconds := 1
-	if framework.NodeOSDistroIs("windows") {
+	if e2eutils.NodeOSDistroIs("windows") {
 		timeoutSeconds = 3
 	}
 	return timeoutSeconds
@@ -227,7 +228,7 @@ func (p *Pod) KubePod() *v1.Pod {
 		},
 	}
 
-	if framework.NodeOSDistroIs("windows") {
+	if e2eutils.NodeOSDistroIs("windows") {
 		thePod.Spec.NodeSelector = map[string]string{
 			"kubernetes.io/os": "windows",
 		}
@@ -305,7 +306,7 @@ func (c *Container) Spec() v1.Container {
 		})
 		cmd = []string{"/agnhost", "porter"}
 	default:
-		framework.Failf("invalid protocol %v", c.Protocol)
+		e2eutils.Failf("invalid protocol %v", c.Protocol)
 	}
 
 	return v1.Container{

@@ -21,6 +21,8 @@ import (
 	"strconv"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -71,10 +73,10 @@ func observeCreation(w watch.Interface) {
 	select {
 	case event := <-w.ResultChan():
 		if event.Type != watch.Added {
-			framework.Failf("Failed to observe the creation: %v", event)
+			e2eutils.Failf("Failed to observe the creation: %v", event)
 		}
 	case <-time.After(30 * time.Second):
-		framework.Failf("Timeout while waiting for observing the creation")
+		e2eutils.Failf("Timeout while waiting for observing the creation")
 	}
 }
 
@@ -95,7 +97,7 @@ func observerUpdate(w watch.Interface, expectedUpdate func(runtime.Object) bool)
 		}
 	}
 	if !updated {
-		framework.Failf("Failed to observe pod update")
+		e2eutils.Failf("Failed to observe pod update")
 	}
 }
 
@@ -114,22 +116,22 @@ var _ = SIGDescribe("Generated clientset", func() {
 		options := metav1.ListOptions{LabelSelector: selector}
 		pods, err := podClient.List(context.TODO(), options)
 		if err != nil {
-			framework.Failf("Failed to query for pods: %v", err)
+			e2eutils.Failf("Failed to query for pods: %v", err)
 		}
-		framework.ExpectEqual(len(pods.Items), 0)
+		e2eutils.ExpectEqual(len(pods.Items), 0)
 		options = metav1.ListOptions{
 			LabelSelector:   selector,
 			ResourceVersion: pods.ListMeta.ResourceVersion,
 		}
 		w, err := podClient.Watch(context.TODO(), options)
 		if err != nil {
-			framework.Failf("Failed to set up watch: %v", err)
+			e2eutils.Failf("Failed to set up watch: %v", err)
 		}
 
 		ginkgo.By("creating the pod")
 		pod, err = podClient.Create(context.TODO(), pod, metav1.CreateOptions{})
 		if err != nil {
-			framework.Failf("Failed to create pod: %v", err)
+			e2eutils.Failf("Failed to create pod: %v", err)
 		}
 
 		ginkgo.By("verifying the pod is in kubernetes")
@@ -139,21 +141,21 @@ var _ = SIGDescribe("Generated clientset", func() {
 		}
 		pods, err = podClient.List(context.TODO(), options)
 		if err != nil {
-			framework.Failf("Failed to query for pods: %v", err)
+			e2eutils.Failf("Failed to query for pods: %v", err)
 		}
-		framework.ExpectEqual(len(pods.Items), 1)
+		e2eutils.ExpectEqual(len(pods.Items), 1)
 
 		ginkgo.By("verifying pod creation was observed")
 		observeCreation(w)
 
 		// We need to wait for the pod to be scheduled, otherwise the deletion
 		// will be carried out immediately rather than gracefully.
-		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name))
+		e2eutils.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name))
 
 		ginkgo.By("deleting the pod gracefully")
 		gracePeriod := int64(31)
 		if err := podClient.Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(gracePeriod)); err != nil {
-			framework.Failf("Failed to delete pod: %v", err)
+			e2eutils.Failf("Failed to delete pod: %v", err)
 		}
 
 		ginkgo.By("verifying the deletionTimestamp and deletionGracePeriodSeconds of the pod is set")
@@ -226,22 +228,22 @@ var _ = SIGDescribe("Generated clientset", func() {
 		options := metav1.ListOptions{LabelSelector: selector}
 		cronJobs, err := cronJobClient.List(context.TODO(), options)
 		if err != nil {
-			framework.Failf("Failed to query for cronJobs: %v", err)
+			e2eutils.Failf("Failed to query for cronJobs: %v", err)
 		}
-		framework.ExpectEqual(len(cronJobs.Items), 0)
+		e2eutils.ExpectEqual(len(cronJobs.Items), 0)
 		options = metav1.ListOptions{
 			LabelSelector:   selector,
 			ResourceVersion: cronJobs.ListMeta.ResourceVersion,
 		}
 		w, err := cronJobClient.Watch(context.TODO(), options)
 		if err != nil {
-			framework.Failf("Failed to set up watch: %v", err)
+			e2eutils.Failf("Failed to set up watch: %v", err)
 		}
 
 		ginkgo.By("creating the cronJob")
 		cronJob, err = cronJobClient.Create(context.TODO(), cronJob, metav1.CreateOptions{})
 		if err != nil {
-			framework.Failf("Failed to create cronJob: %v", err)
+			e2eutils.Failf("Failed to create cronJob: %v", err)
 		}
 
 		ginkgo.By("verifying the cronJob is in kubernetes")
@@ -251,9 +253,9 @@ var _ = SIGDescribe("Generated clientset", func() {
 		}
 		cronJobs, err = cronJobClient.List(context.TODO(), options)
 		if err != nil {
-			framework.Failf("Failed to query for cronJobs: %v", err)
+			e2eutils.Failf("Failed to query for cronJobs: %v", err)
 		}
-		framework.ExpectEqual(len(cronJobs.Items), 1)
+		e2eutils.ExpectEqual(len(cronJobs.Items), 1)
 
 		ginkgo.By("verifying cronJob creation was observed")
 		observeCreation(w)
@@ -262,14 +264,14 @@ var _ = SIGDescribe("Generated clientset", func() {
 		// Use DeletePropagationBackground so the CronJob is really gone when the call returns.
 		propagationPolicy := metav1.DeletePropagationBackground
 		if err := cronJobClient.Delete(context.TODO(), cronJob.Name, metav1.DeleteOptions{PropagationPolicy: &propagationPolicy}); err != nil {
-			framework.Failf("Failed to delete cronJob: %v", err)
+			e2eutils.Failf("Failed to delete cronJob: %v", err)
 		}
 
 		options = metav1.ListOptions{LabelSelector: selector}
 		cronJobs, err = cronJobClient.List(context.TODO(), options)
 		if err != nil {
-			framework.Failf("Failed to list cronJobs to verify deletion: %v", err)
+			e2eutils.Failf("Failed to list cronJobs to verify deletion: %v", err)
 		}
-		framework.ExpectEqual(len(cronJobs.Items), 0)
+		e2eutils.ExpectEqual(len(cronJobs.Items), 0)
 	})
 })

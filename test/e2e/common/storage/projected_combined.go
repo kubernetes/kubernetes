@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -66,11 +68,11 @@ var _ = SIGDescribe("Projected combined", func() {
 
 		ginkgo.By(fmt.Sprintf("Creating configMap with name %s", configMap.Name))
 		if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), configMap, metav1.CreateOptions{}); err != nil {
-			framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
+			e2eutils.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 		}
 		ginkgo.By(fmt.Sprintf("Creating secret with name %s", secret.Name))
 		if secret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(context.TODO(), secret, metav1.CreateOptions{}); err != nil {
-			framework.Failf("unable to create test secret %s: %v", secret.Name, err)
+			e2eutils.Failf("unable to create test secret %s: %v", secret.Name, err)
 		}
 
 		pod := projectedAllVolumeBasePod(podName, secretName, configMapName, nil, nil)

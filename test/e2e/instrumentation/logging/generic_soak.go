@@ -23,7 +23,9 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -62,14 +64,14 @@ var _ = instrumentation.SIGDescribe("Logging soak [Performance] [Slow] [Disrupti
 				defer wg.Done()
 				defer ginkgo.GinkgoRecover()
 				wave := fmt.Sprintf("wave%v", strconv.Itoa(i))
-				framework.Logf("Starting logging soak, wave = %v", wave)
+				e2eutils.Logf("Starting logging soak, wave = %v", wave)
 				RunLogPodsWithSleepOf(f, kbRateInSeconds, wave, totalLogTime)
-				framework.Logf("Completed logging soak, wave %v", i)
+				e2eutils.Logf("Completed logging soak, wave %v", i)
 			}(i)
 			// Niceness.
 			time.Sleep(loggingSoak.TimeBetweenWaves)
 		}
-		framework.Logf("Waiting on all %v logging soak waves to complete", loggingSoak.Scale)
+		e2eutils.Logf("Waiting on all %v logging soak waves to complete", loggingSoak.Scale)
 		wg.Wait()
 	})
 })
@@ -79,9 +81,9 @@ var _ = instrumentation.SIGDescribe("Logging soak [Performance] [Slow] [Disrupti
 func RunLogPodsWithSleepOf(f *framework.Framework, sleep time.Duration, podname string, timeout time.Duration) {
 
 	nodes, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	totalPods := len(nodes.Items)
-	framework.ExpectNotEqual(totalPods, 0)
+	e2eutils.ExpectNotEqual(totalPods, 0)
 
 	kilobyte := strings.Repeat("logs-123", 128) // 8*128=1024 = 1KB of text.
 
@@ -116,7 +118,7 @@ func RunLogPodsWithSleepOf(f *framework.Framework, sleep time.Duration, podname 
 			// we don't validate total log data, since there is no guarantee all logs will be stored forever.
 			// instead, we just validate that some logs are being created in std out.
 			Verify: func(p v1.Pod) (bool, error) {
-				s, err := framework.LookForStringInLog(f.Namespace.Name, p.Name, "logging-soak", "logs-123", 1*time.Second)
+				s, err := e2eutils.LookForStringInLog(f.Namespace.Name, p.Name, "logging-soak", "logs-123", 1*time.Second)
 				return s != "", err
 			},
 		},
@@ -126,8 +128,8 @@ func RunLogPodsWithSleepOf(f *framework.Framework, sleep time.Duration, podname 
 	pods, err := logSoakVerification.WaitFor(totalPods, timeout+largeClusterForgiveness)
 
 	if err != nil {
-		framework.Failf("Error in wait... %v", err)
+		e2eutils.Failf("Error in wait... %v", err)
 	} else if len(pods) < totalPods {
-		framework.Failf("Only got %v out of %v", len(pods), totalPods)
+		e2eutils.Failf("Only got %v out of %v", len(pods), totalPods)
 	}
 }

@@ -23,6 +23,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 	"k8s.io/kubernetes/test/e2e/upgrades"
 
 	"github.com/onsi/ginkgo"
@@ -57,7 +58,7 @@ func (t *PersistentVolumeUpgradeTest) Setup(f *framework.Framework) {
 	}
 	t.pvc = e2epv.MakePersistentVolumeClaim(pvcConfig, ns)
 	t.pvc, err = e2epv.CreatePVC(f.ClientSet, ns, t.pvc)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	ginkgo.By("Consuming the PV before upgrade")
 	t.testPod(f, pvWriteCmd+";"+pvReadCmd)
@@ -75,7 +76,7 @@ func (t *PersistentVolumeUpgradeTest) Test(f *framework.Framework, done <-chan s
 func (t *PersistentVolumeUpgradeTest) Teardown(f *framework.Framework) {
 	errs := e2epv.PVPVCCleanup(f.ClientSet, f.Namespace.Name, nil, t.pvc)
 	if len(errs) > 0 {
-		framework.Failf("Failed to delete 1 or more PVs/PVCs. Errors: %v", utilerrors.NewAggregate(errs))
+		e2eutils.Failf("Failed to delete 1 or more PVs/PVCs. Errors: %v", utilerrors.NewAggregate(errs))
 	}
 }
 

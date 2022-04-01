@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -57,7 +59,7 @@ func setKubeletConfig(f *framework.Framework, cfg *kubeletconfig.KubeletConfigur
 			return kubeletHealthCheck(kubeletHealthCheckURL)
 		}, time.Minute, time.Second).Should(gomega.BeFalse())
 
-		framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(cfg))
+		e2eutils.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(cfg))
 
 		ginkgo.By("Starting the kubelet")
 		startKubelet()
@@ -71,7 +73,7 @@ func setKubeletConfig(f *framework.Framework, cfg *kubeletconfig.KubeletConfigur
 	// Wait for the Kubelet to be ready.
 	gomega.Eventually(func() bool {
 		nodes, err := e2enode.TotalReady(f.ClientSet)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		return nodes == 1
 	}, time.Minute, time.Second).Should(gomega.BeTrue())
 }
@@ -88,11 +90,11 @@ var _ = SIGDescribe("Node Performance Testing [Serial] [Slow]", func() {
 	)
 	ginkgo.JustBeforeEach(func() {
 		err := wl.PreTestExec()
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		oldCfg, err = getCurrentKubeletConfig()
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		newCfg, err = wl.KubeletConfig(oldCfg)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		setKubeletConfig(f, newCfg)
 	})
 
@@ -101,7 +103,7 @@ var _ = SIGDescribe("Node Performance Testing [Serial] [Slow]", func() {
 		delOpts := metav1.DeleteOptions{
 			GracePeriodSeconds: &gp,
 		}
-		f.PodClient().DeleteSync(pod.Name, delOpts, framework.DefaultPodDeletionTimeout)
+		f.PodClient().DeleteSync(pod.Name, delOpts, e2eutils.DefaultPodDeletionTimeout)
 
 		// We are going to give some more time for the CPU manager to do any clean
 		// up it needs to do now that the pod has been deleted. Otherwise we may
@@ -113,7 +115,7 @@ var _ = SIGDescribe("Node Performance Testing [Serial] [Slow]", func() {
 		time.Sleep(15 * time.Second)
 		ginkgo.By("running the post test exec from the workload")
 		err := wl.PostTestExec()
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		setKubeletConfig(f, oldCfg)
 	}
 
@@ -126,10 +128,10 @@ var _ = SIGDescribe("Node Performance Testing [Serial] [Slow]", func() {
 		// Wait for pod success.
 		f.PodClient().WaitForSuccess(pod.Name, wl.Timeout())
 		podLogs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		perf, err := wl.ExtractPerformanceFromLogs(podLogs)
-		framework.ExpectNoError(err)
-		framework.Logf("Time to complete workload %s: %v", wl.Name(), perf)
+		e2eutils.ExpectNoError(err)
+		e2eutils.Logf("Time to complete workload %s: %v", wl.Name(), perf)
 	}
 
 	ginkgo.BeforeEach(func() {

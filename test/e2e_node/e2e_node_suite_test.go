@@ -44,9 +44,9 @@ import (
 	"k8s.io/component-base/logs"
 	"k8s.io/kubernetes/pkg/util/rlimit"
 	commontest "k8s.io/kubernetes/test/e2e/common"
-	"k8s.io/kubernetes/test/e2e/framework"
 	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 	e2etestingmanifests "k8s.io/kubernetes/test/e2e/testing-manifests"
 	"k8s.io/kubernetes/test/e2e_node/services"
 	e2enodetestingmanifests "k8s.io/kubernetes/test/e2e_node/testing-manifests"
@@ -73,25 +73,25 @@ var (
 // registerNodeFlags registers flags specific to the node e2e test suite.
 func registerNodeFlags(flags *flag.FlagSet) {
 	// Mark the test as node e2e when node flags are api.Registry.
-	framework.TestContext.NodeE2E = true
-	flags.StringVar(&framework.TestContext.BearerToken, "bearer-token", "", "The bearer token to authenticate with. If not specified, it would be a random token. Currently this token is only used in node e2e tests.")
-	flags.StringVar(&framework.TestContext.NodeName, "node-name", "", "Name of the node to run tests on.")
+	e2econfig.TestContext.NodeE2E = true
+	flags.StringVar(&e2econfig.TestContext.BearerToken, "bearer-token", "", "The bearer token to authenticate with. If not specified, it would be a random token. Currently this token is only used in node e2e tests.")
+	flags.StringVar(&e2econfig.TestContext.NodeName, "node-name", "", "Name of the node to run tests on.")
 	// TODO(random-liu): Move kubelet start logic out of the test.
 	// TODO(random-liu): Move log fetch logic out of the test.
 	// There are different ways to start kubelet (systemd, initd, docker, manually started etc.)
 	// and manage logs (journald, upstart etc.).
 	// For different situation we need to mount different things into the container, run different commands.
 	// It is hard and unnecessary to deal with the complexity inside the test suite.
-	flags.BoolVar(&framework.TestContext.NodeConformance, "conformance", false, "If true, the test suite will not start kubelet, and fetch system log (kernel, docker, kubelet log etc.) to the report directory.")
-	flags.BoolVar(&framework.TestContext.PrepullImages, "prepull-images", true, "If true, prepull images so image pull failures do not cause test failures.")
-	flags.BoolVar(&framework.TestContext.RestartKubelet, "restart-kubelet", false, "If true, restart Kubelet unit when the process is killed.")
-	flags.StringVar(&framework.TestContext.ImageDescription, "image-description", "", "The description of the image which the test will be running on.")
-	flags.StringVar(&framework.TestContext.SystemSpecName, "system-spec-name", "", "The name of the system spec (e.g., gke) that's used in the node e2e test. The system specs are in test/e2e_node/system/specs/. This is used by the test framework to determine which tests to run for validating the system requirements.")
-	flags.Var(cliflag.NewMapStringString(&framework.TestContext.ExtraEnvs), "extra-envs", "The extra environment variables needed for node e2e tests. Format: a list of key=value pairs, e.g., env1=val1,env2=val2")
-	flags.StringVar(&framework.TestContext.SriovdpConfigMapFile, "sriovdp-configmap-file", "", "The name of the SRIOV device plugin Config Map to load.")
-	flag.StringVar(&framework.TestContext.ClusterDNSDomain, "dns-domain", "", "The DNS Domain of the cluster.")
-	flag.Var(cliflag.NewMapStringString(&framework.TestContext.RuntimeConfig), "runtime-config", "The runtime configuration used on node e2e tests.")
-	flags.BoolVar(&framework.TestContext.RequireDevices, "require-devices", false, "If true, require device plugins to be installed in the running environment.")
+	flags.BoolVar(&e2econfig.TestContext.NodeConformance, "conformance", false, "If true, the test suite will not start kubelet, and fetch system log (kernel, docker, kubelet log etc.) to the report directory.")
+	flags.BoolVar(&e2econfig.TestContext.PrepullImages, "prepull-images", true, "If true, prepull images so image pull failures do not cause test failures.")
+	flags.BoolVar(&e2econfig.TestContext.RestartKubelet, "restart-kubelet", false, "If true, restart Kubelet unit when the process is killed.")
+	flags.StringVar(&e2econfig.TestContext.ImageDescription, "image-description", "", "The description of the image which the test will be running on.")
+	flags.StringVar(&e2econfig.TestContext.SystemSpecName, "system-spec-name", "", "The name of the system spec (e.g., gke) that's used in the node e2e test. The system specs are in test/e2e_node/system/specs/. This is used by the test framework to determine which tests to run for validating the system requirements.")
+	flags.Var(cliflag.NewMapStringString(&e2econfig.TestContext.ExtraEnvs), "extra-envs", "The extra environment variables needed for node e2e tests. Format: a list of key=value pairs, e.g., env1=val1,env2=val2")
+	flags.StringVar(&e2econfig.TestContext.SriovdpConfigMapFile, "sriovdp-configmap-file", "", "The name of the SRIOV device plugin Config Map to load.")
+	flag.StringVar(&e2econfig.TestContext.ClusterDNSDomain, "dns-domain", "", "The DNS Domain of the cluster.")
+	flag.Var(cliflag.NewMapStringString(&e2econfig.TestContext.RuntimeConfig), "runtime-config", "The runtime configuration used on node e2e tests.")
+	flags.BoolVar(&e2econfig.TestContext.RequireDevices, "require-devices", false, "If true, require device plugins to be installed in the running environment.")
 }
 
 func init() {
@@ -103,7 +103,7 @@ func init() {
 func TestMain(m *testing.M) {
 	// Copy go flags in TestMain, to ensure go test flags are registered (no longer available in init() as of go1.13)
 	e2econfig.CopyFlags(e2econfig.Flags, flag.CommandLine)
-	framework.RegisterCommonFlags(flag.CommandLine)
+	e2econfig.RegisterCommonFlags(flag.CommandLine)
 	registerNodeFlags(flag.CommandLine)
 	logs.AddFlags(pflag.CommandLine)
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
@@ -117,7 +117,7 @@ func TestMain(m *testing.M) {
 
 	rand.Seed(time.Now().UnixNano())
 	pflag.Parse()
-	framework.AfterReadingAllFlags(&framework.TestContext)
+	e2econfig.AfterReadingAllFlags(&e2econfig.TestContext)
 	setExtraEnvs()
 	os.Exit(m.Run())
 }
@@ -153,7 +153,7 @@ func TestE2eNode(t *testing.T) {
 				klog.Exitf("Failed to load system spec: %v", err)
 			}
 		}
-		if framework.TestContext.NodeConformance {
+		if e2econfig.TestContext.NodeConformance {
 			// Chroot to /rootfs to make system validation can check system
 			// as in the root filesystem.
 			// TODO(random-liu): Consider to chroot the whole test process to make writing
@@ -171,14 +171,14 @@ func TestE2eNode(t *testing.T) {
 	// We're not running in a special mode so lets run tests.
 	gomega.RegisterFailHandler(ginkgo.Fail)
 	reporters := []ginkgo.Reporter{}
-	reportDir := framework.TestContext.ReportDir
+	reportDir := e2econfig.TestContext.ReportDir
 	if reportDir != "" {
 		// Create the directory if it doesn't already exist
 		if err := os.MkdirAll(reportDir, 0755); err != nil {
 			klog.Errorf("Failed creating report directory: %v", err)
 		} else {
 			// Configure a junit reporter to write to the directory
-			junitFile := fmt.Sprintf("junit_%s_%02d.xml", framework.TestContext.ReportPrefix, config.GinkgoConfig.ParallelNode)
+			junitFile := fmt.Sprintf("junit_%s_%02d.xml", e2econfig.TestContext.ReportPrefix, config.GinkgoConfig.ParallelNode)
 			junitPath := path.Join(reportDir, junitFile)
 			reporters = append(reporters, morereporters.NewJUnitReporter(junitPath))
 		}
@@ -193,7 +193,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 
 	// Pre-pull the images tests depend on so we can fail immediately if there is an image pull issue
 	// This helps with debugging test flakes since it is hard to tell when a test failure is due to image pulling.
-	if framework.TestContext.PrepullImages {
+	if e2econfig.TestContext.PrepullImages {
 		klog.Infof("Pre-pulling images so that they are cached for the tests.")
 		updateImageAllowList()
 		err := PrePullAllImages()
@@ -223,9 +223,9 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// ginkgo would spawn multiple processes to run tests.
 	// Since the bearer token is generated randomly at run time,
 	// we need to distribute the bearer token to other processes to make them use the same token.
-	return []byte(framework.TestContext.BearerToken)
+	return []byte(e2econfig.TestContext.BearerToken)
 }, func(token []byte) {
-	framework.TestContext.BearerToken = string(token)
+	e2econfig.TestContext.BearerToken = string(token)
 	// update test context with node configuration.
 	gomega.Expect(updateTestContext()).To(gomega.Succeed(), "update test context with node config.")
 })
@@ -267,7 +267,7 @@ func maskLocksmithdOnCoreos() {
 	}
 	if bytes.Contains(data, []byte("ID=coreos")) {
 		output, err := exec.Command("systemctl", "mask", "--now", "locksmithd").CombinedOutput()
-		framework.ExpectNoError(err, fmt.Sprintf("should be able to mask locksmithd - output: %q", string(output)))
+		e2eutils.ExpectNoError(err, fmt.Sprintf("should be able to mask locksmithd - output: %q", string(output)))
 		klog.Infof("Locksmithd is masked successfully")
 	}
 }
@@ -280,7 +280,7 @@ func waitForNodeReady() {
 		nodeReadyPollInterval = 1 * time.Second
 	)
 	client, err := getAPIServerClient()
-	framework.ExpectNoError(err, "should be able to get apiserver client.")
+	e2eutils.ExpectNoError(err, "should be able to get apiserver client.")
 	gomega.Eventually(func() error {
 		node, err := getNode(client)
 		if err != nil {
@@ -307,7 +307,7 @@ func updateTestContext() error {
 	if err != nil {
 		return fmt.Errorf("failed to get node: %v", err)
 	}
-	framework.TestContext.NodeName = node.Name // Set node name.
+	e2econfig.TestContext.NodeName = node.Name // Set node name.
 	// Update test context with current kubelet configuration.
 	// This assumes all tests which dynamically change kubelet configuration
 	// must: 1) run in serial; 2) restore kubelet configuration after test.
@@ -315,18 +315,18 @@ func updateTestContext() error {
 	if err != nil {
 		return fmt.Errorf("failed to get kubelet configuration: %v", err)
 	}
-	framework.TestContext.KubeletConfig = *kubeletCfg // Set kubelet config
+	e2econfig.TestContext.KubeletConfig = *kubeletCfg // Set kubelet config
 	return nil
 }
 
 // getNode gets node object from the apiserver.
 func getNode(c *clientset.Clientset) (*v1.Node, error) {
 	nodes, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
-	framework.ExpectNoError(err, "should be able to list nodes.")
+	e2eutils.ExpectNoError(err, "should be able to list nodes.")
 	if nodes == nil {
 		return nil, fmt.Errorf("the node list is nil")
 	}
-	framework.ExpectEqual(len(nodes.Items) > 1, false, "the number of nodes is more than 1.")
+	e2eutils.ExpectEqual(len(nodes.Items) > 1, false, "the number of nodes is more than 1.")
 	if len(nodes.Items) == 0 {
 		return nil, fmt.Errorf("empty node list: %+v", nodes)
 	}
@@ -335,7 +335,7 @@ func getNode(c *clientset.Clientset) (*v1.Node, error) {
 
 // getAPIServerClient gets a apiserver client.
 func getAPIServerClient() (*clientset.Clientset, error) {
-	config, err := framework.LoadConfig()
+	config, err := e2eutils.LoadConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load config: %v", err)
 	}
@@ -375,7 +375,7 @@ func isNodeReady(node *v1.Node) bool {
 }
 
 func setExtraEnvs() {
-	for name, value := range framework.TestContext.ExtraEnvs {
+	for name, value := range e2econfig.TestContext.ExtraEnvs {
 		os.Setenv(name, value)
 	}
 }

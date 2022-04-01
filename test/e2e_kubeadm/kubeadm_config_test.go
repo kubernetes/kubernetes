@@ -22,6 +22,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -93,7 +94,7 @@ func unmarshalYaml(data string) map[interface{}]interface{} {
 	m := make(map[interface{}]interface{})
 	err := yaml.Unmarshal([]byte(data), &m)
 	if err != nil {
-		framework.Failf("error parsing %s ConfigMap: %v", kubeadmConfigName, err)
+		e2eutils.Failf("error parsing %s ConfigMap: %v", kubeadmConfigName, err)
 	}
 	return m
 }

@@ -19,6 +19,8 @@ package storage
 import (
 	"context"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 
 	v1 "k8s.io/api/core/v1"
@@ -71,7 +73,7 @@ var _ = utils.SIGDescribe("GenericPersistentVolume[Disruptive]", func() {
 		)
 		ginkgo.BeforeEach(func() {
 			e2epv.SkipIfNoDefaultStorageClass(c)
-			framework.Logf("Initializing pod and pvcs for test")
+			e2eutils.Logf("Initializing pod and pvcs for test")
 			clientPod, pvc, pv = createPodPVCFromSC(f, c, ns)
 		})
 		for _, test := range disruptiveTestTable {
@@ -83,7 +85,7 @@ var _ = utils.SIGDescribe("GenericPersistentVolume[Disruptive]", func() {
 			}(test)
 		}
 		ginkgo.AfterEach(func() {
-			framework.Logf("Tearing down test spec")
+			e2eutils.Logf("Tearing down test spec")
 			tearDownTestCase(c, f, ns, clientPod, pvc, pv, false)
 			pvc, clientPod = nil, nil
 		})
@@ -102,11 +104,11 @@ func createPodPVCFromSC(f *framework.Framework, c clientset.Interface, ns string
 		VolumeMode: &test.VolumeMode,
 	}, ns)
 	pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(context.TODO(), pvc, metav1.CreateOptions{})
-	framework.ExpectNoError(err, "Error creating pvc")
+	e2eutils.ExpectNoError(err, "Error creating pvc")
 	pvcClaims := []*v1.PersistentVolumeClaim{pvc}
-	pvs, err := e2epv.WaitForPVClaimBoundPhase(c, pvcClaims, framework.ClaimProvisionTimeout)
-	framework.ExpectNoError(err, "Failed waiting for PVC to be bound %v", err)
-	framework.ExpectEqual(len(pvs), 1)
+	pvs, err := e2epv.WaitForPVClaimBoundPhase(c, pvcClaims, e2eutils.ClaimProvisionTimeout)
+	e2eutils.ExpectNoError(err, "Failed waiting for PVC to be bound %v", err)
+	e2eutils.ExpectEqual(len(pvs), 1)
 
 	ginkgo.By("Creating a pod with dynamically provisioned volume")
 	podConfig := e2epod.Config{
@@ -115,6 +117,6 @@ func createPodPVCFromSC(f *framework.Framework, c clientset.Interface, ns string
 		SeLinuxLabel: e2epv.SELinuxLabel,
 	}
 	pod, err := e2epod.CreateSecPod(c, &podConfig, f.Timeouts.PodStart)
-	framework.ExpectNoError(err, "While creating pods for kubelet restart test")
+	e2eutils.ExpectNoError(err, "While creating pods for kubelet restart test")
 	return pod, pvc, pvs[0]
 }

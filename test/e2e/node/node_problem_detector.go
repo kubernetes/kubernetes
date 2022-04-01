@@ -25,6 +25,9 @@ import (
 	"strings"
 	"time"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -51,7 +54,7 @@ var _ = SIGDescribe("NodeProblemDetector", func() {
 
 	ginkgo.BeforeEach(func() {
 		e2eskipper.SkipUnlessSSHKeyPresent()
-		e2eskipper.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
+		e2eskipper.SkipUnlessProviderIs(e2eutils.ProvidersWithSSH...)
 		e2eskipper.SkipUnlessProviderIs("gce", "gke")
 		e2eskipper.SkipUnlessNodeOSDistroIs("gci", "ubuntu")
 		e2enode.WaitForTotalHealthy(f.ClientSet, time.Minute)
@@ -62,7 +65,7 @@ var _ = SIGDescribe("NodeProblemDetector", func() {
 
 		ginkgo.By("Getting all nodes and their SSH-able IP addresses")
 		readyNodes, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		nodes := []v1.Node{}
 		hosts := []string{}
@@ -103,7 +106,7 @@ var _ = SIGDescribe("NodeProblemDetector", func() {
 			workingSetStats[host] = []float64{}
 
 			cmd := "systemctl status node-problem-detector.service"
-			result, err := e2essh.SSH(cmd, host, framework.TestContext.Provider)
+			result, err := e2essh.SSH(cmd, host, e2econfig.TestContext.Provider)
 			isStandaloneMode[host] = (err == nil && result.Code == 0)
 
 			ginkgo.By(fmt.Sprintf("Check node %q has node-problem-detector process", host))
@@ -111,16 +114,16 @@ var _ = SIGDescribe("NodeProblemDetector", func() {
 			// showing up, because string text "[n]ode-problem-detector" does not
 			// match regular expression "[n]ode-problem-detector".
 			psCmd := "ps aux | grep [n]ode-problem-detector"
-			result, err = e2essh.SSH(psCmd, host, framework.TestContext.Provider)
-			framework.ExpectNoError(err)
-			framework.ExpectEqual(result.Code, 0)
+			result, err = e2essh.SSH(psCmd, host, e2econfig.TestContext.Provider)
+			e2eutils.ExpectNoError(err)
+			e2eutils.ExpectEqual(result.Code, 0)
 			gomega.Expect(result.Stdout).To(gomega.ContainSubstring("node-problem-detector"))
 
 			ginkgo.By(fmt.Sprintf("Check node-problem-detector is running fine on node %q", host))
 			journalctlCmd := "sudo journalctl -u node-problem-detector"
-			result, err = e2essh.SSH(journalctlCmd, host, framework.TestContext.Provider)
-			framework.ExpectNoError(err)
-			framework.ExpectEqual(result.Code, 0)
+			result, err = e2essh.SSH(journalctlCmd, host, e2econfig.TestContext.Provider)
+			e2eutils.ExpectNoError(err)
+			e2eutils.ExpectEqual(result.Code, 0)
 			gomega.Expect(result.Stdout).NotTo(gomega.ContainSubstring("node-problem-detector.service: Failed"))
 
 			if isStandaloneMode[host] {
@@ -132,9 +135,9 @@ var _ = SIGDescribe("NodeProblemDetector", func() {
 			ginkgo.By(fmt.Sprintf("Inject log to trigger DockerHung on node %q", host))
 			log := "INFO: task docker:12345 blocked for more than 120 seconds."
 			injectLogCmd := "sudo sh -c \"echo 'kernel: " + log + "' >> /dev/kmsg\""
-			_, err = e2essh.SSH(injectLogCmd, host, framework.TestContext.Provider)
-			framework.ExpectNoError(err)
-			framework.ExpectEqual(result.Code, 0)
+			_, err = e2essh.SSH(injectLogCmd, host, e2econfig.TestContext.Provider)
+			e2eutils.ExpectNoError(err)
+			e2eutils.ExpectEqual(result.Code, 0)
 		}
 
 		ginkgo.By("Check node-problem-detector can post conditions and events to API server")
@@ -206,7 +209,7 @@ var _ = SIGDescribe("NodeProblemDetector", func() {
 			workingSetStatsMsg += fmt.Sprintf(" %s[%.1f|%.1f|%.1f];", nodes[i].Name,
 				workingSetStats[host][0], workingSetStats[host][len(workingSetStats[host])/2], workingSetStats[host][len(workingSetStats[host])-1])
 		}
-		framework.Logf("Node-Problem-Detector CPU and Memory Stats:\n\t%s\n\t%s\n\t%s", cpuStatsMsg, rssStatsMsg, workingSetStatsMsg)
+		e2eutils.Logf("Node-Problem-Detector CPU and Memory Stats:\n\t%s\n\t%s\n\t%s", cpuStatsMsg, rssStatsMsg, workingSetStatsMsg)
 	})
 })
 
@@ -266,13 +269,13 @@ func getMemoryStat(f *framework.Framework, host string) (rss, workingSet float64
 		memCmd = "cat /sys/fs/cgroup/memory/system.slice/node-problem-detector.service/memory.usage_in_bytes && cat /sys/fs/cgroup/memory/system.slice/node-problem-detector.service/memory.stat"
 	}
 
-	result, err := e2essh.SSH(memCmd, host, framework.TestContext.Provider)
-	framework.ExpectNoError(err)
-	framework.ExpectEqual(result.Code, 0)
+	result, err := e2essh.SSH(memCmd, host, e2econfig.TestContext.Provider)
+	e2eutils.ExpectNoError(err)
+	e2eutils.ExpectEqual(result.Code, 0)
 	lines := strings.Split(result.Stdout, "\n")
 
 	memoryUsage, err := strconv.ParseFloat(lines[0], 64)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	var rssToken, inactiveFileToken string
 	if isCgroupV2 {
@@ -291,11 +294,11 @@ func getMemoryStat(f *framework.Framework, host string) (rss, workingSet float64
 
 		if tokens[0] == rssToken {
 			rss, err = strconv.ParseFloat(tokens[1], 64)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 		}
 		if tokens[0] == inactiveFileToken {
 			totalInactiveFile, err = strconv.ParseFloat(tokens[1], 64)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 		}
 	}
 
@@ -320,15 +323,15 @@ func getCPUStat(f *framework.Framework, host string) (usage, uptime float64) {
 		cpuCmd = "cat /sys/fs/cgroup/cpu/system.slice/node-problem-detector.service/cpuacct.usage && cat /proc/uptime | awk '{print $1}'"
 	}
 
-	result, err := e2essh.SSH(cpuCmd, host, framework.TestContext.Provider)
-	framework.ExpectNoError(err)
-	framework.ExpectEqual(result.Code, 0)
+	result, err := e2essh.SSH(cpuCmd, host, e2econfig.TestContext.Provider)
+	e2eutils.ExpectNoError(err)
+	e2eutils.ExpectEqual(result.Code, 0)
 	lines := strings.Split(result.Stdout, "\n")
 
 	usage, err = strconv.ParseFloat(lines[0], 64)
-	framework.ExpectNoError(err, "Cannot parse float for usage")
+	e2eutils.ExpectNoError(err, "Cannot parse float for usage")
 	uptime, err = strconv.ParseFloat(lines[1], 64)
-	framework.ExpectNoError(err, "Cannot parse float for uptime")
+	e2eutils.ExpectNoError(err, "Cannot parse float for uptime")
 
 	// Convert from nanoseconds to seconds
 	usage *= 1e-9
@@ -336,9 +339,9 @@ func getCPUStat(f *framework.Framework, host string) (usage, uptime float64) {
 }
 
 func isHostRunningCgroupV2(f *framework.Framework, host string) bool {
-	result, err := e2essh.SSH("stat -fc %T /sys/fs/cgroup/", host, framework.TestContext.Provider)
-	framework.ExpectNoError(err)
-	framework.ExpectEqual(result.Code, 0)
+	result, err := e2essh.SSH("stat -fc %T /sys/fs/cgroup/", host, e2econfig.TestContext.Provider)
+	e2eutils.ExpectNoError(err)
+	e2eutils.ExpectEqual(result.Code, 0)
 
 	// 0x63677270 == CGROUP2_SUPER_MAGIC
 	// https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v2.html
@@ -347,7 +350,7 @@ func isHostRunningCgroupV2(f *framework.Framework, host string) bool {
 
 func getNpdPodStat(f *framework.Framework, nodeName string) (cpuUsage, rss, workingSet float64) {
 	summary, err := e2ekubelet.GetStatsSummary(f.ClientSet, nodeName)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	hasNpdPod := false
 	for _, pod := range summary.Pods {
@@ -361,7 +364,7 @@ func getNpdPodStat(f *framework.Framework, nodeName string) (cpuUsage, rss, work
 		break
 	}
 	if !hasNpdPod {
-		framework.Failf("No node-problem-detector pod is present in %+v", summary.Pods)
+		e2eutils.Failf("No node-problem-detector pod is present in %+v", summary.Pods)
 	}
 	return
 }

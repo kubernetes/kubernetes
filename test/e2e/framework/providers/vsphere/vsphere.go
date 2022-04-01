@@ -17,13 +17,13 @@ limitations under the License.
 package vsphere
 
 import (
-	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/providers"
 )
 
 func init() {
-	framework.RegisterProvider("vsphere", newProvider)
+	providers.RegisterProvider("vsphere", newProvider)
 }
 
-func newProvider() (framework.ProviderInterface, error) {
-	return &framework.NullProvider{}, nil
+func newProvider() (providers.ProviderInterface, error) {
+	return &providers.NullProvider{}, nil
 }

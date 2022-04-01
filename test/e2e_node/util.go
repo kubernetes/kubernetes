@@ -29,6 +29,9 @@ import (
 	"strings"
 	"time"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -150,7 +153,7 @@ func getV1NodeDevices() (*kubeletpodresourcesv1.ListPodResourcesResponse, error)
 // Returns the current KubeletConfiguration
 func getCurrentKubeletConfig() (*kubeletconfig.KubeletConfiguration, error) {
 	// namespace only relevant if useProxy==true, so we don't bother
-	return e2ekubelet.GetCurrentKubeletConfig(framework.TestContext.NodeName, "", false)
+	return e2ekubelet.GetCurrentKubeletConfig(e2econfig.TestContext.NodeName, "", false)
 }
 
 // Must be called within a Context. Allows the function to modify the KubeletConfiguration during the BeforeEach of the context.
@@ -162,7 +165,7 @@ func tempSetCurrentKubeletConfig(f *framework.Framework, updateFunction func(ini
 	ginkgo.BeforeEach(func() {
 		var err error
 		oldCfg, err = getCurrentKubeletConfig()
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		newCfg := oldCfg.DeepCopy()
 		updateFunction(newCfg)
@@ -197,7 +200,7 @@ func updateKubeletConfig(f *framework.Framework, kubeletConfig *kubeletconfig.Ku
 		deleteStateFile(memoryManagerStateFile)
 	}
 
-	framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(kubeletConfig))
+	e2eutils.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(kubeletConfig))
 
 	ginkgo.By("Starting the kubelet")
 	startKubelet()
@@ -210,14 +213,14 @@ func updateKubeletConfig(f *framework.Framework, kubeletConfig *kubeletconfig.Ku
 	// Wait for the Kubelet to be ready.
 	gomega.Eventually(func() bool {
 		nodes, err := e2enode.TotalReady(f.ClientSet)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		return nodes == 1
 	}, time.Minute, time.Second).Should(gomega.BeTrue())
 }
 
 func deleteStateFile(stateFileName string) {
 	err := exec.Command("/bin/sh", "-c", fmt.Sprintf("rm -f %s", stateFileName)).Run()
-	framework.ExpectNoError(err, "failed to delete the state file")
+	e2eutils.ExpectNoError(err, "failed to delete the state file")
 }
 
 // listNamespaceEvents lists the events in the given namespace.
@@ -233,21 +236,21 @@ func listNamespaceEvents(c clientset.Interface, ns string) error {
 }
 
 func logPodEvents(f *framework.Framework) {
-	framework.Logf("Summary of pod events during the test:")
+	e2eutils.Logf("Summary of pod events during the test:")
 	err := listNamespaceEvents(f.ClientSet, f.Namespace.Name)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 }
 
 func logNodeEvents(f *framework.Framework) {
-	framework.Logf("Summary of node events during the test:")
+	e2eutils.Logf("Summary of node events during the test:")
 	err := listNamespaceEvents(f.ClientSet, "")
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 }
 
 func getLocalNode(f *framework.Framework) *v1.Node {
 	nodeList, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
-	framework.ExpectNoError(err)
-	framework.ExpectEqual(len(nodeList.Items), 1, "Unexpected number of node objects for node e2e. Expects only one node.")
+	e2eutils.ExpectNoError(err)
+	e2eutils.ExpectEqual(len(nodeList.Items), 1, "Unexpected number of node objects for node e2e. Expects only one node.")
 	return &nodeList.Items[0]
 }
 
@@ -259,11 +262,11 @@ func logKubeletLatencyMetrics(metricNames ...string) {
 	for _, key := range metricNames {
 		metricSet.Insert(kubeletmetrics.KubeletSubsystem + "_" + key)
 	}
-	metric, err := e2emetrics.GrabKubeletMetricsWithoutProxy(framework.TestContext.NodeName+":10255", "/metrics")
+	metric, err := e2emetrics.GrabKubeletMetricsWithoutProxy(e2econfig.TestContext.NodeName+":10255", "/metrics")
 	if err != nil {
-		framework.Logf("Error getting kubelet metrics: %v", err)
+		e2eutils.Logf("Error getting kubelet metrics: %v", err)
 	} else {
-		framework.Logf("Kubelet Metrics: %+v", e2emetrics.GetKubeletLatencyMetrics(metric, metricSet))
+		e2eutils.Logf("Kubelet Metrics: %+v", e2emetrics.GetKubeletLatencyMetrics(metric, metricSet))
 	}
 }
 
@@ -281,16 +284,16 @@ func runCommand(cmd ...string) (string, error) {
 func getCRIClient() (internalapi.RuntimeService, internalapi.ImageManagerService, error) {
 	// connection timeout for CRI service connection
 	const connectionTimeout = 2 * time.Minute
-	runtimeEndpoint := framework.TestContext.ContainerRuntimeEndpoint
+	runtimeEndpoint := e2econfig.TestContext.ContainerRuntimeEndpoint
 	r, err := remote.NewRemoteRuntimeService(runtimeEndpoint, connectionTimeout)
 	if err != nil {
 		return nil, nil, err
 	}
 	imageManagerEndpoint := runtimeEndpoint
-	if framework.TestContext.ImageServiceEndpoint != "" {
+	if e2econfig.TestContext.ImageServiceEndpoint != "" {
 		//ImageServiceEndpoint is the same as ContainerRuntimeEndpoint if not
 		//explicitly specified
-		imageManagerEndpoint = framework.TestContext.ImageServiceEndpoint
+		imageManagerEndpoint = e2econfig.TestContext.ImageServiceEndpoint
 	}
 	i, err := remote.NewRemoteImageService(imageManagerEndpoint, connectionTimeout)
 	if err != nil {
@@ -311,12 +314,12 @@ func findKubeletServiceName(running bool) string {
 		cmdLine = append(cmdLine, "--state=running")
 	}
 	stdout, err := exec.Command("sudo", cmdLine...).CombinedOutput()
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	regex := regexp.MustCompile("(kubelet-\\w+)")
 	matches := regex.FindStringSubmatch(string(stdout))
-	framework.ExpectNotEqual(len(matches), 0, "Found more than one kubelet service running: %q", stdout)
+	e2eutils.ExpectNotEqual(len(matches), 0, "Found more than one kubelet service running: %q", stdout)
 	kubeletServiceName := matches[0]
-	framework.Logf("Get running kubelet with systemctl: %v, %v", string(stdout), kubeletServiceName)
+	e2eutils.Logf("Get running kubelet with systemctl: %v, %v", string(stdout), kubeletServiceName)
 	return kubeletServiceName
 }
 
@@ -332,10 +335,10 @@ func restartKubelet(running bool) {
 	kubeletServiceName := findKubeletServiceName(running)
 	// reset the kubelet service start-limit-hit
 	stdout, err := exec.Command("sudo", "systemctl", "reset-failed", kubeletServiceName).CombinedOutput()
-	framework.ExpectNoError(err, "Failed to reset kubelet start-limit-hit with systemctl: %v, %s", err, string(stdout))
+	e2eutils.ExpectNoError(err, "Failed to reset kubelet start-limit-hit with systemctl: %v, %s", err, string(stdout))
 
 	stdout, err = exec.Command("sudo", "systemctl", "restart", kubeletServiceName).CombinedOutput()
-	framework.ExpectNoError(err, "Failed to restart kubelet with systemctl: %v, %s", err, string(stdout))
+	e2eutils.ExpectNoError(err, "Failed to restart kubelet with systemctl: %v, %s", err, string(stdout))
 }
 
 // stopKubelet will kill the running kubelet, and returns a func that will restart the process again
@@ -344,15 +347,15 @@ func stopKubelet() func() {
 
 	// reset the kubelet service start-limit-hit
 	stdout, err := exec.Command("sudo", "systemctl", "reset-failed", kubeletServiceName).CombinedOutput()
-	framework.ExpectNoError(err, "Failed to reset kubelet start-limit-hit with systemctl: %v, %s", err, string(stdout))
+	e2eutils.ExpectNoError(err, "Failed to reset kubelet start-limit-hit with systemctl: %v, %s", err, string(stdout))
 
 	stdout, err = exec.Command("sudo", "systemctl", "kill", kubeletServiceName).CombinedOutput()
-	framework.ExpectNoError(err, "Failed to stop kubelet with systemctl: %v, %s", err, string(stdout))
+	e2eutils.ExpectNoError(err, "Failed to stop kubelet with systemctl: %v, %s", err, string(stdout))
 
 	return func() {
 		// we should restart service, otherwise the transient service start will fail
 		stdout, err := exec.Command("sudo", "systemctl", "restart", kubeletServiceName).CombinedOutput()
-		framework.ExpectNoError(err, "Failed to restart kubelet with systemctl: %v, %v", err, stdout)
+		e2eutils.ExpectNoError(err, "Failed to restart kubelet with systemctl: %v, %v", err, stdout)
 	}
 }
 
@@ -362,10 +365,10 @@ func killKubelet(sig string) {
 
 	// reset the kubelet service start-limit-hit
 	stdout, err := exec.Command("sudo", "systemctl", "reset-failed", kubeletServiceName).CombinedOutput()
-	framework.ExpectNoError(err, "Failed to reset kubelet start-limit-hit with systemctl: %v, %v", err, stdout)
+	e2eutils.ExpectNoError(err, "Failed to reset kubelet start-limit-hit with systemctl: %v, %v", err, stdout)
 
 	stdout, err = exec.Command("sudo", "systemctl", "kill", "-s", sig, kubeletServiceName).CombinedOutput()
-	framework.ExpectNoError(err, "Failed to stop kubelet with systemctl: %v, %v", err, stdout)
+	e2eutils.ExpectNoError(err, "Failed to stop kubelet with systemctl: %v, %v", err, stdout)
 }
 
 func kubeletHealthCheck(url string) bool {
@@ -379,7 +382,7 @@ func kubeletHealthCheck(url string) bool {
 	if err != nil {
 		return false
 	}
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", framework.TestContext.BearerToken))
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", e2econfig.TestContext.BearerToken))
 	resp, err := insecureHTTPClient.Do(req)
 	if err != nil {
 		klog.Warningf("Health check on %q failed, error=%v", url, err)
@@ -390,7 +393,7 @@ func kubeletHealthCheck(url string) bool {
 }
 
 func toCgroupFsName(cgroupName cm.CgroupName) string {
-	if framework.TestContext.KubeletConfig.CgroupDriver == "systemd" {
+	if e2econfig.TestContext.KubeletConfig.CgroupDriver == "systemd" {
 		return cgroupName.ToSystemd()
 	}
 	return cgroupName.ToCgroupfs()
@@ -404,7 +407,7 @@ func reduceAllocatableMemoryUsageIfCgroupv1() {
 	if !IsCgroup2UnifiedMode() {
 		cmd := fmt.Sprintf("echo 0 > /sys/fs/cgroup/memory/%s/memory.force_empty", toCgroupFsName(cm.NewCgroupName(cm.RootCgroupName, defaultNodeAllocatableCgroup)))
 		_, err := exec.Command("sudo", "sh", "-c", cmd).CombinedOutput()
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 	}
 }
 

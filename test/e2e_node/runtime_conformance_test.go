@@ -22,7 +22,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"k8s.io/api/core/v1"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/test/e2e/common/node"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -83,7 +85,7 @@ var _ = SIGDescribe("Container Runtime Conformance Test", func() {
 
 					configFile := filepath.Join(services.KubeletRootDirectory, "config.json")
 					err := os.WriteFile(configFile, []byte(auth), 0644)
-					framework.ExpectNoError(err)
+					e2eutils.ExpectNoError(err)
 					defer os.Remove(configFile)
 
 					// checkContainerStatus checks whether the container status matches expectation.
@@ -142,9 +144,9 @@ var _ = SIGDescribe("Container Runtime Conformance Test", func() {
 							break
 						}
 						if i < flakeRetry {
-							framework.Logf("No.%d attempt failed: %v, retrying...", i, err)
+							e2eutils.Logf("No.%d attempt failed: %v, retrying...", i, err)
 						} else {
-							framework.Failf("All %d attempts failed: %v", flakeRetry, err)
+							e2eutils.Failf("All %d attempts failed: %v", flakeRetry, err)
 						}
 					}
 				})

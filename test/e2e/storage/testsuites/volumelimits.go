@@ -23,6 +23,8 @@ import (
 	"strings"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 
 	v1 "k8s.io/api/core/v1"
@@ -131,7 +133,7 @@ func (t *volumeLimitsTestSuite) DefineTests(driver storageframework.TestDriver, 
 		}
 		var dDriver storageframework.DynamicPVTestDriver
 		if dDriver = driver.(storageframework.DynamicPVTestDriver); dDriver == nil {
-			framework.Failf("Test driver does not provide dynamically created volumes")
+			e2eutils.Failf("Test driver does not provide dynamically created volumes")
 		}
 
 		l.ns = f.Namespace
@@ -146,26 +148,26 @@ func (t *volumeLimitsTestSuite) DefineTests(driver storageframework.TestDriver, 
 		nodeName := l.config.ClientNodeSelection.Name
 		if nodeName == "" {
 			node, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			nodeName = node.Name
 		}
-		framework.Logf("Selected node %s", nodeName)
+		e2eutils.Logf("Selected node %s", nodeName)
 
 		ginkgo.By("Checking node limits")
 		limit, err := getNodeLimits(l.cs, l.config, nodeName, driverInfo)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
-		framework.Logf("Node %s can handle %d volumes of driver %s", nodeName, limit, driverInfo.Name)
+		e2eutils.Logf("Node %s can handle %d volumes of driver %s", nodeName, limit, driverInfo.Name)
 		// Create a storage class and generate a PVC. Do not instantiate the PVC yet, keep it for the last pod.
 		testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
 		driverVolumeSizeRange := dDriver.GetDriverInfo().SupportedSizeRange
 		claimSize, err := storageutils.GetSizeRangesIntersection(testVolumeSizeRange, driverVolumeSizeRange)
-		framework.ExpectNoError(err, "determine intersection of test size range %+v and driver size range %+v", testVolumeSizeRange, dDriver)
+		e2eutils.ExpectNoError(err, "determine intersection of test size range %+v and driver size range %+v", testVolumeSizeRange, dDriver)
 
 		l.resource = storageframework.CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)
 		defer func() {
 			err := l.resource.CleanupResource()
-			framework.ExpectNoError(err, "while cleaning up resource")
+			e2eutils.ExpectNoError(err, "while cleaning up resource")
 		}()
 		defer func() {
 			cleanupTest(l.cs, l.ns.Name, l.podNames, l.pvcNames, l.pvNames, testSlowMultiplier*f.Timeouts.PVDelete)
@@ -191,7 +193,7 @@ func (t *volumeLimitsTestSuite) DefineTests(driver storageframework.TestDriver, 
 					StorageClassName: &l.resource.Sc.Name,
 				}, l.ns.Name)
 				pvc, err = l.cs.CoreV1().PersistentVolumeClaims(l.ns.Name).Create(context.TODO(), pvc, metav1.CreateOptions{})
-				framework.ExpectNoError(err)
+				e2eutils.ExpectNoError(err)
 				l.pvcNames = append(l.pvcNames, pvc.Name)
 				pvcs = append(pvcs, pvc)
 			}
@@ -204,20 +206,20 @@ func (t *volumeLimitsTestSuite) DefineTests(driver storageframework.TestDriver, 
 				NodeSelection: selection,
 			}
 			pod, err := e2epod.MakeSecPod(&podConfig)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			pod, err = l.cs.CoreV1().Pods(l.ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			l.podNames = append(l.podNames, pod.Name)
 		}
 
 		ginkgo.By("Waiting for all PVCs to get Bound")
 		l.pvNames, err = waitForAllPVCsBound(l.cs, testSlowMultiplier*f.Timeouts.PVBound, l.ns.Name, l.pvcNames)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		ginkgo.By("Waiting for the pod(s) running")
 		for _, podName := range l.podNames {
 			err = e2epod.WaitTimeoutForPodRunningInNamespace(l.cs, podName, l.ns.Name, testSlowMultiplier*f.Timeouts.PodStart)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 		}
 
 		ginkgo.By("Creating an extra pod with one volume to exceed the limit")
@@ -243,7 +245,7 @@ func (t *volumeLimitsTestSuite) DefineTests(driver storageframework.TestDriver, 
 			}
 			return false, nil
 		})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 	})
 
 	ginkgo.It("should verify that all csinodes have volume limits", func() {
@@ -265,7 +267,7 @@ func (t *volumeLimitsTestSuite) DefineTests(driver storageframework.TestDriver, 
 			nodeNames = append(nodeNames, l.config.ClientNodeSelection.Name)
 		} else {
 			nodeList, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			for _, node := range nodeList.Items {
 				nodeNames = append(nodeNames, node.Name)
 			}
@@ -275,7 +277,7 @@ func (t *volumeLimitsTestSuite) DefineTests(driver storageframework.TestDriver, 
 			ginkgo.By("Checking csinode limits")
 			_, err := getNodeLimits(l.cs, l.config, nodeName, driverInfo)
 			if err != nil {
-				framework.Failf("Expected volume limits to be set, error: %v", err)
+				e2eutils.Failf("Expected volume limits to be set, error: %v", err)
 			}
 		}
 	})
@@ -308,12 +310,12 @@ func cleanupTest(cs clientset.Interface, ns string, podNames, pvcNames []string,
 				if apierrors.IsNotFound(err) {
 					pvNames.Delete(pvName)
 				} else {
-					framework.Logf("Failed to get PV %s: %s", pvName, err)
+					e2eutils.Logf("Failed to get PV %s: %s", pvName, err)
 				}
 			}
 		}
 		if existing > 0 {
-			framework.Logf("Waiting for %d PVs to be deleted", existing)
+			e2eutils.Logf("Waiting for %d PVs to be deleted", existing)
 			return false, nil
 		}
 		return true, nil
@@ -344,7 +346,7 @@ func waitForAllPVCsBound(cs clientset.Interface, timeout time.Duration, ns strin
 			}
 		}
 		if unbound > 0 {
-			framework.Logf("%d/%d of PVCs are Bound", pvNames.Len(), len(pvcNames))
+			e2eutils.Logf("%d/%d of PVCs are Bound", pvNames.Len(), len(pvcNames))
 			return false, nil
 		}
 		return true, nil
@@ -395,7 +397,7 @@ func getCSINodeLimits(cs clientset.Interface, config *storageframework.PerTestCo
 	err := wait.PollImmediate(2*time.Second, csiNodeInfoTimeout, func() (bool, error) {
 		csiNode, err := cs.StorageV1().CSINodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 		if err != nil {
-			framework.Logf("%s", err)
+			e2eutils.Logf("%s", err)
 			return false, nil
 		}
 		var csiDriver *storagev1.CSINodeDriver
@@ -406,7 +408,7 @@ func getCSINodeLimits(cs clientset.Interface, config *storageframework.PerTestCo
 			}
 		}
 		if csiDriver == nil {
-			framework.Logf("CSINodeInfo does not have driver %s yet", driverInfo.Name)
+			e2eutils.Logf("CSINodeInfo does not have driver %s yet", driverInfo.Name)
 			return false, nil
 		}
 		if csiDriver.Allocatable == nil {

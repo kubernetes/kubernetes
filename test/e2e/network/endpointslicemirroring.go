@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
@@ -78,18 +80,18 @@ var _ = common.SIGDescribe("EndpointSliceMirroring", func() {
 
 		ginkgo.By("mirroring a new custom Endpoint", func() {
 			_, err := cs.CoreV1().Endpoints(f.Namespace.Name).Create(context.TODO(), endpoints, metav1.CreateOptions{})
-			framework.ExpectNoError(err, "Unexpected error creating Endpoints")
+			e2eutils.ExpectNoError(err, "Unexpected error creating Endpoints")
 
 			if err := wait.PollImmediate(2*time.Second, 12*time.Second, func() (bool, error) {
 				esList, err := cs.DiscoveryV1().EndpointSlices(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{
 					LabelSelector: discoveryv1.LabelServiceName + "=" + svc.Name,
 				})
 				if err != nil {
-					framework.Logf("Error listing EndpointSlices: %v", err)
+					e2eutils.Logf("Error listing EndpointSlices: %v", err)
 					return false, nil
 				}
 				if len(esList.Items) == 0 {
-					framework.Logf("Waiting for at least 1 EndpointSlice to exist, got %d", len(esList.Items))
+					e2eutils.Logf("Waiting for at least 1 EndpointSlice to exist, got %d", len(esList.Items))
 					return false, nil
 				}
 
@@ -120,7 +122,7 @@ var _ = common.SIGDescribe("EndpointSliceMirroring", func() {
 
 				return true, nil
 			}); err != nil {
-				framework.Failf("Did not find matching EndpointSlice for %s/%s: %s", svc.Namespace, svc.Name, err)
+				e2eutils.Failf("Did not find matching EndpointSlice for %s/%s: %s", svc.Namespace, svc.Name, err)
 			}
 		})
 
@@ -129,7 +131,7 @@ var _ = common.SIGDescribe("EndpointSliceMirroring", func() {
 				IP: "10.2.3.4",
 			}}
 			_, err := cs.CoreV1().Endpoints(f.Namespace.Name).Update(context.TODO(), endpoints, metav1.UpdateOptions{})
-			framework.ExpectNoError(err, "Unexpected error updating Endpoints")
+			e2eutils.ExpectNoError(err, "Unexpected error updating Endpoints")
 
 			// Expect mirrored EndpointSlice resource to be updated.
 			if err := wait.PollImmediate(2*time.Second, 12*time.Second, func() (bool, error) {
@@ -140,43 +142,43 @@ var _ = common.SIGDescribe("EndpointSliceMirroring", func() {
 					return false, err
 				}
 				if len(esList.Items) != 1 {
-					framework.Logf("Waiting for 1 EndpointSlice to exist, got %d", len(esList.Items))
+					e2eutils.Logf("Waiting for 1 EndpointSlice to exist, got %d", len(esList.Items))
 					return false, nil
 				}
 				epSlice := esList.Items[0]
 				if len(epSlice.Ports) != 1 {
-					framework.Logf("Expected EndpointSlice to have 1 Port, got %d", len(epSlice.Ports))
+					e2eutils.Logf("Expected EndpointSlice to have 1 Port, got %d", len(epSlice.Ports))
 					return false, nil
 				}
 				port := epSlice.Ports[0]
 				if *port.Port != int32(80) {
-					framework.Logf("Expected port to be 80, got %d", *port.Port)
+					e2eutils.Logf("Expected port to be 80, got %d", *port.Port)
 					return false, nil
 				}
 				if len(epSlice.Endpoints) != 1 {
-					framework.Logf("Expected EndpointSlice to have 1 endpoints, got %d", len(epSlice.Endpoints))
+					e2eutils.Logf("Expected EndpointSlice to have 1 endpoints, got %d", len(epSlice.Endpoints))
 					return false, nil
 				}
 				endpoint := epSlice.Endpoints[0]
 				if len(endpoint.Addresses) != 1 {
-					framework.Logf("Expected EndpointSlice endpoint to have 1 address, got %d", len(endpoint.Addresses))
+					e2eutils.Logf("Expected EndpointSlice endpoint to have 1 address, got %d", len(endpoint.Addresses))
 					return false, nil
 				}
 				address := endpoint.Addresses[0]
 				if address != "10.2.3.4" {
-					framework.Logf("Expected EndpointSlice to have 10.2.3.4 as address, got %s", address)
+					e2eutils.Logf("Expected EndpointSlice to have 10.2.3.4 as address, got %s", address)
 					return false, nil
 				}
 
 				return true, nil
 			}); err != nil {
-				framework.Failf("Did not find matching EndpointSlice for %s/%s: %s", svc.Namespace, svc.Name, err)
+				e2eutils.Failf("Did not find matching EndpointSlice for %s/%s: %s", svc.Namespace, svc.Name, err)
 			}
 		})
 
 		ginkgo.By("mirroring deletion of a custom Endpoint", func() {
 			err := cs.CoreV1().Endpoints(f.Namespace.Name).Delete(context.TODO(), endpoints.Name, metav1.DeleteOptions{})
-			framework.ExpectNoError(err, "Unexpected error deleting Endpoints")
+			e2eutils.ExpectNoError(err, "Unexpected error deleting Endpoints")
 
 			// Expect mirrored EndpointSlice resource to be updated.
 			if err := wait.PollImmediate(2*time.Second, 12*time.Second, func() (bool, error) {
@@ -187,13 +189,13 @@ var _ = common.SIGDescribe("EndpointSliceMirroring", func() {
 					return false, err
 				}
 				if len(esList.Items) != 0 {
-					framework.Logf("Waiting for 0 EndpointSlices to exist, got %d", len(esList.Items))
+					e2eutils.Logf("Waiting for 0 EndpointSlices to exist, got %d", len(esList.Items))
 					return false, nil
 				}
 
 				return true, nil
 			}); err != nil {
-				framework.Failf("Did not find matching EndpointSlice for %s/%s: %s", svc.Namespace, svc.Name, err)
+				e2eutils.Failf("Did not find matching EndpointSlice for %s/%s: %s", svc.Namespace, svc.Name, err)
 			}
 		})
 	})

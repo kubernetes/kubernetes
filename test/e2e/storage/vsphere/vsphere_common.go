@@ -20,8 +20,9 @@ import (
 	"os"
 	"strconv"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/gomega"
-	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 // VSphereCSIMigrationEnabled is the environment variables to help
@@ -112,7 +113,7 @@ func GetAndExpectStringEnvVar(varName string) string {
 func GetAndExpectIntEnvVar(varName string) int {
 	varValue := GetAndExpectStringEnvVar(varName)
 	varIntValue, err := strconv.Atoi(varValue)
-	framework.ExpectNoError(err, "Error Parsing "+varName)
+	e2eutils.ExpectNoError(err, "Error Parsing "+varName)
 	return varIntValue
 }
 
@@ -124,6 +125,6 @@ func GetAndExpectBoolEnvVar(varName string) bool {
 		return false
 	}
 	varBoolValue, err := strconv.ParseBool(varValue)
-	framework.ExpectNoError(err, "Error Parsing "+varName)
+	e2eutils.ExpectNoError(err, "Error Parsing "+varName)
 	return varBoolValue
 }

@@ -18,9 +18,11 @@ package kubeadm
 
 import (
 	"context"
+
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -47,7 +49,7 @@ var _ = Describe("nodes", func() {
 	ginkgo.It("should have CRI annotation", func() {
 		nodes, err := f.ClientSet.CoreV1().Nodes().
 			List(context.TODO(), metav1.ListOptions{})
-		framework.ExpectNoError(err, "error reading nodes")
+		e2eutils.ExpectNoError(err, "error reading nodes")
 
 		// checks that the nodes have the CRI annotation
 		for _, node := range nodes.Items {

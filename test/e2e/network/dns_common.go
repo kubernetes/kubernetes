@@ -23,6 +23,8 @@ import (
 	"strings"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -72,11 +74,11 @@ func (t *dnsTestCommon) init() {
 
 	namespace := "kube-system"
 	pods, err := t.f.ClientSet.CoreV1().Pods(namespace).List(context.TODO(), options)
-	framework.ExpectNoError(err, "failed to list pods in namespace: %s", namespace)
+	e2eutils.ExpectNoError(err, "failed to list pods in namespace: %s", namespace)
 	gomega.Expect(len(pods.Items)).Should(gomega.BeNumerically(">=", 1))
 
 	t.dnsPod = &pods.Items[0]
-	framework.Logf("Using DNS pod: %v", t.dnsPod.Name)
+	e2eutils.Logf("Using DNS pod: %v", t.dnsPod.Name)
 
 	if strings.Contains(t.dnsPod.Name, "coredns") {
 		t.name = "coredns"
@@ -100,7 +102,7 @@ func (t *dnsTestCommon) checkDNSRecordFrom(name string, predicate func([]string)
 		})
 
 	if err != nil {
-		framework.Failf("dig result did not match: %#v after %v",
+		e2eutils.Failf("dig result did not match: %#v after %v",
 			actual, timeout)
 	}
 }
@@ -123,7 +125,7 @@ func (t *dnsTestCommon) runDig(dnsName, target string) []string {
 	}
 	cmd = append(cmd, dnsName)
 
-	stdout, stderr, err := t.f.ExecWithOptions(framework.ExecOptions{
+	stdout, stderr, err := e2eutils.ExecWithOptions(t.f.ClientSet, e2eutils.ExecOptions{
 		Command:       cmd,
 		Namespace:     t.f.Namespace.Name,
 		PodName:       t.utilPod.Name,
@@ -132,7 +134,7 @@ func (t *dnsTestCommon) runDig(dnsName, target string) []string {
 		CaptureStderr: true,
 	})
 
-	framework.Logf("Running dig: %v, stdout: %q, stderr: %q, err: %v",
+	e2eutils.Logf("Running dig: %v, stdout: %q, stderr: %q, err: %v",
 		cmd, stdout, stderr, err)
 
 	if stdout == "" {
@@ -156,23 +158,23 @@ func (t *dnsTestCommon) setConfigMap(cm *v1.ConfigMap) {
 		}.AsSelector().String(),
 	}
 	cmList, err := t.c.CoreV1().ConfigMaps(t.ns).List(context.TODO(), options)
-	framework.ExpectNoError(err, "failed to list ConfigMaps in namespace: %s", t.ns)
+	e2eutils.ExpectNoError(err, "failed to list ConfigMaps in namespace: %s", t.ns)
 
 	if len(cmList.Items) == 0 {
 		ginkgo.By(fmt.Sprintf("Creating the ConfigMap (%s:%s) %+v", t.ns, t.name, *cm))
 		_, err := t.c.CoreV1().ConfigMaps(t.ns).Create(context.TODO(), cm, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create ConfigMap (%s:%s) %+v", t.ns, t.name, *cm)
+		e2eutils.ExpectNoError(err, "failed to create ConfigMap (%s:%s) %+v", t.ns, t.name, *cm)
 	} else {
 		ginkgo.By(fmt.Sprintf("Updating the ConfigMap (%s:%s) to %+v", t.ns, t.name, *cm))
 		_, err := t.c.CoreV1().ConfigMaps(t.ns).Update(context.TODO(), cm, metav1.UpdateOptions{})
-		framework.ExpectNoError(err, "failed to update ConfigMap (%s:%s) to %+v", t.ns, t.name, *cm)
+		e2eutils.ExpectNoError(err, "failed to update ConfigMap (%s:%s) to %+v", t.ns, t.name, *cm)
 	}
 }
 
 func (t *dnsTestCommon) fetchDNSConfigMapData() map[string]string {
 	if t.name == "coredns" {
 		pcm, err := t.c.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(context.TODO(), t.name, metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to get DNS ConfigMap: %s", t.name)
+		e2eutils.ExpectNoError(err, "failed to get DNS ConfigMap: %s", t.name)
 		return pcm.Data
 	}
 	return nil
@@ -196,10 +198,10 @@ func (t *dnsTestCommon) createUtilPodLabel(baseName string) {
 
 	var err error
 	t.utilPod, err = t.c.CoreV1().Pods(t.f.Namespace.Name).Create(context.TODO(), t.utilPod, metav1.CreateOptions{})
-	framework.ExpectNoError(err, "failed to create pod: %v", t.utilPod)
-	framework.Logf("Created pod %v", t.utilPod)
+	e2eutils.ExpectNoError(err, "failed to create pod: %v", t.utilPod)
+	e2eutils.Logf("Created pod %v", t.utilPod)
 	err = e2epod.WaitForPodNameRunningInNamespace(t.f.ClientSet, t.utilPod.Name, t.f.Namespace.Name)
-	framework.ExpectNoError(err, "pod failed to start running: %v", t.utilPod)
+	e2eutils.ExpectNoError(err, "pod failed to start running: %v", t.utilPod)
 
 	t.utilService = &v1.Service{
 		TypeMeta: metav1.TypeMeta{
@@ -222,14 +224,14 @@ func (t *dnsTestCommon) createUtilPodLabel(baseName string) {
 	}
 
 	t.utilService, err = t.c.CoreV1().Services(t.f.Namespace.Name).Create(context.TODO(), t.utilService, metav1.CreateOptions{})
-	framework.ExpectNoError(err, "failed to create service: %s/%s", t.f.Namespace.Name, t.utilService.ObjectMeta.Name)
-	framework.Logf("Created service %v", t.utilService)
+	e2eutils.ExpectNoError(err, "failed to create service: %s/%s", t.f.Namespace.Name, t.utilService.ObjectMeta.Name)
+	e2eutils.Logf("Created service %v", t.utilService)
 }
 
 func (t *dnsTestCommon) deleteUtilPod() {
 	podClient := t.c.CoreV1().Pods(t.f.Namespace.Name)
 	if err := podClient.Delete(context.TODO(), t.utilPod.Name, *metav1.NewDeleteOptions(0)); err != nil {
-		framework.Logf("Delete of pod %v/%v failed: %v",
+		e2eutils.Logf("Delete of pod %v/%v failed: %v",
 			t.utilPod.Namespace, t.utilPod.Name, err)
 	}
 }
@@ -241,12 +243,12 @@ func (t *dnsTestCommon) deleteCoreDNSPods() {
 	options := metav1.ListOptions{LabelSelector: label.String()}
 
 	pods, err := t.f.ClientSet.CoreV1().Pods("kube-system").List(context.TODO(), options)
-	framework.ExpectNoError(err, "failed to list pods of kube-system with label %q", label.String())
+	e2eutils.ExpectNoError(err, "failed to list pods of kube-system with label %q", label.String())
 	podClient := t.c.CoreV1().Pods(metav1.NamespaceSystem)
 
 	for _, pod := range pods.Items {
 		err = podClient.Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(0))
-		framework.ExpectNoError(err, "failed to delete pod: %s", pod.Name)
+		e2eutils.ExpectNoError(err, "failed to delete pod: %s", pod.Name)
 	}
 }
 
@@ -306,20 +308,20 @@ func (t *dnsTestCommon) createDNSPodFromObj(pod *v1.Pod) {
 
 	var err error
 	t.dnsServerPod, err = t.c.CoreV1().Pods(t.f.Namespace.Name).Create(context.TODO(), t.dnsServerPod, metav1.CreateOptions{})
-	framework.ExpectNoError(err, "failed to create pod: %v", t.dnsServerPod)
-	framework.Logf("Created pod %v", t.dnsServerPod)
+	e2eutils.ExpectNoError(err, "failed to create pod: %v", t.dnsServerPod)
+	e2eutils.Logf("Created pod %v", t.dnsServerPod)
 	err = e2epod.WaitForPodNameRunningInNamespace(t.f.ClientSet, t.dnsServerPod.Name, t.f.Namespace.Name)
-	framework.ExpectNoError(err, "pod failed to start running: %v", t.dnsServerPod)
+	e2eutils.ExpectNoError(err, "pod failed to start running: %v", t.dnsServerPod)
 
 	t.dnsServerPod, err = t.c.CoreV1().Pods(t.f.Namespace.Name).Get(context.TODO(), t.dnsServerPod.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err, "failed to get pod: %s", t.dnsServerPod.Name)
+	e2eutils.ExpectNoError(err, "failed to get pod: %s", t.dnsServerPod.Name)
 }
 
 func (t *dnsTestCommon) createDNSServer(namespace string, aRecords map[string]string) {
 	corednsConfig := generateCoreDNSConfigmap(namespace, aRecords)
 	corednsConfig, err := t.c.CoreV1().ConfigMaps(namespace).Create(context.TODO(), corednsConfig, metav1.CreateOptions{})
 	if err != nil {
-		framework.Failf("unable to create test configMap %s: %v", corednsConfig.Name, err)
+		e2eutils.Failf("unable to create test configMap %s: %v", corednsConfig.Name, err)
 	}
 
 	t.createDNSPodFromObj(generateCoreDNSServerPod(corednsConfig))
@@ -340,7 +342,7 @@ func (t *dnsTestCommon) createDNSServerWithPtrRecord(namespace string, isIPv6 bo
 func (t *dnsTestCommon) deleteDNSServerPod() {
 	podClient := t.c.CoreV1().Pods(t.f.Namespace.Name)
 	if err := podClient.Delete(context.TODO(), t.dnsServerPod.Name, *metav1.NewDeleteOptions(0)); err != nil {
-		framework.Logf("Delete of pod %v/%v failed: %v",
+		e2eutils.Logf("Delete of pod %v/%v failed: %v",
 			t.utilPod.Namespace, t.dnsServerPod.Name, err)
 	}
 }
@@ -415,7 +417,7 @@ func createProbeCommand(namesToResolve []string, hostEntries []string, ptrLookup
 	if len(ptrLookupIP) > 0 {
 		ptrLookup, err := dnsclient.Reverseaddr(ptrLookupIP)
 		if err != nil {
-			framework.Failf("Unable to obtain reverse IP address record from IP %s: %v", ptrLookupIP, err)
+			e2eutils.Failf("Unable to obtain reverse IP address record from IP %s: %v", ptrLookupIP, err)
 		}
 		ptrRecByUDPFileName := fmt.Sprintf("%s_udp@PTR", ptrLookupIP)
 		ptrRecByTCPFileName := fmt.Sprintf("%s_tcp@PTR", ptrLookupIP)
@@ -444,10 +446,10 @@ func assertFilesExist(fileNames []string, fileDir string, pod *v1.Pod, client cl
 func assertFilesContain(fileNames []string, fileDir string, pod *v1.Pod, client clientset.Interface, check bool, expected string) {
 	var failed []string
 
-	framework.ExpectNoError(wait.PollImmediate(time.Second*5, time.Second*600, func() (bool, error) {
+	e2eutils.ExpectNoError(wait.PollImmediate(time.Second*5, time.Second*600, func() (bool, error) {
 		failed = []string{}
 
-		ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)
+		ctx, cancel := context.WithTimeout(context.Background(), e2eutils.SingleCallTimeout)
 		defer cancel()
 
 		for _, fileName := range fileNames {
@@ -461,23 +463,23 @@ func assertFilesContain(fileNames []string, fileDir string, pod *v1.Pod, client 
 
 			if err != nil {
 				if ctx.Err() != nil {
-					framework.Failf("Unable to read %s from pod %s/%s: %v", fileName, pod.Namespace, pod.Name, err)
+					e2eutils.Failf("Unable to read %s from pod %s/%s: %v", fileName, pod.Namespace, pod.Name, err)
 				} else {
-					framework.Logf("Unable to read %s from pod %s/%s: %v", fileName, pod.Namespace, pod.Name, err)
+					e2eutils.Logf("Unable to read %s from pod %s/%s: %v", fileName, pod.Namespace, pod.Name, err)
 				}
 				failed = append(failed, fileName)
 			} else if check && strings.TrimSpace(string(contents)) != expected {
-				framework.Logf("File %s from pod  %s/%s contains '%s' instead of '%s'", fileName, pod.Namespace, pod.Name, string(contents), expected)
+				e2eutils.Logf("File %s from pod  %s/%s contains '%s' instead of '%s'", fileName, pod.Namespace, pod.Name, string(contents), expected)
 				failed = append(failed, fileName)
 			}
 		}
 		if len(failed) == 0 {
 			return true, nil
 		}
-		framework.Logf("Lookups using %s/%s failed for: %v\n", pod.Namespace, pod.Name, failed)
+		e2eutils.Logf("Lookups using %s/%s failed for: %v\n", pod.Namespace, pod.Name, failed)
 		return false, nil
 	}))
-	framework.ExpectEqual(len(failed), 0)
+	e2eutils.ExpectEqual(len(failed), 0)
 }
 
 func validateDNSResults(f *framework.Framework, pod *v1.Pod, fileNames []string) {
@@ -489,15 +491,15 @@ func validateDNSResults(f *framework.Framework, pod *v1.Pod, fileNames []string)
 		podClient.Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(0))
 	}()
 	if _, err := podClient.Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
-		framework.Failf("ginkgo.Failed to create pod %s/%s: %v", pod.Namespace, pod.Name, err)
+		e2eutils.Failf("ginkgo.Failed to create pod %s/%s: %v", pod.Namespace, pod.Name, err)
 	}
 
-	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespaceSlow(f.ClientSet, pod.Name, f.Namespace.Name))
+	e2eutils.ExpectNoError(e2epod.WaitForPodRunningInNamespaceSlow(f.ClientSet, pod.Name, f.Namespace.Name))
 
 	ginkgo.By("retrieving the pod")
 	pod, err := podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
 	if err != nil {
-		framework.Failf("ginkgo.Failed to get pod %s/%s: %v", pod.Namespace, pod.Name, err)
+		e2eutils.Failf("ginkgo.Failed to get pod %s/%s: %v", pod.Namespace, pod.Name, err)
 	}
 	// Try to find results for each expected name.
 	ginkgo.By("looking for the results for each expected name from probers")
@@ -505,7 +507,7 @@ func validateDNSResults(f *framework.Framework, pod *v1.Pod, fileNames []string)
 
 	// TODO: probe from the host, too.
 
-	framework.Logf("DNS probes using %s/%s succeeded\n", pod.Namespace, pod.Name)
+	e2eutils.Logf("DNS probes using %s/%s succeeded\n", pod.Namespace, pod.Name)
 }
 
 func validateTargetedProbeOutput(f *framework.Framework, pod *v1.Pod, fileNames []string, value string) {
@@ -517,19 +519,19 @@ func validateTargetedProbeOutput(f *framework.Framework, pod *v1.Pod, fileNames 
 		podClient.Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(0))
 	}()
 	if _, err := podClient.Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
-		framework.Failf("ginkgo.Failed to create pod %s/%s: %v", pod.Namespace, pod.Name, err)
+		e2eutils.Failf("ginkgo.Failed to create pod %s/%s: %v", pod.Namespace, pod.Name, err)
 	}
 
-	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespaceSlow(f.ClientSet, pod.Name, f.Namespace.Name))
+	e2eutils.ExpectNoError(e2epod.WaitForPodRunningInNamespaceSlow(f.ClientSet, pod.Name, f.Namespace.Name))
 
 	ginkgo.By("retrieving the pod")
 	pod, err := podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
 	if err != nil {
-		framework.Failf("ginkgo.Failed to get pod %s/%s: %v", pod.Namespace, pod.Name, err)
+		e2eutils.Failf("ginkgo.Failed to get pod %s/%s: %v", pod.Namespace, pod.Name, err)
 	}
 	// Try to find the expected value for each expected name.
 	ginkgo.By("looking for the results for each expected name from probers")
 	assertFilesContain(fileNames, "results", pod, f.ClientSet, true, value)
 
-	framework.Logf("DNS probes using %s succeeded\n", pod.Name)
+	e2eutils.Logf("DNS probes using %s succeeded\n", pod.Name)
 }

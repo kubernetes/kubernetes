@@ -20,7 +20,9 @@ import (
 	"context"
 	"time"
 
-	"k8s.io/api/core/v1"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -75,7 +77,7 @@ var _ = SIGDescribe("Kubelet Volume Manager", func() {
 						},
 					})
 					err := e2epod.WaitForPodSuccessInNamespace(f.ClientSet, memoryBackedPod.Name, f.Namespace.Name)
-					framework.ExpectNoError(err)
+					e2eutils.ExpectNoError(err)
 				})
 				ginkgo.By("Verifying the memory backed volume was removed from node", func() {
 					volumePath := fmt.Sprintf("/tmp/%s/volumes/kubernetes.io~empty-dir/%s", string(memoryBackedPod.UID), volumeName)
@@ -108,7 +110,7 @@ var _ = SIGDescribe("Kubelet Volume Manager", func() {
 										Name: "kubelet-pods",
 										VolumeSource: v1.VolumeSource{
 											// TODO: remove hardcoded kubelet volume directory path
-											// framework.TestContext.KubeVolumeDir is currently not populated for node e2e
+											// e2econfig.TestContext.KubeVolumeDir is currently not populated for node e2e
 											HostPath: &v1.HostPathVolumeSource{Path: "/var/lib/kubelet/pods"},
 										},
 									},
@@ -123,7 +125,7 @@ var _ = SIGDescribe("Kubelet Volume Manager", func() {
 						}
 						<-time.After(10 * time.Second)
 					}
-					framework.ExpectNoError(err)
+					e2eutils.ExpectNoError(err)
 				})
 			})
 		})

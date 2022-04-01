@@ -19,13 +19,14 @@ package services
 import (
 	"time"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/metadata"
 	restclient "k8s.io/client-go/rest"
 	namespacecontroller "k8s.io/kubernetes/pkg/controller/namespace"
-	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 const (
@@ -52,7 +53,7 @@ func NewNamespaceController(host string) *NamespaceController {
 func (n *NamespaceController) Start() error {
 	config := restclient.AddUserAgent(&restclient.Config{
 		Host:        n.host,
-		BearerToken: framework.TestContext.BearerToken,
+		BearerToken: e2econfig.TestContext.BearerToken,
 		TLSClientConfig: restclient.TLSClientConfig{
 			Insecure: true,
 		},

@@ -18,6 +18,7 @@ package vsphere
 
 import (
 	"context"
+
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,6 +26,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -79,7 +81,7 @@ var _ = utils.SIGDescribe("Volume Provisioning On Clustered Datastore [Feature:v
 		volumeOptions.Datastore = clusterDatastore
 
 		volumePath, err := nodeInfo.VSphere.CreateVolume(volumeOptions, nodeInfo.DataCenterRef)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		defer func() {
 			ginkgo.By("Deleting the vsphere volume")
@@ -90,13 +92,13 @@ var _ = utils.SIGDescribe("Volume Provisioning On Clustered Datastore [Feature:v
 
 		ginkgo.By("Creating pod")
 		pod, err := client.CoreV1().Pods(namespace).Create(context.TODO(), podspec, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		ginkgo.By("Waiting for pod to be ready")
 		gomega.Expect(e2epod.WaitForPodNameRunningInNamespace(client, pod.Name, namespace)).To(gomega.Succeed())
 
 		// get fresh pod info
 		pod, err = client.CoreV1().Pods(namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		nodeName := pod.Spec.NodeName
 
 		ginkgo.By("Verifying volume is attached")
@@ -104,11 +106,11 @@ var _ = utils.SIGDescribe("Volume Provisioning On Clustered Datastore [Feature:v
 
 		ginkgo.By("Deleting pod")
 		err = e2epod.DeletePodWithWait(client, pod)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		ginkgo.By("Waiting for volumes to be detached from the node")
 		err = waitForVSphereDiskToDetach(volumePath, nodeName)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 	})
 
 	/*

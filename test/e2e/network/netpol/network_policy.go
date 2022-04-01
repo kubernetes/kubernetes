@@ -19,6 +19,8 @@ package netpol
 import (
 	"context"
 	"fmt"
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -123,7 +125,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 		ginkgo.AfterEach(func() {
 			if !useFixedNamespaces {
 				k8s := newKubeManager(f)
-				framework.ExpectNoError(k8s.deleteNamespaces(model.NamespaceNames), "unable to clean up netpol namespaces")
+				e2eutils.ExpectNoError(k8s.deleteNamespaces(model.NamespaceNames), "unable to clean up netpol namespaces")
 			}
 		})
 
@@ -645,7 +647,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ports := []int32{80}
 			model = initializeResourcesByFixedNS(f, protocols, ports)
 			podXB, err := model.FindPod(nsX, "b")
-			framework.ExpectNoError(err, "find pod x/b")
+			e2eutils.ExpectNoError(err, "find pod x/b")
 			defer ResetPodLabels(k8s, podXB)
 
 			// add a new label, we'll remove it after this test is done
@@ -694,7 +696,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ports := []int32{80}
 			model = initializeResourcesByFixedNS(f, protocols, ports)
 			podXA, err := model.FindPod(nsX, "a")
-			framework.ExpectNoError(err, "find pod x/a")
+			e2eutils.ExpectNoError(err, "find pod x/a")
 			defer ResetPodLabels(k8s, podXA)
 
 			policy := GenNetworkPolicyWithNameAndPodSelector("deny-ingress-via-label-selector",
@@ -987,7 +989,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 
 			err := k8s.cleanNetworkPolicies(model.NamespaceNames)
 			time.Sleep(3 * time.Second) // TODO we can remove this eventually, its just a hack to keep CI stable.
-			framework.ExpectNoError(err, "unable to clean network policies")
+			e2eutils.ExpectNoError(err, "unable to clean network policies")
 
 			// Now the policy is deleted, we expect all connectivity to work again.
 			reachabilityAll := NewReachability(model.AllPods(), true)
@@ -1003,7 +1005,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ports := []int32{80}
 			model = initializeResourcesByFixedNS(f, protocols, ports)
 			podList, err := f.ClientSet.CoreV1().Pods(nsY).List(context.TODO(), metav1.ListOptions{LabelSelector: "pod=b"})
-			framework.ExpectNoError(err, "Failing to list pods in namespace y")
+			e2eutils.ExpectNoError(err, "Failing to list pods in namespace y")
 			pod := podList.Items[0]
 
 			hostMask := 32
@@ -1030,13 +1032,13 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ports := []int32{80}
 			model = initializeResourcesByFixedNS(f, protocols, ports)
 			podList, err := f.ClientSet.CoreV1().Pods(nsX).List(context.TODO(), metav1.ListOptions{LabelSelector: "pod=a"})
-			framework.ExpectNoError(err, "Failing to find pod x/a")
+			e2eutils.ExpectNoError(err, "Failing to find pod x/a")
 			podA := podList.Items[0]
 
 			podServerAllowCIDR := fmt.Sprintf("%s/4", podA.Status.PodIP)
 
 			podList, err = f.ClientSet.CoreV1().Pods(nsX).List(context.TODO(), metav1.ListOptions{LabelSelector: "pod=b"})
-			framework.ExpectNoError(err, "Failing to find pod x/b")
+			e2eutils.ExpectNoError(err, "Failing to find pod x/b")
 			podB := podList.Items[0]
 
 			hostMask := 32
@@ -1064,11 +1066,11 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ports := []int32{80}
 			model = initializeResourcesByFixedNS(f, protocols, ports)
 			podList, err := f.ClientSet.CoreV1().Pods(nsX).List(context.TODO(), metav1.ListOptions{LabelSelector: "pod=a"})
-			framework.ExpectNoError(err, "Failing to find pod x/a")
+			e2eutils.ExpectNoError(err, "Failing to find pod x/a")
 			podA := podList.Items[0]
 
 			podList, err = f.ClientSet.CoreV1().Pods(nsX).List(context.TODO(), metav1.ListOptions{LabelSelector: "pod=b"})
-			framework.ExpectNoError(err, "Failing to find pod x/b")
+			e2eutils.ExpectNoError(err, "Failing to find pod x/b")
 			podB := podList.Items[0]
 
 			// Exclude podServer's IP with an Except clause
@@ -1265,7 +1267,7 @@ var _ = common.SIGDescribe("Netpol [LinuxOnly]", func() {
 		ginkgo.AfterEach(func() {
 			if !useFixedNamespaces {
 				k8s := newKubeManager(f)
-				framework.ExpectNoError(k8s.deleteNamespaces(model.NamespaceNames), "unable to clean up UDP netpol namespaces")
+				e2eutils.ExpectNoError(k8s.deleteNamespaces(model.NamespaceNames), "unable to clean up UDP netpol namespaces")
 			}
 		})
 
@@ -1350,7 +1352,7 @@ var _ = common.SIGDescribe("Netpol [Feature:SCTPConnectivity][LinuxOnly][Disrupt
 		ginkgo.AfterEach(func() {
 			if !useFixedNamespaces {
 				k8s := newKubeManager(f)
-				framework.ExpectNoError(k8s.deleteNamespaces(model.NamespaceNames), "unable to clean up SCTP netpol namespaces")
+				e2eutils.ExpectNoError(k8s.deleteNamespaces(model.NamespaceNames), "unable to clean up SCTP netpol namespaces")
 			}
 		})
 
@@ -1437,7 +1439,7 @@ func getNamespaces(rootNs string) (string, string, string, []string) {
 // defaultModel creates a new "model" pod system under namespaces (x,y,z) which has pods a, b, and c.  Thus resulting in the
 // truth table matrix that is identical for all tests, comprising 81 total connections between 9 pods (x/a, x/b, x/c, ..., z/c).
 func defaultModel(namespaces []string, dnsDomain string, protocols []v1.Protocol, ports []int32) *Model {
-	if framework.NodeOSDistroIs("windows") {
+	if e2eutils.NodeOSDistroIs("windows") {
 		return NewWindowsModel(namespaces, []string{"a", "b", "c"}, ports, dnsDomain)
 	}
 	return NewModel(namespaces, []string{"a", "b", "c"}, ports, protocols, dnsDomain)
@@ -1455,23 +1457,23 @@ func initializeResourcesByFixedNS(f *framework.Framework, protocols []v1.Protoco
 	if useFixedNamespaces {
 		model, _ := initializeResources(f, protocols, ports)
 		k8s := newKubeManager(f)
-		framework.ExpectNoError(k8s.cleanNetworkPolicies(model.NamespaceNames), "unable to clean network policies")
+		e2eutils.ExpectNoError(k8s.cleanNetworkPolicies(model.NamespaceNames), "unable to clean network policies")
 		err := wait.Poll(waitInterval, waitTimeout, func() (done bool, err error) {
 			for _, ns := range model.NamespaceNames {
 				netpols, err := k8s.clientSet.NetworkingV1().NetworkPolicies(ns).List(context.TODO(), metav1.ListOptions{})
-				framework.ExpectNoError(err, "get network policies from ns %s", ns)
+				e2eutils.ExpectNoError(err, "get network policies from ns %s", ns)
 				if len(netpols.Items) > 0 {
 					return false, nil
 				}
 			}
 			return true, nil
 		})
-		framework.ExpectNoError(err, "unable to wait for network policy deletion")
+		e2eutils.ExpectNoError(err, "unable to wait for network policy deletion")
 		return model
 	} else {
-		framework.Logf("Using %v as the default dns domain for this cluster... ", framework.TestContext.ClusterDNSDomain)
+		e2eutils.Logf("Using %v as the default dns domain for this cluster... ", e2econfig.TestContext.ClusterDNSDomain)
 		model, err := initializeResources(f, protocols, ports)
-		framework.ExpectNoError(err, "unable to initialize resources")
+		e2eutils.ExpectNoError(err, "unable to initialize resources")
 		return model
 	}
 }
@@ -1484,16 +1486,16 @@ func initializeResources(f *framework.Framework, protocols []v1.Protocol, ports 
 	rootNs := f.Namespace.GetName()
 	_, _, _, namespaces := getNamespaces(rootNs)
 
-	model := defaultModel(namespaces, framework.TestContext.ClusterDNSDomain, protocols, ports)
+	model := defaultModel(namespaces, e2econfig.TestContext.ClusterDNSDomain, protocols, ports)
 
-	framework.Logf("initializing cluster: ensuring namespaces, deployments, and pods exist and are ready")
+	e2eutils.Logf("initializing cluster: ensuring namespaces, deployments, and pods exist and are ready")
 
 	err := k8s.initializeCluster(model)
 	if err != nil {
 		return nil, err
 	}
 
-	framework.Logf("finished initializing cluster state")
+	e2eutils.Logf("finished initializing cluster state")
 
 	err = waitForHTTPServers(k8s, model)
 	if err != nil {

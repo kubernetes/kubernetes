@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/test/utils/crd"
 
 	"github.com/onsi/ginkgo"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 )
 
 var storageVersionServerVersion = utilversion.MustParseSemantic("v1.13.99")
@@ -50,27 +51,27 @@ var _ = SIGDescribe("Discovery", func() {
 	ginkgo.It("should accurately determine present and missing resources", func() {
 		// checks that legacy api group resources function
 		ok, err := clientdiscovery.IsResourceEnabled(f.ClientSet.Discovery(), schema.GroupVersionResource{Group: "", Version: "v1", Resource: "namespaces"})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		if !ok {
-			framework.Failf("namespace.v1 should always be present")
+			e2eutils.Failf("namespace.v1 should always be present")
 		}
 		// checks that non-legacy api group resources function
 		ok, err = clientdiscovery.IsResourceEnabled(f.ClientSet.Discovery(), schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		if !ok {
-			framework.Failf("deployments.v1.apps should always be present")
+			e2eutils.Failf("deployments.v1.apps should always be present")
 		}
 		// checks that nonsense resources in existing api groups function
 		ok, err = clientdiscovery.IsResourceEnabled(f.ClientSet.Discovery(), schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "please-dont-ever-create-this"})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		if ok {
-			framework.Failf("please-dont-ever-create-this.v1.apps should never be present")
+			e2eutils.Failf("please-dont-ever-create-this.v1.apps should never be present")
 		}
 		// checks that resources resources in nonsense api groups function
 		ok, err = clientdiscovery.IsResourceEnabled(f.ClientSet.Discovery(), schema.GroupVersionResource{Group: "not-these-apps", Version: "v1", Resource: "deployments"})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		if ok {
-			framework.Failf("deployments.v1.not-these-apps should never be present")
+			e2eutils.Failf("deployments.v1.not-these-apps should never be present")
 		}
 	})
 
@@ -83,7 +84,7 @@ var _ = SIGDescribe("Discovery", func() {
 		spec := testcrd.Crd.Spec
 		resources, err := testcrd.APIExtensionClient.Discovery().ServerResourcesForGroupVersion(spec.Group + "/" + spec.Versions[0].Name)
 		if err != nil {
-			framework.Failf("failed to find the discovery doc for %v: %v", resources, err)
+			e2eutils.Failf("failed to find the discovery doc for %v: %v", resources, err)
 		}
 		found := false
 		var storageVersion string
@@ -102,12 +103,12 @@ var _ = SIGDescribe("Discovery", func() {
 			if r.Name == spec.Names.Plural {
 				found = true
 				if r.StorageVersionHash != expected {
-					framework.Failf("expected storageVersionHash of %s/%s/%s to be %s, got %s", r.Group, r.Version, r.Name, expected, r.StorageVersionHash)
+					e2eutils.Failf("expected storageVersionHash of %s/%s/%s to be %s, got %s", r.Group, r.Version, r.Name, expected, r.StorageVersionHash)
 				}
 			}
 		}
 		if !found {
-			framework.Failf("didn't find resource %s in the discovery doc", spec.Names.Plural)
+			e2eutils.Failf("didn't find resource %s in the discovery doc", spec.Names.Plural)
 		}
 	})
 
@@ -122,35 +123,35 @@ var _ = SIGDescribe("Discovery", func() {
 		// get list of APIGroup endpoints
 		list := &metav1.APIGroupList{}
 		err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis/").Do(context.TODO()).Into(list)
-		framework.ExpectNoError(err, "Failed to find /apis/")
-		framework.ExpectNotEqual(len(list.Groups), 0, "Missing APIGroups")
+		e2eutils.ExpectNoError(err, "Failed to find /apis/")
+		e2eutils.ExpectNotEqual(len(list.Groups), 0, "Missing APIGroups")
 
 		for _, group := range list.Groups {
 			if strings.HasSuffix(group.Name, ".example.com") {
 				// ignore known example dynamic API groups that are added/removed during the e2e test run
 				continue
 			}
-			framework.Logf("Checking APIGroup: %v", group.Name)
+			e2eutils.Logf("Checking APIGroup: %v", group.Name)
 
 			// locate APIGroup endpoint
 			checkGroup := &metav1.APIGroup{}
 			apiPath := "/apis/" + group.Name + "/"
 			err = f.ClientSet.Discovery().RESTClient().Get().AbsPath(apiPath).Do(context.TODO()).Into(checkGroup)
-			framework.ExpectNoError(err, "Fail to access: %s", apiPath)
-			framework.ExpectNotEqual(len(checkGroup.Versions), 0, "No version found for %v", group.Name)
-			framework.Logf("PreferredVersion.GroupVersion: %s", checkGroup.PreferredVersion.GroupVersion)
-			framework.Logf("Versions found %v", checkGroup.Versions)
+			e2eutils.ExpectNoError(err, "Fail to access: %s", apiPath)
+			e2eutils.ExpectNotEqual(len(checkGroup.Versions), 0, "No version found for %v", group.Name)
+			e2eutils.Logf("PreferredVersion.GroupVersion: %s", checkGroup.PreferredVersion.GroupVersion)
+			e2eutils.Logf("Versions found %v", checkGroup.Versions)
 
 			// confirm that the PreferredVersion is a valid version
 			match := false
 			for _, version := range checkGroup.Versions {
 				if version.GroupVersion == checkGroup.PreferredVersion.GroupVersion {
-					framework.Logf("%s matches %s", version.GroupVersion, checkGroup.PreferredVersion.GroupVersion)
+					e2eutils.Logf("%s matches %s", version.GroupVersion, checkGroup.PreferredVersion.GroupVersion)
 					match = true
 					break
 				}
 			}
-			framework.ExpectEqual(true, match, "failed to find a valid version for PreferredVersion")
+			e2eutils.ExpectEqual(true, match, "failed to find a valid version for PreferredVersion")
 		}
 	})
 })

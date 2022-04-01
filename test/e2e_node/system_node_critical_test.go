@@ -21,7 +21,10 @@ import (
 	"os"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	kubeapi "k8s.io/kubernetes/pkg/apis/core"
@@ -39,7 +42,7 @@ var _ = SIGDescribe("SystemNodeCriticalPod [Slow] [Serial] [Disruptive] [NodeFea
 	f.SkipNamespaceCreation = true
 
 	ginkgo.AfterEach(func() {
-		if framework.TestContext.PrepullImages {
+		if e2econfig.TestContext.PrepullImages {
 			// The test may cause the prepulled images to be evicted,
 			// prepull those images again to ensure this test not affect following tests.
 			PrePullAllImages()
@@ -63,8 +66,8 @@ var _ = SIGDescribe("SystemNodeCriticalPod [Slow] [Serial] [Disruptive] [NodeFea
 			ginkgo.BeforeEach(func() {
 				ginkgo.By("create a static system-node-critical pod")
 				staticPodName = "static-disk-hog-" + string(uuid.NewUUID())
-				mirrorPodName = staticPodName + "-" + framework.TestContext.NodeName
-				podPath = framework.TestContext.KubeletConfig.StaticPodPath
+				mirrorPodName = staticPodName + "-" + e2econfig.TestContext.NodeName
+				podPath = e2econfig.TestContext.KubeletConfig.StaticPodPath
 				// define a static pod consuming disk gradually
 				// the upper limit is 1024 (iterations) * 10485760 bytes (10MB) = 10GB
 				err := createStaticSystemNodeCriticalPod(
@@ -86,7 +89,7 @@ var _ = SIGDescribe("SystemNodeCriticalPod [Slow] [Serial] [Disruptive] [NodeFea
 						return nil
 					}
 					msg := fmt.Sprintf("NodeCondition: %s not encountered yet", v1.NodeDiskPressure)
-					framework.Logf(msg)
+					e2eutils.Logf(msg)
 					return fmt.Errorf(msg)
 				}, time.Minute*2, time.Second*4).Should(gomega.BeNil())
 
@@ -94,16 +97,16 @@ var _ = SIGDescribe("SystemNodeCriticalPod [Slow] [Serial] [Disruptive] [NodeFea
 				gomega.Consistently(func() error {
 					err := checkMirrorPodRunning(f.ClientSet, mirrorPodName, ns)
 					if err == nil {
-						framework.Logf("mirror pod %q is running", mirrorPodName)
+						e2eutils.Logf("mirror pod %q is running", mirrorPodName)
 					} else {
-						framework.Logf(err.Error())
+						e2eutils.Logf(err.Error())
 					}
 					return err
 				}, time.Minute*8, time.Second*4).ShouldNot(gomega.HaveOccurred())
 			})
 			ginkgo.AfterEach(func() {
 				defer func() {
-					if framework.TestContext.PrepullImages {
+					if e2econfig.TestContext.PrepullImages {
 						// The test may cause the prepulled images to be evicted,
 						// prepull those images again to ensure this test not affect following tests.
 						PrePullAllImages()

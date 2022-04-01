@@ -19,6 +19,8 @@ package windows
 import (
 	"fmt"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -45,13 +47,13 @@ var _ = SIGDescribe("Services", func() {
 
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
 		nodeIP, err := e2enode.PickIP(jig.Client)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		ginkgo.By("creating service " + serviceName + " with type=NodePort in namespace " + ns)
 		svc, err := jig.CreateTCPService(func(svc *v1.Service) {
 			svc.Spec.Type = v1.ServiceTypeNodePort
 		})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		nodePort := int(svc.Spec.Ports[0].NodePort)
 
@@ -63,7 +65,7 @@ var _ = SIGDescribe("Services", func() {
 			}
 		}
 		_, err = jig.Run(windowsNodeSelectorTweak)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		//using hybrid_network methods
 		ginkgo.By("creating Windows testing Pod")
@@ -72,7 +74,7 @@ var _ = SIGDescribe("Services", func() {
 
 		ginkgo.By("verifying that pod has the correct nodeSelector")
 		// Admission controllers may sometimes do the wrong thing
-		framework.ExpectEqual(testPod.Spec.NodeSelector["kubernetes.io/os"], "windows")
+		e2eutils.ExpectEqual(testPod.Spec.NodeSelector["kubernetes.io/os"], "windows")
 
 		ginkgo.By(fmt.Sprintf("checking connectivity Pod to curl http://%s:%d", nodeIP, nodePort))
 		assertConsistentConnectivity(f, testPod.ObjectMeta.Name, windowsOS, windowsCheck(fmt.Sprintf("http://%s:%d", nodeIP, nodePort)))

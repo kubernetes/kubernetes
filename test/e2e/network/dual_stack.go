@@ -23,6 +23,9 @@ import (
 	"strings"
 	"time"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 
@@ -46,7 +49,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 	f := framework.NewDefaultFramework("dualstack")
 
 	var cs clientset.Interface
-	var podClient *framework.PodClient
+	var podClient *e2eutils.PodClient
 
 	ginkgo.BeforeEach(func() {
 		cs = f.ClientSet
@@ -56,16 +59,16 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 	ginkgo.It("should have ipv4 and ipv6 internal node ip", func() {
 		// TODO (aramase) can switch to new function to get all nodes
 		nodeList, err := e2enode.GetReadySchedulableNodes(cs)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		for _, node := range nodeList.Items {
 			// get all internal ips for node
 			internalIPs := e2enode.GetAddresses(&node, v1.NodeInternalIP)
 
-			framework.ExpectEqual(len(internalIPs), 2)
+			e2eutils.ExpectEqual(len(internalIPs), 2)
 			// assert 2 ips belong to different families
 			if netutils.IsIPv4String(internalIPs[0]) == netutils.IsIPv4String(internalIPs[1]) {
-				framework.Failf("both internalIPs %s and %s belong to the same families", internalIPs[0], internalIPs[1])
+				e2eutils.Failf("both internalIPs %s and %s belong to the same families", internalIPs[0], internalIPs[1])
 			}
 		}
 	})
@@ -95,17 +98,17 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 		gomega.Expect(p.Status.PodIPs).ShouldNot(gomega.BeNil())
 
 		// validate there are 2 ips in podIPs
-		framework.ExpectEqual(len(p.Status.PodIPs), 2)
+		e2eutils.ExpectEqual(len(p.Status.PodIPs), 2)
 		// validate first ip in PodIPs is same as PodIP
-		framework.ExpectEqual(p.Status.PodIP, p.Status.PodIPs[0].IP)
+		e2eutils.ExpectEqual(p.Status.PodIP, p.Status.PodIPs[0].IP)
 		// assert 2 pod ips belong to different families
 		if netutils.IsIPv4String(p.Status.PodIPs[0].IP) == netutils.IsIPv4String(p.Status.PodIPs[1].IP) {
-			framework.Failf("both internalIPs %s and %s belong to the same families", p.Status.PodIPs[0].IP, p.Status.PodIPs[1].IP)
+			e2eutils.Failf("both internalIPs %s and %s belong to the same families", p.Status.PodIPs[0].IP, p.Status.PodIPs[1].IP)
 		}
 
 		ginkgo.By("deleting the pod")
 		err := podClient.Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(30))
-		framework.ExpectNoError(err, "failed to delete pod")
+		e2eutils.ExpectNoError(err, "failed to delete pod")
 	})
 
 	// takes close to 140s to complete, so doesn't need to be marked [SLOW]
@@ -118,7 +121,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 		// FIXME: tests may be run in large clusters. This test is O(n^2) in the
 		// number of nodes used. It should use GetBoundedReadySchedulableNodes().
 		nodeList, err := e2enode.GetReadySchedulableNodes(cs)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		replicas := int32(len(nodeList.Items))
 
@@ -179,21 +182,21 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 		}
 
 		serverDeployment, err := cs.AppsV1().Deployments(f.Namespace.Name).Create(context.TODO(), serverDeploymentSpec, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		clientDeployment, err := cs.AppsV1().Deployments(f.Namespace.Name).Create(context.TODO(), clientDeploymentSpec, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		err = e2edeployment.WaitForDeploymentComplete(cs, serverDeployment)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		err = e2edeployment.WaitForDeploymentComplete(cs, clientDeployment)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		serverPods, err := e2edeployment.GetPodsForDeployment(cs, serverDeployment)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		clientPods, err := e2edeployment.GetPodsForDeployment(cs, clientDeployment)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		assertNetworkConnectivity(f, *serverPods, *clientPods, "dualstack-test-client", "80")
 	})
@@ -207,7 +210,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 		defer func() {
 			defer ginkgo.GinkgoRecover()
 			if errs := t.Cleanup(); len(errs) != 0 {
-				framework.Failf("errors in cleanup: %v", errs)
+				e2eutils.Failf("errors in cleanup: %v", errs)
 			}
 		}()
 
@@ -216,15 +219,15 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 
 		jig.Labels = t.Labels
 		err := jig.CreateServicePods(2)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		svc, err := t.CreateService(service)
-		framework.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName, ns)
+		e2eutils.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName, ns)
 
 		validateNumOfServicePorts(svc, 2)
 
 		expectedPolicy := v1.IPFamilyPolicySingleStack
 		expectedFamilies := []v1.IPFamily{v1.IPv4Protocol}
-		if framework.TestContext.ClusterIsIPv6() {
+		if e2econfig.TestContext.ClusterIsIPv6() {
 			expectedFamilies = []v1.IPFamily{v1.IPv6Protocol}
 		}
 
@@ -241,7 +244,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 
 			return true, nil
 		}); err != nil {
-			framework.Failf("Get endpoints for service %s/%s failed (%s)", svc.Namespace, svc.Name, err)
+			e2eutils.Failf("Get endpoints for service %s/%s failed (%s)", svc.Namespace, svc.Name, err)
 		}
 	})
 
@@ -255,7 +258,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 		defer func() {
 			defer ginkgo.GinkgoRecover()
 			if errs := t.Cleanup(); len(errs) != 0 {
-				framework.Failf("errors in cleanup: %v", errs)
+				e2eutils.Failf("errors in cleanup: %v", errs)
 			}
 		}()
 
@@ -268,9 +271,9 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 
 		jig.Labels = t.Labels
 		err := jig.CreateServicePods(2)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		svc, err := t.CreateService(service)
-		framework.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName, ns)
+		e2eutils.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName, ns)
 
 		validateNumOfServicePorts(svc, 2)
 
@@ -286,7 +289,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 			validateEndpointsBelongToIPFamily(svc, endpoint, expectedFamilies[0] /* endpoint controller operates on primary ip */)
 			return true, nil
 		}); err != nil {
-			framework.Failf("Get endpoints for service %s/%s failed (%s)", svc.Namespace, svc.Name, err)
+			e2eutils.Failf("Get endpoints for service %s/%s failed (%s)", svc.Namespace, svc.Name, err)
 		}
 	})
 
@@ -301,7 +304,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 		defer func() {
 			defer ginkgo.GinkgoRecover()
 			if errs := t.Cleanup(); len(errs) != 0 {
-				framework.Failf("errors in cleanup: %v", errs)
+				e2eutils.Failf("errors in cleanup: %v", errs)
 			}
 		}()
 
@@ -313,9 +316,9 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 
 		jig.Labels = t.Labels
 		err := jig.CreateServicePods(2)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		svc, err := t.CreateService(service)
-		framework.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName, ns)
+		e2eutils.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName, ns)
 
 		validateNumOfServicePorts(svc, 2)
 
@@ -331,7 +334,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 			validateEndpointsBelongToIPFamily(svc, endpoint, ipv6)
 			return true, nil
 		}); err != nil {
-			framework.Failf("Get endpoints for service %s/%s failed (%s)", svc.Namespace, svc.Name, err)
+			e2eutils.Failf("Get endpoints for service %s/%s failed (%s)", svc.Namespace, svc.Name, err)
 		}
 	})
 
@@ -345,7 +348,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 		defer func() {
 			defer ginkgo.GinkgoRecover()
 			if errs := t.Cleanup(); len(errs) != 0 {
-				framework.Failf("errors in cleanup: %v", errs)
+				e2eutils.Failf("errors in cleanup: %v", errs)
 			}
 		}()
 
@@ -358,9 +361,9 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 
 		jig.Labels = t.Labels
 		err := jig.CreateServicePods(2)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		svc, err := t.CreateService(service)
-		framework.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName, ns)
+		e2eutils.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName, ns)
 
 		validateNumOfServicePorts(svc, 2)
 
@@ -376,7 +379,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 			validateEndpointsBelongToIPFamily(svc, endpoint, expectedFamilies[0] /* endpoint controller operates on primary ip */)
 			return true, nil
 		}); err != nil {
-			framework.Failf("Get endpoints for service %s/%s failed (%s)", svc.Namespace, svc.Name, err)
+			e2eutils.Failf("Get endpoints for service %s/%s failed (%s)", svc.Namespace, svc.Name, err)
 		}
 	})
 
@@ -390,7 +393,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 		defer func() {
 			defer ginkgo.GinkgoRecover()
 			if errs := t.Cleanup(); len(errs) != 0 {
-				framework.Failf("errors in cleanup: %v", errs)
+				e2eutils.Failf("errors in cleanup: %v", errs)
 			}
 		}()
 
@@ -403,9 +406,9 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 
 		jig.Labels = t.Labels
 		err := jig.CreateServicePods(2)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		svc, err := t.CreateService(service)
-		framework.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName, ns)
+		e2eutils.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName, ns)
 
 		validateNumOfServicePorts(svc, 2)
 
@@ -421,7 +424,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 			validateEndpointsBelongToIPFamily(svc, endpoint, expectedFamilies[0] /* endpoint controller operates on primary ip */)
 			return true, nil
 		}); err != nil {
-			framework.Failf("Get endpoints for service %s/%s failed (%s)", svc.Namespace, svc.Name, err)
+			e2eutils.Failf("Get endpoints for service %s/%s failed (%s)", svc.Namespace, svc.Name, err)
 		}
 	})
 	// TODO (khenidak add slice validation logic, since endpoint controller only operates
@@ -432,129 +435,129 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 	ginkgo.Describe("Granular Checks: Services Secondary IP Family [LinuxOnly]", func() {
 
 		ginkgo.It("should function for pod-Service: http", func() {
-			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack)
+			config := e2enetwork.NewNetworkingTestConfig(f.ClientSet, f.Namespace.Name, e2enetwork.EnableDualStack)
 			ginkgo.By(fmt.Sprintf("dialing(http) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort))
 			err := config.DialFromTestContainer("http", config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort, config.MaxTries, 0, config.EndpointHostnames())
 			if err != nil {
-				framework.Failf("failed dialing endpoint, %v", err)
+				e2eutils.Failf("failed dialing endpoint, %v", err)
 			}
 			ginkgo.By(fmt.Sprintf("dialing(http) %v --> %v:%v (nodeIP)", config.TestContainerPod.Name, config.SecondaryNodeIP, config.NodeHTTPPort))
 			err = config.DialFromTestContainer("http", config.SecondaryNodeIP, config.NodeHTTPPort, config.MaxTries, 0, config.EndpointHostnames())
 			if err != nil {
-				framework.Failf("failed dialing endpoint, %v", err)
+				e2eutils.Failf("failed dialing endpoint, %v", err)
 			}
 		})
 
 		ginkgo.It("should function for pod-Service: udp", func() {
-			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack)
+			config := e2enetwork.NewNetworkingTestConfig(f.ClientSet, f.Namespace.Name, e2enetwork.EnableDualStack)
 			ginkgo.By(fmt.Sprintf("dialing(udp) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.SecondaryClusterIP, e2enetwork.ClusterUDPPort))
 			err := config.DialFromTestContainer("udp", config.SecondaryClusterIP, e2enetwork.ClusterUDPPort, config.MaxTries, 0, config.EndpointHostnames())
 			if err != nil {
-				framework.Failf("failed dialing endpoint, %v", err)
+				e2eutils.Failf("failed dialing endpoint, %v", err)
 			}
 			ginkgo.By(fmt.Sprintf("dialing(udp) %v --> %v:%v (nodeIP)", config.TestContainerPod.Name, config.SecondaryNodeIP, config.NodeUDPPort))
 			err = config.DialFromTestContainer("udp", config.SecondaryNodeIP, config.NodeUDPPort, config.MaxTries, 0, config.EndpointHostnames())
 			if err != nil {
-				framework.Failf("failed dialing endpoint, %v", err)
+				e2eutils.Failf("failed dialing endpoint, %v", err)
 			}
 		})
 
 		// [Disruptive] because it conflicts with tests that call CheckSCTPModuleLoadedOnNodes
 		ginkgo.It("should function for pod-Service: sctp [Feature:SCTPConnectivity][Disruptive]", func() {
-			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack, e2enetwork.EnableSCTP)
+			config := e2enetwork.NewNetworkingTestConfig(f.ClientSet, f.Namespace.Name, e2enetwork.EnableDualStack, e2enetwork.EnableSCTP)
 			ginkgo.By(fmt.Sprintf("dialing(sctp) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.SecondaryClusterIP, e2enetwork.ClusterSCTPPort))
 			err := config.DialFromTestContainer("sctp", config.SecondaryClusterIP, e2enetwork.ClusterSCTPPort, config.MaxTries, 0, config.EndpointHostnames())
 			if err != nil {
-				framework.Failf("failed dialing endpoint, %v", err)
+				e2eutils.Failf("failed dialing endpoint, %v", err)
 			}
 
 			ginkgo.By(fmt.Sprintf("dialing(sctp) %v --> %v:%v (nodeIP)", config.TestContainerPod.Name, config.SecondaryNodeIP, config.NodeSCTPPort))
 			err = config.DialFromTestContainer("sctp", config.SecondaryNodeIP, config.NodeSCTPPort, config.MaxTries, 0, config.EndpointHostnames())
 			if err != nil {
-				framework.Failf("failed dialing endpoint, %v", err)
+				e2eutils.Failf("failed dialing endpoint, %v", err)
 			}
 		})
 
 		ginkgo.It("should function for node-Service: http", func() {
-			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack, e2enetwork.UseHostNetwork)
+			config := e2enetwork.NewNetworkingTestConfig(f.ClientSet, f.Namespace.Name, e2enetwork.EnableDualStack, e2enetwork.UseHostNetwork)
 			ginkgo.By(fmt.Sprintf("dialing(http) %v (node) --> %v:%v (config.clusterIP)", config.SecondaryNodeIP, config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort))
 			err := config.DialFromNode("http", config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort, config.MaxTries, 0, config.EndpointHostnames())
 			if err != nil {
-				framework.Failf("failed dialing endpoint, %v", err)
+				e2eutils.Failf("failed dialing endpoint, %v", err)
 			}
 
 			ginkgo.By(fmt.Sprintf("dialing(http) %v (node) --> %v:%v (nodeIP)", config.SecondaryNodeIP, config.SecondaryNodeIP, config.NodeHTTPPort))
 			err = config.DialFromNode("http", config.SecondaryNodeIP, config.NodeHTTPPort, config.MaxTries, 0, config.EndpointHostnames())
 			if err != nil {
-				framework.Failf("failed dialing endpoint, %v", err)
+				e2eutils.Failf("failed dialing endpoint, %v", err)
 			}
 		})
 
 		ginkgo.It("should function for node-Service: udp", func() {
-			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack, e2enetwork.UseHostNetwork)
+			config := e2enetwork.NewNetworkingTestConfig(f.ClientSet, f.Namespace.Name, e2enetwork.EnableDualStack, e2enetwork.UseHostNetwork)
 			ginkgo.By(fmt.Sprintf("dialing(udp) %v (node) --> %v:%v (config.clusterIP)", config.SecondaryNodeIP, config.SecondaryClusterIP, e2enetwork.ClusterUDPPort))
 			err := config.DialFromNode("udp", config.SecondaryClusterIP, e2enetwork.ClusterUDPPort, config.MaxTries, 0, config.EndpointHostnames())
 			if err != nil {
-				framework.Failf("failed dialing endpoint, %v", err)
+				e2eutils.Failf("failed dialing endpoint, %v", err)
 			}
 
 			ginkgo.By(fmt.Sprintf("dialing(udp) %v (node) --> %v:%v (nodeIP)", config.SecondaryNodeIP, config.SecondaryNodeIP, config.NodeUDPPort))
 			err = config.DialFromNode("udp", config.SecondaryNodeIP, config.NodeUDPPort, config.MaxTries, 0, config.EndpointHostnames())
 			if err != nil {
-				framework.Failf("failed dialing endpoint, %v", err)
+				e2eutils.Failf("failed dialing endpoint, %v", err)
 			}
 		})
 
 		ginkgo.It("should function for endpoint-Service: http", func() {
-			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack)
+			config := e2enetwork.NewNetworkingTestConfig(f.ClientSet, f.Namespace.Name, e2enetwork.EnableDualStack)
 			ginkgo.By(fmt.Sprintf("dialing(http) %v (endpoint) --> %v:%v (config.clusterIP)", config.EndpointPods[0].Name, config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort))
 			err := config.DialFromEndpointContainer("http", config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort, config.MaxTries, 0, config.EndpointHostnames())
 			if err != nil {
-				framework.Failf("failed dialing endpoint, %v", err)
+				e2eutils.Failf("failed dialing endpoint, %v", err)
 			}
 			ginkgo.By(fmt.Sprintf("dialing(http) %v (endpoint) --> %v:%v (nodeIP)", config.EndpointPods[0].Name, config.SecondaryNodeIP, config.NodeHTTPPort))
 			err = config.DialFromEndpointContainer("http", config.SecondaryNodeIP, config.NodeHTTPPort, config.MaxTries, 0, config.EndpointHostnames())
 			if err != nil {
-				framework.Failf("failed dialing endpoint, %v", err)
+				e2eutils.Failf("failed dialing endpoint, %v", err)
 			}
 		})
 
 		ginkgo.It("should function for endpoint-Service: udp", func() {
-			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack)
+			config := e2enetwork.NewNetworkingTestConfig(f.ClientSet, f.Namespace.Name, e2enetwork.EnableDualStack)
 			ginkgo.By(fmt.Sprintf("dialing(udp) %v (endpoint) --> %v:%v (config.clusterIP)", config.EndpointPods[0].Name, config.SecondaryClusterIP, e2enetwork.ClusterUDPPort))
 			err := config.DialFromEndpointContainer("udp", config.SecondaryClusterIP, e2enetwork.ClusterUDPPort, config.MaxTries, 0, config.EndpointHostnames())
 			if err != nil {
-				framework.Failf("failed dialing endpoint, %v", err)
+				e2eutils.Failf("failed dialing endpoint, %v", err)
 			}
 			ginkgo.By(fmt.Sprintf("dialing(udp) %v (endpoint) --> %v:%v (nodeIP)", config.EndpointPods[0].Name, config.SecondaryNodeIP, config.NodeUDPPort))
 			err = config.DialFromEndpointContainer("udp", config.SecondaryNodeIP, config.NodeUDPPort, config.MaxTries, 0, config.EndpointHostnames())
 			if err != nil {
-				framework.Failf("failed dialing endpoint, %v", err)
+				e2eutils.Failf("failed dialing endpoint, %v", err)
 			}
 		})
 
 		ginkgo.It("should update endpoints: http", func() {
-			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack)
+			config := e2enetwork.NewNetworkingTestConfig(f.ClientSet, f.Namespace.Name, e2enetwork.EnableDualStack)
 			ginkgo.By(fmt.Sprintf("dialing(http) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort))
 			err := config.DialFromTestContainer("http", config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort, config.MaxTries, 0, config.EndpointHostnames())
 			if err != nil {
-				framework.Failf("failed dialing endpoint, %v", err)
+				e2eutils.Failf("failed dialing endpoint, %v", err)
 			}
 			config.DeleteNetProxyPod()
 
 			ginkgo.By(fmt.Sprintf("dialing(http) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort))
 			err = config.DialFromTestContainer("http", config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort, config.MaxTries, config.MaxTries, config.EndpointHostnames())
 			if err != nil {
-				framework.Failf("failed dialing endpoint, %v", err)
+				e2eutils.Failf("failed dialing endpoint, %v", err)
 			}
 		})
 
 		ginkgo.It("should update endpoints: udp", func() {
-			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack)
+			config := e2enetwork.NewNetworkingTestConfig(f.ClientSet, f.Namespace.Name, e2enetwork.EnableDualStack)
 			ginkgo.By(fmt.Sprintf("dialing(udp) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.SecondaryClusterIP, e2enetwork.ClusterUDPPort))
 			err := config.DialFromTestContainer("udp", config.SecondaryClusterIP, e2enetwork.ClusterUDPPort, config.MaxTries, 0, config.EndpointHostnames())
 			if err != nil {
-				framework.Failf("failed dialing endpoint, %v", err)
+				e2eutils.Failf("failed dialing endpoint, %v", err)
 			}
 
 			config.DeleteNetProxyPod()
@@ -562,55 +565,55 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 			ginkgo.By(fmt.Sprintf("dialing(udp) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.SecondaryClusterIP, e2enetwork.ClusterUDPPort))
 			err = config.DialFromTestContainer("udp", config.SecondaryClusterIP, e2enetwork.ClusterUDPPort, config.MaxTries, config.MaxTries, config.EndpointHostnames())
 			if err != nil {
-				framework.Failf("failed dialing endpoint, %v", err)
+				e2eutils.Failf("failed dialing endpoint, %v", err)
 			}
 		})
 
 		// [LinuxOnly]: Windows does not support session affinity.
 		ginkgo.It("should function for client IP based session affinity: http [LinuxOnly]", func() {
-			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack)
+			config := e2enetwork.NewNetworkingTestConfig(f.ClientSet, f.Namespace.Name, e2enetwork.EnableDualStack)
 			ginkgo.By(fmt.Sprintf("dialing(http) %v --> %v:%v", config.TestContainerPod.Name, config.SessionAffinityService.Spec.ClusterIPs[1], e2enetwork.ClusterHTTPPort))
 
 			// Check if number of endpoints returned are exactly one.
 			eps, err := config.GetEndpointsFromTestContainer("http", config.SessionAffinityService.Spec.ClusterIPs[1], e2enetwork.ClusterHTTPPort, e2enetwork.SessionAffinityChecks)
 			if err != nil {
-				framework.Failf("ginkgo.Failed to get endpoints from test container, error: %v", err)
+				e2eutils.Failf("ginkgo.Failed to get endpoints from test container, error: %v", err)
 			}
 			if len(eps) == 0 {
-				framework.Failf("Unexpected no endpoints return")
+				e2eutils.Failf("Unexpected no endpoints return")
 			}
 			if len(eps) > 1 {
-				framework.Failf("Unexpected endpoints return: %v, expect 1 endpoints", eps)
+				e2eutils.Failf("Unexpected endpoints return: %v, expect 1 endpoints", eps)
 			}
 		})
 
 		// [LinuxOnly]: Windows does not support session affinity.
 		ginkgo.It("should function for client IP based session affinity: udp [LinuxOnly]", func() {
-			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack)
+			config := e2enetwork.NewNetworkingTestConfig(f.ClientSet, f.Namespace.Name, e2enetwork.EnableDualStack)
 			ginkgo.By(fmt.Sprintf("dialing(udp) %v --> %v:%v", config.TestContainerPod.Name, config.SessionAffinityService.Spec.ClusterIPs[1], e2enetwork.ClusterUDPPort))
 
 			// Check if number of endpoints returned are exactly one.
 			eps, err := config.GetEndpointsFromTestContainer("udp", config.SessionAffinityService.Spec.ClusterIPs[1], e2enetwork.ClusterUDPPort, e2enetwork.SessionAffinityChecks)
 			if err != nil {
-				framework.Failf("ginkgo.Failed to get endpoints from test container, error: %v", err)
+				e2eutils.Failf("ginkgo.Failed to get endpoints from test container, error: %v", err)
 			}
 			if len(eps) == 0 {
-				framework.Failf("Unexpected no endpoints return")
+				e2eutils.Failf("Unexpected no endpoints return")
 			}
 			if len(eps) > 1 {
-				framework.Failf("Unexpected endpoints return: %v, expect 1 endpoints", eps)
+				e2eutils.Failf("Unexpected endpoints return: %v, expect 1 endpoints", eps)
 			}
 		})
 
 		ginkgo.It("should be able to handle large requests: http", func() {
-			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack)
+			config := e2enetwork.NewNetworkingTestConfig(f.ClientSet, f.Namespace.Name, e2enetwork.EnableDualStack)
 			ginkgo.By(fmt.Sprintf("dialing(http) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort))
 			message := strings.Repeat("42", 1000)
 			config.DialEchoFromTestContainer("http", config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort, config.MaxTries, 0, message)
 		})
 
 		ginkgo.It("should be able to handle large requests: udp", func() {
-			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack)
+			config := e2enetwork.NewNetworkingTestConfig(f.ClientSet, f.Namespace.Name, e2enetwork.EnableDualStack)
 			ginkgo.By(fmt.Sprintf("dialing(udp) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.SecondaryClusterIP, e2enetwork.ClusterUDPPort))
 			message := "n" + strings.Repeat("o", 1999)
 			config.DialEchoFromTestContainer("udp", config.SecondaryClusterIP, e2enetwork.ClusterUDPPort, config.MaxTries, 0, message)
@@ -620,19 +623,19 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 		// because the pods will try to acquire the same port in the host.
 		// We run the test in serial, to avoid port conflicts.
 		ginkgo.It("should function for service endpoints using hostNetwork", func() {
-			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack, e2enetwork.UseHostNetwork, e2enetwork.EndpointsUseHostNetwork)
+			config := e2enetwork.NewNetworkingTestConfig(f.ClientSet, f.Namespace.Name, e2enetwork.EnableDualStack, e2enetwork.UseHostNetwork, e2enetwork.EndpointsUseHostNetwork)
 
 			ginkgo.By("pod-Service(hostNetwork): http")
 
 			ginkgo.By(fmt.Sprintf("dialing(http) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort))
 			err := config.DialFromTestContainer("http", config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort, config.MaxTries, 0, config.EndpointHostnames())
 			if err != nil {
-				framework.Failf("failed dialing endpoint, %v", err)
+				e2eutils.Failf("failed dialing endpoint, %v", err)
 			}
 			ginkgo.By(fmt.Sprintf("dialing(http) %v --> %v:%v (nodeIP)", config.TestContainerPod.Name, config.SecondaryNodeIP, config.NodeHTTPPort))
 			err = config.DialFromTestContainer("http", config.SecondaryNodeIP, config.NodeHTTPPort, config.MaxTries, 0, config.EndpointHostnames())
 			if err != nil {
-				framework.Failf("failed dialing endpoint, %v", err)
+				e2eutils.Failf("failed dialing endpoint, %v", err)
 			}
 
 			ginkgo.By("node-Service(hostNetwork): http")
@@ -640,13 +643,13 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 			ginkgo.By(fmt.Sprintf("dialing(http) %v (node) --> %v:%v (config.clusterIP)", config.SecondaryNodeIP, config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort))
 			err = config.DialFromNode("http", config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort, config.MaxTries, 0, config.EndpointHostnames())
 			if err != nil {
-				framework.Failf("failed dialing endpoint, %v", err)
+				e2eutils.Failf("failed dialing endpoint, %v", err)
 			}
 
 			ginkgo.By(fmt.Sprintf("dialing(http) %v (node) --> %v:%v (nodeIP)", config.SecondaryNodeIP, config.SecondaryNodeIP, config.NodeHTTPPort))
 			err = config.DialFromNode("http", config.SecondaryNodeIP, config.NodeHTTPPort, config.MaxTries, 0, config.EndpointHostnames())
 			if err != nil {
-				framework.Failf("failed dialing endpoint, %v", err)
+				e2eutils.Failf("failed dialing endpoint, %v", err)
 			}
 
 			ginkgo.By("node-Service(hostNetwork): udp")
@@ -656,13 +659,13 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 			err = config.DialFromNode("udp", config.SecondaryClusterIP, e2enetwork.ClusterUDPPort, config.MaxTries, 0, config.EndpointHostnames())
 			if err != nil {
 				time.Sleep(10 * time.Hour)
-				framework.Failf("failed dialing endpoint, %v", err)
+				e2eutils.Failf("failed dialing endpoint, %v", err)
 			}
 
 			ginkgo.By(fmt.Sprintf("dialing(udp) %v (node) --> %v:%v (nodeIP)", config.SecondaryNodeIP, config.SecondaryNodeIP, config.NodeUDPPort))
 			err = config.DialFromNode("udp", config.SecondaryNodeIP, config.NodeUDPPort, config.MaxTries, 0, config.EndpointHostnames())
 			if err != nil {
-				framework.Failf("failed dialing endpoint, %v", err)
+				e2eutils.Failf("failed dialing endpoint, %v", err)
 			}
 
 			ginkgo.By("handle large requests: http(hostNetwork)")
@@ -671,7 +674,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 			message := strings.Repeat("42", 1000)
 			err = config.DialEchoFromTestContainer("http", config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort, config.MaxTries, 0, message)
 			if err != nil {
-				framework.Failf("failed dialing endpoint, %v", err)
+				e2eutils.Failf("failed dialing endpoint, %v", err)
 			}
 
 			ginkgo.By("handle large requests: udp(hostNetwork)")
@@ -680,7 +683,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 			message = "n" + strings.Repeat("o", 1999)
 			err = config.DialEchoFromTestContainer("udp", config.SecondaryClusterIP, e2enetwork.ClusterUDPPort, config.MaxTries, 0, message)
 			if err != nil {
-				framework.Failf("failed dialing endpoint, %v", err)
+				e2eutils.Failf("failed dialing endpoint, %v", err)
 			}
 		})
 	})
@@ -688,52 +691,52 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 
 func validateNumOfServicePorts(svc *v1.Service, expectedNumOfPorts int) {
 	if len(svc.Spec.Ports) != expectedNumOfPorts {
-		framework.Failf("got unexpected len(Spec.Ports) for service: %v", svc)
+		e2eutils.Failf("got unexpected len(Spec.Ports) for service: %v", svc)
 	}
 }
 
 func validateServiceAndClusterIPFamily(svc *v1.Service, expectedIPFamilies []v1.IPFamily, expectedPolicy *v1.IPFamilyPolicyType) {
 	if len(svc.Spec.IPFamilies) != len(expectedIPFamilies) {
-		framework.Failf("service ip family nil for service %s/%s", svc.Namespace, svc.Name)
+		e2eutils.Failf("service ip family nil for service %s/%s", svc.Namespace, svc.Name)
 	}
 
 	for idx, family := range expectedIPFamilies {
 		if svc.Spec.IPFamilies[idx] != family {
-			framework.Failf("service %s/%s expected family %v at index[%v] got %v", svc.Namespace, svc.Name, family, idx, svc.Spec.IPFamilies[idx])
+			e2eutils.Failf("service %s/%s expected family %v at index[%v] got %v", svc.Namespace, svc.Name, family, idx, svc.Spec.IPFamilies[idx])
 		}
 	}
 
 	// validate ip assigned is from the family
 	if len(svc.Spec.ClusterIPs) != len(svc.Spec.IPFamilies) {
-		framework.Failf("service %s/%s assigned ips [%+v] does not match families [%+v]", svc.Namespace, svc.Name, svc.Spec.ClusterIPs, svc.Spec.IPFamilies)
+		e2eutils.Failf("service %s/%s assigned ips [%+v] does not match families [%+v]", svc.Namespace, svc.Name, svc.Spec.ClusterIPs, svc.Spec.IPFamilies)
 	}
 
 	for idx, family := range svc.Spec.IPFamilies {
 		if (family == v1.IPv6Protocol) != netutils.IsIPv6String(svc.Spec.ClusterIPs[idx]) {
-			framework.Failf("service %s/%s assigned ips at [%v]:%v does not match family:%v", svc.Namespace, svc.Name, idx, svc.Spec.ClusterIPs[idx], family)
+			e2eutils.Failf("service %s/%s assigned ips at [%v]:%v does not match family:%v", svc.Namespace, svc.Name, idx, svc.Spec.ClusterIPs[idx], family)
 		}
 	}
 	// validate policy
 	if expectedPolicy == nil && svc.Spec.IPFamilyPolicy != nil {
-		framework.Failf("service %s/%s expected nil for IPFamilyPolicy", svc.Namespace, svc.Name)
+		e2eutils.Failf("service %s/%s expected nil for IPFamilyPolicy", svc.Namespace, svc.Name)
 	}
 	if expectedPolicy != nil && svc.Spec.IPFamilyPolicy == nil {
-		framework.Failf("service %s/%s expected value %v for IPFamilyPolicy", svc.Namespace, svc.Name, expectedPolicy)
+		e2eutils.Failf("service %s/%s expected value %v for IPFamilyPolicy", svc.Namespace, svc.Name, expectedPolicy)
 	}
 
 	if expectedPolicy != nil && *(svc.Spec.IPFamilyPolicy) != *(expectedPolicy) {
-		framework.Failf("service %s/%s expected value %v for IPFamilyPolicy", svc.Namespace, svc.Name, expectedPolicy)
+		e2eutils.Failf("service %s/%s expected value %v for IPFamilyPolicy", svc.Namespace, svc.Name, expectedPolicy)
 	}
 }
 
 func validateEndpointsBelongToIPFamily(svc *v1.Service, endpoint *v1.Endpoints, expectedIPFamily v1.IPFamily) {
 	if len(endpoint.Subsets) == 0 {
-		framework.Failf("Endpoint has no subsets, cannot determine service ip family matches endpoints ip family for service %s/%s", svc.Namespace, svc.Name)
+		e2eutils.Failf("Endpoint has no subsets, cannot determine service ip family matches endpoints ip family for service %s/%s", svc.Namespace, svc.Name)
 	}
 	for _, ss := range endpoint.Subsets {
 		for _, e := range ss.Addresses {
 			if (expectedIPFamily == v1.IPv6Protocol) != netutils.IsIPv6String(e.IP) {
-				framework.Failf("service endpoint %s doesn't belong to %s ip family", e.IP, expectedIPFamily)
+				e2eutils.Failf("service endpoint %s doesn't belong to %s ip family", e.IP, expectedIPFamily)
 			}
 		}
 	}
@@ -748,10 +751,10 @@ func assertNetworkConnectivity(f *framework.Framework, serverPods v1.PodList, cl
 	var serverIPs []string
 	for _, pod := range serverPods.Items {
 		if pod.Status.PodIPs == nil || len(pod.Status.PodIPs) != 2 {
-			framework.Failf("PodIPs list not expected value, got %v", pod.Status.PodIPs)
+			e2eutils.Failf("PodIPs list not expected value, got %v", pod.Status.PodIPs)
 		}
 		if netutils.IsIPv4String(pod.Status.PodIPs[0].IP) == netutils.IsIPv4String(pod.Status.PodIPs[1].IP) {
-			framework.Failf("PodIPs should belong to different families, got %v", pod.Status.PodIPs)
+			e2eutils.Failf("PodIPs should belong to different families, got %v", pod.Status.PodIPs)
 		}
 		serverIPs = append(serverIPs, pod.Status.PodIPs[0].IP, pod.Status.PodIPs[1].IP)
 	}
@@ -761,7 +764,7 @@ func assertNetworkConnectivity(f *framework.Framework, serverPods v1.PodList, cl
 			gomega.Consistently(func() error {
 				ginkgo.By(fmt.Sprintf("checking connectivity from pod %s to serverIP: %s, port: %s", clientPod.Name, ip, port))
 				cmd := checkNetworkConnectivity(ip, port, timeout)
-				_, _, err := f.ExecCommandInContainerWithFullOutput(clientPod.Name, containerName, cmd...)
+				_, _, err := e2eutils.ExecCommandInContainerWithFullOutput(f.ClientSet, f.Namespace.Name, clientPod.Name, containerName, cmd...)
 				return err
 			}, duration, pollInterval).ShouldNot(gomega.HaveOccurred())
 		}

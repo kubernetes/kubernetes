@@ -21,6 +21,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	nodev1 "k8s.io/api/node/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -44,7 +47,7 @@ func makePodToVerifyCgroupSize(cgroupNames []string, expectedCPU string, expecte
 		cgroupName := cm.NewCgroupName(rootCgroupName, cgroupComponents...)
 		cgroupFsNames = append(cgroupFsNames, toCgroupFsName(cgroupName))
 	}
-	framework.Logf("expecting %v cgroups to be found", cgroupFsNames)
+	e2eutils.Logf("expecting %v cgroups to be found", cgroupFsNames)
 
 	// build the pod command to verify cgroup sizing
 	command := ""
@@ -53,7 +56,7 @@ func makePodToVerifyCgroupSize(cgroupNames []string, expectedCPU string, expecte
 		cpuQuotaCgroup := filepath.Join("/host_cgroups/cpu", cgroupFsName, "cpu.cfs_quota_us")
 		localCommand := "if [ ! $(cat " + memLimitCgroup + ") == " + expectedMemory + " ] || [ ! $(cat " + cpuQuotaCgroup + ") == " + expectedCPU + " ]; then exit 1; fi; "
 
-		framework.Logf("command: %v: ", localCommand)
+		e2eutils.Logf("command: %v: ", localCommand)
 		command += localCommand
 	}
 
@@ -94,7 +97,7 @@ var _ = SIGDescribe("Kubelet PodOverhead handling [LinuxOnly]", func() {
 	ginkgo.Describe("PodOverhead cgroup accounting", func() {
 		ginkgo.Context("On running pod with PodOverhead defined", func() {
 			ginkgo.It("Pod cgroup should be sum of overhead and resource limits", func() {
-				if !framework.TestContext.KubeletConfig.CgroupsPerQOS {
+				if !e2econfig.TestContext.KubeletConfig.CgroupsPerQOS {
 					return
 				}
 
@@ -113,7 +116,7 @@ var _ = SIGDescribe("Kubelet PodOverhead handling [LinuxOnly]", func() {
 						},
 					}
 					_, err := f.ClientSet.NodeV1().RuntimeClasses().Create(context.TODO(), rc, metav1.CreateOptions{})
-					framework.ExpectNoError(err, "failed to create RuntimeClass resource")
+					e2eutils.ExpectNoError(err, "failed to create RuntimeClass resource")
 				})
 				ginkgo.By("Creating a Guaranteed pod with which has Overhead defined", func() {
 					guaranteedPod = f.PodClient().CreateSync(&v1.Pod{
@@ -140,7 +143,7 @@ var _ = SIGDescribe("Kubelet PodOverhead handling [LinuxOnly]", func() {
 					pod := makePodToVerifyCgroupSize(cgroupsToVerify, "30000", "251658240")
 					pod = f.PodClient().Create(pod)
 					err := e2epod.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
-					framework.ExpectNoError(err)
+					e2eutils.ExpectNoError(err)
 				})
 			})
 		})

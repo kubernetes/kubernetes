@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"path"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -103,7 +105,7 @@ var _ = SIGDescribe("Secrets", func() {
 		)
 
 		if namespace2, err = f.CreateNamespace("secret-namespace", nil); err != nil {
-			framework.Failf("unable to create new namespace %s: %v", namespace2.Name, err)
+			e2eutils.Failf("unable to create new namespace %s: %v", namespace2.Name, err)
 		}
 
 		secret2 := secretForTest(namespace2.Name, secret2Name)
@@ -111,7 +113,7 @@ var _ = SIGDescribe("Secrets", func() {
 			"this_should_not_match_content_of_other_secret": []byte("similarly_this_should_not_match_content_of_other_secret\n"),
 		}
 		if secret2, err = f.ClientSet.CoreV1().Secrets(namespace2.Name).Create(context.TODO(), secret2, metav1.CreateOptions{}); err != nil {
-			framework.Failf("unable to create test secret %s: %v", secret2.Name, err)
+			e2eutils.Failf("unable to create test secret %s: %v", secret2.Name, err)
 		}
 		doSecretE2EWithoutMapping(f, nil /* default mode */, secret2.Name, nil, nil)
 	})
@@ -137,7 +139,7 @@ var _ = SIGDescribe("Secrets", func() {
 		ginkgo.By(fmt.Sprintf("Creating secret with name %s", secret.Name))
 		var err error
 		if secret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(context.TODO(), secret, metav1.CreateOptions{}); err != nil {
-			framework.Failf("unable to create test secret %s: %v", secret.Name, err)
+			e2eutils.Failf("unable to create test secret %s: %v", secret.Name, err)
 		}
 
 		pod := &v1.Pod{
@@ -249,12 +251,12 @@ var _ = SIGDescribe("Secrets", func() {
 		ginkgo.By(fmt.Sprintf("Creating secret with name %s", deleteSecret.Name))
 		var err error
 		if deleteSecret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(context.TODO(), deleteSecret, metav1.CreateOptions{}); err != nil {
-			framework.Failf("unable to create test secret %s: %v", deleteSecret.Name, err)
+			e2eutils.Failf("unable to create test secret %s: %v", deleteSecret.Name, err)
 		}
 
 		ginkgo.By(fmt.Sprintf("Creating secret with name %s", updateSecret.Name))
 		if updateSecret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(context.TODO(), updateSecret, metav1.CreateOptions{}); err != nil {
-			framework.Failf("unable to create test secret %s: %v", updateSecret.Name, err)
+			e2eutils.Failf("unable to create test secret %s: %v", updateSecret.Name, err)
 		}
 
 		pod := &v1.Pod{
@@ -338,39 +340,39 @@ var _ = SIGDescribe("Secrets", func() {
 		pollCreateLogs := func() (string, error) {
 			return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, createContainerName)
 		}
-		gomega.Eventually(pollCreateLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("Error reading file /etc/secret-volumes/create/data-1"))
+		gomega.Eventually(pollCreateLogs, podLogTimeout, e2eutils.Poll).Should(gomega.ContainSubstring("Error reading file /etc/secret-volumes/create/data-1"))
 
 		pollUpdateLogs := func() (string, error) {
 			return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, updateContainerName)
 		}
-		gomega.Eventually(pollUpdateLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("Error reading file /etc/secret-volumes/update/data-3"))
+		gomega.Eventually(pollUpdateLogs, podLogTimeout, e2eutils.Poll).Should(gomega.ContainSubstring("Error reading file /etc/secret-volumes/update/data-3"))
 
 		pollDeleteLogs := func() (string, error) {
 			return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, deleteContainerName)
 		}
-		gomega.Eventually(pollDeleteLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("value-1"))
+		gomega.Eventually(pollDeleteLogs, podLogTimeout, e2eutils.Poll).Should(gomega.ContainSubstring("value-1"))
 
 		ginkgo.By(fmt.Sprintf("Deleting secret %v", deleteSecret.Name))
 		err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Delete(context.TODO(), deleteSecret.Name, metav1.DeleteOptions{})
-		framework.ExpectNoError(err, "Failed to delete secret %q in namespace %q", deleteSecret.Name, f.Namespace.Name)
+		e2eutils.ExpectNoError(err, "Failed to delete secret %q in namespace %q", deleteSecret.Name, f.Namespace.Name)
 
 		ginkgo.By(fmt.Sprintf("Updating secret %v", updateSecret.Name))
 		updateSecret.ResourceVersion = "" // to force update
 		delete(updateSecret.Data, "data-1")
 		updateSecret.Data["data-3"] = []byte("value-3")
 		_, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Update(context.TODO(), updateSecret, metav1.UpdateOptions{})
-		framework.ExpectNoError(err, "Failed to update secret %q in namespace %q", updateSecret.Name, f.Namespace.Name)
+		e2eutils.ExpectNoError(err, "Failed to update secret %q in namespace %q", updateSecret.Name, f.Namespace.Name)
 
 		ginkgo.By(fmt.Sprintf("Creating secret with name %s", createSecret.Name))
 		if createSecret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(context.TODO(), createSecret, metav1.CreateOptions{}); err != nil {
-			framework.Failf("unable to create test secret %s: %v", createSecret.Name, err)
+			e2eutils.Failf("unable to create test secret %s: %v", createSecret.Name, err)
 		}
 
 		ginkgo.By("waiting to observe update in volume")
 
-		gomega.Eventually(pollCreateLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("value-1"))
-		gomega.Eventually(pollUpdateLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("value-3"))
-		gomega.Eventually(pollDeleteLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("Error reading file /etc/secret-volumes/delete/data-1"))
+		gomega.Eventually(pollCreateLogs, podLogTimeout, e2eutils.Poll).Should(gomega.ContainSubstring("value-1"))
+		gomega.Eventually(pollUpdateLogs, podLogTimeout, e2eutils.Poll).Should(gomega.ContainSubstring("value-3"))
+		gomega.Eventually(pollDeleteLogs, podLogTimeout, e2eutils.Poll).Should(gomega.ContainSubstring("Error reading file /etc/secret-volumes/delete/data-1"))
 	})
 
 	/*
@@ -387,49 +389,49 @@ var _ = SIGDescribe("Secrets", func() {
 		secret := secretForTest(f.Namespace.Name, name)
 
 		currentSecret, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(context.TODO(), secret, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "Failed to create secret %q in namespace %q", secret.Name, secret.Namespace)
+		e2eutils.ExpectNoError(err, "Failed to create secret %q in namespace %q", secret.Name, secret.Namespace)
 
 		currentSecret.Data["data-4"] = []byte("value-4\n")
 		currentSecret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Update(context.TODO(), currentSecret, metav1.UpdateOptions{})
-		framework.ExpectNoError(err, "Failed to update secret %q in namespace %q", secret.Name, secret.Namespace)
+		e2eutils.ExpectNoError(err, "Failed to update secret %q in namespace %q", secret.Name, secret.Namespace)
 
 		// Mark secret as immutable.
 		trueVal := true
 		currentSecret.Immutable = &trueVal
 		currentSecret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Update(context.TODO(), currentSecret, metav1.UpdateOptions{})
-		framework.ExpectNoError(err, "Failed to mark secret %q in namespace %q as immutable", secret.Name, secret.Namespace)
+		e2eutils.ExpectNoError(err, "Failed to mark secret %q in namespace %q as immutable", secret.Name, secret.Namespace)
 
 		// Ensure data can't be changed now.
 		currentSecret.Data["data-5"] = []byte("value-5\n")
 		_, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Update(context.TODO(), currentSecret, metav1.UpdateOptions{})
 		if !apierrors.IsInvalid(err) {
-			framework.Failf("expected 'invalid' as error, got instead: %v", err)
+			e2eutils.Failf("expected 'invalid' as error, got instead: %v", err)
 		}
 
 		// Ensure secret can't be switched from immutable to mutable.
 		currentSecret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Get(context.TODO(), name, metav1.GetOptions{})
-		framework.ExpectNoError(err, "Failed to get secret %q in namespace %q", secret.Name, secret.Namespace)
+		e2eutils.ExpectNoError(err, "Failed to get secret %q in namespace %q", secret.Name, secret.Namespace)
 		if !*currentSecret.Immutable {
-			framework.Failf("currentSecret %s can be switched from immutable to mutable", currentSecret.Name)
+			e2eutils.Failf("currentSecret %s can be switched from immutable to mutable", currentSecret.Name)
 		}
 
 		falseVal := false
 		currentSecret.Immutable = &falseVal
 		_, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Update(context.TODO(), currentSecret, metav1.UpdateOptions{})
 		if !apierrors.IsInvalid(err) {
-			framework.Failf("expected 'invalid' as error, got instead: %v", err)
+			e2eutils.Failf("expected 'invalid' as error, got instead: %v", err)
 		}
 
 		// Ensure that metadata can be changed.
 		currentSecret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Get(context.TODO(), name, metav1.GetOptions{})
-		framework.ExpectNoError(err, "Failed to get secret %q in namespace %q", secret.Name, secret.Namespace)
+		e2eutils.ExpectNoError(err, "Failed to get secret %q in namespace %q", secret.Name, secret.Namespace)
 		currentSecret.Labels = map[string]string{"label1": "value1"}
 		_, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Update(context.TODO(), currentSecret, metav1.UpdateOptions{})
-		framework.ExpectNoError(err, "Failed to update secret %q in namespace %q", secret.Name, secret.Namespace)
+		e2eutils.ExpectNoError(err, "Failed to update secret %q in namespace %q", secret.Name, secret.Namespace)
 
 		// Ensure that immutable secret can be deleted.
 		err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Delete(context.TODO(), name, metav1.DeleteOptions{})
-		framework.ExpectNoError(err, "Failed to delete secret %q in namespace %q", secret.Name, secret.Namespace)
+		e2eutils.ExpectNoError(err, "Failed to delete secret %q in namespace %q", secret.Name, secret.Namespace)
 	})
 
 	// The secret is in pending during volume creation until the secret objects are available
@@ -439,7 +441,7 @@ var _ = SIGDescribe("Secrets", func() {
 		volumeMountPath := "/etc/secret-volumes"
 		podName := "pod-secrets-" + string(uuid.NewUUID())
 		err := createNonOptionalSecretPod(f, volumeMountPath, podName)
-		framework.ExpectError(err, "created pod %q with non-optional secret in namespace %q", podName, f.Namespace.Name)
+		e2eutils.ExpectError(err, "created pod %q with non-optional secret in namespace %q", podName, f.Namespace.Name)
 	})
 
 	// Secret object defined for the pod, If a key is specified which is not present in the secret,
@@ -449,7 +451,7 @@ var _ = SIGDescribe("Secrets", func() {
 		volumeMountPath := "/etc/secret-volumes"
 		podName := "pod-secrets-" + string(uuid.NewUUID())
 		err := createNonOptionalSecretPodWithSecret(f, volumeMountPath, podName)
-		framework.ExpectError(err, "created pod %q with non-optional secret in namespace %q", podName, f.Namespace.Name)
+		e2eutils.ExpectError(err, "created pod %q with non-optional secret in namespace %q", podName, f.Namespace.Name)
 	})
 })
 
@@ -478,7 +480,7 @@ func doSecretE2EWithoutMapping(f *framework.Framework, defaultMode *int32, secre
 	ginkgo.By(fmt.Sprintf("Creating secret with name %s", secret.Name))
 	var err error
 	if secret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(context.TODO(), secret, metav1.CreateOptions{}); err != nil {
-		framework.Failf("unable to create test secret %s: %v", secret.Name, err)
+		e2eutils.Failf("unable to create test secret %s: %v", secret.Name, err)
 	}
 
 	pod := &v1.Pod{
@@ -548,7 +550,7 @@ func doSecretE2EWithMapping(f *framework.Framework, mode *int32) {
 	ginkgo.By(fmt.Sprintf("Creating secret with name %s", secret.Name))
 	var err error
 	if secret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(context.TODO(), secret, metav1.CreateOptions{}); err != nil {
-		framework.Failf("unable to create test secret %s: %v", secret.Name, err)
+		e2eutils.Failf("unable to create test secret %s: %v", secret.Name, err)
 	}
 
 	pod := &v1.Pod{
@@ -667,7 +669,7 @@ func createNonOptionalSecretPodWithSecret(f *framework.Framework, volumeMountPat
 	ginkgo.By(fmt.Sprintf("Creating secret with name %s", secret.Name))
 	var err error
 	if secret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(context.TODO(), secret, metav1.CreateOptions{}); err != nil {
-		framework.Failf("unable to create test secret %s: %v", secret.Name, err)
+		e2eutils.Failf("unable to create test secret %s: %v", secret.Name, err)
 	}
 	// creating a pod with secret object, with the key which is not present in secret object.
 	pod := &v1.Pod{

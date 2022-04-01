@@ -25,6 +25,8 @@ import (
 	"fmt"
 	"path/filepath"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 
 	v1 "k8s.io/api/core/v1"
@@ -154,7 +156,7 @@ func (t *volumesTestSuite) DefineTests(driver storageframework.TestDriver, patte
 
 		errs = append(errs, storageutils.TryFunc(l.driverCleanup))
 		l.driverCleanup = nil
-		framework.ExpectNoError(errors.NewAggregate(errs), "while cleaning up resource")
+		e2eutils.ExpectNoError(errors.NewAggregate(errs), "while cleaning up resource")
 		l.migrationCheck.validateMigrationVolumeOpCounts()
 	}
 
@@ -177,7 +179,7 @@ func (t *volumesTestSuite) DefineTests(driver storageframework.TestDriver, patte
 		}
 		config := storageframework.ConvertTestConfig(l.config)
 		var fsGroup *int64
-		if framework.NodeOSDistroIs("windows") && dInfo.Capabilities[storageframework.CapFsGroup] {
+		if e2eutils.NodeOSDistroIs("windows") && dInfo.Capabilities[storageframework.CapFsGroup] {
 			fsGroupVal := int64(1234)
 			fsGroup = &fsGroupVal
 		}
@@ -185,9 +187,9 @@ func (t *volumesTestSuite) DefineTests(driver storageframework.TestDriver, patte
 		// local), plugin skips setting fsGroup if volume is already mounted
 		// and we don't have reliable way to detect volumes are unmounted or
 		// not before starting the second pod.
-		e2evolume.InjectContent(f, config, fsGroup, pattern.FsType, tests)
+		e2evolume.InjectContent(f.ClientSet, f.Namespace.Name, f.Timeouts, config, fsGroup, pattern.FsType, tests)
 		if driver.GetDriverInfo().Capabilities[storageframework.CapPersistence] {
-			e2evolume.TestVolumeClient(f, config, fsGroup, pattern.FsType, tests)
+			e2evolume.TestVolumeClient(f.ClientSet, f.Namespace.Name, f.Timeouts, config, fsGroup, pattern.FsType, tests)
 		} else {
 			ginkgo.By("Skipping persistence check for non-persistent volume")
 		}
@@ -218,7 +220,7 @@ func testScriptInPod(
 	suffix := generateSuffixForPodName(volumeType)
 	fileName := fmt.Sprintf("test-%s", suffix)
 	var content string
-	if framework.NodeOSDistroIs("windows") {
+	if e2eutils.NodeOSDistroIs("windows") {
 		content = fmt.Sprintf("ls -n %s", volPath)
 	} else {
 		content = fmt.Sprintf("ls %s", volPath)
@@ -258,7 +260,7 @@ func testScriptInPod(
 
 	ginkgo.By(fmt.Sprintf("Deleting pod %s", pod.Name))
 	err := e2epod.DeletePodWithWait(f.ClientSet, pod)
-	framework.ExpectNoError(err, "while deleting pod")
+	e2eutils.ExpectNoError(err, "while deleting pod")
 }
 
 // generateWriteandExecuteScriptFileCmd generates the corresponding command lines to write a file with the given file path
@@ -266,12 +268,12 @@ func testScriptInPod(
 // Depending on the Node OS is Windows or linux, the command will use powershell or /bin/sh
 func generateWriteandExecuteScriptFileCmd(content, fileName, filePath string) []string {
 	// for windows cluster, modify the Pod spec.
-	if framework.NodeOSDistroIs("windows") {
+	if e2eutils.NodeOSDistroIs("windows") {
 		scriptName := fmt.Sprintf("%s.ps1", fileName)
 		fullPath := filepath.Join(filePath, scriptName)
 
 		cmd := "echo \"" + content + "\" > " + fullPath + "; .\\" + fullPath
-		framework.Logf("generated pod command %s", cmd)
+		e2eutils.Logf("generated pod command %s", cmd)
 		return []string{"powershell", "/c", cmd}
 	}
 	scriptName := fmt.Sprintf("%s.sh", fileName)

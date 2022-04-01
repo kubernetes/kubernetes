@@ -26,6 +26,9 @@ import (
 	"strings"
 	"time"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
@@ -54,7 +57,7 @@ func StartPodLogs(f *framework.Framework, driverNamespace *v1.Namespace) func() 
 	to := podlogs.LogOutput{
 		StatusWriter: ginkgo.GinkgoWriter,
 	}
-	if framework.TestContext.ReportDir == "" {
+	if e2econfig.TestContext.ReportDir == "" {
 		to.LogWriter = ginkgo.GinkgoWriter
 	} else {
 		test := ginkgo.CurrentGinkgoTestDescription()
@@ -74,13 +77,13 @@ func StartPodLogs(f *framework.Framework, driverNamespace *v1.Namespace) func() 
 		// keeps each directory name smaller (the full test
 		// name at one point exceeded 256 characters, which was
 		// too much for some filesystems).
-		logDir := framework.TestContext.ReportDir + "/" + strings.Join(components, "/")
+		logDir := e2econfig.TestContext.ReportDir + "/" + strings.Join(components, "/")
 		to.LogPathPrefix = logDir + "/"
 
 		err := os.MkdirAll(logDir, 0755)
-		framework.ExpectNoError(err, "create pod log directory")
+		e2eutils.ExpectNoError(err, "create pod log directory")
 		f, err := os.Create(path.Join(logDir, "pod-event.log"))
-		framework.ExpectNoError(err, "create pod events log file")
+		e2eutils.ExpectNoError(err, "create pod events log file")
 		podEventLog = f
 		podEventLogCloser = f
 	}
@@ -106,12 +109,12 @@ func KubeletCommand(kOp KubeletOpt, c clientset.Interface, pod *v1.Pod) {
 	kubeletPid := ""
 
 	nodeIP, err := getHostAddress(c, pod)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	nodeIP = nodeIP + ":22"
 
-	framework.Logf("Checking if systemctl command is present")
-	sshResult, err := e2essh.SSH("systemctl --version", nodeIP, framework.TestContext.Provider)
-	framework.ExpectNoError(err, fmt.Sprintf("SSH to Node %q errored.", pod.Spec.NodeName))
+	e2eutils.Logf("Checking if systemctl command is present")
+	sshResult, err := e2essh.SSH("systemctl --version", nodeIP, e2econfig.TestContext.Provider)
+	e2eutils.ExpectNoError(err, fmt.Sprintf("SSH to Node %q errored.", pod.Spec.NodeName))
 	if !strings.Contains(sshResult.Stderr, "command not found") {
 		command = fmt.Sprintf("systemctl %s kubelet", string(kOp))
 		systemctlPresent = true
@@ -119,7 +122,7 @@ func KubeletCommand(kOp KubeletOpt, c clientset.Interface, pod *v1.Pod) {
 		command = fmt.Sprintf("service kubelet %s", string(kOp))
 	}
 
-	sudoPresent := isSudoPresent(nodeIP, framework.TestContext.Provider)
+	sudoPresent := isSudoPresent(nodeIP, e2econfig.TestContext.Provider)
 	if sudoPresent {
 		command = fmt.Sprintf("sudo %s", command)
 	}
@@ -128,15 +131,15 @@ func KubeletCommand(kOp KubeletOpt, c clientset.Interface, pod *v1.Pod) {
 		kubeletPid = getKubeletMainPid(nodeIP, sudoPresent, systemctlPresent)
 	}
 
-	framework.Logf("Attempting `%s`", command)
-	sshResult, err = e2essh.SSH(command, nodeIP, framework.TestContext.Provider)
-	framework.ExpectNoError(err, fmt.Sprintf("SSH to Node %q errored.", pod.Spec.NodeName))
+	e2eutils.Logf("Attempting `%s`", command)
+	sshResult, err = e2essh.SSH(command, nodeIP, e2econfig.TestContext.Provider)
+	e2eutils.ExpectNoError(err, fmt.Sprintf("SSH to Node %q errored.", pod.Spec.NodeName))
 	e2essh.LogResult(sshResult)
 	gomega.Expect(sshResult.Code).To(gomega.BeZero(), "Failed to [%s] kubelet:\n%#v", string(kOp), sshResult)
 
 	if kOp == KStop {
 		if ok := e2enode.WaitForNodeToBeNotReady(c, pod.Spec.NodeName, NodeStateTimeout); !ok {
-			framework.Failf("Node %s failed to enter NotReady state", pod.Spec.NodeName)
+			e2eutils.Failf("Node %s failed to enter NotReady state", pod.Spec.NodeName)
 		}
 	}
 	if kOp == KRestart {
@@ -149,14 +152,14 @@ func KubeletCommand(kOp KubeletOpt, c clientset.Interface, pod *v1.Pod) {
 				break
 			}
 		}
-		framework.ExpectEqual(isPidChanged, true, "Kubelet PID remained unchanged after restarting Kubelet")
-		framework.Logf("Noticed that kubelet PID is changed. Waiting for 30 Seconds for Kubelet to come back")
+		e2eutils.ExpectEqual(isPidChanged, true, "Kubelet PID remained unchanged after restarting Kubelet")
+		e2eutils.Logf("Noticed that kubelet PID is changed. Waiting for 30 Seconds for Kubelet to come back")
 		time.Sleep(30 * time.Second)
 	}
 	if kOp == KStart || kOp == KRestart {
 		// For kubelet start and restart operations, Wait until Node becomes Ready
 		if ok := e2enode.WaitForNodeToBeReady(c, pod.Spec.NodeName, NodeStateTimeout); !ok {
-			framework.Failf("Node %s failed to enter Ready state", pod.Spec.NodeName)
+			e2eutils.Failf("Node %s failed to enter Ready state", pod.Spec.NodeName)
 		}
 	}
 }

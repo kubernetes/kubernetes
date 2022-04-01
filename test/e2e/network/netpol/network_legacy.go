@@ -26,6 +26,8 @@ import (
 	"strings"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 
 	"github.com/onsi/ginkgo"
@@ -79,8 +81,8 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			podServer, service = createServerPodAndService(f, f.Namespace, "server", []protocolPort{{80, v1.ProtocolTCP}, {81, v1.ProtocolTCP}})
 
 			ginkgo.By("Waiting for pod ready", func() {
-				err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podServer.Name, f.Namespace.Name, framework.PodStartTimeout)
-				framework.ExpectNoError(err)
+				err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podServer.Name, f.Namespace.Name, e2eutils.PodStartTimeout)
+				e2eutils.ExpectNoError(err)
 			})
 
 			// podServerLabelSelector holds the value for the podServer's label "pod-name".
@@ -108,7 +110,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			}
 
 			policy, err := f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(context.TODO(), policy, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			defer cleanupNetworkPolicy(f, policy)
 
 			// Create a pod with name 'client-cannot-connect', which will attempt to communicate with the server,
@@ -122,14 +124,14 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			nsB, err := f.CreateNamespace(nsBName, map[string]string{
 				"ns-name": nsBName,
 			})
-			framework.ExpectNoError(err, "Error occurred while creating namespace-b.")
+			e2eutils.ExpectNoError(err, "Error occurred while creating namespace-b.")
 
 			ginkgo.By("Creating a simple server in another namespace that serves on port 80 and 81.")
 			podB, serviceB := createServerPodAndService(f, nsB, "pod-b", []protocolPort{{80, v1.ProtocolTCP}, {81, v1.ProtocolTCP}})
 
 			ginkgo.By("Waiting for pod ready", func() {
-				err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podB.Name, nsB.Name, framework.PodStartTimeout)
-				framework.ExpectNoError(err)
+				err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podB.Name, nsB.Name, e2eutils.PodStartTimeout)
+				e2eutils.ExpectNoError(err)
 			})
 
 			ginkgo.By("Creating client-a, which should be able to contact the server in another namespace.", func() {
@@ -149,7 +151,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			}
 
 			policy, err = f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(context.TODO(), policy, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			defer cleanupNetworkPolicy(f, policy)
 
 			ginkgo.By("Creating client-to-a, which should not be able to contact the server in the same namespace, Ingress check.", func() {
@@ -167,7 +169,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			nsB, err := f.CreateNamespace(nsBName, map[string]string{
 				"ns-name": nsBName,
 			})
-			framework.ExpectNoError(err, "Error occurred while creating namespace-b.")
+			e2eutils.ExpectNoError(err, "Error occurred while creating namespace-b.")
 
 			// All communication should be possible before applying the policy.
 			ginkgo.By("Creating client-a, in server's namespace, which should be able to contact the server.", func() {
@@ -206,7 +208,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			}
 
 			policy, err = f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(context.TODO(), policy, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			defer cleanupNetworkPolicy(f, policy)
 
 			ginkgo.By("Creating client-a, in server's namespace, which should be able to contact the server.", func() {
@@ -226,12 +228,12 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			nsB, err := f.CreateNamespace(nsBName, map[string]string{
 				"ns-name": nsBName,
 			})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 
 			// Create Server with Service in NS-B
-			framework.Logf("Waiting for server to come up.")
+			e2eutils.Logf("Waiting for server to come up.")
 			err = e2epod.WaitForPodRunningInNamespace(f.ClientSet, podServer)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 
 			// Create Policy for that service that allows traffic only via namespace B
 			ginkgo.By("Creating a network policy for the server which allows traffic from namespace-b.")
@@ -259,7 +261,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 				},
 			}
 			policy, err = f.ClientSet.NetworkingV1().NetworkPolicies(nsA.Name).Create(context.TODO(), policy, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			defer cleanupNetworkPolicy(f, policy)
 
 			testCannotConnect(f, nsA, "client-a", service, 80)
@@ -293,7 +295,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			}
 
 			policy, err := f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(context.TODO(), policy, metav1.CreateOptions{})
-			framework.ExpectNoError(err, "Error creating Network Policy %v: %v", policy.ObjectMeta.Name, err)
+			e2eutils.ExpectNoError(err, "Error creating Network Policy %v: %v", policy.ObjectMeta.Name, err)
 			defer cleanupNetworkPolicy(f, policy)
 
 			ginkgo.By("Creating client-a which should be able to contact the server.", func() {
@@ -310,13 +312,13 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			nsB, err := f.CreateNamespace(nsBName, map[string]string{
 				"ns-name": nsBName,
 			})
-			framework.ExpectNoError(err, "Error creating namespace %v: %v", nsBName, err)
+			e2eutils.ExpectNoError(err, "Error creating namespace %v: %v", nsBName, err)
 
 			nsCName := f.BaseName + "-c"
 			nsC, err := f.CreateNamespace(nsCName, map[string]string{
 				"ns-name": nsCName,
 			})
-			framework.ExpectNoError(err, "Error creating namespace %v: %v", nsCName, err)
+			e2eutils.ExpectNoError(err, "Error creating namespace %v: %v", nsCName, err)
 
 			// Create Policy for the server that allows traffic from namespace different than namespace-a
 			ginkgo.By("Creating a network policy for the server which allows traffic from ns different than namespace-a.")
@@ -345,7 +347,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			}
 
 			policy, err = f.ClientSet.NetworkingV1().NetworkPolicies(nsA.Name).Create(context.TODO(), policy, metav1.CreateOptions{})
-			framework.ExpectNoError(err, "Error creating Network Policy %v: %v", policy.ObjectMeta.Name, err)
+			e2eutils.ExpectNoError(err, "Error creating Network Policy %v: %v", policy.ObjectMeta.Name, err)
 			defer cleanupNetworkPolicy(f, policy)
 
 			testCannotConnect(f, nsC, "client-a", service, 80)
@@ -358,7 +360,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			nsB, err := f.CreateNamespace(nsBName, map[string]string{
 				"ns-name": nsBName,
 			})
-			framework.ExpectNoError(err, "Error creating namespace %v: %v", nsBName, err)
+			e2eutils.ExpectNoError(err, "Error creating namespace %v: %v", nsBName, err)
 
 			// Create Policy for the server that allows traffic only via client B or namespace B
 			ginkgo.By("Creating a network policy for the server which allows traffic from client-b or namespace-b.")
@@ -391,7 +393,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			}
 
 			policy, err = f.ClientSet.NetworkingV1().NetworkPolicies(nsA.Name).Create(context.TODO(), policy, metav1.CreateOptions{})
-			framework.ExpectNoError(err, "Error creating Network Policy %v: %v", policy.ObjectMeta.Name, err)
+			e2eutils.ExpectNoError(err, "Error creating Network Policy %v: %v", policy.ObjectMeta.Name, err)
 			defer cleanupNetworkPolicy(f, policy)
 
 			testCanConnect(f, nsB, "client-a", service, 80)
@@ -405,7 +407,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			nsB, err := f.CreateNamespace(nsBName, map[string]string{
 				"ns-name": nsBName,
 			})
-			framework.ExpectNoError(err, "Error creating namespace %v: %v", nsBName, err)
+			e2eutils.ExpectNoError(err, "Error creating namespace %v: %v", nsBName, err)
 
 			// Create Policy for the server that allows traffic only via client-b in namespace B
 			ginkgo.By("Creating a network policy for the server which allows traffic from client-b in namespace-b.")
@@ -437,7 +439,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			}
 
 			policy, err = f.ClientSet.NetworkingV1().NetworkPolicies(nsA.Name).Create(context.TODO(), policy, metav1.CreateOptions{})
-			framework.ExpectNoError(err, "Error creating Network Policy %v: %v", policy.ObjectMeta.Name, err)
+			e2eutils.ExpectNoError(err, "Error creating Network Policy %v: %v", policy.ObjectMeta.Name, err)
 			defer cleanupNetworkPolicy(f, policy)
 
 			testCannotConnect(f, nsB, "client-a", service, 80)
@@ -451,12 +453,12 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			nsB, err := f.CreateNamespace(nsBName, map[string]string{
 				"ns-name": nsBName,
 			})
-			framework.ExpectNoError(err, "Error occurred while creating namespace-b.")
+			e2eutils.ExpectNoError(err, "Error occurred while creating namespace-b.")
 
 			// Wait for Server in namespaces-a to be ready
-			framework.Logf("Waiting for server to come up.")
+			e2eutils.Logf("Waiting for server to come up.")
 			err = e2epod.WaitForPodRunningInNamespace(f.ClientSet, podServer)
-			framework.ExpectNoError(err, "Error occurred while waiting for pod status in namespace: Running.")
+			e2eutils.ExpectNoError(err, "Error occurred while waiting for pod status in namespace: Running.")
 
 			// Before application of the policy, all communication should be successful.
 			ginkgo.By("Creating client-a, in server's namespace, which should be able to contact the server.", func() {
@@ -504,7 +506,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			}
 
 			policy, err = f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(context.TODO(), policy, metav1.CreateOptions{})
-			framework.ExpectNoError(err, "Error occurred while creating policy: policy.")
+			e2eutils.ExpectNoError(err, "Error occurred while creating policy: policy.")
 			defer cleanupNetworkPolicy(f, policy)
 
 			ginkgo.By("Creating client-a, in server's namespace, which should not be able to contact the server.", func() {
@@ -543,7 +545,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 				},
 			}
 			policy, err := f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(context.TODO(), policy, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			defer cleanupNetworkPolicy(f, policy)
 
 			ginkgo.By("Testing pods can connect only to the port allowed by the policy.")
@@ -573,7 +575,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 				},
 			}
 			policy, err := f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(context.TODO(), policy, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			defer cleanupNetworkPolicy(f, policy)
 
 			ginkgo.By("Creating a network policy for the Service which allows traffic only to another port.")
@@ -597,7 +599,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 				},
 			}
 			policy2, err = f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(context.TODO(), policy2, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			defer cleanupNetworkPolicy(f, policy2)
 
 			ginkgo.By("Testing pods can connect to both ports when both policies are present.")
@@ -620,7 +622,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 				},
 			}
 			policy, err := f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(context.TODO(), policy, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			defer cleanupNetworkPolicy(f, policy)
 
 			ginkgo.By("Testing pods can connect to both ports when an 'allow-all' policy is present.")
@@ -650,7 +652,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			}
 
 			policy, err := f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(context.TODO(), policy, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			defer cleanupNetworkPolicy(f, policy)
 
 			ginkgo.By("Creating client-a which should be able to contact the server.", func() {
@@ -666,7 +668,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			nsB, err := f.CreateNamespace(nsBName, map[string]string{
 				"ns-name": nsBName,
 			})
-			framework.ExpectNoError(err, "Error creating namespace %v: %v", nsBName, err)
+			e2eutils.ExpectNoError(err, "Error creating namespace %v: %v", nsBName, err)
 
 			const allowedPort = 80
 			policy := &networkingv1.NetworkPolicy{
@@ -697,7 +699,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			}
 
 			policy, err = f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(context.TODO(), policy, metav1.CreateOptions{})
-			framework.ExpectNoError(err, "Error creating Network Policy %v: %v", policy.ObjectMeta.Name, err)
+			e2eutils.ExpectNoError(err, "Error creating Network Policy %v: %v", policy.ObjectMeta.Name, err)
 			defer cleanupNetworkPolicy(f, policy)
 
 			testCannotConnect(f, f.Namespace, "client-a", service, allowedPort)
@@ -729,7 +731,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			}
 
 			policy, err := f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(context.TODO(), policy, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			defer cleanupNetworkPolicy(f, policy)
 
 			ginkgo.By("Creating client-a which should be able to contact the server.", func() {
@@ -773,19 +775,19 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 				},
 			}
 			policy, err := f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(context.TODO(), policy, metav1.CreateOptions{})
-			framework.ExpectNoError(err, "Error creating Network Policy %v: %v", policy.ObjectMeta.Name, err)
+			e2eutils.ExpectNoError(err, "Error creating Network Policy %v: %v", policy.ObjectMeta.Name, err)
 
 			testCanConnect(f, f.Namespace, "client-a", service, clientAAllowedPort)
-			e2epod.WaitForPodNotFoundInNamespace(f.ClientSet, "client-a", f.Namespace.Name, framework.PodDeleteTimeout)
-			framework.ExpectNoError(err, "Expected pod to be not found.")
+			e2epod.WaitForPodNotFoundInNamespace(f.ClientSet, "client-a", f.Namespace.Name, e2eutils.PodDeleteTimeout)
+			e2eutils.ExpectNoError(err, "Expected pod to be not found.")
 
 			testCannotConnect(f, f.Namespace, "client-b", service, clientAAllowedPort)
-			e2epod.WaitForPodNotFoundInNamespace(f.ClientSet, "client-b", f.Namespace.Name, framework.PodDeleteTimeout)
-			framework.ExpectNoError(err, "Expected pod to be not found.")
+			e2epod.WaitForPodNotFoundInNamespace(f.ClientSet, "client-b", f.Namespace.Name, e2eutils.PodDeleteTimeout)
+			e2eutils.ExpectNoError(err, "Expected pod to be not found.")
 
 			testCannotConnect(f, f.Namespace, "client-a", service, clientANotAllowedPort)
-			e2epod.WaitForPodNotFoundInNamespace(f.ClientSet, "client-a", f.Namespace.Name, framework.PodDeleteTimeout)
-			framework.ExpectNoError(err, "Expected pod to be not found.")
+			e2epod.WaitForPodNotFoundInNamespace(f.ClientSet, "client-a", f.Namespace.Name, e2eutils.PodDeleteTimeout)
+			e2eutils.ExpectNoError(err, "Expected pod to be not found.")
 
 			const (
 				clientBAllowedPort    = 81
@@ -819,12 +821,12 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 				},
 			}
 			policy, err = f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Update(context.TODO(), policy, metav1.UpdateOptions{})
-			framework.ExpectNoError(err, "Error updating Network Policy %v: %v", policy.ObjectMeta.Name, err)
+			e2eutils.ExpectNoError(err, "Error updating Network Policy %v: %v", policy.ObjectMeta.Name, err)
 			defer cleanupNetworkPolicy(f, policy)
 
 			testCannotConnect(f, f.Namespace, "client-b", service, clientBNotAllowedPort)
-			e2epod.WaitForPodNotFoundInNamespace(f.ClientSet, "client-b", f.Namespace.Name, framework.PodDeleteTimeout)
-			framework.ExpectNoError(err, "Expected pod to be not found.")
+			e2epod.WaitForPodNotFoundInNamespace(f.ClientSet, "client-b", f.Namespace.Name, e2eutils.PodDeleteTimeout)
+			e2eutils.ExpectNoError(err, "Expected pod to be not found.")
 
 			testCannotConnect(f, f.Namespace, "client-a", service, clientBNotAllowedPort)
 			testCanConnect(f, f.Namespace, "client-b", service, clientBAllowedPort)
@@ -837,7 +839,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			nsB, err := f.CreateNamespace(nsBName, map[string]string{
 				"ns-name": nsBName,
 			})
-			framework.ExpectNoError(err, "Error creating namespace %v: %v", nsBName, err)
+			e2eutils.ExpectNoError(err, "Error creating namespace %v: %v", nsBName, err)
 
 			const allowedPort = 80
 			// Create Policy for that service that allows traffic only via namespace B
@@ -865,17 +867,17 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			}
 
 			policy, err = f.ClientSet.NetworkingV1().NetworkPolicies(nsA.Name).Create(context.TODO(), policy, metav1.CreateOptions{})
-			framework.ExpectNoError(err, "Error creating Network Policy %v: %v", policy.ObjectMeta.Name, err)
+			e2eutils.ExpectNoError(err, "Error creating Network Policy %v: %v", policy.ObjectMeta.Name, err)
 			defer cleanupNetworkPolicy(f, policy)
 
 			testCannotConnect(f, nsB, "client-a", service, allowedPort)
 
 			nsB, err = f.ClientSet.CoreV1().Namespaces().Get(context.TODO(), nsB.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err, "Error getting Namespace %v: %v", nsB.ObjectMeta.Name, err)
+			e2eutils.ExpectNoError(err, "Error getting Namespace %v: %v", nsB.ObjectMeta.Name, err)
 
 			nsB.ObjectMeta.Labels["ns-name"] = newNsBName
 			nsB, err = f.ClientSet.CoreV1().Namespaces().Update(context.TODO(), nsB, metav1.UpdateOptions{})
-			framework.ExpectNoError(err, "Error updating Namespace %v: %v", nsB.ObjectMeta.Name, err)
+			e2eutils.ExpectNoError(err, "Error updating Namespace %v: %v", nsB.ObjectMeta.Name, err)
 
 			testCanConnect(f, nsB, "client-b", service, allowedPort)
 		})
@@ -907,7 +909,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			}
 
 			policy, err := f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(context.TODO(), policy, metav1.CreateOptions{})
-			framework.ExpectNoError(err, "Error creating Network Policy %v: %v", policy.ObjectMeta.Name, err)
+			e2eutils.ExpectNoError(err, "Error creating Network Policy %v: %v", policy.ObjectMeta.Name, err)
 			defer cleanupNetworkPolicy(f, policy)
 
 			ginkgo.By(fmt.Sprintf("Creating client pod %s that should not be able to connect to %s.", "client-a", service.Name))
@@ -917,7 +919,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			defer func() {
 				ginkgo.By(fmt.Sprintf("Cleaning up the pod %s", podClient.Name))
 				if err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), podClient.Name, metav1.DeleteOptions{}); err != nil {
-					framework.Failf("unable to cleanup pod %v: %v", podClient.Name, err)
+					e2eutils.Failf("unable to cleanup pod %v: %v", podClient.Name, err)
 				}
 			}()
 			// Check Container exit code as restartable Pod's Phase will be Running even when container fails.
@@ -951,7 +953,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			}
 
 			policy, err := f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(context.TODO(), policy, metav1.CreateOptions{})
-			framework.ExpectNoError(err, "Error creating Network Policy %v: %v", policy.ObjectMeta.Name, err)
+			e2eutils.ExpectNoError(err, "Error creating Network Policy %v: %v", policy.ObjectMeta.Name, err)
 			defer cleanupNetworkPolicy(f, policy)
 
 			// Client can connect to service when the network policy doesn't apply to the server pod.
@@ -971,15 +973,15 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			nsB, err := f.CreateNamespace(nsBName, map[string]string{
 				"ns-name": nsBName,
 			})
-			framework.ExpectNoError(err, "Error occurred while creating namespace-b.")
+			e2eutils.ExpectNoError(err, "Error occurred while creating namespace-b.")
 
 			podB, serviceB := createServerPodAndService(f, nsB, "pod-b", []protocolPort{{allowedPort, v1.ProtocolTCP}, {notAllowedPort, v1.ProtocolTCP}})
 			defer cleanupServerPodAndService(f, podB, serviceB)
 
 			// Wait for Server with Service in NS-B to be ready
-			framework.Logf("Waiting for servers to be ready.")
-			err = e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podB.Name, nsB.Name, framework.PodStartTimeout)
-			framework.ExpectNoError(err, "Error occurred while waiting for pod status in namespace: Ready.")
+			e2eutils.Logf("Waiting for servers to be ready.")
+			err = e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podB.Name, nsB.Name, e2eutils.PodStartTimeout)
+			e2eutils.ExpectNoError(err, "Error occurred while waiting for pod status in namespace: Ready.")
 
 			ginkgo.By("Create a network policy for the server which denies both Ingress and Egress traffic.")
 			policy := &networkingv1.NetworkPolicy{
@@ -1020,7 +1022,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			}
 
 			policy, err = f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(context.TODO(), policy, metav1.CreateOptions{})
-			framework.ExpectNoError(err, "Error creating Network Policy %v: %v", policy.ObjectMeta.Name, err)
+			e2eutils.ExpectNoError(err, "Error creating Network Policy %v: %v", policy.ObjectMeta.Name, err)
 			defer cleanupNetworkPolicy(f, policy)
 
 			ginkgo.By("client-a should be able to communicate with server port 80 in namespace-b", func() {
@@ -1049,7 +1051,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			nsB, err := f.CreateNamespace(nsBName, map[string]string{
 				"ns-name": nsBName,
 			})
-			framework.ExpectNoError(err, "Error occurred while creating namespace-b.")
+			e2eutils.ExpectNoError(err, "Error occurred while creating namespace-b.")
 
 			// Creating pods and services in namespace-b
 			nsBpodServerA, nsBserviceA = createServerPodAndService(f, nsB, "ns-b-server-a", []protocolPort{{80, v1.ProtocolTCP}})
@@ -1058,16 +1060,16 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			defer cleanupServerPodAndService(f, nsBpodServerB, nsBserviceB)
 
 			// Wait for Server with Service in NS-A to be ready
-			framework.Logf("Waiting for servers to be ready.")
-			err = e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podServer.Name, podServer.Namespace, framework.PodStartTimeout)
-			framework.ExpectNoError(err, "Error occurred while waiting for pod status in namespace: Ready.")
+			e2eutils.Logf("Waiting for servers to be ready.")
+			err = e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podServer.Name, podServer.Namespace, e2eutils.PodStartTimeout)
+			e2eutils.ExpectNoError(err, "Error occurred while waiting for pod status in namespace: Ready.")
 
 			// Wait for Servers with Services in NS-B to be ready
-			err = e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, nsBpodServerA.Name, nsBpodServerA.Namespace, framework.PodStartTimeout)
-			framework.ExpectNoError(err, "Error occurred while waiting for pod status in namespace: Ready.")
+			err = e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, nsBpodServerA.Name, nsBpodServerA.Namespace, e2eutils.PodStartTimeout)
+			e2eutils.ExpectNoError(err, "Error occurred while waiting for pod status in namespace: Ready.")
 
-			err = e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, nsBpodServerB.Name, nsBpodServerB.Namespace, framework.PodStartTimeout)
-			framework.ExpectNoError(err, "Error occurred while waiting for pod status in namespace: Ready.")
+			err = e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, nsBpodServerB.Name, nsBpodServerB.Namespace, e2eutils.PodStartTimeout)
+			e2eutils.ExpectNoError(err, "Error occurred while waiting for pod status in namespace: Ready.")
 
 			ginkgo.By("Creating a network policy for the server which allows traffic only to a server in different namespace.")
 			policyAllowToServerInNSB := &networkingv1.NetworkPolicy{
@@ -1106,7 +1108,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			}
 
 			policyAllowToServerInNSB, err = f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(context.TODO(), policyAllowToServerInNSB, metav1.CreateOptions{})
-			framework.ExpectNoError(err, "Error occurred while creating policy: policyAllowToServerInNSB.")
+			e2eutils.ExpectNoError(err, "Error occurred while creating policy: policyAllowToServerInNSB.")
 			defer cleanupNetworkPolicy(f, policyAllowToServerInNSB)
 
 			ginkgo.By("Creating client-a, in 'namespace-a', which should be able to contact the server-a in namespace-b.", func() {
@@ -1149,7 +1151,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			}
 
 			policyAllowOnlyFromClientB, err := f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(context.TODO(), policyAllowOnlyFromClientB, metav1.CreateOptions{})
-			framework.ExpectNoError(err, "Error occurred while creating policy: policyAllowOnlyFromClientB.")
+			e2eutils.ExpectNoError(err, "Error occurred while creating policy: policyAllowOnlyFromClientB.")
 			defer cleanupNetworkPolicy(f, policyAllowOnlyFromClientB)
 
 			ginkgo.By("Creating client-a which should not be able to contact the server.", func() {
@@ -1176,7 +1178,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			}
 
 			policyIngressAllowAll, err = f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(context.TODO(), policyIngressAllowAll, metav1.CreateOptions{})
-			framework.ExpectNoError(err, "Error occurred while creating policy: policyIngressAllowAll.")
+			e2eutils.ExpectNoError(err, "Error occurred while creating policy: policyIngressAllowAll.")
 			defer cleanupNetworkPolicy(f, policyIngressAllowAll)
 
 			ginkgo.By("Creating client-a which should be able to contact the server.", func() {
@@ -1192,8 +1194,8 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			defer cleanupServerPodAndService(f, podServerB, serviceB)
 
 			ginkgo.By("Waiting for pod ready", func() {
-				err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podServerB.Name, f.Namespace.Name, framework.PodStartTimeout)
-				framework.ExpectNoError(err, "Error occurred while waiting for pod type: Ready.")
+				err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podServerB.Name, f.Namespace.Name, e2eutils.PodStartTimeout)
+				e2eutils.ExpectNoError(err, "Error occurred while waiting for pod type: Ready.")
 			})
 
 			ginkgo.By("Creating client-a which should be able to contact the server before applying policy.", func() {
@@ -1231,7 +1233,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 				},
 			}
 			policyAllowOnlyToServerA, err := f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(context.TODO(), policyAllowOnlyToServerA, metav1.CreateOptions{})
-			framework.ExpectNoError(err, "Error occurred while creating policy: policyAllowOnlyToServerA.")
+			e2eutils.ExpectNoError(err, "Error occurred while creating policy: policyAllowOnlyToServerA.")
 			defer cleanupNetworkPolicy(f, policyAllowOnlyToServerA)
 
 			ginkgo.By("Creating client-a which should not be able to contact the server-b.", func() {
@@ -1257,7 +1259,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			}
 
 			policyEgressAllowAll, err = f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(context.TODO(), policyEgressAllowAll, metav1.CreateOptions{})
-			framework.ExpectNoError(err, "Error occurred while creating policy: policyEgressAllowAll.")
+			e2eutils.ExpectNoError(err, "Error occurred while creating policy: policyEgressAllowAll.")
 			defer cleanupNetworkPolicy(f, policyEgressAllowAll)
 
 			ginkgo.By("Creating client-a which should be able to contact the server-b.", func() {
@@ -1284,7 +1286,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			}
 
 			policyDenyAll, err := f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(context.TODO(), policyDenyAll, metav1.CreateOptions{})
-			framework.ExpectNoError(err, "Error occurred while creating policy: policyDenyAll.")
+			e2eutils.ExpectNoError(err, "Error occurred while creating policy: policyDenyAll.")
 
 			ginkgo.By("Creating client-a which should not be able to contact the server.", func() {
 				testCannotConnect(f, f.Namespace, "client-a", service, 80)
@@ -1318,7 +1320,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			}
 
 			policyAllowFromClientA, err = f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(context.TODO(), policyAllowFromClientA, metav1.CreateOptions{})
-			framework.ExpectNoError(err, "Error occurred while creating policy: policyAllowFromClientA.")
+			e2eutils.ExpectNoError(err, "Error occurred while creating policy: policyAllowFromClientA.")
 
 			ginkgo.By("Creating client-a which should be able to contact the server.", func() {
 				testCanConnect(f, f.Namespace, "client-a", service, 80)
@@ -1346,7 +1348,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			// Getting podServer's status to get podServer's IP, to create the CIDR
 			podServerStatus, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), podServer.Name, metav1.GetOptions{})
 			if err != nil {
-				framework.ExpectNoError(err, "Error occurred while getting pod status.")
+				e2eutils.ExpectNoError(err, "Error occurred while getting pod status.")
 			}
 			hostMask := 32
 			if netutils.IsIPv6String(podServerStatus.Status.PodIP) {
@@ -1357,14 +1359,14 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			// Creating pod-b and service-b
 			podServerB, serviceB = createServerPodAndService(f, f.Namespace, "pod-b", []protocolPort{{80, v1.ProtocolTCP}})
 			ginkgo.By("Waiting for pod-b to be ready", func() {
-				err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podServerB.Name, f.Namespace.Name, framework.PodStartTimeout)
-				framework.ExpectNoError(err, "Error occurred while waiting for pod type: Ready.")
+				err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podServerB.Name, f.Namespace.Name, e2eutils.PodStartTimeout)
+				e2eutils.ExpectNoError(err, "Error occurred while waiting for pod type: Ready.")
 			})
 			defer cleanupServerPodAndService(f, podServerB, serviceB)
 
 			// Wait for podServerB with serviceB to be ready
 			err = e2epod.WaitForPodRunningInNamespace(f.ClientSet, podServerB)
-			framework.ExpectNoError(err, "Error occurred while waiting for pod status in namespace: Running.")
+			e2eutils.ExpectNoError(err, "Error occurred while waiting for pod status in namespace: Running.")
 
 			ginkgo.By("Creating client-a which should be able to contact the server-b.", func() {
 				testCanConnect(f, f.Namespace, "client-a", serviceB, 80)
@@ -1399,7 +1401,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			}
 
 			policyAllowCIDR, err = f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(context.TODO(), policyAllowCIDR, metav1.CreateOptions{})
-			framework.ExpectNoError(err, "Error occurred while creating policy: policyAllowCIDR.")
+			e2eutils.ExpectNoError(err, "Error occurred while creating policy: policyAllowCIDR.")
 			defer cleanupNetworkPolicy(f, policyAllowCIDR)
 
 			ginkgo.By("Creating client-a which should not be able to contact the server-b.", func() {
@@ -1414,7 +1416,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			// Getting podServer's status to get podServer's IP, to create the CIDR with except clause
 			podServerStatus, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), podServer.Name, metav1.GetOptions{})
 			if err != nil {
-				framework.ExpectNoError(err, "Error occurred while getting pod status.")
+				e2eutils.ExpectNoError(err, "Error occurred while getting pod status.")
 			}
 
 			allowMask := 24
@@ -1424,7 +1426,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 				hostMask = 128
 			}
 			_, podServerAllowSubnet, err := netutils.ParseCIDRSloppy(fmt.Sprintf("%s/%d", podServerStatus.Status.PodIP, allowMask))
-			framework.ExpectNoError(err, "could not parse allow subnet")
+			e2eutils.ExpectNoError(err, "could not parse allow subnet")
 			podServerAllowCIDR := podServerAllowSubnet.String()
 
 			// Exclude podServer's IP with an Except clause
@@ -1465,7 +1467,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			}
 
 			policyAllowCIDRWithExcept, err = f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(context.TODO(), policyAllowCIDRWithExcept, metav1.CreateOptions{})
-			framework.ExpectNoError(err, "Error occurred while creating policy: policyAllowCIDRWithExcept.")
+			e2eutils.ExpectNoError(err, "Error occurred while creating policy: policyAllowCIDRWithExcept.")
 			defer cleanupNetworkPolicy(f, policyAllowCIDRWithExcept)
 
 			ginkgo.By("Creating client-a which should no longer be able to contact the server.", func() {
@@ -1477,7 +1479,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			// Getting podServer's status to get podServer's IP, to create the CIDR with except clause
 			podServerStatus, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), podServer.Name, metav1.GetOptions{})
 			if err != nil {
-				framework.ExpectNoError(err, "Error occurred while getting pod status.")
+				e2eutils.ExpectNoError(err, "Error occurred while getting pod status.")
 			}
 
 			allowMask := 24
@@ -1487,7 +1489,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 				hostMask = 128
 			}
 			_, podServerAllowSubnet, err := netutils.ParseCIDRSloppy(fmt.Sprintf("%s/%d", podServerStatus.Status.PodIP, allowMask))
-			framework.ExpectNoError(err, "could not parse allow subnet")
+			e2eutils.ExpectNoError(err, "could not parse allow subnet")
 			podServerAllowCIDR := podServerAllowSubnet.String()
 
 			// Exclude podServer's IP with an Except clause
@@ -1525,7 +1527,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			}
 
 			policyAllowCIDRWithExceptServerPodObj, err := f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(context.TODO(), policyAllowCIDRWithExceptServerPod, metav1.CreateOptions{})
-			framework.ExpectNoError(err, "Error occurred while creating policy: policyAllowCIDRWithExceptServerPod.")
+			e2eutils.ExpectNoError(err, "Error occurred while creating policy: policyAllowCIDRWithExceptServerPod.")
 
 			ginkgo.By("Creating client-a which should not be able to contact the server.", func() {
 				testCannotConnect(f, f.Namespace, "client-a", service, 80)
@@ -1561,7 +1563,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			}
 
 			policyAllowCIDRServerPod, err = f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(context.TODO(), policyAllowCIDRServerPod, metav1.CreateOptions{})
-			framework.ExpectNoError(err, "Error occurred while creating policy: policyAllowCIDRServerPod.")
+			e2eutils.ExpectNoError(err, "Error occurred while creating policy: policyAllowCIDRServerPod.")
 			defer cleanupNetworkPolicy(f, policyAllowCIDRServerPod)
 
 			ginkgo.By("Creating client-a which should now be able to contact the server.", func() {
@@ -1577,7 +1579,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 
 			// Recreate the NetworkPolicy which contains the podServer's IP in the except list.
 			policyAllowCIDRWithExceptServerPod, err = f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(context.TODO(), policyAllowCIDRWithExceptServerPod, metav1.CreateOptions{})
-			framework.ExpectNoError(err, "Error occurred while creating policy: policyAllowCIDRWithExceptServerPod.")
+			e2eutils.ExpectNoError(err, "Error occurred while creating policy: policyAllowCIDRWithExceptServerPod.")
 			defer cleanupNetworkPolicy(f, policyAllowCIDRWithExceptServerPod)
 
 			ginkgo.By("Creating client-a which should still be able to contact the server after recreating the network policy with except clause.", func() {
@@ -1593,8 +1595,8 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			// Before applying policy, communication should be successful between pod-a and pod-b
 			podA, serviceA = createServerPodAndService(f, f.Namespace, "pod-a", []protocolPort{{80, v1.ProtocolTCP}})
 			ginkgo.By("Waiting for pod-a to be ready", func() {
-				err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podA.Name, f.Namespace.Name, framework.PodStartTimeout)
-				framework.ExpectNoError(err, "Error occurred while waiting for pod type: Ready.")
+				err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podA.Name, f.Namespace.Name, e2eutils.PodStartTimeout)
+				e2eutils.ExpectNoError(err, "Error occurred while waiting for pod type: Ready.")
 			})
 			ginkgo.By("Creating client pod-b which should be able to contact the server pod-a.", func() {
 				testCanConnect(f, f.Namespace, "pod-b", serviceA, 80)
@@ -1603,8 +1605,8 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 
 			podB, serviceB = createServerPodAndService(f, f.Namespace, "pod-b", []protocolPort{{80, v1.ProtocolTCP}})
 			ginkgo.By("Waiting for pod-b to be ready", func() {
-				err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podB.Name, f.Namespace.Name, framework.PodStartTimeout)
-				framework.ExpectNoError(err, "Error occurred while waiting for pod type: Ready.")
+				err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podB.Name, f.Namespace.Name, e2eutils.PodStartTimeout)
+				e2eutils.ExpectNoError(err, "Error occurred while waiting for pod type: Ready.")
 			})
 			ginkgo.By("Creating client pod-a which should be able to contact the server pod-b.", func() {
 				testCanConnect(f, f.Namespace, "pod-a", serviceB, 80)
@@ -1642,7 +1644,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			}
 
 			policyAllowToPodB, err = f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(context.TODO(), policyAllowToPodB, metav1.CreateOptions{})
-			framework.ExpectNoError(err, "Error occurred while creating policy: policyAllowToPodB.")
+			e2eutils.ExpectNoError(err, "Error occurred while creating policy: policyAllowToPodB.")
 			defer cleanupNetworkPolicy(f, policyAllowToPodB)
 
 			ginkgo.By("Creating a network policy for pod-a that denies traffic from pod-b.")
@@ -1665,7 +1667,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			}
 
 			policyDenyFromPodB, err = f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(context.TODO(), policyDenyFromPodB, metav1.CreateOptions{})
-			framework.ExpectNoError(err, "Error occurred while creating policy: policyDenyFromPodB.")
+			e2eutils.ExpectNoError(err, "Error occurred while creating policy: policyDenyFromPodB.")
 			defer cleanupNetworkPolicy(f, policyDenyFromPodB)
 
 			ginkgo.By("Creating client pod-a which should be able to contact the server pod-b.", func() {
@@ -1676,8 +1678,8 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			// Creating server pod with label "pod-name": "pod-a" to deny traffic from client pod with label "pod-name": "pod-b"
 			podA, serviceA = createServerPodAndService(f, f.Namespace, "pod-a", []protocolPort{{80, v1.ProtocolTCP}})
 			ginkgo.By("Waiting for pod-a to be ready", func() {
-				err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podA.Name, f.Namespace.Name, framework.PodStartTimeout)
-				framework.ExpectNoError(err, "Error occurred while waiting for pod type: Ready.")
+				err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podA.Name, f.Namespace.Name, e2eutils.PodStartTimeout)
+				e2eutils.ExpectNoError(err, "Error occurred while waiting for pod type: Ready.")
 			})
 
 			ginkgo.By("Creating client pod-b which should be able to contact the server pod-a.", func() {
@@ -1688,7 +1690,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 		ginkgo.It("should not allow access by TCP when a policy specifies only SCTP [Feature:NetworkPolicy]", func() {
 			ginkgo.By("getting the state of the sctp module on nodes")
 			nodes, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			sctpLoadedAtStart := CheckSCTPModuleLoadedOnNodes(f, nodes)
 
 			ginkgo.By("Creating a network policy for the server which allows traffic only via SCTP on port 80.")
@@ -1713,7 +1715,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 				},
 			}
 			appliedPolicy, err := f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(context.TODO(), policy, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			defer cleanupNetworkPolicy(f, appliedPolicy)
 
 			ginkgo.By("Testing pods cannot connect on port 80 anymore when not using SCTP as protocol.")
@@ -1722,7 +1724,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			ginkgo.By("validating sctp module is still not loaded")
 			sctpLoadedAtEnd := CheckSCTPModuleLoadedOnNodes(f, nodes)
 			if !sctpLoadedAtStart && sctpLoadedAtEnd {
-				framework.Failf("The state of the sctp module has changed due to the test case")
+				e2eutils.Failf("The state of the sctp module has changed due to the test case")
 			}
 		})
 	})
@@ -1745,8 +1747,8 @@ var _ = common.SIGDescribe("NetworkPolicy [Feature:SCTPConnectivity][LinuxOnly][
 			podServer, service = createServerPodAndService(f, f.Namespace, "server", []protocolPort{{80, v1.ProtocolSCTP}, {81, v1.ProtocolSCTP}})
 
 			ginkgo.By("Waiting for pod ready", func() {
-				err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podServer.Name, f.Namespace.Name, framework.PodStartTimeout)
-				framework.ExpectNoError(err)
+				err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podServer.Name, f.Namespace.Name, e2eutils.PodStartTimeout)
+				e2eutils.ExpectNoError(err)
 			})
 
 			// podServerLabelSelector holds the value for the podServer's label "pod-name".
@@ -1774,7 +1776,7 @@ var _ = common.SIGDescribe("NetworkPolicy [Feature:SCTPConnectivity][LinuxOnly][
 			}
 
 			policy, err := f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(context.TODO(), policy, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			defer cleanupNetworkPolicy(f, policy)
 
 			// Create a pod with name 'client-cannot-connect', which will attempt to communicate with the server,
@@ -1805,7 +1807,7 @@ var _ = common.SIGDescribe("NetworkPolicy [Feature:SCTPConnectivity][LinuxOnly][
 				},
 			}
 			policy, err := f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(context.TODO(), policy, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			defer cleanupNetworkPolicy(f, policy)
 
 			ginkgo.By("Testing pods can connect only to the port allowed by the policy.")
@@ -1819,12 +1821,12 @@ var _ = common.SIGDescribe("NetworkPolicy [Feature:SCTPConnectivity][LinuxOnly][
 			nsB, err := f.CreateNamespace(nsBName, map[string]string{
 				"ns-name": nsBName,
 			})
-			framework.ExpectNoError(err, "Error occurred while creating namespace-b.")
+			e2eutils.ExpectNoError(err, "Error occurred while creating namespace-b.")
 
 			// Wait for Server in namespaces-a to be ready
-			framework.Logf("Waiting for server to come up.")
+			e2eutils.Logf("Waiting for server to come up.")
 			err = e2epod.WaitForPodRunningInNamespace(f.ClientSet, podServer)
-			framework.ExpectNoError(err, "Error occurred while waiting for pod status in namespace: Running.")
+			e2eutils.ExpectNoError(err, "Error occurred while waiting for pod status in namespace: Running.")
 
 			// Before application of the policy, all communication should be successful.
 			ginkgo.By("Creating client-a, in server's namespace, which should be able to contact the server.", func() {
@@ -1872,7 +1874,7 @@ var _ = common.SIGDescribe("NetworkPolicy [Feature:SCTPConnectivity][LinuxOnly][
 			}
 
 			policy, err = f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(context.TODO(), policy, metav1.CreateOptions{})
-			framework.ExpectNoError(err, "Error occurred while creating policy: policy.")
+			e2eutils.ExpectNoError(err, "Error occurred while creating policy: policy.")
 			defer cleanupNetworkPolicy(f, policy)
 
 			ginkgo.By("Creating client-a, in server's namespace, which should not be able to contact the server.", func() {
@@ -1905,7 +1907,7 @@ func testCanConnectProtocol(f *framework.Framework, ns *v1.Namespace, podName st
 	defer func() {
 		ginkgo.By(fmt.Sprintf("Cleaning up the pod %s", podClient.Name))
 		if err := f.ClientSet.CoreV1().Pods(ns.Name).Delete(context.TODO(), podClient.Name, metav1.DeleteOptions{}); err != nil {
-			framework.Failf("unable to cleanup pod %v: %v", podClient.Name, err)
+			e2eutils.Failf("unable to cleanup pod %v: %v", podClient.Name, err)
 		}
 	}()
 	checkConnectivity(f, ns, podClient, service)
@@ -1917,7 +1919,7 @@ func testCannotConnectProtocol(f *framework.Framework, ns *v1.Namespace, podName
 	defer func() {
 		ginkgo.By(fmt.Sprintf("Cleaning up the pod %s", podClient.Name))
 		if err := f.ClientSet.CoreV1().Pods(ns.Name).Delete(context.TODO(), podClient.Name, metav1.DeleteOptions{}); err != nil {
-			framework.Failf("unable to cleanup pod %v: %v", podClient.Name, err)
+			e2eutils.Failf("unable to cleanup pod %v: %v", podClient.Name, err)
 		}
 	}()
 
@@ -1925,40 +1927,40 @@ func testCannotConnectProtocol(f *framework.Framework, ns *v1.Namespace, podName
 }
 
 func checkConnectivity(f *framework.Framework, ns *v1.Namespace, podClient *v1.Pod, service *v1.Service) {
-	framework.Logf("Waiting for %s to complete.", podClient.Name)
+	e2eutils.Logf("Waiting for %s to complete.", podClient.Name)
 	err := e2epod.WaitForPodNoLongerRunningInNamespace(f.ClientSet, podClient.Name, ns.Name)
-	framework.ExpectNoError(err, "Pod did not finish as expected.")
+	e2eutils.ExpectNoError(err, "Pod did not finish as expected.")
 
-	framework.Logf("Waiting for %s to complete.", podClient.Name)
+	e2eutils.Logf("Waiting for %s to complete.", podClient.Name)
 	err = e2epod.WaitForPodSuccessInNamespace(f.ClientSet, podClient.Name, ns.Name)
 	if err != nil {
 		// Dump debug information for the test namespace.
-		framework.DumpDebugInfo(f.ClientSet, f.Namespace.Name)
+		e2eutils.DumpDebugInfo(f.ClientSet, f.Namespace.Name)
 
 		pods, policies, logs := collectPodsAndNetworkPolicies(f, podClient)
-		framework.Failf("Pod %s should be able to connect to service %s, but was not able to connect.\nPod logs:\n%s\n\n Current NetworkPolicies:\n\t%v\n\n Pods:\n\t%v\n\n", podClient.Name, service.Name, logs, policies.Items, pods)
+		e2eutils.Failf("Pod %s should be able to connect to service %s, but was not able to connect.\nPod logs:\n%s\n\n Current NetworkPolicies:\n\t%v\n\n Pods:\n\t%v\n\n", podClient.Name, service.Name, logs, policies.Items, pods)
 
 	}
 }
 
 func checkNoConnectivity(f *framework.Framework, ns *v1.Namespace, podClient *v1.Pod, service *v1.Service) {
-	framework.Logf("Waiting for %s to complete.", podClient.Name)
+	e2eutils.Logf("Waiting for %s to complete.", podClient.Name)
 	err := e2epod.WaitForPodSuccessInNamespace(f.ClientSet, podClient.Name, ns.Name)
 
 	// We expect an error here since it's a cannot connect test.
 	// Dump debug information if the error was nil.
 	if err == nil {
 		// Dump debug information for the test namespace.
-		framework.DumpDebugInfo(f.ClientSet, f.Namespace.Name)
+		e2eutils.DumpDebugInfo(f.ClientSet, f.Namespace.Name)
 
 		pods, policies, logs := collectPodsAndNetworkPolicies(f, podClient)
-		framework.Failf("Pod %s should not be able to connect to service %s, but was able to connect.\nPod logs:\n%s\n\n Current NetworkPolicies:\n\t%v\n\n Pods:\n\t %v\n\n", podClient.Name, service.Name, logs, policies.Items, pods)
+		e2eutils.Failf("Pod %s should not be able to connect to service %s, but was able to connect.\nPod logs:\n%s\n\n Current NetworkPolicies:\n\t%v\n\n Pods:\n\t %v\n\n", podClient.Name, service.Name, logs, policies.Items, pods)
 
 	}
 }
 
 func checkNoConnectivityByExitCode(f *framework.Framework, ns *v1.Namespace, podClient *v1.Pod, service *v1.Service) {
-	err := e2epod.WaitForPodCondition(f.ClientSet, ns.Name, podClient.Name, "terminated", framework.PodStartTimeout, func(pod *v1.Pod) (bool, error) {
+	err := e2epod.WaitForPodCondition(f.ClientSet, ns.Name, podClient.Name, "terminated", e2eutils.PodStartTimeout, func(pod *v1.Pod) (bool, error) {
 		statuses := pod.Status.ContainerStatuses
 		if len(statuses) == 0 || statuses[0].State.Terminated == nil {
 			return false, nil
@@ -1972,10 +1974,10 @@ func checkNoConnectivityByExitCode(f *framework.Framework, ns *v1.Namespace, pod
 	// Dump debug information if the error was nil.
 	if err == nil {
 		pods, policies, logs := collectPodsAndNetworkPolicies(f, podClient)
-		framework.Failf("Pod %s should not be able to connect to service %s, but was able to connect.\nPod logs:\n%s\n\n Current NetworkPolicies:\n\t%v\n\n Pods:\n\t%v\n\n", podClient.Name, service.Name, logs, policies.Items, pods)
+		e2eutils.Failf("Pod %s should not be able to connect to service %s, but was able to connect.\nPod logs:\n%s\n\n Current NetworkPolicies:\n\t%v\n\n Pods:\n\t%v\n\n", podClient.Name, service.Name, logs, policies.Items, pods)
 
 		// Dump debug information for the test namespace.
-		framework.DumpDebugInfo(f.ClientSet, f.Namespace.Name)
+		e2eutils.DumpDebugInfo(f.ClientSet, f.Namespace.Name)
 	}
 }
 
@@ -1987,18 +1989,18 @@ func collectPodsAndNetworkPolicies(f *framework.Framework, podClient *v1.Pod) ([
 		logs, logErr = e2epod.GetPreviousPodLogs(f.ClientSet, f.Namespace.Name, podClient.Name, fmt.Sprintf("%s-container", podClient.Name))
 	}
 	if logErr != nil {
-		framework.Logf("Error getting container logs: %s", logErr)
+		e2eutils.Logf("Error getting container logs: %s", logErr)
 	}
 
 	// Collect current NetworkPolicies applied in the test namespace.
 	policies, err := f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
-		framework.Logf("error getting current NetworkPolicies for %s namespace: %s", f.Namespace.Name, err)
+		e2eutils.Logf("error getting current NetworkPolicies for %s namespace: %s", f.Namespace.Name, err)
 	}
 	// Collect the list of pods running in the test namespace.
 	podsInNS, err := e2epod.GetPodsInNamespace(f.ClientSet, f.Namespace.Name, map[string]string{})
 	if err != nil {
-		framework.Logf("error getting pods for %s namespace: %s", f.Namespace.Name, err)
+		e2eutils.Logf("error getting pods for %s namespace: %s", f.Namespace.Name, err)
 	}
 	pods := []string{}
 	for _, p := range podsInNS {
@@ -2026,7 +2028,7 @@ func createServerPodAndService(f *framework.Framework, namespace *v1.Namespace, 
 			porterPort = fmt.Sprintf("SERVE_SCTP_PORT_%d", portProtocol.port)
 			connectProtocol = "sctp"
 		default:
-			framework.Failf("createServerPodAndService, unexpected protocol %v", portProtocol.protocol)
+			e2eutils.Failf("createServerPodAndService, unexpected protocol %v", portProtocol.protocol)
 		}
 
 		containers = append(containers, v1.Container{
@@ -2077,8 +2079,8 @@ func createServerPodAndService(f *framework.Framework, namespace *v1.Namespace, 
 			RestartPolicy: v1.RestartPolicyNever,
 		},
 	}, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
-	framework.Logf("Created pod %v", pod.ObjectMeta.Name)
+	e2eutils.ExpectNoError(err)
+	e2eutils.Logf("Created pod %v", pod.ObjectMeta.Name)
 
 	svcName := fmt.Sprintf("svc-%s", podName)
 	ginkgo.By(fmt.Sprintf("Creating a service %s for pod %s in namespace %s", svcName, podName, namespace.Name))
@@ -2093,8 +2095,8 @@ func createServerPodAndService(f *framework.Framework, namespace *v1.Namespace, 
 			},
 		},
 	}, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
-	framework.Logf("Created service %s", svc.Name)
+	e2eutils.ExpectNoError(err)
+	e2eutils.Logf("Created service %s", svc.Name)
 
 	return pod, svc
 }
@@ -2102,11 +2104,11 @@ func createServerPodAndService(f *framework.Framework, namespace *v1.Namespace, 
 func cleanupServerPodAndService(f *framework.Framework, pod *v1.Pod, service *v1.Service) {
 	ginkgo.By("Cleaning up the server.")
 	if err := f.ClientSet.CoreV1().Pods(pod.Namespace).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{}); err != nil {
-		framework.Failf("unable to cleanup pod %v: %v", pod.Name, err)
+		e2eutils.Failf("unable to cleanup pod %v: %v", pod.Name, err)
 	}
 	ginkgo.By("Cleaning up the server's service.")
 	if err := f.ClientSet.CoreV1().Services(service.Namespace).Delete(context.TODO(), service.Name, metav1.DeleteOptions{}); err != nil {
-		framework.Failf("unable to cleanup svc %v: %v", service.Name, err)
+		e2eutils.Failf("unable to cleanup svc %v: %v", service.Name, err)
 	}
 }
 
@@ -2127,7 +2129,7 @@ func createNetworkClientPodWithRestartPolicy(f *framework.Framework, namespace *
 	case v1.ProtocolSCTP:
 		connectProtocol = "sctp"
 	default:
-		framework.Failf("createNetworkClientPodWithRestartPolicy, unexpected protocol %v", protocol)
+		e2eutils.Failf("createNetworkClientPodWithRestartPolicy, unexpected protocol %v", protocol)
 	}
 
 	pod, err := f.ClientSet.CoreV1().Pods(namespace.Name).Create(context.TODO(), &v1.Pod{
@@ -2152,7 +2154,7 @@ func createNetworkClientPodWithRestartPolicy(f *framework.Framework, namespace *
 			},
 		},
 	}, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	return pod
 }
 
@@ -2169,10 +2171,10 @@ func updatePodLabel(f *framework.Framework, namespace *v1.Namespace, podName str
 		Value: patchValue,
 	}}
 	payloadBytes, err := json.Marshal(payload)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	pod, err := f.ClientSet.CoreV1().Pods(namespace.Name).Patch(context.TODO(), podName, types.JSONPatchType, payloadBytes, metav1.PatchOptions{})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	return pod
 }
@@ -2180,7 +2182,7 @@ func updatePodLabel(f *framework.Framework, namespace *v1.Namespace, podName str
 func cleanupNetworkPolicy(f *framework.Framework, policy *networkingv1.NetworkPolicy) {
 	ginkgo.By("Cleaning up the policy.")
 	if err := f.ClientSet.NetworkingV1().NetworkPolicies(policy.Namespace).Delete(context.TODO(), policy.Name, metav1.DeleteOptions{}); err != nil {
-		framework.Failf("unable to cleanup policy %v: %v", policy.Name, err)
+		e2eutils.Failf("unable to cleanup policy %v: %v", policy.Name, err)
 	}
 }
 
@@ -2236,7 +2238,7 @@ var _ = common.SIGDescribe("NetworkPolicy API", func() {
 		ginkgo.By("getting /apis")
 		{
 			discoveryGroups, err := f.ClientSet.Discovery().ServerGroups()
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			found := false
 			for _, group := range discoveryGroups.Groups {
 				if group.Name == networkingv1.GroupName {
@@ -2249,14 +2251,14 @@ var _ = common.SIGDescribe("NetworkPolicy API", func() {
 				}
 			}
 			if !found {
-				framework.Failf("expected networking API group/version, got %#v", discoveryGroups.Groups)
+				e2eutils.Failf("expected networking API group/version, got %#v", discoveryGroups.Groups)
 			}
 		}
 		ginkgo.By("getting /apis/networking.k8s.io")
 		{
 			group := &metav1.APIGroup{}
 			err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis/networking.k8s.io").Do(context.TODO()).Into(group)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			found := false
 			for _, version := range group.Versions {
 				if version.Version == npVersion {
@@ -2265,13 +2267,13 @@ var _ = common.SIGDescribe("NetworkPolicy API", func() {
 				}
 			}
 			if !found {
-				framework.Failf("expected networking API version, got %#v", group.Versions)
+				e2eutils.Failf("expected networking API version, got %#v", group.Versions)
 			}
 		}
 		ginkgo.By("getting /apis/networking.k8s.io" + npVersion)
 		{
 			resources, err := f.ClientSet.Discovery().ServerResourcesForGroupVersion(networkingv1.SchemeGroupVersion.String())
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			foundNetPol := false
 			for _, resource := range resources.APIResources {
 				switch resource.Name {
@@ -2280,97 +2282,97 @@ var _ = common.SIGDescribe("NetworkPolicy API", func() {
 				}
 			}
 			if !foundNetPol {
-				framework.Failf("expected networkpolicies, got %#v", resources.APIResources)
+				e2eutils.Failf("expected networkpolicies, got %#v", resources.APIResources)
 			}
 		}
 		// NetPol resource create/read/update/watch verbs
 		ginkgo.By("creating")
 		_, err := npClient.Create(context.TODO(), npTemplate, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		_, err = npClient.Create(context.TODO(), npTemplate, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		createdNetPol, err := npClient.Create(context.TODO(), npTemplate, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		ginkgo.By("getting")
 		gottenNetPol, err := npClient.Get(context.TODO(), createdNetPol.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(gottenNetPol.UID, createdNetPol.UID)
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectEqual(gottenNetPol.UID, createdNetPol.UID)
 
 		ginkgo.By("listing")
 		nps, err := npClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(nps.Items), 3, "filtered list should have 3 items")
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectEqual(len(nps.Items), 3, "filtered list should have 3 items")
 
 		ginkgo.By("watching")
-		framework.Logf("starting watch")
+		e2eutils.Logf("starting watch")
 		npWatch, err := npClient.Watch(context.TODO(), metav1.ListOptions{ResourceVersion: nps.ResourceVersion, LabelSelector: "special-label=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		// Test cluster-wide list and watch
 		clusterNPClient := f.ClientSet.NetworkingV1().NetworkPolicies("")
 		ginkgo.By("cluster-wide listing")
 		clusterNPs, err := clusterNPClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(clusterNPs.Items), 3, "filtered list should have 3 items")
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectEqual(len(clusterNPs.Items), 3, "filtered list should have 3 items")
 
 		ginkgo.By("cluster-wide watching")
-		framework.Logf("starting watch")
+		e2eutils.Logf("starting watch")
 		_, err = clusterNPClient.Watch(context.TODO(), metav1.ListOptions{ResourceVersion: nps.ResourceVersion, LabelSelector: "special-label=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		ginkgo.By("patching")
 		patchedNetPols, err := npClient.Patch(context.TODO(), createdNetPol.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"patched":"true"}}}`), metav1.PatchOptions{})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(patchedNetPols.Annotations["patched"], "true", "patched object should have the applied annotation")
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectEqual(patchedNetPols.Annotations["patched"], "true", "patched object should have the applied annotation")
 
 		ginkgo.By("updating")
 		npToUpdate := patchedNetPols.DeepCopy()
 		npToUpdate.Annotations["updated"] = "true"
 		updatedNetPols, err := npClient.Update(context.TODO(), npToUpdate, metav1.UpdateOptions{})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(updatedNetPols.Annotations["updated"], "true", "updated object should have the applied annotation")
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectEqual(updatedNetPols.Annotations["updated"], "true", "updated object should have the applied annotation")
 
-		framework.Logf("waiting for watch events with expected annotations")
+		e2eutils.Logf("waiting for watch events with expected annotations")
 		for sawAnnotations := false; !sawAnnotations; {
 			select {
 			case evt, ok := <-npWatch.ResultChan():
 				if !ok {
-					framework.Fail("watch channel should not close")
+					e2eutils.Fail("watch channel should not close")
 				}
-				framework.ExpectEqual(evt.Type, watch.Modified)
+				e2eutils.ExpectEqual(evt.Type, watch.Modified)
 				watchedNetPol, isNetPol := evt.Object.(*networkingv1.NetworkPolicy)
 				if !isNetPol {
-					framework.Failf("expected NetworkPolicy, got %T", evt.Object)
+					e2eutils.Failf("expected NetworkPolicy, got %T", evt.Object)
 				}
 				if watchedNetPol.Annotations["patched"] == "true" && watchedNetPol.Annotations["updated"] == "true" {
-					framework.Logf("saw patched and updated annotations")
+					e2eutils.Logf("saw patched and updated annotations")
 					sawAnnotations = true
 					npWatch.Stop()
 				} else {
-					framework.Logf("missing expected annotations, waiting: %#v", watchedNetPol.Annotations)
+					e2eutils.Logf("missing expected annotations, waiting: %#v", watchedNetPol.Annotations)
 				}
 			case <-time.After(wait.ForeverTestTimeout):
-				framework.Fail("timed out waiting for watch event")
+				e2eutils.Fail("timed out waiting for watch event")
 			}
 		}
 		// NetPol resource delete operations
 		ginkgo.By("deleting")
 		err = npClient.Delete(context.TODO(), createdNetPol.Name, metav1.DeleteOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		_, err = npClient.Get(context.TODO(), createdNetPol.Name, metav1.GetOptions{})
 		if !apierrors.IsNotFound(err) {
-			framework.Failf("expected 404, got %#v", err)
+			e2eutils.Failf("expected 404, got %#v", err)
 		}
 		nps, err = npClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(nps.Items), 2, "filtered list should have 2 items")
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectEqual(len(nps.Items), 2, "filtered list should have 2 items")
 
 		ginkgo.By("deleting a collection")
 		err = npClient.DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		nps, err = npClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(nps.Items), 0, "filtered list should have 0 items")
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectEqual(len(nps.Items), 0, "filtered list should have 0 items")
 	})
 })
 
@@ -2385,18 +2387,18 @@ func CheckSCTPModuleLoadedOnNodes(f *framework.Framework, nodes *v1.NodeList) bo
 	re := regexp.MustCompile(`^\s*sctp\s+`)
 	cmd := "lsmod | grep sctp"
 	for _, node := range nodes.Items {
-		framework.Logf("Executing cmd %q on node %v", cmd, node.Name)
+		e2eutils.Logf("Executing cmd %q on node %v", cmd, node.Name)
 		result, err := hostExec.IssueCommandWithResult(cmd, &node)
 		if err != nil {
-			framework.Logf("sctp module is not loaded or error occurred while executing command %s on node: %v", cmd, err)
+			e2eutils.Logf("sctp module is not loaded or error occurred while executing command %s on node: %v", cmd, err)
 		}
 		for _, line := range strings.Split(result, "\n") {
 			if found := re.Find([]byte(line)); found != nil {
-				framework.Logf("the sctp module is loaded on node: %v", node.Name)
+				e2eutils.Logf("the sctp module is loaded on node: %v", node.Name)
 				return true
 			}
 		}
-		framework.Logf("the sctp module is not loaded on node: %v", node.Name)
+		e2eutils.Logf("the sctp module is not loaded on node: %v", node.Name)
 	}
 	return false
 }

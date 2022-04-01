@@ -25,6 +25,9 @@ import (
 	"os/exec"
 	"time"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -43,7 +46,7 @@ func waitForPods(f *framework.Framework, podCount int, timeout time.Duration) (r
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(10 * time.Second) {
 		podList, err := f.PodClient().List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
-			framework.Logf("Failed to list pods on node: %v", err)
+			e2eutils.Logf("Failed to list pods on node: %v", err)
 			continue
 		}
 
@@ -55,7 +58,7 @@ func waitForPods(f *framework.Framework, podCount int, timeout time.Duration) (r
 			}
 			runningPods = append(runningPods, &pod)
 		}
-		framework.Logf("Running pod count %d", len(runningPods))
+		e2eutils.Logf("Running pod count %d", len(runningPods))
 		if len(runningPods) >= podCount {
 			break
 		}
@@ -93,7 +96,7 @@ var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
 				// startTimeout fit on the node and the node is now saturated.
 				runningPods := waitForPods(f, podCount, startTimeout)
 				if len(runningPods) < minPods {
-					framework.Failf("Failed to start %d pods, cannot test that restarting container runtime doesn't leak IPs", minPods)
+					e2eutils.Failf("Failed to start %d pods, cannot test that restarting container runtime doesn't leak IPs", minPods)
 				}
 
 				for i := 0; i < restartCount; i++ {
@@ -101,7 +104,7 @@ var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
 					// Wait for container runtime to be running
 					var pid int
 					gomega.Eventually(func() error {
-						runtimePids, err := getPidsForProcess(framework.TestContext.ContainerRuntimeProcessName, framework.TestContext.ContainerRuntimePidFile)
+						runtimePids, err := getPidsForProcess(e2econfig.TestContext.ContainerRuntimeProcessName, e2econfig.TestContext.ContainerRuntimePidFile)
 						if err != nil {
 							return err
 						}
@@ -116,7 +119,7 @@ var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
 						return nil
 					}, 1*time.Minute, 2*time.Second).Should(gomega.BeNil())
 					if stdout, err := exec.Command("sudo", "kill", "-SIGKILL", fmt.Sprintf("%d", pid)).CombinedOutput(); err != nil {
-						framework.Failf("Failed to kill container runtime (pid=%d): %v, stdout: %q", pid, err, string(stdout))
+						e2eutils.Failf("Failed to kill container runtime (pid=%d): %v, stdout: %q", pid, err, string(stdout))
 					}
 					// Assume that container runtime will be restarted by systemd/supervisord etc.
 					time.Sleep(20 * time.Second)
@@ -125,12 +128,12 @@ var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
 				ginkgo.By("Checking currently Running/Ready pods")
 				postRestartRunningPods := waitForPods(f, len(runningPods), recoverTimeout)
 				if len(postRestartRunningPods) == 0 {
-					framework.Failf("Failed to start *any* pods after container runtime restart, this might indicate an IP leak")
+					e2eutils.Failf("Failed to start *any* pods after container runtime restart, this might indicate an IP leak")
 				}
 				ginkgo.By("Confirm no containers have terminated")
 				for _, pod := range postRestartRunningPods {
 					if c := testutils.TerminatedContainers(pod); len(c) != 0 {
-						framework.Failf("Pod %q has failed containers %+v after container runtime restart, this might indicate an IP leak", pod.Name, c)
+						e2eutils.Failf("Pod %q has failed containers %+v after container runtime restart, this might indicate an IP leak", pod.Name, c)
 					}
 				}
 				ginkgo.By(fmt.Sprintf("Container runtime restart test passed with %d pods", len(postRestartRunningPods)))
@@ -169,7 +172,7 @@ var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
 
 			completedPods := waitForPods(f, podCountRestartNever, startTimeout)
 			if len(completedPods) < podCountRestartNever {
-				framework.Failf("Failed to run sufficient restartNever pods, got %d but expected %d", len(completedPods), podCountRestartNever)
+				e2eutils.Failf("Failed to run sufficient restartNever pods, got %d but expected %d", len(completedPods), podCountRestartNever)
 			}
 
 			podCountRestartAlways := (numCpus / 2) + 1
@@ -186,7 +189,7 @@ var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
 			numAllPods := podCountRestartNever + podCountRestartAlways
 			allPods := waitForPods(f, numAllPods, startTimeout)
 			if len(allPods) < numAllPods {
-				framework.Failf("Failed to run sufficient restartAlways pods, got %d but expected %d", len(allPods), numAllPods)
+				e2eutils.Failf("Failed to run sufficient restartAlways pods, got %d but expected %d", len(allPods), numAllPods)
 			}
 
 			ginkgo.By("killing and restarting kubelet")
@@ -202,7 +205,7 @@ var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
 			for start := time.Now(); time.Since(start) < startTimeout; time.Sleep(10 * time.Second) {
 				postRestartRunningPods := waitForPods(f, numAllPods, recoverTimeout)
 				if len(postRestartRunningPods) < numAllPods {
-					framework.Failf("less pods are running after node restart, got %d but expected %d", len(postRestartRunningPods), numAllPods)
+					e2eutils.Failf("less pods are running after node restart, got %d but expected %d", len(postRestartRunningPods), numAllPods)
 				}
 			}
 		})

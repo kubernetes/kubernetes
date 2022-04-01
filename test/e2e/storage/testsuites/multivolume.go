@@ -21,6 +21,9 @@ import (
 	"fmt"
 	"time"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -126,7 +129,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 
 		errs = append(errs, storageutils.TryFunc(l.driverCleanup))
 		l.driverCleanup = nil
-		framework.ExpectNoError(errors.NewAggregate(errs), "while cleanup resource")
+		e2eutils.ExpectNoError(errors.NewAggregate(errs), "while cleanup resource")
 		l.migrationCheck.validateMigrationVolumeOpCounts()
 	}
 
@@ -184,7 +187,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 			e2eskipper.Skipf("Driver %q requires to deploy on a specific node - skipping", l.driver.GetDriverInfo().Name)
 		}
 		if err := ensureTopologyRequirements(&l.config.ClientNodeSelection, l.cs, dInfo, 2); err != nil {
-			framework.Failf("Error setting topology requirements: %v", err)
+			e2eutils.Failf("Error setting topology requirements: %v", err)
 		}
 
 		var pvcs []*v1.PersistentVolumeClaim
@@ -268,7 +271,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 			e2eskipper.Skipf("Driver %q requires to deploy on a specific node - skipping", l.driver.GetDriverInfo().Name)
 		}
 		if err := ensureTopologyRequirements(&l.config.ClientNodeSelection, l.cs, dInfo, 2); err != nil {
-			framework.Failf("Error setting topology requirements: %v", err)
+			e2eutils.Failf("Error setting topology requirements: %v", err)
 		}
 
 		var pvcs []*v1.PersistentVolumeClaim
@@ -341,7 +344,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 		expectedContent := fmt.Sprintf("volume content %d", time.Now().UTC().UnixNano())
 		sDriver, ok := driver.(storageframework.SnapshottableTestDriver)
 		if !ok {
-			framework.Failf("Driver %q has CapSnapshotDataSource but does not implement SnapshottableTestDriver", dInfo.Name)
+			e2eutils.Failf("Driver %q has CapSnapshotDataSource but does not implement SnapshottableTestDriver", dInfo.Name)
 		}
 		testConfig := storageframework.ConvertTestConfig(l.config)
 		dc := l.config.Framework.DynamicClient
@@ -360,7 +363,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 		pvc2.Spec.DataSource = dataSource
 
 		pvc2, err := l.cs.CoreV1().PersistentVolumeClaims(pvc2.Namespace).Create(context.TODO(), pvc2, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		pvcs = append(pvcs, pvc2)
 		defer func() {
 			l.cs.CoreV1().PersistentVolumeClaims(pvc2.Namespace).Delete(context.TODO(), pvc2.Name, metav1.DeleteOptions{})
@@ -405,7 +408,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 		pvc2.Spec.DataSource = dataSource
 
 		pvc2, err := l.cs.CoreV1().PersistentVolumeClaims(pvc2.Namespace).Create(context.TODO(), pvc2, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		pvcs = append(pvcs, pvc2)
 		defer func() {
 			l.cs.CoreV1().PersistentVolumeClaims(pvc2.Namespace).Delete(context.TODO(), pvc2.Name, metav1.DeleteOptions{})
@@ -464,7 +467,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 		}
 		// For multi-node tests there must be enough nodes with the same toopology to schedule the pods
 		if err := ensureTopologyRequirements(&l.config.ClientNodeSelection, l.cs, dInfo, 2); err != nil {
-			framework.Failf("Error setting topology requirements: %v", err)
+			e2eutils.Failf("Error setting topology requirements: %v", err)
 		}
 
 		// Create volume
@@ -492,9 +495,9 @@ func testAccessMultipleVolumes(f *framework.Framework, cs clientset.Interface, n
 	}
 	pod, err := e2epod.CreateSecPodWithNodeSelection(cs, &podConfig, f.Timeouts.PodStart)
 	defer func() {
-		framework.ExpectNoError(e2epod.DeletePodWithWait(cs, pod))
+		e2eutils.ExpectNoError(e2epod.DeletePodWithWait(cs, pod))
 	}()
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	byteLen := 64
 	for i, pvc := range pvcs {
@@ -502,7 +505,7 @@ func testAccessMultipleVolumes(f *framework.Framework, cs clientset.Interface, n
 		index := i + 1
 		path := fmt.Sprintf("/mnt/volume%d", index)
 		ginkgo.By(fmt.Sprintf("Checking if the volume%d exists as expected volume mode (%s)", index, *pvc.Spec.VolumeMode))
-		e2evolume.CheckVolumeModeOfPath(f, pod, *pvc.Spec.VolumeMode, path)
+		e2evolume.CheckVolumeModeOfPath(f.ClientSet, f.Namespace.Name, pod, *pvc.Spec.VolumeMode, path)
 
 		if readSeedBase > 0 {
 			ginkgo.By(fmt.Sprintf("Checking if read from the volume%d works properly", index))
@@ -517,7 +520,7 @@ func testAccessMultipleVolumes(f *framework.Framework, cs clientset.Interface, n
 	}
 
 	pod, err = cs.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err, "get pod")
+	e2eutils.ExpectNoError(err, "get pod")
 	return pod.Spec.NodeName
 }
 
@@ -572,12 +575,12 @@ func TestConcurrentAccessToSingleVolume(f *framework.Framework, cs clientset.Int
 		}
 		pod, err := e2epod.CreateSecPodWithNodeSelection(cs, &podConfig, f.Timeouts.PodStart)
 		defer func() {
-			framework.ExpectNoError(e2epod.DeletePodWithWait(cs, pod))
+			e2eutils.ExpectNoError(e2epod.DeletePodWithWait(cs, pod))
 		}()
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		pod, err = cs.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		pods = append(pods, pod)
-		framework.ExpectNoError(err, fmt.Sprintf("get pod%d", index))
+		e2eutils.ExpectNoError(err, fmt.Sprintf("get pod%d", index))
 		actualNodeName := pod.Spec.NodeName
 
 		// Set affinity depending on requiresSameNode
@@ -596,7 +599,7 @@ func TestConcurrentAccessToSingleVolume(f *framework.Framework, cs clientset.Int
 	// direct IO is needed for Block-mode PVs
 	if *pvc.Spec.VolumeMode == v1.PersistentVolumeBlock {
 		if len(pods) < 1 {
-			framework.Failf("Number of pods shouldn't be less than 1, but got %d", len(pods))
+			e2eutils.Failf("Number of pods shouldn't be less than 1, but got %d", len(pods))
 		}
 		// byteLen should be the size of a sector to enable direct I/O
 		byteLen = utils.GetSectorSize(f, pods[0], path)
@@ -607,7 +610,7 @@ func TestConcurrentAccessToSingleVolume(f *framework.Framework, cs clientset.Int
 	for i, pod := range pods {
 		index := i + 1
 		ginkgo.By(fmt.Sprintf("Checking if the volume in pod%d exists as expected volume mode (%s)", index, *pvc.Spec.VolumeMode))
-		e2evolume.CheckVolumeModeOfPath(f, pod, *pvc.Spec.VolumeMode, path)
+		e2evolume.CheckVolumeModeOfPath(f.ClientSet, f.Namespace.Name, pod, *pvc.Spec.VolumeMode, path)
 
 		if readOnly {
 			ginkgo.By("Skipping volume content checks, volume is read-only")
@@ -631,11 +634,11 @@ func TestConcurrentAccessToSingleVolume(f *framework.Framework, cs clientset.Int
 	}
 
 	if len(pods) < 2 {
-		framework.Failf("Number of pods shouldn't be less than 2, but got %d", len(pods))
+		e2eutils.Failf("Number of pods shouldn't be less than 2, but got %d", len(pods))
 	}
 	// Delete the last pod and remove from slice of pods
 	lastPod := pods[len(pods)-1]
-	framework.ExpectNoError(e2epod.DeletePodWithWait(cs, lastPod))
+	e2eutils.ExpectNoError(e2epod.DeletePodWithWait(cs, lastPod))
 	pods = pods[:len(pods)-1]
 
 	// Recheck if pv can be accessed from each pod after the last pod deletion
@@ -643,7 +646,7 @@ func TestConcurrentAccessToSingleVolume(f *framework.Framework, cs clientset.Int
 		index := i + 1
 		// index of pod and index of pvc match, because pods are created above way
 		ginkgo.By(fmt.Sprintf("Rechecking if the volume in pod%d exists as expected volume mode (%s)", index, *pvc.Spec.VolumeMode))
-		e2evolume.CheckVolumeModeOfPath(f, pod, *pvc.Spec.VolumeMode, "/mnt/volume1")
+		e2evolume.CheckVolumeModeOfPath(f.ClientSet, f.Namespace.Name, pod, *pvc.Spec.VolumeMode, "/mnt/volume1")
 
 		if readOnly {
 			ginkgo.By("Skipping volume content checks, volume is read-only")
@@ -691,9 +694,9 @@ func TestConcurrentAccessToRelatedVolumes(f *framework.Framework, cs clientset.I
 		}
 		pod, err := e2epod.CreateSecPodWithNodeSelection(cs, &podConfig, f.Timeouts.PodStart)
 		defer func() {
-			framework.ExpectNoError(e2epod.DeletePodWithWait(cs, pod))
+			e2eutils.ExpectNoError(e2epod.DeletePodWithWait(cs, pod))
 		}()
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		pods = append(pods, pod)
 		actualNodeName := pod.Spec.NodeName
 
@@ -710,16 +713,16 @@ func TestConcurrentAccessToRelatedVolumes(f *framework.Framework, cs clientset.I
 			// Check that all pods have the same content
 			index := i + 1
 			ginkgo.By(fmt.Sprintf("Checking if the volume in pod%d has expected initial content", index))
-			_, err := framework.LookForStringInPodExec(pods[i].Namespace, pods[i].Name, commands, expectedContent, time.Minute)
-			framework.ExpectNoError(err, "failed: finding the contents of the block volume %s.", fileName)
+			_, err := e2eutils.LookForStringInPodExec(pods[i].Namespace, pods[i].Name, commands, expectedContent, time.Minute)
+			e2eutils.ExpectNoError(err, "failed: finding the contents of the block volume %s.", fileName)
 		} else {
 			fileName := "/mnt/volume1/index.html"
 			commands = e2evolume.GenerateReadFileCmd(fileName)
 			// Check that all pods have the same content
 			index := i + 1
 			ginkgo.By(fmt.Sprintf("Checking if the volume in pod%d has expected initial content", index))
-			_, err := framework.LookForStringInPodExec(pods[i].Namespace, pods[i].Name, commands, expectedContent, time.Minute)
-			framework.ExpectNoError(err, "failed: finding the contents of the mounted file %s.", fileName)
+			_, err := e2eutils.LookForStringInPodExec(pods[i].Namespace, pods[i].Name, commands, expectedContent, time.Minute)
+			e2eutils.ExpectNoError(err, "failed: finding the contents of the mounted file %s.", fileName)
 		}
 	}
 }
@@ -748,7 +751,7 @@ func getCurrentTopologiesNumber(cs clientset.Interface, nodes *v1.NodeList, keys
 			}
 		}
 		if !found {
-			framework.Logf("found topology %v", topo)
+			e2eutils.Logf("found topology %v", topo)
 			topos = append(topos, topo)
 			topoCount = append(topoCount, 1)
 		}
@@ -760,7 +763,7 @@ func getCurrentTopologiesNumber(cs clientset.Interface, nodes *v1.NodeList, keys
 // sets nodeSelection affinity according to given topology keys for drivers that provide them.
 func ensureTopologyRequirements(nodeSelection *e2epod.NodeSelection, cs clientset.Interface, driverInfo *storageframework.DriverInfo, minCount int) error {
 	nodes, err := e2enode.GetReadySchedulableNodes(cs)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	if len(nodes.Items) < minCount {
 		e2eskipper.Skipf(fmt.Sprintf("Number of available nodes is less than %d - skipping", minCount))
 	}
@@ -790,7 +793,7 @@ func ensureTopologyRequirements(nodeSelection *e2epod.NodeSelection, cs clientse
 }
 
 // initializeVolume creates a filesystem on given volume, so it can be used as read-only later
-func initializeVolume(cs clientset.Interface, t *framework.TimeoutContext, ns string, pvc *v1.PersistentVolumeClaim, node e2epod.NodeSelection) {
+func initializeVolume(cs clientset.Interface, t *e2econfig.TimeoutContext, ns string, pvc *v1.PersistentVolumeClaim, node e2epod.NodeSelection) {
 	if pvc.Spec.VolumeMode != nil && *pvc.Spec.VolumeMode == v1.PersistentVolumeBlock {
 		// Block volumes do not need to be initialized.
 		return
@@ -808,7 +811,7 @@ func initializeVolume(cs clientset.Interface, t *framework.TimeoutContext, ns st
 	}
 	pod, err := e2epod.CreateSecPod(cs, &podConfig, t.PodStart)
 	defer func() {
-		framework.ExpectNoError(e2epod.DeletePodWithWait(cs, pod))
+		e2eutils.ExpectNoError(e2epod.DeletePodWithWait(cs, pod))
 	}()
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 }

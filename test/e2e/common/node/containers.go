@@ -18,6 +18,7 @@ package node
 
 import (
 	"github.com/onsi/gomega"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -40,14 +41,14 @@ var _ = SIGDescribe("Containers", func() {
 		pod.Spec.Containers[0].Args = nil
 		pod = f.PodClient().Create(pod)
 		err := e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
-		framework.ExpectNoError(err, "Expected pod %q to be running, got error: %v", pod.Name, err)
+		e2eutils.ExpectNoError(err, "Expected pod %q to be running, got error: %v", pod.Name, err)
 		pollLogs := func() (string, error) {
 			return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
 		}
 
 		// The agnhost's image default entrypoint / args are: "/agnhost pause"
 		// which will print out "Paused".
-		gomega.Eventually(pollLogs, 3, framework.Poll).Should(gomega.ContainSubstring("Paused"))
+		gomega.Eventually(pollLogs, 3, e2eutils.Poll).Should(gomega.ContainSubstring("Paused"))
 	})
 
 	/*

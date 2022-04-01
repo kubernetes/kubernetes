@@ -20,13 +20,14 @@ import (
 	"fmt"
 	"os"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	netutils "k8s.io/utils/net"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	apiserver "k8s.io/kubernetes/cmd/kube-apiserver/app"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
-	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 const (
@@ -63,8 +64,8 @@ func (a *APIServer) Start() error {
 	if err != nil {
 		return err
 	}
-	if len(framework.TestContext.RuntimeConfig) > 0 {
-		o.APIEnablement.RuntimeConfig = framework.TestContext.RuntimeConfig
+	if len(e2econfig.TestContext.RuntimeConfig) > 0 {
+		o.APIEnablement.RuntimeConfig = e2econfig.TestContext.RuntimeConfig
 	}
 	o.SecureServing.BindAddress = netutils.ParseIPSloppy("127.0.0.1")
 	o.ServiceClusterIPRanges = ipnet.String()
@@ -133,14 +134,14 @@ func (a *APIServer) Name() string {
 }
 
 func getAPIServerClientURL() string {
-	return framework.TestContext.Host
+	return e2econfig.TestContext.Host
 }
 
 func getAPIServerHealthCheckURL() string {
-	return framework.TestContext.Host + "/healthz"
+	return e2econfig.TestContext.Host + "/healthz"
 }
 
 func generateTokenFile(tokenFilePath string) error {
-	tokenFile := fmt.Sprintf("%s,kubelet,uid,system:masters\n", framework.TestContext.BearerToken)
+	tokenFile := fmt.Sprintf("%s,kubelet,uid,system:masters\n", e2econfig.TestContext.BearerToken)
 	return os.WriteFile(tokenFilePath, []byte(tokenFile), 0644)
 }

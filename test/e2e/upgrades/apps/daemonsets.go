@@ -18,7 +18,9 @@ package apps
 
 import (
 	"context"
+
 	"github.com/onsi/ginkgo"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -42,7 +44,7 @@ func (DaemonSetUpgradeTest) Name() string { return "[sig-apps] daemonset-upgrade
 func (t *DaemonSetUpgradeTest) Setup(f *framework.Framework) {
 	daemonSetName := "ds1"
 	labelSet := map[string]string{"ds-name": daemonSetName}
-	image := framework.ServeHostnameImage
+	image := e2eutils.ServeHostnameImage
 
 	ns := f.Namespace
 
@@ -54,14 +56,14 @@ func (t *DaemonSetUpgradeTest) Setup(f *framework.Framework) {
 	ginkgo.By("Creating a DaemonSet")
 	var err error
 	if t.daemonSet, err = f.ClientSet.AppsV1().DaemonSets(ns.Name).Create(context.TODO(), t.daemonSet, metav1.CreateOptions{}); err != nil {
-		framework.Failf("unable to create test DaemonSet %s: %v", t.daemonSet.Name, err)
+		e2eutils.Failf("unable to create test DaemonSet %s: %v", t.daemonSet.Name, err)
 	}
 
 	ginkgo.By("Waiting for DaemonSet pods to become ready")
-	err = wait.Poll(framework.Poll, framework.PodStartTimeout, func() (bool, error) {
-		return e2edaemonset.CheckRunningOnAllNodes(f, t.daemonSet)
+	err = wait.Poll(e2eutils.Poll, e2eutils.PodStartTimeout, func() (bool, error) {
+		return e2edaemonset.CheckRunningOnAllNodes(f.ClientSet, f.Namespace.Name, t.daemonSet)
 	})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	ginkgo.By("Validating the DaemonSet after creation")
 	t.validateRunningDaemonSet(f)
@@ -84,14 +86,14 @@ func (t *DaemonSetUpgradeTest) Teardown(f *framework.Framework) {
 
 func (t *DaemonSetUpgradeTest) validateRunningDaemonSet(f *framework.Framework) {
 	ginkgo.By("confirming the DaemonSet pods are running on all expected nodes")
-	res, err := e2edaemonset.CheckRunningOnAllNodes(f, t.daemonSet)
-	framework.ExpectNoError(err)
+	res, err := e2edaemonset.CheckRunningOnAllNodes(f.ClientSet, f.Namespace.Name, t.daemonSet)
+	e2eutils.ExpectNoError(err)
 	if !res {
-		framework.Failf("expected DaemonSet pod to be running on all nodes, it was not")
+		e2eutils.Failf("expected DaemonSet pod to be running on all nodes, it was not")
 	}
 
 	// DaemonSet resource itself should be good
 	ginkgo.By("confirming the DaemonSet resource is in a good state")
-	err = e2edaemonset.CheckDaemonStatus(f, t.daemonSet.Name)
-	framework.ExpectNoError(err)
+	err = e2edaemonset.CheckDaemonStatus(f.ClientSet, f.Namespace.Name, t.daemonSet.Name)
+	e2eutils.ExpectNoError(err)
 }

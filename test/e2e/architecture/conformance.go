@@ -19,6 +19,8 @@ package architecture
 import (
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -35,11 +37,11 @@ var _ = SIGDescribe("Conformance Tests", func() {
 	*/
 	framework.ConformanceIt("should have at least two untainted nodes", func() {
 		ginkgo.By("Getting node addresses")
-		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(f.ClientSet, 10*time.Minute))
+		e2eutils.ExpectNoError(e2eutils.WaitForAllNodesSchedulable(f.ClientSet, 10*time.Minute))
 		nodeList, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		if len(nodeList.Items) < 2 {
-			framework.Failf("Conformance requires at least two nodes")
+			e2eutils.Failf("Conformance requires at least two nodes")
 		}
 	})
 })

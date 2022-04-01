@@ -19,7 +19,7 @@ package netpol
 import (
 	"strings"
 
-	"k8s.io/kubernetes/test/e2e/framework"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 )
 
 // TruthTable takes in n items and maintains an n x n table of booleans for each ordered pair
@@ -74,10 +74,10 @@ func (tt *TruthTable) IsComplete() bool {
 func (tt *TruthTable) Set(from string, to string, value bool) {
 	dict, ok := tt.Values[from]
 	if !ok {
-		framework.Failf("from-key %s not found", from)
+		e2eutils.Failf("from-key %s not found", from)
 	}
 	if _, ok := tt.toSet[to]; !ok {
-		framework.Failf("to-key %s not allowed", to)
+		e2eutils.Failf("to-key %s not allowed", to)
 	}
 	dict[to] = value
 }
@@ -86,7 +86,7 @@ func (tt *TruthTable) Set(from string, to string, value bool) {
 func (tt *TruthTable) SetAllFrom(from string, value bool) {
 	dict, ok := tt.Values[from]
 	if !ok {
-		framework.Failf("from-key %s not found", from)
+		e2eutils.Failf("from-key %s not found", from)
 	}
 	for _, to := range tt.Tos {
 		dict[to] = value
@@ -96,7 +96,7 @@ func (tt *TruthTable) SetAllFrom(from string, value bool) {
 // SetAllTo sets all values where to = 'to'
 func (tt *TruthTable) SetAllTo(to string, value bool) {
 	if _, ok := tt.toSet[to]; !ok {
-		framework.Failf("to-key %s not found", to)
+		e2eutils.Failf("to-key %s not found", to)
 	}
 	for _, from := range tt.Froms {
 		tt.Values[from][to] = value
@@ -107,11 +107,11 @@ func (tt *TruthTable) SetAllTo(to string, value bool) {
 func (tt *TruthTable) Get(from string, to string) bool {
 	dict, ok := tt.Values[from]
 	if !ok {
-		framework.Failf("from-key %s not found", from)
+		e2eutils.Failf("from-key %s not found", from)
 	}
 	val, ok := dict[to]
 	if !ok {
-		framework.Failf("to-key %s not found in map (%+v)", to, dict)
+		e2eutils.Failf("to-key %s not found in map (%+v)", to, dict)
 	}
 	return val
 }
@@ -121,16 +121,16 @@ func (tt *TruthTable) Get(from string, to string) bool {
 // have identical items.
 func (tt *TruthTable) Compare(other *TruthTable) *TruthTable {
 	if len(tt.Froms) != len(other.Froms) || len(tt.Tos) != len(other.Tos) {
-		framework.Failf("cannot compare tables of different dimensions")
+		e2eutils.Failf("cannot compare tables of different dimensions")
 	}
 	for i, fr := range tt.Froms {
 		if other.Froms[i] != fr {
-			framework.Failf("cannot compare: from keys at index %d do not match (%s vs %s)", i, other.Froms[i], fr)
+			e2eutils.Failf("cannot compare: from keys at index %d do not match (%s vs %s)", i, other.Froms[i], fr)
 		}
 	}
 	for i, to := range tt.Tos {
 		if other.Tos[i] != to {
-			framework.Failf("cannot compare: to keys at index %d do not match (%s vs %s)", i, other.Tos[i], to)
+			e2eutils.Failf("cannot compare: to keys at index %d do not match (%s vs %s)", i, other.Tos[i], to)
 		}
 	}
 

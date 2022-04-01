@@ -30,8 +30,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	scaleclient "k8s.io/client-go/scale"
-	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	"k8s.io/kubernetes/test/e2e/framework/utils"
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
@@ -68,7 +68,7 @@ func DeleteResourceAndWaitForGC(c clientset.Interface, kind schema.GroupKind, ns
 	rtObject, err := GetRuntimeObjectForKind(c, kind, ns, name)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			framework.Logf("%v %s not found: %v", kind, name, err)
+			utils.Logf("%v %s not found: %v", kind, name, err)
 			return nil
 		}
 		return err
@@ -95,7 +95,7 @@ func DeleteResourceAndWaitForGC(c clientset.Interface, kind schema.GroupKind, ns
 		return err
 	}
 	deleteTime := time.Since(startTime)
-	framework.Logf("Deleting %v %s took: %v", kind, name, deleteTime)
+	utils.Logf("Deleting %v %s took: %v", kind, name, deleteTime)
 
 	var interval, timeout time.Duration
 	switch {
@@ -119,7 +119,7 @@ func DeleteResourceAndWaitForGC(c clientset.Interface, kind schema.GroupKind, ns
 		return fmt.Errorf("error while waiting for pods to become inactive %s: %v", name, err)
 	}
 	terminatePodTime := time.Since(startTime) - deleteTime
-	framework.Logf("Terminating %v %s pods took: %v", kind, name, terminatePodTime)
+	utils.Logf("Terminating %v %s pods took: %v", kind, name, terminatePodTime)
 
 	// In gce, at any point, small percentage of nodes can disappear for
 	// ~10 minutes due to hostError. 20 minutes should be long enough to
@@ -143,7 +143,7 @@ func waitForPodsGone(ps *testutils.PodStore, interval, timeout time.Duration) er
 
 	if err == wait.ErrWaitTimeout {
 		for _, pod := range pods {
-			framework.Logf("ERROR: Pod %q still exists. Node: %q", pod.Name, pod.Spec.NodeName)
+			utils.Logf("ERROR: Pod %q still exists. Node: %q", pod.Name, pod.Spec.NodeName)
 		}
 		return fmt.Errorf("there are %d pods left. E.g. %q on node %q", len(pods), pods[0].Name, pods[0].Spec.NodeName)
 	}
@@ -167,7 +167,7 @@ func waitForPodsInactive(ps *testutils.PodStore, interval, timeout time.Duration
 
 	if err == wait.ErrWaitTimeout {
 		for _, pod := range activePods {
-			framework.Logf("ERROR: Pod %q running on %q is still active", pod.Name, pod.Spec.NodeName)
+			utils.Logf("ERROR: Pod %q running on %q is still active", pod.Name, pod.Spec.NodeName)
 		}
 		return fmt.Errorf("there are %d active pods. E.g. %q on node %q", len(activePods), activePods[0].Name, activePods[0].Spec.NodeName)
 	}

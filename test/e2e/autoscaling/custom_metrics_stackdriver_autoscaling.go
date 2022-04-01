@@ -18,6 +18,8 @@ package autoscaling
 
 import (
 	"context"
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 	"math"
 	"time"
 
@@ -230,12 +232,12 @@ type CustomMetricTestCase struct {
 
 // Run starts test case.
 func (tc *CustomMetricTestCase) Run() {
-	projectID := framework.TestContext.CloudConfig.ProjectID
+	projectID := e2econfig.TestContext.CloudConfig.ProjectID
 
 	ctx := context.Background()
 	client, err := google.DefaultClient(ctx, gcm.CloudPlatformScope)
 	if err != nil {
-		framework.Failf("Failed to initialize gcm default client, %v", err)
+		e2eutils.Failf("Failed to initialize gcm default client, %v", err)
 	}
 
 	// Hack for running tests locally, needed to authenticate in Stackdriver
@@ -244,35 +246,35 @@ func (tc *CustomMetricTestCase) Run() {
 	// and uncomment following lines:
 	/*
 		ts, err := google.DefaultTokenSource(oauth2.NoContext)
-		framework.Logf("Couldn't get application default credentials, %v", err)
+		e2eutils.Logf("Couldn't get application default credentials, %v", err)
 		if err != nil {
-			framework.Failf("Error accessing application default credentials, %v", err)
+			e2eutils.Failf("Error accessing application default credentials, %v", err)
 		}
 		client := oauth2.NewClient(oauth2.NoContext, ts)
 	*/
 
 	gcmService, err := gcm.NewService(ctx, option.WithHTTPClient(client))
 	if err != nil {
-		framework.Failf("Failed to create gcm service, %v", err)
+		e2eutils.Failf("Failed to create gcm service, %v", err)
 	}
 
 	// Set up a cluster: create a custom metric and set up k8s-sd adapter
 	err = monitoring.CreateDescriptors(gcmService, projectID)
 	if err != nil {
-		framework.Failf("Failed to create metric descriptor: %v", err)
+		e2eutils.Failf("Failed to create metric descriptor: %v", err)
 	}
 	defer monitoring.CleanupDescriptors(gcmService, projectID)
 
 	err = monitoring.CreateAdapter(monitoring.AdapterDefault)
 	defer monitoring.CleanupAdapter(monitoring.AdapterDefault)
 	if err != nil {
-		framework.Failf("Failed to set up: %v", err)
+		e2eutils.Failf("Failed to set up: %v", err)
 	}
 
 	// Run application that exports the metric
 	err = createDeploymentToScale(tc.framework, tc.kubeClient, tc.deployment, tc.pod)
 	if err != nil {
-		framework.Failf("Failed to create stackdriver-exporter pod: %v", err)
+		e2eutils.Failf("Failed to create stackdriver-exporter pod: %v", err)
 	}
 	defer cleanupDeploymentsToScale(tc.framework, tc.kubeClient, tc.deployment, tc.pod)
 
@@ -282,7 +284,7 @@ func (tc *CustomMetricTestCase) Run() {
 	// Autoscale the deployment
 	_, err = tc.kubeClient.AutoscalingV2().HorizontalPodAutoscalers(tc.framework.Namespace.ObjectMeta.Name).Create(context.TODO(), tc.hpa, metav1.CreateOptions{})
 	if err != nil {
-		framework.Failf("Failed to create HPA: %v", err)
+		e2eutils.Failf("Failed to create HPA: %v", err)
 	}
 	defer tc.kubeClient.AutoscalingV2().HorizontalPodAutoscalers(tc.framework.Namespace.ObjectMeta.Name).Delete(context.TODO(), tc.hpa.ObjectMeta.Name, metav1.DeleteOptions{})
 
@@ -460,13 +462,13 @@ func waitForReplicas(deploymentName, namespace string, cs clientset.Interface, t
 	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
 		deployment, err := cs.AppsV1().Deployments(namespace).Get(context.TODO(), deploymentName, metav1.GetOptions{})
 		if err != nil {
-			framework.Failf("Failed to get replication controller %s: %v", deployment, err)
+			e2eutils.Failf("Failed to get replication controller %s: %v", deployment, err)
 		}
 		replicas := int(deployment.Status.ReadyReplicas)
-		framework.Logf("waiting for %d replicas (current: %d)", desiredReplicas, replicas)
+		e2eutils.Logf("waiting for %d replicas (current: %d)", desiredReplicas, replicas)
 		return replicas == desiredReplicas, nil // Expected number of replicas found. Exit.
 	})
 	if err != nil {
-		framework.Failf("Timeout waiting %v for %v replicas", timeout, desiredReplicas)
+		e2eutils.Failf("Timeout waiting %v for %v replicas", timeout, desiredReplicas)
 	}
 }

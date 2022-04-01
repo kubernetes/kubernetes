@@ -32,8 +32,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubectl/pkg/util/podutils"
-	"k8s.io/kubernetes/test/e2e/framework"
 	e2emanifest "k8s.io/kubernetes/test/e2e/framework/manifest"
+	"k8s.io/kubernetes/test/e2e/framework/utils"
 )
 
 // CreateStatefulSet creates a StatefulSet from the manifest at manifestPath in the Namespace ns using kubectl create.
@@ -42,20 +42,20 @@ func CreateStatefulSet(c clientset.Interface, manifestPath, ns string) *appsv1.S
 		return filepath.Join(manifestPath, file)
 	}
 
-	framework.Logf("Parsing statefulset from %v", mkpath("statefulset.yaml"))
+	utils.Logf("Parsing statefulset from %v", mkpath("statefulset.yaml"))
 	ss, err := e2emanifest.StatefulSetFromManifest(mkpath("statefulset.yaml"), ns)
-	framework.ExpectNoError(err)
-	framework.Logf("Parsing service from %v", mkpath("service.yaml"))
+	utils.ExpectNoError(err)
+	utils.Logf("Parsing service from %v", mkpath("service.yaml"))
 	svc, err := e2emanifest.SvcFromManifest(mkpath("service.yaml"))
-	framework.ExpectNoError(err)
+	utils.ExpectNoError(err)
 
-	framework.Logf(fmt.Sprintf("creating " + ss.Name + " service"))
+	utils.Logf(fmt.Sprintf("creating " + ss.Name + " service"))
 	_, err = c.CoreV1().Services(ns).Create(context.TODO(), svc, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	utils.ExpectNoError(err)
 
-	framework.Logf(fmt.Sprintf("creating statefulset %v/%v with %d replicas and selector %+v", ss.Namespace, ss.Name, *(ss.Spec.Replicas), ss.Spec.Selector))
+	utils.Logf(fmt.Sprintf("creating statefulset %v/%v with %d replicas and selector %+v", ss.Namespace, ss.Name, *(ss.Spec.Replicas), ss.Spec.Selector))
 	_, err = c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	utils.ExpectNoError(err)
 	WaitForRunningAndReady(c, *ss.Spec.Replicas, ss)
 	return ss
 }
@@ -63,16 +63,16 @@ func CreateStatefulSet(c clientset.Interface, manifestPath, ns string) *appsv1.S
 // GetPodList gets the current Pods in ss.
 func GetPodList(c clientset.Interface, ss *appsv1.StatefulSet) *v1.PodList {
 	selector, err := metav1.LabelSelectorAsSelector(ss.Spec.Selector)
-	framework.ExpectNoError(err)
+	utils.ExpectNoError(err)
 	podList, err := c.CoreV1().Pods(ss.Namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: selector.String()})
-	framework.ExpectNoError(err)
+	utils.ExpectNoError(err)
 	return podList
 }
 
 // DeleteAllStatefulSets deletes all StatefulSet API Objects in Namespace ns.
 func DeleteAllStatefulSets(c clientset.Interface, ns string) {
 	ssList, err := c.AppsV1().StatefulSets(ns).List(context.TODO(), metav1.ListOptions{LabelSelector: labels.Everything().String()})
-	framework.ExpectNoError(err)
+	utils.ExpectNoError(err)
 
 	// Scale down each statefulset, then delete it completely.
 	// Deleting a pvc without doing this will leak volumes, #25101.
@@ -84,7 +84,7 @@ func DeleteAllStatefulSets(c clientset.Interface, ns string) {
 			errList = append(errList, fmt.Sprintf("%v", err))
 		}
 		WaitForStatusReplicas(c, ss, 0)
-		framework.Logf("Deleting statefulset %v", ss.Name)
+		utils.Logf("Deleting statefulset %v", ss.Name)
 		// Use OrphanDependents=false so it's deleted synchronously.
 		// We already made sure the Pods are gone inside Scale().
 		if err := c.AppsV1().StatefulSets(ss.Namespace).Delete(context.TODO(), ss.Name, metav1.DeleteOptions{OrphanDependents: new(bool)}); err != nil {
@@ -98,13 +98,13 @@ func DeleteAllStatefulSets(c clientset.Interface, ns string) {
 	pvcPollErr := wait.PollImmediate(StatefulSetPoll, StatefulSetTimeout, func() (bool, error) {
 		pvcList, err := c.CoreV1().PersistentVolumeClaims(ns).List(context.TODO(), metav1.ListOptions{LabelSelector: labels.Everything().String()})
 		if err != nil {
-			framework.Logf("WARNING: Failed to list pvcs, retrying %v", err)
+			utils.Logf("WARNING: Failed to list pvcs, retrying %v", err)
 			return false, nil
 		}
 		for _, pvc := range pvcList.Items {
 			pvNames.Insert(pvc.Spec.VolumeName)
 			// TODO: Double check that there are no pods referencing the pvc
-			framework.Logf("Deleting pvc: %v with volume %v", pvc.Name, pvc.Spec.VolumeName)
+			utils.Logf("Deleting pvc: %v with volume %v", pvc.Name, pvc.Spec.VolumeName)
 			if err := c.CoreV1().PersistentVolumeClaims(ns).Delete(context.TODO(), pvc.Name, metav1.DeleteOptions{}); err != nil {
 				return false, nil
 			}
@@ -118,7 +118,7 @@ func DeleteAllStatefulSets(c clientset.Interface, ns string) {
 	pollErr := wait.PollImmediate(StatefulSetPoll, StatefulSetTimeout, func() (bool, error) {
 		pvList, err := c.CoreV1().PersistentVolumes().List(context.TODO(), metav1.ListOptions{LabelSelector: labels.Everything().String()})
 		if err != nil {
-			framework.Logf("WARNING: Failed to list pvs, retrying %v", err)
+			utils.Logf("WARNING: Failed to list pvs, retrying %v", err)
 			return false, nil
 		}
 		waitingFor := []string{}
@@ -130,14 +130,14 @@ func DeleteAllStatefulSets(c clientset.Interface, ns string) {
 		if len(waitingFor) == 0 {
 			return true, nil
 		}
-		framework.Logf("Still waiting for pvs of statefulset to disappear:\n%v", strings.Join(waitingFor, "\n"))
+		utils.Logf("Still waiting for pvs of statefulset to disappear:\n%v", strings.Join(waitingFor, "\n"))
 		return false, nil
 	})
 	if pollErr != nil {
 		errList = append(errList, fmt.Sprintf("Timeout waiting for pv provisioner to delete pvs, this might mean the test leaked pvs."))
 	}
 	if len(errList) != 0 {
-		framework.ExpectNoError(fmt.Errorf("%v", strings.Join(errList, "\n")))
+		utils.ExpectNoError(fmt.Errorf("%v", strings.Join(errList, "\n")))
 	}
 }
 
@@ -146,7 +146,7 @@ func Scale(c clientset.Interface, ss *appsv1.StatefulSet, count int32) (*appsv1.
 	name := ss.Name
 	ns := ss.Namespace
 
-	framework.Logf("Scaling statefulset %s to %d", name, count)
+	utils.Logf("Scaling statefulset %s to %d", name, count)
 	ss = update(c, ns, name, func(ss *appsv1.StatefulSet) { *(ss.Spec.Replicas) = count })
 
 	var statefulPodList *v1.PodList
@@ -179,7 +179,7 @@ func UpdateReplicas(c clientset.Interface, ss *appsv1.StatefulSet, count int32) 
 func Restart(c clientset.Interface, ss *appsv1.StatefulSet) {
 	oldReplicas := *(ss.Spec.Replicas)
 	ss, err := Scale(c, ss, 0)
-	framework.ExpectNoError(err)
+	utils.ExpectNoError(err)
 	// Wait for controller to report the desired number of Pods.
 	// This way we know the controller has observed all Pod deletions
 	// before we scale it back up.
@@ -192,7 +192,7 @@ func CheckHostname(c clientset.Interface, ss *appsv1.StatefulSet) error {
 	cmd := "printf $(hostname)"
 	podList := GetPodList(c, ss)
 	for _, statefulPod := range podList.Items {
-		hostname, err := framework.RunHostCmdWithRetries(statefulPod.Namespace, statefulPod.Name, cmd, StatefulSetPoll, StatefulPodTimeout)
+		hostname, err := utils.RunHostCmdWithRetries(statefulPod.Namespace, statefulPod.Name, cmd, StatefulSetPoll, StatefulPodTimeout)
 		if err != nil {
 			return err
 		}
@@ -222,7 +222,7 @@ func CheckMount(c clientset.Interface, ss *appsv1.StatefulSet, mountPath string)
 
 // CheckServiceName asserts that the ServiceName for ss is equivalent to expectedServiceName.
 func CheckServiceName(ss *appsv1.StatefulSet, expectedServiceName string) error {
-	framework.Logf("Checking if statefulset spec.serviceName is %s", expectedServiceName)
+	utils.Logf("Checking if statefulset spec.serviceName is %s", expectedServiceName)
 
 	if expectedServiceName != ss.Spec.ServiceName {
 		return fmt.Errorf("wrong service name governing statefulset. Expected %s got %s",
@@ -236,8 +236,8 @@ func CheckServiceName(ss *appsv1.StatefulSet, expectedServiceName string) error 
 func ExecInStatefulPods(c clientset.Interface, ss *appsv1.StatefulSet, cmd string) error {
 	podList := GetPodList(c, ss)
 	for _, statefulPod := range podList.Items {
-		stdout, err := framework.RunHostCmdWithRetries(statefulPod.Namespace, statefulPod.Name, cmd, StatefulSetPoll, StatefulPodTimeout)
-		framework.Logf("stdout of %v on %v: %v", cmd, statefulPod.Name, stdout)
+		stdout, err := utils.RunHostCmdWithRetries(statefulPod.Namespace, statefulPod.Name, cmd, StatefulSetPoll, StatefulPodTimeout)
+		utils.Logf("stdout of %v on %v: %v", cmd, statefulPod.Name, stdout)
 		if err != nil {
 			return err
 		}
@@ -250,7 +250,7 @@ func update(c clientset.Interface, ns, name string, update func(ss *appsv1.State
 	for i := 0; i < 3; i++ {
 		ss, err := c.AppsV1().StatefulSets(ns).Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
-			framework.Failf("failed to get statefulset %q: %v", name, err)
+			utils.Failf("failed to get statefulset %q: %v", name, err)
 		}
 		update(ss)
 		ss, err = c.AppsV1().StatefulSets(ns).Update(context.TODO(), ss, metav1.UpdateOptions{})
@@ -258,9 +258,9 @@ func update(c clientset.Interface, ns, name string, update func(ss *appsv1.State
 			return ss
 		}
 		if !apierrors.IsConflict(err) && !apierrors.IsServerTimeout(err) {
-			framework.Failf("failed to update statefulset %q: %v", name, err)
+			utils.Failf("failed to update statefulset %q: %v", name, err)
 		}
 	}
-	framework.Failf("too many retries draining statefulset %q", name)
+	utils.Failf("too many retries draining statefulset %q", name)
 	return nil
 }

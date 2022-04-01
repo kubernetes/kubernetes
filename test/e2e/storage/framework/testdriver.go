@@ -19,6 +19,8 @@ package framework
 import (
 	"time"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -132,15 +134,15 @@ type SnapshottableTestDriver interface {
 // CustomTimeoutsTestDriver represents an interface fo a TestDriver that supports custom timeouts.
 type CustomTimeoutsTestDriver interface {
 	TestDriver
-	GetTimeouts() *framework.TimeoutContext
+	GetTimeouts() *e2econfig.TimeoutContext
 }
 
 // GetDriverTimeouts returns the timeout of the driver operation
-func GetDriverTimeouts(driver TestDriver) *framework.TimeoutContext {
+func GetDriverTimeouts(driver TestDriver) *e2econfig.TimeoutContext {
 	if d, ok := driver.(CustomTimeoutsTestDriver); ok {
 		return d.GetTimeouts()
 	}
-	return framework.NewTimeoutContextWithDefaults()
+	return e2econfig.NewTimeoutContextWithDefaults()
 }
 
 // Capability represents a feature that a volume plugin supports

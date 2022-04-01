@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"strings"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -50,11 +52,11 @@ func (t *JobUpgradeTest) Setup(f *framework.Framework) {
 	t.job = e2ejob.NewTestJob("notTerminate", "foo", v1.RestartPolicyOnFailure, 2, 2, nil, 6)
 	job, err := e2ejob.CreateJob(f.ClientSet, t.namespace, t.job)
 	t.job = job
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	ginkgo.By("Ensuring active pods == parallelism")
 	err = e2ejob.WaitForAllJobPodsRunning(f.ClientSet, t.namespace, job.Name, 2)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 }
 
 // Test verifies that the Jobs Pods are running after the an upgrade
@@ -62,7 +64,7 @@ func (t *JobUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgr
 	<-done
 	ginkgo.By("Ensuring active pods == parallelism")
 	err := ensureAllJobPodsRunning(f.ClientSet, t.namespace, t.job.Name, 2)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 }
 
 // Teardown cleans up any remaining resources.

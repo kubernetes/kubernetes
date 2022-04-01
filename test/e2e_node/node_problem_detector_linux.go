@@ -26,6 +26,9 @@ import (
 	"path"
 	"time"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
@@ -107,7 +110,7 @@ var _ = SIGDescribe("NodeProblemDetector [NodeFeature:NodeProblemDetector] [Seri
 
 			nodeTime = time.Now()
 			bootTime, err = util.GetBootTime()
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 
 			// Set lookback duration longer than node up time.
 			// Assume the test won't take more than 1 hour, in fact it usually only takes 90 seconds.
@@ -175,12 +178,12 @@ contexts:
     user: node-problem-detector
   name: local-context
 current-context: local-context
-`, framework.TestContext.BearerToken, framework.TestContext.Host)
+`, e2econfig.TestContext.BearerToken, e2econfig.TestContext.Host)
 
 			ginkgo.By("Generate event list options")
 			selector := fields.Set{
 				"involvedObject.kind":      "Node",
-				"involvedObject.name":      framework.TestContext.NodeName,
+				"involvedObject.name":      e2econfig.TestContext.NodeName,
 				"involvedObject.namespace": metav1.NamespaceAll,
 				"source":                   source,
 			}.AsSelector().String()
@@ -194,7 +197,7 @@ current-context: local-context
 					path.Base(kubeConfigFile): kubeConfig,
 				},
 			}, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 
 			ginkgo.By("Create the node problem detector")
 			hostPathType := new(v1.HostPathType)
@@ -263,7 +266,7 @@ current-context: local-context
 								fmt.Sprintf("--system-log-monitors=%s", configFile),
 								// `ServiceAccount` admission controller is disabled in node e2e tests, so we could not use
 								// inClusterConfig here.
-								fmt.Sprintf("--apiserver-override=%s?inClusterConfig=false&auth=%s", framework.TestContext.Host, kubeConfigFile),
+								fmt.Sprintf("--apiserver-override=%s?inClusterConfig=false&auth=%s", e2econfig.TestContext.Host, kubeConfigFile),
 							},
 							Env: []v1.EnvVar{
 								{
@@ -295,7 +298,7 @@ current-context: local-context
 				},
 			})
 			// TODO: remove hardcoded kubelet volume directory path
-			// framework.TestContext.KubeVolumeDir is currently not populated for node e2e
+			// e2econfig.TestContext.KubeVolumeDir is currently not populated for node e2e
 			hostLogFile = "/var/lib/kubelet/pods/" + string(pod.UID) + "/volumes/kubernetes.io~empty-dir" + logFile
 		})
 
@@ -395,7 +398,7 @@ current-context: local-context
 				if test.messageNum > 0 {
 					ginkgo.By(fmt.Sprintf("Inject %d logs: %q", test.messageNum, test.message))
 					err := injectLog(hostLogFile, test.timestamp, test.message, test.messageNum)
-					framework.ExpectNoError(err)
+					e2eutils.ExpectNoError(err)
 				}
 
 				ginkgo.By(fmt.Sprintf("Wait for %d temp events generated", test.tempEvents))
@@ -423,11 +426,11 @@ current-context: local-context
 		})
 
 		ginkgo.AfterEach(func() {
-			if ginkgo.CurrentGinkgoTestDescription().Failed && framework.TestContext.DumpLogsOnFailure {
+			if ginkgo.CurrentGinkgoTestDescription().Failed && e2econfig.TestContext.DumpLogsOnFailure {
 				ginkgo.By("Get node problem detector log")
 				log, err := e2epod.GetPodLogs(c, ns, name, name)
 				gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
-				framework.Logf("Node Problem Detector logs:\n %s", log)
+				e2eutils.Logf("Node Problem Detector logs:\n %s", log)
 			}
 			ginkgo.By("Delete the node problem detector")
 			f.PodClient().Delete(context.TODO(), name, *metav1.NewDeleteOptions(0))
@@ -439,7 +442,7 @@ current-context: local-context
 			gomega.Expect(c.CoreV1().Events(eventNamespace).DeleteCollection(context.TODO(), *metav1.NewDeleteOptions(0), eventListOptions)).To(gomega.Succeed())
 			ginkgo.By("Clean up the node condition")
 			patch := []byte(fmt.Sprintf(`{"status":{"conditions":[{"$patch":"delete","type":"%s"}]}}`, condition))
-			c.CoreV1().RESTClient().Patch(types.StrategicMergePatchType).Resource("nodes").Name(framework.TestContext.NodeName).SubResource("status").Body(patch).Do(context.TODO())
+			c.CoreV1().RESTClient().Patch(types.StrategicMergePatchType).Resource("nodes").Name(e2econfig.TestContext.NodeName).SubResource("status").Body(patch).Do(context.TODO())
 		})
 	})
 })
@@ -497,7 +500,7 @@ func verifyTotalEvents(e coreclientset.EventInterface, options metav1.ListOption
 
 // verifyNodeCondition verifies specific node condition is generated, if reason and message are empty, they will not be checked
 func verifyNodeCondition(n coreclientset.NodeInterface, condition v1.NodeConditionType, status v1.ConditionStatus, reason, message string) error {
-	node, err := n.Get(context.TODO(), framework.TestContext.NodeName, metav1.GetOptions{})
+	node, err := n.Get(context.TODO(), e2econfig.TestContext.NodeName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}

@@ -23,6 +23,9 @@ import (
 	"net/url"
 	"time"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -52,7 +55,7 @@ const (
 var _ = SIGDescribe("Probing container", func() {
 	f := framework.NewDefaultFramework("container-probe")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
-	var podClient *framework.PodClient
+	var podClient *e2eutils.PodClient
 	probe := webserverProbeBuilder{}
 
 	ginkgo.BeforeEach(func() {
@@ -67,29 +70,29 @@ var _ = SIGDescribe("Probing container", func() {
 	framework.ConformanceIt("with readiness probe should not be ready before initial delay and never restart [NodeConformance]", func() {
 		containerName := "test-webserver"
 		p := podClient.Create(testWebServerPodSpec(probe.withInitialDelay().build(), nil, containerName, 80))
-		e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, p.Name, f.Namespace.Name, framework.PodStartTimeout)
+		e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, p.Name, f.Namespace.Name, e2eutils.PodStartTimeout)
 
 		p, err := podClient.Get(context.TODO(), p.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		isReady, err := testutils.PodRunningReady(p)
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(isReady, true, "pod should be ready")
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectEqual(isReady, true, "pod should be ready")
 
 		// We assume the pod became ready when the container became ready. This
 		// is true for a single container pod.
 		readyTime, err := GetTransitionTimeForReadyCondition(p)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		startedTime, err := GetContainerStartedTime(p, containerName)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
-		framework.Logf("Container started at %v, pod became ready at %v", startedTime, readyTime)
+		e2eutils.Logf("Container started at %v, pod became ready at %v", startedTime, readyTime)
 		initialDelay := probeTestInitialDelaySeconds * time.Second
 		if readyTime.Sub(startedTime) < initialDelay {
-			framework.Failf("Pod became ready before it's %v initial delay", initialDelay)
+			e2eutils.Failf("Pod became ready before it's %v initial delay", initialDelay)
 		}
 
 		restartCount := getRestartCount(p)
-		framework.ExpectEqual(restartCount, 0, "pod should have a restart count of 0 but got %v", restartCount)
+		e2eutils.ExpectEqual(restartCount, 0, "pod should have a restart count of 0 but got %v", restartCount)
 	})
 
 	/*
@@ -109,13 +112,13 @@ var _ = SIGDescribe("Probing container", func() {
 		}, 1*time.Minute, 1*time.Second).ShouldNot(gomega.BeTrue(), "pod should not be ready")
 
 		p, err := podClient.Get(context.TODO(), p.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		isReady, _ := testutils.PodRunningReady(p)
-		framework.ExpectNotEqual(isReady, true, "pod should be not ready")
+		e2eutils.ExpectNotEqual(isReady, true, "pod should be not ready")
 
 		restartCount := getRestartCount(p)
-		framework.ExpectEqual(restartCount, 0, "pod should have a restart count of 0 but got %v", restartCount)
+		e2eutils.ExpectEqual(restartCount, 0, "pod should have a restart count of 0 but got %v", restartCount)
 	})
 
 	/*
@@ -312,8 +315,8 @@ var _ = SIGDescribe("Probing container", func() {
 			"involvedObject.namespace": f.Namespace.Name,
 			"reason":                   events.ContainerProbeWarning,
 		}.AsSelector().String()
-		framework.ExpectNoError(e2eevents.WaitTimeoutForEvent(
-			f.ClientSet, f.Namespace.Name, expectedEvent, "Probe terminated redirects, Response body: <a href=\"http://0.0.0.0/\">Found</a>.", framework.PodEventTimeout))
+		e2eutils.ExpectNoError(e2eevents.WaitTimeoutForEvent(
+			f.ClientSet, f.Namespace.Name, expectedEvent, "Probe terminated redirects, Response body: <a href=\"http://0.0.0.0/\">Found</a>.", e2eutils.PodEventTimeout))
 	})
 
 	/*
@@ -427,32 +430,32 @@ var _ = SIGDescribe("Probing container", func() {
 		p := podClient.Create(startupPodSpec(startupProbe, readinessProbe, nil, cmd))
 
 		p, err := podClient.Get(context.TODO(), p.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
-		err = e2epod.WaitForPodContainerStarted(f.ClientSet, f.Namespace.Name, p.Name, 0, framework.PodStartTimeout)
-		framework.ExpectNoError(err)
+		err = e2epod.WaitForPodContainerStarted(f.ClientSet, f.Namespace.Name, p.Name, 0, e2eutils.PodStartTimeout)
+		e2eutils.ExpectNoError(err)
 		startedTime := time.Now()
 
 		// We assume the pod became ready when the container became ready. This
 		// is true for a single container pod.
-		err = e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, p.Name, f.Namespace.Name, framework.PodStartTimeout)
-		framework.ExpectNoError(err)
+		err = e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, p.Name, f.Namespace.Name, e2eutils.PodStartTimeout)
+		e2eutils.ExpectNoError(err)
 		readyTime := time.Now()
 
 		p, err = podClient.Get(context.TODO(), p.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		isReady, err := testutils.PodRunningReady(p)
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(isReady, true, "pod should be ready")
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectEqual(isReady, true, "pod should be ready")
 
 		readyIn := readyTime.Sub(startedTime)
-		framework.Logf("Container started at %v, pod became ready at %v, %v after startupProbe succeeded", startedTime, readyTime, readyIn)
+		e2eutils.Logf("Container started at %v, pod became ready at %v, %v after startupProbe succeeded", startedTime, readyTime, readyIn)
 		if readyIn < 0 {
-			framework.Failf("Pod became ready before startupProbe succeeded")
+			e2eutils.Failf("Pod became ready before startupProbe succeeded")
 		}
 		if readyIn > 25*time.Second {
-			framework.Failf("Pod became ready in %v, more than 25s after startupProbe succeeded. It means that the delay readiness probes were not initiated immediately after startup finished.", readyIn)
+			e2eutils.Failf("Pod became ready in %v, more than 25s after startupProbe succeeded. It means that the delay readiness probes were not initiated immediately after startup finished.", readyIn)
 		}
 	})
 
@@ -730,16 +733,16 @@ func RunLivenessTest(f *framework.Framework, pod *v1.Pod, expectNumRestarts int,
 	// Wait until the pod is not pending. (Here we need to check for something other than
 	// 'Pending' other than checking for 'Running', since when failures occur, we go to
 	// 'Terminated' which can cause indefinite blocking.)
-	framework.ExpectNoError(e2epod.WaitForPodNotPending(f.ClientSet, ns, pod.Name),
+	e2eutils.ExpectNoError(e2epod.WaitForPodNotPending(f.ClientSet, ns, pod.Name),
 		fmt.Sprintf("starting pod %s in namespace %s", pod.Name, ns))
-	framework.Logf("Started pod %s in namespace %s", pod.Name, ns)
+	e2eutils.Logf("Started pod %s in namespace %s", pod.Name, ns)
 
 	// Check the pod's current state and verify that restartCount is present.
 	ginkgo.By("checking the pod's current state and verifying that restartCount is present")
 	pod, err := podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err, fmt.Sprintf("getting pod %s in namespace %s", pod.Name, ns))
+	e2eutils.ExpectNoError(err, fmt.Sprintf("getting pod %s in namespace %s", pod.Name, ns))
 	initialRestartCount := podutil.GetExistingContainerStatus(pod.Status.ContainerStatuses, containerName).RestartCount
-	framework.Logf("Initial restart count of pod %s is %d", pod.Name, initialRestartCount)
+	e2eutils.Logf("Initial restart count of pod %s is %d", pod.Name, initialRestartCount)
 
 	// Wait for the restart state to be as desired.
 	deadline := time.Now().Add(timeout)
@@ -747,13 +750,13 @@ func RunLivenessTest(f *framework.Framework, pod *v1.Pod, expectNumRestarts int,
 	observedRestarts := int32(0)
 	for start := time.Now(); time.Now().Before(deadline); time.Sleep(2 * time.Second) {
 		pod, err = podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err, fmt.Sprintf("getting pod %s", pod.Name))
+		e2eutils.ExpectNoError(err, fmt.Sprintf("getting pod %s", pod.Name))
 		restartCount := podutil.GetExistingContainerStatus(pod.Status.ContainerStatuses, containerName).RestartCount
 		if restartCount != lastRestartCount {
-			framework.Logf("Restart count of pod %s/%s is now %d (%v elapsed)",
+			e2eutils.Logf("Restart count of pod %s/%s is now %d (%v elapsed)",
 				ns, pod.Name, restartCount, time.Since(start))
 			if restartCount < lastRestartCount {
-				framework.Failf("Restart count should increment monotonically: restart cont of pod %s/%s changed from %d to %d",
+				e2eutils.Failf("Restart count should increment monotonically: restart cont of pod %s/%s changed from %d to %d",
 					ns, pod.Name, lastRestartCount, restartCount)
 			}
 		}
@@ -769,7 +772,7 @@ func RunLivenessTest(f *framework.Framework, pod *v1.Pod, expectNumRestarts int,
 	// If we expected n restarts (n > 0), fail if we observed < n restarts.
 	if (expectNumRestarts == 0 && observedRestarts > 0) || (expectNumRestarts > 0 &&
 		int(observedRestarts) < expectNumRestarts) {
-		framework.Failf("pod %s/%s - expected number of restarts: %d, found restarts: %d",
+		e2eutils.Failf("pod %s/%s - expected number of restarts: %d, found restarts: %d",
 			ns, pod.Name, expectNumRestarts, observedRestarts)
 	}
 }
@@ -789,26 +792,26 @@ func runReadinessFailTest(f *framework.Framework, pod *v1.Pod, notReadyUntil tim
 
 	// Wait until the pod is not pending. (Here we need to check for something other than
 	// 'Pending', since when failures occur, we go to 'Terminated' which can cause indefinite blocking.)
-	framework.ExpectNoError(e2epod.WaitForPodNotPending(f.ClientSet, ns, pod.Name),
+	e2eutils.ExpectNoError(e2epod.WaitForPodNotPending(f.ClientSet, ns, pod.Name),
 		fmt.Sprintf("starting pod %s in namespace %s", pod.Name, ns))
-	framework.Logf("Started pod %s in namespace %s", pod.Name, ns)
+	e2eutils.Logf("Started pod %s in namespace %s", pod.Name, ns)
 
 	// Wait for the not ready state to be true for notReadyUntil duration
 	deadline := time.Now().Add(notReadyUntil)
 	for start := time.Now(); time.Now().Before(deadline); time.Sleep(2 * time.Second) {
 		// poll for Not Ready
 		if podutil.IsPodReady(pod) {
-			framework.Failf("pod %s/%s - expected to be not ready", ns, pod.Name)
+			e2eutils.Failf("pod %s/%s - expected to be not ready", ns, pod.Name)
 		}
 
-		framework.Logf("pod %s/%s is not ready (%v elapsed)",
+		e2eutils.Logf("pod %s/%s is not ready (%v elapsed)",
 			ns, pod.Name, time.Since(start))
 	}
 }
 
 func gRPCServerPodSpec(readinessProbe, livenessProbe *v1.Probe, containerName string) *v1.Pod {
 	etcdLocalhostAddress := "127.0.0.1"
-	if framework.TestContext.ClusterIsIPv6() {
+	if e2econfig.TestContext.ClusterIsIPv6() {
 		etcdLocalhostAddress = "::1"
 	}
 	etcdURL := fmt.Sprintf("http://%s", net.JoinHostPort(etcdLocalhostAddress, "2379"))

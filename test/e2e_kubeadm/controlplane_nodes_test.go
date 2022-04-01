@@ -19,6 +19,8 @@ package kubeadm
 import (
 	"context"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -60,8 +62,8 @@ var _ = Describe("control-plane node", func() {
 		// TODO: remove the legacy taint check in 1.25:
 		// https://github.com/kubernetes/kubeadm/issues/2200
 		for _, cp := range controlPlanes.Items {
-			framework.ExpectNodeHasTaint(f.ClientSet, cp.GetName(), &corev1.Taint{Key: controlPlaneLabel, Effect: corev1.TaintEffectNoSchedule})
-			framework.ExpectNodeHasTaint(f.ClientSet, cp.GetName(), &corev1.Taint{Key: controlPlaneLabelLegacy, Effect: corev1.TaintEffectNoSchedule})
+			e2eutils.ExpectNodeHasTaint(f.ClientSet, cp.GetName(), &corev1.Taint{Key: controlPlaneLabel, Effect: corev1.TaintEffectNoSchedule})
+			e2eutils.ExpectNodeHasTaint(f.ClientSet, cp.GetName(), &corev1.Taint{Key: controlPlaneLabelLegacy, Effect: corev1.TaintEffectNoSchedule})
 		}
 	})
 })
@@ -70,6 +72,6 @@ func getControlPlaneNodes(c clientset.Interface) *corev1.NodeList {
 	selector := labels.Set{controlPlaneLabel: ""}.AsSelector()
 	cpNodes, err := c.CoreV1().Nodes().
 		List(context.TODO(), metav1.ListOptions{LabelSelector: selector.String()})
-	framework.ExpectNoError(err, "error reading control-plane nodes")
+	e2eutils.ExpectNoError(err, "error reading control-plane nodes")
 	return cpNodes
 }

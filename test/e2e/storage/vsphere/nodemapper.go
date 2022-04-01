@@ -22,13 +22,14 @@ import (
 	"strings"
 	"sync"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vapi/rest"
 	"github.com/vmware/govmomi/vapi/tags"
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/types"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/kubernetes/test/e2e/framework"
 
 	neturl "net/url"
 )
@@ -79,7 +80,7 @@ func (nm *NodeMapper) GenerateNodeMap(vSphereInstances map[string]*VSphere, node
 		if vs.Config.Datacenters == "" {
 			datacenters, err = vs.GetAllDatacenter(ctx)
 			if err != nil {
-				framework.Logf("NodeMapper error: %v", err)
+				e2eutils.Logf("NodeMapper error: %v", err)
 				continue
 			}
 		} else {
@@ -91,7 +92,7 @@ func (nm *NodeMapper) GenerateNodeMap(vSphereInstances map[string]*VSphere, node
 				}
 				datacenter, err := vs.GetDatacenter(ctx, dc)
 				if err != nil {
-					framework.Logf("NodeMapper error dc: %s \n err: %v", dc, err)
+					e2eutils.Logf("NodeMapper error dc: %s \n err: %v", dc, err)
 
 					continue
 				}
@@ -100,7 +101,7 @@ func (nm *NodeMapper) GenerateNodeMap(vSphereInstances map[string]*VSphere, node
 		}
 
 		for _, dc := range datacenters {
-			framework.Logf("Search candidates vc=%s and datacenter=%s", vs.Config.Hostname, dc.Name())
+			e2eutils.Logf("Search candidates vc=%s and datacenter=%s", vs.Config.Hostname, dc.Name())
 			queueChannel = append(queueChannel, &VMSearch{vs: vs, datacenter: dc})
 		}
 	}
@@ -109,20 +110,20 @@ func (nm *NodeMapper) GenerateNodeMap(vSphereInstances map[string]*VSphere, node
 		n := node
 		go func() {
 			nodeUUID := getUUIDFromProviderID(n.Spec.ProviderID)
-			framework.Logf("Searching for node with UUID: %s", nodeUUID)
+			e2eutils.Logf("Searching for node with UUID: %s", nodeUUID)
 			for _, res := range queueChannel {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 				vm, err := res.vs.GetVMByUUID(ctx, nodeUUID, res.datacenter)
 				if err != nil {
-					framework.Logf("Error %v while looking for node=%s in vc=%s and datacenter=%s",
+					e2eutils.Logf("Error %v while looking for node=%s in vc=%s and datacenter=%s",
 						err, n.Name, res.vs.Config.Hostname, res.datacenter.Name())
 					continue
 				}
 				if vm != nil {
 					hostSystemRef := res.vs.GetHostFromVMReference(ctx, vm.Reference())
 					zones := retrieveZoneInformationForNode(n.Name, res.vs, hostSystemRef)
-					framework.Logf("Found node %s as vm=%+v placed on host=%+v under zones %s in vc=%s and datacenter=%s",
+					e2eutils.Logf("Found node %s as vm=%+v placed on host=%+v under zones %s in vc=%s and datacenter=%s",
 						n.Name, vm, hostSystemRef, zones, res.vs.Config.Hostname, res.datacenter.Name())
 					nodeInfo := &NodeInfo{Name: n.Name, DataCenterRef: res.datacenter.Reference(), VirtualMachineRef: vm.Reference(), HostSystemRef: hostSystemRef, VSphere: res.vs, Zones: zones}
 					nm.SetNodeInfo(n.Name, nodeInfo)
@@ -194,10 +195,10 @@ func retrieveZoneInformationForNode(nodeName string, connection *VSphere, hostSy
 				}
 				switch {
 				case category.Name == "k8s-zone":
-					framework.Logf("Found %s associated with %s for %s", tag.Name, ancestor.Name, nodeName)
+					e2eutils.Logf("Found %s associated with %s for %s", tag.Name, ancestor.Name, nodeName)
 					zonesAttachedToObject = append(zonesAttachedToObject, tag.Name)
 				case category.Name == "k8s-region":
-					framework.Logf("Found %s associated with %s for %s", tag.Name, ancestor.Name, nodeName)
+					e2eutils.Logf("Found %s associated with %s for %s", tag.Name, ancestor.Name, nodeName)
 				}
 			}
 			// Overwrite zone information if it exists for this object
@@ -252,7 +253,7 @@ func (nm *NodeMapper) GenerateZoneToDatastoreMap() error {
 			vcToZoneDatastoresMap[vc][zone] = commonDatastores
 		}
 	}
-	framework.Logf("Zone to datastores map : %+v", vcToZoneDatastoresMap)
+	e2eutils.Logf("Zone to datastores map : %+v", vcToZoneDatastoresMap)
 	return nil
 }
 

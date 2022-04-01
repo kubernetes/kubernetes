@@ -19,6 +19,7 @@ package gcp
 import (
 	"k8s.io/kubernetes/test/e2e/cloud/gcp/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 	"k8s.io/kubernetes/test/e2e/upgrades"
 	"k8s.io/kubernetes/test/e2e/upgrades/apps"
 	"k8s.io/kubernetes/test/e2e/upgrades/autoscaling"
@@ -57,7 +58,7 @@ var _ = SIGDescribe("Upgrade [Feature:Upgrade]", func() {
 	ginkgo.Describe("master upgrade", func() {
 		ginkgo.It("should maintain a functioning cluster [Feature:MasterUpgrade]", func() {
 			upgCtx, err := common.GetUpgradeContext(f.ClientSet.Discovery())
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "Master upgrade"}
 			masterUpgradeTest := &junit.TestCase{
@@ -74,7 +75,7 @@ var _ = SIGDescribe("Upgrade [Feature:Upgrade]", func() {
 	ginkgo.Describe("cluster upgrade", func() {
 		ginkgo.It("should maintain a functioning cluster [Feature:ClusterUpgrade]", func() {
 			upgCtx, err := common.GetUpgradeContext(f.ClientSet.Discovery())
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "Cluster upgrade"}
 			clusterUpgradeTest := &junit.TestCase{Name: "[sig-cloud-provider-gcp] cluster-upgrade", Classname: "upgrade_tests"}
@@ -93,7 +94,7 @@ var _ = SIGDescribe("Downgrade [Feature:Downgrade]", func() {
 	ginkgo.Describe("cluster downgrade", func() {
 		ginkgo.It("should maintain a functioning cluster [Feature:ClusterDowngrade]", func() {
 			upgCtx, err := common.GetUpgradeContext(f.ClientSet.Discovery())
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "Cluster downgrade"}
 			clusterDowngradeTest := &junit.TestCase{Name: "[sig-cloud-provider-gcp] cluster-downgrade", Classname: "upgrade_tests"}

@@ -20,6 +20,8 @@ import (
 	"context"
 	"encoding/json"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -56,8 +58,8 @@ var _ = SIGDescribe("PodTemplates", func() {
 		podTemplateList, err := f.ClientSet.CoreV1().PodTemplates("").List(context.TODO(), metav1.ListOptions{
 			LabelSelector: "podtemplate-static=true",
 		})
-		framework.ExpectNoError(err, "failed to list all PodTemplates")
-		framework.ExpectEqual(len(podTemplateList.Items), 0, "unable to find templates")
+		e2eutils.ExpectNoError(err, "failed to list all PodTemplates")
+		e2eutils.ExpectEqual(len(podTemplateList.Items), 0, "unable to find templates")
 
 		// create a PodTemplate
 		_, err = f.ClientSet.CoreV1().PodTemplates(testNamespaceName).Create(context.TODO(), &v1.PodTemplate{
@@ -75,12 +77,12 @@ var _ = SIGDescribe("PodTemplates", func() {
 				},
 			},
 		}, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create PodTemplate")
+		e2eutils.ExpectNoError(err, "failed to create PodTemplate")
 
 		// get template
 		podTemplateRead, err := f.ClientSet.CoreV1().PodTemplates(testNamespaceName).Get(context.TODO(), podTemplateName, metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to get created PodTemplate")
-		framework.ExpectEqual(podTemplateRead.ObjectMeta.Name, podTemplateName)
+		e2eutils.ExpectNoError(err, "failed to get created PodTemplate")
+		e2eutils.ExpectEqual(podTemplateRead.ObjectMeta.Name, podTemplateName)
 
 		// patch template
 		podTemplatePatch, err := json.Marshal(map[string]interface{}{
@@ -90,25 +92,25 @@ var _ = SIGDescribe("PodTemplates", func() {
 				},
 			},
 		})
-		framework.ExpectNoError(err, "failed to marshal patch data")
+		e2eutils.ExpectNoError(err, "failed to marshal patch data")
 		_, err = f.ClientSet.CoreV1().PodTemplates(testNamespaceName).Patch(context.TODO(), podTemplateName, types.StrategicMergePatchType, []byte(podTemplatePatch), metav1.PatchOptions{})
-		framework.ExpectNoError(err, "failed to patch PodTemplate")
+		e2eutils.ExpectNoError(err, "failed to patch PodTemplate")
 
 		// get template (ensure label is there)
 		podTemplateRead, err = f.ClientSet.CoreV1().PodTemplates(testNamespaceName).Get(context.TODO(), podTemplateName, metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to get PodTemplate")
-		framework.ExpectEqual(podTemplateRead.ObjectMeta.Labels["podtemplate"], "patched", "failed to patch template, new label not found")
+		e2eutils.ExpectNoError(err, "failed to get PodTemplate")
+		e2eutils.ExpectEqual(podTemplateRead.ObjectMeta.Labels["podtemplate"], "patched", "failed to patch template, new label not found")
 
 		// delete the PodTemplate
 		err = f.ClientSet.CoreV1().PodTemplates(testNamespaceName).Delete(context.TODO(), podTemplateName, metav1.DeleteOptions{})
-		framework.ExpectNoError(err, "failed to delete PodTemplate")
+		e2eutils.ExpectNoError(err, "failed to delete PodTemplate")
 
 		// list the PodTemplates
 		podTemplateList, err = f.ClientSet.CoreV1().PodTemplates("").List(context.TODO(), metav1.ListOptions{
 			LabelSelector: "podtemplate-static=true",
 		})
-		framework.ExpectNoError(err, "failed to list PodTemplate")
-		framework.ExpectEqual(len(podTemplateList.Items), 0, "PodTemplate list returned items, failed to delete PodTemplate")
+		e2eutils.ExpectNoError(err, "failed to list PodTemplate")
+		e2eutils.ExpectEqual(len(podTemplateList.Items), 0, "PodTemplate list returned items, failed to delete PodTemplate")
 	})
 
 	/*
@@ -136,8 +138,8 @@ var _ = SIGDescribe("PodTemplates", func() {
 					},
 				},
 			}, metav1.CreateOptions{})
-			framework.ExpectNoError(err, "failed to create pod template")
-			framework.Logf("created %v", podTemplateName)
+			e2eutils.ExpectNoError(err, "failed to create pod template")
+			e2eutils.Logf("created %v", podTemplateName)
 		}
 
 		ginkgo.By("get a list of pod templates with a label in the current namespace")
@@ -145,22 +147,22 @@ var _ = SIGDescribe("PodTemplates", func() {
 		podTemplateList, err := f.ClientSet.CoreV1().PodTemplates(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{
 			LabelSelector: "podtemplate-set=true",
 		})
-		framework.ExpectNoError(err, "failed to get a list of pod templates")
+		e2eutils.ExpectNoError(err, "failed to get a list of pod templates")
 
-		framework.ExpectEqual(len(podTemplateList.Items), len(podTemplateNames), "looking for expected number of pod templates")
+		e2eutils.ExpectEqual(len(podTemplateList.Items), len(podTemplateNames), "looking for expected number of pod templates")
 
 		ginkgo.By("delete collection of pod templates")
 		// delete collection
 
-		framework.Logf("requesting DeleteCollection of pod templates")
+		e2eutils.Logf("requesting DeleteCollection of pod templates")
 		err = f.ClientSet.CoreV1().PodTemplates(f.Namespace.Name).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{
 			LabelSelector: "podtemplate-set=true"})
-		framework.ExpectNoError(err, "failed to delete all pod templates")
+		e2eutils.ExpectNoError(err, "failed to delete all pod templates")
 
 		ginkgo.By("check that the list of pod templates matches the requested quantity")
 
 		err = wait.PollImmediate(podTemplateRetryPeriod, podTemplateRetryTimeout, checkPodTemplateListQuantity(f, "podtemplate-set=true", 0))
-		framework.ExpectNoError(err, "failed to count required pod templates")
+		e2eutils.ExpectNoError(err, "failed to count required pod templates")
 
 	})
 
@@ -188,23 +190,23 @@ var _ = SIGDescribe("PodTemplates", func() {
 				},
 			},
 		}, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create pod template")
+		e2eutils.ExpectNoError(err, "failed to create pod template")
 
 		ginkgo.By("Replace a pod template")
 		var updatedPT *v1.PodTemplate
 
 		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			ptResource, err = ptClient.Get(context.TODO(), ptName, metav1.GetOptions{})
-			framework.ExpectNoError(err, "Unable to get pod template %s", ptName)
+			e2eutils.ExpectNoError(err, "Unable to get pod template %s", ptName)
 			ptResource.Annotations = map[string]string{
 				"updated": "true",
 			}
 			updatedPT, err = ptClient.Update(context.TODO(), ptResource, metav1.UpdateOptions{})
 			return err
 		})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(updatedPT.Annotations["updated"], "true", "updated object should have the applied annotation")
-		framework.Logf("Found updated podtemplate annotation: %#v\n", updatedPT.Annotations["updated"])
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectEqual(updatedPT.Annotations["updated"], "true", "updated object should have the applied annotation")
+		e2eutils.Logf("Found updated podtemplate annotation: %#v\n", updatedPT.Annotations["updated"])
 	})
 
 })
@@ -213,7 +215,7 @@ func checkPodTemplateListQuantity(f *framework.Framework, label string, quantity
 	return func() (bool, error) {
 		var err error
 
-		framework.Logf("requesting list of pod templates to confirm quantity")
+		e2eutils.Logf("requesting list of pod templates to confirm quantity")
 
 		list, err := f.ClientSet.CoreV1().PodTemplates(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{
 			LabelSelector: label})

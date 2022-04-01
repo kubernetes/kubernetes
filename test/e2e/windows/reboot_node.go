@@ -20,6 +20,8 @@ import (
 	"context"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,8 +44,8 @@ var _ = SIGDescribe("[Feature:Windows] [Excluded:WindowsDocker] [MinimumKubeletV
 
 		ginkgo.By("selecting a Windows node")
 		targetNode, err := findWindowsNode(f)
-		framework.ExpectNoError(err, "Error finding Windows node")
-		framework.Logf("Using node: %v", targetNode.Name)
+		e2eutils.ExpectNoError(err, "Error finding Windows node")
+		e2eutils.Logf("Using node: %v", targetNode.Name)
 
 		windowsImage := imageutils.GetE2EImage(imageutils.Agnhost)
 
@@ -164,8 +166,8 @@ var _ = SIGDescribe("[Feature:Windows] [Excluded:WindowsDocker] [MinimumKubeletV
 			podName,
 			metav1.GetOptions{})
 
-		framework.ExpectNoError(err, "Error retrieving pod")
-		framework.ExpectEqual(p.Status.Phase, v1.PodSucceeded)
+		e2eutils.ExpectNoError(err, "Error retrieving pod")
+		e2eutils.ExpectEqual(p.Status.Phase, v1.PodSucceeded)
 
 		ginkgo.By("Waiting for Windows worker rebooting")
 
@@ -192,11 +194,11 @@ var _ = SIGDescribe("[Feature:Windows] [Excluded:WindowsDocker] [MinimumKubeletV
 		}
 
 		ginkgo.By("Checking whether agn-test-pod is rebooted")
-		framework.ExpectEqual(restartCount, 1)
+		e2eutils.ExpectEqual(restartCount, 1)
 
 		agnPodOut, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), agnPod.Name, metav1.GetOptions{})
-		framework.ExpectEqual(agnPodOut.Status.Phase, v1.PodRunning)
-		framework.ExpectNoError(err, "getting pod info after reboot")
+		e2eutils.ExpectEqual(agnPodOut.Status.Phase, v1.PodRunning)
+		e2eutils.ExpectNoError(err, "getting pod info after reboot")
 		assertConsistentConnectivity(f, nginxPod.ObjectMeta.Name, "linux", linuxCheck(agnPodOut.Status.PodIP, 80))
 
 		// create another host process pod to check system boot time
@@ -247,7 +249,7 @@ var _ = SIGDescribe("[Feature:Windows] [Excluded:WindowsDocker] [MinimumKubeletV
 			"check-reboot-pod",
 			metav1.GetOptions{})
 
-		framework.ExpectNoError(err, "Error retrieving pod")
-		framework.ExpectEqual(p.Status.Phase, v1.PodSucceeded)
+		e2eutils.ExpectNoError(err, "Error retrieving pod")
+		e2eutils.ExpectEqual(p.Status.Phase, v1.PodSucceeded)
 	})
 })

@@ -24,13 +24,14 @@ import (
 	"strings"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/soap"
 	"github.com/vmware/govmomi/vim25/types"
-	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 const (
@@ -121,7 +122,7 @@ func (vs *VSphere) GetFolderByPath(ctx context.Context, dc object.Reference, fol
 	finder.SetDatacenter(datacenter)
 	vmFolder, err := finder.Folder(ctx, folderPath)
 	if err != nil {
-		framework.Logf("Failed to get the folder reference for %s. err: %+v", folderPath, err)
+		e2eutils.Logf("Failed to get the folder reference for %s. err: %+v", folderPath, err)
 		return vmFolderMor, err
 	}
 	return vmFolder.Reference(), nil
@@ -156,15 +157,15 @@ func (vs *VSphere) CreateVolume(volumeOptions *VolumeOptions, dataCenterRef type
 			soapFault := soap.ToSoapFault(err)
 			if _, ok := soapFault.VimFault().(types.FileAlreadyExists); ok {
 				directoryAlreadyPresent = true
-				framework.Logf("Directory with the path %+q is already present", directoryPath)
+				e2eutils.Logf("Directory with the path %+q is already present", directoryPath)
 			}
 		}
 		if !directoryAlreadyPresent {
-			framework.Logf("Cannot create dir %#v. err %s", directoryPath, err)
+			e2eutils.Logf("Cannot create dir %#v. err %s", directoryPath, err)
 			return "", err
 		}
 	}
-	framework.Logf("Created dir with path as %+q", directoryPath)
+	e2eutils.Logf("Created dir with path as %+q", directoryPath)
 	vmdkPath := directoryPath + volumeOptions.Name + ".vmdk"
 
 	// Create a virtual disk manager
@@ -180,12 +181,12 @@ func (vs *VSphere) CreateVolume(volumeOptions *VolumeOptions, dataCenterRef type
 	// Create virtual disk
 	task, err := vdm.CreateVirtualDisk(ctx, vmdkPath, datacenter, vmDiskSpec)
 	if err != nil {
-		framework.Logf("Failed to create virtual disk: %s. err: %+v", vmdkPath, err)
+		e2eutils.Logf("Failed to create virtual disk: %s. err: %+v", vmdkPath, err)
 		return "", err
 	}
 	taskInfo, err := task.WaitForResult(ctx, nil)
 	if err != nil {
-		framework.Logf("Failed to complete virtual disk creation: %s. err: %+v", vmdkPath, err)
+		e2eutils.Logf("Failed to complete virtual disk creation: %s. err: %+v", vmdkPath, err)
 		return "", err
 	}
 	volumePath := taskInfo.Result.(string)
@@ -209,12 +210,12 @@ func (vs *VSphere) DeleteVolume(volumePath string, dataCenterRef types.ManagedOb
 	// Delete virtual disk
 	task, err := virtualDiskManager.DeleteVirtualDisk(ctx, diskPath, datacenter)
 	if err != nil {
-		framework.Logf("Failed to delete virtual disk. err: %v", err)
+		e2eutils.Logf("Failed to delete virtual disk. err: %v", err)
 		return err
 	}
 	err = task.Wait(ctx)
 	if err != nil {
-		framework.Logf("Failed to delete virtual disk. err: %v", err)
+		e2eutils.Logf("Failed to delete virtual disk. err: %v", err)
 		return err
 	}
 	return nil
@@ -233,7 +234,7 @@ func (vs *VSphere) IsVMPresent(vmName string, dataCenterRef types.ManagedObjectR
 	vmFolder := object.NewFolder(vs.Client.Client, folderMor)
 	vmFoldersChildren, err := vmFolder.Children(ctx)
 	if err != nil {
-		framework.Logf("Failed to get children from Folder: %s. err: %+v", vmFolder.InventoryPath, err)
+		e2eutils.Logf("Failed to get children from Folder: %s. err: %+v", vmFolder.InventoryPath, err)
 		return
 	}
 	for _, vmFoldersChild := range vmFoldersChildren {

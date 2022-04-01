@@ -22,6 +22,8 @@ import (
 	"path/filepath"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -53,7 +55,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-expansion ", func() {
 		testMode := immediateMode
 		ginkgo.BeforeEach(func() {
 			nodes, err := e2enode.GetBoundedReadySchedulableNodes(f.ClientSet, maxNodes)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 
 			scName = fmt.Sprintf("%v-%v", testSCPrefix, f.Namespace.Name)
 			// Choose a random node
@@ -89,7 +91,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-expansion ", func() {
 			)
 			ginkgo.By("Creating pod1")
 			pod1, pod1Err = createLocalPod(config, testVol, nil)
-			framework.ExpectNoError(pod1Err)
+			e2eutils.ExpectNoError(pod1Err)
 			verifyLocalPod(config, testVol, pod1, config.randomNode.Name)
 
 			// We expand the PVC while l.pod is using it for online expansion.
@@ -97,33 +99,33 @@ var _ = utils.SIGDescribe("PersistentVolumes-expansion ", func() {
 			currentPvcSize := testVol.pvc.Spec.Resources.Requests[v1.ResourceStorage]
 			newSize := currentPvcSize.DeepCopy()
 			newSize.Add(resource.MustParse("10Mi"))
-			framework.Logf("currentPvcSize %s, newSize %s", currentPvcSize.String(), newSize.String())
+			e2eutils.Logf("currentPvcSize %s, newSize %s", currentPvcSize.String(), newSize.String())
 			newPVC, err := testsuites.ExpandPVCSize(testVol.pvc, newSize, f.ClientSet)
-			framework.ExpectNoError(err, "While updating pvc for more size")
+			e2eutils.ExpectNoError(err, "While updating pvc for more size")
 			testVol.pvc = newPVC
 			gomega.Expect(testVol.pvc).NotTo(gomega.BeNil())
 
 			pvcSize := testVol.pvc.Spec.Resources.Requests[v1.ResourceStorage]
 			if pvcSize.Cmp(newSize) != 0 {
-				framework.Failf("error updating pvc size %q", testVol.pvc.Name)
+				e2eutils.Failf("error updating pvc size %q", testVol.pvc.Name)
 			}
 
 			// Now update the underlying volume manually
 			err = config.ltrMgr.ExpandBlockDevice(testVol.ltr, 10 /*number of 1M blocks to add*/)
-			framework.ExpectNoError(err, "while expanding loopback device")
+			e2eutils.ExpectNoError(err, "while expanding loopback device")
 
 			// now update PV to matching size
 			pv, err := UpdatePVSize(testVol.pv, newSize, f.ClientSet)
-			framework.ExpectNoError(err, "while updating pv to more size")
+			e2eutils.ExpectNoError(err, "while updating pv to more size")
 			gomega.Expect(pv).NotTo(gomega.BeNil())
 			testVol.pv = pv
 
 			ginkgo.By("Waiting for file system resize to finish")
 			testVol.pvc, err = testsuites.WaitForFSResize(testVol.pvc, f.ClientSet)
-			framework.ExpectNoError(err, "while waiting for fs resize to finish")
+			e2eutils.ExpectNoError(err, "while waiting for fs resize to finish")
 
 			pvcConditions := testVol.pvc.Status.Conditions
-			framework.ExpectEqual(len(pvcConditions), 0, "pvc should not have conditions")
+			e2eutils.ExpectEqual(len(pvcConditions), 0, "pvc should not have conditions")
 		})
 
 	})
@@ -144,7 +146,7 @@ func UpdatePVSize(pv *v1.PersistentVolume, size resource.Quantity, c clientset.I
 		pvToUpdate.Spec.Capacity[v1.ResourceStorage] = size
 		pvToUpdate, err = c.CoreV1().PersistentVolumes().Update(context.TODO(), pvToUpdate, metav1.UpdateOptions{})
 		if err != nil {
-			framework.Logf("error updating PV %s: %v", pvName, err)
+			e2eutils.Logf("error updating PV %s: %v", pvName, err)
 			lastError = err
 			return false, nil
 		}
@@ -171,5 +173,5 @@ func setupExpandableLocalStorageClass(config *localTestConfig, mode *storagev1.V
 	}
 
 	_, err := config.client.StorageV1().StorageClasses().Create(context.TODO(), sc, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 }

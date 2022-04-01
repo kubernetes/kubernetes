@@ -19,6 +19,8 @@ package node
 import (
 	"fmt"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -39,7 +41,7 @@ var _ = SIGDescribe("crictl", func() {
 
 	ginkgo.It("should be able to run crictl on the node", func() {
 		nodes, err := e2enode.GetBoundedReadySchedulableNodes(f.ClientSet, maxNodes)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		testCases := []string{
 			"crictl version",
@@ -53,10 +55,10 @@ var _ = SIGDescribe("crictl", func() {
 				ginkgo.By(fmt.Sprintf("Testing %q on node %q ", testCase, node.GetName()))
 
 				res, err := hostExec.Execute(testCase, &node)
-				framework.ExpectNoError(err)
+				e2eutils.ExpectNoError(err)
 
 				if res.Stdout == "" && res.Stderr == "" {
-					framework.Fail("output is empty")
+					e2eutils.Fail("output is empty")
 				}
 			}
 		}

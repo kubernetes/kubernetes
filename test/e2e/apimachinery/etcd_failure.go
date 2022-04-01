@@ -20,6 +20,9 @@ import (
 	"context"
 	"time"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -55,7 +58,7 @@ var _ = SIGDescribe("Etcd failure [Disruptive]", func() {
 			Image:     imageutils.GetPauseImageName(),
 			Replicas:  1,
 		})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 	})
 
 	ginkgo.It("should recover from network partition with master", func() {
@@ -80,7 +83,7 @@ func etcdFailTest(f *framework.Framework, failCommand, fixCommand string) {
 
 	checkExistingRCRecovers(f)
 
-	apps.TestReplicationControllerServeImageOrFail(f, "basic", framework.ServeHostnameImage)
+	apps.TestReplicationControllerServeImageOrFail(f, "basic", e2eutils.ServeHostnameImage)
 }
 
 // For this duration, etcd will be failed by executing a failCommand on the master.
@@ -99,12 +102,12 @@ func doEtcdFailure(failCommand, fixCommand string) {
 }
 
 func masterExec(cmd string) {
-	host := framework.APIAddress() + ":22"
-	result, err := e2essh.SSH(cmd, host, framework.TestContext.Provider)
-	framework.ExpectNoError(err, "failed to SSH to host %s on provider %s and run command: %q", host, framework.TestContext.Provider, cmd)
+	host := e2eutils.APIAddress() + ":22"
+	result, err := e2essh.SSH(cmd, host, e2econfig.TestContext.Provider)
+	e2eutils.ExpectNoError(err, "failed to SSH to host %s on provider %s and run command: %q", host, e2econfig.TestContext.Provider, cmd)
 	if result.Code != 0 {
 		e2essh.LogResult(result)
-		framework.Failf("master exec command returned non-zero")
+		e2eutils.Failf("master exec command returned non-zero")
 	}
 }
 
@@ -114,11 +117,11 @@ func checkExistingRCRecovers(f *framework.Framework) {
 	rcSelector := labels.Set{"name": "baz"}.AsSelector()
 
 	ginkgo.By("deleting pods from existing replication controller")
-	framework.ExpectNoError(wait.Poll(time.Millisecond*500, time.Second*60, func() (bool, error) {
+	e2eutils.ExpectNoError(wait.Poll(time.Millisecond*500, time.Second*60, func() (bool, error) {
 		options := metav1.ListOptions{LabelSelector: rcSelector.String()}
 		pods, err := podClient.List(context.TODO(), options)
 		if err != nil {
-			framework.Logf("apiserver returned error, as expected before recovery: %v", err)
+			e2eutils.Logf("apiserver returned error, as expected before recovery: %v", err)
 			return false, nil
 		}
 		if len(pods.Items) == 0 {
@@ -126,17 +129,17 @@ func checkExistingRCRecovers(f *framework.Framework) {
 		}
 		for _, pod := range pods.Items {
 			err = podClient.Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(0))
-			framework.ExpectNoError(err, "failed to delete pod %s in namespace: %s", pod.Name, f.Namespace.Name)
+			e2eutils.ExpectNoError(err, "failed to delete pod %s in namespace: %s", pod.Name, f.Namespace.Name)
 		}
-		framework.Logf("apiserver has recovered")
+		e2eutils.Logf("apiserver has recovered")
 		return true, nil
 	}))
 
 	ginkgo.By("waiting for replication controller to recover")
-	framework.ExpectNoError(wait.Poll(time.Millisecond*500, time.Second*60, func() (bool, error) {
+	e2eutils.ExpectNoError(wait.Poll(time.Millisecond*500, time.Second*60, func() (bool, error) {
 		options := metav1.ListOptions{LabelSelector: rcSelector.String()}
 		pods, err := podClient.List(context.TODO(), options)
-		framework.ExpectNoError(err, "failed to list pods in namespace: %s, that match label selector: %s", f.Namespace.Name, rcSelector.String())
+		e2eutils.ExpectNoError(err, "failed to list pods in namespace: %s, that match label selector: %s", f.Namespace.Name, rcSelector.String())
 		for _, pod := range pods.Items {
 			if pod.DeletionTimestamp == nil && podutil.IsPodReady(&pod) {
 				return true, nil

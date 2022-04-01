@@ -22,6 +22,8 @@ import (
 	"context"
 	"sync"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 
 	v1 "k8s.io/api/core/v1"
@@ -89,10 +91,10 @@ func (t *volumeStressTestSuite) SkipUnsupportedTests(driver storageframework.Tes
 		e2eskipper.Skipf("Driver %s doesn't specify stress test options -- skipping", dInfo.Name)
 	}
 	if dInfo.StressTestOptions.NumPods <= 0 {
-		framework.Failf("NumPods in stress test options must be a positive integer, received: %d", dInfo.StressTestOptions.NumPods)
+		e2eutils.Failf("NumPods in stress test options must be a positive integer, received: %d", dInfo.StressTestOptions.NumPods)
 	}
 	if dInfo.StressTestOptions.NumRestarts <= 0 {
-		framework.Failf("NumRestarts in stress test options must be a positive integer, received: %d", dInfo.StressTestOptions.NumRestarts)
+		e2eutils.Failf("NumRestarts in stress test options must be a positive integer, received: %d", dInfo.StressTestOptions.NumRestarts)
 	}
 
 	if _, ok := driver.(storageframework.DynamicPVTestDriver); !ok {
@@ -129,7 +131,7 @@ func (t *volumeStressTestSuite) DefineTests(driver storageframework.TestDriver, 
 
 	createPodsAndVolumes := func() {
 		for i := 0; i < l.testOptions.NumPods; i++ {
-			framework.Logf("Creating resources for pod %v/%v", i, l.testOptions.NumPods-1)
+			e2eutils.Logf("Creating resources for pod %v/%v", i, l.testOptions.NumPods-1)
 			r := storageframework.CreateVolumeResource(driver, l.config, pattern, t.GetTestSuiteInfo().SupportedSizeRange)
 			l.volumes = append(l.volumes, r)
 			podConfig := e2epod.Config{
@@ -138,14 +140,14 @@ func (t *volumeStressTestSuite) DefineTests(driver storageframework.TestDriver, 
 				SeLinuxLabel: e2epv.SELinuxLabel,
 			}
 			pod, err := e2epod.MakeSecPod(&podConfig)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 
 			l.pods = append(l.pods, pod)
 		}
 	}
 
 	cleanup := func() {
-		framework.Logf("Stopping and waiting for all test routines to finish")
+		e2eutils.Logf("Stopping and waiting for all test routines to finish")
 		l.cancel()
 		l.wg.Wait()
 
@@ -161,7 +163,7 @@ func (t *volumeStressTestSuite) DefineTests(driver storageframework.TestDriver, 
 				defer ginkgo.GinkgoRecover()
 				defer wg.Done()
 
-				framework.Logf("Deleting pod %v", pod.Name)
+				e2eutils.Logf("Deleting pod %v", pod.Name)
 				err := e2epod.DeletePodWithWait(cs, pod)
 				mu.Lock()
 				defer mu.Unlock()
@@ -176,7 +178,7 @@ func (t *volumeStressTestSuite) DefineTests(driver storageframework.TestDriver, 
 				defer ginkgo.GinkgoRecover()
 				defer wg.Done()
 
-				framework.Logf("Deleting volume %s", volume.Pvc.GetName())
+				e2eutils.Logf("Deleting volume %s", volume.Pvc.GetName())
 				err := volume.CleanupResource()
 				mu.Lock()
 				defer mu.Unlock()
@@ -186,7 +188,7 @@ func (t *volumeStressTestSuite) DefineTests(driver storageframework.TestDriver, 
 		wg.Wait()
 
 		errs = append(errs, storageutils.TryFunc(l.driverCleanup))
-		framework.ExpectNoError(errors.NewAggregate(errs), "while cleaning up resource")
+		e2eutils.ExpectNoError(errors.NewAggregate(errs), "while cleaning up resource")
 		l.migrationCheck.validateMigrationVolumeOpCounts()
 	}
 
@@ -214,17 +216,17 @@ func (t *volumeStressTestSuite) DefineTests(driver storageframework.TestDriver, 
 						return
 					default:
 						pod := l.pods[podIndex]
-						framework.Logf("Pod-%v [%v], Iteration %v/%v", podIndex, pod.Name, j, l.testOptions.NumRestarts-1)
+						e2eutils.Logf("Pod-%v [%v], Iteration %v/%v", podIndex, pod.Name, j, l.testOptions.NumRestarts-1)
 						_, err := cs.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 						if err != nil {
 							l.cancel()
-							framework.Failf("Failed to create pod-%v [%+v]. Error: %v", podIndex, pod, err)
+							e2eutils.Failf("Failed to create pod-%v [%+v]. Error: %v", podIndex, pod, err)
 						}
 
 						err = e2epod.WaitTimeoutForPodRunningInNamespace(cs, pod.Name, pod.Namespace, f.Timeouts.PodStart)
 						if err != nil {
 							l.cancel()
-							framework.Failf("Failed to wait for pod-%v [%+v] turn into running status. Error: %v", podIndex, pod, err)
+							e2eutils.Failf("Failed to wait for pod-%v [%+v] turn into running status. Error: %v", podIndex, pod, err)
 						}
 
 						// TODO: write data per pod and validate it everytime
@@ -232,7 +234,7 @@ func (t *volumeStressTestSuite) DefineTests(driver storageframework.TestDriver, 
 						err = e2epod.DeletePodWithWait(f.ClientSet, pod)
 						if err != nil {
 							l.cancel()
-							framework.Failf("Failed to delete pod-%v [%+v]. Error: %v", podIndex, pod, err)
+							e2eutils.Failf("Failed to delete pod-%v [%+v]. Error: %v", podIndex, pod, err)
 						}
 					}
 				}

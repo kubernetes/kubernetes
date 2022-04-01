@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"strings"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -93,12 +95,12 @@ var _ = SIGDescribe("Mount propagation", func() {
 
 		// Pick a node where all pods will run.
 		node, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		// Fail the test if the namespace is not set. We expect that the
 		// namespace is unique and we might delete user data if it's not.
 		if len(f.Namespace.Name) == 0 {
-			framework.ExpectNotEqual(f.Namespace.Name, "")
+			e2eutils.ExpectNotEqual(f.Namespace.Name, "")
 			return
 		}
 
@@ -128,25 +130,25 @@ var _ = SIGDescribe("Mount propagation", func() {
 		for _, podName := range podNames {
 			for _, dirName := range podNames {
 				cmd := fmt.Sprintf("test -d /mnt/test/%s", dirName)
-				f.ExecShellInPod(podName, cmd)
+				e2eutils.ExecShellInPod(f.ClientSet, f.Namespace.Name, podName, cmd)
 			}
 		}
 
 		// Each pod mounts one tmpfs to /mnt/test/<podname> and puts a file there.
 		for _, podName := range podNames {
 			cmd := fmt.Sprintf("mount -t tmpfs e2e-mount-propagation-%[1]s /mnt/test/%[1]s; echo %[1]s > /mnt/test/%[1]s/file", podName)
-			f.ExecShellInPod(podName, cmd)
+			e2eutils.ExecShellInPod(f.ClientSet, f.Namespace.Name, podName, cmd)
 
 			// unmount tmpfs when the test finishes
 			cmd = fmt.Sprintf("umount /mnt/test/%s", podName)
-			defer f.ExecShellInPod(podName, cmd)
+			defer e2eutils.ExecShellInPod(f.ClientSet, f.Namespace.Name, podName, cmd)
 		}
 
 		// The host mounts one tmpfs to testdir/host and puts a file there so we
 		// can check mount propagation from the host to pods.
 		cmd := fmt.Sprintf("mkdir %[1]q/host; mount -t tmpfs e2e-mount-propagation-host %[1]q/host; echo host > %[1]q/host/file", hostDir)
 		err = hostExec.IssueCommand(cmd, node)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		defer func() {
 			cmd := fmt.Sprintf("umount %q/host", hostDir)
@@ -170,16 +172,16 @@ var _ = SIGDescribe("Mount propagation", func() {
 		for podName, mounts := range expectedMounts {
 			for _, mountName := range dirNames {
 				cmd := fmt.Sprintf("cat /mnt/test/%s/file", mountName)
-				stdout, stderr, err := f.ExecShellInPodWithFullOutput(podName, cmd)
-				framework.Logf("pod %s mount %s: stdout: %q, stderr: %q error: %v", podName, mountName, stdout, stderr, err)
+				stdout, stderr, err := e2eutils.ExecShellInPodWithFullOutput(f.ClientSet, f.Namespace.Name, podName, cmd)
+				e2eutils.Logf("pod %s mount %s: stdout: %q, stderr: %q error: %v", podName, mountName, stdout, stderr, err)
 				msg := fmt.Sprintf("When checking pod %s and directory %s", podName, mountName)
 				shouldBeVisible := mounts.Has(mountName)
 				if shouldBeVisible {
-					framework.ExpectNoError(err, "%s: failed to run %q", msg, cmd)
-					framework.ExpectEqual(stdout, mountName, msg)
+					e2eutils.ExpectNoError(err, "%s: failed to run %q", msg, cmd)
+					e2eutils.ExpectEqual(stdout, mountName, msg)
 				} else {
 					// We *expect* cat to return error here
-					framework.ExpectError(err, msg)
+					e2eutils.ExpectError(err, msg)
 				}
 			}
 		}
@@ -187,25 +189,25 @@ var _ = SIGDescribe("Mount propagation", func() {
 		// Find the kubelet PID to ensure we're working with the kubelet's mount namespace
 		cmd = "pidof kubelet"
 		kubeletPid, err := hostExec.IssueCommandWithResult(cmd, node)
-		framework.ExpectNoError(err, "Checking kubelet pid")
+		e2eutils.ExpectNoError(err, "Checking kubelet pid")
 		kubeletPid = strings.TrimSuffix(kubeletPid, "\n")
-		framework.ExpectEqual(strings.Count(kubeletPid, " "), 0, "kubelet should only have a single PID in the system (pidof returned %q)", kubeletPid)
+		e2eutils.ExpectEqual(strings.Count(kubeletPid, " "), 0, "kubelet should only have a single PID in the system (pidof returned %q)", kubeletPid)
 		enterKubeletMountNS := fmt.Sprintf("nsenter -t %s -m", kubeletPid)
 
 		// Check that the master and host mounts are propagated to the container runtime's mount namespace
 		for _, mountName := range []string{"host", master.Name} {
 			cmd := fmt.Sprintf("%s cat \"%s/%s/file\"", enterKubeletMountNS, hostDir, mountName)
 			output, err := hostExec.IssueCommandWithResult(cmd, node)
-			framework.ExpectNoError(err, "host container namespace should see mount from %s: %s", mountName, output)
+			e2eutils.ExpectNoError(err, "host container namespace should see mount from %s: %s", mountName, output)
 			output = strings.TrimSuffix(output, "\n")
-			framework.ExpectEqual(output, mountName, "host container namespace should see mount contents from %s", mountName)
+			e2eutils.ExpectEqual(output, mountName, "host container namespace should see mount contents from %s", mountName)
 		}
 
 		// Check that the slave, private, and default mounts are not propagated to the container runtime's mount namespace
 		for _, podName := range []string{slave.Name, private.Name, defaultPropagation.Name} {
 			cmd := fmt.Sprintf("%s test ! -e \"%s/%s/file\"", enterKubeletMountNS, hostDir, podName)
 			output, err := hostExec.IssueCommandWithResult(cmd, node)
-			framework.ExpectNoError(err, "host container namespace shouldn't see mount from %s: %s", podName, output)
+			e2eutils.ExpectNoError(err, "host container namespace shouldn't see mount from %s: %s", podName, output)
 		}
 	})
 })

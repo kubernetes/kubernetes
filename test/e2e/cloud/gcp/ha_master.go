@@ -26,6 +26,9 @@ import (
 	"strings"
 	"time"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,8 +41,8 @@ import (
 )
 
 func addMasterReplica(zone string) error {
-	framework.Logf(fmt.Sprintf("Adding a new master replica, zone: %s", zone))
-	_, _, err := framework.RunCmd(path.Join(framework.TestContext.RepoRoot, "hack/e2e-internal/e2e-grow-cluster.sh"), zone, "true", "true", "false")
+	e2eutils.Logf(fmt.Sprintf("Adding a new master replica, zone: %s", zone))
+	_, _, err := e2eutils.RunCmd(path.Join(e2econfig.TestContext.RepoRoot, "hack/e2e-internal/e2e-grow-cluster.sh"), zone, "true", "true", "false")
 	if err != nil {
 		return err
 	}
@@ -47,8 +50,8 @@ func addMasterReplica(zone string) error {
 }
 
 func removeMasterReplica(zone string) error {
-	framework.Logf(fmt.Sprintf("Removing an existing master replica, zone: %s", zone))
-	_, _, err := framework.RunCmd(path.Join(framework.TestContext.RepoRoot, "hack/e2e-internal/e2e-shrink-cluster.sh"), zone, "true", "false", "false")
+	e2eutils.Logf(fmt.Sprintf("Removing an existing master replica, zone: %s", zone))
+	_, _, err := e2eutils.RunCmd(path.Join(e2econfig.TestContext.RepoRoot, "hack/e2e-internal/e2e-shrink-cluster.sh"), zone, "true", "false", "false")
 	if err != nil {
 		return err
 	}
@@ -56,8 +59,8 @@ func removeMasterReplica(zone string) error {
 }
 
 func addWorkerNodes(zone string) error {
-	framework.Logf(fmt.Sprintf("Adding worker nodes, zone: %s", zone))
-	_, _, err := framework.RunCmd(path.Join(framework.TestContext.RepoRoot, "hack/e2e-internal/e2e-grow-cluster.sh"), zone, "true", "false", "true")
+	e2eutils.Logf(fmt.Sprintf("Adding worker nodes, zone: %s", zone))
+	_, _, err := e2eutils.RunCmd(path.Join(e2econfig.TestContext.RepoRoot, "hack/e2e-internal/e2e-grow-cluster.sh"), zone, "true", "false", "true")
 	if err != nil {
 		return err
 	}
@@ -65,8 +68,8 @@ func addWorkerNodes(zone string) error {
 }
 
 func removeWorkerNodes(zone string) error {
-	framework.Logf(fmt.Sprintf("Removing worker nodes, zone: %s", zone))
-	_, _, err := framework.RunCmd(path.Join(framework.TestContext.RepoRoot, "hack/e2e-internal/e2e-shrink-cluster.sh"), zone, "true", "true", "true")
+	e2eutils.Logf(fmt.Sprintf("Removing worker nodes, zone: %s", zone))
+	_, _, err := e2eutils.RunCmd(path.Join(e2econfig.TestContext.RepoRoot, "hack/e2e-internal/e2e-shrink-cluster.sh"), zone, "true", "true", "true")
 	if err != nil {
 		return err
 	}
@@ -75,20 +78,20 @@ func removeWorkerNodes(zone string) error {
 
 func verifyRCs(c clientset.Interface, ns string, names []string) {
 	for _, name := range names {
-		framework.ExpectNoError(e2epod.VerifyPods(c, ns, name, true, 1))
+		e2eutils.ExpectNoError(e2epod.VerifyPods(c, ns, name, true, 1))
 	}
 }
 
 func createNewRC(c clientset.Interface, ns string, name string) {
 	_, err := common.NewRCByName(c, ns, name, 1, nil, nil)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 }
 
 func findRegionForZone(zone string) string {
 	region, err := exec.Command("gcloud", "compute", "zones", "list", zone, "--quiet", "--format=csv[no-heading](region)").Output()
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	if string(region) == "" {
-		framework.Failf("Region not found; zone: %s", zone)
+		e2eutils.Failf("Region not found; zone: %s", zone)
 	}
 	return string(region)
 }
@@ -96,7 +99,7 @@ func findRegionForZone(zone string) string {
 func findZonesForRegion(region string) []string {
 	output, err := exec.Command("gcloud", "compute", "zones", "list", "--filter=region="+region,
 		"--quiet", "--format=csv[no-heading](name)").Output()
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	zones := strings.Split(string(output), "\n")
 	return zones
 }
@@ -127,7 +130,7 @@ func waitForMasters(masterPrefix string, c clientset.Interface, size int, timeou
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(20 * time.Second) {
 		nodes, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
-			framework.Logf("Failed to list nodes: %v", err)
+			e2eutils.Logf("Failed to list nodes: %v", err)
 			continue
 		}
 
@@ -135,7 +138,7 @@ func waitForMasters(masterPrefix string, c clientset.Interface, size int, timeou
 		e2enode.Filter(nodes, func(node v1.Node) bool {
 			res, err := regexp.Match(generateMasterRegexp(masterPrefix), ([]byte)(node.Name))
 			if err != nil {
-				framework.Logf("Failed to match regexp to node name: %v", err)
+				e2eutils.Logf("Failed to match regexp to node name: %v", err)
 				return false
 			}
 			return res
@@ -151,10 +154,10 @@ func waitForMasters(masterPrefix string, c clientset.Interface, size int, timeou
 		numReady := len(nodes.Items)
 
 		if numNodes == size && numReady == size {
-			framework.Logf("Cluster has reached the desired number of masters %d", size)
+			e2eutils.Logf("Cluster has reached the desired number of masters %d", size)
 			return nil
 		}
-		framework.Logf("Waiting for the number of masters %d, current %d, not ready master nodes %d", size, numNodes, numNodes-numReady)
+		e2eutils.Logf("Waiting for the number of masters %d, current %d, not ready master nodes %d", size, numNodes, numNodes-numReady)
 	}
 	return fmt.Errorf("timeout waiting %v for the number of masters to be %d", timeout, size)
 }
@@ -171,7 +174,7 @@ var _ = SIGDescribe("HA-master [Feature:HAMaster]", func() {
 		e2eskipper.SkipUnlessProviderIs("gce")
 		c = f.ClientSet
 		ns = f.Namespace.Name
-		framework.ExpectNoError(waitForMasters(framework.TestContext.CloudConfig.MasterName, c, 1, 10*time.Minute))
+		e2eutils.ExpectNoError(waitForMasters(e2econfig.TestContext.CloudConfig.MasterName, c, 1, 10*time.Minute))
 		additionalReplicaZones = make([]string, 0)
 		existingRCs = make([]string, 0)
 	})
@@ -181,13 +184,13 @@ var _ = SIGDescribe("HA-master [Feature:HAMaster]", func() {
 		for _, zone := range additionalNodesZones {
 			removeWorkerNodes(zone)
 		}
-		framework.ExpectNoError(framework.AllNodesReady(c, 5*time.Minute))
+		e2eutils.ExpectNoError(e2eutils.AllNodesReady(c, 5*time.Minute))
 
 		// Clean-up additional master replicas if the test execution was broken.
 		for _, zone := range additionalReplicaZones {
 			removeMasterReplica(zone)
 		}
-		framework.ExpectNoError(waitForMasters(framework.TestContext.CloudConfig.MasterName, c, 1, 10*time.Minute))
+		e2eutils.ExpectNoError(waitForMasters(e2econfig.TestContext.CloudConfig.MasterName, c, 1, 10*time.Minute))
 	})
 
 	type Action int
@@ -203,20 +206,20 @@ var _ = SIGDescribe("HA-master [Feature:HAMaster]", func() {
 		switch action {
 		case None:
 		case AddReplica:
-			framework.ExpectNoError(addMasterReplica(zone))
+			e2eutils.ExpectNoError(addMasterReplica(zone))
 			additionalReplicaZones = append(additionalReplicaZones, zone)
 		case RemoveReplica:
-			framework.ExpectNoError(removeMasterReplica(zone))
+			e2eutils.ExpectNoError(removeMasterReplica(zone))
 			additionalReplicaZones = removeZoneFromZones(additionalReplicaZones, zone)
 		case AddNodes:
-			framework.ExpectNoError(addWorkerNodes(zone))
+			e2eutils.ExpectNoError(addWorkerNodes(zone))
 			additionalNodesZones = append(additionalNodesZones, zone)
 		case RemoveNodes:
-			framework.ExpectNoError(removeWorkerNodes(zone))
+			e2eutils.ExpectNoError(removeWorkerNodes(zone))
 			additionalNodesZones = removeZoneFromZones(additionalNodesZones, zone)
 		}
-		framework.ExpectNoError(waitForMasters(framework.TestContext.CloudConfig.MasterName, c, len(additionalReplicaZones)+1, 10*time.Minute))
-		framework.ExpectNoError(framework.AllNodesReady(c, 5*time.Minute))
+		e2eutils.ExpectNoError(waitForMasters(e2econfig.TestContext.CloudConfig.MasterName, c, len(additionalReplicaZones)+1, 10*time.Minute))
+		e2eutils.ExpectNoError(e2eutils.AllNodesReady(c, 5*time.Minute))
 
 		// Verify that API server works correctly with HA master.
 		rcName := "ha-master-" + strconv.Itoa(len(existingRCs))
@@ -226,7 +229,7 @@ var _ = SIGDescribe("HA-master [Feature:HAMaster]", func() {
 	}
 
 	ginkgo.It("survive addition/removal replicas same zone [Serial][Disruptive]", func() {
-		zone := framework.TestContext.CloudConfig.Zone
+		zone := e2econfig.TestContext.CloudConfig.Zone
 		step(None, "")
 		numAdditionalReplicas := 2
 		for i := 0; i < numAdditionalReplicas; i++ {
@@ -238,7 +241,7 @@ var _ = SIGDescribe("HA-master [Feature:HAMaster]", func() {
 	})
 
 	ginkgo.It("survive addition/removal replicas different zones [Serial][Disruptive]", func() {
-		zone := framework.TestContext.CloudConfig.Zone
+		zone := e2econfig.TestContext.CloudConfig.Zone
 		region := findRegionForZone(zone)
 		zones := findZonesForRegion(region)
 		zones = removeZoneFromZones(zones, zone)
@@ -256,7 +259,7 @@ var _ = SIGDescribe("HA-master [Feature:HAMaster]", func() {
 	})
 
 	ginkgo.It("survive addition/removal replicas multizone workers [Serial][Disruptive]", func() {
-		zone := framework.TestContext.CloudConfig.Zone
+		zone := e2econfig.TestContext.CloudConfig.Zone
 		region := findRegionForZone(zone)
 		zones := findZonesForRegion(region)
 		zones = removeZoneFromZones(zones, zone)

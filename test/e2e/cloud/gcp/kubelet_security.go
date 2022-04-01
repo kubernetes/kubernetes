@@ -22,6 +22,8 @@ import (
 	"net/http"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -40,26 +42,26 @@ var _ = SIGDescribe("Ports Security Check [Feature:KubeletSecurity]", func() {
 	ginkgo.BeforeEach(func() {
 		var err error
 		node, err = e2enode.GetRandomReadySchedulableNode(f.ClientSet)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		nodeName = node.Name
 	})
 
 	// make sure kubelet readonly (10255) and cadvisor (4194) ports are disabled via API server proxy
 	ginkgo.It(fmt.Sprintf("should not be able to proxy to the readonly kubelet port %v using proxy subresource", ports.KubeletReadOnlyPort), func() {
 		result, err := e2ekubelet.ProxyRequest(f.ClientSet, nodeName, "pods/", ports.KubeletReadOnlyPort)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		var statusCode int
 		result.StatusCode(&statusCode)
-		framework.ExpectNotEqual(statusCode, http.StatusOK)
+		e2eutils.ExpectNotEqual(statusCode, http.StatusOK)
 	})
 	ginkgo.It("should not be able to proxy to cadvisor port 4194 using proxy subresource", func() {
 		result, err := e2ekubelet.ProxyRequest(f.ClientSet, nodeName, "containers/", 4194)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		var statusCode int
 		result.StatusCode(&statusCode)
-		framework.ExpectNotEqual(statusCode, http.StatusOK)
+		e2eutils.ExpectNotEqual(statusCode, http.StatusOK)
 	})
 
 	// make sure kubelet readonly (10255) and cadvisor (4194) ports are closed on the public IP address
@@ -74,13 +76,13 @@ var _ = SIGDescribe("Ports Security Check [Feature:KubeletSecurity]", func() {
 // checks whether the target port is closed
 func portClosedTest(f *framework.Framework, pickNode *v1.Node, port int) {
 	nodeAddrs := e2enode.GetAddresses(pickNode, v1.NodeExternalIP)
-	framework.ExpectNotEqual(len(nodeAddrs), 0)
+	e2eutils.ExpectNotEqual(len(nodeAddrs), 0)
 
 	for _, addr := range nodeAddrs {
 		conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", addr, port), 1*time.Minute)
 		if err == nil {
 			conn.Close()
-			framework.Failf("port %d is not disabled", port)
+			e2eutils.Failf("port %d is not disabled", port)
 		}
 	}
 }

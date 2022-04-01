@@ -18,13 +18,15 @@ package storage
 
 import (
 	"github.com/onsi/ginkgo"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -38,16 +40,16 @@ var _ = utils.SIGDescribe("Volume limits", func() {
 		// If CSIMigration is enabled, then the limits should be on CSINodes, not Nodes, and another test checks this
 		e2eskipper.SkipIfFeatureGateEnabled(kubefeatures.CSIMigration)
 		c = f.ClientSet
-		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
+		e2eutils.ExpectNoError(e2eutils.WaitForAllNodesSchedulable(c, e2econfig.TestContext.NodeSchedulableTimeout))
 	})
 
 	ginkgo.It("should verify that all nodes have volume limits", func() {
 		nodeList, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		for _, node := range nodeList.Items {
 			volumeLimits := getVolumeLimit(&node)
 			if len(volumeLimits) == 0 {
-				framework.Failf("Expected volume limits to be set")
+				e2eutils.Failf("Expected volume limits to be set")
 			}
 		}
 	})

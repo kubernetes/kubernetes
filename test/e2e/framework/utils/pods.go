@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package framework
+package utils
 
 import (
 	"context"
@@ -32,33 +32,19 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/kubectl/pkg/util/podutils"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
+	gomegatypes "github.com/onsi/gomega/types"
+	"k8s.io/kubectl/pkg/util/podutils"
 
 	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
+	"k8s.io/kubernetes/test/e2e/framework/config"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-)
-
-const (
-	// DefaultPodDeletionTimeout is the default timeout for deleting pod
-	DefaultPodDeletionTimeout = 3 * time.Minute
-
-	// the status of container event, copied from k8s.io/kubernetes/pkg/kubelet/events
-	killingContainer = "Killing"
-
-	// the status of container event, copied from k8s.io/kubernetes/pkg/kubelet/events
-	failedToCreateContainer = "Failed"
-
-	// the status of container event, copied from k8s.io/kubernetes/pkg/kubelet/events
-	startedContainer = "Started"
-
-	// it is copied from k8s.io/kubernetes/pkg/kubelet/sysctl
-	forbiddenReason = "SysctlForbidden"
 )
 
 // ImagePrePullList is the images used in the current test suite. It should be initialized in test suite and
@@ -66,29 +52,21 @@ const (
 // node e2e test.
 var ImagePrePullList sets.String
 
-// PodClient is a convenience method for getting a pod client interface in the framework's namespace,
-// possibly applying test-suite specific transformations to the pod spec, e.g. for
-// node e2e pod scheduling.
-func (f *Framework) PodClient() *PodClient {
-	return &PodClient{
-		f:            f,
-		PodInterface: f.ClientSet.CoreV1().Pods(f.Namespace.Name),
-	}
-}
-
 // PodClientNS is a convenience method for getting a pod client interface in an alternative namespace,
 // possibly applying test-suite specific transformations to the pod spec, e.g. for
 // node e2e pod scheduling.
-func (f *Framework) PodClientNS(namespace string) *PodClient {
+func PodClientNS(c clientset.Interface, namespace string) *PodClient {
 	return &PodClient{
-		f:            f,
-		PodInterface: f.ClientSet.CoreV1().Pods(namespace),
+		ClientSet:    c,
+		Namespace:    namespace,
+		PodInterface: c.CoreV1().Pods(namespace),
 	}
 }
 
 // PodClient is a struct for pod client.
 type PodClient struct {
-	f *Framework
+	ClientSet clientset.Interface
+	Namespace string
 	v1core.PodInterface
 }
 
@@ -102,9 +80,9 @@ func (c *PodClient) Create(pod *v1.Pod) *v1.Pod {
 
 // CreateSync creates a new pod according to the framework specifications, and wait for it to start and be running and ready.
 func (c *PodClient) CreateSync(pod *v1.Pod) *v1.Pod {
-	namespace := c.f.Namespace.Name
+	namespace := c.Namespace
 	p := c.Create(pod)
-	ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(c.f.ClientSet, p.Name, namespace, PodStartTimeout))
+	ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(c.ClientSet, p.Name, namespace, PodStartTimeout))
 	// Get the newest pod after it becomes running and ready, some status may change after pod created, such as pod ip.
 	p, err := c.Get(context.TODO(), p.Name, metav1.GetOptions{})
 	ExpectNoError(err)
@@ -152,7 +130,7 @@ func (c *PodClient) Update(name string, updateFn func(pod *v1.Pod)) {
 
 // AddEphemeralContainerSync adds an EphemeralContainer to a pod and waits for it to be running.
 func (c *PodClient) AddEphemeralContainerSync(pod *v1.Pod, ec *v1.EphemeralContainer, timeout time.Duration) error {
-	namespace := c.f.Namespace.Name
+	namespace := c.Namespace
 
 	podJS, err := json.Marshal(pod)
 	ExpectNoError(err, "error creating JSON for pod %q", format.Pod(pod))
@@ -170,37 +148,37 @@ func (c *PodClient) AddEphemeralContainerSync(pod *v1.Pod, ec *v1.EphemeralConta
 		return err
 	}
 
-	ExpectNoError(e2epod.WaitForContainerRunning(c.f.ClientSet, namespace, pod.Name, ec.Name, timeout))
+	ExpectNoError(e2epod.WaitForContainerRunning(c.ClientSet, namespace, pod.Name, ec.Name, timeout))
 	return nil
 }
 
 // DeleteSync deletes the pod and wait for the pod to disappear for `timeout`. If the pod doesn't
 // disappear before the timeout, it will fail the test.
 func (c *PodClient) DeleteSync(name string, options metav1.DeleteOptions, timeout time.Duration) {
-	namespace := c.f.Namespace.Name
+	namespace := c.Namespace
 	err := c.Delete(context.TODO(), name, options)
 	if err != nil && !apierrors.IsNotFound(err) {
 		Failf("Failed to delete pod %q: %v", name, err)
 	}
-	gomega.Expect(e2epod.WaitForPodToDisappear(c.f.ClientSet, namespace, name, labels.Everything(),
+	gomega.Expect(e2epod.WaitForPodToDisappear(c.ClientSet, namespace, name, labels.Everything(),
 		2*time.Second, timeout)).To(gomega.Succeed(), "wait for pod %q to disappear", name)
 }
 
 // mungeSpec apply test-suite specific transformations to the pod spec.
 func (c *PodClient) mungeSpec(pod *v1.Pod) {
-	if !TestContext.NodeE2E {
+	if !config.TestContext.NodeE2E {
 		return
 	}
 
-	gomega.Expect(pod.Spec.NodeName).To(gomega.Or(gomega.BeZero(), gomega.Equal(TestContext.NodeName)), "Test misconfigured")
-	pod.Spec.NodeName = TestContext.NodeName
+	gomega.Expect(pod.Spec.NodeName).To(gomega.Or(gomega.BeZero(), gomega.Equal(config.TestContext.NodeName)), "Test misconfigured")
+	pod.Spec.NodeName = config.TestContext.NodeName
 	// Node e2e does not support the default DNSClusterFirst policy. Set
 	// the policy to DNSDefault, which is configured per node.
 	pod.Spec.DNSPolicy = v1.DNSDefault
 
 	// PrepullImages only works for node e2e now. For cluster e2e, image prepull is not enforced,
 	// we should not munge ImagePullPolicy for cluster e2e pods.
-	if !TestContext.PrepullImages {
+	if !config.TestContext.PrepullImages {
 		return
 	}
 	// If prepull is enabled, munge the container spec to make sure the images are not pulled
@@ -225,8 +203,7 @@ func (c *PodClient) mungeSpec(pod *v1.Pod) {
 // WaitForSuccess waits for pod to succeed.
 // TODO(random-liu): Move pod wait function into this file
 func (c *PodClient) WaitForSuccess(name string, timeout time.Duration) {
-	f := c.f
-	gomega.Expect(e2epod.WaitForPodCondition(f.ClientSet, f.Namespace.Name, name, fmt.Sprintf("%s or %s", v1.PodSucceeded, v1.PodFailed), timeout,
+	gomega.Expect(e2epod.WaitForPodCondition(c.ClientSet, c.Namespace, name, fmt.Sprintf("%s or %s", v1.PodSucceeded, v1.PodFailed), timeout,
 		func(pod *v1.Pod) (bool, error) {
 			switch pod.Status.Phase {
 			case v1.PodFailed:
@@ -242,8 +219,7 @@ func (c *PodClient) WaitForSuccess(name string, timeout time.Duration) {
 
 // WaitForFinish waits for pod to finish running, regardless of success or failure.
 func (c *PodClient) WaitForFinish(name string, timeout time.Duration) {
-	f := c.f
-	gomega.Expect(e2epod.WaitForPodCondition(f.ClientSet, f.Namespace.Name, name, fmt.Sprintf("%s or %s", v1.PodSucceeded, v1.PodFailed), timeout,
+	gomega.Expect(e2epod.WaitForPodCondition(c.ClientSet, c.Namespace, name, fmt.Sprintf("%s or %s", v1.PodSucceeded, v1.PodFailed), timeout,
 		func(pod *v1.Pod) (bool, error) {
 			switch pod.Status.Phase {
 			case v1.PodFailed:
@@ -261,16 +237,16 @@ func (c *PodClient) WaitForFinish(name string, timeout time.Duration) {
 func (c *PodClient) WaitForErrorEventOrSuccess(pod *v1.Pod) (*v1.Event, error) {
 	var ev *v1.Event
 	err := wait.Poll(Poll, PodStartTimeout, func() (bool, error) {
-		evnts, err := c.f.ClientSet.CoreV1().Events(pod.Namespace).Search(scheme.Scheme, pod)
+		evnts, err := c.ClientSet.CoreV1().Events(pod.Namespace).Search(scheme.Scheme, pod)
 		if err != nil {
 			return false, fmt.Errorf("error in listing events: %s", err)
 		}
 		for _, e := range evnts.Items {
 			switch e.Reason {
-			case killingContainer, failedToCreateContainer, forbiddenReason:
+			case KillingContainer, FailedToCreateContainer, ForbiddenReason:
 				ev = &e
 				return true, nil
-			case startedContainer:
+			case StartedContainer:
 				return true, nil
 			default:
 				// ignore all other errors
@@ -283,8 +259,7 @@ func (c *PodClient) WaitForErrorEventOrSuccess(pod *v1.Pod) (*v1.Event, error) {
 
 // MatchContainerOutput gets output of a container and match expected regexp in the output.
 func (c *PodClient) MatchContainerOutput(name string, containerName string, expectedRegexp string) error {
-	f := c.f
-	output, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, name, containerName)
+	output, err := e2epod.GetPodLogs(c.ClientSet, c.Namespace, name, containerName)
 	if err != nil {
 		return fmt.Errorf("failed to get output for container %q of pod %q", containerName, name)
 	}
@@ -303,4 +278,75 @@ func (c *PodClient) PodIsReady(name string) bool {
 	pod, err := c.Get(context.TODO(), name, metav1.GetOptions{})
 	ExpectNoError(err)
 	return podutils.IsPodReady(pod)
+}
+
+// NOTE: lijian: recheck this; compare to original; Is podStartTimeout right?
+// MatchContainerOutput creates a pod and waits for all it's containers to exit with success.
+// It then tests that the matcher with each expectedOutput matches the output of the specified container.
+func MatchContainerOutput(
+	clientSet clientset.Interface,
+	namespace string,
+	pod *v1.Pod,
+	containerName string,
+	podStartTimeout time.Duration,
+	expectedOutput []string,
+	matcher func(string, ...interface{}) gomegatypes.GomegaMatcher) error {
+	ns := pod.ObjectMeta.Namespace
+	if ns == "" {
+		ns = namespace
+	}
+	podClient := PodClientNS(clientSet, ns)
+
+	createdPod := podClient.Create(pod)
+	defer func() {
+		ginkgo.By("delete the pod")
+		podClient.DeleteSync(createdPod.Name, metav1.DeleteOptions{}, DefaultPodDeletionTimeout)
+	}()
+
+	// Wait for client pod to complete.
+	podErr := e2epod.WaitForPodSuccessInNamespaceTimeout(clientSet, createdPod.Name, ns, podStartTimeout)
+
+	// Grab its logs.  Get host first.
+	podStatus, err := podClient.Get(context.TODO(), createdPod.Name, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to get pod status: %v", err)
+	}
+
+	if podErr != nil {
+		// Pod failed. Dump all logs from all containers to see what's wrong
+		_ = VisitContainers(&podStatus.Spec, AllFeatureEnabledContainers(), func(c *v1.Container, containerType ContainerType) bool {
+			logs, err := e2epod.GetPodLogs(clientSet, ns, podStatus.Name, c.Name)
+			if err != nil {
+				Logf("Failed to get logs from node %q pod %q container %q: %v",
+					podStatus.Spec.NodeName, podStatus.Name, c.Name, err)
+			} else {
+				Logf("Output of node %q pod %q container %q: %s", podStatus.Spec.NodeName, podStatus.Name, c.Name, logs)
+			}
+			return true
+		})
+		return fmt.Errorf("expected pod %q success: %v", createdPod.Name, podErr)
+	}
+
+	Logf("Trying to get logs from node %s pod %s container %s: %v",
+		podStatus.Spec.NodeName, podStatus.Name, containerName, err)
+
+	// Sometimes the actual containers take a second to get started, try to get logs for 60s
+	logs, err := e2epod.GetPodLogs(clientSet, ns, podStatus.Name, containerName)
+	if err != nil {
+		Logf("Failed to get logs from node %q pod %q container %q. %v",
+			podStatus.Spec.NodeName, podStatus.Name, containerName, err)
+		return fmt.Errorf("failed to get logs from %s for %s: %v", podStatus.Name, containerName, err)
+	}
+
+	for _, expected := range expectedOutput {
+		m := matcher(expected)
+		matches, err := m.Match(logs)
+		if err != nil {
+			return fmt.Errorf("expected %q in container output: %v", expected, err)
+		} else if !matches {
+			return fmt.Errorf("expected %q in container output: %s", expected, m.FailureMessage(logs))
+		}
+	}
+
+	return nil
 }

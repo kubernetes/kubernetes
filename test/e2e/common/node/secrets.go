@@ -22,6 +22,8 @@ import (
 	"encoding/json"
 	"fmt"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 
 	v1 "k8s.io/api/core/v1"
@@ -49,7 +51,7 @@ var _ = SIGDescribe("Secrets", func() {
 		ginkgo.By(fmt.Sprintf("Creating secret with name %s", secret.Name))
 		var err error
 		if secret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(context.TODO(), secret, metav1.CreateOptions{}); err != nil {
-			framework.Failf("unable to create test secret %s: %v", secret.Name, err)
+			e2eutils.Failf("unable to create test secret %s: %v", secret.Name, err)
 		}
 
 		pod := &v1.Pod{
@@ -97,7 +99,7 @@ var _ = SIGDescribe("Secrets", func() {
 		ginkgo.By(fmt.Sprintf("creating secret %v/%v", f.Namespace.Name, secret.Name))
 		var err error
 		if secret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(context.TODO(), secret, metav1.CreateOptions{}); err != nil {
-			framework.Failf("unable to create test secret %s: %v", secret.Name, err)
+			e2eutils.Failf("unable to create test secret %s: %v", secret.Name, err)
 		}
 
 		pod := &v1.Pod{
@@ -138,7 +140,7 @@ var _ = SIGDescribe("Secrets", func() {
 	*/
 	framework.ConformanceIt("should fail to create secret due to empty secret key", func() {
 		secret, err := createEmptyKeySecretForTest(f)
-		framework.ExpectError(err, "created secret %q with empty key in namespace %q", secret.Name, f.Namespace.Name)
+		e2eutils.ExpectError(err, "created secret %q with empty key in namespace %q", secret.Name, f.Namespace.Name)
 	})
 
 	/*
@@ -168,15 +170,15 @@ var _ = SIGDescribe("Secrets", func() {
 			},
 			Type: "Opaque",
 		}, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create secret")
+		e2eutils.ExpectNoError(err, "failed to create secret")
 
 		ginkgo.By("listing secrets in all namespaces to ensure that there are more than zero")
 		// list all secrets in all namespaces to ensure endpoint coverage
 		secretsList, err := f.ClientSet.CoreV1().Secrets("").List(context.TODO(), metav1.ListOptions{
 			LabelSelector: "testsecret-constant=true",
 		})
-		framework.ExpectNoError(err, "failed to list secrets")
-		framework.ExpectNotEqual(len(secretsList.Items), 0, "no secrets found")
+		e2eutils.ExpectNoError(err, "failed to list secrets")
+		e2eutils.ExpectNotEqual(len(secretsList.Items), 0, "no secrets found")
 
 		foundCreatedSecret := false
 		var secretCreatedName string
@@ -187,7 +189,7 @@ var _ = SIGDescribe("Secrets", func() {
 				break
 			}
 		}
-		framework.ExpectEqual(foundCreatedSecret, true, "unable to find secret by its value")
+		e2eutils.ExpectEqual(foundCreatedSecret, true, "unable to find secret by its value")
 
 		ginkgo.By("patching the secret")
 		// patch the secret in the test namespace
@@ -198,30 +200,30 @@ var _ = SIGDescribe("Secrets", func() {
 			},
 			"data": map[string][]byte{"key": []byte(secretPatchNewData)},
 		})
-		framework.ExpectNoError(err, "failed to marshal JSON")
+		e2eutils.ExpectNoError(err, "failed to marshal JSON")
 		_, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Patch(context.TODO(), secretCreatedName, types.StrategicMergePatchType, []byte(secretPatch), metav1.PatchOptions{})
-		framework.ExpectNoError(err, "failed to patch secret")
+		e2eutils.ExpectNoError(err, "failed to patch secret")
 
 		secret, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Get(context.TODO(), secretCreatedName, metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to get secret")
+		e2eutils.ExpectNoError(err, "failed to get secret")
 
 		secretDecodedstring, err := base64.StdEncoding.DecodeString(string(secret.Data["key"]))
-		framework.ExpectNoError(err, "failed to decode secret from Base64")
+		e2eutils.ExpectNoError(err, "failed to decode secret from Base64")
 
-		framework.ExpectEqual(string(secretDecodedstring), "value1", "found secret, but the data wasn't updated from the patch")
+		e2eutils.ExpectEqual(string(secretDecodedstring), "value1", "found secret, but the data wasn't updated from the patch")
 
 		ginkgo.By("deleting the secret using a LabelSelector")
 		err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{
 			LabelSelector: "testsecret=true",
 		})
-		framework.ExpectNoError(err, "failed to delete patched secret")
+		e2eutils.ExpectNoError(err, "failed to delete patched secret")
 
 		ginkgo.By("listing secrets in all namespaces, searching for label name and value in patch")
 		// list all secrets in all namespaces
 		secretsList, err = f.ClientSet.CoreV1().Secrets("").List(context.TODO(), metav1.ListOptions{
 			LabelSelector: "testsecret-constant=true",
 		})
-		framework.ExpectNoError(err, "failed to list secrets")
+		e2eutils.ExpectNoError(err, "failed to list secrets")
 
 		foundCreatedSecret = false
 		for _, val := range secretsList.Items {
@@ -230,7 +232,7 @@ var _ = SIGDescribe("Secrets", func() {
 				break
 			}
 		}
-		framework.ExpectEqual(foundCreatedSecret, false, "secret was not deleted successfully")
+		e2eutils.ExpectEqual(foundCreatedSecret, false, "secret was not deleted successfully")
 	})
 })
 

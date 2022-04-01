@@ -45,6 +45,8 @@ package storage
 import (
 	"context"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -97,7 +99,7 @@ var _ = SIGDescribe("Volumes", func() {
 			}
 
 			// Must match content of test/images/volumes-tester/nfs/index.html
-			e2evolume.TestVolumeClient(f, config, nil, "" /* fsType */, tests)
+			e2evolume.TestVolumeClient(f.ClientSet, f.Namespace.Name, f.Timeouts, config, nil, "" /* fsType */, tests)
 		})
 	})
 
@@ -120,7 +122,7 @@ var _ = SIGDescribe("Volumes", func() {
 				},
 			}
 			// Must match content of test/images/volume-tester/nfs/index.html
-			e2evolume.TestVolumeClient(f, config, nil, "" /* fsType */, tests)
+			e2evolume.TestVolumeClient(f.ClientSet, f.Namespace.Name, f.Timeouts, config, nil, "" /* fsType */, tests)
 		})
 	})
 
@@ -136,7 +138,7 @@ var _ = SIGDescribe("Volumes", func() {
 				e2evolume.TestServerCleanup(f, config)
 				err := c.CoreV1().Endpoints(namespace.Name).Delete(context.TODO(), name, metav1.DeleteOptions{})
 				if !apierrors.IsNotFound(err) {
-					framework.ExpectNoError(err, "defer: Gluster delete endpoints failed")
+					e2eutils.ExpectNoError(err, "defer: Gluster delete endpoints failed")
 				}
 			}()
 
@@ -155,7 +157,7 @@ var _ = SIGDescribe("Volumes", func() {
 					ExpectedContent: "Hello from GlusterFS!",
 				},
 			}
-			e2evolume.TestVolumeClient(f, config, nil, "" /* fsType */, tests)
+			e2evolume.TestVolumeClient(f.ClientSet, f.Namespace.Name, f.Timeouts, config, nil, "" /* fsType */, tests)
 		})
 	})
 })

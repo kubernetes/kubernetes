@@ -31,8 +31,9 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeletconfigscheme "k8s.io/kubernetes/pkg/kubelet/apis/config/scheme"
 
-	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/config"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 )
 
 // GetCurrentKubeletConfig fetches the current Kubelet Config for the given node
@@ -53,38 +54,38 @@ func pollConfigz(timeout time.Duration, pollInterval time.Duration, nodeName, na
 	endpoint := ""
 	if useProxy {
 		// start local proxy, so we can send graceful deletion over query string, rather than body parameter
-		framework.Logf("Opening proxy to cluster")
-		tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, namespace)
+		e2eutils.Logf("Opening proxy to cluster")
+		tk := e2ekubectl.NewTestKubeconfig(config.TestContext.CertDir, config.TestContext.Host, config.TestContext.KubeConfig, config.TestContext.KubeContext, config.TestContext.KubectlPath, namespace)
 		cmd := tk.KubectlCmd("proxy", "-p", "0")
-		stdout, stderr, err := framework.StartCmdAndStreamOutput(cmd)
-		framework.ExpectNoError(err)
+		stdout, stderr, err := e2eutils.StartCmdAndStreamOutput(cmd)
+		e2eutils.ExpectNoError(err)
 		defer stdout.Close()
 		defer stderr.Close()
-		defer framework.TryKill(cmd)
+		defer e2eutils.TryKill(cmd)
 
 		buf := make([]byte, 128)
 		var n int
 		n, err = stdout.Read(buf)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		output := string(buf[:n])
 		proxyRegexp := regexp.MustCompile("Starting to serve on 127.0.0.1:([0-9]+)")
 		match := proxyRegexp.FindStringSubmatch(output)
-		framework.ExpectEqual(len(match), 2)
+		e2eutils.ExpectEqual(len(match), 2)
 		port, err := strconv.Atoi(match[1])
-		framework.ExpectNoError(err)
-		framework.Logf("http requesting node kubelet /configz")
+		e2eutils.ExpectNoError(err)
+		e2eutils.Logf("http requesting node kubelet /configz")
 		endpoint = fmt.Sprintf("http://127.0.0.1:%d/api/v1/nodes/%s/proxy/configz", port, nodeName)
 	} else {
-		endpoint = fmt.Sprintf("%s/api/v1/nodes/%s/proxy/configz", framework.TestContext.Host, framework.TestContext.NodeName)
+		endpoint = fmt.Sprintf("%s/api/v1/nodes/%s/proxy/configz", config.TestContext.Host, config.TestContext.NodeName)
 	}
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
 	client := &http.Client{Transport: tr}
 	req, err := http.NewRequest("GET", endpoint, nil)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	if !useProxy {
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", framework.TestContext.BearerToken))
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", config.TestContext.BearerToken))
 	}
 	req.Header.Add("Accept", "application/json")
 
@@ -92,17 +93,17 @@ func pollConfigz(timeout time.Duration, pollInterval time.Duration, nodeName, na
 	err = wait.PollImmediate(pollInterval, timeout, func() (bool, error) {
 		resp, err = client.Do(req)
 		if err != nil {
-			framework.Logf("Failed to get /configz, retrying. Error: %v", err)
+			e2eutils.Logf("Failed to get /configz, retrying. Error: %v", err)
 			return false, nil
 		}
 		if resp.StatusCode != 200 {
-			framework.Logf("/configz response status not 200, retrying. Response was: %+v", resp)
+			e2eutils.Logf("/configz response status not 200, retrying. Response was: %+v", resp)
 			return false, nil
 		}
 
 		return true, nil
 	})
-	framework.ExpectNoError(err, "Failed to get successful response from /configz")
+	e2eutils.ExpectNoError(err, "Failed to get successful response from /configz")
 	return resp
 }
 

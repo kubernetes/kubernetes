@@ -19,13 +19,15 @@ package testsuites
 import (
 	"context"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"sync"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -132,13 +134,13 @@ func (t *volumePerformanceTestSuite) DefineTests(driver storageframework.TestDri
 		ginkgo.By("Deleting all PVCs")
 		for _, pvc := range l.pvcs {
 			err := e2epv.DeletePersistentVolumeClaim(l.cs, pvc.Name, pvc.Namespace)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			err = e2epv.WaitForPersistentVolumeDeleted(l.cs, pvc.Spec.VolumeName, 1*time.Second, 5*time.Minute)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 		}
 		ginkgo.By(fmt.Sprintf("Deleting Storage Class %s", l.scName))
 		err := l.cs.StorageV1().StorageClasses().Delete(context.TODO(), l.scName, metav1.DeleteOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		l.testCleanup()
 	})
 
@@ -165,7 +167,7 @@ func (t *volumePerformanceTestSuite) DefineTests(driver storageframework.TestDri
 		}
 		ginkgo.By(fmt.Sprintf("Creating Storage Class %s", sc.Name))
 		sc, err := l.cs.StorageV1().StorageClasses().Create(context.TODO(), sc, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		l.scName = sc.Name
 
 		// Create a controller to watch on PVCs
@@ -183,7 +185,7 @@ func (t *volumePerformanceTestSuite) DefineTests(driver storageframework.TestDri
 				StorageClassName: &sc.Name,
 			}, l.ns.Name)
 			pvc, err = l.cs.CoreV1().PersistentVolumeClaims(l.ns.Name).Create(context.TODO(), pvc, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			// Store create time for each PVC
 			provisioningStats.mutex.Lock()
 			provisioningStats.perObjectInterval[pvc.Name] = &interval{
@@ -196,7 +198,7 @@ func (t *volumePerformanceTestSuite) DefineTests(driver storageframework.TestDri
 
 		select {
 		case l.pvcs = <-waitForProvisionCh:
-			framework.Logf("All PVCs in Bound state")
+			e2eutils.Logf("All PVCs in Bound state")
 		case <-time.After(testTimeout):
 			ginkgo.Fail(fmt.Sprintf("expected all PVCs to be in Bound state within %v minutes", testTimeout))
 		}
@@ -206,7 +208,7 @@ func (t *volumePerformanceTestSuite) DefineTests(driver storageframework.TestDri
 
 		ginkgo.By(fmt.Sprintf("Validating performance metrics for provisioning operations against baseline %v", spew.Sdump(l.options.ProvisioningOptions.ExpectedMetrics)))
 		errList := validatePerformanceStats(provisioningStats.operationMetrics, l.options.ProvisioningOptions.ExpectedMetrics)
-		framework.ExpectNoError(errors.NewAggregate(errList), "while validating performance metrics")
+		e2eutils.ExpectNoError(errors.NewAggregate(errList), "while validating performance metrics")
 	})
 
 }
@@ -217,7 +219,7 @@ func createPerformanceStats(stats *performanceStats, provisionCount int, pvcs []
 	var min, max, sum time.Duration
 	for _, pvc := range pvcs {
 		pvcMetric, ok := stats.perObjectInterval[pvc.Name]
-		framework.ExpectEqual(ok, true)
+		e2eutils.ExpectEqual(ok, true)
 
 		elapsedTime := pvcMetric.elapsed
 		sum += elapsedTime
@@ -237,7 +239,7 @@ func createPerformanceStats(stats *performanceStats, provisionCount int, pvcs []
 // validatePerformanceStats validates if test performance metrics meet the baseline target
 func validatePerformanceStats(operationMetrics *storageframework.Metrics, baselineMetrics *storageframework.Metrics) []error {
 	var errList []error
-	framework.Logf("Metrics to evaluate: %+v", spew.Sdump(operationMetrics))
+	e2eutils.Logf("Metrics to evaluate: %+v", spew.Sdump(operationMetrics))
 
 	if operationMetrics.AvgLatency > baselineMetrics.AvgLatency {
 		err := fmt.Errorf("expected latency to be less than %v but calculated latency %v", baselineMetrics.AvgLatency, operationMetrics.AvgLatency)
@@ -269,7 +271,7 @@ func newPVCWatch(f *framework.Framework, provisionCount int, pvcMetrics *perform
 		// Check if PVC entered the bound state
 		if oldPVC.Status.Phase != v1.ClaimBound && newPVC.Status.Phase == v1.ClaimBound {
 			newPVCInterval, ok := pvcMetrics.perObjectInterval[newPVC.Name]
-			framework.ExpectEqual(ok, true, "PVC %s should exist in interval map already", newPVC.Name)
+			e2eutils.ExpectEqual(ok, true, "PVC %s should exist in interval map already", newPVC.Name)
 			count++
 			newPVCInterval.enterDesiredState = now
 			newPVCInterval.elapsed = now.Sub(newPVCInterval.create)
@@ -297,9 +299,9 @@ func newPVCWatch(f *framework.Framework, provisionCount int, pvcMetrics *perform
 		cache.ResourceEventHandlerFuncs{
 			UpdateFunc: func(oldObj, newObj interface{}) {
 				oldPVC, ok := oldObj.(*v1.PersistentVolumeClaim)
-				framework.ExpectEqual(ok, true)
+				e2eutils.ExpectEqual(ok, true)
 				newPVC, ok := newObj.(*v1.PersistentVolumeClaim)
-				framework.ExpectEqual(ok, true)
+				e2eutils.ExpectEqual(ok, true)
 
 				checkPVCBound(oldPVC, newPVC)
 			},

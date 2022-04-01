@@ -25,6 +25,8 @@ import (
 	"runtime"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 
 	v1 "k8s.io/api/core/v1"
@@ -41,8 +43,8 @@ var _ = SIGDescribe("OSArchLabelReconciliation [Serial] [Slow] [Disruptive]", fu
 	ginkgo.Context("Kubelet", func() {
 		ginkgo.It("should reconcile the OS and Arch labels when restarted", func() {
 			node := getLocalNode(f)
-			framework.ExpectNodeHasLabel(f.ClientSet, node.Name, v1.LabelOSStable, runtime.GOOS)
-			framework.ExpectNodeHasLabel(f.ClientSet, node.Name, v1.LabelArchStable, runtime.GOARCH)
+			e2eutils.ExpectNodeHasLabel(f.ClientSet, node.Name, v1.LabelOSStable, runtime.GOOS)
+			e2eutils.ExpectNodeHasLabel(f.ClientSet, node.Name, v1.LabelArchStable, runtime.GOARCH)
 
 			ginkgo.By("killing and restarting kubelet")
 			// Let's kill the kubelet
@@ -52,28 +54,28 @@ var _ = SIGDescribe("OSArchLabelReconciliation [Serial] [Slow] [Disruptive]", fu
 			newNode.Labels[v1.LabelOSStable] = "dummyOS"
 			newNode.Labels[v1.LabelArchStable] = "dummyArch"
 			_, _, err := nodeutil.PatchNodeStatus(f.ClientSet.CoreV1(), types.NodeName(node.Name), node, newNode)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			// Restart kubelet
 			startKubelet()
-			framework.ExpectNoError(framework.WaitForAllNodesSchedulable(f.ClientSet, framework.RestartNodeReadyAgainTimeout))
+			e2eutils.ExpectNoError(e2eutils.WaitForAllNodesSchedulable(f.ClientSet, e2eutils.RestartNodeReadyAgainTimeout))
 			// If this happens right, node should have all the labels reset properly
 			err = waitForNodeLabels(f.ClientSet.CoreV1(), node.Name, 5*time.Minute)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 		})
 		ginkgo.It("should reconcile the OS and Arch labels when running", func() {
 
 			node := getLocalNode(f)
-			framework.ExpectNodeHasLabel(f.ClientSet, node.Name, v1.LabelOSStable, runtime.GOOS)
-			framework.ExpectNodeHasLabel(f.ClientSet, node.Name, v1.LabelArchStable, runtime.GOARCH)
+			e2eutils.ExpectNodeHasLabel(f.ClientSet, node.Name, v1.LabelOSStable, runtime.GOOS)
+			e2eutils.ExpectNodeHasLabel(f.ClientSet, node.Name, v1.LabelArchStable, runtime.GOARCH)
 
 			// Update labels
 			newNode := node.DeepCopy()
 			newNode.Labels[v1.LabelOSStable] = "dummyOS"
 			newNode.Labels[v1.LabelArchStable] = "dummyArch"
 			_, _, err := nodeutil.PatchNodeStatus(f.ClientSet.CoreV1(), types.NodeName(node.Name), node, newNode)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			err = waitForNodeLabels(f.ClientSet.CoreV1(), node.Name, 5*time.Minute)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 		})
 	})
 })
@@ -82,7 +84,7 @@ var _ = SIGDescribe("OSArchLabelReconciliation [Serial] [Slow] [Disruptive]", fu
 func waitForNodeLabels(c v1core.CoreV1Interface, nodeName string, timeout time.Duration) error {
 	ginkgo.By(fmt.Sprintf("Waiting for node %v to have appropriate labels", nodeName))
 	// Poll until the node has desired labels
-	return wait.Poll(framework.Poll, timeout,
+	return wait.Poll(e2eutils.Poll, timeout,
 		func() (bool, error) {
 			node, err := c.Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 			if err != nil {

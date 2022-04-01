@@ -19,6 +19,8 @@ package windows
 import (
 	"fmt"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -96,13 +98,13 @@ func doReadOnlyTest(f *framework.Framework, source v1.VolumeSource, volumePath s
 
 	pod = f.PodClient().CreateSync(pod)
 	ginkgo.By("verifying that pod has the correct nodeSelector")
-	framework.ExpectEqual(pod.Spec.NodeSelector["kubernetes.io/os"], "windows")
+	e2eutils.ExpectEqual(pod.Spec.NodeSelector["kubernetes.io/os"], "windows")
 
 	cmd := []string{"cmd", "/c", "echo windows-volume-test", ">", filePath}
 
 	ginkgo.By("verifying that pod will get an error when writing to a volume that is readonly")
-	_, stderr, _ := f.ExecCommandInContainerWithFullOutput(podName, containerName, cmd...)
-	framework.ExpectEqual(stderr, "Access is denied.")
+	_, stderr, _ := e2eutils.ExecCommandInContainerWithFullOutput(f.ClientSet, f.Namespace.Name, podName, containerName, cmd...)
+	e2eutils.ExpectEqual(stderr, "Access is denied.")
 }
 
 func doReadWriteReadOnlyTest(f *framework.Framework, source v1.VolumeSource, volumePath string) {
@@ -131,24 +133,24 @@ func doReadWriteReadOnlyTest(f *framework.Framework, source v1.VolumeSource, vol
 	pod = f.PodClient().CreateSync(pod)
 
 	ginkgo.By("verifying that pod has the correct nodeSelector")
-	framework.ExpectEqual(pod.Spec.NodeSelector["kubernetes.io/os"], "windows")
+	e2eutils.ExpectEqual(pod.Spec.NodeSelector["kubernetes.io/os"], "windows")
 
 	ginkgo.By("verifying that pod can write to a volume with read/write access")
 	writecmd := []string{"cmd", "/c", "echo windows-volume-test", ">", filePath}
-	stdoutRW, stderrRW, errRW := f.ExecCommandInContainerWithFullOutput(podName, rwcontainerName, writecmd...)
+	stdoutRW, stderrRW, errRW := e2eutils.ExecCommandInContainerWithFullOutput(f.ClientSet, f.Namespace.Name, podName, rwcontainerName, writecmd...)
 	msg := fmt.Sprintf("cmd: %v, stdout: %q, stderr: %q", writecmd, stdoutRW, stderrRW)
-	framework.ExpectNoError(errRW, msg)
+	e2eutils.ExpectNoError(errRW, msg)
 
 	ginkgo.By("verifying that pod will get an error when writing to a volume that is readonly")
-	_, stderr, _ := f.ExecCommandInContainerWithFullOutput(podName, containerName, writecmd...)
-	framework.ExpectEqual(stderr, "Access is denied.")
+	_, stderr, _ := e2eutils.ExecCommandInContainerWithFullOutput(f.ClientSet, f.Namespace.Name, podName, containerName, writecmd...)
+	e2eutils.ExpectEqual(stderr, "Access is denied.")
 
 	ginkgo.By("verifying that pod can read from the the volume that is readonly")
 	readcmd := []string{"cmd", "/c", "type", filePath}
-	readout, readerr, err := f.ExecCommandInContainerWithFullOutput(podName, containerName, readcmd...)
+	readout, readerr, err := e2eutils.ExecCommandInContainerWithFullOutput(f.ClientSet, f.Namespace.Name, podName, containerName, readcmd...)
 	readmsg := fmt.Sprintf("cmd: %v, stdout: %q, stderr: %q", readcmd, readout, readerr)
-	framework.ExpectEqual(readout, "windows-volume-test")
-	framework.ExpectNoError(err, readmsg)
+	e2eutils.ExpectEqual(readout, "windows-volume-test")
+	e2eutils.ExpectNoError(err, readmsg)
 }
 
 // testPodWithROVolume makes a minimal pod defining a volume input source. Similarly to

@@ -25,15 +25,16 @@ import (
 	"sort"
 	"strconv"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+
 	"k8s.io/klog/v2"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	gcecloud "k8s.io/legacy-cloud-providers/gce"
 
-	"k8s.io/kubernetes/test/e2e/framework"
 	e2eingress "k8s.io/kubernetes/test/e2e/framework/ingress"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	"k8s.io/kubernetes/test/e2e/network/scale"
@@ -45,7 +46,7 @@ var (
 	enableTLS        bool
 	numIngressesTest numIngressesSlice
 	testNamespace    string
-	cloudConfig      framework.CloudConfig
+	cloudConfig      e2econfig.CloudConfig
 	outputFile       string
 	cleanup          bool
 )

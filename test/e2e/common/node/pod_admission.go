@@ -18,7 +18,9 @@ package node
 
 import (
 	"context"
+
 	"github.com/onsi/ginkgo"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,7 +39,7 @@ var _ = SIGDescribe("PodOSRejection [NodeConformance]", func() {
 	ginkgo.Context("Kubelet", func() {
 		ginkgo.It("should reject pod when the node OS doesn't match pod's OS", func() {
 			linuxNode, err := findLinuxNode(f)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			pod := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "wrong-pod-os",
@@ -59,7 +61,7 @@ var _ = SIGDescribe("PodOSRejection [NodeConformance]", func() {
 			pod = f.PodClient().Create(pod)
 			// Check the pod is still not running
 			err = e2epod.WaitForPodFailedReason(f.ClientSet, pod, "PodOSNotSupported", f.Timeouts.PodStartShort)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 		})
 	})
 })

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package framework
+package providers
 
 import (
 	"fmt"
@@ -86,9 +86,6 @@ func SetupProviderConfig(providerName string) (ProviderInterface, error) {
 // ProviderInterface contains the implementation for certain
 // provider-specific functionality.
 type ProviderInterface interface {
-	FrameworkBeforeEach(f *Framework)
-	FrameworkAfterEach(f *Framework)
-
 	ResizeGroup(group string, size int32) error
 	GetGroupNodes(group string) ([]string, error)
 	GroupSize(group string) (int, error)
@@ -113,12 +110,6 @@ type ProviderInterface interface {
 // NullProvider is the default implementation of the ProviderInterface
 // which doesn't do anything.
 type NullProvider struct{}
-
-// FrameworkBeforeEach is a base implementation which does BeforeEach.
-func (n NullProvider) FrameworkBeforeEach(f *Framework) {}
-
-// FrameworkAfterEach is a base implementation which does AfterEach.
-func (n NullProvider) FrameworkAfterEach(f *Framework) {}
 
 // ResizeGroup is a base implementation which resizes group.
 func (n NullProvider) ResizeGroup(string, int32) error {

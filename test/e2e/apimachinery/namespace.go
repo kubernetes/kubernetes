@@ -24,6 +24,8 @@ import (
 	"sync"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -49,7 +51,7 @@ func extinguish(f *framework.Framework, totalNS int, maxAllowedAfterDel int, max
 			defer ginkgo.GinkgoRecover()
 			ns := fmt.Sprintf("nslifetest-%v", n)
 			_, err := f.CreateNamespace(ns, nil)
-			framework.ExpectNoError(err, "failed to create namespace: %s", ns)
+			e2eutils.ExpectNoError(err, "failed to create namespace: %s", ns)
 		}(n)
 	}
 	wg.Wait()
@@ -58,13 +60,13 @@ func extinguish(f *framework.Framework, totalNS int, maxAllowedAfterDel int, max
 	ginkgo.By("Waiting 10 seconds")
 	time.Sleep(time.Duration(10 * time.Second))
 	deleteFilter := []string{"nslifetest"}
-	deleted, err := framework.DeleteNamespaces(f.ClientSet, deleteFilter, nil /* skipFilter */)
-	framework.ExpectNoError(err, "failed to delete namespace(s) containing: %s", deleteFilter)
-	framework.ExpectEqual(len(deleted), totalNS)
+	deleted, err := e2eutils.DeleteNamespaces(f.ClientSet, deleteFilter, nil /* skipFilter */)
+	e2eutils.ExpectNoError(err, "failed to delete namespace(s) containing: %s", deleteFilter)
+	e2eutils.ExpectEqual(len(deleted), totalNS)
 
 	ginkgo.By("Waiting for namespaces to vanish")
 	//Now POLL until all namespaces have been eradicated.
-	framework.ExpectNoError(wait.Poll(2*time.Second, time.Duration(maxSeconds)*time.Second,
+	e2eutils.ExpectNoError(wait.Poll(2*time.Second, time.Duration(maxSeconds)*time.Second,
 		func() (bool, error) {
 			var cnt = 0
 			nsList, err := f.ClientSet.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{})
@@ -77,7 +79,7 @@ func extinguish(f *framework.Framework, totalNS int, maxAllowedAfterDel int, max
 				}
 			}
 			if cnt > maxAllowedAfterDel {
-				framework.Logf("Remaining namespaces : %v", cnt)
+				e2eutils.Logf("Remaining namespaces : %v", cnt)
 				return false, nil
 			}
 			return true, nil
@@ -88,11 +90,11 @@ func ensurePodsAreRemovedWhenNamespaceIsDeleted(f *framework.Framework) {
 	ginkgo.By("Creating a test namespace")
 	namespaceName := "nsdeletetest"
 	namespace, err := f.CreateNamespace(namespaceName, nil)
-	framework.ExpectNoError(err, "failed to create namespace: %s", namespaceName)
+	e2eutils.ExpectNoError(err, "failed to create namespace: %s", namespaceName)
 
 	ginkgo.By("Waiting for a default service account to be provisioned in namespace")
-	err = framework.WaitForDefaultServiceAccountInNamespace(f.ClientSet, namespace.Name)
-	framework.ExpectNoError(err, "failure while waiting for a default service account to be provisioned in namespace: %s", namespace.Name)
+	err = e2eutils.WaitForDefaultServiceAccountInNamespace(f.ClientSet, namespace.Name)
+	e2eutils.ExpectNoError(err, "failure while waiting for a default service account to be provisioned in namespace: %s", namespace.Name)
 
 	ginkgo.By("Creating a pod in the namespace")
 	podName := "test-pod"
@@ -110,18 +112,18 @@ func ensurePodsAreRemovedWhenNamespaceIsDeleted(f *framework.Framework) {
 		},
 	}
 	pod, err = f.ClientSet.CoreV1().Pods(namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
-	framework.ExpectNoError(err, "failed to create pod %s in namespace: %s", podName, namespace.Name)
+	e2eutils.ExpectNoError(err, "failed to create pod %s in namespace: %s", podName, namespace.Name)
 
 	ginkgo.By("Waiting for the pod to have running status")
-	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(f.ClientSet, pod))
+	e2eutils.ExpectNoError(e2epod.WaitForPodRunningInNamespace(f.ClientSet, pod))
 
 	ginkgo.By("Deleting the namespace")
 	err = f.ClientSet.CoreV1().Namespaces().Delete(context.TODO(), namespace.Name, metav1.DeleteOptions{})
-	framework.ExpectNoError(err, "failed to delete namespace: %s", namespace.Name)
+	e2eutils.ExpectNoError(err, "failed to delete namespace: %s", namespace.Name)
 
 	ginkgo.By("Waiting for the namespace to be removed.")
 	maxWaitSeconds := int64(60) + *pod.Spec.TerminationGracePeriodSeconds
-	framework.ExpectNoError(wait.Poll(1*time.Second, time.Duration(maxWaitSeconds)*time.Second,
+	e2eutils.ExpectNoError(wait.Poll(1*time.Second, time.Duration(maxWaitSeconds)*time.Second,
 		func() (bool, error) {
 			_, err = f.ClientSet.CoreV1().Namespaces().Get(context.TODO(), namespace.Name, metav1.GetOptions{})
 			if err != nil && apierrors.IsNotFound(err) {
@@ -132,11 +134,11 @@ func ensurePodsAreRemovedWhenNamespaceIsDeleted(f *framework.Framework) {
 
 	ginkgo.By("Recreating the namespace")
 	namespace, err = f.CreateNamespace(namespaceName, nil)
-	framework.ExpectNoError(err, "failed to create namespace: %s", namespaceName)
+	e2eutils.ExpectNoError(err, "failed to create namespace: %s", namespaceName)
 
 	ginkgo.By("Verifying there are no pods in the namespace")
 	_, err = f.ClientSet.CoreV1().Pods(namespace.Name).Get(context.TODO(), pod.Name, metav1.GetOptions{})
-	framework.ExpectError(err, "failed to get pod %s in namespace: %s", pod.Name, namespace.Name)
+	e2eutils.ExpectError(err, "failed to get pod %s in namespace: %s", pod.Name, namespace.Name)
 }
 
 func ensureServicesAreRemovedWhenNamespaceIsDeleted(f *framework.Framework) {
@@ -145,11 +147,11 @@ func ensureServicesAreRemovedWhenNamespaceIsDeleted(f *framework.Framework) {
 	ginkgo.By("Creating a test namespace")
 	namespaceName := "nsdeletetest"
 	namespace, err := f.CreateNamespace(namespaceName, nil)
-	framework.ExpectNoError(err, "failed to create namespace: %s", namespaceName)
+	e2eutils.ExpectNoError(err, "failed to create namespace: %s", namespaceName)
 
 	ginkgo.By("Waiting for a default service account to be provisioned in namespace")
-	err = framework.WaitForDefaultServiceAccountInNamespace(f.ClientSet, namespace.Name)
-	framework.ExpectNoError(err, "failure while waiting for a default service account to be provisioned in namespace: %s", namespace.Name)
+	err = e2eutils.WaitForDefaultServiceAccountInNamespace(f.ClientSet, namespace.Name)
+	e2eutils.ExpectNoError(err, "failure while waiting for a default service account to be provisioned in namespace: %s", namespace.Name)
 
 	ginkgo.By("Creating a service in the namespace")
 	serviceName := "test-service"
@@ -170,15 +172,15 @@ func ensureServicesAreRemovedWhenNamespaceIsDeleted(f *framework.Framework) {
 		},
 	}
 	service, err = f.ClientSet.CoreV1().Services(namespace.Name).Create(context.TODO(), service, metav1.CreateOptions{})
-	framework.ExpectNoError(err, "failed to create service %s in namespace %s", serviceName, namespace.Name)
+	e2eutils.ExpectNoError(err, "failed to create service %s in namespace %s", serviceName, namespace.Name)
 
 	ginkgo.By("Deleting the namespace")
 	err = f.ClientSet.CoreV1().Namespaces().Delete(context.TODO(), namespace.Name, metav1.DeleteOptions{})
-	framework.ExpectNoError(err, "failed to delete namespace: %s", namespace.Name)
+	e2eutils.ExpectNoError(err, "failed to delete namespace: %s", namespace.Name)
 
 	ginkgo.By("Waiting for the namespace to be removed.")
 	maxWaitSeconds := int64(60)
-	framework.ExpectNoError(wait.Poll(1*time.Second, time.Duration(maxWaitSeconds)*time.Second,
+	e2eutils.ExpectNoError(wait.Poll(1*time.Second, time.Duration(maxWaitSeconds)*time.Second,
 		func() (bool, error) {
 			_, err = f.ClientSet.CoreV1().Namespaces().Get(context.TODO(), namespace.Name, metav1.GetOptions{})
 			if err != nil && apierrors.IsNotFound(err) {
@@ -189,11 +191,11 @@ func ensureServicesAreRemovedWhenNamespaceIsDeleted(f *framework.Framework) {
 
 	ginkgo.By("Recreating the namespace")
 	namespace, err = f.CreateNamespace(namespaceName, nil)
-	framework.ExpectNoError(err, "failed to create namespace: %s", namespaceName)
+	e2eutils.ExpectNoError(err, "failed to create namespace: %s", namespaceName)
 
 	ginkgo.By("Verifying there is no service in the namespace")
 	_, err = f.ClientSet.CoreV1().Services(namespace.Name).Get(context.TODO(), service.Name, metav1.GetOptions{})
-	framework.ExpectError(err, "failed to get service %s in namespace: %s", service.Name, namespace.Name)
+	e2eutils.ExpectError(err, "failed to get service %s in namespace: %s", service.Name, namespace.Name)
 }
 
 // This test must run [Serial] due to the impact of running other parallel
@@ -263,7 +265,7 @@ var _ = SIGDescribe("Namespaces [Serial]", func() {
 		ginkgo.By("creating a Namespace")
 		namespaceName := "nspatchtest-" + string(uuid.NewUUID())
 		ns, err := f.CreateNamespace(namespaceName, nil)
-		framework.ExpectNoError(err, "failed creating Namespace")
+		e2eutils.ExpectNoError(err, "failed creating Namespace")
 		namespaceName = ns.ObjectMeta.Name
 
 		ginkgo.By("patching the Namespace")
@@ -272,14 +274,14 @@ var _ = SIGDescribe("Namespaces [Serial]", func() {
 				"labels": map[string]string{"testLabel": "testValue"},
 			},
 		})
-		framework.ExpectNoError(err, "failed to marshal JSON patch data")
+		e2eutils.ExpectNoError(err, "failed to marshal JSON patch data")
 		_, err = f.ClientSet.CoreV1().Namespaces().Patch(context.TODO(), namespaceName, types.StrategicMergePatchType, []byte(nspatch), metav1.PatchOptions{})
-		framework.ExpectNoError(err, "failed to patch Namespace")
+		e2eutils.ExpectNoError(err, "failed to patch Namespace")
 
 		ginkgo.By("get the Namespace and ensuring it has the label")
 		namespace, err := f.ClientSet.CoreV1().Namespaces().Get(context.TODO(), namespaceName, metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to get Namespace")
-		framework.ExpectEqual(namespace.ObjectMeta.Labels["testLabel"], "testValue", "namespace not patched")
+		e2eutils.ExpectNoError(err, "failed to get Namespace")
+		e2eutils.ExpectEqual(namespace.ObjectMeta.Labels["testLabel"], "testValue", "namespace not patched")
 	})
 
 })

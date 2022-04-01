@@ -22,6 +22,9 @@ import (
 	"strings"
 	"time"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -46,8 +49,8 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 			if !ginkgo.CurrentGinkgoTestDescription().Failed {
 				return
 			}
-			if framework.TestContext.DumpLogsOnFailure {
-				e2ekubectl.LogFailedContainers(f.ClientSet, f.Namespace.Name, framework.Logf)
+			if e2econfig.TestContext.DumpLogsOnFailure {
+				e2ekubectl.LogFailedContainers(f.ClientSet, f.Namespace.Name, e2eutils.Logf)
 			}
 			ginkgo.By("Recording processes in system cgroups")
 			recordSystemCgroupProcesses()
@@ -144,7 +147,7 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 			}
 			// The Kubelet only manages the 'misc' system container if the host is not running systemd.
 			if !systemdutil.IsRunningSystemd() {
-				framework.Logf("Host not running systemd; expecting 'misc' system container.")
+				e2eutils.Logf("Host not running systemd; expecting 'misc' system container.")
 				miscContExpectations := sysContExpectations().(*gstruct.FieldsMatcher)
 				// Misc processes are system-dependent, so relax the memory constraints.
 				miscContExpectations.Fields["Memory"] = ptrMatchAllFields(gstruct.Fields{
@@ -260,7 +263,7 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 
 			matchExpectations := ptrMatchAllFields(gstruct.Fields{
 				"Node": gstruct.MatchAllFields(gstruct.Fields{
-					"NodeName":         gomega.Equal(framework.TestContext.NodeName),
+					"NodeName":         gomega.Equal(e2econfig.TestContext.NodeName),
 					"StartTime":        recent(maxStartAge),
 					"SystemContainers": gstruct.MatchAllElements(summaryObjectID, systemContainers),
 					"CPU": ptrMatchAllFields(gstruct.Fields{
@@ -392,7 +395,7 @@ func summaryObjectID(element interface{}) string {
 	case kubeletstatsv1alpha1.UserDefinedMetric:
 		return el.Name
 	default:
-		framework.Failf("Unknown type: %T", el)
+		e2eutils.Failf("Unknown type: %T", el)
 		return "???"
 	}
 }
@@ -420,7 +423,7 @@ func recent(d time.Duration) types.GomegaMatcher {
 func recordSystemCgroupProcesses() {
 	cfg, err := getCurrentKubeletConfig()
 	if err != nil {
-		framework.Logf("Failed to read kubelet config: %v", err)
+		e2eutils.Logf("Failed to read kubelet config: %v", err)
 		return
 	}
 	cgroups := map[string]string{
@@ -429,7 +432,7 @@ func recordSystemCgroupProcesses() {
 	}
 	for name, cgroup := range cgroups {
 		if cgroup == "" {
-			framework.Logf("Skipping unconfigured cgroup %s", name)
+			e2eutils.Logf("Skipping unconfigured cgroup %s", name)
 			continue
 		}
 
@@ -439,18 +442,18 @@ func recordSystemCgroupProcesses() {
 		}
 		pids, err := os.ReadFile(fmt.Sprintf(filePattern, cgroup))
 		if err != nil {
-			framework.Logf("Failed to read processes in cgroup %s: %v", name, err)
+			e2eutils.Logf("Failed to read processes in cgroup %s: %v", name, err)
 			continue
 		}
 
-		framework.Logf("Processes in %s cgroup (%s):", name, cgroup)
+		e2eutils.Logf("Processes in %s cgroup (%s):", name, cgroup)
 		for _, pid := range strings.Fields(string(pids)) {
 			path := fmt.Sprintf("/proc/%s/cmdline", pid)
 			cmd, err := os.ReadFile(path)
 			if err != nil {
-				framework.Logf("  ginkgo.Failed to read %s: %v", path, err)
+				e2eutils.Logf("  ginkgo.Failed to read %s: %v", path, err)
 			} else {
-				framework.Logf("  %s", cmd)
+				e2eutils.Logf("  %s", cmd)
 			}
 		}
 	}

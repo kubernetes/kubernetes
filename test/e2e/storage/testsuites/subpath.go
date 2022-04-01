@@ -24,6 +24,8 @@ import (
 	"strings"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 
@@ -151,7 +153,7 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 				},
 			}
 		default:
-			framework.Failf("SubPath test doesn't support: %s", volType)
+			e2eutils.Failf("SubPath test doesn't support: %s", volType)
 		}
 
 		subPath := f.Namespace.Name
@@ -182,7 +184,7 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 
 		errs = append(errs, storageutils.TryFunc(l.driverCleanup))
 		l.driverCleanup = nil
-		framework.ExpectNoError(errors.NewAggregate(errs), "while cleaning up resource")
+		e2eutils.ExpectNoError(errors.NewAggregate(errs), "while cleaning up resource")
 
 		if l.hostExec != nil {
 			l.hostExec.Cleanup()
@@ -245,7 +247,7 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 
 		// Create the subpath outside the volume
 		var command string
-		if framework.NodeOSDistroIs("windows") {
+		if e2eutils.NodeOSDistroIs("windows") {
 			command = fmt.Sprintf("New-Item -ItemType SymbolicLink -Path %s -value \\Windows", l.subPathDir)
 		} else {
 			command = fmt.Sprintf("ln -s /bin %s", l.subPathDir)
@@ -283,7 +285,7 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 
 		// Create the subpath outside the volume
 		var command string
-		if framework.NodeOSDistroIs("windows") {
+		if e2eutils.NodeOSDistroIs("windows") {
 			command = fmt.Sprintf("New-Item -ItemType SymbolicLink -Path %s -value ..\\", l.subPathDir)
 		} else {
 			command = fmt.Sprintf("ln -s ../ %s", l.subPathDir)
@@ -456,7 +458,7 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 		ginkgo.By(fmt.Sprintf("Creating pod %s", l.pod.Name))
 		removeUnusedContainers(l.pod)
 		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), l.pod, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "while creating pod")
+		e2eutils.ExpectNoError(err, "while creating pod")
 		defer func() {
 			ginkgo.By(fmt.Sprintf("Deleting pod %s", pod.Name))
 			e2epod.DeletePodWithWait(f.ClientSet, pod)
@@ -464,12 +466,12 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 
 		// Wait for pod to be running
 		err = e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, l.pod.Name, l.pod.Namespace, f.Timeouts.PodStart)
-		framework.ExpectNoError(err, "while waiting for pod to be running")
+		e2eutils.ExpectNoError(err, "while waiting for pod to be running")
 
 		// Exec into container that mounted the volume, delete subpath directory
 		rmCmd := fmt.Sprintf("rm -r %s", l.subPathDir)
 		_, err = podContainerExec(l.pod, 1, rmCmd)
-		framework.ExpectNoError(err, "while removing subpath directory")
+		e2eutils.ExpectNoError(err, "while removing subpath directory")
 
 		// Delete pod (from defer) and wait for it to be successfully deleted
 	})
@@ -492,7 +494,7 @@ func TestBasicSubpathFile(f *framework.Framework, contents string, pod *v1.Pod, 
 
 	ginkgo.By(fmt.Sprintf("Deleting pod %s", pod.Name))
 	err := e2epod.DeletePodWithWait(f.ClientSet, pod)
-	framework.ExpectNoError(err, "while deleting pod")
+	e2eutils.ExpectNoError(err, "while deleting pod")
 }
 
 func generateSuffixForPodName(s string) string {
@@ -649,7 +651,7 @@ func setWriteCommand(file string, container *v1.Container) {
 	// See issue https://github.com/kubernetes/kubernetes/issues/94237 about file_mode
 	// not working well on Windows
 	// TODO: remove this check after issue is resolved
-	if !framework.NodeOSDistroIs("windows") {
+	if !e2eutils.NodeOSDistroIs("windows") {
 		container.Args = append(container.Args, fmt.Sprintf("--file_mode=%v", file))
 	}
 
@@ -696,7 +698,7 @@ func testReadFile(f *framework.Framework, file string, pod *v1.Pod, containerInd
 
 	ginkgo.By(fmt.Sprintf("Deleting pod %s", pod.Name))
 	err := e2epod.DeletePodWithWait(f.ClientSet, pod)
-	framework.ExpectNoError(err, "while deleting pod")
+	e2eutils.ExpectNoError(err, "while deleting pod")
 }
 
 func testPodFailSubpath(f *framework.Framework, pod *v1.Pod, allowContainerTerminationError bool) {
@@ -707,13 +709,13 @@ func testPodFailSubpathError(f *framework.Framework, pod *v1.Pod, errorMsg strin
 	ginkgo.By(fmt.Sprintf("Creating pod %s", pod.Name))
 	removeUnusedContainers(pod)
 	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
-	framework.ExpectNoError(err, "while creating pod")
+	e2eutils.ExpectNoError(err, "while creating pod")
 	defer func() {
 		e2epod.DeletePodWithWait(f.ClientSet, pod)
 	}()
 	ginkgo.By("Checking for subpath error in container status")
 	err = waitForPodSubpathError(f, pod, allowContainerTerminationError)
-	framework.ExpectNoError(err, "while waiting for subpath failure")
+	e2eutils.ExpectNoError(err, "while waiting for subpath failure")
 }
 
 func findSubpathContainerName(pod *v1.Pod) string {
@@ -733,7 +735,7 @@ func waitForPodSubpathError(f *framework.Framework, pod *v1.Pod, allowContainerT
 		return fmt.Errorf("failed to find container that uses subpath")
 	}
 
-	waitErr := wait.PollImmediate(framework.Poll, f.Timeouts.PodStart, func() (bool, error) {
+	waitErr := wait.PollImmediate(e2eutils.Poll, f.Timeouts.PodStart, func() (bool, error) {
 		pod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -807,12 +809,12 @@ func testPodContainerRestartWithHooks(f *framework.Framework, pod *v1.Pod, hooks
 	ginkgo.By(fmt.Sprintf("Creating pod %s", pod.Name))
 	removeUnusedContainers(pod)
 	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
-	framework.ExpectNoError(err, "while creating pod")
+	e2eutils.ExpectNoError(err, "while creating pod")
 	defer func() {
 		e2epod.DeletePodWithWait(f.ClientSet, pod)
 	}()
 	err = e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodStart)
-	framework.ExpectNoError(err, "while waiting for pod to be running")
+	e2eutils.ExpectNoError(err, "while waiting for pod to be running")
 
 	ginkgo.By("Failing liveness probe")
 	hooks.FailLivenessProbe(pod, probeFilePath)
@@ -829,17 +831,17 @@ func testPodContainerRestartWithHooks(f *framework.Framework, pod *v1.Pod, hooks
 		}
 		for _, status := range pod.Status.ContainerStatuses {
 			if status.Name == pod.Spec.Containers[0].Name {
-				framework.Logf("Container %v, restarts: %v", status.Name, status.RestartCount)
+				e2eutils.Logf("Container %v, restarts: %v", status.Name, status.RestartCount)
 				restarts = status.RestartCount
 				if restarts > 0 {
-					framework.Logf("Container has restart count: %v", restarts)
+					e2eutils.Logf("Container has restart count: %v", restarts)
 					return true, nil
 				}
 			}
 		}
 		return false, nil
 	})
-	framework.ExpectNoError(err, "while waiting for container to restart")
+	e2eutils.ExpectNoError(err, "while waiting for container to restart")
 
 	// Fix liveness probe
 	ginkgo.By("Fix liveness probe")
@@ -847,13 +849,13 @@ func testPodContainerRestartWithHooks(f *framework.Framework, pod *v1.Pod, hooks
 
 	// Wait for container restarts to stabilize. Estimating the
 	// time for this is harder. In practice,
-	// framework.PodStartTimeout = f.Timeouts.PodStart = 5min
+	// e2eutils.PodStartTimeout = f.Timeouts.PodStart = 5min
 	// turned out to be too low, therefore
 	// f.Timeouts.PodStartSlow = 15min is used now.
 	ginkgo.By("Waiting for container to stop restarting")
 	stableCount := int(0)
-	stableThreshold := int(time.Minute / framework.Poll)
-	err = wait.PollImmediate(framework.Poll, f.Timeouts.PodStartSlow, func() (bool, error) {
+	stableThreshold := int(time.Minute / e2eutils.Poll)
+	err = wait.PollImmediate(e2eutils.Poll, f.Timeouts.PodStartSlow, func() (bool, error) {
 		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -863,20 +865,20 @@ func testPodContainerRestartWithHooks(f *framework.Framework, pod *v1.Pod, hooks
 				if status.RestartCount == restarts {
 					stableCount++
 					if stableCount > stableThreshold {
-						framework.Logf("Container restart has stabilized")
+						e2eutils.Logf("Container restart has stabilized")
 						return true, nil
 					}
 				} else {
 					restarts = status.RestartCount
 					stableCount = 0
-					framework.Logf("Container has restart count: %v", restarts)
+					e2eutils.Logf("Container has restart count: %v", restarts)
 				}
 				break
 			}
 		}
 		return false, nil
 	})
-	framework.ExpectNoError(err, "while waiting for container to stabilize")
+	e2eutils.ExpectNoError(err, "while waiting for container to stabilize")
 }
 
 // testPodContainerRestart tests that the existing subpath mount is detected when a container restarts
@@ -896,20 +898,20 @@ func testPodContainerRestart(f *framework.Framework, pod *v1.Pod) {
 		},
 		FailLivenessProbeFunc: func(p *v1.Pod, probeFilePath string) {
 			out, err := podContainerExec(p, 1, fmt.Sprintf("rm %v", probeFilePath))
-			framework.Logf("Pod exec output: %v", out)
-			framework.ExpectNoError(err, "while failing liveness probe")
+			e2eutils.Logf("Pod exec output: %v", out)
+			e2eutils.ExpectNoError(err, "while failing liveness probe")
 		},
 		FixLivenessProbeFunc: func(p *v1.Pod, probeFilePath string) {
 			ginkgo.By("Rewriting the file")
 			var writeCmd string
-			if framework.NodeOSDistroIs("windows") {
+			if e2eutils.NodeOSDistroIs("windows") {
 				writeCmd = fmt.Sprintf("echo test-after | Out-File -FilePath %v", probeFilePath)
 			} else {
 				writeCmd = fmt.Sprintf("echo test-after > %v", probeFilePath)
 			}
 			out, err := podContainerExec(pod, 1, writeCmd)
-			framework.Logf("Pod exec output: %v", out)
-			framework.ExpectNoError(err, "while rewriting the probe file")
+			e2eutils.Logf("Pod exec output: %v", out)
+			e2eutils.ExpectNoError(err, "while rewriting the probe file")
 		},
 	})
 }
@@ -923,7 +925,7 @@ func TestPodContainerRestartWithConfigmapModified(f *framework.Framework, origin
 	ginkgo.By("Create configmap")
 	_, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), original, metav1.CreateOptions{})
 	if err != nil && !apierrors.IsAlreadyExists(err) {
-		framework.ExpectNoError(err, "while creating configmap to modify")
+		e2eutils.ExpectNoError(err, "while creating configmap to modify")
 	}
 
 	var subpath string
@@ -951,12 +953,12 @@ func TestPodContainerRestartWithConfigmapModified(f *framework.Framework, origin
 		},
 		FailLivenessProbeFunc: func(p *v1.Pod, probeFilePath string) {
 			out, err := podContainerExec(p, 1, fmt.Sprintf("rm %v", probeFilePath))
-			framework.Logf("Pod exec output: %v", out)
-			framework.ExpectNoError(err, "while failing liveness probe")
+			e2eutils.Logf("Pod exec output: %v", out)
+			e2eutils.ExpectNoError(err, "while failing liveness probe")
 		},
 		FixLivenessProbeFunc: func(p *v1.Pod, probeFilePath string) {
 			_, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Update(context.TODO(), modified, metav1.UpdateOptions{})
-			framework.ExpectNoError(err, "while fixing liveness probe")
+			e2eutils.ExpectNoError(err, "while fixing liveness probe")
 		},
 	})
 
@@ -968,7 +970,7 @@ func testSubpathReconstruction(f *framework.Framework, hostExec utils.HostExec, 
 	// Disruptive test run serially, we can cache all voluem global mount
 	// points and verify after the test that we do not leak any global mount point.
 	nodeList, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
-	framework.ExpectNoError(err, "while listing schedulable nodes")
+	e2eutils.ExpectNoError(err, "while listing schedulable nodes")
 	globalMountPointsByNode := make(map[string]sets.String, len(nodeList.Items))
 	for _, node := range nodeList.Items {
 		globalMountPointsByNode[node.Name] = utils.FindVolumeGlobalMountPoints(hostExec, &node)
@@ -989,12 +991,12 @@ func testSubpathReconstruction(f *framework.Framework, hostExec utils.HostExec, 
 	ginkgo.By(fmt.Sprintf("Creating pod %s", pod.Name))
 	removeUnusedContainers(pod)
 	pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
-	framework.ExpectNoError(err, "while creating pod")
+	e2eutils.ExpectNoError(err, "while creating pod")
 	err = e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodStart)
-	framework.ExpectNoError(err, "while waiting for pod to be running")
+	e2eutils.ExpectNoError(err, "while waiting for pod to be running")
 
 	pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), pod.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err, "while getting pod")
+	e2eutils.ExpectNoError(err, "while getting pod")
 
 	var podNode *v1.Node
 	for i := range nodeList.Items {
@@ -1002,7 +1004,7 @@ func testSubpathReconstruction(f *framework.Framework, hostExec utils.HostExec, 
 			podNode = &nodeList.Items[i]
 		}
 	}
-	framework.ExpectNotEqual(podNode, nil, "pod node should exist in schedulable nodes")
+	e2eutils.ExpectNotEqual(podNode, nil, "pod node should exist in schedulable nodes")
 
 	utils.TestVolumeUnmountsFromDeletedPodWithForceOption(f.ClientSet, f, pod, forceDelete, true)
 
@@ -1019,13 +1021,13 @@ func testSubpathReconstruction(f *framework.Framework, hostExec utils.HostExec, 
 func formatVolume(f *framework.Framework, pod *v1.Pod) {
 	ginkgo.By(fmt.Sprintf("Creating pod to format volume %s", pod.Name))
 	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
-	framework.ExpectNoError(err, "while creating volume init pod")
+	e2eutils.ExpectNoError(err, "while creating volume init pod")
 
 	err = e2epod.WaitForPodSuccessInNamespaceTimeout(f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodStart)
-	framework.ExpectNoError(err, "while waiting for volume init pod to succeed")
+	e2eutils.ExpectNoError(err, "while waiting for volume init pod to succeed")
 
 	err = e2epod.DeletePodWithWait(f.ClientSet, pod)
-	framework.ExpectNoError(err, "while deleting volume init pod")
+	e2eutils.ExpectNoError(err, "while deleting volume init pod")
 }
 
 func podContainerExec(pod *v1.Pod, containerIndex int, command string) (string, error) {
@@ -1034,12 +1036,12 @@ func podContainerExec(pod *v1.Pod, containerIndex int, command string) (string, 
 	}
 	var shell string
 	var option string
-	if framework.NodeOSDistroIs("windows") {
+	if e2eutils.NodeOSDistroIs("windows") {
 		shell = "powershell"
 		option = "/c"
 	} else {
 		shell = "/bin/sh"
 		option = "-c"
 	}
-	return framework.RunKubectl(pod.Namespace, "exec", pod.Name, "--container", pod.Spec.Containers[containerIndex].Name, "--", shell, option, command)
+	return e2eutils.RunKubectl(pod.Namespace, "exec", pod.Name, "--container", pod.Spec.Containers[containerIndex].Name, "--", shell, option, command)
 }

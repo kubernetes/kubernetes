@@ -24,6 +24,8 @@ import (
 	"strconv"
 	"strings"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 
@@ -107,7 +109,7 @@ func getCPUToNUMANodeMapFromEnv(f *framework.Framework, pod *v1.Pod, cnt *v1.Con
 
 	cpusPerNUMA := make(map[int][]int)
 	for numaNode := 0; numaNode < numaNodes; numaNode++ {
-		nodeCPUList := f.ExecCommandInContainer(pod.Name, cnt.Name,
+		nodeCPUList := e2eutils.ExecCommandInContainer(f.ClientSet, f.Namespace.Name, pod.Name, cnt.Name,
 			"/bin/cat", fmt.Sprintf("/sys/devices/system/node/node%d/cpulist", numaNode))
 
 		cpus, err := cpuset.Parse(nodeCPUList)
@@ -152,7 +154,7 @@ func getPCIDeviceToNumaNodeMapFromEnv(f *framework.Framework, pod *v1.Pod, cnt *
 		// a single plugin can allocate more than a single device
 		pciDevs := strings.Split(value, ",")
 		for _, pciDev := range pciDevs {
-			pciDevNUMANode := f.ExecCommandInContainer(pod.Name, cnt.Name,
+			pciDevNUMANode := e2eutils.ExecCommandInContainer(f.ClientSet, f.Namespace.Name, pod.Name, cnt.Name,
 				"/bin/cat", fmt.Sprintf("/sys/bus/pci/devices/%s/numa_node", pciDev))
 			NUMAPerDev[pciDev] = numaNodeFromSysFsEntry(pciDevNUMANode)
 		}
@@ -268,6 +270,6 @@ func getPCIDeviceInfo(sysPCIDir string) ([]pciDeviceInfo, error) {
 
 func numaNodeFromSysFsEntry(content string) int {
 	nodeNum, err := strconv.Atoi(strings.TrimSpace(content))
-	framework.ExpectNoError(err, "error detecting the device numa_node from sysfs: %v", err)
+	e2eutils.ExpectNoError(err, "error detecting the device numa_node from sysfs: %v", err)
 	return nodeNum
 }

@@ -22,6 +22,9 @@ import (
 	"path"
 	"time"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
@@ -68,10 +71,10 @@ var _ = utils.SIGDescribe("[Feature:Flexvolumes] Mounted flexvolume expand[Slow]
 		e2eskipper.SkipUnlessSSHKeyPresent()
 		c = f.ClientSet
 		ns = f.Namespace.Name
-		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
+		e2eutils.ExpectNoError(e2eutils.WaitForAllNodesSchedulable(c, e2econfig.TestContext.NodeSchedulableTimeout))
 
 		node, err = e2enode.GetRandomReadySchedulableNode(f.ClientSet)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		nodeName = node.Name
 
 		nodeKey = "mounted_flexvolume_expand"
@@ -80,7 +83,7 @@ var _ = utils.SIGDescribe("[Feature:Flexvolumes] Mounted flexvolume expand[Slow]
 			nodeLabelValue = ns
 			nodeKeyValueLabel = make(map[string]string)
 			nodeKeyValueLabel[nodeKey] = nodeLabelValue
-			framework.AddOrUpdateLabelOnNode(c, nodeName, nodeKey, nodeLabelValue)
+			e2eutils.AddOrUpdateLabelOnNode(c, nodeName, nodeKey, nodeLabelValue)
 			isNodeLabeled = true
 		}
 
@@ -96,29 +99,29 @@ var _ = utils.SIGDescribe("[Feature:Flexvolumes] Mounted flexvolume expand[Slow]
 		if err != nil {
 			fmt.Printf("storage class creation error: %v\n", err)
 		}
-		framework.ExpectNoError(err, "Error creating resizable storage class")
-		framework.ExpectEqual(*resizableSc.AllowVolumeExpansion, true)
+		e2eutils.ExpectNoError(err, "Error creating resizable storage class")
+		e2eutils.ExpectEqual(*resizableSc.AllowVolumeExpansion, true)
 
 		pvc = e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 			StorageClassName: &(resizableSc.Name),
 			ClaimSize:        "2Gi",
 		}, ns)
 		pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(context.TODO(), pvc, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "Error creating pvc")
+		e2eutils.ExpectNoError(err, "Error creating pvc")
 	})
 
 	framework.AddCleanupAction(func() {
 		if len(nodeLabelValue) > 0 {
-			framework.RemoveLabelOffNode(c, nodeName, nodeKey)
+			e2eutils.RemoveLabelOffNode(c, nodeName, nodeKey)
 		}
 	})
 
 	ginkgo.AfterEach(func() {
-		framework.Logf("AfterEach: Cleaning up resources for mounted volume resize")
+		e2eutils.Logf("AfterEach: Cleaning up resources for mounted volume resize")
 
 		if c != nil {
 			if errs := e2epv.PVPVCCleanup(c, ns, nil, pvc); len(errs) > 0 {
-				framework.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
+				e2eutils.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
 			}
 			pvc, nodeName, isNodeLabeled, nodeLabelValue = nil, "", false, ""
 			nodeKeyValueLabel = make(map[string]string)
@@ -143,56 +146,56 @@ var _ = utils.SIGDescribe("[Feature:Flexvolumes] Mounted flexvolume expand[Slow]
 		})
 
 		_, err = e2epv.CreatePV(c, f.Timeouts, pv)
-		framework.ExpectNoError(err, "Error creating pv %v", err)
+		e2eutils.ExpectNoError(err, "Error creating pv %v", err)
 
 		ginkgo.By("Waiting for PVC to be in bound phase")
 		pvcClaims := []*v1.PersistentVolumeClaim{pvc}
 		var pvs []*v1.PersistentVolume
 
-		pvs, err = e2epv.WaitForPVClaimBoundPhase(c, pvcClaims, framework.ClaimProvisionTimeout)
-		framework.ExpectNoError(err, "Failed waiting for PVC to be bound %v", err)
-		framework.ExpectEqual(len(pvs), 1)
+		pvs, err = e2epv.WaitForPVClaimBoundPhase(c, pvcClaims, e2eutils.ClaimProvisionTimeout)
+		e2eutils.ExpectNoError(err, "Failed waiting for PVC to be bound %v", err)
+		e2eutils.ExpectEqual(len(pvs), 1)
 
 		ginkgo.By("Creating a deployment with the provisioned volume")
 		deployment, err := e2edeployment.CreateDeployment(c, int32(1), map[string]string{"test": "app"}, nodeKeyValueLabel, ns, pvcClaims, "")
-		framework.ExpectNoError(err, "Failed creating deployment %v", err)
+		e2eutils.ExpectNoError(err, "Failed creating deployment %v", err)
 		defer c.AppsV1().Deployments(ns).Delete(context.TODO(), deployment.Name, metav1.DeleteOptions{})
 
 		ginkgo.By("Expanding current pvc")
 		newSize := resource.MustParse("6Gi")
 		newPVC, err := testsuites.ExpandPVCSize(pvc, newSize, c)
-		framework.ExpectNoError(err, "While updating pvc for more size")
+		e2eutils.ExpectNoError(err, "While updating pvc for more size")
 		pvc = newPVC
 		gomega.Expect(pvc).NotTo(gomega.BeNil())
 
 		pvcSize := pvc.Spec.Resources.Requests[v1.ResourceStorage]
 		if pvcSize.Cmp(newSize) != 0 {
-			framework.Failf("error updating pvc size %q", pvc.Name)
+			e2eutils.Failf("error updating pvc size %q", pvc.Name)
 		}
 
 		ginkgo.By("Waiting for cloudprovider resize to finish")
 		err = testsuites.WaitForControllerVolumeResize(pvc, c, totalResizeWaitPeriod)
-		framework.ExpectNoError(err, "While waiting for pvc resize to finish")
+		e2eutils.ExpectNoError(err, "While waiting for pvc resize to finish")
 
 		ginkgo.By("Getting a pod from deployment")
 		podList, err := e2edeployment.GetPodsForDeployment(c, deployment)
-		framework.ExpectNoError(err, "While getting pods from deployment")
+		e2eutils.ExpectNoError(err, "While getting pods from deployment")
 		gomega.Expect(podList.Items).NotTo(gomega.BeEmpty())
 		pod := podList.Items[0]
 
 		ginkgo.By("Deleting the pod from deployment")
 		err = e2epod.DeletePodWithWait(c, &pod)
-		framework.ExpectNoError(err, "while deleting pod for resizing")
+		e2eutils.ExpectNoError(err, "while deleting pod for resizing")
 
 		ginkgo.By("Waiting for deployment to create new pod")
 		pod, err = waitForDeploymentToRecreatePod(c, deployment)
-		framework.ExpectNoError(err, "While waiting for pod to be recreated")
+		e2eutils.ExpectNoError(err, "While waiting for pod to be recreated")
 
 		ginkgo.By("Waiting for file system resize to finish")
 		pvc, err = testsuites.WaitForFSResize(pvc, c)
-		framework.ExpectNoError(err, "while waiting for fs resize to finish")
+		e2eutils.ExpectNoError(err, "while waiting for fs resize to finish")
 
 		pvcConditions := pvc.Status.Conditions
-		framework.ExpectEqual(len(pvcConditions), 0, "pvc should not have conditions")
+		e2eutils.ExpectEqual(len(pvcConditions), 0, "pvc should not have conditions")
 	})
 })

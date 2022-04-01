@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -39,7 +41,7 @@ var _ = SIGDescribe("Projected downwardAPI", func() {
 
 	// How long to wait for a log pod to be displayed
 	const podLogTimeout = 2 * time.Minute
-	var podClient *framework.PodClient
+	var podClient *e2eutils.PodClient
 	ginkgo.BeforeEach(func() {
 		podClient = f.PodClient()
 	})
@@ -140,7 +142,7 @@ var _ = SIGDescribe("Projected downwardAPI", func() {
 		gomega.Eventually(func() (string, error) {
 			return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, containerName)
 		},
-			podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("key1=\"value1\"\n"))
+			podLogTimeout, e2eutils.Poll).Should(gomega.ContainSubstring("key1=\"value1\"\n"))
 
 		//modify labels
 		podClient.Update(podName, func(pod *v1.Pod) {
@@ -150,7 +152,7 @@ var _ = SIGDescribe("Projected downwardAPI", func() {
 		gomega.Eventually(func() (string, error) {
 			return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, containerName)
 		},
-			podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("key3=\"value3\"\n"))
+			podLogTimeout, e2eutils.Poll).Should(gomega.ContainSubstring("key3=\"value3\"\n"))
 	})
 
 	/*
@@ -171,7 +173,7 @@ var _ = SIGDescribe("Projected downwardAPI", func() {
 		gomega.Eventually(func() (string, error) {
 			return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, containerName)
 		},
-			podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("builder=\"bar\"\n"))
+			podLogTimeout, e2eutils.Poll).Should(gomega.ContainSubstring("builder=\"bar\"\n"))
 
 		//modify annotations
 		podClient.Update(podName, func(pod *v1.Pod) {
@@ -181,7 +183,7 @@ var _ = SIGDescribe("Projected downwardAPI", func() {
 		gomega.Eventually(func() (string, error) {
 			return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, containerName)
 		},
-			podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("builder=\"foo\"\n"))
+			podLogTimeout, e2eutils.Poll).Should(gomega.ContainSubstring("builder=\"foo\"\n"))
 	})
 
 	/*

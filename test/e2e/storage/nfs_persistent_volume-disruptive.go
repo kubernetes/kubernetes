@@ -22,6 +22,9 @@ import (
 	"net"
 	"time"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 
@@ -52,7 +55,7 @@ func checkForControllerManagerHealthy(duration time.Duration) error {
 	var PID string
 	cmd := "pidof kube-controller-manager"
 	for start := time.Now(); time.Since(start) < duration; time.Sleep(5 * time.Second) {
-		result, err := e2essh.SSH(cmd, net.JoinHostPort(framework.APIAddress(), e2essh.SSHPort), framework.TestContext.Provider)
+		result, err := e2essh.SSH(cmd, net.JoinHostPort(e2eutils.APIAddress(), e2essh.SSHPort), e2econfig.TestContext.Provider)
 		if err != nil {
 			// We don't necessarily know that it crashed, pipe could just be broken
 			e2essh.LogResult(result)
@@ -68,7 +71,7 @@ func checkForControllerManagerHealthy(duration time.Duration) error {
 				return fmt.Errorf("controller manager crashed, old PID: %s, new PID: %s", PID, result.Stdout)
 			}
 		} else {
-			framework.Logf("kube-controller-manager still healthy after %v", time.Since(start))
+			e2eutils.Logf("kube-controller-manager still healthy after %v", time.Since(start))
 		}
 	}
 	return nil
@@ -118,14 +121,14 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 		}
 		// Get the first ready node IP that is not hosting the NFS pod.
 		if clientNodeIP == "" {
-			framework.Logf("Designating test node")
+			e2eutils.Logf("Designating test node")
 			nodes, err := e2enode.GetReadySchedulableNodes(c)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			for _, node := range nodes.Items {
 				if node.Name != nfsServerPod.Spec.NodeName {
 					clientNode = &node
 					clientNodeIP, err = e2enode.GetExternalIP(clientNode)
-					framework.ExpectNoError(err)
+					e2eutils.ExpectNoError(err)
 					break
 				}
 			}
@@ -154,7 +157,7 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 
 			ginkgo.By("Initializing first PD with PVPVC binding")
 			pvSource1, diskName1 = createGCEVolume()
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			pvConfig1 = e2epv.PersistentVolumeConfig{
 				NamePrefix: "gce-",
 				Labels:     volLabel,
@@ -162,12 +165,12 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 				Prebind:    nil,
 			}
 			pv1, pvc1, err = e2epv.CreatePVPVC(c, f.Timeouts, pvConfig1, pvcConfig, ns, false)
-			framework.ExpectNoError(err)
-			framework.ExpectNoError(e2epv.WaitOnPVandPVC(c, f.Timeouts, ns, pv1, pvc1))
+			e2eutils.ExpectNoError(err)
+			e2eutils.ExpectNoError(e2epv.WaitOnPVandPVC(c, f.Timeouts, ns, pv1, pvc1))
 
 			ginkgo.By("Initializing second PD with PVPVC binding")
 			pvSource2, diskName2 = createGCEVolume()
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			pvConfig2 = e2epv.PersistentVolumeConfig{
 				NamePrefix: "gce-",
 				Labels:     volLabel,
@@ -175,34 +178,34 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 				Prebind:    nil,
 			}
 			pv2, pvc2, err = e2epv.CreatePVPVC(c, f.Timeouts, pvConfig2, pvcConfig, ns, false)
-			framework.ExpectNoError(err)
-			framework.ExpectNoError(e2epv.WaitOnPVandPVC(c, f.Timeouts, ns, pv2, pvc2))
+			e2eutils.ExpectNoError(err)
+			e2eutils.ExpectNoError(e2epv.WaitOnPVandPVC(c, f.Timeouts, ns, pv2, pvc2))
 
 			ginkgo.By("Attaching both PVC's to a single pod")
 			clientPod, err = e2epod.CreatePod(c, ns, nil, []*v1.PersistentVolumeClaim{pvc1, pvc2}, true, "")
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 		})
 
 		ginkgo.AfterEach(func() {
 			// Delete client/user pod first
-			framework.ExpectNoError(e2epod.DeletePodWithWait(c, clientPod))
+			e2eutils.ExpectNoError(e2epod.DeletePodWithWait(c, clientPod))
 
 			// Delete PV and PVCs
 			if errs := e2epv.PVPVCCleanup(c, ns, pv1, pvc1); len(errs) > 0 {
-				framework.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
+				e2eutils.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
 			}
 			pv1, pvc1 = nil, nil
 			if errs := e2epv.PVPVCCleanup(c, ns, pv2, pvc2); len(errs) > 0 {
-				framework.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
+				e2eutils.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
 			}
 			pv2, pvc2 = nil, nil
 
 			// Delete the actual disks
 			if diskName1 != "" {
-				framework.ExpectNoError(e2epv.DeletePDWithRetry(diskName1))
+				e2eutils.ExpectNoError(e2epv.DeletePDWithRetry(diskName1))
 			}
 			if diskName2 != "" {
-				framework.ExpectNoError(e2epv.DeletePDWithRetry(diskName2))
+				e2eutils.ExpectNoError(e2epv.DeletePDWithRetry(diskName2))
 			}
 		})
 
@@ -211,20 +214,20 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 
 			ginkgo.By("Deleting PVC for volume 2")
 			err = e2epv.DeletePersistentVolumeClaim(c, pvc2.Name, ns)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			pvc2 = nil
 
 			ginkgo.By("Restarting the kube-controller-manager")
 			err = e2ekubesystem.RestartControllerManager()
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			err = e2ekubesystem.WaitForControllerManagerUp()
-			framework.ExpectNoError(err)
-			framework.Logf("kube-controller-manager restarted")
+			e2eutils.ExpectNoError(err)
+			e2eutils.Logf("kube-controller-manager restarted")
 
 			ginkgo.By("Observing the kube-controller-manager healthy for at least 2 minutes")
 			// Continue checking for 2 minutes to make sure kube-controller-manager is healthy
 			err = checkForControllerManagerHealthy(2 * time.Minute)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 		})
 
 	})
@@ -237,12 +240,12 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 		)
 
 		ginkgo.BeforeEach(func() {
-			framework.Logf("Initializing test spec")
+			e2eutils.Logf("Initializing test spec")
 			clientPod, pv, pvc = initTestCase(f, c, nfsPVconfig, pvcConfig, ns, clientNode.Name)
 		})
 
 		ginkgo.AfterEach(func() {
-			framework.Logf("Tearing down test spec")
+			e2eutils.Logf("Tearing down test spec")
 			tearDownTestCase(c, f, ns, clientPod, pvc, pv, true /* force PV delete */)
 			pv, pvc, clientPod = nil, nil, nil
 		})
@@ -280,7 +283,7 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 // createGCEVolume creates PersistentVolumeSource for GCEVolume.
 func createGCEVolume() (*v1.PersistentVolumeSource, string) {
 	diskName, err := e2epv.CreatePDWithRetry()
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	return &v1.PersistentVolumeSource{
 		GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
 			PDName:   diskName,
@@ -300,27 +303,27 @@ func initTestCase(f *framework.Framework, c clientset.Interface, pvConfig e2epv.
 			e2epv.DeletePersistentVolume(c, pv.Name)
 		}
 	}()
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	pod := e2epod.MakePod(ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, "")
 	pod.Spec.NodeName = nodeName
-	framework.Logf("Creating NFS client pod.")
+	e2eutils.Logf("Creating NFS client pod.")
 	pod, err = c.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
-	framework.Logf("NFS client Pod %q created on Node %q", pod.Name, nodeName)
-	framework.ExpectNoError(err)
+	e2eutils.Logf("NFS client Pod %q created on Node %q", pod.Name, nodeName)
+	e2eutils.ExpectNoError(err)
 	defer func() {
 		if err != nil {
 			e2epod.DeletePodWithWait(c, pod)
 		}
 	}()
 	err = e2epod.WaitTimeoutForPodRunningInNamespace(c, pod.Name, pod.Namespace, f.Timeouts.PodStart)
-	framework.ExpectNoError(err, fmt.Sprintf("Pod %q timed out waiting for phase: Running", pod.Name))
+	e2eutils.ExpectNoError(err, fmt.Sprintf("Pod %q timed out waiting for phase: Running", pod.Name))
 	// Return created api objects
 	pod, err = c.CoreV1().Pods(ns).Get(context.TODO(), pod.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	pvc, err = c.CoreV1().PersistentVolumeClaims(ns).Get(context.TODO(), pvc.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	pv, err = c.CoreV1().PersistentVolumes().Get(context.TODO(), pv.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	return pod, pv, pvc
 }
 
@@ -334,5 +337,5 @@ func tearDownTestCase(c clientset.Interface, f *framework.Framework, ns string, 
 		return
 	}
 	err := e2epv.WaitForPersistentVolumeDeleted(c, pv.Name, 5*time.Second, 5*time.Minute)
-	framework.ExpectNoError(err, "Persistent Volume %v not deleted by dynamic provisioner", pv.Name)
+	e2eutils.ExpectNoError(err, "Persistent Volume %v not deleted by dynamic provisioner", pv.Name)
 }

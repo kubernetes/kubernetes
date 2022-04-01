@@ -22,7 +22,10 @@ import (
 	"strconv"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -145,7 +148,7 @@ func containerGCTest(f *framework.Framework, test testRun) {
 	ginkgo.BeforeEach(func() {
 		var err error
 		runtime, _, err = getCRIClient()
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 	})
 	for _, pod := range test.testPods {
 		// Initialize the getContainerNames function to use CRI runtime client.
@@ -245,7 +248,7 @@ func containerGCTest(f *framework.Framework, test testRun) {
 		ginkgo.AfterEach(func() {
 			for _, pod := range test.testPods {
 				ginkgo.By(fmt.Sprintf("Deleting Pod %v", pod.podName))
-				f.PodClient().DeleteSync(pod.podName, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+				f.PodClient().DeleteSync(pod.podName, metav1.DeleteOptions{}, e2eutils.DefaultPodDeletionTimeout)
 			}
 
 			ginkgo.By("Making sure all containers get cleaned up")
@@ -262,7 +265,7 @@ func containerGCTest(f *framework.Framework, test testRun) {
 				return nil
 			}, garbageCollectDuration, runtimePollInterval).Should(gomega.BeNil())
 
-			if ginkgo.CurrentGinkgoTestDescription().Failed && framework.TestContext.DumpLogsOnFailure {
+			if ginkgo.CurrentGinkgoTestDescription().Failed && e2econfig.TestContext.DumpLogsOnFailure {
 				logNodeEvents(f)
 				logPodEvents(f)
 			}

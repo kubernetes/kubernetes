@@ -22,6 +22,8 @@ import (
 	"strings"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
@@ -57,12 +59,12 @@ var _ = utils.SIGDescribe("Ephemeralstorage", func() {
 			ginkgo.It(fmt.Sprintf("should allow deletion of pod with invalid volume : %s", testSource.volumeType), func() {
 				pod := testEphemeralVolumePod(f, testSource.volumeType, testSource.source)
 				pod, err := c.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
-				framework.ExpectNoError(err)
+				e2eutils.ExpectNoError(err)
 
 				// Allow it to sleep for 30 seconds
 				time.Sleep(30 * time.Second)
-				framework.Logf("Deleting pod %q/%q", pod.Namespace, pod.Name)
-				framework.ExpectNoError(e2epod.DeletePodWithWait(c, pod))
+				e2eutils.Logf("Deleting pod %q/%q", pod.Namespace, pod.Name)
+				e2eutils.ExpectNoError(e2epod.DeletePodWithWait(c, pod))
 			})
 		}
 	})

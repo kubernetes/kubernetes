@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -66,12 +68,12 @@ func CreateVolumeResource(driver TestDriver, config *PerTestConfig, pattern Test
 
 	switch pattern.VolType {
 	case InlineVolume:
-		framework.Logf("Creating resource for inline volume")
+		e2eutils.Logf("Creating resource for inline volume")
 		if iDriver, ok := driver.(InlineVolumeTestDriver); ok {
 			r.VolSource = iDriver.GetVolumeSource(false, pattern.FsType, r.Volume)
 		}
 	case PreprovisionedPV:
-		framework.Logf("Creating resource for pre-provisioned PV")
+		e2eutils.Logf("Creating resource for pre-provisioned PV")
 		if pDriver, ok := driver.(PreprovisionedPVTestDriver); ok {
 			pvSource, volumeNodeAffinity := pDriver.GetPersistentVolumeSource(false, pattern.FsType, r.Volume)
 			if pvSource != nil {
@@ -80,13 +82,13 @@ func CreateVolumeResource(driver TestDriver, config *PerTestConfig, pattern Test
 			}
 		}
 	case DynamicPV, GenericEphemeralVolume:
-		framework.Logf("Creating resource for dynamic PV")
+		e2eutils.Logf("Creating resource for dynamic PV")
 		if dDriver, ok := driver.(DynamicPVTestDriver); ok {
 			var err error
 			driverVolumeSizeRange := dDriver.GetDriverInfo().SupportedSizeRange
 			claimSize, err := storageutils.GetSizeRangesIntersection(testVolumeSizeRange, driverVolumeSizeRange)
-			framework.ExpectNoError(err, "determine intersection of test size range %+v and driver size range %+v", testVolumeSizeRange, driverVolumeSizeRange)
-			framework.Logf("Using claimSize:%s, test suite supported size:%v, driver(%s) supported size:%v ", claimSize, testVolumeSizeRange, dDriver.GetDriverInfo().Name, testVolumeSizeRange)
+			e2eutils.ExpectNoError(err, "determine intersection of test size range %+v and driver size range %+v", testVolumeSizeRange, driverVolumeSizeRange)
+			e2eutils.Logf("Using claimSize:%s, test suite supported size:%v, driver(%s) supported size:%v ", claimSize, testVolumeSizeRange, dDriver.GetDriverInfo().Name, testVolumeSizeRange)
 			r.Sc = dDriver.GetDynamicProvisionStorageClass(r.Config, pattern.FsType)
 
 			if pattern.BindingMode != "" {
@@ -97,7 +99,7 @@ func CreateVolumeResource(driver TestDriver, config *PerTestConfig, pattern Test
 			ginkgo.By("creating a StorageClass " + r.Sc.Name)
 
 			r.Sc, err = cs.StorageV1().StorageClasses().Create(context.TODO(), r.Sc, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 
 			switch pattern.VolType {
 			case DynamicPV:
@@ -107,12 +109,12 @@ func CreateVolumeResource(driver TestDriver, config *PerTestConfig, pattern Test
 			case GenericEphemeralVolume:
 				driverVolumeSizeRange := dDriver.GetDriverInfo().SupportedSizeRange
 				claimSize, err := storageutils.GetSizeRangesIntersection(testVolumeSizeRange, driverVolumeSizeRange)
-				framework.ExpectNoError(err, "determine intersection of test size range %+v and driver size range %+v", testVolumeSizeRange, driverVolumeSizeRange)
+				e2eutils.ExpectNoError(err, "determine intersection of test size range %+v and driver size range %+v", testVolumeSizeRange, driverVolumeSizeRange)
 				r.VolSource = createEphemeralVolumeSource(r.Sc.Name, pattern.VolMode, dInfo.RequiredAccessModes, claimSize)
 			}
 		}
 	case CSIInlineVolume:
-		framework.Logf("Creating resource for CSI ephemeral inline volume")
+		e2eutils.Logf("Creating resource for CSI ephemeral inline volume")
 		if eDriver, ok := driver.(EphemeralTestDriver); ok {
 			attributes, _, _ := eDriver.GetVolume(config, 0)
 			r.VolSource = &v1.VolumeSource{
@@ -123,7 +125,7 @@ func CreateVolumeResource(driver TestDriver, config *PerTestConfig, pattern Test
 			}
 		}
 	default:
-		framework.Failf("VolumeResource doesn't support: %s", pattern.VolType)
+		e2eutils.Failf("VolumeResource doesn't support: %s", pattern.VolType)
 	}
 
 	if r.VolSource == nil {
@@ -167,13 +169,13 @@ func (r *VolumeResource) CleanupResource() error {
 		case PreprovisionedPV:
 			ginkgo.By("Deleting pv and pvc")
 			if errs := e2epv.PVPVCCleanup(f.ClientSet, f.Namespace.Name, r.Pv, r.Pvc); len(errs) != 0 {
-				framework.Failf("Failed to delete PVC or PV: %v", utilerrors.NewAggregate(errs))
+				e2eutils.Failf("Failed to delete PVC or PV: %v", utilerrors.NewAggregate(errs))
 			}
 		case DynamicPV:
 			ginkgo.By("Deleting pvc")
 			// We only delete the PVC so that PV (and disk) can be cleaned up by dynamic provisioner
 			if r.Pv != nil && r.Pv.Spec.PersistentVolumeReclaimPolicy != v1.PersistentVolumeReclaimDelete {
-				framework.Failf("Test framework does not currently support Dynamically Provisioned Persistent Volume %v specified with reclaim policy that isnt %v",
+				e2eutils.Failf("Test framework does not currently support Dynamically Provisioned Persistent Volume %v specified with reclaim policy that isnt %v",
 					r.Pv.Name, v1.PersistentVolumeReclaimDelete)
 			}
 			if r.Pvc != nil {
@@ -212,7 +214,7 @@ func (r *VolumeResource) CleanupResource() error {
 				}
 			}
 		default:
-			framework.Failf("Found PVC (%v) or PV (%v) but not running Preprovisioned or Dynamic test pattern", r.Pvc, r.Pv)
+			e2eutils.Failf("Found PVC (%v) or PV (%v) but not running Preprovisioned or Dynamic test pattern", r.Pvc, r.Pv)
 		}
 	}
 
@@ -258,12 +260,12 @@ func createPVCPV(
 		pvcConfig.VolumeMode = &volMode
 	}
 
-	framework.Logf("Creating PVC and PV")
+	e2eutils.Logf("Creating PVC and PV")
 	pv, pvc, err := e2epv.CreatePVCPV(f.ClientSet, f.Timeouts, pvConfig, pvcConfig, f.Namespace.Name, false)
-	framework.ExpectNoError(err, "PVC, PV creation failed")
+	e2eutils.ExpectNoError(err, "PVC, PV creation failed")
 
 	err = e2epv.WaitOnPVandPVC(f.ClientSet, f.Timeouts, f.Namespace.Name, pv, pvc)
-	framework.ExpectNoError(err, "PVC, PV failed to bind")
+	e2eutils.ExpectNoError(err, "PVC, PV failed to bind")
 
 	return pv, pvc
 }
@@ -292,20 +294,20 @@ func createPVCPVFromDynamicProvisionSC(
 
 	var err error
 	pvc, err = e2epv.CreatePVC(cs, ns, pvc)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	if !isDelayedBinding(sc) {
-		err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, cs, pvc.Namespace, pvc.Name, framework.Poll, f.Timeouts.ClaimProvision)
-		framework.ExpectNoError(err)
+		err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, cs, pvc.Namespace, pvc.Name, e2eutils.Poll, f.Timeouts.ClaimProvision)
+		e2eutils.ExpectNoError(err)
 	}
 
 	pvc, err = cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(context.TODO(), pvc.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	var pv *v1.PersistentVolume
 	if !isDelayedBinding(sc) {
 		pv, err = cs.CoreV1().PersistentVolumes().Get(context.TODO(), pvc.Spec.VolumeName, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 	}
 
 	return pv, pvc

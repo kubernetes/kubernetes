@@ -20,6 +20,9 @@ import (
 	"fmt"
 	"time"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
@@ -116,8 +119,8 @@ var _ = SIGDescribe("ResourceMetricsAPI [NodeFeature:ResourceMetrics]", func() {
 			if !ginkgo.CurrentGinkgoTestDescription().Failed {
 				return
 			}
-			if framework.TestContext.DumpLogsOnFailure {
-				e2ekubectl.LogFailedContainers(f.ClientSet, f.Namespace.Name, framework.Logf)
+			if e2econfig.TestContext.DumpLogsOnFailure {
+				e2ekubectl.LogFailedContainers(f.ClientSet, f.Namespace.Name, e2eutils.Logf)
 			}
 			ginkgo.By("Recording processes in system cgroups")
 			recordSystemCgroupProcesses()
@@ -127,7 +130,7 @@ var _ = SIGDescribe("ResourceMetricsAPI [NodeFeature:ResourceMetrics]", func() {
 
 func getResourceMetrics() (e2emetrics.KubeletMetrics, error) {
 	ginkgo.By("getting stable resource metrics API")
-	return e2emetrics.GrabKubeletMetricsWithoutProxy(framework.TestContext.NodeName+":10255", "/metrics/resource")
+	return e2emetrics.GrabKubeletMetricsWithoutProxy(e2econfig.TestContext.NodeName+":10255", "/metrics/resource")
 }
 
 func nodeID(element interface{}) string {

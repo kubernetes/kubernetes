@@ -26,6 +26,8 @@ import (
 	"strconv"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 
@@ -65,15 +67,15 @@ func (MySQLUpgradeTest) Skip(upgCtx upgrades.UpgradeContext) bool {
 func mysqlKubectlCreate(ns, file string) {
 	data, err := e2etestfiles.Read(filepath.Join(mysqlManifestPath, file))
 	if err != nil {
-		framework.Fail(err.Error())
+		e2eutils.Fail(err.Error())
 	}
 	input := string(data)
-	framework.RunKubectlOrDieInput(ns, input, "create", "-f", "-")
+	e2eutils.RunKubectlOrDieInput(ns, input, "create", "-f", "-")
 }
 
 func (t *MySQLUpgradeTest) getServiceIP(f *framework.Framework, ns, svcName string) string {
 	svc, err := f.ClientSet.CoreV1().Services(ns).Get(context.TODO(), svcName, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	ingress := svc.Status.LoadBalancer.Ingress
 	if len(ingress) == 0 {
 		return ""
@@ -105,24 +107,24 @@ func (t *MySQLUpgradeTest) Setup(f *framework.Framework) {
 			return false, nil
 		}
 		if _, err := t.countNames(); err != nil {
-			framework.Logf("Service endpoint is up but isn't responding")
+			e2eutils.Logf("Service endpoint is up but isn't responding")
 			return false, nil
 		}
 		return true, nil
 	})
-	framework.ExpectNoError(err)
-	framework.Logf("Service endpoint is up")
+	e2eutils.ExpectNoError(err)
+	e2eutils.Logf("Service endpoint is up")
 
 	ginkgo.By("Adding 2 names to the database")
 	err = t.addName(strconv.Itoa(t.nextWrite))
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	err = t.addName(strconv.Itoa(t.nextWrite))
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	ginkgo.By("Verifying that the 2 names have been inserted")
 	count, err := t.countNames()
-	framework.ExpectNoError(err)
-	framework.ExpectEqual(count, 2)
+	e2eutils.ExpectNoError(err)
+	e2eutils.ExpectEqual(count, 2)
 }
 
 // Test continually polls the db using the read and write connections, inserting data, and checking
@@ -133,28 +135,28 @@ func (t *MySQLUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, up
 	go wait.Until(func() {
 		_, err := t.countNames()
 		if err != nil {
-			framework.Logf("Error while trying to read data: %v", err)
+			e2eutils.Logf("Error while trying to read data: %v", err)
 			readFailure++
 		} else {
 			readSuccess++
 		}
-	}, framework.Poll, done)
+	}, e2eutils.Poll, done)
 
 	wait.Until(func() {
 		err := t.addName(strconv.Itoa(t.nextWrite))
 		if err != nil {
-			framework.Logf("Error while trying to write data: %v", err)
+			e2eutils.Logf("Error while trying to write data: %v", err)
 			writeFailure++
 		} else {
 			writeSuccess++
 		}
-	}, framework.Poll, done)
+	}, e2eutils.Poll, done)
 
 	t.successfulWrites = writeSuccess
-	framework.Logf("Successful reads: %d", readSuccess)
-	framework.Logf("Successful writes: %d", writeSuccess)
-	framework.Logf("Failed reads: %d", readFailure)
-	framework.Logf("Failed writes: %d", writeFailure)
+	e2eutils.Logf("Successful reads: %d", readSuccess)
+	e2eutils.Logf("Successful writes: %d", writeSuccess)
+	e2eutils.Logf("Failed reads: %d", readFailure)
+	e2eutils.Logf("Failed writes: %d", writeFailure)
 
 	// TODO: Not sure what the ratio defining a successful test run should be. At time of writing the
 	// test, failures only seem to happen when a race condition occurs (read/write starts, doesn't
@@ -163,17 +165,17 @@ func (t *MySQLUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, up
 	readRatio := float64(readSuccess) / float64(readSuccess+readFailure)
 	writeRatio := float64(writeSuccess) / float64(writeSuccess+writeFailure)
 	if readRatio < 0.75 {
-		framework.Failf("Too many failures reading data. Success ratio: %f", readRatio)
+		e2eutils.Failf("Too many failures reading data. Success ratio: %f", readRatio)
 	}
 	if writeRatio < 0.75 {
-		framework.Failf("Too many failures writing data. Success ratio: %f", writeRatio)
+		e2eutils.Failf("Too many failures writing data. Success ratio: %f", writeRatio)
 	}
 }
 
 // Teardown performs one final check of the data's availability.
 func (t *MySQLUpgradeTest) Teardown(f *framework.Framework) {
 	count, err := t.countNames()
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	gomega.Expect(count).To(gomega.BeNumerically(">=", t.successfulWrites), "count is too small")
 }
 

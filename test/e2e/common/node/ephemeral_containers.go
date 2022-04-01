@@ -19,6 +19,8 @@ package node
 import (
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,7 +38,7 @@ import (
 var _ = SIGDescribe("Ephemeral Containers [NodeFeature:EphemeralContainers]", func() {
 	f := framework.NewDefaultFramework("ephemeral-containers-test")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
-	var podClient *framework.PodClient
+	var podClient *e2eutils.PodClient
 	ginkgo.BeforeEach(func() {
 		podClient = f.PodClient()
 	})
@@ -74,14 +76,14 @@ var _ = SIGDescribe("Ephemeral Containers [NodeFeature:EphemeralContainers]", fu
 			e2eskipper.Skipf("Skipping test because EphemeralContainers feature disabled (error: %q)", err)
 		}
 		// END TODO: Remove when EphemeralContainers feature gate is retired.
-		framework.ExpectNoError(err, "Failed to patch ephemeral containers in pod %q", format.Pod(pod))
+		e2eutils.ExpectNoError(err, "Failed to patch ephemeral containers in pod %q", format.Pod(pod))
 
 		ginkgo.By("checking pod container endpoints")
 		// Can't use anything depending on kubectl here because it's not available in the node test environment
-		output := f.ExecCommandInContainer(pod.Name, ecName, "/bin/echo", "marco")
+		output := e2eutils.ExecCommandInContainer(f.ClientSet, f.Namespace.Name, pod.Name, ecName, "/bin/echo", "marco")
 		gomega.Expect(output).To(gomega.ContainSubstring("marco"))
 		log, err := e2epod.GetPodLogs(f.ClientSet, pod.Namespace, pod.Name, ecName)
-		framework.ExpectNoError(err, "Failed to get logs for pod %q ephemeral container %q", format.Pod(pod), ecName)
+		e2eutils.ExpectNoError(err, "Failed to get logs for pod %q ephemeral container %q", format.Pod(pod), ecName)
 		gomega.Expect(log).To(gomega.ContainSubstring("polo"))
 	})
 })

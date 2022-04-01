@@ -19,6 +19,8 @@ package gcp
 import (
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -55,15 +57,15 @@ var _ = SIGDescribe("Restart [Disruptive]", func() {
 		e2eskipper.SkipUnlessProviderIs("gce", "gke")
 		var err error
 		ps, err = testutils.NewPodStore(f.ClientSet, metav1.NamespaceSystem, labels.Everything(), fields.Everything())
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		numNodes, err = e2enode.TotalRegistered(f.ClientSet)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		systemNamespace = metav1.NamespaceSystem
 
 		ginkgo.By("ensuring all nodes are ready")
-		originalNodes, err = e2enode.CheckReady(f.ClientSet, numNodes, framework.NodeReadyInitialTimeout)
-		framework.ExpectNoError(err)
-		framework.Logf("Got the following nodes before restart: %v", nodeNames(originalNodes))
+		originalNodes, err = e2enode.CheckReady(f.ClientSet, numNodes, e2eutils.NodeReadyInitialTimeout)
+		e2eutils.ExpectNoError(err)
+		e2eutils.Logf("Got the following nodes before restart: %v", nodeNames(originalNodes))
 
 		ginkgo.By("ensuring all pods are running and ready")
 		allPods := ps.List()
@@ -73,9 +75,9 @@ var _ = SIGDescribe("Restart [Disruptive]", func() {
 		for i, p := range pods {
 			originalPodNames[i] = p.ObjectMeta.Name
 		}
-		if !e2epod.CheckPodsRunningReadyOrSucceeded(f.ClientSet, systemNamespace, originalPodNames, framework.PodReadyBeforeTimeout) {
+		if !e2epod.CheckPodsRunningReadyOrSucceeded(f.ClientSet, systemNamespace, originalPodNames, e2eutils.PodReadyBeforeTimeout) {
 			printStatusAndLogsForNotReadyPods(f.ClientSet, systemNamespace, originalPodNames, pods)
-			framework.Failf("At least one pod wasn't running and ready or succeeded at test start.")
+			e2eutils.Failf("At least one pod wasn't running and ready or succeeded at test start.")
 		}
 	})
 
@@ -88,18 +90,18 @@ var _ = SIGDescribe("Restart [Disruptive]", func() {
 	ginkgo.It("should restart all nodes and ensure all nodes and pods recover", func() {
 		ginkgo.By("restarting all of the nodes")
 		err := common.RestartNodes(f.ClientSet, originalNodes)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		ginkgo.By("ensuring all nodes are ready after the restart")
-		nodesAfter, err := e2enode.CheckReady(f.ClientSet, numNodes, framework.RestartNodeReadyAgainTimeout)
-		framework.ExpectNoError(err)
-		framework.Logf("Got the following nodes after restart: %v", nodeNames(nodesAfter))
+		nodesAfter, err := e2enode.CheckReady(f.ClientSet, numNodes, e2eutils.RestartNodeReadyAgainTimeout)
+		e2eutils.ExpectNoError(err)
+		e2eutils.Logf("Got the following nodes after restart: %v", nodeNames(nodesAfter))
 
 		// Make sure that we have the same number of nodes. We're not checking
 		// that the names match because that's implementation specific.
 		ginkgo.By("ensuring the same number of nodes exist after the restart")
 		if len(originalNodes) != len(nodesAfter) {
-			framework.Failf("Had %d nodes before nodes were restarted, but now only have %d",
+			e2eutils.Failf("Had %d nodes before nodes were restarted, but now only have %d",
 				len(originalNodes), len(nodesAfter))
 		}
 
@@ -108,13 +110,13 @@ var _ = SIGDescribe("Restart [Disruptive]", func() {
 		// across node restarts.
 		ginkgo.By("ensuring the same number of pods are running and ready after restart")
 		podCheckStart := time.Now()
-		podNamesAfter, err := e2epod.WaitForNRestartablePods(ps, len(originalPodNames), framework.RestartPodReadyAgainTimeout)
-		framework.ExpectNoError(err)
-		remaining := framework.RestartPodReadyAgainTimeout - time.Since(podCheckStart)
+		podNamesAfter, err := e2epod.WaitForNRestartablePods(ps, len(originalPodNames), e2eutils.RestartPodReadyAgainTimeout)
+		e2eutils.ExpectNoError(err)
+		remaining := e2eutils.RestartPodReadyAgainTimeout - time.Since(podCheckStart)
 		if !e2epod.CheckPodsRunningReadyOrSucceeded(f.ClientSet, systemNamespace, podNamesAfter, remaining) {
 			pods := ps.List()
 			printStatusAndLogsForNotReadyPods(f.ClientSet, systemNamespace, podNamesAfter, pods)
-			framework.Failf("At least one pod wasn't running and ready after the restart.")
+			e2eutils.Failf("At least one pod wasn't running and ready after the restart.")
 		}
 	})
 })

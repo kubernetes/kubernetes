@@ -24,8 +24,9 @@ import (
 	"strconv"
 	"strings"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
-	"k8s.io/kubernetes/test/e2e/framework"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 )
 
@@ -113,7 +114,7 @@ var _ = SIGDescribe("GKE system requirements [NodeConformance][Feature:GKEEnv][N
 
 	ginkgo.It("The required processes should be running", func() {
 		cmdToProcessMap, err := getCmdToProcessMap()
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		for _, p := range []struct {
 			cmd  string
 			ppid int
@@ -122,14 +123,14 @@ var _ = SIGDescribe("GKE system requirements [NodeConformance][Feature:GKEEnv][N
 			{"google_clock_skew_daemon", 1},
 			{"google_ip_forwarding_daemon", 1},
 		} {
-			framework.ExpectNoError(checkProcess(p.cmd, p.ppid, cmdToProcessMap))
+			e2eutils.ExpectNoError(checkProcess(p.cmd, p.ppid, cmdToProcessMap))
 		}
 	})
 	ginkgo.It("The iptable rules should work (required by kube-proxy)", func() {
-		framework.ExpectNoError(checkIPTables())
+		e2eutils.ExpectNoError(checkIPTables())
 	})
 	ginkgo.It("The GCR is accessible", func() {
-		framework.ExpectNoError(checkPublicGCR())
+		e2eutils.ExpectNoError(checkPublicGCR())
 	})
 })
 

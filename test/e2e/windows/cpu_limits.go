@@ -19,6 +19,10 @@ package windows
 import (
 	"context"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
+	"time"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -26,7 +30,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	"time"
 
 	"github.com/onsi/ginkgo"
 )
@@ -54,8 +57,8 @@ var _ = SIGDescribe("[Feature:Windows] Cpu Resources [Serial]", func() {
 					context.TODO(),
 					p.Name,
 					metav1.GetOptions{})
-				framework.ExpectNoError(err, "Error retrieving pod")
-				framework.ExpectEqual(pod.Status.Phase, v1.PodRunning)
+				e2eutils.ExpectNoError(err, "Error retrieving pod")
+				e2eutils.ExpectEqual(pod.Status.Phase, v1.PodRunning)
 				allPods = append(allPods, pod)
 			}
 			for _, p := range podsMilli {
@@ -63,15 +66,15 @@ var _ = SIGDescribe("[Feature:Windows] Cpu Resources [Serial]", func() {
 					context.TODO(),
 					p.Name,
 					metav1.GetOptions{})
-				framework.ExpectNoError(err, "Error retrieving pod")
-				framework.ExpectEqual(pod.Status.Phase, v1.PodRunning)
+				e2eutils.ExpectNoError(err, "Error retrieving pod")
+				e2eutils.ExpectEqual(pod.Status.Phase, v1.PodRunning)
 				allPods = append(allPods, pod)
 			}
 			ginkgo.By("Ensuring cpu doesn't exceed limit by >5%")
 			for _, p := range allPods {
 				ginkgo.By("Gathering node summary stats")
 				nodeStats, err := e2ekubelet.GetStatsSummary(f.ClientSet, p.Spec.NodeName)
-				framework.ExpectNoError(err, "Error grabbing node summary stats")
+				e2eutils.ExpectNoError(err, "Error grabbing node summary stats")
 				found := false
 				cpuUsage := float64(0)
 				for _, pod := range nodeStats.Pods {
@@ -83,14 +86,14 @@ var _ = SIGDescribe("[Feature:Windows] Cpu Resources [Serial]", func() {
 					break
 				}
 				if !found {
-					framework.Failf("Pod %s/%s not found in the stats summary %+v", p.Namespace, p.Name, allPods)
+					e2eutils.Failf("Pod %s/%s not found in the stats summary %+v", p.Namespace, p.Name, allPods)
 				}
-				framework.Logf("Pod %s usage: %v", p.Name, cpuUsage)
+				e2eutils.Logf("Pod %s usage: %v", p.Name, cpuUsage)
 				if cpuUsage <= 0 {
-					framework.Failf("Pod %s/%s reported usage is %v, but it should be greater than 0", p.Namespace, p.Name, cpuUsage)
+					e2eutils.Failf("Pod %s/%s reported usage is %v, but it should be greater than 0", p.Namespace, p.Name, cpuUsage)
 				}
 				if cpuUsage >= .5*1.05 {
-					framework.Failf("Pod %s/%s reported usage is %v, but it should not exceed limit by > 5%%", p.Namespace, p.Name, cpuUsage)
+					e2eutils.Failf("Pod %s/%s reported usage is %v, but it should not exceed limit by > 5%%", p.Namespace, p.Name, cpuUsage)
 				}
 			}
 		})
@@ -102,10 +105,10 @@ func newCPUBurnPods(numPods int, image imageutils.Config, cpuLimit string, memor
 	var pods []*v1.Pod
 
 	memLimitQuantity, err := resource.ParseQuantity(memoryLimit)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	cpuLimitQuantity, err := resource.ParseQuantity(cpuLimit)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	for i := 0; i < numPods; i++ {
 

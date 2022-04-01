@@ -20,8 +20,9 @@ import (
 	"fmt"
 	"os"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 var (
@@ -34,7 +35,7 @@ var (
 // setPodNonRootUser configures the Pod to run as a non-root user.
 // For Windows, it sets the RunAsUserName field to ContainerUser, and for Linux, it sets the RunAsUser field to 1000.
 func setPodNonRootUser(pod *v1.Pod) {
-	if framework.NodeOSDistroIs("windows") {
+	if e2eutils.NodeOSDistroIs("windows") {
 		pod.Spec.SecurityContext.WindowsOptions = &v1.WindowsSecurityContextOptions{RunAsUserName: &nonAdminTestUserName}
 	} else {
 		pod.Spec.SecurityContext.RunAsUser = &nonRootTestUserID

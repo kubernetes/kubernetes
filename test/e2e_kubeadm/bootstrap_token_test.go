@@ -18,11 +18,13 @@ package kubeadm
 
 import (
 	"context"
+
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -52,7 +54,7 @@ var _ = Describe("bootstrap token", func() {
 		secrets, err := f.ClientSet.CoreV1().
 			Secrets(kubeSystemNamespace).
 			List(context.TODO(), metav1.ListOptions{})
-		framework.ExpectNoError(err, "error reading Secrets")
+		e2eutils.ExpectNoError(err, "error reading Secrets")
 
 		tokenNum := 0
 		for _, s := range secrets.Items {

@@ -23,6 +23,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
@@ -54,7 +56,7 @@ import (
 // to max pod constraints.
 func estimateMaximumPods(c clientset.Interface, min, max int32) int32 {
 	nodes, err := e2enode.GetReadySchedulableNodes(c)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	availablePods := int32(0)
 	for _, node := range nodes.Items {
@@ -245,14 +247,14 @@ func gatherMetrics(f *framework.Framework) {
 	var summary framework.TestDataSummary
 	grabber, err := e2emetrics.NewMetricsGrabber(f.ClientSet, f.KubemarkExternalClusterClientSet, f.ClientConfig(), false, false, true, false, false, false)
 	if err != nil {
-		framework.Logf("Failed to create MetricsGrabber. Skipping metrics gathering.")
+		e2eutils.Logf("Failed to create MetricsGrabber. Skipping metrics gathering.")
 	} else {
 		received, err := grabber.Grab()
 		if err != nil {
-			framework.Logf("MetricsGrabber failed grab metrics. Skipping metrics gathering.")
+			e2eutils.Logf("MetricsGrabber failed grab metrics. Skipping metrics gathering.")
 		} else {
 			summary = (*e2emetrics.ComponentCollection)(&received)
-			framework.Logf(summary.PrintHumanReadable())
+			e2eutils.Logf(summary.PrintHumanReadable())
 		}
 	}
 }
@@ -319,7 +321,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		ginkgo.By("create the rc")
 		rc, err := rcClient.Create(context.TODO(), rc, metav1.CreateOptions{})
 		if err != nil {
-			framework.Failf("Failed to create replication controller: %v", err)
+			e2eutils.Failf("Failed to create replication controller: %v", err)
 		}
 		// wait for rc to create some pods
 		if err := wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
@@ -337,13 +339,13 @@ var _ = SIGDescribe("Garbage collector", func() {
 			return false, nil
 
 		}); err != nil {
-			framework.Failf("failed to wait for the rc to create some pods: %v", err)
+			e2eutils.Failf("failed to wait for the rc to create some pods: %v", err)
 		}
 		ginkgo.By("delete the rc")
 		deleteOptions := getBackgroundOptions()
 		deleteOptions.Preconditions = metav1.NewUIDPreconditions(string(rc.UID))
 		if err := rcClient.Delete(context.TODO(), rc.ObjectMeta.Name, deleteOptions); err != nil {
-			framework.Failf("failed to delete the rc: %v", err)
+			e2eutils.Failf("failed to delete the rc: %v", err)
 		}
 		ginkgo.By("wait for all pods to be garbage collected")
 		// wait for the RCs and Pods to reach the expected numbers.
@@ -351,12 +353,12 @@ var _ = SIGDescribe("Garbage collector", func() {
 			objects := map[string]int{"ReplicationControllers": 0, "Pods": 0}
 			return verifyRemainingObjects(f, objects)
 		}); err != nil {
-			framework.Failf("failed to wait for all pods to be deleted: %v", err)
+			e2eutils.Failf("failed to wait for all pods to be deleted: %v", err)
 			remainingPods, err := podClient.List(context.TODO(), metav1.ListOptions{})
 			if err != nil {
-				framework.Failf("failed to list pods post mortem: %v", err)
+				e2eutils.Failf("failed to list pods post mortem: %v", err)
 			} else {
-				framework.Failf("remaining pods are: %#v", remainingPods)
+				e2eutils.Failf("remaining pods are: %#v", remainingPods)
 			}
 		}
 		gatherMetrics(f)
@@ -377,7 +379,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		ginkgo.By("create the rc")
 		rc, err := rcClient.Create(context.TODO(), rc, metav1.CreateOptions{})
 		if err != nil {
-			framework.Failf("Failed to create replication controller: %v", err)
+			e2eutils.Failf("Failed to create replication controller: %v", err)
 		}
 		// wait for rc to create pods
 		if err := wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
@@ -391,13 +393,13 @@ var _ = SIGDescribe("Garbage collector", func() {
 			return false, nil
 
 		}); err != nil {
-			framework.Failf("failed to wait for the rc.Status.Replicas to reach rc.Spec.Replicas: %v", err)
+			e2eutils.Failf("failed to wait for the rc.Status.Replicas to reach rc.Spec.Replicas: %v", err)
 		}
 		ginkgo.By("delete the rc")
 		deleteOptions := getOrphanOptions()
 		deleteOptions.Preconditions = metav1.NewUIDPreconditions(string(rc.UID))
 		if err := rcClient.Delete(context.TODO(), rc.ObjectMeta.Name, deleteOptions); err != nil {
-			framework.Failf("failed to delete the rc: %v", err)
+			e2eutils.Failf("failed to delete the rc: %v", err)
 		}
 		ginkgo.By("wait for the rc to be deleted")
 		// Orphaning the 100 pods takes 100 PATCH operations. The default qps of
@@ -417,20 +419,20 @@ var _ = SIGDescribe("Garbage collector", func() {
 			}
 			return true, nil
 		}); err != nil {
-			framework.Failf("%v", err)
+			e2eutils.Failf("%v", err)
 		}
 		ginkgo.By("wait for 30 seconds to see if the garbage collector mistakenly deletes the pods")
 		time.Sleep(30 * time.Second)
 		pods, err := podClient.List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
-			framework.Failf("Failed to list pods: %v", err)
+			e2eutils.Failf("Failed to list pods: %v", err)
 		}
 		if e, a := int(*(rc.Spec.Replicas)), len(pods.Items); e != a {
-			framework.Failf("expect %d pods, got %d pods", e, a)
+			e2eutils.Failf("expect %d pods, got %d pods", e, a)
 		}
 		gatherMetrics(f)
 		if err = e2epod.DeletePodsWithGracePeriod(clientSet, pods.Items, 0); err != nil {
-			framework.Logf("WARNING: failed to delete pods: %v", err)
+			e2eutils.Logf("WARNING: failed to delete pods: %v", err)
 		}
 	})
 
@@ -446,7 +448,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		ginkgo.By("create the rc")
 		rc, err := rcClient.Create(context.TODO(), rc, metav1.CreateOptions{})
 		if err != nil {
-			framework.Failf("Failed to create replication controller: %v", err)
+			e2eutils.Failf("Failed to create replication controller: %v", err)
 		}
 		// wait for rc to create some pods
 		if err := wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
@@ -459,27 +461,27 @@ var _ = SIGDescribe("Garbage collector", func() {
 			}
 			return false, nil
 		}); err != nil {
-			framework.Failf("failed to wait for the rc.Status.Replicas to reach rc.Spec.Replicas: %v", err)
+			e2eutils.Failf("failed to wait for the rc.Status.Replicas to reach rc.Spec.Replicas: %v", err)
 		}
 		ginkgo.By("delete the rc")
 		deleteOptions := metav1.DeleteOptions{
 			Preconditions: metav1.NewUIDPreconditions(string(rc.UID)),
 		}
 		if err := rcClient.Delete(context.TODO(), rc.ObjectMeta.Name, deleteOptions); err != nil {
-			framework.Failf("failed to delete the rc: %v", err)
+			e2eutils.Failf("failed to delete the rc: %v", err)
 		}
 		ginkgo.By("wait for 30 seconds to see if the garbage collector mistakenly deletes the pods")
 		time.Sleep(30 * time.Second)
 		pods, err := podClient.List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
-			framework.Failf("Failed to list pods: %v", err)
+			e2eutils.Failf("Failed to list pods: %v", err)
 		}
 		if e, a := int(*(rc.Spec.Replicas)), len(pods.Items); e != a {
-			framework.Failf("expect %d pods, got %d pods", e, a)
+			e2eutils.Failf("expect %d pods, got %d pods", e, a)
 		}
 		gatherMetrics(f)
 		if err = e2epod.DeletePodsWithGracePeriod(clientSet, pods.Items, 0); err != nil {
-			framework.Logf("WARNING: failed to delete pods: %v", err)
+			e2eutils.Logf("WARNING: failed to delete pods: %v", err)
 		}
 	})
 
@@ -498,7 +500,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		ginkgo.By("create the deployment")
 		createdDeployment, err := deployClient.Create(context.TODO(), deployment, metav1.CreateOptions{})
 		if err != nil {
-			framework.Failf("Failed to create deployment: %v", err)
+			e2eutils.Failf("Failed to create deployment: %v", err)
 		}
 		// wait for deployment to create some rs
 		ginkgo.By("Wait for the Deployment to create new ReplicaSet")
@@ -511,14 +513,14 @@ var _ = SIGDescribe("Garbage collector", func() {
 
 		})
 		if err != nil {
-			framework.Failf("Failed to wait for the Deployment to create some ReplicaSet: %v", err)
+			e2eutils.Failf("Failed to wait for the Deployment to create some ReplicaSet: %v", err)
 		}
 
 		ginkgo.By("delete the deployment")
 		deleteOptions := getBackgroundOptions()
 		deleteOptions.Preconditions = metav1.NewUIDPreconditions(string(createdDeployment.UID))
 		if err := deployClient.Delete(context.TODO(), deployment.ObjectMeta.Name, deleteOptions); err != nil {
-			framework.Failf("failed to delete the deployment: %v", err)
+			e2eutils.Failf("failed to delete the deployment: %v", err)
 		}
 		ginkgo.By("wait for all rs to be garbage collected")
 		err = wait.PollImmediate(500*time.Millisecond, 1*time.Minute+gcInformerResyncRetryTimeout, func() (bool, error) {
@@ -535,7 +537,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 				errList = append(errList, fmt.Errorf("remaining rs are: %#v", remainingRSs))
 			}
 			aggregatedError := utilerrors.NewAggregate(errList)
-			framework.Failf("Failed to wait for all rs to be garbage collected: %v", aggregatedError)
+			e2eutils.Failf("Failed to wait for all rs to be garbage collected: %v", aggregatedError)
 
 		}
 
@@ -557,7 +559,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		ginkgo.By("create the deployment")
 		createdDeployment, err := deployClient.Create(context.TODO(), deployment, metav1.CreateOptions{})
 		if err != nil {
-			framework.Failf("Failed to create deployment: %v", err)
+			e2eutils.Failf("Failed to create deployment: %v", err)
 		}
 		// wait for deployment to create some rs
 		ginkgo.By("Wait for the Deployment to create new ReplicaSet")
@@ -575,7 +577,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 
 		})
 		if err != nil {
-			framework.Failf("Failed to wait for the Deployment to create some ReplicaSet: %v", err)
+			e2eutils.Failf("Failed to wait for the Deployment to create some ReplicaSet: %v", err)
 		}
 
 		desiredGeneration := replicaset.Generation
@@ -586,14 +588,14 @@ var _ = SIGDescribe("Garbage collector", func() {
 			}
 			return newRS.Status.ObservedGeneration >= desiredGeneration && newRS.Status.Replicas == *replicaset.Spec.Replicas, nil
 		}); err != nil {
-			framework.Failf("failed to verify .Status.Replicas is equal to .Spec.Replicas for replicaset %q: %v", replicaset.Name, err)
+			e2eutils.Failf("failed to verify .Status.Replicas is equal to .Spec.Replicas for replicaset %q: %v", replicaset.Name, err)
 		}
 
 		ginkgo.By("delete the deployment")
 		deleteOptions := getOrphanOptions()
 		deleteOptions.Preconditions = metav1.NewUIDPreconditions(string(createdDeployment.UID))
 		if err := deployClient.Delete(context.TODO(), deployment.ObjectMeta.Name, deleteOptions); err != nil {
-			framework.Failf("failed to delete the deployment: %v", err)
+			e2eutils.Failf("failed to delete the deployment: %v", err)
 		}
 		ginkgo.By("wait for deployment deletion to see if the garbage collector mistakenly deletes the rs")
 		err = wait.PollImmediate(500*time.Millisecond, 1*time.Minute+gcInformerResyncRetryTimeout, func() (bool, error) {
@@ -604,13 +606,13 @@ var _ = SIGDescribe("Garbage collector", func() {
 			return len(dList.Items) == 0, nil
 		})
 		if err != nil {
-			framework.Failf("Failed to wait for the Deployment to be deleted: %v", err)
+			e2eutils.Failf("Failed to wait for the Deployment to be deleted: %v", err)
 		}
 		// Once the deployment object is gone, we'll know the GC has finished performing any relevant actions.
 		objects := map[string]int{"Deployments": 0, "ReplicaSets": 1, "Pods": 2}
 		ok, err := verifyRemainingObjects(f, objects)
 		if err != nil {
-			framework.Failf("Unexpected error while verifying remaining deployments, rs, and pods: %v", err)
+			e2eutils.Failf("Unexpected error while verifying remaining deployments, rs, and pods: %v", err)
 		}
 		if !ok {
 			errList := make([]error, 0)
@@ -627,15 +629,15 @@ var _ = SIGDescribe("Garbage collector", func() {
 				errList = append(errList, fmt.Errorf("remaining deployment's post mortem: %#v", remainingDSs))
 			}
 			aggregatedError := utilerrors.NewAggregate(errList)
-			framework.Failf("Failed to verify remaining deployments, rs, and pods: %v", aggregatedError)
+			e2eutils.Failf("Failed to verify remaining deployments, rs, and pods: %v", aggregatedError)
 		}
 		rs, err := clientSet.AppsV1().ReplicaSets(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
-			framework.Failf("Failed to list ReplicaSet %v", err)
+			e2eutils.Failf("Failed to list ReplicaSet %v", err)
 		}
 		for _, replicaSet := range rs.Items {
 			if metav1.GetControllerOf(&replicaSet.ObjectMeta) != nil {
-				framework.Failf("Found ReplicaSet with non nil ownerRef %v", replicaSet)
+				e2eutils.Failf("Found ReplicaSet with non nil ownerRef %v", replicaSet)
 			}
 		}
 
@@ -657,7 +659,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		ginkgo.By("create the rc")
 		rc, err := rcClient.Create(context.TODO(), rc, metav1.CreateOptions{})
 		if err != nil {
-			framework.Failf("Failed to create replication controller: %v", err)
+			e2eutils.Failf("Failed to create replication controller: %v", err)
 		}
 		// wait for rc to create pods
 		if err := wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
@@ -670,13 +672,13 @@ var _ = SIGDescribe("Garbage collector", func() {
 			}
 			return false, nil
 		}); err != nil {
-			framework.Failf("failed to wait for the rc.Status.Replicas to reach rc.Spec.Replicas: %v", err)
+			e2eutils.Failf("failed to wait for the rc.Status.Replicas to reach rc.Spec.Replicas: %v", err)
 		}
 		ginkgo.By("delete the rc")
 		deleteOptions := getForegroundOptions()
 		deleteOptions.Preconditions = metav1.NewUIDPreconditions(string(rc.UID))
 		if err := rcClient.Delete(context.TODO(), rc.ObjectMeta.Name, deleteOptions); err != nil {
-			framework.Failf("failed to delete the rc: %v", err)
+			e2eutils.Failf("failed to delete the rc: %v", err)
 		}
 		ginkgo.By("wait for the rc to be deleted")
 		// default client QPS is 20, deleting each pod requires 2 requests, so 30s should be enough
@@ -688,15 +690,15 @@ var _ = SIGDescribe("Garbage collector", func() {
 			_, err := rcClient.Get(context.TODO(), rc.Name, metav1.GetOptions{})
 			if err == nil {
 				pods, _ := podClient.List(context.TODO(), metav1.ListOptions{})
-				framework.Logf("%d pods remaining", len(pods.Items))
+				e2eutils.Logf("%d pods remaining", len(pods.Items))
 				count := 0
 				for _, pod := range pods.Items {
 					if pod.ObjectMeta.DeletionTimestamp == nil {
 						count++
 					}
 				}
-				framework.Logf("%d pods has nil DeletionTimestamp", count)
-				framework.Logf("")
+				e2eutils.Logf("%d pods has nil DeletionTimestamp", count)
+				e2eutils.Logf("")
 				return false, nil
 			}
 			if apierrors.IsNotFound(err) {
@@ -706,22 +708,22 @@ var _ = SIGDescribe("Garbage collector", func() {
 		}); err != nil {
 			pods, err2 := podClient.List(context.TODO(), metav1.ListOptions{})
 			if err2 != nil {
-				framework.Failf("%v", err2)
+				e2eutils.Failf("%v", err2)
 			}
-			framework.Logf("%d remaining pods are:", len(pods.Items))
-			framework.Logf("The ObjectMeta of the remaining pods are:")
+			e2eutils.Logf("%d remaining pods are:", len(pods.Items))
+			e2eutils.Logf("The ObjectMeta of the remaining pods are:")
 			for _, pod := range pods.Items {
-				framework.Logf("%#v", pod.ObjectMeta)
+				e2eutils.Logf("%#v", pod.ObjectMeta)
 			}
-			framework.Failf("failed to delete the rc: %v", err)
+			e2eutils.Failf("failed to delete the rc: %v", err)
 		}
 		// There shouldn't be any pods
 		pods, err := podClient.List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
-			framework.Failf("%v", err)
+			e2eutils.Failf("%v", err)
 		}
 		if len(pods.Items) != 0 {
-			framework.Failf("expected no pods, got %#v", pods)
+			e2eutils.Failf("expected no pods, got %#v", pods)
 		}
 		gatherMetrics(f)
 	})
@@ -744,7 +746,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		ginkgo.By("create the rc1")
 		rc1, err := rcClient.Create(context.TODO(), rc1, metav1.CreateOptions{})
 		if err != nil {
-			framework.Failf("Failed to create replication controller: %v", err)
+			e2eutils.Failf("Failed to create replication controller: %v", err)
 		}
 		rc2Name := "simpletest-rc-to-stay"
 		uniqLabelsStay := getUniqLabel("gctest_s", "valid_and_pending_owners_s")
@@ -752,7 +754,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		ginkgo.By("create the rc2")
 		rc2, err = rcClient.Create(context.TODO(), rc2, metav1.CreateOptions{})
 		if err != nil {
-			framework.Failf("Failed to create replication controller: %v", err)
+			e2eutils.Failf("Failed to create replication controller: %v", err)
 		}
 		// wait for rc1 to be stable
 		if err := wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
@@ -765,23 +767,23 @@ var _ = SIGDescribe("Garbage collector", func() {
 			}
 			return false, nil
 		}); err != nil {
-			framework.Failf("failed to wait for the rc.Status.Replicas to reach rc.Spec.Replicas: %v", err)
+			e2eutils.Failf("failed to wait for the rc.Status.Replicas to reach rc.Spec.Replicas: %v", err)
 		}
 		ginkgo.By(fmt.Sprintf("set half of pods created by rc %s to have rc %s as owner as well", rc1Name, rc2Name))
 		pods, err := podClient.List(context.TODO(), metav1.ListOptions{})
-		framework.ExpectNoError(err, "failed to list pods in namespace: %s", f.Namespace.Name)
+		e2eutils.ExpectNoError(err, "failed to list pods in namespace: %s", f.Namespace.Name)
 		patch := fmt.Sprintf(`{"metadata":{"ownerReferences":[{"apiVersion":"v1","kind":"ReplicationController","name":"%s","uid":"%s"}]}}`, rc2.ObjectMeta.Name, rc2.ObjectMeta.UID)
 		for i := 0; i < halfReplicas; i++ {
 			pod := pods.Items[i]
 			_, err := podClient.Patch(context.TODO(), pod.Name, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{})
-			framework.ExpectNoError(err, "failed to apply to pod %s in namespace %s, a strategic merge patch: %s", pod.Name, f.Namespace.Name, patch)
+			e2eutils.ExpectNoError(err, "failed to apply to pod %s in namespace %s, a strategic merge patch: %s", pod.Name, f.Namespace.Name, patch)
 		}
 
 		ginkgo.By(fmt.Sprintf("delete the rc %s", rc1Name))
 		deleteOptions := getForegroundOptions()
 		deleteOptions.Preconditions = metav1.NewUIDPreconditions(string(rc1.UID))
 		if err := rcClient.Delete(context.TODO(), rc1.ObjectMeta.Name, deleteOptions); err != nil {
-			framework.Failf("failed to delete the rc: %v", err)
+			e2eutils.Failf("failed to delete the rc: %v", err)
 		}
 		ginkgo.By("wait for the rc to be deleted")
 		// TODO: shorten the timeout when we make GC's periodic API rediscovery more efficient.
@@ -790,15 +792,15 @@ var _ = SIGDescribe("Garbage collector", func() {
 			_, err := rcClient.Get(context.TODO(), rc1.Name, metav1.GetOptions{})
 			if err == nil {
 				pods, _ := podClient.List(context.TODO(), metav1.ListOptions{})
-				framework.Logf("%d pods remaining", len(pods.Items))
+				e2eutils.Logf("%d pods remaining", len(pods.Items))
 				count := 0
 				for _, pod := range pods.Items {
 					if pod.ObjectMeta.DeletionTimestamp == nil {
 						count++
 					}
 				}
-				framework.Logf("%d pods has nil DeletionTimestamp", count)
-				framework.Logf("")
+				e2eutils.Logf("%d pods has nil DeletionTimestamp", count)
+				e2eutils.Logf("")
 				return false, nil
 			}
 			if apierrors.IsNotFound(err) {
@@ -808,35 +810,35 @@ var _ = SIGDescribe("Garbage collector", func() {
 		}); err != nil {
 			pods, err2 := podClient.List(context.TODO(), metav1.ListOptions{})
 			if err2 != nil {
-				framework.Failf("%v", err2)
+				e2eutils.Failf("%v", err2)
 			}
-			framework.Logf("%d remaining pods are:", len(pods.Items))
-			framework.Logf("ObjectMeta of remaining pods are:")
+			e2eutils.Logf("%d remaining pods are:", len(pods.Items))
+			e2eutils.Logf("ObjectMeta of remaining pods are:")
 			for _, pod := range pods.Items {
-				framework.Logf("%#v", pod.ObjectMeta)
+				e2eutils.Logf("%#v", pod.ObjectMeta)
 			}
-			framework.Failf("failed to delete rc %s, err: %v", rc1Name, err)
+			e2eutils.Failf("failed to delete rc %s, err: %v", rc1Name, err)
 		}
 		// half of the pods should still exist,
 		pods, err = podClient.List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
-			framework.Failf("%v", err)
+			e2eutils.Failf("%v", err)
 		}
 		if len(pods.Items) != halfReplicas {
-			framework.Failf("expected %d pods, got %d", halfReplicas, len(pods.Items))
+			e2eutils.Failf("expected %d pods, got %d", halfReplicas, len(pods.Items))
 		}
 		for _, pod := range pods.Items {
 			if pod.ObjectMeta.DeletionTimestamp != nil {
-				framework.Failf("expected pod DeletionTimestamp to be nil, got %#v", pod.ObjectMeta)
+				e2eutils.Failf("expected pod DeletionTimestamp to be nil, got %#v", pod.ObjectMeta)
 			}
 			// they should only have 1 ownerReference left
 			if len(pod.ObjectMeta.OwnerReferences) != 1 {
-				framework.Failf("expected pod to only have 1 owner, got %#v", pod.ObjectMeta.OwnerReferences)
+				e2eutils.Failf("expected pod to only have 1 owner, got %#v", pod.ObjectMeta.OwnerReferences)
 			}
 		}
 		gatherMetrics(f)
 		if err = e2epod.DeletePodsWithGracePeriod(clientSet, pods.Items, 0); err != nil {
-			framework.Logf("WARNING: failed to delete pods: %v", err)
+			e2eutils.Logf("WARNING: failed to delete pods: %v", err)
 		}
 	})
 
@@ -852,36 +854,36 @@ var _ = SIGDescribe("Garbage collector", func() {
 		pod1Name := "pod1"
 		pod1 := newGCPod(pod1Name)
 		pod1, err := podClient.Create(context.TODO(), pod1, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create pod %s in namespace: %s", pod1Name, f.Namespace.Name)
+		e2eutils.ExpectNoError(err, "failed to create pod %s in namespace: %s", pod1Name, f.Namespace.Name)
 		pod2Name := "pod2"
 		pod2 := newGCPod(pod2Name)
 		pod2, err = podClient.Create(context.TODO(), pod2, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create pod %s in namespace: %s", pod2Name, f.Namespace.Name)
+		e2eutils.ExpectNoError(err, "failed to create pod %s in namespace: %s", pod2Name, f.Namespace.Name)
 		pod3Name := "pod3"
 		pod3 := newGCPod(pod3Name)
 		pod3, err = podClient.Create(context.TODO(), pod3, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create pod %s in namespace: %s", pod3Name, f.Namespace.Name)
+		e2eutils.ExpectNoError(err, "failed to create pod %s in namespace: %s", pod3Name, f.Namespace.Name)
 		// create circular dependency
 		addRefPatch := func(name string, uid types.UID) []byte {
 			return []byte(fmt.Sprintf(`{"metadata":{"ownerReferences":[{"apiVersion":"v1","kind":"Pod","name":"%s","uid":"%s","controller":true,"blockOwnerDeletion":true}]}}`, name, uid))
 		}
 		patch1 := addRefPatch(pod3.Name, pod3.UID)
 		pod1, err = podClient.Patch(context.TODO(), pod1.Name, types.StrategicMergePatchType, patch1, metav1.PatchOptions{})
-		framework.ExpectNoError(err, "failed to apply to pod %s in namespace %s, a strategic merge patch: %s", pod1.Name, f.Namespace.Name, patch1)
-		framework.Logf("pod1.ObjectMeta.OwnerReferences=%#v", pod1.ObjectMeta.OwnerReferences)
+		e2eutils.ExpectNoError(err, "failed to apply to pod %s in namespace %s, a strategic merge patch: %s", pod1.Name, f.Namespace.Name, patch1)
+		e2eutils.Logf("pod1.ObjectMeta.OwnerReferences=%#v", pod1.ObjectMeta.OwnerReferences)
 		patch2 := addRefPatch(pod1.Name, pod1.UID)
 		pod2, err = podClient.Patch(context.TODO(), pod2.Name, types.StrategicMergePatchType, patch2, metav1.PatchOptions{})
-		framework.ExpectNoError(err, "failed to apply to pod %s in namespace %s, a strategic merge patch: %s", pod2.Name, f.Namespace.Name, patch2)
-		framework.Logf("pod2.ObjectMeta.OwnerReferences=%#v", pod2.ObjectMeta.OwnerReferences)
+		e2eutils.ExpectNoError(err, "failed to apply to pod %s in namespace %s, a strategic merge patch: %s", pod2.Name, f.Namespace.Name, patch2)
+		e2eutils.Logf("pod2.ObjectMeta.OwnerReferences=%#v", pod2.ObjectMeta.OwnerReferences)
 		patch3 := addRefPatch(pod2.Name, pod2.UID)
 		pod3, err = podClient.Patch(context.TODO(), pod3.Name, types.StrategicMergePatchType, patch3, metav1.PatchOptions{})
-		framework.ExpectNoError(err, "failed to apply to pod %s in namespace %s, a strategic merge patch: %s", pod3.Name, f.Namespace.Name, patch3)
-		framework.Logf("pod3.ObjectMeta.OwnerReferences=%#v", pod3.ObjectMeta.OwnerReferences)
+		e2eutils.ExpectNoError(err, "failed to apply to pod %s in namespace %s, a strategic merge patch: %s", pod3.Name, f.Namespace.Name, patch3)
+		e2eutils.Logf("pod3.ObjectMeta.OwnerReferences=%#v", pod3.ObjectMeta.OwnerReferences)
 		// delete one pod, should result in the deletion of all pods
 		deleteOptions := getForegroundOptions()
 		deleteOptions.Preconditions = metav1.NewUIDPreconditions(string(pod1.UID))
 		err = podClient.Delete(context.TODO(), pod1.ObjectMeta.Name, deleteOptions)
-		framework.ExpectNoError(err, "failed to delete pod %s in namespace: %s", pod1.Name, f.Namespace.Name)
+		e2eutils.ExpectNoError(err, "failed to delete pod %s in namespace: %s", pod1.Name, f.Namespace.Name)
 		var pods *v1.PodList
 		var err2 error
 		// TODO: shorten the timeout when we make GC's periodic API rediscovery more efficient.
@@ -897,20 +899,20 @@ var _ = SIGDescribe("Garbage collector", func() {
 			return false, nil
 		}); err != nil {
 			data, _ := json.Marshal(pods.Items)
-			framework.Logf("pods are %s", string(data))
-			framework.Failf("failed to wait for all pods to be deleted: %v", err)
+			e2eutils.Logf("pods are %s", string(data))
+			e2eutils.Failf("failed to wait for all pods to be deleted: %v", err)
 		}
 	})
 
 	ginkgo.It("should support cascading deletion of custom resources", func() {
-		config, err := framework.LoadConfig()
+		config, err := e2eutils.LoadConfig()
 		if err != nil {
-			framework.Failf("failed to load config: %v", err)
+			e2eutils.Failf("failed to load config: %v", err)
 		}
 
 		apiExtensionClient, err := apiextensionsclientset.NewForConfig(config)
 		if err != nil {
-			framework.Failf("failed to initialize apiExtensionClient: %v", err)
+			e2eutils.Failf("failed to initialize apiExtensionClient: %v", err)
 		}
 
 		// Create a random custom resource definition and ensure it's available for
@@ -919,14 +921,14 @@ var _ = SIGDescribe("Garbage collector", func() {
 		defer func() {
 			err = apiextensionstestserver.DeleteV1CustomResourceDefinition(definition, apiExtensionClient)
 			if err != nil && !apierrors.IsNotFound(err) {
-				framework.Failf("failed to delete CustomResourceDefinition: %v", err)
+				e2eutils.Failf("failed to delete CustomResourceDefinition: %v", err)
 			}
 		}()
 		definition, err = apiextensionstestserver.CreateNewV1CustomResourceDefinition(definition, apiExtensionClient, f.DynamicClient)
 		if err != nil {
-			framework.Failf("failed to create CustomResourceDefinition: %v", err)
+			e2eutils.Failf("failed to create CustomResourceDefinition: %v", err)
 		}
-		framework.ExpectEqual(len(definition.Spec.Versions), 1, "custom resource definition should have one version")
+		e2eutils.ExpectEqual(len(definition.Spec.Versions), 1, "custom resource definition should have one version")
 		version := definition.Spec.Versions[0]
 
 		// Get a client for the custom resource.
@@ -948,9 +950,9 @@ var _ = SIGDescribe("Garbage collector", func() {
 		}
 		persistedOwner, err := resourceClient.Create(context.TODO(), owner, metav1.CreateOptions{})
 		if err != nil {
-			framework.Failf("failed to create owner resource %q: %v", ownerName, err)
+			e2eutils.Failf("failed to create owner resource %q: %v", ownerName, err)
 		}
-		framework.Logf("created owner resource %q", ownerName)
+		e2eutils.Logf("created owner resource %q", ownerName)
 
 		// Create a custom dependent resource.
 		dependentName := names.SimpleNameGenerator.GenerateName("dependent")
@@ -973,15 +975,15 @@ var _ = SIGDescribe("Garbage collector", func() {
 		}
 		persistedDependent, err := resourceClient.Create(context.TODO(), dependent, metav1.CreateOptions{})
 		if err != nil {
-			framework.Failf("failed to create dependent resource %q: %v", dependentName, err)
+			e2eutils.Failf("failed to create dependent resource %q: %v", dependentName, err)
 		}
-		framework.Logf("created dependent resource %q", dependentName)
+		e2eutils.Logf("created dependent resource %q", dependentName)
 
 		// Delete the owner.
 		background := metav1.DeletePropagationBackground
 		err = resourceClient.Delete(context.TODO(), ownerName, metav1.DeleteOptions{PropagationPolicy: &background})
 		if err != nil {
-			framework.Failf("failed to delete owner resource %q: %v", ownerName, err)
+			e2eutils.Failf("failed to delete owner resource %q: %v", ownerName, err)
 		}
 
 		// Create and delete an unrelated instance of the custom resource in foreground deletion mode,
@@ -995,13 +997,13 @@ var _ = SIGDescribe("Garbage collector", func() {
 		}
 		_, err = resourceClient.Create(context.TODO(), canary, metav1.CreateOptions{})
 		if err != nil {
-			framework.Failf("failed to create canary resource %q: %v", canaryName, err)
+			e2eutils.Failf("failed to create canary resource %q: %v", canaryName, err)
 		}
-		framework.Logf("created canary resource %q", canaryName)
+		e2eutils.Logf("created canary resource %q", canaryName)
 		foreground := metav1.DeletePropagationForeground
 		err = resourceClient.Delete(context.TODO(), canaryName, metav1.DeleteOptions{PropagationPolicy: &foreground})
 		if err != nil {
-			framework.Failf("failed to delete canary resource %q: %v", canaryName, err)
+			e2eutils.Failf("failed to delete canary resource %q: %v", canaryName, err)
 		}
 		// Wait for the canary foreground finalization to complete, which means GC is aware of our new custom resource type
 		var lastCanary *unstructured.Unstructured
@@ -1009,8 +1011,8 @@ var _ = SIGDescribe("Garbage collector", func() {
 			lastCanary, err = resourceClient.Get(context.TODO(), dependentName, metav1.GetOptions{})
 			return apierrors.IsNotFound(err), nil
 		}); err != nil {
-			framework.Logf("canary last state: %#v", lastCanary)
-			framework.Failf("failed waiting for canary resource %q to be deleted", canaryName)
+			e2eutils.Logf("canary last state: %#v", lastCanary)
+			e2eutils.Failf("failed waiting for canary resource %q to be deleted", canaryName)
 		}
 
 		// Ensure the dependent is deleted.
@@ -1020,32 +1022,32 @@ var _ = SIGDescribe("Garbage collector", func() {
 			lastDependent, err2 = resourceClient.Get(context.TODO(), dependentName, metav1.GetOptions{})
 			return apierrors.IsNotFound(err2), nil
 		}); err != nil {
-			framework.Logf("owner: %#v", persistedOwner)
-			framework.Logf("dependent: %#v", persistedDependent)
-			framework.Logf("dependent last state: %#v", lastDependent)
-			framework.Failf("failed waiting for dependent resource %q to be deleted", dependentName)
+			e2eutils.Logf("owner: %#v", persistedOwner)
+			e2eutils.Logf("dependent: %#v", persistedDependent)
+			e2eutils.Logf("dependent last state: %#v", lastDependent)
+			e2eutils.Failf("failed waiting for dependent resource %q to be deleted", dependentName)
 		}
 
 		// Ensure the owner is deleted.
 		_, err = resourceClient.Get(context.TODO(), ownerName, metav1.GetOptions{})
 		if err == nil {
-			framework.Failf("expected owner resource %q to be deleted", ownerName)
+			e2eutils.Failf("expected owner resource %q to be deleted", ownerName)
 		} else {
 			if !apierrors.IsNotFound(err) {
-				framework.Failf("unexpected error getting owner resource %q: %v", ownerName, err)
+				e2eutils.Failf("unexpected error getting owner resource %q: %v", ownerName, err)
 			}
 		}
 	})
 
 	ginkgo.It("should support orphan deletion of custom resources", func() {
-		config, err := framework.LoadConfig()
+		config, err := e2eutils.LoadConfig()
 		if err != nil {
-			framework.Failf("failed to load config: %v", err)
+			e2eutils.Failf("failed to load config: %v", err)
 		}
 
 		apiExtensionClient, err := apiextensionsclientset.NewForConfig(config)
 		if err != nil {
-			framework.Failf("failed to initialize apiExtensionClient: %v", err)
+			e2eutils.Failf("failed to initialize apiExtensionClient: %v", err)
 		}
 
 		// Create a random custom resource definition and ensure it's available for
@@ -1054,14 +1056,14 @@ var _ = SIGDescribe("Garbage collector", func() {
 		defer func() {
 			err = apiextensionstestserver.DeleteV1CustomResourceDefinition(definition, apiExtensionClient)
 			if err != nil && !apierrors.IsNotFound(err) {
-				framework.Failf("failed to delete CustomResourceDefinition: %v", err)
+				e2eutils.Failf("failed to delete CustomResourceDefinition: %v", err)
 			}
 		}()
 		definition, err = apiextensionstestserver.CreateNewV1CustomResourceDefinition(definition, apiExtensionClient, f.DynamicClient)
 		if err != nil {
-			framework.Failf("failed to create CustomResourceDefinition: %v", err)
+			e2eutils.Failf("failed to create CustomResourceDefinition: %v", err)
 		}
-		framework.ExpectEqual(len(definition.Spec.Versions), 1, "custom resource definition should have one version")
+		e2eutils.ExpectEqual(len(definition.Spec.Versions), 1, "custom resource definition should have one version")
 		version := definition.Spec.Versions[0]
 
 		// Get a client for the custom resource.
@@ -1083,9 +1085,9 @@ var _ = SIGDescribe("Garbage collector", func() {
 		}
 		persistedOwner, err := resourceClient.Create(context.TODO(), owner, metav1.CreateOptions{})
 		if err != nil {
-			framework.Failf("failed to create owner resource %q: %v", ownerName, err)
+			e2eutils.Failf("failed to create owner resource %q: %v", ownerName, err)
 		}
-		framework.Logf("created owner resource %q", ownerName)
+		e2eutils.Logf("created owner resource %q", ownerName)
 
 		// Create a custom dependent resource.
 		dependentName := names.SimpleNameGenerator.GenerateName("dependent")
@@ -1108,14 +1110,14 @@ var _ = SIGDescribe("Garbage collector", func() {
 		}
 		_, err = resourceClient.Create(context.TODO(), dependent, metav1.CreateOptions{})
 		if err != nil {
-			framework.Failf("failed to create dependent resource %q: %v", dependentName, err)
+			e2eutils.Failf("failed to create dependent resource %q: %v", dependentName, err)
 		}
-		framework.Logf("created dependent resource %q", dependentName)
+		e2eutils.Logf("created dependent resource %q", dependentName)
 
 		// Delete the owner and orphan the dependent.
 		err = resourceClient.Delete(context.TODO(), ownerName, getOrphanOptions())
 		if err != nil {
-			framework.Failf("failed to delete owner resource %q: %v", ownerName, err)
+			e2eutils.Failf("failed to delete owner resource %q: %v", ownerName, err)
 		}
 
 		ginkgo.By("wait for the owner to be deleted")
@@ -1129,7 +1131,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 			}
 			return true, nil
 		}); err != nil {
-			framework.Failf("timeout in waiting for the owner to be deleted: %v", err)
+			e2eutils.Failf("timeout in waiting for the owner to be deleted: %v", err)
 		}
 
 		// Wait 30s and ensure the dependent is not deleted.
@@ -1138,7 +1140,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 			_, err := resourceClient.Get(context.TODO(), dependentName, metav1.GetOptions{})
 			return false, err
 		}); err != nil && err != wait.ErrWaitTimeout {
-			framework.Failf("failed to ensure the dependent is not deleted: %v", err)
+			e2eutils.Failf("failed to ensure the dependent is not deleted: %v", err)
 		}
 	})
 
@@ -1147,7 +1149,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		ginkgo.By("Create the cronjob")
 		cronJob := newCronJob("simple", "*/1 * * * ?")
 		cronJob, err := f.ClientSet.BatchV1().CronJobs(f.Namespace.Name).Create(context.TODO(), cronJob, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create cronjob: %+v, in namespace: %s", cronJob, f.Namespace.Name)
+		e2eutils.ExpectNoError(err, "failed to create cronjob: %+v, in namespace: %s", cronJob, f.Namespace.Name)
 
 		ginkgo.By("Wait for the CronJob to create new Job")
 		err = wait.PollImmediate(500*time.Millisecond, 2*time.Minute, func() (bool, error) {
@@ -1158,12 +1160,12 @@ var _ = SIGDescribe("Garbage collector", func() {
 			return len(jobs.Items) > 0, nil
 		})
 		if err != nil {
-			framework.Failf("Failed to wait for the CronJob to create some Jobs: %v", err)
+			e2eutils.Failf("Failed to wait for the CronJob to create some Jobs: %v", err)
 		}
 
 		ginkgo.By("Delete the cronjob")
 		if err := f.ClientSet.BatchV1().CronJobs(f.Namespace.Name).Delete(context.TODO(), cronJob.Name, getBackgroundOptions()); err != nil {
-			framework.Failf("Failed to delete the CronJob: %v", err)
+			e2eutils.Failf("Failed to delete the CronJob: %v", err)
 		}
 		ginkgo.By("Verify if cronjob does not leave jobs nor pods behind")
 		err = wait.PollImmediate(500*time.Millisecond, 1*time.Minute, func() (bool, error) {
@@ -1171,7 +1173,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 			return verifyRemainingObjects(f, objects)
 		})
 		if err != nil {
-			framework.Failf("Failed to wait for all jobs and pods to be deleted: %v", err)
+			e2eutils.Failf("Failed to wait for all jobs and pods to be deleted: %v", err)
 		}
 
 		gatherMetrics(f)

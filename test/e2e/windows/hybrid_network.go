@@ -19,6 +19,8 @@ package windows
 import (
 	"fmt"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -107,9 +109,9 @@ func assertConsistentConnectivity(f *framework.Framework, podName string, os str
 	connChecker := func() error {
 		ginkgo.By(fmt.Sprintf("checking connectivity of %s-container in %s", os, podName))
 		// TODO, we should be retrying this similar to what is done in DialFromNode, in the test/e2e/networking/networking.go tests
-		stdout, stderr, err := f.ExecCommandInContainerWithFullOutput(podName, os+"-container", cmd...)
+		stdout, stderr, err := e2eutils.ExecCommandInContainerWithFullOutput(f.ClientSet, f.Namespace.Name, podName, os+"-container", cmd...)
 		if err != nil {
-			framework.Logf("Encountered error while running command: %v.\nStdout: %s\nStderr: %s\nErr: %v", cmd, stdout, stderr, err)
+			e2eutils.Logf("Encountered error while running command: %v.\nStdout: %s\nStderr: %s\nErr: %v", cmd, stdout, stderr, err)
 		}
 		return err
 	}

@@ -34,8 +34,9 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	kubeletstatsv1alpha1 "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
-	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/config"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 )
 
 const (
@@ -128,7 +129,7 @@ func NewRuntimeOperationMonitor(c clientset.Interface) *RuntimeOperationMonitor 
 	}
 	nodes, err := m.client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
-		framework.Failf("RuntimeOperationMonitor: unable to get list of nodes: %v", err)
+		e2eutils.Failf("RuntimeOperationMonitor: unable to get list of nodes: %v", err)
 	}
 	for _, node := range nodes.Items {
 		m.nodesRuntimeOps[node.Name] = make(NodeRuntimeOperationErrorRate)
@@ -144,7 +145,7 @@ func (m *RuntimeOperationMonitor) GetRuntimeOperationErrorRate() map[string]Node
 	for node := range m.nodesRuntimeOps {
 		nodeResult, err := getNodeRuntimeOperationErrorRate(m.client, node)
 		if err != nil {
-			framework.Logf("GetRuntimeOperationErrorRate: unable to get kubelet metrics from node %q: %v", node, err)
+			e2eutils.Logf("GetRuntimeOperationErrorRate: unable to get kubelet metrics from node %q: %v", node, err)
 			continue
 		}
 		m.nodesRuntimeOps[node] = nodeResult
@@ -160,7 +161,7 @@ func (m *RuntimeOperationMonitor) GetLatestRuntimeOperationErrorRate() map[strin
 		oldNodeResult := m.nodesRuntimeOps[node]
 		curNodeResult, err := getNodeRuntimeOperationErrorRate(m.client, node)
 		if err != nil {
-			framework.Logf("GetLatestRuntimeOperationErrorRate: unable to get kubelet metrics from node %q: %v", node, err)
+			e2eutils.Logf("GetLatestRuntimeOperationErrorRate: unable to get kubelet metrics from node %q: %v", node, err)
 			continue
 		}
 		for op, cur := range curNodeResult {
@@ -226,13 +227,13 @@ func getNodeRuntimeOperationErrorRate(c clientset.Interface, node string) (NodeR
 
 // GetStatsSummary contacts kubelet for the container information.
 func GetStatsSummary(c clientset.Interface, nodeName string) (*kubeletstatsv1alpha1.Summary, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), e2eutils.SingleCallTimeout)
 	defer cancel()
 
 	data, err := c.CoreV1().RESTClient().Get().
 		Resource("nodes").
 		SubResource("proxy").
-		Name(fmt.Sprintf("%v:%v", nodeName, framework.KubeletPort)).
+		Name(fmt.Sprintf("%v:%v", nodeName, config.KubeletPort)).
 		Suffix("stats/summary").
 		Do(ctx).Raw()
 
@@ -252,7 +253,7 @@ func getNodeStatsSummary(c clientset.Interface, nodeName string) (*kubeletstatsv
 	data, err := c.CoreV1().RESTClient().Get().
 		Resource("nodes").
 		SubResource("proxy").
-		Name(fmt.Sprintf("%v:%v", nodeName, framework.KubeletPort)).
+		Name(fmt.Sprintf("%v:%v", nodeName, config.KubeletPort)).
 		Suffix("stats/summary").
 		SetHeader("Content-Type", "application/json").
 		Do(context.TODO()).Raw()
@@ -319,7 +320,7 @@ func formatResourceUsageStats(nodeName string, containerStats ResourceUsagePerCo
 
 // GetKubeletHeapStats returns stats of kubelet heap.
 func GetKubeletHeapStats(c clientset.Interface, nodeName string) (string, error) {
-	client, err := ProxyRequest(c, nodeName, "debug/pprof/heap", framework.KubeletPort)
+	client, err := ProxyRequest(c, nodeName, "debug/pprof/heap", config.KubeletPort)
 	if err != nil {
 		return "", err
 	}
@@ -388,7 +389,7 @@ func (r *resourceCollector) Stop() {
 func (r *resourceCollector) collectStats(oldStatsMap map[string]*kubeletstatsv1alpha1.ContainerStats) {
 	summary, err := getNodeStatsSummary(r.client, r.node)
 	if err != nil {
-		framework.Logf("Error getting node stats summary on %q, err: %v", r.node, err)
+		e2eutils.Logf("Error getting node stats summary on %q, err: %v", r.node, err)
 		return
 	}
 	cStatsMap := getSystemContainerStats(summary)
@@ -397,7 +398,7 @@ func (r *resourceCollector) collectStats(oldStatsMap map[string]*kubeletstatsv1a
 	for _, name := range r.containers {
 		cStats, ok := cStatsMap[name]
 		if !ok {
-			framework.Logf("Missing info/stats for container %q on node %q", name, r.node)
+			e2eutils.Logf("Missing info/stats for container %q on node %q", name, r.node)
 			return
 		}
 
@@ -490,7 +491,7 @@ func (r *ResourceMonitor) Start() {
 	// It should be OK to monitor unschedulable Nodes
 	nodes, err := r.client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
-		framework.Failf("ResourceMonitor: unable to get list of nodes: %v", err)
+		e2eutils.Failf("ResourceMonitor: unable to get list of nodes: %v", err)
 	}
 	r.collectors = make(map[string]*resourceCollector, 0)
 	for _, node := range nodes.Items {
@@ -518,9 +519,9 @@ func (r *ResourceMonitor) Reset() {
 func (r *ResourceMonitor) LogLatest() {
 	summary, err := r.GetLatest()
 	if err != nil {
-		framework.Logf("%v", err)
+		e2eutils.Logf("%v", err)
 	}
-	framework.Logf("%s", r.FormatResourceUsage(summary))
+	e2eutils.Logf("%s", r.FormatResourceUsage(summary))
 }
 
 // FormatResourceUsage returns the formatted string for LogLatest().
@@ -624,7 +625,7 @@ func (r *ResourceMonitor) FormatCPUSummary(summary NodesCPUSummary) string {
 // LogCPUSummary outputs summary of CPU into log.
 func (r *ResourceMonitor) LogCPUSummary() {
 	summary := r.GetCPUSummary()
-	framework.Logf("%s", r.FormatCPUSummary(summary))
+	e2eutils.Logf("%s", r.FormatCPUSummary(summary))
 }
 
 // GetCPUSummary returns summary of CPU.

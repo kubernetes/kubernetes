@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"path"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -63,7 +65,7 @@ var _ = utils.SIGDescribe("[Feature:Flexvolumes] Detaching volumes", func() {
 		ns = f.Namespace
 		var err error
 		node, err = e2enode.GetRandomReadySchedulableNode(f.ClientSet)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		suffix = ns.Name
 	})
 
@@ -86,31 +88,31 @@ var _ = utils.SIGDescribe("[Feature:Flexvolumes] Detaching volumes", func() {
 		clientPod := getFlexVolumePod(volumeSource, node.Name)
 		ginkgo.By("Creating pod that uses slow format volume")
 		pod, err := cs.CoreV1().Pods(ns.Name).Create(context.TODO(), clientPod, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		uniqueVolumeName := getUniqueVolumeName(pod, driverInstallAs)
 
 		ginkgo.By("waiting for volumes to be attached to node")
 		err = waitForVolumesAttached(cs, node.Name, uniqueVolumeName)
-		framework.ExpectNoError(err, "while waiting for volume to attach to %s node", node.Name)
+		e2eutils.ExpectNoError(err, "while waiting for volume to attach to %s node", node.Name)
 
 		ginkgo.By("waiting for volume-in-use on the node after pod creation")
 		err = waitForVolumesInUse(cs, node.Name, uniqueVolumeName)
-		framework.ExpectNoError(err, "while waiting for volume in use")
+		e2eutils.ExpectNoError(err, "while waiting for volume in use")
 
 		ginkgo.By("waiting for kubelet to start mounting the volume")
 		time.Sleep(20 * time.Second)
 
 		ginkgo.By("Deleting the flexvolume pod")
 		err = e2epod.DeletePodWithWait(cs, pod)
-		framework.ExpectNoError(err, "in deleting the pod")
+		e2eutils.ExpectNoError(err, "in deleting the pod")
 
 		// Wait a bit for node to sync the volume status
 		time.Sleep(30 * time.Second)
 
 		ginkgo.By("waiting for volume-in-use on the node after pod deletion")
 		err = waitForVolumesInUse(cs, node.Name, uniqueVolumeName)
-		framework.ExpectNoError(err, "while waiting for volume in use")
+		e2eutils.ExpectNoError(err, "while waiting for volume in use")
 
 		// Wait for 110s because mount device operation has a sleep of 120 seconds
 		// we previously already waited for 30s.
@@ -118,7 +120,7 @@ var _ = utils.SIGDescribe("[Feature:Flexvolumes] Detaching volumes", func() {
 
 		ginkgo.By("waiting for volume to disappear from node in-use")
 		err = waitForVolumesNotInUse(cs, node.Name, uniqueVolumeName)
-		framework.ExpectNoError(err, "while waiting for volume to be removed from in-use")
+		e2eutils.ExpectNoError(err, "while waiting for volume to be removed from in-use")
 
 		ginkgo.By(fmt.Sprintf("uninstalling flexvolume %s from node %s", driverInstallAs, node.Name))
 		uninstallFlex(cs, node, "k8s", driverInstallAs)

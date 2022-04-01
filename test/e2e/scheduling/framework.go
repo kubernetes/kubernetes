@@ -21,13 +21,14 @@ import (
 	"fmt"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 var (
@@ -48,11 +49,11 @@ func WaitForStableCluster(c clientset.Interface, workerNodes sets.String) int {
 	for len(allNotScheduledPods) != 0 {
 		time.Sleep(waitTime)
 		if startTime.Add(timeout).Before(time.Now()) {
-			framework.Logf("Timed out waiting for the following pods to schedule")
+			e2eutils.Logf("Timed out waiting for the following pods to schedule")
 			for _, p := range allNotScheduledPods {
-				framework.Logf("%v/%v", p.Namespace, p.Name)
+				e2eutils.Logf("%v/%v", p.Namespace, p.Name)
 			}
-			framework.Failf("Timed out after %v waiting for stable cluster.", timeout)
+			e2eutils.Failf("Timed out after %v waiting for stable cluster.", timeout)
 			break
 		}
 		allScheduledPods, allNotScheduledPods = getScheduledAndUnscheduledPods(c, workerNodes)
@@ -63,7 +64,7 @@ func WaitForStableCluster(c clientset.Interface, workerNodes sets.String) int {
 // getScheduledAndUnscheduledPods lists scheduled and not scheduled pods in all namespaces, with succeeded and failed pods filtered out.
 func getScheduledAndUnscheduledPods(c clientset.Interface, workerNodes sets.String) (scheduledPods, notScheduledPods []v1.Pod) {
 	pods, err := c.CoreV1().Pods(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
-	framework.ExpectNoError(err, fmt.Sprintf("listing all pods in namespace %q while waiting for stable cluster", metav1.NamespaceAll))
+	e2eutils.ExpectNoError(err, fmt.Sprintf("listing all pods in namespace %q while waiting for stable cluster", metav1.NamespaceAll))
 
 	// API server returns also Pods that succeeded. We need to filter them out.
 	filteredPods := make([]v1.Pod, 0, len(pods.Items))

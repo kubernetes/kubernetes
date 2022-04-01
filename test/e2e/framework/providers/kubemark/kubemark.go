@@ -25,6 +25,8 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kubernetes/pkg/kubemark"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/providers"
+	"k8s.io/kubernetes/test/e2e/framework/utils"
 )
 
 var (
@@ -32,17 +34,17 @@ var (
 )
 
 func init() {
-	framework.RegisterProvider("kubemark", newProvider)
+	providers.RegisterProvider("kubemark", newProvider)
 }
 
-func newProvider() (framework.ProviderInterface, error) {
+func newProvider() (providers.ProviderInterface, error) {
 	// Actual initialization happens when the e2e framework gets constructed.
 	return &Provider{}, nil
 }
 
 // Provider is a structure to handle Kubemark cluster for e2e testing
 type Provider struct {
-	framework.NullProvider
+	providers.NullProvider
 	controller   *kubemark.KubemarkController
 	closeChannel chan struct{}
 }
@@ -63,9 +65,9 @@ func (p *Provider) FrameworkBeforeEach(f *framework.Framework) {
 		externalConfig, err := clientcmd.BuildConfigFromFlags("", *kubemarkExternalKubeConfig)
 		externalConfig.QPS = f.Options.ClientQPS
 		externalConfig.Burst = f.Options.ClientBurst
-		framework.ExpectNoError(err)
+		utils.ExpectNoError(err)
 		externalClient, err := clientset.NewForConfig(externalConfig)
-		framework.ExpectNoError(err)
+		utils.ExpectNoError(err)
 		f.KubemarkExternalClusterClientSet = externalClient
 		p.closeChannel = make(chan struct{})
 		externalInformerFactory := informers.NewSharedInformerFactory(externalClient, 0)
@@ -73,10 +75,10 @@ func (p *Provider) FrameworkBeforeEach(f *framework.Framework) {
 		kubemarkNodeInformer := kubemarkInformerFactory.Core().V1().Nodes()
 		go kubemarkNodeInformer.Informer().Run(p.closeChannel)
 		p.controller, err = kubemark.NewKubemarkController(externalClient, externalInformerFactory, f.ClientSet, kubemarkNodeInformer)
-		framework.ExpectNoError(err)
+		utils.ExpectNoError(err)
 		externalInformerFactory.Start(p.closeChannel)
 		if !p.controller.WaitForCacheSync(p.closeChannel) {
-			framework.Failf("Unable to sync caches for %v", p.controller)
+			utils.Failf("Unable to sync caches for %v", p.controller)
 		}
 		go p.controller.Run(p.closeChannel)
 	}

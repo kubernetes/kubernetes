@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/utils"
 	gcecloud "k8s.io/legacy-cloud-providers/gce"
 )
 
@@ -42,7 +42,7 @@ func MakeFirewallNameForLBService(name string) string {
 // ConstructFirewallForLBService returns the expected GCE firewall rule for a loadbalancer type service
 func ConstructFirewallForLBService(svc *v1.Service, nodeTag string) *compute.Firewall {
 	if svc.Spec.Type != v1.ServiceTypeLoadBalancer {
-		framework.Failf("can not construct firewall rule for non-loadbalancer type service")
+		utils.Failf("can not construct firewall rule for non-loadbalancer type service")
 	}
 	fw := compute.Firewall{}
 	fw.Name = MakeFirewallNameForLBService(cloudprovider.DefaultLoadBalancerName(svc))
@@ -70,7 +70,7 @@ func MakeHealthCheckFirewallNameForLBService(clusterID, name string, isNodesHeal
 // ConstructHealthCheckFirewallForLBService returns the expected GCE firewall rule for a loadbalancer type service
 func ConstructHealthCheckFirewallForLBService(clusterID string, svc *v1.Service, nodeTag string, isNodesHealthCheck bool) *compute.Firewall {
 	if svc.Spec.Type != v1.ServiceTypeLoadBalancer {
-		framework.Failf("can not construct firewall rule for non-loadbalancer type service")
+		utils.Failf("can not construct firewall rule for non-loadbalancer type service")
 	}
 	fw := compute.Firewall{}
 	fw.Name = MakeHealthCheckFirewallNameForLBService(clusterID, cloudprovider.DefaultLoadBalancerName(svc), isNodesHealthCheck)
@@ -110,7 +110,7 @@ func GetClusterName(instancePrefix string) string {
 // From cluster/gce/util.sh, all firewall rules should be consistent with the ones created by startup scripts.
 func GetE2eFirewalls(masterName, masterTag, nodeTag, network, clusterIPRange string) []*compute.Firewall {
 	instancePrefix, err := GetInstancePrefix(masterName)
-	framework.ExpectNoError(err)
+	utils.ExpectNoError(err)
 	clusterName := GetClusterName(instancePrefix)
 
 	fws := []*compute.Firewall{}
@@ -395,7 +395,7 @@ func VerifyFirewallRule(res, exp *compute.Firewall, network string, portsSubset 
 
 // WaitForFirewallRule waits for the specified firewall existence
 func WaitForFirewallRule(gceCloud *gcecloud.Cloud, fwName string, exist bool, timeout time.Duration) (*compute.Firewall, error) {
-	framework.Logf("Waiting up to %v for firewall %v exist=%v", timeout, fwName, exist)
+	utils.Logf("Waiting up to %v for firewall %v exist=%v", timeout, fwName, exist)
 	var fw *compute.Firewall
 	var err error
 

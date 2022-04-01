@@ -27,25 +27,31 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 
 	v1 "k8s.io/api/core/v1"
+<<<<<<< HEAD
 	"k8s.io/kubernetes/test/e2e/framework"
+=======
+	"k8s.io/kubernetes/test/e2e/framework/config"
+	"k8s.io/kubernetes/test/e2e/framework/providers"
+>>>>>>> fcf4212fb3d (restructure e2e framework and its sub-packages to solve potential  cycle imports.)
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
+	"k8s.io/kubernetes/test/e2e/framework/utils"
 	awscloud "k8s.io/legacy-cloud-providers/aws"
 )
 
 func init() {
-	framework.RegisterProvider("aws", newProvider)
+	providers.RegisterProvider("aws", newProvider)
 }
 
-func newProvider() (framework.ProviderInterface, error) {
-	if framework.TestContext.CloudConfig.Zone == "" {
-		framework.Logf("Warning: gce-zone not specified! Some tests that use the AWS SDK may select the wrong region and fail.")
+func newProvider() (providers.ProviderInterface, error) {
+	if config.TestContext.CloudConfig.Zone == "" {
+		utils.Logf("Warning: gce-zone not specified! Some tests that use the AWS SDK may select the wrong region and fail.")
 	}
 	return &Provider{}, nil
 }
 
 // Provider is a structure to handle AWS clouds for e2e testing
 type Provider struct {
-	framework.NullProvider
+	providers.NullProvider
 }
 
 // ResizeGroup resizes an instance group
@@ -110,8 +116,8 @@ func (p *Provider) CreatePD(zone string) (string, error) {
 	request.VolumeType = aws.String(awscloud.DefaultVolumeType)
 
 	// We need to tag the volume so that locked-down IAM configurations can still mount it
-	if framework.TestContext.CloudConfig.ClusterTag != "" {
-		clusterID := framework.TestContext.CloudConfig.ClusterTag
+	if config.TestContext.CloudConfig.ClusterTag != "" {
+		clusterID := config.TestContext.CloudConfig.ClusterTag
 
 		legacyTag := &ec2.Tag{
 			Key:   aws.String(awscloud.TagNameKubernetesClusterLegacy),
@@ -154,7 +160,7 @@ func (p *Provider) DeletePD(pdName string) error {
 	_, err := client.DeleteVolume(request)
 	if err != nil {
 		if awsError, ok := err.(awserr.Error); ok && awsError.Code() == "InvalidVolume.NotFound" {
-			framework.Logf("volume deletion implicitly succeeded because volume %q does not exist.", pdName)
+			utils.Logf("volume deletion implicitly succeeded because volume %q does not exist.", pdName)
 		} else {
 			return fmt.Errorf("error deleting EBS volumes: %v", err)
 		}
@@ -181,10 +187,10 @@ func newAWSClient(zone string) *ec2.EC2 {
 	var cfg *aws.Config
 
 	if zone == "" {
-		zone = framework.TestContext.CloudConfig.Zone
+		zone = config.TestContext.CloudConfig.Zone
 	}
 	if zone == "" {
-		framework.Logf("Warning: No AWS zone configured!")
+		utils.Logf("Warning: No AWS zone configured!")
 		cfg = nil
 	} else {
 		region := zone[:len(zone)-1]
@@ -192,7 +198,7 @@ func newAWSClient(zone string) *ec2.EC2 {
 	}
 	session, err := session.NewSession()
 	if err != nil {
-		framework.Logf("Warning: failed to create aws session")
+		utils.Logf("Warning: failed to create aws session")
 	}
 	return ec2.New(session, cfg)
 }

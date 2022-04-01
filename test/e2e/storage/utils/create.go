@@ -23,6 +23,8 @@ import (
 	"errors"
 	"fmt"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -80,7 +82,7 @@ func visitManifests(cb func([]byte) error, files ...string) error {
 	for _, fileName := range files {
 		data, err := e2etestfiles.Read(fileName)
 		if err != nil {
-			framework.Failf("reading manifest file: %v", err)
+			e2eutils.Failf("reading manifest file: %v", err)
 		}
 
 		// Split at the "---" separator before working on
@@ -148,7 +150,7 @@ func CreateItems(f *framework.Framework, ns *v1.Namespace, items ...interface{})
 		// to non-namespaced items.
 		for _, destructor := range destructors {
 			if err := destructor(); err != nil && !apierrors.IsNotFound(err) {
-				framework.Logf("deleting failed: %s", err)
+				e2eutils.Logf("deleting failed: %s", err)
 			}
 		}
 	}
@@ -160,12 +162,12 @@ func CreateItems(f *framework.Framework, ns *v1.Namespace, items ...interface{})
 		description := describeItem(item)
 		// Uncomment this line to get a full dump of the entire item.
 		// description = fmt.Sprintf("%s:\n%s", description, PrettyPrint(item))
-		framework.Logf("creating %s", description)
+		e2eutils.Logf("creating %s", description)
 		for _, factory := range factories {
 			destructor, err := factory.Create(f, ns, item)
 			if destructor != nil {
 				destructors = append(destructors, func() error {
-					framework.Logf("deleting %s", description)
+					e2eutils.Logf("deleting %s", description)
 					return destructor()
 				})
 			}
@@ -413,7 +415,7 @@ func (*clusterRoleFactory) Create(f *framework.Framework, ns *v1.Namespace, i in
 		return nil, errorItemNotSupported
 	}
 
-	framework.Logf("Define cluster role %v", item.GetName())
+	e2eutils.Logf("Define cluster role %v", item.GetName())
 	client := f.ClientSet.RbacV1().ClusterRoles()
 	if _, err := client.Create(context.TODO(), item, metav1.CreateOptions{}); err != nil {
 		return nil, fmt.Errorf("create ClusterRole: %w", err)

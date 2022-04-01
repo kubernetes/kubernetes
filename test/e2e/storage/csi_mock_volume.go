@@ -26,6 +26,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	csipbv1 "github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -188,7 +191,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 		if tp.registerDriver {
 			err = waitForCSIDriver(cs, m.config.GetUniqueDriverName())
-			framework.ExpectNoError(err, "Failed to get CSIDriver %v", m.config.GetUniqueDriverName())
+			e2eutils.ExpectNoError(err, "Failed to get CSIDriver %v", m.config.GetUniqueDriverName())
 			m.testCleanups = append(m.testCleanups, func() {
 				destroyCSIDriver(cs, m.config.GetUniqueDriverName())
 			})
@@ -197,7 +200,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		// Wait for the CSIDriver actually get deployed and CSINode object to be generated.
 		// This indicates the mock CSI driver pod is up and running healthy.
 		err = drivers.WaitForCSIDriverRegistrationOnNode(m.config.ClientNodeSelection.Name, m.config.GetUniqueDriverName(), cs)
-		framework.ExpectNoError(err, "Failed to register CSIDriver %v", m.config.GetUniqueDriverName())
+		e2eutils.ExpectNoError(err, "Failed to register CSIDriver %v", m.config.GetUniqueDriverName())
 	}
 
 	type volumeType string
@@ -305,7 +308,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 					errs = append(errs, err)
 				}
 				if claim.Spec.VolumeName != "" {
-					errs = append(errs, e2epv.WaitForPersistentVolumeDeleted(cs, claim.Spec.VolumeName, framework.Poll, 2*time.Minute))
+					errs = append(errs, e2epv.WaitForPersistentVolumeDeleted(cs, claim.Spec.VolumeName, e2eutils.Poll, 2*time.Minute))
 				}
 			}
 		}
@@ -325,7 +328,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		}
 
 		err := utilerrors.NewAggregate(errs)
-		framework.ExpectNoError(err, "while cleaning up after test")
+		e2eutils.ExpectNoError(err, "while cleaning up after test")
 	}
 
 	// The CSIDriverRegistry feature gate is needed for this test in Kubernetes 1.12.
@@ -371,7 +374,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 					return
 				}
 				err = e2epod.WaitForPodNameRunningInNamespace(m.cs, pod.Name, pod.Namespace)
-				framework.ExpectNoError(err, "Failed to start pod: %v", err)
+				e2eutils.ExpectNoError(err, "Failed to start pod: %v", err)
 
 				ginkgo.By("Checking if VolumeAttachment was created for the pod")
 				testConfig := storageframework.ConvertTestConfig(m.config)
@@ -380,14 +383,14 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				if err != nil {
 					if apierrors.IsNotFound(err) {
 						if !test.disableAttach {
-							framework.ExpectNoError(err, "Expected VolumeAttachment but none was found")
+							e2eutils.ExpectNoError(err, "Expected VolumeAttachment but none was found")
 						}
 					} else {
-						framework.ExpectNoError(err, "Failed to find VolumeAttachment")
+						e2eutils.ExpectNoError(err, "Failed to find VolumeAttachment")
 					}
 				}
 				if test.disableAttach {
-					framework.ExpectError(err, "Unexpected VolumeAttachment found")
+					e2eutils.ExpectError(err, "Unexpected VolumeAttachment found")
 				}
 			})
 
@@ -417,9 +420,9 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			err = e2eevents.WaitTimeoutForEvent(m.cs, pod.Namespace, eventSelector, msg, f.Timeouts.PodStart)
 			if err != nil {
 				podErr := e2epod.WaitTimeoutForPodRunningInNamespace(m.cs, pod.Name, pod.Namespace, 10*time.Second)
-				framework.ExpectError(podErr, "Pod should not be in running status because attaching should failed")
+				e2eutils.ExpectError(podErr, "Pod should not be in running status because attaching should failed")
 				// Events are unreliable, don't depend on the event. It's used only to speed up the test.
-				framework.Logf("Attach should fail and the corresponding event should show up, error: %v", err)
+				e2eutils.Logf("Attach should fail and the corresponding event should show up, error: %v", err)
 			}
 
 			// VolumeAttachment should be created because the default value for CSI attachable is true
@@ -429,9 +432,9 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			_, err = m.cs.StorageV1().VolumeAttachments().Get(context.TODO(), attachmentName, metav1.GetOptions{})
 			if err != nil {
 				if apierrors.IsNotFound(err) {
-					framework.ExpectNoError(err, "Expected VolumeAttachment but none was found")
+					e2eutils.ExpectNoError(err, "Expected VolumeAttachment but none was found")
 				} else {
-					framework.ExpectNoError(err, "Failed to find VolumeAttachment")
+					e2eutils.ExpectNoError(err, "Failed to find VolumeAttachment")
 				}
 			}
 
@@ -448,19 +451,19 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				return utils.PatchCSIDeployment(f, o, item)
 			}, "test/e2e/testing-manifests/storage-csi/mock/csi-mock-driverinfo.yaml")
 			if err != nil {
-				framework.Failf("fail to deploy CSIDriver object: %v", err)
+				e2eutils.Failf("fail to deploy CSIDriver object: %v", err)
 			}
 			m.testCleanups = append(m.testCleanups, cleanupCSIDriver)
 
 			ginkgo.By("Wait for the pod in running status")
 			err = e2epod.WaitForPodNameRunningInNamespace(m.cs, pod.Name, pod.Namespace)
-			framework.ExpectNoError(err, "Failed to start pod: %v", err)
+			e2eutils.ExpectNoError(err, "Failed to start pod: %v", err)
 
 			ginkgo.By(fmt.Sprintf("Wait for the volumeattachment to be deleted up to %v", csiVolumeAttachmentTimeout))
 			// This step can be slow because we have to wait either a NodeUpdate event happens or
 			// the detachment for this volume timeout so that we can do a force detach.
 			err = e2evolume.WaitForVolumeAttachmentTerminated(attachmentName, m.cs, csiVolumeAttachmentTimeout)
-			framework.ExpectNoError(err, "Failed to delete VolumeAttachment: %v", err)
+			e2eutils.ExpectNoError(err, "Failed to delete VolumeAttachment: %v", err)
 		})
 	})
 
@@ -530,7 +533,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 					return
 				}
 				err = e2epod.WaitForPodNameRunningInNamespace(m.cs, pod.Name, pod.Namespace)
-				framework.ExpectNoError(err, "Failed to start pod: %v", err)
+				e2eutils.ExpectNoError(err, "Failed to start pod: %v", err)
 
 				// If we expect an ephemeral volume, the feature has to be enabled.
 				// Otherwise need to check if we expect pod info, because the content
@@ -539,16 +542,16 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				if test.expectPodInfo {
 					ginkgo.By("checking for CSIInlineVolumes feature")
 					csiInlineVolumesEnabled, err = testsuites.CSIInlineVolumesEnabled(m.cs, f.Timeouts, f.Namespace.Name)
-					framework.ExpectNoError(err, "failed to test for CSIInlineVolumes")
+					e2eutils.ExpectNoError(err, "failed to test for CSIInlineVolumes")
 				}
 
 				ginkgo.By("Deleting the previously created pod")
 				err = e2epod.DeletePodWithWait(m.cs, pod)
-				framework.ExpectNoError(err, "while deleting")
+				e2eutils.ExpectNoError(err, "while deleting")
 
 				ginkgo.By("Checking CSI driver logs")
 				err = checkPodLogs(m.driver.GetCalls, pod, test.expectPodInfo, test.expectEphemeral, csiInlineVolumesEnabled, false, 1)
-				framework.ExpectNoError(err)
+				e2eutils.ExpectNoError(err)
 			})
 		}
 	})
@@ -563,7 +566,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			driverName := m.config.GetUniqueDriverName()
 
 			csiNodeAttachLimit, err := checkCSINodeForLimits(nodeName, driverName, m.cs)
-			framework.ExpectNoError(err, "while checking limits in CSINode: %v", err)
+			e2eutils.ExpectNoError(err, "while checking limits in CSINode: %v", err)
 
 			gomega.Expect(csiNodeAttachLimit).To(gomega.BeNumerically("==", 2))
 
@@ -571,18 +574,18 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			gomega.Expect(pod1).NotTo(gomega.BeNil(), "while creating first pod")
 
 			err = e2epod.WaitForPodNameRunningInNamespace(m.cs, pod1.Name, pod1.Namespace)
-			framework.ExpectNoError(err, "Failed to start pod1: %v", err)
+			e2eutils.ExpectNoError(err, "Failed to start pod1: %v", err)
 
 			_, _, pod2 := createPod(pvcReference)
 			gomega.Expect(pod2).NotTo(gomega.BeNil(), "while creating second pod")
 
 			err = e2epod.WaitForPodNameRunningInNamespace(m.cs, pod2.Name, pod2.Namespace)
-			framework.ExpectNoError(err, "Failed to start pod2: %v", err)
+			e2eutils.ExpectNoError(err, "Failed to start pod2: %v", err)
 
 			_, _, pod3 := createPod(pvcReference)
 			gomega.Expect(pod3).NotTo(gomega.BeNil(), "while creating third pod")
 			err = waitForMaxVolumeCondition(pod3, m.cs)
-			framework.ExpectNoError(err, "while waiting for max volume condition on pod : %+v", pod3)
+			e2eutils.ExpectNoError(err, "while waiting for max volume condition on pod : %+v", pod3)
 		})
 
 		ginkgo.It("should report attach limit for generic ephemeral volume when persistent volume is attached [Slow]", func() {
@@ -594,7 +597,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			driverName := m.config.GetUniqueDriverName()
 
 			csiNodeAttachLimit, err := checkCSINodeForLimits(nodeName, driverName, m.cs)
-			framework.ExpectNoError(err, "while checking limits in CSINode: %v", err)
+			e2eutils.ExpectNoError(err, "while checking limits in CSINode: %v", err)
 
 			gomega.Expect(csiNodeAttachLimit).To(gomega.BeNumerically("==", 1))
 
@@ -602,12 +605,12 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			gomega.Expect(pod1).NotTo(gomega.BeNil(), "while creating pod with persistent volume")
 
 			err = e2epod.WaitForPodNameRunningInNamespace(m.cs, pod1.Name, pod1.Namespace)
-			framework.ExpectNoError(err, "Failed to start pod1: %v", err)
+			e2eutils.ExpectNoError(err, "Failed to start pod1: %v", err)
 
 			_, _, pod2 := createPod(genericEphemeral)
 			gomega.Expect(pod2).NotTo(gomega.BeNil(), "while creating pod with ephemeral volume")
 			err = waitForMaxVolumeCondition(pod2, m.cs)
-			framework.ExpectNoError(err, "while waiting for max volume condition on pod : %+v", pod2)
+			e2eutils.ExpectNoError(err, "while waiting for max volume condition on pod : %+v", pod2)
 		})
 
 		ginkgo.It("should report attach limit for persistent volume when generic ephemeral volume is attached [Slow]", func() {
@@ -619,7 +622,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			driverName := m.config.GetUniqueDriverName()
 
 			csiNodeAttachLimit, err := checkCSINodeForLimits(nodeName, driverName, m.cs)
-			framework.ExpectNoError(err, "while checking limits in CSINode: %v", err)
+			e2eutils.ExpectNoError(err, "while checking limits in CSINode: %v", err)
 
 			gomega.Expect(csiNodeAttachLimit).To(gomega.BeNumerically("==", 1))
 
@@ -627,12 +630,12 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			gomega.Expect(pod1).NotTo(gomega.BeNil(), "while creating pod with persistent volume")
 
 			err = e2epod.WaitForPodNameRunningInNamespace(m.cs, pod1.Name, pod1.Namespace)
-			framework.ExpectNoError(err, "Failed to start pod1: %v", err)
+			e2eutils.ExpectNoError(err, "Failed to start pod1: %v", err)
 
 			_, _, pod2 := createPod(pvcReference)
 			gomega.Expect(pod2).NotTo(gomega.BeNil(), "while creating pod with ephemeral volume")
 			err = waitForMaxVolumeCondition(pod2, m.cs)
-			framework.ExpectNoError(err, "while waiting for max volume condition on pod : %+v", pod2)
+			e2eutils.ExpectNoError(err, "while waiting for max volume condition on pod : %+v", pod2)
 		})
 	})
 
@@ -684,39 +687,39 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				sc, pvc, pod := createPod(pvcReference)
 				gomega.Expect(pod).NotTo(gomega.BeNil(), "while creating pod for resizing")
 
-				framework.ExpectEqual(*sc.AllowVolumeExpansion, true, "failed creating sc with allowed expansion")
+				e2eutils.ExpectEqual(*sc.AllowVolumeExpansion, true, "failed creating sc with allowed expansion")
 
 				err = e2epod.WaitForPodNameRunningInNamespace(m.cs, pod.Name, pod.Namespace)
-				framework.ExpectNoError(err, "Failed to start pod1: %v", err)
+				e2eutils.ExpectNoError(err, "Failed to start pod1: %v", err)
 
 				ginkgo.By("Expanding current pvc")
 				newSize := resource.MustParse("6Gi")
 				newPVC, err := testsuites.ExpandPVCSize(pvc, newSize, m.cs)
-				framework.ExpectNoError(err, "While updating pvc for more size")
+				e2eutils.ExpectNoError(err, "While updating pvc for more size")
 				pvc = newPVC
 				gomega.Expect(pvc).NotTo(gomega.BeNil())
 
 				pvcSize := pvc.Spec.Resources.Requests[v1.ResourceStorage]
 				if pvcSize.Cmp(newSize) != 0 {
-					framework.Failf("error updating pvc size %q", pvc.Name)
+					e2eutils.Failf("error updating pvc size %q", pvc.Name)
 				}
 				if test.expectFailure {
 					err = testsuites.WaitForResizingCondition(pvc, m.cs, csiResizingConditionWait)
-					framework.ExpectError(err, "unexpected resizing condition on PVC")
+					e2eutils.ExpectError(err, "unexpected resizing condition on PVC")
 					return
 				}
 
 				ginkgo.By("Waiting for persistent volume resize to finish")
 				err = testsuites.WaitForControllerVolumeResize(pvc, m.cs, csiResizeWaitPeriod)
-				framework.ExpectNoError(err, "While waiting for CSI PV resize to finish")
+				e2eutils.ExpectNoError(err, "While waiting for CSI PV resize to finish")
 
 				checkPVCSize := func() {
 					ginkgo.By("Waiting for PVC resize to finish")
 					pvc, err = testsuites.WaitForFSResize(pvc, m.cs)
-					framework.ExpectNoError(err, "while waiting for PVC resize to finish")
+					e2eutils.ExpectNoError(err, "while waiting for PVC resize to finish")
 
 					pvcConditions := pvc.Status.Conditions
-					framework.ExpectEqual(len(pvcConditions), 0, "pvc should not have conditions")
+					e2eutils.ExpectEqual(len(pvcConditions), 0, "pvc should not have conditions")
 				}
 
 				// if node expansion is not required PVC should be resized as well
@@ -725,22 +728,22 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				} else {
 					ginkgo.By("Checking for conditions on pvc")
 					npvc, err := testsuites.WaitForPendingFSResizeCondition(pvc, m.cs)
-					framework.ExpectNoError(err, "While waiting for pvc to have fs resizing condition")
+					e2eutils.ExpectNoError(err, "While waiting for pvc to have fs resizing condition")
 					pvc = npvc
 
 					inProgressConditions := pvc.Status.Conditions
 					if len(inProgressConditions) > 0 {
-						framework.ExpectEqual(inProgressConditions[0].Type, v1.PersistentVolumeClaimFileSystemResizePending, "pvc must have fs resizing condition")
+						e2eutils.ExpectEqual(inProgressConditions[0].Type, v1.PersistentVolumeClaimFileSystemResizePending, "pvc must have fs resizing condition")
 					}
 
 					ginkgo.By("Deleting the previously created pod")
 					err = e2epod.DeletePodWithWait(m.cs, pod)
-					framework.ExpectNoError(err, "while deleting pod for resizing")
+					e2eutils.ExpectNoError(err, "while deleting pod for resizing")
 
 					ginkgo.By("Creating a new pod with same volume")
 					pod2, err := createPodWithPVC(pvc)
 					gomega.Expect(pod2).NotTo(gomega.BeNil(), "while creating pod for csi resizing")
-					framework.ExpectNoError(err, "while recreating pod for resizing")
+					e2eutils.ExpectNoError(err, "while recreating pod for resizing")
 
 					checkPVCSize()
 				}
@@ -777,33 +780,33 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				sc, pvc, pod := createPod(pvcReference)
 				gomega.Expect(pod).NotTo(gomega.BeNil(), "while creating pod for resizing")
 
-				framework.ExpectEqual(*sc.AllowVolumeExpansion, true, "failed creating sc with allowed expansion")
+				e2eutils.ExpectEqual(*sc.AllowVolumeExpansion, true, "failed creating sc with allowed expansion")
 
 				err = e2epod.WaitForPodNameRunningInNamespace(m.cs, pod.Name, pod.Namespace)
-				framework.ExpectNoError(err, "Failed to start pod1: %v", err)
+				e2eutils.ExpectNoError(err, "Failed to start pod1: %v", err)
 
 				ginkgo.By("Expanding current pvc")
 				newSize := resource.MustParse("6Gi")
 				newPVC, err := testsuites.ExpandPVCSize(pvc, newSize, m.cs)
-				framework.ExpectNoError(err, "While updating pvc for more size")
+				e2eutils.ExpectNoError(err, "While updating pvc for more size")
 				pvc = newPVC
 				gomega.Expect(pvc).NotTo(gomega.BeNil())
 
 				pvcSize := pvc.Spec.Resources.Requests[v1.ResourceStorage]
 				if pvcSize.Cmp(newSize) != 0 {
-					framework.Failf("error updating pvc size %q", pvc.Name)
+					e2eutils.Failf("error updating pvc size %q", pvc.Name)
 				}
 
 				ginkgo.By("Waiting for persistent volume resize to finish")
 				err = testsuites.WaitForControllerVolumeResize(pvc, m.cs, csiResizeWaitPeriod)
-				framework.ExpectNoError(err, "While waiting for PV resize to finish")
+				e2eutils.ExpectNoError(err, "While waiting for PV resize to finish")
 
 				ginkgo.By("Waiting for PVC resize to finish")
 				pvc, err = testsuites.WaitForFSResize(pvc, m.cs)
-				framework.ExpectNoError(err, "while waiting for PVC to finish")
+				e2eutils.ExpectNoError(err, "while waiting for PVC to finish")
 
 				pvcConditions := pvc.Status.Conditions
-				framework.ExpectEqual(len(pvcConditions), 0, "pvc should not have conditions")
+				e2eutils.ExpectEqual(len(pvcConditions), 0, "pvc should not have conditions")
 
 			})
 		}
@@ -920,8 +923,8 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 					return
 				}
 				// Wait for PVC to get bound to make sure the CSI driver is fully started.
-				err := e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, f.ClientSet, f.Namespace.Name, claim.Name, time.Second, framework.ClaimProvisionTimeout)
-				framework.ExpectNoError(err, "while waiting for PVC to get provisioned")
+				err := e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, f.ClientSet, f.Namespace.Name, claim.Name, time.Second, e2eutils.ClaimProvisionTimeout)
+				e2eutils.ExpectNoError(err, "while waiting for PVC to get provisioned")
 
 				ginkgo.By("Waiting for expected CSI calls")
 				// Watch for all calls up to deletePod = true
@@ -929,11 +932,11 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				defer cancel()
 				for {
 					if ctx.Err() != nil {
-						framework.Failf("timed out waiting for the CSI call that indicates that the pod can be deleted: %v", test.expectedCalls)
+						e2eutils.Failf("timed out waiting for the CSI call that indicates that the pod can be deleted: %v", test.expectedCalls)
 					}
 					time.Sleep(1 * time.Second)
 					_, index, err := compareCSICalls(trackedCalls, test.expectedCalls, m.driver.GetCalls)
-					framework.ExpectNoError(err, "while waiting for initial CSI calls")
+					e2eutils.ExpectNoError(err, "while waiting for initial CSI calls")
 					if index == 0 {
 						// No CSI call received yet
 						continue
@@ -947,12 +950,12 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				if test.expectPodRunning {
 					ginkgo.By("Waiting for pod to be running")
 					err := e2epod.WaitForPodNameRunningInNamespace(m.cs, pod.Name, pod.Namespace)
-					framework.ExpectNoError(err, "Failed to start pod: %v", err)
+					e2eutils.ExpectNoError(err, "Failed to start pod: %v", err)
 				}
 
 				ginkgo.By("Deleting the previously created pod")
 				err = e2epod.DeletePodWithWait(m.cs, pod)
-				framework.ExpectNoError(err, "while deleting")
+				e2eutils.ExpectNoError(err, "while deleting")
 
 				ginkgo.By("Waiting for all remaining expected CSI calls")
 				err = wait.Poll(time.Second, csiUnstageWaitTimeout, func() (done bool, err error) {
@@ -970,7 +973,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 					}
 					return false, nil
 				})
-				framework.ExpectNoError(err, "while waiting for all CSI calls")
+				e2eutils.ExpectNoError(err, "while waiting for all CSI calls")
 			})
 		}
 	})
@@ -1058,23 +1061,23 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 					return
 				}
 				// Wait for PVC to get bound to make sure the CSI driver is fully started.
-				err := e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, f.ClientSet, f.Namespace.Name, claim.Name, time.Second, framework.ClaimProvisionTimeout)
-				framework.ExpectNoError(err, "while waiting for PVC to get provisioned")
+				err := e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, f.ClientSet, f.Namespace.Name, claim.Name, time.Second, e2eutils.ClaimProvisionTimeout)
+				e2eutils.ExpectNoError(err, "while waiting for PVC to get provisioned")
 				err = e2epod.WaitForPodNameRunningInNamespace(m.cs, pod.Name, pod.Namespace)
-				framework.ExpectNoError(err, "while waiting for the first pod to start")
+				e2eutils.ExpectNoError(err, "while waiting for the first pod to start")
 				err = e2epod.DeletePodWithWait(m.cs, pod)
-				framework.ExpectNoError(err, "while deleting the first pod")
+				e2eutils.ExpectNoError(err, "while deleting the first pod")
 
 				// Create the second pod
 				pod, err = createPodWithPVC(claim)
-				framework.ExpectNoError(err, "while creating the second pod")
+				e2eutils.ExpectNoError(err, "while creating the second pod")
 				err = e2epod.WaitForPodNameRunningInNamespace(m.cs, pod.Name, pod.Namespace)
-				framework.ExpectNoError(err, "while waiting for the second pod to start")
+				e2eutils.ExpectNoError(err, "while waiting for the second pod to start")
 				// The second pod is running and kubelet can't call NodeUnstage of the first one.
 				// Therefore incrementing the pod counter is safe here.
 				atomic.AddInt64(&deletedPodNumber, 1)
 				err = e2epod.DeletePodWithWait(m.cs, pod)
-				framework.ExpectNoError(err, "while deleting the second pod")
+				e2eutils.ExpectNoError(err, "while deleting the second pod")
 
 				ginkgo.By("Waiting for all remaining expected CSI calls")
 				err = wait.Poll(time.Second, csiUnstageWaitTimeout, func() (done bool, err error) {
@@ -1092,7 +1095,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 					}
 					return false, nil
 				})
-				framework.ExpectNoError(err, "while waiting for all CSI calls")
+				e2eutils.ExpectNoError(err, "while waiting for all CSI calls")
 			})
 		}
 	})
@@ -1189,14 +1192,14 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				// This is important because below the test is going to make assertions about the
 				// PVC state changes.
 				initResource, err := f.ClientSet.CoreV1().PersistentVolumeClaims(f.Namespace.Name).List(ctx, metav1.ListOptions{})
-				framework.ExpectNoError(err, "Failed to fetch initial PVC resource")
+				e2eutils.ExpectNoError(err, "Failed to fetch initial PVC resource")
 				listWatcher := &cachetools.ListWatch{
 					WatchFunc: func(listOptions metav1.ListOptions) (watch.Interface, error) {
 						return f.ClientSet.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Watch(ctx, listOptions)
 					},
 				}
 				pvcWatch, err := watchtools.NewRetryWatcher(initResource.GetResourceVersion(), listWatcher)
-				framework.ExpectNoError(err, "create PVC watch")
+				e2eutils.ExpectNoError(err, "create PVC watch")
 				defer pvcWatch.Stop()
 
 				sc, claim, pod := createPod(pvcReference)
@@ -1205,14 +1208,14 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				if test.lateBinding {
 					bindingMode = storagev1.VolumeBindingWaitForFirstConsumer
 				}
-				framework.ExpectEqual(*sc.VolumeBindingMode, bindingMode, "volume binding mode")
+				e2eutils.ExpectEqual(*sc.VolumeBindingMode, bindingMode, "volume binding mode")
 
 				err = e2epod.WaitForPodNameRunningInNamespace(m.cs, pod.Name, pod.Namespace)
-				framework.ExpectNoError(err, "failed to start pod")
+				e2eutils.ExpectNoError(err, "failed to start pod")
 				err = e2epod.DeletePodWithWait(m.cs, pod)
-				framework.ExpectNoError(err, "failed to delete pod")
+				e2eutils.ExpectNoError(err, "failed to delete pod")
 				err = m.cs.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(ctx, claim.Name, metav1.DeleteOptions{})
-				framework.ExpectNoError(err, "failed to delete claim")
+				e2eutils.ExpectNoError(err, "failed to delete claim")
 
 				normal := []csiCall{}
 				for _, method := range deterministicCalls {
@@ -1247,7 +1250,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 					}
 					return false, nil
 				}, ctx.Done())
-				framework.ExpectNoError(err, "while waiting for all CSI calls")
+				e2eutils.ExpectNoError(err, "while waiting for all CSI calls")
 
 				// The capacity error is dealt with in two different ways.
 				//
@@ -1273,12 +1276,12 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 							break loop
 						}
 
-						framework.Logf("PVC event %s: %#v", event.Type, event.Object)
+						e2eutils.Logf("PVC event %s: %#v", event.Type, event.Object)
 						switch event.Type {
 						case watch.Modified:
 							pvc, ok := event.Object.(*v1.PersistentVolumeClaim)
 							if !ok {
-								framework.Failf("PVC watch sent %#v instead of a PVC", event.Object)
+								e2eutils.Failf("PVC watch sent %#v instead of a PVC", event.Object)
 							}
 							_, set := pvc.Annotations["volume.kubernetes.io/selected-node"]
 							if set {
@@ -1293,7 +1296,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 							break
 						}
 					case <-ctx.Done():
-						framework.Failf("Timeout while waiting to observe PVC list")
+						e2eutils.Failf("Timeout while waiting to observe PVC list")
 					}
 				}
 
@@ -1311,7 +1314,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 						// If the watch failed or stopped prematurely (which can happen at any time), then we cannot
 						// verify whether the annotation was set as expected. This is still considered a successful
 						// test.
-						framework.Logf("PVC watch delivered incomplete data, cannot check annotation")
+						e2eutils.Logf("PVC watch delivered incomplete data, cannot check annotation")
 					case test.lateBinding:
 						gomega.Expect(nodeAnnotationSet).To(gomega.BeTrue(), "selected-node should have been set")
 						// Whether it gets reset depends on whether we have topology enabled. Without
@@ -1398,7 +1401,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 						Capacity:         &capacityQuantity,
 					}
 					createdCapacity, err := f.ClientSet.StorageV1().CSIStorageCapacities(f.Namespace.Name).Create(context.Background(), capacity, metav1.CreateOptions{})
-					framework.ExpectNoError(err, "create CSIStorageCapacity %+v", *capacity)
+					e2eutils.ExpectNoError(err, "create CSIStorageCapacity %+v", *capacity)
 					m.testCleanups = append(m.testCleanups, func() {
 						f.ClientSet.StorageV1().CSIStorageCapacities(f.Namespace.Name).Delete(context.Background(), createdCapacity.Name, metav1.DeleteOptions{})
 					})
@@ -1410,7 +1413,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				time.Sleep(syncDelay)
 
 				sc, _, pod := createPod(pvcReference) // late binding as specified above
-				framework.ExpectEqual(sc.Name, scName, "pre-selected storage class name not used")
+				e2eutils.ExpectEqual(sc.Name, scName, "pre-selected storage class name not used")
 
 				waitCtx, cancel := context.WithTimeout(context.Background(), f.Timeouts.PodStart)
 				defer cancel()
@@ -1429,17 +1432,17 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 						errors.Is(err, errNotEnoughSpace):
 						// Okay, we expected that.
 					case err == nil:
-						framework.Fail("pod unexpectedly started to run")
+						e2eutils.Fail("pod unexpectedly started to run")
 					default:
-						framework.Failf("unexpected error while waiting for pod: %v", err)
+						e2eutils.Failf("unexpected error while waiting for pod: %v", err)
 					}
 				} else {
-					framework.ExpectNoError(err, "failed to start pod")
+					e2eutils.ExpectNoError(err, "failed to start pod")
 				}
 
 				ginkgo.By("Deleting the previously created pod")
 				err = e2epod.DeletePodWithWait(m.cs, pod)
-				framework.ExpectNoError(err, "while deleting")
+				e2eutils.ExpectNoError(err, "while deleting")
 			})
 		}
 	})
@@ -1484,7 +1487,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				sc := m.driver.GetDynamicProvisionStorageClass(m.config, "")
 				ginkgo.By("Creating storage class")
 				class, err := m.cs.StorageV1().StorageClasses().Create(context.TODO(), sc, metav1.CreateOptions{})
-				framework.ExpectNoError(err, "Failed to create class: %v", err)
+				e2eutils.ExpectNoError(err, "Failed to create class: %v", err)
 				m.sc[class.Name] = class
 				claim := e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 					// Use static name so that the volumesnapshot can be created before the pvc.
@@ -1496,35 +1499,35 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				// TODO: Test VolumeSnapshots with Retain policy
 				parameters := map[string]string{}
 				snapshotClass, snapshot := storageframework.CreateSnapshot(sDriver, m.config, storageframework.DynamicSnapshotDelete, claim.Name, claim.Namespace, f.Timeouts, parameters)
-				framework.ExpectNoError(err, "failed to create snapshot")
+				e2eutils.ExpectNoError(err, "failed to create snapshot")
 				m.vsc[snapshotClass.GetName()] = snapshotClass
 				volumeSnapshotName := snapshot.GetName()
 
 				ginkgo.By(fmt.Sprintf("Creating PVC %s/%s", claim.Namespace, claim.Name))
 				claim, err = m.cs.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Create(context.TODO(), claim, metav1.CreateOptions{})
-				framework.ExpectNoError(err, "Failed to create claim: %v", err)
+				e2eutils.ExpectNoError(err, "Failed to create claim: %v", err)
 
 				ginkgo.By(fmt.Sprintf("Wait for finalizer to be added to claim %s/%s", claim.Namespace, claim.Name))
 				err = e2epv.WaitForPVCFinalizer(ctx, m.cs, claim.Name, claim.Namespace, pvcAsSourceProtectionFinalizer, 1*time.Millisecond, 1*time.Minute)
-				framework.ExpectNoError(err)
+				e2eutils.ExpectNoError(err)
 
 				ginkgo.By("Wait for PVC to be Bound")
 				_, err = e2epv.WaitForPVClaimBoundPhase(m.cs, []*v1.PersistentVolumeClaim{claim}, 1*time.Minute)
-				framework.ExpectNoError(err, "Failed to create claim: %v", err)
+				e2eutils.ExpectNoError(err, "Failed to create claim: %v", err)
 
 				ginkgo.By(fmt.Sprintf("Delete PVC %s", claim.Name))
 				err = e2epv.DeletePersistentVolumeClaim(m.cs, claim.Name, claim.Namespace)
-				framework.ExpectNoError(err, "failed to delete pvc")
+				e2eutils.ExpectNoError(err, "failed to delete pvc")
 
 				ginkgo.By("Get PVC from API server and verify deletion timestamp is set")
 				claim, err = m.cs.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Get(context.TODO(), claim.Name, metav1.GetOptions{})
 				if err != nil {
 					if !apierrors.IsNotFound(err) {
-						framework.ExpectNoError(err, "Failed to get claim: %v", err)
+						e2eutils.ExpectNoError(err, "Failed to get claim: %v", err)
 					}
-					framework.Logf("PVC not found. Continuing to test VolumeSnapshotContent finalizer")
+					e2eutils.Logf("PVC not found. Continuing to test VolumeSnapshotContent finalizer")
 				} else if claim.DeletionTimestamp == nil {
-					framework.Failf("Expected deletion timestamp to be set on PVC: %v", claim)
+					e2eutils.Failf("Expected deletion timestamp to be set on PVC: %v", claim)
 				}
 
 				ginkgo.By(fmt.Sprintf("Get VolumeSnapshotContent bound to VolumeSnapshot %s", snapshot.GetName()))
@@ -1533,18 +1536,18 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 				ginkgo.By(fmt.Sprintf("Verify VolumeSnapshotContent %s contains finalizer %s", snapshot.GetName(), volumeSnapshotContentFinalizer))
 				err = utils.WaitForGVRFinalizer(ctx, m.config.Framework.DynamicClient, utils.SnapshotContentGVR, volumeSnapshotContentName, "", volumeSnapshotContentFinalizer, 1*time.Millisecond, 1*time.Minute)
-				framework.ExpectNoError(err)
+				e2eutils.ExpectNoError(err)
 
 				ginkgo.By(fmt.Sprintf("Delete VolumeSnapshotContent %s", snapshotContent.GetName()))
 				err = m.config.Framework.DynamicClient.Resource(utils.SnapshotContentGVR).Delete(ctx, snapshotContent.GetName(), metav1.DeleteOptions{})
-				framework.ExpectNoError(err, "Failed to delete snapshotcontent: %v", err)
+				e2eutils.ExpectNoError(err, "Failed to delete snapshotcontent: %v", err)
 
 				ginkgo.By("Get VolumeSnapshotContent from API server and verify deletion timestamp is set")
 				snapshotContent, err = m.config.Framework.DynamicClient.Resource(utils.SnapshotContentGVR).Get(context.TODO(), snapshotContent.GetName(), metav1.GetOptions{})
-				framework.ExpectNoError(err)
+				e2eutils.ExpectNoError(err)
 
 				if snapshotContent.GetDeletionTimestamp() == nil {
-					framework.Failf("Expected deletion timestamp to be set on snapshotcontent")
+					e2eutils.Failf("Expected deletion timestamp to be set on snapshotcontent")
 				}
 
 				// If the claim is non existent, the Get() call on the API server returns
@@ -1552,21 +1555,21 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				// Refer https://github.com/kubernetes/kubernetes/pull/99167#issuecomment-781670012
 				if claim != nil && claim.Spec.VolumeName != "" {
 					ginkgo.By(fmt.Sprintf("Wait for PV %s to be deleted", claim.Spec.VolumeName))
-					err = e2epv.WaitForPersistentVolumeDeleted(m.cs, claim.Spec.VolumeName, framework.Poll, 3*time.Minute)
-					framework.ExpectNoError(err, fmt.Sprintf("failed to delete PV %s", claim.Spec.VolumeName))
+					err = e2epv.WaitForPersistentVolumeDeleted(m.cs, claim.Spec.VolumeName, e2eutils.Poll, 3*time.Minute)
+					e2eutils.ExpectNoError(err, fmt.Sprintf("failed to delete PV %s", claim.Spec.VolumeName))
 				}
 
 				ginkgo.By(fmt.Sprintf("Verify VolumeSnapshot %s contains finalizer %s", snapshot.GetName(), volumeSnapshotBoundFinalizer))
 				err = utils.WaitForGVRFinalizer(ctx, m.config.Framework.DynamicClient, utils.SnapshotGVR, volumeSnapshotName, f.Namespace.Name, volumeSnapshotBoundFinalizer, 1*time.Millisecond, 1*time.Minute)
-				framework.ExpectNoError(err)
+				e2eutils.ExpectNoError(err)
 
 				ginkgo.By("Delete VolumeSnapshot")
-				err = utils.DeleteAndWaitSnapshot(m.config.Framework.DynamicClient, f.Namespace.Name, volumeSnapshotName, framework.Poll, framework.SnapshotDeleteTimeout)
-				framework.ExpectNoError(err, fmt.Sprintf("failed to delete VolumeSnapshot %s", volumeSnapshotName))
+				err = utils.DeleteAndWaitSnapshot(m.config.Framework.DynamicClient, f.Namespace.Name, volumeSnapshotName, e2eutils.Poll, e2eutils.SnapshotDeleteTimeout)
+				e2eutils.ExpectNoError(err, fmt.Sprintf("failed to delete VolumeSnapshot %s", volumeSnapshotName))
 
 				ginkgo.By(fmt.Sprintf("Wait for VolumeSnapshotContent %s to be deleted", volumeSnapshotContentName))
-				err = utils.WaitForGVRDeletion(m.config.Framework.DynamicClient, utils.SnapshotContentGVR, volumeSnapshotContentName, framework.Poll, framework.SnapshotDeleteTimeout)
-				framework.ExpectNoError(err, fmt.Sprintf("failed to delete VolumeSnapshotContent %s", volumeSnapshotContentName))
+				err = utils.WaitForGVRDeletion(m.config.Framework.DynamicClient, utils.SnapshotContentGVR, volumeSnapshotContentName, e2eutils.Poll, e2eutils.SnapshotDeleteTimeout)
+				e2eutils.ExpectNoError(err, fmt.Sprintf("failed to delete VolumeSnapshotContent %s", volumeSnapshotContentName))
 			})
 		}
 	})
@@ -1613,7 +1616,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 					return
 				}
 				err = e2epod.WaitForPodNameRunningInNamespace(m.cs, pod.Name, pod.Namespace)
-				framework.ExpectNoError(err, "Failed to start pod: %v", err)
+				e2eutils.ExpectNoError(err, "Failed to start pod: %v", err)
 
 				// sleep to make sure RequiresRepublish triggers more than 1 NodePublishVolume
 				numNodePublishVolume := 1
@@ -1624,11 +1627,11 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 				ginkgo.By("Deleting the previously created pod")
 				err = e2epod.DeletePodWithWait(m.cs, pod)
-				framework.ExpectNoError(err, "while deleting")
+				e2eutils.ExpectNoError(err, "while deleting")
 
 				ginkgo.By("Checking CSI driver logs")
 				err = checkPodLogs(m.driver.GetCalls, pod, false, false, false, test.deployCSIDriverObject && csiServiceAccountTokenEnabled, numNodePublishVolume)
-				framework.ExpectNoError(err)
+				e2eutils.ExpectNoError(err)
 			})
 		}
 	})
@@ -1658,7 +1661,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		for _, t := range tests {
 			test := t
 			ginkgo.It(test.name, func() {
-				if framework.NodeOSDistroIs("windows") {
+				if e2eutils.NodeOSDistroIs("windows") {
 					e2eskipper.Skipf("FSGroupPolicy is only applied on linux nodes -- skipping")
 				}
 				init(testParameters{
@@ -1683,24 +1686,24 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				fileName := dirName + "/" + f.UniqueName
 
 				err := e2epod.WaitForPodNameRunningInNamespace(m.cs, pod.Name, pod.Namespace)
-				framework.ExpectNoError(err, "failed to start pod")
+				e2eutils.ExpectNoError(err, "failed to start pod")
 
 				// Create the subdirectory to ensure that fsGroup propagates
 				createDirectory := fmt.Sprintf("mkdir %s", dirName)
-				_, _, err = e2evolume.PodExec(f, pod, createDirectory)
-				framework.ExpectNoError(err, "failed: creating the directory: %s", err)
+				_, _, err = e2evolume.PodExec(f.ClientSet, f.Namespace.Name, pod, createDirectory)
+				e2eutils.ExpectNoError(err, "failed: creating the directory: %s", err)
 
 				// Inject the contents onto the mount
 				createFile := fmt.Sprintf("echo '%s' > '%s'; sync", "filecontents", fileName)
-				_, _, err = e2evolume.PodExec(f, pod, createFile)
-				framework.ExpectNoError(err, "failed: writing the contents: %s", err)
+				_, _, err = e2evolume.PodExec(f.ClientSet, f.Namespace.Name, pod, createFile)
+				e2eutils.ExpectNoError(err, "failed: writing the contents: %s", err)
 
 				// Delete the created file. This step is mandatory, as the mock driver
 				// won't clean up the contents automatically.
 				defer func() {
 					delete := fmt.Sprintf("rm -fr %s", dirName)
-					_, _, err = e2evolume.PodExec(f, pod, delete)
-					framework.ExpectNoError(err, "failed: deleting the directory: %s", err)
+					_, _, err = e2evolume.PodExec(f.ClientSet, f.Namespace.Name, pod, delete)
+					e2eutils.ExpectNoError(err, "failed: deleting the directory: %s", err)
 				}()
 
 				// Ensure that the fsGroup matches what we expect
@@ -1734,7 +1737,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			test := t
 			ginkgo.It(test.name, func() {
 				var nodeStageFsGroup, nodePublishFsGroup string
-				if framework.NodeOSDistroIs("windows") {
+				if e2eutils.NodeOSDistroIs("windows") {
 					e2eskipper.Skipf("FSGroupPolicy is only applied on linux nodes -- skipping")
 				}
 				init(testParameters{
@@ -1752,14 +1755,14 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				_, _, pod := createPodWithFSGroup(fsGroup) /* persistent volume */
 
 				err := e2epod.WaitForPodNameRunningInNamespace(m.cs, pod.Name, pod.Namespace)
-				framework.ExpectNoError(err, "failed to start pod")
+				e2eutils.ExpectNoError(err, "failed to start pod")
 
 				if t.enableVolumeMountGroup {
-					framework.ExpectEqual(nodeStageFsGroup, fsGroupStr, "Expect NodeStageVolumeRequest.VolumeCapability.MountVolume.VolumeMountGroup to equal %q; got: %q", fsGroupStr, nodeStageFsGroup)
-					framework.ExpectEqual(nodePublishFsGroup, fsGroupStr, "Expect NodePublishVolumeRequest.VolumeCapability.MountVolume.VolumeMountGroup to equal %q; got: %q", fsGroupStr, nodePublishFsGroup)
+					e2eutils.ExpectEqual(nodeStageFsGroup, fsGroupStr, "Expect NodeStageVolumeRequest.VolumeCapability.MountVolume.VolumeMountGroup to equal %q; got: %q", fsGroupStr, nodeStageFsGroup)
+					e2eutils.ExpectEqual(nodePublishFsGroup, fsGroupStr, "Expect NodePublishVolumeRequest.VolumeCapability.MountVolume.VolumeMountGroup to equal %q; got: %q", fsGroupStr, nodePublishFsGroup)
 				} else {
-					framework.ExpectEmpty(nodeStageFsGroup, "Expect NodeStageVolumeRequest.VolumeCapability.MountVolume.VolumeMountGroup to be empty; got: %q", nodeStageFsGroup)
-					framework.ExpectEmpty(nodePublishFsGroup, "Expect NodePublishVolumeRequest.VolumeCapability.MountVolume.VolumeMountGroup to empty; got: %q", nodePublishFsGroup)
+					e2eutils.ExpectEmpty(nodeStageFsGroup, "Expect NodeStageVolumeRequest.VolumeCapability.MountVolume.VolumeMountGroup to be empty; got: %q", nodeStageFsGroup)
+					e2eutils.ExpectEmpty(nodePublishFsGroup, "Expect NodePublishVolumeRequest.VolumeCapability.MountVolume.VolumeMountGroup to empty; got: %q", nodePublishFsGroup)
 				}
 			})
 		}
@@ -1819,7 +1822,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				}
 				ginkgo.By("Creating storage class")
 				class, err := m.cs.StorageV1().StorageClasses().Create(context.TODO(), sc, metav1.CreateOptions{})
-				framework.ExpectNoError(err, "Failed to create storage class: %v", err)
+				e2eutils.ExpectNoError(err, "Failed to create storage class: %v", err)
 				m.sc[class.Name] = class
 				pvc := e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 					Name:             "snapshot-test-pvc",
@@ -1828,11 +1831,11 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 				ginkgo.By(fmt.Sprintf("Creating PVC %s/%s", pvc.Namespace, pvc.Name))
 				pvc, err = m.cs.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Create(context.TODO(), pvc, metav1.CreateOptions{})
-				framework.ExpectNoError(err, "Failed to create claim: %v", err)
+				e2eutils.ExpectNoError(err, "Failed to create claim: %v", err)
 
 				ginkgo.By("Wait for PVC to be Bound")
 				_, err = e2epv.WaitForPVClaimBoundPhase(m.cs, []*v1.PersistentVolumeClaim{pvc}, 1*time.Minute)
-				framework.ExpectNoError(err, "Failed to create claim: %v", err)
+				e2eutils.ExpectNoError(err, "Failed to create claim: %v", err)
 
 				m.pvcs = append(m.pvcs, pvc)
 
@@ -1848,7 +1851,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				}
 
 				if secret, err := m.cs.CoreV1().Secrets(f.Namespace.Name).Create(context.TODO(), secret, metav1.CreateOptions{}); err != nil {
-					framework.Failf("unable to create test secret %s: %v", secret.Name, err)
+					e2eutils.Failf("unable to create test secret %s: %v", secret.Name, err)
 				}
 
 				ginkgo.By("Creating snapshot with secrets")
@@ -1858,10 +1861,10 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				}
 
 				_, snapshot := storageframework.CreateSnapshot(sDriver, m.config, storageframework.DynamicSnapshotDelete, pvc.Name, pvc.Namespace, f.Timeouts, parameters)
-				framework.ExpectNoError(err, "failed to create snapshot")
+				e2eutils.ExpectNoError(err, "failed to create snapshot")
 				snapshotcontent := utils.GetSnapshotContentFromSnapshot(m.config.Framework.DynamicClient, snapshot)
 				if annotations, ok = snapshotcontent.Object["metadata"].(map[string]interface{})["annotations"]; !ok {
-					framework.Failf("Unable to get volume snapshot content annotations")
+					e2eutils.Failf("Unable to get volume snapshot content annotations")
 				}
 
 				// checks if delete snapshot secrets annotation is applied to the VolumeSnapshotContent.
@@ -1903,11 +1906,11 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 				metricsGrabber, err := e2emetrics.NewMetricsGrabber(m.config.Framework.ClientSet, nil, f.ClientConfig(), false, false, false, false, false, true)
 				if err != nil {
-					framework.Failf("Error creating metrics grabber : %v", err)
+					e2eutils.Failf("Error creating metrics grabber : %v", err)
 				}
 
 				// Grab initial metrics - if this fails, snapshot controller metrics are not setup. Skip in this case.
-				_, err = metricsGrabber.GrabFromSnapshotController(framework.TestContext.SnapshotControllerPodName, framework.TestContext.SnapshotControllerHTTPPort)
+				_, err = metricsGrabber.GrabFromSnapshotController(e2econfig.TestContext.SnapshotControllerPodName, e2econfig.TestContext.SnapshotControllerHTTPPort)
 				if err != nil {
 					e2eskipper.Skipf("Snapshot controller metrics not found -- skipping")
 				}
@@ -1936,7 +1939,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 					sc = dDriver.GetDynamicProvisionStorageClass(m.config, "")
 				}
 				class, err := m.cs.StorageV1().StorageClasses().Create(context.TODO(), sc, metav1.CreateOptions{})
-				framework.ExpectNoError(err, "Failed to create storage class: %v", err)
+				e2eutils.ExpectNoError(err, "Failed to create storage class: %v", err)
 				m.sc[class.Name] = class
 				pvc := e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 					Name:             "snapshot-test-pvc",
@@ -1945,23 +1948,23 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 				ginkgo.By(fmt.Sprintf("Creating PVC %s/%s", pvc.Namespace, pvc.Name))
 				pvc, err = m.cs.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Create(context.TODO(), pvc, metav1.CreateOptions{})
-				framework.ExpectNoError(err, "Failed to create claim: %v", err)
+				e2eutils.ExpectNoError(err, "Failed to create claim: %v", err)
 
 				ginkgo.By("Wait for PVC to be Bound")
 				_, err = e2epv.WaitForPVClaimBoundPhase(m.cs, []*v1.PersistentVolumeClaim{pvc}, 1*time.Minute)
-				framework.ExpectNoError(err, "Failed to create claim: %v", err)
+				e2eutils.ExpectNoError(err, "Failed to create claim: %v", err)
 
 				ginkgo.By("Creating snapshot")
 				parameters := map[string]string{}
 				sr := storageframework.CreateSnapshotResource(sDriver, m.config, test.pattern, pvc.Name, pvc.Namespace, f.Timeouts, parameters)
-				framework.ExpectNoError(err, "failed to create snapshot")
+				e2eutils.ExpectNoError(err, "failed to create snapshot")
 
 				ginkgo.By("Checking for CreateSnapshot metrics")
 				createSnapshotMetrics.waitForSnapshotControllerMetric(originalCreateSnapshotCount+1.0, f.Timeouts.SnapshotControllerMetrics)
 
 				ginkgo.By("Checking for CreateSnapshotAndReady metrics")
-				err = utils.WaitForSnapshotReady(m.config.Framework.DynamicClient, pvc.Namespace, sr.Vs.GetName(), framework.Poll, f.Timeouts.SnapshotCreate)
-				framework.ExpectNoError(err, "failed to wait for snapshot ready")
+				err = utils.WaitForSnapshotReady(m.config.Framework.DynamicClient, pvc.Namespace, sr.Vs.GetName(), e2eutils.Poll, f.Timeouts.SnapshotCreate)
+				e2eutils.ExpectNoError(err, "failed to wait for snapshot ready")
 				createSnapshotAndReadyMetrics.waitForSnapshotControllerMetric(originalCreateSnapshotAndReadyCount+1.0, f.Timeouts.SnapshotControllerMetrics)
 
 				// delete the snapshot and check if the snapshot is deleted
@@ -1979,11 +1982,11 @@ func deleteSnapshot(cs clientset.Interface, config *storageframework.PerTestConf
 	// delete the given snapshot
 	dc := config.Framework.DynamicClient
 	err := dc.Resource(utils.SnapshotGVR).Namespace(snapshot.GetNamespace()).Delete(context.TODO(), snapshot.GetName(), metav1.DeleteOptions{})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	// check if the snapshot is deleted
 	_, err = dc.Resource(utils.SnapshotGVR).Get(context.TODO(), snapshot.GetName(), metav1.GetOptions{})
-	framework.ExpectError(err)
+	e2eutils.ExpectError(err)
 }
 
 // A lot of this code was copied from e2e/framework. It would be nicer
@@ -2111,7 +2114,7 @@ func createSC(cs clientset.Interface, t testsuites.StorageClassTest, scName, ns 
 	_, err = cs.StorageV1().StorageClasses().Get(context.TODO(), class.Name, metav1.GetOptions{})
 	if err != nil {
 		class, err = cs.StorageV1().StorageClasses().Create(context.TODO(), class, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "Failed to create class: %v", err)
+		e2eutils.ExpectNoError(err, "Failed to create class: %v", err)
 	}
 
 	return class
@@ -2125,12 +2128,12 @@ func createClaim(cs clientset.Interface, t testsuites.StorageClassTest, node e2e
 		VolumeMode:       &t.VolumeMode,
 	}, ns)
 	claim, err := cs.CoreV1().PersistentVolumeClaims(ns).Create(context.TODO(), claim, metav1.CreateOptions{})
-	framework.ExpectNoError(err, "Failed to create claim: %v", err)
+	e2eutils.ExpectNoError(err, "Failed to create claim: %v", err)
 
 	if !t.DelayBinding {
 		pvcClaims := []*v1.PersistentVolumeClaim{claim}
-		_, err = e2epv.WaitForPVClaimBoundPhase(cs, pvcClaims, framework.ClaimProvisionTimeout)
-		framework.ExpectNoError(err, "Failed waiting for PVC to be bound: %v", err)
+		_, err = e2epv.WaitForPVClaimBoundPhase(cs, pvcClaims, e2eutils.ClaimProvisionTimeout)
+		e2eutils.ExpectNoError(err, "Failed waiting for PVC to be bound: %v", err)
 	}
 	return class, claim
 }
@@ -2139,14 +2142,14 @@ func startPausePod(cs clientset.Interface, t testsuites.StorageClassTest, node e
 	class, claim := createClaim(cs, t, node, scName, ns)
 
 	pod, err := startPausePodWithClaim(cs, claim, node, ns)
-	framework.ExpectNoError(err, "Failed to create pause pod: %v", err)
+	e2eutils.ExpectNoError(err, "Failed to create pause pod: %v", err)
 	return class, claim, pod
 }
 
 func startBusyBoxPod(cs clientset.Interface, t testsuites.StorageClassTest, node e2epod.NodeSelection, scName, ns string, fsGroup *int64) (*storagev1.StorageClass, *v1.PersistentVolumeClaim, *v1.Pod) {
 	class, claim := createClaim(cs, t, node, scName, ns)
 	pod, err := startBusyBoxPodWithClaim(cs, claim, node, ns, fsGroup)
-	framework.ExpectNoError(err, "Failed to create busybox pod: %v", err)
+	e2eutils.ExpectNoError(err, "Failed to create busybox pod: %v", err)
 	return class, claim, pod
 }
 
@@ -2156,7 +2159,7 @@ func startPausePodInline(cs clientset.Interface, t testsuites.StorageClassTest, 
 			Driver: t.Provisioner,
 		},
 		node, ns)
-	framework.ExpectNoError(err, "Failed to create pod: %v", err)
+	e2eutils.ExpectNoError(err, "Failed to create pod: %v", err)
 	return pod
 }
 
@@ -2171,7 +2174,7 @@ func startPausePodGenericEphemeral(cs clientset.Interface, t testsuites.StorageC
 		Ephemeral: &v1.EphemeralVolumeSource{
 			VolumeClaimTemplate: &v1.PersistentVolumeClaimTemplate{Spec: claim.Spec}},
 	}, node, ns)
-	framework.ExpectNoError(err, "Failed to create pod: %v", err)
+	e2eutils.ExpectNoError(err, "Failed to create pod: %v", err)
 	return class, pod
 }
 
@@ -2245,7 +2248,7 @@ func startBusyBoxPodWithVolumeSource(cs clientset.Interface, volumeSource v1.Vol
 			Containers: []v1.Container{
 				{
 					Name:  "volume-tester",
-					Image: framework.BusyBoxImage,
+					Image: e2eutils.BusyBoxImage,
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      "my-volume",
@@ -2310,12 +2313,12 @@ func checkPodLogs(getCalls func() ([]drivers.MockCSICall, error), pod *v1.Pod, e
 					vv, found := call.Request.VolumeContext[k]
 					if found && (v == vv || (v == "<nonempty>" && len(vv) != 0)) {
 						foundAttributes.Insert(k)
-						framework.Logf("Found volume attribute %s: %s", k, vv)
+						e2eutils.Logf("Found volume attribute %s: %s", k, vv)
 					}
 				}
 			}
 		case "NodeUnpublishVolume":
-			framework.Logf("Found NodeUnpublishVolume: %+v", call)
+			e2eutils.Logf("Found NodeUnpublishVolume: %+v", call)
 			numNodeUnpublishVolume++
 		}
 	}
@@ -2343,7 +2346,7 @@ func checkPodLogs(getCalls func() ([]drivers.MockCSICall, error), pod *v1.Pod, e
 func compareCSICalls(trackedCalls []string, expectedCallSequence []csiCall, getCalls func() ([]drivers.MockCSICall, error)) ([]drivers.MockCSICall, int, error) {
 	allCalls, err := getCalls()
 	if err != nil {
-		framework.Logf("intermittent (?) log retrieval error, proceeding without output: %v", err)
+		e2eutils.Logf("intermittent (?) log retrieval error, proceeding without output: %v", err)
 		return nil, 0, nil
 	}
 
@@ -2365,7 +2368,7 @@ func compareCSICalls(trackedCalls []string, expectedCallSequence []csiCall, getC
 	for i, c := range calls {
 		if i >= len(expectedCallSequence) {
 			// Log all unexpected calls first, return error below outside the loop.
-			framework.Logf("Unexpected CSI driver call: %s (%d)", c.Method, c.FullError)
+			e2eutils.Logf("Unexpected CSI driver call: %s (%d)", c.Method, c.FullError)
 			continue
 		}
 
@@ -2386,8 +2389,8 @@ func compareCSICalls(trackedCalls []string, expectedCallSequence []csiCall, getC
 func waitForCSIDriver(cs clientset.Interface, driverName string) error {
 	timeout := 4 * time.Minute
 
-	framework.Logf("waiting up to %v for CSIDriver %q", timeout, driverName)
-	for start := time.Now(); time.Since(start) < timeout; time.Sleep(framework.Poll) {
+	e2eutils.Logf("waiting up to %v for CSIDriver %q", timeout, driverName)
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(e2eutils.Poll) {
 		_, err := cs.StorageV1().CSIDrivers().Get(context.TODO(), driverName, metav1.GetOptions{})
 		if !apierrors.IsNotFound(err) {
 			return err
@@ -2399,9 +2402,9 @@ func waitForCSIDriver(cs clientset.Interface, driverName string) error {
 func destroyCSIDriver(cs clientset.Interface, driverName string) {
 	driverGet, err := cs.StorageV1().CSIDrivers().Get(context.TODO(), driverName, metav1.GetOptions{})
 	if err == nil {
-		framework.Logf("deleting %s.%s: %s", driverGet.TypeMeta.APIVersion, driverGet.TypeMeta.Kind, driverGet.ObjectMeta.Name)
+		e2eutils.Logf("deleting %s.%s: %s", driverGet.TypeMeta.APIVersion, driverGet.TypeMeta.Kind, driverGet.ObjectMeta.Name)
 		// Uncomment the following line to get full dump of CSIDriver object
-		// framework.Logf("%s", framework.PrettyPrint(driverGet))
+		// e2eutils.Logf("%s", framework.PrettyPrint(driverGet))
 		cs.StorageV1().CSIDrivers().Delete(context.TODO(), driverName, metav1.DeleteOptions{})
 	}
 }
@@ -2437,19 +2440,19 @@ func checkDeleteSnapshotSecrets(cs clientset.Interface, annotations interface{})
 
 	annotationsObj, ok := annotations.(map[string]interface{})
 	if !ok {
-		framework.Failf("failed to get annotations from annotations object")
+		e2eutils.Failf("failed to get annotations from annotations object")
 	}
 
 	if annDeletionSecretName, ok = annotationsObj[CSISnapshotterDeleteSecretNameAnnotation].(string); !ok {
-		framework.Failf("unable to get secret annotation name")
+		e2eutils.Failf("unable to get secret annotation name")
 	}
 	if annDeletionSecretNamespace, ok = annotationsObj[CSISnapshotterDeleteSecretNamespaceAnnotation].(string); !ok {
-		framework.Failf("unable to get secret annotation namespace")
+		e2eutils.Failf("unable to get secret annotation namespace")
 	}
 
 	// verify if secrets exists
 	if _, err = cs.CoreV1().Secrets(annDeletionSecretNamespace).Get(context.TODO(), annDeletionSecretName, metav1.GetOptions{}); err != nil {
-		framework.Failf("unable to get test secret %s: %v", annDeletionSecretName, err)
+		e2eutils.Failf("unable to get test secret %s: %v", annDeletionSecretName, err)
 	}
 
 	return err
@@ -2528,7 +2531,7 @@ func newSnapshotMetricsTestConfig(metricName, metricType, driverName, operationN
 		snapshotType = "pre-provisioned"
 
 	default:
-		framework.Failf("invalid snapshotType: %v", pattern.SnapshotType)
+		e2eutils.Failf("invalid snapshotType: %v", pattern.SnapshotType)
 	}
 
 	return snapshotMetricsTestConfig{
@@ -2574,7 +2577,7 @@ func (scm *snapshotControllerMetrics) waitForSnapshotControllerMetric(expectedVa
 	}
 
 	scm.showMetricsFailure(metricKey)
-	framework.Failf("Unable to get valid snapshot controller metrics after %v", timeout)
+	e2eutils.Failf("Unable to get valid snapshot controller metrics after %v", timeout)
 }
 
 func (scm *snapshotControllerMetrics) getSnapshotControllerMetricValue() (float64, error) {
@@ -2612,17 +2615,17 @@ func (scm *snapshotControllerMetrics) getMetricsTable() map[string]float64 {
 }
 
 func (scm *snapshotControllerMetrics) showMetricsFailure(metricKey string) {
-	framework.Logf("failed to find metric key %s inside of the following metrics:", metricKey)
+	e2eutils.Logf("failed to find metric key %s inside of the following metrics:", metricKey)
 
 	metrics := scm.getMetricsTable()
 	for k, v := range metrics {
-		framework.Logf("%s: %v", k, v)
+		e2eutils.Logf("%s: %v", k, v)
 	}
 }
 
 func (scm *snapshotControllerMetrics) grabSnapshotControllerMetrics() error {
 	// pull all metrics
-	metrics, err := scm.metricsGrabber.GrabFromSnapshotController(framework.TestContext.SnapshotControllerPodName, framework.TestContext.SnapshotControllerHTTPPort)
+	metrics, err := scm.metricsGrabber.GrabFromSnapshotController(e2econfig.TestContext.SnapshotControllerPodName, e2econfig.TestContext.SnapshotControllerHTTPPort)
 	if err != nil {
 		return err
 	}

@@ -20,6 +20,8 @@ import (
 	"context"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -75,7 +77,7 @@ var _ = utils.SIGDescribe("CSIStorageCapacity", func() {
 		ginkgo.By("getting /apis")
 		{
 			discoveryGroups, err := f.ClientSet.Discovery().ServerGroups()
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			found := false
 			for _, group := range discoveryGroups.Groups {
 				if group.Name == storagev1.GroupName {
@@ -88,7 +90,7 @@ var _ = utils.SIGDescribe("CSIStorageCapacity", func() {
 				}
 			}
 			if !found {
-				framework.Failf("expected CSIStorageCapacity API group/version, got %#v", discoveryGroups.Groups)
+				e2eutils.Failf("expected CSIStorageCapacity API group/version, got %#v", discoveryGroups.Groups)
 			}
 		}
 
@@ -96,7 +98,7 @@ var _ = utils.SIGDescribe("CSIStorageCapacity", func() {
 		{
 			group := &metav1.APIGroup{}
 			err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis/storage.k8s.io").Do(context.TODO()).Into(group)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			found := false
 			for _, version := range group.Versions {
 				if version.Version == cscVersion {
@@ -105,14 +107,14 @@ var _ = utils.SIGDescribe("CSIStorageCapacity", func() {
 				}
 			}
 			if !found {
-				framework.Failf("expected CSIStorageCapacity API version, got %#v", group.Versions)
+				e2eutils.Failf("expected CSIStorageCapacity API version, got %#v", group.Versions)
 			}
 		}
 
 		ginkgo.By("getting /apis/storage.k8s.io/" + cscVersion)
 		{
 			resources, err := f.ClientSet.Discovery().ServerResourcesForGroupVersion(storagev1.SchemeGroupVersion.String())
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			found := false
 			for _, resource := range resources.APIResources {
 				switch resource.Name {
@@ -121,7 +123,7 @@ var _ = utils.SIGDescribe("CSIStorageCapacity", func() {
 				}
 			}
 			if !found {
-				framework.Failf("expected csistoragecapacities, got %#v", resources.APIResources)
+				e2eutils.Failf("expected csistoragecapacities, got %#v", resources.APIResources)
 			}
 		}
 
@@ -129,84 +131,84 @@ var _ = utils.SIGDescribe("CSIStorageCapacity", func() {
 
 		ginkgo.By("creating")
 		createdCSC, err := cscClient.Create(context.TODO(), csc, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		_, err = cscClient.Create(context.TODO(), csc, metav1.CreateOptions{})
 		if !apierrors.IsAlreadyExists(err) {
-			framework.Failf("expected 409, got %#v", err)
+			e2eutils.Failf("expected 409, got %#v", err)
 		}
 		_, err = cscClient.Create(context.TODO(), csc2, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		ginkgo.By("watching")
-		framework.Logf("starting watch")
+		e2eutils.Logf("starting watch")
 		cscWatch, err := cscClient.Watch(context.TODO(), metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		cscWatchNoNamespace, err := cscClientNoNamespace.Watch(context.TODO(), metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		// added for a watch
 		_, err = cscClient.Create(context.TODO(), csc3, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		ginkgo.By("getting")
 		gottenCSC, err := cscClient.Get(context.TODO(), csc.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(gottenCSC.UID, createdCSC.UID)
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectEqual(gottenCSC.UID, createdCSC.UID)
 
 		ginkgo.By("listing in namespace")
 		cscs, err := cscClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(cscs.Items), 3, "filtered list should have 3 items, got: %s", cscs)
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectEqual(len(cscs.Items), 3, "filtered list should have 3 items, got: %s", cscs)
 
 		ginkgo.By("listing across namespaces")
 		cscs, err = cscClientNoNamespace.List(context.TODO(), metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(cscs.Items), 3, "filtered list should have 3 items, got: %s", cscs)
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectEqual(len(cscs.Items), 3, "filtered list should have 3 items, got: %s", cscs)
 
 		ginkgo.By("patching")
 		patchedCSC, err := cscClient.Patch(context.TODO(), createdCSC.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"patched":"true"}}}`), metav1.PatchOptions{})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(patchedCSC.Annotations["patched"], "true", "patched object should have the applied annotation")
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectEqual(patchedCSC.Annotations["patched"], "true", "patched object should have the applied annotation")
 
 		ginkgo.By("updating")
 		csrToUpdate := patchedCSC.DeepCopy()
 		csrToUpdate.Annotations["updated"] = "true"
 		updatedCSC, err := cscClient.Update(context.TODO(), csrToUpdate, metav1.UpdateOptions{})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(updatedCSC.Annotations["updated"], "true", "updated object should have the applied annotation")
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectEqual(updatedCSC.Annotations["updated"], "true", "updated object should have the applied annotation")
 
 		expectWatchResult := func(kind string, w watch.Interface) {
-			framework.Logf("waiting for watch events with expected annotations %s", kind)
+			e2eutils.Logf("waiting for watch events with expected annotations %s", kind)
 			for sawAdded, sawPatched, sawUpdated := false, false, false; !sawAdded && !sawPatched && !sawUpdated; {
 				select {
 				case evt, ok := <-w.ResultChan():
 					if !ok {
-						framework.Failf("%s: watch channel should not close", kind)
+						e2eutils.Failf("%s: watch channel should not close", kind)
 					}
 					if evt.Type == watch.Modified {
 						watchedCSC, isCSC := evt.Object.(*storagev1.CSIStorageCapacity)
 						if !isCSC {
-							framework.Failf("%s: expected CSC, got %T", kind, evt.Object)
+							e2eutils.Failf("%s: expected CSC, got %T", kind, evt.Object)
 						}
 						if watchedCSC.Annotations["patched"] == "true" {
-							framework.Logf("%s: saw patched annotations", kind)
+							e2eutils.Logf("%s: saw patched annotations", kind)
 							sawPatched = true
 						} else if watchedCSC.Annotations["updated"] == "true" {
-							framework.Logf("%s: saw updated annotations", kind)
+							e2eutils.Logf("%s: saw updated annotations", kind)
 							sawUpdated = true
 						} else {
-							framework.Logf("%s: missing expected annotations, waiting: %#v", kind, watchedCSC.Annotations)
+							e2eutils.Logf("%s: missing expected annotations, waiting: %#v", kind, watchedCSC.Annotations)
 						}
 					} else if evt.Type == watch.Added {
 						_, isCSC := evt.Object.(*storagev1.CSIStorageCapacity)
 						if !isCSC {
-							framework.Failf("%s: expected CSC, got %T", kind, evt.Object)
+							e2eutils.Failf("%s: expected CSC, got %T", kind, evt.Object)
 						}
 						sawAdded = true
 					}
 
 				case <-time.After(wait.ForeverTestTimeout):
-					framework.Failf("%s: timed out waiting for watch event", kind)
+					e2eutils.Failf("%s: timed out waiting for watch event", kind)
 				}
 			}
 			w.Stop()
@@ -218,7 +220,7 @@ var _ = utils.SIGDescribe("CSIStorageCapacity", func() {
 
 		ginkgo.By("deleting")
 		err = cscClient.Delete(context.TODO(), createdCSC.Name, metav1.DeleteOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		csc, err = cscClient.Get(context.TODO(), createdCSC.Name, metav1.GetOptions{})
 		min := 2
 		max := min
@@ -227,31 +229,31 @@ var _ = utils.SIGDescribe("CSIStorageCapacity", func() {
 			// Okay, normal case.
 		case err != nil:
 			// Unexpected error.
-			framework.Failf("expected 404, got %#v", err)
+			e2eutils.Failf("expected 404, got %#v", err)
 		case csc.DeletionTimestamp != nil && len(csc.Finalizers) > 0:
 			// Deletion was prevented by a finalizer, but it might
 			// still get deleted before we list them below.
 			max++
 		default:
-			framework.Failf("CSIStorageCapacitity should have been deleted or have DeletionTimestamp and Finalizers, but instead got: %s", csc)
+			e2eutils.Failf("CSIStorageCapacitity should have been deleted or have DeletionTimestamp and Finalizers, but instead got: %s", csc)
 		}
 		cscs, err = cscClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		actualLen := len(cscs.Items)
 		if actualLen < min || actualLen > max {
-			framework.Failf("expected <= %d and >= %d remaining CSIStorageCapacity objects, got %d: %v", max, min, actualLen, cscs.Items)
+			e2eutils.Failf("expected <= %d and >= %d remaining CSIStorageCapacity objects, got %d: %v", max, min, actualLen, cscs.Items)
 		}
 
 		ginkgo.By("deleting a collection")
 		err = cscClient.DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		cscs, err = cscClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		for _, csc := range cscs.Items {
 			// Any remaining objects should be marked for deletion
 			// and only held back by a Finalizer.
 			if csc.DeletionTimestamp == nil || len(csc.Finalizers) == 0 {
-				framework.Failf("CSIStorageCapacity should have been deleted or have DeletionTimestamp and Finalizers, but instead got: %s", &csc)
+				e2eutils.Failf("CSIStorageCapacity should have been deleted or have DeletionTimestamp and Finalizers, but instead got: %s", &csc)
 			}
 		}
 	})

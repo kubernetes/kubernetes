@@ -19,6 +19,8 @@ package bootstrap
 import (
 	"context"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -45,7 +47,7 @@ var _ = lifecycle.SIGDescribe("[Feature:BootstrapTokens]", func() {
 		if len(secretNeedClean) > 0 {
 			ginkgo.By("delete the bootstrap token secret")
 			err := c.CoreV1().Secrets(metav1.NamespaceSystem).Delete(context.TODO(), secretNeedClean, metav1.DeleteOptions{})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			secretNeedClean = ""
 		}
 	})
@@ -56,77 +58,77 @@ var _ = lifecycle.SIGDescribe("[Feature:BootstrapTokens]", func() {
 	ginkgo.It("should sign the new added bootstrap tokens", func() {
 		ginkgo.By("create a new bootstrap token secret")
 		tokenID, err := GenerateTokenID()
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		secret := newTokenSecret(tokenID, "tokenSecret")
 		_, err = c.CoreV1().Secrets(metav1.NamespaceSystem).Create(context.TODO(), secret, metav1.CreateOptions{})
 		secretNeedClean = bootstrapapi.BootstrapTokenSecretPrefix + tokenID
 
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		ginkgo.By("wait for the bootstrap token secret be signed")
 		err = WaitforSignedClusterInfoByBootStrapToken(c, tokenID)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 	})
 
 	ginkgo.It("should resign the bootstrap tokens when the clusterInfo ConfigMap updated [Serial][Disruptive]", func() {
 		ginkgo.By("create a new bootstrap token secret")
 		tokenID, err := GenerateTokenID()
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		secret := newTokenSecret(tokenID, "tokenSecret")
 		_, err = c.CoreV1().Secrets(metav1.NamespaceSystem).Create(context.TODO(), secret, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		secretNeedClean = bootstrapapi.BootstrapTokenSecretPrefix + tokenID
 
 		ginkgo.By("wait for the bootstrap token secret be signed")
 		err = WaitforSignedClusterInfoByBootStrapToken(c, tokenID)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		cfgMap, err := f.ClientSet.CoreV1().ConfigMaps(metav1.NamespacePublic).Get(context.TODO(), bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		signedToken, ok := cfgMap.Data[bootstrapapi.JWSSignatureKeyPrefix+tokenID]
 		if !ok {
-			framework.Failf("expected signed token with key %q not found in %+v", bootstrapapi.JWSSignatureKeyPrefix+tokenID, cfgMap.Data)
+			e2eutils.Failf("expected signed token with key %q not found in %+v", bootstrapapi.JWSSignatureKeyPrefix+tokenID, cfgMap.Data)
 		}
 
 		ginkgo.By("update the cluster-info ConfigMap")
 		originalData := cfgMap.Data[bootstrapapi.KubeConfigKey]
 		updatedKubeConfig, err := randBytes(20)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		cfgMap.Data[bootstrapapi.KubeConfigKey] = updatedKubeConfig
 		_, err = f.ClientSet.CoreV1().ConfigMaps(metav1.NamespacePublic).Update(context.TODO(), cfgMap, metav1.UpdateOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		defer func() {
 			ginkgo.By("update back the cluster-info ConfigMap")
 			cfgMap, err = f.ClientSet.CoreV1().ConfigMaps(metav1.NamespacePublic).Get(context.TODO(), bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			cfgMap.Data[bootstrapapi.KubeConfigKey] = originalData
 			_, err = f.ClientSet.CoreV1().ConfigMaps(metav1.NamespacePublic).Update(context.TODO(), cfgMap, metav1.UpdateOptions{})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 		}()
 
 		ginkgo.By("wait for signed bootstrap token updated")
 		err = WaitForSignedClusterInfoGetUpdatedByBootstrapToken(c, tokenID, signedToken)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 	})
 
 	ginkgo.It("should delete the signed bootstrap tokens from clusterInfo ConfigMap when bootstrap token is deleted", func() {
 		ginkgo.By("create a new bootstrap token secret")
 		tokenID, err := GenerateTokenID()
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		secret := newTokenSecret(tokenID, "tokenSecret")
 		_, err = c.CoreV1().Secrets(metav1.NamespaceSystem).Create(context.TODO(), secret, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		ginkgo.By("wait for the bootstrap secret be signed")
 		err = WaitforSignedClusterInfoByBootStrapToken(c, tokenID)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		ginkgo.By("delete the bootstrap token secret")
 		err = c.CoreV1().Secrets(metav1.NamespaceSystem).Delete(context.TODO(), bootstrapapi.BootstrapTokenSecretPrefix+tokenID, metav1.DeleteOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		ginkgo.By("wait for the bootstrap token removed from cluster-info ConfigMap")
 		err = WaitForSignedClusterInfoByBootstrapTokenToDisappear(c, tokenID)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 	})
 })

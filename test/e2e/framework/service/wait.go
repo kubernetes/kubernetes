@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	servicehelper "k8s.io/cloud-provider/service/helpers"
-	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/utils"
 
 	"github.com/onsi/ginkgo"
 )
@@ -34,7 +34,7 @@ import (
 func WaitForServiceDeletedWithFinalizer(cs clientset.Interface, namespace, name string) {
 	ginkgo.By("Delete service with finalizer")
 	if err := cs.CoreV1().Services(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{}); err != nil {
-		framework.Failf("Failed to delete service %s/%s", namespace, name)
+		utils.Failf("Failed to delete service %s/%s", namespace, name)
 	}
 
 	ginkgo.By("Wait for service to disappear")
@@ -42,15 +42,15 @@ func WaitForServiceDeletedWithFinalizer(cs clientset.Interface, namespace, name 
 		svc, err := cs.CoreV1().Services(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			if apierrors.IsNotFound(err) {
-				framework.Logf("Service %s/%s is gone.", namespace, name)
+				utils.Logf("Service %s/%s is gone.", namespace, name)
 				return true, nil
 			}
 			return false, err
 		}
-		framework.Logf("Service %s/%s still exists with finalizers: %v", namespace, name, svc.Finalizers)
+		utils.Logf("Service %s/%s still exists with finalizers: %v", namespace, name, svc.Finalizers)
 		return false, nil
 	}); pollErr != nil {
-		framework.Failf("Failed to wait for service to disappear: %v", pollErr)
+		utils.Failf("Failed to wait for service to disappear: %v", pollErr)
 	}
 }
 
@@ -71,11 +71,11 @@ func WaitForServiceUpdatedWithFinalizer(cs clientset.Interface, namespace, name 
 			}
 		}
 		if foundFinalizer != hasFinalizer {
-			framework.Logf("Service %s/%s hasFinalizer=%t, want %t", namespace, name, foundFinalizer, hasFinalizer)
+			utils.Logf("Service %s/%s hasFinalizer=%t, want %t", namespace, name, foundFinalizer, hasFinalizer)
 			return false, nil
 		}
 		return true, nil
 	}); pollErr != nil {
-		framework.Failf("Failed to wait for service to hasFinalizer=%t: %v", hasFinalizer, pollErr)
+		utils.Failf("Failed to wait for service to hasFinalizer=%t: %v", hasFinalizer, pollErr)
 	}
 }

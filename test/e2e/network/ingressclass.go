@@ -21,6 +21,8 @@ import (
 	"strings"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -45,39 +47,39 @@ var _ = common.SIGDescribe("IngressClass [Feature:Ingress]", func() {
 
 	ginkgo.It("should set default value on new IngressClass [Serial]", func() {
 		ingressClass1, err := createIngressClass(cs, "ingressclass1", true, f.UniqueName)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		defer deleteIngressClass(cs, ingressClass1.Name)
 
 		ingress, err := createBasicIngress(cs, f.Namespace.Name)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		if ingress.Spec.IngressClassName == nil {
-			framework.Failf("Expected IngressClassName to be set by Admission Controller")
+			e2eutils.Failf("Expected IngressClassName to be set by Admission Controller")
 		} else if *ingress.Spec.IngressClassName != ingressClass1.Name {
-			framework.Failf("Expected IngressClassName to be %s, got %s", ingressClass1.Name, *ingress.Spec.IngressClassName)
+			e2eutils.Failf("Expected IngressClassName to be %s, got %s", ingressClass1.Name, *ingress.Spec.IngressClassName)
 		}
 	})
 
 	ginkgo.It("should not set default value if no default IngressClass [Serial]", func() {
 		ingressClass1, err := createIngressClass(cs, "ingressclass1", false, f.UniqueName)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		defer deleteIngressClass(cs, ingressClass1.Name)
 
 		ingress, err := createBasicIngress(cs, f.Namespace.Name)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		if ingress.Spec.IngressClassName != nil {
-			framework.Failf("Expected IngressClassName to be nil, got %s", *ingress.Spec.IngressClassName)
+			e2eutils.Failf("Expected IngressClassName to be nil, got %s", *ingress.Spec.IngressClassName)
 		}
 	})
 
 	ginkgo.It("should prevent Ingress creation if more than 1 IngressClass marked as default [Serial]", func() {
 		ingressClass1, err := createIngressClass(cs, "ingressclass1", true, f.UniqueName)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		defer deleteIngressClass(cs, ingressClass1.Name)
 
 		ingressClass2, err := createIngressClass(cs, "ingressclass2", true, f.UniqueName)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		defer deleteIngressClass(cs, ingressClass2.Name)
 
 		// the admission controller may take a few seconds to observe both ingress classes
@@ -92,7 +94,7 @@ var _ = common.SIGDescribe("IngressClass [Feature:Ingress]", func() {
 			lastErr = err
 			return strings.Contains(err.Error(), expectedErr), nil
 		}); err != nil {
-			framework.Failf("Expected error to contain %s, got %s", expectedErr, lastErr.Error())
+			e2eutils.Failf("Expected error to contain %s, got %s", expectedErr, lastErr.Error())
 		}
 	})
 
@@ -117,11 +119,11 @@ var _ = common.SIGDescribe("IngressClass [Feature:Ingress]", func() {
 			},
 		}
 		createdIngressClass, err := cs.NetworkingV1().IngressClasses().Create(context.TODO(), ingressClass, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		defer deleteIngressClass(cs, createdIngressClass.Name)
 
 		if createdIngressClass.Spec.Parameters == nil {
-			framework.Failf("Expected IngressClass.spec.parameters to be set")
+			e2eutils.Failf("Expected IngressClass.spec.parameters to be set")
 		}
 		scope := ""
 		if createdIngressClass.Spec.Parameters.Scope != nil {
@@ -129,7 +131,7 @@ var _ = common.SIGDescribe("IngressClass [Feature:Ingress]", func() {
 		}
 
 		if scope != "Namespace" {
-			framework.Failf("Expected IngressClass.spec.parameters.scope to be set to 'Namespace', got %v", scope)
+			e2eutils.Failf("Expected IngressClass.spec.parameters.scope to be set to 'Namespace', got %v", scope)
 		}
 	})
 
@@ -176,7 +178,7 @@ func createBasicIngress(cs clientset.Interface, namespace string) (*networkingv1
 
 func deleteIngressClass(cs clientset.Interface, name string) {
 	err := cs.NetworkingV1().IngressClasses().Delete(context.TODO(), name, metav1.DeleteOptions{})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 }
 
 var _ = common.SIGDescribe("IngressClass API", func() {
@@ -204,7 +206,7 @@ var _ = common.SIGDescribe("IngressClass API", func() {
 		ginkgo.By("getting /apis")
 		{
 			discoveryGroups, err := f.ClientSet.Discovery().ServerGroups()
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			found := false
 			for _, group := range discoveryGroups.Groups {
 				if group.Name == networkingv1.GroupName {
@@ -217,14 +219,14 @@ var _ = common.SIGDescribe("IngressClass API", func() {
 				}
 			}
 			if !found {
-				framework.Failf("expected networking API group/version, got %#v", discoveryGroups.Groups)
+				e2eutils.Failf("expected networking API group/version, got %#v", discoveryGroups.Groups)
 			}
 		}
 		ginkgo.By("getting /apis/networking.k8s.io")
 		{
 			group := &metav1.APIGroup{}
 			err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis/networking.k8s.io").Do(context.TODO()).Into(group)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			found := false
 			for _, version := range group.Versions {
 				if version.Version == icVersion {
@@ -233,14 +235,14 @@ var _ = common.SIGDescribe("IngressClass API", func() {
 				}
 			}
 			if !found {
-				framework.Failf("expected networking API version, got %#v", group.Versions)
+				e2eutils.Failf("expected networking API version, got %#v", group.Versions)
 			}
 		}
 
 		ginkgo.By("getting /apis/networking.k8s.io" + icVersion)
 		{
 			resources, err := f.ClientSet.Discovery().ServerResourcesForGroupVersion(networkingv1.SchemeGroupVersion.String())
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			foundIC := false
 			for _, resource := range resources.APIResources {
 				switch resource.Name {
@@ -249,89 +251,89 @@ var _ = common.SIGDescribe("IngressClass API", func() {
 				}
 			}
 			if !foundIC {
-				framework.Failf("expected ingressclasses, got %#v", resources.APIResources)
+				e2eutils.Failf("expected ingressclasses, got %#v", resources.APIResources)
 			}
 		}
 
 		// IngressClass resource create/read/update/watch verbs
 		ginkgo.By("creating")
 		ingressClass1, err := createIngressClass(cs, "ingressclass1", false, f.UniqueName)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		_, err = createIngressClass(cs, "ingressclass2", false, f.UniqueName)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		_, err = createIngressClass(cs, "ingressclass3", false, f.UniqueName)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		ginkgo.By("getting")
 		gottenIC, err := icClient.Get(context.TODO(), ingressClass1.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(gottenIC.UID, ingressClass1.UID)
-		framework.ExpectEqual(gottenIC.UID, ingressClass1.UID)
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectEqual(gottenIC.UID, ingressClass1.UID)
+		e2eutils.ExpectEqual(gottenIC.UID, ingressClass1.UID)
 
 		ginkgo.By("listing")
 		ics, err := icClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "special-label=generic"})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(ics.Items), 3, "filtered list should have 3 items")
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectEqual(len(ics.Items), 3, "filtered list should have 3 items")
 
 		ginkgo.By("watching")
-		framework.Logf("starting watch")
+		e2eutils.Logf("starting watch")
 		icWatch, err := icClient.Watch(context.TODO(), metav1.ListOptions{ResourceVersion: ics.ResourceVersion, LabelSelector: "ingressclass=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		ginkgo.By("patching")
 		patchedIC, err := icClient.Patch(context.TODO(), ingressClass1.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"patched":"true"}}}`), metav1.PatchOptions{})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(patchedIC.Annotations["patched"], "true", "patched object should have the applied annotation")
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectEqual(patchedIC.Annotations["patched"], "true", "patched object should have the applied annotation")
 
 		ginkgo.By("updating")
 		icToUpdate := patchedIC.DeepCopy()
 		icToUpdate.Annotations["updated"] = "true"
 		updatedIC, err := icClient.Update(context.TODO(), icToUpdate, metav1.UpdateOptions{})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(updatedIC.Annotations["updated"], "true", "updated object should have the applied annotation")
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectEqual(updatedIC.Annotations["updated"], "true", "updated object should have the applied annotation")
 
-		framework.Logf("waiting for watch events with expected annotations")
+		e2eutils.Logf("waiting for watch events with expected annotations")
 		for sawAnnotations := false; !sawAnnotations; {
 			select {
 			case evt, ok := <-icWatch.ResultChan():
 				if !ok {
-					framework.Fail("watch channel should not close")
+					e2eutils.Fail("watch channel should not close")
 				}
-				framework.ExpectEqual(evt.Type, watch.Modified)
+				e2eutils.ExpectEqual(evt.Type, watch.Modified)
 				watchedIngress, isIngress := evt.Object.(*networkingv1.IngressClass)
 				if !isIngress {
-					framework.Failf("expected Ingress, got %T", evt.Object)
+					e2eutils.Failf("expected Ingress, got %T", evt.Object)
 				}
 				if watchedIngress.Annotations["patched"] == "true" {
-					framework.Logf("saw patched and updated annotations")
+					e2eutils.Logf("saw patched and updated annotations")
 					sawAnnotations = true
 					icWatch.Stop()
 				} else {
-					framework.Logf("missing expected annotations, waiting: %#v", watchedIngress.Annotations)
+					e2eutils.Logf("missing expected annotations, waiting: %#v", watchedIngress.Annotations)
 				}
 			case <-time.After(wait.ForeverTestTimeout):
-				framework.Fail("timed out waiting for watch event")
+				e2eutils.Fail("timed out waiting for watch event")
 			}
 		}
 
 		// IngressClass resource delete operations
 		ginkgo.By("deleting")
 		err = icClient.Delete(context.TODO(), ingressClass1.Name, metav1.DeleteOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		_, err = icClient.Get(context.TODO(), ingressClass1.Name, metav1.GetOptions{})
 		if !apierrors.IsNotFound(err) {
-			framework.Failf("expected 404, got %#v", err)
+			e2eutils.Failf("expected 404, got %#v", err)
 		}
 		ics, err = icClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "ingressclass=" + f.UniqueName})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(ics.Items), 2, "filtered list should have 2 items")
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectEqual(len(ics.Items), 2, "filtered list should have 2 items")
 
 		ginkgo.By("deleting a collection")
 		err = icClient.DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "ingressclass=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 		ics, err = icClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "ingressclass=" + f.UniqueName})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(ics.Items), 0, "filtered list should have 0 items")
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectEqual(len(ics.Items), 0, "filtered list should have 0 items")
 	})
 
 })

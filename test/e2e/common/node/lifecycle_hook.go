@@ -21,6 +21,8 @@ import (
 	"strings"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -37,7 +39,7 @@ import (
 var _ = SIGDescribe("Container Lifecycle Hook", func() {
 	f := framework.NewDefaultFramework("container-lifecycle-hook")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
-	var podClient *framework.PodClient
+	var podClient *e2eutils.PodClient
 	const (
 		podCheckInterval     = 1 * time.Second
 		postStartWaitTimeout = 2 * time.Minute
@@ -54,7 +56,7 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 		podHandleHookRequest := e2epod.NewAgnhostPod("", "pod-handle-http-request", nil, nil, ports, "netexec")
 		ginkgo.BeforeEach(func() {
 			node, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			targetNode = node.Name
 			nodeSelection := e2epod.NodeSelection{}
 			e2epod.SetAffinity(&nodeSelection, targetNode)
@@ -80,7 +82,7 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 				}, postStartWaitTimeout, podCheckInterval).Should(gomega.BeNil())
 			}
 			ginkgo.By("delete the pod with lifecycle hook")
-			podClient.DeleteSync(podWithHook.Name, *metav1.NewDeleteOptions(15), framework.DefaultPodDeletionTimeout)
+			podClient.DeleteSync(podWithHook.Name, *metav1.NewDeleteOptions(15), e2eutils.DefaultPodDeletionTimeout)
 			if podWithHook.Spec.Containers[0].Lifecycle.PreStop != nil {
 				ginkgo.By("check prestop hook")
 				gomega.Eventually(func() error {

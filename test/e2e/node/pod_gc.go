@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 
 	v1 "k8s.io/api/core/v1"
@@ -41,22 +43,22 @@ var _ = SIGDescribe("Pod garbage collector [Feature:PodGarbageCollector] [Slow]"
 		for count < 1000 {
 			pod, err := createTerminatingPod(f)
 			if err != nil {
-				framework.Failf("err creating pod: %v", err)
+				e2eutils.Failf("err creating pod: %v", err)
 			}
 			pod.ResourceVersion = ""
 			pod.Status.Phase = v1.PodFailed
 			_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).UpdateStatus(context.TODO(), pod, metav1.UpdateOptions{})
 			if err != nil {
-				framework.Failf("err failing pod: %v", err)
+				e2eutils.Failf("err failing pod: %v", err)
 			}
 
 			count++
 			if count%50 == 0 {
-				framework.Logf("count: %v", count)
+				e2eutils.Logf("count: %v", count)
 			}
 		}
 
-		framework.Logf("created: %v", count)
+		e2eutils.Logf("created: %v", count)
 
 		// The gc controller polls every 30s and fires off a goroutine per
 		// pod to terminate.
@@ -69,17 +71,17 @@ var _ = SIGDescribe("Pod garbage collector [Feature:PodGarbageCollector] [Slow]"
 		pollErr := wait.Poll(1*time.Minute, timeout, func() (bool, error) {
 			pods, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{})
 			if err != nil {
-				framework.Logf("Failed to list pod %v", err)
+				e2eutils.Logf("Failed to list pod %v", err)
 				return false, nil
 			}
 			if len(pods.Items) != gcThreshold {
-				framework.Logf("Number of observed pods %v, waiting for %v", len(pods.Items), gcThreshold)
+				e2eutils.Logf("Number of observed pods %v, waiting for %v", len(pods.Items), gcThreshold)
 				return false, nil
 			}
 			return true, nil
 		})
 		if pollErr != nil {
-			framework.Failf("Failed to GC pods within %v, %v pods remaining, error: %v", timeout, len(pods.Items), err)
+			e2eutils.Failf("Failed to GC pods within %v, %v pods remaining, error: %v", timeout, len(pods.Items), err)
 		}
 	})
 })

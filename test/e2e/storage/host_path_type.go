@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"path"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -269,8 +271,8 @@ var _ = utils.SIGDescribe("HostPathType Character Device [Slow]", func() {
 		targetCharDev = path.Join(hostBaseDir, "achardev")
 		ginkgo.By("Create a character device for further testing")
 		cmd := fmt.Sprintf("mknod %s c 89 1", path.Join(mountBaseDir, "achardev"))
-		stdout, stderr, err := e2evolume.PodExec(f, basePod, cmd)
-		framework.ExpectNoError(err, "command: %q, stdout: %s\nstderr: %s", cmd, stdout, stderr)
+		stdout, stderr, err := e2evolume.PodExec(f.ClientSet, f.Namespace.Name, basePod, cmd)
+		e2eutils.ExpectNoError(err, "command: %q, stdout: %s\nstderr: %s", cmd, stdout, stderr)
 	})
 
 	ginkgo.It("Should fail on mounting non-existent character device 'does-not-exist-char-dev' when HostPathType is HostPathCharDev", func() {
@@ -339,8 +341,8 @@ var _ = utils.SIGDescribe("HostPathType Block Device [Slow]", func() {
 		targetBlockDev = path.Join(hostBaseDir, "ablkdev")
 		ginkgo.By("Create a block device for further testing")
 		cmd := fmt.Sprintf("mknod %s b 89 1", path.Join(mountBaseDir, "ablkdev"))
-		stdout, stderr, err := e2evolume.PodExec(f, basePod, cmd)
-		framework.ExpectNoError(err, "command %q: stdout: %s\nstderr: %s", cmd, stdout, stderr)
+		stdout, stderr, err := e2evolume.PodExec(f.ClientSet, f.Namespace.Name, basePod, cmd)
+		e2eutils.ExpectNoError(err, "command %q: stdout: %s\nstderr: %s", cmd, stdout, stderr)
 	})
 
 	ginkgo.It("Should fail on mounting non-existent block device 'does-not-exist-blk-dev' when HostPathType is HostPathBlockDev", func() {
@@ -458,7 +460,7 @@ func verifyPodHostPathTypeFailure(f *framework.Framework, nodeSelector map[strin
 	pod := newHostPathTypeTestPod(nodeSelector, hostDir, "/mnt/test", hostPathType)
 	ginkgo.By(fmt.Sprintf("Creating pod %s", pod.Name))
 	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	ginkgo.By("Checking for HostPathType error event")
 	eventSelector := fields.Set{
@@ -472,13 +474,13 @@ func verifyPodHostPathTypeFailure(f *framework.Framework, nodeSelector map[strin
 	err = e2eevents.WaitTimeoutForEvent(f.ClientSet, f.Namespace.Name, eventSelector, msg, f.Timeouts.PodStart)
 	// Events are unreliable, don't depend on the event. It's used only to speed up the test.
 	if err != nil {
-		framework.Logf("Warning: did not get event about FailedMountVolume")
+		e2eutils.Logf("Warning: did not get event about FailedMountVolume")
 	}
 
 	// Check the pod is still not running
 	p, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), pod.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err, "could not re-read the pod after event (or timeout)")
-	framework.ExpectEqual(p.Status.Phase, v1.PodPending, "Pod phase isn't pending")
+	e2eutils.ExpectNoError(err, "could not re-read the pod after event (or timeout)")
+	e2eutils.ExpectEqual(p.Status.Phase, v1.PodPending, "Pod phase isn't pending")
 
 	f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(0))
 }
@@ -486,8 +488,8 @@ func verifyPodHostPathTypeFailure(f *framework.Framework, nodeSelector map[strin
 func verifyPodHostPathType(f *framework.Framework, nodeSelector map[string]string, hostDir string, hostPathType *v1.HostPathType) {
 	newPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(),
 		newHostPathTypeTestPod(nodeSelector, hostDir, "/mnt/test", hostPathType), metav1.CreateOptions{})
-	framework.ExpectNoError(err)
-	framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, newPod.Name, newPod.Namespace, f.Timeouts.PodStart))
+	e2eutils.ExpectNoError(err)
+	e2eutils.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, newPod.Name, newPod.Namespace, f.Timeouts.PodStart))
 
 	f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), newPod.Name, *metav1.NewDeleteOptions(0))
 }

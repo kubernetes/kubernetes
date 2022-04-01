@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -68,38 +70,38 @@ func (t *DeploymentUpgradeTest) Setup(f *framework.Framework) {
 	ginkgo.By(fmt.Sprintf("Creating a deployment %q with 1 replica in namespace %q", deploymentName, ns))
 	d := e2edeployment.NewDeployment(deploymentName, int32(1), map[string]string{"test": "upgrade"}, "nginx", nginxImage, appsv1.RollingUpdateDeploymentStrategyType)
 	deployment, err := deploymentClient.Create(context.TODO(), d, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	ginkgo.By(fmt.Sprintf("Waiting deployment %q to complete", deploymentName))
-	framework.ExpectNoError(e2edeployment.WaitForDeploymentComplete(c, deployment))
+	e2eutils.ExpectNoError(e2edeployment.WaitForDeploymentComplete(c, deployment))
 
 	ginkgo.By(fmt.Sprintf("Getting replicaset revision 1 of deployment %q", deploymentName))
 	rsSelector, err := metav1.LabelSelectorAsSelector(d.Spec.Selector)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	rsList, err := rsClient.List(context.TODO(), metav1.ListOptions{LabelSelector: rsSelector.String()})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	rss := rsList.Items
-	framework.ExpectEqual(len(rss), 1, "expected one replicaset, got %d", len(rss))
+	e2eutils.ExpectEqual(len(rss), 1, "expected one replicaset, got %d", len(rss))
 	t.oldRSUID = rss[0].UID
 
 	ginkgo.By(fmt.Sprintf("Waiting for revision of the deployment %q to become 1", deploymentName))
-	framework.ExpectNoError(waitForDeploymentRevision(c, deployment, "1"))
+	e2eutils.ExpectNoError(waitForDeploymentRevision(c, deployment, "1"))
 
 	// Trigger a new rollout so that we have some history.
 	ginkgo.By(fmt.Sprintf("Triggering a new rollout for deployment %q", deploymentName))
 	deployment, err = e2edeployment.UpdateDeploymentWithRetries(c, ns, deploymentName, func(update *appsv1.Deployment) {
 		update.Spec.Template.Spec.Containers[0].Name = "updated-name"
 	})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	ginkgo.By(fmt.Sprintf("Waiting deployment %q to complete", deploymentName))
-	framework.ExpectNoError(e2edeployment.WaitForDeploymentComplete(c, deployment))
+	e2eutils.ExpectNoError(e2edeployment.WaitForDeploymentComplete(c, deployment))
 
 	ginkgo.By(fmt.Sprintf("Getting replicasets revision 1 and 2 of deployment %q", deploymentName))
 	rsList, err = rsClient.List(context.TODO(), metav1.ListOptions{LabelSelector: rsSelector.String()})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	rss = rsList.Items
-	framework.ExpectEqual(len(rss), 2, "expected 2 replicaset, got %d", len(rss))
+	e2eutils.ExpectEqual(len(rss), 2, "expected 2 replicaset, got %d", len(rss))
 
 	ginkgo.By(fmt.Sprintf("Checking replicaset of deployment %q that is created before rollout survives the rollout", deploymentName))
 	switch t.oldRSUID {
@@ -108,11 +110,11 @@ func (t *DeploymentUpgradeTest) Setup(f *framework.Framework) {
 	case rss[1].UID:
 		t.newRSUID = rss[0].UID
 	default:
-		framework.ExpectNoError(fmt.Errorf("old replicaset with UID %q does not survive rollout", t.oldRSUID))
+		e2eutils.ExpectNoError(fmt.Errorf("old replicaset with UID %q does not survive rollout", t.oldRSUID))
 	}
 
 	ginkgo.By(fmt.Sprintf("Waiting for revision of the deployment %q to become 2", deploymentName))
-	framework.ExpectNoError(waitForDeploymentRevision(c, deployment, "2"))
+	e2eutils.ExpectNoError(waitForDeploymentRevision(c, deployment, "2"))
 
 	t.oldDeploymentUID = deployment.UID
 }
@@ -129,43 +131,43 @@ func (t *DeploymentUpgradeTest) Test(f *framework.Framework, done <-chan struct{
 	rsClient := c.AppsV1().ReplicaSets(ns)
 
 	deployment, err := deploymentClient.Get(context.TODO(), deploymentName, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	ginkgo.By(fmt.Sprintf("Checking UID to verify deployment %q survives upgrade", deploymentName))
-	framework.ExpectEqual(deployment.UID, t.oldDeploymentUID)
+	e2eutils.ExpectEqual(deployment.UID, t.oldDeploymentUID)
 
 	ginkgo.By(fmt.Sprintf("Verifying deployment %q does not create new replicasets", deploymentName))
 	rsSelector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	rsList, err := rsClient.List(context.TODO(), metav1.ListOptions{LabelSelector: rsSelector.String()})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	rss := rsList.Items
-	framework.ExpectEqual(len(rss), 2, "expected 2 replicaset, got %d", len(rss))
+	e2eutils.ExpectEqual(len(rss), 2, "expected 2 replicaset, got %d", len(rss))
 
 	switch t.oldRSUID {
 	case rss[0].UID:
-		framework.ExpectEqual(rss[1].UID, t.newRSUID)
+		e2eutils.ExpectEqual(rss[1].UID, t.newRSUID)
 	case rss[1].UID:
-		framework.ExpectEqual(rss[0].UID, t.newRSUID)
+		e2eutils.ExpectEqual(rss[0].UID, t.newRSUID)
 	default:
-		framework.ExpectNoError(fmt.Errorf("new replicasets are created during upgrade of deployment %q", deploymentName))
+		e2eutils.ExpectNoError(fmt.Errorf("new replicasets are created during upgrade of deployment %q", deploymentName))
 	}
 
 	ginkgo.By(fmt.Sprintf("Verifying revision of the deployment %q is still 2", deploymentName))
-	framework.ExpectEqual(deployment.Annotations[deploymentutil.RevisionAnnotation], "2")
+	e2eutils.ExpectEqual(deployment.Annotations[deploymentutil.RevisionAnnotation], "2")
 
 	ginkgo.By(fmt.Sprintf("Waiting for deployment %q to complete adoption", deploymentName))
-	framework.ExpectNoError(e2edeployment.WaitForDeploymentComplete(c, deployment))
+	e2eutils.ExpectNoError(e2edeployment.WaitForDeploymentComplete(c, deployment))
 
 	// Verify the upgraded deployment is active by scaling up the deployment by 1
 	ginkgo.By(fmt.Sprintf("Scaling up replicaset of deployment %q by 1", deploymentName))
 	deploymentWithUpdatedReplicas, err := e2edeployment.UpdateDeploymentWithRetries(c, ns, deploymentName, func(deployment *appsv1.Deployment) {
 		*deployment.Spec.Replicas = *deployment.Spec.Replicas + 1
 	})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	ginkgo.By(fmt.Sprintf("Waiting for deployment %q to complete after scaling", deploymentName))
-	framework.ExpectNoError(e2edeployment.WaitForDeploymentComplete(c, deploymentWithUpdatedReplicas))
+	e2eutils.ExpectNoError(e2edeployment.WaitForDeploymentComplete(c, deploymentWithUpdatedReplicas))
 }
 
 // Teardown cleans up any remaining resources.

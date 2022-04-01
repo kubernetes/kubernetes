@@ -33,6 +33,9 @@ import (
 	"text/tabwriter"
 	"time"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	cadvisorclient "github.com/google/cadvisor/client/v2"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
@@ -94,14 +97,14 @@ func NewResourceCollector(interval time.Duration) *ResourceCollector {
 func (r *ResourceCollector) Start() {
 	// Get the cgroup container names for kubelet and runtime
 	kubeletContainer, err1 := getContainerNameForProcess(kubeletProcessName, "")
-	runtimeContainer, err2 := getContainerNameForProcess(framework.TestContext.ContainerRuntimeProcessName, framework.TestContext.ContainerRuntimePidFile)
+	runtimeContainer, err2 := getContainerNameForProcess(e2econfig.TestContext.ContainerRuntimeProcessName, e2econfig.TestContext.ContainerRuntimePidFile)
 	if err1 == nil && err2 == nil && kubeletContainer != "" && runtimeContainer != "" {
 		systemContainers = map[string]string{
 			kubeletstatsv1alpha1.SystemContainerKubelet: kubeletContainer,
 			kubeletstatsv1alpha1.SystemContainerRuntime: runtimeContainer,
 		}
 	} else {
-		framework.Failf("Failed to get runtime container name in test-e2e-node resource collector.")
+		e2eutils.Failf("Failed to get runtime container name in test-e2e-node resource collector.")
 	}
 
 	wait.Poll(1*time.Second, 1*time.Minute, func() (bool, error) {
@@ -150,9 +153,9 @@ func (r *ResourceCollector) GetCPUSummary() e2ekubelet.ContainersCPUSummary {
 func (r *ResourceCollector) LogLatest() {
 	summary, err := r.GetLatest()
 	if err != nil {
-		framework.Logf("%v", err)
+		e2eutils.Logf("%v", err)
 	}
-	framework.Logf("%s", formatResourceUsageStats(summary))
+	e2eutils.Logf("%s", formatResourceUsageStats(summary))
 }
 
 // collectStats collects resource usage from Cadvisor.
@@ -160,12 +163,12 @@ func (r *ResourceCollector) collectStats(oldStatsMap map[string]*cadvisorapiv2.C
 	for _, name := range systemContainers {
 		ret, err := r.client.Stats(name, r.request)
 		if err != nil {
-			framework.Logf("Error getting container stats, err: %v", err)
+			e2eutils.Logf("Error getting container stats, err: %v", err)
 			return
 		}
 		cStats, ok := ret[name]
 		if !ok {
-			framework.Logf("Missing info/stats for container %q", name)
+			e2eutils.Logf("Missing info/stats for container %q", name)
 			return
 		}
 
@@ -381,7 +384,7 @@ func deletePodsSync(f *framework.Framework, pods []*v1.Pod) {
 
 			err := f.PodClient().Delete(context.TODO(), pod.ObjectMeta.Name, *metav1.NewDeleteOptions(30))
 			if apierrors.IsNotFound(err) {
-				framework.Failf("Unexpected error trying to delete pod %s: %v", pod.Name, err)
+				e2eutils.Failf("Unexpected error trying to delete pod %s: %v", pod.Name, err)
 			}
 
 			gomega.Expect(e2epod.WaitForPodToDisappear(f.ClientSet, f.Namespace.Name, pod.ObjectMeta.Name, labels.Everything(),

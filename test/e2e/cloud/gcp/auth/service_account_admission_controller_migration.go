@@ -19,6 +19,7 @@ package auth
 import (
 	"k8s.io/kubernetes/test/e2e/cloud/gcp/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 	"k8s.io/kubernetes/test/e2e/upgrades"
 	"k8s.io/kubernetes/test/e2e/upgrades/auth"
 	"k8s.io/kubernetes/test/utils/junit"
@@ -37,7 +38,7 @@ var _ = SIGDescribe("ServiceAccount admission controller migration [Feature:Boun
 	ginkgo.Describe("master upgrade", func() {
 		ginkgo.It("should maintain a functioning cluster", func() {
 			upgCtx, err := common.GetUpgradeContext(f.ClientSet.Discovery())
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "ServiceAccount admission controller migration"}
 			serviceaccountAdmissionControllerMigrationTest := &junit.TestCase{

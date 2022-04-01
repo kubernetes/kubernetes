@@ -21,7 +21,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/test/e2e/framework"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
@@ -36,12 +36,12 @@ const (
 // Note that deployment revision and its new RS revision should be updated shortly most of the time, but an overwhelmed RS controller
 // may result in taking longer to relabel a RS.
 func WaitForDeploymentRevisionAndImage(c clientset.Interface, ns, deploymentName string, revision, image string) error {
-	return testutils.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, revision, image, framework.Logf, poll, pollLongTimeout)
+	return testutils.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, revision, image, e2eutils.Logf, poll, pollLongTimeout)
 }
 
 // WaitForDeploymentComplete waits for the deployment to complete, and don't check if rolling update strategy is broken.
 // Rolling update strategy is used only during a rolling update, and can be violated in other situations,
 // such as shortly after a scaling event or the deployment is just created.
 func WaitForDeploymentComplete(c clientset.Interface, d *appsv1.Deployment) error {
-	return testutils.WaitForDeploymentComplete(c, d, framework.Logf, poll, pollLongTimeout)
+	return testutils.WaitForDeploymentComplete(c, d, e2eutils.Logf, poll, pollLongTimeout)
 }

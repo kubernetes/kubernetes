@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package framework
+package config
 
 import (
 	"crypto/rand"
@@ -29,6 +29,8 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo/config"
+	v1 "k8s.io/api/core/v1"
+	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -36,6 +38,7 @@ import (
 	"k8s.io/klog/v2"
 
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	e2eproviders "k8s.io/kubernetes/test/e2e/framework/providers"
 )
 
 const (
@@ -255,8 +258,11 @@ type CloudConfig struct {
 	NodeTag           string
 	MasterTag         string
 
-	Provider ProviderInterface
+	Provider e2eproviders.ProviderInterface
 }
+
+// CreateTestingNSFn is a func that is responsible for creating namespace used for executing e2e tests.
+type CreateTestingNSFn func(baseName string, c clientset.Interface, labels map[string]string) (*v1.Namespace, error)
 
 // TestContext should be used by all tests to access common context data.
 var TestContext TestContextType
@@ -483,17 +489,17 @@ func AfterReadingAllFlags(t *TestContextType) {
 	if TestContext.Provider == "" {
 		// Some users of the e2e.test binary pass --provider=.
 		// We need to support that, changing it would break those usages.
-		Logf("The --provider flag is not set. Continuing as if --provider=skeleton had been used.")
+		// Logf("The --provider flag is not set. Continuing as if --provider=skeleton had been used.")
 		TestContext.Provider = "skeleton"
 	}
 
 	var err error
-	TestContext.CloudConfig.Provider, err = SetupProviderConfig(TestContext.Provider)
+	TestContext.CloudConfig.Provider, err = e2eproviders.SetupProviderConfig(TestContext.Provider)
 	if err != nil {
 		if os.IsNotExist(errors.Unwrap(err)) {
 			// Provide a more helpful error message when the provider is unknown.
 			var providers []string
-			for _, name := range GetProviders() {
+			for _, name := range e2eproviders.GetProviders() {
 				// The empty string is accepted, but looks odd in the output below unless we quote it.
 				if name == "" {
 					name = `""`

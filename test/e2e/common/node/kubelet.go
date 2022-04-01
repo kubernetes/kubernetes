@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
@@ -36,7 +37,7 @@ import (
 var _ = SIGDescribe("Kubelet", func() {
 	f := framework.NewDefaultFramework("kubelet-test")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
-	var podClient *framework.PodClient
+	var podClient *e2eutils.PodClient
 	ginkgo.BeforeEach(func() {
 		podClient = f.PodClient()
 	})
@@ -58,7 +59,7 @@ var _ = SIGDescribe("Kubelet", func() {
 					RestartPolicy: v1.RestartPolicyNever,
 					Containers: []v1.Container{
 						{
-							Image:   framework.BusyBoxImage,
+							Image:   e2eutils.BusyBoxImage,
 							Name:    podName,
 							Command: []string{"sh", "-c", "echo 'Hello World' ; sleep 240"},
 						},
@@ -92,7 +93,7 @@ var _ = SIGDescribe("Kubelet", func() {
 					RestartPolicy: v1.RestartPolicyNever,
 					Containers: []v1.Container{
 						{
-							Image:   framework.BusyBoxImage,
+							Image:   e2eutils.BusyBoxImage,
 							Name:    podName,
 							Command: []string{"/bin/false"},
 						},
@@ -123,7 +124,7 @@ var _ = SIGDescribe("Kubelet", func() {
 					return fmt.Errorf("expected non-zero exitCode and non-empty terminated state reason. Got exitCode: %+v and terminated state reason: %+v", contTerminatedState.ExitCode, contTerminatedState.Reason)
 				}
 				return nil
-			}, framework.PodStartTimeout, time.Second*4).Should(gomega.BeNil())
+			}, e2eutils.PodStartTimeout, time.Second*4).Should(gomega.BeNil())
 		})
 
 		/*
@@ -155,7 +156,7 @@ var _ = SIGDescribe("Kubelet", func() {
 					RestartPolicy: v1.RestartPolicyNever,
 					Containers: []v1.Container{
 						{
-							Image:   framework.BusyBoxImage,
+							Image:   e2eutils.BusyBoxImage,
 							Name:    podName,
 							Command: []string{"/bin/sh", "-c", "cat /etc/hosts; sleep 6000"},
 						},
@@ -207,7 +208,7 @@ var _ = SIGDescribe("Kubelet", func() {
 					RestartPolicy: v1.RestartPolicyNever,
 					Containers: []v1.Container{
 						{
-							Image:   framework.BusyBoxImage,
+							Image:   e2eutils.BusyBoxImage,
 							Name:    podName,
 							Command: []string{"/bin/sh", "-c", "echo test > /file; sleep 240"},
 							SecurityContext: &v1.SecurityContext{

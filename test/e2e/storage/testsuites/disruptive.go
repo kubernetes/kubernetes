@@ -18,6 +18,7 @@ package testsuites
 
 import (
 	"github.com/onsi/ginkgo"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 
 	v1 "k8s.io/api/core/v1"
 	errors "k8s.io/apimachinery/pkg/util/errors"
@@ -121,7 +122,7 @@ func (s *disruptiveTestSuite) DefineTests(driver storageframework.TestDriver, pa
 
 		errs = append(errs, storageutils.TryFunc(l.driverCleanup))
 		l.driverCleanup = nil
-		framework.ExpectNoError(errors.NewAggregate(errs), "while cleaning up resource")
+		e2eutils.ExpectNoError(errors.NewAggregate(errs), "while cleaning up resource")
 	}
 
 	type testBody func(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod)
@@ -174,7 +175,7 @@ func (s *disruptiveTestSuite) DefineTests(driver storageframework.TestDriver, pa
 						ImageID:             e2epod.GetDefaultTestImageID(),
 					}
 					l.pod, err = e2epod.CreateSecPodWithNodeSelection(l.cs, &podConfig, f.Timeouts.PodStart)
-					framework.ExpectNoError(err, "While creating pods for kubelet restart test")
+					e2eutils.ExpectNoError(err, "While creating pods for kubelet restart test")
 
 					if pattern.VolMode == v1.PersistentVolumeBlock && t.runTestBlock != nil {
 						t.runTestBlock(l.cs, l.config.Framework, l.pod)

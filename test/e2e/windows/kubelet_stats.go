@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -46,8 +48,8 @@ var _ = SIGDescribe("[Feature:Windows] Kubelet-Stats [Serial]", func() {
 
 				ginkgo.By("Selecting a Windows node")
 				targetNode, err := findWindowsNode(f)
-				framework.ExpectNoError(err, "Error finding Windows node")
-				framework.Logf("Using node: %v", targetNode.Name)
+				e2eutils.ExpectNoError(err, "Error finding Windows node")
+				e2eutils.Logf("Using node: %v", targetNode.Name)
 
 				ginkgo.By("Scheduling 10 pods")
 				powershellImage := imageutils.GetConfig(imageutils.BusyBox)
@@ -68,7 +70,7 @@ var _ = SIGDescribe("[Feature:Windows] Kubelet-Stats [Serial]", func() {
 					duration := time.Since(start)
 					totalDurationMs += duration.Milliseconds()
 
-					framework.ExpectNoError(err, "Error getting kubelet stats")
+					e2eutils.ExpectNoError(err, "Error getting kubelet stats")
 
 					// Perform some basic sanity checks on retrieved stats for pods in this test's namespace
 					statsChecked := 0
@@ -79,22 +81,22 @@ var _ = SIGDescribe("[Feature:Windows] Kubelet-Stats [Serial]", func() {
 						statsChecked = statsChecked + 1
 
 						if *podStats.CPU.UsageCoreNanoSeconds <= 0 {
-							framework.Failf("Pod %s/%s stats report cpu usage equal to %v but it should be greater than 0", podStats.PodRef.Namespace, podStats.PodRef.Name, *podStats.CPU.UsageCoreNanoSeconds)
+							e2eutils.Failf("Pod %s/%s stats report cpu usage equal to %v but it should be greater than 0", podStats.PodRef.Namespace, podStats.PodRef.Name, *podStats.CPU.UsageCoreNanoSeconds)
 						}
 						if *podStats.Memory.WorkingSetBytes <= 0 {
-							framework.Failf("Pod %s/%s stats report bytes for memory working set equal to %v but it should be greater than 0", podStats.PodRef.Namespace, podStats.PodRef.Name, *podStats.Memory.WorkingSetBytes)
+							e2eutils.Failf("Pod %s/%s stats report bytes for memory working set equal to %v but it should be greater than 0", podStats.PodRef.Namespace, podStats.PodRef.Name, *podStats.Memory.WorkingSetBytes)
 						}
 
 						for _, containerStats := range podStats.Containers {
 							if containerStats.Logs == nil {
-								framework.Failf("Pod %s/%s stats should have container log stats, but it is nil", podStats.PodRef.Namespace, podStats.PodRef.Name)
+								e2eutils.Failf("Pod %s/%s stats should have container log stats, but it is nil", podStats.PodRef.Namespace, podStats.PodRef.Name)
 							}
 							if *containerStats.Logs.AvailableBytes <= 0 {
-								framework.Failf("Pod %s/%s container log stats report %v bytes for AvailableBytes, but it should be greater than 0", podStats.PodRef.Namespace, podStats.PodRef.Name, *containerStats.Logs.AvailableBytes)
+								e2eutils.Failf("Pod %s/%s container log stats report %v bytes for AvailableBytes, but it should be greater than 0", podStats.PodRef.Namespace, podStats.PodRef.Name, *containerStats.Logs.AvailableBytes)
 							}
 						}
 					}
-					framework.ExpectEqual(statsChecked, 10, "Should find stats for 10 pods in kubelet stats")
+					e2eutils.ExpectEqual(statsChecked, 10, "Should find stats for 10 pods in kubelet stats")
 
 					time.Sleep(5 * time.Second)
 				}
@@ -102,9 +104,9 @@ var _ = SIGDescribe("[Feature:Windows] Kubelet-Stats [Serial]", func() {
 				avgDurationMs := totalDurationMs / int64(iterations)
 
 				durationMatch := avgDurationMs <= time.Duration(10*time.Second).Milliseconds()
-				framework.Logf("Getting kubelet stats for node %v took an average of %v milliseconds over %v iterations", targetNode.Name, avgDurationMs, iterations)
+				e2eutils.Logf("Getting kubelet stats for node %v took an average of %v milliseconds over %v iterations", targetNode.Name, avgDurationMs, iterations)
 				if !durationMatch {
-					framework.Failf("Collecting kubelet stats took %v seconds but it should not take longer than 10 seconds", durationMatch)
+					e2eutils.Failf("Collecting kubelet stats took %v seconds but it should not take longer than 10 seconds", durationMatch)
 				}
 			})
 		})
@@ -119,11 +121,11 @@ var _ = SIGDescribe("[Feature:Windows] Kubelet-Stats", func() {
 			ginkgo.It("should return bootid within 10 seconds", func() {
 				ginkgo.By("Selecting a Windows node")
 				targetNode, err := findWindowsNode(f)
-				framework.ExpectNoError(err, "Error finding Windows node")
-				framework.Logf("Using node: %v", targetNode.Name)
+				e2eutils.ExpectNoError(err, "Error finding Windows node")
+				e2eutils.Logf("Using node: %v", targetNode.Name)
 
 				ginkgo.By("Getting bootid")
-				framework.ExpectEqual(len(targetNode.Status.NodeInfo.BootID) != 0, true, "Should find bootId in kubelet stats")
+				e2eutils.ExpectEqual(len(targetNode.Status.NodeInfo.BootID) != 0, true, "Should find bootId in kubelet stats")
 			})
 		})
 
@@ -133,8 +135,8 @@ var _ = SIGDescribe("[Feature:Windows] Kubelet-Stats", func() {
 
 				ginkgo.By("Selecting a Windows node")
 				targetNode, err := findWindowsNode(f)
-				framework.ExpectNoError(err, "Error finding Windows node")
-				framework.Logf("Using node: %v", targetNode.Name)
+				e2eutils.ExpectNoError(err, "Error finding Windows node")
+				e2eutils.Logf("Using node: %v", targetNode.Name)
 
 				ginkgo.By("Scheduling 3 pods")
 				powershellImage := imageutils.GetConfig(imageutils.BusyBox)
@@ -155,7 +157,7 @@ var _ = SIGDescribe("[Feature:Windows] Kubelet-Stats", func() {
 					duration := time.Since(start)
 					totalDurationMs += duration.Milliseconds()
 
-					framework.ExpectNoError(err, "Error getting kubelet stats")
+					e2eutils.ExpectNoError(err, "Error getting kubelet stats")
 
 					// Perform some basic sanity checks on retrieved stats for pods in this test's namespace
 					statsChecked := 0
@@ -166,22 +168,22 @@ var _ = SIGDescribe("[Feature:Windows] Kubelet-Stats", func() {
 						statsChecked = statsChecked + 1
 
 						if *podStats.CPU.UsageCoreNanoSeconds <= 0 {
-							framework.Failf("Pod %s/%s stats report cpu usage equal to %v but it should be greater than 0", podStats.PodRef.Namespace, podStats.PodRef.Name, *podStats.CPU.UsageCoreNanoSeconds)
+							e2eutils.Failf("Pod %s/%s stats report cpu usage equal to %v but it should be greater than 0", podStats.PodRef.Namespace, podStats.PodRef.Name, *podStats.CPU.UsageCoreNanoSeconds)
 						}
 						if *podStats.Memory.WorkingSetBytes <= 0 {
-							framework.Failf("Pod %s/%s stats report bytes for memory working set equal to %v but it should be greater than 0", podStats.PodRef.Namespace, podStats.PodRef.Name, *podStats.Memory.WorkingSetBytes)
+							e2eutils.Failf("Pod %s/%s stats report bytes for memory working set equal to %v but it should be greater than 0", podStats.PodRef.Namespace, podStats.PodRef.Name, *podStats.Memory.WorkingSetBytes)
 						}
 
 						for _, containerStats := range podStats.Containers {
 							if containerStats.Logs == nil {
-								framework.Failf("Pod %s/%s stats should have container log stats, but it is nil", podStats.PodRef.Namespace, podStats.PodRef.Name)
+								e2eutils.Failf("Pod %s/%s stats should have container log stats, but it is nil", podStats.PodRef.Namespace, podStats.PodRef.Name)
 							}
 							if *containerStats.Logs.AvailableBytes <= 0 {
-								framework.Failf("Pod %s/%s container log stats report %v bytes for AvailableBytes, but it should be greater than 0", podStats.PodRef.Namespace, podStats.PodRef.Name, *containerStats.Logs.AvailableBytes)
+								e2eutils.Failf("Pod %s/%s container log stats report %v bytes for AvailableBytes, but it should be greater than 0", podStats.PodRef.Namespace, podStats.PodRef.Name, *containerStats.Logs.AvailableBytes)
 							}
 						}
 					}
-					framework.ExpectEqual(statsChecked, 3, "Should find stats for 10 pods in kubelet stats")
+					e2eutils.ExpectEqual(statsChecked, 3, "Should find stats for 10 pods in kubelet stats")
 
 					time.Sleep(5 * time.Second)
 				}
@@ -189,9 +191,9 @@ var _ = SIGDescribe("[Feature:Windows] Kubelet-Stats", func() {
 				avgDurationMs := totalDurationMs / int64(iterations)
 
 				durationMatch := avgDurationMs <= time.Duration(10*time.Second).Milliseconds()
-				framework.Logf("Getting kubelet stats for node %v took an average of %v milliseconds over %v iterations", targetNode.Name, avgDurationMs, iterations)
+				e2eutils.Logf("Getting kubelet stats for node %v took an average of %v milliseconds over %v iterations", targetNode.Name, avgDurationMs, iterations)
 				if !durationMatch {
-					framework.Failf("Collecting kubelet stats took %v seconds but it should not take longer than 10 seconds", durationMatch)
+					e2eutils.Failf("Collecting kubelet stats took %v seconds but it should not take longer than 10 seconds", durationMatch)
 				}
 			})
 		})

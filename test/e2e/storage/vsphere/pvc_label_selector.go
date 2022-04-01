@@ -20,6 +20,9 @@ import (
 	"context"
 	"time"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -67,7 +70,7 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:vsphere][Feature:LabelSele
 		ns = f.Namespace.Name
 		Bootstrap(f)
 		nodeInfo = GetReadySchedulableRandomNodeInfo()
-		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
+		e2eutils.ExpectNoError(e2eutils.WaitForAllNodesSchedulable(c, e2econfig.TestContext.NodeSchedulableTimeout))
 		ssdlabels = make(map[string]string)
 		ssdlabels["volume-type"] = "ssd"
 		vvollabels = make(map[string]string)
@@ -78,31 +81,31 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:vsphere][Feature:LabelSele
 	ginkgo.Describe("Selector-Label Volume Binding:vsphere [Feature:vsphere]", func() {
 		ginkgo.AfterEach(func() {
 			ginkgo.By("Running clean up actions")
-			if framework.ProviderIs("vsphere") {
+			if e2eutils.ProviderIs("vsphere") {
 				testCleanupVSpherePVClabelselector(c, ns, nodeInfo, volumePath, pvSsd, pvcSsd, pvcVvol)
 			}
 		})
 		ginkgo.It("should bind volume with claim for given label", func() {
 			volumePath, pvSsd, pvcSsd, pvcVvol, err = testSetupVSpherePVClabelselector(c, nodeInfo, ns, ssdlabels, vvollabels)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 
 			ginkgo.By("wait for the pvcSsd to bind with pvSsd")
-			framework.ExpectNoError(e2epv.WaitOnPVandPVC(c, f.Timeouts, ns, pvSsd, pvcSsd))
+			e2eutils.ExpectNoError(e2epv.WaitOnPVandPVC(c, f.Timeouts, ns, pvSsd, pvcSsd))
 
 			ginkgo.By("Verify status of pvcVvol is pending")
 			err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimPending, c, ns, pvcVvol.Name, 3*time.Second, 300*time.Second)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 
 			ginkgo.By("delete pvcSsd")
-			framework.ExpectNoError(e2epv.DeletePersistentVolumeClaim(c, pvcSsd.Name, ns), "Failed to delete PVC ", pvcSsd.Name)
+			e2eutils.ExpectNoError(e2epv.DeletePersistentVolumeClaim(c, pvcSsd.Name, ns), "Failed to delete PVC ", pvcSsd.Name)
 
 			ginkgo.By("verify pvSsd is deleted")
 			err = e2epv.WaitForPersistentVolumeDeleted(c, pvSsd.Name, 3*time.Second, 300*time.Second)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			volumePath = ""
 
 			ginkgo.By("delete pvcVvol")
-			framework.ExpectNoError(e2epv.DeletePersistentVolumeClaim(c, pvcVvol.Name, ns), "Failed to delete PVC ", pvcVvol.Name)
+			e2eutils.ExpectNoError(e2epv.DeletePersistentVolumeClaim(c, pvcVvol.Name, ns), "Failed to delete PVC ", pvcVvol.Name)
 		})
 	})
 })
@@ -141,12 +144,12 @@ func testCleanupVSpherePVClabelselector(c clientset.Interface, ns string, nodeIn
 		nodeInfo.VSphere.DeleteVolume(volumePath, nodeInfo.DataCenterRef)
 	}
 	if pvcSsd != nil {
-		framework.ExpectNoError(e2epv.DeletePersistentVolumeClaim(c, pvcSsd.Name, ns), "Failed to delete PVC ", pvcSsd.Name)
+		e2eutils.ExpectNoError(e2epv.DeletePersistentVolumeClaim(c, pvcSsd.Name, ns), "Failed to delete PVC ", pvcSsd.Name)
 	}
 	if pvcVvol != nil {
-		framework.ExpectNoError(e2epv.DeletePersistentVolumeClaim(c, pvcVvol.Name, ns), "Failed to delete PVC ", pvcVvol.Name)
+		e2eutils.ExpectNoError(e2epv.DeletePersistentVolumeClaim(c, pvcVvol.Name, ns), "Failed to delete PVC ", pvcVvol.Name)
 	}
 	if pvSsd != nil {
-		framework.ExpectNoError(e2epv.DeletePersistentVolume(c, pvSsd.Name), "Failed to delete PV ", pvSsd.Name)
+		e2eutils.ExpectNoError(e2epv.DeletePersistentVolume(c, pvSsd.Name), "Failed to delete PV ", pvSsd.Name)
 	}
 }

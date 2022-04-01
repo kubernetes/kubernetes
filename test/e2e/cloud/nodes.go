@@ -20,6 +20,9 @@ import (
 	"context"
 	"time"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -46,30 +49,30 @@ var _ = SIGDescribe("[Feature:CloudProvider][Disruptive] Nodes", func() {
 		ginkgo.By("deleting a node on the cloud provider")
 
 		nodeToDelete, err := e2enode.GetRandomReadySchedulableNode(c)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		origNodes, err := e2enode.GetReadyNodesIncludingTainted(c)
 		if err != nil {
-			framework.Logf("Unexpected error occurred: %v", err)
+			e2eutils.Logf("Unexpected error occurred: %v", err)
 		}
-		framework.ExpectNoErrorWithOffset(0, err)
+		e2eutils.ExpectNoErrorWithOffset(0, err)
 
-		framework.Logf("Original number of ready nodes: %d", len(origNodes.Items))
+		e2eutils.Logf("Original number of ready nodes: %d", len(origNodes.Items))
 
 		err = deleteNodeOnCloudProvider(nodeToDelete)
 		if err != nil {
-			framework.Failf("failed to delete node %q, err: %q", nodeToDelete.Name, err)
+			e2eutils.Failf("failed to delete node %q, err: %q", nodeToDelete.Name, err)
 		}
 
 		newNodes, err := e2enode.CheckReady(c, len(origNodes.Items)-1, 5*time.Minute)
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(newNodes), len(origNodes.Items)-1)
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectEqual(len(newNodes), len(origNodes.Items)-1)
 
 		_, err = c.CoreV1().Nodes().Get(context.TODO(), nodeToDelete.Name, metav1.GetOptions{})
 		if err == nil {
-			framework.Failf("node %q still exists when it should be deleted", nodeToDelete.Name)
+			e2eutils.Failf("node %q still exists when it should be deleted", nodeToDelete.Name)
 		} else if !apierrors.IsNotFound(err) {
-			framework.Failf("failed to get node %q err: %q", nodeToDelete.Name, err)
+			e2eutils.Failf("failed to get node %q err: %q", nodeToDelete.Name, err)
 		}
 
 	})
@@ -77,5 +80,5 @@ var _ = SIGDescribe("[Feature:CloudProvider][Disruptive] Nodes", func() {
 
 // DeleteNodeOnCloudProvider deletes the specified node.
 func deleteNodeOnCloudProvider(node *v1.Node) error {
-	return framework.TestContext.CloudConfig.Provider.DeleteNode(node)
+	return e2econfig.TestContext.CloudConfig.Provider.DeleteNode(node)
 }

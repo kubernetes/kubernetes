@@ -24,7 +24,9 @@ import (
 
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
+	"k8s.io/kubernetes/test/e2e/framework/utils"
 )
 
 // CleanupSuite is the boilerplate that can be used after tests on ginkgo were run, on the SynchronizedAfterSuite step.
@@ -33,30 +35,30 @@ import (
 // and then the function that only runs on the first Ginkgo node.
 func CleanupSuite() {
 	// Run on all Ginkgo nodes
-	framework.Logf("Running AfterSuite actions on all nodes")
+	utils.Logf("Running AfterSuite actions on all nodes")
 	framework.RunCleanupActions()
 }
 
 // AfterSuiteActions are actions that are run on ginkgo's SynchronizedAfterSuite
 func AfterSuiteActions() {
 	// Run only Ginkgo on node 1
-	framework.Logf("Running AfterSuite actions on node 1")
-	if framework.TestContext.ReportDir != "" {
-		framework.CoreDump(framework.TestContext.ReportDir)
+	utils.Logf("Running AfterSuite actions on node 1")
+	if e2econfig.TestContext.ReportDir != "" {
+		utils.CoreDump(e2econfig.TestContext.ReportDir)
 	}
-	if framework.TestContext.GatherSuiteMetricsAfterTest {
+	if e2econfig.TestContext.GatherSuiteMetricsAfterTest {
 		if err := gatherTestSuiteMetrics(); err != nil {
-			framework.Logf("Error gathering metrics: %v", err)
+			utils.Logf("Error gathering metrics: %v", err)
 		}
 	}
-	if framework.TestContext.NodeKiller.Enabled {
-		close(framework.TestContext.NodeKiller.NodeKillerStopCh)
+	if e2econfig.TestContext.NodeKiller.Enabled {
+		close(e2econfig.TestContext.NodeKiller.NodeKillerStopCh)
 	}
 }
 
 func gatherTestSuiteMetrics() error {
-	framework.Logf("Gathering metrics")
-	config, err := framework.LoadConfig()
+	utils.Logf("Gathering metrics")
+	config, err := utils.LoadConfig()
 	if err != nil {
 		return fmt.Errorf("error loading client config: %v", err)
 	}
@@ -66,7 +68,7 @@ func gatherTestSuiteMetrics() error {
 	}
 
 	// Grab metrics for apiserver, scheduler, controller-manager, kubelet (for non-kubemark case) and cluster autoscaler (optionally).
-	grabber, err := e2emetrics.NewMetricsGrabber(c, nil, config, !framework.ProviderIs("kubemark"), true, true, true, framework.TestContext.IncludeClusterAutoscalerMetrics, false)
+	grabber, err := e2emetrics.NewMetricsGrabber(c, nil, config, !utils.ProviderIs("kubemark"), true, true, true, e2econfig.TestContext.IncludeClusterAutoscalerMetrics, false)
 	if err != nil {
 		return fmt.Errorf("failed to create MetricsGrabber: %v", err)
 	}
@@ -78,13 +80,13 @@ func gatherTestSuiteMetrics() error {
 
 	metricsForE2E := (*e2emetrics.ComponentCollection)(&received)
 	metricsJSON := metricsForE2E.PrintJSON()
-	if framework.TestContext.ReportDir != "" {
-		filePath := path.Join(framework.TestContext.ReportDir, "MetricsForE2ESuite_"+time.Now().Format(time.RFC3339)+".json")
+	if e2econfig.TestContext.ReportDir != "" {
+		filePath := path.Join(e2econfig.TestContext.ReportDir, "MetricsForE2ESuite_"+time.Now().Format(time.RFC3339)+".json")
 		if err := os.WriteFile(filePath, []byte(metricsJSON), 0644); err != nil {
 			return fmt.Errorf("error writing to %q: %v", filePath, err)
 		}
 	} else {
-		framework.Logf("\n\nTest Suite Metrics:\n%s\n", metricsJSON)
+		utils.Logf("\n\nTest Suite Metrics:\n%s\n", metricsJSON)
 	}
 
 	return nil

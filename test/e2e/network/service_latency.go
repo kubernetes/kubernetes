@@ -23,6 +23,8 @@ import (
 	"strings"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -82,9 +84,9 @@ var _ = common.SIGDescribe("Service endpoints latency", func() {
 		)
 
 		// Turn off rate limiting--it interferes with our measurements.
-		cfg, err := framework.LoadConfig()
+		cfg, err := e2eutils.LoadConfig()
 		if err != nil {
-			framework.Failf("Unable to load config: %v", err)
+			e2eutils.Failf("Unable to load config: %v", err)
 		}
 		cfg.RateLimiter = flowcontrol.NewFakeAlwaysRateLimiter()
 		f.ClientSet = kubernetes.NewForConfigOrDie(cfg)
@@ -102,7 +104,7 @@ var _ = common.SIGDescribe("Service endpoints latency", func() {
 		}
 		if n < 2 {
 			failing.Insert("Less than two runs succeeded; aborting.")
-			framework.Failf(strings.Join(failing.List(), "\n"))
+			e2eutils.Failf(strings.Join(failing.List(), "\n"))
 		}
 		percentile := func(p int) time.Duration {
 			est := n * p / 100
@@ -111,14 +113,14 @@ var _ = common.SIGDescribe("Service endpoints latency", func() {
 			}
 			return dSorted[est]
 		}
-		framework.Logf("Latencies: %v", dSorted)
+		e2eutils.Logf("Latencies: %v", dSorted)
 		p50 := percentile(50)
 		p90 := percentile(90)
 		p99 := percentile(99)
-		framework.Logf("50 %%ile: %v", p50)
-		framework.Logf("90 %%ile: %v", p90)
-		framework.Logf("99 %%ile: %v", p99)
-		framework.Logf("Total sample count: %v", len(dSorted))
+		e2eutils.Logf("50 %%ile: %v", p50)
+		e2eutils.Logf("90 %%ile: %v", p90)
+		e2eutils.Logf("99 %%ile: %v", p99)
+		e2eutils.Logf("Total sample count: %v", len(dSorted))
 
 		if p50 > limitMedian {
 			failing.Insert("Median latency should be less than " + limitMedian.String())
@@ -129,7 +131,7 @@ var _ = common.SIGDescribe("Service endpoints latency", func() {
 		if failing.Len() > 0 {
 			errList := strings.Join(failing.List(), "\n")
 			helpfulInfo := fmt.Sprintf("\n50, 90, 99 percentiles: %v %v %v", p50, p90, p99)
-			framework.Failf(errList + helpfulInfo)
+			e2eutils.Failf(errList + helpfulInfo)
 		}
 	})
 })
@@ -183,14 +185,14 @@ func runServiceLatencies(f *framework.Framework, inParallel, total int, acceptab
 	for i := 0; i < total; i++ {
 		select {
 		case e := <-errs:
-			framework.Logf("Got error: %v", e)
+			e2eutils.Logf("Got error: %v", e)
 			errCount++
 		case d := <-durations:
 			output = append(output, d)
 		}
 	}
 	if errCount != 0 {
-		framework.Logf("Got %d errors out of %d tries", errCount, total)
+		e2eutils.Logf("Got %d errors out of %d tries", errCount, total)
 		errRatio := float32(errCount) / float32(total)
 		if errRatio > acceptableFailureRatio {
 			return output, fmt.Errorf("error ratio %g is higher than the acceptable ratio %g", errRatio, acceptableFailureRatio)
@@ -352,13 +354,13 @@ func singleServiceLatency(f *framework.Framework, name string, q *endpointQuerie
 	if err != nil {
 		return 0, err
 	}
-	framework.Logf("Created: %v", gotSvc.Name)
+	e2eutils.Logf("Created: %v", gotSvc.Name)
 
 	if e := q.request(gotSvc.Name); e == nil {
 		return 0, fmt.Errorf("never got a result for endpoint %v", gotSvc.Name)
 	}
 	stopTime := time.Now()
 	d := stopTime.Sub(startTime)
-	framework.Logf("Got endpoints: %v [%v]", gotSvc.Name, d)
+	e2eutils.Logf("Got endpoints: %v [%v]", gotSvc.Name, d)
 	return d, nil
 }

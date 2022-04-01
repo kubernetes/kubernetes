@@ -22,6 +22,8 @@ import (
 	"strings"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
@@ -120,14 +122,14 @@ var _ = SIGDescribe("health handlers", func() {
 	ginkgo.It("should contain necessary checks", func() {
 		ginkgo.By("/health")
 		err := testPath(f.ClientSet, "/healthz?verbose=1", requiredHealthzChecks)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		ginkgo.By("/livez")
 		err = testPath(f.ClientSet, "/livez?verbose=1", requiredLivezChecks)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		ginkgo.By("/readyz")
 		err = testPath(f.ClientSet, "/readyz?verbose=1", requiredReadyzChecks)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 	})
 })

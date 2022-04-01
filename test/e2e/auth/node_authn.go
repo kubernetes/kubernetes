@@ -22,6 +22,9 @@ import (
 	"net"
 	"strconv"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/cluster/ports"
@@ -44,21 +47,21 @@ var _ = SIGDescribe("[Feature:NodeAuthenticator]", func() {
 		ns = f.Namespace.Name
 
 		nodes, err := e2enode.GetBoundedReadySchedulableNodes(f.ClientSet, 1)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		family := v1.IPv4Protocol
-		if framework.TestContext.ClusterIsIPv6() {
+		if e2econfig.TestContext.ClusterIsIPv6() {
 			family = v1.IPv6Protocol
 		}
 
 		nodeIPs := e2enode.GetAddressesByTypeAndFamily(&nodes.Items[0], v1.NodeInternalIP, family)
-		framework.ExpectNotEqual(len(nodeIPs), 0)
+		e2eutils.ExpectNotEqual(len(nodeIPs), 0)
 
 		// make sure ServiceAccount admission controller is enabled, so secret generation on SA creation works
 		saName := "default"
 		sa, err := f.ClientSet.CoreV1().ServiceAccounts(ns).Get(context.TODO(), saName, metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to retrieve service account (%s:%s)", ns, saName)
-		framework.ExpectNotEqual(len(sa.Secrets), 0)
+		e2eutils.ExpectNoError(err, "failed to retrieve service account (%s:%s)", ns, saName)
+		e2eutils.ExpectNotEqual(len(sa.Secrets), 0)
 
 	})
 
@@ -67,7 +70,7 @@ var _ = SIGDescribe("[Feature:NodeAuthenticator]", func() {
 		for _, nodeIP := range nodeIPs {
 			// Anonymous authentication is disabled by default
 			host := net.JoinHostPort(nodeIP, strconv.Itoa(ports.KubeletPort))
-			result := framework.RunHostCmdOrDie(ns, pod.Name, fmt.Sprintf("curl -sIk -o /dev/null -w '%s' https://%s/metrics", "%{http_code}", host))
+			result := e2eutils.RunHostCmdOrDie(ns, pod.Name, fmt.Sprintf("curl -sIk -o /dev/null -w '%s' https://%s/metrics", "%{http_code}", host))
 			gomega.Expect(result).To(gomega.Or(gomega.Equal("401"), gomega.Equal("403")), "the kubelet's main port 10250 should reject requests with no credentials")
 		}
 	})
@@ -83,13 +86,13 @@ var _ = SIGDescribe("[Feature:NodeAuthenticator]", func() {
 			AutomountServiceAccountToken: &trueValue,
 		}
 		_, err := f.ClientSet.CoreV1().ServiceAccounts(ns).Create(context.TODO(), newSA, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create service account (%s:%s)", ns, newSA.Name)
+		e2eutils.ExpectNoError(err, "failed to create service account (%s:%s)", ns, newSA.Name)
 
 		pod := createNodeAuthTestPod(f)
 
 		for _, nodeIP := range nodeIPs {
 			host := net.JoinHostPort(nodeIP, strconv.Itoa(ports.KubeletPort))
-			result := framework.RunHostCmdOrDie(ns,
+			result := e2eutils.RunHostCmdOrDie(ns,
 				pod.Name,
 				fmt.Sprintf("curl -sIk -o /dev/null -w '%s' --header \"Authorization: Bearer `%s`\" https://%s/metrics",
 					"%{http_code}",

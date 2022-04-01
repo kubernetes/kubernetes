@@ -22,6 +22,8 @@ import (
 	"strings"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -87,8 +89,8 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 
 		ginkgo.By("selecting a Windows node")
 		targetNode, err := findWindowsNode(f)
-		framework.ExpectNoError(err, "Error finding Windows node")
-		framework.Logf("Using node: %v", targetNode.Name)
+		e2eutils.ExpectNoError(err, "Error finding Windows node")
+		e2eutils.Logf("Using node: %v", targetNode.Name)
 
 		ginkgo.By("scheduling a pod with a container that verifies %COMPUTERNAME% matches selected node name")
 		image := imageutils.GetConfig(imageutils.BusyBox)
@@ -128,8 +130,8 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 			podName,
 			metav1.GetOptions{})
 
-		framework.ExpectNoError(err, "Error retrieving pod")
-		framework.ExpectEqual(p.Status.Phase, v1.PodSucceeded)
+		e2eutils.ExpectNoError(err, "Error retrieving pod")
+		e2eutils.ExpectEqual(p.Status.Phase, v1.PodSucceeded)
 	})
 
 	ginkgo.It("should support init containers", func() {
@@ -180,16 +182,16 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 			podName,
 			metav1.GetOptions{})
 
-		framework.ExpectNoError(err, "Error retrieving pod")
+		e2eutils.ExpectNoError(err, "Error retrieving pod")
 
 		if p.Status.Phase != v1.PodSucceeded {
 			logs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, "read-configuration")
 			if err != nil {
-				framework.Logf("Error pulling logs: %v", err)
+				e2eutils.Logf("Error pulling logs: %v", err)
 			}
-			framework.Logf("Pod phase: %v\nlogs:\n%s", p.Status.Phase, logs)
+			e2eutils.Logf("Pod phase: %v\nlogs:\n%s", p.Status.Phase, logs)
 		}
-		framework.ExpectEqual(p.Status.Phase, v1.PodSucceeded)
+		e2eutils.ExpectEqual(p.Status.Phase, v1.PodSucceeded)
 	})
 
 	ginkgo.It("container command path validation", func() {
@@ -395,10 +397,10 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 				podName,
 				metav1.GetOptions{})
 
-			framework.ExpectNoError(err, "Error retrieving pod")
+			e2eutils.ExpectNoError(err, "Error retrieving pod")
 
 			if p.Status.Phase != v1.PodSucceeded {
-				framework.Logf("Getting pod events")
+				e2eutils.Logf("Getting pod events")
 				options := metav1.ListOptions{
 					FieldSelector: fields.Set{
 						"involvedObject.kind":      "Pod",
@@ -407,11 +409,11 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 					}.AsSelector().String(),
 				}
 				events, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(context.TODO(), options)
-				framework.ExpectNoError(err, "Error getting events for failed pod")
+				e2eutils.ExpectNoError(err, "Error getting events for failed pod")
 				for _, event := range events.Items {
-					framework.Logf("%s: %s", event.Reason, event.Message)
+					e2eutils.Logf("%s: %s", event.Reason, event.Message)
 				}
-				framework.Failf("Pod '%s' did failed.", p.Name)
+				e2eutils.Failf("Pod '%s' did failed.", p.Name)
 			}
 		}
 
@@ -435,7 +437,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 			},
 		}
 		_, err := f.ClientSet.CoreV1().ConfigMaps(ns.Name).Create(context.TODO(), configMap, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "unable to create create configmap")
+		e2eutils.ExpectNoError(err, "unable to create create configmap")
 
 		ginkgo.By("Creating a secret containing test data")
 		secret := &v1.Secret{
@@ -452,7 +454,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 			},
 		}
 		_, err = f.ClientSet.CoreV1().Secrets(ns.Name).Create(context.TODO(), secret, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "unable to create secret")
+		e2eutils.ExpectNoError(err, "unable to create secret")
 
 		ginkgo.By("Creating a pod with a HostProcess container that uses various types of volume mounts")
 
@@ -465,8 +467,8 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 		f.PodClient().WaitForFinish(podAndContainerName, 3*time.Minute)
 
 		logs, err := e2epod.GetPodLogs(f.ClientSet, ns.Name, podAndContainerName, podAndContainerName)
-		framework.ExpectNoError(err, "Error getting pod logs")
-		framework.Logf("Container logs: %s", logs)
+		e2eutils.ExpectNoError(err, "Error getting pod logs")
+		e2eutils.Logf("Container logs: %s", logs)
 
 		ginkgo.By("Then ensuring pod finished running successfully")
 		p, err := f.ClientSet.CoreV1().Pods(ns.Name).Get(
@@ -474,20 +476,20 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 			podAndContainerName,
 			metav1.GetOptions{})
 
-		framework.ExpectNoError(err, "Error retrieving pod")
-		framework.ExpectEqual(p.Status.Phase, v1.PodSucceeded)
+		e2eutils.ExpectNoError(err, "Error retrieving pod")
+		e2eutils.ExpectEqual(p.Status.Phase, v1.PodSucceeded)
 	})
 
 	ginkgo.It("metrics should report count of started and failed to start HostProcess containers", func() {
 		ginkgo.By("Selecting a Windows node")
 		targetNode, err := findWindowsNode(f)
-		framework.ExpectNoError(err, "Error finding Windows node")
-		framework.Logf("Using node: %v", targetNode.Name)
+		e2eutils.ExpectNoError(err, "Error finding Windows node")
+		e2eutils.Logf("Using node: %v", targetNode.Name)
 
 		ginkgo.By("Getting initial kubelet metrics values")
 		beforeMetrics, err := getCurrentHostProcessMetrics(f, targetNode.Name)
-		framework.ExpectNoError(err, "Error getting initial kubelet metrics for node")
-		framework.Logf("Initial HostProcess container metrics -- StartedContainers: %v, StartedContainersErrors: %v, StartedInitContainers: %v, StartedInitContainersErrors: %v",
+		e2eutils.ExpectNoError(err, "Error getting initial kubelet metrics for node")
+		e2eutils.Logf("Initial HostProcess container metrics -- StartedContainers: %v, StartedContainersErrors: %v, StartedInitContainers: %v, StartedInitContainersErrors: %v",
 			beforeMetrics.StartedContainersCount, beforeMetrics.StartedContainersErrorCount, beforeMetrics.StartedInitContainersCount, beforeMetrics.StartedInitContainersErrorCount)
 
 		ginkgo.By("Scheduling a pod with a HostProcess init container that will fail")
@@ -559,17 +561,17 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 		ginkgo.By("Getting subsequent kubelet metrics values")
 
 		afterMetrics, err := getCurrentHostProcessMetrics(f, targetNode.Name)
-		framework.ExpectNoError(err, "Error getting subsequent kubelet metrics for node")
-		framework.Logf("Subsequent HostProcess container metrics -- StartedContainers: %v, StartedContainersErrors: %v, StartedInitContainers: %v, StartedInitContainersErrors: %v",
+		e2eutils.ExpectNoError(err, "Error getting subsequent kubelet metrics for node")
+		e2eutils.Logf("Subsequent HostProcess container metrics -- StartedContainers: %v, StartedContainersErrors: %v, StartedInitContainers: %v, StartedInitContainersErrors: %v",
 			afterMetrics.StartedContainersCount, afterMetrics.StartedContainersErrorCount, afterMetrics.StartedInitContainersCount, afterMetrics.StartedInitContainersErrorCount)
 
 		// Note: This test performs relative comparisons to ensure metrics values were logged and does not validate specific values.
 		// This done so the test can be run in parallel with other tests which may start HostProcess containers on the same node.
 		ginkgo.By("Ensuring metrics were updated")
-		framework.ExpectEqual(beforeMetrics.StartedContainersCount < afterMetrics.StartedContainersCount, true, "Count of started HostProcess containers should increase")
-		framework.ExpectEqual(beforeMetrics.StartedContainersErrorCount < afterMetrics.StartedContainersErrorCount, true, "Count of started HostProcess errors containers should increase")
-		framework.ExpectEqual(beforeMetrics.StartedInitContainersCount < afterMetrics.StartedInitContainersCount, true, "Count of started HostProcess init containers should increase")
-		framework.ExpectEqual(beforeMetrics.StartedInitContainersErrorCount < afterMetrics.StartedInitContainersErrorCount, true, "Count of started HostProcess errors init containers should increase")
+		e2eutils.ExpectEqual(beforeMetrics.StartedContainersCount < afterMetrics.StartedContainersCount, true, "Count of started HostProcess containers should increase")
+		e2eutils.ExpectEqual(beforeMetrics.StartedContainersErrorCount < afterMetrics.StartedContainersErrorCount, true, "Count of started HostProcess errors containers should increase")
+		e2eutils.ExpectEqual(beforeMetrics.StartedInitContainersCount < afterMetrics.StartedInitContainersCount, true, "Count of started HostProcess init containers should increase")
+		e2eutils.ExpectEqual(beforeMetrics.StartedInitContainersErrorCount < afterMetrics.StartedInitContainersErrorCount, true, "Count of started HostProcess errors init containers should increase")
 	})
 
 })

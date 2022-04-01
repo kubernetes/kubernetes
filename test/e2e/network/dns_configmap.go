@@ -21,9 +21,10 @@ import (
 	"fmt"
 	"time"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/test/e2e/framework"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	"k8s.io/kubernetes/test/e2e/network/common"
 
@@ -78,7 +79,7 @@ func (t *dnsNameserverTest) run(isIPv6 bool) {
     }
      acme.local:53 {
        forward . %v
-    }`, framework.TestContext.ClusterDNSDomain, t.dnsServerPod.Status.PodIP, t.dnsServerPod.Status.PodIP),
+    }`, e2econfig.TestContext.ClusterDNSDomain, t.dnsServerPod.Status.PodIP, t.dnsServerPod.Status.PodIP),
 		}})
 
 		t.deleteCoreDNSPods()
@@ -174,7 +175,7 @@ func (t *dnsPtrFwdTest) run(isIPv6 bool) {
            ttl 30
         }
         forward . %v
-    }`, framework.TestContext.ClusterDNSDomain, t.dnsServerPod.Status.PodIP),
+    }`, e2econfig.TestContext.ClusterDNSDomain, t.dnsServerPod.Status.PodIP),
 		}})
 
 		t.deleteCoreDNSPods()
@@ -258,7 +259,7 @@ func (t *dnsExternalNameTest) run(isIPv6 bool) {
 
 	if isIPv6 {
 		t.checkDNSRecordFrom(
-			fmt.Sprintf("%s.%s.svc.%s", serviceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain),
+			fmt.Sprintf("%s.%s.svc.%s", serviceName, f.Namespace.Name, e2econfig.TestContext.ClusterDNSDomain),
 			func(actual []string) bool {
 				return len(actual) >= 1 && actual[0] == googleDNSHostname+"."
 			},
@@ -266,7 +267,7 @@ func (t *dnsExternalNameTest) run(isIPv6 bool) {
 			moreForeverTestTimeout)
 	} else {
 		t.checkDNSRecordFrom(
-			fmt.Sprintf("%s.%s.svc.%s", serviceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain),
+			fmt.Sprintf("%s.%s.svc.%s", serviceName, f.Namespace.Name, e2econfig.TestContext.ClusterDNSDomain),
 			func(actual []string) bool {
 				return len(actual) >= 1 && actual[0] == googleDNSHostname+"."
 			},
@@ -285,7 +286,7 @@ func (t *dnsExternalNameTest) run(isIPv6 bool) {
            ttl 30
         }
         forward . %v
-    }`, framework.TestContext.ClusterDNSDomain, t.dnsServerPod.Status.PodIP),
+    }`, e2econfig.TestContext.ClusterDNSDomain, t.dnsServerPod.Status.PodIP),
 		}})
 
 		t.deleteCoreDNSPods()
@@ -296,7 +297,7 @@ func (t *dnsExternalNameTest) run(isIPv6 bool) {
 	}
 	if isIPv6 {
 		t.checkDNSRecordFrom(
-			fmt.Sprintf("%s.%s.svc.%s", serviceNameLocal, f.Namespace.Name, framework.TestContext.ClusterDNSDomain),
+			fmt.Sprintf("%s.%s.svc.%s", serviceNameLocal, f.Namespace.Name, e2econfig.TestContext.ClusterDNSDomain),
 			func(actual []string) bool {
 				return len(actual) >= 1 && actual[0] == fooHostname+"." && actual[1] == "2001:db8::29"
 			},
@@ -304,7 +305,7 @@ func (t *dnsExternalNameTest) run(isIPv6 bool) {
 			moreForeverTestTimeout)
 	} else {
 		t.checkDNSRecordFrom(
-			fmt.Sprintf("%s.%s.svc.%s", serviceNameLocal, f.Namespace.Name, framework.TestContext.ClusterDNSDomain),
+			fmt.Sprintf("%s.%s.svc.%s", serviceNameLocal, f.Namespace.Name, e2econfig.TestContext.ClusterDNSDomain),
 			func(actual []string) bool {
 				return len(actual) == 2 && actual[0] == fooHostname+"." && actual[1] == "192.0.2.123"
 			},
@@ -322,7 +323,7 @@ var _ = common.SIGDescribe("DNS configMap nameserver", func() {
 
 		ginkgo.It("should be able to change stubDomain configuration [Slow][Serial]", func() {
 			nsTest.c = nsTest.f.ClientSet
-			nsTest.run(framework.TestContext.ClusterIsIPv6())
+			nsTest.run(e2econfig.TestContext.ClusterIsIPv6())
 		})
 	})
 
@@ -331,7 +332,7 @@ var _ = common.SIGDescribe("DNS configMap nameserver", func() {
 
 		ginkgo.It("should forward PTR records lookup to upstream nameserver [Slow][Serial]", func() {
 			fwdTest.c = fwdTest.f.ClientSet
-			fwdTest.run(framework.TestContext.ClusterIsIPv6())
+			fwdTest.run(e2econfig.TestContext.ClusterIsIPv6())
 		})
 	})
 
@@ -340,7 +341,7 @@ var _ = common.SIGDescribe("DNS configMap nameserver", func() {
 
 		ginkgo.It("should forward externalname lookup to upstream nameserver [Slow][Serial]", func() {
 			externalNameTest.c = externalNameTest.f.ClientSet
-			externalNameTest.run(framework.TestContext.ClusterIsIPv6())
+			externalNameTest.run(e2econfig.TestContext.ClusterIsIPv6())
 		})
 	})
 })

@@ -48,6 +48,8 @@ import (
 	"strings"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
@@ -109,21 +111,21 @@ var _ = SIGDescribe("[Feature:Windows] GMSA Full [Serial] [Slow]", func() {
 			webhookCleanUp, err := deployGmsaWebhook(f)
 			defer webhookCleanUp()
 			if err != nil {
-				framework.Failf(err.Error())
+				e2eutils.Failf(err.Error())
 			}
 
 			ginkgo.By("creating the GMSA custom resource")
 			customResourceCleanup, err := createGmsaCustomResource(f.Namespace.Name, crdManifestContents)
 			defer customResourceCleanup()
 			if err != nil {
-				framework.Failf(err.Error())
+				e2eutils.Failf(err.Error())
 			}
 
 			ginkgo.By("creating an RBAC role to grant use access to that GMSA resource")
 			rbacRoleName, rbacRoleCleanup, err := createRBACRoleForGmsa(f)
 			defer rbacRoleCleanup()
 			if err != nil {
-				framework.Failf(err.Error())
+				e2eutils.Failf(err.Error())
 			}
 
 			ginkgo.By("creating a service account")
@@ -143,7 +145,7 @@ var _ = SIGDescribe("[Feature:Windows] GMSA Full [Serial] [Slow]", func() {
 			gomega.Eventually(func() bool {
 				output, err = runKubectlExecInNamespace(f.Namespace.Name, podName, "nltest", "/QUERY")
 				if err != nil {
-					framework.Logf("unable to run command in container via exec: %s", err)
+					e2eutils.Logf("unable to run command in container via exec: %s", err)
 					return false
 				}
 
@@ -152,10 +154,10 @@ var _ = SIGDescribe("[Feature:Windows] GMSA Full [Serial] [Slow]", func() {
 					// https://kubernetes.io/docs/tasks/configure-pod-container/configure-gmsa/#troubleshooting
 					output, err = runKubectlExecInNamespace(f.Namespace.Name, podName, "nltest", fmt.Sprintf("/sc_reset:%s", gmsaDomain))
 					if err != nil {
-						framework.Logf("unable to run command in container via exec: %s", err)
+						e2eutils.Logf("unable to run command in container via exec: %s", err)
 						return false
 					}
-					framework.Logf("failed to connect to domain; tried resetting the domain, output:\n%s", string(output))
+					e2eutils.Logf("failed to connect to domain; tried resetting the domain, output:\n%s", string(output))
 					return false
 				}
 				return true
@@ -179,21 +181,21 @@ var _ = SIGDescribe("[Feature:Windows] GMSA Full [Serial] [Slow]", func() {
 			webhookCleanUp, err := deployGmsaWebhook(f)
 			defer webhookCleanUp()
 			if err != nil {
-				framework.Failf(err.Error())
+				e2eutils.Failf(err.Error())
 			}
 
 			ginkgo.By("creating the GMSA custom resource")
 			customResourceCleanup, err := createGmsaCustomResource(f.Namespace.Name, crdManifestContents)
 			defer customResourceCleanup()
 			if err != nil {
-				framework.Failf(err.Error())
+				e2eutils.Failf(err.Error())
 			}
 
 			ginkgo.By("creating an RBAC role to grant use access to that GMSA resource")
 			rbacRoleName, rbacRoleCleanup, err := createRBACRoleForGmsa(f)
 			defer rbacRoleCleanup()
 			if err != nil {
-				framework.Failf(err.Error())
+				e2eutils.Failf(err.Error())
 			}
 
 			ginkgo.By("creating a service account")
@@ -215,7 +217,7 @@ var _ = SIGDescribe("[Feature:Windows] GMSA Full [Serial] [Slow]", func() {
 				_, _ = runKubectlExecInNamespace(f.Namespace.Name, podName, "--", "powershell.exe", "-Command", "echo 'This is a test file.' > "+filePath)
 				output, err := runKubectlExecInNamespace(f.Namespace.Name, podName, "powershell.exe", "--", "cat", filePath)
 				if err != nil {
-					framework.Logf("unable to get file from AD server: %s", err)
+					e2eutils.Logf("unable to get file from AD server: %s", err)
 					return false
 				}
 				return strings.Contains(output, "This is a test file.")
@@ -238,7 +240,7 @@ func findPreconfiguredGmsaNodes(c clientset.Interface) []v1.Node {
 	}
 	nodes, err := c.CoreV1().Nodes().List(context.TODO(), nodeOpts)
 	if err != nil {
-		framework.Failf("Unable to list nodes: %v", err)
+		e2eutils.Failf("Unable to list nodes: %v", err)
 	}
 	return nodes.Items
 }
@@ -290,7 +292,7 @@ func retrieveCRDManifestFileContents(f *framework.Framework, node v1.Node) strin
 
 	output, err := runKubectlExecInNamespace(f.Namespace.Name, podName, "cmd", "/S", "/C", fmt.Sprintf("type %s", gmsaCrdManifestPath))
 	if err != nil {
-		framework.Failf("failed to retrieve the contents of %q on node %q: %v", gmsaCrdManifestPath, node.Name, err)
+		e2eutils.Failf("failed to retrieve the contents of %q on node %q: %v", gmsaCrdManifestPath, node.Name, err)
 	}
 
 	// Windows to linux new lines
@@ -308,15 +310,15 @@ func deployGmsaWebhook(f *framework.Framework) (func(), error) {
 
 	// regardless of whether the deployment succeeded, let's do a best effort at cleanup
 	cleanUpFunc := func() {
-		framework.Logf("Best effort clean up of the webhook:\n")
-		stdout, err := framework.RunKubectl("", "delete", "CustomResourceDefinition", "gmsacredentialspecs.windows.k8s.io")
-		framework.Logf("stdout:%s\nerror:%s", stdout, err)
+		e2eutils.Logf("Best effort clean up of the webhook:\n")
+		stdout, err := e2eutils.RunKubectl("", "delete", "CustomResourceDefinition", "gmsacredentialspecs.windows.k8s.io")
+		e2eutils.Logf("stdout:%s\nerror:%s", stdout, err)
 
-		stdout, err = framework.RunKubectl("", "delete", "CertificateSigningRequest", fmt.Sprintf("%s.%s", webHookName, webHookNamespace))
-		framework.Logf("stdout:%s\nerror:%s", stdout, err)
+		stdout, err = e2eutils.RunKubectl("", "delete", "CertificateSigningRequest", fmt.Sprintf("%s.%s", webHookName, webHookNamespace))
+		e2eutils.Logf("stdout:%s\nerror:%s", stdout, err)
 
 		stdout, err = runKubectlExecInNamespace(deployerNamespace, deployerName, "--", "kubectl", "delete", "-f", "/manifests.yml")
-		framework.Logf("stdout:%s\nerror:%s", stdout, err)
+		e2eutils.Logf("stdout:%s\nerror:%s", stdout, err)
 	}
 
 	// ensure the deployer has ability to approve certificatesigningrequests to install the webhook
@@ -367,14 +369,14 @@ func deployGmsaWebhook(f *framework.Framework) (func(), error) {
 		return f.ClientSet.AppsV1().Deployments(webHookNamespace).Get(context.TODO(), webHookName, metav1.GetOptions{})
 	}, 10*time.Second, f.Timeouts.PodStart)
 	if err == nil {
-		framework.Logf("GMSA webhook successfully deployed")
+		e2eutils.Logf("GMSA webhook successfully deployed")
 	} else {
 		err = fmt.Errorf("GMSA webhook did not become ready: %w", err)
 	}
 
 	// Dump deployer logs
 	logs, _ := e2epod.GetPodLogs(f.ClientSet, deployerNamespace, deployerName, deployerName)
-	framework.Logf("GMSA deployment logs:\n%s", logs)
+	e2eutils.Logf("GMSA deployment logs:\n%s", logs)
 
 	return cleanUpFunc, err
 }
@@ -393,7 +395,7 @@ func createGmsaCustomResource(ns string, crdManifestContents string) (func(), er
 	defer tempFile.Close()
 
 	cleanUpFunc = func() {
-		framework.RunKubectl(ns, "delete", "--filename", tempFile.Name())
+		e2eutils.RunKubectl(ns, "delete", "--filename", tempFile.Name())
 		os.Remove(tempFile.Name())
 	}
 
@@ -403,7 +405,7 @@ func createGmsaCustomResource(ns string, crdManifestContents string) (func(), er
 		return cleanUpFunc, err
 	}
 
-	output, err := framework.RunKubectl(ns, "apply", "--filename", tempFile.Name())
+	output, err := e2eutils.RunKubectl(ns, "apply", "--filename", tempFile.Name())
 	if err != nil {
 		err = fmt.Errorf("unable to create custom resource, output:\n%s: %w", output, err)
 	}
@@ -453,7 +455,7 @@ func createServiceAccount(f *framework.Framework) string {
 		},
 	}
 	if _, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Create(context.TODO(), account, metav1.CreateOptions{}); err != nil {
-		framework.Failf("unable to create service account %q: %v", accountName, err)
+		e2eutils.Failf("unable to create service account %q: %v", accountName, err)
 	}
 	return accountName
 }
@@ -540,7 +542,7 @@ func createPodWithGmsa(f *framework.Framework, serviceAccountName string) string
 
 func runKubectlExecInNamespace(namespace string, args ...string) (string, error) {
 	namespaceOption := fmt.Sprintf("--namespace=%s", namespace)
-	return framework.RunKubectl(namespace, append([]string{"exec", namespaceOption}, args...)...)
+	return e2eutils.RunKubectl(namespace, append([]string{"exec", namespaceOption}, args...)...)
 }
 
 func getGmsaDomainIP(f *framework.Framework, podName string) string {
@@ -550,7 +552,7 @@ func getGmsaDomainIP(f *framework.Framework, podName string) string {
 
 	submatchall := re.FindAllString(output[idx:], -1)
 	if len(submatchall) < 1 {
-		framework.Logf("fail to get the ip of the gmsa domain")
+		e2eutils.Logf("fail to get the ip of the gmsa domain")
 		return ""
 	}
 	return submatchall[0]

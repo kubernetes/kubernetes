@@ -18,6 +18,8 @@ package gcp
 
 import (
 	"fmt"
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 	"os/exec"
 
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -36,64 +38,64 @@ var _ = SIGDescribe("GKE node pools [Feature:GKENodePool]", func() {
 	})
 
 	ginkgo.It("should create a cluster with multiple node pools [Feature:GKENodePool]", func() {
-		framework.Logf("Start create node pool test")
+		e2eutils.Logf("Start create node pool test")
 		testCreateDeleteNodePool(f, "test-pool")
 	})
 })
 
 func testCreateDeleteNodePool(f *framework.Framework, poolName string) {
-	framework.Logf("Create node pool: %q in cluster: %q", poolName, framework.TestContext.CloudConfig.Cluster)
+	e2eutils.Logf("Create node pool: %q in cluster: %q", poolName, e2econfig.TestContext.CloudConfig.Cluster)
 
-	clusterStr := fmt.Sprintf("--cluster=%s", framework.TestContext.CloudConfig.Cluster)
+	clusterStr := fmt.Sprintf("--cluster=%s", e2econfig.TestContext.CloudConfig.Cluster)
 
 	out, err := exec.Command("gcloud", "container", "node-pools", "create",
 		poolName,
 		clusterStr,
 		"--num-nodes=2").CombinedOutput()
-	framework.Logf("\n%s", string(out))
+	e2eutils.Logf("\n%s", string(out))
 	if err != nil {
-		framework.Failf("Failed to create node pool %q. Err: %v\n%v", poolName, err, string(out))
+		e2eutils.Failf("Failed to create node pool %q. Err: %v\n%v", poolName, err, string(out))
 	}
-	framework.Logf("Successfully created node pool %q.", poolName)
+	e2eutils.Logf("Successfully created node pool %q.", poolName)
 
 	out, err = exec.Command("gcloud", "container", "node-pools", "list",
 		clusterStr).CombinedOutput()
 	if err != nil {
-		framework.Failf("Failed to list node pools from cluster %q. Err: %v\n%v", framework.TestContext.CloudConfig.Cluster, err, string(out))
+		e2eutils.Failf("Failed to list node pools from cluster %q. Err: %v\n%v", e2econfig.TestContext.CloudConfig.Cluster, err, string(out))
 	}
-	framework.Logf("Node pools:\n%s", string(out))
+	e2eutils.Logf("Node pools:\n%s", string(out))
 
-	framework.Logf("Checking that 2 nodes have the correct node pool label.")
+	e2eutils.Logf("Checking that 2 nodes have the correct node pool label.")
 	nodeCount := nodesWithPoolLabel(f, poolName)
 	if nodeCount != 2 {
-		framework.Failf("Wanted 2 nodes with node pool label, got: %v", nodeCount)
+		e2eutils.Failf("Wanted 2 nodes with node pool label, got: %v", nodeCount)
 	}
-	framework.Logf("Success, found 2 nodes with correct node pool labels.")
+	e2eutils.Logf("Success, found 2 nodes with correct node pool labels.")
 
-	framework.Logf("Deleting node pool: %q in cluster: %q", poolName, framework.TestContext.CloudConfig.Cluster)
+	e2eutils.Logf("Deleting node pool: %q in cluster: %q", poolName, e2econfig.TestContext.CloudConfig.Cluster)
 	out, err = exec.Command("gcloud", "container", "node-pools", "delete",
 		poolName,
 		clusterStr,
 		"-q").CombinedOutput()
-	framework.Logf("\n%s", string(out))
+	e2eutils.Logf("\n%s", string(out))
 	if err != nil {
-		framework.Failf("Failed to delete node pool %q. Err: %v\n%v", poolName, err, string(out))
+		e2eutils.Failf("Failed to delete node pool %q. Err: %v\n%v", poolName, err, string(out))
 	}
-	framework.Logf("Successfully deleted node pool %q.", poolName)
+	e2eutils.Logf("Successfully deleted node pool %q.", poolName)
 
 	out, err = exec.Command("gcloud", "container", "node-pools", "list",
 		clusterStr).CombinedOutput()
 	if err != nil {
-		framework.Failf("\nFailed to list node pools from cluster %q. Err: %v\n%v", framework.TestContext.CloudConfig.Cluster, err, string(out))
+		e2eutils.Failf("\nFailed to list node pools from cluster %q. Err: %v\n%v", e2econfig.TestContext.CloudConfig.Cluster, err, string(out))
 	}
-	framework.Logf("\nNode pools:\n%s", string(out))
+	e2eutils.Logf("\nNode pools:\n%s", string(out))
 
-	framework.Logf("Checking that no nodes have the deleted node pool's label.")
+	e2eutils.Logf("Checking that no nodes have the deleted node pool's label.")
 	nodeCount = nodesWithPoolLabel(f, poolName)
 	if nodeCount != 0 {
-		framework.Failf("Wanted 0 nodes with node pool label, got: %v", nodeCount)
+		e2eutils.Failf("Wanted 0 nodes with node pool label, got: %v", nodeCount)
 	}
-	framework.Logf("Success, found no nodes with the deleted node pool's label.")
+	e2eutils.Logf("Success, found no nodes with the deleted node pool's label.")
 }
 
 // nodesWithPoolLabel returns the number of nodes that have the "gke-nodepool"
@@ -101,7 +103,7 @@ func testCreateDeleteNodePool(f *framework.Framework, poolName string) {
 func nodesWithPoolLabel(f *framework.Framework, poolName string) int {
 	nodeCount := 0
 	nodeList, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	for _, node := range nodeList.Items {
 		if poolLabel := node.Labels["cloud.google.com/gke-nodepool"]; poolLabel == poolName {
 			nodeCount++

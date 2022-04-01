@@ -27,6 +27,8 @@ import (
 	"strings"
 	"time"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/klog/v2"
@@ -39,7 +41,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/configfiles"
 	kubeletconfigcodec "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/codec"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
-	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e_node/builder"
 	"k8s.io/kubernetes/test/e2e_node/remote"
 )
@@ -156,7 +157,7 @@ func (e *E2EServices) startKubelet() (*server, error) {
 	klog.Info("Starting kubelet")
 
 	// set feature gates so we can check which features are enabled and pass the appropriate flags
-	if err := utilfeature.DefaultMutableFeatureGate.SetFromMap(framework.TestContext.FeatureGates); err != nil {
+	if err := utilfeature.DefaultMutableFeatureGate.SetFromMap(e2econfig.TestContext.FeatureGates); err != nil {
 		return nil, err
 	}
 
@@ -237,7 +238,7 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		cmdArgs = append(cmdArgs,
 			systemdRun,
 			"-p", "Delegate=true",
-			"-p", logLocation+framework.TestContext.ReportDir+"/kubelet.log",
+			"-p", logLocation+e2econfig.TestContext.ReportDir+"/kubelet.log",
 			"--unit="+unitName,
 			"--slice=runtime.slice",
 			"--remain-after-exit",
@@ -264,22 +265,22 @@ func (e *E2EServices) startKubelet() (*server, error) {
 
 	// Apply test framework feature gates by default. This could also be overridden
 	// by kubelet-flags.
-	if len(framework.TestContext.FeatureGates) > 0 {
-		cmdArgs = append(cmdArgs, "--feature-gates", cliflag.NewMapStringBool(&framework.TestContext.FeatureGates).String())
-		kc.FeatureGates = framework.TestContext.FeatureGates
+	if len(e2econfig.TestContext.FeatureGates) > 0 {
+		cmdArgs = append(cmdArgs, "--feature-gates", cliflag.NewMapStringBool(&e2econfig.TestContext.FeatureGates).String())
+		kc.FeatureGates = e2econfig.TestContext.FeatureGates
 	}
 
 	// Keep hostname override for convenience.
-	if framework.TestContext.NodeName != "" { // If node name is specified, set hostname override.
-		cmdArgs = append(cmdArgs, "--hostname-override", framework.TestContext.NodeName)
+	if e2econfig.TestContext.NodeName != "" { // If node name is specified, set hostname override.
+		cmdArgs = append(cmdArgs, "--hostname-override", e2econfig.TestContext.NodeName)
 	}
 
-	if framework.TestContext.ContainerRuntimeEndpoint != "" {
-		cmdArgs = append(cmdArgs, "--container-runtime-endpoint", framework.TestContext.ContainerRuntimeEndpoint)
+	if e2econfig.TestContext.ContainerRuntimeEndpoint != "" {
+		cmdArgs = append(cmdArgs, "--container-runtime-endpoint", e2econfig.TestContext.ContainerRuntimeEndpoint)
 	}
 
-	if framework.TestContext.ImageServiceEndpoint != "" {
-		cmdArgs = append(cmdArgs, "--image-service-endpoint", framework.TestContext.ImageServiceEndpoint)
+	if e2econfig.TestContext.ImageServiceEndpoint != "" {
+		cmdArgs = append(cmdArgs, "--image-service-endpoint", e2econfig.TestContext.ImageServiceEndpoint)
 	}
 
 	if err := writeKubeletConfigFile(kc, kubeletConfigPath); err != nil {
@@ -297,7 +298,7 @@ func (e *E2EServices) startKubelet() (*server, error) {
 	}
 
 	cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
-	restartOnExit := framework.TestContext.RestartKubelet
+	restartOnExit := e2econfig.TestContext.RestartKubelet
 	server := newServer(
 		"kubelet",
 		cmd,
@@ -359,7 +360,7 @@ contexts:
     cluster: local
     user: kubelet
   name: local-context
-current-context: local-context`, framework.TestContext.BearerToken, getAPIServerClientURL()))
+current-context: local-context`, e2econfig.TestContext.BearerToken, getAPIServerClientURL()))
 
 	if err := os.WriteFile(path, kubeconfig, 0666); err != nil {
 		return err

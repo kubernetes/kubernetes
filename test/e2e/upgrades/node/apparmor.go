@@ -18,12 +18,14 @@ package node
 
 import (
 	"context"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2esecurity "k8s.io/kubernetes/test/e2e/framework/security"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 	"k8s.io/kubernetes/test/e2e/upgrades"
 
 	"github.com/onsi/ginkgo"
@@ -83,14 +85,14 @@ func (t *AppArmorUpgradeTest) Test(f *framework.Framework, done <-chan struct{},
 func (t *AppArmorUpgradeTest) Teardown(f *framework.Framework) {
 	// rely on the namespace deletion to clean up everything
 	ginkgo.By("Logging container failures")
-	e2ekubectl.LogFailedContainers(f.ClientSet, f.Namespace.Name, framework.Logf)
+	e2ekubectl.LogFailedContainers(f.ClientSet, f.Namespace.Name, e2eutils.Logf)
 }
 
 func (t *AppArmorUpgradeTest) verifyPodStillUp(f *framework.Framework) {
 	ginkgo.By("Verifying an AppArmor profile is continuously enforced for a pod")
 	pod, err := f.PodClient().Get(context.TODO(), t.pod.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err, "Should be able to get pod")
-	framework.ExpectEqual(pod.Status.Phase, v1.PodRunning, "Pod should stay running")
+	e2eutils.ExpectNoError(err, "Should be able to get pod")
+	e2eutils.ExpectEqual(pod.Status.Phase, v1.PodRunning, "Pod should stay running")
 	gomega.Expect(pod.Status.ContainerStatuses[0].State.Running).NotTo(gomega.BeNil(), "Container should be running")
 	gomega.Expect(pod.Status.ContainerStatuses[0].RestartCount).To(gomega.BeZero(), "Container should not need to be restarted")
 }
@@ -103,7 +105,7 @@ func (t *AppArmorUpgradeTest) verifyNewPodSucceeds(f *framework.Framework) {
 func (t *AppArmorUpgradeTest) verifyNodesAppArmorEnabled(f *framework.Framework) {
 	ginkgo.By("Verifying nodes are AppArmor enabled")
 	nodes, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
-	framework.ExpectNoError(err, "Failed to list nodes")
+	e2eutils.ExpectNoError(err, "Failed to list nodes")
 	for _, node := range nodes.Items {
 		gomega.Expect(node.Status.Conditions).To(gstruct.MatchElements(conditionType, gstruct.IgnoreExtras, gstruct.Elements{
 			"Ready": gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{

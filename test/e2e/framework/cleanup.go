@@ -20,6 +20,8 @@ import (
 	"reflect"
 	"runtime"
 	"sync"
+
+	"k8s.io/kubernetes/test/e2e/framework/utils"
 )
 
 // CleanupActionHandle is an integer pointer type for handling cleanup action
@@ -72,7 +74,7 @@ func RunCleanupActions() {
 	}()
 	// Run unlocked.
 	for _, fn := range list {
-		Logf("Running Cleanup Action: %v", runtime.FuncForPC(reflect.ValueOf(fn).Pointer()).Name())
+		utils.Logf("Running Cleanup Action: %v", runtime.FuncForPC(reflect.ValueOf(fn).Pointer()).Name())
 		fn()
 	}
 }

@@ -22,6 +22,8 @@ import (
 	"fmt"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	coordinationv1 "k8s.io/api/coordination/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -83,11 +85,11 @@ var _ = SIGDescribe("Lease", func() {
 		}
 
 		createdLease, err := leaseClient.Create(context.TODO(), lease, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "creating Lease failed")
+		e2eutils.ExpectNoError(err, "creating Lease failed")
 
 		readLease, err := leaseClient.Get(context.TODO(), name, metav1.GetOptions{})
-		framework.ExpectNoError(err, "couldn't read Lease")
-		framework.ExpectEqual(apiequality.Semantic.DeepEqual(lease.Spec, readLease.Spec), true)
+		e2eutils.ExpectNoError(err, "couldn't read Lease")
+		e2eutils.ExpectEqual(apiequality.Semantic.DeepEqual(lease.Spec, readLease.Spec), true)
 
 		createdLease.Spec = coordinationv1.LeaseSpec{
 			HolderIdentity:       pointer.StringPtr("holder2"),
@@ -98,11 +100,11 @@ var _ = SIGDescribe("Lease", func() {
 		}
 
 		_, err = leaseClient.Update(context.TODO(), createdLease, metav1.UpdateOptions{})
-		framework.ExpectNoError(err, "updating Lease failed")
+		e2eutils.ExpectNoError(err, "updating Lease failed")
 
 		readLease, err = leaseClient.Get(context.TODO(), name, metav1.GetOptions{})
-		framework.ExpectNoError(err, "couldn't read Lease")
-		framework.ExpectEqual(apiequality.Semantic.DeepEqual(createdLease.Spec, readLease.Spec), true)
+		e2eutils.ExpectNoError(err, "couldn't read Lease")
+		e2eutils.ExpectEqual(apiequality.Semantic.DeepEqual(createdLease.Spec, readLease.Spec), true)
 
 		patchedLease := readLease.DeepCopy()
 		patchedLease.Spec = coordinationv1.LeaseSpec{
@@ -113,14 +115,14 @@ var _ = SIGDescribe("Lease", func() {
 			LeaseTransitions:     pointer.Int32Ptr(2),
 		}
 		patchBytes, err := getPatchBytes(readLease, patchedLease)
-		framework.ExpectNoError(err, "creating patch failed")
+		e2eutils.ExpectNoError(err, "creating patch failed")
 
 		_, err = leaseClient.Patch(context.TODO(), name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
-		framework.ExpectNoError(err, "patching Lease failed")
+		e2eutils.ExpectNoError(err, "patching Lease failed")
 
 		readLease, err = leaseClient.Get(context.TODO(), name, metav1.GetOptions{})
-		framework.ExpectNoError(err, "couldn't read Lease")
-		framework.ExpectEqual(apiequality.Semantic.DeepEqual(patchedLease.Spec, readLease.Spec), true)
+		e2eutils.ExpectNoError(err, "couldn't read Lease")
+		e2eutils.ExpectEqual(apiequality.Semantic.DeepEqual(patchedLease.Spec, readLease.Spec), true)
 
 		name2 := "lease2"
 		lease2 := &coordinationv1.Lease{
@@ -137,25 +139,25 @@ var _ = SIGDescribe("Lease", func() {
 			},
 		}
 		_, err = leaseClient.Create(context.TODO(), lease2, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "creating Lease failed")
+		e2eutils.ExpectNoError(err, "creating Lease failed")
 
 		leases, err := leaseClient.List(context.TODO(), metav1.ListOptions{})
-		framework.ExpectNoError(err, "couldn't list Leases")
-		framework.ExpectEqual(len(leases.Items), 2)
+		e2eutils.ExpectNoError(err, "couldn't list Leases")
+		e2eutils.ExpectEqual(len(leases.Items), 2)
 
 		selector := labels.Set(map[string]string{"deletecollection": "true"}).AsSelector()
 		err = leaseClient.DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: selector.String()})
-		framework.ExpectNoError(err, "couldn't delete collection")
+		e2eutils.ExpectNoError(err, "couldn't delete collection")
 
 		leases, err = leaseClient.List(context.TODO(), metav1.ListOptions{})
-		framework.ExpectNoError(err, "couldn't list Leases")
-		framework.ExpectEqual(len(leases.Items), 1)
+		e2eutils.ExpectNoError(err, "couldn't list Leases")
+		e2eutils.ExpectEqual(len(leases.Items), 1)
 
 		err = leaseClient.Delete(context.TODO(), name, metav1.DeleteOptions{})
-		framework.ExpectNoError(err, "deleting Lease failed")
+		e2eutils.ExpectNoError(err, "deleting Lease failed")
 
 		_, err = leaseClient.Get(context.TODO(), name, metav1.GetOptions{})
-		framework.ExpectEqual(apierrors.IsNotFound(err), true)
+		e2eutils.ExpectEqual(apierrors.IsNotFound(err), true)
 
 		leaseClient = f.ClientSet.CoordinationV1().Leases(metav1.NamespaceAll)
 		// Number of leases may be high in large clusters, as Lease object is
@@ -163,6 +165,6 @@ var _ = SIGDescribe("Lease", func() {
 		// That said, the objects themselves are small (~300B), so even with 5000
 		// of them, that gives ~1.5MB, which is acceptable.
 		_, err = leaseClient.List(context.TODO(), metav1.ListOptions{})
-		framework.ExpectNoError(err, "couldn't list Leases from all namespace")
+		e2eutils.ExpectNoError(err, "couldn't list Leases from all namespace")
 	})
 })

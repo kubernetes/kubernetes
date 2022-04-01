@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,12 +38,12 @@ var _ = utils.SIGDescribe("Multi-AZ Cluster Volumes", func() {
 	f := framework.NewDefaultFramework("multi-az")
 	var zoneCount int
 	var err error
-	image := framework.ServeHostnameImage
+	image := e2eutils.ServeHostnameImage
 	ginkgo.BeforeEach(func() {
 		e2eskipper.SkipUnlessProviderIs("gce", "gke")
 		if zoneCount <= 0 {
 			zoneCount, err = getZoneCount(f.ClientSet)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 		}
 		ginkgo.By(fmt.Sprintf("Checking for multi-zone cluster.  Zone count = %d", zoneCount))
 		msg := fmt.Sprintf("Zone count is %d, only run for multi-zone clusters, skipping test", zoneCount)
@@ -77,7 +79,7 @@ func PodsUseStaticPVsOrFail(f *framework.Framework, podCount int, image string) 
 	ns := f.Namespace.Name
 
 	zones, err := e2enode.GetSchedulableClusterZones(c)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	zonelist := zones.List()
 	ginkgo.By("Creating static PVs across zones")
 	configs := make([]*staticPVTestConfig, podCount)
@@ -94,14 +96,14 @@ func PodsUseStaticPVsOrFail(f *framework.Framework, podCount int, image string) 
 			e2epod.WaitForPodNoLongerRunningInNamespace(c, config.pod.Name, ns)
 			e2epv.PVPVCCleanup(c, ns, config.pv, config.pvc)
 			err = e2epv.DeletePVSource(config.pvSource)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 		}
 	}()
 
 	for i, config := range configs {
 		zone := zonelist[i%len(zones)]
 		config.pvSource, err = e2epv.CreatePVSource(zone)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		pvConfig := e2epv.PersistentVolumeConfig{
 			NamePrefix: "multizone-pv",
@@ -112,7 +114,7 @@ func PodsUseStaticPVsOrFail(f *framework.Framework, podCount int, image string) 
 		pvcConfig := e2epv.PersistentVolumeClaimConfig{StorageClassName: &className}
 
 		config.pv, config.pvc, err = e2epv.CreatePVPVC(c, f.Timeouts, pvConfig, pvcConfig, ns, true)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 	}
 
 	ginkgo.By("Waiting for all PVCs to be bound")
@@ -124,12 +126,12 @@ func PodsUseStaticPVsOrFail(f *framework.Framework, podCount int, image string) 
 	for _, config := range configs {
 		podConfig := e2epod.MakePod(ns, nil, []*v1.PersistentVolumeClaim{config.pvc}, false, "")
 		config.pod, err = c.CoreV1().Pods(ns).Create(context.TODO(), podConfig, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 	}
 
 	ginkgo.By("Waiting for all pods to be running")
 	for _, config := range configs {
 		err = e2epod.WaitForPodRunningInNamespace(c, config.pod)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 	}
 }

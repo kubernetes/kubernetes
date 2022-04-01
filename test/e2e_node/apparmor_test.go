@@ -26,6 +26,9 @@ import (
 	"strconv"
 	"strings"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/opencontainers/runc/libcontainer/apparmor"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -50,7 +53,7 @@ var _ = SIGDescribe("AppArmor [Feature:AppArmor][NodeFeature:AppArmor]", func() 
 	if isAppArmorEnabled() {
 		ginkgo.BeforeEach(func() {
 			ginkgo.By("Loading AppArmor profiles for testing")
-			framework.ExpectNoError(loadTestProfiles(), "Could not load AppArmor test profiles")
+			e2eutils.ExpectNoError(loadTestProfiles(), "Could not load AppArmor test profiles")
 		})
 		ginkgo.Context("when running with AppArmor", func() {
 			f := framework.NewDefaultFramework("apparmor-test")
@@ -62,7 +65,7 @@ var _ = SIGDescribe("AppArmor [Feature:AppArmor][NodeFeature:AppArmor]", func() 
 			ginkgo.It("should enforce a profile blocking writes", func() {
 				status := runAppArmorTest(f, true, v1.AppArmorBetaProfileNamePrefix+apparmorProfilePrefix+"deny-write")
 				if len(status.ContainerStatuses) == 0 {
-					framework.Failf("Unexpected pod status: %s", spew.Sdump(status))
+					e2eutils.Failf("Unexpected pod status: %s", spew.Sdump(status))
 					return
 				}
 				state := status.ContainerStatuses[0].State.Terminated
@@ -73,7 +76,7 @@ var _ = SIGDescribe("AppArmor [Feature:AppArmor][NodeFeature:AppArmor]", func() 
 			ginkgo.It("should enforce a permissive profile", func() {
 				status := runAppArmorTest(f, true, v1.AppArmorBetaProfileNamePrefix+apparmorProfilePrefix+"audit-write")
 				if len(status.ContainerStatuses) == 0 {
-					framework.Failf("Unexpected pod status: %s", spew.Sdump(status))
+					e2eutils.Failf("Unexpected pod status: %s", spew.Sdump(status))
 					return
 				}
 				state := status.ContainerStatuses[0].State.Terminated
@@ -150,8 +153,8 @@ func runAppArmorTest(f *framework.Framework, shouldRun bool, profile string) v1.
 	pod := createPodWithAppArmor(f, profile)
 	if shouldRun {
 		// The pod needs to start before it stops, so wait for the longer start timeout.
-		framework.ExpectNoError(e2epod.WaitTimeoutForPodNoLongerRunningInNamespace(
-			f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout))
+		e2eutils.ExpectNoError(e2epod.WaitTimeoutForPodNoLongerRunningInNamespace(
+			f.ClientSet, pod.Name, f.Namespace.Name, e2eutils.PodStartTimeout))
 	} else {
 		// Pod should remain in the pending state. Wait for the Reason to be set to "AppArmor".
 		fieldSelector := fields.OneTermEqualSelector("metadata.name", pod.Name).String()
@@ -178,7 +181,7 @@ func runAppArmorTest(f *framework.Framework, shouldRun bool, profile string) v1.
 
 			return false, nil
 		}
-		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), framework.PodStartTimeout)
+		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), e2eutils.PodStartTimeout)
 		defer cancel()
 		_, err := watchtools.UntilWithSync(ctx, w, &v1.Pod{}, preconditionFunc, func(e watch.Event) (bool, error) {
 			switch e.Type {
@@ -197,10 +200,10 @@ func runAppArmorTest(f *framework.Framework, shouldRun bool, profile string) v1.
 			}
 			return false, nil
 		})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 	}
 	p, err := f.PodClient().Get(context.TODO(), pod.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	return p.Status
 }
 
@@ -226,28 +229,28 @@ func createPodWithAppArmor(f *framework.Framework, profile string) *v1.Pod {
 
 func expectSoftRejection(status v1.PodStatus) {
 	args := []interface{}{"PodStatus: %+v", status}
-	framework.ExpectEqual(status.Phase, v1.PodPending, args...)
-	framework.ExpectEqual(status.Reason, "AppArmor", args...)
+	e2eutils.ExpectEqual(status.Phase, v1.PodPending, args...)
+	e2eutils.ExpectEqual(status.Reason, "AppArmor", args...)
 	gomega.Expect(status.Message).To(gomega.ContainSubstring("AppArmor"), args...)
-	framework.ExpectEqual(status.ContainerStatuses[0].State.Waiting.Reason, "Blocked", args...)
+	e2eutils.ExpectEqual(status.ContainerStatuses[0].State.Waiting.Reason, "Blocked", args...)
 }
 
 func isAppArmorEnabled() bool {
 	// TODO(tallclair): Pass this through the image setup rather than hardcoding.
-	if strings.Contains(framework.TestContext.NodeName, "-gci-dev-") {
+	if strings.Contains(e2econfig.TestContext.NodeName, "-gci-dev-") {
 		gciVersionRe := regexp.MustCompile("-gci-dev-([0-9]+)-")
-		matches := gciVersionRe.FindStringSubmatch(framework.TestContext.NodeName)
+		matches := gciVersionRe.FindStringSubmatch(e2econfig.TestContext.NodeName)
 		if len(matches) == 2 {
 			version, err := strconv.Atoi(matches[1])
 			if err != nil {
-				klog.Errorf("Error parsing GCI version from NodeName %q: %v", framework.TestContext.NodeName, err)
+				klog.Errorf("Error parsing GCI version from NodeName %q: %v", e2econfig.TestContext.NodeName, err)
 				return false
 			}
 			return version >= 54
 		}
 		return false
 	}
-	if strings.Contains(framework.TestContext.NodeName, "-ubuntu-") {
+	if strings.Contains(e2econfig.TestContext.NodeName, "-ubuntu-") {
 		return true
 	}
 	return apparmor.IsEnabled()

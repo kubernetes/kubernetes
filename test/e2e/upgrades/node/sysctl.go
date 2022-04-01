@@ -20,9 +20,11 @@ import (
 	"context"
 	"fmt"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -56,17 +58,17 @@ func (t *SysctlUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, u
 	case upgrades.MasterUpgrade, upgrades.ClusterUpgrade:
 		ginkgo.By("Checking the safe sysctl pod keeps running on master upgrade")
 		pod, err := f.ClientSet.CoreV1().Pods(t.validPod.Namespace).Get(context.TODO(), t.validPod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(pod.Status.Phase, v1.PodRunning)
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectEqual(pod.Status.Phase, v1.PodRunning)
 	}
 
 	ginkgo.By("Checking the old unsafe sysctl pod was not suddenly started during an upgrade")
 	pod, err := f.ClientSet.CoreV1().Pods(t.invalidPod.Namespace).Get(context.TODO(), t.invalidPod.Name, metav1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 	}
 	if err == nil {
-		framework.ExpectNotEqual(pod.Status.Phase, v1.PodRunning)
+		e2eutils.ExpectNotEqual(pod.Status.Phase, v1.PodRunning)
 	}
 
 	t.verifySafeSysctlWork(f)
@@ -87,7 +89,7 @@ func (t *SysctlUpgradeTest) verifySafeSysctlWork(f *framework.Framework) *v1.Pod
 
 	ginkgo.By("Making sure the valid pod launches")
 	_, err := f.PodClient().WaitForErrorEventOrSuccess(t.validPod)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	f.TestContainerOutput("pod with safe sysctl launched", t.validPod, 0, []string{fmt.Sprintf("%s = %s", safeSysctl, safeSysctlValue)})
 
 	return validPod
@@ -102,8 +104,8 @@ func (t *SysctlUpgradeTest) verifyUnsafeSysctlsAreRejected(f *framework.Framewor
 
 	ginkgo.By("Making sure the invalid pod failed")
 	ev, err := f.PodClient().WaitForErrorEventOrSuccess(invalidPod)
-	framework.ExpectNoError(err)
-	framework.ExpectEqual(ev.Reason, sysctl.ForbiddenReason)
+	e2eutils.ExpectNoError(err)
+	e2eutils.ExpectEqual(ev.Reason, sysctl.ForbiddenReason)
 
 	return invalidPod
 }

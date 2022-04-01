@@ -22,6 +22,8 @@ import (
 	"net"
 	"time"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -69,15 +71,15 @@ var _ = common.SIGDescribe("NoSNAT [Feature:NoSNAT] [Slow]", func() {
 
 		ginkgo.By("creating a test pod on each Node")
 		nodes, err := e2enode.GetReadySchedulableNodes(cs)
-		framework.ExpectNoError(err)
-		framework.ExpectNotEqual(len(nodes.Items), 0, "no Nodes in the cluster")
+		e2eutils.ExpectNoError(err)
+		e2eutils.ExpectNotEqual(len(nodes.Items), 0, "no Nodes in the cluster")
 
 		for _, node := range nodes.Items {
 			// target Pod at Node
 			nodeSelection := e2epod.NodeSelection{Name: node.Name}
 			e2epod.SetNodeSelection(&testPod.Spec, nodeSelection)
 			_, err = pc.Create(context.TODO(), &testPod, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 		}
 
 		ginkgo.By("waiting for all of the no-snat-test pods to be scheduled and running")
@@ -98,11 +100,11 @@ var _ = common.SIGDescribe("NoSNAT [Feature:NoSNAT] [Slow]", func() {
 			}
 			return true, nil // all pods are running
 		})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		ginkgo.By("sending traffic from each pod to the others and checking that SNAT does not occur")
 		pods, err := pc.List(context.TODO(), metav1.ListOptions{LabelSelector: noSNATTestName})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		// hit the /clientip endpoint on every other Pods to check if source ip is preserved
 		// this test is O(n^2) but it doesn't matter because we only run this test on small clusters (~3 nodes)
@@ -114,7 +116,7 @@ var _ = common.SIGDescribe("NoSNAT [Feature:NoSNAT] [Slow]", func() {
 				targetAddr := net.JoinHostPort(targetPod.Status.PodIP, testPodPort)
 				sourceIP, execPodIP := execSourceIPTest(sourcePod, targetAddr)
 				ginkgo.By("Verifying the preserved source ip")
-				framework.ExpectEqual(sourceIP, execPodIP)
+				e2eutils.ExpectEqual(sourceIP, execPodIP)
 			}
 		}
 	})

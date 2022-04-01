@@ -25,9 +25,9 @@ import (
 	"syscall"
 	"time"
 
-	"k8s.io/klog/v2"
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 
-	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/klog/v2"
 )
 
 // terminationSignals are signals that cause the program to exit in the
@@ -98,7 +98,7 @@ func healthCheck(client *http.Client, url string) bool {
 	if err != nil {
 		return false
 	}
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", framework.TestContext.BearerToken))
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", e2econfig.TestContext.BearerToken))
 	resp, err := client.Do(req)
 	if err != nil {
 		klog.Warningf("Health check on %q failed, error=%v", url, err)

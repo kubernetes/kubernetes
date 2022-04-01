@@ -29,6 +29,8 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -66,7 +68,7 @@ var _ = SIGDescribe("Node Container Manager [Serial]", func() {
 	f := framework.NewDefaultFramework("node-container-manager")
 	ginkgo.Describe("Validate Node Allocatable [NodeFeature:NodeAllocatable]", func() {
 		ginkgo.It("sets up the node and runs the test", func() {
-			framework.ExpectNoError(runTest(f))
+			e2eutils.ExpectNoError(runTest(f))
 		})
 	})
 })
@@ -193,7 +195,7 @@ func runTest(f *framework.Framework) error {
 				return kubeletHealthCheck(kubeletHealthCheckURL)
 			}, time.Minute, time.Second).Should(gomega.BeFalse())
 
-			framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(oldCfg))
+			e2eutils.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(oldCfg))
 
 			ginkgo.By("Starting the kubelet")
 			startKubelet()
@@ -220,7 +222,7 @@ func runTest(f *framework.Framework) error {
 		return kubeletHealthCheck(kubeletHealthCheckURL)
 	}, time.Minute, time.Second).Should(gomega.BeFalse())
 
-	framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(newCfg))
+	e2eutils.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(newCfg))
 
 	ginkgo.By("Starting the kubelet")
 	startKubelet()

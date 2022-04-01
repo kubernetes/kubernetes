@@ -22,6 +22,8 @@ import (
 	"os/exec"
 	"strings"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -37,7 +39,7 @@ import (
 var _ = SIGDescribe("Security Context", func() {
 	f := framework.NewDefaultFramework("security-context-test")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
-	var podClient *framework.PodClient
+	var podClient *e2eutils.PodClient
 	ginkgo.BeforeEach(func() {
 		podClient = f.PodClient()
 	})
@@ -65,10 +67,10 @@ var _ = SIGDescribe("Security Context", func() {
 			})
 
 			ginkgo.By("Check if both containers receive PID 1.")
-			pid1 := f.ExecCommandInContainer("isolated-pid-ns-test-pod", "test-container-1", "/bin/pidof", "top")
-			pid2 := f.ExecCommandInContainer("isolated-pid-ns-test-pod", "test-container-2", "/bin/pidof", "sleep")
+			pid1 := e2eutils.ExecCommandInContainer(f.ClientSet, f.Namespace.Name, "isolated-pid-ns-test-pod", "test-container-1", "/bin/pidof", "top")
+			pid2 := e2eutils.ExecCommandInContainer(f.ClientSet, f.Namespace.Name, "isolated-pid-ns-test-pod", "test-container-2", "/bin/pidof", "sleep")
 			if pid1 != "1" || pid2 != "1" {
-				framework.Failf("PIDs of different containers are not all 1: test-container-1=%v, test-container-2=%v", pid1, pid2)
+				e2eutils.Failf("PIDs of different containers are not all 1: test-container-1=%v, test-container-2=%v", pid1, pid2)
 			}
 		})
 
@@ -95,10 +97,10 @@ var _ = SIGDescribe("Security Context", func() {
 			})
 
 			ginkgo.By("Check if the process in one container is visible to the process in the other.")
-			pid1 := f.ExecCommandInContainer("shared-pid-ns-test-pod", "test-container-1", "/bin/pidof", "top")
-			pid2 := f.ExecCommandInContainer("shared-pid-ns-test-pod", "test-container-2", "/bin/pidof", "top")
+			pid1 := e2eutils.ExecCommandInContainer(f.ClientSet, f.Namespace.Name, "shared-pid-ns-test-pod", "test-container-1", "/bin/pidof", "top")
+			pid2 := e2eutils.ExecCommandInContainer(f.ClientSet, f.Namespace.Name, "shared-pid-ns-test-pod", "test-container-2", "/bin/pidof", "top")
 			if pid1 != pid2 {
-				framework.Failf("PIDs are not the same in different containers: test-container-1=%v, test-container-2=%v", pid1, pid2)
+				e2eutils.Failf("PIDs are not the same in different containers: test-container-1=%v, test-container-2=%v", pid1, pid2)
 			}
 		})
 	})
@@ -129,7 +131,7 @@ var _ = SIGDescribe("Security Context", func() {
 				hostPID,
 			))
 
-			podClient.WaitForSuccess(podName, framework.PodStartTimeout)
+			podClient.WaitForSuccess(podName, e2eutils.PodStartTimeout)
 		}
 
 		nginxPid := ""
@@ -141,7 +143,7 @@ var _ = SIGDescribe("Security Context", func() {
 				true,
 			))
 
-			output := f.ExecShellInContainer(nginxPodName, nginxPodName,
+			output := e2eutils.ExecShellInContainer(f.ClientSet, f.Namespace.Name, nginxPodName, nginxPodName,
 				"cat /var/run/nginx.pid")
 			nginxPid = strings.TrimSpace(output)
 		})
@@ -151,18 +153,18 @@ var _ = SIGDescribe("Security Context", func() {
 			createAndWaitHostPidPod(busyboxPodName, true)
 			logs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, busyboxPodName, busyboxPodName)
 			if err != nil {
-				framework.Failf("GetPodLogs for pod %q failed: %v", busyboxPodName, err)
+				e2eutils.Failf("GetPodLogs for pod %q failed: %v", busyboxPodName, err)
 			}
 
 			pids := strings.TrimSpace(logs)
-			framework.Logf("Got nginx's pid %q from pod %q", pids, busyboxPodName)
+			e2eutils.Logf("Got nginx's pid %q from pod %q", pids, busyboxPodName)
 			if pids == "" {
-				framework.Failf("nginx's pid should be seen by hostpid containers")
+				e2eutils.Failf("nginx's pid should be seen by hostpid containers")
 			}
 
 			pidSets := sets.NewString(strings.Split(pids, " ")...)
 			if !pidSets.Has(nginxPid) {
-				framework.Failf("nginx's pid should be seen by hostpid containers")
+				e2eutils.Failf("nginx's pid should be seen by hostpid containers")
 			}
 		})
 
@@ -171,14 +173,14 @@ var _ = SIGDescribe("Security Context", func() {
 			createAndWaitHostPidPod(busyboxPodName, false)
 			logs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, busyboxPodName, busyboxPodName)
 			if err != nil {
-				framework.Failf("GetPodLogs for pod %q failed: %v", busyboxPodName, err)
+				e2eutils.Failf("GetPodLogs for pod %q failed: %v", busyboxPodName, err)
 			}
 
 			pids := strings.TrimSpace(logs)
-			framework.Logf("Got nginx's pid %q from pod %q", pids, busyboxPodName)
+			e2eutils.Logf("Got nginx's pid %q from pod %q", pids, busyboxPodName)
 			pidSets := sets.NewString(strings.Split(pids, " ")...)
 			if pidSets.Has(nginxPid) {
-				framework.Failf("nginx's pid should not be seen by non-hostpid containers")
+				e2eutils.Failf("nginx's pid should not be seen by non-hostpid containers")
 			}
 		})
 	})
@@ -209,17 +211,17 @@ var _ = SIGDescribe("Security Context", func() {
 				hostNetwork,
 			))
 
-			podClient.WaitForSuccess(podName, framework.PodStartTimeout)
+			podClient.WaitForSuccess(podName, e2eutils.PodStartTimeout)
 		}
 
 		hostSharedMemoryID := ""
 		ginkgo.BeforeEach(func() {
 			output, err := exec.Command("sh", "-c", "ipcmk -M 1048576 | awk '{print $NF}'").Output()
 			if err != nil {
-				framework.Failf("Failed to create the shared memory on the host: %v", err)
+				e2eutils.Failf("Failed to create the shared memory on the host: %v", err)
 			}
 			hostSharedMemoryID = strings.TrimSpace(string(output))
-			framework.Logf("Got host shared memory ID %q", hostSharedMemoryID)
+			e2eutils.Logf("Got host shared memory ID %q", hostSharedMemoryID)
 		})
 
 		ginkgo.It("should show the shared memory ID in the host IPC containers [NodeFeature:HostAccess]", func() {
@@ -227,13 +229,13 @@ var _ = SIGDescribe("Security Context", func() {
 			createAndWaitHostIPCPod(ipcutilsPodName, true)
 			logs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, ipcutilsPodName, ipcutilsPodName)
 			if err != nil {
-				framework.Failf("GetPodLogs for pod %q failed: %v", ipcutilsPodName, err)
+				e2eutils.Failf("GetPodLogs for pod %q failed: %v", ipcutilsPodName, err)
 			}
 
 			podSharedMemoryIDs := strings.TrimSpace(logs)
-			framework.Logf("Got shared memory IDs %q from pod %q", podSharedMemoryIDs, ipcutilsPodName)
+			e2eutils.Logf("Got shared memory IDs %q from pod %q", podSharedMemoryIDs, ipcutilsPodName)
 			if !strings.Contains(podSharedMemoryIDs, hostSharedMemoryID) {
-				framework.Failf("hostIPC container should show shared memory IDs on host")
+				e2eutils.Failf("hostIPC container should show shared memory IDs on host")
 			}
 		})
 
@@ -242,13 +244,13 @@ var _ = SIGDescribe("Security Context", func() {
 			createAndWaitHostIPCPod(ipcutilsPodName, false)
 			logs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, ipcutilsPodName, ipcutilsPodName)
 			if err != nil {
-				framework.Failf("GetPodLogs for pod %q failed: %v", ipcutilsPodName, err)
+				e2eutils.Failf("GetPodLogs for pod %q failed: %v", ipcutilsPodName, err)
 			}
 
 			podSharedMemoryIDs := strings.TrimSpace(logs)
-			framework.Logf("Got shared memory IDs %q from pod %q", podSharedMemoryIDs, ipcutilsPodName)
+			e2eutils.Logf("Got shared memory IDs %q from pod %q", podSharedMemoryIDs, ipcutilsPodName)
 			if strings.Contains(podSharedMemoryIDs, hostSharedMemoryID) {
-				framework.Failf("non-hostIPC container should not show shared memory IDs on host")
+				e2eutils.Failf("non-hostIPC container should not show shared memory IDs on host")
 			}
 		})
 
@@ -256,7 +258,7 @@ var _ = SIGDescribe("Security Context", func() {
 			if hostSharedMemoryID != "" {
 				_, err := exec.Command("sh", "-c", fmt.Sprintf("ipcrm -m %q", hostSharedMemoryID)).Output()
 				if err != nil {
-					framework.Failf("Failed to remove shared memory %q on the host: %v", hostSharedMemoryID, err)
+					e2eutils.Failf("Failed to remove shared memory %q on the host: %v", hostSharedMemoryID, err)
 				}
 			}
 		})
@@ -289,7 +291,7 @@ var _ = SIGDescribe("Security Context", func() {
 				hostNetwork,
 			))
 
-			podClient.WaitForSuccess(podName, framework.PodStartTimeout)
+			podClient.WaitForSuccess(podName, e2eutils.PodStartTimeout)
 		}
 
 		listeningPort := ""
@@ -298,11 +300,11 @@ var _ = SIGDescribe("Security Context", func() {
 		ginkgo.BeforeEach(func() {
 			l, err = net.Listen("tcp", ":0")
 			if err != nil {
-				framework.Failf("Failed to open a new tcp port: %v", err)
+				e2eutils.Failf("Failed to open a new tcp port: %v", err)
 			}
 			addr := strings.Split(l.Addr().String(), ":")
 			listeningPort = addr[len(addr)-1]
-			framework.Logf("Opened a new tcp port %q", listeningPort)
+			e2eutils.Logf("Opened a new tcp port %q", listeningPort)
 		})
 
 		ginkgo.It("should listen on same port in the host network containers [NodeFeature:HostAccess]", func() {
@@ -310,12 +312,12 @@ var _ = SIGDescribe("Security Context", func() {
 			createAndWaitHostNetworkPod(busyboxPodName, true)
 			logs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, busyboxPodName, busyboxPodName)
 			if err != nil {
-				framework.Failf("GetPodLogs for pod %q failed: %v", busyboxPodName, err)
+				e2eutils.Failf("GetPodLogs for pod %q failed: %v", busyboxPodName, err)
 			}
 
-			framework.Logf("Got logs for pod %q: %q", busyboxPodName, logs)
+			e2eutils.Logf("Got logs for pod %q: %q", busyboxPodName, logs)
 			if !strings.Contains(logs, listeningPort) {
-				framework.Failf("host-networked container should listening on same port as host")
+				e2eutils.Failf("host-networked container should listening on same port as host")
 			}
 		})
 
@@ -324,12 +326,12 @@ var _ = SIGDescribe("Security Context", func() {
 			createAndWaitHostNetworkPod(busyboxPodName, false)
 			logs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, busyboxPodName, busyboxPodName)
 			if err != nil {
-				framework.Failf("GetPodLogs for pod %q failed: %v", busyboxPodName, err)
+				e2eutils.Failf("GetPodLogs for pod %q failed: %v", busyboxPodName, err)
 			}
 
-			framework.Logf("Got logs for pod %q: %q", busyboxPodName, logs)
+			e2eutils.Logf("Got logs for pod %q: %q", busyboxPodName, logs)
 			if strings.Contains(logs, listeningPort) {
-				framework.Failf("non-hostnetworked container shouldn't show the same port as host")
+				e2eutils.Failf("non-hostnetworked container shouldn't show the same port as host")
 			}
 		})
 

@@ -26,7 +26,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/config"
+	"k8s.io/kubernetes/test/e2e/framework/utils"
 )
 
 // RecreateNodes recreates the given nodes in a managed instance group.
@@ -46,22 +47,22 @@ func RecreateNodes(c clientset.Interface, nodes []v1.Node) error {
 			continue
 		}
 
-		defaultZone := framework.TestContext.CloudConfig.Zone
+		defaultZone := config.TestContext.CloudConfig.Zone
 		nodeNamesByZone[defaultZone] = append(nodeNamesByZone[defaultZone], node.Name)
 	}
 
 	// Find the sole managed instance group name
 	var instanceGroup string
-	if strings.Index(framework.TestContext.CloudConfig.NodeInstanceGroup, ",") >= 0 {
-		return fmt.Errorf("Test does not support cluster setup with more than one managed instance group: %s", framework.TestContext.CloudConfig.NodeInstanceGroup)
+	if strings.Index(config.TestContext.CloudConfig.NodeInstanceGroup, ",") >= 0 {
+		return fmt.Errorf("Test does not support cluster setup with more than one managed instance group: %s", config.TestContext.CloudConfig.NodeInstanceGroup)
 	}
-	instanceGroup = framework.TestContext.CloudConfig.NodeInstanceGroup
+	instanceGroup = config.TestContext.CloudConfig.NodeInstanceGroup
 
 	// Recreate the nodes.
 	for zone, nodeNames := range nodeNamesByZone {
 		args := []string{
 			"compute",
-			fmt.Sprintf("--project=%s", framework.TestContext.CloudConfig.ProjectID),
+			fmt.Sprintf("--project=%s", config.TestContext.CloudConfig.ProjectID),
 			"instance-groups",
 			"managed",
 			"recreate-instances",
@@ -70,8 +71,8 @@ func RecreateNodes(c clientset.Interface, nodes []v1.Node) error {
 
 		args = append(args, fmt.Sprintf("--instances=%s", strings.Join(nodeNames, ",")))
 		args = append(args, fmt.Sprintf("--zone=%s", zone))
-		framework.Logf("Recreating instance group %s.", instanceGroup)
-		stdout, stderr, err := framework.RunCmd("gcloud", args...)
+		utils.Logf("Recreating instance group %s.", instanceGroup)
+		stdout, stderr, err := utils.RunCmd("gcloud", args...)
 		if err != nil {
 			return fmt.Errorf("error recreating nodes: %s\nstdout: %s\nstderr: %s", err, stdout, stderr)
 		}
@@ -87,7 +88,7 @@ func WaitForNodeBootIdsToChange(c clientset.Interface, nodes []v1.Node, timeout 
 		if err := wait.Poll(30*time.Second, timeout, func() (bool, error) {
 			newNode, err := c.CoreV1().Nodes().Get(context.TODO(), node.Name, metav1.GetOptions{})
 			if err != nil {
-				framework.Logf("Could not get node info: %s. Retrying in %v.", err, 30*time.Second)
+				utils.Logf("Could not get node info: %s. Retrying in %v.", err, 30*time.Second)
 				return false, nil
 			}
 			return node.Status.NodeInfo.BootID != newNode.Status.NodeInfo.BootID, nil

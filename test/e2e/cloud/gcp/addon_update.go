@@ -21,6 +21,8 @@ import (
 	"context"
 	"fmt"
 	"io"
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 	"os"
 	"strings"
 	"time"
@@ -223,13 +225,13 @@ var _ = SIGDescribe("Addon update", func() {
 		// - SSH master access
 		// ... so the provider check should be identical to the intersection of
 		// providers that provide those capabilities.
-		if !framework.ProviderIs("gce") {
+		if !e2eutils.ProviderIs("gce") {
 			return
 		}
 
 		var err error
 		sshClient, err = getMasterSSHClient()
-		framework.ExpectNoError(err, "Failed to get the master SSH client.")
+		e2eutils.ExpectNoError(err, "Failed to get the master SSH client.")
 	})
 
 	ginkgo.AfterEach(func() {
@@ -248,7 +250,7 @@ var _ = SIGDescribe("Addon update", func() {
 		e2eskipper.SkipUnlessProviderIs("gce")
 
 		//these tests are long, so I squeezed several cases in one scenario
-		framework.ExpectNotEqual(sshClient, nil)
+		e2eutils.ExpectNotEqual(sshClient, nil)
 		dir = f.Namespace.Name // we use it only to give a unique string for each test execution
 
 		temporaryRemotePathPrefix := "addon-test-dir"
@@ -277,7 +279,7 @@ var _ = SIGDescribe("Addon update", func() {
 
 		for _, p := range remoteFiles {
 			err := writeRemoteFile(sshClient, p.data, temporaryRemotePath, p.fileName, 0644)
-			framework.ExpectNoError(err, "Failed to write file %q at remote path %q with ssh client %+v", p.fileName, temporaryRemotePath, sshClient)
+			e2eutils.ExpectNoError(err, "Failed to write file %q at remote path %q with ssh client %+v", p.fileName, temporaryRemotePath, sshClient)
 		}
 
 		// directory on kubernetes-master
@@ -286,7 +288,7 @@ var _ = SIGDescribe("Addon update", func() {
 
 		// cleanup from previous tests
 		_, _, _, err := sshExec(sshClient, fmt.Sprintf("sudo rm -rf %s", destinationDirPrefix))
-		framework.ExpectNoError(err, "Failed to remove remote dir %q with ssh client %+v", destinationDirPrefix, sshClient)
+		e2eutils.ExpectNoError(err, "Failed to remove remote dir %q with ssh client %+v", destinationDirPrefix, sshClient)
 
 		defer sshExec(sshClient, fmt.Sprintf("sudo rm -rf %s", destinationDirPrefix)) // ignore result in cleanup
 		sshExecAndVerify(sshClient, fmt.Sprintf("sudo mkdir -p %s", destinationDir))
@@ -301,9 +303,9 @@ var _ = SIGDescribe("Addon update", func() {
 		sshExecAndVerify(sshClient, fmt.Sprintf("sudo cp %s/%s %s/%s", temporaryRemotePath, svcAddonEnsureExists, destinationDir, svcAddonEnsureExists))
 		// Delete the "ensure exist class" addon at the end.
 		defer func() {
-			framework.Logf("Cleaning up ensure exist class addon.")
+			e2eutils.Logf("Cleaning up ensure exist class addon.")
 			err := f.ClientSet.CoreV1().Services(addonNsName).Delete(context.TODO(), "addon-ensure-exists-test", metav1.DeleteOptions{})
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 		}()
 
 		waitForReplicationControllerInAddonTest(f.ClientSet, addonNsName, "addon-reconcile-test", true)
@@ -337,26 +339,26 @@ var _ = SIGDescribe("Addon update", func() {
 
 		ginkgo.By("verify invalid addons weren't created")
 		_, err = f.ClientSet.CoreV1().ReplicationControllers(addonNsName).Get(context.TODO(), "invalid-addon-test", metav1.GetOptions{})
-		framework.ExpectError(err)
+		e2eutils.ExpectError(err)
 
 		// Invalid addon manifests and the "ensure exist class" addon will be deleted by the deferred function.
 	})
 })
 
 func waitForServiceInAddonTest(c clientset.Interface, addonNamespace, name string, exist bool) {
-	framework.ExpectNoError(e2enetwork.WaitForService(c, addonNamespace, name, exist, addonTestPollInterval, addonTestPollTimeout))
+	e2eutils.ExpectNoError(e2enetwork.WaitForService(c, addonNamespace, name, exist, addonTestPollInterval, addonTestPollTimeout))
 }
 
 func waitForReplicationControllerInAddonTest(c clientset.Interface, addonNamespace, name string, exist bool) {
-	framework.ExpectNoError(waitForReplicationController(c, addonNamespace, name, exist, addonTestPollInterval, addonTestPollTimeout))
+	e2eutils.ExpectNoError(waitForReplicationController(c, addonNamespace, name, exist, addonTestPollInterval, addonTestPollTimeout))
 }
 
 func waitForServicewithSelectorInAddonTest(c clientset.Interface, addonNamespace string, exist bool, selector labels.Selector) {
-	framework.ExpectNoError(waitForServiceWithSelector(c, addonNamespace, selector, exist, addonTestPollInterval, addonTestPollTimeout))
+	e2eutils.ExpectNoError(waitForServiceWithSelector(c, addonNamespace, selector, exist, addonTestPollInterval, addonTestPollTimeout))
 }
 
 func waitForReplicationControllerwithSelectorInAddonTest(c clientset.Interface, addonNamespace string, exist bool, selector labels.Selector) {
-	framework.ExpectNoError(waitForReplicationControllerWithSelector(c, addonNamespace, selector, exist, addonTestPollInterval,
+	e2eutils.ExpectNoError(waitForReplicationControllerWithSelector(c, addonNamespace, selector, exist, addonTestPollInterval,
 		addonTestPollTimeout))
 }
 
@@ -365,10 +367,10 @@ func waitForReplicationController(c clientset.Interface, namespace, name string,
 	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
 		_, err := c.CoreV1().ReplicationControllers(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
-			framework.Logf("Get ReplicationController %s in namespace %s failed (%v).", name, namespace, err)
+			e2eutils.Logf("Get ReplicationController %s in namespace %s failed (%v).", name, namespace, err)
 			return !exist, nil
 		}
-		framework.Logf("ReplicationController %s in namespace %s found.", name, namespace)
+		e2eutils.Logf("ReplicationController %s in namespace %s found.", name, namespace)
 		return exist, nil
 	})
 	if err != nil {
@@ -385,16 +387,16 @@ func waitForServiceWithSelector(c clientset.Interface, namespace string, selecto
 		services, err := c.CoreV1().Services(namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: selector.String()})
 		switch {
 		case len(services.Items) != 0:
-			framework.Logf("Service with %s in namespace %s found.", selector.String(), namespace)
+			e2eutils.Logf("Service with %s in namespace %s found.", selector.String(), namespace)
 			return exist, nil
 		case len(services.Items) == 0:
-			framework.Logf("Service with %s in namespace %s disappeared.", selector.String(), namespace)
+			e2eutils.Logf("Service with %s in namespace %s disappeared.", selector.String(), namespace)
 			return !exist, nil
 		case err != nil:
-			framework.Logf("Non-retryable failure while listing service.")
+			e2eutils.Logf("Non-retryable failure while listing service.")
 			return false, err
 		default:
-			framework.Logf("List service with %s in namespace %s failed: %v", selector.String(), namespace, err)
+			e2eutils.Logf("List service with %s in namespace %s failed: %v", selector.String(), namespace, err)
 			return false, nil
 		}
 	})
@@ -412,13 +414,13 @@ func waitForReplicationControllerWithSelector(c clientset.Interface, namespace s
 		rcs, err := c.CoreV1().ReplicationControllers(namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: selector.String()})
 		switch {
 		case len(rcs.Items) != 0:
-			framework.Logf("ReplicationController with %s in namespace %s found.", selector.String(), namespace)
+			e2eutils.Logf("ReplicationController with %s in namespace %s found.", selector.String(), namespace)
 			return exist, nil
 		case len(rcs.Items) == 0:
-			framework.Logf("ReplicationController with %s in namespace %s disappeared.", selector.String(), namespace)
+			e2eutils.Logf("ReplicationController with %s in namespace %s disappeared.", selector.String(), namespace)
 			return !exist, nil
 		default:
-			framework.Logf("List ReplicationController with %s in namespace %s failed: %v", selector.String(), namespace, err)
+			e2eutils.Logf("List ReplicationController with %s in namespace %s failed: %v", selector.String(), namespace, err)
 			return false, nil
 		}
 	})
@@ -433,9 +435,9 @@ func waitForReplicationControllerWithSelector(c clientset.Interface, namespace s
 // differently.
 func getMasterSSHClient() (*ssh.Client, error) {
 	// Get a signer for the provider.
-	signer, err := e2essh.GetSigner(framework.TestContext.Provider)
+	signer, err := e2essh.GetSigner(e2econfig.TestContext.Provider)
 	if err != nil {
-		return nil, fmt.Errorf("error getting signer for provider %s: '%v'", framework.TestContext.Provider, err)
+		return nil, fmt.Errorf("error getting signer for provider %s: '%v'", e2econfig.TestContext.Provider, err)
 	}
 
 	sshUser := os.Getenv("KUBE_SSH_USER")
@@ -448,7 +450,7 @@ func getMasterSSHClient() (*ssh.Client, error) {
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
 
-	host := framework.APIAddress() + ":22"
+	host := e2eutils.APIAddress() + ":22"
 	client, err := ssh.Dial("tcp", host, config)
 	if err != nil {
 		return nil, fmt.Errorf("error getting SSH client to host %s: '%v'", host, err)
@@ -458,12 +460,12 @@ func getMasterSSHClient() (*ssh.Client, error) {
 
 func sshExecAndVerify(client *ssh.Client, cmd string) {
 	_, _, rc, err := sshExec(client, cmd)
-	framework.ExpectNoError(err, "Failed to execute %q with ssh client %+v", cmd, client)
-	framework.ExpectEqual(rc, 0, "error return code from executing command on the cluster: %s", cmd)
+	e2eutils.ExpectNoError(err, "Failed to execute %q with ssh client %+v", cmd, client)
+	e2eutils.ExpectEqual(rc, 0, "error return code from executing command on the cluster: %s", cmd)
 }
 
 func sshExec(client *ssh.Client, cmd string) (string, string, int, error) {
-	framework.Logf("Executing '%s' on %v", cmd, client.RemoteAddr())
+	e2eutils.Logf("Executing '%s' on %v", cmd, client.RemoteAddr())
 	session, err := client.NewSession()
 	if err != nil {
 		return "", "", 0, fmt.Errorf("error creating session to host %s: '%v'", client.RemoteAddr(), err)
@@ -495,7 +497,7 @@ func sshExec(client *ssh.Client, cmd string) (string, string, int, error) {
 }
 
 func writeRemoteFile(sshClient *ssh.Client, data, dir, fileName string, mode os.FileMode) error {
-	framework.Logf(fmt.Sprintf("Writing remote file '%s/%s' on %v", dir, fileName, sshClient.RemoteAddr()))
+	e2eutils.Logf(fmt.Sprintf("Writing remote file '%s/%s' on %v", dir, fileName, sshClient.RemoteAddr()))
 	session, err := sshClient.NewSession()
 	if err != nil {
 		return fmt.Errorf("error creating session to host %s: '%v'", sshClient.RemoteAddr(), err)

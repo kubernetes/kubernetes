@@ -23,13 +23,15 @@ import (
 	"text/template"
 	"time"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/test/e2e/framework"
 	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -112,11 +114,11 @@ func SubstituteImageName(content string) string {
 	contentWithImageName := new(bytes.Buffer)
 	tmpl, err := template.New("imagemanifest").Parse(content)
 	if err != nil {
-		framework.Failf("Failed Parse the template: %v", err)
+		e2eutils.Failf("Failed Parse the template: %v", err)
 	}
 	err = tmpl.Execute(contentWithImageName, testImages)
 	if err != nil {
-		framework.Failf("Failed executing template: %v", err)
+		e2eutils.Failf("Failed executing template: %v", err)
 	}
 	return contentWithImageName.String()
 }
@@ -155,7 +157,7 @@ func NewRCByName(c clientset.Interface, ns, name string, replicas int32, gracePe
 	}
 
 	return c.CoreV1().ReplicationControllers(ns).Create(context.TODO(), rcByNamePort(
-		name, replicas, framework.ServeHostnameImage, containerArgs, 9376, v1.ProtocolTCP, map[string]string{}, gracePeriod), metav1.CreateOptions{})
+		name, replicas, e2eutils.ServeHostnameImage, containerArgs, 9376, v1.ProtocolTCP, map[string]string{}, gracePeriod), metav1.CreateOptions{})
 }
 
 // RestartNodes restarts specific nodes.
@@ -164,7 +166,7 @@ func RestartNodes(c clientset.Interface, nodes []v1.Node) error {
 	nodeNamesByZone := make(map[string][]string)
 	for i := range nodes {
 		node := &nodes[i]
-		zone := framework.TestContext.CloudConfig.Zone
+		zone := e2econfig.TestContext.CloudConfig.Zone
 		if z, ok := node.Labels[v1.LabelFailureDomainBetaZone]; ok {
 			zone = z
 		} else if z, ok := node.Labels[v1.LabelTopologyZone]; ok {
@@ -177,13 +179,13 @@ func RestartNodes(c clientset.Interface, nodes []v1.Node) error {
 	for zone, nodeNames := range nodeNamesByZone {
 		args := []string{
 			"compute",
-			fmt.Sprintf("--project=%s", framework.TestContext.CloudConfig.ProjectID),
+			fmt.Sprintf("--project=%s", e2econfig.TestContext.CloudConfig.ProjectID),
 			"instances",
 			"reset",
 		}
 		args = append(args, nodeNames...)
 		args = append(args, fmt.Sprintf("--zone=%s", zone))
-		stdout, stderr, err := framework.RunCmd("gcloud", args...)
+		stdout, stderr, err := e2eutils.RunCmd("gcloud", args...)
 		if err != nil {
 			return fmt.Errorf("error restarting nodes: %s\nstdout: %s\nstderr: %s", err, stdout, stderr)
 		}
@@ -192,7 +194,7 @@ func RestartNodes(c clientset.Interface, nodes []v1.Node) error {
 	// Wait for their boot IDs to change.
 	for i := range nodes {
 		node := &nodes[i]
-		if err := wait.Poll(30*time.Second, framework.RestartNodeReadyAgainTimeout, func() (bool, error) {
+		if err := wait.Poll(30*time.Second, e2eutils.RestartNodeReadyAgainTimeout, func() (bool, error) {
 			newNode, err := c.CoreV1().Nodes().Get(context.TODO(), node.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, fmt.Errorf("error getting node info after reboot: %s", err)

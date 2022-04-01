@@ -22,6 +22,8 @@ import (
 	"os"
 	"strconv"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
@@ -71,7 +73,7 @@ var _ = utils.SIGDescribe("Volume Operations Storm [Feature:vsphere]", func() {
 		gomega.Expect(GetReadySchedulableNodeInfos()).NotTo(gomega.BeEmpty())
 		if scale := os.Getenv("VOLUME_OPS_SCALE"); scale != "" {
 			volumeOpsScale, err = strconv.Atoi(scale)
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 		} else {
 			volumeOpsScale = defaultVolumeOpsScale
 		}
@@ -84,7 +86,7 @@ var _ = utils.SIGDescribe("Volume Operations Storm [Feature:vsphere]", func() {
 		}
 		ginkgo.By("Deleting StorageClass")
 		err = client.StorageV1().StorageClasses().Delete(context.TODO(), storageclass.Name, metav1.DeleteOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 	})
 
 	ginkgo.It("should create pod with many volumes and verify no attach call fails", func() {
@@ -93,29 +95,29 @@ var _ = utils.SIGDescribe("Volume Operations Storm [Feature:vsphere]", func() {
 		scParameters := make(map[string]string)
 		scParameters["diskformat"] = "thin"
 		storageclass, err = client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec("thinsc", scParameters, nil, ""), metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		ginkgo.By("Creating PVCs using the Storage Class")
 		count := 0
 		for count < volumeOpsScale {
 			pvclaims[count], err = e2epv.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass))
-			framework.ExpectNoError(err)
+			e2eutils.ExpectNoError(err)
 			count++
 		}
 
 		ginkgo.By("Waiting for all claims to be in bound phase")
 		persistentvolumes, err = e2epv.WaitForPVClaimBoundPhase(client, pvclaims, f.Timeouts.ClaimProvision)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		ginkgo.By("Creating pod to attach PVs to the node")
 		pod, err := e2epod.CreatePod(client, namespace, nil, pvclaims, false, "")
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 
 		ginkgo.By("Verify all volumes are accessible and available in the pod")
 		verifyVSphereVolumesAccessible(client, pod, persistentvolumes)
 
 		ginkgo.By("Deleting pod")
-		framework.ExpectNoError(e2epod.DeletePodWithWait(client, pod))
+		e2eutils.ExpectNoError(e2epod.DeletePodWithWait(client, pod))
 
 		ginkgo.By("Waiting for volumes to be detached from the node")
 		for _, pv := range persistentvolumes {

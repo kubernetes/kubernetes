@@ -27,6 +27,9 @@ import (
 	"strings"
 	"time"
 
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -79,8 +82,8 @@ var _ = SIGDescribe("Container Manager Misc [Serial]", func() {
 	ginkgo.Describe("Validate OOM score adjustments [NodeFeature:OOMScoreAdj]", func() {
 		ginkgo.Context("once the node is setup", func() {
 			ginkgo.It("container runtime's oom-score-adj should be -999", func() {
-				runtimePids, err := getPidsForProcess(framework.TestContext.ContainerRuntimeProcessName, framework.TestContext.ContainerRuntimePidFile)
-				framework.ExpectNoError(err, "failed to get list of container runtime pids")
+				runtimePids, err := getPidsForProcess(e2econfig.TestContext.ContainerRuntimeProcessName, e2econfig.TestContext.ContainerRuntimePidFile)
+				e2eutils.ExpectNoError(err, "failed to get list of container runtime pids")
 				for _, pid := range runtimePids {
 					gomega.Eventually(func() error {
 						return validateOOMScoreAdjSetting(pid, -999)
@@ -89,8 +92,8 @@ var _ = SIGDescribe("Container Manager Misc [Serial]", func() {
 			})
 			ginkgo.It("Kubelet's oom-score-adj should be -999", func() {
 				kubeletPids, err := getPidsForProcess(kubeletProcessName, "")
-				framework.ExpectNoError(err, "failed to get list of kubelet pids")
-				framework.ExpectEqual(len(kubeletPids), 1, "expected only one kubelet process; found %d", len(kubeletPids))
+				e2eutils.ExpectNoError(err, "failed to get list of kubelet pids")
+				e2eutils.ExpectEqual(len(kubeletPids), 1, "expected only one kubelet process; found %d", len(kubeletPids))
 				gomega.Eventually(func() error {
 					return validateOOMScoreAdjSetting(kubeletPids[0], -999)
 				}, 5*time.Minute, 30*time.Second).Should(gomega.BeNil())
@@ -101,7 +104,7 @@ var _ = SIGDescribe("Container Manager Misc [Serial]", func() {
 					// created before this test, and may not be infra
 					// containers. They should be excluded from the test.
 					existingPausePIDs, err := getPidsForProcess("pause", "")
-					framework.ExpectNoError(err, "failed to list all pause processes on the node")
+					e2eutils.ExpectNoError(err, "failed to list all pause processes on the node")
 					existingPausePIDSet := sets.NewInt(existingPausePIDs...)
 
 					podClient := f.PodClient()
@@ -113,7 +116,7 @@ var _ = SIGDescribe("Container Manager Misc [Serial]", func() {
 						Spec: v1.PodSpec{
 							Containers: []v1.Container{
 								{
-									Image: framework.ServeHostnameImage,
+									Image: e2eutils.ServeHostnameImage,
 									Name:  podName,
 								},
 							},
@@ -156,16 +159,16 @@ var _ = SIGDescribe("Container Manager Misc [Serial]", func() {
 					if ginkgo.CurrentGinkgoTestDescription().Failed {
 						ginkgo.By("Dump all running containers")
 						runtime, _, err := getCRIClient()
-						framework.ExpectNoError(err)
+						e2eutils.ExpectNoError(err)
 						containers, err := runtime.ListContainers(&runtimeapi.ContainerFilter{
 							State: &runtimeapi.ContainerStateValue{
 								State: runtimeapi.ContainerState_CONTAINER_RUNNING,
 							},
 						})
-						framework.ExpectNoError(err)
-						framework.Logf("Running containers:")
+						e2eutils.ExpectNoError(err)
+						e2eutils.Logf("Running containers:")
 						for _, c := range containers {
-							framework.Logf("%+v", c)
+							e2eutils.Logf("%+v", c)
 						}
 					}
 				})

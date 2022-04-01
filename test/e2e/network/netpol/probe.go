@@ -19,9 +19,10 @@ package netpol
 import (
 	"fmt"
 
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
+
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/kubernetes/test/e2e/framework"
 	netutils "k8s.io/utils/net"
 )
 
@@ -73,17 +74,17 @@ func ProbePodToPodConnectivity(prober Prober, model *Model, testCase *TestCase) 
 		result := <-results
 		job := result.Job
 		if result.Err != nil {
-			framework.Logf("unable to perform probe %s -> %s: %v", job.PodFrom.PodString(), job.PodTo.PodString(), result.Err)
+			e2eutils.Logf("unable to perform probe %s -> %s: %v", job.PodFrom.PodString(), job.PodTo.PodString(), result.Err)
 		}
 		testCase.Reachability.Observe(job.PodFrom.PodString(), job.PodTo.PodString(), result.IsConnected)
 		expected := testCase.Reachability.Expected.Get(job.PodFrom.PodString().String(), job.PodTo.PodString().String())
 		if result.IsConnected != expected {
-			framework.Logf("Validation of %s -> %s FAILED !!!", job.PodFrom.PodString(), job.PodTo.PodString())
-			framework.Logf("error %v ", result.Err)
+			e2eutils.Logf("Validation of %s -> %s FAILED !!!", job.PodFrom.PodString(), job.PodTo.PodString())
+			e2eutils.Logf("error %v ", result.Err)
 			if expected {
-				framework.Logf("Expected allowed pod connection was instead BLOCKED --- run '%v'", result.Command)
+				e2eutils.Logf("Expected allowed pod connection was instead BLOCKED --- run '%v'", result.Command)
 			} else {
-				framework.Logf("Expected blocked pod connection was instead ALLOWED --- run '%v'", result.Command)
+				e2eutils.Logf("Expected blocked pod connection was instead ALLOWED --- run '%v'", result.Command)
 			}
 		}
 	}

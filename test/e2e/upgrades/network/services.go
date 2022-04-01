@@ -21,6 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
+	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 	"k8s.io/kubernetes/test/e2e/upgrades"
 
 	"github.com/onsi/ginkgo"
@@ -39,7 +40,7 @@ type ServiceUpgradeTest struct {
 // Name returns the tracking name of the test.
 func (ServiceUpgradeTest) Name() string { return "service-upgrade" }
 
-func shouldTestPDBs() bool { return framework.ProviderIs("gce", "gke") }
+func shouldTestPDBs() bool { return e2eutils.ProviderIs("gce", "gke") }
 
 // Setup creates a service with a load balancer and makes sure it's reachable.
 func (t *ServiceUpgradeTest) Setup(f *framework.Framework) {
@@ -53,9 +54,9 @@ func (t *ServiceUpgradeTest) Setup(f *framework.Framework) {
 	_, err := jig.CreateTCPService(func(s *v1.Service) {
 		s.Spec.Type = v1.ServiceTypeLoadBalancer
 	})
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 	tcpService, err := jig.WaitForLoadBalancer(e2eservice.GetServiceLoadBalancerCreationTimeout(cs))
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	// Get info to hit it with
 	tcpIngressIP := e2eservice.GetIngressPoint(&tcpService.Status.LoadBalancer.Ingress[0])
@@ -63,18 +64,18 @@ func (t *ServiceUpgradeTest) Setup(f *framework.Framework) {
 
 	ginkgo.By("creating pod to be part of service " + serviceName)
 	rc, err := jig.Run(jig.AddRCAntiAffinity)
-	framework.ExpectNoError(err)
+	e2eutils.ExpectNoError(err)
 
 	if shouldTestPDBs() {
 		ginkgo.By("creating a PodDisruptionBudget to cover the ReplicationController")
 		_, err = jig.CreatePDB(rc)
-		framework.ExpectNoError(err)
+		e2eutils.ExpectNoError(err)
 	}
 
 	// Hit it once before considering ourselves ready
 	ginkgo.By("hitting the pod through the service's LoadBalancer")
 	timeout := e2eservice.LoadBalancerLagTimeoutDefault
-	if framework.ProviderIs("aws") {
+	if e2eutils.ProviderIs("aws") {
 		timeout = e2eservice.LoadBalancerLagTimeoutAWS
 	}
 	e2eservice.TestReachableHTTP(tcpIngressIP, svcPort, timeout)
@@ -109,7 +110,7 @@ func (t *ServiceUpgradeTest) test(f *framework.Framework, done <-chan struct{}, 
 		ginkgo.By("continuously hitting the pod through the service's LoadBalancer")
 		wait.Until(func() {
 			e2eservice.TestReachableHTTP(t.tcpIngressIP, t.svcPort, e2eservice.LoadBalancerLagTimeoutDefault)
-		}, framework.Poll, done)
+		}, e2eutils.Poll, done)
 	} else {
 		// Block until upgrade is done
 		ginkgo.By("waiting for upgrade to finish without checking if service remains up")

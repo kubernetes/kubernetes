@@ -34,7 +34,6 @@ import (
 
 	"k8s.io/component-base/version"
 	conformancetestdata "k8s.io/kubernetes/test/conformance/testdata"
-	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/config"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 	e2etestingmanifests "k8s.io/kubernetes/test/e2e/testing-manifests"
@@ -64,8 +63,8 @@ import (
 // handleFlags sets up all flags and parses the command line.
 func handleFlags() {
 	config.CopyFlags(config.Flags, flag.CommandLine)
-	framework.RegisterCommonFlags(flag.CommandLine)
-	framework.RegisterClusterFlags(flag.CommandLine)
+	config.RegisterCommonFlags(flag.CommandLine)
+	config.RegisterClusterFlags(flag.CommandLine)
 	flag.Parse()
 }
 
@@ -76,7 +75,7 @@ func TestMain(m *testing.M) {
 	// Register test flags, then parse flags.
 	handleFlags()
 
-	if framework.TestContext.ListImages {
+	if config.TestContext.ListImages {
 		for _, v := range image.GetImageConfigs() {
 			fmt.Println(v.GetE2EImage())
 		}
@@ -92,7 +91,7 @@ func TestMain(m *testing.M) {
 	testfiles.AddFileSource(testfixtures.GetTestFixturesFS())
 	testfiles.AddFileSource(conformancetestdata.GetConformanceTestdataFS())
 
-	if framework.TestContext.ListConformanceTests {
+	if config.TestContext.ListConformanceTests {
 		var tests []struct {
 			Testname    string `yaml:"testname"`
 			Codename    string `yaml:"codename"`
@@ -117,15 +116,15 @@ func TestMain(m *testing.M) {
 		os.Exit(0)
 	}
 
-	framework.AfterReadingAllFlags(&framework.TestContext)
+	config.AfterReadingAllFlags(&config.TestContext)
 
 	// TODO: Deprecating repo-root over time... instead just use gobindata_util.go , see #23987.
 	// Right now it is still needed, for example by
 	// test/e2e/framework/ingress/ingress_utils.go
 	// for providing the optional secret.yaml file and by
 	// test/e2e/framework/util.go for cluster/log-dump.
-	if framework.TestContext.RepoRoot != "" {
-		testfiles.AddFileSource(testfiles.RootFileSource{Root: framework.TestContext.RepoRoot})
+	if config.TestContext.RepoRoot != "" {
+		testfiles.AddFileSource(testfiles.RootFileSource{Root: config.TestContext.RepoRoot})
 	}
 
 	rand.Seed(time.Now().UnixNano())
