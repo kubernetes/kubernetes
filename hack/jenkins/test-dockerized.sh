@@ -36,8 +36,8 @@ pushd "./hack/tools" >/dev/null
   GO111MODULE=on go install gotest.tools/gotestsum
 popd >/dev/null
 
-# Disable coverage report
-export KUBE_COVER="n"
+# Enable coverage report
+export KUBE_COVER="y"
 # Set artifacts directory
 export ARTIFACTS=${ARTIFACTS:-"${WORKSPACE}/artifacts"}
 # Save the verbose stdout as well.
