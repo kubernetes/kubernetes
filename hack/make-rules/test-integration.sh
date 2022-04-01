@@ -72,7 +72,8 @@ runTests() {
   make -C "${KUBE_ROOT}" test \
       WHAT="${WHAT:-$(kube::test::find_integration_test_dirs | paste -sd' ' -)}" \
       GOFLAGS="${GOFLAGS:-}" \
-      KUBE_TEST_ARGS="--alsologtostderr=true ${SHORT:--short=true} --vmodule=${KUBE_TEST_VMODULE} ${KUBE_TEST_ARGS:-}" \
+      # Run only 4 programs in parallel https://github.com/kubernetes/kubernetes/issues/109038
+      KUBE_TEST_ARGS="-p 4 --alsologtostderr=true ${SHORT:--short=true} --vmodule=${KUBE_TEST_VMODULE} ${KUBE_TEST_ARGS:-}" \
       KUBE_TIMEOUT="${KUBE_TIMEOUT}" \
       KUBE_RACE=""
 
