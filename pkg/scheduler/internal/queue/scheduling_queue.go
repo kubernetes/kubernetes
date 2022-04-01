@@ -785,9 +785,14 @@ func (npm *nominatedPodMap) add(pi *framework.PodInfo, nodeName string) {
 	}
 
 	if npm.podLister != nil {
-		// If the pod is not alive, don't contain it.
-		if _, err := npm.podLister.Pods(pi.Pod.Namespace).Get(pi.Pod.Name); err != nil {
-			klog.V(4).InfoS("Pod doesn't exist in podLister, aborting adding it to the nominated map", "pod", klog.KObj(pi.Pod))
+		// If the pod was removed or if it was already scheduled, don't nominate it.
+		updatedPod, err := npm.podLister.Pods(pi.Pod.Namespace).Get(pi.Pod.Name)
+		if err != nil {
+			klog.V(4).InfoS("Pod doesn't exist in podLister, aborted adding it to the nominated map", "pod", klog.KObj(pi.Pod))
+			return
+		}
+		if updatedPod.Spec.NodeName != "" {
+			klog.V(4).InfoS("Pod is already scheduled to a node, aborted adding it to the nominated map", "pod", klog.KObj(pi.Pod), "node", updatedPod.Spec.NodeName)
 			return
 		}
 	}
