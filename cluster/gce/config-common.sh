@@ -164,6 +164,6 @@ export WINDOWS_INFRA_CONTAINER="k8s.gcr.io/pause:3.7"
 # Storage Path for csi-proxy. csi-proxy only needs to be installed for Windows.
 export CSI_PROXY_STORAGE_PATH="https://storage.googleapis.com/gke-release/csi-proxy"
 # Version for csi-proxy
-export CSI_PROXY_VERSION="${CSI_PROXY_VERSION:-v1.0.1-gke.0}"
+export CSI_PROXY_VERSION="${CSI_PROXY_VERSION:-v1.1.1-gke.0}"
 # csi-proxy additional flags, there are additional flags that cannot be unset in k8s-node-setup.psm1
 export CSI_PROXY_FLAGS="${CSI_PROXY_FLAGS:-}"
