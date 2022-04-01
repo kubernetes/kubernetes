@@ -1999,6 +1999,14 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 				// Traffic from an external source will be routed but the reply
 				// will have the POD address and will be discarded.
 				endpoints = clusterEndpoints
+
+				if svcInfo.InternalPolicyLocal() && utilfeature.DefaultFeatureGate.Enabled(features.ServiceInternalTrafficPolicy) {
+					proxier.serviceNoLocalEndpointsInternal.Insert(svcPortName.NamespacedName.String())
+				}
+
+				if svcInfo.ExternalPolicyLocal() {
+					proxier.serviceNoLocalEndpointsExternal.Insert(svcPortName.NamespacedName.String())
+				}
 			}
 		} else {
 			endpoints = clusterEndpoints
@@ -2008,15 +2016,6 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 	newEndpoints := sets.NewString()
 	for _, epInfo := range endpoints {
 		newEndpoints.Insert(epInfo.String())
-	}
-	if onlyNodeLocalEndpoints && len(newEndpoints) == 0 {
-		if svcInfo.InternalPolicyLocal() && utilfeature.DefaultFeatureGate.Enabled(features.ServiceInternalTrafficPolicy) {
-			proxier.serviceNoLocalEndpointsInternal.Insert(svcPortName.NamespacedName.String())
-		}
-
-		if svcInfo.ExternalPolicyLocal() {
-			proxier.serviceNoLocalEndpointsExternal.Insert(svcPortName.NamespacedName.String())
-		}
 	}
 
 	// Create new endpoints
