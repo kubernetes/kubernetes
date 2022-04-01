@@ -273,6 +273,20 @@ type Proxier struct {
 	// Inject for test purpose.
 	networkInterfacer     utilproxy.NetworkInterfacer
 	gracefuldeleteManager *GracefulTerminationManager
+	// serviceNoLocalEndpointsInternal represents the set of services that couldn't be applied
+	// due to the absence of local endpoints when the internal traffic policy is "Local".
+	// It is used to publish the sync_proxy_rules_no_endpoints_total
+	// metric with the traffic_policy label set to "internal".
+	// sets.String is used here since we end up calculating endpoint topology multiple times for the same Service
+	// if it has multiple ports but each Service should only be counted once.
+	serviceNoLocalEndpointsInternal sets.String
+	// serviceNoLocalEndpointsExternal irepresents the set of services that couldn't be applied
+	// due to the absence of any endpoints when the external traffic policy is "Local".
+	// It is used to publish the sync_proxy_rules_no_endpoints_total
+	// metric with the traffic_policy label set to "external".
+	// sets.String is used here since we end up calculating endpoint topology multiple times for the same Service
+	// if it has multiple ports but each Service should only be counted once.
+	serviceNoLocalEndpointsExternal sets.String
 }
 
 // IPGetter helps get node network interface IP and IPs binded to the IPVS dummy interface
@@ -1027,6 +1041,8 @@ func (proxier *Proxier) syncProxyRules() {
 
 	klog.V(3).InfoS("Syncing ipvs proxier rules")
 
+	proxier.serviceNoLocalEndpointsInternal = sets.NewString()
+	proxier.serviceNoLocalEndpointsExternal = sets.NewString()
 	// Begin install iptables
 
 	// Reset all buffers used later.
@@ -1599,6 +1615,9 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 	}
 	proxier.deleteEndpointConnections(endpointUpdateResult.StaleEndpoints)
+
+	metrics.SyncProxyRulesNoLocalEndpointsTotal.WithLabelValues("internal").Set(float64(proxier.serviceNoLocalEndpointsInternal.Len()))
+	metrics.SyncProxyRulesNoLocalEndpointsTotal.WithLabelValues("external").Set(float64(proxier.serviceNoLocalEndpointsExternal.Len()))
 }
 
 // writeIptablesRules write all iptables rules to proxier.natRules or proxier.FilterRules that ipvs proxier needed
@@ -1980,6 +1999,14 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 				// Traffic from an external source will be routed but the reply
 				// will have the POD address and will be discarded.
 				endpoints = clusterEndpoints
+
+				if svcInfo.InternalPolicyLocal() && utilfeature.DefaultFeatureGate.Enabled(features.ServiceInternalTrafficPolicy) {
+					proxier.serviceNoLocalEndpointsInternal.Insert(svcPortName.NamespacedName.String())
+				}
+
+				if svcInfo.ExternalPolicyLocal() {
+					proxier.serviceNoLocalEndpointsExternal.Insert(svcPortName.NamespacedName.String())
+				}
 			}
 		} else {
 			endpoints = clusterEndpoints

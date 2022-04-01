@@ -148,6 +148,19 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
+
+	// SyncProxyRulesNoLocalEndpointsTotal is the total number of rules that do
+	// not have an available endpoint. This can be caused by an internal
+	// traffic policy with no available local workload.
+	SyncProxyRulesNoLocalEndpointsTotal = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      kubeProxySubsystem,
+			Name:           "sync_proxy_rules_no_local_endpoints_total",
+			Help:           "Number of services with a Local traffic policy and no endpoints",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"traffic_policy"},
+	)
 )
 
 var registerMetricsOnce sync.Once
@@ -165,6 +178,7 @@ func RegisterMetrics() {
 		legacyregistry.MustRegister(IptablesRulesTotal)
 		legacyregistry.MustRegister(IptablesRestoreFailuresTotal)
 		legacyregistry.MustRegister(SyncProxyRulesLastQueuedTimestamp)
+		legacyregistry.MustRegister(SyncProxyRulesNoLocalEndpointsTotal)
 	})
 }
 
