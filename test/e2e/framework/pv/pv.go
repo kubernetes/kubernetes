@@ -24,7 +24,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/wait"
 
-	"k8s.io/kubernetes/test/e2e/framework/config"
 	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -217,7 +216,7 @@ func DeletePersistentVolumeClaim(c clientset.Interface, pvcName string, ns strin
 // DeletePVCandValidatePV deletes the PVC and waits for the PV to enter its expected phase. Validate that the PV
 // has been reclaimed (assumption here about reclaimPolicy). Caller tells this func which
 // phase value to expect for the pv bound to the to-be-deleted claim.
-func DeletePVCandValidatePV(c clientset.Interface, timeouts *config.TimeoutContext, ns string, pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume, expectPVPhase v1.PersistentVolumePhase) error {
+func DeletePVCandValidatePV(c clientset.Interface, timeouts *e2econfig.TimeoutContext, ns string, pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume, expectPVPhase v1.PersistentVolumePhase) error {
 	pvname := pvc.Spec.VolumeName
 	e2eutils.Logf("Deleting PVC %v to trigger reclamation of PV %v", pvc.Name, pvname)
 	err := DeletePersistentVolumeClaim(c, pvc.Name, ns)
@@ -260,7 +259,7 @@ func DeletePVCandValidatePV(c clientset.Interface, timeouts *config.TimeoutConte
 // Available, Bound).
 // Note: if there are more claims than pvs then some of the remaining claims may bind to just made
 //   available pvs.
-func DeletePVCandValidatePVGroup(c clientset.Interface, timeouts *config.TimeoutContext, ns string, pvols PVMap, claims PVCMap, expectPVPhase v1.PersistentVolumePhase) error {
+func DeletePVCandValidatePVGroup(c clientset.Interface, timeouts *e2econfig.TimeoutContext, ns string, pvols PVMap, claims PVCMap, expectPVPhase v1.PersistentVolumePhase) error {
 	var boundPVs, deletedPVCs int
 
 	for pvName := range pvols {
@@ -300,7 +299,7 @@ func DeletePVCandValidatePVGroup(c clientset.Interface, timeouts *config.Timeout
 }
 
 // create the PV resource. Fails test on error.
-func createPV(c clientset.Interface, timeouts *config.TimeoutContext, pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
+func createPV(c clientset.Interface, timeouts *e2econfig.TimeoutContext, pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
 	var resultPV *v1.PersistentVolume
 	var lastCreateErr error
 	err := wait.PollImmediate(29*time.Second, timeouts.PVCreate, func() (done bool, err error) {
@@ -332,7 +331,7 @@ func createPV(c clientset.Interface, timeouts *config.TimeoutContext, pv *v1.Per
 }
 
 // CreatePV creates the PV resource. Fails test on error.
-func CreatePV(c clientset.Interface, timeouts *config.TimeoutContext, pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
+func CreatePV(c clientset.Interface, timeouts *e2econfig.TimeoutContext, pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
 	return createPV(c, timeouts, pv)
 }
 
@@ -351,7 +350,7 @@ func CreatePVC(c clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim) 
 // Note: in the pre-bind case the real PVC name, which is generated, is not
 //   known until after the PVC is instantiated. This is why the pvc is created
 //   before the pv.
-func CreatePVCPV(c clientset.Interface, timeouts *config.TimeoutContext, pvConfig PersistentVolumeConfig, pvcConfig PersistentVolumeClaimConfig, ns string, preBind bool) (*v1.PersistentVolume, *v1.PersistentVolumeClaim, error) {
+func CreatePVCPV(c clientset.Interface, timeouts *e2econfig.TimeoutContext, pvConfig PersistentVolumeConfig, pvcConfig PersistentVolumeClaimConfig, ns string, preBind bool) (*v1.PersistentVolume, *v1.PersistentVolumeClaim, error) {
 	// make the pvc spec
 	pvc := MakePersistentVolumeClaim(pvcConfig, ns)
 	preBindMsg := ""
@@ -386,7 +385,7 @@ func CreatePVCPV(c clientset.Interface, timeouts *config.TimeoutContext, pvConfi
 // Note: in the pre-bind case the real PV name, which is generated, is not
 //   known until after the PV is instantiated. This is why the pv is created
 //   before the pvc.
-func CreatePVPVC(c clientset.Interface, timeouts *config.TimeoutContext, pvConfig PersistentVolumeConfig, pvcConfig PersistentVolumeClaimConfig, ns string, preBind bool) (*v1.PersistentVolume, *v1.PersistentVolumeClaim, error) {
+func CreatePVPVC(c clientset.Interface, timeouts *e2econfig.TimeoutContext, pvConfig PersistentVolumeConfig, pvcConfig PersistentVolumeClaimConfig, ns string, preBind bool) (*v1.PersistentVolume, *v1.PersistentVolumeClaim, error) {
 	preBindMsg := ""
 	if preBind {
 		preBindMsg = " pre-bound"
@@ -420,7 +419,7 @@ func CreatePVPVC(c clientset.Interface, timeouts *config.TimeoutContext, pvConfi
 // sees an error returned, it needs to decide what to do about entries in the maps.
 // Note: when the test suite deletes the namespace orphaned pvcs and pods are deleted. However,
 //   orphaned pvs are not deleted and will remain after the suite completes.
-func CreatePVsPVCs(numpvs, numpvcs int, c clientset.Interface, timeouts *config.TimeoutContext, ns string, pvConfig PersistentVolumeConfig, pvcConfig PersistentVolumeClaimConfig) (PVMap, PVCMap, error) {
+func CreatePVsPVCs(numpvs, numpvcs int, c clientset.Interface, timeouts *e2econfig.TimeoutContext, ns string, pvConfig PersistentVolumeConfig, pvcConfig PersistentVolumeClaimConfig) (PVMap, PVCMap, error) {
 	pvMap := make(PVMap, numpvs)
 	pvcMap := make(PVCMap, numpvcs)
 	extraPVCs := 0
@@ -462,7 +461,7 @@ func CreatePVsPVCs(numpvs, numpvcs int, c clientset.Interface, timeouts *config.
 }
 
 // WaitOnPVandPVC waits for the pv and pvc to bind to each other.
-func WaitOnPVandPVC(c clientset.Interface, timeouts *config.TimeoutContext, ns string, pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim) error {
+func WaitOnPVandPVC(c clientset.Interface, timeouts *e2econfig.TimeoutContext, ns string, pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim) error {
 	// Wait for newly created PVC to bind to the PV
 	e2eutils.Logf("Waiting for PV %v to bind to PVC %v", pv.Name, pvc.Name)
 	err := WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, pvc.Name, e2eutils.Poll, timeouts.ClaimBound)
@@ -510,7 +509,7 @@ func WaitOnPVandPVC(c clientset.Interface, timeouts *config.TimeoutContext, ns s
 //   to situations where the maximum wait times are reached several times in succession,
 //   extending test time. Thus, it is recommended to keep the delta between PVs and PVCs
 //   small.
-func WaitAndVerifyBinds(c clientset.Interface, timeouts *config.TimeoutContext, ns string, pvols PVMap, claims PVCMap, testExpected bool) error {
+func WaitAndVerifyBinds(c clientset.Interface, timeouts *e2econfig.TimeoutContext, ns string, pvols PVMap, claims PVCMap, testExpected bool) error {
 	var actualBinds int
 	expectedBinds := len(pvols)
 	if expectedBinds > len(claims) { // want the min of # pvs or #pvcs
@@ -710,13 +709,13 @@ func DeletePDWithRetry(diskName string) error {
 
 func createPD(zone string) (string, error) {
 	if zone == "" {
-		zone = config.TestContext.CloudConfig.Zone
+		zone = e2econfig.TestContext.CloudConfig.Zone
 	}
-	return config.TestContext.CloudConfig.Provider.CreatePD(zone)
+	return e2econfig.TestContext.CloudConfig.Provider.CreatePD(zone)
 }
 
 func deletePD(pdName string) error {
-	return config.TestContext.CloudConfig.Provider.DeletePD(pdName)
+	return e2econfig.TestContext.CloudConfig.Provider.DeletePD(pdName)
 }
 
 // WaitForPVClaimBoundPhase waits until all pvcs phase set to bound
@@ -804,12 +803,12 @@ func CreatePVSource(zone string) (*v1.PersistentVolumeSource, error) {
 	if err != nil {
 		return nil, err
 	}
-	return config.TestContext.CloudConfig.Provider.CreatePVSource(zone, diskName)
+	return e2econfig.TestContext.CloudConfig.Provider.CreatePVSource(zone, diskName)
 }
 
 // DeletePVSource deletes a PV source.
 func DeletePVSource(pvSource *v1.PersistentVolumeSource) error {
-	return config.TestContext.CloudConfig.Provider.DeletePVSource(pvSource)
+	return e2econfig.TestContext.CloudConfig.Provider.DeletePVSource(pvSource)
 }
 
 // GetDefaultStorageClassName returns default storageClass or return error

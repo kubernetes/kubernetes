@@ -21,14 +21,13 @@ import (
 	"fmt"
 	"os"
 
-	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/kubernetes/test/e2e/framework/config"
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 	"k8s.io/kubernetes/test/e2e/framework/providers"
 	"k8s.io/kubernetes/test/e2e/framework/utils"
 	"k8s.io/legacy-cloud-providers/azure"
@@ -43,7 +42,7 @@ func newProvider() (providers.ProviderInterface, error) {
 	if e2econfig.TestContext.CloudConfig.ConfigFile == "" {
 		return nil, fmt.Errorf("config-file must be specified for Azure")
 	}
-	config, err := os.Open(config.TestContext.CloudConfig.ConfigFile)
+	config, err := os.Open(e2econfig.TestContext.CloudConfig.ConfigFile)
 	if err != nil {
 		utils.Logf("Couldn't open cloud provider configuration %s: %#v",
 			e2econfig.TestContext.CloudConfig.ConfigFile, err)
@@ -70,7 +69,7 @@ func (p *Provider) DeleteNode(node *v1.Node) error {
 
 // CreatePD creates a persistent volume
 func (p *Provider) CreatePD(zone string) (string, error) {
-	pdName := fmt.Sprintf("%s-%s", config.TestContext.Prefix, string(uuid.NewUUID()))
+	pdName := fmt.Sprintf("%s-%s", e2econfig.TestContext.Prefix, string(uuid.NewUUID()))
 
 	volumeOptions := &azure.ManagedDiskOptions{
 		DiskName:           pdName,

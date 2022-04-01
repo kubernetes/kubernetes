@@ -27,7 +27,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/kubernetes/test/e2e/framework/config"
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 	"k8s.io/kubernetes/test/e2e/framework/providers"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/framework/utils"
@@ -39,7 +39,7 @@ func init() {
 }
 
 func newProvider() (providers.ProviderInterface, error) {
-	if config.TestContext.CloudConfig.Zone == "" {
+	if e2econfig.TestContext.CloudConfig.Zone == "" {
 		utils.Logf("Warning: gce-zone not specified! Some tests that use the AWS SDK may select the wrong region and fail.")
 	}
 	return &Provider{}, nil
@@ -112,8 +112,8 @@ func (p *Provider) CreatePD(zone string) (string, error) {
 	request.VolumeType = aws.String(awscloud.DefaultVolumeType)
 
 	// We need to tag the volume so that locked-down IAM configurations can still mount it
-	if config.TestContext.CloudConfig.ClusterTag != "" {
-		clusterID := config.TestContext.CloudConfig.ClusterTag
+	if e2econfig.TestContext.CloudConfig.ClusterTag != "" {
+		clusterID := e2econfig.TestContext.CloudConfig.ClusterTag
 
 		legacyTag := &ec2.Tag{
 			Key:   aws.String(awscloud.TagNameKubernetesClusterLegacy),
@@ -183,7 +183,7 @@ func newAWSClient(zone string) *ec2.EC2 {
 	var cfg *aws.Config
 
 	if zone == "" {
-		zone = config.TestContext.CloudConfig.Zone
+		zone = e2econfig.TestContext.CloudConfig.Zone
 	}
 	if zone == "" {
 		utils.Logf("Warning: No AWS zone configured!")

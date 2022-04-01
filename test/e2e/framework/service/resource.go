@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/test/e2e/framework/config"
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	"k8s.io/kubernetes/test/e2e/framework/utils"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -88,7 +88,7 @@ func UpdateService(c clientset.Interface, namespace, serviceName string, update 
 
 // CleanupServiceResources cleans up service Type=LoadBalancer resources.
 func CleanupServiceResources(c clientset.Interface, loadBalancerName, region, zone string) {
-	config.TestContext.CloudConfig.Provider.CleanupServiceResources(c, loadBalancerName, region, zone)
+	e2econfig.TestContext.CloudConfig.Provider.CleanupServiceResources(c, loadBalancerName, region, zone)
 }
 
 // GetIngressPoint returns a host on which ingress serves.

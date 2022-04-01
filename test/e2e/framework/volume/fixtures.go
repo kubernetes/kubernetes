@@ -56,7 +56,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	clientexec "k8s.io/client-go/util/exec"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/framework/config"
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -306,8 +306,8 @@ func WaitForVolumeAttachmentTerminated(attachmentName string, cs clientset.Inter
 	return nil
 }
 
-// startVolumeServer starts a container specified by config.serverImage and exports all
-// config.serverPorts from it. The returned pod should be used to get the server
+// startVolumeServer starts a container specified by e2econfig.serverImage and exports all
+// e2econfig.serverPorts from it. The returned pod should be used to get the server
 // IP address and create appropriate VolumeSource.
 func startVolumeServer(client clientset.Interface, config TestConfig) *v1.Pod {
 	podClient := client.CoreV1().Pods(config.Namespace)
@@ -434,7 +434,7 @@ func TestServerCleanup(f *framework.Framework, config TestConfig) {
 	gomega.Expect(err).To(gomega.BeNil(), "Failed to delete pod %v in namespace %v", config.Prefix+"-server", config.Namespace)
 }
 
-func runVolumeTesterPod(client clientset.Interface, timeouts *config.TimeoutContext, config TestConfig, podSuffix string, privileged bool, fsGroup *int64, tests []Test, slow bool) (*v1.Pod, error) {
+func runVolumeTesterPod(client clientset.Interface, timeouts *e2econfig.TimeoutContext, config TestConfig, podSuffix string, privileged bool, fsGroup *int64, tests []Test, slow bool) (*v1.Pod, error) {
 	ginkgo.By(fmt.Sprint("starting ", config.Prefix, "-", podSuffix))
 	var gracePeriod int64 = 1
 	var command string
@@ -578,7 +578,7 @@ func testVolumeContent(clientset clientset.Interface, ns string, pod *v1.Pod, co
 // Timeout for dynamic provisioning (if "WaitForFirstConsumer" is set && provided PVC is not bound yet),
 // pod creation, scheduling and complete pod startup (incl. volume attach & mount) is pod.podStartTimeout.
 // It should be used for cases where "regular" dynamic provisioning of an empty volume is requested.
-func TestVolumeClient(clientset clientset.Interface, ns string, timeouts *config.TimeoutContext, config TestConfig, fsGroup *int64, fsType string, tests []Test) {
+func TestVolumeClient(clientset clientset.Interface, ns string, timeouts *e2econfig.TimeoutContext, config TestConfig, fsGroup *int64, fsType string, tests []Test) {
 	testVolumeClient(clientset, ns, timeouts, config, fsGroup, fsType, tests, false)
 }
 
@@ -587,11 +587,11 @@ func TestVolumeClient(clientset clientset.Interface, ns string, timeouts *config
 // pod creation, scheduling and complete pod startup (incl. volume attach & mount) is pod.slowPodStartTimeout.
 // It should be used for cases where "special" dynamic provisioning is requested, such as volume cloning
 // or snapshot restore.
-func TestVolumeClientSlow(clientset clientset.Interface, ns string, timeouts *config.TimeoutContext, config TestConfig, fsGroup *int64, fsType string, tests []Test) {
+func TestVolumeClientSlow(clientset clientset.Interface, ns string, timeouts *e2econfig.TimeoutContext, config TestConfig, fsGroup *int64, fsType string, tests []Test) {
 	testVolumeClient(clientset, ns, timeouts, config, fsGroup, fsType, tests, true)
 }
 
-func testVolumeClient(clientSet clientset.Interface, ns string, timeouts *config.TimeoutContext, config TestConfig, fsGroup *int64, fsType string, tests []Test, slow bool) {
+func testVolumeClient(clientSet clientset.Interface, ns string, timeouts *e2econfig.TimeoutContext, config TestConfig, fsGroup *int64, fsType string, tests []Test, slow bool) {
 	clientPod, err := runVolumeTesterPod(clientSet, timeouts, config, "client", false, fsGroup, tests, slow)
 	if err != nil {
 		utils.Failf("Failed to create client pod: %v", err)
@@ -623,7 +623,7 @@ func testVolumeClient(clientSet clientset.Interface, ns string, timeouts *config
 // InjectContent inserts index.html with given content into given volume. It does so by
 // starting and auxiliary pod which writes the file there.
 // The volume must be writable.
-func InjectContent(clientSet clientset.Interface, ns string, timeouts *config.TimeoutContext, config TestConfig, fsGroup *int64, fsType string, tests []Test) {
+func InjectContent(clientSet clientset.Interface, ns string, timeouts *e2econfig.TimeoutContext, config TestConfig, fsGroup *int64, fsType string, tests []Test) {
 	privileged := true
 	if utils.NodeOSDistroIs("windows") {
 		privileged = false

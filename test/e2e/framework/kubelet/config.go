@@ -32,6 +32,7 @@ import (
 	kubeletconfigscheme "k8s.io/kubernetes/pkg/kubelet/apis/config/scheme"
 
 	"k8s.io/kubernetes/test/e2e/framework/config"
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 )
@@ -55,7 +56,7 @@ func pollConfigz(timeout time.Duration, pollInterval time.Duration, nodeName, na
 	if useProxy {
 		// start local proxy, so we can send graceful deletion over query string, rather than body parameter
 		e2eutils.Logf("Opening proxy to cluster")
-		tk := e2ekubectl.NewTestKubeconfig(config.TestContext.CertDir, config.TestContext.Host, config.TestContext.KubeConfig, config.TestContext.KubeContext, config.TestContext.KubectlPath, namespace)
+		tk := e2ekubectl.NewTestKubeconfig(e2econfig.TestContext.CertDir, e2econfig.TestContext.Host, e2econfig.TestContext.KubeConfig, e2econfig.TestContext.KubeContext, e2econfig.TestContext.KubectlPath, namespace)
 		cmd := tk.KubectlCmd("proxy", "-p", "0")
 		stdout, stderr, err := e2eutils.StartCmdAndStreamOutput(cmd)
 		e2eutils.ExpectNoError(err)
@@ -76,7 +77,7 @@ func pollConfigz(timeout time.Duration, pollInterval time.Duration, nodeName, na
 		e2eutils.Logf("http requesting node kubelet /configz")
 		endpoint = fmt.Sprintf("http://127.0.0.1:%d/api/v1/nodes/%s/proxy/configz", port, nodeName)
 	} else {
-		endpoint = fmt.Sprintf("%s/api/v1/nodes/%s/proxy/configz", config.TestContext.Host, config.TestContext.NodeName)
+		endpoint = fmt.Sprintf("%s/api/v1/nodes/%s/proxy/configz", e2econfig.TestContext.Host, config.TestContext.NodeName)
 	}
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
@@ -85,7 +86,7 @@ func pollConfigz(timeout time.Duration, pollInterval time.Duration, nodeName, na
 	req, err := http.NewRequest("GET", endpoint, nil)
 	e2eutils.ExpectNoError(err)
 	if !useProxy {
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", config.TestContext.BearerToken))
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", e2econfig.TestContext.BearerToken))
 	}
 	req.Header.Add("Accept", "application/json")
 

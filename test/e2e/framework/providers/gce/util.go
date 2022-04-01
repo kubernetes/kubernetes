@@ -26,7 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/test/e2e/framework/config"
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 	"k8s.io/kubernetes/test/e2e/framework/utils"
 )
 
@@ -47,22 +47,22 @@ func RecreateNodes(c clientset.Interface, nodes []v1.Node) error {
 			continue
 		}
 
-		defaultZone := config.TestContext.CloudConfig.Zone
+		defaultZone := e2econfig.TestContext.CloudConfig.Zone
 		nodeNamesByZone[defaultZone] = append(nodeNamesByZone[defaultZone], node.Name)
 	}
 
 	// Find the sole managed instance group name
 	var instanceGroup string
-	if strings.Index(config.TestContext.CloudConfig.NodeInstanceGroup, ",") >= 0 {
-		return fmt.Errorf("Test does not support cluster setup with more than one managed instance group: %s", config.TestContext.CloudConfig.NodeInstanceGroup)
+	if strings.Index(e2econfig.TestContext.CloudConfig.NodeInstanceGroup, ",") >= 0 {
+		return fmt.Errorf("Test does not support cluster setup with more than one managed instance group: %s", e2econfig.TestContext.CloudConfig.NodeInstanceGroup)
 	}
-	instanceGroup = config.TestContext.CloudConfig.NodeInstanceGroup
+	instanceGroup = e2econfig.TestContext.CloudConfig.NodeInstanceGroup
 
 	// Recreate the nodes.
 	for zone, nodeNames := range nodeNamesByZone {
 		args := []string{
 			"compute",
-			fmt.Sprintf("--project=%s", config.TestContext.CloudConfig.ProjectID),
+			fmt.Sprintf("--project=%s", e2econfig.TestContext.CloudConfig.ProjectID),
 			"instance-groups",
 			"managed",
 			"recreate-instances",

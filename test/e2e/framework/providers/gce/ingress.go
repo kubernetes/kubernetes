@@ -34,7 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/test/e2e/framework/config"
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	"k8s.io/kubernetes/test/e2e/framework/utils"
 	utilexec "k8s.io/utils/exec"
@@ -74,7 +74,7 @@ type IngressController struct {
 	UID          string
 	staticIPName string
 	Client       clientset.Interface
-	Cloud        config.CloudConfig
+	Cloud        e2econfig.CloudConfig
 }
 
 // CleanupIngressController calls cont.CleanupIngressControllerWithTimeout with hard-coded timeout

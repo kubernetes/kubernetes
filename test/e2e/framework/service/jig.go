@@ -42,7 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/test/e2e/framework/config"
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
@@ -1003,7 +1003,7 @@ func (j *TestJig) checkNodePortServiceReachability(svc *v1.Service, pod *v1.Pod)
 // FQDN of kubernetes is used as externalName(for air tight platforms).
 func (j *TestJig) checkExternalServiceReachability(svc *v1.Service, pod *v1.Pod) error {
 	// NOTE(claudiub): Windows does not support PQDN.
-	svcName := fmt.Sprintf("%s.%s.svc.%s", svc.Name, svc.Namespace, config.TestContext.ClusterDNSDomain)
+	svcName := fmt.Sprintf("%s.%s.svc.%s", svc.Name, svc.Namespace, e2econfig.TestContext.ClusterDNSDomain)
 	// Service must resolve to IP
 	cmd := fmt.Sprintf("nslookup %s", svcName)
 	return wait.PollImmediate(utils.Poll, ServiceReachabilityShortPollTimeout, func() (done bool, err error) {

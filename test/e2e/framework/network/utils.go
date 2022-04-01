@@ -40,7 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	coreclientset "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/kubernetes/test/e2e/framework/config"
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -1116,7 +1116,7 @@ func BlockNetwork(from string, to string) {
 	e2eutils.Logf("block network traffic from %s to %s", from, to)
 	iptablesRule := fmt.Sprintf("OUTPUT --destination %s --jump REJECT", to)
 	dropCmd := fmt.Sprintf("sudo iptables --insert %s", iptablesRule)
-	if result, err := e2essh.SSH(dropCmd, from, config.TestContext.Provider); result.Code != 0 || err != nil {
+	if result, err := e2essh.SSH(dropCmd, from, e2econfig.TestContext.Provider); result.Code != 0 || err != nil {
 		e2essh.LogResult(result)
 		e2eutils.Failf("Unexpected error: %v", err)
 	}
@@ -1134,7 +1134,7 @@ func UnblockNetwork(from string, to string) {
 	// may fail). Manual intervention is required in such case (recreating the
 	// cluster solves the problem too).
 	err := wait.Poll(time.Millisecond*100, time.Second*30, func() (bool, error) {
-		result, err := e2essh.SSH(undropCmd, from, config.TestContext.Provider)
+		result, err := e2essh.SSH(undropCmd, from, e2econfig.TestContext.Provider)
 		if result.Code == 0 && err == nil {
 			return true, nil
 		}

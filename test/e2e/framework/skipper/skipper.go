@@ -38,7 +38,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/component-base/featuregate"
-	"k8s.io/kubernetes/test/e2e/framework/config"
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	"k8s.io/kubernetes/test/e2e/framework/utils"
@@ -158,29 +158,29 @@ func SkipIfMissingResource(dynamicClient dynamic.Interface, gvr schema.GroupVers
 
 // SkipUnlessNodeCountIsAtLeast skips if the number of nodes is less than the minNodeCount.
 func SkipUnlessNodeCountIsAtLeast(minNodeCount int) {
-	if config.TestContext.CloudConfig.NumNodes < minNodeCount {
-		skipInternalf(1, "Requires at least %d nodes (not %d)", minNodeCount, config.TestContext.CloudConfig.NumNodes)
+	if e2econfig.TestContext.CloudConfig.NumNodes < minNodeCount {
+		skipInternalf(1, "Requires at least %d nodes (not %d)", minNodeCount, e2econfig.TestContext.CloudConfig.NumNodes)
 	}
 }
 
 // SkipUnlessNodeCountIsAtMost skips if the number of nodes is greater than the maxNodeCount.
 func SkipUnlessNodeCountIsAtMost(maxNodeCount int) {
-	if config.TestContext.CloudConfig.NumNodes > maxNodeCount {
-		skipInternalf(1, "Requires at most %d nodes (not %d)", maxNodeCount, config.TestContext.CloudConfig.NumNodes)
+	if e2econfig.TestContext.CloudConfig.NumNodes > maxNodeCount {
+		skipInternalf(1, "Requires at most %d nodes (not %d)", maxNodeCount, e2econfig.TestContext.CloudConfig.NumNodes)
 	}
 }
 
 // SkipIfProviderIs skips if the provider is included in the unsupportedProviders.
 func SkipIfProviderIs(unsupportedProviders ...string) {
 	if utils.ProviderIs(unsupportedProviders...) {
-		skipInternalf(1, "Not supported for providers %v (found %s)", unsupportedProviders, config.TestContext.Provider)
+		skipInternalf(1, "Not supported for providers %v (found %s)", unsupportedProviders, e2econfig.TestContext.Provider)
 	}
 }
 
 // SkipUnlessProviderIs skips if the provider is not included in the supportedProviders.
 func SkipUnlessProviderIs(supportedProviders ...string) {
 	if !utils.ProviderIs(supportedProviders...) {
-		skipInternalf(1, "Only supported for providers %v (not %s)", supportedProviders, config.TestContext.Provider)
+		skipInternalf(1, "Only supported for providers %v (not %s)", supportedProviders, e2econfig.TestContext.Provider)
 	}
 }
 
@@ -209,28 +209,28 @@ func SkipIfMultizone(c clientset.Interface) {
 // SkipUnlessMasterOSDistroIs skips if the master OS distro is not included in the supportedMasterOsDistros.
 func SkipUnlessMasterOSDistroIs(supportedMasterOsDistros ...string) {
 	if !utils.MasterOSDistroIs(supportedMasterOsDistros...) {
-		skipInternalf(1, "Only supported for master OS distro %v (not %s)", supportedMasterOsDistros, config.TestContext.MasterOSDistro)
+		skipInternalf(1, "Only supported for master OS distro %v (not %s)", supportedMasterOsDistros, e2econfig.TestContext.MasterOSDistro)
 	}
 }
 
 // SkipUnlessNodeOSDistroIs skips if the node OS distro is not included in the supportedNodeOsDistros.
 func SkipUnlessNodeOSDistroIs(supportedNodeOsDistros ...string) {
 	if !utils.NodeOSDistroIs(supportedNodeOsDistros...) {
-		skipInternalf(1, "Only supported for node OS distro %v (not %s)", supportedNodeOsDistros, config.TestContext.NodeOSDistro)
+		skipInternalf(1, "Only supported for node OS distro %v (not %s)", supportedNodeOsDistros, e2econfig.TestContext.NodeOSDistro)
 	}
 }
 
 // SkipUnlessNodeOSArchIs skips if the node OS distro is not included in the supportedNodeOsArchs.
 func SkipUnlessNodeOSArchIs(supportedNodeOsArchs ...string) {
 	if !utils.NodeOSArchIs(supportedNodeOsArchs...) {
-		skipInternalf(1, "Only supported for node OS arch %v (not %s)", supportedNodeOsArchs, config.TestContext.NodeOSArch)
+		skipInternalf(1, "Only supported for node OS arch %v (not %s)", supportedNodeOsArchs, e2econfig.TestContext.NodeOSArch)
 	}
 }
 
 // SkipIfNodeOSDistroIs skips if the node OS distro is included in the unsupportedNodeOsDistros.
 func SkipIfNodeOSDistroIs(unsupportedNodeOsDistros ...string) {
 	if utils.NodeOSDistroIs(unsupportedNodeOsDistros...) {
-		skipInternalf(1, "Not supported for node OS distro %v (is %s)", unsupportedNodeOsDistros, config.TestContext.NodeOSDistro)
+		skipInternalf(1, "Not supported for node OS distro %v (is %s)", unsupportedNodeOsDistros, e2econfig.TestContext.NodeOSDistro)
 	}
 }
 
@@ -247,8 +247,8 @@ func SkipUnlessServerVersionGTE(v *utilversion.Version, c discovery.ServerVersio
 
 // SkipUnlessSSHKeyPresent skips if no SSH key is found.
 func SkipUnlessSSHKeyPresent() {
-	if _, err := e2essh.GetSigner(config.TestContext.Provider); err != nil {
-		skipInternalf(1, "No SSH Key for provider %s: '%v'", config.TestContext.Provider, err)
+	if _, err := e2essh.GetSigner(e2econfig.TestContext.Provider); err != nil {
+		skipInternalf(1, "No SSH Key for provider %s: '%v'", e2econfig.TestContext.Provider, err)
 	}
 }
 
@@ -276,11 +276,11 @@ func SkipIfAppArmorNotSupported() {
 // RunIfSystemSpecNameIs runs if the system spec name is included in the names.
 func RunIfSystemSpecNameIs(names ...string) {
 	for _, name := range names {
-		if name == config.TestContext.SystemSpecName {
+		if name == e2econfig.TestContext.SystemSpecName {
 			return
 		}
 	}
-	skipInternalf(1, "Skipped because system spec name %q is not in %v", config.TestContext.SystemSpecName, names)
+	skipInternalf(1, "Skipped because system spec name %q is not in %v", e2econfig.TestContext.SystemSpecName, names)
 }
 
 // SkipUnlessComponentRunsAsPodsAndClientCanDeleteThem run if the component run as pods and client can delete them
@@ -307,7 +307,7 @@ func SkipUnlessComponentRunsAsPodsAndClientCanDeleteThem(componentName string, c
 
 // SkipIfIPv6 skips if the cluster IP family is IPv6 and the provider is included in the unsupportedProviders.
 func SkipIfIPv6(unsupportedProviders ...string) {
-	if config.TestContext.ClusterIsIPv6() && utils.ProviderIs(unsupportedProviders...) {
-		skipInternalf(1, "Not supported for IPv6 clusters and providers %v (found %s)", unsupportedProviders, config.TestContext.Provider)
+	if e2econfig.TestContext.ClusterIsIPv6() && utils.ProviderIs(unsupportedProviders...) {
+		skipInternalf(1, "Not supported for IPv6 clusters and providers %v (found %s)", unsupportedProviders, e2econfig.TestContext.Provider)
 	}
 }

@@ -22,7 +22,7 @@ import (
 	"strconv"
 	"time"
 
-	"k8s.io/kubernetes/test/e2e/framework/config"
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
 )
@@ -31,14 +31,14 @@ import (
 func RestartControllerManager() error {
 	// TODO: Make it work for all providers and distros.
 	if !e2eutils.ProviderIs("gce", "aws") {
-		return fmt.Errorf("unsupported provider for RestartControllerManager: %s", config.TestContext.Provider)
+		return fmt.Errorf("unsupported provider for RestartControllerManager: %s", e2econfig.TestContext.Provider)
 	}
 	if e2eutils.ProviderIs("gce") && !e2eutils.MasterOSDistroIs("gci") {
-		return fmt.Errorf("unsupported master OS distro: %s", config.TestContext.MasterOSDistro)
+		return fmt.Errorf("unsupported master OS distro: %s", e2econfig.TestContext.MasterOSDistro)
 	}
 	cmd := "pidof kube-controller-manager | xargs sudo kill"
 	e2eutils.Logf("Restarting controller-manager via ssh, running: %v", cmd)
-	result, err := e2essh.SSH(cmd, net.JoinHostPort(e2eutils.APIAddress(), e2essh.SSHPort), config.TestContext.Provider)
+	result, err := e2essh.SSH(cmd, net.JoinHostPort(e2eutils.APIAddress(), e2essh.SSHPort), e2econfig.TestContext.Provider)
 	if err != nil || result.Code != 0 {
 		e2essh.LogResult(result)
 		return fmt.Errorf("couldn't restart controller-manager: %v", err)
@@ -48,9 +48,9 @@ func RestartControllerManager() error {
 
 // WaitForControllerManagerUp waits for the kube-controller-manager to be up.
 func WaitForControllerManagerUp() error {
-	cmd := "curl -k https://localhost:" + strconv.Itoa(config.KubeControllerManagerPort) + "/healthz"
+	cmd := "curl -k https://localhost:" + strconv.Itoa(e2econfig.KubeControllerManagerPort) + "/healthz"
 	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
-		result, err := e2essh.SSH(cmd, net.JoinHostPort(e2eutils.APIAddress(), e2essh.SSHPort), config.TestContext.Provider)
+		result, err := e2essh.SSH(cmd, net.JoinHostPort(e2eutils.APIAddress(), e2essh.SSHPort), e2econfig.TestContext.Provider)
 		if err != nil || result.Code != 0 {
 			e2essh.LogResult(result)
 		}

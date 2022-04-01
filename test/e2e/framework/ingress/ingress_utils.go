@@ -57,7 +57,7 @@ import (
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/kubernetes/test/e2e/framework/config"
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
@@ -547,7 +547,7 @@ func (j *TestJig) runCreate(ing *networkingv1.Ingress) (*networkingv1.Ingress, e
 		return j.Client.NetworkingV1().Ingresses(ing.Namespace).Create(context.TODO(), ing, metav1.CreateOptions{})
 	}
 	// Use kubemci to create a multicluster ingress.
-	filePath := config.TestContext.OutputDir + "/mci.yaml"
+	filePath := e2econfig.TestContext.OutputDir + "/mci.yaml"
 	if err := ingressToManifest(ing, filePath); err != nil {
 		return nil, err
 	}
@@ -562,7 +562,7 @@ func (j *TestJig) runUpdate(ing *networkingv1.Ingress) (*networkingv1.Ingress, e
 	}
 	// Use kubemci to update a multicluster ingress.
 	// kubemci does not have an update command. We use "create --force" to update an existing ingress.
-	filePath := config.TestContext.OutputDir + "/mci.yaml"
+	filePath := e2econfig.TestContext.OutputDir + "/mci.yaml"
 	if err := ingressToManifest(ing, filePath); err != nil {
 		return nil, err
 	}
@@ -677,7 +677,7 @@ func (j *TestJig) runDelete(ing *networkingv1.Ingress) error {
 		return j.Client.NetworkingV1().Ingresses(ing.Namespace).Delete(context.TODO(), ing.Name, metav1.DeleteOptions{})
 	}
 	// Use kubemci to delete a multicluster ingress.
-	filePath := config.TestContext.OutputDir + "/mci.yaml"
+	filePath := e2econfig.TestContext.OutputDir + "/mci.yaml"
 	if err := ingressToManifest(ing, filePath); err != nil {
 		return err
 	}
@@ -962,7 +962,7 @@ func (j *TestJig) ConstructFirewallForIngress(firewallRuleName string, nodeTags 
 
 	fw := compute.Firewall{}
 	fw.Name = firewallRuleName
-	fw.SourceRanges = config.TestContext.CloudConfig.Provider.LoadBalancerSrcRanges()
+	fw.SourceRanges = e2econfig.TestContext.CloudConfig.Provider.LoadBalancerSrcRanges()
 	fw.TargetTags = nodeTags
 	fw.Allowed = []*compute.FirewallAllowed{
 		{

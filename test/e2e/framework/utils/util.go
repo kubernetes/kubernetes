@@ -65,7 +65,7 @@ import (
 	netutils "k8s.io/utils/net"
 
 	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
-	"k8s.io/kubernetes/test/e2e/framework/config"
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -187,7 +187,7 @@ var RunID = uuid.NewUUID()
 
 // APIAddress returns a address of an instance.
 func APIAddress() string {
-	instanceURL, err := url.Parse(config.TestContext.Host)
+	instanceURL, err := url.Parse(e2econfig.TestContext.Host)
 	ExpectNoError(err)
 	return instanceURL.Hostname()
 }
@@ -195,7 +195,7 @@ func APIAddress() string {
 // ProviderIs returns true if the provider is included is the providers. Otherwise false.
 func ProviderIs(providers ...string) bool {
 	for _, provider := range providers {
-		if strings.EqualFold(provider, config.TestContext.Provider) {
+		if strings.EqualFold(provider, e2econfig.TestContext.Provider) {
 			return true
 		}
 	}
@@ -205,7 +205,7 @@ func ProviderIs(providers ...string) bool {
 // MasterOSDistroIs returns true if the master OS distro is included in the supportedMasterOsDistros. Otherwise false.
 func MasterOSDistroIs(supportedMasterOsDistros ...string) bool {
 	for _, distro := range supportedMasterOsDistros {
-		if strings.EqualFold(distro, config.TestContext.MasterOSDistro) {
+		if strings.EqualFold(distro, e2econfig.TestContext.MasterOSDistro) {
 			return true
 		}
 	}
@@ -215,7 +215,7 @@ func MasterOSDistroIs(supportedMasterOsDistros ...string) bool {
 // NodeOSDistroIs returns true if the node OS distro is included in the supportedNodeOsDistros. Otherwise false.
 func NodeOSDistroIs(supportedNodeOsDistros ...string) bool {
 	for _, distro := range supportedNodeOsDistros {
-		if strings.EqualFold(distro, config.TestContext.NodeOSDistro) {
+		if strings.EqualFold(distro, e2econfig.TestContext.NodeOSDistro) {
 			return true
 		}
 	}
@@ -225,7 +225,7 @@ func NodeOSDistroIs(supportedNodeOsDistros ...string) bool {
 // NodeOSArchIs returns true if the node OS arch is included in the supportedNodeOsArchs. Otherwise false.
 func NodeOSArchIs(supportedNodeOsArchs ...string) bool {
 	for _, arch := range supportedNodeOsArchs {
-		if strings.EqualFold(arch, config.TestContext.NodeOSArch) {
+		if strings.EqualFold(arch, e2econfig.TestContext.NodeOSArch) {
 			return true
 		}
 	}
@@ -403,7 +403,7 @@ func CreateTestingNS(baseName string, c clientset.Interface, labels map[string]s
 		return nil, err
 	}
 
-	if config.TestContext.VerifyServiceAccount {
+	if e2econfig.TestContext.VerifyServiceAccount {
 		if err := WaitForDefaultServiceAccountInNamespace(c, got.Name); err != nil {
 			// Even if we fail to create serviceAccount in the namespace,
 			// we have successfully create a namespace.
@@ -481,11 +481,11 @@ func countEndpointsNum(e *v1.Endpoints) int {
 
 // restclientConfig returns a config holds the information needed to build connection to kubernetes clusters.
 func restclientConfig(kubeContext string) (*clientcmdapi.Config, error) {
-	Logf(">>> kubeConfig: %s", config.TestContext.KubeConfig)
-	if config.TestContext.KubeConfig == "" {
+	Logf(">>> kubeConfig: %s", e2econfig.TestContext.KubeConfig)
+	if e2econfig.TestContext.KubeConfig == "" {
 		return nil, fmt.Errorf("KubeConfig must be specified to load client config")
 	}
-	c, err := clientcmd.LoadFromFile(config.TestContext.KubeConfig)
+	c, err := clientcmd.LoadFromFile(e2econfig.TestContext.KubeConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error loading KubeConfig: %v", err.Error())
 	}
@@ -496,7 +496,7 @@ func restclientConfig(kubeContext string) (*clientcmdapi.Config, error) {
 	return c, nil
 }
 
-// ClientConfigGetter is a func that returns getter to return a config.
+// ClientConfigGetter is a func that returns getter to return a e2econfig.
 type ClientConfigGetter func() (*restclient.Config, error)
 
 // LoadConfig returns a config for a rest client with the UserAgent set to include the current test name.
@@ -511,33 +511,33 @@ func LoadConfig() (conf *restclient.Config, err error) {
 		}
 	}()
 
-	if config.TestContext.NodeE2E {
+	if e2econfig.TestContext.NodeE2E {
 		// This is a node e2e test, apply the node e2e configuration
 		return &restclient.Config{
-			Host:        config.TestContext.Host,
-			BearerToken: config.TestContext.BearerToken,
+			Host:        e2econfig.TestContext.Host,
+			BearerToken: e2econfig.TestContext.BearerToken,
 			TLSClientConfig: restclient.TLSClientConfig{
 				Insecure: true,
 			},
 		}, nil
 	}
-	c, err := restclientConfig(config.TestContext.KubeContext)
+	c, err := restclientConfig(e2econfig.TestContext.KubeContext)
 	if err != nil {
-		if config.TestContext.KubeConfig == "" {
+		if e2econfig.TestContext.KubeConfig == "" {
 			return restclient.InClusterConfig()
 		}
 		return nil, err
 	}
 	// In case Host is not set in TestContext, sets it as
 	// CurrentContext Server for k8s API client to connect to.
-	if config.TestContext.Host == "" && c.Clusters != nil {
+	if e2econfig.TestContext.Host == "" && c.Clusters != nil {
 		currentContext, ok := c.Clusters[c.CurrentContext]
 		if ok {
-			config.TestContext.Host = currentContext.Server
+			e2econfig.TestContext.Host = currentContext.Server
 		}
 	}
 
-	return clientcmd.NewDefaultClientConfig(*c, &clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: config.TestContext.Host}}).ClientConfig()
+	return clientcmd.NewDefaultClientConfig(*c, &clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: e2econfig.TestContext.Host}}).ClientConfig()
 }
 
 // LoadClientset returns clientset for connecting to kubernetes clusters.
@@ -600,7 +600,7 @@ type KubectlBuilder struct {
 // NewKubectlCommand returns a KubectlBuilder for running kubectl.
 func NewKubectlCommand(namespace string, args ...string) *KubectlBuilder {
 	b := new(KubectlBuilder)
-	tk := e2ekubectl.NewTestKubeconfig(config.TestContext.CertDir, config.TestContext.Host, config.TestContext.KubeConfig, config.TestContext.KubeContext, config.TestContext.KubectlPath, namespace)
+	tk := e2ekubectl.NewTestKubeconfig(e2econfig.TestContext.CertDir, e2econfig.TestContext.Host, e2econfig.TestContext.KubeConfig, e2econfig.TestContext.KubeContext, e2econfig.TestContext.KubectlPath, namespace)
 	b.cmd = tk.KubectlCmd(args...)
 	return b
 }
@@ -729,8 +729,8 @@ func RunKubectlInput(namespace string, data string, args ...string) (string, err
 
 // RunKubemciWithKubeconfig is a convenience wrapper over RunKubemciCmd
 func RunKubemciWithKubeconfig(args ...string) (string, error) {
-	if config.TestContext.KubeConfig != "" {
-		args = append(args, "--"+clientcmd.RecommendedConfigPathFlag+"="+config.TestContext.KubeConfig)
+	if e2econfig.TestContext.KubeConfig != "" {
+		args = append(args, "--"+clientcmd.RecommendedConfigPathFlag+"="+e2econfig.TestContext.KubeConfig)
 	}
 	return RunKubemciCmd(args...)
 }
@@ -741,7 +741,7 @@ func RunKubemciCmd(args ...string) (string, error) {
 	// kubemci is assumed to be in PATH.
 	kubemci := "kubemci"
 	b := new(KubectlBuilder)
-	args = append(args, "--gcp-project="+config.TestContext.CloudConfig.ProjectID)
+	args = append(args, "--gcp-project="+e2econfig.TestContext.CloudConfig.ProjectID)
 
 	b.cmd = exec.Command(kubemci, args...)
 	return b.Exec()
@@ -858,13 +858,13 @@ func DumpAllNamespaceInfo(c clientset.Interface, namespace string) {
 		return c.CoreV1().Events(ns).List(context.TODO(), opts)
 	}, namespace)
 
-	e2epod.DumpAllPodInfoForNamespace(c, namespace, config.TestContext.ReportDir)
+	e2epod.DumpAllPodInfoForNamespace(c, namespace, e2econfig.TestContext.ReportDir)
 
 	// If cluster is large, then the following logs are basically useless, because:
 	// 1. it takes tens of minutes or hours to grab all of them
 	// 2. there are so many of them that working with them are mostly impossible
 	// So we dump them only if the cluster is relatively small.
-	maxNodesForDump := config.TestContext.MaxNodesToGather
+	maxNodesForDump := e2econfig.TestContext.MaxNodesToGather
 	nodes, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		Logf("unable to fetch node list: %v", err)
@@ -944,7 +944,7 @@ func getKubeletPods(c clientset.Interface, node string) (*v1.PodList, error) {
 		client = c.CoreV1().RESTClient().Get().
 			Resource("nodes").
 			SubResource("proxy").
-			Name(fmt.Sprintf("%v:%v", node, config.KubeletPort)).
+			Name(fmt.Sprintf("%v:%v", node, e2econfig.KubeletPort)).
 			Suffix("pods").
 			Do(context.TODO())
 
@@ -982,17 +982,17 @@ func getNodeEvents(c clientset.Interface, nodeName string) []v1.Event {
 }
 
 // WaitForAllNodesSchedulable waits up to timeout for all
-// (but config.TestContext.AllowedNotReadyNodes) to become schedulable.
+// (but e2econfig.TestContext.AllowedNotReadyNodes) to become schedulable.
 func WaitForAllNodesSchedulable(c clientset.Interface, timeout time.Duration) error {
-	if config.TestContext.AllowedNotReadyNodes == -1 {
+	if e2econfig.TestContext.AllowedNotReadyNodes == -1 {
 		return nil
 	}
 
-	Logf("Waiting up to %v for all (but %d) nodes to be schedulable", timeout, config.TestContext.AllowedNotReadyNodes)
+	Logf("Waiting up to %v for all (but %d) nodes to be schedulable", timeout, e2econfig.TestContext.AllowedNotReadyNodes)
 	return wait.PollImmediate(
 		30*time.Second,
 		timeout,
-		e2enode.CheckReadyForTests(c, config.TestContext.NonblockingTaints, config.TestContext.AllowedNotReadyNodes, largeClusterThreshold),
+		e2enode.CheckReadyForTests(c, e2econfig.TestContext.NonblockingTaints, e2econfig.TestContext.AllowedNotReadyNodes, largeClusterThreshold),
 	)
 }
 
@@ -1082,16 +1082,16 @@ func RunHostCmdWithRetries(ns, name, cmd string, interval, timeout time.Duration
 }
 
 // AllNodesReady checks whether all registered nodes are ready. Setting -1 on
-// config.TestContext.AllowedNotReadyNodes will bypass the post test node readiness check.
+// e2econfig.TestContext.AllowedNotReadyNodes will bypass the post test node readiness check.
 // TODO: we should change the AllNodesReady call in AfterEach to WaitForAllNodesHealthy,
 // and figure out how to do it in a configurable way, as we can't expect all setups to run
 // default test add-ons.
 func AllNodesReady(c clientset.Interface, timeout time.Duration) error {
-	if config.TestContext.AllowedNotReadyNodes == -1 {
+	if e2econfig.TestContext.AllowedNotReadyNodes == -1 {
 		return nil
 	}
 
-	Logf("Waiting up to %v for all (but %d) nodes to be ready", timeout, config.TestContext.AllowedNotReadyNodes)
+	Logf("Waiting up to %v for all (but %d) nodes to be ready", timeout, e2econfig.TestContext.AllowedNotReadyNodes)
 
 	var notReady []*v1.Node
 	err := wait.PollImmediate(Poll, timeout, func() (bool, error) {
@@ -1107,19 +1107,19 @@ func AllNodesReady(c clientset.Interface, timeout time.Duration) error {
 				notReady = append(notReady, node)
 			}
 		}
-		// Framework allows for <config.TestContext.AllowedNotReadyNodes> nodes to be non-ready,
+		// Framework allows for <e2econfig.TestContext.AllowedNotReadyNodes> nodes to be non-ready,
 		// to make it possible e.g. for incorrect deployment of some small percentage
 		// of nodes (which we allow in cluster validation). Some nodes that are not
 		// provisioned correctly at startup will never become ready (e.g. when something
 		// won't install correctly), so we can't expect them to be ready at any point.
-		return len(notReady) <= config.TestContext.AllowedNotReadyNodes, nil
+		return len(notReady) <= e2econfig.TestContext.AllowedNotReadyNodes, nil
 	})
 
 	if err != nil && err != wait.ErrWaitTimeout {
 		return err
 	}
 
-	if len(notReady) > config.TestContext.AllowedNotReadyNodes {
+	if len(notReady) > e2econfig.TestContext.AllowedNotReadyNodes {
 		msg := ""
 		for _, node := range notReady {
 			msg = fmt.Sprintf("%s, %s", msg, node.Name)
@@ -1139,26 +1139,26 @@ func LookForStringInLog(ns, podName, container, expectedString string, timeout t
 // EnsureLoadBalancerResourcesDeleted ensures that cloud load balancer resources that were created
 // are actually cleaned up.  Currently only implemented for GCE/GKE.
 func EnsureLoadBalancerResourcesDeleted(ip, portRange string) error {
-	return config.TestContext.CloudConfig.Provider.EnsureLoadBalancerResourcesDeleted(ip, portRange)
+	return e2econfig.TestContext.CloudConfig.Provider.EnsureLoadBalancerResourcesDeleted(ip, portRange)
 }
 
 // CoreDump SSHs to the master and all nodes and dumps their logs into dir.
 // It shells out to cluster/log-dump/log-dump.sh to accomplish this.
 func CoreDump(dir string) {
-	if config.TestContext.DisableLogDump {
+	if e2econfig.TestContext.DisableLogDump {
 		Logf("Skipping dumping logs from cluster")
 		return
 	}
 	var cmd *exec.Cmd
-	if config.TestContext.LogexporterGCSPath != "" {
-		Logf("Dumping logs from nodes to GCS directly at path: %s", config.TestContext.LogexporterGCSPath)
-		cmd = exec.Command(path.Join(config.TestContext.RepoRoot, "cluster", "log-dump", "log-dump.sh"), dir, config.TestContext.LogexporterGCSPath)
+	if e2econfig.TestContext.LogexporterGCSPath != "" {
+		Logf("Dumping logs from nodes to GCS directly at path: %s", e2econfig.TestContext.LogexporterGCSPath)
+		cmd = exec.Command(path.Join(e2econfig.TestContext.RepoRoot, "cluster", "log-dump", "log-dump.sh"), dir, e2econfig.TestContext.LogexporterGCSPath)
 	} else {
 		Logf("Dumping logs locally to: %s", dir)
-		cmd = exec.Command(path.Join(config.TestContext.RepoRoot, "cluster", "log-dump", "log-dump.sh"), dir)
+		cmd = exec.Command(path.Join(e2econfig.TestContext.RepoRoot, "cluster", "log-dump", "log-dump.sh"), dir)
 	}
-	cmd.Env = append(os.Environ(), fmt.Sprintf("LOG_DUMP_SYSTEMD_SERVICES=%s", parseSystemdServices(config.TestContext.SystemdServices)))
-	cmd.Env = append(os.Environ(), fmt.Sprintf("LOG_DUMP_SYSTEMD_JOURNAL=%v", config.TestContext.DumpSystemdJournal))
+	cmd.Env = append(os.Environ(), fmt.Sprintf("LOG_DUMP_SYSTEMD_SERVICES=%s", parseSystemdServices(e2econfig.TestContext.SystemdServices)))
+	cmd.Env = append(os.Environ(), fmt.Sprintf("LOG_DUMP_SYSTEMD_JOURNAL=%v", e2econfig.TestContext.DumpSystemdJournal))
 
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -1221,7 +1221,7 @@ func getControlPlaneAddresses(c clientset.Interface) ([]string, []string, []stri
 	}
 
 	// Populate the external IP/hostname.
-	hostURL, err := url.Parse(config.TestContext.Host)
+	hostURL, err := url.Parse(e2econfig.TestContext.Host)
 	if err != nil {
 		Failf("Failed to parse hostname: %v", err)
 	}
@@ -1242,7 +1242,7 @@ func GetControlPlaneAddresses(c clientset.Interface) []string {
 	externalIPs, internalIPs, _ := getControlPlaneAddresses(c)
 
 	ips := sets.NewString()
-	switch config.TestContext.Provider {
+	switch e2econfig.TestContext.Provider {
 	case "gce", "gke":
 		for _, ip := range externalIPs {
 			ips.Insert(ip)
@@ -1253,7 +1253,7 @@ func GetControlPlaneAddresses(c clientset.Interface) []string {
 	case "aws":
 		ips.Insert(awsMasterIP)
 	default:
-		Failf("This test is not supported for provider %s and should be disabled", config.TestContext.Provider)
+		Failf("This test is not supported for provider %s and should be disabled", e2econfig.TestContext.Provider)
 	}
 	return ips.List()
 }

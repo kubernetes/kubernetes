@@ -43,7 +43,7 @@ import (
 
 	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	"k8s.io/kubernetes/test/e2e/framework/config"
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 )
 
@@ -166,19 +166,19 @@ func (c *PodClient) DeleteSync(name string, options metav1.DeleteOptions, timeou
 
 // mungeSpec apply test-suite specific transformations to the pod spec.
 func (c *PodClient) mungeSpec(pod *v1.Pod) {
-	if !config.TestContext.NodeE2E {
+	if !e2econfig.TestContext.NodeE2E {
 		return
 	}
 
-	gomega.Expect(pod.Spec.NodeName).To(gomega.Or(gomega.BeZero(), gomega.Equal(config.TestContext.NodeName)), "Test misconfigured")
-	pod.Spec.NodeName = config.TestContext.NodeName
+	gomega.Expect(pod.Spec.NodeName).To(gomega.Or(gomega.BeZero(), gomega.Equal(e2econfig.TestContext.NodeName)), "Test misconfigured")
+	pod.Spec.NodeName = e2econfig.TestContext.NodeName
 	// Node e2e does not support the default DNSClusterFirst policy. Set
 	// the policy to DNSDefault, which is configured per node.
 	pod.Spec.DNSPolicy = v1.DNSDefault
 
 	// PrepullImages only works for node e2e now. For cluster e2e, image prepull is not enforced,
 	// we should not munge ImagePullPolicy for cluster e2e pods.
-	if !config.TestContext.PrepullImages {
+	if !e2econfig.TestContext.PrepullImages {
 		return
 	}
 	// If prepull is enabled, munge the container spec to make sure the images are not pulled

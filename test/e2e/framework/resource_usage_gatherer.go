@@ -39,7 +39,7 @@ import (
 	kubeletstatsv1alpha1 "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 
 	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
-	"k8s.io/kubernetes/test/e2e/framework/config"
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	"k8s.io/kubernetes/test/e2e/framework/utils"
 )
@@ -298,7 +298,7 @@ func getStatsSummary(c clientset.Interface, nodeName string) (*kubeletstatsv1alp
 	data, err := c.CoreV1().RESTClient().Get().
 		Resource("nodes").
 		SubResource("proxy").
-		Name(fmt.Sprintf("%v:%v", nodeName, config.KubeletPort)).
+		Name(fmt.Sprintf("%v:%v", nodeName, e2econfig.KubeletPort)).
 		Suffix("stats/summary").
 		Do(ctx).Raw()
 
@@ -606,7 +606,7 @@ type kubemarkResourceUsage struct {
 }
 
 func getMasterUsageByPrefix(prefix string) (string, error) {
-	sshResult, err := e2essh.SSH(fmt.Sprintf("ps ax -o %%cpu,rss,command | tail -n +2 | grep %v | sed 's/\\s+/ /g'", prefix), utils.APIAddress()+":22", config.TestContext.Provider)
+	sshResult, err := e2essh.SSH(fmt.Sprintf("ps ax -o %%cpu,rss,command | tail -n +2 | grep %v | sed 's/\\s+/ /g'", prefix), utils.APIAddress()+":22", e2econfig.TestContext.Provider)
 	if err != nil {
 		return "", err
 	}

@@ -28,7 +28,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 
 	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
-	"k8s.io/kubernetes/test/e2e/framework/config"
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	"k8s.io/kubernetes/test/e2e/framework/utils"
 )
@@ -258,7 +258,7 @@ func (g *LogSizeGatherer) Work() bool {
 	sshResult, err := e2essh.SSH(
 		fmt.Sprintf("ls -l %v | awk '{print $9, $5}' | tr '\n' ' '", strings.Join(workItem.paths, " ")),
 		workItem.ip,
-		config.TestContext.Provider,
+		e2econfig.TestContext.Provider,
 	)
 	if err != nil {
 		utils.Logf("Error while trying to SSH to %v, skipping probe. Error: %v", workItem.ip, err)
