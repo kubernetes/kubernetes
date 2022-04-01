@@ -43,8 +43,7 @@ var (
 
 	// Periodic flushing gets configured either via the global flag
 	// in this file or via LoggingConfiguration.
-	logFlushFreq      time.Duration
-	logFlushFreqAdded bool
+	logFlushFreq time.Duration
 )
 
 func init() {
@@ -100,7 +99,6 @@ func AddFlags(fs *pflag.FlagSet, opts ...Option) {
 			if o.skipLoggingConfigurationFlags {
 				return
 			}
-			logFlushFreqAdded = true
 		case "vmodule":
 			// TODO: see above
 			// pf.Usage += vmoduleUsage
@@ -142,7 +140,6 @@ func AddGoFlags(fs *flag.FlagSet, opts ...Option) {
 			if o.skipLoggingConfigurationFlags {
 				return
 			}
-			logFlushFreqAdded = true
 		case "vmodule":
 			// TODO: see above
 			// usage += vmoduleUsage
@@ -181,11 +178,11 @@ func (writer KlogWriter) Write(data []byte) (n int, err error) {
 func InitLogs() {
 	log.SetOutput(KlogWriter{})
 	log.SetFlags(0)
-	if logFlushFreqAdded {
-		// The flag from this file was activated, so use it now.
-		// Otherwise LoggingConfiguration.Apply will do this.
-		klog.StartFlushDaemon(logFlushFreq)
-	}
+
+	// Start flushing now. If LoggingConfiguration.ApplyAndValidate is
+	// used, it will restart the daemon with the log flush interval defined
+	// there.
+	klog.StartFlushDaemon(logFlushFreq)
 
 	// This is the default in Kubernetes. Options.ValidateAndApply
 	// will override this with the result of a feature gate check.
