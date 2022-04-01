@@ -1760,7 +1760,11 @@ func TestValidationExpressions(t *testing.T) {
 			ctx := context.TODO()
 			for j := range tt.valid {
 				validRule := tt.valid[j]
-				t.Run(validRule, func(t *testing.T) {
+				testName := validRule
+				if len(testName) > 127 {
+					testName = testName[:127]
+				}
+				t.Run(testName, func(t *testing.T) {
 					t.Parallel()
 					s := withRule(*tt.schema, validRule)
 					celValidator := validator(&s, tt.isRoot, PerCallLimit)
@@ -1781,7 +1785,11 @@ func TestValidationExpressions(t *testing.T) {
 				})
 			}
 			for rule, expectErrToContain := range tt.errors {
-				t.Run(rule, func(t *testing.T) {
+				testName := rule
+				if len(testName) > 127 {
+					testName = testName[:127]
+				}
+				t.Run(testName, func(t *testing.T) {
 					s := withRule(*tt.schema, rule)
 					celValidator := NewValidator(&s, PerCallLimit)
 					if celValidator == nil {
