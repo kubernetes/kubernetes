@@ -63,7 +63,7 @@ type SpdyRoundTripper struct {
 	// DialContext specifies the dial function for creating unencrypted TCP connections.
 	DialContext func(ctx context.Context, network, address string) (net.Conn, error)
 
-	// Deprecated: Use Dial instead, we can do little to control the action how the connection created by *net.Dialer
+	// Deprecated: Use DialContext instead, we can do little to control the detail how the connection created by *net.Dialer
 	Dialer *net.Dialer
 
 	// proxier knows which proxy to use given a request, defaults to http.ProxyFromEnvironment

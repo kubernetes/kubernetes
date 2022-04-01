@@ -51,7 +51,7 @@ func RoundTripperFor(config *restclient.Config) (http.RoundTripper, Upgrader, er
 		PingPeriod:               time.Second * 5,
 	})
 	if config.Dial != nil {
-		upgradeRoundTripper.Dial = config.Dial
+		upgradeRoundTripper.DialContext = config.Dial
 	}
 	wrapper, err := restclient.HTTPWrappersForConfig(config, upgradeRoundTripper)
 	if err != nil {
