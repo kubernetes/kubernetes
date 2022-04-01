@@ -28,6 +28,7 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	pvutil "k8s.io/kubernetes/pkg/api/persistentvolume"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	volumevalidation "k8s.io/kubernetes/pkg/volume/validation"
@@ -62,6 +63,10 @@ func (persistentvolumeStrategy) GetResetFields() map[fieldpath.APIVersion]*field
 
 // ResetBeforeCreate clears the Status field which is not allowed to be set by end users on creation.
 func (persistentvolumeStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+	pv := obj.(*api.PersistentVolume)
+	pv.Status = api.PersistentVolumeStatus{}
+
+	pvutil.DropDisabledFields(&pv.Spec, nil)
 }
 
 func (persistentvolumeStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
@@ -89,6 +94,8 @@ func (persistentvolumeStrategy) PrepareForUpdate(ctx context.Context, obj, old r
 	newPv := obj.(*api.PersistentVolume)
 	oldPv := old.(*api.PersistentVolume)
 	newPv.Status = oldPv.Status
+
+	pvutil.DropDisabledFields(&newPv.Spec, &oldPv.Spec)
 }
 
 func (persistentvolumeStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {

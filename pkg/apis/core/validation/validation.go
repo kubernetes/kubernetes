@@ -1595,6 +1595,18 @@ func validateCSIPersistentVolumeSource(csi *core.CSIPersistentVolumeSource, fldP
 			allErrs = append(allErrs, ValidateDNS1123Label(csi.NodePublishSecretRef.Namespace, fldPath.Child("namespace"))...)
 		}
 	}
+	if csi.NodeExpandSecretRef != nil {
+		if len(csi.NodeExpandSecretRef.Name) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("nodeExpandSecretRef", "name"), ""))
+		} else {
+			allErrs = append(allErrs, ValidateDNS1123Subdomain(csi.NodeExpandSecretRef.Name, fldPath.Child("name"))...)
+		}
+		if len(csi.NodeExpandSecretRef.Namespace) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("nodeExpandSecretRef", "namespace"), ""))
+		} else {
+			allErrs = append(allErrs, ValidateDNS1123Label(csi.NodeExpandSecretRef.Namespace, fldPath.Child("namespace"))...)
+		}
+	}
 
 	return allErrs
 }

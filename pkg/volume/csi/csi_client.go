@@ -120,6 +120,7 @@ type csiResizeOptions struct {
 	accessMode        api.PersistentVolumeAccessMode
 	newSize           resource.Quantity
 	mountOptions      []string
+	secrets           map[string]string
 }
 
 var _ csiClient = &csiDriverClient{}
@@ -320,6 +321,7 @@ func (c *csiDriverClient) NodeExpandVolume(ctx context.Context, opts csiResizeOp
 				Mode: accessModeMapper(opts.accessMode),
 			},
 		},
+		Secrets: opts.secrets,
 	}
 
 	// not all CSI drivers support NodeStageUnstage and hence the StagingTargetPath
