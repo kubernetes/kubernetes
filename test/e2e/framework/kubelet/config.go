@@ -31,7 +31,6 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeletconfigscheme "k8s.io/kubernetes/pkg/kubelet/apis/config/scheme"
 
-	"k8s.io/kubernetes/test/e2e/framework/config"
 	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2eutils "k8s.io/kubernetes/test/e2e/framework/utils"
@@ -77,7 +76,7 @@ func pollConfigz(timeout time.Duration, pollInterval time.Duration, nodeName, na
 		e2eutils.Logf("http requesting node kubelet /configz")
 		endpoint = fmt.Sprintf("http://127.0.0.1:%d/api/v1/nodes/%s/proxy/configz", port, nodeName)
 	} else {
-		endpoint = fmt.Sprintf("%s/api/v1/nodes/%s/proxy/configz", e2econfig.TestContext.Host, config.TestContext.NodeName)
+		endpoint = fmt.Sprintf("%s/api/v1/nodes/%s/proxy/configz", e2econfig.TestContext.Host, e2econfig.TestContext.NodeName)
 	}
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
