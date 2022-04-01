@@ -54,14 +54,17 @@ type SpdyRoundTripper struct {
 	/* TODO according to http://golang.org/pkg/net/http/#RoundTripper, a RoundTripper
 	   must be safe for use by multiple concurrent goroutines. If this is absolutely
 	   necessary, we could keep a map from http.Request to net.Conn. In practice,
-	   a client will create an http.Client, set the transport to a new insteace of
+	   a client will create an http.Client, set the transport to a new instance of
 	   SpdyRoundTripper, and use it a single time, so this hopefully won't be an issue.
 	*/
 	// conn is the underlying network connection to the remote server.
 	conn net.Conn
 
-	// Dial specifies the dial function for creating TCP conntions.
+	// Dial specifies the dial function for creating unencrypted TCP connections.
 	Dial func(ctx context.Context, network, address string) (net.Conn, error)
+
+	// Deprecated: Use Dial instead, we can do little to control the action how the connection created by *net.Dialer
+	Dialer *net.Dialer
 
 	// proxier knows which proxy to use given a request, defaults to http.ProxyFromEnvironment
 	// Used primarily for mocking the proxy discovery in tests.
@@ -232,14 +235,16 @@ func (s *SpdyRoundTripper) dialWithSocks5Proxy(req *http.Request, proxyURL *url.
 	}
 
 	var dialer proxy.Dialer
-	if s.Dial == nil {
+	if s.Dial == nil && s.Dialer == nil {
 		dialer = &net.Dialer{
 			Timeout: 30 * time.Second,
 		}
-	} else {
+	} else if s.Dial != nil {
 		dialer = &functionDialer{
 			dial: s.Dial,
 		}
+	} else {
+		dialer = s.Dialer
 	}
 
 	proxyDialer, err := proxy.SOCKS5("tcp", proxyDialAddr, auth, dialer)
@@ -315,21 +320,25 @@ func (s *SpdyRoundTripper) dialWithoutProxy(ctx context.Context, url *url.URL) (
 	dialAddr := netutil.CanonicalAddr(url)
 
 	if url.Scheme == "http" {
-		if s.Dial == nil {
+		if s.Dial == nil && s.Dialer == nil {
 			var d net.Dialer
 			return d.DialContext(ctx, "tcp", dialAddr)
-		} else {
+		} else if s.Dial != nil {
 			return s.Dial(ctx, "tcp", dialAddr)
+		} else {
+			return s.Dialer.DialContext(ctx, "tcp", dialAddr)
 		}
 	}
 
 	// TODO validate the TLSClientConfig is set up?
 	var conn *tls.Conn
 	var err error
-	if s.Dial == nil {
+	if s.Dial == nil && s.Dialer == nil {
 		conn, err = tls.Dial("tcp", dialAddr, s.tlsConfig)
-	} else {
+	} else if s.Dial != nil {
 		conn, err = s.TLSDialWithDialer(ctx, s.Dial, "tcp", dialAddr, s.tlsConfig)
+	} else {
+		conn, err = tls.DialWithDialer(s.Dialer, "tcp", dialAddr, s.tlsConfig)
 	}
 	if err != nil {
 		return nil, err
