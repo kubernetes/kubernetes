@@ -211,6 +211,14 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 				}
 			}
 
+			// Config and flags parsed, now we can initialize logging.
+			logs.InitLogs()
+			logOption := &logs.Options{Config: kubeletConfig.Logging}
+			if err := logOption.ValidateAndApply(utilfeature.DefaultFeatureGate); err != nil {
+				return fmt.Errorf("failed to initialize logging: %v", err)
+			}
+			cliflag.PrintFlags(cleanFlagSet)
+
 			// We always validate the local configuration (command line + config file).
 			// This is the default "last-known-good" config for dynamic config, and must always remain valid.
 			if err := kubeletconfigvalidation.ValidateKubeletConfiguration(kubeletConfig); err != nil {
@@ -227,15 +235,6 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
 				return fmt.Errorf("cannot set feature gate %v to %v, feature is locked to %v", features.DynamicKubeletConfig, true, false)
 			}
-
-			// Config and flags parsed, now we can initialize logging.
-			logs.InitLogs()
-			logOption := &logs.Options{Config: kubeletConfig.Logging}
-			if err := logOption.ValidateAndApply(utilfeature.DefaultFeatureGate); err != nil {
-				klog.ErrorS(err, "Failed to initialize logging")
-				os.Exit(1)
-			}
-			cliflag.PrintFlags(cleanFlagSet)
 
 			// construct a KubeletServer from kubeletFlags and kubeletConfig
 			kubeletServer := &options.KubeletServer{
