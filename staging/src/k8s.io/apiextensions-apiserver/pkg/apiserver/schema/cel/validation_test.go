@@ -1778,38 +1778,6 @@ func TestValidationExpressions(t *testing.T) {
 						}
 						return
 					}
-
-					// test with cost budget exceeded
-					errs, _ = celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, tt.oldObj, 0)
-					var found bool
-					for _, err := range errs {
-						if err.Type == field.ErrorTypeInvalid && strings.Contains(err.Error(), "validation failed due to running out of cost budget, no further validation rules will be run") {
-							found = true
-						}
-					}
-					if !found {
-						t.Errorf("expect cost limit exceed err but did not find")
-					}
-					if len(errs) > 1 {
-						t.Errorf("expect to return cost budget exceed err once")
-					}
-
-					// test with PerCallLimit exceeded
-					found = false
-					celValidator = NewValidator(&s, 0)
-					if celValidator == nil {
-						t.Fatal("expected non nil validator")
-					}
-					errs, _ = celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, tt.oldObj, tt.costBudget)
-					for _, err := range errs {
-						if err.Type == field.ErrorTypeInvalid && strings.Contains(err.Error(), "no further validation rules will be run due to call cost exceeds limit for rule") {
-							found = true
-							break
-						}
-					}
-					if !found {
-						t.Errorf("expect PerCostLimit exceed err but did not find")
-					}
 				})
 			}
 			for rule, expectErrToContain := range tt.errors {
@@ -1827,21 +1795,6 @@ func TestValidationExpressions(t *testing.T) {
 						if err.Type != field.ErrorTypeInvalid || !strings.Contains(err.Error(), expectErrToContain) {
 							t.Errorf("expected error to contain '%s', but got: %v", expectErrToContain, err)
 						}
-					}
-
-					// test with cost budget exceeded
-					errs, _ = celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, tt.oldObj, 0)
-					var found bool
-					for _, err := range errs {
-						if err.Type == field.ErrorTypeInvalid && strings.Contains(err.Error(), "validation failed due to running out of cost budget, no further validation rules will be run") {
-							found = true
-						}
-					}
-					if !found {
-						t.Errorf("expect cost limit exceed err but did not find")
-					}
-					if len(errs) > 1 {
-						t.Errorf("expect to return cost budget exceed err once")
 					}
 				})
 			}
