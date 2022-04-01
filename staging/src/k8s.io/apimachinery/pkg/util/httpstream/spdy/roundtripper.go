@@ -60,8 +60,8 @@ type SpdyRoundTripper struct {
 	// conn is the underlying network connection to the remote server.
 	conn net.Conn
 
-	// Dial specifies the dial function for creating unencrypted TCP connections.
-	Dial func(ctx context.Context, network, address string) (net.Conn, error)
+	// DialContext specifies the dial function for creating unencrypted TCP connections.
+	DialContext func(ctx context.Context, network, address string) (net.Conn, error)
 
 	// Deprecated: Use Dial instead, we can do little to control the action how the connection created by *net.Dialer
 	Dialer *net.Dialer
@@ -235,13 +235,13 @@ func (s *SpdyRoundTripper) dialWithSocks5Proxy(req *http.Request, proxyURL *url.
 	}
 
 	var dialer proxy.Dialer
-	if s.Dial == nil && s.Dialer == nil {
+	if s.DialContext == nil && s.Dialer == nil {
 		dialer = &net.Dialer{
 			Timeout: 30 * time.Second,
 		}
-	} else if s.Dial != nil {
+	} else if s.DialContext != nil {
 		dialer = &functionDialer{
-			dial: s.Dial,
+			dial: s.DialContext,
 		}
 	} else {
 		dialer = s.Dialer
@@ -320,11 +320,11 @@ func (s *SpdyRoundTripper) dialWithoutProxy(ctx context.Context, url *url.URL) (
 	dialAddr := netutil.CanonicalAddr(url)
 
 	if url.Scheme == "http" {
-		if s.Dial == nil && s.Dialer == nil {
+		if s.DialContext == nil && s.Dialer == nil {
 			var d net.Dialer
 			return d.DialContext(ctx, "tcp", dialAddr)
-		} else if s.Dial != nil {
-			return s.Dial(ctx, "tcp", dialAddr)
+		} else if s.DialContext != nil {
+			return s.DialContext(ctx, "tcp", dialAddr)
 		} else {
 			return s.Dialer.DialContext(ctx, "tcp", dialAddr)
 		}
@@ -333,10 +333,10 @@ func (s *SpdyRoundTripper) dialWithoutProxy(ctx context.Context, url *url.URL) (
 	// TODO validate the TLSClientConfig is set up?
 	var conn *tls.Conn
 	var err error
-	if s.Dial == nil && s.Dialer == nil {
+	if s.DialContext == nil && s.Dialer == nil {
 		conn, err = tls.Dial("tcp", dialAddr, s.tlsConfig)
-	} else if s.Dial != nil {
-		conn, err = s.TLSDialWithDialer(ctx, s.Dial, "tcp", dialAddr, s.tlsConfig)
+	} else if s.DialContext != nil {
+		conn, err = s.TLSDialWithDialer(ctx, s.DialContext, "tcp", dialAddr, s.tlsConfig)
 	} else {
 		conn, err = tls.DialWithDialer(s.Dialer, "tcp", dialAddr, s.tlsConfig)
 	}
