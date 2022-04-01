@@ -140,10 +140,8 @@ controller, and serviceaccounts controller.`,
 			}
 		},
 		Args: func(cmd *cobra.Command, args []string) error {
-			for _, arg := range args {
-				if len(arg) > 0 {
-					return fmt.Errorf("%q does not take any arguments, got %q", cmd.CommandPath(), args)
-				}
+			if len(args) != 0 {
+				return fmt.Errorf("%q does not take any arguments, got %q", cmd.CommandPath(), args)
 			}
 			return nil
 		},

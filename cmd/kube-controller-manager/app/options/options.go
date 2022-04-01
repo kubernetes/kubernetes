@@ -92,9 +92,8 @@ type KubeControllerManagerOptions struct {
 	Metrics        *metrics.Options
 	Logs           *logs.Options
 
-	Master                      string
-	Kubeconfig                  string
-	ShowHiddenMetricsForVersion string
+	Master     string
+	Kubeconfig string
 }
 
 // NewKubeControllerManagerOptions creates a new KubeControllerManagerOptions with a default config.
