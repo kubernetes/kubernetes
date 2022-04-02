@@ -81,6 +81,17 @@ type ActualStateOfWorld interface {
 	// log the error and return
 	SetNodeStatusUpdateNeeded(nodeName types.NodeName)
 
+	// SetNodeStatusUpdateNotNeeded sets statusUpdateNeeded for the specified
+	// node to false indicating the AttachedVolume field in the Node's Status
+	// object needs not to be updated by the node updater again.
+	// If the specified node does not exist in the nodesToUpdateStatusFor list,
+	// log the error and return
+	SetNodeStatusUpdateNotNeeded(nodeName types.NodeName)
+
+	// updateNodeStatusUpdateNeeded set statusUpdateNeeded for the specified
+	// node to the value of needed paramenter given.
+	updateNodeStatusUpdateNeeded(nodeName types.NodeName, needed bool) error
+
 	// ResetDetachRequestTime resets the detachRequestTime to 0 which indicates there is no detach
 	// request any more for the volume
 	ResetDetachRequestTime(volumeName v1.UniqueVolumeName, nodeName types.NodeName)
@@ -542,6 +553,14 @@ func (asw *actualStateOfWorld) SetNodeStatusUpdateNeeded(nodeName types.NodeName
 	}
 }
 
+func (asw *actualStateOfWorld) SetNodeStatusUpdateNotNeeded(nodeName types.NodeName) {
+	asw.Lock()
+	defer asw.Unlock()
+	if err := asw.updateNodeStatusUpdateNeeded(nodeName, false); err != nil {
+		klog.Warningf("Failed to update statusUpdateNeeded field in actual state of world: %v", err)
+	}
+}
+
 func (asw *actualStateOfWorld) DeleteVolumeNode(
 	volumeName v1.UniqueVolumeName, nodeName types.NodeName) {
 	asw.Lock()
@@ -668,16 +687,13 @@ func (asw *actualStateOfWorld) GetVolumesToReportAttached() map[types.NodeName][
 	defer asw.Unlock()
 
 	volumesToReportAttached := make(map[types.NodeName][]v1.AttachedVolume)
-	for nodeName, nodeToUpdateObj := range asw.nodesToUpdateStatusFor {
+	for _, nodeToUpdateObj := range asw.nodesToUpdateStatusFor {
 		if nodeToUpdateObj.statusUpdateNeeded {
 			volumesToReportAttached[nodeToUpdateObj.nodeName] = asw.getAttachedVolumeFromUpdateObject(nodeToUpdateObj.volumesToReportAsAttached)
 		}
 		// When GetVolumesToReportAttached is called by node status updater, the current status
-		// of this node will be updated, so set the flag statusUpdateNeeded to false indicating
-		// the current status is already updated.
-		if err := asw.updateNodeStatusUpdateNeeded(nodeName, false); err != nil {
-			klog.Errorf("Failed to update statusUpdateNeeded field when getting volumes: %v", err)
-		}
+		// of this node will be updated, SetNodeStatusUpdateNotNeeded is expected to be called
+		// when the status is updated.
 	}
 
 	return volumesToReportAttached
@@ -696,12 +712,9 @@ func (asw *actualStateOfWorld) GetVolumesToReportAttachedForNode(nodeName types.
 	}
 
 	volumesToReportAttached := asw.getAttachedVolumeFromUpdateObject(nodeToUpdateObj.volumesToReportAsAttached)
-	// When GetVolumesToReportAttached is called by node status updater, the current status
-	// of this node will be updated, so set the flag statusUpdateNeeded to false indicating
-	// the current status is already updated.
-	if err := asw.updateNodeStatusUpdateNeeded(nodeName, false); err != nil {
-		klog.Errorf("Failed to update statusUpdateNeeded field when getting volumes: %v", err)
-	}
+	// When GetVolumesToReportAttachedForNode is called by node status updater, the current status
+	// of this node will be updated, SetNodeStatusUpdateNotNeeded is expected to be called
+	// when the status is updated.
 
 	return true, volumesToReportAttached
 }

@@ -1478,7 +1478,9 @@ func Test_GetVolumesToReportAttachedForNode_Positive(t *testing.T) {
 	if len(attachedVolumes) != 1 {
 		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
 	}
-
+	if err := asw.updateNodeStatusUpdateNeeded(nodeName, false); err != nil {
+		t.Fatalf("updateNodeStatusUpdateNeeded failed. Expected: <no error> Actual: <%v>", err)
+	}
 	needsUpdate, _ = asw.GetVolumesToReportAttachedForNode(nodeName)
 	if needsUpdate {
 		t.Fatalf("GetVolumesToReportAttachedForNode_Positive_NewVolumeNewNodeWithTrueAttached failed. Actual: <node %q needs an update> Expect: <node exists in the reportedAsAttached map and does not need an update", nodeName)

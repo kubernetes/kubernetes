@@ -88,17 +88,18 @@ func (nsu *nodeStatusUpdater) processNodeVolumes(nodeName types.NodeName, attach
 	nodeObj, err := nsu.nodeLister.Get(string(nodeName))
 	if errors.IsNotFound(err) {
 		// If node does not exist, its status cannot be updated.
-		// Do nothing so that there is no retry until node is created.
+		// Set node status to update not needed so that there is no retry until node is created.
+		nsu.actualStateOfWorld.SetNodeStatusUpdateNotNeeded(nodeName)
 		klog.V(2).Infof(
 			"Could not update node status. Failed to find node %q in NodeInformer cache. Error: '%v'",
 			nodeName,
 			err)
 		return nil
 	} else if err != nil {
-		// For all other errors, log error and reset flag statusUpdateNeeded
-		// back to true to indicate this node status needs to be updated again.
+		// For all other errors SetNodeStatusUpdateNotNeeded
+		// is not expected to be called to indicate this node status needs
+		// to be updated again.
 		klog.V(2).Infof("Error retrieving nodes from node lister. Error: %v", err)
-		nsu.actualStateOfWorld.SetNodeStatusUpdateNeeded(nodeName)
 		return err
 	}
 
@@ -111,10 +112,6 @@ func (nsu *nodeStatusUpdater) processNodeVolumes(nodeName types.NodeName, attach
 			nodeName)
 		return nil
 	} else if err != nil {
-		// If update node status fails, reset flag statusUpdateNeeded back to true
-		// to indicate this node status needs to be updated again
-		nsu.actualStateOfWorld.SetNodeStatusUpdateNeeded(nodeName)
-
 		klog.V(2).Infof(
 			"Could not update node status for %q; re-marking for update. %v",
 			nodeName,
@@ -122,6 +119,7 @@ func (nsu *nodeStatusUpdater) processNodeVolumes(nodeName types.NodeName, attach
 
 		return err
 	}
+	nsu.actualStateOfWorld.SetNodeStatusUpdateNotNeeded(nodeName)
 	return nil
 }
 
