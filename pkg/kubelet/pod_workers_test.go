@@ -398,7 +398,7 @@ func TestUpdatePod(t *testing.T) {
 func TestUpdatePodWithTerminatedPod(t *testing.T) {
 	podWorkers, _ := createPodWorkers()
 	terminatedPod := newPodWithPhase("0000-0000-0000", "done-pod", v1.PodSucceeded)
-	runningPod := &kubecontainer.Pod{ID: "0000-0000-0001", Name: "done-pod"}
+	orphanedPod := &kubecontainer.Pod{ID: "0000-0000-0001", Name: "orphaned-pod"}
 	pod := newPod("0000-0000-0002", "running-pod")
 
 	podWorkers.UpdatePod(UpdatePodOptions{
@@ -411,17 +411,17 @@ func TestUpdatePodWithTerminatedPod(t *testing.T) {
 	})
 	podWorkers.UpdatePod(UpdatePodOptions{
 		UpdateType: kubetypes.SyncPodKill,
-		RunningPod: runningPod,
+		RunningPod: orphanedPod,
 	})
-
+	drainAllWorkers(podWorkers)
 	if podWorkers.IsPodKnownTerminated(pod.UID) == true {
 		t.Errorf("podWorker state should not be terminated")
 	}
 	if podWorkers.IsPodKnownTerminated(terminatedPod.UID) == false {
 		t.Errorf("podWorker state should be terminated")
 	}
-	if podWorkers.IsPodKnownTerminated(runningPod.ID) == true {
-		t.Errorf("podWorker state should not be marked terminated for a running pod")
+	if podWorkers.IsPodKnownTerminated(orphanedPod.ID) == false {
+		t.Errorf("podWorker state should be terminated for orphaned pod")
 	}
 }
 
