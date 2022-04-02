@@ -1459,6 +1459,7 @@ func verifyVolumeNoStatusUpdateNeeded(
 	nodeName k8stypes.NodeName,
 	asw cache.ActualStateOfWorld,
 ) {
+	asw.SetNodeStatusUpdateNotNeeded(nodeName)
 	volumes := asw.GetVolumesToReportAttached()
 	for _, volume := range volumes[nodeName] {
 		if volume.Name == volumeName {
