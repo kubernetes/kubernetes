@@ -61,13 +61,11 @@ func RegisterConversions(s *runtime.Scheme) error {
 
 func autoConvert_v1alpha1_DeploymentControllerConfiguration_To_config_DeploymentControllerConfiguration(in *v1alpha1.DeploymentControllerConfiguration, out *config.DeploymentControllerConfiguration, s conversion.Scope) error {
 	out.ConcurrentDeploymentSyncs = in.ConcurrentDeploymentSyncs
-	out.DeploymentControllerSyncPeriod = in.DeploymentControllerSyncPeriod
 	return nil
 }
 
 func autoConvert_config_DeploymentControllerConfiguration_To_v1alpha1_DeploymentControllerConfiguration(in *config.DeploymentControllerConfiguration, out *v1alpha1.DeploymentControllerConfiguration, s conversion.Scope) error {
 	out.ConcurrentDeploymentSyncs = in.ConcurrentDeploymentSyncs
-	out.DeploymentControllerSyncPeriod = in.DeploymentControllerSyncPeriod
 	return nil
 }
 

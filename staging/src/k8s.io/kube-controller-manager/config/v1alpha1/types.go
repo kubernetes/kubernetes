@@ -225,8 +225,6 @@ type DeploymentControllerConfiguration struct {
 	// allowed to sync concurrently. Larger number = more responsive deployments,
 	// but more CPU (and network) load.
 	ConcurrentDeploymentSyncs int32
-	// deploymentControllerSyncPeriod is the period for syncing the deployments.
-	DeploymentControllerSyncPeriod metav1.Duration
 }
 
 // StatefulSetControllerConfiguration contains elements describing StatefulSetController.

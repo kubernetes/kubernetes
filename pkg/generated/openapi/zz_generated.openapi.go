@@ -48607,19 +48607,10 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_DeploymentControllerCo
 							Format:      "int32",
 						},
 					},
-					"DeploymentControllerSyncPeriod": {
-						SchemaProps: spec.SchemaProps{
-							Description: "deploymentControllerSyncPeriod is the period for syncing the deployments.",
-							Default:     0,
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
-						},
-					},
 				},
-				Required: []string{"ConcurrentDeploymentSyncs", "DeploymentControllerSyncPeriod"},
+				Required: []string{"ConcurrentDeploymentSyncs"},
 			},
 		},
-		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.Duration"},
 	}
 }
 
