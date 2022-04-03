@@ -763,6 +763,15 @@
     pod. Modify the labels of one of the Job's Pods. The Job MUST release the Pod.
   release: v1.16
   file: test/e2e/apps/job.go
+- testname: Jobs, apply changes to status
+  codename: '[sig-apps] Job should apply changes to a job status [Conformance]'
+  description: Attempt to create a running Job which MUST succeed. Attempt to patch
+    the Job status to include a new start time which MUST succeed. An annotation for
+    the job that was patched MUST be found. Attempt to replace the job status with
+    a new start time which MUST succeed. Attempt to read its status sub-resource which
+    MUST succeed.
+  release: v1.24
+  file: test/e2e/apps/job.go
 - testname: Ensure Pods of an Indexed Job get a unique index.
   codename: '[sig-apps] Job should create pods for an Indexed job with completion
     indexes and specified hostname [Conformance]'
@@ -775,6 +784,16 @@
   description: Create a job. Ensure the active pods reflect paralellism in the namespace
     and delete the job. Job MUST be deleted successfully.
   release: v1.15
+  file: test/e2e/apps/job.go
+- testname: Jobs, manage lifecycle
+  codename: '[sig-apps] Job should manage the lifecycle of a job [Conformance]'
+  description: Attempt to create a suspended Job which MUST succeed. Attempt to patch
+    the Job to include a new label which MUST succeed. The label MUST be found. Attempt
+    to replace the Job to include a new annotation which MUST succeed. The annotation
+    MUST be found. Attempt to list all namespaces with a label selector which MUST
+    succeed. One list MUST be found. It MUST succeed at deleting a collection of jobs
+    via a label selector.
+  release: v1.24
   file: test/e2e/apps/job.go
 - testname: Jobs, completion after task failure
   codename: '[sig-apps] Job should run a job to completion when tasks sometimes fail
