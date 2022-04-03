@@ -26,6 +26,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
@@ -159,13 +160,28 @@ func NewKubeletFlags() *KubeletFlags {
 // ValidateKubeletFlags validates Kubelet's configuration flags and returns an error if they are invalid.
 func ValidateKubeletFlags(f *KubeletFlags) error {
 	unknownLabels := sets.NewString()
-	for k := range f.NodeLabels {
+	invalidLabelErrs := make(map[string][]string)
+	for k, v := range f.NodeLabels {
 		if isKubernetesLabel(k) && !kubeletapis.IsKubeletLabel(k) {
 			unknownLabels.Insert(k)
+		}
+
+		if errs := validation.IsQualifiedName(k); len(errs) > 0 {
+			invalidLabelErrs[k] = append(invalidLabelErrs[k], errs...)
+		}
+		if errs := validation.IsValidLabelValue(v); len(errs) > 0 {
+			invalidLabelErrs[v] = append(invalidLabelErrs[v], errs...)
 		}
 	}
 	if len(unknownLabels) > 0 {
 		return fmt.Errorf("unknown 'kubernetes.io' or 'k8s.io' labels specified with --node-labels: %v\n--node-labels in the 'kubernetes.io' namespace must begin with an allowed prefix (%s) or be in the specifically allowed set (%s)", unknownLabels.List(), strings.Join(kubeletapis.KubeletLabelNamespaces(), ", "), strings.Join(kubeletapis.KubeletLabels(), ", "))
+	}
+	if len(invalidLabelErrs) > 0 {
+		labelErrs := []string{}
+		for k, v := range invalidLabelErrs {
+			labelErrs = append(labelErrs, fmt.Sprintf("'%s' - %s", k, strings.Join(v, ", ")))
+		}
+		return fmt.Errorf("invalid node labels: %s", strings.Join(labelErrs, "; "))
 	}
 
 	if f.SeccompDefault && !utilfeature.DefaultFeatureGate.Enabled(features.SeccompDefault) {
