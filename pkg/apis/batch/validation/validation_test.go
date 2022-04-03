@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"runtime"
 	"strings"
 	"testing"
 
@@ -1033,23 +1034,6 @@ func TestValidateCronJob(t *testing.T) {
 				},
 			},
 		},
-		"spec.timeZone: Invalid value: \"AMERICA/new_york\": unknown time zone AMERICA/new_york": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "mycronjob",
-				Namespace: metav1.NamespaceDefault,
-				UID:       types.UID("1a2b3c"),
-			},
-			Spec: batch.CronJobSpec{
-				Schedule:          "0 * * * *",
-				TimeZone:          &timeZoneBadCasing,
-				ConcurrencyPolicy: batch.AllowConcurrent,
-				JobTemplate: batch.JobTemplateSpec{
-					Spec: batch.JobSpec{
-						Template: validPodTemplateSpec,
-					},
-				},
-			},
-		},
 		"spec.timeZone: Invalid value: \" America/New_York\": unknown time zone  America/New_York": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "mycronjob",
@@ -1331,6 +1315,28 @@ func TestValidateCronJob(t *testing.T) {
 			},
 		},
 	}
+
+	if runtime.GOOS != "windows" && runtime.GOOS != "darwin" {
+		// Skip this error case on case-insensitive Operating Systems
+		errorCases["spec.timeZone: Invalid value: \"AMERICA/new_york\": unknown time zone AMERICA/new_york"] = batch.CronJob{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mycronjob",
+				Namespace: metav1.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.CronJobSpec{
+				Schedule:          "0 * * * *",
+				TimeZone:          &timeZoneBadCasing,
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+		}
+	}
+
 	errorCases["spec.jobTemplate.spec.ttlSecondsAfterFinished:must be greater than or equal to 0"] = batch.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "mycronjob",
