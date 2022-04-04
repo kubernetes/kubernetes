@@ -45,8 +45,22 @@ run_crd_tests() {
         "storage": true,
         "schema": {
           "openAPIV3Schema": {
-            "x-kubernetes-preserve-unknown-fields": true,
-            "type": "object"
+            "type": "object",
+            "properties": {
+              "metadata": {"type": "object"},
+              "nestedField": {
+                "type": "object",
+                "properties": {
+                  "someSubfield": {"type": "string"},
+                  "otherSubfield": {"type": "string"},
+                  "newSubfield": {"type": "string"}
+                }
+              },
+              "otherField": {"type": "string"},
+              "someField": {"type": "string"},
+              "newField": {"type": "string"},
+              "patched": {"type": "string"}
+            }
           }
         }
       }
