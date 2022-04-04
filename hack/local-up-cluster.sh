@@ -125,7 +125,7 @@ ENABLE_ADMISSION_PLUGINS=${ENABLE_ADMISSION_PLUGINS:-"NamespaceLifecycle,LimitRa
 DISABLE_ADMISSION_PLUGINS=${DISABLE_ADMISSION_PLUGINS:-""}
 ADMISSION_CONTROL_CONFIG_FILE=${ADMISSION_CONTROL_CONFIG_FILE:-""}
 
-# START_MODE can be 'all', 'kubeletonly', 'nokubelet', or 'nokubeproxy'
+# START_MODE can be 'all', 'kubeletonly', 'nokubelet', 'nokubeproxy', or 'nokubelet,nokubeproxy'
 START_MODE=${START_MODE:-"all"}
 
 # A list of controllers to enable
@@ -836,7 +836,7 @@ EOF
 function start_kubeproxy {
     PROXY_LOG=${LOG_DIR}/kube-proxy.log
 
-    if [[ "${START_MODE}" != "nokubelet" ]]; then
+    if [[ "${START_MODE}" != *"nokubelet"* ]]; then
       # wait for kubelet collect node information
       echo "wait kubelet ready"
       wait_node_ready
@@ -981,7 +981,7 @@ fi
 
 if [[ "${START_MODE}" == "all" ]]; then
   echo "  ${KUBELET_LOG}"
-elif [[ "${START_MODE}" == "nokubelet" ]]; then
+elif [[ "${START_MODE}" == *"nokubelet"* ]]; then
   echo
   echo "No kubelet was started because you set START_MODE=nokubelet"
   echo "Run this script again with START_MODE=kubeletonly to run a kubelet"
@@ -1172,8 +1172,7 @@ if [[ "${START_MODE}" != "kubeletonly" ]]; then
   start_csi_snapshotter
 fi
 
-if [[ "${START_MODE}" != "nokubelet" ]]; then
-    install_cni_if_needed
+if [[ "${START_MODE}" != *"nokubelet"* ]]; then
   ## TODO remove this check if/when kubelet is supported on darwin
   # Detect the OS name/arch and display appropriate error.
     case "$(uname -s)" in
@@ -1182,6 +1181,7 @@ if [[ "${START_MODE}" != "nokubelet" ]]; then
         KUBELET_LOG=""
         ;;
       Linux)
+        install_cni_if_needed
         start_kubelet
         ;;
       *)
@@ -1191,7 +1191,7 @@ if [[ "${START_MODE}" != "nokubelet" ]]; then
 fi
 
 if [[ "${START_MODE}" != "kubeletonly" ]]; then
-  if [[ "${START_MODE}" != "nokubeproxy" ]]; then
+  if [[ "${START_MODE}" != *"nokubeproxy"* ]]; then
     ## TODO remove this check if/when kubelet is supported on darwin
     # Detect the OS name/arch and display appropriate error.
     case "$(uname -s)" in
