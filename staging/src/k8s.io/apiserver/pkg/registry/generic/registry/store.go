@@ -1445,6 +1445,11 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 				}
 			}
 		}
+
+		// TODO : Remove RegisterStorageCleanup below when PR
+		// https://github.com/kubernetes/kubernetes/pull/50690
+		// merges as that shuts down storage properly
+		RegisterStorageCleanup(e.DestroyFunc)
 	}
 
 	return nil
@@ -1468,7 +1473,13 @@ func (e *Store) startObservingCount(period time.Duration, objectCountTracker flo
 			objectCountTracker.Set(resourceName, count)
 		}
 	}, period, resourceCountPollPeriodJitter, true, stopCh)
-	return func() { close(stopCh) }
+
+	var once sync.Once
+	return func() {
+		// we know that storage destroy funcs are called multiple times (due to reuse in subresources).
+		// Hence, we only destroy once.
+		once.Do(func() { close(stopCh) })
+	}
 }
 
 func (e *Store) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {

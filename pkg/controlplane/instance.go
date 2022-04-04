@@ -63,6 +63,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	apiserverfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/registry/generic/registry"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
@@ -262,10 +263,16 @@ func (c *Config) createLeaseReconciler() reconcilers.EndpointReconciler {
 	if err != nil {
 		klog.Fatalf("Error determining service IP ranges: %v", err)
 	}
-	leaseStorage, _, err := storagefactory.Create(*config, nil)
+	leaseStorage, destroyFunc, err := storagefactory.Create(*config, nil)
 	if err != nil {
 		klog.Fatalf("Error creating storage factory: %v", err)
 	}
+
+	// TODO : Remove RegisterStorageCleanup below when PR
+	// https://github.com/kubernetes/kubernetes/pull/50690
+	// merges as that shuts down storage properly
+	registry.RegisterStorageCleanup(destroyFunc)
+
 	masterLeases := reconcilers.NewLeases(leaseStorage, "/masterleases/", ttl)
 
 	return reconcilers.NewLeaseEndpointReconciler(endpointsAdapter, masterLeases)

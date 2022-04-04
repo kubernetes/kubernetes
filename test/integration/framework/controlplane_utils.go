@@ -39,6 +39,7 @@ import (
 	authorizerunion "k8s.io/apiserver/pkg/authorization/union"
 	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
 	genericfeatures "k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/registry/generic/registry"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/options"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
@@ -172,6 +173,11 @@ func startAPIServerOrDie(controlPlaneConfig *controlplane.Config, incomingServer
 		v.Set(strconv.Itoa(MinVerbosity))
 	}
 
+	// TODO : Remove TrackStorageCleanup below when PR
+	// https://github.com/kubernetes/kubernetes/pull/50690
+	// merges as that shuts down storage properly
+	registry.TrackStorageCleanup()
+
 	if incomingServer != nil {
 		s = incomingServer
 	} else {
@@ -187,6 +193,8 @@ func startAPIServerOrDie(controlPlaneConfig *controlplane.Config, incomingServer
 		}
 		close(stopCh)
 		s.Close()
+
+		registry.CleanupStorage()
 	}
 
 	if controlPlaneConfig == nil {

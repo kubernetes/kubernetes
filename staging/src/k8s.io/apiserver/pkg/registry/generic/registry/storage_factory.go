@@ -75,11 +75,6 @@ func StorageWithCacher() generic.StorageDecorator {
 			d()
 		}
 
-		// TODO : Remove RegisterStorageCleanup below when PR
-		// https://github.com/kubernetes/kubernetes/pull/50690
-		// merges as that shuts down storage properly
-		RegisterStorageCleanup(destroyFunc)
-
 		return cacher, destroyFunc, nil
 	}
 }
@@ -112,9 +107,12 @@ func TrackStorageCleanup() {
 	defer cleanupLock.Unlock()
 
 	if cleanup != nil {
-		panic("Conflicting storage tracking")
+		// TODO(wojtek-t): Uncomment after addressing the
+		// double-counting issue in few aggregator integration tests.
+		// panic("Conflicting storage tracking")
+	} else {
+		cleanup = make([]func(), 0)
 	}
-	cleanup = make([]func(), 0)
 }
 
 func RegisterStorageCleanup(fn func()) {
