@@ -27,6 +27,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/test/e2e/framework"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 )
@@ -116,6 +117,7 @@ func testPath(client clientset.Interface, path string, requiredChecks sets.Strin
 
 var _ = SIGDescribe("health handlers", func() {
 	f := framework.NewDefaultFramework("health")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.It("should contain necessary checks", func() {
 		ginkgo.By("/health")

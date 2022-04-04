@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/types"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -972,6 +973,7 @@ func hostPrecheck() (int, int) {
 // Serial because the test updates kubelet configuration.
 var _ = SIGDescribe("Topology Manager [Serial] [Feature:TopologyManager][NodeFeature:TopologyManager]", func() {
 	f := framework.NewDefaultFramework("topology-manager-test")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Context("With kubeconfig updated to static CPU Manager policy run the Topology Manager tests", func() {
 		runTopologyManagerTests(f)

@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"regexp"
 
@@ -61,6 +62,7 @@ var (
 // Serial because the test restarts Kubelet
 var _ = SIGDescribe("Device Plugin [Feature:DevicePluginProbe][NodeFeature:DevicePluginProbe][Serial]", func() {
 	f := framework.NewDefaultFramework("device-plugin-errors")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	testDevicePlugin(f, "/var/lib/kubelet/plugins_registry")
 })
 

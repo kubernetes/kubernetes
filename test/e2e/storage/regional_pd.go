@@ -48,6 +48,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 const (
@@ -60,6 +61,7 @@ const (
 
 var _ = utils.SIGDescribe("Regional PD", func() {
 	f := framework.NewDefaultFramework("regional-pd")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	// filled in BeforeEach
 	var c clientset.Interface

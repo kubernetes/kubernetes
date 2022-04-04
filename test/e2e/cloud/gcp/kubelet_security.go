@@ -27,12 +27,14 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 )
 
 var _ = SIGDescribe("Ports Security Check [Feature:KubeletSecurity]", func() {
 	f := framework.NewDefaultFramework("kubelet-security")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	var node *v1.Node
 	var nodeName string

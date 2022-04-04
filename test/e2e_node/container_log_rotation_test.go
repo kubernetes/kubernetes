@@ -25,6 +25,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubelogs "k8s.io/kubernetes/pkg/kubelet/logs"
 	"k8s.io/kubernetes/test/e2e/framework"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -40,6 +41,7 @@ const (
 
 var _ = SIGDescribe("ContainerLogRotation [Slow] [Serial] [Disruptive]", func() {
 	f := framework.NewDefaultFramework("container-log-rotation-test")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("when a container generates a lot of log", func() {
 		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
 			initialConfig.ContainerLogMaxFiles = testContainerLogMaxFiles

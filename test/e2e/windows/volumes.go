@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 )
@@ -42,6 +43,7 @@ var (
 
 var _ = SIGDescribe("[Feature:Windows] Windows volume mounts ", func() {
 	f := framework.NewDefaultFramework("windows-volumes")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var (
 		emptyDirSource = v1.VolumeSource{
 			EmptyDir: &v1.EmptyDirVolumeSource{
