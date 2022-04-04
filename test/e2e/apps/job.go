@@ -440,7 +440,16 @@ var _ = SIGDescribe("Job", func() {
 		framework.ExpectEqual(successes, largeCompletions, "expected %d successful job pods, but got  %d", largeCompletions, successes)
 	})
 
-	ginkgo.It("should apply changes to a job status", func() {
+	/*
+		Release: v1.24
+		Testname: Jobs, apply changes to status
+		Description: Attempt to create a running Job which MUST succeed.
+		Attempt to patch the Job status to include a new start time which
+		MUST succeed. An annotation for the job that was patched MUST be found.
+		Attempt to replace the job status with a new start time which MUST
+		succeed. Attempt to read its status sub-resource which MUST succeed
+	*/
+	framework.ConformanceIt("should apply changes to a job status", func() {
 
 		ns := f.Namespace.Name
 		jClient := f.ClientSet.BatchV1().Jobs(ns)

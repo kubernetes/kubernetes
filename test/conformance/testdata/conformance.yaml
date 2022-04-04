@@ -763,6 +763,15 @@
     pod. Modify the labels of one of the Job's Pods. The Job MUST release the Pod.
   release: v1.16
   file: test/e2e/apps/job.go
+- testname: Jobs, apply changes to status
+  codename: '[sig-apps] Job should apply changes to a job status [Conformance]'
+  description: Attempt to create a running Job which MUST succeed. Attempt to patch
+    the Job status to include a new start time which MUST succeed. An annotation for
+    the job that was patched MUST be found. Attempt to replace the job status with
+    a new start time which MUST succeed. Attempt to read its status sub-resource which
+    MUST succeed
+  release: v1.24
+  file: test/e2e/apps/job.go
 - testname: Ensure Pods of an Indexed Job get a unique index.
   codename: '[sig-apps] Job should create pods for an Indexed job with completion
     indexes and specified hostname [Conformance]'
