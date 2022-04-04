@@ -143,6 +143,7 @@ var iptablesCleanupChains = []struct {
 	{utiliptables.TableNAT, KubeNodePortChain},
 	{utiliptables.TableNAT, KubeLoadBalancerChain},
 	{utiliptables.TableFilter, KubeForwardChain},
+	{utiliptables.TableFilter, KubeNodePortChain},
 }
 
 // ipsetInfo is all ipset we needed in ipvs proxier
