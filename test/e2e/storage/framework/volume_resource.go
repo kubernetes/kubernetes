@@ -121,6 +121,9 @@ func CreateVolumeResource(driver TestDriver, config *PerTestConfig, pattern Test
 					VolumeAttributes: attributes,
 				},
 			}
+			if pattern.FsType != "" {
+				r.VolSource.CSI.FSType = &pattern.FsType
+			}
 		}
 	default:
 		framework.Failf("VolumeResource doesn't support: %s", pattern.VolType)
