@@ -174,7 +174,7 @@ fi
 function stop-proxy()
 {
   [[ -n "${PROXY_PORT-}" ]] && kube::log::status "Stopping proxy on port ${PROXY_PORT}"
-  [[ -n "${PROXY_PID-}" ]] && kill "${PROXY_PID}" 1>&2 2>/dev/null
+  [[ -n "${PROXY_PID-}" ]] && kill -9 "${PROXY_PID}" 1>&2 2>/dev/null
   [[ -n "${PROXY_PORT_FILE-}" ]] && rm -f "${PROXY_PORT_FILE}"
   PROXY_PID=
   PROXY_PORT=
@@ -223,10 +223,10 @@ function start-proxy()
 
 function cleanup()
 {
-  [[ -n "${APISERVER_PID-}" ]] && kill "${APISERVER_PID}" 1>&2 2>/dev/null
-  [[ -n "${CTLRMGR_PID-}" ]] && kill "${CTLRMGR_PID}" 1>&2 2>/dev/null
-  [[ -n "${KUBELET_PID-}" ]] && kill "${KUBELET_PID}" 1>&2 2>/dev/null
   stop-proxy
+  [[ -n "${CTLRMGR_PID-}" ]] && kill -9 "${CTLRMGR_PID}" 1>&2 2>/dev/null
+  [[ -n "${KUBELET_PID-}" ]] && kill -9 "${KUBELET_PID}" 1>&2 2>/dev/null
+  [[ -n "${APISERVER_PID-}" ]] && kill -9 "${APISERVER_PID}" 1>&2 2>/dev/null
 
   kube::etcd::cleanup
   rm -rf "${KUBE_TEMP}"
