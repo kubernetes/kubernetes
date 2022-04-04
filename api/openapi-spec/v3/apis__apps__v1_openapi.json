@@ -987,8 +987,7 @@
           }
         },
         "required": [
-          "replicas",
-          "availableReplicas"
+          "replicas"
         ],
         "type": "object"
       },
