@@ -75,7 +75,9 @@ runTests() {
   kube::etcd::start_scraping
   kube::log::status "Running integration test cases"
 
-  make -C "${KUBE_ROOT}" test \
+  # Lower CPU priority by one compared to etcd and IO priority to
+  # "best-effort" with lowest priority.
+  nice -1 ionice -c 2 -n 7 make -C "${KUBE_ROOT}" test \
       WHAT="${WHAT:-$(kube::test::find_integration_test_dirs | paste -sd' ' -)}" \
       GOFLAGS="${GOFLAGS:-}" \
       KUBE_TEST_ARGS="--alsologtostderr=true ${SHORT:--short=true} --vmodule=${KUBE_TEST_VMODULE} ${KUBE_TEST_ARGS:-}" \
