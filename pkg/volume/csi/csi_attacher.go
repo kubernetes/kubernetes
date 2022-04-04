@@ -302,6 +302,13 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 	if err != nil {
 		return err
 	}
+	if !stageUnstageSet {
+		// MountDevice and UnmountDevice should not be called in the first place
+		// for drivers that do not support Node Stage/Unstage because volumemanager
+		// should mark such drivers as non-deviceMountable
+		klog.Warningf(log("attacher.MountDevice STAGE_UNSTAGE_VOLUME capability not set. Skipping MountDevice..."))
+		return nil
+	}
 
 	// Get secrets and publish context required for mountDevice
 	nodeName := string(c.plugin.host.GetNodeName())
@@ -323,8 +330,6 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 		}
 	}
 
-	// Store volume metadata for UnmountDevice. Keep it around even if the
-	// driver does not support NodeStage, UnmountDevice still needs it.
 	if err = os.MkdirAll(deviceMountPath, 0750); err != nil {
 		return errors.New(log("attacher.MountDevice failed to create dir %#v:  %v", deviceMountPath, err))
 	}
@@ -352,12 +357,6 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 		errMsg := log("failed to save volume info data: %v", err)
 		klog.Error(errMsg)
 		return errors.New(errMsg)
-	}
-
-	if !stageUnstageSet {
-		klog.Infof(log("attacher.MountDevice STAGE_UNSTAGE_VOLUME capability not set. Skipping MountDevice..."))
-		// defer does *not* remove the metadata file and it's correct - UnmountDevice needs it there.
-		return nil
 	}
 
 	//TODO (vladimirvivien) implement better AccessModes mapping between k8s and CSI
@@ -611,12 +610,10 @@ func (c *csiAttacher) UnmountDevice(deviceMountPath string) error {
 		return errors.New(log("attacher.UnmountDevice failed to check whether STAGE_UNSTAGE_VOLUME set: %v", err))
 	}
 	if !stageUnstageSet {
-		klog.Infof(log("attacher.UnmountDevice STAGE_UNSTAGE_VOLUME capability not set. Skipping UnmountDevice..."))
-		// Just	delete the global directory + json file
-		if err := removeMountDir(c.plugin, deviceMountPath); err != nil {
-			return errors.New(log("failed to clean up global mount %s: %s", dataDir, err))
-		}
-
+		// MountDevice and UnmountDevice should not be called in the first place
+		// for drivers that do not support Node Stage/Unstage because volumemanager
+		// should mark such drivers as non-deviceMountable
+		klog.Warningf(log("attacher.UnmountDevice STAGE_UNSTAGE_VOLUME capability not set. Skipping UnmountDevice..."))
 		return nil
 	}
 

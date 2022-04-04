@@ -1608,13 +1608,16 @@ func TestAttacherUnmountDevice(t *testing.T) {
 			jsonFile:        `{"driverName": "csi", "volumeHandle":"project/zone/test-vol1"}`,
 			stageUnstageSet: true,
 		},
-		{
-			testName:        "stage_unstage not set, PV agnostic path, unmount device is skipped",
-			deviceMountPath: "plugins/csi/" + generateSha("project/zone/test-vol1") + "/globalmount",
-			jsonFile:        `{"driverName":"test-driver","volumeHandle":"test-vol1"}`,
-			stageUnstageSet: false,
-		},
 		// PV agnostic path negative test cases
+		{
+			testName:        "stage_unstage not set, json file doesn't exist, PV agnostic path, unmount device is skipped",
+			deviceMountPath: "plugins/csi/" + generateSha("project/zone/test-vol1") + "/globalmount",
+			jsonFile:        "",
+			// if stageUnstageSet is false, UnmountDevice should not be called in the
+			// first place, so shouldFail is true
+			stageUnstageSet: false,
+			shouldFail:      true,
+		},
 		{
 			testName:        "fail: missing json, fail to retrieve driver and volumeID from globalpath",
 			volID:           "project/zone/test-vol1",
@@ -1648,13 +1651,16 @@ func TestAttacherUnmountDevice(t *testing.T) {
 			stageUnstageSet: true,
 			createPV:        true,
 		},
-		{
-			testName:        "stage_unstage not set, PV based path, unmount device is skipped",
-			deviceMountPath: "plugins/csi/pv/test-pv-name/globalmount",
-			jsonFile:        `{"driverName":"test-driver","volumeHandle":"test-vol1"}`,
-			stageUnstageSet: false,
-		},
 		// Old style PV based path negative test cases
+		{
+			testName:        "stage_unstage not set, json file doesn't exist, PV based path, unmount device is skipped",
+			deviceMountPath: "plugins/csi/pv/test-pv-name/globalmount",
+			jsonFile:        "",
+			// if stageUnstageSet is false, UnmountDevice should not be called in the
+			// first place, so shouldFail is true
+			stageUnstageSet: false,
+			shouldFail:      true,
+		},
 		{
 			testName:        "fail: json file doesn't exist, old style pv based device path, missing PV",
 			volID:           "project/zone/test-vol1",
