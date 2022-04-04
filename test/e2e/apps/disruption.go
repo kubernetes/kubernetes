@@ -76,6 +76,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 
 	ginkgo.Context("Listing PodDisruptionBudgets for all namespaces", func() {
 		anotherFramework := framework.NewDefaultFramework("disruption-2")
+		anotherFramework.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 		/*
 		   Release : v1.21

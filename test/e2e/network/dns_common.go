@@ -36,6 +36,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	dnsclient "k8s.io/kubernetes/third_party/forked/golang/net"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -59,8 +60,10 @@ type dnsTestCommon struct {
 }
 
 func newDNSTestCommon() dnsTestCommon {
+	framework := framework.NewDefaultFramework("dns-config-map")
+	framework.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	return dnsTestCommon{
-		f:  framework.NewDefaultFramework("dns-config-map"),
+		f:  framework,
 		ns: "kube-system",
 	}
 }

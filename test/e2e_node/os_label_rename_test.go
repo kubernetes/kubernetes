@@ -34,10 +34,12 @@ import (
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/kubernetes/test/e2e/framework"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 var _ = SIGDescribe("OSArchLabelReconciliation [Serial] [Slow] [Disruptive]", func() {
 	f := framework.NewDefaultFramework("node-label-reconciliation")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("Kubelet", func() {
 		ginkgo.It("should reconcile the OS and Arch labels when restarted", func() {
 			node := getLocalNode(f)

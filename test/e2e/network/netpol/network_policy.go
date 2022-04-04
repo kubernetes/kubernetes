@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/network/common"
+	admissionapi "k8s.io/pod-security-admission/api"
 	utilnet "k8s.io/utils/net"
 )
 
@@ -116,6 +117,7 @@ and what is happening in practice:
 
 var _ = common.SIGDescribe("Netpol", func() {
 	f := framework.NewDefaultFramework("netpol")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var model *Model
 
 	ginkgo.Context("NetworkPolicy between server and client", func() {
@@ -1254,6 +1256,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 
 var _ = common.SIGDescribe("Netpol [LinuxOnly]", func() {
 	f := framework.NewDefaultFramework("udp-network-policy")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var model *Model
 	ginkgo.BeforeEach(func() {
 		// Windows does not support UDP testing via agnhost.
@@ -1339,6 +1342,7 @@ var _ = common.SIGDescribe("Netpol [LinuxOnly]", func() {
 
 var _ = common.SIGDescribe("Netpol [Feature:SCTPConnectivity][LinuxOnly][Disruptive]", func() {
 	f := framework.NewDefaultFramework("sctp-network-policy")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var model *Model
 	ginkgo.BeforeEach(func() {
 		// Windows does not support network policies.

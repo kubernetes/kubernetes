@@ -214,6 +214,7 @@ func newTestingCronJob(name string, value string) *batchv1.CronJob {
 
 var _ = SIGDescribe("Generated clientset", func() {
 	f := framework.NewDefaultFramework("clientset")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.It("should create v1 cronJobs, delete cronJobs, watch cronJobs", func() {
 		cronJobClient := f.ClientSet.BatchV1().CronJobs(f.Namespace.Name)

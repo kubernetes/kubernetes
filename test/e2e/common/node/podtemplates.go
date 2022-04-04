@@ -31,6 +31,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 )
@@ -42,6 +43,7 @@ const (
 
 var _ = SIGDescribe("PodTemplates", func() {
 	f := framework.NewDefaultFramework("podtemplate")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	/*
 	   Release: v1.19
 	   Testname: PodTemplate lifecycle

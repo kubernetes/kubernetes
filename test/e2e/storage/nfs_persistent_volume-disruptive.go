@@ -39,6 +39,7 @@ import (
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 type testBody func(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod)
@@ -77,6 +78,7 @@ func checkForControllerManagerHealthy(duration time.Duration) error {
 var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 
 	f := framework.NewDefaultFramework("disruptive-pv")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var (
 		c                           clientset.Interface
 		ns                          string
