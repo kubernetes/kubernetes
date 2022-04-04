@@ -89,7 +89,7 @@ type NoExecuteTaintManager struct {
 
 	taintEvictionQueue *TimedWorkerQueue
 	// keeps a map from nodeName to all noExecute taints on that Node
-	taintedNodesLock sync.Mutex
+	taintedNodesLock sync.RWMutex
 	taintedNodes     map[string][]v1.Taint
 
 	nodeUpdateChannels []chan nodeUpdateItem
@@ -403,12 +403,8 @@ func (tc *NoExecuteTaintManager) handlePodUpdate(ctx context.Context, podUpdate 
 	if nodeName == "" {
 		return
 	}
-	taints, ok := func() ([]v1.Taint, bool) {
-		tc.taintedNodesLock.Lock()
-		defer tc.taintedNodesLock.Unlock()
-		taints, ok := tc.taintedNodes[nodeName]
-		return taints, ok
-	}()
+
+	taints, ok := tc.nodeTaints(nodeName)
 	// It's possible that Node was deleted, or Taints were removed before, which triggered
 	// eviction cancelling if it was needed.
 	if !ok {
@@ -423,9 +419,7 @@ func (tc *NoExecuteTaintManager) handleNodeUpdate(ctx context.Context, nodeUpdat
 		if apierrors.IsNotFound(err) {
 			// Delete
 			klog.V(4).InfoS("Noticed node deletion", "node", nodeUpdate.nodeName)
-			tc.taintedNodesLock.Lock()
-			defer tc.taintedNodesLock.Unlock()
-			delete(tc.taintedNodes, nodeUpdate.nodeName)
+			tc.deleteTaintNode(nodeUpdate.nodeName)
 			return
 		}
 		utilruntime.HandleError(fmt.Errorf("cannot get node %s: %v", nodeUpdate.nodeName, err))
@@ -435,16 +429,13 @@ func (tc *NoExecuteTaintManager) handleNodeUpdate(ctx context.Context, nodeUpdat
 	// Create or Update
 	klog.V(4).InfoS("Noticed node update", "node", nodeUpdate)
 	taints := getNoExecuteTaints(node.Spec.Taints)
-	func() {
-		tc.taintedNodesLock.Lock()
-		defer tc.taintedNodesLock.Unlock()
-		klog.V(4).InfoS("Updating known taints on node", "node", node.Name, "taints", taints)
-		if len(taints) == 0 {
-			delete(tc.taintedNodes, node.Name)
-		} else {
-			tc.taintedNodes[node.Name] = taints
-		}
-	}()
+
+	klog.V(4).InfoS("Updating known taints on node", "node", node.Name, "taints", taints)
+	if len(taints) == 0 {
+		tc.deleteTaintNode(node.Name)
+	} else {
+		tc.addTaintNode(node.Name, taints)
+	}
 
 	// This is critical that we update tc.taintedNodes before we call getPodsAssignedToNode:
 	// getPodsAssignedToNode can be delayed as long as all future updates to pods will call
@@ -495,4 +486,26 @@ func (tc *NoExecuteTaintManager) emitCancelPodDeletionEvent(nsName types.Namespa
 		Namespace: nsName.Namespace,
 	}
 	tc.recorder.Eventf(ref, v1.EventTypeNormal, "TaintManagerEviction", "Cancelling deletion of Pod %s", nsName.String())
+}
+
+func (tc *NoExecuteTaintManager) addTaintNode(nodeName string, taints []v1.Taint) {
+	tc.taintedNodesLock.Lock()
+	defer tc.taintedNodesLock.Unlock()
+
+	tc.taintedNodes[nodeName] = taints
+}
+
+func (tc *NoExecuteTaintManager) deleteTaintNode(nodeName string) {
+	tc.taintedNodesLock.Lock()
+	defer tc.taintedNodesLock.Unlock()
+
+	delete(tc.taintedNodes, nodeName)
+}
+
+func (tc *NoExecuteTaintManager) nodeTaints(nodeName string) ([]v1.Taint, bool) {
+	tc.taintedNodesLock.RLock()
+	defer tc.taintedNodesLock.RLocker().Unlock()
+
+	taints, ok := tc.taintedNodes[nodeName]
+	return taints, ok
 }

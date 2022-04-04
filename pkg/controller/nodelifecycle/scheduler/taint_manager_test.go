@@ -395,6 +395,8 @@ func TestCreateNode(t *testing.T) {
 
 func TestDeleteNode(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	fakeClientset := fake.NewSimpleClientset()
 	controller := NewNoExecuteTaintManager(ctx, fakeClientset, getPodFromClientset(fakeClientset), getNodeFromClientset(fakeClientset), getPodsAssignedToNode(fakeClientset))
 	controller.recorder = testutil.NewFakeRecorder()
@@ -405,12 +407,10 @@ func TestDeleteNode(t *testing.T) {
 	controller.NodeUpdated(testutil.NewNode("node1"), nil)
 	// wait a bit to see if nothing will panic
 	time.Sleep(timeForControllerToProgress)
-	controller.taintedNodesLock.Lock()
-	if _, ok := controller.taintedNodes["node1"]; ok {
+
+	if _, ok := controller.nodeTaints("node1"); ok {
 		t.Error("Node should have been deleted from taintedNodes list")
 	}
-	controller.taintedNodesLock.Unlock()
-	cancel()
 }
 
 func TestUpdateNode(t *testing.T) {
