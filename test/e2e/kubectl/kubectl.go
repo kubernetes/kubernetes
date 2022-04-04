@@ -1048,7 +1048,7 @@ metadata:
 			}
 		})
 
-		ginkgo.It("should create/apply an invalid/valid CR with arbitrary-extra properties for CRD with partially-specified validation schema", func() {
+		ginkgo.It("should create/apply a valid CR with arbitrary-extra properties for CRD with partially-specified validation schema", func() {
 			ginkgo.By("prepare CRD with partially-specified validation schema")
 			crd, err := crd.CreateTestCRD(f, func(crd *apiextensionsv1.CustomResourceDefinition) {
 				props := &apiextensionsv1.JSONSchemaProps{}
@@ -1073,15 +1073,6 @@ metadata:
 			framework.ExpectNotEqual(schema, nil, "retrieving a schema for the crd")
 
 			meta := fmt.Sprintf(metaPattern, crd.Crd.Spec.Names.Kind, crd.Crd.Spec.Group, crd.Crd.Spec.Versions[0].Name, "test-cr")
-
-			// XPreserveUnknownFields is defined on the root of the schema so unknown fields within the spec
-			// are still considered invalid
-			invalidArbitraryCR := fmt.Sprintf(`{%s,"spec":{"bars":[{"name":"test-bar"}],"extraProperty":"arbitrary-value"}}`, meta)
-			err = createApplyCustomResource(invalidArbitraryCR, f.Namespace.Name, "test-cr", crd)
-			framework.ExpectError(err, "creating custom resource")
-			if !strings.Contains(err.Error(), `unknown field "spec.extraProperty"`) {
-				framework.Failf("incorrect error from createApplyCustomResource: %v", err)
-			}
 
 			// unknown fields on the root are considered valid
 			validArbitraryCR := fmt.Sprintf(`{%s,"spec":{"bars":[{"name":"test-bar"}]},"extraProperty":"arbitrary-value"}`, meta)
