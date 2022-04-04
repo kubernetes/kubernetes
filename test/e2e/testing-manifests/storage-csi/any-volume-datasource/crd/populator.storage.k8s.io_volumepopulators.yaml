@@ -1,0 +1,57 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.5.0
+    api-approved.kubernetes.io: https://github.com/kubernetes/enhancements/pull/2934
+  creationTimestamp: null
+  name: volumepopulators.populator.storage.k8s.io
+spec:
+  group: populator.storage.k8s.io
+  names:
+    kind: VolumePopulator
+    listKind: VolumePopulatorList
+    plural: volumepopulators
+    singular: volumepopulator
+  scope: Cluster
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .sourceKind
+      name: SourceKind
+      type: string
+    name: v1beta1
+    schema:
+      openAPIV3Schema:
+        description: VolumePopulator represents the registration for a volume populator. VolumePopulators are cluster scoped.
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          sourceKind:
+            description: Kind of the data source this populator supports
+            properties:
+              group:
+                type: string
+              kind:
+                type: string
+            required:
+            - group
+            - kind
+            type: object
+        required:
+        - sourceKind
+        type: object
+    served: true
+    storage: true
+    subresources: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
