@@ -1332,7 +1332,7 @@ func (v *unstructuredSchemaCoercer) apply(u *unstructured.Unstructured) (unknown
 			if v.returnUnknownFieldPaths {
 				pruneOpts.ReturnPruned = true
 			}
-			unknownFieldPaths = structuralpruning.PruneWithOptions(u.Object, v.structuralSchemas[gv.Version], false, pruneOpts)
+			unknownFieldPaths = structuralpruning.PruneWithOptions(u.Object, v.structuralSchemas[gv.Version], true, pruneOpts)
 			structuraldefaulting.PruneNonNullableNullsWithoutDefaults(u.Object, v.structuralSchemas[gv.Version])
 		}
 
