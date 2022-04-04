@@ -194,11 +194,13 @@ func EtcdMain(tests func() int) {
 	stop() // Don't defer this. See os.Exit documentation.
 
 	checkNumberOfGoroutines := func() (bool, error) {
-		// Leave some room for goroutines we can not get rid of
-		// like k8s.io/klog/v2.(*loggingT).flushDaemon()
-		// TODO(#108483): Figure out if we can reduce this
-		//   further (ideally down to zero).
-		if dg := runtime.NumGoroutine() - before; dg <= 4 {
+		// We leave some room for leaked goroutines as there are
+		// still some leaks, mostly:
+		// - leak from lumberjack package we're vendoring
+		// - leak from apiserve healthz
+		// - leak from opencensus library
+		// Once fixed, we should be able to bring it down to zero.
+		if dg := runtime.NumGoroutine() - before; dg <= 3 {
 			return true, nil
 		}
 		// Allow goroutines to schedule and die off.
@@ -210,7 +212,9 @@ func EtcdMain(tests func() int) {
 	// But we keep the limit higher to account for cpu-starved environments.
 	if err := wait.Poll(100*time.Millisecond, 5*time.Second, checkNumberOfGoroutines); err != nil {
 		after := runtime.NumGoroutine()
-		klog.Fatalf("unexpected number of goroutines: before: %d after %d", before, after)
+		stacktraces := make([]byte, 1<<20)
+		runtime.Stack(stacktraces, true)
+		klog.Fatalf("unexpected number of goroutines: before: %d after %d\n%sd", before, after, string(stacktraces))
 	}
 	os.Exit(result)
 }
