@@ -424,3 +424,12 @@
 - endpoint: logFileListHandler
   reason: optional feature
   link: https://github.com/kubernetes/kubernetes/issues/108675
+- endpoint: readNetworkingV1NamespacedNetworkPolicyStatus
+  reason: endpoints is currently feature gated and and will only receive e2e & conformance test in 1.25
+  link: https://github.com/kubernetes/kubernetes/pull/107963
+- endpoint: patchNetworkingV1NamespacedNetworkPolicyStatus
+  reason: endpoints is currently feature gated and and will only receive e2e & conformance test in 1.25
+  link: https://github.com/kubernetes/kubernetes/pull/107963
+- endpoint: replaceNetworkingV1NamespacedNetworkPolicyStatus
+  reason: endpoints is currently feature gated and and will only receive e2e & conformance test in 1.25
+  link: https://github.com/kubernetes/kubernetes/pull/107963
