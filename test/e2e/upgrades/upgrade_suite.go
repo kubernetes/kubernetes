@@ -31,6 +31,7 @@ import (
 	e2eginkgowrapper "k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/utils/junit"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 )
@@ -101,7 +102,9 @@ func CreateUpgradeFrameworks(tests []Test) map[string]*framework.Framework {
 	for _, t := range tests {
 		ns := nsFilter.ReplaceAllString(t.Name(), "-") // and replace with a single hyphen
 		ns = strings.Trim(ns, "-")
-		testFrameworks[t.Name()] = framework.NewDefaultFramework(ns)
+		f := framework.NewDefaultFramework(ns)
+		f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+		testFrameworks[t.Name()] = f
 	}
 	return testFrameworks
 }

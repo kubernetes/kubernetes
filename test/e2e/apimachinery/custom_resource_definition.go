@@ -39,11 +39,13 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/test/e2e/framework"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin]", func() {
 
 	f := framework.NewDefaultFramework("custom-resource-definition")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Context("Simple CustomResourceDefinition", func() {
 		/*

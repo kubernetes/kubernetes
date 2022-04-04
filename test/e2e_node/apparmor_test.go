@@ -40,6 +40,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/onsi/ginkgo"
@@ -54,6 +55,7 @@ var _ = SIGDescribe("AppArmor [Feature:AppArmor][NodeFeature:AppArmor]", func() 
 		})
 		ginkgo.Context("when running with AppArmor", func() {
 			f := framework.NewDefaultFramework("apparmor-test")
+			f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 			ginkgo.It("should reject an unloaded profile", func() {
 				status := runAppArmorTest(f, false, v1.AppArmorBetaProfileNamePrefix+"non-existent-profile")
@@ -84,6 +86,7 @@ var _ = SIGDescribe("AppArmor [Feature:AppArmor][NodeFeature:AppArmor]", func() 
 	} else {
 		ginkgo.Context("when running without AppArmor", func() {
 			f := framework.NewDefaultFramework("apparmor-test")
+			f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 			ginkgo.It("should reject a pod with an AppArmor profile", func() {
 				status := runAppArmorTest(f, false, v1.AppArmorBetaProfileRuntimeDefault)

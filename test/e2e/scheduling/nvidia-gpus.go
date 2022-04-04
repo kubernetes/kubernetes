@@ -39,6 +39,7 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -221,6 +222,7 @@ func logContainers(f *framework.Framework, pod *v1.Pod) {
 
 var _ = SIGDescribe("[Feature:GPUDevicePlugin]", func() {
 	f := framework.NewDefaultFramework("device-plugin-gpus")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	ginkgo.It("run Nvidia GPU Device Plugin tests", func() {
 		testNvidiaGPUs(f)
 	})
@@ -322,6 +324,7 @@ var _ = SIGDescribe("GPUDevicePluginAcrossRecreate [Feature:Recreate]", func() {
 		e2eskipper.SkipUnlessProviderIs("gce", "gke")
 	})
 	f := framework.NewDefaultFramework("device-plugin-gpus-recreate")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	ginkgo.It("run Nvidia GPU Device Plugin tests with a recreation", func() {
 		testNvidiaGPUsJob(f)
 	})

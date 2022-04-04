@@ -33,6 +33,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 const (
@@ -84,6 +85,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [Excluded:WindowsDoc
 	})
 
 	f := framework.NewDefaultFramework("host-process-test-windows")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.It("should run as a process on the host/node", func() {
 

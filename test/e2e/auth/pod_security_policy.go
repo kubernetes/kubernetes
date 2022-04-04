@@ -36,6 +36,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 	utilpointer "k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo"
@@ -45,6 +46,7 @@ const nobodyUser = int64(65534)
 
 var _ = SIGDescribe("PodSecurityPolicy [Feature:PodSecurityPolicy]", func() {
 	f := framework.NewDefaultFramework("podsecuritypolicy")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	f.SkipPrivilegedPSPBinding = true
 
 	// Client that will impersonate the default service account, in order to run

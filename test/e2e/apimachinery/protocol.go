@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -35,6 +36,7 @@ import (
 var _ = SIGDescribe("client-go should negotiate", func() {
 	f := framework.NewDefaultFramework("protocol")
 	f.SkipNamespaceCreation = true
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	for _, s := range []string{
 		"application/json",

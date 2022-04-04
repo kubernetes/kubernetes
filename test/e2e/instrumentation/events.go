@@ -31,6 +31,7 @@ import (
 	typedeventsv1 "k8s.io/client-go/kubernetes/typed/events/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/instrumentation/common"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 	"k8s.io/apimachinery/pkg/types"
@@ -74,6 +75,7 @@ func eventExistsInList(client typedeventsv1.EventInterface, namespace, name stri
 
 var _ = common.SIGDescribe("Events API", func() {
 	f := framework.NewDefaultFramework("events")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var coreClient corev1.EventInterface
 	var client typedeventsv1.EventInterface
 	var clientAllNamespaces typedeventsv1.EventInterface

@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/utils/crd"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 )
@@ -33,6 +34,7 @@ import (
 var storageVersionServerVersion = utilversion.MustParseSemantic("v1.13.99")
 var _ = SIGDescribe("Discovery", func() {
 	f := framework.NewDefaultFramework("discovery")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	var namespaceName string
 

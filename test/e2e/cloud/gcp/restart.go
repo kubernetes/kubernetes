@@ -29,6 +29,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	testutils "k8s.io/kubernetes/test/utils"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 )
@@ -43,6 +44,7 @@ func nodeNames(nodes []v1.Node) []string {
 
 var _ = SIGDescribe("Restart [Disruptive]", func() {
 	f := framework.NewDefaultFramework("restart")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var ps *testutils.PodStore
 	var originalNodes []v1.Node
 	var originalPodNames []string
