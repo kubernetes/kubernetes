@@ -31,9 +31,9 @@ export KUBE_PANIC_WATCH_DECODE_ERROR
 
 KUBE_INTEGRATION_TEST_MAX_CONCURRENCY=${KUBE_INTEGRATION_TEST_MAX_CONCURRENCY:-"-1"}
 if [[ ${KUBE_INTEGRATION_TEST_MAX_CONCURRENCY} -gt 0 ]]; then
-  GOMAXPROCS=${KUBE_INTEGRATION_TEST_MAX_CONCURRENCY}
-  export GOMAXPROCS
-  kube::log::status "Setting parallelism to ${GOMAXPROCS}"
+  # GOMAXPROCS=${KUBE_INTEGRATION_TEST_MAX_CONCURRENCY}
+  # export GOMAXPROCS
+  kube::log::status "*Not* setting parallelism to ${KUBE_INTEGRATION_TEST_MAX_CONCURRENCY}"
 fi
 
 # Give integration tests longer to run by default.
