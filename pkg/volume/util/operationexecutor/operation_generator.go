@@ -1485,7 +1485,7 @@ func (og *operationGenerator) GenerateVerifyControllerAttachedVolumeFunc(
 		claimSize := actualStateOfWorld.GetClaimSize(volumeToMount.VolumeName)
 
 		// only fetch claimSize if it was not set previously
-		if volumeToMount.VolumeSpec.PersistentVolume != nil && claimSize == nil {
+		if volumeToMount.VolumeSpec.PersistentVolume != nil && claimSize == nil && !volumeToMount.VolumeSpec.InlineVolumeSpecForCSIMigration {
 			pv := volumeToMount.VolumeSpec.PersistentVolume
 			pvc, err := og.kubeClient.CoreV1().PersistentVolumeClaims(pv.Spec.ClaimRef.Namespace).Get(context.TODO(), pv.Spec.ClaimRef.Name, metav1.GetOptions{})
 			if err != nil {

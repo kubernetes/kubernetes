@@ -343,7 +343,7 @@ func (dswp *desiredStateOfWorldPopulator) checkVolumeFSResize(
 	volumeSpec *volume.Spec,
 	uniquePodName volumetypes.UniquePodName,
 	mountedVolumesForPod map[volumetypes.UniquePodName]map[string]cache.MountedVolume) {
-	if podVolume.PersistentVolumeClaim == nil {
+	if podVolume.PersistentVolumeClaim == nil || pvc == nil {
 		// Only PVC supports resize operation.
 		return
 	}
