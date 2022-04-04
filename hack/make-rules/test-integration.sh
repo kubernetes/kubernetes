@@ -55,6 +55,8 @@ kube::test::find_integration_test_dirs() {
   )
 }
 
+MODIFIED_GO_ROOT="$(pwd)/_goroot"
+
 CLEANUP_REQUIRED=
 cleanup() {
   if [[ -z "${CLEANUP_REQUIRED}" ]]; then
@@ -62,6 +64,7 @@ cleanup() {
   fi
   kube::log::status "Cleaning up etcd"
   kube::etcd::cleanup
+  rm -rf "${MODIFIED_GO_ROOT}"
   CLEANUP_REQUIRED=
   kube::log::status "Integration test cleanup complete"
 }
@@ -74,6 +77,26 @@ runTests() {
   local ETCD_SCRAPE_PID # Set in kube::etcd::start_scraping, used in cleanup
   kube::etcd::start_scraping
   kube::log::status "Running integration test cases"
+
+  # HACK: replace some binaries with wrapper scripts that lower
+  # CPU priority.
+  local goroot="$(go env GOROOT)"
+  cp -a "$goroot" "${MODIFIED_GO_ROOT}"
+  mkdir -p "${MODIFIED_GO_ROOT}/pkg/tool/linux_amd64/real"
+  for i in compile cgo link; do
+      local binary="${MODIFIED_GO_ROOT}/pkg/tool/linux_amd64/$i"
+      if [ -x "${binary}" ]; then
+          mv "${binary}" "${MODIFIED_GO_ROOT}/pkg/tool/linux_amd64/real"
+          cat >"${binary}" <<EOF
+#!/bin/sh
+
+exec nice -1 "${MODIFIED_GO_ROOT}/pkg/tool/linux_amd64/real/$i" "\$@"
+EOF
+      fi
+      chmod u+x "${binary}"
+  done
+  export GOROOT="${MODIFIED_GO_ROOT}"
+  export PATH="${MODIFIED_GO_ROOT}/bin:${PATH}"
 
   # Lower CPU priority by one compared to etcd and IO priority to
   # "best-effort" with lowest priority.
