@@ -916,6 +916,7 @@ func parseInstanceMetadata(str string) map[string]string {
 // tried to replace the GCE_SSH_PUBLIC_KEY_FILE_CONTENT placeholder.
 func ignitionInjectGCEPublicKey(path string, content string) string {
 	if os.Getenv("IGNITION_INJECT_GCE_SSH_PUBLIC_KEY_FILE") == "" {
+		klog.Infof("Leaving ignition file untouched")
 		return content
 	}
 
