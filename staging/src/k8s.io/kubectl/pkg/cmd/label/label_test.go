@@ -333,7 +333,7 @@ func TestLabelErrors(t *testing.T) {
 			ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
 			buf := bytes.NewBuffer([]byte{})
 			cmd := NewCmdLabel(tf, ioStreams)
-			cmd.SetOutput(buf)
+			cmd.SetOut(buf)
 
 			for k, v := range testCase.flags {
 				cmd.Flags().Set(k, v)
@@ -552,7 +552,7 @@ func TestLabelResourceVersion(t *testing.T) {
 
 	iostreams, _, bufOut, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdLabel(tf, iostreams)
-	cmd.SetOutput(bufOut)
+	cmd.SetOut(bufOut)
 	options := NewLabelOptions(iostreams)
 	options.resourceVersion = "10"
 	args := []string{"pods/foo", "a=b"}
