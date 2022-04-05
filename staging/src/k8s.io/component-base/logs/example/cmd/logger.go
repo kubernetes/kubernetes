@@ -58,7 +58,7 @@ func NewLoggerCommand() *cobra.Command {
 			}
 
 			// Initialize contextual logging.
-			logger := klog.Background().WithName("example").WithValues("foo", "bar")
+			logger := klog.LoggerWithValues(klog.LoggerWithName(klog.Background(), "example"), "foo", "bar")
 			ctx := klog.NewContext(context.Background(), logger)
 
 			runLogger(ctx)
