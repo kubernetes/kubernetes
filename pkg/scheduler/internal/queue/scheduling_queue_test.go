@@ -54,21 +54,21 @@ var (
 	TestEvent    = framework.ClusterEvent{Resource: "test"}
 	NodeAllEvent = framework.ClusterEvent{Resource: framework.Node, ActionType: framework.All}
 	EmptyEvent   = framework.ClusterEvent{}
-)
 
-var lowPriority, midPriority, highPriority = int32(0), int32(100), int32(1000)
-var mediumPriority = (lowPriority + highPriority) / 2
-var highPriorityPodInfo, highPriNominatedPodInfo, medPriorityPodInfo, unschedulablePodInfo = framework.NewPodInfo(&v1.Pod{
-	ObjectMeta: metav1.ObjectMeta{
-		Name:      "hpp",
-		Namespace: "ns1",
-		UID:       "hppns1",
-	},
-	Spec: v1.PodSpec{
-		Priority: &highPriority,
-	},
-}),
-	framework.NewPodInfo(&v1.Pod{
+	lowPriority, midPriority, highPriority = int32(0), int32(100), int32(1000)
+	mediumPriority                         = (lowPriority + highPriority) / 2
+
+	highPriorityPodInfo = framework.NewPodInfo(&v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "hpp",
+			Namespace: "ns1",
+			UID:       "hppns1",
+		},
+		Spec: v1.PodSpec{
+			Priority: &highPriority,
+		},
+	})
+	highPriNominatedPodInfo = framework.NewPodInfo(&v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "hpp",
 			Namespace: "ns1",
@@ -80,8 +80,8 @@ var highPriorityPodInfo, highPriNominatedPodInfo, medPriorityPodInfo, unschedula
 		Status: v1.PodStatus{
 			NominatedNodeName: "node1",
 		},
-	}),
-	framework.NewPodInfo(&v1.Pod{
+	})
+	medPriorityPodInfo = framework.NewPodInfo(&v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "mpp",
 			Namespace: "ns2",
@@ -96,8 +96,8 @@ var highPriorityPodInfo, highPriNominatedPodInfo, medPriorityPodInfo, unschedula
 		Status: v1.PodStatus{
 			NominatedNodeName: "node1",
 		},
-	}),
-	framework.NewPodInfo(&v1.Pod{
+	})
+	unschedulablePodInfo = framework.NewPodInfo(&v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "up",
 			Namespace: "ns1",
@@ -120,6 +120,24 @@ var highPriorityPodInfo, highPriNominatedPodInfo, medPriorityPodInfo, unschedula
 			NominatedNodeName: "node1",
 		},
 	})
+	nonExistentPodInfo = framework.NewPodInfo(&v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "ne",
+			Namespace: "ns1",
+			UID:       "nens1",
+		},
+	})
+	scheduledPodInfo = framework.NewPodInfo(&v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "sp",
+			Namespace: "ns1",
+			UID:       "spns1",
+		},
+		Spec: v1.PodSpec{
+			NodeName: "foo",
+		},
+	})
+)
 
 func getUnschedulablePod(p *PriorityQueue, pod *v1.Pod) *v1.Pod {
 	pInfo := p.unschedulableQ.get(pod)
@@ -735,7 +753,7 @@ func TestPriorityQueue_PendingPods(t *testing.T) {
 }
 
 func TestPriorityQueue_UpdateNominatedPodForNode(t *testing.T) {
-	objs := []runtime.Object{medPriorityPodInfo.Pod, unschedulablePodInfo.Pod, highPriorityPodInfo.Pod}
+	objs := []runtime.Object{medPriorityPodInfo.Pod, unschedulablePodInfo.Pod, highPriorityPodInfo.Pod, scheduledPodInfo.Pod}
 	q := NewTestQueueWithObjects(context.Background(), newDefaultQueueSort(), objs)
 	if err := q.Add(medPriorityPodInfo.Pod); err != nil {
 		t.Errorf("add failed: %v", err)
@@ -784,6 +802,21 @@ func TestPriorityQueue_UpdateNominatedPodForNode(t *testing.T) {
 	}
 	if diff := cmp.Diff(q.PodNominator, expectedNominatedPods, cmp.AllowUnexported(nominator{}), cmpopts.IgnoreFields(nominator{}, "podLister", "RWMutex")); diff != "" {
 		t.Errorf("Unexpected diff after updating pods (-want, +got):\n%s", diff)
+	}
+
+	// Attempt to nominate a pod that was deleted from the informer cache.
+	// Nothing should change.
+	q.AddNominatedPod(nonExistentPodInfo, "node1")
+	if diff := cmp.Diff(q.PodNominator, expectedNominatedPods, cmp.AllowUnexported(nominator{}), cmpopts.IgnoreFields(nominator{}, "podLister", "RWMutex")); diff != "" {
+		t.Errorf("Unexpected diff after nominating a deleted pod (-want, +got):\n%s", diff)
+	}
+	// Attempt to nominate a pod that was already scheduled in the informer cache.
+	// Nothing should change.
+	scheduledPodCopy := scheduledPodInfo.Pod.DeepCopy()
+	scheduledPodInfo.Pod.Spec.NodeName = ""
+	q.AddNominatedPod(framework.NewPodInfo(scheduledPodCopy), "node1")
+	if diff := cmp.Diff(q.PodNominator, expectedNominatedPods, cmp.AllowUnexported(nominator{}), cmpopts.IgnoreFields(nominator{}, "podLister", "RWMutex")); diff != "" {
+		t.Errorf("Unexpected diff after nominating a scheduled pod (-want, +got):\n%s", diff)
 	}
 
 	// Delete a nominated pod that doesn't have nominatedNodeName in the pod
