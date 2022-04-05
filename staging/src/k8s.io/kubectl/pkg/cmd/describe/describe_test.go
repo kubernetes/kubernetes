@@ -250,7 +250,7 @@ func TestDescribeHelpMessage(t *testing.T) {
 
 	cmd := NewCmdDescribe("kubectl", tf, streams)
 	cmd.SetArgs([]string{"-h"})
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
 	_, err := cmd.ExecuteC()
 
 	if err != nil {
