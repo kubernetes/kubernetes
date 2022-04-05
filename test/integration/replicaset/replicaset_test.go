@@ -422,7 +422,7 @@ func TestAdoption(t *testing.T) {
 		},
 	}
 	for i, tc := range testCases {
-		func() {
+		t.Run(tc.name, func(t *testing.T) {
 			s, closeFn, rm, informers, clientSet := rmSetup(t)
 			defer closeFn()
 			ns := framework.CreateTestingNamespace(fmt.Sprintf("rs-adoption-%d", i), s, t)
@@ -461,7 +461,7 @@ func TestAdoption(t *testing.T) {
 			}); err != nil {
 				t.Fatalf("test %q failed: %v", tc.name, err)
 			}
-		}()
+		})
 	}
 }
 
