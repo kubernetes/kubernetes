@@ -460,7 +460,7 @@ func (config *NetworkingTestConfig) DialFromNode(protocol, targetIP string, targ
 	eps := sets.NewString()
 
 	filterCmd := fmt.Sprintf("%s | grep -v '^\\s*$'", cmd)
-	framework.Logf("Going to poll %v on port %v at least %v times, with a maximum of %v tries before failing", targetIP, targetPort, minTries, maxTries)
+	framework.Logf("Going to poll %v on port %v at least %v times, with a maximum of %v tries before failing from hostnetwork pod with ip %s", targetIP, targetPort, minTries, maxTries, config.HostTestContainerPod.Status.PodIP)
 	for i := 0; i < maxTries; i++ {
 		stdout, stderr, err := config.f.ExecShellInPodWithFullOutput(config.HostTestContainerPod.Name, filterCmd)
 		if err != nil || len(stderr) > 0 {
