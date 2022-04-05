@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"strings"
@@ -301,6 +302,17 @@ func (m *cgroupManagerImpl) Destroy(cgroupConfig *CgroupConfig) error {
 
 	// Delete cgroups using libcontainers Managers Destroy() method
 	if err = manager.Destroy(); err != nil {
+		for _, ss := range []string{"rdma", ""} {
+			path := manager.Path(ss)
+			pids, pErr := libcontainercgroups.GetAllPids(path)
+			dir, dErr := exec.Command("ls", "-lR", path).CombinedOutput()
+			head, hErr := exec.Command("sh", "-c", "cd "+path+"; head tasks cgroup.procs */tasks */cgroup.procs").CombinedOutput()
+			klog.InfoS("KKK subsystem info", "name", ss, "path", path,
+				"pids", pids, "pErr", pErr,
+				"ls-lR", dir, "dErr", dErr,
+				"head", head, "oErr", hErr,
+			)
+		}
 		return fmt.Errorf("unable to destroy cgroup paths for cgroup %v : %v", cgroupConfig.Name, err)
 	}
 

@@ -189,7 +189,7 @@ func (m *podContainerManagerImpl) Destroy(podCgroup CgroupName) error {
 		ResourceParameters: &ResourceConfig{},
 	}
 	if err := m.cgroupManager.Destroy(containerConfig); err != nil {
-		klog.InfoS("Failed to delete cgroup paths", "cgroupName", podCgroup, "err", err)
+		klog.InfoS("Failed to delete cgroup paths", "cgroupName", podCgroup, "err", err, "pids", m.cgroupManager.Pids(podCgroup))
 		return fmt.Errorf("failed to delete cgroup paths for %v : %v", podCgroup, err)
 	}
 	return nil
