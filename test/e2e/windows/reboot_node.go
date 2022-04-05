@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 var _ = SIGDescribe("[Feature:Windows] [Excluded:WindowsDocker] [MinimumKubeletVersion:1.22] RebootHost containers [Serial] [Disruptive] [Slow]", func() {
@@ -37,6 +38,7 @@ var _ = SIGDescribe("[Feature:Windows] [Excluded:WindowsDocker] [MinimumKubeletV
 	})
 
 	f := framework.NewDefaultFramework("reboot-host-test-windows")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.It("should run as a reboot process on the host/node", func() {
 

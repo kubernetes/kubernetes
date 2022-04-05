@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -43,6 +44,7 @@ var (
 
 var _ = SIGDescribe("Hybrid cluster network", func() {
 	f := framework.NewDefaultFramework("hybrid-network")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func() {
 		e2eskipper.SkipUnlessNodeOSDistroIs("windows")

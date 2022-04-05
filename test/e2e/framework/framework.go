@@ -534,8 +534,7 @@ func (f *Framework) CreateNamespace(baseName string, labels map[string]string) (
 		labels = labelsCopy
 	}
 
-	// TODO(sur): set to restricted before 1.24 test freeze
-	enforceLevel := admissionapi.LevelPrivileged
+	enforceLevel := admissionapi.LevelRestricted
 	if f.NamespacePodSecurityEnforceLevel != "" {
 		enforceLevel = f.NamespacePodSecurityEnforceLevel
 	}

@@ -32,6 +32,7 @@ import (
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 // verifyGCEDiskAttached performs a sanity check to verify the PD attached to the node
@@ -74,6 +75,7 @@ var _ = utils.SIGDescribe("PersistentVolumes GCEPD [Feature:StorageProvider]", f
 	)
 
 	f := framework.NewDefaultFramework("pv")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	ginkgo.BeforeEach(func() {
 		c = f.ClientSet
 		ns = f.Namespace.Name

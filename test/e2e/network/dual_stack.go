@@ -38,12 +38,14 @@ import (
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	"k8s.io/kubernetes/test/e2e/network/common"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 	netutils "k8s.io/utils/net"
 )
 
 // Tests for ipv4-ipv6 dual-stack feature
 var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 	f := framework.NewDefaultFramework("dualstack")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	var cs clientset.Interface
 	var podClient *framework.PodClient

@@ -31,6 +31,7 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	"k8s.io/mount-utils"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 )
@@ -96,6 +97,7 @@ func runOneQuotaTest(f *framework.Framework, quotasRequested bool) {
 // file; if du is used to monitor, it will not detect this.
 var _ = SIGDescribe("LocalStorageCapacityIsolationQuotaMonitoring [Slow] [Serial] [Disruptive] [Feature:LocalStorageCapacityIsolationQuota][NodeFeature:LSCIQuotaMonitoring]", func() {
 	f := framework.NewDefaultFramework("localstorage-quota-monitoring-test")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	runOneQuotaTest(f, true)
 	runOneQuotaTest(f, false)
 })

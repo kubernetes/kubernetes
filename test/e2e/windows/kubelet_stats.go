@@ -31,12 +31,14 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 )
 
 var _ = SIGDescribe("[Feature:Windows] Kubelet-Stats [Serial]", func() {
 	f := framework.NewDefaultFramework("kubelet-stats-test-windows-serial")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Describe("Kubelet stats collection for Windows nodes", func() {
 
@@ -112,6 +114,7 @@ var _ = SIGDescribe("[Feature:Windows] Kubelet-Stats [Serial]", func() {
 })
 var _ = SIGDescribe("[Feature:Windows] Kubelet-Stats", func() {
 	f := framework.NewDefaultFramework("kubelet-stats-test-windows")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Describe("Kubelet stats collection for Windows nodes", func() {
 

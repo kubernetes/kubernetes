@@ -35,6 +35,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/test/e2e/framework"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 func shouldCheckRemainingItem() bool {
@@ -45,6 +46,7 @@ const numberOfTotalResources = 400
 
 var _ = SIGDescribe("Servers with support for API chunking", func() {
 	f := framework.NewDefaultFramework("chunking")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func() {
 		ns := f.Namespace.Name
