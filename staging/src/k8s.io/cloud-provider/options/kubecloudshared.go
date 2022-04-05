@@ -29,7 +29,7 @@ type KubeCloudSharedOptions struct {
 }
 
 // NewKubeCloudSharedOptions returns common/default configuration values for both
-// the kube-controller-manager and the cloud-contoller-manager. Any common changes should
+// the kube-controller-manager and the cloud-controller-manager. Any common changes should
 // be made here. Any individual changes should be made in that controller.
 func NewKubeCloudSharedOptions(cfg *cpconfig.KubeCloudSharedConfiguration) *KubeCloudSharedOptions {
 	o := &KubeCloudSharedOptions{
