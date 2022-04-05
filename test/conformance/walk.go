@@ -108,10 +108,9 @@ func main() {
 			testInfo := getTestInfo(spec)
 			if testInfo != nil {
 				testInfos = append(testInfos, testInfo)
-			}
-
-			if err := validateTestName(testInfo.CodeName); err != nil {
-				log.Fatal(err)
+				if err := validateTestName(testInfo.CodeName); err != nil {
+					log.Fatal(err)
+				}
 			}
 		}
 	}
