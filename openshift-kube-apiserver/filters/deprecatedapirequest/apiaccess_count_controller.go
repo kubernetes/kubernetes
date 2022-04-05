@@ -2,6 +2,7 @@ package deprecatedapirequest
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
 	"strings"
 	"sync"
@@ -14,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/openshift-kube-apiserver/admission/customresourcevalidation/apirequestcount"
 	"k8s.io/kubernetes/openshift-kube-apiserver/filters/deprecatedapirequest/v1helpers"
 )
 
@@ -128,7 +130,12 @@ func (c *controller) persistRequestCountForAllResources(ctx context.Context, cur
 			return
 		}
 		for _, arc := range arcs.Items {
-			countsToPersist.Resource(apiNameToResource(arc.Name))
+			gvr, err := apirequestcount.NameToResource(arc.Name)
+			if err != nil {
+				runtime.HandleError(fmt.Errorf("invalid APIRequestCount %s (added manually) should be deleted: %v", arc.Name, err))
+				continue
+			}
+			countsToPersist.Resource(gvr)
 		}
 	})
 
@@ -207,13 +214,4 @@ func resourceToAPIName(resource schema.GroupVersionResource) string {
 		apiName += "." + resource.Group
 	}
 	return apiName
-}
-
-func apiNameToResource(name string) schema.GroupVersionResource {
-	segments := strings.SplitN(name, ".", 3)
-	result := schema.GroupVersionResource{Resource: segments[0], Version: segments[1]}
-	if len(segments) > 2 {
-		result.Group = segments[2]
-	}
-	return result
 }
