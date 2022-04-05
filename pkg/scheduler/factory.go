@@ -132,7 +132,7 @@ func (c *Configurator) create() (*Scheduler, error) {
 	}
 
 	// The nominator will be passed all the way to framework instantiation.
-	nominator := internalqueue.NewPodNominator()
+	nominator := internalqueue.NewSafePodNominator(c.informerFactory.Core().V1().Pods().Lister())
 	// It's a "cluster event" -> "plugin names" map.
 	clusterEventMap := make(map[framework.ClusterEvent]sets.String)
 	profiles, err := profile.NewMap(c.profiles, c.registry, c.recorderFactory,
