@@ -5,6 +5,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/admission"
 
+	apiv1 "github.com/openshift/api/apiserver/v1"
 	authorizationv1 "github.com/openshift/api/authorization/v1"
 	configv1 "github.com/openshift/api/config/v1"
 	operatorv1 "github.com/openshift/api/operator/v1"
@@ -52,4 +53,5 @@ func init() {
 	utilruntime.Must(quotav1.Install(supportedObjectsScheme))
 	utilruntime.Must(securityv1.Install(supportedObjectsScheme))
 	utilruntime.Must(authorizationv1.Install(supportedObjectsScheme))
+	utilruntime.Must(apiv1.Install(supportedObjectsScheme))
 }

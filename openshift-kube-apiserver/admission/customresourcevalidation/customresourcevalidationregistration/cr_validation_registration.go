@@ -2,6 +2,7 @@ package customresourcevalidationregistration
 
 import (
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/kubernetes/openshift-kube-apiserver/admission/customresourcevalidation/apirequestcount"
 
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/customresourcevalidation/apiserver"
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/customresourcevalidation/authentication"
@@ -36,6 +37,7 @@ var AllCustomResourceValidators = []string{
 	securitycontextconstraints.PluginName,
 	rolebindingrestriction.PluginName,
 	network.PluginName,
+	apirequestcount.PluginName,
 
 	// the kubecontrollermanager operator resource has to exist in order to run deployments to deploy admission webhooks.
 	kubecontrollermanager.PluginName,
@@ -66,6 +68,8 @@ func RegisterCustomResourceValidation(plugins *admission.Plugins) {
 	rolebindingrestriction.Register(plugins)
 	// This plugin validates the network.config.openshift.io object for service node port range changes
 	network.Register(plugins)
+	// This plugin validates the apiserver.openshift.io/v1 APIRequestCount resources.
+	apirequestcount.Register(plugins)
 	// this one is special because we don't work without it.
 	securitycontextconstraints.RegisterDefaulting(plugins)
 }
