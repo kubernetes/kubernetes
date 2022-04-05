@@ -92,9 +92,7 @@ type APIGroupInfo struct {
 func (a *APIGroupInfo) destroyStorage() {
 	for _, stores := range a.VersionedResourcesStorageMap {
 		for _, store := range stores {
-			// TODO(wojtek-t): Uncomment once all storage support it.
-			klog.Errorf("Destroying storage: %v", store)
-			// store.Destroy()
+			store.Destroy()
 		}
 	}
 }
