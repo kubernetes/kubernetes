@@ -48,6 +48,11 @@ func NewStorage(s rest.StandardStorage, authorizer authorizer.Authorizer, ruleRe
 	return &Storage{s, authorizer, ruleResolver}
 }
 
+// Destroy cleans up resources on shutdown.
+func (r *Storage) Destroy() {
+	// FIXME: Do we have to anything to destroy here?
+}
+
 func (r *Storage) NamespaceScoped() bool {
 	return true
 }
