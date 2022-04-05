@@ -1372,7 +1372,7 @@
   file: test/e2e/common/network/networking.go
 - testname: Networking, intra pod http, from node
   codename: '[sig-network] Networking Granular Checks: Pods should function for node-pod
-    communication: http [NodeConformance] [Conformance]'
+    communication: http [LinuxOnly] [NodeConformance] [Conformance]'
   description: Create a hostexec pod that is capable of curl to netcat commands. Create
     a test Pod that will act as a webserver front end exposing ports 8080 for tcp
     and 8081 for udp. The netserver service proxies are created on specified number
@@ -1380,12 +1380,13 @@
     the each of service proxy endpoints in the cluster using a http post(protocol=tcp)  and
     the request MUST be successful. Container will execute curl command to reach the
     service port within specified max retry limit and MUST result in reporting unique
-    hostnames.
+    hostnames. This test is marked LinuxOnly it breaks when using Overlay networking
+    with Windows.
   release: v1.9
   file: test/e2e/common/network/networking.go
 - testname: Networking, intra pod http, from node
   codename: '[sig-network] Networking Granular Checks: Pods should function for node-pod
-    communication: udp [NodeConformance] [Conformance]'
+    communication: udp [LinuxOnly] [NodeConformance] [Conformance]'
   description: Create a hostexec pod that is capable of curl to netcat commands. Create
     a test Pod that will act as a webserver front end exposing ports 8080 for tcp
     and 8081 for udp. The netserver service proxies are created on specified number
@@ -1393,7 +1394,8 @@
     the each of service proxy endpoints in the cluster using a http post(protocol=udp)  and
     the request MUST be successful. Container will execute curl command to reach the
     service port within specified max retry limit and MUST result in reporting unique
-    hostnames.
+    hostnames. This test is marked LinuxOnly it breaks when using Overlay networking
+    with Windows.
   release: v1.9
   file: test/e2e/common/network/networking.go
 - testname: Proxy, validate Proxy responses
