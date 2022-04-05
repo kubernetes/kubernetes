@@ -4,7 +4,6 @@ import (
 	"net/http"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
-
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kubernetes/openshift-kube-apiserver/filters/deprecatedapirequest"
 )
@@ -14,7 +13,7 @@ func WithDeprecatedApiRequestLogging(handler http.Handler, controller deprecated
 	handlerFunc := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		defer handler.ServeHTTP(w, req)
 		info, ok := request.RequestInfoFrom(req.Context())
-		if !ok {
+		if !ok || !info.IsResourceRequest {
 			return
 		}
 		timestamp, ok := request.ReceivedTimestampFrom(req.Context())
