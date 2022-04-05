@@ -5810,7 +5810,7 @@ func TestNoEndpointsMetric(t *testing.T) {
 
 	internalTrafficPolicyLocal := v1.ServiceInternalTrafficPolicyLocal
 	externalTrafficPolicyLocal := v1.ServiceExternalTrafficPolicyTypeLocal
-	metrics.RegisterMetrics()
+	setupMetrics()
 
 	testCases := []struct {
 		name                                                string
@@ -5959,4 +5959,9 @@ func TestNoEndpointsMetric(t *testing.T) {
 			t.Errorf("sync_proxy_rules_no_endpoints_total metric mismatch(external): got=%d, expected %d", int(syncProxyRulesNoLocalEndpointsTotalExternal), tc.expectedSyncProxyRulesNoLocalEndpointsTotalExternal)
 		}
 	}
+}
+
+func setupMetrics() {
+	metrics.RegisterMetrics()
+	metrics.SyncProxyRulesNoLocalEndpointsTotal.Reset()
 }

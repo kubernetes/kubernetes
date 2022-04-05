@@ -1376,7 +1376,7 @@ func assertIPTablesRulesNotEqual(t *testing.T, line int, expected, result string
 func TestOverallIPTablesRulesWithMultipleServices(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
-	metrics.RegisterMetrics()
+	setupMetrics()
 	tcpProtocol := v1.ProtocolTCP
 
 	makeServiceMap(fp,
@@ -4260,7 +4260,7 @@ func TestProxierMetricsIptablesTotalRules(t *testing.T) {
 	fp := NewFakeProxier(ipt)
 	tcpProtocol := v1.ProtocolTCP
 
-	metrics.RegisterMetrics()
+	setupMetrics()
 
 	svcIP := "172.30.0.41"
 	svcPort := 80
@@ -6060,7 +6060,7 @@ func TestNoEndpointsMetric(t *testing.T) {
 	internalTrafficPolicyLocal := v1.ServiceInternalTrafficPolicyLocal
 	externalTrafficPolicyLocal := v1.ServiceExternalTrafficPolicyTypeLocal
 
-	metrics.RegisterMetrics()
+	setupMetrics()
 	testCases := []struct {
 		name                                                string
 		internalTrafficPolicy                               *v1.ServiceInternalTrafficPolicyType
@@ -6203,4 +6203,11 @@ func TestNoEndpointsMetric(t *testing.T) {
 			}
 		})
 	}
+}
+
+func setupMetrics() {
+	metrics.RegisterMetrics()
+	metrics.IptablesRestoreFailuresTotal.Reset()
+	metrics.IptablesRulesTotal.Reset()
+	metrics.SyncProxyRulesNoLocalEndpointsTotal.Reset()
 }
