@@ -252,7 +252,9 @@ func RemovePath(path string) error {
 	for _, info := range infos {
 		if info.IsDir() {
 			// We should remove subcgroups dir first
+			logrus.Infof("KKK rm %s", filepath.Join(path, info.Name()))
 			if err = RemovePath(filepath.Join(path, info.Name())); err != nil {
+				logrus.Infof("KKK rm failure: %v", err)
 				break
 			}
 		}
