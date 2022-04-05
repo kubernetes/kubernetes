@@ -70,9 +70,12 @@ func StorageWithCacher() generic.StorageDecorator {
 		if err != nil {
 			return nil, func() {}, err
 		}
+		var once sync.Once
 		destroyFunc := func() {
-			cacher.Stop()
-			d()
+			once.Do(func() {
+				cacher.Stop()
+				d()
+			})
 		}
 
 		// TODO : Remove RegisterStorageCleanup below when PR
