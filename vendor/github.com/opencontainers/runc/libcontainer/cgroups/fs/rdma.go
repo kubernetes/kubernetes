@@ -12,7 +12,12 @@ func (s *RdmaGroup) Name() string {
 	return "rdma"
 }
 
-func (s *RdmaGroup) Apply(path string, _ *configs.Resources, pid int) error {
+func (s *RdmaGroup) Apply(path string, r *configs.Resources, pid int) error {
+	if len(r.Rdma) == 0 {
+		// Do not join RDMA controller unless resources are specified.
+		return nil
+	}
+
 	return apply(path, pid)
 }
 
