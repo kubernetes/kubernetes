@@ -51,10 +51,5 @@ make generated_files
 go install ./cmd/...
 ./hack/install-etcd.sh
 
-# TODO(MadhavJivrajani): Temporary fix due to Go 1.18 changes.
-# Please see https://tip.golang.org/doc/go1.18#sha1
-GODEBUG=x509sha1=1
-export GODEBUG
-
 make test-cmd
 make test-integration
