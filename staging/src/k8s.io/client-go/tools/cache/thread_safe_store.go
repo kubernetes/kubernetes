@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"sync"
 
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -50,6 +51,7 @@ type ThreadSafeStore interface {
 	IndexKeys(indexName, indexKey string) ([]string, error)
 	ListIndexFuncValues(name string) []string
 	ByIndex(indexName, indexKey string) ([]interface{}, error)
+	ByIndexes(conds IndexConditions) ([]interface{}, error)
 	GetIndexers() Indexers
 
 	// AddIndexers adds more indexers to this store.  If you call this after you already have data
@@ -57,6 +59,16 @@ type ThreadSafeStore interface {
 	AddIndexers(newIndexers Indexers) error
 	// Resync is a no-op and is deprecated
 	Resync() error
+}
+
+// IndexConditions is AND of all IndexCondition
+type IndexConditions []IndexCondition
+
+// IndexCondition contains a IndexName, a IndexKey, and an operator.
+type IndexCondition struct {
+	Operator  selection.Operator
+	IndexName string
+	IndexKey  string
 }
 
 // threadSafeMap implements ThreadSafeStore
@@ -191,6 +203,64 @@ func (c *threadSafeMap) ByIndex(indexName, indexedValue string) ([]interface{}, 
 	}
 
 	return list, nil
+}
+
+// ByIndexes Joint indexing by multiple indexers while supporting Operator
+func (c *threadSafeMap) ByIndexes(conds IndexConditions) ([]interface{}, error) {
+	set := sets.NewString()
+	for _, cond := range conds {
+		populatedIndex, err := c.getIndex(cond)
+		if err != nil {
+			return nil, err
+		}
+		if set.Len() == 0 {
+			set = populatedIndex
+			continue
+		}
+		set = set.Intersection(populatedIndex)
+	}
+
+	list := make([]interface{}, 0, set.Len())
+	for key := range set {
+		list = append(list, c.items[key])
+	}
+
+	return list, nil
+}
+
+// getIndex can get Index by given IndexCondition
+func (c *threadSafeMap) getIndex(cond IndexCondition) (sets.String, error) {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	indexFunc := c.indexers[cond.IndexName]
+	if indexFunc == nil {
+		return nil, fmt.Errorf("Index with name %s does not exist", cond.IndexName)
+	}
+
+	index := c.indices[cond.IndexName]
+
+	set := index[cond.IndexKey]
+
+	populatedIndex, err := c.populateIndex(cond.Operator, set)
+	if err != nil {
+		return nil, err
+	}
+
+	return populatedIndex, nil
+}
+
+// populateIndex would populate real Index according to Operator
+func (c *threadSafeMap) populateIndex(op selection.Operator, set sets.String) (sets.String, error) {
+	switch op {
+	case selection.Equals, selection.DoubleEquals:
+		return set, nil
+	case selection.NotEquals:
+		return sets.NewString(c.ListKeys()...).Difference(set), nil
+		// todo(weilaaa): support more selections
+	}
+
+	return nil, fmt.Errorf("not support selector operator: %v", op)
 }
 
 // IndexKeys returns a list of the Store keys of the objects whose indexed values in the given index include the given indexed value.
