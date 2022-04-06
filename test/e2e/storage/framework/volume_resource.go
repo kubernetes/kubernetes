@@ -204,7 +204,7 @@ func (r *VolumeResource) CleanupResource() error {
 				}
 
 				if pv != nil {
-					err = e2epv.WaitForPersistentVolumeDeleted(f.ClientSet, pv.Name, 5*time.Second, 5*time.Minute)
+					err = e2epv.WaitForPersistentVolumeDeleted(f.ClientSet, pv.Name, 5*time.Second, f.Timeouts.PVDelete)
 					if err != nil {
 						cleanUpErrs = append(cleanUpErrs, fmt.Errorf(
 							"persistent Volume %v not deleted by dynamic provisioner: %w", pv.Name, err))
