@@ -302,6 +302,24 @@ func (ect *EndpointChangeTracker) EndpointSliceUpdate(endpointSlice *discovery.E
 	return changeNeeded
 }
 
+// PendingChanges returns a set whose keys are the names of the services whose endpoints
+// have changed since the last time ect was used to update an EndpointsMap. (You must call
+// this _before_ calling em.Update(ect).)
+func (ect *EndpointChangeTracker) PendingChanges() sets.String {
+	if ect.endpointSliceCache != nil {
+		return ect.endpointSliceCache.pendingChanges()
+	}
+
+	ect.lock.Lock()
+	defer ect.lock.Unlock()
+
+	changes := sets.NewString()
+	for name := range ect.items {
+		changes.Insert(name.String())
+	}
+	return changes
+}
+
 // checkoutChanges returns a list of pending endpointsChanges and marks them as
 // applied.
 func (ect *EndpointChangeTracker) checkoutChanges() []*endpointsChange {

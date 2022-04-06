@@ -188,6 +188,21 @@ func (cache *EndpointSliceCache) updatePending(endpointSlice *discovery.Endpoint
 	return changed
 }
 
+// pendingChanges returns a set whose keys are the names of the services whose endpoints
+// have changed since the last time checkoutChanges was called
+func (cache *EndpointSliceCache) pendingChanges() sets.String {
+	cache.lock.Lock()
+	defer cache.lock.Unlock()
+
+	changes := sets.NewString()
+	for serviceNN, esTracker := range cache.trackerByServiceMap {
+		if len(esTracker.pending) > 0 {
+			changes.Insert(serviceNN.String())
+		}
+	}
+	return changes
+}
+
 // checkoutChanges returns a list of all endpointsChanges that are
 // pending and then marks them as applied.
 func (cache *EndpointSliceCache) checkoutChanges() []*endpointsChange {
