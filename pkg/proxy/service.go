@@ -328,6 +328,20 @@ func (sct *ServiceChangeTracker) Update(previous, current *v1.Service) bool {
 	return len(sct.items) > 0
 }
 
+// PendingChanges returns a set whose keys are the names of the services that have changed
+// since the last time sct was used to update a ServiceMap. (You must call this _before_
+// calling sm.Update(sct).)
+func (sct *ServiceChangeTracker) PendingChanges() sets.String {
+	sct.lock.Lock()
+	defer sct.lock.Unlock()
+
+	changes := sets.NewString()
+	for name := range sct.items {
+		changes.Insert(name.String())
+	}
+	return changes
+}
+
 // UpdateServiceMapResult is the updated results after applying service changes.
 type UpdateServiceMapResult struct {
 	// HCServiceNodePorts is a map of Service names to node port numbers which indicate the health of that Service on this Node.
