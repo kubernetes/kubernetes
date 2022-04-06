@@ -18,7 +18,9 @@ package portworx
 
 import (
 	"fmt"
+	"net"
 	"os"
+	"strconv"
 
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
@@ -71,7 +73,7 @@ func (plugin *portworxVolumePlugin) IsMigratedToCSI() bool {
 
 func (plugin *portworxVolumePlugin) Init(host volume.VolumeHost) error {
 	client, err := volumeclient.NewDriverClient(
-		fmt.Sprintf("http://%s:%d", host.GetHostName(), osdMgmtDefaultPort),
+		fmt.Sprintf("http://%s", net.JoinHostPort(host.GetHostName(), strconv.Itoa(osdMgmtDefaultPort))),
 		pxdDriverName, osdDriverVersion, pxDriverName)
 	if err != nil {
 		return err
