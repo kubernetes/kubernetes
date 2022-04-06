@@ -834,6 +834,7 @@ func TestNormalizeScorePlugin(t *testing.T) {
 	}
 
 	scoreWithNormalizePlugin.reset()
+	testutils.CleanupPods(testCtx.ClientSet, t, []*v1.Pod{pod})
 }
 
 // TestReservePlugin tests invocation of reserve plugins.
@@ -1871,6 +1872,7 @@ func TestPermitPluginsCancelled(t *testing.T) {
 	if err != nil {
 		t.Errorf("Expected all permit plugins to be cancelled")
 	}
+	testutils.CleanupPods(testCtx.ClientSet, t, []*v1.Pod{pod})
 }
 
 // TestCoSchedulingWithPermitPlugin tests invocation of permit plugins.
@@ -2405,6 +2407,7 @@ func TestActivatePods(t *testing.T) {
 	if jobPlugin.podsActivated == false {
 		t.Errorf("JobPlugin's pods activation logic is not called")
 	}
+	testutils.CleanupPods(testCtx.ClientSet, t, pods)
 }
 
 func initTestSchedulerForFrameworkTest(t *testing.T, testCtx *testutils.TestContext, nodeCount int, opts ...scheduler.Option) *testutils.TestContext {
