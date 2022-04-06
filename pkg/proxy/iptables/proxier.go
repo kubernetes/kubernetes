@@ -1054,6 +1054,17 @@ func (proxier *Proxier) syncProxyRules() {
 			activeNATChains[externalTrafficChain] = true
 		}
 
+		// Traffic to LoadBalancer IPs can go directly to externalTrafficChain
+		// unless LoadBalancerSourceRanges is in use in which case we will
+		// create a firewall chain.
+		loadBalancerTrafficChain := externalTrafficChain
+		fwChain := svcInfo.firewallChainName
+		usesFWChain := hasEndpoints && len(svcInfo.LoadBalancerIPStrings()) > 0 && len(svcInfo.LoadBalancerSourceRanges()) > 0
+		if usesFWChain {
+			activeNATChains[fwChain] = true
+			loadBalancerTrafficChain = fwChain
+		}
+
 		var internalTrafficFilterTarget, internalTrafficFilterComment string
 		var externalTrafficFilterTarget, externalTrafficFilterComment string
 		if !hasEndpoints {
@@ -1136,72 +1147,15 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		// Capture load-balancer ingress.
-		if len(svcInfo.LoadBalancerIPStrings()) > 0 && hasEndpoints {
-			// Normally we send LB matches to the "external destination" chain.
-			nextChain := externalTrafficChain
-
-			// If the service specifies any LB source ranges, we need to insert
-			// a firewall chain first.
-			if len(svcInfo.LoadBalancerSourceRanges()) > 0 {
-				fwChain := svcInfo.firewallChainName
-
-				// Declare the service firewall chain.
-				proxier.natChains.Write(utiliptables.MakeChainLine(fwChain))
-				activeNATChains[fwChain] = true
-
-				// The firewall chain will jump to the "external destination"
-				// chain.
-				nextChain = svcInfo.firewallChainName
-
-				// The service firewall rules are created based on the
-				// loadBalancerSourceRanges field.  This only works for
-				// VIP-like loadbalancers that preserve source IPs.  For
-				// loadbalancers which direct traffic to service NodePort, the
-				// firewall rules will not apply.
-				args = append(args[:0],
-					"-A", string(nextChain),
-					"-m", "comment", "--comment", fmt.Sprintf(`"%s loadbalancer IP"`, svcPortNameString),
-				)
-
-				// firewall filter based on each source range
-				allowFromNode := false
-				for _, src := range svcInfo.LoadBalancerSourceRanges() {
-					proxier.natRules.Write(args, "-s", src, "-j", string(externalTrafficChain))
-					_, cidr, err := netutils.ParseCIDRSloppy(src)
-					if err != nil {
-						klog.ErrorS(err, "Error parsing CIDR in LoadBalancerSourceRanges, dropping it", "cidr", cidr)
-					} else if cidr.Contains(proxier.nodeIP) {
-						allowFromNode = true
-					}
-				}
-				// For VIP-like LBs, the VIP is often added as a local
-				// address (via an IP route rule).  In that case, a request
-				// from a node to the VIP will not hit the loadbalancer but
-				// will loop back with the source IP set to the VIP.  We
-				// need the following rules to allow requests from this node.
-				if allowFromNode {
-					for _, lbip := range svcInfo.LoadBalancerIPStrings() {
-						proxier.natRules.Write(
-							args,
-							"-s", lbip,
-							"-j", string(externalTrafficChain))
-					}
-				}
-
-				// If the packet was able to reach the end of firewall chain,
-				// then it did not get DNATed.  It means the packet cannot go
-				// thru the firewall, then mark it for DROP.
-				proxier.natRules.Write(args, "-j", string(kubeMarkDropChain))
-			}
-
-			for _, lbip := range svcInfo.LoadBalancerIPStrings() {
+		for _, lbip := range svcInfo.LoadBalancerIPStrings() {
+			if hasEndpoints {
 				proxier.natRules.Write(
 					"-A", string(kubeServicesChain),
 					"-m", "comment", "--comment", fmt.Sprintf(`"%s loadbalancer IP"`, svcPortNameString),
 					"-m", protocol, "-p", protocol,
 					"-d", lbip,
 					"--dport", strconv.Itoa(svcInfo.Port()),
-					"-j", string(nextChain))
+					"-j", string(loadBalancerTrafficChain))
 
 			}
 		}
@@ -1344,6 +1298,50 @@ func (proxier *Proxier) syncProxyRules() {
 					"-A", string(externalTrafficChain),
 					"-j", string(externalPolicyChain))
 			}
+		}
+
+		// Set up firewall chain, if needed
+		if usesFWChain {
+			proxier.natChains.Write(utiliptables.MakeChainLine(fwChain))
+
+			// The service firewall rules are created based on the
+			// loadBalancerSourceRanges field. This only works for VIP-like
+			// loadbalancers that preserve source IPs. For loadbalancers which
+			// direct traffic to service NodePort, the firewall rules will not
+			// apply.
+			args = append(args[:0],
+				"-A", string(fwChain),
+				"-m", "comment", "--comment", fmt.Sprintf(`"%s loadbalancer IP"`, svcPortNameString),
+			)
+
+			// firewall filter based on each source range
+			allowFromNode := false
+			for _, src := range svcInfo.LoadBalancerSourceRanges() {
+				proxier.natRules.Write(args, "-s", src, "-j", string(externalTrafficChain))
+				_, cidr, err := netutils.ParseCIDRSloppy(src)
+				if err != nil {
+					klog.ErrorS(err, "Error parsing CIDR in LoadBalancerSourceRanges, dropping it", "cidr", cidr)
+				} else if cidr.Contains(proxier.nodeIP) {
+					allowFromNode = true
+				}
+			}
+			// For VIP-like LBs, the VIP is often added as a local
+			// address (via an IP route rule).  In that case, a request
+			// from a node to the VIP will not hit the loadbalancer but
+			// will loop back with the source IP set to the VIP.  We
+			// need the following rules to allow requests from this node.
+			if allowFromNode {
+				for _, lbip := range svcInfo.LoadBalancerIPStrings() {
+					proxier.natRules.Write(
+						args,
+						"-s", lbip,
+						"-j", string(externalTrafficChain))
+				}
+			}
+			// If the packet was able to reach the end of firewall chain,
+			// then it did not get DNATed.  It means the packet cannot go
+			// thru the firewall, then mark it for DROP.
+			proxier.natRules.Write(args, "-j", string(kubeMarkDropChain))
 		}
 
 		// If Cluster policy is in use, create the chain and create rules jumping
