@@ -1354,24 +1354,19 @@ func (proxier *Proxier) syncProxyRules() {
 			if len(localEndpoints) != 0 {
 				// Write rules jumping from localPolicyChain to localEndpointChains
 				proxier.writeServiceToEndpointRules(svcNameString, svcInfo, localPolicyChain, localEndpoints, args)
-			} else {
+			} else if hasEndpoints {
 				if svcInfo.InternalPolicyLocal() && utilfeature.DefaultFeatureGate.Enabled(features.ServiceInternalTrafficPolicy) {
 					serviceNoLocalEndpointsTotalInternal++
 				}
 				if svcInfo.ExternalPolicyLocal() {
 					serviceNoLocalEndpointsTotalExternal++
 				}
-				if hasEndpoints {
-					// Blackhole all traffic since there are no local endpoints
-					args = append(args[:0],
-						"-A", string(localPolicyChain),
-						"-m", "comment", "--comment",
-						fmt.Sprintf(`"%s has no local endpoints"`, svcNameString),
-						"-j",
-						string(KubeMarkDropChain),
-					)
-					proxier.natRules.Write(args)
-				}
+				// Blackhole all traffic since there are no local endpoints
+				proxier.natRules.Write(
+					"-A", string(localPolicyChain),
+					"-m", "comment", "--comment",
+					fmt.Sprintf(`"%s has no local endpoints"`, svcNameString),
+					"-j", string(KubeMarkDropChain))
 			}
 		}
 	}
