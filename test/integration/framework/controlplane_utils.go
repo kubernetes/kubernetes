@@ -232,6 +232,7 @@ func startAPIServerOrDie(controlPlaneConfig *controlplane.Config, incomingServer
 
 	clientset, err := clientset.NewForConfig(controlPlaneConfig.GenericConfig.LoopbackClientConfig)
 	if err != nil {
+		closeFn()
 		klog.Fatal(err)
 	}
 
