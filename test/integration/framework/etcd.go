@@ -196,6 +196,11 @@ func EtcdMain(tests func() int) {
 	}
 	after := runtime.NumGoroutine()
 	klog.Infof("unexpected number of goroutines: before: %d after %d", before, after)
+
+	buf := make([]byte, 1<<16)
+	runtime.Stack(buf, true)
+	fmt.Printf("%s", buf)
+
 	os.Exit(result)
 }
 
