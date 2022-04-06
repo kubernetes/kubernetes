@@ -998,10 +998,19 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 		}
 
-		// These chains represent the sets of endpoints to use when internal or
-		// external traffic policy is "Cluster" vs "Local".
+		// clusterPolicyChain contains the endpoints used with "Cluster" traffic policy
 		clusterPolicyChain := svcInfo.clusterPolicyChainName
+		usesClusterPolicyChain := len(clusterEndpoints) > 0 && svcInfo.UsesClusterEndpoints()
+		if usesClusterPolicyChain {
+			activeNATChains[clusterPolicyChain] = true
+		}
+
+		// localPolicyChain contains the endpoints used with "Local" traffic policy
 		localPolicyChain := svcInfo.localPolicyChainName
+		usesLocalPolicyChain := len(localEndpoints) > 0 && svcInfo.UsesLocalEndpoints()
+		if usesLocalPolicyChain {
+			activeNATChains[localPolicyChain] = true
+		}
 
 		// internalPolicyChain is the chain containing the endpoints for
 		// "internal" (ClusterIP) traffic. internalTrafficChain is the chain that
@@ -1067,19 +1076,6 @@ func (proxier *Proxier) syncProxyRules() {
 				externalTrafficFilterComment = fmt.Sprintf(`"%s has no local endpoints"`, svcPortNameString)
 				serviceNoLocalEndpointsTotalExternal++
 			}
-		}
-
-		// Declare the clusterPolicyChain if needed.
-		if len(clusterEndpoints) > 0 && svcInfo.UsesClusterEndpoints() {
-			// Create the Cluster traffic policy chain
-			proxier.natChains.Write(utiliptables.MakeChainLine(clusterPolicyChain))
-			activeNATChains[clusterPolicyChain] = true
-		}
-
-		// Declare the localPolicyChain if needed.
-		if len(localEndpoints) > 0 && svcInfo.UsesLocalEndpoints() {
-			proxier.natChains.Write(utiliptables.MakeChainLine(localPolicyChain))
-			activeNATChains[localPolicyChain] = true
 		}
 
 		// If any "external" destinations are enabled, set up external traffic
@@ -1337,13 +1333,17 @@ func (proxier *Proxier) syncProxyRules() {
 			)
 		}
 
-		if svcInfo.UsesClusterEndpoints() {
-			// Write rules jumping from clusterPolicyChain to clusterEndpoints
+		// If Cluster policy is in use, create the chain and create rules jumping
+		// from clusterPolicyChain to the clusterEndpoints
+		if usesClusterPolicyChain {
+			proxier.natChains.Write(utiliptables.MakeChainLine(clusterPolicyChain))
 			proxier.writeServiceToEndpointRules(svcPortNameString, svcInfo, clusterPolicyChain, clusterEndpoints, args)
 		}
 
-		if svcInfo.UsesLocalEndpoints() {
-			// Write rules jumping from localPolicyChain to localEndpointChains
+		// If Local policy is in use, create the chain and create rules jumping
+		// from localPolicyChain to the localEndpoints
+		if usesLocalPolicyChain {
+			proxier.natChains.Write(utiliptables.MakeChainLine(localPolicyChain))
 			proxier.writeServiceToEndpointRules(svcPortNameString, svcInfo, localPolicyChain, localEndpoints, args)
 		}
 
