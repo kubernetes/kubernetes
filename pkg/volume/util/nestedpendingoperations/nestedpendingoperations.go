@@ -149,15 +149,13 @@ func (grm *nestedPendingOperations) Run(
 
 	opKey := operationKey{volumeName, podName, nodeName}
 
-	opExists, previousOpIndex := grm.isOperationExists(opKey)
+	opExists, previousOpIndex := grm.isPendingOperationExists(opKey)
 	if opExists {
-		previousOp := grm.operations[previousOpIndex]
-		// Operation already exists
-		if previousOp.operationPending {
-			// Operation is pending
-			return NewAlreadyExistsError(opKey)
-		}
+		return NewAlreadyExistsError(opKey)
+	}
 
+	if previousOpIndex > -1 {
+		previousOp := grm.operations[previousOpIndex]
 		backOffErr := previousOp.expBackoff.SafeToRetry(fmt.Sprintf("%+v", opKey))
 		if backOffErr != nil {
 			if previousOp.operationName == generatedOperations.OperationName {
@@ -167,7 +165,6 @@ func (grm *nestedPendingOperations) Run(
 			grm.operations[previousOpIndex].operationName = generatedOperations.OperationName
 			grm.operations[previousOpIndex].expBackoff = exponentialbackoff.ExponentialBackoff{}
 		}
-
 		// Update existing operation to mark as pending.
 		grm.operations[previousOpIndex].operationPending = true
 		grm.operations[previousOpIndex].key = opKey
@@ -202,19 +199,21 @@ func (grm *nestedPendingOperations) IsOperationSafeToRetry(
 	defer grm.lock.RUnlock()
 
 	opKey := operationKey{volumeName, podName, nodeName}
-	exist, previousOpIndex := grm.isOperationExists(opKey)
-	if !exist {
-		return true
-	}
-	previousOp := grm.operations[previousOpIndex]
-	if previousOp.operationPending {
+	exist, previousOpIndex := grm.isPendingOperationExists(opKey)
+	if exist {
 		return false
 	}
+	if previousOpIndex == -1 {
+		return true
+	}
+
+	previousOp := grm.operations[previousOpIndex]
 	backOffErr := previousOp.expBackoff.SafeToRetry(fmt.Sprintf("%+v", opKey))
 	if backOffErr != nil {
-		if previousOp.operationName == operationName {
-			return false
-		}
+		// even if operation is different, we should return notSafeToRetry
+		//if previousOp.operationName == operationName {
+		return false
+		//}
 	}
 
 	return true
@@ -229,21 +228,27 @@ func (grm *nestedPendingOperations) IsOperationPending(
 	defer grm.lock.RUnlock()
 
 	opKey := operationKey{volumeName, podName, nodeName}
-	exist, previousOpIndex := grm.isOperationExists(opKey)
-	if exist && grm.operations[previousOpIndex].operationPending {
+	exist, _ := grm.isPendingOperationExists(opKey)
+	if exist {
 		return true
 	}
 	return false
 }
 
 // This is an internal function and caller should acquire and release the lock
-func (grm *nestedPendingOperations) isOperationExists(key operationKey) (bool, int) {
+// If there is a pending operation matches, it returns true and and an index
+// for the previous matching operation.
+// If there is no pending operation matches,it returns an index that the operations
+// exactly matches volumename, node name, pod name. If no such operation exists,
+// the index value will be -1
+func (grm *nestedPendingOperations) isPendingOperationExists(key operationKey) (bool, int) {
 
 	// If volumeName is empty, operation can be executed concurrently
 	if key.volumeName == EmptyUniqueVolumeName {
 		return false, -1
 	}
 
+	index := -1
 	for previousOpIndex, previousOp := range grm.operations {
 		volumeNameMatch := previousOp.key.volumeName == key.volumeName
 
@@ -251,16 +256,25 @@ func (grm *nestedPendingOperations) isOperationExists(key operationKey) (bool, i
 			key.podName == EmptyUniquePodName ||
 			previousOp.key.podName == key.podName
 
+		podExacMatch := previousOp.key.podName == key.podName
+
 		nodeNameMatch := previousOp.key.nodeName == EmptyNodeName ||
 			key.nodeName == EmptyNodeName ||
 			previousOp.key.nodeName == key.nodeName
 
+		nodeExactNameMatch := previousOp.key.nodeName == key.nodeName
+
 		if volumeNameMatch && podNameMatch && nodeNameMatch {
-			return true, previousOpIndex
+			if previousOp.operationPending {
+				return true, previousOpIndex
+			}
+		} else if volumeNameMatch && podExacMatch && nodeExactNameMatch {
+			index = previousOpIndex
 		}
+
 	}
 
-	return false, -1
+	return false, index
 }
 
 func (grm *nestedPendingOperations) getOperation(key operationKey) (uint, error) {
