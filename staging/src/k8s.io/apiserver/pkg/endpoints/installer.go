@@ -159,6 +159,10 @@ func getStorageVersionKind(storageVersioner runtime.GroupVersioner, storage rest
 // object. If the storage object is a subresource and has an override supplied for it, it returns
 // the group version kind supplied in the override.
 func GetResourceKind(groupVersion schema.GroupVersion, storage rest.Storage, typer runtime.ObjectTyper) (schema.GroupVersionKind, error) {
+	if storage == nil {
+		return schema.GroupVersionKind{}, fmt.Errorf("rest storage in %v is nil", groupVersion.String())
+	}
+
 	// Let the storage tell us exactly what GVK it has
 	if gvkProvider, ok := storage.(rest.GroupVersionKindProvider); ok {
 		return gvkProvider.GroupVersionKind(groupVersion), nil
