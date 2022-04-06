@@ -1088,31 +1088,12 @@ func (proxier *Proxier) syncProxyRules() {
 
 		// Capture the clusterIP.
 		if hasInternalEndpoints {
-			args = append(args[:0],
+			proxier.natRules.Write(
+				"-A", string(kubeServicesChain),
 				"-m", "comment", "--comment", fmt.Sprintf(`"%s cluster IP"`, svcPortNameString),
 				"-m", protocol, "-p", protocol,
 				"-d", svcInfo.ClusterIP().String(),
 				"--dport", strconv.Itoa(svcInfo.Port()),
-			)
-			if proxier.masqueradeAll {
-				proxier.natRules.Write(
-					"-A", string(internalTrafficChain),
-					args,
-					"-j", string(kubeMarkMasqChain))
-			} else if proxier.localDetector.IsImplemented() {
-				// This masquerades off-cluster traffic to a service VIP.  The idea
-				// is that you can establish a static route for your Service range,
-				// routing to any node, and that node will bridge into the Service
-				// for you.  Since that might bounce off-node, we masquerade here.
-				proxier.natRules.Write(
-					"-A", string(internalTrafficChain),
-					args,
-					proxier.localDetector.IfNotLocal(),
-					"-j", string(kubeMarkMasqChain))
-			}
-			proxier.natRules.Write(
-				"-A", string(kubeServicesChain),
-				args,
 				"-j", string(internalTrafficChain))
 		} else {
 			// No endpoints.
@@ -1279,6 +1260,33 @@ func (proxier *Proxier) syncProxyRules() {
 				"--dport", strconv.Itoa(svcInfo.HealthCheckNodePort()),
 				"-j", "ACCEPT",
 			)
+		}
+
+		// Set up internal traffic handling.
+		if hasInternalEndpoints {
+			args = append(args[:0],
+				"-m", "comment", "--comment", fmt.Sprintf(`"%s cluster IP"`, svcPortNameString),
+				"-m", protocol, "-p", protocol,
+				"-d", svcInfo.ClusterIP().String(),
+				"--dport", strconv.Itoa(svcInfo.Port()),
+			)
+			if proxier.masqueradeAll {
+				proxier.natRules.Write(
+					"-A", string(internalTrafficChain),
+					args,
+					"-j", string(kubeMarkMasqChain))
+			} else if proxier.localDetector.IsImplemented() {
+				// This masquerades off-cluster traffic to a service VIP. The
+				// idea is that you can establish a static route for your
+				// Service range, routing to any node, and that node will
+				// bridge into the Service for you. Since that might bounce
+				// off-node, we masquerade here.
+				proxier.natRules.Write(
+					"-A", string(internalTrafficChain),
+					args,
+					proxier.localDetector.IfNotLocal(),
+					"-j", string(kubeMarkMasqChain))
+			}
 		}
 
 		// Set up external traffic handling (if any "external" destinations are
