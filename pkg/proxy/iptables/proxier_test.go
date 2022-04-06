@@ -1343,8 +1343,10 @@ func getLine() int {
 }
 
 // assertIPTablesRulesEqual asserts that the generated rules in result match the rules in
-// expected, ignoring irrelevant ordering differences.
-func assertIPTablesRulesEqual(t *testing.T, line int, expected, result string) {
+// expected, ignoring irrelevant ordering differences. By default this also checks the
+// rules for consistency (eg, no jumps to chains that aren't defined), but that can be
+// disabled by passing false for checkConsistency if you are passing a partial set of rules.
+func assertIPTablesRulesEqual(t *testing.T, line int, checkConsistency bool, expected, result string) {
 	expected = strings.TrimLeft(expected, " \t\n")
 
 	result, err := sortIPTablesRules(strings.TrimLeft(result, " \t\n"))
@@ -1360,9 +1362,11 @@ func assertIPTablesRulesEqual(t *testing.T, line int, expected, result string) {
 		t.Errorf("rules do not match%s:\ndiff:\n%s\nfull result:\n```\n%s```", lineStr, diff, result)
 	}
 
-	err = checkIPTablesRuleJumps(expected)
-	if err != nil {
-		t.Fatalf("%s", err)
+	if checkConsistency {
+		err = checkIPTablesRuleJumps(expected)
+		if err != nil {
+			t.Fatalf("%s%s", err, lineStr)
+		}
 	}
 }
 
@@ -2037,7 +2041,7 @@ func TestOverallIPTablesRulesWithMultipleServices(t *testing.T) {
 		COMMIT
 		`)
 
-	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 
 	natRulesMetric, err := testutil.GetGaugeMetricValue(metrics.IptablesRulesTotal.WithLabelValues(string(utiliptables.TableNAT)))
 	if err != nil {
@@ -2099,7 +2103,7 @@ func TestClusterIPReject(t *testing.T) {
 		COMMIT
 		`)
 
-	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 
 	runPacketFlowTests(t, getLine(), ipt, testNodeIP, []packetFlowTest{
 		{
@@ -2182,7 +2186,7 @@ func TestClusterIPEndpointsJump(t *testing.T) {
 		-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 -> 10.180.0.1:80" -j KUBE-SEP-SXIVWICOYRO3J4NJ
 		COMMIT
 		`)
-	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 
 	runPacketFlowTests(t, getLine(), ipt, testNodeIP, []packetFlowTest{
 		{
@@ -2303,7 +2307,7 @@ func TestLoadBalancer(t *testing.T) {
 		COMMIT
 		`)
 
-	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 
 	runPacketFlowTests(t, getLine(), ipt, testNodeIP, []packetFlowTest{
 		{
@@ -2491,7 +2495,7 @@ func TestNodePort(t *testing.T) {
 		-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 -> 10.180.0.1:80" -j KUBE-SEP-SXIVWICOYRO3J4NJ
 		COMMIT
 		`)
-	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 
 	runPacketFlowTests(t, getLine(), ipt, testNodeIP, []packetFlowTest{
 		{
@@ -2586,7 +2590,7 @@ func TestHealthCheckNodePort(t *testing.T) {
 		COMMIT
 		`)
 
-	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 
 	runPacketFlowTests(t, getLine(), ipt, testNodeIP, []packetFlowTest{
 		{
@@ -2648,7 +2652,7 @@ func TestMasqueradeRule(t *testing.T) {
 		} else {
 			expected = fmt.Sprintf(expectedFmt, "")
 		}
-		assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
+		assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 	}
 }
 
@@ -2704,7 +2708,7 @@ func TestExternalIPsReject(t *testing.T) {
 		-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
 		COMMIT
 		`)
-	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 
 	runPacketFlowTests(t, getLine(), ipt, testNodeIP, []packetFlowTest{
 		{
@@ -2813,7 +2817,7 @@ func TestOnlyLocalExternalIPs(t *testing.T) {
 		-A KUBE-SVL-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 -> 10.180.2.1:80" -j KUBE-SEP-ZX7GRIZKSNUQ3LAJ
 		COMMIT
 		`)
-	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 
 	runPacketFlowTests(t, getLine(), ipt, testNodeIP, []packetFlowTest{
 		{
@@ -2921,7 +2925,7 @@ func TestNonLocalExternalIPs(t *testing.T) {
 		-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 -> 10.180.2.1:80" -j KUBE-SEP-ZX7GRIZKSNUQ3LAJ
 		COMMIT
 		`)
-	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 
 	runPacketFlowTests(t, getLine(), ipt, testNodeIP, []packetFlowTest{
 		{
@@ -2994,7 +2998,7 @@ func TestNodePortReject(t *testing.T) {
 		-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
 		COMMIT
 		`)
-	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 
 	runPacketFlowTests(t, getLine(), ipt, testNodeIP, []packetFlowTest{
 		{
@@ -3086,7 +3090,7 @@ func TestLoadBalancerReject(t *testing.T) {
 		-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
 		COMMIT
 		`)
-	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 
 	runPacketFlowTests(t, getLine(), ipt, testNodeIP, []packetFlowTest{
 		{
@@ -3219,7 +3223,7 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 		-A KUBE-SVL-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 -> 10.180.2.1:80" -j KUBE-SEP-ZX7GRIZKSNUQ3LAJ
 		COMMIT
 		`)
-	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 
 	runPacketFlowTests(t, getLine(), ipt, testNodeIP, []packetFlowTest{
 		{
@@ -3395,7 +3399,7 @@ func onlyLocalNodePorts(t *testing.T, fp *Proxier, ipt *iptablestest.FakeIPTable
 
 	fp.syncProxyRules()
 
-	assertIPTablesRulesEqual(t, line, expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, line, true, expected, fp.iptablesData.String())
 
 	runPacketFlowTests(t, line, ipt, testNodeIP, []packetFlowTest{
 		{
@@ -4742,7 +4746,7 @@ func TestEndpointSliceE2E(t *testing.T) {
 
 	fp.OnEndpointSliceAdd(endpointSlice)
 	fp.syncProxyRules()
-	assertIPTablesRulesEqual(t, getLine(), expectedIPTablesWithSlice, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), true, expectedIPTablesWithSlice, fp.iptablesData.String())
 
 	fp.OnEndpointSliceDelete(endpointSlice)
 	fp.syncProxyRules()
@@ -5345,7 +5349,7 @@ func TestInternalTrafficPolicyE2E(t *testing.T) {
 
 			fp.OnEndpointSliceAdd(endpointSlice)
 			fp.syncProxyRules()
-			assertIPTablesRulesEqual(t, tc.line, tc.expectedIPTablesWithSlice, fp.iptablesData.String())
+			assertIPTablesRulesEqual(t, tc.line, true, tc.expectedIPTablesWithSlice, fp.iptablesData.String())
 			runPacketFlowTests(t, tc.line, ipt, testNodeIP, tc.flowTests)
 
 			fp.OnEndpointSliceDelete(endpointSlice)
@@ -6122,14 +6126,14 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 
 			fp.OnEndpointSliceAdd(testcase.endpointslice)
 			fp.syncProxyRules()
-			assertIPTablesRulesEqual(t, testcase.line, testcase.expectedIPTables, fp.iptablesData.String())
+			assertIPTablesRulesEqual(t, testcase.line, true, testcase.expectedIPTables, fp.iptablesData.String())
 			runPacketFlowTests(t, testcase.line, ipt, testNodeIP, testcase.flowTests)
 
 			fp.OnEndpointSliceDelete(testcase.endpointslice)
 			fp.syncProxyRules()
 			if testcase.noUsableEndpoints {
 				// Deleting the EndpointSlice should have had no effect
-				assertIPTablesRulesEqual(t, testcase.line, testcase.expectedIPTables, fp.iptablesData.String())
+				assertIPTablesRulesEqual(t, testcase.line, true, testcase.expectedIPTables, fp.iptablesData.String())
 			} else {
 				assertIPTablesRulesNotEqual(t, testcase.line, testcase.expectedIPTables, fp.iptablesData.String())
 			}
@@ -6868,14 +6872,14 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyCluster(t *testing.T)
 
 			fp.OnEndpointSliceAdd(testcase.endpointslice)
 			fp.syncProxyRules()
-			assertIPTablesRulesEqual(t, testcase.line, testcase.expectedIPTables, fp.iptablesData.String())
+			assertIPTablesRulesEqual(t, testcase.line, true, testcase.expectedIPTables, fp.iptablesData.String())
 			runPacketFlowTests(t, testcase.line, ipt, testNodeIP, testcase.flowTests)
 
 			fp.OnEndpointSliceDelete(testcase.endpointslice)
 			fp.syncProxyRules()
 			if testcase.noUsableEndpoints {
 				// Deleting the EndpointSlice should have had no effect
-				assertIPTablesRulesEqual(t, testcase.line, testcase.expectedIPTables, fp.iptablesData.String())
+				assertIPTablesRulesEqual(t, testcase.line, true, testcase.expectedIPTables, fp.iptablesData.String())
 			} else {
 				assertIPTablesRulesNotEqual(t, testcase.line, testcase.expectedIPTables, fp.iptablesData.String())
 			}
@@ -7744,7 +7748,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 -> 10.0.1.1:80" -j KUBE-SEP-SNQ3ZNILQDEJNDQO
 		COMMIT
 		`)
-	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 
 	// Add a new service and its endpoints
 	makeServiceMap(fp,
@@ -7819,7 +7823,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 -> 10.0.1.1:80" -j KUBE-SEP-SNQ3ZNILQDEJNDQO
 		COMMIT
 		`)
-	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 
 	// Delete a service
 	fp.OnServiceDelete(svc2)
@@ -7866,7 +7870,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		-X KUBE-SVC-2VJB64SDSIJUP5T6
 		COMMIT
 		`)
-	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 
 	// Add a service, sync, then add its endpoints
 	makeServiceMap(fp,
@@ -7919,7 +7923,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 -> 10.0.1.1:80" -j KUBE-SEP-SNQ3ZNILQDEJNDQO
 		COMMIT
 		`)
-	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 
 	populateEndpointSlices(fp,
 		makeTestEndpointSlice("ns4", "svc4", 1, func(eps *discovery.EndpointSlice) {
@@ -7979,7 +7983,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 -> 10.0.1.1:80" -j KUBE-SEP-SNQ3ZNILQDEJNDQO
 		COMMIT
 		`)
-	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 
 	// Change an endpoint of an existing service
 	eps3update := eps3.DeepCopy()
@@ -8033,7 +8037,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		-X KUBE-SEP-BSWRHOQ77KEXZLNL
 		COMMIT
 		`)
-	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 
 	// Add an endpoint to a service
 	eps3update2 := eps3update.DeepCopy()
@@ -8089,7 +8093,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 -> 10.0.1.1:80" -j KUBE-SEP-SNQ3ZNILQDEJNDQO
 		COMMIT
 		`)
-	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 
 	// Sync with no new changes...
 	fp.syncProxyRules()
@@ -8142,7 +8146,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 -> 10.0.1.1:80" -j KUBE-SEP-SNQ3ZNILQDEJNDQO
 		COMMIT
 		`)
-	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 }
 
 func TestNoEndpointsMetric(t *testing.T) {
