@@ -2448,9 +2448,6 @@ func TestLoadBalancer(t *testing.T) {
 		-A KUBE-FW-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 loadbalancer IP" -s 192.168.0.0/24 -j KUBE-EXT-XPGD46QRK7WJZT7O
 		-A KUBE-FW-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 loadbalancer IP" -s 203.0.113.0/25 -j KUBE-EXT-XPGD46QRK7WJZT7O
 		-A KUBE-FW-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 loadbalancer IP" -s 1.2.3.4 -j KUBE-EXT-XPGD46QRK7WJZT7O
-		-A KUBE-FW-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 loadbalancer IP" -j KUBE-MARK-DROP
-		-A KUBE-FW-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 loadbalancer IP" -s 192.168.0.0/24 -j KUBE-EXT-XPGD46QRK7WJZT7O
-		-A KUBE-FW-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 loadbalancer IP" -s 203.0.113.0/25 -j KUBE-EXT-XPGD46QRK7WJZT7O
 		-A KUBE-FW-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 loadbalancer IP" -s 5.6.7.8 -j KUBE-EXT-XPGD46QRK7WJZT7O
 		-A KUBE-FW-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 loadbalancer IP" -j KUBE-MARK-DROP
 		-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
@@ -2564,15 +2561,14 @@ func TestLoadBalancer(t *testing.T) {
 			output:   fmt.Sprintf("%s:%d", epIP, svcPort),
 			masq:     true,
 		},
-		// FIXME: this fails
-		// {
-		// 	name:     "same node to LB2, SNATted to LB2 (implicitly allowed)",
-		// 	sourceIP: svcLBIP2,
-		// 	destIP:   svcLBIP2,
-		// 	destPort: svcPort,
-		// 	output:   fmt.Sprintf("%s:%d", epIP, svcPort),
-		// 	masq:     true,
-		// },
+		{
+			name:     "same node to LB2, SNATted to LB2 (implicitly allowed)",
+			sourceIP: svcLBIP2,
+			destIP:   svcLBIP2,
+			destPort: svcPort,
+			output:   fmt.Sprintf("%s:%d", epIP, svcPort),
+			masq:     true,
+		},
 	})
 }
 
