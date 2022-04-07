@@ -452,6 +452,10 @@ func TestKindToResource(t *testing.T) {
 		{Kind: "miss", Plural: "misses", Singular: "miss"},
 		// Add "s" otherwise
 		{Kind: "lowercase", Plural: "lowercases", Singular: "lowercase"},
+		// Add "es" when ending with "ch"
+		{Kind: "Bench", Plural: "benches", Singular: "bench"},
+		// Add "es" when ending with "sh"
+		{Kind: "Mesh", Plural: "meshes", Singular: "mesh"},
 	}
 	for i, testCase := range testCases {
 		version := schema.GroupVersion{}
