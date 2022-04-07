@@ -47,6 +47,9 @@ type Indexer interface {
 	// ByIndex returns the stored objects whose set of indexed values
 	// for the named index includes the given indexed value
 	ByIndex(indexName, indexedValue string) ([]interface{}, error)
+	// ByIndexes returns the stored objects by given index conditions
+	ByIndexes(conds IndexConditions) ([]interface{}, error)
+	// GetIndexer return the indexers
 	// GetIndexers return the indexers
 	GetIndexers() Indexers
 
