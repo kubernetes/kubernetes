@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -67,12 +66,6 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 	// Write the new kubelet config down to disk and the env file if needed
 	if err := writeKubeletConfigFiles(client, cfg, dryRun); err != nil {
 		errs = append(errs, err)
-	}
-
-	// TODO: Temporary workaround. Remove in 1.25:
-	// https://github.com/kubernetes/kubeadm/issues/2426
-	if err := UpdateKubeletDynamicEnvFileWithURLScheme(dryRun); err != nil {
-		return err
 	}
 
 	// Annotate the node with the crisocket information, sourced either from the InitConfiguration struct or
@@ -270,29 +263,6 @@ func AddNewControlPlaneTaint(client clientset.Interface) error {
 				return err
 			}
 		}
-	}
-	return nil
-}
-
-// UpdateKubeletDynamicEnvFileWithURLScheme reads the kubelet dynamic environment file
-// from disk, ensure that the CRI endpoint flag has a scheme prefix and writes it
-// back to disk.
-// TODO: Temporary workaround. Remove in 1.25:
-// https://github.com/kubernetes/kubeadm/issues/2426
-func UpdateKubeletDynamicEnvFileWithURLScheme(dryRun bool) error {
-	filePath := filepath.Join(kubeadmconstants.KubeletRunDirectory, kubeadmconstants.KubeletEnvFileName)
-	if dryRun {
-		fmt.Printf("[upgrade] Would ensure that %q includes a CRI endpoint URL scheme\n", filePath)
-		return nil
-	}
-	klog.V(2).Infof("Ensuring that %q includes a CRI endpoint URL scheme", filePath)
-	bytes, err := os.ReadFile(filePath)
-	if err != nil {
-		return errors.Wrapf(err, "failed to read kubelet configuration from file %q", filePath)
-	}
-	updated := updateKubeletDynamicEnvFileWithURLScheme(string(bytes))
-	if err := os.WriteFile(filePath, []byte(updated), 0644); err != nil {
-		return errors.Wrapf(err, "failed to write kubelet configuration to the file %q", filePath)
 	}
 	return nil
 }
