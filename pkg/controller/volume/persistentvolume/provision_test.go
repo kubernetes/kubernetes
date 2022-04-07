@@ -19,6 +19,9 @@ package persistentvolume
 import (
 	"context"
 	"errors"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -167,6 +170,8 @@ var provision2Success = provisionCall{
 // 2. Call the syncVolume *once*.
 // 3. Compare resulting volumes with expected volumes.
 func TestProvisionSync(t *testing.T) {
+	// Default enable the HonorPVReclaimPolicy feature gate.
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HonorPVReclaimPolicy, true)()
 	tests := []controllerTest{
 		{
 			// Provision a volume (with a default class)
@@ -493,8 +498,8 @@ func TestProvisionSync(t *testing.T) {
 			"11-23 - skip finding PV and provision for PVC annotated with AnnSelectedNode",
 			newVolumeArray("volume11-23", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimDelete, classCopper),
 			[]*v1.PersistentVolume{
-				newVolume("volume11-23", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimDelete, classCopper),
-				newVolume("pvc-uid11-23", "1Gi", "uid11-23", "claim11-23", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classCopper, volume.AnnDynamicallyProvisioned, volume.AnnBoundByController),
+				newVolumeWithFinalizers("volume11-23", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimDelete, classCopper, nil /*No Finalizer is added here since the test doesn't trigger syncVolume, instead just syncClaim*/),
+				newVolumeWithFinalizers("pvc-uid11-23", "1Gi", "uid11-23", "claim11-23", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classCopper, []string{volume.PVDeletionInTreeProtectionFinalizer}, volume.AnnDynamicallyProvisioned, volume.AnnBoundByController),
 			},
 			claimWithAnnotation(volume.AnnSelectedNode, "node1",
 				newClaimArray("claim11-23", "uid11-23", "1Gi", "", v1.ClaimPending, &classCopper)),
