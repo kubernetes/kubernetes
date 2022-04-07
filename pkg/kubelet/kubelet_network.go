@@ -31,7 +31,7 @@ func (kl *Kubelet) providerRequiresNetworkingConfiguration() bool {
 	// is used or whether we are using overlay networking. We should return
 	// true for cloud providers if they implement Routes() interface and
 	// we are not using overlay networking.
-	if kl.cloud == nil || kl.cloud.ProviderName() != "gce" {
+	if kl.cloud == nil {
 		return false
 	}
 	_, supported := kl.cloud.Routes()
