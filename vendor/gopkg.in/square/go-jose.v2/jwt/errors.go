@@ -46,5 +46,8 @@ var ErrNotValidYet = errors.New("square/go-jose/jwt: validation failed, token no
 // ErrExpired indicates that token is used after expiry time indicated in exp claim.
 var ErrExpired = errors.New("square/go-jose/jwt: validation failed, token is expired (exp)")
 
-// ErrInvalidContentType indicated that token requires JWT cty header.
+// ErrIssuedInTheFuture indicates that the iat field is in the future.
+var ErrIssuedInTheFuture = errors.New("square/go-jose/jwt: validation field, token issued in the future (iat)")
+
+// ErrInvalidContentType indicates that token requires JWT cty header.
 var ErrInvalidContentType = errors.New("square/go-jose/jwt: expected content type to be JWT (cty header)")

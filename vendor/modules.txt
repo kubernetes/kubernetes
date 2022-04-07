@@ -196,9 +196,9 @@ github.com/coredns/caddy/caddyfile
 ## explicit
 github.com/coredns/corefile-migration/migration
 github.com/coredns/corefile-migration/migration/corefile
-# github.com/coreos/go-oidc v2.1.0+incompatible => github.com/coreos/go-oidc v2.1.0+incompatible
+# github.com/coreos/go-oidc/v3 v3.1.0 => github.com/coreos/go-oidc/v3 v3.1.0
 ## explicit
-github.com/coreos/go-oidc
+github.com/coreos/go-oidc/v3/oidc
 # github.com/coreos/go-semver v0.3.0 => github.com/coreos/go-semver v0.3.0
 github.com/coreos/go-semver/semver
 # github.com/coreos/go-systemd/v22 v22.3.2 => github.com/coreos/go-systemd/v22 v22.3.2
@@ -639,9 +639,6 @@ github.com/pkg/errors
 # github.com/pmezard/go-difflib v1.0.0 => github.com/pmezard/go-difflib v1.0.0
 ## explicit
 github.com/pmezard/go-difflib/difflib
-# github.com/pquerna/cachecontrol v0.0.0-20171018203845-0dec1b30a021 => github.com/pquerna/cachecontrol v0.0.0-20171018203845-0dec1b30a021
-github.com/pquerna/cachecontrol
-github.com/pquerna/cachecontrol/cacheobject
 # github.com/prometheus/client_golang v1.12.1 => github.com/prometheus/client_golang v1.12.1
 ## explicit
 github.com/prometheus/client_golang/prometheus
@@ -1232,7 +1229,7 @@ gopkg.in/gcfg.v1/types
 gopkg.in/inf.v0
 # gopkg.in/natefinch/lumberjack.v2 v2.0.0 => gopkg.in/natefinch/lumberjack.v2 v2.0.0
 gopkg.in/natefinch/lumberjack.v2
-# gopkg.in/square/go-jose.v2 v2.2.2 => gopkg.in/square/go-jose.v2 v2.2.2
+# gopkg.in/square/go-jose.v2 v2.5.1 => gopkg.in/square/go-jose.v2 v2.5.1
 ## explicit
 gopkg.in/square/go-jose.v2
 gopkg.in/square/go-jose.v2/cipher
@@ -2496,7 +2493,7 @@ sigs.k8s.io/yaml
 # github.com/containerd/typeurl => github.com/containerd/typeurl v1.0.2
 # github.com/coredns/caddy => github.com/coredns/caddy v1.1.0
 # github.com/coredns/corefile-migration => github.com/coredns/corefile-migration v1.0.14
-# github.com/coreos/go-oidc => github.com/coreos/go-oidc v2.1.0+incompatible
+# github.com/coreos/go-oidc/v3 => github.com/coreos/go-oidc/v3 v3.1.0
 # github.com/coreos/go-semver => github.com/coreos/go-semver v0.3.0
 # github.com/coreos/go-systemd/v22 => github.com/coreos/go-systemd/v22 v22.3.2
 # github.com/cpuguy83/go-md2man/v2 => github.com/cpuguy83/go-md2man/v2 v2.0.1
@@ -2725,7 +2722,7 @@ sigs.k8s.io/yaml
 # gopkg.in/gcfg.v1 => gopkg.in/gcfg.v1 v1.2.0
 # gopkg.in/inf.v0 => gopkg.in/inf.v0 v0.9.1
 # gopkg.in/natefinch/lumberjack.v2 => gopkg.in/natefinch/lumberjack.v2 v2.0.0
-# gopkg.in/square/go-jose.v2 => gopkg.in/square/go-jose.v2 v2.2.2
+# gopkg.in/square/go-jose.v2 => gopkg.in/square/go-jose.v2 v2.5.1
 # gopkg.in/tomb.v1 => gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7
 # gopkg.in/warnings.v0 => gopkg.in/warnings.v0 v0.1.1
 # gopkg.in/yaml.v2 => gopkg.in/yaml.v2 v2.4.0

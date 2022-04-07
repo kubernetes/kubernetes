@@ -29,7 +29,7 @@ import (
 	"math/big"
 
 	"golang.org/x/crypto/ed25519"
-	"gopkg.in/square/go-jose.v2/cipher"
+	josecipher "gopkg.in/square/go-jose.v2/cipher"
 	"gopkg.in/square/go-jose.v2/json"
 )
 
@@ -288,7 +288,7 @@ func (ctx rsaDecrypterSigner) signPayload(payload []byte, alg SignatureAlgorithm
 		out, err = rsa.SignPKCS1v15(RandReader, ctx.privateKey, hash, hashed)
 	case PS256, PS384, PS512:
 		out, err = rsa.SignPSS(RandReader, ctx.privateKey, hash, hashed, &rsa.PSSOptions{
-			SaltLength: rsa.PSSSaltLengthAuto,
+			SaltLength: rsa.PSSSaltLengthEqualsHash,
 		})
 	}
 

@@ -81,3 +81,64 @@ type opaqueVerifier struct {
 func (o *opaqueVerifier) verifyPayload(payload []byte, signature []byte, alg SignatureAlgorithm) error {
 	return o.verifier.VerifyPayload(payload, signature, alg)
 }
+
+// OpaqueKeyEncrypter is an interface that supports encrypting keys with an opaque key.
+type OpaqueKeyEncrypter interface {
+	// KeyID returns the kid
+	KeyID() string
+	// Algs returns a list of supported key encryption algorithms.
+	Algs() []KeyAlgorithm
+	// encryptKey encrypts the CEK using the given algorithm.
+	encryptKey(cek []byte, alg KeyAlgorithm) (recipientInfo, error)
+}
+
+type opaqueKeyEncrypter struct {
+	encrypter OpaqueKeyEncrypter
+}
+
+func newOpaqueKeyEncrypter(alg KeyAlgorithm, encrypter OpaqueKeyEncrypter) (recipientKeyInfo, error) {
+	var algSupported bool
+	for _, salg := range encrypter.Algs() {
+		if alg == salg {
+			algSupported = true
+			break
+		}
+	}
+	if !algSupported {
+		return recipientKeyInfo{}, ErrUnsupportedAlgorithm
+	}
+
+	return recipientKeyInfo{
+		keyID:  encrypter.KeyID(),
+		keyAlg: alg,
+		keyEncrypter: &opaqueKeyEncrypter{
+			encrypter: encrypter,
+		},
+	}, nil
+}
+
+func (oke *opaqueKeyEncrypter) encryptKey(cek []byte, alg KeyAlgorithm) (recipientInfo, error) {
+	return oke.encrypter.encryptKey(cek, alg)
+}
+
+//OpaqueKeyDecrypter is an interface that supports decrypting keys with an opaque key.
+type OpaqueKeyDecrypter interface {
+	DecryptKey(encryptedKey []byte, header Header) ([]byte, error)
+}
+
+type opaqueKeyDecrypter struct {
+	decrypter OpaqueKeyDecrypter
+}
+
+func (okd *opaqueKeyDecrypter) decryptKey(headers rawHeader, recipient *recipientInfo, generator keyGenerator) ([]byte, error) {
+	mergedHeaders := rawHeader{}
+	mergedHeaders.merge(&headers)
+	mergedHeaders.merge(recipient.header)
+
+	header, err := mergedHeaders.sanitized()
+	if err != nil {
+		return nil, err
+	}
+
+	return okd.decrypter.DecryptKey(recipient.encryptedKey, header)
+}

@@ -153,11 +153,17 @@ const (
 	headerJWK   = "jwk"   // *JSONWebKey
 	headerKeyID = "kid"   // string
 	headerNonce = "nonce" // string
+	headerB64   = "b64"   // bool
 
 	headerP2C = "p2c" // *byteBuffer (int)
 	headerP2S = "p2s" // *byteBuffer ([]byte)
 
 )
+
+// supportedCritical is the set of supported extensions that are understood and processed.
+var supportedCritical = map[string]bool{
+	headerB64: true,
+}
 
 // rawHeader represents the JOSE header for JWE/JWS objects (used for parsing).
 //
@@ -347,6 +353,21 @@ func (parsed rawHeader) getP2C() (int, error) {
 // getS2S extracts parsed "p2s" from the raw JSON.
 func (parsed rawHeader) getP2S() (*byteBuffer, error) {
 	return parsed.getByteBuffer(headerP2S)
+}
+
+// getB64 extracts parsed "b64" from the raw JSON, defaulting to true.
+func (parsed rawHeader) getB64() (bool, error) {
+	v := parsed[headerB64]
+	if v == nil {
+		return true, nil
+	}
+
+	var b64 bool
+	err := json.Unmarshal(*v, &b64)
+	if err != nil {
+		return true, err
+	}
+	return b64, nil
 }
 
 // sanitized produces a cleaned-up header object from the raw JSON.

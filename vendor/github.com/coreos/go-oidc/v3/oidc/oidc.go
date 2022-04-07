@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"golang.org/x/oauth2"
-	jose "gopkg.in/square/go-jose.v2"
 )
 
 const (
@@ -40,6 +39,10 @@ var (
 	errInvalidAtHash = errors.New("access token hash does not match value in ID token")
 )
 
+type contextKey int
+
+var issuerURLKey contextKey
+
 // ClientContext returns a new Context that carries the provided HTTP client.
 //
 // This method sets the same context key used by the golang.org/x/oauth2 package,
@@ -53,6 +56,36 @@ var (
 //
 func ClientContext(ctx context.Context, client *http.Client) context.Context {
 	return context.WithValue(ctx, oauth2.HTTPClient, client)
+}
+
+// cloneContext copies a context's bag-of-values into a new context that isn't
+// associated with its cancellation. This is used to initialize remote keys sets
+// which run in the background and aren't associated with the initial context.
+func cloneContext(ctx context.Context) context.Context {
+	cp := context.Background()
+	if c, ok := ctx.Value(oauth2.HTTPClient).(*http.Client); ok {
+		cp = ClientContext(cp, c)
+	}
+	return cp
+}
+
+// InsecureIssuerURLContext allows discovery to work when the issuer_url reported
+// by upstream is mismatched with the discovery URL. This is meant for integration
+// with off-spec providers such as Azure.
+//
+//    discoveryBaseURL := "https://login.microsoftonline.com/organizations/v2.0"
+//    issuerURL := "https://login.microsoftonline.com/my-tenantid/v2.0"
+//
+//    ctx := oidc.InsecureIssuerURLContext(parentContext, issuerURL)
+//
+//    // Provider will be discovered with the discoveryBaseURL, but use issuerURL
+//    // for future issuer validation.
+//    provider, err := oidc.NewProvider(ctx, discoveryBaseURL)
+//
+// This is insecure because validating the correct issuer is critical for multi-tenant
+// proivders. Any overrides here MUST be carefully reviewed.
+func InsecureIssuerURLContext(ctx context.Context, issuerURL string) context.Context {
+	return context.WithValue(ctx, issuerURLKey, issuerURL)
 }
 
 func doRequest(ctx context.Context, req *http.Request) (*http.Response, error) {
@@ -69,6 +102,7 @@ type Provider struct {
 	authURL     string
 	tokenURL    string
 	userInfoURL string
+	algorithms  []string
 
 	// Raw claims returned by the server.
 	rawClaims []byte
@@ -76,17 +110,28 @@ type Provider struct {
 	remoteKeySet KeySet
 }
 
-type cachedKeys struct {
-	keys   []jose.JSONWebKey
-	expiry time.Time
+type providerJSON struct {
+	Issuer      string   `json:"issuer"`
+	AuthURL     string   `json:"authorization_endpoint"`
+	TokenURL    string   `json:"token_endpoint"`
+	JWKSURL     string   `json:"jwks_uri"`
+	UserInfoURL string   `json:"userinfo_endpoint"`
+	Algorithms  []string `json:"id_token_signing_alg_values_supported"`
 }
 
-type providerJSON struct {
-	Issuer      string `json:"issuer"`
-	AuthURL     string `json:"authorization_endpoint"`
-	TokenURL    string `json:"token_endpoint"`
-	JWKSURL     string `json:"jwks_uri"`
-	UserInfoURL string `json:"userinfo_endpoint"`
+// supportedAlgorithms is a list of algorithms explicitly supported by this
+// package. If a provider supports other algorithms, such as HS256 or none,
+// those values won't be passed to the IDTokenVerifier.
+var supportedAlgorithms = map[string]bool{
+	RS256: true,
+	RS384: true,
+	RS512: true,
+	ES256: true,
+	ES384: true,
+	ES512: true,
+	PS256: true,
+	PS384: true,
+	PS512: true,
 }
 
 // NewProvider uses the OpenID Connect discovery mechanism to construct a Provider.
@@ -120,16 +165,27 @@ func NewProvider(ctx context.Context, issuer string) (*Provider, error) {
 		return nil, fmt.Errorf("oidc: failed to decode provider discovery object: %v", err)
 	}
 
-	if p.Issuer != issuer {
+	issuerURL, skipIssuerValidation := ctx.Value(issuerURLKey).(string)
+	if !skipIssuerValidation {
+		issuerURL = issuer
+	}
+	if p.Issuer != issuerURL && !skipIssuerValidation {
 		return nil, fmt.Errorf("oidc: issuer did not match the issuer returned by provider, expected %q got %q", issuer, p.Issuer)
 	}
+	var algs []string
+	for _, a := range p.Algorithms {
+		if supportedAlgorithms[a] {
+			algs = append(algs, a)
+		}
+	}
 	return &Provider{
-		issuer:       p.Issuer,
+		issuer:       issuerURL,
 		authURL:      p.AuthURL,
 		tokenURL:     p.TokenURL,
 		userInfoURL:  p.UserInfoURL,
+		algorithms:   algs,
 		rawClaims:    body,
-		remoteKeySet: NewRemoteKeySet(ctx, p.JWKSURL),
+		remoteKeySet: NewRemoteKeySet(cloneContext(ctx), p.JWKSURL),
 	}, nil
 }
 
@@ -166,6 +222,16 @@ type UserInfo struct {
 	EmailVerified bool   `json:"email_verified"`
 
 	claims []byte
+}
+
+type userInfoRaw struct {
+	Subject string `json:"sub"`
+	Profile string `json:"profile"`
+	Email   string `json:"email"`
+	// Handle providers that return email_verified as a string
+	// https://forums.aws.amazon.com/thread.jspa?messageID=949441&#949441 and
+	// https://discuss.elastic.co/t/openid-error-after-authenticating-against-aws-cognito/206018/11
+	EmailVerified stringAsBool `json:"email_verified"`
 }
 
 // Claims unmarshals the raw JSON object claims into the provided object.
@@ -206,12 +272,27 @@ func (p *Provider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource)
 		return nil, fmt.Errorf("%s: %s", resp.Status, body)
 	}
 
-	var userInfo UserInfo
+	ct := resp.Header.Get("Content-Type")
+	mediaType, _, parseErr := mime.ParseMediaType(ct)
+	if parseErr == nil && mediaType == "application/jwt" {
+		payload, err := p.remoteKeySet.VerifySignature(ctx, string(body))
+		if err != nil {
+			return nil, fmt.Errorf("oidc: invalid userinfo jwt signature %v", err)
+		}
+		body = payload
+	}
+
+	var userInfo userInfoRaw
 	if err := json.Unmarshal(body, &userInfo); err != nil {
 		return nil, fmt.Errorf("oidc: failed to decode userinfo: %v", err)
 	}
-	userInfo.claims = body
-	return &userInfo, nil
+	return &UserInfo{
+		Subject:       userInfo.Subject,
+		Profile:       userInfo.Profile,
+		Email:         userInfo.Email,
+		EmailVerified: bool(userInfo.EmailVerified),
+		claims:        body,
+	}, nil
 }
 
 // IDToken is an OpenID Connect extension that provides a predictable representation
@@ -333,6 +414,20 @@ type claimSource struct {
 	AccessToken string `json:"access_token"`
 }
 
+type stringAsBool bool
+
+func (sb *stringAsBool) UnmarshalJSON(b []byte) error {
+	switch string(b) {
+	case "true", `"true"`:
+		*sb = true
+	case "false", `"false"`:
+		*sb = false
+	default:
+		return errors.New("invalid value for boolean")
+	}
+	return nil
+}
+
 type audience []string
 
 func (a *audience) UnmarshalJSON(b []byte) error {
@@ -345,7 +440,7 @@ func (a *audience) UnmarshalJSON(b []byte) error {
 	if err := json.Unmarshal(b, &auds); err != nil {
 		return err
 	}
-	*a = audience(auds)
+	*a = auds
 	return nil
 }
 
