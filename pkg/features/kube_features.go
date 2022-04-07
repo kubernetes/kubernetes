@@ -815,7 +815,6 @@ const (
 	// owner: @deepakkinni @xing-yang
 	// kep: http://kep.k8s.io/2680
 	// alpha: v1.23
-	// beta: v1.24
 	//
 	// Honor Persistent Volume Reclaim Policy when it is "Delete" irrespective of PV-PVC
 	// deletion ordering.
@@ -1000,7 +999,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	JobMutableNodeSchedulingDirectives:             {Default: true, PreRelease: featuregate.Beta},
 	IdentifyPodOS:                                  {Default: true, PreRelease: featuregate.Beta},
 	PodAndContainerStatsFromCRI:                    {Default: false, PreRelease: featuregate.Alpha},
-	HonorPVReclaimPolicy:                           {Default: true, PreRelease: featuregate.Beta},
+	HonorPVReclaimPolicy:                           {Default: false, PreRelease: featuregate.Alpha},
 	RecoverVolumeExpansionFailure:                  {Default: false, PreRelease: featuregate.Alpha},
 	GRPCContainerProbe:                             {Default: true, PreRelease: featuregate.Beta},
 	LegacyServiceAccountTokenNoAutoGeneration:      {Default: true, PreRelease: featuregate.Beta},
