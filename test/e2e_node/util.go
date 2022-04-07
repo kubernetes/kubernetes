@@ -41,6 +41,7 @@ import (
 	kubeletpodresourcesv1 "k8s.io/kubelet/pkg/apis/podresources/v1"
 	kubeletpodresourcesv1alpha1 "k8s.io/kubelet/pkg/apis/podresources/v1alpha1"
 	stats "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
+	"k8s.io/kubernetes/pkg/cluster/ports"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -70,12 +71,12 @@ const (
 	defaultPodResourcesPath    = "/var/lib/kubelet/pod-resources"
 	defaultPodResourcesTimeout = 10 * time.Second
 	defaultPodResourcesMaxSize = 1024 * 1024 * 16 // 16 Mb
-	kubeletReadOnlyPort        = "10255"
-	kubeletHealthCheckURL      = "http://127.0.0.1:" + kubeletReadOnlyPort + "/healthz"
 	// state files
 	cpuManagerStateFile    = "/var/lib/kubelet/cpu_manager_state"
 	memoryManagerStateFile = "/var/lib/kubelet/memory_manager_state"
 )
+
+var kubeletHealthCheckURL = fmt.Sprintf("http://127.0.0.1:%d/healthz", ports.KubeletHealthzPort)
 
 func getNodeSummary() (*stats.Summary, error) {
 	kubeletConfig, err := getCurrentKubeletConfig()
@@ -259,7 +260,7 @@ func logKubeletLatencyMetrics(metricNames ...string) {
 	for _, key := range metricNames {
 		metricSet.Insert(kubeletmetrics.KubeletSubsystem + "_" + key)
 	}
-	metric, err := e2emetrics.GrabKubeletMetricsWithoutProxy(framework.TestContext.NodeName+":10255", "/metrics")
+	metric, err := e2emetrics.GrabKubeletMetricsWithoutProxy(fmt.Sprintf("%s:%d", framework.TestContext.NodeName, ports.KubeletReadOnlyPort), "/metrics")
 	if err != nil {
 		framework.Logf("Error getting kubelet metrics: %v", err)
 	} else {
