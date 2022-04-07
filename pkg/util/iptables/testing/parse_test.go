@@ -17,9 +17,12 @@ limitations under the License.
 package testing
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/lithammer/dedent"
 
 	"k8s.io/kubernetes/pkg/util/iptables"
 	utilpointer "k8s.io/utils/pointer"
@@ -214,6 +217,377 @@ func TestParseRule(t *testing.T) {
 					t.Errorf("expected error %q, got %+v", testCase.err, rule)
 				} else if !reflect.DeepEqual(rule, testCase.parsed) {
 					t.Errorf("bad match: expected\n%+v\ngot\n%+v", testCase.parsed, rule)
+				}
+			}
+		})
+	}
+}
+
+// Helper for TestParseIPTablesDump. Obviously it should not be used in TestParseRule...
+func mustParseRule(rule string) *Rule {
+	parsed, err := ParseRule(rule, false)
+	if err != nil {
+		panic(fmt.Sprintf("failed to parse test case rule %q: %v", rule, err))
+	}
+	return parsed
+}
+
+func TestParseIPTablesDump(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		input  string
+		output *IPTablesDump
+		error  string
+	}{
+		{
+			name: "basic test",
+			input: dedent.Dedent(`
+				*filter
+				:KUBE-SERVICES - [0:0]
+				:KUBE-EXTERNAL-SERVICES - [0:0]
+				:KUBE-FORWARD - [0:0]
+				:KUBE-NODEPORTS - [0:0]
+				-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
+				-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
+				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+				COMMIT
+				*nat
+				:KUBE-SERVICES - [0:0]
+				:KUBE-NODEPORTS - [0:0]
+				:KUBE-POSTROUTING - [0:0]
+				:KUBE-MARK-MASQ - [0:0]
+				:KUBE-SVC-XPGD46QRK7WJZT7O - [0:0]
+				:KUBE-SEP-SXIVWICOYRO3J4NJ - [0:0]
+				-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
+				-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
+				-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
+				-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
+				-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
+				-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+				-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment ns1/svc1:p80 -j KUBE-SEP-SXIVWICOYRO3J4NJ
+				-A KUBE-SEP-SXIVWICOYRO3J4NJ -m comment --comment ns1/svc1:p80 -s 10.180.0.1 -j KUBE-MARK-MASQ
+				-A KUBE-SEP-SXIVWICOYRO3J4NJ -m comment --comment ns1/svc1:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.1:80
+				-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
+				COMMIT
+				`),
+			output: &IPTablesDump{
+				Tables: []Table{{
+					Name: iptables.TableFilter,
+					Chains: []Chain{{
+						Name: iptables.Chain("KUBE-SERVICES"),
+					}, {
+						Name: iptables.Chain("KUBE-EXTERNAL-SERVICES"),
+					}, {
+						Name: iptables.Chain("KUBE-FORWARD"),
+						Rules: []*Rule{
+							mustParseRule(`-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP`),
+							mustParseRule(`-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT`),
+							mustParseRule(`-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT`),
+						},
+					}, {
+						Name: iptables.Chain("KUBE-NODEPORTS"),
+						Rules: []*Rule{
+							mustParseRule(`-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT`),
+						},
+					}},
+				}, {
+					Name: iptables.TableNAT,
+					Chains: []Chain{{
+						Name: iptables.Chain("KUBE-SERVICES"),
+						Rules: []*Rule{
+							mustParseRule(`-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O`),
+							mustParseRule(`-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS`),
+						},
+					}, {
+						Name: iptables.Chain("KUBE-NODEPORTS"),
+					}, {
+						Name: iptables.Chain("KUBE-POSTROUTING"),
+						Rules: []*Rule{
+							mustParseRule(`-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN`),
+							mustParseRule(`-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000`),
+							mustParseRule(`-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE`),
+						},
+					}, {
+						Name: iptables.Chain("KUBE-MARK-MASQ"),
+						Rules: []*Rule{
+							mustParseRule(`-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000`),
+						},
+					}, {
+						Name: iptables.Chain("KUBE-SVC-XPGD46QRK7WJZT7O"),
+						Rules: []*Rule{
+							mustParseRule(`-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ`),
+							mustParseRule(`-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment ns1/svc1:p80 -j KUBE-SEP-SXIVWICOYRO3J4NJ`),
+						},
+					}, {
+						Name: iptables.Chain("KUBE-SEP-SXIVWICOYRO3J4NJ"),
+						Rules: []*Rule{
+							mustParseRule(`-A KUBE-SEP-SXIVWICOYRO3J4NJ -m comment --comment ns1/svc1:p80 -s 10.180.0.1 -j KUBE-MARK-MASQ`),
+							mustParseRule(`-A KUBE-SEP-SXIVWICOYRO3J4NJ -m comment --comment ns1/svc1:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.1:80`),
+						},
+					}},
+				}},
+			},
+		},
+		{
+			name: "deletion",
+			input: dedent.Dedent(`
+				*nat
+				:KUBE-SERVICES - [0:0]
+				:KUBE-SVC-XPGD46QRK7WJZT7O - [0:0]
+				:KUBE-SEP-SXIVWICOYRO3J4NJ - [0:0]
+				-X KUBE-SVC-XPGD46QRK7WJZT7O
+				-X KUBE-SEP-SXIVWICOYRO3J4NJ
+				-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
+				COMMIT
+				`),
+			output: &IPTablesDump{
+				Tables: []Table{{
+					Name: iptables.TableNAT,
+					Chains: []Chain{{
+						Name: iptables.Chain("KUBE-SERVICES"),
+						Rules: []*Rule{
+							mustParseRule(`-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS`),
+						},
+					}, {
+						Name:    iptables.Chain("KUBE-SVC-XPGD46QRK7WJZT7O"),
+						Deleted: true,
+					}, {
+						Name:    iptables.Chain("KUBE-SEP-SXIVWICOYRO3J4NJ"),
+						Deleted: true,
+					}},
+				}},
+			},
+		},
+		{
+			name: "whitespace and comments",
+			input: dedent.Dedent(`
+				# Generated by iptables-save v1.8.7 on Mon May  9 11:22:21 2022
+				# (not really...)
+				*filter
+				:KUBE-SERVICES - [0:0]
+				:KUBE-EXTERNAL-SERVICES - [0:0]
+
+				:KUBE-FORWARD - [0:0]
+				:KUBE-NODEPORTS - [0:0]
+				-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
+				  -A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
+				# This rule does a thing
+				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+				COMMIT
+				# Completed on Mon May  9 11:22:21 2022
+				`),
+			output: &IPTablesDump{
+				Tables: []Table{{
+					Name: iptables.TableFilter,
+					Chains: []Chain{{
+						Name: iptables.Chain("KUBE-SERVICES"),
+					}, {
+						Name: iptables.Chain("KUBE-EXTERNAL-SERVICES"),
+					}, {
+						Name: iptables.Chain("KUBE-FORWARD"),
+						Rules: []*Rule{
+							mustParseRule(`-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP`),
+							mustParseRule(`-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT`),
+							mustParseRule(`-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT`),
+						},
+					}, {
+						Name: iptables.Chain("KUBE-NODEPORTS"),
+						Rules: []*Rule{
+							mustParseRule(`-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT`),
+						},
+					}},
+				}},
+			},
+		},
+		{
+			name: "no COMMIT line",
+			input: dedent.Dedent(`
+				*filter
+				:KUBE-SERVICES - [0:0]
+				:KUBE-EXTERNAL-SERVICES - [0:0]
+				:KUBE-FORWARD - [0:0]
+				:KUBE-NODEPORTS - [0:0]
+				-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
+				-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
+				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+				`),
+			error: "no COMMIT line?",
+		},
+		{
+			name: "two tables, no second COMMIT line",
+			input: dedent.Dedent(`
+				*filter
+				:KUBE-SERVICES - [0:0]
+				:KUBE-EXTERNAL-SERVICES - [0:0]
+				:KUBE-FORWARD - [0:0]
+				:KUBE-NODEPORTS - [0:0]
+				-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
+				-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
+				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+				COMMIT
+				*nat
+				:KUBE-SERVICES - [0:0]
+				:KUBE-NODEPORTS - [0:0]
+				:KUBE-POSTROUTING - [0:0]
+				:KUBE-MARK-MASQ - [0:0]
+				:KUBE-SVC-XPGD46QRK7WJZT7O - [0:0]
+				:KUBE-SEP-SXIVWICOYRO3J4NJ - [0:0]
+				-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
+				-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
+				-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
+				-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
+				-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
+				-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+				-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment ns1/svc1:p80 -j KUBE-SEP-SXIVWICOYRO3J4NJ
+				-A KUBE-SEP-SXIVWICOYRO3J4NJ -m comment --comment ns1/svc1:p80 -s 10.180.0.1 -j KUBE-MARK-MASQ
+				-A KUBE-SEP-SXIVWICOYRO3J4NJ -m comment --comment ns1/svc1:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.1:80
+				-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
+				`),
+			error: "no COMMIT line?",
+		},
+		{
+			name: "two tables, no second header line",
+			input: dedent.Dedent(`
+				*filter
+				:KUBE-SERVICES - [0:0]
+				:KUBE-EXTERNAL-SERVICES - [0:0]
+				:KUBE-FORWARD - [0:0]
+				:KUBE-NODEPORTS - [0:0]
+				-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
+				-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
+				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+				COMMIT
+				:KUBE-SERVICES - [0:0]
+				:KUBE-NODEPORTS - [0:0]
+				:KUBE-POSTROUTING - [0:0]
+				:KUBE-MARK-MASQ - [0:0]
+				:KUBE-SVC-XPGD46QRK7WJZT7O - [0:0]
+				:KUBE-SEP-SXIVWICOYRO3J4NJ - [0:0]
+				-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
+				-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
+				-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
+				-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
+				-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
+				-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+				-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment ns1/svc1:p80 -j KUBE-SEP-SXIVWICOYRO3J4NJ
+				-A KUBE-SEP-SXIVWICOYRO3J4NJ -m comment --comment ns1/svc1:p80 -s 10.180.0.1 -j KUBE-MARK-MASQ
+				-A KUBE-SEP-SXIVWICOYRO3J4NJ -m comment --comment ns1/svc1:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.1:80
+				-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
+				COMMIT
+				`),
+			error: "not a table name",
+		},
+		{
+			name: "trailing junk",
+			input: dedent.Dedent(`
+				*filter
+				:KUBE-SERVICES - [0:0]
+				:KUBE-EXTERNAL-SERVICES - [0:0]
+				:KUBE-FORWARD - [0:0]
+				:KUBE-NODEPORTS - [0:0]
+				-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
+				-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
+				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+				COMMIT
+				*nat
+				:KUBE-SERVICES - [0:0]
+				:KUBE-EXTERNAL-SERVICES - [0:0]
+				:KUBE-FORWARD - [0:0]
+				:KUBE-NODEPORTS - [0:0]
+				-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
+				-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
+				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+				COMMIT
+				junk
+				`),
+			error: `table 3 starts with "junk"`,
+		},
+		{
+			name: "add to missing chain",
+			input: dedent.Dedent(`
+				*filter
+				:KUBE-SERVICES - [0:0]
+				:KUBE-EXTERNAL-SERVICES - [0:0]
+				:KUBE-NODEPORTS - [0:0]
+				-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
+				-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
+				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+				COMMIT
+				`),
+			error: `no such chain "KUBE-FORWARD"`,
+		},
+		{
+			name: "add to deleted chain",
+			input: dedent.Dedent(`
+				*filter
+				:KUBE-SERVICES - [0:0]
+				:KUBE-EXTERNAL-SERVICES - [0:0]
+				:KUBE-FORWARD - [0:0]
+				:KUBE-NODEPORTS - [0:0]
+				-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
+				-X KUBE-FORWARD
+				-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
+				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+				COMMIT
+				`),
+			error: `cannot add rules to deleted chain`,
+		},
+		{
+			name: "deleted non-empty chain",
+			input: dedent.Dedent(`
+				*filter
+				:KUBE-SERVICES - [0:0]
+				:KUBE-EXTERNAL-SERVICES - [0:0]
+				:KUBE-FORWARD - [0:0]
+				:KUBE-NODEPORTS - [0:0]
+				-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
+				-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
+				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+				-X KUBE-FORWARD
+				COMMIT
+				`),
+			error: `cannot delete chain "KUBE-FORWARD" after adding rules`,
+		},
+		{
+			name: "junk rule",
+			input: dedent.Dedent(`
+				*filter
+				:KUBE-SERVICES - [0:0]
+				:KUBE-EXTERNAL-SERVICES - [0:0]
+				:KUBE-FORWARD - [0:0]
+				:KUBE-NODEPORTS - [0:0]
+				-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
+				-Q KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
+				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+				COMMIT
+				`),
+			error: `"-Q KUBE-FORWARD`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dump, err := ParseIPTablesDump(tc.input)
+			if err == nil {
+				if tc.error != "" {
+					t.Errorf("unexpectedly did not get error")
+				} else if !reflect.DeepEqual(tc.output, dump) {
+					t.Errorf("bad output: expected %#v got %#v", tc.output, dump)
+				}
+			} else {
+				if tc.error == "" {
+					t.Errorf("got unexpected error: %v", err)
+				} else if !strings.Contains(err.Error(), tc.error) {
+					t.Errorf("got wrong error: %v (expected %q)", err, tc.error)
 				}
 			}
 		})
