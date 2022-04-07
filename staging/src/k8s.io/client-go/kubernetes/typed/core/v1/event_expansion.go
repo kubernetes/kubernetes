@@ -112,7 +112,7 @@ func (e *events) Search(scheme *runtime.Scheme, objOrRef runtime.Object) (*v1.Ev
 	if len(e.ns) > 0 && ref.Namespace != e.ns {
 		return nil, fmt.Errorf("won't be able to find any events of namespace '%v' in namespace '%v'", ref.Namespace, e.ns)
 	}
-	stringRefKind := string(ref.Kind)
+	stringRefKind := ref.Kind
 	var refKind *string
 	if len(stringRefKind) > 0 {
 		refKind = &stringRefKind
