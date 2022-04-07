@@ -105,15 +105,18 @@ func (ssc *defaultStatefulSetControl) performUpdate(
 	}
 
 	// perform the main update function and get the status
-	currentStatus, err = ssc.updateStatefulSet(ctx, set, currentRevision, updateRevision, collisionCount, pods)
-	if err != nil {
-		return currentRevision, updateRevision, currentStatus, err
-	}
+	currentStatus, updateStatefulSetsErr = ssc.updateStatefulSet(ctx, set, currentRevision, updateRevision, collisionCount, pods)
 	// update the set's status
-	err = ssc.updateStatefulSetStatus(ctx, set, currentStatus)
-	if err != nil {
-		return currentRevision, updateRevision, currentStatus, err
+	updateStatefulSetStatusErr = ssc.updateStatefulSetStatus(ctx, set, currentStatus)
+	
+	if updateStatefulSetsErr != nil {
+		return currentRevision, updateRevision, currentStatus, updateStatefulSetsErr
 	}
+	
+	if updateStatefulSetStatusErr != nil {
+		return currentRevision, updateRevision, currentStatus, updateStatefulSetStatusErr
+	}
+	
 	klog.V(4).InfoS("StatefulSet pod status", "statefulSet", klog.KObj(set),
 		"replicas", currentStatus.Replicas,
 		"readyReplicas", currentStatus.ReadyReplicas,
