@@ -20,10 +20,179 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"k8s.io/kubernetes/pkg/util/iptables"
 )
+
+// IPTablesDump represents a parsed IPTables rules dump (ie, the output of
+// "iptables-save" or input to "iptables-restore")
+type IPTablesDump struct {
+	Tables []Table
+}
+
+// Table represents an IPTables table
+type Table struct {
+	Name   iptables.Table
+	Chains []Chain
+}
+
+// Chain represents an IPTables chain
+type Chain struct {
+	Name    iptables.Chain
+	Packets uint64
+	Bytes   uint64
+	Rules   []*Rule
+
+	// Deleted is set if the input contained a "-X Name" line; this would never
+	// appear in iptables-save output but it could appear in iptables-restore *input*.
+	Deleted bool
+}
+
+var declareTableRegex = regexp.MustCompile(`^\*(.*)$`)
+var declareChainRegex = regexp.MustCompile(`^:([^ ]*) - \[([0-9]*):([0-9]*)\]$`)
+var addRuleRegex = regexp.MustCompile(`^-A ([^ ]*) (.*)$`)
+var deleteChainRegex = regexp.MustCompile(`^-X (.*)$`)
+
+type parseState int
+
+const (
+	parseTableDeclaration parseState = iota
+	parseChainDeclarations
+	parseChains
+)
+
+// ParseIPTablesDump parses an IPTables rules dump. Note: this may ignore some bad data.
+func ParseIPTablesDump(data string) (*IPTablesDump, error) {
+	dump := &IPTablesDump{}
+	state := parseTableDeclaration
+	lines := strings.Split(strings.Trim(data, "\n"), "\n")
+	var t *Table
+
+	for _, line := range lines {
+	retry:
+		line = strings.TrimSpace(line)
+		if line == "" || line[0] == '#' {
+			continue
+		}
+
+		switch state {
+		case parseTableDeclaration:
+			// Parse table declaration line ("*filter").
+			match := declareTableRegex.FindStringSubmatch(line)
+			if match == nil {
+				return nil, fmt.Errorf("could not parse iptables data (table %d starts with %q not a table name)", len(dump.Tables)+1, line)
+			}
+			dump.Tables = append(dump.Tables, Table{Name: iptables.Table(match[1])})
+			t = &dump.Tables[len(dump.Tables)-1]
+			state = parseChainDeclarations
+
+		case parseChainDeclarations:
+			match := declareChainRegex.FindStringSubmatch(line)
+			if match == nil {
+				state = parseChains
+				goto retry
+			}
+
+			chain := iptables.Chain(match[1])
+			packets, _ := strconv.ParseUint(match[2], 10, 64)
+			bytes, _ := strconv.ParseUint(match[3], 10, 64)
+
+			t.Chains = append(t.Chains,
+				Chain{
+					Name:    chain,
+					Packets: packets,
+					Bytes:   bytes,
+				},
+			)
+
+		case parseChains:
+			if match := addRuleRegex.FindStringSubmatch(line); match != nil {
+				chain := iptables.Chain(match[1])
+
+				c, err := dump.GetChain(t.Name, chain)
+				if err != nil {
+					return nil, fmt.Errorf("error parsing rule %q: %v", line, err)
+				}
+				if c.Deleted {
+					return nil, fmt.Errorf("cannot add rules to deleted chain %q", chain)
+				}
+
+				rule, err := ParseRule(line, false)
+				if err != nil {
+					return nil, err
+				}
+				c.Rules = append(c.Rules, rule)
+			} else if match := deleteChainRegex.FindStringSubmatch(line); match != nil {
+				chain := iptables.Chain(match[1])
+
+				c, err := dump.GetChain(t.Name, chain)
+				if err != nil {
+					return nil, fmt.Errorf("error parsing rule %q: %v", line, err)
+				}
+				if len(c.Rules) != 0 {
+					return nil, fmt.Errorf("cannot delete chain %q after adding rules", chain)
+				}
+				c.Deleted = true
+			} else if line == "COMMIT" {
+				state = parseTableDeclaration
+			} else {
+				return nil, fmt.Errorf("error parsing rule %q", line)
+			}
+		}
+	}
+
+	if state != parseTableDeclaration {
+		return nil, fmt.Errorf("could not parse iptables data (no COMMIT line?)")
+	}
+
+	return dump, nil
+}
+
+func (dump *IPTablesDump) String() string {
+	buffer := &strings.Builder{}
+	for _, t := range dump.Tables {
+		fmt.Fprintf(buffer, "*%s\n", t.Name)
+		for _, c := range t.Chains {
+			fmt.Fprintf(buffer, ":%s - [%d:%d]\n", c.Name, c.Packets, c.Bytes)
+		}
+		for _, c := range t.Chains {
+			for _, r := range c.Rules {
+				fmt.Fprintf(buffer, "%s\n", r.Raw)
+			}
+		}
+		for _, c := range t.Chains {
+			if c.Deleted {
+				fmt.Fprintf(buffer, "-X %s\n", c.Name)
+			}
+		}
+		fmt.Fprintf(buffer, "COMMIT\n")
+	}
+	return buffer.String()
+}
+
+func (dump *IPTablesDump) GetTable(table iptables.Table) (*Table, error) {
+	for i := range dump.Tables {
+		if dump.Tables[i].Name == table {
+			return &dump.Tables[i], nil
+		}
+	}
+	return nil, fmt.Errorf("no such table %q", table)
+}
+
+func (dump *IPTablesDump) GetChain(table iptables.Table, chain iptables.Chain) (*Chain, error) {
+	t, err := dump.GetTable(table)
+	if err != nil {
+		return nil, err
+	}
+	for i := range t.Chains {
+		if t.Chains[i].Name == chain {
+			return &t.Chains[i], nil
+		}
+	}
+	return nil, fmt.Errorf("no such chain %q", chain)
+}
 
 // Rule represents a single parsed IPTables rule. (This currently covers all of the rule
 // types that we actually use in pkg/proxy/iptables or pkg/proxy/ipvs.)

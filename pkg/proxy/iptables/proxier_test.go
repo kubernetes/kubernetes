@@ -675,18 +675,22 @@ func TestParseIPTablesData(t *testing.T) {
 	}
 }
 
-func countRules(tableName string, ruleData string) int {
-	tables, err := parseIPTablesData(ruleData)
+func countRules(tableName utiliptables.Table, ruleData string) int {
+	dump, err := iptablestest.ParseIPTablesDump(ruleData)
 	if err != nil {
 		klog.ErrorS(err, "error parsing iptables rules")
 		return -1
 	}
 
 	rules := 0
-	for _, line := range tables[tableName] {
-		if line[0] == '-' {
-			rules++
-		}
+	table, err := dump.GetTable(tableName)
+	if err != nil {
+		klog.ErrorS(err, "can't find table", "table", tableName)
+		return -1
+	}
+
+	for _, c := range table.Chains {
+		rules += len(c.Rules)
 	}
 	return rules
 }
@@ -703,20 +707,6 @@ func findAllMatches(lines []string, pattern string) []string {
 		}
 	}
 	return allMatches.List()
-}
-
-// moveMatchingLines moves lines that match pattern from input to output
-func moveMatchingLines(pattern string, input, output []string) ([]string, []string) {
-	var newIn []string
-	regex := regexp.MustCompile(pattern)
-	for _, line := range input {
-		if regex.FindString(line) != "" {
-			output = append(output, line)
-		} else {
-			newIn = append(newIn, line)
-		}
-	}
-	return newIn, output
 }
 
 // checkIPTablesRuleJumps checks that every `-j` in the given rules jumps to a chain
@@ -910,76 +900,107 @@ func TestCheckIPTablesRuleJumps(t *testing.T) {
 	}
 }
 
+// orderByCommentServiceName is a helper function that orders two IPTables rules
+// based on the service name in their comment. (If either rule has no comment then the
+// return value is undefined.)
+func orderByCommentServiceName(rule1, rule2 *iptablestest.Rule) bool {
+	if rule1.Comment == nil || rule2.Comment == nil {
+		return false
+	}
+	name1, name2 := rule1.Comment.Value, rule2.Comment.Value
+
+	// The service name is the comment up to the first space or colon
+	i := strings.IndexAny(name1, " :")
+	if i != -1 {
+		name1 = name1[:i]
+	}
+	i = strings.IndexAny(name2, " :")
+	if i != -1 {
+		name2 = name2[:i]
+	}
+
+	return name1 < name2
+}
+
 // sortIPTablesRules sorts `iptables-restore` output so as to not depend on the order that
 // Services get processed in, while preserving the relative ordering of related rules.
 func sortIPTablesRules(ruleData string) (string, error) {
-	tables, err := parseIPTablesData(ruleData)
+	dump, err := iptablestest.ParseIPTablesDump(ruleData)
 	if err != nil {
 		return "", err
 	}
 
-	tableNames := make([]string, 0, len(tables))
-	for tableName := range tables {
-		tableNames = append(tableNames, tableName)
-	}
-	sort.Strings(tableNames)
+	// Sort tables
+	sort.Slice(dump.Tables, func(i, j int) bool {
+		return dump.Tables[i].Name < dump.Tables[j].Name
+	})
 
-	var output []string
-	for _, name := range tableNames {
-		lines := tables[name]
-
-		// Move "*TABLENAME" line
-		lines, output = moveMatchingLines(`^\*`, lines, output)
-
-		// findAllMatches() returns a sorted list of unique matches. So for
-		// each of the following, we find all the matches for the regex, then
-		// for each unique match (in sorted order), move all of the lines that
-		// contain that match.
-
-		// Move and sort ":CHAINNAME" lines (in the same order we will sort
-		// the chains themselves below).
-		lines, output = moveMatchingLines(`:KUBE-NODEPORTS`, lines, output)
-		lines, output = moveMatchingLines(`:KUBE-SERVICES`, lines, output)
-		for _, chainName := range findAllMatches(lines, `^(:KUBE-[^ ]*) `) {
-			lines, output = moveMatchingLines(chainName, lines, output)
-		}
-		for _, chainName := range findAllMatches(lines, `^(:[^ ]*) `) {
-			lines, output = moveMatchingLines(chainName, lines, output)
-		}
-
-		// Move KUBE-NODEPORTS rules for each service, sorted by service name
-		for _, nextNodePortService := range findAllMatches(lines, `-A KUBE-NODEPORTS.*--comment "?([^ ]*)`) {
-			lines, output = moveMatchingLines(fmt.Sprintf(`^-A KUBE-NODEPORTS.*%s`, nextNodePortService), lines, output)
-		}
-
-		// Move KUBE-SERVICES rules for each service, sorted by service name. The
-		// relative ordering of actual per-service lines doesn't matter, but keep
-		// the "must be the last rule" rule last because it's confusing otherwise...
-		lines, tmp := moveMatchingLines(`KUBE-SERVICES.*must be the last rule`, lines, nil)
-		for _, nextService := range findAllMatches(lines, `-A KUBE-SERVICES.*--comment "?([^ ]*)`) {
-			lines, output = moveMatchingLines(fmt.Sprintf(`^-A KUBE-SERVICES.*%s`, nextService), lines, output)
-		}
-		_, output = moveMatchingLines(`.`, tmp, output)
-
-		// Move remaining chains, sorted by chain name
-		for _, nextChain := range findAllMatches(lines, `(-A KUBE-[^ ]* )`) {
-			lines, output = moveMatchingLines(nextChain, lines, output)
-		}
-
-		// Some tests have deletions...
-		for _, nextChain := range findAllMatches(lines, `(-X KUBE-.*)`) {
-			lines, output = moveMatchingLines(nextChain, lines, output)
-		}
-
-		// Move the "COMMIT" line and anything else left. (There shouldn't be anything
-		// else, but if there is, it will show up in the diff later.)
-		_, output = moveMatchingLines(".", lines, output)
+	// Sort chains
+	for t := range dump.Tables {
+		table := &dump.Tables[t]
+		sort.Slice(table.Chains, func(i, j int) bool {
+			switch {
+			case table.Chains[i].Name == kubeNodePortsChain:
+				// KUBE-NODEPORTS comes before anything
+				return true
+			case table.Chains[j].Name == kubeNodePortsChain:
+				// anything goes after KUBE-NODEPORTS
+				return false
+			case table.Chains[i].Name == kubeServicesChain:
+				// KUBE-SERVICES comes before anything (except KUBE-NODEPORTS)
+				return true
+			case table.Chains[j].Name == kubeServicesChain:
+				// anything (except KUBE-NODEPORTS) goes after KUBE-SERVICES
+				return false
+			case strings.HasPrefix(string(table.Chains[i].Name), "KUBE-") && !strings.HasPrefix(string(table.Chains[j].Name), "KUBE-"):
+				// KUBE-* comes before non-KUBE-*
+				return true
+			case !strings.HasPrefix(string(table.Chains[i].Name), "KUBE-") && strings.HasPrefix(string(table.Chains[j].Name), "KUBE-"):
+				// non-KUBE-* goes after KUBE-*
+				return false
+			default:
+				// We have two KUBE-* chains or two non-KUBE-* chains; either
+				// way they sort alphabetically
+				return table.Chains[i].Name < table.Chains[j].Name
+			}
+		})
 	}
 
-	// Input ended with a "\n", so make sure the output does too
-	output = append(output, "")
+	// Sort KUBE-NODEPORTS chains by service name
+	chain, _ := dump.GetChain(utiliptables.TableFilter, kubeNodePortsChain)
+	if chain != nil {
+		sort.SliceStable(chain.Rules, func(i, j int) bool {
+			return orderByCommentServiceName(chain.Rules[i], chain.Rules[j])
+		})
+	}
+	chain, _ = dump.GetChain(utiliptables.TableNAT, kubeNodePortsChain)
+	if chain != nil {
+		sort.SliceStable(chain.Rules, func(i, j int) bool {
+			return orderByCommentServiceName(chain.Rules[i], chain.Rules[j])
+		})
+	}
 
-	return strings.Join(output, "\n"), nil
+	// Sort KUBE-SERVICES chains by service name (but keeping the "must be the last
+	// rule" rule in the "nat" table's KUBE-SERVICES chain last).
+	chain, _ = dump.GetChain(utiliptables.TableFilter, kubeServicesChain)
+	if chain != nil {
+		sort.SliceStable(chain.Rules, func(i, j int) bool {
+			return orderByCommentServiceName(chain.Rules[i], chain.Rules[j])
+		})
+	}
+	chain, _ = dump.GetChain(utiliptables.TableNAT, kubeServicesChain)
+	if chain != nil {
+		sort.SliceStable(chain.Rules, func(i, j int) bool {
+			if chain.Rules[i].Comment != nil && strings.Contains(chain.Rules[i].Comment.Value, "must be the last rule") {
+				return false
+			} else if chain.Rules[j].Comment != nil && strings.Contains(chain.Rules[j].Comment.Value, "must be the last rule") {
+				return true
+			}
+			return orderByCommentServiceName(chain.Rules[i], chain.Rules[j])
+		})
+	}
+
+	return dump.String(), nil
 }
 
 func TestSortIPTablesRules(t *testing.T) {
@@ -1135,22 +1156,6 @@ func TestSortIPTablesRules(t *testing.T) {
 				-A KUBE-SVL-GNZBNJ2PO5MGZ6GT -m comment --comment "ns2/svc2:p80 has no local endpoints" -j KUBE-MARK-DROP
 				COMMIT
 				`),
-		},
-		{
-			name: "not enough tables",
-			input: dedent.Dedent(`
-				*filter
-				:KUBE-SERVICES - [0:0]
-				:KUBE-EXTERNAL-SERVICES - [0:0]
-				:KUBE-FORWARD - [0:0]
-				:KUBE-NODEPORTS - [0:0]
-				-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
-				-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
-				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
-				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
-				COMMIT
-				`),
-			error: "bad ruleData (1 tables)",
 		},
 		{
 			name: "extra tables",
@@ -2213,7 +2218,7 @@ func TestOverallIPTablesRulesWithMultipleServices(t *testing.T) {
 	}
 	nNatRules := int(natRulesMetric)
 
-	expectedNatRules := countRules("nat", fp.iptablesData.String())
+	expectedNatRules := countRules(utiliptables.TableNAT, fp.iptablesData.String())
 
 	if nNatRules != expectedNatRules {
 		t.Fatalf("Wrong number of nat rules: expected %d received %d", expectedNatRules, nNatRules)
@@ -5182,7 +5187,7 @@ func TestProxierMetricsIptablesTotalRules(t *testing.T) {
 		t.Errorf("failed to get %s value, err: %v", metrics.IptablesRulesTotal.Name, err)
 	}
 	nFilterRules := int(nFilterRulesMetric)
-	expectedFilterRules := countRules("filter", iptablesData)
+	expectedFilterRules := countRules(utiliptables.TableFilter, iptablesData)
 
 	if nFilterRules != expectedFilterRules {
 		t.Fatalf("Wrong number of filter rule: expected %d got %d\n%s", expectedFilterRules, nFilterRules, iptablesData)
@@ -5193,7 +5198,7 @@ func TestProxierMetricsIptablesTotalRules(t *testing.T) {
 		t.Errorf("failed to get %s value, err: %v", metrics.IptablesRulesTotal.Name, err)
 	}
 	nNatRules := int(nNatRulesMetric)
-	expectedNatRules := countRules("nat", iptablesData)
+	expectedNatRules := countRules(utiliptables.TableNAT, iptablesData)
 
 	if nNatRules != expectedNatRules {
 		t.Fatalf("Wrong number of nat rules: expected %d got %d\n%s", expectedNatRules, nNatRules, iptablesData)
@@ -5223,7 +5228,7 @@ func TestProxierMetricsIptablesTotalRules(t *testing.T) {
 		t.Errorf("failed to get %s value, err: %v", metrics.IptablesRulesTotal.Name, err)
 	}
 	nFilterRules = int(nFilterRulesMetric)
-	expectedFilterRules = countRules("filter", iptablesData)
+	expectedFilterRules = countRules(utiliptables.TableFilter, iptablesData)
 
 	if nFilterRules != expectedFilterRules {
 		t.Fatalf("Wrong number of filter rule: expected %d got %d\n%s", expectedFilterRules, nFilterRules, iptablesData)
@@ -5234,7 +5239,7 @@ func TestProxierMetricsIptablesTotalRules(t *testing.T) {
 		t.Errorf("failed to get %s value, err: %v", metrics.IptablesRulesTotal.Name, err)
 	}
 	nNatRules = int(nNatRulesMetric)
-	expectedNatRules = countRules("nat", iptablesData)
+	expectedNatRules = countRules(utiliptables.TableNAT, iptablesData)
 
 	if nNatRules != expectedNatRules {
 		t.Fatalf("Wrong number of nat rules: expected %d got %d\n%s", expectedNatRules, nNatRules, iptablesData)
