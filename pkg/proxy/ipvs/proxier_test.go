@@ -3835,12 +3835,8 @@ func getRules(ipt *iptablestest.FakeIPTables, chain utiliptables.Chain) []*iptab
 	var rules []*iptablestest.Rule
 
 	buf := bytes.NewBuffer(nil)
-	// FIXME: FakeIPTables.SaveInto is currently broken and ignores the "table"
-	// argument and just echoes whatever was last passed to RestoreAll(), so even
-	// though we want to see the rules from both "nat" and "filter", we have to
-	// only request one of them, or else we'll get all the rules twice...
 	_ = ipt.SaveInto(utiliptables.TableNAT, buf)
-	// _ = ipt.SaveInto(utiliptable.TableFilter, buf)
+	_ = ipt.SaveInto(utiliptables.TableFilter, buf)
 	lines := strings.Split(string(buf.Bytes()), "\n")
 	for _, l := range lines {
 		if !strings.HasPrefix(l, "-A ") {
