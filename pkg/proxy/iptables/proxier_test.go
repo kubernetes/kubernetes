@@ -936,7 +936,13 @@ func sortIPTablesRules(ruleData string) (string, error) {
 		// for each unique match (in sorted order), move all of the lines that
 		// contain that match.
 
-		// Move and sort ":CHAINNAME" lines
+		// Move and sort ":CHAINNAME" lines (in the same order we will sort
+		// the chains themselves below).
+		lines, output = moveMatchingLines(`:KUBE-NODEPORTS`, lines, output)
+		lines, output = moveMatchingLines(`:KUBE-SERVICES`, lines, output)
+		for _, chainName := range findAllMatches(lines, `^(:KUBE-[^ ]*) `) {
+			lines, output = moveMatchingLines(chainName, lines, output)
+		}
 		for _, chainName := range findAllMatches(lines, `^(:[^ ]*) `) {
 			lines, output = moveMatchingLines(chainName, lines, output)
 		}
@@ -1059,27 +1065,27 @@ func TestSortIPTablesRules(t *testing.T) {
 				`),
 			output: dedent.Dedent(`
 				*filter
-				:KUBE-EXTERNAL-SERVICES - [0:0]
-				:KUBE-FORWARD - [0:0]
 				:KUBE-NODEPORTS - [0:0]
 				:KUBE-SERVICES - [0:0]
+				:KUBE-EXTERNAL-SERVICES - [0:0]
+				:KUBE-FORWARD - [0:0]
 				-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
 				-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 				COMMIT
 				*nat
+				:KUBE-NODEPORTS - [0:0]
+				:KUBE-SERVICES - [0:0]
 				:KUBE-EXT-GNZBNJ2PO5MGZ6GT - [0:0]
 				:KUBE-FW-GNZBNJ2PO5MGZ6GT - [0:0]
 				:KUBE-MARK-MASQ - [0:0]
-				:KUBE-NODEPORTS - [0:0]
 				:KUBE-POSTROUTING - [0:0]
 				:KUBE-SEP-C6EBXVWJJZMIWKLZ - [0:0]
 				:KUBE-SEP-OYPFS5VJICHGATKP - [0:0]
 				:KUBE-SEP-RS4RBKLTHTF2IUXJ - [0:0]
 				:KUBE-SEP-SXIVWICOYRO3J4NJ - [0:0]
 				:KUBE-SEP-UKSFD7AGPMPPLUHC - [0:0]
-				:KUBE-SERVICES - [0:0]
 				:KUBE-SVC-4SW47YFZTEDKD3PK - [0:0]
 				:KUBE-SVC-GNZBNJ2PO5MGZ6GT - [0:0]
 				:KUBE-SVC-X27LE4BHSL4DOUIK - [0:0]
@@ -1182,30 +1188,30 @@ func TestSortIPTablesRules(t *testing.T) {
 				`),
 			output: dedent.Dedent(`
 				*filter
-				:KUBE-EXTERNAL-SERVICES - [0:0]
-				:KUBE-FORWARD - [0:0]
 				:KUBE-NODEPORTS - [0:0]
 				:KUBE-SERVICES - [0:0]
+				:KUBE-EXTERNAL-SERVICES - [0:0]
+				:KUBE-FORWARD - [0:0]
 				-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
 				-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 				COMMIT
 				*mangle
-				:KUBE-EXTERNAL-SERVICES - [0:0]
-				:KUBE-FORWARD - [0:0]
 				:KUBE-NODEPORTS - [0:0]
 				:KUBE-SERVICES - [0:0]
+				:KUBE-EXTERNAL-SERVICES - [0:0]
+				:KUBE-FORWARD - [0:0]
 				-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
 				-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 				COMMIT
 				*nat
-				:KUBE-EXTERNAL-SERVICES - [0:0]
-				:KUBE-FORWARD - [0:0]
 				:KUBE-NODEPORTS - [0:0]
 				:KUBE-SERVICES - [0:0]
+				:KUBE-EXTERNAL-SERVICES - [0:0]
+				:KUBE-FORWARD - [0:0]
 				-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
 				-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
@@ -1278,9 +1284,9 @@ func TestSortIPTablesRules(t *testing.T) {
 				*filter
 				COMMIT
 				*nat
+				:KUBE-SERVICES - [0:0]
 				:KUBE-AAAAA - [0:0]
 				:KUBE-SEP-RS4RBKLTHTF2IUXJ - [0:0]
-				:KUBE-SERVICES - [0:0]
 				:KUBE-ZZZZZ - [0:0]
 				:WHY-IS-THIS-CHAIN-HERE - [0:0]
 				-A KUBE-SERVICES -m comment --comment "ns2/svc2:p80 cluster IP" svc2 line 1
@@ -2112,23 +2118,24 @@ func TestOverallIPTablesRulesWithMultipleServices(t *testing.T) {
 
 	expected := dedent.Dedent(`
 		*filter
-		:KUBE-EXTERNAL-SERVICES - [0:0]
-		:KUBE-FORWARD - [0:0]
 		:KUBE-NODEPORTS - [0:0]
 		:KUBE-SERVICES - [0:0]
+		:KUBE-EXTERNAL-SERVICES - [0:0]
+		:KUBE-FORWARD - [0:0]
 		-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
 		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 		COMMIT
 		*nat
+		:KUBE-NODEPORTS - [0:0]
+		:KUBE-SERVICES - [0:0]
 		:KUBE-EXT-4SW47YFZTEDKD3PK - [0:0]
 		:KUBE-EXT-GNZBNJ2PO5MGZ6GT - [0:0]
 		:KUBE-EXT-PAZTZYUUMV5KCDZL - [0:0]
 		:KUBE-EXT-X27LE4BHSL4DOUIK - [0:0]
 		:KUBE-FW-GNZBNJ2PO5MGZ6GT - [0:0]
 		:KUBE-MARK-MASQ - [0:0]
-		:KUBE-NODEPORTS - [0:0]
 		:KUBE-POSTROUTING - [0:0]
 		:KUBE-SEP-C6EBXVWJJZMIWKLZ - [0:0]
 		:KUBE-SEP-OYPFS5VJICHGATKP - [0:0]
@@ -2136,7 +2143,6 @@ func TestOverallIPTablesRulesWithMultipleServices(t *testing.T) {
 		:KUBE-SEP-RS4RBKLTHTF2IUXJ - [0:0]
 		:KUBE-SEP-SXIVWICOYRO3J4NJ - [0:0]
 		:KUBE-SEP-UKSFD7AGPMPPLUHC - [0:0]
-		:KUBE-SERVICES - [0:0]
 		:KUBE-SVC-4SW47YFZTEDKD3PK - [0:0]
 		:KUBE-SVC-GNZBNJ2PO5MGZ6GT - [0:0]
 		:KUBE-SVC-PAZTZYUUMV5KCDZL - [0:0]
@@ -2238,20 +2244,20 @@ func TestClusterIPReject(t *testing.T) {
 
 	expected := dedent.Dedent(`
 		*filter
-		:KUBE-EXTERNAL-SERVICES - [0:0]
-		:KUBE-FORWARD - [0:0]
 		:KUBE-NODEPORTS - [0:0]
 		:KUBE-SERVICES - [0:0]
+		:KUBE-EXTERNAL-SERVICES - [0:0]
+		:KUBE-FORWARD - [0:0]
 		-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 has no endpoints" -m tcp -p tcp -d 172.30.0.41 --dport 80 -j REJECT
 		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 		COMMIT
 		*nat
-		:KUBE-MARK-MASQ - [0:0]
 		:KUBE-NODEPORTS - [0:0]
-		:KUBE-POSTROUTING - [0:0]
 		:KUBE-SERVICES - [0:0]
+		:KUBE-MARK-MASQ - [0:0]
+		:KUBE-POSTROUTING - [0:0]
 		-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
 		-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
 		-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
@@ -2315,20 +2321,20 @@ func TestClusterIPEndpointsJump(t *testing.T) {
 
 	expected := dedent.Dedent(`
 		*filter
-		:KUBE-EXTERNAL-SERVICES - [0:0]
-		:KUBE-FORWARD - [0:0]
 		:KUBE-NODEPORTS - [0:0]
 		:KUBE-SERVICES - [0:0]
+		:KUBE-EXTERNAL-SERVICES - [0:0]
+		:KUBE-FORWARD - [0:0]
 		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 		COMMIT
 		*nat
-		:KUBE-MARK-MASQ - [0:0]
 		:KUBE-NODEPORTS - [0:0]
+		:KUBE-SERVICES - [0:0]
+		:KUBE-MARK-MASQ - [0:0]
 		:KUBE-POSTROUTING - [0:0]
 		:KUBE-SEP-SXIVWICOYRO3J4NJ - [0:0]
-		:KUBE-SERVICES - [0:0]
 		:KUBE-SVC-XPGD46QRK7WJZT7O - [0:0]
 		-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
 		-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
@@ -2421,22 +2427,22 @@ func TestLoadBalancer(t *testing.T) {
 
 	expected := dedent.Dedent(`
 		*filter
-		:KUBE-EXTERNAL-SERVICES - [0:0]
-		:KUBE-FORWARD - [0:0]
 		:KUBE-NODEPORTS - [0:0]
 		:KUBE-SERVICES - [0:0]
+		:KUBE-EXTERNAL-SERVICES - [0:0]
+		:KUBE-FORWARD - [0:0]
 		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 		COMMIT
 		*nat
+		:KUBE-NODEPORTS - [0:0]
+		:KUBE-SERVICES - [0:0]
 		:KUBE-EXT-XPGD46QRK7WJZT7O - [0:0]
 		:KUBE-FW-XPGD46QRK7WJZT7O - [0:0]
 		:KUBE-MARK-MASQ - [0:0]
-		:KUBE-NODEPORTS - [0:0]
 		:KUBE-POSTROUTING - [0:0]
 		:KUBE-SEP-SXIVWICOYRO3J4NJ - [0:0]
-		:KUBE-SERVICES - [0:0]
 		:KUBE-SVC-XPGD46QRK7WJZT7O - [0:0]
 		-A KUBE-NODEPORTS -m comment --comment ns1/svc1:p80 -m tcp -p tcp --dport 3001 -j KUBE-EXT-XPGD46QRK7WJZT7O
 		-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
@@ -2617,21 +2623,21 @@ func TestNodePort(t *testing.T) {
 
 	expected := dedent.Dedent(`
 		*filter
-		:KUBE-EXTERNAL-SERVICES - [0:0]
-		:KUBE-FORWARD - [0:0]
 		:KUBE-NODEPORTS - [0:0]
 		:KUBE-SERVICES - [0:0]
+		:KUBE-EXTERNAL-SERVICES - [0:0]
+		:KUBE-FORWARD - [0:0]
 		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 		COMMIT
 		*nat
+		:KUBE-NODEPORTS - [0:0]
+		:KUBE-SERVICES - [0:0]
 		:KUBE-EXT-XPGD46QRK7WJZT7O - [0:0]
 		:KUBE-MARK-MASQ - [0:0]
-		:KUBE-NODEPORTS - [0:0]
 		:KUBE-POSTROUTING - [0:0]
 		:KUBE-SEP-SXIVWICOYRO3J4NJ - [0:0]
-		:KUBE-SERVICES - [0:0]
 		:KUBE-SVC-XPGD46QRK7WJZT7O - [0:0]
 		-A KUBE-NODEPORTS -m comment --comment ns1/svc1:p80 -m tcp -p tcp --dport 3001 -j KUBE-EXT-XPGD46QRK7WJZT7O
 		-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
@@ -2718,10 +2724,10 @@ func TestHealthCheckNodePort(t *testing.T) {
 
 	expected := dedent.Dedent(`
 		*filter
-		:KUBE-EXTERNAL-SERVICES - [0:0]
-		:KUBE-FORWARD - [0:0]
 		:KUBE-NODEPORTS - [0:0]
 		:KUBE-SERVICES - [0:0]
+		:KUBE-EXTERNAL-SERVICES - [0:0]
+		:KUBE-FORWARD - [0:0]
 		-A KUBE-NODEPORTS -m comment --comment "ns1/svc1:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
 		-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 has no endpoints" -m tcp -p tcp -d 172.30.0.42 --dport 80 -j REJECT
 		-A KUBE-EXTERNAL-SERVICES -m comment --comment "ns1/svc1:p80 has no endpoints" -m addrtype --dst-type LOCAL -m tcp -p tcp --dport 3001 -j REJECT
@@ -2730,10 +2736,10 @@ func TestHealthCheckNodePort(t *testing.T) {
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 		COMMIT
 		*nat
-		:KUBE-MARK-MASQ - [0:0]
 		:KUBE-NODEPORTS - [0:0]
-		:KUBE-POSTROUTING - [0:0]
 		:KUBE-SERVICES - [0:0]
+		:KUBE-MARK-MASQ - [0:0]
+		:KUBE-POSTROUTING - [0:0]
 		-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -d 127.0.0.1 -j KUBE-NODEPORTS
 		-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
 		-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
@@ -2777,19 +2783,19 @@ func TestMasqueradeRule(t *testing.T) {
 
 		expectedFmt := dedent.Dedent(`
 		*filter
-		:KUBE-EXTERNAL-SERVICES - [0:0]
-		:KUBE-FORWARD - [0:0]
 		:KUBE-NODEPORTS - [0:0]
 		:KUBE-SERVICES - [0:0]
+		:KUBE-EXTERNAL-SERVICES - [0:0]
+		:KUBE-FORWARD - [0:0]
 		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 		COMMIT
 		*nat
-		:KUBE-MARK-MASQ - [0:0]
 		:KUBE-NODEPORTS - [0:0]
-		:KUBE-POSTROUTING - [0:0]
 		:KUBE-SERVICES - [0:0]
+		:KUBE-MARK-MASQ - [0:0]
+		:KUBE-POSTROUTING - [0:0]
 		-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
 		-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
 		-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
@@ -2836,10 +2842,10 @@ func TestExternalIPsReject(t *testing.T) {
 
 	expected := dedent.Dedent(`
 		*filter
-		:KUBE-EXTERNAL-SERVICES - [0:0]
-		:KUBE-FORWARD - [0:0]
 		:KUBE-NODEPORTS - [0:0]
 		:KUBE-SERVICES - [0:0]
+		:KUBE-EXTERNAL-SERVICES - [0:0]
+		:KUBE-FORWARD - [0:0]
 		-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 has no endpoints" -m tcp -p tcp -d 172.30.0.41 --dport 80 -j REJECT
 		-A KUBE-EXTERNAL-SERVICES -m comment --comment "ns1/svc1:p80 has no endpoints" -m tcp -p tcp -d 192.168.99.11 --dport 80 -j REJECT
 		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
@@ -2847,10 +2853,10 @@ func TestExternalIPsReject(t *testing.T) {
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 		COMMIT
 		*nat
-		:KUBE-MARK-MASQ - [0:0]
 		:KUBE-NODEPORTS - [0:0]
-		:KUBE-POSTROUTING - [0:0]
 		:KUBE-SERVICES - [0:0]
+		:KUBE-MARK-MASQ - [0:0]
+		:KUBE-POSTROUTING - [0:0]
 		-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
 		-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
 		-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
@@ -2927,22 +2933,22 @@ func TestOnlyLocalExternalIPs(t *testing.T) {
 
 	expected := dedent.Dedent(`
 		*filter
-		:KUBE-EXTERNAL-SERVICES - [0:0]
-		:KUBE-FORWARD - [0:0]
 		:KUBE-NODEPORTS - [0:0]
 		:KUBE-SERVICES - [0:0]
+		:KUBE-EXTERNAL-SERVICES - [0:0]
+		:KUBE-FORWARD - [0:0]
 		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 		COMMIT
 		*nat
+		:KUBE-NODEPORTS - [0:0]
+		:KUBE-SERVICES - [0:0]
 		:KUBE-EXT-XPGD46QRK7WJZT7O - [0:0]
 		:KUBE-MARK-MASQ - [0:0]
-		:KUBE-NODEPORTS - [0:0]
 		:KUBE-POSTROUTING - [0:0]
 		:KUBE-SEP-SXIVWICOYRO3J4NJ - [0:0]
 		:KUBE-SEP-ZX7GRIZKSNUQ3LAJ - [0:0]
-		:KUBE-SERVICES - [0:0]
 		:KUBE-SVC-XPGD46QRK7WJZT7O - [0:0]
 		:KUBE-SVL-XPGD46QRK7WJZT7O - [0:0]
 		-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
@@ -3038,22 +3044,22 @@ func TestNonLocalExternalIPs(t *testing.T) {
 
 	expected := dedent.Dedent(`
 		*filter
-		:KUBE-EXTERNAL-SERVICES - [0:0]
-		:KUBE-FORWARD - [0:0]
 		:KUBE-NODEPORTS - [0:0]
 		:KUBE-SERVICES - [0:0]
+		:KUBE-EXTERNAL-SERVICES - [0:0]
+		:KUBE-FORWARD - [0:0]
 		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 		COMMIT
 		*nat
+		:KUBE-NODEPORTS - [0:0]
+		:KUBE-SERVICES - [0:0]
 		:KUBE-EXT-XPGD46QRK7WJZT7O - [0:0]
 		:KUBE-MARK-MASQ - [0:0]
-		:KUBE-NODEPORTS - [0:0]
 		:KUBE-POSTROUTING - [0:0]
 		:KUBE-SEP-SXIVWICOYRO3J4NJ - [0:0]
 		:KUBE-SEP-ZX7GRIZKSNUQ3LAJ - [0:0]
-		:KUBE-SERVICES - [0:0]
 		:KUBE-SVC-XPGD46QRK7WJZT7O - [0:0]
 		-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
 		-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 external IP" -m tcp -p tcp -d 192.168.99.11 --dport 80 -j KUBE-EXT-XPGD46QRK7WJZT7O
@@ -3123,10 +3129,10 @@ func TestNodePortReject(t *testing.T) {
 
 	expected := dedent.Dedent(`
 		*filter
-		:KUBE-EXTERNAL-SERVICES - [0:0]
-		:KUBE-FORWARD - [0:0]
 		:KUBE-NODEPORTS - [0:0]
 		:KUBE-SERVICES - [0:0]
+		:KUBE-EXTERNAL-SERVICES - [0:0]
+		:KUBE-FORWARD - [0:0]
 		-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 has no endpoints" -m tcp -p tcp -d 172.30.0.41 --dport 80 -j REJECT
 		-A KUBE-EXTERNAL-SERVICES -m comment --comment "ns1/svc1:p80 has no endpoints" -m addrtype --dst-type LOCAL -m tcp -p tcp --dport 3001 -j REJECT
 		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
@@ -3134,10 +3140,10 @@ func TestNodePortReject(t *testing.T) {
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 		COMMIT
 		*nat
-		:KUBE-MARK-MASQ - [0:0]
 		:KUBE-NODEPORTS - [0:0]
-		:KUBE-POSTROUTING - [0:0]
 		:KUBE-SERVICES - [0:0]
+		:KUBE-MARK-MASQ - [0:0]
+		:KUBE-POSTROUTING - [0:0]
 		-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
 		-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
 		-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
@@ -3212,10 +3218,10 @@ func TestLoadBalancerReject(t *testing.T) {
 
 	expected := dedent.Dedent(`
 		*filter
-		:KUBE-EXTERNAL-SERVICES - [0:0]
-		:KUBE-FORWARD - [0:0]
 		:KUBE-NODEPORTS - [0:0]
 		:KUBE-SERVICES - [0:0]
+		:KUBE-EXTERNAL-SERVICES - [0:0]
+		:KUBE-FORWARD - [0:0]
 		-A KUBE-NODEPORTS -m comment --comment "ns1/svc1:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
 		-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 has no endpoints" -m tcp -p tcp -d 172.30.0.41 --dport 80 -j REJECT
 		-A KUBE-EXTERNAL-SERVICES -m comment --comment "ns1/svc1:p80 has no endpoints" -m tcp -p tcp -d 1.2.3.4 --dport 80 -j REJECT
@@ -3225,10 +3231,10 @@ func TestLoadBalancerReject(t *testing.T) {
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 		COMMIT
 		*nat
-		:KUBE-MARK-MASQ - [0:0]
 		:KUBE-NODEPORTS - [0:0]
-		:KUBE-POSTROUTING - [0:0]
 		:KUBE-SERVICES - [0:0]
+		:KUBE-MARK-MASQ - [0:0]
+		:KUBE-POSTROUTING - [0:0]
 		-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
 		-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
 		-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
@@ -3324,23 +3330,23 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 
 	expected := dedent.Dedent(`
 		*filter
-		:KUBE-EXTERNAL-SERVICES - [0:0]
-		:KUBE-FORWARD - [0:0]
 		:KUBE-NODEPORTS - [0:0]
 		:KUBE-SERVICES - [0:0]
+		:KUBE-EXTERNAL-SERVICES - [0:0]
+		:KUBE-FORWARD - [0:0]
 		-A KUBE-NODEPORTS -m comment --comment "ns1/svc1:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
 		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 		COMMIT
 		*nat
+		:KUBE-NODEPORTS - [0:0]
+		:KUBE-SERVICES - [0:0]
 		:KUBE-EXT-XPGD46QRK7WJZT7O - [0:0]
 		:KUBE-MARK-MASQ - [0:0]
-		:KUBE-NODEPORTS - [0:0]
 		:KUBE-POSTROUTING - [0:0]
 		:KUBE-SEP-SXIVWICOYRO3J4NJ - [0:0]
 		:KUBE-SEP-ZX7GRIZKSNUQ3LAJ - [0:0]
-		:KUBE-SERVICES - [0:0]
 		:KUBE-SVC-XPGD46QRK7WJZT7O - [0:0]
 		:KUBE-SVL-XPGD46QRK7WJZT7O - [0:0]
 		-A KUBE-NODEPORTS -m comment --comment ns1/svc1:p80 -m tcp -p tcp --dport 3001 -j KUBE-EXT-XPGD46QRK7WJZT7O
@@ -3406,22 +3412,22 @@ func TestOnlyLocalNodePortsNoClusterCIDR(t *testing.T) {
 
 	expected := dedent.Dedent(`
 		*filter
-		:KUBE-EXTERNAL-SERVICES - [0:0]
-		:KUBE-FORWARD - [0:0]
 		:KUBE-NODEPORTS - [0:0]
 		:KUBE-SERVICES - [0:0]
+		:KUBE-EXTERNAL-SERVICES - [0:0]
+		:KUBE-FORWARD - [0:0]
 		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 		COMMIT
 		*nat
+		:KUBE-NODEPORTS - [0:0]
+		:KUBE-SERVICES - [0:0]
 		:KUBE-EXT-XPGD46QRK7WJZT7O - [0:0]
 		:KUBE-MARK-MASQ - [0:0]
-		:KUBE-NODEPORTS - [0:0]
 		:KUBE-POSTROUTING - [0:0]
 		:KUBE-SEP-SXIVWICOYRO3J4NJ - [0:0]
 		:KUBE-SEP-ZX7GRIZKSNUQ3LAJ - [0:0]
-		:KUBE-SERVICES - [0:0]
 		:KUBE-SVC-XPGD46QRK7WJZT7O - [0:0]
 		:KUBE-SVL-XPGD46QRK7WJZT7O - [0:0]
 		-A KUBE-NODEPORTS -m comment --comment ns1/svc1:p80 -m tcp -p tcp --dport 3001 -j KUBE-EXT-XPGD46QRK7WJZT7O
@@ -3453,22 +3459,22 @@ func TestOnlyLocalNodePorts(t *testing.T) {
 
 	expected := dedent.Dedent(`
 		*filter
-		:KUBE-EXTERNAL-SERVICES - [0:0]
-		:KUBE-FORWARD - [0:0]
 		:KUBE-NODEPORTS - [0:0]
 		:KUBE-SERVICES - [0:0]
+		:KUBE-EXTERNAL-SERVICES - [0:0]
+		:KUBE-FORWARD - [0:0]
 		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 		COMMIT
 		*nat
+		:KUBE-NODEPORTS - [0:0]
+		:KUBE-SERVICES - [0:0]
 		:KUBE-EXT-XPGD46QRK7WJZT7O - [0:0]
 		:KUBE-MARK-MASQ - [0:0]
-		:KUBE-NODEPORTS - [0:0]
 		:KUBE-POSTROUTING - [0:0]
 		:KUBE-SEP-SXIVWICOYRO3J4NJ - [0:0]
 		:KUBE-SEP-ZX7GRIZKSNUQ3LAJ - [0:0]
-		:KUBE-SERVICES - [0:0]
 		:KUBE-SVC-XPGD46QRK7WJZT7O - [0:0]
 		:KUBE-SVL-XPGD46QRK7WJZT7O - [0:0]
 		-A KUBE-NODEPORTS -m comment --comment ns1/svc1:p80 -m tcp -p tcp --dport 3001 -j KUBE-EXT-XPGD46QRK7WJZT7O
@@ -4801,22 +4807,22 @@ func TestUpdateEndpointsMap(t *testing.T) {
 func TestEndpointSliceE2E(t *testing.T) {
 	expectedIPTablesWithSlice := dedent.Dedent(`
 		*filter
-		:KUBE-EXTERNAL-SERVICES - [0:0]
-		:KUBE-FORWARD - [0:0]
 		:KUBE-NODEPORTS - [0:0]
 		:KUBE-SERVICES - [0:0]
+		:KUBE-EXTERNAL-SERVICES - [0:0]
+		:KUBE-FORWARD - [0:0]
 		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 		COMMIT
 		*nat
-		:KUBE-MARK-MASQ - [0:0]
 		:KUBE-NODEPORTS - [0:0]
+		:KUBE-SERVICES - [0:0]
+		:KUBE-MARK-MASQ - [0:0]
 		:KUBE-POSTROUTING - [0:0]
 		:KUBE-SEP-3JOIVZTXZZRGORX4 - [0:0]
 		:KUBE-SEP-IO5XOSKPAXIFQXAJ - [0:0]
 		:KUBE-SEP-XGJFVO3L2O5SRFNT - [0:0]
-		:KUBE-SERVICES - [0:0]
 		:KUBE-SVC-AQI2S6QIMU7PVVRP - [0:0]
 		-A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.30.1.1 --dport 0 -j KUBE-SVC-AQI2S6QIMU7PVVRP
 		-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
@@ -5250,22 +5256,22 @@ func TestInternalTrafficPolicyE2E(t *testing.T) {
 
 	clusterExpectedIPTables := dedent.Dedent(`
 		*filter
-		:KUBE-EXTERNAL-SERVICES - [0:0]
-		:KUBE-FORWARD - [0:0]
 		:KUBE-NODEPORTS - [0:0]
 		:KUBE-SERVICES - [0:0]
+		:KUBE-EXTERNAL-SERVICES - [0:0]
+		:KUBE-FORWARD - [0:0]
 		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 		COMMIT
 		*nat
-		:KUBE-MARK-MASQ - [0:0]
 		:KUBE-NODEPORTS - [0:0]
+		:KUBE-SERVICES - [0:0]
+		:KUBE-MARK-MASQ - [0:0]
 		:KUBE-POSTROUTING - [0:0]
 		:KUBE-SEP-3JOIVZTXZZRGORX4 - [0:0]
 		:KUBE-SEP-IO5XOSKPAXIFQXAJ - [0:0]
 		:KUBE-SEP-XGJFVO3L2O5SRFNT - [0:0]
-		:KUBE-SERVICES - [0:0]
 		:KUBE-SVC-AQI2S6QIMU7PVVRP - [0:0]
 		-A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.30.1.1 --dport 80 -j KUBE-SVC-AQI2S6QIMU7PVVRP
 		-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
@@ -5332,20 +5338,20 @@ func TestInternalTrafficPolicyE2E(t *testing.T) {
 			expectEndpointRule: true,
 			expectedIPTablesWithSlice: dedent.Dedent(`
 				*filter
-				:KUBE-EXTERNAL-SERVICES - [0:0]
-				:KUBE-FORWARD - [0:0]
 				:KUBE-NODEPORTS - [0:0]
 				:KUBE-SERVICES - [0:0]
+				:KUBE-EXTERNAL-SERVICES - [0:0]
+				:KUBE-FORWARD - [0:0]
 				-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 				COMMIT
 				*nat
-				:KUBE-MARK-MASQ - [0:0]
 				:KUBE-NODEPORTS - [0:0]
+				:KUBE-SERVICES - [0:0]
+				:KUBE-MARK-MASQ - [0:0]
 				:KUBE-POSTROUTING - [0:0]
 				:KUBE-SEP-3JOIVZTXZZRGORX4 - [0:0]
-				:KUBE-SERVICES - [0:0]
 				:KUBE-SVL-AQI2S6QIMU7PVVRP - [0:0]
 				-A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.30.1.1 --dport 80 -j KUBE-SVL-AQI2S6QIMU7PVVRP
 				-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
@@ -5383,19 +5389,19 @@ func TestInternalTrafficPolicyE2E(t *testing.T) {
 			expectEndpointRule: false,
 			expectedIPTablesWithSlice: dedent.Dedent(`
 				*filter
-				:KUBE-EXTERNAL-SERVICES - [0:0]
-				:KUBE-FORWARD - [0:0]
 				:KUBE-NODEPORTS - [0:0]
 				:KUBE-SERVICES - [0:0]
+				:KUBE-EXTERNAL-SERVICES - [0:0]
+				:KUBE-FORWARD - [0:0]
 				-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 				COMMIT
 				*nat
-				:KUBE-MARK-MASQ - [0:0]
 				:KUBE-NODEPORTS - [0:0]
-				:KUBE-POSTROUTING - [0:0]
 				:KUBE-SERVICES - [0:0]
+				:KUBE-MARK-MASQ - [0:0]
+				:KUBE-POSTROUTING - [0:0]
 				:KUBE-SVL-AQI2S6QIMU7PVVRP - [0:0]
 				-A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.30.1.1 --dport 80 -j KUBE-SVL-AQI2S6QIMU7PVVRP
 				-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
@@ -5629,24 +5635,24 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 			},
 			expectedIPTables: dedent.Dedent(`
 				*filter
-				:KUBE-EXTERNAL-SERVICES - [0:0]
-				:KUBE-FORWARD - [0:0]
 				:KUBE-NODEPORTS - [0:0]
 				:KUBE-SERVICES - [0:0]
+				:KUBE-EXTERNAL-SERVICES - [0:0]
+				:KUBE-FORWARD - [0:0]
 				-A KUBE-NODEPORTS -m comment --comment "ns1/svc1 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
 				-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 				COMMIT
 				*nat
+				:KUBE-NODEPORTS - [0:0]
+				:KUBE-SERVICES - [0:0]
 				:KUBE-EXT-AQI2S6QIMU7PVVRP - [0:0]
 				:KUBE-MARK-MASQ - [0:0]
-				:KUBE-NODEPORTS - [0:0]
 				:KUBE-POSTROUTING - [0:0]
 				:KUBE-SEP-3JOIVZTXZZRGORX4 - [0:0]
 				:KUBE-SEP-EQCHZ7S2PJ72OHAY - [0:0]
 				:KUBE-SEP-IO5XOSKPAXIFQXAJ - [0:0]
-				:KUBE-SERVICES - [0:0]
 				:KUBE-SVC-AQI2S6QIMU7PVVRP - [0:0]
 				:KUBE-SVL-AQI2S6QIMU7PVVRP - [0:0]
 				-A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.30.1.1 --dport 80 -j KUBE-SVC-AQI2S6QIMU7PVVRP
@@ -5767,24 +5773,24 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 			},
 			expectedIPTables: dedent.Dedent(`
 				*filter
-				:KUBE-EXTERNAL-SERVICES - [0:0]
-				:KUBE-FORWARD - [0:0]
 				:KUBE-NODEPORTS - [0:0]
 				:KUBE-SERVICES - [0:0]
+				:KUBE-EXTERNAL-SERVICES - [0:0]
+				:KUBE-FORWARD - [0:0]
 				-A KUBE-NODEPORTS -m comment --comment "ns1/svc1 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
 				-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 				COMMIT
 				*nat
+				:KUBE-NODEPORTS - [0:0]
+				:KUBE-SERVICES - [0:0]
 				:KUBE-EXT-AQI2S6QIMU7PVVRP - [0:0]
 				:KUBE-MARK-MASQ - [0:0]
-				:KUBE-NODEPORTS - [0:0]
 				:KUBE-POSTROUTING - [0:0]
 				:KUBE-SEP-3JOIVZTXZZRGORX4 - [0:0]
 				:KUBE-SEP-EQCHZ7S2PJ72OHAY - [0:0]
 				:KUBE-SEP-IO5XOSKPAXIFQXAJ - [0:0]
-				:KUBE-SERVICES - [0:0]
 				:KUBE-SVC-AQI2S6QIMU7PVVRP - [0:0]
 				:KUBE-SVL-AQI2S6QIMU7PVVRP - [0:0]
 				-A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.30.1.1 --dport 80 -j KUBE-SVC-AQI2S6QIMU7PVVRP
@@ -5897,24 +5903,24 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 			},
 			expectedIPTables: dedent.Dedent(`
 				*filter
-				:KUBE-EXTERNAL-SERVICES - [0:0]
-				:KUBE-FORWARD - [0:0]
 				:KUBE-NODEPORTS - [0:0]
 				:KUBE-SERVICES - [0:0]
+				:KUBE-EXTERNAL-SERVICES - [0:0]
+				:KUBE-FORWARD - [0:0]
 				-A KUBE-NODEPORTS -m comment --comment "ns1/svc1 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
 				-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 				COMMIT
 				*nat
+				:KUBE-NODEPORTS - [0:0]
+				:KUBE-SERVICES - [0:0]
 				:KUBE-EXT-AQI2S6QIMU7PVVRP - [0:0]
 				:KUBE-MARK-MASQ - [0:0]
-				:KUBE-NODEPORTS - [0:0]
 				:KUBE-POSTROUTING - [0:0]
 				:KUBE-SEP-EQCHZ7S2PJ72OHAY - [0:0]
 				:KUBE-SEP-IO5XOSKPAXIFQXAJ - [0:0]
 				:KUBE-SEP-XGJFVO3L2O5SRFNT - [0:0]
-				:KUBE-SERVICES - [0:0]
 				:KUBE-SVC-AQI2S6QIMU7PVVRP - [0:0]
 				:KUBE-SVL-AQI2S6QIMU7PVVRP - [0:0]
 				-A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.30.1.1 --dport 80 -j KUBE-SVC-AQI2S6QIMU7PVVRP
@@ -6028,22 +6034,22 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 			},
 			expectedIPTables: dedent.Dedent(`
 				*filter
-				:KUBE-EXTERNAL-SERVICES - [0:0]
-				:KUBE-FORWARD - [0:0]
 				:KUBE-NODEPORTS - [0:0]
 				:KUBE-SERVICES - [0:0]
+				:KUBE-EXTERNAL-SERVICES - [0:0]
+				:KUBE-FORWARD - [0:0]
 				-A KUBE-NODEPORTS -m comment --comment "ns1/svc1 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
 				-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 				COMMIT
 				*nat
+				:KUBE-NODEPORTS - [0:0]
+				:KUBE-SERVICES - [0:0]
 				:KUBE-EXT-AQI2S6QIMU7PVVRP - [0:0]
 				:KUBE-MARK-MASQ - [0:0]
-				:KUBE-NODEPORTS - [0:0]
 				:KUBE-POSTROUTING - [0:0]
 				:KUBE-SEP-EQCHZ7S2PJ72OHAY - [0:0]
-				:KUBE-SERVICES - [0:0]
 				:KUBE-SVC-AQI2S6QIMU7PVVRP - [0:0]
 				:KUBE-SVL-AQI2S6QIMU7PVVRP - [0:0]
 				-A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.30.1.1 --dport 80 -j KUBE-SVC-AQI2S6QIMU7PVVRP
@@ -6115,22 +6121,22 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 			},
 			expectedIPTables: dedent.Dedent(`
 				*filter
-				:KUBE-EXTERNAL-SERVICES - [0:0]
-				:KUBE-FORWARD - [0:0]
 				:KUBE-NODEPORTS - [0:0]
 				:KUBE-SERVICES - [0:0]
+				:KUBE-EXTERNAL-SERVICES - [0:0]
+				:KUBE-FORWARD - [0:0]
 				-A KUBE-NODEPORTS -m comment --comment "ns1/svc1 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
 				-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 				COMMIT
 				*nat
+				:KUBE-NODEPORTS - [0:0]
+				:KUBE-SERVICES - [0:0]
 				:KUBE-EXT-AQI2S6QIMU7PVVRP - [0:0]
 				:KUBE-MARK-MASQ - [0:0]
-				:KUBE-NODEPORTS - [0:0]
 				:KUBE-POSTROUTING - [0:0]
 				:KUBE-SEP-EQCHZ7S2PJ72OHAY - [0:0]
-				:KUBE-SERVICES - [0:0]
 				:KUBE-SVC-AQI2S6QIMU7PVVRP - [0:0]
 				:KUBE-SVL-AQI2S6QIMU7PVVRP - [0:0]
 				-A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.30.1.1 --dport 80 -j KUBE-SVC-AQI2S6QIMU7PVVRP
@@ -6211,10 +6217,10 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 			noUsableEndpoints: true,
 			expectedIPTables: dedent.Dedent(`
 				*filter
-				:KUBE-EXTERNAL-SERVICES - [0:0]
-				:KUBE-FORWARD - [0:0]
 				:KUBE-NODEPORTS - [0:0]
 				:KUBE-SERVICES - [0:0]
+				:KUBE-EXTERNAL-SERVICES - [0:0]
+				:KUBE-FORWARD - [0:0]
 				-A KUBE-NODEPORTS -m comment --comment "ns1/svc1 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
 				-A KUBE-SERVICES -m comment --comment "ns1/svc1 has no endpoints" -m tcp -p tcp -d 172.30.1.1 --dport 80 -j REJECT
 				-A KUBE-EXTERNAL-SERVICES -m comment --comment "ns1/svc1 has no endpoints" -m tcp -p tcp -d 1.2.3.4 --dport 80 -j REJECT
@@ -6223,10 +6229,10 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 				COMMIT
 				*nat
-				:KUBE-MARK-MASQ - [0:0]
 				:KUBE-NODEPORTS - [0:0]
-				:KUBE-POSTROUTING - [0:0]
 				:KUBE-SERVICES - [0:0]
+				:KUBE-MARK-MASQ - [0:0]
+				:KUBE-POSTROUTING - [0:0]
 				-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
 				-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
 				-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
@@ -6411,23 +6417,23 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyCluster(t *testing.T)
 			},
 			expectedIPTables: dedent.Dedent(`
 				*filter
-				:KUBE-EXTERNAL-SERVICES - [0:0]
-				:KUBE-FORWARD - [0:0]
 				:KUBE-NODEPORTS - [0:0]
 				:KUBE-SERVICES - [0:0]
+				:KUBE-EXTERNAL-SERVICES - [0:0]
+				:KUBE-FORWARD - [0:0]
 				-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 				COMMIT
 				*nat
+				:KUBE-NODEPORTS - [0:0]
+				:KUBE-SERVICES - [0:0]
 				:KUBE-EXT-AQI2S6QIMU7PVVRP - [0:0]
 				:KUBE-MARK-MASQ - [0:0]
-				:KUBE-NODEPORTS - [0:0]
 				:KUBE-POSTROUTING - [0:0]
 				:KUBE-SEP-3JOIVZTXZZRGORX4 - [0:0]
 				:KUBE-SEP-EQCHZ7S2PJ72OHAY - [0:0]
 				:KUBE-SEP-IO5XOSKPAXIFQXAJ - [0:0]
-				:KUBE-SERVICES - [0:0]
 				:KUBE-SVC-AQI2S6QIMU7PVVRP - [0:0]
 				-A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.30.1.1 --dport 80 -j KUBE-SVC-AQI2S6QIMU7PVVRP
 				-A KUBE-SERVICES -m comment --comment "ns1/svc1 loadbalancer IP" -m tcp -p tcp -d 1.2.3.4 --dport 80 -j KUBE-EXT-AQI2S6QIMU7PVVRP
@@ -6540,23 +6546,23 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyCluster(t *testing.T)
 			},
 			expectedIPTables: dedent.Dedent(`
 				*filter
-				:KUBE-EXTERNAL-SERVICES - [0:0]
-				:KUBE-FORWARD - [0:0]
 				:KUBE-NODEPORTS - [0:0]
 				:KUBE-SERVICES - [0:0]
+				:KUBE-EXTERNAL-SERVICES - [0:0]
+				:KUBE-FORWARD - [0:0]
 				-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 				COMMIT
 				*nat
+				:KUBE-NODEPORTS - [0:0]
+				:KUBE-SERVICES - [0:0]
 				:KUBE-EXT-AQI2S6QIMU7PVVRP - [0:0]
 				:KUBE-MARK-MASQ - [0:0]
-				:KUBE-NODEPORTS - [0:0]
 				:KUBE-POSTROUTING - [0:0]
 				:KUBE-SEP-3JOIVZTXZZRGORX4 - [0:0]
 				:KUBE-SEP-EQCHZ7S2PJ72OHAY - [0:0]
 				:KUBE-SEP-IO5XOSKPAXIFQXAJ - [0:0]
-				:KUBE-SERVICES - [0:0]
 				:KUBE-SVC-AQI2S6QIMU7PVVRP - [0:0]
 				-A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.30.1.1 --dport 80 -j KUBE-SVC-AQI2S6QIMU7PVVRP
 				-A KUBE-SERVICES -m comment --comment "ns1/svc1 loadbalancer IP" -m tcp -p tcp -d 1.2.3.4 --dport 80 -j KUBE-EXT-AQI2S6QIMU7PVVRP
@@ -6662,23 +6668,23 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyCluster(t *testing.T)
 			},
 			expectedIPTables: dedent.Dedent(`
 				*filter
-				:KUBE-EXTERNAL-SERVICES - [0:0]
-				:KUBE-FORWARD - [0:0]
 				:KUBE-NODEPORTS - [0:0]
 				:KUBE-SERVICES - [0:0]
+				:KUBE-EXTERNAL-SERVICES - [0:0]
+				:KUBE-FORWARD - [0:0]
 				-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 				COMMIT
 				*nat
+				:KUBE-NODEPORTS - [0:0]
+				:KUBE-SERVICES - [0:0]
 				:KUBE-EXT-AQI2S6QIMU7PVVRP - [0:0]
 				:KUBE-MARK-MASQ - [0:0]
-				:KUBE-NODEPORTS - [0:0]
 				:KUBE-POSTROUTING - [0:0]
 				:KUBE-SEP-EQCHZ7S2PJ72OHAY - [0:0]
 				:KUBE-SEP-IO5XOSKPAXIFQXAJ - [0:0]
 				:KUBE-SEP-XGJFVO3L2O5SRFNT - [0:0]
-				:KUBE-SERVICES - [0:0]
 				:KUBE-SVC-AQI2S6QIMU7PVVRP - [0:0]
 				-A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.30.1.1 --dport 80 -j KUBE-SVC-AQI2S6QIMU7PVVRP
 				-A KUBE-SERVICES -m comment --comment "ns1/svc1 loadbalancer IP" -m tcp -p tcp -d 1.2.3.4 --dport 80 -j KUBE-EXT-AQI2S6QIMU7PVVRP
@@ -6790,10 +6796,10 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyCluster(t *testing.T)
 			noUsableEndpoints: true,
 			expectedIPTables: dedent.Dedent(`
 				*filter
-				:KUBE-EXTERNAL-SERVICES - [0:0]
-				:KUBE-FORWARD - [0:0]
 				:KUBE-NODEPORTS - [0:0]
 				:KUBE-SERVICES - [0:0]
+				:KUBE-EXTERNAL-SERVICES - [0:0]
+				:KUBE-FORWARD - [0:0]
 				-A KUBE-SERVICES -m comment --comment "ns1/svc1 has no endpoints" -m tcp -p tcp -d 172.30.1.1 --dport 80 -j REJECT
 				-A KUBE-EXTERNAL-SERVICES -m comment --comment "ns1/svc1 has no endpoints" -m tcp -p tcp -d 1.2.3.4 --dport 80 -j REJECT
 				-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
@@ -6801,10 +6807,10 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyCluster(t *testing.T)
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 				COMMIT
 				*nat
-				:KUBE-MARK-MASQ - [0:0]
 				:KUBE-NODEPORTS - [0:0]
-				:KUBE-POSTROUTING - [0:0]
 				:KUBE-SERVICES - [0:0]
+				:KUBE-MARK-MASQ - [0:0]
+				:KUBE-POSTROUTING - [0:0]
 				-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
 				-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
 				-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
@@ -6859,21 +6865,21 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyCluster(t *testing.T)
 			},
 			expectedIPTables: dedent.Dedent(`
 				*filter
-				:KUBE-EXTERNAL-SERVICES - [0:0]
-				:KUBE-FORWARD - [0:0]
 				:KUBE-NODEPORTS - [0:0]
 				:KUBE-SERVICES - [0:0]
+				:KUBE-EXTERNAL-SERVICES - [0:0]
+				:KUBE-FORWARD - [0:0]
 				-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 				COMMIT
 				*nat
+				:KUBE-NODEPORTS - [0:0]
+				:KUBE-SERVICES - [0:0]
 				:KUBE-EXT-AQI2S6QIMU7PVVRP - [0:0]
 				:KUBE-MARK-MASQ - [0:0]
-				:KUBE-NODEPORTS - [0:0]
 				:KUBE-POSTROUTING - [0:0]
 				:KUBE-SEP-EQCHZ7S2PJ72OHAY - [0:0]
-				:KUBE-SERVICES - [0:0]
 				:KUBE-SVC-AQI2S6QIMU7PVVRP - [0:0]
 				-A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.30.1.1 --dport 80 -j KUBE-SVC-AQI2S6QIMU7PVVRP
 				-A KUBE-SERVICES -m comment --comment "ns1/svc1 loadbalancer IP" -m tcp -p tcp -d 1.2.3.4 --dport 80 -j KUBE-EXT-AQI2S6QIMU7PVVRP
@@ -6952,10 +6958,10 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyCluster(t *testing.T)
 			noUsableEndpoints: true,
 			expectedIPTables: dedent.Dedent(`
 				*filter
-				:KUBE-EXTERNAL-SERVICES - [0:0]
-				:KUBE-FORWARD - [0:0]
 				:KUBE-NODEPORTS - [0:0]
 				:KUBE-SERVICES - [0:0]
+				:KUBE-EXTERNAL-SERVICES - [0:0]
+				:KUBE-FORWARD - [0:0]
 				-A KUBE-SERVICES -m comment --comment "ns1/svc1 has no endpoints" -m tcp -p tcp -d 172.30.1.1 --dport 80 -j REJECT
 				-A KUBE-EXTERNAL-SERVICES -m comment --comment "ns1/svc1 has no endpoints" -m tcp -p tcp -d 1.2.3.4 --dport 80 -j REJECT
 				-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
@@ -6963,10 +6969,10 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyCluster(t *testing.T)
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 				COMMIT
 				*nat
-				:KUBE-MARK-MASQ - [0:0]
 				:KUBE-NODEPORTS - [0:0]
-				:KUBE-POSTROUTING - [0:0]
 				:KUBE-SERVICES - [0:0]
+				:KUBE-MARK-MASQ - [0:0]
+				:KUBE-POSTROUTING - [0:0]
 				-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
 				-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
 				-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
