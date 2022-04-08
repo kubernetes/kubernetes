@@ -257,7 +257,7 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("storage.k8s.io", "v1alpha1", "csistoragecapacities"): {
 			Stub:             `{"metadata": {"name": "csc-12345-1"}, "storageClassName": "sc1"}`,
 			ExpectedEtcdPath: "/registry/csistoragecapacities/" + namespace + "/csc-12345-1",
-			ExpectedGVK:      gvkP("storage.k8s.io", "v1beta1", "CSIStorageCapacity"),
+			ExpectedGVK:      gvkP("storage.k8s.io", "v1", "CSIStorageCapacity"),
 		},
 		// --
 
@@ -318,6 +318,7 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("storage.k8s.io", "v1beta1", "csistoragecapacities"): {
 			Stub:             `{"metadata": {"name": "csc-12345-2"}, "storageClassName": "sc1"}`,
 			ExpectedEtcdPath: "/registry/csistoragecapacities/" + namespace + "/csc-12345-2",
+			ExpectedGVK:      gvkP("storage.k8s.io", "v1", "CSIStorageCapacity"),
 		},
 		// --
 
@@ -329,7 +330,6 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("storage.k8s.io", "v1", "csistoragecapacities"): {
 			Stub:             `{"metadata": {"name": "csc-12345-3"}, "storageClassName": "sc1"}`,
 			ExpectedEtcdPath: "/registry/csistoragecapacities/" + namespace + "/csc-12345-3",
-			ExpectedGVK:      gvkP("storage.k8s.io", "v1beta1", "CSIStorageCapacity"),
 		},
 		// --
 
