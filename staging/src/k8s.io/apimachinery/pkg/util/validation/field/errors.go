@@ -46,6 +46,8 @@ type omitValueType struct{}
 
 var omitValue = omitValueType{}
 
+var stringerType = reflect.TypeOf((*fmt.Stringer)(nil)).Elem()
+
 // ErrorBody returns the error message without the field name.  This is useful
 // for building nice-looking higher-level error reporting.
 func (v *Error) ErrorBody() string {
@@ -70,7 +72,10 @@ func (v *Error) ErrorBody() string {
 			if reflectValue := reflect.ValueOf(value); reflectValue.IsNil() {
 				value = "null"
 			} else {
-				value = reflectValue.Elem().Interface()
+				// Do not use the pointer value if the pointer implements fmt.Stringer
+				if !reflectValue.Type().Implements(stringerType) {
+					value = reflectValue.Elem().Interface()
+				}
 			}
 		}
 		switch t := value.(type) {

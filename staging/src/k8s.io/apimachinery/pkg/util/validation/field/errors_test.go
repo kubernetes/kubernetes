@@ -173,3 +173,42 @@ func TestNotSupported(t *testing.T) {
 		t.Errorf("Expected: %s\n, but got: %s\n", expected, notSupported.ErrorBody())
 	}
 }
+
+type stringer struct {
+}
+
+func (s stringer) String() string {
+	return "stringer"
+}
+
+func TestErrorBody(t *testing.T) {
+	var nilStringer *stringer = nil
+	testCases := []struct {
+		name     string
+		err      *Error
+		expected string
+	}{
+		{
+			name:     "stringer",
+			err:      Invalid(NewPath("bla"), stringer{}, "details"),
+			expected: "Invalid value: stringer: details",
+		}, {
+			name:     "stringer pointer",
+			err:      Invalid(NewPath("bla"), &stringer{}, "details"),
+			expected: "Invalid value: stringer: details",
+		}, {
+			name:     "nil stringer",
+			err:      Invalid(NewPath("bla"), nilStringer, "details"),
+			expected: "Invalid value: \"null\": details",
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			actual := testCase.err.ErrorBody()
+			expected := testCase.expected
+			if actual != expected {
+				t.Errorf("Expected: %s\n, but got: %s\n", expected, actual)
+			}
+		})
+	}
+}
