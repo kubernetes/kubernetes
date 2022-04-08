@@ -326,14 +326,18 @@ func (s *Server) getMetricMethodBucket(method string) string {
 	return "other"
 }
 
-func (s *Server) registerCadvisorMetrics(r compbasemetrics.KubeRegistry, includedMetrics cadvisormetrics.MetricSet, metricsPath string) {
+func (s *Server) registerCadvisorMetrics(r compbasemetrics.KubeRegistry, includedMetrics cadvisormetrics.MetricSet, metricsPath string, containerMetrics, machineMetrics bool) {
 	cadvisorOpts := cadvisorv2.RequestOptions{
 		IdType:    cadvisorv2.TypeName,
 		Count:     1,
 		Recursive: true,
 	}
-	r.RawMustRegister(metrics.NewPrometheusCollector(prometheusHostAdapter{s.host}, containerPrometheusLabelsFunc(s.host), includedMetrics, clock.RealClock{}, cadvisorOpts))
-	r.RawMustRegister(metrics.NewPrometheusMachineCollector(prometheusHostAdapter{s.host}, includedMetrics))
+	if containerMetrics {
+		r.RawMustRegister(metrics.NewPrometheusCollector(prometheusHostAdapter{s.host}, containerPrometheusLabelsFunc(s.host), includedMetrics, clock.RealClock{}, cadvisorOpts))
+	}
+	if machineMetrics {
+		r.RawMustRegister(metrics.NewPrometheusMachineCollector(prometheusHostAdapter{s.host}, includedMetrics))
+	}
 	s.restfulCont.Handle(metricsPath,
 		compbasemetrics.HandlerFor(r, compbasemetrics.HandlerOpts{ErrorHandling: compbasemetrics.ContinueOnError}),
 	)
@@ -391,18 +395,24 @@ func (s *Server) InstallDefaultHandlers() {
 		compbasemetrics.NewKubeRegistry(),
 		includedMetrics,
 		cadvisorMetricsPath,
+		true, /* include container metrics */
+		true, /* include machine metrics */
 	)
 
-	// Add a subset of basic cadvisor metrics under different buckets
+	// Add a subset of basic cadvisor metrics split under different buckets
 	s.registerCadvisorMetrics(
 		compbasemetrics.NewKubeRegistry(),
 		cadvisormetrics.MetricSet{cadvisormetrics.CpuUsageMetrics: struct{}{}},
 		cadvisorMetricsPath + "/cpu",
+		true, /* include container metrics */
+		false, /* include machine metrics */
 	)
 	s.registerCadvisorMetrics(
 		compbasemetrics.NewKubeRegistry(),
 		cadvisormetrics.MetricSet{cadvisormetrics.MemoryUsageMetrics: struct{}{}},
 		cadvisorMetricsPath + "/memory",
+		true, /* include container metrics */
+		false, /* include machine metrics */
 	)
 	s.registerCadvisorMetrics(
 		compbasemetrics.NewKubeRegistry(),
@@ -411,11 +421,22 @@ func (s *Server) InstallDefaultHandlers() {
 			cadvisormetrics.DiskUsageMetrics:    struct{}{},
 		},
 		cadvisorMetricsPath + "/disk",
+		true, /* include container metrics */
+		false, /* include machine metrics */
 	)
 	s.registerCadvisorMetrics(
 		compbasemetrics.NewKubeRegistry(),
 		cadvisormetrics.MetricSet{cadvisormetrics.NetworkUsageMetrics: struct{}{}},
 		cadvisorMetricsPath + "/network",
+		true, /* include container metrics */
+		false, /* include machine metrics */
+	)
+	s.registerCadvisorMetrics(
+		compbasemetrics.NewKubeRegistry(),
+		includedMetrics,
+		cadvisorMetricsPath + "/machine",
+		false, /* include container metrics */
+		true, /* include machine metrics */
 	)
 
 	s.addMetricsBucketMatcher("metrics/resource")

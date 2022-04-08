@@ -527,7 +527,7 @@ func TestAuthzCoverage(t *testing.T) {
 
 	// This is a sanity check that the Handle->HandleWithFilter() delegation is working
 	// Ideally, these would move to registered web services and this list would get shorter
-	expectedPaths := []string{"/healthz", "/metrics", "/metrics/cadvisor", "/metrics/cadvisor/cpu", "/metrics/cadvisor/memory", "/metrics/cadvisor/disk", "/metrics/cadvisor/network"}
+	expectedPaths := []string{"/healthz", "/metrics", "/metrics/cadvisor", "/metrics/cadvisor/cpu", "/metrics/cadvisor/memory", "/metrics/cadvisor/disk", "/metrics/cadvisor/network", "/metrics/cadvisor/machine"}
 	for _, expectedPath := range expectedPaths {
 		if _, expected := expectedCases["GET:"+expectedPath]; !expected {
 			t.Errorf("Expected registered handle path %s was missing", expectedPath)

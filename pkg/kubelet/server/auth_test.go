@@ -128,6 +128,7 @@ func AuthzTestCases() []AuthzTestCase {
 		"/metrics/cadvisor/memory":            "metrics",
 		"/metrics/cadvisor/disk":              "metrics",
 		"/metrics/cadvisor/network":           "metrics",
+		"/metrics/cadvisor/machine":           "metrics",
 		"/metrics/probes":                     "metrics",
 		"/metrics/resource":                   "metrics",
 		"/pods/":                              "proxy",
