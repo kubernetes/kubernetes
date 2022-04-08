@@ -18,42 +18,10 @@ package testing
 
 import (
 	"bytes"
-	"fmt"
-	"strings"
 	"time"
 
 	"k8s.io/kubernetes/pkg/util/iptables"
 )
-
-const (
-	// Destination represents the destination address flag
-	Destination = "-d "
-	// Source represents the source address flag
-	Source = "-s "
-	// DPort represents the destination port flag
-	DPort = "--dport "
-	// Protocol represents the protocol flag
-	Protocol = "-p "
-	// Jump represents jump flag specifies the jump target
-	Jump = "-j "
-	// Reject specifies the reject target
-	Reject = "REJECT"
-	// Accept specifies the accept target
-	Accept = "ACCEPT"
-	// ToDest represents the flag used to specify the destination address in DNAT
-	ToDest = "--to-destination "
-	// Recent represents the sub-command recent that allows to dynamically create list of IP address to match against
-	Recent = "recent "
-	// MatchSet represents the flag which match packets against the specified set
-	MatchSet = "--match-set "
-	// SrcType represents the --src-type flag which matches if the source address is of given type
-	SrcType = "--src-type "
-	// Masquerade represents the target that is used in nat table.
-	Masquerade = "MASQUERADE "
-)
-
-// Rule holds a map of rules.
-type Rule map[string]string
 
 // FakeIPTables is no-op implementation of iptables Interface.
 type FakeIPTables struct {
@@ -144,31 +112,6 @@ func (f *FakeIPTables) RestoreAll(data []byte, flush iptables.FlushFlag, counter
 
 // Monitor is part of iptables.Interface
 func (f *FakeIPTables) Monitor(canary iptables.Chain, tables []iptables.Table, reloadFunc func(), interval time.Duration, stopCh <-chan struct{}) {
-}
-
-func getToken(line, separator string) string {
-	tokens := strings.Split(line, separator)
-	if len(tokens) == 2 {
-		return strings.Split(tokens[1], " ")[0]
-	}
-	return ""
-}
-
-// GetRules is part of iptables.Interface
-func (f *FakeIPTables) GetRules(chainName string) (rules []Rule) {
-	for _, l := range strings.Split(string(f.Lines), "\n") {
-		if strings.Contains(l, fmt.Sprintf("-A %v", chainName)) {
-			newRule := Rule(map[string]string{})
-			for _, arg := range []string{Destination, Source, DPort, Protocol, Jump, ToDest, Recent, MatchSet, SrcType, Masquerade} {
-				tok := getToken(l, arg)
-				if tok != "" {
-					newRule[arg] = tok
-				}
-			}
-			rules = append(rules, newRule)
-		}
-	}
-	return
 }
 
 // HasRandomFully is part of iptables.Interface
