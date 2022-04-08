@@ -21,6 +21,7 @@ import (
 	"strconv"
 	"time"
 
+	"k8s.io/apiserver/pkg/server/httplog"
 	"k8s.io/apiserver/pkg/server/mux"
 	fq "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
 	"k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/eventclock"
@@ -186,7 +187,9 @@ func (cfgCtlr *configController) Handle(ctx context.Context, requestDigest Reque
 		executed = true
 		startExecutionTime := time.Now()
 		defer func() {
-			metrics.ObserveExecutionDuration(ctx, pl.Name, fs.Name, time.Since(startExecutionTime))
+			executionTime := time.Since(startExecutionTime)
+			httplog.AddKeyValue(ctx, "apf_execution_time", executionTime)
+			metrics.ObserveExecutionDuration(ctx, pl.Name, fs.Name, executionTime)
 		}()
 		execFn()
 	})
