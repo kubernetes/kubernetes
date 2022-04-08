@@ -326,6 +326,19 @@ func (s *Server) getMetricMethodBucket(method string) string {
 	return "other"
 }
 
+func (s *Server) registerCadvisorMetrics(r compbasemetrics.KubeRegistry, includedMetrics cadvisormetrics.MetricSet, metricsPath string) {
+	cadvisorOpts := cadvisorv2.RequestOptions{
+		IdType:    cadvisorv2.TypeName,
+		Count:     1,
+		Recursive: true,
+	}
+	r.RawMustRegister(metrics.NewPrometheusCollector(prometheusHostAdapter{s.host}, containerPrometheusLabelsFunc(s.host), includedMetrics, clock.RealClock{}, cadvisorOpts))
+	r.RawMustRegister(metrics.NewPrometheusMachineCollector(prometheusHostAdapter{s.host}, includedMetrics))
+	s.restfulCont.Handle(cadvisorMetricsPath,
+		compbasemetrics.HandlerFor(r, compbasemetrics.HandlerOpts{ErrorHandling: compbasemetrics.ContinueOnError}),
+	)
+}
+
 // InstallDefaultHandlers registers the default set of supported HTTP request
 // patterns with the restful Container.
 func (s *Server) InstallDefaultHandlers() {
@@ -376,16 +389,13 @@ func (s *Server) InstallDefaultHandlers() {
 		includedMetrics[cadvisormetrics.AcceleratorUsageMetrics] = struct{}{}
 	}
 
-	cadvisorOpts := cadvisorv2.RequestOptions{
-		IdType:    cadvisorv2.TypeName,
-		Count:     1,
-		Recursive: true,
-	}
-	r.RawMustRegister(metrics.NewPrometheusCollector(prometheusHostAdapter{s.host}, containerPrometheusLabelsFunc(s.host), includedMetrics, clock.RealClock{}, cadvisorOpts))
-	r.RawMustRegister(metrics.NewPrometheusMachineCollector(prometheusHostAdapter{s.host}, includedMetrics))
-	s.restfulCont.Handle(cadvisorMetricsPath,
-		compbasemetrics.HandlerFor(r, compbasemetrics.HandlerOpts{ErrorHandling: compbasemetrics.ContinueOnError}),
-	)
+	s.registerCadvisorMetrics(r, includedMetrics, cadvisorMetricsPath)
+
+	// Add a subset of cadvisor metrics under different buckets
+	// cadvisorCpuMetrics := cadvisorMetricsPath + "/cpu"
+	// cadvisorMemoryMetrics := cadvisorMetricsPath + "/memory"
+	// cadvisorDiskMetrics := cadvisorMetricsPath + "/disk"
+	// cadvisorNetworkMetrics := cadvisorMetricsPath + "/network"
 
 	s.addMetricsBucketMatcher("metrics/resource")
 	resourceRegistry := compbasemetrics.NewKubeRegistry()
