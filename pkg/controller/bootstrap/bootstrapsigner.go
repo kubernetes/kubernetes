@@ -18,15 +18,14 @@ package bootstrap
 
 import (
 	"context"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/klog/v2"
 	"strings"
 	"time"
-
-	"k8s.io/klog/v2"
 
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -161,6 +160,7 @@ func (e *Signer) Run(ctx context.Context) {
 	defer e.syncQueue.ShutDown()
 
 	if !cache.WaitForNamedCacheSync("bootstrap_signer", ctx.Done(), e.configMapSynced, e.secretSynced) {
+		utilruntime.HandleError(fmt.Errorf("timed out waiting for bootstrap_signer caches to sync"))
 		return
 	}
 
@@ -181,16 +181,18 @@ func (e *Signer) serviceConfigMapQueue(ctx context.Context) {
 	}
 	defer e.syncQueue.Done(key)
 
-	e.signConfigMap(ctx)
+	err := e.signConfigMap(ctx)
+	e.handleErr(err, key)
+
 }
 
 // signConfigMap computes the signatures on our latest cached objects and writes
 // back if necessary.
-func (e *Signer) signConfigMap(ctx context.Context) {
+func (e *Signer) signConfigMap(ctx context.Context) error {
 	origCM := e.getConfigMap()
 
 	if origCM == nil {
-		return
+		return nil
 	}
 
 	var needUpdate = false
@@ -200,8 +202,7 @@ func (e *Signer) signConfigMap(ctx context.Context) {
 	// First capture the config we are signing
 	content, ok := newCM.Data[bootstrapapi.KubeConfigKey]
 	if !ok {
-		klog.V(3).Infof("No %s key in %s/%s ConfigMap", bootstrapapi.KubeConfigKey, origCM.Namespace, origCM.Name)
-		return
+		return fmt.Errorf("no %s key in %s/%s ConfigMap", bootstrapapi.KubeConfigKey, origCM.Namespace, origCM.Name)
 	}
 
 	// Next remove and save all existing signatures
@@ -239,15 +240,14 @@ func (e *Signer) signConfigMap(ctx context.Context) {
 	}
 
 	if needUpdate {
-		e.updateConfigMap(ctx, newCM)
+		return e.updateConfigMap(ctx, newCM)
 	}
+	return nil
 }
 
-func (e *Signer) updateConfigMap(ctx context.Context, cm *v1.ConfigMap) {
+func (e *Signer) updateConfigMap(ctx context.Context, cm *v1.ConfigMap) error {
 	_, err := e.client.CoreV1().ConfigMaps(cm.Namespace).Update(ctx, cm, metav1.UpdateOptions{})
-	if err != nil && !apierrors.IsConflict(err) && !apierrors.IsNotFound(err) {
-		klog.V(3).Infof("Error updating ConfigMap: %v", err)
-	}
+	return err
 }
 
 // getConfigMap gets the ConfigMap we are interested in
@@ -306,4 +306,23 @@ func (e *Signer) getTokens() map[string]string {
 	}
 
 	return ret
+}
+
+// handleErr checks if an error happened and makes sure we will retry later.
+func (e *Signer) handleErr(err error, key interface{}) {
+	if err == nil {
+		e.syncQueue.Forget(key)
+		return
+	}
+
+	// This controller retries 5 times if something goes wrong. After that, it stops trying.
+	if e.syncQueue.NumRequeues(key) < 5 {
+		time.Sleep(5 * time.Second)
+		e.syncQueue.AddRateLimited(key)
+		return
+	}
+
+	e.syncQueue.Forget(key)
+	utilruntime.HandleError(err)
+	klog.V(3).Infof("error updating ConfigMap %v: %v", key, err)
 }
