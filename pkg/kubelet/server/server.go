@@ -334,7 +334,7 @@ func (s *Server) registerCadvisorMetrics(r compbasemetrics.KubeRegistry, include
 	}
 	r.RawMustRegister(metrics.NewPrometheusCollector(prometheusHostAdapter{s.host}, containerPrometheusLabelsFunc(s.host), includedMetrics, clock.RealClock{}, cadvisorOpts))
 	r.RawMustRegister(metrics.NewPrometheusMachineCollector(prometheusHostAdapter{s.host}, includedMetrics))
-	s.restfulCont.Handle(cadvisorMetricsPath,
+	s.restfulCont.Handle(metricsPath,
 		compbasemetrics.HandlerFor(r, compbasemetrics.HandlerOpts{ErrorHandling: compbasemetrics.ContinueOnError}),
 	)
 }
@@ -369,8 +369,6 @@ func (s *Server) InstallDefaultHandlers() {
 	s.restfulCont.Handle(metricsPath, legacyregistry.Handler())
 
 	// cAdvisor metrics are exposed under the secured handler as well
-	r := compbasemetrics.NewKubeRegistry()
-
 	includedMetrics := cadvisormetrics.MetricSet{
 		cadvisormetrics.CpuUsageMetrics:     struct{}{},
 		cadvisormetrics.MemoryUsageMetrics:  struct{}{},
@@ -389,13 +387,36 @@ func (s *Server) InstallDefaultHandlers() {
 		includedMetrics[cadvisormetrics.AcceleratorUsageMetrics] = struct{}{}
 	}
 
-	s.registerCadvisorMetrics(r, includedMetrics, cadvisorMetricsPath)
+	s.registerCadvisorMetrics(
+		compbasemetrics.NewKubeRegistry(),
+		includedMetrics,
+		cadvisorMetricsPath,
+	)
 
-	// Add a subset of cadvisor metrics under different buckets
-	// cadvisorCpuMetrics := cadvisorMetricsPath + "/cpu"
-	// cadvisorMemoryMetrics := cadvisorMetricsPath + "/memory"
-	// cadvisorDiskMetrics := cadvisorMetricsPath + "/disk"
-	// cadvisorNetworkMetrics := cadvisorMetricsPath + "/network"
+	// Add a subset of basic cadvisor metrics under different buckets
+	s.registerCadvisorMetrics(
+		compbasemetrics.NewKubeRegistry(),
+		cadvisormetrics.MetricSet{cadvisormetrics.CpuUsageMetrics: struct{}{}},
+		cadvisorMetricsPath + "/cpu",
+	)
+	s.registerCadvisorMetrics(
+		compbasemetrics.NewKubeRegistry(),
+		cadvisormetrics.MetricSet{cadvisormetrics.MemoryUsageMetrics: struct{}{}},
+		cadvisorMetricsPath + "/memory",
+	)
+	s.registerCadvisorMetrics(
+		compbasemetrics.NewKubeRegistry(),
+		cadvisormetrics.MetricSet{
+			cadvisormetrics.DiskIOMetrics:       struct{}{},
+			cadvisormetrics.DiskUsageMetrics:    struct{}{},
+		},
+		cadvisorMetricsPath + "/disk",
+	)
+	s.registerCadvisorMetrics(
+		compbasemetrics.NewKubeRegistry(),
+		cadvisormetrics.MetricSet{cadvisormetrics.NetworkUsageMetrics: struct{}{}},
+		cadvisorMetricsPath + "/network",
+	)
 
 	s.addMetricsBucketMatcher("metrics/resource")
 	resourceRegistry := compbasemetrics.NewKubeRegistry()
