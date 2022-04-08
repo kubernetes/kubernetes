@@ -25,6 +25,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kubernetes/pkg/kubemark"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/providers"
 )
 
 var (
@@ -32,17 +33,17 @@ var (
 )
 
 func init() {
-	framework.RegisterProvider("kubemark", newProvider)
+	providers.RegisterProvider("kubemark", newProvider)
 }
 
-func newProvider() (framework.ProviderInterface, error) {
+func newProvider() (providers.ProviderInterface, error) {
 	// Actual initialization happens when the e2e framework gets constructed.
 	return &Provider{}, nil
 }
 
 // Provider is a structure to handle Kubemark cluster for e2e testing
 type Provider struct {
-	framework.NullProvider
+	providers.NullProvider
 	controller   *kubemark.KubemarkController
 	closeChannel chan struct{}
 }

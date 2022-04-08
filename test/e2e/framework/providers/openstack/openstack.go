@@ -17,18 +17,18 @@ limitations under the License.
 package openstack
 
 import (
-	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/providers"
 )
 
 func init() {
-	framework.RegisterProvider("openstack", newProvider)
+	providers.RegisterProvider("openstack", newProvider)
 }
 
-func newProvider() (framework.ProviderInterface, error) {
+func newProvider() (providers.ProviderInterface, error) {
 	return &Provider{}, nil
 }
 
 // Provider is a structure to handle OpenStack clouds for e2e testing
 type Provider struct {
-	framework.NullProvider
+	providers.NullProvider
 }

@@ -233,8 +233,6 @@ func (f *Framework) BeforeEach() {
 		restMapper.Reset()
 		resolver := scaleclient.NewDiscoveryScaleKindResolver(cachedDiscoClient)
 		f.ScalesGetter = scaleclient.New(restClient, restMapper, dynamic.LegacyAPIPathResolverFunc, resolver)
-
-		TestContext.CloudConfig.Provider.FrameworkBeforeEach(f)
 	}
 
 	if !f.SkipNamespaceCreation {
@@ -466,8 +464,6 @@ func (f *Framework) AfterEach() {
 			f.TestSummaries = append(f.TestSummaries, (*e2emetrics.ComponentCollection)(&received))
 		}
 	}
-
-	TestContext.CloudConfig.Provider.FrameworkAfterEach(f)
 
 	// Report any flakes that were observed in the e2e test and reset.
 	if f.flakeReport != nil && f.flakeReport.GetFlakeCount() > 0 {

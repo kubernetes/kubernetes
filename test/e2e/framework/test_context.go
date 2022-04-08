@@ -36,6 +36,7 @@ import (
 	"k8s.io/klog/v2"
 
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	e2eproviders "k8s.io/kubernetes/test/e2e/framework/providers"
 )
 
 const (
@@ -255,7 +256,7 @@ type CloudConfig struct {
 	NodeTag           string
 	MasterTag         string
 
-	Provider ProviderInterface
+	Provider e2eproviders.ProviderInterface
 }
 
 // TestContext should be used by all tests to access common context data.
@@ -488,12 +489,12 @@ func AfterReadingAllFlags(t *TestContextType) {
 	}
 
 	var err error
-	TestContext.CloudConfig.Provider, err = SetupProviderConfig(TestContext.Provider)
+	TestContext.CloudConfig.Provider, err = e2eproviders.SetupProviderConfig(TestContext.Provider)
 	if err != nil {
 		if os.IsNotExist(errors.Unwrap(err)) {
 			// Provide a more helpful error message when the provider is unknown.
 			var providers []string
-			for _, name := range GetProviders() {
+			for _, name := range e2eproviders.GetProviders() {
 				// The empty string is accepted, but looks odd in the output below unless we quote it.
 				if name == "" {
 					name = `""`
