@@ -271,7 +271,7 @@ message IngressSpec {
   // (controller -> IngressClass -> Ingress resource). Although the
   // `kubernetes.io/ingress.class` annotation (simple constant name) was never
   // formally defined, it was widely supported by Ingress controllers to create
-  // a direct bound between Ingress controller and Ingress resources. Newly
+  // a direct binding between Ingress controller and Ingress resources. Newly
   // created Ingress resources should prefer using the field. However, even
   // though the annotation is officially deprecated, for backwards compatibility
   // reasons the annotation should still be honored if present.
