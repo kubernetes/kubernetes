@@ -316,7 +316,7 @@ func TestNodeResourcesBalancedAllocation(t *testing.T) {
 		// Node1 scores on 0-MaxNodeScore scale
 		// CPU Fraction: 3000 / 3500 = 85.71%
 		// Memory Fraction: 5000 / 40000 = 12.5%
-		// GPU Fraction: 4 / 8 = 0.5%
+		// GPU Fraction: 4 / 8 = 50%
 		// Node1 std: sqrt(((0.8571 - 0.503) *  (0.8571 - 0.503) + (0.503 - 0.125) * (0.503 - 0.125) + (0.503 - 0.5) * (0.503 - 0.5)) / 3) = 0.3002
 		// Node1 Score: (1 - 0.3002)*MaxNodeScore = 70
 		// Node2 scores on 0-MaxNodeScore scale

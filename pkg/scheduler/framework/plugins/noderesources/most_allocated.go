@@ -26,12 +26,12 @@ import (
 //
 // Details:
 // (cpu(MaxNodeScore * sum(requested) / capacity) + memory(MaxNodeScore * sum(requested) / capacity)) / weightSum
-func mostResourceScorer(resToWeightMap resourceToWeightMap) func(requested, allocable resourceToValueMap) int64 {
-	return func(requested, allocable resourceToValueMap) int64 {
+func mostResourceScorer(resToWeightMap resourceToWeightMap) func(requested, allocatable resourceToValueMap) int64 {
+	return func(requested, allocatable resourceToValueMap) int64 {
 		var nodeScore, weightSum int64
 		for resource := range requested {
 			weight := resToWeightMap[resource]
-			resourceScore := mostRequestedScore(requested[resource], allocable[resource])
+			resourceScore := mostRequestedScore(requested[resource], allocatable[resource])
 			nodeScore += resourceScore * weight
 			weightSum += weight
 		}

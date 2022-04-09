@@ -95,11 +95,11 @@ func NewBalancedAllocation(baArgs runtime.Object, h framework.Handle, fts featur
 	}, nil
 }
 
-func balancedResourceScorer(requested, allocable resourceToValueMap) int64 {
+func balancedResourceScorer(requested, allocatable resourceToValueMap) int64 {
 	var resourceToFractions []float64
 	var totalFraction float64
 	for name, value := range requested {
-		fraction := float64(value) / float64(allocable[name])
+		fraction := float64(value) / float64(allocatable[name])
 		if fraction > 1 {
 			fraction = 1
 		}
