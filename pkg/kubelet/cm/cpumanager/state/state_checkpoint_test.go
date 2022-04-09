@@ -17,6 +17,7 @@ limitations under the License.
 package state
 
 import (
+	"github.com/stretchr/testify/require"
 	"io/ioutil"
 	"os"
 	"reflect"
@@ -201,15 +202,11 @@ func TestCheckpointStateRestore(t *testing.T) {
 
 	// create temp dir
 	testingDir, err := ioutil.TempDir("", "cpumanager_state_test")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	defer os.RemoveAll(testingDir)
 	// create checkpoint manager for testing
 	cpm, err := checkpointmanager.NewCheckpointManager(testingDir)
-	if err != nil {
-		t.Fatalf("could not create testing checkpoint manager: %v", err)
-	}
+	require.NoErrorf(t, err, "could not create testing checkpoint manager: %v", err)
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
@@ -219,25 +216,18 @@ func TestCheckpointStateRestore(t *testing.T) {
 			// prepare checkpoint for testing
 			if strings.TrimSpace(tc.checkpointContent) != "" {
 				checkpoint := &testutil.MockCheckpoint{Content: tc.checkpointContent}
-				if err := cpm.CreateCheckpoint(testingCheckpoint, checkpoint); err != nil {
-					t.Fatalf("could not create testing checkpoint: %v", err)
-				}
+				err = cpm.CreateCheckpoint(testingCheckpoint, checkpoint)
+				require.NoErrorf(t, err, "could not create testing checkpoint: %v", err)
 			}
 
 			restoredState, err := NewCheckpointState(testingDir, testingCheckpoint, tc.policyName, tc.initialContainers)
 			if strings.TrimSpace(tc.expectedError) == "" {
-				if err != nil {
-					t.Fatalf("unexpected error while creating checkpointState: %v", err)
-				}
+				require.NoError(t, err)
 			} else {
-				if err == nil {
-					t.Fatalf("expected error: %s, got nil", tc.expectedError)
-				}
-				if strings.Contains(err.Error(), "could not restore state from checkpoint") &&
-					strings.Contains(err.Error(), tc.expectedError) {
-					t.Logf("got expected error: %v", err)
-					return
-				}
+				require.Error(t, err)
+				require.Contains(t, err.Error(), "could not restore state from checkpoint")
+				require.Contains(t, err.Error(), tc.expectedError)
+				return
 			}
 
 			// compare state after restoration with the one expected
