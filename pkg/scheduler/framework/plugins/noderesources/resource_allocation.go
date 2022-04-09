@@ -17,6 +17,8 @@ limitations under the License.
 package noderesources
 
 import (
+	"sync"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -35,13 +37,42 @@ type resourceAllocationScorer struct {
 	Name string
 	// used to decide whether to use Requested or NonZeroRequested for
 	// cpu and memory.
-	useRequested        bool
-	scorer              func(requested, allocable resourceToValueMap) int64
-	resourceToWeightMap resourceToWeightMap
+	useRequested           bool
+	scorer                 func(requested, allocatable resourceToValueMap) int64
+	resourceToWeightMap    resourceToWeightMap
+	resourceToValueMapPool *sync.Pool
+}
+
+func newResourceAllocationScorer(name string, scorer func(resourceToValueMap, resourceToValueMap) int64,
+	r resourceToWeightMap, useRequested bool) *resourceAllocationScorer {
+	return &resourceAllocationScorer{
+		Name:                name,
+		scorer:              scorer,
+		resourceToWeightMap: r,
+		useRequested:        useRequested,
+		resourceToValueMapPool: &sync.Pool{
+			New: func() interface{} {
+				return resourceToValueMap(make(map[v1.ResourceName]int64, 4))
+			},
+		},
+	}
 }
 
 // resourceToValueMap is keyed with resource name and valued with quantity.
 type resourceToValueMap map[v1.ResourceName]int64
+
+// acquireResourceToValueMap get resourceToValueMap from resourceToValueMapPool
+func (r *resourceAllocationScorer) acquireResourceToValueMap() resourceToValueMap {
+	return r.resourceToValueMapPool.Get().(resourceToValueMap)
+}
+
+// releaseResourceToValueMap put resourceToValueMap to resourceToValueMapPool
+func (r *resourceAllocationScorer) releaseResourceToValueMap(rm resourceToValueMap) {
+	for resourceName := range rm {
+		rm[resourceName] = 0
+	}
+	r.resourceToValueMapPool.Put(rm)
+}
 
 // score will use `scorer` function to calculate the score.
 func (r *resourceAllocationScorer) score(
@@ -55,8 +86,8 @@ func (r *resourceAllocationScorer) score(
 		return 0, framework.NewStatus(framework.Error, "resources not found")
 	}
 
-	requested := make(resourceToValueMap)
-	allocatable := make(resourceToValueMap)
+	requested := r.acquireResourceToValueMap()
+	allocatable := r.acquireResourceToValueMap()
 	for resource := range r.resourceToWeightMap {
 		alloc, req := r.calculateResourceAllocatableRequest(nodeInfo, pod, resource)
 		if alloc != 0 {
@@ -68,9 +99,11 @@ func (r *resourceAllocationScorer) score(
 	score := r.scorer(requested, allocatable)
 
 	klog.V(10).InfoS("Listing internal info for allocatable resources, requested resources and score", "pod",
-		klog.KObj(pod), "node", klog.KObj(node), "resourceAllocationScorer", r.Name,
+		pod.Name, "node", node.Name, "resourceAllocationScorer", r.Name,
 		"allocatableResource", allocatable, "requestedResource", requested, "resourceScore", score,
 	)
+	r.releaseResourceToValueMap(requested)
+	r.releaseResourceToValueMap(allocatable)
 
 	return score, nil
 }

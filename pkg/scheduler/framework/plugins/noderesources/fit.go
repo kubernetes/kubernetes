@@ -19,6 +19,8 @@ package noderesources
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -28,7 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
-	"strings"
 )
 
 var _ framework.PreFilterPlugin = &Fit{}
@@ -49,27 +50,19 @@ const (
 var nodeResourceStrategyTypeMap = map[config.ScoringStrategyType]scorer{
 	config.LeastAllocated: func(args *config.NodeResourcesFitArgs) *resourceAllocationScorer {
 		resToWeightMap := resourcesToWeightMap(args.ScoringStrategy.Resources)
-		return &resourceAllocationScorer{
-			Name:                string(config.LeastAllocated),
-			scorer:              leastResourceScorer(resToWeightMap),
-			resourceToWeightMap: resToWeightMap,
-		}
+		return newResourceAllocationScorer(string(config.LeastAllocated),
+			leastResourceScorer(resToWeightMap), resToWeightMap, false)
 	},
 	config.MostAllocated: func(args *config.NodeResourcesFitArgs) *resourceAllocationScorer {
 		resToWeightMap := resourcesToWeightMap(args.ScoringStrategy.Resources)
-		return &resourceAllocationScorer{
-			Name:                string(config.MostAllocated),
-			scorer:              mostResourceScorer(resToWeightMap),
-			resourceToWeightMap: resToWeightMap,
-		}
+		return newResourceAllocationScorer(string(config.MostAllocated),
+			mostResourceScorer(resToWeightMap), resToWeightMap, false)
 	},
 	config.RequestedToCapacityRatio: func(args *config.NodeResourcesFitArgs) *resourceAllocationScorer {
 		resToWeightMap := resourcesToWeightMap(args.ScoringStrategy.Resources)
-		return &resourceAllocationScorer{
-			Name:                string(config.RequestedToCapacityRatio),
-			scorer:              requestedToCapacityRatioScorer(resToWeightMap, args.ScoringStrategy.RequestedToCapacityRatio.Shape),
-			resourceToWeightMap: resToWeightMap,
-		}
+		return newResourceAllocationScorer(string(config.RequestedToCapacityRatio),
+			requestedToCapacityRatioScorer(resToWeightMap, args.ScoringStrategy.RequestedToCapacityRatio.Shape),
+			resToWeightMap, false)
 	},
 }
 

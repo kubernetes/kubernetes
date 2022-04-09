@@ -34,7 +34,7 @@ import (
 // of capacity, and prioritizes the host based on how close the two metrics are to each other.
 type BalancedAllocation struct {
 	handle framework.Handle
-	resourceAllocationScorer
+	*resourceAllocationScorer
 }
 
 var _ = framework.ScorePlugin(&BalancedAllocation{})
@@ -86,12 +86,8 @@ func NewBalancedAllocation(baArgs runtime.Object, h framework.Handle, fts featur
 
 	return &BalancedAllocation{
 		handle: h,
-		resourceAllocationScorer: resourceAllocationScorer{
-			Name:                BalancedAllocationName,
-			scorer:              balancedResourceScorer,
-			useRequested:        true,
-			resourceToWeightMap: resToWeightMap,
-		},
+		resourceAllocationScorer: newResourceAllocationScorer(BalancedAllocationName, balancedResourceScorer,
+			resToWeightMap, true),
 	}, nil
 }
 
