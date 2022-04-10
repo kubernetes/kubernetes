@@ -35,7 +35,7 @@ type ContainerRuntime interface {
 	IsRunning() error
 	ListKubeContainers() ([]string, error)
 	RemoveContainers(containers []string) error
-	PullImage(image string) error
+	PullImage(image string, username string, password string) error
 	ImageExists(image string) (bool, error)
 }
 
@@ -156,11 +156,15 @@ func (runtime *DockerRuntime) RemoveContainers(containers []string) error {
 }
 
 // PullImage pulls the image
-func (runtime *CRIRuntime) PullImage(image string) error {
+func (runtime *CRIRuntime) PullImage(image string, username string, password string) error {
 	var err error
 	var out []byte
+	args := []string{"-r", runtime.criSocket, "pull", image}
+	if username != "" && password != "" {
+		args = append(args, "--creds", username+":"+password)
+	}
 	for i := 0; i < constants.PullImageRetry; i++ {
-		out, err = runtime.exec.Command("crictl", "-r", runtime.criSocket, "pull", image).CombinedOutput()
+		out, err = runtime.exec.Command("crictl", args...).CombinedOutput()
 		if err == nil {
 			return nil
 		}
@@ -169,7 +173,7 @@ func (runtime *CRIRuntime) PullImage(image string) error {
 }
 
 // PullImage pulls the image
-func (runtime *DockerRuntime) PullImage(image string) error {
+func (runtime *DockerRuntime) PullImage(image string, username string, password string) error {
 	var err error
 	var out []byte
 	for i := 0; i < constants.PullImageRetry; i++ {

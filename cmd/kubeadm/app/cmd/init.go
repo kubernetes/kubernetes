@@ -166,7 +166,7 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 	AddInitOtherFlags(cmd.Flags(), initOptions)
 	initOptions.bto.AddTokenFlag(cmd.Flags())
 	initOptions.bto.AddTTLFlag(cmd.Flags())
-	options.AddImageMetaFlags(cmd.Flags(), &initOptions.externalClusterCfg.ImageRepository)
+	options.AddImageMetaFlags(cmd.Flags(), &initOptions.externalClusterCfg.ImageRepository, &initOptions.externalClusterCfg.ImageRepositoryUsername, &initOptions.externalClusterCfg.ImageRepository)
 
 	// defines additional flag that are not used by the init command but that could be eventually used
 	// by the sub-commands automatically generated for phases

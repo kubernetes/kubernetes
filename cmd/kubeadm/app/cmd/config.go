@@ -337,7 +337,7 @@ func NewImagesPull(runtime utilruntime.ContainerRuntime, images []string) *Image
 func PullControlPlaneImages(runtime utilruntime.ContainerRuntime, cfg *kubeadmapi.ClusterConfiguration) error {
 	images := images.GetControlPlaneImages(cfg)
 	for _, image := range images {
-		if err := runtime.PullImage(image); err != nil {
+		if err := runtime.PullImage(image, cfg.ImageRepositoryUsername, cfg.ImageRepositoryPassword); err != nil {
 			return errors.Wrapf(err, "failed to pull image %q", image)
 		}
 		fmt.Printf("[config/images] Pulled %s\n", image)
@@ -447,6 +447,6 @@ func (i *ImagesList) Run(out io.Writer, printer output.Printer) error {
 func AddImagesCommonConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1.ClusterConfiguration, cfgPath *string, featureGatesString *string) {
 	options.AddKubernetesVersionFlag(flagSet, &cfg.KubernetesVersion)
 	options.AddFeatureGatesStringFlag(flagSet, featureGatesString)
-	options.AddImageMetaFlags(flagSet, &cfg.ImageRepository)
+	options.AddImageMetaFlags(flagSet, &cfg.ImageRepository, &cfg.ImageRepositoryUsername, &cfg.ImageRepositoryPassword)
 	options.AddConfigFlag(flagSet, cfgPath)
 }

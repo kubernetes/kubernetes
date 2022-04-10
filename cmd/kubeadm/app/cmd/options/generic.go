@@ -60,8 +60,10 @@ func AddControlPlanExtraArgsFlags(fs *pflag.FlagSet, apiServerExtraArgs, control
 }
 
 // AddImageMetaFlags adds the --image-repository flag to the given flagset
-func AddImageMetaFlags(fs *pflag.FlagSet, imageRepository *string) {
+func AddImageMetaFlags(fs *pflag.FlagSet, imageRepository *string, imageRepositoryUsername *string, imageRepositoryPassword *string) {
 	fs.StringVar(imageRepository, ImageRepository, *imageRepository, "Choose a container registry to pull control plane images from")
+	fs.StringVar(imageRepositoryUsername, ImageRepositoryUsername, *imageRepositoryUsername, "Container registry' username to pull control plane images from")
+	fs.StringVar(imageRepositoryPassword, ImageRepositoryPassword, *imageRepositoryPassword, "Container registry' password to pull control plane images from")
 }
 
 // AddFeatureGatesStringFlag adds the --feature-gates flag to the given flagset

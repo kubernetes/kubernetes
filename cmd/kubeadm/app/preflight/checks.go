@@ -826,9 +826,11 @@ func getEtcdVersionResponse(client *http.Client, url string, target interface{})
 
 // ImagePullCheck will pull container images used by kubeadm
 type ImagePullCheck struct {
-	runtime         utilruntime.ContainerRuntime
-	imageList       []string
-	imagePullPolicy v1.PullPolicy
+	runtime                 utilruntime.ContainerRuntime
+	imageList               []string
+	ImageRepositoryUsername string
+	ImageRepositoryPassword string
+	imagePullPolicy         v1.PullPolicy
 }
 
 // Name returns the label for ImagePullCheck
@@ -857,7 +859,7 @@ func (ipc ImagePullCheck) Check() (warnings, errorList []error) {
 			fallthrough // Proceed with pulling the image if it does not exist
 		case v1.PullAlways:
 			klog.V(1).Infof("pulling: %s", image)
-			if err := ipc.runtime.PullImage(image); err != nil {
+			if err := ipc.runtime.PullImage(image, ipc.ImageRepositoryUsername, ipc.ImageRepositoryPassword); err != nil {
 				errorList = append(errorList, errors.Wrapf(err, "failed to pull image %s", image))
 			}
 		default:
@@ -1082,7 +1084,7 @@ func RunPullImagesCheck(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigur
 	}
 
 	checks := []Checker{
-		ImagePullCheck{runtime: containerRuntime, imageList: images.GetControlPlaneImages(&cfg.ClusterConfiguration), imagePullPolicy: cfg.NodeRegistration.ImagePullPolicy},
+		ImagePullCheck{runtime: containerRuntime, ImageRepositoryUsername: cfg.ImageRepositoryUsername, ImageRepositoryPassword: cfg.ImageRepositoryPassword, imageList: images.GetControlPlaneImages(&cfg.ClusterConfiguration), imagePullPolicy: cfg.NodeRegistration.ImagePullPolicy},
 	}
 	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
 }

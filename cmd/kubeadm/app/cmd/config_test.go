@@ -373,7 +373,7 @@ func TestImagesPull(t *testing.T) {
 
 	images := []string{"a", "b", "c", "d", "a"}
 	for _, image := range images {
-		if err := containerRuntime.PullImage(image); err != nil {
+		if err := containerRuntime.PullImage(image, "", ""); err != nil {
 			t.Fatalf("expected nil but found %v", err)
 		}
 		fmt.Printf("[config/images] Pulled %s\n", image)

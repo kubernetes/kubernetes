@@ -128,6 +128,14 @@ type ClusterConfiguration struct {
 	// +optional
 	ImageRepository string `json:"imageRepository,omitempty"`
 
+	// ImageRepositoryUsername username for image repository if any
+	// +optional
+	ImageRepositoryUsername string
+
+	// ImageRepositoryPassword password for image repository if any
+	// +optional
+	ImageRepositoryPassword string
+
 	// FeatureGates enabled by the user.
 	// +optional
 	FeatureGates map[string]bool `json:"featureGates,omitempty"`

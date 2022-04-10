@@ -51,7 +51,9 @@ const (
 	IgnorePreflightErrors = "ignore-preflight-errors"
 
 	// ImageRepository sets the container registry to pull control plane images from.
-	ImageRepository = "image-repository"
+	ImageRepository         = "image-repository"
+	ImageRepositoryUsername = "image-repository-username"
+	ImageRepositoryPassword = "image-repository-password"
 
 	// KubeconfigDir flag sets the path where to save the kubeconfig file.
 	KubeconfigDir = "kubeconfig-dir"

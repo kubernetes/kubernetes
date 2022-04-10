@@ -101,6 +101,14 @@ type ClusterConfiguration struct {
 	// will be used for all the other images.
 	ImageRepository string `json:"imageRepository,omitempty"`
 
+	// ImageRepositoryUsername username for image repository if any
+	// +optional
+	ImageRepositoryUsername string
+
+	// ImageRepositoryPassword password for image repository if any
+	// +optional
+	ImageRepositoryPassword string
+
 	// UseHyperKubeImage controls if hyperkube should be used for Kubernetes components instead of their respective separate images
 	// DEPRECATED: As hyperkube is itself deprecated, this fields is too. It will be removed in future kubeadm config versions, kubeadm
 	// will print multiple warnings when set to true, and at some point it may become ignored.
