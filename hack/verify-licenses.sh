@@ -31,6 +31,12 @@ kube::golang::verify_go_version
 kube::util::ensure-temp-dir
 
 
+# Creating a new repository tree 
+# Deleting vendor directory to make go-licenses fetch license URLs from go-packages source repository
+git worktree add -f "${KUBE_TEMP}"/tmp_test_licenses/kubernetes HEAD >/dev/null 2>&1 || true
+cd "${KUBE_TEMP}"/tmp_test_licenses/kubernetes && rm -rf vendor
+
+
 # Ensure that we find the binaries we build before anything else.
 export GOBIN="${KUBE_OUTPUT_BINPATH}"
 PATH="${GOBIN}:${PATH}"
@@ -50,7 +56,7 @@ git remote add licenses https://github.com/kubernetes/kubernetes >/dev/null 2>&1
 
 
 # Install go-licenses
-echo -e "[INFO] Installing go-licenses..."
+echo -e '[INFO] Installing go-licenses...'
 pushd "${KUBE_TEMP}" >/dev/null
     git clone https://github.com/google/go-licenses.git >/dev/null 2>&1
     cd go-licenses
@@ -60,14 +66,14 @@ popd >/dev/null
 
 # Fetching CNCF Approved List Of Licenses
 # Refer: https://github.com/cncf/foundation/blob/main/allowed-third-party-license-policy.md
-curl -s 'https://spdx.org/licenses/licenses.json' > "${KUBE_TEMP}"/licenses.json
+curl -s 'https://spdx.org/licenses/licenses.json' -o "${KUBE_TEMP}"/licenses.json
 
 
 number_of_licenses=$(jq '.licenses | length' "${KUBE_TEMP}"/licenses.json)
 loop_index_length=$(( number_of_licenses - 1 ))
 
 
-echo -e "[INFO] Fetching current list of CNCF approved licenses..."
+echo -e '[INFO] Fetching current list of CNCF approved licenses...'
 for index in $(seq 0 $loop_index_length);
 do
 	licenseID=$(jq ".licenses[$index] .licenseId" "${KUBE_TEMP}"/licenses.json)
@@ -78,26 +84,30 @@ do
 done
 
 
-# Scanning go-packages Under The Project & Verifying Against The CNCF Approved List Of Licenses
-echo -e "[INFO] Starting license scan on go-packages..."
+# Scanning go-packages under the project & verifying against the CNCF approved list of licenses
+echo -e '[INFO] Starting license scan on go-packages...'
 go-licenses csv --git_remote "licenses" ./... >> "${KUBE_TEMP}"/licenses.csv 2>/dev/null
 
 
-echo -e "PACKAGE_NAME  LICENSE_NAME  LICENSE_URL\n" >> "${KUBE_TEMP}"/approved_licenses.dump
+echo -e 'PACKAGE_NAME  LICENSE_NAME  LICENSE_URL\n' >> "${KUBE_TEMP}"/approved_licenses.dump
 while IFS=, read -r GO_PACKAGE LICENSE_URL LICENSE_NAME
 do
 	if [[ " ${allowed_licenses[*]} " == *"${LICENSE_NAME}"* ]];
 	then
-		if [[ "${LICENSE_URL}" == "Unknown" ]];
+		if [[ "${LICENSE_URL}" == 'Unknown' ]];
 		then
 			if  [[ "${GO_PACKAGE}" != k8s.io/* ]];
 			then
 				echo -e "${GO_PACKAGE}  ${LICENSE_NAME}  ${LICENSE_URL}" >> "${KUBE_TEMP}"/approved_licenses_with_missing_urls.dump
 				packages_url_missing+=("${GO_PACKAGE}")
 			else
-				LICENSE_URL="https://github.com/kubernetes/kubernetes/blob/master/LICENSE"
+				LICENSE_URL='https://github.com/kubernetes/kubernetes/blob/master/LICENSE'
 				echo -e "${GO_PACKAGE}  ${LICENSE_NAME}  ${LICENSE_URL}" >> "${KUBE_TEMP}"/approved_licenses.dump
 			fi
+		elif curl -Is "${LICENSE_URL}" | head -1 | grep -q 404;
+		then
+			packages_url_missing+=("${GO_PACKAGE}")
+			echo -e "${GO_PACKAGE}  ${LICENSE_NAME}  ${LICENSE_URL}" >> "${KUBE_TEMP}"/approved_licenses_with_missing_urls.dump
 		else
 			echo -e "${GO_PACKAGE}  ${LICENSE_NAME}  ${LICENSE_URL}" >> "${KUBE_TEMP}"/approved_licenses.dump
 		fi
@@ -114,16 +124,18 @@ git remote remove licenses
 
 
 if [[ ${#packages_url_missing[@]} -gt 0 ]]; then
-	kube::log::error "[ERROR] The following go-packages in the project have missing or unknown license URL.\n\n"
+	echo -e '\n[ERROR] The following go-packages in the project have unknown or unreachable license URL:'
 	awk '{ printf "%-100s :  %-20s : %s\n", $1, $2, $3 }' "${KUBE_TEMP}"/approved_licenses_with_missing_urls.dump
 	exit_code=1
 fi
 
 
 if [[ ${#packages_flagged[@]} -gt 0 ]]; then
-	kube::log::error "[ERROR] The following go-packages in the project are using non-CNCF approved licenses. Please check the CNCF allowed list of licenses for more details here: https://github.com/cncf/foundation/blob/main/allowed-third-party-license-policy.md\n\n"
+	kube::log::error "[ERROR] The following go-packages in the project are using non-CNCF approved licenses. Please refer to the CNCF's approved licence list for further information: https://github.com/cncf/foundation/blob/main/allowed-third-party-license-policy.md"
 	awk '{ printf "%-100s :  %-20s : %s\n", $1, $2, $3 }' "${KUBE_TEMP}"/notapproved_licenses.dump
 	exit_code=1
+elif [[ "${exit_code}" -eq 1 ]]; then
+	kube::log::status "[ERROR] Project is using go-packages with unknown or unreachable license URLs. Please refer to the CNCF's approved licence list for further information: https://github.com/cncf/foundation/blob/main/allowed-third-party-license-policy.md "
 else
 	kube::log::status "[SUCCESS] Scan complete! All go-packages under the project are using current CNCF approved licenses!"
 fi
