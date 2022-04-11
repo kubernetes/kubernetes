@@ -835,7 +835,9 @@ func setupLocalVolumes(config *localTestConfig, localVolumeType localVolumeType,
 	vols := []*localTestVolume{}
 	for i := 0; i < count; i++ {
 		ltrType, ok := setupLocalVolumeMap[localVolumeType]
-		framework.ExpectEqual(ok, true)
+		if !ok {
+			framework.Failf("Invalid localVolumeType: %v", localVolumeType)
+		}
 		ltr := config.ltrMgr.Create(node, ltrType, nil)
 		vols = append(vols, &localTestVolume{
 			ltr:             ltr,

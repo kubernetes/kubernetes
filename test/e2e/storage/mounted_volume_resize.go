@@ -90,7 +90,9 @@ var _ = utils.SIGDescribe("Mounted volume expand [Feature:StorageProvider]", fun
 		}
 
 		sc, cleanStorageClass = testsuites.SetupStorageClass(c, newStorageClass(test, ns, "resizing"))
-		framework.ExpectEqual(*sc.AllowVolumeExpansion, true)
+		if !*sc.AllowVolumeExpansion {
+			framework.Failf("Class %s does not allow volume expansion", sc.Name)
+		}
 
 		pvc = e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 			ClaimSize:        test.ClaimSize,
