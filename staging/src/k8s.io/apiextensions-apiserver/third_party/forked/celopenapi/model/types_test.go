@@ -75,7 +75,7 @@ func TestTypes_MapType(t *testing.T) {
 func TestTypes_RuleTypesFieldMapping(t *testing.T) {
 	stdEnv, _ := cel.NewEnv()
 	reg := NewRegistry(stdEnv)
-	rt, err := NewRuleTypes("CustomObject", testSchema(), true, reg)
+	rt, err := NewRuleTypes("CustomObject", SchemaDeclType(testSchema(), true), reg)
 	if err != nil {
 		t.Fatal(err)
 	}

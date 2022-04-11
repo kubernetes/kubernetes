@@ -26,8 +26,6 @@ import (
 
 	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 	"google.golang.org/protobuf/proto"
-
-	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 )
 
 const (
@@ -81,7 +79,8 @@ func newSimpleType(name string, celType *cel.Type, zeroVal ref.Val) *DeclType {
 type DeclType struct {
 	fmt.Stringer
 
-	name        string
+	name string
+	// Fields contains a map of escaped CEL identifier field names to field declarations.
 	Fields      map[string]*DeclField
 	KeyType     *DeclType
 	ElemType    *DeclType
@@ -295,14 +294,13 @@ func (f *DeclField) EnumValues() []ref.Val {
 
 // NewRuleTypes returns an Open API Schema-based type-system which is CEL compatible.
 func NewRuleTypes(kind string,
-	schema *schema.Structural,
-	isResourceRoot bool,
+	declType *DeclType,
 	res Resolver) (*RuleTypes, error) {
 	// Note, if the schema indicates that it's actually based on another proto
 	// then prefer the proto definition. For expressions in the proto, a new field
 	// annotation will be needed to indicate the expected environment and type of
 	// the expression.
-	schemaTypes, err := newSchemaTypeProvider(kind, schema, isResourceRoot)
+	schemaTypes, err := newSchemaTypeProvider(kind, declType)
 	if err != nil {
 		return nil, err
 	}
@@ -310,7 +308,6 @@ func NewRuleTypes(kind string,
 		return nil, nil
 	}
 	return &RuleTypes{
-		Schema:              schema,
 		ruleSchemaDeclTypes: schemaTypes,
 		resolver:            res,
 	}, nil
@@ -320,7 +317,6 @@ func NewRuleTypes(kind string,
 // type-system.
 type RuleTypes struct {
 	ref.TypeProvider
-	Schema              *schema.Structural
 	ruleSchemaDeclTypes *schemaTypeProvider
 	typeAdapter         ref.TypeAdapter
 	resolver            Resolver
@@ -345,7 +341,6 @@ func (rt *RuleTypes) EnvOptions(tp ref.TypeProvider) ([]cel.EnvOption, error) {
 	rtWithTypes := &RuleTypes{
 		TypeProvider:        tp,
 		typeAdapter:         ta,
-		Schema:              rt.Schema,
 		ruleSchemaDeclTypes: rt.ruleSchemaDeclTypes,
 		resolver:            rt.resolver,
 	}
@@ -492,12 +487,11 @@ func (rt *RuleTypes) convertToCustomType(dyn *DynValue, declType *DeclType) *Dyn
 	}
 }
 
-func newSchemaTypeProvider(kind string, schema *schema.Structural, isResourceRoot bool) (*schemaTypeProvider, error) {
-	delType := SchemaDeclType(schema, isResourceRoot)
-	if delType == nil {
+func newSchemaTypeProvider(kind string, declType *DeclType) (*schemaTypeProvider, error) {
+	if declType == nil {
 		return nil, nil
 	}
-	root := delType.MaybeAssignTypeName(kind)
+	root := declType.MaybeAssignTypeName(kind)
 	types := FieldTypeMap(kind, root)
 	return &schemaTypeProvider{
 		root:  root,

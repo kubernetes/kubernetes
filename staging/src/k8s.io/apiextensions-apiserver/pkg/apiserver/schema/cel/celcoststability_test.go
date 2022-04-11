@@ -1094,7 +1094,7 @@ func TestCelCostStability(t *testing.T) {
 				t.Run(testName, func(t *testing.T) {
 					t.Parallel()
 					s := withRule(*tt.schema, validRule)
-					celValidator := NewValidator(&s, PerCallLimit)
+					celValidator := NewValidator(&s, true, PerCallLimit)
 					if celValidator == nil {
 						t.Fatal("expected non nil validator")
 					}
