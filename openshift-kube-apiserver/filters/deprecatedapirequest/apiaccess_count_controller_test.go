@@ -18,6 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/kubernetes/openshift-kube-apiserver/admission/customresourcevalidation/apirequestcount"
 )
 
 func TestRemovedRelease(t *testing.T) {
@@ -608,6 +609,20 @@ func TestPersistRequestCountForAllResources(t *testing.T) {
 			},
 		},
 		{
+			name: "IgnoreInvalidResourceName",
+			existing: []runtime.Object{
+				apiRequestCount("test-v1-invalid"),
+				apiRequestCount("test.v1.group"),
+			},
+			expected: []*apiv1.APIRequestCount{
+				apiRequestCount("test-v1-invalid"),
+				apiRequestCount("test.v1.group", withStatus(
+					withRequestLastHour(withPerNodeAPIRequestLog("node10")),
+					withRequestLast24hN("0,2-23", withPerNodeAPIRequestLog("node10")),
+				)),
+			},
+		},
+		{
 			name: "OnRestart",
 			existing: []runtime.Object{
 				// current hour is 0, this api has not been requested since hour 20
@@ -683,7 +698,6 @@ func TestPersistRequestCountForAllResources(t *testing.T) {
 			for _, logRequest := range tc.requests {
 				logRequest(c)
 			}
-
 			c.persistRequestCountForAllResources(ctx, tc.currentHour)
 
 			arcs, err := c.client.List(ctx, metav1.ListOptions{})
@@ -822,12 +836,16 @@ func withRequestN(resource string, hour int, user, agent, verb string, n int) fu
 func withRequest(resource string, hour int, user, agent, verb string) func(*controller) {
 	ts := time.Date(2021, 11, 9, hour, 0, 0, 0, time.UTC)
 	return func(c *controller) {
-		c.LogRequest(apiNameToResource(resource), ts, user, agent, verb)
+		gvr, err := apirequestcount.NameToResource(resource)
+		if err != nil {
+			panic(err)
+		}
+		c.LogRequest(gvr, ts, user, agent, verb)
 	}
 }
 
 func withPerUserAPIRequestCount(user, userAgent string, options ...func(*apiv1.PerUserAPIRequestCount)) func(*apiv1.PerNodeAPIRequestLog) {
-	return func(nodeRequestlog *apiv1.PerNodeAPIRequestLog) {
+	return func(nodeRequestLog *apiv1.PerNodeAPIRequestLog) {
 		requestUser := &apiv1.PerUserAPIRequestCount{
 			UserName:  user,
 			UserAgent: userAgent,
@@ -835,7 +853,7 @@ func withPerUserAPIRequestCount(user, userAgent string, options ...func(*apiv1.P
 		for _, f := range options {
 			f(requestUser)
 		}
-		nodeRequestlog.ByUser = append(nodeRequestlog.ByUser, *requestUser)
+		nodeRequestLog.ByUser = append(nodeRequestLog.ByUser, *requestUser)
 	}
 }
 
@@ -906,8 +924,6 @@ func apiRequestCountStatus(options ...func(*apiv1.APIRequestCountStatus)) *apiv1
 	}
 	return status
 }
-
-const all = "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23"
 
 func requestLog(options ...func(*apiv1.PerResourceAPIRequestLog)) apiv1.PerResourceAPIRequestLog {
 	requestLog := &apiv1.PerResourceAPIRequestLog{}
