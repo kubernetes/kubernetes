@@ -181,14 +181,54 @@ func (s stringer) String() string {
 	return "stringer"
 }
 
+type stringerPtr struct {
+}
+
+func (s *stringerPtr) String() string {
+	return "stringer"
+}
+
+func intPtr(i int) *int {
+	return &i
+}
+
 func TestErrorBody(t *testing.T) {
 	var nilStringer *stringer = nil
+	var nilStringerPtr *stringerPtr = nil
+	var nilInt *int
+	type dummy struct{}
+	var nilDummy *dummy
+
 	testCases := []struct {
 		name     string
 		err      *Error
 		expected string
 	}{
 		{
+			name:     "int",
+			err:      Invalid(NewPath("bla"), 2, "details"),
+			expected: "Invalid value: 2: details",
+		}, {
+			name:     "intPtr",
+			err:      Invalid(NewPath("bla"), intPtr(2), "details"),
+			expected: "Invalid value: 2: details",
+		}, {
+			name:     "nil intPtr",
+			err:      Invalid(NewPath("bla"), nilInt, "details"),
+			expected: `Invalid value: "null": details`,
+		}, {
+			name:     "dummy",
+			err:      Invalid(NewPath("bla"), dummy{}, "details"),
+			expected: "Invalid value: field.dummy{}: details",
+		}, {
+			name:     "dummyPtr",
+			err:      Invalid(NewPath("bla"), &dummy{}, "details"),
+			expected: "Invalid value: field.dummy{}: details",
+		}, {
+			name:     "nil dummyPtr",
+			err:      Invalid(NewPath("bla"), nilDummy, "details"),
+			expected: `Invalid value: "null": details`,
+		}, {
 			name:     "stringer",
 			err:      Invalid(NewPath("bla"), stringer{}, "details"),
 			expected: "Invalid value: stringer: details",
@@ -199,7 +239,19 @@ func TestErrorBody(t *testing.T) {
 		}, {
 			name:     "nil stringer",
 			err:      Invalid(NewPath("bla"), nilStringer, "details"),
-			expected: "Invalid value: \"null\": details",
+			expected: `Invalid value: "null": details`,
+		}, {
+			name:     "stringerPtr",
+			err:      Invalid(NewPath("bla"), stringerPtr{}, "details"),
+			expected: "Invalid value: stringer: details",
+		}, {
+			name:     "stringerPtr pointer",
+			err:      Invalid(NewPath("bla"), &stringerPtr{}, "details"),
+			expected: "Invalid value: stringer: details",
+		}, {
+			name:     "nil stringerPtr",
+			err:      Invalid(NewPath("bla"), nilStringerPtr, "details"),
+			expected: `Invalid value: "null": details`,
 		},
 	}
 	for _, testCase := range testCases {
