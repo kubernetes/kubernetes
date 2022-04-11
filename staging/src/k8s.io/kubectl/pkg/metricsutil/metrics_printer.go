@@ -295,7 +295,7 @@ func printAllResourceUsages(out io.Writer, metrics *ResourceMetricsInfo) {
 		fmt.Fprint(out, "\t")
 		if available, found := metrics.Available[res]; found {
 			fraction := float64(quantity.MilliValue()) / float64(available.MilliValue()) * 100
-			fmt.Fprintf(out, "%d%%\t", int64(fraction))
+			fmt.Fprintf(out, "%.2f%%\t", fraction)
 		}
 	}
 }
