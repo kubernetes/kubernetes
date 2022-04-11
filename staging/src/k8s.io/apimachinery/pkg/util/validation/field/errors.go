@@ -77,12 +77,6 @@ func (v *Error) ErrorBody() string {
 					value = reflectValue.Elem().Interface()
 				}
 			}
-		} else {
-			valuePtr := reflect.New(valueType)
-			if valuePtr.Type().Implements(stringerType) {
-				valuePtr.Elem().Set(reflect.ValueOf(value))
-				value = valuePtr.Interface()
-			}
 		}
 		switch t := value.(type) {
 		case int64, int32, float64, float32, bool:

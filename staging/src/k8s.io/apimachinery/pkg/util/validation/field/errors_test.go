@@ -243,7 +243,7 @@ func TestErrorBody(t *testing.T) {
 		}, {
 			name:     "stringerPtr",
 			err:      Invalid(NewPath("bla"), stringerPtr{}, "details"),
-			expected: "Invalid value: stringer: details",
+			expected: "Invalid value: field.stringerPtr{}: details",
 		}, {
 			name:     "stringerPtr pointer",
 			err:      Invalid(NewPath("bla"), &stringerPtr{}, "details"),
