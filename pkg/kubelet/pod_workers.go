@@ -681,9 +681,6 @@ func (p *podWorkers) UpdatePod(options UpdatePodOptions) {
 
 		wasGracePeriodShortened = gracePeriodShortened
 		status.gracePeriod = gracePeriod
-		// always set the grace period for syncTerminatingPod so we don't have to recalculate,
-		// will never be zero.
-		options.KillPodOptions.PodTerminationGracePeriodSecondsOverride = &gracePeriod
 
 	default:
 		workType = SyncPodWork
@@ -770,18 +767,23 @@ func calculateEffectiveGracePeriod(status *podSyncStatus, pod *v1.Pod, options *
 	// enforce the restriction that a grace period can only decrease and track whatever our value is,
 	// then ensure a calculated value is passed down to lower levels
 	gracePeriod := status.gracePeriod
-	// this value is bedrock truth - the apiserver owns telling us this value calculated by apiserver
-	if override := pod.DeletionGracePeriodSeconds; override != nil {
-		if gracePeriod == 0 || *override < gracePeriod {
-			gracePeriod = *override
-		}
-	}
-	// we allow other parts of the kubelet (namely eviction) to request this pod be terminated faster
+	// we allow other parts of the kubelet (namely eviction) to request this pod be terminated faster,
+	// so we should not override this
 	if options != nil {
 		if override := options.PodTerminationGracePeriodSecondsOverride; override != nil {
 			if gracePeriod == 0 || *override < gracePeriod {
 				gracePeriod = *override
 			}
+			// we should keep options.PodTerminationGracePeriodSecondsOverride as it is
+			// since if options.PodTerminationGracePeriodSecondsOverride is nil, the killContainer interface
+			// of kuberuntime_container will still calculate a effective grace period for this container termination
+			return gracePeriod, status.gracePeriod != 0 && status.gracePeriod != gracePeriod
+		}
+	}
+	// this value is bedrock truth - the apiserver owns telling us this value calculated by apiserver
+	if override := pod.DeletionGracePeriodSeconds; override != nil {
+		if gracePeriod == 0 || *override < gracePeriod {
+			gracePeriod = *override
 		}
 	}
 	// make a best effort to default this value to the pod's desired intent, in the event
