@@ -93,7 +93,8 @@ type Manager interface {
 	// IsMirrorPodOf returns true if mirrorPod is a correct representation of
 	// pod; false otherwise.
 	IsMirrorPodOf(mirrorPod, pod *v1.Pod) bool
-
+	// GetAllPodNum returns pod number of both regular and mirror pods.
+	GetAllPodNum() int
 	MirrorClient
 }
 
@@ -346,4 +347,10 @@ func (pm *basicManager) GetPodByMirrorPod(mirrorPod *v1.Pod) (*v1.Pod, bool) {
 	defer pm.lock.RUnlock()
 	pod, ok := pm.podByFullName[kubecontainer.GetPodFullName(mirrorPod)]
 	return pod, ok
+}
+
+func (pm *basicManager) GetAllPodNum() int {
+	pm.lock.RLock()
+	defer pm.lock.RUnlock()
+	return len(pm.podByUID) + len(pm.mirrorPodByUID)
 }

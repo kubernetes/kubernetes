@@ -289,3 +289,7 @@ func (mr *MockManagerMockRecorder) UpdatePod(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdatePod", reflect.TypeOf((*MockManager)(nil).UpdatePod), arg0)
 }
+
+func (m *MockManager) GetAllPodNum() int {
+	return 0
+}

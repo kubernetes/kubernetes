@@ -233,6 +233,7 @@ func MachineInfo(nodeName string,
 	capacityFunc func() v1.ResourceList, // typically Kubelet.containerManager.GetCapacity
 	devicePluginResourceCapacityFunc func() (v1.ResourceList, v1.ResourceList, []string), // typically Kubelet.containerManager.GetDevicePluginResourceCapacity
 	nodeAllocatableReservationFunc func() v1.ResourceList, // typically Kubelet.containerManager.GetNodeAllocatableReservation
+	getAllPodNum func() int,
 	recordEventFunc func(eventType, event, message string), // typically Kubelet.recordEvent
 ) Setter {
 	return func(node *v1.Node) error {
@@ -338,6 +339,16 @@ func MachineInfo(nodeName string,
 			}
 			node.Status.Allocatable[k] = value
 		}
+
+		//Set Allocatable.ResourcePods to minus the pods already scheduled to this node.
+		allocatedPodNum := getAllPodNum()
+		allocatablePodsValue := node.Status.Allocatable[v1.ResourcePods].DeepCopy()
+		allocatablePodsValue.Sub(*resource.NewQuantity(int64(allocatedPodNum), resource.DecimalSI))
+		if allocatablePodsValue.Sign() < 0 {
+			//May occur when kubelet start more mirror pods than the maxPods limits, set to 0.
+			allocatablePodsValue.Set(0)
+		}
+		node.Status.Allocatable[v1.ResourcePods] = allocatablePodsValue
 
 		for k, v := range devicePluginAllocatable {
 			if old, ok := node.Status.Allocatable[k]; !ok || old.Value() != v.Value() {

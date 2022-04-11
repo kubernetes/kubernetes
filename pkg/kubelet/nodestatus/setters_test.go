@@ -539,6 +539,7 @@ func TestMachineInfo(t *testing.T) {
 		nodeAllocatableReservation   v1.ResourceList
 		expectNode                   *v1.Node
 		expectEvents                 []testEvent
+		allocatedPodNum              int
 	}{
 		{
 			desc:    "machine identifiers, basic capacity and allocatable",
@@ -898,6 +899,54 @@ func TestMachineInfo(t *testing.T) {
 				},
 			},
 		},
+		{
+			desc:            "allocatedPodNum less than maxPods number, Allocatable.ResourcePods must minus allocatedPodNum",
+			node:            &v1.Node{},
+			maxPods:         110,
+			allocatedPodNum: 50,
+			machineInfo: &cadvisorapiv1.MachineInfo{
+				NumCores:       2,
+				MemoryCapacity: 1024,
+			},
+			expectNode: &v1.Node{
+				Status: v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
+					},
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourcePods:   *resource.NewQuantity(60, resource.DecimalSI),
+					},
+				},
+			},
+		},
+		{
+			desc:            "allocatedPodNum greater than maxPods number, Allocatable.ResourcePods is set to 0",
+			node:            &v1.Node{},
+			maxPods:         110,
+			allocatedPodNum: 111,
+			machineInfo: &cadvisorapiv1.MachineInfo{
+				NumCores:       2,
+				MemoryCapacity: 1024,
+			},
+			expectNode: &v1.Node{
+				Status: v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
+					},
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
+					},
+				},
+			},
+		},
 	}
 
 	for _, tc := range cases {
@@ -915,6 +964,9 @@ func TestMachineInfo(t *testing.T) {
 			nodeAllocatableReservationFunc := func() v1.ResourceList {
 				return tc.nodeAllocatableReservation
 			}
+			getAllPodNum := func() int {
+				return tc.allocatedPodNum
+			}
 
 			events := []testEvent{}
 			recordEventFunc := func(eventType, event, message string) {
@@ -926,7 +978,7 @@ func TestMachineInfo(t *testing.T) {
 			}
 			// construct setter
 			setter := MachineInfo(nodeName, tc.maxPods, tc.podsPerCore, machineInfoFunc, capacityFunc,
-				devicePluginResourceCapacityFunc, nodeAllocatableReservationFunc, recordEventFunc)
+				devicePluginResourceCapacityFunc, nodeAllocatableReservationFunc, getAllPodNum, recordEventFunc)
 			// call setter on node
 			if err := setter(tc.node); err != nil {
 				t.Fatalf("unexpected error: %v", err)
