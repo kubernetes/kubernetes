@@ -57,9 +57,13 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 
 	var cs clientset.Interface
 	serviceLBNames := []string{}
+	var subnetPrefix []string
+	var err error
 
 	ginkgo.BeforeEach(func() {
 		cs = f.ClientSet
+		subnetPrefix, err = e2enode.GetSubnetPrefix(cs)
+		framework.ExpectNoError(err)
 	})
 
 	ginkgo.AfterEach(func() {
@@ -590,7 +594,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		isInternalEndpoint := func(lbIngress *v1.LoadBalancerIngress) bool {
 			ingressEndpoint := e2eservice.GetIngressPoint(lbIngress)
 			// Needs update for providers using hostname as endpoint.
-			return strings.HasPrefix(ingressEndpoint, "10.")
+			return strings.HasPrefix(ingressEndpoint, subnetPrefix[0]+".")
 		}
 
 		ginkgo.By("creating a service with type LoadBalancer and cloud specific Internal-LB annotation enabled")
@@ -669,7 +673,9 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		// will be removed when GCP supports similar functionality.
 		if framework.ProviderIs("azure") {
 			ginkgo.By("switching back to interal type LoadBalancer, with static IP specified.")
-			internalStaticIP := "10.240.11.11"
+			// For a cluster created with CAPZ, node-subnet may not be "10.240.0.0/16", e.g. "10.1.0.0/16".
+			internalStaticIP := fmt.Sprintf("%s.%s.11.11", subnetPrefix[0], subnetPrefix[1])
+
 			svc, err = jig.UpdateService(func(svc *v1.Service) {
 				svc.Spec.LoadBalancerIP = internalStaticIP
 				enableILB(svc)
@@ -987,6 +993,8 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP [Slow]", func() {
 
 	var cs clientset.Interface
 	serviceLBNames := []string{}
+	var subnetPrefix []string
+	var err error
 
 	ginkgo.BeforeEach(func() {
 		// requires cloud load-balancer support - this feature currently supported only on GCE/GKE
@@ -994,6 +1002,8 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP [Slow]", func() {
 
 		cs = f.ClientSet
 		loadBalancerCreateTimeout = e2eservice.GetServiceLoadBalancerCreationTimeout(cs)
+		subnetPrefix, err = e2enode.GetSubnetPrefix(cs)
+		framework.ExpectNoError(err)
 	})
 
 	ginkgo.AfterEach(func() {
@@ -1052,7 +1062,7 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP [Slow]", func() {
 		framework.Logf("ClientIP detected by target pod using VIP:SvcPort is %s", clientIP)
 
 		ginkgo.By("checking if Source IP is preserved")
-		if strings.HasPrefix(clientIP, "10.") {
+		if strings.HasPrefix(clientIP, subnetPrefix[0]+".") {
 			framework.Failf("Source IP was NOT preserved")
 		}
 	})
@@ -1334,7 +1344,7 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP [Slow]", func() {
 			if err != nil {
 				return false, nil
 			}
-			if strings.HasPrefix(clientIP, "10.") {
+			if strings.HasPrefix(clientIP, subnetPrefix[0]+".") {
 				return true, nil
 			}
 			return false, nil
@@ -1363,7 +1373,7 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP [Slow]", func() {
 				return false, nil
 			}
 			ginkgo.By(fmt.Sprintf("Endpoint %v:%v%v returned client ip %v", ingressIP, svcTCPPort, path, clientIP))
-			if !strings.HasPrefix(clientIP, "10.") {
+			if !strings.HasPrefix(clientIP, subnetPrefix[0]+".") {
 				return true, nil
 			}
 			return false, nil
