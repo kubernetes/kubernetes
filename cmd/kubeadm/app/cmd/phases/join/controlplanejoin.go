@@ -190,8 +190,8 @@ func runMarkControlPlanePhase(c workflow.RunData) error {
 	}
 
 	if !data.DryRun() {
-		if err := markcontrolplanephase.MarkControlPlane(client, cfg.NodeRegistration.Name, cfg.NodeRegistration.Taints); err != nil {
-			return errors.Wrap(err, "error applying control-plane label and taints")
+		if err := markcontrolplanephase.MarkControlPlane(client, cfg.NodeRegistration.Name); err != nil {
+			return errors.Wrap(err, "error applying control-plane label")
 		}
 	} else {
 		fmt.Printf("[control-plane-join] Would mark node %s as a control-plane\n", cfg.NodeRegistration.Name)

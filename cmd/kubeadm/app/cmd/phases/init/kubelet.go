@@ -66,10 +66,8 @@ func runKubeletStart(c workflow.RunData) error {
 		kubeletphase.TryStopKubelet()
 	}
 
-	// Write env file with flags for the kubelet to use. We do not need to write the --register-with-taints for the control-plane,
-	// as we handle that ourselves in the mark-control-plane phase
-	// TODO: Maybe we want to do that some time in the future, in order to remove some logic from the mark-control-plane phase?
-	if err := kubeletphase.WriteKubeletDynamicEnvFile(&data.Cfg().ClusterConfiguration, &data.Cfg().NodeRegistration, false, data.KubeletDir()); err != nil {
+	// Write env file with flags for the kubelet to use.
+	if err := kubeletphase.WriteKubeletDynamicEnvFile(&data.Cfg().ClusterConfiguration, &data.Cfg().NodeRegistration, true, data.KubeletDir()); err != nil {
 		return errors.Wrap(err, "error writing a dynamic environment file for the kubelet")
 	}
 

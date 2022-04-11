@@ -28,7 +28,7 @@ import (
 )
 
 // Mutate modifies absolute path fields in the KubeletConfiguration to be Windows compatible absolute paths.
-func (kc *kubeletConfig) Mutate() error {
+func (kc *KubeletConfig) Mutate() error {
 	// When "kubeadm join" downloads the KubeletConfiguration from the cluster on Windows
 	// nodes, it would contain absolute paths that may lack drive letters, since the config
 	// could have been generated on a Linux control-plane node. On Windows the

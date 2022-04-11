@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	phases "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/upgrade/node"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
+	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 )
@@ -128,14 +129,7 @@ func newNodeData(cmd *cobra.Command, args []string, options *nodeOptions) (*node
 		return nil, errors.Wrapf(err, "couldn't create a Kubernetes client from file %q", options.kubeConfigPath)
 	}
 
-	// isControlPlane checks if a node is a control-plane node by looking up
-	// the kube-apiserver manifest file
-	isControlPlaneNode := true
-	filepath := constants.GetStaticPodFilepath(constants.KubeAPIServer, constants.GetStaticPodDirectory())
-	if _, err := os.Stat(filepath); os.IsNotExist(err) {
-		isControlPlaneNode = false
-	}
-
+	isControlPlaneNode := cmdutil.IsControlPlaneNode()
 	// Fetches the cluster configuration
 	// NB in case of control-plane node, we are reading all the info for the node; in case of NOT control-plane node
 	//    (worker node), we are not reading local API address and the CRI socket from the node object

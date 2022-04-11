@@ -27,10 +27,10 @@ import (
 
 var (
 	markControlPlaneExample = cmdutil.Examples(`
-		# Applies control-plane label and taint to the current node, functionally equivalent to what executed by kubeadm init.
+		# Applies control-plane label to the current node, functionally equivalent to what executed by kubeadm init.
 		kubeadm init phase mark-control-plane --config config.yaml
 
-		# Applies control-plane label and taint to a specific node
+		# Applies control-plane label to a specific node
 		kubeadm init phase mark-control-plane --node-name myNode
 		`)
 )
@@ -62,5 +62,5 @@ func runMarkControlPlane(c workflow.RunData) error {
 	}
 
 	nodeRegistration := data.Cfg().NodeRegistration
-	return markcontrolplanephase.MarkControlPlane(client, nodeRegistration.Name, nodeRegistration.Taints)
+	return markcontrolplanephase.MarkControlPlane(client, nodeRegistration.Name)
 }

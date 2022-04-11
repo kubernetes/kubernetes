@@ -28,6 +28,7 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
+	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/initsystem"
 )
@@ -61,11 +62,15 @@ var kubeletHandler = handler{
 	GroupVersion: kubeletconfig.SchemeGroupVersion,
 	AddToScheme:  kubeletconfig.AddToScheme,
 	CreateEmpty: func() kubeadmapi.ComponentConfig {
-		return &kubeletConfig{
+		kubeletCfg := &KubeletConfig{
 			configBase: configBase{
 				GroupVersion: kubeletconfig.SchemeGroupVersion,
 			},
 		}
+		if cmdutil.IsControlPlaneNode() {
+			kubeletCfg.config.RegisterWithTaints = append(kubeletCfg.config.RegisterWithTaints, constants.ControlPlaneTaint)
+		}
+		return kubeletCfg
 	},
 	fromCluster: kubeletConfigFromCluster,
 }
@@ -98,36 +103,36 @@ func kubeletConfigFromCluster(h *handler, clientset clientset.Interface, cluster
 	return cm, nil
 }
 
-// kubeletConfig implements the kubeadmapi.ComponentConfig interface for kubelet
-type kubeletConfig struct {
+// KubeletConfig implements the kubeadmapi.ComponentConfig interface for kubelet
+type KubeletConfig struct {
 	configBase
 	config kubeletconfig.KubeletConfiguration
 }
 
-func (kc *kubeletConfig) DeepCopy() kubeadmapi.ComponentConfig {
-	result := &kubeletConfig{}
+func (kc *KubeletConfig) DeepCopy() kubeadmapi.ComponentConfig {
+	result := &KubeletConfig{}
 	kc.configBase.DeepCopyInto(&result.configBase)
 	kc.config.DeepCopyInto(&result.config)
 	return result
 }
 
-func (kc *kubeletConfig) Marshal() ([]byte, error) {
+func (kc *KubeletConfig) Marshal() ([]byte, error) {
 	return kc.configBase.Marshal(&kc.config)
 }
 
-func (kc *kubeletConfig) Unmarshal(docmap kubeadmapi.DocumentMap) error {
+func (kc *KubeletConfig) Unmarshal(docmap kubeadmapi.DocumentMap) error {
 	return kc.configBase.Unmarshal(docmap, &kc.config)
 }
 
-func (kc *kubeletConfig) Get() interface{} {
+func (kc *KubeletConfig) Get() interface{} {
 	return &kc.config
 }
 
-func (kc *kubeletConfig) Set(cfg interface{}) {
+func (kc *KubeletConfig) Set(cfg interface{}) {
 	kc.config = *cfg.(*kubeletconfig.KubeletConfiguration)
 }
 
-func (kc *kubeletConfig) Default(cfg *kubeadmapi.ClusterConfiguration, _ *kubeadmapi.APIEndpoint, nodeRegOpts *kubeadmapi.NodeRegistrationOptions) {
+func (kc *KubeletConfig) Default(cfg *kubeadmapi.ClusterConfiguration, _ *kubeadmapi.APIEndpoint, nodeRegOpts *kubeadmapi.NodeRegistrationOptions) {
 	const kind = "KubeletConfiguration"
 
 	if kc.config.FeatureGates == nil {

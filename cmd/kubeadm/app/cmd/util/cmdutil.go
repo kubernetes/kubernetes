@@ -17,6 +17,8 @@ limitations under the License.
 package util
 
 import (
+	"os"
+
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -26,6 +28,7 @@ import (
 
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
@@ -99,4 +102,14 @@ func DefaultInitConfiguration() *kubeadmapiv1.InitConfiguration {
 		},
 	}
 	return initCfg
+}
+
+// isControlPlaneNode checks if a node is a control-plane node by looking up
+// the kube-apiserver manifest file
+func IsControlPlaneNode() bool {
+	filepath := constants.GetStaticPodFilepath(constants.KubeAPIServer, constants.GetStaticPodDirectory())
+	if _, err := os.Stat(filepath); os.IsNotExist(err) {
+		return false
+	}
+	return true
 }

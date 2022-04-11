@@ -20,6 +20,6 @@ limitations under the License.
 package componentconfigs
 
 // Mutate allows applying pre-defined modifications to the config before it's marshaled.
-func (kc *kubeletConfig) Mutate() error {
+func (kc *KubeletConfig) Mutate() error {
 	return nil
 }

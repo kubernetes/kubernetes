@@ -66,7 +66,7 @@ func GetNodeNameAndHostname(cfg *kubeadmapi.NodeRegistrationOptions) (string, st
 
 // WriteKubeletDynamicEnvFile writes an environment file with dynamic flags to the kubelet.
 // Used at "kubeadm init" and "kubeadm join" time.
-func WriteKubeletDynamicEnvFile(cfg *kubeadmapi.ClusterConfiguration, nodeReg *kubeadmapi.NodeRegistrationOptions, registerTaintsUsingFlags bool, kubeletDir string) error {
+func WriteKubeletDynamicEnvFile(cfg *kubeadmapi.ClusterConfiguration, nodeReg *kubeadmapi.NodeRegistrationOptions, isControlPlane bool, kubeletDir string) error {
 	// This is a temporary measure until kubeadm no longer supports a kubelet version with built-in dockershim.
 	// TODO: https://github.com/kubernetes/kubeadm/issues/2626
 	kubeletVersion, err := preflight.GetKubeletVersion(utilsexec.New())
@@ -81,10 +81,9 @@ func WriteKubeletDynamicEnvFile(cfg *kubeadmapi.ClusterConfiguration, nodeReg *k
 	}
 
 	flagOpts := kubeletFlagsOpts{
-		nodeRegOpts:              nodeReg,
-		pauseImage:               images.GetPauseImage(cfg),
-		registerTaintsUsingFlags: registerTaintsUsingFlags,
-		kubeletVersion:           kubeletVersion,
+		nodeRegOpts:    nodeReg,
+		pauseImage:     images.GetPauseImage(cfg),
+		kubeletVersion: kubeletVersion,
 	}
 	stringMap := buildKubeletArgMap(flagOpts)
 	argList := kubeadmutil.BuildArgumentListFromMap(stringMap, nodeReg.KubeletExtraArgs)
@@ -119,15 +118,6 @@ func buildKubeletArgMapCommon(opts kubeletFlagsOpts) map[string]string {
 	// and prevents its garbage collection
 	if opts.pauseImage != "" {
 		kubeletFlags["pod-infra-container-image"] = opts.pauseImage
-	}
-
-	if opts.registerTaintsUsingFlags && opts.nodeRegOpts.Taints != nil && len(opts.nodeRegOpts.Taints) > 0 {
-		taintStrs := []string{}
-		for _, taint := range opts.nodeRegOpts.Taints {
-			taintStrs = append(taintStrs, taint.ToString())
-		}
-
-		kubeletFlags["register-with-taints"] = strings.Join(taintStrs, ",")
 	}
 
 	// Pass the "--hostname-override" flag to the kubelet only if it's different from the hostname

@@ -60,12 +60,12 @@ func TestKubeletDefault(t *testing.T) {
 	tests := []struct {
 		name       string
 		clusterCfg kubeadmapi.ClusterConfiguration
-		expected   kubeletConfig
+		expected   KubeletConfig
 	}{
 		{
 			name:       "No specific defaulting works",
 			clusterCfg: kubeadmapi.ClusterConfiguration{},
-			expected: kubeletConfig{
+			expected: KubeletConfig{
 				config: kubeletconfig.KubeletConfiguration{
 					FeatureGates:  map[string]bool{},
 					StaticPodPath: kubeadmapiv1.DefaultManifestsDir,
@@ -99,7 +99,7 @@ func TestKubeletDefault(t *testing.T) {
 					ServiceSubnet: "192.168.0.0/16",
 				},
 			},
-			expected: kubeletConfig{
+			expected: KubeletConfig{
 				config: kubeletconfig.KubeletConfiguration{
 					FeatureGates:  map[string]bool{},
 					StaticPodPath: kubeadmapiv1.DefaultManifestsDir,
@@ -133,7 +133,7 @@ func TestKubeletDefault(t *testing.T) {
 					ServiceSubnet: "192.168.0.0/16",
 				},
 			},
-			expected: kubeletConfig{
+			expected: KubeletConfig{
 				config: kubeletconfig.KubeletConfiguration{
 					FeatureGates:  map[string]bool{},
 					StaticPodPath: kubeadmapiv1.DefaultManifestsDir,
@@ -167,7 +167,7 @@ func TestKubeletDefault(t *testing.T) {
 					DNSDomain: "example.com",
 				},
 			},
-			expected: kubeletConfig{
+			expected: KubeletConfig{
 				config: kubeletconfig.KubeletConfiguration{
 					FeatureGates:  map[string]bool{},
 					StaticPodPath: kubeadmapiv1.DefaultManifestsDir,
@@ -200,7 +200,7 @@ func TestKubeletDefault(t *testing.T) {
 			clusterCfg: kubeadmapi.ClusterConfiguration{
 				CertificatesDir: "/path/to/certs",
 			},
-			expected: kubeletConfig{
+			expected: KubeletConfig{
 				config: kubeletconfig.KubeletConfiguration{
 					FeatureGates:  map[string]bool{},
 					StaticPodPath: kubeadmapiv1.DefaultManifestsDir,
@@ -235,7 +235,7 @@ func TestKubeletDefault(t *testing.T) {
 			expected := test.expected
 			expected.configBase.GroupVersion = kubeletconfig.SchemeGroupVersion
 
-			got := &kubeletConfig{
+			got := &KubeletConfig{
 				configBase: configBase{
 					GroupVersion: kubeletconfig.SchemeGroupVersion,
 				},
@@ -267,7 +267,7 @@ func runKubeletFromTest(t *testing.T, perform func(gvk schema.GroupVersionKind, 
 	if cfg == nil {
 		t.Fatal("no config loaded where it should have been")
 	}
-	if kubeletCfg, ok := cfg.(*kubeletConfig); !ok {
+	if kubeletCfg, ok := cfg.(*KubeletConfig); !ok {
 		t.Fatalf("found different object type than expected: %s", reflect.TypeOf(cfg))
 	} else if kubeletCfg.config.ClusterDomain != clusterDomain {
 		t.Fatalf("unexpected control value (clusterDomain):\n\tgot: %q\n\texpected: %q", kubeletCfg.config.ClusterDomain, clusterDomain)

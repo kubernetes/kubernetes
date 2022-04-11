@@ -40,40 +40,12 @@ func TestMarkControlPlane(t *testing.T) {
 	tests := []struct {
 		name           string
 		existingLabels []string
-		existingTaints []v1.Taint
-		newTaints      []v1.Taint
 		expectedPatch  string
 	}{
 		{
-			name:           "control-plane label and taint missing",
-			existingLabels: []string{""},
-			existingTaints: nil,
-			newTaints:      []v1.Taint{kubeadmconstants.OldControlPlaneTaint},
-			expectedPatch:  `{"metadata":{"labels":{"node-role.kubernetes.io/control-plane":"","node.kubernetes.io/exclude-from-external-load-balancers":""}},"spec":{"taints":[{"effect":"NoSchedule","key":"node-role.kubernetes.io/master"}]}}`,
-		},
-		{
-			name:           "control-plane label and taint missing but taint not wanted",
-			existingLabels: []string{""},
-			existingTaints: nil,
-			newTaints:      nil,
-			expectedPatch:  `{"metadata":{"labels":{"node-role.kubernetes.io/control-plane":"","node.kubernetes.io/exclude-from-external-load-balancers":""}}}`,
-		},
-		{
 			name:           "control-plane label missing",
 			existingLabels: []string{""},
-			existingTaints: []v1.Taint{kubeadmconstants.OldControlPlaneTaint},
-			newTaints:      []v1.Taint{kubeadmconstants.OldControlPlaneTaint},
 			expectedPatch:  `{"metadata":{"labels":{"node-role.kubernetes.io/control-plane":"","node.kubernetes.io/exclude-from-external-load-balancers":""}}}`,
-		},
-		{
-			name: "control-plane taint missing",
-			existingLabels: []string{
-				kubeadmconstants.LabelNodeRoleControlPlane,
-				kubeadmconstants.LabelExcludeFromExternalLB,
-			},
-			existingTaints: nil,
-			newTaints:      []v1.Taint{kubeadmconstants.OldControlPlaneTaint},
-			expectedPatch:  `{"spec":{"taints":[{"effect":"NoSchedule","key":"node-role.kubernetes.io/master"}]}}`,
 		},
 		{
 			name: "nothing missing",
@@ -81,40 +53,7 @@ func TestMarkControlPlane(t *testing.T) {
 				kubeadmconstants.LabelNodeRoleControlPlane,
 				kubeadmconstants.LabelExcludeFromExternalLB,
 			},
-			existingTaints: []v1.Taint{kubeadmconstants.OldControlPlaneTaint},
-			newTaints:      []v1.Taint{kubeadmconstants.OldControlPlaneTaint},
-			expectedPatch:  `{}`,
-		},
-		{
-			name: "has taint and no new taints wanted",
-			existingLabels: []string{
-				kubeadmconstants.LabelNodeRoleControlPlane,
-				kubeadmconstants.LabelExcludeFromExternalLB,
-			},
-			existingTaints: []v1.Taint{
-				{
-					Key:    "node.cloudprovider.kubernetes.io/uninitialized",
-					Effect: v1.TaintEffectNoSchedule,
-				},
-			},
-			newTaints:     nil,
 			expectedPatch: `{}`,
-		},
-		{
-			name: "has taint and should merge with wanted taint",
-			existingLabels: []string{
-				kubeadmconstants.LabelNodeRoleOldControlPlane,
-				kubeadmconstants.LabelNodeRoleControlPlane,
-				kubeadmconstants.LabelExcludeFromExternalLB,
-			},
-			existingTaints: []v1.Taint{
-				{
-					Key:    "node.cloudprovider.kubernetes.io/uninitialized",
-					Effect: v1.TaintEffectNoSchedule,
-				},
-			},
-			newTaints:     []v1.Taint{kubeadmconstants.OldControlPlaneTaint},
-			expectedPatch: `{"spec":{"taints":[{"effect":"NoSchedule","key":"node-role.kubernetes.io/master"},{"effect":"NoSchedule","key":"node.cloudprovider.kubernetes.io/uninitialized"}]}}`,
 		},
 	}
 
@@ -132,10 +71,6 @@ func TestMarkControlPlane(t *testing.T) {
 
 			for _, label := range tc.existingLabels {
 				controlPlaneNode.ObjectMeta.Labels[label] = ""
-			}
-
-			if tc.existingTaints != nil {
-				controlPlaneNode.Spec.Taints = tc.existingTaints
 			}
 
 			jsonNode, err := json.Marshal(controlPlaneNode)
@@ -175,7 +110,7 @@ func TestMarkControlPlane(t *testing.T) {
 				t.Fatalf("unexpected error building clientset: %v", err)
 			}
 
-			if err := MarkControlPlane(cs, nodename, tc.newTaints); err != nil {
+			if err := MarkControlPlane(cs, nodename); err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
 
