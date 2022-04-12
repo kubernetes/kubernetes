@@ -250,6 +250,16 @@ func (p *PodWrapper) NominatedNodeName(n string) *PodWrapper {
 	return p
 }
 
+// Toleration creates a toleration (with the operator Exists)
+// and injects into the inner pod.
+func (p *PodWrapper) Toleration(key string) *PodWrapper {
+	p.Spec.Tolerations = append(p.Spec.Tolerations, v1.Toleration{
+		Key:      key,
+		Operator: v1.TolerationOpExists,
+	})
+	return p
+}
+
 // PodAffinityKind represents different kinds of PodAffinity.
 type PodAffinityKind int
 
@@ -451,5 +461,11 @@ func (n *NodeWrapper) Images(images map[string]int64) *NodeWrapper {
 		containerImages = append(containerImages, v1.ContainerImage{Names: []string{name}, SizeBytes: size})
 	}
 	n.Status.Images = containerImages
+	return n
+}
+
+// Taints applies taints to the inner node.
+func (n *NodeWrapper) Taints(taints []v1.Taint) *NodeWrapper {
+	n.Spec.Taints = taints
 	return n
 }
