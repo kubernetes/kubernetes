@@ -179,14 +179,21 @@ func (o *Options) Run() error {
 }
 
 func getKustomizeVersion() string {
+	if modVersion, ok := GetKustomizeModVersion(); ok {
+		return modVersion
+	}
+	return kustomizeVersion // other clients should provide their own fallback
+}
+
+func GetKustomizeModVersion() (string, bool) {
 	info, ok := debug.ReadBuildInfo()
 	if !ok {
-		return kustomizeVersion
+		return "", false
 	}
 	for _, dep := range info.Deps {
 		if dep.Path == "sigs.k8s.io/kustomize/kustomize/v4" {
-			return dep.Version
+			return dep.Version, true
 		}
 	}
-	return kustomizeVersion
+	return "", false
 }
