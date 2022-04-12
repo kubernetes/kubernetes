@@ -501,3 +501,9 @@ func (n *NodeWrapper) Images(images map[string]int64) *NodeWrapper {
 	n.Status.Images = containerImages
 	return n
 }
+
+// Taints applies taints to the inner node.
+func (n *NodeWrapper) Taints(taints []v1.Taint) *NodeWrapper {
+	n.Spec.Taints = taints
+	return n
+}
