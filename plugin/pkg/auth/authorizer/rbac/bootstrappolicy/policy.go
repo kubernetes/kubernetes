@@ -564,6 +564,15 @@ func ClusterRoles() []rbacv1.ClusterRole {
 		rbacv1helpers.NewRule(Read...).Groups(storageGroup).Resources("csidrivers").RuleOrDie(),
 		rbacv1helpers.NewRule(Read...).Groups(storageGroup).Resources("csistoragecapacities").RuleOrDie(),
 	}
+	// Needed for dynamic resource allocation.
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+		kubeSchedulerRules = append(kubeSchedulerRules,
+			rbacv1helpers.NewRule(Read...).Groups(resourceGroup).Resources("resourceclaims", "resourceclasses").RuleOrDie(),
+			rbacv1helpers.NewRule(ReadUpdate...).Groups(resourceGroup).Resources("resourceclaims/status").RuleOrDie(),
+			rbacv1helpers.NewRule(ReadWrite...).Groups(resourceGroup).Resources("podschedulings").RuleOrDie(),
+			rbacv1helpers.NewRule(Read...).Groups(resourceGroup).Resources("podschedulings/status").RuleOrDie(),
+		)
+	}
 	roles = append(roles, rbacv1.ClusterRole{
 		// a role to use for the kube-scheduler
 		ObjectMeta: metav1.ObjectMeta{Name: "system:kube-scheduler"},
