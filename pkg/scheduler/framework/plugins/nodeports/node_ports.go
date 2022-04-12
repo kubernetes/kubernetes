@@ -105,7 +105,7 @@ func (pl *NodePorts) EventsToRegister() []framework.ClusterEvent {
 	return []framework.ClusterEvent{
 		// Due to immutable fields `spec.containers[*].ports`, pod update events are ignored.
 		{Resource: framework.Pod, ActionType: framework.Delete},
-		{Resource: framework.Node, ActionType: framework.Add},
+		{Resource: framework.Node, ActionType: framework.Add | framework.Update},
 	}
 }
 
