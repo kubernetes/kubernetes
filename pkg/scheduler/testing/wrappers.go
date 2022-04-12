@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 var zero int64
@@ -250,6 +251,16 @@ func (p *PodWrapper) NominatedNodeName(n string) *PodWrapper {
 	return p
 }
 
+// Toleration creates a toleration (with the operator Exists)
+// and injects into the inner pod.
+func (p *PodWrapper) Toleration(key string) *PodWrapper {
+	p.Spec.Tolerations = append(p.Spec.Tolerations, v1.Toleration{
+		Key:      key,
+		Operator: v1.TolerationOpExists,
+	})
+	return p
+}
+
 // PodAffinityKind represents different kinds of PodAffinity.
 type PodAffinityKind int
 
@@ -381,6 +392,8 @@ func (p *PodWrapper) Req(resMap map[v1.ResourceName]string) *PodWrapper {
 		res[k] = resource.MustParse(v)
 	}
 	p.Spec.Containers = append(p.Spec.Containers, v1.Container{
+		Name:  fmt.Sprintf("con%d", len(p.Spec.Containers)),
+		Image: imageutils.GetPauseImageName(),
 		Resources: v1.ResourceRequirements{
 			Requests: res,
 		},
@@ -451,5 +464,11 @@ func (n *NodeWrapper) Images(images map[string]int64) *NodeWrapper {
 		containerImages = append(containerImages, v1.ContainerImage{Names: []string{name}, SizeBytes: size})
 	}
 	n.Status.Images = containerImages
+	return n
+}
+
+// Taints applies taints to the inner node.
+func (n *NodeWrapper) Taints(taints []v1.Taint) *NodeWrapper {
+	n.Spec.Taints = taints
 	return n
 }
