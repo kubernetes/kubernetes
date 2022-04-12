@@ -114,13 +114,21 @@ function ensure_require_replace_directives_for_all_dependencies() {
       | xargs -L 100 go mod edit -fmt
 }
 
-function group_replace_directives() {
+function group_directives() {
   local local_tmp_dir
   local_tmp_dir=$(mktemp -d "${TMP_DIR}/group_replace.XXXX")
+  local go_mod_require_direct="${local_tmp_dir}/go.mod.require_direct.tmp"
+  local go_mod_require_indirect="${local_tmp_dir}/go.mod.require_indirect.tmp"
   local go_mod_replace="${local_tmp_dir}/go.mod.replace.tmp"
-  local go_mod_noreplace="${local_tmp_dir}/go.mod.noreplace.tmp"
+  local go_mod_other="${local_tmp_dir}/go.mod.other.tmp"
   # separate replace and non-replace directives
   awk "
+     # print lines between 'require (' ... ')' lines
+     /^require [(]/          { inrequire=1; next                            }
+     inrequire && /^[)]/     { inrequire=0; next                            }
+     inrequire && /\/\/ indirect/ { print > \"${go_mod_require_indirect}\"; next }
+     inrequire               { print > \"${go_mod_require_direct}\";   next }
+
      # print lines between 'replace (' ... ')' lines
      /^replace [(]/      { inreplace=1; next                   }
      inreplace && /^[)]/ { inreplace=0; next                   }
@@ -129,11 +137,21 @@ function group_replace_directives() {
      # print ungrouped replace directives with the replace directive trimmed
      /^replace [^(]/ { sub(/^replace /,\"\"); print > \"${go_mod_replace}\"; next }
 
-     # otherwise print to the noreplace file
-     { print > \"${go_mod_noreplace}\" }
+     # print ungrouped require directives with the require directive trimmed
+     /^require [^(].*\/\/ indirect/ { sub(/^require /,\"\"); print > \"${go_mod_require_indirect}\"; next }
+     /^require [^(]/ { sub(/^require /,\"\"); print > \"${go_mod_require_direct}\"; next }
+
+     # otherwise print to the other file
+     { print > \"${go_mod_other}\" }
   " < go.mod
   {
-    cat "${go_mod_noreplace}";
+    cat "${go_mod_other}";
+    echo "require (";
+    cat "${go_mod_require_direct}";
+    echo ")";
+    echo "require (";
+    cat "${go_mod_require_indirect}";
+    echo ")";
     echo "replace (";
     cat "${go_mod_replace}";
     echo ")";
@@ -215,8 +233,8 @@ ensure_require_replace_directives_for_all_dependencies
 go mod tidy >>"${LOG_FILE}" 2>&1
 # pin expanded versions
 ensure_require_replace_directives_for_all_dependencies
-# group replace directives
-group_replace_directives
+# group require/replace directives
+group_directives
 
 # Phase 4: copy root go.mod to staging dirs and rewrite
 
@@ -331,6 +349,9 @@ $(go mod why "${loopback_deps[@]}")"
              select(.Version == .Replace.Version) |
              "-dropreplace \(.Replace.Path)"' |
     xargs -L 100 go mod edit -fmt
+
+    # group require/replace directives
+    group_directives
 
   popd >/dev/null 2>&1
 done
