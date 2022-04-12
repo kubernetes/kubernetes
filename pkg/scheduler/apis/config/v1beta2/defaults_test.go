@@ -339,6 +339,7 @@ func TestSchedulerDefaults(t *testing.T) {
 									{Name: names.InterPodAffinity},
 									{Name: names.VolumeBinding},
 									{Name: names.NodeAffinity},
+									{Name: names.DynamicResources},
 								},
 							},
 							Filter: v1beta2.PluginSet{
@@ -358,11 +359,13 @@ func TestSchedulerDefaults(t *testing.T) {
 									{Name: names.VolumeZone},
 									{Name: names.PodTopologySpread},
 									{Name: names.InterPodAffinity},
+									{Name: names.DynamicResources},
 								},
 							},
 							PostFilter: v1beta2.PluginSet{
 								Enabled: []v1beta2.Plugin{
 									{Name: names.DefaultPreemption},
+									{Name: names.DynamicResources},
 								},
 							},
 							PreScore: v1beta2.PluginSet{
@@ -371,6 +374,7 @@ func TestSchedulerDefaults(t *testing.T) {
 									{Name: names.PodTopologySpread},
 									{Name: names.TaintToleration},
 									{Name: names.NodeAffinity},
+									{Name: names.DynamicResources},
 								},
 							},
 							Score: v1beta2.PluginSet{
@@ -387,6 +391,7 @@ func TestSchedulerDefaults(t *testing.T) {
 							Reserve: v1beta2.PluginSet{
 								Enabled: []v1beta2.Plugin{
 									{Name: names.VolumeBinding},
+									{Name: names.DynamicResources},
 								},
 							},
 							PreBind: v1beta2.PluginSet{
@@ -397,6 +402,11 @@ func TestSchedulerDefaults(t *testing.T) {
 							Bind: v1beta2.PluginSet{
 								Enabled: []v1beta2.Plugin{
 									{Name: "BarPlugin"},
+								},
+							},
+							PostBind: v1beta2.PluginSet{
+								Enabled: []v1beta2.Plugin{
+									{Name: "DynamicResources"},
 								},
 							},
 						},

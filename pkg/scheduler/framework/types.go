@@ -66,6 +66,8 @@ const (
 	Node                  GVK = "Node"
 	PersistentVolume      GVK = "PersistentVolume"
 	PersistentVolumeClaim GVK = "PersistentVolumeClaim"
+	PodScheduling         GVK = "PodScheduling"
+	ResourceClaim         GVK = "ResourceClaim"
 	Service               GVK = "Service"
 	StorageClass          GVK = "storage.k8s.io/StorageClass"
 	CSINode               GVK = "storage.k8s.io/CSINode"

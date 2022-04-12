@@ -37,6 +37,7 @@ var PluginsV1beta2 = &config.Plugins{
 			{Name: names.InterPodAffinity},
 			{Name: names.VolumeBinding},
 			{Name: names.NodeAffinity},
+			{Name: names.DynamicResources},
 		},
 	},
 	Filter: config.PluginSet{
@@ -56,11 +57,13 @@ var PluginsV1beta2 = &config.Plugins{
 			{Name: names.VolumeZone},
 			{Name: names.PodTopologySpread},
 			{Name: names.InterPodAffinity},
+			{Name: names.DynamicResources},
 		},
 	},
 	PostFilter: config.PluginSet{
 		Enabled: []config.Plugin{
 			{Name: names.DefaultPreemption},
+			{Name: names.DynamicResources},
 		},
 	},
 	PreScore: config.PluginSet{
@@ -69,6 +72,7 @@ var PluginsV1beta2 = &config.Plugins{
 			{Name: names.PodTopologySpread},
 			{Name: names.TaintToleration},
 			{Name: names.NodeAffinity},
+			{Name: names.DynamicResources},
 		},
 	},
 	Score: config.PluginSet{
@@ -88,6 +92,7 @@ var PluginsV1beta2 = &config.Plugins{
 	Reserve: config.PluginSet{
 		Enabled: []config.Plugin{
 			{Name: names.VolumeBinding},
+			{Name: names.DynamicResources},
 		},
 	},
 	PreBind: config.PluginSet{
@@ -98,6 +103,11 @@ var PluginsV1beta2 = &config.Plugins{
 	Bind: config.PluginSet{
 		Enabled: []config.Plugin{
 			{Name: names.DefaultBinder},
+		},
+	},
+	PostBind: config.PluginSet{
+		Enabled: []config.Plugin{
+			{Name: names.DynamicResources},
 		},
 	},
 }

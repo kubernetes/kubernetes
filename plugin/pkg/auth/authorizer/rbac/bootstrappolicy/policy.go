@@ -24,7 +24,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/apiserver/pkg/authentication/user"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	rbacv1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // Write and other vars are slices of the allowed verbs.
@@ -552,6 +554,15 @@ func ClusterRoles() []rbacv1.ClusterRole {
 		rbacv1helpers.NewRule(Read...).Groups(legacyGroup).Resources("namespaces").RuleOrDie(),
 		rbacv1helpers.NewRule(Read...).Groups(storageGroup).Resources("csidrivers").RuleOrDie(),
 		rbacv1helpers.NewRule(Read...).Groups(storageGroup).Resources("csistoragecapacities").RuleOrDie(),
+	}
+	// Needed for dynamic resource allocation.
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+		kubeSchedulerRules = append(kubeSchedulerRules,
+			rbacv1helpers.NewRule(Read...).Groups(legacyGroup).Resources("resourceclaims").RuleOrDie(),
+			rbacv1helpers.NewRule(ReadUpdate...).Groups(legacyGroup).Resources("resourceclaims/status").RuleOrDie(),
+			rbacv1helpers.NewRule(ReadWrite...).Groups(legacyGroup).Resources("podschedulings").RuleOrDie(),
+			rbacv1helpers.NewRule(Read...).Groups(legacyGroup).Resources("podschedulings/status").RuleOrDie(),
+		)
 	}
 	roles = append(roles, rbacv1.ClusterRole{
 		// a role to use for the kube-scheduler

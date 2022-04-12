@@ -21,6 +21,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpreemption"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources"
 	plfeature "k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/imagelocality"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
@@ -51,7 +52,7 @@ func NewInTreeRegistry() runtime.Registry {
 		EnableNodeInclusionPolicyInPodTopologySpread: feature.DefaultFeatureGate.Enabled(features.NodeInclusionPolicyInPodTopologySpread),
 	}
 
-	return runtime.Registry{
+	registry := runtime.Registry{
 		selectorspread.Name:                  selectorspread.New,
 		imagelocality.Name:                   imagelocality.New,
 		tainttoleration.Name:                 tainttoleration.New,
@@ -75,4 +76,10 @@ func NewInTreeRegistry() runtime.Registry {
 		defaultbinder.Name:                   defaultbinder.New,
 		defaultpreemption.Name:               runtime.FactoryAdapter(fts, defaultpreemption.New),
 	}
+
+	if feature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+		registry[dynamicresources.Name] = dynamicresources.New
+	}
+
+	return registry
 }
