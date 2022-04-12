@@ -43,7 +43,7 @@ const (
 // failed by this plugin schedulable.
 func (pl *NodeName) EventsToRegister() []framework.ClusterEvent {
 	return []framework.ClusterEvent{
-		{Resource: framework.Node, ActionType: framework.Add},
+		{Resource: framework.Node, ActionType: framework.Add | framework.Update},
 	}
 }
 
