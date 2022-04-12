@@ -267,7 +267,10 @@ func parseResolvConf(reader io.Reader) (nameservers []string, searches []string,
 			// Normalise search fields so the same domain with and without trailing dot will only count once, to avoid hitting search validation limits.
 			searches = []string{}
 			for _, s := range fields[1:] {
-				searches = append(searches, strings.TrimSuffix(s, "."))
+				if s != "." {
+					s = strings.TrimSuffix(s, ".")
+				}
+				searches = append(searches, s)
 			}
 		}
 		if fields[0] == "options" {
