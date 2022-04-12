@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 	"k8s.io/utils/pointer"
 )
 
@@ -415,6 +416,8 @@ func (p *PodWrapper) Req(resMap map[v1.ResourceName]string) *PodWrapper {
 		res[k] = resource.MustParse(v)
 	}
 	p.Spec.Containers = append(p.Spec.Containers, v1.Container{
+		Name:  fmt.Sprintf("con%d", len(p.Spec.Containers)),
+		Image: imageutils.GetPauseImageName(),
 		Resources: v1.ResourceRequirements{
 			Requests: res,
 		},
@@ -485,5 +488,11 @@ func (n *NodeWrapper) Images(images map[string]int64) *NodeWrapper {
 		containerImages = append(containerImages, v1.ContainerImage{Names: []string{name}, SizeBytes: size})
 	}
 	n.Status.Images = containerImages
+	return n
+}
+
+// Taints applies taints to the inner node.
+func (n *NodeWrapper) Taints(taints []v1.Taint) *NodeWrapper {
+	n.Spec.Taints = taints
 	return n
 }
