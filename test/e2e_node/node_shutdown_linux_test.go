@@ -29,6 +29,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/kubectl/pkg/util/podutils"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -46,6 +47,7 @@ import (
 
 var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShutdown] [NodeFeature:GracefulNodeShutdownBasedOnPodPriority]", func() {
 	f := framework.NewDefaultFramework("graceful-node-shutdown")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("when gracefully shutting down", func() {
 
 		const (

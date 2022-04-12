@@ -32,6 +32,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/network/common"
+	admissionapi "k8s.io/pod-security-admission/api"
 	utilpointer "k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo"
@@ -39,6 +40,7 @@ import (
 
 var _ = common.SIGDescribe("IngressClass [Feature:Ingress]", func() {
 	f := framework.NewDefaultFramework("ingressclass")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var cs clientset.Interface
 	ginkgo.BeforeEach(func() {
 		cs = f.ClientSet
@@ -182,6 +184,7 @@ func deleteIngressClass(cs clientset.Interface, name string) {
 
 var _ = common.SIGDescribe("IngressClass API", func() {
 	f := framework.NewDefaultFramework("ingressclass")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var cs clientset.Interface
 	ginkgo.BeforeEach(func() {
 		cs = f.ClientSet

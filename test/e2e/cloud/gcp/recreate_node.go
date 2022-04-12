@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	testutils "k8s.io/kubernetes/test/utils"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 const (
@@ -43,6 +44,7 @@ const (
 
 var _ = SIGDescribe("Recreate [Feature:Recreate]", func() {
 	f := framework.NewDefaultFramework("recreate")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var originalNodes []v1.Node
 	var originalPodNames []string
 	var ps *testutils.PodStore

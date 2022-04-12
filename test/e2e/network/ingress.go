@@ -594,6 +594,7 @@ func detectNegAnnotation(f *framework.Framework, jig *e2eingress.TestJig, gceCon
 
 var _ = common.SIGDescribe("Ingress API", func() {
 	f := framework.NewDefaultFramework("ingress")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	/*
 		Release: v1.19
 		Testname: Ingress API

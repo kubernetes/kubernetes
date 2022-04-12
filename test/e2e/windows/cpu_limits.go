@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 	"time"
 
 	"github.com/onsi/ginkgo"
@@ -33,6 +34,7 @@ import (
 
 var _ = SIGDescribe("[Feature:Windows] Cpu Resources [Serial]", func() {
 	f := framework.NewDefaultFramework("cpu-resources-test-windows")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	// The Windows 'BusyBox' image is PowerShell plus a collection of scripts and utilities to mimic common busybox commands
 	powershellImage := imageutils.GetConfig(imageutils.BusyBox)

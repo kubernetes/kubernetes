@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -36,6 +37,7 @@ import (
 
 var _ = common.SIGDescribe("Netpol API", func() {
 	f := framework.NewDefaultFramework("netpol")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	/*
 		Release: v1.20
 		Testname: NetworkPolicies API

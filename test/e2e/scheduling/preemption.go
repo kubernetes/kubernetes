@@ -676,6 +676,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 	ginkgo.Context("PriorityClass endpoints", func() {
 		var cs clientset.Interface
 		f := framework.NewDefaultFramework("sched-preemption-path")
+		f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 		testUUID := uuid.New().String()
 		var pcs []*schedulingv1.PriorityClass
 

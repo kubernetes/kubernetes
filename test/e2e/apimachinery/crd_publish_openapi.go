@@ -44,6 +44,7 @@ import (
 	"k8s.io/kube-openapi/pkg/validation/spec"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/utils/crd"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 var (
@@ -52,6 +53,7 @@ var (
 
 var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", func() {
 	f := framework.NewDefaultFramework("crd-publish-openapi")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	/*
 		Release: v1.16
