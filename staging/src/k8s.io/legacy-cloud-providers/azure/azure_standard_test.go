@@ -412,6 +412,13 @@ func TestGetFrontendIPConfigName(t *testing.T) {
 			expected:      "a257b965551374ad2b091ef3f07043ad-shortsubnet",
 		},
 		{
+			description:   "internal lb should have subnet name on the frontend ip configuration name but truncated to 80 characters, also not end with char like '-'",
+			subnetName:    "a--------------------------------------------------z",
+			isInternal:    true,
+			useStandardLB: true,
+			expected:      "a257b965551374ad2b091ef3f07043ad-a---------------------------------------------_",
+		},
+		{
 			description:   "internal standard lb should have subnet name on the frontend ip configuration name but truncated to 80 characters",
 			subnetName:    "averylonnnngggnnnnnnnnnnnnnnnnnnnnnngggggggggggggggggggggggggggggggggggggsubet",
 			isInternal:    true,
@@ -442,16 +449,18 @@ func TestGetFrontendIPConfigName(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		if c.useStandardLB {
-			az.Config.LoadBalancerSku = loadBalancerSkuStandard
-		} else {
-			az.Config.LoadBalancerSku = loadBalancerSkuBasic
-		}
-		svc.Annotations[ServiceAnnotationLoadBalancerInternalSubnet] = c.subnetName
-		svc.Annotations[ServiceAnnotationLoadBalancerInternal] = strconv.FormatBool(c.isInternal)
+		t.Run(c.description, func(t *testing.T) {
+			if c.useStandardLB {
+				az.Config.LoadBalancerSku = loadBalancerSkuStandard
+			} else {
+				az.Config.LoadBalancerSku = loadBalancerSkuBasic
+			}
+			svc.Annotations[ServiceAnnotationLoadBalancerInternalSubnet] = c.subnetName
+			svc.Annotations[ServiceAnnotationLoadBalancerInternal] = strconv.FormatBool(c.isInternal)
 
-		ipconfigName := az.getDefaultFrontendIPConfigName(svc)
-		assert.Equal(t, c.expected, ipconfigName, c.description)
+			ipconfigName := az.getDefaultFrontendIPConfigName(svc)
+			assert.Equal(t, c.expected, ipconfigName, c.description)
+		})
 	}
 }
 

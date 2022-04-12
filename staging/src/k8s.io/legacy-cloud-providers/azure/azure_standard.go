@@ -28,6 +28,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2019-06-01/network"
@@ -402,6 +403,11 @@ func (az *Cloud) getDefaultFrontendIPConfigName(service *v1.Service) string {
 		// Azure lb front end configuration name must not exceed 80 characters
 		if len(ipcName) > frontendIPConfigNameMaxLength {
 			ipcName = ipcName[:frontendIPConfigNameMaxLength]
+			// Cutting the string may result in char like "-" as the string end.
+			// If the last char is not a letter or '_', replace it with "_".
+			if !unicode.IsLetter(rune(ipcName[len(ipcName)-1:][0])) && ipcName[len(ipcName)-1:] != "_" {
+				ipcName = ipcName[:len(ipcName)-1] + "_"
+			}
 		}
 		return ipcName
 	}
