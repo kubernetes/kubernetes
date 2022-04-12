@@ -169,15 +169,6 @@ const (
 	// Enables SecretRef field in CSI NodeExpandVolume request.
 	CSINodeExpandSecret featuregate.Feature = "CSINodeExpandSecret"
 
-	// owner: @zshihang
-	// alpha: v1.20
-	// beta: v1.21
-	// ga: v1.22
-	//
-	// Enable kubelet to pass pod's service account token to NodePublishVolume
-	// call of CSI driver which is mounting volumes for that pod.
-	CSIServiceAccountToken featuregate.Feature = "CSIServiceAccountToken"
-
 	// owner: @pohly
 	// alpha: v1.19
 	// beta: v1.21
@@ -291,31 +282,6 @@ const (
 	// deprecated: 1.22
 	DynamicKubeletConfig featuregate.Feature = "DynamicKubeletConfig"
 
-	// owner: @robscott @freehan
-	// kep: http://kep.k8s.io/752
-	// alpha: v1.16
-	// beta: v1.18
-	// ga: v1.21
-	//
-	// Enable Endpoint Slices for more scalable Service endpoints.
-	EndpointSlice featuregate.Feature = "EndpointSlice"
-
-	// owner: @robscott
-	// kep: http://kep.k8s.io/752
-	// alpha: v1.20
-	//
-	// Enable NodeName field on Endpoint Slices.
-	EndpointSliceNodeName featuregate.Feature = "EndpointSliceNodeName"
-
-	// owner: @robscott @freehan
-	// kep: http://kep.k8s.io/752
-	// alpha: v1.18
-	// beta: v1.19
-	// ga: v1.22
-	//
-	// Enable Endpoint Slice consumption by kube-proxy for improved scalability.
-	EndpointSliceProxying featuregate.Feature = "EndpointSliceProxying"
-
 	// owner: @andrewsykim
 	// kep: http://kep.k8s.io/1672
 	// alpha: v1.20
@@ -381,14 +347,6 @@ const (
 	// Enables GRPC probe method for {Liveness,Readiness,Startup}Probe.
 	GRPCContainerProbe featuregate.Feature = "GRPCContainerProbe"
 
-	// owner: @pohly
-	// alpha: v1.19
-	// beta: v1.21
-	// GA: v1.23
-	//
-	// Enables generic ephemeral inline volume support for pods
-	GenericEphemeralVolume featuregate.Feature = "GenericEphemeralVolume"
-
 	// owner: @bobbypage
 	// alpha: v1.20
 	// beta:  v1.21
@@ -421,15 +379,6 @@ const (
 	// Honor Persistent Volume Reclaim Policy when it is "Delete" irrespective of PV-PVC
 	// deletion ordering.
 	HonorPVReclaimPolicy featuregate.Feature = "HonorPVReclaimPolicy"
-
-	// owner: @khenidak
-	// kep: http://kep.k8s.io/563
-	// alpha: v1.15
-	// beta: v1.21
-	// ga: v1.23
-	//
-	// Enables ipv6 dual stack
-	IPv6DualStack featuregate.Feature = "IPv6DualStack"
 
 	// owner: @ravig
 	// alpha: v1.23
@@ -493,15 +442,6 @@ const (
 	//
 	// Allows Job controller to manage Pod completions per completion index.
 	IndexedJob featuregate.Feature = "IndexedJob"
-
-	// owner: @hbagdi
-	// kep: http://kep.k8s.io/2365
-	// alpha: v1.21
-	// beta: v1.22
-	// GA: v1.23
-	//
-	// Enable Scope and Namespace fields on IngressClassParametersReference.
-	IngressClassNamespacedParams featuregate.Feature = "IngressClassNamespacedParams"
 
 	// owner: @ahg
 	// beta: v1.23
@@ -817,12 +757,6 @@ const (
 	// StatefulSetMinReadySeconds allows minReadySeconds to be respected by StatefulSet controller
 	StatefulSetMinReadySeconds featuregate.Feature = "StatefulSetMinReadySeconds"
 
-	// owner: @pospispa
-	// GA: v1.11
-	//
-	// Postpone deletion of a PV or a PVC when they are being used
-	StorageObjectInUseProtection featuregate.Feature = "StorageObjectInUseProtection"
-
 	// owner: @adtac
 	// alpha: v1.21
 	// beta: v1.22
@@ -830,13 +764,6 @@ const (
 	//
 	// Allows jobs to be created in the suspended state.
 	SuspendJob featuregate.Feature = "SuspendJob"
-
-	// owner: @janetkuo
-	// alpha: v1.12
-	// beta:  v1.21
-	//
-	// Allow TTL controller to clean up Pods and Jobs after they finish.
-	TTLAfterFinished featuregate.Feature = "TTLAfterFinished"
 
 	// owner: @robscott
 	// kep: http://kep.k8s.io/2433
@@ -857,14 +784,6 @@ const (
 	// alpha: v1.21
 	VolumeCapacityPriority featuregate.Feature = "VolumeCapacityPriority"
 
-	// owner: @saad-ali
-	// ga: 	  v1.10
-	//
-	// Allow mounting a subpath of a volume in a container
-	// NOTE: This feature gate has been deprecated and is no longer enforced.
-	// It will be completely removed in 1.25. Until then, it's still visible in `kubelet --help`
-	VolumeSubpath featuregate.Feature = "VolumeSubpath"
-
 	// owner: @ksubrmnn
 	// alpha: v1.14
 	//
@@ -877,15 +796,6 @@ const (
 	//
 	// Allows kube-proxy to run in Overlay mode for Windows
 	WinOverlay featuregate.Feature = "WinOverlay"
-
-	// owner: @robscott @kumarvin123
-	// kep: http://kep.k8s.io/752
-	// alpha: v1.19
-	// beta: v1.21
-	// ga: v1.22
-	//
-	// Enable Endpoint Slice consumption by kube-proxy in Windows for improved scalability.
-	WindowsEndpointSliceProxying featuregate.Feature = "WindowsEndpointSliceProxying"
 
 	// owner: @marosset
 	// alpha: v1.22
@@ -942,8 +852,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	CSINodeExpandSecret: {Default: false, PreRelease: featuregate.Alpha},
 
-	CSIServiceAccountToken: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
-
 	CSIStorageCapacity: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
 
 	CSIVolumeFSGroupPolicy: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.25
@@ -976,31 +884,23 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	DynamicKubeletConfig: {Default: false, PreRelease: featuregate.Deprecated}, // feature gate is deprecated in 1.22, kubelet logic is removed in 1.24, api server logic can be removed in 1.26
 
-	EndpointSlice: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.25
-
-	EndpointSliceNodeName: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.25
-
-	EndpointSliceProxying: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.25
-
 	EndpointSliceTerminatingCondition: {Default: true, PreRelease: featuregate.Beta},
 
 	EphemeralContainers: {Default: true, PreRelease: featuregate.Beta},
 
 	ExecProbeTimeout: {Default: true, PreRelease: featuregate.GA}, // lock to default and remove after v1.22 based on KEP #1972 update
 
-	ExpandCSIVolumes: {Default: true, PreRelease: featuregate.GA}, // remove in 1.25
+	ExpandCSIVolumes: {Default: true, PreRelease: featuregate.GA}, // remove in 1.26
 
-	ExpandInUsePersistentVolumes: {Default: true, PreRelease: featuregate.GA}, // remove in 1.25
+	ExpandInUsePersistentVolumes: {Default: true, PreRelease: featuregate.GA}, // remove in 1.26
 
-	ExpandPersistentVolumes: {Default: true, PreRelease: featuregate.GA}, // remove in 1.25
+	ExpandPersistentVolumes: {Default: true, PreRelease: featuregate.GA}, // remove in 1.26
 
 	ExpandedDNSConfig: {Default: false, PreRelease: featuregate.Alpha},
 
 	ExperimentalHostUserNamespaceDefaultingGate: {Default: false, PreRelease: featuregate.Beta},
 
 	GRPCContainerProbe: {Default: true, PreRelease: featuregate.Beta},
-
-	GenericEphemeralVolume: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.25
 
 	GracefulNodeShutdown: {Default: true, PreRelease: featuregate.Beta},
 
@@ -1009,8 +909,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	HPAContainerMetrics: {Default: false, PreRelease: featuregate.Alpha},
 
 	HonorPVReclaimPolicy: {Default: false, PreRelease: featuregate.Alpha},
-
-	IPv6DualStack: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.25
 
 	IdentifyPodOS: {Default: true, PreRelease: featuregate.Beta},
 
@@ -1031,8 +929,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	InTreePluginvSphereUnregister: {Default: false, PreRelease: featuregate.Alpha},
 
 	IndexedJob: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
-
-	IngressClassNamespacedParams: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.25
 
 	JobMutableNodeSchedulingDirectives: {Default: true, PreRelease: featuregate.Beta},
 
@@ -1074,7 +970,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	NodeSwap: {Default: false, PreRelease: featuregate.Alpha},
 
-	NonPreemptingPriority: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.25
+	NonPreemptingPriority: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
 
 	PodAffinityNamespaceSelector: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
 
@@ -1088,7 +984,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	PodSecurity: {Default: true, PreRelease: featuregate.Beta},
 
-	PreferNominatedNode: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.25
+	PreferNominatedNode: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
 
 	ProbeTerminationGracePeriod: {Default: false, PreRelease: featuregate.Beta}, // Default to false in beta 1.22, set to true in 1.24
 
@@ -1120,11 +1016,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	StatefulSetMinReadySeconds: {Default: true, PreRelease: featuregate.Beta},
 
-	StorageObjectInUseProtection: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.25
-
 	SuspendJob: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
-
-	TTLAfterFinished: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.25
 
 	TopologyAwareHints: {Default: true, PreRelease: featuregate.Beta},
 
@@ -1132,13 +1024,9 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	VolumeCapacityPriority: {Default: false, PreRelease: featuregate.Alpha},
 
-	VolumeSubpath: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.25
-
 	WinDSR: {Default: false, PreRelease: featuregate.Alpha},
 
 	WinOverlay: {Default: true, PreRelease: featuregate.Beta},
-
-	WindowsEndpointSliceProxying: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.25
 
 	WindowsHostProcessContainers: {Default: true, PreRelease: featuregate.Beta},
 
