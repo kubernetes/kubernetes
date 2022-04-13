@@ -382,11 +382,14 @@ kube::golang::is_statically_linked_library() {
 kube::golang::binaries_from_targets() {
   local target
   for target; do
-    # If the target starts with what looks like a domain name, assume it has a
-    # fully-qualified package name rather than one that needs the Kubernetes
-    # package prepended.
     if [[ "${target}" =~ ^([[:alnum:]]+".")+[[:alnum:]]+"/" ]]; then
+      # If the target starts with what looks like a domain name, assume it has a
+      # fully-qualified package name rather than one that needs the Kubernetes
+      # package prepended.
       echo "${target}"
+    elif [[ "${target}" =~ ^vendor/ ]]; then
+      # Strip vendor/ prefix, since we're building in gomodule mode.
+      echo "${target#"vendor/"}"
     else
       echo "${KUBE_GO_PACKAGE}/${target}"
     fi
@@ -668,13 +671,13 @@ kube::golang::build_some_binaries() {
     done
     if [[ "${#uncovered[@]}" != 0 ]]; then
       V=2 kube::log::info "Building ${uncovered[*]} without coverage..."
-      go install "${build_args[@]}" "${uncovered[@]}"
+      GO111MODULE=on GOPROXY=off go install "${build_args[@]}" "${uncovered[@]}"
     else
       V=2 kube::log::info "Nothing to build without coverage."
      fi
    else
     V=2 kube::log::info "Coverage is disabled."
-    go install "${build_args[@]}" "$@"
+    GO111MODULE=on GOPROXY=off go install "${build_args[@]}" "$@"
    fi
 }
 
