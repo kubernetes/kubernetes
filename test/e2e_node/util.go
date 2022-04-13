@@ -106,6 +106,21 @@ func getNodeSummary() (*stats.Summary, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse /stats/summary to go struct: %+v", resp)
 	}
+
+	framework.Logf("ruiwen-zhao: /stats/suammry: %+v", summary)
+	for _, p := range summary.Pods {
+		framework.Logf("ruiwen-zhao: pod: %+v", p.PodRef.Name)
+		if p.Network != nil {
+			framework.Logf("ruiwen-zhao: NetworkStats: %+v", *p.Network)
+			if p.Network.RxBytes != nil {
+				framework.Logf("ruiwen-zhao: NetworkStats.RxBytes: %+v", *p.Network.RxBytes)
+			} else {
+				framework.Logf("ruiwen-zhao: NetworkStats.RxBytes is nil")
+			}
+		} else {
+			framework.Logf("ruiwen-zhao: NetworkStats is nil")
+		}
+	}
 	return &summary, nil
 }
 
