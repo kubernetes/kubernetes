@@ -577,6 +577,9 @@ var _ = SIGDescribe("Job", func() {
 			patchedJob, err = jobClient.Get(context.TODO(), jobName, metav1.GetOptions{})
 			framework.ExpectNoError(err, "Unable to get job %s", jobName)
 			patchedJob.Spec.Suspend = pointer.BoolPtr(false)
+			if patchedJob.Annotations == nil {
+				patchedJob.Annotations = map[string]string{}
+			}
 			patchedJob.Annotations["updated"] = "true"
 			updatedJob, err = e2ejob.UpdateJob(f.ClientSet, ns, patchedJob)
 			return err
