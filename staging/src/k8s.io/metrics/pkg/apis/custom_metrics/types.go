@@ -49,6 +49,9 @@ type MetricValueList struct {
 type MetricValue struct {
 	metav1.TypeMeta
 
+	// implement the Object interface of k8s.io/apimachinery/pkg/apis/meta/v1
+	metav1.ObjectMeta
+
 	// a reference to the described object
 	DescribedObject ObjectReference
 

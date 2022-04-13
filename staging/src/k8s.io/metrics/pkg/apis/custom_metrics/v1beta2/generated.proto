@@ -57,6 +57,9 @@ message MetricListOptions {
 
 // MetricValue is the metric value for some object
 message MetricValue {
+  // implement the Object interface of k8s.io/apimachinery/pkg/apis/meta/v1
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta objectMeta = 6;
+
   // a reference to the described object
   optional k8s.io.api.core.v1.ObjectReference describedObject = 1;
 

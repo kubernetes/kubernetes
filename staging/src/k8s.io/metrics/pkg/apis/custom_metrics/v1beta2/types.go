@@ -51,6 +51,9 @@ type MetricValueList struct {
 type MetricValue struct {
 	metav1.TypeMeta `json:",inline"`
 
+	// implement the Object interface of k8s.io/apimachinery/pkg/apis/meta/v1
+	metav1.ObjectMeta `protobuf:"bytes,6,opt,name=objectMeta"`
+
 	// a reference to the described object
 	DescribedObject v1.ObjectReference `json:"describedObject" protobuf:"bytes,1,name=describedObject"`
 

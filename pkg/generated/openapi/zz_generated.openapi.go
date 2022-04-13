@@ -53976,6 +53976,13 @@ func schema_pkg_apis_custom_metrics_v1beta1_MetricValue(ref common.ReferenceCall
 							Format:      "",
 						},
 					},
+					"ObjectMeta": {
+						SchemaProps: spec.SchemaProps{
+							Description: "implement the Object interface of k8s.io/apimachinery/pkg/apis/meta/v1",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+						},
+					},
 					"describedObject": {
 						SchemaProps: spec.SchemaProps{
 							Description: "a reference to the described object",
@@ -54019,11 +54026,11 @@ func schema_pkg_apis_custom_metrics_v1beta1_MetricValue(ref common.ReferenceCall
 						},
 					},
 				},
-				Required: []string{"describedObject", "metricName", "timestamp", "value"},
+				Required: []string{"ObjectMeta", "describedObject", "metricName", "timestamp", "value"},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/core/v1.ObjectReference", "k8s.io/apimachinery/pkg/api/resource.Quantity", "k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector", "k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
+			"k8s.io/api/core/v1.ObjectReference", "k8s.io/apimachinery/pkg/api/resource.Quantity", "k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta", "k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
 	}
 }
 
@@ -54169,6 +54176,13 @@ func schema_pkg_apis_custom_metrics_v1beta2_MetricValue(ref common.ReferenceCall
 							Format:      "",
 						},
 					},
+					"ObjectMeta": {
+						SchemaProps: spec.SchemaProps{
+							Description: "implement the Object interface of k8s.io/apimachinery/pkg/apis/meta/v1",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+						},
+					},
 					"describedObject": {
 						SchemaProps: spec.SchemaProps{
 							Description: "a reference to the described object",
@@ -54204,11 +54218,11 @@ func schema_pkg_apis_custom_metrics_v1beta2_MetricValue(ref common.ReferenceCall
 						},
 					},
 				},
-				Required: []string{"describedObject", "metric", "timestamp", "value"},
+				Required: []string{"ObjectMeta", "describedObject", "metric", "timestamp", "value"},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/core/v1.ObjectReference", "k8s.io/apimachinery/pkg/api/resource.Quantity", "k8s.io/apimachinery/pkg/apis/meta/v1.Time", "k8s.io/metrics/pkg/apis/custom_metrics/v1beta2.MetricIdentifier"},
+			"k8s.io/api/core/v1.ObjectReference", "k8s.io/apimachinery/pkg/api/resource.Quantity", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta", "k8s.io/apimachinery/pkg/apis/meta/v1.Time", "k8s.io/metrics/pkg/apis/custom_metrics/v1beta2.MetricIdentifier"},
 	}
 }
 

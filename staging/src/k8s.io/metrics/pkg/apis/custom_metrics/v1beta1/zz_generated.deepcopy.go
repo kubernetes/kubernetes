@@ -55,6 +55,7 @@ func (in *MetricListOptions) DeepCopyObject() runtime.Object {
 func (in *MetricValue) DeepCopyInto(out *MetricValue) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
 	out.DescribedObject = in.DescribedObject
 	in.Timestamp.DeepCopyInto(&out.Timestamp)
 	if in.WindowSeconds != nil {

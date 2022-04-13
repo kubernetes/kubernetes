@@ -92,6 +92,7 @@ func Convert_custom_metrics_MetricListOptions_To_v1beta1_MetricListOptions(in *c
 }
 
 func autoConvert_v1beta1_MetricValue_To_custom_metrics_MetricValue(in *MetricValue, out *custommetrics.MetricValue, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
 	if err := custommetrics.Convert_v1_ObjectReference_To_custom_metrics_ObjectReference(&in.DescribedObject, &out.DescribedObject, s); err != nil {
 		return err
 	}
@@ -104,6 +105,7 @@ func autoConvert_v1beta1_MetricValue_To_custom_metrics_MetricValue(in *MetricVal
 }
 
 func autoConvert_custom_metrics_MetricValue_To_v1beta1_MetricValue(in *custommetrics.MetricValue, out *MetricValue, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
 	if err := custommetrics.Convert_custom_metrics_ObjectReference_To_v1_ObjectReference(&in.DescribedObject, &out.DescribedObject, s); err != nil {
 		return err
 	}
