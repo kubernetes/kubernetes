@@ -67,6 +67,7 @@ const (
 	ResctrlMetrics                 MetricKind = "resctrl"
 	CPUSetMetrics                  MetricKind = "cpuset"
 	OOMMetrics                     MetricKind = "oom_event"
+	ExcludeSpecMetrics	       MetricKind = "exclude_spec"
 )
 
 // AllMetrics represents all kinds of metrics that cAdvisor supported.
