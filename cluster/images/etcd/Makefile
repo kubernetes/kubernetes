@@ -92,19 +92,19 @@ DOCKERFILE.windows = Dockerfile.windows
 DOCKERFILE := ${DOCKERFILE.${OS}}
 
 ifeq ($(ARCH),amd64)
-    BASEIMAGE?=k8s.gcr.io/build-image/debian-base:bullseye-v1.0.0
+    BASEIMAGE?=k8s.gcr.io/build-image/debian-base:bullseye-v1.2.0
 endif
 ifeq ($(ARCH),arm)
-    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-arm:bullseye-v1.0.0
+    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-arm:bullseye-v1.2.0
 endif
 ifeq ($(ARCH),arm64)
-    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-arm64:bullseye-v1.0.0
+    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-arm64:bullseye-v1.2.0
 endif
 ifeq ($(ARCH),ppc64le)
-    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-ppc64le:bullseye-v1.0.0
+    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-ppc64le:bullseye-v1.2.0
 endif
 ifeq ($(ARCH),s390x)
-    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-s390x:bullseye-v1.0.0
+    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-s390x:bullseye-v1.2.0
 endif
 
 BASE.windows = mcr.microsoft.com/windows/nanoserver
