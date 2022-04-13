@@ -420,6 +420,7 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 		filterRules:              utilproxy.LineBuffer{},
 		natChains:                utilproxy.LineBuffer{},
 		natRules:                 utilproxy.LineBuffer{},
+		nodeIP:                   netutils.ParseIPSloppy(testNodeIP),
 		nodePortAddresses:        make([]string, 0),
 		networkInterfacer:        networkInterfacer,
 	}
@@ -2389,9 +2390,12 @@ func TestLoadBalancer(t *testing.T) {
 			svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{
 				IP: svcLBIP,
 			}}
-			// Also ensure that invalid LoadBalancerSourceRanges will not result
-			// in a crash.
-			svc.Spec.LoadBalancerSourceRanges = []string{" 203.0.113.0/25"}
+			svc.Spec.LoadBalancerSourceRanges = []string{
+				"192.168.0.0/24",
+
+				// Regression test that excess whitespace gets ignored
+				" 203.0.113.0/25",
+			}
 		}),
 	)
 
@@ -2438,7 +2442,9 @@ func TestLoadBalancer(t *testing.T) {
 		-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
 		-A KUBE-EXT-XPGD46QRK7WJZT7O -m comment --comment "masquerade traffic for ns1/svc1:p80 external destinations" -j KUBE-MARK-MASQ
 		-A KUBE-EXT-XPGD46QRK7WJZT7O -j KUBE-SVC-XPGD46QRK7WJZT7O
+		-A KUBE-FW-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 loadbalancer IP" -s 192.168.0.0/24 -j KUBE-EXT-XPGD46QRK7WJZT7O
 		-A KUBE-FW-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 loadbalancer IP" -s 203.0.113.0/25 -j KUBE-EXT-XPGD46QRK7WJZT7O
+		-A KUBE-FW-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 loadbalancer IP" -s 1.2.3.4 -j KUBE-EXT-XPGD46QRK7WJZT7O
 		-A KUBE-FW-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 loadbalancer IP" -j KUBE-MARK-DROP
 		-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
 		-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
@@ -2501,11 +2507,25 @@ func TestLoadBalancer(t *testing.T) {
 			output:   "DROP",
 		},
 		{
-			name:     "node to LB (blocked by LoadBalancerSourceRanges)",
+			name:     "node to LB (allowed by LoadBalancerSourceRanges)",
 			sourceIP: testNodeIP,
 			destIP:   svcLBIP,
 			destPort: svcPort,
-			output:   "DROP",
+			output:   fmt.Sprintf("%s:%d", epIP, svcPort),
+			masq:     true,
+		},
+
+		// The LB rules assume that when you connect from a node to a LB IP, that
+		// something external to kube-proxy will cause the connection to be
+		// SNATted to the LB IP, so if the LoadBalancerSourceRanges include the
+		// node IP, then we add a rule allowing traffic from the LB IP as well...
+		{
+			name:     "same node to LB, SNATted to LB (implicitly allowed)",
+			sourceIP: svcLBIP,
+			destIP:   svcLBIP,
+			destPort: svcPort,
+			output:   fmt.Sprintf("%s:%d", epIP, svcPort),
+			masq:     true,
 		},
 	})
 }
