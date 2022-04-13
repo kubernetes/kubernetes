@@ -3,14 +3,14 @@
 reviewers:
   - ibabou
   - mtaufen
-  - pjh
   - yujuhong
   - yliaog
 approvers:
   - ibabou
   - mtaufen
-  - pjh
   - yujuhong
   - yliaog
+emeritus_approvers:
+  - pjh
 labels:
   - area/provider/gcp
