@@ -106,6 +106,8 @@ func getNodeSummary() (*stats.Summary, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse /stats/summary to go struct: %+v", resp)
 	}
+
+	framework.Logf("porterdavid: Got stats summary response: %+v", summary)
 	return &summary, nil
 }
 

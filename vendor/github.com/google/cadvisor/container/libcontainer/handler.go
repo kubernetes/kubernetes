@@ -72,6 +72,14 @@ func NewHandler(cgroupManager cgroups.Manager, rootFs string, pid int, includedM
 	}
 }
 
+func (h *Handler) GetName() string {
+	cgroups, err := h.cgroupManager.GetCgroups()
+	if err != nil {
+		return fmt.Sprintf("Unknown name: %v", err)
+	}
+	return cgroups.Name
+}
+
 // Get cgroup and networking stats of the specified container
 func (h *Handler) GetStats() (*info.ContainerStats, error) {
 	ignoreStatsError := false
@@ -95,6 +103,7 @@ func (h *Handler) GetStats() (*info.ContainerStats, error) {
 		CgroupStats: cgroupStats,
 	}
 	stats := newContainerStats(libcontainerStats, h.includedMetrics)
+	klog.V(1).Infof("porterdavid: Got stats for container: %v. Stats: %+v", h.GetName(), stats)
 
 	if h.includedMetrics.Has(container.ProcessSchedulerMetrics) {
 		stats.Cpu.Schedstat, err = h.schedulerStatsFromProcs()
@@ -120,6 +129,7 @@ func (h *Handler) GetStats() (*info.ContainerStats, error) {
 	if h.pid > 0 {
 		if h.includedMetrics.Has(container.NetworkUsageMetrics) {
 			netStats, err := networkStatsFromProc(h.rootFs, h.pid)
+			klog.V(1).Infof("porterdavid: Trying to add network stats for container from proc: %v. netStats: %+v, err: %v", h.GetName(), netStats, err)
 			if err != nil {
 				klog.V(4).Infof("Unable to get network stats from pid %d: %v", h.pid, err)
 			} else {
