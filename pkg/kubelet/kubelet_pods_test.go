@@ -3732,3 +3732,92 @@ func TestConvertToAPIContainerStatusesDataRace(t *testing.T) {
 		}()
 	}
 }
+
+func TestGetPullSecretsForPod(t *testing.T) {
+	fakeRecorder := record.NewFakeRecorder(1)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet.kubelet.recorder = fakeRecorder
+	defer testKubelet.Cleanup()
+
+	testPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:   "test1",
+			Name:        "image-pull-secrets-test-pod",
+			Annotations: map[string]string{},
+		},
+		Spec: v1.PodSpec{
+			ImagePullSecrets: []v1.LocalObjectReference{
+				{Name: "secret1"},
+				{Name: "secret2"},
+				{Name: "secret3"},
+			},
+		},
+	}
+
+	pullSecrets := testKubelet.kubelet.getPullSecretsForPod(testPod)
+
+	assert.Equal(t, 3, len(pullSecrets))
+}
+
+func TestFromPullSecretsForPodWithEmptySecret(t *testing.T) {
+	fakeRecorder := record.NewFakeRecorder(1024)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet.kubelet.recorder = fakeRecorder
+	defer testKubelet.Cleanup()
+
+	testPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:   "test1",
+			Name:        "image-pull-secrets-test-pod",
+			Annotations: map[string]string{},
+		},
+		Spec: v1.PodSpec{
+			ImagePullSecrets: []v1.LocalObjectReference{
+			},
+		},
+	}
+
+	pullSecrets := testKubelet.kubelet.getPullSecretsForPod(testPod)
+	assert.Equal(t, 0, len(pullSecrets))
+}
+
+type errorSecretManager struct {}
+
+func (s *errorSecretManager) GetSecret(namespace, name string) (*v1.Secret, error) {
+	return nil, fmt.Errorf("unexpected object type: %v", name)
+}
+
+func (s *errorSecretManager) RegisterPod(pod *v1.Pod) {
+	// No-Ops
+}
+
+func (s *errorSecretManager) UnregisterPod(pod *v1.Pod) {
+	// No-Ops
+}
+
+func TestFromPullSecretsForPodWithSecretError(t *testing.T) {
+	fakeRecorder := record.NewFakeRecorder(1024)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet.kubelet.recorder = fakeRecorder
+	testKubelet.kubelet.secretManager = &errorSecretManager{}
+	defer testKubelet.Cleanup()
+
+	testPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:   "test1",
+			Name:        "image-pull-secrets-test-pod",
+			Annotations: map[string]string{},
+		},
+		Spec: v1.PodSpec{
+			ImagePullSecrets: []v1.LocalObjectReference{
+				{Name: "secret1"},
+				{Name: "secret2"},
+			},
+		},
+	}
+
+	pullSecrets := testKubelet.kubelet.getPullSecretsForPod(testPod)
+	warningStr := <- fakeRecorder.Events 
+	assert.Equal(t, `Warning FailedToRetrieveImagePullSecret Unable to retrieve image pull secrets secret1, secret2, will attempt to pull the image without these secrets. The image pull may not succeed.`, warningStr)
+	assert.Equal(t, 0, len(pullSecrets))
+}
