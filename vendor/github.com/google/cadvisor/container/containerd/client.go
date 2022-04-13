@@ -30,6 +30,7 @@ import (
 	"github.com/google/cadvisor/container/containerd/pkg/dialer"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/backoff"
+	"k8s.io/klog/v2"
 )
 
 type client struct {
@@ -114,6 +115,12 @@ func (c *client) TaskPid(ctx context.Context, id string) (uint32, error) {
 	if err != nil {
 		return 0, errdefs.FromGRPC(err)
 	}
+
+	taskPid := response.Process.Pid
+	if int(taskPid) == 0 {
+		klog.V(1).Infof("ruiwen-zhao: Got zero pid from containerd task. container id: %v , pid: %v, status: %v", id, int(taskPid), response.Process.Status.String())
+	}
+
 	return response.Process.Pid, nil
 }
 

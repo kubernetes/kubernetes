@@ -24,6 +24,7 @@ import (
 	"github.com/google/cadvisor/container/containerd/errdefs"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"golang.org/x/net/context"
+	"k8s.io/klog/v2"
 
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 
@@ -101,8 +102,12 @@ func newContainerdContainerHandler(
 		if err == nil {
 			break
 		}
+		if err != nil {
+			klog.V(1).Infof("ruiwen-zhao: failed to get taskPid for name: %v, id: %v, retry: %v error: %v", name, id, retry, err)
+		}
 		retry--
 		if !errdefs.IsNotFound(err) || retry == 0 {
+			klog.V(1).Infof("ruiwen-zhao: failed to get taskPid bailing out for name: %v, id: %v, retry: %v error: %v", name, id, retry, err)
 			return nil, err
 		}
 		time.Sleep(backoff)
@@ -119,6 +124,10 @@ func newContainerdContainerHandler(
 		Name:      name,
 		Namespace: k8sContainerdNamespace,
 		Aliases:   []string{id, name},
+	}
+
+	if int(taskPid) == 0 {
+		klog.V(1).Infof("ruiwen-zhao: creating containerd handler name: %v, id: %v, with taskPid: %v", name, id, int(taskPid))
 	}
 
 	libcontainerHandler := containerlibcontainer.NewHandler(cgroupManager, rootfs, int(taskPid), includedMetrics)

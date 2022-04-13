@@ -226,6 +226,9 @@ func (p *criStatsProvider) listPodStatsPartiallyFromCRI(updateCPUNanoCoreUsage b
 		p.makePodStorageStats(s, rootFsInfo)
 		result = append(result, *s)
 	}
+
+	klog.V(1).Infof("ruiwen-zhao: listPodStatsPartiallyFromCRI done, result=%+v", result)
+
 	return result, nil
 }
 
@@ -514,6 +517,8 @@ func (p *criStatsProvider) addPodNetworkStats(
 			return
 		}
 	}
+
+	klog.V(1).InfoS("ruiwen-zhao: Did not find network stats for sandbox", "sandboxID", podSandboxID)
 
 	// Not found from cadvisor, get from netStats.
 	if netStats != nil {

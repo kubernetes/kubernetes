@@ -187,19 +187,26 @@ func cadvisorInfoToProcessStats(info *cadvisorapiv2.ContainerInfo) *statsapi.Pro
 // the container info from cadvisor.
 func cadvisorInfoToNetworkStats(info *cadvisorapiv2.ContainerInfo) *statsapi.NetworkStats {
 	if !info.Spec.HasNetwork {
+		klog.V(1).InfoS("ruiwen-zhao: Did not find network stats for container case1", "labels", info.Spec.Labels)
 		return nil
 	}
 	cstat, found := latestContainerStats(info)
 	if !found {
+		klog.V(1).InfoS("ruiwen-zhao: Did not find network stats for container case2", "labels", info.Spec.Labels)
 		return nil
 	}
 
 	if cstat.Network == nil {
+		klog.V(1).InfoS("ruiwen-zhao: Did not find network stats for container case3", "labels", info.Spec.Labels)
 		return nil
 	}
 
 	iStats := statsapi.NetworkStats{
 		Time: metav1.NewTime(cstat.Timestamp),
+	}
+
+	if len(cstat.Network.Interfaces) == 0 {
+		klog.V(1).InfoS("ruiwen-zhao: Did not find network stats for container case4", "labels", info.Spec.Labels)
 	}
 
 	for i := range cstat.Network.Interfaces {
