@@ -343,6 +343,7 @@ func TestProgressNotify(t *testing.T) {
 	if err := store.Create(ctx, key, input, out, 0); err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
+	validateResourceVersion := resourceVersionNotOlderThan(out.ResourceVersion)
 
 	opts := storage.ListOptions{
 		ResourceVersion: out.ResourceVersion,
@@ -353,12 +354,27 @@ func TestProgressNotify(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
+
+	// when we send a bookmark event, the client expects the event to contain an
+	// object of the correct type, but with no fields set other than the resourceVersion
 	testCheckResultFunc(t, watch.Bookmark, w, func(object runtime.Object) error {
+		// first, check that we have the correct resource version
+		obj, ok := object.(metav1.Object)
+		if !ok {
+			return fmt.Errorf("got %T, not metav1.Object", object)
+		}
+		if err := validateResourceVersion(obj.GetResourceVersion()); err != nil {
+			return err
+		}
+
+		// then, check that we have the right type and content
 		pod, ok := object.(*example.Pod)
 		if !ok {
 			return fmt.Errorf("got %T, not *example.Pod", object)
 		}
-		return resourceVersionNotOlderThan(out.ResourceVersion)(pod.ResourceVersion)
+		pod.ResourceVersion = ""
+		expectNoDiff(t, "bookmark event should contain an object with no fields set other than resourceVersion", newPod(), pod)
+		return nil
 	})
 }
 
