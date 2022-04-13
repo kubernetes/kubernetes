@@ -1019,6 +1019,9 @@ func TestSortIPTablesRules(t *testing.T) {
 				:KUBE-FORWARD - [0:0]
 				:KUBE-NODEPORTS - [0:0]
 				-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
+				-A KUBE-EXTERNAL-SERVICES -m comment --comment "ns2/svc2:p80 has no local endpoints" -m tcp -p tcp -d 192.168.99.22 --dport 80 -j DROP
+				-A KUBE-EXTERNAL-SERVICES -m comment --comment "ns2/svc2:p80 has no local endpoints" -m tcp -p tcp -d 1.2.3.4 --dport 80 -j DROP
+				-A KUBE-EXTERNAL-SERVICES -m comment --comment "ns2/svc2:p80 has no local endpoints" -m addrtype --dst-type LOCAL -m tcp -p tcp --dport 3001 -j DROP
 				-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
@@ -1091,6 +1094,9 @@ func TestSortIPTablesRules(t *testing.T) {
 				:KUBE-EXTERNAL-SERVICES - [0:0]
 				:KUBE-FORWARD - [0:0]
 				-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
+				-A KUBE-EXTERNAL-SERVICES -m comment --comment "ns2/svc2:p80 has no local endpoints" -m tcp -p tcp -d 192.168.99.22 --dport 80 -j DROP
+				-A KUBE-EXTERNAL-SERVICES -m comment --comment "ns2/svc2:p80 has no local endpoints" -m tcp -p tcp -d 1.2.3.4 --dport 80 -j DROP
+				-A KUBE-EXTERNAL-SERVICES -m comment --comment "ns2/svc2:p80 has no local endpoints" -m addrtype --dst-type LOCAL -m tcp -p tcp --dport 3001 -j DROP
 				-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
@@ -1521,7 +1527,7 @@ func (tracer *iptablesTracer) runChain(table utiliptables.Table, chain utiliptab
 			tracer.markDrop = true
 			continue
 
-		case "ACCEPT", "REJECT":
+		case "ACCEPT", "REJECT", "DROP":
 			// (only valid in filter)
 			tracer.outputs = append(tracer.outputs, rule.Jump.Value)
 			return true
@@ -1639,6 +1645,9 @@ func TestTracePackets(t *testing.T) {
 		-A OUTPUT -m conntrack --ctstate NEW -m comment --comment kubernetes service portals -j KUBE-SERVICES
 		-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
 		-A KUBE-SERVICES -m comment --comment "ns6/svc6:p80 has no endpoints" -m tcp -p tcp -d 172.30.0.46 --dport 80 -j REJECT
+		-A KUBE-EXTERNAL-SERVICES -m comment --comment "ns2/svc2:p80 has no local endpoints" -m tcp -p tcp -d 192.168.99.22 --dport 80 -j DROP
+		-A KUBE-EXTERNAL-SERVICES -m comment --comment "ns2/svc2:p80 has no local endpoints" -m tcp -p tcp -d 1.2.3.4 --dport 80 -j DROP
+		-A KUBE-EXTERNAL-SERVICES -m comment --comment "ns2/svc2:p80 has no local endpoints" -m addrtype --dst-type LOCAL -m tcp -p tcp --dport 3001 -j DROP
 		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
@@ -1668,7 +1677,6 @@ func TestTracePackets(t *testing.T) {
 		:KUBE-SVC-NUKIZ6OKUXPJNT4C - [0:0]
 		:KUBE-SVC-X27LE4BHSL4DOUIK - [0:0]
 		:KUBE-SVC-XPGD46QRK7WJZT7O - [0:0]
-		:KUBE-SVL-GNZBNJ2PO5MGZ6GT - [0:0]
 		-A PREROUTING -m comment --comment kubernetes service portals -j KUBE-SERVICES
 		-A OUTPUT -m comment --comment kubernetes service portals -j KUBE-SERVICES
 		-A POSTROUTING -m comment --comment kubernetes postrouting rules -j KUBE-POSTROUTING
@@ -1694,7 +1702,6 @@ func TestTracePackets(t *testing.T) {
 		-A KUBE-EXT-GNZBNJ2PO5MGZ6GT -m comment --comment "pod traffic for ns2/svc2:p80 external destinations" -s 10.0.0.0/8 -j KUBE-SVC-GNZBNJ2PO5MGZ6GT
 		-A KUBE-EXT-GNZBNJ2PO5MGZ6GT -m comment --comment "masquerade LOCAL traffic for ns2/svc2:p80 external destinations" -m addrtype --src-type LOCAL -j KUBE-MARK-MASQ
 		-A KUBE-EXT-GNZBNJ2PO5MGZ6GT -m comment --comment "route LOCAL traffic for ns2/svc2:p80 external destinations" -m addrtype --src-type LOCAL -j KUBE-SVC-GNZBNJ2PO5MGZ6GT
-		-A KUBE-EXT-GNZBNJ2PO5MGZ6GT -j KUBE-SVL-GNZBNJ2PO5MGZ6GT
 		-A KUBE-EXT-NUKIZ6OKUXPJNT4C -m comment --comment "masquerade traffic for ns5/svc5:p80 external destinations" -j KUBE-MARK-MASQ
 		-A KUBE-EXT-NUKIZ6OKUXPJNT4C -j KUBE-SVC-NUKIZ6OKUXPJNT4C
 		-A KUBE-EXT-X27LE4BHSL4DOUIK -m comment --comment "masquerade traffic for ns3/svc3:p80 external destinations" -j KUBE-MARK-MASQ
@@ -1724,7 +1731,6 @@ func TestTracePackets(t *testing.T) {
 		-A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment "ns3/svc3:p80 -> 10.180.0.3:80" -j KUBE-SEP-OYPFS5VJICHGATKP
 		-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
 		-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 -> 10.180.0.1:80" -j KUBE-SEP-SXIVWICOYRO3J4NJ
-		-A KUBE-SVL-GNZBNJ2PO5MGZ6GT -m comment --comment "ns2/svc2:p80 has no local endpoints" -j KUBE-MARK-DROP
 		COMMIT
 		`)
 
@@ -1765,9 +1771,16 @@ func TestTracePackets(t *testing.T) {
 			masq:     true,
 		},
 		{
-			name:     "KUBE-MARK-DROP",
+			name:     "DROP (via filter table)",
 			sourceIP: testExternalClient,
 			destIP:   "192.168.99.22",
+			destPort: 80,
+			output:   "DROP",
+		},
+		{
+			name:     "DROP (via KUBE-MARK-DROP)",
+			sourceIP: testExternalClientBlocked,
+			destIP:   "5.6.7.8",
 			destPort: 80,
 			output:   "DROP",
 		},
@@ -1956,6 +1969,9 @@ func TestOverallIPTablesRulesWithMultipleServices(t *testing.T) {
 		:KUBE-FORWARD - [0:0]
 		-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
 		-A KUBE-SERVICES -m comment --comment "ns6/svc6:p80 has no endpoints" -m tcp -p tcp -d 172.30.0.46 --dport 80 -j REJECT
+		-A KUBE-EXTERNAL-SERVICES -m comment --comment "ns2/svc2:p80 has no local endpoints" -m tcp -p tcp -d 192.168.99.22 --dport 80 -j DROP
+		-A KUBE-EXTERNAL-SERVICES -m comment --comment "ns2/svc2:p80 has no local endpoints" -m tcp -p tcp -d 1.2.3.4 --dport 80 -j DROP
+		-A KUBE-EXTERNAL-SERVICES -m comment --comment "ns2/svc2:p80 has no local endpoints" -m addrtype --dst-type LOCAL -m tcp -p tcp --dport 3001 -j DROP
 		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
@@ -1981,7 +1997,6 @@ func TestOverallIPTablesRulesWithMultipleServices(t *testing.T) {
 		:KUBE-SVC-NUKIZ6OKUXPJNT4C - [0:0]
 		:KUBE-SVC-X27LE4BHSL4DOUIK - [0:0]
 		:KUBE-SVC-XPGD46QRK7WJZT7O - [0:0]
-		:KUBE-SVL-GNZBNJ2PO5MGZ6GT - [0:0]
 		-A KUBE-NODEPORTS -m comment --comment ns2/svc2:p80 -m tcp -p tcp --dport 3001 -j KUBE-EXT-GNZBNJ2PO5MGZ6GT
 		-A KUBE-NODEPORTS -m comment --comment ns3/svc3:p80 -m tcp -p tcp --dport 3003 -j KUBE-EXT-X27LE4BHSL4DOUIK
 		-A KUBE-NODEPORTS -m comment --comment ns5/svc5:p80 -m tcp -p tcp --dport 3002 -j KUBE-EXT-NUKIZ6OKUXPJNT4C
@@ -2000,7 +2015,6 @@ func TestOverallIPTablesRulesWithMultipleServices(t *testing.T) {
 		-A KUBE-EXT-GNZBNJ2PO5MGZ6GT -m comment --comment "pod traffic for ns2/svc2:p80 external destinations" -s 10.0.0.0/8 -j KUBE-SVC-GNZBNJ2PO5MGZ6GT
 		-A KUBE-EXT-GNZBNJ2PO5MGZ6GT -m comment --comment "masquerade LOCAL traffic for ns2/svc2:p80 external destinations" -m addrtype --src-type LOCAL -j KUBE-MARK-MASQ
 		-A KUBE-EXT-GNZBNJ2PO5MGZ6GT -m comment --comment "route LOCAL traffic for ns2/svc2:p80 external destinations" -m addrtype --src-type LOCAL -j KUBE-SVC-GNZBNJ2PO5MGZ6GT
-		-A KUBE-EXT-GNZBNJ2PO5MGZ6GT -j KUBE-SVL-GNZBNJ2PO5MGZ6GT
 		-A KUBE-EXT-NUKIZ6OKUXPJNT4C -m comment --comment "masquerade traffic for ns5/svc5:p80 external destinations" -j KUBE-MARK-MASQ
 		-A KUBE-EXT-NUKIZ6OKUXPJNT4C -j KUBE-SVC-NUKIZ6OKUXPJNT4C
 		-A KUBE-EXT-X27LE4BHSL4DOUIK -m comment --comment "masquerade traffic for ns3/svc3:p80 external destinations" -j KUBE-MARK-MASQ
@@ -2034,7 +2048,6 @@ func TestOverallIPTablesRulesWithMultipleServices(t *testing.T) {
 		-A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment "ns3/svc3:p80 -> 10.180.0.3:80" -j KUBE-SEP-OYPFS5VJICHGATKP
 		-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
 		-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 -> 10.180.0.1:80" -j KUBE-SEP-SXIVWICOYRO3J4NJ
-		-A KUBE-SVL-GNZBNJ2PO5MGZ6GT -m comment --comment "ns2/svc2:p80 has no local endpoints" -j KUBE-MARK-DROP
 		COMMIT
 		`)
 
@@ -5226,6 +5239,7 @@ func TestInternalTrafficPolicyE2E(t *testing.T) {
 				:KUBE-SERVICES - [0:0]
 				:KUBE-EXTERNAL-SERVICES - [0:0]
 				:KUBE-FORWARD - [0:0]
+				-A KUBE-SERVICES -m comment --comment "ns1/svc1 has no local endpoints" -m tcp -p tcp -d 172.30.1.1 --dport 80 -j DROP
 				-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
@@ -5235,15 +5249,11 @@ func TestInternalTrafficPolicyE2E(t *testing.T) {
 				:KUBE-SERVICES - [0:0]
 				:KUBE-MARK-MASQ - [0:0]
 				:KUBE-POSTROUTING - [0:0]
-				:KUBE-SVL-AQI2S6QIMU7PVVRP - [0:0]
-				-A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.30.1.1 --dport 80 -j KUBE-SVL-AQI2S6QIMU7PVVRP
 				-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
 				-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
 				-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
 				-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
 				-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
-				-A KUBE-SVL-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.30.1.1 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
-				-A KUBE-SVL-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 has no local endpoints" -j KUBE-MARK-DROP
 				COMMIT
 				`),
 			flowTests: []packetFlowTest{
@@ -5872,6 +5882,7 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 				:KUBE-EXTERNAL-SERVICES - [0:0]
 				:KUBE-FORWARD - [0:0]
 				-A KUBE-NODEPORTS -m comment --comment "ns1/svc1 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
+				-A KUBE-EXTERNAL-SERVICES -m comment --comment "ns1/svc1 has no local endpoints" -m tcp -p tcp -d 1.2.3.4 --dport 80 -j DROP
 				-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
@@ -5884,14 +5895,12 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 				:KUBE-POSTROUTING - [0:0]
 				:KUBE-SEP-EQCHZ7S2PJ72OHAY - [0:0]
 				:KUBE-SVC-AQI2S6QIMU7PVVRP - [0:0]
-				:KUBE-SVL-AQI2S6QIMU7PVVRP - [0:0]
 				-A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.30.1.1 --dport 80 -j KUBE-SVC-AQI2S6QIMU7PVVRP
 				-A KUBE-SERVICES -m comment --comment "ns1/svc1 loadbalancer IP" -m tcp -p tcp -d 1.2.3.4 --dport 80 -j KUBE-EXT-AQI2S6QIMU7PVVRP
 				-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
 				-A KUBE-EXT-AQI2S6QIMU7PVVRP -m comment --comment "pod traffic for ns1/svc1 external destinations" -s 10.0.0.0/8 -j KUBE-SVC-AQI2S6QIMU7PVVRP
 				-A KUBE-EXT-AQI2S6QIMU7PVVRP -m comment --comment "masquerade LOCAL traffic for ns1/svc1 external destinations" -m addrtype --src-type LOCAL -j KUBE-MARK-MASQ
 				-A KUBE-EXT-AQI2S6QIMU7PVVRP -m comment --comment "route LOCAL traffic for ns1/svc1 external destinations" -m addrtype --src-type LOCAL -j KUBE-SVC-AQI2S6QIMU7PVVRP
-				-A KUBE-EXT-AQI2S6QIMU7PVVRP -j KUBE-SVL-AQI2S6QIMU7PVVRP
 				-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
 				-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
 				-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
@@ -5901,7 +5910,6 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 				-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.30.1.1 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
 				-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 -> 10.0.1.5:80" -m recent --name KUBE-SEP-EQCHZ7S2PJ72OHAY --rcheck --seconds 10800 --reap -j KUBE-SEP-EQCHZ7S2PJ72OHAY
 				-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 -> 10.0.1.5:80" -j KUBE-SEP-EQCHZ7S2PJ72OHAY
-				-A KUBE-SVL-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 has no local endpoints" -j KUBE-MARK-DROP
 				COMMIT
 				`),
 			flowTests: []packetFlowTest{
@@ -5959,6 +5967,7 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 				:KUBE-EXTERNAL-SERVICES - [0:0]
 				:KUBE-FORWARD - [0:0]
 				-A KUBE-NODEPORTS -m comment --comment "ns1/svc1 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
+				-A KUBE-EXTERNAL-SERVICES -m comment --comment "ns1/svc1 has no local endpoints" -m tcp -p tcp -d 1.2.3.4 --dport 80 -j DROP
 				-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
@@ -5971,14 +5980,12 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 				:KUBE-POSTROUTING - [0:0]
 				:KUBE-SEP-EQCHZ7S2PJ72OHAY - [0:0]
 				:KUBE-SVC-AQI2S6QIMU7PVVRP - [0:0]
-				:KUBE-SVL-AQI2S6QIMU7PVVRP - [0:0]
 				-A KUBE-SERVICES -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.30.1.1 --dport 80 -j KUBE-SVC-AQI2S6QIMU7PVVRP
 				-A KUBE-SERVICES -m comment --comment "ns1/svc1 loadbalancer IP" -m tcp -p tcp -d 1.2.3.4 --dport 80 -j KUBE-EXT-AQI2S6QIMU7PVVRP
 				-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
 				-A KUBE-EXT-AQI2S6QIMU7PVVRP -m comment --comment "pod traffic for ns1/svc1 external destinations" -s 10.0.0.0/8 -j KUBE-SVC-AQI2S6QIMU7PVVRP
 				-A KUBE-EXT-AQI2S6QIMU7PVVRP -m comment --comment "masquerade LOCAL traffic for ns1/svc1 external destinations" -m addrtype --src-type LOCAL -j KUBE-MARK-MASQ
 				-A KUBE-EXT-AQI2S6QIMU7PVVRP -m comment --comment "route LOCAL traffic for ns1/svc1 external destinations" -m addrtype --src-type LOCAL -j KUBE-SVC-AQI2S6QIMU7PVVRP
-				-A KUBE-EXT-AQI2S6QIMU7PVVRP -j KUBE-SVL-AQI2S6QIMU7PVVRP
 				-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
 				-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
 				-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
@@ -5988,7 +5995,6 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 				-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 cluster IP" -m tcp -p tcp -d 172.30.1.1 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
 				-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 -> 10.0.1.5:80" -m recent --name KUBE-SEP-EQCHZ7S2PJ72OHAY --rcheck --seconds 10800 --reap -j KUBE-SEP-EQCHZ7S2PJ72OHAY
 				-A KUBE-SVC-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 -> 10.0.1.5:80" -j KUBE-SEP-EQCHZ7S2PJ72OHAY
-				-A KUBE-SVL-AQI2S6QIMU7PVVRP -m comment --comment "ns1/svc1 has no local endpoints" -j KUBE-MARK-DROP
 				COMMIT
 				`),
 			flowTests: []packetFlowTest{
