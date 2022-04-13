@@ -1179,7 +1179,7 @@ Data corruption issue was found in etcd v3.5.0 release that was shipped with 1.2
   - `--address`
   The insecure port flags `--port` may only be set to 0 now.
   
-  In addtion, please be careful that:
+  In addition, please be careful that:
   - controller-manager MUST start with `--authorization-kubeconfig` and `--authentication-kubeconfig` correctly set to get authentication/authorization working.
   - liveness/readiness probes to controller-manager MUST use HTTPS now, and the default port has been changed to 10257.
   - Applications that fetch metrics from controller-manager should use a dedicated service account which is allowed to access nonResourceURLs `/metrics`. ([#96216](https://github.com/kubernetes/kubernetes/pull/96216), [@knight42](https://github.com/knight42)) [SIG API Machinery, Cloud Provider, Instrumentation and Testing]
@@ -2712,7 +2712,7 @@ filename | sha512 hash
   - `--address`
   The insecure port flags `--port` may only be set to 0 now.
   
-  In addtion, please be careful that:
+  In addition, please be careful that:
   - controller-manager MUST start with `--authorization-kubeconfig` and `--authentication-kubeconfig` correctly set to get authentication/authorization working.
   - liveness/readiness probes to controller-manager MUST use HTTPS now, and the default port has been changed to 10257.
   - Applications that fetch metrics from controller-manager should use a dedicated service account which is allowed to access nonResourceURLs `/metrics`. ([#96216](https://github.com/kubernetes/kubernetes/pull/96216), [@knight42](https://github.com/knight42)) [SIG API Machinery, Cloud Provider, Instrumentation and Testing]
