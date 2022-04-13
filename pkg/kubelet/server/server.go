@@ -402,41 +402,58 @@ func (s *Server) InstallDefaultHandlers() {
 	// Add a subset of basic cadvisor metrics split under different buckets
 	s.registerCadvisorMetrics(
 		compbasemetrics.NewKubeRegistry(),
-		cadvisormetrics.MetricSet{cadvisormetrics.CpuUsageMetrics: struct{}{}},
-		cadvisorMetricsPath + "/cpu",
-		true, /* include container metrics */
-		false, /* include machine metrics */
-	)
-	s.registerCadvisorMetrics(
-		compbasemetrics.NewKubeRegistry(),
-		cadvisormetrics.MetricSet{cadvisormetrics.MemoryUsageMetrics: struct{}{}},
-		cadvisorMetricsPath + "/memory",
-		true, /* include container metrics */
+		cadvisormetrics.MetricSet{
+			cadvisormetrics.CpuUsageMetrics:    struct{}{},
+			cadvisormetrics.ExcludeSpecMetrics: struct{}{},
+		},
+		cadvisorMetricsPath+"/cpu",
+		true,  /* include container metrics */
 		false, /* include machine metrics */
 	)
 	s.registerCadvisorMetrics(
 		compbasemetrics.NewKubeRegistry(),
 		cadvisormetrics.MetricSet{
-			cadvisormetrics.DiskIOMetrics:       struct{}{},
-			cadvisormetrics.DiskUsageMetrics:    struct{}{},
+			cadvisormetrics.MemoryUsageMetrics: struct{}{},
+			cadvisormetrics.ExcludeSpecMetrics: struct{}{},
 		},
-		cadvisorMetricsPath + "/disk",
-		true, /* include container metrics */
+		cadvisorMetricsPath+"/memory",
+		true,  /* include container metrics */
 		false, /* include machine metrics */
 	)
 	s.registerCadvisorMetrics(
 		compbasemetrics.NewKubeRegistry(),
-		cadvisormetrics.MetricSet{cadvisormetrics.NetworkUsageMetrics: struct{}{}},
-		cadvisorMetricsPath + "/network",
-		true, /* include container metrics */
+		cadvisormetrics.MetricSet{
+			cadvisormetrics.DiskIOMetrics:      struct{}{},
+			cadvisormetrics.DiskUsageMetrics:   struct{}{},
+			cadvisormetrics.ExcludeSpecMetrics: struct{}{},
+		},
+		cadvisorMetricsPath+"/disk",
+		true,  /* include container metrics */
+		false, /* include machine metrics */
+	)
+	s.registerCadvisorMetrics(
+		compbasemetrics.NewKubeRegistry(),
+		cadvisormetrics.MetricSet{
+			cadvisormetrics.NetworkUsageMetrics: struct{}{},
+			cadvisormetrics.ExcludeSpecMetrics:  struct{}{},
+		},
+		cadvisorMetricsPath+"/network",
+		true,  /* include container metrics */
+		false, /* include machine metrics */
+	)
+	s.registerCadvisorMetrics(
+		compbasemetrics.NewKubeRegistry(),
+		cadvisormetrics.MetricSet{},
+		cadvisorMetricsPath+"/spec",
+		true,  /* include container metrics */
 		false, /* include machine metrics */
 	)
 	s.registerCadvisorMetrics(
 		compbasemetrics.NewKubeRegistry(),
 		includedMetrics,
-		cadvisorMetricsPath + "/machine",
+		cadvisorMetricsPath+"/machine",
 		false, /* include container metrics */
-		true, /* include machine metrics */
+		true,  /* include machine metrics */
 	)
 
 	s.addMetricsBucketMatcher("metrics/resource")
