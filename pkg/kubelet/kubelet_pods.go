@@ -874,8 +874,9 @@ func (kl *Kubelet) makePodDataDirs(pod *v1.Pod) error {
 
 // getPullSecretsForPod inspects the Pod and retrieves the referenced pull
 // secrets.
-func (kl *Kubelet) getPullSecretsForPod(pod *v1.Pod) []v1.Secret {
+func (kl *Kubelet) getPullSecretsForPod(pod *v1.Pod) (secrets []v1.Secret, err error) {
 	pullSecrets := []v1.Secret{}
+	failedSecretNames := []string{}
 
 	for _, secretRef := range pod.Spec.ImagePullSecrets {
 		if len(secretRef.Name) == 0 {
@@ -885,14 +886,19 @@ func (kl *Kubelet) getPullSecretsForPod(pod *v1.Pod) []v1.Secret {
 		}
 		secret, err := kl.secretManager.GetSecret(pod.Namespace, secretRef.Name)
 		if err != nil {
-			klog.InfoS("Unable to retrieve pull secret, the image pull may not succeed.", "pod", klog.KObj(pod), "secret", klog.KObj(secret), "err", err)
+			klog.InfoS("Unable to retrieve pull secret, the image pull may not succeed.", "pod", klog.KObj(pod), "secret", klog.KObj(secret), "secretName", secretRef.Name, "err", err)
+			failedSecretNames = append(failedSecretNames, secretRef.Name)
 			continue
 		}
 
 		pullSecrets = append(pullSecrets, *secret)
 	}
 
-	return pullSecrets
+	if len(failedSecretNames) > 0 {
+		return pullSecrets, fmt.Errorf("FailedToRetrieveImagePullSecret: Unable to retrieve image pull secrets %s, will attempt to pull the image without these secrets. The image pull may not succeed", strings.Join(failedSecretNames, ", "))
+	}
+
+	return pullSecrets, nil
 }
 
 func countRunningContainerStatus(status v1.PodStatus) int {

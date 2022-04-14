@@ -1711,25 +1711,32 @@ func (kl *Kubelet) syncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	}
 
 	// Fetch the pull secrets for the pod
-	pullSecrets := kl.getPullSecretsForPod(pod)
+	pullSecrets, pullSecretError := kl.getPullSecretsForPod(pod)
 
 	// Call the container runtime's SyncPod callback
 	result := kl.containerRuntime.SyncPod(pod, podStatus, pullSecrets, kl.backOff)
 	kl.reasonCache.Update(pod.UID, result)
+	var errorStrArray []string
 	if err := result.Error(); err != nil {
 		// Do not return error if the only failures were pods in backoff
 		for _, r := range result.SyncResults {
 			if r.Error != kubecontainer.ErrCrashLoopBackOff && r.Error != images.ErrImagePullBackOff {
 				// Do not record an event here, as we keep all event logging for sync pod failures
 				// local to container runtime, so we get better errors.
-				return false, err
+				errorStrArray = append(errorStrArray, err.Error())
 			}
 		}
-
-		return false, nil
 	}
 
-	return false, nil
+	if pullSecretError != nil {
+		errorStrArray = append(errorStrArray, pullSecretError.Error())
+	}
+
+	if len(errorStrArray) > 0 {
+		return false, fmt.Errorf(strings.Join(errorStrArray, "\n"))
+	} else {
+		return false, nil
+	}
 }
 
 // syncTerminatingPod is expected to terminate all running containers in a pod. Once this method
