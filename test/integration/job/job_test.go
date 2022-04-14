@@ -658,7 +658,7 @@ func TestSuspendJob(t *testing.T) {
 			validate := func(s string, active int, status v1.ConditionStatus, reason string) {
 				validateJobPodsStatus(ctx, t, clientSet, job, podsByStatus{
 					Active: active,
-				}, true)
+				}, feature.DefaultFeatureGate.Enabled(features.JobTrackingWithFinalizers))
 				job, err = clientSet.BatchV1().Jobs(ns.Name).Get(ctx, job.Name, metav1.GetOptions{})
 				if err != nil {
 					t.Fatalf("Failed to get Job after %s: %v", s, err)
@@ -704,7 +704,7 @@ func TestSuspendJobControllerRestart(t *testing.T) {
 	}
 	validateJobPodsStatus(ctx, t, clientSet, job, podsByStatus{
 		Active: 0,
-	}, true)
+	}, feature.DefaultFeatureGate.Enabled(features.JobTrackingWithFinalizers))
 
 	// Disable feature gate and restart controller to test that pods get created.
 	defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.SuspendJob, false)()
@@ -716,7 +716,7 @@ func TestSuspendJobControllerRestart(t *testing.T) {
 	}
 	validateJobPodsStatus(ctx, t, clientSet, job, podsByStatus{
 		Active: 2,
-	}, true)
+	}, feature.DefaultFeatureGate.Enabled(features.JobTrackingWithFinalizers))
 }
 
 func TestNodeSelectorUpdate(t *testing.T) {
