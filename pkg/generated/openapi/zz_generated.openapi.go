@@ -53452,6 +53452,22 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							Format:      "",
 						},
 					},
+					"RemoteRuntimeEndpoint": {
+						SchemaProps: spec.SchemaProps{
+							Description: "RemoteRuntimeEndpoint is the endpoint of remote runtime service Default:\n       Linux:   \"unix:///run/containerd/containerd.sock\"\n       Windows: \"tcp://localhost:3735\"",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"RemoteImageEndpoint": {
+						SchemaProps: spec.SchemaProps{
+							Description: "RemoteImageEndpoint is the endpoint to pull images from in order to handle If not specified, it will be the same with --container-runtime-endpoint by default Default: \"\"",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
 			},
 		},

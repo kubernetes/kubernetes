@@ -445,6 +445,18 @@ type KubeletConfiguration struct {
 	// registerNode enables automatic registration with the apiserver.
 	// +optional
 	RegisterNode bool
+
+	// RemoteRuntimeEndpoint is the endpoint of remote runtime service
+	// Default:
+	//        Linux:   "unix:///run/containerd/containerd.sock"
+	//        Windows: "tcp://localhost:3735"
+	// +optional
+	RemoteRuntimeEndpoint string
+	// RemoteImageEndpoint is the endpoint to pull images from in order to handle
+	// If not specified, it will be the same with --container-runtime-endpoint by default
+	// Default: ""
+	// +optional
+	RemoteImageEndpoint string
 }
 
 // KubeletAuthorizationMode denotes the authorization mode for the kubelet

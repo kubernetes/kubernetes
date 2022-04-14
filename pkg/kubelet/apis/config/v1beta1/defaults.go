@@ -17,6 +17,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	"runtime"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -263,5 +264,15 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	}
 	if obj.RegisterNode == nil {
 		obj.RegisterNode = utilpointer.BoolPtr(true)
+	}
+	if obj.RemoteRuntimeEndpoint == "" {
+		if runtime.GOOS == "linux" {
+			obj.RemoteRuntimeEndpoint = "unix:///run/containerd/containerd.sock"
+		} else if runtime.GOOS == "windows" {
+			obj.RemoteRuntimeEndpoint = "tcp://localhost:3735"
+		}
+	}
+	if obj.RemoteImageEndpoint == "" {
+		obj.RemoteImageEndpoint = obj.RemoteRuntimeEndpoint
 	}
 }

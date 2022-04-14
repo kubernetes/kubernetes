@@ -18,9 +18,10 @@ package fuzzer
 
 import (
 	"math/rand"
+	"runtime"
 	"time"
 
-	"github.com/google/gofuzz"
+	fuzz "github.com/google/gofuzz"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
@@ -110,6 +111,12 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			}
 			obj.EnableSystemLogHandler = true
 			obj.MemoryThrottlingFactor = utilpointer.Float64Ptr(rand.Float64())
+			if runtime.GOOS == "linux" {
+				obj.RemoteRuntimeEndpoint = "unix:///run/containerd/containerd.sock"
+			} else if runtime.GOOS == "windows" {
+				obj.RemoteRuntimeEndpoint = "tcp://localhost:3735"
+			}
+			obj.RemoteImageEndpoint = obj.RemoteRuntimeEndpoint
 		},
 	}
 }
