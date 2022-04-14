@@ -695,7 +695,7 @@ func (d *decodeState) object(v reflect.Value) error {
 					seenKeys = map[string]struct{}{}
 				}
 				if _, seen := seenKeys[fieldName]; seen {
-					d.saveStrictError(d.newFieldError("duplicate field", fieldName))
+					d.saveStrictError(d.newFieldError(duplicateStrictErrType, fieldName))
 				} else {
 					seenKeys[fieldName] = struct{}{}
 				}
@@ -711,7 +711,7 @@ func (d *decodeState) object(v reflect.Value) error {
 				var seenKeys uint64
 				checkDuplicateField = func(fieldNameIndex int, fieldName string) {
 					if seenKeys&(1<<fieldNameIndex) != 0 {
-						d.saveStrictError(d.newFieldError("duplicate field", fieldName))
+						d.saveStrictError(d.newFieldError(duplicateStrictErrType, fieldName))
 					} else {
 						seenKeys = seenKeys | (1 << fieldNameIndex)
 					}
@@ -724,7 +724,7 @@ func (d *decodeState) object(v reflect.Value) error {
 						seenIndexes = make([]bool, len(fields.list))
 					}
 					if seenIndexes[fieldNameIndex] {
-						d.saveStrictError(d.newFieldError("duplicate field", fieldName))
+						d.saveStrictError(d.newFieldError(duplicateStrictErrType, fieldName))
 					} else {
 						seenIndexes[fieldNameIndex] = true
 					}
@@ -836,7 +836,7 @@ func (d *decodeState) object(v reflect.Value) error {
 				d.errorContext.Struct = t
 				d.appendStrictFieldStackKey(f.name)
 			} else if d.disallowUnknownFields {
-				d.saveStrictError(d.newFieldError("unknown field", string(key)))
+				d.saveStrictError(d.newFieldError(unknownStrictErrType, string(key)))
 			}
 		}
 
@@ -1231,7 +1231,7 @@ func (d *decodeState) objectInterface() map[string]interface{} {
 
 		if d.disallowDuplicateFields {
 			if _, exists := m[key]; exists {
-				d.saveStrictError(d.newFieldError("duplicate field", key))
+				d.saveStrictError(d.newFieldError(duplicateStrictErrType, key))
 			}
 		}
 
