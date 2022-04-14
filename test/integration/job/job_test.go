@@ -710,7 +710,7 @@ func TestSuspendJob(t *testing.T) {
 				validateJobPodsStatus(ctx, t, clientSet, job, podsByStatus{
 					Active: active,
 					Ready:  pointer.Int32(0),
-				}, true)
+				}, feature.DefaultFeatureGate.Enabled(features.JobTrackingWithFinalizers))
 				job, err = clientSet.BatchV1().Jobs(ns.Name).Get(ctx, job.Name, metav1.GetOptions{})
 				if err != nil {
 					t.Fatalf("Failed to get Job after %s: %v", s, err)
