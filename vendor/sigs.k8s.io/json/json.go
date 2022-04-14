@@ -137,3 +137,11 @@ func SyntaxErrorOffset(err error) (isSyntaxError bool, offset int64) {
 		return false, 0
 	}
 }
+
+// FieldError are errors that provide access to
+// the path of the erroneous field
+type FieldError interface {
+	Error() string
+	FieldPath() string
+	SetFieldPath(path string)
+}
