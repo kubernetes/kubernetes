@@ -36,9 +36,6 @@ linters-settings: # please keep this alphabetized
     go: "1.17"
     checks: [
       "all",
-      "-S1*",    # TODO(fix) Omit code simplifications for now.
-      "-ST1*",   # Mostly stylistic, redundant w/ golint
-      "-SA5011", # TODO(fix) Possible nil pointer dereference
       "-SA1019", # TODO(fix) Using a deprecated function, variable, constant or field
       "-SA2002"  # TODO(fix) Called testing.T.FailNow or SkipNow in a goroutine, which isn’t allowed
     ]
