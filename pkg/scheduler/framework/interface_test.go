@@ -34,6 +34,7 @@ func TestStatus(t *testing.T) {
 		expectedCode      Code
 		expectedMessage   string
 		expectedIsSuccess bool
+		expectedIsWait    bool
 		expectedAsError   error
 	}{
 		{
@@ -42,6 +43,16 @@ func TestStatus(t *testing.T) {
 			expectedCode:      Success,
 			expectedMessage:   "",
 			expectedIsSuccess: true,
+			expectedIsWait:    false,
+			expectedAsError:   nil,
+		},
+		{
+			name:              "wait status",
+			status:            NewStatus(Wait, ""),
+			expectedCode:      Wait,
+			expectedMessage:   "",
+			expectedIsSuccess: false,
+			expectedIsWait:    true,
 			expectedAsError:   nil,
 		},
 		{
@@ -50,6 +61,7 @@ func TestStatus(t *testing.T) {
 			expectedCode:      Error,
 			expectedMessage:   "unknown error",
 			expectedIsSuccess: false,
+			expectedIsWait:    false,
 			expectedAsError:   errors.New("unknown error"),
 		},
 		{
@@ -74,6 +86,10 @@ func TestStatus(t *testing.T) {
 
 			if test.status.IsSuccess() != test.expectedIsSuccess {
 				t.Errorf("expect status.IsSuccess() returns %v, but %v", test.expectedIsSuccess, test.status.IsSuccess())
+			}
+
+			if test.status.IsWait() != test.expectedIsWait {
+				t.Errorf("status.IsWait() returns %v, but want %v", test.status.IsWait(), test.expectedIsWait)
 			}
 
 			if test.status.AsError() == test.expectedAsError {
