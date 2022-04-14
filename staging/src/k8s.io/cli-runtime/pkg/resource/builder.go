@@ -259,7 +259,7 @@ func (b *Builder) FilenameParam(enforceNamespace bool, filenameOptions *Filename
 		default:
 			matches, err := expandIfFilePattern(s)
 			if err != nil {
-				b.errs = append(b.errs, fmt.Errorf("pattern %q is not valid: %v", s, err))
+				b.errs = append(b.errs, err)
 				continue
 			}
 			if !recursive && len(matches) == 1 {
@@ -1213,11 +1213,12 @@ func expandIfFilePattern(pattern string) ([]string, error) {
 	if _, err := os.Stat(pattern); os.IsNotExist(err) {
 		matches, err := filepath.Glob(pattern)
 		if err == nil && len(matches) == 0 {
-			return nil, fmt.Errorf("no match")
+			return nil, fmt.Errorf("the path %q does not exist", pattern)
 		}
-		if err == nil || err != filepath.ErrBadPattern {
-			return matches, err
+		if err == filepath.ErrBadPattern {
+			return nil, fmt.Errorf("pattern %q is not valid: %v", pattern, err)
 		}
+		return matches, err
 	}
 	return []string{pattern}, nil
 }
