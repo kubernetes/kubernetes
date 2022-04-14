@@ -196,6 +196,9 @@ func TestControllerSyncJob(t *testing.T) {
 		wasSuspended   bool
 		suspend        bool
 
+		// If set, it means that the case is exclusive to tracking with/without finalizers.
+		wFinalizersExclusive *bool
+
 		// pod setup
 		podControllerError        error
 		jobKeyForget              bool
@@ -480,6 +483,16 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedConditionReason: "BackoffLimitExceeded",
 			expectedPodPatches:      1,
 		},
+		"job failures, unsatisfied expectations": {
+			wFinalizersExclusive:      pointer.Bool(true),
+			parallelism:               2,
+			completions:               5,
+			deleting:                  true,
+			failedPods:                1,
+			fakeExpectationAtCreation: 1,
+			expectedFailed:            1,
+			expectedPodPatches:        1,
+		},
 		"indexed job start": {
 			parallelism:            2,
 			completions:            5,
@@ -705,6 +718,9 @@ func TestControllerSyncJob(t *testing.T) {
 			t.Run(fmt.Sprintf("%s, finalizers=%t", name, wFinalizers), func(t *testing.T) {
 				if wFinalizers && tc.podControllerError != nil {
 					t.Skip("Can't track status if finalizers can't be removed")
+				}
+				if tc.wFinalizersExclusive != nil && *tc.wFinalizersExclusive != wFinalizers {
+					t.Skipf("Test is exclusive for wFinalizers=%t", *tc.wFinalizersExclusive)
 				}
 				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobReadyPods, tc.jobReadyPodsEnabled)()
 				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobTrackingWithFinalizers, wFinalizers)()
