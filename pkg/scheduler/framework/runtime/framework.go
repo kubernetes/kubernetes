@@ -1158,7 +1158,7 @@ func (f *frameworkImpl) RunPermitPlugins(ctx context.Context, state *framework.C
 				status.SetFailedPlugin(pl.Name())
 				return status
 			}
-			if status.Code() == framework.Wait {
+			if status.IsWait() {
 				// Not allowed to be greater than maxTimeout.
 				if timeout > maxTimeout {
 					timeout = maxTimeout
