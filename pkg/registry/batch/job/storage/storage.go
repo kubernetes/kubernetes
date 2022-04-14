@@ -98,7 +98,6 @@ func (r *REST) Categories() []string {
 
 func (r *REST) Delete(ctx context.Context, name string, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
 	//nolint:staticcheck // SA1019 backwards compatibility
-	//nolint: staticcheck
 	if options != nil && options.PropagationPolicy == nil && options.OrphanDependents == nil &&
 		job.Strategy.DefaultGarbageCollectionPolicy(ctx) == rest.OrphanDependents {
 		// Throw a warning if delete options are not explicitly set as Job deletion strategy by default is orphaning
