@@ -2596,32 +2596,63 @@ func TestWatchOrphanPods(t *testing.T) {
 		jobSynced = true
 		return true, nil
 	}
-
-	// Create job but don't add it to the store.
-	testJob := newJob(2, 2, 6, batch.NonIndexedCompletion)
-
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	go sharedInformers.Core().V1().Pods().Informer().Run(stopCh)
 	go manager.Run(context.TODO(), 1)
 
-	orphanPod := buildPod().name("a").job(testJob).deletionTimestamp().trackingFinalizer().Pod
-	orphanPod, err := clientset.CoreV1().Pods("default").Create(context.Background(), orphanPod, metav1.CreateOptions{})
-	if err != nil {
-		t.Fatalf("Creating orphan pod: %v", err)
+	// Create job but don't add it to the store.
+	cases := map[string]struct {
+		job           *batch.Job
+		inCache       bool
+		wantJobSynced bool
+	}{
+		"job_does_not_exist": {
+			job: newJob(2, 2, 6, batch.NonIndexedCompletion),
+		},
+		"orphan": {},
+		"job_finished": {
+			job: func() *batch.Job {
+				j := newJob(2, 2, 6, batch.NonIndexedCompletion)
+				j.Status.Conditions = append(j.Status.Conditions, batch.JobCondition{
+					Type:   batch.JobComplete,
+					Status: v1.ConditionTrue,
+				})
+				return j
+			}(),
+			inCache: true,
+		},
 	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			jobSynced = false
+			if tc.inCache {
+				sharedInformers.Batch().V1().Jobs().Informer().GetIndexer().Add(tc.job)
+			}
 
-	if err := wait.Poll(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-		p, err := clientset.CoreV1().Pods(orphanPod.Namespace).Get(context.Background(), orphanPod.Name, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		return !hasJobTrackingFinalizer(p), nil
-	}); err != nil {
-		t.Errorf("Waiting for Pod to get the finalizer removed: %v", err)
-	}
-	if jobSynced {
-		t.Error("Tried to sync deleted job")
+			podBuilder := buildPod().name(name).deletionTimestamp().trackingFinalizer()
+			if tc.job != nil {
+				podBuilder = podBuilder.job(tc.job)
+			}
+			orphanPod := podBuilder.Pod
+			orphanPod, err := clientset.CoreV1().Pods("default").Create(context.Background(), orphanPod, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("Creating orphan pod: %v", err)
+			}
+
+			if err := wait.Poll(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+				p, err := clientset.CoreV1().Pods(orphanPod.Namespace).Get(context.Background(), orphanPod.Name, metav1.GetOptions{})
+				if err != nil {
+					return false, err
+				}
+				return !hasJobTrackingFinalizer(p), nil
+			}); err != nil {
+				t.Errorf("Waiting for Pod to get the finalizer removed: %v", err)
+			}
+			if !tc.inCache && jobSynced {
+				t.Error("Tried to sync deleted job")
+			}
+		})
 	}
 }
 

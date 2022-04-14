@@ -384,7 +384,8 @@ func (jm *Controller) deletePod(obj interface{}, final bool) {
 		return
 	}
 	job := jm.resolveControllerRef(pod.Namespace, controllerRef)
-	if job == nil {
+	if job == nil || IsJobFinished(job) {
+		// syncJob will not remove this finalizer.
 		if hasFinalizer {
 			jm.enqueueOrphanPod(pod)
 		}
@@ -585,7 +586,7 @@ func (jm Controller) syncOrphanPod(ctx context.Context, key string) error {
 	// Make sure the pod is still orphaned.
 	if controllerRef := metav1.GetControllerOf(sharedPod); controllerRef != nil {
 		job := jm.resolveControllerRef(sharedPod.Namespace, controllerRef)
-		if job != nil {
+		if job != nil && !IsJobFinished(job) {
 			// The pod was adopted. Do not remove finalizer.
 			return nil
 		}
