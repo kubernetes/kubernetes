@@ -55,17 +55,18 @@ dependencies:
 
   # etcd
   - name: "etcd"
-    version: 3.5.1
+    version: 3.5.3
     refPaths:
     - path: cluster/gce/manifests/etcd.manifest
       match: etcd_docker_tag|etcd_version
     - path: cluster/gce/upgrade-aliases.sh
       match: ETCD_IMAGE|ETCD_VERSION
     - path: cmd/kubeadm/app/constants/constants.go
+      match: DefaultEtcdVersion =
     - path: hack/lib/etcd.sh
       match: ETCD_VERSION=
     - path: staging/src/k8s.io/sample-apiserver/artifacts/example/deployment.yaml
-      match: quay.io/coreos/etcd
+      match: gcr.io/etcd-development/etcd
     - path: test/e2e/framework/nodes_util.go
       match: const etcdImage
     - path: test/utils/image/manifest.go
