@@ -276,12 +276,18 @@ func (f *ConfigFlags) toDiscoveryClient() (discovery.CachedDiscoveryInterface, e
 	config.QPS = f.discoveryQPS
 
 	cacheDir := defaultCacheDir
+	if kcd := os.Getenv("KUBECACHEDIR"); kcd != "" {
+		cacheDir = kcd
+	}
 
 	// retrieve a user-provided value for the "cache-dir"
 	// override httpCacheDir and discoveryCacheDir if user-value is given.
-	if f.CacheDir != nil {
+	// user-provided value has higher precedence than default
+	// and KUBECACHEDIR environment variable.
+	if f.CacheDir != nil && *f.CacheDir != "" {
 		cacheDir = *f.CacheDir
 	}
+
 	httpCacheDir := filepath.Join(cacheDir, "http")
 	discoveryCacheDir := computeDiscoverCacheDir(filepath.Join(cacheDir, "discovery"), config.Host)
 
@@ -420,7 +426,7 @@ func NewConfigFlags(usePersistentConfig bool) *ConfigFlags {
 		Timeout:    utilpointer.String("0"),
 		KubeConfig: utilpointer.String(""),
 
-		CacheDir:         utilpointer.String(defaultCacheDir),
+		CacheDir:         utilpointer.String(""),
 		ClusterName:      utilpointer.String(""),
 		AuthInfoName:     utilpointer.String(""),
 		Context:          utilpointer.String(""),
