@@ -21,6 +21,8 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/util/sets"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	v1 "k8s.io/api/core/v1"
@@ -78,6 +80,7 @@ func TestVolumeBinding(t *testing.T) {
 		pvs                     []*v1.PersistentVolume
 		fts                     feature.Features
 		args                    *config.VolumeBindingArgs
+		wantPreFilterResult     *framework.PreFilterResult
 		wantPreFilterStatus     *framework.Status
 		wantStateAfterPreFilter *stateData
 		wantFilterStatus        []*framework.Status
@@ -111,12 +114,16 @@ func TestVolumeBinding(t *testing.T) {
 			pvs: []*v1.PersistentVolume{
 				makePV("pv-a", waitSC.Name).withPhase(v1.VolumeAvailable).PersistentVolume,
 			},
+			wantPreFilterResult: &framework.PreFilterResult{
+				NodeNames: sets.NewString("node-a"),
+			},
 			wantStateAfterPreFilter: &stateData{
 				boundClaims: []*v1.PersistentVolumeClaim{
 					makePVC("pvc-a", waitSC.Name).withBoundPV("pv-a").PersistentVolumeClaim,
 				},
-				claimsToBind:     []*v1.PersistentVolumeClaim{},
-				podVolumesByNode: map[string]*PodVolumes{},
+				claimsToBind:          []*v1.PersistentVolumeClaim{},
+				skipNodeAffinityCheck: true,
+				podVolumesByNode:      map[string]*PodVolumes{},
 			},
 			wantFilterStatus: []*framework.Status{
 				nil,
@@ -653,9 +660,12 @@ func TestVolumeBinding(t *testing.T) {
 			state := framework.NewCycleState()
 
 			t.Logf("Verify: call PreFilter and check status")
-			_, gotPreFilterStatus := p.PreFilter(ctx, state, item.pod)
+			gotPreFilterResult, gotPreFilterStatus := p.PreFilter(ctx, state, item.pod)
 			if !reflect.DeepEqual(gotPreFilterStatus, item.wantPreFilterStatus) {
 				t.Errorf("filter prefilter status does not match: %v, want: %v", gotPreFilterStatus, item.wantPreFilterStatus)
+			}
+			if !reflect.DeepEqual(gotPreFilterResult, item.wantPreFilterResult) {
+				t.Errorf("filter prefilter result does not match: %v, want: %v", gotPreFilterResult, item.wantPreFilterResult)
 			}
 			if !gotPreFilterStatus.IsSuccess() {
 				// scheduler framework will skip Filter if PreFilter fails

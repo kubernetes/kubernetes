@@ -50,10 +50,11 @@ const (
 // framework.CycleState, in the later phases we don't need to call Write method
 // to update the value
 type stateData struct {
-	skip         bool // set true if pod does not have PVCs
-	boundClaims  []*v1.PersistentVolumeClaim
-	claimsToBind []*v1.PersistentVolumeClaim
-	allBound     bool
+	skip                  bool // set true if pod does not have PVCs
+	boundClaims           []*v1.PersistentVolumeClaim
+	claimsToBind          []*v1.PersistentVolumeClaim
+	allBound              bool
+	skipNodeAffinityCheck bool
 	// podVolumesByNode holds the pod's volume information found in the Filter
 	// phase for each node
 	// it's initialized in the PreFilter phase
@@ -185,8 +186,24 @@ func (pl *VolumeBinding) PreFilter(ctx context.Context, state *framework.CycleSt
 		status.AppendReason("pod has unbound immediate PersistentVolumeClaims")
 		return nil, status
 	}
-	state.Write(stateKey, &stateData{boundClaims: boundClaims, claimsToBind: claimsToBind, podVolumesByNode: make(map[string]*PodVolumes)})
-	return nil, nil
+
+	// Attempt to reduce down the number of nodes to consider in subsequent scheduling stages if pod has bound claims.
+	var result *framework.PreFilterResult
+	skipNodeAffinityCheck := false
+	nodes, err := pl.Binder.GetEligibleNodes(boundClaims)
+	if err == nil && len(nodes) > 0 {
+		result = &framework.PreFilterResult{
+			NodeNames: nodes,
+		}
+		skipNodeAffinityCheck = true
+	}
+	state.Write(stateKey, &stateData{
+		boundClaims:           boundClaims,
+		claimsToBind:          claimsToBind,
+		skipNodeAffinityCheck: skipNodeAffinityCheck,
+		podVolumesByNode:      make(map[string]*PodVolumes),
+	})
+	return result, nil
 }
 
 // PreFilterExtensions returns prefilter extensions, pod add and remove.
@@ -236,7 +253,7 @@ func (pl *VolumeBinding) Filter(ctx context.Context, cs *framework.CycleState, p
 		return nil
 	}
 
-	podVolumes, reasons, err := pl.Binder.FindPodVolumes(pod, state.boundClaims, state.claimsToBind, node)
+	podVolumes, reasons, err := pl.Binder.FindPodVolumes(pod, state.boundClaims, state.claimsToBind, node, state.skipNodeAffinityCheck)
 
 	if err != nil {
 		return framework.AsStatus(err)

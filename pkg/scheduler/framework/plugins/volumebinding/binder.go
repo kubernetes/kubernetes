@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -28,6 +29,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/storage/etcd3"
@@ -37,6 +39,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/component-helpers/storage/ephemeral"
 	"k8s.io/component-helpers/storage/volume"
 	csitrans "k8s.io/csi-translation-lib"
@@ -126,6 +129,8 @@ type InTreeToCSITranslator interface {
 // 1. The scheduler takes a Pod off the scheduler queue and processes it serially:
 //    a. Invokes all pre-filter plugins for the pod. GetPodVolumes() is invoked
 //    here, pod volume information will be saved in current scheduling cycle state for later use.
+//    If pod has bound immediate PVCs, GetEligibleNodes() is invoked to potentially reduce
+//    down the list of eligible nodes based on the bound PV's NodeAffinity (if any).
 //    b. Invokes all filter plugins, parallelized across nodes.  FindPodVolumes() is invoked here.
 //    c. Invokes all score plugins.  Future/TBD
 //    d. Selects the best node for the Pod.
@@ -148,10 +153,15 @@ type SchedulerVolumeBinder interface {
 	// and unbound with immediate binding (including prebound)
 	GetPodVolumes(pod *v1.Pod) (boundClaims, unboundClaimsDelayBinding, unboundClaimsImmediate []*v1.PersistentVolumeClaim, err error)
 
+	// GetEligibleNodes returns a list of eligible nodes by name based on the bound claims of the pod to reduce down
+	// the list of nodes in subsequent scheduling stages
+	GetEligibleNodes(boundClaims []*v1.PersistentVolumeClaim) (sets.String, error)
+
 	// FindPodVolumes checks if all of a Pod's PVCs can be satisfied by the
 	// node and returns pod's volumes information.
 	//
-	// If a PVC is bound, it checks if the PV's NodeAffinity matches the Node.
+	// If a PVC is bound and PV NodeAffinity check has not been done,
+	// it checks if the PV's NodeAffinity matches the Node.
 	// Otherwise, it tries to find an available PV to bind to the PVC.
 	//
 	// It returns an error when something went wrong or a list of reasons why the node is
@@ -161,7 +171,7 @@ type SchedulerVolumeBinder interface {
 	// for volumes that still need to be created.
 	//
 	// This function is called by the scheduler VolumeBinding plugin and can be called in parallel
-	FindPodVolumes(pod *v1.Pod, boundClaims, claimsToBind []*v1.PersistentVolumeClaim, node *v1.Node) (podVolumes *PodVolumes, reasons ConflictReasons, err error)
+	FindPodVolumes(pod *v1.Pod, boundClaims, claimsToBind []*v1.PersistentVolumeClaim, node *v1.Node, skipNodeAffinityCheck bool) (podVolumes *PodVolumes, reasons ConflictReasons, err error)
 
 	// AssumePodVolumes will:
 	// 1. Take the PV matches for unbound PVCs and update the PV cache assuming
@@ -208,6 +218,8 @@ type volumeBinder struct {
 	csiStorageCapacityLister storagelisters.CSIStorageCapacityLister
 }
 
+var _ SchedulerVolumeBinder = &volumeBinder{}
+
 // CapacityCheck contains additional parameters for NewVolumeBinder that
 // are only needed when checking volume sizes against available storage
 // capacity is desired.
@@ -247,10 +259,68 @@ func NewVolumeBinder(
 	return b
 }
 
+// GetEligibleNodes returns a list of eligible nodes by name based on the bound claims of the pod to reduce down
+// the list of nodes in subsequent scheduling stages
+func (b *volumeBinder) GetEligibleNodes(boundClaims []*v1.PersistentVolumeClaim) (sets.String, error) {
+	eligibleNodes := sets.NewString()
+	lock := sync.RWMutex{}
+	if len(boundClaims) == 0 {
+		return eligibleNodes, nil
+	}
+
+	nodes, err := b.nodeLister.List(labels.Everything())
+	if err != nil {
+		return eligibleNodes, err
+	}
+
+	var errs []error
+	workqueue.ParallelizeUntil(context.TODO(), len(nodes), len(nodes), func(i int) {
+		node := nodes[i]
+
+		csiNode, _ := b.csiNodeLister.Get(node.Name)
+		for _, pvc := range boundClaims {
+			pvName := pvc.Spec.VolumeName
+			pv, err := b.pvCache.GetPV(pvName)
+			if err != nil {
+				if _, ok := err.(*errNotFound); ok {
+					err = nil
+				}
+				errs = append(errs, err)
+				continue
+			}
+
+			pv, err = b.tryTranslatePVToCSI(pv, csiNode)
+			if err != nil {
+				errs = append(errs, err)
+				continue
+			}
+
+			err = volume.CheckNodeAffinity(pv, node.Labels)
+			if err != nil {
+				if err.Error() != "no matching NodeSelectorTerms" {
+					errs = append(errs, err)
+				}
+				continue
+			}
+
+			lock.Lock()
+			eligibleNodes.Insert(node.Name)
+			lock.Unlock()
+		}
+	})
+
+	klog.V(4).InfoS("GetEligibleNodes: reduced down eligible nodes", "nodes", eligibleNodes, "error", errs)
+
+	if len(errs) > 0 {
+		return eligibleNodes, errors.NewAggregate(errs)
+	}
+	return eligibleNodes, nil
+}
+
 // FindPodVolumes finds the matching PVs for PVCs and nodes to provision PVs
-// for the given pod and node. If the node does not fit, confilict reasons are
+// for the given pod and node. If the node does not fit, conflict reasons are
 // returned.
-func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, boundClaims, claimsToBind []*v1.PersistentVolumeClaim, node *v1.Node) (podVolumes *PodVolumes, reasons ConflictReasons, err error) {
+func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, boundClaims, claimsToBind []*v1.PersistentVolumeClaim, node *v1.Node, skipNodeAffinityCheck bool) (podVolumes *PodVolumes, reasons ConflictReasons, err error) {
 	podVolumes = &PodVolumes{}
 
 	// Warning: Below log needs high verbosity as it can be printed several times (#60933).
@@ -305,7 +375,7 @@ func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, boundClaims, claimsToBind []*
 	}()
 
 	// Check PV node affinity on bound volumes
-	if len(boundClaims) > 0 {
+	if len(boundClaims) > 0 && !skipNodeAffinityCheck {
 		boundVolumesSatisfied, boundPVsFound, err = b.checkBoundClaims(boundClaims, node, pod)
 		if err != nil {
 			return

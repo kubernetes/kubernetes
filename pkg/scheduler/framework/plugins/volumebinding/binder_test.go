@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -820,7 +821,7 @@ func checkReasons(t *testing.T, actual, expected ConflictReasons) {
 }
 
 // findPodVolumes gets and finds volumes for given pod and node
-func findPodVolumes(binder SchedulerVolumeBinder, pod *v1.Pod, node *v1.Node) (*PodVolumes, ConflictReasons, error) {
+func findPodVolumes(binder SchedulerVolumeBinder, pod *v1.Pod, node *v1.Node, skipCheckNodeAffinity bool) (*PodVolumes, ConflictReasons, error) {
 	boundClaims, claimsToBind, unboundClaimsImmediate, err := binder.GetPodVolumes(pod)
 	if err != nil {
 		return nil, nil, err
@@ -828,7 +829,7 @@ func findPodVolumes(binder SchedulerVolumeBinder, pod *v1.Pod, node *v1.Node) (*
 	if len(unboundClaimsImmediate) > 0 {
 		return nil, nil, fmt.Errorf("pod has unbound immediate PersistentVolumeClaims")
 	}
-	return binder.FindPodVolumes(pod, boundClaims, claimsToBind, node)
+	return binder.FindPodVolumes(pod, boundClaims, claimsToBind, node, skipCheckNodeAffinity)
 }
 
 func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
@@ -1005,7 +1006,7 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 		}
 
 		// Execute
-		podVolumes, reasons, err := findPodVolumes(testEnv.binder, scenario.pod, testNode)
+		podVolumes, reasons, err := findPodVolumes(testEnv.binder, scenario.pod, testNode, false)
 
 		// Validate
 		if !scenario.shouldFail && err != nil {
@@ -1132,7 +1133,7 @@ func TestFindPodVolumesWithProvisioning(t *testing.T) {
 		}
 
 		// Execute
-		podVolumes, reasons, err := findPodVolumes(testEnv.binder, scenario.pod, testNode)
+		podVolumes, reasons, err := findPodVolumes(testEnv.binder, scenario.pod, testNode, false)
 
 		// Validate
 		if !scenario.shouldFail && err != nil {
@@ -1251,7 +1252,7 @@ func TestFindPodVolumesWithCSIMigration(t *testing.T) {
 		}
 
 		// Execute
-		_, reasons, err := findPodVolumes(testEnv.binder, scenario.pod, node)
+		_, reasons, err := findPodVolumes(testEnv.binder, scenario.pod, node, false)
 
 		// Validate
 		if !scenario.shouldFail && err != nil {
@@ -2128,7 +2129,7 @@ func TestFindAssumeVolumes(t *testing.T) {
 
 	// Execute
 	// 1. Find matching PVs
-	podVolumes, reasons, err := findPodVolumes(testEnv.binder, pod, testNode)
+	podVolumes, reasons, err := findPodVolumes(testEnv.binder, pod, testNode, false)
 	if err != nil {
 		t.Errorf("Test failed: FindPodVolumes returned error: %v", err)
 	}
@@ -2154,7 +2155,7 @@ func TestFindAssumeVolumes(t *testing.T) {
 	// This should always return the original chosen pv
 	// Run this many times in case sorting returns different orders for the two PVs.
 	for i := 0; i < 50; i++ {
-		podVolumes, reasons, err := findPodVolumes(testEnv.binder, pod, testNode)
+		podVolumes, reasons, err := findPodVolumes(testEnv.binder, pod, testNode, false)
 		if err != nil {
 			t.Errorf("Test failed: FindPodVolumes returned error: %v", err)
 		}
@@ -2281,7 +2282,7 @@ func TestCapacity(t *testing.T) {
 			withPVCSVolume(scenario.pvcs).Pod
 
 		// Execute
-		podVolumes, reasons, err := findPodVolumes(testEnv.binder, pod, testNode)
+		podVolumes, reasons, err := findPodVolumes(testEnv.binder, pod, testNode, false)
 
 		// Validate
 		shouldFail := scenario.shouldFail
@@ -2312,5 +2313,96 @@ func TestCapacity(t *testing.T) {
 				t.Run(name, func(t *testing.T) { run(t, scenario, optIn) })
 			}
 		})
+	}
+}
+
+func TestGetEligibleNodes(t *testing.T) {
+	type scenarioType struct {
+		// Inputs
+		pvcs  []*v1.PersistentVolumeClaim
+		pvs   []*v1.PersistentVolume
+		nodes []*v1.Node
+
+		// Expected return values
+		eligibleNodes sets.String
+		shouldFail    bool
+	}
+
+	scenarios := map[string]scenarioType{
+		"no-bound-claims": {},
+		"no-nodes-found": {
+			pvcs: []*v1.PersistentVolumeClaim{
+				preboundPVC,
+				preboundPVCNode1a,
+			},
+		},
+		"pv-not-found": {
+			pvcs: []*v1.PersistentVolumeClaim{
+				preboundPVC,
+				preboundPVCNode1a,
+			},
+			nodes: []*v1.Node{
+				node1,
+			},
+		},
+		"node-affinity-mismatch": {
+			pvcs: []*v1.PersistentVolumeClaim{
+				preboundPVC,
+				preboundPVCNode1a,
+			},
+			pvs: []*v1.PersistentVolume{
+				pvNode1a,
+			},
+			nodes: []*v1.Node{
+				node2,
+			},
+		},
+		"node-affinity-match": {
+			pvcs: []*v1.PersistentVolumeClaim{
+				preboundPVC,
+				preboundPVCNode1a,
+			},
+			pvs: []*v1.PersistentVolume{
+				pvNode1a,
+			},
+			nodes: []*v1.Node{
+				node1,
+				node2,
+			},
+			eligibleNodes: sets.NewString("node1"),
+		},
+	}
+
+	run := func(t *testing.T, scenario scenarioType) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, true)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationGCE, true)()
+
+		// Setup
+		testEnv := newTestBinder(t, ctx.Done())
+		testEnv.initVolumes(scenario.pvs, scenario.pvs)
+
+		testEnv.initNodes(scenario.nodes)
+		testEnv.initClaims(scenario.pvcs, scenario.pvcs)
+
+		// Execute
+		nodes, err := testEnv.binder.GetEligibleNodes(scenario.pvcs)
+
+		// Validate
+		if !scenario.shouldFail && err != nil {
+			t.Errorf("returned error: %v", err)
+		}
+		if scenario.shouldFail && err == nil {
+			t.Error("returned success but expected error")
+		}
+		if !scenario.eligibleNodes.Equal(nodes) {
+			t.Errorf("expected eligible nodes to be: %v, got %v", scenario.eligibleNodes.List(), nodes.List())
+		}
+	}
+
+	for name, scenario := range scenarios {
+		t.Run(name, func(t *testing.T) { run(t, scenario) })
 	}
 }
