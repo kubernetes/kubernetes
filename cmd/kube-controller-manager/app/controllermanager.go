@@ -241,7 +241,7 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 		return err
 	}
 
-	// add a uniquifier so that two processes on the same host don't accidentally both become active
+	// add an uniquifier so that two processes on the same host don't accidentally both become active
 	id = id + "_" + string(uuid.NewUUID())
 
 	// leaderMigrator will be non-nil if and only if Leader Migration is enabled.

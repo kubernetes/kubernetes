@@ -24,7 +24,7 @@ import (
 )
 
 var (
-	// These constants repeats previous HPA behavior
+	// These constants repeat previous HPA behavior
 	scaleUpLimitPercent         int32 = 100
 	scaleUpLimitMinimumPods     int32 = 4
 	scaleUpPeriod               int32 = 15
