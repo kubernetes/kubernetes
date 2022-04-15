@@ -625,28 +625,6 @@ func TestDirectoryBuilder(t *testing.T) {
 	}
 }
 
-func TestFilePatternBuilderWhenPatternYieldsNoResult(t *testing.T) {
-	const pathPattern = "../../artifacts/_does_not_exist_/*.yaml"
-	b := newDefaultBuilder().
-		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{pathPattern}}).
-		NamespaceParam("test").DefaultNamespace()
-
-	test := &testVisitor{}
-	singleItemImplied := false
-
-	err := b.Do().IntoSingleItemImplied(&singleItemImplied).Visit(test.Handle)
-	if err == nil {
-		t.Fatalf("unexpected response: error is nil")
-	}
-	const expectedErrorMsg = "does not exist"
-	if !strings.Contains(err.Error(), expectedErrorMsg) {
-		t.Fatalf("expected %s but got %s", expectedErrorMsg, err.Error())
-	}
-	if !strings.Contains(err.Error(), pathPattern) {
-		t.Fatalf("expected %s but got %s", pathPattern, err.Error())
-	}
-}
-
 func TestFilePatternBuilderWhenFileLiteralExists(t *testing.T) {
 	const pathPattern = "../../artifacts/oddly-named-file[x].yaml"
 	b := newDefaultBuilder().
@@ -662,28 +640,6 @@ func TestFilePatternBuilderWhenFileLiteralExists(t *testing.T) {
 	}
 	if !strings.Contains(test.Infos[0].Source, "oddly-named-file[x]") {
 		t.Errorf("unexpected file name: %#v", test.Infos[0].Source)
-	}
-}
-
-func TestFilePatternBuilderWhenBadPatternUsesRawInput(t *testing.T) {
-	const pathPattern = "../../artifacts/[a-z*.yaml" // missing closing bracket, "[a-z]*.yaml"
-	b := newDefaultBuilder().
-		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{pathPattern}}).
-		NamespaceParam("test").DefaultNamespace()
-
-	test := &testVisitor{}
-	singleItemImplied := false
-
-	err := b.Do().IntoSingleItemImplied(&singleItemImplied).Visit(test.Handle)
-	if err == nil {
-		t.Fatalf("unexpected response: error is nil")
-	}
-	const expectedErrorMsg = "syntax error in pattern"
-	if !strings.Contains(err.Error(), expectedErrorMsg) {
-		t.Fatalf("expected %s but got %s", expectedErrorMsg, err.Error())
-	}
-	if !strings.Contains(err.Error(), pathPattern) {
-		t.Fatalf("expected %s but got %s", pathPattern, err.Error())
 	}
 }
 
@@ -709,30 +665,39 @@ func TestFilePatternBuilder(t *testing.T) {
 
 func TestErrorFilePatternBuilder(t *testing.T) {
 	testCases := map[string]struct {
-		input       []string
-		expectedErr string
+		input        string
+		expectedErr  string
+		inputInError bool
 	}{
 		"invalid pattern": {
-			input:       []string{"[a-z*.yaml"},
-			expectedErr: "syntax error in pattern",
+			input:        "[a-z*.yaml",
+			expectedErr:  "syntax error in pattern",
+			inputInError: true,
 		},
 		"file does not exist": {
-			input:       []string{"../../artifacts/guestbook/notexist.yaml"},
-			expectedErr: "does not exist",
+			input:        "../../artifacts/guestbook/notexist.yaml",
+			expectedErr:  "does not exist",
+			inputInError: true,
+		},
+		"directory does not exist and valid glob": {
+			input:        "../../artifacts/_does_not_exist_/*.yaml",
+			expectedErr:  "does not exist",
+			inputInError: true,
 		},
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			b := newDefaultBuilder().
-				FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: tc.input}).
+				FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{tc.input}}).
 				NamespaceParam("test").DefaultNamespace()
 
 			test := &testVisitor{}
 			singleItemImplied := false
 
 			err := b.Do().IntoSingleItemImplied(&singleItemImplied).Visit(test.Handle)
-			if err == nil || len(test.Infos) != 0 || !strings.Contains(err.Error(), tc.expectedErr) {
-				t.Fatalf("unexpected response: %v %#v", err, test.Infos)
+			if err == nil || len(test.Infos) != 0 || !strings.Contains(err.Error(), tc.expectedErr) ||
+				(tc.inputInError && !strings.Contains(err.Error(), tc.input)) {
+				t.Errorf("unexpected response: %v %#v", err, test.Infos)
 			}
 		})
 	}
