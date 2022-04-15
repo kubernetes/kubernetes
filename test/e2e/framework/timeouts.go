@@ -25,6 +25,7 @@ const (
 	podStartSlowTimeout              = 15 * time.Minute
 	podDeleteTimeout                 = 5 * time.Minute
 	podListTimeout                   = time.Minute
+	podEventTimeout                  = 2 * time.Minute
 	claimProvisionTimeout            = 5 * time.Minute
 	claimProvisionShortTimeout       = 1 * time.Minute
 	dataSourceProvisionTimeout       = 5 * time.Minute
@@ -57,6 +58,9 @@ type TimeoutContext struct {
 
 	// PodList is how long to wait for the pod to be listable.
 	PodList time.Duration
+
+	// PodEventTimeout is how much we wait for a pod event to occur.
+	PodEvent time.Duration
 
 	// ClaimProvision is how long claims have to become dynamically provisioned.
 	ClaimProvision time.Duration
@@ -103,6 +107,7 @@ func NewTimeoutContextWithDefaults() *TimeoutContext {
 		PodStartSlow:              podStartSlowTimeout,
 		PodDelete:                 podDeleteTimeout,
 		PodList:                   podListTimeout,
+		PodEvent:                  podEventTimeout,
 		ClaimProvision:            claimProvisionTimeout,
 		ClaimProvisionShort:       claimProvisionShortTimeout,
 		DataSourceProvision:       dataSourceProvisionTimeout,

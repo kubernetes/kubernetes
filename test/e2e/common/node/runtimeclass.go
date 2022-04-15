@@ -70,7 +70,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 			"reason":                   events.FailedCreatePodSandBox,
 		}.AsSelector().String()
 		// Events are unreliable, don't depend on the event. It's used only to speed up the test.
-		err := e2eevents.WaitTimeoutForEvent(f.ClientSet, f.Namespace.Name, eventSelector, handler, framework.PodEventTimeout)
+		err := e2eevents.WaitTimeoutForEvent(f.ClientSet, f.Namespace.Name, eventSelector, handler, f.Timeouts.PodEvent)
 		if err != nil {
 			framework.Logf("Warning: did not get event about FailedCreatePodSandBox. Err: %v", err)
 		}

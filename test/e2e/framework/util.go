@@ -89,9 +89,6 @@ const (
 	// PodGetTimeout is how long to wait for a pod to be got.
 	PodGetTimeout = 2 * time.Minute
 
-	// PodEventTimeout is how much we wait for a pod event to occur.
-	PodEventTimeout = 2 * time.Minute
-
 	// ServiceStartTimeout is how long to wait for a service endpoint to be resolvable.
 	ServiceStartTimeout = 3 * time.Minute
 

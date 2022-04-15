@@ -313,7 +313,7 @@ var _ = SIGDescribe("Probing container", func() {
 			"reason":                   events.ContainerProbeWarning,
 		}.AsSelector().String()
 		framework.ExpectNoError(e2eevents.WaitTimeoutForEvent(
-			f.ClientSet, f.Namespace.Name, expectedEvent, "Probe terminated redirects, Response body: <a href=\"http://0.0.0.0/\">Found</a>.", framework.PodEventTimeout))
+			f.ClientSet, f.Namespace.Name, expectedEvent, "Probe terminated redirects, Response body: <a href=\"http://0.0.0.0/\">Found</a>.", f.Timeouts.PodEvent))
 	})
 
 	/*
