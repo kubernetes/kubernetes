@@ -165,7 +165,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		e2epod.SetNodeSelection(&serverPod1.Spec, nodeSelection)
 		fr.PodClient().CreateSync(serverPod1)
 
-		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{podBackend1: {80}})
+		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{podBackend1: {80}}, fr.Timeouts.ServiceStart)
 
 		// Note that the fact that Endpoints object already exists, does NOT mean
 		// that iptables (or whatever else is used) was already programmed.
@@ -192,7 +192,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		framework.Logf("Cleaning up %s pod", podBackend1)
 		fr.PodClient().DeleteSync(podBackend1, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
 
-		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{podBackend2: {80}})
+		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{podBackend2: {80}}, fr.Timeouts.ServiceStart)
 
 		// Check that the second pod keeps receiving traffic
 		// UDP conntrack entries timeout is 30 sec by default
@@ -241,7 +241,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		e2epod.SetNodeSelection(&serverPod1.Spec, nodeSelection)
 		fr.PodClient().CreateSync(serverPod1)
 
-		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{podBackend1: {80}})
+		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{podBackend1: {80}}, fr.Timeouts.ServiceStart)
 
 		// Note that the fact that Endpoints object already exists, does NOT mean
 		// that iptables (or whatever else is used) was already programmed.
@@ -268,7 +268,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		framework.Logf("Cleaning up %s pod", podBackend1)
 		fr.PodClient().DeleteSync(podBackend1, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
 
-		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{podBackend2: {80}})
+		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{podBackend2: {80}}, fr.Timeouts.ServiceStart)
 
 		// Check that the second pod keeps receiving traffic
 		// UDP conntrack entries timeout is 30 sec by default
@@ -337,7 +337,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		fr.PodClient().CreateSync(serverPod1)
 
 		// wait until the endpoints are ready
-		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{podBackend1: {80}})
+		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{podBackend1: {80}}, fr.Timeouts.ServiceStart)
 
 		// Note that the fact that Endpoints object already exists, does NOT mean
 		// that iptables (or whatever else is used) was already programmed.

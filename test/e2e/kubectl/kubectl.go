@@ -1318,13 +1318,13 @@ metadata:
 
 			ginkgo.By("exposing RC")
 			framework.RunKubectlOrDie(ns, "expose", "rc", "agnhost-primary", "--name=rm2", "--port=1234", fmt.Sprintf("--target-port=%d", agnhostPort))
-			e2enetwork.WaitForService(c, ns, "rm2", true, framework.Poll, framework.ServiceStartTimeout)
-			validateService("rm2", 1234, framework.ServiceStartTimeout)
+			e2enetwork.WaitForService(c, ns, "rm2", true, framework.Poll, f.Timeouts.ServiceStart)
+			validateService("rm2", 1234, f.Timeouts.ServiceStart)
 
 			ginkgo.By("exposing service")
 			framework.RunKubectlOrDie(ns, "expose", "service", "rm2", "--name=rm3", "--port=2345", fmt.Sprintf("--target-port=%d", agnhostPort))
-			e2enetwork.WaitForService(c, ns, "rm3", true, framework.Poll, framework.ServiceStartTimeout)
-			validateService("rm3", 2345, framework.ServiceStartTimeout)
+			e2enetwork.WaitForService(c, ns, "rm3", true, framework.Poll, f.Timeouts.ServiceStart)
+			validateService("rm3", 2345, f.Timeouts.ServiceStart)
 		})
 	})
 

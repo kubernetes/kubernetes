@@ -105,7 +105,7 @@ var _ = common.SIGDescribe("ClusterDns [Feature:Example]", func() {
 		// wait for objects
 		for _, ns := range namespaces {
 			e2eresource.WaitForControlledPodsRunning(c, ns.Name, backendName, api.Kind("ReplicationController"))
-			e2enetwork.WaitForService(c, ns.Name, backendName, true, framework.Poll, framework.ServiceStartTimeout)
+			e2enetwork.WaitForService(c, ns.Name, backendName, true, framework.Poll, f.Timeouts.ServiceStart)
 		}
 		// it is not enough that pods are running because they may be set to running, but
 		// the application itself may have not been initialized. Just query the application.

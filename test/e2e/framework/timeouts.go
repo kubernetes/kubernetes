@@ -38,6 +38,7 @@ const (
 	snapshotCreateTimeout            = 5 * time.Minute
 	snapshotDeleteTimeout            = 5 * time.Minute
 	snapshotControllerMetricsTimeout = 5 * time.Minute
+	serviceStartTimeout              = 3 * time.Minute
 )
 
 // TimeoutContext contains timeout settings for several actions.
@@ -97,6 +98,9 @@ type TimeoutContext struct {
 
 	// SnapshotControllerMetrics is how long to wait for snapshot controller metrics.
 	SnapshotControllerMetrics time.Duration
+
+	// ServiceStartTimeout is how long to wait for a service endpoint to be resolvable.
+	ServiceStart time.Duration
 }
 
 // NewTimeoutContextWithDefaults returns a TimeoutContext with default values.
@@ -120,5 +124,6 @@ func NewTimeoutContextWithDefaults() *TimeoutContext {
 		SnapshotCreate:            snapshotCreateTimeout,
 		SnapshotDelete:            snapshotDeleteTimeout,
 		SnapshotControllerMetrics: snapshotControllerMetricsTimeout,
+		ServiceStart:              serviceStartTimeout,
 	}
 }
