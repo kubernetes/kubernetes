@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -80,6 +81,12 @@ type Grabber struct {
 	waitForSnapshotControllerReadyOnce sync.Once
 }
 
+type componentInfo struct {
+	Name string
+	Port int
+	IP   string
+}
+
 // NewMetricsGrabber prepares for grabbing metrics data from several different
 // components. It should be called when those components are running because
 // it needs to communicate with them to determine for which components
@@ -101,6 +108,47 @@ func NewMetricsGrabber(c clientset.Interface, ec clientset.Interface, config *re
 	if (scheduler || controllers) && config == nil {
 		return nil, errors.New("a rest config is required for grabbing kube-controller and kube-controller-manager metrics")
 	}
+
+	var infos []componentInfo
+	// The component pods might take some time to show up.
+	err := wait.PollImmediate(time.Second*5, time.Minute*5, func() (bool, error) {
+		podList, err := c.CoreV1().Pods(metav1.NamespaceSystem).List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			return false, fmt.Errorf("list pods in ns %s: %w", metav1.NamespaceSystem, err)
+		}
+		var foundComponents []componentInfo
+		for _, pod := range podList.Items {
+			if len(pod.Status.PodIP) == 0 {
+				continue
+			}
+			switch {
+			case strings.HasPrefix(pod.Name, "kube-scheduler-"):
+				foundComponents = append(foundComponents, componentInfo{
+					Name: pod.Name,
+					Port: kubeSchedulerPort,
+					IP:   pod.Status.PodIP,
+				})
+			case strings.HasPrefix(pod.Name, "kube-controller-manager-"):
+				foundComponents = append(foundComponents, componentInfo{
+					Name: pod.Name,
+					Port: kubeControllerManagerPort,
+					IP:   pod.Status.PodIP,
+				})
+			}
+		}
+		if len(foundComponents) != 2 {
+			klog.Infof("Only %d components found. Will retry.", len(foundComponents))
+			klog.Infof("Found components: %v", foundComponents)
+			return false, nil
+		}
+		infos = foundComponents
+		return true, nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("missing component pods: %w", err)
+	}
+
+	klog.Infof("Found components: %v", infos)
 
 	podList, err := c.CoreV1().Pods(metav1.NamespaceSystem).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
