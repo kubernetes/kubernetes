@@ -383,7 +383,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 		}
 		message, annotations := evictionMessage(resourceToReclaim, pod, statsFunc)
 		if m.evictPod(pod, gracePeriodOverride, message, annotations) {
-			metrics.Evictions.WithLabelValues(string(thresholdToReclaim.Signal)).Inc()
+			metrics.Evictions.WithLabelValues(string(thresholdToReclaim.Signal), pod.Namespace).Inc()
 			return []*v1.Pod{pod}
 		}
 	}
@@ -489,7 +489,7 @@ func (m *managerImpl) emptyDirLimitEviction(podStats statsapi.PodStats, pod *v1.
 			if used != nil && size != nil && size.Sign() == 1 && used.Cmp(*size) > 0 {
 				// the emptyDir usage exceeds the size limit, evict the pod
 				if m.evictPod(pod, 0, fmt.Sprintf(emptyDirMessageFmt, pod.Spec.Volumes[i].Name, size.String()), nil) {
-					metrics.Evictions.WithLabelValues(signalEmptyDirFsLimit).Inc()
+					metrics.Evictions.WithLabelValues(signalEmptyDirFsLimit, pod.Namespace).Inc()
 					return true
 				}
 				return false
@@ -516,7 +516,7 @@ func (m *managerImpl) podEphemeralStorageLimitEviction(podStats statsapi.PodStat
 	if podEphemeralStorageTotalUsage.Cmp(podEphemeralStorageLimit) > 0 {
 		// the total usage of pod exceeds the total size limit of containers, evict the pod
 		if m.evictPod(pod, 0, fmt.Sprintf(podEphemeralStorageMessageFmt, podEphemeralStorageLimit.String()), nil) {
-			metrics.Evictions.WithLabelValues(signalEphemeralPodFsLimit).Inc()
+			metrics.Evictions.WithLabelValues(signalEphemeralPodFsLimit, pod.Namespace).Inc()
 			return true
 		}
 		return false
@@ -542,7 +542,7 @@ func (m *managerImpl) containerEphemeralStorageLimitEviction(podStats statsapi.P
 		if ephemeralStorageThreshold, ok := thresholdsMap[containerStat.Name]; ok {
 			if ephemeralStorageThreshold.Cmp(*containerUsed) < 0 {
 				if m.evictPod(pod, 0, fmt.Sprintf(containerEphemeralStorageMessageFmt, containerStat.Name, ephemeralStorageThreshold.String()), nil) {
-					metrics.Evictions.WithLabelValues(signalEphemeralContainerFsLimit).Inc()
+					metrics.Evictions.WithLabelValues(signalEphemeralContainerFsLimit, pod.Namespace).Inc()
 					return true
 				}
 				return false

@@ -241,7 +241,7 @@ var (
 			Help:           "Cumulative number of pod evictions by eviction signal",
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"eviction_signal"},
+		[]string{"eviction_signal", "namespace"},
 	)
 	// EvictionStatsAge is a Histogram that tracks the time (in seconds) between when stats are collected and when a pod is evicted
 	// based on those stats. Broken down by eviction signal.
