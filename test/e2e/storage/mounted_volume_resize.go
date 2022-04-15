@@ -134,7 +134,7 @@ var _ = utils.SIGDescribe("Mounted volume expand [Feature:StorageProvider]", fun
 
 		// PVC should be bound at this point
 		ginkgo.By("Checking for bound PVC")
-		pvs, err := e2epv.WaitForPVClaimBoundPhase(c, pvcClaims, framework.ClaimProvisionTimeout)
+		pvs, err := e2epv.WaitForPVClaimBoundPhase(c, pvcClaims, f.Timeouts.ClaimProvision)
 		framework.ExpectNoError(err, "Failed waiting for PVC to be bound %v", err)
 		framework.ExpectEqual(len(pvs), 1)
 

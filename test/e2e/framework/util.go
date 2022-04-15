@@ -111,9 +111,6 @@ const (
 	// PodReadyBeforeTimeout is how long pods have to be "ready" when a test begins.
 	PodReadyBeforeTimeout = 5 * time.Minute
 
-	// ClaimProvisionTimeout is how long claims have to become dynamically provisioned.
-	ClaimProvisionTimeout = 5 * time.Minute
-
 	// RestartNodeReadyAgainTimeout is how long a node is allowed to become "Ready" after it is restarted before
 	// the test is considered failed.
 	RestartNodeReadyAgainTimeout = 5 * time.Minute

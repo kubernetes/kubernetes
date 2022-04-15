@@ -86,7 +86,7 @@ func (t *VolumeModeDowngradeTest) Setup(f *framework.Framework) {
 	t.pvc, err = e2epv.CreatePVC(cs, ns, t.pvc)
 	framework.ExpectNoError(err)
 
-	err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, cs, ns, t.pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
+	err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, cs, ns, t.pvc.Name, framework.Poll, f.Timeouts.ClaimProvision)
 	framework.ExpectNoError(err)
 
 	t.pvc, err = cs.CoreV1().PersistentVolumeClaims(t.pvc.Namespace).Get(context.TODO(), t.pvc.Name, metav1.GetOptions{})

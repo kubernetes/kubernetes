@@ -235,7 +235,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				},
 			}
 		case pvcReference:
-			class, claim, pod = startPausePod(f.ClientSet, scTest, nodeSelection, m.tp.scName, f.Namespace.Name)
+			class, claim, pod = startPausePod(f.ClientSet, scTest, nodeSelection, m.tp.scName, f.Namespace.Name, f.Timeouts.ClaimProvision)
 			if class != nil {
 				m.sc[class.Name] = class
 			}
@@ -272,7 +272,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			AllowVolumeExpansion: m.tp.enableResizing,
 		}
 
-		class, claim, pod := startBusyBoxPod(f.ClientSet, scTest, nodeSelection, m.tp.scName, f.Namespace.Name, fsGroup)
+		class, claim, pod := startBusyBoxPod(f.ClientSet, scTest, nodeSelection, m.tp.scName, f.Namespace.Name, fsGroup, f.Timeouts.ClaimProvision)
 
 		if class != nil {
 			m.sc[class.Name] = class
@@ -920,7 +920,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 					return
 				}
 				// Wait for PVC to get bound to make sure the CSI driver is fully started.
-				err := e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, f.ClientSet, f.Namespace.Name, claim.Name, time.Second, framework.ClaimProvisionTimeout)
+				err := e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, f.ClientSet, f.Namespace.Name, claim.Name, time.Second, f.Timeouts.ClaimProvision)
 				framework.ExpectNoError(err, "while waiting for PVC to get provisioned")
 
 				ginkgo.By("Waiting for expected CSI calls")
@@ -1058,7 +1058,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 					return
 				}
 				// Wait for PVC to get bound to make sure the CSI driver is fully started.
-				err := e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, f.ClientSet, f.Namespace.Name, claim.Name, time.Second, framework.ClaimProvisionTimeout)
+				err := e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, f.ClientSet, f.Namespace.Name, claim.Name, time.Second, f.Timeouts.ClaimProvision)
 				framework.ExpectNoError(err, "while waiting for PVC to get provisioned")
 				err = e2epod.WaitForPodNameRunningInNamespace(m.cs, pod.Name, pod.Namespace)
 				framework.ExpectNoError(err, "while waiting for the first pod to start")
@@ -2117,7 +2117,7 @@ func createSC(cs clientset.Interface, t testsuites.StorageClassTest, scName, ns 
 	return class
 }
 
-func createClaim(cs clientset.Interface, t testsuites.StorageClassTest, node e2epod.NodeSelection, scName, ns string) (*storagev1.StorageClass, *v1.PersistentVolumeClaim) {
+func createClaim(cs clientset.Interface, t testsuites.StorageClassTest, node e2epod.NodeSelection, scName, ns string, timeout time.Duration) (*storagev1.StorageClass, *v1.PersistentVolumeClaim) {
 	class := createSC(cs, t, scName, ns)
 	claim := e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 		ClaimSize:        t.ClaimSize,
@@ -2129,22 +2129,22 @@ func createClaim(cs clientset.Interface, t testsuites.StorageClassTest, node e2e
 
 	if !t.DelayBinding {
 		pvcClaims := []*v1.PersistentVolumeClaim{claim}
-		_, err = e2epv.WaitForPVClaimBoundPhase(cs, pvcClaims, framework.ClaimProvisionTimeout)
+		_, err = e2epv.WaitForPVClaimBoundPhase(cs, pvcClaims, timeout)
 		framework.ExpectNoError(err, "Failed waiting for PVC to be bound: %v", err)
 	}
 	return class, claim
 }
 
-func startPausePod(cs clientset.Interface, t testsuites.StorageClassTest, node e2epod.NodeSelection, scName, ns string) (*storagev1.StorageClass, *v1.PersistentVolumeClaim, *v1.Pod) {
-	class, claim := createClaim(cs, t, node, scName, ns)
+func startPausePod(cs clientset.Interface, t testsuites.StorageClassTest, node e2epod.NodeSelection, scName, ns string, timeout time.Duration) (*storagev1.StorageClass, *v1.PersistentVolumeClaim, *v1.Pod) {
+	class, claim := createClaim(cs, t, node, scName, ns, timeout)
 
 	pod, err := startPausePodWithClaim(cs, claim, node, ns)
 	framework.ExpectNoError(err, "Failed to create pause pod: %v", err)
 	return class, claim, pod
 }
 
-func startBusyBoxPod(cs clientset.Interface, t testsuites.StorageClassTest, node e2epod.NodeSelection, scName, ns string, fsGroup *int64) (*storagev1.StorageClass, *v1.PersistentVolumeClaim, *v1.Pod) {
-	class, claim := createClaim(cs, t, node, scName, ns)
+func startBusyBoxPod(cs clientset.Interface, t testsuites.StorageClassTest, node e2epod.NodeSelection, scName, ns string, fsGroup *int64, timeout time.Duration) (*storagev1.StorageClass, *v1.PersistentVolumeClaim, *v1.Pod) {
+	class, claim := createClaim(cs, t, node, scName, ns, timeout)
 	pod, err := startBusyBoxPodWithClaim(cs, claim, node, ns, fsGroup)
 	framework.ExpectNoError(err, "Failed to create busybox pod: %v", err)
 	return class, claim, pod

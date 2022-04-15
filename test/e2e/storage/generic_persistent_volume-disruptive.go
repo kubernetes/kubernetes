@@ -106,7 +106,7 @@ func createPodPVCFromSC(f *framework.Framework, c clientset.Interface, ns string
 	pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(context.TODO(), pvc, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "Error creating pvc")
 	pvcClaims := []*v1.PersistentVolumeClaim{pvc}
-	pvs, err := e2epv.WaitForPVClaimBoundPhase(c, pvcClaims, framework.ClaimProvisionTimeout)
+	pvs, err := e2epv.WaitForPVClaimBoundPhase(c, pvcClaims, f.Timeouts.ClaimProvision)
 	framework.ExpectNoError(err, "Failed waiting for PVC to be bound %v", err)
 	framework.ExpectEqual(len(pvs), 1)
 
