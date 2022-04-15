@@ -86,9 +86,6 @@ const (
 
 // DEPRECATED constants. Use the timeouts in framework.Framework instead.
 const (
-	// PodListTimeout is how long to wait for the pod to be listable.
-	PodListTimeout = time.Minute
-
 	// PodStartTimeout is how long to wait for the pod to be started.
 	PodStartTimeout = 5 * time.Minute
 

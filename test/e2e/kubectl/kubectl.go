@@ -826,7 +826,7 @@ metadata:
 				WithStdinReader(stdin).
 				ExecOrDie(ns)
 			ginkgo.By("checking the result")
-			forEachReplicationController(c, ns, "app", "agnhost", validateReplicationControllerConfiguration)
+			forEachReplicationController(c, ns, "app", "agnhost", f.Timeouts.PodList, validateReplicationControllerConfiguration)
 		})
 		ginkgo.It("should reuse port when apply to an existing SVC", func() {
 			serviceJSON := readTestFileOrDie(agnhostServiceFilename)
@@ -2053,10 +2053,10 @@ func modifyReplicationControllerConfiguration(contents string) io.Reader {
 	return bytes.NewReader(data)
 }
 
-func forEachReplicationController(c clientset.Interface, ns, selectorKey, selectorValue string, fn func(v1.ReplicationController)) {
+func forEachReplicationController(c clientset.Interface, ns, selectorKey, selectorValue string, podListTimeout time.Duration, fn func(v1.ReplicationController)) {
 	var rcs *v1.ReplicationControllerList
 	var err error
-	for t := time.Now(); time.Since(t) < framework.PodListTimeout; time.Sleep(framework.Poll) {
+	for t := time.Now(); time.Since(t) < podListTimeout; time.Sleep(framework.Poll) {
 		label := labels.SelectorFromSet(labels.Set(map[string]string{selectorKey: selectorValue}))
 		options := metav1.ListOptions{LabelSelector: label.String()}
 		rcs, err = c.CoreV1().ReplicationControllers(ns).List(context.TODO(), options)
