@@ -120,12 +120,6 @@ func RunE2ETests(t *testing.T) {
 	// Stream the progress to stdout and optionally a URL accepting progress updates.
 	r = append(r, e2ereporters.NewProgressReporter(framework.TestContext.ProgressReportURL))
 
-	// The DetailsRepoerter will output details about every test (name, files, lines, etc) which helps
-	// when documenting our tests.
-	if len(framework.TestContext.SpecSummaryOutput) > 0 {
-		r = append(r, e2ereporters.NewDetailsReporterFile(framework.TestContext.SpecSummaryOutput))
-	}
-
 	klog.Infof("Starting e2e run %q on Ginkgo node %d", framework.RunID, config.GinkgoConfig.ParallelNode)
 	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "Kubernetes e2e suite", r)
 }
