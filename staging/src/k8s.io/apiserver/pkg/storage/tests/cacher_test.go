@@ -162,6 +162,31 @@ func updatePod(t *testing.T, s storage.Interface, obj, old *example.Pod) *exampl
 	return result
 }
 
+func TestCreate(t *testing.T) {
+	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
+	defer server.Terminate(t)
+	cacher, _, err := newTestCacher(etcdStorage)
+	if err != nil {
+		t.Fatalf("Couldn't create cacher: %v", err)
+	}
+	defer cacher.Stop()
+
+	checkObject := func(context.Context, *testing.T, storage.Interface, string) {}
+	storagetesting.StorageInterfaceCreateTest(t, cacher, checkObject)
+}
+
+func TestCreateWithTTL(t *testing.T) {
+	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
+	defer server.Terminate(t)
+	cacher, _, err := newTestCacher(etcdStorage)
+	if err != nil {
+		t.Fatalf("Couldn't create cacher: %v", err)
+	}
+	defer cacher.Stop()
+
+	storagetesting.StorageInterfaceCreateWithTTLTest(t, cacher)
+}
+
 func TestGet(t *testing.T) {
 	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
 	defer server.Terminate(t)

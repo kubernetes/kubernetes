@@ -110,37 +110,13 @@ func newPod() runtime.Object {
 }
 
 func TestCreate(t *testing.T) {
-	ctx, store, etcdClient := testSetup(t)
+	_, store, etcdClient := testSetup(t)
+	storagetesting.StorageInterfaceCreateTest(t, store, checkObjectInvariants(etcdClient, store))
+}
 
-	key := "/testkey"
-	out := &example.Pod{}
-	obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", SelfLink: "testlink"}}
-
-	// verify that kv pair is empty before set
-	getResp, err := etcdClient.KV.Get(ctx, key)
-	if err != nil {
-		t.Fatalf("etcdClient.KV.Get failed: %v", err)
-	}
-	if len(getResp.Kvs) != 0 {
-		t.Fatalf("expecting empty result on key: %s", key)
-	}
-
-	err = store.Create(ctx, key, obj, out, 0)
-	if err != nil {
-		t.Fatalf("Set failed: %v", err)
-	}
-	// basic tests of the output
-	if obj.ObjectMeta.Name != out.ObjectMeta.Name {
-		t.Errorf("pod name want=%s, get=%s", obj.ObjectMeta.Name, out.ObjectMeta.Name)
-	}
-	if out.ResourceVersion == "" {
-		t.Errorf("output should have non-empty resource version")
-	}
-	if out.SelfLink != "" {
-		t.Errorf("output should have empty selfLink")
-	}
-
-	checkStorageInvariants(ctx, t, etcdClient, store, key)
+func TestCreateWithTTL(t *testing.T) {
+	_, store, _ := testSetup(t)
+	storagetesting.StorageInterfaceCreateWithTTLTest(t, store)
 }
 
 func checkStorageInvariants(ctx context.Context, t *testing.T, etcdClient *clientv3.Client, store *store, key string) {
@@ -164,32 +140,9 @@ func checkStorageInvariants(ctx context.Context, t *testing.T, etcdClient *clien
 	}
 }
 
-func TestCreateWithTTL(t *testing.T) {
-	ctx, store, _ := testSetup(t)
-
-	input := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
-	key := "/somekey"
-
-	out := &example.Pod{}
-	if err := store.Create(ctx, key, input, out, 1); err != nil {
-		t.Fatalf("Create failed: %v", err)
-	}
-
-	w, err := store.Watch(ctx, key, storage.ListOptions{ResourceVersion: out.ResourceVersion, Predicate: storage.Everything})
-	if err != nil {
-		t.Fatalf("Watch failed: %v", err)
-	}
-	testCheckEventType(t, watch.Deleted, w)
-}
-
-func TestCreateWithKeyExist(t *testing.T) {
-	ctx, store, _ := testSetup(t)
-	obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
-	key, _ := testPropogateStore(ctx, t, store, obj)
-	out := &example.Pod{}
-	err := store.Create(ctx, key, obj, out, 0)
-	if err == nil || !storage.IsExist(err) {
-		t.Errorf("expecting key exists error, but get: %s", err)
+func checkObjectInvariants(etcdClient *clientv3.Client, store *store) storagetesting.ObjectInvariantsFunc {
+	return func(ctx context.Context, t *testing.T, _ storage.Interface, key string) {
+		checkStorageInvariants(ctx, t, etcdClient, store, key)
 	}
 }
 
