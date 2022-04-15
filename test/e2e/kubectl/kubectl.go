@@ -109,9 +109,6 @@ var (
 	httpdImage    = imageutils.GetE2EImage(imageutils.Httpd)
 	busyboxImage  = imageutils.GetE2EImage(imageutils.BusyBox)
 	agnhostImage  = imageutils.GetE2EImage(imageutils.Agnhost)
-
-	// If this suite still flakes due to timeouts we should change this to framework.PodStartTimeout
-	podRunningTimeoutArg = fmt.Sprintf("--pod-running-timeout=%s", framework.PodStartShortTimeout.String())
 )
 
 var proxyRegexp = regexp.MustCompile("Starting to serve on 127.0.0.1:([0-9]+)")
@@ -228,6 +225,8 @@ var _ = SIGDescribe("Kubectl client", func() {
 	f := framework.NewDefaultFramework("kubectl")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
+	// If this suite still flakes due to timeouts we should change this to framework.PodStartTimeout
+	var podRunningTimeoutArg = fmt.Sprintf("--pod-running-timeout=%s", f.Timeouts.PodStartShort.String())
 	// Reusable cluster state function.  This won't be adversely affected by lazy initialization of framework.
 	clusterState := func() *framework.ClusterVerification {
 		return f.NewClusterVerification(

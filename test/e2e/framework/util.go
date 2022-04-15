@@ -86,11 +86,6 @@ const (
 
 // DEPRECATED constants. Use the timeouts in framework.Framework instead.
 const (
-	// PodStartShortTimeout is same as `PodStartTimeout` to wait for the pod to be started, but shorter.
-	// Use it case by case when we are sure pod start will not be delayed.
-	// minutes by slow docker pulls or something else.
-	PodStartShortTimeout = 2 * time.Minute
-
 	// PodDeleteTimeout is how long to wait for a pod to be deleted.
 	PodDeleteTimeout = 5 * time.Minute
 

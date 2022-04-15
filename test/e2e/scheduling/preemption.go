@@ -193,7 +193,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 				Requests: podRes,
 				Limits:   podRes,
 			},
-		}, framework.PodStartShortTimeout)
+		}, f.Timeouts.PodStartShort)
 
 		preemptedPod, err := cs.CoreV1().Pods(pods[0].Namespace).Get(context.TODO(), pods[0].Name, metav1.GetOptions{})
 		podPreempted := (err != nil && apierrors.IsNotFound(err)) ||
@@ -291,7 +291,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 				Requests: podRes,
 				Limits:   podRes,
 			},
-		}, framework.PodStartShortTimeout)
+		}, f.Timeouts.PodStartShort)
 
 		defer func() {
 			// Clean-up the critical pod
