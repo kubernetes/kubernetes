@@ -86,9 +86,6 @@ const (
 
 // DEPRECATED constants. Use the timeouts in framework.Framework instead.
 const (
-	// PodDeleteTimeout is how long to wait for a pod to be deleted.
-	PodDeleteTimeout = 5 * time.Minute
-
 	// PodGetTimeout is how long to wait for a pod to be got.
 	PodGetTimeout = 2 * time.Minute
 
