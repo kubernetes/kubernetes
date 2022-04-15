@@ -301,6 +301,15 @@ func (g *Cloud) ensureExternalLoadBalancer(clusterName string, clusterID string,
 
 // updateExternalLoadBalancer is the external implementation of LoadBalancer.UpdateLoadBalancer.
 func (g *Cloud) updateExternalLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node) error {
+	// Skip service handling if managed by ingress-gce using Regional Backend Services
+	if val, ok := service.Annotations[RBSAnnotationKey]; ok && val == RBSEnabled {
+		return cloudprovider.ImplementedElsewhere
+	}
+	// Skip service handling if service has Regional Backend Services finalizer
+	if hasFinalizer(service, ELBRbsFinalizer) {
+		return cloudprovider.ImplementedElsewhere
+	}
+
 	hosts, err := g.getInstancesByNames(nodeNames(nodes))
 	if err != nil {
 		return err

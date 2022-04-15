@@ -617,6 +617,13 @@ func TestEnsureExternalLoadBalancerRBSAnnotation(t *testing.T) {
 			} else {
 				assert.NoError(t, err, "Should not return an error "+desc)
 			}
+
+			err = gce.updateExternalLoadBalancer(vals.ClusterName, svc, nodes)
+			if tc.expectError != nil {
+				assert.EqualError(t, err, (*tc.expectError).Error())
+			} else {
+				assert.NoError(t, err, "Should not return an error "+desc)
+			}
 		})
 	}
 }
@@ -649,6 +656,13 @@ func TestEnsureExternalLoadBalancerRBSFinalizer(t *testing.T) {
 			svc := fakeLoadbalancerService("")
 			svc.Finalizers = tc.finalizers
 			_, err = gce.ensureExternalLoadBalancer(vals.ClusterName, vals.ClusterID, svc, nil, nodes)
+			if tc.expectError != nil {
+				assert.EqualError(t, err, (*tc.expectError).Error())
+			} else {
+				assert.NoError(t, err, "Should not return an error "+desc)
+			}
+
+			err = gce.updateExternalLoadBalancer(vals.ClusterName, svc, nodes)
 			if tc.expectError != nil {
 				assert.EqualError(t, err, (*tc.expectError).Error())
 			} else {
