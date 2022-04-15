@@ -660,7 +660,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			}()
 
 			// The claim should timeout phase:Pending
-			err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, claim.Name, 2*time.Second, framework.ClaimProvisionShortTimeout)
+			err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, claim.Name, 2*time.Second, f.Timeouts.ClaimProvisionShort)
 			framework.ExpectError(err)
 			framework.Logf(err.Error())
 			claim, err = c.CoreV1().PersistentVolumeClaims(ns).Get(context.TODO(), claim.Name, metav1.GetOptions{})
@@ -699,7 +699,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			}()
 
 			// The claim should timeout phase:Pending
-			err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, claim.Name, 2*time.Second, framework.ClaimProvisionShortTimeout)
+			err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, claim.Name, 2*time.Second, f.Timeouts.ClaimProvisionShort)
 			framework.ExpectError(err)
 			framework.Logf(err.Error())
 			claim, err = c.CoreV1().PersistentVolumeClaims(ns).Get(context.TODO(), claim.Name, metav1.GetOptions{})
