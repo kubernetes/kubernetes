@@ -20,12 +20,13 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	admissionapi "k8s.io/pod-security-admission/api"
 	"os"
 	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
+
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/opencontainers/runc/libcontainer/apparmor"
 	v1 "k8s.io/api/core/v1"
@@ -154,7 +155,7 @@ func runAppArmorTest(f *framework.Framework, shouldRun bool, profile string) v1.
 	if shouldRun {
 		// The pod needs to start before it stops, so wait for the longer start timeout.
 		framework.ExpectNoError(e2epod.WaitTimeoutForPodNoLongerRunningInNamespace(
-			f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout))
+			f.ClientSet, pod.Name, f.Namespace.Name, f.Timeouts.PodStart))
 	} else {
 		// Pod should remain in the pending state. Wait for the Reason to be set to "AppArmor".
 		fieldSelector := fields.OneTermEqualSelector("metadata.name", pod.Name).String()
@@ -181,7 +182,7 @@ func runAppArmorTest(f *framework.Framework, shouldRun bool, profile string) v1.
 
 			return false, nil
 		}
-		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), framework.PodStartTimeout)
+		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), f.Timeouts.PodStart)
 		defer cancel()
 		_, err := watchtools.UntilWithSync(ctx, w, &v1.Pod{}, preconditionFunc, func(e watch.Event) (bool, error) {
 			switch e.Type {

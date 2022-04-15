@@ -18,6 +18,7 @@ package apps
 
 import (
 	"context"
+
 	"github.com/onsi/ginkgo"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -58,7 +59,7 @@ func (t *DaemonSetUpgradeTest) Setup(f *framework.Framework) {
 	}
 
 	ginkgo.By("Waiting for DaemonSet pods to become ready")
-	err = wait.Poll(framework.Poll, framework.PodStartTimeout, func() (bool, error) {
+	err = wait.Poll(framework.Poll, f.Timeouts.PodStart, func() (bool, error) {
 		return e2edaemonset.CheckRunningOnAllNodes(f, t.daemonSet)
 	})
 	framework.ExpectNoError(err)

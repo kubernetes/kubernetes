@@ -195,7 +195,7 @@ func createHostPortPodOnNode(f *framework.Framework, podName, ns, hostIP string,
 		framework.Failf("error creating pod %s, err:%v", podName, err)
 	}
 
-	if err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podName, ns, framework.PodStartTimeout); err != nil {
+	if err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podName, ns, f.Timeouts.PodStart); err != nil {
 		framework.Failf("wait for pod %s timeout, err:%v", podName, err)
 	}
 }

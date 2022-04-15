@@ -18,6 +18,7 @@ package node
 
 import (
 	"context"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -61,7 +62,7 @@ func (t *AppArmorUpgradeTest) Setup(f *framework.Framework) {
 
 	// Create the initial test pod.
 	ginkgo.By("Creating a long-running AppArmor enabled pod.")
-	t.pod = e2esecurity.CreateAppArmorTestPod(f.Namespace.Name, f.ClientSet, f.PodClient(), false, false)
+	t.pod = e2esecurity.CreateAppArmorTestPod(f.Namespace.Name, f.ClientSet, f.PodClient(), false, false, f.Timeouts.PodStart)
 
 	// Verify initial state.
 	t.verifyNodesAppArmorEnabled(f)
@@ -97,7 +98,7 @@ func (t *AppArmorUpgradeTest) verifyPodStillUp(f *framework.Framework) {
 
 func (t *AppArmorUpgradeTest) verifyNewPodSucceeds(f *framework.Framework) {
 	ginkgo.By("Verifying an AppArmor profile is enforced for a new pod")
-	e2esecurity.CreateAppArmorTestPod(f.Namespace.Name, f.ClientSet, f.PodClient(), false, true)
+	e2esecurity.CreateAppArmorTestPod(f.Namespace.Name, f.ClientSet, f.PodClient(), false, true, f.Timeouts.PodStart)
 }
 
 func (t *AppArmorUpgradeTest) verifyNodesAppArmorEnabled(f *framework.Framework) {

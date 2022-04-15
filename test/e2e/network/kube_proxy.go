@@ -187,7 +187,7 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 		fr.PodClient().CreateSync(serverPodSpec)
 
 		// The server should be listening before spawning the client pod
-		if readyErr := e2epod.WaitTimeoutForPodReadyInNamespace(fr.ClientSet, serverPodSpec.Name, fr.Namespace.Name, framework.PodStartTimeout); readyErr != nil {
+		if readyErr := e2epod.WaitTimeoutForPodReadyInNamespace(fr.ClientSet, serverPodSpec.Name, fr.Namespace.Name, fr.Timeouts.PodStart); readyErr != nil {
 			framework.Failf("error waiting for server pod %s to be ready: %v", serverPodSpec.Name, readyErr)
 		}
 		// Connect to the server and leak the connection

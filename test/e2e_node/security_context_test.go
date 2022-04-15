@@ -129,7 +129,7 @@ var _ = SIGDescribe("Security Context", func() {
 				hostPID,
 			))
 
-			podClient.WaitForSuccess(podName, framework.PodStartTimeout)
+			podClient.WaitForSuccess(podName, f.Timeouts.PodStart)
 		}
 
 		nginxPid := ""
@@ -209,7 +209,7 @@ var _ = SIGDescribe("Security Context", func() {
 				hostNetwork,
 			))
 
-			podClient.WaitForSuccess(podName, framework.PodStartTimeout)
+			podClient.WaitForSuccess(podName, f.Timeouts.PodStart)
 		}
 
 		hostSharedMemoryID := ""
@@ -289,7 +289,7 @@ var _ = SIGDescribe("Security Context", func() {
 				hostNetwork,
 			))
 
-			podClient.WaitForSuccess(podName, framework.PodStartTimeout)
+			podClient.WaitForSuccess(podName, f.Timeouts.PodStart)
 		}
 
 		listeningPort := ""

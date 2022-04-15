@@ -39,13 +39,13 @@ import (
 	"github.com/onsi/ginkgo"
 )
 
-const (
-	serverStartTimeout = framework.PodStartTimeout + 3*time.Minute
-)
+const ()
 
 var _ = SIGDescribe("[Feature:Example]", func() {
 	f := framework.NewDefaultFramework("examples")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+
+	var serverStartTimeout = f.Timeouts.PodStart + 3*time.Minute
 
 	var c clientset.Interface
 	var ns string

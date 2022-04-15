@@ -123,7 +123,7 @@ func stopNfsServer(serverPod *v1.Pod) {
 // Creates a pod that mounts an nfs volume that is served by the nfs-server pod. The container
 // will execute the passed in shell cmd. Waits for the pod to start.
 // Note: the nfs plugin is defined inline, no PV or PVC.
-func createPodUsingNfs(f *framework.Framework, c clientset.Interface, ns, nfsIP, cmd string) *v1.Pod {
+func createPodUsingNfs(f *framework.Framework, c clientset.Interface, ns, nfsIP, cmd string, podStartTimeout time.Duration) *v1.Pod {
 	ginkgo.By("create pod using nfs volume")
 
 	isPrivileged := true
@@ -173,7 +173,7 @@ func createPodUsingNfs(f *framework.Framework, c clientset.Interface, ns, nfsIP,
 	rtnPod, err := c.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
-	err = e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, rtnPod.Name, f.Namespace.Name, framework.PodStartTimeout) // running & ready
+	err = e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, rtnPod.Name, f.Namespace.Name, podStartTimeout) // running & ready
 	framework.ExpectNoError(err)
 
 	rtnPod, err = c.CoreV1().Pods(ns).Get(context.TODO(), rtnPod.Name, metav1.GetOptions{}) // return fresh pod
@@ -433,7 +433,7 @@ var _ = SIGDescribe("kubelet", func() {
 			// execute It blocks from above table of tests
 			for _, t := range testTbl {
 				ginkgo.It(t.itDescr, func() {
-					pod = createPodUsingNfs(f, c, ns, nfsIP, t.podCmd)
+					pod = createPodUsingNfs(f, c, ns, nfsIP, t.podCmd, f.Timeouts.PodStart)
 
 					ginkgo.By("Stop the NFS server")
 					stopNfsServer(nfsServerPod)

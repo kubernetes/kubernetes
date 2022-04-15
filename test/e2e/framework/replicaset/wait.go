@@ -29,8 +29,8 @@ import (
 )
 
 // WaitForReadyReplicaSet waits until the replicaset has all of its replicas ready.
-func WaitForReadyReplicaSet(c clientset.Interface, ns, name string) error {
-	err := wait.Poll(framework.Poll, framework.PodStartTimeout, func() (bool, error) {
+func WaitForReadyReplicaSet(c clientset.Interface, ns, name string, podStartTimeout time.Duration) error {
+	err := wait.Poll(framework.Poll, podStartTimeout, func() (bool, error) {
 		rs, err := c.AppsV1().ReplicaSets(ns).Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -44,8 +44,8 @@ func WaitForReadyReplicaSet(c clientset.Interface, ns, name string) error {
 }
 
 // WaitForReplicaSetTargetAvailableReplicas waits for .status.availableReplicas of a RS to equal targetReplicaNum
-func WaitForReplicaSetTargetAvailableReplicas(c clientset.Interface, replicaSet *appsv1.ReplicaSet, targetReplicaNum int32) error {
-	return WaitForReplicaSetTargetAvailableReplicasWithTimeout(c, replicaSet, targetReplicaNum, framework.PodStartTimeout)
+func WaitForReplicaSetTargetAvailableReplicas(c clientset.Interface, replicaSet *appsv1.ReplicaSet, targetReplicaNum int32, podStartTimeout time.Duration) error {
+	return WaitForReplicaSetTargetAvailableReplicasWithTimeout(c, replicaSet, targetReplicaNum, podStartTimeout)
 }
 
 // WaitForReplicaSetTargetAvailableReplicasWithTimeout waits for .status.availableReplicas of a RS to equal targetReplicaNum

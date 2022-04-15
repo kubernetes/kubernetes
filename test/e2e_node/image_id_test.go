@@ -18,7 +18,8 @@ package e2enode
 
 import (
 	"context"
-	"k8s.io/api/core/v1"
+
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -54,7 +55,7 @@ var _ = SIGDescribe("ImageID [NodeFeature: ImageID]", func() {
 		pod := f.PodClient().Create(podDesc)
 
 		framework.ExpectNoError(e2epod.WaitTimeoutForPodNoLongerRunningInNamespace(
-			f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout))
+			f.ClientSet, pod.Name, f.Namespace.Name, f.Timeouts.PodStart))
 		runningPod, err := f.PodClient().Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 

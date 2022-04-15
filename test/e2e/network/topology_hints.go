@@ -80,7 +80,7 @@ var _ = common.SIGDescribe("[Feature:Topology Hints]", func() {
 			},
 		})
 
-		err = wait.Poll(5*time.Second, framework.PodStartTimeout, func() (bool, error) {
+		err = wait.Poll(5*time.Second, f.Timeouts.PodStart, func() (bool, error) {
 			return e2edaemonset.CheckRunningOnAllNodes(f, ds)
 		})
 		framework.ExpectNoError(err, "timed out waiting for DaemonSets to be ready")

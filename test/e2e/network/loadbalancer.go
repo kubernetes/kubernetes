@@ -618,7 +618,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		//  a pod to test the service.
 		ginkgo.By("hitting the internal load balancer from pod")
 		framework.Logf("creating pod with host network")
-		hostExec := launchHostExecPod(f.ClientSet, f.Namespace.Name, "ilb-host-exec")
+		hostExec := launchHostExecPod(f.ClientSet, f.Namespace.Name, "ilb-host-exec", f.Timeouts.PodStart)
 
 		framework.Logf("Waiting up to %v for service %q's internal LB to respond to requests", createTimeout, serviceName)
 		tcpIngressIP := e2eservice.GetIngressPoint(lbIngress)

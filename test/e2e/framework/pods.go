@@ -104,7 +104,7 @@ func (c *PodClient) Create(pod *v1.Pod) *v1.Pod {
 func (c *PodClient) CreateSync(pod *v1.Pod) *v1.Pod {
 	namespace := c.f.Namespace.Name
 	p := c.Create(pod)
-	ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(c.f.ClientSet, p.Name, namespace, PodStartTimeout))
+	ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(c.f.ClientSet, p.Name, namespace, c.f.Timeouts.PodStart))
 	// Get the newest pod after it becomes running and ready, some status may change after pod created, such as pod ip.
 	p, err := c.Get(context.TODO(), p.Name, metav1.GetOptions{})
 	ExpectNoError(err)
@@ -260,7 +260,7 @@ func (c *PodClient) WaitForFinish(name string, timeout time.Duration) {
 // WaitForErrorEventOrSuccess waits for pod to succeed or an error event for that pod.
 func (c *PodClient) WaitForErrorEventOrSuccess(pod *v1.Pod) (*v1.Event, error) {
 	var ev *v1.Event
-	err := wait.Poll(Poll, PodStartTimeout, func() (bool, error) {
+	err := wait.Poll(Poll, c.f.Timeouts.PodStart, func() (bool, error) {
 		evnts, err := c.f.ClientSet.CoreV1().Events(pod.Namespace).Search(scheme.Scheme, pod)
 		if err != nil {
 			return false, fmt.Errorf("error in listing events: %s", err)

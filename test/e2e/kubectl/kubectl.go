@@ -252,7 +252,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 	// test files.
 	// Print debug info if atLeast Pods are not found before the timeout
 	waitForOrFailWithDebug := func(atLeast int) {
-		pods, err := clusterState().WaitFor(atLeast, framework.PodStartTimeout)
+		pods, err := clusterState().WaitFor(atLeast, f.Timeouts.PodStart)
 		if err != nil || len(pods) < atLeast {
 			// TODO: Generalize integrating debug info into these tests so we always get debug info when we need it
 			framework.DumpAllNamespaceInfo(f.ClientSet, ns)
@@ -312,7 +312,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 
 			ginkgo.By("creating a replication controller")
 			framework.RunKubectlOrDieInput(ns, nautilus, "create", "-f", "-")
-			validateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
+			validateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns, f.Timeouts.PodStart)
 		})
 
 		/*
@@ -325,15 +325,15 @@ var _ = SIGDescribe("Kubectl client", func() {
 
 			ginkgo.By("creating a replication controller")
 			framework.RunKubectlOrDieInput(ns, nautilus, "create", "-f", "-")
-			validateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
+			validateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns, f.Timeouts.PodStart)
 			ginkgo.By("scaling down the replication controller")
 			debugDiscovery()
 			framework.RunKubectlOrDie(ns, "scale", "rc", "update-demo-nautilus", "--replicas=1", "--timeout=5m")
-			validateController(c, nautilusImage, 1, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
+			validateController(c, nautilusImage, 1, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns, f.Timeouts.PodStart)
 			ginkgo.By("scaling up the replication controller")
 			debugDiscovery()
 			framework.RunKubectlOrDie(ns, "scale", "rc", "update-demo-nautilus", "--replicas=2", "--timeout=5m")
-			validateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
+			validateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns, f.Timeouts.PodStart)
 		})
 	})
 
@@ -383,7 +383,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			ginkgo.By(fmt.Sprintf("creating the pod from %v", podYaml))
 			podYaml = commonutils.SubstituteImageName(string(readTestFileOrDie("pod-with-readiness-probe.yaml.in")))
 			framework.RunKubectlOrDieInput(ns, podYaml, "create", "-f", "-")
-			framework.ExpectEqual(e2epod.CheckPodsRunningReady(c, ns, []string{simplePodName}, framework.PodStartTimeout), true)
+			framework.ExpectEqual(e2epod.CheckPodsRunningReady(c, ns, []string{simplePodName}, f.Timeouts.PodStart), true)
 		})
 		ginkgo.AfterEach(func() {
 			cleanupKubectlInputs(podYaml, ns, simplePodSelector)
@@ -627,7 +627,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			ginkgo.By("executing a command with run")
 			framework.RunKubectlOrDie(ns, "run", podName, "--image="+busyboxImage, "--restart=OnFailure", podRunningTimeoutArg, "--", "sh", "-c", "sleep 10; seq 100 | while read i; do echo $i; sleep 0.01; done; echo EOF")
 
-			if !e2epod.CheckPodsRunningReadyOrSucceeded(c, ns, []string{podName}, framework.PodStartTimeout) {
+			if !e2epod.CheckPodsRunningReadyOrSucceeded(c, ns, []string{podName}, f.Timeouts.PodStart) {
 				framework.Failf("Pod for run-log-test was not ready")
 			}
 
@@ -1267,7 +1267,7 @@ metadata:
 			waitForOrFailWithDebug(1)
 			forEachPod(func(pod v1.Pod) {
 				framework.Logf("wait on agnhost-primary startup in %v ", ns)
-				framework.LookForStringInLog(ns, pod.Name, "agnhost-primary", "Paused", framework.PodStartTimeout)
+				framework.LookForStringInLog(ns, pod.Name, "agnhost-primary", "Paused", f.Timeouts.PodStart)
 			})
 			validateService := func(name string, servicePort int, timeout time.Duration) {
 				err := wait.Poll(framework.Poll, timeout, func() (bool, error) {
@@ -1335,7 +1335,7 @@ metadata:
 			ginkgo.By("creating the pod")
 			podYaml = commonutils.SubstituteImageName(string(readTestFileOrDie("pause-pod.yaml.in")))
 			framework.RunKubectlOrDieInput(ns, podYaml, "create", "-f", "-")
-			framework.ExpectEqual(e2epod.CheckPodsRunningReady(c, ns, []string{pausePodName}, framework.PodStartTimeout), true)
+			framework.ExpectEqual(e2epod.CheckPodsRunningReady(c, ns, []string{pausePodName}, f.Timeouts.PodStart), true)
 		})
 		ginkgo.AfterEach(func() {
 			cleanupKubectlInputs(podYaml, ns, pausePodSelector)
@@ -1374,7 +1374,7 @@ metadata:
 			ginkgo.By("creating the pod")
 			podYaml = commonutils.SubstituteImageName(string(readTestFileOrDie("busybox-pod.yaml.in")))
 			framework.RunKubectlOrDieInput(ns, podYaml, "create", "-f", "-")
-			framework.ExpectEqual(e2epod.CheckPodsRunningReady(c, ns, []string{busyboxPodName}, framework.PodStartTimeout), true)
+			framework.ExpectEqual(e2epod.CheckPodsRunningReady(c, ns, []string{busyboxPodName}, f.Timeouts.PodStart), true)
 		})
 		ginkgo.AfterEach(func() {
 			cleanupKubectlInputs(podYaml, ns, busyboxPodSelector)
@@ -1437,12 +1437,12 @@ metadata:
 			}
 
 			ginkgo.By("Waiting for log generator to start.")
-			if !e2epod.CheckPodsRunningReadyOrSucceeded(c, ns, []string{podName}, framework.PodStartTimeout) {
+			if !e2epod.CheckPodsRunningReadyOrSucceeded(c, ns, []string{podName}, f.Timeouts.PodStart) {
 				framework.Failf("Pod %s was not ready", podName)
 			}
 
 			ginkgo.By("checking for a matching strings")
-			_, err := framework.LookForStringInLog(ns, podName, containerName, "/api/v1/namespaces/kube-system", framework.PodStartTimeout)
+			_, err := framework.LookForStringInLog(ns, podName, containerName, "/api/v1/namespaces/kube-system", f.Timeouts.PodStart)
 			framework.ExpectNoError(err)
 
 			ginkgo.By("limiting log lines")
@@ -2190,7 +2190,7 @@ type validatorFn func(c clientset.Interface, podID string) error
 // "containerImage" : this is the name of the image we expect to be launched.  Not to confuse w/ images (kitten.jpg)  which are validated.
 // "testname":  which gets bubbled up to the logging/failure messages if errors happen.
 // "validator" function: This function is given a podID and a client, and it can do some specific validations that way.
-func validateController(c clientset.Interface, containerImage string, replicas int, containername string, testname string, validator validatorFn, ns string) {
+func validateController(c clientset.Interface, containerImage string, replicas int, containername string, testname string, validator validatorFn, ns string, podStartTimeout time.Duration) {
 	containerImage = trimDockerRegistry(containerImage)
 	getPodsTemplate := "--template={{range.items}}{{.metadata.name}} {{end}}"
 
@@ -2200,7 +2200,7 @@ func validateController(c clientset.Interface, containerImage string, replicas i
 
 	ginkgo.By(fmt.Sprintf("waiting for all containers in %s pods to come up.", testname)) //testname should be selector
 waitLoop:
-	for start := time.Now(); time.Since(start) < framework.PodStartTimeout; time.Sleep(5 * time.Second) {
+	for start := time.Now(); time.Since(start) < podStartTimeout; time.Sleep(5 * time.Second) {
 		getPodsOutput := framework.RunKubectlOrDie(ns, "get", "pods", "-o", "template", getPodsTemplate, "-l", testname)
 		pods := strings.Fields(getPodsOutput)
 		if numPods := len(pods); numPods != replicas {
@@ -2238,5 +2238,5 @@ waitLoop:
 		}
 	}
 	// Reaching here means that one of more checks failed multiple times.  Assuming its not a race condition, something is broken.
-	framework.Failf("Timed out after %v seconds waiting for %s pods to reach valid state", framework.PodStartTimeout.Seconds(), testname)
+	framework.Failf("Timed out after %v seconds waiting for %s pods to reach valid state", podStartTimeout.Seconds(), testname)
 }

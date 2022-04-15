@@ -123,7 +123,7 @@ var _ = SIGDescribe("Kubelet", func() {
 					return fmt.Errorf("expected non-zero exitCode and non-empty terminated state reason. Got exitCode: %+v and terminated state reason: %+v", contTerminatedState.ExitCode, contTerminatedState.Reason)
 				}
 				return nil
-			}, framework.PodStartTimeout, time.Second*4).Should(gomega.BeNil())
+			}, f.Timeouts.PodStart, time.Second*4).Should(gomega.BeNil())
 		})
 
 		/*

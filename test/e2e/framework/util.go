@@ -86,9 +86,6 @@ const (
 
 // DEPRECATED constants. Use the timeouts in framework.Framework instead.
 const (
-	// PodStartTimeout is how long to wait for the pod to be started.
-	PodStartTimeout = 5 * time.Minute
-
 	// PodStartShortTimeout is same as `PodStartTimeout` to wait for the pod to be started, but shorter.
 	// Use it case by case when we are sure pod start will not be delayed.
 	// minutes by slow docker pulls or something else.

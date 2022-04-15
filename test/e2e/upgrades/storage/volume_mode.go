@@ -101,7 +101,7 @@ func (t *VolumeModeDowngradeTest) Setup(f *framework.Framework) {
 		PVCs:         []*v1.PersistentVolumeClaim{t.pvc},
 		SeLinuxLabel: e2epv.SELinuxLabel,
 	}
-	t.pod, err = e2epod.CreateSecPod(cs, &podConfig, framework.PodStartTimeout)
+	t.pod, err = e2epod.CreateSecPod(cs, &podConfig, f.Timeouts.PodStart)
 	framework.ExpectNoError(err)
 
 	ginkgo.By("Checking if PV exists as expected volume mode")

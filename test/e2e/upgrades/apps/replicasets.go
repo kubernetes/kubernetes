@@ -19,6 +19,7 @@ package apps
 import (
 	"context"
 	"fmt"
+
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -59,7 +60,7 @@ func (r *ReplicaSetUpgradeTest) Setup(f *framework.Framework) {
 	framework.ExpectNoError(err)
 
 	ginkgo.By(fmt.Sprintf("Waiting for replicaset %s to have all of its replicas ready", rsName))
-	framework.ExpectNoError(e2ereplicaset.WaitForReadyReplicaSet(c, ns, rsName))
+	framework.ExpectNoError(e2ereplicaset.WaitForReadyReplicaSet(c, ns, rsName, f.Timeouts.PodStart))
 
 	r.UID = rs.UID
 }
@@ -83,7 +84,7 @@ func (r *ReplicaSetUpgradeTest) Test(f *framework.Framework, done <-chan struct{
 	}
 
 	ginkgo.By(fmt.Sprintf("Waiting for replicaset %s to have all of its replicas ready after upgrade", rsName))
-	framework.ExpectNoError(e2ereplicaset.WaitForReadyReplicaSet(c, ns, rsName))
+	framework.ExpectNoError(e2ereplicaset.WaitForReadyReplicaSet(c, ns, rsName, f.Timeouts.PodStart))
 
 	// Verify the upgraded RS is active by scaling up the RS to scaleNum and ensuring all pods are Ready
 	ginkgo.By(fmt.Sprintf("Scaling up replicaset %s to %d", rsName, scaleNum))
@@ -93,7 +94,7 @@ func (r *ReplicaSetUpgradeTest) Test(f *framework.Framework, done <-chan struct{
 	framework.ExpectNoError(err)
 
 	ginkgo.By(fmt.Sprintf("Waiting for replicaset %s to have all of its replicas ready after scaling", rsName))
-	framework.ExpectNoError(e2ereplicaset.WaitForReadyReplicaSet(c, ns, rsName))
+	framework.ExpectNoError(e2ereplicaset.WaitForReadyReplicaSet(c, ns, rsName, f.Timeouts.PodStart))
 }
 
 // Teardown cleans up any remaining resources.

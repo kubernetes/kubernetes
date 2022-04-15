@@ -67,7 +67,7 @@ var _ = SIGDescribe("Probing container", func() {
 	framework.ConformanceIt("with readiness probe should not be ready before initial delay and never restart [NodeConformance]", func() {
 		containerName := "test-webserver"
 		p := podClient.Create(testWebServerPodSpec(probe.withInitialDelay().build(), nil, containerName, 80))
-		e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, p.Name, f.Namespace.Name, framework.PodStartTimeout)
+		e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, p.Name, f.Namespace.Name, f.Timeouts.PodStart)
 
 		p, err := podClient.Get(context.TODO(), p.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
@@ -429,13 +429,13 @@ var _ = SIGDescribe("Probing container", func() {
 		p, err := podClient.Get(context.TODO(), p.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
-		err = e2epod.WaitForPodContainerStarted(f.ClientSet, f.Namespace.Name, p.Name, 0, framework.PodStartTimeout)
+		err = e2epod.WaitForPodContainerStarted(f.ClientSet, f.Namespace.Name, p.Name, 0, f.Timeouts.PodStart)
 		framework.ExpectNoError(err)
 		startedTime := time.Now()
 
 		// We assume the pod became ready when the container became ready. This
 		// is true for a single container pod.
-		err = e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, p.Name, f.Namespace.Name, framework.PodStartTimeout)
+		err = e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, p.Name, f.Namespace.Name, f.Timeouts.PodStart)
 		framework.ExpectNoError(err)
 		readyTime := time.Now()
 

@@ -291,7 +291,7 @@ var _ = SIGDescribe("Pods", func() {
 				if event.Type != watch.Added {
 					framework.Failf("Failed to observe pod creation: %v", event)
 				}
-			case <-time.After(framework.PodStartTimeout):
+			case <-time.After(f.Timeouts.PodStart):
 				framework.Failf("Timeout while waiting for pod creation")
 			}
 		case <-time.After(10 * time.Second):

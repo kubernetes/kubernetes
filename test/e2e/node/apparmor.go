@@ -43,11 +43,11 @@ var _ = SIGDescribe("AppArmor", func() {
 		})
 
 		ginkgo.It("should enforce an AppArmor profile", func() {
-			e2esecurity.CreateAppArmorTestPod(f.Namespace.Name, f.ClientSet, f.PodClient(), false, true)
+			e2esecurity.CreateAppArmorTestPod(f.Namespace.Name, f.ClientSet, f.PodClient(), false, true, f.Timeouts.PodStart)
 		})
 
 		ginkgo.It("can disable an AppArmor profile, using unconfined", func() {
-			e2esecurity.CreateAppArmorTestPod(f.Namespace.Name, f.ClientSet, f.PodClient(), true, true)
+			e2esecurity.CreateAppArmorTestPod(f.Namespace.Name, f.ClientSet, f.PodClient(), true, true, f.Timeouts.PodStart)
 		})
 	})
 })

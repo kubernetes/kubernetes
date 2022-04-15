@@ -19,6 +19,7 @@ package security
 import (
 	"context"
 	"fmt"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -47,7 +48,7 @@ func LoadAppArmorProfiles(nsName string, clientset clientset.Interface) {
 // CreateAppArmorTestPod creates a pod that tests apparmor profile enforcement. The pod exits with
 // an error code if the profile is incorrectly enforced. If runOnce is true the pod will exit after
 // a single test, otherwise it will repeat the test every 1 second until failure.
-func CreateAppArmorTestPod(nsName string, clientset clientset.Interface, podClient *framework.PodClient, unconfined bool, runOnce bool) *v1.Pod {
+func CreateAppArmorTestPod(nsName string, clientset clientset.Interface, podClient *framework.PodClient, unconfined bool, runOnce bool, podStartTimeout time.Duration) *v1.Pod {
 	profile := "localhost/" + appArmorProfilePrefix + nsName
 	testCmd := fmt.Sprintf(`
 if touch %[1]s; then
@@ -123,7 +124,7 @@ done`, testCmd)
 		framework.ExpectNoError(err)
 	} else {
 		pod = podClient.CreateSync(pod)
-		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(clientset, pod.Name, nsName, framework.PodStartTimeout))
+		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(clientset, pod.Name, nsName, podStartTimeout))
 	}
 
 	// Verify Pod affinity colocated the Pods.

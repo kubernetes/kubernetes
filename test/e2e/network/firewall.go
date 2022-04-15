@@ -160,7 +160,7 @@ var _ = common.SIGDescribe("Firewall rule", func() {
 			pod.Spec.HostNetwork = true
 			_, err := cs.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
-			framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podName, f.Namespace.Name, framework.PodStartTimeout))
+			framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podName, f.Namespace.Name, f.Timeouts.PodStart))
 			framework.Logf("Netexec pod %q in namespace %q running", podName, ns)
 
 			defer func() {

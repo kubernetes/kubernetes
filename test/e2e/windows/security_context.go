@@ -96,7 +96,7 @@ var _ = SIGDescribe("[Feature:Windows] SecurityContext", func() {
 			}
 
 			return false
-		}, framework.PodStartTimeout, 1*time.Second).Should(gomega.BeTrue())
+		}, f.Timeouts.PodStart, 1*time.Second).Should(gomega.BeTrue())
 	})
 
 	ginkgo.It("should not be able to create pods with unknown usernames at Container level", func() {

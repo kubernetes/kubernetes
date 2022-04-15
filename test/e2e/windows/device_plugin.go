@@ -106,7 +106,7 @@ var _ = SIGDescribe("[Feature:GPUDevicePlugin] Device Plugin", func() {
 		windowsPod, err = cs.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), windowsPod, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 		ginkgo.By("Waiting for the pod Running")
-		err = e2epod.WaitTimeoutForPodRunningInNamespace(cs, windowsPod.Name, f.Namespace.Name, testSlowMultiplier*framework.PodStartTimeout)
+		err = e2epod.WaitTimeoutForPodRunningInNamespace(cs, windowsPod.Name, f.Namespace.Name, testSlowMultiplier*f.Timeouts.PodStart)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("verifying device access in Windows testing Pod")

@@ -905,7 +905,7 @@ func testRolloverDeployment(f *framework.Framework) {
 
 	// Wait for replica set to become ready before adopting it.
 	framework.Logf("Waiting for pods owned by replica set %q to become ready", rsName)
-	err = e2ereplicaset.WaitForReadyReplicaSet(c, ns, rsName)
+	err = e2ereplicaset.WaitForReadyReplicaSet(c, ns, rsName, f.Timeouts.PodStart)
 	framework.ExpectNoError(err)
 
 	// Create a deployment to delete webserver pods and instead bring up redis-slave pods.
@@ -1228,7 +1228,7 @@ func testProportionalScalingDeployment(f *framework.Framework) {
 	// First rollout's replicaset should have Deployment's (replicas - maxUnavailable) = 10 - 2 = 8 available replicas.
 	minAvailableReplicas := replicas - int32(maxUnavailable)
 	framework.Logf("Waiting for the first rollout's replicaset to have .status.availableReplicas = %d", minAvailableReplicas)
-	err = e2ereplicaset.WaitForReplicaSetTargetAvailableReplicas(c, firstRS, minAvailableReplicas)
+	err = e2ereplicaset.WaitForReplicaSetTargetAvailableReplicas(c, firstRS, minAvailableReplicas, f.Timeouts.PodStart)
 	framework.ExpectNoError(err)
 
 	// First rollout's replicaset should have .spec.replicas = 8 too.

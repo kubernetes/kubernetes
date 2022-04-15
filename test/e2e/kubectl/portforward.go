@@ -124,8 +124,8 @@ func pfPod(expectedClientData, chunks, chunkSize, chunkIntervalMillis string, bi
 }
 
 // WaitForTerminatedContainer waits till a given container be terminated for a given pod.
-func WaitForTerminatedContainer(f *framework.Framework, pod *v1.Pod, containerName string) error {
-	return e2epod.WaitForPodCondition(f.ClientSet, f.Namespace.Name, pod.Name, "container terminated", framework.PodStartTimeout, func(pod *v1.Pod) (bool, error) {
+func WaitForTerminatedContainer(f *framework.Framework, pod *v1.Pod, containerName string, podStartTimeout time.Duration) error {
+	return e2epod.WaitForPodCondition(f.ClientSet, f.Namespace.Name, pod.Name, "container terminated", podStartTimeout, func(pod *v1.Pod) (bool, error) {
 		if len(testutils.TerminatedContainers(pod)[containerName]) > 0 {
 			return true, nil
 		}
@@ -213,7 +213,7 @@ func doTestConnectSendDisconnect(bindAddress string, f *framework.Framework) {
 	if _, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
 		framework.Failf("Couldn't create pod: %v", err)
 	}
-	if err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout); err != nil {
+	if err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, pod.Name, f.Namespace.Name, f.Timeouts.PodStart); err != nil {
 		framework.Failf("Pod did not start running: %v", err)
 	}
 
@@ -242,7 +242,7 @@ func doTestConnectSendDisconnect(bindAddress string, f *framework.Framework) {
 	}
 
 	ginkgo.By("Waiting for the target pod to stop running")
-	if err := WaitForTerminatedContainer(f, pod, "portforwardtester"); err != nil {
+	if err := WaitForTerminatedContainer(f, pod, "portforwardtester", f.Timeouts.PodStart); err != nil {
 		framework.Failf("Container did not terminate: %v", err)
 	}
 
@@ -261,7 +261,7 @@ func doTestMustConnectSendNothing(bindAddress string, f *framework.Framework) {
 	if _, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
 		framework.Failf("Couldn't create pod: %v", err)
 	}
-	if err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout); err != nil {
+	if err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, pod.Name, f.Namespace.Name, f.Timeouts.PodStart); err != nil {
 		framework.Failf("Pod did not start running: %v", err)
 	}
 
@@ -279,7 +279,7 @@ func doTestMustConnectSendNothing(bindAddress string, f *framework.Framework) {
 	conn.Close()
 
 	ginkgo.By("Waiting for the target pod to stop running")
-	if err := WaitForTerminatedContainer(f, pod, "portforwardtester"); err != nil {
+	if err := WaitForTerminatedContainer(f, pod, "portforwardtester", f.Timeouts.PodStart); err != nil {
 		framework.Failf("Container did not terminate: %v", err)
 	}
 
@@ -298,7 +298,7 @@ func doTestMustConnectSendDisconnect(bindAddress string, f *framework.Framework)
 	if _, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
 		framework.Failf("Couldn't create pod: %v", err)
 	}
-	if err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout); err != nil {
+	if err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, pod.Name, f.Namespace.Name, f.Timeouts.PodStart); err != nil {
 		framework.Failf("Pod did not start running: %v", err)
 	}
 
@@ -345,7 +345,7 @@ func doTestMustConnectSendDisconnect(bindAddress string, f *framework.Framework)
 	}
 
 	ginkgo.By("Waiting for the target pod to stop running")
-	if err := WaitForTerminatedContainer(f, pod, "portforwardtester"); err != nil {
+	if err := WaitForTerminatedContainer(f, pod, "portforwardtester", f.Timeouts.PodStart); err != nil {
 		framework.Failf("Container did not terminate: %v", err)
 	}
 
@@ -368,7 +368,7 @@ func doTestOverWebSockets(bindAddress string, f *framework.Framework) {
 	if _, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
 		framework.Failf("Couldn't create pod: %v", err)
 	}
-	if err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout); err != nil {
+	if err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, pod.Name, f.Namespace.Name, f.Timeouts.PodStart); err != nil {
 		framework.Failf("Pod did not start running: %v", err)
 	}
 
