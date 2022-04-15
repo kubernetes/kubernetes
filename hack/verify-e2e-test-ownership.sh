@@ -64,7 +64,7 @@ function ensure_dependencies() {
     hack/make-rules/build.sh test/e2e/e2e.test
   fi
   if ! { [ -f "${spec_summaries}" ] && [[ "${REUSE_BUILD_OUTPUT}" =~ ^[yY]$ ]]; }; then
-    "${ginkgo}" --dryRun=true "${e2e_test}" -- --spec-dump "${spec_summaries}" > /dev/null
+    "${ginkgo}" --dry-run=true "${e2e_test}" -- --spec-dump "${spec_summaries}" > /dev/null
   fi
 }
 
