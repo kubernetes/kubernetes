@@ -236,6 +236,19 @@ func TestUpdateAnnotations(t *testing.T) {
 				},
 			},
 			annotations: map[string]string{"a": "b"},
+			expected: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{"a": "b"},
+				},
+			},
+		},
+		{
+			obj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{"a": "b"},
+				},
+			},
+			annotations: map[string]string{"a": "c"},
 			expectErr:   true,
 		},
 		{
