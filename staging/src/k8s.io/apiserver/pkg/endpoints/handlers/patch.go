@@ -506,11 +506,11 @@ func (p *applyPatcher) createNewObject(requestContext context.Context) (runtime.
 	return p.applyPatchToCurrentObject(requestContext, obj)
 }
 
-// strategicPatchObject applies a strategic merge patch of <patchBytes> to
-// <originalObject> and stores the result in <objToUpdate>.
+// strategicPatchObject applies a strategic merge patch of `patchBytes` to
+// `originalObject` and stores the result in `objToUpdate`.
 // It additionally returns the map[string]interface{} representation of the
-// <originalObject> and <patchBytes>.
-// NOTE: Both <originalObject> and <objToUpdate> are supposed to be versioned.
+// `originalObject` and `patchBytes`.
+// NOTE: Both `originalObject` and `objToUpdate` are supposed to be versioned.
 func strategicPatchObject(
 	requestContext context.Context,
 	defaulter runtime.ObjectDefaulter,
