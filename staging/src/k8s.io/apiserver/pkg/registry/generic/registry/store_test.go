@@ -2627,9 +2627,9 @@ type staleGuaranteedUpdateStorage struct {
 
 // GuaranteedUpdate overwrites the method with one that always suggests the cachedObj.
 func (s *staleGuaranteedUpdateStorage) GuaranteedUpdate(
-	ctx context.Context, key string, ptrToType runtime.Object, ignoreNotFound bool,
+	ctx context.Context, key string, destination runtime.Object, ignoreNotFound bool,
 	preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, _ runtime.Object) error {
-	return s.Interface.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate, s.cachedObj)
+	return s.Interface.GuaranteedUpdate(ctx, key, destination, ignoreNotFound, preconditions, tryUpdate, s.cachedObj)
 }
 
 func TestDeleteWithCachedObject(t *testing.T) {
