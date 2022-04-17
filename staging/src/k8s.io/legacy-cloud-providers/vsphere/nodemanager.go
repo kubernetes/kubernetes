@@ -128,7 +128,7 @@ func (nm *NodeManager) DiscoverNode(node *v1.Node) error {
 		for vc, vsi := range nm.vsphereInstanceMap {
 
 			found := getVMFound()
-			if found == true {
+			if found {
 				break
 			}
 
@@ -169,7 +169,7 @@ func (nm *NodeManager) DiscoverNode(node *v1.Node) error {
 
 			for _, datacenterObj := range datacenterObjs {
 				found := getVMFound()
-				if found == true {
+				if found {
 					break
 				}
 
@@ -189,7 +189,7 @@ func (nm *NodeManager) DiscoverNode(node *v1.Node) error {
 			for res := range queueChannel {
 				ctx, cancel := context.WithCancel(context.Background())
 				vm, err := res.datacenter.GetVMByUUID(ctx, nodeUUID)
-				if err != nil {
+				if err != nil || vm == nil {
 					klog.V(4).Infof("Error while looking for vm=%+v in vc=%s and datacenter=%s: %v",
 						vm, res.vc, res.datacenter.Name(), err)
 					if err != vclib.ErrNoVMFound {
@@ -201,36 +201,35 @@ func (nm *NodeManager) DiscoverNode(node *v1.Node) error {
 					cancel()
 					continue
 				}
-				if vm != nil {
-					klog.V(4).Infof("Found node %s as vm=%+v in vc=%s and datacenter=%s",
-						node.Name, vm, res.vc, res.datacenter.Name())
-					var vmObj mo.VirtualMachine
-					err := vm.Properties(ctx, vm.Reference(), []string{"config"}, &vmObj)
-					if err != nil || vmObj.Config == nil {
-						klog.Errorf("failed to retrieve guest vmconfig for node: %s Err: %v", node.Name, err)
-					} else {
-						klog.V(4).Infof("vm hardware version for node:%s is %s", node.Name, vmObj.Config.Version)
-						// vmconfig.Version returns vm hardware version as vmx-11, vmx-13, vmx-14, vmx-15 etc.
-						vmhardwaredeprecated, err := isGuestHardwareVersionDeprecated(vmObj.Config.Version)
-						if err != nil {
-							klog.Errorf("failed to check if vm hardware version is deprecated. VM Hardware Version: %s Err: %v", vmObj.Config.Version, err)
-						}
-						if vmhardwaredeprecated {
-							klog.Warningf("VM Hardware version: %s from node: %s is deprecated. Please consider upgrading virtual machine hardware version to vmx-15 or higher", vmObj.Config.Version, node.Name)
-						}
+
+				klog.V(4).Infof("Found node %s as vm=%+v in vc=%s and datacenter=%s",
+					node.Name, vm, res.vc, res.datacenter.Name())
+				var vmObj mo.VirtualMachine
+				err = vm.Properties(ctx, vm.Reference(), []string{"config"}, &vmObj)
+				if err != nil || vmObj.Config == nil {
+					klog.Errorf("failed to retrieve guest vmconfig for node: %s Err: %v", node.Name, err)
+				} else {
+					klog.V(4).Infof("vm hardware version for node:%s is %s", node.Name, vmObj.Config.Version)
+					// vmconfig.Version returns vm hardware version as vmx-11, vmx-13, vmx-14, vmx-15 etc.
+					vmhardwaredeprecated, err := isGuestHardwareVersionDeprecated(vmObj.Config.Version)
+					if err != nil {
+						klog.Errorf("failed to check if vm hardware version is deprecated. VM Hardware Version: %s Err: %v", vmObj.Config.Version, err)
 					}
-					// Get the node zone information
-					nodeFd := node.ObjectMeta.Labels[v1.LabelTopologyZone]
-					nodeRegion := node.ObjectMeta.Labels[v1.LabelTopologyRegion]
-					nodeZone := &cloudprovider.Zone{FailureDomain: nodeFd, Region: nodeRegion}
-					nodeInfo := &NodeInfo{dataCenter: res.datacenter, vm: vm, vcServer: res.vc, vmUUID: nodeUUID, zone: nodeZone}
-					nm.addNodeInfo(node.ObjectMeta.Name, nodeInfo)
-					for range queueChannel {
+					if vmhardwaredeprecated {
+						klog.Warningf("VM Hardware version: %s from node: %s is deprecated. Please consider upgrading virtual machine hardware version to vmx-15 or higher", vmObj.Config.Version, node.Name)
 					}
-					setVMFound(true)
-					cancel()
-					break
 				}
+				// Get the node zone information
+				nodeFd := node.ObjectMeta.Labels[v1.LabelTopologyZone]
+				nodeRegion := node.ObjectMeta.Labels[v1.LabelTopologyRegion]
+				nodeZone := &cloudprovider.Zone{FailureDomain: nodeFd, Region: nodeRegion}
+				nodeInfo := &NodeInfo{dataCenter: res.datacenter, vm: vm, vcServer: res.vc, vmUUID: nodeUUID, zone: nodeZone}
+				nm.addNodeInfo(node.ObjectMeta.Name, nodeInfo)
+				for range queueChannel {
+				}
+				setVMFound(true)
+				cancel()
+				break
 			}
 			wg.Done()
 		}()
