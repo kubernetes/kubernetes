@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletstatsv1alpha1 "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
+	stats "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
@@ -327,9 +328,26 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 
 			ginkgo.By("Validating /stats/summary")
 			// Give pods a minute to actually start up.
-			gomega.Eventually(getNodeSummary, 180*time.Second, 15*time.Second).Should(matchExpectations)
+			gomega.Eventually(func() *stats.Summary {
+				summary, err := getNodeSummary()
+				if err != nil {
+					framework.Logf("error getting node /stats/summary: %v", err)
+					return summary
+				}
+				framework.Logf("Node stats summary obtained: %+v", summary)
+				return summary
+			}, 180*time.Second, 15*time.Second).Should(matchExpectations)
+			ginkgo.By("Validating /stats/summary are consistent")
 			// Then the summary should match the expectations a few more times.
-			gomega.Consistently(getNodeSummary, 30*time.Second, 15*time.Second).Should(matchExpectations)
+			gomega.Consistently(func() *stats.Summary {
+				summary, err := getNodeSummary()
+				if err != nil {
+					framework.Logf("error getting node /stats/summary: %v", err)
+					return summary
+				}
+				framework.Logf("Node stats summary obtained: %+v", summary)
+				return summary
+			}, 30*time.Second, 15*time.Second).Should(matchExpectations)
 		})
 	})
 })
