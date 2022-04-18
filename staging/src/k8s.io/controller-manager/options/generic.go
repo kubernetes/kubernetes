@@ -94,7 +94,7 @@ func (o *GenericControllerManagerConfigurationOptions) ApplyTo(cfg *cmconfig.Gen
 }
 
 // Validate checks validation of GenericOptions.
-func (o *GenericControllerManagerConfigurationOptions) Validate(allControllers []string, disabledByDefaultControllers []string) []error {
+func (o *GenericControllerManagerConfigurationOptions) Validate(allControllers []string) []error {
 	if o == nil {
 		return nil
 	}

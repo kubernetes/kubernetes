@@ -365,10 +365,10 @@ func (s *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config) e
 }
 
 // Validate is used to validate the options and config before launching the controller manager
-func (s *KubeControllerManagerOptions) Validate(allControllers []string, disabledByDefaultControllers []string) error {
+func (s *KubeControllerManagerOptions) Validate(allControllers []string) error {
 	var errs []error
 
-	errs = append(errs, s.Generic.Validate(allControllers, disabledByDefaultControllers)...)
+	errs = append(errs, s.Generic.Validate(allControllers)...)
 	errs = append(errs, s.KubeCloudShared.Validate()...)
 	errs = append(errs, s.AttachDetachController.Validate()...)
 	errs = append(errs, s.CSRSigningController.Validate()...)
@@ -406,8 +406,8 @@ func (s *KubeControllerManagerOptions) Validate(allControllers []string, disable
 }
 
 // Config return a controller manager config objective
-func (s KubeControllerManagerOptions) Config(allControllers []string, disabledByDefaultControllers []string) (*kubecontrollerconfig.Config, error) {
-	if err := s.Validate(allControllers, disabledByDefaultControllers); err != nil {
+func (s KubeControllerManagerOptions) Config(allControllers []string) (*kubecontrollerconfig.Config, error) {
+	if err := s.Validate(allControllers); err != nil {
 		return nil, err
 	}
 

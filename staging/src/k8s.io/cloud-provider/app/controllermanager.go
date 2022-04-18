@@ -76,7 +76,7 @@ the cloud specific control loops shipped with Kubernetes.`,
 			verflag.PrintAndExitIfRequested()
 			cliflag.PrintFlags(cmd.Flags())
 
-			c, err := s.Config(ControllerNames(controllerInitFuncConstructors), ControllersDisabledByDefault.List())
+			c, err := s.Config(ControllerNames(controllerInitFuncConstructors))
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				return err

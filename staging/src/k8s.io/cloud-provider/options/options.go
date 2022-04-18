@@ -199,10 +199,10 @@ func (o *CloudControllerManagerOptions) ApplyTo(c *config.Config, userAgent stri
 }
 
 // Validate is used to validate config before launching the cloud controller manager
-func (o *CloudControllerManagerOptions) Validate(allControllers, disabledByDefaultControllers []string) error {
+func (o *CloudControllerManagerOptions) Validate(allControllers []string) error {
 	errors := []error{}
 
-	errors = append(errors, o.Generic.Validate(allControllers, disabledByDefaultControllers)...)
+	errors = append(errors, o.Generic.Validate(allControllers)...)
 	errors = append(errors, o.KubeCloudShared.Validate()...)
 	errors = append(errors, o.ServiceController.Validate()...)
 	errors = append(errors, o.SecureServing.Validate()...)
@@ -225,8 +225,8 @@ func resyncPeriod(c *config.Config) func() time.Duration {
 }
 
 // Config return a cloud controller manager config objective
-func (o *CloudControllerManagerOptions) Config(allControllers, disabledByDefaultControllers []string) (*config.Config, error) {
-	if err := o.Validate(allControllers, disabledByDefaultControllers); err != nil {
+func (o *CloudControllerManagerOptions) Config(allControllers []string) (*config.Config, error) {
+	if err := o.Validate(allControllers); err != nil {
 		return nil, err
 	}
 

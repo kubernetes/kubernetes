@@ -100,7 +100,7 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 		t.Logf("kube-controller-manager will listen securely on port %d...", s.SecureServing.BindPort)
 	}
 
-	config, err := s.Config(all, disabled)
+	config, err := s.Config(all)
 	if err != nil {
 		return result, fmt.Errorf("failed to create config from options: %v", err)
 	}
