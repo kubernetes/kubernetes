@@ -785,6 +785,16 @@
     and delete the job. Job MUST be deleted successfully.
   release: v1.15
   file: test/e2e/apps/job.go
+- testname: Jobs, manage lifecycle
+  codename: '[sig-apps] Job should manage the lifecycle of a job [Conformance]'
+  description: Attempt to create a suspended Job which MUST succeed. Attempt to patch
+    the Job to include a new label which MUST succeed. The label MUST be found. Attempt
+    to replace the Job to include a new annotation which MUST succeed. The annotation
+    MUST be found. Attempt to list all namespaces with a label selector which MUST
+    succeed. One list MUST be found. It MUST succeed at deleting a collection of jobs
+    via a label selector.
+  release: v1.25
+  file: test/e2e/apps/job.go
 - testname: Jobs, completion after task failure
   codename: '[sig-apps] Job should run a job to completion when tasks sometimes fail
     and are locally restarted [Conformance]'
