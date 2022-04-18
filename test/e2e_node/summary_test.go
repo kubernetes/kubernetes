@@ -337,7 +337,7 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 				framework.Logf("Node stats summary obtained: %+v", summary)
 				return summary
 			}, 180*time.Second, 15*time.Second).Should(matchExpectations)
-			ginkgo.By("Validating /stats/summary are consistent")
+			ginkgo.By("Validating that the returned stats consistently pass validation")
 			// Then the summary should match the expectations a few more times.
 			gomega.Consistently(func() *stats.Summary {
 				summary, err := getNodeSummary()
