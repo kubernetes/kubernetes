@@ -39,8 +39,6 @@ import (
 	"github.com/onsi/ginkgo"
 )
 
-const ()
-
 var _ = SIGDescribe("[Feature:Example]", func() {
 	f := framework.NewDefaultFramework("examples")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
