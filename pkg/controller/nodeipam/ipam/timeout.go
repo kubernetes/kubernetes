@@ -27,7 +27,7 @@ import (
 type Timeout struct {
 	// Resync is the default timeout duration when there are no errors.
 	Resync time.Duration
-	// MaxBackoff is the maximum timeout when in a error backoff state.
+	// MaxBackoff is the maximum timeout when in an error backoff state.
 	MaxBackoff time.Duration
 	// InitialRetry is the initial retry interval when an error is reported.
 	InitialRetry time.Duration

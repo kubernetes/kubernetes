@@ -43,7 +43,7 @@ const (
 	// ipamMaxBackoff is the maximum backoff for retrying synchronization of a
 	// given in the error state.
 	ipamMaxBackoff = 10 * time.Second
-	// ipamInitialRetry is the initial retry interval for retrying synchronization of a
+	// ipamInitialBackoff is the initial retry interval for retrying synchronization of a
 	// given in the error state.
 	ipamInitialBackoff = 250 * time.Millisecond
 )
