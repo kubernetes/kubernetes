@@ -359,6 +359,8 @@ func verifyGroupKind(controllerRef *metav1.OwnerReference, expectedKind string, 
 func (dc *DisruptionController) Run(ctx context.Context) {
 	defer utilruntime.HandleCrash()
 	defer dc.queue.ShutDown()
+	defer dc.recheckQueue.ShutDown()
+	defer dc.broadcaster.Shutdown()
 
 	klog.Infof("Starting disruption controller")
 	defer klog.Infof("Shutting down disruption controller")

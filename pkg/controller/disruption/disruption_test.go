@@ -48,7 +48,6 @@ import (
 	scalefake "k8s.io/client-go/scale/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/controller"
@@ -146,7 +145,7 @@ var customGVK = schema.GroupVersionKind{
 	Kind:    "customresource",
 }
 
-func newFakeDisruptionController() (*disruptionController, *pdbStates) {
+func newFakeDisruptionController(ctx context.Context) (*disruptionController, *pdbStates) {
 	ps := &pdbStates{}
 
 	coreClient := fake.NewSimpleClientset()
@@ -178,9 +177,15 @@ func newFakeDisruptionController() (*disruptionController, *pdbStates) {
 	dc.rsListerSynced = alwaysReady
 	dc.dListerSynced = alwaysReady
 	dc.ssListerSynced = alwaysReady
-	ctx := context.TODO()
 	informerFactory.Start(ctx.Done())
-	informerFactory.WaitForCacheSync(nil)
+	informerFactory.WaitForCacheSync(ctx.Done())
+
+	go func() {
+		<-ctx.Done()
+		dc.queue.ShutDown()
+		dc.recheckQueue.ShutDown()
+		dc.broadcaster.Shutdown()
+	}()
 
 	return &disruptionController{
 		dc,
@@ -414,14 +419,15 @@ func add(t *testing.T, store cache.Store, obj interface{}) {
 
 // Create one with no selector.  Verify it matches all pods
 func TestNoSelector(t *testing.T) {
-	dc, ps := newFakeDisruptionController()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	dc, ps := newFakeDisruptionController(ctx)
 
 	pdb, pdbName := newMinAvailablePodDisruptionBudget(t, intstr.FromInt(3))
 	pdb.Spec.Selector = &metav1.LabelSelector{}
 	pod, _ := newPod(t, "yo-yo-yo")
 
 	add(t, dc.pdbStore, pdb)
-	ctx := context.TODO()
 	dc.sync(ctx, pdbName)
 	ps.VerifyPdbStatus(t, pdbName, 0, 0, 3, 0, map[string]metav1.Time{})
 
@@ -433,10 +439,11 @@ func TestNoSelector(t *testing.T) {
 // Verify that available/expected counts go up as we add pods, then verify that
 // available count goes down when we make a pod unavailable.
 func TestUnavailable(t *testing.T) {
-	dc, ps := newFakeDisruptionController()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	dc, ps := newFakeDisruptionController(ctx)
 
 	pdb, pdbName := newMinAvailablePodDisruptionBudget(t, intstr.FromInt(3))
-	ctx := context.TODO()
 	add(t, dc.pdbStore, pdb)
 	dc.sync(ctx, pdbName)
 
@@ -463,11 +470,11 @@ func TestUnavailable(t *testing.T) {
 // Verify that an integer MaxUnavailable won't
 // allow a disruption for pods with no controller.
 func TestIntegerMaxUnavailable(t *testing.T) {
-	dc, ps := newFakeDisruptionController()
-
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	dc, ps := newFakeDisruptionController(ctx)
 	pdb, pdbName := newMaxUnavailablePodDisruptionBudget(t, intstr.FromInt(1))
 	add(t, dc.pdbStore, pdb)
-	ctx := context.TODO()
 	dc.sync(ctx, pdbName)
 	// This verifies that when a PDB has 0 pods, disruptions are not allowed.
 	ps.VerifyDisruptionAllowed(t, pdbName, 0)
@@ -482,8 +489,9 @@ func TestIntegerMaxUnavailable(t *testing.T) {
 // Verify that an integer MaxUnavailable will recompute allowed disruptions when the scale of
 // the selected pod's controller is modified.
 func TestIntegerMaxUnavailableWithScaling(t *testing.T) {
-	dc, ps := newFakeDisruptionController()
-
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	dc, ps := newFakeDisruptionController(ctx)
 	pdb, pdbName := newMaxUnavailablePodDisruptionBudget(t, intstr.FromInt(2))
 	add(t, dc.pdbStore, pdb)
 
@@ -492,7 +500,6 @@ func TestIntegerMaxUnavailableWithScaling(t *testing.T) {
 
 	pod, _ := newPod(t, "pod")
 	updatePodOwnerToRs(t, pod, rs)
-	ctx := context.TODO()
 	add(t, dc.podStore, pod)
 	dc.sync(ctx, pdbName)
 	ps.VerifyPdbStatus(t, pdbName, 0, 1, 5, 7, map[string]metav1.Time{})
@@ -508,8 +515,9 @@ func TestIntegerMaxUnavailableWithScaling(t *testing.T) {
 // Verify that an percentage MaxUnavailable will recompute allowed disruptions when the scale of
 // the selected pod's controller is modified.
 func TestPercentageMaxUnavailableWithScaling(t *testing.T) {
-	dc, ps := newFakeDisruptionController()
-
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	dc, ps := newFakeDisruptionController(ctx)
 	pdb, pdbName := newMaxUnavailablePodDisruptionBudget(t, intstr.FromString("30%"))
 	add(t, dc.pdbStore, pdb)
 
@@ -519,7 +527,6 @@ func TestPercentageMaxUnavailableWithScaling(t *testing.T) {
 	pod, _ := newPod(t, "pod")
 	updatePodOwnerToRs(t, pod, rs)
 	add(t, dc.podStore, pod)
-	ctx := context.TODO()
 	dc.sync(ctx, pdbName)
 	ps.VerifyPdbStatus(t, pdbName, 0, 1, 4, 7, map[string]metav1.Time{})
 
@@ -534,11 +541,11 @@ func TestPercentageMaxUnavailableWithScaling(t *testing.T) {
 // Create a pod  with no controller, and verify that a PDB with a percentage
 // specified won't allow a disruption.
 func TestNakedPod(t *testing.T) {
-	dc, ps := newFakeDisruptionController()
-
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	dc, ps := newFakeDisruptionController(ctx)
 	pdb, pdbName := newMinAvailablePodDisruptionBudget(t, intstr.FromString("28%"))
 	add(t, dc.pdbStore, pdb)
-	ctx := context.TODO()
 	dc.sync(ctx, pdbName)
 	// This verifies that when a PDB has 0 pods, disruptions are not allowed.
 	ps.VerifyDisruptionAllowed(t, pdbName, 0)
@@ -552,11 +559,11 @@ func TestNakedPod(t *testing.T) {
 
 // Verify that disruption controller is not erroring when unmanaged pods are found
 func TestStatusForUnmanagedPod(t *testing.T) {
-	dc, ps := newFakeDisruptionController()
-
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	dc, ps := newFakeDisruptionController(ctx)
 	pdb, pdbName := newMinAvailablePodDisruptionBudget(t, intstr.FromString("28%"))
 	add(t, dc.pdbStore, pdb)
-	ctx := context.TODO()
 	dc.sync(ctx, pdbName)
 	// This verifies that when a PDB has 0 pods, disruptions are not allowed.
 	ps.VerifyDisruptionAllowed(t, pdbName, 0)
@@ -571,11 +578,11 @@ func TestStatusForUnmanagedPod(t *testing.T) {
 
 // Check if the unmanaged pods are correctly collected or not
 func TestTotalUnmanagedPods(t *testing.T) {
-	dc, ps := newFakeDisruptionController()
-
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	dc, ps := newFakeDisruptionController(ctx)
 	pdb, pdbName := newMinAvailablePodDisruptionBudget(t, intstr.FromString("28%"))
 	add(t, dc.pdbStore, pdb)
-	ctx := context.TODO()
 	dc.sync(ctx, pdbName)
 	// This verifies that when a PDB has 0 pods, disruptions are not allowed.
 	ps.VerifyDisruptionAllowed(t, pdbName, 0)
@@ -595,14 +602,14 @@ func TestTotalUnmanagedPods(t *testing.T) {
 
 // Verify that we count the scale of a ReplicaSet even when it has no Deployment.
 func TestReplicaSet(t *testing.T) {
-	dc, ps := newFakeDisruptionController()
-
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	dc, ps := newFakeDisruptionController(ctx)
 	pdb, pdbName := newMinAvailablePodDisruptionBudget(t, intstr.FromString("20%"))
 	add(t, dc.pdbStore, pdb)
 
 	rs, _ := newReplicaSet(t, 10)
 	add(t, dc.rsStore, rs)
-	ctx := context.TODO()
 	pod, _ := newPod(t, "pod")
 	updatePodOwnerToRs(t, pod, rs)
 	add(t, dc.podStore, pod)
@@ -616,7 +623,9 @@ func TestScaleResource(t *testing.T) {
 	pods := int32(4)
 	maxUnavailable := int32(5)
 
-	dc, ps := newFakeDisruptionController()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	dc, ps := newFakeDisruptionController(ctx)
 
 	dc.scaleClient.AddReactor("get", "customresources", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		obj := &autoscalingapi.Scale{
@@ -647,7 +656,6 @@ func TestScaleResource(t *testing.T) {
 		})
 		add(t, dc.podStore, pod)
 	}
-	ctx := context.TODO()
 	dc.sync(ctx, pdbName)
 	disruptionsAllowed := int32(0)
 	if replicas-pods < maxUnavailable {
@@ -690,7 +698,9 @@ func TestScaleFinderNoResource(t *testing.T) {
 		t.Run(tn, func(t *testing.T) {
 			customResourceUID := uuid.NewUUID()
 
-			dc, _ := newFakeDisruptionController()
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			dc, _ := newFakeDisruptionController(ctx)
 
 			dc.scaleClient.AddReactor("get", resourceName, func(action core.Action) (handled bool, ret runtime.Object, err error) {
 				gr := schema.GroupResource{
@@ -731,7 +741,9 @@ func TestScaleFinderNoResource(t *testing.T) {
 func TestMultipleControllers(t *testing.T) {
 	const podCount = 2
 
-	dc, ps := newFakeDisruptionController()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	dc, ps := newFakeDisruptionController(ctx)
 
 	pdb, pdbName := newMinAvailablePodDisruptionBudget(t, intstr.FromString("1%"))
 	add(t, dc.pdbStore, pdb)
@@ -742,7 +754,6 @@ func TestMultipleControllers(t *testing.T) {
 		pods = append(pods, pod)
 		add(t, dc.podStore, pod)
 	}
-	ctx := context.TODO()
 	dc.sync(ctx, pdbName)
 
 	// No controllers yet => no disruption allowed
@@ -781,7 +792,9 @@ func TestReplicationController(t *testing.T) {
 		"baz": "quux",
 	}
 
-	dc, ps := newFakeDisruptionController()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	dc, ps := newFakeDisruptionController(ctx)
 
 	// 34% should round up to 2
 	pdb, pdbName := newMinAvailablePodDisruptionBudget(t, intstr.FromString("34%"))
@@ -789,7 +802,7 @@ func TestReplicationController(t *testing.T) {
 	rc, _ := newReplicationController(t, 3)
 	rc.Spec.Selector = labels
 	add(t, dc.rcStore, rc)
-	ctx := context.TODO()
+
 	dc.sync(ctx, pdbName)
 
 	// It starts out at 0 expected because, with no pods, the PDB doesn't know
@@ -821,14 +834,15 @@ func TestStatefulSetController(t *testing.T) {
 		"baz": "quux",
 	}
 
-	dc, ps := newFakeDisruptionController()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	dc, ps := newFakeDisruptionController(ctx)
 
 	// 34% should round up to 2
 	pdb, pdbName := newMinAvailablePodDisruptionBudget(t, intstr.FromString("34%"))
 	add(t, dc.pdbStore, pdb)
 	ss, _ := newStatefulSet(t, 3)
 	add(t, dc.ssStore, ss)
-	ctx := context.TODO()
 	dc.sync(ctx, pdbName)
 
 	// It starts out at 0 expected because, with no pods, the PDB doesn't know
@@ -860,7 +874,9 @@ func TestTwoControllers(t *testing.T) {
 		"foo": "bar",
 		"baz": "quuux",
 	}
-	dc, ps := newFakeDisruptionController()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	dc, ps := newFakeDisruptionController(ctx)
 
 	// These constants are related, but I avoid calculating the correct values in
 	// code.  If you update a parameter here, recalculate the correct values for
@@ -875,7 +891,6 @@ func TestTwoControllers(t *testing.T) {
 	rc, _ := newReplicationController(t, collectionSize)
 	rc.Spec.Selector = rcLabels
 	add(t, dc.rcStore, rc)
-	ctx := context.TODO()
 	dc.sync(ctx, pdbName)
 
 	ps.VerifyPdbStatus(t, pdbName, 0, 0, 0, 0, map[string]metav1.Time{})
@@ -959,7 +974,9 @@ func TestTwoControllers(t *testing.T) {
 
 // Test pdb doesn't exist
 func TestPDBNotExist(t *testing.T) {
-	dc, _ := newFakeDisruptionController()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	dc, _ := newFakeDisruptionController(ctx)
 	pdb, _ := newMinAvailablePodDisruptionBudget(t, intstr.FromString("67%"))
 	add(t, dc.pdbStore, pdb)
 	if err := dc.sync(context.TODO(), "notExist"); err != nil {
@@ -968,8 +985,9 @@ func TestPDBNotExist(t *testing.T) {
 }
 
 func TestUpdateDisruptedPods(t *testing.T) {
-	dc, ps := newFakeDisruptionController()
-	dc.recheckQueue = workqueue.NewNamedDelayingQueue("pdb_queue")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	dc, ps := newFakeDisruptionController(ctx)
 	pdb, pdbName := newMinAvailablePodDisruptionBudget(t, intstr.FromInt(1))
 	currentTime := time.Now()
 	pdb.Status.DisruptedPods = map[string]metav1.Time{
@@ -989,14 +1007,15 @@ func TestUpdateDisruptedPods(t *testing.T) {
 	add(t, dc.podStore, pod2)
 	add(t, dc.podStore, pod3)
 
-	dc.sync(context.TODO(), pdbName)
+	dc.sync(ctx, pdbName)
 
 	ps.VerifyPdbStatus(t, pdbName, 0, 1, 1, 3, map[string]metav1.Time{"p3": {Time: currentTime}})
 }
 
 func TestBasicFinderFunctions(t *testing.T) {
-	dc, _ := newFakeDisruptionController()
-
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	dc, _ := newFakeDisruptionController(ctx)
 	rs, _ := newReplicaSet(t, 10)
 	add(t, dc.rsStore, rs)
 	rc, _ := newReplicationController(t, 12)
@@ -1075,7 +1094,7 @@ func TestBasicFinderFunctions(t *testing.T) {
 				UID:        tc.uid,
 			}
 
-			controllerAndScale, _ := tc.finderFunc(context.TODO(), controllerRef, metav1.NamespaceDefault)
+			controllerAndScale, _ := tc.finderFunc(ctx, controllerRef, metav1.NamespaceDefault)
 
 			if controllerAndScale == nil {
 				if tc.findsScale {
@@ -1148,7 +1167,9 @@ func TestDeploymentFinderFunction(t *testing.T) {
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			dc, _ := newFakeDisruptionController()
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			dc, _ := newFakeDisruptionController(ctx)
 
 			dep, _ := newDeployment(t, 10)
 			dep.Spec.Selector = newSel(labels)
@@ -1173,7 +1194,7 @@ func TestDeploymentFinderFunction(t *testing.T) {
 				UID:        rs.UID,
 			}
 
-			controllerAndScale, _ := dc.getPodDeployment(context.TODO(), controllerRef, metav1.NamespaceDefault)
+			controllerAndScale, _ := dc.getPodDeployment(ctx, controllerRef, metav1.NamespaceDefault)
 
 			if controllerAndScale == nil {
 				if tc.findsScale {
@@ -1207,10 +1228,11 @@ func TestDeploymentFinderFunction(t *testing.T) {
 // (C) If the DisruptionController writes DisruptionsAllowed=1 despite the
 // resource conflict error, then there is a bug.
 func TestUpdatePDBStatusRetries(t *testing.T) {
-	dc, _ := newFakeDisruptionController()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	dc, _ := newFakeDisruptionController(ctx)
 	// Inject the production code over our fake impl
 	dc.getUpdater = func() updater { return dc.writePdbStatus }
-	ctx := context.TODO()
 	// Create a PDB and 3 pods that match it.
 	pdb, pdbKey := newMinAvailablePodDisruptionBudget(t, intstr.FromInt(1))
 	pdb, err := dc.coreClient.PolicyV1().PodDisruptionBudgets(pdb.Namespace).Create(ctx, pdb, metav1.CreateOptions{})
@@ -1347,7 +1369,7 @@ func TestInvalidSelectors(t *testing.T) {
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			dc, ps := newFakeDisruptionController()
+			dc, ps := newFakeDisruptionController(ctx)
 
 			pdb, pdbName := newMinAvailablePodDisruptionBudget(t, intstr.FromInt(3))
 			pdb.Spec.Selector = tc.labelSelector

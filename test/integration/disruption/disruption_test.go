@@ -101,7 +101,8 @@ func setup(t *testing.T) (*kubeapiservertesting.TestServer, *disruption.Disrupti
 func TestPDBWithScaleSubresource(t *testing.T) {
 	s, pdbc, informers, clientSet, apiExtensionClient, dynamicClient := setup(t)
 	defer s.TearDownFn()
-	ctx := context.TODO()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	nsName := "pdb-scale-subresource"
 	createNs(ctx, t, nsName, clientSet)
 
@@ -290,7 +291,7 @@ func TestSelectorsForPodsWithoutLabels(t *testing.T) {
 						Selector:     &metav1.LabelSelector{},
 					},
 				}
-				_, err := clientSet.PolicyV1().PodDisruptionBudgets(nsName).Create(context.TODO(), pdb, metav1.CreateOptions{})
+				_, err := clientSet.PolicyV1().PodDisruptionBudgets(nsName).Create(ctx, pdb, metav1.CreateOptions{})
 				return err
 			},
 			expectedCurrentHealthy: 1,
@@ -406,7 +407,7 @@ func createPod(ctx context.Context, t *testing.T, name, namespace string, labels
 		t.Error(err)
 	}
 	addPodConditionReady(pod)
-	if _, err := clientSet.CoreV1().Pods(namespace).UpdateStatus(context.TODO(), pod, metav1.UpdateOptions{}); err != nil {
+	if _, err := clientSet.CoreV1().Pods(namespace).UpdateStatus(ctx, pod, metav1.UpdateOptions{}); err != nil {
 		t.Error(err)
 	}
 }
@@ -498,6 +499,8 @@ func waitToObservePods(t *testing.T, podInformer cache.SharedIndexInformer, podN
 }
 
 func TestPatchCompatibility(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	s, _, _, clientSet, _, _ := setup(t)
 	defer s.TearDownFn()
 
@@ -601,11 +604,11 @@ func TestPatchCompatibility(t *testing.T) {
 					},
 				},
 			}
-			if _, err := clientSet.PolicyV1().PodDisruptionBudgets(ns).Create(context.TODO(), pdb, metav1.CreateOptions{}); err != nil {
+			if _, err := clientSet.PolicyV1().PodDisruptionBudgets(ns).Create(ctx, pdb, metav1.CreateOptions{}); err != nil {
 				t.Fatalf("Error creating PodDisruptionBudget: %v", err)
 			}
 			defer func() {
-				err := clientSet.PolicyV1().PodDisruptionBudgets(ns).Delete(context.TODO(), pdb.Name, metav1.DeleteOptions{})
+				err := clientSet.PolicyV1().PodDisruptionBudgets(ns).Delete(ctx, pdb.Name, metav1.DeleteOptions{})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -614,13 +617,13 @@ func TestPatchCompatibility(t *testing.T) {
 			var resultSelector *metav1.LabelSelector
 			switch tc.version {
 			case "v1":
-				result, err := clientSet.PolicyV1().PodDisruptionBudgets(ns).Patch(context.TODO(), pdb.Name, tc.patchType, []byte(tc.patch), metav1.PatchOptions{Force: tc.force, FieldManager: tc.fieldManager})
+				result, err := clientSet.PolicyV1().PodDisruptionBudgets(ns).Patch(ctx, pdb.Name, tc.patchType, []byte(tc.patch), metav1.PatchOptions{Force: tc.force, FieldManager: tc.fieldManager})
 				if err != nil {
 					t.Fatal(err)
 				}
 				resultSelector = result.Spec.Selector
 			case "v1beta1":
-				result, err := clientSet.PolicyV1beta1().PodDisruptionBudgets(ns).Patch(context.TODO(), pdb.Name, tc.patchType, []byte(tc.patch), metav1.PatchOptions{Force: tc.force, FieldManager: tc.fieldManager})
+				result, err := clientSet.PolicyV1beta1().PodDisruptionBudgets(ns).Patch(ctx, pdb.Name, tc.patchType, []byte(tc.patch), metav1.PatchOptions{Force: tc.force, FieldManager: tc.fieldManager})
 				if err != nil {
 					t.Fatal(err)
 				}
