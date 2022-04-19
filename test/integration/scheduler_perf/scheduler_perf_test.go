@@ -77,8 +77,8 @@ var (
 				label:  extensionPointsLabelName,
 				values: []string{"Filter", "Score"},
 			},
-			"scheduler_e2e_scheduling_duration_seconds": nil,
-			"scheduler_pod_scheduling_duration_seconds": nil,
+			"scheduler_scheduling_attempt_duration_seconds": nil,
+			"scheduler_pod_scheduling_duration_seconds":     nil,
 		},
 	}
 )
