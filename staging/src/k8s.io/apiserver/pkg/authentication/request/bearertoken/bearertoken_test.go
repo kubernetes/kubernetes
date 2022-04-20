@@ -184,6 +184,13 @@ func TestBearerToken(t *testing.T) {
 			ExpectedErr:                  true,
 			ExpectedAuthorizationHeaders: []string{"Bearer 123"},
 		},
+		"invalid bearer token with a space": {
+			AuthorizationHeaders:         []string{"Bearer  token"},
+			ExpectedUserName:             "",
+			ExpectedOK:                   false,
+			ExpectedErr:                  true,
+			ExpectedAuthorizationHeaders: []string{"Bearer  token"},
+		},
 		"error bearer token": {
 			AuthorizationHeaders: []string{"Bearer 123"},
 			TokenAuth: authenticator.TokenFunc(func(ctx context.Context, t string) (*authenticator.Response, bool, error) {
