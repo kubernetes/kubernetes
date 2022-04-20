@@ -166,9 +166,12 @@ elif [[ "${E2E_TEST_DEBUG_TOOL}" == "gdb" ]]; then
   program=("gdb")
 fi
 
+# NOTE: Ginkgo's default timeout has been reduced from 24h to 1h in V2, set it manually here as "24h"
+# for backward compatibility purpose.
 "${program[@]}" "${ginkgo_args[@]:+${ginkgo_args[@]}}" "${e2e_test}" -- \
   "${auth_config[@]:+${auth_config[@]}}" \
   --ginkgo.flakeAttempts="${FLAKE_ATTEMPTS}" \
+  --ginkgo.timeout="24h" \
   --host="${KUBE_MASTER_URL}" \
   --provider="${KUBERNETES_PROVIDER}" \
   --gce-project="${PROJECT:-}" \
