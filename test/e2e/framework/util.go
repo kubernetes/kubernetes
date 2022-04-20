@@ -876,12 +876,27 @@ func (f *Framework) MatchContainerOutput(
 	Logf("Trying to get logs from node %s pod %s container %s: %v",
 		podStatus.Spec.NodeName, podStatus.Name, containerName, err)
 
-	// Sometimes the actual containers take a second to get started, try to get logs for 60s
-	logs, err := e2epod.GetPodLogs(f.ClientSet, ns, podStatus.Name, containerName)
+	// Sometimes the actual containers take a few seconds to get started, try to get logs for 1m.
+	var logs string
+	var podLogErr error
+	err = wait.PollImmediate(Poll, PollShortTimeout, func() (bool, error) {
+		logs, podLogErr = e2epod.GetPodLogs(f.ClientSet, ns, podStatus.Name, containerName)
+		if podLogErr == nil {
+			return true, nil
+		}
+		return false, nil
+	})
 	if err != nil {
-		Logf("Failed to get logs from node %q pod %q container %q. %v",
-			podStatus.Spec.NodeName, podStatus.Name, containerName, err)
-		return fmt.Errorf("failed to get logs from %s for %s: %v", podStatus.Name, containerName, err)
+		// Fetch the latest version of the pod.
+		podStatus, podStatusErr := podClient.Get(context.TODO(), podStatus.Name, metav1.GetOptions{})
+		if podStatusErr != nil {
+			return fmt.Errorf("failed to get pod: %v", podStatusErr)
+		}
+
+		err = fmt.Errorf("%s: %w", err.Error(), podLogErr)
+		Logf("Failed to get logs from node=%q podName=%q podStatus=%q container %q. %v",
+			podStatus.Spec.NodeName, podStatus.Name, podStatus.Status.Phase, containerName, err)
+		return fmt.Errorf("failed to get logs from podName=%s for containerName=%s: %v", podStatus.Name, containerName, err)
 	}
 
 	for _, expected := range expectedOutput {
