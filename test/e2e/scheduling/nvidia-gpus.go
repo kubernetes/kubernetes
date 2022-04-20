@@ -221,6 +221,9 @@ func logContainers(f *framework.Framework, pod *v1.Pod) {
 }
 
 var _ = SIGDescribe("[Feature:GPUDevicePlugin]", func() {
+	ginkgo.BeforeEach(func() {
+		e2eskipper.SkipUnlessProviderIs("gce", "gke")
+	})
 	f := framework.NewDefaultFramework("device-plugin-gpus")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	ginkgo.It("run Nvidia GPU Device Plugin tests", func() {
