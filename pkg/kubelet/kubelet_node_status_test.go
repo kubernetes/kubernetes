@@ -1701,13 +1701,46 @@ func TestUpdateDefaultLabels(t *testing.T) {
 				v1.LabelArchStable:              "new-arch",
 			},
 		},
+		{
+			name: "set labels passed via command line",
+			initialNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						v1.LabelHostname:                "new-hostname",
+						v1.LabelTopologyZone:            "new-zone-failure-domain",
+						v1.LabelTopologyRegion:          "new-zone-region",
+						v1.LabelFailureDomainBetaZone:   "new-zone-failure-domain",
+						v1.LabelFailureDomainBetaRegion: "new-zone-region",
+						v1.LabelInstanceTypeStable:      "new-instance-type",
+						v1.LabelInstanceType:            "new-instance-type",
+						v1.LabelOSStable:                "new-os",
+						v1.LabelArchStable:              "new-arch",
+						"new-command-line-label":        "foo",
+					},
+				},
+			},
+			existingNode: &v1.Node{},
+			needsUpdate:  true,
+			finalLabels: map[string]string{
+				v1.LabelHostname:                "new-hostname",
+				v1.LabelTopologyZone:            "new-zone-failure-domain",
+				v1.LabelTopologyRegion:          "new-zone-region",
+				v1.LabelFailureDomainBetaZone:   "new-zone-failure-domain",
+				v1.LabelFailureDomainBetaRegion: "new-zone-region",
+				v1.LabelInstanceTypeStable:      "new-instance-type",
+				v1.LabelInstanceType:            "new-instance-type",
+				v1.LabelOSStable:                "new-os",
+				v1.LabelArchStable:              "new-arch",
+				"new-command-line-label":        "foo",
+			},
+		},
 	}
 
 	for _, tc := range cases {
 		defer testKubelet.Cleanup()
 		kubelet := testKubelet.kubelet
 
-		needsUpdate := kubelet.updateDefaultLabels(tc.initialNode, tc.existingNode)
+		needsUpdate := kubelet.updateLabels(tc.initialNode, tc.existingNode)
 		assert.Equal(t, tc.needsUpdate, needsUpdate, tc.name)
 		assert.Equal(t, tc.finalLabels, tc.existingNode.Labels, tc.name)
 	}

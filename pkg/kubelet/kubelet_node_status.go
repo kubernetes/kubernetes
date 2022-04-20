@@ -111,7 +111,7 @@ func (kl *Kubelet) tryRegisterWithAPIServer(node *v1.Node) bool {
 	// the value of the controller-managed attach-detach
 	// annotation.
 	requiresUpdate := kl.reconcileCMADAnnotationWithExistingNode(node, existingNode)
-	requiresUpdate = kl.updateDefaultLabels(node, existingNode) || requiresUpdate
+	requiresUpdate = kl.updateLabels(node, existingNode) || requiresUpdate
 	requiresUpdate = kl.reconcileExtendedResource(node, existingNode) || requiresUpdate
 	requiresUpdate = kl.reconcileHugePageResource(node, existingNode) || requiresUpdate
 	if requiresUpdate {
@@ -211,29 +211,15 @@ func updateDefaultResources(initialNode, existingNode *v1.Node) bool {
 	return requiresUpdate
 }
 
-// updateDefaultLabels will set the default labels on the node
-func (kl *Kubelet) updateDefaultLabels(initialNode, existingNode *v1.Node) bool {
-	defaultLabels := []string{
-		v1.LabelHostname,
-		v1.LabelTopologyZone,
-		v1.LabelTopologyRegion,
-		v1.LabelFailureDomainBetaZone,
-		v1.LabelFailureDomainBetaRegion,
-		v1.LabelInstanceTypeStable,
-		v1.LabelInstanceType,
-		v1.LabelOSStable,
-		v1.LabelArchStable,
-		v1.LabelWindowsBuild,
-		kubeletapis.LabelOS,
-		kubeletapis.LabelArch,
-	}
-
+// updateLabels will set the labels on the node
+func (kl *Kubelet) updateLabels(initialNode, existingNode *v1.Node) bool {
 	needsUpdate := false
 	if existingNode.Labels == nil {
 		existingNode.Labels = make(map[string]string)
 	}
-	//Set default labels but make sure to not set labels with empty values
-	for _, label := range defaultLabels {
+
+	// Set labels but make sure to not set labels with empty values
+	for label := range initialNode.Labels {
 		if _, hasInitialValue := initialNode.Labels[label]; !hasInitialValue {
 			continue
 		}
