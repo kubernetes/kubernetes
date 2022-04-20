@@ -58,6 +58,10 @@ var (
 	extraLongThrottleLatency = 1 * time.Second
 )
 
+const (
+	ReqHook = "REQ_HOOK"
+)
+
 // HTTPClient is an interface for testing a request object.
 type HTTPClient interface {
 	Do(req *http.Request) (*http.Response, error)
@@ -815,6 +819,15 @@ func (r *Request) newHTTPRequest(ctx context.Context) (*http.Request, error) {
 	}
 	req = req.WithContext(ctx)
 	req.Header = r.headers
+
+	if v := ctx.Value(ReqHook); v != nil {
+		if hook, ok := v.(func(*http.Header)); ok {
+			hook(&req.Header)
+		} else if hook, ok := v.(func(*http.Request)); ok {
+			hook(req)
+		}
+	}
+
 	return req, nil
 }
 
