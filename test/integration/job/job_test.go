@@ -535,7 +535,7 @@ func TestDisableJobTrackingWithFinalizers(t *testing.T) {
 
 func TestOrphanPodsFinalizersClearedWithGC(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobTrackingWithFinalizers, true)()
-	for _, policy := range []metav1.DeletionPropagation{metav1.DeletePropagationOrphan, metav1.DeletePropagationBackground} {
+	for _, policy := range []metav1.DeletionPropagation{metav1.DeletePropagationOrphan, metav1.DeletePropagationBackground, metav1.DeletePropagationForeground} {
 		t.Run(string(policy), func(t *testing.T) {
 			closeFn, restConfig, clientSet, ns := setup(t, "simple")
 			defer closeFn()
