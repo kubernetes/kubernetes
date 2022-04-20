@@ -20,9 +20,12 @@ limitations under the License.
 package e2enode
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"fmt"
 	"os/exec"
+	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -206,6 +209,88 @@ var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
 				if len(postRestartRunningPods) < numAllPods {
 					framework.Failf("less pods are running after node restart, got %d but expected %d", len(postRestartRunningPods), numAllPods)
 				}
+			}
+		})
+
+		ginkgo.It("should restart successfully when PodSandboxes are missing", func() {
+			containerRuntimeEndpoint := framework.TestContext.ContainerRuntimeEndpoint
+			// We only run this test on containerd nodes for now - I'm not sure if we
+			// have a CRI independent way of removing containers outside of the kubelet api.
+			if !strings.HasSuffix(containerRuntimeEndpoint, "/containerd.sock") {
+				e2eskipper.Skipf("the container runtime is not containerd")
+			}
+			if _, err := exec.Command("which", "ctr").CombinedOutput(); err != nil {
+				e2eskipper.Skipf("'ctr' command is not found")
+			}
+			if _, err := exec.Command("which", "crictl").CombinedOutput(); err != nil {
+				e2eskipper.Skipf("'crictl' command is not found")
+			}
+
+			ginkgo.By("creating a pod on the node")
+			podCountRestartAlways := 1
+			pods := newTestPods(1, false, imageutils.GetE2EImage(imageutils.BusyBox), "restart-kubelet-test2")
+			for _, pod := range pods {
+				pod.Spec.Containers[0].Command = []string{"sleep", "3d"}
+			}
+			createBatchPodWithRateControl(f, pods, podCreationInterval)
+			defer deletePodsSync(f, pods)
+
+			completedPods := waitForPods(f, podCountRestartAlways, startTimeout)
+			if len(completedPods) < podCountRestartAlways {
+				framework.Failf("Failed to run sufficient pods, got '%d' but expected '%d'", len(completedPods), podCount)
+			}
+
+			ginkgo.By("removing a pod sandbox's '/pause' container")
+
+			// retrieve pods on the node
+			getPodsCmd := fmt.Sprintf("crictl --runtime-endpoint %q pods --quiet", containerRuntimeEndpoint)
+			stdout, err := exec.Command("sudo", "bash", "-c", getPodsCmd).CombinedOutput()
+			if err != nil {
+				framework.Failf("Failed to get pods using crictl command: %q, err: %v, stdout: %q", getPodsCmd, err, string(stdout))
+			}
+
+			// find a pod sandbox ID
+			var podSandboxID string
+			scanner := bufio.NewScanner(bytes.NewReader(stdout))
+			for scanner.Scan() {
+				line := scanner.Text()
+				podSandboxID = strings.TrimSpace(line)
+				if podSandboxID != "" {
+					break
+				}
+			}
+			if podSandboxID == "" {
+				framework.Failf("Failed to find a pod sandbox using crictl command: %q, stdout: %s", getPodsCmd, string(stdout))
+			}
+
+			// Remove the pod sandbox's /pause task - A task is not guaranteed to exist
+			// at a given point in time, so log if this fails. We only really care about
+			// the container.
+			ctrCmd := fmt.Sprintf("ctr -n k8s.io --timeout 10s --address %q", strings.TrimPrefix(containerRuntimeEndpoint, "unix://"))
+			removePodSandboxTaskCmd := fmt.Sprintf("%s t rm -f %s", ctrCmd, podSandboxID)
+			stdout, err = exec.Command("sudo", "bash", "-c", removePodSandboxTaskCmd).CombinedOutput()
+			if err != nil {
+				framework.Logf("Unable to remove the pod sandbox's /pause task using ctr command: %q, err: %v, stdout: %q", removePodSandboxTaskCmd, err, string(stdout))
+			}
+
+			// Remove the pod sandbox's /pause container
+			removePodSandboxContainerCmd := fmt.Sprintf("%s c rm %s", ctrCmd, podSandboxID)
+			stdout, err = exec.Command("sudo", "bash", "-c", removePodSandboxContainerCmd).CombinedOutput()
+			if err != nil {
+				framework.Failf("Failed to remove pod sandbox's /pause container using ctr command: %q, err: %v, stdout: %q", removePodSandboxContainerCmd, err, string(stdout))
+			}
+
+			ginkgo.By("killing kubelet")
+			// We want to kill the kubelet rather than a graceful restart
+			startKubelet := stopKubelet()
+
+			ginkgo.By("starting kubelet")
+			startKubelet()
+
+			ginkgo.By("verifying restartAlways pods stay running")
+			postRestartRunningPods := waitForPods(f, podCountRestartAlways, recoverTimeout)
+			if len(postRestartRunningPods) < podCountRestartAlways {
+				framework.Failf("fewer pods are running after node restart, got %d but expected %d", len(postRestartRunningPods), podCountRestartAlways)
 			}
 		})
 	})
