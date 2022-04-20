@@ -531,7 +531,7 @@ func newGrpcConn(addr csiAddr, metricsManager *MetricsManager) (*grpc.ClientConn
 	klog.V(4).InfoS(log("creating new gRPC connection"), "protocol", network, "endpoint", addr)
 
 	return grpc.Dial(
-		string(addr),
+		"unix:"+string(addr),
 		grpc.WithInsecure(),
 		grpc.WithContextDialer(func(ctx context.Context, target string) (net.Conn, error) {
 			return (&net.Dialer{}).DialContext(ctx, network, target)
