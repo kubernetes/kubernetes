@@ -40,9 +40,6 @@ var BannedOwners = map[schema.GroupVersionKind]struct{}{
 	{Group: "", Version: "v1", Kind: "Event"}: {},
 }
 
-// ValidateZZZ_DeprecatedClusterName can be used to check whether the given cluster name is valid.
-var ValidateZZZ_DeprecatedClusterName = NameIsDNS1035Label
-
 // ValidateAnnotations validates that a set of annotations are correctly defined.
 func ValidateAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -184,11 +181,6 @@ func ValidateObjectMetaAccessor(meta metav1.Object, requiresNamespace bool, name
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("namespace"), "not allowed on this type"))
 		}
 	}
-	if len(meta.GetZZZ_DeprecatedClusterName()) != 0 {
-		for _, msg := range ValidateZZZ_DeprecatedClusterName(meta.GetZZZ_DeprecatedClusterName(), false) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("clusterName"), meta.GetZZZ_DeprecatedClusterName(), msg))
-		}
-	}
 
 	allErrs = append(allErrs, ValidateNonnegativeField(meta.GetGeneration(), fldPath.Child("generation"))...)
 	allErrs = append(allErrs, v1validation.ValidateLabels(meta.GetLabels(), fldPath.Child("labels"))...)
@@ -261,7 +253,6 @@ func ValidateObjectMetaAccessorUpdate(newMeta, oldMeta metav1.Object, fldPath *f
 	allErrs = append(allErrs, ValidateImmutableField(newMeta.GetCreationTimestamp(), oldMeta.GetCreationTimestamp(), fldPath.Child("creationTimestamp"))...)
 	allErrs = append(allErrs, ValidateImmutableField(newMeta.GetDeletionTimestamp(), oldMeta.GetDeletionTimestamp(), fldPath.Child("deletionTimestamp"))...)
 	allErrs = append(allErrs, ValidateImmutableField(newMeta.GetDeletionGracePeriodSeconds(), oldMeta.GetDeletionGracePeriodSeconds(), fldPath.Child("deletionGracePeriodSeconds"))...)
-	allErrs = append(allErrs, ValidateImmutableField(newMeta.GetZZZ_DeprecatedClusterName(), oldMeta.GetZZZ_DeprecatedClusterName(), fldPath.Child("clusterName"))...)
 
 	allErrs = append(allErrs, v1validation.ValidateLabels(newMeta.GetLabels(), fldPath.Child("labels"))...)
 	allErrs = append(allErrs, ValidateAnnotations(newMeta.GetAnnotations(), fldPath.Child("annotations"))...)
