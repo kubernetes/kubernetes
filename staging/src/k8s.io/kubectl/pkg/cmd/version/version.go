@@ -57,8 +57,6 @@ type Options struct {
 	Short      bool
 	Output     string
 
-	args []string
-
 	discoveryClient discovery.CachedDiscoveryInterface
 
 	genericclioptions.IOStreams
@@ -93,8 +91,11 @@ func NewCmdVersion(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *co
 	return cmd
 }
 
-// Complete completes all the required options
+// Complete adapts from the command line args and factory to the data required
 func (o *Options) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+	if len(args) != 0 {
+		return cmdutil.UsageErrorf(cmd, "unexpected arguments: %v", args)
+	}
 	var err error
 	if o.ClientOnly {
 		return nil
@@ -106,16 +107,11 @@ func (o *Options) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string)
 		return err
 	}
 
-	o.args = args
 	return nil
 }
 
 // Validate validates the provided options
 func (o *Options) Validate() error {
-	if len(o.args) != 0 {
-		return errors.New(fmt.Sprintf("extra arguments: %v", o.args))
-	}
-
 	if o.Output != "" && o.Output != "yaml" && o.Output != "json" {
 		return errors.New(`--output must be 'yaml' or 'json'`)
 	}
