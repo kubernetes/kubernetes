@@ -705,15 +705,14 @@ func createInstance(imageConfig *internalGCEImage) (string, error) {
 
 		var output string
 		output, err = remote.SSH(name, "sh", "-c",
-			"'systemctl list-units  --type=service  --state=running | grep -e docker -e containerd -e crio'")
+			"'systemctl list-units  --type=service  --state=running | grep -e containerd -e crio'")
 		if err != nil {
-			err = fmt.Errorf("instance %s not running docker/containerd/crio daemon - Command failed: %s", name, output)
+			err = fmt.Errorf("instance %s not running containerd/crio daemon - Command failed: %s", name, output)
 			continue
 		}
-		if !strings.Contains(output, "docker.service") &&
-			!strings.Contains(output, "containerd.service") &&
+		if !strings.Contains(output, "containerd.service") &&
 			!strings.Contains(output, "crio.service") {
-			err = fmt.Errorf("instance %s not running docker/containerd/crio daemon: %s", name, output)
+			err = fmt.Errorf("instance %s not running containerd/crio daemon: %s", name, output)
 			continue
 		}
 		instanceRunning = true
