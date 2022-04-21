@@ -2395,13 +2395,6 @@ func schema_pkg_apis_meta_v1_ObjectMeta(ref common.ReferenceCallback) common.Ope
 							},
 						},
 					},
-					"clusterName": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Deprecated: ClusterName is a legacy field that was always cleared by the system and never used; it will be removed completely in 1.25.\n\nThe name in the go struct is changed to help clients detect accidental use.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
 					"managedFields": {
 						SchemaProps: spec.SchemaProps{
 							Description: "ManagedFields maps workflow-id and version to the set of fields that are managed by that workflow. This is mostly for internal housekeeping, and users typically shouldn't need to set or understand this field. A workflow can be the user's name, a controller's name, or the name of a specific apply path like \"ci-cd\". The set of fields is always in the version that the workflow used when modifying the object.",
