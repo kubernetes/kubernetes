@@ -177,6 +177,10 @@ func (v *volumeExpandTestSuite) DefineTests(driver storageframework.TestDriver, 
 			init()
 			defer cleanup()
 
+			if !driver.GetDriverInfo().Capabilities[storageframework.CapOfflineExpansion] {
+				e2eskipper.Skipf("Driver %q does not support offline volume expansion - skipping", driver.GetDriverInfo().Name)
+			}
+
 			var err error
 			ginkgo.By("Creating a pod with dynamically provisioned volume")
 			podConfig := e2epod.Config{
