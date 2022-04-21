@@ -194,7 +194,7 @@ func cadvisorInfoToNetworkStats(info *cadvisorapiv2.ContainerInfo) *statsapi.Net
 		return nil
 	}
 
-	if cstat.Network == nil {
+	if cstat.Network == nil || len(cstat.Network.Interfaces) == 0 {
 		return nil
 	}
 
@@ -212,7 +212,7 @@ func cadvisorInfoToNetworkStats(info *cadvisorapiv2.ContainerInfo) *statsapi.Net
 			TxErrors: &inter.TxErrors,
 		}
 
-		if inter.Name == defaultNetworkInterfaceName {
+		if inter.Name == defaultNetworkInterfaceName || iStats.InterfaceStats.Name == "" {
 			iStats.InterfaceStats = iStat
 		}
 
