@@ -11533,9 +11533,6 @@ var schemaYAML = typed.YAMLObject(`types:
         map:
           elementType:
             scalar: string
-    - name: clusterName
-      type:
-        scalar: string
     - name: creationTimestamp
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
