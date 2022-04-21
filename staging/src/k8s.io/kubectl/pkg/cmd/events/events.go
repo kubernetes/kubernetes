@@ -117,7 +117,7 @@ func NewCmdEvents(restClientGetter genericclioptions.RESTClientGetter, streams g
 		Long:                  eventsLong,
 		Example:               eventsExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			o, err := flags.ToOptions(cmd.Context(), args)
+			o, err := flags.ToOptions(cmd, args)
 			cmdutil.CheckErr(err)
 			cmdutil.CheckErr(o.Run())
 		},
@@ -135,9 +135,12 @@ func (o *EventsFlags) AddFlags(cmd *cobra.Command) {
 }
 
 // ToOptions converts from CLI inputs to runtime inputs.
-func (flags *EventsFlags) ToOptions(ctx context.Context, args []string) (*EventsOptions, error) {
+func (flags *EventsFlags) ToOptions(cmd *cobra.Command, args []string) (*EventsOptions, error) {
+	if len(args) != 0 {
+		return nil, cmdutil.UsageErrorf(cmd, "unexpected arguments: %v", args)
+	}
 	o := &EventsOptions{
-		ctx:           ctx,
+		ctx:           cmd.Context(),
 		AllNamespaces: flags.AllNamespaces,
 		Watch:         flags.Watch,
 		IOStreams:     flags.IOStreams,
