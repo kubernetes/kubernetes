@@ -316,7 +316,7 @@ func (f *ConfigFlags) toRESTMapper() (meta.RESTMapper, error) {
 		return nil, err
 	}
 
-	mapper := restmapper.NewDeferredBustedDiscoveryRESTMapper(discoveryClient)
+	mapper := restmapper.NewDeferredUncachedDiscoveryRESTMapper(discoveryClient)
 	expander := restmapper.NewShortcutExpander(mapper, discoveryClient)
 	return expander, nil
 }
