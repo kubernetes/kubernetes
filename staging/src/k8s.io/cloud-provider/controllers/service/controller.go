@@ -876,7 +876,10 @@ func (s *Controller) syncService(ctx context.Context, key string) error {
 	case err != nil:
 		runtime.HandleError(fmt.Errorf("Unable to retrieve service %v from store: %v", key, err))
 	default:
-		err = s.processServiceCreateOrUpdate(ctx, service, key)
+		// It is not safe to modify an object returned from an informer.
+		// As reconcilers may modify the service object we need to copy
+		// it first.
+		err = s.processServiceCreateOrUpdate(ctx, service.DeepCopy(), key)
 	}
 
 	return err
