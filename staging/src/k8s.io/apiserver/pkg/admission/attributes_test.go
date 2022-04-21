@@ -40,10 +40,9 @@ func TestAddAnnotation(t *testing.T) {
 
 	// test invalid plugin names
 	var testCases map[string]string = map[string]string{
-		"invalid dns subdomain": "INVALID-DNS-Subdomain/policy",
-		"no plugin name":        "policy",
-		"no key name":           "podsecuritypolicy.admission.k8s.io",
-		"empty key":             "",
+		"no plugin name": "policy",
+		"no key name":    "podsecuritypolicy.admission.k8s.io",
+		"empty key":      "",
 	}
 	for name, invalidKey := range testCases {
 		err := attr.AddAnnotation(invalidKey, "value-foo")

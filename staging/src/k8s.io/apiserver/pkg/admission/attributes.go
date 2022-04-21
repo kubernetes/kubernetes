@@ -204,7 +204,7 @@ func checkKeyFormat(key string) error {
 	if len(parts) != 2 {
 		return fmt.Errorf("annotation key has invalid format, the right format is a DNS subdomain prefix and '/' and key name. (e.g. 'podsecuritypolicy.admission.k8s.io/admit-policy')")
 	}
-	if msgs := validation.IsQualifiedName(key); len(msgs) != 0 {
+	if msgs := validation.IsQualifiedName(strings.ToLower(key)); len(msgs) != 0 {
 		return fmt.Errorf("annotation key has invalid format %s. A qualified name like 'podsecuritypolicy.admission.k8s.io/admit-policy' is required.", strings.Join(msgs, ","))
 	}
 	return nil

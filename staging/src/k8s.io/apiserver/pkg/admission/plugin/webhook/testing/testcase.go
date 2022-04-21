@@ -910,6 +910,7 @@ func NewMutatingTestCases(url *url.URL, configurationName string) []MutatingTest
 				"mutation.webhook.admission.k8s.io/round_0_index_1": mutationAnnotationValue(configurationName, "removeLabel", true),
 				"patch.webhook.admission.k8s.io/round_0_index_0":    patchAnnotationValue(configurationName, "addLabel", `[{"op": "add", "path": "/metadata/labels/added", "value": "test"}]`),
 				"patch.webhook.admission.k8s.io/round_0_index_1":    patchAnnotationValue(configurationName, "removeLabel", `[{"op": "remove", "path": "/metadata/labels/remove"}]`),
+				"removeLabel/key1": "value1",
 			},
 		},
 		{
