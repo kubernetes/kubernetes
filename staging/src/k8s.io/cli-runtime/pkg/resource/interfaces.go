@@ -26,7 +26,7 @@ import (
 
 type RESTClientGetter interface {
 	ToRESTConfig() (*rest.Config, error)
-	ToDiscoveryClient() (discovery.CachedDiscoveryInterface, error)
+	ToDiscoveryClient() (discovery.DiscoveryInterface, error)
 	ToRESTMapper() (meta.RESTMapper, error)
 }
 

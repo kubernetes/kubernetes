@@ -173,6 +173,114 @@ func GetAPIGroupResources(cl discovery.DiscoveryInterface) ([]*APIGroupResources
 	return result, nil
 }
 
+type DeferredUncachedDiscoveryRESTMapper struct {
+	initMu   sync.Mutex
+	delegate meta.RESTMapper
+	client   discovery.DiscoveryInterface
+}
+
+func NewDeferredUncachedDiscoveryRESTMapper(client discovery.DiscoveryInterface) *DeferredUncachedDiscoveryRESTMapper {
+	return &DeferredUncachedDiscoveryRESTMapper{
+		client: client,
+	}
+}
+
+func (d *DeferredUncachedDiscoveryRESTMapper) getDelegate() (meta.RESTMapper, error) {
+	d.initMu.Lock()
+	defer d.initMu.Unlock()
+
+	if d.delegate != nil {
+		return d.delegate, nil
+	}
+
+	groupResources, err := GetAPIGroupResources(d.client)
+	if err != nil {
+		return nil, err
+	}
+
+	d.delegate = NewDiscoveryRESTMapper(groupResources)
+	return d.delegate, nil
+}
+
+// KindFor takes a partial resource and returns back the single match.
+// It returns an error if there are multiple matches.
+func (d *DeferredUncachedDiscoveryRESTMapper) KindFor(resource schema.GroupVersionResource) (gvk schema.GroupVersionKind, err error) {
+	del, err := d.getDelegate()
+	if err != nil {
+		return schema.GroupVersionKind{}, err
+	}
+	return del.KindFor(resource)
+}
+
+// KindsFor takes a partial resource and returns back the list of
+// potential kinds in priority order.
+func (d *DeferredUncachedDiscoveryRESTMapper) KindsFor(resource schema.GroupVersionResource) (gvks []schema.GroupVersionKind, err error) {
+	del, err := d.getDelegate()
+	if err != nil {
+		return nil, err
+	}
+	return del.KindsFor(resource)
+}
+
+// ResourceFor takes a partial resource and returns back the single
+// match. It returns an error if there are multiple matches.
+func (d *DeferredUncachedDiscoveryRESTMapper) ResourceFor(input schema.GroupVersionResource) (gvr schema.GroupVersionResource, err error) {
+	del, err := d.getDelegate()
+	if err != nil {
+		return schema.GroupVersionResource{}, err
+	}
+	return del.ResourceFor(input)
+}
+
+// ResourcesFor takes a partial resource and returns back the list of
+// potential resource in priority order.
+func (d *DeferredUncachedDiscoveryRESTMapper) ResourcesFor(input schema.GroupVersionResource) (gvrs []schema.GroupVersionResource, err error) {
+	del, err := d.getDelegate()
+	if err != nil {
+		return nil, err
+	}
+	return del.ResourcesFor(input)
+}
+
+// RESTMapping identifies a preferred resource mapping for the
+// provided group kind.
+func (d *DeferredUncachedDiscoveryRESTMapper) RESTMapping(gk schema.GroupKind, versions ...string) (m *meta.RESTMapping, err error) {
+	del, err := d.getDelegate()
+	if err != nil {
+		return nil, err
+	}
+	return del.RESTMapping(gk, versions...)
+}
+
+// RESTMappings returns the RESTMappings for the provided group kind
+// in a rough internal preferred order. If no kind is found, it will
+// return a NoResourceMatchError.
+func (d *DeferredUncachedDiscoveryRESTMapper) RESTMappings(gk schema.GroupKind, versions ...string) (ms []*meta.RESTMapping, err error) {
+	del, err := d.getDelegate()
+	if err != nil {
+		return nil, err
+	}
+	return del.RESTMappings(gk, versions...)
+}
+
+// ResourceSingularizer converts a resource name from plural to
+// singular (e.g., from pods to pod).
+func (d *DeferredUncachedDiscoveryRESTMapper) ResourceSingularizer(resource string) (singular string, err error) {
+	del, err := d.getDelegate()
+	if err != nil {
+		return resource, err
+	}
+	return del.ResourceSingularizer(resource)
+}
+
+func (d *DeferredUncachedDiscoveryRESTMapper) String() string {
+	del, err := d.getDelegate()
+	if err != nil {
+		return fmt.Sprintf("DeferredUncachedDiscoveryRESTMapper{%v}", err)
+	}
+	return fmt.Sprintf("DeferredUncachedDiscoveryRESTMapper{\n\t%v\n}", del)
+}
+
 // DeferredDiscoveryRESTMapper is a RESTMapper that will defer
 // initialization of the RESTMapper until the first mapping is
 // requested.

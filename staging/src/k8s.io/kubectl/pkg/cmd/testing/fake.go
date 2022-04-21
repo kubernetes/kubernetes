@@ -368,13 +368,6 @@ type fakeCachedDiscoveryClient struct {
 	discovery.DiscoveryInterface
 }
 
-func (d *fakeCachedDiscoveryClient) Fresh() bool {
-	return true
-}
-
-func (d *fakeCachedDiscoveryClient) Invalidate() {
-}
-
 func (d *fakeCachedDiscoveryClient) ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
 	return []*metav1.APIGroup{}, []*metav1.APIResourceList{}, nil
 }
@@ -593,7 +586,7 @@ func (f *TestFactory) RESTClient() (*restclient.RESTClient, error) {
 }
 
 // DiscoveryClient returns a discovery client from TestFactory
-func (f *TestFactory) DiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
+func (f *TestFactory) DiscoveryClient() (discovery.DiscoveryInterface, error) {
 	fakeClient := f.Client.(*fake.RESTClient)
 
 	cacheDir := filepath.Join("", ".kube", "cache", "discovery")
