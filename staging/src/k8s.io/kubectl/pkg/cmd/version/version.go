@@ -57,7 +57,7 @@ type Options struct {
 	Short      bool
 	Output     string
 
-	discoveryClient discovery.CachedDiscoveryInterface
+	discoveryClient discovery.DiscoveryInterface
 
 	genericclioptions.IOStreams
 }
@@ -130,8 +130,8 @@ func (o *Options) Run() error {
 	versionInfo.KustomizeVersion = getKustomizeVersion()
 
 	if !o.ClientOnly && o.discoveryClient != nil {
-		// Always request fresh data from the server
-		o.discoveryClient.Invalidate()
+		//// Always request fresh data from the server
+		//o.discoveryClient.Invalidate()
 		versionInfo.ServerVersion, serverErr = o.discoveryClient.ServerVersion()
 	}
 

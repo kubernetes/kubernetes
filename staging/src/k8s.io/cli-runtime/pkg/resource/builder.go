@@ -191,7 +191,7 @@ type noopClientGetter struct{}
 func (noopClientGetter) ToRESTConfig() (*rest.Config, error) {
 	return nil, fmt.Errorf("local operation only")
 }
-func (noopClientGetter) ToDiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
+func (noopClientGetter) ToDiscoveryClient() (discovery.DiscoveryInterface, error) {
 	return nil, fmt.Errorf("local operation only")
 }
 func (noopClientGetter) ToRESTMapper() (meta.RESTMapper, error) {

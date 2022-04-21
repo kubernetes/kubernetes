@@ -173,6 +173,129 @@ func GetAPIGroupResources(cl discovery.DiscoveryInterface) ([]*APIGroupResources
 	return result, nil
 }
 
+type DeferredBustedDiscoveryRESTMapper struct {
+	initMu   sync.Mutex
+	delegate meta.RESTMapper
+	client   discovery.DiscoveryInterface
+}
+
+func NewDeferredBustedDiscoveryRESTMapper(client discovery.DiscoveryInterface) *DeferredBustedDiscoveryRESTMapper {
+	return &DeferredBustedDiscoveryRESTMapper{
+		client: client,
+	}
+}
+
+func (d *DeferredBustedDiscoveryRESTMapper) getDelegate() (meta.RESTMapper, error) {
+	d.initMu.Lock()
+	defer d.initMu.Unlock()
+
+	if d.delegate != nil {
+		return d.delegate, nil
+	}
+
+	groupResources, err := GetAPIGroupResources(d.client)
+	if err != nil {
+		return nil, err
+	}
+
+	d.delegate = NewDiscoveryRESTMapper(groupResources)
+	return d.delegate, nil
+}
+
+// TODO: I don't think the busted disco mapper needs to be resettable
+// TODO: should we still clear the delegate or is this now a no-op
+// TODO: see if this actually gets used anywhere externally
+// Reset resets the internally cached Discovery information and will
+// cause the next mapping request to re-discover.
+//func (d *DeferredBustedDiscoveryRESTMapper) Reset() {
+//	klog.V(5).Info("Invalidating discovery information")
+//
+//	d.initMu.Lock()
+//	defer d.initMu.Unlock()
+//
+//	//d.cl.Invalidate()
+//	d.delegate = nil
+//}
+
+// KindFor takes a partial resource and returns back the single match.
+// It returns an error if there are multiple matches.
+func (d *DeferredBustedDiscoveryRESTMapper) KindFor(resource schema.GroupVersionResource) (gvk schema.GroupVersionKind, err error) {
+	del, err := d.getDelegate()
+	if err != nil {
+		return schema.GroupVersionKind{}, err
+	}
+	return del.KindFor(resource)
+}
+
+// KindsFor takes a partial resource and returns back the list of
+// potential kinds in priority order.
+func (d *DeferredBustedDiscoveryRESTMapper) KindsFor(resource schema.GroupVersionResource) (gvks []schema.GroupVersionKind, err error) {
+	del, err := d.getDelegate()
+	if err != nil {
+		return nil, err
+	}
+	return del.KindsFor(resource)
+}
+
+// ResourceFor takes a partial resource and returns back the single
+// match. It returns an error if there are multiple matches.
+func (d *DeferredBustedDiscoveryRESTMapper) ResourceFor(input schema.GroupVersionResource) (gvr schema.GroupVersionResource, err error) {
+	del, err := d.getDelegate()
+	if err != nil {
+		return schema.GroupVersionResource{}, err
+	}
+	return del.ResourceFor(input)
+}
+
+// ResourcesFor takes a partial resource and returns back the list of
+// potential resource in priority order.
+func (d *DeferredBustedDiscoveryRESTMapper) ResourcesFor(input schema.GroupVersionResource) (gvrs []schema.GroupVersionResource, err error) {
+	del, err := d.getDelegate()
+	if err != nil {
+		return nil, err
+	}
+	return del.ResourcesFor(input)
+}
+
+// RESTMapping identifies a preferred resource mapping for the
+// provided group kind.
+func (d *DeferredBustedDiscoveryRESTMapper) RESTMapping(gk schema.GroupKind, versions ...string) (m *meta.RESTMapping, err error) {
+	del, err := d.getDelegate()
+	if err != nil {
+		return nil, err
+	}
+	return del.RESTMapping(gk, versions...)
+}
+
+// RESTMappings returns the RESTMappings for the provided group kind
+// in a rough internal preferred order. If no kind is found, it will
+// return a NoResourceMatchError.
+func (d *DeferredBustedDiscoveryRESTMapper) RESTMappings(gk schema.GroupKind, versions ...string) (ms []*meta.RESTMapping, err error) {
+	del, err := d.getDelegate()
+	if err != nil {
+		return nil, err
+	}
+	return del.RESTMappings(gk, versions...)
+}
+
+// ResourceSingularizer converts a resource name from plural to
+// singular (e.g., from pods to pod).
+func (d *DeferredBustedDiscoveryRESTMapper) ResourceSingularizer(resource string) (singular string, err error) {
+	del, err := d.getDelegate()
+	if err != nil {
+		return resource, err
+	}
+	return del.ResourceSingularizer(resource)
+}
+
+func (d *DeferredBustedDiscoveryRESTMapper) String() string {
+	del, err := d.getDelegate()
+	if err != nil {
+		return fmt.Sprintf("DeferredBustedDiscoveryRESTMapper{%v}", err)
+	}
+	return fmt.Sprintf("DeferredBustedDiscoveryRESTMapper{\n\t%v\n}", del)
+}
+
 // DeferredDiscoveryRESTMapper is a RESTMapper that will defer
 // initialization of the RESTMapper until the first mapping is
 // requested.

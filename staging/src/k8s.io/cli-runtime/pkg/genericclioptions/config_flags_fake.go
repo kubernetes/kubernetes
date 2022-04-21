@@ -31,7 +31,7 @@ import (
 // and interfaces that implements RESTClientGetter
 type TestConfigFlags struct {
 	clientConfig    clientcmd.ClientConfig
-	discoveryClient discovery.CachedDiscoveryInterface
+	discoveryClient discovery.DiscoveryInterface
 	restMapper      meta.RESTMapper
 }
 
@@ -54,7 +54,7 @@ func (f *TestConfigFlags) ToRESTConfig() (*rest.Config, error) {
 
 // ToDiscoveryClient implements RESTClientGetter.
 // Returns a CachedDiscoveryInterface
-func (f *TestConfigFlags) ToDiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
+func (f *TestConfigFlags) ToDiscoveryClient() (discovery.DiscoveryInterface, error) {
 	return f.discoveryClient, nil
 }
 
@@ -65,7 +65,7 @@ func (f *TestConfigFlags) ToRESTMapper() (meta.RESTMapper, error) {
 		return f.restMapper, nil
 	}
 	if f.discoveryClient != nil {
-		mapper := restmapper.NewDeferredDiscoveryRESTMapper(f.discoveryClient)
+		mapper := restmapper.NewDeferredBustedDiscoveryRESTMapper(f.discoveryClient)
 		expander := restmapper.NewShortcutExpander(mapper, f.discoveryClient)
 		return expander, nil
 	}
@@ -85,7 +85,7 @@ func (f *TestConfigFlags) WithRESTMapper(mapper meta.RESTMapper) *TestConfigFlag
 }
 
 // WithDiscoveryClient sets the discoveryClient flag
-func (f *TestConfigFlags) WithDiscoveryClient(c discovery.CachedDiscoveryInterface) *TestConfigFlags {
+func (f *TestConfigFlags) WithDiscoveryClient(c discovery.DiscoveryInterface) *TestConfigFlags {
 	f.discoveryClient = c
 	return f
 }

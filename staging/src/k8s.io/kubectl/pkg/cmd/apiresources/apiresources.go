@@ -145,10 +145,10 @@ func (o *APIResourceOptions) RunAPIResources(cmd *cobra.Command, f cmdutil.Facto
 		return err
 	}
 
-	if !o.Cached {
-		// Always request fresh data from the server
-		discoveryclient.Invalidate()
-	}
+	//if !o.Cached {
+	//	// Always request fresh data from the server
+	//	discoveryclient.Invalidate()
+	//}
 
 	errs := []error{}
 	lists, err := discoveryclient.ServerPreferredResources()

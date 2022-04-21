@@ -38,6 +38,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 )
 
+// TODO: nuke this whole struct
 // CachedDiscoveryClient implements the functions that discovery server-supported API groups,
 // versions and resources.
 type CachedDiscoveryClient struct {
@@ -63,7 +64,7 @@ type CachedDiscoveryClient struct {
 	openapiClient openapi.Client
 }
 
-var _ discovery.CachedDiscoveryInterface = &CachedDiscoveryClient{}
+var _ discovery.DiscoveryInterface = &CachedDiscoveryClient{}
 
 // ServerResourcesForGroupVersion returns the supported resources for a group and version.
 func (d *CachedDiscoveryClient) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
@@ -282,7 +283,7 @@ func (d *CachedDiscoveryClient) Invalidate() {
 // CachedDiscoveryClient cache data. If httpCacheDir is empty, the restconfig's transport will not
 // be updated with a roundtripper that understands cache responses.
 // If discoveryCacheDir is empty, cached server resource data will be looked up in the current directory.
-func NewCachedDiscoveryClientForConfig(config *restclient.Config, discoveryCacheDir, httpCacheDir string, ttl time.Duration) (*CachedDiscoveryClient, error) {
+func NewCachedDiscoveryClientForConfig(config *restclient.Config, discoveryCacheDir, httpCacheDir string, ttl time.Duration) (discovery.DiscoveryInterface, error) {
 	if len(httpCacheDir) > 0 {
 		// update the given restconfig with a custom roundtripper that
 		// understands how to handle cache responses.
@@ -292,21 +293,11 @@ func NewCachedDiscoveryClientForConfig(config *restclient.Config, discoveryCache
 		})
 	}
 
-	discoveryClient, err := discovery.NewDiscoveryClientForConfig(config)
-	if err != nil {
-		return nil, err
-	}
+	return discovery.NewDiscoveryClientForConfig(config)
+	//discoveryClient, err := discovery.NewDiscoveryClientForConfig(config)
+	//if err != nil {
+	//	return nil, err
+	//}
 
-	return newCachedDiscoveryClient(discoveryClient, discoveryCacheDir, ttl), nil
-}
-
-// NewCachedDiscoveryClient creates a new DiscoveryClient.  cacheDirectory is the directory where discovery docs are held.  It must be unique per host:port combination to work well.
-func newCachedDiscoveryClient(delegate discovery.DiscoveryInterface, cacheDirectory string, ttl time.Duration) *CachedDiscoveryClient {
-	return &CachedDiscoveryClient{
-		delegate:       delegate,
-		cacheDirectory: cacheDirectory,
-		ttl:            ttl,
-		ourFiles:       map[string]struct{}{},
-		fresh:          true,
-	}
+	//return newCachedDiscoveryClient(discoveryClient, discoveryCacheDir, ttl), nil
 }

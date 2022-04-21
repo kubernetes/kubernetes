@@ -38,7 +38,7 @@ var (
 
 // APIVersionsOptions have the data required for API versions
 type APIVersionsOptions struct {
-	discoveryClient discovery.CachedDiscoveryInterface
+	discoveryClient discovery.DiscoveryInterface
 
 	genericclioptions.IOStreams
 }
@@ -83,7 +83,7 @@ func (o *APIVersionsOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 // RunAPIVersions does the work
 func (o *APIVersionsOptions) RunAPIVersions() error {
 	// Always request fresh data from the server
-	o.discoveryClient.Invalidate()
+	//o.discoveryClient.Invalidate()
 
 	groupList, err := o.discoveryClient.ServerGroups()
 	if err != nil {

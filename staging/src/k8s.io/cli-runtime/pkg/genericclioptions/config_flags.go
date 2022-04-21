@@ -68,7 +68,7 @@ type RESTClientGetter interface {
 	// ToRESTConfig returns restconfig
 	ToRESTConfig() (*rest.Config, error)
 	// ToDiscoveryClient returns discovery client
-	ToDiscoveryClient() (discovery.CachedDiscoveryInterface, error)
+	ToDiscoveryClient() (discovery.DiscoveryInterface, error)
 	// ToRESTMapper returns a restmapper
 	ToRESTMapper() (meta.RESTMapper, error)
 	// ToRawKubeConfigLoader return kubeconfig loader as-is
@@ -111,7 +111,7 @@ type ConfigFlags struct {
 	restMapper     meta.RESTMapper
 	restMapperLock sync.Mutex
 
-	discoveryClient     discovery.CachedDiscoveryInterface
+	discoveryClient     discovery.DiscoveryInterface
 	discoveryClientLock sync.Mutex
 
 	// If set to true, will use persistent client config, rest mapper, discovery client, and
@@ -245,14 +245,14 @@ func (f *ConfigFlags) toRawKubePersistentConfigLoader() clientcmd.ClientConfig {
 // ToDiscoveryClient implements RESTClientGetter.
 // Expects the AddFlags method to have been called.
 // Returns a CachedDiscoveryInterface using a computed RESTConfig.
-func (f *ConfigFlags) ToDiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
+func (f *ConfigFlags) ToDiscoveryClient() (discovery.DiscoveryInterface, error) {
 	if f.usePersistentConfig {
 		return f.toPersistentDiscoveryClient()
 	}
 	return f.toDiscoveryClient()
 }
 
-func (f *ConfigFlags) toPersistentDiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
+func (f *ConfigFlags) toPersistentDiscoveryClient() (discovery.DiscoveryInterface, error) {
 	f.discoveryClientLock.Lock()
 	defer f.discoveryClientLock.Unlock()
 
@@ -266,7 +266,7 @@ func (f *ConfigFlags) toPersistentDiscoveryClient() (discovery.CachedDiscoveryIn
 	return f.discoveryClient, nil
 }
 
-func (f *ConfigFlags) toDiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
+func (f *ConfigFlags) toDiscoveryClient() (discovery.DiscoveryInterface, error) {
 	config, err := f.ToRESTConfig()
 	if err != nil {
 		return nil, err
@@ -316,7 +316,7 @@ func (f *ConfigFlags) toRESTMapper() (meta.RESTMapper, error) {
 		return nil, err
 	}
 
-	mapper := restmapper.NewDeferredDiscoveryRESTMapper(discoveryClient)
+	mapper := restmapper.NewDeferredBustedDiscoveryRESTMapper(discoveryClient)
 	expander := restmapper.NewShortcutExpander(mapper, discoveryClient)
 	return expander, nil
 }

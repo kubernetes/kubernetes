@@ -65,6 +65,8 @@ type DiscoveryInterface interface {
 	OpenAPIV3SchemaInterface
 }
 
+// TODO: nuke this
+// TODO: can't yet kill this until mem cached discovery is off of it
 // CachedDiscoveryInterface is a DiscoveryInterface with cache invalidation and freshness.
 // Note that If the ServerResourcesForGroupVersion method returns a cache miss
 // error, the user needs to explicitly call Invalidate to clear the cache,
