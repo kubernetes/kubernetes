@@ -8,13 +8,6 @@ import (
 	"reflect"
 )
 
-var Equal = eq
-var GreaterEqual = ge
-var Greater = gt
-var LessEqual = le
-var Less = lt
-var NotEqual = ne
-
 var (
 	errBadComparisonType = errors.New("invalid type for comparison")
 	errBadComparison     = errors.New("incompatible types for comparison")
@@ -52,8 +45,8 @@ func basicKind(v reflect.Value) (kind, error) {
 	return invalidKind, errBadComparisonType
 }
 
-// eq evaluates the comparison a == b || a == c || ...
-func eq(arg1 interface{}, arg2 ...interface{}) (bool, error) {
+// Equal evaluates the comparison a == b || a == c || ...
+func Equal(arg1 interface{}, arg2 ...interface{}) (bool, error) {
 	v1 := reflect.ValueOf(arg1)
 	k1, err := basicKind(v1)
 	if err != nil {
@@ -104,15 +97,15 @@ func eq(arg1 interface{}, arg2 ...interface{}) (bool, error) {
 	return false, nil
 }
 
-// ne evaluates the comparison a != b.
-func ne(arg1, arg2 interface{}) (bool, error) {
+// NotEqual evaluates the comparison a != b.
+func NotEqual(arg1, arg2 interface{}) (bool, error) {
 	// != is the inverse of ==.
-	equal, err := eq(arg1, arg2)
+	equal, err := Equal(arg1, arg2)
 	return !equal, err
 }
 
-// lt evaluates the comparison a < b.
-func lt(arg1, arg2 interface{}) (bool, error) {
+// Less evaluates the comparison a < b.
+func Less(arg1, arg2 interface{}) (bool, error) {
 	v1 := reflect.ValueOf(arg1)
 	k1, err := basicKind(v1)
 	if err != nil {
@@ -153,30 +146,30 @@ func lt(arg1, arg2 interface{}) (bool, error) {
 	return truth, nil
 }
 
-// le evaluates the comparison <= b.
-func le(arg1, arg2 interface{}) (bool, error) {
+// LessEqual evaluates the comparison <= b.
+func LessEqual(arg1, arg2 interface{}) (bool, error) {
 	// <= is < or ==.
-	lessThan, err := lt(arg1, arg2)
+	lessThan, err := Less(arg1, arg2)
 	if lessThan || err != nil {
 		return lessThan, err
 	}
-	return eq(arg1, arg2)
+	return Equal(arg1, arg2)
 }
 
-// gt evaluates the comparison a > b.
-func gt(arg1, arg2 interface{}) (bool, error) {
+// Greater evaluates the comparison a > b.
+func Greater(arg1, arg2 interface{}) (bool, error) {
 	// > is the inverse of <=.
-	lessOrEqual, err := le(arg1, arg2)
+	lessOrEqual, err := LessEqual(arg1, arg2)
 	if err != nil {
 		return false, err
 	}
 	return !lessOrEqual, nil
 }
 
-// ge evaluates the comparison a >= b.
-func ge(arg1, arg2 interface{}) (bool, error) {
+// GreaterEqual evaluates the comparison a >= b.
+func GreaterEqual(arg1, arg2 interface{}) (bool, error) {
 	// >= is the inverse of <.
-	lessThan, err := lt(arg1, arg2)
+	lessThan, err := Less(arg1, arg2)
 	if err != nil {
 		return false, err
 	}
