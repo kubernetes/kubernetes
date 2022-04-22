@@ -188,18 +188,19 @@ func (d *Helper) daemonSetFilter(pod corev1.Pod) PodDeleteStatus {
 	}
 
 	if _, err := d.Client.AppsV1().DaemonSets(pod.Namespace).Get(context.TODO(), controllerRef.Name, metav1.GetOptions{}); err != nil {
-		// remove orphaned pods with a warning if --force is used
+		// if --force is used， remove orphaned pods with a warning
 		if apierrors.IsNotFound(err) && d.Force {
 			return MakePodDeleteStatusWithWarning(true, err.Error())
 		}
-
+		// if --force/--ignore-daemonsets are used, the pod can also be removed with a warning
+		if d.IgnoreAllDaemonSets && d.Force {
+			return MakePodDeleteStatusWithWarning(false, daemonSetWarning)
+		}
 		return MakePodDeleteStatusWithError(err.Error())
 	}
-
 	if !d.IgnoreAllDaemonSets {
 		return MakePodDeleteStatusWithError(daemonSetFatal)
 	}
-
 	return MakePodDeleteStatusWithWarning(false, daemonSetWarning)
 }
 
