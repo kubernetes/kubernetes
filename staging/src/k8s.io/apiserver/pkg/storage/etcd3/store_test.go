@@ -1790,7 +1790,7 @@ func TestListPaginationRareObject(t *testing.T) {
 	transformer := &prefixTransformer{prefix: []byte(defaultTestPrefix)}
 	recorder := &clientRecorder{KV: etcdClient.KV}
 	etcdClient.KV = recorder
-	store := newStore(etcdClient, codec, newPod, "", schema.GroupResource{Resource: "pods"}, transformer, true, NewDefaultLeaseManagerConfig())
+	store := newStore(etcdClient, codec, newPod, "", schema.GroupResource{Resource: "pods"}, transformer, true, newTestLeaseManagerConfig())
 	ctx := context.Background()
 
 	podCount := 1000
