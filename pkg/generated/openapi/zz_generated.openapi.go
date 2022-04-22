@@ -48465,33 +48465,6 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_DeprecatedControllerCo
 			SchemaProps: spec.SchemaProps{
 				Description: "DeprecatedControllerConfiguration contains elements be deprecated.",
 				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"DeletingPodsQPS": {
-						SchemaProps: spec.SchemaProps{
-							Description: "DEPRECATED: deletingPodsQps is the number of nodes per second on which pods are deleted in case of node failure.",
-							Default:     0,
-							Type:        []string{"number"},
-							Format:      "float",
-						},
-					},
-					"DeletingPodsBurst": {
-						SchemaProps: spec.SchemaProps{
-							Description: "DEPRECATED: deletingPodsBurst is the number of nodes on which pods are bursty deleted in case of node failure. For more details look into RateLimiter.",
-							Default:     0,
-							Type:        []string{"integer"},
-							Format:      "int32",
-						},
-					},
-					"RegisterRetryCount": {
-						SchemaProps: spec.SchemaProps{
-							Description: "registerRetryCount is the number of retries for initial node registration. Retry interval equals node-sync-period.",
-							Default:     0,
-							Type:        []string{"integer"},
-							Format:      "int32",
-						},
-					},
-				},
-				Required: []string{"DeletingPodsQPS", "DeletingPodsBurst", "RegisterRetryCount"},
 			},
 		},
 	}
