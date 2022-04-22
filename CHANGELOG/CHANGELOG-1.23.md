@@ -2504,7 +2504,7 @@ filename | sha512 hash
 - Kubeadm: add support for dry running "kubeadm join". The new flag "kubeadm join --dry-run" is similar to the existing flag for "kubeadm init/upgrade" and allows you to see what changes would be applied. ([#103027](https://github.com/kubernetes/kubernetes/pull/103027), [@Haleygo](https://github.com/Haleygo)) [SIG Cluster Lifecycle]
 - Kubernetes is now built with Golang 1.16.7 ([#104199](https://github.com/kubernetes/kubernetes/pull/104199), [@cpanato](https://github.com/cpanato)) [SIG Cloud Provider, Instrumentation, Release and Testing]
 - The ServiceAccountIssuerDiscovery feature gate is removed. It reached GA in Kubernetes 1.21. ([#103685](https://github.com/kubernetes/kubernetes/pull/103685), [@mengjiao-liu](https://github.com/mengjiao-liu)) [SIG API Machinery and Auth]
-- Updated Cluster Autosaler to version 1.22.0. Release notes: https://github.com/kubernetes/autoscaler/releases/tag/cluster-autoscaler-1.22.0 ([#104293](https://github.com/kubernetes/kubernetes/pull/104293), [@x13n](https://github.com/x13n)) [SIG Autoscaling and Cloud Provider]
+- Updated Cluster Autoscaler to version 1.22.0. Release notes: https://github.com/kubernetes/autoscaler/releases/tag/cluster-autoscaler-1.22.0 ([#104293](https://github.com/kubernetes/kubernetes/pull/104293), [@x13n](https://github.com/x13n)) [SIG Autoscaling and Cloud Provider]
 - Updates the following images to pick up CVE fixes:
   - debian to v1.9.0
   - debian-iptables to v1.6.6
