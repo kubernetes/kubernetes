@@ -408,7 +408,7 @@ func (c *Cacher) startCaching(stopChannel <-chan struct{}) {
 		successfulList = true
 		c.ready.set(true)
 		klog.V(1).Infof("cacher (%v): initialized", c.objectType.String())
-		watchCacheInitializations.WithLabelValues(c.objectType.String()).Inc()
+		metrics.WatchCacheInitializations.WithLabelValues(c.objectType.String()).Inc()
 	})
 	defer func() {
 		if successfulList {
@@ -773,7 +773,7 @@ func (c *Cacher) dispatchEvents() {
 				c.dispatchEvent(&event)
 			}
 			lastProcessedResourceVersion = event.ResourceVersion
-			eventsCounter.WithLabelValues(c.objectType.String()).Inc()
+			metrics.EventsCounter.WithLabelValues(c.objectType.String()).Inc()
 		case <-bookmarkTimer.C():
 			bookmarkTimer.Reset(wait.Jitter(time.Second, 0.25))
 			// Never send a bookmark event if we did not see an event here, this is fine
@@ -1212,7 +1212,7 @@ func (c *cacheWatcher) add(event *watchCacheEvent, timer *time.Timer) bool {
 		// Since we don't want to block on it infinitely,
 		// we simply terminate it.
 		klog.V(1).Infof("Forcing %v watcher close due to unresponsiveness: %v. len(c.input) = %v, len(c.result) = %v", c.objectType.String(), c.identifier, len(c.input), len(c.result))
-		terminatedWatchersCounter.WithLabelValues(c.objectType.String()).Inc()
+		metrics.TerminatedWatchersCounter.WithLabelValues(c.objectType.String()).Inc()
 		c.forget()
 	}
 
@@ -1392,7 +1392,7 @@ func (c *cacheWatcher) processInterval(ctx context.Context, cacheInterval *watch
 
 	objType := c.objectType.String()
 	if initEventCount > 0 {
-		initCounter.WithLabelValues(objType).Add(float64(initEventCount))
+		metrics.InitCounter.WithLabelValues(objType).Add(float64(initEventCount))
 	}
 	processingTime := time.Since(startTime)
 	if processingTime > initProcessThreshold {
