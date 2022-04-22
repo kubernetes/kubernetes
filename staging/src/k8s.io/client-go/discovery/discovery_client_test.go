@@ -404,6 +404,120 @@ func TestGetServerResourcesForGroupVersion(t *testing.T) {
 	}
 }
 
+func TestHashes(t *testing.T) {
+	savedHashes := map[string][]string{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		savedHashes[req.URL.Path] = req.URL.Query()["hash"]
+		var obj interface{}
+		switch req.URL.Path {
+		case "/api":
+			obj = &metav1.APIVersions{
+				Versions: []string{
+					"v1",
+				},
+			}
+		case "/apis":
+			obj = &metav1.APIGroupList{
+				Groups: []metav1.APIGroup{
+					{
+						Name: "extensions",
+						Versions: []metav1.GroupVersionForDiscovery{
+							{GroupVersion: "extensions/v1beta1", Version: "v1beta1", Hash: "hash1"},
+							{GroupVersion: "extensions/v1beta2", Version: "v1beta2", Hash: "hash2"},
+						},
+					},
+					{
+						Name: "apps",
+						Versions: []metav1.GroupVersionForDiscovery{
+							// No hash set for apps group
+							{GroupVersion: "apps/v1beta1", Version: "v1beta1"},
+							{GroupVersion: "apps/v1beta2", Version: "v1beta2"},
+						},
+					},
+				},
+			}
+		default:
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		output, err := json.Marshal(obj)
+		if err != nil {
+			t.Fatalf("unexpected encoding error: %v", err)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write(output)
+	}))
+	defer server.Close()
+	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
+	tests := []struct {
+		path         string
+		groupVersion string
+		hashPre      []string
+		hashPost     []string
+	}{
+		{
+			path:         "/api/v1",
+			groupVersion: "v1",
+			hashPre:      nil,
+			hashPost:     nil,
+		},
+		{
+			path:         "/apis/apps/v1beta1",
+			groupVersion: "apps/v1beta1",
+			hashPre:      nil,
+			hashPost:     nil,
+		},
+		{
+			path:         "/apis/apps/v1beta2",
+			groupVersion: "apps/v1beta2",
+			hashPre:      nil,
+			hashPost:     nil,
+		},
+		{
+			path:         "/apis/extensions/v1beta1",
+			groupVersion: "extensions/v1beta1",
+			hashPre:      nil,
+			hashPost:     []string{"hash1"},
+		},
+		{
+			path:         "/apis/extensions/v1beta2",
+			groupVersion: "extensions/v1beta2",
+			hashPre:      nil,
+			hashPost:     []string{"hash2"},
+		},
+	}
+	_ = tests
+	for _, test := range tests {
+		client.ServerResourcesForGroupVersion(test.groupVersion)
+		if !reflect.DeepEqual(test.hashPre, savedHashes[test.path]) {
+			t.Errorf("unexpected hash before calling ServerGroups(). Expected: %s, got: %s", test.hashPre, savedHashes[test.path])
+		}
+	}
+	// ServerGroups should not return an error even if server returns error at /api and /apis
+	apiGroups, err := client.ServerGroups()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	for _, apiGroup := range apiGroups.Groups {
+		for _, version := range apiGroup.Versions {
+			groupVersion := schema.GroupVersion{Group: apiGroup.Name, Version: version.Version}
+			if client.hashesByGroupVersion[groupVersion.String()] != version.Hash {
+				t.Errorf("unexpected hash, expected: %s, got: %s", version.Hash, client.hashesByGroupVersion[groupVersion.String()])
+			}
+		}
+	}
+
+	for _, test := range tests {
+		client.ServerResourcesForGroupVersion(test.groupVersion)
+		if !reflect.DeepEqual(test.hashPost, savedHashes[test.path]) {
+			t.Errorf("unexpected hash before calling ServerGroups(). Expected: %s, got: %s", test.hashPost, savedHashes[test.path])
+		}
+	}
+}
+
 func returnedOpenAPI() *openapi_v2.Document {
 	return &openapi_v2.Document{
 		Definitions: &openapi_v2.Definitions{

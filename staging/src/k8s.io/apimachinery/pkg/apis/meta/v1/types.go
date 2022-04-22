@@ -1079,6 +1079,8 @@ type GroupVersionForDiscovery struct {
 	// version specifies the version in the form of "version". This is to save
 	// the clients the trouble of splitting the GroupVersion.
 	Version string `json:"version" protobuf:"bytes,2,opt,name=version"`
+	// hash is the current hash of the GroupVersion, used allow the client to detect if the groupversion has changed at all.
+	Hash string `json:"hash,omitempty" protobuf:"bytes,5,opt"`
 }
 
 // APIResource specifies the name of a resource and whether it is namespaced.
