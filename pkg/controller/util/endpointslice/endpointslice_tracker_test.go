@@ -124,6 +124,10 @@ func TestEndpointSliceTrackerStaleSlices(t *testing.T) {
 	epSlice1NewerGen := epSlice1.DeepCopy()
 	epSlice1NewerGen.Generation = 2
 
+	epTerminatingSlice := epSlice1.DeepCopy()
+	now := metav1.Now()
+	epTerminatingSlice.DeletionTimestamp = &now
+
 	testCases := []struct {
 		name         string
 		tracker      *EndpointSliceTracker
@@ -208,6 +212,18 @@ func TestEndpointSliceTrackerStaleSlices(t *testing.T) {
 		serviceParam: &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "svc1", Namespace: "ns1"}},
 		slicesParam:  []*discovery.EndpointSlice{},
 		expectNewer:  true,
+	}, {
+		name: "slice in params is has non nil deletion timestamp",
+		tracker: &EndpointSliceTracker{
+			generationsByService: map[types.NamespacedName]GenerationsBySlice{
+				{Name: "svc1", Namespace: "ns1"}: {
+					epSlice1.UID: epSlice1.Generation,
+				},
+			},
+		},
+		serviceParam: &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "svc1", Namespace: "ns1"}},
+		slicesParam:  []*discovery.EndpointSlice{epTerminatingSlice},
+		expectNewer:  false,
 	}}
 
 	for _, tc := range testCases {
