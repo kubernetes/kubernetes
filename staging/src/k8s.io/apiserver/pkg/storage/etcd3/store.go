@@ -593,9 +593,11 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 
 	// set the appropriate clientv3 options to filter the returned data set
 	var limitOption *clientv3.OpOption
-	var limit int64 = pred.Limit
+	limit := pred.Limit
+	var paging bool
 	options := make([]clientv3.OpOption, 0, 4)
 	if s.pagingEnabled && pred.Limit > 0 {
+		paging = true
 		options = append(options, clientv3.WithLimit(limit))
 		limitOption = &options[len(options)-1]
 	}
@@ -722,7 +724,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 
 		// take items from the response until the bucket is full, filtering as we go
 		for i, kv := range getResp.Kvs {
-			if limitOption != nil && int64(v.Len()) >= pred.Limit {
+			if paging && int64(v.Len()) >= pred.Limit {
 				hasMore = true
 				break
 			}
@@ -748,7 +750,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		}
 
 		// no more results remain or we didn't request paging
-		if !hasMore || limitOption == nil {
+		if !hasMore || !paging {
 			break
 		}
 		// we're paging but we have filled our bucket
