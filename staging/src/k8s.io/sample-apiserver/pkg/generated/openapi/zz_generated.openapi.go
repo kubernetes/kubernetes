@@ -848,6 +848,13 @@ func schema_pkg_apis_meta_v1_GroupVersionForDiscovery(ref common.ReferenceCallba
 							Format:      "",
 						},
 					},
+					"hash": {
+						SchemaProps: spec.SchemaProps{
+							Description: "hash is the current hash of the GroupVersion, used allow the client to detect if the groupversion has changed at all.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
 				Required: []string{"groupVersion", "version"},
 			},

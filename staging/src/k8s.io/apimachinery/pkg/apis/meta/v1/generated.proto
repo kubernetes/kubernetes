@@ -381,6 +381,9 @@ message GroupVersionForDiscovery {
   // version specifies the version in the form of "version". This is to save
   // the clients the trouble of splitting the GroupVersion.
   optional string version = 2;
+
+  // hash is the current hash of the GroupVersion, used allow the client to detect if the groupversion has changed at all.
+  optional string hash = 5;
 }
 
 // GroupVersionKind unambiguously identifies a kind.  It doesn't anonymously include GroupVersion
