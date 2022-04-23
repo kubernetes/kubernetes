@@ -1954,8 +1954,8 @@ func TestFindSecurityGroupForInstance(t *testing.T) {
 	if err != nil {
 		t.Error()
 	}
-	assert.Equal(t, *id.GroupId, "sg123")
-	assert.Equal(t, *id.GroupName, "my_group")
+	assert.Equal(t, "sg123", *id.GroupId)
+	assert.Equal(t, "my_group", *id.GroupName)
 }
 
 func TestFindSecurityGroupForInstanceMultipleTagged(t *testing.T) {
@@ -2008,7 +2008,7 @@ func TestCreateDisk(t *testing.T) {
 
 	volumeID, err := c.CreateDisk(volumeOptions)
 	assert.Nil(t, err, "Error creating disk: %v", err)
-	assert.Equal(t, volumeID, KubernetesVolumeID("aws://us-east-1a/vol-volumeId0"))
+	assert.Equal(t, "aws://us-east-1a/vol-volumeId0", volumeID)
 	awsServices.ec2.(*MockedFakeEC2).AssertExpectations(t)
 }
 
