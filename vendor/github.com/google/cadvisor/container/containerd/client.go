@@ -24,12 +24,15 @@ import (
 	containersapi "github.com/containerd/containerd/api/services/containers/v1"
 	tasksapi "github.com/containerd/containerd/api/services/tasks/v1"
 	versionapi "github.com/containerd/containerd/api/services/version/v1"
+	tasktypes "github.com/containerd/containerd/api/types/task"
 	ptypes "github.com/gogo/protobuf/types"
 	"github.com/google/cadvisor/container/containerd/containers"
 	"github.com/google/cadvisor/container/containerd/errdefs"
 	"github.com/google/cadvisor/container/containerd/pkg/dialer"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/backoff"
+
+	"k8s.io/klog/v2"
 )
 
 type client struct {
@@ -113,6 +116,11 @@ func (c *client) TaskPid(ctx context.Context, id string) (uint32, error) {
 	})
 	if err != nil {
 		return 0, errdefs.FromGRPC(err)
+	}
+	if response.Process.Status == tasktypes.StatusUnknown {
+		klog.Warningf("@@@@: ContainerID: %d", id)
+		klog.Warningf("@@@@: GetRequest returns: %+v", response)
+		return 0, errdefs.ErrUnknown
 	}
 	return response.Process.Pid, nil
 }
