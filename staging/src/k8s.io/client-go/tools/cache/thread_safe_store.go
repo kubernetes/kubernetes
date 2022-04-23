@@ -64,11 +64,11 @@ type ThreadSafeStore interface {
 // IndexConditions is AND of all IndexCondition
 type IndexConditions []IndexCondition
 
-// IndexCondition contains a IndexName, a IndexKey, and an operator.
+// IndexCondition contains a IndexName, a indexedValue, and an operator.
 type IndexCondition struct {
-	Operator  selection.Operator
-	IndexName string
-	IndexKey  string
+	Operator     selection.Operator
+	IndexName    string
+	indexedValue string
 }
 
 // threadSafeMap implements ThreadSafeStore
@@ -330,6 +330,9 @@ func (c *threadSafeMap) ByIndex(indexName, indexedValue string) ([]interface{}, 
 
 // ByIndexes Joint indexing by multiple indexers while supporting Operator
 func (c *threadSafeMap) ByIndexes(conds IndexConditions) ([]interface{}, error) {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
 	set := sets.NewString()
 	for _, cond := range conds {
 		populatedIndex, err := c.getIndex(cond)
@@ -353,9 +356,6 @@ func (c *threadSafeMap) ByIndexes(conds IndexConditions) ([]interface{}, error) 
 
 // getIndex can get Index by given IndexCondition
 func (c *threadSafeMap) getIndex(cond IndexCondition) (sets.String, error) {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
-
 	indexFunc := c.indexers[cond.IndexName]
 	if indexFunc == nil {
 		return nil, fmt.Errorf("Index with name %s does not exist", cond.IndexName)
@@ -363,7 +363,7 @@ func (c *threadSafeMap) getIndex(cond IndexCondition) (sets.String, error) {
 
 	index := c.indices[cond.IndexName]
 
-	set := index[cond.IndexKey]
+	set := index[cond.indexedValue]
 
 	populatedIndex, err := c.populateIndex(cond.Operator, set)
 	if err != nil {

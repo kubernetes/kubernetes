@@ -47,8 +47,6 @@ type Indexer interface {
 	// ByIndex returns the stored objects whose set of indexed values
 	// for the named index includes the given indexed value
 	ByIndex(indexName, indexedValue string) ([]interface{}, error)
-	// ByIndexes returns the stored objects by given index conditions
-	ByIndexes(conds IndexConditions) ([]interface{}, error)
 	// GetIndexer return the indexers
 	// GetIndexers return the indexers
 	GetIndexers() Indexers
@@ -56,6 +54,14 @@ type Indexer interface {
 	// AddIndexers adds more indexers to this store.  If you call this after you already have data
 	// in the store, the results are undefined.
 	AddIndexers(newIndexers Indexers) error
+}
+
+// JointIndexer for doing convenient joint index against indexer
+// by given multi IndexConditions
+type JointIndexer interface {
+	Indexer
+	// ByIndexes returns the stored objects by given IndexConditions
+	ByIndexes(conds IndexConditions) ([]interface{}, error)
 }
 
 // IndexFunc knows how to compute the set of indexed values for an object.

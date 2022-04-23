@@ -195,24 +195,24 @@ func TestThreadSafeStoreByIndexes(t *testing.T) {
 		{
 			name: "equal match",
 			in: IndexConditions{
-				{Operator: selection.Equals, IndexName: testIndexer1, IndexKey: "test"},
-				{Operator: selection.Equals, IndexName: testIndexer2, IndexKey: "1"},
+				{Operator: selection.Equals, IndexName: testIndexer1, indexedValue: "test"},
+				{Operator: selection.Equals, IndexName: testIndexer2, indexedValue: "1"},
 			},
 			out: []interface{}{testIndexer1},
 		},
 		{
 			name: "double equal match",
 			in: IndexConditions{
-				{Operator: selection.DoubleEquals, IndexName: testIndexer1, IndexKey: "test"},
-				{Operator: selection.DoubleEquals, IndexName: testIndexer2, IndexKey: "1"},
+				{Operator: selection.DoubleEquals, IndexName: testIndexer1, indexedValue: "test"},
+				{Operator: selection.DoubleEquals, IndexName: testIndexer2, indexedValue: "1"},
 			},
 			out: []interface{}{testIndexer1},
 		},
 		{
 			name: "not equal match",
 			in: IndexConditions{
-				{Operator: selection.Equals, IndexName: testIndexer1, IndexKey: "test"},
-				{Operator: selection.NotEquals, IndexName: testIndexer2, IndexKey: "1"},
+				{Operator: selection.Equals, IndexName: testIndexer1, indexedValue: "test"},
+				{Operator: selection.NotEquals, IndexName: testIndexer2, indexedValue: "1"},
 			},
 			out: []interface{}{testIndexer2},
 		},
@@ -225,8 +225,11 @@ func TestThreadSafeStoreByIndexes(t *testing.T) {
 				t.Errorf("ByIndexes() error = %v", err)
 				return
 			}
+			if len(got) != len(tt.out) {
+				t.Errorf("ByIndexes() len of got = %v, len of want = %v", got, tt.out)
+			}
 			if got[0].(string) != tt.out[0].(string) {
-				t.Errorf("ByIndexes() got = %v, want %v", got, tt.out)
+				t.Errorf("ByIndexes() got = %v, want = %v", got, tt.out)
 			}
 		})
 	}
