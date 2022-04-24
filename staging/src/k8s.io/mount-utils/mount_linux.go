@@ -21,7 +21,10 @@ package mount
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"github.com/moby/sys/mountinfo"
+	"io/fs"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -690,6 +693,60 @@ func SearchMountPoints(hostSource, mountInfoPath string) ([]string, error) {
 	}
 
 	return refs, nil
+}
+
+// IsMountPoint determines if a file is a mountpoint.
+// It first detects bind & any other mountpoints using
+// MountedFast function. If the MountedFast function returns
+// sure as true and err as nil, then a mountpoint is detected
+// successfully. When an error is returned by MountedFast, the
+// following is true:
+// 1. All errors are returned with IsMountPoint as false
+// except os.IsPermission.
+// 2. When os.IsPermission is returned by MountedFast, List()
+// is called to confirm if the given file is a mountpoint are not.
+//
+// os.ErrNotExist should always be returned if a file does not exist
+// as callers have in past relied on this error and not fallback.
+//
+// When MountedFast returns sure as false and err as nil (eg: in
+// case of bindmounts on kernel version 5.10- ); mounter.List()
+// endpoint is called to enumerate all the mountpoints and check if
+// it is mountpoint match or not.
+func (mounter *Mounter) IsMountPoint(file string) (bool, error) {
+	isMnt, sure, isMntErr := mountinfo.MountedFast(file)
+	if sure && isMntErr == nil {
+		return isMnt, nil
+	}
+	if isMntErr != nil {
+		if errors.Is(isMntErr, fs.ErrNotExist) {
+			return false, fs.ErrNotExist
+		}
+		// We were not allowed to do the simple stat() check, e.g. on NFS with
+		// root_squash. Fall back to /proc/mounts check below when
+		// fs.ErrPermission is returned.
+		if !errors.Is(isMntErr, fs.ErrPermission) {
+			return false, isMntErr
+		}
+	}
+	// Resolve any symlinks in file, kernel would do the same and use the resolved path in /proc/mounts.
+	resolvedFile, err := filepath.EvalSymlinks(file)
+	if err != nil {
+		return false, err
+	}
+
+	// check all mountpoints since MountedFast is not sure.
+	// is not reliable for some mountpoint types.
+	mountPoints, mountPointsErr := mounter.List()
+	if mountPointsErr != nil {
+		return false, mountPointsErr
+	}
+	for _, mp := range mountPoints {
+		if isMountPointMatch(mp, resolvedFile) {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // tryUnmount calls plain "umount" and waits for unmountTimeout for it to finish.
