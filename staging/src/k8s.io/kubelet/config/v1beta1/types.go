@@ -235,6 +235,10 @@ type KubeletConfiguration struct {
 	// Default: "127.0.0.1"
 	// +optional
 	HealthzBindAddress string `json:"healthzBindAddress,omitempty"`
+	// healthzCRI enables cri check for the healthz server.
+	// Default: false
+	// +optional
+	HealthzCRI bool `json:"healthzCRI,omitempty"`
 	// oomScoreAdj is The oom-score-adj value for kubelet process. Values
 	// must be within the range [-1000, 1000].
 	// Default: -999

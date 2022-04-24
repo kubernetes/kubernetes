@@ -210,6 +210,7 @@ var (
 		"HairpinMode",
 		"HealthzBindAddress",
 		"HealthzPort",
+		"HealthzCRI",
 		"Logging.FlushFrequency",
 		"Logging.Format",
 		"Logging.Options.JSON.InfoBufferSize.Quantity.Format",

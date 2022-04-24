@@ -166,6 +166,8 @@ type KubeletConfiguration struct {
 	HealthzPort int32
 	// healthzBindAddress is the IP address for the healthz server to serve on
 	HealthzBindAddress string
+	// HealthzCRI enables cri check for the healthz server.
+	HealthzCRI bool
 	// oomScoreAdj is The oom-score-adj value for kubelet process. Values
 	// must be within the range [-1000, 1000].
 	OOMScoreAdj int32

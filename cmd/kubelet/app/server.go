@@ -77,6 +77,8 @@ import (
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
 	nodeutil "k8s.io/component-helpers/node/util"
+	internalapi "k8s.io/cri-api/pkg/apis"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -786,8 +788,15 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 	}
 
 	if s.HealthzPort > 0 {
+		checks := []healthz.HealthChecker{healthz.PingHealthz}
 		mux := http.NewServeMux()
-		healthz.InstallHandler(mux)
+		healthz.InstallHandler(mux, checks...)
+		if s.HealthzCRI {
+			criCheck := healthz.NamedCheck("cri", func(r *http.Request) error {
+				return checkCRIStatus(kubeDeps.RemoteRuntimeService, r)
+			})
+			healthz.InstallReadyzHandler(mux, criCheck)
+		}
 		go wait.Until(func() {
 			err := http.ListenAndServe(net.JoinHostPort(s.HealthzBindAddress, strconv.Itoa(int(s.HealthzPort))), mux)
 			if err != nil {
@@ -1284,4 +1293,40 @@ func newTracerProvider(s *options.KubeletServer) (oteltrace.TracerProvider, erro
 		return nil, fmt.Errorf("could not configure tracer provider: %w", err)
 	}
 	return tp, nil
+}
+
+func checkCRIStatus(runtimeService internalapi.RuntimeService, r *http.Request) error {
+	status, err := runtimeService.Status(context.Background(), false)
+	if err != nil {
+		return err
+	}
+	if _, found := r.URL.Query()["ignore_conditions"]; found {
+		return nil
+	}
+	requiredConditions := map[string]*runtimeapi.RuntimeCondition{
+		"RuntimeReady": nil,
+	}
+	if conditions, found := r.URL.Query()["check_conditions"]; found {
+		for _, c := range conditions {
+			requiredConditions[c] = nil
+		}
+	}
+	for _, c := range status.GetStatus().GetConditions() {
+		if _, found := requiredConditions[c.GetType()]; !found {
+			continue
+		}
+		requiredConditions[c.GetType()] = c
+	}
+	var messages []string
+	for t, c := range requiredConditions {
+		if c == nil {
+			messages = append(messages, fmt.Sprintf("%s=false", t))
+		} else if !c.GetStatus() {
+			messages = append(messages, fmt.Sprintf("%s=%t reason:%s message:%s", c.GetType(), c.GetStatus(), c.GetReason(), c.GetMessage()))
+		}
+	}
+	if len(messages) > 0 {
+		return fmt.Errorf("Runtime Conditions: %s", strings.Join(messages, ", "))
+	}
+	return nil
 }

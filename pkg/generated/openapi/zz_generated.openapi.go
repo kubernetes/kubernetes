@@ -58264,6 +58264,13 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							Format:      "",
 						},
 					},
+					"healthzCRI": {
+						SchemaProps: spec.SchemaProps{
+							Description: "healthzCRI enables cri check for the healthz server. Default: false",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 					"oomScoreAdj": {
 						SchemaProps: spec.SchemaProps{
 							Description: "oomScoreAdj is The oom-score-adj value for kubelet process. Values must be within the range [-1000, 1000]. Default: -999",

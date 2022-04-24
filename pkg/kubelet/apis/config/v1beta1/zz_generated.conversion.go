@@ -382,6 +382,7 @@ func autoConvert_v1beta1_KubeletConfiguration_To_config_KubeletConfiguration(in 
 		return err
 	}
 	out.HealthzBindAddress = in.HealthzBindAddress
+	out.HealthzCRI = in.HealthzCRI
 	if err := v1.Convert_Pointer_int32_To_int32(&in.OOMScoreAdj, &out.OOMScoreAdj, s); err != nil {
 		return err
 	}
@@ -569,6 +570,7 @@ func autoConvert_config_KubeletConfiguration_To_v1beta1_KubeletConfiguration(in 
 		return err
 	}
 	out.HealthzBindAddress = in.HealthzBindAddress
+	out.HealthzCRI = in.HealthzCRI
 	if err := v1.Convert_int32_To_Pointer_int32(&in.OOMScoreAdj, &out.OOMScoreAdj, s); err != nil {
 		return err
 	}
