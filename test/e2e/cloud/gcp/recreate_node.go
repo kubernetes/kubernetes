@@ -75,7 +75,7 @@ var _ = SIGDescribe("Recreate [Feature:Recreate]", func() {
 	})
 
 	ginkgo.AfterEach(func() {
-		if ginkgo.CurrentGinkgoTestDescription().Failed {
+		if ginkgo.CurrentSpecReport().Failed() {
 			// Make sure that addon/system pods are running, so dump
 			// events for the kube-system namespace on failures
 			ginkgo.By(fmt.Sprintf("Collecting events from namespace %q.", systemNamespace))

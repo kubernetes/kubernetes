@@ -53,7 +53,7 @@ var _ = common.SIGDescribe("Services GCE [Slow]", func() {
 	})
 
 	ginkgo.AfterEach(func() {
-		if ginkgo.CurrentGinkgoTestDescription().Failed {
+		if ginkgo.CurrentSpecReport().Failed() {
 			DescribeSvc(f.Namespace.Name)
 		}
 		for _, lb := range serviceLBNames {

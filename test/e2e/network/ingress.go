@@ -102,7 +102,7 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 
 		// Platform specific cleanup
 		ginkgo.AfterEach(func() {
-			if ginkgo.CurrentGinkgoTestDescription().Failed {
+			if ginkgo.CurrentSpecReport().Failed() {
 				e2eingress.DescribeIng(ns)
 			}
 			if jig.Ingress == nil {
@@ -147,7 +147,7 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 
 		// Platform specific cleanup
 		ginkgo.AfterEach(func() {
-			if ginkgo.CurrentGinkgoTestDescription().Failed {
+			if ginkgo.CurrentSpecReport().Failed() {
 				e2eingress.DescribeIng(ns)
 			}
 			if jig.Ingress == nil {

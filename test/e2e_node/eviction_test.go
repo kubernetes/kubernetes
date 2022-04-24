@@ -644,7 +644,7 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 				},
 			})
 
-			if ginkgo.CurrentGinkgoTestDescription().Failed {
+			if ginkgo.CurrentSpecReport().Failed() {
 				if framework.TestContext.DumpLogsOnFailure {
 					logPodEvents(f)
 					logNodeEvents(f)

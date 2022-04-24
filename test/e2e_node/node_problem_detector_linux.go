@@ -425,7 +425,7 @@ current-context: local-context
 		})
 
 		ginkgo.AfterEach(func() {
-			if ginkgo.CurrentGinkgoTestDescription().Failed && framework.TestContext.DumpLogsOnFailure {
+			if ginkgo.CurrentSpecReport().Failed() && framework.TestContext.DumpLogsOnFailure {
 				ginkgo.By("Get node problem detector log")
 				log, err := e2epod.GetPodLogs(c, ns, name, name)
 				gomega.Expect(err).ShouldNot(gomega.HaveOccurred())

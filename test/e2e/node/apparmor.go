@@ -36,7 +36,7 @@ var _ = SIGDescribe("AppArmor", func() {
 			e2esecurity.LoadAppArmorProfiles(f.Namespace.Name, f.ClientSet)
 		})
 		ginkgo.AfterEach(func() {
-			if !ginkgo.CurrentGinkgoTestDescription().Failed {
+			if !ginkgo.CurrentSpecReport().Failed() {
 				return
 			}
 			e2ekubectl.LogFailedContainers(f.ClientSet, f.Namespace.Name, framework.Logf)

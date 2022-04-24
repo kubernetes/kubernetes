@@ -67,7 +67,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 	})
 
 	ginkgo.AfterEach(func() {
-		if ginkgo.CurrentGinkgoTestDescription().Failed {
+		if ginkgo.CurrentSpecReport().Failed() {
 			DescribeSvc(f.Namespace.Name)
 		}
 		for _, lb := range serviceLBNames {
@@ -1007,7 +1007,7 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP [Slow]", func() {
 	})
 
 	ginkgo.AfterEach(func() {
-		if ginkgo.CurrentGinkgoTestDescription().Failed {
+		if ginkgo.CurrentSpecReport().Failed() {
 			DescribeSvc(f.Namespace.Name)
 		}
 		for _, lb := range serviceLBNames {

@@ -115,7 +115,7 @@ var _ = SIGDescribe("ResourceMetricsAPI [NodeFeature:ResourceMetrics]", func() {
 			var zero int64 = 0
 			f.PodClient().DeleteSync(pod0, metav1.DeleteOptions{GracePeriodSeconds: &zero}, 10*time.Minute)
 			f.PodClient().DeleteSync(pod1, metav1.DeleteOptions{GracePeriodSeconds: &zero}, 10*time.Minute)
-			if !ginkgo.CurrentGinkgoTestDescription().Failed {
+			if !ginkgo.CurrentSpecReport().Failed() {
 				return
 			}
 			if framework.TestContext.DumpLogsOnFailure {
