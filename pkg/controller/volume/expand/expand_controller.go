@@ -40,7 +40,6 @@ import (
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
-	kcache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	cloudprovider "k8s.io/cloud-provider"
@@ -80,10 +79,10 @@ type expandController struct {
 	// objects from the API server. It is shared with other controllers and
 	// therefore the PVC objects in its store should be treated as immutable.
 	pvcLister  corelisters.PersistentVolumeClaimLister
-	pvcsSynced kcache.InformerSynced
+	pvcsSynced cache.InformerSynced
 
 	pvLister corelisters.PersistentVolumeLister
-	pvSynced kcache.InformerSynced
+	pvSynced cache.InformerSynced
 
 	// cloud provider used by volume host
 	cloud cloudprovider.Interface
@@ -145,7 +144,7 @@ func NewExpandController(
 		expc.recorder,
 		blkutil)
 
-	pvcInformer.Informer().AddEventHandler(kcache.ResourceEventHandlerFuncs{
+	pvcInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: expc.enqueuePVC,
 		UpdateFunc: func(old, new interface{}) {
 			oldPVC, ok := old.(*v1.PersistentVolumeClaim)
@@ -181,7 +180,7 @@ func (expc *expandController) enqueuePVC(obj interface{}) {
 	}
 
 	if pvc.Status.Phase == v1.ClaimBound {
-		key, err := kcache.DeletionHandlingMetaNamespaceKeyFunc(pvc)
+		key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(pvc)
 		if err != nil {
 			runtime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", pvc, err))
 			return
@@ -212,7 +211,7 @@ func (expc *expandController) processNextWorkItem(ctx context.Context) bool {
 // syncHandler performs actual expansion of volume. If an error is returned
 // from this function - PVC will be requeued for resizing.
 func (expc *expandController) syncHandler(ctx context.Context, key string) error {
-	namespace, name, err := kcache.SplitMetaNamespaceKey(key)
+	namespace, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
 		return err
 	}

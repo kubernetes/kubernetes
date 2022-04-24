@@ -27,7 +27,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
-	asserttestify "github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 	v1 "k8s.io/api/core/v1"
@@ -43,7 +42,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/utils/pointer"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -18917,7 +18915,7 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 					MaxSkew:           1,
 					TopologyKey:       "k8s.io/zone",
 					WhenUnsatisfiable: core.DoNotSchedule,
-					MinDomains:        pointer.Int32(3),
+					MinDomains:        utilpointer.Int32(3),
 				},
 			},
 			wantFieldErrors: field.ErrorList{},
@@ -18955,10 +18953,10 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 					MaxSkew:           1,
 					TopologyKey:       "k8s.io/zone",
 					WhenUnsatisfiable: core.DoNotSchedule,
-					MinDomains:        pointer.Int32(-1),
+					MinDomains:        utilpointer.Int32(-1),
 				},
 			},
-			wantFieldErrors: []*field.Error{field.Invalid(fieldPathMinDomains, pointer.Int32(-1), isNotPositiveErrorMsg)},
+			wantFieldErrors: []*field.Error{field.Invalid(fieldPathMinDomains, utilpointer.Int32(-1), isNotPositiveErrorMsg)},
 		},
 		{
 			name: "cannot use non-nil MinDomains with ScheduleAnyway",
@@ -18967,10 +18965,10 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 					MaxSkew:           1,
 					TopologyKey:       "k8s.io/zone",
 					WhenUnsatisfiable: core.ScheduleAnyway,
-					MinDomains:        pointer.Int32(10),
+					MinDomains:        utilpointer.Int32(10),
 				},
 			},
-			wantFieldErrors: []*field.Error{field.Invalid(fieldPathMinDomains, pointer.Int32(10), fmt.Sprintf("can only use minDomains if whenUnsatisfiable=%s, not %s", string(core.DoNotSchedule), string(core.ScheduleAnyway)))},
+			wantFieldErrors: []*field.Error{field.Invalid(fieldPathMinDomains, utilpointer.Int32(10), fmt.Sprintf("can only use minDomains if whenUnsatisfiable=%s, not %s", string(core.DoNotSchedule), string(core.ScheduleAnyway)))},
 		},
 		{
 			name: "use negative MinDomains with ScheduleAnyway(invalid)",
@@ -18979,12 +18977,12 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 					MaxSkew:           1,
 					TopologyKey:       "k8s.io/zone",
 					WhenUnsatisfiable: core.ScheduleAnyway,
-					MinDomains:        pointer.Int32(-1),
+					MinDomains:        utilpointer.Int32(-1),
 				},
 			},
 			wantFieldErrors: []*field.Error{
-				field.Invalid(fieldPathMinDomains, pointer.Int32(-1), isNotPositiveErrorMsg),
-				field.Invalid(fieldPathMinDomains, pointer.Int32(-1), fmt.Sprintf("can only use minDomains if whenUnsatisfiable=%s, not %s", string(core.DoNotSchedule), string(core.ScheduleAnyway))),
+				field.Invalid(fieldPathMinDomains, utilpointer.Int32(-1), isNotPositiveErrorMsg),
+				field.Invalid(fieldPathMinDomains, utilpointer.Int32(-1), fmt.Sprintf("can only use minDomains if whenUnsatisfiable=%s, not %s", string(core.DoNotSchedule), string(core.ScheduleAnyway))),
 			},
 		},
 		{
@@ -19641,7 +19639,7 @@ func TestValidateSeccompAnnotationsAndFieldsMatch(t *testing.T) {
 
 	for i, test := range tests {
 		err := validateSeccompAnnotationsAndFieldsMatch(test.annotationValue, test.seccompField, test.fldPath)
-		asserttestify.Equal(t, test.expectedErr, err, "TestCase[%d]: %s", i, test.description)
+		assert.Equal(t, test.expectedErr, err, "TestCase[%d]: %s", i, test.description)
 	}
 }
 
@@ -19770,7 +19768,7 @@ func TestValidatePodTemplateSpecSeccomp(t *testing.T) {
 
 	for i, test := range tests {
 		err := ValidatePodTemplateSpec(test.spec, rootFld, PodValidationOptions{})
-		asserttestify.Equal(t, test.expectedErr, err, "TestCase[%d]: %s", i, test.description)
+		assert.Equal(t, test.expectedErr, err, "TestCase[%d]: %s", i, test.description)
 	}
 }
 

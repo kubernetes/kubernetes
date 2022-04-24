@@ -23,7 +23,6 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/controller/util/endpoint"
-	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -33,8 +32,8 @@ func TestNumEndpointsAndSlices(t *testing.T) {
 	p80 := int32(80)
 	p443 := int32(443)
 
-	pmKey80443 := endpointutil.NewPortMapKey([]discovery.EndpointPort{{Port: &p80}, {Port: &p443}})
-	pmKey80 := endpointutil.NewPortMapKey([]discovery.EndpointPort{{Port: &p80}})
+	pmKey80443 := endpoint.NewPortMapKey([]discovery.EndpointPort{{Port: &p80}, {Port: &p443}})
+	pmKey80 := endpoint.NewPortMapKey([]discovery.EndpointPort{{Port: &p80}})
 
 	spCacheEfficient := NewServicePortCache()
 	spCacheEfficient.Set(pmKey80, EfficiencyInfo{Endpoints: 45, Slices: 1})
@@ -66,8 +65,8 @@ func TestPlaceHolderSlice(t *testing.T) {
 	p80 := int32(80)
 	p443 := int32(443)
 
-	pmKey80443 := endpointutil.NewPortMapKey([]discovery.EndpointPort{{Port: &p80}, {Port: &p443}})
-	pmKey80 := endpointutil.NewPortMapKey([]discovery.EndpointPort{{Port: &p80}})
+	pmKey80443 := endpoint.NewPortMapKey([]discovery.EndpointPort{{Port: &p80}, {Port: &p443}})
+	pmKey80 := endpoint.NewPortMapKey([]discovery.EndpointPort{{Port: &p80}})
 
 	sp := NewServicePortCache()
 	sp.Set(pmKey80, EfficiencyInfo{Endpoints: 0, Slices: 1})
@@ -95,7 +94,7 @@ func benchmarkUpdateServicePortCache(b *testing.B, num int) {
 	ns := "benchmark"
 	httpKey := endpoint.NewPortMapKey([]discovery.EndpointPort{{Port: utilpointer.Int32Ptr(80)}})
 	httpsKey := endpoint.NewPortMapKey([]discovery.EndpointPort{{Port: utilpointer.Int32Ptr(443)}})
-	spCache := &ServicePortCache{items: map[endpointutil.PortMapKey]EfficiencyInfo{
+	spCache := &ServicePortCache{items: map[endpoint.PortMapKey]EfficiencyInfo{
 		httpKey: {
 			Endpoints: 182,
 			Slices:    2,

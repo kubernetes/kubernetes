@@ -24,13 +24,11 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
-	"k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/endpoint"
@@ -285,7 +283,7 @@ func TestEndpointSliceMirroringUpdates(t *testing.T) {
 		{
 			testName: "Update addresses",
 			tweakEndpoint: func(ep *corev1.Endpoints) {
-				ep.Subsets[0].Addresses = []v1.EndpointAddress{{IP: "1.2.3.4"}, {IP: "1.2.3.6"}}
+				ep.Subsets[0].Addresses = []corev1.EndpointAddress{{IP: "1.2.3.4"}, {IP: "1.2.3.6"}}
 			},
 		},
 	}
@@ -530,7 +528,7 @@ func TestEndpointSliceMirroringSelectorTransition(t *testing.T) {
 	}
 }
 
-func waitForMirroredSlices(t *testing.T, client *kubernetes.Clientset, nsName, svcName string, num int) error {
+func waitForMirroredSlices(t *testing.T, client *clientset.Clientset, nsName, svcName string, num int) error {
 	t.Helper()
 	return wait.PollImmediate(1*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
 		lSelector := discovery.LabelServiceName + "=" + svcName

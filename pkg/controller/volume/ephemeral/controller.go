@@ -34,7 +34,6 @@ import (
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
-	kcache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/component-helpers/storage/ephemeral"
@@ -57,13 +56,13 @@ type ephemeralController struct {
 	// objects from the API server. It is shared with other controllers and
 	// therefore the PVC objects in its store should be treated as immutable.
 	pvcLister  corelisters.PersistentVolumeClaimLister
-	pvcsSynced kcache.InformerSynced
+	pvcsSynced cache.InformerSynced
 
 	// podLister is the shared Pod lister used to fetch Pod
 	// objects from the API server. It is shared with other controllers and
 	// therefore the Pod objects in its store should be treated as immutable.
 	podLister corelisters.PodLister
-	podSynced kcache.InformerSynced
+	podSynced cache.InformerSynced
 
 	// podIndexer has the common PodPVC indexer indexer installed To
 	// limit iteration over pods to those of interest.
@@ -98,7 +97,7 @@ func NewController(
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 	ec.recorder = eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "ephemeral_volume"})
 
-	podInformer.Informer().AddEventHandler(kcache.ResourceEventHandlerFuncs{
+	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: ec.enqueuePod,
 		// The pod spec is immutable. Therefore the controller can ignore pod updates
 		// because there cannot be any changes that have to be copied into the generated
@@ -106,7 +105,7 @@ func NewController(
 		// Deletion of the PVC is handled through the owner reference and garbage collection.
 		// Therefore pod deletions also can be ignored.
 	})
-	pvcInformer.Informer().AddEventHandler(kcache.ResourceEventHandlerFuncs{
+	pvcInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		DeleteFunc: ec.onPVCDelete,
 	})
 	if err := common.AddPodPVCIndexerIfNotPresent(ec.podIndexer); err != nil {
@@ -130,7 +129,7 @@ func (ec *ephemeralController) enqueuePod(obj interface{}) {
 	for _, vol := range pod.Spec.Volumes {
 		if vol.Ephemeral != nil {
 			// It has at least one ephemeral inline volume, work on it.
-			key, err := kcache.DeletionHandlingMetaNamespaceKeyFunc(pod)
+			key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(pod)
 			if err != nil {
 				runtime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", pod, err))
 				return
@@ -208,7 +207,7 @@ func (ec *ephemeralController) processNextWorkItem(ctx context.Context) bool {
 // syncHandler is invoked for each pod which might need to be processed.
 // If an error is returned from this function, the pod will be requeued.
 func (ec *ephemeralController) syncHandler(ctx context.Context, key string) error {
-	namespace, name, err := kcache.SplitMetaNamespaceKey(key)
+	namespace, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
 		return err
 	}
