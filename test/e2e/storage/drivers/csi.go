@@ -59,7 +59,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -309,7 +308,7 @@ type mockCSIDriver struct {
 	embeddedCSIDriver      *mockdriver.CSIDriver
 
 	// Additional values set during PrepareTest
-	clientSet       kubernetes.Interface
+	clientSet       clientset.Interface
 	driverNamespace *v1.Namespace
 }
 

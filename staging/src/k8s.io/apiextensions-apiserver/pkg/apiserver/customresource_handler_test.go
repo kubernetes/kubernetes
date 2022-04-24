@@ -55,7 +55,6 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -478,7 +477,7 @@ func testHandlerConversion(t *testing.T, enableWatchCache bool) {
 	crd := multiVersionFixture.DeepCopy()
 	// Create a context with metav1.NamespaceNone as the namespace since multiVersionFixture
 	// is a cluster scoped CRD.
-	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceNone)
+	ctx := apirequest.WithNamespace(apirequest.NewContext(), metav1.NamespaceNone)
 	if _, err := cl.ApiextensionsV1().CustomResourceDefinitions().Create(ctx, crd, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}

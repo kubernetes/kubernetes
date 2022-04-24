@@ -26,7 +26,6 @@ import (
 	"go.etcd.io/etcd/client/pkg/v3/transport"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"google.golang.org/grpc"
-	"k8s.io/apiextensions-apiserver/pkg/cmd/server/options"
 	serveroptions "k8s.io/apiextensions-apiserver/pkg/cmd/server/options"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
@@ -37,7 +36,7 @@ import (
 )
 
 // StartDefaultServer starts a test server.
-func StartDefaultServer(t servertesting.Logger, flags ...string) (func(), *rest.Config, *options.CustomResourceDefinitionsServerOptions, error) {
+func StartDefaultServer(t servertesting.Logger, flags ...string) (func(), *rest.Config, *serveroptions.CustomResourceDefinitionsServerOptions, error) {
 	// create kubeconfig which will not actually be used. But authz/authn needs it to startup.
 	fakeKubeConfig, err := ioutil.TempFile("", "kubeconfig")
 	if err != nil {

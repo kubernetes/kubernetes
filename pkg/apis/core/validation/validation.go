@@ -45,7 +45,6 @@ import (
 	schedulinghelper "k8s.io/component-helpers/scheduling/corev1"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/apis/core"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	podshelper "k8s.io/kubernetes/pkg/apis/core/pods"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
@@ -4715,7 +4714,7 @@ func validateServicePort(sp *core.ServicePort, requireName, isHeadlessService bo
 	return allErrs
 }
 
-func needsExternalTrafficPolicy(svc *api.Service) bool {
+func needsExternalTrafficPolicy(svc *core.Service) bool {
 	return svc.Spec.Type == core.ServiceTypeLoadBalancer || svc.Spec.Type == core.ServiceTypeNodePort
 }
 
@@ -4760,7 +4759,7 @@ func validateServiceExternalTrafficPolicy(service *core.Service) field.ErrorList
 	return allErrs
 }
 
-func validateServiceExternalTrafficFieldsUpdate(before, after *api.Service) field.ErrorList {
+func validateServiceExternalTrafficFieldsUpdate(before, after *core.Service) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if apiservice.NeedsHealthCheck(before) && apiservice.NeedsHealthCheck(after) {

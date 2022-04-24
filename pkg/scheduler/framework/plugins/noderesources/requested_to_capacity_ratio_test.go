@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	plfeature "k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
@@ -317,7 +316,7 @@ func TestResourceBinPackingSingleExtended(t *testing.T) {
 					},
 				},
 			}
-			p, err := NewFit(&args, fh, feature.Features{})
+			p, err := NewFit(&args, fh, plfeature.Features{})
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -540,7 +539,7 @@ func TestResourceBinPackingMultipleExtended(t *testing.T) {
 				},
 			}
 
-			p, err := NewFit(&args, fh, feature.Features{})
+			p, err := NewFit(&args, fh, plfeature.Features{})
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
