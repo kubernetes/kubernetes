@@ -64,11 +64,11 @@ type ThreadSafeStore interface {
 // IndexConditions is AND of all IndexCondition
 type IndexConditions []IndexCondition
 
-// IndexCondition contains a IndexName, a indexedValue, and an operator.
+// IndexCondition contains a IndexName, a IndexedValue, and an operator.
 type IndexCondition struct {
 	Operator     selection.Operator
 	IndexName    string
-	indexedValue string
+	IndexedValue string
 }
 
 // threadSafeMap implements ThreadSafeStore
@@ -363,7 +363,7 @@ func (c *threadSafeMap) getIndex(cond IndexCondition) (sets.String, error) {
 
 	index := c.indices[cond.IndexName]
 
-	set := index[cond.indexedValue]
+	set := index[cond.IndexedValue]
 
 	populatedIndex, err := c.populateIndex(cond.Operator, set)
 	if err != nil {

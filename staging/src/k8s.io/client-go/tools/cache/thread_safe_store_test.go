@@ -195,24 +195,24 @@ func TestThreadSafeStoreByIndexes(t *testing.T) {
 		{
 			name: "equal match",
 			in: IndexConditions{
-				{Operator: selection.Equals, IndexName: testIndexer1, indexedValue: "test"},
-				{Operator: selection.Equals, IndexName: testIndexer2, indexedValue: "1"},
+				{Operator: selection.Equals, IndexName: testIndexer1, IndexedValue: "test"},
+				{Operator: selection.Equals, IndexName: testIndexer2, IndexedValue: "1"},
 			},
 			out: []interface{}{testIndexer1},
 		},
 		{
 			name: "double equal match",
 			in: IndexConditions{
-				{Operator: selection.DoubleEquals, IndexName: testIndexer1, indexedValue: "test"},
-				{Operator: selection.DoubleEquals, IndexName: testIndexer2, indexedValue: "1"},
+				{Operator: selection.DoubleEquals, IndexName: testIndexer1, IndexedValue: "test"},
+				{Operator: selection.DoubleEquals, IndexName: testIndexer2, IndexedValue: "1"},
 			},
 			out: []interface{}{testIndexer1},
 		},
 		{
 			name: "not equal match",
 			in: IndexConditions{
-				{Operator: selection.Equals, IndexName: testIndexer1, indexedValue: "test"},
-				{Operator: selection.NotEquals, IndexName: testIndexer2, indexedValue: "1"},
+				{Operator: selection.Equals, IndexName: testIndexer1, IndexedValue: "test"},
+				{Operator: selection.NotEquals, IndexName: testIndexer2, IndexedValue: "1"},
 			},
 			out: []interface{}{testIndexer2},
 		},
