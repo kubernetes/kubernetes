@@ -159,7 +159,7 @@ var _ = common.SIGDescribe("ClusterDns [Feature:Example]", func() {
 
 		// wait for pods to print their result
 		for _, ns := range namespaces {
-			_, err := framework.LookForStringInLog(ns.Name, frontendName, frontendName, podOutput, framework.PodStartTimeout)
+			_, err := framework.LookForStringInLog(ns.Name, frontendName, frontendName, podOutput, f.Timeouts.PodStart)
 			framework.ExpectNoError(err, "pod %s failed to print result in logs", frontendName)
 		}
 	})

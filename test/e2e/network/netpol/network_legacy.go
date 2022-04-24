@@ -79,7 +79,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			podServer, service = createServerPodAndService(f, f.Namespace, "server", []protocolPort{{80, v1.ProtocolTCP}, {81, v1.ProtocolTCP}})
 
 			ginkgo.By("Waiting for pod ready", func() {
-				err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podServer.Name, f.Namespace.Name, framework.PodStartTimeout)
+				err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podServer.Name, f.Namespace.Name, f.Timeouts.PodStart)
 				framework.ExpectNoError(err)
 			})
 
@@ -128,7 +128,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			podB, serviceB := createServerPodAndService(f, nsB, "pod-b", []protocolPort{{80, v1.ProtocolTCP}, {81, v1.ProtocolTCP}})
 
 			ginkgo.By("Waiting for pod ready", func() {
-				err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podB.Name, nsB.Name, framework.PodStartTimeout)
+				err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podB.Name, nsB.Name, f.Timeouts.PodStart)
 				framework.ExpectNoError(err)
 			})
 
