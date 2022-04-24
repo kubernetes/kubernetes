@@ -59,6 +59,19 @@ func TestGetPodQOS(t *testing.T) {
 			expected: v1.PodQOSBestEffort,
 		},
 		{
+			pod: newPod("best-effort-zero", []v1.Container{
+				newContainer("best-effort", getResourceList("0", "0"), getResourceList("0", "0")),
+			}),
+			expected: v1.PodQOSBestEffort,
+		},
+		{
+			pod: newPod("best-effort-multi-containers-zero", []v1.Container{
+				newContainer("best-effort", getResourceList("0", "0"), getResourceList("0", "0")),
+				newContainer("best-effort", getResourceList("0", "0"), getResourceList("0", "0")),
+			}),
+			expected: v1.PodQOSBestEffort,
+		},
+		{
 			pod: newPod("best-effort-burstable", []v1.Container{
 				newContainer("best-effort", getResourceList("", ""), getResourceList("", "")),
 				newContainer("burstable", getResourceList("1", ""), getResourceList("2", "")),
@@ -75,6 +88,12 @@ func TestGetPodQOS(t *testing.T) {
 		{
 			pod: newPod("burstable-cpu-guaranteed-memory", []v1.Container{
 				newContainer("burstable", getResourceList("", "100Mi"), getResourceList("", "100Mi")),
+			}),
+			expected: v1.PodQOSBurstable,
+		},
+		{
+			pod: newPod("burstable-no-requests", []v1.Container{
+				newContainer("burstable", getResourceList("", ""), getResourceList("100m", "100Mi")),
 			}),
 			expected: v1.PodQOSBurstable,
 		},
