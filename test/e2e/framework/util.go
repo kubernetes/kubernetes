@@ -488,10 +488,13 @@ type ClientConfigGetter func() (*restclient.Config, error)
 func LoadConfig() (config *restclient.Config, err error) {
 	defer func() {
 		if err == nil && config != nil {
-			testDesc := ginkgo.CurrentGinkgoTestDescription()
-			if len(testDesc.ComponentTexts) > 0 {
-				componentTexts := strings.Join(testDesc.ComponentTexts, " ")
-				config.UserAgent = fmt.Sprintf("%s -- %s", restclient.DefaultKubernetesUserAgent(), componentTexts)
+			testDesc := ginkgo.CurrentSpecReport()
+			if len(testDesc.ContainerHierarchyTexts) > 0 {
+				testName := strings.Join(testDesc.ContainerHierarchyTexts, " ")
+				if len(testDesc.LeafNodeText) > 0 {
+					testName = testName + " " + testDesc.LeafNodeText
+				}
+				config.UserAgent = fmt.Sprintf("%s -- %s", restclient.DefaultKubernetesUserAgent(), testName)
 			}
 		}
 	}()
