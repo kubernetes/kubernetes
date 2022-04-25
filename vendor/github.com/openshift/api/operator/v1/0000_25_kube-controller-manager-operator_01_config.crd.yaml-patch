@@ -1,0 +1,3 @@
+- op: replace
+  path: /spec/versions/name=v1/schema/openAPIV3Schema/properties/spec/properties/managementState/pattern
+  value: "^(Managed|Force)$"

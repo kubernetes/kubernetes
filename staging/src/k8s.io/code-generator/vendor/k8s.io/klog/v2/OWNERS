@@ -1,0 +1,13 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+reviewers:
+  - pohly
+approvers:
+  - dims
+  - thockin
+  - serathius
+emeritus_approvers:
+  - brancz
+  - justinsb
+  - lavalamp
+  - piosz
+  - tallclair
