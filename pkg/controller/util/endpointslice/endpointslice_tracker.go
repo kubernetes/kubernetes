@@ -100,9 +100,6 @@ func (est *EndpointSliceTracker) StaleSlices(service *v1.Service, endpointSlices
 		providedSlices[endpointSlice.UID] = endpointSlice.Generation
 		g, ok := gfs[endpointSlice.UID]
 		if ok && (g == deletionExpected || g > endpointSlice.Generation) {
-			if endpointSlice.DeletionTimestamp != nil {
-				continue
-			}
 			return true
 		}
 	}
