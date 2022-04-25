@@ -637,9 +637,9 @@ func disk(stats statsFunc, fsStatsToMeasure []fsStatsType, diskResource v1.Resou
 		// adjust p1, p2 usage relative to the request (if any)
 		p1Disk := p1Usage[diskResource]
 		p2Disk := p2Usage[diskResource]
-		p1Request := v1resource.GetResourceRequestQuantity(p1, v1.ResourceEphemeralStorage)
+		p1Request := v1resource.GetResourceRequestQuantity(p1, diskResource)
 		p1Disk.Sub(p1Request)
-		p2Request := v1resource.GetResourceRequestQuantity(p2, v1.ResourceEphemeralStorage)
+		p2Request := v1resource.GetResourceRequestQuantity(p2, diskResource)
 		p2Disk.Sub(p2Request)
 		// prioritize evicting the pod which has the larger consumption of disk
 		return p2Disk.Cmp(p1Disk)
