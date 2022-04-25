@@ -27,7 +27,6 @@ import (
 	"strings"
 	"time"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/klog/v2"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
@@ -73,13 +72,13 @@ func init() {
 
 // RunKubelet starts kubelet and waits for termination signal. Once receives the
 // termination signal, it will stop the kubelet gracefully.
-func RunKubelet() {
+func RunKubelet(featureGates map[string]bool) {
 	var err error
 	// Enable monitorParent to make sure kubelet will receive termination signal
 	// when test process exits.
 	e := NewE2EServices(true /* monitorParent */)
 	defer e.Stop()
-	e.kubelet, err = e.startKubelet()
+	e.kubelet, err = e.startKubelet(featureGates)
 	if err != nil {
 		klog.Fatalf("Failed to start kubelet: %v", err)
 	}
@@ -152,13 +151,8 @@ func baseKubeConfiguration(cfgPath string) (*kubeletconfig.KubeletConfiguration,
 
 // startKubelet starts the Kubelet in a separate process or returns an error
 // if the Kubelet fails to start.
-func (e *E2EServices) startKubelet() (*server, error) {
+func (e *E2EServices) startKubelet(featureGates map[string]bool) (*server, error) {
 	klog.Info("Starting kubelet")
-
-	// set feature gates so we can check which features are enabled and pass the appropriate flags
-	if err := utilfeature.DefaultMutableFeatureGate.SetFromMap(framework.TestContext.FeatureGates); err != nil {
-		return nil, err
-	}
 
 	// Build kubeconfig
 	kubeconfigPath, err := createKubeconfigCWD()
@@ -264,9 +258,9 @@ func (e *E2EServices) startKubelet() (*server, error) {
 
 	// Apply test framework feature gates by default. This could also be overridden
 	// by kubelet-flags.
-	if len(framework.TestContext.FeatureGates) > 0 {
-		cmdArgs = append(cmdArgs, "--feature-gates", cliflag.NewMapStringBool(&framework.TestContext.FeatureGates).String())
-		kc.FeatureGates = framework.TestContext.FeatureGates
+	if len(featureGates) > 0 {
+		cmdArgs = append(cmdArgs, "--feature-gates", cliflag.NewMapStringBool(&featureGates).String())
+		kc.FeatureGates = featureGates
 	}
 
 	// Keep hostname override for convenience.
