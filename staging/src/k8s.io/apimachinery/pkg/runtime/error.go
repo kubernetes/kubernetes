@@ -17,6 +17,7 @@ limitations under the License.
 package runtime
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -71,11 +72,9 @@ func (k *notRegisteredErr) Error() string {
 // IsNotRegisteredError returns true if the error indicates the provided
 // object or input data is not registered.
 func IsNotRegisteredError(err error) bool {
-	if err == nil {
-		return false
-	}
-	_, ok := err.(*notRegisteredErr)
-	return ok
+	var nerr *notRegisteredErr
+
+	return errors.As(err, &nerr)
 }
 
 type missingKindErr struct {
@@ -93,11 +92,9 @@ func (k *missingKindErr) Error() string {
 // IsMissingKind returns true if the error indicates that the provided object
 // is missing a 'Kind' field.
 func IsMissingKind(err error) bool {
-	if err == nil {
-		return false
-	}
-	_, ok := err.(*missingKindErr)
-	return ok
+	var merr *missingKindErr
+
+	return errors.As(err, &merr)
 }
 
 type missingVersionErr struct {
@@ -115,11 +112,9 @@ func (k *missingVersionErr) Error() string {
 // IsMissingVersion returns true if the error indicates that the provided object
 // is missing a 'Version' field.
 func IsMissingVersion(err error) bool {
-	if err == nil {
-		return false
-	}
-	_, ok := err.(*missingVersionErr)
-	return ok
+	var merr *missingVersionErr
+
+	return errors.As(err, &merr)
 }
 
 // strictDecodingError is a base error type that is returned by a strict Decoder such
@@ -154,19 +149,15 @@ func (e *strictDecodingError) Errors() []error {
 // IsStrictDecodingError returns true if the error indicates that the provided object
 // strictness violations.
 func IsStrictDecodingError(err error) bool {
-	if err == nil {
-		return false
-	}
-	_, ok := err.(*strictDecodingError)
+	_, ok := AsStrictDecodingError(err)
+
 	return ok
 }
 
 // AsStrictDecodingError returns a strict decoding error
 // containing all the strictness violations.
 func AsStrictDecodingError(err error) (*strictDecodingError, bool) {
-	if err == nil {
-		return nil, false
-	}
-	strictErr, ok := err.(*strictDecodingError)
-	return strictErr, ok
+	var serr *strictDecodingError
+	ok := errors.As(err, &serr)
+	return serr, ok
 }
