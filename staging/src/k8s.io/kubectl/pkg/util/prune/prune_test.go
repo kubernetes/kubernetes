@@ -68,8 +68,8 @@ func TestGetRESTMappings(t *testing.T) {
 		if tc.expectederr != nil {
 			assert.NotEmptyf(t, actualerr, "getRESTMappings error expected but not fired")
 		}
-		assert.Equal(t, len(actualns), tc.expectedns, "getRESTMappings failed expected number namespaced %d actual %d", tc.expectedns, len(actualns))
-		assert.Equal(t, len(actualnns), tc.expectednns, "getRESTMappings failed expected number nonnamespaced %d actual %d", tc.expectednns, len(actualnns))
+		assert.Equal(t, tc.expectedns, len(actualns), "getRESTMappings failed expected number namespaced %d actual %d", tc.expectedns, len(actualns))
+		assert.Equal(t, tc.expectednns, len(actualnns), "getRESTMappings failed expected number nonnamespaced %d actual %d", tc.expectednns, len(actualnns))
 	}
 }
 
@@ -119,7 +119,7 @@ func TestParsePruneResources(t *testing.T) {
 		if tc.err {
 			assert.NotEmptyf(t, err, "parsePruneResources error expected but not fired")
 		} else {
-			assert.Equal(t, actual, tc.expected, "parsePruneResources failed expected %v actual %v", tc.expected, actual)
+			assert.Equal(t, tc.expected, actual, "parsePruneResources failed expected %v actual %v", tc.expected, actual)
 		}
 	}
 }
