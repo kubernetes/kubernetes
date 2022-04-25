@@ -22,6 +22,8 @@
 set -o errexit
 set -o nounset
 set -o pipefail
+set -x
+
 
 ### Hardcoded constants
 DEFAULT_CNI_VERSION='v0.9.1'
@@ -478,7 +480,7 @@ function load-docker-images {
 # If we are on ubuntu we can try to install containerd
 function install-containerd-ubuntu {
   # bailout if we are not on ubuntu
-  if [[ -z "$(command -v lsb_release)" || $(lsb_release -si) != "Ubuntu" ]]; then
+  if ! command -v apt-get >/dev/null 2>&1; then
     echo "Unable to automatically install containerd in non-ubuntu image. Bailing out..."
     exit 2
   fi

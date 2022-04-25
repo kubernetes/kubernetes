@@ -73,7 +73,7 @@ func (plugin *iscsiPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
 	if err != nil {
 		return "", err
 	}
-
+	_ = fmt.Sprintf("%v:%v:%v", tp, iqn, lun)
 	return fmt.Sprintf("%v:%v:%v", tp, iqn, lun), nil
 }
 
