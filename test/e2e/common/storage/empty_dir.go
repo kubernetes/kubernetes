@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -297,9 +296,6 @@ var _ = SIGDescribe("EmptyDir volumes", func() {
 		Description: A Pod created with an 'emptyDir' Volume backed by memory should be sized to user provided value.
 	*/
 	ginkgo.It("pod should support memory backed volumes of specified size", func() {
-		// skip if feature gate is not enabled, this could be elevated to conformance in future if on Linux.
-		e2eskipper.SkipUnlessFeatureGateEnabled(features.SizeMemoryBackedVolumes)
-
 		var (
 			volumeName                 = "shared-data"
 			busyBoxMainVolumeMountPath = "/usr/share/volumeshare"
