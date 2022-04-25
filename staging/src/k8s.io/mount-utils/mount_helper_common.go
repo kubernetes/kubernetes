@@ -53,7 +53,7 @@ func CleanupMountWithForce(mountPath string, mounter MounterForceUnmounter, exte
 	}
 	var notMnt bool
 	var err error
-	if !corruptedMnt {
+	if !corruptedMnt && !mounter.CanSafelySkipMountPointCheck() {
 		notMnt, err = removePathIfNotMountPoint(mountPath, mounter, extensiveMountPointCheck)
 		// if mountPath was not a mount point - we would have attempted to remove mountPath
 		// and hence return errors if any.
@@ -82,11 +82,11 @@ func CleanupMountWithForce(mountPath string, mounter MounterForceUnmounter, exte
 // IsNotMountPoint will be called instead of IsLikelyNotMountPoint.
 // IsNotMountPoint is more expensive but properly handles bind mounts within the same fs.
 // if corruptedMnt is true, it means that the mountPath is a corrupted mountpoint, and the mount point check
-// will be skipped
+// will be skipped. The mount point check will also be skipped if the mounter supports it.
 func doCleanupMountPoint(mountPath string, mounter Interface, extensiveMountPointCheck bool, corruptedMnt bool) error {
 	var notMnt bool
 	var err error
-	if !corruptedMnt {
+	if !corruptedMnt || mounter.CanSafelySkipMountPointCheck() {
 		notMnt, err = removePathIfNotMountPoint(mountPath, mounter, extensiveMountPointCheck)
 		// if mountPath was not a mount point - we would have attempted to remove mountPath
 		// and hence return errors if any.

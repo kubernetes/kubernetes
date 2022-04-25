@@ -244,6 +244,11 @@ func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	return true, nil
 }
 
+// CanSafelySkipMountPointCheck always returns false on Windows
+func (mounter *Mounter) CanSafelySkipMountPointCheck() bool {
+	return false
+}
+
 // GetMountRefs : empty implementation here since there is no place to query all mount points on Windows
 func (mounter *Mounter) GetMountRefs(pathname string) ([]string, error) {
 	windowsPath := NormalizeWindowsPath(pathname)
