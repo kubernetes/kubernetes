@@ -247,16 +247,14 @@ func detectSafeNotMountedBehavior() bool {
 	cmd := exec.Command("umount", path)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		klog.V(2).Infof("Cannot run umount to detect safe 'not mounted' behavior: %v", err)
-		klog.V(4).Infof("'umount %s' output: %s, failed with: %v", path, string(output), err)
-		return false
+		if strings.Contains(string(output), errNotMounted) {
+			klog.V(2).Infof("Detected umount with safe 'not mounted' behavior")
+			return true
+		}
+		klog.V(4).Infof("'umount %s' failed with: %v, output: %s", path, err, string(output))
 	}
-	if !strings.Contains(string(output), errNotMounted) {
-		klog.V(2).Infof("Detected umount with unsafe 'not mounted' behavior")
-		return false
-	}
-	klog.V(2).Infof("Detected umount with safe 'not mounted' behavior")
-	return true
+	klog.V(2).Infof("Detected umount with unsafe 'not mounted' behavior")
+	return false
 }
 
 // MakeMountArgs makes the arguments to the mount(8) command.
