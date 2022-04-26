@@ -23,7 +23,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/moby/sys/mountinfo"
 	"io/fs"
 	"io/ioutil"
 	"os"
@@ -61,8 +60,7 @@ const (
 // kubelet is running in the host's root mount namespace.
 type Mounter struct {
 	mounterPath                string
-	withSystemd                *bool
-	trySystemd                 bool
+	withSystemd                bool
 	withSafeNotMountedBehavior bool
 }
 
@@ -74,7 +72,7 @@ var _ MounterForceUnmounter = &Mounter{}
 func New(mounterPath string) Interface {
 	return &Mounter{
 		mounterPath:                mounterPath,
-		trySystemd:                 true,
+		withSystemd:                detectSystemd(),
 		withSafeNotMountedBehavior: detectSafeNotMountedBehavior(),
 	}
 }
@@ -264,29 +262,30 @@ func detectSystemd() bool {
 // When possible, we will trust umount's message and avoid doing our own mount point checks.
 // More info: https://github.com/util-linux/util-linux/blob/v2.2/mount/umount.c#L179
 func detectSafeNotMountedBehavior() bool {
-	return detectSafeNotMountedBehaviorWithExec(utilexec.New())
-}
-
-// detectSafeNotMountedBehaviorWithExec is for testing with FakeExec.
-func detectSafeNotMountedBehaviorWithExec(exec utilexec.Interface) bool {
+	if _, err := exec.LookPath("umount"); err != nil {
+		klog.V(2).Infof("Failed to locate umount executable to detect safe 'not mounted' behavior")
+		return false
+	}
 	// create a temp dir and try to umount it
 	path, err := ioutil.TempDir("", "kubelet-detect-safe-umount")
 	if err != nil {
-		klog.V(4).Infof("Cannot create temp dir to detect safe 'not mounted' behavior: %v", err)
+		klog.V(2).Infof("Cannot create temp dir to detect safe 'not mounted' behavior: %v", err)
 		return false
 	}
 	defer os.RemoveAll(path)
 	cmd := exec.Command("umount", path)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		if strings.Contains(string(output), errNotMounted) {
-			klog.V(4).Infof("Detected umount with safe 'not mounted' behavior")
-			return true
-		}
-		klog.V(4).Infof("'umount %s' failed with: %v, output: %s", path, err, string(output))
+		klog.V(2).Infof("Cannot run umount to detect safe 'not mounted' behavior: %v", err)
+		klog.V(4).Infof("'umount %s' output: %s, failed with: %v", path, string(output), err)
+		return false
 	}
-	klog.V(4).Infof("Detected umount with unsafe 'not mounted' behavior")
-	return false
+	if !strings.Contains(string(output), errNotMounted) {
+		klog.V(2).Infof("Detected umount with unsafe 'not mounted' behavior")
+		return false
+	}
+	klog.V(2).Infof("Detected umount with safe 'not mounted' behavior")
+	return true
 }
 
 // MakeMountArgs makes the arguments to the mount(8) command.
@@ -371,7 +370,6 @@ func (mounter *Mounter) Unmount(target string) error {
 			err = &exec.ExitError{ProcessState: command.ProcessState}
 		}
 		if mounter.withSafeNotMountedBehavior && strings.Contains(string(output), errNotMounted) {
-			klog.V(4).Infof("ignoring 'not mounted' error for %s", target)
 			return nil
 		}
 		return fmt.Errorf("unmount failed: %v\nUnmounting arguments: %s\nOutput: %s", err, target, string(output))
@@ -422,8 +420,8 @@ func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	return true, nil
 }
 
-// canSafelySkipMountPointCheck relies on the detected behavior of umount when given a target that is not a mount point.
-func (mounter *Mounter) canSafelySkipMountPointCheck() bool {
+// CanSafelySkipMountPointCheck relies on the detected behavior of umount when given a target that is not a mount point.
+func (mounter *Mounter) CanSafelySkipMountPointCheck() bool {
 	return mounter.withSafeNotMountedBehavior
 }
 
