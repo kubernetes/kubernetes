@@ -322,7 +322,7 @@ github.com/golang/protobuf/ptypes/timestamp
 github.com/golang/protobuf/ptypes/wrappers
 # github.com/google/btree v1.0.1 => github.com/google/btree v1.0.1
 github.com/google/btree
-# github.com/google/cadvisor v0.44.0 => github.com/google/cadvisor v0.44.0
+# github.com/google/cadvisor v0.44.1 => github.com/google/cadvisor v0.44.1
 ## explicit
 github.com/google/cadvisor/accelerators
 github.com/google/cadvisor/cache/memory
@@ -2545,7 +2545,7 @@ sigs.k8s.io/yaml
 # github.com/golang/protobuf => github.com/golang/protobuf v1.5.2
 # github.com/golangplus/testing => github.com/golangplus/testing v0.0.0-20180327235837-af21d9c3145e
 # github.com/google/btree => github.com/google/btree v1.0.1
-# github.com/google/cadvisor => github.com/google/cadvisor v0.44.0
+# github.com/google/cadvisor => github.com/google/cadvisor v0.44.1
 # github.com/google/cel-go => github.com/google/cel-go v0.10.1
 # github.com/google/cel-spec => github.com/google/cel-spec v0.6.0
 # github.com/google/gnostic => github.com/google/gnostic v0.5.7-v3refs
