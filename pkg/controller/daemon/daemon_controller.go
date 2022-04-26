@@ -1147,6 +1147,7 @@ func (dsc *DaemonSetsController) updateDaemonSetStatus(ctx context.Context, ds *
 			}
 		} else {
 			if scheduled {
+				klog.V(2).InfoS("Found misscheduled daemon set pod", "daemonSet", klog.KObj(ds), "node", node.Name)
 				numberMisscheduled++
 			}
 		}
