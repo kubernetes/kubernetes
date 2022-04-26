@@ -114,7 +114,16 @@ func (g *APIGroupVersion) InstallREST(container *restful.Container) ([]*storagev
 	}
 
 	apiResources, resourceInfos, ws, registrationErrors := installer.Install()
-	versionDiscoveryHandler := discovery.NewAPIVersionHandler(g.Serializer, g.GroupVersion, staticLister{apiResources})
+	lister, err := newStaticLister(&metav1.APIResourceList{
+		GroupVersion: g.GroupVersion.String(),
+		APIResources: apiResources,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	versionDiscoveryHandler := discovery.NewAPIVersionHandler(g.Serializer, g.GroupVersion, lister)
 	versionDiscoveryHandler.AddToWebService(ws)
 	container.Add(ws)
 	return removeNonPersistedResources(resourceInfos), utilerrors.NewAggregate(registrationErrors)
@@ -135,11 +144,28 @@ func removeNonPersistedResources(infos []*storageversion.ResourceInfo) []*storag
 
 // staticLister implements the APIResourceLister interface
 type staticLister struct {
-	list []metav1.APIResource
+	list *metav1.APIResourceList
+	hash string
 }
 
-func (s staticLister) ListAPIResources() []metav1.APIResource {
-	return s.list
+func newStaticLister(list *metav1.APIResourceList) (*staticLister, error) {
+	hash, err := discovery.CalculateETag(list)
+	if err != nil {
+		return nil, err
+	}
+
+	return &staticLister{
+		list: list,
+		hash: hash,
+	}, nil
+}
+
+func (s staticLister) getHash() string {
+	return s.hash
+}
+
+func (s staticLister) ListAPIResources() ([]metav1.APIResource, string) {
+	return s.list.APIResources, s.hash
 }
 
 var _ discovery.APIResourceLister = &staticLister{}

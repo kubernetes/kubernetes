@@ -179,8 +179,8 @@ func TestRouting(t *testing.T) {
 		delegate:  delegate,
 		versionDiscoveryHandler: &versionDiscoveryHandler{
 			discovery: map[schema.GroupVersion]*discovery.APIVersionHandler{
-				customV1: discovery.NewAPIVersionHandler(Codecs, customV1, discovery.APIResourceListerFunc(func() []metav1.APIResource {
-					return nil
+				customV1: discovery.NewAPIVersionHandler(Codecs, customV1, discovery.APIResourceListerFunc(func() ([]metav1.APIResource, string) {
+					return nil, ""
 				})),
 			},
 			delegate: delegate,

@@ -18,6 +18,8 @@ package discovery
 
 import (
 	"net/http"
+	"strconv"
+	"time"
 
 	restful "github.com/emicklei/go-restful"
 
@@ -29,12 +31,12 @@ import (
 )
 
 type APIResourceLister interface {
-	ListAPIResources() []metav1.APIResource
+	ListAPIResources() ([]metav1.APIResource, string)
 }
 
-type APIResourceListerFunc func() []metav1.APIResource
+type APIResourceListerFunc func() ([]metav1.APIResource, string)
 
-func (f APIResourceListerFunc) ListAPIResources() []metav1.APIResource {
+func (f APIResourceListerFunc) ListAPIResources() ([]metav1.APIResource, string) {
 	return f()
 }
 
@@ -77,7 +79,63 @@ func (s *APIVersionHandler) handle(req *restful.Request, resp *restful.Response)
 	s.ServeHTTP(resp.ResponseWriter, req.Request)
 }
 
+func (s *APIVersionHandler) GetCurrentHash() string {
+	_, hash := s.apiResourceLister.ListAPIResources()
+	return hash
+}
+
 func (s *APIVersionHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	responsewriters.WriteObjectNegotiated(s.serializer, negotiation.DefaultEndpointRestrictions, schema.GroupVersion{}, w, req, http.StatusOK,
-		&metav1.APIResourceList{GroupVersion: s.groupVersion.String(), APIResources: s.apiResourceLister.ListAPIResources()})
+	reqURL := req.URL
+	if reqURL == nil {
+		// Can not find documentation guaranteeing the non-nility of reqURL.
+		w.WriteHeader(500)
+		return
+	}
+
+	// Get current resource list and hash
+	resourceList, hash := s.apiResourceLister.ListAPIResources()
+
+	if providedHash := reqURL.Query().Get("hash"); len(providedHash) > 0 && len(hash) > 0 {
+		if hash == providedHash {
+			// The Vary header is required because the Accept header can
+			// change the contents returned. This prevents clients from caching
+			// protobuf as JSON and vice versa.
+			w.Header().Set("Vary", "Accept")
+
+			// Only set these headers when a hash is given.
+			w.Header().Set("Cache-Control", "public, immutable")
+
+			// Set the Expires directive to the maximum value of one year from the request,
+			// effectively indicating that the cache never expires.
+			w.Header().Set(
+				"Expires", time.Now().AddDate(1, 0, 0).Format(time.RFC1123))
+		} else {
+			// redirect with reply
+			redirectURL := *reqURL
+			query := redirectURL.Query()
+			query.Set("hash", hash)
+			redirectURL.RawQuery = query.Encode()
+
+			//!TODO: is MovedPermanently the right status code to use here?
+			http.Redirect(w, req, redirectURL.String(), http.StatusMovedPermanently)
+			return
+		}
+	}
+
+	// ETag must be enclosed in double quotes:
+	// https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/ETag
+	w.Header().Set("Etag", strconv.Quote(hash))
+
+	responsewriters.WriteObjectNegotiated(
+		s.serializer,
+		negotiation.DefaultEndpointRestrictions,
+		schema.GroupVersion{},
+		w,
+		req,
+		http.StatusOK,
+		&metav1.APIResourceList{
+			GroupVersion: s.groupVersion.String(),
+			APIResources: resourceList,
+		},
+	)
 }
