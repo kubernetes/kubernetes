@@ -16,6 +16,7 @@ package containerd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"sync"
@@ -24,6 +25,7 @@ import (
 	containersapi "github.com/containerd/containerd/api/services/containers/v1"
 	tasksapi "github.com/containerd/containerd/api/services/tasks/v1"
 	versionapi "github.com/containerd/containerd/api/services/version/v1"
+	tasktypes "github.com/containerd/containerd/api/types/task"
 	ptypes "github.com/gogo/protobuf/types"
 	"github.com/google/cadvisor/container/containerd/containers"
 	"github.com/google/cadvisor/container/containerd/errdefs"
@@ -43,6 +45,10 @@ type ContainerdClient interface {
 	TaskPid(ctx context.Context, id string) (uint32, error)
 	Version(ctx context.Context) (string, error)
 }
+
+var (
+	ErrTaskIsInUnknownState = errors.New("containerd task is in unknown state") // used when process reported in containerd task is in Unknown State
+)
 
 var once sync.Once
 var ctrdClient ContainerdClient = nil
@@ -113,6 +119,9 @@ func (c *client) TaskPid(ctx context.Context, id string) (uint32, error) {
 	})
 	if err != nil {
 		return 0, errdefs.FromGRPC(err)
+	}
+	if response.Process.Status == tasktypes.StatusUnknown {
+		return 0, ErrTaskIsInUnknownState
 	}
 	return response.Process.Pid, nil
 }
