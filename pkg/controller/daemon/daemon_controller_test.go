@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"regexp"
 	"sort"
 	"strconv"
 	"sync"
@@ -2107,18 +2108,16 @@ func setDaemonSetCritical(ds *apps.DaemonSet) {
 }
 
 func TestNodeShouldRunDaemonPod(t *testing.T) {
-	shouldRun := true
-	shouldContinueRunning := true
 	cases := []struct {
-		predicateName                    string
-		podsOnNode                       []*v1.Pod
-		nodeCondition                    []v1.NodeCondition
-		nodeUnschedulable                bool
-		ds                               *apps.DaemonSet
-		shouldRun, shouldContinueRunning bool
+		predicateName                          string
+		podsOnNode                             []*v1.Pod
+		nodeCondition                          []v1.NodeCondition
+		nodeUnschedulable                      bool
+		ds                                     *apps.DaemonSet
+		shouldNotRun, shouldNotContinueRunning *regexp.Regexp
 	}{
 		{
-			predicateName: "ShouldRunDaemonPod",
+			predicateName: "ShouldRunDaemonPod (no pods yet, requests resources)",
 			ds: &apps.DaemonSet{
 				Spec: apps.DaemonSetSpec{
 					Selector: &metav1.LabelSelector{MatchLabels: simpleDaemonSetLabel},
@@ -2130,11 +2129,9 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 					},
 				},
 			},
-			shouldRun:             true,
-			shouldContinueRunning: true,
 		},
 		{
-			predicateName: "InsufficientResourceError",
+			predicateName: "InsufficientResourceError (no pods yet)",
 			ds: &apps.DaemonSet{
 				Spec: apps.DaemonSetSpec{
 					Selector: &metav1.LabelSelector{MatchLabels: simpleDaemonSetLabel},
@@ -2146,8 +2143,7 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 					},
 				},
 			},
-			shouldRun:             shouldRun,
-			shouldContinueRunning: true,
+			shouldNotRun: regexp.MustCompile(`^FIXME$`),
 		},
 		{
 			predicateName: "ErrPodNotMatchHostName",
@@ -2162,11 +2158,11 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 					},
 				},
 			},
-			shouldRun:             false,
-			shouldContinueRunning: false,
+			shouldNotRun:            regexp.MustCompile(`^FIXME$`),
+			shouldNotContinueRuning: regexp.MustCompile(`^FIXME$`),
 		},
 		{
-			predicateName: "ErrPodNotFitsHostPorts",
+			predicateName: "ShouldRunDaemonPod (pod fits host ports)",
 			podsOnNode: []*v1.Pod{
 				{
 					Spec: v1.PodSpec{
@@ -2195,11 +2191,10 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 					},
 				},
 			},
-			shouldRun:             shouldRun,
-			shouldContinueRunning: shouldContinueRunning,
 		},
 		{
-			predicateName: "InsufficientResourceError",
+			// we defer resource constraints to the scheduler
+			predicateName: "ShouldRunDaemonPod (insufficient resources, but we do not care)",
 			podsOnNode: []*v1.Pod{
 				{
 					Spec: v1.PodSpec{
@@ -2223,11 +2218,9 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 					},
 				},
 			},
-			shouldRun:             shouldRun, // This is because we don't care about the resource constraints any more and let default scheduler handle it.
-			shouldContinueRunning: true,
 		},
 		{
-			predicateName: "ShouldRunDaemonPod",
+			predicateName: "ShouldRunDaemonPod (pods on node)",
 			podsOnNode: []*v1.Pod{
 				{
 					Spec: v1.PodSpec{
@@ -2251,8 +2244,6 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 					},
 				},
 			},
-			shouldRun:             true,
-			shouldContinueRunning: true,
 		},
 		{
 			predicateName: "ErrNodeSelectorNotMatch",
@@ -2269,11 +2260,11 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 					},
 				},
 			},
-			shouldRun:             false,
-			shouldContinueRunning: false,
+			shouldNotRun:             regexp.MustCompile(`^FIXME$`),
+			shouldNotContinueRunning: regexp.MustCompile(`^FIXME$`),
 		},
 		{
-			predicateName: "ShouldRunDaemonPod",
+			predicateName: "ShouldRunDaemonPod (no pods yet, requested nodeSelector)",
 			ds: &apps.DaemonSet{
 				Spec: apps.DaemonSetSpec{
 					Selector: &metav1.LabelSelector{MatchLabels: simpleDaemonSetLabel},
@@ -2287,8 +2278,6 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 					},
 				},
 			},
-			shouldRun:             true,
-			shouldContinueRunning: true,
 		},
 		{
 			predicateName: "ErrPodAffinityNotMatch",
@@ -2321,11 +2310,11 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 					},
 				},
 			},
-			shouldRun:             false,
-			shouldContinueRunning: false,
+			shouldNotRun:             regexp.MustCompile(`^FIXME$`),
+			shouldNotContinueRunning: regexp.MustCompile(`^FIXME$`),
 		},
 		{
-			predicateName: "ShouldRunDaemonPod",
+			predicateName: "ShouldRunDaemonPod (no pods yet, requests affinity)",
 			ds: &apps.DaemonSet{
 				Spec: apps.DaemonSetSpec{
 					Selector: &metav1.LabelSelector{MatchLabels: simpleDaemonSetLabel},
@@ -2355,8 +2344,6 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 					},
 				},
 			},
-			shouldRun:             true,
-			shouldContinueRunning: true,
 		},
 		{
 			predicateName: "ShouldRunDaemonPodOnUnschedulableNode",
@@ -2371,43 +2358,55 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 					},
 				},
 			},
-			nodeUnschedulable:     true,
-			shouldRun:             true,
-			shouldContinueRunning: true,
+			nodeUnschedulable: true,
 		},
 	}
 
-	for i, c := range cases {
+	for _, c := range cases {
 		dsMaxSurgeFeatureFlags := []bool{false, true}
 		for _, isEnabled := range dsMaxSurgeFeatureFlags {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DaemonSetUpdateSurge, isEnabled)()
 			for _, strategy := range updateStrategies() {
-				node := newNode("test-node", simpleDaemonSetLabel)
-				node.Status.Conditions = append(node.Status.Conditions, c.nodeCondition...)
-				node.Status.Allocatable = allocatableResources("100M", "1")
-				node.Spec.Unschedulable = c.nodeUnschedulable
-				manager, _, _, err := newTestController()
-				if err != nil {
-					t.Fatalf("error creating DaemonSets controller: %v", err)
-				}
-				manager.nodeStore.Add(node)
-				for _, p := range c.podsOnNode {
-					manager.podStore.Add(p)
-					p.Spec.NodeName = "test-node"
-					manager.podNodeIndex.Add(p)
-				}
-				c.ds.Spec.UpdateStrategy = *strategy
-				shouldRun, shouldContinueRunning := NodeShouldRunDaemonPod(node, c.ds)
+				t.Run(fmt.Sprintf("strategy: %v, predicateName: %v", c.ds.Spec.UpdateStrategy.Type, c.predicateName), func(t *testing.T) {
+					node := newNode("test-node", simpleDaemonSetLabel)
+					node.Status.Conditions = append(node.Status.Conditions, c.nodeCondition...)
+					node.Status.Allocatable = allocatableResources("100M", "1")
+					node.Spec.Unschedulable = c.nodeUnschedulable
+					manager, _, _, err := newTestController()
+					if err != nil {
+						t.Fatalf("error creating DaemonSets controller: %v", err)
+					}
+					manager.nodeStore.Add(node)
+					for _, p := range c.podsOnNode {
+						manager.podStore.Add(p)
+						p.Spec.NodeName = "test-node"
+						manager.podNodeIndex.Add(p)
+					}
+					c.ds.Spec.UpdateStrategy = *strategy
+					shouldNotRun, shouldNotContinueRunning := NodeShouldRunDaemonPod(node, c.ds)
 
-				if shouldRun != c.shouldRun {
-					t.Errorf("[%v] strategy: %v, predicateName: %v expected shouldRun: %v, got: %v", i, c.ds.Spec.UpdateStrategy.Type, c.predicateName, c.shouldRun, shouldRun)
-				}
-				if shouldContinueRunning != c.shouldContinueRunning {
-					t.Errorf("[%v] strategy: %v, predicateName: %v expected shouldContinueRunning: %v, got: %v", i, c.ds.Spec.UpdateStrategy.Type, c.predicateName, c.shouldContinueRunning, shouldContinueRunning)
-				}
+					if err := assertError(c.shouldNotRun, shouldNotRun); err != nil {
+						t.Errorf("shouldNotRun: %v", err)
+					}
+
+					if err := assertError(c.shouldNotContinueRunning, shouldNotContinueRunning); err != nil {
+						t.Errorf("shouldNotContinueRunning: %v", err)
+					}
+				})
 			}
 		}
 	}
+}
+
+func assertError(expected *regexp.Regexp, actual error) error {
+	if actual != nil && expected == nil {
+		return fmt.Errorf("unexpected error: %v", actual)
+	} else if expected != nil && actual == nil {
+		t.Errorf("unexpected success, expected: %s", expected)
+	} else if expected != nil && !expected.MatchString(actual.Error()) {
+		t.Errorf("expected error %s, not: %v", expected, actual)
+	}
+	return nil
 }
 
 // DaemonSets should be resynced when node labels or taints changed

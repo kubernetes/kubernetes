@@ -84,9 +84,9 @@ func SchedulableNodes(c clientset.Interface, ds *appsv1.DaemonSet) []string {
 	framework.ExpectNoError(err)
 	nodeNames := make([]string, 0)
 	for _, node := range nodeList.Items {
-		shouldRun, _ := daemon.NodeShouldRunDaemonPod(&node, ds)
-		if !shouldRun {
-			framework.Logf("DaemonSet pods can't tolerate node %s with taints %+v, skip checking this node", node.Name, node.Spec.Taints)
+		shouldNotRun, _ := daemon.NodeShouldRunDaemonPod(&node, ds)
+		if shouldNotRun != nil {
+			framework.Logf("DaemonSet pods should not run on %s: %v", node.Name, shouldNotRun)
 			continue
 		}
 		nodeNames = append(nodeNames, node.Name)
