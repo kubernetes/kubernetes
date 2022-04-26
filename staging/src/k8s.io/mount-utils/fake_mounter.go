@@ -212,6 +212,11 @@ func (f *FakeMounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	return true, nil
 }
 
+// CanSafelySkipMountPointCheck always returns false for FakeMounter.
+func (f *FakeMounter) CanSafelySkipMountPointCheck() bool {
+	return false
+}
+
 // GetMountRefs finds all mount references to the path, returns a
 // list of paths.
 func (f *FakeMounter) GetMountRefs(pathname string) ([]string, error) {
