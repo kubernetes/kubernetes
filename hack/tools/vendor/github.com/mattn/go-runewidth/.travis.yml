@@ -1,0 +1,16 @@
+language: go
+sudo: false
+go:
+  - 1.13.x
+  - tip
+
+before_install:
+  - go get -t -v ./...
+
+script:
+  - go generate
+  - git diff --cached --exit-code
+  - ./go.test.sh
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)

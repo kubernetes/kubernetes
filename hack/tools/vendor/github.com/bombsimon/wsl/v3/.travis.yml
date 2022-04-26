@@ -1,0 +1,25 @@
+---
+language: go
+
+go:
+  - 1.13.x
+  - 1.12.x
+  - 1.11.x
+
+env:
+  global:
+    - GO111MODULE=on
+
+install:
+  - go get -v golang.org/x/tools/cmd/cover github.com/mattn/goveralls
+
+script:
+  - go test -v -covermode=count -coverprofile=coverage.out
+
+after_script:
+  - $HOME/gopath/bin/goveralls -coverprofile=coverage.out -service=travis-ci
+
+notifications:
+  email: false
+
+# vim: set ts=2 sw=2 et:

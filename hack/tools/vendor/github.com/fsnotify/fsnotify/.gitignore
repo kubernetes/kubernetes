@@ -1,0 +1,6 @@
+# Setup a Global .gitignore for OS and editor generated files:
+# https://help.github.com/articles/ignoring-files
+# git config --global core.excludesfile ~/.gitignore_global
+
+.vagrant
+*.sublime-project

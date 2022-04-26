@@ -1,0 +1,38 @@
+run:
+  timeout: 5m
+  skip-files: []
+
+linters-settings:
+  govet:
+    enable-all: true
+    disable:
+      - fieldalignment
+  gocyclo:
+    min-complexity: 12
+  misspell:
+    locale: US
+  godox:
+    keywords:
+      - FIXME
+  gofumpt:
+    extra-rules: true
+
+linters:
+  disable-all: true
+  enable:
+    - govet
+    - revive
+    - goimports
+    - staticcheck
+    - gosimple
+    - unused
+    - godox
+    - gofumpt
+    - misspell
+    - gocyclo
+
+issues:
+  exclude-use-default: true
+  max-per-linter: 0
+  max-same-issues: 0
+  exclude: []

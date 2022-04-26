@@ -1,0 +1,150 @@
+---
+run:
+  concurrency: 6
+  deadline: 5m
+issues:
+  exclude-rules:
+    # counterfeiter fakes are usually named 'fake_<something>.go'
+    - path: fake_.*\.go
+      linters:
+        - gocritic
+        - golint
+        - dupl
+linters:
+  disable-all: true
+  enable:
+    - asciicheck
+    - bodyclose
+    - deadcode
+    - depguard
+    - dogsled
+    - dupl
+    - errcheck
+    - goconst
+    - gocritic
+    - gocyclo
+    - godox
+    - gofmt
+    - gofumpt
+    - goheader
+    - goimports
+    - golint
+    - gomodguard
+    - goprintffuncname
+    - gosimple
+    - govet
+    - ineffassign
+    - interfacer
+    - maligned
+    - misspell
+    - nakedret
+    - prealloc
+    - rowserrcheck
+    - sqlclosecheck
+    - staticcheck
+    - structcheck
+    - stylecheck
+    - typecheck
+    - unconvert
+    - unparam
+    - unused
+    - varcheck
+    - whitespace
+    # - exhaustive
+    # - exportloopref
+    # - funlen
+    # - gci
+    # - gochecknoglobals
+    # - gochecknoinits
+    # - gocognit
+    # - godot
+    # - goerr113
+    # - gomnd
+    # - gosec
+    # - lll
+    # - nestif
+    # - nlreturn
+    # - noctx
+    # - nolintlint
+    # - scopelint
+    # - testpackage
+    # - wsl
+linters-settings:
+  godox:
+    keywords:
+      - BUG
+      - FIXME
+      - HACK
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+  gocritic:
+    enabled-checks:
+      # Diagnostic
+      - appendAssign
+      - argOrder
+      - badCond
+      - caseOrder
+      - codegenComment
+      - commentedOutCode
+      - deprecatedComment
+      - dupArg
+      - dupBranchBody
+      - dupCase
+      - dupSubExpr
+      - exitAfterDefer
+      - flagDeref
+      - flagName
+      - nilValReturn
+      - offBy1
+      - sloppyReassign
+      - weakCond
+      - octalLiteral
+
+      # Performance
+      - appendCombine
+      - equalFold
+      - hugeParam
+      - indexAlloc
+      - rangeExprCopy
+      - rangeValCopy
+
+      # Style
+      - assignOp
+      - boolExprSimplify
+      - captLocal
+      - commentFormatting
+      - commentedOutImport
+      - defaultCaseOrder
+      - docStub
+      - elseif
+      - emptyFallthrough
+      - emptyStringTest
+      - hexLiteral
+      - methodExprCall
+      - regexpMust
+      - singleCaseSwitch
+      - sloppyLen
+      - stringXbytes
+      - switchTrue
+      - typeAssertChain
+      - typeSwitchVar
+      - underef
+      - unlabelStmt
+      - unlambda
+      - unslice
+      - valSwap
+      - wrapperFunc
+      - yodaStyleExpr
+      # - ifElseChain
+
+      # Opinionated
+      - builtinShadow
+      - importShadow
+      - initClause
+      - nestingReduce
+      - paramTypeCombine
+      - ptrToRefParam
+      - typeUnparen
+      - unnamedResult
+      - unnecessaryBlock

@@ -31,7 +31,7 @@ import (
 	gomock "github.com/golang/mock/gomock"
 	v1 "k8s.io/api/core/v1"
 	types "k8s.io/apimachinery/pkg/types"
-	cloudprovider "k8s.io/cloud-provider"
+	cloud_provider "k8s.io/cloud-provider"
 	cache "k8s.io/legacy-cloud-providers/azure/cache"
 )
 
@@ -314,10 +314,10 @@ func (mr *MockVMSetMockRecorder) GetVMSetNames(service, nodes interface{}) *gomo
 }
 
 // GetZoneByNodeName mocks base method.
-func (m *MockVMSet) GetZoneByNodeName(name string) (cloudprovider.Zone, error) {
+func (m *MockVMSet) GetZoneByNodeName(name string) (cloud_provider.Zone, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetZoneByNodeName", name)
-	ret0, _ := ret[0].(cloudprovider.Zone)
+	ret0, _ := ret[0].(cloud_provider.Zone)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

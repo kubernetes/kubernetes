@@ -1,0 +1,25 @@
+{
+  "dependencyDashboard": true,
+  "dependencyDashboardTitle" : "Renovate(bot) : dependency dashboard",
+  "vulnerabilityAlerts": {
+    "enabled": true
+  },
+  "extends": [
+    ":preserveSemverRanges",
+    "group:all",
+    "schedule:weekly"
+  ],
+  "lockFileMaintenance": {
+    "commitMessageAction": "Update",
+    "enabled": true,
+    "extends": [
+      "group:all",
+      "schedule:weekly"
+    ]
+  },
+  "postUpdateOptions": [
+    "gomodTidy",
+    "gomodUpdateImportPaths"
+  ],
+  "separateMajorMinor": false
+}

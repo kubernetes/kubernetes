@@ -1,0 +1,11 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+  - sig-release-leads
+  - zeitgeist-approvers
+reviewers:
+  - zeitgeist-approvers
+  - zeitgeist-reviewers
+labels:
+  - sig/release
+  - area/release-eng

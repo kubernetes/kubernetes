@@ -1,0 +1,75 @@
+= err113 image:https://godoc.org/github.com/Djarvur/go-err113?status.svg["GoDoc",link="http://godoc.org/github.com/Djarvur/go-err113"] image:https://travis-ci.org/Djarvur/go-err113.svg["Build Status",link="https://travis-ci.org/Djarvur/go-err113"] image:https://coveralls.io/repos/Djarvur/go-err113/badge.svg?branch=master&service=github["Coverage Status",link="https://coveralls.io/github/Djarvur/go-err113?branch=master"]
+Daniel Podolsky
+:toc:
+
+Golang linter to check the errors handling expressions
+
+== Details
+
+Starting from Go 1.13 the standard `error` type behaviour was changed: one `error` could be derived from another with `fmt.Errorf()` method using `%w` format specifier.
+
+So the errors hierarchy could be built for flexible and responsible errors processing.
+
+And to make this possible at least two simple rules should be followed:
+
+1. `error` values should not be compared directly but with `errors.Is()` method.
+1. `error` should not be created dynamically from scratch but by the wrapping the static (package-level) error.
+
+This linter is checking the code for these 2 rules compliance.
+
+=== Reports
+
+So, `err113` reports every `==` and `!=` comparison for exact `error` type variables except comparison to `nil` and `io.EOF`.
+
+Also, any call of `errors.New()` and `fmt.Errorf()` methods are reported except the calls used to initialise package-level variables and the `fmt.Errorf()` calls wrapping the other errors.
+
+Note: non-standard packages, like `github.com/pkg/errors` are ignored completely.
+
+== Install
+
+```
+go get -u github.com/Djarvur/go-err113/cmd/err113
+```
+
+== Usage
+
+Defined by link:https://pkg.go.dev/golang.org/x/tools/go/analysis/singlechecker[singlechecker] package.
+
+```
+err113: checks the error handling rules according to the Go 1.13 new error type
+
+Usage: err113 [-flag] [package]
+
+
+Flags:
+  -V	print version and exit
+  -all
+    	no effect (deprecated)
+  -c int
+    	display offending line with this many lines of context (default -1)
+  -cpuprofile string
+    	write CPU profile to this file
+  -debug string
+    	debug flags, any subset of "fpstv"
+  -fix
+    	apply all suggested fixes
+  -flags
+    	print analyzer flags in JSON
+  -json
+    	emit JSON output
+  -memprofile string
+    	write memory profile to this file
+  -source
+    	no effect (deprecated)
+  -tags string
+    	no effect (deprecated)
+  -trace string
+    	write trace log to this file
+  -v	no effect (deprecated)
+```
+
+== Thanks
+
+To link:https://github.com/quasilyte[Iskander (Alex) Sharipov] for the really useful advices.
+
+To link:https://github.com/jackwhelpton[Jack Whelpton] for the bugfix provided.

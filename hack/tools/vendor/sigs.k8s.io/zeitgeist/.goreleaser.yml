@@ -1,0 +1,36 @@
+builds:
+- goos:
+  - darwin
+  - linux
+  goarch:
+  - amd64
+env:
+- GO111MODULE=on
+- CGO_ENABLED=0
+before:
+  hooks:
+  - go mod tidy
+signs:
+- artifacts: all
+checksum:
+  name_template: 'checksums.txt'
+snapshot:
+  name_template: "{{ .Tag }}-next"
+release:
+  github:
+    owner: pluies
+    name: zeitgeist
+  prerelease: auto
+#dockers:
+#- image_templates:
+#  - "pluies/zeitgeist:latest"
+#  - "pluies/zeitgeist:{{ .Tag }}"
+#  dockerfile: Dockerfile-goreleaser
+#  binaries:
+#  - zeitgeist
+changelog:
+  sort: asc
+  filters:
+    exclude:
+    - '^docs:'
+    - '^test:'

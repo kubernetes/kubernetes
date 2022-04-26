@@ -1,0 +1,26 @@
+sudo: false
+language: go
+arch:
+ - amd64
+ - ppc64e
+
+go:
+  - "1.14"
+  - "1.15"
+  - "1.16"
+  - tip
+
+os:
+  - linux
+  - osx
+
+matrix:
+  allow_failures:
+    - go: tip
+  fast_finish: true
+
+script:
+  - go build -v ./...
+  - go test -count=1 -cover -race -v ./...
+  - go vet ./...
+  - FILES=$(gofmt -s -l . zipfs sftpfs mem tarfs); if [[ -n "${FILES}" ]]; then  echo "You have go format errors; gofmt your changes"; exit 1; fi

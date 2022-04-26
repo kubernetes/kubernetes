@@ -1,0 +1,29 @@
+builds:
+- main: ./cmd/gomodguard/main.go
+  env:
+  - CGO_ENABLED=0
+archives:
+- replacements:
+    darwin: Darwin
+    linux: Linux
+    windows: Windows
+    386: i386
+    amd64: x86_64
+checksum:
+  name_template: 'checksums.txt'
+dockers:
+- goos: linux
+  goarch: amd64
+  image_templates:
+  - "ryancurrah/gomodguard:latest"
+  - "ryancurrah/gomodguard:{{.Tag}}"
+  skip_push: false
+  dockerfile: Dockerfile.goreleaser
+  build_flag_templates:
+  - "--pull"
+  - "--build-arg=gomodguard_VERSION={{.Version}}"
+  - "--label=org.opencontainers.image.created={{.Date}}"
+  - "--label=org.opencontainers.image.name={{.ProjectName}}"
+  - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+  - "--label=org.opencontainers.image.version={{.Version}}"
+  - "--label=org.opencontainers.image.source={{.GitURL}}"

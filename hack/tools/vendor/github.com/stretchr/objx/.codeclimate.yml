@@ -1,0 +1,13 @@
+engines:
+  gofmt:
+    enabled: true
+  golint:
+    enabled: true
+  govet:
+    enabled: true
+
+exclude_patterns:
+- ".github/"
+- "vendor/"
+- "codegen/"
+- "doc.go"

@@ -1,0 +1,132 @@
+# See https://golangci-lint.run/usage/configuration/
+
+linters-settings:
+  revive:
+    # see https://github.com/mgechev/revive#available-rules for details.
+    ignore-generated-header: true
+    severity: warning
+    rules:
+      - name: atomic
+      # - name: bare-return
+      - name: blank-imports
+      - name: bool-literal-in-expr
+      - name: call-to-gc
+      - name: confusing-naming
+      - name: confusing-results
+      - name: constant-logical-expr
+      - name: context-as-argument
+      - name: context-keys-type
+      - name: deep-exit
+      - name: defer
+      - name: dot-imports
+      - name: duplicated-imports
+      - name: early-return
+      - name: empty-block
+      - name: empty-lines
+      - name: error-naming
+      - name: error-return
+      - name: error-strings
+      - name: errorf
+      - name: exported
+      # - name: flag-parameter
+      - name: get-return
+      - name: identical-branches
+      - name: if-return
+      - name: import-shadowing
+      - name: increment-decrement
+      - name: indent-error-flow
+      - name: modifies-parameter
+      - name: modifies-value-receiver
+      - name: package-comments
+      - name: range
+      - name: range-val-address
+      - name: range-val-in-closure
+      - name: receiver-naming
+      - name: redefines-builtin-id
+      - name: string-of-int
+      - name: struct-tag
+      - name: superfluous-else
+      - name: time-naming
+      - name: unconditional-recursion
+      - name: unexported-naming
+      - name: unexported-return
+      # - name: unhandled-error
+      - name: unnecessary-stmt
+      - name: unreachable-code
+      - name: unused-parameter
+      # - name: unused-receiver
+      - name: var-declaration
+      - name: var-naming
+      - name: waitgroup-by-value
+
+linters:
+  disable-all: true
+  enable:
+    - asciicheck
+    - bodyclose
+    # - cyclop
+    - deadcode
+    - dogsled
+    - dupl
+    - durationcheck
+    - errcheck
+    - errorlint
+    - exhaustive
+    # - exhaustivestruct
+    - exportloopref
+    # - forbidigo
+    - forcetypeassert
+    - funlen
+    # - gci
+    # - gochecknoglobals
+    - gochecknoinits
+    - gocognit
+    - goconst
+    - gocritic
+    - gocyclo
+    - godot
+    - godox
+    - goerr113
+    - goimports
+    - gomnd
+    - gomoddirectives
+    - gomodguard
+    - goprintffuncname
+    - gosec
+    - gosimple
+    - govet
+    # - ifshort
+    - importas
+    - ineffassign
+    - lll
+    - makezero
+    - misspell
+    - nakedret
+    - nestif
+    - nilerr
+    # - nlreturn
+    - noctx
+    - nolintlint
+    # - paralleltest
+    - prealloc
+    - predeclared
+    # - promlinter
+    - revive
+    - rowserrcheck
+    - sqlclosecheck
+    - staticcheck
+    - structcheck
+    - stylecheck
+    # - tagliatelle
+    - testpackage
+    - thelper
+    - tparallel
+    - typecheck
+    - unconvert
+    - unparam
+    - unused
+    - varcheck
+    # - wastedassign
+    - whitespace
+    # - wrapcheck
+    - wsl

@@ -1,0 +1,14 @@
+go_import_path: github.com/kevinburke/ssh_config
+
+language: go
+
+go:
+  - 1.11.x
+  - 1.12.x
+  - master
+
+before_script:
+    - go get -u ./...
+
+script:
+    - make race-test

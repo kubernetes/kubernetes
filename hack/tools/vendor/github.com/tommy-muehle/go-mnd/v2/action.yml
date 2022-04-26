@@ -1,0 +1,19 @@
+name: 'go-mnd'
+description: 'Runs the Golang magic number detector'
+author: '@tommy-muehle'
+
+inputs:
+  args:
+    description: 'Arguments for go-mnd'
+    required: true
+    default: '-h'
+
+runs:
+  using: 'docker'
+  image: 'Dockerfile'
+  args:
+    - ${{ inputs.args }}
+
+branding:
+  icon: 'check-circle'
+  color: 'blue'

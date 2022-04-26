@@ -1,0 +1,25 @@
+# See the OWNERS docs at https://go.k8s.io/owners#owners_aliases
+
+aliases:
+  sig-release-leads:
+    - alejandrox1
+    - justaugustus
+    - saschagrunert
+    - tpepper
+  zeitgeist-approvers:
+    - alejandrox1 # subproject owner
+    - justaugustus # subproject owner / Release Manager
+    - Pluies # subproject owner
+    - saschagrunert # subproject owner / Release Manager
+    - tpepper # subproject owner / Release Manager
+  zeitgeist-reviewers:
+    - cpanato # Release Manager
+    - hasheddan # Release Manager
+    - n3wscott
+    - saschagrunert # Release Manager
+  
+  # TODO: This alias, along with the buoy subdirectory, can be safely removed
+  #       once buoy has been integrated with zeitgeist.
+  buoy-owners: # formerly https://github.com/n3wscott/buoy
+    - justaugustus # subproject owner / Release Manager
+    - n3wscott # buoy creator
