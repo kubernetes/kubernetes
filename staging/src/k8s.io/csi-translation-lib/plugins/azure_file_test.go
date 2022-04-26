@@ -224,6 +224,25 @@ func TestTranslateAzureFileInTreePVToCSI(t *testing.T) {
 			expErr: true,
 		},
 		{
+			name: "return error if secret namespace could not be found",
+			volume: &corev1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "uuid",
+					Annotations: map[string]string{resourceGroupAnnotation: "rg"},
+				},
+				Spec: corev1.PersistentVolumeSpec{
+					PersistentVolumeSource: corev1.PersistentVolumeSource{
+						AzureFile: &corev1.AzureFilePersistentVolumeSource{
+							ShareName:  "sharename",
+							SecretName: "secretname",
+							ReadOnly:   true,
+						},
+					},
+				},
+			},
+			expErr: true,
+		},
+		{
 			name: "azure file volume",
 			volume: &corev1.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
@@ -295,6 +314,51 @@ func TestTranslateAzureFileInTreePVToCSI(t *testing.T) {
 							VolumeAttributes: map[string]string{shareNameField: "sharename"},
 							VolumeHandle:     "rg#secretname#sharename#uuid#secretnamespace",
 						},
+					},
+				},
+			},
+		},
+		{
+			name: "get secret namespace from ClaimRef when it's missing in pv spec source",
+			volume: &corev1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "uuid",
+					Annotations: map[string]string{resourceGroupAnnotation: "rg"},
+				},
+				Spec: corev1.PersistentVolumeSpec{
+					PersistentVolumeSource: corev1.PersistentVolumeSource{
+						AzureFile: &corev1.AzureFilePersistentVolumeSource{
+							ShareName:  "sharename",
+							SecretName: "secretname",
+							//SecretNamespace: &secretNamespace,
+							ReadOnly: true,
+						},
+					},
+					ClaimRef: &corev1.ObjectReference{
+						Namespace: secretNamespace,
+					},
+				},
+			},
+			expVol: &corev1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "uuid",
+					Annotations: map[string]string{resourceGroupAnnotation: "rg"},
+				},
+				Spec: corev1.PersistentVolumeSpec{
+					PersistentVolumeSource: corev1.PersistentVolumeSource{
+						CSI: &corev1.CSIPersistentVolumeSource{
+							Driver:   "file.csi.azure.com",
+							ReadOnly: true,
+							NodeStageSecretRef: &corev1.SecretReference{
+								Name:      "secretname",
+								Namespace: secretNamespace,
+							},
+							VolumeAttributes: map[string]string{shareNameField: "sharename"},
+							VolumeHandle:     "rg#secretname#sharename#uuid#secretnamespace",
+						},
+					},
+					ClaimRef: &corev1.ObjectReference{
+						Namespace: secretNamespace,
 					},
 				},
 			},
