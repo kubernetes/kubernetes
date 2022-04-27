@@ -35,36 +35,32 @@ func TestEndpointsAdapterGet(t *testing.T) {
 	endpoints1, _ := generateEndpointsAndSlice("foo", "testing", []int{80, 443}, []string{"10.1.2.3", "10.1.2.4"})
 
 	testCases := map[string]struct {
-		endpointSlicesEnabled bool
-		expectedError         error
-		expectedEndpoints     *corev1.Endpoints
-		initialState          []runtime.Object
-		namespaceParam        string
-		nameParam             string
+		expectedError     error
+		expectedEndpoints *corev1.Endpoints
+		initialState      []runtime.Object
+		namespaceParam    string
+		nameParam         string
 	}{
 		"single-existing-endpoints": {
-			endpointSlicesEnabled: true,
-			expectedError:         nil,
-			expectedEndpoints:     endpoints1,
-			initialState:          []runtime.Object{endpoints1},
-			namespaceParam:        "testing",
-			nameParam:             "foo",
+			expectedError:     nil,
+			expectedEndpoints: endpoints1,
+			initialState:      []runtime.Object{endpoints1},
+			namespaceParam:    "testing",
+			nameParam:         "foo",
 		},
 		"wrong-namespace": {
-			endpointSlicesEnabled: true,
-			expectedError:         errors.NewNotFound(schema.GroupResource{Group: "", Resource: "endpoints"}, "foo"),
-			expectedEndpoints:     nil,
-			initialState:          []runtime.Object{endpoints1},
-			namespaceParam:        "foo",
-			nameParam:             "foo",
+			expectedError:     errors.NewNotFound(schema.GroupResource{Group: "", Resource: "endpoints"}, "foo"),
+			expectedEndpoints: nil,
+			initialState:      []runtime.Object{endpoints1},
+			namespaceParam:    "foo",
+			nameParam:         "foo",
 		},
 		"wrong-name": {
-			endpointSlicesEnabled: true,
-			expectedError:         errors.NewNotFound(schema.GroupResource{Group: "", Resource: "endpoints"}, "bar"),
-			expectedEndpoints:     nil,
-			initialState:          []runtime.Object{endpoints1},
-			namespaceParam:        "testing",
-			nameParam:             "bar",
+			expectedError:     errors.NewNotFound(schema.GroupResource{Group: "", Resource: "endpoints"}, "bar"),
+			expectedEndpoints: nil,
+			initialState:      []runtime.Object{endpoints1},
+			namespaceParam:    "testing",
+			nameParam:         "bar",
 		},
 	}
 
@@ -100,49 +96,44 @@ func TestEndpointsAdapterCreate(t *testing.T) {
 	epSlice3.AddressType = discovery.AddressTypeIPv6
 
 	testCases := map[string]struct {
-		endpointSlicesEnabled bool
-		expectedError         error
-		expectedResult        *corev1.Endpoints
-		expectCreate          []runtime.Object
-		expectUpdate          []runtime.Object
-		initialState          []runtime.Object
-		namespaceParam        string
-		endpointsParam        *corev1.Endpoints
+		expectedError  error
+		expectedResult *corev1.Endpoints
+		expectCreate   []runtime.Object
+		expectUpdate   []runtime.Object
+		initialState   []runtime.Object
+		namespaceParam string
+		endpointsParam *corev1.Endpoints
 	}{
 		"single-endpoint": {
-			endpointSlicesEnabled: true,
-			expectedError:         nil,
-			expectedResult:        endpoints1,
-			expectCreate:          []runtime.Object{endpoints1, epSlice1},
-			initialState:          []runtime.Object{},
-			namespaceParam:        endpoints1.Namespace,
-			endpointsParam:        endpoints1,
+			expectedError:  nil,
+			expectedResult: endpoints1,
+			expectCreate:   []runtime.Object{endpoints1, epSlice1},
+			initialState:   []runtime.Object{},
+			namespaceParam: endpoints1.Namespace,
+			endpointsParam: endpoints1,
 		},
 		"single-endpoint-partial-ipv6": {
-			endpointSlicesEnabled: true,
-			expectedError:         nil,
-			expectedResult:        endpoints2,
-			expectCreate:          []runtime.Object{endpoints2, epSlice2},
-			initialState:          []runtime.Object{},
-			namespaceParam:        endpoints2.Namespace,
-			endpointsParam:        endpoints2,
+			expectedError:  nil,
+			expectedResult: endpoints2,
+			expectCreate:   []runtime.Object{endpoints2, epSlice2},
+			initialState:   []runtime.Object{},
+			namespaceParam: endpoints2.Namespace,
+			endpointsParam: endpoints2,
 		},
 		"single-endpoint-full-ipv6": {
-			endpointSlicesEnabled: true,
-			expectedError:         nil,
-			expectedResult:        endpoints3,
-			expectCreate:          []runtime.Object{endpoints3, epSlice3},
-			initialState:          []runtime.Object{},
-			namespaceParam:        endpoints3.Namespace,
-			endpointsParam:        endpoints3,
+			expectedError:  nil,
+			expectedResult: endpoints3,
+			expectCreate:   []runtime.Object{endpoints3, epSlice3},
+			initialState:   []runtime.Object{},
+			namespaceParam: endpoints3.Namespace,
+			endpointsParam: endpoints3,
 		},
 		"existing-endpoint": {
-			endpointSlicesEnabled: true,
-			expectedError:         errors.NewAlreadyExists(schema.GroupResource{Group: "", Resource: "endpoints"}, "foo"),
-			expectedResult:        nil,
-			initialState:          []runtime.Object{endpoints1, epSlice1},
-			namespaceParam:        endpoints1.Namespace,
-			endpointsParam:        endpoints1,
+			expectedError:  errors.NewAlreadyExists(schema.GroupResource{Group: "", Resource: "endpoints"}, "foo"),
+			expectedResult: nil,
+			initialState:   []runtime.Object{endpoints1, epSlice1},
+			namespaceParam: endpoints1.Namespace,
+			endpointsParam: endpoints1,
 
 			// We expect the create to be attempted, we just also expect it to fail
 			expectCreate: []runtime.Object{endpoints1},
@@ -186,34 +177,31 @@ func TestEndpointsAdapterUpdate(t *testing.T) {
 	_, epSlice4IPv4 := generateEndpointsAndSlice("foo", "testing", []int{80}, []string{"10.1.2.7", "10.1.2.8"})
 
 	testCases := map[string]struct {
-		endpointSlicesEnabled bool
-		expectedError         error
-		expectedResult        *corev1.Endpoints
-		expectCreate          []runtime.Object
-		expectUpdate          []runtime.Object
-		initialState          []runtime.Object
-		namespaceParam        string
-		endpointsParam        *corev1.Endpoints
+		expectedError  error
+		expectedResult *corev1.Endpoints
+		expectCreate   []runtime.Object
+		expectUpdate   []runtime.Object
+		initialState   []runtime.Object
+		namespaceParam string
+		endpointsParam *corev1.Endpoints
 	}{
 		"single-existing-endpoints-no-change": {
-			endpointSlicesEnabled: true,
-			expectedError:         nil,
-			expectedResult:        endpoints1,
-			initialState:          []runtime.Object{endpoints1, epSlice1},
-			namespaceParam:        "testing",
-			endpointsParam:        endpoints1,
+			expectedError:  nil,
+			expectedResult: endpoints1,
+			initialState:   []runtime.Object{endpoints1, epSlice1},
+			namespaceParam: "testing",
+			endpointsParam: endpoints1,
 
 			// Even though there's no change, we still expect Update() to be
 			// called, because this unit test ALWAYS calls Update().
 			expectUpdate: []runtime.Object{endpoints1},
 		},
 		"existing-endpointslice-replaced-with-updated-ipv4-address-type": {
-			endpointSlicesEnabled: true,
-			expectedError:         nil,
-			expectedResult:        endpoints4,
-			initialState:          []runtime.Object{endpoints4, epSlice4IP},
-			namespaceParam:        "testing",
-			endpointsParam:        endpoints4,
+			expectedError:  nil,
+			expectedResult: endpoints4,
+			initialState:   []runtime.Object{endpoints4, epSlice4IP},
+			namespaceParam: "testing",
+			endpointsParam: endpoints4,
 
 			// When AddressType changes, we Delete+Create the EndpointSlice,
 			// so that shows up in expectCreate, not expectUpdate.
@@ -221,21 +209,19 @@ func TestEndpointsAdapterUpdate(t *testing.T) {
 			expectCreate: []runtime.Object{epSlice4IPv4},
 		},
 		"add-ports-and-ips": {
-			endpointSlicesEnabled: true,
-			expectedError:         nil,
-			expectedResult:        endpoints2,
-			expectUpdate:          []runtime.Object{endpoints2, epSlice2},
-			initialState:          []runtime.Object{endpoints1, epSlice1},
-			namespaceParam:        "testing",
-			endpointsParam:        endpoints2,
+			expectedError:  nil,
+			expectedResult: endpoints2,
+			expectUpdate:   []runtime.Object{endpoints2, epSlice2},
+			initialState:   []runtime.Object{endpoints1, epSlice1},
+			namespaceParam: "testing",
+			endpointsParam: endpoints2,
 		},
 		"missing-endpoints": {
-			endpointSlicesEnabled: true,
-			expectedError:         errors.NewNotFound(schema.GroupResource{Group: "", Resource: "endpoints"}, "bar"),
-			expectedResult:        nil,
-			initialState:          []runtime.Object{endpoints1, epSlice1},
-			namespaceParam:        "testing",
-			endpointsParam:        endpoints3,
+			expectedError:  errors.NewNotFound(schema.GroupResource{Group: "", Resource: "endpoints"}, "bar"),
+			expectedResult: nil,
+			initialState:   []runtime.Object{endpoints1, epSlice1},
+			namespaceParam: "testing",
+			endpointsParam: endpoints3,
 
 			// We expect the update to be attempted, we just also expect it to fail
 			expectUpdate: []runtime.Object{endpoints3},
@@ -316,7 +302,6 @@ func TestEndpointsAdapterEnsureEndpointSliceFromEndpoints(t *testing.T) {
 	endpoints2, epSlice2 := generateEndpointsAndSlice("foo", "testing", []int{80, 443}, []string{"10.1.2.3", "10.1.2.4", "10.1.2.5"})
 
 	testCases := map[string]struct {
-		endpointSlicesEnabled bool
 		expectedError         error
 		expectedEndpointSlice *discovery.EndpointSlice
 		initialState          []runtime.Object
@@ -324,7 +309,6 @@ func TestEndpointsAdapterEnsureEndpointSliceFromEndpoints(t *testing.T) {
 		endpointsParam        *corev1.Endpoints
 	}{
 		"existing-endpointslice-no-change": {
-			endpointSlicesEnabled: true,
 			expectedError:         nil,
 			expectedEndpointSlice: epSlice1,
 			initialState:          []runtime.Object{epSlice1},
@@ -332,7 +316,6 @@ func TestEndpointsAdapterEnsureEndpointSliceFromEndpoints(t *testing.T) {
 			endpointsParam:        endpoints1,
 		},
 		"existing-endpointslice-change": {
-			endpointSlicesEnabled: true,
 			expectedError:         nil,
 			expectedEndpointSlice: epSlice2,
 			initialState:          []runtime.Object{epSlice1},
@@ -340,7 +323,6 @@ func TestEndpointsAdapterEnsureEndpointSliceFromEndpoints(t *testing.T) {
 			endpointsParam:        endpoints2,
 		},
 		"missing-endpointslice": {
-			endpointSlicesEnabled: true,
 			expectedError:         nil,
 			expectedEndpointSlice: epSlice1,
 			initialState:          []runtime.Object{},
