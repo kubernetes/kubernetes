@@ -17,13 +17,11 @@ limitations under the License.
 package reconcilers
 
 import (
-	"reflect"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
-	core "k8s.io/client-go/testing"
 	netutils "k8s.io/utils/net"
 )
 
@@ -186,43 +184,12 @@ func TestMasterCountEndpointReconciler(t *testing.T) {
 			reconciler := NewMasterCountEndpointReconciler(test.additionalMasters+1, epAdapter)
 			err := reconciler.ReconcileEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, true)
 			if err != nil {
-				t.Errorf("unexpected error: %v", err)
+				t.Errorf("unexpected error reconciling: %v", err)
 			}
 
-			updates := []core.UpdateAction{}
-			for _, action := range fakeClient.Actions() {
-				if action.GetVerb() != "update" {
-					continue
-				}
-				updates = append(updates, action.(core.UpdateAction))
-			}
-			if test.expectUpdate != nil {
-				if len(updates) != 1 {
-					t.Errorf("unexpected updates: %v", updates)
-				} else if e, a := test.expectUpdate[0], updates[0].GetObject(); !reflect.DeepEqual(e, a) {
-					t.Errorf("expected update:\n%#v\ngot:\n%#v\n", e, a)
-				}
-			}
-			if test.expectUpdate == nil && len(updates) > 0 {
-				t.Errorf("no update expected, yet saw: %v", updates)
-			}
-
-			creates := []core.CreateAction{}
-			for _, action := range fakeClient.Actions() {
-				if action.GetVerb() != "create" {
-					continue
-				}
-				creates = append(creates, action.(core.CreateAction))
-			}
-			if test.expectCreate != nil {
-				if len(creates) != 1 {
-					t.Errorf("unexpected creates: %v", creates)
-				} else if e, a := test.expectCreate[0], creates[0].GetObject(); !reflect.DeepEqual(e, a) {
-					t.Errorf("expected create:\n%#v\ngot:\n%#v\n", e, a)
-				}
-			}
-			if test.expectCreate == nil && len(creates) > 0 {
-				t.Errorf("no create expected, yet saw: %v", creates)
+			err = verifyCreatesAndUpdates(fakeClient, test.expectCreate, test.expectUpdate)
+			if err != nil {
+				t.Errorf("unexpected error in side effects: %v", err)
 			}
 		})
 	}
@@ -275,47 +242,15 @@ func TestMasterCountEndpointReconciler(t *testing.T) {
 			reconciler := NewMasterCountEndpointReconciler(test.additionalMasters+1, epAdapter)
 			err := reconciler.ReconcileEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, false)
 			if err != nil {
-				t.Errorf("unexpected error: %v", err)
+				t.Errorf("unexpected error reconciling: %v", err)
 			}
 
-			updates := []core.UpdateAction{}
-			for _, action := range fakeClient.Actions() {
-				if action.GetVerb() != "update" {
-					continue
-				}
-				updates = append(updates, action.(core.UpdateAction))
-			}
-			if test.expectUpdate != nil {
-				if len(updates) != 1 {
-					t.Errorf("unexpected updates: %v", updates)
-				} else if e, a := test.expectUpdate[0], updates[0].GetObject(); !reflect.DeepEqual(e, a) {
-					t.Errorf("expected update:\n%#v\ngot:\n%#v\n", e, a)
-				}
-			}
-			if test.expectUpdate == nil && len(updates) > 0 {
-				t.Errorf("no update expected, yet saw: %v", updates)
-			}
-
-			creates := []core.CreateAction{}
-			for _, action := range fakeClient.Actions() {
-				if action.GetVerb() != "create" {
-					continue
-				}
-				creates = append(creates, action.(core.CreateAction))
-			}
-			if test.expectCreate != nil {
-				if len(creates) != 1 {
-					t.Errorf("unexpected creates: %v", creates)
-				} else if e, a := test.expectCreate[0], creates[0].GetObject(); !reflect.DeepEqual(e, a) {
-					t.Errorf("expected create:\n%#v\ngot:\n%#v\n", e, a)
-				}
-			}
-			if test.expectCreate == nil && len(creates) > 0 {
-				t.Errorf("no create expected, yet saw: %v", creates)
+			err = verifyCreatesAndUpdates(fakeClient, test.expectCreate, test.expectUpdate)
+			if err != nil {
+				t.Errorf("unexpected error in side effects: %v", err)
 			}
 		})
 	}
-
 }
 
 func TestEmptySubsets(t *testing.T) {
