@@ -64,31 +64,31 @@ const (
 	kubeServicesChain utiliptables.Chain = "KUBE-SERVICES"
 
 	// KubeFireWallChain is the kubernetes firewall chain.
-	KubeFireWallChain utiliptables.Chain = "KUBE-FIREWALL"
+	kubeFirewallChain utiliptables.Chain = "KUBE-FIREWALL"
 
 	// kubePostroutingChain is the kubernetes postrouting chain
 	kubePostroutingChain utiliptables.Chain = "KUBE-POSTROUTING"
 
-	// KubeMarkMasqChain is the mark-for-masquerade chain
-	KubeMarkMasqChain utiliptables.Chain = "KUBE-MARK-MASQ"
+	// kubeMarkMasqChain is the mark-for-masquerade chain
+	kubeMarkMasqChain utiliptables.Chain = "KUBE-MARK-MASQ"
 
-	// KubeNodePortChain is the kubernetes node port chain
-	KubeNodePortChain utiliptables.Chain = "KUBE-NODE-PORT"
+	// kubeNodePortChain is the kubernetes node port chain
+	kubeNodePortChain utiliptables.Chain = "KUBE-NODE-PORT"
 
 	// KubeMarkDropChain is the mark-for-drop chain
-	KubeMarkDropChain utiliptables.Chain = "KUBE-MARK-DROP"
+	kubeMarkDropChain utiliptables.Chain = "KUBE-MARK-DROP"
 
-	// KubeForwardChain is the kubernetes forward chain
-	KubeForwardChain utiliptables.Chain = "KUBE-FORWARD"
+	// kubeForwardChain is the kubernetes forward chain
+	kubeForwardChain utiliptables.Chain = "KUBE-FORWARD"
 
-	// KubeLoadBalancerChain is the kubernetes chain for loadbalancer type service
-	KubeLoadBalancerChain utiliptables.Chain = "KUBE-LOAD-BALANCER"
+	// kubeLoadBalancerChain is the kubernetes chain for loadbalancer type service
+	kubeLoadBalancerChain utiliptables.Chain = "KUBE-LOAD-BALANCER"
 
-	// DefaultScheduler is the default ipvs scheduler algorithm - round robin.
-	DefaultScheduler = "rr"
+	// defaultScheduler is the default ipvs scheduler algorithm - round robin.
+	defaultScheduler = "rr"
 
-	// DefaultDummyDevice is the default dummy interface which ipvs service address will bind to it.
-	DefaultDummyDevice = "kube-ipvs0"
+	// defaultDummyDevice is the default dummy interface which ipvs service address will bind to it.
+	defaultDummyDevice = "kube-ipvs0"
 
 	connReuseMinSupportedKernelVersion = "4.1"
 
@@ -108,8 +108,8 @@ var iptablesJumpChain = []struct {
 	{utiliptables.TableNAT, utiliptables.ChainOutput, kubeServicesChain, "kubernetes service portals"},
 	{utiliptables.TableNAT, utiliptables.ChainPrerouting, kubeServicesChain, "kubernetes service portals"},
 	{utiliptables.TableNAT, utiliptables.ChainPostrouting, kubePostroutingChain, "kubernetes postrouting rules"},
-	{utiliptables.TableFilter, utiliptables.ChainForward, KubeForwardChain, "kubernetes forwarding rules"},
-	{utiliptables.TableFilter, utiliptables.ChainInput, KubeNodePortChain, "kubernetes health check rules"},
+	{utiliptables.TableFilter, utiliptables.ChainForward, kubeForwardChain, "kubernetes forwarding rules"},
+	{utiliptables.TableFilter, utiliptables.ChainInput, kubeNodePortChain, "kubernetes health check rules"},
 }
 
 var iptablesChains = []struct {
@@ -118,19 +118,19 @@ var iptablesChains = []struct {
 }{
 	{utiliptables.TableNAT, kubeServicesChain},
 	{utiliptables.TableNAT, kubePostroutingChain},
-	{utiliptables.TableNAT, KubeFireWallChain},
-	{utiliptables.TableNAT, KubeNodePortChain},
-	{utiliptables.TableNAT, KubeLoadBalancerChain},
-	{utiliptables.TableNAT, KubeMarkMasqChain},
-	{utiliptables.TableFilter, KubeForwardChain},
-	{utiliptables.TableFilter, KubeNodePortChain},
+	{utiliptables.TableNAT, kubeFirewallChain},
+	{utiliptables.TableNAT, kubeNodePortChain},
+	{utiliptables.TableNAT, kubeLoadBalancerChain},
+	{utiliptables.TableNAT, kubeMarkMasqChain},
+	{utiliptables.TableFilter, kubeForwardChain},
+	{utiliptables.TableFilter, kubeNodePortChain},
 }
 
 var iptablesEnsureChains = []struct {
 	table utiliptables.Table
 	chain utiliptables.Chain
 }{
-	{utiliptables.TableNAT, KubeMarkDropChain},
+	{utiliptables.TableNAT, kubeMarkDropChain},
 }
 
 var iptablesCleanupChains = []struct {
@@ -139,11 +139,11 @@ var iptablesCleanupChains = []struct {
 }{
 	{utiliptables.TableNAT, kubeServicesChain},
 	{utiliptables.TableNAT, kubePostroutingChain},
-	{utiliptables.TableNAT, KubeFireWallChain},
-	{utiliptables.TableNAT, KubeNodePortChain},
-	{utiliptables.TableNAT, KubeLoadBalancerChain},
-	{utiliptables.TableFilter, KubeForwardChain},
-	{utiliptables.TableFilter, KubeNodePortChain},
+	{utiliptables.TableNAT, kubeFirewallChain},
+	{utiliptables.TableNAT, kubeNodePortChain},
+	{utiliptables.TableNAT, kubeLoadBalancerChain},
+	{utiliptables.TableFilter, kubeForwardChain},
+	{utiliptables.TableFilter, kubeNodePortChain},
 }
 
 // ipsetInfo is all ipset we needed in ipvs proxier
@@ -183,17 +183,17 @@ var ipsetWithIptablesChain = []struct {
 	protocolMatch string
 }{
 	{kubeLoopBackIPSet, string(kubePostroutingChain), "MASQUERADE", "dst,dst,src", ""},
-	{kubeLoadBalancerSet, string(kubeServicesChain), string(KubeLoadBalancerChain), "dst,dst", ""},
-	{kubeLoadbalancerFWSet, string(KubeLoadBalancerChain), string(KubeFireWallChain), "dst,dst", ""},
-	{kubeLoadBalancerSourceCIDRSet, string(KubeFireWallChain), "RETURN", "dst,dst,src", ""},
-	{kubeLoadBalancerSourceIPSet, string(KubeFireWallChain), "RETURN", "dst,dst,src", ""},
-	{kubeLoadBalancerLocalSet, string(KubeLoadBalancerChain), "RETURN", "dst,dst", ""},
-	{kubeNodePortLocalSetTCP, string(KubeNodePortChain), "RETURN", "dst", utilipset.ProtocolTCP},
-	{kubeNodePortSetTCP, string(KubeNodePortChain), string(KubeMarkMasqChain), "dst", utilipset.ProtocolTCP},
-	{kubeNodePortLocalSetUDP, string(KubeNodePortChain), "RETURN", "dst", utilipset.ProtocolUDP},
-	{kubeNodePortSetUDP, string(KubeNodePortChain), string(KubeMarkMasqChain), "dst", utilipset.ProtocolUDP},
-	{kubeNodePortLocalSetSCTP, string(KubeNodePortChain), "RETURN", "dst,dst", utilipset.ProtocolSCTP},
-	{kubeNodePortSetSCTP, string(KubeNodePortChain), string(KubeMarkMasqChain), "dst,dst", utilipset.ProtocolSCTP},
+	{kubeLoadBalancerSet, string(kubeServicesChain), string(kubeLoadBalancerChain), "dst,dst", ""},
+	{kubeLoadbalancerFWSet, string(kubeLoadBalancerChain), string(kubeFirewallChain), "dst,dst", ""},
+	{kubeLoadBalancerSourceCIDRSet, string(kubeFirewallChain), "RETURN", "dst,dst,src", ""},
+	{kubeLoadBalancerSourceIPSet, string(kubeFirewallChain), "RETURN", "dst,dst,src", ""},
+	{kubeLoadBalancerLocalSet, string(kubeLoadBalancerChain), "RETURN", "dst,dst", ""},
+	{kubeNodePortLocalSetTCP, string(kubeNodePortChain), "RETURN", "dst", utilipset.ProtocolTCP},
+	{kubeNodePortSetTCP, string(kubeNodePortChain), string(kubeMarkMasqChain), "dst", utilipset.ProtocolTCP},
+	{kubeNodePortLocalSetUDP, string(kubeNodePortChain), "RETURN", "dst", utilipset.ProtocolUDP},
+	{kubeNodePortSetUDP, string(kubeNodePortChain), string(kubeMarkMasqChain), "dst", utilipset.ProtocolUDP},
+	{kubeNodePortLocalSetSCTP, string(kubeNodePortChain), "RETURN", "dst,dst", utilipset.ProtocolSCTP},
+	{kubeNodePortSetSCTP, string(kubeNodePortChain), string(kubeMarkMasqChain), "dst,dst", utilipset.ProtocolSCTP},
 }
 
 // In IPVS proxy mode, the following flags need to be set
@@ -334,7 +334,7 @@ func (r *realIPGetter) NodeIPs() (ips []net.IP, err error) {
 
 // BindedIPs returns all addresses that are binded to the IPVS dummy interface kube-ipvs0
 func (r *realIPGetter) BindedIPs() (sets.String, error) {
-	return r.nl.GetLocalAddresses(DefaultDummyDevice)
+	return r.nl.GetLocalAddresses(defaultDummyDevice)
 }
 
 // Proxier implements proxy.Provider
@@ -449,7 +449,7 @@ func NewProxier(ipt utiliptables.Interface,
 
 	if len(scheduler) == 0 {
 		klog.InfoS("IPVS scheduler not specified, use rr by default")
-		scheduler = DefaultScheduler
+		scheduler = defaultScheduler
 	}
 
 	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder, nodePortAddresses)
@@ -732,7 +732,7 @@ func CanUseIPVSProxier(handle KernelHandler, ipsetver IPSetVersioner, scheduler 
 	wantModules := sets.NewString()
 	// We check for the existence of the scheduler mod and will trigger a missingMods error if not found
 	if scheduler == "" {
-		scheduler = DefaultScheduler
+		scheduler = defaultScheduler
 	}
 	schedulerMod := "ip_vs_" + scheduler
 	mods = append(mods, schedulerMod)
@@ -819,9 +819,9 @@ func CleanupLeftovers(ipvs utilipvs.Interface, ipt utiliptables.Interface, ipset
 	}
 	// Delete dummy interface created by ipvs Proxier.
 	nl := NewNetLinkHandle(false)
-	err := nl.DeleteDummyDevice(DefaultDummyDevice)
+	err := nl.DeleteDummyDevice(defaultDummyDevice)
 	if err != nil {
-		klog.ErrorS(err, "Error deleting dummy device created by ipvs proxier", "device", DefaultDummyDevice)
+		klog.ErrorS(err, "Error deleting dummy device created by ipvs proxier", "device", defaultDummyDevice)
 		encounteredError = true
 	}
 	// Clear iptables created by ipvs Proxier.
@@ -1060,9 +1060,9 @@ func (proxier *Proxier) syncProxyRules() {
 	proxier.createAndLinkKubeChain()
 
 	// make sure dummy interface exists in the system where ipvs Proxier will bind service address on it
-	_, err := proxier.netlinkHandle.EnsureDummyDevice(DefaultDummyDevice)
+	_, err := proxier.netlinkHandle.EnsureDummyDevice(defaultDummyDevice)
 	if err != nil {
-		klog.ErrorS(err, "Failed to create dummy interface", "interface", DefaultDummyDevice)
+		klog.ErrorS(err, "Failed to create dummy interface", "interface", defaultDummyDevice)
 		return
 	}
 
@@ -1078,7 +1078,7 @@ func (proxier *Proxier) syncProxyRules() {
 	activeIPVSServices := map[string]bool{}
 	// currentIPVSServices represent IPVS services listed from the system
 	currentIPVSServices := make(map[string]*utilipvs.VirtualServer)
-	// activeBindAddrs represents ip address successfully bind to DefaultDummyDevice in this round of sync
+	// activeBindAddrs represents ip address successfully bind to defaultDummyDevice in this round of sync
 	activeBindAddrs := map[string]bool{}
 
 	bindedAddresses, err := proxier.ipGetter.BindedIPs()
@@ -1575,8 +1575,8 @@ func (proxier *Proxier) syncProxyRules() {
 	}
 
 	// Get legacy bind address
-	// currentBindAddrs represents ip addresses bind to DefaultDummyDevice from the system
-	currentBindAddrs, err := proxier.netlinkHandle.ListBindAddress(DefaultDummyDevice)
+	// currentBindAddrs represents ip addresses bind to defaultDummyDevice from the system
+	currentBindAddrs, err := proxier.netlinkHandle.ListBindAddress(defaultDummyDevice)
 	if err != nil {
 		klog.ErrorS(err, "Failed to get bind address")
 	}
@@ -1661,7 +1661,7 @@ func (proxier *Proxier) writeIptablesRules() {
 		if proxier.masqueradeAll {
 			proxier.natRules.Write(
 				args, "dst,dst",
-				"-j", string(KubeMarkMasqChain))
+				"-j", string(kubeMarkMasqChain))
 		} else if proxier.localDetector.IsImplemented() {
 			// This masquerades off-cluster traffic to a service VIP.  The idea
 			// is that you can establish a static route for your Service range,
@@ -1671,7 +1671,7 @@ func (proxier *Proxier) writeIptablesRules() {
 			proxier.natRules.Write(
 				args, "dst,dst",
 				proxier.localDetector.IfNotLocal(),
-				"-j", string(KubeMarkMasqChain))
+				"-j", string(kubeMarkMasqChain))
 		} else {
 			// Masquerade all OUTPUT traffic coming from a service ip.
 			// The kube dummy interface has all service VIPs assigned which
@@ -1682,7 +1682,7 @@ func (proxier *Proxier) writeIptablesRules() {
 			// source ip and service port destination fixes the outgoing connections.
 			proxier.natRules.Write(
 				args, "src,dst",
-				"-j", string(KubeMarkMasqChain))
+				"-j", string(kubeMarkMasqChain))
 		}
 	}
 
@@ -1710,7 +1710,7 @@ func (proxier *Proxier) writeIptablesRules() {
 			"-m", "set", "--match-set", proxier.ipsetList[kubeExternalIPSet].Name,
 			"dst,dst",
 		)
-		proxier.natRules.Write(args, "-j", string(KubeMarkMasqChain))
+		proxier.natRules.Write(args, "-j", string(kubeMarkMasqChain))
 		externalIPRules(args)
 	}
 
@@ -1729,18 +1729,18 @@ func (proxier *Proxier) writeIptablesRules() {
 		"-A", string(kubeServicesChain),
 		"-m", "addrtype", "--dst-type", "LOCAL",
 	)
-	proxier.natRules.Write(args, "-j", string(KubeNodePortChain))
+	proxier.natRules.Write(args, "-j", string(kubeNodePortChain))
 
 	// mark drop for KUBE-LOAD-BALANCER
 	proxier.natRules.Write(
-		"-A", string(KubeLoadBalancerChain),
-		"-j", string(KubeMarkMasqChain),
+		"-A", string(kubeLoadBalancerChain),
+		"-j", string(kubeMarkMasqChain),
 	)
 
 	// mark drop for KUBE-FIRE-WALL
 	proxier.natRules.Write(
-		"-A", string(KubeFireWallChain),
-		"-j", string(KubeMarkDropChain),
+		"-A", string(kubeFirewallChain),
+		"-j", string(kubeMarkDropChain),
 	)
 
 	// Accept all traffic with destination of ipvs virtual service, in case other iptables rules
@@ -1752,7 +1752,7 @@ func (proxier *Proxier) writeIptablesRules() {
 	// traffic, this allows NodePort traffic to be forwarded even if the default
 	// FORWARD policy is not accept.
 	proxier.filterRules.Write(
-		"-A", string(KubeForwardChain),
+		"-A", string(kubeForwardChain),
 		"-m", "comment", "--comment", `"kubernetes forwarding rules"`,
 		"-m", "mark", "--mark", fmt.Sprintf("%s/%s", proxier.masqueradeMark, proxier.masqueradeMark),
 		"-j", "ACCEPT",
@@ -1761,7 +1761,7 @@ func (proxier *Proxier) writeIptablesRules() {
 	// The following rule ensures the traffic after the initial packet accepted
 	// by the "kubernetes forwarding rules" rule above will be accepted.
 	proxier.filterRules.Write(
-		"-A", string(KubeForwardChain),
+		"-A", string(kubeForwardChain),
 		"-m", "comment", "--comment", `"kubernetes forwarding conntrack rule"`,
 		"-m", "conntrack",
 		"--ctstate", "RELATED,ESTABLISHED",
@@ -1770,7 +1770,7 @@ func (proxier *Proxier) writeIptablesRules() {
 
 	// Add rule to accept traffic towards health check node port
 	proxier.filterRules.Write(
-		"-A", string(KubeNodePortChain),
+		"-A", string(kubeNodePortChain),
 		"-m", "comment", "--comment", proxier.ipsetList[kubeHealthCheckNodePortSet].getComment(),
 		"-m", "set", "--match-set", proxier.ipsetList[kubeHealthCheckNodePortSet].Name, "dst",
 		"-j", "ACCEPT",
@@ -1805,7 +1805,7 @@ func (proxier *Proxier) writeIptablesRules() {
 	// this so that it is easier to flush and change, for example if the mark
 	// value should ever change.
 	proxier.natRules.Write(
-		"-A", string(KubeMarkMasqChain),
+		"-A", string(kubeMarkMasqChain),
 		"-j", "MARK", "--or-mark", proxier.masqueradeMark,
 	)
 
@@ -1949,7 +1949,7 @@ func (proxier *Proxier) syncService(svcName string, vs *utilipvs.VirtualServer, 
 		}
 
 		klog.V(4).InfoS("Bind address", "address", vs.Address)
-		_, err := proxier.netlinkHandle.EnsureAddressBind(vs.Address.String(), DefaultDummyDevice)
+		_, err := proxier.netlinkHandle.EnsureAddressBind(vs.Address.String(), defaultDummyDevice)
 		if err != nil {
 			klog.ErrorS(err, "Failed to bind service address to dummy device", "serviceName", svcName)
 			return err
@@ -2109,8 +2109,8 @@ func (proxier *Proxier) cleanLegacyService(activeServices map[string]bool, curre
 			addr := svc.Address.String()
 			if _, ok := legacyBindAddrs[addr]; ok {
 				klog.V(4).InfoS("Unbinding address", "address", addr)
-				if err := proxier.netlinkHandle.UnbindAddress(addr, DefaultDummyDevice); err != nil {
-					klog.ErrorS(err, "Failed to unbind service from dummy interface", "interface", DefaultDummyDevice, "address", addr)
+				if err := proxier.netlinkHandle.UnbindAddress(addr, defaultDummyDevice); err != nil {
+					klog.ErrorS(err, "Failed to unbind service from dummy interface", "interface", defaultDummyDevice, "address", addr)
 				} else {
 					// In case we delete a multi-port service, avoid trying to unbind multiple times
 					delete(legacyBindAddrs, addr)
