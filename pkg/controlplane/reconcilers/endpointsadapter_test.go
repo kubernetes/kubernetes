@@ -26,6 +26,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/fake"
 )
@@ -37,7 +38,7 @@ func TestEndpointsAdapterGet(t *testing.T) {
 		endpointSlicesEnabled bool
 		expectedError         error
 		expectedEndpoints     *corev1.Endpoints
-		endpoints             []*corev1.Endpoints
+		initialState          []runtime.Object
 		namespaceParam        string
 		nameParam             string
 	}{
@@ -45,7 +46,7 @@ func TestEndpointsAdapterGet(t *testing.T) {
 			endpointSlicesEnabled: false,
 			expectedError:         nil,
 			expectedEndpoints:     endpoints1,
-			endpoints:             []*corev1.Endpoints{endpoints1},
+			initialState:          []runtime.Object{endpoints1},
 			namespaceParam:        "testing",
 			nameParam:             "foo",
 		},
@@ -53,7 +54,7 @@ func TestEndpointsAdapterGet(t *testing.T) {
 			endpointSlicesEnabled: true,
 			expectedError:         nil,
 			expectedEndpoints:     endpoints1,
-			endpoints:             []*corev1.Endpoints{endpoints1},
+			initialState:          []runtime.Object{endpoints1},
 			namespaceParam:        "testing",
 			nameParam:             "foo",
 		},
@@ -61,7 +62,7 @@ func TestEndpointsAdapterGet(t *testing.T) {
 			endpointSlicesEnabled: false,
 			expectedError:         errors.NewNotFound(schema.GroupResource{Group: "", Resource: "endpoints"}, "foo"),
 			expectedEndpoints:     nil,
-			endpoints:             []*corev1.Endpoints{endpoints1},
+			initialState:          []runtime.Object{endpoints1},
 			namespaceParam:        "foo",
 			nameParam:             "foo",
 		},
@@ -69,7 +70,7 @@ func TestEndpointsAdapterGet(t *testing.T) {
 			endpointSlicesEnabled: false,
 			expectedError:         errors.NewNotFound(schema.GroupResource{Group: "", Resource: "endpoints"}, "bar"),
 			expectedEndpoints:     nil,
-			endpoints:             []*corev1.Endpoints{endpoints1},
+			initialState:          []runtime.Object{endpoints1},
 			namespaceParam:        "testing",
 			nameParam:             "bar",
 		},
@@ -77,17 +78,10 @@ func TestEndpointsAdapterGet(t *testing.T) {
 
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
-			client := fake.NewSimpleClientset()
+			client := fake.NewSimpleClientset(testCase.initialState...)
 			epAdapter := EndpointsAdapter{endpointClient: client.CoreV1()}
 			if testCase.endpointSlicesEnabled {
 				epAdapter.endpointSliceClient = client.DiscoveryV1()
-			}
-
-			for _, endpoints := range testCase.endpoints {
-				_, err := client.CoreV1().Endpoints(endpoints.Namespace).Create(context.TODO(), endpoints, metav1.CreateOptions{})
-				if err != nil {
-					t.Fatalf("Error creating Endpoints: %v", err)
-				}
 			}
 
 			endpoints, err := epAdapter.Get(testCase.namespaceParam, testCase.nameParam, metav1.GetOptions{})
@@ -121,7 +115,7 @@ func TestEndpointsAdapterCreate(t *testing.T) {
 		expectedError         error
 		expectedEndpoints     *corev1.Endpoints
 		expectedEndpointSlice *discovery.EndpointSlice
-		endpoints             []*corev1.Endpoints
+		initialState          []runtime.Object
 		endpointSlices        []*discovery.EndpointSlice
 		namespaceParam        string
 		endpointsParam        *corev1.Endpoints
@@ -131,7 +125,7 @@ func TestEndpointsAdapterCreate(t *testing.T) {
 			expectedError:         nil,
 			expectedEndpoints:     endpoints1,
 			expectedEndpointSlice: epSlice1,
-			endpoints:             []*corev1.Endpoints{},
+			initialState:          []runtime.Object{},
 			namespaceParam:        endpoints1.Namespace,
 			endpointsParam:        endpoints1,
 		},
@@ -140,7 +134,7 @@ func TestEndpointsAdapterCreate(t *testing.T) {
 			expectedError:         nil,
 			expectedEndpoints:     endpoints2,
 			expectedEndpointSlice: epSlice2,
-			endpoints:             []*corev1.Endpoints{},
+			initialState:          []runtime.Object{},
 			namespaceParam:        endpoints2.Namespace,
 			endpointsParam:        endpoints2,
 		},
@@ -149,7 +143,7 @@ func TestEndpointsAdapterCreate(t *testing.T) {
 			expectedError:         nil,
 			expectedEndpoints:     endpoints3,
 			expectedEndpointSlice: epSlice3,
-			endpoints:             []*corev1.Endpoints{},
+			initialState:          []runtime.Object{},
 			namespaceParam:        endpoints3.Namespace,
 			endpointsParam:        endpoints3,
 		},
@@ -158,7 +152,7 @@ func TestEndpointsAdapterCreate(t *testing.T) {
 			expectedError:         nil,
 			expectedEndpoints:     endpoints1,
 			expectedEndpointSlice: nil,
-			endpoints:             []*corev1.Endpoints{},
+			initialState:          []runtime.Object{},
 			namespaceParam:        endpoints1.Namespace,
 			endpointsParam:        endpoints1,
 		},
@@ -167,7 +161,7 @@ func TestEndpointsAdapterCreate(t *testing.T) {
 			expectedError:         errors.NewAlreadyExists(schema.GroupResource{Group: "", Resource: "endpoints"}, "foo"),
 			expectedEndpoints:     nil,
 			expectedEndpointSlice: nil,
-			endpoints:             []*corev1.Endpoints{endpoints1},
+			initialState:          []runtime.Object{endpoints1},
 			namespaceParam:        endpoints1.Namespace,
 			endpointsParam:        endpoints1,
 		},
@@ -175,17 +169,10 @@ func TestEndpointsAdapterCreate(t *testing.T) {
 
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
-			client := fake.NewSimpleClientset()
+			client := fake.NewSimpleClientset(testCase.initialState...)
 			epAdapter := EndpointsAdapter{endpointClient: client.CoreV1()}
 			if testCase.endpointSlicesEnabled {
 				epAdapter.endpointSliceClient = client.DiscoveryV1()
-			}
-
-			for _, endpoints := range testCase.endpoints {
-				_, err := client.CoreV1().Endpoints(endpoints.Namespace).Create(context.TODO(), endpoints, metav1.CreateOptions{})
-				if err != nil {
-					t.Fatalf("Error creating Endpoints: %v", err)
-				}
 			}
 
 			endpoints, err := epAdapter.Create(testCase.namespaceParam, testCase.endpointsParam)
@@ -241,7 +228,7 @@ func TestEndpointsAdapterUpdate(t *testing.T) {
 		expectedError         error
 		expectedEndpoints     *corev1.Endpoints
 		expectedEndpointSlice *discovery.EndpointSlice
-		endpoints             []*corev1.Endpoints
+		initialState          []runtime.Object
 		endpointSlices        []*discovery.EndpointSlice
 		namespaceParam        string
 		endpointsParam        *corev1.Endpoints
@@ -251,7 +238,7 @@ func TestEndpointsAdapterUpdate(t *testing.T) {
 			expectedError:         nil,
 			expectedEndpoints:     endpoints1,
 			expectedEndpointSlice: nil,
-			endpoints:             []*corev1.Endpoints{endpoints1},
+			initialState:          []runtime.Object{endpoints1},
 			namespaceParam:        "testing",
 			endpointsParam:        endpoints1,
 		},
@@ -260,7 +247,7 @@ func TestEndpointsAdapterUpdate(t *testing.T) {
 			expectedError:         nil,
 			expectedEndpoints:     endpoints4,
 			expectedEndpointSlice: epSlice4IPv4,
-			endpoints:             []*corev1.Endpoints{endpoints4},
+			initialState:          []runtime.Object{endpoints4},
 			endpointSlices:        []*discovery.EndpointSlice{epSlice4IP},
 			namespaceParam:        "testing",
 			endpointsParam:        endpoints4,
@@ -270,7 +257,7 @@ func TestEndpointsAdapterUpdate(t *testing.T) {
 			expectedError:         nil,
 			expectedEndpoints:     endpoints2,
 			expectedEndpointSlice: epSlice2,
-			endpoints:             []*corev1.Endpoints{endpoints1},
+			initialState:          []runtime.Object{endpoints1},
 			namespaceParam:        "testing",
 			endpointsParam:        endpoints2,
 		},
@@ -279,7 +266,7 @@ func TestEndpointsAdapterUpdate(t *testing.T) {
 			expectedError:         errors.NewNotFound(schema.GroupResource{Group: "", Resource: "endpoints"}, "bar"),
 			expectedEndpoints:     nil,
 			expectedEndpointSlice: nil,
-			endpoints:             []*corev1.Endpoints{endpoints1},
+			initialState:          []runtime.Object{endpoints1},
 			namespaceParam:        "testing",
 			endpointsParam:        endpoints3,
 		},
@@ -287,17 +274,10 @@ func TestEndpointsAdapterUpdate(t *testing.T) {
 
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
-			client := fake.NewSimpleClientset()
+			client := fake.NewSimpleClientset(testCase.initialState...)
 			epAdapter := EndpointsAdapter{endpointClient: client.CoreV1()}
 			if testCase.endpointSlicesEnabled {
 				epAdapter.endpointSliceClient = client.DiscoveryV1()
-			}
-
-			for _, endpoints := range testCase.endpoints {
-				_, err := client.CoreV1().Endpoints(endpoints.Namespace).Create(context.TODO(), endpoints, metav1.CreateOptions{})
-				if err != nil {
-					t.Fatalf("Error creating Endpoints: %v", err)
-				}
 			}
 
 			endpoints, err := epAdapter.Update(testCase.namespaceParam, testCase.endpointsParam)
@@ -389,7 +369,7 @@ func TestEndpointsAdapterEnsureEndpointSliceFromEndpoints(t *testing.T) {
 		endpointSlicesEnabled bool
 		expectedError         error
 		expectedEndpointSlice *discovery.EndpointSlice
-		endpointSlices        []*discovery.EndpointSlice
+		initialState          []runtime.Object
 		namespaceParam        string
 		endpointsParam        *corev1.Endpoints
 	}{
@@ -397,7 +377,7 @@ func TestEndpointsAdapterEnsureEndpointSliceFromEndpoints(t *testing.T) {
 			endpointSlicesEnabled: true,
 			expectedError:         nil,
 			expectedEndpointSlice: epSlice1,
-			endpointSlices:        []*discovery.EndpointSlice{epSlice1},
+			initialState:          []runtime.Object{epSlice1},
 			namespaceParam:        "testing",
 			endpointsParam:        endpoints1,
 		},
@@ -405,7 +385,7 @@ func TestEndpointsAdapterEnsureEndpointSliceFromEndpoints(t *testing.T) {
 			endpointSlicesEnabled: true,
 			expectedError:         nil,
 			expectedEndpointSlice: epSlice2,
-			endpointSlices:        []*discovery.EndpointSlice{epSlice1},
+			initialState:          []runtime.Object{epSlice1},
 			namespaceParam:        "testing",
 			endpointsParam:        endpoints2,
 		},
@@ -413,7 +393,7 @@ func TestEndpointsAdapterEnsureEndpointSliceFromEndpoints(t *testing.T) {
 			endpointSlicesEnabled: true,
 			expectedError:         nil,
 			expectedEndpointSlice: epSlice1,
-			endpointSlices:        []*discovery.EndpointSlice{},
+			initialState:          []runtime.Object{},
 			namespaceParam:        "testing",
 			endpointsParam:        endpoints1,
 		},
@@ -421,7 +401,7 @@ func TestEndpointsAdapterEnsureEndpointSliceFromEndpoints(t *testing.T) {
 			endpointSlicesEnabled: false,
 			expectedError:         nil,
 			expectedEndpointSlice: nil,
-			endpointSlices:        []*discovery.EndpointSlice{},
+			initialState:          []runtime.Object{},
 			namespaceParam:        "testing",
 			endpointsParam:        endpoints1,
 		},
@@ -429,17 +409,10 @@ func TestEndpointsAdapterEnsureEndpointSliceFromEndpoints(t *testing.T) {
 
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
-			client := fake.NewSimpleClientset()
+			client := fake.NewSimpleClientset(testCase.initialState...)
 			epAdapter := EndpointsAdapter{endpointClient: client.CoreV1()}
 			if testCase.endpointSlicesEnabled {
 				epAdapter.endpointSliceClient = client.DiscoveryV1()
-			}
-
-			for _, endpointSlice := range testCase.endpointSlices {
-				_, err := client.DiscoveryV1().EndpointSlices(endpointSlice.Namespace).Create(context.TODO(), endpointSlice, metav1.CreateOptions{})
-				if err != nil {
-					t.Fatalf("Error creating EndpointSlice: %v", err)
-				}
 			}
 
 			err := epAdapter.EnsureEndpointSliceFromEndpoints(testCase.namespaceParam, testCase.endpointsParam)
