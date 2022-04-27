@@ -18,7 +18,7 @@ package kubelet
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"syscall"
 
@@ -209,7 +209,7 @@ func (kl *Kubelet) cleanupOrphanedPodDirs(pods []*v1.Pod, runningPods []*kubecon
 
 		// Call RemoveAllOneFilesystem for remaining subdirs under the pod directory
 		podDir := kl.getPodDir(uid)
-		podSubdirs, err := ioutil.ReadDir(podDir)
+		podSubdirs, err := os.ReadDir(podDir)
 		if err != nil {
 			klog.ErrorS(err, "Could not read directory", "path", podDir)
 			orphanRemovalErrors = append(orphanRemovalErrors, fmt.Errorf("orphaned pod %q found, but error occurred during reading the pod dir from disk: %v", uid, err))
