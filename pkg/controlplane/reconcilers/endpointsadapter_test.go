@@ -43,14 +43,6 @@ func TestEndpointsAdapterGet(t *testing.T) {
 		nameParam             string
 	}{
 		"single-existing-endpoints": {
-			endpointSlicesEnabled: false,
-			expectedError:         nil,
-			expectedEndpoints:     endpoints1,
-			initialState:          []runtime.Object{endpoints1},
-			namespaceParam:        "testing",
-			nameParam:             "foo",
-		},
-		"single-existing-endpoints-slices-enabled": {
 			endpointSlicesEnabled: true,
 			expectedError:         nil,
 			expectedEndpoints:     endpoints1,
@@ -59,7 +51,7 @@ func TestEndpointsAdapterGet(t *testing.T) {
 			nameParam:             "foo",
 		},
 		"wrong-namespace": {
-			endpointSlicesEnabled: false,
+			endpointSlicesEnabled: true,
 			expectedError:         errors.NewNotFound(schema.GroupResource{Group: "", Resource: "endpoints"}, "foo"),
 			expectedEndpoints:     nil,
 			initialState:          []runtime.Object{endpoints1},
@@ -67,7 +59,7 @@ func TestEndpointsAdapterGet(t *testing.T) {
 			nameParam:             "foo",
 		},
 		"wrong-name": {
-			endpointSlicesEnabled: false,
+			endpointSlicesEnabled: true,
 			expectedError:         errors.NewNotFound(schema.GroupResource{Group: "", Resource: "endpoints"}, "bar"),
 			expectedEndpoints:     nil,
 			initialState:          []runtime.Object{endpoints1},
@@ -79,10 +71,7 @@ func TestEndpointsAdapterGet(t *testing.T) {
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
 			client := fake.NewSimpleClientset(testCase.initialState...)
-			epAdapter := EndpointsAdapter{endpointClient: client.CoreV1()}
-			if testCase.endpointSlicesEnabled {
-				epAdapter.endpointSliceClient = client.DiscoveryV1()
-			}
+			epAdapter := NewEndpointsAdapter(client.CoreV1(), client.DiscoveryV1())
 
 			endpoints, err := epAdapter.Get(testCase.namespaceParam, testCase.nameParam, metav1.GetOptions{})
 
@@ -147,15 +136,6 @@ func TestEndpointsAdapterCreate(t *testing.T) {
 			namespaceParam:        endpoints3.Namespace,
 			endpointsParam:        endpoints3,
 		},
-		"single-endpoint-no-slices": {
-			endpointSlicesEnabled: false,
-			expectedError:         nil,
-			expectedResult:        endpoints1,
-			expectCreate:          []runtime.Object{endpoints1},
-			initialState:          []runtime.Object{},
-			namespaceParam:        endpoints1.Namespace,
-			endpointsParam:        endpoints1,
-		},
 		"existing-endpoint": {
 			endpointSlicesEnabled: true,
 			expectedError:         errors.NewAlreadyExists(schema.GroupResource{Group: "", Resource: "endpoints"}, "foo"),
@@ -172,10 +152,7 @@ func TestEndpointsAdapterCreate(t *testing.T) {
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
 			client := fake.NewSimpleClientset(testCase.initialState...)
-			epAdapter := EndpointsAdapter{endpointClient: client.CoreV1()}
-			if testCase.endpointSlicesEnabled {
-				epAdapter.endpointSliceClient = client.DiscoveryV1()
-			}
+			epAdapter := NewEndpointsAdapter(client.CoreV1(), client.DiscoveryV1())
 
 			endpoints, err := epAdapter.Create(testCase.namespaceParam, testCase.endpointsParam)
 
@@ -219,10 +196,10 @@ func TestEndpointsAdapterUpdate(t *testing.T) {
 		endpointsParam        *corev1.Endpoints
 	}{
 		"single-existing-endpoints-no-change": {
-			endpointSlicesEnabled: false,
+			endpointSlicesEnabled: true,
 			expectedError:         nil,
 			expectedResult:        endpoints1,
-			initialState:          []runtime.Object{endpoints1},
+			initialState:          []runtime.Object{endpoints1, epSlice1},
 			namespaceParam:        "testing",
 			endpointsParam:        endpoints1,
 
@@ -268,10 +245,7 @@ func TestEndpointsAdapterUpdate(t *testing.T) {
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
 			client := fake.NewSimpleClientset(testCase.initialState...)
-			epAdapter := EndpointsAdapter{endpointClient: client.CoreV1()}
-			if testCase.endpointSlicesEnabled {
-				epAdapter.endpointSliceClient = client.DiscoveryV1()
-			}
+			epAdapter := NewEndpointsAdapter(client.CoreV1(), client.DiscoveryV1())
 
 			endpoints, err := epAdapter.Update(testCase.namespaceParam, testCase.endpointsParam)
 
@@ -373,23 +347,12 @@ func TestEndpointsAdapterEnsureEndpointSliceFromEndpoints(t *testing.T) {
 			namespaceParam:        "testing",
 			endpointsParam:        endpoints1,
 		},
-		"endpointslices-disabled": {
-			endpointSlicesEnabled: false,
-			expectedError:         nil,
-			expectedEndpointSlice: nil,
-			initialState:          []runtime.Object{},
-			namespaceParam:        "testing",
-			endpointsParam:        endpoints1,
-		},
 	}
 
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
 			client := fake.NewSimpleClientset(testCase.initialState...)
-			epAdapter := EndpointsAdapter{endpointClient: client.CoreV1()}
-			if testCase.endpointSlicesEnabled {
-				epAdapter.endpointSliceClient = client.DiscoveryV1()
-			}
+			epAdapter := NewEndpointsAdapter(client.CoreV1(), client.DiscoveryV1())
 
 			err := epAdapter.EnsureEndpointSliceFromEndpoints(testCase.namespaceParam, testCase.endpointsParam)
 			if !apiequality.Semantic.DeepEqual(testCase.expectedError, err) {
