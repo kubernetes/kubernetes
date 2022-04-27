@@ -54,7 +54,7 @@ const (
 // adding and removing APIServices
 type AutoAPIServiceRegistration interface {
 	// AddAPIServiceToSyncOnStart adds an API service to sync on start.
-	AddAPIServiceToSyncOnStart(in *v1.APIService)
+	AddAPIServiceToSyncOnStart(in *v1.APIService, hash string)
 	// AddAPIServiceToSync adds an API service to sync continuously.
 	AddAPIServiceToSync(in *v1.APIService)
 	// RemoveAPIServiceToSync removes an API service to auto-register.
@@ -241,11 +241,17 @@ func (c *autoRegisterController) checkAPIService(name string) (err error) {
 
 	// we don't have an entry and we do want one (2B,2C)
 	case apierrors.IsNotFound(err) && desired != nil:
-		_, err := c.apiServiceClient.APIServices().Create(context.TODO(), desired, metav1.CreateOptions{})
+		a, err := c.apiServiceClient.APIServices().Create(context.TODO(), desired, metav1.CreateOptions{})
 		if apierrors.IsAlreadyExists(err) {
 			// created in the meantime, we'll get called again
 			return nil
 		}
+		if err != nil {
+			return err
+		}
+		apiService := a.DeepCopy()
+		apiService.Status.Hash = desired.Status.Hash
+		_, err = c.apiServiceClient.APIServices().UpdateStatus(context.TODO(), apiService, metav1.UpdateOptions{})
 		return err
 
 	// we aren't trying to manage this APIService (3A,3B,3C)
@@ -271,19 +277,28 @@ func (c *autoRegisterController) checkAPIService(name string) (err error) {
 		return err
 
 	// if the specs already match, nothing for us to do
-	case reflect.DeepEqual(curr.Spec, desired.Spec):
+	case reflect.DeepEqual(curr.Spec, desired.Spec) && curr.Status.Hash == desired.Status.Hash:
 		return nil
 	}
 
 	// we have an entry and we have a desired, now we deconflict.  Only a few fields matter. (5B,5C,6B,6C)
 	apiService := curr.DeepCopy()
 	apiService.Spec = desired.Spec
-	_, err = c.apiServiceClient.APIServices().Update(context.TODO(), apiService, metav1.UpdateOptions{})
+	a, err := c.apiServiceClient.APIServices().Update(context.TODO(), apiService, metav1.UpdateOptions{})
 	if apierrors.IsNotFound(err) || apierrors.IsConflict(err) {
 		// deleted or changed in the meantime, we'll get called again
 		return nil
 	}
-	return err
+	if err != nil {
+		return err
+	}
+	if a.Status.Hash != desired.Status.Hash {
+		apiService = a.DeepCopy()
+		apiService.Status.Hash = desired.Status.Hash
+		_, err = c.apiServiceClient.APIServices().UpdateStatus(context.TODO(), apiService, metav1.UpdateOptions{})
+		return err
+	}
+	return nil
 }
 
 // GetAPIServiceToSync gets a single API service to sync.
@@ -295,16 +310,16 @@ func (c *autoRegisterController) GetAPIServiceToSync(name string) *v1.APIService
 }
 
 // AddAPIServiceToSyncOnStart registers an API service to sync only when the controller starts.
-func (c *autoRegisterController) AddAPIServiceToSyncOnStart(in *v1.APIService) {
-	c.addAPIServiceToSync(in, manageOnStart)
+func (c *autoRegisterController) AddAPIServiceToSyncOnStart(in *v1.APIService, hash string) {
+	c.addAPIServiceToSync(in, manageOnStart, hash)
 }
 
 // AddAPIServiceToSync registers an API service to sync continuously.
 func (c *autoRegisterController) AddAPIServiceToSync(in *v1.APIService) {
-	c.addAPIServiceToSync(in, manageContinuously)
+	c.addAPIServiceToSync(in, manageContinuously, "")
 }
 
-func (c *autoRegisterController) addAPIServiceToSync(in *v1.APIService, syncType string) {
+func (c *autoRegisterController) addAPIServiceToSync(in *v1.APIService, syncType string, hash string) {
 	c.apiServicesToSyncLock.Lock()
 	defer c.apiServicesToSyncLock.Unlock()
 
@@ -313,7 +328,9 @@ func (c *autoRegisterController) addAPIServiceToSync(in *v1.APIService, syncType
 		apiService.Labels = map[string]string{}
 	}
 	apiService.Labels[AutoRegisterManagedLabel] = syncType
-
+	if hash != "" {
+		apiService.Status.Hash = hash
+	}
 	c.apiServicesToSync[apiService.Name] = apiService
 	c.queue.Add(apiService.Name)
 }

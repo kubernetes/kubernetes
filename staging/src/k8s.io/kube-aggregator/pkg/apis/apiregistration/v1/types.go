@@ -140,6 +140,10 @@ type APIServiceStatus struct {
 	// +listType=map
 	// +listMapKey=type
 	Conditions []APIServiceCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
+
+	// Hash is the current hash of the APIService's groupversion, used allow the client to detect if the apiservice groupversion has changed at all.
+	// +optional
+	Hash string `json:"hash,omitempty" protobuf:"bytes,2,opt,name=hash"`
 }
 
 // +genclient

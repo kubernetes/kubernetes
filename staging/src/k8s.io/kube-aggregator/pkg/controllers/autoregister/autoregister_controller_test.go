@@ -337,7 +337,7 @@ func TestSync(t *testing.T) {
 		}
 
 		for _, obj := range test.addSyncOnStartAPIServices {
-			c.AddAPIServiceToSyncOnStart(obj)
+			c.AddAPIServiceToSyncOnStart(obj, "")
 		}
 
 		for _, objName := range test.delSyncAPIServices {

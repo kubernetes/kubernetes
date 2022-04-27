@@ -252,6 +252,7 @@ func Convert_apiregistration_APIServiceSpec_To_v1_APIServiceSpec(in *apiregistra
 
 func autoConvert_v1_APIServiceStatus_To_apiregistration_APIServiceStatus(in *APIServiceStatus, out *apiregistration.APIServiceStatus, s conversion.Scope) error {
 	out.Conditions = *(*[]apiregistration.APIServiceCondition)(unsafe.Pointer(&in.Conditions))
+	out.Hash = in.Hash
 	return nil
 }
 
@@ -262,6 +263,7 @@ func Convert_v1_APIServiceStatus_To_apiregistration_APIServiceStatus(in *APIServ
 
 func autoConvert_apiregistration_APIServiceStatus_To_v1_APIServiceStatus(in *apiregistration.APIServiceStatus, out *APIServiceStatus, s conversion.Scope) error {
 	out.Conditions = *(*[]APIServiceCondition)(unsafe.Pointer(&in.Conditions))
+	out.Hash = in.Hash
 	return nil
 }
 

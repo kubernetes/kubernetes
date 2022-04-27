@@ -132,6 +132,9 @@ message APIServiceStatus {
   // +listType=map
   // +listMapKey=type
   repeated APIServiceCondition conditions = 1;
+
+  // +optional
+  optional string hash = 2;
 }
 
 // ServiceReference holds a reference to Service.legacy.k8s.io

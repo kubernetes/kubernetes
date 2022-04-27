@@ -47926,6 +47926,13 @@ func schema_pkg_apis_apiregistration_v1_APIServiceStatus(ref common.ReferenceCal
 							},
 						},
 					},
+					"hash": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Hash is the current hash of the APIService's groupversion, used allow the client to detect if the apiservice groupversion has changed at all.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
 			},
 		},

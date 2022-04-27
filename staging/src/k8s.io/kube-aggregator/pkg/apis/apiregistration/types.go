@@ -127,6 +127,10 @@ type APIServiceStatus struct {
 	// +listType=map
 	// +listMapKey=type
 	Conditions []APIServiceCondition
+
+	// Hash is the current hash of the APIService's groupversion, used allow the client to detect if the apiservice groupversion has changed at all.
+	// +optional
+	Hash string
 }
 
 // +genclient
