@@ -151,7 +151,7 @@ func TestRotateLogs(t *testing.T) {
 	require.NoError(t, c.rotateLogs())
 
 	timestamp := now.Format(timestampFormat)
-	logs, err := ioutil.ReadDir(dir)
+	logs, err := os.ReadDir(dir)
 	require.NoError(t, err)
 	assert.Len(t, logs, 5)
 	assert.Equal(t, testLogs[0], logs[0].Name())
@@ -223,7 +223,7 @@ func TestClean(t *testing.T) {
 	err = c.Clean("container-3")
 	require.NoError(t, err)
 
-	logs, err := ioutil.ReadDir(dir)
+	logs, err := os.ReadDir(dir)
 	require.NoError(t, err)
 	assert.Len(t, logs, 4)
 	assert.Equal(t, testLogs[0], logs[0].Name())
@@ -259,7 +259,7 @@ func TestCleanupUnusedLog(t *testing.T) {
 	assert.Len(t, got, 2)
 	assert.Equal(t, []string{testLogs[0], testLogs[3]}, got)
 
-	logs, err := ioutil.ReadDir(dir)
+	logs, err := os.ReadDir(dir)
 	require.NoError(t, err)
 	assert.Len(t, logs, 2)
 	assert.Equal(t, testLogs[0], filepath.Join(dir, logs[0].Name()))
@@ -309,7 +309,7 @@ func TestRemoveExcessLog(t *testing.T) {
 			assert.Equal(t, name, filepath.Base(got[i]))
 		}
 
-		logs, err := ioutil.ReadDir(dir)
+		logs, err := os.ReadDir(dir)
 		require.NoError(t, err)
 		require.Len(t, logs, len(test.expect))
 		for i, name := range test.expect {
