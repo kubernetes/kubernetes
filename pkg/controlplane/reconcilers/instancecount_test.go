@@ -393,53 +393,54 @@ func TestMasterCountEndpointReconciler(t *testing.T) {
 		},
 	}
 	for _, test := range reconcileTests {
-		fakeClient := fake.NewSimpleClientset()
-		if test.endpoints != nil {
-			fakeClient = fake.NewSimpleClientset(test.endpoints)
-		}
-		epAdapter := NewEndpointsAdapter(fakeClient.CoreV1(), nil)
-		reconciler := NewMasterCountEndpointReconciler(test.additionalMasters+1, epAdapter)
-		err := reconciler.ReconcileEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, true)
-		if err != nil {
-			t.Errorf("case %q: unexpected error: %v", test.testName, err)
-		}
+		t.Run(test.testName, func(t *testing.T) {
+			fakeClient := fake.NewSimpleClientset()
+			if test.endpoints != nil {
+				fakeClient = fake.NewSimpleClientset(test.endpoints)
+			}
+			epAdapter := NewEndpointsAdapter(fakeClient.CoreV1(), nil)
+			reconciler := NewMasterCountEndpointReconciler(test.additionalMasters+1, epAdapter)
+			err := reconciler.ReconcileEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, true)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
 
-		updates := []core.UpdateAction{}
-		for _, action := range fakeClient.Actions() {
-			if action.GetVerb() != "update" {
-				continue
+			updates := []core.UpdateAction{}
+			for _, action := range fakeClient.Actions() {
+				if action.GetVerb() != "update" {
+					continue
+				}
+				updates = append(updates, action.(core.UpdateAction))
 			}
-			updates = append(updates, action.(core.UpdateAction))
-		}
-		if test.expectUpdate != nil {
-			if len(updates) != 1 {
-				t.Errorf("case %q: unexpected updates: %v", test.testName, updates)
-			} else if e, a := test.expectUpdate, updates[0].GetObject(); !reflect.DeepEqual(e, a) {
-				t.Errorf("case %q: expected update:\n%#v\ngot:\n%#v\n", test.testName, e, a)
+			if test.expectUpdate != nil {
+				if len(updates) != 1 {
+					t.Errorf("unexpected updates: %v", updates)
+				} else if e, a := test.expectUpdate, updates[0].GetObject(); !reflect.DeepEqual(e, a) {
+					t.Errorf("expected update:\n%#v\ngot:\n%#v\n", e, a)
+				}
 			}
-		}
-		if test.expectUpdate == nil && len(updates) > 0 {
-			t.Errorf("case %q: no update expected, yet saw: %v", test.testName, updates)
-		}
+			if test.expectUpdate == nil && len(updates) > 0 {
+				t.Errorf("no update expected, yet saw: %v", updates)
+			}
 
-		creates := []core.CreateAction{}
-		for _, action := range fakeClient.Actions() {
-			if action.GetVerb() != "create" {
-				continue
+			creates := []core.CreateAction{}
+			for _, action := range fakeClient.Actions() {
+				if action.GetVerb() != "create" {
+					continue
+				}
+				creates = append(creates, action.(core.CreateAction))
 			}
-			creates = append(creates, action.(core.CreateAction))
-		}
-		if test.expectCreate != nil {
-			if len(creates) != 1 {
-				t.Errorf("case %q: unexpected creates: %v", test.testName, creates)
-			} else if e, a := test.expectCreate, creates[0].GetObject(); !reflect.DeepEqual(e, a) {
-				t.Errorf("case %q: expected create:\n%#v\ngot:\n%#v\n", test.testName, e, a)
+			if test.expectCreate != nil {
+				if len(creates) != 1 {
+					t.Errorf("unexpected creates: %v", creates)
+				} else if e, a := test.expectCreate, creates[0].GetObject(); !reflect.DeepEqual(e, a) {
+					t.Errorf("expected create:\n%#v\ngot:\n%#v\n", e, a)
+				}
 			}
-		}
-		if test.expectCreate == nil && len(creates) > 0 {
-			t.Errorf("case %q: no create expected, yet saw: %v", test.testName, creates)
-		}
-
+			if test.expectCreate == nil && len(creates) > 0 {
+				t.Errorf("no create expected, yet saw: %v", creates)
+			}
+		})
 	}
 
 	nonReconcileTests := []struct {
@@ -512,53 +513,54 @@ func TestMasterCountEndpointReconciler(t *testing.T) {
 		},
 	}
 	for _, test := range nonReconcileTests {
-		fakeClient := fake.NewSimpleClientset()
-		if test.endpoints != nil {
-			fakeClient = fake.NewSimpleClientset(test.endpoints)
-		}
-		epAdapter := NewEndpointsAdapter(fakeClient.CoreV1(), nil)
-		reconciler := NewMasterCountEndpointReconciler(test.additionalMasters+1, epAdapter)
-		err := reconciler.ReconcileEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, false)
-		if err != nil {
-			t.Errorf("case %q: unexpected error: %v", test.testName, err)
-		}
+		t.Run(test.testName, func(t *testing.T) {
+			fakeClient := fake.NewSimpleClientset()
+			if test.endpoints != nil {
+				fakeClient = fake.NewSimpleClientset(test.endpoints)
+			}
+			epAdapter := NewEndpointsAdapter(fakeClient.CoreV1(), nil)
+			reconciler := NewMasterCountEndpointReconciler(test.additionalMasters+1, epAdapter)
+			err := reconciler.ReconcileEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, false)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
 
-		updates := []core.UpdateAction{}
-		for _, action := range fakeClient.Actions() {
-			if action.GetVerb() != "update" {
-				continue
+			updates := []core.UpdateAction{}
+			for _, action := range fakeClient.Actions() {
+				if action.GetVerb() != "update" {
+					continue
+				}
+				updates = append(updates, action.(core.UpdateAction))
 			}
-			updates = append(updates, action.(core.UpdateAction))
-		}
-		if test.expectUpdate != nil {
-			if len(updates) != 1 {
-				t.Errorf("case %q: unexpected updates: %v", test.testName, updates)
-			} else if e, a := test.expectUpdate, updates[0].GetObject(); !reflect.DeepEqual(e, a) {
-				t.Errorf("case %q: expected update:\n%#v\ngot:\n%#v\n", test.testName, e, a)
+			if test.expectUpdate != nil {
+				if len(updates) != 1 {
+					t.Errorf("unexpected updates: %v", updates)
+				} else if e, a := test.expectUpdate, updates[0].GetObject(); !reflect.DeepEqual(e, a) {
+					t.Errorf("expected update:\n%#v\ngot:\n%#v\n", e, a)
+				}
 			}
-		}
-		if test.expectUpdate == nil && len(updates) > 0 {
-			t.Errorf("case %q: no update expected, yet saw: %v", test.testName, updates)
-		}
+			if test.expectUpdate == nil && len(updates) > 0 {
+				t.Errorf("no update expected, yet saw: %v", updates)
+			}
 
-		creates := []core.CreateAction{}
-		for _, action := range fakeClient.Actions() {
-			if action.GetVerb() != "create" {
-				continue
+			creates := []core.CreateAction{}
+			for _, action := range fakeClient.Actions() {
+				if action.GetVerb() != "create" {
+					continue
+				}
+				creates = append(creates, action.(core.CreateAction))
 			}
-			creates = append(creates, action.(core.CreateAction))
-		}
-		if test.expectCreate != nil {
-			if len(creates) != 1 {
-				t.Errorf("case %q: unexpected creates: %v", test.testName, creates)
-			} else if e, a := test.expectCreate, creates[0].GetObject(); !reflect.DeepEqual(e, a) {
-				t.Errorf("case %q: expected create:\n%#v\ngot:\n%#v\n", test.testName, e, a)
+			if test.expectCreate != nil {
+				if len(creates) != 1 {
+					t.Errorf("unexpected creates: %v", creates)
+				} else if e, a := test.expectCreate, creates[0].GetObject(); !reflect.DeepEqual(e, a) {
+					t.Errorf("expected create:\n%#v\ngot:\n%#v\n", e, a)
+				}
 			}
-		}
-		if test.expectCreate == nil && len(creates) > 0 {
-			t.Errorf("case %q: no create expected, yet saw: %v", test.testName, creates)
-		}
-
+			if test.expectCreate == nil && len(creates) > 0 {
+				t.Errorf("no create expected, yet saw: %v", creates)
+			}
+		})
 	}
 
 }
