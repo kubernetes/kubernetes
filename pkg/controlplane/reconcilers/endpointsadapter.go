@@ -123,6 +123,7 @@ func (adapter *EndpointsAdapter) EnsureEndpointSliceFromEndpoints(namespace stri
 func endpointSliceFromEndpoints(endpoints *corev1.Endpoints) *discovery.EndpointSlice {
 	endpointSlice := &discovery.EndpointSlice{}
 	endpointSlice.Name = endpoints.Name
+	endpointSlice.Namespace = endpoints.Namespace
 	endpointSlice.Labels = map[string]string{discovery.LabelServiceName: endpoints.Name}
 
 	// TODO: Add support for dual stack here (and in the rest of
