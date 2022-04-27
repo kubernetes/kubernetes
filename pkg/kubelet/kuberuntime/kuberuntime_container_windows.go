@@ -109,6 +109,17 @@ func (m *kubeGenericRuntimeManager) generateWindowsContainerConfig(container *v1
 		wc.Resources.MemoryLimitInBytes = memoryLimit
 	}
 
+	// Windows containers use ephemeral storage by default and are created with
+	// a default volume size of 20GB.
+	// If specified - resources.limits.ephemeral-storage value will be used to
+	// override this default.
+	// https://docs.microsoft.com/virtualization/windowscontainers/manage-containers/container-storage#scratch-space
+	// https://docs.microsoft.com/virtualization/windowscontainers/manage-containers/container-storage#storage-limits
+	ephemeralStorageLimit := container.Resources.Limits.StorageEphemeral().Value()
+	if ephemeralStorageLimit != 0 {
+		wc.Resources.RootfsSizeInBytes = ephemeralStorageLimit
+	}
+
 	// setup security context
 	effectiveSc := securitycontext.DetermineEffectiveSecurityContext(pod, container)
 
