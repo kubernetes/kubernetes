@@ -22,8 +22,6 @@ https://github.com/openshift/origin/blob/bb340c5dd5ff72718be86fb194dedc0faed7f4c
 */
 
 import (
-	"context"
-	"reflect"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -89,6 +87,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 		endpointKeys  []string
 		initialState  []runtime.Object
 		expectUpdate  []runtime.Object
+		expectCreate  []runtime.Object
 	}{
 		{
 			testName:      "no existing endpoints",
@@ -96,7 +95,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			ip:            "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 			initialState:  nil,
-			expectUpdate:  makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			expectCreate:  makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 		},
 		{
 			testName:      "existing endpoints satisfy",
@@ -154,7 +153,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			ip:            "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 			initialState:  makeEndpointsArray("bar", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
-			expectUpdate:  makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			expectCreate:  makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 		},
 		{
 			testName:      "existing endpoints wrong IP",
@@ -253,17 +252,14 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			r := NewLeaseEndpointReconciler(epAdapter, fakeLeases)
 			err := r.ReconcileEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, true)
 			if err != nil {
-				t.Errorf("unexpected error: %v", err)
+				t.Errorf("unexpected error reconciling: %v", err)
 			}
-			actualEndpoints, err := clientset.CoreV1().Endpoints(corev1.NamespaceDefault).Get(context.TODO(), test.serviceName, metav1.GetOptions{})
+
+			err = verifyCreatesAndUpdates(clientset, test.expectCreate, test.expectUpdate)
 			if err != nil {
-				t.Errorf("unexpected error: %v", err)
+				t.Errorf("unexpected error in side effects: %v", err)
 			}
-			if test.expectUpdate != nil {
-				if e, a := test.expectUpdate[0], actualEndpoints; !reflect.DeepEqual(e, a) {
-					t.Errorf("expected update:\n%#v\ngot:\n%#v\n", e, a)
-				}
-			}
+
 			if updatedKeys := fakeLeases.GetUpdatedKeys(); len(updatedKeys) != 1 || updatedKeys[0] != test.ip {
 				t.Errorf("expected the master's IP to be refreshed, but the following IPs were refreshed instead: %v", updatedKeys)
 			}
@@ -278,6 +274,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 		endpointKeys  []string
 		initialState  []runtime.Object
 		expectUpdate  []runtime.Object
+		expectCreate  []runtime.Object
 	}{
 		{
 			testName:    "existing endpoints extra service ports missing port no update",
@@ -307,7 +304,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			ip:            "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 			initialState:  nil,
-			expectUpdate:  makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			expectCreate:  makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 		},
 	}
 	for _, test := range nonReconcileTests {
@@ -319,17 +316,14 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			r := NewLeaseEndpointReconciler(epAdapter, fakeLeases)
 			err := r.ReconcileEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, false)
 			if err != nil {
-				t.Errorf("unexpected error: %v", err)
+				t.Errorf("unexpected error reconciling: %v", err)
 			}
-			actualEndpoints, err := clientset.CoreV1().Endpoints(corev1.NamespaceDefault).Get(context.TODO(), test.serviceName, metav1.GetOptions{})
+
+			err = verifyCreatesAndUpdates(clientset, test.expectCreate, test.expectUpdate)
 			if err != nil {
-				t.Errorf("unexpected error: %v", err)
+				t.Errorf("unexpected error in side effects: %v", err)
 			}
-			if test.expectUpdate != nil {
-				if e, a := test.expectUpdate[0], actualEndpoints; !reflect.DeepEqual(e, a) {
-					t.Errorf("expected update:\n%#v\ngot:\n%#v\n", e, a)
-				}
-			}
+
 			if updatedKeys := fakeLeases.GetUpdatedKeys(); len(updatedKeys) != 1 || updatedKeys[0] != test.ip {
 				t.Errorf("expected the master's IP to be refreshed, but the following IPs were refreshed instead: %v", updatedKeys)
 			}
@@ -371,6 +365,7 @@ func TestLeaseRemoveEndpoints(t *testing.T) {
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 			endpointKeys:  []string{"1.2.3.4", "4.3.2.2", "4.3.2.3", "4.3.2.4"},
 			initialState:  makeEndpointsArray("foo", nil, nil),
+			expectUpdate:  makeEndpointsArray("foo", []string{"1.2.3.4", "4.3.2.2", "4.3.2.3", "4.3.2.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 		},
 	}
 	for _, test := range stopTests {
@@ -382,17 +377,14 @@ func TestLeaseRemoveEndpoints(t *testing.T) {
 			r := NewLeaseEndpointReconciler(epAdapter, fakeLeases)
 			err := r.RemoveEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts)
 			if err != nil {
-				t.Errorf("unexpected error: %v", err)
+				t.Errorf("unexpected error reconciling: %v", err)
 			}
-			actualEndpoints, err := clientset.CoreV1().Endpoints(corev1.NamespaceDefault).Get(context.TODO(), test.serviceName, metav1.GetOptions{})
+
+			err = verifyCreatesAndUpdates(clientset, nil, test.expectUpdate)
 			if err != nil {
-				t.Errorf("unexpected error: %v", err)
+				t.Errorf("unexpected error in side effects: %v", err)
 			}
-			if test.expectUpdate != nil {
-				if e, a := test.expectUpdate[0], actualEndpoints; !reflect.DeepEqual(e, a) {
-					t.Errorf("expected update:\n%#v\ngot:\n%#v\n", e, a)
-				}
-			}
+
 			for _, key := range fakeLeases.GetUpdatedKeys() {
 				if key == test.ip {
 					t.Errorf("Found ip %s in leases but shouldn't be there", key)
