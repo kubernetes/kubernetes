@@ -448,36 +448,38 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 		},
 	}
 	for _, test := range reconcileTests {
-		fakeLeases := newFakeLeases()
-		fakeLeases.SetKeys(test.endpointKeys)
-		clientset := fake.NewSimpleClientset()
-		if test.endpoints != nil {
-			for _, ep := range test.endpoints.Items {
-				if _, err := clientset.CoreV1().Endpoints(ep.Namespace).Create(context.TODO(), &ep, metav1.CreateOptions{}); err != nil {
-					t.Errorf("case %q: unexpected error: %v", test.testName, err)
-					continue
+		t.Run(test.testName, func(t *testing.T) {
+			fakeLeases := newFakeLeases()
+			fakeLeases.SetKeys(test.endpointKeys)
+			clientset := fake.NewSimpleClientset()
+			if test.endpoints != nil {
+				for _, ep := range test.endpoints.Items {
+					if _, err := clientset.CoreV1().Endpoints(ep.Namespace).Create(context.TODO(), &ep, metav1.CreateOptions{}); err != nil {
+						t.Errorf("unexpected error: %v", err)
+						continue
+					}
 				}
 			}
-		}
 
-		epAdapter := EndpointsAdapter{endpointClient: clientset.CoreV1()}
-		r := NewLeaseEndpointReconciler(epAdapter, fakeLeases)
-		err := r.ReconcileEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, true)
-		if err != nil {
-			t.Errorf("case %q: unexpected error: %v", test.testName, err)
-		}
-		actualEndpoints, err := clientset.CoreV1().Endpoints(corev1.NamespaceDefault).Get(context.TODO(), test.serviceName, metav1.GetOptions{})
-		if err != nil {
-			t.Errorf("case %q: unexpected error: %v", test.testName, err)
-		}
-		if test.expectUpdate != nil {
-			if e, a := test.expectUpdate, actualEndpoints; !reflect.DeepEqual(e, a) {
-				t.Errorf("case %q: expected update:\n%#v\ngot:\n%#v\n", test.testName, e, a)
+			epAdapter := EndpointsAdapter{endpointClient: clientset.CoreV1()}
+			r := NewLeaseEndpointReconciler(epAdapter, fakeLeases)
+			err := r.ReconcileEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, true)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
 			}
-		}
-		if updatedKeys := fakeLeases.GetUpdatedKeys(); len(updatedKeys) != 1 || updatedKeys[0] != test.ip {
-			t.Errorf("case %q: expected the master's IP to be refreshed, but the following IPs were refreshed instead: %v", test.testName, updatedKeys)
-		}
+			actualEndpoints, err := clientset.CoreV1().Endpoints(corev1.NamespaceDefault).Get(context.TODO(), test.serviceName, metav1.GetOptions{})
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if test.expectUpdate != nil {
+				if e, a := test.expectUpdate, actualEndpoints; !reflect.DeepEqual(e, a) {
+					t.Errorf("expected update:\n%#v\ngot:\n%#v\n", e, a)
+				}
+			}
+			if updatedKeys := fakeLeases.GetUpdatedKeys(); len(updatedKeys) != 1 || updatedKeys[0] != test.ip {
+				t.Errorf("expected the master's IP to be refreshed, but the following IPs were refreshed instead: %v", updatedKeys)
+			}
+		})
 	}
 
 	nonReconcileTests := []struct {
@@ -556,7 +558,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			if test.endpoints != nil {
 				for _, ep := range test.endpoints.Items {
 					if _, err := clientset.CoreV1().Endpoints(ep.Namespace).Create(context.TODO(), &ep, metav1.CreateOptions{}); err != nil {
-						t.Errorf("case %q: unexpected error: %v", test.testName, err)
+						t.Errorf("unexpected error: %v", err)
 						continue
 					}
 				}
@@ -565,19 +567,19 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			r := NewLeaseEndpointReconciler(epAdapter, fakeLeases)
 			err := r.ReconcileEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, false)
 			if err != nil {
-				t.Errorf("case %q: unexpected error: %v", test.testName, err)
+				t.Errorf("unexpected error: %v", err)
 			}
 			actualEndpoints, err := clientset.CoreV1().Endpoints(corev1.NamespaceDefault).Get(context.TODO(), test.serviceName, metav1.GetOptions{})
 			if err != nil {
-				t.Errorf("case %q: unexpected error: %v", test.testName, err)
+				t.Errorf("unexpected error: %v", err)
 			}
 			if test.expectUpdate != nil {
 				if e, a := test.expectUpdate, actualEndpoints; !reflect.DeepEqual(e, a) {
-					t.Errorf("case %q: expected update:\n%#v\ngot:\n%#v\n", test.testName, e, a)
+					t.Errorf("expected update:\n%#v\ngot:\n%#v\n", e, a)
 				}
 			}
 			if updatedKeys := fakeLeases.GetUpdatedKeys(); len(updatedKeys) != 1 || updatedKeys[0] != test.ip {
-				t.Errorf("case %q: expected the master's IP to be refreshed, but the following IPs were refreshed instead: %v", test.testName, updatedKeys)
+				t.Errorf("expected the master's IP to be refreshed, but the following IPs were refreshed instead: %v", updatedKeys)
 			}
 		})
 	}
@@ -677,7 +679,7 @@ func TestLeaseRemoveEndpoints(t *testing.T) {
 			clientset := fake.NewSimpleClientset()
 			for _, ep := range test.endpoints.Items {
 				if _, err := clientset.CoreV1().Endpoints(ep.Namespace).Create(context.TODO(), &ep, metav1.CreateOptions{}); err != nil {
-					t.Errorf("case %q: unexpected error: %v", test.testName, err)
+					t.Errorf("unexpected error: %v", err)
 					continue
 				}
 			}
@@ -685,20 +687,20 @@ func TestLeaseRemoveEndpoints(t *testing.T) {
 			r := NewLeaseEndpointReconciler(epAdapter, fakeLeases)
 			err := r.RemoveEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts)
 			if err != nil {
-				t.Errorf("case %q: unexpected error: %v", test.testName, err)
+				t.Errorf("unexpected error: %v", err)
 			}
 			actualEndpoints, err := clientset.CoreV1().Endpoints(corev1.NamespaceDefault).Get(context.TODO(), test.serviceName, metav1.GetOptions{})
 			if err != nil {
-				t.Errorf("case %q: unexpected error: %v", test.testName, err)
+				t.Errorf("unexpected error: %v", err)
 			}
 			if test.expectUpdate != nil {
 				if e, a := test.expectUpdate, actualEndpoints; !reflect.DeepEqual(e, a) {
-					t.Errorf("case %q: expected update:\n%#v\ngot:\n%#v\n", test.testName, e, a)
+					t.Errorf("expected update:\n%#v\ngot:\n%#v\n", e, a)
 				}
 			}
 			for _, key := range fakeLeases.GetUpdatedKeys() {
 				if key == test.ip {
-					t.Errorf("case %q: Found ip %s in leases but shouldn't be there", test.testName, key)
+					t.Errorf("Found ip %s in leases but shouldn't be there", key)
 				}
 			}
 		})
