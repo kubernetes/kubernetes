@@ -27,7 +27,6 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
-	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
@@ -82,16 +81,6 @@ func (f *fakeLeases) Destroy() {
 }
 
 func TestLeaseEndpointReconciler(t *testing.T) {
-	ns := corev1.NamespaceDefault
-	om := func(name string, skipMirrorLabel bool) metav1.ObjectMeta {
-		o := metav1.ObjectMeta{Namespace: ns, Name: name}
-		if skipMirrorLabel {
-			o.Labels = map[string]string{
-				discoveryv1.LabelSkipMirror: "true",
-			}
-		}
-		return o
-	}
 	reconcileTests := []struct {
 		testName      string
 		serviceName   string
@@ -99,7 +88,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 		endpointPorts []corev1.EndpointPort
 		endpointKeys  []string
 		initialState  []runtime.Object
-		expectUpdate  *corev1.Endpoints // nil means none expected
+		expectUpdate  []runtime.Object
 	}{
 		{
 			testName:      "no existing endpoints",
@@ -107,28 +96,14 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			ip:            "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 			initialState:  nil,
-			expectUpdate: &corev1.Endpoints{
-				ObjectMeta: om("foo", true),
-				Subsets: []corev1.EndpointSubset{{
-					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
-					Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-				}},
-			},
+			expectUpdate:  makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 		},
 		{
 			testName:      "existing endpoints satisfy",
 			serviceName:   "foo",
 			ip:            "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-			initialState: []runtime.Object{
-				&corev1.Endpoints{
-					ObjectMeta: om("foo", true),
-					Subsets: []corev1.EndpointSubset{{
-						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
-						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-					}},
-				},
-			},
+			initialState:  makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 		},
 		{
 			testName:      "existing endpoints satisfy + refresh existing key",
@@ -136,37 +111,15 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			ip:            "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 			endpointKeys:  []string{"1.2.3.4"},
-			initialState: []runtime.Object{
-				&corev1.Endpoints{
-					ObjectMeta: om("foo", true),
-					Subsets: []corev1.EndpointSubset{{
-						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
-						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-					}},
-				},
-			},
+			initialState:  makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 		},
 		{
 			testName:      "existing endpoints satisfy but too many",
 			serviceName:   "foo",
 			ip:            "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-			initialState: []runtime.Object{
-				&corev1.Endpoints{
-					ObjectMeta: om("foo", true),
-					Subsets: []corev1.EndpointSubset{{
-						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}, {IP: "4.3.2.1"}},
-						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-					}},
-				},
-			},
-			expectUpdate: &corev1.Endpoints{
-				ObjectMeta: om("foo", true),
-				Subsets: []corev1.EndpointSubset{{
-					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
-					Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-				}},
-			},
+			initialState:  makeEndpointsArray("foo", []string{"1.2.3.4", "4.3.2.1"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			expectUpdate:  makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 		},
 		{
 			testName:      "existing endpoints satisfy but too many + extra masters",
@@ -174,33 +127,8 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			ip:            "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 			endpointKeys:  []string{"1.2.3.4", "4.3.2.2", "4.3.2.3", "4.3.2.4"},
-			initialState: []runtime.Object{
-				&corev1.Endpoints{
-					ObjectMeta: om("foo", true),
-					Subsets: []corev1.EndpointSubset{{
-						Addresses: []corev1.EndpointAddress{
-							{IP: "1.2.3.4"},
-							{IP: "4.3.2.1"},
-							{IP: "4.3.2.2"},
-							{IP: "4.3.2.3"},
-							{IP: "4.3.2.4"},
-						},
-						Ports: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-					}},
-				},
-			},
-			expectUpdate: &corev1.Endpoints{
-				ObjectMeta: om("foo", true),
-				Subsets: []corev1.EndpointSubset{{
-					Addresses: []corev1.EndpointAddress{
-						{IP: "1.2.3.4"},
-						{IP: "4.3.2.2"},
-						{IP: "4.3.2.3"},
-						{IP: "4.3.2.4"},
-					},
-					Ports: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-				}},
-			},
+			initialState:  makeEndpointsArray("foo", []string{"1.2.3.4", "4.3.2.1", "4.3.2.2", "4.3.2.3", "4.3.2.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			expectUpdate:  makeEndpointsArray("foo", []string{"1.2.3.4", "4.3.2.2", "4.3.2.3", "4.3.2.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 		},
 		{
 			testName:      "existing endpoints satisfy but too many + extra masters + delete first",
@@ -208,33 +136,8 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			ip:            "4.3.2.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 			endpointKeys:  []string{"4.3.2.1", "4.3.2.2", "4.3.2.3", "4.3.2.4"},
-			initialState: []runtime.Object{
-				&corev1.Endpoints{
-					ObjectMeta: om("foo", true),
-					Subsets: []corev1.EndpointSubset{{
-						Addresses: []corev1.EndpointAddress{
-							{IP: "1.2.3.4"},
-							{IP: "4.3.2.1"},
-							{IP: "4.3.2.2"},
-							{IP: "4.3.2.3"},
-							{IP: "4.3.2.4"},
-						},
-						Ports: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-					}},
-				},
-			},
-			expectUpdate: &corev1.Endpoints{
-				ObjectMeta: om("foo", true),
-				Subsets: []corev1.EndpointSubset{{
-					Addresses: []corev1.EndpointAddress{
-						{IP: "4.3.2.1"},
-						{IP: "4.3.2.2"},
-						{IP: "4.3.2.3"},
-						{IP: "4.3.2.4"},
-					},
-					Ports: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-				}},
-			},
+			initialState:  makeEndpointsArray("foo", []string{"1.2.3.4", "4.3.2.1", "4.3.2.2", "4.3.2.3", "4.3.2.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			expectUpdate:  makeEndpointsArray("foo", []string{"4.3.2.1", "4.3.2.2", "4.3.2.3", "4.3.2.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 		},
 		{
 			testName:      "existing endpoints current IP missing",
@@ -242,137 +145,48 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			ip:            "4.3.2.2",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 			endpointKeys:  []string{"4.3.2.1"},
-			initialState: []runtime.Object{
-				&corev1.Endpoints{
-					ObjectMeta: om("foo", true),
-					Subsets: []corev1.EndpointSubset{{
-						Addresses: []corev1.EndpointAddress{
-							{IP: "4.3.2.1"},
-						},
-						Ports: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-					}},
-				},
-			},
-			expectUpdate: &corev1.Endpoints{
-				ObjectMeta: om("foo", true),
-				Subsets: []corev1.EndpointSubset{{
-					Addresses: []corev1.EndpointAddress{
-						{IP: "4.3.2.1"},
-						{IP: "4.3.2.2"},
-					},
-					Ports: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-				}},
-			},
+			initialState:  makeEndpointsArray("foo", []string{"4.3.2.1"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			expectUpdate:  makeEndpointsArray("foo", []string{"4.3.2.1", "4.3.2.2"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 		},
 		{
 			testName:      "existing endpoints wrong name",
 			serviceName:   "foo",
 			ip:            "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-			initialState: []runtime.Object{
-				&corev1.Endpoints{
-					ObjectMeta: om("bar", true),
-					Subsets: []corev1.EndpointSubset{{
-						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
-						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-					}},
-				},
-			},
-			expectUpdate: &corev1.Endpoints{
-				ObjectMeta: om("foo", true),
-				Subsets: []corev1.EndpointSubset{{
-					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
-					Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-				}},
-			},
+			initialState:  makeEndpointsArray("bar", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			expectUpdate:  makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 		},
 		{
 			testName:      "existing endpoints wrong IP",
 			serviceName:   "foo",
 			ip:            "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-			initialState: []runtime.Object{
-				&corev1.Endpoints{
-					ObjectMeta: om("foo", true),
-					Subsets: []corev1.EndpointSubset{{
-						Addresses: []corev1.EndpointAddress{{IP: "4.3.2.1"}},
-						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-					}},
-				},
-			},
-			expectUpdate: &corev1.Endpoints{
-				ObjectMeta: om("foo", true),
-				Subsets: []corev1.EndpointSubset{{
-					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
-					Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-				}},
-			},
+			initialState:  makeEndpointsArray("foo", []string{"4.3.2.1"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			expectUpdate:  makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 		},
 		{
 			testName:      "existing endpoints wrong port",
 			serviceName:   "foo",
 			ip:            "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-			initialState: []runtime.Object{
-				&corev1.Endpoints{
-					ObjectMeta: om("foo", true),
-					Subsets: []corev1.EndpointSubset{{
-						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
-						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 9090, Protocol: "TCP"}},
-					}},
-				},
-			},
-			expectUpdate: &corev1.Endpoints{
-				ObjectMeta: om("foo", true),
-				Subsets: []corev1.EndpointSubset{{
-					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
-					Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-				}},
-			},
+			initialState:  makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 9090, Protocol: "TCP"}}),
+			expectUpdate:  makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 		},
 		{
 			testName:      "existing endpoints wrong protocol",
 			serviceName:   "foo",
 			ip:            "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-			initialState: []runtime.Object{
-				&corev1.Endpoints{
-					ObjectMeta: om("foo", true),
-					Subsets: []corev1.EndpointSubset{{
-						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
-						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "UDP"}},
-					}},
-				},
-			},
-			expectUpdate: &corev1.Endpoints{
-				ObjectMeta: om("foo", true),
-				Subsets: []corev1.EndpointSubset{{
-					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
-					Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-				}},
-			},
+			initialState:  makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "UDP"}}),
+			expectUpdate:  makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 		},
 		{
 			testName:      "existing endpoints wrong port name",
 			serviceName:   "foo",
 			ip:            "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "baz", Port: 8080, Protocol: "TCP"}},
-			initialState: []runtime.Object{
-				&corev1.Endpoints{
-					ObjectMeta: om("foo", true),
-					Subsets: []corev1.EndpointSubset{{
-						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
-						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-					}},
-				},
-			},
-			expectUpdate: &corev1.Endpoints{
-				ObjectMeta: om("foo", true),
-				Subsets: []corev1.EndpointSubset{{
-					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
-					Ports:     []corev1.EndpointPort{{Name: "baz", Port: 8080, Protocol: "TCP"}},
-				}},
-			},
+			initialState:  makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			expectUpdate:  makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "baz", Port: 8080, Protocol: "TCP"}}),
 		},
 		{
 			testName:      "existing endpoints without skip mirror label",
@@ -380,21 +194,20 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			ip:            "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 			initialState: []runtime.Object{
+				// can't use makeEndpointsArray() here because we don't want the
+				// skip-mirror label
 				&corev1.Endpoints{
-					ObjectMeta: om("foo", false),
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: metav1.NamespaceDefault,
+						Name:      "foo",
+					},
 					Subsets: []corev1.EndpointSubset{{
 						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
 						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 					}},
 				},
 			},
-			expectUpdate: &corev1.Endpoints{
-				ObjectMeta: om("foo", true),
-				Subsets: []corev1.EndpointSubset{{
-					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
-					Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-				}},
-			},
+			expectUpdate: makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 		},
 		{
 			testName:    "existing endpoints extra service ports satisfy",
@@ -405,19 +218,13 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 				{Name: "bar", Port: 1000, Protocol: "TCP"},
 				{Name: "baz", Port: 1010, Protocol: "TCP"},
 			},
-			initialState: []runtime.Object{
-				&corev1.Endpoints{
-					ObjectMeta: om("foo", true),
-					Subsets: []corev1.EndpointSubset{{
-						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
-						Ports: []corev1.EndpointPort{
-							{Name: "foo", Port: 8080, Protocol: "TCP"},
-							{Name: "bar", Port: 1000, Protocol: "TCP"},
-							{Name: "baz", Port: 1010, Protocol: "TCP"},
-						},
-					}},
+			initialState: makeEndpointsArray("foo", []string{"1.2.3.4"},
+				[]corev1.EndpointPort{
+					{Name: "foo", Port: 8080, Protocol: "TCP"},
+					{Name: "bar", Port: 1000, Protocol: "TCP"},
+					{Name: "baz", Port: 1010, Protocol: "TCP"},
 				},
-			},
+			),
 		},
 		{
 			testName:    "existing endpoints extra service ports missing port",
@@ -427,25 +234,13 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 				{Name: "foo", Port: 8080, Protocol: "TCP"},
 				{Name: "bar", Port: 1000, Protocol: "TCP"},
 			},
-			initialState: []runtime.Object{
-				&corev1.Endpoints{
-					ObjectMeta: om("foo", true),
-					Subsets: []corev1.EndpointSubset{{
-						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
-						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-					}},
+			initialState: makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			expectUpdate: makeEndpointsArray("foo", []string{"1.2.3.4"},
+				[]corev1.EndpointPort{
+					{Name: "foo", Port: 8080, Protocol: "TCP"},
+					{Name: "bar", Port: 1000, Protocol: "TCP"},
 				},
-			},
-			expectUpdate: &corev1.Endpoints{
-				ObjectMeta: om("foo", true),
-				Subsets: []corev1.EndpointSubset{{
-					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
-					Ports: []corev1.EndpointPort{
-						{Name: "foo", Port: 8080, Protocol: "TCP"},
-						{Name: "bar", Port: 1000, Protocol: "TCP"},
-					},
-				}},
-			},
+			),
 		},
 	}
 	for _, test := range reconcileTests {
@@ -465,7 +260,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 				t.Errorf("unexpected error: %v", err)
 			}
 			if test.expectUpdate != nil {
-				if e, a := test.expectUpdate, actualEndpoints; !reflect.DeepEqual(e, a) {
+				if e, a := test.expectUpdate[0], actualEndpoints; !reflect.DeepEqual(e, a) {
 					t.Errorf("expected update:\n%#v\ngot:\n%#v\n", e, a)
 				}
 			}
@@ -482,7 +277,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 		endpointPorts []corev1.EndpointPort
 		endpointKeys  []string
 		initialState  []runtime.Object
-		expectUpdate  *corev1.Endpoints // nil means none expected
+		expectUpdate  []runtime.Object
 	}{
 		{
 			testName:    "existing endpoints extra service ports missing port no update",
@@ -492,15 +287,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 				{Name: "foo", Port: 8080, Protocol: "TCP"},
 				{Name: "bar", Port: 1000, Protocol: "TCP"},
 			},
-			initialState: []runtime.Object{
-				&corev1.Endpoints{
-					ObjectMeta: om("foo", true),
-					Subsets: []corev1.EndpointSubset{{
-						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
-						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-					}},
-				},
-			},
+			initialState: makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 			expectUpdate: nil,
 		},
 		{
@@ -511,22 +298,8 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 				{Name: "foo", Port: 8080, Protocol: "TCP"},
 				{Name: "bar", Port: 1000, Protocol: "TCP"},
 			},
-			initialState: []runtime.Object{
-				&corev1.Endpoints{
-					ObjectMeta: om("foo", true),
-					Subsets: []corev1.EndpointSubset{{
-						Addresses: []corev1.EndpointAddress{{IP: "4.3.2.1"}},
-						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-					}},
-				},
-			},
-			expectUpdate: &corev1.Endpoints{
-				ObjectMeta: om("foo", true),
-				Subsets: []corev1.EndpointSubset{{
-					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
-					Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-				}},
-			},
+			initialState: makeEndpointsArray("foo", []string{"4.3.2.1"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			expectUpdate: makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 		},
 		{
 			testName:      "no existing endpoints",
@@ -534,13 +307,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			ip:            "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 			initialState:  nil,
-			expectUpdate: &corev1.Endpoints{
-				ObjectMeta: om("foo", true),
-				Subsets: []corev1.EndpointSubset{{
-					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
-					Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-				}},
-			},
+			expectUpdate:  makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 		},
 	}
 	for _, test := range nonReconcileTests {
@@ -559,7 +326,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 				t.Errorf("unexpected error: %v", err)
 			}
 			if test.expectUpdate != nil {
-				if e, a := test.expectUpdate, actualEndpoints; !reflect.DeepEqual(e, a) {
+				if e, a := test.expectUpdate[0], actualEndpoints; !reflect.DeepEqual(e, a) {
 					t.Errorf("expected update:\n%#v\ngot:\n%#v\n", e, a)
 				}
 			}
@@ -571,16 +338,6 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 }
 
 func TestLeaseRemoveEndpoints(t *testing.T) {
-	ns := corev1.NamespaceDefault
-	om := func(name string, skipMirrorLabel bool) metav1.ObjectMeta {
-		o := metav1.ObjectMeta{Namespace: ns, Name: name}
-		if skipMirrorLabel {
-			o.Labels = map[string]string{
-				discoveryv1.LabelSkipMirror: "true",
-			}
-		}
-		return o
-	}
 	stopTests := []struct {
 		testName      string
 		serviceName   string
@@ -588,7 +345,7 @@ func TestLeaseRemoveEndpoints(t *testing.T) {
 		endpointPorts []corev1.EndpointPort
 		endpointKeys  []string
 		initialState  []runtime.Object
-		expectUpdate  *corev1.Endpoints // nil means none expected
+		expectUpdate  []runtime.Object
 	}{
 		{
 			testName:      "successful stop reconciling",
@@ -596,31 +353,8 @@ func TestLeaseRemoveEndpoints(t *testing.T) {
 			ip:            "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 			endpointKeys:  []string{"1.2.3.4", "4.3.2.2", "4.3.2.3", "4.3.2.4"},
-			initialState: []runtime.Object{
-				&corev1.Endpoints{
-					ObjectMeta: om("foo", true),
-					Subsets: []corev1.EndpointSubset{{
-						Addresses: []corev1.EndpointAddress{
-							{IP: "1.2.3.4"},
-							{IP: "4.3.2.2"},
-							{IP: "4.3.2.3"},
-							{IP: "4.3.2.4"},
-						},
-						Ports: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-					}},
-				},
-			},
-			expectUpdate: &corev1.Endpoints{
-				ObjectMeta: om("foo", true),
-				Subsets: []corev1.EndpointSubset{{
-					Addresses: []corev1.EndpointAddress{
-						{IP: "4.3.2.2"},
-						{IP: "4.3.2.3"},
-						{IP: "4.3.2.4"},
-					},
-					Ports: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-				}},
-			},
+			initialState:  makeEndpointsArray("foo", []string{"1.2.3.4", "4.3.2.2", "4.3.2.3", "4.3.2.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			expectUpdate:  makeEndpointsArray("foo", []string{"4.3.2.2", "4.3.2.3", "4.3.2.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 		},
 		{
 			testName:      "stop reconciling with ip not in endpoint ip list",
@@ -628,20 +362,7 @@ func TestLeaseRemoveEndpoints(t *testing.T) {
 			ip:            "5.6.7.8",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 			endpointKeys:  []string{"1.2.3.4", "4.3.2.2", "4.3.2.3", "4.3.2.4"},
-			initialState: []runtime.Object{
-				&corev1.Endpoints{
-					ObjectMeta: om("foo", true),
-					Subsets: []corev1.EndpointSubset{{
-						Addresses: []corev1.EndpointAddress{
-							{IP: "1.2.3.4"},
-							{IP: "4.3.2.2"},
-							{IP: "4.3.2.3"},
-							{IP: "4.3.2.4"},
-						},
-						Ports: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-					}},
-				},
-			},
+			initialState:  makeEndpointsArray("foo", []string{"1.2.3.4", "4.3.2.2", "4.3.2.3", "4.3.2.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 		},
 		{
 			testName:      "endpoint with no subset",
@@ -649,12 +370,7 @@ func TestLeaseRemoveEndpoints(t *testing.T) {
 			ip:            "5.6.7.8",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 			endpointKeys:  []string{"1.2.3.4", "4.3.2.2", "4.3.2.3", "4.3.2.4"},
-			initialState: []runtime.Object{
-				&corev1.Endpoints{
-					ObjectMeta: om("foo", true),
-					Subsets:    nil,
-				},
-			},
+			initialState:  makeEndpointsArray("foo", nil, nil),
 		},
 	}
 	for _, test := range stopTests {
@@ -673,7 +389,7 @@ func TestLeaseRemoveEndpoints(t *testing.T) {
 				t.Errorf("unexpected error: %v", err)
 			}
 			if test.expectUpdate != nil {
-				if e, a := test.expectUpdate, actualEndpoints; !reflect.DeepEqual(e, a) {
+				if e, a := test.expectUpdate[0], actualEndpoints; !reflect.DeepEqual(e, a) {
 					t.Errorf("expected update:\n%#v\ngot:\n%#v\n", e, a)
 				}
 			}
