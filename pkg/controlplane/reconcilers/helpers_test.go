@@ -17,10 +17,16 @@ limitations under the License.
 package reconcilers
 
 import (
+	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/client-go/kubernetes/fake"
+	k8stesting "k8s.io/client-go/testing"
 )
 
 func makeEndpointsArray(name string, ips []string, ports []corev1.EndpointPort) []runtime.Object {
@@ -49,4 +55,52 @@ func makeEndpoints(name string, ips []string, ports []corev1.EndpointPort) *core
 		}
 	}
 	return endpoints
+}
+
+func verifyCreatesAndUpdates(fakeClient *fake.Clientset, expectedCreates, expectedUpdates []runtime.Object) error {
+	errors := []error{}
+
+	updates := []k8stesting.UpdateAction{}
+	creates := []k8stesting.CreateAction{}
+	for _, action := range fakeClient.Actions() {
+		if action.GetVerb() == "update" {
+			updates = append(updates, action.(k8stesting.UpdateAction))
+		} else if action.GetVerb() == "create" {
+			creates = append(creates, action.(k8stesting.CreateAction))
+		}
+	}
+
+	if len(creates) != len(expectedCreates) {
+		errors = append(errors, fmt.Errorf("expected %d creates got %d", len(expectedCreates), len(creates)))
+	}
+	for i := 0; i < len(creates) || i < len(expectedCreates); i++ {
+		var expected, actual runtime.Object
+		if i < len(creates) {
+			actual = creates[i].GetObject()
+		}
+		if i < len(expectedCreates) {
+			expected = expectedCreates[i]
+		}
+		if !apiequality.Semantic.DeepEqual(expected, actual) {
+			errors = append(errors, fmt.Errorf("expected create %d to be:\n%#v\ngot:\n%#v\n", i, expected, actual))
+		}
+	}
+
+	if len(updates) != len(expectedUpdates) {
+		errors = append(errors, fmt.Errorf("expected %d updates got %d", len(expectedUpdates), len(updates)))
+	}
+	for i := 0; i < len(updates) || i < len(expectedUpdates); i++ {
+		var expected, actual runtime.Object
+		if i < len(updates) {
+			actual = updates[i].GetObject()
+		}
+		if i < len(expectedUpdates) {
+			expected = expectedUpdates[i]
+		}
+		if !apiequality.Semantic.DeepEqual(expected, actual) {
+			errors = append(errors, fmt.Errorf("expected update %d to be:\n%#v\ngot:\n%#v\n", i, expected, actual))
+		}
+	}
+
+	return utilerrors.NewAggregate(errors)
 }
