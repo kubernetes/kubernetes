@@ -23,6 +23,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	netutils "k8s.io/utils/net"
@@ -45,7 +46,7 @@ func TestMasterCountEndpointReconciler(t *testing.T) {
 		ip                string
 		endpointPorts     []corev1.EndpointPort
 		additionalMasters int
-		endpoints         *corev1.EndpointsList
+		initialState      []runtime.Object
 		expectUpdate      *corev1.Endpoints // nil means none expected
 		expectCreate      *corev1.Endpoints // nil means none expected
 	}{
@@ -54,7 +55,7 @@ func TestMasterCountEndpointReconciler(t *testing.T) {
 			serviceName:   "foo",
 			ip:            "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-			endpoints:     nil,
+			initialState:  nil,
 			expectCreate: &corev1.Endpoints{
 				ObjectMeta: om("foo", true),
 				Subsets: []corev1.EndpointSubset{{
@@ -68,14 +69,14 @@ func TestMasterCountEndpointReconciler(t *testing.T) {
 			serviceName:   "foo",
 			ip:            "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-			endpoints: &corev1.EndpointsList{
-				Items: []corev1.Endpoints{{
+			initialState: []runtime.Object{
+				&corev1.Endpoints{
 					ObjectMeta: om("foo", true),
 					Subsets: []corev1.EndpointSubset{{
 						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
 						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 					}},
-				}},
+				},
 			},
 		},
 		{
@@ -83,14 +84,14 @@ func TestMasterCountEndpointReconciler(t *testing.T) {
 			serviceName:   "foo",
 			ip:            "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-			endpoints: &corev1.EndpointsList{
-				Items: []corev1.Endpoints{{
+			initialState: []runtime.Object{
+				&corev1.Endpoints{
 					ObjectMeta: om("foo", true),
 					Subsets: []corev1.EndpointSubset{{
 						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}, {IP: "4.3.2.1"}},
 						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 					}},
-				}},
+				},
 			},
 			expectUpdate: &corev1.Endpoints{
 				ObjectMeta: om("foo", true),
@@ -106,8 +107,8 @@ func TestMasterCountEndpointReconciler(t *testing.T) {
 			ip:                "1.2.3.4",
 			endpointPorts:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 			additionalMasters: 3,
-			endpoints: &corev1.EndpointsList{
-				Items: []corev1.Endpoints{{
+			initialState: []runtime.Object{
+				&corev1.Endpoints{
 					ObjectMeta: om("foo", true),
 					Subsets: []corev1.EndpointSubset{{
 						Addresses: []corev1.EndpointAddress{
@@ -119,7 +120,7 @@ func TestMasterCountEndpointReconciler(t *testing.T) {
 						},
 						Ports: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 					}},
-				}},
+				},
 			},
 			expectUpdate: &corev1.Endpoints{
 				ObjectMeta: om("foo", true),
@@ -140,8 +141,8 @@ func TestMasterCountEndpointReconciler(t *testing.T) {
 			ip:                "4.3.2.4",
 			endpointPorts:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 			additionalMasters: 3,
-			endpoints: &corev1.EndpointsList{
-				Items: []corev1.Endpoints{{
+			initialState: []runtime.Object{
+				&corev1.Endpoints{
 					ObjectMeta: om("foo", true),
 					Subsets: []corev1.EndpointSubset{{
 						Addresses: []corev1.EndpointAddress{
@@ -153,7 +154,7 @@ func TestMasterCountEndpointReconciler(t *testing.T) {
 						},
 						Ports: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 					}},
-				}},
+				},
 			},
 			expectUpdate: &corev1.Endpoints{
 				ObjectMeta: om("foo", true),
@@ -174,8 +175,8 @@ func TestMasterCountEndpointReconciler(t *testing.T) {
 			ip:                "4.3.2.2",
 			endpointPorts:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 			additionalMasters: 3,
-			endpoints: &corev1.EndpointsList{
-				Items: []corev1.Endpoints{{
+			initialState: []runtime.Object{
+				&corev1.Endpoints{
 					ObjectMeta: om("foo", true),
 					Subsets: []corev1.EndpointSubset{{
 						Addresses: []corev1.EndpointAddress{
@@ -184,7 +185,7 @@ func TestMasterCountEndpointReconciler(t *testing.T) {
 						},
 						Ports: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 					}},
-				}},
+				},
 			},
 			expectUpdate: nil,
 		},
@@ -194,8 +195,8 @@ func TestMasterCountEndpointReconciler(t *testing.T) {
 			ip:                "4.3.2.2",
 			endpointPorts:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 			additionalMasters: 3,
-			endpoints: &corev1.EndpointsList{
-				Items: []corev1.Endpoints{{
+			initialState: []runtime.Object{
+				&corev1.Endpoints{
 					ObjectMeta: om("foo", true),
 					Subsets: []corev1.EndpointSubset{{
 						Addresses: []corev1.EndpointAddress{
@@ -203,7 +204,7 @@ func TestMasterCountEndpointReconciler(t *testing.T) {
 						},
 						Ports: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 					}},
-				}},
+				},
 			},
 			expectUpdate: &corev1.Endpoints{
 				ObjectMeta: om("foo", true),
@@ -221,14 +222,14 @@ func TestMasterCountEndpointReconciler(t *testing.T) {
 			serviceName:   "foo",
 			ip:            "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-			endpoints: &corev1.EndpointsList{
-				Items: []corev1.Endpoints{{
+			initialState: []runtime.Object{
+				&corev1.Endpoints{
 					ObjectMeta: om("bar", true),
 					Subsets: []corev1.EndpointSubset{{
 						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
 						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 					}},
-				}},
+				},
 			},
 			expectCreate: &corev1.Endpoints{
 				ObjectMeta: om("foo", true),
@@ -243,14 +244,14 @@ func TestMasterCountEndpointReconciler(t *testing.T) {
 			serviceName:   "foo",
 			ip:            "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-			endpoints: &corev1.EndpointsList{
-				Items: []corev1.Endpoints{{
+			initialState: []runtime.Object{
+				&corev1.Endpoints{
 					ObjectMeta: om("foo", true),
 					Subsets: []corev1.EndpointSubset{{
 						Addresses: []corev1.EndpointAddress{{IP: "4.3.2.1"}},
 						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 					}},
-				}},
+				},
 			},
 			expectUpdate: &corev1.Endpoints{
 				ObjectMeta: om("foo", true),
@@ -265,14 +266,14 @@ func TestMasterCountEndpointReconciler(t *testing.T) {
 			serviceName:   "foo",
 			ip:            "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-			endpoints: &corev1.EndpointsList{
-				Items: []corev1.Endpoints{{
+			initialState: []runtime.Object{
+				&corev1.Endpoints{
 					ObjectMeta: om("foo", true),
 					Subsets: []corev1.EndpointSubset{{
 						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
 						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 9090, Protocol: "TCP"}},
 					}},
-				}},
+				},
 			},
 			expectUpdate: &corev1.Endpoints{
 				ObjectMeta: om("foo", true),
@@ -287,14 +288,14 @@ func TestMasterCountEndpointReconciler(t *testing.T) {
 			serviceName:   "foo",
 			ip:            "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-			endpoints: &corev1.EndpointsList{
-				Items: []corev1.Endpoints{{
+			initialState: []runtime.Object{
+				&corev1.Endpoints{
 					ObjectMeta: om("foo", true),
 					Subsets: []corev1.EndpointSubset{{
 						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
 						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "UDP"}},
 					}},
-				}},
+				},
 			},
 			expectUpdate: &corev1.Endpoints{
 				ObjectMeta: om("foo", true),
@@ -309,14 +310,14 @@ func TestMasterCountEndpointReconciler(t *testing.T) {
 			serviceName:   "foo",
 			ip:            "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "baz", Port: 8080, Protocol: "TCP"}},
-			endpoints: &corev1.EndpointsList{
-				Items: []corev1.Endpoints{{
+			initialState: []runtime.Object{
+				&corev1.Endpoints{
 					ObjectMeta: om("foo", true),
 					Subsets: []corev1.EndpointSubset{{
 						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
 						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 					}},
-				}},
+				},
 			},
 			expectUpdate: &corev1.Endpoints{
 				ObjectMeta: om("foo", true),
@@ -335,8 +336,8 @@ func TestMasterCountEndpointReconciler(t *testing.T) {
 				{Name: "bar", Port: 1000, Protocol: "TCP"},
 				{Name: "baz", Port: 1010, Protocol: "TCP"},
 			},
-			endpoints: &corev1.EndpointsList{
-				Items: []corev1.Endpoints{{
+			initialState: []runtime.Object{
+				&corev1.Endpoints{
 					ObjectMeta: om("foo", true),
 					Subsets: []corev1.EndpointSubset{{
 						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
@@ -346,7 +347,7 @@ func TestMasterCountEndpointReconciler(t *testing.T) {
 							{Name: "baz", Port: 1010, Protocol: "TCP"},
 						},
 					}},
-				}},
+				},
 			},
 		},
 		{
@@ -357,14 +358,14 @@ func TestMasterCountEndpointReconciler(t *testing.T) {
 				{Name: "foo", Port: 8080, Protocol: "TCP"},
 				{Name: "bar", Port: 1000, Protocol: "TCP"},
 			},
-			endpoints: &corev1.EndpointsList{
-				Items: []corev1.Endpoints{{
+			initialState: []runtime.Object{
+				&corev1.Endpoints{
 					ObjectMeta: om("foo", true),
 					Subsets: []corev1.EndpointSubset{{
 						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
 						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 					}},
-				}},
+				},
 			},
 			expectUpdate: &corev1.Endpoints{
 				ObjectMeta: om("foo", true),
@@ -382,7 +383,7 @@ func TestMasterCountEndpointReconciler(t *testing.T) {
 			serviceName:   "boo",
 			ip:            "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "boo", Port: 7777, Protocol: "SCTP"}},
-			endpoints:     nil,
+			initialState:  nil,
 			expectCreate: &corev1.Endpoints{
 				ObjectMeta: om("boo", true),
 				Subsets: []corev1.EndpointSubset{{
@@ -394,10 +395,7 @@ func TestMasterCountEndpointReconciler(t *testing.T) {
 	}
 	for _, test := range reconcileTests {
 		t.Run(test.testName, func(t *testing.T) {
-			fakeClient := fake.NewSimpleClientset()
-			if test.endpoints != nil {
-				fakeClient = fake.NewSimpleClientset(test.endpoints)
-			}
+			fakeClient := fake.NewSimpleClientset(test.initialState...)
 			epAdapter := NewEndpointsAdapter(fakeClient.CoreV1(), nil)
 			reconciler := NewMasterCountEndpointReconciler(test.additionalMasters+1, epAdapter)
 			err := reconciler.ReconcileEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, true)
@@ -449,7 +447,7 @@ func TestMasterCountEndpointReconciler(t *testing.T) {
 		ip                string
 		endpointPorts     []corev1.EndpointPort
 		additionalMasters int
-		endpoints         *corev1.EndpointsList
+		initialState      []runtime.Object
 		expectUpdate      *corev1.Endpoints // nil means none expected
 		expectCreate      *corev1.Endpoints // nil means none expected
 	}{
@@ -461,14 +459,14 @@ func TestMasterCountEndpointReconciler(t *testing.T) {
 				{Name: "foo", Port: 8080, Protocol: "TCP"},
 				{Name: "bar", Port: 1000, Protocol: "TCP"},
 			},
-			endpoints: &corev1.EndpointsList{
-				Items: []corev1.Endpoints{{
+			initialState: []runtime.Object{
+				&corev1.Endpoints{
 					ObjectMeta: om("foo", true),
 					Subsets: []corev1.EndpointSubset{{
 						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
 						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 					}},
-				}},
+				},
 			},
 			expectUpdate: nil,
 		},
@@ -480,14 +478,14 @@ func TestMasterCountEndpointReconciler(t *testing.T) {
 				{Name: "foo", Port: 8080, Protocol: "TCP"},
 				{Name: "bar", Port: 1000, Protocol: "TCP"},
 			},
-			endpoints: &corev1.EndpointsList{
-				Items: []corev1.Endpoints{{
+			initialState: []runtime.Object{
+				&corev1.Endpoints{
 					ObjectMeta: om("foo", true),
 					Subsets: []corev1.EndpointSubset{{
 						Addresses: []corev1.EndpointAddress{{IP: "4.3.2.1"}},
 						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 					}},
-				}},
+				},
 			},
 			expectUpdate: &corev1.Endpoints{
 				ObjectMeta: om("foo", true),
@@ -502,7 +500,7 @@ func TestMasterCountEndpointReconciler(t *testing.T) {
 			serviceName:   "foo",
 			ip:            "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-			endpoints:     nil,
+			initialState:  nil,
 			expectCreate: &corev1.Endpoints{
 				ObjectMeta: om("foo", true),
 				Subsets: []corev1.EndpointSubset{{
@@ -514,10 +512,7 @@ func TestMasterCountEndpointReconciler(t *testing.T) {
 	}
 	for _, test := range nonReconcileTests {
 		t.Run(test.testName, func(t *testing.T) {
-			fakeClient := fake.NewSimpleClientset()
-			if test.endpoints != nil {
-				fakeClient = fake.NewSimpleClientset(test.endpoints)
-			}
+			fakeClient := fake.NewSimpleClientset(test.initialState...)
 			epAdapter := NewEndpointsAdapter(fakeClient.CoreV1(), nil)
 			reconciler := NewMasterCountEndpointReconciler(test.additionalMasters+1, epAdapter)
 			err := reconciler.ReconcileEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, false)
@@ -576,10 +571,7 @@ func TestEmptySubsets(t *testing.T) {
 			Subsets:    nil,
 		}},
 	}
-	fakeClient := fake.NewSimpleClientset()
-	if endpoints != nil {
-		fakeClient = fake.NewSimpleClientset(endpoints)
-	}
+	fakeClient := fake.NewSimpleClientset(endpoints)
 	epAdapter := NewEndpointsAdapter(fakeClient.CoreV1(), nil)
 	reconciler := NewMasterCountEndpointReconciler(1, epAdapter)
 	endpointPorts := []corev1.EndpointPort{
