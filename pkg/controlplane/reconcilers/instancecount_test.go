@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,13 +16,7 @@ limitations under the License.
 
 package reconcilers
 
-/*
-Original Source:
-https://github.com/openshift/origin/blob/bb340c5dd5ff72718be86fb194dedc0faed7f4c7/pkg/cmd/server/election/lease_endpoint_reconciler_test.go
-*/
-
 import (
-	"context"
 	"reflect"
 	"testing"
 
@@ -30,55 +24,12 @@ import (
 	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
+	core "k8s.io/client-go/testing"
 	netutils "k8s.io/utils/net"
 )
 
-type fakeLeases struct {
-	keys map[string]bool
-}
-
-var _ Leases = &fakeLeases{}
-
-func newFakeLeases() *fakeLeases {
-	return &fakeLeases{make(map[string]bool)}
-}
-
-func (f *fakeLeases) ListLeases() ([]string, error) {
-	res := make([]string, 0, len(f.keys))
-	for ip := range f.keys {
-		res = append(res, ip)
-	}
-	return res, nil
-}
-
-func (f *fakeLeases) UpdateLease(ip string) error {
-	f.keys[ip] = true
-	return nil
-}
-
-func (f *fakeLeases) RemoveLease(ip string) error {
-	delete(f.keys, ip)
-	return nil
-}
-
-func (f *fakeLeases) SetKeys(keys []string) {
-	for _, ip := range keys {
-		f.keys[ip] = false
-	}
-}
-
-func (f *fakeLeases) GetUpdatedKeys() []string {
-	res := []string{}
-	for ip, updated := range f.keys {
-		if updated {
-			res = append(res, ip)
-		}
-	}
-	return res
-}
-
-func TestLeaseEndpointReconciler(t *testing.T) {
-	ns := corev1.NamespaceDefault
+func TestMasterCountEndpointReconciler(t *testing.T) {
+	ns := metav1.NamespaceDefault
 	om := func(name string, skipMirrorLabel bool) metav1.ObjectMeta {
 		o := metav1.ObjectMeta{Namespace: ns, Name: name}
 		if skipMirrorLabel {
@@ -89,13 +40,14 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 		return o
 	}
 	reconcileTests := []struct {
-		testName      string
-		serviceName   string
-		ip            string
-		endpointPorts []corev1.EndpointPort
-		endpointKeys  []string
-		endpoints     *corev1.EndpointsList
-		expectUpdate  *corev1.Endpoints // nil means none expected
+		testName          string
+		serviceName       string
+		ip                string
+		endpointPorts     []corev1.EndpointPort
+		additionalMasters int
+		endpoints         *corev1.EndpointsList
+		expectUpdate      *corev1.Endpoints // nil means none expected
+		expectCreate      *corev1.Endpoints // nil means none expected
 	}{
 		{
 			testName:      "no existing endpoints",
@@ -103,7 +55,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			ip:            "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 			endpoints:     nil,
-			expectUpdate: &corev1.Endpoints{
+			expectCreate: &corev1.Endpoints{
 				ObjectMeta: om("foo", true),
 				Subsets: []corev1.EndpointSubset{{
 					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
@@ -116,22 +68,6 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			serviceName:   "foo",
 			ip:            "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-			endpoints: &corev1.EndpointsList{
-				Items: []corev1.Endpoints{{
-					ObjectMeta: om("foo", true),
-					Subsets: []corev1.EndpointSubset{{
-						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
-						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-					}},
-				}},
-			},
-		},
-		{
-			testName:      "existing endpoints satisfy + refresh existing key",
-			serviceName:   "foo",
-			ip:            "1.2.3.4",
-			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-			endpointKeys:  []string{"1.2.3.4"},
 			endpoints: &corev1.EndpointsList{
 				Items: []corev1.Endpoints{{
 					ObjectMeta: om("foo", true),
@@ -165,11 +101,11 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			},
 		},
 		{
-			testName:      "existing endpoints satisfy but too many + extra masters",
-			serviceName:   "foo",
-			ip:            "1.2.3.4",
-			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-			endpointKeys:  []string{"1.2.3.4", "4.3.2.2", "4.3.2.3", "4.3.2.4"},
+			testName:          "existing endpoints satisfy but too many + extra masters",
+			serviceName:       "foo",
+			ip:                "1.2.3.4",
+			endpointPorts:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+			additionalMasters: 3,
 			endpoints: &corev1.EndpointsList{
 				Items: []corev1.Endpoints{{
 					ObjectMeta: om("foo", true),
@@ -199,11 +135,11 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			},
 		},
 		{
-			testName:      "existing endpoints satisfy but too many + extra masters + delete first",
-			serviceName:   "foo",
-			ip:            "4.3.2.4",
-			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-			endpointKeys:  []string{"4.3.2.1", "4.3.2.2", "4.3.2.3", "4.3.2.4"},
+			testName:          "existing endpoints satisfy but too many + extra masters + delete first",
+			serviceName:       "foo",
+			ip:                "4.3.2.4",
+			endpointPorts:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+			additionalMasters: 3,
 			endpoints: &corev1.EndpointsList{
 				Items: []corev1.Endpoints{{
 					ObjectMeta: om("foo", true),
@@ -233,11 +169,31 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			},
 		},
 		{
-			testName:      "existing endpoints current IP missing",
-			serviceName:   "foo",
-			ip:            "4.3.2.2",
-			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-			endpointKeys:  []string{"4.3.2.1"},
+			testName:          "existing endpoints satisfy and endpoint addresses length less than master count",
+			serviceName:       "foo",
+			ip:                "4.3.2.2",
+			endpointPorts:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+			additionalMasters: 3,
+			endpoints: &corev1.EndpointsList{
+				Items: []corev1.Endpoints{{
+					ObjectMeta: om("foo", true),
+					Subsets: []corev1.EndpointSubset{{
+						Addresses: []corev1.EndpointAddress{
+							{IP: "4.3.2.1"},
+							{IP: "4.3.2.2"},
+						},
+						Ports: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+					}},
+				}},
+			},
+			expectUpdate: nil,
+		},
+		{
+			testName:          "existing endpoints current IP missing and address length less than master count",
+			serviceName:       "foo",
+			ip:                "4.3.2.2",
+			endpointPorts:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+			additionalMasters: 3,
 			endpoints: &corev1.EndpointsList{
 				Items: []corev1.Endpoints{{
 					ObjectMeta: om("foo", true),
@@ -274,7 +230,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 					}},
 				}},
 			},
-			expectUpdate: &corev1.Endpoints{
+			expectCreate: &corev1.Endpoints{
 				ObjectMeta: om("foo", true),
 				Subsets: []corev1.EndpointSubset{{
 					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
@@ -371,28 +327,6 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			},
 		},
 		{
-			testName:      "existing endpoints without skip mirror label",
-			serviceName:   "foo",
-			ip:            "1.2.3.4",
-			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-			endpoints: &corev1.EndpointsList{
-				Items: []corev1.Endpoints{{
-					ObjectMeta: om("foo", false),
-					Subsets: []corev1.EndpointSubset{{
-						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
-						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-					}},
-				}},
-			},
-			expectUpdate: &corev1.Endpoints{
-				ObjectMeta: om("foo", true),
-				Subsets: []corev1.EndpointSubset{{
-					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
-					Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-				}},
-			},
-		},
-		{
 			testName:    "existing endpoints extra service ports satisfy",
 			serviceName: "foo",
 			ip:          "1.2.3.4",
@@ -443,50 +377,81 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 				}},
 			},
 		},
+		{
+			testName:      "no existing sctp endpoints",
+			serviceName:   "boo",
+			ip:            "1.2.3.4",
+			endpointPorts: []corev1.EndpointPort{{Name: "boo", Port: 7777, Protocol: "SCTP"}},
+			endpoints:     nil,
+			expectCreate: &corev1.Endpoints{
+				ObjectMeta: om("boo", true),
+				Subsets: []corev1.EndpointSubset{{
+					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
+					Ports:     []corev1.EndpointPort{{Name: "boo", Port: 7777, Protocol: "SCTP"}},
+				}},
+			},
+		},
 	}
 	for _, test := range reconcileTests {
 		t.Run(test.testName, func(t *testing.T) {
-			fakeLeases := newFakeLeases()
-			fakeLeases.SetKeys(test.endpointKeys)
-			clientset := fake.NewSimpleClientset()
+			fakeClient := fake.NewSimpleClientset()
 			if test.endpoints != nil {
-				for _, ep := range test.endpoints.Items {
-					if _, err := clientset.CoreV1().Endpoints(ep.Namespace).Create(context.TODO(), &ep, metav1.CreateOptions{}); err != nil {
-						t.Errorf("unexpected error: %v", err)
-						continue
-					}
-				}
+				fakeClient = fake.NewSimpleClientset(test.endpoints)
+			}
+			epAdapter := NewEndpointsAdapter(fakeClient.CoreV1(), nil)
+			reconciler := NewMasterCountEndpointReconciler(test.additionalMasters+1, epAdapter)
+			err := reconciler.ReconcileEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, true)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
 			}
 
-			epAdapter := EndpointsAdapter{endpointClient: clientset.CoreV1()}
-			r := NewLeaseEndpointReconciler(epAdapter, fakeLeases)
-			err := r.ReconcileEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, true)
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-			actualEndpoints, err := clientset.CoreV1().Endpoints(corev1.NamespaceDefault).Get(context.TODO(), test.serviceName, metav1.GetOptions{})
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
+			updates := []core.UpdateAction{}
+			for _, action := range fakeClient.Actions() {
+				if action.GetVerb() != "update" {
+					continue
+				}
+				updates = append(updates, action.(core.UpdateAction))
 			}
 			if test.expectUpdate != nil {
-				if e, a := test.expectUpdate, actualEndpoints; !reflect.DeepEqual(e, a) {
+				if len(updates) != 1 {
+					t.Errorf("unexpected updates: %v", updates)
+				} else if e, a := test.expectUpdate, updates[0].GetObject(); !reflect.DeepEqual(e, a) {
 					t.Errorf("expected update:\n%#v\ngot:\n%#v\n", e, a)
 				}
 			}
-			if updatedKeys := fakeLeases.GetUpdatedKeys(); len(updatedKeys) != 1 || updatedKeys[0] != test.ip {
-				t.Errorf("expected the master's IP to be refreshed, but the following IPs were refreshed instead: %v", updatedKeys)
+			if test.expectUpdate == nil && len(updates) > 0 {
+				t.Errorf("no update expected, yet saw: %v", updates)
+			}
+
+			creates := []core.CreateAction{}
+			for _, action := range fakeClient.Actions() {
+				if action.GetVerb() != "create" {
+					continue
+				}
+				creates = append(creates, action.(core.CreateAction))
+			}
+			if test.expectCreate != nil {
+				if len(creates) != 1 {
+					t.Errorf("unexpected creates: %v", creates)
+				} else if e, a := test.expectCreate, creates[0].GetObject(); !reflect.DeepEqual(e, a) {
+					t.Errorf("expected create:\n%#v\ngot:\n%#v\n", e, a)
+				}
+			}
+			if test.expectCreate == nil && len(creates) > 0 {
+				t.Errorf("no create expected, yet saw: %v", creates)
 			}
 		})
 	}
 
 	nonReconcileTests := []struct {
-		testName      string
-		serviceName   string
-		ip            string
-		endpointPorts []corev1.EndpointPort
-		endpointKeys  []string
-		endpoints     *corev1.EndpointsList
-		expectUpdate  *corev1.Endpoints // nil means none expected
+		testName          string
+		serviceName       string
+		ip                string
+		endpointPorts     []corev1.EndpointPort
+		additionalMasters int
+		endpoints         *corev1.EndpointsList
+		expectUpdate      *corev1.Endpoints // nil means none expected
+		expectCreate      *corev1.Endpoints // nil means none expected
 	}{
 		{
 			testName:    "existing endpoints extra service ports missing port no update",
@@ -538,7 +503,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			ip:            "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 			endpoints:     nil,
-			expectUpdate: &corev1.Endpoints{
+			expectCreate: &corev1.Endpoints{
 				ObjectMeta: om("foo", true),
 				Subsets: []corev1.EndpointSubset{{
 					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
@@ -549,157 +514,79 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 	}
 	for _, test := range nonReconcileTests {
 		t.Run(test.testName, func(t *testing.T) {
-			fakeLeases := newFakeLeases()
-			fakeLeases.SetKeys(test.endpointKeys)
-			clientset := fake.NewSimpleClientset()
+			fakeClient := fake.NewSimpleClientset()
 			if test.endpoints != nil {
-				for _, ep := range test.endpoints.Items {
-					if _, err := clientset.CoreV1().Endpoints(ep.Namespace).Create(context.TODO(), &ep, metav1.CreateOptions{}); err != nil {
-						t.Errorf("unexpected error: %v", err)
-						continue
-					}
-				}
+				fakeClient = fake.NewSimpleClientset(test.endpoints)
 			}
-			epAdapter := EndpointsAdapter{endpointClient: clientset.CoreV1()}
-			r := NewLeaseEndpointReconciler(epAdapter, fakeLeases)
-			err := r.ReconcileEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, false)
+			epAdapter := NewEndpointsAdapter(fakeClient.CoreV1(), nil)
+			reconciler := NewMasterCountEndpointReconciler(test.additionalMasters+1, epAdapter)
+			err := reconciler.ReconcileEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, false)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
-			actualEndpoints, err := clientset.CoreV1().Endpoints(corev1.NamespaceDefault).Get(context.TODO(), test.serviceName, metav1.GetOptions{})
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-			if test.expectUpdate != nil {
-				if e, a := test.expectUpdate, actualEndpoints; !reflect.DeepEqual(e, a) {
-					t.Errorf("expected update:\n%#v\ngot:\n%#v\n", e, a)
-				}
-			}
-			if updatedKeys := fakeLeases.GetUpdatedKeys(); len(updatedKeys) != 1 || updatedKeys[0] != test.ip {
-				t.Errorf("expected the master's IP to be refreshed, but the following IPs were refreshed instead: %v", updatedKeys)
-			}
-		})
-	}
-}
 
-func TestLeaseRemoveEndpoints(t *testing.T) {
-	ns := corev1.NamespaceDefault
-	om := func(name string, skipMirrorLabel bool) metav1.ObjectMeta {
-		o := metav1.ObjectMeta{Namespace: ns, Name: name}
-		if skipMirrorLabel {
-			o.Labels = map[string]string{
-				discoveryv1.LabelSkipMirror: "true",
-			}
-		}
-		return o
-	}
-	stopTests := []struct {
-		testName      string
-		serviceName   string
-		ip            string
-		endpointPorts []corev1.EndpointPort
-		endpointKeys  []string
-		endpoints     *corev1.EndpointsList
-		expectUpdate  *corev1.Endpoints // nil means none expected
-	}{
-		{
-			testName:      "successful stop reconciling",
-			serviceName:   "foo",
-			ip:            "1.2.3.4",
-			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-			endpointKeys:  []string{"1.2.3.4", "4.3.2.2", "4.3.2.3", "4.3.2.4"},
-			endpoints: &corev1.EndpointsList{
-				Items: []corev1.Endpoints{{
-					ObjectMeta: om("foo", true),
-					Subsets: []corev1.EndpointSubset{{
-						Addresses: []corev1.EndpointAddress{
-							{IP: "1.2.3.4"},
-							{IP: "4.3.2.2"},
-							{IP: "4.3.2.3"},
-							{IP: "4.3.2.4"},
-						},
-						Ports: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-					}},
-				}},
-			},
-			expectUpdate: &corev1.Endpoints{
-				ObjectMeta: om("foo", true),
-				Subsets: []corev1.EndpointSubset{{
-					Addresses: []corev1.EndpointAddress{
-						{IP: "4.3.2.2"},
-						{IP: "4.3.2.3"},
-						{IP: "4.3.2.4"},
-					},
-					Ports: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-				}},
-			},
-		},
-		{
-			testName:      "stop reconciling with ip not in endpoint ip list",
-			serviceName:   "foo",
-			ip:            "5.6.7.8",
-			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-			endpointKeys:  []string{"1.2.3.4", "4.3.2.2", "4.3.2.3", "4.3.2.4"},
-			endpoints: &corev1.EndpointsList{
-				Items: []corev1.Endpoints{{
-					ObjectMeta: om("foo", true),
-					Subsets: []corev1.EndpointSubset{{
-						Addresses: []corev1.EndpointAddress{
-							{IP: "1.2.3.4"},
-							{IP: "4.3.2.2"},
-							{IP: "4.3.2.3"},
-							{IP: "4.3.2.4"},
-						},
-						Ports: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-					}},
-				}},
-			},
-		},
-		{
-			testName:      "endpoint with no subset",
-			serviceName:   "foo",
-			ip:            "5.6.7.8",
-			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-			endpointKeys:  []string{"1.2.3.4", "4.3.2.2", "4.3.2.3", "4.3.2.4"},
-			endpoints: &corev1.EndpointsList{
-				Items: []corev1.Endpoints{{
-					ObjectMeta: om("foo", true),
-					Subsets:    nil,
-				}},
-			},
-		},
-	}
-	for _, test := range stopTests {
-		t.Run(test.testName, func(t *testing.T) {
-			fakeLeases := newFakeLeases()
-			fakeLeases.SetKeys(test.endpointKeys)
-			clientset := fake.NewSimpleClientset()
-			for _, ep := range test.endpoints.Items {
-				if _, err := clientset.CoreV1().Endpoints(ep.Namespace).Create(context.TODO(), &ep, metav1.CreateOptions{}); err != nil {
-					t.Errorf("unexpected error: %v", err)
+			updates := []core.UpdateAction{}
+			for _, action := range fakeClient.Actions() {
+				if action.GetVerb() != "update" {
 					continue
 				}
-			}
-			epAdapter := EndpointsAdapter{endpointClient: clientset.CoreV1()}
-			r := NewLeaseEndpointReconciler(epAdapter, fakeLeases)
-			err := r.RemoveEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts)
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-			actualEndpoints, err := clientset.CoreV1().Endpoints(corev1.NamespaceDefault).Get(context.TODO(), test.serviceName, metav1.GetOptions{})
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
+				updates = append(updates, action.(core.UpdateAction))
 			}
 			if test.expectUpdate != nil {
-				if e, a := test.expectUpdate, actualEndpoints; !reflect.DeepEqual(e, a) {
+				if len(updates) != 1 {
+					t.Errorf("unexpected updates: %v", updates)
+				} else if e, a := test.expectUpdate, updates[0].GetObject(); !reflect.DeepEqual(e, a) {
 					t.Errorf("expected update:\n%#v\ngot:\n%#v\n", e, a)
 				}
 			}
-			for _, key := range fakeLeases.GetUpdatedKeys() {
-				if key == test.ip {
-					t.Errorf("Found ip %s in leases but shouldn't be there", key)
+			if test.expectUpdate == nil && len(updates) > 0 {
+				t.Errorf("no update expected, yet saw: %v", updates)
+			}
+
+			creates := []core.CreateAction{}
+			for _, action := range fakeClient.Actions() {
+				if action.GetVerb() != "create" {
+					continue
+				}
+				creates = append(creates, action.(core.CreateAction))
+			}
+			if test.expectCreate != nil {
+				if len(creates) != 1 {
+					t.Errorf("unexpected creates: %v", creates)
+				} else if e, a := test.expectCreate, creates[0].GetObject(); !reflect.DeepEqual(e, a) {
+					t.Errorf("expected create:\n%#v\ngot:\n%#v\n", e, a)
 				}
 			}
+			if test.expectCreate == nil && len(creates) > 0 {
+				t.Errorf("no create expected, yet saw: %v", creates)
+			}
 		})
+	}
+
+}
+
+func TestEmptySubsets(t *testing.T) {
+	ns := metav1.NamespaceDefault
+	om := func(name string) metav1.ObjectMeta {
+		return metav1.ObjectMeta{Namespace: ns, Name: name}
+	}
+	endpoints := &corev1.EndpointsList{
+		Items: []corev1.Endpoints{{
+			ObjectMeta: om("foo"),
+			Subsets:    nil,
+		}},
+	}
+	fakeClient := fake.NewSimpleClientset()
+	if endpoints != nil {
+		fakeClient = fake.NewSimpleClientset(endpoints)
+	}
+	epAdapter := NewEndpointsAdapter(fakeClient.CoreV1(), nil)
+	reconciler := NewMasterCountEndpointReconciler(1, epAdapter)
+	endpointPorts := []corev1.EndpointPort{
+		{Name: "foo", Port: 8080, Protocol: "TCP"},
+	}
+	err := reconciler.RemoveEndpoints("foo", netutils.ParseIPSloppy("1.2.3.4"), endpointPorts)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
 	}
 }
