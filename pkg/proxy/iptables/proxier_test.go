@@ -746,7 +746,7 @@ func checkIPTablesRuleJumps(ruleData string) error {
 		// Ignore jumps to chains that we expect to exist even if kube-proxy
 		// didn't create them itself.
 		jumpedChains.Delete("ACCEPT", "REJECT", "DROP", "MARK", "RETURN", "DNAT", "SNAT", "MASQUERADE")
-		jumpedChains.Delete(string(KubeMarkDropChain))
+		jumpedChains.Delete(string(kubeMarkDropChain))
 
 		// Find cases where we have "-A FOO ... -j BAR" but no ":BAR", meaning
 		// that we are jumping to a chain that was not created.
@@ -769,7 +769,7 @@ func checkIPTablesRuleJumps(ruleData string) error {
 		// Find cases where we have ":BAR" but no "-A FOO ... -j BAR", meaning
 		// that we are creating an empty chain but not using it for anything.
 		extraChains := createdChains.Difference(jumpedChains)
-		extraChains.Delete(string(kubeServicesChain), string(kubeExternalServicesChain), string(kubeNodePortsChain), string(kubePostroutingChain), string(kubeForwardChain), string(KubeMarkMasqChain))
+		extraChains.Delete(string(kubeServicesChain), string(kubeExternalServicesChain), string(kubeNodePortsChain), string(kubePostroutingChain), string(kubeForwardChain), string(kubeMarkMasqChain))
 		if len(extraChains) > 0 {
 			return fmt.Errorf("some chains in %s are created but not used: %v", tableName, extraChains.List())
 		}
