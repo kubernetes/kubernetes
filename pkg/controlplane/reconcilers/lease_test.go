@@ -205,8 +205,12 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 					}},
 				},
+				makeEndpointSlice("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 			},
-			expectUpdate: makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			expectUpdate: []runtime.Object{
+				makeEndpoints("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+				// EndpointSlice does not get updated because it was already correct
+			},
 		},
 		{
 			testName:    "existing endpoints extra service ports satisfy",
@@ -248,7 +252,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			fakeLeases.SetKeys(test.endpointKeys)
 			clientset := fake.NewSimpleClientset(test.initialState...)
 
-			epAdapter := EndpointsAdapter{endpointClient: clientset.CoreV1()}
+			epAdapter := NewEndpointsAdapter(clientset.CoreV1(), clientset.DiscoveryV1())
 			r := NewLeaseEndpointReconciler(epAdapter, fakeLeases)
 			err := r.ReconcileEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, true)
 			if err != nil {
@@ -312,7 +316,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			fakeLeases := newFakeLeases()
 			fakeLeases.SetKeys(test.endpointKeys)
 			clientset := fake.NewSimpleClientset(test.initialState...)
-			epAdapter := EndpointsAdapter{endpointClient: clientset.CoreV1()}
+			epAdapter := NewEndpointsAdapter(clientset.CoreV1(), clientset.DiscoveryV1())
 			r := NewLeaseEndpointReconciler(epAdapter, fakeLeases)
 			err := r.ReconcileEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, false)
 			if err != nil {
@@ -373,7 +377,7 @@ func TestLeaseRemoveEndpoints(t *testing.T) {
 			fakeLeases := newFakeLeases()
 			fakeLeases.SetKeys(test.endpointKeys)
 			clientset := fake.NewSimpleClientset(test.initialState...)
-			epAdapter := EndpointsAdapter{endpointClient: clientset.CoreV1()}
+			epAdapter := NewEndpointsAdapter(clientset.CoreV1(), clientset.DiscoveryV1())
 			r := NewLeaseEndpointReconciler(epAdapter, fakeLeases)
 			err := r.RemoveEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts)
 			if err != nil {

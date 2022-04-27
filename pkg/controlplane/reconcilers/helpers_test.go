@@ -32,6 +32,7 @@ import (
 func makeEndpointsArray(name string, ips []string, ports []corev1.EndpointPort) []runtime.Object {
 	return []runtime.Object{
 		makeEndpoints(name, ips, ports),
+		makeEndpointSlice(name, ips, ports),
 	}
 }
 
@@ -55,6 +56,32 @@ func makeEndpoints(name string, ips []string, ports []corev1.EndpointPort) *core
 		}
 	}
 	return endpoints
+}
+
+func makeEndpointSlice(name string, ips []string, ports []corev1.EndpointPort) *discoveryv1.EndpointSlice {
+	slice := &discoveryv1.EndpointSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: metav1.NamespaceDefault,
+			Name:      name,
+			Labels: map[string]string{
+				discoveryv1.LabelServiceName: name,
+			},
+		},
+		AddressType: discoveryv1.AddressTypeIPv4,
+		Endpoints:   make([]discoveryv1.Endpoint, len(ips)),
+		Ports:       make([]discoveryv1.EndpointPort, len(ports)),
+	}
+	ready := true
+	for i := range ips {
+		slice.Endpoints[i].Addresses = []string{ips[i]}
+		slice.Endpoints[i].Conditions.Ready = &ready
+	}
+	for i := range ports {
+		slice.Ports[i].Name = &ports[i].Name
+		slice.Ports[i].Protocol = &ports[i].Protocol
+		slice.Ports[i].Port = &ports[i].Port
+	}
+	return slice
 }
 
 func verifyCreatesAndUpdates(fakeClient *fake.Clientset, expectedCreates, expectedUpdates []runtime.Object) error {

@@ -180,7 +180,7 @@ func TestMasterCountEndpointReconciler(t *testing.T) {
 	for _, test := range reconcileTests {
 		t.Run(test.testName, func(t *testing.T) {
 			fakeClient := fake.NewSimpleClientset(test.initialState...)
-			epAdapter := NewEndpointsAdapter(fakeClient.CoreV1(), nil)
+			epAdapter := NewEndpointsAdapter(fakeClient.CoreV1(), fakeClient.DiscoveryV1())
 			reconciler := NewMasterCountEndpointReconciler(test.additionalMasters+1, epAdapter)
 			err := reconciler.ReconcileEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, true)
 			if err != nil {
@@ -238,7 +238,7 @@ func TestMasterCountEndpointReconciler(t *testing.T) {
 	for _, test := range nonReconcileTests {
 		t.Run(test.testName, func(t *testing.T) {
 			fakeClient := fake.NewSimpleClientset(test.initialState...)
-			epAdapter := NewEndpointsAdapter(fakeClient.CoreV1(), nil)
+			epAdapter := NewEndpointsAdapter(fakeClient.CoreV1(), fakeClient.DiscoveryV1())
 			reconciler := NewMasterCountEndpointReconciler(test.additionalMasters+1, epAdapter)
 			err := reconciler.ReconcileEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, false)
 			if err != nil {
@@ -254,9 +254,9 @@ func TestMasterCountEndpointReconciler(t *testing.T) {
 }
 
 func TestEmptySubsets(t *testing.T) {
-	endpoints := makeEndpoints("foo", nil, nil)
-	fakeClient := fake.NewSimpleClientset(endpoints)
-	epAdapter := NewEndpointsAdapter(fakeClient.CoreV1(), nil)
+	endpoints := makeEndpointsArray("foo", nil, nil)
+	fakeClient := fake.NewSimpleClientset(endpoints...)
+	epAdapter := NewEndpointsAdapter(fakeClient.CoreV1(), fakeClient.DiscoveryV1())
 	reconciler := NewMasterCountEndpointReconciler(1, epAdapter)
 	endpointPorts := []corev1.EndpointPort{
 		{Name: "foo", Port: 8080, Protocol: "TCP"},
