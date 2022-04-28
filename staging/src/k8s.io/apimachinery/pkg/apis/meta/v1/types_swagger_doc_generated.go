@@ -156,6 +156,7 @@ var map_GroupVersionForDiscovery = map[string]string{
 	"":             "GroupVersion contains the \"group/version\" and \"version\" string of a version. It is made a struct to keep extensibility.",
 	"groupVersion": "groupVersion specifies the API group and version in the form \"group/version\"",
 	"version":      "version specifies the version in the form of \"version\". This is to save the clients the trouble of splitting the GroupVersion.",
+	"hash":         "hash is the current hash of the GroupVersion, used allow the client to detect if the groupversion has changed at all.",
 }
 
 func (GroupVersionForDiscovery) SwaggerDoc() map[string]string {

@@ -72,6 +72,10 @@
             "description": "groupVersion specifies the API group and version in the form \"group/version\"",
             "type": "string"
           },
+          "hash": {
+            "description": "hash is the current hash of the GroupVersion, used allow the client to detect if the groupversion has changed at all.",
+            "type": "string"
+          },
           "version": {
             "default": "",
             "description": "version specifies the version in the form of \"version\". This is to save the clients the trouble of splitting the GroupVersion.",

@@ -134,6 +134,9 @@ type DiscoveryClient struct {
 	restClient restclient.Interface
 
 	LegacyPrefix string
+
+	hashesByGroupVersion map[string]string
+	hashesMu             sync.RWMutex
 }
 
 // Convert metav1.APIVersions to metav1.APIGroup. APIVersions is used by legacy v1, so
@@ -182,6 +185,20 @@ func (d *DiscoveryClient) ServerGroups() (apiGroupList *metav1.APIGroupList, err
 	if len(v.Versions) != 0 {
 		apiGroupList.Groups = append([]metav1.APIGroup{apiGroup}, apiGroupList.Groups...)
 	}
+
+	// populate the map of hashes for each group version
+	d.hashesMu.Lock()
+	defer d.hashesMu.Unlock()
+	d.hashesByGroupVersion = make(map[string]string)
+	for _, apiGroup := range apiGroupList.Groups {
+		for _, version := range apiGroup.Versions {
+			if version.Hash != "" {
+				groupVersion := schema.GroupVersion{Group: apiGroup.Name, Version: version.Version}
+				d.hashesByGroupVersion[groupVersion.String()] = version.Hash
+			}
+		}
+	}
+
 	return apiGroupList, nil
 }
 
@@ -199,7 +216,13 @@ func (d *DiscoveryClient) ServerResourcesForGroupVersion(groupVersion string) (r
 	resources = &metav1.APIResourceList{
 		GroupVersion: groupVersion,
 	}
-	err = d.restClient.Get().AbsPath(url.String()).Do(context.TODO()).Into(resources)
+	req := d.restClient.Get().AbsPath(url.String())
+	d.hashesMu.RLock()
+	defer d.hashesMu.RUnlock()
+	if d.hashesByGroupVersion != nil && d.hashesByGroupVersion[groupVersion] != "" {
+		req.Param("hash", d.hashesByGroupVersion[groupVersion])
+	}
+	err = req.Do(context.TODO()).Into(resources)
 	if err != nil {
 		// ignore 403 or 404 error to be compatible with an v1.0 server.
 		if groupVersion == "v1" && (errors.IsNotFound(err) || errors.IsForbidden(err)) {

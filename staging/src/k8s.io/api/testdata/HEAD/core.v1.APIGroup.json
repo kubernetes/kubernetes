@@ -5,12 +5,14 @@
   "versions": [
     {
       "groupVersion": "groupVersionValue",
-      "version": "versionValue"
+      "version": "versionValue",
+      "hash": "hashValue"
     }
   ],
   "preferredVersion": {
     "groupVersion": "groupVersionValue",
-    "version": "versionValue"
+    "version": "versionValue",
+    "hash": "hashValue"
   },
   "serverAddressByClientCIDRs": [
     {

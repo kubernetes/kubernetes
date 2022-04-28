@@ -3,10 +3,12 @@ kind: APIGroup
 name: nameValue
 preferredVersion:
   groupVersion: groupVersionValue
+  hash: hashValue
   version: versionValue
 serverAddressByClientCIDRs:
 - clientCIDR: clientCIDRValue
   serverAddress: serverAddressValue
 versions:
 - groupVersion: groupVersionValue
+  hash: hashValue
   version: versionValue
