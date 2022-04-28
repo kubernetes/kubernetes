@@ -30,6 +30,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubectl/pkg/util/podutils"
@@ -170,33 +171,30 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods, allowedN
 		// Clear API error from the last attempt in case the following calls succeed.
 		lastAPIError = nil
 
-		rcList, err := c.CoreV1().ReplicationControllers(ns).List(context.TODO(), metav1.ListOptions{})
+		rcList, err := c.CoreV1().ReplicationControllers(ns).List(context.Background(), metav1.ListOptions{})
+		lastAPIError = err
 		if err != nil {
-			e2elog.Logf("Error getting replication controllers in namespace '%s': %v", ns, err)
-			lastAPIError = err
-			return false, err
+			return handleWaitingAPIError(err, false, "listing replication controllers in namespace %s", ns)
 		}
 		for _, rc := range rcList.Items {
 			replicas += *rc.Spec.Replicas
 			replicaOk += rc.Status.ReadyReplicas
 		}
 
-		rsList, err := c.AppsV1().ReplicaSets(ns).List(context.TODO(), metav1.ListOptions{})
+		rsList, err := c.AppsV1().ReplicaSets(ns).List(context.Background(), metav1.ListOptions{})
+		lastAPIError = err
 		if err != nil {
-			lastAPIError = err
-			e2elog.Logf("Error getting replication sets in namespace %q: %v", ns, err)
-			return false, err
+			return handleWaitingAPIError(err, false, "listing replication sets in namespace %s", ns)
 		}
 		for _, rs := range rsList.Items {
 			replicas += *rs.Spec.Replicas
 			replicaOk += rs.Status.ReadyReplicas
 		}
 
-		podList, err := c.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{})
+		podList, err := c.CoreV1().Pods(ns).List(context.Background(), metav1.ListOptions{})
 		lastAPIError = err
 		if err != nil {
-			e2elog.Logf("Error getting pods in namespace '%s': %v", ns, err)
-			return false, err
+			return handleWaitingAPIError(err, false, "listing pods in namespace %s", ns)
 		}
 		nOk := int32(0)
 		notReady = int32(0)
@@ -255,12 +253,7 @@ func WaitForPodCondition(c clientset.Interface, ns, podName, conditionDesc strin
 		pod, err := c.CoreV1().Pods(ns).Get(context.TODO(), podName, metav1.GetOptions{})
 		lastPodError = err
 		if err != nil {
-			if apierrors.IsNotFound(err) {
-				e2elog.Logf("Pod %q in namespace %q not found. Error: %v", podName, ns, err)
-			} else {
-				e2elog.Logf("Get pod %q in namespace %q failed, ignoring for %v. Error: %v", podName, ns, poll, err)
-			}
-			return false, nil
+			return handleWaitingAPIError(err, true, "getting pod %s", podIdentifier(ns, podName))
 		}
 		// log now so that current pod info is reported before calling `condition()`
 		e2elog.Logf("Pod %q: Phase=%q, Reason=%q, readiness=%t. Elapsed: %v",
@@ -288,7 +281,7 @@ func WaitForAllPodsCondition(c clientset.Interface, ns string, opts metav1.ListO
 	err := wait.PollImmediate(poll, timeout, func() (done bool, err error) {
 		pods, err = c.CoreV1().Pods(ns).List(context.Background(), opts)
 		if err != nil {
-			return false, err
+			return handleWaitingAPIError(err, true, "listing pods")
 		}
 		if len(pods.Items) < minPods {
 			e2elog.Logf("found %d pods, waiting for at least %d", len(pods.Items), minPods)
@@ -477,7 +470,7 @@ func WaitForPodNotFoundInNamespace(c clientset.Interface, podName, ns string, ti
 			return true, nil // done
 		}
 		if err != nil {
-			return true, err // stop wait with error
+			return handleWaitingAPIError(err, true, "getting pod %s", podIdentifier(ns, podName))
 		}
 		return false, nil
 	})
@@ -491,7 +484,7 @@ func WaitForPodToDisappear(c clientset.Interface, ns, podName string, label labe
 		options := metav1.ListOptions{LabelSelector: label.String()}
 		pods, err := c.CoreV1().Pods(ns).List(context.TODO(), options)
 		if err != nil {
-			return false, err
+			return handleWaitingAPIError(err, true, "listing pods")
 		}
 		found := false
 		for _, pod := range pods.Items {
@@ -524,9 +517,8 @@ func PodsResponding(c clientset.Interface, ns, name string, wantName bool, pods 
 func WaitForNumberOfPods(c clientset.Interface, ns string, num int, timeout time.Duration) (pods *v1.PodList, err error) {
 	err = wait.PollImmediate(poll, timeout, func() (bool, error) {
 		pods, err = c.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{})
-		// ignore intermittent network error
 		if err != nil {
-			return false, nil
+			return handleWaitingAPIError(err, false, "listing pods")
 		}
 		return len(pods.Items) == num, nil
 	})
@@ -652,4 +644,38 @@ func WaitForContainerRunning(c clientset.Interface, namespace, podName, containe
 		}
 		return false, nil
 	})
+}
+
+// handleWaitingAPIErrror handles an error from an API request in the context of a Wait function.
+// If the error is retryable, sleep the recommended delay and ignore the error.
+// If the erorr is terminal, return it.
+func handleWaitingAPIError(err error, retryNotFound bool, taskFormat string, taskArgs ...interface{}) (bool, error) {
+	if retryNotFound && apierrors.IsNotFound(err) {
+		e2elog.Logf("Ignoring NotFound error while "+taskFormat, taskArgs...)
+		return false, nil
+	}
+	if retry, delay := shouldRetry(err); retry {
+		e2elog.Logf("Retryable error while %s, retrying after %v: %v", fmt.Sprintf(taskFormat, taskArgs...), delay, err)
+		if delay > 0 {
+			time.Sleep(delay)
+		}
+		return false, nil
+	}
+	// Non-retryable error.
+	return false, err
+}
+
+// Decide whether to retry an API request. Optionally include a delay to retry after.
+func shouldRetry(err error) (retry bool, retryAfter time.Duration) {
+	// if the error sends the Retry-After header, we respect it as an explicit confirmation we should retry.
+	if delay, shouldRetry := apierrors.SuggestsClientDelay(err); shouldRetry {
+		return shouldRetry, time.Duration(delay) * time.Second
+	}
+
+	// these errors indicate a transient error that should be retried.
+	if utilnet.IsConnectionReset(err) || apierrors.IsInternalError(err) || apierrors.IsTimeout(err) || apierrors.IsTooManyRequests(err) {
+		return true, 0
+	}
+
+	return false, 0
 }
