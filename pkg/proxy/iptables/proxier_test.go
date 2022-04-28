@@ -53,7 +53,6 @@ import (
 	iptablestest "k8s.io/kubernetes/pkg/util/iptables/testing"
 	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
-	utilnet "k8s.io/utils/net"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -463,26 +462,6 @@ func TestDeleteEndpointConnectionsIPv6(t *testing.T) {
 	}
 }
 
-// fakeCloseable implements utilproxy.Closeable
-type fakeCloseable struct{}
-
-// Close fakes out the close() used by syncProxyRules to release a local port.
-func (f *fakeCloseable) Close() error {
-	return nil
-}
-
-// fakePortOpener implements portOpener.
-type fakePortOpener struct {
-	openPorts []*utilnet.LocalPort
-}
-
-// OpenLocalPort fakes out the listen() and bind() used by syncProxyRules
-// to lock a local port.
-func (f *fakePortOpener) OpenLocalPort(lp *utilnet.LocalPort) (utilnet.Closeable, error) {
-	f.openPorts = append(f.openPorts, lp)
-	return &fakeCloseable{}, nil
-}
-
 const testHostname = "test-hostname"
 
 func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
@@ -503,8 +482,6 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 		masqueradeMark:           "0x4000",
 		localDetector:            detectLocal,
 		hostname:                 testHostname,
-		portsMap:                 make(map[utilnet.LocalPort]utilnet.Closeable),
-		portMapper:               &fakePortOpener{[]*utilnet.LocalPort{}},
 		serviceHealthServer:      healthcheck.NewFakeServiceHealthServer(),
 		precomputedProbabilities: make([]string, 0, 1001),
 		iptablesData:             bytes.NewBuffer(nil),
@@ -1598,7 +1575,6 @@ COMMIT
 -A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
 COMMIT
 `
-
 	assertIPTablesRulesEqual(t, expected, fp.iptablesData.String())
 }
 
