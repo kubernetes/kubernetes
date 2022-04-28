@@ -211,7 +211,7 @@ func getPreFilterState(cycleState *framework.CycleState) (*preFilterState, error
 func (f *Fit) EventsToRegister() []framework.ClusterEvent {
 	return []framework.ClusterEvent{
 		{Resource: framework.Pod, ActionType: framework.Delete},
-		{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeAllocatable},
+		{Resource: framework.Node, ActionType: framework.Add | framework.Update},
 	}
 }
 
