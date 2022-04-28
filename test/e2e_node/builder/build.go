@@ -35,6 +35,7 @@ var buildTargets = []string{
 	"test/e2e_node/e2e_node.test",
 	"vendor/github.com/onsi/ginkgo/ginkgo",
 	"cluster/gce/gci/mounter",
+	"test/e2e_node/plugins/gcp-credential-provider",
 }
 
 // BuildGo builds k8s binaries.

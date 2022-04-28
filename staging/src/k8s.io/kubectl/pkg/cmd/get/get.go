@@ -17,14 +17,11 @@ limitations under the License.
 package get
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/url"
-	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -45,12 +42,12 @@ import (
 	kubernetesscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	watchtools "k8s.io/client-go/tools/watch"
-	"k8s.io/kubectl/pkg/cmd/apiresources"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/rawhttp"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/interrupt"
+	"k8s.io/kubectl/pkg/util/slice"
 	"k8s.io/kubectl/pkg/util/templates"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -78,6 +75,7 @@ type GetOptions struct {
 	AllNamespaces     bool
 	Namespace         string
 	ExplicitNamespace bool
+	Subresource       string
 
 	ServerPrint bool
 
@@ -132,13 +130,18 @@ var (
 		kubectl get rc,services
 
 		# List one or more resources by their type and names
-		kubectl get rc/web service/frontend pods/web-pod-13je7`))
+		kubectl get rc/web service/frontend pods/web-pod-13je7
+
+		# List status subresource for a single pod.
+		kubectl get pod web-pod-13je7 --subresource status`))
 )
 
 const (
 	useOpenAPIPrintColumnFlagLabel = "use-openapi-print-columns"
 	useServerPrintColumns          = "server-print"
 )
+
+var supportedSubresources = []string{"status", "scale"}
 
 // NewGetOptions returns a GetOptions with default chunk size 500.
 func NewGetOptions(parent string, streams genericclioptions.IOStreams) *GetOptions {
@@ -163,18 +166,7 @@ func NewCmdGet(parent string, f cmdutil.Factory, streams genericclioptions.IOStr
 		Short:                 i18n.T("Display one or many resources"),
 		Long:                  getLong + "\n\n" + cmdutil.SuggestAPIResources(parent),
 		Example:               getExample,
-		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			var comps []string
-			if len(args) == 0 {
-				comps = apiresources.CompGetResourceList(f, cmd, toComplete)
-			} else {
-				comps = CompGetResource(f, cmd, args[0], toComplete)
-				if len(args) > 1 {
-					comps = cmdutil.Difference(comps, args[1:])
-				}
-			}
-			return comps, cobra.ShellCompDirectiveNoFileComp
-		},
+		// ValidArgsFunction is set when this function is called so that we have access to the util package
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate(cmd))
@@ -190,13 +182,14 @@ func NewCmdGet(parent string, f cmdutil.Factory, streams genericclioptions.IOStr
 	cmd.Flags().BoolVar(&o.WatchOnly, "watch-only", o.WatchOnly, "Watch for changes to the requested object(s), without listing/getting first.")
 	cmd.Flags().BoolVar(&o.OutputWatchEvents, "output-watch-events", o.OutputWatchEvents, "Output watch event objects when --watch or --watch-only is used. Existing objects are output as initial ADDED events.")
 	cmd.Flags().BoolVar(&o.IgnoreNotFound, "ignore-not-found", o.IgnoreNotFound, "If the requested object does not exist the command will return exit code 0.")
-	cmd.Flags().StringVarP(&o.LabelSelector, "selector", "l", o.LabelSelector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().StringVar(&o.FieldSelector, "field-selector", o.FieldSelector, "Selector (field query) to filter on, supports '=', '==', and '!='.(e.g. --field-selector key1=value1,key2=value2). The server only supports a limited number of field queries per type.")
 	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespaces", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 	addOpenAPIPrintColumnFlags(cmd, o)
 	addServerPrintColumnFlags(cmd, o)
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, "identifying the resource to get from a server.")
 	cmdutil.AddChunkSizeFlag(cmd, &o.ChunkSize)
+	cmdutil.AddLabelSelectorFlagVar(cmd, &o.LabelSelector)
+	cmdutil.AddSubresourceFlags(cmd, &o.Subresource, "If specified, gets the subresource of the requested object.", supportedSubresources...)
 	return cmd
 }
 
@@ -330,6 +323,9 @@ func (o *GetOptions) Validate(cmd *cobra.Command) error {
 	}
 	if o.OutputWatchEvents && !(o.Watch || o.WatchOnly) {
 		return cmdutil.UsageErrorf(cmd, "--output-watch-events option can only be used with --watch or --watch-only")
+	}
+	if len(o.Subresource) > 0 && !slice.ContainsString(supportedSubresources, o.Subresource, nil) {
+		return fmt.Errorf("invalid subresource value: %q. Must be one of %v", o.Subresource, supportedSubresources)
 	}
 	return nil
 }
@@ -484,6 +480,7 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		FilenameParam(o.ExplicitNamespace, &o.FilenameOptions).
 		LabelSelectorParam(o.LabelSelector).
 		FieldSelectorParam(o.FieldSelector).
+		Subresource(o.Subresource).
 		RequestChunksOf(chunkSize).
 		ResourceTypeOrNameArgs(true, args...).
 		ContinueOnError().
@@ -813,7 +810,6 @@ func (o *GetOptions) printGeneric(r *resource.Result) error {
 		}
 		if listMeta, err := meta.ListAccessor(obj); err == nil {
 			list.Object["metadata"] = map[string]interface{}{
-				"selfLink":        listMeta.GetSelfLink(),
 				"resourceVersion": listMeta.GetResourceVersion(),
 			}
 		}
@@ -862,62 +858,4 @@ func multipleGVKsRequested(infos []*resource.Info) bool {
 		}
 	}
 	return false
-}
-
-// CompGetResource gets the list of the resource specified which begin with `toComplete`.
-func CompGetResource(f cmdutil.Factory, cmd *cobra.Command, resourceName string, toComplete string) []string {
-	template := "{{ range .items  }}{{ .metadata.name }} {{ end }}"
-	return CompGetFromTemplate(&template, f, "", cmd, []string{resourceName}, toComplete)
-}
-
-// CompGetContainers gets the list of containers of the specified pod which begin with `toComplete`.
-func CompGetContainers(f cmdutil.Factory, cmd *cobra.Command, podName string, toComplete string) []string {
-	template := "{{ range .spec.initContainers }}{{ .name }} {{end}}{{ range .spec.containers  }}{{ .name }} {{ end }}"
-	return CompGetFromTemplate(&template, f, "", cmd, []string{"pod", podName}, toComplete)
-}
-
-// CompGetFromTemplate executes a Get operation using the specified template and args and returns the results
-// which begin with `toComplete`.
-func CompGetFromTemplate(template *string, f cmdutil.Factory, namespace string, cmd *cobra.Command, args []string, toComplete string) []string {
-	buf := new(bytes.Buffer)
-	streams := genericclioptions.IOStreams{In: os.Stdin, Out: buf, ErrOut: ioutil.Discard}
-	o := NewGetOptions("kubectl", streams)
-
-	// Get the list of names of the specified resource
-	o.PrintFlags.TemplateFlags.GoTemplatePrintFlags.TemplateArgument = template
-	format := "go-template"
-	o.PrintFlags.OutputFormat = &format
-
-	// Do the steps Complete() would have done.
-	// We cannot actually call Complete() or Validate() as these function check for
-	// the presence of flags, which, in our case won't be there
-	if namespace != "" {
-		o.Namespace = namespace
-		o.ExplicitNamespace = true
-	} else {
-		var err error
-		o.Namespace, o.ExplicitNamespace, err = f.ToRawKubeConfigLoader().Namespace()
-		if err != nil {
-			return nil
-		}
-	}
-
-	o.ToPrinter = func(mapping *meta.RESTMapping, outputObjects *bool, withNamespace bool, withKind bool) (printers.ResourcePrinterFunc, error) {
-		printer, err := o.PrintFlags.ToPrinter()
-		if err != nil {
-			return nil, err
-		}
-		return printer.PrintObj, nil
-	}
-
-	o.Run(f, cmd, args)
-
-	var comps []string
-	resources := strings.Split(buf.String(), " ")
-	for _, res := range resources {
-		if res != "" && strings.HasPrefix(res, toComplete) {
-			comps = append(comps, res)
-		}
-	}
-	return comps
 }

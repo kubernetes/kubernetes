@@ -98,7 +98,7 @@ type KubeletConfiguration struct {
 	// staticPodURL is the URL for accessing static pods to run
 	StaticPodURL string
 	// staticPodURLHeader is a map of slices with HTTP headers to use when accessing the podURL
-	StaticPodURLHeader map[string][]string
+	StaticPodURLHeader map[string][]string `datapolicy:"token"`
 	// address is the IP address for the Kubelet to serve on (set to 0.0.0.0
 	// for all interfaces)
 	Address string
@@ -340,9 +340,10 @@ type KubeletConfiguration struct {
 	ContainerLogMaxFiles int32
 	// ConfigMapAndSecretChangeDetectionStrategy is a mode in which config map and secret managers are running.
 	ConfigMapAndSecretChangeDetectionStrategy ResourceChangeDetectionStrategy
-	// A comma separated allowlist of unsafe sysctls or sysctl patterns (ending in *).
-	// Unsafe sysctl groups are kernel.shm*, kernel.msg*, kernel.sem, fs.mqueue.*, and net.*.
-	// These sysctls are namespaced but not allowed by default.  For example: "kernel.msg*,net.ipv4.route.min_pmtu"
+	// A comma separated allowlist of unsafe sysctls or sysctl patterns (ending in `*`).
+	// Unsafe sysctl groups are `kernel.shm*`, `kernel.msg*`, `kernel.sem`, `fs.mqueue.*`, and `net.*`.
+	// These sysctls are namespaced but not allowed by default.
+	// For example: "`kernel.msg*,net.ipv4.route.min_pmtu`"
 	// +optional
 	AllowedUnsafeSysctls []string
 	// kernelMemcgNotification if enabled, the kubelet will integrate with the kernel memcg
@@ -397,6 +398,15 @@ type KubeletConfiguration struct {
 	// +featureGate=GracefulNodeShutdown
 	// +optional
 	ShutdownGracePeriodCriticalPods metav1.Duration
+	// ShutdownGracePeriodByPodPriority specifies the shutdown grace period for Pods based
+	// on their associated priority class value.
+	// When a shutdown request is received, the Kubelet will initiate shutdown on all pods
+	// running on the node with a grace period that depends on the priority of the pod,
+	// and then wait for all pods to exit.
+	// Each entry in the array represents the graceful shutdown time a pod with a priority
+	// class value that lies in the range of that value and the next higher entry in the
+	// list when the node is shutting down.
+	ShutdownGracePeriodByPodPriority []ShutdownGracePeriodByPodPriority
 	// ReservedMemory specifies a comma-separated list of memory reservations for NUMA nodes.
 	// The parameter makes sense only in the context of the memory manager feature. The memory manager will not allocate reserved memory for container workloads.
 	// For example, if you have a NUMA0 with 10Gi of memory and the ReservedMemory was specified to reserve 1Gi of memory at NUMA0,
@@ -426,6 +436,15 @@ type KubeletConfiguration struct {
 	// +featureGate=MemoryQoS
 	// +optional
 	MemoryThrottlingFactor *float64
+	// registerWithTaints are an array of taints to add to a node object when
+	// the kubelet registers itself. This only takes effect when registerNode
+	// is true and upon the initial registration of the node.
+	// +optional
+	RegisterWithTaints []v1.Taint
+
+	// registerNode enables automatic registration with the apiserver.
+	// +optional
+	RegisterNode bool
 }
 
 // KubeletAuthorizationMode denotes the authorization mode for the kubelet
@@ -536,9 +555,9 @@ type CredentialProvider struct {
 	//
 	// Each entry in matchImages is a pattern which can optionally contain a port and a path.
 	// Globs can be used in the domain, but not in the port or the path. Globs are supported
-	// as subdomains like '*.k8s.io' or 'k8s.*.io', and top-level-domains such as 'k8s.*'.
-	// Matching partial subdomains like 'app*.k8s.io' is also supported. Each glob can only match
-	// a single subdomain segment, so *.io does not match *.k8s.io.
+	// as subdomains like `*.k8s.io` or `k8s.*.io`, and top-level-domains such as `k8s.*`.
+	// Matching partial subdomains like `app*.k8s.io` is also supported. Each glob can only match
+	// a single subdomain segment, so `*.io` does not match *.k8s.io.
 	//
 	// A match exists between an image and a matchImage when all of the below are true:
 	// - Both contain the same number of domain parts and each part matches.
@@ -546,11 +565,11 @@ type CredentialProvider struct {
 	// - If the imageMatch contains a port, then the port must match in the image as well.
 	//
 	// Example values of matchImages:
-	//   - 123456789.dkr.ecr.us-east-1.amazonaws.com
-	//   - *.azurecr.io
-	//   - gcr.io
-	//   - *.*.registry.io
-	//   - registry.io:8080/path
+	//   - `123456789.dkr.ecr.us-east-1.amazonaws.com`
+	//   - `*.azurecr.io`
+	//   - `gcr.io`
+	//   - `*.*.registry.io`
+	//   - `registry.io:8080/path`
 	MatchImages []string
 
 	// defaultCacheDuration is the default duration the plugin will cache credentials in-memory
@@ -560,6 +579,7 @@ type CredentialProvider struct {
 	// Required input version of the exec CredentialProviderRequest. The returned CredentialProviderResponse
 	// MUST use the same encoding version as the input. Current supported values are:
 	// - credentialprovider.kubelet.k8s.io/v1alpha1
+	// - credentialprovider.kubelet.k8s.io/v1beta1
 	APIVersion string
 
 	// Arguments to pass to the command when executing it.
@@ -584,6 +604,14 @@ type ExecEnvVar struct {
 type MemoryReservation struct {
 	NumaNode int32
 	Limits   v1.ResourceList
+}
+
+// ShutdownGracePeriodByPodPriority specifies the shutdown grace period for Pods based on their associated priority class value
+type ShutdownGracePeriodByPodPriority struct {
+	// priority is the priority value associated with the shutdown grace period
+	Priority int32
+	// shutdownGracePeriodSeconds is the shutdown grace period in seconds
+	ShutdownGracePeriodSeconds int64
 }
 
 type MemorySwapConfiguration struct {

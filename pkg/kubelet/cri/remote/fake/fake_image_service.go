@@ -19,7 +19,7 @@ package fake
 import (
 	"context"
 
-	kubeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	kubeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 // ListImages lists existing images.
@@ -38,12 +38,12 @@ func (f *RemoteRuntime) ListImages(ctx context.Context, req *kubeapi.ListImagesR
 // present, returns a response with ImageStatusResponse.Image set to
 // nil.
 func (f *RemoteRuntime) ImageStatus(ctx context.Context, req *kubeapi.ImageStatusRequest) (*kubeapi.ImageStatusResponse, error) {
-	status, err := f.ImageService.ImageStatus(req.Image)
+	resp, err := f.ImageService.ImageStatus(req.Image, false)
 	if err != nil {
 		return nil, err
 	}
 
-	return &kubeapi.ImageStatusResponse{Image: status}, nil
+	return resp, nil
 }
 
 // PullImage pulls an image with authentication config.

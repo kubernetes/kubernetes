@@ -28,7 +28,6 @@ import (
 	"encoding/pem"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"math/big"
 	"net"
 	"os"
@@ -38,7 +37,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/blang/semver"
+	"github.com/blang/semver/v4"
 	"k8s.io/klog/v2"
 	netutils "k8s.io/utils/net"
 )
@@ -292,13 +291,13 @@ func getOrCreateTestCertFiles(certFileName, keyFileName string, spec TestCertSpe
 	}
 
 	os.MkdirAll(filepath.Dir(certFileName), os.FileMode(0777))
-	err = ioutil.WriteFile(certFileName, certPem, os.FileMode(0777))
+	err = os.WriteFile(certFileName, certPem, os.FileMode(0777))
 	if err != nil {
 		return err
 	}
 
 	os.MkdirAll(filepath.Dir(keyFileName), os.FileMode(0777))
-	err = ioutil.WriteFile(keyFileName, keyPem, os.FileMode(0777))
+	err = os.WriteFile(keyFileName, keyPem, os.FileMode(0777))
 	if err != nil {
 		return err
 	}

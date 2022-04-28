@@ -37,15 +37,16 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 var _ = SIGDescribe("Multi-AZ Clusters", func() {
 	f := framework.NewDefaultFramework("multi-az")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 	var zoneCount int
 	var err error
 	var cleanUp func()
 	ginkgo.BeforeEach(func() {
-		e2eskipper.SkipUnlessProviderIs("gce", "gke", "aws")
 		if zoneCount <= 0 {
 			zoneCount, err = getZoneCount(f.ClientSet)
 			framework.ExpectNoError(err)

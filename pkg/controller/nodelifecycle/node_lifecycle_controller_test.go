@@ -44,7 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/nodelifecycle/scheduler"
 	"k8s.io/kubernetes/pkg/controller/testutil"
-	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
+	controllerutil "k8s.io/kubernetes/pkg/controller/util/node"
 	"k8s.io/kubernetes/pkg/util/node"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/utils/pointer"
@@ -95,7 +95,7 @@ func (nc *nodeLifecycleController) doEviction(fakeNodeHandler *testutil.FakeNode
 		nc.zonePodEvictor[zone].Try(func(value scheduler.TimedValue) (bool, time.Duration) {
 			uid, _ := value.UID.(string)
 			pods, _ := nc.getPodsAssignedToNode(value.Value)
-			nodeutil.DeletePods(context.TODO(), fakeNodeHandler, pods, nc.recorder, value.Value, uid, nc.daemonSetStore)
+			controllerutil.DeletePods(context.TODO(), fakeNodeHandler, pods, nc.recorder, value.Value, uid, nc.daemonSetStore)
 			_ = nc.nodeEvictionMap.setStatus(value.Value, evicted)
 			return true, 0
 		})
@@ -729,7 +729,7 @@ func TestMonitorNodeHealthEvictPods(t *testing.T) {
 						t.Errorf("unexpected error: %v", err)
 					}
 					t.Logf("listed pods %d for node %v", len(pods), value.Value)
-					nodeutil.DeletePods(context.TODO(), item.fakeNodeHandler, pods, nodeController.recorder, value.Value, nodeUID, nodeController.daemonSetInformer.Lister())
+					controllerutil.DeletePods(context.TODO(), item.fakeNodeHandler, pods, nodeController.recorder, value.Value, nodeUID, nodeController.daemonSetInformer.Lister())
 					return true, 0
 				})
 			} else {
@@ -889,7 +889,7 @@ func TestPodStatusChange(t *testing.T) {
 				if err != nil {
 					t.Errorf("unexpected error: %v", err)
 				}
-				nodeutil.DeletePods(context.TODO(), item.fakeNodeHandler, pods, nodeController.recorder, value.Value, nodeUID, nodeController.daemonSetStore)
+				controllerutil.DeletePods(context.TODO(), item.fakeNodeHandler, pods, nodeController.recorder, value.Value, nodeUID, nodeController.daemonSetStore)
 				return true, 0
 			})
 		}
@@ -3810,7 +3810,7 @@ func TestTryUpdateNodeHealth(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			_, savedReadyCondition := nodeutil.GetNodeCondition(nodeController.nodeHealthMap.getDeepCopy(test.node.Name).status, v1.NodeReady)
+			_, savedReadyCondition := controllerutil.GetNodeCondition(nodeController.nodeHealthMap.getDeepCopy(test.node.Name).status, v1.NodeReady)
 			savedStatus := getStatus(savedReadyCondition)
 			currentStatus := getStatus(currentReadyCondition)
 			if !apiequality.Semantic.DeepEqual(currentStatus, savedStatus) {

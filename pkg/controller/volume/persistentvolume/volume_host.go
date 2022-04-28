@@ -95,6 +95,10 @@ func (ctrl *PersistentVolumeController) GetNodeAllocatable() (v1.ResourceList, e
 	return v1.ResourceList{}, nil
 }
 
+func (ctrl *PersistentVolumeController) GetAttachedVolumesFromNodeStatus() (map[v1.UniqueVolumeName]string, error) {
+	return map[v1.UniqueVolumeName]string{}, nil
+}
+
 func (ctrl *PersistentVolumeController) GetSecretFunc() func(namespace, name string) (*v1.Secret, error) {
 	return func(_, _ string) (*v1.Secret, error) {
 		return nil, fmt.Errorf("GetSecret unsupported in PersistentVolumeController")

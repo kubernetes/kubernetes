@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"runtime/debug"
 
 	"github.com/spf13/cobra"
 	"sigs.k8s.io/yaml"
@@ -34,10 +35,14 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
+// TODO(knverey): remove this hardcoding once kubectl being built with module support makes BuildInfo available.
+const kustomizeVersion = "v4.5.4"
+
 // Version is a struct for version information
 type Version struct {
-	ClientVersion *apimachineryversion.Info `json:"clientVersion,omitempty" yaml:"clientVersion,omitempty"`
-	ServerVersion *apimachineryversion.Info `json:"serverVersion,omitempty" yaml:"serverVersion,omitempty"`
+	ClientVersion    *apimachineryversion.Info `json:"clientVersion,omitempty" yaml:"clientVersion,omitempty"`
+	KustomizeVersion string                    `json:"kustomizeVersion,omitempty" yaml:"kustomizeVersion,omitempty"`
+	ServerVersion    *apimachineryversion.Info `json:"serverVersion,omitempty" yaml:"serverVersion,omitempty"`
 }
 
 var (
@@ -75,12 +80,13 @@ func NewCmdVersion(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *co
 		Example: versionExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd))
-			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.Validate(args))
 			cmdutil.CheckErr(o.Run())
 		},
 	}
 	cmd.Flags().BoolVar(&o.ClientOnly, "client", o.ClientOnly, "If true, shows client version only (no server required).")
 	cmd.Flags().BoolVar(&o.Short, "short", o.Short, "If true, print just the version number.")
+	cmd.Flags().MarkDeprecated("short", "and will be removed in the future. The --short output will become the default.")
 	cmd.Flags().StringVarP(&o.Output, "output", "o", o.Output, "One of 'yaml' or 'json'.")
 	return cmd
 }
@@ -101,7 +107,11 @@ func (o *Options) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 }
 
 // Validate validates the provided options
-func (o *Options) Validate() error {
+func (o *Options) Validate(args []string) error {
+	if len(args) != 0 {
+		return errors.New(fmt.Sprintf("extra arguments: %v", args))
+	}
+
 	if o.Output != "" && o.Output != "yaml" && o.Output != "json" {
 		return errors.New(`--output must be 'yaml' or 'json'`)
 	}
@@ -112,32 +122,33 @@ func (o *Options) Validate() error {
 // Run executes version command
 func (o *Options) Run() error {
 	var (
-		serverVersion *apimachineryversion.Info
-		serverErr     error
-		versionInfo   Version
+		serverErr   error
+		versionInfo Version
 	)
 
-	clientVersion := version.Get()
-	versionInfo.ClientVersion = &clientVersion
+	versionInfo.ClientVersion = func() *apimachineryversion.Info { v := version.Get(); return &v }()
+	versionInfo.KustomizeVersion = getKustomizeVersion()
 
 	if !o.ClientOnly && o.discoveryClient != nil {
 		// Always request fresh data from the server
 		o.discoveryClient.Invalidate()
-		serverVersion, serverErr = o.discoveryClient.ServerVersion()
-		versionInfo.ServerVersion = serverVersion
+		versionInfo.ServerVersion, serverErr = o.discoveryClient.ServerVersion()
 	}
 
 	switch o.Output {
 	case "":
 		if o.Short {
-			fmt.Fprintf(o.Out, "Client Version: %s\n", clientVersion.GitVersion)
-			if serverVersion != nil {
-				fmt.Fprintf(o.Out, "Server Version: %s\n", serverVersion.GitVersion)
+			fmt.Fprintf(o.Out, "Client Version: %s\n", versionInfo.ClientVersion.GitVersion)
+			fmt.Fprintf(o.Out, "Kustomize Version: %s\n", versionInfo.KustomizeVersion)
+			if versionInfo.ServerVersion != nil {
+				fmt.Fprintf(o.Out, "Server Version: %s\n", versionInfo.ServerVersion.GitVersion)
 			}
 		} else {
-			fmt.Fprintf(o.Out, "Client Version: %s\n", fmt.Sprintf("%#v", clientVersion))
-			if serverVersion != nil {
-				fmt.Fprintf(o.Out, "Server Version: %s\n", fmt.Sprintf("%#v", *serverVersion))
+			fmt.Fprintf(o.ErrOut, "WARNING: This version information is deprecated and will be replaced with the output from kubectl version --short.  Use --output=yaml|json to get the full version.\n")
+			fmt.Fprintf(o.Out, "Client Version: %#v\n", *versionInfo.ClientVersion)
+			fmt.Fprintf(o.Out, "Kustomize Version: %s\n", versionInfo.KustomizeVersion)
+			if versionInfo.ServerVersion != nil {
+				fmt.Fprintf(o.Out, "Server Version: %#v\n", *versionInfo.ServerVersion)
 			}
 		}
 	case "yaml":
@@ -158,11 +169,24 @@ func (o *Options) Run() error {
 		return fmt.Errorf("VersionOptions were not validated: --output=%q should have been rejected", o.Output)
 	}
 
-	if serverVersion != nil {
-		if err := printVersionSkewWarning(o.ErrOut, clientVersion, *serverVersion); err != nil {
+	if versionInfo.ServerVersion != nil {
+		if err := printVersionSkewWarning(o.ErrOut, *versionInfo.ClientVersion, *versionInfo.ServerVersion); err != nil {
 			return err
 		}
 	}
 
 	return serverErr
+}
+
+func getKustomizeVersion() string {
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return kustomizeVersion
+	}
+	for _, dep := range info.Deps {
+		if dep.Path == "sigs.k8s.io/kustomize/kustomize/v4" {
+			return dep.Version
+		}
+	}
+	return kustomizeVersion
 }

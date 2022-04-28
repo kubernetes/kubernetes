@@ -22,8 +22,11 @@ import (
 	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )
 
-// StandardDeclarations returns the Decls for all functions and constants in the evaluator.
-func StandardDeclarations() []*exprpb.Decl {
+var (
+	standardDeclarations []*exprpb.Decl
+)
+
+func init() {
 	// Some shortcuts we use when building declarations.
 	paramA := decls.NewTypeParamType("A")
 	typeParamAList := []string{"A"}
@@ -45,9 +48,9 @@ func StandardDeclarations() []*exprpb.Decl {
 		decls.NewVar("null_type", decls.NewTypeType(decls.Null)),
 		decls.NewVar("type", decls.NewTypeType(decls.NewTypeType(nil))))
 
-	// Booleans
-	// TODO: allow the conditional to return a heterogenous type.
-	return append(idents, []*exprpb.Decl{
+	standardDeclarations = append(standardDeclarations, idents...)
+	standardDeclarations = append(standardDeclarations, []*exprpb.Decl{
+		// Booleans
 		decls.NewFunction(operators.Conditional,
 			decls.NewParameterizedOverload(overloads.Conditional,
 				[]*exprpb.Type{decls.Bool, paramA, paramA}, paramA,
@@ -68,80 +71,6 @@ func StandardDeclarations() []*exprpb.Decl {
 		decls.NewFunction(operators.NotStrictlyFalse,
 			decls.NewOverload(overloads.NotStrictlyFalse,
 				[]*exprpb.Type{decls.Bool}, decls.Bool)),
-
-		// Relations.
-
-		decls.NewFunction(operators.Less,
-			decls.NewOverload(overloads.LessBool,
-				[]*exprpb.Type{decls.Bool, decls.Bool}, decls.Bool),
-			decls.NewOverload(overloads.LessInt64,
-				[]*exprpb.Type{decls.Int, decls.Int}, decls.Bool),
-			decls.NewOverload(overloads.LessUint64,
-				[]*exprpb.Type{decls.Uint, decls.Uint}, decls.Bool),
-			decls.NewOverload(overloads.LessDouble,
-				[]*exprpb.Type{decls.Double, decls.Double}, decls.Bool),
-			decls.NewOverload(overloads.LessString,
-				[]*exprpb.Type{decls.String, decls.String}, decls.Bool),
-			decls.NewOverload(overloads.LessBytes,
-				[]*exprpb.Type{decls.Bytes, decls.Bytes}, decls.Bool),
-			decls.NewOverload(overloads.LessTimestamp,
-				[]*exprpb.Type{decls.Timestamp, decls.Timestamp}, decls.Bool),
-			decls.NewOverload(overloads.LessDuration,
-				[]*exprpb.Type{decls.Duration, decls.Duration}, decls.Bool)),
-
-		decls.NewFunction(operators.LessEquals,
-			decls.NewOverload(overloads.LessEqualsBool,
-				[]*exprpb.Type{decls.Bool, decls.Bool}, decls.Bool),
-			decls.NewOverload(overloads.LessEqualsInt64,
-				[]*exprpb.Type{decls.Int, decls.Int}, decls.Bool),
-			decls.NewOverload(overloads.LessEqualsUint64,
-				[]*exprpb.Type{decls.Uint, decls.Uint}, decls.Bool),
-			decls.NewOverload(overloads.LessEqualsDouble,
-				[]*exprpb.Type{decls.Double, decls.Double}, decls.Bool),
-			decls.NewOverload(overloads.LessEqualsString,
-				[]*exprpb.Type{decls.String, decls.String}, decls.Bool),
-			decls.NewOverload(overloads.LessEqualsBytes,
-				[]*exprpb.Type{decls.Bytes, decls.Bytes}, decls.Bool),
-			decls.NewOverload(overloads.LessEqualsTimestamp,
-				[]*exprpb.Type{decls.Timestamp, decls.Timestamp}, decls.Bool),
-			decls.NewOverload(overloads.LessEqualsDuration,
-				[]*exprpb.Type{decls.Duration, decls.Duration}, decls.Bool)),
-
-		decls.NewFunction(operators.Greater,
-			decls.NewOverload(overloads.GreaterBool,
-				[]*exprpb.Type{decls.Bool, decls.Bool}, decls.Bool),
-			decls.NewOverload(overloads.GreaterInt64,
-				[]*exprpb.Type{decls.Int, decls.Int}, decls.Bool),
-			decls.NewOverload(overloads.GreaterUint64,
-				[]*exprpb.Type{decls.Uint, decls.Uint}, decls.Bool),
-			decls.NewOverload(overloads.GreaterDouble,
-				[]*exprpb.Type{decls.Double, decls.Double}, decls.Bool),
-			decls.NewOverload(overloads.GreaterString,
-				[]*exprpb.Type{decls.String, decls.String}, decls.Bool),
-			decls.NewOverload(overloads.GreaterBytes,
-				[]*exprpb.Type{decls.Bytes, decls.Bytes}, decls.Bool),
-			decls.NewOverload(overloads.GreaterTimestamp,
-				[]*exprpb.Type{decls.Timestamp, decls.Timestamp}, decls.Bool),
-			decls.NewOverload(overloads.GreaterDuration,
-				[]*exprpb.Type{decls.Duration, decls.Duration}, decls.Bool)),
-
-		decls.NewFunction(operators.GreaterEquals,
-			decls.NewOverload(overloads.GreaterEqualsBool,
-				[]*exprpb.Type{decls.Bool, decls.Bool}, decls.Bool),
-			decls.NewOverload(overloads.GreaterEqualsInt64,
-				[]*exprpb.Type{decls.Int, decls.Int}, decls.Bool),
-			decls.NewOverload(overloads.GreaterEqualsUint64,
-				[]*exprpb.Type{decls.Uint, decls.Uint}, decls.Bool),
-			decls.NewOverload(overloads.GreaterEqualsDouble,
-				[]*exprpb.Type{decls.Double, decls.Double}, decls.Bool),
-			decls.NewOverload(overloads.GreaterEqualsString,
-				[]*exprpb.Type{decls.String, decls.String}, decls.Bool),
-			decls.NewOverload(overloads.GreaterEqualsBytes,
-				[]*exprpb.Type{decls.Bytes, decls.Bytes}, decls.Bool),
-			decls.NewOverload(overloads.GreaterEqualsTimestamp,
-				[]*exprpb.Type{decls.Timestamp, decls.Timestamp}, decls.Bool),
-			decls.NewOverload(overloads.GreaterEqualsDuration,
-				[]*exprpb.Type{decls.Duration, decls.Duration}, decls.Bool)),
 
 		decls.NewFunction(operators.Equals,
 			decls.NewParameterizedOverload(overloads.Equals,
@@ -227,8 +156,6 @@ func StandardDeclarations() []*exprpb.Decl {
 			decls.NewParameterizedOverload(overloads.IndexMap,
 				[]*exprpb.Type{mapOfAB, paramA}, paramB,
 				typeParamABList)),
-		//decls.NewOverload(overloads.IndexMessage,
-		//	[]*expr.Type{decls.Dyn, decls.String}, decls.Dyn)),
 
 		// Collections.
 
@@ -267,8 +194,6 @@ func StandardDeclarations() []*exprpb.Decl {
 			decls.NewParameterizedOverload(overloads.InMap,
 				[]*exprpb.Type{paramA, mapOfAB}, decls.Bool,
 				typeParamABList)),
-		//decls.NewOverload(overloads.InMessage,
-		//	[]*expr.Type{Dyn, decls.String},decls.Bool)),
 
 		// Conversions to type.
 
@@ -436,5 +361,132 @@ func StandardDeclarations() []*exprpb.Decl {
 			decls.NewInstanceOverload(overloads.TimestampToMillisecondsWithTz,
 				[]*exprpb.Type{decls.Timestamp, decls.String}, decls.Int),
 			decls.NewInstanceOverload(overloads.DurationToMilliseconds,
-				[]*exprpb.Type{decls.Duration}, decls.Int))}...)
+				[]*exprpb.Type{decls.Duration}, decls.Int)),
+
+		// Relations.
+		decls.NewFunction(operators.Less,
+			decls.NewOverload(overloads.LessBool,
+				[]*exprpb.Type{decls.Bool, decls.Bool}, decls.Bool),
+			decls.NewOverload(overloads.LessInt64,
+				[]*exprpb.Type{decls.Int, decls.Int}, decls.Bool),
+			decls.NewOverload(overloads.LessInt64Double,
+				[]*exprpb.Type{decls.Int, decls.Double}, decls.Bool),
+			decls.NewOverload(overloads.LessInt64Uint64,
+				[]*exprpb.Type{decls.Int, decls.Uint}, decls.Bool),
+			decls.NewOverload(overloads.LessUint64,
+				[]*exprpb.Type{decls.Uint, decls.Uint}, decls.Bool),
+			decls.NewOverload(overloads.LessUint64Double,
+				[]*exprpb.Type{decls.Uint, decls.Double}, decls.Bool),
+			decls.NewOverload(overloads.LessUint64Int64,
+				[]*exprpb.Type{decls.Uint, decls.Int}, decls.Bool),
+			decls.NewOverload(overloads.LessDouble,
+				[]*exprpb.Type{decls.Double, decls.Double}, decls.Bool),
+			decls.NewOverload(overloads.LessDoubleInt64,
+				[]*exprpb.Type{decls.Double, decls.Int}, decls.Bool),
+			decls.NewOverload(overloads.LessDoubleUint64,
+				[]*exprpb.Type{decls.Double, decls.Uint}, decls.Bool),
+			decls.NewOverload(overloads.LessString,
+				[]*exprpb.Type{decls.String, decls.String}, decls.Bool),
+			decls.NewOverload(overloads.LessBytes,
+				[]*exprpb.Type{decls.Bytes, decls.Bytes}, decls.Bool),
+			decls.NewOverload(overloads.LessTimestamp,
+				[]*exprpb.Type{decls.Timestamp, decls.Timestamp}, decls.Bool),
+			decls.NewOverload(overloads.LessDuration,
+				[]*exprpb.Type{decls.Duration, decls.Duration}, decls.Bool)),
+
+		decls.NewFunction(operators.LessEquals,
+			decls.NewOverload(overloads.LessEqualsBool,
+				[]*exprpb.Type{decls.Bool, decls.Bool}, decls.Bool),
+			decls.NewOverload(overloads.LessEqualsInt64,
+				[]*exprpb.Type{decls.Int, decls.Int}, decls.Bool),
+			decls.NewOverload(overloads.LessEqualsInt64Double,
+				[]*exprpb.Type{decls.Int, decls.Double}, decls.Bool),
+			decls.NewOverload(overloads.LessEqualsInt64Uint64,
+				[]*exprpb.Type{decls.Int, decls.Uint}, decls.Bool),
+			decls.NewOverload(overloads.LessEqualsUint64,
+				[]*exprpb.Type{decls.Uint, decls.Uint}, decls.Bool),
+			decls.NewOverload(overloads.LessEqualsUint64Double,
+				[]*exprpb.Type{decls.Uint, decls.Double}, decls.Bool),
+			decls.NewOverload(overloads.LessEqualsUint64Int64,
+				[]*exprpb.Type{decls.Uint, decls.Int}, decls.Bool),
+			decls.NewOverload(overloads.LessEqualsDouble,
+				[]*exprpb.Type{decls.Double, decls.Double}, decls.Bool),
+			decls.NewOverload(overloads.LessEqualsDoubleInt64,
+				[]*exprpb.Type{decls.Double, decls.Int}, decls.Bool),
+			decls.NewOverload(overloads.LessEqualsDoubleUint64,
+				[]*exprpb.Type{decls.Double, decls.Uint}, decls.Bool),
+			decls.NewOverload(overloads.LessEqualsString,
+				[]*exprpb.Type{decls.String, decls.String}, decls.Bool),
+			decls.NewOverload(overloads.LessEqualsBytes,
+				[]*exprpb.Type{decls.Bytes, decls.Bytes}, decls.Bool),
+			decls.NewOverload(overloads.LessEqualsTimestamp,
+				[]*exprpb.Type{decls.Timestamp, decls.Timestamp}, decls.Bool),
+			decls.NewOverload(overloads.LessEqualsDuration,
+				[]*exprpb.Type{decls.Duration, decls.Duration}, decls.Bool)),
+
+		decls.NewFunction(operators.Greater,
+			decls.NewOverload(overloads.GreaterBool,
+				[]*exprpb.Type{decls.Bool, decls.Bool}, decls.Bool),
+			decls.NewOverload(overloads.GreaterInt64,
+				[]*exprpb.Type{decls.Int, decls.Int}, decls.Bool),
+			decls.NewOverload(overloads.GreaterInt64Double,
+				[]*exprpb.Type{decls.Int, decls.Double}, decls.Bool),
+			decls.NewOverload(overloads.GreaterInt64Uint64,
+				[]*exprpb.Type{decls.Int, decls.Uint}, decls.Bool),
+			decls.NewOverload(overloads.GreaterUint64,
+				[]*exprpb.Type{decls.Uint, decls.Uint}, decls.Bool),
+			decls.NewOverload(overloads.GreaterUint64Double,
+				[]*exprpb.Type{decls.Uint, decls.Double}, decls.Bool),
+			decls.NewOverload(overloads.GreaterUint64Int64,
+				[]*exprpb.Type{decls.Uint, decls.Int}, decls.Bool),
+			decls.NewOverload(overloads.GreaterDouble,
+				[]*exprpb.Type{decls.Double, decls.Double}, decls.Bool),
+			decls.NewOverload(overloads.GreaterDoubleInt64,
+				[]*exprpb.Type{decls.Double, decls.Int}, decls.Bool),
+			decls.NewOverload(overloads.GreaterDoubleUint64,
+				[]*exprpb.Type{decls.Double, decls.Uint}, decls.Bool),
+			decls.NewOverload(overloads.GreaterString,
+				[]*exprpb.Type{decls.String, decls.String}, decls.Bool),
+			decls.NewOverload(overloads.GreaterBytes,
+				[]*exprpb.Type{decls.Bytes, decls.Bytes}, decls.Bool),
+			decls.NewOverload(overloads.GreaterTimestamp,
+				[]*exprpb.Type{decls.Timestamp, decls.Timestamp}, decls.Bool),
+			decls.NewOverload(overloads.GreaterDuration,
+				[]*exprpb.Type{decls.Duration, decls.Duration}, decls.Bool)),
+
+		decls.NewFunction(operators.GreaterEquals,
+			decls.NewOverload(overloads.GreaterEqualsBool,
+				[]*exprpb.Type{decls.Bool, decls.Bool}, decls.Bool),
+			decls.NewOverload(overloads.GreaterEqualsInt64,
+				[]*exprpb.Type{decls.Int, decls.Int}, decls.Bool),
+			decls.NewOverload(overloads.GreaterEqualsInt64Double,
+				[]*exprpb.Type{decls.Int, decls.Double}, decls.Bool),
+			decls.NewOverload(overloads.GreaterEqualsInt64Uint64,
+				[]*exprpb.Type{decls.Int, decls.Uint}, decls.Bool),
+			decls.NewOverload(overloads.GreaterEqualsUint64,
+				[]*exprpb.Type{decls.Uint, decls.Uint}, decls.Bool),
+			decls.NewOverload(overloads.GreaterEqualsUint64Double,
+				[]*exprpb.Type{decls.Uint, decls.Double}, decls.Bool),
+			decls.NewOverload(overloads.GreaterEqualsUint64Int64,
+				[]*exprpb.Type{decls.Uint, decls.Int}, decls.Bool),
+			decls.NewOverload(overloads.GreaterEqualsDouble,
+				[]*exprpb.Type{decls.Double, decls.Double}, decls.Bool),
+			decls.NewOverload(overloads.GreaterEqualsDoubleInt64,
+				[]*exprpb.Type{decls.Double, decls.Int}, decls.Bool),
+			decls.NewOverload(overloads.GreaterEqualsDoubleUint64,
+				[]*exprpb.Type{decls.Double, decls.Uint}, decls.Bool),
+			decls.NewOverload(overloads.GreaterEqualsString,
+				[]*exprpb.Type{decls.String, decls.String}, decls.Bool),
+			decls.NewOverload(overloads.GreaterEqualsBytes,
+				[]*exprpb.Type{decls.Bytes, decls.Bytes}, decls.Bool),
+			decls.NewOverload(overloads.GreaterEqualsTimestamp,
+				[]*exprpb.Type{decls.Timestamp, decls.Timestamp}, decls.Bool),
+			decls.NewOverload(overloads.GreaterEqualsDuration,
+				[]*exprpb.Type{decls.Duration, decls.Duration}, decls.Bool)),
+	}...)
+}
+
+// StandardDeclarations returns the Decls for all functions and constants in the evaluator.
+func StandardDeclarations() []*exprpb.Decl {
+	return standardDeclarations
 }

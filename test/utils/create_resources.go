@@ -59,6 +59,9 @@ func CreatePodWithRetries(c clientset.Interface, namespace string, obj *v1.Pod) 
 	}
 	createFunc := func() (bool, error) {
 		_, err := c.CoreV1().Pods(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
+		if isGenerateNameConflict(obj.ObjectMeta, err) {
+			return false, nil
+		}
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
@@ -73,6 +76,9 @@ func CreateRCWithRetries(c clientset.Interface, namespace string, obj *v1.Replic
 	}
 	createFunc := func() (bool, error) {
 		_, err := c.CoreV1().ReplicationControllers(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
+		if isGenerateNameConflict(obj.ObjectMeta, err) {
+			return false, nil
+		}
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
@@ -87,6 +93,9 @@ func CreateReplicaSetWithRetries(c clientset.Interface, namespace string, obj *a
 	}
 	createFunc := func() (bool, error) {
 		_, err := c.AppsV1().ReplicaSets(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
+		if isGenerateNameConflict(obj.ObjectMeta, err) {
+			return false, nil
+		}
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
@@ -101,6 +110,9 @@ func CreateDeploymentWithRetries(c clientset.Interface, namespace string, obj *a
 	}
 	createFunc := func() (bool, error) {
 		_, err := c.AppsV1().Deployments(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
+		if isGenerateNameConflict(obj.ObjectMeta, err) {
+			return false, nil
+		}
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
@@ -115,6 +127,9 @@ func CreateDaemonSetWithRetries(c clientset.Interface, namespace string, obj *ap
 	}
 	createFunc := func() (bool, error) {
 		_, err := c.AppsV1().DaemonSets(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
+		if isGenerateNameConflict(obj.ObjectMeta, err) {
+			return false, nil
+		}
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
@@ -129,6 +144,9 @@ func CreateJobWithRetries(c clientset.Interface, namespace string, obj *batch.Jo
 	}
 	createFunc := func() (bool, error) {
 		_, err := c.BatchV1().Jobs(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
+		if isGenerateNameConflict(obj.ObjectMeta, err) {
+			return false, nil
+		}
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
@@ -143,6 +161,9 @@ func CreateSecretWithRetries(c clientset.Interface, namespace string, obj *v1.Se
 	}
 	createFunc := func() (bool, error) {
 		_, err := c.CoreV1().Secrets(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
+		if isGenerateNameConflict(obj.ObjectMeta, err) {
+			return false, nil
+		}
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
@@ -157,6 +178,9 @@ func CreateConfigMapWithRetries(c clientset.Interface, namespace string, obj *v1
 	}
 	createFunc := func() (bool, error) {
 		_, err := c.CoreV1().ConfigMaps(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
+		if isGenerateNameConflict(obj.ObjectMeta, err) {
+			return false, nil
+		}
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
@@ -171,6 +195,9 @@ func CreateServiceWithRetries(c clientset.Interface, namespace string, obj *v1.S
 	}
 	createFunc := func() (bool, error) {
 		_, err := c.CoreV1().Services(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
+		if isGenerateNameConflict(obj.ObjectMeta, err) {
+			return false, nil
+		}
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
@@ -185,6 +212,9 @@ func CreateStorageClassWithRetries(c clientset.Interface, obj *storage.StorageCl
 	}
 	createFunc := func() (bool, error) {
 		_, err := c.StorageV1().StorageClasses().Create(context.TODO(), obj, metav1.CreateOptions{})
+		if isGenerateNameConflict(obj.ObjectMeta, err) {
+			return false, nil
+		}
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
@@ -199,6 +229,9 @@ func CreateResourceQuotaWithRetries(c clientset.Interface, namespace string, obj
 	}
 	createFunc := func() (bool, error) {
 		_, err := c.CoreV1().ResourceQuotas(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
+		if isGenerateNameConflict(obj.ObjectMeta, err) {
+			return false, nil
+		}
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
@@ -213,6 +246,9 @@ func CreatePersistentVolumeWithRetries(c clientset.Interface, obj *v1.Persistent
 	}
 	createFunc := func() (bool, error) {
 		_, err := c.CoreV1().PersistentVolumes().Create(context.TODO(), obj, metav1.CreateOptions{})
+		if isGenerateNameConflict(obj.ObjectMeta, err) {
+			return false, nil
+		}
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
@@ -227,10 +263,21 @@ func CreatePersistentVolumeClaimWithRetries(c clientset.Interface, namespace str
 	}
 	createFunc := func() (bool, error) {
 		_, err := c.CoreV1().PersistentVolumeClaims(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
+		if isGenerateNameConflict(obj.ObjectMeta, err) {
+			return false, nil
+		}
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
 		return false, fmt.Errorf("failed to create object with non-retriable error: %v", err)
 	}
 	return RetryWithExponentialBackOff(createFunc)
+}
+
+// isGenerateNameConflict returns whether the error is generateName conflict or not.
+func isGenerateNameConflict(meta metav1.ObjectMeta, err error) bool {
+	if apierrors.IsAlreadyExists(err) && meta.Name == "" {
+		return true
+	}
+	return false
 }

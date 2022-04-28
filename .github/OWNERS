@@ -4,12 +4,11 @@ reviewers:
   - alisondy
   - cblecker
   - guineveresaenger
-  - justaugustus
   - mrbobbytables
   - nikhita
   - parispittman
 approvers:
-  - sig-contribex-approvers
+  - sig-contributor-experience-approvers
   - parispittman
 emeritus_approvers:
   - castrojo

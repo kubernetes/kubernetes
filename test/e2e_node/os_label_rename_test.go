@@ -32,12 +32,14 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	node2 "k8s.io/kubernetes/pkg/util/node"
+	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/kubernetes/test/e2e/framework"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 var _ = SIGDescribe("OSArchLabelReconciliation [Serial] [Slow] [Disruptive]", func() {
 	f := framework.NewDefaultFramework("node-label-reconciliation")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("Kubelet", func() {
 		ginkgo.It("should reconcile the OS and Arch labels when restarted", func() {
 			node := getLocalNode(f)
@@ -51,7 +53,7 @@ var _ = SIGDescribe("OSArchLabelReconciliation [Serial] [Slow] [Disruptive]", fu
 			newNode := node.DeepCopy()
 			newNode.Labels[v1.LabelOSStable] = "dummyOS"
 			newNode.Labels[v1.LabelArchStable] = "dummyArch"
-			_, _, err := node2.PatchNodeStatus(f.ClientSet.CoreV1(), types.NodeName(node.Name), node, newNode)
+			_, _, err := nodeutil.PatchNodeStatus(f.ClientSet.CoreV1(), types.NodeName(node.Name), node, newNode)
 			framework.ExpectNoError(err)
 			// Restart kubelet
 			startKubelet()
@@ -70,7 +72,7 @@ var _ = SIGDescribe("OSArchLabelReconciliation [Serial] [Slow] [Disruptive]", fu
 			newNode := node.DeepCopy()
 			newNode.Labels[v1.LabelOSStable] = "dummyOS"
 			newNode.Labels[v1.LabelArchStable] = "dummyArch"
-			_, _, err := node2.PatchNodeStatus(f.ClientSet.CoreV1(), types.NodeName(node.Name), node, newNode)
+			_, _, err := nodeutil.PatchNodeStatus(f.ClientSet.CoreV1(), types.NodeName(node.Name), node, newNode)
 			framework.ExpectNoError(err)
 			err = waitForNodeLabels(f.ClientSet.CoreV1(), node.Name, 5*time.Minute)
 			framework.ExpectNoError(err)

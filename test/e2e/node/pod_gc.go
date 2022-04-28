@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 // This test requires that --terminated-pod-gc-threshold=100 be set on the controller manager
@@ -36,6 +37,7 @@ import (
 // Slow by design (7 min)
 var _ = SIGDescribe("Pod garbage collector [Feature:PodGarbageCollector] [Slow]", func() {
 	f := framework.NewDefaultFramework("pod-garbage-collector")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	ginkgo.It("should handle the creation of 1000 pods", func() {
 		var count int
 		for count < 1000 {

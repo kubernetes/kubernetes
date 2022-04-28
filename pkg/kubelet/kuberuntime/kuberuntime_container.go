@@ -34,6 +34,9 @@ import (
 	"sync"
 	"time"
 
+	crierror "k8s.io/cri-api/pkg/errors"
+
+	"github.com/opencontainers/selinux/go-selinux"
 	grpcstatus "google.golang.org/grpc/status"
 
 	"github.com/armon/circbuf"
@@ -45,13 +48,13 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/cri/remote"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	"k8s.io/kubernetes/pkg/util/selinux"
 	"k8s.io/kubernetes/pkg/util/tail"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -378,7 +381,7 @@ func (m *kubeGenericRuntimeManager) makeMounts(opts *kubecontainer.RunContainerO
 
 	for idx := range opts.Mounts {
 		v := opts.Mounts[idx]
-		selinuxRelabel := v.SELinuxRelabel && selinux.SELinuxEnabled()
+		selinuxRelabel := v.SELinuxRelabel && selinux.GetEnabled()
 		mount := &runtimeapi.Mount{
 			HostPath:       v.HostPath,
 			ContainerPath:  v.ContainerPath,
@@ -393,9 +396,7 @@ func (m *kubeGenericRuntimeManager) makeMounts(opts *kubecontainer.RunContainerO
 	// The reason we create and mount the log file in here (not in kubelet) is because
 	// the file's location depends on the ID of the container, and we need to create and
 	// mount the file before actually starting the container.
-	// we can only mount individual files (e.g.: /etc/hosts, termination-log files) on Windows only if we're using Containerd.
-	supportsSingleFileMapping := m.SupportsSingleFileMapping()
-	if opts.PodContainerDir != "" && len(container.TerminationMessagePath) != 0 && supportsSingleFileMapping {
+	if opts.PodContainerDir != "" && len(container.TerminationMessagePath) != 0 {
 		// Because the PodContainerDir contains pod uid and container name which is unique enough,
 		// here we just add a random id to make the path unique for different instances
 		// of the same container.
@@ -418,7 +419,7 @@ func (m *kubeGenericRuntimeManager) makeMounts(opts *kubecontainer.RunContainerO
 			// Volume Mounts fail on Windows if it is not of the form C:/
 			containerLogPath = volumeutil.MakeAbsolutePath(goruntime.GOOS, containerLogPath)
 			terminationMessagePath := volumeutil.MakeAbsolutePath(goruntime.GOOS, container.TerminationMessagePath)
-			selinuxRelabel := selinux.SELinuxEnabled()
+			selinuxRelabel := selinux.GetEnabled()
 			volumeMounts = append(volumeMounts, &runtimeapi.Mount{
 				HostPath:       containerLogPath,
 				ContainerPath:  terminationMessagePath,
@@ -502,14 +503,25 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(uid kubetypes.UID, n
 		return nil, err
 	}
 
-	statuses := make([]*kubecontainer.Status, len(containers))
+	statuses := []*kubecontainer.Status{}
 	// TODO: optimization: set maximum number of containers per container name to examine.
-	for i, c := range containers {
-		status, err := m.runtimeService.ContainerStatus(c.Id)
+	for _, c := range containers {
+		resp, err := m.runtimeService.ContainerStatus(c.Id, false)
+		// Between List (ListContainers) and check (ContainerStatus) another thread might remove a container, and that is normal.
+		// The previous call (ListContainers) never fails due to a pod container not existing.
+		// Therefore, this method should not either, but instead act as if the previous call failed,
+		// which means the error should be ignored.
+		if crierror.IsNotFound(err) {
+			continue
+		}
 		if err != nil {
 			// Merely log this here; GetPodStatus will actually report the error out.
 			klog.V(4).InfoS("ContainerStatus return error", "containerID", c.Id, "err", err)
 			return nil, err
+		}
+		status := resp.GetStatus()
+		if status == nil {
+			return nil, remote.ErrContainerStatusNil
 		}
 		cStatus := toKubeContainerStatus(status, m.runtimeName)
 		if status.State == runtimeapi.ContainerState_CONTAINER_EXITED {
@@ -520,15 +532,7 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(uid kubetypes.UID, n
 				cStatus.ExitCode != 0 && cStatus.Reason != "ContainerCannotRun"
 			tMessage, checkLogs := getTerminationMessage(status, annotatedInfo.TerminationMessagePath, fallbackToLogs)
 			if checkLogs {
-				// if dockerLegacyService is populated, we're supposed to use it to fetch logs
-				if m.legacyLogProvider != nil {
-					tMessage, err = m.legacyLogProvider.GetContainerLogTail(uid, name, namespace, kubecontainer.ContainerID{Type: m.runtimeName, ID: c.Id})
-					if err != nil {
-						tMessage = fmt.Sprintf("Error reading termination message from logs: %v", err)
-					}
-				} else {
-					tMessage = m.readLastStringFromContainerLogs(status.GetLogPath())
-				}
+				tMessage = m.readLastStringFromContainerLogs(status.GetLogPath())
 			}
 			// Enrich the termination message written by the application is not empty
 			if len(tMessage) != 0 {
@@ -538,7 +542,7 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(uid kubetypes.UID, n
 				cStatus.Message += tMessage
 			}
 		}
-		statuses[i] = cStatus
+		statuses = append(statuses, cStatus)
 	}
 
 	sort.Sort(containerStatusByCreated(statuses))
@@ -615,9 +619,13 @@ func (m *kubeGenericRuntimeManager) executePreStopHook(pod *v1.Pod, containerID 
 func (m *kubeGenericRuntimeManager) restoreSpecsFromContainerLabels(containerID kubecontainer.ContainerID) (*v1.Pod, *v1.Container, error) {
 	var pod *v1.Pod
 	var container *v1.Container
-	s, err := m.runtimeService.ContainerStatus(containerID.ID)
+	resp, err := m.runtimeService.ContainerStatus(containerID.ID, false)
 	if err != nil {
 		return nil, nil, err
+	}
+	s := resp.GetStatus()
+	if s == nil {
+		return nil, nil, remote.ErrContainerStatusNil
 	}
 
 	l := getContainerInfoFromLabels(s.Labels)
@@ -715,15 +723,15 @@ func (m *kubeGenericRuntimeManager) killContainer(pod *v1.Pod, containerID kubec
 		"containerName", containerName, "containerID", containerID.String(), "gracePeriod", gracePeriod)
 
 	err := m.runtimeService.StopContainer(containerID.ID, gracePeriod)
-	if err != nil {
+	if err != nil && !crierror.IsNotFound(err) {
 		klog.ErrorS(err, "Container termination failed with gracePeriod", "pod", klog.KObj(pod), "podUID", pod.UID,
 			"containerName", containerName, "containerID", containerID.String(), "gracePeriod", gracePeriod)
-	} else {
-		klog.V(3).InfoS("Container exited normally", "pod", klog.KObj(pod), "podUID", pod.UID,
-			"containerName", containerName, "containerID", containerID.String())
+		return err
 	}
+	klog.V(3).InfoS("Container exited normally", "pod", klog.KObj(pod), "podUID", pod.UID,
+		"containerName", containerName, "containerID", containerID.String())
 
-	return err
+	return nil
 }
 
 // killContainersWithSyncResult kills all pod's containers with sync results.
@@ -877,10 +885,14 @@ func findNextInitContainerToRun(pod *v1.Pod, podStatus *kubecontainer.PodStatus)
 
 // GetContainerLogs returns logs of a specific container.
 func (m *kubeGenericRuntimeManager) GetContainerLogs(ctx context.Context, pod *v1.Pod, containerID kubecontainer.ContainerID, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) (err error) {
-	status, err := m.runtimeService.ContainerStatus(containerID.ID)
+	resp, err := m.runtimeService.ContainerStatus(containerID.ID, false)
 	if err != nil {
 		klog.V(4).InfoS("Failed to get container status", "containerID", containerID.String(), "err", err)
 		return fmt.Errorf("unable to retrieve container logs for %v", containerID.String())
+	}
+	status := resp.GetStatus()
+	if status == nil {
+		return remote.ErrContainerStatusNil
 	}
 	return m.ReadLogs(ctx, status.GetLogPath(), containerID.ID, logOptions, stdout, stderr)
 }
@@ -958,9 +970,13 @@ func (m *kubeGenericRuntimeManager) removeContainerLog(containerID string) error
 		return err
 	}
 
-	status, err := m.runtimeService.ContainerStatus(containerID)
+	resp, err := m.runtimeService.ContainerStatus(containerID, false)
 	if err != nil {
 		return fmt.Errorf("failed to get container status %q: %v", containerID, err)
+	}
+	status := resp.GetStatus()
+	if status == nil {
+		return remote.ErrContainerStatusNil
 	}
 	// Remove the legacy container log symlink.
 	// TODO(random-liu): Remove this after cluster logging supports CRI container log path.

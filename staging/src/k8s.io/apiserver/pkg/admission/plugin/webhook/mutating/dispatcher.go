@@ -43,6 +43,7 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 	webhookrequest "k8s.io/apiserver/pkg/admission/plugin/webhook/request"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
+	endpointsrequest "k8s.io/apiserver/pkg/endpoints/request"
 	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/apiserver/pkg/warning"
 	utiltrace "k8s.io/utils/trace"
@@ -177,7 +178,7 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attrib
 		if callErr, ok := err.(*webhookutil.ErrCallingWebhook); ok {
 			if ignoreClientCallFailures {
 				klog.Warningf("Failed calling webhook, failing open %v: %v", hook.Name, callErr)
-
+				admissionmetrics.Metrics.ObserveWebhookFailOpen(ctx, hook.Name, "admit")
 				annotator.addFailedOpenAnnotation()
 
 				utilruntime.HandleError(callErr)
@@ -263,7 +264,13 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *admiss
 		}
 	}
 
-	if err := r.Do(ctx).Into(response); err != nil {
+	do := func() { err = r.Do(ctx).Into(response) }
+	if wd, ok := endpointsrequest.LatencyTrackersFrom(ctx); ok {
+		tmp := do
+		do = func() { wd.MutatingWebhookTracker.Track(tmp) }
+	}
+	do()
+	if err != nil {
 		var status *apierrors.StatusError
 		if se, ok := err.(*apierrors.StatusError); ok {
 			status = se

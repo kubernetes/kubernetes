@@ -61,6 +61,12 @@ var (
 		[]string{"namespace", "persistentvolumeclaim"}, nil,
 		metrics.ALPHA, "",
 	)
+
+	volumeStatsHealthAbnormalDesc = metrics.NewDesc(
+		metrics.BuildFQName("", kubeletmetrics.KubeletSubsystem, kubeletmetrics.VolumeStatsHealthStatusAbnormalKey),
+		"Abnormal volume health status. The count is either 1 or 0. 1 indicates the volume is unhealthy, 0 indicates volume is healthy",
+		[]string{"namespace", "persistentvolumeclaim"}, nil,
+		metrics.ALPHA, "")
 )
 
 type volumeStatsCollector struct {
@@ -85,6 +91,7 @@ func (collector *volumeStatsCollector) DescribeWithStability(ch chan<- *metrics.
 	ch <- volumeStatsInodesDesc
 	ch <- volumeStatsInodesFreeDesc
 	ch <- volumeStatsInodesUsedDesc
+	ch <- volumeStatsHealthAbnormalDesc
 }
 
 // CollectWithStability implements the metrics.StableCollector interface.
@@ -95,7 +102,6 @@ func (collector *volumeStatsCollector) CollectWithStability(ch chan<- metrics.Me
 	}
 	addGauge := func(desc *metrics.Desc, pvcRef *stats.PVCReference, v float64, lv ...string) {
 		lv = append([]string{pvcRef.Namespace, pvcRef.Name}, lv...)
-
 		ch <- metrics.NewLazyConstMetric(desc, metrics.GaugeValue, v, lv...)
 	}
 	allPVCs := sets.String{}
@@ -120,7 +126,18 @@ func (collector *volumeStatsCollector) CollectWithStability(ch chan<- metrics.Me
 			addGauge(volumeStatsInodesDesc, pvcRef, float64(*volumeStat.Inodes))
 			addGauge(volumeStatsInodesFreeDesc, pvcRef, float64(*volumeStat.InodesFree))
 			addGauge(volumeStatsInodesUsedDesc, pvcRef, float64(*volumeStat.InodesUsed))
+			if volumeStat.VolumeHealthStats != nil {
+				addGauge(volumeStatsHealthAbnormalDesc, pvcRef, convertBoolToFloat64(volumeStat.VolumeHealthStats.Abnormal))
+			}
 			allPVCs.Insert(pvcUniqStr)
 		}
 	}
+}
+
+func convertBoolToFloat64(boolVal bool) float64 {
+	if boolVal {
+		return 1
+	}
+
+	return 0
 }

@@ -29,7 +29,6 @@ type ObjectMetaApplyConfiguration struct {
 	Name                       *string                            `json:"name,omitempty"`
 	GenerateName               *string                            `json:"generateName,omitempty"`
 	Namespace                  *string                            `json:"namespace,omitempty"`
-	SelfLink                   *string                            `json:"selfLink,omitempty"`
 	UID                        *types.UID                         `json:"uid,omitempty"`
 	ResourceVersion            *string                            `json:"resourceVersion,omitempty"`
 	Generation                 *int64                             `json:"generation,omitempty"`
@@ -40,7 +39,6 @@ type ObjectMetaApplyConfiguration struct {
 	Annotations                map[string]string                  `json:"annotations,omitempty"`
 	OwnerReferences            []OwnerReferenceApplyConfiguration `json:"ownerReferences,omitempty"`
 	Finalizers                 []string                           `json:"finalizers,omitempty"`
-	ClusterName                *string                            `json:"clusterName,omitempty"`
 }
 
 // ObjectMetaApplyConfiguration constructs an declarative configuration of the ObjectMeta type for use with
@@ -70,14 +68,6 @@ func (b *ObjectMetaApplyConfiguration) WithGenerateName(value string) *ObjectMet
 // If called multiple times, the Namespace field is set to the value of the last call.
 func (b *ObjectMetaApplyConfiguration) WithNamespace(value string) *ObjectMetaApplyConfiguration {
 	b.Namespace = &value
-	return b
-}
-
-// WithSelfLink sets the SelfLink field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the SelfLink field is set to the value of the last call.
-func (b *ObjectMetaApplyConfiguration) WithSelfLink(value string) *ObjectMetaApplyConfiguration {
-	b.SelfLink = &value
 	return b
 }
 
@@ -177,13 +167,5 @@ func (b *ObjectMetaApplyConfiguration) WithFinalizers(values ...string) *ObjectM
 	for i := range values {
 		b.Finalizers = append(b.Finalizers, values[i])
 	}
-	return b
-}
-
-// WithClusterName sets the ClusterName field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the ClusterName field is set to the value of the last call.
-func (b *ObjectMetaApplyConfiguration) WithClusterName(value string) *ObjectMetaApplyConfiguration {
-	b.ClusterName = &value
 	return b
 }

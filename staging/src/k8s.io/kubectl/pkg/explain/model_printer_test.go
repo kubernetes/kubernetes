@@ -24,19 +24,22 @@ import (
 )
 
 func TestModel(t *testing.T) {
-	gvk := schema.GroupVersionKind{
+	oneKind := schema.GroupVersionKind{
 		Group:   "",
 		Version: "v1",
 		Kind:    "OneKind",
 	}
-	schema := resources.LookupResource(gvk)
-	if schema == nil {
-		t.Fatal("Couldn't find schema v1.OneKind")
+
+	controlCharacterKind := schema.GroupVersionKind{
+		Group:   "",
+		Version: "v1",
+		Kind:    "ControlCharacterKind",
 	}
 
 	tests := []struct {
 		path []string
 		want string
+		gvk  schema.GroupVersionKind
 	}{
 		{
 			want: `KIND:     OneKind
@@ -60,6 +63,7 @@ FIELDS:
 
 `,
 			path: []string{},
+			gvk:  oneKind,
 		},
 		{
 			want: `KIND:     OneKind
@@ -95,6 +99,7 @@ FIELDS:
 
 `,
 			path: []string{"field1"},
+			gvk:  oneKind,
 		},
 		{
 			want: `KIND:     OneKind
@@ -106,6 +111,7 @@ DESCRIPTION:
      This string must be a string
 `,
 			path: []string{"field1", "string"},
+			gvk:  oneKind,
 		},
 		{
 			want: `KIND:     OneKind
@@ -119,12 +125,32 @@ DESCRIPTION:
      This is an int in an array
 `,
 			path: []string{"field1", "array"},
+			gvk:  oneKind,
+		},
+		{
+			want: `KIND:     ControlCharacterKind
+VERSION:  v1
+
+DESCRIPTION:
+     Control character %
+
+FIELDS:
+   field1	<>
+     Control character %
+
+`,
+			path: []string{},
+			gvk:  controlCharacterKind,
 		},
 	}
 
 	for _, test := range tests {
+		schema := resources.LookupResource(test.gvk)
+		if schema == nil {
+			t.Fatalf("Couldn't find schema %v", test.gvk)
+		}
 		buf := bytes.Buffer{}
-		if err := PrintModelDescription(test.path, &buf, schema, gvk, false); err != nil {
+		if err := PrintModelDescription(test.path, &buf, schema, test.gvk, false); err != nil {
 			t.Fatalf("Failed to PrintModelDescription for path %v: %v", test.path, err)
 		}
 		got := buf.String()

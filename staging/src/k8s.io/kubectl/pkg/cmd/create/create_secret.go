@@ -112,9 +112,10 @@ type CreateSecretOptions struct {
 	Namespace        string
 	EnforceNamespace bool
 
-	Client         corev1client.CoreV1Interface
-	DryRunStrategy cmdutil.DryRunStrategy
-	DryRunVerifier *resource.DryRunVerifier
+	Client              corev1client.CoreV1Interface
+	DryRunStrategy      cmdutil.DryRunStrategy
+	DryRunVerifier      *resource.QueryParamVerifier
+	ValidationDirective string
 
 	genericclioptions.IOStreams
 }
@@ -151,7 +152,7 @@ func NewCmdCreateSecretGeneric(f cmdutil.Factory, ioStreams genericclioptions.IO
 
 	cmd.Flags().StringSliceVar(&o.FileSources, "from-file", o.FileSources, "Key files can be specified using their file path, in which case a default name will be given to them, or optionally with a name and file path, in which case the given name will be used.  Specifying a directory will iterate each named file in the directory that is a valid secret key.")
 	cmd.Flags().StringArrayVar(&o.LiteralSources, "from-literal", o.LiteralSources, "Specify a key and literal value to insert in secret (i.e. mykey=somevalue)")
-	cmd.Flags().StringSliceVar(&o.EnvFileSources, "from-env-file", o.EnvFileSources, "Specify the path to a file to read lines of key=val pairs to create a secret (i.e. a Docker .env file).")
+	cmd.Flags().StringSliceVar(&o.EnvFileSources, "from-env-file", o.EnvFileSources, "Specify the path to a file to read lines of key=val pairs to create a secret.")
 	cmd.Flags().StringVar(&o.Type, "type", o.Type, i18n.T("The type of secret to create"))
 	cmd.Flags().BoolVar(&o.AppendHash, "append-hash", o.AppendHash, "Append a hash of the secret to its name.")
 
@@ -195,21 +196,26 @@ func (o *CreateSecretOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, ar
 		return err
 	}
 
-	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
+	o.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, discoveryClient, resource.QueryParamDryRun)
 
 	o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
-		return nil
+		return err
 	}
 
 	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
-		return nil
+		return err
 	}
 
 	o.PrintObj = func(obj runtime.Object) error {
 		return printer.PrintObj(obj, o.Out)
+	}
+
+	o.ValidationDirective, err = cmdutil.GetValidationDirective(cmd)
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -242,6 +248,7 @@ func (o *CreateSecretOptions) Run() error {
 		if o.FieldManager != "" {
 			createOptions.FieldManager = o.FieldManager
 		}
+		createOptions.FieldValidation = o.ValidationDirective
 		if o.DryRunStrategy == cmdutil.DryRunServer {
 			err := o.DryRunVerifier.HasSupport(secret.GroupVersionKind())
 			if err != nil {

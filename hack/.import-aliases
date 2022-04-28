@@ -40,6 +40,8 @@
   "k8s.io/api/storage/v1alpha1": "storagev1alpha1",
   "k8s.io/api/storage/v1beta1": "storagev1beta1",
   "k8s.io/apimachinery/pkg/api/errors": "apierrors",
+  "k8s.io/component-helpers/node/util": "nodeutil",
+  "k8s.io/kubernetes/pkg/controller/util/node": "controllerutil",
   "k8s.io/kubelet/apis/stats/v1alpha1": "kubeletstatsv1alpha1",
   "k8s.io/kubernetes/pkg/controller/apis/config/v1alpha1": "controllerconfigv1alpha1",
   "k8s.io/kubernetes/pkg/kubelet/apis/config/v1beta1": "kubeletconfigv1beta1",

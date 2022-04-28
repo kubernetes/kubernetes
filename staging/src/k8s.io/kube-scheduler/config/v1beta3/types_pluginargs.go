@@ -110,8 +110,7 @@ type PodTopologySpreadArgs struct {
 	//   Nodes and Zones.
 	// - "List": Use constraints defined in .defaultConstraints.
 	//
-	// Defaults to "List" if feature gate DefaultPodTopologySpread is disabled
-	// and to "System" if enabled.
+	// Defaults to "System".
 	// +optional
 	DefaultingType PodTopologySpreadConstraintsDefaulting `json:"defaultingType,omitempty"`
 }
@@ -192,9 +191,9 @@ type NodeAffinityArgs struct {
 type ScoringStrategyType string
 
 const (
-	// LeastAllocated strategy prioritizes nodes with least allcoated resources.
+	// LeastAllocated strategy prioritizes nodes with least allocated resources.
 	LeastAllocated ScoringStrategyType = "LeastAllocated"
-	// MostAllocated strategy prioritizes nodes with most allcoated resources.
+	// MostAllocated strategy prioritizes nodes with most allocated resources.
 	MostAllocated ScoringStrategyType = "MostAllocated"
 	// RequestedToCapacityRatio strategy allows specifying a custom shape function
 	// to score nodes based on the request to capacity ratio.

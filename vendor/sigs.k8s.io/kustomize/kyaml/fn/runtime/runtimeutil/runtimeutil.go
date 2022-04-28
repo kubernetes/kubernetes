@@ -15,6 +15,7 @@ import (
 	"sigs.k8s.io/kustomize/kyaml/errors"
 	"sigs.k8s.io/kustomize/kyaml/kio"
 	"sigs.k8s.io/kustomize/kyaml/kio/kioutil"
+	"sigs.k8s.io/kustomize/kyaml/order"
 
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 )
@@ -65,9 +66,14 @@ func (c *FunctionFilter) getFunctionScope() (string, error) {
 	if err != nil {
 		return "", errors.Wrap(err)
 	}
-	p, found := m.Annotations[kioutil.PathAnnotation]
+	var p string
+	var found bool
+	p, found = m.Annotations[kioutil.PathAnnotation]
 	if !found {
-		return "", nil
+		p, found = m.Annotations[kioutil.LegacyPathAnnotation]
+		if !found {
+			return "", nil
+		}
 	}
 
 	functionDir := path.Clean(path.Dir(p))
@@ -100,12 +106,17 @@ func (c *FunctionFilter) scope(dir string, nodes []*yaml.RNode) ([]*yaml.RNode, 
 		if err != nil {
 			return nil, nil, err
 		}
-		p, found := m.Annotations[kioutil.PathAnnotation]
+		var p string
+		var found bool
+		p, found = m.Annotations[kioutil.PathAnnotation]
 		if !found {
-			// this Resource isn't scoped under the function -- don't know where it came from
-			// consider it out of scope
-			saved = append(saved, nodes[i])
-			continue
+			p, found = m.Annotations[kioutil.LegacyPathAnnotation]
+			if !found {
+				// this Resource isn't scoped under the function -- don't know where it came from
+				// consider it out of scope
+				saved = append(saved, nodes[i])
+				continue
+			}
 		}
 
 		resourceDir := path.Clean(path.Dir(p))
@@ -169,8 +180,8 @@ func (c *FunctionFilter) Filter(nodes []*yaml.RNode) ([]*yaml.RNode, error) {
 		return nil, err
 	}
 
-	// copy the comments from the inputs to the outputs
-	if err := c.setComments(output); err != nil {
+	// copy the comments and sync the order of fields from the inputs to the outputs
+	if err := c.copyCommentsAndSyncOrder(output); err != nil {
 		return nil, err
 	}
 
@@ -192,8 +203,6 @@ func (c *FunctionFilter) Filter(nodes []*yaml.RNode) ([]*yaml.RNode, error) {
 	return append(output, saved...), nil
 }
 
-const idAnnotation = "config.k8s.io/id"
-
 func (c *FunctionFilter) setIds(nodes []*yaml.RNode) error {
 	// set the id on each node to map inputs to outputs
 	var id int
@@ -201,7 +210,11 @@ func (c *FunctionFilter) setIds(nodes []*yaml.RNode) error {
 	for i := range nodes {
 		id++
 		idStr := fmt.Sprintf("%v", id)
-		err := nodes[i].PipeE(yaml.SetAnnotation(idAnnotation, idStr))
+		err := nodes[i].PipeE(yaml.SetAnnotation(kioutil.IdAnnotation, idStr))
+		if err != nil {
+			return errors.Wrap(err)
+		}
+		err = nodes[i].PipeE(yaml.SetAnnotation(kioutil.LegacyIdAnnotation, idStr))
 		if err != nil {
 			return errors.Wrap(err)
 		}
@@ -210,15 +223,21 @@ func (c *FunctionFilter) setIds(nodes []*yaml.RNode) error {
 	return nil
 }
 
-func (c *FunctionFilter) setComments(nodes []*yaml.RNode) error {
+func (c *FunctionFilter) copyCommentsAndSyncOrder(nodes []*yaml.RNode) error {
 	for i := range nodes {
 		node := nodes[i]
-		anID, err := node.Pipe(yaml.GetAnnotation(idAnnotation))
+		anID, err := node.Pipe(yaml.GetAnnotation(kioutil.IdAnnotation))
 		if err != nil {
 			return errors.Wrap(err)
 		}
 		if anID == nil {
-			continue
+			anID, err = node.Pipe(yaml.GetAnnotation(kioutil.LegacyIdAnnotation))
+			if err != nil {
+				return errors.Wrap(err)
+			}
+			if anID == nil {
+				continue
+			}
 		}
 
 		var in *yaml.RNode
@@ -229,7 +248,13 @@ func (c *FunctionFilter) setComments(nodes []*yaml.RNode) error {
 		if err := comments.CopyComments(in, node); err != nil {
 			return errors.Wrap(err)
 		}
-		if err := node.PipeE(yaml.ClearAnnotation(idAnnotation)); err != nil {
+		if err := order.SyncOrder(in, node); err != nil {
+			return errors.Wrap(err)
+		}
+		if err := node.PipeE(yaml.ClearAnnotation(kioutil.IdAnnotation)); err != nil {
+			return errors.Wrap(err)
+		}
+		if err := node.PipeE(yaml.ClearAnnotation(kioutil.LegacyIdAnnotation)); err != nil {
 			return errors.Wrap(err)
 		}
 	}

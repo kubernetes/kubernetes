@@ -37,6 +37,7 @@ import (
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 type volumePerformanceTestSuite struct {
@@ -126,6 +127,7 @@ func (t *volumePerformanceTestSuite) DefineTests(driver storageframework.TestDri
 		ClientBurst: 400,
 	}
 	f := framework.NewFramework("volume-lifecycle-performance", frameworkOptions, nil)
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	f.AddAfterEach("cleanup", func(f *framework.Framework, failed bool) {
 		ginkgo.By("Closing informer channel")
 		close(l.stopCh)

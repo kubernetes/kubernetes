@@ -125,7 +125,7 @@ func TestMetadataSharedInformerFactory(t *testing.T) {
 			timeout := time.Duration(3 * time.Second)
 			ctx, cancel := context.WithTimeout(context.Background(), timeout)
 			defer cancel()
-			scheme := runtime.NewScheme()
+			scheme := fake.NewTestScheme()
 			metav1.AddMetaToScheme(scheme)
 			informerReciveObjectCh := make(chan *metav1.PartialObjectMetadata, 1)
 			objs := []runtime.Object{}

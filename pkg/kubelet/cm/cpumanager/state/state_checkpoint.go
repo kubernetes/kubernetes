@@ -54,7 +54,7 @@ func NewCheckpointState(stateDir, checkpointName, policyName string, initialCont
 	}
 
 	if err := stateCheckpoint.restoreState(); err != nil {
-		//lint:ignore ST1005 user-facing error message
+		//nolint:staticcheck // ST1005 user-facing error message
 		return nil, fmt.Errorf("could not restore state from checkpoint: %v, please drain this node and delete the CPU manager checkpoint file %q before restarting Kubelet",
 			err, path.Join(stateDir, checkpointName))
 	}

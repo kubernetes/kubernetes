@@ -21,7 +21,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -55,7 +55,7 @@ func NewAdmissionWebhookServer(handler http.Handler) (string, func(), error) {
 func AdmissionWebhookHandler(t *testing.T, admit func(*v1beta1.AdmissionReview) error) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
-		data, err := ioutil.ReadAll(r.Body)
+		data, err := io.ReadAll(r.Body)
 		if err != nil {
 			t.Error(err)
 			return

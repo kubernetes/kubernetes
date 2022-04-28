@@ -335,4 +335,4 @@ func (d *DeferredDiscoveryRESTMapper) String() string {
 }
 
 // Make sure it satisfies the interface
-var _ meta.RESTMapper = &DeferredDiscoveryRESTMapper{}
+var _ meta.ResettableRESTMapper = &DeferredDiscoveryRESTMapper{}

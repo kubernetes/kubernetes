@@ -21,6 +21,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	"k8s.io/utils/pointer"
 )
 
 // NodeOSDistroIs returns true if the distro is the same as `--node-os-distro`
@@ -112,4 +113,20 @@ func GetLinuxLabel() *v1.SELinuxOptions {
 	}
 	return &v1.SELinuxOptions{
 		Level: "s0:c0,c1"}
+}
+
+// GetRestrictedPodSecurityContext returns a minimal restricted pod security context.
+func GetRestrictedPodSecurityContext() *v1.PodSecurityContext {
+	return &v1.PodSecurityContext{
+		RunAsNonRoot:   pointer.BoolPtr(true),
+		SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeRuntimeDefault},
+	}
+}
+
+// GetRestrictedContainerSecurityContext returns a minimal restricted container security context.
+func GetRestrictedContainerSecurityContext() *v1.SecurityContext {
+	return &v1.SecurityContext{
+		AllowPrivilegeEscalation: pointer.BoolPtr(false),
+		Capabilities:             &v1.Capabilities{Drop: []v1.Capability{"ALL"}},
+	}
 }

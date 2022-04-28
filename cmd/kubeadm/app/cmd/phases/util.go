@@ -17,6 +17,8 @@ limitations under the License.
 package phases
 
 import (
+	"os"
+
 	"k8s.io/component-base/version"
 
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
@@ -30,4 +32,15 @@ func SetKubernetesVersion(cfg *kubeadmapiv1.ClusterConfiguration) {
 		return
 	}
 	cfg.KubernetesVersion = version.Get().String()
+}
+
+// CopyFile copy file from src to dest.
+func CopyFile(src, dest string) error {
+	fileInfo, _ := os.Stat(src)
+	contents, err := os.ReadFile(src)
+	if err != nil {
+		return err
+	}
+	err = os.WriteFile(dest, contents, fileInfo.Mode())
+	return err
 }

@@ -451,14 +451,31 @@ func describeNamespace(namespace *corev1.Namespace, resourceQuotaList *corev1.Re
 		printLabelsMultiline(w, "Labels", namespace.Labels)
 		printAnnotationsMultiline(w, "Annotations", namespace.Annotations)
 		w.Write(LEVEL_0, "Status:\t%s\n", string(namespace.Status.Phase))
+
+		if len(namespace.Status.Conditions) > 0 {
+			w.Write(LEVEL_0, "Conditions:\n")
+			w.Write(LEVEL_1, "Type\tStatus\tLastTransitionTime\tReason\tMessage\n")
+			w.Write(LEVEL_1, "----\t------\t------------------\t------\t-------\n")
+			for _, c := range namespace.Status.Conditions {
+				w.Write(LEVEL_1, "%v\t%v\t%s\t%v\t%v\n",
+					c.Type,
+					c.Status,
+					c.LastTransitionTime.Time.Format(time.RFC1123Z),
+					c.Reason,
+					c.Message)
+			}
+		}
+
 		if resourceQuotaList != nil {
 			w.Write(LEVEL_0, "\n")
 			DescribeResourceQuotas(resourceQuotaList, w)
 		}
+
 		if limitRangeList != nil {
 			w.Write(LEVEL_0, "\n")
 			DescribeLimitRanges(limitRangeList, w)
 		}
+
 		return nil
 	})
 }
@@ -1398,7 +1415,6 @@ func printCSIPersistentVolumeAttributesMultilineIndent(w PrefixWriter, initialIn
 		} else {
 			w.Write(LEVEL_2, "%s\n", line)
 		}
-		i++
 	}
 }
 
@@ -1926,6 +1942,9 @@ func DescribeProbe(probe *corev1.Probe) string {
 		return fmt.Sprintf("http-get %s %s", url.String(), attrs)
 	case probe.TCPSocket != nil:
 		return fmt.Sprintf("tcp-socket %s:%s %s", probe.TCPSocket.Host, probe.TCPSocket.Port.String(), attrs)
+
+	case probe.GRPC != nil:
+		return fmt.Sprintf("grpc <pod>:%d %s %s", probe.GRPC.Port, *(probe.GRPC.Service), attrs)
 	}
 	return fmt.Sprintf("unknown %s", attrs)
 }
@@ -2611,22 +2630,18 @@ func (i *IngressDescriber) describeIngressV1(ing *networkingv1.Ingress, events *
 		printLabelsMultiline(w, "Labels", ing.Labels)
 		w.Write(LEVEL_0, "Namespace:\t%v\n", ing.Namespace)
 		w.Write(LEVEL_0, "Address:\t%v\n", loadBalancerStatusStringer(ing.Status.LoadBalancer, true))
+		ingressClassName := "<none>"
+		if ing.Spec.IngressClassName != nil {
+			ingressClassName = *ing.Spec.IngressClassName
+		}
+		w.Write(LEVEL_0, "Ingress Class:\t%v\n", ingressClassName)
 		def := ing.Spec.DefaultBackend
 		ns := ing.Namespace
 		if def == nil {
-			// Ingresses that don't specify a default backend inherit the
-			// default backend in the kube-system namespace.
-			def = &networkingv1.IngressBackend{
-				Service: &networkingv1.IngressServiceBackend{
-					Name: "default-http-backend",
-					Port: networkingv1.ServiceBackendPort{
-						Number: 80,
-					},
-				},
-			}
-			ns = metav1.NamespaceSystem
+			w.Write(LEVEL_0, "Default backend:\t<default>\n")
+		} else {
+			w.Write(LEVEL_0, "Default backend:\t%s\n", i.describeBackendV1(ns, def))
 		}
-		w.Write(LEVEL_0, "Default backend:\t%s\n", i.describeBackendV1(ns, def))
 		if len(ing.Spec.TLS) != 0 {
 			describeIngressTLSV1(w, ing.Spec.TLS)
 		}
@@ -2667,18 +2682,18 @@ func (i *IngressDescriber) describeIngressV1beta1(ing *networkingv1beta1.Ingress
 		printLabelsMultiline(w, "Labels", ing.Labels)
 		w.Write(LEVEL_0, "Namespace:\t%v\n", ing.Namespace)
 		w.Write(LEVEL_0, "Address:\t%v\n", loadBalancerStatusStringer(ing.Status.LoadBalancer, true))
+		ingressClassName := "<none>"
+		if ing.Spec.IngressClassName != nil {
+			ingressClassName = *ing.Spec.IngressClassName
+		}
+		w.Write(LEVEL_0, "Ingress Class:\t%v\n", ingressClassName)
 		def := ing.Spec.Backend
 		ns := ing.Namespace
 		if def == nil {
-			// Ingresses that don't specify a default backend inherit the
-			// default backend in the kube-system namespace.
-			def = &networkingv1beta1.IngressBackend{
-				ServiceName: "default-http-backend",
-				ServicePort: intstr.IntOrString{Type: intstr.Int, IntVal: 80},
-			}
-			ns = metav1.NamespaceSystem
+			w.Write(LEVEL_0, "Default backend:\t<default>\n")
+		} else {
+			w.Write(LEVEL_0, "Default backend:\t%s\n", i.describeBackendV1beta1(ns, def))
 		}
-		w.Write(LEVEL_0, "Default backend:\t%s (%s)\n", backendStringer(def), i.describeBackendV1beta1(ns, def))
 		if len(ing.Spec.TLS) != 0 {
 			describeIngressTLSV1beta1(w, ing.Spec.TLS)
 		}
@@ -2701,7 +2716,7 @@ func (i *IngressDescriber) describeIngressV1beta1(ing *networkingv1beta1.Ingress
 			}
 		}
 		if count == 0 {
-			w.Write(LEVEL_1, "%s\t%s \t%s (%s)\n", "*", "*", backendStringer(def), i.describeBackendV1beta1(ns, def))
+			w.Write(LEVEL_1, "%s\t%s \t<default>\n", "*", "*")
 		}
 		printAnnotationsMultiline(w, "Annotations", ing.Annotations)
 
@@ -3504,8 +3519,17 @@ func (d *NodeDescriber) Describe(namespace, name string, describerSettings Descr
 			klog.Errorf("Unable to construct reference to '%#v': %v", node, err)
 		} else {
 			// TODO: We haven't decided the namespace for Node object yet.
-			ref.UID = types.UID(ref.Name)
+			// there are two UIDs for host events:
+			// controller use node.uid
+			// kubelet use node.name
+			// TODO: Uniform use of UID
 			events, _ = searchEvents(d.CoreV1(), ref, describerSettings.ChunkSize)
+
+			ref.UID = types.UID(ref.Name)
+			eventsInvName, _ := searchEvents(d.CoreV1(), ref, describerSettings.ChunkSize)
+
+			// Merge the results of two queries
+			events.Items = append(events.Items, eventsInvName.Items...)
 		}
 	}
 
@@ -4743,6 +4767,7 @@ func describePriorityClass(pc *schedulingv1.PriorityClass, events *corev1.EventL
 		w.Write(LEVEL_0, "Name:\t%s\n", pc.Name)
 		w.Write(LEVEL_0, "Value:\t%v\n", pc.Value)
 		w.Write(LEVEL_0, "GlobalDefault:\t%v\n", pc.GlobalDefault)
+		w.Write(LEVEL_0, "PreemptionPolicy:\t%s\n", *pc.PreemptionPolicy)
 		w.Write(LEVEL_0, "Description:\t%s\n", pc.Description)
 
 		w.Write(LEVEL_0, "Annotations:\t%s\n", labels.FormatLabels(pc.Annotations))
@@ -5094,7 +5119,6 @@ func printLabelsMultilineWithIndent(w PrefixWriter, initialIndent, title, innerI
 			w.Write(LEVEL_0, "%s", innerIndent)
 		}
 		w.Write(LEVEL_0, "%s=%s\n", key, labels[key])
-		i++
 	}
 }
 
@@ -5328,7 +5352,6 @@ func printAnnotationsMultiline(w PrefixWriter, title string, annotations map[str
 		} else {
 			w.Write(LEVEL_0, "%s: %s\n", key, value)
 		}
-		i++
 	}
 }
 

@@ -205,8 +205,6 @@ func (sv *structValue) ConvertToNative(typeDesc reflect.Type) (interface{}, erro
 		return nil, fmt.Errorf("type conversion error from object to '%v'", typeDesc)
 	}
 
-	// TODO: Special case handling for protobuf Struct and Any if needed
-
 	// Unwrap pointers, but track their use.
 	isPtr := false
 	if typeDesc.Kind() == reflect.Ptr {

@@ -67,7 +67,9 @@ type testRESTMapper struct {
 	meta.RESTMapper
 }
 
-func (*testRESTMapper) Reset() {}
+func (m *testRESTMapper) Reset() {
+	meta.MaybeResetRESTMapper(m.RESTMapper)
+}
 
 func TestGarbageCollectorConstruction(t *testing.T) {
 	config := &restclient.Config{}
@@ -444,7 +446,10 @@ func TestDependentsRace(t *testing.T) {
 	owner := &node{dependents: make(map[*node]struct{})}
 	ownerUID := types.UID("owner")
 	gc.dependencyGraphBuilder.uidToNode.Write(owner)
+	var wg sync.WaitGroup
+	wg.Add(2)
 	go func() {
+		defer wg.Done()
 		for i := 0; i < updates; i++ {
 			dependent := &node{}
 			gc.dependencyGraphBuilder.addDependentToOwners(dependent, []metav1.OwnerReference{{UID: ownerUID}})
@@ -452,11 +457,13 @@ func TestDependentsRace(t *testing.T) {
 		}
 	}()
 	go func() {
-		gc.attemptToOrphan.Add(owner)
+		defer wg.Done()
 		for i := 0; i < updates; i++ {
-			gc.attemptToOrphanWorker()
+			gc.attemptToOrphan.Add(owner)
+			gc.processAttemptToOrphanWorker()
 		}
 	}()
+	wg.Wait()
 }
 
 func podToGCNode(pod *v1.Pod) *node {
@@ -946,11 +953,6 @@ type fakeServerResources struct {
 }
 
 func (*fakeServerResources) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
-	return nil, nil
-}
-
-// Deprecated: use ServerGroupsAndResources instead.
-func (*fakeServerResources) ServerResources() ([]*metav1.APIResourceList, error) {
 	return nil, nil
 }
 
@@ -2236,7 +2238,7 @@ func TestConflictingData(t *testing.T) {
 			eventRecorder := record.NewFakeRecorder(100)
 			eventRecorder.IncludeObject = true
 
-			metadataClient := fakemetadata.NewSimpleMetadataClient(legacyscheme.Scheme)
+			metadataClient := fakemetadata.NewSimpleMetadataClient(fakemetadata.NewTestScheme())
 
 			tweakableRM := meta.NewDefaultRESTMapper(nil)
 			tweakableRM.AddSpecific(
@@ -2438,7 +2440,7 @@ func processAttemptToDelete(count int) step {
 			if count <= 0 {
 				// process all
 				for ctx.gc.dependencyGraphBuilder.attemptToDelete.Len() != 0 {
-					ctx.gc.attemptToDeleteWorker(context.TODO())
+					ctx.gc.processAttemptToDeleteWorker(context.TODO())
 				}
 			} else {
 				for i := 0; i < count; i++ {
@@ -2446,7 +2448,7 @@ func processAttemptToDelete(count int) step {
 						ctx.t.Errorf("expected at least %d pending changes, got %d", count, i+1)
 						return
 					}
-					ctx.gc.attemptToDeleteWorker(context.TODO())
+					ctx.gc.processAttemptToDeleteWorker(context.TODO())
 				}
 			}
 		},

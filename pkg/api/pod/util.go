@@ -571,26 +571,42 @@ func dropDisabledFields(
 		})
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead) && !overheadInUse(oldPodSpec) {
-		// Set Overhead to nil only if the feature is disabled and it is not used
-		podSpec.Overhead = nil
-	}
-
 	dropDisabledProcMountField(podSpec, oldPodSpec)
 
 	dropDisabledCSIVolumeSourceAlphaFields(podSpec, oldPodSpec)
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.NonPreemptingPriority) &&
-		!podPriorityInUse(oldPodSpec) {
-		// Set to nil pod's PreemptionPolicy fields if the feature is disabled and the old pod
-		// does not specify any values for these fields.
-		podSpec.PreemptionPolicy = nil
-	}
 	if !utilfeature.DefaultFeatureGate.Enabled(features.IdentifyPodOS) && !podOSInUse(oldPodSpec) {
 		podSpec.OS = nil
 	}
 
-	dropDisabledPodAffinityTermFields(podSpec, oldPodSpec)
+	dropDisabledTopologySpreadConstraintsFields(podSpec, oldPodSpec)
+}
+
+// dropDisabledTopologySpreadConstraintsFields removes disabled fields from PodSpec related
+// to TopologySpreadConstraints only if it is not already used by the old spec.
+func dropDisabledTopologySpreadConstraintsFields(podSpec, oldPodSpec *api.PodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.MinDomainsInPodTopologySpread) &&
+		!minDomainsInUse(oldPodSpec) &&
+		podSpec != nil {
+		for i := range podSpec.TopologySpreadConstraints {
+			podSpec.TopologySpreadConstraints[i].MinDomains = nil
+		}
+	}
+}
+
+// minDomainsInUse returns true if the pod spec is non-nil
+// and has non-nil MinDomains field in TopologySpreadConstraints.
+func minDomainsInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+
+	for _, c := range podSpec.TopologySpreadConstraints {
+		if c.MinDomains != nil {
+			return true
+		}
+	}
+	return false
 }
 
 // podOSInUse returns true if the pod spec is non-nil and has OS field set
@@ -631,82 +647,11 @@ func dropDisabledCSIVolumeSourceAlphaFields(podSpec, oldPodSpec *api.PodSpec) {
 	}
 }
 
-func dropPodAffinityTermNamespaceSelector(terms []api.PodAffinityTerm) {
-	for i := range terms {
-		terms[i].NamespaceSelector = nil
-	}
-}
-
-func dropWeightedPodAffinityTermNamespaceSelector(terms []api.WeightedPodAffinityTerm) {
-	for i := range terms {
-		terms[i].PodAffinityTerm.NamespaceSelector = nil
-	}
-}
-
-// dropDisabledPodAffinityTermFields removes disabled fields from PodSpec related
-// to PodAffinityTerm only if it is not already used by the old spec
-func dropDisabledPodAffinityTermFields(podSpec, oldPodSpec *api.PodSpec) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PodAffinityNamespaceSelector) &&
-		podSpec != nil && podSpec.Affinity != nil &&
-		!podAffinityNamespaceSelectorInUse(oldPodSpec) {
-		if podSpec.Affinity.PodAffinity != nil {
-			dropPodAffinityTermNamespaceSelector(podSpec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution)
-			dropWeightedPodAffinityTermNamespaceSelector(podSpec.Affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution)
-		}
-		if podSpec.Affinity.PodAntiAffinity != nil {
-			dropPodAffinityTermNamespaceSelector(podSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution)
-			dropWeightedPodAffinityTermNamespaceSelector(podSpec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution)
-		}
-	}
-}
-
-func podAffinityNamespaceSelectorInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil || podSpec.Affinity == nil {
-		return false
-	}
-	if podSpec.Affinity.PodAffinity != nil {
-		for _, t := range podSpec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution {
-			if t.NamespaceSelector != nil {
-				return true
-			}
-		}
-		for _, t := range podSpec.Affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution {
-			if t.PodAffinityTerm.NamespaceSelector != nil {
-				return true
-			}
-		}
-	}
-	if podSpec.Affinity.PodAntiAffinity != nil {
-		for _, t := range podSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution {
-			if t.NamespaceSelector != nil {
-				return true
-			}
-		}
-		for _, t := range podSpec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution {
-			if t.PodAffinityTerm.NamespaceSelector == nil {
-				return true
-			}
-		}
-	}
-	return false
-}
-
 func ephemeralContainersInUse(podSpec *api.PodSpec) bool {
 	if podSpec == nil {
 		return false
 	}
 	return len(podSpec.EphemeralContainers) > 0
-}
-
-// overheadInUse returns true if the pod spec is non-nil and has Overhead set
-func overheadInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-	if podSpec.Overhead != nil {
-		return true
-	}
-	return false
 }
 
 // procMountInUse returns true if the pod spec is non-nil and has a SecurityContext's ProcMount field set to a non-default value
@@ -736,17 +681,6 @@ func appArmorInUse(podAnnotations map[string]string) bool {
 		if strings.HasPrefix(k, v1.AppArmorBetaContainerAnnotationKeyPrefix) {
 			return true
 		}
-	}
-	return false
-}
-
-// podPriorityInUse returns true if the pod spec is non-nil and has Priority or PriorityClassName set.
-func podPriorityInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-	if podSpec.Priority != nil || podSpec.PriorityClassName != "" {
-		return true
 	}
 	return false
 }

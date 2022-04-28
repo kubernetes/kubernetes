@@ -14,6 +14,7 @@ import (
 
 	"sigs.k8s.io/kustomize/kyaml/errors"
 	"sigs.k8s.io/kustomize/kyaml/internal/forked/github.com/go-yaml/yaml"
+	"sigs.k8s.io/kustomize/kyaml/sliceutil"
 	"sigs.k8s.io/kustomize/kyaml/yaml/internal/k8sgen/pkg/labels"
 )
 
@@ -146,6 +147,50 @@ func NewMapRNode(values *map[string]string) *RNode {
 	return m
 }
 
+// SyncMapNodesOrder sorts the map node keys in 'to' node to match the order of
+// map node keys in 'from' node, additional keys are moved to the end
+func SyncMapNodesOrder(from, to *RNode) {
+	to.Copy()
+	res := &RNode{value: &yaml.Node{
+		Kind:        to.YNode().Kind,
+		Style:       to.YNode().Style,
+		Tag:         to.YNode().Tag,
+		Anchor:      to.YNode().Anchor,
+		Alias:       to.YNode().Alias,
+		HeadComment: to.YNode().HeadComment,
+		LineComment: to.YNode().LineComment,
+		FootComment: to.YNode().FootComment,
+		Line:        to.YNode().Line,
+		Column:      to.YNode().Column,
+	}}
+
+	fromFieldNames, err := from.Fields()
+	if err != nil {
+		return
+	}
+
+	toFieldNames, err := to.Fields()
+	if err != nil {
+		return
+	}
+
+	for _, fieldName := range fromFieldNames {
+		if !sliceutil.Contains(toFieldNames, fieldName) {
+			continue
+		}
+		// append the common nodes in the order defined in 'from' node
+		res.value.Content = append(res.value.Content, to.Field(fieldName).Key.YNode(), to.Field(fieldName).Value.YNode())
+		toFieldNames = sliceutil.Remove(toFieldNames, fieldName)
+	}
+
+	for _, fieldName := range toFieldNames {
+		// append the residual nodes which are not present in 'from' node
+		res.value.Content = append(res.value.Content, to.Field(fieldName).Key.YNode(), to.Field(fieldName).Value.YNode())
+	}
+
+	to.SetYNode(res.YNode())
+}
+
 // NewRNode returns a new RNode pointer containing the provided Node.
 func NewRNode(value *yaml.Node) *RNode {
 	return &RNode{value: value}
@@ -201,6 +246,11 @@ func (rn *RNode) IsNilOrEmpty() bool {
 		IsYNodeEmptyMap(rn.YNode()) ||
 		IsYNodeEmptySeq(rn.YNode()) ||
 		IsYNodeZero(rn.YNode())
+}
+
+// IsStringValue is true if the RNode is not nil and is scalar string node
+func (rn *RNode) IsStringValue() bool {
+	return !rn.IsNil() && IsYNodeString(rn.YNode())
 }
 
 // GetMeta returns the ResourceMeta for an RNode
@@ -858,6 +908,155 @@ func (rn *RNode) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// DeAnchor inflates all YAML aliases with their anchor values.
+// All YAML anchor data is permanently removed (feel free to call Copy first).
+func (rn *RNode) DeAnchor() (err error) {
+	rn.value, err = deAnchor(rn.value)
+	return
+}
+
+// deAnchor removes all AliasNodes from the yaml.Node's tree, replacing
+// them with what they point to.  All Anchor fields (these are used to mark
+// anchor definitions) are cleared.
+func deAnchor(yn *yaml.Node) (res *yaml.Node, err error) {
+	if yn == nil {
+		return nil, nil
+	}
+	if yn.Anchor != "" {
+		// This node defines an anchor. Clear the field so that it
+		// doesn't show up when marshalling.
+		if yn.Kind == yaml.AliasNode {
+			// Maybe this is OK, but for now treating it as a bug.
+			return nil, fmt.Errorf(
+				"anchor %q defined using alias %v", yn.Anchor, yn.Alias)
+		}
+		yn.Anchor = ""
+	}
+	switch yn.Kind {
+	case yaml.ScalarNode:
+		return yn, nil
+	case yaml.AliasNode:
+		return deAnchor(yn.Alias)
+	case yaml.MappingNode:
+		toMerge, err := removeMergeTags(yn)
+		if err != nil {
+			return nil, err
+		}
+		err = mergeAll(yn, toMerge)
+		if err != nil {
+			return nil, err
+		}
+		fallthrough
+	case yaml.DocumentNode, yaml.SequenceNode:
+		for i := range yn.Content {
+			yn.Content[i], err = deAnchor(yn.Content[i])
+			if err != nil {
+				return nil, err
+			}
+		}
+		return yn, nil
+	default:
+		return nil, fmt.Errorf("cannot deAnchor kind %q", yn.Kind)
+	}
+}
+
+// isMerge returns if the node is tagged with !!merge
+func isMerge(yn *yaml.Node) bool {
+	return yn.Tag == MergeTag
+}
+
+// findMergeValues receives either a MappingNode, a AliasNode or a potentially
+// mixed list of MappingNodes and AliasNodes. It returns a list of MappingNodes.
+func findMergeValues(yn *yaml.Node) ([]*yaml.Node, error) {
+	if yn == nil {
+		return []*yaml.Node{}, nil
+	}
+	switch yn.Kind {
+	case MappingNode:
+		return []*yaml.Node{yn}, nil
+	case AliasNode:
+		if yn.Alias != nil && yn.Alias.Kind != MappingNode {
+			return nil, errors.Errorf("invalid map merge: received alias for a non-map value")
+		}
+		return []*yaml.Node{yn.Alias}, nil
+	case SequenceNode:
+		mergeValues := []*yaml.Node{}
+		for i := 0; i < len(yn.Content); i++ {
+			if yn.Content[i].Kind == SequenceNode {
+				return nil, errors.Errorf("invalid map merge: received a nested sequence")
+			}
+			newMergeValues, err := findMergeValues(yn.Content[i])
+			if err != nil {
+				return nil, err
+			}
+			mergeValues = append(newMergeValues, mergeValues...)
+		}
+		return mergeValues, nil
+	default:
+		return nil, errors.Errorf("map merge requires map or sequence of maps as the value")
+	}
+}
+
+// getMergeTagValue receives a MappingNode yaml node, and it searches for
+// merge tagged keys and return its value yaml node. If the key is duplicated,
+// it fails.
+func getMergeTagValue(yn *yaml.Node) (*yaml.Node, error) {
+	var result *yaml.Node
+	for i := 0; i < len(yn.Content); i += 2 {
+		key := yn.Content[i]
+		value := yn.Content[i+1]
+		if isMerge(key) {
+			if result != nil {
+				return nil, fmt.Errorf("duplicate merge key")
+			}
+			result = value
+		}
+	}
+	return result, nil
+}
+
+// removeMergeTags removes all merge tags and returns a ordered list of yaml
+// nodes to merge and a error
+func removeMergeTags(yn *yaml.Node) ([]*yaml.Node, error) {
+	if yn == nil || yn.Content == nil {
+		return nil, nil
+	}
+	if yn.Kind != yaml.MappingNode {
+		return nil, nil
+	}
+	value, err := getMergeTagValue(yn)
+	if err != nil {
+		return nil, err
+	}
+	toMerge, err := findMergeValues(value)
+	if err != nil {
+		return nil, err
+	}
+	err = NewRNode(yn).PipeE(Clear("<<"))
+	if err != nil {
+		return nil, err
+	}
+	return toMerge, nil
+}
+
+func mergeAll(yn *yaml.Node, toMerge []*yaml.Node) error {
+	// We only need to start with a copy of the existing node because we need to
+	// maintain duplicated keys and style
+	rn := NewRNode(yn).Copy()
+	toMerge = append(toMerge, yn)
+	for i := range toMerge {
+		rnToMerge := NewRNode(toMerge[i]).Copy()
+		err := rnToMerge.VisitFields(func(node *MapNode) error {
+			return rn.PipeE(MapEntrySetter{Key: node.Key, Value: node.Value})
+		})
+		if err != nil {
+			return err
+		}
+	}
+	*yn = *rn.value
+	return nil
+}
+
 // GetValidatedMetadata returns metadata after subjecting it to some tests.
 func (rn *RNode) GetValidatedMetadata() (ResourceMeta, error) {
 	m, err := rn.GetMeta()
@@ -976,7 +1175,6 @@ func checkKey(key string, elems []*Node) bool {
 	return count == len(elems)
 }
 
-// Deprecated: use pipes instead.
 // GetSlice returns the contents of the slice field at the given path.
 func (rn *RNode) GetSlice(path string) ([]interface{}, error) {
 	value, err := rn.GetFieldValue(path)
@@ -989,7 +1187,6 @@ func (rn *RNode) GetSlice(path string) ([]interface{}, error) {
 	return nil, fmt.Errorf("node %s is not a slice", path)
 }
 
-// Deprecated: use pipes instead.
 // GetString returns the contents of the string field at the given path.
 func (rn *RNode) GetString(path string) (string, error) {
 	value, err := rn.GetFieldValue(path)
@@ -1002,7 +1199,6 @@ func (rn *RNode) GetString(path string) (string, error) {
 	return "", fmt.Errorf("node %s is not a string: %v", path, value)
 }
 
-// Deprecated: use slash paths instead.
 // GetFieldValue finds period delimited fields.
 // TODO: When doing kustomize var replacement, which is likely a
 // a primary use of this function and the reason it returns interface{}

@@ -50,7 +50,7 @@ const (
 	errBadCertificate    = "Get .*: remote error: tls: bad certificate"
 	errNoConfiguration   = "invalid configuration: no configuration has been provided"
 	errMissingCertPath   = "invalid configuration: unable to read %s %s for %s due to open %s: .*"
-	errSignedByUnknownCA = "Get .*: x509: certificate signed by unknown authority"
+	errSignedByUnknownCA = "Get .*: x509: .*(unknown authority|not standards compliant|not trusted)"
 )
 
 var (
@@ -288,13 +288,18 @@ MIIDGTCCAgGgAwIBAgIUOS2M
 				kubeConfig.CurrentContext = tt.currentContext
 
 				kubeConfigFile, err := newKubeConfigFile(kubeConfig)
-
-				if err == nil {
-					defer os.Remove(kubeConfigFile)
-
-					_, err = NewGenericWebhook(runtime.NewScheme(), scheme.Codecs, kubeConfigFile, groupVersions, retryBackoff, nil)
+				if err != nil {
+					return err
 				}
 
+				defer os.Remove(kubeConfigFile)
+
+				config, err := LoadKubeconfig(kubeConfigFile, nil)
+				if err != nil {
+					return err
+				}
+
+				_, err = NewGenericWebhook(runtime.NewScheme(), scheme.Codecs, config, groupVersions, retryBackoff)
 				return err
 			}()
 
@@ -316,7 +321,7 @@ MIIDGTCCAgGgAwIBAgIUOS2M
 // TestMissingKubeConfigFile ensures that a kube config path to a missing file is handled properly
 func TestMissingKubeConfigFile(t *testing.T) {
 	kubeConfigPath := "/some/missing/path"
-	_, err := NewGenericWebhook(runtime.NewScheme(), scheme.Codecs, kubeConfigPath, groupVersions, retryBackoff, nil)
+	_, err := LoadKubeconfig(kubeConfigPath, nil)
 
 	if err == nil {
 		t.Errorf("creating the webhook should had failed")
@@ -329,11 +334,12 @@ func TestMissingKubeConfigFile(t *testing.T) {
 func TestTLSConfig(t *testing.T) {
 	invalidCert := []byte("invalid")
 	tests := []struct {
-		test                            string
-		clientCert, clientKey, clientCA []byte
-		serverCert, serverKey, serverCA []byte
-		errRegex                        string
-		increaseSANWarnCounter          bool
+		test                             string
+		clientCert, clientKey, clientCA  []byte
+		serverCert, serverKey, serverCA  []byte
+		errRegex                         string
+		increaseSANWarnCounter           bool
+		increaseSHA1SignatureWarnCounter bool
 	}{
 		{
 			test:       "invalid server CA",
@@ -397,8 +403,23 @@ func TestTLSConfig(t *testing.T) {
 			errRegex:               "x509: certificate relies on legacy Common Name field",
 			increaseSANWarnCounter: true,
 		},
+		{
+			test:       "server cert with SHA1 signature",
+			clientCA:   caCert,
+			serverCert: append(append(sha1ServerCertInter, byte('\n')), caCertInter...), serverKey: serverKey,
+			errRegex:                         "x509: cannot verify signature: insecure algorithm SHA1-RSA \\(temporarily override with GODEBUG=x509sha1=1\\)",
+			increaseSHA1SignatureWarnCounter: true,
+		},
+		{
+			test:       "server cert signed by an intermediate CA with SHA1 signature",
+			clientCA:   caCert,
+			serverCert: append(append(serverCertInterSHA1, byte('\n')), caCertInterSHA1...), serverKey: serverKey,
+			errRegex:                         "x509: cannot verify signature: insecure algorithm SHA1-RSA \\(temporarily override with GODEBUG=x509sha1=1\\)",
+			increaseSHA1SignatureWarnCounter: true,
+		},
 	}
 
+	lastSHA1SigCounter := 0
 	for _, tt := range tests {
 		// Use a closure so defer statements trigger between loop iterations.
 		func() {
@@ -445,7 +466,12 @@ func TestTLSConfig(t *testing.T) {
 
 			defer os.Remove(configFile)
 
-			wh, err := NewGenericWebhook(runtime.NewScheme(), scheme.Codecs, configFile, groupVersions, retryBackoff, nil)
+			config, err := LoadKubeconfig(configFile, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			wh, err := NewGenericWebhook(runtime.NewScheme(), scheme.Codecs, config, groupVersions, retryBackoff)
 
 			if err == nil {
 				err = wh.RestClient.Get().Do(context.TODO()).Error()
@@ -472,6 +498,20 @@ func TestTLSConfig(t *testing.T) {
 				if int(errorCounter) != 1 {
 					t.Errorf("expected the x509_common_name_error_count to be 1, but it's %d", errorCounter)
 				}
+			}
+
+			if tt.increaseSHA1SignatureWarnCounter {
+				errorCounter := getSingleCounterValueFromRegistry(t, legacyregistry.DefaultGatherer, "apiserver_webhooks_x509_insecure_sha1_total")
+
+				if errorCounter == -1 {
+					t.Errorf("failed to get the apiserver_webhooks_x509_insecure_sha1_total metrics: %v", err)
+				}
+
+				if int(errorCounter) != lastSHA1SigCounter+1 {
+					t.Errorf("expected the apiserver_webhooks_x509_insecure_sha1_total counter to be 1, but it's %d", errorCounter)
+				}
+
+				lastSHA1SigCounter++
 			}
 		}()
 	}
@@ -520,7 +560,14 @@ func TestRequestTimeout(t *testing.T) {
 
 	var requestTimeout = 10 * time.Millisecond
 
-	wh, err := newGenericWebhook(runtime.NewScheme(), scheme.Codecs, configFile, groupVersions, retryBackoff, requestTimeout, nil)
+	config, err := LoadKubeconfig(configFile, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	config.Timeout = requestTimeout
+
+	wh, err := NewGenericWebhook(runtime.NewScheme(), scheme.Codecs, config, groupVersions, retryBackoff)
 	if err != nil {
 		t.Fatalf("failed to create the webhook: %v", err)
 	}
@@ -606,7 +653,12 @@ func TestWithExponentialBackoff(t *testing.T) {
 
 	defer os.Remove(configFile)
 
-	wh, err := NewGenericWebhook(runtime.NewScheme(), scheme.Codecs, configFile, groupVersions, retryBackoff, nil)
+	config, err := LoadKubeconfig(configFile, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	wh, err := NewGenericWebhook(runtime.NewScheme(), scheme.Codecs, config, groupVersions, retryBackoff)
 
 	if err != nil {
 		t.Fatalf("failed to create the webhook: %v", err)

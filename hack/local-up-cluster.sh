@@ -27,7 +27,6 @@ DOCKER_ROOT=${DOCKER_ROOT:-""}
 ALLOW_PRIVILEGED=${ALLOW_PRIVILEGED:-""}
 DENY_SECURITY_CONTEXT_ADMISSION=${DENY_SECURITY_CONTEXT_ADMISSION:-""}
 PSP_ADMISSION=${PSP_ADMISSION:-""}
-NODE_ADMISSION=${NODE_ADMISSION:-""}
 RUNTIME_CONFIG=${RUNTIME_CONFIG:-""}
 KUBELET_AUTHORIZATION_WEBHOOK=${KUBELET_AUTHORIZATION_WEBHOOK:-""}
 KUBELET_AUTHENTICATION_WEBHOOK=${KUBELET_AUTHENTICATION_WEBHOOK:-""}
@@ -36,14 +35,8 @@ KUBELET_FLAGS=${KUBELET_FLAGS:-""}
 KUBELET_IMAGE=${KUBELET_IMAGE:-""}
 # many dev environments run with swap on, so we don't fail in this env
 FAIL_SWAP_ON=${FAIL_SWAP_ON:-"false"}
-# Name of the network plugin, eg: "kubenet"
-NET_PLUGIN=${NET_PLUGIN:-""}
 # Name of the dns addon, eg: "kube-dns" or "coredns"
 DNS_ADDON=${DNS_ADDON:-"coredns"}
-# Place the config files and binaries required by NET_PLUGIN in these directory,
-# eg: "/etc/cni/net.d" for config files, and "/opt/cni/bin" for binaries.
-CNI_CONF_DIR=${CNI_CONF_DIR:-""}
-CNI_BIN_DIR=${CNI_BIN_DIR:-""}
 CLUSTER_CIDR=${CLUSTER_CIDR:-10.1.0.0/16}
 SERVICE_CLUSTER_IP_RANGE=${SERVICE_CLUSTER_IP_RANGE:-10.0.0.0/24}
 FIRST_SERVICE_CLUSTER_IP=${FIRST_SERVICE_CLUSTER_IP:-10.0.0.1}
@@ -55,6 +48,17 @@ CGROUP_DRIVER=${CGROUP_DRIVER:-""}
 CGROUP_ROOT=${CGROUP_ROOT:-""}
 # owner of client certs, default to current user if not specified
 USER=${USER:-$(whoami)}
+
+# required for cni installation
+CNI_CONFIG_DIR=${CNI_CONFIG_DIR:-/etc/cni/net.d}
+CNI_PLUGINS_VERSION=${CNI_PLUGINS_VERSION:-"v1.0.1"}
+CNI_TARGETARCH=${CNI_TARGETARCH:-amd64}
+CNI_PLUGINS_TARBALL="${CNI_PLUGINS_VERSION}/cni-plugins-linux-${CNI_TARGETARCH}-${CNI_PLUGINS_VERSION}.tgz"
+CNI_PLUGINS_URL="https://github.com/containernetworking/plugins/releases/download/${CNI_PLUGINS_TARBALL}"
+CNI_PLUGINS_AMD64_SHA256SUM=${CNI_PLUGINS_AMD64_SHA256SUM:-"5238fbb2767cbf6aae736ad97a7aa29167525dcd405196dfbc064672a730d3cf"}
+CNI_PLUGINS_ARM64_SHA256SUM=${CNI_PLUGINS_ARM64_SHA256SUM:-"2d4528c45bdd0a8875f849a75082bc4eafe95cb61f9bcc10a6db38a031f67226"}
+CNI_PLUGINS_PPC64LE_SHA256SUM=${CNI_PLUGINS_PPC64LE_SHA256SUM:-"f078e33067e6daaef3a3a5010d6440f2464b7973dec3ca0b5d5be22fdcb1fd96"}
+CNI_PLUGINS_S390X_SHA256SUM=${CNI_PLUGINS_S390X_SHA256SUM:-"468d33e16440d9ca4395c6bb2d5b71b35ae4a4df26301e4da85ac70c5ce56822"}
 
 # enables testing eviction scenarios locally.
 EVICTION_HARD=${EVICTION_HARD:-"memory.available<100Mi,nodefs.available<10%,nodefs.inodesFree<5%"}
@@ -81,6 +85,7 @@ EXTERNAL_CLOUD_PROVIDER=${EXTERNAL_CLOUD_PROVIDER:-false}
 EXTERNAL_CLOUD_PROVIDER_BINARY=${EXTERNAL_CLOUD_PROVIDER_BINARY:-""}
 EXTERNAL_CLOUD_VOLUME_PLUGIN=${EXTERNAL_CLOUD_VOLUME_PLUGIN:-""}
 CONFIGURE_CLOUD_ROUTES=${CONFIGURE_CLOUD_ROUTES:-true}
+CLOUD_CTLRMGR_FLAGS=${CLOUD_CTLRMGR_FLAGS:-""}
 CLOUD_PROVIDER=${CLOUD_PROVIDER:-""}
 CLOUD_CONFIG=${CLOUD_CONFIG:-""}
 KUBELET_PROVIDER_ID=${KUBELET_PROVIDER_ID:-"$(hostname)"}
@@ -89,9 +94,6 @@ STORAGE_BACKEND=${STORAGE_BACKEND:-"etcd3"}
 STORAGE_MEDIA_TYPE=${STORAGE_MEDIA_TYPE:-"application/vnd.kubernetes.protobuf"}
 # preserve etcd data. you also need to set ETCD_DIR.
 PRESERVE_ETCD="${PRESERVE_ETCD:-false}"
-
-# enable kubernetes dashboard
-ENABLE_CLUSTER_DASHBOARD=${KUBE_ENABLE_CLUSTER_DASHBOARD:-false}
 
 # enable Kubernetes-CSI snapshotter
 ENABLE_CSI_SNAPSHOTTER=${ENABLE_CSI_SNAPSHOTTER:-false}
@@ -119,11 +121,11 @@ export KUBE_PANIC_WATCH_DECODE_ERROR
 
 # Default list of admission Controllers to invoke prior to persisting objects in cluster
 # The order defined here does not matter.
-ENABLE_ADMISSION_PLUGINS=${ENABLE_ADMISSION_PLUGINS:-"NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,Priority,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota"}
+ENABLE_ADMISSION_PLUGINS=${ENABLE_ADMISSION_PLUGINS:-"NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,Priority,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota,NodeRestriction"}
 DISABLE_ADMISSION_PLUGINS=${DISABLE_ADMISSION_PLUGINS:-""}
 ADMISSION_CONTROL_CONFIG_FILE=${ADMISSION_CONTROL_CONFIG_FILE:-""}
 
-# START_MODE can be 'all', 'kubeletonly', 'nokubelet', or 'nokubeproxy'
+# START_MODE can be 'all', 'kubeletonly', 'nokubelet', 'nokubeproxy', or 'nokubelet,nokubeproxy'
 START_MODE=${START_MODE:-"all"}
 
 # A list of controllers to enable
@@ -142,10 +144,6 @@ if [ "${CLOUD_PROVIDER}" == "openstack" ]; then
         echo "Cloud config ${CLOUD_CONFIG} doesn't exist"
         exit 1
     fi
-fi
-
-if [ "$(id -u)" != "0" ]; then
-    echo "WARNING : This script MAY be run as root for docker socket / iptables functionality; if failures occur, retry as root." 2>&1
 fi
 
 # Stop right away if the build fails
@@ -232,8 +230,8 @@ LOG_LEVEL=${LOG_LEVEL:-3}
 # Use to increase verbosity on particular files, e.g. LOG_SPEC=token_controller*=5,other_controller*=4
 LOG_SPEC=${LOG_SPEC:-""}
 LOG_DIR=${LOG_DIR:-"/tmp"}
-CONTAINER_RUNTIME=${CONTAINER_RUNTIME:-"docker"}
-CONTAINER_RUNTIME_ENDPOINT=${CONTAINER_RUNTIME_ENDPOINT:-""}
+CONTAINER_RUNTIME=${CONTAINER_RUNTIME:-"remote"}
+CONTAINER_RUNTIME_ENDPOINT=${CONTAINER_RUNTIME_ENDPOINT:-"unix:///run/containerd/containerd.sock"}
 RUNTIME_REQUEST_TIMEOUT=${RUNTIME_REQUEST_TIMEOUT:-"2m"}
 IMAGE_SERVICE_ENDPOINT=${IMAGE_SERVICE_ENDPOINT:-""}
 CPU_CFS_QUOTA=${CPU_CFS_QUOTA:-true}
@@ -249,20 +247,6 @@ CLUSTER_SIGNING_KEY_FILE=${CLUSTER_SIGNING_KEY_FILE:-"${CERT_DIR}/client-ca.key"
 # Reuse certs will skip generate new ca/cert files under CERT_DIR
 # it's useful with PRESERVE_ETCD=true because new ca will make existed service account secrets invalided
 REUSE_CERTS=${REUSE_CERTS:-false}
-
-# name of the cgroup driver, i.e. cgroupfs or systemd
-if [[ ${CONTAINER_RUNTIME} == "docker" ]]; then
-  # default cgroup driver to match what is reported by docker to simplify local development
-  if [[ -z ${CGROUP_DRIVER} ]]; then
-    # match driver with docker runtime reported value (they must match)
-    CGROUP_DRIVER=$(docker info | grep "Cgroup Driver:" |  sed -e 's/^[[:space:]]*//'|cut -f3- -d' ')
-    echo "Kubelet cgroup driver defaulted to use: ${CGROUP_DRIVER}"
-  fi
-  if [[ -f /var/log/docker.log && ! -f "${LOG_DIR}/docker.log" ]]; then
-    ln -s /var/log/docker.log "${LOG_DIR}/docker.log"
-  fi
-fi
-
 
 
 # Ensure CERT_DIR is created for auto-generated crt/key and kubeconfig
@@ -382,8 +366,6 @@ cleanup()
     [[ -n "${ETCD_DIR-}" ]] && kube::etcd::clean_etcd_dir
   fi
 
-  # Drop the rule we added
-  iptables -t nat -D OUTPUT -m addrtype --dst-type LOCAL -j DOCKER || true
   exit 0
 }
 
@@ -500,9 +482,6 @@ function start_apiserver {
     fi
     if [[ -n "${PSP_ADMISSION}" ]]; then
       security_admission=",PodSecurityPolicy"
-    fi
-    if [[ -n "${NODE_ADMISSION}" ]]; then
-      security_admission=",NodeRestriction"
     fi
 
     # Append security_admission plugin
@@ -634,7 +613,6 @@ EOF
     if [[ -z "${AUTH_ARGS}" ]]; then
         AUTH_ARGS="--client-key=${CERT_DIR}/client-admin.key --client-certificate=${CERT_DIR}/client-admin.crt"
     fi
-
     # Grant apiserver permission to speak to the kubelet
     ${KUBECTL} --kubeconfig "${CERT_DIR}/admin.kubeconfig" create clusterrolebinding kube-apiserver-kubelet-admin --clusterrole=system:kubelet-api-admin --user=kube-apiserver
 
@@ -642,18 +620,13 @@ EOF
     ${KUBECTL} --kubeconfig "${CERT_DIR}/admin.kubeconfig" create clusterrolebinding kubelet-csr --clusterrole=system:certificates.k8s.io:certificatesigningrequests:selfnodeclient --group=system:nodes
 
     ${CONTROLPLANE_SUDO} cp "${CERT_DIR}/admin.kubeconfig" "${CERT_DIR}/admin-kube-aggregator.kubeconfig"
-    ${CONTROLPLANE_SUDO} chown "$(whoami)" "${CERT_DIR}/admin-kube-aggregator.kubeconfig"
+    ${CONTROLPLANE_SUDO} chown -R "$(whoami)" "${CERT_DIR}"
     ${KUBECTL} config set-cluster local-up-cluster --kubeconfig="${CERT_DIR}/admin-kube-aggregator.kubeconfig" --server="https://${API_HOST_IP}:31090"
     echo "use 'kubectl --kubeconfig=${CERT_DIR}/admin-kube-aggregator.kubeconfig' to use the aggregated API server"
 
 }
 
 function start_controller_manager {
-    node_cidr_args=()
-    if [[ "${NET_PLUGIN}" == "kubenet" ]]; then
-      node_cidr_args=("--allocate-node-cidrs=true" "--cluster-cidr=${CLUSTER_CIDR}")
-    fi
-
     cloud_config_arg=("--cloud-provider=${CLOUD_PROVIDER}" "--cloud-config=${CLOUD_CONFIG}")
     cloud_config_arg+=("--configure-cloud-routes=${CONFIGURE_CLOUD_ROUTES}")
     if [[ "${EXTERNAL_CLOUD_PROVIDER:-}" == "true" ]]; then
@@ -672,7 +645,6 @@ function start_controller_manager {
       --cluster-signing-cert-file="${CLUSTER_SIGNING_CERT_FILE}" \
       --cluster-signing-key-file="${CLUSTER_SIGNING_KEY_FILE}" \
       --enable-hostpath-provisioner="${ENABLE_HOSTPATH_PROVISIONER}" \
-      ${node_cidr_args[@]+"${node_cidr_args[@]}"} \
       --pvclaimbinder-sync-period="${CLAIM_BINDER_SYNC_PERIOD}" \
       --feature-gates="${FEATURE_GATES}" \
       "${cloud_config_arg[@]}" \
@@ -697,16 +669,11 @@ function start_cloud_controller_manager {
       exit 1
     fi
 
-    node_cidr_args=()
-    if [[ "${NET_PLUGIN}" == "kubenet" ]]; then
-      node_cidr_args=("--allocate-node-cidrs=true" "--cluster-cidr=${CLUSTER_CIDR}")
-    fi
-
     CLOUD_CTLRMGR_LOG=${LOG_DIR}/cloud-controller-manager.log
     ${CONTROLPLANE_SUDO} "${EXTERNAL_CLOUD_PROVIDER_BINARY:-"${GO_OUT}/cloud-controller-manager"}" \
+      "${CLOUD_CTLRMGR_FLAGS}" \
       --v="${LOG_LEVEL}" \
       --vmodule="${LOG_SPEC}" \
-      "${node_cidr_args[@]:-}" \
       --feature-gates="${FEATURE_GATES}" \
       --cloud-provider="${CLOUD_PROVIDER}" \
       --cloud-config="${CLOUD_CONFIG}" \
@@ -746,21 +713,6 @@ function start_kubelet {
     fi
 
     mkdir -p "/var/lib/kubelet" &>/dev/null || sudo mkdir -p "/var/lib/kubelet"
-    net_plugin_args=()
-    if [[ -n "${NET_PLUGIN}" ]]; then
-      net_plugin_args=("--network-plugin=${NET_PLUGIN}")
-    fi
-
-    cni_conf_dir_args=()
-    if [[ -n "${CNI_CONF_DIR}" ]]; then
-      cni_conf_dir_args=("--cni-conf-dir=${CNI_CONF_DIR}")
-    fi
-
-    cni_bin_dir_args=()
-    if [[ -n "${CNI_BIN_DIR}" ]]; then
-      cni_bin_dir_args=("--cni-bin-dir=${CNI_BIN_DIR}")
-    fi
-
     container_runtime_endpoint_args=()
     if [[ -n "${CONTAINER_RUNTIME_ENDPOINT}" ]]; then
       container_runtime_endpoint_args=("--container-runtime-endpoint=${CONTAINER_RUNTIME_ENDPOINT}")
@@ -780,9 +732,6 @@ function start_kubelet {
       "${cloud_config_arg[@]}"
       "--bootstrap-kubeconfig=${CERT_DIR}/kubelet.kubeconfig"
       "--kubeconfig=${CERT_DIR}/kubelet-rotated.kubeconfig"
-      ${cni_conf_dir_args[@]+"${cni_conf_dir_args[@]}"}
-      ${cni_bin_dir_args[@]+"${cni_bin_dir_args[@]}"}
-      ${net_plugin_args[@]+"${net_plugin_args[@]}"}
       ${container_runtime_endpoint_args[@]+"${container_runtime_endpoint_args[@]}"}
       ${image_service_endpoint_args[@]+"${image_service_endpoint_args[@]}"}
       ${KUBELET_FLAGS}
@@ -887,7 +836,7 @@ EOF
 function start_kubeproxy {
     PROXY_LOG=${LOG_DIR}/kube-proxy.log
 
-    if [[ "${START_MODE}" != "nokubelet" ]]; then
+    if [[ "${START_MODE}" != *"nokubelet"* ]]; then
       # wait for kubelet collect node information
       echo "wait kubelet ready"
       wait_node_ready
@@ -911,10 +860,6 @@ EOF
     if [[ -n ${FEATURE_GATES} ]]; then
       parse_feature_gates "${FEATURE_GATES}"
     fi >>/tmp/kube-proxy.yaml
-
-    if [[ "${NET_PLUGIN}" == "kubenet" && -n ${CLUSTER_CIDR} ]]; then
-        echo "clusterCIDR: \"${CLUSTER_CIDR}\"" >> /tmp/kube-proxy.yaml
-    fi
 
     if [[ "${REUSE_CERTS}" != true ]]; then
         generate_kubeproxy_certs
@@ -981,15 +926,6 @@ function start_nodelocaldns {
   rm nodelocaldns.yaml
 }
 
-function start_kubedashboard {
-    if [[ "${ENABLE_CLUSTER_DASHBOARD}" = true ]]; then
-        echo "Creating kubernetes-dashboard"
-        # use kubectl to create the dashboard
-        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" apply -f "${KUBE_ROOT}/cluster/addons/dashboard/dashboard.yaml"
-        echo "kubernetes-dashboard deployment and service successfully deployed."
-    fi
-}
-
 function start_csi_snapshotter {
     if [[ "${ENABLE_CSI_SNAPSHOTTER}" = true ]]; then
         echo "Creating Kubernetes-CSI snapshotter"
@@ -1045,7 +981,7 @@ fi
 
 if [[ "${START_MODE}" == "all" ]]; then
   echo "  ${KUBELET_LOG}"
-elif [[ "${START_MODE}" == "nokubelet" ]]; then
+elif [[ "${START_MODE}" == *"nokubelet"* ]]; then
   echo
   echo "No kubelet was started because you set START_MODE=nokubelet"
   echo "Run this script again with START_MODE=kubeletonly to run a kubelet"
@@ -1103,6 +1039,70 @@ function parse_eviction {
   done
 }
 
+function install_cni {
+  echo "Installing CNI plugin binaries ..." \
+    && curl -sSL --retry 5 --output /tmp/cni."${CNI_TARGETARCH}".tgz "${CNI_PLUGINS_URL}" \
+    && echo "${CNI_PLUGINS_AMD64_SHA256SUM}  /tmp/cni.amd64.tgz" | tee /tmp/cni.sha256 \
+    && sha256sum --ignore-missing -c /tmp/cni.sha256 \
+    && rm -f /tmp/cni.sha256 \
+    && sudo mkdir -p /opt/cni/bin \
+    && sudo tar -C /opt/cni/bin -xzvf /tmp/cni."${CNI_TARGETARCH}".tgz \
+    && rm -rf /tmp/cni."${CNI_TARGETARCH}".tgz \
+    && sudo find /opt/cni/bin -type f -not \( \
+         -iname host-local \
+         -o -iname bridge \
+         -o -iname portmap \
+         -o -iname loopback \
+      \) \
+      -delete
+
+  # containerd 1.4.12 installed by docker in kubekins supports CNI version 0.4.0
+  echo "Configuring cni"
+  sudo mkdir -p "$CNI_CONFIG_DIR"
+  cat << EOF | sudo tee "$CNI_CONFIG_DIR"/10-containerd-net.conflist
+{
+  "cniVersion": "0.4.0",
+  "name": "containerd-net",
+  "plugins": [
+    {
+      "type": "bridge",
+      "bridge": "cni0",
+      "isGateway": true,
+      "ipMasq": true,
+      "promiscMode": true,
+      "ipam": {
+        "type": "host-local",
+        "ranges": [
+          [{
+            "subnet": "10.88.0.0/16"
+          }],
+          [{
+            "subnet": "2001:4860:4860::/64"
+          }]
+        ],
+        "routes": [
+          { "dst": "0.0.0.0/0" },
+          { "dst": "::/0" }
+        ]
+      }
+    },
+    {
+      "type": "portmap",
+      "capabilities": {"portMappings": true}
+    }
+  ]
+}
+EOF
+}
+
+function install_cni_if_needed {
+  echo "Checking CNI Installation at /opt/cni/bin"
+  if ! command -v /opt/cni/bin/loopback &> /dev/null ; then
+    echo "CNI Installation not found at /opt/cni/bin"
+    install_cni
+  fi
+}
+
 # If we are running in the CI, we need a few more things before we can start
 if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then
   echo "Preparing to test ..."
@@ -1118,24 +1118,23 @@ if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then
 
   # kubekins has a special directory for docker root
   DOCKER_ROOT="/docker-graph"
+
+  # to use docker installed containerd as kubelet container runtime
+  # we need to enable cri and install cni
+  # install cni for docker in docker
+  install_cni 
+
+  # enable cri for docker in docker
+  echo "enable cri"
+  echo "DOCKER_OPTS=\"\${DOCKER_OPTS} --cri-containerd\"" >> /etc/default/docker
+
+  echo "restarting docker"
+  service docker restart
 fi
 
 # validate that etcd is: not running, in path, and has minimum required version.
 if [[ "${START_MODE}" != "kubeletonly" ]]; then
   kube::etcd::validate
-fi
-
-if [ "${CONTAINER_RUNTIME}" == "docker" ]; then
-  if ! kube::util::ensure_docker_daemon_connectivity; then
-    exit 1
-  else
-    # docker doesn't allow to reach exposed hostPorts from the node, however, Kubernetes does
-    # so we append a new rule on top of the docker one
-    # -A OUTPUT ! -d 127.0.0.0/8 -m addrtype --dst-type LOCAL -j DOCKER  <-- docker rule
-    if ! iptables -t nat -C OUTPUT -m addrtype --dst-type LOCAL -j DOCKER; then
-      iptables -t nat -A OUTPUT -m addrtype --dst-type LOCAL -j DOCKER
-    fi
-  fi
 fi
 
 if [[ "${START_MODE}" != "kubeletonly" ]]; then
@@ -1170,11 +1169,10 @@ if [[ "${START_MODE}" != "kubeletonly" ]]; then
   if [[ "${ENABLE_NODELOCAL_DNS:-}" == "true" ]]; then
     start_nodelocaldns
   fi
-  start_kubedashboard
   start_csi_snapshotter
 fi
 
-if [[ "${START_MODE}" != "nokubelet" ]]; then
+if [[ "${START_MODE}" != *"nokubelet"* ]]; then
   ## TODO remove this check if/when kubelet is supported on darwin
   # Detect the OS name/arch and display appropriate error.
     case "$(uname -s)" in
@@ -1183,6 +1181,7 @@ if [[ "${START_MODE}" != "nokubelet" ]]; then
         KUBELET_LOG=""
         ;;
       Linux)
+        install_cni_if_needed
         start_kubelet
         ;;
       *)
@@ -1192,7 +1191,7 @@ if [[ "${START_MODE}" != "nokubelet" ]]; then
 fi
 
 if [[ "${START_MODE}" != "kubeletonly" ]]; then
-  if [[ "${START_MODE}" != "nokubeproxy" ]]; then
+  if [[ "${START_MODE}" != *"nokubeproxy"* ]]; then
     ## TODO remove this check if/when kubelet is supported on darwin
     # Detect the OS name/arch and display appropriate error.
     case "$(uname -s)" in

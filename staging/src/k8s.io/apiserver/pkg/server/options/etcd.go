@@ -148,10 +148,6 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.StorageConfig.Type, "storage-backend", s.StorageConfig.Type,
 		"The storage backend for persistence. Options: 'etcd3' (default).")
 
-	dummyCacheSize := 0
-	fs.IntVar(&dummyCacheSize, "deserialization-cache-size", 0, "Number of deserialized json objects to cache in memory.")
-	fs.MarkDeprecated("deserialization-cache-size", "the deserialization cache was dropped in 1.13 with support for etcd2")
-
 	fs.StringSliceVar(&s.StorageConfig.Transport.ServerList, "etcd-servers", s.StorageConfig.Transport.ServerList,
 		"List of etcd servers to connect with (scheme://ip:port), comma separated.")
 
@@ -166,10 +162,6 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 
 	fs.StringVar(&s.StorageConfig.Transport.TrustedCAFile, "etcd-cafile", s.StorageConfig.Transport.TrustedCAFile,
 		"SSL Certificate Authority file used to secure etcd communication.")
-
-	fs.StringVar(&s.EncryptionProviderConfigFilepath, "experimental-encryption-provider-config", s.EncryptionProviderConfigFilepath,
-		"The file containing configuration for encryption providers to be used for storing secrets in etcd")
-	fs.MarkDeprecated("experimental-encryption-provider-config", "use --encryption-provider-config.")
 
 	fs.StringVar(&s.EncryptionProviderConfigFilepath, "encryption-provider-config", s.EncryptionProviderConfigFilepath,
 		"The file containing configuration for encryption providers to be used for storing secrets in etcd")

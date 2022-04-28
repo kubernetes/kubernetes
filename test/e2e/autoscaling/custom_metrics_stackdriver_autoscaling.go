@@ -24,7 +24,7 @@ import (
 	gcm "google.golang.org/api/monitoring/v3"
 	"google.golang.org/api/option"
 	appsv1 "k8s.io/api/apps/v1"
-	as "k8s.io/api/autoscaling/v2beta1"
+	as "k8s.io/api/autoscaling/v2"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/instrumentation/monitoring"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 	"golang.org/x/oauth2/google"
@@ -51,6 +52,7 @@ var _ = SIGDescribe("[HPA] Horizontal pod autoscaling (scale resource: Custom Me
 	})
 
 	f := framework.NewDefaultFramework("horizontal-pod-autoscaling")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.It("should scale down with Custom Metric of type Pod from Stackdriver [Feature:CustomMetricsAutoscaling]", func() {
 		initialReplicas := 2
@@ -264,10 +266,10 @@ func (tc *CustomMetricTestCase) Run() {
 	defer monitoring.CleanupDescriptors(gcmService, projectID)
 
 	err = monitoring.CreateAdapter(monitoring.AdapterDefault)
+	defer monitoring.CleanupAdapter(monitoring.AdapterDefault)
 	if err != nil {
 		framework.Failf("Failed to set up: %v", err)
 	}
-	defer monitoring.CleanupAdapter(monitoring.AdapterDefault)
 
 	// Run application that exports the metric
 	err = createDeploymentToScale(tc.framework, tc.kubeClient, tc.deployment, tc.pod)
@@ -280,11 +282,11 @@ func (tc *CustomMetricTestCase) Run() {
 	waitForReplicas(tc.deployment.ObjectMeta.Name, tc.framework.Namespace.ObjectMeta.Name, tc.kubeClient, 15*time.Minute, tc.initialReplicas)
 
 	// Autoscale the deployment
-	_, err = tc.kubeClient.AutoscalingV2beta1().HorizontalPodAutoscalers(tc.framework.Namespace.ObjectMeta.Name).Create(context.TODO(), tc.hpa, metav1.CreateOptions{})
+	_, err = tc.kubeClient.AutoscalingV2().HorizontalPodAutoscalers(tc.framework.Namespace.ObjectMeta.Name).Create(context.TODO(), tc.hpa, metav1.CreateOptions{})
 	if err != nil {
 		framework.Failf("Failed to create HPA: %v", err)
 	}
-	defer tc.kubeClient.AutoscalingV2beta1().HorizontalPodAutoscalers(tc.framework.Namespace.ObjectMeta.Name).Delete(context.TODO(), tc.hpa.ObjectMeta.Name, metav1.DeleteOptions{})
+	defer tc.kubeClient.AutoscalingV2().HorizontalPodAutoscalers(tc.framework.Namespace.ObjectMeta.Name).Delete(context.TODO(), tc.hpa.ObjectMeta.Name, metav1.DeleteOptions{})
 
 	waitForReplicas(tc.deployment.ObjectMeta.Name, tc.framework.Namespace.ObjectMeta.Name, tc.kubeClient, 15*time.Minute, tc.scaledReplicas)
 }
@@ -325,8 +327,13 @@ func podsHPA(namespace string, deploymentName string, metricTargets map[string]i
 		metrics = append(metrics, as.MetricSpec{
 			Type: as.PodsMetricSourceType,
 			Pods: &as.PodsMetricSource{
-				MetricName:         metric,
-				TargetAverageValue: *resource.NewQuantity(target, resource.DecimalSI),
+				Metric: as.MetricIdentifier{
+					Name: metric,
+				},
+				Target: as.MetricTarget{
+					Type:         as.AverageValueMetricType,
+					AverageValue: resource.NewQuantity(target, resource.DecimalSI),
+				},
 			},
 		})
 	}
@@ -360,12 +367,17 @@ func objectHPA(namespace string, metricTarget int64) *as.HorizontalPodAutoscaler
 				{
 					Type: as.ObjectMetricSourceType,
 					Object: &as.ObjectMetricSource{
-						MetricName: monitoring.CustomMetricName,
-						Target: as.CrossVersionObjectReference{
+						Metric: as.MetricIdentifier{
+							Name: monitoring.CustomMetricName,
+						},
+						DescribedObject: as.CrossVersionObjectReference{
 							Kind: "Pod",
 							Name: stackdriverExporterPod,
 						},
-						TargetValue: *resource.NewQuantity(metricTarget, resource.DecimalSI),
+						Target: as.MetricTarget{
+							Type:  as.ValueMetricType,
+							Value: resource.NewQuantity(metricTarget, resource.DecimalSI),
+						},
 					},
 				},
 			},
@@ -410,14 +422,18 @@ func externalHPA(namespace string, metricTargets map[string]externalMetricTarget
 		metricSpec = as.MetricSpec{
 			Type: as.ExternalMetricSourceType,
 			External: &as.ExternalMetricSource{
-				MetricName:     "custom.googleapis.com|" + metric,
-				MetricSelector: selector,
+				Metric: as.MetricIdentifier{
+					Name:     "custom.googleapis.com|" + metric,
+					Selector: selector,
+				},
 			},
 		}
 		if target.isAverage {
-			metricSpec.External.TargetAverageValue = resource.NewQuantity(target.value, resource.DecimalSI)
+			metricSpec.External.Target.Type = as.AverageValueMetricType
+			metricSpec.External.Target.AverageValue = resource.NewQuantity(target.value, resource.DecimalSI)
 		} else {
-			metricSpec.External.TargetValue = resource.NewQuantity(target.value, resource.DecimalSI)
+			metricSpec.External.Target.Type = as.ValueMetricType
+			metricSpec.External.Target.Value = resource.NewQuantity(target.value, resource.DecimalSI)
 		}
 		metricSpecs = append(metricSpecs, metricSpec)
 	}

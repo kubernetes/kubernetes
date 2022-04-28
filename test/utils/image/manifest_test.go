@@ -48,7 +48,7 @@ func BenchmarkReplaceRegistryInImageURL(b *testing.B) {
 			in:  "k8s.gcr.io/sig-storage/test:latest",
 			out: "test.io/sig-storage/test:latest",
 		}, {
-			in:  "invalid.com/invalid/test:latest",
+			in:  "invalid.registry.k8s.io/invalid/test:latest",
 			out: "test.io/invalid/test:latest",
 		}, {
 			in:  "mcr.microsoft.com/test:latest",
@@ -109,7 +109,7 @@ func TestReplaceRegistryInImageURL(t *testing.T) {
 			in:  "k8s.gcr.io/sig-storage/test:latest",
 			out: "test.io/sig-storage/test:latest",
 		}, {
-			in:  "invalid.com/invalid/test:latest",
+			in:  "invalid.registry.k8s.io/invalid/test:latest",
 			out: "test.io/invalid/test:latest",
 		}, {
 			in:  "mcr.microsoft.com/test:latest",

@@ -30,7 +30,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubectl/pkg/scheme"
-	"k8s.io/kubectl/pkg/util"
+	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -46,6 +46,7 @@ type PauseOptions struct {
 	Namespace        string
 	EnforceNamespace bool
 	Resources        []string
+	LabelSelector    string
 
 	resource.FilenameOptions
 	genericclioptions.IOStreams
@@ -83,7 +84,7 @@ func NewCmdRolloutPause(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 		Short:                 i18n.T("Mark the provided resource as paused"),
 		Long:                  pauseLong,
 		Example:               pauseExample,
-		ValidArgsFunction:     util.SpecifiedResourceTypeAndNameCompletionFunc(f, validArgs),
+		ValidArgsFunction:     completion.SpecifiedResourceTypeAndNameCompletionFunc(f, validArgs),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
@@ -96,6 +97,7 @@ func NewCmdRolloutPause(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 	usage := "identifying the resource to get from a server."
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.fieldManager, "kubectl-rollout")
+	cmdutil.AddLabelSelectorFlagVar(cmd, &o.LabelSelector)
 	return cmd
 }
 
@@ -132,6 +134,7 @@ func (o *PauseOptions) RunPause() error {
 	r := o.Builder().
 		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		NamespaceParam(o.Namespace).DefaultNamespace().
+		LabelSelectorParam(o.LabelSelector).
 		FilenameParam(o.EnforceNamespace, &o.FilenameOptions).
 		ResourceTypeOrNameArgs(true, o.Resources...).
 		ContinueOnError().
@@ -153,7 +156,14 @@ func (o *PauseOptions) RunPause() error {
 		allErrs = append(allErrs, err)
 	}
 
-	for _, patch := range set.CalculatePatches(infos, scheme.DefaultJSONEncoder(), set.PatchFn(o.Pauser)) {
+	patches := set.CalculatePatches(infos, scheme.DefaultJSONEncoder(), set.PatchFn(o.Pauser))
+
+	if len(patches) == 0 && len(allErrs) == 0 {
+		fmt.Fprintf(o.ErrOut, "No resources found in %s namespace.\n", o.Namespace)
+		return nil
+	}
+
+	for _, patch := range patches {
 		info := patch.Info
 
 		if patch.Err != nil {

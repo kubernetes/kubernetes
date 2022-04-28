@@ -59,7 +59,7 @@ func (s *preScoreState) Clone() framework.StateData {
 func (pl *PodTopologySpread) initPreScoreState(s *preScoreState, pod *v1.Pod, filteredNodes []*v1.Node, requireAllTopologies bool) error {
 	var err error
 	if len(pod.Spec.TopologySpreadConstraints) > 0 {
-		s.Constraints, err = filterTopologySpreadConstraints(pod.Spec.TopologySpreadConstraints, v1.ScheduleAnyway)
+		s.Constraints, err = filterTopologySpreadConstraints(pod.Spec.TopologySpreadConstraints, v1.ScheduleAnyway, pl.enableMinDomainsInPodTopologySpread)
 		if err != nil {
 			return fmt.Errorf("obtaining pod's soft topology spread constraints: %w", err)
 		}
@@ -209,7 +209,7 @@ func (pl *PodTopologySpread) Score(ctx context.Context, cycleState *framework.Cy
 			score += scoreForCount(cnt, c.MaxSkew, s.TopologyNormalizingWeight[i])
 		}
 	}
-	return int64(score), nil
+	return int64(math.Round(score)), nil
 }
 
 // NormalizeScore invoked after scoring all nodes.

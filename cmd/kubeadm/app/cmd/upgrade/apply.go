@@ -151,15 +151,24 @@ func runApply(flags *applyFlags, args []string) error {
 	waiter := getWaiter(flags.dryRun, client, upgrade.UpgradeManifestTimeout)
 
 	// Now; perform the upgrade procedure
-	klog.V(1).Infoln("[upgrade/apply] performing upgrade")
 	if err := PerformControlPlaneUpgrade(flags, client, waiter, cfg); err != nil {
 		return errors.Wrap(err, "[upgrade/apply] FATAL")
 	}
 
 	// TODO: https://github.com/kubernetes/kubeadm/issues/2200
-	fmt.Printf("[upgrade/postupgrade] Applying label %s='' to Nodes with label %s='' (deprecated)\n",
-		kubeadmconstants.LabelNodeRoleControlPlane, kubeadmconstants.LabelNodeRoleOldControlPlane)
-	if err := upgrade.LabelOldControlPlaneNodes(client); err != nil {
+	fmt.Printf("[upgrade/postupgrade] Removing the deprecated label %s='' from all control plane Nodes. "+
+		"After this step only the label %s='' will be present on control plane Nodes.\n",
+		kubeadmconstants.LabelNodeRoleOldControlPlane, kubeadmconstants.LabelNodeRoleControlPlane)
+	if err := upgrade.RemoveOldControlPlaneLabel(client); err != nil {
+		return err
+	}
+
+	// TODO: https://github.com/kubernetes/kubeadm/issues/2200
+	fmt.Printf("[upgrade/postupgrade] Adding the new taint %s to all control plane Nodes. "+
+		"After this step both taints %s and %s should be present on control plane Nodes.\n",
+		kubeadmconstants.ControlPlaneTaint.String(), kubeadmconstants.ControlPlaneTaint.String(),
+		kubeadmconstants.OldControlPlaneTaint.String())
+	if err := upgrade.AddNewControlPlaneTaint(client); err != nil {
 		return err
 	}
 
@@ -170,7 +179,7 @@ func runApply(flags *applyFlags, args []string) error {
 	}
 
 	if flags.dryRun {
-		fmt.Println("[dryrun] Finished dryrunning successfully!")
+		fmt.Println("[upgrade/successful] Finished dryrunning successfully!")
 		return nil
 	}
 
@@ -212,7 +221,8 @@ func EnforceVersionPolicies(newK8sVersionStr string, newK8sVersion *version.Vers
 func PerformControlPlaneUpgrade(flags *applyFlags, client clientset.Interface, waiter apiclient.Waiter, internalcfg *kubeadmapi.InitConfiguration) error {
 
 	// OK, the cluster is hosted using static pods. Upgrade a static-pod hosted cluster
-	fmt.Printf("[upgrade/apply] Upgrading your Static Pod-hosted control plane to version %q...\n", internalcfg.KubernetesVersion)
+	fmt.Printf("[upgrade/apply] Upgrading your Static Pod-hosted control plane to version %q (timeout: %v)...\n",
+		internalcfg.KubernetesVersion, upgrade.UpgradeManifestTimeout)
 
 	if flags.dryRun {
 		return upgrade.DryRunStaticPodUpgrade(flags.patchesDir, internalcfg)

@@ -18,7 +18,6 @@ package e2enode
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"time"
@@ -28,12 +27,14 @@ import (
 	"k8s.io/kubernetes/test/e2e/common/node"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e_node/services"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 )
 
 var _ = SIGDescribe("Container Runtime Conformance Test", func() {
 	f := framework.NewDefaultFramework("runtime-conformance")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	ginkgo.Describe("container runtime conformance blackbox test", func() {
 
@@ -81,7 +82,7 @@ var _ = SIGDescribe("Container Runtime Conformance Test", func() {
 					}
 
 					configFile := filepath.Join(services.KubeletRootDirectory, "config.json")
-					err := ioutil.WriteFile(configFile, []byte(auth), 0644)
+					err := os.WriteFile(configFile, []byte(auth), 0644)
 					framework.ExpectNoError(err)
 					defer os.Remove(configFile)
 

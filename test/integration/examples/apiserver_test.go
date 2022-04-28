@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
@@ -72,7 +71,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 	// start the wardle server to prove we can aggregate it
 	wardleToKASKubeConfigFile := writeKubeConfigForWardleServerToKASConnection(t, rest.CopyConfig(kubeClientConfig))
 	defer os.Remove(wardleToKASKubeConfigFile)
-	wardleCertDir, _ := ioutil.TempDir("", "test-integration-wardle-server")
+	wardleCertDir, _ := os.MkdirTemp("", "test-integration-wardle-server")
 	defer os.RemoveAll(wardleCertDir)
 	listener, wardlePort, err := genericapiserveroptions.CreateListener("tcp", "127.0.0.1:0", net.ListenConfig{})
 	if err != nil {
@@ -108,7 +107,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 	testAPIGroup(t, wardleClient.Discovery().RESTClient())
 	testAPIResourceList(t, wardleClient.Discovery().RESTClient())
 
-	wardleCA, err := ioutil.ReadFile(directWardleClientConfig.CAFile)
+	wardleCA, err := os.ReadFile(directWardleClientConfig.CAFile)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -158,10 +157,10 @@ func TestAggregatedAPIServer(t *testing.T) {
 
 	// now we update the client-ca nd request-header-client-ca-file and the kas will consume it, update the configmap
 	// and then the wardle server will detect and update too.
-	if err := ioutil.WriteFile(path.Join(testServer.TmpDir, "client-ca.crt"), differentClientCA, 0644); err != nil {
+	if err := os.WriteFile(path.Join(testServer.TmpDir, "client-ca.crt"), differentClientCA, 0644); err != nil {
 		t.Fatal(err)
 	}
-	if err := ioutil.WriteFile(path.Join(testServer.TmpDir, "proxy-ca.crt"), differentFrontProxyCA, 0644); err != nil {
+	if err := os.WriteFile(path.Join(testServer.TmpDir, "proxy-ca.crt"), differentFrontProxyCA, 0644); err != nil {
 		t.Fatal(err)
 	}
 	// wait for it to be picked up.  there's a test in certreload_test.go that ensure this works
@@ -274,7 +273,7 @@ func writeKubeConfigForWardleServerToKASConnection(t *testing.T, kubeClientConfi
 	}
 
 	adminKubeConfig := createKubeConfig(wardleToKASKubeClientConfig)
-	wardleToKASKubeConfigFile, _ := ioutil.TempFile("", "")
+	wardleToKASKubeConfigFile, _ := os.CreateTemp("", "")
 	if err := clientcmd.WriteToFile(*adminKubeConfig, wardleToKASKubeConfigFile.Name()); err != nil {
 		t.Fatal(err)
 	}

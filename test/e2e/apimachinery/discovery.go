@@ -21,11 +21,14 @@ import (
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
+	clientdiscovery "k8s.io/client-go/discovery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/utils/crd"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 )
@@ -33,6 +36,7 @@ import (
 var storageVersionServerVersion = utilversion.MustParseSemantic("v1.13.99")
 var _ = SIGDescribe("Discovery", func() {
 	f := framework.NewDefaultFramework("discovery")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	var namespaceName string
 
@@ -43,6 +47,33 @@ var _ = SIGDescribe("Discovery", func() {
 
 		ginkgo.By("Setting up server cert")
 		setupServerCert(namespaceName, serviceName)
+	})
+
+	ginkgo.It("should accurately determine present and missing resources", func() {
+		// checks that legacy api group resources function
+		ok, err := clientdiscovery.IsResourceEnabled(f.ClientSet.Discovery(), schema.GroupVersionResource{Group: "", Version: "v1", Resource: "namespaces"})
+		framework.ExpectNoError(err)
+		if !ok {
+			framework.Failf("namespace.v1 should always be present")
+		}
+		// checks that non-legacy api group resources function
+		ok, err = clientdiscovery.IsResourceEnabled(f.ClientSet.Discovery(), schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"})
+		framework.ExpectNoError(err)
+		if !ok {
+			framework.Failf("deployments.v1.apps should always be present")
+		}
+		// checks that nonsense resources in existing api groups function
+		ok, err = clientdiscovery.IsResourceEnabled(f.ClientSet.Discovery(), schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "please-dont-ever-create-this"})
+		framework.ExpectNoError(err)
+		if ok {
+			framework.Failf("please-dont-ever-create-this.v1.apps should never be present")
+		}
+		// checks that resources resources in nonsense api groups function
+		ok, err = clientdiscovery.IsResourceEnabled(f.ClientSet.Discovery(), schema.GroupVersionResource{Group: "not-these-apps", Version: "v1", Resource: "deployments"})
+		framework.ExpectNoError(err)
+		if ok {
+			framework.Failf("deployments.v1.not-these-apps should never be present")
+		}
 	})
 
 	ginkgo.It("Custom resource should have storage version hash", func() {

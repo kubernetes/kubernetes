@@ -59,7 +59,7 @@ function generate_code() {
 	protoc \
 	--proto_path="${KUBE_REMOTE_RUNTIME_PATH}" \
 	--proto_path="${KUBE_ROOT}/vendor" \
-	--gogo_out=plugins=grpc:"${KUBE_REMOTE_RUNTIME_PATH}" "${KUBE_REMOTE_RUNTIME_PATH}/api.proto"
+	--gogo_out=plugins=grpc:"${KUBE_ROOT}/staging/src" "${KUBE_REMOTE_RUNTIME_PATH}/api.proto"
 
 	# Update boilerplate for the generated file.
 	cat hack/boilerplate/boilerplate.generatego.txt "${KUBE_REMOTE_RUNTIME_PATH}/api.pb.go" > "${KUBE_REMOTE_RUNTIME_PATH}/api.pb.go.tmp"

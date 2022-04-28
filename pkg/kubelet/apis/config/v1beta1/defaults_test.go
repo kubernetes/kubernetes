@@ -120,6 +120,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				EnableDebugFlagsHandler: utilpointer.BoolPtr(true),
 				SeccompDefault:          utilpointer.BoolPtr(false),
 				MemoryThrottlingFactor:  utilpointer.Float64Ptr(DefaultMemoryThrottlingFactor),
+				RegisterNode:            utilpointer.BoolPtr(true),
 			},
 		},
 		{
@@ -234,7 +235,6 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				Logging: componentbaseconfigv1alpha1.LoggingConfiguration{
 					Format:         "",
 					FlushFrequency: 5 * time.Second,
-					Sanitization:   false,
 				},
 				EnableSystemLogHandler:          utilpointer.Bool(false),
 				ShutdownGracePeriod:             zeroDuration,
@@ -244,6 +244,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				EnableDebugFlagsHandler:         utilpointer.Bool(false),
 				SeccompDefault:                  utilpointer.Bool(false),
 				MemoryThrottlingFactor:          utilpointer.Float64(0),
+				RegisterNode:                    utilpointer.BoolPtr(false),
 			},
 			&v1beta1.KubeletConfiguration{
 				EnableServer:       utilpointer.BoolPtr(false),
@@ -331,7 +332,6 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				Logging: componentbaseconfigv1alpha1.LoggingConfiguration{
 					Format:         "text",
 					FlushFrequency: 5 * time.Second,
-					Sanitization:   false,
 				},
 				EnableSystemLogHandler:  utilpointer.Bool(false),
 				ReservedMemory:          []v1beta1.MemoryReservation{},
@@ -339,6 +339,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				EnableDebugFlagsHandler: utilpointer.Bool(false),
 				SeccompDefault:          utilpointer.Bool(false),
 				MemoryThrottlingFactor:  utilpointer.Float64(0),
+				RegisterNode:            utilpointer.BoolPtr(false),
 			},
 		},
 		{
@@ -441,19 +442,16 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				EvictionMinimumReclaim: map[string]string{
 					"imagefs.available": "1Gi",
 				},
-				PodsPerCore:                  1,
-				EnableControllerAttachDetach: utilpointer.Bool(true),
-				ProtectKernelDefaults:        true,
-				MakeIPTablesUtilChains:       utilpointer.Bool(true),
-				IPTablesMasqueradeBit:        utilpointer.Int32(1),
-				IPTablesDropBit:              utilpointer.Int32(1),
-				FeatureGates: map[string]bool{
-					"DynamicKubeletConfig": true,
-				},
-				FailSwapOn:           utilpointer.Bool(true),
-				MemorySwap:           v1beta1.MemorySwapConfiguration{SwapBehavior: "UnlimitedSwap"},
-				ContainerLogMaxSize:  "1Mi",
-				ContainerLogMaxFiles: utilpointer.Int32(1),
+				PodsPerCore:                               1,
+				EnableControllerAttachDetach:              utilpointer.Bool(true),
+				ProtectKernelDefaults:                     true,
+				MakeIPTablesUtilChains:                    utilpointer.Bool(true),
+				IPTablesMasqueradeBit:                     utilpointer.Int32(1),
+				IPTablesDropBit:                           utilpointer.Int32(1),
+				FailSwapOn:                                utilpointer.Bool(true),
+				MemorySwap:                                v1beta1.MemorySwapConfiguration{SwapBehavior: "UnlimitedSwap"},
+				ContainerLogMaxSize:                       "1Mi",
+				ContainerLogMaxFiles:                      utilpointer.Int32(1),
 				ConfigMapAndSecretChangeDetectionStrategy: v1beta1.TTLCacheChangeDetectionStrategy,
 				SystemReserved: map[string]string{
 					"memory": "1Gi",
@@ -473,7 +471,6 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				Logging: componentbaseconfigv1alpha1.LoggingConfiguration{
 					Format:         "json",
 					FlushFrequency: 5 * time.Second,
-					Sanitization:   true,
 				},
 				EnableSystemLogHandler:          utilpointer.Bool(true),
 				ShutdownGracePeriod:             metav1.Duration{Duration: 60 * time.Second},
@@ -488,6 +485,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				EnableDebugFlagsHandler: utilpointer.Bool(true),
 				SeccompDefault:          utilpointer.Bool(true),
 				MemoryThrottlingFactor:  utilpointer.Float64(1),
+				RegisterNode:            utilpointer.BoolPtr(true),
 			},
 			&v1beta1.KubeletConfiguration{
 				EnableServer:       utilpointer.BoolPtr(true),
@@ -587,19 +585,16 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				EvictionMinimumReclaim: map[string]string{
 					"imagefs.available": "1Gi",
 				},
-				PodsPerCore:                  1,
-				EnableControllerAttachDetach: utilpointer.Bool(true),
-				ProtectKernelDefaults:        true,
-				MakeIPTablesUtilChains:       utilpointer.Bool(true),
-				IPTablesMasqueradeBit:        utilpointer.Int32(1),
-				IPTablesDropBit:              utilpointer.Int32(1),
-				FeatureGates: map[string]bool{
-					"DynamicKubeletConfig": true,
-				},
-				FailSwapOn:           utilpointer.Bool(true),
-				MemorySwap:           v1beta1.MemorySwapConfiguration{SwapBehavior: "UnlimitedSwap"},
-				ContainerLogMaxSize:  "1Mi",
-				ContainerLogMaxFiles: utilpointer.Int32(1),
+				PodsPerCore:                               1,
+				EnableControllerAttachDetach:              utilpointer.Bool(true),
+				ProtectKernelDefaults:                     true,
+				MakeIPTablesUtilChains:                    utilpointer.Bool(true),
+				IPTablesMasqueradeBit:                     utilpointer.Int32(1),
+				IPTablesDropBit:                           utilpointer.Int32(1),
+				FailSwapOn:                                utilpointer.Bool(true),
+				MemorySwap:                                v1beta1.MemorySwapConfiguration{SwapBehavior: "UnlimitedSwap"},
+				ContainerLogMaxSize:                       "1Mi",
+				ContainerLogMaxFiles:                      utilpointer.Int32(1),
 				ConfigMapAndSecretChangeDetectionStrategy: v1beta1.TTLCacheChangeDetectionStrategy,
 				SystemReserved: map[string]string{
 					"memory": "1Gi",
@@ -619,7 +614,6 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				Logging: componentbaseconfigv1alpha1.LoggingConfiguration{
 					Format:         "json",
 					FlushFrequency: 5 * time.Second,
-					Sanitization:   true,
 				},
 				EnableSystemLogHandler:          utilpointer.Bool(true),
 				ShutdownGracePeriod:             metav1.Duration{Duration: 60 * time.Second},
@@ -634,6 +628,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				EnableDebugFlagsHandler: utilpointer.Bool(true),
 				SeccompDefault:          utilpointer.Bool(true),
 				MemoryThrottlingFactor:  utilpointer.Float64(1),
+				RegisterNode:            utilpointer.BoolPtr(true),
 			},
 		},
 		{
@@ -719,6 +714,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				EnableDebugFlagsHandler: utilpointer.BoolPtr(true),
 				SeccompDefault:          utilpointer.BoolPtr(false),
 				MemoryThrottlingFactor:  utilpointer.Float64Ptr(DefaultMemoryThrottlingFactor),
+				RegisterNode:            utilpointer.BoolPtr(true),
 			},
 		},
 	}

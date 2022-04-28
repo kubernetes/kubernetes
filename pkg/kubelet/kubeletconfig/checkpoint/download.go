@@ -60,7 +60,7 @@ type RemoteConfigSource interface {
 	// KubeletFilename returns the name of the Kubelet config file as it should appear in the keys of Payload.Files()
 	KubeletFilename() string
 
-	// APIPath returns the API path to the remote resource, e.g. its SelfLink
+	// APIPath returns the API path to the remote resource.
 	APIPath() string
 
 	// UID returns the globally unique identifier for the most recently downloaded payload targeted by the source.

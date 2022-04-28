@@ -2,8 +2,9 @@
   "kind": "PatchOptions",
   "apiVersion": "v1",
   "dryRun": [
-    "2"
+    "dryRunValue"
   ],
   "force": true,
-  "fieldManager": "3"
+  "fieldManager": "fieldManagerValue",
+  "fieldValidation": "fieldValidationValue"
 }

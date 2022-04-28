@@ -57,7 +57,7 @@ func newPerfCounter(counter string) (*perfCounter, error) {
 
 	ret = win_pdh.PdhAddEnglishCounter(queryHandle, counter, 0, &counterHandle)
 	if ret != win_pdh.ERROR_SUCCESS {
-		return nil, fmt.Errorf("unable to add process counter. Error code is %x", ret)
+		return nil, fmt.Errorf("unable to add process counter: %s. Error code is %x", counter, ret)
 	}
 
 	ret = win_pdh.PdhCollectQueryData(queryHandle)

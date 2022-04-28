@@ -25,14 +25,14 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
+	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -135,10 +135,10 @@ func TestGenerateContainerConfig(t *testing.T) {
 	assert.Error(t, err)
 
 	imageID, _ := imageService.PullImage(&runtimeapi.ImageSpec{Image: "busybox"}, nil, nil)
-	image, _ := imageService.ImageStatus(&runtimeapi.ImageSpec{Image: imageID})
+	resp, _ := imageService.ImageStatus(&runtimeapi.ImageSpec{Image: imageID}, false)
 
-	image.Uid = nil
-	image.Username = "test"
+	resp.Image.Uid = nil
+	resp.Image.Username = "test"
 
 	podWithContainerSecurityContext.Spec.Containers[0].SecurityContext.RunAsUser = nil
 	podWithContainerSecurityContext.Spec.Containers[0].SecurityContext.RunAsNonRoot = &runAsNonRootTrue
@@ -366,7 +366,7 @@ func TestGetHugepageLimitsFromResources(t *testing.T) {
 	var baseHugepage []*runtimeapi.HugepageLimit
 
 	// For each page size, limit to 0.
-	for _, pageSize := range cgroupfs.HugePageSizes {
+	for _, pageSize := range libcontainercgroups.HugePageSizes() {
 		baseHugepage = append(baseHugepage, &runtimeapi.HugepageLimit{
 			PageSize: pageSize,
 			Limit:    uint64(0),
@@ -481,7 +481,7 @@ func TestGetHugepageLimitsFromResources(t *testing.T) {
 		machineHugepageSupport := true
 		for _, hugepageLimit := range test.expected {
 			hugepageSupport := false
-			for _, pageSize := range cgroupfs.HugePageSizes {
+			for _, pageSize := range libcontainercgroups.HugePageSizes() {
 				if pageSize == hugepageLimit.PageSize {
 					hugepageSupport = true
 					break

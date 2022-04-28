@@ -25,7 +25,7 @@ import (
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
-	//lint:ignore SA1019 Keep using deprecated module; it still seems to be maintained and the api of the recommended replacement differs
+	//nolint:staticcheck //iccheck // SA1019 Keep using deprecated module; it still seems to be maintained and the api of the recommended replacement differs
 	"github.com/golang/protobuf/proto"
 	fuzz "github.com/google/gofuzz"
 	flag "github.com/spf13/pflag"

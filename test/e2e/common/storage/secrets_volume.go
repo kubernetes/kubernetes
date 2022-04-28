@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -35,6 +36,7 @@ import (
 
 var _ = SIGDescribe("Secrets", func() {
 	f := framework.NewDefaultFramework("secrets")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	/*
 		Release: v1.9
@@ -400,17 +402,23 @@ var _ = SIGDescribe("Secrets", func() {
 		// Ensure data can't be changed now.
 		currentSecret.Data["data-5"] = []byte("value-5\n")
 		_, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Update(context.TODO(), currentSecret, metav1.UpdateOptions{})
-		framework.ExpectEqual(apierrors.IsInvalid(err), true)
+		if !apierrors.IsInvalid(err) {
+			framework.Failf("expected 'invalid' as error, got instead: %v", err)
+		}
 
 		// Ensure secret can't be switched from immutable to mutable.
 		currentSecret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Get(context.TODO(), name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "Failed to get secret %q in namespace %q", secret.Name, secret.Namespace)
-		framework.ExpectEqual(*currentSecret.Immutable, true)
+		if !*currentSecret.Immutable {
+			framework.Failf("currentSecret %s can be switched from immutable to mutable", currentSecret.Name)
+		}
 
 		falseVal := false
 		currentSecret.Immutable = &falseVal
 		_, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Update(context.TODO(), currentSecret, metav1.UpdateOptions{})
-		framework.ExpectEqual(apierrors.IsInvalid(err), true)
+		if !apierrors.IsInvalid(err) {
+			framework.Failf("expected 'invalid' as error, got instead: %v", err)
+		}
 
 		// Ensure that metadata can be changed.
 		currentSecret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Get(context.TODO(), name, metav1.GetOptions{})

@@ -63,9 +63,10 @@ func testPod(namespace string, id int, nPorts int, isReady bool, ipFamilies []v1
 	p := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{APIVersion: "v1"},
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: namespace,
-			Name:      fmt.Sprintf("pod%d", id),
-			Labels:    map[string]string{"foo": "bar"},
+			Namespace:       namespace,
+			Name:            fmt.Sprintf("pod%d", id),
+			Labels:          map[string]string{"foo": "bar"},
+			ResourceVersion: fmt.Sprint(id),
 		},
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{{Ports: []v1.ContainerPort{}}},
@@ -315,6 +316,52 @@ func TestSyncEndpointsExistingEmptySubsets(t *testing.T) {
 			Ports:    []v1.ServicePort{{Port: 80}},
 		},
 	})
+	endpoints.syncService(context.TODO(), ns+"/foo")
+	endpointsHandler.ValidateRequestCount(t, 0)
+}
+
+func TestSyncEndpointsWithPodResourceVersionUpdateOnly(t *testing.T) {
+	ns := metav1.NamespaceDefault
+	testServer, endpointsHandler := makeTestServer(t, ns)
+	defer testServer.Close()
+	pod0 := testPod(ns, 0, 1, true, ipv4only)
+	pod1 := testPod(ns, 1, 1, false, ipv4only)
+	endpoints := newController(testServer.URL, 0*time.Second)
+	endpoints.endpointsStore.Add(&v1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "foo",
+			Namespace:       ns,
+			ResourceVersion: "1",
+		},
+		Subsets: []v1.EndpointSubset{{
+			Addresses: []v1.EndpointAddress{
+				{
+					IP:        pod0.Status.PodIPs[0].IP,
+					NodeName:  &emptyNodeName,
+					TargetRef: &v1.ObjectReference{Kind: "Pod", Name: pod0.Name, Namespace: ns, ResourceVersion: "1"},
+				},
+			},
+			NotReadyAddresses: []v1.EndpointAddress{
+				{
+					IP:        pod1.Status.PodIPs[0].IP,
+					NodeName:  &emptyNodeName,
+					TargetRef: &v1.ObjectReference{Kind: "Pod", Name: pod1.Name, Namespace: ns, ResourceVersion: "2"},
+				},
+			},
+			Ports: []v1.EndpointPort{{Port: 8080, Protocol: "TCP"}},
+		}},
+	})
+	endpoints.serviceStore.Add(&v1.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
+		Spec: v1.ServiceSpec{
+			Selector: map[string]string{"foo": "bar"},
+			Ports:    []v1.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt(8080)}},
+		},
+	})
+	pod0.ResourceVersion = "3"
+	pod1.ResourceVersion = "4"
+	endpoints.podStore.Add(pod0)
+	endpoints.podStore.Add(pod1)
 	endpoints.syncService(context.TODO(), ns+"/foo")
 	endpointsHandler.ValidateRequestCount(t, 0)
 }
@@ -1384,16 +1431,16 @@ func TestPodToEndpointAddressForService(t *testing.T) {
 				t.Fatalf("TargetRef.Kind: expected: %s, got: %s", "Pod", epa.TargetRef.Kind)
 			}
 			if epa.TargetRef.Namespace != pod.ObjectMeta.Namespace {
-				t.Fatalf("TargetRef.Kind: expected: %s, got: %s", pod.ObjectMeta.Namespace, epa.TargetRef.Namespace)
+				t.Fatalf("TargetRef.Namespace: expected: %s, got: %s", pod.ObjectMeta.Namespace, epa.TargetRef.Namespace)
 			}
 			if epa.TargetRef.Name != pod.ObjectMeta.Name {
-				t.Fatalf("TargetRef.Kind: expected: %s, got: %s", pod.ObjectMeta.Name, epa.TargetRef.Name)
+				t.Fatalf("TargetRef.Name: expected: %s, got: %s", pod.ObjectMeta.Name, epa.TargetRef.Name)
 			}
 			if epa.TargetRef.UID != pod.ObjectMeta.UID {
-				t.Fatalf("TargetRef.Kind: expected: %s, got: %s", pod.ObjectMeta.UID, epa.TargetRef.UID)
+				t.Fatalf("TargetRef.UID: expected: %s, got: %s", pod.ObjectMeta.UID, epa.TargetRef.UID)
 			}
-			if epa.TargetRef.ResourceVersion != pod.ObjectMeta.ResourceVersion {
-				t.Fatalf("TargetRef.Kind: expected: %s, got: %s", pod.ObjectMeta.ResourceVersion, epa.TargetRef.ResourceVersion)
+			if epa.TargetRef.ResourceVersion != "" {
+				t.Fatalf("TargetRef.ResourceVersion: expected empty, got: %s", epa.TargetRef.ResourceVersion)
 			}
 		})
 	}

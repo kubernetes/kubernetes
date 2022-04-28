@@ -38,8 +38,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/klog/v2"
-	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
@@ -432,17 +432,12 @@ func (nim *nodeInfoManager) tryInitializeCSINodeWithAnnotation(csiKubeClient cli
 
 func (nim *nodeInfoManager) CreateCSINode() (*storagev1.CSINode, error) {
 
-	kubeClient := nim.volumeHost.GetKubeClient()
-	if kubeClient == nil {
-		return nil, fmt.Errorf("error getting kube client")
-	}
-
 	csiKubeClient := nim.volumeHost.GetKubeClient()
 	if csiKubeClient == nil {
 		return nil, fmt.Errorf("error getting CSI client")
 	}
 
-	node, err := kubeClient.CoreV1().Nodes().Get(context.TODO(), string(nim.nodeName), metav1.GetOptions{})
+	node, err := csiKubeClient.CoreV1().Nodes().Get(context.TODO(), string(nim.nodeName), metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}

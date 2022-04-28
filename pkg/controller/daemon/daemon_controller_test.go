@@ -2397,7 +2397,7 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 					manager.podNodeIndex.Add(p)
 				}
 				c.ds.Spec.UpdateStrategy = *strategy
-				shouldRun, shouldContinueRunning := manager.nodeShouldRunDaemonPod(node, c.ds)
+				shouldRun, shouldContinueRunning := NodeShouldRunDaemonPod(node, c.ds)
 
 				if shouldRun != c.shouldRun {
 					t.Errorf("[%v] strategy: %v, predicateName: %v expected shouldRun: %v, got: %v", i, c.ds.Spec.UpdateStrategy.Type, c.predicateName, c.shouldRun, shouldRun)

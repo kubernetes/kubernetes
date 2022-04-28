@@ -26,6 +26,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 var _ = utils.SIGDescribe("Volume limits", func() {
@@ -33,6 +34,7 @@ var _ = utils.SIGDescribe("Volume limits", func() {
 		c clientset.Interface
 	)
 	f := framework.NewDefaultFramework("volume-limits-on-node")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	ginkgo.BeforeEach(func() {
 		e2eskipper.SkipUnlessProviderIs("aws", "gce", "gke")
 		// If CSIMigration is enabled, then the limits should be on CSINodes, not Nodes, and another test checks this

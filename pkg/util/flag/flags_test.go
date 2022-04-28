@@ -18,6 +18,7 @@ package flag
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -50,7 +51,7 @@ func TestIPVar(t *testing.T) {
 	for _, tc := range testCases {
 		fs := pflag.NewFlagSet("blah", pflag.PanicOnError)
 		ip := defaultIP
-		fs.Var(IPVar{&ip}, "ip", "the ip")
+		fs.Var(&IPVar{&ip}, "ip", "the ip")
 
 		var err error
 		func() {
@@ -144,7 +145,7 @@ func TestIPPortVar(t *testing.T) {
 	for _, tc := range testCases {
 		fs := pflag.NewFlagSet("blah", pflag.PanicOnError)
 		ipport := defaultIPPort
-		fs.Var(IPPortVar{&ipport}, "ipport", "the ip:port")
+		fs.Var(&IPPortVar{&ipport}, "ipport", "the ip:port")
 
 		var err error
 		func() {
@@ -224,6 +225,25 @@ func TestReservedMemoryVar(t *testing.T) {
 			},
 		},
 		{
+			desc: "valid input with ';' as separator for multiple reserved-memory arguments",
+			argc: "blah --reserved-memory=0:memory=1Gi,hugepages-1Gi=1Gi;1:memory=1Gi",
+			expectVal: []kubeletconfig.MemoryReservation{
+				{
+					NumaNode: 0,
+					Limits: v1.ResourceList{
+						v1.ResourceMemory:        memory1Gi,
+						resourceNameHugepages1Gi: memory1Gi,
+					},
+				},
+				{
+					NumaNode: 1,
+					Limits: v1.ResourceList{
+						v1.ResourceMemory: memory1Gi,
+					},
+				},
+			},
+		},
+		{
 			desc:      "invalid input",
 			argc:      "blah --reserved-memory=bad-input",
 			expectVal: nil,
@@ -286,4 +306,63 @@ func TestReservedMemoryVar(t *testing.T) {
 			t.Fatalf("%q: Unexpected reserved-error: expected %v, saw %v", tc.desc, tc.expectVal, reservedMemory)
 		}
 	}
+}
+
+func TestTaintsVar(t *testing.T) {
+	cases := []struct {
+		f   string
+		err bool
+		t   []v1.Taint
+	}{
+		{
+			f: "",
+			t: []v1.Taint(nil),
+		},
+		{
+			f: "--t=foo=bar:NoSchedule",
+			t: []v1.Taint{{Key: "foo", Value: "bar", Effect: "NoSchedule"}},
+		},
+		{
+			f: "--t=baz:NoSchedule",
+			t: []v1.Taint{{Key: "baz", Value: "", Effect: "NoSchedule"}},
+		},
+		{
+			f: "--t=foo=bar:NoSchedule,baz:NoSchedule,bing=bang:PreferNoSchedule,qux=:NoSchedule",
+			t: []v1.Taint{
+				{Key: "foo", Value: "bar", Effect: v1.TaintEffectNoSchedule},
+				{Key: "baz", Value: "", Effect: "NoSchedule"},
+				{Key: "bing", Value: "bang", Effect: v1.TaintEffectPreferNoSchedule},
+				{Key: "qux", Value: "", Effect: "NoSchedule"},
+			},
+		},
+		{
+			f: "--t=dedicated-for=user1:NoExecute,baz:NoSchedule,foo-bar=:NoSchedule",
+			t: []v1.Taint{
+				{Key: "dedicated-for", Value: "user1", Effect: "NoExecute"},
+				{Key: "baz", Value: "", Effect: "NoSchedule"},
+				{Key: "foo-bar", Value: "", Effect: "NoSchedule"},
+			},
+		},
+	}
+
+	for i, c := range cases {
+		args := append([]string{"test"}, strings.Fields(c.f)...)
+		cli := pflag.NewFlagSet("test", pflag.ContinueOnError)
+		var taints []v1.Taint
+		cli.Var(RegisterWithTaintsVar{Value: &taints}, "t", "bar")
+
+		err := cli.Parse(args)
+		if err == nil && c.err {
+			t.Errorf("[%v] expected error", i)
+			continue
+		}
+		if err != nil && !c.err {
+			t.Errorf("[%v] unexpected error: %v", i, err)
+			continue
+		}
+		if !reflect.DeepEqual(c.t, taints) {
+			t.Errorf("[%v] unexpected taints:\n\texpected:\n\t\t%#v\n\tgot:\n\t\t%#v", i, c.t, taints)
+		}
+	}
+
 }

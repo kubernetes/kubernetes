@@ -444,10 +444,6 @@ func TestCSI_VolumeAll(t *testing.T) {
 				t.Fatalf("csiTest.VolumeAll volPlugin.NewMounter is nil or error: %s", err)
 			}
 
-			if err := mounter.CanMount(); err != nil {
-				t.Fatal("csiTest.VolumeAll mounter.CanMount failed, skipping mount")
-			}
-
 			var fsGroup *int64
 			if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.FSGroup != nil {
 				fsGroup = pod.Spec.SecurityContext.FSGroup

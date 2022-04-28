@@ -26,6 +26,7 @@ import (
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/lifecycle"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 const (
@@ -41,6 +42,7 @@ var _ = lifecycle.SIGDescribe("[Feature:BootstrapTokens]", func() {
 	var c clientset.Interface
 
 	f := framework.NewDefaultFramework("bootstrap-signer")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	ginkgo.AfterEach(func() {
 		if len(secretNeedClean) > 0 {
 			ginkgo.By("delete the bootstrap token secret")

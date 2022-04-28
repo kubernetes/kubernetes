@@ -27,12 +27,14 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 )
 
 var _ = SIGDescribe("Downward API [Serial] [Disruptive] [NodeFeature:EphemeralStorage]", func() {
 	f := framework.NewDefaultFramework("downward-api")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Context("Downward API tests for local ephemeral storage", func() {
 		ginkgo.BeforeEach(func() {

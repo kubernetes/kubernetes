@@ -22,7 +22,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -265,7 +265,7 @@ func testWebhookReinvocationPolicy(t *testing.T, watchCache bool) {
 	defer webhookServer.Close()
 
 	// prepare audit policy file
-	policyFile, err := ioutil.TempFile("", "audit-policy.yaml")
+	policyFile, err := os.CreateTemp("", "audit-policy.yaml")
 	if err != nil {
 		t.Fatalf("Failed to create audit policy file: %v", err)
 	}
@@ -278,7 +278,7 @@ func testWebhookReinvocationPolicy(t *testing.T, watchCache bool) {
 	}
 
 	// prepare audit log file
-	logFile, err := ioutil.TempFile("", "audit.log")
+	logFile, err := os.CreateTemp("", "audit.log")
 	if err != nil {
 		t.Fatalf("Failed to create audit log file: %v", err)
 	}
@@ -536,7 +536,7 @@ func newReinvokeWebhookHandler(recorder *invocationRecorder) http.Handler {
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
-		data, err := ioutil.ReadAll(r.Body)
+		data, err := io.ReadAll(r.Body)
 		if err != nil {
 			http.Error(w, err.Error(), 400)
 		}

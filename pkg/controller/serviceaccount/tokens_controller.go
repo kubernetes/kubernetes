@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -68,6 +68,9 @@ type TokensControllerOptions struct {
 	// MaxRetries controls the maximum number of times a particular key is retried before giving up
 	// If zero, a default max is used
 	MaxRetries int
+
+	// AutoGenerate decides the auto-generation of secret-based token for service accounts.
+	AutoGenerate bool
 }
 
 // NewTokensController returns a new *TokensController.
@@ -85,7 +88,8 @@ func NewTokensController(serviceAccounts informers.ServiceAccountInformer, secre
 		syncServiceAccountQueue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "serviceaccount_tokens_service"),
 		syncSecretQueue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "serviceaccount_tokens_secret"),
 
-		maxRetries: maxRetries,
+		maxRetries:   maxRetries,
+		autoGenerate: options.AutoGenerate,
 	}
 	if cl != nil && cl.CoreV1().RESTClient().GetRateLimiter() != nil {
 		if err := ratelimiter.RegisterMetricAndTrackRateLimiterUsage("serviceaccount_tokens_controller", cl.CoreV1().RESTClient().GetRateLimiter()); err != nil {
@@ -160,7 +164,8 @@ type TokensController struct {
 	// key is a secretQueueKey{}
 	syncSecretQueue workqueue.RateLimitingInterface
 
-	maxRetries int
+	maxRetries   int
+	autoGenerate bool
 }
 
 // Run runs controller blocks until stopCh is closed
@@ -255,7 +260,7 @@ func (e *TokensController) syncServiceAccount() {
 		if err != nil {
 			klog.Errorf("error deleting serviceaccount tokens for %s/%s: %v", saInfo.namespace, saInfo.name, err)
 		}
-	default:
+	case e.autoGenerate:
 		// ensure a token exists and is referenced by this service account
 		retry, err = e.ensureReferencedToken(sa)
 		if err != nil {

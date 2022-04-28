@@ -93,14 +93,23 @@ type KubeSchedulerConfiguration struct {
 
 // DecodeNestedObjects decodes plugin args for known types.
 func (c *KubeSchedulerConfiguration) DecodeNestedObjects(d runtime.Decoder) error {
+	var strictDecodingErrs []error
 	for i := range c.Profiles {
 		prof := &c.Profiles[i]
 		for j := range prof.PluginConfig {
 			err := prof.PluginConfig[j].decodeNestedObjects(d)
 			if err != nil {
-				return fmt.Errorf("decoding .profiles[%d].pluginConfig[%d]: %w", i, j, err)
+				decodingErr := fmt.Errorf("decoding .profiles[%d].pluginConfig[%d]: %w", i, j, err)
+				if runtime.IsStrictDecodingError(err) {
+					strictDecodingErrs = append(strictDecodingErrs, decodingErr)
+				} else {
+					return decodingErr
+				}
 			}
 		}
+	}
+	if len(strictDecodingErrs) > 0 {
+		return runtime.NewStrictDecodingError(strictDecodingErrs)
 	}
 	return nil
 }
@@ -184,6 +193,24 @@ type Plugins struct {
 
 	// PostBind is a list of plugins that should be invoked after a pod is successfully bound.
 	PostBind PluginSet `json:"postBind,omitempty"`
+
+	// MultiPoint is a simplified config section to enable plugins for all valid extension points.
+	// Plugins enabled through MultiPoint will automatically register for every individual extension
+	// point the plugin has implemented. Disabling a plugin through MultiPoint disables that behavior.
+	// The same is true for disabling "*" through MultiPoint (no default plugins will be automatically registered).
+	// Plugins can still be disabled through their individual extension points.
+	//
+	// In terms of precedence, plugin config follows this basic hierarchy
+	//   1. Specific extension points
+	//   2. Explicitly configured MultiPoint plugins
+	//   3. The set of default plugins, as MultiPoint plugins
+	// This implies that a higher precedence plugin will run first and overwrite any settings within MultiPoint.
+	// Explicitly user-configured plugins also take a higher precedence over default plugins.
+	// Within this hierarchy, an Enabled setting takes precedence over Disabled. For example, if a plugin is
+	// set in both `multiPoint.Enabled` and `multiPoint.Disabled`, the plugin will be enabled. Similarly,
+	// including `multiPoint.Disabled = '*'` and `multiPoint.Enabled = pluginA` will still register that specific
+	// plugin through MultiPoint. This follows the same behavior as all other extension point configurations.
+	MultiPoint PluginSet `json:"multiPoint,omitempty"`
 }
 
 // PluginSet specifies enabled and disabled plugins for an extension point.
@@ -227,15 +254,21 @@ func (c *PluginConfig) decodeNestedObjects(d runtime.Decoder) error {
 		return nil
 	}
 
+	var strictDecodingErr error
 	obj, parsedGvk, err := d.Decode(c.Args.Raw, &gvk, nil)
 	if err != nil {
-		return fmt.Errorf("decoding args for plugin %s: %w", c.Name, err)
+		decodingArgsErr := fmt.Errorf("decoding args for plugin %s: %w", c.Name, err)
+		if obj != nil && runtime.IsStrictDecodingError(err) {
+			strictDecodingErr = runtime.NewStrictDecodingError([]error{decodingArgsErr})
+		} else {
+			return decodingArgsErr
+		}
 	}
 	if parsedGvk.GroupKind() != gvk.GroupKind() {
 		return fmt.Errorf("args for plugin %s were not of type %s, got %s", c.Name, gvk.GroupKind(), parsedGvk.GroupKind())
 	}
 	c.Args.Object = obj
-	return nil
+	return strictDecodingErr
 }
 
 func (c *PluginConfig) encodeNestedObjects(e runtime.Encoder) error {

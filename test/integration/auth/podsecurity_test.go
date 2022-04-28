@@ -20,7 +20,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -325,7 +325,7 @@ func ValidateWebhookMetrics(t *testing.T, webhookAddr string) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("Non-200 response trying to scrape metrics from %s: %v", endpoint.String(), resp)
 	}
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatalf("Unable to read metrics response: %v", err)
 	}

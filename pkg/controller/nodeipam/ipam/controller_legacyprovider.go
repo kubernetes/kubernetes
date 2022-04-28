@@ -35,7 +35,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam/cidrset"
 	nodesync "k8s.io/kubernetes/pkg/controller/nodeipam/ipam/sync"
-	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
+	controllerutil "k8s.io/kubernetes/pkg/controller/util/node"
 	"k8s.io/legacy-cloud-providers/gce"
 )
 
@@ -142,9 +142,9 @@ func (c *Controller) Start(nodeInformer informers.NodeInformer) error {
 	}
 
 	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    nodeutil.CreateAddNodeHandler(c.onAdd),
-		UpdateFunc: nodeutil.CreateUpdateNodeHandler(c.onUpdate),
-		DeleteFunc: nodeutil.CreateDeleteNodeHandler(c.onDelete),
+		AddFunc:    controllerutil.CreateAddNodeHandler(c.onAdd),
+		UpdateFunc: controllerutil.CreateUpdateNodeHandler(c.onUpdate),
+		DeleteFunc: controllerutil.CreateDeleteNodeHandler(c.onDelete),
 	})
 
 	return nil

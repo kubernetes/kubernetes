@@ -18,6 +18,7 @@ package testing
 
 import (
 	"fmt"
+	"k8s.io/utils/net"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -27,6 +28,8 @@ type FakeNetlinkHandle struct {
 	// localAddresses is a network interface name to all of its IP addresses map, e.g.
 	// eth0 -> [1.2.3.4, 10.20.30.40]
 	localAddresses map[string][]string
+
+	IsIPv6 bool
 }
 
 // NewFakeNetlinkHandle will create a new FakeNetlinkHandle
@@ -112,23 +115,25 @@ func (h *FakeNetlinkHandle) ListBindAddress(devName string) ([]string, error) {
 }
 
 // GetLocalAddresses is a mock implementation
-func (h *FakeNetlinkHandle) GetLocalAddresses(dev, filterDev string) (sets.String, error) {
+func (h *FakeNetlinkHandle) GetLocalAddresses(dev string) (sets.String, error) {
 	res := sets.NewString()
-	if len(dev) != 0 {
-		// list all addresses from a given network interface.
-		for _, addr := range h.localAddresses[dev] {
+	// list all addresses from a given network interface.
+	for _, addr := range h.localAddresses[dev] {
+		if h.isValidForSet(addr) {
 			res.Insert(addr)
 		}
-		return res, nil
 	}
-	// If filterDev is not given, will list all addresses from all available network interface.
+	return res, nil
+}
+func (h *FakeNetlinkHandle) GetAllLocalAddresses() (sets.String, error) {
+	res := sets.NewString()
+	// List all addresses from all available network interfaces.
 	for linkName := range h.localAddresses {
-		if linkName == filterDev {
-			continue
-		}
 		// list all addresses from a given network interface.
 		for _, addr := range h.localAddresses[linkName] {
-			res.Insert(addr)
+			if h.isValidForSet(addr) {
+				res.Insert(addr)
+			}
 		}
 	}
 	return res, nil
@@ -145,4 +150,18 @@ func (h *FakeNetlinkHandle) SetLocalAddresses(dev string, ips ...string) error {
 	h.localAddresses[dev] = make([]string, 0)
 	h.localAddresses[dev] = append(h.localAddresses[dev], ips...)
 	return nil
+}
+
+func (h *FakeNetlinkHandle) isValidForSet(ipString string) bool {
+	ip := net.ParseIPSloppy(ipString)
+	if h.IsIPv6 != (ip.To4() == nil) {
+		return false
+	}
+	if h.IsIPv6 && ip.IsLinkLocalUnicast() {
+		return false
+	}
+	if ip.IsLoopback() {
+		return false
+	}
+	return true
 }

@@ -32,10 +32,10 @@ import (
 // before committing to a concurrency allotment for the second.
 type QueueSetFactory interface {
 	// BeginConstruction does the first phase of creating a QueueSet.
-	// The TimedObserverPair observes number of requests,
+	// The RatioedChangeObserverPair observes number of requests,
 	// execution covering just the regular phase.
-	// The TimedObserver observes number of seats occupied through all phases of execution.
-	BeginConstruction(QueuingConfig, metrics.TimedObserverPair, metrics.TimedObserver) (QueueSetCompleter, error)
+	// The RatioedChangeObserver observes number of seats occupied through all phases of execution.
+	BeginConstruction(QueuingConfig, metrics.RatioedChangeObserverPair, metrics.RatioedChangeObserver) (QueueSetCompleter, error)
 }
 
 // QueueSetCompleter finishes the two-step process of creating or

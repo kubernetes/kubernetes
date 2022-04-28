@@ -397,6 +397,10 @@ func (_ Quantity) OpenAPISchemaType() []string { return []string{"string"} }
 // the OpenAPI spec of this type.
 func (_ Quantity) OpenAPISchemaFormat() string { return "" }
 
+// OpenAPIV3OneOfTypes is used by the kube-openapi generator when constructing
+// the OpenAPI v3 spec of this type.
+func (Quantity) OpenAPIV3OneOfTypes() []string { return []string{"string", "number"} }
+
 // CanonicalizeBytes returns the canonical form of q and its suffix (see comment on Quantity).
 //
 // Note about BinarySI:

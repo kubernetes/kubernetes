@@ -18,7 +18,6 @@ package storage
 
 import (
 	"context"
-	"crypto/sha256"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -27,11 +26,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	csipbv1 "github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -57,6 +56,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 	utilptr "k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo"
@@ -107,6 +107,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		// just disable resizing on driver it overrides enableResizing flag for CSI mock driver
 		disableResizingOnDriver bool
 		enableSnapshot          bool
+		enableVolumeMountGroup  bool // enable the VOLUME_MOUNT_GROUP node capability in the CSI mock driver.
 		hooks                   *drivers.Hooks
 		tokenRequests           []storagev1.TokenRequest
 		requiresRepublish       *bool
@@ -129,6 +130,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 	var m mockDriverSetup
 
 	f := framework.NewDefaultFramework("csi-mock-volumes")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	init := func(tp testParameters) {
 		m = mockDriverSetup{
@@ -140,18 +142,19 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		cs := f.ClientSet
 		var err error
 		driverOpts := drivers.CSIMockDriverOpts{
-			RegisterDriver:      tp.registerDriver,
-			PodInfo:             tp.podInfo,
-			StorageCapacity:     tp.storageCapacity,
-			EnableTopology:      tp.enableTopology,
-			AttachLimit:         tp.attachLimit,
-			DisableAttach:       tp.disableAttach,
-			EnableResizing:      tp.enableResizing,
-			EnableNodeExpansion: tp.enableNodeExpansion,
-			EnableSnapshot:      tp.enableSnapshot,
-			TokenRequests:       tp.tokenRequests,
-			RequiresRepublish:   tp.requiresRepublish,
-			FSGroupPolicy:       tp.fsGroupPolicy,
+			RegisterDriver:         tp.registerDriver,
+			PodInfo:                tp.podInfo,
+			StorageCapacity:        tp.storageCapacity,
+			EnableTopology:         tp.enableTopology,
+			AttachLimit:            tp.attachLimit,
+			DisableAttach:          tp.disableAttach,
+			EnableResizing:         tp.enableResizing,
+			EnableNodeExpansion:    tp.enableNodeExpansion,
+			EnableSnapshot:         tp.enableSnapshot,
+			EnableVolumeMountGroup: tp.enableVolumeMountGroup,
+			TokenRequests:          tp.tokenRequests,
+			RequiresRepublish:      tp.requiresRepublish,
+			FSGroupPolicy:          tp.fsGroupPolicy,
 		}
 
 		// At the moment, only tests which need hooks are
@@ -371,9 +374,8 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				framework.ExpectNoError(err, "Failed to start pod: %v", err)
 
 				ginkgo.By("Checking if VolumeAttachment was created for the pod")
-				handle := getVolumeHandle(m.cs, claim)
-				attachmentHash := sha256.Sum256([]byte(fmt.Sprintf("%s%s%s", handle, m.provisioner, m.config.ClientNodeSelection.Name)))
-				attachmentName := fmt.Sprintf("csi-%x", attachmentHash)
+				testConfig := storageframework.ConvertTestConfig(m.config)
+				attachmentName := e2evolume.GetVolumeAttachmentName(m.cs, testConfig, m.provisioner, claim.Name, claim.Namespace)
 				_, err = m.cs.StorageV1().VolumeAttachments().Get(context.TODO(), attachmentName, metav1.GetOptions{})
 				if err != nil {
 					if apierrors.IsNotFound(err) {
@@ -422,9 +424,8 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 			// VolumeAttachment should be created because the default value for CSI attachable is true
 			ginkgo.By("Checking if VolumeAttachment was created for the pod")
-			handle := getVolumeHandle(m.cs, claim)
-			attachmentHash := sha256.Sum256([]byte(fmt.Sprintf("%s%s%s", handle, m.provisioner, m.config.ClientNodeSelection.Name)))
-			attachmentName := fmt.Sprintf("csi-%x", attachmentHash)
+			testConfig := storageframework.ConvertTestConfig(m.config)
+			attachmentName := e2evolume.GetVolumeAttachmentName(m.cs, testConfig, m.provisioner, claim.Name, claim.Namespace)
 			_, err = m.cs.StorageV1().VolumeAttachments().Get(context.TODO(), attachmentName, metav1.GetOptions{})
 			if err != nil {
 				if apierrors.IsNotFound(err) {
@@ -458,7 +459,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			ginkgo.By(fmt.Sprintf("Wait for the volumeattachment to be deleted up to %v", csiVolumeAttachmentTimeout))
 			// This step can be slow because we have to wait either a NodeUpdate event happens or
 			// the detachment for this volume timeout so that we can do a force detach.
-			err = waitForVolumeAttachmentTerminated(attachmentName, m.cs)
+			err = e2evolume.WaitForVolumeAttachmentTerminated(attachmentName, m.cs, csiVolumeAttachmentTimeout)
 			framework.ExpectNoError(err, "Failed to delete VolumeAttachment: %v", err)
 		})
 	})
@@ -1387,7 +1388,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				// before adding CSIStorageCapacity objects for it.
 				for _, capacityStr := range test.capacities {
 					capacityQuantity := resource.MustParse(capacityStr)
-					capacity := &storagev1beta1.CSIStorageCapacity{
+					capacity := &storagev1.CSIStorageCapacity{
 						ObjectMeta: metav1.ObjectMeta{
 							GenerateName: "fake-capacity-",
 						},
@@ -1396,10 +1397,10 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 						NodeTopology:     &metav1.LabelSelector{},
 						Capacity:         &capacityQuantity,
 					}
-					createdCapacity, err := f.ClientSet.StorageV1beta1().CSIStorageCapacities(f.Namespace.Name).Create(context.Background(), capacity, metav1.CreateOptions{})
+					createdCapacity, err := f.ClientSet.StorageV1().CSIStorageCapacities(f.Namespace.Name).Create(context.Background(), capacity, metav1.CreateOptions{})
 					framework.ExpectNoError(err, "create CSIStorageCapacity %+v", *capacity)
 					m.testCleanups = append(m.testCleanups, func() {
-						f.ClientSet.StorageV1beta1().CSIStorageCapacities(f.Namespace.Name).Delete(context.Background(), createdCapacity.Name, metav1.DeleteOptions{})
+						f.ClientSet.StorageV1().CSIStorageCapacities(f.Namespace.Name).Delete(context.Background(), createdCapacity.Name, metav1.DeleteOptions{})
 					})
 				}
 
@@ -1711,6 +1712,55 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 				// The created resources will be removed by the cleanup() function,
 				// so need to delete anything here.
+			})
+		}
+	})
+
+	ginkgo.Context("Delegate FSGroup to CSI driver [LinuxOnly]", func() {
+		tests := []struct {
+			name                   string
+			enableVolumeMountGroup bool
+		}{
+			{
+				name:                   "should pass FSGroup to CSI driver if it is set in pod and driver supports VOLUME_MOUNT_GROUP",
+				enableVolumeMountGroup: true,
+			},
+			{
+				name:                   "should not pass FSGroup to CSI driver if it is set in pod and driver supports VOLUME_MOUNT_GROUP",
+				enableVolumeMountGroup: false,
+			},
+		}
+		for _, t := range tests {
+			test := t
+			ginkgo.It(test.name, func() {
+				var nodeStageFsGroup, nodePublishFsGroup string
+				if framework.NodeOSDistroIs("windows") {
+					e2eskipper.Skipf("FSGroupPolicy is only applied on linux nodes -- skipping")
+				}
+				init(testParameters{
+					disableAttach:          true,
+					registerDriver:         true,
+					enableVolumeMountGroup: t.enableVolumeMountGroup,
+					hooks:                  createFSGroupRequestPreHook(&nodeStageFsGroup, &nodePublishFsGroup),
+				})
+				defer cleanup()
+
+				fsGroupVal := int64(rand.Int63n(20000) + 1024)
+				fsGroup := &fsGroupVal
+				fsGroupStr := strconv.FormatInt(fsGroupVal, 10 /* base */)
+
+				_, _, pod := createPodWithFSGroup(fsGroup) /* persistent volume */
+
+				err := e2epod.WaitForPodNameRunningInNamespace(m.cs, pod.Name, pod.Namespace)
+				framework.ExpectNoError(err, "failed to start pod")
+
+				if t.enableVolumeMountGroup {
+					framework.ExpectEqual(nodeStageFsGroup, fsGroupStr, "Expect NodeStageVolumeRequest.VolumeCapability.MountVolume.VolumeMountGroup to equal %q; got: %q", fsGroupStr, nodeStageFsGroup)
+					framework.ExpectEqual(nodePublishFsGroup, fsGroupStr, "Expect NodePublishVolumeRequest.VolumeCapability.MountVolume.VolumeMountGroup to equal %q; got: %q", fsGroupStr, nodePublishFsGroup)
+				} else {
+					framework.ExpectEmpty(nodeStageFsGroup, "Expect NodeStageVolumeRequest.VolumeCapability.MountVolume.VolumeMountGroup to be empty; got: %q", nodeStageFsGroup)
+					framework.ExpectEmpty(nodePublishFsGroup, "Expect NodePublishVolumeRequest.VolumeCapability.MountVolume.VolumeMountGroup to empty; got: %q", nodePublishFsGroup)
+				}
 			})
 		}
 	})
@@ -2028,24 +2078,6 @@ func waitForMaxVolumeCondition(pod *v1.Pod, cs clientset.Interface) error {
 	})
 	if waitErr != nil {
 		return fmt.Errorf("error waiting for pod %s/%s to have max volume condition: %v", pod.Namespace, pod.Name, waitErr)
-	}
-	return nil
-}
-
-func waitForVolumeAttachmentTerminated(attachmentName string, cs clientset.Interface) error {
-	waitErr := wait.PollImmediate(10*time.Second, csiVolumeAttachmentTimeout, func() (bool, error) {
-		_, err := cs.StorageV1().VolumeAttachments().Get(context.TODO(), attachmentName, metav1.GetOptions{})
-		if err != nil {
-			// if the volumeattachment object is not found, it means it has been terminated.
-			if apierrors.IsNotFound(err) {
-				return true, nil
-			}
-			return false, err
-		}
-		return false, nil
-	})
-	if waitErr != nil {
-		return fmt.Errorf("error waiting volume attachment %v to terminate: %v", attachmentName, waitErr)
 	}
 	return nil
 }
@@ -2374,26 +2406,6 @@ func destroyCSIDriver(cs clientset.Interface, driverName string) {
 	}
 }
 
-func getVolumeHandle(cs clientset.Interface, claim *v1.PersistentVolumeClaim) string {
-	// re-get the claim to the latest state with bound volume
-	claim, err := cs.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(context.TODO(), claim.Name, metav1.GetOptions{})
-	if err != nil {
-		framework.ExpectNoError(err, "Cannot get PVC")
-		return ""
-	}
-	pvName := claim.Spec.VolumeName
-	pv, err := cs.CoreV1().PersistentVolumes().Get(context.TODO(), pvName, metav1.GetOptions{})
-	if err != nil {
-		framework.ExpectNoError(err, "Cannot get PV")
-		return ""
-	}
-	if pv.Spec.CSI == nil {
-		gomega.Expect(pv.Spec.CSI).NotTo(gomega.BeNil())
-		return ""
-	}
-	return pv.Spec.CSI.VolumeHandle
-}
-
 func getVolumeLimitFromCSINode(csiNode *storagev1.CSINode, driverName string) int32 {
 	for _, d := range csiNode.Spec.Drivers {
 		if d.Name != driverName {
@@ -2457,6 +2469,30 @@ func createPreHook(method string, callback func(counter int64) error) *drivers.H
 				return nil, nil
 			}
 		}(),
+	}
+}
+
+// createFSGroupRequestPreHook creates a hook that records the fsGroup passed in
+// through NodeStageVolume and NodePublishVolume calls.
+func createFSGroupRequestPreHook(nodeStageFsGroup, nodePublishFsGroup *string) *drivers.Hooks {
+	return &drivers.Hooks{
+		Pre: func(ctx context.Context, fullMethod string, request interface{}) (reply interface{}, err error) {
+			nodeStageRequest, ok := request.(csipbv1.NodeStageVolumeRequest)
+			if ok {
+				mountVolume := nodeStageRequest.GetVolumeCapability().GetMount()
+				if mountVolume != nil {
+					*nodeStageFsGroup = mountVolume.VolumeMountGroup
+				}
+			}
+			nodePublishRequest, ok := request.(csipbv1.NodePublishVolumeRequest)
+			if ok {
+				mountVolume := nodePublishRequest.GetVolumeCapability().GetMount()
+				if mountVolume != nil {
+					*nodePublishFsGroup = mountVolume.VolumeMountGroup
+				}
+			}
+			return nil, nil
+		},
 	}
 }
 

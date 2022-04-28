@@ -20,7 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"runtime"
@@ -51,7 +51,7 @@ func scrapeMetrics(s *httptest.Server) (testutil.Metrics, error) {
 		return nil, fmt.Errorf("Non-200 response trying to scrape metrics from API Server: %v", resp)
 	}
 	metrics := testutil.NewMetrics()
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("Unable to read response: %v", resp)
 	}

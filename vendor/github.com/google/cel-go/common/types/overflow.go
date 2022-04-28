@@ -355,3 +355,35 @@ func uint64ToInt64Checked(v uint64) (int64, error) {
 	}
 	return int64(v), nil
 }
+
+func doubleToUint64Lossless(v float64) (uint64, bool) {
+	u, err := doubleToUint64Checked(v)
+	if err != nil {
+		return 0, false
+	}
+	if float64(u) != v {
+		return 0, false
+	}
+	return u, true
+}
+
+func doubleToInt64Lossless(v float64) (int64, bool) {
+	i, err := doubleToInt64Checked(v)
+	if err != nil {
+		return 0, false
+	}
+	if float64(i) != v {
+		return 0, false
+	}
+	return i, true
+}
+
+func int64ToUint64Lossless(v int64) (uint64, bool) {
+	u, err := int64ToUint64Checked(v)
+	return u, err == nil
+}
+
+func uint64ToInt64Lossless(v uint64) (int64, bool) {
+	i, err := uint64ToInt64Checked(v)
+	return i, err == nil
+}

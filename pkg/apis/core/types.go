@@ -430,6 +430,9 @@ type PersistentVolumeClaimSpec struct {
 	// +optional
 	Selector *metav1.LabelSelector
 	// Resources represents the minimum resources required
+	// If RecoverVolumeExpansionFailure feature is enabled users are allowed to specify resource requirements
+	// that are lower than previous value but must still be higher than capacity recorded in the
+	// status field of the claim.
 	// +optional
 	Resources ResourceRequirements
 	// VolumeName is the binding reference to the PersistentVolume backing this
@@ -469,7 +472,7 @@ type PersistentVolumeClaimSpec struct {
 	// * While DataSource ignores disallowed values (dropping them), DataSourceRef
 	//   preserves all values, and generates an error if a disallowed value is
 	//   specified.
-	// (Alpha) Using this field requires the AnyVolumeDataSource feature gate to be enabled.
+	// (Beta) Using this field requires the AnyVolumeDataSource feature gate to be enabled.
 	// +optional
 	DataSourceRef *TypedLocalObjectReference
 }
@@ -484,6 +487,26 @@ const (
 	PersistentVolumeClaimResizing PersistentVolumeClaimConditionType = "Resizing"
 	// PersistentVolumeClaimFileSystemResizePending - controller resize is finished and a file system resize is pending on node
 	PersistentVolumeClaimFileSystemResizePending PersistentVolumeClaimConditionType = "FileSystemResizePending"
+)
+
+// +enum
+type PersistentVolumeClaimResizeStatus string
+
+const (
+	// When expansion is complete, the empty string is set by resize controller or kubelet.
+	PersistentVolumeClaimNoExpansionInProgress PersistentVolumeClaimResizeStatus = ""
+	// State set when resize controller starts expanding the volume in control-plane
+	PersistentVolumeClaimControllerExpansionInProgress PersistentVolumeClaimResizeStatus = "ControllerExpansionInProgress"
+	// State set when expansion has failed in resize controller with a terminal error.
+	// Transient errors such as timeout should not set this status and should leave ResizeStatus
+	// unmodified, so as resize controller can resume the volume expansion.
+	PersistentVolumeClaimControllerExpansionFailed PersistentVolumeClaimResizeStatus = "ControllerExpansionFailed"
+	// State set when resize controller has finished expanding the volume but further expansion is needed on the node.
+	PersistentVolumeClaimNodeExpansionPending PersistentVolumeClaimResizeStatus = "NodeExpansionPending"
+	// State set when kubelet starts expanding the volume.
+	PersistentVolumeClaimNodeExpansionInProgress PersistentVolumeClaimResizeStatus = "NodeExpansionInProgress"
+	// State set when expansion has failed in kubelet with a terminal error. Transient errors don't set NodeExpansionFailed.
+	PersistentVolumeClaimNodeExpansionFailed PersistentVolumeClaimResizeStatus = "NodeExpansionFailed"
 )
 
 // PersistentVolumeClaimCondition represents the current condition of PV claim
@@ -513,6 +536,24 @@ type PersistentVolumeClaimStatus struct {
 	Capacity ResourceList
 	// +optional
 	Conditions []PersistentVolumeClaimCondition
+	// The storage resource within AllocatedResources tracks the capacity allocated to a PVC. It may
+	// be larger than the actual capacity when a volume expansion operation is requested.
+	// For storage quota, the larger value from allocatedResources and PVC.spec.resources is used.
+	// If allocatedResources is not set, PVC.spec.resources alone is used for quota calculation.
+	// If a volume expansion capacity request is lowered, allocatedResources is only
+	// lowered if there are no expansion operations in progress and if the actual volume capacity
+	// is equal or lower than the requested capacity.
+	// This is an alpha field and requires enabling RecoverVolumeExpansionFailure feature.
+	// +featureGate=RecoverVolumeExpansionFailure
+	// +optional
+	AllocatedResources ResourceList
+	// ResizeStatus stores status of resize operation.
+	// ResizeStatus is not set by default but when expansion is complete resizeStatus is set to empty
+	// string by resize controller or kubelet.
+	// This is an alpha field and requires enabling RecoverVolumeExpansionFailure feature.
+	// +featureGate=RecoverVolumeExpansionFailure
+	// +optional
+	ResizeStatus *PersistentVolumeClaimResizeStatus
 }
 
 // PersistentVolumeAccessMode defines various access modes for PV.
@@ -2119,7 +2160,7 @@ type Container struct {
 	Name string
 	// Required.
 	Image string
-	// Optional: The docker image's entrypoint is used if this is not provided; cannot be updated.
+	// Optional: The container image's entrypoint is used if this is not provided; cannot be updated.
 	// Variable references $(VAR_NAME) are expanded using the container's environment.  If a variable
 	// cannot be resolved, the reference in the input string will be unchanged.  Double $$ are reduced
 	// to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will
@@ -2127,7 +2168,7 @@ type Container struct {
 	// of whether the variable exists or not.
 	// +optional
 	Command []string
-	// Optional: The docker image's cmd is used if this is not provided; cannot be updated.
+	// Optional: The container image's cmd is used if this is not provided; cannot be updated.
 	// Variable references $(VAR_NAME) are expanded using the container's environment.  If a variable
 	// cannot be resolved, the reference in the input string will be unchanged.  Double $$ are reduced
 	// to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will
@@ -2135,7 +2176,7 @@ type Container struct {
 	// of whether the variable exists or not.
 	// +optional
 	Args []string
-	// Optional: Defaults to Docker's default.
+	// Optional: Defaults to the container runtime's default working directory.
 	// +optional
 	WorkingDir string
 	// +optional
@@ -2189,11 +2230,8 @@ type Container struct {
 }
 
 // ProbeHandler defines a specific action that should be taken in a probe.
-// This type has a strong relationship to LifecycleHandler - overlapping fields
-// should be identical.
-// TODO: pass structured data to these actions, and document that data here.
+// One and only one of the fields must be specified.
 type ProbeHandler struct {
-	// One and only one of the following should be specified.
 	// Exec specifies the action to take.
 	// +optional
 	Exec *ExecAction
@@ -2201,27 +2239,43 @@ type ProbeHandler struct {
 	// +optional
 	HTTPGet *HTTPGetAction
 	// TCPSocket specifies an action involving a TCP port.
-	// TODO: implement a realistic TCP lifecycle hook
+	// +optional
+	TCPSocket *TCPSocketAction
+
+	// GRPC specifies an action involving a GRPC port.
+	// This is a beta field and requires enabling GRPCContainerProbe feature gate.
+	// +featureGate=GRPCContainerProbe
+	// +optional
+	GRPC *GRPCAction
+}
+
+// LifecycleHandler defines a specific action that should be taken in a lifecycle
+// hook. One and only one of the fields, except TCPSocket must be specified.
+type LifecycleHandler struct {
+	// Exec specifies the action to take.
+	// +optional
+	Exec *ExecAction
+	// HTTPGet specifies the http request to perform.
+	// +optional
+	HTTPGet *HTTPGetAction
+	// Deprecated. TCPSocket is NOT supported as a LifecycleHandler and kept
+	// for the backward compatibility. There are no validation of this field and
+	// lifecycle hooks will fail in runtime when tcp handler is specified.
 	// +optional
 	TCPSocket *TCPSocketAction
 }
 
-// LifecycleHandler defines a specific action that should be taken in a lifecycle
-// hook.  This type has a strong relationship to ProbeHandler - overlapping fields
-// should be identical.
-// TODO: pass structured data to these actions, and document that data here.
-type LifecycleHandler struct {
-	// One and only one of the following should be specified.
-	// Exec specifies the action to take.
+type GRPCAction struct {
+	// Port number of the gRPC service.
+	// Note: Number must be in the range 1 to 65535.
+	Port int32
+
+	// Service is the name of the service to place in the gRPC HealthCheckRequest
+	// (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md).
+	//
+	// If this is not specified, the default behavior is to probe the server's overall health status.
 	// +optional
-	Exec *ExecAction
-	// HTTPGet specifies the http request to perform.
-	// +optional
-	HTTPGet *HTTPGetAction
-	// TCPSocket specifies an action involving a TCP port.
-	// TODO: implement a realistic TCP lifecycle hook
-	// +optional
-	TCPSocket *TCPSocketAction
+	Service *string
 }
 
 // Lifecycle describes actions that the management system should take in response to container lifecycle
@@ -2230,17 +2284,18 @@ type LifecycleHandler struct {
 type Lifecycle struct {
 	// PostStart is called immediately after a container is created.  If the handler fails, the container
 	// is terminated and restarted.
+	// More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks
 	// +optional
 	PostStart *LifecycleHandler
 	// PreStop is called immediately before a container is terminated due to an
 	// API request or management event such as liveness/startup probe failure,
 	// preemption, resource contention, etc. The handler is not called if the
-	// container crashes or exits. The reason for termination is passed to the
-	// handler. The Pod's termination grace period countdown begins before the
-	// PreStop hooked is executed. Regardless of the outcome of the handler, the
+	// container crashes or exits. The Pod's termination grace period countdown begins before the
+	// PreStop hook is executed. Regardless of the outcome of the handler, the
 	// container will eventually terminate within the Pod's termination grace
-	// period. Other management of the container blocks until the hook completes
+	// period (unless delayed by finalizers). Other management of the container blocks until the hook completes
 	// or until the termination grace period is reached.
+	// More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks
 	// +optional
 	PreStop *LifecycleHandler
 }
@@ -2607,7 +2662,7 @@ type PodAffinityTerm struct {
 	// namespaces specifies a static list of namespace names that the term applies to.
 	// The term is applied to the union of the namespaces listed in this field
 	// and the ones selected by namespaceSelector.
-	// null or empty namespaces list and null namespaceSelector means "this pod's namespace"
+	// null or empty namespaces list and null namespaceSelector means "this pod's namespace".
 	// +optional
 	Namespaces []string
 	// This pod should be co-located (affinity) or not co-located (anti-affinity) with the pods matching
@@ -2621,7 +2676,6 @@ type PodAffinityTerm struct {
 	// and the ones listed in the namespaces field.
 	// null selector and null or empty namespaces list means "this pod's namespace".
 	// An empty selector ({}) matches all namespaces.
-	// This field is beta-level and is only honored when PodAffinityNamespaceSelector feature is enabled.
 	// +optional
 	NamespaceSelector *metav1.LabelSelector
 }
@@ -2813,8 +2867,7 @@ type PodSpec struct {
 	// +optional
 	SecurityContext *PodSecurityContext
 	// ImagePullSecrets is an optional list of references to secrets in the same namespace to use for pulling any of the images used by this PodSpec.
-	// If specified, these secrets will be passed to individual puller implementations for them to use.  For example,
-	// in the case of docker, only DockerConfig type secrets are honored.
+	// If specified, these secrets will be passed to individual puller implementations for them to use.
 	// +optional
 	ImagePullSecrets []LocalObjectReference
 	// Specifies the hostname of the Pod.
@@ -2863,7 +2916,6 @@ type PodSpec struct {
 	// PreemptionPolicy is the Policy for preempting pods with lower priority.
 	// One of Never, PreemptLowerPriority.
 	// Defaults to PreemptLowerPriority if unset.
-	// This field is beta-level, gated by the NonPreemptingPriority feature-gate.
 	// +optional
 	PreemptionPolicy *PreemptionPolicy
 	// Specifies the DNS parameters of a pod.
@@ -2891,7 +2943,6 @@ type PodSpec struct {
 	// set. If RuntimeClass is configured and selected in the PodSpec, Overhead will be set to the value
 	// defined in the corresponding RuntimeClass, otherwise it will remain unset and treated as zero.
 	// More info: https://git.k8s.io/enhancements/keps/sig-node/688-pod-overhead
-	// This field is beta-level as of Kubernetes v1.18, and is only honored by servers that enable the PodOverhead feature.
 	// +optional
 	Overhead ResourceList
 	// EnableServiceLinks indicates whether information about services should be injected into pod's
@@ -2932,7 +2983,7 @@ type PodSpec struct {
 	// - spec.containers[*].securityContext.runAsUser
 	// - spec.containers[*].securityContext.runAsGroup
 	// +optional
-	// This is an alpha field and requires the IdentifyPodOS feature
+	// This is a beta field and requires the IdentifyPodOS feature
 	OS *PodOS
 }
 
@@ -3178,7 +3229,7 @@ type EphemeralContainerCommon struct {
 	Name string
 	// Required.
 	Image string
-	// Optional: The docker image's entrypoint is used if this is not provided; cannot be updated.
+	// Optional: The container image's entrypoint is used if this is not provided; cannot be updated.
 	// Variable references $(VAR_NAME) are expanded using the container's environment.  If a variable
 	// cannot be resolved, the reference in the input string will be unchanged.  Double $$ are reduced
 	// to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will
@@ -3186,7 +3237,7 @@ type EphemeralContainerCommon struct {
 	// of whether the variable exists or not.
 	// +optional
 	Command []string
-	// Optional: The docker image's cmd is used if this is not provided; cannot be updated.
+	// Optional: The container image's cmd is used if this is not provided; cannot be updated.
 	// Variable references $(VAR_NAME) are expanded using the container's environment.  If a variable
 	// cannot be resolved, the reference in the input string will be unchanged.  Double $$ are reduced
 	// to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will
@@ -3194,7 +3245,7 @@ type EphemeralContainerCommon struct {
 	// of whether the variable exists or not.
 	// +optional
 	Args []string
-	// Optional: Defaults to Docker's default.
+	// Optional: Defaults to the container runtime's default working directory.
 	// +optional
 	WorkingDir string
 	// Ports are not allowed for ephemeral containers.
@@ -3325,11 +3376,7 @@ type PodStatus struct {
 	// startTime set.
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-and-container-status
 	InitContainerStatuses []ContainerStatus
-	// The list has one entry per container in the manifest. Each entry is
-	// currently the output of `docker inspect`. This output format is *not*
-	// final and should not be relied upon.
-	// TODO: Make real decisions about what our info should look like. Re-enable fuzz test
-	// when we have done this.
+	// The list has one entry per app container in the manifest.
 	// +optional
 	ContainerStatuses []ContainerStatus
 
@@ -3785,6 +3832,10 @@ type ServiceSpec struct {
 	// This feature depends on whether the underlying cloud-provider supports specifying
 	// the loadBalancerIP when a load balancer is created.
 	// This field will be ignored if the cloud-provider does not support the feature.
+	// Deprecated: This field was under-specified and its meaning varies across implementations,
+	// and it cannot support dual-stack.
+	// As of Kubernetes v1.24, users are encouraged to use implementation-specific annotations when available.
+	// This field may be removed in a future API version.
 	// +optional
 	LoadBalancerIP string
 
@@ -3837,7 +3888,6 @@ type ServiceSpec struct {
 	// value), those requests will be respected, regardless of this field.
 	// This field may only be set for services with type LoadBalancer and will
 	// be cleared if the type is changed to any other type.
-	// This field is beta-level and is only honored by servers that enable the ServiceLBNodePortControl feature.
 	// +optional
 	AllocateLoadBalancerNodePorts *bool
 
@@ -3880,7 +3930,7 @@ type ServicePort struct {
 	// The application protocol for this port.
 	// This field follows standard Kubernetes label syntax.
 	// Un-prefixed names are reserved for IANA standard service names (as per
-	// RFC-6335 and http://www.iana.org/assignments/service-names).
+	// RFC-6335 and https://www.iana.org/assignments/service-names).
 	// Non-standard protocols should use prefixed names such as
 	// mycompany.com/my-custom-protocol.
 	// +optional
@@ -3932,7 +3982,10 @@ type ServiceAccount struct {
 	// +optional
 	metav1.ObjectMeta
 
-	// Secrets is the list of secrets allowed to be used by pods running using this ServiceAccount
+	// Secrets is a list of the secrets in the same namespace that pods running using this ServiceAccount are allowed to use.
+	// Pods are only limited to this list if this service account has a "kubernetes.io/enforce-mountable-secrets" annotation set to "true".
+	// This field should not be used to find auto-generated service account token secrets for use outside of pods.
+	// Instead, tokens can be requested directly using the TokenRequest API, or service account token secrets can be manually created.
 	Secrets []ObjectReference
 
 	// ImagePullSecrets is a list of references to secrets in the same namespace to use for pulling any images
@@ -4030,7 +4083,7 @@ type EndpointPort struct {
 	// The application protocol for this port.
 	// This field follows standard Kubernetes label syntax.
 	// Un-prefixed names are reserved for IANA standard service names (as per
-	// RFC-6335 and http://www.iana.org/assignments/service-names).
+	// RFC-6335 and https://www.iana.org/assignments/service-names).
 	// Non-standard protocols should use prefixed names such as
 	// mycompany.com/my-custom-protocol.
 	// +optional
@@ -4069,8 +4122,7 @@ type NodeSpec struct {
 	// +optional
 	Taints []Taint
 
-	// If specified, the source to get node configuration from
-	// The DynamicKubeletConfig feature gate must be enabled for the Kubelet to use this field
+	// Deprecated: Previously used to specify the source of the node's configuration for the DynamicKubeletConfig feature. This feature is removed from Kubelets as of 1.24 and will be fully removed in 1.26.
 	// +optional
 	ConfigSource *NodeConfigSource
 
@@ -4080,12 +4132,12 @@ type NodeSpec struct {
 	DoNotUseExternalID string
 }
 
-// NodeConfigSource specifies a source of node configuration. Exactly one subfield must be non-nil.
+// Deprecated: NodeConfigSource specifies a source of node configuration. Exactly one subfield must be non-nil.
 type NodeConfigSource struct {
 	ConfigMap *ConfigMapNodeConfigSource
 }
 
-// ConfigMapNodeConfigSource represents the config map of a node
+// Deprecated: ConfigMapNodeConfigSource represents the config map of a node
 type ConfigMapNodeConfigSource struct {
 	// Namespace is the metadata.namespace of the referenced ConfigMap.
 	// This field is required in all cases.
@@ -5009,7 +5061,6 @@ const (
 	// Match all pod objects that have priority class mentioned
 	ResourceQuotaScopePriorityClass ResourceQuotaScope = "PriorityClass"
 	// Match all pod objects that have cross-namespace pod (anti)affinity mentioned
-	// This is a beta feature enabled by the PodAffinityNamespaceSelector feature flag.
 	ResourceQuotaScopeCrossNamespacePodAffinity ResourceQuotaScope = "CrossNamespacePodAffinity"
 )
 
@@ -5548,15 +5599,18 @@ type TopologySpreadConstraint struct {
 	// MaxSkew describes the degree to which pods may be unevenly distributed.
 	// When `whenUnsatisfiable=DoNotSchedule`, it is the maximum permitted difference
 	// between the number of matching pods in the target topology and the global minimum.
+	// The global minimum is the minimum number of matching pods in an eligible domain
+	// or zero if the number of eligible domains is less than MinDomains.
 	// For example, in a 3-zone cluster, MaxSkew is set to 1, and pods with the same
-	// labelSelector spread as 1/1/0:
+	// labelSelector spread as 2/2/1:
+	// In this case, the global minimum is 1.
 	// +-------+-------+-------+
 	// | zone1 | zone2 | zone3 |
 	// +-------+-------+-------+
-	// |   P   |   P   |       |
+	// |  P P  |  P P  |   P   |
 	// +-------+-------+-------+
-	// - if MaxSkew is 1, incoming pod can only be scheduled to zone3 to become 1/1/1;
-	// scheduling it onto zone1(zone2) would make the ActualSkew(2-0) on zone1(zone2)
+	// - if MaxSkew is 1, incoming pod can only be scheduled to zone3 to become 2/2/2;
+	// scheduling it onto zone1(zone2) would make the ActualSkew(3-1) on zone1(zone2)
 	// violate MaxSkew(1).
 	// - if MaxSkew is 2, incoming pod can be scheduled onto any zone.
 	// When `whenUnsatisfiable=ScheduleAnyway`, it is used to give higher precedence
@@ -5567,6 +5621,10 @@ type TopologySpreadConstraint struct {
 	// and identical values are considered to be in the same topology.
 	// We consider each <key, value> as a "bucket", and try to put balanced number
 	// of pods into each bucket.
+	// We define a domain as a particular instance of a topology.
+	// Also, we define an eligible domain as a domain whose nodes match the node selector.
+	// e.g. If TopologyKey is "kubernetes.io/hostname", each Node is a domain of that topology.
+	// And, if TopologyKey is "topology.kubernetes.io/zone", each zone is a domain of that topology.
 	// It's a required field.
 	TopologyKey string
 	// WhenUnsatisfiable indicates how to deal with a pod if it doesn't satisfy
@@ -5596,6 +5654,32 @@ type TopologySpreadConstraint struct {
 	// in their corresponding topology domain.
 	// +optional
 	LabelSelector *metav1.LabelSelector
+	// MinDomains indicates a minimum number of eligible domains.
+	// When the number of eligible domains with matching topology keys is less than minDomains,
+	// Pod Topology Spread treats "global minimum" as 0, and then the calculation of Skew is performed.
+	// And when the number of eligible domains with matching topology keys equals or greater than minDomains,
+	// this value has no effect on scheduling.
+	// As a result, when the number of eligible domains is less than minDomains,
+	// scheduler won't schedule more than maxSkew Pods to those domains.
+	// If value is nil, the constraint behaves as if MinDomains is equal to 1.
+	// Valid values are integers greater than 0.
+	// When value is not nil, WhenUnsatisfiable must be DoNotSchedule.
+	//
+	// For example, in a 3-zone cluster, MaxSkew is set to 2, MinDomains is set to 5 and pods with the same
+	// labelSelector spread as 2/2/2:
+	// +-------+-------+-------+
+	// | zone1 | zone2 | zone3 |
+	// +-------+-------+-------+
+	// |  P P  |  P P  |  P P  |
+	// +-------+-------+-------+
+	// The number of domains is less than 5(MinDomains), so "global minimum" is treated as 0.
+	// In this situation, new pod with the same labelSelector cannot be scheduled,
+	// because computed skew will be 3(3 - 0) if new Pod is scheduled to any of the three zones,
+	// it will violate MaxSkew.
+	//
+	// This is an alpha field and requires enabling MinDomainsInPodTopologySpread feature gate.
+	// +optional
+	MinDomains *int32
 }
 
 // These are the built-in errors for PortStatus.

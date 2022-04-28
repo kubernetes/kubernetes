@@ -36,7 +36,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/component-helpers/scheduling/corev1"
 	storagehelpers "k8s.io/component-helpers/storage/volume"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -162,30 +161,6 @@ func GetClassForVolume(kubeClient clientset.Interface, pv *v1.PersistentVolume) 
 		return nil, err
 	}
 	return class, nil
-}
-
-// CheckNodeAffinity looks at the PV node affinity, and checks if the node has the same corresponding labels
-// This ensures that we don't mount a volume that doesn't belong to this node
-func CheckNodeAffinity(pv *v1.PersistentVolume, nodeLabels map[string]string) error {
-	return checkVolumeNodeAffinity(pv, &v1.Node{ObjectMeta: metav1.ObjectMeta{Labels: nodeLabels}})
-}
-
-func checkVolumeNodeAffinity(pv *v1.PersistentVolume, node *v1.Node) error {
-	if pv.Spec.NodeAffinity == nil {
-		return nil
-	}
-
-	if pv.Spec.NodeAffinity.Required != nil {
-		terms := pv.Spec.NodeAffinity.Required
-		klog.V(10).Infof("Match for Required node selector terms %+v", terms)
-		if matches, err := corev1.MatchNodeSelectorTerms(node, terms); err != nil {
-			return err
-		} else if !matches {
-			return fmt.Errorf("no matching NodeSelectorTerms")
-		}
-	}
-
-	return nil
 }
 
 // LoadPodFromFile will read, decode, and return a Pod from a file.

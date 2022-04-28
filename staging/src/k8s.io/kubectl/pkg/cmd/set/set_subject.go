@@ -66,7 +66,7 @@ type SubjectOptions struct {
 	Output            string
 	All               bool
 	DryRunStrategy    cmdutil.DryRunStrategy
-	DryRunVerifier    *resource.DryRunVerifier
+	DryRunVerifier    *resource.QueryParamVerifier
 	Local             bool
 	fieldManager      string
 
@@ -110,7 +110,7 @@ func NewCmdSubject(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, "the resource to update the subjects")
 	cmd.Flags().BoolVar(&o.All, "all", o.All, "Select all resources, in the namespace of the specified resource types")
-	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
+	cmdutil.AddLabelSelectorFlagVar(cmd, &o.Selector)
 	cmd.Flags().BoolVar(&o.Local, "local", o.Local, "If true, set subject will NOT contact api-server but run locally.")
 	cmdutil.AddDryRunFlag(cmd)
 	cmd.Flags().StringArrayVar(&o.Users, "user", o.Users, "Usernames to bind to the role")
@@ -132,7 +132,7 @@ func (o *SubjectOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 	if err != nil {
 		return err
 	}
-	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, f.OpenAPIGetter())
+	o.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 
 	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
 	printer, err := o.PrintFlags.ToPrinter()

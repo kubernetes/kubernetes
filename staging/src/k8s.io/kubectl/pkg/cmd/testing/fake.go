@@ -51,7 +51,7 @@ import (
 	openapitesting "k8s.io/kubectl/pkg/util/openapi/testing"
 	"k8s.io/kubectl/pkg/validation"
 
-	openapi_v2 "github.com/googleapis/gnostic/openapiv2"
+	openapi_v2 "github.com/google/gnostic/openapiv2"
 )
 
 // InternalType is the schema for internal type
@@ -375,11 +375,6 @@ func (d *fakeCachedDiscoveryClient) Fresh() bool {
 func (d *fakeCachedDiscoveryClient) Invalidate() {
 }
 
-// Deprecated: use ServerGroupsAndResources instead.
-func (d *fakeCachedDiscoveryClient) ServerResources() ([]*metav1.APIResourceList, error) {
-	return []*metav1.APIResourceList{}, nil
-}
-
 func (d *fakeCachedDiscoveryClient) ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
 	return []*metav1.APIGroup{}, []*metav1.APIResourceList{}, nil
 }
@@ -446,6 +441,12 @@ func (f *TestFactory) WithNamespace(ns string) *TestFactory {
 	return f
 }
 
+// WithClientConfig sets the client config to use
+func (f *TestFactory) WithClientConfig(clientConfig clientcmd.ClientConfig) *TestFactory {
+	f.kubeConfigFlags.WithClientConfig(clientConfig)
+	return f
+}
+
 // Cleanup cleans up TestFactory temp config file
 func (f *TestFactory) Cleanup() {
 	if f.tempConfigFile == nil {
@@ -493,7 +494,7 @@ func (f *TestFactory) UnstructuredClientForMapping(mapping *meta.RESTMapping) (r
 }
 
 // Validator returns a validation schema
-func (f *TestFactory) Validator(validate bool) (validation.Schema, error) {
+func (f *TestFactory) Validator(validateDirective string, verifier *resource.QueryParamVerifier) (validation.Schema, error) {
 	return validation.NullSchema{}, nil
 }
 

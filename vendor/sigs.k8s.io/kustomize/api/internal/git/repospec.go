@@ -125,7 +125,7 @@ func parseGitUrl(n string) (
 		index := strings.Index(n, gitSuffix)
 		orgRepo = n[0:index]
 		n = n[index+len(gitSuffix):]
-		if n[0] == '/' {
+		if len(n) > 0 && n[0] == '/' {
 			n = n[1:]
 		}
 		path, gitRef, gitTimeout, gitSubmodules = peelQuery(n)

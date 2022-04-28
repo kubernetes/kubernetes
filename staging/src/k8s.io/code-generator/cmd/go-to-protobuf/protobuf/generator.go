@@ -47,7 +47,7 @@ type genProtoIDL struct {
 func (g *genProtoIDL) PackageVars(c *generator.Context) []string {
 	if g.omitGogo {
 		return []string{
-			fmt.Sprintf("option go_package = %q;", g.localGoPackage.Name),
+			fmt.Sprintf("option go_package = %q;", g.localGoPackage.Package),
 		}
 	}
 	return []string{
@@ -60,7 +60,7 @@ func (g *genProtoIDL) PackageVars(c *generator.Context) []string {
 		"option (gogoproto.goproto_unrecognized_all) = false;",
 		"option (gogoproto.goproto_enum_prefix_all) = false;",
 		"option (gogoproto.goproto_getters_all) = false;",
-		fmt.Sprintf("option go_package = %q;", g.localGoPackage.Name),
+		fmt.Sprintf("option go_package = %q;", g.localGoPackage.Package),
 	}
 }
 func (g *genProtoIDL) Filename() string { return g.OptionalName + ".proto" }
@@ -573,7 +573,7 @@ func protobufTagToField(tag string, field *protoField, m types.Member, t *types.
 	switch parts[0] {
 	case "varint", "fixed32", "fixed64", "bytes", "group":
 	default:
-		name := types.Name{}
+		var name types.Name
 		if last := strings.LastIndex(parts[0], "."); last != -1 {
 			prefix := parts[0][:last]
 			name = types.Name{

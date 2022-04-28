@@ -535,12 +535,30 @@ func TestSetEnvFromResource(t *testing.T) {
 		},
 	}
 
+	mockConfigMapUpperCaseKey := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: "testconfigmapuppercasekey"},
+		Data: map[string]string{
+			"ENV":          "prod",
+			"TEST_KEY":     "testValue",
+			"TEST_KEY_TWO": "testValueTwo",
+		},
+	}
+
 	mockSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{Name: "testsecret"},
 		Data: map[string][]byte{
 			"env":          []byte("prod"),
 			"test-key":     []byte("testValue"),
 			"test-key-two": []byte("testValueTwo"),
+		},
+	}
+
+	mockSecretUpperCaseKey := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "testsecretuppercasekey"},
+		Data: map[string][]byte{
+			"ENV":          []byte("prod"),
+			"TEST_KEY":     []byte("testValue"),
+			"TEST_KEY_TWO": []byte("testValueTwo"),
 		},
 	}
 
@@ -551,6 +569,7 @@ func TestSetEnvFromResource(t *testing.T) {
 		keys           []string
 		assertIncludes []string
 		assertExcludes []string
+		warning        bool
 	}{
 		{
 			name: "test from configmap",
@@ -563,6 +582,20 @@ func TestSetEnvFromResource(t *testing.T) {
 				`{"name":"TEST_KEY_TWO","valueFrom":{"configMapKeyRef":{"key":"test-key-two","name":"testconfigmap"}}}`,
 			},
 			assertExcludes: []string{},
+			warning:        true,
+		},
+		{
+			name: "test from configmap with upper case key",
+			args: []string{"deployment", "nginx"},
+			from: "configmap/testconfigmapuppercasekey",
+			keys: []string{},
+			assertIncludes: []string{
+				`{"name":"ENV","valueFrom":{"configMapKeyRef":{"key":"ENV","name":"testconfigmapuppercasekey"}}}`,
+				`{"name":"TEST_KEY","valueFrom":{"configMapKeyRef":{"key":"TEST_KEY","name":"testconfigmapuppercasekey"}}}`,
+				`{"name":"TEST_KEY_TWO","valueFrom":{"configMapKeyRef":{"key":"TEST_KEY_TWO","name":"testconfigmapuppercasekey"}}}`,
+			},
+			assertExcludes: []string{},
+			warning:        false,
 		},
 		{
 			name: "test from secret",
@@ -575,6 +608,20 @@ func TestSetEnvFromResource(t *testing.T) {
 				`{"name":"TEST_KEY_TWO","valueFrom":{"secretKeyRef":{"key":"test-key-two","name":"testsecret"}}}`,
 			},
 			assertExcludes: []string{},
+			warning:        true,
+		},
+		{
+			name: "test from secret with upper case key",
+			args: []string{"deployment", "nginx"},
+			from: "secret/testsecretuppercasekey",
+			keys: []string{},
+			assertIncludes: []string{
+				`{"name":"ENV","valueFrom":{"secretKeyRef":{"key":"ENV","name":"testsecretuppercasekey"}}}`,
+				`{"name":"TEST_KEY","valueFrom":{"secretKeyRef":{"key":"TEST_KEY","name":"testsecretuppercasekey"}}}`,
+				`{"name":"TEST_KEY_TWO","valueFrom":{"secretKeyRef":{"key":"TEST_KEY_TWO","name":"testsecretuppercasekey"}}}`,
+			},
+			assertExcludes: []string{},
+			warning:        false,
 		},
 		{
 			name: "test from configmap with keys",
@@ -586,6 +633,7 @@ func TestSetEnvFromResource(t *testing.T) {
 				`{"name":"TEST_KEY_TWO","valueFrom":{"configMapKeyRef":{"key":"test-key-two","name":"testconfigmap"}}}`,
 			},
 			assertExcludes: []string{`{"name":"TEST_KEY","valueFrom":{"configMapKeyRef":{"key":"test-key","name":"testconfigmap"}}}`},
+			warning:        true,
 		},
 		{
 			name: "test from secret with keys",
@@ -597,6 +645,7 @@ func TestSetEnvFromResource(t *testing.T) {
 				`{"name":"TEST_KEY_TWO","valueFrom":{"secretKeyRef":{"key":"test-key-two","name":"testsecret"}}}`,
 			},
 			assertExcludes: []string{`{"name":"TEST_KEY","valueFrom":{"secretKeyRef":{"key":"test-key","name":"testsecret"}}}`},
+			warning:        true,
 		},
 	}
 
@@ -628,8 +677,12 @@ func TestSetEnvFromResource(t *testing.T) {
 					switch p, m := req.URL.Path, req.Method; {
 					case p == "/namespaces/test/configmaps/testconfigmap" && m == http.MethodGet:
 						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: objBody(mockConfigMap)}, nil
+					case p == "/namespaces/test/configmaps/testconfigmapuppercasekey" && m == http.MethodGet:
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: objBody(mockConfigMapUpperCaseKey)}, nil
 					case p == "/namespaces/test/secrets/testsecret" && m == http.MethodGet:
 						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: objBody(mockSecret)}, nil
+					case p == "/namespaces/test/secrets/testsecretuppercasekey" && m == http.MethodGet:
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: objBody(mockSecretUpperCaseKey)}, nil
 					case p == "/namespaces/test/deployments/nginx" && m == http.MethodGet:
 						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: objBody(mockDeployment)}, nil
 					case p == "/namespaces/test/deployments/nginx" && m == http.MethodPatch:
@@ -656,7 +709,7 @@ func TestSetEnvFromResource(t *testing.T) {
 			}
 
 			outputFormat := "yaml"
-			streams := genericclioptions.NewTestIOStreamsDiscard()
+			streams, _, _, errOut := genericclioptions.NewTestIOStreams()
 			opts := NewEnvOptions(streams)
 			opts.From = input.from
 			opts.Keys = input.keys
@@ -666,6 +719,11 @@ func TestSetEnvFromResource(t *testing.T) {
 			err := opts.Complete(tf, NewCmdEnv(tf, streams), input.args)
 			assert.NoError(t, err)
 			err = opts.RunEnv()
+			if input.warning {
+				assert.Contains(t, errOut.String(), "warning")
+			} else {
+				assert.NotContains(t, errOut.String(), "warning")
+			}
 			assert.NoError(t, err)
 		})
 	}

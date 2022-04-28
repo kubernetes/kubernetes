@@ -69,6 +69,26 @@ func ValidatePodTemplateSpecForStatefulSet(template *api.PodTemplateSpec, select
 	return allErrs
 }
 
+func ValidatePersistentVolumeClaimRetentionPolicyType(policy apps.PersistentVolumeClaimRetentionPolicyType, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	switch policy {
+	case apps.RetainPersistentVolumeClaimRetentionPolicyType:
+	case apps.DeletePersistentVolumeClaimRetentionPolicyType:
+	default:
+		allErrs = append(allErrs, field.NotSupported(fldPath, policy, []string{string(apps.RetainPersistentVolumeClaimRetentionPolicyType), string(apps.DeletePersistentVolumeClaimRetentionPolicyType)}))
+	}
+	return allErrs
+}
+
+func ValidatePersistentVolumeClaimRetentionPolicy(policy *apps.StatefulSetPersistentVolumeClaimRetentionPolicy, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if policy != nil {
+		allErrs = append(allErrs, ValidatePersistentVolumeClaimRetentionPolicyType(policy.WhenDeleted, fldPath.Child("whenDeleted"))...)
+		allErrs = append(allErrs, ValidatePersistentVolumeClaimRetentionPolicyType(policy.WhenScaled, fldPath.Child("whenScaled"))...)
+	}
+	return allErrs
+}
+
 // ValidateStatefulSetSpec tests if required fields in the StatefulSet spec are set.
 func ValidateStatefulSetSpec(spec *apps.StatefulSetSpec, fldPath *field.Path, opts apivalidation.PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -95,10 +115,8 @@ func ValidateStatefulSetSpec(spec *apps.StatefulSetSpec, fldPath *field.Path, op
 		}
 	case apps.RollingUpdateStatefulSetStrategyType:
 		if spec.UpdateStrategy.RollingUpdate != nil {
-			allErrs = append(allErrs,
-				apivalidation.ValidateNonnegativeField(
-					int64(spec.UpdateStrategy.RollingUpdate.Partition),
-					fldPath.Child("updateStrategy").Child("rollingUpdate").Child("partition"))...)
+			allErrs = append(allErrs, validateRollingUpdateStatefulSet(spec.UpdateStrategy.RollingUpdate, fldPath.Child("updateStrategy", "rollingUpdate"))...)
+
 		}
 	default:
 		allErrs = append(allErrs,
@@ -107,6 +125,8 @@ func ValidateStatefulSetSpec(spec *apps.StatefulSetSpec, fldPath *field.Path, op
 					apps.RollingUpdateStatefulSetStrategyType,
 					apps.OnDeleteStatefulSetStrategyType)))
 	}
+
+	allErrs = append(allErrs, ValidatePersistentVolumeClaimRetentionPolicy(spec.PersistentVolumeClaimRetentionPolicy, fldPath.Child("persistentVolumeClaimRetentionPolicy"))...)
 
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(spec.Replicas), fldPath.Child("replicas"))...)
 	if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetMinReadySeconds) {
@@ -158,11 +178,12 @@ func ValidateStatefulSetUpdate(statefulSet, oldStatefulSet *apps.StatefulSet) fi
 	if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetMinReadySeconds) {
 		newStatefulSetClone.Spec.MinReadySeconds = oldStatefulSet.Spec.MinReadySeconds // +k8s:verify-mutation:reason=clone
 	}
+	newStatefulSetClone.Spec.PersistentVolumeClaimRetentionPolicy = oldStatefulSet.Spec.PersistentVolumeClaimRetentionPolicy // +k8s:verify-mutation:reason=clone
 	if !apiequality.Semantic.DeepEqual(newStatefulSetClone.Spec, oldStatefulSet.Spec) {
 		if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetMinReadySeconds) {
-			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to statefulset spec for fields other than 'replicas', 'template', 'minReadySeconds' and 'updateStrategy' are forbidden"))
+			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to statefulset spec for fields other than 'replicas', 'template', 'updateStrategy', 'persistentVolumeClaimRetentionPolicy' and 'minReadySeconds' are forbidden"))
 		} else {
-			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to statefulset spec for fields other than 'replicas', 'template', 'updateStrategy' and 'minReadySeconds' are forbidden"))
+			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to statefulset spec for fields other than 'replicas', 'template', 'updateStrategy' and 'persistentVolumeClaimRetentionPolicy' are forbidden"))
 		}
 	}
 
@@ -170,6 +191,7 @@ func ValidateStatefulSetUpdate(statefulSet, oldStatefulSet *apps.StatefulSet) fi
 	if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetMinReadySeconds) {
 		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(statefulSet.Spec.MinReadySeconds), field.NewPath("spec", "minReadySeconds"))...)
 	}
+	allErrs = append(allErrs, ValidatePersistentVolumeClaimRetentionPolicy(statefulSet.Spec.PersistentVolumeClaimRetentionPolicy, field.NewPath("spec", "persistentVolumeClaimRetentionPolicy"))...)
 	return allErrs
 }
 
@@ -391,6 +413,26 @@ func ValidateRollingUpdateDaemonSet(rollingUpdate *apps.RollingUpdateDaemonSet, 
 		}
 		// Validate that MaxUnavailable is not more than 100%.
 		allErrs = append(allErrs, IsNotMoreThan100Percent(rollingUpdate.MaxUnavailable, fldPath.Child("maxUnavailable"))...)
+	}
+	return allErrs
+}
+
+// validateRollingUpdateStatefulSet validates a given RollingUpdateStatefulSet.
+func validateRollingUpdateStatefulSet(rollingUpdate *apps.RollingUpdateStatefulSetStrategy, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	fldPathMaxUn := fldPath.Child("maxUnavailable")
+	allErrs = append(allErrs,
+		apivalidation.ValidateNonnegativeField(
+			int64(rollingUpdate.Partition),
+			fldPath.Child("partition"))...)
+	if rollingUpdate.MaxUnavailable != nil {
+		allErrs = append(allErrs, ValidatePositiveIntOrPercent(*rollingUpdate.MaxUnavailable, fldPathMaxUn)...)
+		if getIntOrPercentValue(*rollingUpdate.MaxUnavailable) == 0 {
+			// MaxUnavailable cannot be 0.
+			allErrs = append(allErrs, field.Invalid(fldPathMaxUn, *rollingUpdate.MaxUnavailable, "cannot be 0"))
+		}
+		// Validate that MaxUnavailable is not more than 100%.
+		allErrs = append(allErrs, IsNotMoreThan100Percent(*rollingUpdate.MaxUnavailable, fldPathMaxUn)...)
 	}
 	return allErrs
 }

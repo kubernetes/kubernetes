@@ -31,7 +31,7 @@ import (
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta"
 	"github.com/google/go-cmp/cmp"
 	compute "google.golang.org/api/compute/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	cloudprovider "k8s.io/cloud-provider"
@@ -202,8 +202,10 @@ func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v
 		// Delete existing forwarding rule before making changes to the backend service. For example - changing protocol
 		// of backend service without first deleting forwarding rule will throw an error since the linked forwarding
 		// rule would show the old protocol.
-		frDiff := cmp.Diff(existingFwdRule, newFwdRule)
-		klog.V(2).Infof("ensureInternalLoadBalancer(%v): forwarding rule changed - Existing - %+v\n, New - %+v\n, Diff(-existing, +new) - %s\n. Deleting existing forwarding rule.", loadBalancerName, existingFwdRule, newFwdRule, frDiff)
+		if klogV := klog.V(2); klogV.Enabled() {
+			frDiff := cmp.Diff(existingFwdRule, newFwdRule)
+			klogV.Infof("ensureInternalLoadBalancer(%v): forwarding rule changed - Existing - %+v\n, New - %+v\n, Diff(-existing, +new) - %s\n. Deleting existing forwarding rule.", loadBalancerName, existingFwdRule, newFwdRule, frDiff)
+		}
 		if err = ignoreNotFound(g.DeleteRegionForwardingRule(loadBalancerName, g.region)); err != nil {
 			return nil, err
 		}
@@ -623,11 +625,21 @@ func (g *Cloud) ensureInternalInstanceGroups(name string, nodes []*v1.Node) ([]s
 	klog.V(2).Infof("ensureInternalInstanceGroups(%v): %d nodes over %d zones in region %v", name, len(nodes), len(zonedNodes), g.region)
 	var igLinks []string
 	for zone, nodes := range zonedNodes {
-		igLink, err := g.ensureInternalInstanceGroup(name, zone, nodes)
-		if err != nil {
-			return []string{}, err
+		if g.AlphaFeatureGate.Enabled(AlphaFeatureSkipIGsManagement) {
+			igs, err := g.FilterInstanceGroupsByNamePrefix(name, zone)
+			if err != nil {
+				return nil, err
+			}
+			for _, ig := range igs {
+				igLinks = append(igLinks, ig.SelfLink)
+			}
+		} else {
+			igLink, err := g.ensureInternalInstanceGroup(name, zone, nodes)
+			if err != nil {
+				return nil, err
+			}
+			igLinks = append(igLinks, igLink)
 		}
-		igLinks = append(igLinks, igLink)
 	}
 
 	return igLinks, nil
@@ -640,10 +652,13 @@ func (g *Cloud) ensureInternalInstanceGroupsDeleted(name string) error {
 		return err
 	}
 
-	klog.V(2).Infof("ensureInternalInstanceGroupsDeleted(%v): attempting delete instance group in all %d zones", name, len(zones))
-	for _, z := range zones {
-		if err := g.DeleteInstanceGroup(name, z.Name); err != nil && !isNotFoundOrInUse(err) {
-			return err
+	// Skip Instance Group deletion if IG management was moved out of k/k code
+	if !g.AlphaFeatureGate.Enabled(AlphaFeatureSkipIGsManagement) {
+		klog.V(2).Infof("ensureInternalInstanceGroupsDeleted(%v): attempting delete instance group in all %d zones", name, len(zones))
+		for _, z := range zones {
+			if err := g.DeleteInstanceGroup(name, z.Name); err != nil && !isNotFoundOrInUse(err) {
+				return err
+			}
 		}
 	}
 	return nil

@@ -27,7 +27,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	batch "k8s.io/api/batch/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -224,8 +224,6 @@ func TestControllerSyncJob(t *testing.T) {
 		expectedPodPatches int
 
 		// features
-		indexedJobEnabled   bool
-		suspendJobEnabled   bool
 		jobReadyPodsEnabled bool
 	}{
 		"job start": {
@@ -491,7 +489,6 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedCreations:      2,
 			expectedActive:         2,
 			expectedCreatedIndexes: sets.NewInt(0, 1),
-			indexedJobEnabled:      true,
 		},
 		"indexed job completed": {
 			parallelism:    2,
@@ -511,7 +508,6 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedCondition:       &jobConditionComplete,
 			expectedConditionStatus: v1.ConditionTrue,
 			expectedPodPatches:      4,
-			indexedJobEnabled:       true,
 		},
 		"indexed job repeated completed index": {
 			parallelism:    2,
@@ -530,7 +526,6 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedCompletedIdxs:  "0,1",
 			expectedCreatedIndexes: sets.NewInt(2),
 			expectedPodPatches:     3,
-			indexedJobEnabled:      true,
 		},
 		"indexed job some running and completed pods": {
 			parallelism:    8,
@@ -554,7 +549,6 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedCompletedIdxs:  "2,4,5,7-9",
 			expectedCreatedIndexes: sets.NewInt(1, 6, 10, 11, 12, 13),
 			expectedPodPatches:     6,
-			indexedJobEnabled:      true,
 		},
 		"indexed job some failed pods": {
 			parallelism:    3,
@@ -571,7 +565,6 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedFailed:         2,
 			expectedCreatedIndexes: sets.NewInt(0, 2),
 			expectedPodPatches:     2,
-			indexedJobEnabled:      true,
 		},
 		"indexed job some pods without index": {
 			parallelism:    2,
@@ -597,7 +590,6 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedFailed:        0,
 			expectedCompletedIdxs: "0",
 			expectedPodPatches:    8,
-			indexedJobEnabled:     true,
 		},
 		"indexed job repeated indexes": {
 			parallelism:    5,
@@ -620,7 +612,6 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedSucceeded:     1,
 			expectedCompletedIdxs: "0",
 			expectedPodPatches:    5,
-			indexedJobEnabled:     true,
 		},
 		"indexed job with indexes outside of range": {
 			parallelism:    2,
@@ -642,24 +633,10 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedActive:        0,
 			expectedFailed:        0,
 			expectedPodPatches:    5,
-			indexedJobEnabled:     true,
-		},
-		"indexed job feature disabled": {
-			parallelism:    2,
-			completions:    3,
-			backoffLimit:   6,
-			completionMode: batch.IndexedCompletion,
-			podsWithIndexes: []indexPhase{
-				{"0", v1.PodRunning},
-				{"1", v1.PodSucceeded},
-			},
-			// No status updates.
-			indexedJobEnabled: false,
 		},
 		"suspending a job with satisfied expectations": {
 			// Suspended Job should delete active pods when expectations are
 			// satisfied.
-			suspendJobEnabled:       true,
 			suspend:                 true,
 			parallelism:             2,
 			activePods:              2, // parallelism == active, expectations satisfied
@@ -679,7 +656,6 @@ func TestControllerSyncJob(t *testing.T) {
 			// Job in the syncJob call because the controller will wait for
 			// expectations to be satisfied first. The next syncJob call (not tested
 			// here) will be the same as the previous test.
-			suspendJobEnabled:         true,
 			suspend:                   true,
 			parallelism:               2,
 			activePods:                3,  // active > parallelism, expectations unsatisfied
@@ -692,7 +668,6 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedActive:            3,
 		},
 		"resuming a suspended job": {
-			suspendJobEnabled:       true,
 			wasSuspended:            true,
 			suspend:                 false,
 			parallelism:             2,
@@ -711,7 +686,6 @@ func TestControllerSyncJob(t *testing.T) {
 			// cases above), but since this job is being deleted, we don't expect
 			// anything changed here from before the job was suspended. The
 			// JobSuspended condition is also missing.
-			suspendJobEnabled:  true,
 			suspend:            true,
 			deleting:           true,
 			parallelism:        2,
@@ -732,8 +706,6 @@ func TestControllerSyncJob(t *testing.T) {
 				if wFinalizers && tc.podControllerError != nil {
 					t.Skip("Can't track status if finalizers can't be removed")
 				}
-				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.IndexedJob, tc.indexedJobEnabled)()
-				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.SuspendJob, tc.suspendJobEnabled)()
 				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobReadyPods, tc.jobReadyPodsEnabled)()
 				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobTrackingWithFinalizers, wFinalizers)()
 
@@ -863,7 +835,7 @@ func TestControllerSyncJob(t *testing.T) {
 				if actual.Status.StartTime != nil && tc.suspend {
 					t.Error("Unexpected .status.startTime not nil when suspend is true")
 				}
-				if actual.Status.StartTime == nil && tc.indexedJobEnabled && !tc.suspend {
+				if actual.Status.StartTime == nil && !tc.suspend {
 					t.Error("Missing .status.startTime")
 				}
 				// validate conditions
@@ -1696,9 +1668,6 @@ func TestSyncJobPastDeadline(t *testing.T) {
 		expectedFailed          int32
 		expectedCondition       batch.JobConditionType
 		expectedConditionReason string
-
-		// features
-		suspendJobEnabled bool
 	}{
 		"activeDeadlineSeconds less than single pod execution": {
 			parallelism:             1,
@@ -1750,7 +1719,6 @@ func TestSyncJobPastDeadline(t *testing.T) {
 			expectedConditionReason: "BackoffLimitExceeded",
 		},
 		"activeDeadlineSeconds is not triggered when Job is suspended": {
-			suspendJobEnabled:       true,
 			suspend:                 true,
 			parallelism:             1,
 			completions:             2,
@@ -1765,8 +1733,6 @@ func TestSyncJobPastDeadline(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.SuspendJob, tc.suspendJobEnabled)()
-
 			// job manager setup
 			clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 			manager, sharedInformerFactory := newControllerFromClient(clientSet, controller.NoResyncPeriodFunc)
@@ -2180,6 +2146,8 @@ func TestAddPod(t *testing.T) {
 	jm, informer := newControllerFromClient(clientset, controller.NoResyncPeriodFunc)
 	jm.podStoreSynced = alwaysReady
 	jm.jobStoreSynced = alwaysReady
+	// Disable batching of pod updates.
+	jm.podUpdateBatchPeriod = 0
 
 	job1 := newJob(1, 1, 6, batch.NonIndexedCompletion)
 	job1.Name = "job1"
@@ -2225,6 +2193,8 @@ func TestAddPodOrphan(t *testing.T) {
 	jm, informer := newControllerFromClient(clientset, controller.NoResyncPeriodFunc)
 	jm.podStoreSynced = alwaysReady
 	jm.jobStoreSynced = alwaysReady
+	// Disable batching of pod updates.
+	jm.podUpdateBatchPeriod = 0
 
 	job1 := newJob(1, 1, 6, batch.NonIndexedCompletion)
 	job1.Name = "job1"
@@ -2253,6 +2223,8 @@ func TestUpdatePod(t *testing.T) {
 	jm, informer := newControllerFromClient(clientset, controller.NoResyncPeriodFunc)
 	jm.podStoreSynced = alwaysReady
 	jm.jobStoreSynced = alwaysReady
+	// Disable batching of pod updates.
+	jm.podUpdateBatchPeriod = 0
 
 	job1 := newJob(1, 1, 6, batch.NonIndexedCompletion)
 	job1.Name = "job1"
@@ -2302,6 +2274,8 @@ func TestUpdatePodOrphanWithNewLabels(t *testing.T) {
 	jm, informer := newControllerFromClient(clientset, controller.NoResyncPeriodFunc)
 	jm.podStoreSynced = alwaysReady
 	jm.jobStoreSynced = alwaysReady
+	// Disable batching of pod updates.
+	jm.podUpdateBatchPeriod = 0
 
 	job1 := newJob(1, 1, 6, batch.NonIndexedCompletion)
 	job1.Name = "job1"
@@ -2329,6 +2303,8 @@ func TestUpdatePodChangeControllerRef(t *testing.T) {
 	jm, informer := newControllerFromClient(clientset, controller.NoResyncPeriodFunc)
 	jm.podStoreSynced = alwaysReady
 	jm.jobStoreSynced = alwaysReady
+	// Disable batching of pod updates.
+	jm.podUpdateBatchPeriod = 0
 
 	job1 := newJob(1, 1, 6, batch.NonIndexedCompletion)
 	job1.Name = "job1"
@@ -2355,6 +2331,8 @@ func TestUpdatePodRelease(t *testing.T) {
 	jm, informer := newControllerFromClient(clientset, controller.NoResyncPeriodFunc)
 	jm.podStoreSynced = alwaysReady
 	jm.jobStoreSynced = alwaysReady
+	// Disable batching of pod updates.
+	jm.podUpdateBatchPeriod = 0
 
 	job1 := newJob(1, 1, 6, batch.NonIndexedCompletion)
 	job1.Name = "job1"
@@ -2381,6 +2359,8 @@ func TestDeletePod(t *testing.T) {
 	jm, informer := newControllerFromClient(clientset, controller.NoResyncPeriodFunc)
 	jm.podStoreSynced = alwaysReady
 	jm.jobStoreSynced = alwaysReady
+	// Disable batching of pod updates.
+	jm.podUpdateBatchPeriod = 0
 
 	job1 := newJob(1, 1, 6, batch.NonIndexedCompletion)
 	job1.Name = "job1"
@@ -2426,6 +2406,8 @@ func TestDeletePodOrphan(t *testing.T) {
 	jm, informer := newControllerFromClient(clientset, controller.NoResyncPeriodFunc)
 	jm.podStoreSynced = alwaysReady
 	jm.jobStoreSynced = alwaysReady
+	// Disable batching of pod updates.
+	jm.podUpdateBatchPeriod = 0
 
 	job1 := newJob(1, 1, 6, batch.NonIndexedCompletion)
 	job1.Name = "job1"
@@ -2737,24 +2719,61 @@ func TestJobBackoff(t *testing.T) {
 	newPod.ResourceVersion = "2"
 
 	testCases := map[string]struct {
-		// inputs
-		requeues int
-		phase    v1.PodPhase
-
-		// expectation
-		backoff int
+		requeues            int
+		phase               v1.PodPhase
+		jobReadyPodsEnabled bool
+		wantBackoff         time.Duration
 	}{
-		"1st failure": {0, v1.PodFailed, 0},
-		"2nd failure": {1, v1.PodFailed, 1},
-		"3rd failure": {2, v1.PodFailed, 2},
-		"1st success": {0, v1.PodSucceeded, 0},
-		"2nd success": {1, v1.PodSucceeded, 0},
-		"1st running": {0, v1.PodSucceeded, 0},
-		"2nd running": {1, v1.PodSucceeded, 0},
+		"1st failure": {
+			requeues:    0,
+			phase:       v1.PodFailed,
+			wantBackoff: 0,
+		},
+		"2nd failure": {
+			requeues:    1,
+			phase:       v1.PodFailed,
+			wantBackoff: DefaultJobBackOff,
+		},
+		"3rd failure": {
+			requeues:    2,
+			phase:       v1.PodFailed,
+			wantBackoff: 2 * DefaultJobBackOff,
+		},
+		"1st success": {
+			requeues:    0,
+			phase:       v1.PodSucceeded,
+			wantBackoff: 0,
+		},
+		"2nd success": {
+			requeues:    1,
+			phase:       v1.PodSucceeded,
+			wantBackoff: 0,
+		},
+		"1st running": {
+			requeues:    0,
+			phase:       v1.PodSucceeded,
+			wantBackoff: 0,
+		},
+		"2nd running": {
+			requeues:    1,
+			phase:       v1.PodSucceeded,
+			wantBackoff: 0,
+		},
+		"1st failure with pod updates batching": {
+			requeues:    0,
+			phase:       v1.PodFailed,
+			wantBackoff: podUpdateBatchPeriod,
+		},
+		"2nd failure with pod updates batching": {
+			requeues:    1,
+			phase:       v1.PodFailed,
+			wantBackoff: DefaultJobBackOff,
+		},
 	}
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobReadyPods, tc.jobReadyPodsEnabled)()
 			clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 			manager, sharedInformerFactory := newControllerFromClient(clientset, controller.NoResyncPeriodFunc)
 			fakePodControl := controller.FakePodControl{}
@@ -2769,7 +2788,7 @@ func TestJobBackoff(t *testing.T) {
 			newPod.Status.Phase = tc.phase
 			manager.updatePod(oldPod, newPod)
 
-			if queue.duration.Nanoseconds() != int64(tc.backoff)*DefaultJobBackOff.Nanoseconds() {
+			if queue.duration.Nanoseconds() != int64(tc.wantBackoff)*DefaultJobBackOff.Nanoseconds() {
 				t.Errorf("unexpected backoff %v", queue.duration)
 			}
 		})

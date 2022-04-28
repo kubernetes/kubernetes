@@ -396,7 +396,8 @@ func TestSelectorSpreadScore(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			nodes := makeNodeList(test.nodes)
 			snapshot := cache.NewSnapshot(test.pods, nodes)
-			ctx := context.Background()
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			informerFactory, err := populateAndStartInformers(ctx, test.rcs, test.rss, test.services, test.sss)
 			if err != nil {
 				t.Errorf("error creating informerFactory: %+v", err)
@@ -653,7 +654,8 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			nodes := makeLabeledNodeList(labeledNodes)
 			snapshot := cache.NewSnapshot(test.pods, nodes)
-			ctx := context.Background()
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			informerFactory, err := populateAndStartInformers(ctx, test.rcs, test.rss, test.services, test.sss)
 			if err != nil {
 				t.Errorf("error creating informerFactory: %+v", err)

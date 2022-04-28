@@ -17,6 +17,7 @@ limitations under the License.
 package cm
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -127,10 +128,7 @@ func (m *podContainerManagerImpl) killOnePid(pid int) error {
 	p, _ := os.FindProcess(pid)
 	if err := p.Kill(); err != nil {
 		// If the process already exited, that's fine.
-		if strings.Contains(err.Error(), "process already finished") {
-			// Hate parsing strings, but
-			// vendor/github.com/opencontainers/runc/libcontainer/
-			// also does this.
+		if errors.Is(err, os.ErrProcessDone) {
 			klog.V(3).InfoS("Process no longer exists", "pid", pid)
 			return nil
 		}

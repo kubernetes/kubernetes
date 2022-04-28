@@ -17,6 +17,7 @@ limitations under the License.
 package cache
 
 import (
+	"k8s.io/apimachinery/pkg/api/resource"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -676,7 +677,7 @@ func TestUncertainVolumeMounts(t *testing.T) {
 		t.Fatalf("expected volume %s to be found in aws.GetPossiblyMountedVolumesForPod", volumeSpec1.Name())
 	}
 
-	volExists, _, _ := asw.PodExistsInVolume(podName1, generatedVolumeName1)
+	volExists, _, _ := asw.PodExistsInVolume(podName1, generatedVolumeName1, resource.Quantity{})
 	if volExists {
 		t.Fatalf("expected volume %s to not exist in asw", generatedVolumeName1)
 	}
@@ -762,7 +763,7 @@ func verifyPodExistsInVolumeAsw(
 	expectedDevicePath string,
 	asw ActualStateOfWorld) {
 	podExistsInVolume, devicePath, err :=
-		asw.PodExistsInVolume(expectedPodName, expectedVolumeName)
+		asw.PodExistsInVolume(expectedPodName, expectedVolumeName, resource.Quantity{})
 	if err != nil {
 		t.Fatalf(
 			"ASW PodExistsInVolume failed. Expected: <no error> Actual: <%v>", err)
@@ -804,7 +805,7 @@ func verifyPodDoesntExistInVolumeAsw(
 	expectVolumeToExist bool,
 	asw ActualStateOfWorld) {
 	podExistsInVolume, devicePath, err :=
-		asw.PodExistsInVolume(podToCheck, volumeToCheck)
+		asw.PodExistsInVolume(podToCheck, volumeToCheck, resource.Quantity{})
 	if !expectVolumeToExist && err == nil {
 		t.Fatalf(
 			"ASW PodExistsInVolume did not return error. Expected: <error indicating volume does not exist> Actual: <%v>", err)

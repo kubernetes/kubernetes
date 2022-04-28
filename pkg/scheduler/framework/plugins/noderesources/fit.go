@@ -38,12 +38,12 @@ var _ framework.EnqueueExtensions = &Fit{}
 var _ framework.ScorePlugin = &Fit{}
 
 const (
-	// FitName is the name of the plugin used in the plugin registry and configurations.
-	FitName = names.NodeResourcesFit
+	// Name is the name of the plugin used in the plugin registry and configurations.
+	Name = names.NodeResourcesFit
 
 	// preFilterStateKey is the key in CycleState to NodeResourcesFit pre-computed data.
 	// Using the name of the plugin will likely help us avoid collisions with other plugins.
-	preFilterStateKey = "PreFilter" + FitName
+	preFilterStateKey = "PreFilter" + Name
 )
 
 // nodeResourceStrategyTypeMap maps strategy to scorer implementation
@@ -78,7 +78,6 @@ var nodeResourceStrategyTypeMap = map[config.ScoringStrategyType]scorer{
 type Fit struct {
 	ignoredResources      sets.String
 	ignoredResourceGroups sets.String
-	enablePodOverhead     bool
 	handle                framework.Handle
 	resourceAllocationScorer
 }
@@ -100,7 +99,7 @@ func (s *preFilterState) Clone() framework.StateData {
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (f *Fit) Name() string {
-	return FitName
+	return Name
 }
 
 // NewFit initializes a new plugin and returns it.
@@ -126,7 +125,6 @@ func NewFit(plArgs runtime.Object, h framework.Handle, fts feature.Features) (fr
 	return &Fit{
 		ignoredResources:         sets.NewString(args.IgnoredResources...),
 		ignoredResourceGroups:    sets.NewString(args.IgnoredResourceGroups...),
-		enablePodOverhead:        fts.EnablePodOverhead,
 		handle:                   h,
 		resourceAllocationScorer: *scorePlugin(args),
 	}, nil
@@ -137,8 +135,7 @@ func NewFit(plArgs runtime.Object, h framework.Handle, fts feature.Features) (fr
 // the max in each dimension iteratively. In contrast, we sum the resource vectors for
 // regular containers since they run simultaneously.
 //
-// If Pod Overhead is specified and the feature gate is set, the resources defined for Overhead
-// are added to the calculated Resource request sum
+// The resources defined for Overhead should be added to the calculated Resource request sum
 //
 // Example:
 //
@@ -159,7 +156,7 @@ func NewFit(plArgs runtime.Object, h framework.Handle, fts feature.Features) (fr
 //       Memory: 1G
 //
 // Result: CPU: 3, Memory: 3G
-func computePodResourceRequest(pod *v1.Pod, enablePodOverhead bool) *preFilterState {
+func computePodResourceRequest(pod *v1.Pod) *preFilterState {
 	result := &preFilterState{}
 	for _, container := range pod.Spec.Containers {
 		result.Add(container.Resources.Requests)
@@ -171,17 +168,16 @@ func computePodResourceRequest(pod *v1.Pod, enablePodOverhead bool) *preFilterSt
 	}
 
 	// If Overhead is being utilized, add to the total requests for the pod
-	if pod.Spec.Overhead != nil && enablePodOverhead {
+	if pod.Spec.Overhead != nil {
 		result.Add(pod.Spec.Overhead)
 	}
-
 	return result
 }
 
 // PreFilter invoked at the prefilter extension point.
-func (f *Fit) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod) *framework.Status {
-	cycleState.Write(preFilterStateKey, computePodResourceRequest(pod, f.enablePodOverhead))
-	return nil
+func (f *Fit) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+	cycleState.Write(preFilterStateKey, computePodResourceRequest(pod))
+	return nil, nil
 }
 
 // PreFilterExtensions returns prefilter extensions, pod add and remove.
@@ -211,7 +207,7 @@ func getPreFilterState(cycleState *framework.CycleState) (*preFilterState, error
 func (f *Fit) EventsToRegister() []framework.ClusterEvent {
 	return []framework.ClusterEvent{
 		{Resource: framework.Pod, ActionType: framework.Delete},
-		{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeAllocatable},
+		{Resource: framework.Node, ActionType: framework.Add | framework.Update},
 	}
 }
 
@@ -249,8 +245,8 @@ type InsufficientResource struct {
 }
 
 // Fits checks if node have enough resources to host the pod.
-func Fits(pod *v1.Pod, nodeInfo *framework.NodeInfo, enablePodOverhead bool) []InsufficientResource {
-	return fitsRequest(computePodResourceRequest(pod, enablePodOverhead), nodeInfo, nil, nil)
+func Fits(pod *v1.Pod, nodeInfo *framework.NodeInfo) []InsufficientResource {
+	return fitsRequest(computePodResourceRequest(pod), nodeInfo, nil, nil)
 }
 
 func fitsRequest(podRequest *preFilterState, nodeInfo *framework.NodeInfo, ignoredExtendedResources, ignoredResourceGroups sets.String) []InsufficientResource {
@@ -259,11 +255,11 @@ func fitsRequest(podRequest *preFilterState, nodeInfo *framework.NodeInfo, ignor
 	allowedPodNumber := nodeInfo.Allocatable.AllowedPodNumber
 	if len(nodeInfo.Pods)+1 > allowedPodNumber {
 		insufficientResources = append(insufficientResources, InsufficientResource{
-			v1.ResourcePods,
-			"Too many pods",
-			1,
-			int64(len(nodeInfo.Pods)),
-			int64(allowedPodNumber),
+			ResourceName: v1.ResourcePods,
+			Reason:       "Too many pods",
+			Requested:    1,
+			Used:         int64(len(nodeInfo.Pods)),
+			Capacity:     int64(allowedPodNumber),
 		})
 	}
 
@@ -276,29 +272,29 @@ func fitsRequest(podRequest *preFilterState, nodeInfo *framework.NodeInfo, ignor
 
 	if podRequest.MilliCPU > (nodeInfo.Allocatable.MilliCPU - nodeInfo.Requested.MilliCPU) {
 		insufficientResources = append(insufficientResources, InsufficientResource{
-			v1.ResourceCPU,
-			"Insufficient cpu",
-			podRequest.MilliCPU,
-			nodeInfo.Requested.MilliCPU,
-			nodeInfo.Allocatable.MilliCPU,
+			ResourceName: v1.ResourceCPU,
+			Reason:       "Insufficient cpu",
+			Requested:    podRequest.MilliCPU,
+			Used:         nodeInfo.Requested.MilliCPU,
+			Capacity:     nodeInfo.Allocatable.MilliCPU,
 		})
 	}
 	if podRequest.Memory > (nodeInfo.Allocatable.Memory - nodeInfo.Requested.Memory) {
 		insufficientResources = append(insufficientResources, InsufficientResource{
-			v1.ResourceMemory,
-			"Insufficient memory",
-			podRequest.Memory,
-			nodeInfo.Requested.Memory,
-			nodeInfo.Allocatable.Memory,
+			ResourceName: v1.ResourceMemory,
+			Reason:       "Insufficient memory",
+			Requested:    podRequest.Memory,
+			Used:         nodeInfo.Requested.Memory,
+			Capacity:     nodeInfo.Allocatable.Memory,
 		})
 	}
 	if podRequest.EphemeralStorage > (nodeInfo.Allocatable.EphemeralStorage - nodeInfo.Requested.EphemeralStorage) {
 		insufficientResources = append(insufficientResources, InsufficientResource{
-			v1.ResourceEphemeralStorage,
-			"Insufficient ephemeral-storage",
-			podRequest.EphemeralStorage,
-			nodeInfo.Requested.EphemeralStorage,
-			nodeInfo.Allocatable.EphemeralStorage,
+			ResourceName: v1.ResourceEphemeralStorage,
+			Reason:       "Insufficient ephemeral-storage",
+			Requested:    podRequest.EphemeralStorage,
+			Used:         nodeInfo.Requested.EphemeralStorage,
+			Capacity:     nodeInfo.Allocatable.EphemeralStorage,
 		})
 	}
 
@@ -316,11 +312,11 @@ func fitsRequest(podRequest *preFilterState, nodeInfo *framework.NodeInfo, ignor
 		}
 		if rQuant > (nodeInfo.Allocatable.ScalarResources[rName] - nodeInfo.Requested.ScalarResources[rName]) {
 			insufficientResources = append(insufficientResources, InsufficientResource{
-				rName,
-				fmt.Sprintf("Insufficient %v", rName),
-				podRequest.ScalarResources[rName],
-				nodeInfo.Requested.ScalarResources[rName],
-				nodeInfo.Allocatable.ScalarResources[rName],
+				ResourceName: rName,
+				Reason:       fmt.Sprintf("Insufficient %v", rName),
+				Requested:    podRequest.ScalarResources[rName],
+				Used:         nodeInfo.Requested.ScalarResources[rName],
+				Capacity:     nodeInfo.Allocatable.ScalarResources[rName],
 			})
 		}
 	}

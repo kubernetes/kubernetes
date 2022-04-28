@@ -120,7 +120,11 @@ func (w *Watcher) RemoveWatch(path string) error {
 	}
 	success, errno := syscall.InotifyRmWatch(w.fd, watch.wd)
 	if success == -1 {
-		return os.NewSyscallError("inotify_rm_watch", errno)
+		// when file descriptor or watch descriptor not found, InotifyRmWatch syscall return EINVAL error
+		// if return error, it may lead this path remain in watches and paths map, and no other event can trigger remove action.
+		if errno != syscall.EINVAL {
+			return os.NewSyscallError("inotify_rm_watch", errno)
+		}
 	}
 	delete(w.watches, path)
 	// Locking here to protect the read from paths in readEvents.

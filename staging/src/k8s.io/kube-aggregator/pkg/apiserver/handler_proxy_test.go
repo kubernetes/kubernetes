@@ -301,6 +301,7 @@ func TestProxyHandler(t *testing.T) {
 	target := &targetHTTPHandler{}
 	for name, tc := range tests {
 		target.Reset()
+		legacyregistry.Reset()
 
 		func() {
 			targetServer := httptest.NewUnstartedServer(target)
@@ -846,7 +847,8 @@ func TestProxyCertReload(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unable to create dynamic certificates: %v", err)
 	}
-	err = certProvider.RunOnce()
+	ctx := context.TODO()
+	err = certProvider.RunOnce(ctx)
 	if err != nil {
 		t.Fatalf("Unable to load dynamic certificates: %v", err)
 	}
@@ -885,7 +887,7 @@ func TestProxyCertReload(t *testing.T) {
 	// STEP 3: swap the certificate used by the aggregator to auth against the backend server and verify the request passes
 	//         note that this step uses the certificate that can be validated by the backend server with clientCaCrt()
 	writeCerts(certFile, keyFile, clientCert(), clientKey(), t)
-	err = certProvider.RunOnce()
+	err = certProvider.RunOnce(ctx)
 	if err != nil {
 		t.Fatalf("Expected no error when refreshing dynamic certs, got %v", err)
 	}
@@ -921,8 +923,11 @@ type hookedListener struct {
 }
 
 func (wl *hookedListener) Accept() (net.Conn, error) {
-	wl.onAccept()
-	return wl.l.Accept()
+	conn, err := wl.l.Accept()
+	if err == nil {
+		wl.onAccept()
+	}
+	return conn, err
 }
 
 func (wl *hookedListener) Close() error {
@@ -1015,8 +1020,11 @@ func TestFlowControlSignal(t *testing.T) {
 
 			req := tc.Request
 			req.URL = surl
-			_, err = server.Client().Do(&req)
+			res, err := server.Client().Do(&req)
 			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if err := res.Body.Close(); err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 

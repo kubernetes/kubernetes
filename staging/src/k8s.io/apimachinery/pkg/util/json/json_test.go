@@ -122,7 +122,7 @@ func TestEvaluateTypes(t *testing.T) {
 		},
 		{
 			In:   `-0.0`,
-			Data: float64(-0.0),
+			Data: float64(-0.0), //nolint:staticcheck // SA4026: in Go, the floating-point literal '-0.0' is the same as '0.0'
 			Out:  `-0`,
 		},
 		{

@@ -27,12 +27,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 const (
@@ -77,13 +77,13 @@ var (
 	User_NTAuthoritySystem       = "NT AUTHORITY\\SYSTEM"
 )
 
-var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [Excluded:WindowsDocker] [MinimumKubeletVersion:1.22] HostProcess containers", func() {
+var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersion:1.22] HostProcess containers", func() {
 	ginkgo.BeforeEach(func() {
 		e2eskipper.SkipUnlessNodeOSDistroIs("windows")
-		SkipUnlessWindowsHostProcessContainersEnabled()
 	})
 
 	f := framework.NewDefaultFramework("host-process-test-windows")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.It("should run as a process on the host/node", func() {
 
@@ -743,10 +743,4 @@ func getCurrentHostProcessMetrics(f *framework.Framework, nodeName string) (Host
 	}
 
 	return result, nil
-}
-
-func SkipUnlessWindowsHostProcessContainersEnabled() {
-	if !framework.TestContext.FeatureGates[string(features.WindowsHostProcessContainers)] {
-		e2eskipper.Skipf("Skipping test because feature 'WindowsHostProcessContainers' is not enabled")
-	}
 }

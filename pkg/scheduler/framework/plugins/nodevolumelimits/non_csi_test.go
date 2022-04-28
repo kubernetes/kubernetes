@@ -35,8 +35,8 @@ import (
 func TestEphemeralLimits(t *testing.T) {
 	// We have to specify a valid filter and arbitrarily pick Cinder here.
 	// It doesn't matter for the test cases.
-	filterName := cinderVolumeFilterType
-	driverName := csilibplugins.CinderInTreePluginName
+	filterName := gcePDVolumeFilterType
+	driverName := csilibplugins.GCEPDInTreePluginName
 
 	ephemeralVolumePod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -467,72 +467,6 @@ func TestAzureDiskLimits(t *testing.T) {
 	}
 }
 
-func TestCinderLimits(t *testing.T) {
-	twoVolCinderPod := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						Cinder: &v1.CinderVolumeSource{VolumeID: "tvp1"},
-					},
-				},
-				{
-					VolumeSource: v1.VolumeSource{
-						Cinder: &v1.CinderVolumeSource{VolumeID: "tvp2"},
-					},
-				},
-			},
-		},
-	}
-	oneVolCinderPod := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						Cinder: &v1.CinderVolumeSource{VolumeID: "ovp"},
-					},
-				},
-			},
-		},
-	}
-
-	tests := []struct {
-		newPod       *v1.Pod
-		existingPods []*v1.Pod
-		filterName   string
-		driverName   string
-		maxVols      int
-		test         string
-		wantStatus   *framework.Status
-	}{
-		{
-			newPod:       oneVolCinderPod,
-			existingPods: []*v1.Pod{twoVolCinderPod},
-			filterName:   cinderVolumeFilterType,
-			maxVols:      4,
-			test:         "fits when node capacity >= new pod's Cinder volumes",
-		},
-		{
-			newPod:       oneVolCinderPod,
-			existingPods: []*v1.Pod{twoVolCinderPod},
-			filterName:   cinderVolumeFilterType,
-			maxVols:      2,
-			test:         "not fit when node capacity < new pod's Cinder volumes",
-			wantStatus:   framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded),
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.test, func(t *testing.T) {
-			node, csiNode := getNodeWithPodAndVolumeLimits("node", test.existingPods, int64(test.maxVols), test.filterName)
-			p := newNonCSILimits(test.filterName, getFakeCSINodeLister(csiNode), getFakeCSIStorageClassLister(test.filterName, test.driverName), getFakePVLister(test.filterName), getFakePVCLister(test.filterName), feature.Features{}).(framework.FilterPlugin)
-			gotStatus := p.Filter(context.Background(), nil, test.newPod, node)
-			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
-				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
-			}
-		})
-	}
-}
 func TestEBSLimits(t *testing.T) {
 	oneVolPod := &v1.Pod{
 		Spec: v1.PodSpec{

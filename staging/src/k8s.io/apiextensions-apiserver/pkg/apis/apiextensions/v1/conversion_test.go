@@ -18,6 +18,7 @@ package v1
 
 import (
 	"encoding/json"
+	fmt "fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -659,4 +660,72 @@ func TestJSONRoundTrip(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestMemoryEqual(t *testing.T) {
+	testcases := []struct {
+		a interface{}
+		b interface{}
+	}{
+		{apiextensions.JSONSchemaProps{}.XValidations, JSONSchemaProps{}.XValidations},
+	}
+
+	for _, tc := range testcases {
+		aType := reflect.TypeOf(tc.a)
+		bType := reflect.TypeOf(tc.b)
+		t.Run(aType.String(), func(t *testing.T) {
+			assertEqualTypes(t, nil, aType, bType)
+		})
+	}
+}
+
+func assertEqualTypes(t *testing.T, path []string, a, b reflect.Type) {
+	if a == b {
+		return
+	}
+
+	if a.Kind() != b.Kind() {
+		fatalTypeError(t, path, a, b, "mismatched Kind")
+	}
+
+	switch a.Kind() {
+	case reflect.Struct:
+		aFields := a.NumField()
+		bFields := b.NumField()
+		if aFields != bFields {
+			fatalTypeError(t, path, a, b, "mismatched field count")
+		}
+		for i := 0; i < aFields; i++ {
+			aField := a.Field(i)
+			bField := b.Field(i)
+			if aField.Name != bField.Name {
+				fatalTypeError(t, path, a, b, fmt.Sprintf("mismatched field name %d: %s %s", i, aField.Name, bField.Name))
+			}
+			if aField.Offset != bField.Offset {
+				fatalTypeError(t, path, a, b, fmt.Sprintf("mismatched field offset %d: %v %v", i, aField.Offset, bField.Offset))
+			}
+			if aField.Anonymous != bField.Anonymous {
+				fatalTypeError(t, path, a, b, fmt.Sprintf("mismatched field anonymous %d: %v %v", i, aField.Anonymous, bField.Anonymous))
+			}
+			if !reflect.DeepEqual(aField.Index, bField.Index) {
+				fatalTypeError(t, path, a, b, fmt.Sprintf("mismatched field index %d: %v %v", i, aField.Index, bField.Index))
+			}
+			path = append(path, aField.Name)
+			assertEqualTypes(t, path, aField.Type, bField.Type)
+			path = path[:len(path)-1]
+		}
+
+	case reflect.Ptr, reflect.Slice:
+		aElemType := a.Elem()
+		bElemType := b.Elem()
+		assertEqualTypes(t, path, aElemType, bElemType)
+
+	default:
+		fatalTypeError(t, path, a, b, "unhandled kind")
+	}
+}
+
+func fatalTypeError(t *testing.T, path []string, a, b reflect.Type, message string) {
+	t.Helper()
+	t.Fatalf("%s: %s: %s %s", strings.Join(path, "."), message, a, b)
 }

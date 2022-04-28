@@ -24,21 +24,22 @@ import (
 	"regexp"
 	dstrings "strings"
 
-	"k8s.io/klog/v2"
-	"k8s.io/mount-utils"
-	utilexec "k8s.io/utils/exec"
-	utilstrings "k8s.io/utils/strings"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
+	"k8s.io/mount-utils"
+	utilexec "k8s.io/utils/exec"
+	utilstrings "k8s.io/utils/strings"
 )
 
 var (
@@ -76,6 +77,11 @@ const (
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
 	return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedName(rbdPluginName), volName)
+}
+
+func (plugin *rbdPlugin) IsMigratedToCSI() bool {
+	return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) &&
+		utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationRBD)
 }
 
 func (plugin *rbdPlugin) Init(host volume.VolumeHost) error {
@@ -825,17 +831,10 @@ var _ volume.Mounter = &rbdMounter{}
 
 func (rbd *rbd) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:        rbd.ReadOnly,
-		Managed:         !rbd.ReadOnly,
-		SupportsSELinux: true,
+		ReadOnly:       rbd.ReadOnly,
+		Managed:        !rbd.ReadOnly,
+		SELinuxRelabel: true,
 	}
-}
-
-// Checks prior to mount operations to verify that the required components (binaries, etc.)
-// to mount the volume are available on the underlying node.
-// If not, it returns an error
-func (b *rbdMounter) CanMount() error {
-	return nil
 }
 
 func (b *rbdMounter) SetUp(mounterArgs volume.MounterArgs) error {

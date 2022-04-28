@@ -37,6 +37,7 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 // waitForKubeletUp waits for the kubelet on the given host to be up.
@@ -101,6 +102,7 @@ func restartKubelet(host string) error {
 */
 var _ = utils.SIGDescribe("Volume Attach Verify [Feature:vsphere][Serial][Disruptive]", func() {
 	f := framework.NewDefaultFramework("restart-master")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	const labelKey = "vsphere_e2e_label"
 	var (

@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/kubernetes/test/e2e/framework"
+	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/pointer"
 )
 
@@ -51,6 +52,7 @@ func getPatchBytes(oldLease, newLease *coordinationv1.Lease) ([]byte, error) {
 
 var _ = SIGDescribe("Lease", func() {
 	f := framework.NewDefaultFramework("lease-test")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	/*
 		Release: v1.17

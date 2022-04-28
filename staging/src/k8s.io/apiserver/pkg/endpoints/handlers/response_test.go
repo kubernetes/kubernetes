@@ -77,11 +77,6 @@ type mockNamer struct{}
 func (*mockNamer) Namespace(_ *http.Request) (string, error)           { return "", nil }
 func (*mockNamer) Name(_ *http.Request) (string, string, error)        { return "", "", nil }
 func (*mockNamer) ObjectName(_ runtime.Object) (string, string, error) { return "", "", nil }
-func (*mockNamer) SetSelfLink(_ runtime.Object, _ string) error        { return nil }
-func (*mockNamer) GenerateLink(_ *request.RequestInfo, _ runtime.Object) (string, error) {
-	return "", nil
-}
-func (*mockNamer) GenerateListLink(_ *http.Request) (string, error) { return "", nil }
 
 func TestCacheableObject(t *testing.T) {
 	pomGVK := metav1.SchemeGroupVersion.WithKind("PartialObjectMetadata")
@@ -167,6 +162,38 @@ func TestCacheableObject(t *testing.T) {
 			}
 			if a, e := result, test.expectedObj; !reflect.DeepEqual(a, e) {
 				t.Errorf("unexpected result: %v, expected: %v", a, e)
+			}
+		})
+	}
+}
+
+func TestAsPartialObjectMetadataList(t *testing.T) {
+	var remainingItemCount int64 = 10
+	pods := &examplev1.PodList{
+		ListMeta: metav1.ListMeta{
+			ResourceVersion:    "10",
+			Continue:           "continuetoken",
+			RemainingItemCount: &remainingItemCount,
+		},
+	}
+
+	pomGVs := []schema.GroupVersion{metav1beta1.SchemeGroupVersion, metav1.SchemeGroupVersion}
+	for _, gv := range pomGVs {
+		t.Run(fmt.Sprintf("as %s PartialObjectMetadataList", gv), func(t *testing.T) {
+			list, err := asPartialObjectMetadataList(pods, gv)
+			if err != nil {
+				t.Fatalf("failed to transform object: %v", err)
+			}
+
+			var listMeta metav1.ListMeta
+			switch gv {
+			case metav1beta1.SchemeGroupVersion:
+				listMeta = list.(*metav1beta1.PartialObjectMetadataList).ListMeta
+			case metav1.SchemeGroupVersion:
+				listMeta = list.(*metav1.PartialObjectMetadataList).ListMeta
+			}
+			if !reflect.DeepEqual(pods.ListMeta, listMeta) {
+				t.Errorf("unexpected list metadata: %v, expected: %v", listMeta, pods.ListMeta)
 			}
 		})
 	}

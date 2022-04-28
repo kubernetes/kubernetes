@@ -189,6 +189,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsappsv1.StatefulSetApplyConfiguration{}
 	case appsv1.SchemeGroupVersion.WithKind("StatefulSetCondition"):
 		return &applyconfigurationsappsv1.StatefulSetConditionApplyConfiguration{}
+	case appsv1.SchemeGroupVersion.WithKind("StatefulSetPersistentVolumeClaimRetentionPolicy"):
+		return &applyconfigurationsappsv1.StatefulSetPersistentVolumeClaimRetentionPolicyApplyConfiguration{}
 	case appsv1.SchemeGroupVersion.WithKind("StatefulSetSpec"):
 		return &applyconfigurationsappsv1.StatefulSetSpecApplyConfiguration{}
 	case appsv1.SchemeGroupVersion.WithKind("StatefulSetStatus"):
@@ -219,6 +221,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsappsv1beta1.StatefulSetApplyConfiguration{}
 	case appsv1beta1.SchemeGroupVersion.WithKind("StatefulSetCondition"):
 		return &applyconfigurationsappsv1beta1.StatefulSetConditionApplyConfiguration{}
+	case appsv1beta1.SchemeGroupVersion.WithKind("StatefulSetPersistentVolumeClaimRetentionPolicy"):
+		return &applyconfigurationsappsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicyApplyConfiguration{}
 	case appsv1beta1.SchemeGroupVersion.WithKind("StatefulSetSpec"):
 		return &applyconfigurationsappsv1beta1.StatefulSetSpecApplyConfiguration{}
 	case appsv1beta1.SchemeGroupVersion.WithKind("StatefulSetStatus"):
@@ -269,6 +273,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &appsv1beta2.StatefulSetApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("StatefulSetCondition"):
 		return &appsv1beta2.StatefulSetConditionApplyConfiguration{}
+	case v1beta2.SchemeGroupVersion.WithKind("StatefulSetPersistentVolumeClaimRetentionPolicy"):
+		return &appsv1beta2.StatefulSetPersistentVolumeClaimRetentionPolicyApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("StatefulSetSpec"):
 		return &appsv1beta2.StatefulSetSpecApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("StatefulSetStatus"):
@@ -601,6 +607,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.GlusterfsPersistentVolumeSourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("GlusterfsVolumeSource"):
 		return &applyconfigurationscorev1.GlusterfsVolumeSourceApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("GRPCAction"):
+		return &applyconfigurationscorev1.GRPCActionApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("HostAlias"):
 		return &applyconfigurationscorev1.HostAliasApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("HostPathVolumeSource"):
@@ -945,6 +953,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsextensionsv1beta1.NetworkPolicyPortApplyConfiguration{}
 	case extensionsv1beta1.SchemeGroupVersion.WithKind("NetworkPolicySpec"):
 		return &applyconfigurationsextensionsv1beta1.NetworkPolicySpecApplyConfiguration{}
+	case extensionsv1beta1.SchemeGroupVersion.WithKind("NetworkPolicyStatus"):
+		return &applyconfigurationsextensionsv1beta1.NetworkPolicyStatusApplyConfiguration{}
 	case extensionsv1beta1.SchemeGroupVersion.WithKind("PodSecurityPolicy"):
 		return &applyconfigurationsextensionsv1beta1.PodSecurityPolicyApplyConfiguration{}
 	case extensionsv1beta1.SchemeGroupVersion.WithKind("PodSecurityPolicySpec"):
@@ -1183,6 +1193,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsnetworkingv1.NetworkPolicyPortApplyConfiguration{}
 	case networkingv1.SchemeGroupVersion.WithKind("NetworkPolicySpec"):
 		return &applyconfigurationsnetworkingv1.NetworkPolicySpecApplyConfiguration{}
+	case networkingv1.SchemeGroupVersion.WithKind("NetworkPolicyStatus"):
+		return &applyconfigurationsnetworkingv1.NetworkPolicyStatusApplyConfiguration{}
 	case networkingv1.SchemeGroupVersion.WithKind("ServiceBackendPort"):
 		return &applyconfigurationsnetworkingv1.ServiceBackendPortApplyConfiguration{}
 
@@ -1361,6 +1373,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsstoragev1.CSINodeDriverApplyConfiguration{}
 	case storagev1.SchemeGroupVersion.WithKind("CSINodeSpec"):
 		return &applyconfigurationsstoragev1.CSINodeSpecApplyConfiguration{}
+	case storagev1.SchemeGroupVersion.WithKind("CSIStorageCapacity"):
+		return &applyconfigurationsstoragev1.CSIStorageCapacityApplyConfiguration{}
 	case storagev1.SchemeGroupVersion.WithKind("StorageClass"):
 		return &applyconfigurationsstoragev1.StorageClassApplyConfiguration{}
 	case storagev1.SchemeGroupVersion.WithKind("TokenRequest"):

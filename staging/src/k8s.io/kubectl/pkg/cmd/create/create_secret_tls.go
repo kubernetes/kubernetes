@@ -69,9 +69,10 @@ type CreateSecretTLSOptions struct {
 	Namespace        string
 	EnforceNamespace bool
 
-	Client         corev1client.CoreV1Interface
-	DryRunStrategy cmdutil.DryRunStrategy
-	DryRunVerifier *resource.DryRunVerifier
+	Client              corev1client.CoreV1Interface
+	DryRunStrategy      cmdutil.DryRunStrategy
+	DryRunVerifier      *resource.QueryParamVerifier
+	ValidationDirective string
 
 	genericclioptions.IOStreams
 }
@@ -151,21 +152,26 @@ func (o *CreateSecretTLSOptions) Complete(f cmdutil.Factory, cmd *cobra.Command,
 		return err
 	}
 
-	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
+	o.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, discoveryClient, resource.QueryParamDryRun)
 
 	o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
-		return nil
+		return err
 	}
 
 	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
-		return nil
+		return err
 	}
 
 	o.PrintObj = func(obj runtime.Object) error {
 		return printer.PrintObj(obj, o.Out)
+	}
+
+	o.ValidationDirective, err = cmdutil.GetValidationDirective(cmd)
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -198,6 +204,7 @@ func (o *CreateSecretTLSOptions) Run() error {
 		if o.FieldManager != "" {
 			createOptions.FieldManager = o.FieldManager
 		}
+		createOptions.FieldValidation = o.ValidationDirective
 		if o.DryRunStrategy == cmdutil.DryRunServer {
 			err := o.DryRunVerifier.HasSupport(secretTLS.GroupVersionKind())
 			if err != nil {

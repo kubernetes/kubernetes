@@ -43,7 +43,7 @@ func TestGetReferenceRefVersion(t *testing.T) {
 		{
 			name: "v1 GV from scheme",
 			input: &TestRuntimeObj{
-				ObjectMeta: metav1.ObjectMeta{SelfLink: "/bad-selflink/unused"},
+				ObjectMeta: metav1.ObjectMeta{},
 			},
 			groupVersion:       schema.GroupVersion{Group: "", Version: "v1"},
 			expectedRefVersion: "v1",
@@ -51,7 +51,7 @@ func TestGetReferenceRefVersion(t *testing.T) {
 		{
 			name: "foo.group/v3 GV from scheme",
 			input: &TestRuntimeObj{
-				ObjectMeta: metav1.ObjectMeta{SelfLink: "/bad-selflink/unused"},
+				ObjectMeta: metav1.ObjectMeta{},
 			},
 			groupVersion:       schema.GroupVersion{Group: "foo.group", Version: "v3"},
 			expectedRefVersion: "foo.group/v3",

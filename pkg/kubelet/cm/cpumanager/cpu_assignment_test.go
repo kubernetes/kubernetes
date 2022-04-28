@@ -574,14 +574,6 @@ func commonTakeByTopologyTestCases(t *testing.T) []takeByTopologyTestCase {
 			cpuset.NewCPUSet(2, 6),
 		},
 		{
-			"take one cpu from dual socket with HT - core from Socket 0",
-			topoDualSocketHT,
-			cpuset.NewCPUSet(1, 2, 3, 4, 5, 7, 8, 9, 10, 11),
-			1,
-			"",
-			cpuset.NewCPUSet(2),
-		},
-		{
 			"take a socket of cpus from dual socket with HT",
 			topoDualSocketHT,
 			cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
@@ -635,6 +627,14 @@ func commonTakeByTopologyTestCases(t *testing.T) []takeByTopologyTestCase {
 func TestTakeByTopologyNUMAPacked(t *testing.T) {
 	testCases := commonTakeByTopologyTestCases(t)
 	testCases = append(testCases, []takeByTopologyTestCase{
+		{
+			"take one cpu from dual socket with HT - core from Socket 0",
+			topoDualSocketHT,
+			cpuset.NewCPUSet(1, 2, 3, 4, 5, 7, 8, 9, 10, 11),
+			1,
+			"",
+			cpuset.NewCPUSet(2),
+		},
 		{
 			"allocate 4 full cores with 3 coming from the first NUMA node (filling it up) and 1 coming from the second NUMA node",
 			topoDualSocketHT,
@@ -721,22 +721,22 @@ func commonTakeByTopologyExtendedTestCases(t *testing.T) []takeByTopologyExtende
 			mustParseCPUSet(t, "0-7,10-17,20-27,40-47,50-57,60-67"),
 		},
 		{
-			"allocate 24 full cores with 8 distributed across the first 3 NUMA nodes (filling the first NUMA node)",
+			"allocate 24 full cores with 8 distributed across the first 3 NUMA nodes (taking all but 2 from the first NUMA node)",
 			topoDualSocketMultiNumaPerSocketHT,
-			mustParseCPUSet(t, "2-39,42-79"),
+			mustParseCPUSet(t, "1-29,32-39,41-69,72-79"),
 			48,
 			1,
 			"",
-			mustParseCPUSet(t, "2-9,10-17,20-27,42-49,50-57,60-67"),
+			mustParseCPUSet(t, "1-8,10-17,20-27,41-48,50-57,60-67"),
 		},
 		{
-			"allocate 24 full cores with 8 distributed across the last 3 NUMA nodes (no room on the first NUMA node to distribute)",
+			"allocate 24 full cores with 8 distributed across the last 3 NUMA nodes (even though all 8 could be allocated from the first NUMA node)",
 			topoDualSocketMultiNumaPerSocketHT,
-			mustParseCPUSet(t, "3-39,43-79"),
+			mustParseCPUSet(t, "2-29,31-39,42-69,71-79"),
 			48,
 			1,
 			"",
-			mustParseCPUSet(t, "10-17,20-27,30-37,50-57,60-67,70-77"),
+			mustParseCPUSet(t, "10-17,20-27,31-38,50-57,60-67,71-78"),
 		},
 		{
 			"allocate 8 full cores with 2 distributed across each NUMA node",
@@ -764,6 +764,24 @@ func commonTakeByTopologyExtendedTestCases(t *testing.T) []takeByTopologyExtende
 func TestTakeByTopologyNUMADistributed(t *testing.T) {
 	testCases := commonTakeByTopologyExtendedTestCases(t)
 	testCases = append(testCases, []takeByTopologyExtendedTestCase{
+		{
+			"take one cpu from dual socket with HT - core from Socket 0",
+			topoDualSocketHT,
+			cpuset.NewCPUSet(1, 2, 3, 4, 5, 7, 8, 9, 10, 11),
+			1,
+			1,
+			"",
+			cpuset.NewCPUSet(1),
+		},
+		{
+			"take one cpu from dual socket with HT - core from Socket 0 - cpuGroupSize 2",
+			topoDualSocketHT,
+			cpuset.NewCPUSet(1, 2, 3, 4, 5, 7, 8, 9, 10, 11),
+			1,
+			2,
+			"",
+			cpuset.NewCPUSet(2),
+		},
 		{
 			"allocate 13 full cores distributed across the first 2 NUMA nodes",
 			topoDualSocketMultiNumaPerSocketHT,
@@ -818,13 +836,37 @@ func TestTakeByTopologyNUMADistributed(t *testing.T) {
 			"",
 			mustParseCPUSet(t, "0-7,10-16,20-27,30-37,40-47,50-56,60-67,70-77"),
 		},
+		{
+			"ensure bestRemainder chosen with NUMA nodes that have enough CPUs to satisfy the request",
+			topoDualSocketMultiNumaPerSocketHT,
+			mustParseCPUSet(t, "0-3,10-13,20-23,30-36,40-43,50-53,60-63,70-76"),
+			34,
+			1,
+			"",
+			mustParseCPUSet(t, "0-3,10-13,20-23,30-34,40-43,50-53,60-63,70-74"),
+		},
+		{
+			"ensure previous failure encountered on live machine has been fixed (1/1)",
+			topoDualSocketMultiNumaPerSocketHTLarge,
+			mustParseCPUSet(t, "0,128,30,31,158,159,43-47,171-175,62,63,190,191,75-79,203-207,94,96,222,223,101-111,229-239,126,127,254,255"),
+			28,
+			1,
+			"",
+			mustParseCPUSet(t, "43-47,75-79,96,101-105,171-174,203-206,229-232"),
+		},
 	}...)
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			result, err := takeByTopologyNUMADistributed(tc.topo, tc.availableCPUs, tc.numCPUs, tc.cpuGroupSize)
-			if tc.expErr != "" && err.Error() != tc.expErr {
-				t.Errorf("expected error to be [%v] but it was [%v]", tc.expErr, err)
+			if err != nil {
+				if tc.expErr == "" {
+					t.Errorf("unexpected error [%v]", err)
+				}
+				if tc.expErr != "" && err.Error() != tc.expErr {
+					t.Errorf("expected error to be [%v] but it was [%v]", tc.expErr, err)
+				}
+				return
 			}
 			if !result.Equals(tc.expResult) {
 				t.Errorf("expected result [%s] to equal [%s]", result, tc.expResult)

@@ -25,11 +25,8 @@ import (
 // Interpretable expression nodes at construction time.
 type InterpretableDecorator func(Interpretable) (Interpretable, error)
 
-// evalObserver is a functional interface that accepts an expression id and an observed value.
-type evalObserver func(int64, ref.Val)
-
 // decObserveEval records evaluation state into an EvalState object.
-func decObserveEval(observer evalObserver) InterpretableDecorator {
+func decObserveEval(observer EvalObserver) InterpretableDecorator {
 	return func(i Interpretable) (Interpretable, error) {
 		switch inst := i.(type) {
 		case *evalWatch, *evalWatchAttr, *evalWatchConst:
@@ -54,6 +51,19 @@ func decObserveEval(observer evalObserver) InterpretableDecorator {
 	}
 }
 
+// decInterruptFolds creates an intepretable decorator which marks comprehensions as interruptable
+// where the interrupt state is communicated via a hidden variable on the Activation.
+func decInterruptFolds() InterpretableDecorator {
+	return func(i Interpretable) (Interpretable, error) {
+		fold, ok := i.(*evalFold)
+		if !ok {
+			return i, nil
+		}
+		fold.interruptable = true
+		return fold, nil
+	}
+}
+
 // decDisableShortcircuits ensures that all branches of an expression will be evaluated, no short-circuiting.
 func decDisableShortcircuits() InterpretableDecorator {
 	return func(i Interpretable) (Interpretable, error) {
@@ -71,16 +81,8 @@ func decDisableShortcircuits() InterpretableDecorator {
 				rhs: expr.rhs,
 			}, nil
 		case *evalFold:
-			return &evalExhaustiveFold{
-				id:        expr.id,
-				accu:      expr.accu,
-				accuVar:   expr.accuVar,
-				iterRange: expr.iterRange,
-				iterVar:   expr.iterVar,
-				cond:      expr.cond,
-				step:      expr.step,
-				result:    expr.result,
-			}, nil
+			expr.exhaustive = true
+			return expr, nil
 		case InterpretableAttribute:
 			cond, isCond := expr.Attr().(*conditionalAttribute)
 			if isCond {
@@ -115,6 +117,48 @@ func decOptimize() InterpretableDecorator {
 			}
 		}
 		return i, nil
+	}
+}
+
+// decRegexOptimizer compiles regex pattern string constants.
+func decRegexOptimizer(regexOptimizations ...*RegexOptimization) InterpretableDecorator {
+	functionMatchMap := make(map[string]*RegexOptimization)
+	overloadMatchMap := make(map[string]*RegexOptimization)
+	for _, m := range regexOptimizations {
+		functionMatchMap[m.Function] = m
+		if m.OverloadID != "" {
+			overloadMatchMap[m.OverloadID] = m
+		}
+	}
+
+	return func(i Interpretable) (Interpretable, error) {
+		call, ok := i.(InterpretableCall)
+		if !ok {
+			return i, nil
+		}
+
+		var matcher *RegexOptimization
+		var found bool
+		if call.OverloadID() != "" {
+			matcher, found = overloadMatchMap[call.OverloadID()]
+		}
+		if !found {
+			matcher, found = functionMatchMap[call.Function()]
+		}
+		if !found || matcher.RegexIndex >= len(call.Args()) {
+			return i, nil
+		}
+		args := call.Args()
+		regexArg := args[matcher.RegexIndex]
+		regexStr, isConst := regexArg.(InterpretableConst)
+		if !isConst {
+			return i, nil
+		}
+		pattern, ok := regexStr.Value().(types.String)
+		if !ok {
+			return i, nil
+		}
+		return matcher.Factory(call, string(pattern))
 	}
 }
 
@@ -177,7 +221,6 @@ func maybeOptimizeSetMembership(i Interpretable, inlist InterpretableCall) (Inte
 		return NewConstValue(inlist.ID(), types.False), nil
 	}
 	it := list.Iterator()
-	var typ ref.Type
 	valueSet := make(map[ref.Val]ref.Val)
 	for it.HasNext() == types.True {
 		elem := it.Next()
@@ -185,17 +228,42 @@ func maybeOptimizeSetMembership(i Interpretable, inlist InterpretableCall) (Inte
 			// Note, non-primitive type are not yet supported.
 			return i, nil
 		}
-		if typ == nil {
-			typ = elem.Type()
-		} else if typ.TypeName() != elem.Type().TypeName() {
-			return i, nil
-		}
 		valueSet[elem] = types.True
+		switch ev := elem.(type) {
+		case types.Double:
+			iv := ev.ConvertToType(types.IntType)
+			// Ensure that only lossless conversions are added to the set
+			if !types.IsError(iv) && iv.Equal(ev) == types.True {
+				valueSet[iv] = types.True
+			}
+			// Ensure that only lossless conversions are added to the set
+			uv := ev.ConvertToType(types.UintType)
+			if !types.IsError(uv) && uv.Equal(ev) == types.True {
+				valueSet[uv] = types.True
+			}
+		case types.Int:
+			dv := ev.ConvertToType(types.DoubleType)
+			if !types.IsError(dv) {
+				valueSet[dv] = types.True
+			}
+			uv := ev.ConvertToType(types.UintType)
+			if !types.IsError(uv) {
+				valueSet[uv] = types.True
+			}
+		case types.Uint:
+			dv := ev.ConvertToType(types.DoubleType)
+			if !types.IsError(dv) {
+				valueSet[dv] = types.True
+			}
+			iv := ev.ConvertToType(types.IntType)
+			if !types.IsError(iv) {
+				valueSet[iv] = types.True
+			}
+		}
 	}
 	return &evalSetMembership{
-		inst:        inlist,
-		arg:         lhs,
-		argTypeName: typ.TypeName(),
-		valueSet:    valueSet,
+		inst:     inlist,
+		arg:      lhs,
+		valueSet: valueSet,
 	}, nil
 }

@@ -68,6 +68,7 @@ if [[ ! -f "${SERVICE_ACCOUNT_KEY}" ]]; then
 fi
 
 # Start kube-apiserver
+# omit enums from static openapi snapshots used to generate clients until #109177 is resolved
 kube::log::status "Starting kube-apiserver"
 "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
   --bind-address="${API_HOST}" \
@@ -75,7 +76,7 @@ kube::log::status "Starting kube-apiserver"
   --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
   --advertise-address="10.10.10.10" \
   --cert-dir="${TMP_DIR}/certs" \
-  --feature-gates=AllAlpha=true \
+  --feature-gates=AllAlpha=true,OpenAPIEnums=false \
   --runtime-config="api/all=true" \
   --token-auth-file="${TMP_DIR}/tokenauth.csv" \
   --authorization-mode=RBAC \
@@ -96,9 +97,24 @@ if ! kube::util::wait_for_url "https://${API_HOST}:${API_PORT}/healthz" "apiserv
   exit 1
 fi
 
-kube::log::status "Updating " "${OPENAPI_ROOT_DIR}"
+kube::log::status "Updating " "${OPENAPI_ROOT_DIR} for OpenAPI v2"
 
 curl -w "\n" -kfsS -H 'Authorization: Bearer dummy_token' "https://${API_HOST}:${API_PORT}/openapi/v2" | jq -S '.info.version="unversioned"' > "${OPENAPI_ROOT_DIR}/swagger.json"
+
+kube::log::status "Updating " "${OPENAPI_ROOT_DIR}/v3 for OpenAPI v3"
+
+mkdir -p "${OPENAPI_ROOT_DIR}/v3"
+# clean up folder, note that some files start with dot like
+# ".well-known__openid-configuration_openapi.json"
+rm -r "${OPENAPI_ROOT_DIR}"/v3/{*,.*} || true
+
+curl -w "\n" -kfsS -H 'Authorization: Bearer dummy_token' "https://${API_HOST}:${API_PORT}/openapi/v3" | jq -r '.paths | to_entries | .[].key' | while read -r group; do
+    kube::log::status "Updating OpenAPI spec for group ${group}"
+    OPENAPI_FILENAME="${group}_openapi.json"
+    OPENAPI_FILENAME_ESCAPED="${OPENAPI_FILENAME//\//__}"
+    OPENAPI_PATH="${OPENAPI_ROOT_DIR}/v3/${OPENAPI_FILENAME_ESCAPED}"
+    curl -w "\n" -kfsS -H 'Authorization: Bearer dummy_token' "https://${API_HOST}:${API_PORT}/openapi/v3/{$group}" | jq -S '.info.version="unversioned"' > "$OPENAPI_PATH"
+done
 
 kube::log::status "SUCCESS"
 

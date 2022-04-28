@@ -65,7 +65,6 @@ import (
 	persistentvolumecontroller "k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
 	"k8s.io/kubernetes/pkg/controller/volume/pvcprotection"
 	"k8s.io/kubernetes/pkg/controller/volume/pvprotection"
-	"k8s.io/kubernetes/pkg/features"
 	quotainstall "k8s.io/kubernetes/pkg/quota/v1/install"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
 	netutils "k8s.io/utils/net"
@@ -336,36 +335,34 @@ func startAttachDetachController(ctx context.Context, controllerContext Controll
 }
 
 func startVolumeExpandController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) {
-		plugins, err := ProbeExpandableVolumePlugins(controllerContext.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration)
-		if err != nil {
-			return nil, true, fmt.Errorf("failed to probe volume plugins when starting volume expand controller: %v", err)
-		}
-		csiTranslator := csitrans.New()
-		filteredDialOptions, err := options.ParseVolumeHostFilters(
-			controllerContext.ComponentConfig.PersistentVolumeBinderController.VolumeHostCIDRDenylist,
-			controllerContext.ComponentConfig.PersistentVolumeBinderController.VolumeHostAllowLocalLoopback)
-		if err != nil {
-			return nil, true, err
-		}
-		expandController, expandControllerErr := expand.NewExpandController(
-			controllerContext.ClientBuilder.ClientOrDie("expand-controller"),
-			controllerContext.InformerFactory.Core().V1().PersistentVolumeClaims(),
-			controllerContext.InformerFactory.Core().V1().PersistentVolumes(),
-			controllerContext.Cloud,
-			plugins,
-			csiTranslator,
-			csimigration.NewPluginManager(csiTranslator, utilfeature.DefaultFeatureGate),
-			filteredDialOptions,
-		)
-
-		if expandControllerErr != nil {
-			return nil, true, fmt.Errorf("failed to start volume expand controller: %v", expandControllerErr)
-		}
-		go expandController.Run(ctx)
-		return nil, true, nil
+	plugins, err := ProbeExpandableVolumePlugins(controllerContext.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration)
+	if err != nil {
+		return nil, true, fmt.Errorf("failed to probe volume plugins when starting volume expand controller: %v", err)
 	}
-	return nil, false, nil
+	csiTranslator := csitrans.New()
+	filteredDialOptions, err := options.ParseVolumeHostFilters(
+		controllerContext.ComponentConfig.PersistentVolumeBinderController.VolumeHostCIDRDenylist,
+		controllerContext.ComponentConfig.PersistentVolumeBinderController.VolumeHostAllowLocalLoopback)
+	if err != nil {
+		return nil, true, err
+	}
+	expandController, expandControllerErr := expand.NewExpandController(
+		controllerContext.ClientBuilder.ClientOrDie("expand-controller"),
+		controllerContext.InformerFactory.Core().V1().PersistentVolumeClaims(),
+		controllerContext.InformerFactory.Core().V1().PersistentVolumes(),
+		controllerContext.Cloud,
+		plugins,
+		csiTranslator,
+		csimigration.NewPluginManager(csiTranslator, utilfeature.DefaultFeatureGate),
+		filteredDialOptions,
+	)
+
+	if expandControllerErr != nil {
+		return nil, true, fmt.Errorf("failed to start volume expand controller: %v", expandControllerErr)
+	}
+	go expandController.Run(ctx)
+	return nil, true, nil
+
 }
 
 func startEphemeralVolumeController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {

@@ -38,11 +38,13 @@ func init() {
 	addCheck(CheckHostPathVolumes)
 }
 
+const checkHostPathVolumesID CheckID = "hostPathVolumes"
+
 // CheckHostPathVolumes returns a baseline level check
 // that requires hostPath=undefined/null in 1.0+
 func CheckHostPathVolumes() Check {
 	return Check{
-		ID:    "hostPathVolumes",
+		ID:    checkHostPathVolumesID,
 		Level: api.LevelBaseline,
 		Versions: []VersionedCheck{
 			{

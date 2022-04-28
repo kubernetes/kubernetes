@@ -27,7 +27,7 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
-option go_package = "v1";
+option go_package = "k8s.io/api/policy/v1";
 
 // Eviction evicts a pod from its node subject to certain policies and safety constraints.
 // This is a subresource of Pod.  A request to cause such an eviction is

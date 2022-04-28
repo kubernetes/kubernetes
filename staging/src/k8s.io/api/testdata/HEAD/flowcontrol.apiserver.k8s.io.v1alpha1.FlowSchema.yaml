@@ -2,68 +2,72 @@ apiVersion: flowcontrol.apiserver.k8s.io/v1alpha1
 kind: FlowSchema
 metadata:
   annotations:
-    "9": "10"
-  clusterName: "15"
-  creationTimestamp: "2061-09-19T18:13:36Z"
-  deletionGracePeriodSeconds: -4955867275792137171
+    annotationsKey: annotationsValue
+  clusterName: clusterNameValue
+  creationTimestamp: "2008-01-01T01:01:01Z"
+  deletionGracePeriodSeconds: 10
+  deletionTimestamp: "2009-01-01T01:01:01Z"
   finalizers:
-  - "14"
-  generateName: "3"
-  generation: 8071137005907523419
+  - finalizersValue
+  generateName: generateNameValue
+  generation: 7
   labels:
-    "7": "8"
+    labelsKey: labelsValue
   managedFields:
-  - apiVersion: "17"
-    fieldsType: "18"
-    manager: "16"
-    operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
-    subresource: "19"
-  name: "2"
-  namespace: "4"
+  - apiVersion: apiVersionValue
+    fieldsType: fieldsTypeValue
+    fieldsV1: {}
+    manager: managerValue
+    operation: operationValue
+    subresource: subresourceValue
+    time: "2004-01-01T01:01:01Z"
+  name: nameValue
+  namespace: namespaceValue
   ownerReferences:
-  - apiVersion: "11"
+  - apiVersion: apiVersionValue
     blockOwnerDeletion: true
-    controller: false
-    kind: "12"
-    name: "13"
-    uid: Dz廔ȇ{sŊƏp
-  resourceVersion: "11042405498087606203"
-  selfLink: "5"
-  uid: "7"
+    controller: true
+    kind: kindValue
+    name: nameValue
+    uid: uidValue
+  resourceVersion: resourceVersionValue
+  selfLink: selfLinkValue
+  uid: uidValue
 spec:
   distinguisherMethod:
-    type: Hr鯹)晿<o,c鮽ort昍řČ扷5Ɨ
-  matchingPrecedence: -595102844
+    type: typeValue
+  matchingPrecedence: 2
   priorityLevelConfiguration:
-    name: "20"
+    name: nameValue
   rules:
   - nonResourceRules:
     - nonResourceURLs:
-      - "30"
+      - nonResourceURLsValue
       verbs:
-      - "29"
+      - verbsValue
     resourceRules:
     - apiGroups:
-      - "26"
+      - apiGroupsValue
+      clusterScope: true
       namespaces:
-      - "28"
+      - namespacesValue
       resources:
-      - "27"
+      - resourcesValue
       verbs:
-      - "25"
+      - verbsValue
     subjects:
     - group:
-        name: "22"
-      kind: Ă凗蓏Ŋ蛊ĉy
+        name: nameValue
+      kind: kindValue
       serviceAccount:
-        name: "24"
-        namespace: "23"
+        name: nameValue
+        namespace: namespaceValue
       user:
-        name: "21"
+        name: nameValue
 status:
   conditions:
-  - lastTransitionTime: "2559-01-29T18:41:04Z"
-    message: "32"
-    reason: "31"
-    status: 彀亞
-    type: ?狱³-Ǐ忄*齧獚
+  - lastTransitionTime: "2003-01-01T01:01:01Z"
+    message: messageValue
+    reason: reasonValue
+    status: statusValue
+    type: typeValue

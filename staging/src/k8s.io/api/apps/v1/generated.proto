@@ -28,7 +28,7 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
-option go_package = "v1";
+option go_package = "k8s.io/api/apps/v1";
 
 // ControllerRevision implements an immutable snapshot of state data. Clients
 // are responsible for serializing and deserializing the objects that contain
@@ -550,11 +550,22 @@ message RollingUpdateDeployment {
 
 // RollingUpdateStatefulSetStrategy is used to communicate parameter for RollingUpdateStatefulSetStrategyType.
 message RollingUpdateStatefulSetStrategy {
-  // Partition indicates the ordinal at which the StatefulSet should be
-  // partitioned.
-  // Default value is 0.
+  // Partition indicates the ordinal at which the StatefulSet should be partitioned
+  // for updates. During a rolling update, all pods from ordinal Replicas-1 to
+  // Partition are updated. All pods from ordinal Partition-1 to 0 remain untouched.
+  // This is helpful in being able to do a canary based deployment. The default value is 0.
   // +optional
   optional int32 partition = 1;
+
+  // The maximum number of pods that can be unavailable during the update.
+  // Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
+  // Absolute number is calculated from percentage by rounding up. This can not be 0.
+  // Defaults to 1. This field is alpha-level and is only honored by servers that enable the
+  // MaxUnavailableStatefulSet feature. The field applies to all pods in the range 0 to
+  // Replicas-1. That means if there is any unavailable pod in the range 0 to Replicas-1, it
+  // will be counted towards MaxUnavailable.
+  // +optional
+  optional k8s.io.apimachinery.pkg.util.intstr.IntOrString maxUnavailable = 2;
 }
 
 // StatefulSet represents a set of pods with consistent identities.
@@ -609,6 +620,23 @@ message StatefulSetList {
 
   // Items is the list of stateful sets.
   repeated StatefulSet items = 2;
+}
+
+// StatefulSetPersistentVolumeClaimRetentionPolicy describes the policy used for PVCs
+// created from the StatefulSet VolumeClaimTemplates.
+message StatefulSetPersistentVolumeClaimRetentionPolicy {
+  // WhenDeleted specifies what happens to PVCs created from StatefulSet
+  // VolumeClaimTemplates when the StatefulSet is deleted. The default policy
+  // of `Retain` causes PVCs to not be affected by StatefulSet deletion. The
+  // `Delete` policy causes those PVCs to be deleted.
+  optional string whenDeleted = 1;
+
+  // WhenScaled specifies what happens to PVCs created from StatefulSet
+  // VolumeClaimTemplates when the StatefulSet is scaled down. The default
+  // policy of `Retain` causes PVCs to not be affected by a scaledown. The
+  // `Delete` policy causes the associated PVCs for any excess pods above
+  // the replica count to be deleted.
+  optional string whenScaled = 2;
 }
 
 // A StatefulSetSpec is the specification of a StatefulSet.
@@ -677,6 +705,15 @@ message StatefulSetSpec {
   // This is an alpha field and requires enabling StatefulSetMinReadySeconds feature gate.
   // +optional
   optional int32 minReadySeconds = 9;
+
+  // persistentVolumeClaimRetentionPolicy describes the lifecycle of persistent
+  // volume claims created from volumeClaimTemplates. By default, all persistent
+  // volume claims are created as needed and retained until manually deleted. This
+  // policy allows the lifecycle to be altered, for example by deleting persistent
+  // volume claims when their stateful set is deleted, or when their pod is scaled
+  // down. This requires the StatefulSetAutoDeletePVC feature gate to be enabled,
+  // which is alpha.  +optional
+  optional StatefulSetPersistentVolumeClaimRetentionPolicy persistentVolumeClaimRetentionPolicy = 10;
 }
 
 // StatefulSetStatus represents the current state of a StatefulSet.
@@ -722,6 +759,7 @@ message StatefulSetStatus {
 
   // Total number of available pods (ready for at least minReadySeconds) targeted by this statefulset.
   // This is a beta field and enabled/disabled by StatefulSetMinReadySeconds feature gate.
+  // +optional
   optional int32 availableReplicas = 11;
 }
 

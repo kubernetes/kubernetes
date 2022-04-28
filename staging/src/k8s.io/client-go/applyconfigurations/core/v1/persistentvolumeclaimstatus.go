@@ -25,10 +25,12 @@ import (
 // PersistentVolumeClaimStatusApplyConfiguration represents an declarative configuration of the PersistentVolumeClaimStatus type for use
 // with apply.
 type PersistentVolumeClaimStatusApplyConfiguration struct {
-	Phase       *v1.PersistentVolumeClaimPhase                     `json:"phase,omitempty"`
-	AccessModes []v1.PersistentVolumeAccessMode                    `json:"accessModes,omitempty"`
-	Capacity    *v1.ResourceList                                   `json:"capacity,omitempty"`
-	Conditions  []PersistentVolumeClaimConditionApplyConfiguration `json:"conditions,omitempty"`
+	Phase              *v1.PersistentVolumeClaimPhase                     `json:"phase,omitempty"`
+	AccessModes        []v1.PersistentVolumeAccessMode                    `json:"accessModes,omitempty"`
+	Capacity           *v1.ResourceList                                   `json:"capacity,omitempty"`
+	Conditions         []PersistentVolumeClaimConditionApplyConfiguration `json:"conditions,omitempty"`
+	AllocatedResources *v1.ResourceList                                   `json:"allocatedResources,omitempty"`
+	ResizeStatus       *v1.PersistentVolumeClaimResizeStatus              `json:"resizeStatus,omitempty"`
 }
 
 // PersistentVolumeClaimStatusApplyConfiguration constructs an declarative configuration of the PersistentVolumeClaimStatus type for use with
@@ -73,5 +75,21 @@ func (b *PersistentVolumeClaimStatusApplyConfiguration) WithConditions(values ..
 		}
 		b.Conditions = append(b.Conditions, *values[i])
 	}
+	return b
+}
+
+// WithAllocatedResources sets the AllocatedResources field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the AllocatedResources field is set to the value of the last call.
+func (b *PersistentVolumeClaimStatusApplyConfiguration) WithAllocatedResources(value v1.ResourceList) *PersistentVolumeClaimStatusApplyConfiguration {
+	b.AllocatedResources = &value
+	return b
+}
+
+// WithResizeStatus sets the ResizeStatus field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ResizeStatus field is set to the value of the last call.
+func (b *PersistentVolumeClaimStatusApplyConfiguration) WithResizeStatus(value v1.PersistentVolumeClaimResizeStatus) *PersistentVolumeClaimStatusApplyConfiguration {
+	b.ResizeStatus = &value
 	return b
 }

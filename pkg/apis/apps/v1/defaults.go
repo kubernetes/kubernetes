@@ -20,6 +20,8 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -111,10 +113,30 @@ func SetDefaults_StatefulSet(obj *appsv1.StatefulSet) {
 	}
 
 	if obj.Spec.UpdateStrategy.Type == appsv1.RollingUpdateStatefulSetStrategyType &&
-		obj.Spec.UpdateStrategy.RollingUpdate != nil &&
-		obj.Spec.UpdateStrategy.RollingUpdate.Partition == nil {
-		obj.Spec.UpdateStrategy.RollingUpdate.Partition = new(int32)
-		*obj.Spec.UpdateStrategy.RollingUpdate.Partition = 0
+		obj.Spec.UpdateStrategy.RollingUpdate != nil {
+
+		if obj.Spec.UpdateStrategy.RollingUpdate.Partition == nil {
+			obj.Spec.UpdateStrategy.RollingUpdate.Partition = new(int32)
+			*obj.Spec.UpdateStrategy.RollingUpdate.Partition = 0
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.MaxUnavailableStatefulSet) {
+			if obj.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable == nil {
+				maxUnavailable := intstr.FromInt(1)
+				obj.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = &maxUnavailable
+			}
+		}
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
+		if obj.Spec.PersistentVolumeClaimRetentionPolicy == nil {
+			obj.Spec.PersistentVolumeClaimRetentionPolicy = &appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{}
+		}
+		if len(obj.Spec.PersistentVolumeClaimRetentionPolicy.WhenDeleted) == 0 {
+			obj.Spec.PersistentVolumeClaimRetentionPolicy.WhenDeleted = appsv1.RetainPersistentVolumeClaimRetentionPolicyType
+		}
+		if len(obj.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled) == 0 {
+			obj.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled = appsv1.RetainPersistentVolumeClaimRetentionPolicyType
+		}
 	}
 
 	if obj.Spec.Replicas == nil {

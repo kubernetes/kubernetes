@@ -39,11 +39,16 @@ type Cache struct {
 	// should be added to an EndpointSlice.
 	maxEndpointsPerSlice int32
 
-	// lock protects changes to numEndpoints and cache.
+	// lock protects changes to numEndpoints, numSlicesActual, numSlicesDesired,
+	// and cache.
 	lock sync.Mutex
 	// numEndpoints represents the total number of endpoints stored in
 	// EndpointSlices.
 	numEndpoints int
+	// numSlicesActual represents the total number of EndpointSlices.
+	numSlicesActual int
+	// numSlicesDesired represents the desired number of EndpointSlices.
+	numSlicesDesired int
 	// cache stores a ServicePortCache grouped by NamespacedNames representing
 	// Services.
 	cache map[types.NamespacedName]*ServicePortCache
@@ -77,14 +82,16 @@ func (spc *ServicePortCache) Set(pmKey endpointutil.PortMapKey, eInfo Efficiency
 	spc.items[pmKey] = eInfo
 }
 
-// numEndpoints returns the total number of endpoints represented by a
+// totals returns the total number of endpoints and slices represented by a
 // ServicePortCache.
-func (spc *ServicePortCache) numEndpoints() int {
-	num := 0
+func (spc *ServicePortCache) totals(maxEndpointsPerSlice int) (int, int, int) {
+	var actualSlices, desiredSlices, endpoints int
 	for _, eInfo := range spc.items {
-		num += eInfo.Endpoints
+		endpoints += eInfo.Endpoints
+		actualSlices += eInfo.Slices
+		desiredSlices += numDesiredSlices(eInfo.Endpoints, maxEndpointsPerSlice)
 	}
-	return num
+	return actualSlices, desiredSlices, endpoints
 }
 
 // UpdateServicePortCache updates a ServicePortCache in the global cache for a
@@ -96,15 +103,18 @@ func (c *Cache) UpdateServicePortCache(serviceNN types.NamespacedName, spCache *
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	prevNumEndpoints := 0
+	var prevActualSlices, prevDesiredSlices, prevEndpoints int
 	if existingSPCache, ok := c.cache[serviceNN]; ok {
-		prevNumEndpoints = existingSPCache.numEndpoints()
+		prevActualSlices, prevDesiredSlices, prevEndpoints = existingSPCache.totals(int(c.maxEndpointsPerSlice))
 	}
 
-	currNumEndpoints := spCache.numEndpoints()
+	currActualSlices, currDesiredSlices, currEndpoints := spCache.totals(int(c.maxEndpointsPerSlice))
 	// To keep numEndpoints up to date, add the difference between the number of
 	// endpoints in the provided spCache and any spCache it might be replacing.
-	c.numEndpoints = c.numEndpoints + currNumEndpoints - prevNumEndpoints
+	c.numEndpoints = c.numEndpoints + currEndpoints - prevEndpoints
+
+	c.numSlicesDesired += currDesiredSlices - prevDesiredSlices
+	c.numSlicesActual += currActualSlices - prevActualSlices
 
 	c.cache[serviceNN] = spCache
 	c.updateMetrics()
@@ -117,45 +127,29 @@ func (c *Cache) DeleteService(serviceNN types.NamespacedName) {
 	defer c.lock.Unlock()
 
 	if spCache, ok := c.cache[serviceNN]; ok {
-		c.numEndpoints = c.numEndpoints - spCache.numEndpoints()
-		delete(c.cache, serviceNN)
+		actualSlices, desiredSlices, endpoints := spCache.totals(int(c.maxEndpointsPerSlice))
+		c.numEndpoints = c.numEndpoints - endpoints
+		c.numSlicesDesired -= desiredSlices
+		c.numSlicesActual -= actualSlices
 		c.updateMetrics()
-	}
-}
+		delete(c.cache, serviceNN)
 
-// metricsUpdate stores a desired and actual number of EndpointSlices.
-type metricsUpdate struct {
-	desired, actual int
-}
-
-// desiredAndActualSlices returns a metricsUpdate with the desired and actual
-// number of EndpointSlices given the current values in the cache.
-// Must be called holding lock.
-func (c *Cache) desiredAndActualSlices() metricsUpdate {
-	mUpdate := metricsUpdate{}
-	for _, spCache := range c.cache {
-		for _, eInfo := range spCache.items {
-			mUpdate.actual += eInfo.Slices
-			mUpdate.desired += numDesiredSlices(eInfo.Endpoints, int(c.maxEndpointsPerSlice))
-		}
 	}
-	return mUpdate
 }
 
 // updateMetrics updates metrics with the values from this Cache.
 // Must be called holding lock.
 func (c *Cache) updateMetrics() {
-	mUpdate := c.desiredAndActualSlices()
-	NumEndpointSlices.WithLabelValues().Set(float64(mUpdate.actual))
-	DesiredEndpointSlices.WithLabelValues().Set(float64(mUpdate.desired))
+	NumEndpointSlices.WithLabelValues().Set(float64(c.numSlicesActual))
+	DesiredEndpointSlices.WithLabelValues().Set(float64(c.numSlicesDesired))
 	EndpointsDesired.WithLabelValues().Set(float64(c.numEndpoints))
 }
 
 // numDesiredSlices calculates the number of EndpointSlices that would exist
 // with ideal endpoint distribution.
-func numDesiredSlices(numEndpoints, maxPerSlice int) int {
-	if numEndpoints <= maxPerSlice {
+func numDesiredSlices(numEndpoints, maxEndpointsPerSlice int) int {
+	if numEndpoints <= maxEndpointsPerSlice {
 		return 1
 	}
-	return int(math.Ceil(float64(numEndpoints) / float64(maxPerSlice)))
+	return int(math.Ceil(float64(numEndpoints) / float64(maxEndpointsPerSlice)))
 }

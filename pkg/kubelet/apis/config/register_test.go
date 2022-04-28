@@ -35,6 +35,7 @@ func TestComponentConfigSetup(t *testing.T) {
 			reflect.TypeOf(metav1.TypeMeta{}):     true,
 			reflect.TypeOf(metav1.Duration{}):     true,
 			reflect.TypeOf(v1.NodeConfigSource{}): true,
+			reflect.TypeOf(v1.Taint{}):            true,
 		},
 	}
 

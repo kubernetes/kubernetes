@@ -1,7 +1,6 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 reviewers:
-- smarterclayton
-- deads2k
-- derekwaynecarr
-- vishh
+  - smarterclayton
+  - deads2k
+  - derekwaynecarr

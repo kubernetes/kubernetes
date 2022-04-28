@@ -8,9 +8,11 @@ go_library(
     name = "go_default_library",
     srcs = [
         "checker.go",
+        "cost.go",
         "env.go",
         "errors.go",
         "mapping.go",
+        "options.go",
         "printer.go",
         "standard.go",
         "types.go",
@@ -40,6 +42,7 @@ go_test(
     size = "small",
     srcs = [
         "checker_test.go",
+        "cost_test.go",
         "env_test.go",
     ],
     embed = [

@@ -1,12 +1,13 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- Random-Liu
-- dchen1107
-- derekwaynecarr
-- vishh
-- yujuhong
-- ConnorDoyle
-- klueska
+  - Random-Liu
+  - dchen1107
+  - derekwaynecarr
+  - yujuhong
+  - klueska
 reviewers:
-- sig-node-reviewers
+  - sig-node-reviewers
+emeritus_approvers:
+  - ConnorDoyle
+  - vishh

@@ -15,12 +15,20 @@
 package cel
 
 import (
+	"errors"
 	"fmt"
+	"reflect"
 
 	"github.com/google/cel-go/common"
+	"github.com/google/cel-go/common/types"
+	"github.com/google/cel-go/common/types/ref"
+	"github.com/google/cel-go/common/types/traits"
 	"github.com/google/cel-go/parser"
 
+	"google.golang.org/protobuf/proto"
+
 	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
+	anypb "google.golang.org/protobuf/types/known/anypb"
 )
 
 // CheckedExprToAst converts a checked expression proto message to an Ast.
@@ -119,4 +127,154 @@ func AstToString(a *Ast) (string, error) {
 	expr := a.Expr()
 	info := a.SourceInfo()
 	return parser.Unparse(expr, info)
+}
+
+// RefValueToValue converts between ref.Val and api.expr.Value.
+// The result Value is the serialized proto form. The ref.Val must not be error or unknown.
+func RefValueToValue(res ref.Val) (*exprpb.Value, error) {
+	switch res.Type() {
+	case types.BoolType:
+		return &exprpb.Value{
+			Kind: &exprpb.Value_BoolValue{BoolValue: res.Value().(bool)}}, nil
+	case types.BytesType:
+		return &exprpb.Value{
+			Kind: &exprpb.Value_BytesValue{BytesValue: res.Value().([]byte)}}, nil
+	case types.DoubleType:
+		return &exprpb.Value{
+			Kind: &exprpb.Value_DoubleValue{DoubleValue: res.Value().(float64)}}, nil
+	case types.IntType:
+		return &exprpb.Value{
+			Kind: &exprpb.Value_Int64Value{Int64Value: res.Value().(int64)}}, nil
+	case types.ListType:
+		l := res.(traits.Lister)
+		sz := l.Size().(types.Int)
+		elts := make([]*exprpb.Value, 0, int64(sz))
+		for i := types.Int(0); i < sz; i++ {
+			v, err := RefValueToValue(l.Get(i))
+			if err != nil {
+				return nil, err
+			}
+			elts = append(elts, v)
+		}
+		return &exprpb.Value{
+			Kind: &exprpb.Value_ListValue{
+				ListValue: &exprpb.ListValue{Values: elts}}}, nil
+	case types.MapType:
+		mapper := res.(traits.Mapper)
+		sz := mapper.Size().(types.Int)
+		entries := make([]*exprpb.MapValue_Entry, 0, int64(sz))
+		for it := mapper.Iterator(); it.HasNext().(types.Bool); {
+			k := it.Next()
+			v := mapper.Get(k)
+			kv, err := RefValueToValue(k)
+			if err != nil {
+				return nil, err
+			}
+			vv, err := RefValueToValue(v)
+			if err != nil {
+				return nil, err
+			}
+			entries = append(entries, &exprpb.MapValue_Entry{Key: kv, Value: vv})
+		}
+		return &exprpb.Value{
+			Kind: &exprpb.Value_MapValue{
+				MapValue: &exprpb.MapValue{Entries: entries}}}, nil
+	case types.NullType:
+		return &exprpb.Value{
+			Kind: &exprpb.Value_NullValue{}}, nil
+	case types.StringType:
+		return &exprpb.Value{
+			Kind: &exprpb.Value_StringValue{StringValue: res.Value().(string)}}, nil
+	case types.TypeType:
+		typeName := res.(ref.Type).TypeName()
+		return &exprpb.Value{Kind: &exprpb.Value_TypeValue{TypeValue: typeName}}, nil
+	case types.UintType:
+		return &exprpb.Value{
+			Kind: &exprpb.Value_Uint64Value{Uint64Value: res.Value().(uint64)}}, nil
+	default:
+		any, err := res.ConvertToNative(anyPbType)
+		if err != nil {
+			return nil, err
+		}
+		return &exprpb.Value{
+			Kind: &exprpb.Value_ObjectValue{ObjectValue: any.(*anypb.Any)}}, nil
+	}
+}
+
+var (
+	typeNameToTypeValue = map[string]*types.TypeValue{
+		"bool":      types.BoolType,
+		"bytes":     types.BytesType,
+		"double":    types.DoubleType,
+		"null_type": types.NullType,
+		"int":       types.IntType,
+		"list":      types.ListType,
+		"map":       types.MapType,
+		"string":    types.StringType,
+		"type":      types.TypeType,
+		"uint":      types.UintType,
+	}
+
+	anyPbType = reflect.TypeOf(&anypb.Any{})
+)
+
+// ValueToRefValue converts between exprpb.Value and ref.Val.
+func ValueToRefValue(adapter ref.TypeAdapter, v *exprpb.Value) (ref.Val, error) {
+	switch v.Kind.(type) {
+	case *exprpb.Value_NullValue:
+		return types.NullValue, nil
+	case *exprpb.Value_BoolValue:
+		return types.Bool(v.GetBoolValue()), nil
+	case *exprpb.Value_Int64Value:
+		return types.Int(v.GetInt64Value()), nil
+	case *exprpb.Value_Uint64Value:
+		return types.Uint(v.GetUint64Value()), nil
+	case *exprpb.Value_DoubleValue:
+		return types.Double(v.GetDoubleValue()), nil
+	case *exprpb.Value_StringValue:
+		return types.String(v.GetStringValue()), nil
+	case *exprpb.Value_BytesValue:
+		return types.Bytes(v.GetBytesValue()), nil
+	case *exprpb.Value_ObjectValue:
+		any := v.GetObjectValue()
+		msg, err := anypb.UnmarshalNew(any, proto.UnmarshalOptions{DiscardUnknown: true})
+		if err != nil {
+			return nil, err
+		}
+		return adapter.NativeToValue(msg.(proto.Message)), nil
+	case *exprpb.Value_MapValue:
+		m := v.GetMapValue()
+		entries := make(map[ref.Val]ref.Val)
+		for _, entry := range m.Entries {
+			key, err := ValueToRefValue(adapter, entry.Key)
+			if err != nil {
+				return nil, err
+			}
+			pb, err := ValueToRefValue(adapter, entry.Value)
+			if err != nil {
+				return nil, err
+			}
+			entries[key] = pb
+		}
+		return adapter.NativeToValue(entries), nil
+	case *exprpb.Value_ListValue:
+		l := v.GetListValue()
+		elts := make([]ref.Val, len(l.Values))
+		for i, e := range l.Values {
+			rv, err := ValueToRefValue(adapter, e)
+			if err != nil {
+				return nil, err
+			}
+			elts[i] = rv
+		}
+		return adapter.NativeToValue(elts), nil
+	case *exprpb.Value_TypeValue:
+		typeName := v.GetTypeValue()
+		tv, ok := typeNameToTypeValue[typeName]
+		if ok {
+			return tv, nil
+		}
+		return types.NewObjectTypeValue(typeName), nil
+	}
+	return nil, errors.New("unknown value")
 }

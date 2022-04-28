@@ -19,7 +19,6 @@ package tracing
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"testing"
@@ -61,13 +60,13 @@ func TestAPIServerTracing(t *testing.T) {
 	defer srv.Stop()
 
 	// Write the configuration for tracing to a file
-	tracingConfigFile, err := ioutil.TempFile("", "tracing-config.yaml")
+	tracingConfigFile, err := os.CreateTemp("", "tracing-config.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer os.Remove(tracingConfigFile.Name())
 
-	if err := ioutil.WriteFile(tracingConfigFile.Name(), []byte(fmt.Sprintf(`
+	if err := os.WriteFile(tracingConfigFile.Name(), []byte(fmt.Sprintf(`
 apiVersion: apiserver.config.k8s.io/v1alpha1
 kind: TracingConfiguration
 endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {

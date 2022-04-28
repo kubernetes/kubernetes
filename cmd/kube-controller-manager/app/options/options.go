@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/spf13/pflag"
 	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
@@ -222,20 +221,6 @@ func NewDefaultComponentConfig() (kubectrlmgrconfig.KubeControllerManagerConfigu
 	return internal, nil
 }
 
-// TODO: remove these insecure flags in v1.24
-func addDummyInsecureFlags(fs *pflag.FlagSet) {
-	var (
-		bindAddr = net.IPv4(127, 0, 0, 1)
-		bindPort = 0
-	)
-	fs.IPVar(&bindAddr, "address", bindAddr,
-		"The IP address on which to serve the insecure --port (set to 0.0.0.0 for all IPv4 interfaces and :: for all IPv6 interfaces).")
-	fs.MarkDeprecated("address", "This flag has no effect now and will be removed in v1.24.")
-
-	fs.IntVar(&bindPort, "port", bindPort, "The port on which to serve unsecured, unauthenticated access. Set to 0 to disable.")
-	fs.MarkDeprecated("port", "This flag has no effect now and will be removed in v1.24.")
-}
-
 // Flags returns flags for a specific APIServer by section name
 func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledByDefaultControllers []string) cliflag.NamedFlagSets {
 	fss := cliflag.NamedFlagSets{}
@@ -244,7 +229,6 @@ func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledBy
 	s.ServiceController.AddFlags(fss.FlagSet("service controller"))
 
 	s.SecureServing.AddFlags(fss.FlagSet("secure serving"))
-	addDummyInsecureFlags(fss.FlagSet("insecure serving"))
 	s.Authentication.AddFlags(fss.FlagSet("authentication"))
 	s.Authorization.AddFlags(fss.FlagSet("authorization"))
 

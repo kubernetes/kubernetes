@@ -25,7 +25,7 @@
 # and the timestamp from the filename is multiplied by the necessary 1000
 # and added to the data in that file.
 
-# This requires an `nc` comment that this script knows how to wrangle.
+# This requires an `nc` command that this script knows how to wrangle.
 
 if (( $# != 2 )); then
     echo "Usage: $0 port_num scrapes_dir" >&2

@@ -2186,6 +2186,7 @@ The new storage capacity tracking alpha feature is known to be affected by a lim
   - `servicePort` -> `service.port.name` (for string values)
   - `servicePort` -> `service.port.number` (for numeric values)
   - `pathType` no longer has a default value in v1; "Exact", "Prefix", or "ImplementationSpecific" must be specified
+
   Other Ingress API updates:
   - backends can now be resource or service backends
   - `path` is no longer required to be a valid regular expression ([#89778](https://github.com/kubernetes/kubernetes/pull/89778), [@cmluciano](https://github.com/cmluciano)) [SIG API Machinery, Apps, CLI, Network and Testing]

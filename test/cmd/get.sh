@@ -175,6 +175,14 @@ run_kubectl_get_tests() {
   output_message=$(! kubectl get pod valid-pod --allow-missing-template-keys=false -o go-template='{{.missing}}' "${kube_flags[@]}")
   kube::test::if_has_string "${output_message}" 'map has no entry for key "missing"'
 
+  ## check --subresource=status works
+  output_message=$(kubectl get "${kube_flags[@]}" pod valid-pod --subresource=status)
+  kube::test::if_has_string "${output_message}" 'valid-pod'
+
+   ## check --subresource=scale returns an error for pods
+  output_message=$(! kubectl get pod valid-pod --subresource=scale 2>&1 "${kube_flags[@]:?}")
+  kube::test::if_has_string "${output_message}" 'the server could not find the requested resource'
+
   ### Test kubectl get watch
   output_message=$(kubectl get pods -w --request-timeout=1 "${kube_flags[@]}")
   kube::test::if_has_string "${output_message}" 'STATUS'    # headers
@@ -421,7 +429,7 @@ run_deprecated_api_tests() {
   kube::test::if_has_string "${output_message}" 'PodSecurityPolicy is deprecated'
   output_message=$(! kubectl get podsecuritypolicies.v1beta1.policy --warnings-as-errors 2>&1 "${kube_flags[@]}")
   kube::test::if_has_string "${output_message}" 'PodSecurityPolicy is deprecated'
-  kube::test::if_has_string "${output_message}" 'err="1 warning received"'
+  kube::test::if_has_string "${output_message}" 'error: 1 warning received'
 
   set +o nounset
   set +o errexit

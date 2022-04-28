@@ -37,7 +37,7 @@ import (
 	"time"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -71,6 +71,10 @@ const (
 
 	// The number of times we retry updating a ReplicaSet's status.
 	statusUpdateRetries = 1
+
+	// controllerUIDIndex is the name for the ReplicaSet store's index function,
+	// which is to index by ReplicaSet's controllerUID.
+	controllerUIDIndex = "controllerUID"
 )
 
 // ReplicaSetController is responsible for synchronizing ReplicaSet objects stored
@@ -98,6 +102,7 @@ type ReplicaSetController struct {
 	// rsListerSynced returns true if the pod store has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
 	rsListerSynced cache.InformerSynced
+	rsIndexer      cache.Indexer
 
 	// A store of pods, populated by the shared informer passed to NewReplicaSetController
 	podLister corelisters.PodLister
@@ -150,6 +155,20 @@ func NewBaseController(rsInformer appsinformers.ReplicaSetInformer, podInformer 
 		UpdateFunc: rsc.updateRS,
 		DeleteFunc: rsc.deleteRS,
 	})
+	rsInformer.Informer().AddIndexers(cache.Indexers{
+		controllerUIDIndex: func(obj interface{}) ([]string, error) {
+			rs, ok := obj.(*apps.ReplicaSet)
+			if !ok {
+				return []string{}, nil
+			}
+			controllerRef := metav1.GetControllerOf(rs)
+			if controllerRef == nil {
+				return []string{}, nil
+			}
+			return []string{string(controllerRef.UID)}, nil
+		},
+	})
+	rsc.rsIndexer = rsInformer.Informer().GetIndexer()
 	rsc.rsLister = rsInformer.Lister()
 	rsc.rsListerSynced = rsInformer.Informer().HasSynced
 
@@ -206,25 +225,20 @@ func (rsc *ReplicaSetController) getReplicaSetsWithSameController(rs *apps.Repli
 		return nil
 	}
 
-	allRSs, err := rsc.rsLister.ReplicaSets(rs.Namespace).List(labels.Everything())
+	objects, err := rsc.rsIndexer.ByIndex(controllerUIDIndex, string(controllerRef.UID))
 	if err != nil {
 		utilruntime.HandleError(err)
 		return nil
 	}
-
-	var relatedRSs []*apps.ReplicaSet
-	for _, r := range allRSs {
-		if ref := metav1.GetControllerOf(r); ref != nil && ref.UID == controllerRef.UID {
-			relatedRSs = append(relatedRSs, r)
-		}
+	relatedRSs := make([]*apps.ReplicaSet, 0, len(objects))
+	for _, obj := range objects {
+		relatedRSs = append(relatedRSs, obj.(*apps.ReplicaSet))
 	}
 
-	if klog.V(2).Enabled() {
-		var relatedNames []string
-		for _, r := range relatedRSs {
-			relatedNames = append(relatedNames, r.Name)
-		}
-		klog.InfoS("Found related ReplicaSets", "replicaSet", klog.KObj(rs), "relatedReplicaSets", relatedNames)
+	// The if check is used to avoid the overhead for the KObjs call, see
+	// https://github.com/kubernetes/kubernetes/issues/106945.
+	if klogV := klog.V(2); klogV.Enabled() {
+		klogV.InfoS("Found related ReplicaSets", "replicaSet", klog.KObj(rs), "relatedReplicaSets", klog.KObjs(relatedRSs))
 	}
 
 	return relatedRSs
@@ -670,7 +684,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 	rsNeedsSync := rsc.expectations.SatisfiedExpectations(key)
 	selector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("error converting pod selector to selector: %v", err))
+		utilruntime.HandleError(fmt.Errorf("error converting pod selector to selector for rs %v/%v: %v", namespace, name, err))
 		return nil
 	}
 
@@ -776,7 +790,8 @@ func (rsc *ReplicaSetController) getIndirectlyRelatedPods(rs *apps.ReplicaSet) (
 	for _, relatedRS := range rsc.getReplicaSetsWithSameController(rs) {
 		selector, err := metav1.LabelSelectorAsSelector(relatedRS.Spec.Selector)
 		if err != nil {
-			return nil, err
+			// This object has an invalid selector, it does not match any pods
+			continue
 		}
 		pods, err := rsc.podLister.Pods(relatedRS.Namespace).List(selector)
 		if err != nil {
@@ -791,13 +806,7 @@ func (rsc *ReplicaSetController) getIndirectlyRelatedPods(rs *apps.ReplicaSet) (
 			relatedPods = append(relatedPods, pod)
 		}
 	}
-	if klog.V(4).Enabled() {
-		var relatedNames []string
-		for _, related := range relatedPods {
-			relatedNames = append(relatedNames, related.Name)
-		}
-		klog.Infof("Found %d related pods for %v %s/%s: %v", len(relatedPods), rsc.Kind, rs.Namespace, rs.Name, strings.Join(relatedNames, ", "))
-	}
+	klog.V(4).InfoS("Found related pods", "kind", rsc.Kind, "object", klog.KObj(rs), "pods", klog.KObjs(relatedPods))
 	return relatedPods, nil
 }
 

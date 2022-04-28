@@ -43,6 +43,7 @@ import (
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -68,7 +69,7 @@ func estimateMaximumPods(c clientset.Interface, min, max int32) int32 {
 		availablePods += 10
 	}
 	//avoid creating exactly max pods
-	availablePods *= 8 / 10
+	availablePods = int32(float32(availablePods) * 0.5)
 	// bound the top and bottom
 	if availablePods > max {
 		availablePods = max
@@ -301,6 +302,7 @@ func getUniqLabel(labelkey, labelvalue string) map[string]string {
 
 var _ = SIGDescribe("Garbage collector", func() {
 	f := framework.NewDefaultFramework("gc")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	/*
 		Release: v1.9

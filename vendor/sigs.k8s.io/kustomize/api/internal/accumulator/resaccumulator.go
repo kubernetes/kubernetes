@@ -168,3 +168,23 @@ func (ra *ResAccumulator) FixBackReferences() (err error) {
 	return ra.Transform(
 		newNameReferenceTransformer(ra.tConfig.NameReference))
 }
+
+// Intersection drops the resources which "other" does not have.
+func (ra *ResAccumulator) Intersection(other resmap.ResMap) error {
+	for _, curId := range ra.resMap.AllIds() {
+		toDelete := true
+		for _, otherId := range other.AllIds() {
+			if otherId == curId {
+				toDelete = false
+				break
+			}
+		}
+		if toDelete {
+			err := ra.resMap.Remove(curId)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}

@@ -74,15 +74,15 @@ func (et *enumType) ValueStrings() []string {
 // DescriptionLines returns a description of the enum in this format:
 //
 // Possible enum values:
-//  - `value1`: description 1
-//  - `value2`: description 2
+//  - `"value1"` description 1
+//  - `"value2"` description 2
 func (et *enumType) DescriptionLines() []string {
 	var lines []string
 	for _, value := range et.Values {
 		lines = append(lines, value.Description())
 	}
 	sort.Strings(lines)
-	// Prepend a empty string to initiate a new paragraph.
+	// Prepend an empty string to initiate a new paragraph.
 	return append([]string{"", enumTypeDescriptionHeader}, lines...)
 }
 
@@ -125,7 +125,7 @@ func (et *enumType) appendValue(value *enumValue) {
 
 // Description returns the description line for the enumValue
 // with the format:
-//  - `FooValue`: is the Foo value
+//  - `"FooValue"` is the Foo value
 func (ev *enumValue) Description() string {
 	comment := strings.TrimSpace(ev.Comment)
 	// The comment should starts with the type name, trim it first.
@@ -134,7 +134,7 @@ func (ev *enumValue) Description() string {
 	comment = strings.TrimSpace(comment)
 	// The comment may be multiline, cascade all consecutive whitespaces.
 	comment = whitespaceRegex.ReplaceAllString(comment, " ")
-	return fmt.Sprintf(" - `%s`: %s", ev.Value, comment)
+	return fmt.Sprintf(" - `%q` %s", ev.Value, comment)
 }
 
 // isEnumType checks if a given type is an enum by the definition

@@ -95,6 +95,18 @@ func NewJSONList(adapter ref.TypeAdapter, l *structpb.ListValue) traits.Lister {
 	}
 }
 
+// NewMutableList creates a new mutable list whose internal state can be modified.
+//
+// The mutable list only handles `Add` calls correctly as it is intended only for use within
+// comprehension loops which generate an immutable result upon completion.
+func NewMutableList(adapter ref.TypeAdapter) traits.Lister {
+	return &mutableList{
+		TypeAdapter:   adapter,
+		baseList:      nil,
+		mutableValues: []ref.Val{},
+	}
+}
+
 // baseList points to a list containing elements of any type.
 // The `value` is an array of native values, and refValue is its reflection object.
 // The `ref.TypeAdapter` enables native type to CEL type conversions.
@@ -131,27 +143,13 @@ func (l *baseList) Add(other ref.Val) ref.Val {
 
 // Contains implements the traits.Container interface method.
 func (l *baseList) Contains(elem ref.Val) ref.Val {
-	if IsUnknownOrError(elem) {
-		return elem
-	}
-	var err ref.Val
 	for i := 0; i < l.size; i++ {
 		val := l.NativeToValue(l.get(i))
 		cmp := elem.Equal(val)
 		b, ok := cmp.(Bool)
-		// When there is an error on the contain check, this is not necessarily terminal.
-		// The contains call could find the element and return True, just as though the user
-		// had written a per-element comparison in an exists() macro or logical ||, e.g.
-		//    list.exists(e, e == elem)
-		if !ok && err == nil {
-			err = ValOrErr(cmp, "no such overload")
-		}
-		if b == True {
+		if ok && b == True {
 			return True
 		}
-	}
-	if err != nil {
-		return err
 	}
 	return False
 }
@@ -222,25 +220,18 @@ func (l *baseList) ConvertToType(typeVal ref.Type) ref.Val {
 func (l *baseList) Equal(other ref.Val) ref.Val {
 	otherList, ok := other.(traits.Lister)
 	if !ok {
-		return MaybeNoSuchOverloadErr(other)
+		return False
 	}
 	if l.Size() != otherList.Size() {
 		return False
 	}
-	var maybeErr ref.Val
 	for i := IntZero; i < l.Size().(Int); i++ {
 		thisElem := l.Get(i)
 		otherElem := otherList.Get(i)
-		elemEq := thisElem.Equal(otherElem)
+		elemEq := Equal(thisElem, otherElem)
 		if elemEq == False {
 			return False
 		}
-		if maybeErr == nil && IsUnknownOrError(elemEq) {
-			maybeErr = elemEq
-		}
-	}
-	if maybeErr != nil {
-		return maybeErr
 	}
 	return True
 }
@@ -277,6 +268,32 @@ func (l *baseList) Type() ref.Type {
 // Value implements the ref.Val interface method.
 func (l *baseList) Value() interface{} {
 	return l.value
+}
+
+// mutableList aggregates values into its internal storage. For use with internal CEL variables only.
+type mutableList struct {
+	ref.TypeAdapter
+	*baseList
+	mutableValues []ref.Val
+}
+
+// Add copies elements from the other list into the internal storage of the mutable list.
+func (l *mutableList) Add(other ref.Val) ref.Val {
+	otherList, ok := other.(traits.Lister)
+	if !ok {
+		return MaybeNoSuchOverloadErr(otherList)
+	}
+	for i := IntZero; i < otherList.Size().(Int); i++ {
+		l.mutableValues = append(l.mutableValues, otherList.Get(i))
+	}
+	return l
+}
+
+// ToImmutableList returns an immutable list based on the internal storage of the mutable list.
+func (l *mutableList) ToImmutableList() traits.Lister {
+	// The reference to internal state is guaranteed to be safe as this call is only performed
+	// when mutations have been completed.
+	return NewRefValList(l.TypeAdapter, l.mutableValues)
 }
 
 // concatList combines two list implementations together into a view.
@@ -349,7 +366,7 @@ func (l *concatList) ConvertToType(typeVal ref.Type) ref.Val {
 func (l *concatList) Equal(other ref.Val) ref.Val {
 	otherList, ok := other.(traits.Lister)
 	if !ok {
-		return MaybeNoSuchOverloadErr(other)
+		return False
 	}
 	if l.Size() != otherList.Size() {
 		return False
@@ -358,7 +375,7 @@ func (l *concatList) Equal(other ref.Val) ref.Val {
 	for i := IntZero; i < l.Size().(Int); i++ {
 		thisElem := l.Get(i)
 		otherElem := otherList.Get(i)
-		elemEq := thisElem.Equal(otherElem)
+		elemEq := Equal(thisElem, otherElem)
 		if elemEq == False {
 			return False
 		}

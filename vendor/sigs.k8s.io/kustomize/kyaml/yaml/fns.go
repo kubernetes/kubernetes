@@ -424,10 +424,44 @@ func Lookup(path ...string) PathGetter {
 	return PathGetter{Path: path}
 }
 
-// Lookup returns a PathGetter to lookup a field by its path and create it if it doesn't already
+// LookupCreate returns a PathGetter to lookup a field by its path and create it if it doesn't already
 // exist.
 func LookupCreate(kind yaml.Kind, path ...string) PathGetter {
 	return PathGetter{Path: path, Create: kind}
+}
+
+// ConventionalContainerPaths is a list of paths at which containers typically appear in workload APIs.
+// It is intended for use with LookupFirstMatch.
+var ConventionalContainerPaths = [][]string{
+	// e.g. Deployment, ReplicaSet, DaemonSet, Job, StatefulSet
+	{"spec", "template", "spec", "containers"},
+	// e.g. CronJob
+	{"spec", "jobTemplate", "spec", "template", "spec", "containers"},
+	// e.g. Pod
+	{"spec", "containers"},
+	// e.g. PodTemplate
+	{"template", "spec", "containers"},
+}
+
+// LookupFirstMatch returns a Filter for locating a value that may exist at one of several possible paths.
+// For example, it can be used with ConventionalContainerPaths to find the containers field in a standard workload resource.
+// If more than one of the paths exists in the resource, the first will be returned. If none exist,
+// nil will be returned. If an error is encountered during lookup, it will be returned.
+func LookupFirstMatch(paths [][]string) Filter {
+	return FilterFunc(func(object *RNode) (*RNode, error) {
+		var result *RNode
+		var err error
+		for _, path := range paths {
+			result, err = object.Pipe(PathGetter{Path: path})
+			if err != nil {
+				return nil, errors.Wrap(err)
+			}
+			if result != nil {
+				return result, nil
+			}
+		}
+		return nil, nil
+	})
 }
 
 // PathGetter returns the RNode under Path.
@@ -578,6 +612,50 @@ func Set(value *RNode) FieldSetter {
 	return FieldSetter{Value: value}
 }
 
+// MapEntrySetter sets a map entry to a value. If it finds a key with the same
+// value, it will override both Key and Value RNodes, including style and any
+// other metadata. If it doesn't find the key, it will insert a new map entry.
+// It will set the field, even if it's empty or nil, unlike the FieldSetter.
+// This is useful for rebuilding some pre-existing RNode structure.
+type MapEntrySetter struct {
+	// Name is the name of the field or key to lookup in a MappingNode.
+	// If Name is unspecified, it will use the Key's Value
+	Name string `yaml:"name,omitempty"`
+
+	// Value is the value to set.
+	Value *RNode `yaml:"value,omitempty"`
+
+	// Key is the map key to set.
+	Key *RNode `yaml:"key,omitempty"`
+}
+
+func (s MapEntrySetter) Filter(rn *RNode) (*RNode, error) {
+	if rn == nil {
+		return nil, errors.Errorf("Can't set map entry on a nil RNode")
+	}
+	if err := ErrorIfInvalid(rn, yaml.MappingNode); err != nil {
+		return nil, err
+	}
+	if s.Name == "" {
+		s.Name = GetValue(s.Key)
+	}
+	for i := 0; i < len(rn.Content()); i = IncrementFieldIndex(i) {
+		isMatchingField := rn.Content()[i].Value == s.Name
+		if isMatchingField {
+			rn.Content()[i] = s.Key.YNode()
+			rn.Content()[i+1] = s.Value.YNode()
+			return rn, nil
+		}
+	}
+
+	// create the field
+	rn.YNode().Content = append(
+		rn.YNode().Content,
+		s.Key.YNode(),
+		s.Value.YNode())
+	return rn, nil
+}
+
 // FieldSetter sets a field or map entry to a value.
 type FieldSetter struct {
 	Kind string `yaml:"kind,omitempty"`
@@ -605,6 +683,12 @@ type FieldSetter struct {
 func (s FieldSetter) Filter(rn *RNode) (*RNode, error) {
 	if s.StringValue != "" && s.Value == nil {
 		s.Value = NewScalarRNode(s.StringValue)
+	}
+
+	// need to set style for strings not recognized by yaml 1.1 to quoted if not previously set
+	// TODO: fix in upstream yaml library so this can be handled with yaml SetString
+	if s.Value.IsStringValue() && !s.OverrideStyle && s.Value.YNode().Style == 0 && IsYaml1_1NonString(s.Value.YNode()) {
+		s.Value.YNode().Style = yaml.DoubleQuotedStyle
 	}
 
 	if s.Name == "" {
@@ -746,6 +830,19 @@ func ErrorIfInvalid(rn *RNode, kind yaml.Kind) error {
 // e.g. [=primitiveValue]
 func IsListIndex(p string) bool {
 	return strings.HasPrefix(p, "[") && strings.HasSuffix(p, "]")
+}
+
+// IsIdxNumber returns true if p is an index number.
+// e.g. 1
+func IsIdxNumber(p string) bool {
+	idx, err := strconv.Atoi(p)
+	return err == nil && idx >= 0
+}
+
+// IsWildcard returns true if p is matching every elements.
+// e.g. "*"
+func IsWildcard(p string) bool {
+	return p == "*"
 }
 
 // SplitIndexNameValue splits a lookup part Val index into the field name

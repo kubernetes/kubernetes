@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"k8s.io/apimachinery/pkg/api/resource"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -286,5 +287,113 @@ func TestDataSourceRef(t *testing.T) {
 					testName, test.spec, test.want)
 			}
 		})
+	}
+}
+
+func TestDropDisabledFieldsFromStatus(t *testing.T) {
+	tests := []struct {
+		name     string
+		feature  bool
+		pvc      *core.PersistentVolumeClaim
+		oldPVC   *core.PersistentVolumeClaim
+		expected *core.PersistentVolumeClaim
+	}{
+		{
+			name:     "for:newPVC=hasAllocatedResource,oldPVC=doesnot,featuregate=false; should drop field",
+			feature:  false,
+			pvc:      withAllocatedResource("5G"),
+			oldPVC:   getPVC(),
+			expected: getPVC(),
+		},
+		{
+			name:     "for:newPVC=hasAllocatedResource,oldPVC=doesnot,featuregate=true; should keep field",
+			feature:  true,
+			pvc:      withAllocatedResource("5G"),
+			oldPVC:   getPVC(),
+			expected: withAllocatedResource("5G"),
+		},
+		{
+			name:     "for:newPVC=hasAllocatedResource,oldPVC=hasAllocatedResource,featuregate=true; should keep field",
+			feature:  true,
+			pvc:      withAllocatedResource("5G"),
+			oldPVC:   withAllocatedResource("5G"),
+			expected: withAllocatedResource("5G"),
+		},
+		{
+			name:     "for:newPVC=hasAllocatedResource,oldPVC=hasAllocatedResource,featuregate=false; should keep field",
+			feature:  false,
+			pvc:      withAllocatedResource("10G"),
+			oldPVC:   withAllocatedResource("5G"),
+			expected: withAllocatedResource("10G"),
+		},
+		{
+			name:     "for:newPVC=hasAllocatedResource,oldPVC=nil,featuregate=false; should drop field",
+			feature:  false,
+			pvc:      withAllocatedResource("5G"),
+			oldPVC:   nil,
+			expected: getPVC(),
+		},
+		{
+			name:     "for:newPVC=hasResizeStatus,oldPVC=nil, featuregate=false should drop field",
+			feature:  false,
+			pvc:      withResizeStatus(core.PersistentVolumeClaimNodeExpansionFailed),
+			oldPVC:   nil,
+			expected: getPVC(),
+		},
+		{
+			name:     "for:newPVC=hasResizeStatus,oldPVC=doesnot,featuregate=true; should keep field",
+			feature:  true,
+			pvc:      withResizeStatus(core.PersistentVolumeClaimNodeExpansionFailed),
+			oldPVC:   getPVC(),
+			expected: withResizeStatus(core.PersistentVolumeClaimNodeExpansionFailed),
+		},
+		{
+			name:     "for:newPVC=hasResizeStatus,oldPVC=hasResizeStatus,featuregate=true; should keep field",
+			feature:  true,
+			pvc:      withResizeStatus(core.PersistentVolumeClaimNodeExpansionFailed),
+			oldPVC:   withResizeStatus(core.PersistentVolumeClaimNodeExpansionFailed),
+			expected: withResizeStatus(core.PersistentVolumeClaimNodeExpansionFailed),
+		},
+		{
+			name:     "for:newPVC=hasResizeStatus,oldPVC=hasResizeStatus,featuregate=false; should keep field",
+			feature:  false,
+			pvc:      withResizeStatus(core.PersistentVolumeClaimNodeExpansionFailed),
+			oldPVC:   withResizeStatus(core.PersistentVolumeClaimNodeExpansionFailed),
+			expected: withResizeStatus(core.PersistentVolumeClaimNodeExpansionFailed),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, test.feature)()
+
+			DropDisabledFieldsFromStatus(test.pvc, test.oldPVC)
+
+			if !reflect.DeepEqual(*test.expected, *test.pvc) {
+				t.Errorf("Unexpected change: %+v", cmp.Diff(test.expected, test.pvc))
+			}
+		})
+	}
+}
+
+func getPVC() *core.PersistentVolumeClaim {
+	return &core.PersistentVolumeClaim{}
+}
+
+func withAllocatedResource(q string) *core.PersistentVolumeClaim {
+	return &core.PersistentVolumeClaim{
+		Status: core.PersistentVolumeClaimStatus{
+			AllocatedResources: core.ResourceList{
+				core.ResourceStorage: resource.MustParse(q),
+			},
+		},
+	}
+}
+
+func withResizeStatus(status core.PersistentVolumeClaimResizeStatus) *core.PersistentVolumeClaim {
+	return &core.PersistentVolumeClaim{
+		Status: core.PersistentVolumeClaimStatus{
+			ResizeStatus: &status,
+		},
 	}
 }

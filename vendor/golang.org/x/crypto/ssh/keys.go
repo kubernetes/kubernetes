@@ -939,6 +939,15 @@ func newDSAPrivateKey(key *dsa.PrivateKey) (Signer, error) {
 	return &dsaPrivateKey{key}, nil
 }
 
+type rsaSigner struct {
+	AlgorithmSigner
+	defaultAlgorithm string
+}
+
+func (s *rsaSigner) Sign(rand io.Reader, data []byte) (*Signature, error) {
+	return s.AlgorithmSigner.SignWithAlgorithm(rand, data, s.defaultAlgorithm)
+}
+
 type wrappedSigner struct {
 	signer crypto.Signer
 	pubKey PublicKey

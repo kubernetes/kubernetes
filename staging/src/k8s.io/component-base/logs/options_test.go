@@ -18,12 +18,17 @@ package logs
 
 import (
 	"bytes"
+	"context"
 	"testing"
 
+	"github.com/go-logr/logr"
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/component-base/featuregate"
+	"k8s.io/klog/v2"
 )
 
 func TestFlags(t *testing.T) {
@@ -33,14 +38,12 @@ func TestFlags(t *testing.T) {
 	o.AddFlags(fs)
 	fs.SetOutput(&output)
 	fs.PrintDefaults()
-	want := `      --experimental-logging-sanitization   [Experimental] When enabled prevents logging of fields tagged as sensitive (passwords, keys, tokens).
-                                            Runtime log sanitization may introduce significant computation overhead and therefore should not be enabled in production.
-      --log-flush-frequency duration        Maximum number of seconds between log flushes (default 5s)
-      --logging-format string               Sets the log format. Permitted formats: "text".
-                                            Non-default formats don't honor these flags: --add-dir-header, --alsologtostderr, --log-backtrace-at, --log-dir, --log-file, --log-file-max-size, --logtostderr, --one-output, --skip-headers, --skip-log-headers, --stderrthreshold, --vmodule.
-                                            Non-default choices are currently alpha and subject to change without warning. (default "text")
-  -v, --v Level                             number for the log level verbosity
-      --vmodule pattern=N,...               comma-separated list of pattern=N settings for file-filtered logging (only works for text log format)
+	want := `      --log-flush-frequency duration   Maximum number of seconds between log flushes (default 5s)
+      --logging-format string          Sets the log format. Permitted formats: "text".
+                                       Non-default formats don't honor these flags: --add-dir-header, --alsologtostderr, --log-backtrace-at, --log-dir, --log-file, --log-file-max-size, --logtostderr, --one-output, --skip-headers, --skip-log-headers, --stderrthreshold, --vmodule.
+                                       Non-default choices are currently alpha and subject to change without warning. (default "text")
+  -v, --v Level                        number for the log level verbosity
+      --vmodule pattern=N,...          comma-separated list of pattern=N settings for file-filtered logging (only works for text log format)
 `
 	if !assert.Equal(t, want, output.String()) {
 		t.Errorf("Wrong list of flags. expect %q, got %q", want, output.String())
@@ -63,15 +66,6 @@ func TestOptions(t *testing.T) {
 			name: "Text log format",
 			args: []string{"--logging-format=text"},
 			want: newOptions,
-		},
-		{
-			name: "log sanitization",
-			args: []string{"--experimental-logging-sanitization"},
-			want: func() *Options {
-				c := newOptions.Config.DeepCopy()
-				c.Sanitization = true
-				return &Options{*c}
-			}(),
 		},
 		{
 			name: "Unsupported log format",
@@ -99,12 +93,52 @@ func TestOptions(t *testing.T) {
 			if !assert.Equal(t, tc.want, o) {
 				t.Errorf("Wrong Validate() result for %q. expect %v, got %v", tc.name, tc.want, o)
 			}
-			err := o.ValidateAndApply()
+			err := o.ValidateAndApply(nil /* We don't care about feature gates here. */)
+			defer klog.StopFlushDaemon()
 
 			if !assert.ElementsMatch(t, tc.errs.ToAggregate(), err) {
 				t.Errorf("Wrong Validate() result for %q.\n expect:\t%+v\n got:\t%+v", tc.name, tc.errs, err)
 
 			}
 		})
+	}
+}
+
+func TestContextualLogging(t *testing.T) {
+	t.Run("enabled", func(t *testing.T) {
+		testContextualLogging(t, true)
+	})
+
+	t.Run("disabled", func(t *testing.T) {
+		testContextualLogging(t, false)
+	})
+}
+
+func testContextualLogging(t *testing.T, enabled bool) {
+	var err error
+
+	o := NewOptions()
+	featureGate := featuregate.NewFeatureGate()
+	AddFeatureGates(featureGate)
+	err = featureGate.SetFromMap(map[string]bool{string(ContextualLogging): enabled})
+	require.NoError(t, err)
+	err = o.ValidateAndApply(featureGate)
+	require.NoError(t, err)
+	defer klog.StopFlushDaemon()
+	defer klog.EnableContextualLogging(true)
+
+	ctx := context.Background()
+	logger := klog.NewKlogr().WithName("contextual")
+	ctx = logr.NewContext(ctx, logger)
+	if enabled {
+		assert.Equal(t, logger, klog.FromContext(ctx), "FromContext")
+		assert.NotEqual(t, ctx, klog.NewContext(ctx, logger), "NewContext")
+		assert.NotEqual(t, logger, klog.LoggerWithName(logger, "foo"), "LoggerWithName")
+		assert.NotEqual(t, logger, klog.LoggerWithValues(logger, "x", "y"), "LoggerWithValues")
+	} else {
+		assert.NotEqual(t, logger, klog.FromContext(ctx), "FromContext")
+		assert.Equal(t, ctx, klog.NewContext(ctx, logger), "NewContext")
+		assert.Equal(t, logger, klog.LoggerWithName(logger, "foo"), "LoggerWithName")
+		assert.Equal(t, logger, klog.LoggerWithValues(logger, "x", "y"), "LoggerWithValues")
 	}
 }

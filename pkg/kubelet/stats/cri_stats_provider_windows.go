@@ -20,104 +20,98 @@ limitations under the License.
 package stats
 
 import (
-	"fmt"
 	"time"
 
-	"github.com/Microsoft/hcsshim"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
+
+	"github.com/Microsoft/hcsshim"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 )
 
+// windowsNetworkStatsProvider creates an interface that allows for testing the logic without needing to create a container
+type windowsNetworkStatsProvider interface {
+	HNSListEndpointRequest() ([]hcsshim.HNSEndpoint, error)
+	GetHNSEndpointStats(endpointName string) (*hcsshim.HNSEndpointStats, error)
+}
+
+// networkStats exposes the required functionality for hcsshim in this scenario
+type networkStats struct{}
+
+func (s networkStats) HNSListEndpointRequest() ([]hcsshim.HNSEndpoint, error) {
+	return hcsshim.HNSListEndpointRequest()
+}
+
+func (s networkStats) GetHNSEndpointStats(endpointName string) (*hcsshim.HNSEndpointStats, error) {
+	return hcsshim.GetHNSEndpointStats(endpointName)
+}
+
 // listContainerNetworkStats returns the network stats of all the running containers.
 func (p *criStatsProvider) listContainerNetworkStats() (map[string]*statsapi.NetworkStats, error) {
-	containers, err := hcsshim.GetContainers(hcsshim.ComputeSystemQuery{
-		Types: []string{"Container"},
-	})
+	networkStatsProvider := newNetworkStatsProvider(p)
+
+	endpoints, err := networkStatsProvider.HNSListEndpointRequest()
 	if err != nil {
+		klog.ErrorS(err, "Failed to fetch current HNS endpoints")
 		return nil, err
 	}
 
-	stats := make(map[string]*statsapi.NetworkStats)
-	for _, c := range containers {
-		cstats, err := fetchContainerStats(c)
+	networkStats := make(map[string]*statsapi.NetworkStats)
+	for _, endpoint := range endpoints {
+		endpointStats, err := networkStatsProvider.GetHNSEndpointStats(endpoint.Id)
 		if err != nil {
-			klog.V(4).InfoS("Failed to fetch statistics for container, continue to get stats for other containers", "containerID", c.ID, "err", err)
+			klog.V(2).InfoS("Failed to fetch statistics for endpoint, continue to get stats for other endpoints", "endpointId", endpoint.Id, "containers", endpoint.SharedContainers)
 			continue
 		}
-		if len(cstats.Network) > 0 {
-			stats[c.ID] = hcsStatsToNetworkStats(cstats.Timestamp, cstats.Network)
-		}
-	}
 
-	return stats, nil
-}
-
-func fetchContainerStats(c hcsshim.ContainerProperties) (stats hcsshim.Statistics, err error) {
-	var (
-		container hcsshim.Container
-	)
-	container, err = hcsshim.OpenContainer(c.ID)
-	if err != nil {
-		return
-	}
-	defer func() {
-		if closeErr := container.Close(); closeErr != nil {
-			if err != nil {
-				err = fmt.Errorf("failed to close container after error %v; close error: %v", err, closeErr)
-			} else {
-				err = closeErr
+		// only add the interface for each container if not already in the list
+		for _, cId := range endpoint.SharedContainers {
+			networkStat, found := networkStats[cId]
+			if found && networkStat.Name != endpoint.Name {
+				iStat := hcsStatToInterfaceStat(endpointStats, endpoint.Name)
+				networkStat.Interfaces = append(networkStat.Interfaces, iStat)
+				continue
 			}
+			networkStats[cId] = hcsStatsToNetworkStats(p.clock.Now(), endpointStats, endpoint.Name)
 		}
-	}()
+	}
 
-	return container.Statistics()
+	return networkStats, nil
 }
 
 // hcsStatsToNetworkStats converts hcsshim.Statistics.Network to statsapi.NetworkStats
-func hcsStatsToNetworkStats(timestamp time.Time, hcsStats []hcsshim.NetworkStats) *statsapi.NetworkStats {
+func hcsStatsToNetworkStats(timestamp time.Time, hcsStats *hcsshim.HNSEndpointStats, endpointName string) *statsapi.NetworkStats {
 	result := &statsapi.NetworkStats{
 		Time:       metav1.NewTime(timestamp),
 		Interfaces: make([]statsapi.InterfaceStats, 0),
 	}
 
-	adapters := sets.NewString()
-	for _, stat := range hcsStats {
-		iStat, err := hcsStatsToInterfaceStats(stat)
-		if err != nil {
-			klog.InfoS("Failed to get HNS endpoint, continue to get stats for other endpoints", "endpointID", stat.EndpointId, "err", err)
-			continue
-		}
+	iStat := hcsStatToInterfaceStat(hcsStats, endpointName)
 
-		// Only count each adapter once.
-		if adapters.Has(iStat.Name) {
-			continue
-		}
-
-		result.Interfaces = append(result.Interfaces, *iStat)
-		adapters.Insert(iStat.Name)
-	}
-
-	// TODO(feiskyer): add support of multiple interfaces for getting default interface.
-	if len(result.Interfaces) > 0 {
-		result.InterfaceStats = result.Interfaces[0]
-	}
+	// TODO: add support of multiple interfaces for getting default interface.
+	result.Interfaces = append(result.Interfaces, iStat)
+	result.InterfaceStats = iStat
 
 	return result
 }
 
-// hcsStatsToInterfaceStats converts hcsshim.NetworkStats to statsapi.InterfaceStats.
-func hcsStatsToInterfaceStats(stat hcsshim.NetworkStats) (*statsapi.InterfaceStats, error) {
-	endpoint, err := hcsshim.GetHNSEndpointByID(stat.EndpointId)
-	if err != nil {
-		return nil, err
+func hcsStatToInterfaceStat(hcsStats *hcsshim.HNSEndpointStats, endpointName string) statsapi.InterfaceStats {
+	iStat := statsapi.InterfaceStats{
+		Name:    endpointName,
+		RxBytes: &hcsStats.BytesReceived,
+		TxBytes: &hcsStats.BytesSent,
 	}
+	return iStat
+}
 
-	return &statsapi.InterfaceStats{
-		Name:    endpoint.Name,
-		RxBytes: &stat.BytesReceived,
-		TxBytes: &stat.BytesSent,
-	}, nil
+// newNetworkStatsProvider uses the real windows hcsshim if not provided otherwise if the interface is provided
+// by the cristatsprovider in testing scenarios it uses that one
+func newNetworkStatsProvider(p *criStatsProvider) windowsNetworkStatsProvider {
+	var statsProvider windowsNetworkStatsProvider
+	if p.windowsNetworkStatsProvider == nil {
+		statsProvider = networkStats{}
+	} else {
+		statsProvider = p.windowsNetworkStatsProvider.(windowsNetworkStatsProvider)
+	}
+	return statsProvider
 }

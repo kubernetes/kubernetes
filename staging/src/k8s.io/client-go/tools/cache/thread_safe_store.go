@@ -71,11 +71,7 @@ type threadSafeMap struct {
 }
 
 func (c *threadSafeMap) Add(key string, obj interface{}) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-	oldObject := c.items[key]
-	c.items[key] = obj
-	c.updateIndices(oldObject, obj, key)
+	c.Update(key, obj)
 }
 
 func (c *threadSafeMap) Update(key string, obj interface{}) {
@@ -284,18 +280,15 @@ func (c *threadSafeMap) updateIndices(oldObj interface{}, newObj interface{}, ke
 			c.indices[name] = index
 		}
 
+		if len(indexValues) == 1 && len(oldIndexValues) == 1 && indexValues[0] == oldIndexValues[0] {
+			// We optimize for the most common case where indexFunc returns a single value which has not been changed
+			continue
+		}
+
 		for _, value := range oldIndexValues {
-			// We optimize for the most common case where index returns a single value.
-			if len(indexValues) == 1 && value == indexValues[0] {
-				continue
-			}
 			c.deleteKeyFromIndex(key, value, index)
 		}
 		for _, value := range indexValues {
-			// We optimize for the most common case where index returns a single value.
-			if len(oldIndexValues) == 1 && value == oldIndexValues[0] {
-				continue
-			}
 			c.addKeyToIndex(key, value, index)
 		}
 	}

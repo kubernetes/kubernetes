@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 	"time"
 
 	"github.com/onsi/ginkgo"
@@ -33,6 +34,7 @@ import (
 
 var _ = SIGDescribe("[Feature:Windows] Cpu Resources [Serial]", func() {
 	f := framework.NewDefaultFramework("cpu-resources-test-windows")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	// The Windows 'BusyBox' image is PowerShell plus a collection of scripts and utilities to mimic common busybox commands
 	powershellImage := imageutils.GetConfig(imageutils.BusyBox)
@@ -82,10 +84,16 @@ var _ = SIGDescribe("[Feature:Windows] Cpu Resources [Serial]", func() {
 					found = true
 					break
 				}
-				framework.ExpectEqual(found, true, "Found pod in stats summary")
+				if !found {
+					framework.Failf("Pod %s/%s not found in the stats summary %+v", p.Namespace, p.Name, allPods)
+				}
 				framework.Logf("Pod %s usage: %v", p.Name, cpuUsage)
-				framework.ExpectEqual(cpuUsage > 0, true, "Pods reported usage should be > 0")
-				framework.ExpectEqual((.5*1.05) > cpuUsage, true, "Pods reported usage should not exceed limit by >5%")
+				if cpuUsage <= 0 {
+					framework.Failf("Pod %s/%s reported usage is %v, but it should be greater than 0", p.Namespace, p.Name, cpuUsage)
+				}
+				if cpuUsage >= .5*1.05 {
+					framework.Failf("Pod %s/%s reported usage is %v, but it should not exceed limit by > 5%%", p.Namespace, p.Name, cpuUsage)
+				}
 			}
 		})
 	})

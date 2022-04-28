@@ -396,12 +396,13 @@ func (p *PodWrapper) PodAntiAffinityExists(labelKey, topologyKey string, kind Po
 
 // SpreadConstraint constructs a TopologySpreadConstraint object and injects
 // into the inner pod.
-func (p *PodWrapper) SpreadConstraint(maxSkew int, tpKey string, mode v1.UnsatisfiableConstraintAction, selector *metav1.LabelSelector) *PodWrapper {
+func (p *PodWrapper) SpreadConstraint(maxSkew int, tpKey string, mode v1.UnsatisfiableConstraintAction, selector *metav1.LabelSelector, minDomains *int32) *PodWrapper {
 	c := v1.TopologySpreadConstraint{
 		MaxSkew:           int32(maxSkew),
 		TopologyKey:       tpKey,
 		WhenUnsatisfiable: mode,
 		LabelSelector:     selector,
+		MinDomains:        minDomains,
 	}
 	p.Spec.TopologySpreadConstraints = append(p.Spec.TopologySpreadConstraints, c)
 	return p
@@ -431,6 +432,7 @@ func (p *PodWrapper) Req(resMap map[v1.ResourceName]string) *PodWrapper {
 		Image: imageutils.GetPauseImageName(),
 		Resources: v1.ResourceRequirements{
 			Requests: res,
+			Limits:   res,
 		},
 	})
 	return p
@@ -439,6 +441,12 @@ func (p *PodWrapper) Req(resMap map[v1.ResourceName]string) *PodWrapper {
 // PreemptionPolicy sets the give preemption policy to the inner pod.
 func (p *PodWrapper) PreemptionPolicy(policy v1.PreemptionPolicy) *PodWrapper {
 	p.Spec.PreemptionPolicy = &policy
+	return p
+}
+
+// Overhead sets the give resourcelist to the inner pod
+func (p *PodWrapper) Overhead(rl v1.ResourceList) *PodWrapper {
+	p.Spec.Overhead = rl
 	return p
 }
 
@@ -499,5 +507,11 @@ func (n *NodeWrapper) Images(images map[string]int64) *NodeWrapper {
 		containerImages = append(containerImages, v1.ContainerImage{Names: []string{name}, SizeBytes: size})
 	}
 	n.Status.Images = containerImages
+	return n
+}
+
+// Taints applies taints to the inner node.
+func (n *NodeWrapper) Taints(taints []v1.Taint) *NodeWrapper {
+	n.Spec.Taints = taints
 	return n
 }

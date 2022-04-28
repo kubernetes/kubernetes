@@ -165,6 +165,10 @@ func (f *FileSetter) Filter(input []*yaml.RNode) ([]*yaml.RNode, error) {
 
 	resources := map[string][]*yaml.RNode{}
 	for i := range input {
+		if err := kioutil.CopyLegacyAnnotations(input[i]); err != nil {
+			return nil, err
+		}
+
 		m, err := input[i].GetMeta()
 		if err != nil {
 			return nil, err
@@ -176,6 +180,9 @@ func (f *FileSetter) Filter(input []*yaml.RNode) ([]*yaml.RNode, error) {
 
 		if _, found := m.Annotations[kioutil.PathAnnotation]; !found || f.Override {
 			if _, err := input[i].Pipe(yaml.SetAnnotation(kioutil.PathAnnotation, file)); err != nil {
+				return nil, err
+			}
+			if _, err := input[i].Pipe(yaml.SetAnnotation(kioutil.LegacyPathAnnotation, file)); err != nil {
 				return nil, err
 			}
 		}
@@ -190,6 +197,10 @@ func (f *FileSetter) Filter(input []*yaml.RNode) ([]*yaml.RNode, error) {
 		for j := range resources[i] {
 			if _, err := resources[i][j].Pipe(
 				yaml.SetAnnotation(kioutil.IndexAnnotation, fmt.Sprintf("%d", j))); err != nil {
+				return nil, err
+			}
+			if _, err := resources[i][j].Pipe(
+				yaml.SetAnnotation(kioutil.LegacyIndexAnnotation, fmt.Sprintf("%d", j))); err != nil {
 				return nil, err
 			}
 			output = append(output, resources[i][j])

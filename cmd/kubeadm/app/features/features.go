@@ -29,22 +29,19 @@ import (
 )
 
 const (
-	// IPv6DualStack is expected to be beta in v1.21
-	IPv6DualStack = "IPv6DualStack"
 	// PublicKeysECDSA is expected to be alpha in v1.19
 	PublicKeysECDSA = "PublicKeysECDSA"
 	// RootlessControlPlane is expected to be in alpha in v1.22
 	RootlessControlPlane = "RootlessControlPlane"
-	// UnversionedKubeletConfigMap is expected to be alpha in 1.23
+	// UnversionedKubeletConfigMap is expected to be beta in 1.24
 	UnversionedKubeletConfigMap = "UnversionedKubeletConfigMap"
 )
 
 // InitFeatureGates are the default feature gates for the init command
 var InitFeatureGates = FeatureList{
-	IPv6DualStack:               {FeatureSpec: featuregate.FeatureSpec{Default: true, LockToDefault: true, PreRelease: featuregate.GA}, HiddenInHelpText: true},
 	PublicKeysECDSA:             {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Alpha}},
 	RootlessControlPlane:        {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Alpha}},
-	UnversionedKubeletConfigMap: {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Alpha}},
+	UnversionedKubeletConfigMap: {FeatureSpec: featuregate.FeatureSpec{Default: true, PreRelease: featuregate.Beta}},
 }
 
 // Feature represents a feature being gated

@@ -268,7 +268,13 @@ func (rw *RetryWatcher) receive() {
 			return
 		}
 
-		time.Sleep(retryAfter)
+		timer := time.NewTimer(retryAfter)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return
+		case <-timer.C:
+		}
 
 		klog.V(4).Infof("Restarting RetryWatcher at RV=%q", rw.lastResourceVersion)
 	}, rw.minRestartDelay)

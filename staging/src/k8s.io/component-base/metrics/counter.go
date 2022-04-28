@@ -18,7 +18,7 @@ package metrics
 
 import (
 	"context"
-	"github.com/blang/semver"
+	"github.com/blang/semver/v4"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 )
@@ -212,13 +212,13 @@ func (v *CounterVec) Reset() {
 func (v *CounterVec) WithContext(ctx context.Context) *CounterVecWithContext {
 	return &CounterVecWithContext{
 		ctx:        ctx,
-		CounterVec: *v,
+		CounterVec: v,
 	}
 }
 
 // CounterVecWithContext is the wrapper of CounterVec with context.
 type CounterVecWithContext struct {
-	CounterVec
+	*CounterVec
 	ctx context.Context
 }
 

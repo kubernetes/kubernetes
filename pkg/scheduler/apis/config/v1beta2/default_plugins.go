@@ -116,16 +116,6 @@ func applyFeatureGates(config *v1beta2.Plugins) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeCapacityPriority) {
 		config.Score.Enabled = append(config.Score.Enabled, v1beta2.Plugin{Name: names.VolumeBinding, Weight: pointer.Int32Ptr(1)})
 	}
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.DefaultPodTopologySpread) {
-		// When feature is enabled, the default spreading is done by
-		// PodTopologySpread plugin, which is enabled by default.
-		klog.InfoS("Registering SelectorSpread plugin")
-		s := v1beta2.Plugin{Name: names.SelectorSpread}
-		config.PreScore.Enabled = append(config.PreScore.Enabled, s)
-		s.Weight = pointer.Int32Ptr(1)
-		config.Score.Enabled = append(config.Score.Enabled, s)
-	}
 }
 
 // mergePlugins merges the custom set into the given default one, handling disabled sets.

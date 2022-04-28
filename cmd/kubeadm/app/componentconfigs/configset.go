@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/output"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/config/strict"
 )
 
 // handler is a package internal type that handles component config factory and common functionality.
@@ -169,6 +170,11 @@ func (cb *configBase) Unmarshal(from kubeadmapi.DocumentMap, into runtime.Object
 				CurrentVersion: cb.GroupVersion,
 				Document:       cloneBytes(yaml),
 			}
+		}
+
+		// Print warnings for strict errors
+		if err := strict.VerifyUnmarshalStrict([]*runtime.Scheme{Scheme}, gvk, yaml); err != nil {
+			klog.Warning(err.Error())
 		}
 
 		// As long as we support only component configs with a single kind, this is allowed

@@ -33,6 +33,7 @@ import (
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 const (
@@ -120,6 +121,9 @@ type ConfigFlags struct {
 	// Allows increasing burst used for discovery, this is useful
 	// in clusters with many registered resources
 	discoveryBurst int
+	// Allows increasing qps used for discovery, this is useful
+	// in clusters with many registered resources
+	discoveryQPS float32
 }
 
 // ToRESTConfig implements RESTClientGetter.
@@ -268,10 +272,8 @@ func (f *ConfigFlags) toDiscoveryClient() (discovery.CachedDiscoveryInterface, e
 		return nil, err
 	}
 
-	// The more groups you have, the more discovery requests you need to make.
-	// given 25 groups (our groups + a few custom resources) with one-ish version each, discovery needs to make 50 requests
-	// double it just so we don't end up here again for a while.  This config is only used for discovery.
 	config.Burst = f.discoveryBurst
+	config.QPS = f.discoveryQPS
 
 	cacheDir := defaultCacheDir
 
@@ -283,7 +285,7 @@ func (f *ConfigFlags) toDiscoveryClient() (discovery.CachedDiscoveryInterface, e
 	httpCacheDir := filepath.Join(cacheDir, "http")
 	discoveryCacheDir := computeDiscoverCacheDir(filepath.Join(cacheDir, "discovery"), config.Host)
 
-	return diskcached.NewCachedDiscoveryClientForConfig(config, discoveryCacheDir, httpCacheDir, time.Duration(10*time.Minute))
+	return diskcached.NewCachedDiscoveryClientForConfig(config, discoveryCacheDir, httpCacheDir, time.Duration(6*time.Hour))
 }
 
 // ToRESTMapper returns a mapper.
@@ -385,14 +387,26 @@ func (f *ConfigFlags) AddFlags(flags *pflag.FlagSet) {
 
 // WithDeprecatedPasswordFlag enables the username and password config flags
 func (f *ConfigFlags) WithDeprecatedPasswordFlag() *ConfigFlags {
-	f.Username = stringptr("")
-	f.Password = stringptr("")
+	f.Username = utilpointer.String("")
+	f.Password = utilpointer.String("")
 	return f
 }
 
 // WithDiscoveryBurst sets the RESTClient burst for discovery.
 func (f *ConfigFlags) WithDiscoveryBurst(discoveryBurst int) *ConfigFlags {
 	f.discoveryBurst = discoveryBurst
+	return f
+}
+
+// WithDiscoveryQPS sets the RESTClient QPS for discovery.
+func (f *ConfigFlags) WithDiscoveryQPS(discoveryQPS float32) *ConfigFlags {
+	f.discoveryQPS = discoveryQPS
+	return f
+}
+
+// WithWrapConfigFn allows providing a wrapper function for the client Config.
+func (f *ConfigFlags) WithWrapConfigFn(wrapConfigFn func(*rest.Config) *rest.Config) *ConfigFlags {
+	f.WrapConfigFn = wrapConfigFn
 	return f
 }
 
@@ -403,22 +417,22 @@ func NewConfigFlags(usePersistentConfig bool) *ConfigFlags {
 
 	return &ConfigFlags{
 		Insecure:   &insecure,
-		Timeout:    stringptr("0"),
-		KubeConfig: stringptr(""),
+		Timeout:    utilpointer.String("0"),
+		KubeConfig: utilpointer.String(""),
 
-		CacheDir:         stringptr(defaultCacheDir),
-		ClusterName:      stringptr(""),
-		AuthInfoName:     stringptr(""),
-		Context:          stringptr(""),
-		Namespace:        stringptr(""),
-		APIServer:        stringptr(""),
-		TLSServerName:    stringptr(""),
-		CertFile:         stringptr(""),
-		KeyFile:          stringptr(""),
-		CAFile:           stringptr(""),
-		BearerToken:      stringptr(""),
-		Impersonate:      stringptr(""),
-		ImpersonateUID:   stringptr(""),
+		CacheDir:         utilpointer.String(defaultCacheDir),
+		ClusterName:      utilpointer.String(""),
+		AuthInfoName:     utilpointer.String(""),
+		Context:          utilpointer.String(""),
+		Namespace:        utilpointer.String(""),
+		APIServer:        utilpointer.String(""),
+		TLSServerName:    utilpointer.String(""),
+		CertFile:         utilpointer.String(""),
+		KeyFile:          utilpointer.String(""),
+		CAFile:           utilpointer.String(""),
+		BearerToken:      utilpointer.String(""),
+		Impersonate:      utilpointer.String(""),
+		ImpersonateUID:   utilpointer.String(""),
 		ImpersonateGroup: &impersonateGroup,
 
 		usePersistentConfig: usePersistentConfig,
@@ -427,10 +441,6 @@ func NewConfigFlags(usePersistentConfig bool) *ConfigFlags {
 		// double it just so we don't end up here again for a while.  This config is only used for discovery.
 		discoveryBurst: 100,
 	}
-}
-
-func stringptr(val string) *string {
-	return &val
 }
 
 // overlyCautiousIllegalFileCharacters matches characters that *might* not be supported.  Windows is really restrictive, so this is really restrictive

@@ -19,6 +19,9 @@ package validation
 import (
 	"fmt"
 	"testing"
+
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/cli-runtime/pkg/resource"
 )
 
 func TestValidateDuplicateLabelsFailCases(t *testing.T) {
@@ -130,6 +133,124 @@ func TestConjunctiveSchema(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			schema := ConjunctiveSchema(tt.schemas)
 			err := schema.ValidateBytes([]byte{})
+			if err != nil && tt.shouldPass {
+				t.Errorf("Unexpected error: %v in %s", err, tt.name)
+			}
+			if err == nil && !tt.shouldPass {
+				t.Errorf("Unexpected non-error: %s", tt.name)
+			}
+		})
+	}
+}
+
+type mockVerifier struct {
+	supported bool
+}
+
+func (v *mockVerifier) HasSupport(gvk schema.GroupVersionKind) error {
+	if !v.supported {
+		return resource.NewParamUnsupportedError(gvk, resource.QueryParamFieldValidation)
+	}
+	return nil
+}
+
+// TestParamVerifyingSchema tests that client-side schema validation
+// should be bypassed (and therefore validation succeeds) in all cases
+// except when the field validation is "Strict" and server-side validation is
+// unsupported.
+func TestParamVerifyingSchema(t *testing.T) {
+	bytes := []byte(`
+{
+  "kind": "Pod",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "name",
+    "labels": {
+      "name": "redis-master"
+    }
+  },
+  "spec": {
+    "containers": [
+      {
+        "name": "master",
+	"image": "gcr.io/fake_project/fake_image:fake_tag",
+        "args": "this is a bad command"
+      }
+    ]
+  }
+}
+`)
+	supportedVerifier := &mockVerifier{true}
+	unsupportedVerifier := &mockVerifier{false}
+	tests := []struct {
+		name       string
+		supported  bool
+		schema     Schema
+		verifier   resource.Verifier
+		directive  string
+		shouldPass bool
+	}{
+		{
+			name:       "supported, strict",
+			schema:     NullSchema{},
+			verifier:   supportedVerifier,
+			directive:  "Strict",
+			shouldPass: true,
+		},
+		{
+			name:       "supported, warn",
+			schema:     NullSchema{},
+			verifier:   supportedVerifier,
+			directive:  "Warn",
+			shouldPass: true,
+		},
+		{
+			name:       "unsupported, strict",
+			schema:     NullSchema{},
+			verifier:   unsupportedVerifier,
+			directive:  "Strict",
+			shouldPass: true,
+		},
+		{
+			name:       "unsupported, warn",
+			schema:     NullSchema{},
+			verifier:   unsupportedVerifier,
+			directive:  "Warn",
+			shouldPass: true,
+		},
+		{
+			name:       "supported, strict, invalid schema",
+			schema:     AlwaysInvalidSchema{},
+			verifier:   supportedVerifier,
+			directive:  "Strict",
+			shouldPass: true,
+		},
+		{
+			name:       "supported, warn, invalid schema",
+			schema:     AlwaysInvalidSchema{},
+			verifier:   supportedVerifier,
+			directive:  "Warn",
+			shouldPass: true,
+		},
+		{
+			name:       "unsupported, strict, invalid schema",
+			schema:     AlwaysInvalidSchema{},
+			verifier:   unsupportedVerifier,
+			directive:  "Strict",
+			shouldPass: false,
+		},
+		{
+			name:       "unsupported, warn, invalid schema",
+			schema:     AlwaysInvalidSchema{},
+			verifier:   unsupportedVerifier,
+			directive:  "Warn",
+			shouldPass: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			schema := NewParamVerifyingSchema(tt.schema, tt.verifier, tt.directive)
+			err := schema.ValidateBytes(bytes)
 			if err != nil && tt.shouldPass {
 				t.Errorf("Unexpected error: %v in %s", err, tt.name)
 			}

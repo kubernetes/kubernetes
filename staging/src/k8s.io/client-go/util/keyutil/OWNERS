@@ -1,7 +1,6 @@
 approvers:
-- sig-auth-certificates-approvers
+  - sig-auth-certificates-approvers
 reviewers:
-- sig-auth-certificates-reviewers
+  - sig-auth-certificates-reviewers
 labels:
-- sig/auth
-
+  - sig/auth

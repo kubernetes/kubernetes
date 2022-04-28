@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -40,7 +41,9 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	cloudproviderapi "k8s.io/cloud-provider/api"
 	cloudnodeutil "k8s.io/cloud-provider/node/helpers"
+	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/klog/v2"
+	netutils "k8s.io/utils/net"
 )
 
 // labelReconcileInfo lists Node labels to reconcile, and how to reconcile them.
@@ -348,18 +351,26 @@ func (cnc *CloudNodeController) updateNodeAddress(ctx context.Context, node *v1.
 			}
 		}
 	}
-	// If nodeIP was suggested by user, ensure that
-	// it can be found in the cloud as well (consistent with the behaviour in kubelet)
-	if nodeIP, ok := ensureNodeProvidedIPExists(node, nodeAddresses); ok && nodeIP == nil {
-		klog.Errorf("Specified Node IP not found in cloudprovider for node %q", node.Name)
+	// If kubelet provided a node IP, prefer it in the node address list
+	nodeIP, err := getNodeProvidedIP(node)
+	if err != nil {
+		klog.Errorf("Failed to get preferred node IP for node %q: %v", node.Name, err)
 		return
+	}
+
+	if nodeIP != nil {
+		nodeAddresses, err = cloudnodeutil.PreferNodeIP(nodeIP, nodeAddresses)
+		if err != nil {
+			klog.Errorf("Failed to update node addresses for node %q: %v", node.Name, err)
+			return
+		}
 	}
 	if !nodeAddressesChangeDetected(node.Status.Addresses, nodeAddresses) {
 		return
 	}
 	newNode := node.DeepCopy()
 	newNode.Status.Addresses = nodeAddresses
-	if _, _, err := cloudnodeutil.PatchNodeStatus(cnc.kubeClient.CoreV1(), types.NodeName(node.Name), node, newNode); err != nil {
+	if _, _, err := nodeutil.PatchNodeStatus(cnc.kubeClient.CoreV1(), types.NodeName(node.Name), node, newNode); err != nil {
 		klog.Errorf("Error patching node with cloud ip addresses = [%v]", err)
 	}
 }
@@ -415,7 +426,7 @@ func (cnc *CloudNodeController) syncNode(ctx context.Context, nodeName string) e
 			// TODO(wlan0): Move this logic to the route controller using the node taint instead of condition
 			// Since there are node taints, do we still need this?
 			// This condition marks the node as unusable until routes are initialized in the cloud provider
-			if err := cloudnodeutil.SetNodeCondition(cnc.kubeClient, types.NodeName(nodeName), v1.NodeCondition{
+			if err := nodeutil.SetNodeCondition(cnc.kubeClient, types.NodeName(nodeName), v1.NodeCondition{
 				Type:               v1.NodeNetworkUnavailable,
 				Status:             v1.ConditionTrue,
 				Reason:             "NoRouteCreated",
@@ -482,10 +493,19 @@ func (cnc *CloudNodeController) getNodeModifiersFromCloudProvider(
 		}
 	}
 
-	// If user provided an IP address, ensure that IP address is found
-	// in the cloud provider before removing the taint on the node
-	if nodeIP, ok := ensureNodeProvidedIPExists(node, instanceMeta.NodeAddresses); ok && nodeIP == nil {
-		return nil, errors.New("failed to find kubelet node IP from cloud provider")
+	// If kubelet annotated the node with a node IP, ensure that it is valid
+	// and can be applied to the discovered node addresses before removing
+	// the taint on the node.
+	nodeIP, err := getNodeProvidedIP(node)
+	if err != nil {
+		return nil, err
+	}
+
+	if nodeIP != nil {
+		_, err := cloudnodeutil.PreferNodeIP(nodeIP, instanceMeta.NodeAddresses)
+		if err != nil {
+			return nil, fmt.Errorf("provided node ip for node %q is not valid: %w", node.Name, err)
+		}
 	}
 
 	if instanceMeta.InstanceType != "" {
@@ -692,19 +712,18 @@ func nodeAddressesChangeDetected(addressSet1, addressSet2 []v1.NodeAddress) bool
 	return false
 }
 
-func ensureNodeProvidedIPExists(node *v1.Node, nodeAddresses []v1.NodeAddress) (*v1.NodeAddress, bool) {
-	var nodeIP *v1.NodeAddress
-	nodeIPExists := false
-	if providedIP, ok := node.ObjectMeta.Annotations[cloudproviderapi.AnnotationAlphaProvidedIPAddr]; ok {
-		nodeIPExists = true
-		for i := range nodeAddresses {
-			if nodeAddresses[i].Address == providedIP {
-				nodeIP = &nodeAddresses[i]
-				break
-			}
-		}
+func getNodeProvidedIP(node *v1.Node) (net.IP, error) {
+	providedIP, ok := node.ObjectMeta.Annotations[cloudproviderapi.AnnotationAlphaProvidedIPAddr]
+	if !ok {
+		return nil, nil
 	}
-	return nodeIP, nodeIPExists
+
+	nodeIP := netutils.ParseIPSloppy(providedIP)
+	if nodeIP == nil {
+		return nil, fmt.Errorf("failed to parse node IP %q for node %q", providedIP, node.Name)
+	}
+
+	return nodeIP, nil
 }
 
 // getInstanceTypeByProviderIDOrName will attempt to get the instance type of node using its providerID

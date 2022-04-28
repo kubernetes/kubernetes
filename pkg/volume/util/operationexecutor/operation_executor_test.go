@@ -18,6 +18,7 @@ package operationexecutor
 
 import (
 	"fmt"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"strconv"
 	"testing"
 	"time"
@@ -658,7 +659,17 @@ func (fopg *fakeOperationGenerator) GenerateExpandVolumeFunc(pvc *v1.PersistentV
 	}, nil
 }
 
-func (fopg *fakeOperationGenerator) GenerateExpandInUseVolumeFunc(volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater) (volumetypes.GeneratedOperations, error) {
+func (fopg *fakeOperationGenerator) GenerateExpandAndRecoverVolumeFunc(pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume, resizerName string) (volumetypes.GeneratedOperations, error) {
+	opFunc := func() volumetypes.OperationContext {
+		startOperationAndBlock(fopg.ch, fopg.quit)
+		return volumetypes.NewOperationContext(nil, nil, false)
+	}
+	return volumetypes.GeneratedOperations{
+		OperationFunc: opFunc,
+	}, nil
+}
+
+func (fopg *fakeOperationGenerator) GenerateExpandInUseVolumeFunc(volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater, currentSize resource.Quantity) (volumetypes.GeneratedOperations, error) {
 	opFunc := func() volumetypes.OperationContext {
 		startOperationAndBlock(fopg.ch, fopg.quit)
 		return volumetypes.NewOperationContext(nil, nil, false)

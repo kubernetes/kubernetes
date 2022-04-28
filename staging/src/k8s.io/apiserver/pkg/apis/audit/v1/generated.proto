@@ -27,7 +27,7 @@ import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 
 // Package-wide variables from generator "generated".
-option go_package = "v1";
+option go_package = "k8s.io/apiserver/pkg/apis/audit/v1";
 
 // Event captures all the information that can be included in an API audit log.
 message Event {
@@ -55,6 +55,12 @@ message Event {
   optional k8s.io.api.authentication.v1.UserInfo impersonatedUser = 7;
 
   // Source IPs, from where the request originated and intermediate proxies.
+  // The source IPs are listed from (in order):
+  // 1. X-Forwarded-For request header IPs
+  // 2. X-Real-Ip header, if not present in the X-Forwarded-For list
+  // 3. The remote address for the connection, if it doesn't match the last
+  //    IP in the list up to here (X-Forwarded-For or X-Real-Ip).
+  // Note: All but the last IP can be arbitrarily set by the client.
   // +optional
   repeated string sourceIPs = 8;
 

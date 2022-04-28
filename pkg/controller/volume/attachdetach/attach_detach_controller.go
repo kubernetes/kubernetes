@@ -166,7 +166,6 @@ func NewAttachDetachController(
 			kubeClient,
 			&adc.volumePluginMgr,
 			recorder,
-			false, // flag for experimental binary check for volume mount
 			blkutil))
 	adc.nodeStatusUpdater = statusupdater.NewNodeStatusUpdater(
 		kubeClient, nodeInformer.Lister(), adc.actualStateOfWorld)
@@ -181,6 +180,7 @@ func NewAttachDetachController(
 		adc.actualStateOfWorld,
 		adc.attacherDetacher,
 		adc.nodeStatusUpdater,
+		adc.nodeLister,
 		recorder)
 
 	csiTranslator := csitrans.New()
@@ -856,6 +856,10 @@ func (adc *attachDetachController) GetHostIP() (net.IP, error) {
 
 func (adc *attachDetachController) GetNodeAllocatable() (v1.ResourceList, error) {
 	return v1.ResourceList{}, nil
+}
+
+func (adc *attachDetachController) GetAttachedVolumesFromNodeStatus() (map[v1.UniqueVolumeName]string, error) {
+	return map[v1.UniqueVolumeName]string{}, nil
 }
 
 func (adc *attachDetachController) GetSecretFunc() func(namespace, name string) (*v1.Secret, error) {

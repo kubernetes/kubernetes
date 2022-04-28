@@ -31,6 +31,7 @@ API rule violation: names_match,k8s.io/apimachinery/pkg/apis/meta/v1,Duration,Du
 API rule violation: names_match,k8s.io/apimachinery/pkg/apis/meta/v1,InternalEvent,Object
 API rule violation: names_match,k8s.io/apimachinery/pkg/apis/meta/v1,InternalEvent,Type
 API rule violation: names_match,k8s.io/apimachinery/pkg/apis/meta/v1,MicroTime,Time
+API rule violation: names_match,k8s.io/apimachinery/pkg/apis/meta/v1,ObjectMeta,ZZZ_DeprecatedClusterName
 API rule violation: names_match,k8s.io/apimachinery/pkg/apis/meta/v1,StatusCause,Type
 API rule violation: names_match,k8s.io/apimachinery/pkg/apis/meta/v1,Time,Time
 API rule violation: names_match,k8s.io/apimachinery/pkg/runtime,Unknown,ContentEncoding

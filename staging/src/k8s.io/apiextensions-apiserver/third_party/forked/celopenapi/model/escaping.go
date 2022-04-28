@@ -17,13 +17,10 @@ limitations under the License.
 package model
 
 import (
-	"fmt"
-	"strings"
+	"regexp"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 )
-
-// TODO: replace escaping with new rules described in kEP update
 
 // celReservedSymbols is a list of RESERVED symbols defined in the CEL lexer.
 // No identifiers are allowed to collide with these symbols.
@@ -36,47 +33,78 @@ var celReservedSymbols = sets.NewString(
 	"var", "void", "while",
 )
 
-// celLanguageIdentifiers is a list of identifiers that are part of the CEL language.
-// This does NOT include builtin macro or function identifiers.
-// https://github.com/google/cel-spec/blob/master/doc/langdef.md#values
-var celLanguageIdentifiers = sets.NewString(
-	"int", "uint", "double", "bool", "string", "bytes", "list", "map", "null_type", "type",
-)
+// expandMatcher matches the escape sequence, characters that are escaped, and characters that are unsupported
+var expandMatcher = regexp.MustCompile(`(__|[-./]|[^a-zA-Z0-9-./_])`)
 
-// IsRootReserved returns true if an identifier is reserved by CEL. Declaring root variables in CEL with
-// these identifiers is not allowed and would result in an "overlapping identifier for name '<identifier>'"
-// CEL compilation error.
-func IsRootReserved(prop string) bool {
-	return celLanguageIdentifiers.Has(prop)
-}
-
-// Escape escapes identifiers in the AlwaysReservedIdentifiers set by prefixing ident with "_" and by prefixing
-// any ident already prefixed with N '_' with N+1 '_'.
-// For an identifier that does not require escaping, the identifier is returned as-is.
-func Escape(ident string) string {
-	if strings.HasPrefix(ident, "_") || celReservedSymbols.Has(ident) {
-		return "_" + ident
+// Escape escapes ident and returns a CEL identifier (of the form '[a-zA-Z_][a-zA-Z0-9_]*'), or returns
+// false if the ident does not match the supported input format of `[a-zA-Z_.-/][a-zA-Z0-9_.-/]*`.
+// Escaping Rules:
+// - '__' escapes to '__underscores__'
+// - '.' escapes to '__dot__'
+// - '-' escapes to '__dash__'
+// - '/' escapes to '__slash__'
+// - Identifiers that exactly match a CEL RESERVED keyword escape to '__{keyword}__'. The keywords are: "true", "false",
+//	  "null", "in", "as", "break", "const", "continue", "else", "for", "function", "if", "import", "let", loop", "package",
+//	  "namespace", "return".
+func Escape(ident string) (string, bool) {
+	if len(ident) == 0 || ('0' <= ident[0] && ident[0] <= '9') {
+		return "", false
 	}
-	return ident
-}
-
-// EscapeSlice returns identifiers with Escape applied to each.
-func EscapeSlice(idents []string) []string {
-	result := make([]string, len(idents))
-	for i, prop := range idents {
-		result[i] = Escape(prop)
+	if celReservedSymbols.Has(ident) {
+		return "__" + ident + "__", true
 	}
-	return result
-}
-
-// Unescape unescapes an identifier escaped by Escape.
-func Unescape(escaped string) string {
-	if strings.HasPrefix(escaped, "_") {
-		trimmed := strings.TrimPrefix(escaped, "_")
-		if strings.HasPrefix(trimmed, "_") || celReservedSymbols.Has(trimmed) {
-			return trimmed
+	ok := true
+	ident = expandMatcher.ReplaceAllStringFunc(ident, func(s string) string {
+		switch s {
+		case "__":
+			return "__underscores__"
+		case ".":
+			return "__dot__"
+		case "-":
+			return "__dash__"
+		case "/":
+			return "__slash__"
+		default: // matched a unsupported supported
+			ok = false
+			return ""
 		}
-		panic(fmt.Sprintf("failed to unescape improperly escaped string: %v", escaped))
+	})
+	if !ok {
+		return "", false
 	}
-	return escaped
+	return ident, true
+}
+
+var unexpandMatcher = regexp.MustCompile(`(_{2}[^_]+_{2})`)
+
+// Unescape unescapes an CEL identifier containing the escape sequences described in Escape, or return false if the
+// string contains invalid escape sequences. The escaped input is expected to be a valid CEL identifier, but is
+// not checked.
+func Unescape(escaped string) (string, bool) {
+	ok := true
+	escaped = unexpandMatcher.ReplaceAllStringFunc(escaped, func(s string) string {
+		contents := s[2 : len(s)-2]
+		switch contents {
+		case "underscores":
+			return "__"
+		case "dot":
+			return "."
+		case "dash":
+			return "-"
+		case "slash":
+			return "/"
+		}
+		if celReservedSymbols.Has(contents) {
+			if len(s) != len(escaped) {
+				ok = false
+			}
+			return contents
+		}
+		ok = false
+		return ""
+	})
+	if !ok {
+		return "", false
+	}
+	return escaped, true
 }

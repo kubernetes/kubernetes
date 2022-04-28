@@ -95,7 +95,12 @@ func (pl *DefaultPreemption) PostFilter(ctx context.Context, state *framework.Cy
 		State:      state,
 		Interface:  pl,
 	}
-	return pe.Preempt(ctx, pod, m)
+
+	result, status := pe.Preempt(ctx, pod, m)
+	if status.Message() != "" {
+		return result, framework.NewStatus(status.Code(), "preemption: "+status.Message())
+	}
+	return result, status
 }
 
 // calculateNumCandidates returns the number of candidates the FindCandidates
@@ -170,7 +175,7 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 
 	// No potential victims are found, and so we don't need to evaluate the node again since its state didn't change.
 	if len(potentialVictims) == 0 {
-		message := fmt.Sprintf("No victims found on node %v for preemptor pod %v", nodeInfo.Node().Name, pod.Name)
+		message := fmt.Sprintf("No preemption victims found for incoming pod")
 		return nil, 0, framework.NewStatus(framework.UnschedulableAndUnresolvable, message)
 	}
 
@@ -222,16 +227,17 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 	return victims, numViolatingVictim, framework.NewStatus(framework.Success)
 }
 
-// PodEligibleToPreemptOthers determines whether this pod should be considered
-// for preempting other pods or not. If this pod has already preempted other
+// PodEligibleToPreemptOthers returns one bool and one string. The bool
+// indicates whether this pod should be considered for preempting other pods or
+// not. The string includes the reason if this pod isn't eligible.
+// If this pod has a preemptionPolicy of Never or has already preempted other
 // pods and those are in their graceful termination period, it shouldn't be
 // considered for preemption.
 // We look at the node that is nominated for this pod and as long as there are
 // terminating pods on the node, we don't consider this for preempting more pods.
-func (pl *DefaultPreemption) PodEligibleToPreemptOthers(pod *v1.Pod, nominatedNodeStatus *framework.Status) bool {
+func (pl *DefaultPreemption) PodEligibleToPreemptOthers(pod *v1.Pod, nominatedNodeStatus *framework.Status) (bool, string) {
 	if pod.Spec.PreemptionPolicy != nil && *pod.Spec.PreemptionPolicy == v1.PreemptNever {
-		klog.V(5).InfoS("Pod is not eligible for preemption because it has a preemptionPolicy of Never", "pod", klog.KObj(pod))
-		return false
+		return false, fmt.Sprint("not eligible due to preemptionPolicy=Never.")
 	}
 	nodeInfos := pl.fh.SnapshotSharedLister().NodeInfos()
 	nomNodeName := pod.Status.NominatedNodeName
@@ -239,7 +245,7 @@ func (pl *DefaultPreemption) PodEligibleToPreemptOthers(pod *v1.Pod, nominatedNo
 		// If the pod's nominated node is considered as UnschedulableAndUnresolvable by the filters,
 		// then the pod should be considered for preempting again.
 		if nominatedNodeStatus.Code() == framework.UnschedulableAndUnresolvable {
-			return true
+			return true, ""
 		}
 
 		if nodeInfo, _ := nodeInfos.Get(nomNodeName); nodeInfo != nil {
@@ -247,12 +253,12 @@ func (pl *DefaultPreemption) PodEligibleToPreemptOthers(pod *v1.Pod, nominatedNo
 			for _, p := range nodeInfo.Pods {
 				if p.Pod.DeletionTimestamp != nil && corev1helpers.PodPriority(p.Pod) < podPriority {
 					// There is a terminating pod on the nominated node.
-					return false
+					return false, fmt.Sprint("not eligible due to a terminating pod on the nominated node.")
 				}
 			}
 		}
 	}
-	return true
+	return true, ""
 }
 
 // filterPodsWithPDBViolation groups the given "pods" into two groups of "violatingPods"
@@ -277,6 +283,7 @@ func filterPodsWithPDBViolation(podInfos []*framework.PodInfo, pdbs []*policy.Po
 				}
 				selector, err := metav1.LabelSelectorAsSelector(pdb.Spec.Selector)
 				if err != nil {
+					// This object has an invalid selector, it does not match the pod
 					continue
 				}
 				// A PDB with a nil or empty selector matches nothing.

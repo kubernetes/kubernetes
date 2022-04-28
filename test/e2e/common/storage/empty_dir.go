@@ -31,6 +31,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 const (
@@ -43,6 +44,7 @@ var (
 
 var _ = SIGDescribe("EmptyDir volumes", func() {
 	f := framework.NewDefaultFramework("emptydir")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	ginkgo.Context("when FSGroup is specified [LinuxOnly] [NodeFeature:FSGroup]", func() {
 

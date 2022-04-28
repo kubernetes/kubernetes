@@ -139,6 +139,17 @@ func TestHTTPProbeChecker(t *testing.T) {
 		}
 	}
 
+	redirectHandlerWithBody := func(s int, body string) func(w http.ResponseWriter, r *http.Request) {
+		return func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/" {
+				http.Redirect(w, r, "/new", s)
+			} else if r.URL.Path == "/new" {
+				w.WriteHeader(s)
+				w.Write([]byte(body))
+			}
+		}
+	}
+
 	followNonLocalRedirects := true
 	prober := New(followNonLocalRedirects)
 	testCases := []struct {
@@ -335,6 +346,16 @@ func TestHTTPProbeChecker(t *testing.T) {
 		{
 			handler: redirectHandler(http.StatusPermanentRedirect, true), // 308
 			health:  probe.Failure,
+		},
+		{
+			handler: redirectHandlerWithBody(http.StatusPermanentRedirect, ""), // redirect with empty body
+			health:  probe.Warning,
+			accBody: "Probe terminated redirects, Response body:",
+		},
+		{
+			handler: redirectHandlerWithBody(http.StatusPermanentRedirect, "ok body"), // redirect with body
+			health:  probe.Warning,
+			accBody: "Probe terminated redirects, Response body: ok body",
 		},
 	}
 	for i, test := range testCases {

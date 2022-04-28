@@ -35,19 +35,18 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	autoscalinginformers "k8s.io/client-go/informers/autoscaling/v1"
+	autoscalinginformers "k8s.io/client-go/informers/autoscaling/v2"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
-	autoscalingclient "k8s.io/client-go/kubernetes/typed/autoscaling/v1"
+	autoscalingclient "k8s.io/client-go/kubernetes/typed/autoscaling/v2"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	autoscalinglisters "k8s.io/client-go/listers/autoscaling/v1"
+	autoscalinglisters "k8s.io/client-go/listers/autoscaling/v2"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/controller"
 	metricsclient "k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 )
@@ -571,16 +570,9 @@ func (a *HorizontalController) recordInitialRecommendation(currentReplicas int32
 	}
 }
 
-func (a *HorizontalController) reconcileAutoscaler(ctx context.Context, hpav1Shared *autoscalingv1.HorizontalPodAutoscaler, key string) error {
+func (a *HorizontalController) reconcileAutoscaler(ctx context.Context, hpaShared *autoscalingv2.HorizontalPodAutoscaler, key string) error {
 	// make a copy so that we never mutate the shared informer cache (conversion can mutate the object)
-	hpav1 := hpav1Shared.DeepCopy()
-	// then, convert to autoscaling/v2, which makes our lives easier when calculating metrics
-	hpaRaw, err := unsafeConvertToVersionVia(hpav1, autoscalingv2.SchemeGroupVersion)
-	if err != nil {
-		a.eventRecorder.Event(hpav1, v1.EventTypeWarning, "FailedConvertHPA", err.Error())
-		return fmt.Errorf("failed to convert the given HPA to %s: %v", autoscalingv2.SchemeGroupVersion.String(), err)
-	}
-	hpa := hpaRaw.(*autoscalingv2.HorizontalPodAutoscaler)
+	hpa := hpaShared.DeepCopy()
 	hpaStatusOriginal := hpa.Status.DeepCopy()
 
 	reference := fmt.Sprintf("%s/%s/%s", hpa.Spec.ScaleTargetRef.Kind, hpa.Namespace, hpa.Spec.ScaleTargetRef.Name)
@@ -1156,39 +1148,13 @@ func (a *HorizontalController) updateStatusIfNeeded(ctx context.Context, oldStat
 
 // updateStatus actually does the update request for the status of the given HPA
 func (a *HorizontalController) updateStatus(ctx context.Context, hpa *autoscalingv2.HorizontalPodAutoscaler) error {
-	// convert back to autoscalingv1
-	hpaRaw, err := unsafeConvertToVersionVia(hpa, autoscalingv1.SchemeGroupVersion)
-	if err != nil {
-		a.eventRecorder.Event(hpa, v1.EventTypeWarning, "FailedConvertHPA", err.Error())
-		return fmt.Errorf("failed to convert the given HPA to %s: %v", autoscalingv2.SchemeGroupVersion.String(), err)
-	}
-	hpav1 := hpaRaw.(*autoscalingv1.HorizontalPodAutoscaler)
-
-	_, err = a.hpaNamespacer.HorizontalPodAutoscalers(hpav1.Namespace).UpdateStatus(ctx, hpav1, metav1.UpdateOptions{})
+	_, err := a.hpaNamespacer.HorizontalPodAutoscalers(hpa.Namespace).UpdateStatus(ctx, hpa, metav1.UpdateOptions{})
 	if err != nil {
 		a.eventRecorder.Event(hpa, v1.EventTypeWarning, "FailedUpdateStatus", err.Error())
 		return fmt.Errorf("failed to update status for %s: %v", hpa.Name, err)
 	}
 	klog.V(2).Infof("Successfully updated status for %s", hpa.Name)
 	return nil
-}
-
-// unsafeConvertToVersionVia is like Scheme.UnsafeConvertToVersion, but it does so via an internal version first.
-// We use it since working with v2alpha1 is convenient here, but we want to use the v1 client (and
-// can't just use the internal version).  Note that conversion mutates the object, so you need to deepcopy
-// *before* you call this if the input object came out of a shared cache.
-func unsafeConvertToVersionVia(obj runtime.Object, externalVersion schema.GroupVersion) (runtime.Object, error) {
-	objInt, err := legacyscheme.Scheme.UnsafeConvertToVersion(obj, schema.GroupVersion{Group: externalVersion.Group, Version: runtime.APIVersionInternal})
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert the given object to the internal version: %v", err)
-	}
-
-	objExt, err := legacyscheme.Scheme.UnsafeConvertToVersion(objInt, externalVersion)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert the given object back to the external version: %v", err)
-	}
-
-	return objExt, err
 }
 
 // setCondition sets the specific condition type on the given HPA to the specified value with the given reason

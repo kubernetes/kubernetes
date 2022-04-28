@@ -61,9 +61,10 @@ type RoleBindingOptions struct {
 	FieldManager     string
 	CreateAnnotation bool
 
-	Client         rbacclientv1.RbacV1Interface
-	DryRunStrategy cmdutil.DryRunStrategy
-	DryRunVerifier *resource.DryRunVerifier
+	Client              rbacclientv1.RbacV1Interface
+	DryRunStrategy      cmdutil.DryRunStrategy
+	DryRunVerifier      *resource.QueryParamVerifier
+	ValidationDirective string
 
 	genericclioptions.IOStreams
 }
@@ -136,11 +137,11 @@ func (o *RoleBindingOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 	if err != nil {
 		return err
 	}
-	dynamicCient, err := f.DynamicClient()
+	dynamicClient, err := f.DynamicClient()
 	if err != nil {
 		return err
 	}
-	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicCient, f.OpenAPIGetter())
+	o.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
@@ -148,6 +149,11 @@ func (o *RoleBindingOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 	}
 	o.PrintObj = func(obj runtime.Object) error {
 		return printer.PrintObj(obj, o.Out)
+	}
+
+	o.ValidationDirective, err = cmdutil.GetValidationDirective(cmd)
+	if err != nil {
+		return err
 	}
 	return nil
 }
@@ -178,6 +184,7 @@ func (o *RoleBindingOptions) Run() error {
 		if o.FieldManager != "" {
 			createOptions.FieldManager = o.FieldManager
 		}
+		createOptions.FieldValidation = o.ValidationDirective
 		if o.DryRunStrategy == cmdutil.DryRunServer {
 			if err := o.DryRunVerifier.HasSupport(roleBinding.GroupVersionKind()); err != nil {
 				return err

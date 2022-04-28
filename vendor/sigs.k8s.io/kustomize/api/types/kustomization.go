@@ -17,7 +17,13 @@ const (
 	ComponentVersion      = "kustomize.config.k8s.io/v1alpha1"
 	ComponentKind         = "Component"
 	MetadataNamespacePath = "metadata/namespace"
+
+	OriginAnnotations      = "originAnnotations"
+	TransformerAnnotations = "transformerAnnotations"
+	ManagedByLabelOption   = "managedByLabel"
 )
+
+var BuildMetadataOptions = []string{OriginAnnotations, TransformerAnnotations, ManagedByLabelOption}
 
 // Kustomization holds the information needed to generate customized k8s api resources.
 type Kustomization struct {
@@ -55,7 +61,7 @@ type Kustomization struct {
 
 	// PatchesStrategicMerge specifies the relative path to a file
 	// containing a strategic merge patch.  Format documented at
-	// https://github.com/kubernetes/community/blob/master/contributors/devel/strategic-merge-patch.md
+	// https://github.com/kubernetes/community/blob/master/contributors/devel/sig-api-machinery/strategic-merge-patch.md
 	// URLs and globs are not supported.
 	PatchesStrategicMerge []PatchStrategicMerge `json:"patchesStrategicMerge,omitempty" yaml:"patchesStrategicMerge,omitempty"`
 
@@ -161,6 +167,9 @@ type Kustomization struct {
 	// Inventory appends an object that contains the record
 	// of all other objects, which can be used in apply, prune and delete
 	Inventory *Inventory `json:"inventory,omitempty" yaml:"inventory,omitempty"`
+
+	// BuildMetadata is a list of strings used to toggle different build options
+	BuildMetadata []string `json:"buildMetadata,omitempty" yaml:"buildMetadata,omitempty"`
 }
 
 // FixKustomizationPostUnmarshalling fixes things

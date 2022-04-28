@@ -253,9 +253,8 @@ func ShouldDeleteNamespaceDuringUpdate(ctx context.Context, key string, obj, exi
 }
 
 func shouldHaveOrphanFinalizer(options *metav1.DeleteOptions, haveOrphanFinalizer bool) bool {
-	//lint:ignore SA1019 backwards compatibility
+	//nolint:staticcheck // SA1019 backwards compatibility
 	if options.OrphanDependents != nil {
-		//lint:ignore SA1019 backwards compatibility
 		return *options.OrphanDependents
 	}
 	if options.PropagationPolicy != nil {
@@ -265,9 +264,8 @@ func shouldHaveOrphanFinalizer(options *metav1.DeleteOptions, haveOrphanFinalize
 }
 
 func shouldHaveDeleteDependentsFinalizer(options *metav1.DeleteOptions, haveDeleteDependentsFinalizer bool) bool {
-	//lint:ignore SA1019 backwards compatibility
+	//nolint:staticcheck // SA1019 backwards compatibility
 	if options.OrphanDependents != nil {
-		//lint:ignore SA1019 backwards compatibility
 		return *options.OrphanDependents == false
 	}
 	if options.PropagationPolicy != nil {
@@ -318,6 +316,11 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	return r.store.GetResetFields()
 }
+
+func (r *StatusREST) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {
+	return r.store.ConvertToTable(ctx, object, tableOptions)
+}
+
 func (r *FinalizeREST) New() runtime.Object {
 	return r.store.New()
 }

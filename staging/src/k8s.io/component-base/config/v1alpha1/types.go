@@ -90,8 +90,9 @@ type LoggingConfiguration struct {
 	// Format Flag specifies the structure of log messages.
 	// default value of format is `text`
 	Format string `json:"format,omitempty"`
-	// Maximum number of seconds between log flushes. Ignored if the
-	// selected logging backend writes log messages without buffering.
+	// Maximum number of nanoseconds (i.e. 1s = 1000000000) between log
+	// flushes.  Ignored if the selected logging backend writes log
+	// messages without buffering.
 	FlushFrequency time.Duration `json:"flushFrequency"`
 	// Verbosity is the threshold that determines which log messages are
 	// logged. Default is zero which logs only the most important
@@ -101,9 +102,6 @@ type LoggingConfiguration struct {
 	// VModule overrides the verbosity threshold for individual files.
 	// Only supported for "text" log format.
 	VModule VModuleConfiguration `json:"vmodule,omitempty"`
-	// [Experimental] When enabled prevents logging of fields tagged as sensitive (passwords, keys, tokens).
-	// Runtime log sanitization may introduce significant computation overhead and therefore should not be enabled in production.`)
-	Sanitization bool `json:"sanitization,omitempty"`
 	// [Experimental] Options holds additional parameters that are specific
 	// to the different logging formats. Only the options for the selected
 	// format get used, but all of them get validated.

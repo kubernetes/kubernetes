@@ -18,19 +18,10 @@ package validation
 
 import (
 	"encoding/json"
-	"fmt"
 	"strings"
 
-	"github.com/google/cel-go/cel"
-	"github.com/google/cel-go/checker/decls"
-	"github.com/google/cel-go/common/types"
-	"github.com/google/cel-go/ext"
-
-	expr "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
-
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
-	"k8s.io/apiextensions-apiserver/third_party/forked/celopenapi/model"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	openapierrors "k8s.io/kube-openapi/pkg/validation/errors"
 	"k8s.io/kube-openapi/pkg/validation/spec"
@@ -87,6 +78,46 @@ func ValidateCustomResource(fldPath *field.Path, customResource interface{}, val
 					}
 				}
 				allErrs = append(allErrs, field.NotSupported(errPath, err.Value, values))
+
+			case openapierrors.TooLongFailCode:
+				value := interface{}("")
+				if err.Value != nil {
+					value = err.Value
+				}
+				max := int64(-1)
+				if i, ok := err.Valid.(int64); ok {
+					max = i
+				}
+				allErrs = append(allErrs, field.TooLongMaxLength(errPath, value, int(max)))
+
+			case openapierrors.MaxItemsFailCode:
+				actual := int64(-1)
+				if i, ok := err.Value.(int64); ok {
+					actual = i
+				}
+				max := int64(-1)
+				if i, ok := err.Valid.(int64); ok {
+					max = i
+				}
+				allErrs = append(allErrs, field.TooMany(errPath, int(actual), int(max)))
+
+			case openapierrors.TooManyPropertiesCode:
+				actual := int64(-1)
+				if i, ok := err.Value.(int64); ok {
+					actual = i
+				}
+				max := int64(-1)
+				if i, ok := err.Valid.(int64); ok {
+					max = i
+				}
+				allErrs = append(allErrs, field.TooMany(errPath, int(actual), int(max)))
+
+			case openapierrors.InvalidTypeCode:
+				value := interface{}("")
+				if err.Value != nil {
+					value = err.Value
+				}
+				allErrs = append(allErrs, field.TypeInvalid(errPath, value, err.Error()))
 
 			default:
 				value := interface{}("")
@@ -264,6 +295,13 @@ func ConvertJSONSchemaPropsWithPostProcess(in *apiextensions.JSONSchemaProps, ou
 	if in.XMapType != nil {
 		out.VendorExtensible.AddExtension("x-kubernetes-map-type", *in.XMapType)
 	}
+	if len(in.XValidations) != 0 {
+		var serializationValidationRules apiextensionsv1.ValidationRules
+		if err := apiextensionsv1.Convert_apiextensions_ValidationRules_To_v1_ValidationRules(&in.XValidations, &serializationValidationRules, nil); err != nil {
+			return err
+		}
+		out.VendorExtensible.AddExtension("x-kubernetes-validations", serializationValidationRules)
+	}
 	return nil
 }
 
@@ -338,46 +376,4 @@ func convertJSONSchemaPropsOrStringArray(in *apiextensions.JSONSchemaPropsOrStri
 		}
 	}
 	return nil
-}
-
-// CompileAndValidate provides a sanity check of the CEL validation functionality until we wire in the
-// full functionality.
-func CompileAndValidate(s *schema.Structural, bindings map[string]interface{}, rule string) (bool, error) {
-	env, err := cel.NewEnv()
-	if err != nil {
-		return false, err
-	}
-	reg := model.NewRegistry(env)
-	rt, err := model.NewRuleTypes("testType", s, reg)
-	if err != nil {
-		return false, err
-	}
-	opts, err := rt.EnvOptions(env.TypeProvider())
-	if err != nil {
-		return false, err
-	}
-	root, ok := rt.FindDeclType("testType")
-	if !ok {
-		root = model.SchemaDeclType(s).MaybeAssignTypeName("testType")
-	}
-	propDecls := []*expr.Decl{decls.NewVar("self", root.ExprType())}
-	opts = append(opts, cel.Declarations(propDecls...))
-	opts = append(opts, ext.Strings())
-	env, err = env.Extend(opts...)
-	if err != nil {
-		return false, err
-	}
-	ast, issues := env.Compile(rule)
-	if issues != nil {
-		return false, fmt.Errorf("issues: %v", issues)
-	}
-	prog, err := env.Program(ast)
-	if err != nil {
-		return false, err
-	}
-	evalResult, _, err := prog.Eval(bindings)
-	if err != nil {
-		return false, err
-	}
-	return evalResult == types.True, nil
 }

@@ -231,7 +231,7 @@ var (
 
 	// Used to indicate that watching stopped because of a signal from the stop
 	// channel passed in from a client of the reflector.
-	errorStopRequested = errors.New("Stop requested")
+	errorStopRequested = errors.New("stop requested")
 )
 
 // resyncChan returns a channel which will receive something when a resync is
@@ -258,7 +258,7 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 	options := metav1.ListOptions{ResourceVersion: r.relistResourceVersion()}
 
 	if err := func() error {
-		initTrace := trace.New("Reflector ListAndWatch", trace.Field{"name", r.name})
+		initTrace := trace.New("Reflector ListAndWatch", trace.Field{Key: "name", Value: r.name})
 		defer initTrace.LogIfLong(10 * time.Second)
 		var list runtime.Object
 		var paginatedResult bool
@@ -319,7 +319,7 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 			panic(r)
 		case <-listCh:
 		}
-		initTrace.Step("Objects listed", trace.Field{"error", err})
+		initTrace.Step("Objects listed", trace.Field{Key: "error", Value: err})
 		if err != nil {
 			klog.Warningf("%s: failed to list %v: %v", r.name, r.expectedTypeName, err)
 			return fmt.Errorf("failed to list %v: %v", r.expectedTypeName, err)
@@ -401,7 +401,7 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 		timeoutSeconds := int64(minWatchTimeout.Seconds() * (rand.Float64() + 1.0))
 		options = metav1.ListOptions{
 			ResourceVersion: resourceVersion,
-			// We want to avoid situations of hanging watchers. Stop any wachers that do not
+			// We want to avoid situations of hanging watchers. Stop any watchers that do not
 			// receive any events within the timeout window.
 			TimeoutSeconds: &timeoutSeconds,
 			// To reduce load on kube-apiserver on watch restarts, you may enable watch bookmarks.

@@ -120,7 +120,7 @@ func GetOriginal(w http.ResponseWriter) http.ResponseWriter {
 	return GetOriginal(inner)
 }
 
-//lint:ignore SA1019 backward compatibility
+//nolint:staticcheck // SA1019
 var _ http.CloseNotifier = outerWithCloseNotifyAndFlush{}
 var _ http.Flusher = outerWithCloseNotifyAndFlush{}
 var _ http.ResponseWriter = outerWithCloseNotifyAndFlush{}

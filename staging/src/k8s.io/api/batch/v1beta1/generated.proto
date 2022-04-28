@@ -28,7 +28,7 @@ import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 
 // Package-wide variables from generator "generated".
-option go_package = "v1beta1";
+option go_package = "k8s.io/api/batch/v1beta1";
 
 // CronJob represents the configuration of a single cron job.
 message CronJob {
@@ -63,6 +63,12 @@ message CronJobList {
 message CronJobSpec {
   // The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
   optional string schedule = 1;
+
+  // The time zone for the given schedule, see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones.
+  // If not specified, this will rely on the time zone of the kube-controller-manager process.
+  // ALPHA: This field is in alpha and must be enabled via the `CronJobTimeZone` feature gate.
+  // +optional
+  optional string timeZone = 8;
 
   // Optional deadline in seconds for starting the job if it misses scheduled
   // time for any reason.  Missed jobs executions will be counted as failed ones.

@@ -3276,6 +3276,42 @@ func TestUpdateNodeCaches(t *testing.T) {
 	assert.Equal(t, 1, len(az.nodeNames))
 }
 
+func TestUpdateNodeCacheExcludeLoadBalancer(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	az := GetTestCloud(ctrl)
+
+	zone := fmt.Sprintf("%s-0", az.Location)
+	nodesInZone := sets.NewString("prevNode")
+	az.nodeZones = map[string]sets.String{zone: nodesInZone}
+	az.nodeResourceGroups = map[string]string{"prevNode": "rg"}
+	az.unmanagedNodes = sets.NewString("prevNode")
+	az.excludeLoadBalancerNodes = sets.NewString()
+	az.nodeNames = sets.NewString("prevNode")
+
+	// excluded node cache shall be updated even if the topology label does not change
+	prevNode := v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{
+				v1.LabelTopologyZone: zone,
+			},
+			Name: "prevNode",
+		},
+	}
+	newNode := v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{
+				v1.LabelTopologyZone:         zone,
+				v1.LabelNodeExcludeBalancers: "true",
+			},
+			Name: "newNode",
+		},
+	}
+	az.updateNodeCaches(&prevNode, &newNode)
+	assert.Equal(t, 1, len(az.excludeLoadBalancerNodes))
+
+}
+
 func TestGetActiveZones(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()

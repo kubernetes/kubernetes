@@ -19,6 +19,8 @@ package cpuset
 import (
 	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestCPUSetBuilder(t *testing.T) {
@@ -36,6 +38,9 @@ func TestCPUSetBuilder(t *testing.T) {
 	if len(elems) != result.Size() {
 		t.Fatalf("expected cpuset %s to have the same size as %v", result, elems)
 	}
+
+	b.Add(6)
+	require.False(t, result.Contains(6), "expected calls to Add after calling Result() to have no effect")
 }
 
 func TestCPUSetSize(t *testing.T) {

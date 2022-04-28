@@ -72,7 +72,7 @@ func HTTPWrappersForConfig(config *Config, rt http.RoundTripper) (http.RoundTrip
 func DebugWrappers(rt http.RoundTripper) http.RoundTripper {
 	switch {
 	case bool(klog.V(9).Enabled()):
-		rt = NewDebuggingRoundTripper(rt, DebugCurlCommand, DebugDetailedTiming, DebugResponseHeaders)
+		rt = NewDebuggingRoundTripper(rt, DebugCurlCommand, DebugURLTiming, DebugDetailedTiming, DebugResponseHeaders)
 	case bool(klog.V(8).Enabled()):
 		rt = NewDebuggingRoundTripper(rt, DebugJustURL, DebugRequestHeaders, DebugResponseStatus, DebugResponseHeaders)
 	case bool(klog.V(7).Enabled()):

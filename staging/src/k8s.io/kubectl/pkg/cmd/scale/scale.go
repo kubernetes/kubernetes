@@ -31,7 +31,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scale"
-	"k8s.io/kubectl/pkg/util"
+	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -87,7 +87,7 @@ type ScaleOptions struct {
 	unstructuredClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
 	parent                       string
 	dryRunStrategy               cmdutil.DryRunStrategy
-	dryRunVerifier               *resource.DryRunVerifier
+	dryRunVerifier               *resource.QueryParamVerifier
 
 	genericclioptions.IOStreams
 }
@@ -114,7 +114,7 @@ func NewCmdScale(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 		Short:                 i18n.T("Set a new size for a deployment, replica set, or replication controller"),
 		Long:                  scaleLong,
 		Example:               scaleExample,
-		ValidArgsFunction:     util.SpecifiedResourceTypeAndNameCompletionFunc(f, validArgs),
+		ValidArgsFunction:     completion.SpecifiedResourceTypeAndNameCompletionFunc(f, validArgs),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate(cmd))
@@ -125,7 +125,6 @@ func NewCmdScale(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 	o.RecordFlags.AddFlags(cmd)
 	o.PrintFlags.AddFlags(cmd)
 
-	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().BoolVar(&o.All, "all", o.All, "Select all resources in the namespace of the specified resource types")
 	cmd.Flags().StringVar(&o.ResourceVersion, "resource-version", o.ResourceVersion, i18n.T("Precondition for resource version. Requires that the current resource version match this value in order to scale."))
 	cmd.Flags().IntVar(&o.CurrentReplicas, "current-replicas", o.CurrentReplicas, "Precondition for current size. Requires that the current size of the resource match this value in order to scale. -1 (default) for no condition.")
@@ -134,6 +133,7 @@ func NewCmdScale(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 	cmd.Flags().DurationVar(&o.Timeout, "timeout", 0, "The length of time to wait before giving up on a scale operation, zero means don't wait. Any other values should contain a corresponding time unit (e.g. 1s, 2m, 3h).")
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, "identifying the resource to set a new size")
 	cmdutil.AddDryRunFlag(cmd)
+	cmdutil.AddLabelSelectorFlagVar(cmd, &o.Selector)
 	return cmd
 }
 
@@ -158,7 +158,7 @@ func (o *ScaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	if err != nil {
 		return err
 	}
-	o.dryRunVerifier = resource.NewDryRunVerifier(dynamicClient, f.OpenAPIGetter())
+	o.dryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 
 	o.namespace, o.enforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {

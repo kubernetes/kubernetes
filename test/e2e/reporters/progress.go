@@ -20,7 +20,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -123,7 +123,7 @@ func (reporter *ProgressReporter) postProgressToURL(b []byte) {
 		klog.Errorf("Unexpected response when posting progress update to %v: %v", reporter.progressURL, resp.StatusCode)
 		if resp.Body != nil {
 			defer resp.Body.Close()
-			respBody, err := ioutil.ReadAll(resp.Body)
+			respBody, err := io.ReadAll(resp.Body)
 			if err != nil {
 				klog.Errorf("Failed to read response body from posting progress: %v", err)
 				return

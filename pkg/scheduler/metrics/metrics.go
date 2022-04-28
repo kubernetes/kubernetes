@@ -93,7 +93,7 @@ var (
 		&metrics.GaugeOpts{
 			Subsystem:      SchedulerSubsystem,
 			Name:           "pending_pods",
-			Help:           "Number of pending pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulableQ.",
+			Help:           "Number of pending pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulablePods.",
 			StabilityLevel: metrics.STABLE,
 		}, []string{"queue"})
 	SchedulerGoroutines = metrics.NewGaugeVec(
@@ -111,7 +111,7 @@ var (
 			Help:      "E2e latency for a pod being scheduled which may include multiple scheduling attempts.",
 			// Start with 10ms with the last bucket being [~88m, Inf).
 			Buckets:        metrics.ExponentialBuckets(0.01, 2, 20),
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.STABLE,
 		},
 		[]string{"attempts"})
 
@@ -121,7 +121,7 @@ var (
 			Name:           "pod_scheduling_attempts",
 			Help:           "Number of attempts to successfully schedule a pod.",
 			Buckets:        metrics.ExponentialBuckets(1, 2, 5),
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.STABLE,
 		})
 
 	FrameworkExtensionPointDuration = metrics.NewHistogramVec(
@@ -131,7 +131,7 @@ var (
 			Help:      "Latency for running all plugins of a specific extension point.",
 			// Start with 0.1ms with the last bucket being [~200ms, Inf)
 			Buckets:        metrics.ExponentialBuckets(0.0001, 2, 12),
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.STABLE,
 		},
 		[]string{"extension_point", "status", "profile"})
 
@@ -152,7 +152,7 @@ var (
 			Subsystem:      SchedulerSubsystem,
 			Name:           "queue_incoming_pods_total",
 			Help:           "Number of pods added to scheduling queues by event and queue type.",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.STABLE,
 		}, []string{"queue", "event"})
 
 	PermitWaitDuration = metrics.NewHistogramVec(
@@ -173,6 +173,14 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		}, []string{"type"})
 
+	unschedulableReasons = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "unschedulable_pods",
+			Help:           "The number of unschedulable pods broken down by plugin name. A pod will increment the gauge for all plugins that caused it to not schedule and so this metric have meaning only when broken down by plugin.",
+			StabilityLevel: metrics.ALPHA,
+		}, []string{"plugin", "profile"})
+
 	metricsList = []metrics.Registerable{
 		scheduleAttempts,
 		e2eSchedulingLatency,
@@ -189,6 +197,7 @@ var (
 		SchedulerGoroutines,
 		PermitWaitDuration,
 		CacheSize,
+		unschedulableReasons,
 	}
 )
 
@@ -234,4 +243,8 @@ func UnschedulablePods() metrics.GaugeMetric {
 // SinceInSeconds gets the time since the specified start in seconds.
 func SinceInSeconds(start time.Time) float64 {
 	return time.Since(start).Seconds()
+}
+
+func UnschedulableReason(plugin string, profile string) metrics.GaugeMetric {
+	return unschedulableReasons.With(metrics.Labels{"plugin": plugin, "profile": profile})
 }

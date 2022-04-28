@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 
 	"github.com/cilium/ebpf/asm"
 	"github.com/cilium/ebpf/internal"
@@ -64,7 +63,7 @@ func parseExtInfos(r io.ReadSeeker, bo binary.ByteOrder, strings stringTable) (f
 
 	// Of course, the .BTF.ext header has different semantics than the
 	// .BTF ext header. We need to ignore non-null values.
-	_, err = io.CopyN(ioutil.Discard, r, remainder)
+	_, err = io.CopyN(io.Discard, r, remainder)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("header padding: %v", err)
 	}
@@ -114,11 +113,16 @@ type extInfoRecord struct {
 }
 
 type extInfo struct {
+	byteOrder  binary.ByteOrder
 	recordSize uint32
 	records    []extInfoRecord
 }
 
 func (ei extInfo) append(other extInfo, offset uint64) (extInfo, error) {
+	if other.byteOrder != ei.byteOrder {
+		return extInfo{}, fmt.Errorf("ext_info byte order mismatch, want %v (got %v)", ei.byteOrder, other.byteOrder)
+	}
+
 	if other.recordSize != ei.recordSize {
 		return extInfo{}, fmt.Errorf("ext_info record size mismatch, want %d (got %d)", ei.recordSize, other.recordSize)
 	}
@@ -131,10 +135,14 @@ func (ei extInfo) append(other extInfo, offset uint64) (extInfo, error) {
 			Opaque:  info.Opaque,
 		})
 	}
-	return extInfo{ei.recordSize, records}, nil
+	return extInfo{ei.byteOrder, ei.recordSize, records}, nil
 }
 
 func (ei extInfo) MarshalBinary() ([]byte, error) {
+	if ei.byteOrder != internal.NativeEndian {
+		return nil, fmt.Errorf("%s is not the native byte order", ei.byteOrder)
+	}
+
 	if len(ei.records) == 0 {
 		return nil, nil
 	}
@@ -197,6 +205,7 @@ func parseExtInfo(r io.Reader, bo binary.ByteOrder, strings stringTable) (map[st
 		}
 
 		result[secName] = extInfo{
+			bo,
 			recordSize,
 			records,
 		}

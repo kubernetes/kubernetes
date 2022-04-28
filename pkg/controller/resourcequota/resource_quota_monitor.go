@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/klog/v2"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -72,11 +72,11 @@ type QuotaMonitor struct {
 	// each monitor list/watches a resource and determines if we should replenish quota
 	monitors    monitors
 	monitorLock sync.RWMutex
-	// informersStarted is closed after after all of the controllers have been initialized and are running.
+	// informersStarted is closed after all the controllers have been initialized and are running.
 	// After that it is safe to start them here, before that it is not.
 	informersStarted <-chan struct{}
 
-	// stopCh drives shutdown. When a receive from it unblocks, monitors will shut down.
+	// stopCh drives shutdown. When a reception from it unblocks, monitors will shut down.
 	// This channel is also protected by monitorLock.
 	stopCh <-chan struct{}
 
@@ -148,6 +148,10 @@ func (qm *QuotaMonitor) controllerFor(resource schema.GroupVersionResource) (cac
 				oldService := oldObj.(*v1.Service)
 				newService := newObj.(*v1.Service)
 				notifyUpdate = core.GetQuotaServiceType(oldService) != core.GetQuotaServiceType(newService)
+			case schema.GroupResource{Resource: "persistentvolumeclaims"}:
+				oldPVC := oldObj.(*v1.PersistentVolumeClaim)
+				newPVC := newObj.(*v1.PersistentVolumeClaim)
+				notifyUpdate = core.RequiresQuotaReplenish(newPVC, oldPVC)
 			}
 			if notifyUpdate {
 				event := &event{

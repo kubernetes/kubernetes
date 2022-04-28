@@ -48,7 +48,7 @@ import (
 	toolswatch "k8s.io/client-go/tools/watch"
 	"k8s.io/component-base/configz"
 	"k8s.io/component-base/metrics"
-	utilsysctl "k8s.io/component-helpers/node/utils/sysctl"
+	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/proxy/apis/config/scheme"
@@ -108,7 +108,7 @@ func newProxyServer(
 	}
 
 	if canUseIPVS {
-		ipvsInterface = utilipvs.New(execer)
+		ipvsInterface = utilipvs.New()
 	}
 
 	// We omit creation of pretty much everything if we run in cleanup mode
@@ -436,7 +436,7 @@ func detectNumCPU() int {
 func getDetectLocalMode(config *proxyconfigapi.KubeProxyConfiguration) (proxyconfigapi.LocalMode, error) {
 	mode := config.DetectLocalMode
 	switch mode {
-	case proxyconfigapi.LocalModeClusterCIDR, proxyconfigapi.LocalModeNodeCIDR:
+	case proxyconfigapi.LocalModeClusterCIDR, proxyconfigapi.LocalModeNodeCIDR, proxyconfigapi.LocalModeBridgeInterface, proxyconfigapi.LocalModeInterfaceNamePrefix:
 		return mode, nil
 	default:
 		if strings.TrimSpace(mode.String()) != "" {
@@ -461,6 +461,16 @@ func getLocalDetector(mode proxyconfigapi.LocalMode, config *proxyconfigapi.Kube
 			break
 		}
 		return proxyutiliptables.NewDetectLocalByCIDR(nodeInfo.Spec.PodCIDR, ipt)
+	case proxyconfigapi.LocalModeBridgeInterface:
+		if len(strings.TrimSpace(config.DetectLocal.BridgeInterface)) == 0 {
+			return nil, fmt.Errorf("Detect-local-mode set to BridgeInterface, but no bridge-interface-name %s is defined", config.DetectLocal.BridgeInterface)
+		}
+		return proxyutiliptables.NewDetectLocalByBridgeInterface(config.DetectLocal.BridgeInterface)
+	case proxyconfigapi.LocalModeInterfaceNamePrefix:
+		if len(strings.TrimSpace(config.DetectLocal.InterfaceNamePrefix)) == 0 {
+			return nil, fmt.Errorf("Detect-local-mode set to InterfaceNamePrefix, but no interface-prefix %s is defined", config.DetectLocal.InterfaceNamePrefix)
+		}
+		return proxyutiliptables.NewDetectLocalByInterfaceNamePrefix(config.DetectLocal.InterfaceNamePrefix)
 	}
 	klog.V(0).InfoS("Defaulting to no-op detect-local", "detect-local-mode", string(mode))
 	return proxyutiliptables.NewNoOpLocalDetector(), nil
@@ -516,6 +526,13 @@ func getDualStackLocalDetectorTuple(mode proxyconfigapi.LocalMode, config *proxy
 			if len(nodeInfo.Spec.PodCIDRs) > 1 {
 				localDetectors[1], err = proxyutiliptables.NewDetectLocalByCIDR(nodeInfo.Spec.PodCIDRs[1], ipt[1])
 			}
+		}
+		return localDetectors, err
+	case proxyconfigapi.LocalModeBridgeInterface, proxyconfigapi.LocalModeInterfaceNamePrefix:
+		localDetector, err := getLocalDetector(mode, config, ipt[0], nodeInfo)
+		if err == nil {
+			localDetectors[0] = localDetector
+			localDetectors[1] = localDetector
 		}
 		return localDetectors, err
 	default:

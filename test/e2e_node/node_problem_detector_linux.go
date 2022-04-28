@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	coreclientset "k8s.io/client-go/kubernetes/typed/core/v1"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -50,6 +51,7 @@ var _ = SIGDescribe("NodeProblemDetector [NodeFeature:NodeProblemDetector] [Seri
 		pollTimeout    = 1 * time.Minute
 	)
 	f := framework.NewDefaultFramework("node-problem-detector")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var c clientset.Interface
 	var uid string
 	var ns, name, configName, eventNamespace string

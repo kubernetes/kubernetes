@@ -13,4 +13,4 @@ approvers:
   - sttts
   - tallclair
 labels:
-- sig/auth
+  - sig/auth

@@ -749,10 +749,6 @@ func (az *Cloud) SetInformers(informerFactory informers.SharedInformerFactory) {
 		UpdateFunc: func(prev, obj interface{}) {
 			prevNode := prev.(*v1.Node)
 			newNode := obj.(*v1.Node)
-			if newNode.Labels[v1.LabelTopologyZone] ==
-				prevNode.Labels[v1.LabelTopologyZone] {
-				return
-			}
 			az.updateNodeCaches(prevNode, newNode)
 		},
 		DeleteFunc: func(obj interface{}) {

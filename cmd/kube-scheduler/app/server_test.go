@@ -19,7 +19,6 @@ package app
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -30,7 +29,9 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/spf13/pflag"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/util/feature"
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/component-base/featuregate"
@@ -40,12 +41,12 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/testing/defaults"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 func TestSetup(t *testing.T) {
 	// temp dir
-	tmpDir, err := ioutil.TempDir("", "scheduler-options")
+	tmpDir, err := os.MkdirTemp("", "scheduler-options")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +60,7 @@ func TestSetup(t *testing.T) {
 	defer server.Close()
 
 	configKubeconfig := filepath.Join(tmpDir, "config.kubeconfig")
-	if err := ioutil.WriteFile(configKubeconfig, []byte(fmt.Sprintf(`
+	if err := os.WriteFile(configKubeconfig, []byte(fmt.Sprintf(`
 apiVersion: v1
 kind: Config
 clusters:
@@ -82,8 +83,46 @@ users:
 	}
 
 	// plugin config
-	pluginConfigFile := filepath.Join(tmpDir, "plugin.yaml")
-	if err := ioutil.WriteFile(pluginConfigFile, []byte(fmt.Sprintf(`
+	pluginConfigFilev1beta3 := filepath.Join(tmpDir, "pluginv1beta3.yaml")
+	if err := os.WriteFile(pluginConfigFilev1beta3, []byte(fmt.Sprintf(`
+apiVersion: kubescheduler.config.k8s.io/v1beta3
+kind: KubeSchedulerConfiguration
+clientConnection:
+  kubeconfig: "%s"
+profiles:
+- plugins:
+    multiPoint:
+      enabled:
+      - name: DefaultBinder
+      - name: PrioritySort
+      - name: DefaultPreemption
+      - name: VolumeBinding
+      - name: NodeResourcesFit
+      - name: NodePorts
+      - name: InterPodAffinity
+      - name: TaintToleration
+      disabled:
+      - name: "*"
+    preFilter:
+      disabled:
+      - name: VolumeBinding
+      - name: InterPodAffinity
+    filter:
+      disabled:
+      - name: VolumeBinding
+      - name: InterPodAffinity
+      - name: TaintToleration
+    score:
+      disabled:
+      - name: VolumeBinding
+      - name: NodeResourcesFit
+`, configKubeconfig)), os.FileMode(0600)); err != nil {
+		t.Fatal(err)
+	}
+
+	// plugin config
+	pluginConfigFilev1beta2 := filepath.Join(tmpDir, "pluginv1beta2.yaml")
+	if err := os.WriteFile(pluginConfigFilev1beta2, []byte(fmt.Sprintf(`
 apiVersion: kubescheduler.config.k8s.io/v1beta2
 kind: KubeSchedulerConfiguration
 clientConnection:
@@ -118,9 +157,47 @@ profiles:
 		t.Fatal(err)
 	}
 
+	// out-of-tree plugin config v1beta3
+	outOfTreePluginConfigFilev1beta3 := filepath.Join(tmpDir, "outOfTreePluginv1beta3.yaml")
+	if err := os.WriteFile(outOfTreePluginConfigFilev1beta3, []byte(fmt.Sprintf(`
+apiVersion: kubescheduler.config.k8s.io/v1beta3
+kind: KubeSchedulerConfiguration
+clientConnection:
+  kubeconfig: "%s"
+profiles:
+- plugins:
+    preFilter:
+      enabled:
+      - name: Foo
+    filter:
+      enabled:
+      - name: Foo
+`, configKubeconfig)), os.FileMode(0600)); err != nil {
+		t.Fatal(err)
+	}
+
+	// out-of-tree plugin config v1beta2
+	outOfTreePluginConfigFilev1beta2 := filepath.Join(tmpDir, "outOfTreePluginv1beta2.yaml")
+	if err := os.WriteFile(outOfTreePluginConfigFilev1beta2, []byte(fmt.Sprintf(`
+apiVersion: kubescheduler.config.k8s.io/v1beta2
+kind: KubeSchedulerConfiguration
+clientConnection:
+  kubeconfig: "%s"
+profiles:
+- plugins:
+    preFilter:
+      enabled:
+      - name: Foo
+    filter:
+      enabled:
+      - name: Foo
+`, configKubeconfig)), os.FileMode(0600)); err != nil {
+		t.Fatal(err)
+	}
+
 	// multiple profiles config
 	multiProfilesConfig := filepath.Join(tmpDir, "multi-profiles.yaml")
-	if err := ioutil.WriteFile(multiProfilesConfig, []byte(fmt.Sprintf(`
+	if err := os.WriteFile(multiProfilesConfig, []byte(fmt.Sprintf(`
 apiVersion: kubescheduler.config.k8s.io/v1beta2
 kind: KubeSchedulerConfiguration
 clientConnection:
@@ -150,7 +227,7 @@ profiles:
 
 	// empty leader-election config
 	emptyLeaderElectionConfig := filepath.Join(tmpDir, "empty-leader-election-config.yaml")
-	if err := ioutil.WriteFile(emptyLeaderElectionConfig, []byte(fmt.Sprintf(`
+	if err := os.WriteFile(emptyLeaderElectionConfig, []byte(fmt.Sprintf(`
 apiVersion: kubescheduler.config.k8s.io/v1beta3
 kind: KubeSchedulerConfiguration
 clientConnection:
@@ -161,7 +238,7 @@ clientConnection:
 
 	// leader-election config
 	leaderElectionConfig := filepath.Join(tmpDir, "leader-election-config.yaml")
-	if err := ioutil.WriteFile(leaderElectionConfig, []byte(fmt.Sprintf(`
+	if err := os.WriteFile(leaderElectionConfig, []byte(fmt.Sprintf(`
 apiVersion: kubescheduler.config.k8s.io/v1beta3
 kind: KubeSchedulerConfiguration
 clientConnection:
@@ -175,41 +252,35 @@ leaderElection:
 	testcases := []struct {
 		name               string
 		flags              []string
+		registryOptions    []Option
 		restoreFeatures    map[featuregate.Feature]bool
 		wantPlugins        map[string]*config.Plugins
 		wantLeaderElection *componentbaseconfig.LeaderElectionConfiguration
 	}{
 		{
-			name: "default config with an alpha feature enabled and an beta feature disabled",
+			name: "default config with an alpha feature enabled",
 			flags: []string{
 				"--kubeconfig", configKubeconfig,
-				"--feature-gates=VolumeCapacityPriority=true,DefaultPodTopologySpread=false",
+				"--feature-gates=VolumeCapacityPriority=true",
 			},
 			wantPlugins: map[string]*config.Plugins{
 				"default-scheduler": func() *config.Plugins {
 					plugins := &config.Plugins{
-						QueueSort:  defaults.PluginsV1beta3.QueueSort,
-						PreFilter:  defaults.PluginsV1beta3.PreFilter,
-						Filter:     defaults.PluginsV1beta3.Filter,
-						PostFilter: defaults.PluginsV1beta3.PostFilter,
-						PreScore:   defaults.PluginsV1beta3.PreScore,
-						Score:      defaults.PluginsV1beta3.Score,
-						Bind:       defaults.PluginsV1beta3.Bind,
-						PreBind:    defaults.PluginsV1beta3.PreBind,
-						Reserve:    defaults.PluginsV1beta3.Reserve,
+						QueueSort:  defaults.ExpandedPluginsV1beta3.QueueSort,
+						PreFilter:  defaults.ExpandedPluginsV1beta3.PreFilter,
+						Filter:     defaults.ExpandedPluginsV1beta3.Filter,
+						PostFilter: defaults.ExpandedPluginsV1beta3.PostFilter,
+						PreScore:   defaults.ExpandedPluginsV1beta3.PreScore,
+						Score:      defaults.ExpandedPluginsV1beta3.Score,
+						Bind:       defaults.ExpandedPluginsV1beta3.Bind,
+						PreBind:    defaults.ExpandedPluginsV1beta3.PreBind,
+						Reserve:    defaults.ExpandedPluginsV1beta3.Reserve,
 					}
-					plugins.PreScore.Enabled = append(plugins.PreScore.Enabled, config.Plugin{Name: names.SelectorSpread, Weight: 0})
-					plugins.Score.Enabled = append(
-						plugins.Score.Enabled,
-						config.Plugin{Name: names.VolumeBinding, Weight: 1},
-						config.Plugin{Name: names.SelectorSpread, Weight: 1},
-					)
 					return plugins
 				}(),
 			},
 			restoreFeatures: map[featuregate.Feature]bool{
-				features.VolumeCapacityPriority:   false,
-				features.DefaultPodTopologySpread: true,
+				features.VolumeCapacityPriority: false,
 			},
 		},
 		{
@@ -218,13 +289,13 @@ leaderElection:
 				"--kubeconfig", configKubeconfig,
 			},
 			wantPlugins: map[string]*config.Plugins{
-				"default-scheduler": defaults.PluginsV1beta3,
+				"default-scheduler": defaults.ExpandedPluginsV1beta3,
 			},
 		},
 		{
-			name: "component configuration",
+			name: "component configuration v1beta2",
 			flags: []string{
-				"--config", pluginConfigFile,
+				"--config", pluginConfigFilev1beta2,
 				"--kubeconfig", configKubeconfig,
 			},
 			wantPlugins: map[string]*config.Plugins{
@@ -258,6 +329,96 @@ leaderElection:
 					},
 					Reserve: config.PluginSet{Enabled: []config.Plugin{{Name: "VolumeBinding"}}},
 					PreBind: config.PluginSet{Enabled: []config.Plugin{{Name: "VolumeBinding"}}},
+				},
+			},
+		},
+		{
+			name: "component configuration v1beta3",
+			flags: []string{
+				"--config", pluginConfigFilev1beta3,
+				"--kubeconfig", configKubeconfig,
+			},
+			wantPlugins: map[string]*config.Plugins{
+				"default-scheduler": {
+					Bind: config.PluginSet{Enabled: []config.Plugin{{Name: "DefaultBinder"}}},
+					Filter: config.PluginSet{
+						Enabled: []config.Plugin{
+							{Name: "NodeResourcesFit"},
+							{Name: "NodePorts"},
+						},
+					},
+					PreFilter: config.PluginSet{
+						Enabled: []config.Plugin{
+							{Name: "NodeResourcesFit"},
+							{Name: "NodePorts"},
+						},
+					},
+					PostFilter: config.PluginSet{Enabled: []config.Plugin{{Name: "DefaultPreemption"}}},
+					PreScore: config.PluginSet{
+						Enabled: []config.Plugin{
+							{Name: "InterPodAffinity"},
+							{Name: "TaintToleration"},
+						},
+					},
+					QueueSort: config.PluginSet{Enabled: []config.Plugin{{Name: "PrioritySort"}}},
+					Score: config.PluginSet{
+						Enabled: []config.Plugin{
+							{Name: "InterPodAffinity", Weight: 1},
+							{Name: "TaintToleration", Weight: 1},
+						},
+					},
+					Reserve: config.PluginSet{Enabled: []config.Plugin{{Name: "VolumeBinding"}}},
+					PreBind: config.PluginSet{Enabled: []config.Plugin{{Name: "VolumeBinding"}}},
+				},
+			},
+		},
+		{
+			name: "out-of-tree component configuration v1beta2",
+			flags: []string{
+				"--config", outOfTreePluginConfigFilev1beta2,
+				"--kubeconfig", configKubeconfig,
+			},
+			registryOptions: []Option{WithPlugin("Foo", newFoo)},
+			wantPlugins: map[string]*config.Plugins{
+				"default-scheduler": {
+					Bind: defaults.PluginsV1beta2.Bind,
+					Filter: config.PluginSet{
+						Enabled: append(defaults.PluginsV1beta2.Filter.Enabled, config.Plugin{Name: "Foo"}),
+					},
+					PreFilter: config.PluginSet{
+						Enabled: append(defaults.PluginsV1beta2.PreFilter.Enabled, config.Plugin{Name: "Foo"}),
+					},
+					PostFilter: defaults.PluginsV1beta2.PostFilter,
+					PreScore:   defaults.PluginsV1beta2.PreScore,
+					QueueSort:  defaults.PluginsV1beta2.QueueSort,
+					Score:      defaults.PluginsV1beta2.Score,
+					Reserve:    defaults.PluginsV1beta2.Reserve,
+					PreBind:    defaults.PluginsV1beta2.PreBind,
+				},
+			},
+		},
+		{
+			name: "out-of-tree component configuration v1beta3",
+			flags: []string{
+				"--config", outOfTreePluginConfigFilev1beta3,
+				"--kubeconfig", configKubeconfig,
+			},
+			registryOptions: []Option{WithPlugin("Foo", newFoo)},
+			wantPlugins: map[string]*config.Plugins{
+				"default-scheduler": {
+					Bind: defaults.ExpandedPluginsV1beta3.Bind,
+					Filter: config.PluginSet{
+						Enabled: append(defaults.ExpandedPluginsV1beta3.Filter.Enabled, config.Plugin{Name: "Foo"}),
+					},
+					PreFilter: config.PluginSet{
+						Enabled: append(defaults.ExpandedPluginsV1beta3.PreFilter.Enabled, config.Plugin{Name: "Foo"}),
+					},
+					PostFilter: defaults.ExpandedPluginsV1beta3.PostFilter,
+					PreScore:   defaults.ExpandedPluginsV1beta3.PreScore,
+					QueueSort:  defaults.ExpandedPluginsV1beta3.QueueSort,
+					Score:      defaults.ExpandedPluginsV1beta3.Score,
+					Reserve:    defaults.ExpandedPluginsV1beta3.Reserve,
+					PreBind:    defaults.ExpandedPluginsV1beta3.PreBind,
 				},
 			},
 		},
@@ -368,7 +529,7 @@ leaderElection:
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			_, sched, err := Setup(ctx, opts)
+			_, sched, err := Setup(ctx, opts, tc.registryOptions...)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -392,4 +553,30 @@ leaderElection:
 			}
 		})
 	}
+}
+
+// Simulates an out-of-tree plugin.
+type foo struct{}
+
+var _ framework.PreFilterPlugin = &foo{}
+var _ framework.FilterPlugin = &foo{}
+
+func (*foo) Name() string {
+	return "Foo"
+}
+
+func newFoo(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+	return &foo{}, nil
+}
+
+func (*foo) PreFilter(_ context.Context, _ *framework.CycleState, _ *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+	return nil, nil
+}
+
+func (*foo) PreFilterExtensions() framework.PreFilterExtensions {
+	return nil
+}
+
+func (*foo) Filter(_ context.Context, _ *framework.CycleState, _ *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+	return nil
 }

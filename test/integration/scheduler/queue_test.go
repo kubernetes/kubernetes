@@ -100,19 +100,19 @@ func TestCoreResourceEnqueue(t *testing.T) {
 			t.Fatalf("Cannot find the profile for Pod %v", podInfo.Pod.Name)
 		}
 		// Schedule the Pod manually.
-		_, fitError := testCtx.Scheduler.Algorithm.Schedule(ctx, nil, fwk, framework.NewCycleState(), podInfo.Pod)
+		_, fitError := testCtx.Scheduler.SchedulePod(ctx, fwk, framework.NewCycleState(), podInfo.Pod)
 		if fitError == nil {
 			t.Fatalf("Expect Pod %v to fail at scheduling.", podInfo.Pod.Name)
 		}
 		testCtx.Scheduler.Error(podInfo, fitError)
 
 		// Scheduling cycle is incremented by one after NextPod() is called, so
-		// pass a number larger than i to move Pod to unschedulableQ.
+		// pass a number larger than i to move Pod to unschedulablePods.
 		testCtx.Scheduler.SchedulingQueue.AddUnschedulableIfNotPresent(podInfo, int64(i+10))
 	}
 
 	// Trigger a NodeTaintChange event.
-	// We expect this event to trigger moving the test Pod from unschedulableQ to activeQ.
+	// We expect this event to trigger moving the test Pod from unschedulablePods to activeQ.
 	node.Spec.Taints = nil
 	if _, err := cs.CoreV1().Nodes().Update(ctx, node, metav1.UpdateOptions{}); err != nil {
 		t.Fatalf("Failed to remove taints off the node: %v", err)
@@ -124,7 +124,7 @@ func TestCoreResourceEnqueue(t *testing.T) {
 		t.Fatalf("Expected the Pod to be attempted 2 times, but got %v", podInfo.Attempts)
 	}
 	if got := podInfo.Pod.Name; got != "pod1" {
-		t.Fatalf("Exepcted pod1 to be popped, but got %v", got)
+		t.Fatalf("Expected pod1 to be popped, but got %v", got)
 	}
 
 	// Pod2 and Pod3 are not expected to be popped out.
@@ -277,7 +277,7 @@ func TestCustomResourceEnqueue(t *testing.T) {
 		t.Fatalf("Cannot find the profile for Pod %v", podInfo.Pod.Name)
 	}
 	// Schedule the Pod manually.
-	_, fitError := testCtx.Scheduler.Algorithm.Schedule(ctx, nil, fwk, framework.NewCycleState(), podInfo.Pod)
+	_, fitError := testCtx.Scheduler.SchedulePod(ctx, fwk, framework.NewCycleState(), podInfo.Pod)
 	// The fitError is expected to be non-nil as it failed the fakeCRPlugin plugin.
 	if fitError == nil {
 		t.Fatalf("Expect Pod %v to fail at scheduling.", podInfo.Pod.Name)
@@ -285,11 +285,11 @@ func TestCustomResourceEnqueue(t *testing.T) {
 	testCtx.Scheduler.Error(podInfo, fitError)
 
 	// Scheduling cycle is incremented from 0 to 1 after NextPod() is called, so
-	// pass a number larger than 1 to move Pod to unschedulableQ.
+	// pass a number larger than 1 to move Pod to unschedulablePods.
 	testCtx.Scheduler.SchedulingQueue.AddUnschedulableIfNotPresent(podInfo, 10)
 
 	// Trigger a Custom Resource event.
-	// We expect this event to trigger moving the test Pod from unschedulableQ to activeQ.
+	// We expect this event to trigger moving the test Pod from unschedulablePods to activeQ.
 	crdGVR := schema.GroupVersionResource{Group: fooCRD.Spec.Group, Version: fooCRD.Spec.Versions[0].Name, Resource: "foos"}
 	crClient := dynamicClient.Resource(crdGVR).Namespace(ns)
 	if _, err := crClient.Create(ctx, &unstructured.Unstructured{

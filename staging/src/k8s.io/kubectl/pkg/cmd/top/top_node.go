@@ -29,7 +29,7 @@ import (
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/metricsutil"
-	"k8s.io/kubectl/pkg/util"
+	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 	metricsapi "k8s.io/metrics/pkg/apis/metrics"
@@ -82,7 +82,7 @@ func NewCmdTopNode(f cmdutil.Factory, o *TopNodeOptions, streams genericclioptio
 		Short:                 i18n.T("Display resource (CPU/memory) usage of nodes"),
 		Long:                  topNodeLong,
 		Example:               topNodeExample,
-		ValidArgsFunction:     util.ResourceNameCompletionFunc(f, "node"),
+		ValidArgsFunction:     completion.ResourceNameCompletionFunc(f, "node"),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
@@ -90,7 +90,7 @@ func NewCmdTopNode(f cmdutil.Factory, o *TopNodeOptions, streams genericclioptio
 		},
 		Aliases: []string{"nodes", "no"},
 	}
-	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
+	cmdutil.AddLabelSelectorFlagVar(cmd, &o.Selector)
 	cmd.Flags().StringVar(&o.SortBy, "sort-by", o.SortBy, "If non-empty, sort nodes list using specified field. The field can be either 'cpu' or 'memory'.")
 	cmd.Flags().BoolVar(&o.NoHeaders, "no-headers", o.NoHeaders, "If present, print output without headers")
 	cmd.Flags().BoolVar(&o.UseProtocolBuffers, "use-protocol-buffers", o.UseProtocolBuffers, "Enables using protocol-buffers to access Metrics API.")

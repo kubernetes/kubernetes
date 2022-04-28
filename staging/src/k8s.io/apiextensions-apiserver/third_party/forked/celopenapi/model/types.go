@@ -16,6 +16,7 @@ package model
 
 import (
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/google/cel-go/cel"
@@ -24,28 +25,34 @@ import (
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/common/types/traits"
 
+	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 	"google.golang.org/protobuf/proto"
 
-	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 )
 
+const (
+	noMaxLength = math.MaxInt
+)
+
 // NewListType returns a parameterized list type with a specified element type.
-func NewListType(elem *DeclType) *DeclType {
+func NewListType(elem *DeclType, maxItems int64) *DeclType {
 	return &DeclType{
 		name:         "list",
 		ElemType:     elem,
+		MaxElements:  maxItems,
 		exprType:     decls.NewListType(elem.ExprType()),
 		defaultValue: NewListValue(),
 	}
 }
 
 // NewMapType returns a parameterized map type with the given key and element types.
-func NewMapType(key, elem *DeclType) *DeclType {
+func NewMapType(key, elem *DeclType, maxProperties int64) *DeclType {
 	return &DeclType{
 		name:         "map",
 		KeyType:      key,
 		ElemType:     elem,
+		MaxElements:  maxProperties,
 		exprType:     decls.NewMapType(key.ExprType(), elem.ExprType()),
 		defaultValue: NewMapValue(),
 	}
@@ -97,12 +104,13 @@ func newSimpleType(name string, exprType *exprpb.Type, zeroVal ref.Val) *DeclTyp
 type DeclType struct {
 	fmt.Stringer
 
-	name      string
-	Fields    map[string]*DeclField
-	KeyType   *DeclType
-	ElemType  *DeclType
-	TypeParam bool
-	Metadata  map[string]string
+	name        string
+	Fields      map[string]*DeclField
+	KeyType     *DeclType
+	ElemType    *DeclType
+	TypeParam   bool
+	Metadata    map[string]string
+	MaxElements int64
 
 	exprType     *exprpb.Type
 	traitMask    int
@@ -160,7 +168,7 @@ func (t *DeclType) MaybeAssignTypeName(name string) *DeclType {
 		if updated == t.ElemType {
 			return t
 		}
-		return NewMapType(t.KeyType, updated)
+		return NewMapType(t.KeyType, updated, t.MaxElements)
 	}
 	if t.IsList() {
 		elemTypeName := fmt.Sprintf("%s.@idx", name)
@@ -168,7 +176,7 @@ func (t *DeclType) MaybeAssignTypeName(name string) *DeclType {
 		if updated == t.ElemType {
 			return t
 		}
-		return NewListType(updated)
+		return NewListType(updated, t.MaxElements)
 	}
 	return t
 }
@@ -306,14 +314,18 @@ func (f *DeclField) EnumValues() []ref.Val {
 // NewRuleTypes returns an Open API Schema-based type-system which is CEL compatible.
 func NewRuleTypes(kind string,
 	schema *schema.Structural,
+	isResourceRoot bool,
 	res Resolver) (*RuleTypes, error) {
 	// Note, if the schema indicates that it's actually based on another proto
 	// then prefer the proto definition. For expressions in the proto, a new field
 	// annotation will be needed to indicate the expected environment and type of
 	// the expression.
-	schemaTypes, err := newSchemaTypeProvider(kind, schema)
+	schemaTypes, err := newSchemaTypeProvider(kind, schema, isResourceRoot)
 	if err != nil {
 		return nil, err
+	}
+	if schemaTypes == nil {
+		return nil, nil
 	}
 	return &RuleTypes{
 		Schema:              schema,
@@ -467,7 +479,6 @@ func (rt *RuleTypes) convertToCustomType(dyn *DynValue, declType *DeclType) *Dyn
 			dyn.SetValue(obj)
 			return dyn
 		}
-		// TODO: handle complex map types which have non-string keys.
 		fieldType := declType.ElemType
 		for _, f := range v.fieldMap {
 			f.Ref = rt.convertToCustomType(f.Ref, fieldType)
@@ -485,8 +496,12 @@ func (rt *RuleTypes) convertToCustomType(dyn *DynValue, declType *DeclType) *Dyn
 	}
 }
 
-func newSchemaTypeProvider(kind string, schema *schema.Structural) (*schemaTypeProvider, error) {
-	root := SchemaDeclType(schema).MaybeAssignTypeName(kind)
+func newSchemaTypeProvider(kind string, schema *schema.Structural, isResourceRoot bool) (*schemaTypeProvider, error) {
+	delType := SchemaDeclType(schema, isResourceRoot)
+	if delType == nil {
+		return nil, nil
+	}
+	root := delType.MaybeAssignTypeName(kind)
 	types := FieldTypeMap(kind, root)
 	return &schemaTypeProvider{
 		root:  root,
@@ -540,8 +555,8 @@ var (
 	UintType = newSimpleType("uint", decls.Uint, types.Uint(0))
 
 	// ListType is equivalent to the CEL 'list' type.
-	ListType = NewListType(AnyType)
+	ListType = NewListType(AnyType, noMaxLength)
 
 	// MapType is equivalent to the CEL 'map' type.
-	MapType = NewMapType(AnyType, AnyType)
+	MapType = NewMapType(AnyType, AnyType, noMaxLength)
 )

@@ -38,17 +38,14 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/resourcequota"
 	resourcequotaapi "k8s.io/apiserver/pkg/admission/plugin/resourcequota/apis/resourcequota"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	watchtools "k8s.io/client-go/tools/watch"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/controller"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	resourcequotacontroller "k8s.io/kubernetes/pkg/controller/resourcequota"
-	"k8s.io/kubernetes/pkg/features"
 	quotainstall "k8s.io/kubernetes/pkg/quota/v1/install"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -416,7 +413,6 @@ func TestQuotaLimitedResourceDenial(t *testing.T) {
 }
 
 func TestQuotaLimitService(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceLBNodePortControl, true)()
 
 	// Set up an API server
 	h := &framework.APIServerHolder{Initialized: make(chan struct{})}

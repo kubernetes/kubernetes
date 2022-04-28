@@ -19,7 +19,6 @@ package copycerts
 import (
 	"context"
 	"encoding/hex"
-	"io/ioutil"
 	"os"
 	"path"
 	"regexp"
@@ -61,7 +60,7 @@ func TestGetDataFromInitConfig(t *testing.T) {
 
 	certs := certsToTransfer(cfg)
 	for name, path := range certs {
-		if err := ioutil.WriteFile(path, certData, 0644); err != nil {
+		if err := os.WriteFile(path, certData, 0644); err != nil {
 			t.Fatalf(dedent.Dedent("failed to write cert: %s\nfatal error: %v"), name, err)
 		}
 	}
@@ -191,7 +190,7 @@ func TestUploadCerts(t *testing.T) {
 		if err != nil {
 			t.Fatalf("error decrypting secret data: %v", err)
 		}
-		diskCertData, err := ioutil.ReadFile(certPath)
+		diskCertData, err := os.ReadFile(certPath)
 		if err != nil {
 			t.Fatalf("error reading certificate from disk: %v", err)
 		}
@@ -235,7 +234,7 @@ func TestDownloadCerts(t *testing.T) {
 	const certFileMode = 0644
 
 	for certName, certPath := range certsToTransfer(initForDownloadConfiguration) {
-		diskCertData, err := ioutil.ReadFile(certPath)
+		diskCertData, err := os.ReadFile(certPath)
 		if err != nil {
 			t.Errorf("error reading certificate from disk: %v", err)
 		}

@@ -24,6 +24,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"k8s.io/apiserver/pkg/endpoints/request"
+	clocktesting "k8s.io/utils/clock/testing"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	webhooktesting "k8s.io/apiserver/pkg/admission/plugin/webhook/testing"
@@ -211,5 +213,71 @@ func TestValidateCachedClient(t *testing.T) {
 		if !tt.ExpectCacheMiss && *cacheMisses > 0 {
 			t.Errorf("%s: expected client to be cached, but got %d AuthenticationInfoResolver calls", tt.Name, *cacheMisses)
 		}
+	}
+}
+
+// TestValidateWebhookDuration tests that ValidatingWebhook#Validate sets webhook duration in context correctly
+func TestValidateWebhookDuration(ts *testing.T) {
+	clk := clocktesting.FakeClock{}
+	testServer := webhooktesting.NewTestServerWithHandler(ts, webhooktesting.ClockSteppingWebhookHandler(ts, &clk))
+	testServer.StartTLS()
+	defer testServer.Close()
+	serverURL, err := url.ParseRequestURI(testServer.URL)
+	if err != nil {
+		ts.Fatalf("this should never happen? %v", err)
+	}
+
+	objectInterfaces := webhooktesting.NewObjectInterfacesForTest()
+
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	for _, test := range webhooktesting.NewValidationDurationTestCases(serverURL) {
+		ts.Run(test.Name, func(t *testing.T) {
+			ctx := context.TODO()
+			if test.InitContext {
+				ctx = request.WithLatencyTrackersAndCustomClock(ctx, &clk)
+			}
+			wh, err := NewValidatingAdmissionWebhook(nil)
+			if err != nil {
+				t.Errorf("failed to create mutating webhook: %v", err)
+				return
+			}
+
+			ns := "webhook-test"
+			client, informer := webhooktesting.NewFakeValidatingDataSource(ns, test.Webhooks, stopCh)
+
+			wh.SetAuthenticationInfoResolverWrapper(webhooktesting.Wrapper(webhooktesting.NewAuthenticationInfoResolver(new(int32))))
+			wh.SetServiceResolver(webhooktesting.NewServiceResolver(*serverURL))
+			wh.SetExternalKubeClientSet(client)
+			wh.SetExternalKubeInformerFactory(informer)
+
+			informer.Start(stopCh)
+			informer.WaitForCacheSync(stopCh)
+
+			if err = wh.ValidateInitialization(); err != nil {
+				t.Errorf("failed to validate initialization: %v", err)
+				return
+			}
+
+			_ = wh.Validate(ctx, webhooktesting.NewAttribute(ns, nil, test.IsDryRun), objectInterfaces)
+			wd, ok := request.LatencyTrackersFrom(ctx)
+			if !ok {
+				if test.InitContext {
+					t.Errorf("expected webhook duration to be initialized")
+				}
+				return
+			}
+			if !test.InitContext {
+				t.Errorf("expected webhook duration to not be initialized")
+				return
+			}
+			if wd.MutatingWebhookTracker.GetLatency() != 0 {
+				t.Errorf("expected admit duration to be equal to 0 got %q", wd.MutatingWebhookTracker.GetLatency())
+			}
+			if wd.ValidatingWebhookTracker.GetLatency() < test.ExpectedDurationMax {
+				t.Errorf("expected validate duraion to be greater or equal to %q got %q", test.ExpectedDurationMax, wd.ValidatingWebhookTracker.GetLatency())
+			}
+		})
 	}
 }

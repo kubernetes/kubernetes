@@ -86,7 +86,7 @@ func TestGetAccessModes(t *testing.T) {
 func TestRecycler(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
 	pluginHost := volumetest.NewFakeKubeletVolumeHost(t, "/tmp/fake", nil, nil)
-	plugMgr.InitPlugins([]volume.VolumePlugin{&hostPathPlugin{nil, volume.VolumeConfig{}}}, nil, pluginHost)
+	plugMgr.InitPlugins([]volume.VolumePlugin{&hostPathPlugin{nil, volume.VolumeConfig{}, false}}, nil, pluginHost)
 
 	spec := &volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{PersistentVolumeSource: v1.PersistentVolumeSource{HostPath: &v1.HostPathVolumeSource{Path: "/foo"}}}}}
 	_, err := plugMgr.FindRecyclablePluginBySpec(spec)

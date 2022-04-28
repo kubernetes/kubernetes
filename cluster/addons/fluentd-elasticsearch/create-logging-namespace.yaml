@@ -1,8 +1,0 @@
-kind: Namespace
-apiVersion: v1
-metadata:
- name: logging
- labels:
-   k8s-app: logging
-   kubernetes.io/cluster-service: "true"
-   addonmanager.kubernetes.io/mode: Reconcile

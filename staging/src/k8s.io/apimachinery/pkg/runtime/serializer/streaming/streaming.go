@@ -90,7 +90,6 @@ func (d *decoder) Decode(defaults *schema.GroupVersionKind, into runtime.Object)
 			}
 			// must read the rest of the frame (until we stop getting ErrShortBuffer)
 			d.resetRead = true
-			base = 0
 			return nil, nil, ErrObjectTooLarge
 		}
 		if err != nil {
@@ -134,4 +133,24 @@ func (e *encoder) Encode(obj runtime.Object) error {
 	_, err := e.writer.Write(e.buf.Bytes())
 	e.buf.Reset()
 	return err
+}
+
+type encoderWithAllocator struct {
+	writer       io.Writer
+	encoder      runtime.EncoderWithAllocator
+	memAllocator runtime.MemoryAllocator
+}
+
+// NewEncoderWithAllocator returns a new streaming encoder
+func NewEncoderWithAllocator(w io.Writer, e runtime.EncoderWithAllocator, a runtime.MemoryAllocator) Encoder {
+	return &encoderWithAllocator{
+		writer:       w,
+		encoder:      e,
+		memAllocator: a,
+	}
+}
+
+// Encode writes the provided object to the nested writer
+func (e *encoderWithAllocator) Encode(obj runtime.Object) error {
+	return e.encoder.EncodeWithAllocator(obj, e.writer, e.memAllocator)
 }

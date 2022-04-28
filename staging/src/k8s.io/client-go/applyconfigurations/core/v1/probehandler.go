@@ -24,6 +24,7 @@ type ProbeHandlerApplyConfiguration struct {
 	Exec      *ExecActionApplyConfiguration      `json:"exec,omitempty"`
 	HTTPGet   *HTTPGetActionApplyConfiguration   `json:"httpGet,omitempty"`
 	TCPSocket *TCPSocketActionApplyConfiguration `json:"tcpSocket,omitempty"`
+	GRPC      *GRPCActionApplyConfiguration      `json:"grpc,omitempty"`
 }
 
 // ProbeHandlerApplyConfiguration constructs an declarative configuration of the ProbeHandler type for use with
@@ -53,5 +54,13 @@ func (b *ProbeHandlerApplyConfiguration) WithHTTPGet(value *HTTPGetActionApplyCo
 // If called multiple times, the TCPSocket field is set to the value of the last call.
 func (b *ProbeHandlerApplyConfiguration) WithTCPSocket(value *TCPSocketActionApplyConfiguration) *ProbeHandlerApplyConfiguration {
 	b.TCPSocket = value
+	return b
+}
+
+// WithGRPC sets the GRPC field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the GRPC field is set to the value of the last call.
+func (b *ProbeHandlerApplyConfiguration) WithGRPC(value *GRPCActionApplyConfiguration) *ProbeHandlerApplyConfiguration {
+	b.GRPC = value
 	return b
 }

@@ -179,6 +179,6 @@ func populateInstanceMap(cfg *ConfigFile) (map[string]*VSphere, error) {
 		vsphereInstances[vcServer] = &vsphereIns
 	}
 
-	framework.Logf("ConfigFile %v \n vSphere instances %v", cfg, vsphereInstances)
+	framework.Logf("vSphere instances: %v", vsphereInstances)
 	return vsphereInstances, nil
 }

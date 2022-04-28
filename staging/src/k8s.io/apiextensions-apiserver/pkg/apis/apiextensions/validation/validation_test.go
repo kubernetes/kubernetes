@@ -17,10 +17,14 @@ limitations under the License.
 package validation
 
 import (
+	"context"
+	"math"
 	"math/rand"
 	"reflect"
 	"strings"
 	"testing"
+
+	"k8s.io/utils/pointer"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsfuzzer "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/fuzzer"
@@ -31,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/utils/pointer"
 )
 
 type validationMatch struct {
@@ -45,6 +48,9 @@ func required(path ...string) validationMatch {
 }
 func invalid(path ...string) validationMatch {
 	return validationMatch{path: field.NewPath(path[0], path[1:]...), errorType: field.ErrorTypeInvalid}
+}
+func invalidtypecode(path ...string) validationMatch {
+	return validationMatch{path: field.NewPath(path[0], path[1:]...), errorType: field.ErrorTypeTypeInvalid}
 }
 func invalidIndex(index int, path ...string) validationMatch {
 	return validationMatch{path: field.NewPath(path[0], path[1:]...).Index(index), errorType: field.ErrorTypeInvalid}
@@ -1768,6 +1774,51 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 			},
 		},
 		{
+			name: "x-kubernetes-validations access metadata name",
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:    "group.com",
+					Versions: singleVersionList,
+					Subresources: &apiextensions.CustomResourceSubresources{
+						Status: &apiextensions.CustomResourceSubresourceStatus{},
+					},
+					Scope: apiextensions.NamespaceScoped,
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					PreserveUnknownFields: pointer.BoolPtr(false),
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type:                   "object",
+							XPreserveUnknownFields: pointer.BoolPtr(true),
+							XValidations: apiextensions.ValidationRules{
+								{
+									Rule: "size(self.metadata.name) > 3",
+								},
+							},
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"metadata": {
+									Type: "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"name": {
+											Type: "string",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+		},
+		{
 			name: "defaults with enabled feature gate, unstructural schema",
 			resource: &apiextensions.CustomResourceDefinition{
 				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
@@ -2055,7 +2106,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 			},
 			errors: []validationMatch{
 				invalid("spec", "validation", "openAPIV3Schema", "properties[a]", "default"),
-				invalid("spec", "validation", "openAPIV3Schema", "properties[c]", "default", "foo"),
+				invalidtypecode("spec", "validation", "openAPIV3Schema", "properties[c]", "default", "foo"),
 				invalid("spec", "validation", "openAPIV3Schema", "properties[d]", "default", "bad"),
 				// we also expected unpruned and valid defaults under x-kubernetes-preserve-unknown-fields. We could be more
 				// strict here, but want to encourage proper specifications by forbidding other defaults.
@@ -3939,6 +3990,78 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 				invalid("spec", "validation", "openAPIV3Schema", "properties[nested]", "properties[invalid]", "properties[metadata]", "type"),
 			},
 		},
+		{
+			name: "x-kubernetes-validations should be forbidden under oneOf/anyOf/allOf/not, structural schema",
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:    "group.com",
+					Version:  "version",
+					Versions: singleVersionList,
+					Scope:    apiextensions.NamespaceScoped,
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"a": {
+									Type: "number",
+									Not: &apiextensions.JSONSchemaProps{
+										XValidations: apiextensions.ValidationRules{
+											{
+												Rule: "should be forbidden",
+											},
+										},
+									},
+									AnyOf: []apiextensions.JSONSchemaProps{
+										{
+											XValidations: apiextensions.ValidationRules{
+												{
+													Rule: "should be forbidden",
+												},
+											},
+										},
+									},
+									AllOf: []apiextensions.JSONSchemaProps{
+										{
+											XValidations: apiextensions.ValidationRules{
+												{
+													Rule: "should be forbidden",
+												},
+											},
+										},
+									},
+									OneOf: []apiextensions.JSONSchemaProps{
+										{
+											XValidations: apiextensions.ValidationRules{
+												{
+													Rule: "should be forbidden",
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					PreserveUnknownFields: pointer.BoolPtr(false),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			errors: []validationMatch{
+				forbidden("spec", "validation", "openAPIV3Schema", "properties[a]", "not", "x-kubernetes-validations"),
+				forbidden("spec", "validation", "openAPIV3Schema", "properties[a]", "allOf[0]", "x-kubernetes-validations"),
+				forbidden("spec", "validation", "openAPIV3Schema", "properties[a]", "anyOf[0]", "x-kubernetes-validations"),
+				forbidden("spec", "validation", "openAPIV3Schema", "properties[a]", "oneOf[0]", "x-kubernetes-validations"),
+			},
+		},
 	}
 
 	for _, tc := range tests {
@@ -3948,7 +4071,8 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 			if tc.resource.Spec.Conversion != nil && tc.resource.Spec.Conversion.Strategy == apiextensions.WebhookConverter && len(tc.resource.Spec.Conversion.ConversionReviewVersions) == 0 {
 				tc.resource.Spec.Conversion.ConversionReviewVersions = []string{"v1beta1"}
 			}
-			errs := ValidateCustomResourceDefinition(tc.resource)
+			ctx := context.TODO()
+			errs := ValidateCustomResourceDefinition(ctx, tc.resource)
 			seenErrs := make([]bool, len(errs))
 
 			for _, expectedError := range tc.errors {
@@ -6075,7 +6199,8 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			errs := ValidateCustomResourceDefinitionUpdate(tc.resource, tc.old)
+			ctx := context.TODO()
+			errs := ValidateCustomResourceDefinitionUpdate(ctx, tc.resource, tc.old)
 			seenErrs := make([]bool, len(errs))
 
 			for _, expectedError := range tc.errors {
@@ -6104,22 +6229,20 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 
 func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 	tests := []struct {
-		name          string
-		input         apiextensions.CustomResourceValidation
-		statusEnabled bool
-		opts          validationOptions
-		wantError     bool
+		name           string
+		input          apiextensions.CustomResourceValidation
+		statusEnabled  bool
+		opts           validationOptions
+		expectedErrors []validationMatch
 	}{
 		{
-			name:      "empty",
-			input:     apiextensions.CustomResourceValidation{},
-			wantError: false,
+			name:  "empty",
+			input: apiextensions.CustomResourceValidation{},
 		},
 		{
 			name:          "empty with status",
 			input:         apiextensions.CustomResourceValidation{},
 			statusEnabled: true,
-			wantError:     false,
 		},
 		{
 			name: "root type without status",
@@ -6129,7 +6252,6 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 				},
 			},
 			statusEnabled: false,
-			wantError:     false,
 		},
 		{
 			name: "root type having invalid value, with status",
@@ -6139,7 +6261,9 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 				},
 			},
 			statusEnabled: true,
-			wantError:     true,
+			expectedErrors: []validationMatch{
+				invalid("spec.validation.openAPIV3Schema.type"),
+			},
 		},
 		{
 			name: "non-allowed root field with status",
@@ -6156,7 +6280,9 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 				},
 			},
 			statusEnabled: true,
-			wantError:     true,
+			expectedErrors: []validationMatch{
+				invalid("spec.validation.openAPIV3Schema"),
+			},
 		},
 		{
 			name: "all allowed fields at the root of the schema with status",
@@ -6164,7 +6290,6 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 				OpenAPIV3Schema: validValidationSchema,
 			},
 			statusEnabled: true,
-			wantError:     false,
 		},
 		{
 			name: "null type",
@@ -6177,7 +6302,9 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					},
 				},
 			},
-			wantError: true,
+			expectedErrors: []validationMatch{
+				forbidden("spec.validation.openAPIV3Schema.properties[null].type"),
+			},
 		},
 		{
 			name: "nullable at the root",
@@ -6187,7 +6314,9 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					Nullable: true,
 				},
 			},
-			wantError: true,
+			expectedErrors: []validationMatch{
+				forbidden("spec.validation.openAPIV3Schema.nullable"),
+			},
 		},
 		{
 			name: "nullable without type",
@@ -6200,7 +6329,6 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					},
 				},
 			},
-			wantError: false,
 		},
 		{
 			name: "nullable with types",
@@ -6226,15 +6354,16 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					},
 				},
 			},
-			wantError: false,
 		},
 		{
 			name: "must be structural, but isn't",
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{},
 			},
-			opts:      validationOptions{requireStructuralSchema: true},
-			wantError: true,
+			opts: validationOptions{requireStructuralSchema: true},
+			expectedErrors: []validationMatch{
+				required("spec.validation.openAPIV3Schema.type"),
+			},
 		},
 		{
 			name: "must be structural",
@@ -6243,8 +6372,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					Type: "object",
 				},
 			},
-			opts:      validationOptions{requireStructuralSchema: true},
-			wantError: false,
+			opts: validationOptions{requireStructuralSchema: true},
 		},
 		{
 			name: "require valid types, valid",
@@ -6253,8 +6381,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					Type: "object",
 				},
 			},
-			opts:      validationOptions{requireValidPropertyType: true, requireStructuralSchema: true},
-			wantError: false,
+			opts: validationOptions{requireValidPropertyType: true, requireStructuralSchema: true},
 		},
 		{
 			name: "require valid types, invalid",
@@ -6263,8 +6390,15 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					Type: "null",
 				},
 			},
-			opts:      validationOptions{requireValidPropertyType: true, requireStructuralSchema: true},
-			wantError: true,
+			opts: validationOptions{requireValidPropertyType: true, requireStructuralSchema: true},
+			expectedErrors: []validationMatch{
+				// Invalid value: "null": must be object at the root
+				unsupported("spec.validation.openAPIV3Schema.type"),
+				// Forbidden: type cannot be set to null, use nullable as an alternative
+				forbidden("spec.validation.openAPIV3Schema.type"),
+				// Unsupported value: "null": supported values: "array", "boolean", "integer", "number", "object", "string"
+				invalid("spec.validation.openAPIV3Schema.type"),
+			},
 		},
 		{
 			name: "require valid types, invalid",
@@ -6273,8 +6407,11 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					Type: "bogus",
 				},
 			},
-			opts:      validationOptions{requireValidPropertyType: true, requireStructuralSchema: true},
-			wantError: true,
+			opts: validationOptions{requireValidPropertyType: true, requireStructuralSchema: true},
+			expectedErrors: []validationMatch{
+				unsupported("spec.validation.openAPIV3Schema.type"),
+				invalid("spec.validation.openAPIV3Schema.type"),
+			},
 		},
 		{
 			name: "invalid type with list type extension set",
@@ -6284,7 +6421,9 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					XListType: strPtr("set"),
 				},
 			},
-			wantError: true,
+			expectedErrors: []validationMatch{
+				invalid("spec.validation.openAPIV3Schema.type"),
+			},
 		},
 		{
 			name: "unset type with list type extension set",
@@ -6293,7 +6432,9 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					XListType: strPtr("set"),
 				},
 			},
-			wantError: true,
+			expectedErrors: []validationMatch{
+				required("spec.validation.openAPIV3Schema.type"),
+			},
 		},
 		{
 			name: "invalid list type extension",
@@ -6303,7 +6444,9 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					XListType: strPtr("invalid"),
 				},
 			},
-			wantError: true,
+			expectedErrors: []validationMatch{
+				unsupported("spec.validation.openAPIV3Schema.x-kubernetes-list-type"),
+			},
 		},
 		{
 			name: "invalid list type extension with list map keys extension non-empty",
@@ -6314,7 +6457,9 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					XListMapKeys: []string{"key"},
 				},
 			},
-			wantError: true,
+			expectedErrors: []validationMatch{
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-list-type"),
+			},
 		},
 		{
 			name: "unset list type extension with list map keys extension non-empty",
@@ -6323,7 +6468,9 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					XListMapKeys: []string{"key"},
 				},
 			},
-			wantError: true,
+			expectedErrors: []validationMatch{
+				required("spec.validation.openAPIV3Schema.x-kubernetes-list-type"),
+			},
 		},
 		{
 			name: "empty list map keys extension with list type extension map",
@@ -6333,7 +6480,10 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					XListType: strPtr("map"),
 				},
 			},
-			wantError: true,
+			expectedErrors: []validationMatch{
+				required("spec.validation.openAPIV3Schema.x-kubernetes-list-map-keys"),
+				required("spec.validation.openAPIV3Schema.items"),
+			},
 		},
 		{
 			name: "no items schema with list type extension map",
@@ -6344,7 +6494,9 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					XListMapKeys: []string{"key"},
 				},
 			},
-			wantError: true,
+			expectedErrors: []validationMatch{
+				required("spec.validation.openAPIV3Schema.items"),
+			},
 		},
 		{
 			name: "multiple schema items with list type extension map",
@@ -6364,7 +6516,10 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					},
 				},
 			},
-			wantError: true,
+			expectedErrors: []validationMatch{
+				forbidden("spec.validation.openAPIV3Schema.items"),
+				invalid("spec.validation.openAPIV3Schema.items"),
+			},
 		},
 		{
 			name: "non object item with list type extension map",
@@ -6380,7 +6535,9 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					},
 				},
 			},
-			wantError: true,
+			expectedErrors: []validationMatch{
+				invalid("spec.validation.openAPIV3Schema.items.type"),
+			},
 		},
 		{
 			name: "items with key missing from properties with list type extension map",
@@ -6396,7 +6553,9 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					},
 				},
 			},
-			wantError: true,
+			expectedErrors: []validationMatch{
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-list-map-keys"),
+			},
 		},
 		{
 			name: "items with non scalar key property type with list type extension map",
@@ -6417,7 +6576,9 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					},
 				},
 			},
-			wantError: true,
+			expectedErrors: []validationMatch{
+				invalid("spec.validation.openAPIV3Schema.items.properties[key].type"),
+			},
 		},
 		{
 			name: "duplicate map keys with list type extension map",
@@ -6438,7 +6599,9 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					},
 				},
 			},
-			wantError: true,
+			expectedErrors: []validationMatch{
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-list-map-keys"),
+			},
 		},
 		{
 			name: "allowed schema with list type extension map",
@@ -6462,7 +6625,6 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					},
 				},
 			},
-			wantError: false,
 		},
 		{
 			name: "allowed list-type atomic",
@@ -6477,7 +6639,6 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					},
 				},
 			},
-			wantError: false,
 		},
 		{
 			name: "allowed list-type atomic with non-atomic items",
@@ -6493,7 +6654,6 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					},
 				},
 			},
-			wantError: false,
 		},
 		{
 			name: "allowed list-type set with scalar items",
@@ -6508,7 +6668,6 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					},
 				},
 			},
-			wantError: false,
 		},
 		{
 			name: "allowed list-type set with atomic map items",
@@ -6527,7 +6686,6 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					},
 				},
 			},
-			wantError: false,
 		},
 		{
 			name: "invalid list-type set with non-atomic map items",
@@ -6546,8 +6704,10 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					},
 				},
 			},
-			opts:      validationOptions{requireAtomicSetType: true},
-			wantError: true,
+			opts: validationOptions{requireAtomicSetType: true},
+			expectedErrors: []validationMatch{
+				invalid("spec.validation.openAPIV3Schema.items.x-kubernetes-map-type"),
+			},
 		},
 		{
 			name: "invalid list-type set with unspecified map-type for map items",
@@ -6565,8 +6725,10 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					},
 				},
 			},
-			opts:      validationOptions{requireAtomicSetType: true},
-			wantError: true,
+			opts: validationOptions{requireAtomicSetType: true},
+			expectedErrors: []validationMatch{
+				invalid("spec.validation.openAPIV3Schema.items.x-kubernetes-map-type"),
+			},
 		},
 		{
 			name: "allowed list-type set with atomic list items",
@@ -6587,7 +6749,6 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					},
 				},
 			},
-			wantError: false,
 		},
 		{
 			name: "allowed list-type set with unspecified list-type in list items",
@@ -6607,7 +6768,6 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					},
 				},
 			},
-			wantError: false,
 		},
 		{
 			name: "invalid list-type set with with non-atomic list items",
@@ -6628,8 +6788,10 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					},
 				},
 			},
-			opts:      validationOptions{requireAtomicSetType: true},
-			wantError: true,
+			opts: validationOptions{requireAtomicSetType: true},
+			expectedErrors: []validationMatch{
+				invalid("spec.validation.openAPIV3Schema.items.x-kubernetes-list-type"),
+			},
 		},
 		{
 			name: "invalid type with map type extension (granular)",
@@ -6639,7 +6801,9 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					XMapType: strPtr("granular"),
 				},
 			},
-			wantError: true,
+			expectedErrors: []validationMatch{
+				invalid("spec.validation.openAPIV3Schema.type"),
+			},
 		},
 		{
 			name: "unset type with map type extension (granular)",
@@ -6648,7 +6812,9 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					XMapType: strPtr("granular"),
 				},
 			},
-			wantError: true,
+			expectedErrors: []validationMatch{
+				required("spec.validation.openAPIV3Schema.type"),
+			},
 		},
 		{
 			name: "invalid type with map type extension (atomic)",
@@ -6658,7 +6824,9 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					XMapType: strPtr("atomic"),
 				},
 			},
-			wantError: true,
+			expectedErrors: []validationMatch{
+				invalid("spec.validation.openAPIV3Schema.type"),
+			},
 		},
 		{
 			name: "unset type with map type extension (atomic)",
@@ -6667,7 +6835,9 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					XMapType: strPtr("atomic"),
 				},
 			},
-			wantError: true,
+			expectedErrors: []validationMatch{
+				required("spec.validation.openAPIV3Schema.type"),
+			},
 		},
 		{
 			name: "invalid map type",
@@ -6677,7 +6847,9 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					XMapType: strPtr("badMapType"),
 				},
 			},
-			wantError: true,
+			expectedErrors: []validationMatch{
+				unsupported("spec.validation.openAPIV3Schema.x-kubernetes-map-type"),
+			},
 		},
 		{
 			name: "allowed type with map type extension (granular)",
@@ -6687,7 +6859,6 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					XMapType: strPtr("granular"),
 				},
 			},
-			wantError: false,
 		},
 		{
 			name: "allowed type with map type extension (atomic)",
@@ -6697,7 +6868,6 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					XMapType: strPtr("atomic"),
 				},
 			},
-			wantError: false,
 		},
 		{
 			name: "invalid map with non-required key and no default",
@@ -6721,7 +6891,9 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			opts: validationOptions{
 				requireMapListKeysMapSetValidation: true,
 			},
-			wantError: true,
+			expectedErrors: []validationMatch{
+				required("spec.validation.openAPIV3Schema.items.properties[key].default"),
+			},
 		},
 		{
 			name: "allowed map with required key and no default",
@@ -6746,7 +6918,6 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			opts: validationOptions{
 				requireMapListKeysMapSetValidation: true,
 			},
-			wantError: false,
 		},
 		{
 			name: "allowed map with non-required key and default",
@@ -6772,7 +6943,6 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 				allowDefaults:                      true,
 				requireMapListKeysMapSetValidation: true,
 			},
-			wantError: false,
 		},
 		{
 			name: "invalid map with nullable key",
@@ -6797,7 +6967,10 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			opts: validationOptions{
 				requireMapListKeysMapSetValidation: true,
 			},
-			wantError: true,
+			expectedErrors: []validationMatch{
+				required("spec.validation.openAPIV3Schema.items.properties[key].default"),
+				forbidden("spec.validation.openAPIV3Schema.items.properties[key].nullable"),
+			},
 		},
 		{
 			name: "invalid map with nullable items",
@@ -6822,7 +6995,10 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			opts: validationOptions{
 				requireMapListKeysMapSetValidation: true,
 			},
-			wantError: true,
+			expectedErrors: []validationMatch{
+				forbidden("spec.validation.openAPIV3Schema.items.nullable"),
+				required("spec.validation.openAPIV3Schema.items.properties[key].default"),
+			},
 		},
 		{
 			name: "valid map with some required, some defaulted, and non-key fields",
@@ -6857,7 +7033,9 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			opts: validationOptions{
 				requireMapListKeysMapSetValidation: true,
 			},
-			wantError: true,
+			expectedErrors: []validationMatch{
+				forbidden("spec.validation.openAPIV3Schema.items.properties[b].default"),
+			},
 		},
 		{
 			name: "invalid set with nullable items",
@@ -6875,7 +7053,9 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			opts: validationOptions{
 				requireMapListKeysMapSetValidation: true,
 			},
-			wantError: true,
+			expectedErrors: []validationMatch{
+				forbidden("spec.validation.openAPIV3Schema.items.nullable"),
+			},
 		},
 		{
 			name: "allowed set with non-nullable items",
@@ -6893,16 +7073,1111 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			opts: validationOptions{
 				requireMapListKeysMapSetValidation: true,
 			},
-			wantError: false,
+		},
+		{
+			name: "valid x-kubernetes-validations for scalar element",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"subRoot": {
+							Type: "string",
+							XValidations: apiextensions.ValidationRules{
+								{
+									Rule:    "self.startsWith('s')",
+									Message: "subRoot should start with 's'.",
+								},
+								{
+									Rule:    "self.endsWith('s')",
+									Message: "subRoot should end with 's'.",
+								},
+							},
+						},
+					},
+				},
+			},
+			opts: validationOptions{
+				requireStructuralSchema: true,
+			},
+		},
+		{
+			name: "valid x-kubernetes-validations for object",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					XValidations: apiextensions.ValidationRules{
+						{
+							Rule:    "self.minReplicas <= self.maxReplicas",
+							Message: "minReplicas should be no greater than maxReplicas",
+						},
+					},
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"minReplicas": {
+							Type: "integer",
+						},
+						"maxReplicas": {
+							Type: "integer",
+						},
+					},
+				},
+			},
+			opts: validationOptions{
+				requireStructuralSchema: true,
+			},
+		},
+		{
+			name: "invalid x-kubernetes-validations with empty rule",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					XValidations: apiextensions.ValidationRules{
+						{Message: "empty rule"},
+					},
+				},
+			},
+			expectedErrors: []validationMatch{
+				required("spec.validation.openAPIV3Schema.x-kubernetes-validations[0].rule"),
+			},
+			opts: validationOptions{
+				requireStructuralSchema: true,
+			},
+		},
+		{
+			name: "valid x-kubernetes-validations with empty validators",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type:         "object",
+					XValidations: apiextensions.ValidationRules{},
+				},
+			},
+			opts: validationOptions{
+				requireStructuralSchema: true,
+			},
+		},
+		{
+			name: "invalid rule in x-kubernetes-validations",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"subRoot": {
+							Type: "string",
+							XValidations: apiextensions.ValidationRules{
+								{
+									Rule:    "self == true",
+									Message: "subRoot should be true.",
+								},
+								{
+									Rule:    "self.endsWith('s')",
+									Message: "subRoot should end with 's'.",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: []validationMatch{
+				invalid("spec.validation.openAPIV3Schema.properties[subRoot].x-kubernetes-validations[0].rule"),
+			},
+			opts: validationOptions{
+				requireStructuralSchema: true,
+			},
+		},
+		{
+			name: "valid x-kubernetes-validations for nested object under multiple fields",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					XValidations: apiextensions.ValidationRules{
+						{
+							Rule:    "self.minReplicas <= self.maxReplicas",
+							Message: "minReplicas should be no greater than maxReplicas.",
+						},
+					},
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"minReplicas": {
+							Type: "integer",
+						},
+						"maxReplicas": {
+							Type: "integer",
+						},
+						"subRule": {
+							Type: "object",
+							XValidations: apiextensions.ValidationRules{
+								{
+									Rule:    "self.isTest == true",
+									Message: "isTest should be true.",
+								},
+							},
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"isTest": {
+									Type: "boolean",
+								},
+							},
+						},
+					},
+				},
+			},
+			opts: validationOptions{
+				requireStructuralSchema: true,
+			},
+		},
+		{
+			name: "valid x-kubernetes-validations for object of array",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					XValidations: apiextensions.ValidationRules{
+						{
+							Rule:    "size(self.nestedObj[0]) == 10",
+							Message: "size of first element in nestedObj should be equal to 10",
+						},
+					},
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"nestedObj": {
+							Type: "array",
+							Items: &apiextensions.JSONSchemaPropsOrArray{
+								Schema: &apiextensions.JSONSchemaProps{
+									Type: "array",
+									Items: &apiextensions.JSONSchemaPropsOrArray{
+										Schema: &apiextensions.JSONSchemaProps{
+											Type: "string",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			opts: validationOptions{
+				requireStructuralSchema: true,
+			},
+		},
+		{
+			name: "valid x-kubernetes-validations for array",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Items: &apiextensions.JSONSchemaPropsOrArray{
+						Schema: &apiextensions.JSONSchemaProps{
+							Type: "array",
+							XValidations: apiextensions.ValidationRules{
+								{
+									Rule:    "size(self) > 0",
+									Message: "scoped field should contain more than 0 element.",
+								},
+							},
+							Items: &apiextensions.JSONSchemaPropsOrArray{
+								Schema: &apiextensions.JSONSchemaProps{
+									Type: "string",
+								},
+							},
+						},
+					},
+				},
+			},
+			opts: validationOptions{
+				requireStructuralSchema: true,
+			},
+		},
+		{
+			name: "valid x-kubernetes-validations for array of object",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Items: &apiextensions.JSONSchemaPropsOrArray{
+						Schema: &apiextensions.JSONSchemaProps{
+							Type: "array",
+							XValidations: apiextensions.ValidationRules{
+								{
+									Rule:    "self[0].nestedObj.val > 0",
+									Message: "val should be greater than 0.",
+								},
+							},
+							Items: &apiextensions.JSONSchemaPropsOrArray{
+								Schema: &apiextensions.JSONSchemaProps{
+									Type: "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"nestedObj": {
+											Type: "object",
+											Properties: map[string]apiextensions.JSONSchemaProps{
+												"val": {
+													Type: "integer",
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			opts: validationOptions{
+				requireStructuralSchema: true,
+			},
+		},
+		{
+			name: "valid x-kubernetes-validations for escaping",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					XValidations: apiextensions.ValidationRules{
+						{
+							Rule: "self.__if__ > 0",
+						},
+						{
+							Rule: "self.__namespace__ > 0",
+						},
+						{
+							Rule: "self.self > 0",
+						},
+						{
+							Rule: "self.int > 0",
+						},
+					},
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"if": {
+							Type: "integer",
+						},
+						"namespace": {
+							Type: "integer",
+						},
+						"self": {
+							Type: "integer",
+						},
+						"int": {
+							Type: "integer",
+						},
+					},
+				},
+			},
+			opts: validationOptions{
+				requireStructuralSchema: true,
+			},
+		},
+		{
+			name: "invalid x-kubernetes-validations for escaping",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					XValidations: apiextensions.ValidationRules{
+						{
+							Rule: "self.if > 0",
+						},
+						{
+							Rule: "self.namespace > 0",
+						},
+						{
+							Rule: "self.unknownProp > 0",
+						},
+					},
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"if": {
+							Type: "integer",
+						},
+						"namespace": {
+							Type: "integer",
+						},
+					},
+				},
+			},
+			expectedErrors: []validationMatch{
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[0].rule"),
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[1].rule"),
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[2].rule"),
+			},
+			opts: validationOptions{
+				requireStructuralSchema: true,
+			},
+		},
+		{
+			name: "valid default with x-kubernetes-validations",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"embedded": {
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"metadata": {
+									Type:              "object",
+									XEmbeddedResource: true,
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"name": {
+											Type: "string",
+											XValidations: apiextensions.ValidationRules{
+												{
+													Rule: "self == 'singleton'",
+												},
+											},
+											Default: jsonPtr("singleton"),
+										},
+									},
+								},
+							},
+						},
+						"value": {
+							Type: "string",
+							XValidations: apiextensions.ValidationRules{
+								{
+									Rule: "self.startsWith('kube')",
+								},
+							},
+							Default: jsonPtr("kube-everything"),
+						},
+						"object": {
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"field1": {
+									Type: "integer",
+								},
+								"field2": {
+									Type: "integer",
+								},
+							},
+							XValidations: apiextensions.ValidationRules{
+								{
+									Rule: "self.field1 < self.field2",
+								},
+							},
+							Default: jsonPtr(map[string]interface{}{"field1": 1, "field2": 2}),
+						},
+					},
+				},
+			},
+			opts: validationOptions{
+				requireStructuralSchema: true,
+				allowDefaults:           true,
+			},
+		},
+		{
+			name: "invalid default with x-kubernetes-validations",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"embedded": {
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"metadata": {
+									Type:              "object",
+									XEmbeddedResource: true,
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"name": {
+											Type: "string",
+											XValidations: apiextensions.ValidationRules{
+												{
+													Rule: "self == 'singleton'",
+												},
+											},
+											Default: jsonPtr("nope"),
+										},
+									},
+								},
+							},
+						},
+						"value": {
+							Type: "string",
+							XValidations: apiextensions.ValidationRules{
+								{
+									Rule: "self.startsWith('kube')",
+								},
+							},
+							Default: jsonPtr("nope"),
+						},
+						"object": {
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"field1": {
+									Type: "integer",
+								},
+								"field2": {
+									Type: "integer",
+								},
+							},
+							XValidations: apiextensions.ValidationRules{
+								{
+									Rule: "self.field1 < self.field2",
+								},
+							},
+							Default: jsonPtr(map[string]interface{}{"field1": 2, "field2": 1}),
+						},
+					},
+				},
+			},
+			expectedErrors: []validationMatch{
+				invalid("spec.validation.openAPIV3Schema.properties[embedded].properties[metadata].properties[name].default"),
+				invalid("spec.validation.openAPIV3Schema.properties[value].default"),
+				invalid("spec.validation.openAPIV3Schema.properties[object].default"),
+			},
+			opts: validationOptions{
+				requireStructuralSchema: true,
+				allowDefaults:           true,
+			},
+		},
+		{
+			name: "rule is empty or not specified",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"value": {
+							Type: "integer",
+							XValidations: apiextensions.ValidationRules{
+								{
+									Message: "something",
+								},
+								{
+									Rule:    "   ",
+									Message: "something",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: []validationMatch{
+				required("spec.validation.openAPIV3Schema.properties[value].x-kubernetes-validations[0].rule"),
+				required("spec.validation.openAPIV3Schema.properties[value].x-kubernetes-validations[1].rule"),
+			},
+		},
+		{
+			name: "multiline rule with message",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"value": {
+							Type: "integer",
+							XValidations: apiextensions.ValidationRules{
+								{
+									Rule:    "self >= 0 &&\nself <= 100",
+									Message: "value must be between 0 and 100 (inclusive)",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "invalid and required messages",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"value": {
+							Type: "integer",
+							XValidations: apiextensions.ValidationRules{
+								{
+									Rule: "self >= 0 &&\nself <= 100",
+								},
+								{
+									Rule:    "self == 50",
+									Message: "value requirements:\nmust be >= 0\nmust be <= 100 ",
+								},
+								{
+									Rule:    "self == 50",
+									Message: " ",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: []validationMatch{
+				// message must be specified if rule contains line breaks
+				required("spec.validation.openAPIV3Schema.properties[value].x-kubernetes-validations[0].message"),
+				// message must not contain line breaks
+				invalid("spec.validation.openAPIV3Schema.properties[value].x-kubernetes-validations[1].message"),
+				// message must be non-empty if specified
+				invalid("spec.validation.openAPIV3Schema.properties[value].x-kubernetes-validations[2].message"),
+			},
+		},
+		{
+			name: "forbid transition rule on element of list of type atomic",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"value": {
+							Type:      "array",
+							XListType: strPtr("atomic"),
+							Items: &apiextensions.JSONSchemaPropsOrArray{
+								Schema: &apiextensions.JSONSchemaProps{
+									Type:      "string",
+									MaxLength: int64ptr(10),
+									XValidations: apiextensions.ValidationRules{
+										{Rule: "self == oldSelf"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: []validationMatch{
+				invalid("spec.validation.openAPIV3Schema.properties[value].items.x-kubernetes-validations[0].rule"),
+			},
+		},
+		{
+			name: "forbid transition rule on element of list defaulting to type atomic",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"value": {
+							Type: "array",
+							Items: &apiextensions.JSONSchemaPropsOrArray{
+								Schema: &apiextensions.JSONSchemaProps{
+									Type:      "string",
+									MaxLength: int64ptr(10),
+									XValidations: apiextensions.ValidationRules{
+										{Rule: "self == oldSelf"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: []validationMatch{
+				invalid("spec.validation.openAPIV3Schema.properties[value].items.x-kubernetes-validations[0].rule"),
+			},
+		},
+		{
+			name: "allow transition rule on list of type atomic",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"value": {
+							Type:      "array",
+							MaxItems:  int64ptr(10),
+							XListType: strPtr("atomic"),
+							Items: &apiextensions.JSONSchemaPropsOrArray{
+								Schema: &apiextensions.JSONSchemaProps{
+									Type: "string",
+								},
+							},
+							XValidations: apiextensions.ValidationRules{
+								{Rule: "self == oldSelf"},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "allow transition rule on list defaulting to type atomic",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"value": {
+							Type:     "array",
+							MaxItems: int64ptr(10),
+							Items: &apiextensions.JSONSchemaPropsOrArray{
+								Schema: &apiextensions.JSONSchemaProps{
+									Type:      "string",
+									MaxLength: int64ptr(10),
+								},
+							},
+							XValidations: apiextensions.ValidationRules{
+								{Rule: "self == oldSelf"},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "forbid transition rule on element of list of type set",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"value": {
+							Type:      "array",
+							MaxItems:  int64ptr(10),
+							XListType: strPtr("set"),
+							Items: &apiextensions.JSONSchemaPropsOrArray{
+								Schema: &apiextensions.JSONSchemaProps{
+									Type:      "string",
+									MaxLength: int64ptr(10),
+									XValidations: apiextensions.ValidationRules{
+										{Rule: "self == oldSelf"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: []validationMatch{
+				invalid("spec.validation.openAPIV3Schema.properties[value].items.x-kubernetes-validations[0].rule"),
+			},
+		},
+		{
+			name: "allow transition rule on list of type set",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"value": {
+							Type:      "array",
+							MaxItems:  int64ptr(10),
+							XListType: strPtr("set"),
+							Items: &apiextensions.JSONSchemaPropsOrArray{
+								Schema: &apiextensions.JSONSchemaProps{
+									Type:      "string",
+									MaxLength: int64ptr(10),
+								},
+							},
+							XValidations: apiextensions.ValidationRules{
+								{Rule: "self == oldSelf"},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "allow transition rule on element of list of type map",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"value": {
+							Type:         "array",
+							XListType:    strPtr("map"),
+							XListMapKeys: []string{"name"},
+							Items: &apiextensions.JSONSchemaPropsOrArray{
+								Schema: &apiextensions.JSONSchemaProps{
+									Type: "object",
+									XValidations: apiextensions.ValidationRules{
+										{Rule: "self == oldSelf"},
+									},
+									Required: []string{"name"},
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"name": {Type: "string", MaxLength: int64ptr(5)},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "allow transition rule on list of type map",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"value": {
+							Type:         "array",
+							MaxItems:     int64ptr(10),
+							XListType:    strPtr("map"),
+							XListMapKeys: []string{"name"},
+							Items: &apiextensions.JSONSchemaPropsOrArray{
+								Schema: &apiextensions.JSONSchemaProps{
+									Type:     "object",
+									Required: []string{"name"},
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"name": {Type: "string", MaxLength: int64ptr(5)},
+									},
+								},
+							},
+							XValidations: apiextensions.ValidationRules{
+								{Rule: "self == oldSelf"},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "allow transition rule on element of map of type granular",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"value": {
+							Type:     "object",
+							XMapType: strPtr("granular"),
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"subfield": {
+									Type:      "string",
+									MaxLength: int64ptr(10),
+									XValidations: apiextensions.ValidationRules{
+										{Rule: "self == oldSelf"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "forbid transition rule on element of map of unrecognized type",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"value": {
+							Type:     "object",
+							XMapType: strPtr("future"),
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"subfield": {
+									Type:      "string",
+									MaxLength: int64ptr(10),
+									XValidations: apiextensions.ValidationRules{
+										{Rule: "self == oldSelf"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: []validationMatch{
+				invalid("spec.validation.openAPIV3Schema.properties[value].properties[subfield].x-kubernetes-validations[0].rule"),
+				unsupported("spec.validation.openAPIV3Schema.properties[value].x-kubernetes-map-type"),
+			},
+		},
+		{
+			name: "allow transition rule on element of map defaulting to type granular",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"value": {
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"subfield": {
+									Type:      "string",
+									MaxLength: int64ptr(10),
+									XValidations: apiextensions.ValidationRules{
+										{Rule: "self == oldSelf"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "allow transition rule on map of type granular",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"value": {
+							Type:     "object",
+							XMapType: strPtr("granular"),
+							XValidations: apiextensions.ValidationRules{
+								{Rule: "self == oldSelf"},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "allow transition rule on map defaulting to type granular",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"value": {
+							Type: "object",
+							XValidations: apiextensions.ValidationRules{
+								{Rule: "self == oldSelf"},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "allow transition rule on element of map of type atomic",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"value": {
+							Type:     "object",
+							XMapType: strPtr("atomic"),
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"subfield": {
+									Type: "object",
+									XValidations: apiextensions.ValidationRules{
+										{Rule: "self == oldSelf"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "allow transition rule on map of type atomic",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"value": {
+							Type:     "object",
+							XMapType: strPtr("atomic"),
+							XValidations: apiextensions.ValidationRules{
+								{Rule: "self == oldSelf"},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "forbid double-nested rule with no limit set",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"value": {
+							Type: "array",
+							Items: &apiextensions.JSONSchemaPropsOrArray{
+								Schema: &apiextensions.JSONSchemaProps{
+									Type: "object",
+									AdditionalProperties: &apiextensions.JSONSchemaPropsOrBool{
+										Schema: &apiextensions.JSONSchemaProps{
+											Type:     "object",
+											Required: []string{"key"},
+											Properties: map[string]apiextensions.JSONSchemaProps{
+												"key": {Type: "string"},
+											},
+										},
+									},
+								},
+							},
+							XValidations: apiextensions.ValidationRules{
+								{Rule: "self.all(x, x.all(y, x[y].key == x[y].key))"},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: []validationMatch{
+				// exceeds per-rule limit and contributes to total limit being exceeded (1 error for each)
+				forbidden("spec.validation.openAPIV3Schema.properties[value].x-kubernetes-validations[0].rule"),
+				forbidden("spec.validation.openAPIV3Schema.properties[value].x-kubernetes-validations[0].rule"),
+				// total limit is exceeded
+				forbidden("spec.validation.openAPIV3Schema"),
+			},
+		},
+		{
+			name: "forbid double-nested rule with one limit set",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"value": {
+							Type: "array",
+							Items: &apiextensions.JSONSchemaPropsOrArray{
+								Schema: &apiextensions.JSONSchemaProps{
+									Type: "object",
+									AdditionalProperties: &apiextensions.JSONSchemaPropsOrBool{
+										Schema: &apiextensions.JSONSchemaProps{
+											Type:     "object",
+											Required: []string{"key"},
+											Properties: map[string]apiextensions.JSONSchemaProps{
+												"key": {Type: "string", MaxLength: int64ptr(10)},
+											},
+										},
+									},
+								},
+							},
+							XValidations: apiextensions.ValidationRules{
+								{Rule: "self.all(x, x.all(y, x[y].key == x[y].key))"},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: []validationMatch{
+				// exceeds per-rule limit and contributes to total limit being exceeded (1 error for each)
+				forbidden("spec.validation.openAPIV3Schema.properties[value].x-kubernetes-validations[0].rule"),
+				forbidden("spec.validation.openAPIV3Schema.properties[value].x-kubernetes-validations[0].rule"),
+				// total limit is exceeded
+				forbidden("spec.validation.openAPIV3Schema"),
+			},
+		},
+		{
+			name: "allow double-nested rule with three limits set",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"value": {
+							Type:     "array",
+							MaxItems: int64ptr(10),
+							Items: &apiextensions.JSONSchemaPropsOrArray{
+								Schema: &apiextensions.JSONSchemaProps{
+									Type:          "object",
+									MaxProperties: int64ptr(10),
+									AdditionalProperties: &apiextensions.JSONSchemaPropsOrBool{
+										Schema: &apiextensions.JSONSchemaProps{
+											Type:     "object",
+											Required: []string{"key"},
+											Properties: map[string]apiextensions.JSONSchemaProps{
+												"key": {Type: "string", MaxLength: int64ptr(10)},
+											},
+										},
+									},
+								},
+							},
+							XValidations: apiextensions.ValidationRules{
+								{Rule: "self.all(x, x.all(y, x[y].key == x[y].key))"},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: []validationMatch{},
+		},
+		{
+			name: "allow double-nested rule with one limit set on outermost array",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"value": {
+							Type:     "array",
+							MaxItems: int64ptr(4),
+							Items: &apiextensions.JSONSchemaPropsOrArray{
+								Schema: &apiextensions.JSONSchemaProps{
+									Type: "object",
+									AdditionalProperties: &apiextensions.JSONSchemaPropsOrBool{
+										Schema: &apiextensions.JSONSchemaProps{
+											Type:     "object",
+											Required: []string{"key"},
+											Properties: map[string]apiextensions.JSONSchemaProps{
+												"key": {Type: "number"},
+											},
+										},
+									},
+								},
+							},
+							XValidations: apiextensions.ValidationRules{
+								{Rule: "self.all(x, x.all(y, x[y].key == x[y].key))"},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: []validationMatch{},
+		},
+		{
+			name: "check for cardinality of 1 under root object",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"value": {
+							Type: "integer",
+							XValidations: apiextensions.ValidationRules{
+								{Rule: "self < 1024"},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: []validationMatch{},
+		},
+		{
+			name: "forbid validation rules where cost total exceeds total limit",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"list": {
+							Type:     "array",
+							MaxItems: int64Ptr(100000),
+							Items: &apiextensions.JSONSchemaPropsOrArray{
+								Schema: &apiextensions.JSONSchemaProps{
+									Type:      "string",
+									MaxLength: int64Ptr(5000),
+									XValidations: apiextensions.ValidationRules{
+										{Rule: "self.contains('keyword')"},
+									},
+								},
+							},
+						},
+						"map": {
+							Type:          "object",
+							MaxProperties: int64Ptr(1000),
+							AdditionalProperties: &apiextensions.JSONSchemaPropsOrBool{
+								Allows: true,
+								Schema: &apiextensions.JSONSchemaProps{
+									Type:      "string",
+									MaxLength: int64Ptr(5000),
+									XValidations: apiextensions.ValidationRules{
+										{Rule: "self.contains('keyword')"},
+									},
+								},
+							},
+						},
+						"field": { // include a validation rule that does not contribute to total limit being exceeded (i.e. it is less than 1% of the limit)
+							Type: "integer",
+							XValidations: apiextensions.ValidationRules{
+								{Rule: "self > 50 && self < 100"},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: []validationMatch{
+				// exceeds per-rule limit and contributes to total limit being exceeded (1 error for each)
+				forbidden("spec.validation.openAPIV3Schema.properties[list].items.x-kubernetes-validations[0].rule"),
+				forbidden("spec.validation.openAPIV3Schema.properties[list].items.x-kubernetes-validations[0].rule"),
+				// contributes to total limit being exceeded, but does not exceed per-rule limit
+				forbidden("spec.validation.openAPIV3Schema.properties[map].additionalProperties.x-kubernetes-validations[0].rule"),
+				// total limit is exceeded
+				forbidden("spec.validation.openAPIV3Schema"),
+			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := validateCustomResourceDefinitionValidation(&tt.input, tt.statusEnabled, tt.opts, field.NewPath("spec", "validation"))
-			if !tt.wantError && len(got) > 0 {
-				t.Errorf("Expected no error, but got: %v", got)
-			} else if tt.wantError && len(got) == 0 {
-				t.Error("Expected error, but got none")
+			ctx := context.TODO()
+			got := validateCustomResourceDefinitionValidation(ctx, &tt.input, tt.statusEnabled, tt.opts, field.NewPath("spec", "validation"))
+
+			seenErrs := make([]bool, len(got))
+
+			for _, expectedError := range tt.expectedErrors {
+				found := false
+				for i, err := range got {
+					if expectedError.matches(err) && !seenErrs[i] {
+						found = true
+						seenErrs[i] = true
+						break
+					}
+				}
+
+				if !found {
+					t.Errorf("expected %v at %v, got %v", expectedError.errorType, expectedError.path.String(), got)
+				}
+			}
+
+			for i, seen := range seenErrs {
+				if !seen {
+					t.Errorf("unexpected error: %v", got[i])
+				}
 			}
 		})
 	}
@@ -7115,4 +8390,217 @@ func Test_validateDeprecationWarning(t *testing.T) {
 			}
 		})
 	}
+}
+
+func genMapSchema() *apiextensions.JSONSchemaProps {
+	return &apiextensions.JSONSchemaProps{
+		Type: "object",
+		AdditionalProperties: &apiextensions.JSONSchemaPropsOrBool{
+			Schema: &apiextensions.JSONSchemaProps{
+				Type: "string",
+			},
+		},
+	}
+}
+
+func withMaxProperties(mapSchema *apiextensions.JSONSchemaProps, maxProps *int64) *apiextensions.JSONSchemaProps {
+	mapSchema.MaxProperties = maxProps
+	return mapSchema
+}
+
+func genArraySchema() *apiextensions.JSONSchemaProps {
+	return &apiextensions.JSONSchemaProps{
+		Type: "array",
+	}
+}
+
+func withMaxItems(arraySchema *apiextensions.JSONSchemaProps, maxItems *int64) *apiextensions.JSONSchemaProps {
+	arraySchema.MaxItems = maxItems
+	return arraySchema
+}
+
+func genObjectSchema() *apiextensions.JSONSchemaProps {
+	return &apiextensions.JSONSchemaProps{
+		Type: "object",
+	}
+}
+
+func TestCostInfo(t *testing.T) {
+	tests := []struct {
+		name                   string
+		schema                 []*apiextensions.JSONSchemaProps
+		expectedMaxCardinality *uint64
+	}{
+		{
+			name: "object",
+			schema: []*apiextensions.JSONSchemaProps{
+				genObjectSchema(),
+			},
+			expectedMaxCardinality: uint64ptr(1),
+		},
+		{
+			name: "array",
+			schema: []*apiextensions.JSONSchemaProps{
+				withMaxItems(genArraySchema(), int64ptr(5)),
+			},
+			expectedMaxCardinality: uint64ptr(5),
+		},
+		{
+			name:                   "unbounded array",
+			schema:                 []*apiextensions.JSONSchemaProps{genArraySchema()},
+			expectedMaxCardinality: nil,
+		},
+		{
+			name:                   "map",
+			schema:                 []*apiextensions.JSONSchemaProps{withMaxProperties(genMapSchema(), int64ptr(10))},
+			expectedMaxCardinality: uint64ptr(10),
+		},
+		{
+			name: "unbounded map",
+			schema: []*apiextensions.JSONSchemaProps{
+				genMapSchema(),
+			},
+			expectedMaxCardinality: nil,
+		},
+		{
+			name: "array inside map",
+			schema: []*apiextensions.JSONSchemaProps{
+				withMaxProperties(genMapSchema(), int64ptr(5)),
+				withMaxItems(genArraySchema(), int64ptr(5)),
+			},
+			expectedMaxCardinality: uint64ptr(25),
+		},
+		{
+			name: "unbounded array inside bounded map",
+			schema: []*apiextensions.JSONSchemaProps{
+				withMaxProperties(genMapSchema(), int64ptr(5)),
+				genArraySchema(),
+			},
+			expectedMaxCardinality: nil,
+		},
+		{
+			name: "object inside array",
+			schema: []*apiextensions.JSONSchemaProps{
+				withMaxItems(genArraySchema(), int64ptr(3)),
+				genObjectSchema(),
+			},
+			expectedMaxCardinality: uint64ptr(3),
+		},
+		{
+			name: "map inside object inside array",
+			schema: []*apiextensions.JSONSchemaProps{
+				withMaxItems(genArraySchema(), int64ptr(2)),
+				genObjectSchema(),
+				withMaxProperties(genMapSchema(), int64ptr(4)),
+			},
+			expectedMaxCardinality: uint64ptr(8),
+		},
+		{
+			name: "integer overflow bounds check",
+			schema: []*apiextensions.JSONSchemaProps{
+				withMaxItems(genArraySchema(), int64ptr(math.MaxInt)),
+				withMaxItems(genArraySchema(), int64ptr(100)),
+			},
+			expectedMaxCardinality: uint64ptr(math.MaxUint),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			curCostInfo := rootCostInfo()
+			// simulate the recursive validation calls
+			for _, schema := range tt.schema {
+				curCostInfo = curCostInfo.MultiplyByElementCost(schema)
+			}
+			if tt.expectedMaxCardinality == nil && curCostInfo.MaxCardinality == nil {
+				// unbounded cardinality case, test ran correctly
+			} else if tt.expectedMaxCardinality == nil && curCostInfo.MaxCardinality != nil {
+				t.Errorf("expected unbounded cardinality (got %d)", curCostInfo.MaxCardinality)
+			} else if tt.expectedMaxCardinality != nil && curCostInfo.MaxCardinality == nil {
+				t.Errorf("expected bounded cardinality of %d but got unbounded cardinality", tt.expectedMaxCardinality)
+			} else if *tt.expectedMaxCardinality != *curCostInfo.MaxCardinality {
+				t.Errorf("wrong cardinality (expected %d, got %d)", *tt.expectedMaxCardinality, curCostInfo.MaxCardinality)
+			}
+		})
+	}
+}
+
+func TestPerCRDEstimatedCost(t *testing.T) {
+	tests := []struct {
+		name              string
+		costs             []uint64
+		expectedExpensive []uint64
+		expectedTotal     uint64
+	}{
+		{
+			name:              "no costs",
+			costs:             []uint64{},
+			expectedExpensive: []uint64{},
+			expectedTotal:     uint64(0),
+		},
+		{
+			name:              "one cost",
+			costs:             []uint64{1000000},
+			expectedExpensive: []uint64{1000000},
+			expectedTotal:     uint64(1000000),
+		},
+		{
+			name:              "one cost, ignored", // costs < 1% of the per-CRD cost limit are not considered expensive
+			costs:             []uint64{900000},
+			expectedExpensive: []uint64{},
+			expectedTotal:     uint64(900000),
+		},
+		{
+			name:              "2 costs",
+			costs:             []uint64{5000000, 25000000},
+			expectedExpensive: []uint64{25000000, 5000000},
+			expectedTotal:     uint64(30000000),
+		},
+		{
+			name:              "3 costs, one ignored",
+			costs:             []uint64{5000000, 25000000, 900000},
+			expectedExpensive: []uint64{25000000, 5000000},
+			expectedTotal:     uint64(30900000),
+		},
+		{
+			name:              "4 costs",
+			costs:             []uint64{16000000, 50000000, 34000000, 50000000},
+			expectedExpensive: []uint64{50000000, 50000000, 34000000, 16000000},
+			expectedTotal:     uint64(150000000),
+		},
+		{
+			name:              "5 costs, one trimmed, one ignored", // only the top 4 most expensive are tracked
+			costs:             []uint64{16000000, 50000000, 900000, 34000000, 50000000, 50000001},
+			expectedExpensive: []uint64{50000001, 50000000, 50000000, 34000000},
+			expectedTotal:     uint64(200900001),
+		},
+		{
+			name:              "costs do not overflow",
+			costs:             []uint64{math.MaxUint64 / 2, math.MaxUint64 / 2, 1, 10, 100, 1000},
+			expectedExpensive: []uint64{math.MaxUint64 / 2, math.MaxUint64 / 2},
+			expectedTotal:     uint64(math.MaxUint64),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			crdCost := rootCostInfo().TotalCost
+			for _, cost := range tt.costs {
+				crdCost.observeExpressionCost(nil, cost)
+			}
+			if len(crdCost.mostExpensive) != len(tt.expectedExpensive) {
+				t.Fatalf("expected %d largest costs but got %d: %v", len(tt.expectedExpensive), len(crdCost.mostExpensive), crdCost.mostExpensive)
+			}
+			for i, expensive := range crdCost.mostExpensive {
+				if tt.expectedExpensive[i] != expensive.cost {
+					t.Errorf("expected largest cost of %d at index %d but got %d", tt.expectedExpensive[i], i, expensive.cost)
+				}
+			}
+			if tt.expectedTotal != crdCost.totalCost {
+				t.Errorf("expected total cost of %d but got %d", tt.expectedTotal, crdCost.totalCost)
+			}
+		})
+	}
+}
+
+func int64ptr(i int64) *int64 {
+	return &i
 }

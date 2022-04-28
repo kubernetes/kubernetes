@@ -16,10 +16,10 @@ const DefaultReplacementFieldPath = "metadata.name"
 // where it is from and where it is to.
 type Replacement struct {
 	// The source of the value.
-	Source *SourceSelector `json:"source" yaml:"source"`
+	Source *SourceSelector `json:"source,omitempty" yaml:"source,omitempty"`
 
 	// The N fields to write the value to.
-	Targets []*TargetSelector `json:"targets" yaml:"targets"`
+	Targets []*TargetSelector `json:"targets,omitempty" yaml:"targets,omitempty"`
 }
 
 // SourceSelector is the source of the replacement transformer.

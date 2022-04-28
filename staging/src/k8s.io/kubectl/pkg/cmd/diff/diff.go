@@ -35,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
-	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/cmd/apply"
@@ -44,6 +43,7 @@ import (
 	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/openapi"
+	"k8s.io/kubectl/pkg/util/prune"
 	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/utils/exec"
 	"sigs.k8s.io/yaml"
@@ -109,13 +109,13 @@ type DiffOptions struct {
 
 	Selector         string
 	OpenAPISchema    openapi.Resources
-	DiscoveryClient  discovery.DiscoveryInterface
 	DynamicClient    dynamic.Interface
-	DryRunVerifier   *resource.DryRunVerifier
+	DryRunVerifier   *resource.QueryParamVerifier
 	CmdNamespace     string
 	EnforceNamespace bool
 	Builder          *resource.Builder
 	Diff             *DiffProgram
+	pruner           *pruner
 }
 
 func validateArgs(cmd *cobra.Command, args []string) error {
@@ -169,10 +169,12 @@ func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	})
 
 	usage := "contains the configuration to diff"
-	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
+	cmd.Flags().StringArray("prune-allowlist", []string{}, "Overwrite the default whitelist with <group/version/kind> for --prune")
+	cmd.Flags().Bool("prune", false, "Include resources that would be deleted by pruning. Can be used with -l and default shows all resources would be pruned")
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 	cmdutil.AddServerSideApplyFlags(cmd)
 	cmdutil.AddFieldManagerFlagVar(cmd, &options.FieldManager, apply.FieldManagerClientSideApply)
+	cmdutil.AddLabelSelectorFlagVar(cmd, &options.Selector)
 
 	return cmd
 }
@@ -625,21 +627,29 @@ func (o *DiffOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		}
 	}
 
-	o.DiscoveryClient, err = f.ToDiscoveryClient()
-	if err != nil {
-		return err
-	}
-
 	o.DynamicClient, err = f.DynamicClient()
 	if err != nil {
 		return err
 	}
 
-	o.DryRunVerifier = resource.NewDryRunVerifier(o.DynamicClient, f.OpenAPIGetter())
+	o.DryRunVerifier = resource.NewQueryParamVerifier(o.DynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 
 	o.CmdNamespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
+	}
+
+	if cmdutil.GetFlagBool(cmd, "prune") {
+		mapper, err := f.ToRESTMapper()
+		if err != nil {
+			return err
+		}
+
+		resources, err := prune.ParseResources(mapper, cmdutil.GetFlagStringArray(cmd, "prune-allowlist"))
+		if err != nil {
+			return err
+		}
+		o.pruner = newPruner(o.DynamicClient, mapper, resources)
 	}
 
 	o.Builder = f.NewBuilder()
@@ -707,6 +717,10 @@ func (o *DiffOptions) Run() error {
 				IOStreams:       o.Diff.IOStreams,
 			}
 
+			if o.pruner != nil {
+				o.pruner.MarkVisited(info)
+			}
+
 			err = differ.Diff(obj, printer)
 			if !isConflict(err) {
 				break
@@ -717,9 +731,52 @@ func (o *DiffOptions) Run() error {
 
 		return err
 	})
+
+	if o.pruner != nil {
+		prunedObjs, err := o.pruner.pruneAll()
+		if err != nil {
+			klog.Warningf("pruning failed and could not be evaluated err: %v", err)
+		}
+
+		// Print pruned objects into old file and thus, diff
+		// command will show them as pruned.
+		for _, p := range prunedObjs {
+			name, err := getObjectName(p)
+			if err != nil {
+				klog.Warningf("pruning failed and object name could not be retrieved: %v", err)
+				continue
+			}
+			if err := differ.From.Print(name, p, printer); err != nil {
+				return err
+			}
+		}
+	}
+
 	if err != nil {
 		return err
 	}
 
 	return differ.Run(o.Diff)
+}
+
+func getObjectName(obj runtime.Object) (string, error) {
+	gvk := obj.GetObjectKind().GroupVersionKind()
+	metadata, err := meta.Accessor(obj)
+	if err != nil {
+		return "", err
+	}
+	name := metadata.GetName()
+	ns := metadata.GetNamespace()
+
+	group := ""
+	if gvk.Group != "" {
+		group = fmt.Sprintf("%v.", gvk.Group)
+	}
+	return group + fmt.Sprintf(
+		"%v.%v.%v.%v",
+		gvk.Version,
+		gvk.Kind,
+		ns,
+		name,
+	), nil
 }

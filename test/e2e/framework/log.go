@@ -49,6 +49,7 @@ func Failf(format string, args ...interface{}) {
 	skip := 2
 	log("FAIL", "%s\n\nFull Stack Trace\n%s", msg, PrunedStack(skip))
 	e2eginkgowrapper.Fail(nowStamp()+": "+msg, skip)
+	panic("unreachable")
 }
 
 // Fail is a replacement for ginkgo.Fail which logs the problem as it occurs

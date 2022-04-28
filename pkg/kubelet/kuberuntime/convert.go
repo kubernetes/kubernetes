@@ -19,7 +19,7 @@ package kuberuntime
 import (
 	"sort"
 
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 

@@ -120,7 +120,7 @@ func (dk *BasicDockerKeyring) Add(cfg DockerConfig) {
 
 	// Update the index used to identify which credentials to use for a given
 	// image. The index is reverse-sorted so more specific paths are matched
-	// first. For example, if for the given image "quay.io/coreos/etcd",
+	// first. For example, if for the given image "gcr.io/etcd-development/etcd",
 	// credentials for "quay.io/coreos" should match before "quay.io".
 	sort.Sort(sort.Reverse(sort.StringSlice(dk.index)))
 }

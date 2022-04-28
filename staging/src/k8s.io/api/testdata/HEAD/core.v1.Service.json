@@ -2,100 +2,103 @@
   "kind": "Service",
   "apiVersion": "v1",
   "metadata": {
-    "name": "2",
-    "generateName": "3",
-    "namespace": "4",
-    "selfLink": "5",
-    "uid": "7",
-    "resourceVersion": "11042405498087606203",
-    "generation": 8071137005907523419,
-    "creationTimestamp": "2061-09-19T18:13:36Z",
-    "deletionGracePeriodSeconds": -4955867275792137171,
+    "name": "nameValue",
+    "generateName": "generateNameValue",
+    "namespace": "namespaceValue",
+    "selfLink": "selfLinkValue",
+    "uid": "uidValue",
+    "resourceVersion": "resourceVersionValue",
+    "generation": 7,
+    "creationTimestamp": "2008-01-01T01:01:01Z",
+    "deletionTimestamp": "2009-01-01T01:01:01Z",
+    "deletionGracePeriodSeconds": 10,
     "labels": {
-      "7": "8"
+      "labelsKey": "labelsValue"
     },
     "annotations": {
-      "9": "10"
+      "annotationsKey": "annotationsValue"
     },
     "ownerReferences": [
       {
-        "apiVersion": "11",
-        "kind": "12",
-        "name": "13",
-        "uid": "Dz廔ȇ{sŊƏp",
-        "controller": false,
+        "apiVersion": "apiVersionValue",
+        "kind": "kindValue",
+        "name": "nameValue",
+        "uid": "uidValue",
+        "controller": true,
         "blockOwnerDeletion": true
       }
     ],
     "finalizers": [
-      "14"
+      "finalizersValue"
     ],
-    "clusterName": "15",
+    "clusterName": "clusterNameValue",
     "managedFields": [
       {
-        "manager": "16",
-        "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
-        "apiVersion": "17",
-        "fieldsType": "18",
-        "subresource": "19"
+        "manager": "managerValue",
+        "operation": "operationValue",
+        "apiVersion": "apiVersionValue",
+        "time": "2004-01-01T01:01:01Z",
+        "fieldsType": "fieldsTypeValue",
+        "fieldsV1": {},
+        "subresource": "subresourceValue"
       }
     ]
   },
   "spec": {
     "ports": [
       {
-        "name": "20",
-        "protocol": "@Hr鯹)晿",
-        "appProtocol": "21",
-        "port": 202283346,
-        "targetPort": "22",
-        "nodePort": -474380055
+        "name": "nameValue",
+        "protocol": "protocolValue",
+        "appProtocol": "appProtocolValue",
+        "port": 3,
+        "targetPort": "targetPortValue",
+        "nodePort": 5
       }
     ],
     "selector": {
-      "23": "24"
+      "selectorKey": "selectorValue"
     },
-    "clusterIP": "25",
+    "clusterIP": "clusterIPValue",
     "clusterIPs": [
-      "26"
+      "clusterIPsValue"
     ],
-    "type": "鮽ort昍řČ扷5ƗǸƢ6/ʕVŚ(Ŀ",
+    "type": "typeValue",
     "externalIPs": [
-      "27"
+      "externalIPsValue"
     ],
-    "sessionAffinity": "甞谐颋ǅS",
-    "loadBalancerIP": "28",
+    "sessionAffinity": "sessionAffinityValue",
+    "loadBalancerIP": "loadBalancerIPValue",
     "loadBalancerSourceRanges": [
-      "29"
+      "loadBalancerSourceRangesValue"
     ],
-    "externalName": "30",
-    "externalTrafficPolicy": "ƏS$+½H牗洝尿",
-    "healthCheckNodePort": -1965738697,
+    "externalName": "externalNameValue",
+    "externalTrafficPolicy": "externalTrafficPolicyValue",
+    "healthCheckNodePort": 12,
     "publishNotReadyAddresses": true,
     "sessionAffinityConfig": {
       "clientIP": {
-        "timeoutSeconds": 2072604405
+        "timeoutSeconds": 1
       }
     },
     "ipFamilies": [
-      "x"
+      "ipFamiliesValue"
     ],
-    "ipFamilyPolicy": "%a鯿rŎǀ朲^苣f",
+    "ipFamilyPolicy": "ipFamilyPolicyValue",
     "allocateLoadBalancerNodePorts": true,
-    "loadBalancerClass": "31",
-    "internalTrafficPolicy": "hDrȮO励鹗"
+    "loadBalancerClass": "loadBalancerClassValue",
+    "internalTrafficPolicy": "internalTrafficPolicyValue"
   },
   "status": {
     "loadBalancer": {
       "ingress": [
         {
-          "ip": "32",
-          "hostname": "33",
+          "ip": "ipValue",
+          "hostname": "hostnameValue",
           "ports": [
             {
-              "port": 165528693,
-              "protocol": "UɦOŖ",
-              "error": "34"
+              "port": 1,
+              "protocol": "protocolValue",
+              "error": "errorValue"
             }
           ]
         }
@@ -103,12 +106,12 @@
     },
     "conditions": [
       {
-        "type": "35",
-        "status": "尷ȸd賑",
-        "observedGeneration": 3519145202439908029,
-        "lastTransitionTime": "2256-09-10T15:38:25Z",
-        "reason": "36",
-        "message": "37"
+        "type": "typeValue",
+        "status": "statusValue",
+        "observedGeneration": 3,
+        "lastTransitionTime": "2004-01-01T01:01:01Z",
+        "reason": "reasonValue",
+        "message": "messageValue"
       }
     ]
   }

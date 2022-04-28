@@ -52,6 +52,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 const (
@@ -135,6 +136,7 @@ func checkGCEPD(volume *v1.PersistentVolume, volumeType string) error {
 
 var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 	f := framework.NewDefaultFramework("volume-provisioning")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	// filled in BeforeEach
 	var c clientset.Interface
@@ -147,7 +149,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 		timeouts = f.Timeouts
 	})
 
-	ginkgo.Describe("DynamicProvisioner [Slow]", func() {
+	ginkgo.Describe("DynamicProvisioner [Slow] [Feature:StorageProvider]", func() {
 		ginkgo.It("should provision storage with different parameters", func() {
 
 			// This test checks that dynamic provisioning can provision a volume
@@ -604,6 +606,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 	ginkgo.Describe("DynamicProvisioner Default", func() {
 		ginkgo.It("should create and delete default persistent volumes [Slow]", func() {
 			e2eskipper.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere", "azure")
+			e2epv.SkipIfNoDefaultStorageClass(c)
 
 			ginkgo.By("creating a claim with no annotation")
 			test := testsuites.StorageClassTest{
@@ -629,6 +632,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 		// Modifying the default storage class can be disruptive to other tests that depend on it
 		ginkgo.It("should be disabled by changing the default annotation [Serial] [Disruptive]", func() {
 			e2eskipper.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere", "azure")
+			e2epv.SkipIfNoDefaultStorageClass(c)
 
 			scName, scErr := e2epv.GetDefaultStorageClassName(c)
 			framework.ExpectNoError(scErr)
@@ -667,6 +671,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 		// Modifying the default storage class can be disruptive to other tests that depend on it
 		ginkgo.It("should be disabled by removing the default annotation [Serial] [Disruptive]", func() {
 			e2eskipper.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere", "azure")
+			e2epv.SkipIfNoDefaultStorageClass(c)
 
 			scName, scErr := e2epv.GetDefaultStorageClassName(c)
 			framework.ExpectNoError(scErr)
@@ -968,6 +973,7 @@ func waitForProvisionedVolumesDeleted(c clientset.Interface, scName string) ([]*
 		}
 		for _, pv := range allPVs.Items {
 			if pv.Spec.StorageClassName == scName {
+				pv := pv
 				remainingPVs = append(remainingPVs, &pv)
 			}
 		}

@@ -187,7 +187,6 @@ func TestParallelPuller(t *testing.T) {
 			Namespace:       "test-ns",
 			UID:             "bar",
 			ResourceVersion: "42",
-			SelfLink:        "/api/v1/pods/foo",
 		}}
 
 	cases := pullerTestCases()
@@ -215,7 +214,6 @@ func TestSerializedPuller(t *testing.T) {
 			Namespace:       "test-ns",
 			UID:             "bar",
 			ResourceVersion: "42",
-			SelfLink:        "/api/v1/pods/foo",
 		}}
 
 	cases := pullerTestCases()
@@ -264,7 +262,6 @@ func TestPullAndListImageWithPodAnnotations(t *testing.T) {
 			Namespace:       "test-ns",
 			UID:             "bar",
 			ResourceVersion: "42",
-			SelfLink:        "/api/v1/pods/foo",
 			Annotations: map[string]string{
 				"kubernetes.io/runtimehandler": "handler_name",
 			},

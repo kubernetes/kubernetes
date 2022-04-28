@@ -51,8 +51,11 @@ type CreateOptions struct {
 	PrintFlags  *genericclioptions.PrintFlags
 	RecordFlags *genericclioptions.RecordFlags
 
-	DryRunStrategy cmdutil.DryRunStrategy
-	DryRunVerifier *resource.DryRunVerifier
+	DryRunStrategy          cmdutil.DryRunStrategy
+	DryRunVerifier          *resource.QueryParamVerifier
+	FieldValidationVerifier *resource.QueryParamVerifier
+
+	ValidationDirective string
 
 	fieldManager string
 
@@ -80,8 +83,8 @@ var (
 		# Create a pod based on the JSON passed into stdin
 		cat pod.json | kubectl create -f -
 
-		# Edit the data in docker-registry.yaml in JSON then create the resource using the edited data
-		kubectl create -f docker-registry.yaml --edit -o json`))
+		# Edit the data in registry.yaml in JSON then create the resource using the edited data
+		kubectl create -f registry.yaml --edit -o json`))
 )
 
 // NewCreateOptions returns an initialized CreateOptions instance
@@ -130,7 +133,7 @@ func NewCmdCreate(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cob
 		"Only relevant if --edit=true. Defaults to the line ending native to your platform.")
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddDryRunFlag(cmd)
-	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
+	cmdutil.AddLabelSelectorFlagVar(cmd, &o.Selector)
 	cmd.Flags().StringVar(&o.Raw, "raw", o.Raw, "Raw URI to POST to the server.  Uses the transport specified by the kubeconfig file.")
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.fieldManager, "kubectl-create")
 
@@ -153,6 +156,7 @@ func NewCmdCreate(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cob
 	cmd.AddCommand(NewCmdCreateJob(f, ioStreams))
 	cmd.AddCommand(NewCmdCreateCronJob(f, ioStreams))
 	cmd.AddCommand(NewCmdCreateIngress(f, ioStreams))
+	cmd.AddCommand(NewCmdCreateToken(f, ioStreams))
 	return cmd
 }
 
@@ -206,7 +210,13 @@ func (o *CreateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	if err != nil {
 		return err
 	}
-	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, f.OpenAPIGetter())
+	o.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
+	o.FieldValidationVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamFieldValidation)
+
+	o.ValidationDirective, err = cmdutil.GetValidationDirective(cmd)
+	if err != nil {
+		return err
+	}
 
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
@@ -235,7 +245,8 @@ func (o *CreateOptions) RunCreate(f cmdutil.Factory, cmd *cobra.Command) error {
 	if o.EditBeforeCreate {
 		return RunEditOnCreate(f, o.PrintFlags, o.RecordFlags, o.IOStreams, cmd, &o.FilenameOptions, o.fieldManager)
 	}
-	schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"))
+
+	schema, err := f.Validator(o.ValidationDirective, o.FieldValidationVerifier)
 	if err != nil {
 		return err
 	}
@@ -282,6 +293,7 @@ func (o *CreateOptions) RunCreate(f cmdutil.Factory, cmd *cobra.Command) error {
 				NewHelper(info.Client, info.Mapping).
 				DryRun(o.DryRunStrategy == cmdutil.DryRunServer).
 				WithFieldManager(o.fieldManager).
+				WithFieldValidation(o.ValidationDirective).
 				Create(info.Namespace, true, info.Object)
 			if err != nil {
 				return cmdutil.AddSourceToErr("creating", info.Source, err)
@@ -306,15 +318,19 @@ func (o *CreateOptions) RunCreate(f cmdutil.Factory, cmd *cobra.Command) error {
 func RunEditOnCreate(f cmdutil.Factory, printFlags *genericclioptions.PrintFlags, recordFlags *genericclioptions.RecordFlags, ioStreams genericclioptions.IOStreams, cmd *cobra.Command, options *resource.FilenameOptions, fieldManager string) error {
 	editOptions := editor.NewEditOptions(editor.EditBeforeCreateMode, ioStreams)
 	editOptions.FilenameOptions = *options
+	validationDirective, err := cmdutil.GetValidationDirective(cmd)
+	if err != nil {
+		return err
+	}
 	editOptions.ValidateOptions = cmdutil.ValidateOptions{
-		EnableValidation: cmdutil.GetFlagBool(cmd, "validate"),
+		ValidationDirective: string(validationDirective),
 	}
 	editOptions.PrintFlags = printFlags
 	editOptions.ApplyAnnotation = cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
 	editOptions.RecordFlags = recordFlags
 	editOptions.FieldManager = "kubectl-create"
 
-	err := editOptions.Complete(f, []string{}, cmd)
+	err = editOptions.Complete(f, []string{}, cmd)
 	if err != nil {
 		return err
 	}
@@ -343,9 +359,10 @@ type CreateSubcommandOptions struct {
 	// StructuredGenerator is the resource generator for the object being created
 	StructuredGenerator generate.StructuredGenerator
 	DryRunStrategy      cmdutil.DryRunStrategy
-	DryRunVerifier      *resource.DryRunVerifier
+	DryRunVerifier      *resource.QueryParamVerifier
 	CreateAnnotation    bool
 	FieldManager        string
+	ValidationDirective string
 
 	Namespace        string
 	EnforceNamespace bool
@@ -383,11 +400,16 @@ func (o *CreateSubcommandOptions) Complete(f cmdutil.Factory, cmd *cobra.Command
 	if err != nil {
 		return err
 	}
-	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, f.OpenAPIGetter())
+	o.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 	o.CreateAnnotation = cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
 
 	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
 	printer, err := o.PrintFlags.ToPrinter()
+	if err != nil {
+		return err
+	}
+
+	o.ValidationDirective, err = cmdutil.GetValidationDirective(cmd)
 	if err != nil {
 		return err
 	}
@@ -446,6 +468,8 @@ func (o *CreateSubcommandOptions) Run() error {
 		if o.FieldManager != "" {
 			createOptions.FieldManager = o.FieldManager
 		}
+		createOptions.FieldValidation = o.ValidationDirective
+
 		if o.DryRunStrategy == cmdutil.DryRunServer {
 			if err := o.DryRunVerifier.HasSupport(mapping.GroupVersionKind); err != nil {
 				return err

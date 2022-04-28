@@ -328,12 +328,16 @@ kube::test::if_has_string() {
   local match=$2
 
   if grep -q "${match}" <<< "${message}"; then
+    echo -n "${green}"
     echo "Successful"
+    echo -n "${reset}"
     echo "message:${message}"
     echo "has:${match}"
     return 0
   else
+    echo -n "${bold}${red}"
     echo "FAIL!"
+    echo -n "${reset}"
     echo "message:${message}"
     echo "has not:${match}"
     caller
@@ -346,13 +350,17 @@ kube::test::if_has_not_string() {
   local match=$2
 
   if grep -q "${match}" <<< "${message}"; then
+    echo -n "${bold}${red}"
     echo "FAIL!"
+    echo -n "${reset}"
     echo "message:${message}"
     echo "has:${match}"
     caller
     return 1
   else
+    echo -n "${green}"
     echo "Successful"
+    echo -n "${reset}"
     echo "message:${message}"
     echo "has not:${match}"
     return 0
@@ -362,11 +370,16 @@ kube::test::if_has_not_string() {
 kube::test::if_empty_string() {
   local match=$1
   if [ -n "${match}" ]; then
+    echo -n "${bold}${red}"
+    echo "FAIL!"
     echo "${match} is not empty"
+    echo -n "${reset}"
     caller
     return 1
   else
+    echo -n "${green}"
     echo "Successful"
+    echo -n "${reset}"
     return 0
   fi
 }
@@ -451,10 +464,16 @@ kube::test::version::diff_assert() {
         return 1
   fi
 
-  sort "${original}" > "${original}.sorted"
-  sort "${latest}" > "${latest}.sorted"
+  if [ "${comparator}" == "exact" ]; then
+      # Skip sorting of file content for exact comparison.
+      cp "${original}" "${original}.sorted"
+      cp "${latest}" "${latest}.sorted"
+  else
+      sort "${original}" > "${original}.sorted"
+      sort "${latest}" > "${latest}.sorted"
+  fi
 
-  if [ "${comparator}" == "eq" ]; then
+  if [ "${comparator}" == "eq" ] || [ "${comparator}" == "exact" ]; then
     if [ "$(diff -iwB "${original}".sorted "${latest}".sorted)" == "" ] ; then
         echo -n "${green}"
         echo "Successful: ${diff_msg}"
@@ -493,3 +512,47 @@ kube::test::version::diff_assert() {
   fi
 }
 
+# Force exact match of kubectl stdout, stderr, and return code.
+# $1: file with actual stdout
+# $2: file with actual stderr
+# $3: the actual return code
+# $4: file with expected stdout
+# $5: file with expected stderr
+# $6: expected return code
+# $7: additional message describing the invocation
+kube::test::results::diff() {
+  local actualstdout=$1
+  local actualstderr=$2
+  local actualcode=$3
+  local expectedstdout=$4
+  local expectedstderr=$5
+  local expectedcode=$6
+  local message=$7
+  local result=0
+
+  if ! kube::test::version::diff_assert "${expectedstdout}" "exact" "${actualstdout}" "stdout for ${message}"; then
+      result=1
+  fi
+  if ! kube::test::version::diff_assert "${expectedstderr}" "exact" "${actualstderr}" "stderr for ${message}"; then
+      result=1
+  fi
+  if [ "${actualcode}" -ne "${expectedcode}" ]; then
+      echo "${bold}${red}"
+      echo "$(kube::test::get_caller): FAIL!"
+      echo "Return code for ${message}"
+      echo "  Expected: ${expectedcode}"
+      echo "  Got:      ${actualcode}"
+      echo "${reset}${red}"
+      caller
+      echo "${reset}"
+      result=1
+  fi
+
+  if [ "${result}" -eq 0 ]; then
+     echo -n "${green}"
+     echo "$(kube::test::get_caller): Successful: ${message}"
+     echo -n "${reset}"
+  fi
+
+  return "$result"
+}

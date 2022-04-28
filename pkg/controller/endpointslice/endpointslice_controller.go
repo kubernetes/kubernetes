@@ -265,10 +265,6 @@ func (c *Controller) Run(workers int, stopCh <-chan struct{}) {
 		go wait.Until(c.worker, c.workerLoopPeriod, stopCh)
 	}
 
-	go func() {
-		defer utilruntime.HandleCrash()
-	}()
-
 	<-stopCh
 }
 
@@ -539,6 +535,7 @@ func (c *Controller) checkNodeTopologyDistribution() {
 	nodes, err := c.nodeLister.List(labels.Everything())
 	if err != nil {
 		klog.Errorf("Error listing Nodes: %v", err)
+		return
 	}
 	c.topologyCache.SetNodes(nodes)
 	serviceKeys := c.topologyCache.GetOverloadedServices()

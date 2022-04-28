@@ -17,6 +17,7 @@ limitations under the License.
 package event
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
@@ -116,4 +117,34 @@ func TestSelectableFieldLabelConversions(t *testing.T) {
 		fset,
 		nil,
 	)
+}
+
+func TestValidateUpdate(t *testing.T) {
+	makeEvent := func(name string) *api.Event {
+		return &api.Event{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            name,
+				Namespace:       "default",
+				ResourceVersion: "123",
+			},
+			InvolvedObject: api.ObjectReference{
+				Kind:            "Pod",
+				Name:            "foo",
+				Namespace:       "default",
+				UID:             "long uid string",
+				APIVersion:      "v1",
+				ResourceVersion: "0",
+				FieldPath:       "",
+			},
+			Reason: "ForTesting",
+			Source: api.EventSource{Component: "test"},
+			Type:   api.EventTypeNormal,
+		}
+	}
+	eventA := makeEvent("eventA")
+	eventB := makeEvent("eventB")
+	errList := Strategy.ValidateUpdate(context.Background(), eventA, eventB)
+	if len(errList) == 0 {
+		t.Errorf("ValidateUpdate should fail on name change")
+	}
 }

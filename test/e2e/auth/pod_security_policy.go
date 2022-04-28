@@ -36,6 +36,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 	utilpointer "k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo"
@@ -45,6 +46,7 @@ const nobodyUser = int64(65534)
 
 var _ = SIGDescribe("PodSecurityPolicy [Feature:PodSecurityPolicy]", func() {
 	f := framework.NewDefaultFramework("podsecuritypolicy")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	f.SkipPrivilegedPSPBinding = true
 
 	// Client that will impersonate the default service account, in order to run
@@ -167,15 +169,6 @@ func testPrivilegedPods(tester func(pod *v1.Pod)) {
 		hostipc.Spec.HostIPC = true
 		tester(hostipc)
 	})
-
-	if isAppArmorSupported() && framework.TestContext.ContainerRuntime == "docker" {
-		ginkgo.By("Running a custom AppArmor profile pod", func() {
-			aa := restrictedPod("apparmor")
-			// Every node is expected to have the docker-default profile.
-			aa.Annotations[v1.AppArmorBetaContainerAnnotationKeyPrefix+"pause"] = "localhost/docker-default"
-			tester(aa)
-		})
-	}
 
 	ginkgo.By("Running an unconfined Seccomp pod", func() {
 		unconfined := restrictedPod("seccomp")
@@ -371,9 +364,4 @@ func restrictedPSP(name string) *policyv1beta1.PodSecurityPolicy {
 
 func boolPtr(b bool) *bool {
 	return &b
-}
-
-// isAppArmorSupported checks whether the AppArmor is supported by the node OS distro.
-func isAppArmorSupported() bool {
-	return framework.NodeOSDistroIs(e2eskipper.AppArmorDistros...)
 }

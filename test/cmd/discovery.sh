@@ -96,6 +96,36 @@ run_resource_aliasing_tests() {
   set +o errexit
 }
 
+run_crd_deletion_recreation_tests() {
+  set -o nounset
+  set -o errexit
+
+  create_and_use_new_namespace
+  kube::log::status "Testing resource creation, deletion, and re-creation"
+
+  output_message=$(kubectl apply -f hack/testdata/CRD/example-crd-1-cluster-scoped.yaml)
+  kube::test::if_has_string "${output_message}" 'created'
+  output_message=$(kubectl apply -f hack/testdata/CRD/example-crd-1-cluster-scoped-resource.yaml)
+  kube::test::if_has_string "${output_message}" 'created'
+  output_message=$(kubectl delete -f hack/testdata/CRD/example-crd-1-cluster-scoped.yaml)
+  kube::test::if_has_string "${output_message}" 'deleted'
+  # Invalidate local cache because cluster scoped CRD in cache is stale.
+  # Invalidation of cache may take up to 10 minutes and we are manually
+  # invalidate cache and expect that scope changed CRD should be created without problem.
+  kubectl api-resources
+  output_message=$(kubectl apply -f hack/testdata/CRD/example-crd-1-namespaced.yaml)
+  kube::test::if_has_string "${output_message}" 'created'
+  output_message=$(kubectl apply -f hack/testdata/CRD/example-crd-1-namespaced-resource.yaml)
+  kube::test::if_has_string "${output_message}" 'created'
+
+  # Cleanup
+  kubectl delete -f hack/testdata/CRD/example-crd-1-namespaced-resource.yaml
+  kubectl delete -f hack/testdata/CRD/example-crd-1-namespaced.yaml
+
+  set +o nounset
+  set +o errexit
+}
+
 run_kubectl_explain_tests() {
   set -o nounset
   set -o errexit

@@ -161,6 +161,9 @@ type Plugins struct {
 
 	// PostBind is a list of plugins that should be invoked after a pod is successfully bound.
 	PostBind PluginSet
+
+	// MultiPoint is a simplified config field for enabling plugins for all valid extension points
+	MultiPoint PluginSet
 }
 
 // PluginSet specifies enabled and disabled plugins for an extension point.

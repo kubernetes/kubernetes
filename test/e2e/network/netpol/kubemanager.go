@@ -31,7 +31,19 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
+
+// probeConnectivityArgs is set of arguments for a probeConnectivity
+type probeConnectivityArgs struct {
+	nsFrom         string
+	podFrom        string
+	containerFrom  string
+	addrTo         string
+	protocol       v1.Protocol
+	toPort         int
+	timeoutSeconds int
+}
 
 // kubeManager provides a convenience interface to kube functionality that we leverage for polling NetworkPolicy connections.
 // Its responsibilities are:
@@ -116,33 +128,33 @@ func (k *kubeManager) getPod(ns string, name string) (*v1.Pod, error) {
 
 // probeConnectivity execs into a pod and checks its connectivity to another pod.
 // Implements the Prober interface.
-func (k *kubeManager) probeConnectivity(nsFrom string, podFrom string, containerFrom string, addrTo string, protocol v1.Protocol, toPort int, timeoutSeconds int) (bool, string, error) {
-	port := strconv.Itoa(toPort)
-	if addrTo == "" {
+func (k *kubeManager) probeConnectivity(args *probeConnectivityArgs) (bool, string, error) {
+	port := strconv.Itoa(args.toPort)
+	if args.addrTo == "" {
 		return false, "no IP provided", fmt.Errorf("empty addrTo field")
 	}
-	framework.Logf("Starting probe from pod %v to %v", podFrom, addrTo)
+	framework.Logf("Starting probe from pod %v to %v", args.podFrom, args.addrTo)
 	var cmd []string
-	timeout := fmt.Sprintf("--timeout=%vs", timeoutSeconds)
+	timeout := fmt.Sprintf("--timeout=%vs", args.timeoutSeconds)
 
-	switch protocol {
+	switch args.protocol {
 	case v1.ProtocolSCTP:
-		cmd = []string{"/agnhost", "connect", net.JoinHostPort(addrTo, port), timeout, "--protocol=sctp"}
+		cmd = []string{"/agnhost", "connect", net.JoinHostPort(args.addrTo, port), timeout, "--protocol=sctp"}
 	case v1.ProtocolTCP:
-		cmd = []string{"/agnhost", "connect", net.JoinHostPort(addrTo, port), timeout, "--protocol=tcp"}
+		cmd = []string{"/agnhost", "connect", net.JoinHostPort(args.addrTo, port), timeout, "--protocol=tcp"}
 	case v1.ProtocolUDP:
-		cmd = []string{"/agnhost", "connect", net.JoinHostPort(addrTo, port), timeout, "--protocol=udp"}
+		cmd = []string{"/agnhost", "connect", net.JoinHostPort(args.addrTo, port), timeout, "--protocol=udp"}
 		if framework.NodeOSDistroIs("windows") {
 			framework.Logf("probing UDP for windows may result in cluster instability for certain windows nodes with low CPU/Memory, depending on CRI version")
 		}
 	default:
-		framework.Failf("protocol %s not supported", protocol)
+		framework.Failf("protocol %s not supported", args.protocol)
 	}
 
-	commandDebugString := fmt.Sprintf("kubectl exec %s -c %s -n %s -- %s", podFrom, containerFrom, nsFrom, strings.Join(cmd, " "))
-	stdout, stderr, err := k.executeRemoteCommand(nsFrom, podFrom, containerFrom, cmd)
+	commandDebugString := fmt.Sprintf("kubectl exec %s -c %s -n %s -- %s", args.podFrom, args.containerFrom, args.nsFrom, strings.Join(cmd, " "))
+	stdout, stderr, err := k.executeRemoteCommand(args.nsFrom, args.podFrom, args.containerFrom, cmd)
 	if err != nil {
-		framework.Logf("%s/%s -> %s: error when running command: err - %v /// stdout - %s /// stderr - %s", nsFrom, podFrom, addrTo, err, stdout, stderr)
+		framework.Logf("%s/%s -> %s: error when running command: err - %v /// stdout - %s /// stderr - %s", args.nsFrom, args.podFrom, args.addrTo, err, stdout, stderr)
 		return false, commandDebugString, nil
 	}
 	return true, commandDebugString, nil
@@ -164,6 +176,7 @@ func (k *kubeManager) executeRemoteCommand(namespace string, pod string, contain
 
 // createNamespace is a convenience function for namespace setup.
 func (k *kubeManager) createNamespace(ns *v1.Namespace) (*v1.Namespace, error) {
+	enforcePodSecurityBaseline(ns)
 	createdNamespace, err := k.clientSet.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("unable to update namespace %s: %w", ns.Name, err)
@@ -252,6 +265,7 @@ func (k *kubeManager) setNamespaceLabels(ns string, labels map[string]string) er
 		return err
 	}
 	selectedNameSpace.ObjectMeta.Labels = labels
+	enforcePodSecurityBaseline(selectedNameSpace)
 	_, err = k.clientSet.CoreV1().Namespaces().Update(context.TODO(), selectedNameSpace, metav1.UpdateOptions{})
 	if err != nil {
 		return fmt.Errorf("unable to update namespace %s: %w", ns, err)
@@ -268,4 +282,12 @@ func (k *kubeManager) deleteNamespaces(namespaces []string) error {
 		}
 	}
 	return nil
+}
+
+func enforcePodSecurityBaseline(ns *v1.Namespace) {
+	if len(ns.ObjectMeta.Labels) == 0 {
+		ns.ObjectMeta.Labels = make(map[string]string)
+	}
+	// TODO(https://github.com/kubernetes/kubernetes/issues/108298): route namespace creation via framework.Framework.CreateNamespace
+	ns.ObjectMeta.Labels[admissionapi.EnforceLevelLabel] = string(admissionapi.LevelBaseline)
 }

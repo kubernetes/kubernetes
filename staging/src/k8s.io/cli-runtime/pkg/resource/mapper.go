@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -64,6 +65,10 @@ func (m *mapper) infoForData(data []byte, source string) (*Info, error) {
 		}
 		mapping, err := restMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 		if err != nil {
+			if _, ok := err.(*meta.NoKindMatchError); ok {
+				return nil, fmt.Errorf("resource mapping not found for name: %q namespace: %q from %q: %v\nensure CRDs are installed first",
+					name, namespace, source, err)
+			}
 			return nil, fmt.Errorf("unable to recognize %q: %v", source, err)
 		}
 		ret.Mapping = mapping

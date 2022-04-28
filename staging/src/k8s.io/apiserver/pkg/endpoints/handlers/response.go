@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
+	endpointsrequest "k8s.io/apiserver/pkg/endpoints/request"
 	utiltrace "k8s.io/utils/trace"
 )
 
@@ -59,8 +60,14 @@ func doTransformObject(ctx context.Context, obj runtime.Object, opts interface{}
 	if _, ok := obj.(*metav1.Status); ok {
 		return obj, nil
 	}
-	if err := setObjectSelfLink(ctx, obj, req, scope.Namer); err != nil {
-		return nil, err
+
+	// ensure that for empty lists we don't return <nil> items.
+	// This is safe to modify without deep-copying the object, as
+	// List objects themselves are never cached.
+	if meta.IsListType(obj) && meta.LenList(obj) == 0 {
+		if err := meta.SetList(obj, []runtime.Object{}); err != nil {
+			return nil, err
+		}
 	}
 
 	switch target := mediaType.Convert; {
@@ -128,7 +135,13 @@ func transformResponseObject(ctx context.Context, scope *RequestScope, trace *ut
 		scope.err(err, w, req)
 		return
 	}
-	obj, err := transformObject(ctx, result, options, mediaType, scope, req)
+
+	var obj runtime.Object
+	do := func() {
+		obj, err = transformObject(ctx, result, options, mediaType, scope, req)
+	}
+	endpointsrequest.TrackTransformResponseObjectLatency(ctx, do)
+
 	if err != nil {
 		scope.err(err, w, req)
 		return
@@ -244,9 +257,9 @@ func asPartialObjectMetadataList(result runtime.Object, groupVersion schema.Grou
 		if err != nil {
 			return nil, err
 		}
-		list.SelfLink = li.GetSelfLink()
 		list.ResourceVersion = li.GetResourceVersion()
 		list.Continue = li.GetContinue()
+		list.RemainingItemCount = li.GetRemainingItemCount()
 		return list, nil
 
 	case groupVersion == metav1.SchemeGroupVersion:
@@ -264,9 +277,9 @@ func asPartialObjectMetadataList(result runtime.Object, groupVersion schema.Grou
 		if err != nil {
 			return nil, err
 		}
-		list.SelfLink = li.GetSelfLink()
 		list.ResourceVersion = li.GetResourceVersion()
 		list.Continue = li.GetContinue()
+		list.RemainingItemCount = li.GetRemainingItemCount()
 		return list, nil
 
 	default:

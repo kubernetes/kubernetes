@@ -143,6 +143,10 @@ var newClientsetForConfigTemplate = `
 func NewForConfig(c *$.Config|raw$) (*Clientset, error) {
 	configShallowCopy := *c
 
+	if configShallowCopy.UserAgent == "" {
+		configShallowCopy.UserAgent = $.DefaultKubernetesUserAgent|raw$()
+	}
+
 	// share the transport between all clients
 	httpClient, err := $.RESTHTTPClientFor|raw$(&configShallowCopy)
 	if err != nil {

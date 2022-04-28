@@ -20,6 +20,8 @@ import (
 	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -61,15 +63,37 @@ func SetDefaults_StatefulSet(obj *appsv1beta2.StatefulSet) {
 	if obj.Spec.UpdateStrategy.Type == "" {
 		obj.Spec.UpdateStrategy.Type = appsv1beta2.RollingUpdateStatefulSetStrategyType
 
-		// UpdateStrategy.RollingUpdate will take default values below.
-		obj.Spec.UpdateStrategy.RollingUpdate = &appsv1beta2.RollingUpdateStatefulSetStrategy{}
+		if obj.Spec.UpdateStrategy.RollingUpdate == nil {
+			// UpdateStrategy.RollingUpdate will take default values below.
+			obj.Spec.UpdateStrategy.RollingUpdate = &appsv1beta2.RollingUpdateStatefulSetStrategy{}
+		}
 	}
 
 	if obj.Spec.UpdateStrategy.Type == appsv1beta2.RollingUpdateStatefulSetStrategyType &&
-		obj.Spec.UpdateStrategy.RollingUpdate != nil &&
-		obj.Spec.UpdateStrategy.RollingUpdate.Partition == nil {
-		obj.Spec.UpdateStrategy.RollingUpdate.Partition = new(int32)
-		*obj.Spec.UpdateStrategy.RollingUpdate.Partition = 0
+		obj.Spec.UpdateStrategy.RollingUpdate != nil {
+
+		if obj.Spec.UpdateStrategy.RollingUpdate.Partition == nil {
+			obj.Spec.UpdateStrategy.RollingUpdate.Partition = new(int32)
+			*obj.Spec.UpdateStrategy.RollingUpdate.Partition = 0
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.MaxUnavailableStatefulSet) {
+			if obj.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable == nil {
+				maxUnavailable := intstr.FromInt(1)
+				obj.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = &maxUnavailable
+			}
+		}
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
+		if obj.Spec.PersistentVolumeClaimRetentionPolicy == nil {
+			obj.Spec.PersistentVolumeClaimRetentionPolicy = &appsv1beta2.StatefulSetPersistentVolumeClaimRetentionPolicy{}
+		}
+		if len(obj.Spec.PersistentVolumeClaimRetentionPolicy.WhenDeleted) == 0 {
+			obj.Spec.PersistentVolumeClaimRetentionPolicy.WhenDeleted = appsv1beta2.RetainPersistentVolumeClaimRetentionPolicyType
+		}
+		if len(obj.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled) == 0 {
+			obj.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled = appsv1beta2.RetainPersistentVolumeClaimRetentionPolicyType
+		}
 	}
 
 	if obj.Spec.Replicas == nil {

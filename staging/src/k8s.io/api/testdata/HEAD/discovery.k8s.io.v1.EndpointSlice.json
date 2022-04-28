@@ -2,75 +2,78 @@
   "kind": "EndpointSlice",
   "apiVersion": "discovery.k8s.io/v1",
   "metadata": {
-    "name": "2",
-    "generateName": "3",
-    "namespace": "4",
-    "selfLink": "5",
-    "uid": "7",
-    "resourceVersion": "11042405498087606203",
-    "generation": 8071137005907523419,
-    "creationTimestamp": "2061-09-19T18:13:36Z",
-    "deletionGracePeriodSeconds": -4955867275792137171,
+    "name": "nameValue",
+    "generateName": "generateNameValue",
+    "namespace": "namespaceValue",
+    "selfLink": "selfLinkValue",
+    "uid": "uidValue",
+    "resourceVersion": "resourceVersionValue",
+    "generation": 7,
+    "creationTimestamp": "2008-01-01T01:01:01Z",
+    "deletionTimestamp": "2009-01-01T01:01:01Z",
+    "deletionGracePeriodSeconds": 10,
     "labels": {
-      "7": "8"
+      "labelsKey": "labelsValue"
     },
     "annotations": {
-      "9": "10"
+      "annotationsKey": "annotationsValue"
     },
     "ownerReferences": [
       {
-        "apiVersion": "11",
-        "kind": "12",
-        "name": "13",
-        "uid": "Dz廔ȇ{sŊƏp",
-        "controller": false,
+        "apiVersion": "apiVersionValue",
+        "kind": "kindValue",
+        "name": "nameValue",
+        "uid": "uidValue",
+        "controller": true,
         "blockOwnerDeletion": true
       }
     ],
     "finalizers": [
-      "14"
+      "finalizersValue"
     ],
-    "clusterName": "15",
+    "clusterName": "clusterNameValue",
     "managedFields": [
       {
-        "manager": "16",
-        "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
-        "apiVersion": "17",
-        "fieldsType": "18",
-        "subresource": "19"
+        "manager": "managerValue",
+        "operation": "operationValue",
+        "apiVersion": "apiVersionValue",
+        "time": "2004-01-01T01:01:01Z",
+        "fieldsType": "fieldsTypeValue",
+        "fieldsV1": {},
+        "subresource": "subresourceValue"
       }
     ]
   },
-  "addressType": "īqJ枊a8衍`Ĩɘ.蘯",
+  "addressType": "addressTypeValue",
   "endpoints": [
     {
       "addresses": [
-        "20"
+        "addressesValue"
       ],
       "conditions": {
-        "ready": false,
-        "serving": false,
-        "terminating": false
+        "ready": true,
+        "serving": true,
+        "terminating": true
       },
-      "hostname": "21",
+      "hostname": "hostnameValue",
       "targetRef": {
-        "kind": "22",
-        "namespace": "23",
-        "name": "24",
-        "uid": "ɑ",
-        "apiVersion": "25",
-        "resourceVersion": "26",
-        "fieldPath": "27"
+        "kind": "kindValue",
+        "namespace": "namespaceValue",
+        "name": "nameValue",
+        "uid": "uidValue",
+        "apiVersion": "apiVersionValue",
+        "resourceVersion": "resourceVersionValue",
+        "fieldPath": "fieldPathValue"
       },
       "deprecatedTopology": {
-        "28": "29"
+        "deprecatedTopologyKey": "deprecatedTopologyValue"
       },
-      "nodeName": "30",
-      "zone": "31",
+      "nodeName": "nodeNameValue",
+      "zone": "zoneValue",
       "hints": {
         "forZones": [
           {
-            "name": "32"
+            "name": "nameValue"
           }
         ]
       }
@@ -78,10 +81,10 @@
   ],
   "ports": [
     {
-      "name": "33",
-      "protocol": "ěĂ凗蓏Ŋ蛊ĉy緅縕",
-      "port": -591435092,
-      "appProtocol": "34"
+      "name": "nameValue",
+      "protocol": "protocolValue",
+      "port": 3,
+      "appProtocol": "appProtocolValue"
     }
   ]
 }

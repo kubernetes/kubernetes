@@ -23,6 +23,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"time"
 
 	registrationv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -241,6 +242,17 @@ type MutatingTest struct {
 	ExpectAnnotations      map[string]string
 	ExpectStatusCode       int32
 	ExpectReinvokeWebhooks map[string]bool
+}
+
+// DurationTest is webhook duration test case, used both in mutating and
+// validating plugin test cases.
+type DurationTest struct {
+	Name                string
+	Webhooks            []registrationv1.ValidatingWebhook
+	InitContext         bool
+	IsDryRun            bool
+	ExpectedDurationSum time.Duration
+	ExpectedDurationMax time.Duration
 }
 
 // ConvertToMutatingTestCases converts a validating test case to a mutating one for test purposes.
@@ -1068,4 +1080,68 @@ func NewObjectInterfacesForTest() admission.ObjectInterfaces {
 	scheme := runtime.NewScheme()
 	corev1.AddToScheme(scheme)
 	return admission.NewObjectInterfacesFromScheme(scheme)
+}
+
+// NewValidationDurationTestCases returns test cases for webhook duration test
+func NewValidationDurationTestCases(url *url.URL) []DurationTest {
+	ccfgURL := urlConfigGenerator{url}.ccfgURL
+	webhooks := []registrationv1.ValidatingWebhook{
+		{
+			Name:                    "allow match",
+			ClientConfig:            ccfgURL("allow/100"),
+			Rules:                   matchEverythingRules,
+			NamespaceSelector:       &metav1.LabelSelector{},
+			ObjectSelector:          &metav1.LabelSelector{},
+			AdmissionReviewVersions: []string{"v1beta1"},
+		},
+		{
+			Name:                    "allow no match",
+			ClientConfig:            ccfgURL("allow/200"),
+			NamespaceSelector:       &metav1.LabelSelector{},
+			ObjectSelector:          &metav1.LabelSelector{},
+			AdmissionReviewVersions: []string{"v1beta1"},
+		},
+		{
+			Name:                    "disallow match",
+			ClientConfig:            ccfgURL("disallow/400"),
+			Rules:                   matchEverythingRules,
+			NamespaceSelector:       &metav1.LabelSelector{},
+			ObjectSelector:          &metav1.LabelSelector{},
+			AdmissionReviewVersions: []string{"v1beta1"},
+		},
+		{
+			Name:                    "disallow no match",
+			ClientConfig:            ccfgURL("disallow/800"),
+			NamespaceSelector:       &metav1.LabelSelector{},
+			ObjectSelector:          &metav1.LabelSelector{},
+			AdmissionReviewVersions: []string{"v1beta1"},
+		},
+	}
+
+	return []DurationTest{
+		{
+			Name:                "duration test",
+			IsDryRun:            false,
+			InitContext:         true,
+			Webhooks:            webhooks,
+			ExpectedDurationSum: 500,
+			ExpectedDurationMax: 400,
+		},
+		{
+			Name:                "duration dry run",
+			IsDryRun:            true,
+			InitContext:         true,
+			Webhooks:            webhooks,
+			ExpectedDurationSum: 0,
+			ExpectedDurationMax: 0,
+		},
+		{
+			Name:                "duration no init",
+			IsDryRun:            false,
+			InitContext:         false,
+			Webhooks:            webhooks,
+			ExpectedDurationSum: 0,
+			ExpectedDurationMax: 0,
+		},
+	}
 }
