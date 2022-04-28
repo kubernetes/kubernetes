@@ -627,18 +627,7 @@ func (f *FakePodControl) PatchPod(namespace, name string, data []byte) error {
 }
 
 func (f *FakePodControl) CreatePods(namespace string, spec *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference) error {
-	f.Lock()
-	defer f.Unlock()
-	f.CreateCallCount++
-	if f.CreateLimit != 0 && f.CreateCallCount > f.CreateLimit {
-		return fmt.Errorf("not creating pod, limit %d already reached (create call %d)", f.CreateLimit, f.CreateCallCount)
-	}
-	f.Templates = append(f.Templates, *spec)
-	f.ControllerRefs = append(f.ControllerRefs, *controllerRef)
-	if f.Err != nil {
-		return f.Err
-	}
-	return nil
+	return f.CreatePodsWithGenerateName(namespace, spec, object, controllerRef, "")
 }
 
 func (f *FakePodControl) CreatePodsWithGenerateName(namespace string, spec *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference, generateNamePrefix string) error {
@@ -648,6 +637,7 @@ func (f *FakePodControl) CreatePodsWithGenerateName(namespace string, spec *v1.P
 	if f.CreateLimit != 0 && f.CreateCallCount > f.CreateLimit {
 		return fmt.Errorf("not creating pod, limit %d already reached (create call %d)", f.CreateLimit, f.CreateCallCount)
 	}
+	spec.GenerateName = generateNamePrefix
 	f.Templates = append(f.Templates, *spec)
 	f.ControllerRefs = append(f.ControllerRefs, *controllerRef)
 	if f.Err != nil {
