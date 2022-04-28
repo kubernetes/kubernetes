@@ -138,6 +138,10 @@ func waitForReflection(t *testing.T, nodeLister corelisters.NodeLister, key stri
 	return err
 }
 
+func updateNode(cs clientset.Interface, node *v1.Node) (*v1.Node, error) {
+	return cs.CoreV1().Nodes().Update(context.TODO(), node, metav1.UpdateOptions{})
+}
+
 func createNode(cs clientset.Interface, node *v1.Node) (*v1.Node, error) {
 	return cs.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
 }
@@ -357,7 +361,7 @@ func podUnschedulable(c clientset.Interface, podNamespace, podName string) wait.
 		}
 		_, cond := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
 		return cond != nil && cond.Status == v1.ConditionFalse &&
-			cond.Reason == v1.PodReasonUnschedulable, nil
+			cond.Reason == v1.PodReasonUnschedulable && pod.Spec.NodeName == "", nil
 	}
 }
 
