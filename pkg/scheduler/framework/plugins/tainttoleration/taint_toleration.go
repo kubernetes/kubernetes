@@ -56,7 +56,7 @@ func (pl *TaintToleration) Name() string {
 // failed by this plugin schedulable.
 func (pl *TaintToleration) EventsToRegister() []framework.ClusterEvent {
 	return []framework.ClusterEvent{
-		{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeTaint},
+		{Resource: framework.Node, ActionType: framework.Add | framework.Update},
 	}
 }
 

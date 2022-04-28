@@ -78,7 +78,7 @@ func (s *preFilterState) Clone() framework.StateData {
 // failed by this plugin schedulable.
 func (pl *NodeAffinity) EventsToRegister() []framework.ClusterEvent {
 	return []framework.ClusterEvent{
-		{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeLabel},
+		{Resource: framework.Node, ActionType: framework.Add | framework.Update},
 	}
 }
 
