@@ -223,7 +223,7 @@ func flagsUsages(f *flag.FlagSet) (string, error) {
 	flagBuf := new(bytes.Buffer)
 	wrapLimit, err := term.GetWordWrapperLimit()
 	if err != nil {
-		return "", err
+		wrapLimit = 0
 	}
 	printer := NewHelpFlagPrinter(flagBuf, wrapLimit)
 
