@@ -136,8 +136,8 @@ func (collector *volumeStatsCollector) CollectWithStability(ch chan<- metrics.Me
 
 func convertBoolToFloat64(boolVal bool) float64 {
 	if boolVal {
-		return 1
+		return (float64)1
 	}
 
-	return 0
+	return (float64)0
 }
