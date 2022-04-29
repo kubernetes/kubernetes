@@ -64,6 +64,17 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			time.Sleep(10 * time.Second)
 			sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Get(ctx, "default", metav1.GetOptions{})
 			framework.ExpectNoError(err)
+
+			// TODO: Ignore the image pull secret that OpenShift sometimes creates and adds to the list of Secrets.
+			// TODO: This patch can be removed once OpenShift stops adding the pull secret to the list of secrets in 4.16.
+			secrets := sa.DeepCopy().Secrets
+			sa.Secrets = nil
+			for _, s := range secrets {
+				if strings.HasPrefix(s.Name, "default-dockercfg") {
+					continue
+				}
+				sa.Secrets = append(sa.Secrets, s)
+			}
 			gomega.Expect(sa.Secrets).To(gomega.BeEmpty())
 		}
 	})
