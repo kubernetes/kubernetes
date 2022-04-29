@@ -31,6 +31,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/ginkgo/v2/types"
+
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -458,8 +459,21 @@ func GenerateSecureToken(tokenLen int) (string, error) {
 }
 
 // AfterReadingAllFlags makes changes to the context after all flags
-// have been read.
+// have been read and prepares the process for a test run.
 func AfterReadingAllFlags(t *TestContextType) {
+	// Reconfigure klog so that output goes to the GinkgoWriter instead
+	// of stderr. The advantage is that it then gets interleaved properly
+	// with output that goes to GinkgoWriter (By, Logf).
+
+	// These flags are not exposed via the normal command line flag set,
+	// therefore we have to use our own private one here.
+	var fs flag.FlagSet
+	klog.InitFlags(&fs)
+	fs.Set("logtostderr", "false")
+	fs.Set("alsologtostderr", "false")
+	fs.Set("one_output", "true")
+	klog.SetOutput(ginkgo.GinkgoWriter)
+
 	// Only set a default host if one won't be supplied via kubeconfig
 	if len(t.Host) == 0 && len(t.KubeConfig) == 0 {
 		// Check if we can use the in-cluster config
