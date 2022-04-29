@@ -103,7 +103,12 @@ func NewGraph() *Graph {
 		destinationEdgeIndex: map[int]*intSet{},
 		// experimentally determined to be the point at which iteration adds an order of magnitude to the authz check.
 		// since maintaining indexes costs time/memory while processing graph changes, we don't want to make this too low.
-		destinationEdgeThreshold: 200,
+		//
+		// FIXME: It seems to be causing significant lock-contention on high throughput and not keeping up.
+		// Experiment with smaller value.
+		// Rationale: let's avoid dangling objects, but if some object is referenced from 5 pods, it's clearly used,
+		// so will also be asked for (i.e. list+watch from kubelet).
+		destinationEdgeThreshold: 5,
 	}
 }
 
