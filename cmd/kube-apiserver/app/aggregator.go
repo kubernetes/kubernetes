@@ -22,7 +22,6 @@ package app
 import (
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 	"sync"
 
@@ -35,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/endpoints/discovery"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/healthz"
@@ -290,7 +290,7 @@ func apiServicesToRegister(delegateAPIServer genericapiserver.DelegationTarget, 
 
 	for _, curr := range delegateAPIServer.ListedPaths() {
 		if curr == "/api/v1" {
-			hash, err := getGroupVersionHash(curr, delegateAPIServer.UnprotectedHandler())
+			hash, err := discovery.GetGroupVersionHash(curr, delegateAPIServer.UnprotectedHandler())
 			if err != nil {
 				klog.Warning(err)
 			}
@@ -309,7 +309,7 @@ func apiServicesToRegister(delegateAPIServer genericapiserver.DelegationTarget, 
 			continue
 		}
 
-		hash, err := getGroupVersionHash(curr, delegateAPIServer.UnprotectedHandler())
+		hash, err := discovery.GetGroupVersionHash(curr, delegateAPIServer.UnprotectedHandler())
 		if err != nil {
 			klog.Warning(err)
 		}
@@ -322,65 +322,4 @@ func apiServicesToRegister(delegateAPIServer genericapiserver.DelegationTarget, 
 	}
 
 	return apiServices
-}
-
-func getGroupVersionHash(path string, handler http.Handler) (string, error) {
-	// TODO: This can be optimized by using HEAD since we are only interested in the ETag
-	req, err := http.NewRequest("GET", path, nil)
-	if err != nil {
-		return "", err
-	}
-	writer := newInMemoryResponseWriter()
-	handler.ServeHTTP(writer, req)
-	if writer.respCode != http.StatusOK {
-		return "", fmt.Errorf("Error requesting has for group-version under %s", path)
-	}
-	etag := writer.Header().Get("Etag")
-	etag, err = strconv.Unquote(etag)
-	if err != nil {
-		return "", err
-	}
-	return etag, nil
-}
-
-// inMemoryResponseWriter is a http.Writer that keep the response in memory.
-type inMemoryResponseWriter struct {
-	writeHeaderCalled bool
-	header            http.Header
-	respCode          int
-	data              []byte
-}
-
-// This is duplicated from the OpenAPI downloader
-// TODO: Maybe move this into a utility library
-func newInMemoryResponseWriter() *inMemoryResponseWriter {
-	return &inMemoryResponseWriter{header: http.Header{}}
-}
-
-func (r *inMemoryResponseWriter) Header() http.Header {
-	return r.header
-}
-
-func (r *inMemoryResponseWriter) WriteHeader(code int) {
-	r.writeHeaderCalled = true
-	r.respCode = code
-}
-
-func (r *inMemoryResponseWriter) Write(in []byte) (int, error) {
-	if !r.writeHeaderCalled {
-		r.WriteHeader(http.StatusOK)
-	}
-	r.data = append(r.data, in...)
-	return len(in), nil
-}
-
-func (r *inMemoryResponseWriter) String() string {
-	s := fmt.Sprintf("ResponseCode: %d", r.respCode)
-	if r.data != nil {
-		s += fmt.Sprintf(", Body: %s", string(r.data))
-	}
-	if r.header != nil {
-		s += fmt.Sprintf(", Header: %s", r.header)
-	}
-	return s
 }

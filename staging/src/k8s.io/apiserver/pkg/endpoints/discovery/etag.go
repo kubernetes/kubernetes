@@ -19,6 +19,8 @@ package discovery
 import (
 	"crypto/sha512"
 	"fmt"
+	"net/http"
+	"strconv"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -33,4 +35,62 @@ func CalculateETag(resurces *metav1.APIResourceList) (string, error) {
 	}
 
 	return fmt.Sprintf("%X", sha512.Sum512(serialized)), nil
+}
+
+func GetGroupVersionHash(path string, handler http.Handler) (string, error) {
+	req, err := http.NewRequest("GET", path, nil)
+	if err != nil {
+		return "", err
+	}
+	writer := newInMemoryResponseWriter()
+	handler.ServeHTTP(writer, req)
+	if writer.respCode != http.StatusOK {
+		return "", fmt.Errorf("Error requesting hash for group-version %v, %v", path, writer.String())
+	}
+	etag := writer.Header().Get("Etag")
+	etag, err = strconv.Unquote(etag)
+	if err != nil {
+		return "", err
+	}
+	return etag, nil
+}
+
+// inMemoryResponseWriter is a http.Writer that keep the response in memory.
+type inMemoryResponseWriter struct {
+	writeHeaderCalled bool
+	header            http.Header
+	respCode          int
+	data              []byte
+}
+
+func newInMemoryResponseWriter() *inMemoryResponseWriter {
+	return &inMemoryResponseWriter{header: http.Header{}}
+}
+
+func (r *inMemoryResponseWriter) Header() http.Header {
+	return r.header
+}
+
+func (r *inMemoryResponseWriter) WriteHeader(code int) {
+	r.writeHeaderCalled = true
+	r.respCode = code
+}
+
+func (r *inMemoryResponseWriter) Write(in []byte) (int, error) {
+	if !r.writeHeaderCalled {
+		r.WriteHeader(http.StatusOK)
+	}
+	r.data = append(r.data, in...)
+	return len(in), nil
+}
+
+func (r *inMemoryResponseWriter) String() string {
+	s := fmt.Sprintf("ResponseCode: %d", r.respCode)
+	if r.data != nil {
+		s += fmt.Sprintf(", Body: %s", string(r.data))
+	}
+	if r.header != nil {
+		s += fmt.Sprintf(", Header: %s", r.header)
+	}
+	return s
 }
