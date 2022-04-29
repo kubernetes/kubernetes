@@ -62,7 +62,11 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			time.Sleep(10 * time.Second)
 			sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Get(ctx, "default", metav1.GetOptions{})
 			framework.ExpectNoError(err)
-			framework.ExpectEmpty(sa.Secrets)
+
+			// TODO: OpenShift creates a Secret with a prefix "default-dockercfg", is the
+			//  following assertion valid?
+			framework.ExpectEqual(len(sa.Secrets), 1)
+			framework.ExpectEqual(strings.HasPrefix(sa.Secrets[0].Name, "default-dockercfg"), true)
 		}
 	})
 
