@@ -152,22 +152,6 @@ func (h *Heap) Add(obj interface{}) error {
 	return nil
 }
 
-// AddIfNotPresent inserts an item, and puts it in the queue. If an item with
-// the key is present in the map, no changes is made to the item.
-func (h *Heap) AddIfNotPresent(obj interface{}) error {
-	key, err := h.data.keyFunc(obj)
-	if err != nil {
-		return cache.KeyError{Obj: obj, Err: err}
-	}
-	if _, exists := h.data.items[key]; !exists {
-		heap.Push(h.data, &itemKeyValue{key, obj})
-		if h.metricRecorder != nil {
-			h.metricRecorder.Inc()
-		}
-	}
-	return nil
-}
-
 // Update is the same as Add in this implementation. When the item does not
 // exist, it is added.
 func (h *Heap) Update(obj interface{}) error {
