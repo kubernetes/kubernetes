@@ -18,13 +18,11 @@ package spdy
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -314,29 +312,16 @@ func (s *SpdyRoundTripper) proxyAuth(proxyURL *url.URL) string {
 // clients may call SpdyRoundTripper.Connection() to retrieve the upgraded
 // connection.
 func (s *SpdyRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	header := utilnet.CloneHeader(req.Header)
-	header.Add(httpstream.HeaderConnection, httpstream.HeaderUpgrade)
-	header.Add(httpstream.HeaderUpgrade, HeaderSpdy31)
+	req = utilnet.CloneRequest(req)
+	req.Header.Add(httpstream.HeaderConnection, httpstream.HeaderUpgrade)
+	req.Header.Add(httpstream.HeaderUpgrade, HeaderSpdy31)
 
-	var (
-		conn        net.Conn
-		rawResponse []byte
-		err         error
-	)
-
-	clone := utilnet.CloneRequest(req)
-	clone.Header = header
-	conn, err = s.Dial(clone)
+	conn, err := s.Dial(req)
 	if err != nil {
 		return nil, err
 	}
 
-	responseReader := bufio.NewReader(
-		io.MultiReader(
-			bytes.NewBuffer(rawResponse),
-			conn,
-		),
-	)
+	responseReader := bufio.NewReader(conn)
 
 	resp, err := http.ReadResponse(responseReader, nil)
 	if err != nil {
