@@ -31,6 +31,7 @@ import (
 	cachetools "k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/integration/apimachinery/watchtotalorder"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
@@ -377,6 +378,23 @@ var _ = SIGDescribe("Watchers", func() {
 		}
 		<-donec
 	})
+
+	/*
+	   Release: v1.25
+	   Testname: watch-total-order
+	   Description: Ensure that clients observe an identical total order of events across a set of keys, irrespective
+	   of how many individual watch calls are used to observe the full set for any given client. When a client observes
+	   events on some interval between resource versions a and b with one watch stream, they must observe all events on
+	   that interval [a, b], in order.
+	   TODO(skuznets): promote to conformance
+	*/
+	ginkgo.It("should observe a total order of events across watch calls", func() {
+		cfg := f.ClientConfig()
+		ns := f.Namespace.Name
+
+		err := watchtotalorder.Run(context.Background(), cfg, &adapter{}, ns, false)
+		framework.ExpectNoError(err)
+	})
 })
 
 func watchConfigMaps(f *framework.Framework, resourceVersion string, labels ...string) (watch.Interface, error) {
@@ -525,3 +543,15 @@ func produceConfigMapEvents(f *framework.Framework, stopc <-chan struct{}, minWa
 		}
 	}
 }
+
+type adapter struct{}
+
+func (g adapter) Log(s string) {
+	ginkgo.By(s)
+}
+
+func (g adapter) Fatal(format string, args ...interface{}) {
+	framework.Failf(format, args...)
+}
+
+var _ watchtotalorder.Logger = &adapter{}
