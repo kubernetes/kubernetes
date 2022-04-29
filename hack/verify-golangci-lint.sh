@@ -14,18 +14,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This script checks coding style for go language files in each
-# Kubernetes package by golint.
+# This script checks the coding style for the Go language files using
+# golangci-lint. Which checks are enabled depends on command line flags. The
+# default is a minimal set of checks that all existing code passes without
+# issues.
 
 usage () {
   cat <<EOF >&2
-Usage: $0 [-- <golangci-lint run flags>] [packages]"
+Usage: $0 [-r <revision>|-a] [-s] [-c none|<config>] [-- <golangci-lint run flags>] [packages]"
+   -r <revision>: only report issues in code added since that revision
+   -a: automatically select the common base of origin/master and HEAD
+       as revision
+   -s: select a strict configuration for new code
    -c <config|"none">: use the specified configuration or none instead of the default hack/golangci.yaml
    [packages]: check specific packages or directories instead of everything
 EOF
   exit 1
 }
-
 
 set -o errexit
 set -o nounset
@@ -50,8 +55,26 @@ invocation=(./hack/verify-golangci-lint.sh "$@")
 # _output/local/bin/golangci-lint cache clean
 golangci=(env LOGCHECK_CONFIG="${KUBE_ROOT}/hack/logcheck.conf" "${GOBIN}/golangci-lint" run)
 golangci_config="${KUBE_ROOT}/hack/golangci.yaml"
-while getopts "c:" o; do
+base=
+strict=
+githubactions=
+while getopts "ar:sc:" o; do
   case "${o}" in
+    a)
+      base="$(git merge-base origin/master HEAD)"
+      ;;
+    r)
+      base="${OPTARG}"
+      if [ ! "$base" ]; then
+        echo "ERROR: -c needs a non-empty parameter" >&2
+        echo >&2
+        usage
+      fi
+      ;;
+    s)
+      golangci_config="${KUBE_ROOT}/hack/golangci-strict.yaml"
+      strict=1
+      ;;
     c)
       if [ "${OPTARG}" = "none" ]; then
         golangci_config=""
@@ -68,6 +91,16 @@ done
 if [ "${golangci_config}" ]; then
     golangci+=(--config="${golangci_config}")
 fi
+
+if [ "$base" ]; then
+    # Must be a something that git can resolve to a commit.
+    # "git rev-parse --verify" checks that and prints a detailed
+    # error.
+    base="$(git rev-parse --verify "$base")"
+    golangci+=(--new --new-from-rev="$base")
+fi
+
+kube::golang::verify_go_version
 
 # Filter out arguments that start with "-" and move them to the run flags.
 shift $((OPTIND-1))
@@ -122,6 +155,11 @@ else
     echo "Please review the above warnings. You can test via \"${invocation[*]}\""
     echo 'If the above warnings do not make sense, you can exempt this warning with a comment'
     echo ' (if your reviewer is okay with it).'
+    if [ "$strict" ]; then
+        echo 'The more strict golangci-strict.yaml was used. If you feel that this warns about issues'
+        echo 'that should be ignored by default, then please discuss with your reviewer and propose'
+        echo 'a change for hack/golangci-strict.yaml as part of your PR.'
+    fi
     echo 'In general please prefer to fix the error, we have already disabled specific lints'
     echo ' that the project chooses to ignore.'
     echo 'See: https://golangci-lint.run/usage/false-positives/'
