@@ -140,7 +140,8 @@ func createAggregatorServer(aggregatorConfig *aggregatorapiserver.Config, delega
 	apiServices := apiServicesToRegister(delegateAPIServer, autoRegistrationController)
 	crdRegistrationController := crdregistration.NewCRDRegistrationController(
 		apiExtensionInformers.Apiextensions().V1().CustomResourceDefinitions(),
-		autoRegistrationController)
+		autoRegistrationController,
+		delegateAPIServer.UnprotectedHandler())
 
 	err = aggregatorServer.GenericAPIServer.AddPostStartHook("kube-apiserver-autoregistration", func(context genericapiserver.PostStartHookContext) error {
 		go crdRegistrationController.Run(5, context.StopCh)

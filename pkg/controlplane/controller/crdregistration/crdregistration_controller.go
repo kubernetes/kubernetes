@@ -18,6 +18,7 @@ package crdregistration
 
 import (
 	"fmt"
+	"net/http"
 	"time"
 
 	"k8s.io/klog/v2"
@@ -30,6 +31,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/endpoints/discovery"
+	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
@@ -48,6 +52,8 @@ type crdRegistrationController struct {
 	crdLister crdlisters.CustomResourceDefinitionLister
 	crdSynced cache.InformerSynced
 
+	crdAPIHandler http.Handler
+
 	apiServiceRegistration AutoAPIServiceRegistration
 
 	syncHandler func(groupVersion schema.GroupVersion) error
@@ -61,13 +67,14 @@ type crdRegistrationController struct {
 
 // NewCRDRegistrationController returns a controller which will register CRD GroupVersions with the auto APIService registration
 // controller so they automatically stay in sync.
-func NewCRDRegistrationController(crdinformer crdinformers.CustomResourceDefinitionInformer, apiServiceRegistration AutoAPIServiceRegistration) *crdRegistrationController {
+func NewCRDRegistrationController(crdinformer crdinformers.CustomResourceDefinitionInformer, apiServiceRegistration AutoAPIServiceRegistration, crdAPIHandler http.Handler) *crdRegistrationController {
 	c := &crdRegistrationController{
 		crdLister:              crdinformer.Lister(),
 		crdSynced:              crdinformer.Informer().HasSynced,
 		apiServiceRegistration: apiServiceRegistration,
 		syncedInitialSet:       make(chan struct{}),
 		queue:                  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "crd_autoregistration_controller"),
+		crdAPIHandler:          crdAPIHandler,
 	}
 	c.syncHandler = c.handleVersionUpdate
 
@@ -198,6 +205,18 @@ func (c *crdRegistrationController) handleVersionUpdate(groupVersion schema.Grou
 	if err != nil {
 		return err
 	}
+
+	//!TODO: This is likely not the best way to accomplish this.
+	// crdAPIHandler giving error 500 for missing RequestInfo?
+	hash, err := discovery.GetGroupVersionHash(
+		"/apis/"+groupVersion.Group+"/"+groupVersion.Version,
+		genericapifilters.WithRequestInfo(c.crdAPIHandler, &request.RequestInfoFactory{}),
+	)
+	if err != nil {
+		klog.Error(err.Error())
+		return err
+	}
+
 	for _, crd := range crds {
 		if crd.Spec.Group != groupVersion.Group {
 			continue
@@ -214,6 +233,9 @@ func (c *crdRegistrationController) handleVersionUpdate(groupVersion schema.Grou
 					Version:              groupVersion.Version,
 					GroupPriorityMinimum: 1000, // CRDs should have relatively low priority
 					VersionPriority:      100,  // CRDs will be sorted by kube-like versions like any other APIService with the same VersionPriority
+				},
+				Status: v1.APIServiceStatus{
+					Hash: hash,
 				},
 			})
 			return nil
