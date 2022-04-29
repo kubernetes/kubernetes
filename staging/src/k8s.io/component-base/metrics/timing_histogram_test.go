@@ -18,63 +18,68 @@ package metrics
 
 import (
 	"testing"
+	"time"
 
 	"github.com/blang/semver/v4"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
+	testclock "k8s.io/utils/clock/testing"
 )
 
-func TestHistogram(t *testing.T) {
+func TestTimingHistogram(t *testing.T) {
 	v115 := semver.MustParse("1.15.0")
 	var tests = []struct {
 		desc string
-		*HistogramOpts
+		*TimingHistogramOpts
 		registryVersion     *semver.Version
 		expectedMetricCount int
 		expectedHelp        string
 	}{
 		{
 			desc: "Test non deprecated",
-			HistogramOpts: &HistogramOpts{
-				Namespace: "namespace",
-				Name:      "metric_test_name",
-				Subsystem: "subsystem",
-				Help:      "histogram help message",
-				Buckets:   prometheus.DefBuckets,
+			TimingHistogramOpts: &TimingHistogramOpts{
+				Namespace:    "namespace",
+				Name:         "metric_test_name",
+				Subsystem:    "subsystem",
+				Help:         "histogram help message",
+				Buckets:      DefBuckets,
+				InitialValue: 13,
 			},
 			registryVersion:     &v115,
 			expectedMetricCount: 1,
-			expectedHelp:        "[ALPHA] histogram help message",
+			expectedHelp:        "EXPERIMENTAL: [ALPHA] histogram help message",
 		},
 		{
 			desc: "Test deprecated",
-			HistogramOpts: &HistogramOpts{
+			TimingHistogramOpts: &TimingHistogramOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
 				Subsystem:         "subsystem",
 				Help:              "histogram help message",
 				DeprecatedVersion: "1.15.0",
-				Buckets:           prometheus.DefBuckets,
+				Buckets:           DefBuckets,
+				InitialValue:      3,
 			},
 			registryVersion:     &v115,
 			expectedMetricCount: 1,
-			expectedHelp:        "[ALPHA] (Deprecated since 1.15.0) histogram help message",
+			expectedHelp:        "EXPERIMENTAL: [ALPHA] (Deprecated since 1.15.0) histogram help message",
 		},
 		{
 			desc: "Test hidden",
-			HistogramOpts: &HistogramOpts{
+			TimingHistogramOpts: &TimingHistogramOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
 				Subsystem:         "subsystem",
 				Help:              "histogram help message",
 				DeprecatedVersion: "1.14.0",
-				Buckets:           prometheus.DefBuckets,
+				Buckets:           DefBuckets,
+				InitialValue:      5,
 			},
 			registryVersion:     &v115,
 			expectedMetricCount: 0,
-			expectedHelp:        "histogram help message",
+			expectedHelp:        "EXPERIMENTAL: histogram help message",
 		},
 	}
 
@@ -85,16 +90,20 @@ func TestHistogram(t *testing.T) {
 				Minor:      "15",
 				GitVersion: "v1.15.0-alpha-1.12345",
 			})
-			c := NewHistogram(test.HistogramOpts)
+			t0 := time.Now()
+			clk := testclock.NewFakePassiveClock(t0)
+			c := NewTestableTimingHistogram(clk.Now, test.TimingHistogramOpts)
 			registry.MustRegister(c)
-			cm := c.ObserverMetric.(prometheus.Metric)
 
-			metricChan := make(chan prometheus.Metric, 2)
-			c.Collect(metricChan)
-			close(metricChan)
+			metricChan := make(chan prometheus.Metric)
+			go func() {
+				c.Collect(metricChan)
+				close(metricChan)
+			}()
 			m1 := <-metricChan
-			if m1 != cm {
-				t.Error("Unexpected metric", m1, cm)
+			gm1, ok := m1.(GaugeMetric)
+			if !ok || gm1 != c.GaugeMetric {
+				t.Error("Unexpected metric", m1, c.GaugeMetric)
 			}
 			m2, ok := <-metricChan
 			if ok {
@@ -109,29 +118,43 @@ func TestHistogram(t *testing.T) {
 				assert.Equalf(t, test.expectedHelp, metric.GetHelp(), "Got %s as help message, want %s", metric.GetHelp(), test.expectedHelp)
 			}
 
-			// let's increment the counter and verify that the metric still works
-			c.Observe(1)
-			c.Observe(2)
-			c.Observe(3)
-			c.Observe(1.5)
-			expected := 4
+			// let's exercise the metric and check that it still works
+			v0 := test.TimingHistogramOpts.InitialValue
+			dt1 := time.Nanosecond
+			t1 := t0.Add(dt1)
+			clk.SetTime(t1)
+			var v1 float64 = 10
+			c.Set(v1)
+			dt2 := time.Hour
+			t2 := t1.Add(dt2)
+			clk.SetTime(t2)
+			var v2 float64 = 1e6
+			c.Add(v2 - v1)
+			dt3 := time.Microsecond
+			t3 := t2.Add(dt3)
+			clk.SetTime(t3)
+			c.Set(0)
+			expectedCount := uint64(dt1 + dt2 + dt3)
+			expectedSum := float64(dt1)*v0 + float64(dt2)*v1 + float64(dt3)*v2
 			ms, err = registry.Gather()
 			assert.Nil(t, err, "Gather failed %v", err)
 
 			for _, mf := range ms {
+				t.Logf("Considering metric family %s", mf.GetName())
 				for _, m := range mf.GetMetric() {
-					assert.Equalf(t, expected, int(m.GetHistogram().GetSampleCount()), "Got %v, want %v as the sample count", m.GetHistogram().GetSampleCount(), expected)
+					assert.Equalf(t, expectedCount, m.GetHistogram().GetSampleCount(), "Got %v, want %v as the sample count of metric %s", m.GetHistogram().GetSampleCount(), expectedCount, m.String())
+					assert.Equalf(t, expectedSum, m.GetHistogram().GetSampleSum(), "Got %v, want %v as the sample sum of metric %s", m.GetHistogram().GetSampleSum(), expectedSum, m.String())
 				}
 			}
 		})
 	}
 }
 
-func TestHistogramVec(t *testing.T) {
+func TestTimingHistogramVec(t *testing.T) {
 	v115 := semver.MustParse("1.15.0")
 	var tests = []struct {
 		desc string
-		*HistogramOpts
+		*TimingHistogramOpts
 		labels              []string
 		registryVersion     *semver.Version
 		expectedMetricCount int
@@ -139,47 +162,50 @@ func TestHistogramVec(t *testing.T) {
 	}{
 		{
 			desc: "Test non deprecated",
-			HistogramOpts: &HistogramOpts{
-				Namespace: "namespace",
-				Name:      "metric_test_name",
-				Subsystem: "subsystem",
-				Help:      "histogram help message",
-				Buckets:   prometheus.DefBuckets,
+			TimingHistogramOpts: &TimingHistogramOpts{
+				Namespace:    "namespace",
+				Name:         "metric_test_name",
+				Subsystem:    "subsystem",
+				Help:         "histogram help message",
+				Buckets:      DefBuckets,
+				InitialValue: 5,
 			},
 			labels:              []string{"label_a", "label_b"},
 			registryVersion:     &v115,
 			expectedMetricCount: 1,
-			expectedHelp:        "[ALPHA] histogram help message",
+			expectedHelp:        "EXPERIMENTAL: [ALPHA] histogram help message",
 		},
 		{
 			desc: "Test deprecated",
-			HistogramOpts: &HistogramOpts{
+			TimingHistogramOpts: &TimingHistogramOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
 				Subsystem:         "subsystem",
 				Help:              "histogram help message",
 				DeprecatedVersion: "1.15.0",
-				Buckets:           prometheus.DefBuckets,
+				Buckets:           DefBuckets,
+				InitialValue:      13,
 			},
 			labels:              []string{"label_a", "label_b"},
 			registryVersion:     &v115,
 			expectedMetricCount: 1,
-			expectedHelp:        "[ALPHA] (Deprecated since 1.15.0) histogram help message",
+			expectedHelp:        "EXPERIMENTAL: [ALPHA] (Deprecated since 1.15.0) histogram help message",
 		},
 		{
 			desc: "Test hidden",
-			HistogramOpts: &HistogramOpts{
+			TimingHistogramOpts: &TimingHistogramOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
 				Subsystem:         "subsystem",
 				Help:              "histogram help message",
 				DeprecatedVersion: "1.14.0",
-				Buckets:           prometheus.DefBuckets,
+				Buckets:           DefBuckets,
+				InitialValue:      42,
 			},
 			labels:              []string{"label_a", "label_b"},
 			registryVersion:     &v115,
 			expectedMetricCount: 0,
-			expectedHelp:        "histogram help message",
+			expectedHelp:        "EXPERIMENTAL: histogram help message",
 		},
 	}
 
@@ -190,18 +216,23 @@ func TestHistogramVec(t *testing.T) {
 				Minor:      "15",
 				GitVersion: "v1.15.0-alpha-1.12345",
 			})
-			c := NewHistogramVec(test.HistogramOpts, test.labels)
+			t0 := time.Now()
+			clk := testclock.NewFakePassiveClock(t0)
+			c := NewTestableTimingHistogramVec(clk.Now, test.TimingHistogramOpts, test.labels)
 			registry.MustRegister(c)
-			ov12 := c.WithLabelValues("1", "2")
-			cm1 := ov12.(prometheus.Metric)
-			ov12.Observe(1.0)
+			var v0 float64 = 3
+			cm1, err := c.WithLabelValues("1", "2")
+			if err != nil {
+				t.Error(err)
+			}
+			cm1.Set(v0)
 
 			if test.expectedMetricCount > 0 {
 				metricChan := make(chan prometheus.Metric, 2)
 				c.Collect(metricChan)
 				close(metricChan)
 				m1 := <-metricChan
-				if m1 != cm1 {
+				if m1 != cm1.(prometheus.Metric) {
 					t.Error("Unexpected metric", m1, cm1)
 				}
 				m2, ok := <-metricChan
@@ -219,31 +250,42 @@ func TestHistogramVec(t *testing.T) {
 				}
 			}
 
-			// let's increment the counter and verify that the metric still works
-			c.WithLabelValues("1", "3").Observe(1.0)
-			c.WithLabelValues("2", "3").Observe(1.0)
+			// let's exercise the metric and verify it still works
+			c.Set(v0, "1", "3")
+			c.Set(v0, "2", "3")
+			dt1 := time.Nanosecond
+			t1 := t0.Add(dt1)
+			clk.SetTime(t1)
+			c.Add(5.0, "1", "2")
+			c.Add(5.0, "1", "3")
+			c.Add(5.0, "2", "3")
 			ms, err = registry.Gather()
 			assert.Nil(t, err, "Gather failed %v", err)
 
 			for _, mf := range ms {
-				assert.Equalf(t, 3, len(mf.GetMetric()), "Got %v metrics, wanted 3 as the count", len(mf.GetMetric()))
+				t.Logf("Considering metric family %s", mf.String())
+				assert.Equalf(t, 3, len(mf.GetMetric()), "Got %v metrics, wanted 3 as the count for family %#+v", len(mf.GetMetric()), mf)
 				for _, m := range mf.GetMetric() {
-					assert.Equalf(t, uint64(1), m.GetHistogram().GetSampleCount(), "Got %v metrics, expected histogram sample count to equal 1", m.GetHistogram().GetSampleCount())
+					expectedCount := uint64(dt1)
+					expectedSum := float64(dt1) * v0
+					assert.Equalf(t, expectedCount, m.GetHistogram().GetSampleCount(), "Got %v, expected histogram sample count to equal %d for metric %s", m.GetHistogram().GetSampleCount(), expectedCount, m.String())
+					assert.Equalf(t, expectedSum, m.GetHistogram().GetSampleSum(), "Got %v, expected histogram sample sum to equal %v for metric %s", m.GetHistogram().GetSampleSum(), expectedSum, m.String())
 				}
 			}
 		})
 	}
 }
 
-func TestHistogramWithLabelValueAllowList(t *testing.T) {
+func TestTimingHistogramWithLabelValueAllowList(t *testing.T) {
 	labelAllowValues := map[string]string{
 		"namespace_subsystem_metric_allowlist_test,label_a": "allowed",
 	}
 	labels := []string{"label_a", "label_b"}
-	opts := &HistogramOpts{
-		Namespace: "namespace",
-		Name:      "metric_allowlist_test",
-		Subsystem: "subsystem",
+	opts := &TimingHistogramOpts{
+		Namespace:    "namespace",
+		Name:         "metric_allowlist_test",
+		Subsystem:    "subsystem",
+		InitialValue: 7,
 	}
 	var tests = []struct {
 		desc               string
@@ -276,11 +318,21 @@ func TestHistogramWithLabelValueAllowList(t *testing.T) {
 				Minor:      "15",
 				GitVersion: "v1.15.0-alpha-1.12345",
 			})
-			c := NewHistogramVec(opts, labels)
+			t0 := time.Now()
+			clk := testclock.NewFakePassiveClock(t0)
+			c := NewTestableTimingHistogramVec(clk.Now, opts, labels)
 			registry.MustRegister(c)
+			var v0 float64 = 13
+			for _, lv := range test.labelValues {
+				c.Set(v0, lv...)
+			}
+
+			dt1 := 3 * time.Hour
+			t1 := t0.Add(dt1)
+			clk.SetTime(t1)
 
 			for _, lv := range test.labelValues {
-				c.WithLabelValues(lv...).Observe(1.0)
+				c.Add(1.0, lv...)
 			}
 			mfs, err := registry.Gather()
 			assert.Nil(t, err, "Gather failed %v", err)
@@ -290,6 +342,7 @@ func TestHistogramWithLabelValueAllowList(t *testing.T) {
 					continue
 				}
 				mfMetric := mf.GetMetric()
+				t.Logf("Consider metric family %s", mf.GetName())
 
 				for _, m := range mfMetric {
 					var aValue, bValue string
@@ -302,10 +355,14 @@ func TestHistogramWithLabelValueAllowList(t *testing.T) {
 						}
 					}
 					labelValuePair := aValue + " " + bValue
-					expectedValue, ok := test.expectMetricValues[labelValuePair]
+					expectedCount, ok := test.expectMetricValues[labelValuePair]
 					assert.True(t, ok, "Got unexpected label values, lable_a is %v, label_b is %v", aValue, bValue)
-					actualValue := m.GetHistogram().GetSampleCount()
-					assert.Equalf(t, expectedValue, actualValue, "Got %v, wanted %v as the count while setting label_a to %v and label b to %v", actualValue, expectedValue, aValue, bValue)
+					expectedSum := float64(dt1) * v0 * float64(expectedCount)
+					expectedCount *= uint64(dt1)
+					actualCount := m.GetHistogram().GetSampleCount()
+					actualSum := m.GetHistogram().GetSampleSum()
+					assert.Equalf(t, expectedCount, actualCount, "Got %v, wanted %v as the count while setting label_a to %v and label b to %v", actualCount, expectedCount, aValue, bValue)
+					assert.Equalf(t, expectedSum, actualSum, "Got %v, wanted %v as the sum while setting label_a to %v and label b to %v", actualSum, expectedSum, aValue, bValue)
 				}
 			}
 		})

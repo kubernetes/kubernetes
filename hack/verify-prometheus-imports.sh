@@ -66,6 +66,7 @@ allowed_prometheus_importers=(
   ./staging/src/k8s.io/component-base/metrics/testutil/metrics_test.go
   ./staging/src/k8s.io/component-base/metrics/testutil/promlint.go
   ./staging/src/k8s.io/component-base/metrics/testutil/testutil.go
+  ./staging/src/k8s.io/component-base/metrics/timing_histogram_test.go
   ./staging/src/k8s.io/component-base/metrics/value.go
   ./staging/src/k8s.io/component-base/metrics/wrappers.go
   ./test/e2e/apimachinery/flowcontrol.go

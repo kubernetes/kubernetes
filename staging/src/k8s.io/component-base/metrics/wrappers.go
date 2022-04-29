@@ -17,6 +17,9 @@ limitations under the License.
 package metrics
 
 import (
+	"context"
+	"errors"
+
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 )
@@ -65,6 +68,70 @@ type GaugeMetric interface {
 	SetToCurrentTime()
 }
 
+// GaugeMetricVec is a collection of Gauges that differ only in label values.
+// This is really just one Metric.
+// It might be better called GaugeVecMetric, but that pattern of name is already
+// taken by the other pattern --- which is treacherous.  The treachery is that
+// WithLabelValues can return an object that is permanently broken (i.e., a noop).
+type GaugeMetricVec interface {
+	Set(value float64, labelValues ...string)
+	Inc(labelValues ...string)
+	Dec(labelValues ...string)
+	Add(delta float64, labelValues ...string)
+	SetToCurrentTime(labelValues ...string)
+
+	SetForLabels(value float64, labels map[string]string)
+	IncForLabels(labels map[string]string)
+	DecForLabels(labels map[string]string)
+	AddForLabels(delta float64, labels map[string]string)
+	SetToCurrentTimeForLabels(labels map[string]string)
+
+	// WithLabelValues, if called after this vector has been
+	// registered in at least one registry and this vector is not
+	// hidden, will return a GaugeMetric that is NOT a noop along
+	// with nil error.  If called on a hidden vector then it will
+	// return a noop and a nil error.  Otherwise it returns a noop
+	// and an error that passes ErrIsNotReady.
+	WithLabelValues(labelValues ...string) (GaugeMetric, error)
+
+	// With, if called after this vector has been
+	// registered in at least one registry and this vector is not
+	// hidden, will return a GaugeMetric that is NOT a noop along
+	// with nil error.  If called on a hidden vector then it will
+	// return a noop and a nil error.  Otherwise it returns a noop
+	// and an error that passes ErrIsNotReady.
+	With(labels map[string]string) (GaugeMetric, error)
+
+	// Delete asserts that the vec should have no member for the given label set.
+	// The returned bool indicates whether there was a change.
+	// The return will certainly be `false` if the given label set has the wrong
+	// set of label names.
+	Delete(map[string]string) bool
+
+	// Reset removes all the members
+	Reset()
+}
+
+// PreContextGaugeMetricVec is something that can construct a GaugeMetricVec
+// that uses a given Context.
+type PreContextGaugeMetricVec interface {
+	// WithContext creates a GaugeMetricVec that uses the given Context
+	WithContext(ctx context.Context) GaugeMetricVec
+}
+
+// RegisterableGaugeMetricVec is the intersection of Registerable and GaugeMetricVec
+type RegisterableGaugeMetricVec interface {
+	Registerable
+	GaugeMetricVec
+}
+
+// PreContextAndRegisterableGaugeMetricVec is the intersection of
+// PreContextGaugeMetricVec and RegisterableGaugeMetricVec
+type PreContextAndRegisterableGaugeMetricVec interface {
+	PreContextGaugeMetricVec
+	RegisterableGaugeMetricVec
+}
+
 // ObserverMetric captures individual observations.
 type ObserverMetric interface {
 	Observe(float64)
@@ -93,3 +160,9 @@ type GaugeFunc interface {
 	Metric
 	Collector
 }
+
+func ErrIsNotReady(err error) bool {
+	return err == errNotReady
+}
+
+var errNotReady = errors.New("metric vec is not registered yet")
