@@ -84,7 +84,7 @@ func (f *MatchVersionFlags) ToRawKubeConfigLoader() clientcmd.ClientConfig {
 	return f.Delegate.ToRawKubeConfigLoader()
 }
 
-func (f *MatchVersionFlags) ToDiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
+func (f *MatchVersionFlags) ToDiscoveryClient() (discovery.DiscoveryInterface, error) {
 	if err := f.checkMatchingServerVersion(); err != nil {
 		return nil, err
 	}
