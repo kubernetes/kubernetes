@@ -273,29 +273,20 @@ func (s *SpdyRoundTripper) tlsConn(ctx context.Context, rwc net.Conn, targetHost
 // dialWithoutProxy dials the host specified by url, using TLS if appropriate.
 func (s *SpdyRoundTripper) dialWithoutProxy(ctx context.Context, url *url.URL) (net.Conn, error) {
 	dialAddr := netutil.CanonicalAddr(url)
+	dialer := s.Dialer
+	if dialer == nil {
+		dialer = &net.Dialer{}
+	}
 
 	if url.Scheme == "http" {
-		if s.Dialer == nil {
-			var d net.Dialer
-			return d.DialContext(ctx, "tcp", dialAddr)
-		} else {
-			return s.Dialer.DialContext(ctx, "tcp", dialAddr)
-		}
+		return dialer.DialContext(ctx, "tcp", dialAddr)
 	}
 
-	// TODO validate the TLSClientConfig is set up?
-	var conn *tls.Conn
-	var err error
-	if s.Dialer == nil {
-		conn, err = tls.Dial("tcp", dialAddr, s.tlsConfig)
-	} else {
-		conn, err = tls.DialWithDialer(s.Dialer, "tcp", dialAddr, s.tlsConfig)
+	tlsDialer := tls.Dialer{
+		NetDialer: dialer,
+		Config:    s.tlsConfig,
 	}
-	if err != nil {
-		return nil, err
-	}
-
-	return conn, nil
+	return tlsDialer.DialContext(ctx, "tcp", dialAddr)
 }
 
 // proxyAuth returns, for a given proxy URL, the value to be used for the Proxy-Authorization header
@@ -325,9 +316,7 @@ func (s *SpdyRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) 
 
 	resp, err := http.ReadResponse(responseReader, nil)
 	if err != nil {
-		if conn != nil {
-			conn.Close()
-		}
+		conn.Close()
 		return nil, err
 	}
 
