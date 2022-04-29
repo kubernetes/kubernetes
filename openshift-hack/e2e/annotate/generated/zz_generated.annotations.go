@@ -1153,15 +1153,15 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-network] Services should delete a collection of services [Conformance]": "should delete a collection of services [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[Top Level] [sig-network] Services should fail health check node port if there are only terminating endpoints [Feature:ProxyTerminatingEndpoints]": "should fail health check node port if there are only terminating endpoints [Feature:ProxyTerminatingEndpoints] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-network] Services should fail health check node port if there are only terminating endpoints [Feature:ProxyTerminatingEndpoints]": "should fail health check node port if there are only terminating endpoints [Feature:ProxyTerminatingEndpoints] [Disabled:Alpha] [Suite:k8s]",
 
-	"[Top Level] [sig-network] Services should fallback to local terminating endpoints when there are no ready endpoints with externalTrafficPolicy=Local [Feature:ProxyTerminatingEndpoints]": "should fallback to local terminating endpoints when there are no ready endpoints with externalTrafficPolicy=Local [Feature:ProxyTerminatingEndpoints] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-network] Services should fallback to local terminating endpoints when there are no ready endpoints with externalTrafficPolicy=Local [Feature:ProxyTerminatingEndpoints]": "should fallback to local terminating endpoints when there are no ready endpoints with externalTrafficPolicy=Local [Feature:ProxyTerminatingEndpoints] [Disabled:Alpha] [Suite:k8s]",
 
-	"[Top Level] [sig-network] Services should fallback to local terminating endpoints when there are no ready endpoints with internalTrafficPolicy=Local [Feature:ProxyTerminatingEndpoints]": "should fallback to local terminating endpoints when there are no ready endpoints with internalTrafficPolicy=Local [Feature:ProxyTerminatingEndpoints] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-network] Services should fallback to local terminating endpoints when there are no ready endpoints with internalTrafficPolicy=Local [Feature:ProxyTerminatingEndpoints]": "should fallback to local terminating endpoints when there are no ready endpoints with internalTrafficPolicy=Local [Feature:ProxyTerminatingEndpoints] [Disabled:Alpha] [Suite:k8s]",
 
-	"[Top Level] [sig-network] Services should fallback to terminating endpoints when there are no ready endpoints with externallTrafficPolicy=Cluster [Feature:ProxyTerminatingEndpoints]": "should fallback to terminating endpoints when there are no ready endpoints with externallTrafficPolicy=Cluster [Feature:ProxyTerminatingEndpoints] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-network] Services should fallback to terminating endpoints when there are no ready endpoints with externallTrafficPolicy=Cluster [Feature:ProxyTerminatingEndpoints]": "should fallback to terminating endpoints when there are no ready endpoints with externallTrafficPolicy=Cluster [Feature:ProxyTerminatingEndpoints] [Disabled:Alpha] [Suite:k8s]",
 
-	"[Top Level] [sig-network] Services should fallback to terminating endpoints when there are no ready endpoints with internalTrafficPolicy=Cluster [Feature:ProxyTerminatingEndpoints]": "should fallback to terminating endpoints when there are no ready endpoints with internalTrafficPolicy=Cluster [Feature:ProxyTerminatingEndpoints] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-network] Services should fallback to terminating endpoints when there are no ready endpoints with internalTrafficPolicy=Cluster [Feature:ProxyTerminatingEndpoints]": "should fallback to terminating endpoints when there are no ready endpoints with internalTrafficPolicy=Cluster [Feature:ProxyTerminatingEndpoints] [Disabled:Alpha] [Suite:k8s]",
 
 	"[Top Level] [sig-network] Services should find a service from listing all namespaces [Conformance]": "should find a service from listing all namespaces [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
@@ -1247,7 +1247,7 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-network] [Feature:PerformanceDNS][Serial] Should answer DNS query for maximum number of services per cluster": "Should answer DNS query for maximum number of services per cluster [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-network] [Feature:Topology Hints] should distribute endpoints evenly": "should distribute endpoints evenly [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-network] [Feature:Topology Hints] should distribute endpoints evenly": "should distribute endpoints evenly [Disabled:SpecialConfig] [Suite:k8s]",
 
 	"[Top Level] [sig-node] AppArmor load AppArmor profiles can disable an AppArmor profile, using unconfined": "can disable an AppArmor profile, using unconfined [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
