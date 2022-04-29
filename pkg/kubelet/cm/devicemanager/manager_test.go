@@ -1403,3 +1403,69 @@ func TestReadPreNUMACheckpoint(t *testing.T) {
 	err = m.readCheckpoint()
 	require.NoError(t, err)
 }
+
+type recoveringSourcesReady struct{}
+
+func (s *recoveringSourcesReady) AddSource(source string) {}
+func (s *recoveringSourcesReady) AllReady() bool          { return false }
+
+func TestRecoverPodWhileDeviceNotRegistered(t *testing.T) {
+	socketDir, socketName, _, err := tmpSocketDir()
+	require.NoError(t, err)
+	defer os.RemoveAll(socketDir)
+
+	resourceName1 := "domain1.com/resource1"
+
+	topologyStore := topologymanager.NewFakeManager()
+	m, err := newManagerImpl(socketName, nil, topologyStore)
+	require.NoError(t, err)
+
+	// simulate recovery, note we intentionally replace Start() with the following
+	m.sourcesReady = &recoveringSourcesReady{}
+
+	podName := "pod-dev-recover"
+	cntName := "cnt-dev-recover"
+	podUID := types.UID("1f4865ea-c7b0-11ec-93d7-8c16457c8c9c") // randomly generated, no special meaning
+
+	// simulate existing pod with device allocated. Just one of everything is enough to trigger the flow
+	m.podDevices.insert(string(podUID), cntName, resourceName1,
+		constructDevices([]string{"dev1"}),
+		constructAllocResp(map[string]string{"/dev/r1dev1": "/dev/r1dev1", "/dev/r1dev2": "/dev/r1dev2"},
+			map[string]string{"/home/r1lib1": "/usr/r1lib1"}, map[string]string{}))
+	m.allocatedDevices = m.podDevices.devices()
+
+	// note podDevices and allocatedDevices contains data, but healtyDevices is empty
+	// we are in this state when we are recovering pods from the apiserver and we
+	// recover a pod which had devices allocated, but the device plugin is not recovered yet,
+	// or it was recovered but the devices are not re-registered again.
+
+	cnt := v1.Container{
+		Name:  cntName,
+		Image: "fake.io/pause",
+		Resources: v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceName(resourceName1): resource.MustParse("1"),
+			},
+			Limits: v1.ResourceList{
+				v1.ResourceName(resourceName1): resource.MustParse("1"),
+			},
+		},
+		Command: []string{"/pause"},
+	}
+	pod := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: podName,
+			UID:  podUID,
+		},
+		Spec: v1.PodSpec{
+			RestartPolicy: v1.RestartPolicyNever,
+			Containers: []v1.Container{
+				cnt,
+			},
+		},
+	}
+
+	// simulate call done in the admission flow
+	err = m.Allocate(&pod, &cnt)
+	require.Error(t, err)
+}

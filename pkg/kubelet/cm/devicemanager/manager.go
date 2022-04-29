@@ -531,6 +531,13 @@ func (m *ManagerImpl) UpdateAllocatedDevices() {
 func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, required int, reusableDevices sets.String) (sets.String, error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
+
+	// Check if resource registered with devicemanager
+	if _, ok := m.healthyDevices[resource]; !ok {
+		klog.V(3).InfoS("Unhealthy device required by pod", "resourceName", resource, "podUID", string(podUID), "containerName", contName)
+		return nil, fmt.Errorf("can't allocate unregistered device %s", resource)
+	}
+
 	needed := required
 	// Gets list of devices that have already been allocated.
 	// This can happen if a container restarts for example.
@@ -544,15 +551,13 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 			return nil, fmt.Errorf("pod %q container %q changed request for resource %q from %d to %d", string(podUID), contName, resource, devices.Len(), required)
 		}
 	}
+
 	if needed == 0 {
 		// No change, no work.
 		return nil, nil
 	}
+
 	klog.V(3).InfoS("Need devices to allocate for pod", "deviceNumber", needed, "resourceName", resource, "podUID", string(podUID), "containerName", contName)
-	// Check if resource registered with devicemanager
-	if _, ok := m.healthyDevices[resource]; !ok {
-		return nil, fmt.Errorf("can't allocate unregistered device %s", resource)
-	}
 
 	// Declare the list of allocated devices.
 	// This will be populated and returned below.
