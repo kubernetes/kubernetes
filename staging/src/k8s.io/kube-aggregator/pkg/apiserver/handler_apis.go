@@ -109,6 +109,7 @@ func convertToDiscoveryAPIGroup(apiServices []*apiregistrationv1api.APIService) 
 				PreferredVersion: metav1.GroupVersionForDiscovery{
 					GroupVersion: apiService.Spec.Group + "/" + apiService.Spec.Version,
 					Version:      apiService.Spec.Version,
+					Hash:         apiService.Status.Hash,
 				},
 			}
 		}
@@ -117,6 +118,7 @@ func convertToDiscoveryAPIGroup(apiServices []*apiregistrationv1api.APIService) 
 			metav1.GroupVersionForDiscovery{
 				GroupVersion: apiService.Spec.Group + "/" + apiService.Spec.Version,
 				Version:      apiService.Spec.Version,
+				Hash:         apiService.Status.Hash,
 			},
 		)
 	}
