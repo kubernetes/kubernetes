@@ -31,7 +31,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubectl/pkg/util/podutils"
@@ -267,6 +266,9 @@ func WaitForPodCondition(c clientset.Interface, ns, podName, conditionDesc strin
 				e2elog.Logf("Pod %q satisfied condition %q", podName, conditionDesc)
 			}
 			return true, err
+		} else if err != nil {
+			// TODO(#109732): stop polling and return the error in this case.
+			e2elog.Logf("Error evaluating pod condition %s: %v", conditionDesc, err)
 		}
 		return false, nil
 	})
@@ -683,18 +685,19 @@ func WaitForContainerRunning(c clientset.Interface, namespace, podName, containe
 // If the error is retryable, sleep the recommended delay and ignore the error.
 // If the erorr is terminal, return it.
 func handleWaitingAPIError(err error, retryNotFound bool, taskFormat string, taskArgs ...interface{}) (bool, error) {
+	taskDescription := fmt.Sprintf(taskFormat, taskArgs...)
 	if retryNotFound && apierrors.IsNotFound(err) {
-		e2elog.Logf("Ignoring NotFound error while "+taskFormat, taskArgs...)
+		e2elog.Logf("Ignoring NotFound error while " + taskDescription)
 		return false, nil
 	}
 	if retry, delay := shouldRetry(err); retry {
-		e2elog.Logf("Retryable error while %s, retrying after %v: %v", fmt.Sprintf(taskFormat, taskArgs...), delay, err)
+		e2elog.Logf("Retryable error while %s, retrying after %v: %v", taskDescription, delay, err)
 		if delay > 0 {
 			time.Sleep(delay)
 		}
 		return false, nil
 	}
-	// Non-retryable error.
+	e2elog.Logf("Encountered non-retryable error while %s: %v", taskDescription, err)
 	return false, err
 }
 
@@ -706,7 +709,7 @@ func shouldRetry(err error) (retry bool, retryAfter time.Duration) {
 	}
 
 	// these errors indicate a transient error that should be retried.
-	if utilnet.IsConnectionReset(err) || apierrors.IsInternalError(err) || apierrors.IsTimeout(err) || apierrors.IsTooManyRequests(err) {
+	if apierrors.IsInternalError(err) || apierrors.IsTimeout(err) || apierrors.IsTooManyRequests(err) {
 		return true, 0
 	}
 
