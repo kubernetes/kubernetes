@@ -16,50 +16,63 @@ limitations under the License.
 
 package metrics
 
+const (
+	LabelNamePhase      = "phase"
+	LabelValueWaiting   = "waiting"
+	LabelValueExecuting = "executing"
+)
+
 // Observer is something that can be given numeric observations.
+// TODO: Change the names here to use "Gauge" in place of "Observer", to
+// follow conventions in lower layers, where "Observer" implies sampling and
+// "Gauge" is for a variable (all values seen, no sampling).
 type Observer interface {
 	// Observe takes an observation
 	Observe(float64)
 }
 
-//  ChangeObserver extends Observer with the ability to take
-// an observation that is relative to the previous observation.
-type ChangeObserver interface {
-	Observer
-
-	// Observe a new value that differs by the given amount from the previous observation.
-	Add(float64)
-}
-
-// RatioedChangeObserver tracks ratios.
-// The numerator is set/changed through the ChangeObserver methods,
+// RatioedObserver tracks ratios.
+// The numerator is set through the Observer methods,
 // and the denominator can be updated through the SetDenominator method.
-// A ratio is tracked whenever the numerator is set/changed.
-type RatioedChangeObserver interface {
-	ChangeObserver
+type RatioedObserver interface {
+	Observer
 
 	// SetDenominator sets the denominator to use until it is changed again
 	SetDenominator(float64)
 }
 
-// RatioedChangeObserverGenerator creates related observers that are
-// differentiated by a series of label values
-type RatioedChangeObserverGenerator interface {
-	Generate(initialNumerator, initialDenominator float64, labelValues []string) RatioedChangeObserver
+// RatioedbserverVec creates related observers that are
+// differentiated by a series of label values.
+type RatioedObserverVec interface {
+	// WithLabelValues will return an error if this vec is not hidden and not yet registered
+	// or there is a syntactic problem with the labelValues.
+	WithLabelValuesChecked(initialDenominator float64, labelValues ...string) (RatioedObserver, error)
+
+	// WithLabelValuesSafe is the same as WithLabelValuesChecked in cases where that does not
+	// return an error.  When the unsafe version returns an error due to the vector not being
+	// registered yet, the safe version returns an object that implements its methods
+	// by first calling WithLabelValuesChecked and then delegating to whatever observer that returns.
+	// In the other error cases the object returned here is a noop.
+	WithLabelValuesSafe(initialDenominator float64, labelValues ...string) RatioedObserver
 }
 
-// RatioedChangeObserverPair is a corresponding pair of observers, one for the
+// RatioedObserverPair is a corresponding pair of observers, one for the
 // number of requests waiting in queue(s) and one for the number of
 // requests being executed
-type RatioedChangeObserverPair struct {
+type RatioedObserverPair struct {
 	// RequestsWaiting is given observations of the number of currently queued requests
-	RequestsWaiting RatioedChangeObserver
+	RequestsWaiting RatioedObserver
 
 	// RequestsExecuting is given observations of the number of requests currently executing
-	RequestsExecuting RatioedChangeObserver
+	RequestsExecuting RatioedObserver
 }
 
-// RatioedChangeObserverPairGenerator generates pairs
-type RatioedChangeObserverPairGenerator interface {
-	Generate(initialWaitingDenominator, initialExecutingDenominator float64, labelValues []string) RatioedChangeObserverPair
+// RatioedObserverPairVec generates pairs
+type RatioedObserverPairVec interface {
+	// WithLabelValues will return an error if this pair is not hidden and not yet registered
+	// or there is a syntactic problem with the labelValues.
+	WithLabelValuesChecked(initialWaitingDenominator, initialExecutingDenominator float64, labelValues ...string) (RatioedObserverPair, error)
+
+	// WithLabelValuesSafe uses the safe version of each pair member.
+	WithLabelValuesSafe(initialWaitingDenominator, initialExecutingDenominator float64, labelValues ...string) RatioedObserverPair
 }

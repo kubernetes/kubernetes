@@ -1461,10 +1461,18 @@ func newFIFO(requests ...*request) fifo {
 	return l
 }
 
-func newObserverPair(clk clock.PassiveClock) metrics.RatioedChangeObserverPair {
-	return metrics.PriorityLevelConcurrencyObserverPairGenerator.Generate(1, 1, []string{"test"})
+func newObserverPair(clk clock.PassiveClock) metrics.RatioedObserverPair {
+	rop, err := metrics.PriorityLevelConcurrencyObserverPairVec.WithLabelValuesChecked(1, 1, "test")
+	if err != nil {
+		panic(err)
+	}
+	return rop
 }
 
-func newExecSeatsObserver(clk clock.PassiveClock) metrics.RatioedChangeObserver {
-	return metrics.PriorityLevelExecutionSeatsObserverGenerator.Generate(1, 1, []string{"test"})
+func newExecSeatsObserver(clk clock.PassiveClock) metrics.RatioedObserver {
+	ro, err := metrics.PriorityLevelExecutionSeatsObserverVec.WithLabelValuesChecked(1, "test")
+	if err != nil {
+		panic(err)
+	}
+	return ro
 }

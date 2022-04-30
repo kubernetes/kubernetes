@@ -30,7 +30,8 @@ import (
 // Integrator is created, and ends at the latest operation on the
 // Integrator.
 type Integrator interface {
-	metrics.ChangeObserver
+	metrics.Observer
+	Add(float64)
 
 	GetResults() IntegratorResults
 

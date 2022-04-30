@@ -45,11 +45,20 @@ type PriorityAndFairnessClassification struct {
 }
 
 // waitingMark tracks requests waiting rather than being executed
-var waitingMark = &requestWatermark{
-	phase:            epmetrics.WaitingPhase,
-	readOnlyObserver: fcmetrics.ReadWriteConcurrencyObserverPairGenerator.Generate(1, 1, []string{epmetrics.ReadOnlyKind}).RequestsWaiting,
-	mutatingObserver: fcmetrics.ReadWriteConcurrencyObserverPairGenerator.Generate(1, 1, []string{epmetrics.MutatingKind}).RequestsWaiting,
-}
+var waitingMark = requestWatermark{
+	phase: epmetrics.WaitingPhase,
+	observersFunc: func(readonlyLimit, mutatingLimit int) (readOnlyObserver, mutatingObserver fcmetrics.RatioedObserver) {
+		var err error
+		readOnlyObserver, err = fcmetrics.ReadWriteConcurrencyObserverVec.WithLabelValuesChecked(float64(readonlyLimit), fcmetrics.LabelValueWaiting, epmetrics.ReadOnlyKind)
+		if err != nil {
+			klog.Errorf("Failed to get readonly waiting member of %v: %s", fcmetrics.ReadWriteConcurrencyObserverVec.FQName(), err)
+		}
+		mutatingObserver, err = fcmetrics.ReadWriteConcurrencyObserverVec.WithLabelValuesChecked(float64(mutatingLimit), fcmetrics.LabelValueWaiting, epmetrics.MutatingKind)
+		if err != nil {
+			klog.Errorf("Failed to get mutating waiting member of %v: %s", fcmetrics.ReadWriteConcurrencyObserverVec.FQName(), err)
+		}
+		return
+	}}
 
 var atomicMutatingExecuting, atomicReadOnlyExecuting int32
 var atomicMutatingWaiting, atomicReadOnlyWaiting int32
@@ -99,6 +108,9 @@ func WithPriorityAndFairness(
 			handler.ServeHTTP(w, r)
 			return
 		}
+
+		watermark.ensureInitialized(0, 0)   // TODO: fix https://github.com/kubernetes/kubernetes/issues/109846
+		waitingMark.ensureInitialized(0, 0) // TODO: something about denominators here too
 
 		var classification *PriorityAndFairnessClassification
 		noteFn := func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration, flowDistinguisher string) {
@@ -304,8 +316,8 @@ func WithPriorityAndFairness(
 // StartPriorityAndFairnessWatermarkMaintenance starts the goroutines to observe and maintain watermarks for
 // priority-and-fairness requests.
 func StartPriorityAndFairnessWatermarkMaintenance(stopCh <-chan struct{}) {
-	startWatermarkMaintenance(watermark, stopCh)
-	startWatermarkMaintenance(waitingMark, stopCh)
+	StartMaxInFlightWatermarkMaintenance(stopCh)
+	startWatermarkMaintenance(&waitingMark, stopCh)
 }
 
 func setResponseHeaders(classification *PriorityAndFairnessClassification, w http.ResponseWriter) {

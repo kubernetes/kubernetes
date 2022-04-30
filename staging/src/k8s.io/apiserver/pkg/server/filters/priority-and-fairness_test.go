@@ -186,6 +186,7 @@ func newApfHandlerWithFilter(t *testing.T, flowControlFilter utilflowcontrol.Int
 
 func TestApfSkipLongRunningRequest(t *testing.T) {
 	epmetrics.Register()
+	fcmetrics.Register()
 
 	server := newApfServerWithSingleRequest(t, decisionSkipFilter)
 	defer server.Close()
@@ -203,6 +204,7 @@ func TestApfSkipLongRunningRequest(t *testing.T) {
 
 func TestApfRejectRequest(t *testing.T) {
 	epmetrics.Register()
+	fcmetrics.Register()
 
 	server := newApfServerWithSingleRequest(t, decisionReject)
 	defer server.Close()
@@ -242,8 +244,7 @@ func TestApfExemptRequest(t *testing.T) {
 
 	checkForExpectedMetrics(t, []string{
 		"apiserver_current_inflight_requests",
-		"apiserver_flowcontrol_read_vs_write_request_count_watermarks",
-		"apiserver_flowcontrol_read_vs_write_request_count_samples",
+		"apiserver_flowcontrol_read_vs_write_requests_current",
 	})
 }
 
@@ -269,8 +270,7 @@ func TestApfExecuteRequest(t *testing.T) {
 	checkForExpectedMetrics(t, []string{
 		"apiserver_current_inflight_requests",
 		"apiserver_current_inqueue_requests",
-		"apiserver_flowcontrol_read_vs_write_request_count_watermarks",
-		"apiserver_flowcontrol_read_vs_write_request_count_samples",
+		"apiserver_flowcontrol_read_vs_write_requests_current",
 	})
 }
 
@@ -349,13 +349,13 @@ func TestApfExecuteMultipleRequests(t *testing.T) {
 	checkForExpectedMetrics(t, []string{
 		"apiserver_current_inflight_requests",
 		"apiserver_current_inqueue_requests",
-		"apiserver_flowcontrol_read_vs_write_request_count_watermarks",
-		"apiserver_flowcontrol_read_vs_write_request_count_samples",
+		"apiserver_flowcontrol_read_vs_write_requests_current",
 	})
 }
 
 func TestApfCancelWaitRequest(t *testing.T) {
 	epmetrics.Register()
+	fcmetrics.Register()
 
 	server := newApfServerWithSingleRequest(t, decisionCancelWait)
 	defer server.Close()
@@ -441,6 +441,8 @@ func (f *fakeWatchApfFilter) wait() error {
 }
 
 func TestApfExecuteWatchRequestsWithInitializationSignal(t *testing.T) {
+	epmetrics.Register()
+	fcmetrics.Register()
 	signalsLock := sync.Mutex{}
 	signals := []utilflowcontrol.InitializationSignal{}
 	sendSignals := func() {
@@ -520,6 +522,8 @@ func TestApfExecuteWatchRequestsWithInitializationSignal(t *testing.T) {
 }
 
 func TestApfRejectWatchRequestsWithInitializationSignal(t *testing.T) {
+	epmetrics.Register()
+	fcmetrics.Register()
 	fakeFilter := newFakeWatchApfFilter(0)
 
 	onExecuteFunc := func() {
@@ -536,6 +540,8 @@ func TestApfRejectWatchRequestsWithInitializationSignal(t *testing.T) {
 }
 
 func TestApfWatchPanic(t *testing.T) {
+	epmetrics.Register()
+	fcmetrics.Register()
 	fakeFilter := newFakeWatchApfFilter(1)
 
 	onExecuteFunc := func() {
@@ -561,6 +567,8 @@ func TestApfWatchPanic(t *testing.T) {
 }
 
 func TestApfWatchHandlePanic(t *testing.T) {
+	epmetrics.Register()
+	fcmetrics.Register()
 	preExecutePanicingFilter := newFakeWatchApfFilter(1)
 	preExecutePanicingFilter.preExecutePanic = true
 
@@ -614,6 +622,8 @@ func TestApfWatchHandlePanic(t *testing.T) {
 // Even though in production we are not using httptest.Server, this logic is shared
 // across these two.
 func TestContextClosesOnRequestProcessed(t *testing.T) {
+	epmetrics.Register()
+	fcmetrics.Register()
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	handler := func(w http.ResponseWriter, r *http.Request) {
@@ -652,6 +662,8 @@ func (f *fakeFilterRequestDigest) Handle(ctx context.Context,
 }
 
 func TestApfWithRequestDigest(t *testing.T) {
+	epmetrics.Register()
+	fcmetrics.Register()
 	longRunningFunc := func(_ *http.Request, _ *apirequest.RequestInfo) bool { return false }
 	fakeFilter := &fakeFilterRequestDigest{}
 
@@ -690,6 +702,7 @@ func TestApfWithRequestDigest(t *testing.T) {
 }
 
 func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
+	epmetrics.Register()
 	fcmetrics.Register()
 
 	t.Run("priority level concurrency is set to 1, request handler panics, next request should not be rejected", func(t *testing.T) {
@@ -1293,14 +1306,18 @@ func checkForExpectedMetrics(t *testing.T, expectedMetrics []string) {
 	}
 
 	metrics := map[string]interface{}{}
+	apiserverMetrics := sets.NewString()
 	for _, mf := range metricsFamily {
 		metrics[*mf.Name] = mf
+		if strings.HasPrefix(*mf.Name, "apiserver_") {
+			apiserverMetrics.Insert(*mf.Name)
+		}
 	}
 
 	for _, metricName := range expectedMetrics {
 		if _, ok := metrics[metricName]; !ok {
 			if !ok {
-				t.Errorf("Scraped metrics did not include expected metric %s", metricName)
+				t.Errorf("Scraped metrics did not include expected metric %s; apiserver metrics = %v", metricName, apiserverMetrics.List())
 			}
 		}
 	}

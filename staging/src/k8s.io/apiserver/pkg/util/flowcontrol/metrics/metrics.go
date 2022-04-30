@@ -27,7 +27,6 @@ import (
 	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 	basemetricstestutil "k8s.io/component-base/metrics/testutil"
-	"k8s.io/utils/clock"
 )
 
 const (
@@ -105,67 +104,44 @@ var (
 		},
 		[]string{priorityLevel, flowSchema},
 	)
-	// PriorityLevelExecutionSeatsObserverGenerator creates observers of seats occupied throughout execution for priority levels
-	PriorityLevelExecutionSeatsObserverGenerator = NewSampleAndWaterMarkHistogramsGenerator(clock.RealClock{}, time.Millisecond,
-		&compbasemetrics.HistogramOpts{
+	// PriorityLevelExecutionSeatsObserverVec creates observers of seats occupied throughout execution for priority levels
+	PriorityLevelExecutionSeatsObserverVec = NewTimingRatioHistogramVec(
+		&compbasemetrics.TimingHistogramOpts{
 			Namespace:      namespace,
 			Subsystem:      subsystem,
-			Name:           "priority_level_seat_count_samples",
-			Help:           "Periodic observations of number of seats occupied for any stage of execution (but only initial stage for WATCHes)",
-			Buckets:        []float64{0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1},
+			Name:           "priority_level_seat_utilization",
+			Help:           "Observations, at the end of every nanosecond, of utilization of seats for any stage of execution (but only initial stage for WATCHes)",
+			Buckets:        []float64{0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.99, 1},
 			ConstLabels:    map[string]string{phase: "executing"},
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
-		&compbasemetrics.HistogramOpts{
-			Namespace:      namespace,
-			Subsystem:      subsystem,
-			Name:           "priority_level_seat_count_watermarks",
-			Help:           "Watermarks of the number of seats occupied for any stage of execution (but only initial stage for WATCHes)",
-			Buckets:        []float64{0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1},
-			ConstLabels:    map[string]string{phase: "executing"},
-			StabilityLevel: compbasemetrics.ALPHA,
-		},
-		[]string{priorityLevel},
+		priorityLevel,
 	)
-	// PriorityLevelConcurrencyObserverPairGenerator creates pairs that observe concurrency for priority levels
-	PriorityLevelConcurrencyObserverPairGenerator = NewSampleAndWaterMarkHistogramsPairGenerator(clock.RealClock{}, time.Millisecond,
-		&compbasemetrics.HistogramOpts{
+	// PriorityLevelConcurrencyObserverPairVec creates pairs that observe concurrency for priority levels
+	PriorityLevelConcurrencyObserverPairVec = NewTimingRatioHistogramPairVec(
+		&compbasemetrics.TimingHistogramOpts{
 			Namespace:      namespace,
 			Subsystem:      subsystem,
-			Name:           "priority_level_request_count_samples",
-			Help:           "Periodic observations of the number of requests waiting or in any stage of execution (but only initial stage for WATCHes)",
-			Buckets:        []float64{0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1},
+			Name:           "priority_level_request_utilization",
+			Help:           "Observations, at the end of every nanosecond, of number of requests (as a fraction of the relevant limit) waiting or in any stage of execution (but only initial stage for WATCHes)",
+			Buckets:        []float64{0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.99, 1},
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
-		&compbasemetrics.HistogramOpts{
-			Namespace:      namespace,
-			Subsystem:      subsystem,
-			Name:           "priority_level_request_count_watermarks",
-			Help:           "Watermarks of the number of requests waiting or in any stage of execution (but only initial stage for WATCHes)",
-			Buckets:        []float64{0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1},
-			StabilityLevel: compbasemetrics.ALPHA,
-		},
-		[]string{priorityLevel},
+		priorityLevel,
 	)
-	// ReadWriteConcurrencyObserverPairGenerator creates pairs that observe concurrency broken down by mutating vs readonly
-	ReadWriteConcurrencyObserverPairGenerator = NewSampleAndWaterMarkHistogramsPairGenerator(clock.RealClock{}, time.Millisecond,
-		&compbasemetrics.HistogramOpts{
-			Namespace:      namespace,
-			Subsystem:      subsystem,
-			Name:           "read_vs_write_request_count_samples",
-			Help:           "Periodic observations of the number of requests waiting or in regular stage of execution",
+	// readWriteConcurrencyObserverPairVec creates pairs that observe concurrency broken down by mutating vs readonly
+	ReadWriteConcurrencyObserverVec = NewTimingRatioHistogramVec(
+		&compbasemetrics.TimingHistogramOpts{
+			Namespace: namespace,
+			Subsystem: subsystem,
+			Name:      "read_vs_write_requests_current",
+			Help:      "Observations, at the end of every nanosecond, of the number of requests (as a fraction of the relevant limit, in the case of executing) waiting or in regular stage of execution",
+			// TODO: something about the irregularity ^^^
 			Buckets:        []float64{0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1},
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
-		&compbasemetrics.HistogramOpts{
-			Namespace:      namespace,
-			Subsystem:      subsystem,
-			Name:           "read_vs_write_request_count_watermarks",
-			Help:           "Watermarks of the number of requests waiting or in regular stage of execution",
-			Buckets:        []float64{0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1},
-			StabilityLevel: compbasemetrics.ALPHA,
-		},
-		[]string{requestKind},
+		LabelNamePhase,
+		requestKind,
 	)
 	apiserverCurrentR = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
@@ -355,9 +331,9 @@ var (
 		apiserverWorkEstimatedSeats,
 		apiserverDispatchWithNoAccommodation,
 	}.
-		Append(PriorityLevelExecutionSeatsObserverGenerator.metrics()...).
-		Append(PriorityLevelConcurrencyObserverPairGenerator.metrics()...).
-		Append(ReadWriteConcurrencyObserverPairGenerator.metrics()...)
+		Append(PriorityLevelExecutionSeatsObserverVec.metrics()...).
+		Append(PriorityLevelConcurrencyObserverPairVec.metrics()...).
+		Append(ReadWriteConcurrencyObserverVec.metrics()...)
 )
 
 // AddRequestsInQueues adds the given delta to the gauge of the # of requests in the queues of the specified flowSchema and priorityLevel

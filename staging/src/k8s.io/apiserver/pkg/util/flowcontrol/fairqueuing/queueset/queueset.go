@@ -61,8 +61,8 @@ type promiseFactoryFactory func(*queueSet) promiseFactory
 // the fields `factory` and `theSet` is non-nil.
 type queueSetCompleter struct {
 	factory      *queueSetFactory
-	reqsObsPair  metrics.RatioedChangeObserverPair
-	execSeatsObs metrics.RatioedChangeObserver
+	reqsObsPair  metrics.RatioedObserverPair
+	execSeatsObs metrics.RatioedObserver
 	theSet       *queueSet
 	qCfg         fq.QueuingConfig
 	dealer       *shufflesharding.Dealer
@@ -81,9 +81,9 @@ type queueSet struct {
 	clock                    eventclock.Interface
 	estimatedServiceDuration time.Duration
 
-	reqsObsPair metrics.RatioedChangeObserverPair // .RequestsExecuting covers regular phase only
+	reqsObsPair metrics.RatioedObserverPair // .RequestsExecuting covers regular phase only
 
-	execSeatsObs metrics.RatioedChangeObserver // for all phases of execution
+	execSeatsObs metrics.RatioedObserver // for all phases of execution
 
 	promiseFactory promiseFactory
 
@@ -148,7 +148,7 @@ func newTestableQueueSetFactory(c eventclock.Interface, promiseFactoryFactory pr
 	}
 }
 
-func (qsf *queueSetFactory) BeginConstruction(qCfg fq.QueuingConfig, reqsObsPair metrics.RatioedChangeObserverPair, execSeatsObs metrics.RatioedChangeObserver) (fq.QueueSetCompleter, error) {
+func (qsf *queueSetFactory) BeginConstruction(qCfg fq.QueuingConfig, reqsObsPair metrics.RatioedObserverPair, execSeatsObs metrics.RatioedObserver) (fq.QueueSetCompleter, error) {
 	dealer, err := checkConfig(qCfg)
 	if err != nil {
 		return nil, err
@@ -398,7 +398,7 @@ func (req *request) wait() (bool, bool) {
 		metrics.AddReject(req.ctx, qs.qCfg.Name, req.fsName, "cancelled")
 		metrics.AddRequestsInQueues(req.ctx, qs.qCfg.Name, req.fsName, -1)
 		req.NoteQueued(false)
-		qs.reqsObsPair.RequestsWaiting.Add(-1)
+		qs.reqsObsPair.RequestsWaiting.Observe(float64(qs.totRequestsWaiting))
 	}
 	return false, qs.isIdleLocked()
 }
@@ -609,7 +609,7 @@ func (qs *queueSet) removeTimedOutRequestsFromQueueLocked(queue *queue, fsName s
 	// remove timed out requests from queue
 	if timeoutCount > 0 {
 		qs.totRequestsWaiting -= timeoutCount
-		qs.reqsObsPair.RequestsWaiting.Add(float64(-timeoutCount))
+		qs.reqsObsPair.RequestsWaiting.Observe(float64(qs.totRequestsWaiting))
 	}
 }
 
@@ -646,7 +646,7 @@ func (qs *queueSet) enqueueLocked(request *request) {
 	qs.totRequestsWaiting++
 	metrics.AddRequestsInQueues(request.ctx, qs.qCfg.Name, request.fsName, 1)
 	request.NoteQueued(true)
-	qs.reqsObsPair.RequestsWaiting.Add(1)
+	qs.reqsObsPair.RequestsWaiting.Observe(float64(qs.totRequestsWaiting))
 }
 
 // dispatchAsMuchAsPossibleLocked does as many dispatches as possible now.
@@ -675,8 +675,8 @@ func (qs *queueSet) dispatchSansQueueLocked(ctx context.Context, workEstimate *f
 	qs.totSeatsInUse += req.MaxSeats()
 	metrics.AddRequestsExecuting(ctx, qs.qCfg.Name, fsName, 1)
 	metrics.AddRequestConcurrencyInUse(qs.qCfg.Name, fsName, req.MaxSeats())
-	qs.reqsObsPair.RequestsExecuting.Add(1)
-	qs.execSeatsObs.Add(float64(req.MaxSeats()))
+	qs.reqsObsPair.RequestsExecuting.Observe(float64(qs.totRequestsExecuting))
+	qs.execSeatsObs.Observe(float64(qs.totSeatsInUse))
 	klogV := klog.V(5)
 	if klogV.Enabled() {
 		klogV.Infof("QS(%s) at t=%s R=%v: immediate dispatch of request %q %#+v %#+v, qs will have %d executing", qs.qCfg.Name, now.Format(nsTimeFmt), qs.currentR, fsName, descr1, descr2, qs.totRequestsExecuting)
@@ -700,7 +700,7 @@ func (qs *queueSet) dispatchLocked() bool {
 	qs.totRequestsWaiting--
 	metrics.AddRequestsInQueues(request.ctx, qs.qCfg.Name, request.fsName, -1)
 	request.NoteQueued(false)
-	qs.reqsObsPair.RequestsWaiting.Add(-1)
+	qs.reqsObsPair.RequestsWaiting.Observe(float64(qs.totRequestsWaiting))
 	defer qs.boundNextDispatchLocked(queue)
 	if !request.decision.Set(decisionExecute) {
 		return true
@@ -717,8 +717,8 @@ func (qs *queueSet) dispatchLocked() bool {
 	queue.seatsInUse += request.MaxSeats()
 	metrics.AddRequestsExecuting(request.ctx, qs.qCfg.Name, request.fsName, 1)
 	metrics.AddRequestConcurrencyInUse(qs.qCfg.Name, request.fsName, request.MaxSeats())
-	qs.reqsObsPair.RequestsExecuting.Add(1)
-	qs.execSeatsObs.Add(float64(request.MaxSeats()))
+	qs.reqsObsPair.RequestsExecuting.Observe(float64(qs.totRequestsExecuting))
+	qs.execSeatsObs.Observe(float64(qs.totSeatsInUse))
 	klogV := klog.V(6)
 	if klogV.Enabled() {
 		klogV.Infof("QS(%s) at t=%s R=%v: dispatching request %#+v %#+v work %v from queue %d with start R %v, queue will have %d waiting & %d requests occupying %d seats, set will have %d seats occupied",
@@ -862,7 +862,7 @@ func (qs *queueSet) finishRequestLocked(r *request) {
 	now := qs.clock.Now()
 	qs.totRequestsExecuting--
 	metrics.AddRequestsExecuting(r.ctx, qs.qCfg.Name, r.fsName, -1)
-	qs.reqsObsPair.RequestsExecuting.Add(-1)
+	qs.reqsObsPair.RequestsExecuting.Observe(float64(qs.totRequestsExecuting))
 
 	actualServiceDuration := now.Sub(r.startTime)
 
@@ -874,7 +874,7 @@ func (qs *queueSet) finishRequestLocked(r *request) {
 
 		qs.totSeatsInUse -= r.MaxSeats()
 		metrics.AddRequestConcurrencyInUse(qs.qCfg.Name, r.fsName, -r.MaxSeats())
-		qs.execSeatsObs.Add(-float64(r.MaxSeats()))
+		qs.execSeatsObs.Observe(float64(qs.totSeatsInUse))
 		if r.queue != nil {
 			r.queue.seatsInUse -= r.MaxSeats()
 		}
@@ -989,9 +989,6 @@ func removeQueueAndUpdateIndexes(queues []*queue, index int) []*queue {
 }
 
 func (qs *queueSet) UpdateObservations() {
-	qs.reqsObsPair.RequestsWaiting.Add(0)
-	qs.reqsObsPair.RequestsExecuting.Add(0)
-	qs.execSeatsObs.Add(0)
 }
 
 func (qs *queueSet) Dump(includeRequestDetails bool) debug.QueueSetDump {

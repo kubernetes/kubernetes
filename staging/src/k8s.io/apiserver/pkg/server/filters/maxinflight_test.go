@@ -29,6 +29,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	apifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
+	fcmetrics "k8s.io/apiserver/pkg/util/flowcontrol/metrics"
 )
 
 func createMaxInflightServer(callsWg, blockWg *sync.WaitGroup, disableCallsWg *bool, disableCallsWgMutex *sync.Mutex, nonMutating, mutating int) *httptest.Server {
@@ -100,6 +101,8 @@ func TestMaxInFlightNonMutating(t *testing.T) {
 
 	waitForCalls := true
 	waitForCallsMutex := sync.Mutex{}
+
+	fcmetrics.Register()
 
 	server := createMaxInflightServer(calls, block, &waitForCalls, &waitForCallsMutex, AllowedNonMutatingInflightRequestsNo, 1)
 	defer server.Close()
@@ -184,6 +187,8 @@ func TestMaxInFlightMutating(t *testing.T) {
 
 	waitForCalls := true
 	waitForCallsMutex := sync.Mutex{}
+
+	fcmetrics.Register()
 
 	server := createMaxInflightServer(calls, block, &waitForCalls, &waitForCallsMutex, 1, AllowedMutatingInflightRequestsNo)
 	defer server.Close()
@@ -280,6 +285,8 @@ func TestMaxInFlightSkipsMasters(t *testing.T) {
 
 	waitForCalls := true
 	waitForCallsMutex := sync.Mutex{}
+
+	fcmetrics.Register()
 
 	server := createMaxInflightServer(calls, block, &waitForCalls, &waitForCallsMutex, 1, AllowedMutatingInflightRequestsNo)
 	defer server.Close()

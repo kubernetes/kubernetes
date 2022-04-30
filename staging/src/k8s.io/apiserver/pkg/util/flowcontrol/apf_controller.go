@@ -99,11 +99,11 @@ type RequestDigest struct {
 // this type and cfgMeal follow the convention that the suffix
 // "Locked" means that the caller must hold the configController lock.
 type configController struct {
-	name                  string // varies in tests of fighting controllers
-	clock                 clock.PassiveClock
-	queueSetFactory       fq.QueueSetFactory
-	reqsObsPairGenerator  metrics.RatioedChangeObserverPairGenerator
-	execSeatsObsGenerator metrics.RatioedChangeObserverGenerator
+	name            string // varies in tests of fighting controllers
+	clock           clock.PassiveClock
+	queueSetFactory fq.QueueSetFactory
+	reqsObsPairVec  metrics.RatioedObserverPairVec
+	execSeatsObsVec metrics.RatioedObserverVec
 
 	// How this controller appears in an ObjectMeta ManagedFieldsEntry.Manager
 	asFieldManager string
@@ -193,10 +193,10 @@ type priorityLevelState struct {
 	numPending int
 
 	// Observers tracking number of requests waiting, executing
-	reqsObsPair metrics.RatioedChangeObserverPair
+	reqsObsPair metrics.RatioedObserverPair
 
 	// Observer of number of seats occupied throughout execution
-	execSeatsObs metrics.RatioedChangeObserver
+	execSeatsObs metrics.RatioedObserver
 }
 
 // NewTestableController is extra flexible to facilitate testing
@@ -205,8 +205,8 @@ func newTestableController(config TestableConfig) *configController {
 		name:                   config.Name,
 		clock:                  config.Clock,
 		queueSetFactory:        config.QueueSetFactory,
-		reqsObsPairGenerator:   config.ReqsObsPairGenerator,
-		execSeatsObsGenerator:  config.ExecSeatsObsGenerator,
+		reqsObsPairVec:         config.ReqsObsPairVec,
+		execSeatsObsVec:        config.ExecSeatsObsVec,
 		asFieldManager:         config.AsFieldManager,
 		foundToDangling:        config.FoundToDangling,
 		serverConcurrencyLimit: config.ServerConcurrencyLimit,
@@ -292,20 +292,9 @@ func newTestableController(config TestableConfig) *configController {
 }
 
 // MaintainObservations keeps the observers from
-// metrics.PriorityLevelConcurrencyObserverPairGenerator from falling
+// metrics.PriorityLevelConcurrencyObserverPairVec from falling
 // too far behind
 func (cfgCtlr *configController) MaintainObservations(stopCh <-chan struct{}) {
-	wait.Until(cfgCtlr.updateObservations, 10*time.Second, stopCh)
-}
-
-func (cfgCtlr *configController) updateObservations() {
-	cfgCtlr.lock.RLock()
-	defer cfgCtlr.lock.RUnlock()
-	for _, plc := range cfgCtlr.priorityLevelStates {
-		if plc.queues != nil {
-			plc.queues.UpdateObservations()
-		}
-	}
 }
 
 func (cfgCtlr *configController) Run(stopCh <-chan struct{}) error {
@@ -538,8 +527,7 @@ func (meal *cfgMeal) digestNewPLsLocked(newPLs []*flowcontrol.PriorityLevelConfi
 	for _, pl := range newPLs {
 		state := meal.cfgCtlr.priorityLevelStates[pl.Name]
 		if state == nil {
-			labelValues := []string{pl.Name}
-			state = &priorityLevelState{reqsObsPair: meal.cfgCtlr.reqsObsPairGenerator.Generate(1, 1, labelValues), execSeatsObs: meal.cfgCtlr.execSeatsObsGenerator.Generate(0, 1, labelValues)}
+			state = &priorityLevelState{reqsObsPair: meal.cfgCtlr.reqsObsPairVec.WithLabelValuesSafe(1, 1, pl.Name), execSeatsObs: meal.cfgCtlr.execSeatsObsVec.WithLabelValuesSafe(1, pl.Name)}
 		}
 		qsCompleter, err := queueSetCompleterForPL(meal.cfgCtlr.queueSetFactory, state.queues, pl, meal.cfgCtlr.requestWaitLimit, state.reqsObsPair, state.execSeatsObs)
 		if err != nil {
@@ -694,7 +682,7 @@ func (meal *cfgMeal) finishQueueSetReconfigsLocked() {
 // given priority level configuration.  Returns nil if that config
 // does not call for limiting.  Returns nil and an error if the given
 // object is malformed in a way that is a problem for this package.
-func queueSetCompleterForPL(qsf fq.QueueSetFactory, queues fq.QueueSet, pl *flowcontrol.PriorityLevelConfiguration, requestWaitLimit time.Duration, reqsIntPair metrics.RatioedChangeObserverPair, execSeatsObs metrics.RatioedChangeObserver) (fq.QueueSetCompleter, error) {
+func queueSetCompleterForPL(qsf fq.QueueSetFactory, queues fq.QueueSet, pl *flowcontrol.PriorityLevelConfiguration, requestWaitLimit time.Duration, reqsIntPair metrics.RatioedObserverPair, execSeatsObs metrics.RatioedObserver) (fq.QueueSetCompleter, error) {
 	if (pl.Spec.Type == flowcontrol.PriorityLevelEnablementExempt) != (pl.Spec.Limited == nil) {
 		return nil, errors.New("broken union structure at the top")
 	}
@@ -768,9 +756,8 @@ func (meal *cfgMeal) presyncFlowSchemaStatus(fs *flowcontrol.FlowSchema, isDangl
 // that does not actually exist (right now) as a real API object.
 func (meal *cfgMeal) imaginePL(proto *flowcontrol.PriorityLevelConfiguration, requestWaitLimit time.Duration) {
 	klog.V(3).Infof("No %s PriorityLevelConfiguration found, imagining one", proto.Name)
-	labelValues := []string{proto.Name}
-	reqsObsPair := meal.cfgCtlr.reqsObsPairGenerator.Generate(1, 1, labelValues)
-	execSeatsObs := meal.cfgCtlr.execSeatsObsGenerator.Generate(0, 1, labelValues)
+	reqsObsPair := meal.cfgCtlr.reqsObsPairVec.WithLabelValuesSafe(1, 1, proto.Name)
+	execSeatsObs := meal.cfgCtlr.execSeatsObsVec.WithLabelValuesSafe(1, proto.Name)
 	qsCompleter, err := queueSetCompleterForPL(meal.cfgCtlr.queueSetFactory, nil, proto, requestWaitLimit, reqsObsPair, execSeatsObs)
 	if err != nil {
 		// This can not happen because proto is one of the mandatory

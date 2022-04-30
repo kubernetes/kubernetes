@@ -56,8 +56,8 @@ func genPL(rng *rand.Rand, name string) *flowcontrol.PriorityLevelConfiguration 
 			HandSize:         hs,
 			QueueLengthLimit: 5}
 	}
-	labelVals := []string{"test"}
-	_, err := queueSetCompleterForPL(noRestraintQSF, nil, plc, time.Minute, metrics.PriorityLevelConcurrencyObserverPairGenerator.Generate(1, 1, labelVals), metrics.PriorityLevelExecutionSeatsObserverGenerator.Generate(1, 1, labelVals))
+	labelVal := "test"
+	_, err := queueSetCompleterForPL(noRestraintQSF, nil, plc, time.Minute, metrics.PriorityLevelConcurrencyObserverPairVec.WithLabelValuesSafe(1, 1, labelVal), metrics.PriorityLevelExecutionSeatsObserverVec.WithLabelValuesSafe(1, labelVal))
 	if err != nil {
 		panic(err)
 	}
