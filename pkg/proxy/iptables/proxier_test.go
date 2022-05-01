@@ -4235,6 +4235,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		// previousEndpoints and currentEndpoints are used to call appropriate
 		// handlers OnEndpoints* (based on whether corresponding values are nil
 		// or non-nil) and must be of equal length.
+		name                      string
 		previousEndpoints         []*discovery.EndpointSlice
 		currentEndpoints          []*discovery.EndpointSlice
 		oldEndpoints              map[proxy.ServicePortName][]*endpointsInfo
@@ -4244,6 +4245,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		expectedHealthchecks      map[types.NamespacedName]int
 	}{{
 		// Case[0]: nothing
+		name:                      "nothing",
 		oldEndpoints:              map[proxy.ServicePortName][]*endpointsInfo{},
 		expectedResult:            map[proxy.ServicePortName][]*endpointsInfo{},
 		expectedStaleEndpoints:    []proxy.ServiceEndpoint{},
@@ -4251,6 +4253,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		expectedHealthchecks:      map[types.NamespacedName]int{},
 	}, {
 		// Case[1]: no change, named port, local
+		name:              "no change, named port, local",
 		previousEndpoints: namedPortLocal,
 		currentEndpoints:  namedPortLocal,
 		oldEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
@@ -4270,6 +4273,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		},
 	}, {
 		// Case[2]: no change, multiple subsets
+		name:              "no change, multiple subsets",
 		previousEndpoints: multipleSubsets,
 		currentEndpoints:  multipleSubsets,
 		oldEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
@@ -4293,6 +4297,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		expectedHealthchecks:      map[types.NamespacedName]int{},
 	}, {
 		// Case[3]: no change, multiple subsets, multiple ports, local
+		name:              "no change, multiple subsets, multiple ports, local",
 		previousEndpoints: multipleSubsetsMultiplePortsLocal,
 		currentEndpoints:  multipleSubsetsMultiplePortsLocal,
 		oldEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
@@ -4324,6 +4329,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		},
 	}, {
 		// Case[4]: no change, multiple endpoints, subsets, IPs, and ports
+		name:              "no change, multiple endpoints, subsets, IPs, and ports",
 		previousEndpoints: multipleSubsetsIPsPorts,
 		currentEndpoints:  multipleSubsetsIPsPorts,
 		oldEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
@@ -4386,6 +4392,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		},
 	}, {
 		// Case[5]: add an Endpoints
+		name:              "add an Endpoints",
 		previousEndpoints: []*discovery.EndpointSlice{nil},
 		currentEndpoints:  namedPortLocal,
 		oldEndpoints:      map[proxy.ServicePortName][]*endpointsInfo{},
@@ -4403,6 +4410,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		},
 	}, {
 		// Case[6]: remove an Endpoints
+		name:              "remove an Endpoints",
 		previousEndpoints: namedPortLocal,
 		currentEndpoints:  []*discovery.EndpointSlice{nil},
 		oldEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
@@ -4419,6 +4427,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		expectedHealthchecks:      map[types.NamespacedName]int{},
 	}, {
 		// Case[7]: add an IP and port
+		name:              "add an IP and port",
 		previousEndpoints: namedPort,
 		currentEndpoints:  namedPortsLocalNoLocal,
 		oldEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
@@ -4445,6 +4454,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		},
 	}, {
 		// Case[8]: remove an IP and port
+		name:              "remove an IP and port",
 		previousEndpoints: namedPortsLocalNoLocal,
 		currentEndpoints:  namedPort,
 		oldEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
@@ -4476,6 +4486,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		expectedHealthchecks:      map[types.NamespacedName]int{},
 	}, {
 		// Case[9]: add a subset
+		name:              "add a subset",
 		previousEndpoints: []*discovery.EndpointSlice{namedPort[0], nil},
 		currentEndpoints:  multipleSubsetsWithLocal,
 		oldEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
@@ -4500,6 +4511,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		},
 	}, {
 		// Case[10]: remove a subset
+		name:              "remove a subset",
 		previousEndpoints: multipleSubsets,
 		currentEndpoints:  []*discovery.EndpointSlice{namedPort[0], nil},
 		oldEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
@@ -4523,6 +4535,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		expectedHealthchecks:      map[types.NamespacedName]int{},
 	}, {
 		// Case[11]: rename a port
+		name:              "rename a port",
 		previousEndpoints: namedPort,
 		currentEndpoints:  namedPortRenamed,
 		oldEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
@@ -4545,6 +4558,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		expectedHealthchecks: map[types.NamespacedName]int{},
 	}, {
 		// Case[12]: renumber a port
+		name:              "renumber a port",
 		previousEndpoints: namedPort,
 		currentEndpoints:  namedPortRenumbered,
 		oldEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
@@ -4565,6 +4579,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		expectedHealthchecks:      map[types.NamespacedName]int{},
 	}, {
 		// Case[13]: complex add and remove
+		name:              "complex add and remove",
 		previousEndpoints: complexBefore,
 		currentEndpoints:  complexAfter,
 		oldEndpoints: map[proxy.ServicePortName][]*endpointsInfo{
@@ -4630,6 +4645,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		},
 	}, {
 		// Case[14]: change from 0 endpoint address to 1 unnamed port
+		name:              "change from 0 endpoint address to 1 unnamed port",
 		previousEndpoints: emptyEndpointSlices,
 		currentEndpoints:  namedPort,
 		oldEndpoints:      map[proxy.ServicePortName][]*endpointsInfo{},
@@ -4647,72 +4663,73 @@ func TestUpdateEndpointsMap(t *testing.T) {
 	}
 
 	for tci, tc := range testCases {
-		ipt := iptablestest.NewFake()
-		fp := NewFakeProxier(ipt)
-		fp.hostname = nodeName
+		t.Run(tc.name, func(t *testing.T) {
+			ipt := iptablestest.NewFake()
+			fp := NewFakeProxier(ipt)
+			fp.hostname = nodeName
 
-		// First check that after adding all previous versions of endpoints,
-		// the fp.oldEndpoints is as we expect.
-		for i := range tc.previousEndpoints {
-			if tc.previousEndpoints[i] != nil {
-				fp.OnEndpointSliceAdd(tc.previousEndpoints[i])
-			}
-		}
-		fp.endpointsMap.Update(fp.endpointsChanges)
-		compareEndpointsMapsExceptChainName(t, tci, fp.endpointsMap, tc.oldEndpoints)
-
-		// Now let's call appropriate handlers to get to state we want to be.
-		if len(tc.previousEndpoints) != len(tc.currentEndpoints) {
-			t.Fatalf("[%d] different lengths of previous and current endpoints", tci)
-			continue
-		}
-
-		for i := range tc.previousEndpoints {
-			prev, curr := tc.previousEndpoints[i], tc.currentEndpoints[i]
-			switch {
-			case prev == nil:
-				fp.OnEndpointSliceAdd(curr)
-			case curr == nil:
-				fp.OnEndpointSliceDelete(prev)
-			default:
-				fp.OnEndpointSliceUpdate(prev, curr)
-			}
-		}
-		result := fp.endpointsMap.Update(fp.endpointsChanges)
-		newMap := fp.endpointsMap
-		compareEndpointsMapsExceptChainName(t, tci, newMap, tc.expectedResult)
-		if len(result.StaleEndpoints) != len(tc.expectedStaleEndpoints) {
-			t.Errorf("[%d] expected %d staleEndpoints, got %d: %v", tci, len(tc.expectedStaleEndpoints), len(result.StaleEndpoints), result.StaleEndpoints)
-		}
-		for _, x := range tc.expectedStaleEndpoints {
-			found := false
-			for _, stale := range result.StaleEndpoints {
-				if stale == x {
-					found = true
-					break
+			// First check that after adding all previous versions of endpoints,
+			// the fp.oldEndpoints is as we expect.
+			for i := range tc.previousEndpoints {
+				if tc.previousEndpoints[i] != nil {
+					fp.OnEndpointSliceAdd(tc.previousEndpoints[i])
 				}
 			}
-			if !found {
-				t.Errorf("[%d] expected staleEndpoints[%v], but didn't find it: %v", tci, x, result.StaleEndpoints)
+			fp.endpointsMap.Update(fp.endpointsChanges)
+			compareEndpointsMapsExceptChainName(t, tci, fp.endpointsMap, tc.oldEndpoints)
+
+			// Now let's call appropriate handlers to get to state we want to be.
+			if len(tc.previousEndpoints) != len(tc.currentEndpoints) {
+				t.Fatalf("[%d] different lengths of previous and current endpoints", tci)
 			}
-		}
-		if len(result.StaleServiceNames) != len(tc.expectedStaleServiceNames) {
-			t.Errorf("[%d] expected %d staleServiceNames, got %d: %v", tci, len(tc.expectedStaleServiceNames), len(result.StaleServiceNames), result.StaleServiceNames)
-		}
-		for svcName := range tc.expectedStaleServiceNames {
-			found := false
-			for _, stale := range result.StaleServiceNames {
-				if stale == svcName {
-					found = true
+
+			for i := range tc.previousEndpoints {
+				prev, curr := tc.previousEndpoints[i], tc.currentEndpoints[i]
+				switch {
+				case prev == nil:
+					fp.OnEndpointSliceAdd(curr)
+				case curr == nil:
+					fp.OnEndpointSliceDelete(prev)
+				default:
+					fp.OnEndpointSliceUpdate(prev, curr)
 				}
 			}
-			if !found {
-				t.Errorf("[%d] expected staleServiceNames[%v], but didn't find it: %v", tci, svcName, result.StaleServiceNames)
+			result := fp.endpointsMap.Update(fp.endpointsChanges)
+			newMap := fp.endpointsMap
+			compareEndpointsMapsExceptChainName(t, tci, newMap, tc.expectedResult)
+			if len(result.StaleEndpoints) != len(tc.expectedStaleEndpoints) {
+				t.Errorf("[%d] expected %d staleEndpoints, got %d: %v", tci, len(tc.expectedStaleEndpoints), len(result.StaleEndpoints), result.StaleEndpoints)
 			}
-		}
-		if !reflect.DeepEqual(result.HCEndpointsLocalIPSize, tc.expectedHealthchecks) {
-			t.Errorf("[%d] expected healthchecks %v, got %v", tci, tc.expectedHealthchecks, result.HCEndpointsLocalIPSize)
-		}
+			for _, x := range tc.expectedStaleEndpoints {
+				found := false
+				for _, stale := range result.StaleEndpoints {
+					if stale == x {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("[%d] expected staleEndpoints[%v], but didn't find it: %v", tci, x, result.StaleEndpoints)
+				}
+			}
+			if len(result.StaleServiceNames) != len(tc.expectedStaleServiceNames) {
+				t.Errorf("[%d] expected %d staleServiceNames, got %d: %v", tci, len(tc.expectedStaleServiceNames), len(result.StaleServiceNames), result.StaleServiceNames)
+			}
+			for svcName := range tc.expectedStaleServiceNames {
+				found := false
+				for _, stale := range result.StaleServiceNames {
+					if stale == svcName {
+						found = true
+					}
+				}
+				if !found {
+					t.Errorf("[%d] expected staleServiceNames[%v], but didn't find it: %v", tci, svcName, result.StaleServiceNames)
+				}
+			}
+			if !reflect.DeepEqual(result.HCEndpointsLocalIPSize, tc.expectedHealthchecks) {
+				t.Errorf("[%d] expected healthchecks %v, got %v", tci, tc.expectedHealthchecks, result.HCEndpointsLocalIPSize)
+			}
+		})
 	}
 }
 
