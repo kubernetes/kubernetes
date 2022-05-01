@@ -851,7 +851,7 @@ func (p *Parser) parseExactValue() (sets.String, error) {
 //  <exact-match-restriction> ::= ["="|"=="|"!="] VALUE
 //
 // KEY is a sequence of one or more characters following [ DNS_SUBDOMAIN "/" ] DNS_LABEL. Max length is 63 characters.
-// VALUE is a sequence of zero or more characters "([A-Za-z0-9_-\.])". Max length is 63 characters.
+// VALUE is a sequence of zero or more characters "([A-Za-z0-9_\.-])". Max length is 63 characters.
 // Delimiter is white space: (' ', '\t')
 // Example of valid syntax:
 //  "x in (foo,,baz),y,z notin ()"
