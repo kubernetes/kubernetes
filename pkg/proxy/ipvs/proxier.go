@@ -577,7 +577,7 @@ func filterCIDRs(wantIPv6 bool, cidrs []string) []string {
 type serviceInfo struct {
 	*proxy.BaseServiceInfo
 	// The following fields are computed and stored for performance reasons.
-	serviceNameString string
+	svcPortNameString string
 }
 
 // returns a new proxy.ServicePort which abstracts a serviceInfo
@@ -587,7 +587,7 @@ func newServiceInfo(port *v1.ServicePort, service *v1.Service, baseInfo *proxy.B
 	// Store the following for performance reasons.
 	svcName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
 	svcPortName := proxy.ServicePortName{NamespacedName: svcName, Port: port.Name}
-	info.serviceNameString = svcPortName.String()
+	info.svcPortNameString = svcPortName.String()
 
 	return info
 }
