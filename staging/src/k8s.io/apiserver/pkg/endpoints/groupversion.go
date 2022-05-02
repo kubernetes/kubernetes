@@ -22,7 +22,6 @@ import (
 
 	restful "github.com/emicklei/go-restful"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -114,16 +113,8 @@ func (g *APIGroupVersion) InstallREST(container *restful.Container) ([]*storagev
 	}
 
 	apiResources, resourceInfos, ws, registrationErrors := installer.Install()
-	lister, err := newStaticLister(&metav1.APIResourceList{
-		GroupVersion: g.GroupVersion.String(),
-		APIResources: apiResources,
-	})
 
-	if err != nil {
-		return nil, err
-	}
-
-	versionDiscoveryHandler := discovery.NewAPIVersionHandler(g.Serializer, g.GroupVersion, lister)
+	versionDiscoveryHandler := discovery.NewAPIVersionHandler(g.Serializer, g.GroupVersion, apiResources)
 	versionDiscoveryHandler.AddToWebService(ws)
 	container.Add(ws)
 	return removeNonPersistedResources(resourceInfos), utilerrors.NewAggregate(registrationErrors)
@@ -141,31 +132,3 @@ func removeNonPersistedResources(infos []*storageversion.ResourceInfo) []*storag
 	}
 	return filtered
 }
-
-// staticLister implements the APIResourceLister interface
-type staticLister struct {
-	list *metav1.APIResourceList
-	hash string
-}
-
-func newStaticLister(list *metav1.APIResourceList) (*staticLister, error) {
-	hash, err := discovery.CalculateETag(list)
-	if err != nil {
-		return nil, err
-	}
-
-	return &staticLister{
-		list: list,
-		hash: hash,
-	}, nil
-}
-
-func (s staticLister) getHash() string {
-	return s.hash
-}
-
-func (s staticLister) ListAPIResources() ([]metav1.APIResource, string) {
-	return s.list.APIResources, s.hash
-}
-
-var _ discovery.APIResourceLister = &staticLister{}

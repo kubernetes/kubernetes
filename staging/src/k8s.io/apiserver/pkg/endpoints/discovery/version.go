@@ -18,8 +18,6 @@ package discovery
 
 import (
 	"net/http"
-	"strconv"
-	"time"
 
 	restful "github.com/emicklei/go-restful"
 
@@ -27,29 +25,30 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
-	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
+	"k8s.io/klog/v2"
 )
-
-type APIResourceLister interface {
-	ListAPIResources() ([]metav1.APIResource, string)
-}
-
-type APIResourceListerFunc func() ([]metav1.APIResource, string)
-
-func (f APIResourceListerFunc) ListAPIResources() ([]metav1.APIResource, string) {
-	return f()
-}
 
 // APIVersionHandler creates a webservice serving the supported resources for the version
 // E.g., such a web service will be registered at /apis/extensions/v1beta1.
 type APIVersionHandler struct {
 	serializer runtime.NegotiatedSerializer
 
-	groupVersion      schema.GroupVersion
-	apiResourceLister APIResourceLister
+	groupVersion schema.GroupVersion
+	resourceList *metav1.APIResourceList
+	hash         string
 }
 
-func NewAPIVersionHandler(serializer runtime.NegotiatedSerializer, groupVersion schema.GroupVersion, apiResourceLister APIResourceLister) *APIVersionHandler {
+func NewAPIVersionHandler(
+	serializer runtime.NegotiatedSerializer,
+	groupVersion schema.GroupVersion,
+	resources []metav1.APIResource,
+) *APIVersionHandler {
+
+	resourceList := &metav1.APIResourceList{
+		GroupVersion: groupVersion.String(),
+		APIResources: resources,
+	}
+
 	if keepUnversioned(groupVersion.Group) {
 		// Because in release 1.1, /apis/extensions returns response with empty
 		// APIVersion, we use stripVersionNegotiatedSerializer to keep the
@@ -57,10 +56,22 @@ func NewAPIVersionHandler(serializer runtime.NegotiatedSerializer, groupVersion 
 		serializer = stripVersionNegotiatedSerializer{serializer}
 	}
 
+	hash, err := CalculateETag(resourceList)
+	if err != nil {
+		// This method cannot fail. If E-Tag cannot be calculated, then we will
+		// simply not support etags with this endpoint.
+		klog.Error(
+			"failed to calculate e-tag for resoure list of %v. E-Tags will not be supported",
+			groupVersion.String())
+
+		hash = ""
+	}
+
 	return &APIVersionHandler{
-		serializer:        serializer,
-		groupVersion:      groupVersion,
-		apiResourceLister: apiResourceLister,
+		serializer:   serializer,
+		groupVersion: groupVersion,
+		resourceList: resourceList,
+		hash:         hash,
 	}
 }
 
@@ -80,62 +91,9 @@ func (s *APIVersionHandler) handle(req *restful.Request, resp *restful.Response)
 }
 
 func (s *APIVersionHandler) GetCurrentHash() string {
-	_, hash := s.apiResourceLister.ListAPIResources()
-	return hash
+	return s.hash
 }
 
 func (s *APIVersionHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	reqURL := req.URL
-	if reqURL == nil {
-		// Can not find documentation guaranteeing the non-nility of reqURL.
-		w.WriteHeader(500)
-		return
-	}
-
-	// Get current resource list and hash
-	resourceList, hash := s.apiResourceLister.ListAPIResources()
-
-	if providedHash := reqURL.Query().Get("hash"); len(providedHash) > 0 && len(hash) > 0 {
-		if hash == providedHash {
-			// The Vary header is required because the Accept header can
-			// change the contents returned. This prevents clients from caching
-			// protobuf as JSON and vice versa.
-			w.Header().Set("Vary", "Accept")
-
-			// Only set these headers when a hash is given.
-			w.Header().Set("Cache-Control", "public, immutable")
-
-			// Set the Expires directive to the maximum value of one year from the request,
-			// effectively indicating that the cache never expires.
-			w.Header().Set(
-				"Expires", time.Now().AddDate(1, 0, 0).Format(time.RFC1123))
-		} else {
-			// redirect with reply
-			redirectURL := *reqURL
-			query := redirectURL.Query()
-			query.Set("hash", hash)
-			redirectURL.RawQuery = query.Encode()
-
-			//!TODO: is MovedPermanently the right status code to use here?
-			http.Redirect(w, req, redirectURL.String(), http.StatusMovedPermanently)
-			return
-		}
-	}
-
-	// ETag must be enclosed in double quotes:
-	// https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/ETag
-	w.Header().Set("Etag", strconv.Quote(hash))
-
-	responsewriters.WriteObjectNegotiated(
-		s.serializer,
-		negotiation.DefaultEndpointRestrictions,
-		schema.GroupVersion{},
-		w,
-		req,
-		http.StatusOK,
-		&metav1.APIResourceList{
-			GroupVersion: s.groupVersion.String(),
-			APIResources: resourceList,
-		},
-	)
+	ServeHTTPWithETag(s.resourceList, s.hash, s.serializer, w, req)
 }

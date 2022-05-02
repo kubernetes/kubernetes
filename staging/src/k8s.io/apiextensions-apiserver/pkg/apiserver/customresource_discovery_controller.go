@@ -189,20 +189,7 @@ func (c *DiscoveryController) sync(version schema.GroupVersion) error {
 		return nil
 	}
 
-	versionResourcesHash, err := discovery.CalculateETag(&metav1.APIResourceList{
-		GroupVersion: version.String(),
-		APIResources: apiResourcesForDiscovery,
-	})
-
-	if err != nil {
-		klog.ErrorS(err, "Failed to calculate APIResourceList hash")
-		c.versionHandler.unsetDiscovery(version)
-		return err
-	}
-
-	c.versionHandler.setDiscovery(version, discovery.NewAPIVersionHandler(Codecs, version, discovery.APIResourceListerFunc(func() ([]metav1.APIResource, string) {
-		return apiResourcesForDiscovery, versionResourcesHash
-	})))
+	c.versionHandler.setDiscovery(version, discovery.NewAPIVersionHandler(Codecs, version, apiResourcesForDiscovery))
 
 	return nil
 }

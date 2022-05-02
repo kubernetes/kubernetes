@@ -22,11 +22,11 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
+	"k8s.io/apiserver/pkg/endpoints/discovery"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
+	"k8s.io/klog/v2"
 
 	apiregistrationv1api "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	apiregistrationv1apihelper "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1/helper"
@@ -91,7 +91,17 @@ func (r *apisHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	responsewriters.WriteObjectNegotiated(r.codecs, negotiation.DefaultEndpointRestrictions, schema.GroupVersion{}, w, req, http.StatusOK, discoveryGroupList)
+	hash, err := discovery.CalculateETag(discoveryGroupList)
+	if err != nil {
+		// Non-fatal
+		klog.Error(
+			"failed to calculate e-tag for group list of apisHandler.",
+			"E-Tags will not be supported")
+
+		// Empty hash to disable E-Tag
+		hash = ""
+	}
+	discovery.ServeHTTPWithETag(discoveryGroupList, hash, r.codecs, w, req)
 }
 
 // convertToDiscoveryAPIGroup takes apiservices in a single group and returns a discovery compatible object.
@@ -164,5 +174,17 @@ func (r *apiGroupHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "", http.StatusNotFound)
 		return
 	}
-	responsewriters.WriteObjectNegotiated(r.codecs, negotiation.DefaultEndpointRestrictions, schema.GroupVersion{}, w, req, http.StatusOK, discoveryGroup)
+
+	hash, err := discovery.CalculateETag(discoveryGroup)
+	if err != nil {
+		// Non-fatal
+		klog.Error(
+			"failed to calculate e-tag for group list of apisHandler.",
+			"E-Tags will not be supported")
+
+		// Empty hash to disable E-Tag
+		hash = ""
+	}
+
+	discovery.ServeHTTPWithETag(discoveryGroup, hash, r.codecs, w, req)
 }
