@@ -2,7 +2,7 @@
 // +build windows
 
 /*
-Copyright 2021 The Kubernetes Authors.
+Copyright 2024 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,18 +20,20 @@ limitations under the License.
 package kuberuntime
 
 import (
-	v1 "k8s.io/api/core/v1"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func (m *kubeGenericRuntimeManager) applySandboxResources(pod *v1.Pod, config *runtimeapi.PodSandboxConfig) error {
-	return nil
-}
+func TestGetPodSandboxWindowsConfig(t *testing.T) {
+	_, _, m, err := createTestRuntimeManager()
+	require.NoError(t, err)
+	pod := newTestPod()
 
-func getPodSandboxWindowsConfig(m *kubeGenericRuntimeManager, pod *v1.Pod) (*runtimeapi.WindowsPodSandboxConfig, error) {
-	return m.generatePodSandboxWindowsConfig(pod)
-}
-
-func (m *kubeGenericRuntimeManager) addLinuxSecurityContext(lc *runtimeapi.LinuxPodSandboxConfig, pod *v1.Pod) error {
-	return nil
+	windowsConfig, err := getPodSandboxWindowsConfig(m, pod)
+	require.NoError(t, err)
+	wc, err := m.generatePodSandboxWindowsConfig(pod)
+	require.NoError(t, err)
+	assert.Equal(t, windowsConfig, wc)
 }
