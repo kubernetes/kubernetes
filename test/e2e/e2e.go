@@ -74,9 +74,12 @@ const (
 	namespaceCleanupTimeout = 15 * time.Minute
 )
 
+var progressReporter = &e2ereporters.ProgressReporter{}
+
 var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Reference common test to make the import valid.
 	commontest.CurrentSuite = commontest.E2E
+	progressReporter.SetStartMsg()
 	setupSuite()
 	return nil
 }, func(data []byte) {
@@ -85,6 +88,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 })
 
 var _ = ginkgo.SynchronizedAfterSuite(func() {
+	progressReporter.SetEndMsg()
 	CleanupSuite()
 }, func() {
 	AfterSuiteActions()
@@ -98,7 +102,7 @@ var _ = ginkgo.SynchronizedAfterSuite(func() {
 func RunE2ETests(t *testing.T) {
 	logs.InitLogs()
 	defer logs.FlushLogs()
-
+	progressReporter = e2ereporters.NewProgressReporter(framework.TestContext.ProgressReportURL)
 	gomega.RegisterFailHandler(framework.Fail)
 	// Disable skipped tests unless they are explicitly requested.
 	if config.GinkgoConfig.FocusString == "" && config.GinkgoConfig.SkipString == "" {
@@ -116,9 +120,6 @@ func RunE2ETests(t *testing.T) {
 			r = append(r, reporters.NewJUnitReporter(path.Join(framework.TestContext.ReportDir, fmt.Sprintf("junit_%v%02d.xml", framework.TestContext.ReportPrefix, config.GinkgoConfig.ParallelNode))))
 		}
 	}
-
-	// Stream the progress to stdout and optionally a URL accepting progress updates.
-	r = append(r, e2ereporters.NewProgressReporter(framework.TestContext.ProgressReportURL))
 
 	klog.Infof("Starting e2e run %q on Ginkgo node %d", framework.RunID, config.GinkgoConfig.ParallelNode)
 	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "Kubernetes e2e suite", r)

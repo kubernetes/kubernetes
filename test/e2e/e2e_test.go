@@ -139,6 +139,10 @@ func TestE2E(t *testing.T) {
 	RunE2ETests(t)
 }
 
+var _ = ginkgo.ReportAfterEach(func(report ginkgo.SpecReport) {
+	progressReporter.ProcessSpecReport(report)
+})
+
 var _ = ginkgo.ReportAfterSuite("Kubernetes e2e suite report", func(report ginkgo.Report) {
 	var err error
 	// The DetailsRepoerter will output details about every test (name, files, lines, etc) which helps
