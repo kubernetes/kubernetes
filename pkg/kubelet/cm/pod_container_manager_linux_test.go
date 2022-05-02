@@ -102,6 +102,12 @@ func TestIsCgroupPod(t *testing.T) {
 			expectedResult: false,
 			expectedUID:    types.UID(""),
 		},
+		{
+			// contains reserved word "pod" in cgroup name
+			input:          NewCgroupName(RootCgroupName, GetPodCgroupNameSuffix("this-uid-contains-reserved-word-pod")),
+			expectedResult: false,
+			expectedUID:    types.UID(""),
+		},
 	}
 	for _, cgroupDriver := range []string{"cgroupfs", "systemd"} {
 		pcm := &podContainerManagerImpl{
