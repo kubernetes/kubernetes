@@ -133,7 +133,7 @@ function return_to_kansas {
 trap return_to_kansas EXIT
 
 SUBJECTS=()
-function make-a-pr() {
+function make_a_pr() {
   local rel
   rel="$(basename "${BRANCH}")"
   echo
@@ -237,7 +237,7 @@ if git remote -v | grep ^"${FORK_REMOTE}" | grep "${MAIN_REPO_ORG}/${MAIN_REPO_N
   echo "where REMOTE is your personal fork (maybe ${UPSTREAM_REMOTE}? Consider swapping those.)."
   echo "OR consider setting UPSTREAM_REMOTE and FORK_REMOTE to different values."
   echo
-  make-a-pr
+  make_a_pr
   cleanbranch=""
   exit 0
 fi
@@ -254,4 +254,4 @@ if ! [[ "${REPLY}" =~ ^[yY]$ ]]; then
 fi
 
 git push "${FORK_REMOTE}" -f "${NEWBRANCHUNIQ}:${NEWBRANCH}"
-make-a-pr
+make_a_pr
