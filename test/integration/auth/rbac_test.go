@@ -518,124 +518,126 @@ func TestRBAC(t *testing.T) {
 	}
 
 	for i, tc := range tests {
-		// Create an API Server.
-		controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-		controlPlaneConfig.GenericConfig.Authorization.Authorizer = newRBACAuthorizer(t, controlPlaneConfig)
-		controlPlaneConfig.GenericConfig.Authentication.Authenticator = group.NewAuthenticatedGroupAdder(bearertoken.New(tokenfile.New(map[string]*user.DefaultInfo{
-			superUser:                          {Name: "admin", Groups: []string{"system:masters"}},
-			"any-rolebinding-writer":           {Name: "any-rolebinding-writer"},
-			"any-rolebinding-writer-namespace": {Name: "any-rolebinding-writer-namespace"},
-			"bob":                              {Name: "bob"},
-			"job-writer":                       {Name: "job-writer"},
-			"job-writer-namespace":             {Name: "job-writer-namespace"},
-			"nonescalating-rolebinding-writer": {Name: "nonescalating-rolebinding-writer"},
-			"pod-reader":                       {Name: "pod-reader"},
-			"limitrange-updater":               {Name: "limitrange-updater"},
-			"limitrange-patcher":               {Name: "limitrange-patcher"},
-			"user-with-no-permissions":         {Name: "user-with-no-permissions"},
-		})))
-		controlPlaneConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
-		_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
-		defer closeFn()
+		t.Run(fmt.Sprintf("case-%d", i), func(t *testing.T) {
+			// Create an API Server.
+			controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
+			controlPlaneConfig.GenericConfig.Authorization.Authorizer = newRBACAuthorizer(t, controlPlaneConfig)
+			controlPlaneConfig.GenericConfig.Authentication.Authenticator = group.NewAuthenticatedGroupAdder(bearertoken.New(tokenfile.New(map[string]*user.DefaultInfo{
+				superUser:                          {Name: "admin", Groups: []string{"system:masters"}},
+				"any-rolebinding-writer":           {Name: "any-rolebinding-writer"},
+				"any-rolebinding-writer-namespace": {Name: "any-rolebinding-writer-namespace"},
+				"bob":                              {Name: "bob"},
+				"job-writer":                       {Name: "job-writer"},
+				"job-writer-namespace":             {Name: "job-writer-namespace"},
+				"nonescalating-rolebinding-writer": {Name: "nonescalating-rolebinding-writer"},
+				"pod-reader":                       {Name: "pod-reader"},
+				"limitrange-updater":               {Name: "limitrange-updater"},
+				"limitrange-patcher":               {Name: "limitrange-patcher"},
+				"user-with-no-permissions":         {Name: "user-with-no-permissions"},
+			})))
+			controlPlaneConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
+			_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
+			defer closeFn()
 
-		clientConfig := &restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs}}
+			clientConfig := &restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs}}
 
-		// Bootstrap the API Server with the test case's initial roles.
-		superuserClient, _ := clientsetForToken(superUser, clientConfig)
-		if err := tc.bootstrapRoles.bootstrap(superuserClient); err != nil {
-			t.Errorf("case %d: failed to apply initial roles: %v", i, err)
-			continue
-		}
-		previousResourceVersion := make(map[string]float64)
+			// Bootstrap the API Server with the test case's initial roles.
+			superuserClient, _ := clientsetForToken(superUser, clientConfig)
+			if err := tc.bootstrapRoles.bootstrap(superuserClient); err != nil {
+				t.Errorf("case %d: failed to apply initial roles: %v", i, err)
+				return
+			}
+			previousResourceVersion := make(map[string]float64)
 
-		for j, r := range tc.requests {
-			path := "/"
-			if r.apiGroup == "" {
-				path = gopath.Join(path, "api/v1")
-			} else {
-				path = gopath.Join(path, "apis", r.apiGroup, "v1")
-			}
-			if r.namespace != "" {
-				path = gopath.Join(path, "namespaces", r.namespace)
-			}
-			if r.resource != "" {
-				path = gopath.Join(path, r.resource)
-			}
-			if r.name != "" {
-				path = gopath.Join(path, r.name)
-			}
+			for j, r := range tc.requests {
+				path := "/"
+				if r.apiGroup == "" {
+					path = gopath.Join(path, "api/v1")
+				} else {
+					path = gopath.Join(path, "apis", r.apiGroup, "v1")
+				}
+				if r.namespace != "" {
+					path = gopath.Join(path, "namespaces", r.namespace)
+				}
+				if r.resource != "" {
+					path = gopath.Join(path, r.resource)
+				}
+				if r.name != "" {
+					path = gopath.Join(path, r.name)
+				}
 
-			var body io.Reader
-			if r.body != "" {
-				sub := ""
-				if r.verb == "PUT" {
-					// For update operations, insert previous resource version
-					if resVersion := previousResourceVersion[getPreviousResourceVersionKey(path, "")]; resVersion != 0 {
-						sub += fmt.Sprintf(",\"resourceVersion\": \"%v\"", resVersion)
+				var body io.Reader
+				if r.body != "" {
+					sub := ""
+					if r.verb == "PUT" {
+						// For update operations, insert previous resource version
+						if resVersion := previousResourceVersion[getPreviousResourceVersionKey(path, "")]; resVersion != 0 {
+							sub += fmt.Sprintf(",\"resourceVersion\": \"%v\"", resVersion)
+						}
 					}
+					body = strings.NewReader(fmt.Sprintf(r.body, sub))
 				}
-				body = strings.NewReader(fmt.Sprintf(r.body, sub))
-			}
 
-			req, err := http.NewRequest(r.verb, s.URL+path, body)
-			if r.verb == "PATCH" {
-				// For patch operations, use the apply content type
-				req.Header.Add("Content-Type", string(types.ApplyPatchType))
-				q := req.URL.Query()
-				q.Add("fieldManager", "rbac_test")
-				req.URL.RawQuery = q.Encode()
-			}
+				req, err := http.NewRequest(r.verb, s.URL+path, body)
+				if r.verb == "PATCH" {
+					// For patch operations, use the apply content type
+					req.Header.Add("Content-Type", string(types.ApplyPatchType))
+					q := req.URL.Query()
+					q.Add("fieldManager", "rbac_test")
+					req.URL.RawQuery = q.Encode()
+				}
 
-			if err != nil {
-				t.Fatalf("failed to create request: %v", err)
-			}
-
-			func() {
-				reqDump, err := httputil.DumpRequest(req, true)
 				if err != nil {
-					t.Fatalf("failed to dump request: %v", err)
-					return
+					t.Fatalf("failed to create request: %v", err)
 				}
 
-				resp, err := clientForToken(r.token).Do(req)
-				if err != nil {
-					t.Errorf("case %d, req %d: failed to make request: %v", i, j, err)
-					return
-				}
-				defer resp.Body.Close()
-
-				respDump, err := httputil.DumpResponse(resp, true)
-				if err != nil {
-					t.Fatalf("failed to dump response: %v", err)
-					return
-				}
-
-				if resp.StatusCode != r.expectedStatus {
-					// When debugging is on, dump the entire request and response. Very helpful for
-					// debugging malformed test cases.
-					//
-					// To turn on debugging, use the '-args' flag.
-					//
-					//    go test -v -tags integration -run RBAC -args -v 10
-					//
-					klog.V(8).Infof("case %d, req %d: %s\n%s\n", i, j, reqDump, respDump)
-					t.Errorf("case %d, req %d: %s expected %q got %q", i, j, r, statusCode(r.expectedStatus), statusCode(resp.StatusCode))
-				}
-
-				b, _ := io.ReadAll(resp.Body)
-
-				if r.verb == "POST" && (resp.StatusCode/100) == 2 {
-					// For successful create operations, extract resourceVersion
-					id, currentResourceVersion, err := parseResourceVersion(b)
-					if err == nil {
-						key := getPreviousResourceVersionKey(path, id)
-						previousResourceVersion[key] = currentResourceVersion
-					} else {
-						t.Logf("error in trying to extract resource version: %s", err)
+				func() {
+					reqDump, err := httputil.DumpRequest(req, true)
+					if err != nil {
+						t.Fatalf("failed to dump request: %v", err)
+						return
 					}
-				}
-			}()
-		}
+
+					resp, err := clientForToken(r.token).Do(req)
+					if err != nil {
+						t.Errorf("case %d, req %d: failed to make request: %v", i, j, err)
+						return
+					}
+					defer resp.Body.Close()
+
+					respDump, err := httputil.DumpResponse(resp, true)
+					if err != nil {
+						t.Fatalf("failed to dump response: %v", err)
+						return
+					}
+
+					if resp.StatusCode != r.expectedStatus {
+						// When debugging is on, dump the entire request and response. Very helpful for
+						// debugging malformed test cases.
+						//
+						// To turn on debugging, use the '-args' flag.
+						//
+						//    go test -v -tags integration -run RBAC -args -v 10
+						//
+						klog.V(8).Infof("case %d, req %d: %s\n%s\n", i, j, reqDump, respDump)
+						t.Errorf("case %d, req %d: %s expected %q got %q", i, j, r, statusCode(r.expectedStatus), statusCode(resp.StatusCode))
+					}
+
+					b, _ := io.ReadAll(resp.Body)
+
+					if r.verb == "POST" && (resp.StatusCode/100) == 2 {
+						// For successful create operations, extract resourceVersion
+						id, currentResourceVersion, err := parseResourceVersion(b)
+						if err == nil {
+							key := getPreviousResourceVersionKey(path, id)
+							previousResourceVersion[key] = currentResourceVersion
+						} else {
+							t.Logf("error in trying to extract resource version: %s", err)
+						}
+					}
+				}()
+			}
+		})
 	}
 }
 
