@@ -20,16 +20,13 @@ import (
 	"context"
 	"fmt"
 	"net/url"
-	"runtime"
 	"sort"
 
 	v1 "k8s.io/api/core/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubelet/pkg/types"
-	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	runtimeutil "k8s.io/kubernetes/pkg/kubelet/kuberuntime/util"
 	"k8s.io/kubernetes/pkg/kubelet/util"
@@ -141,14 +138,11 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *v1.Pod, attemp
 		return nil, err
 	}
 	podSandboxConfig.Linux = lc
-
-	if runtime.GOOS == "windows" {
-		wc, err := m.generatePodSandboxWindowsConfig(pod)
-		if err != nil {
-			return nil, err
-		}
-		podSandboxConfig.Windows = wc
+	wc, err := m.generatePodSandboxWindowsConfig(pod)
+	if err != nil {
+		return nil, err
 	}
+	podSandboxConfig.Windows = wc
 
 	// Update config to include overhead, sandbox level resources
 	if err := m.applySandboxResources(pod, podSandboxConfig); err != nil {
@@ -187,20 +181,14 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(pod *v1.Pod) (
 
 	if pod.Spec.SecurityContext != nil {
 		sc := pod.Spec.SecurityContext
-		if sc.RunAsUser != nil && runtime.GOOS != "windows" {
-			lc.SecurityContext.RunAsUser = &runtimeapi.Int64Value{Value: int64(*sc.RunAsUser)}
-		}
-		if sc.RunAsGroup != nil && runtime.GOOS != "windows" {
-			lc.SecurityContext.RunAsGroup = &runtimeapi.Int64Value{Value: int64(*sc.RunAsGroup)}
-		}
 		namespaceOptions, err := runtimeutil.NamespacesForPod(pod, m.runtimeHelper, m.runtimeClassManager)
 		if err != nil {
 			return nil, err
 		}
 		lc.SecurityContext.NamespaceOptions = namespaceOptions
 
-		if sc.FSGroup != nil && runtime.GOOS != "windows" {
-			lc.SecurityContext.SupplementalGroups = append(lc.SecurityContext.SupplementalGroups, int64(*sc.FSGroup))
+		if err := m.addLinuxSecurityContext(lc, pod); err != nil {
+			return nil, err
 		}
 		if groups := m.runtimeHelper.GetExtraSupplementalGroupsForPod(pod); len(groups) > 0 {
 			lc.SecurityContext.SupplementalGroups = append(lc.SecurityContext.SupplementalGroups, groups...)
@@ -217,75 +205,9 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(pod *v1.Pod) (
 			}
 			lc.SecurityContext.SupplementalGroupsPolicy = runtimeapi.SupplementalGroupsPolicy(policyValue)
 		}
-
-		if sc.SELinuxOptions != nil && runtime.GOOS != "windows" {
-			lc.SecurityContext.SelinuxOptions = &runtimeapi.SELinuxOption{
-				User:  sc.SELinuxOptions.User,
-				Role:  sc.SELinuxOptions.Role,
-				Type:  sc.SELinuxOptions.Type,
-				Level: sc.SELinuxOptions.Level,
-			}
-		}
 	}
 
 	return lc, nil
-}
-
-// generatePodSandboxWindowsConfig generates WindowsPodSandboxConfig from v1.Pod.
-// On Windows this will get called in addition to LinuxPodSandboxConfig because not all relevant fields have been added to
-// WindowsPodSandboxConfig at this time.
-func (m *kubeGenericRuntimeManager) generatePodSandboxWindowsConfig(pod *v1.Pod) (*runtimeapi.WindowsPodSandboxConfig, error) {
-	wc := &runtimeapi.WindowsPodSandboxConfig{
-		SecurityContext: &runtimeapi.WindowsSandboxSecurityContext{},
-	}
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.WindowsHostNetwork) {
-		wc.SecurityContext.NamespaceOptions = &runtimeapi.WindowsNamespaceOption{}
-		if kubecontainer.IsHostNetworkPod(pod) {
-			wc.SecurityContext.NamespaceOptions.Network = runtimeapi.NamespaceMode_NODE
-		} else {
-			wc.SecurityContext.NamespaceOptions.Network = runtimeapi.NamespaceMode_POD
-		}
-	}
-
-	// If all of the containers in a pod are HostProcess containers, set the pod's HostProcess field
-	// explicitly because the container runtime requires this information at sandbox creation time.
-	if kubecontainer.HasWindowsHostProcessContainer(pod) {
-		// At present Windows all containers in a Windows pod must be HostProcess containers
-		// and HostNetwork is required to be set.
-		if !kubecontainer.AllContainersAreWindowsHostProcess(pod) {
-			return nil, fmt.Errorf("pod must not contain both HostProcess and non-HostProcess containers")
-		}
-
-		if !kubecontainer.IsHostNetworkPod(pod) {
-			return nil, fmt.Errorf("hostNetwork is required if Pod contains HostProcess containers")
-		}
-
-		wc.SecurityContext.HostProcess = true
-	}
-
-	sc := pod.Spec.SecurityContext
-	if sc == nil || sc.WindowsOptions == nil {
-		return wc, nil
-	}
-
-	wo := sc.WindowsOptions
-	if wo.GMSACredentialSpec != nil {
-		wc.SecurityContext.CredentialSpec = *wo.GMSACredentialSpec
-	}
-
-	if wo.RunAsUserName != nil {
-		wc.SecurityContext.RunAsUsername = *wo.RunAsUserName
-	}
-
-	if kubecontainer.HasWindowsHostProcessContainer(pod) {
-
-		if wo.HostProcess != nil && !*wo.HostProcess {
-			return nil, fmt.Errorf("pod must not contain any HostProcess containers if Pod's WindowsOptions.HostProcess is set to false")
-		}
-	}
-
-	return wc, nil
 }
 
 // getKubeletSandboxes lists all (or just the running) sandboxes managed by kubelet.
