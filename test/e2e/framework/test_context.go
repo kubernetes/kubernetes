@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"path"
 	"sort"
 	"strings"
 	"time"
@@ -293,7 +294,7 @@ func RegisterCommonFlags(flags *flag.FlagSet) {
 
 	flags.StringVar(&TestContext.Host, "host", "", fmt.Sprintf("The host, or apiserver, to connect to. Will default to %s if this argument and --kubeconfig are not set.", defaultHost))
 	flags.StringVar(&TestContext.ReportPrefix, "report-prefix", "", "Optional prefix for JUnit XML reports. Default is empty, which doesn't prepend anything to the default name.")
-	flags.StringVar(&TestContext.ReportDir, "report-dir", "", "Path to the directory where the JUnit XML reports should be saved. Default is empty, which doesn't generate these reports.")
+	flags.StringVar(&TestContext.ReportDir, "report-dir", "", "Path to the directory where the JUnit XML reports and other tests results should be saved. Default is empty, which doesn't generate these reports. If ginkgo's -junit-report parameter is used, that parameter instead of -report-dir determines the location of a single JUnit report.")
 	flags.StringVar(&TestContext.ContainerRuntimeEndpoint, "container-runtime-endpoint", "unix:///var/run/containerd/containerd.sock", "The container runtime endpoint of cluster VM instances.")
 	flags.StringVar(&TestContext.ContainerRuntimeProcessName, "container-runtime-process-name", "dockerd", "The name of the container runtime process.")
 	flags.StringVar(&TestContext.ContainerRuntimePidFile, "container-runtime-pid-file", "/var/run/docker.pid", "The pid file of the container runtime.")
@@ -328,6 +329,14 @@ func CreateGinkgoConfig() (types.SuiteConfig, types.ReporterConfig) {
 	suiteConfig.RandomizeAllSpecs = true
 	// Turn on verbose by default to get spec names
 	reporterConfig.Verbose = true
+	// Enable JUnit output to the result directory, but only if not already specified
+	// via -junit-report.
+	if reporterConfig.JUnitReport == "" && TestContext.ReportDir != "" {
+		// With Ginkgo v1, we used to write one file per parallel node. Now Ginkgo v2 automatically
+		// merges all results into a single file for us. The 01 suffix is kept in case that users
+		// expect files to be called "junit_<prefix><number>.xml".
+		reporterConfig.JUnitReport = path.Join(TestContext.ReportDir, "junit_"+TestContext.ReportPrefix+"01.xml")
+	}
 	// Disable skipped tests unless they are explicitly requested.
 	if len(suiteConfig.FocusStrings) == 0 && len(suiteConfig.SkipStrings) == 0 {
 		suiteConfig.SkipStrings = []string{`\[Flaky\]|\[Feature:.+\]`}

@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -31,8 +30,6 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/ginkgo/v2/config"
-	"github.com/onsi/ginkgo/v2/reporters"
 	"github.com/onsi/gomega"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -106,14 +103,12 @@ func RunE2ETests(t *testing.T) {
 	gomega.RegisterFailHandler(framework.Fail)
 
 	// Run tests through the Ginkgo runner with output to console + JUnit for Jenkins
-	var r []ginkgo.Reporter
 	if framework.TestContext.ReportDir != "" {
 		// TODO: we should probably only be trying to create this directory once
 		// rather than once-per-Ginkgo-node.
+		// NOTE: junit report can be simply created by executing your tests with the new --junit-report flags instead.
 		if err := os.MkdirAll(framework.TestContext.ReportDir, 0755); err != nil {
 			klog.Errorf("Failed creating report directory: %v", err)
-		} else {
-			r = append(r, reporters.NewJUnitReporter(path.Join(framework.TestContext.ReportDir, fmt.Sprintf("junit_%v%02d.xml", framework.TestContext.ReportPrefix, config.GinkgoConfig.ParallelNode))))
 		}
 	}
 

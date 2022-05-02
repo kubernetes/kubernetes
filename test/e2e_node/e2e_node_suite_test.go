@@ -31,7 +31,6 @@ import (
 	"math/rand"
 	"os"
 	"os/exec"
-	"path"
 	"syscall"
 	"testing"
 	"time"
@@ -55,8 +54,6 @@ import (
 	system "k8s.io/system-validators/validators"
 
 	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/ginkgo/v2/config"
-	morereporters "github.com/onsi/ginkgo/v2/reporters"
 	"github.com/onsi/gomega"
 	"github.com/spf13/pflag"
 	"k8s.io/klog/v2"
@@ -179,17 +176,12 @@ func TestE2eNode(t *testing.T) {
 
 	// We're not running in a special mode so lets run tests.
 	gomega.RegisterFailHandler(ginkgo.Fail)
-	reporters := []ginkgo.Reporter{}
 	reportDir := framework.TestContext.ReportDir
 	if reportDir != "" {
 		// Create the directory if it doesn't already exist
+		// NOTE: junit report can be simply created by executing your tests with the new --junit-report flags instead.
 		if err := os.MkdirAll(reportDir, 0755); err != nil {
 			klog.Errorf("Failed creating report directory: %v", err)
-		} else {
-			// Configure a junit reporter to write to the directory
-			junitFile := fmt.Sprintf("junit_%s_%02d.xml", framework.TestContext.ReportPrefix, config.GinkgoConfig.ParallelNode)
-			junitPath := path.Join(reportDir, junitFile)
-			reporters = append(reporters, morereporters.NewJUnitReporter(junitPath))
 		}
 	}
 	suiteConfig, reporterConfig := framework.CreateGinkgoConfig()
