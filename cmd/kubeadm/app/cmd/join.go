@@ -145,7 +145,7 @@ type joinData struct {
 	cfg                   *kubeadmapi.JoinConfiguration
 	initCfg               *kubeadmapi.InitConfiguration
 	tlsBootstrapCfg       *clientcmdapi.Config
-	clientSet             *clientset.Clientset
+	client                clientset.Interface
 	ignorePreflightErrors sets.String
 	outputWriter          io.Writer
 	patchesDir            string
@@ -547,10 +547,10 @@ func (j *joinData) InitCfg() (*kubeadmapi.InitConfiguration, error) {
 	return initCfg, err
 }
 
-// ClientSet returns the ClientSet for accessing the cluster with the identity defined in admin.conf.
-func (j *joinData) ClientSet() (*clientset.Clientset, error) {
-	if j.clientSet != nil {
-		return j.clientSet, nil
+// Client returns the Client for accessing the cluster with the identity defined in admin.conf.
+func (j *joinData) Client() (clientset.Interface, error) {
+	if j.client != nil {
+		return j.client, nil
 	}
 	path := filepath.Join(j.KubeConfigDir(), kubeadmconstants.AdminKubeConfigFileName)
 
@@ -558,7 +558,7 @@ func (j *joinData) ClientSet() (*clientset.Clientset, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "[preflight] couldn't create Kubernetes client")
 	}
-	j.clientSet = client
+	j.client = client
 	return client, nil
 }
 
