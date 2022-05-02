@@ -192,7 +192,8 @@ func TestE2eNode(t *testing.T) {
 			reporters = append(reporters, morereporters.NewJUnitReporter(junitPath))
 		}
 	}
-	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "E2eNode Suite", reporters)
+	suiteConfig, reporterConfig := framework.CreateGinkgoConfig()
+	ginkgo.RunSpecs(t, "E2eNode Suite", suiteConfig, reporterConfig)
 }
 
 // Setup the kubelet on the node
