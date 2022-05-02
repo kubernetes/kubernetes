@@ -28,7 +28,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo/v2/config"
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/ginkgo/v2/types"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -276,15 +277,6 @@ func (tc TestContextType) ClusterIsIPv6() bool {
 // options themselves, copy flags from test/e2e/framework/config
 // as shown in HandleFlags.
 func RegisterCommonFlags(flags *flag.FlagSet) {
-	// Turn on verbose by default to get spec names
-	config.DefaultReporterConfig.Verbose = true
-
-	// Turn on EmitSpecProgress to get spec progress (especially on interrupt)
-	config.GinkgoConfig.EmitSpecProgress = true
-
-	// Randomize specs as well as suites
-	config.GinkgoConfig.RandomizeAllSpecs = true
-
 	flags.StringVar(&TestContext.GatherKubeSystemResourceUsageData, "gather-resource-usage", "false", "If set to 'true' or 'all' framework will be monitoring resource usage of system all add-ons in (some) e2e tests, if set to 'master' framework will be monitoring master node only, if set to 'none' of 'false' monitoring will be turned off.")
 	flags.BoolVar(&TestContext.GatherLogsSizes, "gather-logs-sizes", false, "If set to true framework will be monitoring logs sizes on all machines running e2e tests.")
 	flags.IntVar(&TestContext.MaxNodesToGather, "max-nodes-to-gather-from", 20, "The maximum number of nodes to gather extended info from on test failure.")
@@ -325,6 +317,22 @@ func RegisterCommonFlags(flags *flag.FlagSet) {
 
 	flags.StringVar(&TestContext.SnapshotControllerPodName, "snapshot-controller-pod-name", "", "The pod name to use for identifying the snapshot controller in the kube-system namespace.")
 	flags.IntVar(&TestContext.SnapshotControllerHTTPPort, "snapshot-controller-http-port", 0, "The port to use for snapshot controller HTTP communication.")
+}
+
+func CreateGinkgoConfig() (types.SuiteConfig, types.ReporterConfig) {
+	// fetch the current config
+	suiteConfig, reporterConfig := ginkgo.GinkgoConfiguration()
+	// Turn on EmitSpecProgress to get spec progress (especially on interrupt)
+	suiteConfig.EmitSpecProgress = true
+	// Randomize specs as well as suites
+	suiteConfig.RandomizeAllSpecs = true
+	// Turn on verbose by default to get spec names
+	reporterConfig.Verbose = true
+	// Disable skipped tests unless they are explicitly requested.
+	if len(suiteConfig.FocusStrings) == 0 && len(suiteConfig.SkipStrings) == 0 {
+		suiteConfig.SkipStrings = []string{`\[Flaky\]|\[Feature:.+\]`}
+	}
+	return suiteConfig, reporterConfig
 }
 
 // RegisterClusterFlags registers flags specific to the cluster e2e test suite.

@@ -59,5 +59,6 @@ func TestE2E(t *testing.T) {
 			reporters = append(reporters, morereporters.NewJUnitReporter(junitPath))
 		}
 	}
-	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "E2EKubeadm suite", reporters)
+	suiteConfig, reporterConfig := framework.CreateGinkgoConfig()
+	ginkgo.RunSpecs(t, "E2EKubeadm suite", suiteConfig, reporterConfig)
 }
