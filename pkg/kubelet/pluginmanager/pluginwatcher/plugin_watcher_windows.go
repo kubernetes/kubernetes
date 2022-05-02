@@ -17,21 +17,26 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kuberuntime
+package pluginwatcher
 
 import (
-	v1 "k8s.io/api/core/v1"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"github.com/fsnotify/fsnotify"
+	"k8s.io/kubernetes/pkg/kubelet/util"
+	"os"
 )
 
-func (m *kubeGenericRuntimeManager) applySandboxResources(pod *v1.Pod, config *runtimeapi.PodSandboxConfig) error {
-	return nil
+func getStat(event fsnotify.Event) (os.FileInfo, error) {
+	fi, err := os.Stat(event.Name)
+	// TODO: This is a workaround for Windows 20H2 issue for os.Stat(). Please see
+	// microsoft/Windows-Containers#97 for details.
+	// Once the issue is resvolved, the following os.Lstat() is not needed.
+	if err != nil {
+		fi, err = os.Lstat(event.Name)
+	}
+
+	return fi, err
 }
 
-func getPodSandboxWindowsConfig(m *kubeGenericRuntimeManager, pod *v1.Pod, podSandboxConfig *runtimeapi.PodSandboxConfig) {
-	wc, err := m.generatePodSandboxWindowsConfig(pod)
-	if err != nil {
-		return nil, err
-	}
-	podSandboxConfig.Windows = wc
+func getSocketPath(socketPath string) string {
+	return util.NormalizePath(socketPath)
 }

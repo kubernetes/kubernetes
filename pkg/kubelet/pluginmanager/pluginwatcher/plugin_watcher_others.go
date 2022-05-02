@@ -1,8 +1,8 @@
-//go:build windows
-// +build windows
+//go:build !windows
+// +build !windows
 
 /*
-Copyright 2021 The Kubernetes Authors.
+Copyright 2022 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,21 +17,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kuberuntime
+package pluginwatcher
 
 import (
-	v1 "k8s.io/api/core/v1"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"os"
+
+	"github.com/fsnotify/fsnotify"
+	"k8s.io/kubernetes/pkg/kubelet/util"
 )
 
-func (m *kubeGenericRuntimeManager) applySandboxResources(pod *v1.Pod, config *runtimeapi.PodSandboxConfig) error {
-	return nil
+func getStat(event fsnotify.Event) (os.FileInfo, error) {
+	return os.Stat(event.Name)
 }
 
-func getPodSandboxWindowsConfig(m *kubeGenericRuntimeManager, pod *v1.Pod, podSandboxConfig *runtimeapi.PodSandboxConfig) {
-	wc, err := m.generatePodSandboxWindowsConfig(pod)
-	if err != nil {
-		return nil, err
-	}
-	podSandboxConfig.Windows = wc
+func getSocketPath(socketPath string) string {
+	return util.NormalizePath(socketPath)
 }
