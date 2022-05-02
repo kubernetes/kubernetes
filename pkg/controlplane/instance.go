@@ -65,7 +65,6 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
-	storagefactory "k8s.io/apiserver/pkg/storage/storagebackend/factory"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -259,13 +258,12 @@ func (c *Config) createLeaseReconciler() reconcilers.EndpointReconciler {
 	ttl := c.ExtraConfig.MasterEndpointReconcileTTL
 	config, err := c.ExtraConfig.StorageFactory.NewConfig(api.Resource("apiServerIPInfo"))
 	if err != nil {
-		klog.Fatalf("Error determining service IP ranges: %v", err)
+		klog.Fatalf("Error creating storage factory config: %v", err)
 	}
-	leaseStorage, _, err := storagefactory.Create(*config, nil)
+	masterLeases, err := reconcilers.NewLeases(config, "/masterleases/", ttl)
 	if err != nil {
-		klog.Fatalf("Error creating storage factory: %v", err)
+		klog.Fatalf("Error creating leases: %v", err)
 	}
-	masterLeases := reconcilers.NewLeases(leaseStorage, "/masterleases/", ttl)
 
 	return reconcilers.NewLeaseEndpointReconciler(endpointsAdapter, masterLeases)
 }

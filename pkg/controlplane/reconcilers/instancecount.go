@@ -181,6 +181,9 @@ func (r *masterCountEndpointReconciler) StopReconciling() {
 	r.stopReconcilingCalled = true
 }
 
+func (r *masterCountEndpointReconciler) Destroy() {
+}
+
 // Determine if the endpoint is in the format ReconcileEndpoints expects.
 //
 // Return values:

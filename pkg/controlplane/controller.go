@@ -200,6 +200,7 @@ func (c *Controller) Stop() {
 		if err := c.EndpointReconciler.RemoveEndpoints(kubernetesServiceName, c.PublicIP, endpointPorts); err != nil {
 			klog.Errorf("Unable to remove endpoints from kubernetes service: %v", err)
 		}
+		c.EndpointReconciler.Destroy()
 	}()
 
 	select {
