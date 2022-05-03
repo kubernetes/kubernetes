@@ -44076,6 +44076,22 @@ func schema_pkg_apis_meta_v1_APIVersions(ref common.ReferenceCallback) common.Op
 							},
 						},
 					},
+					"hashes": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Hashes are the map of hashes by version for a given API version. This is the legacy group corollary of GroupVersionForDiscovery's  hash field.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"versions", "serverAddressByClientCIDRs"},
 			},

@@ -35,9 +35,11 @@ type legacyRootAPIHandler struct {
 	addresses  Addresses
 	apiPrefix  string
 	serializer runtime.NegotiatedSerializer
+	handler    http.Handler
+	hash       string
 }
 
-func NewLegacyRootAPIHandler(addresses Addresses, serializer runtime.NegotiatedSerializer, apiPrefix string) *legacyRootAPIHandler {
+func NewLegacyRootAPIHandler(addresses Addresses, serializer runtime.NegotiatedSerializer, handler http.Handler, apiPrefix string) *legacyRootAPIHandler {
 	// Because in release 1.1, /apis returns response with empty APIVersion, we
 	// use stripVersionNegotiatedSerializer to keep the response backwards
 	// compatible.
@@ -47,6 +49,7 @@ func NewLegacyRootAPIHandler(addresses Addresses, serializer runtime.NegotiatedS
 		addresses:  addresses,
 		apiPrefix:  apiPrefix,
 		serializer: serializer,
+		handler:    handler,
 	}
 }
 
@@ -66,10 +69,18 @@ func (s *legacyRootAPIHandler) WebService() *restful.WebService {
 }
 
 func (s *legacyRootAPIHandler) handle(req *restful.Request, resp *restful.Response) {
+	if s.hash == "" {
+		hash, err := GetGroupVersionHash("/api/v1", s.handler)
+		if err != nil {
+			panic(err)
+		}
+		s.hash = hash
+	}
 	clientIP := utilnet.GetClientIP(req.Request)
 	apiVersions := &metav1.APIVersions{
 		ServerAddressByClientCIDRs: s.addresses.ServerAddressByClientCIDRs(clientIP),
 		Versions:                   []string{"v1"},
+		Hashes:                     map[string]string{"v1": s.hash},
 	}
 
 	responsewriters.WriteObjectNegotiated(s.serializer, negotiation.DefaultEndpointRestrictions, schema.GroupVersion{}, resp.ResponseWriter, req.Request, http.StatusOK, apiVersions)
