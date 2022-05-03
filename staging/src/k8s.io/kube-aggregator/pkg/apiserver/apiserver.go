@@ -237,7 +237,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 	apisHandler := &apisHandler{
 		codecs:         aggregatorscheme.Codecs,
 		lister:         s.lister,
-		discoveryGroup: discoveryGroup(enabledVersions),
+		discoveryGroup: discoveryGroup(enabledVersions, s.GenericAPIServer.UnprotectedHandler()),
 	}
 	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle("/apis", apisHandler)
 	s.GenericAPIServer.Handler.NonGoRestfulMux.UnlistedHandle("/apis/", apisHandler)
