@@ -40,7 +40,7 @@ invocation=(./hack/verify-golangci-lint.sh "$@")
 # otherwise golangci-lint will report stale results:
 # _output/local/bin/golangci-lint cache clean
 golangci=(env LOGCHECK_CONFIG="${KUBE_ROOT}/hack/logcheck.conf" "${GOBIN}/golangci-lint" run)
-golangci_config="${KUBE_ROOT}/.golangci.yaml"
+golangci_config="${KUBE_ROOT}/hack/golangci.yaml"
 golangci+=(--config="${golangci_config}")
 
 kube::golang::verify_go_version
