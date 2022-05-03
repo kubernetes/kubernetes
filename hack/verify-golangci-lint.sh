@@ -26,6 +26,8 @@ Usage: $0 [-r <revision>|-a] [-s] [-c none|<config>] [-- <golangci-lint run flag
    -a: automatically select the common base of origin/master and HEAD
        as revision
    -s: select a strict configuration for new code
+   -g <github action file>: also write results with --out-format=github-actions
+       to a separate file
    -c <config|"none">: use the specified configuration or none instead of the default hack/golangci.yaml
    [packages]: check specific packages or directories instead of everything
 EOF
@@ -58,7 +60,7 @@ golangci_config="${KUBE_ROOT}/hack/golangci.yaml"
 base=
 strict=
 githubactions=
-while getopts "ar:sc:" o; do
+while getopts "ar:sg:c:" o; do
   case "${o}" in
     a)
       base="$(git merge-base origin/master HEAD)"
@@ -74,6 +76,9 @@ while getopts "ar:sc:" o; do
     s)
       golangci_config="${KUBE_ROOT}/hack/golangci-strict.yaml"
       strict=1
+      ;;
+    g)
+      githubactions="${OPTARG}"
       ;;
     c)
       if [ "${OPTARG}" = "none" ]; then
@@ -131,19 +136,31 @@ popd >/dev/null
 cd "${KUBE_ROOT}"
 
 res=0
-if [[ "${#targets[@]}" -gt 0 ]]; then
+run () {
+  if [[ "${#targets[@]}" -gt 0 ]]; then
     echo "running ${golangci[*]} ${targets[*]}" >&2
     "${golangci[@]}" "${targets[@]}" >&2 || res=$?
-else
+  else
     echo "running ${golangci[*]} ./..." >&2
     "${golangci[@]}" ./... >&2 || res=$?
     for d in staging/src/k8s.io/*; do
-        MODPATH="staging/src/k8s.io/$(basename "${d}")"
-        echo "running ( cd ${KUBE_ROOT}/${MODPATH}; ${golangci[*]} --path-prefix ${MODPATH} ./... )"
-        pushd "${KUBE_ROOT}/${MODPATH}" >/dev/null
-            "${golangci[@]}" --path-prefix "${MODPATH}" ./... >&2 || res=$?
-        popd >/dev/null
+      MODPATH="staging/src/k8s.io/$(basename "${d}")"
+      echo "running ( cd ${KUBE_ROOT}/${MODPATH}; ${golangci[*]} --path-prefix ${MODPATH} ./... )"
+      pushd "${KUBE_ROOT}/${MODPATH}" >/dev/null
+        "${golangci[@]}" --path-prefix "${MODPATH}" ./... >&2 || res=$?
+      popd >/dev/null
     done
+  fi
+}
+# First run with normal output.
+run "${targets[@]}"
+
+# Then optionally do it again with github-actions as format.
+# Because golangci-lint caches results, this is faster than the
+# initial invocation.
+if [ "$githubactions" ]; then
+  golangci+=(--out-format=github-actions)
+  run "$${targets[@]}" >"$githubactions" 2>&1
 fi
 
 # print a message based on the result
