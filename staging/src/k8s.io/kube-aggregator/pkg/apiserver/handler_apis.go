@@ -42,18 +42,30 @@ type apisHandler struct {
 	discoveryGroup metav1.APIGroup
 }
 
-func discoveryGroup(enabledVersions sets.String) metav1.APIGroup {
+// discoveryGroup generates the APIGroup for the apiregistration group.
+//
+// enabledVersions is used to determine if the v1beta1 version of the apiregistration
+// group is also to be included in the resulting APIGroup.
+//
+// handler is a GenericAPIServerHandler, used to resolve the hash of the API GroupVersion
+func discoveryGroup(enabledVersions sets.String, handler http.Handler) metav1.APIGroup {
+	hash, err := discovery.GetGroupVersionHash("/apis/"+apiregistrationv1api.SchemeGroupVersion.String(), handler)
+	if err != nil {
+		klog.Errorf("unable to retrieve hash for groupversion: %v", err)
+	}
 	retval := metav1.APIGroup{
 		Name: apiregistrationv1api.GroupName,
 		Versions: []metav1.GroupVersionForDiscovery{
 			{
 				GroupVersion: apiregistrationv1api.SchemeGroupVersion.String(),
 				Version:      apiregistrationv1api.SchemeGroupVersion.Version,
+				Hash:         hash,
 			},
 		},
 		PreferredVersion: metav1.GroupVersionForDiscovery{
 			GroupVersion: apiregistrationv1api.SchemeGroupVersion.String(),
 			Version:      apiregistrationv1api.SchemeGroupVersion.Version,
+			Hash:         hash,
 		},
 	}
 
@@ -61,6 +73,7 @@ func discoveryGroup(enabledVersions sets.String) metav1.APIGroup {
 		retval.Versions = append(retval.Versions, metav1.GroupVersionForDiscovery{
 			GroupVersion: apiregistrationv1beta1api.SchemeGroupVersion.String(),
 			Version:      apiregistrationv1beta1api.SchemeGroupVersion.Version,
+			Hash:         hash,
 		})
 	}
 

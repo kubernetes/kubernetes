@@ -190,6 +190,8 @@ func (d *DiscoveryClient) ServerGroups() (apiGroupList *metav1.APIGroupList, err
 	d.hashesMu.Lock()
 	defer d.hashesMu.Unlock()
 	d.hashesByGroupVersion = make(map[string]string)
+	// populate the hash for the legacy core group
+	d.hashesByGroupVersion["v1"] = v.Hashes["v1"]
 	for _, apiGroup := range apiGroupList.Groups {
 		for _, version := range apiGroup.Versions {
 			if version.Hash != "" {

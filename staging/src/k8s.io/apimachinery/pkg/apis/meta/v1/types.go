@@ -1025,6 +1025,10 @@ type APIVersions struct {
 	// For example: the master will return an internal IP CIDR only, if the client reaches the server using an internal IP.
 	// Server looks at X-Forwarded-For header or X-Real-Ip header or request.RemoteAddr (in that order) to get the client IP.
 	ServerAddressByClientCIDRs []ServerAddressByClientCIDR `json:"serverAddressByClientCIDRs" protobuf:"bytes,2,rep,name=serverAddressByClientCIDRs"`
+	// Hashes are the map of hashes by version for a given API version.
+	// This is the legacy group corollary of GroupVersionForDiscovery's  hash field.
+	// +optional
+	Hashes map[string]string `json:"hashes" protobuf:"bytes,3,rep,name=hashes"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

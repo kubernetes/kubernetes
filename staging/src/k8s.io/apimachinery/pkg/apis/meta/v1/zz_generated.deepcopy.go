@@ -171,6 +171,13 @@ func (in *APIVersions) DeepCopyInto(out *APIVersions) {
 		*out = make([]ServerAddressByClientCIDR, len(*in))
 		copy(*out, *in)
 	}
+	if in.Hashes != nil {
+		in, out := &in.Hashes, &out.Hashes
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	return
 }
 
