@@ -263,6 +263,7 @@ aliases:
     - freehan
     - khenidak
     - mrhohn
+    - robscott
     - thockin
   sig-network-reviewers:
     - andrewsykim
@@ -274,6 +275,7 @@ aliases:
     - freehan
     - khenidak
     - mrhohn
+    - robscott
     - thockin
   sig-apps-approvers:
     - kow3ns
