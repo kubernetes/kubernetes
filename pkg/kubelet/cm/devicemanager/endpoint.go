@@ -29,6 +29,10 @@ import (
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 )
 
+// maxMsgSize use 16MB as the default message size limit.
+// grpc library default is 4MB
+const maxMsgSize = 1024 * 1024 * 16
+
 // endpoint maps to a single registered device plugin. It is responsible
 // for managing gRPC communications with the device plugin and caching
 // device states reported by the device plugin.
@@ -197,7 +201,7 @@ func dial(unixSocketPath string) (pluginapi.DevicePluginClient, *grpc.ClientConn
 		grpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) {
 			return (&net.Dialer{}).DialContext(ctx, "unix", addr)
 		}),
-	)
+		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)))
 
 	if err != nil {
 		return nil, nil, fmt.Errorf(errFailedToDialDevicePlugin+" %v", err)
