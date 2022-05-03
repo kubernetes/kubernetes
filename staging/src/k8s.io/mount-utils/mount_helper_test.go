@@ -102,6 +102,20 @@ func TestDoCleanupMountPoint(t *testing.T) {
 			},
 			expectErr: false,
 		},
+		"skip-mount-point-check": {
+			prepareMnt: func(base string) (MountPoint, error, error) {
+				path := filepath.Join(base, testMount)
+				if err := os.MkdirAll(path, defaultPerm); err != nil {
+					return MountPoint{Device: "/dev/sdb", Path: path}, nil, err
+				}
+				return MountPoint{Device: "/dev/sdb", Path: path}, nil, nil
+			},
+			prepareMntr: func(mntr *FakeMounter) error {
+				mntr.WithSkipMountPointCheck()
+				return nil
+			},
+			expectErr: false,
+		},
 	}
 
 	for name, tt := range tests {
