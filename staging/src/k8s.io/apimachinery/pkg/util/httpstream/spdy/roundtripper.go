@@ -266,6 +266,7 @@ func (s *SpdyRoundTripper) tlsConn(ctx context.Context, rwc net.Conn, targetHost
 
 	// need to manually call Handshake() so we can call VerifyHostname() below
 	if err := tlsConn.HandshakeContext(ctx); err != nil {
+		tlsConn.Close()
 		return nil, err
 	}
 
