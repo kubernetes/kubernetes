@@ -2337,15 +2337,6 @@ function setup-addon-manifests {
   local -r dst_dir="/etc/kubernetes/$1/$2"
 
   copy-manifests "${src_dir}/$2" "${dst_dir}"
-
-  # If the PodSecurityPolicy admission controller is enabled,
-  # set up the corresponding addon policies.
-  if [[ "${ENABLE_POD_SECURITY_POLICY:-}" == "true" ]]; then
-    local -r psp_dir="${src_dir}/${3:-$2}/podsecuritypolicies"
-    if [[ -d "${psp_dir}" ]]; then
-      copy-manifests "${psp_dir}" "${dst_dir}"
-    fi
-  fi
 }
 
 # A function that downloads extra addons from a URL and puts them in the GCI
@@ -2693,10 +2684,6 @@ function start-kube-addons {
     setup-addon-manifests "addons" "rbac/legacy-kubelet-user"
   else
     setup-addon-manifests "addons" "rbac/legacy-kubelet-user-disable"
-  fi
-
-  if [[ "${ENABLE_POD_SECURITY_POLICY:-}" == "true" ]]; then
-    setup-addon-manifests "addons" "podsecuritypolicies"
   fi
 
   # Set up manifests of other addons.
