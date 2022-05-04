@@ -1063,7 +1063,7 @@ func RunRootCheckOnly(ignorePreflightErrors sets.String) error {
 func RunPullImagesCheck(execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.String) error {
 	containerRuntime, err := utilruntime.NewContainerRuntime(utilsexec.New(), cfg.NodeRegistration.CRISocket)
 	if err != nil {
-		return err
+		return &Error{Msg: err.Error()}
 	}
 
 	checks := []Checker{
