@@ -233,6 +233,11 @@ func detectSystemd() bool {
 // When possible, we will trust umount's message and avoid doing our own mount point checks.
 // More info: https://github.com/util-linux/util-linux/blob/v2.2/mount/umount.c#L179
 func detectSafeNotMountedBehavior() bool {
+	return detectSafeNotMountedBehaviorWithExec(utilexec.New())
+}
+
+// detectSafeNotMountedBehaviorWithExec is for testing with FakeExec.
+func detectSafeNotMountedBehaviorWithExec(exec utilexec.Interface) bool {
 	if _, err := exec.LookPath("umount"); err != nil {
 		klog.V(2).Infof("Failed to locate umount executable to detect safe 'not mounted' behavior")
 		return false
