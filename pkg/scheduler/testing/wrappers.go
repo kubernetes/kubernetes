@@ -201,6 +201,21 @@ func (p *PodWrapper) Priority(val int32) *PodWrapper {
 	return p
 }
 
+// Annotation adds a pair of (key, value) to a pod's Annotations.
+func (p *PodWrapper) Annotation(key, value string) *PodWrapper {
+	if p.Annotations == nil {
+		p.Annotations = make(map[string]string)
+	}
+	p.Annotations[key] = value
+	return p
+}
+
+// CreationTimestamp sets the inner pod's CreationTimestamp.
+func (p *PodWrapper) CreationTimestamp(t metav1.Time) *PodWrapper {
+	p.ObjectMeta.CreationTimestamp = t
+	return p
+}
+
 // Terminating sets the inner pod's deletionTimestamp to current timestamp.
 func (p *PodWrapper) Terminating() *PodWrapper {
 	now := metav1.Now()
@@ -263,6 +278,12 @@ func (p *PodWrapper) StartTime(t metav1.Time) *PodWrapper {
 // NominatedNodeName sets `n` as the .Status.NominatedNodeName of the inner pod.
 func (p *PodWrapper) NominatedNodeName(n string) *PodWrapper {
 	p.Status.NominatedNodeName = n
+	return p
+}
+
+// Condition adds a `condition(Type, Status, Reason)` to .Status.Conditions.
+func (p *PodWrapper) Condition(t v1.PodConditionType, s v1.ConditionStatus, r string) *PodWrapper {
+	p.Status.Conditions = append(p.Status.Conditions, v1.PodCondition{Type: t, Status: s, Reason: r})
 	return p
 }
 
