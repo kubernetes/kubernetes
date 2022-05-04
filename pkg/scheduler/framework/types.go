@@ -549,7 +549,7 @@ func (n *NodeInfo) Clone() *NodeInfo {
 		Allocatable:      n.Allocatable.Clone(),
 		UsedPorts:        make(HostPortInfo),
 		ImageStates:      n.ImageStates,
-		PVCRefCounts:     n.PVCRefCounts,
+		PVCRefCounts:     make(map[string]int),
 		Generation:       n.Generation,
 	}
 	if len(n.Pods) > 0 {
@@ -570,6 +570,9 @@ func (n *NodeInfo) Clone() *NodeInfo {
 	}
 	if len(n.PodsWithRequiredAntiAffinity) > 0 {
 		clone.PodsWithRequiredAntiAffinity = append([]*PodInfo(nil), n.PodsWithRequiredAntiAffinity...)
+	}
+	for key, value := range n.PVCRefCounts {
+		clone.PVCRefCounts[key] = value
 	}
 	return clone
 }
@@ -770,7 +773,7 @@ func (n *NodeInfo) updatePVCRefCounts(pod *v1.Pod, add bool) {
 			continue
 		}
 
-		key := pod.Namespace + "/" + v.PersistentVolumeClaim.ClaimName
+		key := GetNamespacedName(pod.Namespace, v.PersistentVolumeClaim.ClaimName)
 		if add {
 			n.PVCRefCounts[key] += 1
 		} else {
@@ -836,6 +839,11 @@ func GetPodKey(pod *v1.Pod) (string, error) {
 		return "", errors.New("cannot get cache key for pod with empty UID")
 	}
 	return uid, nil
+}
+
+// GetNamespacedName returns the string format of a namespaced resource name.
+func GetNamespacedName(namespace, name string) string {
+	return fmt.Sprintf("%s/%s", namespace, name)
 }
 
 // DefaultBindAllHostIP defines the default ip address used to bind to all host.
