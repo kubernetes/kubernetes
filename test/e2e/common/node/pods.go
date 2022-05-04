@@ -249,20 +249,10 @@ var _ = SIGDescribe("Pods", func() {
 		framework.ExpectNoError(err, "failed to query for pods")
 		framework.ExpectEqual(len(pods.Items), 0)
 
-		listCompleted := make(chan bool, 1)
 		lw := &cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				options.LabelSelector = selector.String()
 				podList, err := podClient.List(context.TODO(), options)
-				if err == nil {
-					select {
-					case listCompleted <- true:
-						framework.Logf("observed the pod list")
-						return podList, err
-					default:
-						framework.Logf("channel blocked")
-					}
-				}
 				return podList, err
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
@@ -270,8 +260,14 @@ var _ = SIGDescribe("Pods", func() {
 				return podClient.Watch(context.TODO(), options)
 			},
 		}
-		_, _, w, _ := watchtools.NewIndexerInformerWatcher(lw, &v1.Pod{})
+		_, informer, w, _ := watchtools.NewIndexerInformerWatcher(lw, &v1.Pod{})
 		defer w.Stop()
+
+		ctx, cancelCtx := context.WithTimeout(context.TODO(), wait.ForeverTestTimeout)
+		defer cancelCtx()
+		if !cache.WaitForCacheSync(ctx.Done(), informer.HasSynced) {
+			framework.Failf("Timeout while waiting to Pod informer to sync")
+		}
 
 		ginkgo.By("submitting the pod to kubernetes")
 		podClient.Create(pod)
@@ -285,17 +281,12 @@ var _ = SIGDescribe("Pods", func() {
 
 		ginkgo.By("verifying pod creation was observed")
 		select {
-		case <-listCompleted:
-			select {
-			case event := <-w.ResultChan():
-				if event.Type != watch.Added {
-					framework.Failf("Failed to observe pod creation: %v", event)
-				}
-			case <-time.After(framework.PodStartTimeout):
-				framework.Failf("Timeout while waiting for pod creation")
+		case event := <-w.ResultChan():
+			if event.Type != watch.Added {
+				framework.Failf("Failed to observe pod creation: %v", event)
 			}
-		case <-time.After(10 * time.Second):
-			framework.Failf("Timeout while waiting to observe pod list")
+		case <-time.After(framework.PodStartTimeout):
+			framework.Failf("Timeout while waiting for pod creation")
 		}
 
 		// We need to wait for the pod to be running, otherwise the deletion
