@@ -193,16 +193,21 @@ func (s *Status) IsSuccess() bool {
 	return s.Code() == Success
 }
 
+// IsWait returns true if and only if "Status" is non-nil and its Code is "Wait".
+func (s *Status) IsWait() bool {
+	return s.Code() == Wait
+}
+
 // IsUnschedulable returns true if "Status" is Unschedulable (Unschedulable or UnschedulableAndUnresolvable).
 func (s *Status) IsUnschedulable() bool {
 	code := s.Code()
 	return code == Unschedulable || code == UnschedulableAndUnresolvable
 }
 
-// AsError returns nil if the status is a success; otherwise returns an "error" object
+// AsError returns nil if the status is a success or a wait; otherwise returns an "error" object
 // with a concatenated message on reasons of the Status.
 func (s *Status) AsError() error {
-	if s.IsSuccess() {
+	if s.IsSuccess() || s.IsWait() {
 		return nil
 	}
 	if s.err != nil {
