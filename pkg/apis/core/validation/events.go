@@ -146,9 +146,7 @@ func legacyValidateEvent(event *core.Event) field.ErrorList {
 		if len(event.ReportingController) == 0 {
 			allErrs = append(allErrs, field.Required(field.NewPath("reportingController"), ""))
 		}
-		for _, msg := range validation.IsQualifiedName(event.ReportingController) {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("reportingController"), event.ReportingController, msg))
-		}
+		allErrs = append(allErrs, ValidateQualifiedName(event.ReportingController, field.NewPath("reportingController"))...)
 		if len(event.ReportingInstance) == 0 {
 			allErrs = append(allErrs, field.Required(field.NewPath("reportingInstance"), ""))
 		}
