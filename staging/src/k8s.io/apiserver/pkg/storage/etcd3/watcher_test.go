@@ -225,15 +225,13 @@ func TestWatchFromNoneZero(t *testing.T) {
 func TestWatchError(t *testing.T) {
 	// this codec fails on decodes, which will bubble up so we can verify the behavior
 	invalidCodec := &testCodec{apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)}
-	client := testserver.RunEtcd(t, nil)
-	invalidStore := newStore(client, invalidCodec, newPod, "", schema.GroupResource{Resource: "pods"}, &prefixTransformer{prefix: []byte("test!")}, true, newTestLeaseManagerConfig())
-	ctx := context.Background()
+	ctx, invalidStore, client := testSetup(t, withCodec(invalidCodec))
 	w, err := invalidStore.Watch(ctx, "/abc", storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
 	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
-	validStore := newStore(client, codec, newPod, "", schema.GroupResource{Resource: "pods"}, &prefixTransformer{prefix: []byte("test!")}, true, newTestLeaseManagerConfig())
+	_, validStore, _ := testSetup(t, withCodec(codec), withClient(client))
 	if err := validStore.GuaranteedUpdate(ctx, "/abc", &example.Pod{}, true, nil, storage.SimpleUpdate(
 		func(runtime.Object) (runtime.Object, error) {
 			return &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}, nil
@@ -359,12 +357,9 @@ func TestWatchInitializationSignal(t *testing.T) {
 }
 
 func TestProgressNotify(t *testing.T) {
-	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
 	clusterConfig := testserver.NewTestConfig(t)
 	clusterConfig.ExperimentalWatchProgressNotifyInterval = time.Second
-	client := testserver.RunEtcd(t, clusterConfig)
-	store := newStore(client, codec, newPod, "", schema.GroupResource{Resource: "pods"}, &prefixTransformer{prefix: []byte(defaultTestPrefix)}, false, newTestLeaseManagerConfig())
-	ctx := context.Background()
+	ctx, store, _ := testSetup(t, withClientConfig(clusterConfig))
 
 	key := "/somekey"
 	input := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "name"}}

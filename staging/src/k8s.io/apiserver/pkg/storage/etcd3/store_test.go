@@ -35,6 +35,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	clientv3 "go.etcd.io/etcd/client/v3"
+	"go.etcd.io/etcd/server/v3/embed"
 	"google.golang.org/grpc/grpclog"
 
 	"k8s.io/apimachinery/pkg/api/apitesting"
@@ -863,8 +864,6 @@ func TestGuaranteedUpdateChecksStoredData(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	store.transformer = &prefixTransformer{prefix: []byte(defaultTestPrefix)}
-
 	// this update should write the canonical value to etcd because the new serialization differs
 	// from the stored serialization
 	input.ResourceVersion = strconv.FormatInt(resp.Header.Revision, 10)
@@ -1034,10 +1033,7 @@ func TestGuaranteedUpdateWithSuggestionAndConflict(t *testing.T) {
 }
 
 func TestTransformationFailure(t *testing.T) {
-	client := testserver.RunEtcd(t, nil)
-	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
-	store := newStore(client, codec, newPod, "", schema.GroupResource{Resource: "pods"}, &prefixTransformer{prefix: []byte(defaultTestPrefix)}, false, newTestLeaseManagerConfig())
-	ctx := context.Background()
+	ctx, store, _ := testSetup(t)
 
 	preset := []struct {
 		key       string
@@ -1113,12 +1109,9 @@ func TestTransformationFailure(t *testing.T) {
 }
 
 func TestList(t *testing.T) {
-	client := testserver.RunEtcd(t, nil)
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RemainingItemCount, true)()
-	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
-	store := newStore(client, codec, newPod, "", schema.GroupResource{Resource: "pods"}, &prefixTransformer{prefix: []byte(defaultTestPrefix)}, true, newTestLeaseManagerConfig())
-	disablePagingStore := newStore(client, codec, newPod, "", schema.GroupResource{Resource: "pods"}, &prefixTransformer{prefix: []byte(defaultTestPrefix)}, false, newTestLeaseManagerConfig())
-	ctx := context.Background()
+	ctx, store, client := testSetup(t)
+	_, disablePagingStore, _ := testSetup(t, withoutPaging(), withClient(client))
 
 	// Setup storage with the following structure:
 	//  /
@@ -1633,13 +1626,10 @@ func TestList(t *testing.T) {
 }
 
 func TestListContinuation(t *testing.T) {
-	etcdClient := testserver.RunEtcd(t, nil)
-	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
-	transformer := &prefixTransformer{prefix: []byte(defaultTestPrefix)}
+	ctx, store, etcdClient := testSetup(t)
+	transformer := store.transformer.(*prefixTransformer)
 	recorder := &clientRecorder{KV: etcdClient.KV}
 	etcdClient.KV = recorder
-	store := newStore(etcdClient, codec, newPod, "", schema.GroupResource{Resource: "pods"}, transformer, true, newTestLeaseManagerConfig())
-	ctx := context.Background()
 
 	// Setup storage with the following structure:
 	//  /
@@ -1791,13 +1781,10 @@ func TestListContinuation(t *testing.T) {
 }
 
 func TestListPaginationRareObject(t *testing.T) {
-	etcdClient := testserver.RunEtcd(t, nil)
-	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
-	transformer := &prefixTransformer{prefix: []byte(defaultTestPrefix)}
+	ctx, store, etcdClient := testSetup(t)
+	transformer := store.transformer.(*prefixTransformer)
 	recorder := &clientRecorder{KV: etcdClient.KV}
 	etcdClient.KV = recorder
-	store := newStore(etcdClient, codec, newPod, "", schema.GroupResource{Resource: "pods"}, transformer, true, NewDefaultLeaseManagerConfig())
-	ctx := context.Background()
 
 	podCount := 1000
 	var pods []*example.Pod
@@ -1866,13 +1853,10 @@ func (r *clientRecorder) resetReads() {
 }
 
 func TestListContinuationWithFilter(t *testing.T) {
-	etcdClient := testserver.RunEtcd(t, nil)
-	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
-	transformer := &prefixTransformer{prefix: []byte(defaultTestPrefix)}
+	ctx, store, etcdClient := testSetup(t)
+	transformer := store.transformer.(*prefixTransformer)
 	recorder := &clientRecorder{KV: etcdClient.KV}
 	etcdClient.KV = recorder
-	store := newStore(etcdClient, codec, newPod, "", schema.GroupResource{Resource: "pods"}, transformer, true, newTestLeaseManagerConfig())
-	ctx := context.Background()
 
 	preset := []struct {
 		key       string
@@ -1977,10 +1961,7 @@ func TestListContinuationWithFilter(t *testing.T) {
 }
 
 func TestListInconsistentContinuation(t *testing.T) {
-	client := testserver.RunEtcd(t, nil)
-	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
-	store := newStore(client, codec, newPod, "", schema.GroupResource{Resource: "pods"}, &prefixTransformer{prefix: []byte(defaultTestPrefix)}, true, newTestLeaseManagerConfig())
-	ctx := context.Background()
+	ctx, store, client := testSetup(t)
 
 	// Setup storage with the following structure:
 	//  /
@@ -2146,10 +2127,101 @@ func newTestLeaseManagerConfig() LeaseManagerConfig {
 	return cfg
 }
 
-func testSetup(t *testing.T) (context.Context, *store, *clientv3.Client) {
-	client := testserver.RunEtcd(t, nil)
-	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
-	store := newStore(client, codec, newPod, "", schema.GroupResource{Resource: "pods"}, &prefixTransformer{prefix: []byte(defaultTestPrefix)}, true, newTestLeaseManagerConfig())
+func newTestTransformer() *prefixTransformer {
+	return &prefixTransformer{prefix: []byte(defaultTestPrefix)}
+}
+
+type setupOptions struct {
+	client        func(*testing.T) *clientv3.Client
+	codec         runtime.Codec
+	newFunc       func() runtime.Object
+	prefix        string
+	groupResource schema.GroupResource
+	transformer   value.Transformer
+	pagingEnabled bool
+	leaseConfig   LeaseManagerConfig
+}
+
+type setupOption func(*setupOptions)
+
+func withClient(client *clientv3.Client) setupOption {
+	return func(options *setupOptions) {
+		options.client = func(t *testing.T) *clientv3.Client {
+			return client
+		}
+	}
+}
+
+func withClientConfig(config *embed.Config) setupOption {
+	return func(options *setupOptions) {
+		options.client = func(t *testing.T) *clientv3.Client {
+			return testserver.RunEtcd(t, config)
+		}
+	}
+}
+
+func withCodec(codec runtime.Codec) setupOption {
+	return func(options *setupOptions) {
+		options.codec = codec
+	}
+}
+
+func withPrefix(prefix string) setupOption {
+	return func(options *setupOptions) {
+		options.prefix = prefix
+	}
+}
+
+func withoutPaging() setupOption {
+	return func(options *setupOptions) {
+		options.pagingEnabled = false
+	}
+}
+
+func withTransformer(transformer value.Transformer) setupOption {
+	return func(options *setupOptions) {
+		options.transformer = transformer
+	}
+}
+
+func withLeaseConfig(leaseConfig LeaseManagerConfig) setupOption {
+	return func(options *setupOptions) {
+		options.leaseConfig = leaseConfig
+	}
+}
+
+func withDefaults(options *setupOptions) {
+	options.client = func(t *testing.T) *clientv3.Client {
+		return testserver.RunEtcd(t, nil)
+	}
+	options.codec = apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
+	options.newFunc = newPod
+	options.prefix = ""
+	options.groupResource = schema.GroupResource{Resource: "pods"}
+	options.transformer = newTestTransformer()
+	options.pagingEnabled = true
+	options.leaseConfig = newTestLeaseManagerConfig()
+}
+
+var _ setupOption = withDefaults
+
+func testSetup(t *testing.T, opts ...setupOption) (context.Context, *store, *clientv3.Client) {
+	setupOpts := setupOptions{}
+	opts = append([]setupOption{withDefaults}, opts...)
+	for _, opt := range opts {
+		opt(&setupOpts)
+	}
+	client := setupOpts.client(t)
+	store := newStore(
+		client,
+		setupOpts.codec,
+		setupOpts.newFunc,
+		setupOpts.prefix,
+		setupOpts.groupResource,
+		setupOpts.transformer,
+		setupOpts.pagingEnabled,
+		setupOpts.leaseConfig,
+	)
 	ctx := context.Background()
 	return ctx, store, client
 }
@@ -2181,16 +2253,13 @@ func testPropogateStoreWithKey(ctx context.Context, t *testing.T, store *store, 
 }
 
 func TestPrefix(t *testing.T) {
-	client := testserver.RunEtcd(t, nil)
-	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
-	transformer := &prefixTransformer{prefix: []byte(defaultTestPrefix)}
 	testcases := map[string]string{
 		"custom/prefix":     "/custom/prefix",
 		"/custom//prefix//": "/custom/prefix",
 		"/registry":         "/registry",
 	}
 	for configuredPrefix, effectivePrefix := range testcases {
-		store := newStore(client, codec, nil, configuredPrefix, schema.GroupResource{Resource: "widgets"}, transformer, true, newTestLeaseManagerConfig())
+		_, store, _ := testSetup(t, withPrefix(configuredPrefix))
 		if store.pathPrefix != effectivePrefix {
 			t.Errorf("configured prefix of %s, expected effective prefix of %s, got %s", configuredPrefix, effectivePrefix, store.pathPrefix)
 		}
@@ -2349,14 +2418,10 @@ func (t *fancyTransformer) createObject(ctx context.Context) error {
 }
 
 func TestConsistentList(t *testing.T) {
-	client := testserver.RunEtcd(t, nil)
-	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
-	ctx := context.Background()
-
 	transformer := &fancyTransformer{
-		transformer: &prefixTransformer{prefix: []byte(defaultTestPrefix)},
+		transformer: newTestTransformer(),
 	}
-	store := newStore(client, codec, newPod, "", schema.GroupResource{Resource: "pods"}, transformer, true, newTestLeaseManagerConfig())
+	ctx, store, _ := testSetup(t, withTransformer(transformer))
 	transformer.store = store
 
 	for i := 0; i < 5; i++ {
@@ -2459,13 +2524,10 @@ func TestCount(t *testing.T) {
 }
 
 func TestLeaseMaxObjectCount(t *testing.T) {
-	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
-	client := testserver.RunEtcd(t, nil)
-	store := newStore(client, codec, newPod, "", schema.GroupResource{Resource: "pods"}, &prefixTransformer{prefix: []byte(defaultTestPrefix)}, true, LeaseManagerConfig{
+	ctx, store, _ := testSetup(t, withLeaseConfig(LeaseManagerConfig{
 		ReuseDurationSeconds: defaultLeaseReuseDurationSeconds,
 		MaxObjectCount:       2,
-	})
-	ctx := context.Background()
+	}))
 
 	obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 	out := &example.Pod{}
