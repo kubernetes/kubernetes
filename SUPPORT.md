@@ -16,7 +16,7 @@ The Kubernetes Community is active on Stack Overflow, you can post your question
 ### Documentation
 
 * [User Documentation](https://kubernetes.io/docs/)
-* [Troubleshooting Guide](https://kubernetes.io/docs/tasks/debug-application-cluster/troubleshooting/)
+* [Troubleshooting Guide](https://kubernetes.io/docs/tasks/debug/)
 
 ### Real-time Chat
 
