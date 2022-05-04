@@ -60,6 +60,7 @@ const (
 	createPodSetsOpcode      = "createPodSets"
 	churnOpcode              = "churn"
 	barrierOpcode            = "barrier"
+	sleepOpcode              = "sleep"
 	extensionPointsLabelName = "extension_point"
 
 	// Two modes supported in "churn" operator.
@@ -208,7 +209,7 @@ func (op *op) UnmarshalJSON(b []byte) error {
 		&createPodSetsOp{},
 		&churnOp{},
 		&barrierOp{},
-		// TODO(#93793): add a sleep timer op to simulate waiting?
+		&sleepOp{},
 		// TODO(#94601): add a delete nodes op to simulate scaling behaviour?
 	}
 	var firstError error
@@ -509,6 +510,44 @@ func (*barrierOp) collectsMetrics() bool {
 
 func (bo barrierOp) patchParams(w *workload) (realOp, error) {
 	return &bo, nil
+}
+
+// sleepOp defines an op that can be used to sleep for a specified amount of time.
+// This is useful in simulating workloads that require some sort of time-based synchronisation.
+type sleepOp struct {
+	// Must be "sleep".
+	Opcode string
+	// duration of sleep.
+	Duration time.Duration
+}
+
+func (so *sleepOp) UnmarshalJSON(data []byte) (err error) {
+	var tmp struct {
+		Opcode   string
+		Duration string
+	}
+	if err = json.Unmarshal(data, &tmp); err != nil {
+		return err
+	}
+
+	so.Opcode = tmp.Opcode
+	so.Duration, err = time.ParseDuration(tmp.Duration)
+	return err
+}
+
+func (so *sleepOp) isValid(_ bool) error {
+	if so.Opcode != sleepOpcode {
+		return fmt.Errorf("invalid opcode %q; expected %q", so.Opcode, sleepOpcode)
+	}
+	return nil
+}
+
+func (so *sleepOp) collectsMetrics() bool {
+	return false
+}
+
+func (so sleepOp) patchParams(_ *workload) (realOp, error) {
+	return &so, nil
 }
 
 func BenchmarkPerfScheduling(b *testing.B) {
@@ -831,6 +870,11 @@ func runWorkload(b *testing.B, tc *testCase, w *workload) []DataItem {
 				}
 			}
 
+		case *sleepOp:
+			select {
+			case <-ctx.Done():
+			case <-time.After(concreteOp.Duration):
+			}
 		default:
 			b.Fatalf("op %d: invalid op %v", opIndex, concreteOp)
 		}
