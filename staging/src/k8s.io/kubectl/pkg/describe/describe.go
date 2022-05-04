@@ -3702,6 +3702,9 @@ func describeStatefulSet(ps *appsv1.StatefulSet, selector labels.Selector, event
 			ru := ps.Spec.UpdateStrategy.RollingUpdate
 			if ru.Partition != nil {
 				w.Write(LEVEL_1, "Partition:\t%d\n", *ru.Partition)
+				if ru.MaxUnavailable != nil {
+					w.Write(LEVEL_1, "MaxUnavailable:\t%s\n", ru.MaxUnavailable.String())
+				}
 			}
 		}
 
