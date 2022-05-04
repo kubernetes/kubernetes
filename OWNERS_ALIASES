@@ -296,7 +296,6 @@ aliases:
     - MaciekPytel
     - mwielgus
   sig-instrumentation-approvers:
-    - brancz
     - logicalhan
     - dashpole
     - ehashman
@@ -304,19 +303,17 @@ aliases:
     - serathius
     - dgrisonnet
   sig-instrumentation-reviewers:
-    - brancz
     - dashpole
     - ehashman
     - s-urbaniak
-    - andyxning
     - coffeepac
     - logicalhan
     - RainbowMango
     - serathius
-    - lilic
     - dgrisonnet
     - pohly
   # sig-instrumentation-emeritus
+  # - brancz
   # - DirectXMan12
 
   api-approvers:
