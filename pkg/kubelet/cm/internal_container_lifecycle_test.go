@@ -1,8 +1,10 @@
 package cm
 
 import (
-	"github.com/stretchr/testify/assert"
+	"github.com/golang/mock/gomock"
 	"k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
@@ -11,20 +13,109 @@ import (
 
 func TestPreStartContainer(t *testing.T) {
 	// setup vars
-	i := internalContainerLifecycleImpl{
-		cpuManager:      cpumanager.NewFakeManager(),
-		memoryManager:   memorymanager.NewFakeManager(),
-		topologyManager: topologymanager.NewFakeManager(),
+
+	var tests = []struct {
+		i internalContainerLifecycleImpl
+	}{
+		{
+			i: internalContainerLifecycleImpl{
+				cpuManager:      nil,
+				memoryManager:   nil,
+				topologyManager: nil,
+			},
+		},
+		{
+			i: internalContainerLifecycleImpl{
+				cpuManager:      cpumanager.NewFakeManager(),
+				memoryManager:   nil,
+				topologyManager: nil,
+			},
+		},
+		{
+			i: internalContainerLifecycleImpl{
+				cpuManager:      cpumanager.NewFakeManager(),
+				memoryManager:   memorymanager.NewFakeManager(),
+				topologyManager: nil,
+			},
+		},
+		{
+			i: internalContainerLifecycleImpl{
+				cpuManager:      cpumanager.NewFakeManager(),
+				memoryManager:   nil,
+				topologyManager: topologymanager.NewFakeManager(),
+			},
+		},
+		{
+			i: internalContainerLifecycleImpl{
+				cpuManager:      nil,
+				memoryManager:   memorymanager.NewFakeManager(),
+				topologyManager: nil,
+			},
+		},
+		{
+			i: internalContainerLifecycleImpl{
+				cpuManager:      nil,
+				memoryManager:   memorymanager.NewFakeManager(),
+				topologyManager: topologymanager.NewFakeManager(),
+			},
+		},
+		{
+			i: internalContainerLifecycleImpl{
+				cpuManager:      nil,
+				memoryManager:   nil,
+				topologyManager: topologymanager.NewFakeManager(),
+			},
+		},
+		{
+			i: internalContainerLifecycleImpl{
+				cpuManager:      cpumanager.NewFakeManager(),
+				memoryManager:   memorymanager.NewFakeManager(),
+				topologyManager: topologymanager.NewFakeManager(),
+			},
+		},
 	}
-	fakePod := &v1.Pod{}
-	fakeContainer := &v1.Container{}
-	containerId := "testid"
-	// execute and match expected
-	err := i.PreStartContainer(fakePod, fakeContainer, containerId)
-	if err != nil {
-		assert.Error(t, err, "Error Occured when trying to prestart container")
+
+	for _, test := range tests {
+		mockCtrl := gomock.NewController(t)
+		defer mockCtrl.Finish()
+
+		pod := &v1.Pod{}
+		container := &v1.Container{}
+		containerId := "test-id"
+		i := test.i
+
+		//("Running PreStart Container",i.PreStartContainer())
+		i.PreStartContainer(pod, container, containerId)
+
+		mockCPUManager := cpumanager.NewMockManager(mockCtrl)
+		mockMemoryManager := memorymanager.NewMockManager(mockCtrl)
+		mockTopologyManager := topologymanager.NewMockManager(mockCtrl)
+
+		if i.cpuManager != nil {
+			mockCPUManager.EXPECT().AddContainer(pod, container, containerId).Return(nil).Times(1)
+		} else {
+			mockCPUManager.EXPECT().AddContainer(pod, container, containerId).Return(nil).Times(0)
+		}
+
+		if i.memoryManager != nil {
+			mockMemoryManager.EXPECT().AddContainer(pod, container, containerId).Return(nil).Times(1)
+		} else {
+			mockMemoryManager.EXPECT().AddContainer(pod, container, containerId).Return(nil).Times(0)
+		}
+
+		if i.topologyManager != nil && utilfeature.DefaultFeatureGate.Enabled(kubefeatures.TopologyManager) {
+			mockTopologyManager.EXPECT().AddContainer(pod, container, containerId).Return(nil).Times(1)
+		} else {
+			mockTopologyManager.EXPECT().AddContainer(pod, container, containerId).Return(nil).Times(0)
+		}
+
 	}
-	assert.NotNil(t, i.cpuManager, "cpu manager Container should not be null %v", i.cpuManager)
-	assert.NotNil(t, i.memoryManager, "memory manager Container should not be null %v", i.cpuManager)
-	assert.NotNil(t, i.topologyManager, "topology manager Container should not be null %v", i.cpuManager)
+}
+
+func TestPreStopContainer(t *testing.T) {
+
+}
+
+func TestPostStopContainer(t *testing.T) {
+
 }
