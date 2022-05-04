@@ -2423,6 +2423,7 @@ func autoConvert_v1_CSIPersistentVolumeSource_To_core_CSIPersistentVolumeSource(
 	out.NodeStageSecretRef = (*core.SecretReference)(unsafe.Pointer(in.NodeStageSecretRef))
 	out.NodePublishSecretRef = (*core.SecretReference)(unsafe.Pointer(in.NodePublishSecretRef))
 	out.ControllerExpandSecretRef = (*core.SecretReference)(unsafe.Pointer(in.ControllerExpandSecretRef))
+	out.NodeExpandSecretRef = (*core.SecretReference)(unsafe.Pointer(in.NodeExpandSecretRef))
 	return nil
 }
 
@@ -2441,6 +2442,7 @@ func autoConvert_core_CSIPersistentVolumeSource_To_v1_CSIPersistentVolumeSource(
 	out.NodeStageSecretRef = (*v1.SecretReference)(unsafe.Pointer(in.NodeStageSecretRef))
 	out.NodePublishSecretRef = (*v1.SecretReference)(unsafe.Pointer(in.NodePublishSecretRef))
 	out.ControllerExpandSecretRef = (*v1.SecretReference)(unsafe.Pointer(in.ControllerExpandSecretRef))
+	out.NodeExpandSecretRef = (*v1.SecretReference)(unsafe.Pointer(in.NodeExpandSecretRef))
 	return nil
 }
 

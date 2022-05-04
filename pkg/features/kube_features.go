@@ -882,6 +882,13 @@ const (
 	//
 	// Enables support for time zones in CronJobs.
 	CronJobTimeZone featuregate.Feature = "CronJobTimeZone"
+
+	// owner: @humblec, @zhucan
+	// kep: http://kep.k8s.io/3171
+	// alpha: v1.24
+	//
+	// Enables SecretRef field in CSI NodeExpandVolume request.
+	CSINodeExpandSecret featuregate.Feature = "CSINodeExpandSecret"
 )
 
 func init() {
@@ -990,6 +997,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ReadWriteOncePod:                               {Default: false, PreRelease: featuregate.Alpha},
 	CSRDuration:                                    {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
 	DelegateFSGroupToCSIDriver:                     {Default: true, PreRelease: featuregate.Beta},
+	CSINodeExpandSecret:                            {Default: false, PreRelease: featuregate.Alpha},
 	KubeletInUserNamespace:                         {Default: false, PreRelease: featuregate.Alpha},
 	MemoryQoS:                                      {Default: false, PreRelease: featuregate.Alpha},
 	CPUManagerPolicyOptions:                        {Default: true, PreRelease: featuregate.Beta},
