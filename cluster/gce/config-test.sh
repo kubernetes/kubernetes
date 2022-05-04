@@ -411,9 +411,6 @@ CUSTOM_INGRESS_YAML=${CUSTOM_INGRESS_YAML:-}
 
 if [[ -z "${KUBE_ADMISSION_CONTROL:-}" ]]; then
   ADMISSION_CONTROL='NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,Priority,StorageObjectInUseProtection,PersistentVolumeClaimResize,RuntimeClass'
-  if [[ "${ENABLE_POD_SECURITY_POLICY:-}" = 'true' ]]; then
-    ADMISSION_CONTROL="${ADMISSION_CONTROL},PodSecurityPolicy"
-  fi
   # ResourceQuota must come last, or a creation is recorded, but the pod may be forbidden.
   ADMISSION_CONTROL="${ADMISSION_CONTROL},MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota"
 else
