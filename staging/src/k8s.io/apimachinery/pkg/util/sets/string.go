@@ -28,7 +28,7 @@ type String map[string]Empty
 
 // NewString creates a String from a list of values.
 func NewString(items ...string) String {
-	ss := String{}
+	ss := make(String, len(items))
 	ss.Insert(items...)
 	return ss
 }
@@ -37,7 +37,7 @@ func NewString(items ...string) String {
 // If the value passed in is not actually a map, this will panic.
 func StringKeySet(theMap interface{}) String {
 	v := reflect.ValueOf(theMap)
-	ret := String{}
+	ret := make(String, len(v.MapKeys()))
 
 	for _, keyValue := range v.MapKeys() {
 		ret.Insert(keyValue.Interface().(string))
