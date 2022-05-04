@@ -90,7 +90,6 @@ nodes="nodes"
 persistentvolumeclaims="persistentvolumeclaims"
 persistentvolumes="persistentvolumes"
 pods="pods"
-podsecuritypolicies="podsecuritypolicies"
 podtemplates="podtemplates"
 replicasets="replicasets"
 replicationcontrollers="replicationcontrollers"
@@ -934,7 +933,7 @@ runTests() {
   # Kubectl deprecated APIs  #
   ############################
 
-  if kube::test::if_supports_resource "${podsecuritypolicies}" ; then
+  if kube::test::if_supports_resource "${customresourcedefinitions}" ; then
     record_command run_deprecated_api_tests
   fi
 
