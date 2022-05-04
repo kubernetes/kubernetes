@@ -20,6 +20,7 @@ import (
 	"context"
 	"strings"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
@@ -84,7 +85,7 @@ var _ = SIGDescribe("Discovery", func() {
 		defer testcrd.CleanUp()
 		spec := testcrd.Crd.Spec
 		resources, err := testcrd.APIExtensionClient.Discovery().ServerResourcesForGroupVersion(spec.Group + "/" + spec.Versions[0].Name)
-		if err != nil {
+		if apierrors.IsNotFound(err) {
 			framework.Failf("failed to find the discovery doc for %v: %v", resources, err)
 		}
 		found := false

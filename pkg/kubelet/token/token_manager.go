@@ -50,7 +50,7 @@ func NewManager(c clientset.Interface) *Manager {
 	tokenRequestsSupported := func() bool {
 		once.Do(func() {
 			resources, err := c.Discovery().ServerResourcesForGroupVersion("v1")
-			if err != nil {
+			if apierrors.IsNotFound(err) {
 				return
 			}
 			for _, resource := range resources.APIResources {

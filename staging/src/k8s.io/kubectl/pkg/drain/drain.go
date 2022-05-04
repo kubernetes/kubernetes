@@ -110,7 +110,7 @@ func CheckEvictionSupport(clientset kubernetes.Interface) (schema.GroupVersion, 
 
 	// version info available in subresources since v1.8.0 in https://github.com/kubernetes/kubernetes/pull/49971
 	resourceList, err := discoveryClient.ServerResourcesForGroupVersion("v1")
-	if err != nil {
+	if apierrors.IsNotFound(err) {
 		return schema.GroupVersion{}, err
 	}
 	for _, resource := range resourceList.APIResources {

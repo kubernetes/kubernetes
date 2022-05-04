@@ -323,7 +323,7 @@ func (dc *DisruptionController) getScaleController(ctx context.Context, controll
 
 func (dc *DisruptionController) implementsScale(gv schema.GroupVersion, kind string) (bool, error) {
 	resourceList, err := dc.discoveryClient.ServerResourcesForGroupVersion(gv.String())
-	if err != nil {
+	if errors.IsNotFound(err) {
 		return false, err
 	}
 	for _, resource := range resourceList.APIResources {
