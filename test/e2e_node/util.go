@@ -23,9 +23,11 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os/exec"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -83,7 +85,7 @@ func getNodeSummary() (*stats.Summary, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current kubelet config")
 	}
-	req, err := http.NewRequest("GET", fmt.Sprintf("http://%s:%d/stats/summary", kubeletConfig.Address, kubeletConfig.ReadOnlyPort), nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf("http://%s/stats/summary", net.JoinHostPort(kubeletConfig.Address, strconv.Itoa(int(kubeletConfig.ReadOnlyPort)))), nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build http request: %v", err)
 	}
