@@ -95,12 +95,6 @@ func CleanupMountWithForce(mountPath string, mounter MounterForceUnmounter, exte
 // if corruptedMnt is true, it means that the mountPath is a corrupted mountpoint, and the mount point check
 // will be skipped. The mount point check will also be skipped if the mounter supports it.
 func doCleanupMountPoint(mountPath string, mounter Interface, extensiveMountPointCheck bool, corruptedMnt bool) error {
-<<<<<<< HEAD
-	if corruptedMnt || mounter.canSafelySkipMountPointCheck() {
-		klog.V(4).Infof("unmounting %q (corruptedMount: %t, mounterCanSkipMountPointChecks: %t)",
-			mountPath, corruptedMnt, mounter.canSafelySkipMountPointCheck())
-		if err := mounter.Unmount(mountPath); err != nil {
-=======
 	var notMnt bool
 	var err error
 	if !mounter.CanSafelySkipMountPointCheck() && !corruptedMnt {
@@ -108,7 +102,6 @@ func doCleanupMountPoint(mountPath string, mounter Interface, extensiveMountPoin
 		// if mountPath was not a mount point - we would have attempted to remove mountPath
 		// and hence return errors if any.
 		if err != nil || notMnt {
->>>>>>> Skip mount point checks when possible during mount cleanup.
 			return err
 		}
 		return removePath(mountPath)
@@ -168,10 +161,14 @@ func removePathIfNotMountPoint(mountPath string, mounter Interface, extensiveMou
 // removePath attempts to remove the directory. Returns nil if the directory was removed or does not exist.
 func removePath(mountPath string) error {
 <<<<<<< HEAD
+<<<<<<< HEAD
 	klog.V(4).Infof("Warning: deleting path %q", mountPath)
 =======
 	klog.Warningf("Warning: deleting mount path %q", mountPath)
 >>>>>>> Skip mount point checks when possible during mount cleanup.
+=======
+	klog.Warningf("Warning: deleting path %q", mountPath)
+>>>>>>> Add test for detectSafeNotMountedBehavior.
 	err := os.Remove(mountPath)
 	if os.IsNotExist(err) {
 		klog.V(4).Infof("%q does not exist", mountPath)
