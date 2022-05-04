@@ -83,7 +83,6 @@ type Framework struct {
 	Namespace                        *v1.Namespace   // Every test has at least one namespace unless creation is skipped
 	namespacesToDelete               []*v1.Namespace // Some tests have more than one.
 	NamespaceDeletionTimeout         time.Duration
-	SkipPrivilegedPSPBinding         bool               // Whether to skip creating a binding to the privileged PSP in the test namespace
 	NamespacePodSecurityEnforceLevel admissionapi.Level // The pod security enforcement level for namespaces to be applied.
 
 	gatherer *ContainerResourceGatherer
@@ -544,10 +543,6 @@ func (f *Framework) CreateNamespace(baseName string, labels map[string]string) (
 	// check ns instead of err to see if it's nil as we may
 	// fail to create serviceAccount in it.
 	f.AddNamespacesToDelete(ns)
-
-	if err == nil && !f.SkipPrivilegedPSPBinding {
-		CreatePrivilegedPSPBinding(f.ClientSet, ns.Name)
-	}
 
 	return ns, err
 }

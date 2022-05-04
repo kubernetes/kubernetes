@@ -14,17 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package capabilities
+package sysctl
 
-import (
-	"k8s.io/apimachinery/pkg/util/validation/field"
-	api "k8s.io/kubernetes/pkg/apis/core"
-)
-
-// Strategy defines the interface for all cap constraint strategies.
-type Strategy interface {
-	// Generate creates the capabilities based on policy rules.
-	Generate(pod *api.Pod, container *api.Container) (*api.Capabilities, error)
-	// Validate ensures that the specified values fall within the range of the strategy.
-	Validate(fldPath *field.Path, pod *api.Pod, container *api.Container, capabilities *api.Capabilities) field.ErrorList
+// SafeSysctlAllowlist returns the allowlist of safe sysctls and safe sysctl patterns (ending in *).
+//
+// A sysctl is called safe iff
+// - it is namespaced in the container or the pod
+// - it is isolated, i.e. has no influence on any other pod on the same node.
+func SafeSysctlAllowlist() []string {
+	return []string{
+		"kernel.shm_rmid_forced",
+		"net.ipv4.ip_local_port_range",
+		"net.ipv4.tcp_syncookies",
+		"net.ipv4.ping_group_range",
+		"net.ipv4.ip_unprivileged_port_start",
+	}
 }
