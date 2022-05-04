@@ -166,7 +166,7 @@ func TestLabelFunc(t *testing.T) {
 		labels    map[string]string
 		remove    []string
 		expected  runtime.Object
-		expectErr bool
+		expectErr string
 	}{
 		{
 			obj: &v1.Pod{
@@ -174,8 +174,21 @@ func TestLabelFunc(t *testing.T) {
 					Labels: map[string]string{"a": "b"},
 				},
 			},
-			labels:    map[string]string{"a": "b"},
-			expectErr: true,
+			labels: map[string]string{"a": "b"},
+			expected: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"a": "b"},
+				},
+			},
+		},
+		{
+			obj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"a": "b"},
+				},
+			},
+			labels:    map[string]string{"a": "c"},
+			expectErr: "'a' already has a value (b), and --overwrite is false",
 		},
 		{
 			obj: &v1.Pod{
@@ -264,13 +277,16 @@ func TestLabelFunc(t *testing.T) {
 	}
 	for _, test := range tests {
 		err := labelFunc(test.obj, test.overwrite, test.version, test.labels, test.remove)
-		if test.expectErr {
+		if test.expectErr != "" {
 			if err == nil {
 				t.Errorf("unexpected non-error: %v", test)
 			}
+			if err.Error() != test.expectErr {
+				t.Errorf("error expected: %v, got: %v", test.expectErr, err.Error())
+			}
 			continue
 		}
-		if !test.expectErr && err != nil {
+		if test.expectErr == "" && err != nil {
 			t.Errorf("unexpected error: %v %v", err, test)
 		}
 		if !reflect.DeepEqual(test.obj, test.expected) {
@@ -586,7 +602,6 @@ func TestLabelMsg(t *testing.T) {
 			},
 			labels:    map[string]string{"a": "b"},
 			expectMsg: MsgNotLabeled,
-			expectErr: true,
 		},
 		{
 			obj: &v1.Pod{
