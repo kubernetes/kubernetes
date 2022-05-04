@@ -198,15 +198,16 @@ type Interface interface {
 	// match 'opts.ResourceVersion' according 'opts.ResourceVersionMatch'.
 	GetList(ctx context.Context, key string, opts ListOptions, listObj runtime.Object) error
 
-	// GuaranteedUpdate keeps calling 'tryUpdate()' to update key 'key' (of type 'ptrToType')
+	// GuaranteedUpdate keeps calling 'tryUpdate()' to update key 'key' (of type 'destination')
 	// retrying the update until success if there is index conflict.
 	// Note that object passed to tryUpdate may change across invocations of tryUpdate() if
 	// other writers are simultaneously updating it, so tryUpdate() needs to take into account
 	// the current contents of the object when deciding how the update object should look.
 	// If the key doesn't exist, it will return NotFound storage error if ignoreNotFound=false
-	// or zero value in 'ptrToType' parameter otherwise.
-	// If the object to update has the same value as previous, it won't do any update
-	// but will return the object in 'ptrToType' parameter.
+	// else `destination` will be set to the zero value of it's type.
+	// If the eventual successful invocation of `tryUpdate` returns an output with the same serialized
+	// contents as the input, it won't perform any update, but instead set `destination` to an object with those
+	// contents.
 	// If 'cachedExistingObject' is non-nil, it can be used as a suggestion about the
 	// current version of the object to avoid read operation from storage to get it.
 	// However, the implementations have to retry in case suggestion is stale.
@@ -215,7 +216,7 @@ type Interface interface {
 	//
 	// s := /* implementation of Interface */
 	// err := s.GuaranteedUpdate(
-	//     "myKey", &MyType{}, true,
+	//     "myKey", &MyType{}, true, preconditions,
 	//     func(input runtime.Object, res ResponseMeta) (runtime.Object, *uint64, error) {
 	//       // Before each invocation of the user defined function, "input" is reset to
 	//       // current contents for "myKey" in database.
@@ -227,10 +228,10 @@ type Interface interface {
 	//       // Return the modified object - return an error to stop iterating. Return
 	//       // a uint64 to alter the TTL on the object, or nil to keep it the same value.
 	//       return cur, nil, nil
-	//    },
+	//    }, cachedExistingObject
 	// )
 	GuaranteedUpdate(
-		ctx context.Context, key string, ptrToType runtime.Object, ignoreNotFound bool,
+		ctx context.Context, key string, destination runtime.Object, ignoreNotFound bool,
 		preconditions *Preconditions, tryUpdate UpdateFunc, cachedExistingObject runtime.Object) error
 
 	// Count returns number of different entries under the key (generally being path prefix).

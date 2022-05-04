@@ -316,12 +316,12 @@ func (s *store) conditionalDelete(
 
 // GuaranteedUpdate implements storage.Interface.GuaranteedUpdate.
 func (s *store) GuaranteedUpdate(
-	ctx context.Context, key string, out runtime.Object, ignoreNotFound bool,
+	ctx context.Context, key string, destination runtime.Object, ignoreNotFound bool,
 	preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, cachedExistingObject runtime.Object) error {
-	trace := utiltrace.New("GuaranteedUpdate etcd3", utiltrace.Field{"type", getTypeName(out)})
+	trace := utiltrace.New("GuaranteedUpdate etcd3", utiltrace.Field{"type", getTypeName(destination)})
 	defer trace.LogIfLong(500 * time.Millisecond)
 
-	v, err := conversion.EnforcePtr(out)
+	v, err := conversion.EnforcePtr(destination)
 	if err != nil {
 		return fmt.Errorf("unable to convert output object to pointer: %v", err)
 	}
@@ -330,7 +330,7 @@ func (s *store) GuaranteedUpdate(
 	getCurrentState := func() (*objState, error) {
 		startTime := time.Now()
 		getResp, err := s.client.KV.Get(ctx, key)
-		metrics.RecordEtcdRequestLatency("get", getTypeName(out), startTime)
+		metrics.RecordEtcdRequestLatency("get", getTypeName(destination), startTime)
 		if err != nil {
 			return nil, err
 		}
@@ -418,7 +418,7 @@ func (s *store) GuaranteedUpdate(
 			}
 			// recheck that the data from etcd is not stale before short-circuiting a write
 			if !origState.stale {
-				return decode(s.codec, s.versioner, origState.data, out, origState.rev)
+				return decode(s.codec, s.versioner, origState.data, destination, origState.rev)
 			}
 		}
 
@@ -441,7 +441,7 @@ func (s *store) GuaranteedUpdate(
 		).Else(
 			clientv3.OpGet(key),
 		).Commit()
-		metrics.RecordEtcdRequestLatency("update", getTypeName(out), startTime)
+		metrics.RecordEtcdRequestLatency("update", getTypeName(destination), startTime)
 		if err != nil {
 			return err
 		}
@@ -459,7 +459,7 @@ func (s *store) GuaranteedUpdate(
 		}
 		putResp := txnResp.Responses[0].GetResponsePut()
 
-		return decode(s.codec, s.versioner, data, out, putResp.Header.Revision)
+		return decode(s.codec, s.versioner, data, destination, putResp.Header.Revision)
 	}
 }
 
