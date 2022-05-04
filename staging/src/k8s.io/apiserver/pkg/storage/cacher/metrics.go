@@ -95,7 +95,7 @@ var (
 		&metrics.CounterOpts{
 			Namespace:      namespace,
 			Subsystem:      subsystem,
-			Name:           "watch_cache_initializations_total",
+			Name:           "initializations_total",
 			Help:           "Counter of watch cache initializations broken by resource type.",
 			StabilityLevel: metrics.ALPHA,
 		},
