@@ -24,10 +24,14 @@ import (
 	"testing"
 	"time"
 
+	st "k8s.io/kubernetes/pkg/scheduler/testing"
+
+	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
@@ -1169,7 +1173,7 @@ func TestNodeOperators(t *testing.T) {
 
 func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 	// Create a few nodes to be used in tests.
-	nodes := []*v1.Node{}
+	var nodes []*v1.Node
 	for i := 0; i < 10; i++ {
 		node := &v1.Node{
 			ObjectMeta: metav1.ObjectMeta{
@@ -1185,7 +1189,7 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 		nodes = append(nodes, node)
 	}
 	// Create a few nodes as updated versions of the above nodes
-	updatedNodes := []*v1.Node{}
+	var updatedNodes []*v1.Node
 	for _, n := range nodes {
 		updatedNode := n.DeepCopy()
 		updatedNode.Status.Allocatable = v1.ResourceList{
@@ -1196,7 +1200,7 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 	}
 
 	// Create a few pods for tests.
-	pods := []*v1.Pod{}
+	var pods []*v1.Pod
 	for i := 0; i < 20; i++ {
 		pod := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -1212,7 +1216,7 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 	}
 
 	// Create a few pods as updated versions of the above pods.
-	updatedPods := []*v1.Pod{}
+	var updatedPods []*v1.Pod
 	for _, p := range pods {
 		updatedPod := p.DeepCopy()
 		priority := int32(1000)
@@ -1221,22 +1225,19 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 	}
 
 	// Add a couple of pods with affinity, on the first and seconds nodes.
-	podsWithAffinity := []*v1.Pod{}
+	var podsWithAffinity []*v1.Pod
 	for i := 0; i < 2; i++ {
-		pod := &v1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      fmt.Sprintf("test-pod%v", i),
-				Namespace: "test-ns",
-				UID:       types.UID(fmt.Sprintf("test-puid%v", i)),
-			},
-			Spec: v1.PodSpec{
-				NodeName: fmt.Sprintf("test-node%v", i),
-				Affinity: &v1.Affinity{
-					PodAffinity: &v1.PodAffinity{},
-				},
-			},
-		}
+		pod := st.MakePod().Name(fmt.Sprintf("p-affinity-%v", i)).Namespace("test-ns").UID(fmt.Sprintf("puid-affinity-%v", i)).
+			PodAffinityExists("foo", "", st.PodAffinityWithRequiredReq).Node(fmt.Sprintf("test-node%v", i)).Obj()
 		podsWithAffinity = append(podsWithAffinity, pod)
+	}
+
+	// Add a few of pods with PVC
+	var podsWithPVC []*v1.Pod
+	for i := 0; i < 8; i++ {
+		pod := st.MakePod().Name(fmt.Sprintf("p-pvc-%v", i)).Namespace("test-ns").UID(fmt.Sprintf("puid-pvc-%v", i)).
+			PVC(fmt.Sprintf("test-pvc%v", i%4)).Node(fmt.Sprintf("test-node%v", i%2)).Obj()
+		podsWithPVC = append(podsWithPVC, pod)
 	}
 
 	var cache *cacheImpl
@@ -1274,6 +1275,13 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 			}
 		}
 	}
+	addPodWithPVC := func(i int) operation {
+		return func(t *testing.T) {
+			if err := cache.AddPod(podsWithPVC[i]); err != nil {
+				t.Error(err)
+			}
+		}
+	}
 	removePod := func(i int) operation {
 		return func(t *testing.T) {
 			if err := cache.RemovePod(pods[i]); err != nil {
@@ -1284,6 +1292,13 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 	removePodWithAffinity := func(i int) operation {
 		return func(t *testing.T) {
 			if err := cache.RemovePod(podsWithAffinity[i]); err != nil {
+				t.Error(err)
+			}
+		}
+	}
+	removePodWithPVC := func(i int) operation {
+		return func(t *testing.T) {
+			if err := cache.RemovePod(podsWithPVC[i]); err != nil {
 				t.Error(err)
 			}
 		}
@@ -1309,30 +1324,35 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 		operations                   []operation
 		expected                     []*v1.Node
 		expectedHavePodsWithAffinity int
+		expectedUsedPVCSet           sets.String
 	}{
 		{
-			name:       "Empty cache",
-			operations: []operation{},
-			expected:   []*v1.Node{},
+			name:               "Empty cache",
+			operations:         []operation{},
+			expected:           []*v1.Node{},
+			expectedUsedPVCSet: sets.NewString(),
 		},
 		{
-			name:       "Single node",
-			operations: []operation{addNode(1)},
-			expected:   []*v1.Node{nodes[1]},
+			name:               "Single node",
+			operations:         []operation{addNode(1)},
+			expected:           []*v1.Node{nodes[1]},
+			expectedUsedPVCSet: sets.NewString(),
 		},
 		{
 			name: "Add node, remove it, add it again",
 			operations: []operation{
 				addNode(1), updateSnapshot(), removeNode(1), addNode(1),
 			},
-			expected: []*v1.Node{nodes[1]},
+			expected:           []*v1.Node{nodes[1]},
+			expectedUsedPVCSet: sets.NewString(),
 		},
 		{
 			name: "Add node and remove it in the same cycle, add it again",
 			operations: []operation{
 				addNode(1), updateSnapshot(), addNode(2), removeNode(1),
 			},
-			expected: []*v1.Node{nodes[2]},
+			expected:           []*v1.Node{nodes[2]},
+			expectedUsedPVCSet: sets.NewString(),
 		},
 		{
 			name: "Add a few nodes, and snapshot in the middle",
@@ -1340,21 +1360,24 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 				addNode(0), updateSnapshot(), addNode(1), updateSnapshot(), addNode(2),
 				updateSnapshot(), addNode(3),
 			},
-			expected: []*v1.Node{nodes[3], nodes[2], nodes[1], nodes[0]},
+			expected:           []*v1.Node{nodes[3], nodes[2], nodes[1], nodes[0]},
+			expectedUsedPVCSet: sets.NewString(),
 		},
 		{
 			name: "Add a few nodes, and snapshot in the end",
 			operations: []operation{
 				addNode(0), addNode(2), addNode(5), addNode(6),
 			},
-			expected: []*v1.Node{nodes[6], nodes[5], nodes[2], nodes[0]},
+			expected:           []*v1.Node{nodes[6], nodes[5], nodes[2], nodes[0]},
+			expectedUsedPVCSet: sets.NewString(),
 		},
 		{
 			name: "Update some nodes",
 			operations: []operation{
 				addNode(0), addNode(1), addNode(5), updateSnapshot(), updateNode(1),
 			},
-			expected: []*v1.Node{nodes[1], nodes[5], nodes[0]},
+			expected:           []*v1.Node{nodes[1], nodes[5], nodes[0]},
+			expectedUsedPVCSet: sets.NewString(),
 		},
 		{
 			name: "Add a few nodes, and remove all of them",
@@ -1362,7 +1385,8 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 				addNode(0), addNode(2), addNode(5), addNode(6), updateSnapshot(),
 				removeNode(0), removeNode(2), removeNode(5), removeNode(6),
 			},
-			expected: []*v1.Node{},
+			expected:           []*v1.Node{},
+			expectedUsedPVCSet: sets.NewString(),
 		},
 		{
 			name: "Add a few nodes, and remove some of them",
@@ -1370,7 +1394,8 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 				addNode(0), addNode(2), addNode(5), addNode(6), updateSnapshot(),
 				removeNode(0), removeNode(6),
 			},
-			expected: []*v1.Node{nodes[5], nodes[2]},
+			expected:           []*v1.Node{nodes[5], nodes[2]},
+			expectedUsedPVCSet: sets.NewString(),
 		},
 		{
 			name: "Add a few nodes, remove all of them, and add more",
@@ -1379,7 +1404,8 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 				removeNode(2), removeNode(5), removeNode(6), updateSnapshot(),
 				addNode(7), addNode(9),
 			},
-			expected: []*v1.Node{nodes[9], nodes[7]},
+			expected:           []*v1.Node{nodes[9], nodes[7]},
+			expectedUsedPVCSet: sets.NewString(),
 		},
 		{
 			name: "Update nodes in particular order",
@@ -1387,7 +1413,8 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 				addNode(8), updateNode(2), updateNode(8), updateSnapshot(),
 				addNode(1),
 			},
-			expected: []*v1.Node{nodes[1], nodes[8], nodes[2]},
+			expected:           []*v1.Node{nodes[1], nodes[8], nodes[2]},
+			expectedUsedPVCSet: sets.NewString(),
 		},
 		{
 			name: "Add some nodes and some pods",
@@ -1395,21 +1422,24 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 				addNode(0), addNode(2), addNode(8), updateSnapshot(),
 				addPod(8), addPod(2),
 			},
-			expected: []*v1.Node{nodes[2], nodes[8], nodes[0]},
+			expected:           []*v1.Node{nodes[2], nodes[8], nodes[0]},
+			expectedUsedPVCSet: sets.NewString(),
 		},
 		{
 			name: "Updating a pod moves its node to the head",
 			operations: []operation{
 				addNode(0), addPod(0), addNode(2), addNode(4), updatePod(0),
 			},
-			expected: []*v1.Node{nodes[0], nodes[4], nodes[2]},
+			expected:           []*v1.Node{nodes[0], nodes[4], nodes[2]},
+			expectedUsedPVCSet: sets.NewString(),
 		},
 		{
 			name: "Add pod before its node",
 			operations: []operation{
 				addNode(0), addPod(1), updatePod(1), addNode(1),
 			},
-			expected: []*v1.Node{nodes[1], nodes[0]},
+			expected:           []*v1.Node{nodes[1], nodes[0]},
+			expectedUsedPVCSet: sets.NewString(),
 		},
 		{
 			name: "Remove node before its pods",
@@ -1418,7 +1448,8 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 				removeNode(1), updateSnapshot(),
 				updatePod(1), updatePod(11), removePod(1), removePod(11),
 			},
-			expected: []*v1.Node{nodes[0]},
+			expected:           []*v1.Node{nodes[0]},
+			expectedUsedPVCSet: sets.NewString(),
 		},
 		{
 			name: "Add Pods with affinity",
@@ -1427,6 +1458,15 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 			},
 			expected:                     []*v1.Node{nodes[1], nodes[0]},
 			expectedHavePodsWithAffinity: 1,
+			expectedUsedPVCSet:           sets.NewString(),
+		},
+		{
+			name: "Add Pods with PVC",
+			operations: []operation{
+				addNode(0), addPodWithPVC(0), updateSnapshot(), addNode(1),
+			},
+			expected:           []*v1.Node{nodes[1], nodes[0]},
+			expectedUsedPVCSet: sets.NewString("test-ns/test-pvc0"),
 		},
 		{
 			name: "Add multiple nodes with pods with affinity",
@@ -1435,6 +1475,15 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 			},
 			expected:                     []*v1.Node{nodes[1], nodes[0]},
 			expectedHavePodsWithAffinity: 2,
+			expectedUsedPVCSet:           sets.NewString(),
+		},
+		{
+			name: "Add multiple nodes with pods with PVC",
+			operations: []operation{
+				addNode(0), addPodWithPVC(0), updateSnapshot(), addNode(1), addPodWithPVC(1), updateSnapshot(),
+			},
+			expected:           []*v1.Node{nodes[1], nodes[0]},
+			expectedUsedPVCSet: sets.NewString("test-ns/test-pvc0", "test-ns/test-pvc1"),
 		},
 		{
 			name: "Add then Remove pods with affinity",
@@ -1443,6 +1492,43 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 			},
 			expected:                     []*v1.Node{nodes[0], nodes[1]},
 			expectedHavePodsWithAffinity: 0,
+			expectedUsedPVCSet:           sets.NewString(),
+		},
+		{
+			name: "Add then Remove pod with PVC",
+			operations: []operation{
+				addNode(0), addPodWithPVC(0), updateSnapshot(), removePodWithPVC(0), addPodWithPVC(2), updateSnapshot(),
+			},
+			expected:           []*v1.Node{nodes[0]},
+			expectedUsedPVCSet: sets.NewString("test-ns/test-pvc2"),
+		},
+		{
+			name: "Add then Remove pod with PVC and add same pod again",
+			operations: []operation{
+				addNode(0), addPodWithPVC(0), updateSnapshot(), removePodWithPVC(0), addPodWithPVC(0), updateSnapshot(),
+			},
+			expected:           []*v1.Node{nodes[0]},
+			expectedUsedPVCSet: sets.NewString("test-ns/test-pvc0"),
+		},
+		{
+			name: "Add and Remove multiple pods with PVC with same ref count length different content",
+			operations: []operation{
+				addNode(0), addNode(1), addPodWithPVC(0), addPodWithPVC(1), updateSnapshot(),
+				removePodWithPVC(0), removePodWithPVC(1), addPodWithPVC(2), addPodWithPVC(3), updateSnapshot(),
+			},
+			expected:           []*v1.Node{nodes[1], nodes[0]},
+			expectedUsedPVCSet: sets.NewString("test-ns/test-pvc2", "test-ns/test-pvc3"),
+		},
+		{
+			name: "Add and Remove multiple pods with PVC",
+			operations: []operation{
+				addNode(0), addNode(1), addPodWithPVC(0), addPodWithPVC(1), addPodWithPVC(2), updateSnapshot(),
+				removePodWithPVC(0), removePodWithPVC(1), updateSnapshot(), addPodWithPVC(0), updateSnapshot(),
+				addPodWithPVC(3), addPodWithPVC(4), addPodWithPVC(5), updateSnapshot(),
+				removePodWithPVC(0), removePodWithPVC(3), removePodWithPVC(4), updateSnapshot(),
+			},
+			expected:           []*v1.Node{nodes[0], nodes[1]},
+			expectedUsedPVCSet: sets.NewString("test-ns/test-pvc1", "test-ns/test-pvc2"),
 		},
 	}
 
@@ -1474,6 +1560,11 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 			// Check number of nodes with pods with affinity
 			if len(snapshot.havePodsWithAffinityNodeInfoList) != test.expectedHavePodsWithAffinity {
 				t.Errorf("unexpected number of HavePodsWithAffinity nodes. Expected: %v, got: %v", test.expectedHavePodsWithAffinity, len(snapshot.havePodsWithAffinityNodeInfoList))
+			}
+
+			// Compare content of the used PVC set
+			if diff := cmp.Diff(test.expectedUsedPVCSet, snapshot.usedPVCSet); diff != "" {
+				t.Errorf("Unexpected usedPVCSet (-want +got):\n%s", diff)
 			}
 
 			// Always update the snapshot at the end of operations and compare it.
@@ -1509,6 +1600,7 @@ func compareCacheWithNodeInfoSnapshot(t *testing.T, cache *cacheImpl, snapshot *
 
 	expectedNodeInfoList := make([]*framework.NodeInfo, 0, cache.nodeTree.numNodes)
 	expectedHavePodsWithAffinityNodeInfoList := make([]*framework.NodeInfo, 0, cache.nodeTree.numNodes)
+	expectedUsedPVCSet := sets.NewString()
 	nodesList, err := cache.nodeTree.list()
 	if err != nil {
 		t.Fatal(err)
@@ -1518,6 +1610,9 @@ func compareCacheWithNodeInfoSnapshot(t *testing.T, cache *cacheImpl, snapshot *
 			expectedNodeInfoList = append(expectedNodeInfoList, n)
 			if len(n.PodsWithAffinity) > 0 {
 				expectedHavePodsWithAffinityNodeInfoList = append(expectedHavePodsWithAffinityNodeInfoList, n)
+			}
+			for key := range n.PVCRefCounts {
+				expectedUsedPVCSet.Insert(key)
 			}
 		} else {
 			return fmt.Errorf("node %q exist in nodeTree but not in NodeInfoMap, this should not happen", nodeName)
@@ -1538,12 +1633,18 @@ func compareCacheWithNodeInfoSnapshot(t *testing.T, cache *cacheImpl, snapshot *
 		}
 	}
 
+	for key := range expectedUsedPVCSet {
+		if !snapshot.usedPVCSet.Has(key) {
+			return fmt.Errorf("expected PVC %s to exist in UsedPVCSet but it is not found", key)
+		}
+	}
+
 	return nil
 }
 
 func TestSchedulerCache_updateNodeInfoSnapshotList(t *testing.T) {
 	// Create a few nodes to be used in tests.
-	nodes := []*v1.Node{}
+	var nodes []*v1.Node
 	i := 0
 	// List of number of nodes per zone, zone 0 -> 2, zone 1 -> 6
 	for zone, nb := range []int{2, 6} {
