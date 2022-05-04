@@ -372,6 +372,7 @@ func TestProgressNotify(t *testing.T) {
 	if err := store.Create(ctx, key, input, out, 0); err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
+	validateResourceVersion := resourceVersionNotOlderThan(out.ResourceVersion)
 
 	opts := storage.ListOptions{
 		ResourceVersion: out.ResourceVersion,
@@ -382,8 +383,28 @@ func TestProgressNotify(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
-	result := &example.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: out.ResourceVersion}}
-	testCheckResult(t, watch.Bookmark, w, result)
+
+	// when we send a bookmark event, the client expects the event to contain an
+	// object of the correct type, but with no fields set other than the resourceVersion
+	testCheckResultFunc(t, watch.Bookmark, w, func(object runtime.Object) error {
+		// first, check that we have the correct resource version
+		obj, ok := object.(metav1.Object)
+		if !ok {
+			return fmt.Errorf("got %T, not metav1.Object", object)
+		}
+		if err := validateResourceVersion(obj.GetResourceVersion()); err != nil {
+			return err
+		}
+
+		// then, check that we have the right type and content
+		pod, ok := object.(*example.Pod)
+		if !ok {
+			return fmt.Errorf("got %T, not *example.Pod", object)
+		}
+		pod.ResourceVersion = ""
+		expectNoDiff(t, "bookmark event should contain an object with no fields set other than resourceVersion", newPod(), pod)
+		return nil
+	})
 }
 
 type testWatchStruct struct {
@@ -411,14 +432,44 @@ func testCheckEventType(t *testing.T, expectEventType watch.EventType, w watch.I
 	}
 }
 
+// resourceVersionNotOlderThan returns a function to validate resource versions. Resource versions
+// referring to points in logical time before the sentinel generate an error. All logical times as
+// new as the sentinel or newer generate no error.
+func resourceVersionNotOlderThan(sentinel string) func(string) error {
+	return func(resourceVersion string) error {
+		objectVersioner := APIObjectVersioner{}
+		actualRV, err := objectVersioner.ParseResourceVersion(resourceVersion)
+		if err != nil {
+			return err
+		}
+		expectedRV, err := objectVersioner.ParseResourceVersion(sentinel)
+		if err != nil {
+			return err
+		}
+		if actualRV < expectedRV {
+			return fmt.Errorf("expected a resourceVersion no smaller than than %d, but got %d", expectedRV, actualRV)
+		}
+		return nil
+	}
+}
+
 func testCheckResult(t *testing.T, expectEventType watch.EventType, w watch.Interface, expectObj *example.Pod) {
+	testCheckResultFunc(t, expectEventType, w, func(object runtime.Object) error {
+		expectNoDiff(t, "incorrect object", expectObj, object)
+		return nil
+	})
+}
+
+func testCheckResultFunc(t *testing.T, expectEventType watch.EventType, w watch.Interface, check func(object runtime.Object) error) {
 	select {
 	case res := <-w.ResultChan():
 		if res.Type != expectEventType {
 			t.Errorf("event type want=%v, get=%v", expectEventType, res.Type)
 			return
 		}
-		expectNoDiff(t, "incorrect obj", expectObj, res.Object)
+		if err := check(res.Object); err != nil {
+			t.Error(err)
+		}
 	case <-time.After(wait.ForeverTestTimeout):
 		t.Errorf("time out after waiting %v on ResultChan", wait.ForeverTestTimeout)
 	}
