@@ -234,7 +234,7 @@ After its deprecation in v1.20, the dockershim component has been removed from t
 From v1.24 onwards, you will need to either use one of the other [supported runtimes](https://kubernetes.io/docs/setup/production-environment/container-runtimes/) (such as containerd or CRI-O)
 or use cri-dockerd if you are relying on Docker Engine as your container runtime.
 For more information about ensuring your cluster is ready for this removal, please
-see [this guide](/blog/2022/03/31/ready-for-dockershim-removal/).
+see [this guide](https://kubernetes.io/blog/2022/03/31/ready-for-dockershim-removal/).
 
 ### Beta APIs Off by Default
 
@@ -245,7 +245,7 @@ Existing beta APIs and new versions of existing beta APIs, will continue to be e
 
 Release artifacts are [signed](https://github.com/kubernetes/enhancements/issues/3031) using [cosign](https://github.com/sigstore/cosign)
 signatures
-and there is experimental support for [verifying image signatures](/docs/tasks/administer-cluster/verify-signed-images/).
+and there is experimental support for [verifying image signatures](https://kubernetes.io/docs/tasks/administer-cluster/verify-signed-images/).
 Signing and verification of release artifacts is part of [increasing software supply chain security for the Kubernetes release process](https://github.com/kubernetes/enhancements/issues/3027).
 
 ### OpenAPI v3
@@ -277,14 +277,14 @@ have both been migrated.
 ### gRPC Probes Graduate to Beta
 
 With Kubernetes 1.24, the [gRPC probes functionality](https://github.com/kubernetes/enhancements/issues/2727)
-has entered beta and is available by default. You can now [configure startup, liveness, and readiness probes](/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#configure-probes) for your gRPC app
+has entered beta and is available by default. You can now [configure startup, liveness, and readiness probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#configure-probes) for your gRPC app
 natively within Kubernetes, without exposing an HTTP endpoint or
 using an extra executable.
 
 ### Kubelet Credential Provider Graduates to Beta
 
 Originally released as Alpha in Kubernetes 1.20, the kubelet's support for
-[image credential providers](/docs/tasks/kubelet-credential-provider/kubelet-credential-provider/)
+[image credential providers](https://kubernetes.io/docs/tasks/kubelet-credential-provider/kubelet-credential-provider/)
 has now graduated to Beta.
 This allows the kubelet to dynamically retrieve credentials for a container image registry
 using exec plugins, rather than storing credentials on the node's filesystem.
@@ -297,7 +297,7 @@ that enables the caller of a function to control all aspects of logging (output 
 ### Avoiding Collisions in IP allocation to Services
 
 Kubernetes 1.24 introduced a new opt-in feature that allows you to
-[soft-reserve a range for static IP address assignments](/docs/concepts/services-networking/service/#service-ip-static-sub-range)
+[soft-reserve a range for static IP address assignments](https://kubernetes.io/docs/concepts/services-networking/service/#service-ip-static-sub-range)
 to Services.
 With the manual enablement of this feature, the cluster will prefer automatic assignment from
 the pool of Service IP addresses thereby reducing the risk of collision.
