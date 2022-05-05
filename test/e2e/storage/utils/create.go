@@ -115,11 +115,11 @@ func visitManifests(cb func([]byte) error, files ...string) error {
 // PatchItems has some limitations:
 // - only some common items are supported, unknown ones trigger an error
 // - only the latest stable API version for each item is supported
-func PatchItems(f *framework.Framework, driverNamspace *v1.Namespace, items ...interface{}) error {
+func PatchItems(f *framework.Framework, driverNamespace *v1.Namespace, items ...interface{}) error {
 	for _, item := range items {
 		// Uncomment when debugging the loading and patching of items.
 		// Logf("patching original content of %T:\n%s", item, PrettyPrint(item))
-		if err := patchItemRecursively(f, driverNamspace, item); err != nil {
+		if err := patchItemRecursively(f, driverNamespace, item); err != nil {
 			return err
 		}
 	}
