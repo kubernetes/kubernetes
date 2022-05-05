@@ -550,7 +550,7 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}, shutdow
 	internalStopCh := make(chan struct{})
 	var stoppedCh <-chan struct{}
 	var listenerStoppedCh <-chan struct{}
-	if s.SecureServingInfo != nil && s.Handler != nil {
+/*	if s.SecureServingInfo != nil && s.Handler != nil {
 		var err error
 		stoppedCh, listenerStoppedCh, err = s.SecureServingInfo.Serve(s.Handler, shutdownTimeout, internalStopCh)
 		if err != nil {
@@ -558,7 +558,7 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}, shutdow
 			close(auditStopCh)
 			return nil, nil, err
 		}
-	}
+	}*/
 
 	// Now that listener have bound successfully, it is the
 	// responsibility of the caller to close the provided channel to
@@ -574,11 +574,9 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}, shutdow
 	}()
 
 	s.RunPostStartHooks(stopCh)
-
 	if _, err := systemd.SdNotify(true, "READY=1\n"); err != nil {
 		klog.Errorf("Unable to send systemd daemon successful start message: %v\n", err)
 	}
-
 	return stoppedCh, listenerStoppedCh, nil
 }
 

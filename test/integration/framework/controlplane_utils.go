@@ -182,9 +182,6 @@ func startAPIServerOrDie(controlPlaneConfig *controlplane.Config, incomingServer
 
 	stopCh := make(chan struct{})
 	closeFn := func() {
-		if m != nil {
-			m.GenericAPIServer.RunPreShutdownHooks()
-		}
 		close(stopCh)
 		m.GenericAPIServer.Destroy()
 		s.Close()
@@ -262,11 +259,8 @@ func startAPIServerOrDie(controlPlaneConfig *controlplane.Config, incomingServer
 		apiServerReceiver.SetAPIServer(m)
 	}
 
-	// TODO have this start method actually use the normal start sequence for the API server
-	// this method never actually calls the `Run` method for the API server
-	// fire the post hooks ourselves
-	m.GenericAPIServer.PrepareRun()
-	m.GenericAPIServer.RunPostStartHooks(stopCh)
+	preparedServer := m.GenericAPIServer.PrepareRun()
+	go preparedServer.Run(stopCh)
 
 	cfg := *controlPlaneConfig.GenericConfig.LoopbackClientConfig
 	cfg.ContentConfig.GroupVersion = &schema.GroupVersion{}
@@ -280,7 +274,9 @@ func startAPIServerOrDie(controlPlaneConfig *controlplane.Config, incomingServer
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
+		klog.Errorf("111111")
 		result := privilegedClient.Get().AbsPath("/healthz").Do(ctx)
+		klog.Errorf("222222")
 		status := 0
 		result.StatusCode(&status)
 		if status == 200 {
