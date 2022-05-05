@@ -834,8 +834,8 @@ func TestPreemptionRaces(t *testing.T) {
 			// after preemption and while the higher priority pods is not scheduled yet.
 			name:              "ensures that other pods are not scheduled while preemptor is being marked as nominated (issue #72124)",
 			numInitialPods:    2,
-			numAdditionalPods: 50,
-			numRepetitions:    10,
+			numAdditionalPods: 20,
+			numRepetitions:    5,
 			preemptor: initPausePod(&pausePodConfig{
 				Name:      "preemptor-pod",
 				Namespace: testCtx.NS.Name,
