@@ -51,12 +51,11 @@ packages_flagged=()
 packages_url_missing=()
 exit_code=0
 
-
 git remote add licenses https://github.com/kubernetes/kubernetes >/dev/null 2>&1 || true
 
 
 # Install go-licenses
-echo -e '[INFO] Installing go-licenses...'
+echo '[INFO] Installing go-licenses...'
 pushd "${KUBE_TEMP}" >/dev/null
     git clone https://github.com/google/go-licenses.git >/dev/null 2>&1
     cd go-licenses
@@ -73,7 +72,7 @@ number_of_licenses=$(jq '.licenses | length' "${KUBE_TEMP}"/licenses.json)
 loop_index_length=$(( number_of_licenses - 1 ))
 
 
-echo -e '[INFO] Fetching current list of CNCF approved licenses...'
+echo '[INFO] Fetching current list of CNCF approved licenses...'
 for index in $(seq 0 $loop_index_length);
 do
 	licenseID=$(jq ".licenses[$index] .licenseId" "${KUBE_TEMP}"/licenses.json)
@@ -85,34 +84,61 @@ done
 
 
 # Scanning go-packages under the project & verifying against the CNCF approved list of licenses
-echo -e '[INFO] Starting license scan on go-packages...'
-go-licenses csv --git_remote "licenses" ./... >> "${KUBE_TEMP}"/licenses.csv 2>/dev/null
+echo '[INFO] Starting license scan on go-packages...'
+go-licenses csv --git_remote licenses ./... >> "${KUBE_TEMP}"/licenses.csv 2>/dev/null
 
 
 echo -e 'PACKAGE_NAME  LICENSE_NAME  LICENSE_URL\n' >> "${KUBE_TEMP}"/approved_licenses.dump
 while IFS=, read -r GO_PACKAGE LICENSE_URL LICENSE_NAME
 do
+	FORMATTED_LICENSE_URL=
 	if [[ " ${allowed_licenses[*]} " == *"${LICENSE_NAME}"* ]];
 	then
 		if [[ "${LICENSE_URL}" == 'Unknown' ]];
 		then
 			if  [[ "${GO_PACKAGE}" != k8s.io/* ]];
 			then
-				echo -e "${GO_PACKAGE}  ${LICENSE_NAME}  ${LICENSE_URL}" >> "${KUBE_TEMP}"/approved_licenses_with_missing_urls.dump
+				echo "${GO_PACKAGE}  ${LICENSE_NAME}  ${LICENSE_URL}" >> "${KUBE_TEMP}"/approved_licenses_with_missing_urls.dump
 				packages_url_missing+=("${GO_PACKAGE}")
 			else
 				LICENSE_URL='https://github.com/kubernetes/kubernetes/blob/master/LICENSE'
-				echo -e "${GO_PACKAGE}  ${LICENSE_NAME}  ${LICENSE_URL}" >> "${KUBE_TEMP}"/approved_licenses.dump
+				echo "${GO_PACKAGE}  ${LICENSE_NAME}  ${LICENSE_URL}" >> "${KUBE_TEMP}"/approved_licenses.dump
 			fi
 		elif curl -Is "${LICENSE_URL}" | head -1 | grep -q 404;
 		then
-			packages_url_missing+=("${GO_PACKAGE}")
-			echo -e "${GO_PACKAGE}  ${LICENSE_NAME}  ${LICENSE_URL}" >> "${KUBE_TEMP}"/approved_licenses_with_missing_urls.dump
+			# Check whether the License URL is incorrectly formed
+			# TODO: Remove this workaround check once PR https://github.com/google/go-licenses/pull/110 is merged
+			IFS='/' read -r -a split_license_url <<< ${LICENSE_URL}
+			for part_of_url in "${split_license_url[@]}"
+			do
+				if  [[ ${part_of_url} == '' ]]
+				then
+					continue
+				elif	[[ ${part_of_url} == 'https:' ]]
+				then
+					FORMATTED_LICENSE_URL+='https://'
+				else
+					if [[ ${part_of_url} =~ ^v[0-9]+\.[0-9]+\.[0-9]+ ]]
+					then
+						FORMATTED_LICENSE_URL+="${part_of_url}/${split_license_url[-1]}"
+						break
+					else
+						FORMATTED_LICENSE_URL+="${part_of_url}/"
+					fi
+				fi
+			done
+			if curl -Is "${FORMATTED_LICENSE_URL}" | head -1 | grep -q 404;
+			then
+				packages_url_missing+=("${GO_PACKAGE}")
+				echo "${GO_PACKAGE}  ${LICENSE_NAME}  ${LICENSE_URL}" >> "${KUBE_TEMP}"/approved_licenses_with_missing_urls.dump
+			else
+				echo "${GO_PACKAGE}  ${LICENSE_NAME}  ${FORMATTED_LICENSE_URL}" >> "${KUBE_TEMP}"/approved_licenses.dump
+			fi
 		else
-			echo -e "${GO_PACKAGE}  ${LICENSE_NAME}  ${LICENSE_URL}" >> "${KUBE_TEMP}"/approved_licenses.dump
+			echo "${GO_PACKAGE}  ${LICENSE_NAME}  ${LICENSE_URL}" >> "${KUBE_TEMP}"/approved_licenses.dump
 		fi
 	else
-		echo -e "${GO_PACKAGE}  ${LICENSE_NAME}  ${LICENSE_URL}" >> "${KUBE_TEMP}"notapproved_licenses.dump
+		echo "${GO_PACKAGE}  ${LICENSE_NAME}  ${LICENSE_URL}" >> "${KUBE_TEMP}"notapproved_licenses.dump
 		packages_flagged+=("${GO_PACKAGE}")
 	fi
 done < "${KUBE_TEMP}"/licenses.csv
@@ -135,9 +161,9 @@ if [[ ${#packages_flagged[@]} -gt 0 ]]; then
 	awk '{ printf "%-100s :  %-20s : %s\n", $1, $2, $3 }' "${KUBE_TEMP}"/notapproved_licenses.dump
 	exit_code=1
 elif [[ "${exit_code}" -eq 1 ]]; then
-	kube::log::status "[ERROR] Project is using go-packages with unknown or unreachable license URLs. Please refer to the CNCF's approved licence list for further information: https://github.com/cncf/foundation/blob/main/allowed-third-party-license-policy.md "
+	kube::log::status "[ERROR] Project is using go-packages with unknown or unreachable license URLs. Please refer to the CNCF's approved licence list for further information: https://github.com/cncf/foundation/blob/main/allowed-third-party-license-policy.md"
 else
 	kube::log::status "[SUCCESS] Scan complete! All go-packages under the project are using current CNCF approved licenses!"
 fi
 
-exit ${exit_code}
+exit "${exit_code}"
