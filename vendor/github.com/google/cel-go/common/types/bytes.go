@@ -53,7 +53,7 @@ func (b Bytes) Add(other ref.Val) ref.Val {
 	return append(b, otherBytes...)
 }
 
-// Compare implments traits.Comparer interface method by lexicographic ordering.
+// Compare implements traits.Comparer interface method by lexicographic ordering.
 func (b Bytes) Compare(other ref.Val) ref.Val {
 	otherBytes, ok := other.(Bytes)
 	if !ok {
