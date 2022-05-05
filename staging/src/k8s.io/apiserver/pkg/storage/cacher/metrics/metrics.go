@@ -23,6 +23,11 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 )
 
+const (
+	namespace = "apiserver"
+	subsystem = "watch_cache"
+)
+
 /*
  * By default, all the following metrics are defined as falling under
  * ALPHA stability level https://github.com/kubernetes/enhancements/blob/master/keps/sig-instrumentation/1209-metrics-stability/kubernetes-control-plane-metrics-stability.md#stability-classes)
@@ -34,7 +39,8 @@ import (
 var (
 	listCacheCount = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
-			Name:           "apiserver_cache_list_total",
+			Namespace:      namespace,
+			Name:           "cache_list_total",
 			Help:           "Number of LIST requests served from watch cache",
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
@@ -42,7 +48,8 @@ var (
 	)
 	listCacheNumFetched = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
-			Name:           "apiserver_cache_list_fetched_objects_total",
+			Namespace:      namespace,
+			Name:           "cache_list_fetched_objects_total",
 			Help:           "Number of objects read from watch cache in the course of serving a LIST request",
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
@@ -50,11 +57,83 @@ var (
 	)
 	listCacheNumReturned = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
-			Name:           "apiserver_cache_list_returned_objects_total",
+			Namespace:      namespace,
+			Name:           "cache_list_returned_objects_total",
 			Help:           "Number of objects returned for a LIST request from watch cache",
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
 		[]string{"resource_prefix"},
+	)
+	InitCounter = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Namespace:      namespace,
+			Name:           "init_events_total",
+			Help:           "Counter of init events processed in watch cache broken by resource type.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"resource"},
+	)
+
+	EventsCounter = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "events_dispatched_total",
+			Help:           "Counter of events dispatched in watch cache broken by resource type.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"resource"},
+	)
+
+	TerminatedWatchersCounter = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Namespace:      namespace,
+			Name:           "terminated_watchers_total",
+			Help:           "Counter of watchers closed due to unresponsiveness broken by resource type.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"resource"},
+	)
+
+	watchCacheCapacityIncreaseTotal = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Subsystem:      subsystem,
+			Name:           "capacity_increase_total",
+			Help:           "Total number of watch cache capacity increase events broken by resource type.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"resource"},
+	)
+
+	watchCacheCapacityDecreaseTotal = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Subsystem:      subsystem,
+			Name:           "capacity_decrease_total",
+			Help:           "Total number of watch cache capacity decrease events broken by resource type.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"resource"},
+	)
+
+	WatchCacheCapacity = compbasemetrics.NewGaugeVec(
+		&compbasemetrics.GaugeOpts{
+			Subsystem:      subsystem,
+			Name:           "capacity",
+			Help:           "Total capacity of watch cache broken by resource type.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"resource"},
+	)
+
+	WatchCacheInitializations = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "initializations_total",
+			Help:           "Counter of watch cache initializations broken by resource type.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"resource"},
 	)
 )
 
@@ -67,6 +146,13 @@ func Register() {
 		legacyregistry.MustRegister(listCacheCount)
 		legacyregistry.MustRegister(listCacheNumFetched)
 		legacyregistry.MustRegister(listCacheNumReturned)
+		legacyregistry.MustRegister(InitCounter)
+		legacyregistry.MustRegister(EventsCounter)
+		legacyregistry.MustRegister(TerminatedWatchersCounter)
+		legacyregistry.MustRegister(watchCacheCapacityIncreaseTotal)
+		legacyregistry.MustRegister(watchCacheCapacityDecreaseTotal)
+		legacyregistry.MustRegister(WatchCacheCapacity)
+		legacyregistry.MustRegister(WatchCacheInitializations)
 	})
 }
 
@@ -75,4 +161,14 @@ func RecordListCacheMetrics(resourcePrefix, indexName string, numFetched, numRet
 	listCacheCount.WithLabelValues(resourcePrefix, indexName).Inc()
 	listCacheNumFetched.WithLabelValues(resourcePrefix, indexName).Add(float64(numFetched))
 	listCacheNumReturned.WithLabelValues(resourcePrefix).Add(float64(numReturned))
+}
+
+// RecordsWatchCacheCapacityChange record watchCache capacity resize(increase or decrease) operations.
+func RecordsWatchCacheCapacityChange(objType string, old, new int) {
+	WatchCacheCapacity.WithLabelValues(objType).Set(float64(new))
+	if old < new {
+		WatchCacheCapacity.WithLabelValues(objType).Inc()
+		return
+	}
+	watchCacheCapacityDecreaseTotal.WithLabelValues(objType).Inc()
 }
