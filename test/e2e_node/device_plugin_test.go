@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	kubeletdevicepluginv1beta1 "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -97,8 +96,6 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 		var devicePluginPod, dptemplate *v1.Pod
 
 		ginkgo.BeforeEach(func() {
-			e2eskipper.Skipf("Device Plugin tests are currently broken and being investigated")
-
 			ginkgo.By("Wait for node to be ready")
 			gomega.Eventually(func() bool {
 				nodes, err := e2enode.TotalReady(f.ClientSet)
