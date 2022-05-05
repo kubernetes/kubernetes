@@ -30,8 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/policy"
-	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
-	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
 	"k8s.io/utils/pointer"
 )
 
@@ -373,15 +371,15 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 
 	invalidSeccompDefault := validPSP()
 	invalidSeccompDefault.Annotations = map[string]string{
-		seccomp.DefaultProfileAnnotationKey: "not-good",
+		seccompDefaultProfileAnnotationKey: "not-good",
 	}
 	invalidSeccompAllowAnyDefault := validPSP()
 	invalidSeccompAllowAnyDefault.Annotations = map[string]string{
-		seccomp.DefaultProfileAnnotationKey: "*",
+		seccompDefaultProfileAnnotationKey: "*",
 	}
 	invalidSeccompAllowed := validPSP()
 	invalidSeccompAllowed.Annotations = map[string]string{
-		seccomp.AllowedProfilesAnnotationKey: api.SeccompProfileRuntimeDefault + ",not-good",
+		seccompAllowedProfilesAnnotationKey: api.SeccompProfileRuntimeDefault + ",not-good",
 	}
 
 	invalidAllowedHostPathMissingPath := validPSP()
@@ -660,8 +658,8 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 
 	validSeccomp := validPSP()
 	validSeccomp.Annotations = map[string]string{
-		seccomp.DefaultProfileAnnotationKey:  api.SeccompProfileRuntimeDefault,
-		seccomp.AllowedProfilesAnnotationKey: api.SeccompProfileRuntimeDefault + ",unconfined,localhost/foo,*",
+		seccompDefaultProfileAnnotationKey:  api.SeccompProfileRuntimeDefault,
+		seccompAllowedProfilesAnnotationKey: api.SeccompProfileRuntimeDefault + ",unconfined,localhost/foo,*",
 	}
 
 	validDefaultAllowPrivilegeEscalation := validPSP()
@@ -779,7 +777,7 @@ func TestValidatePSPVolumes(t *testing.T) {
 		}
 	}
 
-	volumes := psputil.GetAllFSTypesAsSet()
+	volumes := getAllFSTypesAsSet()
 	// add in the * value since that is a pseudo type that is not included by default
 	volumes.Insert(string(policy.All))
 
