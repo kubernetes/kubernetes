@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package etcd3
+package testing
 
 import (
 	"context"
@@ -50,12 +50,12 @@ func RunTestCreateWithTTL(ctx context.Context, t *testing.T, store storage.Inter
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
-	testCheckEventType(t, watch.Deleted, w)
+	TestCheckEventType(t, watch.Deleted, w)
 }
 
 func RunTestCreateWithKeyExist(ctx context.Context, t *testing.T, store storage.Interface) {
 	obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
-	key, _ := testPropogateStore(ctx, t, store, obj)
+	key, _ := TestPropogateStore(ctx, t, store, obj)
 	out := &example.Pod{}
 	err := store.Create(ctx, key, obj, out, 0)
 	if err == nil || !storage.IsExist(err) {
@@ -65,7 +65,7 @@ func RunTestCreateWithKeyExist(ctx context.Context, t *testing.T, store storage.
 
 func RunTestGet(ctx context.Context, t *testing.T, store storage.Interface) {
 	// create an object to test
-	key, createdObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+	key, createdObj := TestPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 	// update the object once to allow get by exact resource version to be tested
 	updateObj := createdObj.DeepCopy()
 	updateObj.Annotations = map[string]string{"test-annotation": "1"}
@@ -159,13 +159,13 @@ func RunTestGet(ctx context.Context, t *testing.T, store storage.Interface) {
 			if err != nil {
 				t.Fatalf("Get failed: %v", err)
 			}
-			expectNoDiff(t, fmt.Sprintf("%s: incorrect pod", tt.name), tt.expectedOut, out)
+			ExpectNoDiff(t, fmt.Sprintf("%s: incorrect pod", tt.name), tt.expectedOut, out)
 		})
 	}
 }
 
 func RunTestUnconditionalDelete(ctx context.Context, t *testing.T, store storage.Interface) {
-	key, storedObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+	key, storedObj := TestPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 
 	tests := []struct {
 		name              string
@@ -197,13 +197,13 @@ func RunTestUnconditionalDelete(ctx context.Context, t *testing.T, store storage
 			if err != nil {
 				t.Fatalf("%s: Delete failed: %v", tt.name, err)
 			}
-			expectNoDiff(t, fmt.Sprintf("%s: incorrect pod:", tt.name), tt.expectedObj, out)
+			ExpectNoDiff(t, fmt.Sprintf("%s: incorrect pod:", tt.name), tt.expectedObj, out)
 		})
 	}
 }
 
 func RunTestConditionalDelete(ctx context.Context, t *testing.T, store storage.Interface) {
-	key, storedObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: "A"}})
+	key, storedObj := TestPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: "A"}})
 
 	tests := []struct {
 		name                string
@@ -232,8 +232,8 @@ func RunTestConditionalDelete(ctx context.Context, t *testing.T, store storage.I
 			if err != nil {
 				t.Fatalf("%s: Delete failed: %v", tt.name, err)
 			}
-			expectNoDiff(t, fmt.Sprintf("%s: incorrect pod", tt.name), storedObj, out)
-			key, storedObj = testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: "A"}})
+			ExpectNoDiff(t, fmt.Sprintf("%s: incorrect pod", tt.name), storedObj, out)
+			key, storedObj = TestPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: "A"}})
 		})
 	}
 }
@@ -265,7 +265,7 @@ func RunTestConditionalDelete(ctx context.Context, t *testing.T, store storage.I
 
 func RunTestDeleteWithSuggestion(ctx context.Context, t *testing.T, store storage.Interface) {
 
-	key, originalPod := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "name"}})
+	key, originalPod := TestPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "name"}})
 
 	out := &example.Pod{}
 	if err := store.Delete(ctx, key, out, nil, storage.ValidateAllObjectFunc, originalPod); err != nil {
@@ -279,7 +279,7 @@ func RunTestDeleteWithSuggestion(ctx context.Context, t *testing.T, store storag
 
 func RunTestDeleteWithSuggestionAndConflict(ctx context.Context, t *testing.T, store storage.Interface) {
 
-	key, originalPod := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "name"}})
+	key, originalPod := TestPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "name"}})
 
 	// First update, so originalPod is outdated.
 	updatedPod := &example.Pod{}
@@ -304,7 +304,7 @@ func RunTestDeleteWithSuggestionAndConflict(ctx context.Context, t *testing.T, s
 
 func RunTestDeleteWithSuggestionOfDeletedObject(ctx context.Context, t *testing.T, store storage.Interface) {
 
-	key, originalPod := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "name"}})
+	key, originalPod := TestPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "name"}})
 
 	// First delete, so originalPod is outdated.
 	deletedPod := &example.Pod{}
@@ -321,7 +321,7 @@ func RunTestDeleteWithSuggestionOfDeletedObject(ctx context.Context, t *testing.
 
 func RunTestValidateDeletionWithSuggestion(ctx context.Context, t *testing.T, store storage.Interface) {
 
-	key, originalPod := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "name"}})
+	key, originalPod := TestPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "name"}})
 
 	// Check that validaing fresh object fails is called once and fails.
 	validationCalls := 0
@@ -374,7 +374,7 @@ func RunTestValidateDeletionWithSuggestion(ctx context.Context, t *testing.T, st
 
 func RunTestPreconditionalDeleteWithSuggestion(ctx context.Context, t *testing.T, store storage.Interface) {
 
-	key, originalPod := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "name"}})
+	key, originalPod := TestPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "name"}})
 
 	// First update, so originalPod is outdated.
 	updatedPod := &example.Pod{}
@@ -400,11 +400,11 @@ func RunTestPreconditionalDeleteWithSuggestion(ctx context.Context, t *testing.T
 }
 
 func RunTestGetListNonRecursive(ctx context.Context, t *testing.T, store storage.Interface) {
-	prevKey, prevStoredObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "prev"}})
+	prevKey, prevStoredObj := TestPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "prev"}})
 
 	prevRV, _ := strconv.Atoi(prevStoredObj.ResourceVersion)
 
-	key, storedObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+	key, storedObj := TestPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 
 	currentRV, _ := strconv.Atoi(storedObj.ResourceVersion)
 
@@ -524,7 +524,7 @@ func RunTestGetListNonRecursive(ctx context.Context, t *testing.T, store storage
 			}
 			for j, wantPod := range tt.expectedOut {
 				getPod := &out.Items[j]
-				expectNoDiff(t, fmt.Sprintf("%s: incorrect pod", tt.name), wantPod, getPod)
+				ExpectNoDiff(t, fmt.Sprintf("%s: incorrect pod", tt.name), wantPod, getPod)
 			}
 		})
 	}
@@ -549,11 +549,11 @@ func RunTestGuaranteedUpdateWithTTL(ctx context.Context, t *testing.T, store sto
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
-	testCheckEventType(t, watch.Deleted, w)
+	TestCheckEventType(t, watch.Deleted, w)
 }
 
 func RunTestGuaranteedUpdateWithConflict(ctx context.Context, t *testing.T, store storage.Interface) {
-	key, _ := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+	key, _ := TestPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 
 	errChan := make(chan error, 1)
 	var firstToFinish sync.WaitGroup
@@ -598,7 +598,7 @@ func RunTestGuaranteedUpdateWithConflict(ctx context.Context, t *testing.T, stor
 }
 
 func RunTestGuaranteedUpdateWithSuggestionAndConflict(ctx context.Context, t *testing.T, store storage.Interface) {
-	key, originalPod := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+	key, originalPod := TestPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 
 	// First, update without a suggestion so originalPod is outdated
 	updatedPod := &example.Pod{}
@@ -672,16 +672,16 @@ func RunTestGuaranteedUpdateWithSuggestionAndConflict(ctx context.Context, t *te
 	}
 }
 
-// testPropogateStore helps propagates store with objects, automates key generation, and returns
+// TestPropogateStore helps propagates store with objects, automates key generation, and returns
 // keys and stored objects.
-func testPropogateStore(ctx context.Context, t *testing.T, store storage.Interface, obj *example.Pod) (string, *example.Pod) {
+func TestPropogateStore(ctx context.Context, t *testing.T, store storage.Interface, obj *example.Pod) (string, *example.Pod) {
 	// Setup store with a key and grab the output for returning.
 	key := "/testkey"
-	return key, testPropogateStoreWithKey(ctx, t, store, key, obj)
+	return key, TestPropogateStoreWithKey(ctx, t, store, key, obj)
 }
 
-// testPropogateStoreWithKey helps propagate store with objects, the given object will be stored at the specified key.
-func testPropogateStoreWithKey(ctx context.Context, t *testing.T, store storage.Interface, key string, obj *example.Pod) *example.Pod {
+// TestPropogateStoreWithKey helps propagate store with objects, the given object will be stored at the specified key.
+func TestPropogateStoreWithKey(ctx context.Context, t *testing.T, store storage.Interface, key string, obj *example.Pod) *example.Pod {
 	// Setup store with the specified key and grab the output for returning.
 	err := store.Delete(ctx, key, &example.Pod{}, nil, storage.ValidateAllObjectFunc, nil)
 	if err != nil && !storage.IsNotFound(err) {
@@ -707,7 +707,7 @@ func RunTestCount(ctx context.Context, t *testing.T, store storage.Interface) {
 		obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("foo-%d", i)}}
 
 		key := fmt.Sprintf("%s/%d", resourceA, i)
-		testPropogateStoreWithKey(ctx, t, store, key, obj)
+		TestPropogateStoreWithKey(ctx, t, store, key, obj)
 	}
 
 	resourceBCount := 4
@@ -715,7 +715,7 @@ func RunTestCount(ctx context.Context, t *testing.T, store storage.Interface) {
 		obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("foo-%d", i)}}
 
 		key := fmt.Sprintf("%s/%d", resourceB, i)
-		testPropogateStoreWithKey(ctx, t, store, key, obj)
+		TestPropogateStoreWithKey(ctx, t, store, key, obj)
 	}
 
 	resourceACountGot, err := store.Count(resourceA)
@@ -730,7 +730,7 @@ func RunTestCount(ctx context.Context, t *testing.T, store storage.Interface) {
 	}
 }
 
-func expectNoDiff(t *testing.T, msg string, expected, got interface{}) {
+func ExpectNoDiff(t *testing.T, msg string, expected, got interface{}) {
 	t.Helper()
 	if !reflect.DeepEqual(expected, got) {
 		if diff := cmp.Diff(expected, got); diff != "" {

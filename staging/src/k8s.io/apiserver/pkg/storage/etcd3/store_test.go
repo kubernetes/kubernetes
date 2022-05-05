@@ -164,27 +164,27 @@ func checkStorageInvariants(ctx context.Context, t *testing.T, etcdClient *clien
 
 func TestCreateWithTTL(t *testing.T) {
 	ctx, store, _ := testSetup(t)
-	RunTestCreateWithTTL(ctx, t, store)
+	storagetesting.RunTestCreateWithTTL(ctx, t, store)
 }
 
 func TestCreateWithKeyExist(t *testing.T) {
 	ctx, store, _ := testSetup(t)
-	RunTestCreateWithKeyExist(ctx, t, store)
+	storagetesting.RunTestCreateWithKeyExist(ctx, t, store)
 }
 
 func TestGet(t *testing.T) {
 	ctx, store, _ := testSetup(t)
-	RunTestGet(ctx, t, store)
+	storagetesting.RunTestGet(ctx, t, store)
 }
 
 func TestUnconditionalDelete(t *testing.T) {
 	ctx, store, _ := testSetup(t)
-	RunTestUnconditionalDelete(ctx, t, store)
+	storagetesting.RunTestUnconditionalDelete(ctx, t, store)
 }
 
 func TestConditionalDelete(t *testing.T) {
 	ctx, store, _ := testSetup(t)
-	RunTestConditionalDelete(ctx, t, store)
+	storagetesting.RunTestConditionalDelete(ctx, t, store)
 }
 
 // The following set of Delete tests are testing the logic of adding `suggestion`
@@ -214,32 +214,32 @@ func TestConditionalDelete(t *testing.T) {
 
 func TestDeleteWithSuggestion(t *testing.T) {
 	ctx, store, _ := testSetup(t)
-	RunTestDeleteWithSuggestion(ctx, t, store)
+	storagetesting.RunTestDeleteWithSuggestion(ctx, t, store)
 }
 
 func TestDeleteWithSuggestionAndConflict(t *testing.T) {
 	ctx, store, _ := testSetup(t)
-	RunTestDeleteWithSuggestionAndConflict(ctx, t, store)
+	storagetesting.RunTestDeleteWithSuggestionAndConflict(ctx, t, store)
 }
 
 func TestDeleteWithSuggestionOfDeletedObject(t *testing.T) {
 	ctx, store, _ := testSetup(t)
-	RunTestDeleteWithSuggestionOfDeletedObject(ctx, t, store)
+	storagetesting.RunTestDeleteWithSuggestionOfDeletedObject(ctx, t, store)
 }
 
 func TestValidateDeletionWithSuggestion(t *testing.T) {
 	ctx, store, _ := testSetup(t)
-	RunTestValidateDeletionWithSuggestion(ctx, t, store)
+	storagetesting.RunTestValidateDeletionWithSuggestion(ctx, t, store)
 }
 
 func TestPreconditionalDeleteWithSuggestion(t *testing.T) {
 	ctx, store, _ := testSetup(t)
-	RunTestPreconditionalDeleteWithSuggestion(ctx, t, store)
+	storagetesting.RunTestPreconditionalDeleteWithSuggestion(ctx, t, store)
 }
 
 func TestGetListNonRecursive(t *testing.T) {
 	ctx, store, _ := testSetup(t)
-	RunTestGetListNonRecursive(ctx, t, store)
+	storagetesting.RunTestGetListNonRecursive(ctx, t, store)
 }
 
 func TestGuaranteedUpdate(t *testing.T) {
@@ -326,7 +326,7 @@ func TestGuaranteedUpdate(t *testing.T) {
 
 	for i, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			key, storeObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: "A"}})
+			key, storeObj := storagetesting.TestPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: "A"}})
 
 			out := &example.Pod{}
 			name := fmt.Sprintf("foo-%d", i)
@@ -397,7 +397,7 @@ func TestGuaranteedUpdate(t *testing.T) {
 
 func TestGuaranteedUpdateWithTTL(t *testing.T) {
 	ctx, store, _ := testSetup(t)
-	RunTestGuaranteedUpdateWithTTL(ctx, t, store)
+	storagetesting.RunTestGuaranteedUpdateWithTTL(ctx, t, store)
 }
 
 func TestGuaranteedUpdateChecksStoredData(t *testing.T) {
@@ -465,12 +465,12 @@ func TestGuaranteedUpdateChecksStoredData(t *testing.T) {
 
 func TestGuaranteedUpdateWithConflict(t *testing.T) {
 	ctx, store, _ := testSetup(t)
-	RunTestGuaranteedUpdateWithConflict(ctx, t, store)
+	storagetesting.RunTestGuaranteedUpdateWithConflict(ctx, t, store)
 }
 
 func TestGuaranteedUpdateWithSuggestionAndConflict(t *testing.T) {
 	ctx, store, _ := testSetup(t)
-	RunTestGuaranteedUpdateWithSuggestionAndConflict(ctx, t, store)
+	storagetesting.RunTestGuaranteedUpdateWithSuggestionAndConflict(ctx, t, store)
 }
 
 func TestTransformationFailure(t *testing.T) {
@@ -1060,7 +1060,7 @@ func TestList(t *testing.T) {
 			}
 			for j, wantPod := range tt.expectedOut {
 				getPod := &out.Items[j]
-				expectNoDiff(t, fmt.Sprintf("%s: incorrect pod", tt.name), wantPod, getPod)
+				storagetesting.ExpectNoDiff(t, fmt.Sprintf("%s: incorrect pod", tt.name), wantPod, getPod)
 			}
 		})
 	}
@@ -1136,7 +1136,7 @@ func TestListContinuation(t *testing.T) {
 	if len(out.Continue) == 0 {
 		t.Fatalf("No continuation token set")
 	}
-	expectNoDiff(t, "incorrect first page", []example.Pod{*preset[0].storedObj}, out.Items)
+	storagetesting.ExpectNoDiff(t, "incorrect first page", []example.Pod{*preset[0].storedObj}, out.Items)
 	if transformer.reads != 1 {
 		t.Errorf("unexpected reads: %d", transformer.reads)
 	}
@@ -1163,7 +1163,7 @@ func TestListContinuation(t *testing.T) {
 	}
 	key, rv, err := decodeContinue(continueFromSecondItem, "/")
 	t.Logf("continue token was %d %s %v", rv, key, err)
-	expectNoDiff(t, "incorrect second page", []example.Pod{*preset[1].storedObj, *preset[2].storedObj}, out.Items)
+	storagetesting.ExpectNoDiff(t, "incorrect second page", []example.Pod{*preset[1].storedObj, *preset[2].storedObj}, out.Items)
 	if transformer.reads != 2 {
 		t.Errorf("unexpected reads: %d", transformer.reads)
 	}
@@ -1186,7 +1186,7 @@ func TestListContinuation(t *testing.T) {
 	if len(out.Continue) == 0 {
 		t.Fatalf("No continuation token set")
 	}
-	expectNoDiff(t, "incorrect second page", []example.Pod{*preset[1].storedObj}, out.Items)
+	storagetesting.ExpectNoDiff(t, "incorrect second page", []example.Pod{*preset[1].storedObj}, out.Items)
 	if transformer.reads != 1 {
 		t.Errorf("unexpected reads: %d", transformer.reads)
 	}
@@ -1210,7 +1210,7 @@ func TestListContinuation(t *testing.T) {
 	if len(out.Continue) != 0 {
 		t.Fatalf("Unexpected continuation token set")
 	}
-	expectNoDiff(t, "incorrect third page", []example.Pod{*preset[2].storedObj}, out.Items)
+	storagetesting.ExpectNoDiff(t, "incorrect third page", []example.Pod{*preset[2].storedObj}, out.Items)
 	if transformer.reads != 1 {
 		t.Errorf("unexpected reads: %d", transformer.reads)
 	}
@@ -1358,7 +1358,7 @@ func TestListContinuationWithFilter(t *testing.T) {
 	if len(out.Continue) == 0 {
 		t.Errorf("No continuation token set")
 	}
-	expectNoDiff(t, "incorrect first page", []example.Pod{*preset[0].storedObj, *preset[2].storedObj}, out.Items)
+	storagetesting.ExpectNoDiff(t, "incorrect first page", []example.Pod{*preset[0].storedObj, *preset[2].storedObj}, out.Items)
 	if transformer.reads != 3 {
 		t.Errorf("unexpected reads: %d", transformer.reads)
 	}
@@ -1390,7 +1390,7 @@ func TestListContinuationWithFilter(t *testing.T) {
 	if len(out.Continue) != 0 {
 		t.Errorf("Unexpected continuation token set")
 	}
-	expectNoDiff(t, "incorrect second page", []example.Pod{*preset[3].storedObj}, out.Items)
+	storagetesting.ExpectNoDiff(t, "incorrect second page", []example.Pod{*preset[3].storedObj}, out.Items)
 	if transformer.reads != 1 {
 		t.Errorf("unexpected reads: %d", transformer.reads)
 	}
@@ -1468,7 +1468,7 @@ func TestListInconsistentContinuation(t *testing.T) {
 	if len(out.Continue) == 0 {
 		t.Fatalf("No continuation token set")
 	}
-	expectNoDiff(t, "incorrect first page", []example.Pod{*preset[0].storedObj}, out.Items)
+	storagetesting.ExpectNoDiff(t, "incorrect first page", []example.Pod{*preset[0].storedObj}, out.Items)
 
 	continueFromSecondItem := out.Continue
 
@@ -1535,7 +1535,7 @@ func TestListInconsistentContinuation(t *testing.T) {
 		t.Fatalf("No continuation token set")
 	}
 	validateResourceVersion := resourceVersionNotOlderThan(lastRVString)
-	expectNoDiff(t, "incorrect second page", []example.Pod{*preset[1].storedObj}, out.Items)
+	storagetesting.ExpectNoDiff(t, "incorrect second page", []example.Pod{*preset[1].storedObj}, out.Items)
 	if err := validateResourceVersion(out.ResourceVersion); err != nil {
 		t.Fatal(err)
 	}
@@ -1553,7 +1553,7 @@ func TestListInconsistentContinuation(t *testing.T) {
 	if len(out.Continue) != 0 {
 		t.Fatalf("Unexpected continuation token set")
 	}
-	expectNoDiff(t, "incorrect third page", []example.Pod{*preset[2].storedObj}, out.Items)
+	storagetesting.ExpectNoDiff(t, "incorrect third page", []example.Pod{*preset[2].storedObj}, out.Items)
 	if out.ResourceVersion != resolvedResourceVersionFromThirdItem {
 		t.Fatalf("Expected list resource version to be %s, got %s", resolvedResourceVersionFromThirdItem, out.ResourceVersion)
 	}
@@ -1880,7 +1880,7 @@ func TestConsistentList(t *testing.T) {
 		t.Fatalf("failed to list objects: %v", err)
 	}
 
-	expectNoDiff(t, "incorrect lists", result1, result2)
+	storagetesting.ExpectNoDiff(t, "incorrect lists", result1, result2)
 
 	// Now also verify the  ResourceVersionMatchNotOlderThan.
 	options.ResourceVersionMatch = metav1.ResourceVersionMatchNotOlderThan
@@ -1898,12 +1898,12 @@ func TestConsistentList(t *testing.T) {
 		t.Fatalf("failed to list objects: %v", err)
 	}
 
-	expectNoDiff(t, "incorrect lists", result3, result4)
+	storagetesting.ExpectNoDiff(t, "incorrect lists", result3, result4)
 }
 
 func TestCount(t *testing.T) {
 	ctx, store, _ := testSetup(t)
-	RunTestCount(ctx, t, store)
+	storagetesting.RunTestCount(ctx, t, store)
 }
 
 func TestLeaseMaxObjectCount(t *testing.T) {
