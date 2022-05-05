@@ -5838,7 +5838,7 @@ func TestNoEndpointsMetric(t *testing.T) {
 		expectedSyncProxyRulesNoLocalEndpointsTotalExternal int
 	}{
 		{
-			name:                  "internalTrafficPolicy is set and there is non-zero local endpoints",
+			name:                  "internalTrafficPolicy is set and there are local endpoints",
 			internalTrafficPolicy: &internalTrafficPolicyLocal,
 			endpoints: []endpoint{
 				{"10.0.1.1", testHostname},
@@ -5847,7 +5847,7 @@ func TestNoEndpointsMetric(t *testing.T) {
 			},
 		},
 		{
-			name:                  "externalTrafficPolicy is set and there is non-zero local endpoints",
+			name:                  "externalTrafficPolicy is set and there are local endpoints",
 			externalTrafficPolicy: externalTrafficPolicyLocal,
 			endpoints: []endpoint{
 				{"10.0.1.1", testHostname},
@@ -5856,7 +5856,7 @@ func TestNoEndpointsMetric(t *testing.T) {
 			},
 		},
 		{
-			name:                  "both policies are set and there is non-zero local endpoints",
+			name:                  "both policies are set and there are local endpoints",
 			internalTrafficPolicy: &internalTrafficPolicyLocal,
 			externalTrafficPolicy: externalTrafficPolicyLocal,
 			endpoints: []endpoint{
@@ -5866,7 +5866,7 @@ func TestNoEndpointsMetric(t *testing.T) {
 			},
 		},
 		{
-			name:                  "internalTrafficPolicy is set and there is zero local endpoint",
+			name:                  "internalTrafficPolicy is set and there are no local endpoints",
 			internalTrafficPolicy: &internalTrafficPolicyLocal,
 			endpoints: []endpoint{
 				{"10.0.1.1", "host0"},
@@ -5876,7 +5876,7 @@ func TestNoEndpointsMetric(t *testing.T) {
 			expectedSyncProxyRulesNoLocalEndpointsTotalInternal: 1,
 		},
 		{
-			name:                  "externalTrafficPolicy is set and there is zero local endpoint",
+			name:                  "externalTrafficPolicy is set and there are no local endpoints",
 			externalTrafficPolicy: externalTrafficPolicyLocal,
 			endpoints: []endpoint{
 				{"10.0.1.1", "host0"},
@@ -5886,7 +5886,7 @@ func TestNoEndpointsMetric(t *testing.T) {
 			expectedSyncProxyRulesNoLocalEndpointsTotalExternal: 1,
 		},
 		{
-			name:                  "Both policies are set and there is zero local endpoint",
+			name:                  "Both policies are set and there are no local endpoints",
 			internalTrafficPolicy: &internalTrafficPolicyLocal,
 			externalTrafficPolicy: externalTrafficPolicyLocal,
 			endpoints: []endpoint{
@@ -5896,6 +5896,14 @@ func TestNoEndpointsMetric(t *testing.T) {
 			},
 			expectedSyncProxyRulesNoLocalEndpointsTotalInternal: 1,
 			expectedSyncProxyRulesNoLocalEndpointsTotalExternal: 1,
+		},
+		{
+			name:                  "Both policies are set and there are no endpoints at all",
+			internalTrafficPolicy: &internalTrafficPolicyLocal,
+			externalTrafficPolicy: externalTrafficPolicyLocal,
+			endpoints:             []endpoint{},
+			expectedSyncProxyRulesNoLocalEndpointsTotalInternal: 0,
+			expectedSyncProxyRulesNoLocalEndpointsTotalExternal: 0,
 		},
 	}
 	for _, tc := range testCases {
