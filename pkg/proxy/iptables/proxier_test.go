@@ -2370,7 +2370,8 @@ func TestLoadBalancer(t *testing.T) {
 	svcIP := "172.30.0.41"
 	svcPort := 80
 	svcNodePort := 3001
-	svcLBIP := "1.2.3.4"
+	svcLBIP1 := "1.2.3.4"
+	svcLBIP2 := "5.6.7.8"
 	svcPortName := proxy.ServicePortName{
 		NamespacedName: makeNSN("ns1", "svc1"),
 		Port:           "p80",
@@ -2387,9 +2388,10 @@ func TestLoadBalancer(t *testing.T) {
 				Protocol: v1.ProtocolTCP,
 				NodePort: int32(svcNodePort),
 			}}
-			svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{
-				IP: svcLBIP,
-			}}
+			svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{
+				{IP: svcLBIP1},
+				{IP: svcLBIP2},
+			}
 			svc.Spec.LoadBalancerSourceRanges = []string{
 				"192.168.0.0/24",
 
@@ -2439,12 +2441,17 @@ func TestLoadBalancer(t *testing.T) {
 		-A KUBE-NODEPORTS -m comment --comment ns1/svc1:p80 -m tcp -p tcp --dport 3001 -j KUBE-EXT-XPGD46QRK7WJZT7O
 		-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
 		-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 loadbalancer IP" -m tcp -p tcp -d 1.2.3.4 --dport 80 -j KUBE-FW-XPGD46QRK7WJZT7O
+		-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 loadbalancer IP" -m tcp -p tcp -d 5.6.7.8 --dport 80 -j KUBE-FW-XPGD46QRK7WJZT7O
 		-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
 		-A KUBE-EXT-XPGD46QRK7WJZT7O -m comment --comment "masquerade traffic for ns1/svc1:p80 external destinations" -j KUBE-MARK-MASQ
 		-A KUBE-EXT-XPGD46QRK7WJZT7O -j KUBE-SVC-XPGD46QRK7WJZT7O
 		-A KUBE-FW-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 loadbalancer IP" -s 192.168.0.0/24 -j KUBE-EXT-XPGD46QRK7WJZT7O
 		-A KUBE-FW-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 loadbalancer IP" -s 203.0.113.0/25 -j KUBE-EXT-XPGD46QRK7WJZT7O
 		-A KUBE-FW-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 loadbalancer IP" -s 1.2.3.4 -j KUBE-EXT-XPGD46QRK7WJZT7O
+		-A KUBE-FW-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 loadbalancer IP" -j KUBE-MARK-DROP
+		-A KUBE-FW-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 loadbalancer IP" -s 192.168.0.0/24 -j KUBE-EXT-XPGD46QRK7WJZT7O
+		-A KUBE-FW-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 loadbalancer IP" -s 203.0.113.0/25 -j KUBE-EXT-XPGD46QRK7WJZT7O
+		-A KUBE-FW-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 loadbalancer IP" -s 5.6.7.8 -j KUBE-EXT-XPGD46QRK7WJZT7O
 		-A KUBE-FW-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 loadbalancer IP" -j KUBE-MARK-DROP
 		-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
 		-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
@@ -2485,31 +2492,61 @@ func TestLoadBalancer(t *testing.T) {
 			masq:     true,
 		},
 		{
-			name:     "accepted external to LB",
+			name:     "accepted external to LB1",
 			sourceIP: testExternalClient,
-			destIP:   svcLBIP,
+			destIP:   svcLBIP1,
 			destPort: svcPort,
 			output:   fmt.Sprintf("%s:%d", epIP, svcPort),
 			masq:     true,
 		},
 		{
-			name:     "blocked external to LB",
+			name:     "accepted external to LB2",
+			sourceIP: testExternalClient,
+			destIP:   svcLBIP2,
+			destPort: svcPort,
+			output:   fmt.Sprintf("%s:%d", epIP, svcPort),
+			masq:     true,
+		},
+		{
+			name:     "blocked external to LB1",
 			sourceIP: testExternalClientBlocked,
-			destIP:   svcLBIP,
+			destIP:   svcLBIP1,
 			destPort: svcPort,
 			output:   "DROP",
 		},
 		{
-			name:     "pod to LB (blocked by LoadBalancerSourceRanges)",
+			name:     "blocked external to LB2",
+			sourceIP: testExternalClientBlocked,
+			destIP:   svcLBIP2,
+			destPort: svcPort,
+			output:   "DROP",
+		},
+		{
+			name:     "pod to LB1 (blocked by LoadBalancerSourceRanges)",
 			sourceIP: "10.0.0.2",
-			destIP:   svcLBIP,
+			destIP:   svcLBIP1,
 			destPort: svcPort,
 			output:   "DROP",
 		},
 		{
-			name:     "node to LB (allowed by LoadBalancerSourceRanges)",
+			name:     "pod to LB2 (blocked by LoadBalancerSourceRanges)",
+			sourceIP: "10.0.0.2",
+			destIP:   svcLBIP2,
+			destPort: svcPort,
+			output:   "DROP",
+		},
+		{
+			name:     "node to LB1 (allowed by LoadBalancerSourceRanges)",
 			sourceIP: testNodeIP,
-			destIP:   svcLBIP,
+			destIP:   svcLBIP1,
+			destPort: svcPort,
+			output:   fmt.Sprintf("%s:%d", epIP, svcPort),
+			masq:     true,
+		},
+		{
+			name:     "node to LB2 (allowed by LoadBalancerSourceRanges)",
+			sourceIP: testNodeIP,
+			destIP:   svcLBIP2,
 			destPort: svcPort,
 			output:   fmt.Sprintf("%s:%d", epIP, svcPort),
 			masq:     true,
@@ -2520,13 +2557,22 @@ func TestLoadBalancer(t *testing.T) {
 		// SNATted to the LB IP, so if the LoadBalancerSourceRanges include the
 		// node IP, then we add a rule allowing traffic from the LB IP as well...
 		{
-			name:     "same node to LB, SNATted to LB (implicitly allowed)",
-			sourceIP: svcLBIP,
-			destIP:   svcLBIP,
+			name:     "same node to LB1, SNATted to LB1 (implicitly allowed)",
+			sourceIP: svcLBIP1,
+			destIP:   svcLBIP1,
 			destPort: svcPort,
 			output:   fmt.Sprintf("%s:%d", epIP, svcPort),
 			masq:     true,
 		},
+		// FIXME: this fails
+		// {
+		// 	name:     "same node to LB2, SNATted to LB2 (implicitly allowed)",
+		// 	sourceIP: svcLBIP2,
+		// 	destIP:   svcLBIP2,
+		// 	destPort: svcPort,
+		// 	output:   fmt.Sprintf("%s:%d", epIP, svcPort),
+		// 	masq:     true,
+		// },
 	})
 }
 
