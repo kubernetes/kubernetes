@@ -18,12 +18,14 @@ package statefulset
 
 import (
 	"context"
+	"fmt"
 	"sort"
 
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
@@ -329,6 +331,11 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		// If the ordinal could not be parsed (ord < 0), ignore the Pod.
 	}
 
+	err = ssc.resizePVCs(set, replicas)
+	if err != nil {
+		return nil, err
+	}
+
 	// make sure to update the latest status even if there is an error later
 	defer func() {
 		// update the set's status
@@ -590,6 +597,42 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 
 	}
 	return &status, nil
+}
+
+func (ssc *defaultStatefulSetControl) resizePVCs(set *apps.StatefulSet, pods []*v1.Pod) error {
+	var errs []error
+	for _, pvc := range set.Spec.VolumeClaimTemplates {
+		for _, pod := range pods {
+			if pod == nil {
+				continue
+			}
+
+			ordinal := getOrdinal(pod)
+			claimName := getPersistentVolumeClaimName(set, &pvc, ordinal)
+			pvcActual, err := ssc.podControl.objectMgr.GetClaim(set.Namespace, claimName)
+			if err != nil {
+				err = fmt.Errorf("failed to retrieve PVC %s: %s", claimName, err)
+				errs = append(errs, err)
+				ssc.podControl.recordUnavailableClaimEvent("resize", set, pod, claimName, err)
+				continue
+			}
+
+			patch := fmt.Sprintf(`{"spec": {"resources": {"requests": {"storage": "%s"}}}}`, pvc.Spec.Resources.Requests.Storage().String())
+			err = ssc.podControl.objectMgr.PatchClaim(set.Namespace, claimName, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{})
+			if err != nil {
+				err = fmt.Errorf("failed to resize PVC %s: %s", claimName, err)
+				errs = append(errs, err)
+				ssc.podControl.recordClaimEvent("resize", set, pod, pvcActual, err)
+				continue
+			}
+
+			if !pvcActual.Spec.Resources.Requests.Storage().Equal(*pvc.Spec.Resources.Requests.Storage()) {
+				ssc.podControl.recordClaimEvent("resize", set, pod, pvcActual, nil)
+			}
+		}
+	}
+
+	return utilerrors.NewAggregate(errs)
 }
 
 func updateStatefulSetAfterInvariantEstablished(

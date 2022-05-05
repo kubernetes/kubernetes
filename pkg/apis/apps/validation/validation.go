@@ -178,6 +178,15 @@ func ValidateStatefulSetUpdate(statefulSet, oldStatefulSet *apps.StatefulSet, op
 	newStatefulSetClone.Spec.Replicas = oldStatefulSet.Spec.Replicas             // +k8s:verify-mutation:reason=clone
 	newStatefulSetClone.Spec.Template = oldStatefulSet.Spec.Template             // +k8s:verify-mutation:reason=clone
 	newStatefulSetClone.Spec.UpdateStrategy = oldStatefulSet.Spec.UpdateStrategy // +k8s:verify-mutation:reason=clone
+
+	oldStatefulSetPVCRequestsMap := getPVCTemplatesRequestsMap(oldStatefulSet.Spec.VolumeClaimTemplates)
+	for idx, _ := range newStatefulSetClone.Spec.VolumeClaimTemplates {
+		oldRequests, ok := oldStatefulSetPVCRequestsMap[newStatefulSetClone.Spec.VolumeClaimTemplates[idx].Name]
+		if ok {
+			newStatefulSetClone.Spec.VolumeClaimTemplates[idx].Spec.Resources.Requests = oldRequests.DeepCopy()
+		}
+	}
+
 	if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetMinReadySeconds) {
 		newStatefulSetClone.Spec.MinReadySeconds = oldStatefulSet.Spec.MinReadySeconds // +k8s:verify-mutation:reason=clone
 	}
@@ -488,6 +497,14 @@ func getPercentValue(intOrStringValue intstr.IntOrString) (int, bool) {
 	}
 	value, _ := strconv.Atoi(intOrStringValue.StrVal[:len(intOrStringValue.StrVal)-1])
 	return value, true
+}
+
+func getPVCTemplatesRequestsMap(pvcTemplates []api.PersistentVolumeClaim) map[string]api.ResourceList {
+	ret := make(map[string]api.ResourceList)
+	for _, pvcTemplate := range pvcTemplates {
+		ret[pvcTemplate.Name] = pvcTemplate.Spec.Resources.Requests
+	}
+	return ret
 }
 
 func getIntOrPercentValue(intOrStringValue intstr.IntOrString) int {

@@ -22,9 +22,10 @@ import (
 	"strings"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	errorutils "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -46,6 +47,7 @@ type StatefulPodControlObjectManager interface {
 	CreateClaim(claim *v1.PersistentVolumeClaim) error
 	GetClaim(namespace, claimName string) (*v1.PersistentVolumeClaim, error)
 	UpdateClaim(claim *v1.PersistentVolumeClaim) error
+	PatchClaim(namespace, claimName string, patchType types.PatchType, data []byte, opts metav1.PatchOptions) error
 }
 
 // StatefulPodControl defines the interface that StatefulSetController uses to create, update, and delete Pods,
@@ -109,6 +111,11 @@ func (om *realStatefulPodControlObjectManager) GetClaim(namespace, claimName str
 
 func (om *realStatefulPodControlObjectManager) UpdateClaim(claim *v1.PersistentVolumeClaim) error {
 	_, err := om.client.CoreV1().PersistentVolumeClaims(claim.Namespace).Update(context.TODO(), claim, metav1.UpdateOptions{})
+	return err
+}
+
+func (om *realStatefulPodControlObjectManager) PatchClaim(namespace, claimName string, patchType types.PatchType, data []byte, opts metav1.PatchOptions) error {
+	_, err := om.client.CoreV1().PersistentVolumeClaims(namespace).Patch(context.TODO(), claimName, patchType, data, opts)
 	return err
 }
 
@@ -301,15 +308,22 @@ func (spc *StatefulPodControl) recordPodEvent(verb string, set *apps.StatefulSet
 // nil the generated event will have a reason of v1.EventTypeNormal. If err is not nil the generated event will have a
 // reason of v1.EventTypeWarning.
 func (spc *StatefulPodControl) recordClaimEvent(verb string, set *apps.StatefulSet, pod *v1.Pod, claim *v1.PersistentVolumeClaim, err error) {
+	spc.recordUnavailableClaimEvent(verb, set, pod, claim.Name, err)
+}
+
+// recordClaimEvent records an event for verb applied to the PersistentVolumeClaim of a Pod in a StatefulSet. If err is
+// nil the generated event will have a reason of v1.EventTypeNormal. If err is not nil the generated event will have a
+// reason of v1.EventTypeWarning.
+func (spc *StatefulPodControl) recordUnavailableClaimEvent(verb string, set *apps.StatefulSet, pod *v1.Pod, claimName string, err error) {
 	if err == nil {
 		reason := fmt.Sprintf("Successful%s", strings.Title(verb))
 		message := fmt.Sprintf("%s Claim %s Pod %s in StatefulSet %s success",
-			strings.ToLower(verb), claim.Name, pod.Name, set.Name)
+			strings.ToLower(verb), claimName, pod.Name, set.Name)
 		spc.recorder.Event(set, v1.EventTypeNormal, reason, message)
 	} else {
 		reason := fmt.Sprintf("Failed%s", strings.Title(verb))
 		message := fmt.Sprintf("%s Claim %s for Pod %s in StatefulSet %s failed error: %s",
-			strings.ToLower(verb), claim.Name, pod.Name, set.Name, err)
+			strings.ToLower(verb), claimName, pod.Name, set.Name, err)
 		spc.recorder.Event(set, v1.EventTypeWarning, reason, message)
 	}
 }
