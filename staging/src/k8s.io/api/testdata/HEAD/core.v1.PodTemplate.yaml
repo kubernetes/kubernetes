@@ -3,7 +3,6 @@ kind: PodTemplate
 metadata:
   annotations:
     annotationsKey: annotationsValue
-  clusterName: clusterNameValue
   creationTimestamp: "2008-01-01T01:01:01Z"
   deletionGracePeriodSeconds: 10
   deletionTimestamp: "2009-01-01T01:01:01Z"
@@ -37,7 +36,6 @@ template:
   metadata:
     annotations:
       annotationsKey: annotationsValue
-    clusterName: clusterNameValue
     creationTimestamp: "2008-01-01T01:01:01Z"
     deletionGracePeriodSeconds: 10
     deletionTimestamp: "2009-01-01T01:01:01Z"
@@ -909,7 +907,6 @@ template:
           metadata:
             annotations:
               annotationsKey: annotationsValue
-            clusterName: clusterNameValue
             creationTimestamp: "2008-01-01T01:01:01Z"
             deletionGracePeriodSeconds: 10
             deletionTimestamp: "2009-01-01T01:01:01Z"
