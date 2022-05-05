@@ -125,7 +125,9 @@ require (
 )
 
 replace (
-	google.golang.org/grpc => google.golang.org/grpc v1.40.0
+	github.com/cncf/udpa/go => github.com/cncf/udpa/go v0.0.0-20201120205902-5459f2c99403
+	github.com/cncf/xds/go => github.com/cncf/xds/go v0.0.0-20210312221358-fbca930ec8ed
+	github.com/envoyproxy/go-control-plane => github.com/envoyproxy/go-control-plane v0.9.9-0.20210512163311-63b5d3c536b0
 	k8s.io/api => ../api
 	k8s.io/apiextensions-apiserver => ../apiextensions-apiserver
 	k8s.io/apimachinery => ../apimachinery

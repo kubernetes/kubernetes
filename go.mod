@@ -551,7 +551,7 @@ replace (
 	google.golang.org/api => google.golang.org/api v0.46.0
 	google.golang.org/appengine => google.golang.org/appengine v1.6.7
 	google.golang.org/genproto => google.golang.org/genproto v0.0.0-20220310185008-1973136f34c6
-	google.golang.org/grpc => google.golang.org/grpc v1.40.0
+	google.golang.org/grpc => google.golang.org/grpc v1.44.0
 	google.golang.org/protobuf => google.golang.org/protobuf v1.27.1
 	gopkg.in/alecthomas/kingpin.v2 => gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	gopkg.in/check.v1 => gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f
