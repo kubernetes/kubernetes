@@ -89,7 +89,7 @@ require (
 	gonum.org/v1/gonum v0.6.2
 	google.golang.org/api v0.46.0
 	google.golang.org/genproto v0.0.0-20220310185008-1973136f34c6
-	google.golang.org/grpc v1.40.0
+	google.golang.org/grpc v1.44.0
 	google.golang.org/protobuf v1.27.1
 	gopkg.in/gcfg.v1 v1.2.0
 	gopkg.in/square/go-jose.v2 v2.2.2
@@ -292,7 +292,7 @@ replace (
 	github.com/PuerkitoBio/urlesc => github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578
 	github.com/ajstarks/svgo => github.com/ajstarks/svgo v0.0.0-20180226025133-644b8db467af
 	github.com/antihax/optional => github.com/antihax/optional v1.0.0
-	github.com/antlr/antlr4/runtime/Go/antlr => github.com/antlr/antlr4/runtime/Go/antlr v0.0.0-20210826220005-b48c857c3a0e
+	github.com/antlr/antlr4/runtime/Go/antlr => github.com/antlr/antlr4/runtime/Go/antlr v0.0.0-20220209173558-ad29539cd2e9
 	github.com/armon/circbuf => github.com/armon/circbuf v0.0.0-20150827004946-bbbad097214e
 	github.com/armon/go-socks5 => github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
 	github.com/asaskevich/govalidator => github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a
@@ -550,7 +550,7 @@ replace (
 	gonum.org/v1/plot => gonum.org/v1/plot v0.0.0-20190515093506-e2840ee46a6b
 	google.golang.org/api => google.golang.org/api v0.46.0
 	google.golang.org/appengine => google.golang.org/appengine v1.6.7
-	google.golang.org/genproto => google.golang.org/genproto v0.0.0-20220107163113-42d7afdf6368
+	google.golang.org/genproto => google.golang.org/genproto v0.0.0-20220310185008-1973136f34c6
 	google.golang.org/grpc => google.golang.org/grpc v1.40.0
 	google.golang.org/protobuf => google.golang.org/protobuf v1.27.1
 	gopkg.in/alecthomas/kingpin.v2 => gopkg.in/alecthomas/kingpin.v2 v2.2.6
