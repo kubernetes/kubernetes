@@ -320,27 +320,27 @@ func (t *TestPlugin) Filter(ctx context.Context, state *framework.CycleState, po
 
 func TestSchedulerMultipleProfilesScheduling(t *testing.T) {
 	nodes := []runtime.Object{
-		st.MakeNode().Name("machine1").UID("machine1").Obj(),
-		st.MakeNode().Name("machine2").UID("machine2").Obj(),
-		st.MakeNode().Name("machine3").UID("machine3").Obj(),
+		st.MakeNode().Name("node1").UID("node1").Obj(),
+		st.MakeNode().Name("node2").UID("node2").Obj(),
+		st.MakeNode().Name("node3").UID("node3").Obj(),
 	}
 	pods := []*v1.Pod{
-		st.MakePod().Name("pod1").UID("pod1").SchedulerName("match-machine3").Obj(),
-		st.MakePod().Name("pod2").UID("pod2").SchedulerName("match-machine2").Obj(),
-		st.MakePod().Name("pod3").UID("pod3").SchedulerName("match-machine2").Obj(),
-		st.MakePod().Name("pod4").UID("pod4").SchedulerName("match-machine3").Obj(),
+		st.MakePod().Name("pod1").UID("pod1").SchedulerName("match-node3").Obj(),
+		st.MakePod().Name("pod2").UID("pod2").SchedulerName("match-node2").Obj(),
+		st.MakePod().Name("pod3").UID("pod3").SchedulerName("match-node2").Obj(),
+		st.MakePod().Name("pod4").UID("pod4").SchedulerName("match-node3").Obj(),
 	}
 	wantBindings := map[string]string{
-		"pod1": "machine3",
-		"pod2": "machine2",
-		"pod3": "machine2",
-		"pod4": "machine3",
+		"pod1": "node3",
+		"pod2": "node2",
+		"pod3": "node2",
+		"pod4": "node3",
 	}
 	wantControllers := map[string]string{
-		"pod1": "match-machine3",
-		"pod2": "match-machine2",
-		"pod3": "match-machine2",
-		"pod4": "match-machine3",
+		"pod1": "match-node3",
+		"pod2": "match-node2",
+		"pod3": "match-node2",
+		"pod4": "match-node3",
 	}
 
 	// Set up scheduler for the 3 nodes.
@@ -361,7 +361,7 @@ func TestSchedulerMultipleProfilesScheduling(t *testing.T) {
 		profile.NewRecorderFactory(broadcaster),
 		ctx.Done(),
 		WithProfiles(
-			schedulerapi.KubeSchedulerProfile{SchedulerName: "match-machine2",
+			schedulerapi.KubeSchedulerProfile{SchedulerName: "match-node2",
 				Plugins: &schedulerapi.Plugins{
 					Filter:    schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "FakeNodeSelector"}}},
 					QueueSort: schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "PrioritySort"}}},
@@ -370,12 +370,12 @@ func TestSchedulerMultipleProfilesScheduling(t *testing.T) {
 				PluginConfig: []schedulerapi.PluginConfig{
 					{
 						Name: "FakeNodeSelector",
-						Args: &runtime.Unknown{Raw: []byte(`{"nodeName":"machine2"}`)},
+						Args: &runtime.Unknown{Raw: []byte(`{"nodeName":"node2"}`)},
 					},
 				},
 			},
 			schedulerapi.KubeSchedulerProfile{
-				SchedulerName: "match-machine3",
+				SchedulerName: "match-node3",
 				Plugins: &schedulerapi.Plugins{
 					Filter:    schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "FakeNodeSelector"}}},
 					QueueSort: schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "PrioritySort"}}},
@@ -384,7 +384,7 @@ func TestSchedulerMultipleProfilesScheduling(t *testing.T) {
 				PluginConfig: []schedulerapi.PluginConfig{
 					{
 						Name: "FakeNodeSelector",
-						Args: &runtime.Unknown{Raw: []byte(`{"nodeName":"machine3"}`)},
+						Args: &runtime.Unknown{Raw: []byte(`{"nodeName":"node3"}`)},
 					},
 				},
 			},
@@ -445,7 +445,7 @@ func TestSchedulerMultipleProfilesScheduling(t *testing.T) {
 }
 
 func TestSchedulerScheduleOne(t *testing.T) {
-	testNode := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine1", UID: types.UID("machine1")}}
+	testNode := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1", UID: types.UID("node1")}}
 	client := clientsetfake.NewSimpleClientset(&testNode)
 	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
 	errS := errors.New("scheduler")
@@ -641,7 +641,7 @@ func TestSchedulerNoPhantomPodAfterExpire(t *testing.T) {
 	queuedPodStore := clientcache.NewFIFO(clientcache.MetaNamespaceKeyFunc)
 	scache := internalcache.New(100*time.Millisecond, ctx.Done())
 	pod := podWithPort("pod.Name", "", 8080)
-	node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine1", UID: types.UID("machine1")}}
+	node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1", UID: types.UID("node1")}}
 	scache.AddNode(&node)
 
 	fns := []st.RegisterPluginFunc{
@@ -706,7 +706,7 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 	queuedPodStore := clientcache.NewFIFO(clientcache.MetaNamespaceKeyFunc)
 	scache := internalcache.New(10*time.Minute, ctx.Done())
 	firstPod := podWithPort("pod.Name", "", 8080)
-	node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine1", UID: types.UID("machine1")}}
+	node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1", UID: types.UID("node1")}}
 	scache.AddNode(&node)
 	fns := []st.RegisterPluginFunc{
 		st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
@@ -790,7 +790,7 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 	var nodes []*v1.Node
 	var objects []runtime.Object
 	for i := 0; i < 100; i++ {
-		uid := fmt.Sprintf("machine%v", i)
+		uid := fmt.Sprintf("node%v", i)
 		node := v1.Node{
 			ObjectMeta: metav1.ObjectMeta{Name: uid, UID: types.UID(uid)},
 			Status: v1.NodeStatus{
@@ -877,7 +877,7 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 				AllBound: true,
 			},
 			expectAssumeCalled: true,
-			expectPodBind:      &v1.Binding{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "foo-ns", UID: types.UID("foo")}, Target: v1.ObjectReference{Kind: "Node", Name: "machine1"}},
+			expectPodBind:      &v1.Binding{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "foo-ns", UID: types.UID("foo")}, Target: v1.ObjectReference{Kind: "Node", Name: "node1"}},
 			eventReason:        "Scheduled",
 		},
 		{
@@ -910,7 +910,7 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 			volumeBinderConfig: &volumebinding.FakeVolumeBinderConfig{},
 			expectAssumeCalled: true,
 			expectBindCalled:   true,
-			expectPodBind:      &v1.Binding{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "foo-ns", UID: types.UID("foo")}, Target: v1.ObjectReference{Kind: "Node", Name: "machine1"}},
+			expectPodBind:      &v1.Binding{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "foo-ns", UID: types.UID("foo")}, Target: v1.ObjectReference{Kind: "Node", Name: "node1"}},
 			eventReason:        "Scheduled",
 		},
 		{
@@ -1034,11 +1034,7 @@ func TestSchedulerBinding(t *testing.T) {
 
 	for _, test := range table {
 		t.Run(test.name, func(t *testing.T) {
-			pod := &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: test.podName,
-				},
-			}
+			pod := st.MakePod().Name(test.podName).Obj()
 			defaultBound := false
 			client := clientsetfake.NewSimpleClientset(pod)
 			client.PrependReactor("create", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
@@ -1239,13 +1235,7 @@ func TestUpdatePod(t *testing.T) {
 				return true, &v1.Pod{}, nil
 			})
 
-			pod := &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Status: v1.PodStatus{
-					Conditions:        test.currentPodConditions,
-					NominatedNodeName: test.currentNominatedNodeName,
-				},
-			}
+			pod := st.MakePod().Name("foo").NominatedNodeName(test.currentNominatedNodeName).Conditions(test.currentPodConditions).Obj()
 
 			if err := updatePod(cs, pod, test.newPodCondition, test.newNominatingInfo); err != nil {
 				t.Fatalf("Error calling update: %v", err)
@@ -1277,33 +1267,33 @@ func TestSelectHost(t *testing.T) {
 		{
 			name: "unique properly ordered scores",
 			list: []framework.NodeScore{
-				{Name: "machine1.1", Score: 1},
-				{Name: "machine2.1", Score: 2},
+				{Name: "node1.1", Score: 1},
+				{Name: "node2.1", Score: 2},
 			},
-			possibleHosts: sets.NewString("machine2.1"),
+			possibleHosts: sets.NewString("node2.1"),
 			expectsErr:    false,
 		},
 		{
 			name: "equal scores",
 			list: []framework.NodeScore{
-				{Name: "machine1.1", Score: 1},
-				{Name: "machine1.2", Score: 2},
-				{Name: "machine1.3", Score: 2},
-				{Name: "machine2.1", Score: 2},
+				{Name: "node1.1", Score: 1},
+				{Name: "node1.2", Score: 2},
+				{Name: "node1.3", Score: 2},
+				{Name: "node2.1", Score: 2},
 			},
-			possibleHosts: sets.NewString("machine1.2", "machine1.3", "machine2.1"),
+			possibleHosts: sets.NewString("node1.2", "node1.3", "node2.1"),
 			expectsErr:    false,
 		},
 		{
 			name: "out of order scores",
 			list: []framework.NodeScore{
-				{Name: "machine1.1", Score: 3},
-				{Name: "machine1.2", Score: 3},
-				{Name: "machine2.1", Score: 2},
-				{Name: "machine3.1", Score: 1},
-				{Name: "machine1.3", Score: 3},
+				{Name: "node1.1", Score: 3},
+				{Name: "node1.2", Score: 3},
+				{Name: "node2.1", Score: 2},
+				{Name: "node3.1", Score: 1},
+				{Name: "node1.3", Score: 3},
 			},
-			possibleHosts: sets.NewString("machine1.1", "machine1.2", "machine1.3"),
+			possibleHosts: sets.NewString("node1.1", "node1.2", "node1.3"),
 			expectsErr:    false,
 		},
 		{
@@ -1494,7 +1484,7 @@ func TestFindNodesThatPassExtenders(t *testing.T) {
 				extenders = append(extenders, &tt.extenders[ii])
 			}
 
-			pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "1", UID: types.UID("1")}}
+			pod := st.MakePod().Name("1").UID("1").Obj()
 			got, err := findNodesThatPassExtenders(extenders, pod, tt.nodes, tt.filteredNodesStatuses)
 			if tt.expectsErr {
 				if err == nil {
@@ -1534,16 +1524,16 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				st.RegisterFilterPlugin("FalseFilter", st.NewFalseFilterPlugin),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
-			nodes: []string{"machine1", "machine2"},
-			pod:   &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
+			nodes: []string{"node1", "node2"},
+			pod:   st.MakePod().Name("2").UID("2").Obj(),
 			name:  "test 1",
 			wErr: &framework.FitError{
-				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
+				Pod:         st.MakePod().Name("2").UID("2").Obj(),
 				NumAllNodes: 2,
 				Diagnosis: framework.Diagnosis{
 					NodeToStatusMap: framework.NodeToStatusMap{
-						"machine1": framework.NewStatus(framework.Unschedulable, st.ErrReasonFake).WithFailedPlugin("FalseFilter"),
-						"machine2": framework.NewStatus(framework.Unschedulable, st.ErrReasonFake).WithFailedPlugin("FalseFilter"),
+						"node1": framework.NewStatus(framework.Unschedulable, st.ErrReasonFake).WithFailedPlugin("FalseFilter"),
+						"node2": framework.NewStatus(framework.Unschedulable, st.ErrReasonFake).WithFailedPlugin("FalseFilter"),
 					},
 					UnschedulablePlugins: sets.NewString("FalseFilter"),
 				},
@@ -1555,22 +1545,22 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
-			nodes:     []string{"machine1", "machine2"},
-			pod:       &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "ignore", UID: types.UID("ignore")}},
-			wantNodes: sets.NewString("machine1", "machine2"),
+			nodes:     []string{"node1", "node2"},
+			pod:       st.MakePod().Name("ignore").UID("ignore").Obj(),
+			wantNodes: sets.NewString("node1", "node2"),
 			name:      "test 2",
 			wErr:      nil,
 		},
 		{
-			// Fits on a machine where the pod ID matches the machine name
+			// Fits on a node where the pod ID matches the node name
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				st.RegisterFilterPlugin("MatchFilter", st.NewMatchFilterPlugin),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
-			nodes:     []string{"machine1", "machine2"},
-			pod:       &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "machine2", UID: types.UID("machine2")}},
-			wantNodes: sets.NewString("machine2"),
+			nodes:     []string{"node1", "node2"},
+			pod:       st.MakePod().Name("node2").UID("node2").Obj(),
+			wantNodes: sets.NewString("node2"),
 			name:      "test 3",
 			wErr:      nil,
 		},
@@ -1582,7 +1572,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes:     []string{"3", "2", "1"},
-			pod:       &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "ignore", UID: types.UID("ignore")}},
+			pod:       st.MakePod().Name("ignore").UID("ignore").Obj(),
 			wantNodes: sets.NewString("3"),
 			name:      "test 4",
 			wErr:      nil,
@@ -1595,7 +1585,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes:     []string{"3", "2", "1"},
-			pod:       &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
+			pod:       st.MakePod().Name("2").UID("2").Obj(),
 			wantNodes: sets.NewString("2"),
 			name:      "test 5",
 			wErr:      nil,
@@ -1609,7 +1599,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes:     []string{"3", "2", "1"},
-			pod:       &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
+			pod:       st.MakePod().Name("2").UID("2").Obj(),
 			wantNodes: sets.NewString("1"),
 			name:      "test 6",
 			wErr:      nil,
@@ -1623,10 +1613,10 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes: []string{"3", "2", "1"},
-			pod:   &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
+			pod:   st.MakePod().Name("2").UID("2").Obj(),
 			name:  "test 7",
 			wErr: &framework.FitError{
-				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
+				Pod:         st.MakePod().Name("2").UID("2").Obj(),
 				NumAllNodes: 3,
 				Diagnosis: framework.Diagnosis{
 					NodeToStatusMap: framework.NodeToStatusMap{
@@ -1647,21 +1637,13 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			pods: []*v1.Pod{
-				{
-					ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")},
-					Spec: v1.PodSpec{
-						NodeName: "2",
-					},
-					Status: v1.PodStatus{
-						Phase: v1.PodRunning,
-					},
-				},
+				st.MakePod().Name("2").UID("2").Node("2").Phase(v1.PodRunning).Obj(),
 			},
-			pod:   &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
+			pod:   st.MakePod().Name("2").UID("2").Obj(),
 			nodes: []string{"1", "2"},
 			name:  "test 8",
 			wErr: &framework.FitError{
-				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
+				Pod:         st.MakePod().Name("2").UID("2").Obj(),
 				NumAllNodes: 2,
 				Diagnosis: framework.Diagnosis{
 					NodeToStatusMap: framework.NodeToStatusMap{
@@ -1680,28 +1662,15 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
-			nodes: []string{"machine1", "machine2"},
+			nodes: []string{"node1", "node2"},
 			pvcs: []v1.PersistentVolumeClaim{
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "existingPVC", UID: types.UID("existingPVC"), Namespace: v1.NamespaceDefault},
 					Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "existingPV"},
 				},
 			},
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "ignore", UID: types.UID("ignore"), Namespace: v1.NamespaceDefault},
-				Spec: v1.PodSpec{
-					Volumes: []v1.Volume{
-						{
-							VolumeSource: v1.VolumeSource{
-								PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-									ClaimName: "existingPVC",
-								},
-							},
-						},
-					},
-				},
-			},
-			wantNodes: sets.NewString("machine1", "machine2"),
+			pod:       st.MakePod().Name("ignore").UID("ignore").Namespace(v1.NamespaceDefault).PVC("existingPVC").Obj(),
+			wantNodes: sets.NewString("node1", "node2"),
 			name:      "existing PVC",
 			wErr:      nil,
 		},
@@ -1713,42 +1682,16 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
-			nodes: []string{"machine1", "machine2"},
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "ignore", UID: types.UID("ignore")},
-				Spec: v1.PodSpec{
-					Volumes: []v1.Volume{
-						{
-							VolumeSource: v1.VolumeSource{
-								PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-									ClaimName: "unknownPVC",
-								},
-							},
-						},
-					},
-				},
-			},
-			name: "unknown PVC",
+			nodes: []string{"node1", "node2"},
+			pod:   st.MakePod().Name("ignore").UID("ignore").PVC("unknownPVC").Obj(),
+			name:  "unknown PVC",
 			wErr: &framework.FitError{
-				Pod: &v1.Pod{
-					ObjectMeta: metav1.ObjectMeta{Name: "ignore", UID: types.UID("ignore")},
-					Spec: v1.PodSpec{
-						Volumes: []v1.Volume{
-							{
-								VolumeSource: v1.VolumeSource{
-									PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-										ClaimName: "unknownPVC",
-									},
-								},
-							},
-						},
-					},
-				},
+				Pod:         st.MakePod().Name("ignore").UID("ignore").PVC("unknownPVC").Obj(),
 				NumAllNodes: 2,
 				Diagnosis: framework.Diagnosis{
 					NodeToStatusMap: framework.NodeToStatusMap{
-						"machine1": framework.NewStatus(framework.UnschedulableAndUnresolvable, `persistentvolumeclaim "unknownPVC" not found`).WithFailedPlugin(volumebinding.Name),
-						"machine2": framework.NewStatus(framework.UnschedulableAndUnresolvable, `persistentvolumeclaim "unknownPVC" not found`).WithFailedPlugin(volumebinding.Name),
+						"node1": framework.NewStatus(framework.UnschedulableAndUnresolvable, `persistentvolumeclaim "unknownPVC" not found`).WithFailedPlugin(volumebinding.Name),
+						"node2": framework.NewStatus(framework.UnschedulableAndUnresolvable, `persistentvolumeclaim "unknownPVC" not found`).WithFailedPlugin(volumebinding.Name),
 					},
 					UnschedulablePlugins: sets.NewString(volumebinding.Name),
 				},
@@ -1762,43 +1705,17 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
-			nodes: []string{"machine1", "machine2"},
+			nodes: []string{"node1", "node2"},
 			pvcs:  []v1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "existingPVC", UID: types.UID("existingPVC"), Namespace: v1.NamespaceDefault, DeletionTimestamp: &metav1.Time{}}}},
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "ignore", UID: types.UID("ignore"), Namespace: v1.NamespaceDefault},
-				Spec: v1.PodSpec{
-					Volumes: []v1.Volume{
-						{
-							VolumeSource: v1.VolumeSource{
-								PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-									ClaimName: "existingPVC",
-								},
-							},
-						},
-					},
-				},
-			},
-			name: "deleted PVC",
+			pod:   st.MakePod().Name("ignore").UID("ignore").Namespace(v1.NamespaceDefault).PVC("existingPVC").Obj(),
+			name:  "deleted PVC",
 			wErr: &framework.FitError{
-				Pod: &v1.Pod{
-					ObjectMeta: metav1.ObjectMeta{Name: "ignore", UID: types.UID("ignore"), Namespace: v1.NamespaceDefault},
-					Spec: v1.PodSpec{
-						Volumes: []v1.Volume{
-							{
-								VolumeSource: v1.VolumeSource{
-									PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-										ClaimName: "existingPVC",
-									},
-								},
-							},
-						},
-					},
-				},
+				Pod:         st.MakePod().Name("ignore").UID("ignore").Namespace(v1.NamespaceDefault).PVC("existingPVC").Obj(),
 				NumAllNodes: 2,
 				Diagnosis: framework.Diagnosis{
 					NodeToStatusMap: framework.NodeToStatusMap{
-						"machine1": framework.NewStatus(framework.UnschedulableAndUnresolvable, `persistentvolumeclaim "existingPVC" is being deleted`).WithFailedPlugin(volumebinding.Name),
-						"machine2": framework.NewStatus(framework.UnschedulableAndUnresolvable, `persistentvolumeclaim "existingPVC" is being deleted`).WithFailedPlugin(volumebinding.Name),
+						"node1": framework.NewStatus(framework.UnschedulableAndUnresolvable, `persistentvolumeclaim "existingPVC" is being deleted`).WithFailedPlugin(volumebinding.Name),
+						"node2": framework.NewStatus(framework.UnschedulableAndUnresolvable, `persistentvolumeclaim "existingPVC" is being deleted`).WithFailedPlugin(volumebinding.Name),
 					},
 					UnschedulablePlugins: sets.NewString(volumebinding.Name),
 				},
@@ -1813,7 +1730,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes: []string{"2", "1"},
-			pod:   &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
+			pod:   st.MakePod().Name("2").Obj(),
 			name:  "test error with priority map",
 			wErr:  fmt.Errorf("running Score plugins: %w", fmt.Errorf(`plugin "FalseMap" failed with: %w`, errPrioritize)),
 		},
@@ -1829,39 +1746,19 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
-			nodes: []string{"machine1", "machine2"},
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "p", UID: types.UID("p"), Labels: map[string]string{"foo": ""}},
-				Spec: v1.PodSpec{
-					TopologySpreadConstraints: []v1.TopologySpreadConstraint{
-						{
-							MaxSkew:           1,
-							TopologyKey:       "hostname",
-							WhenUnsatisfiable: v1.DoNotSchedule,
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
-									{
-										Key:      "foo",
-										Operator: metav1.LabelSelectorOpExists,
-									},
-								},
-							},
-						},
+			nodes: []string{"node1", "node2"},
+			pod: st.MakePod().Name("p").UID("p").Label("foo", "").SpreadConstraint(1, "hostname", v1.DoNotSchedule, &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Key:      "foo",
+						Operator: metav1.LabelSelectorOpExists,
 					},
 				},
-			},
+			}, nil).Obj(),
 			pods: []*v1.Pod{
-				{
-					ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: types.UID("pod1"), Labels: map[string]string{"foo": ""}},
-					Spec: v1.PodSpec{
-						NodeName: "machine1",
-					},
-					Status: v1.PodStatus{
-						Phase: v1.PodRunning,
-					},
-				},
+				st.MakePod().Name("pod1").UID("pod1").Label("foo", "").Node("node1").Phase(v1.PodRunning).Obj(),
 			},
-			wantNodes: sets.NewString("machine2"),
+			wantNodes: sets.NewString("node2"),
 			wErr:      nil,
 		},
 		{
@@ -1876,57 +1773,21 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
-			nodes: []string{"machine1", "machine2", "machine3"},
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "p", UID: types.UID("p"), Labels: map[string]string{"foo": ""}},
-				Spec: v1.PodSpec{
-					TopologySpreadConstraints: []v1.TopologySpreadConstraint{
-						{
-							MaxSkew:           2,
-							TopologyKey:       "hostname",
-							WhenUnsatisfiable: v1.DoNotSchedule,
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
-									{
-										Key:      "foo",
-										Operator: metav1.LabelSelectorOpExists,
-									},
-								},
-							},
-						},
+			nodes: []string{"node1", "node2", "node3"},
+			pod: st.MakePod().Name("p").UID("p").Label("foo", "").SpreadConstraint(2, "hostname", v1.DoNotSchedule, &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Key:      "foo",
+						Operator: metav1.LabelSelectorOpExists,
 					},
 				},
-			},
+			}, nil).Obj(),
 			pods: []*v1.Pod{
-				{
-					ObjectMeta: metav1.ObjectMeta{Name: "pod1a", UID: types.UID("pod1a"), Labels: map[string]string{"foo": ""}},
-					Spec: v1.PodSpec{
-						NodeName: "machine1",
-					},
-					Status: v1.PodStatus{
-						Phase: v1.PodRunning,
-					},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{Name: "pod1b", UID: types.UID("pod1b"), Labels: map[string]string{"foo": ""}},
-					Spec: v1.PodSpec{
-						NodeName: "machine1",
-					},
-					Status: v1.PodStatus{
-						Phase: v1.PodRunning,
-					},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{Name: "pod2", UID: types.UID("pod2"), Labels: map[string]string{"foo": ""}},
-					Spec: v1.PodSpec{
-						NodeName: "machine2",
-					},
-					Status: v1.PodStatus{
-						Phase: v1.PodRunning,
-					},
-				},
+				st.MakePod().Name("pod1a").UID("pod1a").Label("foo", "").Node("node1").Phase(v1.PodRunning).Obj(),
+				st.MakePod().Name("pod1b").UID("pod1b").Label("foo", "").Node("node1").Phase(v1.PodRunning).Obj(),
+				st.MakePod().Name("pod2").UID("pod2").Label("foo", "").Node("node2").Phase(v1.PodRunning).Obj(),
 			},
-			wantNodes: sets.NewString("machine2", "machine3"),
+			wantNodes: sets.NewString("node2", "node3"),
 			wErr:      nil,
 		},
 		{
@@ -1941,10 +1802,10 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes:     []string{"3"},
-			pod:       &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-filter", UID: types.UID("test-filter")}},
+			pod:       st.MakePod().Name("test-filter").UID("test-filter").Obj(),
 			wantNodes: nil,
 			wErr: &framework.FitError{
-				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-filter", UID: types.UID("test-filter")}},
+				Pod:         st.MakePod().Name("test-filter").UID("test-filter").Obj(),
 				NumAllNodes: 1,
 				Diagnosis: framework.Diagnosis{
 					NodeToStatusMap: framework.NodeToStatusMap{
@@ -1966,10 +1827,10 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes:     []string{"3"},
-			pod:       &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-filter", UID: types.UID("test-filter")}},
+			pod:       st.MakePod().Name("test-filter").UID("test-filter").Obj(),
 			wantNodes: nil,
 			wErr: &framework.FitError{
-				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-filter", UID: types.UID("test-filter")}},
+				Pod:         st.MakePod().Name("test-filter").UID("test-filter").Obj(),
 				NumAllNodes: 1,
 				Diagnosis: framework.Diagnosis{
 					NodeToStatusMap: framework.NodeToStatusMap{
@@ -1991,7 +1852,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes:     []string{"1", "2"},
-			pod:       &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-filter", UID: types.UID("test-filter")}},
+			pod:       st.MakePod().Name("test-filter").UID("test-filter").Obj(),
 			wantNodes: nil,
 			wErr:      nil,
 		},
@@ -2006,10 +1867,10 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes:     []string{"1", "2"},
-			pod:       &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-prefilter", UID: types.UID("test-prefilter")}},
+			pod:       st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
 			wantNodes: nil,
 			wErr: &framework.FitError{
-				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-prefilter", UID: types.UID("test-prefilter")}},
+				Pod:         st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
 				NumAllNodes: 2,
 				Diagnosis: framework.Diagnosis{
 					NodeToStatusMap: framework.NodeToStatusMap{
@@ -2031,7 +1892,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes:     []string{"1", "2"},
-			pod:       &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-prefilter", UID: types.UID("test-prefilter")}},
+			pod:       st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
 			wantNodes: nil,
 			wErr:      fmt.Errorf(`running PreFilter plugin "FakePreFilter": %w`, errors.New("injected error status")),
 		},
@@ -2054,7 +1915,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes:              []string{"node1", "node2", "node3"},
-			pod:                &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-prefilter", UID: types.UID("test-prefilter")}},
+			pod:                st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
 			wantNodes:          sets.NewString("node2"),
 			wantEvaluatedNodes: pointer.Int32Ptr(1),
 		},
@@ -2077,9 +1938,9 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes: []string{"node1", "node2", "node3"},
-			pod:   &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-prefilter", UID: types.UID("test-prefilter")}},
+			pod:   st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
 			wErr: &framework.FitError{
-				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-prefilter", UID: types.UID("test-prefilter")}},
+				Pod:         st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
 				NumAllNodes: 3,
 				Diagnosis: framework.Diagnosis{
 					NodeToStatusMap: framework.NodeToStatusMap{
@@ -2106,9 +1967,9 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes: []string{"node1"},
-			pod:   &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-prefilter", UID: types.UID("test-prefilter")}},
+			pod:   st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
 			wErr: &framework.FitError{
-				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-prefilter", UID: types.UID("test-prefilter")}},
+				Pod:         st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
 				NumAllNodes: 1,
 				Diagnosis: framework.Diagnosis{
 					NodeToStatusMap: framework.NodeToStatusMap{
@@ -2247,7 +2108,7 @@ func TestFindFitSomeError(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "1", UID: types.UID("1")}}
+	pod := st.MakePod().Name("1").UID("1").Obj()
 	_, diagnosis, err := scheduler.findNodesThatFitPod(context.Background(), fwk, framework.NewCycleState(), pod)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -2286,12 +2147,12 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 	}{
 		{
 			name:          "nominated pods have lower priority, predicate is called once",
-			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "1", UID: types.UID("1")}, Spec: v1.PodSpec{Priority: &highPriority}},
+			pod:           st.MakePod().Name("1").UID("1").Priority(highPriority).Obj(),
 			expectedCount: 1,
 		},
 		{
 			name:          "nominated pods have higher priority, predicate is called twice",
-			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "1", UID: types.UID("1")}, Spec: v1.PodSpec{Priority: &lowPriority}},
+			pod:           st.MakePod().Name("1").UID("1").Priority(lowPriority).Obj(),
 			expectedCount: 2,
 		},
 	}
@@ -2324,7 +2185,7 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 			if err := scheduler.Cache.UpdateSnapshot(scheduler.nodeInfoSnapshot); err != nil {
 				t.Fatal(err)
 			}
-			fwk.AddNominatedPod(framework.NewPodInfo(&v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "nominated"}, Spec: v1.PodSpec{Priority: &midPriority}}),
+			fwk.AddNominatedPod(framework.NewPodInfo(st.MakePod().UID("nominated").Priority(midPriority).Obj()),
 				&framework.NominatingInfo{NominatingMode: framework.ModeOverride, NominatedNodeName: "1"})
 
 			_, _, err = scheduler.findNodesThatFitPod(context.Background(), fwk, framework.NewCycleState(), test.pod)
@@ -2340,7 +2201,7 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 
 // The point of this test is to show that you:
 // - get the same priority for a zero-request pod as for a pod with the defaults requests,
-//   both when the zero-request pod is already on the machine and when the zero-request pod
+//   both when the zero-request pod is already on the node and when the zero-request pod
 //   is the one being scheduled.
 // - don't get the same score no matter what we schedule.
 func TestZeroRequest(t *testing.T) {
@@ -2351,7 +2212,7 @@ func TestZeroRequest(t *testing.T) {
 		},
 	}
 	noResources1 := noResources
-	noResources1.NodeName = "machine1"
+	noResources1.NodeName = "node1"
 	// A pod with the same resources as a 0-request pod gets by default as its resources (for spreading).
 	small := v1.PodSpec{
 		Containers: []v1.Container{
@@ -2368,7 +2229,7 @@ func TestZeroRequest(t *testing.T) {
 		},
 	}
 	small2 := small
-	small2.NodeName = "machine2"
+	small2.NodeName = "node2"
 	// A larger pod.
 	large := v1.PodSpec{
 		Containers: []v1.Container{
@@ -2385,9 +2246,9 @@ func TestZeroRequest(t *testing.T) {
 		},
 	}
 	large1 := large
-	large1.NodeName = "machine1"
+	large1.NodeName = "node1"
 	large2 := large
-	large2.NodeName = "machine2"
+	large2.NodeName = "node2"
 	tests := []struct {
 		pod           *v1.Pod
 		pods          []*v1.Pod
@@ -2396,12 +2257,12 @@ func TestZeroRequest(t *testing.T) {
 		expectedScore int64
 	}{
 		// The point of these next two tests is to show you get the same priority for a zero-request pod
-		// as for a pod with the defaults requests, both when the zero-request pod is already on the machine
+		// as for a pod with the defaults requests, both when the zero-request pod is already on the node
 		// and when the zero-request pod is the one being scheduled.
 		{
 			pod:   &v1.Pod{Spec: noResources},
-			nodes: []*v1.Node{makeNode("machine1", 1000, schedutil.DefaultMemoryRequest*10), makeNode("machine2", 1000, schedutil.DefaultMemoryRequest*10)},
-			name:  "test priority of zero-request pod with machine with zero-request pod",
+			nodes: []*v1.Node{makeNode("node1", 1000, schedutil.DefaultMemoryRequest*10), makeNode("node2", 1000, schedutil.DefaultMemoryRequest*10)},
+			name:  "test priority of zero-request pod with node with zero-request pod",
 			pods: []*v1.Pod{
 				{Spec: large1}, {Spec: noResources1},
 				{Spec: large2}, {Spec: small2},
@@ -2410,8 +2271,8 @@ func TestZeroRequest(t *testing.T) {
 		},
 		{
 			pod:   &v1.Pod{Spec: small},
-			nodes: []*v1.Node{makeNode("machine1", 1000, schedutil.DefaultMemoryRequest*10), makeNode("machine2", 1000, schedutil.DefaultMemoryRequest*10)},
-			name:  "test priority of nonzero-request pod with machine with zero-request pod",
+			nodes: []*v1.Node{makeNode("node1", 1000, schedutil.DefaultMemoryRequest*10), makeNode("node2", 1000, schedutil.DefaultMemoryRequest*10)},
+			name:  "test priority of nonzero-request pod with node with zero-request pod",
 			pods: []*v1.Pod{
 				{Spec: large1}, {Spec: noResources1},
 				{Spec: large2}, {Spec: small2},
@@ -2421,8 +2282,8 @@ func TestZeroRequest(t *testing.T) {
 		// The point of this test is to verify that we're not just getting the same score no matter what we schedule.
 		{
 			pod:   &v1.Pod{Spec: large},
-			nodes: []*v1.Node{makeNode("machine1", 1000, schedutil.DefaultMemoryRequest*10), makeNode("machine2", 1000, schedutil.DefaultMemoryRequest*10)},
-			name:  "test priority of larger pod with machine with zero-request pod",
+			nodes: []*v1.Node{makeNode("node1", 1000, schedutil.DefaultMemoryRequest*10), makeNode("node2", 1000, schedutil.DefaultMemoryRequest*10)},
+			name:  "test priority of larger pod with node with zero-request pod",
 			pods: []*v1.Pod{
 				{Spec: large1}, {Spec: noResources1},
 				{Spec: large2}, {Spec: small2},
@@ -2665,31 +2526,11 @@ func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
 }
 
 func podWithID(id, desiredHost string) *v1.Pod {
-	return &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: id,
-			UID:  types.UID(id),
-		},
-		Spec: v1.PodSpec{
-			NodeName:      desiredHost,
-			SchedulerName: testSchedulerName,
-		},
-	}
+	return st.MakePod().Name(id).UID(id).Node(desiredHost).SchedulerName(testSchedulerName).Obj()
 }
 
 func deletingPod(id string) *v1.Pod {
-	deletionTimestamp := metav1.Now()
-	return &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              id,
-			UID:               types.UID(id),
-			DeletionTimestamp: &deletionTimestamp,
-		},
-		Spec: v1.PodSpec{
-			NodeName:      "",
-			SchedulerName: testSchedulerName,
-		},
-	}
+	return st.MakePod().Name(id).UID(id).Terminating().Node("").SchedulerName(testSchedulerName).Obj()
 }
 
 func podWithPort(id, desiredHost string, port int) *v1.Pod {
@@ -2843,7 +2684,7 @@ func setupTestScheduler(ctx context.Context, queuedPodStore *clientcache.FIFO, c
 }
 
 func setupTestSchedulerWithVolumeBinding(ctx context.Context, volumeBinder volumebinding.SchedulerVolumeBinder, broadcaster events.EventBroadcaster) (*Scheduler, chan *v1.Binding, chan error) {
-	testNode := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine1", UID: types.UID("machine1")}}
+	testNode := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1", UID: types.UID("node1")}}
 	queuedPodStore := clientcache.NewFIFO(clientcache.MetaNamespaceKeyFunc)
 	pod := podWithID("foo", "")
 	pod.Namespace = "foo-ns"
