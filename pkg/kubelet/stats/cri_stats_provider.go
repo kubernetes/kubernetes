@@ -963,11 +963,15 @@ func addCRIPodNetworkStats(ps *statsapi.PodStats, criPodStat *runtimeapi.PodSand
 
 func criInterfaceToSummary(criIface *runtimeapi.NetworkInterfaceUsage) statsapi.InterfaceStats {
 	return statsapi.InterfaceStats{
-		Name:     criIface.Name,
-		RxBytes:  valueOfUInt64Value(criIface.RxBytes),
-		RxErrors: valueOfUInt64Value(criIface.RxErrors),
-		TxBytes:  valueOfUInt64Value(criIface.TxBytes),
-		TxErrors: valueOfUInt64Value(criIface.TxErrors),
+		Name:      criIface.Name,
+		RxBytes:   valueOfUInt64Value(criIface.RxBytes),
+		RxErrors:  valueOfUInt64Value(criIface.RxErrors),
+		RxPackets: valueOfUInt64Value(criIface.RxPackets),
+		RxDropped: valueOfUInt64Value(criIface.RxDropped),
+		TxBytes:   valueOfUInt64Value(criIface.TxBytes),
+		TxErrors:  valueOfUInt64Value(criIface.TxErrors),
+		TxPackets: valueOfUInt64Value(criIface.TxPackets),
+		TxDropped: valueOfUInt64Value(criIface.TxDropped),
 	}
 }
 
