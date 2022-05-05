@@ -1,7 +1,0 @@
-apiVersion: v1
-kind: APIVersions
-serverAddressByClientCIDRs:
-- clientCIDR: "3"
-  serverAddress: "4"
-versions:
-- "2"
