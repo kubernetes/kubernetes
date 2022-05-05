@@ -204,9 +204,9 @@ func RegisterChannel(c Channel, pid int64, ref string) int64 {
 		trace:       &channelTrace{createdTime: time.Now(), events: make([]*TraceEvent, 0, getMaxTraceEntry())},
 	}
 	if pid == 0 {
-		db.get().addChannel(id, cn, true, pid, ref)
+		db.get().addChannel(id, cn, true, pid)
 	} else {
-		db.get().addChannel(id, cn, false, pid, ref)
+		db.get().addChannel(id, cn, false, pid)
 	}
 	return id
 }
@@ -228,7 +228,7 @@ func RegisterSubChannel(c Channel, pid int64, ref string) int64 {
 		pid:     pid,
 		trace:   &channelTrace{createdTime: time.Now(), events: make([]*TraceEvent, 0, getMaxTraceEntry())},
 	}
-	db.get().addSubChannel(id, sc, pid, ref)
+	db.get().addSubChannel(id, sc, pid)
 	return id
 }
 
@@ -258,7 +258,7 @@ func RegisterListenSocket(s Socket, pid int64, ref string) int64 {
 	}
 	id := idGen.genID()
 	ls := &listenSocket{refName: ref, s: s, id: id, pid: pid}
-	db.get().addListenSocket(id, ls, pid, ref)
+	db.get().addListenSocket(id, ls, pid)
 	return id
 }
 
@@ -273,11 +273,11 @@ func RegisterNormalSocket(s Socket, pid int64, ref string) int64 {
 	}
 	id := idGen.genID()
 	ns := &normalSocket{refName: ref, s: s, id: id, pid: pid}
-	db.get().addNormalSocket(id, ns, pid, ref)
+	db.get().addNormalSocket(id, ns, pid)
 	return id
 }
 
-// RemoveEntry removes an entry with unique channelz trakcing id to be id from
+// RemoveEntry removes an entry with unique channelz tracking id to be id from
 // channelz database.
 func RemoveEntry(id int64) {
 	db.get().removeEntry(id)
@@ -333,7 +333,7 @@ func (c *channelMap) addServer(id int64, s *server) {
 	c.mu.Unlock()
 }
 
-func (c *channelMap) addChannel(id int64, cn *channel, isTopChannel bool, pid int64, ref string) {
+func (c *channelMap) addChannel(id int64, cn *channel, isTopChannel bool, pid int64) {
 	c.mu.Lock()
 	cn.cm = c
 	cn.trace.cm = c
@@ -346,7 +346,7 @@ func (c *channelMap) addChannel(id int64, cn *channel, isTopChannel bool, pid in
 	c.mu.Unlock()
 }
 
-func (c *channelMap) addSubChannel(id int64, sc *subChannel, pid int64, ref string) {
+func (c *channelMap) addSubChannel(id int64, sc *subChannel, pid int64) {
 	c.mu.Lock()
 	sc.cm = c
 	sc.trace.cm = c
@@ -355,7 +355,7 @@ func (c *channelMap) addSubChannel(id int64, sc *subChannel, pid int64, ref stri
 	c.mu.Unlock()
 }
 
-func (c *channelMap) addListenSocket(id int64, ls *listenSocket, pid int64, ref string) {
+func (c *channelMap) addListenSocket(id int64, ls *listenSocket, pid int64) {
 	c.mu.Lock()
 	ls.cm = c
 	c.listenSockets[id] = ls
@@ -363,7 +363,7 @@ func (c *channelMap) addListenSocket(id int64, ls *listenSocket, pid int64, ref 
 	c.mu.Unlock()
 }
 
-func (c *channelMap) addNormalSocket(id int64, ns *normalSocket, pid int64, ref string) {
+func (c *channelMap) addNormalSocket(id int64, ns *normalSocket, pid int64) {
 	c.mu.Lock()
 	ns.cm = c
 	c.normalSockets[id] = ns
@@ -630,7 +630,7 @@ func (c *channelMap) GetServerSockets(id int64, startID int64, maxResults int64)
 	if count == 0 {
 		end = true
 	}
-	var s []*SocketMetric
+	s := make([]*SocketMetric, 0, len(sks))
 	for _, ns := range sks {
 		sm := &SocketMetric{}
 		sm.SocketData = ns.s.ChannelzMetric()

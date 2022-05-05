@@ -18,6 +18,8 @@ import (
 	"fmt"
 	"strings"
 
+	"google.golang.org/protobuf/proto"
+
 	"github.com/google/cel-go/checker/decls"
 	"github.com/google/cel-go/common/containers"
 	"github.com/google/cel-go/common/overloads"
@@ -99,6 +101,9 @@ func NewEnv(container *containers.Container, provider ref.TypeProvider, opts ...
 	if envOptions.crossTypeNumericComparisons {
 		filteredOverloadIDs = make(map[string]struct{})
 	}
+	if envOptions.validatedDeclarations != nil {
+		declarations = envOptions.validatedDeclarations.Copy()
+	}
 	return &Env{
 		container:           container,
 		provider:            provider,
@@ -117,7 +122,7 @@ func (e *Env) Add(decls ...*exprpb.Decl) error {
 		case *exprpb.Decl_Ident:
 			errMsgs = append(errMsgs, e.addIdent(sanitizeIdent(decl)))
 		case *exprpb.Decl_Function:
-			errMsgs = append(errMsgs, e.addFunction(sanitizeFunction(decl))...)
+			errMsgs = append(errMsgs, e.setFunction(sanitizeFunction(decl))...)
 		}
 	}
 	return formatError(errMsgs)
@@ -204,22 +209,22 @@ func (e *Env) addOverload(f *exprpb.Decl, overload *exprpb.Decl_FunctionDecl_Ove
 	return errMsgs
 }
 
-// addFunction adds the function Decl to the Env.
+// setFunction adds the function Decl to the Env.
 // Adds a function decl if one doesn't already exist, then adds all overloads from the Decl.
 // If overload overlaps with an existing overload, adds to the errors  in the Env instead.
-func (e *Env) addFunction(decl *exprpb.Decl) []errorMsg {
+func (e *Env) setFunction(decl *exprpb.Decl) []errorMsg {
 	current := e.declarations.FindFunction(decl.Name)
 	if current == nil {
 		//Add the function declaration without overloads and check the overloads below.
 		current = decls.NewFunction(decl.Name)
-		e.declarations.AddFunction(current)
+	} else {
+		// Copy on write since we don't know where this original definition came from.
+		current = proto.Clone(current).(*exprpb.Decl)
 	}
+	e.declarations.SetFunction(current)
 
 	errorMsgs := make([]errorMsg, 0)
 	for _, overload := range decl.GetFunction().GetOverloads() {
-		if _, found := e.filteredOverloadIDs[overload.GetOverloadId()]; found {
-			continue
-		}
 		errorMsgs = append(errorMsgs, e.addOverload(current, overload)...)
 	}
 	return errorMsgs
@@ -234,6 +239,12 @@ func (e *Env) addIdent(decl *exprpb.Decl) errorMsg {
 	}
 	e.declarations.AddIdent(decl)
 	return ""
+}
+
+// isOverloadDisabled returns whether the overloadID is disabled in the current environment.
+func (e *Env) isOverloadDisabled(overloadID string) bool {
+	_, found := e.filteredOverloadIDs[overloadID]
+	return found
 }
 
 // sanitizeFunction replaces well-known types referenced by message name with their equivalent
@@ -311,6 +322,12 @@ func isObjectWellKnownType(t *exprpb.Type) bool {
 // getObjectWellKnownType returns the built-in CEL type declaration for input type's message name.
 func getObjectWellKnownType(t *exprpb.Type) *exprpb.Type {
 	return pb.CheckedWellKnowns[t.GetMessageType()]
+}
+
+// validatedDeclarations returns a reference to the validated variable and function declaration scope stack.
+// must be copied before use.
+func (e *Env) validatedDeclarations() *decls.Scopes {
+	return e.declarations
 }
 
 // enterScope creates a new Env instance with a new innermost declaration scope.
