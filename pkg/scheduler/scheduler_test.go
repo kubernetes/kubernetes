@@ -40,6 +40,7 @@ import (
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
+	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testingclock "k8s.io/utils/clock/testing"
 )
 
@@ -226,7 +227,7 @@ func TestSchedulerCreation(t *testing.T) {
 }
 
 func TestDefaultErrorFunc(t *testing.T) {
-	testPod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-pod", Namespace: "default"}}
+	testPod := st.MakePod().Name("test-pod").Namespace(v1.NamespaceDefault).Obj()
 	testPodUpdated := testPod.DeepCopy()
 	testPodUpdated.Labels = map[string]string{"foo": ""}
 
@@ -307,7 +308,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 func TestDefaultErrorFunc_NodeNotFound(t *testing.T) {
 	nodeFoo := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 	nodeBar := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}
-	testPod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-pod", Namespace: "default"}}
+	testPod := st.MakePod().Name("test-pod").Namespace(v1.NamespaceDefault).Obj()
 	tests := []struct {
 		name             string
 		nodes            []v1.Node
@@ -374,7 +375,7 @@ func TestDefaultErrorFunc_PodAlreadyBound(t *testing.T) {
 	defer close(stopCh)
 
 	nodeFoo := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
-	testPod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-pod", Namespace: "default"}, Spec: v1.PodSpec{NodeName: "foo"}}
+	testPod := st.MakePod().Name("test-pod").Namespace(v1.NamespaceDefault).Node("foo").Obj()
 
 	client := fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testPod}}, &v1.NodeList{Items: []v1.Node{nodeFoo}})
 	informerFactory := informers.NewSharedInformerFactory(client, 0)

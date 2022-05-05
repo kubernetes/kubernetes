@@ -24,8 +24,6 @@ import (
 	"testing"
 	"time"
 
-	st "k8s.io/kubernetes/pkg/scheduler/testing"
-
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -33,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
@@ -745,24 +744,11 @@ func TestExpireAddUpdatePod(t *testing.T) {
 }
 
 func makePodWithEphemeralStorage(nodeName, ephemeralStorage string) *v1.Pod {
-	req := v1.ResourceList{
-		v1.ResourceEphemeralStorage: resource.MustParse(ephemeralStorage),
-	}
-	return &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "default-namespace",
-			Name:      "pod-with-ephemeral-storage",
-			UID:       types.UID("pod-with-ephemeral-storage"),
+	return st.MakePod().Name("pod-with-ephemeral-storage").Namespace("default-namespace").UID("pod-with-ephemeral-storage").Req(
+		map[v1.ResourceName]string{
+			v1.ResourceEphemeralStorage: ephemeralStorage,
 		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{{
-				Resources: v1.ResourceRequirements{
-					Requests: req,
-				},
-			}},
-			NodeName: nodeName,
-		},
-	}
+	).Node(nodeName).Obj()
 }
 
 func TestEphemeralStorageResource(t *testing.T) {
@@ -1202,16 +1188,8 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 	// Create a few pods for tests.
 	var pods []*v1.Pod
 	for i := 0; i < 20; i++ {
-		pod := &v1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      fmt.Sprintf("test-pod%v", i),
-				Namespace: "test-ns",
-				UID:       types.UID(fmt.Sprintf("test-puid%v", i)),
-			},
-			Spec: v1.PodSpec{
-				NodeName: fmt.Sprintf("test-node%v", i%10),
-			},
-		}
+		pod := st.MakePod().Name(fmt.Sprintf("test-pod%v", i)).Namespace("test-ns").UID(fmt.Sprintf("test-puid%v", i)).
+			Node(fmt.Sprintf("test-node%v", i%10)).Obj()
 		pods = append(pods, pod)
 	}
 
@@ -1823,36 +1801,23 @@ type testingMode interface {
 }
 
 func makeBasePod(t testingMode, nodeName, objName, cpu, mem, extended string, ports []v1.ContainerPort) *v1.Pod {
-	req := v1.ResourceList{}
+	req := make(map[v1.ResourceName]string)
 	if cpu != "" {
-		req = v1.ResourceList{
-			v1.ResourceCPU:    resource.MustParse(cpu),
-			v1.ResourceMemory: resource.MustParse(mem),
-		}
+		req[v1.ResourceCPU] = cpu
+		req[v1.ResourceMemory] = mem
+
 		if extended != "" {
 			parts := strings.Split(extended, ":")
 			if len(parts) != 2 {
 				t.Fatalf("Invalid extended resource string: \"%s\"", extended)
 			}
-			req[v1.ResourceName(parts[0])] = resource.MustParse(parts[1])
+			req[v1.ResourceName(parts[0])] = parts[1]
 		}
 	}
-	return &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			UID:       types.UID(objName),
-			Namespace: "node_info_cache_test",
-			Name:      objName,
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{{
-				Resources: v1.ResourceRequirements{
-					Requests: req,
-				},
-				Ports: ports,
-			}},
-			NodeName: nodeName,
-		},
-	}
+	podWrapper := st.MakePod().Name(objName).Namespace("node_info_cache_test").UID(objName).Node(nodeName).Containers([]v1.Container{
+		st.MakeContainer().Name("container").Image("pause").Resources(req).ContainerPort(ports).Obj(),
+	})
+	return podWrapper.Obj()
 }
 
 func setupCacheOf1kNodes30kPods(b *testing.B) Cache {
