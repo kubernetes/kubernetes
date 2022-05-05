@@ -258,7 +258,7 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
       kubectl controls the Kubernetes cluster manager.
 
       Find more information at:
-            https://kubernetes.io/docs/reference/kubectl/overview/`),
+            https://kubernetes.io/docs/reference/kubectl/`),
 		Run: runHelp,
 		// Hook before and after Run initialize and write profiles to disk,
 		// respectively.
