@@ -682,36 +682,13 @@ func WaitForContainerRunning(c clientset.Interface, namespace, podName, containe
 }
 
 // handleWaitingAPIErrror handles an error from an API request in the context of a Wait function.
-// If the error is retryable, sleep the recommended delay and ignore the error.
-// If the erorr is terminal, return it.
+// It allows to retry NotFound errors.
 func handleWaitingAPIError(err error, retryNotFound bool, taskFormat string, taskArgs ...interface{}) (bool, error) {
 	taskDescription := fmt.Sprintf(taskFormat, taskArgs...)
 	if retryNotFound && apierrors.IsNotFound(err) {
 		e2elog.Logf("Ignoring NotFound error while " + taskDescription)
 		return false, nil
 	}
-	if retry, delay := shouldRetry(err); retry {
-		e2elog.Logf("Retryable error while %s, retrying after %v: %v", taskDescription, delay, err)
-		if delay > 0 {
-			time.Sleep(delay)
-		}
-		return false, nil
-	}
-	e2elog.Logf("Encountered non-retryable error while %s: %v", taskDescription, err)
+	e2elog.Logf("Encountered error while %s: %v", taskDescription, err)
 	return false, err
-}
-
-// Decide whether to retry an API request. Optionally include a delay to retry after.
-func shouldRetry(err error) (retry bool, retryAfter time.Duration) {
-	// if the error sends the Retry-After header, we respect it as an explicit confirmation we should retry.
-	if delay, shouldRetry := apierrors.SuggestsClientDelay(err); shouldRetry {
-		return shouldRetry, time.Duration(delay) * time.Second
-	}
-
-	// these errors indicate a transient error that should be retried.
-	if apierrors.IsInternalError(err) || apierrors.IsTimeout(err) || apierrors.IsTooManyRequests(err) {
-		return true, 0
-	}
-
-	return false, 0
 }
