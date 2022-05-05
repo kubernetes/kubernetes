@@ -31,7 +31,6 @@
     "finalizers": [
       "finalizersValue"
     ],
-    "clusterName": "clusterNameValue",
     "managedFields": [
       {
         "manager": "managerValue",
@@ -81,7 +80,6 @@
         "finalizers": [
           "finalizersValue"
         ],
-        "clusterName": "clusterNameValue",
         "managedFields": [
           {
             "manager": "managerValue",
@@ -145,7 +143,6 @@
             "finalizers": [
               "finalizersValue"
             ],
-            "clusterName": "clusterNameValue",
             "managedFields": [
               {
                 "manager": "managerValue",
@@ -473,7 +470,6 @@
                       "finalizers": [
                         "finalizersValue"
                       ],
-                      "clusterName": "clusterNameValue",
                       "managedFields": [
                         {
                           "manager": "managerValue",
