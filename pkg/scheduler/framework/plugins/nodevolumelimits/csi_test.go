@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/fake"
+	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -68,195 +69,35 @@ func getVolumeLimitKey(filterType string) v1.ResourceName {
 }
 
 func TestCSILimits(t *testing.T) {
-	runningPod := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "csi-ebs.csi.aws.com-3",
-						},
-					},
-				},
-			},
-		},
-	}
-
-	pendingVolumePod := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "csi-4",
-						},
-					},
-				},
-			},
-		},
-	}
+	runningPod := st.MakePod().PVC("csi-ebs.csi.aws.com-3").Obj()
+	pendingVolumePod := st.MakePod().PVC("csi-4").Obj()
 
 	// Different pod than pendingVolumePod, but using the same unbound PVC
-	unboundPVCPod2 := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "csi-4",
-						},
-					},
-				},
-			},
-		},
-	}
+	unboundPVCPod2 := st.MakePod().PVC("csi-4").Obj()
 
-	missingPVPod := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "csi-6",
-						},
-					},
-				},
-			},
-		},
-	}
+	missingPVPod := st.MakePod().PVC("csi-6").Obj()
+	noSCPVCPod := st.MakePod().PVC("csi-5").Obj()
 
-	noSCPVCPod := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "csi-5",
-						},
-					},
-				},
-			},
-		},
-	}
-	gceTwoVolPod := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "csi-pd.csi.storage.gke.io-1",
-						},
-					},
-				},
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "csi-pd.csi.storage.gke.io-2",
-						},
-					},
-				},
-			},
-		},
-	}
+	gceTwoVolPod := st.MakePod().PVC("csi-pd.csi.storage.gke.io-1").PVC("csi-pd.csi.storage.gke.io-2").Obj()
+
 	// In-tree volumes
-	inTreeOneVolPod := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "csi-kubernetes.io/aws-ebs-0",
-						},
-					},
-				},
-			},
-		},
-	}
-	inTreeTwoVolPod := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "csi-kubernetes.io/aws-ebs-1",
-						},
-					},
-				},
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "csi-kubernetes.io/aws-ebs-2",
-						},
-					},
-				},
-			},
-		},
-	}
-	// pods with matching csi driver names
-	csiEBSOneVolPod := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "csi-ebs.csi.aws.com-0",
-						},
-					},
-				},
-			},
-		},
-	}
-	csiEBSTwoVolPod := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "csi-ebs.csi.aws.com-1",
-						},
-					},
-				},
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "csi-ebs.csi.aws.com-2",
-						},
-					},
-				},
-			},
-		},
-	}
-	inTreeNonMigratableOneVolPod := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "csi-kubernetes.io/hostpath-0",
-						},
-					},
-				},
-			},
-		},
-	}
+	inTreeOneVolPod := st.MakePod().PVC("csi-kubernetes.io/aws-ebs-0").Obj()
+	inTreeTwoVolPod := st.MakePod().PVC("csi-kubernetes.io/aws-ebs-1").PVC("csi-kubernetes.io/aws-ebs-2").Obj()
 
-	ephemeralVolumePod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "test",
-			Name:      "abc",
-			UID:       "12345",
-		},
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					Name: "xyz",
-					VolumeSource: v1.VolumeSource{
-						Ephemeral: &v1.EphemeralVolumeSource{},
-					},
-				},
+	// pods with matching csi driver names
+	csiEBSOneVolPod := st.MakePod().PVC("csi-ebs.csi.aws.com-0").Obj()
+	csiEBSTwoVolPod := st.MakePod().PVC("csi-ebs.csi.aws.com-1").PVC("csi-ebs.csi.aws.com-2").Obj()
+
+	inTreeNonMigratableOneVolPod := st.MakePod().PVC("csi-kubernetes.io/hostpath-0").Obj()
+
+	ephemeralVolumePod := st.MakePod().Name("abc").Namespace("test").UID("12345").Volume(
+		v1.Volume{
+			Name: "xyz",
+			VolumeSource: v1.VolumeSource{
+				Ephemeral: &v1.EphemeralVolumeSource{},
 			},
-		},
-	}
+		}).Obj()
+
 	controller := true
 	ephemeralClaim := &v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
@@ -278,29 +119,18 @@ func TestCSILimits(t *testing.T) {
 	conflictingClaim := ephemeralClaim.DeepCopy()
 	conflictingClaim.OwnerReferences = nil
 
-	ephemeralTwoVolumePod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "test",
-			Name:      "abc",
-			UID:       "12345II",
+	ephemeralTwoVolumePod := st.MakePod().Name("abc").Namespace("test").UID("12345II").Volume(v1.Volume{
+		Name: "x",
+		VolumeSource: v1.VolumeSource{
+			Ephemeral: &v1.EphemeralVolumeSource{},
 		},
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					Name: "x",
-					VolumeSource: v1.VolumeSource{
-						Ephemeral: &v1.EphemeralVolumeSource{},
-					},
-				},
-				{
-					Name: "y",
-					VolumeSource: v1.VolumeSource{
-						Ephemeral: &v1.EphemeralVolumeSource{},
-					},
-				},
-			},
+	}).Volume(v1.Volume{
+		Name: "y",
+		VolumeSource: v1.VolumeSource{
+			Ephemeral: &v1.EphemeralVolumeSource{},
 		},
-	}
+	}).Obj()
+
 	ephemeralClaimX := &v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: ephemeralTwoVolumePod.Namespace,

@@ -26,24 +26,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/fake"
+	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
 func createPodWithVolume(pod, pv, pvc string) *v1.Pod {
-	return &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: pod, Namespace: "default"},
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					Name: pv,
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: pvc,
-						},
-					},
-				},
-			},
-		},
-	}
+	return st.MakePod().Name(pod).Namespace(metav1.NamespaceDefault).PVC(pvc).Obj()
 }
 
 func TestSingleZone(t *testing.T) {
@@ -100,9 +87,7 @@ func TestSingleZone(t *testing.T) {
 	}{
 		{
 			name: "pod without volume",
-			Pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "pod_1", Namespace: "default"},
-			},
+			Pod:  st.MakePod().Name("pod_1").Namespace(metav1.NamespaceDefault).Obj(),
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "host1",

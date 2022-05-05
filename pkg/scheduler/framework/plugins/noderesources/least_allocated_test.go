@@ -81,7 +81,7 @@ func TestLeastAllocatedScoringStrategy(t *testing.T) {
 			// CPU Score: ((6000 - 3000) * MaxNodeScore) / 6000 = 50
 			// Memory Score: ((10000 - 5000) * MaxNodeScore) / 10000 = 50
 			// Node2 Score: (50 + 50) / 2 = 50
-			name: "nothing scheduled, resources requested, differently sized machines",
+			name: "nothing scheduled, resources requested, differently sized nodes",
 			requestedPod: st.MakePod().
 				Req(map[v1.ResourceName]string{"cpu": "1000", "memory": "2000"}).
 				Req(map[v1.ResourceName]string{"cpu": "2000", "memory": "3000"}).
@@ -95,7 +95,7 @@ func TestLeastAllocatedScoringStrategy(t *testing.T) {
 			resources:      defaultResources,
 		},
 		{
-			name: "Resources not set, nothing scheduled, resources requested, differently sized machines",
+			name: "Resources not set, nothing scheduled, resources requested, differently sized nodes",
 			requestedPod: st.MakePod().
 				Req(map[v1.ResourceName]string{"cpu": "1000", "memory": "2000"}).
 				Req(map[v1.ResourceName]string{"cpu": "2000", "memory": "3000"}).
@@ -190,7 +190,7 @@ func TestLeastAllocatedScoringStrategy(t *testing.T) {
 			// CPU Score: ((10000 - 6000) * MaxNodeScore) / 10000 = 40
 			// Memory Score: ((50000 - 10000) * MaxNodeScore) / 50000 = 80
 			// Node2 Score: (40 + 80) / 2 = 60
-			name: "resources requested, pods scheduled with resources, differently sized machines",
+			name: "resources requested, pods scheduled with resources, differently sized nodes",
 			requestedPod: st.MakePod().
 				Req(map[v1.ResourceName]string{"cpu": "1000", "memory": "2000"}).
 				Req(map[v1.ResourceName]string{"cpu": "2000", "memory": "3000"}).
@@ -249,7 +249,7 @@ func TestLeastAllocatedScoringStrategy(t *testing.T) {
 			// CPU Score: ((6000 - 3000) *100) / 6000 = 50
 			// Memory Score: ((10000 - 5000) *100) / 10000 = 50
 			// Node2 Score: (50 * 1 + 50 * 2) / (1 + 2) = 50
-			name: "nothing scheduled, resources requested with different weight on CPU and memory, differently sized machines",
+			name: "nothing scheduled, resources requested with different weight on CPU and memory, differently sized nodes",
 			requestedPod: st.MakePod().Node("node1").
 				Req(map[v1.ResourceName]string{"cpu": "1000", "memory": "2000"}).
 				Req(map[v1.ResourceName]string{"cpu": "2000", "memory": "3000"}).
