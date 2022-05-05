@@ -4218,7 +4218,7 @@ func ValidatePodCreate(pod *core.Pod, opts PodValidationOptions) field.ErrorList
 	return allErrs
 }
 
-// ValidateSeccompAnnotationsAndFields iterates through all containers and ensure that when both seccompProfile and seccomp annotations exist they match.
+// validateSeccompAnnotationsAndFields iterates through all containers and ensure that when both seccompProfile and seccomp annotations exist they match.
 func validateSeccompAnnotationsAndFields(objectMeta metav1.ObjectMeta, podSpec *core.PodSpec, specPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
