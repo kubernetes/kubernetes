@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package etcd3
+package testing
 
 import (
 	"context"
@@ -111,18 +111,18 @@ func testWatch(ctx context.Context, t *testing.T, store storage.Interface, recur
 						expectObj = prevObj
 						expectObj.ResourceVersion = out.ResourceVersion
 					}
-					testCheckResult(t, watchTest.watchType, w, expectObj)
+					TestCheckResult(t, watchTest.watchType, w, expectObj)
 				}
 				prevObj = out
 			}
 			w.Stop()
-			testCheckStop(t, w)
+			TestCheckStop(t, w)
 		})
 	}
 }
 
 func RunTestDeleteTriggerWatch(ctx context.Context, t *testing.T, store storage.Interface) {
-	key, storedObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+	key, storedObj := TestPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 	w, err := store.Watch(ctx, key, storage.ListOptions{ResourceVersion: storedObj.ResourceVersion, Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
@@ -130,11 +130,11 @@ func RunTestDeleteTriggerWatch(ctx context.Context, t *testing.T, store storage.
 	if err := store.Delete(ctx, key, &example.Pod{}, nil, storage.ValidateAllObjectFunc, nil); err != nil {
 		t.Fatalf("Delete failed: %v", err)
 	}
-	testCheckEventType(t, watch.Deleted, w)
+	TestCheckEventType(t, watch.Deleted, w)
 }
 
 func RunTestWatchFromNoneZero(ctx context.Context, t *testing.T, store storage.Interface) {
-	key, storedObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+	key, storedObj := TestPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 
 	w, err := store.Watch(ctx, key, storage.ListOptions{ResourceVersion: storedObj.ResourceVersion, Predicate: storage.Everything})
 	if err != nil {
@@ -145,7 +145,7 @@ func RunTestWatchFromNoneZero(ctx context.Context, t *testing.T, store storage.I
 		func(runtime.Object) (runtime.Object, error) {
 			return &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}, err
 		}), nil)
-	testCheckResult(t, watch.Modified, w, out)
+	TestCheckResult(t, watch.Modified, w, out)
 }
 
 func RunTestWatchInitializationSignal(ctx context.Context, t *testing.T, store storage.Interface) {
@@ -153,7 +153,7 @@ func RunTestWatchInitializationSignal(ctx context.Context, t *testing.T, store s
 	initSignal := utilflowcontrol.NewInitializationSignal()
 	ctx = utilflowcontrol.WithInitializationSignal(ctx, initSignal)
 
-	key, storedObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+	key, storedObj := TestPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 	_, err := store.Watch(ctx, key, storage.ListOptions{ResourceVersion: storedObj.ResourceVersion, Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
@@ -168,7 +168,7 @@ type testWatchStruct struct {
 	watchType   watch.EventType
 }
 
-func testCheckEventType(t *testing.T, expectEventType watch.EventType, w watch.Interface) {
+func TestCheckEventType(t *testing.T, expectEventType watch.EventType, w watch.Interface) {
 	select {
 	case res := <-w.ResultChan():
 		if res.Type != expectEventType {
@@ -179,14 +179,14 @@ func testCheckEventType(t *testing.T, expectEventType watch.EventType, w watch.I
 	}
 }
 
-func testCheckResult(t *testing.T, expectEventType watch.EventType, w watch.Interface, expectObj *example.Pod) {
-	testCheckResultFunc(t, expectEventType, w, func(object runtime.Object) error {
-		expectNoDiff(t, "incorrect object", expectObj, object)
+func TestCheckResult(t *testing.T, expectEventType watch.EventType, w watch.Interface, expectObj *example.Pod) {
+	TestCheckResultFunc(t, expectEventType, w, func(object runtime.Object) error {
+		ExpectNoDiff(t, "incorrect object", expectObj, object)
 		return nil
 	})
 }
 
-func testCheckResultFunc(t *testing.T, expectEventType watch.EventType, w watch.Interface, check func(object runtime.Object) error) {
+func TestCheckResultFunc(t *testing.T, expectEventType watch.EventType, w watch.Interface, check func(object runtime.Object) error) {
 	select {
 	case res := <-w.ResultChan():
 		if res.Type != expectEventType {
@@ -201,7 +201,7 @@ func testCheckResultFunc(t *testing.T, expectEventType watch.EventType, w watch.
 	}
 }
 
-func testCheckStop(t *testing.T, w watch.Interface) {
+func TestCheckStop(t *testing.T, w watch.Interface) {
 	select {
 	case e, ok := <-w.ResultChan():
 		if ok {

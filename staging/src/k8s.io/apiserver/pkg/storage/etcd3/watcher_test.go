@@ -25,6 +25,7 @@ import (
 
 	"go.etcd.io/etcd/api/v3/mvccpb"
 	clientv3 "go.etcd.io/etcd/client/v3"
+	storagetesting "k8s.io/apiserver/pkg/storage/testing"
 
 	"k8s.io/apimachinery/pkg/api/apitesting"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,12 +41,12 @@ import (
 
 func TestWatch(t *testing.T) {
 	ctx, store, _ := testSetup(t)
-	RunTestWatch(ctx, t, store)
+	storagetesting.RunTestWatch(ctx, t, store)
 }
 
 func TestDeleteTriggerWatch(t *testing.T) {
 	ctx, store, _ := testSetup(t)
-	RunTestDeleteTriggerWatch(ctx, t, store)
+	storagetesting.RunTestDeleteTriggerWatch(ctx, t, store)
 }
 
 // TestWatchFromZero tests that
@@ -53,13 +54,13 @@ func TestDeleteTriggerWatch(t *testing.T) {
 // - watch from 0 is able to return events for objects whose previous version has been compacted
 func TestWatchFromZero(t *testing.T) {
 	ctx, store, client := testSetup(t)
-	key, storedObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "ns"}})
+	key, storedObj := storagetesting.TestPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "ns"}})
 
 	w, err := store.Watch(ctx, key, storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
-	testCheckResult(t, watch.Added, w, storedObj)
+	storagetesting.TestCheckResult(t, watch.Added, w, storedObj)
 	w.Stop()
 
 	// Update
@@ -77,7 +78,7 @@ func TestWatchFromZero(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
-	testCheckResult(t, watch.Added, w, out)
+	storagetesting.TestCheckResult(t, watch.Added, w, out)
 	w.Stop()
 
 	// Update again
@@ -105,14 +106,14 @@ func TestWatchFromZero(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
-	testCheckResult(t, watch.Added, w, out)
+	storagetesting.TestCheckResult(t, watch.Added, w, out)
 }
 
 // TestWatchFromNoneZero tests that
 // - watch from non-0 should just watch changes after given version
 func TestWatchFromNoneZero(t *testing.T) {
 	ctx, store, _ := testSetup(t)
-	RunTestWatchFromNoneZero(ctx, t, store)
+	storagetesting.RunTestWatchFromNoneZero(ctx, t, store)
 }
 
 func TestWatchError(t *testing.T) {
@@ -131,7 +132,7 @@ func TestWatchError(t *testing.T) {
 		}), nil); err != nil {
 		t.Fatalf("GuaranteedUpdate failed: %v", err)
 	}
-	testCheckEventType(t, watch.Error, w)
+	storagetesting.TestCheckEventType(t, watch.Error, w)
 }
 
 func TestWatchContextCancel(t *testing.T) {
@@ -179,7 +180,7 @@ func TestWatchErrResultNotBlockAfterCancel(t *testing.T) {
 
 func TestWatchDeleteEventObjectHaveLatestRV(t *testing.T) {
 	ctx, store, client := testSetup(t)
-	key, storedObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+	key, storedObj := storagetesting.TestPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 
 	w, err := store.Watch(ctx, key, storage.ListOptions{ResourceVersion: storedObj.ResourceVersion, Predicate: storage.Everything})
 	if err != nil {
@@ -235,7 +236,7 @@ func deletedRevision(ctx context.Context, watch <-chan clientv3.WatchResponse) (
 
 func TestWatchInitializationSignal(t *testing.T) {
 	ctx, store, _ := testSetup(t)
-	RunTestWatchInitializationSignal(ctx, t, store)
+	storagetesting.RunTestWatchInitializationSignal(ctx, t, store)
 }
 
 func TestProgressNotify(t *testing.T) {
@@ -263,7 +264,7 @@ func TestProgressNotify(t *testing.T) {
 
 	// when we send a bookmark event, the client expects the event to contain an
 	// object of the correct type, but with no fields set other than the resourceVersion
-	testCheckResultFunc(t, watch.Bookmark, w, func(object runtime.Object) error {
+	storagetesting.TestCheckResultFunc(t, watch.Bookmark, w, func(object runtime.Object) error {
 		// first, check that we have the correct resource version
 		obj, ok := object.(metav1.Object)
 		if !ok {
@@ -279,7 +280,7 @@ func TestProgressNotify(t *testing.T) {
 			return fmt.Errorf("got %T, not *example.Pod", object)
 		}
 		pod.ResourceVersion = ""
-		expectNoDiff(t, "bookmark event should contain an object with no fields set other than resourceVersion", newPod(), pod)
+		storagetesting.ExpectNoDiff(t, "bookmark event should contain an object with no fields set other than resourceVersion", newPod(), pod)
 		return nil
 	})
 }
