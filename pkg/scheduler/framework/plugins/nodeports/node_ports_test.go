@@ -27,6 +27,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
 func newPod(host string, hostPortInfos ...string) *v1.Pod {
@@ -41,16 +42,7 @@ func newPod(host string, hostPortInfos ...string) *v1.Pod {
 			Protocol: v1.Protocol(splited[0]),
 		})
 	}
-	return &v1.Pod{
-		Spec: v1.PodSpec{
-			NodeName: host,
-			Containers: []v1.Container{
-				{
-					Ports: networkPorts,
-				},
-			},
-		},
-	}
+	return st.MakePod().Node(host).ContainerPort(networkPorts).Obj()
 }
 
 func TestNodePorts(t *testing.T) {
@@ -184,66 +176,42 @@ func TestGetContainerPorts(t *testing.T) {
 		expected []*v1.ContainerPort
 	}{
 		{
-			pod1: &v1.Pod{
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{
-							Ports: []v1.ContainerPort{
-								{
-									ContainerPort: 8001,
-									Protocol:      v1.ProtocolTCP,
-								},
-								{
-									ContainerPort: 8002,
-									Protocol:      v1.ProtocolTCP,
-								},
-							},
-						},
-						{
-							Ports: []v1.ContainerPort{
-								{
-									ContainerPort: 8003,
-									Protocol:      v1.ProtocolTCP,
-								},
-								{
-									ContainerPort: 8004,
-									Protocol:      v1.ProtocolTCP,
-								},
-							},
-						},
-					},
+			pod1: st.MakePod().ContainerPort([]v1.ContainerPort{
+				{
+					ContainerPort: 8001,
+					Protocol:      v1.ProtocolTCP,
 				},
-			},
-			pod2: &v1.Pod{
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{
-							Ports: []v1.ContainerPort{
-								{
-									ContainerPort: 8011,
-									Protocol:      v1.ProtocolTCP,
-								},
-								{
-									ContainerPort: 8012,
-									Protocol:      v1.ProtocolTCP,
-								},
-							},
-						},
-						{
-							Ports: []v1.ContainerPort{
-								{
-									ContainerPort: 8013,
-									Protocol:      v1.ProtocolTCP,
-								},
-								{
-									ContainerPort: 8014,
-									Protocol:      v1.ProtocolTCP,
-								},
-							},
-						},
-					},
+				{
+					ContainerPort: 8002,
+					Protocol:      v1.ProtocolTCP,
+				}}).ContainerPort([]v1.ContainerPort{
+				{
+					ContainerPort: 8003,
+					Protocol:      v1.ProtocolTCP,
 				},
-			},
+				{
+					ContainerPort: 8004,
+					Protocol:      v1.ProtocolTCP,
+				},
+			}).Obj(),
+			pod2: st.MakePod().ContainerPort([]v1.ContainerPort{
+				{
+					ContainerPort: 8011,
+					Protocol:      v1.ProtocolTCP,
+				},
+				{
+					ContainerPort: 8012,
+					Protocol:      v1.ProtocolTCP,
+				}}).ContainerPort([]v1.ContainerPort{
+				{
+					ContainerPort: 8013,
+					Protocol:      v1.ProtocolTCP,
+				},
+				{
+					ContainerPort: 8014,
+					Protocol:      v1.ProtocolTCP,
+				},
+			}).Obj(),
 			expected: []*v1.ContainerPort{
 				{
 					ContainerPort: 8001,

@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
+	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
 // TODO: Add test case for RequiredDuringSchedulingRequiredDuringExecution after it's implemented.
@@ -49,37 +50,25 @@ func TestNodeAffinity(t *testing.T) {
 		},
 		{
 			name: "missing labels",
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{
-					NodeSelector: map[string]string{
-						"foo": "bar",
-					},
-				},
-			},
+			pod: st.MakePod().NodeSelector(map[string]string{
+				"foo": "bar",
+			}).Obj(),
 			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
 		},
 		{
 			name: "same labels",
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{
-					NodeSelector: map[string]string{
-						"foo": "bar",
-					},
-				},
-			},
+			pod: st.MakePod().NodeSelector(map[string]string{
+				"foo": "bar",
+			}).Obj(),
 			labels: map[string]string{
 				"foo": "bar",
 			},
 		},
 		{
 			name: "node labels are superset",
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{
-					NodeSelector: map[string]string{
-						"foo": "bar",
-					},
-				},
-			},
+			pod: st.MakePod().NodeSelector(map[string]string{
+				"foo": "bar",
+			}).Obj(),
 			labels: map[string]string{
 				"foo": "bar",
 				"baz": "blah",
@@ -87,14 +76,10 @@ func TestNodeAffinity(t *testing.T) {
 		},
 		{
 			name: "node labels are subset",
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{
-					NodeSelector: map[string]string{
-						"foo": "bar",
-						"baz": "blah",
-					},
-				},
-			},
+			pod: st.MakePod().NodeSelector(map[string]string{
+				"foo": "bar",
+				"baz": "blah",
+			}).Obj(),
 			labels: map[string]string{
 				"foo": "bar",
 			},
@@ -1029,69 +1014,69 @@ func TestNodeAffinityPriority(t *testing.T) {
 		disablePreScore bool
 	}{
 		{
-			name: "all machines are same priority as NodeAffinity is nil",
+			name: "all nodes are same priority as NodeAffinity is nil",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{},
 				},
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: label1}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: label2}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "machine3", Labels: label3}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: label1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: label2}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node3", Labels: label3}},
 			},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: 0}, {Name: "machine3", Score: 0}},
+			expectedList: []framework.NodeScore{{Name: "node1", Score: 0}, {Name: "node2", Score: 0}, {Name: "node3", Score: 0}},
 		},
 		{
-			name: "no machine matches preferred scheduling requirements in NodeAffinity of pod so all machines' priority is zero",
+			name: "no node matches preferred scheduling requirements in NodeAffinity of pod so all nodes' priority is zero",
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
 					Affinity: affinity1,
 				},
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: label4}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: label2}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "machine3", Labels: label3}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: label4}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: label2}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node3", Labels: label3}},
 			},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: 0}, {Name: "machine3", Score: 0}},
+			expectedList: []framework.NodeScore{{Name: "node1", Score: 0}, {Name: "node2", Score: 0}, {Name: "node3", Score: 0}},
 		},
 		{
-			name: "only machine1 matches the preferred scheduling requirements of pod",
+			name: "only node1 matches the preferred scheduling requirements of pod",
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
 					Affinity: affinity1,
 				},
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: label1}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: label2}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "machine3", Labels: label3}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: label1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: label2}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node3", Labels: label3}},
 			},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: framework.MaxNodeScore}, {Name: "machine2", Score: 0}, {Name: "machine3", Score: 0}},
+			expectedList: []framework.NodeScore{{Name: "node1", Score: framework.MaxNodeScore}, {Name: "node2", Score: 0}, {Name: "node3", Score: 0}},
 		},
 		{
-			name: "all machines matches the preferred scheduling requirements of pod but with different priorities ",
+			name: "all nodes matches the preferred scheduling requirements of pod but with different priorities ",
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
 					Affinity: affinity2,
 				},
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: label1}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "machine5", Labels: label5}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: label2}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: label1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node5", Labels: label5}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: label2}},
 			},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: 18}, {Name: "machine5", Score: framework.MaxNodeScore}, {Name: "machine2", Score: 36}},
+			expectedList: []framework.NodeScore{{Name: "node1", Score: 18}, {Name: "node5", Score: framework.MaxNodeScore}, {Name: "node2", Score: 36}},
 		},
 		{
 			name: "added affinity",
 			pod:  &v1.Pod{},
 			nodes: []*v1.Node{
-				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: label1}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: label2}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: label1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: label2}},
 			},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: framework.MaxNodeScore}, {Name: "machine2", Score: 0}},
+			expectedList: []framework.NodeScore{{Name: "node1", Score: framework.MaxNodeScore}, {Name: "node2", Score: 0}},
 			args: config.NodeAffinityArgs{
 				AddedAffinity: affinity1.NodeAffinity,
 			},
@@ -1104,11 +1089,11 @@ func TestNodeAffinityPriority(t *testing.T) {
 				},
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: label1}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: label2}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "machine3", Labels: label5}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: label1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: label2}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node3", Labels: label5}},
 			},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: 40}, {Name: "machine2", Score: 60}, {Name: "machine3", Score: framework.MaxNodeScore}},
+			expectedList: []framework.NodeScore{{Name: "node1", Score: 40}, {Name: "node2", Score: 60}, {Name: "node3", Score: framework.MaxNodeScore}},
 			args: config.NodeAffinityArgs{
 				AddedAffinity: &v1.NodeAffinity{
 					PreferredDuringSchedulingIgnoredDuringExecution: []v1.PreferredSchedulingTerm{
@@ -1136,11 +1121,11 @@ func TestNodeAffinityPriority(t *testing.T) {
 				},
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: label1}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "machine5", Labels: label5}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: label2}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: label1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node5", Labels: label5}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: label2}},
 			},
-			expectedList:    []framework.NodeScore{{Name: "machine1", Score: 18}, {Name: "machine5", Score: framework.MaxNodeScore}, {Name: "machine2", Score: 36}},
+			expectedList:    []framework.NodeScore{{Name: "node1", Score: 18}, {Name: "node5", Score: framework.MaxNodeScore}, {Name: "node2", Score: 36}},
 			disablePreScore: true,
 		},
 	}

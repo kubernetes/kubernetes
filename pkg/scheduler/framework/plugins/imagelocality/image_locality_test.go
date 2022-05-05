@@ -240,8 +240,8 @@ func TestImageLocalityPriority(t *testing.T) {
 			// Image: gcr.io/250:latest 250MB
 			// Score: 100 * (250M/2 - 23M)/(1000M * 2 - 23M) = 5
 			pod:          &v1.Pod{Spec: test40250},
-			nodes:        []*v1.Node{makeImageNode("machine1", node403002000), makeImageNode("machine2", node25010)},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: 5}},
+			nodes:        []*v1.Node{makeImageNode("node1", node403002000), makeImageNode("node2", node25010)},
+			expectedList: []framework.NodeScore{{Name: "node1", Score: 0}, {Name: "node2", Score: 5}},
 			name:         "two images spread on two nodes, prefer the larger image one",
 		},
 		{
@@ -255,8 +255,8 @@ func TestImageLocalityPriority(t *testing.T) {
 			// Image: not present
 			// Score: 0
 			pod:          &v1.Pod{Spec: test40300},
-			nodes:        []*v1.Node{makeImageNode("machine1", node403002000), makeImageNode("machine2", node25010)},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: 7}, {Name: "machine2", Score: 0}},
+			nodes:        []*v1.Node{makeImageNode("node1", node403002000), makeImageNode("node2", node25010)},
+			expectedList: []framework.NodeScore{{Name: "node1", Score: 7}, {Name: "node2", Score: 0}},
 			name:         "two images on one node, prefer this node",
 		},
 		{
@@ -270,8 +270,8 @@ func TestImageLocalityPriority(t *testing.T) {
 			// Image: gcr.io/10:latest 10MB
 			// Score: 0 (10M/2 < 23M, min-threshold)
 			pod:          &v1.Pod{Spec: testMinMax},
-			nodes:        []*v1.Node{makeImageNode("machine1", node400030), makeImageNode("machine2", node25010)},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: framework.MaxNodeScore}, {Name: "machine2", Score: 0}},
+			nodes:        []*v1.Node{makeImageNode("node1", node400030), makeImageNode("node2", node25010)},
+			expectedList: []framework.NodeScore{{Name: "node1", Score: framework.MaxNodeScore}, {Name: "node2", Score: 0}},
 			name:         "if exceed limit, use limit",
 		},
 		{
@@ -289,8 +289,8 @@ func TestImageLocalityPriority(t *testing.T) {
 			// Image:
 			// Score: 0
 			pod:          &v1.Pod{Spec: testMinMax},
-			nodes:        []*v1.Node{makeImageNode("machine1", node400030), makeImageNode("machine2", node25010), makeImageNode("machine3", nodeWithNoImages)},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: 66}, {Name: "machine2", Score: 0}, {Name: "machine3", Score: 0}},
+			nodes:        []*v1.Node{makeImageNode("node1", node400030), makeImageNode("node2", node25010), makeImageNode("node3", nodeWithNoImages)},
+			expectedList: []framework.NodeScore{{Name: "node1", Score: 66}, {Name: "node2", Score: 0}, {Name: "node3", Score: 0}},
 			name:         "if exceed limit, use limit (with node which has no images present)",
 		},
 		{
@@ -308,9 +308,9 @@ func TestImageLocalityPriority(t *testing.T) {
 			// Image:
 			// Score: 0
 			pod:          &v1.Pod{Spec: test300600900},
-			nodes:        []*v1.Node{makeImageNode("machine1", node60040900), makeImageNode("machine2", node300600900), makeImageNode("machine3", nodeWithNoImages)},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: 32}, {Name: "machine2", Score: 36}, {Name: "machine3", Score: 0}},
-			name:         "pod with multiple large images, machine2 is preferred",
+			nodes:        []*v1.Node{makeImageNode("node1", node60040900), makeImageNode("node2", node300600900), makeImageNode("node3", nodeWithNoImages)},
+			expectedList: []framework.NodeScore{{Name: "node1", Score: 32}, {Name: "node2", Score: 36}, {Name: "node3", Score: 0}},
+			name:         "pod with multiple large images, node2 is preferred",
 		},
 		{
 			// Pod: gcr.io/30 gcr.io/40
@@ -323,8 +323,8 @@ func TestImageLocalityPriority(t *testing.T) {
 			// Image: 100 * (30M - 23M) / (1000M * 2 - 23M) = 0
 			// Score: 0
 			pod:          &v1.Pod{Spec: test3040},
-			nodes:        []*v1.Node{makeImageNode("machine1", node203040), makeImageNode("machine2", node400030)},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: 1}, {Name: "machine2", Score: 0}},
+			nodes:        []*v1.Node{makeImageNode("node1", node203040), makeImageNode("node2", node400030)},
+			expectedList: []framework.NodeScore{{Name: "node1", Score: 1}, {Name: "node2", Score: 0}},
 			name:         "pod with multiple small images",
 		},
 	}
