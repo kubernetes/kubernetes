@@ -43,7 +43,4 @@ require (
 	sigs.k8s.io/yaml v1.2.0 // indirect
 )
 
-replace (
-	github.com/envoyproxy/go-control-plane => github.com/envoyproxy/go-control-plane v0.9.9-0.20210512163311-63b5d3c536b0
-	k8s.io/code-generator => ../code-generator
-)
+replace k8s.io/code-generator => ../code-generator
