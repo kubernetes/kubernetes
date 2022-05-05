@@ -748,7 +748,7 @@ func TestHandlePortConflicts(t *testing.T) {
 	recorder := record.NewFakeRecorder(20)
 	nodeRef := &v1.ObjectReference{
 		Kind:      "Node",
-		Name:      string("testNode"),
+		Name:      "testNode",
 		UID:       types.UID("testNode"),
 		Namespace: "",
 	}
@@ -798,7 +798,7 @@ func TestHandleHostNameConflicts(t *testing.T) {
 	recorder := record.NewFakeRecorder(20)
 	nodeRef := &v1.ObjectReference{
 		Kind:      "Node",
-		Name:      string("testNode"),
+		Name:      "testNode",
 		UID:       types.UID("testNode"),
 		Namespace: "",
 	}
@@ -841,7 +841,7 @@ func TestHandleNodeSelector(t *testing.T) {
 	recorder := record.NewFakeRecorder(20)
 	nodeRef := &v1.ObjectReference{
 		Kind:      "Node",
-		Name:      string("testNode"),
+		Name:      "testNode",
 		UID:       types.UID("testNode"),
 		Namespace: "",
 	}
@@ -911,7 +911,7 @@ func TestHandleNodeSelectorBasedOnOS(t *testing.T) {
 			recorder := record.NewFakeRecorder(20)
 			nodeRef := &v1.ObjectReference{
 				Kind:      "Node",
-				Name:      string("testNode"),
+				Name:      "testNode",
 				UID:       types.UID("testNode"),
 				Namespace: "",
 			}
@@ -946,7 +946,7 @@ func TestHandleMemExceeded(t *testing.T) {
 	recorder := record.NewFakeRecorder(20)
 	nodeRef := &v1.ObjectReference{
 		Kind:      "Node",
-		Name:      string("testNode"),
+		Name:      "testNode",
 		UID:       types.UID("testNode"),
 		Namespace: "",
 	}
@@ -1044,7 +1044,7 @@ func TestHandlePluginResources(t *testing.T) {
 	recorder := record.NewFakeRecorder(20)
 	nodeRef := &v1.ObjectReference{
 		Kind:      "Node",
-		Name:      string("testNode"),
+		Name:      "testNode",
 		UID:       types.UID("testNode"),
 		Namespace: "",
 	}
@@ -1290,24 +1290,40 @@ func TestValidateContainerLogStatus(t *testing.T) {
 }
 
 func TestCreateMirrorPod(t *testing.T) {
-	for _, updateType := range []kubetypes.SyncPodType{kubetypes.SyncPodCreate, kubetypes.SyncPodUpdate} {
-		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-		defer testKubelet.Cleanup()
+	tests := []struct {
+		name       string
+		updateType kubetypes.SyncPodType
+	}{
+		{
+			name:       "SyncPodCreate",
+			updateType: kubetypes.SyncPodCreate,
+		},
+		{
+			name:       "SyncPodUpdate",
+			updateType: kubetypes.SyncPodUpdate,
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
 
-		kl := testKubelet.kubelet
-		manager := testKubelet.fakeMirrorClient
-		pod := podWithUIDNameNs("12345678", "bar", "foo")
-		pod.Annotations[kubetypes.ConfigSourceAnnotationKey] = "file"
-		pods := []*v1.Pod{pod}
-		kl.podManager.SetPods(pods)
-		isTerminal, err := kl.syncPod(context.Background(), updateType, pod, nil, &kubecontainer.PodStatus{})
-		assert.NoError(t, err)
-		if isTerminal {
-			t.Fatalf("pod should not be terminal: %#v", pod)
-		}
-		podFullName := kubecontainer.GetPodFullName(pod)
-		assert.True(t, manager.HasPod(podFullName), "Expected mirror pod %q to be created", podFullName)
-		assert.Equal(t, 1, manager.NumOfPods(), "Expected only 1 mirror pod %q, got %+v", podFullName, manager.GetPods())
+			kl := testKubelet.kubelet
+			manager := testKubelet.fakeMirrorClient
+			pod := podWithUIDNameNs("12345678", "bar", "foo")
+			pod.Annotations[kubetypes.ConfigSourceAnnotationKey] = "file"
+			pods := []*v1.Pod{pod}
+			kl.podManager.SetPods(pods)
+			isTerminal, err := kl.syncPod(context.Background(), tt.updateType, pod, nil, &kubecontainer.PodStatus{})
+			assert.NoError(t, err)
+			if isTerminal {
+				t.Fatalf("pod should not be terminal: %#v", pod)
+			}
+			podFullName := kubecontainer.GetPodFullName(pod)
+			assert.True(t, manager.HasPod(podFullName), "Expected mirror pod %q to be created", podFullName)
+			assert.Equal(t, 1, manager.NumOfPods(), "Expected only 1 mirror pod %q, got %+v", podFullName, manager.GetPods())
+		})
 	}
 }
 
