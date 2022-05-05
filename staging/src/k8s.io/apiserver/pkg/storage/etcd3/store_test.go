@@ -41,7 +41,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/apitesting"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -167,7 +166,10 @@ func checkStorageInvariants(ctx context.Context, t *testing.T, etcdClient *clien
 
 func TestCreateWithTTL(t *testing.T) {
 	ctx, store, _ := testSetup(t)
+	RunTestCreateWithTTL(ctx, t, store)
+}
 
+func RunTestCreateWithTTL(ctx context.Context, t *testing.T, store storage.Interface) {
 	input := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 	key := "/somekey"
 
@@ -185,6 +187,10 @@ func TestCreateWithTTL(t *testing.T) {
 
 func TestCreateWithKeyExist(t *testing.T) {
 	ctx, store, _ := testSetup(t)
+	RunTestCreateWithKeyExist(ctx, t, store)
+}
+
+func RunTestCreateWithKeyExist(ctx context.Context, t *testing.T, store storage.Interface) {
 	obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 	key, _ := testPropogateStore(ctx, t, store, obj)
 	out := &example.Pod{}
@@ -196,6 +202,10 @@ func TestCreateWithKeyExist(t *testing.T) {
 
 func TestGet(t *testing.T) {
 	ctx, store, _ := testSetup(t)
+	RunTestGet(ctx, t, store)
+}
+
+func RunTestGet(ctx context.Context, t *testing.T, store storage.Interface) {
 	// create an object to test
 	key, createdObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 	// update the object once to allow get by exact resource version to be tested
@@ -298,6 +308,10 @@ func TestGet(t *testing.T) {
 
 func TestUnconditionalDelete(t *testing.T) {
 	ctx, store, _ := testSetup(t)
+	RunTestUnconditionalDelete(ctx, t, store)
+}
+
+func RunTestUnconditionalDelete(ctx context.Context, t *testing.T, store storage.Interface) {
 	key, storedObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 
 	tests := []struct {
@@ -337,6 +351,10 @@ func TestUnconditionalDelete(t *testing.T) {
 
 func TestConditionalDelete(t *testing.T) {
 	ctx, store, _ := testSetup(t)
+	RunTestConditionalDelete(ctx, t, store)
+}
+
+func RunTestConditionalDelete(ctx context.Context, t *testing.T, store storage.Interface) {
 	key, storedObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: "A"}})
 
 	tests := []struct {
@@ -399,6 +417,10 @@ func TestConditionalDelete(t *testing.T) {
 
 func TestDeleteWithSuggestion(t *testing.T) {
 	ctx, store, _ := testSetup(t)
+	RunTestDeleteWithSuggestion(ctx, t, store)
+}
+
+func RunTestDeleteWithSuggestion(ctx context.Context, t *testing.T, store storage.Interface) {
 
 	key, originalPod := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "name"}})
 
@@ -414,6 +436,10 @@ func TestDeleteWithSuggestion(t *testing.T) {
 
 func TestDeleteWithSuggestionAndConflict(t *testing.T) {
 	ctx, store, _ := testSetup(t)
+	RunTestDeleteWithSuggestionAndConflict(ctx, t, store)
+}
+
+func RunTestDeleteWithSuggestionAndConflict(ctx context.Context, t *testing.T, store storage.Interface) {
 
 	key, originalPod := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "name"}})
 
@@ -440,6 +466,10 @@ func TestDeleteWithSuggestionAndConflict(t *testing.T) {
 
 func TestDeleteWithSuggestionOfDeletedObject(t *testing.T) {
 	ctx, store, _ := testSetup(t)
+	RunTestDeleteWithSuggestionOfDeletedObject(ctx, t, store)
+}
+
+func RunTestDeleteWithSuggestionOfDeletedObject(ctx context.Context, t *testing.T, store storage.Interface) {
 
 	key, originalPod := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "name"}})
 
@@ -458,6 +488,10 @@ func TestDeleteWithSuggestionOfDeletedObject(t *testing.T) {
 
 func TestValidateDeletionWithSuggestion(t *testing.T) {
 	ctx, store, _ := testSetup(t)
+	RunTestValidateDeletionWithSuggestion(ctx, t, store)
+}
+
+func RunTestValidateDeletionWithSuggestion(ctx context.Context, t *testing.T, store storage.Interface) {
 
 	key, originalPod := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "name"}})
 
@@ -512,6 +546,10 @@ func TestValidateDeletionWithSuggestion(t *testing.T) {
 
 func TestPreconditionalDeleteWithSuggestion(t *testing.T) {
 	ctx, store, _ := testSetup(t)
+	RunTestPreconditionalDeleteWithSuggestion(ctx, t, store)
+}
+
+func RunTestPreconditionalDeleteWithSuggestion(ctx context.Context, t *testing.T, store storage.Interface) {
 
 	key, originalPod := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "name"}})
 
@@ -540,6 +578,10 @@ func TestPreconditionalDeleteWithSuggestion(t *testing.T) {
 
 func TestGetListNonRecursive(t *testing.T) {
 	ctx, store, _ := testSetup(t)
+	RunTestGetListNonRecursive(ctx, t, store)
+}
+
+func RunTestGetListNonRecursive(ctx context.Context, t *testing.T, store storage.Interface) {
 	prevKey, prevStoredObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "prev"}})
 
 	prevRV, _ := strconv.Atoi(prevStoredObj.ResourceVersion)
@@ -825,6 +867,10 @@ func TestGuaranteedUpdate(t *testing.T) {
 
 func TestGuaranteedUpdateWithTTL(t *testing.T) {
 	ctx, store, _ := testSetup(t)
+	RunTestGuaranteedUpdateWithTTL(ctx, t, store)
+}
+
+func RunTestGuaranteedUpdateWithTTL(ctx context.Context, t *testing.T, store storage.Interface) {
 
 	input := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 	key := "/somekey"
@@ -848,7 +894,6 @@ func TestGuaranteedUpdateWithTTL(t *testing.T) {
 
 func TestGuaranteedUpdateChecksStoredData(t *testing.T) {
 	ctx, store, _ := testSetup(t)
-
 	input := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 	key := "/somekey"
 
@@ -912,6 +957,10 @@ func TestGuaranteedUpdateChecksStoredData(t *testing.T) {
 
 func TestGuaranteedUpdateWithConflict(t *testing.T) {
 	ctx, store, _ := testSetup(t)
+	RunTestGuaranteedUpdateWithConflict(ctx, t, store)
+}
+
+func RunTestGuaranteedUpdateWithConflict(ctx context.Context, t *testing.T, store storage.Interface) {
 	key, _ := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 
 	errChan := make(chan error, 1)
@@ -958,6 +1007,10 @@ func TestGuaranteedUpdateWithConflict(t *testing.T) {
 
 func TestGuaranteedUpdateWithSuggestionAndConflict(t *testing.T) {
 	ctx, store, _ := testSetup(t)
+	RunTestGuaranteedUpdateWithSuggestionAndConflict(ctx, t, store)
+}
+
+func RunTestGuaranteedUpdateWithSuggestionAndConflict(ctx context.Context, t *testing.T, store storage.Interface) {
 	key, originalPod := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 
 	// First, update without a suggestion so originalPod is outdated
@@ -2228,20 +2281,16 @@ func testSetup(t *testing.T, opts ...setupOption) (context.Context, *store, *cli
 
 // testPropogateStore helps propagates store with objects, automates key generation, and returns
 // keys and stored objects.
-func testPropogateStore(ctx context.Context, t *testing.T, store *store, obj *example.Pod) (string, *example.Pod) {
+func testPropogateStore(ctx context.Context, t *testing.T, store storage.Interface, obj *example.Pod) (string, *example.Pod) {
 	// Setup store with a key and grab the output for returning.
 	key := "/testkey"
 	return key, testPropogateStoreWithKey(ctx, t, store, key, obj)
 }
 
 // testPropogateStoreWithKey helps propagate store with objects, the given object will be stored at the specified key.
-func testPropogateStoreWithKey(ctx context.Context, t *testing.T, store *store, key string, obj *example.Pod) *example.Pod {
+func testPropogateStoreWithKey(ctx context.Context, t *testing.T, store storage.Interface, key string, obj *example.Pod) *example.Pod {
 	// Setup store with the specified key and grab the output for returning.
-	v, err := conversion.EnforcePtr(obj)
-	if err != nil {
-		panic("unable to convert output object to pointer")
-	}
-	err = store.conditionalDelete(ctx, key, &example.Pod{}, v, nil, storage.ValidateAllObjectFunc, nil)
+	err := store.Delete(ctx, key, &example.Pod{}, nil, storage.ValidateAllObjectFunc, nil)
 	if err != nil && !storage.IsNotFound(err) {
 		t.Fatalf("Cleanup failed: %v", err)
 	}
@@ -2488,6 +2537,10 @@ func TestConsistentList(t *testing.T) {
 
 func TestCount(t *testing.T) {
 	ctx, store, _ := testSetup(t)
+	RunTestCount(ctx, t, store)
+}
+
+func RunTestCount(ctx context.Context, t *testing.T, store storage.Interface) {
 
 	resourceA := "/foo.bar.io/abc"
 
