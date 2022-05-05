@@ -49,4 +49,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
 )
 
-replace k8s.io/apimachinery => ../apimachinery
+replace (
+	google.golang.org/genproto => google.golang.org/genproto v0.0.0-20220107163113-42d7afdf6368
+	k8s.io/apimachinery => ../apimachinery
+)
