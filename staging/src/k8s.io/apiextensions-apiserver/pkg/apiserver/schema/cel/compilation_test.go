@@ -18,6 +18,7 @@ package cel
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"testing"
 
@@ -1601,5 +1602,21 @@ func TestCostEstimation(t *testing.T) {
 			setSchema := testCase.schemaGenerator(&testCase.setMaxElements)
 			t.Run("set maxLength", schemaChecker(setSchema, testCase.expectedSetCost, testCase.expectedSetCostExceedsLimit, t))
 		})
+	}
+}
+
+func BenchmarkCompile(b *testing.B) {
+	_, err := getBaseEnv() // prime the baseEnv
+	if err != nil {
+		b.Fatal(err)
+	}
+	s := genArrayWithRule("number", "true")(nil)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := Compile(s, false, uint64(math.MaxInt64))
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }
