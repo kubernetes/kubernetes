@@ -42,16 +42,20 @@ import (
 )
 
 func TestWatch(t *testing.T) {
-	testWatch(t, false)
-	testWatch(t, true)
+	ctx, store, _ := testSetup(t)
+	RunTestWatch(ctx, t, store)
+}
+
+func RunTestWatch(ctx context.Context, t *testing.T, store storage.Interface) {
+	testWatch(ctx, t, store, false)
+	testWatch(ctx, t, store, true)
 }
 
 // It tests that
 // - first occurrence of objects should notify Add event
 // - update should trigger Modified event
 // - update that gets filtered should trigger Deleted event
-func testWatch(t *testing.T, recursive bool) {
-	ctx, store, _ := testSetup(t)
+func testWatch(ctx context.Context, t *testing.T, store storage.Interface, recursive bool) {
 	podFoo := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 	podBar := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}
 
@@ -133,6 +137,10 @@ func testWatch(t *testing.T, recursive bool) {
 
 func TestDeleteTriggerWatch(t *testing.T) {
 	ctx, store, _ := testSetup(t)
+	RunTestDeleteTriggerWatch(ctx, t, store)
+}
+
+func RunTestDeleteTriggerWatch(ctx context.Context, t *testing.T, store storage.Interface) {
 	key, storedObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 	w, err := store.Watch(ctx, key, storage.ListOptions{ResourceVersion: storedObj.ResourceVersion, Predicate: storage.Everything})
 	if err != nil {
@@ -208,6 +216,10 @@ func TestWatchFromZero(t *testing.T) {
 // - watch from non-0 should just watch changes after given version
 func TestWatchFromNoneZero(t *testing.T) {
 	ctx, store, _ := testSetup(t)
+	RunTestWatchFromNoneZero(ctx, t, store)
+}
+
+func RunTestWatchFromNoneZero(ctx context.Context, t *testing.T, store storage.Interface) {
 	key, storedObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 
 	w, err := store.Watch(ctx, key, storage.ListOptions{ResourceVersion: storedObj.ResourceVersion, Predicate: storage.Everything})
@@ -341,9 +353,12 @@ func deletedRevision(ctx context.Context, watch <-chan clientv3.WatchResponse) (
 }
 
 func TestWatchInitializationSignal(t *testing.T) {
-	_, store, _ := testSetup(t)
+	ctx, store, _ := testSetup(t)
+	RunTestWatchInitializationSignal(ctx, t, store)
+}
 
-	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+func RunTestWatchInitializationSignal(ctx context.Context, t *testing.T, store storage.Interface) {
+	ctx, _ = context.WithTimeout(ctx, 5*time.Second)
 	initSignal := utilflowcontrol.NewInitializationSignal()
 	ctx = utilflowcontrol.WithInitializationSignal(ctx, initSignal)
 
