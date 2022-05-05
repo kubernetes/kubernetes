@@ -65,7 +65,7 @@ const (
 		throw "Contents of /etc/secret/foo.txt are not as expected"
 	}
 	if ($env:NODE_NAME_TEST -ne $env:COMPUTERNAME) {
-		throw "NODE_NAME_TEST env var ($NODE_NAME_TEST) does not equal COMPUTERNAME ($env:COMPUTERNAME)"
+		throw "NODE_NAME_TEST env var ($env:NODE_NAME_TEST) does not equal COMPUTERNAME ($env:COMPUTERNAME)"
 	}
 	Write-Output "SUCCESS"`
 )
