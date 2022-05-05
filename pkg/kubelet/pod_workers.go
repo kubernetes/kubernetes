@@ -940,7 +940,6 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan podWork) {
 			return err
 		}()
 
-		var phaseTransition bool
 		switch {
 		case err == context.Canceled:
 			// when the context is cancelled we expect an update to already be queued
@@ -971,17 +970,15 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan podWork) {
 			}
 			// otherwise we move to the terminating phase
 			p.completeTerminating(pod)
-			phaseTransition = true
 
 		case isTerminal:
 			// if syncPod indicated we are now terminal, set the appropriate pod status to move to terminating
 			klog.V(4).InfoS("Pod is terminal", "pod", klog.KObj(pod), "podUID", pod.UID, "updateType", update.WorkType)
 			p.completeSync(pod)
-			phaseTransition = true
 		}
 
 		// queue a retry if necessary, then put the next event in the channel if any
-		p.completeWork(pod, phaseTransition, err)
+		p.completeWork(pod, err)
 		if start := update.Options.StartTime; !start.IsZero() {
 			metrics.PodWorkerDuration.WithLabelValues(update.Options.UpdateType.String()).Observe(metrics.SinceInSeconds(start))
 		}
@@ -1151,11 +1148,9 @@ func (p *podWorkers) completeUnstartedTerminated(pod *v1.Pod) {
 
 // completeWork requeues on error or the next sync interval and then immediately executes any pending
 // work.
-func (p *podWorkers) completeWork(pod *v1.Pod, phaseTransition bool, syncErr error) {
+func (p *podWorkers) completeWork(pod *v1.Pod, syncErr error) {
 	// Requeue the last update if the last sync returned error.
 	switch {
-	case phaseTransition:
-		p.workQueue.Enqueue(pod.UID, 0)
 	case syncErr == nil:
 		// No error; requeue at the regular resync interval.
 		p.workQueue.Enqueue(pod.UID, wait.Jitter(p.resyncInterval, workerResyncIntervalJitterFactor))
