@@ -264,17 +264,8 @@ func (s *SpdyRoundTripper) tlsConn(ctx context.Context, rwc net.Conn, targetHost
 
 	tlsConn := tls.Client(rwc, tlsConfig)
 
-	// need to manually call Handshake() so we can call VerifyHostname() below
 	if err := tlsConn.HandshakeContext(ctx); err != nil {
-		return nil, err
-	}
-
-	// Return if we were configured to skip validation
-	if tlsConfig.InsecureSkipVerify {
-		return tlsConn, nil
-	}
-
-	if err := tlsConn.VerifyHostname(tlsConfig.ServerName); err != nil {
+		tlsConn.Close()
 		return nil, err
 	}
 
@@ -302,23 +293,6 @@ func (s *SpdyRoundTripper) dialWithoutProxy(ctx context.Context, url *url.URL) (
 	} else {
 		conn, err = tls.DialWithDialer(s.Dialer, "tcp", dialAddr, s.tlsConfig)
 	}
-	if err != nil {
-		return nil, err
-	}
-
-	// Return if we were configured to skip validation
-	if s.tlsConfig != nil && s.tlsConfig.InsecureSkipVerify {
-		return conn, nil
-	}
-
-	host, _, err := net.SplitHostPort(dialAddr)
-	if err != nil {
-		return nil, err
-	}
-	if s.tlsConfig != nil && len(s.tlsConfig.ServerName) > 0 {
-		host = s.tlsConfig.ServerName
-	}
-	err = conn.VerifyHostname(host)
 	if err != nil {
 		return nil, err
 	}
