@@ -518,6 +518,8 @@ var _ = SIGDescribe("Job", func() {
 	})
 
 	/*
+		Release: v1.25
+		Testname: Jobs, manage lifecycle
 		Description: Attempt to create a suspended Job which MUST succeed.
 		Attempt to patch the Job to include a new label which MUST succeed.
 		The label MUST be found. Attempt to replace the Job to include a
@@ -526,7 +528,7 @@ var _ = SIGDescribe("Job", func() {
 		succeed. One list MUST be found. It MUST succeed at deleting a
 		collection of jobs via a label selector.
 	*/
-	ginkgo.It("should manage the lifecycle of a job", func() {
+	framework.ConformanceIt("should manage the lifecycle of a job", func() {
 		jobName := "e2e-" + utilrand.String(5)
 		label := map[string]string{"e2e-job-label": jobName}
 		labelSelector := labels.SelectorFromSet(label).String()
