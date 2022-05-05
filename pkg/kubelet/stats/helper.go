@@ -205,11 +205,15 @@ func cadvisorInfoToNetworkStats(info *cadvisorapiv2.ContainerInfo) *statsapi.Net
 	for i := range cstat.Network.Interfaces {
 		inter := cstat.Network.Interfaces[i]
 		iStat := statsapi.InterfaceStats{
-			Name:     inter.Name,
-			RxBytes:  &inter.RxBytes,
-			RxErrors: &inter.RxErrors,
-			TxBytes:  &inter.TxBytes,
-			TxErrors: &inter.TxErrors,
+			Name:      inter.Name,
+			RxBytes:   &inter.RxBytes,
+			RxErrors:  &inter.RxErrors,
+			RxPackets: &inter.RxPackets,
+			RxDropped: &inter.RxDropped,
+			TxBytes:   &inter.TxBytes,
+			TxErrors:  &inter.TxErrors,
+			TxPackets: &inter.TxPackets,
+			TxDropped: &inter.TxDropped,
 		}
 
 		if inter.Name == defaultNetworkInterfaceName {
