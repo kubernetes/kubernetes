@@ -191,6 +191,12 @@ func podEndpointsChanged(oldPod, newPod *v1.Pod) (bool, bool) {
 	if len(oldPod.Status.PodIPs) != len(newPod.Status.PodIPs) {
 		return true, labelsChanged
 	}
+
+	// Check if the pod is hostnetwork
+	if newPod.Spec.HostNetwork {
+		return true, labelsChanged
+	}
+
 	for i := range oldPod.Status.PodIPs {
 		if oldPod.Status.PodIPs[i].IP != newPod.Status.PodIPs[i].IP {
 			return true, labelsChanged
