@@ -91,7 +91,7 @@ type GaugeMetricVec interface {
 	// hidden, will return a GaugeMetric that is NOT a noop along
 	// with nil error.  If called on a hidden vector then it will
 	// return a noop and a nil error.  Otherwise it returns a noop
-	// and an error that passes ErrIsNotReady.
+	// and an error that passes ErrIsNotRegistered.
 	WithLabelValues(labelValues ...string) (GaugeMetric, error)
 
 	// With, if called after this vector has been
@@ -99,7 +99,7 @@ type GaugeMetricVec interface {
 	// hidden, will return a GaugeMetric that is NOT a noop along
 	// with nil error.  If called on a hidden vector then it will
 	// return a noop and a nil error.  Otherwise it returns a noop
-	// and an error that passes ErrIsNotReady.
+	// and an error that passes ErrIsNotRegistered.
 	With(labels map[string]string) (GaugeMetric, error)
 
 	// Delete asserts that the vec should have no member for the given label set.
@@ -161,8 +161,8 @@ type GaugeFunc interface {
 	Collector
 }
 
-func ErrIsNotReady(err error) bool {
-	return err == errNotReady
+func ErrIsNotRegistered(err error) bool {
+	return err == errNotRegistered
 }
 
-var errNotReady = errors.New("metric vec is not registered yet")
+var errNotRegistered = errors.New("metric vec is not registered yet")
