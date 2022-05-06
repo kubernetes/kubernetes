@@ -21,31 +21,17 @@ import (
 )
 
 var (
-	createPausePod                  = testutils.CreatePausePod
-	createPausePodWithResource      = testutils.CreatePausePodWithResource
-	createNode                      = testutils.CreateNode
-	initPausePod                    = testutils.InitPausePod
-	runPausePod                     = testutils.RunPausePod
-	waitForPodUnschedulable         = testutils.WaitForPodUnschedulable
-	waitForPodToScheduleWithTimeout = testutils.WaitForPodToScheduleWithTimeout
-	waitCachedPodsStable            = testutils.WaitCachedPodsStable
-	waitForPDBsStable               = testutils.WaitForPDBsStable
-	waitForReflection               = testutils.WaitForReflection
-	waitForNodesInCache             = testutils.WaitForNodesInCache
-	createAndWaitForNodesInCache    = testutils.CreateAndWaitForNodesInCache
-	getPod                          = testutils.GetPod
-	deletePod                       = testutils.DeletePod
-	updateNode                      = testutils.UpdateNode
-	podSchedulingError              = testutils.PodSchedulingError
-	podScheduledIn                  = testutils.PodScheduledIn
-	podUnschedulable                = testutils.PodUnschedulable
-	podIsGettingEvicted             = testutils.PodIsGettingEvicted
-	initTest                        = testutils.InitTestSchedulerWithNS
-	initTestDisablePreemption       = testutils.InitTestDisablePreemption
-	initDisruptionController        = testutils.InitDisruptionController
-	createNamespacesWithLabels      = testutils.CreateNamespacesWithLabels
-	runPodWithContainers            = testutils.RunPodWithContainers
-	initPodWithContainers           = testutils.InitPodWithContainers
-	nextPodOrDie                    = testutils.NextPodOrDie
-	nextPod                         = testutils.NextPod
+	createNode                 = testutils.CreateNode
+	createPausePod             = testutils.CreatePausePod
+	createPausePodWithResource = testutils.CreatePausePodWithResource
+	deletePod                  = testutils.DeletePod
+	initPausePod               = testutils.InitPausePod
+	initTest                   = testutils.InitTestSchedulerWithNS
+	nextPod                    = testutils.NextPod
+	nextPodOrDie               = testutils.NextPodOrDie
+	runPausePod                = testutils.RunPausePod
+	updateNode                 = testutils.UpdateNode
+	waitForNodesInCache        = testutils.WaitForNodesInCache
+	waitForPodUnschedulable    = testutils.WaitForPodUnschedulable
+	waitForReflection          = testutils.WaitForReflection
 )
