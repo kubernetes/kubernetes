@@ -26,6 +26,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	metricsv1alpha1 "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
 	metricsv1beta1 "k8s.io/metrics/pkg/apis/metrics/v1beta1"
+	metricsv1beta2 "k8s.io/metrics/pkg/apis/metrics/v1beta2"
 )
 
 var Scheme = runtime.NewScheme()
@@ -34,6 +35,7 @@ var ParameterCodec = runtime.NewParameterCodec(Scheme)
 var localSchemeBuilder = runtime.SchemeBuilder{
 	metricsv1alpha1.AddToScheme,
 	metricsv1beta1.AddToScheme,
+	metricsv1beta2.AddToScheme,
 }
 
 // AddToScheme adds all types of this clientset into the given scheme. This allows composition

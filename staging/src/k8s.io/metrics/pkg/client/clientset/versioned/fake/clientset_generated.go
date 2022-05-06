@@ -29,6 +29,8 @@ import (
 	fakemetricsv1alpha1 "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1alpha1/fake"
 	metricsv1beta1 "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
 	fakemetricsv1beta1 "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1/fake"
+	metricsv1beta2 "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta2"
+	fakemetricsv1beta2 "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta2/fake"
 )
 
 // NewSimpleClientset returns a clientset that will respond with the provided objects.
@@ -89,4 +91,9 @@ func (c *Clientset) MetricsV1alpha1() metricsv1alpha1.MetricsV1alpha1Interface {
 // MetricsV1beta1 retrieves the MetricsV1beta1Client
 func (c *Clientset) MetricsV1beta1() metricsv1beta1.MetricsV1beta1Interface {
 	return &fakemetricsv1beta1.FakeMetricsV1beta1{Fake: &c.Fake}
+}
+
+// MetricsV1beta2 retrieves the MetricsV1beta2Client
+func (c *Clientset) MetricsV1beta2() metricsv1beta2.MetricsV1beta2Interface {
+	return &fakemetricsv1beta2.FakeMetricsV1beta2{Fake: &c.Fake}
 }

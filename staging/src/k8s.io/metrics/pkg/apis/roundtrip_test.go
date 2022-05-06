@@ -28,6 +28,7 @@ import (
 	metrics "k8s.io/metrics/pkg/apis/metrics"
 	metricsv1alpha1 "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
 	metricsv1beta1 "k8s.io/metrics/pkg/apis/metrics/v1beta1"
+	metricsv1beta2 "k8s.io/metrics/pkg/apis/metrics/v1beta2"
 
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
@@ -46,6 +47,7 @@ var groups = []runtime.SchemeBuilder{
 	metrics.SchemeBuilder,
 	metricsv1alpha1.SchemeBuilder,
 	metricsv1beta1.SchemeBuilder,
+	metricsv1beta2.SchemeBuilder,
 }
 
 func TestRoundTripTypes(t *testing.T) {

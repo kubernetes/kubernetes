@@ -27,12 +27,14 @@ import (
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
 	metricsv1alpha1 "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1alpha1"
 	metricsv1beta1 "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
+	metricsv1beta2 "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta2"
 )
 
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	MetricsV1alpha1() metricsv1alpha1.MetricsV1alpha1Interface
 	MetricsV1beta1() metricsv1beta1.MetricsV1beta1Interface
+	MetricsV1beta2() metricsv1beta2.MetricsV1beta2Interface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
@@ -41,6 +43,7 @@ type Clientset struct {
 	*discovery.DiscoveryClient
 	metricsV1alpha1 *metricsv1alpha1.MetricsV1alpha1Client
 	metricsV1beta1  *metricsv1beta1.MetricsV1beta1Client
+	metricsV1beta2  *metricsv1beta2.MetricsV1beta2Client
 }
 
 // MetricsV1alpha1 retrieves the MetricsV1alpha1Client
@@ -51,6 +54,11 @@ func (c *Clientset) MetricsV1alpha1() metricsv1alpha1.MetricsV1alpha1Interface {
 // MetricsV1beta1 retrieves the MetricsV1beta1Client
 func (c *Clientset) MetricsV1beta1() metricsv1beta1.MetricsV1beta1Interface {
 	return c.metricsV1beta1
+}
+
+// MetricsV1beta2 retrieves the MetricsV1beta2Client
+func (c *Clientset) MetricsV1beta2() metricsv1beta2.MetricsV1beta2Interface {
+	return c.metricsV1beta2
 }
 
 // Discovery retrieves the DiscoveryClient
@@ -105,6 +113,10 @@ func NewForConfigAndClient(c *rest.Config, httpClient *http.Client) (*Clientset,
 	if err != nil {
 		return nil, err
 	}
+	cs.metricsV1beta2, err = metricsv1beta2.NewForConfigAndClient(&configShallowCopy, httpClient)
+	if err != nil {
+		return nil, err
+	}
 
 	cs.DiscoveryClient, err = discovery.NewDiscoveryClientForConfigAndClient(&configShallowCopy, httpClient)
 	if err != nil {
@@ -128,6 +140,7 @@ func New(c rest.Interface) *Clientset {
 	var cs Clientset
 	cs.metricsV1alpha1 = metricsv1alpha1.New(c)
 	cs.metricsV1beta1 = metricsv1beta1.New(c)
+	cs.metricsV1beta2 = metricsv1beta2.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs
