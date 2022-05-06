@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"k8s.io/klog/v2"
@@ -37,6 +38,7 @@ const (
 func stubAllocFunc(r *pluginapi.AllocateRequest, devs map[string]pluginapi.Device) (*pluginapi.AllocateResponse, error) {
 	var responses pluginapi.AllocateResponse
 	for _, req := range r.ContainerRequests {
+		var deviceIDs []string
 		response := &pluginapi.ContainerAllocateResponse{}
 		for _, requestID := range req.DevicesIDs {
 			dev, ok := devs[requestID]
@@ -63,10 +65,15 @@ func stubAllocFunc(r *pluginapi.AllocateRequest, devs map[string]pluginapi.Devic
 
 			f.Close()
 
+			deviceIDs = append(deviceIDs, dev.ID)
+
 			response.Mounts = append(response.Mounts, &pluginapi.Mount{
 				ContainerPath: fpath,
 				HostPath:      fpath,
 			})
+		}
+		response.Envs = map[string]string{
+			"SAMPLE_DEVICES": strings.Join(deviceIDs, ","),
 		}
 		responses.ContainerResponses = append(responses.ContainerResponses, response)
 	}
