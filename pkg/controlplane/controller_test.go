@@ -27,6 +27,7 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/client-go/kubernetes/fake"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
+	eventsv1client "k8s.io/client-go/kubernetes/typed/events/v1"
 	"k8s.io/client-go/rest"
 	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
@@ -1021,7 +1022,7 @@ func Test_completedConfig_NewBootstrapController(t *testing.T) {
 		legacyRESTStorage corerest.LegacyRESTStorage
 		serviceClient     corev1client.ServicesGetter
 		nsClient          corev1client.NamespacesGetter
-		eventClient       corev1client.EventsGetter
+		eventClient       eventsv1client.EventsV1Interface
 		readyzClient      rest.Interface
 	}
 	tests := []struct {

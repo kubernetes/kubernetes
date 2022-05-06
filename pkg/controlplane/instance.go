@@ -70,6 +70,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	discoveryclient "k8s.io/client-go/kubernetes/typed/discovery/v1"
+	eventsv1client "k8s.io/client-go/kubernetes/typed/events/v1"
 	"k8s.io/component-helpers/apimachinery/lease"
 	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -543,7 +544,8 @@ func (m *Instance) InstallLegacyAPI(c *completedConfig, restOptionsGetter generi
 
 	controllerName := "bootstrap-controller"
 	coreClient := corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
-	bootstrapController, err := c.NewBootstrapController(legacyRESTStorage, coreClient, coreClient, coreClient, coreClient.RESTClient())
+	eventsClient := eventsv1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
+	bootstrapController, err := c.NewBootstrapController(legacyRESTStorage, coreClient, coreClient, eventsClient, coreClient.RESTClient())
 	if err != nil {
 		return fmt.Errorf("error creating bootstrap controller: %v", err)
 	}
