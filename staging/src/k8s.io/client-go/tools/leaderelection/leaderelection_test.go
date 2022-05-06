@@ -82,9 +82,10 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 		observedTime   time.Time
 		reactors       []Reactor
 
-		expectSuccess    bool
-		transitionLeader bool
-		outHolder        string
+		expectSuccess       bool
+		transitionLeader    bool
+		outHolder           string
+		disableLockCreation bool
 	}{
 		{
 			name: "acquire from no object",
@@ -207,6 +208,19 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 			outHolder:     "bing",
 		},
 		{
+			name: "don't create lock object if DisableLockCreation is true",
+			reactors: []Reactor{
+				{
+					verb: "get",
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						return true, nil, errors.NewNotFound(action.(fakeclient.GetAction).GetResource().GroupResource(), action.(fakeclient.GetAction).GetName())
+					},
+				},
+			},
+			expectSuccess:       false,
+			disableLockCreation: true,
+		},
+		{
 			name: "renew already acquired object",
 			reactors: []Reactor{
 				{
@@ -273,6 +287,7 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 						reportedLeader = l
 					},
 				},
+				DisableLockCreation: test.disableLockCreation,
 			}
 			observedRawRecord := GetRawRecordOrDie(t, objectType, test.observedRecord)
 			le := &LeaderElector{
@@ -302,6 +317,12 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 			}
 
 			le.maybeReportTransition()
+			if test.disableLockCreation {
+				// This sleep is to make sure that there is no async leader transition,
+				// when lock creation is disabled.
+				time.Sleep(time.Second * 10)
+				wg.Done()
+			}
 			wg.Wait()
 			if reportedLeader != test.outHolder {
 				t.Errorf("reported leader was not the new leader. expected %q, got %q", test.outHolder, reportedLeader)

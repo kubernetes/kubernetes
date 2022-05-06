@@ -153,6 +153,13 @@ type LeaderElectionConfig struct {
 	// simultaneously acting on the critical path.
 	ReleaseOnCancel bool
 
+	// DisableLockCreation should be set to true if the lock should not be created,
+	// when it doesn't exist. By default, DisableLockCreation is false and leader elector
+	// creates a new lock when trying to acquire a non-existing lock object. If DisableLockCreation
+	// is true and the lock object doesn't exist, the leader elector won't be able to create a
+	// lock object and consequently can't become the leader.
+	DisableLockCreation bool
+
 	// Name is the name of the resource lock for debugging
 	Name string
 }
@@ -328,6 +335,11 @@ func (le *LeaderElector) tryAcquireOrRenew(ctx context.Context) bool {
 	if err != nil {
 		if !errors.IsNotFound(err) {
 			klog.Errorf("error retrieving resource lock %v: %v", le.config.Lock.Describe(), err)
+			return false
+		}
+		// don't create a lock and exit early, if lock creation is disabled.
+		if le.config.DisableLockCreation {
+			klog.Warningf("skipping lock creation since lock creation is disabled")
 			return false
 		}
 		if err = le.config.Lock.Create(ctx, leaderElectionRecord); err != nil {
