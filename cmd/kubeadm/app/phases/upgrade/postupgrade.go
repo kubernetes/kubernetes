@@ -253,16 +253,20 @@ func AddNewControlPlaneTaint(client clientset.Interface) error {
 	}
 
 	for _, n := range nodes.Items {
-		// Check if the node has the taint already and skip it if so
-		hasTaint := false
+		// Check if the node has the old / new taints
+		hasOldTaint := false
+		hasNewTaint := false
 		for _, t := range n.Spec.Taints {
-			if t.String() == kubeadmconstants.ControlPlaneTaint.String() {
-				hasTaint = true
-				break
+			switch t.String() {
+			case kubeadmconstants.OldControlPlaneTaint.String():
+				hasOldTaint = true
+			case kubeadmconstants.ControlPlaneTaint.String():
+				hasNewTaint = true
 			}
 		}
-		// If the node does not have the taint, patch it
-		if !hasTaint {
+		// If the old taint is present and the new taint is missing, patch the node with the new taint.
+		// When the old taint is missing, assume the user has manually untainted the node and take no action.
+		if !hasNewTaint && hasOldTaint {
 			err = apiclient.PatchNode(client, n.Name, func(n *v1.Node) {
 				n.Spec.Taints = append(n.Spec.Taints, kubeadmconstants.ControlPlaneTaint)
 			})
