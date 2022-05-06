@@ -16,7 +16,7 @@ limitations under the License.
 
 // This file tests preemption functionality of the scheduler.
 
-package scheduler
+package preemption
 
 import (
 	"context"
@@ -51,6 +51,26 @@ import (
 	testutils "k8s.io/kubernetes/test/integration/util"
 	"k8s.io/utils/pointer"
 )
+
+// imported from testutils
+var (
+	initPausePod                    = testutils.InitPausePod
+	createNode                      = testutils.CreateNode
+	createPausePod                  = testutils.CreatePausePod
+	runPausePod                     = testutils.RunPausePod
+	deletePod                       = testutils.DeletePod
+	initTest                        = testutils.InitTestSchedulerWithNS
+	initTestDisablePreemption       = testutils.InitTestDisablePreemption
+	initDisruptionController        = testutils.InitDisruptionController
+	waitCachedPodsStable            = testutils.WaitCachedPodsStable
+	podIsGettingEvicted             = testutils.PodIsGettingEvicted
+	podUnschedulable                = testutils.PodUnschedulable
+	waitForPDBsStable               = testutils.WaitForPDBsStable
+	waitForPodToScheduleWithTimeout = testutils.WaitForPodToScheduleWithTimeout
+	waitForPodUnschedulable         = testutils.WaitForPodUnschedulable
+)
+
+const filterPluginName = "filter-plugin"
 
 var lowPriority, mediumPriority, highPriority = int32(100), int32(200), int32(300)
 
