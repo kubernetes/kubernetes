@@ -37,16 +37,16 @@ import (
 )
 
 var (
-	createPausePod               = testutils.CreatePausePod
-	initPausePod                 = testutils.InitPausePod
-	getPod                       = testutils.GetPod
-	deletePod                    = testutils.DeletePod
-	initTest                     = testutils.InitTestSchedulerWithNS
 	createAndWaitForNodesInCache = testutils.CreateAndWaitForNodesInCache
 	createNamespacesWithLabels   = testutils.CreateNamespacesWithLabels
-	podUnschedulable             = testutils.PodUnschedulable
 	createNode                   = testutils.CreateNode
+	createPausePod               = testutils.CreatePausePod
+	deletePod                    = testutils.DeletePod
+	getPod                       = testutils.GetPod
+	initPausePod                 = testutils.InitPausePod
+	initTest                     = testutils.InitTestSchedulerWithNS
 	podScheduledIn               = testutils.PodScheduledIn
+	podUnschedulable             = testutils.PodUnschedulable
 	waitForPodUnschedulable      = testutils.WaitForPodUnschedulable
 )
 
@@ -1290,7 +1290,6 @@ func TestPodTopologySpreadFilter(t *testing.T) {
 
 var (
 	hardSpread = v1.DoNotSchedule
-	softSpread = v1.ScheduleAnyway
 )
 
 func TestUnschedulablePodBecomesSchedulable(t *testing.T) {
