@@ -865,6 +865,9 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan podWork) {
 	var podStarted bool
 	for update := range podUpdates {
 		pod := update.Options.Pod
+		if pod.UID == "5-static" {
+			time.Sleep(10 * time.Second)
+		}
 
 		// Decide whether to start the pod. If the pod was terminated prior to the pod being allowed
 		// to start, we have to clean it up and then exit the pod worker loop.

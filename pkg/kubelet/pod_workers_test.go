@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/klog/v2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -848,6 +849,7 @@ func TestStaticPodExclusion(t *testing.T) {
 		Pod:        newNamedPod("5-static", "test1", "pod1", true),
 		UpdateType: kubetypes.SyncPodUpdate,
 	})
+	time.Sleep(5 * time.Second)
 	channels.Channel("5-static").Hold()
 	podWorkers.UpdatePod(UpdatePodOptions{
 		Pod:        newNamedPod("5-static", "test1", "pod1", true),
@@ -858,6 +860,8 @@ func TestStaticPodExclusion(t *testing.T) {
 		UpdateType: kubetypes.SyncPodUpdate,
 	})
 	drainWorkersExcept(podWorkers, "5-static")
+
+	time.Sleep(20 * time.Second)
 
 	// pod 5 should have termination requested, but hasn't cleaned up
 	pod5 := podWorkers.podSyncStatuses[types.UID("5-static")]
@@ -1755,4 +1759,8 @@ func Test_allowPodStart(t *testing.T) {
 			}
 		})
 	}
+}
+
+func init() {
+	klog.InitFlags(nil)
 }
