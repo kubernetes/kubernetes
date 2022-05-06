@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package scheduler
+package taint
 
 // This file tests the Taint feature.
 
@@ -35,6 +35,11 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction"
 	pluginapi "k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction"
 	testutils "k8s.io/kubernetes/test/integration/util"
+)
+
+// imported from testutils
+var (
+	waitForPodUnschedulable = testutils.WaitForPodUnschedulable
 )
 
 func newPod(nsName, name string, req, limit v1.ResourceList) *v1.Pod {
