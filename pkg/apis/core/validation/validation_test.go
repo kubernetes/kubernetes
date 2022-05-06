@@ -20471,3 +20471,65 @@ func TestValidateAppArmorProfileFormat(t *testing.T) {
 		}
 	}
 }
+
+func TestValidatePVSecretReference(t *testing.T) {
+	rootFld := field.NewPath("name")
+	type args struct {
+		secretRef *core.SecretReference
+		fldPath   *field.Path
+	}
+	tests := []struct {
+		name          string
+		args          args
+		expectError   bool
+		expectedError string
+	}{
+		{
+			name:          "invalid secret ref name",
+			args:          args{&core.SecretReference{Name: "$%^&*#", Namespace: "default"}, rootFld},
+			expectError:   true,
+			expectedError: "name.name: Invalid value: \"$%^&*#\": " + dnsLabelErrMsg,
+		},
+		{
+			name:          "invalid secret ref namespace",
+			args:          args{&core.SecretReference{Name: "valid", Namespace: "$%^&*#"}, rootFld},
+			expectError:   true,
+			expectedError: "name.namespace: Invalid value: \"$%^&*#\": " + dnsLabelErrMsg,
+		},
+		{
+			name:          "invalid secret: missing namespace",
+			args:          args{&core.SecretReference{Name: "valid"}, rootFld},
+			expectError:   true,
+			expectedError: "name.namespace: Required value",
+		},
+		{
+			name:          "invalid secret : missing name",
+			args:          args{&core.SecretReference{Namespace: "default"}, rootFld},
+			expectError:   true,
+			expectedError: "name.name: Required value",
+		},
+		{
+			name:          "valid secret",
+			args:          args{&core.SecretReference{Name: "valid", Namespace: "default"}, rootFld},
+			expectError:   false,
+			expectedError: "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			errs := validatePVSecretReference(tt.args.secretRef, tt.args.fldPath)
+			if tt.expectError && len(errs) == 0 {
+				t.Errorf("Unexpected success")
+			}
+			if tt.expectError && len(errs) != 0 {
+				str := errs[0].Error()
+				if str != "" && !strings.Contains(str, tt.expectedError) {
+					t.Errorf("%s: expected error detail either empty or %q, got %q", tt.name, tt.expectedError, str)
+				}
+			}
+			if !tt.expectError && len(errs) != 0 {
+				t.Errorf("Unexpected error(s): %v", errs)
+			}
+		})
+	}
+}
