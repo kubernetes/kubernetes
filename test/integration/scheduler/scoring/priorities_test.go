@@ -14,13 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package scheduler
+package scoring
 
 import (
 	"context"
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -42,8 +43,27 @@ import (
 	"k8s.io/utils/pointer"
 )
 
+// imported from testutils
+var (
+	runPausePod                  = testutils.RunPausePod
+	createAndWaitForNodesInCache = testutils.CreateAndWaitForNodesInCache
+	createNode                   = testutils.CreateNode
+	createNamespacesWithLabels   = testutils.CreateNamespacesWithLabels
+	runPodWithContainers         = testutils.RunPodWithContainers
+	initPausePod                 = testutils.InitPausePod
+	initPodWithContainers        = testutils.InitPodWithContainers
+	podScheduledIn               = testutils.PodScheduledIn
+	podUnschedulable             = testutils.PodUnschedulable
+)
+
+var (
+	hardSpread = v1.DoNotSchedule
+	softSpread = v1.ScheduleAnyway
+)
+
 const (
-	resourceGPU = "example.com/gpu"
+	resourceGPU  = "example.com/gpu"
+	pollInterval = 100 * time.Millisecond
 )
 
 // This file tests the scheduler priority functions.
