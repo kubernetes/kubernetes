@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package scheduler
+package filters
 
 import (
 	"context"
@@ -34,6 +34,20 @@ import (
 	testutils "k8s.io/kubernetes/test/integration/util"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	"k8s.io/utils/pointer"
+)
+
+var (
+	createPausePod               = testutils.CreatePausePod
+	initPausePod                 = testutils.InitPausePod
+	getPod                       = testutils.GetPod
+	deletePod                    = testutils.DeletePod
+	initTest                     = testutils.InitTestSchedulerWithNS
+	createAndWaitForNodesInCache = testutils.CreateAndWaitForNodesInCache
+	createNamespacesWithLabels   = testutils.CreateNamespacesWithLabels
+	podUnschedulable             = testutils.PodUnschedulable
+	createNode                   = testutils.CreateNode
+	podScheduledIn               = testutils.PodScheduledIn
+	waitForPodUnschedulable      = testutils.WaitForPodUnschedulable
 )
 
 // This file tests the scheduler predicates functionality.

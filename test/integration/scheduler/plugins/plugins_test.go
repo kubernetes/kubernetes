@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package scheduler
+package plugins
 
 import (
 	"context"
@@ -45,6 +45,19 @@ import (
 	testutils "k8s.io/kubernetes/test/integration/util"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	"k8s.io/utils/pointer"
+)
+
+// imported from testutils
+var (
+	createPausePod                  = testutils.CreatePausePod
+	initPausePod                    = testutils.InitPausePod
+	getPod                          = testutils.GetPod
+	deletePod                       = testutils.DeletePod
+	podUnschedulable                = testutils.PodUnschedulable
+	podSchedulingError              = testutils.PodSchedulingError
+	createAndWaitForNodesInCache    = testutils.CreateAndWaitForNodesInCache
+	waitForPodUnschedulable         = testutils.WaitForPodUnschedulable
+	waitForPodToScheduleWithTimeout = testutils.WaitForPodToScheduleWithTimeout
 )
 
 type PreFilterPlugin struct {
