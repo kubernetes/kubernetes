@@ -844,11 +844,11 @@ func TestStaticPodExclusion(t *testing.T) {
 
 	// start a static pod, kill it, then add another one, but ensure the pod worker
 	// for pod 5 doesn't see the kill event (so it remains waiting to start)
+	channels.Channel("5-static").Hold()
 	podWorkers.UpdatePod(UpdatePodOptions{
 		Pod:        newNamedPod("5-static", "test1", "pod1", true),
 		UpdateType: kubetypes.SyncPodUpdate,
 	})
-	channels.Channel("5-static").Hold()
 	podWorkers.UpdatePod(UpdatePodOptions{
 		Pod:        newNamedPod("5-static", "test1", "pod1", true),
 		UpdateType: kubetypes.SyncPodKill,
