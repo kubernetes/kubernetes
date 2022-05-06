@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"k8s.io/klog/v2"
@@ -28,7 +29,8 @@ import (
 )
 
 const (
-	resourceName = "example.com/resource"
+	resourceName         = "example.com/resource"
+	minimumInstanceCount = 2 // previous default
 )
 
 // stubAllocFunc creates and returns allocation response for the input allocate request
@@ -72,14 +74,39 @@ func stubAllocFunc(r *pluginapi.AllocateRequest, devs map[string]pluginapi.Devic
 	return &responses, nil
 }
 
+func getPluginInstanceCount() (int, error) {
+	pluginInstCount := os.Getenv("PLUGIN_INST_COUNT")
+	if pluginInstCount == "" {
+		return 0, fmt.Errorf("missing device instance count")
+	}
+	devNum, err := strconv.Atoi(pluginInstCount)
+	if err != nil {
+		return 0, err
+	}
+	if devNum <= miniumumInstanceCount {
+		return 0, fmt.Errorf("wrong device instance count: %d", devNum)
+	}
+	return devNum, nil
+}
+
 func main() {
-	devs := []*pluginapi.Device{
-		{ID: "Dev-1", Health: pluginapi.Healthy},
-		{ID: "Dev-2", Health: pluginapi.Healthy},
+	devNum, err := getPluginInstanceCount()
+	if err != nil {
+		panic(err)
+	}
+	klog.Infof("pluginInstCount: %q", pluginInstCount)
+
+	var devs []*pluginapi.Device
+	for idx := 0; idx < devNum; idx++ {
+		devs = append(devs, &plugiapi.Device{
+			// previous versions of the device started from 1, so we keep doing that way
+			ID:     fmt.Sprintf("Dev-%d", idx+1),
+			Health: pluginapi.Healthy,
+		})
 	}
 
 	pluginSocksDir := os.Getenv("PLUGIN_SOCK_DIR")
-	klog.Infof("pluginSocksDir: %s", pluginSocksDir)
+	klog.Infof("pluginSocksDir: %q", pluginSocksDir)
 	if pluginSocksDir == "" {
 		klog.Errorf("Empty pluginSocksDir")
 		return
@@ -89,7 +116,6 @@ func main() {
 	dp1 := plugin.NewDevicePluginStub(devs, socketPath, resourceName, false, false)
 	if err := dp1.Start(); err != nil {
 		panic(err)
-
 	}
 	dp1.SetAllocFunc(stubAllocFunc)
 	if err := dp1.Register(pluginapi.KubeletSocket, resourceName, pluginapi.DevicePluginPath); err != nil {
