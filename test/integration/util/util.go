@@ -878,18 +878,6 @@ func GetPod(cs clientset.Interface, podName string, podNamespace string) (*v1.Po
 	return cs.CoreV1().Pods(podNamespace).Get(context.TODO(), podName, metav1.GetOptions{})
 }
 
-// podScheduled returns true if a node is assigned to the given pod.
-func podScheduled(c clientset.Interface, podNamespace, podName string) wait.ConditionFunc {
-	return func() (bool, error) {
-		pod, err := c.CoreV1().Pods(podNamespace).Get(context.TODO(), podName, metav1.GetOptions{})
-		if err != nil {
-			// This could be a connection error so we want to retry.
-			return false, nil
-		}
-		return pod.Spec.NodeName != "", nil
-	}
-}
-
 func CreateNamespacesWithLabels(cs clientset.Interface, namespaces []string, labels map[string]string) error {
 	for _, n := range namespaces {
 		ns := v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: n, Labels: labels}}
