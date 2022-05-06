@@ -114,11 +114,11 @@ func (s *server) Start() error {
 }
 
 func (s *server) Stop() error {
-	for _, r := range s.clientResources() {
-		if err := s.disconnectClient(r); err != nil {
+	s.visitClients(func(r string, c Client) {
+		if err := s.disconnectClient(r, c); err != nil {
 			klog.InfoS("Error disconnecting device plugin client", "resourceName", r, "err", err)
 		}
-	}
+	})
 
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -177,12 +177,12 @@ func (s *server) isVersionCompatibleWithPlugin(versions ...string) bool {
 	return false
 }
 
-func (s *server) clientResources() []string {
+func (s *server) visitClients(visit func(r string, c Client)) {
 	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	var resources []string
-	for r := range s.clients {
-		resources = append(resources, r)
+	for r, c := range s.clients {
+		s.mutex.Unlock()
+		visit(r, c)
+		s.mutex.Lock()
 	}
-	return resources
+	s.mutex.Unlock()
 }
