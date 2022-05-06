@@ -192,7 +192,7 @@ func TestNodeAffinityScoring(t *testing.T) {
 
 	// Create a pod with node affinity.
 	podName := "pod-with-node-affinity"
-	pod, err := runPausePod(testCtx.ClientSet, initPausePod(&pausePodConfig{
+	pod, err := runPausePod(testCtx.ClientSet, initPausePod(&testutils.PausePodConfig{
 		Name:      podName,
 		Namespace: testCtx.NS.Name,
 		Affinity: &v1.Affinity{
@@ -233,11 +233,11 @@ func TestPodAffinityScoring(t *testing.T) {
 	topologyValue := "topologyvalue"
 	tests := []struct {
 		name      string
-		podConfig *pausePodConfig
+		podConfig *testutils.PausePodConfig
 	}{
 		{
 			name: "pod affinity",
-			podConfig: &pausePodConfig{
+			podConfig: &testutils.PausePodConfig{
 				Name:      "pod1",
 				Namespace: "ns1",
 				Affinity: &v1.Affinity{
@@ -265,7 +265,7 @@ func TestPodAffinityScoring(t *testing.T) {
 		},
 		{
 			name: "pod affinity with namespace selector",
-			podConfig: &pausePodConfig{
+			podConfig: &testutils.PausePodConfig{
 				Name:      "pod1",
 				Namespace: "ns2",
 				Affinity: &v1.Affinity{
@@ -306,7 +306,7 @@ func TestPodAffinityScoring(t *testing.T) {
 				t.Fatal(err)
 			}
 			// Add a pod with a label and wait for it to schedule.
-			_, err = runPausePod(testCtx.ClientSet, initPausePod(&pausePodConfig{
+			_, err = runPausePod(testCtx.ClientSet, initPausePod(&testutils.PausePodConfig{
 				Name:      "attractor-pod",
 				Namespace: "ns1",
 				Labels:    map[string]string{labelKey: labelValue},
@@ -363,7 +363,7 @@ func TestImageLocalityScoring(t *testing.T) {
 
 	// Create a pod with containers each having the specified image.
 	podName := "pod-using-large-image"
-	pod, err := runPodWithContainers(testCtx.ClientSet, initPodWithContainers(testCtx.ClientSet, &podWithContainersConfig{
+	pod, err := runPodWithContainers(testCtx.ClientSet, initPodWithContainers(testCtx.ClientSet, &testutils.PodWithContainersConfig{
 		Name:       podName,
 		Namespace:  testCtx.NS.Name,
 		Containers: makeContainersWithImages([]string{imageName}),
