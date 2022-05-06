@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package scheduler
+package extender
 
 // This file tests scheduler extender.
 
@@ -38,6 +38,11 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	testutils "k8s.io/kubernetes/test/integration/util"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+)
+
+// imported from testutils
+var (
+	createNode = testutils.CreateNode
 )
 
 const (
