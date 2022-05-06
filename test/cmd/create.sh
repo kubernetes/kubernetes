@@ -170,6 +170,12 @@ run_kubectl_create_validate_tests() {
 
   create_and_use_new_namespace
 
+   ## test --validate no value expects default strict is used
+   kube::log::status "Testing kubectl create --validate"
+   # create and verify
+   output_message=$(! kubectl create -f hack/testdata/invalid-deployment-unknown-and-duplicate-fields.yaml --validate 2>&1)
+   has_one_of_error_message "${output_message}" 'strict decoding error' 'error validating data'
+
   ## test --validate=true
   kube::log::status "Testing kubectl create --validate=true"
   # create and verify
