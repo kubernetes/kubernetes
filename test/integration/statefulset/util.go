@@ -24,7 +24,7 @@ import (
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -182,11 +182,11 @@ func scSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, *statefulset.
 }
 
 // Run STS controller and informers
-func runControllerAndInformers(sc *statefulset.StatefulSetController, informers informers.SharedInformerFactory) chan struct{} {
-	stopCh := make(chan struct{})
-	informers.Start(stopCh)
-	go sc.Run(context.TODO(), 5)
-	return stopCh
+func runControllerAndInformers(sc *statefulset.StatefulSetController, informers informers.SharedInformerFactory) context.CancelFunc {
+	ctx, cancel := context.WithCancel(context.Background())
+	informers.Start(ctx.Done())
+	go sc.Run(ctx, 5)
+	return cancel
 }
 
 func createHeadlessService(t *testing.T, clientSet clientset.Interface, headlessService *v1.Service) {
