@@ -1283,12 +1283,12 @@ func TestUnschedulablePodBecomesSchedulable(t *testing.T) {
 	tests := []struct {
 		name   string
 		init   func(kubernetes.Interface, string) error
-		pod    *pausePodConfig
+		pod    *testutils.PausePodConfig
 		update func(kubernetes.Interface, string) error
 	}{
 		{
 			name: "node gets added",
-			pod: &pausePodConfig{
+			pod: &testutils.PausePodConfig{
 				Name: "pod-1",
 			},
 			update: func(cs kubernetes.Interface, _ string) error {
@@ -1312,7 +1312,7 @@ func TestUnschedulablePodBecomesSchedulable(t *testing.T) {
 				}
 				return nil
 			},
-			pod: &pausePodConfig{
+			pod: &testutils.PausePodConfig{
 				Name: "pod-1",
 			},
 			update: func(cs kubernetes.Interface, _ string) error {
@@ -1331,13 +1331,13 @@ func TestUnschedulablePodBecomesSchedulable(t *testing.T) {
 				if err != nil {
 					return fmt.Errorf("cannot create node: %v", err)
 				}
-				_, err = createPausePod(cs, initPausePod(&pausePodConfig{Name: "pod-to-be-deleted", Namespace: ns}))
+				_, err = createPausePod(cs, initPausePod(&testutils.PausePodConfig{Name: "pod-to-be-deleted", Namespace: ns}))
 				if err != nil {
 					return fmt.Errorf("cannot create pod: %v", err)
 				}
 				return nil
 			},
-			pod: &pausePodConfig{
+			pod: &testutils.PausePodConfig{
 				Name: "pod-1",
 			},
 			update: func(cs kubernetes.Interface, ns string) error {
@@ -1356,7 +1356,7 @@ func TestUnschedulablePodBecomesSchedulable(t *testing.T) {
 				}
 				return nil
 			},
-			pod: &pausePodConfig{
+			pod: &testutils.PausePodConfig{
 				Name: "pod-1",
 				Affinity: &v1.Affinity{
 					PodAffinity: &v1.PodAffinity{
@@ -1374,7 +1374,7 @@ func TestUnschedulablePodBecomesSchedulable(t *testing.T) {
 				},
 			},
 			update: func(cs kubernetes.Interface, ns string) error {
-				podConfig := &pausePodConfig{
+				podConfig := &testutils.PausePodConfig{
 					Name:      "pod-with-affinity",
 					Namespace: ns,
 					Labels: map[string]string{
@@ -1394,12 +1394,12 @@ func TestUnschedulablePodBecomesSchedulable(t *testing.T) {
 				if err != nil {
 					return fmt.Errorf("cannot create node: %v", err)
 				}
-				if _, err := createPausePod(cs, initPausePod(&pausePodConfig{Name: "pod-to-be-updated", Namespace: ns})); err != nil {
+				if _, err := createPausePod(cs, initPausePod(&testutils.PausePodConfig{Name: "pod-to-be-updated", Namespace: ns})); err != nil {
 					return fmt.Errorf("cannot create pod: %v", err)
 				}
 				return nil
 			},
-			pod: &pausePodConfig{
+			pod: &testutils.PausePodConfig{
 				Name: "pod-1",
 				Affinity: &v1.Affinity{
 					PodAffinity: &v1.PodAffinity{
