@@ -189,6 +189,7 @@ func TestControllerSyncJob(t *testing.T) {
 	jobConditionComplete := batch.JobComplete
 	jobConditionFailed := batch.JobFailed
 	jobConditionSuspended := batch.JobSuspended
+	JobConditionPodFailure := batch.JobPodFailure
 
 	testCases := map[string]struct {
 		// job setup
@@ -214,6 +215,7 @@ func TestControllerSyncJob(t *testing.T) {
 		failedPods                int
 		podsWithIndexes           []indexPhase
 		fakeExpectationAtCreation int32 // negative: ExpectDeletions, positive: ExpectCreations
+		currentConditions         []batch.JobCondition
 
 		// expectations
 		expectedCreations       int32
@@ -308,16 +310,38 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedActive:    2,
 		},
 		"too few active pods, with controller error": {
-			parallelism:        2,
-			completions:        5,
-			backoffLimit:       6,
-			podControllerError: fmt.Errorf("fake error"),
-			jobKeyForget:       true,
-			activePods:         1,
-			succeededPods:      1,
+			parallelism:             2,
+			completions:             5,
+			backoffLimit:            6,
+			podControllerError:      fmt.Errorf("fake error"),
+			jobKeyForget:            true,
+			activePods:              1,
+			succeededPods:           1,
+			expectedCreations:       1,
+			expectedActive:          1,
+			expectedSucceeded:       1,
+			expectedCondition:       &JobConditionPodFailure,
+			expectedConditionStatus: v1.ConditionTrue,
+			expectedConditionReason: "FailedCreate",
+		},
+		"too few active pods, with previous error": {
+			parallelism:   2,
+			completions:   5,
+			backoffLimit:  6,
+			jobKeyForget:  true,
+			activePods:    1,
+			succeededPods: 1,
+			currentConditions: []batch.JobCondition{
+				{
+					Type:   JobConditionPodFailure,
+					Status: v1.ConditionTrue,
+					Reason: "FailedCreate",
+				},
+			},
 			expectedCreations:  1,
-			expectedActive:     1,
+			expectedActive:     2,
 			expectedSucceeded:  1,
+			expectedPodPatches: 1,
 		},
 		"too many active pods": {
 			parallelism:        2,
@@ -330,28 +354,51 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedPodPatches: 1,
 		},
 		"too many active pods, with controller error": {
-			parallelism:        2,
-			completions:        5,
-			backoffLimit:       6,
-			podControllerError: fmt.Errorf("fake error"),
-			jobKeyForget:       true,
-			activePods:         3,
+			parallelism:             2,
+			completions:             5,
+			backoffLimit:            6,
+			podControllerError:      fmt.Errorf("fake error"),
+			jobKeyForget:            true,
+			activePods:              3,
+			expectedDeletions:       1,
+			expectedActive:          3,
+			expectedCondition:       &JobConditionPodFailure,
+			expectedConditionStatus: v1.ConditionTrue,
+			expectedConditionReason: "FailedDelete",
+		},
+		"too many active pods, with previous error": {
+			parallelism:  2,
+			completions:  5,
+			backoffLimit: 6,
+			jobKeyForget: true,
+			activePods:   3,
+			currentConditions: []batch.JobCondition{
+				{
+					Type:   JobConditionPodFailure,
+					Status: v1.ConditionTrue,
+					Reason: "FailedDelete",
+				},
+			},
 			expectedDeletions:  1,
-			expectedActive:     3,
+			expectedActive:     2,
+			expectedPodPatches: 1,
 		},
 		"failed + succeed pods: reset backoff delay": {
-			parallelism:        2,
-			completions:        5,
-			backoffLimit:       6,
-			podControllerError: fmt.Errorf("fake error"),
-			jobKeyForget:       true,
-			activePods:         1,
-			succeededPods:      1,
-			failedPods:         1,
-			expectedCreations:  1,
-			expectedActive:     1,
-			expectedSucceeded:  1,
-			expectedFailed:     1,
+			parallelism:             2,
+			completions:             5,
+			backoffLimit:            6,
+			podControllerError:      fmt.Errorf("fake error"),
+			jobKeyForget:            true,
+			activePods:              1,
+			succeededPods:           1,
+			failedPods:              1,
+			expectedCreations:       1,
+			expectedActive:          1,
+			expectedSucceeded:       1,
+			expectedFailed:          1,
+			expectedCondition:       &JobConditionPodFailure,
+			expectedConditionStatus: v1.ConditionTrue,
+			expectedConditionReason: "FailedCreate",
 		},
 		"new failed pod": {
 			parallelism:        2,
@@ -365,15 +412,18 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedPodPatches: 1,
 		},
 		"only new failed pod with controller error": {
-			parallelism:        2,
-			completions:        5,
-			backoffLimit:       6,
-			podControllerError: fmt.Errorf("fake error"),
-			activePods:         1,
-			failedPods:         1,
-			expectedCreations:  1,
-			expectedActive:     1,
-			expectedFailed:     1,
+			parallelism:             2,
+			completions:             5,
+			backoffLimit:            6,
+			podControllerError:      fmt.Errorf("fake error"),
+			activePods:              1,
+			failedPods:              1,
+			expectedCreations:       1,
+			expectedActive:          1,
+			expectedFailed:          1,
+			expectedCondition:       &JobConditionPodFailure,
+			expectedConditionStatus: v1.ConditionTrue,
+			expectedConditionReason: "FailedCreate",
 		},
 		"job finish": {
 			parallelism:             2,
@@ -468,13 +518,16 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedPodPatches: 3,
 		},
 		"limited pods": {
-			parallelism:       100,
-			completions:       200,
-			backoffLimit:      6,
-			podLimit:          10,
-			jobKeyForget:      true,
-			expectedCreations: 10,
-			expectedActive:    10,
+			parallelism:             100,
+			completions:             200,
+			backoffLimit:            6,
+			podLimit:                10,
+			jobKeyForget:            true,
+			expectedCreations:       10,
+			expectedActive:          10,
+			expectedCondition:       &JobConditionPodFailure,
+			expectedConditionStatus: v1.ConditionTrue,
+			expectedConditionReason: "FailedCreate",
 		},
 		"too many job failures": {
 			parallelism:             2,
@@ -741,6 +794,7 @@ func TestControllerSyncJob(t *testing.T) {
 				// job & pods setup
 				job := newJob(tc.parallelism, tc.completions, tc.backoffLimit, tc.completionMode)
 				job.Spec.Suspend = pointer.BoolPtr(tc.suspend)
+				job.Status.Conditions = tc.currentConditions
 				key, err := controller.KeyFunc(job)
 				if err != nil {
 					t.Errorf("Unexpected error getting job key: %v", err)

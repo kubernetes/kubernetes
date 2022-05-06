@@ -297,6 +297,8 @@ const (
 	JobComplete JobConditionType = "Complete"
 	// JobFailed means the job has failed its execution.
 	JobFailed JobConditionType = "Failed"
+	// JobPodFailure means the pod of job fails to be created.
+	JobPodFailure JobConditionType = "JobPodFailure"
 )
 
 // JobCondition describes current state of a job.

@@ -780,7 +780,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (forget bool, rEr
 		prevSucceededIndexes, succeededIndexes = calculateSucceededIndexes(&job, pods)
 		succeeded = int32(succeededIndexes.total())
 	}
-	suspendCondChanged := false
+	conditionsChanged := false
 	// Remove active pods if Job failed.
 	if finishedCondition != nil {
 		deleted, err := jm.deleteActivePods(ctx, &job, activePods)
@@ -820,6 +820,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (forget bool, rEr
 		if complete {
 			finishedCondition = newCondition(batch.JobComplete, v1.ConditionTrue, "", "")
 		} else if manageJobCalled {
+			suspendCondChanged := false
 			// Update the conditions / emit events only if manageJob was called in
 			// this syncJob. Otherwise wait for the right syncJob call to make
 			// updates.
@@ -848,6 +849,19 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (forget bool, rEr
 					job.Status.StartTime = &now
 				}
 			}
+			podFailureCondChanged := false
+			if manageJobErr != nil {
+				if action == metrics.JobSyncActionPodsCreated {
+					job.Status.Conditions, podFailureCondChanged = ensureJobConditionStatus(job.Status.Conditions, batch.JobPodFailure, v1.ConditionTrue, "FailedCreate", manageJobErr.Error())
+				}
+				if action == metrics.JobSyncActionPodsDeleted {
+					job.Status.Conditions, podFailureCondChanged = ensureJobConditionStatus(job.Status.Conditions, batch.JobPodFailure, v1.ConditionTrue, "FailedDelete", manageJobErr.Error())
+				}
+			} else {
+				job.Status.Conditions, podFailureCondChanged = removeCondition(job.Status.Conditions, batch.JobPodFailure)
+			}
+
+			conditionsChanged = suspendCondChanged || podFailureCondChanged
 		}
 	}
 
@@ -858,7 +872,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (forget bool, rEr
 	forget = job.Status.Succeeded < succeeded
 
 	if uncounted != nil {
-		needsStatusUpdate := suspendCondChanged || active != job.Status.Active || !equalReady(ready, job.Status.Ready)
+		needsStatusUpdate := conditionsChanged || active != job.Status.Active || !equalReady(ready, job.Status.Ready)
 		job.Status.Active = active
 		job.Status.Ready = ready
 		err = jm.trackJobStatusAndRemoveFinalizers(ctx, &job, pods, prevSucceededIndexes, *uncounted, expectedRmFinalizers, finishedCondition, needsStatusUpdate)
@@ -881,7 +895,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (forget bool, rEr
 	}
 
 	// no need to update the job if the status hasn't changed since last time
-	if job.Status.Active != active || job.Status.Succeeded != succeeded || job.Status.Failed != failed || !equalReady(job.Status.Ready, ready) || suspendCondChanged || finishedCondition != nil {
+	if job.Status.Active != active || job.Status.Succeeded != succeeded || job.Status.Failed != failed || !equalReady(job.Status.Ready, ready) || conditionsChanged || finishedCondition != nil {
 		job.Status.Active = active
 		job.Status.Succeeded = succeeded
 		job.Status.Failed = failed
@@ -1677,6 +1691,21 @@ func findConditionByType(list []batch.JobCondition, cType batch.JobConditionType
 		}
 	}
 	return nil
+}
+
+// removeCondition removes the condition of the given type from the given conditions list of job.status.
+// The function returns a bool to let the caller know if the list was changed
+func removeCondition(conditions []batch.JobCondition, cType batch.JobConditionType) ([]batch.JobCondition, bool) {
+	condRemoved := false
+	var newConditions []batch.JobCondition
+	for _, c := range conditions {
+		if c.Type == cType {
+			condRemoved = true
+			continue
+		}
+		newConditions = append(newConditions, c)
+	}
+	return newConditions, condRemoved
 }
 
 func recordJobPodFinished(job *batch.Job, oldCounters batch.JobStatus) {
