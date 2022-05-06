@@ -124,8 +124,8 @@ func TestSpecReplicasChange(t *testing.T) {
 	defer closeFn()
 	ns := framework.CreateTestingNamespace("test-spec-replicas-change", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
-	stopCh := runControllerAndInformers(rm, informers)
-	defer close(stopCh)
+	cancel := runControllerAndInformers(rm, informers)
+	defer cancel()
 
 	createHeadlessService(t, c, newHeadlessService(ns.Name))
 	sts := newSTS("sts", ns.Name, 2)
@@ -167,8 +167,8 @@ func TestDeletingAndFailedPods(t *testing.T) {
 	defer closeFn()
 	ns := framework.CreateTestingNamespace("test-deleting-and-failed-pods", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
-	stopCh := runControllerAndInformers(rm, informers)
-	defer close(stopCh)
+	cancel := runControllerAndInformers(rm, informers)
+	defer cancel()
 
 	labelMap := labelMap()
 	sts := newSTS("sts", ns.Name, 2)
@@ -268,8 +268,8 @@ func TestStatefulSetAvailable(t *testing.T) {
 			defer closeFn()
 			ns := framework.CreateTestingNamespace("test-available-pods", s, t)
 			defer framework.DeleteTestingNamespace(ns, s, t)
-			stopCh := runControllerAndInformers(rm, informers)
-			defer close(stopCh)
+			cancel := runControllerAndInformers(rm, informers)
+			defer cancel()
 
 			labelMap := labelMap()
 			sts := newSTS("sts", ns.Name, 4)
