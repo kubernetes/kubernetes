@@ -653,6 +653,14 @@ message NetworkInterfaceUsage {
     UInt64Value tx_bytes = 4;
     // Cumulative count of transmit errors encountered.
     UInt64Value tx_errors = 5;
+    // Cumulative count of packets received.
+    UInt64Value rx_packets = 6;
+    // Cumulative count of packets dropped while receiving.
+    UInt64Value rx_dropped = 7;
+    // Cumulative count of packets transmitted.
+    UInt64Value tx_packets = 8;
+    // Cumulative count of packets dropped while transmitting.
+    UInt64Value tx_dropped = 9;
 }
 
 // ProcessUsage are stats pertaining to processes.
