@@ -196,13 +196,13 @@ func (v *timingHistogramVec) SetToCurrentTimeForLabels(labels map[string]string)
 // hidden, will return a GaugeMetric that is NOT a noop along
 // with nil error.  If called on a hidden vector then it will
 // return a noop and a nil error.  Otherwise it returns a noop
-// and an error that passes ErrIsNotReady.
+// and an error that passes ErrIsNotRegistered.
 func (v *timingHistogramVec) WithLabelValues(lvs ...string) (GaugeMetric, error) {
 	if v.IsHidden() {
 		return noop, nil
 	}
 	if !v.IsCreated() {
-		return noop, errNotReady
+		return noop, errNotRegistered
 	}
 	if v.LabelValueAllowLists != nil {
 		v.LabelValueAllowLists.ConstrainToAllowedList(v.originalLabels, lvs)
@@ -215,13 +215,13 @@ func (v *timingHistogramVec) WithLabelValues(lvs ...string) (GaugeMetric, error)
 // hidden, will return a GaugeMetric that is NOT a noop along
 // with nil error.  If called on a hidden vector then it will
 // return a noop and a nil error.  Otherwise it returns a noop
-// and an error that passes ErrIsNotReady.
+// and an error that passes ErrIsNotRegistered.
 func (v *timingHistogramVec) With(labels map[string]string) (GaugeMetric, error) {
 	if v.IsHidden() {
 		return noop, nil
 	}
 	if !v.IsCreated() {
-		return noop, errNotReady
+		return noop, errNotRegistered
 	}
 	if v.LabelValueAllowLists != nil {
 		v.LabelValueAllowLists.ConstrainLabelMap(labels)
