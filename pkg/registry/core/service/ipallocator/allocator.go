@@ -39,6 +39,7 @@ type Interface interface {
 	CIDR() net.IPNet
 	IPFamily() api.IPFamily
 	Has(ip net.IP) bool
+	Destroy()
 
 	// DryRun offers a way to try operations without persisting them.
 	DryRun() Interface
@@ -358,6 +359,11 @@ func (r *Range) contains(ip net.IP) (bool, int) {
 	return true, offset
 }
 
+// Destroy shuts down internal allocator.
+func (r *Range) Destroy() {
+	r.alloc.Destroy()
+}
+
 // calculateIPOffset calculates the integer offset of ip from base such that
 // base + offset = ip. It requires ip >= base.
 func calculateIPOffset(base *big.Int, ip net.IP) int {
@@ -426,4 +432,7 @@ func (dry dryRunRange) DryRun() Interface {
 
 func (dry dryRunRange) Has(ip net.IP) bool {
 	return dry.real.Has(ip)
+}
+
+func (dry dryRunRange) Destroy() {
 }
