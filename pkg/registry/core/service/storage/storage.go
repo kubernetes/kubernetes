@@ -157,6 +157,12 @@ func (r *REST) Categories() []string {
 	return []string{"all"}
 }
 
+// Destroy cleans up everything on shutdown.
+func (r *REST) Destroy() {
+	r.Store.Destroy()
+	r.alloc.Destroy()
+}
+
 // StatusREST implements the REST endpoint for changing the status of a service.
 type StatusREST struct {
 	store *genericregistry.Store
