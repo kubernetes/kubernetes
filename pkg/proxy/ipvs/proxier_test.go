@@ -144,7 +144,7 @@ func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset u
 		localDetector:         proxyutiliptables.NewNoOpLocalDetector(),
 		hostname:              testHostname,
 		serviceHealthServer:   healthcheck.NewFakeServiceHealthServer(),
-		ipvsScheduler:         DefaultScheduler,
+		ipvsScheduler:         defaultScheduler,
 		ipGetter:              &fakeIPGetter{nodeIPs: nodeIPs},
 		iptablesData:          bytes.NewBuffer(nil),
 		filterChainsData:      bytes.NewBuffer(nil),
@@ -655,15 +655,15 @@ func TestNodePortIPv4(t *testing.T) {
 				}},
 			},
 			expectedIptablesChains: netlinktest.ExpectedIptablesChain{
-				string(KubeNodePortChain): {{
-					JumpChain: string(KubeMarkMasqChain), MatchSet: kubeNodePortSetUDP,
+				string(kubeNodePortChain): {{
+					JumpChain: string(kubeMarkMasqChain), MatchSet: kubeNodePortSetUDP,
 				}, {
 					JumpChain: "ACCEPT", MatchSet: kubeHealthCheckNodePortSet,
 				}},
 				string(kubeServicesChain): {{
-					JumpChain: string(KubeMarkMasqChain), MatchSet: kubeClusterIPSet,
+					JumpChain: string(kubeMarkMasqChain), MatchSet: kubeClusterIPSet,
 				}, {
-					JumpChain: string(KubeNodePortChain), MatchSet: "",
+					JumpChain: string(kubeNodePortChain), MatchSet: "",
 				}, {
 					JumpChain: "ACCEPT", MatchSet: kubeClusterIPSet,
 				}},
@@ -982,10 +982,10 @@ func TestNodePortIPv4(t *testing.T) {
 				},
 			},
 			expectedIptablesChains: netlinktest.ExpectedIptablesChain{
-				string(KubeNodePortChain): {{
+				string(kubeNodePortChain): {{
 					JumpChain: "RETURN", MatchSet: kubeNodePortLocalSetSCTP,
 				}, {
-					JumpChain: string(KubeMarkMasqChain), MatchSet: kubeNodePortSetSCTP,
+					JumpChain: string(kubeMarkMasqChain), MatchSet: kubeNodePortSetSCTP,
 				}, {
 					JumpChain: "ACCEPT", MatchSet: kubeHealthCheckNodePortSet,
 				}},
@@ -1947,18 +1947,18 @@ func TestLoadBalancer(t *testing.T) {
 	// Check iptables chain and rules
 	epIpt := netlinktest.ExpectedIptablesChain{
 		string(kubeServicesChain): {{
-			JumpChain: string(KubeLoadBalancerChain), MatchSet: kubeLoadBalancerSet,
+			JumpChain: string(kubeLoadBalancerChain), MatchSet: kubeLoadBalancerSet,
 		}, {
-			JumpChain: string(KubeMarkMasqChain), MatchSet: kubeClusterIPSet,
+			JumpChain: string(kubeMarkMasqChain), MatchSet: kubeClusterIPSet,
 		}, {
-			JumpChain: string(KubeNodePortChain), MatchSet: "",
+			JumpChain: string(kubeNodePortChain), MatchSet: "",
 		}, {
 			JumpChain: "ACCEPT", MatchSet: kubeClusterIPSet,
 		}, {
 			JumpChain: "ACCEPT", MatchSet: kubeLoadBalancerSet,
 		}},
 		string(kubeLoadBalancerSet): {{
-			JumpChain: string(KubeMarkMasqChain), MatchSet: "",
+			JumpChain: string(kubeMarkMasqChain), MatchSet: "",
 		}},
 	}
 	checkIptables(t, ipt, epIpt)
@@ -2047,16 +2047,16 @@ func TestOnlyLocalNodePorts(t *testing.T) {
 	// Check iptables chain and rules
 	epIpt := netlinktest.ExpectedIptablesChain{
 		string(kubeServicesChain): {{
-			JumpChain: string(KubeMarkMasqChain), MatchSet: kubeClusterIPSet,
+			JumpChain: string(kubeMarkMasqChain), MatchSet: kubeClusterIPSet,
 		}, {
-			JumpChain: string(KubeNodePortChain), MatchSet: "",
+			JumpChain: string(kubeNodePortChain), MatchSet: "",
 		}, {
 			JumpChain: "ACCEPT", MatchSet: kubeClusterIPSet,
 		}},
-		string(KubeNodePortChain): {{
+		string(kubeNodePortChain): {{
 			JumpChain: "RETURN", MatchSet: kubeNodePortLocalSetTCP,
 		}, {
-			JumpChain: string(KubeMarkMasqChain), MatchSet: kubeNodePortSetTCP,
+			JumpChain: string(kubeMarkMasqChain), MatchSet: kubeNodePortSetTCP,
 		}, {
 			JumpChain: "ACCEPT", MatchSet: kubeHealthCheckNodePortSet,
 		}},
@@ -2126,10 +2126,10 @@ func TestHealthCheckNodePort(t *testing.T) {
 
 	// Check iptables chain and rules
 	epIpt := netlinktest.ExpectedIptablesChain{
-		string(KubeNodePortChain): {{
+		string(kubeNodePortChain): {{
 			JumpChain: "RETURN", MatchSet: kubeNodePortLocalSetTCP,
 		}, {
-			JumpChain: string(KubeMarkMasqChain), MatchSet: kubeNodePortSetTCP,
+			JumpChain: string(kubeMarkMasqChain), MatchSet: kubeNodePortSetTCP,
 		}, {
 			JumpChain: "ACCEPT", MatchSet: kubeHealthCheckNodePortSet,
 		}},
@@ -2219,25 +2219,25 @@ func TestLoadBalanceSourceRanges(t *testing.T) {
 	// Check iptables chain and rules
 	epIpt := netlinktest.ExpectedIptablesChain{
 		string(kubeServicesChain): {{
-			JumpChain: string(KubeLoadBalancerChain), MatchSet: kubeLoadBalancerSet,
+			JumpChain: string(kubeLoadBalancerChain), MatchSet: kubeLoadBalancerSet,
 		}, {
-			JumpChain: string(KubeMarkMasqChain), MatchSet: kubeClusterIPSet,
+			JumpChain: string(kubeMarkMasqChain), MatchSet: kubeClusterIPSet,
 		}, {
-			JumpChain: string(KubeNodePortChain), MatchSet: "",
+			JumpChain: string(kubeNodePortChain), MatchSet: "",
 		}, {
 			JumpChain: "ACCEPT", MatchSet: kubeClusterIPSet,
 		}, {
 			JumpChain: "ACCEPT", MatchSet: kubeLoadBalancerSet,
 		}},
-		string(KubeLoadBalancerChain): {{
-			JumpChain: string(KubeFireWallChain), MatchSet: kubeLoadbalancerFWSet,
+		string(kubeLoadBalancerChain): {{
+			JumpChain: string(kubeFirewallChain), MatchSet: kubeLoadbalancerFWSet,
 		}, {
-			JumpChain: string(KubeMarkMasqChain), MatchSet: "",
+			JumpChain: string(kubeMarkMasqChain), MatchSet: "",
 		}},
-		string(KubeFireWallChain): {{
+		string(kubeFirewallChain): {{
 			JumpChain: "RETURN", MatchSet: kubeLoadBalancerSourceCIDRSet,
 		}, {
-			JumpChain: string(KubeMarkDropChain), MatchSet: "",
+			JumpChain: string(kubeMarkDropChain), MatchSet: "",
 		}},
 	}
 	checkIptables(t, ipt, epIpt)
@@ -2300,12 +2300,12 @@ func TestAcceptIPVSTraffic(t *testing.T) {
 	// Check iptables chain and rules
 	epIpt := netlinktest.ExpectedIptablesChain{
 		string(kubeServicesChain): {
-			{JumpChain: string(KubeLoadBalancerChain), MatchSet: kubeLoadBalancerSet},
-			{JumpChain: string(KubeMarkMasqChain), MatchSet: kubeClusterIPSet},
-			{JumpChain: string(KubeMarkMasqChain), MatchSet: kubeExternalIPSet},
+			{JumpChain: string(kubeLoadBalancerChain), MatchSet: kubeLoadBalancerSet},
+			{JumpChain: string(kubeMarkMasqChain), MatchSet: kubeClusterIPSet},
+			{JumpChain: string(kubeMarkMasqChain), MatchSet: kubeExternalIPSet},
 			{JumpChain: "ACCEPT", MatchSet: kubeExternalIPSet}, // With externalTrafficOnlyArgs
 			{JumpChain: "ACCEPT", MatchSet: kubeExternalIPSet}, // With dstLocalOnlyArgs
-			{JumpChain: string(KubeNodePortChain), MatchSet: ""},
+			{JumpChain: string(kubeNodePortChain), MatchSet: ""},
 			{JumpChain: "ACCEPT", MatchSet: kubeClusterIPSet},
 			{JumpChain: "ACCEPT", MatchSet: kubeLoadBalancerSet},
 		},
@@ -2398,20 +2398,20 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 	// Check iptables chain and rules
 	epIpt := netlinktest.ExpectedIptablesChain{
 		string(kubeServicesChain): {{
-			JumpChain: string(KubeLoadBalancerChain), MatchSet: kubeLoadBalancerSet,
+			JumpChain: string(kubeLoadBalancerChain), MatchSet: kubeLoadBalancerSet,
 		}, {
-			JumpChain: string(KubeMarkMasqChain), MatchSet: kubeClusterIPSet,
+			JumpChain: string(kubeMarkMasqChain), MatchSet: kubeClusterIPSet,
 		}, {
-			JumpChain: string(KubeNodePortChain), MatchSet: "",
+			JumpChain: string(kubeNodePortChain), MatchSet: "",
 		}, {
 			JumpChain: "ACCEPT", MatchSet: kubeClusterIPSet,
 		}, {
 			JumpChain: "ACCEPT", MatchSet: kubeLoadBalancerSet,
 		}},
-		string(KubeLoadBalancerChain): {{
+		string(kubeLoadBalancerChain): {{
 			JumpChain: "RETURN", MatchSet: kubeLoadBalancerLocalSet,
 		}, {
-			JumpChain: string(KubeMarkMasqChain), MatchSet: "",
+			JumpChain: string(kubeMarkMasqChain), MatchSet: "",
 		}},
 	}
 	checkIptables(t, ipt, epIpt)
@@ -3786,7 +3786,7 @@ func Test_syncService(t *testing.T) {
 		ipset := ipsettest.NewFake(testIPSetVersion)
 		proxier := NewFakeProxier(ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
 
-		proxier.netlinkHandle.EnsureDummyDevice(DefaultDummyDevice)
+		proxier.netlinkHandle.EnsureDummyDevice(defaultDummyDevice)
 		if testCases[i].oldVirtualServer != nil {
 			if err := proxier.ipvs.AddVirtualServer(testCases[i].oldVirtualServer); err != nil {
 				t.Errorf("Case [%d], unexpected add IPVS virtual server error: %v", i, err)
@@ -3967,12 +3967,12 @@ func TestCleanLegacyService(t *testing.T) {
 		fp.ipvs.AddVirtualServer(currentServices[v])
 	}
 
-	fp.netlinkHandle.EnsureDummyDevice(DefaultDummyDevice)
+	fp.netlinkHandle.EnsureDummyDevice(defaultDummyDevice)
 	activeBindAddrs := map[string]bool{"1.1.1.1": true, "2.2.2.2": true, "3.3.3.3": true, "4.4.4.4": true}
 	// This is ipv4-only so ipv6 addresses should be ignored
 	currentBindAddrs := []string{"1.1.1.1", "2.2.2.2", "3.3.3.3", "4.4.4.4", "5.5.5.5", "6.6.6.6", "fd80::1:2:3", "fd80::1:2:4"}
 	for i := range currentBindAddrs {
-		fp.netlinkHandle.EnsureAddressBind(currentBindAddrs[i], DefaultDummyDevice)
+		fp.netlinkHandle.EnsureAddressBind(currentBindAddrs[i], defaultDummyDevice)
 	}
 
 	fp.cleanLegacyService(activeServices, currentServices, map[string]bool{"5.5.5.5": true, "6.6.6.6": true})
@@ -3992,7 +3992,7 @@ func TestCleanLegacyService(t *testing.T) {
 	}
 
 	// Addresses 5.5.5.5 and 6.6.6.6 should not be bound any more, but the ipv6 addresses should remain
-	remainingAddrs, _ := fp.netlinkHandle.ListBindAddress(DefaultDummyDevice)
+	remainingAddrs, _ := fp.netlinkHandle.ListBindAddress(defaultDummyDevice)
 	if len(remainingAddrs) != 6 {
 		t.Errorf("Expected number of remaining bound addrs after cleanup to be %v. Got %v", 6, len(remainingAddrs))
 	}
@@ -4066,11 +4066,11 @@ func TestCleanLegacyServiceWithRealServers(t *testing.T) {
 		fp.ipvs.AddRealServer(v, r)
 	}
 
-	fp.netlinkHandle.EnsureDummyDevice(DefaultDummyDevice)
+	fp.netlinkHandle.EnsureDummyDevice(defaultDummyDevice)
 	activeBindAddrs := map[string]bool{"3.3.3.3": true}
 	currentBindAddrs := []string{"1.1.1.1", "2.2.2.2", "3.3.3.3"}
 	for i := range currentBindAddrs {
-		fp.netlinkHandle.EnsureAddressBind(currentBindAddrs[i], DefaultDummyDevice)
+		fp.netlinkHandle.EnsureAddressBind(currentBindAddrs[i], defaultDummyDevice)
 	}
 
 	fp.cleanLegacyService(activeServices, currentServices, map[string]bool{"1.1.1.1": true, "2.2.2.2": true})
@@ -4085,7 +4085,7 @@ func TestCleanLegacyServiceWithRealServers(t *testing.T) {
 		t.Errorf("unexpected IPVS service")
 	}
 
-	remainingAddrs, _ := fp.netlinkHandle.ListBindAddress(DefaultDummyDevice)
+	remainingAddrs, _ := fp.netlinkHandle.ListBindAddress(defaultDummyDevice)
 	if len(remainingAddrs) != 1 {
 		t.Errorf("Expected number of remaining bound addrs after cleanup to be %v. Got %v", 1, len(remainingAddrs))
 	}
@@ -4140,9 +4140,9 @@ func TestCleanLegacyRealServersExcludeCIDRs(t *testing.T) {
 		fp.ipvs.AddRealServer(vs, rs)
 	}
 
-	fp.netlinkHandle.EnsureDummyDevice(DefaultDummyDevice)
+	fp.netlinkHandle.EnsureDummyDevice(defaultDummyDevice)
 
-	fp.netlinkHandle.EnsureAddressBind("4.4.4.4", DefaultDummyDevice)
+	fp.netlinkHandle.EnsureAddressBind("4.4.4.4", defaultDummyDevice)
 
 	fp.cleanLegacyService(
 		map[string]bool{},
@@ -4224,12 +4224,12 @@ func TestCleanLegacyService6(t *testing.T) {
 		fp.ipvs.AddVirtualServer(currentServices[v])
 	}
 
-	fp.netlinkHandle.EnsureDummyDevice(DefaultDummyDevice)
+	fp.netlinkHandle.EnsureDummyDevice(defaultDummyDevice)
 	activeBindAddrs := map[string]bool{"1000::1": true, "1000::2": true, "3000::1": true, "4000::1": true}
 	// This is ipv6-only so ipv4 addresses should be ignored
 	currentBindAddrs := []string{"1000::1", "1000::2", "3000::1", "4000::1", "5000::1", "1000::6", "1.1.1.1", "2.2.2.2"}
 	for i := range currentBindAddrs {
-		fp.netlinkHandle.EnsureAddressBind(currentBindAddrs[i], DefaultDummyDevice)
+		fp.netlinkHandle.EnsureAddressBind(currentBindAddrs[i], defaultDummyDevice)
 	}
 
 	fp.cleanLegacyService(activeServices, currentServices, map[string]bool{"5000::1": true, "1000::6": true})
@@ -4249,7 +4249,7 @@ func TestCleanLegacyService6(t *testing.T) {
 	}
 
 	// Addresses 5000::1 and 1000::6 should not be bound any more, but the ipv4 addresses should remain
-	remainingAddrs, _ := fp.netlinkHandle.ListBindAddress(DefaultDummyDevice)
+	remainingAddrs, _ := fp.netlinkHandle.ListBindAddress(defaultDummyDevice)
 	if len(remainingAddrs) != 6 {
 		t.Errorf("Expected number of remaining bound addrs after cleanup to be %v. Got %v", 6, len(remainingAddrs))
 	}
@@ -4297,7 +4297,7 @@ func TestMultiPortServiceBindAddr(t *testing.T) {
 	// first, add multi-port service1
 	fp.OnServiceAdd(service1)
 	fp.syncProxyRules()
-	remainingAddrs, _ := fp.netlinkHandle.ListBindAddress(DefaultDummyDevice)
+	remainingAddrs, _ := fp.netlinkHandle.ListBindAddress(defaultDummyDevice)
 	// should only remain address "172.16.55.4"
 	if len(remainingAddrs) != 1 {
 		t.Errorf("Expected number of remaining bound addrs after cleanup to be %v. Got %v", 1, len(remainingAddrs))
@@ -4309,7 +4309,7 @@ func TestMultiPortServiceBindAddr(t *testing.T) {
 	// update multi-port service1 to single-port service2
 	fp.OnServiceUpdate(service1, service2)
 	fp.syncProxyRules()
-	remainingAddrs, _ = fp.netlinkHandle.ListBindAddress(DefaultDummyDevice)
+	remainingAddrs, _ = fp.netlinkHandle.ListBindAddress(defaultDummyDevice)
 	// should still only remain address "172.16.55.4"
 	if len(remainingAddrs) != 1 {
 		t.Errorf("Expected number of remaining bound addrs after cleanup to be %v. Got %v", 1, len(remainingAddrs))
@@ -4320,7 +4320,7 @@ func TestMultiPortServiceBindAddr(t *testing.T) {
 	// update single-port service2 to multi-port service3
 	fp.OnServiceUpdate(service2, service3)
 	fp.syncProxyRules()
-	remainingAddrs, _ = fp.netlinkHandle.ListBindAddress(DefaultDummyDevice)
+	remainingAddrs, _ = fp.netlinkHandle.ListBindAddress(defaultDummyDevice)
 	// should still only remain address "172.16.55.4"
 	if len(remainingAddrs) != 1 {
 		t.Errorf("Expected number of remaining bound addrs after cleanup to be %v. Got %v", 1, len(remainingAddrs))
@@ -4331,7 +4331,7 @@ func TestMultiPortServiceBindAddr(t *testing.T) {
 	// delete multi-port service3
 	fp.OnServiceDelete(service3)
 	fp.syncProxyRules()
-	remainingAddrs, _ = fp.netlinkHandle.ListBindAddress(DefaultDummyDevice)
+	remainingAddrs, _ = fp.netlinkHandle.ListBindAddress(defaultDummyDevice)
 	// all addresses should be unbound
 	if len(remainingAddrs) != 0 {
 		t.Errorf("Expected number of remaining bound addrs after cleanup to be %v. Got %v", 0, len(remainingAddrs))
