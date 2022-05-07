@@ -798,40 +798,6 @@ func (n *NodeInfo) RemoveNode() {
 	n.Generation = nextGeneration()
 }
 
-// FilterOutPods receives a list of pods and filters out those whose node names
-// are equal to the node of this NodeInfo, but are not found in the pods of this NodeInfo.
-//
-// Preemption logic simulates removal of pods on a node by removing them from the
-// corresponding NodeInfo. In order for the simulation to work, we call this method
-// on the pods returned from SchedulerCache, so that predicate functions see
-// only the pods that are not removed from the NodeInfo.
-func (n *NodeInfo) FilterOutPods(pods []*v1.Pod) []*v1.Pod {
-	node := n.Node()
-	if node == nil {
-		return pods
-	}
-	filtered := make([]*v1.Pod, 0, len(pods))
-	for _, p := range pods {
-		if p.Spec.NodeName != node.Name {
-			filtered = append(filtered, p)
-			continue
-		}
-		// If pod is on the given node, add it to 'filtered' only if it is present in nodeInfo.
-		podKey, err := GetPodKey(p)
-		if err != nil {
-			continue
-		}
-		for _, np := range n.Pods {
-			npodkey, _ := GetPodKey(np.Pod)
-			if npodkey == podKey {
-				filtered = append(filtered, p)
-				break
-			}
-		}
-	}
-	return filtered
-}
-
 // GetPodKey returns the string key of a pod.
 func GetPodKey(pod *v1.Pod) (string, error) {
 	uid := string(pod.UID)
