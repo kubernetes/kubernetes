@@ -168,8 +168,6 @@ func (t *Tester) TestCreate(valid runtime.Object, createFn CreateFunc, getFn Get
 	t.testCreateInvokesValidation(opts, invalid...)
 	t.testCreateValidatesNames(valid.DeepCopyObject(), dryRunOpts)
 	t.testCreateValidatesNames(valid.DeepCopyObject(), opts)
-	t.testCreateIgnoreZZZ_DeprecatedClusterName(valid.DeepCopyObject(), dryRunOpts)
-	t.testCreateIgnoreZZZ_DeprecatedClusterName(valid.DeepCopyObject(), opts)
 }
 
 // Test updating an object.
@@ -190,7 +188,6 @@ func (t *Tester) TestUpdate(valid runtime.Object, createFn CreateFunc, getFn Get
 	t.testUpdatePropagatesUpdatedObjectError(valid.DeepCopyObject(), createFn, getFn, dryRunOpts)
 	t.testUpdatePropagatesUpdatedObjectError(valid.DeepCopyObject(), createFn, getFn, opts)
 	t.testUpdateIgnoreGenerationUpdates(valid.DeepCopyObject(), createFn, getFn)
-	t.testUpdateIgnoreZZZ_DeprecatedClusterName(valid.DeepCopyObject(), createFn, getFn)
 }
 
 // Test deleting an object.
@@ -506,22 +503,6 @@ func (t *Tester) testCreateResetsUserData(valid runtime.Object, opts metav1.Crea
 	}
 }
 
-func (t *Tester) testCreateIgnoreZZZ_DeprecatedClusterName(valid runtime.Object, opts metav1.CreateOptions) {
-	objectMeta := t.getObjectMetaOrFail(valid)
-	objectMeta.SetName(t.namer(3))
-	objectMeta.SetZZZ_DeprecatedClusterName("clustername-to-ignore")
-
-	obj, err := t.storage.(rest.Creater).Create(t.TestContext(), valid.DeepCopyObject(), rest.ValidateAllObjectFunc, &opts)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	defer t.delete(t.TestContext(), obj)
-	createdObjectMeta := t.getObjectMetaOrFail(obj)
-	if len(createdObjectMeta.GetZZZ_DeprecatedClusterName()) != 0 {
-		t.Errorf("Expected empty clusterName on created object, got '%v'", createdObjectMeta.GetZZZ_DeprecatedClusterName())
-	}
-}
-
 // =============================================================================
 // Update tests.
 
@@ -788,41 +769,6 @@ func (t *Tester) testUpdateRejectsMismatchedNamespace(obj runtime.Object, create
 	} else if !strings.Contains(err.Error(), "does not match the namespace sent on the request") {
 		t.Errorf("expected 'does not match the namespace sent on the request' error, got '%v'", err.Error())
 	}
-}
-
-func (t *Tester) testUpdateIgnoreZZZ_DeprecatedClusterName(obj runtime.Object, createFn CreateFunc, getFn GetFunc) {
-	ctx := t.TestContext()
-
-	foo := obj.DeepCopyObject()
-	name := t.namer(9)
-	t.setObjectMeta(foo, name)
-
-	if err := createFn(ctx, foo); err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	storedFoo, err := getFn(ctx, foo)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	older := storedFoo.DeepCopyObject()
-	olderMeta := t.getObjectMetaOrFail(older)
-	olderMeta.SetZZZ_DeprecatedClusterName("clustername-to-ignore")
-
-	_, _, err = t.storage.(rest.Updater).Update(t.TestContext(), olderMeta.GetName(), rest.DefaultUpdatedObjectInfo(older), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-
-	updatedFoo, err := getFn(ctx, older)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if clusterName := t.getObjectMetaOrFail(updatedFoo).GetZZZ_DeprecatedClusterName(); len(clusterName) != 0 {
-		t.Errorf("Unexpected clusterName update: expected empty, got %v", clusterName)
-	}
-
 }
 
 // =============================================================================
