@@ -28,12 +28,11 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
+	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
 func TestDefaultBinder(t *testing.T) {
-	testPod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "ns"},
-	}
+	testPod := st.MakePod().Name("foo").Namespace("ns").Obj()
 	testNode := "foohost.kubernetes.mydomain.com"
 	tests := []struct {
 		name        string
