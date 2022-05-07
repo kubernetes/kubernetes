@@ -485,7 +485,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 				if rt.skipKubeConfig == kubeConfig {
 					continue
 				}
-				if err := kubeconfigphase.CreateKubeConfigFile(kubeConfig, tmpKubernetesDir, oldcfg); err != nil {
+				if err := kubeconfigphase.CreateKubeConfigFile(kubeConfig, tmpKubernetesDir, "", oldcfg); err != nil {
 					t.Fatalf("couldn't create kubeconfig %q: %v", kubeConfig, err)
 				}
 			}
@@ -807,7 +807,7 @@ func TestRenewCertsByComponent(t *testing.T) {
 
 			// Create expected kubeconfigs
 			for _, kubeConfig := range test.kubeConfigShouldExist {
-				if err := kubeconfigphase.CreateKubeConfigFile(kubeConfig, tmpDir, cfg); err != nil {
+				if err := kubeconfigphase.CreateKubeConfigFile(kubeConfig, tmpDir, "", cfg); err != nil {
 					t.Fatalf("couldn't create kubeconfig %q: %v", kubeConfig, err)
 				}
 

@@ -22,6 +22,7 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -300,14 +301,14 @@ func TestCreateKubeConfigFileIfNotExists(t *testing.T) {
 func TestCreateKubeconfigFilesAndWrappers(t *testing.T) {
 	var tests = []struct {
 		name                     string
-		createKubeConfigFunction func(outDir string, cfg *kubeadmapi.InitConfiguration) error
+		createKubeConfigFunction func(outDir, patchesDir string, cfg *kubeadmapi.InitConfiguration) error
 		expectedFiles            []string
 		expectedError            bool
 	}{
 		{ // Test createKubeConfigFiles fails for unknown kubeconfig is requested
 			name: "createKubeConfigFiles",
-			createKubeConfigFunction: func(outDir string, cfg *kubeadmapi.InitConfiguration) error {
-				return createKubeConfigFiles(outDir, cfg, "unknown.conf")
+			createKubeConfigFunction: func(outDir, patchesDir string, cfg *kubeadmapi.InitConfiguration) error {
+				return createKubeConfigFiles(outDir, "", cfg, "unknown.conf")
 			},
 			expectedError: true,
 		},
@@ -340,7 +341,7 @@ func TestCreateKubeconfigFilesAndWrappers(t *testing.T) {
 			}
 
 			// Execs the createKubeConfigFunction
-			err := test.createKubeConfigFunction(tmpdir, cfg)
+			err := test.createKubeConfigFunction(tmpdir, "", cfg)
 			if test.expectedError && err == nil {
 				t.Errorf("createKubeConfigFunction didn't failed when expected to fail")
 				return
@@ -353,6 +354,51 @@ func TestCreateKubeconfigFilesAndWrappers(t *testing.T) {
 			// Assert expected files are there
 			testutil.AssertFileExists(t, tmpdir, test.expectedFiles...)
 		})
+	}
+}
+
+func TestCreateKubeConfigFileWithPatches(t *testing.T) {
+	// Create temp folder for the test case
+	tmpdir := testutil.SetupTempDir(t)
+	defer os.RemoveAll(tmpdir)
+
+	// Adds a pki folder with a ca cert to the temp folder
+	pkidir := testutil.SetupPkiDirWithCertificateAuthority(t, tmpdir)
+
+	patchesPath := filepath.Join(tmpdir, "patch-files")
+	err := os.MkdirAll(patchesPath, 0777)
+	if err != nil {
+		t.Fatalf("Couldn't create %s", patchesPath)
+	}
+
+	newServerAddress := "https://127.0.0.1:6443"
+	patchString := fmt.Sprintf(`[{"op": "replace", "path": "/clusters/0/cluster/server", "value": "%s"}]`, newServerAddress)
+	err = ioutil.WriteFile(filepath.Join(patchesPath, kubeadmconstants.ControllerManagerKubeConfigFileName+"+json.json"), []byte(patchString), 0644)
+	if err != nil {
+		t.Fatalf("WriteFile returned unexpected error: %v", err)
+	}
+
+	initConfig := &kubeadmapi.InitConfiguration{
+		ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+			CertificatesDir: pkidir,
+		},
+		LocalAPIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4", BindPort: 1234},
+	}
+	// Execute createStaticPodFunction with patches
+	kubeConfigPath := filepath.Join(tmpdir, "kubeconfig-files")
+	err = CreateKubeConfigFile(kubeadmconstants.ControllerManagerKubeConfigFileName, kubeConfigPath, patchesPath, initConfig)
+	if err != nil {
+		t.Errorf("Error executing CreateKubeConfigFile: %v", err)
+		return
+	}
+
+	patchedConfig, err := clientcmd.LoadFromFile(filepath.Join(kubeConfigPath, kubeadmconstants.ControllerManagerKubeConfigFileName))
+	if err != nil {
+		t.Errorf("Error executing LoadFromFile: %v", err)
+	}
+
+	if patchedConfig.Clusters[""].Server != newServerAddress {
+		t.Errorf("Patches were not applied to %s", kubeadmconstants.ControllerManagerKubeConfigFileName)
 	}
 }
 

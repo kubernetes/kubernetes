@@ -151,6 +151,6 @@ func runKubeConfigFile(kubeConfigFileName string) func(workflow.RunData) error {
 		defer func() { cfg.CertificatesDir = data.CertificateDir() }()
 
 		// creates the KubeConfig file (or use existing)
-		return kubeconfigphase.CreateKubeConfigFile(kubeConfigFileName, data.KubeConfigDir(), data.Cfg())
+		return kubeconfigphase.CreateKubeConfigFile(kubeConfigFileName, data.KubeConfigDir(), data.PatchesDir(), data.Cfg())
 	}
 }

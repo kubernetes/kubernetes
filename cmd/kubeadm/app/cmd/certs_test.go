@@ -134,7 +134,7 @@ func TestRunRenewCommands(t *testing.T) {
 		kubeadmconstants.SchedulerKubeConfigFileName,
 		kubeadmconstants.ControllerManagerKubeConfigFileName,
 	} {
-		if err := kubeconfigphase.CreateKubeConfigFile(kubeConfig, tmpDir, cfg); err != nil {
+		if err := kubeconfigphase.CreateKubeConfigFile(kubeConfig, tmpDir, "", cfg); err != nil {
 			t.Fatalf("couldn't create kubeconfig %q: %v", kubeConfig, err)
 		}
 	}

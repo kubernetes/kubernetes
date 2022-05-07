@@ -39,6 +39,7 @@ import (
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/patches"
 	pkiutil "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
 
@@ -72,7 +73,7 @@ type kubeConfigSpec struct {
 // kubelet.conf file must not be created because it will be created and signed by the kubelet TLS bootstrap process.
 // When not using external CA mode, if a kubeconfig file already exists it is used only if evaluated equal,
 // otherwise an error is returned. For external CA mode, the creation of kubeconfig files is skipped.
-func CreateJoinControlPlaneKubeConfigFiles(outDir string, cfg *kubeadmapi.InitConfiguration) error {
+func CreateJoinControlPlaneKubeConfigFiles(outDir string, patchesDir string, cfg *kubeadmapi.InitConfiguration) error {
 	var externaCA bool
 	caKeyPath := filepath.Join(cfg.CertificatesDir, kubeadmconstants.CAKeyName)
 	if _, err := os.Stat(caKeyPath); os.IsNotExist(err) {
@@ -90,7 +91,7 @@ func CreateJoinControlPlaneKubeConfigFiles(outDir string, cfg *kubeadmapi.InitCo
 			fmt.Printf("[kubeconfig] External CA mode: Using user provided %s\n", file)
 			continue
 		}
-		if err := createKubeConfigFiles(outDir, cfg, file); err != nil {
+		if err := createKubeConfigFiles(outDir, patchesDir, cfg, file); err != nil {
 			return err
 		}
 	}
@@ -99,14 +100,14 @@ func CreateJoinControlPlaneKubeConfigFiles(outDir string, cfg *kubeadmapi.InitCo
 
 // CreateKubeConfigFile creates a kubeconfig file.
 // If the kubeconfig file already exists, it is used only if evaluated equal; otherwise an error is returned.
-func CreateKubeConfigFile(kubeConfigFileName string, outDir string, cfg *kubeadmapi.InitConfiguration) error {
+func CreateKubeConfigFile(kubeConfigFileName string, outDir string, patchesDir string, cfg *kubeadmapi.InitConfiguration) error {
 	klog.V(1).Infof("creating kubeconfig file for %s", kubeConfigFileName)
-	return createKubeConfigFiles(outDir, cfg, kubeConfigFileName)
+	return createKubeConfigFiles(outDir, patchesDir, cfg, kubeConfigFileName)
 }
 
 // createKubeConfigFiles creates all the requested kubeconfig files.
 // If kubeconfig files already exists, they are used only if evaluated equal; otherwise an error is returned.
-func createKubeConfigFiles(outDir string, cfg *kubeadmapi.InitConfiguration, kubeConfigFileNames ...string) error {
+func createKubeConfigFiles(outDir, patchesDir string, cfg *kubeadmapi.InitConfiguration, kubeConfigFileNames ...string) error {
 
 	// gets the KubeConfigSpecs, actualized for the current InitConfiguration
 	specs, err := getKubeConfigSpecs(cfg)
@@ -125,6 +126,14 @@ func createKubeConfigFiles(outDir string, cfg *kubeadmapi.InitConfiguration, kub
 		config, err := buildKubeConfigFromSpec(spec, cfg.ClusterName, nil)
 		if err != nil {
 			return err
+		}
+
+		// if patchesDir is defined, patch the KubeConfig object
+		if patchesDir != "" {
+			config, err = patchKubeConfig(kubeConfigFileName, config, patchesDir, os.Stdout)
+			if err != nil {
+				return errors.Wrapf(err, "failed to patch KubeConfig file %q", kubeConfigFileName)
+			}
 		}
 
 		// writes the kubeconfig to disk if it does not exist
@@ -251,6 +260,46 @@ func validateKubeConfig(outDir, filename string, config *clientcmdapi.Config) er
 	}
 
 	return nil
+}
+
+// patchKubeConfig applies patches stored in patchesDir to the kubeconfig.
+func patchKubeConfig(configFileName string, config *clientcmdapi.Config, patchesDir string, output io.Writer) (*clientcmdapi.Config, error) {
+	configYAML, err := clientcmd.Write(*config)
+	if err != nil {
+		return config, errors.Wrapf(err, "failed to marshal KubeConfig to YAML")
+	}
+
+	var knownTargets = []string{
+		kubeadmconstants.Etcd,
+		kubeadmconstants.KubeAPIServer,
+		kubeadmconstants.KubeControllerManager,
+		kubeadmconstants.KubeScheduler,
+		kubeadmconstants.AdminKubeConfigFileName,
+		kubeadmconstants.KubeletKubeConfigFileName,
+		kubeadmconstants.ControllerManagerKubeConfigFileName,
+		kubeadmconstants.SchedulerKubeConfigFileName,
+	}
+
+	patchManager, err := patches.GetPatchManagerForPath(patchesDir, knownTargets, output)
+	if err != nil {
+		return config, err
+	}
+
+	patchTarget := &patches.PatchTarget{
+		Name:                      configFileName,
+		StrategicMergePatchObject: clientcmdapi.Config{},
+		Data:                      configYAML,
+	}
+	if err := patchManager.ApplyPatchesToTarget(patchTarget); err != nil {
+		return config, err
+	}
+
+	patchedConfig, err := clientcmd.Load(patchTarget.Data)
+	if err != nil {
+		return config, errors.Wrap(err, "failed to unmarshal patched KubeConfig from YAML")
+	}
+
+	return patchedConfig, nil
 }
 
 // createKubeConfigFileIfNotExists saves the KubeConfig object into a file if there isn't any file at the given path.

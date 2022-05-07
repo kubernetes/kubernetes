@@ -173,6 +173,10 @@ func PatchStaticPod(pod *v1.Pod, patchesDir string, output io.Writer) (*v1.Pod, 
 		kubeadmconstants.KubeAPIServer,
 		kubeadmconstants.KubeControllerManager,
 		kubeadmconstants.KubeScheduler,
+		kubeadmconstants.AdminKubeConfigFileName,
+		kubeadmconstants.KubeletKubeConfigFileName,
+		kubeadmconstants.ControllerManagerKubeConfigFileName,
+		kubeadmconstants.SchedulerKubeConfigFileName,
 	}
 
 	patchManager, err := patches.GetPatchManagerForPath(patchesDir, knownTargets, output)
