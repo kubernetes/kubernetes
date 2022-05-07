@@ -633,7 +633,6 @@ func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(podInfoList []*framework.
 		if len(pInfo.UnschedulablePlugins) != 0 && !p.podMatchesEvent(pInfo, event) {
 			continue
 		}
-		moved = true
 		pod := pInfo.Pod
 		if p.isPodBackingoff(pInfo) {
 			if err := p.podBackoffQ.Add(pInfo); err != nil {
@@ -646,6 +645,7 @@ func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(podInfoList []*framework.
 			if err := p.activeQ.Add(pInfo); err != nil {
 				klog.ErrorS(err, "Error adding pod to the scheduling queue", "pod", klog.KObj(pod))
 			} else {
+				moved = true
 				metrics.SchedulerQueueIncomingPods.WithLabelValues("active", event.Label).Inc()
 				p.unschedulablePods.delete(pod)
 			}
