@@ -156,15 +156,15 @@ func getMinTolerationTime(tolerations []v1.Toleration) time.Duration {
 // NewNoExecuteTaintManager creates a new NoExecuteTaintManager that will use passed clientset to
 // communicate with the API server.
 func NewNoExecuteTaintManager(ctx context.Context, c clientset.Interface, getPod GetPodFunc, getNode GetNodeFunc, getPodsAssignedToNode GetPodsByNodeNameFunc) *NoExecuteTaintManager {
+	if c == nil {
+		klog.Fatalf("kubeClient is nil when starting NodeController")
+	}
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "taint-controller"})
 	eventBroadcaster.StartStructuredLogging(0)
-	if c != nil {
-		klog.InfoS("Sending events to api server")
-		eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: c.CoreV1().Events("")})
-	} else {
-		klog.Fatalf("kubeClient is nil when starting NodeController")
-	}
+
+	klog.InfoS("Sending events to api server")
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: c.CoreV1().Events("")})
 
 	tm := &NoExecuteTaintManager{
 		client:                c,
