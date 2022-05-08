@@ -317,7 +317,9 @@ var _ = SIGDescribe("DisruptionController", func() {
 			if c.shouldDeny {
 				err = cs.CoreV1().Pods(ns).EvictV1(context.TODO(), e)
 				framework.ExpectError(err, "pod eviction should fail")
-				framework.ExpectEqual(apierrors.HasStatusCause(err, policyv1.DisruptionBudgetCause), true, "pod eviction should fail with DisruptionBudget cause")
+				if !apierrors.HasStatusCause(err, policyv1.DisruptionBudgetCause) {
+					framework.Fail("pod eviction should fail with DisruptionBudget cause")
+				}
 			} else {
 				// Only wait for running pods in the "allow" case
 				// because one of shouldDeny cases relies on the
@@ -361,7 +363,9 @@ var _ = SIGDescribe("DisruptionController", func() {
 		}
 		err = cs.CoreV1().Pods(ns).EvictV1(context.TODO(), e)
 		framework.ExpectError(err, "pod eviction should fail")
-		framework.ExpectEqual(apierrors.HasStatusCause(err, policyv1.DisruptionBudgetCause), true, "pod eviction should fail with DisruptionBudget cause")
+		if !apierrors.HasStatusCause(err, policyv1.DisruptionBudgetCause) {
+			framework.Fail("pod eviction should fail with DisruptionBudget cause")
+		}
 
 		ginkgo.By("Updating the pdb to allow a pod to be evicted")
 		updatePDBOrDie(cs, ns, defaultName, func(pdb *policyv1.PodDisruptionBudget) *policyv1.PodDisruptionBudget {
@@ -399,7 +403,9 @@ var _ = SIGDescribe("DisruptionController", func() {
 		}
 		err = cs.CoreV1().Pods(ns).EvictV1(context.TODO(), e)
 		framework.ExpectError(err, "pod eviction should fail")
-		framework.ExpectEqual(apierrors.HasStatusCause(err, policyv1.DisruptionBudgetCause), true, "pod eviction should fail with DisruptionBudget cause")
+		if !apierrors.HasStatusCause(err, policyv1.DisruptionBudgetCause) {
+			framework.Fail("pod eviction should fail with DisruptionBudget cause")
+		}
 
 		ginkgo.By("Deleting the pdb to allow a pod to be evicted")
 		deletePDBOrDie(cs, ns, defaultName)
