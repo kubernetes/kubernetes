@@ -85,8 +85,8 @@ func mustSetupScheduler(config *config.KubeSchedulerConfiguration) (util.Shutdow
 	cfg := &restclient.Config{
 		Host:          apiURL,
 		ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}},
-		QPS:           5000.0,
-		Burst:         5000,
+		QPS:           300.0,
+		Burst:         300,
 	}
 
 	// use default component config if config here is nil
