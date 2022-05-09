@@ -20,8 +20,6 @@ limitations under the License.
 package e2enode
 
 import (
-	"bufio"
-	"bytes"
 	"context"
 	"fmt"
 	"os/exec"
@@ -242,33 +240,24 @@ var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
 
 			ginkgo.By("removing a pod sandbox's '/pause' container")
 
-			// retrieve pods on the node
-			getPodsCmd := fmt.Sprintf("crictl --runtime-endpoint %q pods --quiet", containerRuntimeEndpoint)
-			stdout, err := exec.Command("sudo", "bash", "-c", getPodsCmd).CombinedOutput()
-			if err != nil {
-				framework.Failf("Failed to get pods using crictl command: %q, err: %v, stdout: %q", getPodsCmd, err, string(stdout))
+			runtimeSvc, _, err := getCRIClient()
+			framework.ExpectNoError(err, "should successfully get a cri client")
+
+			sandboxes, err := runtimeSvc.ListPodSandbox(nil)
+			framework.ExpectNoError(err, "should successfully list sandboxes")
+
+			if len(sandboxes) == 0 {
+				framework.Failf("Failed to find a pod sandbox")
 			}
 
-			// find a pod sandbox ID
-			var podSandboxID string
-			scanner := bufio.NewScanner(bytes.NewReader(stdout))
-			for scanner.Scan() {
-				line := scanner.Text()
-				podSandboxID = strings.TrimSpace(line)
-				if podSandboxID != "" {
-					break
-				}
-			}
-			if podSandboxID == "" {
-				framework.Failf("Failed to find a pod sandbox using crictl command: %q, stdout: %s", getPodsCmd, string(stdout))
-			}
+			podSandboxID := sandboxes[0].Id
 
 			// Remove the pod sandbox's /pause task - A task is not guaranteed to exist
 			// at a given point in time, so log if this fails. We only really care about
 			// the container.
 			ctrCmd := fmt.Sprintf("ctr -n k8s.io --timeout 10s --address %q", strings.TrimPrefix(containerRuntimeEndpoint, "unix://"))
 			removePodSandboxTaskCmd := fmt.Sprintf("%s t rm -f %s", ctrCmd, podSandboxID)
-			stdout, err = exec.Command("sudo", "bash", "-c", removePodSandboxTaskCmd).CombinedOutput()
+			stdout, err := exec.Command("sudo", "bash", "-c", removePodSandboxTaskCmd).CombinedOutput()
 			if err != nil {
 				framework.Logf("Unable to remove the pod sandbox's /pause task using ctr command: %q, err: %v, stdout: %q", removePodSandboxTaskCmd, err, string(stdout))
 			}
