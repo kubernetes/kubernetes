@@ -44,10 +44,9 @@ func (s *server) RegisterPlugin(pluginName string, endpoint string, versions []s
 
 func (s *server) DeRegisterPlugin(pluginName string) {
 	klog.V(2).InfoS("Deregistering plugin", "plugin", pluginName)
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	if _, exists := s.clients[pluginName]; exists {
-		s.disconnectClient(pluginName)
+	client := s.getClient(pluginName)
+	if client != nil {
+		s.disconnectClient(pluginName, client)
 	}
 }
 
@@ -82,8 +81,7 @@ func (s *server) connectClient(name string, socketPath string) error {
 	return nil
 }
 
-func (s *server) disconnectClient(name string) error {
-	c := s.clients[name]
+func (s *server) disconnectClient(name string, c Client) error {
 	s.deregisterClient(name)
 	return c.Disconnect()
 }
@@ -107,14 +105,18 @@ func (s *server) deregisterClient(name string) {
 func (s *server) runClient(name string, c Client) {
 	c.Run()
 
-	s.mutex.Lock()
-	if _, exists := s.clients[name]; !exists {
-		s.mutex.Unlock()
+	c = s.getClient(name)
+	if c == nil {
 		return
 	}
-	s.mutex.Unlock()
 
-	if err := s.disconnectClient(name); err != nil {
+	if err := s.disconnectClient(name, c); err != nil {
 		klog.V(2).InfoS("Unable to disconnect client", "resource", name, "client", c, "err", err)
 	}
+}
+
+func (s *server) getClient(name string) Client {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	return s.clients[name]
 }
