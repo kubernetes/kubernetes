@@ -148,6 +148,29 @@ func RunTestWatchFromNoneZero(ctx context.Context, t *testing.T, store storage.I
 	TestCheckResult(t, watch.Modified, w, out)
 }
 
+func RunTestWatchContextCancel(ctx context.Context, t *testing.T, store storage.Interface) {
+	canceledCtx, cancel := context.WithCancel(ctx)
+	cancel()
+	// When we watch with a canceled context, we should detect that it's context canceled.
+	// We won't take it as error and also close the watcher.
+	w, err := store.Watch(canceledCtx, "/abc", storage.ListOptions{
+		ResourceVersion: "0",
+		Predicate:       storage.Everything,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	select {
+	case _, ok := <-w.ResultChan():
+		if ok {
+			t.Error("ResultChan() should be closed")
+		}
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Errorf("timeout after %v", wait.ForeverTestTimeout)
+	}
+}
+
 func RunTestWatchInitializationSignal(ctx context.Context, t *testing.T, store storage.Interface) {
 	ctx, _ = context.WithTimeout(ctx, 5*time.Second)
 	initSignal := utilflowcontrol.NewInitializationSignal()
