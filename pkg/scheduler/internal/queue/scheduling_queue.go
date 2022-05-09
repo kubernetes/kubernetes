@@ -431,7 +431,7 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(pInfo *framework.QueuedPodI
 func (p *PriorityQueue) flushBackoffQCompleted() {
 	p.lock.Lock()
 	defer p.lock.Unlock()
-	broadcast := false
+	activated := false
 	for {
 		rawPodInfo := p.podBackoffQ.Peek()
 		if rawPodInfo == nil {
@@ -449,10 +449,10 @@ func (p *PriorityQueue) flushBackoffQCompleted() {
 		}
 		p.activeQ.Add(rawPodInfo)
 		metrics.SchedulerQueueIncomingPods.WithLabelValues("active", BackoffComplete).Inc()
-		broadcast = true
+		activated = true
 	}
 
-	if broadcast {
+	if activated {
 		p.cond.Broadcast()
 	}
 }
@@ -624,7 +624,7 @@ func (p *PriorityQueue) MoveAllToActiveOrBackoffQueue(event framework.ClusterEve
 
 // NOTE: this function assumes lock has been acquired in caller
 func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(podInfoList []*framework.QueuedPodInfo, event framework.ClusterEvent) {
-	moved := false
+	activated := false
 	for _, pInfo := range podInfoList {
 		// If the event doesn't help making the Pod schedulable, continue.
 		// Note: we don't run the check if pInfo.UnschedulablePlugins is nil, which denotes
@@ -633,7 +633,6 @@ func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(podInfoList []*framework.
 		if len(pInfo.UnschedulablePlugins) != 0 && !p.podMatchesEvent(pInfo, event) {
 			continue
 		}
-		moved = true
 		pod := pInfo.Pod
 		if p.isPodBackingoff(pInfo) {
 			if err := p.podBackoffQ.Add(pInfo); err != nil {
@@ -646,13 +645,14 @@ func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(podInfoList []*framework.
 			if err := p.activeQ.Add(pInfo); err != nil {
 				klog.ErrorS(err, "Error adding pod to the scheduling queue", "pod", klog.KObj(pod))
 			} else {
+				activated = true
 				metrics.SchedulerQueueIncomingPods.WithLabelValues("active", event.Label).Inc()
 				p.unschedulablePods.delete(pod)
 			}
 		}
 	}
 	p.moveRequestCycle = p.schedulingCycle
-	if moved {
+	if activated {
 		p.cond.Broadcast()
 	}
 }
