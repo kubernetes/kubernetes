@@ -243,7 +243,9 @@ var _ = SIGDescribe("Certificates API [Privileged:ClusterAdmin]", func() {
 					}
 				}
 			}
-			framework.ExpectEqual(found, true, fmt.Sprintf("expected certificates API group/version, got %#v", discoveryGroups.Groups))
+			if !found {
+				framework.Failf("expected certificates API group/version, got %#v", discoveryGroups.Groups)
+			}
 		}
 
 		ginkgo.By("getting /apis/certificates.k8s.io")
@@ -258,7 +260,9 @@ var _ = SIGDescribe("Certificates API [Privileged:ClusterAdmin]", func() {
 					break
 				}
 			}
-			framework.ExpectEqual(found, true, fmt.Sprintf("expected certificates API version, got %#v", group.Versions))
+			if !found {
+				framework.Failf("expected certificates API version, got %#v", group.Versions)
+			}
 		}
 
 		ginkgo.By("getting /apis/certificates.k8s.io/" + csrVersion)
@@ -276,9 +280,15 @@ var _ = SIGDescribe("Certificates API [Privileged:ClusterAdmin]", func() {
 					foundStatus = true
 				}
 			}
-			framework.ExpectEqual(foundCSR, true, fmt.Sprintf("expected certificatesigningrequests, got %#v", resources.APIResources))
-			framework.ExpectEqual(foundApproval, true, fmt.Sprintf("expected certificatesigningrequests/approval, got %#v", resources.APIResources))
-			framework.ExpectEqual(foundStatus, true, fmt.Sprintf("expected certificatesigningrequests/status, got %#v", resources.APIResources))
+			if !foundCSR {
+				framework.Failf("expected certificatesigningrequests, got %#v", resources.APIResources)
+			}
+			if !foundApproval {
+				framework.Failf("expected certificatesigningrequests/approval, got %#v", resources.APIResources)
+			}
+			if !foundStatus {
+				framework.Failf("expected certificatesigningrequests/status, got %#v", resources.APIResources)
+			}
 		}
 
 		// Main resource create/read/update/watch operations
@@ -323,10 +333,14 @@ var _ = SIGDescribe("Certificates API [Privileged:ClusterAdmin]", func() {
 		for sawAnnotations := false; !sawAnnotations; {
 			select {
 			case evt, ok := <-csrWatch.ResultChan():
-				framework.ExpectEqual(ok, true, "watch channel should not close")
+				if !ok {
+					framework.Fail("watch channel should not close")
+				}
 				framework.ExpectEqual(evt.Type, watch.Modified)
 				watchedCSR, isCSR := evt.Object.(*certificatesv1.CertificateSigningRequest)
-				framework.ExpectEqual(isCSR, true, fmt.Sprintf("expected CSR, got %T", evt.Object))
+				if !isCSR {
+					framework.Failf("expected CSR, got %T", evt.Object)
+				}
 				if watchedCSR.Annotations["patched"] == "true" {
 					framework.Logf("saw patched and updated annotations")
 					sawAnnotations = true
@@ -404,7 +418,9 @@ var _ = SIGDescribe("Certificates API [Privileged:ClusterAdmin]", func() {
 		err = csrClient.Delete(context.TODO(), createdCSR.Name, metav1.DeleteOptions{})
 		framework.ExpectNoError(err)
 		_, err = csrClient.Get(context.TODO(), createdCSR.Name, metav1.GetOptions{})
-		framework.ExpectEqual(apierrors.IsNotFound(err), true, fmt.Sprintf("expected 404, got %#v", err))
+		if !apierrors.IsNotFound(err) {
+			framework.Failf("expected 404, got %#v", err)
+		}
 		csrs, err = csrClient.List(context.TODO(), metav1.ListOptions{FieldSelector: "spec.signerName=" + signerName})
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(len(csrs.Items), 2, "filtered list should have 2 items")
