@@ -109,7 +109,14 @@ func newPod() runtime.Object {
 
 func TestCreate(t *testing.T) {
 	ctx, store, etcdClient := testSetup(t)
+	RunTestCreate(ctx, t, store, func(ctx context.Context, t *testing.T, key string) {
+		checkStorageInvariants(ctx, t, etcdClient, store.codec, key)
+	})
+}
 
+type KeyValidation func(ctx context.Context, t *testing.T, key string)
+
+func RunTestCreate(ctx context.Context, t *testing.T, store storage.Interface, validation KeyValidation) {
 	key := "/testkey"
 	out := &example.Pod{}
 	obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", SelfLink: "testlink"}}
@@ -133,10 +140,10 @@ func TestCreate(t *testing.T) {
 		t.Errorf("output should have empty selfLink")
 	}
 
-	checkStorageInvariants(ctx, t, etcdClient, store, key)
+	validation(ctx, t, key)
 }
 
-func checkStorageInvariants(ctx context.Context, t *testing.T, etcdClient *clientv3.Client, store *store, key string) {
+func checkStorageInvariants(ctx context.Context, t *testing.T, etcdClient *clientv3.Client, codec runtime.Codec, key string) {
 	getResp, err := etcdClient.KV.Get(ctx, key)
 	if err != nil {
 		t.Fatalf("etcdClient.KV.Get failed: %v", err)
@@ -144,7 +151,7 @@ func checkStorageInvariants(ctx context.Context, t *testing.T, etcdClient *clien
 	if len(getResp.Kvs) == 0 {
 		t.Fatalf("expecting non empty result on key: %s", key)
 	}
-	decoded, err := runtime.Decode(store.codec, getResp.Kvs[0].Value[len(defaultTestPrefix):])
+	decoded, err := runtime.Decode(codec, getResp.Kvs[0].Value[len(defaultTestPrefix):])
 	if err != nil {
 		t.Fatalf("expecting successful decode of object from %v\n%v", err, string(getResp.Kvs[0].Value))
 	}
@@ -374,7 +381,7 @@ func TestGuaranteedUpdate(t *testing.T) {
 			}
 
 			// verify that kv pair is not empty after set and that the underlying data matches expectations
-			checkStorageInvariants(ctx, t, etcdClient, store, key)
+			checkStorageInvariants(ctx, t, etcdClient, store.codec, key)
 
 			switch tt.expectNoUpdate {
 			case true:
