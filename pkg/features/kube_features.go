@@ -177,14 +177,6 @@ const (
 	// Enables tracking of available storage capacity that CSI drivers provide.
 	CSIStorageCapacity featuregate.Feature = "CSIStorageCapacity"
 
-	// owner: @huffmanca, @dobsonj
-	// alpha: v1.19
-	// beta: v1.20
-	// GA: v1.23
-	//
-	// Determines if a CSI Driver supports applying fsGroup.
-	CSIVolumeFSGroupPolicy featuregate.Feature = "CSIVolumeFSGroupPolicy"
-
 	// owner: @fengzixu
 	// alpha: v1.21
 	//
@@ -197,14 +189,6 @@ const (
 	//
 	// Allows clients to request a duration for certificates issued via the Kubernetes CSR API.
 	CSRDuration featuregate.Feature = "CSRDuration"
-
-	// owner: @gnufied
-	// alpha: v1.18
-	// beta: v1.20
-	// GA: v1.23
-	// Allows user to configure volume permission change policy for fsGroups when mounting
-	// a volume in a Pod.
-	ConfigurableFSGroupPolicy featuregate.Feature = "ConfigurableFSGroupPolicy"
 
 	// owner: @jiahuif
 	// alpha: v1.21
@@ -616,13 +600,6 @@ const (
 	// Enables controlling pod ranking on replicaset scale-down.
 	PodDeletionCost featuregate.Feature = "PodDeletionCost"
 
-	// owner: @mortent
-	// alpha: v1.3
-	// beta:  v1.5
-	//
-	// Enable all logic related to the PodDisruptionBudget API object in policy
-	PodDisruptionBudget featuregate.Feature = "PodDisruptionBudget"
-
 	// owner: @egernst
 	// alpha: v1.16
 	// beta: v1.18
@@ -862,13 +839,9 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	CSIStorageCapacity: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
 
-	CSIVolumeFSGroupPolicy: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.25
-
 	CSIVolumeHealth: {Default: false, PreRelease: featuregate.Alpha},
 
 	CSRDuration: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
-
-	ConfigurableFSGroupPolicy: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.25
 
 	ControllerManagerLeaderMigration: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
 
@@ -985,8 +958,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	PodAndContainerStatsFromCRI: {Default: false, PreRelease: featuregate.Alpha},
 
 	PodDeletionCost: {Default: true, PreRelease: featuregate.Beta},
-
-	PodDisruptionBudget: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.25
 
 	PodOverhead: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
 
