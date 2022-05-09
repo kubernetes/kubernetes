@@ -19,7 +19,7 @@ package openapi
 import (
 	"context"
 
-	openapi_v3 "github.com/google/gnostic/openapiv3"
+	openapi_v3 "github.com/google/gnostic-models/openapiv3"
 	"google.golang.org/protobuf/proto"
 	"k8s.io/kube-openapi/pkg/handler3"
 )

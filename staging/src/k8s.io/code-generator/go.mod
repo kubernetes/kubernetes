@@ -6,13 +6,13 @@ go 1.18
 
 require (
 	github.com/gogo/protobuf v1.3.2
-	github.com/google/gnostic v0.5.7-v3refs
+	github.com/google/gnostic-models v0.6.8
 	github.com/spf13/pflag v1.0.5
 	golang.org/x/tools v0.1.10-0.20220218145154-897bd77cd717
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/gengo v0.0.0-20211129171323-c02415ce4185
 	k8s.io/klog/v2 v2.60.1
-	k8s.io/kube-openapi v0.0.0-20220328201542-3ee0da9b0b42
+	k8s.io/kube-openapi v0.0.8-gnostic.0.20220425145412-55d630839892
 )
 
 require (
@@ -43,4 +43,7 @@ require (
 	sigs.k8s.io/yaml v1.2.0 // indirect
 )
 
-replace k8s.io/code-generator => ../code-generator
+replace (
+	k8s.io/code-generator => ../code-generator
+	k8s.io/kube-openapi => github.com/jefftree/kube-openapi v0.0.8-gnostic.0.20220425145412-55d630839892
+)

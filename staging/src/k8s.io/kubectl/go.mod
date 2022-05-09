@@ -14,7 +14,7 @@ require (
 	github.com/exponent-io/jsonpath v0.0.0-20151013193312-d6023ce2651d
 	github.com/fatih/camelcase v1.0.0
 	github.com/fvbommel/sortorder v1.0.1
-	github.com/google/gnostic v0.5.7-v3refs
+	github.com/google/gnostic-models v0.6.8
 	github.com/google/go-cmp v0.5.5
 	github.com/jonboulle/clockwork v0.2.2
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de
@@ -36,7 +36,7 @@ require (
 	k8s.io/component-base v0.0.0
 	k8s.io/component-helpers v0.0.0
 	k8s.io/klog/v2 v2.60.1
-	k8s.io/kube-openapi v0.0.0-20220328201542-3ee0da9b0b42
+	k8s.io/kube-openapi v0.0.8-gnostic.0.20220425145412-55d630839892
 	k8s.io/metrics v0.0.0
 	k8s.io/utils v0.0.0-20220210201930-3a6ce19ff2f9
 	sigs.k8s.io/json v0.0.0-20211208200746-9f7c6b3444d2
@@ -105,6 +105,7 @@ replace (
 	k8s.io/code-generator => ../code-generator
 	k8s.io/component-base => ../component-base
 	k8s.io/component-helpers => ../component-helpers
+	k8s.io/kube-openapi => github.com/jefftree/kube-openapi v0.0.8-gnostic.0.20220425145412-55d630839892
 	k8s.io/kubectl => ../kubectl
 	k8s.io/metrics => ../metrics
 )

@@ -7,7 +7,7 @@ go 1.18
 require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/evanphx/json-patch v4.12.0+incompatible
-	github.com/google/gnostic v0.5.7-v3refs
+	github.com/google/gnostic-models v0.6.8
 	github.com/google/uuid v1.1.2
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de
 	github.com/spf13/cobra v1.4.0
@@ -18,7 +18,7 @@ require (
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/client-go v0.0.0
-	k8s.io/kube-openapi v0.0.0-20220328201542-3ee0da9b0b42
+	k8s.io/kube-openapi v0.0.8-gnostic.0.20220425145412-55d630839892
 	k8s.io/utils v0.0.0-20220210201930-3a6ce19ff2f9
 	sigs.k8s.io/kustomize/api v0.11.4
 	sigs.k8s.io/kustomize/kyaml v0.13.6
@@ -74,4 +74,5 @@ replace (
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/cli-runtime => ../cli-runtime
 	k8s.io/client-go => ../client-go
+	k8s.io/kube-openapi => github.com/jefftree/kube-openapi v0.0.8-gnostic.0.20220425145412-55d630839892
 )

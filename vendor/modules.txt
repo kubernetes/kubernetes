@@ -430,13 +430,13 @@ github.com/google/cel-go/interpreter
 github.com/google/cel-go/interpreter/functions
 github.com/google/cel-go/parser
 github.com/google/cel-go/parser/gen
-# github.com/google/gnostic v0.5.7-v3refs => github.com/google/gnostic v0.5.7-v3refs
-## explicit; go 1.12
-github.com/google/gnostic/compiler
-github.com/google/gnostic/extensions
-github.com/google/gnostic/jsonschema
-github.com/google/gnostic/openapiv2
-github.com/google/gnostic/openapiv3
+# github.com/google/gnostic-models v0.6.8 => github.com/google/gnostic-models v0.6.8
+## explicit; go 1.18
+github.com/google/gnostic-models/compiler
+github.com/google/gnostic-models/extensions
+github.com/google/gnostic-models/jsonschema
+github.com/google/gnostic-models/openapiv2
+github.com/google/gnostic-models/openapiv3
 # github.com/google/go-cmp v0.5.5 => github.com/google/go-cmp v0.5.5
 ## explicit; go 1.8
 github.com/google/go-cmp/cmp
@@ -2170,7 +2170,7 @@ k8s.io/kube-aggregator/pkg/registry/apiservice/rest
 # k8s.io/kube-controller-manager v0.0.0 => ./staging/src/k8s.io/kube-controller-manager
 ## explicit; go 1.18
 k8s.io/kube-controller-manager/config/v1alpha1
-# k8s.io/kube-openapi v0.0.0-20220328201542-3ee0da9b0b42 => k8s.io/kube-openapi v0.0.0-20220328201542-3ee0da9b0b42
+# k8s.io/kube-openapi v0.0.8-gnostic.0.20220425145412-55d630839892 => github.com/jefftree/kube-openapi v0.0.8-gnostic.0.20220425145412-55d630839892
 ## explicit; go 1.16
 k8s.io/kube-openapi/cmd/openapi-gen
 k8s.io/kube-openapi/cmd/openapi-gen/args
@@ -2667,6 +2667,7 @@ sigs.k8s.io/yaml
 # github.com/google/cadvisor => github.com/google/cadvisor v0.44.1
 # github.com/google/cel-go => github.com/google/cel-go v0.11.2
 # github.com/google/gnostic => github.com/google/gnostic v0.5.7-v3refs
+# github.com/google/gnostic-models => github.com/google/gnostic-models v0.6.8
 # github.com/google/go-cmp => github.com/google/go-cmp v0.5.5
 # github.com/google/gofuzz => github.com/google/gofuzz v1.1.0
 # github.com/google/martian/v3 => github.com/google/martian/v3 v3.1.0
@@ -2861,7 +2862,7 @@ sigs.k8s.io/yaml
 # k8s.io/klog/v2 => k8s.io/klog/v2 v2.60.1
 # k8s.io/kube-aggregator => ./staging/src/k8s.io/kube-aggregator
 # k8s.io/kube-controller-manager => ./staging/src/k8s.io/kube-controller-manager
-# k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20220328201542-3ee0da9b0b42
+# k8s.io/kube-openapi => github.com/jefftree/kube-openapi v0.0.8-gnostic.0.20220425145412-55d630839892
 # k8s.io/kube-proxy => ./staging/src/k8s.io/kube-proxy
 # k8s.io/kube-scheduler => ./staging/src/k8s.io/kube-scheduler
 # k8s.io/kubectl => ./staging/src/k8s.io/kubectl

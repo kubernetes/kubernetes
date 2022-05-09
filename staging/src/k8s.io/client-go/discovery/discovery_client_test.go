@@ -27,8 +27,8 @@ import (
 	"time"
 
 	"github.com/gogo/protobuf/proto"
-	openapi_v2 "github.com/google/gnostic/openapiv2"
-	openapi_v3 "github.com/google/gnostic/openapiv3"
+	openapi_v2 "github.com/google/gnostic-models/openapiv2"
+	openapi_v3 "github.com/google/gnostic-models/openapiv3"
 	"github.com/stretchr/testify/assert"
 	golangproto "google.golang.org/protobuf/proto"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

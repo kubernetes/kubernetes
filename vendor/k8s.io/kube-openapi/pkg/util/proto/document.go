@@ -21,7 +21,7 @@ import (
 	"sort"
 	"strings"
 
-	openapi_v2 "github.com/google/gnostic/openapiv2"
+	openapi_v2 "github.com/google/gnostic-models/openapiv2"
 	"gopkg.in/yaml.v2"
 )
 

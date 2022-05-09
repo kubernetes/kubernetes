@@ -42,7 +42,7 @@ require (
 	github.com/golang/mock v1.6.0
 	github.com/golang/protobuf v1.5.2
 	github.com/google/cadvisor v0.44.1
-	github.com/google/gnostic v0.5.7-v3refs
+	github.com/google/gnostic-models v0.6.8
 	github.com/google/go-cmp v0.5.5
 	github.com/google/gofuzz v1.1.0
 	github.com/google/uuid v1.1.2
@@ -113,7 +113,7 @@ require (
 	k8s.io/klog/v2 v2.60.1
 	k8s.io/kube-aggregator v0.0.0
 	k8s.io/kube-controller-manager v0.0.0
-	k8s.io/kube-openapi v0.0.0-20220328201542-3ee0da9b0b42
+	k8s.io/kube-openapi v0.0.8-gnostic.0.20220425145412-55d630839892
 	k8s.io/kube-proxy v0.0.0
 	k8s.io/kube-scheduler v0.0.0
 	k8s.io/kubectl v0.0.0
@@ -386,6 +386,7 @@ replace (
 	github.com/google/cadvisor => github.com/google/cadvisor v0.44.1
 	github.com/google/cel-go => github.com/google/cel-go v0.11.2
 	github.com/google/gnostic => github.com/google/gnostic v0.5.7-v3refs
+	github.com/google/gnostic-models => github.com/google/gnostic-models v0.6.8
 	github.com/google/go-cmp => github.com/google/go-cmp v0.5.5
 	github.com/google/gofuzz => github.com/google/gofuzz v1.1.0
 	github.com/google/martian/v3 => github.com/google/martian/v3 v3.1.0
@@ -580,7 +581,7 @@ replace (
 	k8s.io/klog/v2 => k8s.io/klog/v2 v2.60.1
 	k8s.io/kube-aggregator => ./staging/src/k8s.io/kube-aggregator
 	k8s.io/kube-controller-manager => ./staging/src/k8s.io/kube-controller-manager
-	k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20220328201542-3ee0da9b0b42
+	k8s.io/kube-openapi => github.com/jefftree/kube-openapi v0.0.8-gnostic.0.20220425145412-55d630839892
 	k8s.io/kube-proxy => ./staging/src/k8s.io/kube-proxy
 	k8s.io/kube-scheduler => ./staging/src/k8s.io/kube-scheduler
 	k8s.io/kubectl => ./staging/src/k8s.io/kubectl
