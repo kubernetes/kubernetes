@@ -50,9 +50,6 @@ func (csiDriverStrategy) PrepareForCreate(ctx context.Context, obj runtime.Objec
 	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
 		csiDriver.Spec.VolumeLifecycleModes = nil
 	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeFSGroupPolicy) {
-		csiDriver.Spec.FSGroupPolicy = nil
-	}
 }
 
 func (csiDriverStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
@@ -84,10 +81,6 @@ func (csiDriverStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 	if oldCSIDriver.Spec.VolumeLifecycleModes == nil &&
 		!utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
 		newCSIDriver.Spec.VolumeLifecycleModes = nil
-	}
-	if oldCSIDriver.Spec.FSGroupPolicy == nil &&
-		!utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeFSGroupPolicy) {
-		newCSIDriver.Spec.FSGroupPolicy = nil
 	}
 
 	// Any changes to the mutable fields increment the generation number.
