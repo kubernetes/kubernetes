@@ -5,13 +5,13 @@ module k8s.io/legacy-cloud-providers
 go 1.18
 
 require (
-	cloud.google.com/go v0.81.0
+	cloud.google.com/go v0.97.0
 	github.com/Azure/azure-sdk-for-go v55.0.0+incompatible
 	github.com/Azure/go-autorest/autorest v0.11.27
 	github.com/Azure/go-autorest/autorest/adal v0.9.20
 	github.com/Azure/go-autorest/autorest/mocks v0.4.2
 	github.com/Azure/go-autorest/autorest/to v0.4.0
-	github.com/GoogleCloudPlatform/k8s-cloud-provider v1.16.1-0.20210702024009-ea6160c1d0e3
+	github.com/GoogleCloudPlatform/k8s-cloud-provider v1.18.1-0.20220218231025-f11817397a1b
 	github.com/aws/aws-sdk-go v1.38.49
 	github.com/golang/mock v1.6.0
 	github.com/google/go-cmp v0.5.6
@@ -22,7 +22,7 @@ require (
 	github.com/vmware/govmomi v0.20.3
 	golang.org/x/crypto v0.0.0-20220315160706-3147a52a75dd
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8
-	google.golang.org/api v0.46.0
+	google.golang.org/api v0.60.0
 	gopkg.in/gcfg.v1 v1.2.0
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
@@ -63,7 +63,7 @@ require (
 	github.com/google/gnostic v0.5.7-v3refs // indirect
 	github.com/google/gofuzz v1.1.0 // indirect
 	github.com/google/uuid v1.1.2 // indirect
-	github.com/googleapis/gax-go/v2 v2.0.5 // indirect
+	github.com/googleapis/gax-go/v2 v2.1.1 // indirect
 	github.com/imdario/mergo v0.3.5 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
