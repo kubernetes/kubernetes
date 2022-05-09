@@ -50,6 +50,8 @@ func CreateTestingNamespace(baseName string, apiserver *httptest.Server, t *test
 	// TODO: Create a namespace with a given basename.
 	// Currently we neither create the namespace nor delete all of its contents at the end.
 	// But as long as tests are not using the same namespaces, this should work fine.
+	// Note: As the integration tests do not run with admission turned on, it's not actually
+	// required to persist a Namespace object to create other objects inside of it.
 	return &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			// TODO: Once we start creating namespaces, switch to GenerateName.
@@ -61,6 +63,8 @@ func CreateTestingNamespace(baseName string, apiserver *httptest.Server, t *test
 // DeleteTestingNamespace is currently a no-op function.
 func DeleteTestingNamespace(ns *v1.Namespace, apiserver *httptest.Server, t *testing.T) {
 	// TODO: Remove all resources from a given namespace once we implement CreateTestingNamespace.
+	// Note: integration tests are not expected to run against persistent fixtures today, so not
+	// cleaning up data they create has no impact.
 }
 
 // GetReadySchedulableNodes addresses the common use case of getting nodes you can do work on.
