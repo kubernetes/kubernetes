@@ -137,6 +137,10 @@ func TestWatchError(t *testing.T) {
 
 func TestWatchContextCancel(t *testing.T) {
 	ctx, store, _ := testSetup(t)
+	RunTestWatchContextCancel(ctx, t, store)
+}
+
+func RunTestWatchContextCancel(ctx context.Context, t *testing.T, store storage.Interface) {
 	canceledCtx, cancel := context.WithCancel(ctx)
 	cancel()
 	// When we watch with a canceled context, we should detect that it's context canceled.
