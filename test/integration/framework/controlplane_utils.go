@@ -181,12 +181,25 @@ func startAPIServerOrDie(controlPlaneConfig *controlplane.Config, incomingServer
 	}
 
 	stopCh := make(chan struct{})
+
+	// the APIServer implements logic to handle the shutdown process, taking care of draining
+	// the connections, closing the listener socket, running the preShutdown hooks, stopping the postStartHooks, ...
+	// In the integration framework we don't have that logic so we try to emulate a similar shutdown process.
+	// Ref: staging/src/k8s.io/apiserver/pkg/server/genericapiserver.go
 	closeFn := func() {
 		if m != nil {
 			m.GenericAPIServer.RunPreShutdownHooks()
 		}
+		// Signal RunPostStartHooks to finish
 		close(stopCh)
+		// Clean up APIServer resources
 		m.GenericAPIServer.Destroy()
+		// At this point the APIserver was already "destroyed", new requests will not be processed,
+		// however, the httptest.Server.Close() method will block if there are active connections.
+		// To avoid that any spurious connection keeps the test hanging, we forcefully close the
+		// connections before shuting down the server. There is a small window where new connections
+		// can be initiated but is unlikely those move to active, hanging the server shutdown.
+		s.CloseClientConnections()
 		s.Close()
 	}
 
