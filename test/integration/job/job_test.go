@@ -535,7 +535,7 @@ func TestDisableJobTrackingWithFinalizers(t *testing.T) {
 
 func TestOrphanPodsFinalizersClearedWithGC(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobTrackingWithFinalizers, true)()
-	for _, policy := range []metav1.DeletionPropagation{metav1.DeletePropagationOrphan, metav1.DeletePropagationBackground} {
+	for _, policy := range []metav1.DeletionPropagation{metav1.DeletePropagationOrphan, metav1.DeletePropagationBackground, metav1.DeletePropagationForeground} {
 		t.Run(string(policy), func(t *testing.T) {
 			closeFn, restConfig, clientSet, ns := setup(t, "simple")
 			defer closeFn()
@@ -575,26 +575,73 @@ func TestOrphanPodsFinalizersClearedWithGC(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to delete job: %v", err)
 			}
-			orphanPods := 0
-			if err := wait.Poll(waitInterval, wait.ForeverTestTimeout, func() (done bool, err error) {
-				pods, err := clientSet.CoreV1().Pods(jobObj.Namespace).List(ctx, metav1.ListOptions{
-					LabelSelector: metav1.FormatLabelSelector(jobObj.Spec.Selector),
-				})
-				if err != nil {
-					return false, err
-				}
-				orphanPods = 0
-				for _, pod := range pods.Items {
-					if hasJobTrackingFinalizer(&pod) {
-						orphanPods++
-					}
-				}
-				return orphanPods == 0, nil
-			}); err != nil {
-				t.Errorf("Failed waiting for pods to be freed from finalizer: %v", err)
-				t.Logf("Last saw %d orphan pods", orphanPods)
-			}
+			validateNoOrphanPodsWithFinalizers(ctx, t, clientSet, jobObj)
 		})
+	}
+}
+
+func TestFinalizersClearedWhenBackoffLimitExceeded(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobTrackingWithFinalizers, true)()
+
+	closeFn, restConfig, clientSet, ns := setup(t, "simple")
+	defer closeFn()
+	ctx, cancel := startJobController(restConfig)
+	defer func() {
+		cancel()
+	}()
+
+	// Job tracking with finalizers requires less calls in Indexed mode,
+	// so it's more likely to process all finalizers before all the pods
+	// are visible.
+	mode := batchv1.IndexedCompletion
+	jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
+		Spec: batchv1.JobSpec{
+			CompletionMode: &mode,
+			Completions:    pointer.Int32(500),
+			Parallelism:    pointer.Int32(500),
+			BackoffLimit:   pointer.Int32(0),
+		},
+	})
+	if err != nil {
+		t.Fatalf("Could not create job: %v", err)
+	}
+
+	// Fail a pod ASAP.
+	err = wait.PollImmediate(time.Millisecond, wait.ForeverTestTimeout, func() (done bool, err error) {
+		if err := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodFailed, 1); err != nil {
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		t.Fatalf("Could not fail pod: %v", err)
+	}
+
+	validateJobFailed(ctx, t, clientSet, jobObj)
+
+	validateNoOrphanPodsWithFinalizers(ctx, t, clientSet, jobObj)
+}
+
+func validateNoOrphanPodsWithFinalizers(ctx context.Context, t *testing.T, clientSet clientset.Interface, jobObj *batchv1.Job) {
+	t.Helper()
+	orphanPods := 0
+	if err := wait.Poll(waitInterval, wait.ForeverTestTimeout, func() (done bool, err error) {
+		pods, err := clientSet.CoreV1().Pods(jobObj.Namespace).List(ctx, metav1.ListOptions{
+			LabelSelector: metav1.FormatLabelSelector(jobObj.Spec.Selector),
+		})
+		if err != nil {
+			return false, err
+		}
+		orphanPods = 0
+		for _, pod := range pods.Items {
+			if hasJobTrackingFinalizer(&pod) {
+				orphanPods++
+			}
+		}
+		return orphanPods == 0, nil
+	}); err != nil {
+		t.Errorf("Failed waiting for pods to be freed from finalizer: %v", err)
+		t.Logf("Last saw %d orphan pods", orphanPods)
 	}
 }
 
@@ -974,16 +1021,26 @@ func getJobConditionStatus(ctx context.Context, job *batchv1.Job, cType batchv1.
 	return ""
 }
 
+func validateJobFailed(ctx context.Context, t *testing.T, clientSet clientset.Interface, jobObj *batchv1.Job) {
+	t.Helper()
+	validateJobCondition(ctx, t, clientSet, jobObj, batchv1.JobFailed)
+}
+
 func validateJobSucceeded(ctx context.Context, t *testing.T, clientSet clientset.Interface, jobObj *batchv1.Job) {
+	t.Helper()
+	validateJobCondition(ctx, t, clientSet, jobObj, batchv1.JobComplete)
+}
+
+func validateJobCondition(ctx context.Context, t *testing.T, clientSet clientset.Interface, jobObj *batchv1.Job, cond batchv1.JobConditionType) {
 	t.Helper()
 	if err := wait.Poll(waitInterval, wait.ForeverTestTimeout, func() (bool, error) {
 		j, err := clientSet.BatchV1().Jobs(jobObj.Namespace).Get(ctx, jobObj.Name, metav1.GetOptions{})
 		if err != nil {
 			t.Fatalf("Failed to obtain updated Job: %v", err)
 		}
-		return getJobConditionStatus(ctx, j, batchv1.JobComplete) == v1.ConditionTrue, nil
+		return getJobConditionStatus(ctx, j, cond) == v1.ConditionTrue, nil
 	}); err != nil {
-		t.Errorf("Waiting for Job to succeed: %v", err)
+		t.Errorf("Waiting for Job to have condition %s: %v", cond, err)
 	}
 }
 
