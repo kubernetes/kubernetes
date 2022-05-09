@@ -72,8 +72,8 @@ var (
 		rest of the resource.
 
 		After a CustomResourceDefinition is deleted, invalidation of discovery cache may take up
-		to 10 minutes. If you don't want to wait, you might want to run "kubectl api-resources"
-		to refresh the discovery cache.`))
+		to 6 hours. If you don't want to wait, you might want to run "kubectl api-resources" to refresh
+		the discovery cache.`))
 
 	deleteExample = templates.Examples(i18n.T(`
 		# Delete a pod using the type and name specified in pod.json
