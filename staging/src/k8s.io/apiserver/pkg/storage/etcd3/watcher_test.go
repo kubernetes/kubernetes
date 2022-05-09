@@ -141,7 +141,10 @@ func TestWatchContextCancel(t *testing.T) {
 	cancel()
 	// When we watch with a canceled context, we should detect that it's context canceled.
 	// We won't take it as error and also close the watcher.
-	w, err := store.watcher.Watch(canceledCtx, "/abc", 0, false, false, storage.Everything)
+	w, err := store.Watch(canceledCtx, "/abc", storage.ListOptions{
+		ResourceVersion:      "0",
+		Predicate:            storage.Everything,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
