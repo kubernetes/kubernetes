@@ -115,16 +115,11 @@ func TestCreate(t *testing.T) {
 	obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", SelfLink: "testlink"}}
 
 	// verify that kv pair is empty before set
-	getResp, err := etcdClient.KV.Get(ctx, key)
-	if err != nil {
-		t.Fatalf("etcdClient.KV.Get failed: %v", err)
-	}
-	if len(getResp.Kvs) != 0 {
-		t.Fatalf("expecting empty result on key: %s", key)
+	if err := store.Get(ctx, key, storage.GetOptions{}, out); !storage.IsNotFound(err) {
+		t.Fatalf("expecting empty result on key %s, got %v", key, err)
 	}
 
-	err = store.Create(ctx, key, obj, out, 0)
-	if err != nil {
+	if err := store.Create(ctx, key, obj, out, 0); err != nil {
 		t.Fatalf("Set failed: %v", err)
 	}
 	// basic tests of the output
