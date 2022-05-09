@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
@@ -68,18 +67,11 @@ type ShutdownFunc func()
 
 // StartApiserver starts a local API server for testing and returns the handle to the URL and the shutdown function to stop it.
 func StartApiserver() (string, ShutdownFunc) {
-	h := &framework.APIServerHolder{Initialized: make(chan struct{})}
-	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		<-h.Initialized
-		h.M.GenericAPIServer.Handler.ServeHTTP(w, req)
-	}))
-
-	_, _, closeFn := framework.RunAnAPIServerUsingServer(framework.NewIntegrationTestControlPlaneConfig(), s, h)
+	_, s, closeFn := framework.RunAnAPIServer(framework.NewIntegrationTestControlPlaneConfig())
 
 	shutdownFunc := func() {
 		klog.Infof("destroying API server")
 		closeFn()
-		s.Close()
 		klog.Infof("destroyed API server")
 	}
 	return s.URL, shutdownFunc
