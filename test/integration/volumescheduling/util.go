@@ -18,7 +18,6 @@ package volumescheduling
 
 import (
 	"context"
-	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
@@ -63,12 +62,6 @@ func initTestAPIServer(t *testing.T, nsPrefix string, admission admission.Interf
 	}
 
 	// 1. Create API server
-	h := &framework.APIServerHolder{Initialized: make(chan struct{})}
-	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		<-h.Initialized
-		h.M.GenericAPIServer.Handler.ServeHTTP(w, req)
-	}))
-
 	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
 	resourceConfig := controlplane.DefaultAPIResourceConfigSource()
 	controlPlaneConfig.ExtraConfig.APIResourceConfigSource = resourceConfig
@@ -77,7 +70,8 @@ func initTestAPIServer(t *testing.T, nsPrefix string, admission admission.Interf
 		controlPlaneConfig.GenericConfig.AdmissionControl = admission
 	}
 
-	_, testCtx.httpServer, testCtx.closeFn = framework.RunAnAPIServerUsingServer(controlPlaneConfig, s, h)
+	_, testCtx.httpServer, testCtx.closeFn = framework.RunAnAPIServer(controlPlaneConfig)
+	s := testCtx.httpServer
 
 	if nsPrefix != "default" {
 		testCtx.ns = framework.CreateTestingNamespace(nsPrefix+string(uuid.NewUUID()), s, t)
