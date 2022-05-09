@@ -82,7 +82,7 @@ func FlushCoverage() {
 
 	var deps fakeTestDeps
 
-	dummyRun := testing.MainStart(deps, tests, fuzztargets, benchmarks, examples)
+	dummyRun := testing.MainStart(deps, tests, benchmarks, fuzztargets, examples)
 	dummyRun.Run()
 
 	// Once it writes to the temporary path, we move it to the intended path.
