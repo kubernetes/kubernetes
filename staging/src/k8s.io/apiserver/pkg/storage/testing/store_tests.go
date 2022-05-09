@@ -37,6 +37,35 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 )
 
+type KeyValidation func(ctx context.Context, t *testing.T, key string)
+
+func RunTestCreate(ctx context.Context, t *testing.T, store storage.Interface, validation KeyValidation) {
+	key := "/testkey"
+	out := &example.Pod{}
+	obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", SelfLink: "testlink"}}
+
+	// verify that kv pair is empty before set
+	if err := store.Get(ctx, key, storage.GetOptions{}, out); !storage.IsNotFound(err) {
+		t.Fatalf("expecting empty result on key %s, got %v", key, err)
+	}
+
+	if err := store.Create(ctx, key, obj, out, 0); err != nil {
+		t.Fatalf("Set failed: %v", err)
+	}
+	// basic tests of the output
+	if obj.ObjectMeta.Name != out.ObjectMeta.Name {
+		t.Errorf("pod name want=%s, get=%s", obj.ObjectMeta.Name, out.ObjectMeta.Name)
+	}
+	if out.ResourceVersion == "" {
+		t.Errorf("output should have non-empty resource version")
+	}
+	if out.SelfLink != "" {
+		t.Errorf("output should have empty selfLink")
+	}
+
+	validation(ctx, t, key)
+}
+
 func RunTestCreateWithTTL(ctx context.Context, t *testing.T, store storage.Interface) {
 	input := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 	key := "/somekey"
