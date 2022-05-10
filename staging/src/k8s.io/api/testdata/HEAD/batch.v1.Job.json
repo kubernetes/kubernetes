@@ -1619,7 +1619,9 @@
                 }
               ]
             },
-            "minDomains": 5
+            "minDomains": 5,
+            "nodeAffinityPolicy": "nodeAffinityPolicyValue",
+            "nodeTaintsPolicy": "nodeTaintsPolicyValue"
           }
         ],
         "setHostnameAsFQDN": true,

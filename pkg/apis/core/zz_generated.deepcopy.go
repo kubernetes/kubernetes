@@ -5639,6 +5639,16 @@ func (in *TopologySpreadConstraint) DeepCopyInto(out *TopologySpreadConstraint) 
 		*out = new(int32)
 		**out = **in
 	}
+	if in.NodeAffinityPolicy != nil {
+		in, out := &in.NodeAffinityPolicy, &out.NodeAffinityPolicy
+		*out = new(NodeInclusionPolicy)
+		**out = **in
+	}
+	if in.NodeTaintsPolicy != nil {
+		in, out := &in.NodeTaintsPolicy, &out.NodeTaintsPolicy
+		*out = new(NodeInclusionPolicy)
+		**out = **in
+	}
 	return
 }
 
