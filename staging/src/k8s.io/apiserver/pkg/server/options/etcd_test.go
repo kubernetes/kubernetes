@@ -21,7 +21,9 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
@@ -214,9 +216,12 @@ func TestKMSHealthzEndpoint(t *testing.T) {
 		},
 	}
 
+	scheme := runtime.NewScheme()
+	codecs := serializer.NewCodecFactory(scheme)
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			serverConfig := &server.Config{}
+			serverConfig := server.NewConfig(codecs)
 			etcdOptions := &EtcdOptions{
 				EncryptionProviderConfigFilepath: tc.encryptionConfigPath,
 			}

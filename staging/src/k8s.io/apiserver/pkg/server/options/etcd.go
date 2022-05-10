@@ -226,7 +226,7 @@ func (s *EtcdOptions) ApplyWithStorageFactoryTo(factory serverstorage.StorageFac
 }
 
 func (s *EtcdOptions) addEtcdHealthEndpoint(c *server.Config) error {
-	healthCheck, err := storagefactory.CreateHealthCheck(s.StorageConfig)
+	healthCheck, err := storagefactory.CreateHealthCheck(s.StorageConfig, c.StopNotify())
 	if err != nil {
 		return err
 	}
