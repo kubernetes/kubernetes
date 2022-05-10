@@ -32,7 +32,7 @@ spec:
         hostPath:
           path: /dev
       containers:
-      - image: k8s.gcr.io/e2e-test-images/sample-device-plugin:1.3
+      - image: registry.k8s.io/e2e-test-images/sample-device-plugin:1.3
         name: sample-device-plugin
         env:
         - name: PLUGIN_SOCK_DIR

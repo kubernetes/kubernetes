@@ -1000,7 +1000,7 @@ func getMemhogPod(podName string, ctnName string, res v1.ResourceRequirements) *
 			Containers: []v1.Container{
 				{
 					Name:            ctnName,
-					Image:           "k8s.gcr.io/stress:v1",
+					Image:           "registry.k8s.io/stress:v1",
 					ImagePullPolicy: "Always",
 					Env:             env,
 					// 60 min timeout * 60s / tick per 10s = 360 ticks before timeout => ~11.11Mi/tick
