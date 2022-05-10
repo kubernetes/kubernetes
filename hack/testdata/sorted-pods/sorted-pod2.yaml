@@ -8,7 +8,7 @@ metadata:
 spec:
   containers:
   - name: kubernetes-pause1
-    image: k8s.gcr.io/pause:3.7
+    image: registry.k8s.io/pause:3.7
     resources: 
       requests:
         memory: "1G"

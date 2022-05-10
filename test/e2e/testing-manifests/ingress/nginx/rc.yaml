@@ -17,7 +17,7 @@ spec:
     spec:
       terminationGracePeriodSeconds: 0
       containers:
-      - image: k8s.gcr.io/ingress-nginx/controller:v0.46.0
+      - image: registry.k8s.io/ingress-nginx/controller:v0.46.0
         args:
         - /nginx-ingress-controller
         - --election-id=ingress-controller-leader

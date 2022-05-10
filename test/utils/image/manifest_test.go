@@ -39,13 +39,13 @@ func BenchmarkReplaceRegistryInImageURL(b *testing.B) {
 			in:  "test",
 			out: "test.io/library/test",
 		}, {
-			in:  "k8s.gcr.io/test:123",
+			in:  "registry.k8s.io/test:123",
 			out: "test.io/test:123",
 		}, {
 			in:  "gcr.io/k8s-authenticated-test/test:123",
 			out: "test.io/k8s-authenticated-test/test:123",
 		}, {
-			in:  "k8s.gcr.io/sig-storage/test:latest",
+			in:  "registry.k8s.io/sig-storage/test:latest",
 			out: "test.io/sig-storage/test:latest",
 		}, {
 			in:  "invalid.registry.k8s.io/invalid/test:latest",
@@ -54,10 +54,10 @@ func BenchmarkReplaceRegistryInImageURL(b *testing.B) {
 			in:  "mcr.microsoft.com/test:latest",
 			out: "test.io/microsoft/test:latest",
 		}, {
-			in:  "k8s.gcr.io/e2e-test-images/test:latest",
+			in:  "registry.k8s.io/e2e-test-images/test:latest",
 			out: "test.io/promoter/test:latest",
 		}, {
-			in:  "k8s.gcr.io/build-image/test:latest",
+			in:  "registry.k8s.io/build-image/test:latest",
 			out: "test.io/build/test:latest",
 		}, {
 			in:  "gcr.io/authenticated-image-pulling/test:latest",
@@ -100,13 +100,13 @@ func TestReplaceRegistryInImageURL(t *testing.T) {
 			in:  "test",
 			out: "test.io/library/test",
 		}, {
-			in:  "k8s.gcr.io/test:123",
+			in:  "registry.k8s.io/test:123",
 			out: "test.io/test:123",
 		}, {
 			in:  "gcr.io/k8s-authenticated-test/test:123",
 			out: "test.io/k8s-authenticated-test/test:123",
 		}, {
-			in:  "k8s.gcr.io/sig-storage/test:latest",
+			in:  "registry.k8s.io/sig-storage/test:latest",
 			out: "test.io/sig-storage/test:latest",
 		}, {
 			in:  "invalid.registry.k8s.io/invalid/test:latest",
@@ -115,10 +115,10 @@ func TestReplaceRegistryInImageURL(t *testing.T) {
 			in:  "mcr.microsoft.com/test:latest",
 			out: "test.io/microsoft/test:latest",
 		}, {
-			in:  "k8s.gcr.io/e2e-test-images/test:latest",
+			in:  "registry.k8s.io/e2e-test-images/test:latest",
 			out: "test.io/promoter/test:latest",
 		}, {
-			in:  "k8s.gcr.io/build-image/test:latest",
+			in:  "registry.k8s.io/build-image/test:latest",
 			out: "test.io/build/test:latest",
 		}, {
 			in:  "gcr.io/authenticated-image-pulling/test:latest",

@@ -1,8 +1,8 @@
-linux/amd64=k8s.gcr.io/debian-base-amd64:v1.0.0
-linux/arm=k8s.gcr.io/debian-base-arm:v1.0.0
-linux/arm64=k8s.gcr.io/debian-base-arm64:v1.0.0
-linux/ppc64le=k8s.gcr.io/debian-base-ppc64le:v1.0.0
-linux/s390x=k8s.gcr.io/debian-base-s390x:v1.0.0
+linux/amd64=registry.k8s.io/debian-base-amd64:v1.0.0
+linux/arm=registry.k8s.io/debian-base-arm:v1.0.0
+linux/arm64=registry.k8s.io/debian-base-arm64:v1.0.0
+linux/ppc64le=registry.k8s.io/debian-base-ppc64le:v1.0.0
+linux/s390x=registry.k8s.io/debian-base-s390x:v1.0.0
 windows/amd64/1809=mcr.microsoft.com/windows/nanoserver:1809
 windows/amd64/20H2=mcr.microsoft.com/windows/nanoserver:20H2
 windows/amd64/ltsc2022=mcr.microsoft.com/windows/nanoserver:ltsc2022

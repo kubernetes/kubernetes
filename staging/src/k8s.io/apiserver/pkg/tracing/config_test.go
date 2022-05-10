@@ -114,7 +114,7 @@ spec:
         k8s-app: agent
     spec:
       containers:
-        - image: k8s.gcr.io/busybox
+        - image: registry.k8s.io/busybox
           name: agent
 `,
 			expectedResult: nil,

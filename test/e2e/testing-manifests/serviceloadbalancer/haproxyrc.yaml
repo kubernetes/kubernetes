@@ -17,7 +17,7 @@ spec:
         version: v1
     spec:
       containers:
-      - image: k8s.gcr.io/servicelb:0.1
+      - image: registry.k8s.io/servicelb:0.1
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
