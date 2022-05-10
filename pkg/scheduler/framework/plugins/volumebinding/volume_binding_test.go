@@ -18,7 +18,6 @@ package volumebinding
 
 import (
 	"context"
-	"reflect"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -654,8 +653,8 @@ func TestVolumeBinding(t *testing.T) {
 
 			t.Logf("Verify: call PreFilter and check status")
 			_, gotPreFilterStatus := p.PreFilter(ctx, state, item.pod)
-			if !reflect.DeepEqual(gotPreFilterStatus, item.wantPreFilterStatus) {
-				t.Errorf("filter prefilter status does not match: %v, want: %v", gotPreFilterStatus, item.wantPreFilterStatus)
+			if diff := cmp.Diff(item.wantPreFilterStatus, gotPreFilterStatus); diff != "" {
+				t.Errorf("prefilter status does not match: (-want,+got):\n%s", diff)
 			}
 			if !gotPreFilterStatus.IsSuccess() {
 				// scheduler framework will skip Filter if PreFilter fails
@@ -678,8 +677,8 @@ func TestVolumeBinding(t *testing.T) {
 			t.Logf("Verify: call Filter and check status")
 			for i, nodeInfo := range nodeInfos {
 				gotStatus := p.Filter(ctx, state, item.pod, nodeInfo)
-				if !reflect.DeepEqual(gotStatus, item.wantFilterStatus[i]) {
-					t.Errorf("filter status does not match for node %q, got: %v, want: %v", nodeInfo.Node().Name, gotStatus, item.wantFilterStatus)
+				if diff := cmp.Diff(item.wantFilterStatus[i], gotStatus); diff != "" {
+					t.Errorf("filter status does not match for node %q, (-want,+got):\n%s", nodeInfo.Node().Name, diff)
 				}
 			}
 
