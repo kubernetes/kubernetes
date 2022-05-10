@@ -625,9 +625,15 @@ func (handle *LinuxKernelHandler) GetModules() ([]string, error) {
 	ipvsModules := utilipvs.GetRequiredIPVSModules(kernelVersion)
 
 	var bmods, lmods []string
+	
+	// ipvs can load required modules automatically and ipvs denpends on nf_conntrack
+	modulesFile, err := os.Open("/proc/net/ip_vs")
+	if err == nil {
+		return ipvsModules, nil
+	}
 
 	// Find out loaded kernel modules. If this is a full static kernel it will try to verify if the module is compiled using /boot/config-KERNELVERSION
-	modulesFile, err := os.Open("/proc/modules")
+	modulesFile, err = os.Open("/proc/modules")
 	if err == os.ErrNotExist {
 		klog.ErrorS(err, "Failed to read file /proc/modules, assuming this is a kernel without loadable modules support enabled")
 		kernelConfigFile := fmt.Sprintf("/boot/config-%s", kernelVersionStr)
