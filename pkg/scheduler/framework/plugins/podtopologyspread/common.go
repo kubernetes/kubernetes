@@ -20,6 +20,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	v1helper "k8s.io/component-helpers/scheduling/corev1"
+	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 )
@@ -33,17 +35,35 @@ type topologyPair struct {
 // and where the selector is parsed.
 // Fields are exported for comparison during testing.
 type topologySpreadConstraint struct {
-	MaxSkew     int32
-	TopologyKey string
-	Selector    labels.Selector
-	MinDomains  int32
+	MaxSkew            int32
+	TopologyKey        string
+	Selector           labels.Selector
+	MinDomains         int32
+	NodeAffinityPolicy v1.NodeInclusionPolicy
+	NodeTaintsPolicy   v1.NodeInclusionPolicy
+}
+
+func (tsc *topologySpreadConstraint) matchNodeInclusionPolicies(pod *v1.Pod, node *v1.Node, require nodeaffinity.RequiredNodeAffinity) bool {
+	if tsc.NodeAffinityPolicy == v1.NodeInclusionPolicyHonor {
+		// We ignore parsing errors here for backwards compatibility.
+		if match, _ := require.Match(node); !match {
+			return false
+		}
+	}
+
+	if tsc.NodeTaintsPolicy == v1.NodeInclusionPolicyHonor {
+		if _, untolerated := v1helper.FindMatchingUntoleratedTaint(node.Spec.Taints, pod.Spec.Tolerations, nil); untolerated {
+			return false
+		}
+	}
+	return true
 }
 
 // buildDefaultConstraints builds the constraints for a pod using
 // .DefaultConstraints and the selectors from the services, replication
 // controllers, replica sets and stateful sets that match the pod.
 func (pl *PodTopologySpread) buildDefaultConstraints(p *v1.Pod, action v1.UnsatisfiableConstraintAction) ([]topologySpreadConstraint, error) {
-	constraints, err := filterTopologySpreadConstraints(pl.defaultConstraints, action, pl.enableMinDomainsInPodTopologySpread)
+	constraints, err := filterTopologySpreadConstraints(pl.defaultConstraints, action, pl.enableMinDomainsInPodTopologySpread, pl.enableNodeInclusionPolicyInPodTopologySpread)
 	if err != nil || len(constraints) == 0 {
 		return nil, err
 	}
@@ -67,7 +87,7 @@ func nodeLabelsMatchSpreadConstraints(nodeLabels map[string]string, constraints 
 	return true
 }
 
-func filterTopologySpreadConstraints(constraints []v1.TopologySpreadConstraint, action v1.UnsatisfiableConstraintAction, enableMinDomainsInPodTopologySpread bool) ([]topologySpreadConstraint, error) {
+func filterTopologySpreadConstraints(constraints []v1.TopologySpreadConstraint, action v1.UnsatisfiableConstraintAction, enableMinDomainsInPodTopologySpread, enableNodeInclusionPolicyInPodTopologySpread bool) ([]topologySpreadConstraint, error) {
 	var result []topologySpreadConstraint
 	for _, c := range constraints {
 		if c.WhenUnsatisfiable == action {
@@ -76,13 +96,23 @@ func filterTopologySpreadConstraints(constraints []v1.TopologySpreadConstraint, 
 				return nil, err
 			}
 			tsc := topologySpreadConstraint{
-				MaxSkew:     c.MaxSkew,
-				TopologyKey: c.TopologyKey,
-				Selector:    selector,
-				MinDomains:  1, // if MinDomains is nil, we treat MinDomains as 1.
+				MaxSkew:            c.MaxSkew,
+				TopologyKey:        c.TopologyKey,
+				Selector:           selector,
+				MinDomains:         1,                            // If MinDomains is nil, we treat MinDomains as 1.
+				NodeAffinityPolicy: v1.NodeInclusionPolicyHonor,  // If NodeAffinityPolicy is nil, we treat NodeAffinityPolicy as "Honor".
+				NodeTaintsPolicy:   v1.NodeInclusionPolicyIgnore, // If NodeTaintsPolicy is nil, we treat NodeTaintsPolicy as "Ignore".
 			}
 			if enableMinDomainsInPodTopologySpread && c.MinDomains != nil {
 				tsc.MinDomains = *c.MinDomains
+			}
+			if enableNodeInclusionPolicyInPodTopologySpread {
+				if c.NodeAffinityPolicy != nil {
+					tsc.NodeAffinityPolicy = *c.NodeAffinityPolicy
+				}
+				if c.NodeTaintsPolicy != nil {
+					tsc.NodeTaintsPolicy = *c.NodeTaintsPolicy
+				}
 			}
 			result = append(result, tsc)
 		}

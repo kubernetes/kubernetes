@@ -547,13 +547,15 @@ func (p *PodWrapper) PodAntiAffinityNotIn(labelKey, topologyKey string, vals []s
 
 // SpreadConstraint constructs a TopologySpreadConstraint object and injects
 // into the inner pod.
-func (p *PodWrapper) SpreadConstraint(maxSkew int, tpKey string, mode v1.UnsatisfiableConstraintAction, selector *metav1.LabelSelector, minDomains *int32) *PodWrapper {
+func (p *PodWrapper) SpreadConstraint(maxSkew int, tpKey string, mode v1.UnsatisfiableConstraintAction, selector *metav1.LabelSelector, minDomains *int32, nodeAffinityPolicy, nodeTaintsPolicy *v1.NodeInclusionPolicy) *PodWrapper {
 	c := v1.TopologySpreadConstraint{
-		MaxSkew:           int32(maxSkew),
-		TopologyKey:       tpKey,
-		WhenUnsatisfiable: mode,
-		LabelSelector:     selector,
-		MinDomains:        minDomains,
+		MaxSkew:            int32(maxSkew),
+		TopologyKey:        tpKey,
+		WhenUnsatisfiable:  mode,
+		LabelSelector:      selector,
+		MinDomains:         minDomains,
+		NodeAffinityPolicy: nodeAffinityPolicy,
+		NodeTaintsPolicy:   nodeTaintsPolicy,
 	}
 	p.Spec.TopologySpreadConstraints = append(p.Spec.TopologySpreadConstraints, c)
 	return p
