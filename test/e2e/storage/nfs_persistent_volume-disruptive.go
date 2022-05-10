@@ -181,7 +181,7 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 			framework.ExpectNoError(e2epv.WaitOnPVandPVC(c, f.Timeouts, ns, pv2, pvc2))
 
 			ginkgo.By("Attaching both PVC's to a single pod")
-			clientPod, err = e2epod.CreatePod(c, ns, nil, []*v1.PersistentVolumeClaim{pvc1, pvc2}, true, "")
+			clientPod, err = e2epod.CreatePod(c, ns, selector.MatchLabels, []*v1.PersistentVolumeClaim{pvc1, pvc2}, true, "")
 			framework.ExpectNoError(err)
 		})
 
