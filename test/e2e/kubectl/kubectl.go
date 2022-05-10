@@ -102,8 +102,11 @@ const (
 	httpdDeployment2Filename  = "httpd-deployment2.yaml.in"
 	httpdDeployment3Filename  = "httpd-deployment3.yaml.in"
 	metaPattern               = `"kind":"%s","apiVersion":"%s/%s","metadata":{"name":"%s"}`
-	unknownMetaPattern        = `"kind":"%s","apiVersion":"%s/%s","metadata":{"unknownMeta": "foo", "name":"%s"}`
 )
+
+func unknownFieldMetadataJSON(gvk schema.GroupVersionKind, name string) string {
+	return fmt.Sprintf(`"kind":"%s","apiVersion":"%s/%s","metadata":{"unknownMeta": "foo", "name":"%s"}`, gvk.Kind, gvk.Group, gvk.Version, name)
+}
 
 var (
 	nautilusImage = imageutils.GetE2EImage(imageutils.Nautilus)
@@ -174,6 +177,11 @@ properties:
         type: object
         x-kubernetes-embedded-resource: true
         properties:
+          metadata:
+            type: object
+            properties:
+              name:
+                type: string
           spec:
             type: object
   metadata:
@@ -1129,24 +1137,25 @@ metadata:
 			time.Sleep(10 * time.Second)
 
 			ginkgo.By("attempting to create a CR with unknown metadata fields at the root level")
-			schema := schemaForGVK(schema.GroupVersionKind{Group: testCRD.Crd.Spec.Group, Version: testCRD.Crd.Spec.Versions[0].Name, Kind: testCRD.Crd.Spec.Names.Kind})
+			gvk := schema.GroupVersionKind{Group: testCRD.Crd.Spec.Group, Version: testCRD.Crd.Spec.Versions[0].Name, Kind: testCRD.Crd.Spec.Names.Kind}
+			schema := schemaForGVK(gvk)
 			framework.ExpectNotEqual(schema, nil, "retrieving a schema for the crd")
 			embeddedCRPattern := `
 
 {%s,
   "spec": {
-          "template": {
-      	          "apiVersion": "foo/v1",
-      	 	  "kind": "Sub",
-      		  "metadata": {
-			%s
-      		        "name": "subobject"
-      		  },
-      		  "spec": null
-          }
+    "template": {
+      "apiVersion": "foo/v1",
+      "kind": "Sub",
+      "metadata": {
+        %s
+        "name": "subobject",
+        "namespace": "my-ns"
+      }
+    }
   }
 }`
-			meta := fmt.Sprintf(unknownMetaPattern, testCRD.Crd.Spec.Names.Kind, testCRD.Crd.Spec.Group, testCRD.Crd.Spec.Versions[0].Name, "test-cr")
+			meta := unknownFieldMetadataJSON(gvk, "test-cr")
 			unknownRootMetaCR := fmt.Sprintf(embeddedCRPattern, meta, "")
 			_, err = framework.RunKubectlInput(ns, unknownRootMetaCR, "create", "--validate=true", "-f", "-")
 			if !(strings.Contains(err.Error(), `unknown field "unknownMeta"`) || strings.Contains(err.Error(), `unknown field "metadata.unknownMeta"`)) {
@@ -1170,6 +1179,7 @@ metadata:
 		"kind": "Deployment",
 		"metadata": {
 			"name": "my-dep",
+			"namespace": "my-ns",
 			"unknownMeta": "foo",
 			"labels": {"app": "nginx"}
 		},
