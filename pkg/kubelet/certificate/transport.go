@@ -74,7 +74,10 @@ func updateTransport(stopCh <-chan struct{}, period time.Duration, clientConfig 
 		clientConfig.Dial = d.DialContext
 	}
 
-	return d.CloseAll, nil
+	return func() {
+		d.MarkAllInUse() // TODO see if we can do better
+		d.CloseAllInUse()
+	}, nil
 }
 
 func addCertRotation(stopCh <-chan struct{}, period time.Duration, clientConfig *restclient.Config, clientCertificateManager certificate.Manager, exitAfter time.Duration, d *connrotation.Dialer) error {
@@ -137,7 +140,8 @@ func addCertRotation(stopCh <-chan struct{}, period time.Duration, clientConfig 
 		// to reperform its TLS handshake with new cert.
 		//
 		// See: https://github.com/kubernetes-incubator/bootkube/pull/663#issuecomment-318506493
-		d.CloseAll()
+		d.MarkAllInUse() // TODO see if we can do better
+		d.CloseAllInUse()
 	}, period, stopCh)
 
 	clientConfig.Transport = utilnet.SetTransportDefaults(&http.Transport{

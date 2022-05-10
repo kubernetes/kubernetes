@@ -312,6 +312,7 @@ func (a *Authenticator) UpdateTransportConfig(c *transport.Config) error {
 	}
 
 	c.Dial = d.DialContext
+	c.TLS.TLSSessionStarted = d.MarkAllInUse
 
 	return nil
 }
@@ -390,7 +391,7 @@ func (a *Authenticator) cert(ctx context.Context) (*tls.Certificate, error) {
 		// If we close the underlying TCP connection in the process of starting the TLS handshake,
 		// there is no point in letting the handshake continue.  At least this way we provide a
 		// better error message then "write tcp host:port->host:port use of closed network connection"
-		return nil, errors.New("failing TLS handshake due to certificate rotation")
+		// return nil, errors.New("failing TLS handshake due to certificate rotation")
 	}
 	return creds.cert, nil
 }
@@ -532,7 +533,7 @@ func (a *Authenticator) refreshCredsLocked() (bool, error) {
 		if oldCreds.cert != nil && oldCreds.cert.Leaf != nil {
 			metrics.ClientCertRotationAge.Observe(time.Since(oldCreds.cert.Leaf.NotBefore))
 		}
-		a.connTracker.CloseAll()
+		a.connTracker.CloseAllInUse()
 		connClosed = true
 	}
 

@@ -100,6 +100,7 @@ func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 	if config.TLS.ReloadTLSFiles {
 		dynamicCertDialer := certRotatingDialer(tlsConfig.GetClientCertificate, dial)
 		tlsConfig.GetClientCertificate = dynamicCertDialer.GetClientCertificate
+		tlsConfig.ClientSessionCache = recordPutClientSessionCache(dynamicCertDialer.connDialer.MarkAllInUse)
 		dial = dynamicCertDialer.connDialer.DialContext
 		go dynamicCertDialer.Run(wait.NeverStop)
 	}

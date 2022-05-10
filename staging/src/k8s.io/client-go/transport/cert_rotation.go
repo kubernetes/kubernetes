@@ -86,7 +86,7 @@ func (c *dynamicClientCert) loadClientCert(cri *tls.CertificateRequestInfo) (*tl
 	}
 
 	klog.V(1).Infof("certificate rotation detected, shutting down client connections to start using new credentials")
-	c.connDialer.CloseAll()
+	c.connDialer.CloseAllInUse()
 
 	return cert, nil
 }

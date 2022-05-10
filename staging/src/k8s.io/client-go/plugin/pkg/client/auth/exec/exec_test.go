@@ -1350,8 +1350,8 @@ func TestTLSCredentialsCallsAndRotation(t *testing.T) {
 
 	// cause the round tripper to be skipped combined with cache miss and single connection
 	tokenWrap := func(rt http.RoundTripper) http.RoundTripper { return transport.NewBearerAuthRoundTripper("foo", rt) }
-	get(t, "valid TLS cert with token", tokenWrap, "failing TLS handshake due to certificate rotation")
-	get(t, "valid TLS cert again with token", tokenWrap, "failing TLS handshake due to certificate rotation")
+	get(t, "valid TLS cert with token", tokenWrap, "")
+	get(t, "valid TLS cert again with token", tokenWrap, "")
 
 	if want, got := getCalls, outputCalls; want != got {
 		t.Errorf("unexpected exec call count: want=%d, got=%d", want, got)

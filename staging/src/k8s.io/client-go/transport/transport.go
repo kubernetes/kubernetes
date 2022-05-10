@@ -131,9 +131,23 @@ func TLSConfigFor(c *Config) (*tls.Config, error) {
 			// be sent to the server.
 			return &tls.Certificate{}, nil
 		}
+
+		if c.TLS.TLSSessionStarted != nil {
+			tlsConfig.ClientSessionCache = recordPutClientSessionCache(c.TLS.TLSSessionStarted)
+		}
 	}
 
 	return tlsConfig, nil
+}
+
+type recordPutClientSessionCache func()
+
+func (f recordPutClientSessionCache) Get(_ string) (*tls.ClientSessionState, bool) {
+	return nil, false
+}
+
+func (f recordPutClientSessionCache) Put(_ string, _ *tls.ClientSessionState) {
+	f()
 }
 
 func certificateRequestInfoContext(cri *tls.CertificateRequestInfo) context.Context {

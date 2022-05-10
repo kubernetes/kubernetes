@@ -60,8 +60,9 @@ func NewDialerWithTracker(dial DialFunc, tracker *ConnectionTracker) *Dialer {
 
 // ConnectionTracker keeps track of opened connections
 type ConnectionTracker struct {
-	mu    sync.Mutex
-	conns map[*closableConn]struct{}
+	mu       sync.Mutex
+	conns    map[*closableConn]struct{}
+	canClose []map[*closableConn]struct{}
 }
 
 // NewConnectionTracker returns a connection tracker for use with NewDialerWithTracker
@@ -71,18 +72,35 @@ func NewConnectionTracker() *ConnectionTracker {
 	}
 }
 
-// CloseAll forcibly closes all tracked connections.
+// CloseAllInUse forcibly closes all in-use connections.
 //
-// Note: new connections may get created before CloseAll returns.
-func (c *ConnectionTracker) CloseAll() {
+// Note: new connections may get created before CloseAllInUse returns.
+func (c *ConnectionTracker) CloseAllInUse() {
 	c.mu.Lock()
-	conns := c.conns
-	c.conns = make(map[*closableConn]struct{})
+	canClose := c.canClose
+	c.canClose = nil
 	c.mu.Unlock()
 
-	for conn := range conns {
-		conn.Close()
+	for i := range canClose {
+		conns := canClose[i]
+		for conn := range conns {
+			_ = conn.Close()
+		}
 	}
+}
+
+// TODO comment
+func (c *ConnectionTracker) MarkAllInUse() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if len(c.conns) == 0 {
+		return
+	}
+
+	conns := c.conns
+	c.conns = make(map[*closableConn]struct{})
+	c.canClose = append(c.canClose, conns)
 }
 
 // Track adds the connection to the list of tracked connections,
@@ -96,6 +114,9 @@ func (c *ConnectionTracker) Track(conn net.Conn) net.Conn {
 	// is called.
 	closable.onClose = func() {
 		c.mu.Lock()
+		for i := range c.canClose {
+			delete(c.canClose[i], closable)
+		}
 		delete(c.conns, closable)
 		c.mu.Unlock()
 	}

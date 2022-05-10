@@ -786,7 +786,8 @@ func TestExecPluginRotationViaInformer(t *testing.T) {
 	// Make sure informer does not see events since it is using the invalid token.
 	execPlugin.rotateToken(clientUnauthorizedToken, tokenLifetime)
 	time.Sleep(tokenLifetime) // wait for old token to expire to make sure the watch is restarted with clientUnauthorizedToken
-	clientDialer.CloseAll()
+	clientDialer.MarkAllInUse()
+	clientDialer.CloseAllInUse()
 	waitForInformerSync(ctx, t, informer, true, "")
 	informerSpy.clear()
 	createUpdateDeleteConfigMap(ctx, t, adminClient.CoreV1().ConfigMaps(ns.Name))

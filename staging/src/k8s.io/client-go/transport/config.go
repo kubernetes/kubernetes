@@ -144,4 +144,7 @@ type TLSConfig struct {
 	NextProtos []string
 
 	GetCert func(context.Context) (*tls.Certificate, error) // Callback that returns a TLS client certificate. CertData, CertFile, KeyData and KeyFile supercede this field.
+
+	// TODO comment
+	TLSSessionStarted func()
 }

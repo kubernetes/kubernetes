@@ -40,8 +40,9 @@ func TestCloseAll(t *testing.T) {
 			if _, err := dialer.Dial("", ""); err != nil {
 				t.Fatal(err)
 			}
+			dialer.MarkAllInUse()
 		}
-		dialer.CloseAll()
+		dialer.CloseAllInUse()
 		deadline := time.After(time.Second)
 		for j := 0; j < numConns; j++ {
 			select {
@@ -72,7 +73,7 @@ func TestCloseAllRace(t *testing.T) {
 		begin.Wait()
 		defer wg.Done()
 		for i := 0; i < raceCount; i++ {
-			dialer.CloseAll()
+			dialer.CloseAllInUse()
 		}
 	}()
 
@@ -88,6 +89,7 @@ func TestCloseAllRace(t *testing.T) {
 			}
 			atomic.AddInt64(&conns, 1)
 		}
+		dialer.MarkAllInUse()
 	}()
 
 	// Trigger both goroutines as close to the same time as possible
@@ -97,7 +99,7 @@ func TestCloseAllRace(t *testing.T) {
 	wg.Wait()
 
 	// Ensure CloseAll ran after all dials
-	dialer.CloseAll()
+	dialer.CloseAllInUse()
 
 	// Expect all connections to close within 5 seconds
 	for start := time.Now(); time.Now().Sub(start) < 5*time.Second; time.Sleep(10 * time.Millisecond) {

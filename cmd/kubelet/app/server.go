@@ -911,7 +911,10 @@ func updateDialer(clientConfig *restclient.Config) (func(), error) {
 	}
 	d := connrotation.NewDialer((&net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}).DialContext)
 	clientConfig.Dial = d.DialContext
-	return d.CloseAll, nil
+	return func() {
+		d.MarkAllInUse() // TODO see if we can do better
+		d.CloseAllInUse()
+	}, nil
 }
 
 // buildClientCertificateManager creates a certificate manager that will use certConfig to request a client certificate
