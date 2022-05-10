@@ -202,8 +202,7 @@ func (ufc *unsyncFakeClock) SetTime(now time.Time) {
 func BenchmarkTimingHistogramDirect(b *testing.B) {
 	b.StopTimer()
 	now := time.Now()
-	clk := &unsyncFakeClock{now: now}
-	hist, err := NewTestableTimingHistogram(clk.Now, TimingHistogramOpts{
+	hist, err := NewTestableTimingHistogram(func() time.Time { return now }, TimingHistogramOpts{
 		Namespace: "testns",
 		Subsystem: "testsubsys",
 		Name:      "testhist",
@@ -216,8 +215,48 @@ func BenchmarkTimingHistogramDirect(b *testing.B) {
 	var x int
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		clk.now = clk.now.Add(time.Duration(31-x) * time.Microsecond)
+		now = now.Add(time.Duration(31-x) * time.Microsecond)
 		hist.Set(float64(x))
+		x = (x + i) % 23
+	}
+}
+func BenchmarkTimingHistogramVecEltCached(b *testing.B) {
+	b.StopTimer()
+	now := time.Now()
+	vec := NewTestableTimingHistogramVec(func() time.Time { return now }, TimingHistogramOpts{
+		Namespace: "testns",
+		Subsystem: "testsubsys",
+		Name:      "testhist",
+		Help:      "Me",
+		Buckets:   []float64{1, 2, 4, 8, 16},
+	},
+		"label1", "label2")
+	hist := vec.WithLabelValues("val1", "val2")
+	var x int
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		now = now.Add(time.Duration(31-x) * time.Microsecond)
+		hist.Set(float64(x))
+		x = (x + i) % 23
+	}
+}
+
+func BenchmarkTimingHistogramVecEltFetched(b *testing.B) {
+	b.StopTimer()
+	now := time.Now()
+	vec := NewTestableTimingHistogramVec(func() time.Time { return now }, TimingHistogramOpts{
+		Namespace: "testns",
+		Subsystem: "testsubsys",
+		Name:      "testhist",
+		Help:      "Me",
+		Buckets:   []float64{1, 2, 4, 8, 16},
+	},
+		"label1", "label2")
+	var x int
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		now = now.Add(time.Duration(31-x) * time.Microsecond)
+		vec.WithLabelValues("val1", "val2").Set(float64(x))
 		x = (x + i) % 23
 	}
 }
