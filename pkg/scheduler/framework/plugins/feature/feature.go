@@ -32,4 +32,5 @@ type Features struct {
 	EnableSchedulingQueueHint                    bool
 	EnableAsyncPreemption                        bool
 	EnablePodLevelResources                      bool
+	EnableStorageCapacityScoring                 bool
 }
