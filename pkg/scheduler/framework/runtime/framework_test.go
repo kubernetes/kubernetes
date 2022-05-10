@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/component-base/metrics/testutil"
+
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
@@ -1769,13 +1770,6 @@ func TestPermitPlugins(t *testing.T) {
 	}
 }
 
-// withMetricsRecorder set metricsRecorder for the scheduling frameworkImpl.
-func withMetricsRecorder(recorder *metricsRecorder) Option {
-	return func(o *frameworkOptions) {
-		o.metricsRecorder = recorder
-	}
-}
-
 func TestRecordingMetrics(t *testing.T) {
 	state := &framework.CycleState{}
 	state.SetRecordPluginMetrics(true)
@@ -1924,12 +1918,12 @@ func TestRecordingMetrics(t *testing.T) {
 				Bind:      pluginSet,
 				PostBind:  pluginSet,
 			}
-			recorder := newMetricsRecorder(100, time.Nanosecond)
+			recorder := newBufferedMetricsRecorder(100, time.Nanosecond)
 			profile := config.KubeSchedulerProfile{
 				SchedulerName: testProfileName,
 				Plugins:       plugins,
 			}
-			f, err := newFrameworkWithQueueSortAndBind(r, profile, withMetricsRecorder(recorder))
+			f, err := newFrameworkWithQueueSortAndBind(r, profile, WithMetricsRecorder(recorder))
 			if err != nil {
 				t.Fatalf("Failed to create framework for testing: %v", err)
 			}
@@ -2033,12 +2027,12 @@ func TestRunBindPlugins(t *testing.T) {
 				pluginSet.Enabled = append(pluginSet.Enabled, config.Plugin{Name: name})
 			}
 			plugins := &config.Plugins{Bind: pluginSet}
-			recorder := newMetricsRecorder(100, time.Nanosecond)
+			recorder := newBufferedMetricsRecorder(100, time.Nanosecond)
 			profile := config.KubeSchedulerProfile{
 				SchedulerName: testProfileName,
 				Plugins:       plugins,
 			}
-			fwk, err := newFrameworkWithQueueSortAndBind(r, profile, withMetricsRecorder(recorder))
+			fwk, err := newFrameworkWithQueueSortAndBind(r, profile, WithMetricsRecorder(recorder))
 			if err != nil {
 				t.Fatal(err)
 			}
