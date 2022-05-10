@@ -1345,6 +1345,12 @@
     lockToDefault: true
     preRelease: GA
     version: "1.31"
+- name: StorageCapacityScoring
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.33"
 - name: StorageNamespaceIndex
   versionedSpecs:
   - default: true
