@@ -1754,7 +1754,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 						Operator: metav1.LabelSelectorOpExists,
 					},
 				},
-			}, nil).Obj(),
+			}, nil, nil, nil).Obj(),
 			pods: []*v1.Pod{
 				st.MakePod().Name("pod1").UID("pod1").Label("foo", "").Node("node1").Phase(v1.PodRunning).Obj(),
 			},
@@ -1781,7 +1781,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 						Operator: metav1.LabelSelectorOpExists,
 					},
 				},
-			}, nil).Obj(),
+			}, nil, nil, nil).Obj(),
 			pods: []*v1.Pod{
 				st.MakePod().Name("pod1a").UID("pod1a").Label("foo", "").Node("node1").Phase(v1.PodRunning).Obj(),
 				st.MakePod().Name("pod1b").UID("pod1b").Label("foo", "").Node("node1").Phase(v1.PodRunning).Obj(),
