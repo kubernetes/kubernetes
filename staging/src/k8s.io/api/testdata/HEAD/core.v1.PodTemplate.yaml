@@ -837,6 +837,8 @@ template:
           matchLabelsKey: matchLabelsValue
       maxSkew: 1
       minDomains: 5
+      nodeAffinityPolicy: nodeAffinityPolicyValue
+      nodeTaintsPolicy: nodeTaintsPolicyValue
       topologyKey: topologyKeyValue
       whenUnsatisfiable: whenUnsatisfiableValue
     volumes:
