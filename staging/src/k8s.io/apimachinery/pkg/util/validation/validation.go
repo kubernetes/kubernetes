@@ -334,7 +334,7 @@ func IsValidPortName(port string) []string {
 		errs = append(errs, "must contain only alpha-numeric characters (a-z, 0-9), and hyphens (-)")
 	}
 	if !portNameOneLetterRegexp.MatchString(port) {
-		errs = append(errs, "must contain at least one letter or number (a-z, 0-9)")
+		errs = append(errs, "must contain at least one letter (a-z)")
 	}
 	if strings.Contains(port, "--") {
 		errs = append(errs, "must not contain consecutive hyphens")
