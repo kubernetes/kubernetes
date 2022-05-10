@@ -254,7 +254,7 @@ func (rss randomScanStrategyWithOffset) AllocateBit(allocated *big.Int, max, cou
 	for i := 0; i < rss.offset; i++ {
 		at := (start + i) % rss.offset
 		if allocated.Bit(at) == 0 {
-			return i, true
+			return at, true
 		}
 	}
 	return 0, false
