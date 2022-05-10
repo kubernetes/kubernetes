@@ -221,7 +221,7 @@ func TestTimingHistogramVec(t *testing.T) {
 			c := NewTestableTimingHistogramVec(clk.Now, test.TimingHistogramOpts, test.labels)
 			registry.MustRegister(c)
 			var v0 float64 = 3
-			cm1, err := c.WithLabelValues("1", "2")
+			cm1, err := c.WithLabelValuesChecked("1", "2")
 			if err != nil {
 				t.Error(err)
 			}
@@ -251,14 +251,14 @@ func TestTimingHistogramVec(t *testing.T) {
 			}
 
 			// let's exercise the metric and verify it still works
-			c.Set(v0, "1", "3")
-			c.Set(v0, "2", "3")
+			c.WithLabelValues("1", "3").Set(v0)
+			c.WithLabelValues("2", "3").Set(v0)
 			dt1 := time.Nanosecond
 			t1 := t0.Add(dt1)
 			clk.SetTime(t1)
-			c.Add(5.0, "1", "2")
-			c.Add(5.0, "1", "3")
-			c.Add(5.0, "2", "3")
+			c.WithLabelValues("1", "2").Add(5.0)
+			c.WithLabelValues("1", "3").Add(5.0)
+			c.WithLabelValues("2", "3").Add(5.0)
 			ms, err = registry.Gather()
 			assert.Nil(t, err, "Gather failed %v", err)
 
@@ -324,7 +324,7 @@ func TestTimingHistogramWithLabelValueAllowList(t *testing.T) {
 			registry.MustRegister(c)
 			var v0 float64 = 13
 			for _, lv := range test.labelValues {
-				c.Set(v0, lv...)
+				c.WithLabelValues(lv...).Set(v0)
 			}
 
 			dt1 := 3 * time.Hour
@@ -332,7 +332,7 @@ func TestTimingHistogramWithLabelValueAllowList(t *testing.T) {
 			clk.SetTime(t1)
 
 			for _, lv := range test.labelValues {
-				c.Add(1.0, lv...)
+				c.WithLabelValues(lv...).Add(1.0)
 			}
 			mfs, err := registry.Gather()
 			assert.Nil(t, err, "Gather failed %v", err)
@@ -366,5 +366,77 @@ func TestTimingHistogramWithLabelValueAllowList(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func BenchmarkTimingHistogram(b *testing.B) {
+	b.StopTimer()
+	now := time.Now()
+	th := NewTestableTimingHistogram(func() time.Time { return now }, &TimingHistogramOpts{
+		Namespace:    "testns",
+		Subsystem:    "testsubsys",
+		Name:         "testhist",
+		Help:         "Me",
+		Buckets:      []float64{1, 2, 4, 8, 16},
+		InitialValue: 3,
+	})
+	registry := NewKubeRegistry()
+	registry.MustRegister(th)
+	var x int
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		now = now.Add(time.Duration(31-x) * time.Microsecond)
+		th.Set(float64(x))
+		x = (x + i) % 23
+	}
+}
+
+func BenchmarkTimingHistogramVecEltCached(b *testing.B) {
+	b.StopTimer()
+	now := time.Now()
+	hv := NewTestableTimingHistogramVec(func() time.Time { return now }, &TimingHistogramOpts{
+		Namespace:    "testns",
+		Subsystem:    "testsubsys",
+		Name:         "testhist",
+		Help:         "Me",
+		Buckets:      []float64{1, 2, 4, 8, 16},
+		InitialValue: 3,
+	},
+		[]string{"label1", "label2"})
+	registry := NewKubeRegistry()
+	registry.MustRegister(hv)
+	th, err := hv.WithLabelValuesChecked("v1", "v2")
+	if err != nil {
+		b.Error(err)
+	}
+	var x int
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		now = now.Add(time.Duration(31-x) * time.Microsecond)
+		th.Set(float64(x))
+		x = (x + i) % 23
+	}
+}
+
+func BenchmarkTimingHistogramVecEltFetched(b *testing.B) {
+	b.StopTimer()
+	now := time.Now()
+	hv := NewTestableTimingHistogramVec(func() time.Time { return now }, &TimingHistogramOpts{
+		Namespace:    "testns",
+		Subsystem:    "testsubsys",
+		Name:         "testhist",
+		Help:         "Me",
+		Buckets:      []float64{1, 2, 4, 8, 16},
+		InitialValue: 3,
+	},
+		[]string{"label1", "label2"})
+	registry := NewKubeRegistry()
+	registry.MustRegister(hv)
+	var x int
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		now = now.Add(time.Duration(31-x) * time.Microsecond)
+		hv.WithLabelValues("v1", "v2").Set(float64(x))
+		x = (x + i) % 60
 	}
 }

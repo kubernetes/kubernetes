@@ -143,61 +143,16 @@ func (v *timingHistogramVec) initializeDeprecatedMetric() {
 	v.initializeMetric()
 }
 
-func (v *timingHistogramVec) Set(value float64, labelValues ...string) {
-	gm, _ := v.WithLabelValues(labelValues...)
-	gm.Set(value)
-}
-
-func (v *timingHistogramVec) Inc(labelValues ...string) {
-	gm, _ := v.WithLabelValues(labelValues...)
-	gm.Inc()
-}
-
-func (v *timingHistogramVec) Dec(labelValues ...string) {
-	gm, _ := v.WithLabelValues(labelValues...)
-	gm.Dec()
-}
-
-func (v *timingHistogramVec) Add(delta float64, labelValues ...string) {
-	gm, _ := v.WithLabelValues(labelValues...)
-	gm.Add(delta)
-}
-func (v *timingHistogramVec) SetToCurrentTime(labelValues ...string) {
-	gm, _ := v.WithLabelValues(labelValues...)
-	gm.SetToCurrentTime()
-}
-
-func (v *timingHistogramVec) SetForLabels(value float64, labels map[string]string) {
-	gm, _ := v.With(labels)
-	gm.Set(value)
-}
-
-func (v *timingHistogramVec) IncForLabels(labels map[string]string) {
-	gm, _ := v.With(labels)
-	gm.Inc()
-}
-
-func (v *timingHistogramVec) DecForLabels(labels map[string]string) {
-	gm, _ := v.With(labels)
-	gm.Dec()
-}
-
-func (v *timingHistogramVec) AddForLabels(delta float64, labels map[string]string) {
-	gm, _ := v.With(labels)
-	gm.Add(delta)
-}
-func (v *timingHistogramVec) SetToCurrentTimeForLabels(labels map[string]string) {
-	gm, _ := v.With(labels)
-	gm.SetToCurrentTime()
-}
-
-// WithLabelValues, if called after this vector has been
-// registered in at least one registry and this vector is not
-// hidden, will return a GaugeMetric that is NOT a noop along
-// with nil error.  If called on a hidden vector then it will
-// return a noop and a nil error.  Otherwise it returns a noop
-// and an error that passes ErrIsNotRegistered.
-func (v *timingHistogramVec) WithLabelValues(lvs ...string) (GaugeMetric, error) {
+// WithLabelValuesChecked, if called on a hidden vector,
+// will return a noop gauge and a nil error.
+// If called before this vector has been registered in
+// at least one registry, will return a noop gauge and
+// an error that passes ErrIsNotRegistered.
+// If called with a syntactic problem in the labels, will
+// return a noop gauge and an error about the labels.
+// If none of the above apply, this method will return
+// the appropriate vector member and a nil error.
+func (v *timingHistogramVec) WithLabelValuesChecked(lvs ...string) (GaugeMetric, error) {
 	if v.IsHidden() {
 		return noop, nil
 	}
@@ -207,16 +162,33 @@ func (v *timingHistogramVec) WithLabelValues(lvs ...string) (GaugeMetric, error)
 	if v.LabelValueAllowLists != nil {
 		v.LabelValueAllowLists.ConstrainToAllowedList(v.originalLabels, lvs)
 	}
-	return v.TimingHistogramVec.WithLabelValues(lvs...).(GaugeMetric), nil
+	ops, err := v.TimingHistogramVec.GetMetricWithLabelValues(lvs...)
+	return ops.(GaugeMetric), err
 }
 
-// With, if called after this vector has been
-// registered in at least one registry and this vector is not
-// hidden, will return a GaugeMetric that is NOT a noop along
-// with nil error.  If called on a hidden vector then it will
-// return a noop and a nil error.  Otherwise it returns a noop
-// and an error that passes ErrIsNotRegistered.
-func (v *timingHistogramVec) With(labels map[string]string) (GaugeMetric, error) {
+// WithLabelValues calls WithLabelValuesChecked
+// and handles errors as follows.
+// An error that passes ErrIsNotRegistered is ignored
+// and the noop gauge is returned;
+// all other errors cause a panic.
+func (v *timingHistogramVec) WithLabelValues(lvs ...string) GaugeMetric {
+	ans, err := v.WithLabelValuesChecked(lvs...)
+	if err == nil || ErrIsNotRegistered(err) {
+		return ans
+	}
+	panic(err)
+}
+
+// WithChecked, if called on a hidden vector,
+// will return a noop gauge and a nil error.
+// If called before this vector has been registered in
+// at least one registry, will return a noop gauge and
+// an error that passes ErrIsNotRegistered.
+// If called with a syntactic problem in the labels, will
+// return a noop gauge and an error about the labels.
+// If none of the above apply, this method will return
+// the appropriate vector member and a nil error.
+func (v *timingHistogramVec) WithChecked(labels map[string]string) (GaugeMetric, error) {
 	if v.IsHidden() {
 		return noop, nil
 	}
@@ -226,7 +198,20 @@ func (v *timingHistogramVec) With(labels map[string]string) (GaugeMetric, error)
 	if v.LabelValueAllowLists != nil {
 		v.LabelValueAllowLists.ConstrainLabelMap(labels)
 	}
-	return v.TimingHistogramVec.With(labels).(GaugeMetric), nil
+	ops, err := v.TimingHistogramVec.GetMetricWith(labels)
+	return ops.(GaugeMetric), err
+}
+
+// With calls WithChecked and handles errors as follows.
+// An error that passes ErrIsNotRegistered is ignored
+// and the noop gauge is returned;
+// all other errors cause a panic.
+func (v *timingHistogramVec) With(labels map[string]string) GaugeMetric {
+	ans, err := v.WithChecked(labels)
+	if err == nil || ErrIsNotRegistered(err) {
+		return ans
+	}
+	panic(err)
 }
 
 // Delete deletes the metric where the variable labels are the same as those

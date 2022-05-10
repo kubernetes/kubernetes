@@ -74,33 +74,41 @@ type GaugeMetric interface {
 // taken by the other pattern --- which is treacherous.  The treachery is that
 // WithLabelValues can return an object that is permanently broken (i.e., a noop).
 type GaugeMetricVec interface {
-	Set(value float64, labelValues ...string)
-	Inc(labelValues ...string)
-	Dec(labelValues ...string)
-	Add(delta float64, labelValues ...string)
-	SetToCurrentTime(labelValues ...string)
 
-	SetForLabels(value float64, labels map[string]string)
-	IncForLabels(labels map[string]string)
-	DecForLabels(labels map[string]string)
-	AddForLabels(delta float64, labels map[string]string)
-	SetToCurrentTimeForLabels(labels map[string]string)
+	// WithLabelValuesChecked, if called on a hidden vector,
+	// will return a noop gauge and a nil error.
+	// If called before this vector has been registered in
+	// at least one registry, will return a noop gauge and
+	// an error that passes ErrIsNotRegistered.
+	// If called with a syntactic problem in the labels, will
+	// return a noop gauge and an error about the labels.
+	// If none of the above apply, this method will return
+	// the appropriate vector member and a nil error.
+	WithLabelValuesChecked(labelValues ...string) (GaugeMetric, error)
 
-	// WithLabelValues, if called after this vector has been
-	// registered in at least one registry and this vector is not
-	// hidden, will return a GaugeMetric that is NOT a noop along
-	// with nil error.  If called on a hidden vector then it will
-	// return a noop and a nil error.  Otherwise it returns a noop
-	// and an error that passes ErrIsNotRegistered.
-	WithLabelValues(labelValues ...string) (GaugeMetric, error)
+	// WithLabelValues calls WithLabelValuesChecked
+	// and handles errors as follows.
+	// An error that passes ErrIsNotRegistered is ignored
+	// and the noop gauge is returned;
+	// all other errors cause a panic.
+	WithLabelValues(labelValues ...string) GaugeMetric
 
-	// With, if called after this vector has been
-	// registered in at least one registry and this vector is not
-	// hidden, will return a GaugeMetric that is NOT a noop along
-	// with nil error.  If called on a hidden vector then it will
-	// return a noop and a nil error.  Otherwise it returns a noop
-	// and an error that passes ErrIsNotRegistered.
-	With(labels map[string]string) (GaugeMetric, error)
+	// WithChecked, if called on a hidden vector,
+	// will return a noop gauge and a nil error.
+	// If called before this vector has been registered in
+	// at least one registry, will return a noop gauge and
+	// an error that passes ErrIsNotRegistered.
+	// If called with a syntactic problem in the labels, will
+	// return a noop gauge and an error about the labels.
+	// If none of the above apply, this method will return
+	// the appropriate vector member and a nil error.
+	WithChecked(labels map[string]string) (GaugeMetric, error)
+
+	// With calls WithChecked and handles errors as follows.
+	// An error that passes ErrIsNotRegistered is ignored
+	// and the noop gauge is returned;
+	// all other errors cause a panic.
+	With(labels map[string]string) GaugeMetric
 
 	// Delete asserts that the vec should have no member for the given label set.
 	// The returned bool indicates whether there was a change.
