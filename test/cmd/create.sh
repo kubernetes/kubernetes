@@ -89,9 +89,9 @@ run_create_job_tests() {
     create_and_use_new_namespace
 
     # Test kubectl create job
-    kubectl create job test-job --image=k8s.gcr.io/nginx:test-cmd
+    kubectl create job test-job --image=registry.k8s.io/nginx:test-cmd
     # Post-Condition: job nginx is created
-    kube::test::get_object_assert 'job test-job' "{{${image_field0:?}}}" 'k8s.gcr.io/nginx:test-cmd'
+    kube::test::get_object_assert 'job test-job' "{{${image_field0:?}}}" 'registry.k8s.io/nginx:test-cmd'
     # Clean up
     kubectl delete job test-job "${kube_flags[@]}"
 

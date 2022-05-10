@@ -133,8 +133,8 @@ status:
     - grafana/grafana:4.4.2
     sizeBytes: 287008013
   - names:
-    - k8s.gcr.io/node-problem-detector@sha256:f95cab985c26b2f46e9bd43283e0bfa88860c14e0fb0649266babe8b65e9eb2b
-    - k8s.gcr.io/node-problem-detector:v0.4.1
+    - registry.k8s.io/node-problem-detector@sha256:f95cab985c26b2f46e9bd43283e0bfa88860c14e0fb0649266babe8b65e9eb2b
+    - registry.k8s.io/node-problem-detector:v0.4.1
     sizeBytes: 286572743
   - names:
     - grafana/grafana@sha256:7ff7f9b2501a5d55b55ce3f58d21771b1c5af1f2a4ab7dbf11bef7142aae7033
@@ -153,76 +153,76 @@ status:
     - nginx:1.10.1
     sizeBytes: 180708613
   - names:
-    - k8s.gcr.io/fluentd-elasticsearch@sha256:b8c94527b489fb61d3d81ce5ad7f3ddbb7be71e9620a3a36e2bede2f2e487d73
-    - k8s.gcr.io/fluentd-elasticsearch:v2.0.4
+    - registry.k8s.io/fluentd-elasticsearch@sha256:b8c94527b489fb61d3d81ce5ad7f3ddbb7be71e9620a3a36e2bede2f2e487d73
+    - registry.k8s.io/fluentd-elasticsearch:v2.0.4
     sizeBytes: 135716379
   - names:
     - nginx@sha256:00be67d6ba53d5318cd91c57771530f5251cfbe028b7be2c4b70526f988cfc9f
     - nginx:latest
     sizeBytes: 109357355
   - names:
-    - k8s.gcr.io/kubernetes-dashboard-amd64@sha256:dc4026c1b595435ef5527ca598e1e9c4343076926d7d62b365c44831395adbd0
-    - k8s.gcr.io/kubernetes-dashboard-amd64:v1.8.3
+    - registry.k8s.io/kubernetes-dashboard-amd64@sha256:dc4026c1b595435ef5527ca598e1e9c4343076926d7d62b365c44831395adbd0
+    - registry.k8s.io/kubernetes-dashboard-amd64:v1.8.3
     sizeBytes: 102319441
   - names:
     - gcr.io/google_containers/kube-proxy:v1.11.10-gke.5
-    - k8s.gcr.io/kube-proxy:v1.11.10-gke.5
+    - registry.k8s.io/kube-proxy:v1.11.10-gke.5
     sizeBytes: 102279340
   - names:
-    - k8s.gcr.io/event-exporter@sha256:7f9cd7cb04d6959b0aa960727d04fa86759008048c785397b7b0d9dff0007516
-    - k8s.gcr.io/event-exporter:v0.2.3
+    - registry.k8s.io/event-exporter@sha256:7f9cd7cb04d6959b0aa960727d04fa86759008048c785397b7b0d9dff0007516
+    - registry.k8s.io/event-exporter:v0.2.3
     sizeBytes: 94171943
   - names:
-    - k8s.gcr.io/prometheus-to-sd@sha256:6c0c742475363d537ff059136e5d5e4ab1f512ee0fd9b7ca42ea48bc309d1662
-    - k8s.gcr.io/prometheus-to-sd:v0.3.1
+    - registry.k8s.io/prometheus-to-sd@sha256:6c0c742475363d537ff059136e5d5e4ab1f512ee0fd9b7ca42ea48bc309d1662
+    - registry.k8s.io/prometheus-to-sd:v0.3.1
     sizeBytes: 88077694
   - names:
-    - k8s.gcr.io/fluentd-gcp-scaler@sha256:a5ace7506d393c4ed65eb2cbb6312c64ab357fcea16dff76b9055bc6e498e5ff
-    - k8s.gcr.io/fluentd-gcp-scaler:0.5.1
+    - registry.k8s.io/fluentd-gcp-scaler@sha256:a5ace7506d393c4ed65eb2cbb6312c64ab357fcea16dff76b9055bc6e498e5ff
+    - registry.k8s.io/fluentd-gcp-scaler:0.5.1
     sizeBytes: 86637208
   - names:
-    - k8s.gcr.io/heapster-amd64@sha256:9fae0af136ce0cf4f88393b3670f7139ffc464692060c374d2ae748e13144521
-    - k8s.gcr.io/heapster-amd64:v1.6.0-beta.1
+    - registry.k8s.io/heapster-amd64@sha256:9fae0af136ce0cf4f88393b3670f7139ffc464692060c374d2ae748e13144521
+    - registry.k8s.io/heapster-amd64:v1.6.0-beta.1
     sizeBytes: 76016169
   - names:
-    - k8s.gcr.io/ingress-glbc-amd64@sha256:31d36bbd9c44caffa135fc78cf0737266fcf25e3cf0cd1c2fcbfbc4f7309cc52
-    - k8s.gcr.io/ingress-glbc-amd64:v1.1.1
+    - registry.k8s.io/ingress-glbc-amd64@sha256:31d36bbd9c44caffa135fc78cf0737266fcf25e3cf0cd1c2fcbfbc4f7309cc52
+    - registry.k8s.io/ingress-glbc-amd64:v1.1.1
     sizeBytes: 67801919
   - names:
-    - k8s.gcr.io/kube-addon-manager@sha256:d53486c3a0b49ebee019932878dc44232735d5622a51dbbdcec7124199020d09
-    - k8s.gcr.io/kube-addon-manager:v8.7
+    - registry.k8s.io/kube-addon-manager@sha256:d53486c3a0b49ebee019932878dc44232735d5622a51dbbdcec7124199020d09
+    - registry.k8s.io/kube-addon-manager:v8.7
     sizeBytes: 63322109
   - names:
     - nginx@sha256:4aacdcf186934dcb02f642579314075910f1855590fd3039d8fa4c9f96e48315
     - nginx:1.10-alpine
     sizeBytes: 54042627
   - names:
-    - k8s.gcr.io/cpvpa-amd64@sha256:cfe7b0a11c9c8e18c87b1eb34fef9a7cbb8480a8da11fc2657f78dbf4739f869
-    - k8s.gcr.io/cpvpa-amd64:v0.6.0
+    - registry.k8s.io/cpvpa-amd64@sha256:cfe7b0a11c9c8e18c87b1eb34fef9a7cbb8480a8da11fc2657f78dbf4739f869
+    - registry.k8s.io/cpvpa-amd64:v0.6.0
     sizeBytes: 51785854
   - names:
-    - k8s.gcr.io/cluster-proportional-autoscaler-amd64@sha256:003f98d9f411ddfa6ff6d539196355e03ddd69fa4ed38c7ffb8fec6f729afe2d
-    - k8s.gcr.io/cluster-proportional-autoscaler-amd64:1.1.2-r2
+    - registry.k8s.io/cluster-proportional-autoscaler-amd64@sha256:003f98d9f411ddfa6ff6d539196355e03ddd69fa4ed38c7ffb8fec6f729afe2d
+    - registry.k8s.io/cluster-proportional-autoscaler-amd64:1.1.2-r2
     sizeBytes: 49648481
   - names:
-    - k8s.gcr.io/ip-masq-agent-amd64@sha256:1ffda57d87901bc01324c82ceb2145fe6a0448d3f0dd9cb65aa76a867cd62103
-    - k8s.gcr.io/ip-masq-agent-amd64:v2.1.1
+    - registry.k8s.io/ip-masq-agent-amd64@sha256:1ffda57d87901bc01324c82ceb2145fe6a0448d3f0dd9cb65aa76a867cd62103
+    - registry.k8s.io/ip-masq-agent-amd64:v2.1.1
     sizeBytes: 49612505
   - names:
-    - k8s.gcr.io/k8s-dns-kube-dns-amd64@sha256:b99fc3eee2a9f052f7eb4cc00f15eb12fc405fa41019baa2d6b79847ae7284a8
-    - k8s.gcr.io/k8s-dns-kube-dns-amd64:1.14.10
+    - registry.k8s.io/k8s-dns-kube-dns-amd64@sha256:b99fc3eee2a9f052f7eb4cc00f15eb12fc405fa41019baa2d6b79847ae7284a8
+    - registry.k8s.io/k8s-dns-kube-dns-amd64:1.14.10
     sizeBytes: 49549457
   - names:
-    - k8s.gcr.io/rescheduler@sha256:156cfbfd05a5a815206fd2eeb6cbdaf1596d71ea4b415d3a6c43071dd7b99450
-    - k8s.gcr.io/rescheduler:v0.4.0
+    - registry.k8s.io/rescheduler@sha256:156cfbfd05a5a815206fd2eeb6cbdaf1596d71ea4b415d3a6c43071dd7b99450
+    - registry.k8s.io/rescheduler:v0.4.0
     sizeBytes: 48973149
   - names:
-    - k8s.gcr.io/event-exporter@sha256:16ca66e2b5dc7a1ce6a5aafcb21d0885828b75cdfc08135430480f7ad2364adc
-    - k8s.gcr.io/event-exporter:v0.2.4
+    - registry.k8s.io/event-exporter@sha256:16ca66e2b5dc7a1ce6a5aafcb21d0885828b75cdfc08135430480f7ad2364adc
+    - registry.k8s.io/event-exporter:v0.2.4
     sizeBytes: 47261019
   - names:
-    - k8s.gcr.io/coredns@sha256:db2bf53126ed1c761d5a41f24a1b82a461c85f736ff6e90542e9522be4757848
-    - k8s.gcr.io/coredns:1.1.3
+    - registry.k8s.io/coredns@sha256:db2bf53126ed1c761d5a41f24a1b82a461c85f736ff6e90542e9522be4757848
+    - registry.k8s.io/coredns:1.1.3
     sizeBytes: 45587362
   - names:
     - prom/prometheus@sha256:483f4c9d7733699ba79facca9f8bcce1cef1af43dfc3e7c5a1882aa85f53cb74
