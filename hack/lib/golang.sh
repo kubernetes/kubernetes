@@ -721,13 +721,13 @@ kube::golang::build_some_binaries() {
     done
     if [[ "${#uncovered[@]}" != 0 ]]; then
       V=2 kube::log::info "Building ${uncovered[*]} without coverage..."
-      GO111MODULE=on GOPROXY=off go install "${build_args[@]}" "${uncovered[@]}"
+      GO111MODULE=on go install "${build_args[@]}" "${uncovered[@]}"
     else
       V=2 kube::log::info "Nothing to build without coverage."
      fi
    else
     V=2 kube::log::info "Coverage is disabled."
-    GO111MODULE=on GOPROXY=off go install "${build_args[@]}" "$@"
+    GO111MODULE=on go install "${build_args[@]}" "$@"
    fi
 }
 
