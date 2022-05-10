@@ -256,7 +256,7 @@ func initImageConfigs(list RegistryList) (map[int]Config, map[int]Config) {
 	configs[NginxNew] = Config{list.PromoterE2eRegistry, "nginx", "1.15-2"}
 	configs[NodePerfNpbEp] = Config{list.PromoterE2eRegistry, "node-perf/npb-ep", "1.2"}
 	configs[NodePerfNpbIs] = Config{list.PromoterE2eRegistry, "node-perf/npb-is", "1.2"}
-	configs[NodePerfTfWideDeep] = Config{list.PromoterE2eRegistry, "node-perf/tf-wide-deep", "1.1"}
+	configs[NodePerfTfWideDeep] = Config{list.PromoterE2eRegistry, "node-perf/tf-wide-deep", "1.2"}
 	configs[Nonewprivs] = Config{list.PromoterE2eRegistry, "nonewprivs", "1.3"}
 	configs[NonRoot] = Config{list.PromoterE2eRegistry, "nonroot", "1.2"}
 	// Pause - when these values are updated, also update cmd/kubelet/app/options/container_runtime.go
