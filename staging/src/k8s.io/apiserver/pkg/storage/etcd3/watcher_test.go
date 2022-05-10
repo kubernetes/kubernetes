@@ -137,23 +137,7 @@ func TestWatchError(t *testing.T) {
 
 func TestWatchContextCancel(t *testing.T) {
 	ctx, store, _ := testSetup(t)
-	canceledCtx, cancel := context.WithCancel(ctx)
-	cancel()
-	// When we watch with a canceled context, we should detect that it's context canceled.
-	// We won't take it as error and also close the watcher.
-	w, err := store.watcher.Watch(canceledCtx, "/abc", 0, false, false, storage.Everything)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	select {
-	case _, ok := <-w.ResultChan():
-		if ok {
-			t.Error("ResultChan() should be closed")
-		}
-	case <-time.After(wait.ForeverTestTimeout):
-		t.Errorf("timeout after %v", wait.ForeverTestTimeout)
-	}
+	storagetesting.RunTestWatchContextCancel(ctx, t, store)
 }
 
 func TestWatchErrResultNotBlockAfterCancel(t *testing.T) {
