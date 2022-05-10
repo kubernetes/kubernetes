@@ -18926,6 +18926,12 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 	fieldPathTopologyKey := subFldPath0.Child("topologyKey")
 	fieldPathWhenUnsatisfiable := subFldPath0.Child("whenUnsatisfiable")
 	fieldPathTopologyKeyAndWhenUnsatisfiable := subFldPath0.Child("{topologyKey, whenUnsatisfiable}")
+	nodeAffinityField := subFldPath0.Child("nodeAffinityPolicy")
+	nodeTaintsField := subFldPath0.Child("nodeTaintsPolicy")
+	unknown := core.NodeInclusionPolicy("Unknown")
+	ignore := core.NodeInclusionPolicyIgnore
+	honor := core.NodeInclusionPolicyHonor
+
 	testCases := []struct {
 		name            string
 		constraints     []core.TopologySpreadConstraint
@@ -19053,6 +19059,49 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 			},
 			wantFieldErrors: []*field.Error{
 				field.Duplicate(fieldPathTopologyKeyAndWhenUnsatisfiable, fmt.Sprintf("{%v, %v}", "k8s.io/zone", core.DoNotSchedule)),
+			},
+		},
+		{
+			name: "supported policy name set on NodeAffinityPolicy and NodeTaintsPolicy",
+			constraints: []core.TopologySpreadConstraint{
+				{
+					MaxSkew:            1,
+					TopologyKey:        "k8s.io/zone",
+					WhenUnsatisfiable:  core.DoNotSchedule,
+					NodeAffinityPolicy: &honor,
+					NodeTaintsPolicy:   &ignore,
+				},
+			},
+			wantFieldErrors: []*field.Error{},
+		},
+		{
+			name: "unsupported policy name set on NodeAffinityPolicy",
+			constraints: []core.TopologySpreadConstraint{
+				{
+					MaxSkew:            1,
+					TopologyKey:        "k8s.io/zone",
+					WhenUnsatisfiable:  core.DoNotSchedule,
+					NodeAffinityPolicy: &unknown,
+					NodeTaintsPolicy:   &ignore,
+				},
+			},
+			wantFieldErrors: []*field.Error{
+				field.NotSupported(nodeAffinityField, &unknown, supportedPodTopologySpreadNodePolicies.List()),
+			},
+		},
+		{
+			name: "unsupported policy name set on NodeTaintsPolicy",
+			constraints: []core.TopologySpreadConstraint{
+				{
+					MaxSkew:            1,
+					TopologyKey:        "k8s.io/zone",
+					WhenUnsatisfiable:  core.DoNotSchedule,
+					NodeAffinityPolicy: &honor,
+					NodeTaintsPolicy:   &unknown,
+				},
+			},
+			wantFieldErrors: []*field.Error{
+				field.NotSupported(nodeTaintsField, &unknown, supportedPodTopologySpreadNodePolicies.List()),
 			},
 		},
 	}

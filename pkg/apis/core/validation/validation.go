@@ -6490,6 +6490,12 @@ func validateTopologySpreadConstraints(constraints []core.TopologySpreadConstrai
 			allErrs = append(allErrs, err)
 		}
 		allErrs = append(allErrs, validateMinDomains(subFldPath.Child("minDomains"), constraint.MinDomains, constraint.WhenUnsatisfiable)...)
+		if err := validateNodeInclusionPolicy(subFldPath.Child("nodeAffinityPolicy"), constraint.NodeAffinityPolicy); err != nil {
+			allErrs = append(allErrs, err)
+		}
+		if err := validateNodeInclusionPolicy(subFldPath.Child("nodeTaintsPolicy"), constraint.NodeTaintsPolicy); err != nil {
+			allErrs = append(allErrs, err)
+		}
 	}
 
 	return allErrs
@@ -6543,6 +6549,22 @@ func ValidateSpreadConstraintNotRepeat(fldPath *field.Path, constraint core.Topo
 			constraint.WhenUnsatisfiable == restingConstraint.WhenUnsatisfiable {
 			return field.Duplicate(fldPath, fmt.Sprintf("{%v, %v}", constraint.TopologyKey, constraint.WhenUnsatisfiable))
 		}
+	}
+	return nil
+}
+
+var (
+	supportedPodTopologySpreadNodePolicies = sets.NewString(string(core.NodeInclusionPolicyIgnore), string(core.NodeInclusionPolicyHonor))
+)
+
+// validateNodeAffinityPolicy tests that the argument is a valid NodeInclusionPolicy.
+func validateNodeInclusionPolicy(fldPath *field.Path, policy *core.NodeInclusionPolicy) *field.Error {
+	if policy == nil {
+		return nil
+	}
+
+	if !supportedPodTopologySpreadNodePolicies.Has(string(*policy)) {
+		return field.NotSupported(fldPath, policy, supportedPodTopologySpreadNodePolicies.List())
 	}
 	return nil
 }
