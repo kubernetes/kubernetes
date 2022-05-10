@@ -61,6 +61,27 @@ run_kubectl_events_tests() {
     output_message=$(kubectl alpha events -n test-events --for=Cronjob/pi --watch --request-timeout=1 "${kube_flags[@]:?}" 2>&1)
     kube::test::if_has_string "${output_message}" "Warning" "InvalidSchedule" "Cronjob/pi"
 
+    # Post-Condition: events returns event for Cronjob/pi when filtered by Warning
+    output_message=$(kubectl alpha events -n test-events --for=Cronjob/pi --types=Warning "${kube_flags[@]:?}" 2>&1)
+    kube::test::if_has_string "${output_message}" "Warning" "InvalidSchedule" "Cronjob/pi"
+
+    # Post-Condition: events not returns event for Cronjob/pi when filtered only by Normal
+    output_message=$(kubectl alpha events -n test-events --for=Cronjob/pi --types=Normal "${kube_flags[@]:?}" 2>&1)
+    kube::test::if_has_not_string "${output_message}" "Warning" "InvalidSchedule" "Cronjob/pi"
+
+    # Post-Condition: events returns event for Cronjob/pi without headers
+    output_message=$(kubectl alpha events -n test-events --for=Cronjob/pi --no-headers "${kube_flags[@]:?}" 2>&1)
+    kube::test::if_has_not_string "${output_message}" "LAST SEEN" "TYPE" "REASON"
+    kube::test::if_has_string "${output_message}" "Warning" "InvalidSchedule" "Cronjob/pi"
+
+    # Post-Condition: events returns event for Cronjob/pi in json format
+    output_message=$(kubectl alpha events -n test-events --for=Cronjob/pi --output=json "${kube_flags[@]:?}" 2>&1)
+    kube::test::if_has_string "${output_message}" "Warning" "InvalidSchedule" "Cronjob/pi"
+
+    # Post-Condition: events returns event for Cronjob/pi in yaml format
+    output_message=$(kubectl alpha events -n test-events --for=Cronjob/pi --output=yaml "${kube_flags[@]:?}" 2>&1)
+    kube::test::if_has_string "${output_message}" "Warning" "InvalidSchedule" "Cronjob/pi"
+
     #Clean up
     kubectl delete cronjob pi --namespace=test-events
     kubectl delete namespace test-events
