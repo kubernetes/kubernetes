@@ -60,7 +60,7 @@ func TestRepair(t *testing.T) {
 	_, cidr, _ := netutils.ParseCIDRSloppy(ipregistry.item.Range)
 	r := NewRepair(0, fakeClient.CoreV1(), fakeClient.EventsV1(), cidr, ipregistry, nil, nil)
 
-	if err := r.RunOnce(); err != nil {
+	if err := r.runOnce(); err != nil {
 		t.Fatal(err)
 	}
 	if !ipregistry.updateCalled || ipregistry.updated == nil || ipregistry.updated.Range != cidr.String() || ipregistry.updated != ipregistry.item {
@@ -72,7 +72,7 @@ func TestRepair(t *testing.T) {
 		updateErr: fmt.Errorf("test error"),
 	}
 	r = NewRepair(0, fakeClient.CoreV1(), fakeClient.EventsV1(), cidr, ipregistry, nil, nil)
-	if err := r.RunOnce(); !strings.Contains(err.Error(), ": test error") {
+	if err := r.runOnce(); !strings.Contains(err.Error(), ": test error") {
 		t.Fatal(err)
 	}
 }
@@ -105,7 +105,7 @@ func TestRepairLeak(t *testing.T) {
 	r := NewRepair(0, fakeClient.CoreV1(), fakeClient.EventsV1(), cidr, ipregistry, nil, nil)
 	// Run through the "leak detection holdoff" loops.
 	for i := 0; i < (numRepairsBeforeLeakCleanup - 1); i++ {
-		if err := r.RunOnce(); err != nil {
+		if err := r.runOnce(); err != nil {
 			t.Fatal(err)
 		}
 		after, err := ipallocator.NewFromSnapshot(ipregistry.updated)
@@ -117,7 +117,7 @@ func TestRepairLeak(t *testing.T) {
 		}
 	}
 	// Run one more time to actually remove the leak.
-	if err := r.RunOnce(); err != nil {
+	if err := r.runOnce(); err != nil {
 		t.Fatal(err)
 	}
 	after, err := ipallocator.NewFromSnapshot(ipregistry.updated)
@@ -201,7 +201,7 @@ func TestRepairWithExisting(t *testing.T) {
 		},
 	}
 	r := NewRepair(0, fakeClient.CoreV1(), fakeClient.EventsV1(), cidr, ipregistry, nil, nil)
-	if err := r.RunOnce(); err != nil {
+	if err := r.runOnce(); err != nil {
 		t.Fatal(err)
 	}
 	after, err := ipallocator.NewFromSnapshot(ipregistry.updated)
@@ -336,7 +336,7 @@ func TestRepairDualStack(t *testing.T) {
 	_, secondaryCIDR, _ := netutils.ParseCIDRSloppy(secondaryIPRegistry.item.Range)
 	r := NewRepair(0, fakeClient.CoreV1(), fakeClient.EventsV1(), cidr, ipregistry, secondaryCIDR, secondaryIPRegistry)
 
-	if err := r.RunOnce(); err != nil {
+	if err := r.runOnce(); err != nil {
 		t.Fatal(err)
 	}
 	if !ipregistry.updateCalled || ipregistry.updated == nil || ipregistry.updated.Range != cidr.String() || ipregistry.updated != ipregistry.item {
@@ -356,7 +356,7 @@ func TestRepairDualStack(t *testing.T) {
 	}
 
 	r = NewRepair(0, fakeClient.CoreV1(), fakeClient.EventsV1(), cidr, ipregistry, secondaryCIDR, secondaryIPRegistry)
-	if err := r.RunOnce(); !strings.Contains(err.Error(), ": test error") {
+	if err := r.runOnce(); !strings.Contains(err.Error(), ": test error") {
 		t.Fatal(err)
 	}
 }
@@ -413,7 +413,7 @@ func TestRepairLeakDualStack(t *testing.T) {
 	r := NewRepair(0, fakeClient.CoreV1(), fakeClient.EventsV1(), cidr, ipregistry, secondaryCIDR, secondaryIPRegistry)
 	// Run through the "leak detection holdoff" loops.
 	for i := 0; i < (numRepairsBeforeLeakCleanup - 1); i++ {
-		if err := r.RunOnce(); err != nil {
+		if err := r.runOnce(); err != nil {
 			t.Fatal(err)
 		}
 		after, err := ipallocator.NewFromSnapshot(ipregistry.updated)
@@ -432,7 +432,7 @@ func TestRepairLeakDualStack(t *testing.T) {
 		}
 	}
 	// Run one more time to actually remove the leak.
-	if err := r.RunOnce(); err != nil {
+	if err := r.runOnce(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -597,7 +597,7 @@ func TestRepairWithExistingDualStack(t *testing.T) {
 	}
 
 	r := NewRepair(0, fakeClient.CoreV1(), fakeClient.EventsV1(), cidr, ipregistry, secondaryCIDR, secondaryIPRegistry)
-	if err := r.RunOnce(); err != nil {
+	if err := r.runOnce(); err != nil {
 		t.Fatal(err)
 	}
 	after, err := ipallocator.NewFromSnapshot(ipregistry.updated)
