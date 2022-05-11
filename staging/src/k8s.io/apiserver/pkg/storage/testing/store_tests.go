@@ -769,3 +769,13 @@ func ExpectNoDiff(t *testing.T, msg string, expected, got interface{}) {
 		}
 	}
 }
+
+const dummyPrefix = "adapter"
+
+func EncodeContinueOrDie(key string, resourceVersion int64) string {
+	token, err := storage.EncodeContinue(dummyPrefix+key, dummyPrefix, resourceVersion)
+	if err != nil {
+		panic(err)
+	}
+	return token
+}
