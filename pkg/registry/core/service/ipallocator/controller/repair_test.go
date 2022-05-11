@@ -58,7 +58,7 @@ func TestRepair(t *testing.T) {
 		item: &api.RangeAllocation{Range: "192.168.1.0/24"},
 	}
 	_, cidr, _ := netutils.ParseCIDRSloppy(ipregistry.item.Range)
-	r := NewRepair(0, fakeClient.CoreV1(), fakeClient.CoreV1(), cidr, ipregistry, nil, nil)
+	r := NewRepair(0, fakeClient.CoreV1(), fakeClient.EventsV1(), cidr, ipregistry, nil, nil)
 
 	if err := r.RunOnce(); err != nil {
 		t.Fatal(err)
@@ -71,7 +71,7 @@ func TestRepair(t *testing.T) {
 		item:      &api.RangeAllocation{Range: "192.168.1.0/24"},
 		updateErr: fmt.Errorf("test error"),
 	}
-	r = NewRepair(0, fakeClient.CoreV1(), fakeClient.CoreV1(), cidr, ipregistry, nil, nil)
+	r = NewRepair(0, fakeClient.CoreV1(), fakeClient.EventsV1(), cidr, ipregistry, nil, nil)
 	if err := r.RunOnce(); !strings.Contains(err.Error(), ": test error") {
 		t.Fatal(err)
 	}
@@ -102,7 +102,7 @@ func TestRepairLeak(t *testing.T) {
 		},
 	}
 
-	r := NewRepair(0, fakeClient.CoreV1(), fakeClient.CoreV1(), cidr, ipregistry, nil, nil)
+	r := NewRepair(0, fakeClient.CoreV1(), fakeClient.EventsV1(), cidr, ipregistry, nil, nil)
 	// Run through the "leak detection holdoff" loops.
 	for i := 0; i < (numRepairsBeforeLeakCleanup - 1); i++ {
 		if err := r.RunOnce(); err != nil {
@@ -200,7 +200,7 @@ func TestRepairWithExisting(t *testing.T) {
 			Data:  dst.Data,
 		},
 	}
-	r := NewRepair(0, fakeClient.CoreV1(), fakeClient.CoreV1(), cidr, ipregistry, nil, nil)
+	r := NewRepair(0, fakeClient.CoreV1(), fakeClient.EventsV1(), cidr, ipregistry, nil, nil)
 	if err := r.RunOnce(); err != nil {
 		t.Fatal(err)
 	}
@@ -290,7 +290,7 @@ func TestShouldWorkOnSecondary(t *testing.T) {
 				secondaryRegistry = makeRangeRegistry(t, tc.secondaryNet.String())
 			}
 
-			repair := NewRepair(0, fakeClient.CoreV1(), fakeClient.CoreV1(), tc.primaryNet, primaryRegistry, tc.secondaryNet, secondaryRegistry)
+			repair := NewRepair(0, fakeClient.CoreV1(), fakeClient.EventsV1(), tc.primaryNet, primaryRegistry, tc.secondaryNet, secondaryRegistry)
 			if len(repair.allocatorByFamily) != len(tc.expectedFamilies) {
 				t.Fatalf("expected to have allocator by family count:%v got %v", len(tc.expectedFamilies), len(repair.allocatorByFamily))
 			}
@@ -334,7 +334,7 @@ func TestRepairDualStack(t *testing.T) {
 
 	_, cidr, _ := netutils.ParseCIDRSloppy(ipregistry.item.Range)
 	_, secondaryCIDR, _ := netutils.ParseCIDRSloppy(secondaryIPRegistry.item.Range)
-	r := NewRepair(0, fakeClient.CoreV1(), fakeClient.CoreV1(), cidr, ipregistry, secondaryCIDR, secondaryIPRegistry)
+	r := NewRepair(0, fakeClient.CoreV1(), fakeClient.EventsV1(), cidr, ipregistry, secondaryCIDR, secondaryIPRegistry)
 
 	if err := r.RunOnce(); err != nil {
 		t.Fatal(err)
@@ -355,7 +355,7 @@ func TestRepairDualStack(t *testing.T) {
 		updateErr: fmt.Errorf("test error"),
 	}
 
-	r = NewRepair(0, fakeClient.CoreV1(), fakeClient.CoreV1(), cidr, ipregistry, secondaryCIDR, secondaryIPRegistry)
+	r = NewRepair(0, fakeClient.CoreV1(), fakeClient.EventsV1(), cidr, ipregistry, secondaryCIDR, secondaryIPRegistry)
 	if err := r.RunOnce(); !strings.Contains(err.Error(), ": test error") {
 		t.Fatal(err)
 	}
@@ -410,7 +410,7 @@ func TestRepairLeakDualStack(t *testing.T) {
 		},
 	}
 
-	r := NewRepair(0, fakeClient.CoreV1(), fakeClient.CoreV1(), cidr, ipregistry, secondaryCIDR, secondaryIPRegistry)
+	r := NewRepair(0, fakeClient.CoreV1(), fakeClient.EventsV1(), cidr, ipregistry, secondaryCIDR, secondaryIPRegistry)
 	// Run through the "leak detection holdoff" loops.
 	for i := 0; i < (numRepairsBeforeLeakCleanup - 1); i++ {
 		if err := r.RunOnce(); err != nil {
@@ -596,7 +596,7 @@ func TestRepairWithExistingDualStack(t *testing.T) {
 		},
 	}
 
-	r := NewRepair(0, fakeClient.CoreV1(), fakeClient.CoreV1(), cidr, ipregistry, secondaryCIDR, secondaryIPRegistry)
+	r := NewRepair(0, fakeClient.CoreV1(), fakeClient.EventsV1(), cidr, ipregistry, secondaryCIDR, secondaryIPRegistry)
 	if err := r.RunOnce(); err != nil {
 		t.Fatal(err)
 	}

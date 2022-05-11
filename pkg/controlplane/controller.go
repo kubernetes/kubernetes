@@ -33,6 +33,7 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/storage"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
+	eventsv1client "k8s.io/client-go/kubernetes/typed/events/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
@@ -55,7 +56,7 @@ const (
 type Controller struct {
 	ServiceClient   corev1client.ServicesGetter
 	NamespaceClient corev1client.NamespacesGetter
-	EventClient     corev1client.EventsGetter
+	EventClient     eventsv1client.EventsV1Interface
 	readyzClient    rest.Interface
 
 	ServiceClusterIPRegistry          rangeallocation.RangeRegistry
@@ -85,11 +86,12 @@ type Controller struct {
 	PublicServicePort         int
 	KubernetesServiceNodePort int
 
+	stopCh chan struct{}
 	runner *async.Runner
 }
 
 // NewBootstrapController returns a controller for watching the core capabilities of the master
-func (c *completedConfig) NewBootstrapController(legacyRESTStorage corerest.LegacyRESTStorage, serviceClient corev1client.ServicesGetter, nsClient corev1client.NamespacesGetter, eventClient corev1client.EventsGetter, readyzClient rest.Interface) (*Controller, error) {
+func (c *completedConfig) NewBootstrapController(legacyRESTStorage corerest.LegacyRESTStorage, serviceClient corev1client.ServicesGetter, nsClient corev1client.NamespacesGetter, eventClient eventsv1client.EventsV1Interface, readyzClient rest.Interface) (*Controller, error) {
 	_, publicServicePort, err := c.GenericConfig.SecureServing.HostPort()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get listener address: %w", err)
@@ -172,6 +174,28 @@ func (c *Controller) Start() {
 	repairClusterIPs := servicecontroller.NewRepair(c.ServiceClusterIPInterval, c.ServiceClient, c.EventClient, &c.ServiceClusterIPRange, c.ServiceClusterIPRegistry, &c.SecondaryServiceClusterIPRange, c.SecondaryServiceClusterIPRegistry)
 	repairNodePorts := portallocatorcontroller.NewRepair(c.ServiceNodePortInterval, c.ServiceClient, c.EventClient, c.ServiceNodePortRange, c.ServiceNodePortRegistry)
 
+	// We start both repairClusterIPs and repairNodePorts to catch events
+	// coming from the RunOnce() calls to them.
+	// TODO: Refactor both controllers to only expose a public RunUntil
+	// method, but to accommodate the usecase below (of forcing the first
+	// successful call before proceeding) let them signal on that, like:
+	//   func (c *Repair) RunUntil(stopCh chan struct{}, onFirstSuccess func())
+	// and use it here like:
+	//   wg := sync.WaitGroup{}
+	//   wg.Add(2)
+	//   runRepairClusterIPs := func(stopCh chan struct{}) {
+	//     repairClusterIPs(stopCh, wg.Done)
+	//   }
+	//   runRepairNodePorts := func(stopCh chan struct{}) {
+	//     repairNodePorts(stopCh, wg.Done)
+	//   }
+	//   c.runner = ...
+	//   c.runner.Start()
+	//   wg.Wait()
+	c.stopCh = make(chan struct{})
+	repairClusterIPs.Start(c.stopCh)
+	repairNodePorts.Start(c.stopCh)
+
 	// run all of the controllers once prior to returning from Start.
 	if err := repairClusterIPs.RunOnce(); err != nil {
 		// If we fail to repair cluster IPs apiserver is useless. We should restart and retry.
@@ -190,6 +214,7 @@ func (c *Controller) Start() {
 func (c *Controller) Stop() {
 	if c.runner != nil {
 		c.runner.Stop()
+		close(c.stopCh)
 	}
 	endpointPorts := createEndpointPortSpec(c.PublicServicePort, "https", c.ExtraEndpointPorts)
 	finishedReconciling := make(chan struct{})
