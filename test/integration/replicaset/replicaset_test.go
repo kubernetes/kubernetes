@@ -152,12 +152,12 @@ func rmSimpleSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, clients
 }
 
 // Run RS controller and informers
-func runControllerAndInformers(t *testing.T, rm *replicaset.ReplicaSetController, informers informers.SharedInformerFactory, podNum int) chan struct{} {
-	stopCh := make(chan struct{})
-	informers.Start(stopCh)
+func runControllerAndInformers(t *testing.T, rm *replicaset.ReplicaSetController, informers informers.SharedInformerFactory, podNum int) func() {
+	ctx, cancelFn := context.WithCancel(context.Background())
+	informers.Start(ctx.Done())
 	waitToObservePods(t, informers.Core().V1().Pods().Informer(), podNum)
-	go rm.Run(context.TODO(), 5)
-	return stopCh
+	go rm.Run(ctx, 5)
+	return cancelFn
 }
 
 // wait for the podInformer to observe the pods. Call this function before
@@ -443,8 +443,8 @@ func TestAdoption(t *testing.T) {
 				t.Fatalf("Failed to create Pod: %v", err)
 			}
 
-			stopCh := runControllerAndInformers(t, rm, informers, 1)
-			defer close(stopCh)
+			stopControllers := runControllerAndInformers(t, rm, informers, 1)
+			defer stopControllers()
 			if err := wait.PollImmediate(interval, timeout, func() (bool, error) {
 				updatedPod, err := podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
 				if err != nil {
@@ -498,8 +498,8 @@ func TestSpecReplicasChange(t *testing.T) {
 	defer closeFn()
 	ns := framework.CreateTestingNamespace("test-spec-replicas-change", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
-	stopCh := runControllerAndInformers(t, rm, informers, 0)
-	defer close(stopCh)
+	stopControllers := runControllerAndInformers(t, rm, informers, 0)
+	defer stopControllers()
 
 	rs := newRS("rs", ns.Name, 2)
 	rss, _ := createRSsPods(t, c, []*apps.ReplicaSet{rs}, []*v1.Pod{})
@@ -540,8 +540,8 @@ func TestDeletingAndFailedPods(t *testing.T) {
 	defer closeFn()
 	ns := framework.CreateTestingNamespace("test-deleting-and-failed-pods", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
-	stopCh := runControllerAndInformers(t, rm, informers, 0)
-	defer close(stopCh)
+	stopControllers := runControllerAndInformers(t, rm, informers, 0)
+	defer stopControllers()
 
 	rs := newRS("rs", ns.Name, 2)
 	rss, _ := createRSsPods(t, c, []*apps.ReplicaSet{rs}, []*v1.Pod{})
@@ -643,8 +643,8 @@ func TestPodDeletionCost(t *testing.T) {
 			defer closeFn()
 			ns := framework.CreateTestingNamespace(tc.name, s, t)
 			defer framework.DeleteTestingNamespace(ns, s, t)
-			stopCh := runControllerAndInformers(t, rm, informers, 0)
-			defer close(stopCh)
+			stopControllers := runControllerAndInformers(t, rm, informers, 0)
+			defer stopControllers()
 
 			rs := newRS("rs", ns.Name, 2)
 			rss, _ := createRSsPods(t, c, []*apps.ReplicaSet{rs}, []*v1.Pod{})
@@ -702,8 +702,8 @@ func TestOverlappingRSs(t *testing.T) {
 	defer closeFn()
 	ns := framework.CreateTestingNamespace("test-overlapping-rss", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
-	stopCh := runControllerAndInformers(t, rm, informers, 0)
-	defer close(stopCh)
+	stopControllers := runControllerAndInformers(t, rm, informers, 0)
+	defer stopControllers()
 
 	// Create 2 RSs with identical selectors
 	for i := 0; i < 2; i++ {
@@ -737,8 +737,8 @@ func TestPodOrphaningAndAdoptionWhenLabelsChange(t *testing.T) {
 	defer closeFn()
 	ns := framework.CreateTestingNamespace("test-pod-orphaning-and-adoption-when-labels-change", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
-	stopCh := runControllerAndInformers(t, rm, informers, 0)
-	defer close(stopCh)
+	stopControllers := runControllerAndInformers(t, rm, informers, 0)
+	defer stopControllers()
 
 	rs := newRS("rs", ns.Name, 1)
 	rss, _ := createRSsPods(t, c, []*apps.ReplicaSet{rs}, []*v1.Pod{})
@@ -814,8 +814,8 @@ func TestGeneralPodAdoption(t *testing.T) {
 	defer closeFn()
 	ns := framework.CreateTestingNamespace("test-general-pod-adoption", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
-	stopCh := runControllerAndInformers(t, rm, informers, 0)
-	defer close(stopCh)
+	stopControllers := runControllerAndInformers(t, rm, informers, 0)
+	defer stopControllers()
 
 	rs := newRS("rs", ns.Name, 1)
 	rss, _ := createRSsPods(t, c, []*apps.ReplicaSet{rs}, []*v1.Pod{})
@@ -846,8 +846,8 @@ func TestReadyAndAvailableReplicas(t *testing.T) {
 	defer closeFn()
 	ns := framework.CreateTestingNamespace("test-ready-and-available-replicas", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
-	stopCh := runControllerAndInformers(t, rm, informers, 0)
-	defer close(stopCh)
+	stopControllers := runControllerAndInformers(t, rm, informers, 0)
+	defer stopControllers()
 
 	rs := newRS("rs", ns.Name, 3)
 	rs.Spec.MinReadySeconds = 3600
@@ -898,8 +898,8 @@ func TestRSScaleSubresource(t *testing.T) {
 	defer closeFn()
 	ns := framework.CreateTestingNamespace("test-rs-scale-subresource", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
-	stopCh := runControllerAndInformers(t, rm, informers, 0)
-	defer close(stopCh)
+	stopControllers := runControllerAndInformers(t, rm, informers, 0)
+	defer stopControllers()
 
 	rs := newRS("rs", ns.Name, 1)
 	rss, _ := createRSsPods(t, c, []*apps.ReplicaSet{rs}, []*v1.Pod{})
@@ -928,8 +928,8 @@ func TestExtraPodsAdoptionAndDeletion(t *testing.T) {
 	}
 	rss, _ := createRSsPods(t, c, []*apps.ReplicaSet{rs}, podList)
 	rs = rss[0]
-	stopCh := runControllerAndInformers(t, rm, informers, 3)
-	defer close(stopCh)
+	stopControllers := runControllerAndInformers(t, rm, informers, 3)
+	defer stopControllers()
 	waitRSStable(t, c, rs)
 
 	// Verify the extra pod is deleted eventually by determining whether number of
@@ -949,8 +949,8 @@ func TestFullyLabeledReplicas(t *testing.T) {
 	defer closeFn()
 	ns := framework.CreateTestingNamespace("test-fully-labeled-replicas", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
-	stopCh := runControllerAndInformers(t, rm, informers, 0)
-	defer close(stopCh)
+	stopControllers := runControllerAndInformers(t, rm, informers, 0)
+	defer stopControllers()
 
 	extraLabelMap := map[string]string{"foo": "bar", "extraKey": "extraValue"}
 	rs := newRS("rs", ns.Name, 2)
@@ -992,8 +992,8 @@ func TestReplicaSetsAppsV1DefaultGCPolicy(t *testing.T) {
 	defer closeFn()
 	ns := framework.CreateTestingNamespace("test-default-gc-v1", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
-	stopCh := runControllerAndInformers(t, rm, informers, 0)
-	defer close(stopCh)
+	stopControllers := runControllerAndInformers(t, rm, informers, 0)
+	defer stopControllers()
 
 	rs := newRS("rs", ns.Name, 2)
 	fakeFinalizer := "kube.io/dummy-finalizer"
