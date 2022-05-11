@@ -27,6 +27,7 @@ import (
 	"github.com/onsi/ginkgo/config"
 	"github.com/onsi/ginkgo/reporters"
 	"github.com/onsi/gomega"
+	"github.com/stretchr/testify/assert"
 
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -35,7 +36,6 @@ import (
 // Be careful when moving it around or changing the import statements above.
 // Here are some intentionally blank lines that can be removed to compensate
 // for future additional import statements.
-//
 //
 //
 //
@@ -115,17 +115,14 @@ func TestFailureOutput(t *testing.T) {
 			stack:   "k8s.io/kubernetes/test/e2e/framework_test.glob..func1.2()\n\tlog_test.go:57\nk8s.io/kubernetes/test/e2e/framework_test.runTests()\n\tlog_test.go:47\n",
 		},
 	}
-	// Compare individual fields. Comparing the slices leads to unreadable error output when there is any mismatch.
-	framework.ExpectEqual(len(actual), len(expected), "%d entries in %v", len(expected), actual)
-	for i, a := range actual {
-		b := expected[i]
-		framework.ExpectEqual(a.name, b.name, "name in %d", i)
-		framework.ExpectEqual(a.output, b.output, "output in %d", i)
-		framework.ExpectEqual(a.failure, b.failure, "failure in %d", i)
-		// There may be additional stack entries from the "testing" package at the
-		// end. We ignore those in the comparison because the line number in them
-		// varies.
-		framework.ExpectEqual(a.stack, b.stack, "stack in %d: %s", i, a.stack)
+	// assert.Equal prints a useful diff if the slices are not
+	// equal. However, the diff does not show changes inside the
+	// strings. Therefore we also compare the individual fields.
+	if !assert.Equal(t, expected, actual) {
+		for i := 0; i < len(expected) && i < len(actual); i++ {
+			assert.Equal(t, expected[i].output, actual[i].output, "output from test #%d: %s", i, expected[i].name)
+			assert.Equal(t, expected[i].stack, actual[i].stack, "stack from test #%d: %s", i, expected[i].name)
+		}
 	}
 }
 
