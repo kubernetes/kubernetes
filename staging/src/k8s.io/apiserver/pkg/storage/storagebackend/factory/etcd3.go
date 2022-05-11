@@ -24,7 +24,6 @@ import (
 	"path"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	grpcprom "github.com/grpc-ecosystem/go-grpc-prometheus"
@@ -35,6 +34,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server/egressselector"
@@ -72,31 +72,64 @@ func init() {
 	dbMetricsMonitors = make(map[string]struct{})
 }
 
-func newETCD3HealthCheck(c storagebackend.Config) (func() error, error) {
+func newETCD3HealthCheck(c storagebackend.Config, stopCh <-chan struct{}) (func() error, error) {
 	// constructing the etcd v3 client blocks and times out if etcd is not available.
 	// retry in a loop in the background until we successfully create the client, storing the client or error encountered
 
-	clientValue := &atomic.Value{}
-
-	clientErrMsg := &atomic.Value{}
-	clientErrMsg.Store("etcd client connection not yet established")
+	lock := sync.Mutex{}
+	var client *clientv3.Client
+	clientErr := fmt.Errorf("etcd client connection not yet established")
 
 	go wait.PollUntil(time.Second, func() (bool, error) {
-		client, err := newETCD3Client(c.Transport)
+		newClient, err := newETCD3Client(c.Transport)
+
+		lock.Lock()
+		defer lock.Unlock()
+
+		// Ensure that server is already not shutting down.
+		select {
+		case <-stopCh:
+			if err == nil {
+				newClient.Close()
+			}
+			return true, nil
+		default:
+		}
+
 		if err != nil {
-			clientErrMsg.Store(err.Error())
+			clientErr = err
 			return false, nil
 		}
-		clientValue.Store(client)
-		clientErrMsg.Store("")
+		client = newClient
+		clientErr = nil
 		return true, nil
-	}, wait.NeverStop)
+	}, stopCh)
+
+	// Close the client on shutdown.
+	go func() {
+		defer utilruntime.HandleCrash()
+		<-stopCh
+
+		lock.Lock()
+		defer lock.Unlock()
+		if client != nil {
+			client.Close()
+			clientErr = fmt.Errorf("server is shutting down")
+		}
+	}()
 
 	return func() error {
-		if errMsg := clientErrMsg.Load().(string); len(errMsg) > 0 {
-			return fmt.Errorf(errMsg)
+		// Given that client is closed on shutdown we hold the lock for
+		// the entire period of healthcheck call to ensure that client will
+		// not be closed during healthcheck.
+		// Given that healthchecks has a 2s timeout, worst case of blocking
+		// shutdown for additional 2s seems acceptable.
+		lock.Lock()
+		defer lock.Unlock()
+		if clientErr != nil {
+			return clientErr
 		}
-		client := clientValue.Load().(*clientv3.Client)
+
 		healthcheckTimeout := storagebackend.DefaultHealthcheckTimeout
 		if c.HealthcheckTimeout != time.Duration(0) {
 			healthcheckTimeout = c.HealthcheckTimeout
