@@ -1351,29 +1351,6 @@ func (proxier *Proxier) syncProxyRules() {
 			} else {
 				klog.V(3).InfoS("Skipped creating Hns LoadBalancer for loadBalancer Ingress resources", "lbIngressIP", lbIngressIP)
 			}
-
-			if proxier.forwardHealthCheckVip && gatewayHnsendpoint != nil {
-				nodeport := proxier.healthzPort
-				if svcInfo.HealthCheckNodePort() != 0 {
-					nodeport = svcInfo.HealthCheckNodePort()
-				}
-				hnsHealthCheckLoadBalancer, err := hns.getLoadBalancer(
-					[]endpointsInfo{*gatewayHnsendpoint},
-					loadBalancerFlags{isDSR: false, useMUX: svcInfo.preserveDIP, preserveDIP: svcInfo.preserveDIP},
-					sourceVip,
-					lbIngressIP.ip,
-					Enum(svcInfo.Protocol()),
-					uint16(nodeport),
-					uint16(nodeport),
-					queriedLoadBalancers,
-				)
-				if err != nil {
-					klog.ErrorS(err, "Policy creation failed")
-					continue
-				}
-				lbIngressIP.healthCheckHnsID = hnsHealthCheckLoadBalancer.hnsID
-				klog.V(3).InfoS("Hns Health Check LoadBalancer resource created for loadBalancer Ingress resources", "ip", lbIngressIP)
-			}
 		}
 		svcInfo.policyApplied = true
 		klog.V(2).InfoS("Policy successfully applied for service", "serviceInfo", svcInfo)
