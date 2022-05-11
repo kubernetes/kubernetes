@@ -702,6 +702,9 @@ func (adc *attachDetachController) processVolumeAttachments() error {
 		return err
 	}
 	for _, va := range vas {
+		if !va.DeletionTimestamp.IsZero() {
+			continue
+		}
 		nodeName := types.NodeName(va.Spec.NodeName)
 		pvName := va.Spec.Source.PersistentVolumeName
 		if pvName == nil {
@@ -766,8 +769,25 @@ func (adc *attachDetachController) processVolumeAttachments() error {
 		}
 		attachState := adc.actualStateOfWorld.GetAttachState(volumeName, nodeName)
 		if attachState == cache.AttachStateDetached {
+			// Normally, when volumeattachment object exist without deletionTimeStamp set, the volume should be attached and actual state
+			// shoud already have this volume from populateActualState process which gets volume information from volumeAttached list.
+			// However, due to issue # , the volume id might be different the volume id in actual state does not have zone information,
+			// while volume id retrived from volumeattachment has zone information.
+			// In this case, we will update actual state with the volume information from volumeattachment while delete the one from node status
+			// volumeAttached list
+
+			atttached := adc.actualStateOfWorld.GetAttachedVolumesForNode(nodeName)
+			for _, av := range atttached {
+				oldName := av.AttachedVolume.VolumeName
+				if volumeNameMatch(oldName, volumeName) {
+					klog.V(1).Infof("Fount a matching volume id with in-tree name %s, and CSI name %s", oldName, volumeName)
+					adc.actualStateOfWorld.DeleteVolumeNode(oldName, nodeName)
+				}
+			}
+
 			klog.V(1).Infof("Marking volume attachment as uncertain as volume:%q (%q) is not attached (%v)",
 				volumeName, nodeName, attachState)
+
 			err = adc.actualStateOfWorld.MarkVolumeAsUncertain(volumeName, volumeSpec, nodeName)
 			if err != nil {
 				klog.Errorf("MarkVolumeAsUncertain fail to add the volume %q (%q) to ASW. err: %s", volumeName, nodeName, err)
