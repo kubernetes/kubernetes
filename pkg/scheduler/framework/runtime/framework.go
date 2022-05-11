@@ -1038,7 +1038,7 @@ func (f *frameworkImpl) RunBindPlugins(ctx context.Context, state *framework.Cyc
 	}
 	for _, bp := range f.bindPlugins {
 		status = f.runBindPlugin(ctx, bp, state, pod, nodeName)
-		if status != nil && status.Code() == framework.Skip {
+		if status.IsSkip() {
 			continue
 		}
 		if !status.IsSuccess() {

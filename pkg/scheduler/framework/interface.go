@@ -198,6 +198,11 @@ func (s *Status) IsWait() bool {
 	return s.Code() == Wait
 }
 
+// IsSkip returns true if and only if "Status" is non-nil and its Code is "Skip".
+func (s *Status) IsSkip() bool {
+	return s.Code() == Skip
+}
+
 // IsUnschedulable returns true if "Status" is Unschedulable (Unschedulable or UnschedulableAndUnresolvable).
 func (s *Status) IsUnschedulable() bool {
 	code := s.Code()
@@ -207,7 +212,7 @@ func (s *Status) IsUnschedulable() bool {
 // AsError returns nil if the status is a success or a wait; otherwise returns an "error" object
 // with a concatenated message on reasons of the Status.
 func (s *Status) AsError() error {
-	if s.IsSuccess() || s.IsWait() {
+	if s.IsSuccess() || s.IsWait() || s.IsSkip() {
 		return nil
 	}
 	if s.err != nil {
