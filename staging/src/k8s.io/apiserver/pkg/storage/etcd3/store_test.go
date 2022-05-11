@@ -525,64 +525,9 @@ func TestList(t *testing.T) {
 	ctx, store, client := testSetup(t)
 	_, disablePagingStore, _ := testSetup(t, withoutPaging(), withClient(client))
 
-	// Setup storage with the following structure:
-	//  /
-	//   - one-level/
-	//  |            - test
-	//  |
-	//   - two-level/
-	//  |            - 1/
-	//  |           |   - test
-	//  |           |
-	//  |            - 2/
-	//  |               - test
-	//  |
-	//   - z-level/
-	//               - 3/
-	//              |   - test
-	//              |
-	//               - 3/
-	//                  - test-2
-	preset := []struct {
-		key       string
-		obj       *example.Pod
-		storedObj *example.Pod
-	}{
-		{
-			key: "/one-level/test",
-			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
-		},
-		{
-			key: "/two-level/1/test",
-			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
-		},
-		{
-			key: "/two-level/2/test",
-			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}},
-		},
-		{
-			key: "/z-level/3/test",
-			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "fourth"}},
-		},
-		{
-			key: "/z-level/3/test-2",
-			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}},
-		},
-	}
-
-	// we want to figure out the resourceVersion before we create anything
-	initialList := &example.PodList{}
-	if err := store.GetList(ctx, "/", storage.ListOptions{Predicate: storage.Everything, Recursive: true}, initialList); err != nil {
-		t.Errorf("Unexpected List error: %v", err)
-	}
-	initialRV := initialList.ResourceVersion
-
-	for i, ps := range preset {
-		preset[i].storedObj = &example.Pod{}
-		err := store.Create(ctx, ps.key, ps.obj, preset[i].storedObj, 0)
-		if err != nil {
-			t.Fatalf("Set failed: %v", err)
-		}
+	initialRV, preset, err := seedMultiLevelData(ctx, store)
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	list := &example.PodList{}
@@ -649,13 +594,13 @@ func TestList(t *testing.T) {
 			name:        "test List on existing key",
 			prefix:      "/one-level/",
 			pred:        storage.Everything,
-			expectedOut: []*example.Pod{preset[0].storedObj},
+			expectedOut: []*example.Pod{preset[0]},
 		},
 		{
 			name:        "test List on existing key with resource version set to 0",
 			prefix:      "/one-level/",
 			pred:        storage.Everything,
-			expectedOut: []*example.Pod{preset[0].storedObj},
+			expectedOut: []*example.Pod{preset[0]},
 			rv:          "0",
 		},
 		{
@@ -671,7 +616,7 @@ func TestList(t *testing.T) {
 			name:        "test List on existing key with resource version set to 0, match=NotOlderThan",
 			prefix:      "/one-level/",
 			pred:        storage.Everything,
-			expectedOut: []*example.Pod{preset[0].storedObj},
+			expectedOut: []*example.Pod{preset[0]},
 			rv:          "0",
 			rvMatch:     metav1.ResourceVersionMatchNotOlderThan,
 		},
@@ -687,7 +632,7 @@ func TestList(t *testing.T) {
 			name:        "test List on existing key with resource version set before first write, match=NotOlderThan",
 			prefix:      "/one-level/",
 			pred:        storage.Everything,
-			expectedOut: []*example.Pod{preset[0].storedObj},
+			expectedOut: []*example.Pod{preset[0]},
 			rv:          initialRV,
 			rvMatch:     metav1.ResourceVersionMatchNotOlderThan,
 		},
@@ -703,14 +648,14 @@ func TestList(t *testing.T) {
 			name:        "test List on existing key with resource version set to current resource version",
 			prefix:      "/one-level/",
 			pred:        storage.Everything,
-			expectedOut: []*example.Pod{preset[0].storedObj},
+			expectedOut: []*example.Pod{preset[0]},
 			rv:          list.ResourceVersion,
 		},
 		{
 			name:        "test List on existing key with resource version set to current resource version, match=Exact",
 			prefix:      "/one-level/",
 			pred:        storage.Everything,
-			expectedOut: []*example.Pod{preset[0].storedObj},
+			expectedOut: []*example.Pod{preset[0]},
 			rv:          list.ResourceVersion,
 			rvMatch:     metav1.ResourceVersionMatchExact,
 			expectRV:    list.ResourceVersion,
@@ -719,7 +664,7 @@ func TestList(t *testing.T) {
 			name:        "test List on existing key with resource version set to current resource version, match=NotOlderThan",
 			prefix:      "/one-level/",
 			pred:        storage.Everything,
-			expectedOut: []*example.Pod{preset[0].storedObj},
+			expectedOut: []*example.Pod{preset[0]},
 			rv:          list.ResourceVersion,
 			rvMatch:     metav1.ResourceVersionMatchNotOlderThan,
 		},
@@ -746,7 +691,7 @@ func TestList(t *testing.T) {
 				Field: fields.Everything(),
 				Limit: 1,
 			},
-			expectedOut:                []*example.Pod{preset[1].storedObj},
+			expectedOut:                []*example.Pod{preset[1]},
 			expectContinue:             true,
 			expectedRemainingItemCount: utilpointer.Int64Ptr(1),
 		},
@@ -758,7 +703,7 @@ func TestList(t *testing.T) {
 				Field: fields.Everything(),
 				Limit: 1,
 			},
-			expectedOut:                []*example.Pod{preset[1].storedObj},
+			expectedOut:                []*example.Pod{preset[1]},
 			expectContinue:             true,
 			expectedRemainingItemCount: utilpointer.Int64Ptr(1),
 			rv:                         list.ResourceVersion,
@@ -772,7 +717,7 @@ func TestList(t *testing.T) {
 				Field: fields.Everything(),
 				Limit: 1,
 			},
-			expectedOut:                []*example.Pod{preset[1].storedObj},
+			expectedOut:                []*example.Pod{preset[1]},
 			expectContinue:             true,
 			expectedRemainingItemCount: utilpointer.Int64Ptr(1),
 			rv:                         list.ResourceVersion,
@@ -787,7 +732,7 @@ func TestList(t *testing.T) {
 				Field: fields.Everything(),
 				Limit: 1,
 			},
-			expectedOut:                []*example.Pod{preset[1].storedObj},
+			expectedOut:                []*example.Pod{preset[1]},
 			expectContinue:             true,
 			expectedRemainingItemCount: utilpointer.Int64Ptr(1),
 			rv:                         "0",
@@ -801,7 +746,7 @@ func TestList(t *testing.T) {
 				Field: fields.Everything(),
 				Limit: 1,
 			},
-			expectedOut:                []*example.Pod{preset[1].storedObj},
+			expectedOut:                []*example.Pod{preset[1]},
 			expectContinue:             true,
 			expectedRemainingItemCount: utilpointer.Int64Ptr(1),
 			rv:                         "0",
@@ -843,7 +788,7 @@ func TestList(t *testing.T) {
 				Limit:    1,
 				Continue: secondContinuation,
 			},
-			expectedOut: []*example.Pod{preset[2].storedObj},
+			expectedOut: []*example.Pod{preset[2]},
 		},
 		{
 			name:   "ignores resource version 0 for List with pregenerated continue token",
@@ -855,13 +800,13 @@ func TestList(t *testing.T) {
 				Continue: secondContinuation,
 			},
 			rv:          "0",
-			expectedOut: []*example.Pod{preset[2].storedObj},
+			expectedOut: []*example.Pod{preset[2]},
 		},
 		{
 			name:        "test List with multiple levels of directories and expect flattened result",
 			prefix:      "/two-level/",
 			pred:        storage.Everything,
-			expectedOut: []*example.Pod{preset[1].storedObj, preset[2].storedObj},
+			expectedOut: []*example.Pod{preset[1], preset[2]},
 		},
 		{
 			name:   "test List with filter returning only one item, ensure only a single page returned",
@@ -871,7 +816,7 @@ func TestList(t *testing.T) {
 				Label: labels.Everything(),
 				Limit: 1,
 			},
-			expectedOut:    []*example.Pod{preset[3].storedObj},
+			expectedOut:    []*example.Pod{preset[3]},
 			expectContinue: true,
 		},
 		{
@@ -882,7 +827,7 @@ func TestList(t *testing.T) {
 				Label: labels.Everything(),
 				Limit: 2,
 			},
-			expectedOut:    []*example.Pod{preset[3].storedObj},
+			expectedOut:    []*example.Pod{preset[3]},
 			expectContinue: false,
 		},
 		{
@@ -894,7 +839,7 @@ func TestList(t *testing.T) {
 				Limit: 2,
 			},
 			rv:             "0",
-			expectedOut:    []*example.Pod{preset[3].storedObj},
+			expectedOut:    []*example.Pod{preset[3]},
 			expectContinue: false,
 		},
 		{
@@ -906,7 +851,7 @@ func TestList(t *testing.T) {
 				Limit: 2,
 			},
 			expectContinue: true,
-			expectedOut:    []*example.Pod{preset[0].storedObj, preset[1].storedObj},
+			expectedOut:    []*example.Pod{preset[0], preset[1]},
 		},
 		{
 			name:   "filter returns two items split across multiple pages",
@@ -916,7 +861,7 @@ func TestList(t *testing.T) {
 				Label: labels.Everything(),
 				Limit: 2,
 			},
-			expectedOut: []*example.Pod{preset[2].storedObj, preset[4].storedObj},
+			expectedOut: []*example.Pod{preset[2], preset[4]},
 		},
 		{
 			name:   "filter returns one item for last page, ends on last item, not full",
@@ -927,7 +872,7 @@ func TestList(t *testing.T) {
 				Limit:    2,
 				Continue: storagetesting.EncodeContinueOrDie("z-level/3", int64(continueRV)),
 			},
-			expectedOut: []*example.Pod{preset[4].storedObj},
+			expectedOut: []*example.Pod{preset[4]},
 		},
 		{
 			name:   "filter returns one item for last page, starts on last item, full",
@@ -938,7 +883,7 @@ func TestList(t *testing.T) {
 				Limit:    1,
 				Continue: storagetesting.EncodeContinueOrDie("z-level/3/test-2", int64(continueRV)),
 			},
-			expectedOut: []*example.Pod{preset[4].storedObj},
+			expectedOut: []*example.Pod{preset[4]},
 		},
 		{
 			name:   "filter returns one item for last page, starts on last item, partial page",
@@ -949,7 +894,7 @@ func TestList(t *testing.T) {
 				Limit:    2,
 				Continue: storagetesting.EncodeContinueOrDie("z-level/3/test-2", int64(continueRV)),
 			},
-			expectedOut: []*example.Pod{preset[4].storedObj},
+			expectedOut: []*example.Pod{preset[4]},
 		},
 		{
 			name:   "filter returns two items, page size equal to total list size",
@@ -959,7 +904,7 @@ func TestList(t *testing.T) {
 				Label: labels.Everything(),
 				Limit: 5,
 			},
-			expectedOut: []*example.Pod{preset[2].storedObj, preset[4].storedObj},
+			expectedOut: []*example.Pod{preset[2], preset[4]},
 		},
 		{
 			name:   "filter returns one item, page size equal to total list size",
@@ -969,7 +914,7 @@ func TestList(t *testing.T) {
 				Label: labels.Everything(),
 				Limit: 5,
 			},
-			expectedOut: []*example.Pod{preset[3].storedObj},
+			expectedOut: []*example.Pod{preset[3]},
 		},
 	}
 
@@ -1035,6 +980,76 @@ func TestList(t *testing.T) {
 			}
 		})
 	}
+}
+
+// seedMultiLevelData creates a set of keys with a multi-level structure, returning a resourceVersion
+// from before any were created along with the full set of objects that were persisted
+func seedMultiLevelData(ctx context.Context, store storage.Interface) (string, []*example.Pod, error) {
+	// Setup storage with the following structure:
+	//  /
+	//   - one-level/
+	//  |            - test
+	//  |
+	//   - two-level/
+	//  |            - 1/
+	//  |           |   - test
+	//  |           |
+	//  |            - 2/
+	//  |               - test
+	//  |
+	//   - z-level/
+	//               - 3/
+	//              |   - test
+	//              |
+	//               - 3/
+	//                  - test-2
+	preset := []struct {
+		key       string
+		obj       *example.Pod
+		storedObj *example.Pod
+	}{
+		{
+			key: "/one-level/test",
+			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
+		},
+		{
+			key: "/two-level/1/test",
+			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
+		},
+		{
+			key: "/two-level/2/test",
+			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}},
+		},
+		{
+			key: "/z-level/3/test",
+			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "fourth"}},
+		},
+		{
+			key: "/z-level/3/test-2",
+			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}},
+		},
+	}
+
+	// we want to figure out the resourceVersion before we create anything
+	initialList := &example.PodList{}
+	if err := store.GetList(ctx, "/", storage.ListOptions{Predicate: storage.Everything, Recursive: true}, initialList); err != nil {
+		return "", nil, fmt.Errorf("failed to determine starting resourceVersion: %w", err)
+	}
+	initialRV := initialList.ResourceVersion
+
+	for i, ps := range preset {
+		preset[i].storedObj = &example.Pod{}
+		err := store.Create(ctx, ps.key, ps.obj, preset[i].storedObj, 0)
+		if err != nil {
+			return "", nil, fmt.Errorf("failed to create object: %w", err)
+		}
+	}
+
+	var created []*example.Pod
+	for _, item := range preset {
+		created = append(created, item.storedObj)
+	}
+	return initialRV, created, nil
 }
 
 func TestListContinuation(t *testing.T) {
