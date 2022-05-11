@@ -18,6 +18,7 @@ package ipvs
 
 import (
 	"bytes"
+	"compress/gzip"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -610,12 +611,34 @@ func (handle *LinuxKernelHandler) GetModules() ([]string, error) {
 
 	// Find out loaded kernel modules. If this is a full static kernel it will try to verify if the module is compiled using /boot/config-KERNELVERSION
 	modulesFile, err := os.Open("/proc/modules")
-	if err == os.ErrNotExist {
-		klog.Warningf("Failed to read file /proc/modules with error %v. Assuming this is a kernel without loadable modules support enabled", err)
-		kernelConfigFile := fmt.Sprintf("/boot/config-%s", kernelVersionStr)
-		kConfig, err := ioutil.ReadFile(kernelConfigFile)
+	if err != nil {
+		if os.IsNotExist(err) {
+			klog.Warningf("Failed to read file /proc/modules with error %v. Assuming this is a kernel without loadable modules support enabled", err)
+			kernelConfigFile := fmt.Sprintf("/boot/config-%s", kernelVersionStr)
+                        err = nil
+			kConfig, err := ioutil.ReadFile(kernelConfigFile)
+			if err != nil {
+				return nil, fmt.Errorf("Failed to read Kernel Config file %s with error %v", kernelConfigFile, err)
+			}
+			for _, module := range ipvsModules {
+				if match, _ := regexp.Match("CONFIG_"+strings.ToUpper(module)+"=y", kConfig); match {
+					bmods = append(bmods, module)
+				}
+			}
+			return bmods, nil
+		}
+		return nil, fmt.Errorf("Failed to read file /proc/modules with error %v", err)
+	}
+
+	mods, err := getFirstColumn(modulesFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find loaded kernel modules: %v", err)
+	}
+	if len(mods) == 0 {
+		klog.Infof("The config from /proc/modules or /boot/config-*** is empty , so read the file /proc/config.gz.")
+		kConfig, err := ReadGzFile("/proc/config.gz")
 		if err != nil {
-			return nil, fmt.Errorf("Failed to read Kernel Config file %s with error %v", kernelConfigFile, err)
+			return nil, fmt.Errorf("Failed to read Kernel Config file /proc/config.gz with error %v", err)
 		}
 		for _, module := range ipvsModules {
 			if match, _ := regexp.Match("CONFIG_"+strings.ToUpper(module)+"=y", kConfig); match {
@@ -623,14 +646,6 @@ func (handle *LinuxKernelHandler) GetModules() ([]string, error) {
 			}
 		}
 		return bmods, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("Failed to read file /proc/modules with error %v", err)
-	}
-
-	mods, err := getFirstColumn(modulesFile)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find loaded kernel modules: %v", err)
 	}
 
 	builtinModsFilePath := fmt.Sprintf("/lib/modules/%s/modules.builtin", kernelVersionStr)
@@ -657,6 +672,27 @@ func (handle *LinuxKernelHandler) GetModules() ([]string, error) {
 	mods = append(mods, bmods...)
 	mods = append(mods, lmods...)
 	return mods, nil
+}
+
+// ReadGzFile reads all the content from config.gz
+func ReadGzFile(filename string) ([]byte, error) {
+	fi, err := os.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+	defer fi.Close()
+
+	fz, err := gzip.NewReader(fi)
+	if err != nil {
+		return nil, err
+	}
+	defer fz.Close()
+
+	s, err := ioutil.ReadAll(fz)
+	if err != nil {
+		return nil, err
+	}
+	return s, nil
 }
 
 // getFirstColumn reads all the content from r into memory and return a
