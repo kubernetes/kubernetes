@@ -522,8 +522,7 @@ func TestTransformationFailure(t *testing.T) {
 
 func TestList(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RemainingItemCount, true)()
-	ctx, store, client := testSetup(t)
-	_, disablePagingStore, _ := testSetup(t, withoutPaging(), withClient(client))
+	ctx, store, _ := testSetup(t)
 
 	initialRV, preset, err := seedMultiLevelData(ctx, store)
 	if err != nil {
@@ -552,7 +551,6 @@ func TestList(t *testing.T) {
 
 	tests := []struct {
 		name                       string
-		disablePaging              bool
 		rv                         string
 		rvMatch                    metav1.ResourceVersionMatch
 		prefix                     string
@@ -768,18 +766,6 @@ func TestList(t *testing.T) {
 			expectRV:       initialRV,
 		},
 		{
-			name:          "test List with limit when paging disabled",
-			disablePaging: true,
-			prefix:        "/two-level/",
-			pred: storage.SelectionPredicate{
-				Label: labels.Everything(),
-				Field: fields.Everything(),
-				Limit: 1,
-			},
-			expectedOut:    []*example.Pod{preset[1].storedObj, preset[2].storedObj},
-			expectContinue: false,
-		},
-		{
 			name:   "test List with pregenerated continue token",
 			prefix: "/two-level/",
 			pred: storage.SelectionPredicate{
@@ -931,12 +917,7 @@ func TestList(t *testing.T) {
 				Predicate:            tt.pred,
 				Recursive:            true,
 			}
-			var err error
-			if tt.disablePaging {
-				err = disablePagingStore.GetList(ctx, tt.prefix, storageOpts, out)
-			} else {
-				err = store.GetList(ctx, tt.prefix, storageOpts, out)
-			}
+			err = store.GetList(ctx, tt.prefix, storageOpts, out)
 			if tt.expectRVTooLarge {
 				if err == nil || !storage.IsTooLargeResourceVersion(err) {
 					t.Fatalf("expecting resource version too high error, but get: %s", err)
@@ -968,6 +949,82 @@ func TestList(t *testing.T) {
 					t.Errorf("resourceVersion in list response invalid: %v", err)
 				}
 			}
+			if len(tt.expectedOut) != len(out.Items) {
+				t.Fatalf("length of list want=%d, got=%d", len(tt.expectedOut), len(out.Items))
+			}
+			if diff := cmp.Diff(tt.expectedRemainingItemCount, out.ListMeta.GetRemainingItemCount()); diff != "" {
+				t.Errorf("incorrect remainingItemCount: %s", diff)
+			}
+			for j, wantPod := range tt.expectedOut {
+				getPod := &out.Items[j]
+				storagetesting.ExpectNoDiff(t, fmt.Sprintf("%s: incorrect pod", tt.name), wantPod, getPod)
+			}
+		})
+	}
+}
+
+func TestListWithoutPaging(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RemainingItemCount, true)()
+	ctx, store, _ := testSetup(t, withoutPaging())
+
+	_, preset, err := seedMultiLevelData(ctx, store)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	getAttrs := func(obj runtime.Object) (labels.Set, fields.Set, error) {
+		pod := obj.(*example.Pod)
+		return nil, fields.Set{"metadata.name": pod.Name}, nil
+	}
+
+	tests := []struct {
+		name                       string
+		disablePaging              bool
+		rv                         string
+		rvMatch                    metav1.ResourceVersionMatch
+		prefix                     string
+		pred                       storage.SelectionPredicate
+		expectedOut                []*example.Pod
+		expectContinue             bool
+		expectedRemainingItemCount *int64
+		expectError                bool
+	}{
+		{
+			name:          "test List with limit when paging disabled",
+			disablePaging: true,
+			prefix:        "/two-level/",
+			pred: storage.SelectionPredicate{
+				Label: labels.Everything(),
+				Field: fields.Everything(),
+				Limit: 1,
+			},
+			expectedOut:    []*example.Pod{preset[1], preset[2]},
+			expectContinue: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.pred.GetAttrs == nil {
+				tt.pred.GetAttrs = getAttrs
+			}
+
+			out := &example.PodList{}
+			storageOpts := storage.ListOptions{
+				ResourceVersion:      tt.rv,
+				ResourceVersionMatch: tt.rvMatch,
+				Predicate:            tt.pred,
+				Recursive:            true,
+			}
+
+			if err := store.GetList(ctx, tt.prefix, storageOpts, out); err != nil {
+				t.Fatalf("GetList failed: %v", err)
+				return
+			}
+			if (len(out.Continue) > 0) != tt.expectContinue {
+				t.Errorf("unexpected continue token: %q", out.Continue)
+			}
+
 			if len(tt.expectedOut) != len(out.Items) {
 				t.Fatalf("length of list want=%d, got=%d", len(tt.expectedOut), len(out.Items))
 			}
