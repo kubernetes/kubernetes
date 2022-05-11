@@ -86,33 +86,120 @@ func TestFailureOutput(t *testing.T) {
 	actual := normalizeReport(*reporter)
 
 	// output from AfterEach
-	commonOutput := "\n\nINFO: after\nFAIL: true is never false either\nExpected\n    <bool>: true\nto equal\n    <bool>: false\n\nFull Stack Trace\nk8s.io/kubernetes/test/e2e/framework_test.glob..func1.6()\n\tlog_test.go:71\nk8s.io/kubernetes/test/e2e/framework_test.runTests()\n\tlog_test.go:47\n\n"
+	commonOutput := `
+
+INFO: after
+FAIL: true is never false either
+Expected
+    <bool>: true
+to equal
+    <bool>: false
+
+Full Stack Trace
+k8s.io/kubernetes/test/e2e/framework_test.glob..func1.6()
+	log_test.go:71
+k8s.io/kubernetes/test/e2e/framework_test.runTests()
+	log_test.go:47
+
+`
 
 	// Sorted by name!
 	expected := suiteResults{
 		testResult{
-			name:    "[Top Level] log asserts",
-			output:  "INFO: before\nFAIL: false is never true\nExpected\n    <bool>: false\nto equal\n    <bool>: true\n\nFull Stack Trace\nk8s.io/kubernetes/test/e2e/framework_test.glob..func1.3()\n\tlog_test.go:60\nk8s.io/kubernetes/test/e2e/framework_test.runTests()\n\tlog_test.go:47" + commonOutput,
-			failure: "false is never true\nExpected\n    <bool>: false\nto equal\n    <bool>: true",
-			stack:   "k8s.io/kubernetes/test/e2e/framework_test.glob..func1.3()\n\tlog_test.go:60\nk8s.io/kubernetes/test/e2e/framework_test.runTests()\n\tlog_test.go:47\n",
+			name: "[Top Level] log asserts",
+			output: `INFO: before
+FAIL: false is never true
+Expected
+    <bool>: false
+to equal
+    <bool>: true
+
+Full Stack Trace
+k8s.io/kubernetes/test/e2e/framework_test.glob..func1.3()
+	log_test.go:60
+k8s.io/kubernetes/test/e2e/framework_test.runTests()
+	log_test.go:47` + commonOutput,
+			failure: `false is never true
+Expected
+    <bool>: false
+to equal
+    <bool>: true`,
+			stack: `k8s.io/kubernetes/test/e2e/framework_test.glob..func1.3()
+	log_test.go:60
+k8s.io/kubernetes/test/e2e/framework_test.runTests()
+	log_test.go:47
+`,
 		},
 		testResult{
-			name:    "[Top Level] log equal",
-			output:  "INFO: before\nFAIL: of course it's not equal...\nExpected\n    <int>: 0\nto equal\n    <int>: 1\n\nFull Stack Trace\nk8s.io/kubernetes/test/e2e/framework_test.glob..func1.5()\n\tlog_test.go:67\nk8s.io/kubernetes/test/e2e/framework_test.runTests()\n\tlog_test.go:47" + commonOutput,
-			failure: "of course it's not equal...\nExpected\n    <int>: 0\nto equal\n    <int>: 1",
-			stack:   "k8s.io/kubernetes/test/e2e/framework_test.glob..func1.5()\n\tlog_test.go:67\nk8s.io/kubernetes/test/e2e/framework_test.runTests()\n\tlog_test.go:47\n",
+			name: "[Top Level] log equal",
+			output: `INFO: before
+FAIL: of course it's not equal...
+Expected
+    <int>: 0
+to equal
+    <int>: 1
+
+Full Stack Trace
+k8s.io/kubernetes/test/e2e/framework_test.glob..func1.5()
+	log_test.go:67
+k8s.io/kubernetes/test/e2e/framework_test.runTests()
+	log_test.go:47` + commonOutput,
+			failure: `of course it's not equal...
+Expected
+    <int>: 0
+to equal
+    <int>: 1`,
+			stack: `k8s.io/kubernetes/test/e2e/framework_test.glob..func1.5()
+	log_test.go:67
+k8s.io/kubernetes/test/e2e/framework_test.runTests()
+	log_test.go:47
+`,
 		},
 		testResult{
-			name:    "[Top Level] log error",
-			output:  "INFO: before\nFAIL: hard-coded error\nUnexpected error:\n    <*errors.errorString>: {\n        s: \"an error with a long, useless description\",\n    }\n    an error with a long, useless description\noccurred\n\nFull Stack Trace\nk8s.io/kubernetes/test/e2e/framework_test.glob..func1.4()\n\tlog_test.go:64\nk8s.io/kubernetes/test/e2e/framework_test.runTests()\n\tlog_test.go:47" + commonOutput,
-			failure: "hard-coded error\nUnexpected error:\n    <*errors.errorString>: {\n        s: \"an error with a long, useless description\",\n    }\n    an error with a long, useless description\noccurred",
-			stack:   "k8s.io/kubernetes/test/e2e/framework_test.glob..func1.4()\n\tlog_test.go:64\nk8s.io/kubernetes/test/e2e/framework_test.runTests()\n\tlog_test.go:47\n",
+			name: "[Top Level] log error",
+			output: `INFO: before
+FAIL: hard-coded error
+Unexpected error:
+    <*errors.errorString>: {
+        s: "an error with a long, useless description",
+    }
+    an error with a long, useless description
+occurred
+
+Full Stack Trace
+k8s.io/kubernetes/test/e2e/framework_test.glob..func1.4()
+	log_test.go:64
+k8s.io/kubernetes/test/e2e/framework_test.runTests()
+	log_test.go:47` + commonOutput,
+			failure: `hard-coded error
+Unexpected error:
+    <*errors.errorString>: {
+        s: "an error with a long, useless description",
+    }
+    an error with a long, useless description
+occurred`,
+			stack: `k8s.io/kubernetes/test/e2e/framework_test.glob..func1.4()
+	log_test.go:64
+k8s.io/kubernetes/test/e2e/framework_test.runTests()
+	log_test.go:47
+`,
 		},
 		testResult{
-			name:    "[Top Level] log fails",
-			output:  "INFO: before\nFAIL: I'm failing.\n\nFull Stack Trace\nk8s.io/kubernetes/test/e2e/framework_test.glob..func1.2()\n\tlog_test.go:57\nk8s.io/kubernetes/test/e2e/framework_test.runTests()\n\tlog_test.go:47" + commonOutput,
+			name: "[Top Level] log fails",
+			output: `INFO: before
+FAIL: I'm failing.
+
+Full Stack Trace
+k8s.io/kubernetes/test/e2e/framework_test.glob..func1.2()
+	log_test.go:57
+k8s.io/kubernetes/test/e2e/framework_test.runTests()
+	log_test.go:47` + commonOutput,
 			failure: "I'm failing.",
-			stack:   "k8s.io/kubernetes/test/e2e/framework_test.glob..func1.2()\n\tlog_test.go:57\nk8s.io/kubernetes/test/e2e/framework_test.runTests()\n\tlog_test.go:47\n",
+			stack: `k8s.io/kubernetes/test/e2e/framework_test.glob..func1.2()
+	log_test.go:57
+k8s.io/kubernetes/test/e2e/framework_test.runTests()
+	log_test.go:47
+`,
 		},
 	}
 	// assert.Equal prints a useful diff if the slices are not
