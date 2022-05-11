@@ -21,8 +21,8 @@ import (
 	"net/http"
 
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
-	"go.opentelemetry.io/otel/exporters/otlp"
-	"go.opentelemetry.io/otel/exporters/otlp/otlpgrpc"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -33,10 +33,10 @@ import (
 )
 
 // NewProvider initializes tracing in the component, and enforces recommended tracing behavior.
-func NewProvider(ctx context.Context, baseSampler sdktrace.Sampler, resourceOpts []resource.Option, opts ...otlpgrpc.Option) trace.TracerProvider {
-	opts = append(opts, otlpgrpc.WithInsecure())
-	driver := otlpgrpc.NewDriver(opts...)
-	exporter, err := otlp.NewExporter(ctx, driver)
+func NewProvider(ctx context.Context, baseSampler sdktrace.Sampler, resourceOpts []resource.Option, opts ...otlptracegrpc.Option) trace.TracerProvider {
+	opts = append(opts, otlptracegrpc.WithInsecure())
+	client := otlptracegrpc.NewClient(opts...)
+	exporter, err := otlptrace.New(ctx, client)
 	if err != nil {
 		klog.Fatalf("Failed to create OTLP exporter: %v", err)
 	}
