@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
-	"k8s.io/apiextensions-apiserver/third_party/forked/celopenapi/model"
+	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/model"
 	"k8s.io/kube-openapi/pkg/validation/strfmt"
 )
 

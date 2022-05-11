@@ -1,16 +1,18 @@
-// Copyright 2020 Google LLC
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//    https://www.apache.org/licenses/LICENSE2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+/*
+Copyright 2022 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
 
 package model
 
@@ -38,9 +40,6 @@ const (
 	minDurationSizeJSON = 3
 	// RFC 3339 dates require YYYY-MM-DD, and then we add 2 to allow for quotation marks
 	dateSizeJSON = 12
-	// RFC 3339 times require 2-digit 24-hour time at the very least plus a capital T at the start,
-	// e.g., T23, and we add 2 to allow for quotation marks as usual
-	minTimeSizeJSON = 5
 	// RFC 3339 datetimes require a full date (YYYY-MM-DD) and full time (HH:MM:SS), and we add 3 for
 	// quotation marks like always in addition to the capital T that separates the date and time
 	minDatetimeSizeJSON = 21

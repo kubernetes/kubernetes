@@ -90,13 +90,13 @@ var validCharacterFilter = newCharacterFilter("abcdefghijklmnopqrstuvwxyzABCDEFG
 // Escape escapes ident and returns a CEL identifier (of the form '[a-zA-Z_][a-zA-Z0-9_]*'), or returns
 // false if the ident does not match the supported input format of `[a-zA-Z_.-/][a-zA-Z0-9_.-/]*`.
 // Escaping Rules:
-// - '__' escapes to '__underscores__'
-// - '.' escapes to '__dot__'
-// - '-' escapes to '__dash__'
-// - '/' escapes to '__slash__'
-// - Identifiers that exactly match a CEL RESERVED keyword escape to '__{keyword}__'. The keywords are: "true", "false",
-//	  "null", "in", "as", "break", "const", "continue", "else", "for", "function", "if", "import", "let", loop", "package",
-//	  "namespace", "return".
+//   - '__' escapes to '__underscores__'
+//   - '.' escapes to '__dot__'
+//   - '-' escapes to '__dash__'
+//   - '/' escapes to '__slash__'
+//   - Identifiers that exactly match a CEL RESERVED keyword escape to '__{keyword}__'. The keywords are: "true", "false",
+//     "null", "in", "as", "break", "const", "continue", "else", "for", "function", "if", "import", "let", loop", "package",
+//     "namespace", "return".
 func Escape(ident string) (string, bool) {
 	if len(ident) == 0 || ('0' <= ident[0] && ident[0] <= '9') {
 		return "", false
