@@ -343,10 +343,14 @@ func (dswp *desiredStateOfWorldPopulator) checkVolumeFSResize(
 	volumeSpec *volume.Spec,
 	uniquePodName volumetypes.UniquePodName,
 	mountedVolumesForPod map[volumetypes.UniquePodName]map[string]cache.MountedVolume) {
-	if podVolume.PersistentVolumeClaim == nil || pvc == nil {
+
+	// if a volumeSpec does not have PV or has InlineVolumeSpecForCSIMigration set or pvc is nil
+	// we can't resize the volume and hence resizing should be skipped.
+	if volumeSpec.PersistentVolume == nil || volumeSpec.InlineVolumeSpecForCSIMigration || pvc == nil {
 		// Only PVC supports resize operation.
 		return
 	}
+
 	uniqueVolumeName, exist := getUniqueVolumeName(uniquePodName, podVolume.Name, mountedVolumesForPod)
 	if !exist {
 		// Volume not exist in ASW, we assume it hasn't been mounted yet. If it needs resize,
