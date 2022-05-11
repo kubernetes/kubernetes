@@ -125,7 +125,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 					dp.Spec.Containers[0].Env[i].Value = pluginSockDir
 				}
 			}
-			dptemplate = dp
+			dptemplate = dp.DeepCopy()
 			devicePluginPod = f.PodClient().CreateSync(dp)
 
 			ginkgo.By("Waiting for devices to become available on the local node")
