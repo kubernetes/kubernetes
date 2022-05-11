@@ -34,6 +34,10 @@ type TimingHistogram struct {
 	selfCollector
 }
 
+var _ GaugeMetric = &TimingHistogram{}
+var _ Registerable = &TimingHistogram{}
+var _ kubeCollector = &TimingHistogram{}
+
 // NewTimingHistogram returns an object which is TimingHistogram-like. However, nothing
 // will be measured until the histogram is registered somewhere.
 func NewTimingHistogram(opts *TimingHistogramOpts) *TimingHistogram {
@@ -89,9 +93,9 @@ func (h *TimingHistogram) WithContext(ctx context.Context) GaugeMetric {
 	return h.GaugeMetric
 }
 
-// timingHistogramVec is the internal representation of our wrapping struct around prometheus
+// TimingHistogramVec is the internal representation of our wrapping struct around prometheus
 // TimingHistogramVecs.
-type timingHistogramVec struct {
+type TimingHistogramVec struct {
 	*promext.TimingHistogramVec
 	*TimingHistogramOpts
 	nowFunc func() time.Time
@@ -99,15 +103,19 @@ type timingHistogramVec struct {
 	originalLabels []string
 }
 
-// NewTimingHistogramVec returns an object which satisfies kubeCollector and
-// wraps the promext.timingHistogramVec object.  Note well the way that
+var _ GaugeVecMetric = &TimingHistogramVec{}
+var _ Registerable = &TimingHistogramVec{}
+var _ kubeCollector = &TimingHistogramVec{}
+
+// NewTimingHistogramVec returns an object which satisfies the kubeCollector, Registerable, and GaugeVecMetric interfaces
+// and wraps an underlying promext.TimingHistogramVec object.  Note well the way that
 // behavior depends on registration and whether this is hidden.
-func NewTimingHistogramVec(opts *TimingHistogramOpts, labels []string) PreContextAndRegisterableGaugeMetricVec {
+func NewTimingHistogramVec(opts *TimingHistogramOpts, labels []string) *TimingHistogramVec {
 	return NewTestableTimingHistogramVec(time.Now, opts, labels)
 }
 
 // NewTestableTimingHistogramVec adds injection of the clock.
-func NewTestableTimingHistogramVec(nowFunc func() time.Time, opts *TimingHistogramOpts, labels []string) PreContextAndRegisterableGaugeMetricVec {
+func NewTestableTimingHistogramVec(nowFunc func() time.Time, opts *TimingHistogramOpts, labels []string) *TimingHistogramVec {
 	opts.StabilityLevel.setDefaults()
 
 	fqName := BuildFQName(opts.Namespace, opts.Subsystem, opts.Name)
@@ -117,7 +125,7 @@ func NewTestableTimingHistogramVec(nowFunc func() time.Time, opts *TimingHistogr
 	}
 	allowListLock.RUnlock()
 
-	v := &timingHistogramVec{
+	v := &TimingHistogramVec{
 		TimingHistogramVec:  noopTimingHistogramVec,
 		TimingHistogramOpts: opts,
 		nowFunc:             nowFunc,
@@ -129,16 +137,16 @@ func NewTestableTimingHistogramVec(nowFunc func() time.Time, opts *TimingHistogr
 }
 
 // DeprecatedVersion returns a pointer to the Version or nil
-func (v *timingHistogramVec) DeprecatedVersion() *semver.Version {
+func (v *TimingHistogramVec) DeprecatedVersion() *semver.Version {
 	return parseSemver(v.TimingHistogramOpts.DeprecatedVersion)
 }
 
-func (v *timingHistogramVec) initializeMetric() {
+func (v *TimingHistogramVec) initializeMetric() {
 	v.TimingHistogramOpts.annotateStabilityLevel()
 	v.TimingHistogramVec = promext.NewTestableTimingHistogramVec(v.nowFunc, v.TimingHistogramOpts.toPromHistogramOpts(), v.originalLabels...)
 }
 
-func (v *timingHistogramVec) initializeDeprecatedMetric() {
+func (v *TimingHistogramVec) initializeDeprecatedMetric() {
 	v.TimingHistogramOpts.markDeprecated()
 	v.initializeMetric()
 }
@@ -152,7 +160,7 @@ func (v *timingHistogramVec) initializeDeprecatedMetric() {
 // return a noop gauge and an error about the labels.
 // If none of the above apply, this method will return
 // the appropriate vector member and a nil error.
-func (v *timingHistogramVec) WithLabelValuesChecked(lvs ...string) (GaugeMetric, error) {
+func (v *TimingHistogramVec) WithLabelValuesChecked(lvs ...string) (GaugeMetric, error) {
 	if v.IsHidden() {
 		return noop, nil
 	}
@@ -171,7 +179,7 @@ func (v *timingHistogramVec) WithLabelValuesChecked(lvs ...string) (GaugeMetric,
 // An error that passes ErrIsNotRegistered is ignored
 // and the noop gauge is returned;
 // all other errors cause a panic.
-func (v *timingHistogramVec) WithLabelValues(lvs ...string) GaugeMetric {
+func (v *TimingHistogramVec) WithLabelValues(lvs ...string) GaugeMetric {
 	ans, err := v.WithLabelValuesChecked(lvs...)
 	if err == nil || ErrIsNotRegistered(err) {
 		return ans
@@ -188,7 +196,7 @@ func (v *timingHistogramVec) WithLabelValues(lvs ...string) GaugeMetric {
 // return a noop gauge and an error about the labels.
 // If none of the above apply, this method will return
 // the appropriate vector member and a nil error.
-func (v *timingHistogramVec) WithChecked(labels map[string]string) (GaugeMetric, error) {
+func (v *TimingHistogramVec) WithChecked(labels map[string]string) (GaugeMetric, error) {
 	if v.IsHidden() {
 		return noop, nil
 	}
@@ -206,7 +214,7 @@ func (v *timingHistogramVec) WithChecked(labels map[string]string) (GaugeMetric,
 // An error that passes ErrIsNotRegistered is ignored
 // and the noop gauge is returned;
 // all other errors cause a panic.
-func (v *timingHistogramVec) With(labels map[string]string) GaugeMetric {
+func (v *TimingHistogramVec) With(labels map[string]string) GaugeMetric {
 	ans, err := v.WithChecked(labels)
 	if err == nil || ErrIsNotRegistered(err) {
 		return ans
@@ -221,7 +229,7 @@ func (v *timingHistogramVec) With(labels map[string]string) GaugeMetric {
 // with those of the VariableLabels in Desc. However, such inconsistent Labels
 // can never match an actual metric, so the method will always return false in
 // that case.
-func (v *timingHistogramVec) Delete(labels map[string]string) bool {
+func (v *TimingHistogramVec) Delete(labels map[string]string) bool {
 	if !v.IsCreated() {
 		return false // since we haven't created the metric, we haven't deleted a metric with the passed in values
 	}
@@ -229,7 +237,7 @@ func (v *timingHistogramVec) Delete(labels map[string]string) bool {
 }
 
 // Reset deletes all metrics in this vector.
-func (v *timingHistogramVec) Reset() {
+func (v *TimingHistogramVec) Reset() {
 	if !v.IsCreated() {
 		return
 	}
@@ -237,17 +245,17 @@ func (v *timingHistogramVec) Reset() {
 	v.TimingHistogramVec.Reset()
 }
 
-// WithContext returns wrapped timingHistogramVec with context
-func (v *timingHistogramVec) WithContext(ctx context.Context) GaugeMetricVec {
+// WithContext returns wrapped TimingHistogramVec with context
+func (v *TimingHistogramVec) InterfaceWithContext(ctx context.Context) GaugeVecMetric {
 	return &TimingHistogramVecWithContext{
 		ctx:                ctx,
-		timingHistogramVec: v,
+		TimingHistogramVec: v,
 	}
 }
 
-// TimingHistogramVecWithContext is the wrapper of timingHistogramVec with context.
+// TimingHistogramVecWithContext is the wrapper of TimingHistogramVec with context.
 // Currently the context is ignored.
 type TimingHistogramVecWithContext struct {
-	*timingHistogramVec
+	*TimingHistogramVec
 	ctx context.Context
 }
