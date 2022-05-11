@@ -17,7 +17,6 @@ limitations under the License.
 package metrics
 
 import (
-	"context"
 	"errors"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -68,12 +67,18 @@ type GaugeMetric interface {
 	SetToCurrentTime()
 }
 
-// GaugeMetricVec is a collection of Gauges that differ only in label values.
-// This is really just one Metric.
-// It might be better called GaugeVecMetric, but that pattern of name is already
-// taken by the other pattern --- which is treacherous.  The treachery is that
-// WithLabelValues can return an object that is permanently broken (i.e., a noop).
-type GaugeMetricVec interface {
+// GaugeVecMetric is a collection of Gauges that differ only in label values.
+type GaugeVecMetric interface {
+	// Default Prometheus Vec behavior is that member extraction results in creation of a new element
+	// if one with the unique label values is not found in the underlying stored metricMap.
+	// This means  that if this function is called but the underlying metric is not registered
+	// (which means it will never be exposed externally nor consumed), the metric would exist in memory
+	// for perpetuity (i.e. throughout application lifecycle).
+	//
+	// For reference: https://github.com/prometheus/client_golang/blob/v0.9.2/prometheus/gauge.go#L190-L208
+	//
+	// In contrast, the Vec behavior in this package is that member extraction before registration
+	// returns a permanent noop object.
 
 	// WithLabelValuesChecked, if called on a hidden vector,
 	// will return a noop gauge and a nil error.
@@ -118,26 +123,6 @@ type GaugeMetricVec interface {
 
 	// Reset removes all the members
 	Reset()
-}
-
-// PreContextGaugeMetricVec is something that can construct a GaugeMetricVec
-// that uses a given Context.
-type PreContextGaugeMetricVec interface {
-	// WithContext creates a GaugeMetricVec that uses the given Context
-	WithContext(ctx context.Context) GaugeMetricVec
-}
-
-// RegisterableGaugeMetricVec is the intersection of Registerable and GaugeMetricVec
-type RegisterableGaugeMetricVec interface {
-	Registerable
-	GaugeMetricVec
-}
-
-// PreContextAndRegisterableGaugeMetricVec is the intersection of
-// PreContextGaugeMetricVec and RegisterableGaugeMetricVec
-type PreContextAndRegisterableGaugeMetricVec interface {
-	PreContextGaugeMetricVec
-	RegisterableGaugeMetricVec
 }
 
 // ObserverMetric captures individual observations.
