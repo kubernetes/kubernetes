@@ -54,15 +54,16 @@ var systemDefaultConstraints = []v1.TopologySpreadConstraint{
 
 // PodTopologySpread is a plugin that ensures pod's topologySpreadConstraints is satisfied.
 type PodTopologySpread struct {
-	systemDefaulted                     bool
-	parallelizer                        parallelize.Parallelizer
-	defaultConstraints                  []v1.TopologySpreadConstraint
-	sharedLister                        framework.SharedLister
-	services                            corelisters.ServiceLister
-	replicationCtrls                    corelisters.ReplicationControllerLister
-	replicaSets                         appslisters.ReplicaSetLister
-	statefulSets                        appslisters.StatefulSetLister
-	enableMinDomainsInPodTopologySpread bool
+	systemDefaulted                              bool
+	parallelizer                                 parallelize.Parallelizer
+	defaultConstraints                           []v1.TopologySpreadConstraint
+	sharedLister                                 framework.SharedLister
+	services                                     corelisters.ServiceLister
+	replicationCtrls                             corelisters.ReplicationControllerLister
+	replicaSets                                  appslisters.ReplicaSetLister
+	statefulSets                                 appslisters.StatefulSetLister
+	enableMinDomainsInPodTopologySpread          bool
+	enableNodeInclusionPolicyInPodTopologySpread bool
 }
 
 var _ framework.PreFilterPlugin = &PodTopologySpread{}
@@ -98,6 +99,7 @@ func New(plArgs runtime.Object, h framework.Handle, fts feature.Features) (frame
 		sharedLister:                        h.SnapshotSharedLister(),
 		defaultConstraints:                  args.DefaultConstraints,
 		enableMinDomainsInPodTopologySpread: fts.EnableMinDomainsInPodTopologySpread,
+		enableNodeInclusionPolicyInPodTopologySpread: fts.EnableNodeInclusionPolicyInPodTopologySpread,
 	}
 	if args.DefaultingType == config.SystemDefaulting {
 		pl.defaultConstraints = systemDefaultConstraints
