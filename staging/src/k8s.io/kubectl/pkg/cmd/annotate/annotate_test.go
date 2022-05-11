@@ -227,7 +227,7 @@ func TestUpdateAnnotations(t *testing.T) {
 		annotations map[string]string
 		remove      []string
 		expected    runtime.Object
-		expectErr   bool
+		expectedErr string
 	}{
 		{
 			obj: &v1.Pod{
@@ -249,7 +249,7 @@ func TestUpdateAnnotations(t *testing.T) {
 				},
 			},
 			annotations: map[string]string{"a": "c"},
-			expectErr:   true,
+			expectedErr: "--overwrite is false but found the following declared annotation(s): 'a' already has a value (b)",
 		},
 		{
 			obj: &v1.Pod{
@@ -378,13 +378,16 @@ func TestUpdateAnnotations(t *testing.T) {
 			resourceVersion:   test.version,
 		}
 		err := options.updateAnnotations(test.obj)
-		if test.expectErr {
+		if test.expectedErr != "" {
 			if err == nil {
 				t.Errorf("unexpected non-error: %v", test)
 			}
+			if err.Error() != test.expectedErr {
+				t.Errorf("error expected: %v, got: %v", test.expectedErr, err.Error())
+			}
 			continue
 		}
-		if !test.expectErr && err != nil {
+		if test.expectedErr == "" && err != nil {
 			t.Errorf("unexpected error: %v %v", err, test)
 		}
 		if !reflect.DeepEqual(test.obj, test.expected) {
