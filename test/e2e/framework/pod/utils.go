@@ -56,14 +56,14 @@ func GetDefaultTestImage() string {
 // If the node OS is windows, currently we return Agnhost image for Windows node
 // due to the issue of #https://github.com/kubernetes-sigs/windows-testing/pull/35.
 // If the node OS is linux, return busybox image
-func GetDefaultTestImageID() int {
+func GetDefaultTestImageID() imageutils.ImageID {
 	return GetTestImageID(imageutils.BusyBox)
 }
 
 // GetTestImage returns the image name with the given input
 // If the Node OS is windows, currently we return Agnhost image for Windows node
 // due to the issue of #https://github.com/kubernetes-sigs/windows-testing/pull/35.
-func GetTestImage(id int) string {
+func GetTestImage(id imageutils.ImageID) string {
 	if NodeOSDistroIs("windows") {
 		return imageutils.GetE2EImage(imageutils.Agnhost)
 	}
@@ -73,7 +73,7 @@ func GetTestImage(id int) string {
 // GetTestImageID returns the image id with the given input
 // If the Node OS is windows, currently we return Agnhost image for Windows node
 // due to the issue of #https://github.com/kubernetes-sigs/windows-testing/pull/35.
-func GetTestImageID(id int) int {
+func GetTestImageID(id imageutils.ImageID) imageutils.ImageID {
 	if NodeOSDistroIs("windows") {
 		return imageutils.Agnhost
 	}
