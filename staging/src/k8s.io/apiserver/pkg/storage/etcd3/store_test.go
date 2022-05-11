@@ -19,8 +19,6 @@ package etcd3
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"math"
@@ -597,7 +595,7 @@ func TestList(t *testing.T) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	continueRV, _ := strconv.Atoi(list.ResourceVersion)
-	secondContinuation, err := encodeContinue("/two-level/2", "/two-level/", int64(continueRV))
+	secondContinuation, err := storage.EncodeContinue("/two-level/2", "/two-level/", int64(continueRV))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -927,7 +925,7 @@ func TestList(t *testing.T) {
 				Field:    fields.OneTermEqualSelector("metadata.name", "bar"),
 				Label:    labels.Everything(),
 				Limit:    2,
-				Continue: encodeContinueOrDie("meta.k8s.io/v1", int64(continueRV), "z-level/3"),
+				Continue: storagetesting.EncodeContinueOrDie("z-level/3", int64(continueRV)),
 			},
 			expectedOut: []*example.Pod{preset[4].storedObj},
 		},
@@ -938,7 +936,7 @@ func TestList(t *testing.T) {
 				Field:    fields.OneTermEqualSelector("metadata.name", "bar"),
 				Label:    labels.Everything(),
 				Limit:    1,
-				Continue: encodeContinueOrDie("meta.k8s.io/v1", int64(continueRV), "z-level/3/test-2"),
+				Continue: storagetesting.EncodeContinueOrDie("z-level/3/test-2", int64(continueRV)),
 			},
 			expectedOut: []*example.Pod{preset[4].storedObj},
 		},
@@ -949,7 +947,7 @@ func TestList(t *testing.T) {
 				Field:    fields.OneTermEqualSelector("metadata.name", "bar"),
 				Label:    labels.Everything(),
 				Limit:    2,
-				Continue: encodeContinueOrDie("meta.k8s.io/v1", int64(continueRV), "z-level/3/test-2"),
+				Continue: storagetesting.EncodeContinueOrDie("z-level/3/test-2", int64(continueRV)),
 			},
 			expectedOut: []*example.Pod{preset[4].storedObj},
 		},
@@ -1134,7 +1132,7 @@ func TestListContinuation(t *testing.T) {
 	if len(out.Continue) != 0 {
 		t.Fatalf("Unexpected continuation token set")
 	}
-	key, rv, err := decodeContinue(continueFromSecondItem, "/")
+	key, rv, err := storage.DecodeContinue(continueFromSecondItem, "/")
 	t.Logf("continue token was %d %s %v", rv, key, err)
 	storagetesting.ExpectNoDiff(t, "incorrect second page", []example.Pod{*preset[1].storedObj, *preset[2].storedObj}, out.Items)
 	if transformer.reads != 2 {
@@ -1651,54 +1649,6 @@ func TestPrefix(t *testing.T) {
 		if store.pathPrefix != effectivePrefix {
 			t.Errorf("configured prefix of %s, expected effective prefix of %s, got %s", configuredPrefix, effectivePrefix, store.pathPrefix)
 		}
-	}
-}
-
-func encodeContinueOrDie(apiVersion string, resourceVersion int64, nextKey string) string {
-	out, err := json.Marshal(&continueToken{APIVersion: apiVersion, ResourceVersion: resourceVersion, StartKey: nextKey})
-	if err != nil {
-		panic(err)
-	}
-	return base64.RawURLEncoding.EncodeToString(out)
-}
-
-func Test_decodeContinue(t *testing.T) {
-	type args struct {
-		continueValue string
-		keyPrefix     string
-	}
-	tests := []struct {
-		name        string
-		args        args
-		wantFromKey string
-		wantRv      int64
-		wantErr     bool
-	}{
-		{name: "valid", args: args{continueValue: encodeContinueOrDie("meta.k8s.io/v1", 1, "key"), keyPrefix: "/test/"}, wantRv: 1, wantFromKey: "/test/key"},
-		{name: "root path", args: args{continueValue: encodeContinueOrDie("meta.k8s.io/v1", 1, "/"), keyPrefix: "/test/"}, wantRv: 1, wantFromKey: "/test/"},
-
-		{name: "empty version", args: args{continueValue: encodeContinueOrDie("", 1, "key"), keyPrefix: "/test/"}, wantErr: true},
-		{name: "invalid version", args: args{continueValue: encodeContinueOrDie("v1", 1, "key"), keyPrefix: "/test/"}, wantErr: true},
-
-		{name: "path traversal - parent", args: args{continueValue: encodeContinueOrDie("meta.k8s.io/v1", 1, "../key"), keyPrefix: "/test/"}, wantErr: true},
-		{name: "path traversal - local", args: args{continueValue: encodeContinueOrDie("meta.k8s.io/v1", 1, "./key"), keyPrefix: "/test/"}, wantErr: true},
-		{name: "path traversal - double parent", args: args{continueValue: encodeContinueOrDie("meta.k8s.io/v1", 1, "./../key"), keyPrefix: "/test/"}, wantErr: true},
-		{name: "path traversal - after parent", args: args{continueValue: encodeContinueOrDie("meta.k8s.io/v1", 1, "key/../.."), keyPrefix: "/test/"}, wantErr: true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			gotFromKey, gotRv, err := decodeContinue(tt.args.continueValue, tt.args.keyPrefix)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("decodeContinue() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if gotFromKey != tt.wantFromKey {
-				t.Errorf("decodeContinue() gotFromKey = %v, want %v", gotFromKey, tt.wantFromKey)
-			}
-			if gotRv != tt.wantRv {
-				t.Errorf("decodeContinue() gotRv = %v, want %v", gotRv, tt.wantRv)
-			}
-		})
 	}
 }
 
