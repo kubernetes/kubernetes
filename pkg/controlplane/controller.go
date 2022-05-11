@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"sync"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -86,7 +87,6 @@ type Controller struct {
 	PublicServicePort         int
 	KubernetesServiceNodePort int
 
-	stopCh chan struct{}
 	runner *async.Runner
 }
 
@@ -174,47 +174,47 @@ func (c *Controller) Start() {
 	repairClusterIPs := servicecontroller.NewRepair(c.ServiceClusterIPInterval, c.ServiceClient, c.EventClient, &c.ServiceClusterIPRange, c.ServiceClusterIPRegistry, &c.SecondaryServiceClusterIPRange, c.SecondaryServiceClusterIPRegistry)
 	repairNodePorts := portallocatorcontroller.NewRepair(c.ServiceNodePortInterval, c.ServiceClient, c.EventClient, c.ServiceNodePortRange, c.ServiceNodePortRegistry)
 
-	// We start both repairClusterIPs and repairNodePorts to catch events
-	// coming from the RunOnce() calls to them.
-	// TODO: Refactor both controllers to only expose a public RunUntil
-	// method, but to accommodate the usecase below (of forcing the first
-	// successful call before proceeding) let them signal on that, like:
-	//   func (c *Repair) RunUntil(stopCh chan struct{}, onFirstSuccess func())
-	// and use it here like:
-	//   wg := sync.WaitGroup{}
-	//   wg.Add(2)
-	//   runRepairClusterIPs := func(stopCh chan struct{}) {
-	//     repairClusterIPs(stopCh, wg.Done)
-	//   }
-	//   runRepairNodePorts := func(stopCh chan struct{}) {
-	//     repairNodePorts(stopCh, wg.Done)
-	//   }
-	//   c.runner = ...
-	//   c.runner.Start()
-	//   wg.Wait()
-	c.stopCh = make(chan struct{})
-	repairClusterIPs.Start(c.stopCh)
-	repairNodePorts.Start(c.stopCh)
+	// We start both repairClusterIPs and repairNodePorts to ensure repair
+	// loops of ClusterIPs and NodePorts.
+	// We run both repair loops using RunUntil public interface.
+	// However, we want to fail liveness/readiness until the first
+	// successful repair loop, so we basically pass appropriate
+	// callbacks to RunUtil methods.
+	// Additionally, we ensure that we don't wait for it for longer
+	// than 1 minute for backward compatibility of failing the whole
+	// apiserver if we can't repair them.
+	wg := sync.WaitGroup{}
+	wg.Add(2)
 
-	// run all of the controllers once prior to returning from Start.
-	if err := repairClusterIPs.RunOnce(); err != nil {
-		// If we fail to repair cluster IPs apiserver is useless. We should restart and retry.
-		klog.Fatalf("Unable to perform initial IP allocation check: %v", err)
+	runRepairClusterIPs := func(stopCh chan struct{}) {
+		repairClusterIPs.RunUntil(wg.Done, stopCh)
 	}
-	if err := repairNodePorts.RunOnce(); err != nil {
-		// If we fail to repair node ports apiserver is useless. We should restart and retry.
-		klog.Fatalf("Unable to perform initial service nodePort check: %v", err)
+	runRepairNodePorts := func(stopCh chan struct{}) {
+		repairNodePorts.RunUntil(wg.Done, stopCh)
 	}
 
-	c.runner = async.NewRunner(c.RunKubernetesNamespaces, c.RunKubernetesService, repairClusterIPs.RunUntil, repairNodePorts.RunUntil)
+	c.runner = async.NewRunner(c.RunKubernetesNamespaces, c.RunKubernetesService, runRepairClusterIPs, runRepairNodePorts)
 	c.runner.Start()
+
+	// For backward compatibility, we ensure that if we never are able
+	// to repair clusterIPs and/or nodeports, we not only fail the liveness
+	// and/or readiness, but also explicitly fail.
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		wg.Wait()
+	}()
+	select {
+	case <-done:
+	case <-time.After(time.Minute):
+		klog.Fatalf("Unable to perform initial IP and Port allocation check")
+	}
 }
 
 // Stop cleans up this API Servers endpoint reconciliation leases so another master can take over more quickly.
 func (c *Controller) Stop() {
 	if c.runner != nil {
 		c.runner.Stop()
-		close(c.stopCh)
 	}
 	endpointPorts := createEndpointPortSpec(c.PublicServicePort, "https", c.ExtraEndpointPorts)
 	finishedReconciling := make(chan struct{})
