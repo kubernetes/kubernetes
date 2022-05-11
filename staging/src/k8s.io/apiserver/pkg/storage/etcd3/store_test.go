@@ -1463,7 +1463,7 @@ func TestListInconsistentContinuation(t *testing.T) {
 	}
 
 	// compact to latest revision.
-	versioner := APIObjectVersioner{}
+	versioner := storage.APIObjectVersioner{}
 	lastRVString := preset[2].storedObj.ResourceVersion
 	lastRV, err := versioner.ParseResourceVersion(lastRVString)
 	if err != nil {

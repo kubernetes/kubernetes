@@ -29,7 +29,7 @@ import (
 	"time"
 
 	fuzz "github.com/google/gofuzz"
-	apitesting "k8s.io/apimachinery/pkg/api/apitesting"
+	"k8s.io/apimachinery/pkg/api/apitesting"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -51,7 +51,6 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
 	cacherstorage "k8s.io/apiserver/pkg/storage/cacher"
-	"k8s.io/apiserver/pkg/storage/etcd3"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/apiserver/pkg/storage/storagebackend/factory"
@@ -267,7 +266,7 @@ func TestStoreListResourceVersion(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	versioner := etcd3.APIObjectVersioner{}
+	versioner := storage.APIObjectVersioner{}
 	rev, err := versioner.ObjectResourceVersion(obj)
 	if err != nil {
 		t.Fatal(err)
@@ -2318,7 +2317,7 @@ func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheE
 	if hasCacheEnabled {
 		config := cacherstorage.Config{
 			Storage:        s,
-			Versioner:      etcd3.APIObjectVersioner{},
+			Versioner:      storage.APIObjectVersioner{},
 			ResourcePrefix: podPrefix,
 			KeyFunc:        func(obj runtime.Object) (string, error) { return storage.NoNamespaceKeyFunc(podPrefix, obj) },
 			GetAttrsFunc:   getPodAttrs,

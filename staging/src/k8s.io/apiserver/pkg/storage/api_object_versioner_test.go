@@ -14,13 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package etcd3
+package storage
 
 import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apiserver/pkg/storage"
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
 )
 
@@ -65,7 +64,7 @@ func TestEtcdParseResourceVersion(t *testing.T) {
 			switch {
 			case testCase.Err && err == nil:
 				t.Errorf("%s[%v]: unexpected non-error", testCase.Version, i)
-			case testCase.Err && !storage.IsInvalidError(err):
+			case testCase.Err && !IsInvalidError(err):
 				t.Errorf("%s[%v]: unexpected error: %v", testCase.Version, i, err)
 			case !testCase.Err && err != nil:
 				t.Errorf("%s[%v]: unexpected error: %v", testCase.Version, i, err)

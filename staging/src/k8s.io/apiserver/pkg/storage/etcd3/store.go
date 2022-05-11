@@ -98,7 +98,7 @@ func New(c *clientv3.Client, codec runtime.Codec, newFunc func() runtime.Object,
 }
 
 func newStore(c *clientv3.Client, codec runtime.Codec, newFunc func() runtime.Object, prefix string, groupResource schema.GroupResource, transformer value.Transformer, pagingEnabled bool, leaseManagerConfig LeaseManagerConfig) *store {
-	versioner := APIObjectVersioner{}
+	versioner := storage.APIObjectVersioner{}
 	result := &store{
 		client:        c,
 		codec:         codec,
