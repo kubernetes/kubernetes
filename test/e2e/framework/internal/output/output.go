@@ -90,8 +90,12 @@ func normalizeReport(report reporters.FakeReporter) SuiteResults {
 // timePrefix matches "Jul 17 08:08:25.950: " at the beginning of each line.
 var timePrefix = regexp.MustCompile(`(?m)^[[:alpha:]]{3} +[[:digit:]]{1,2} +[[:digit:]]{2}:[[:digit:]]{2}:[[:digit:]]{2}.[[:digit:]]{3}: `)
 
+// elapsedSuffix matches "Elapsed: 16.189µs"
+var elapsedSuffix = regexp.MustCompile(`Elapsed: [[:digit:]]+(\.[[:digit:]]+)?(µs|ns|ms|s|m)`)
+
 func stripTimes(in string) string {
 	out := timePrefix.ReplaceAllString(in, "")
+	out = elapsedSuffix.ReplaceAllString(out, "Elapsed: <elapsed>")
 	return out
 }
 
