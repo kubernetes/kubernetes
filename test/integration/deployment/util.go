@@ -146,6 +146,15 @@ func dcSimpleSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, clients
 	return s, closeFn, clientSet
 }
 
+// runControllersAndInformers runs RS and deployment controllers and informers
+func runControllersAndInformers(t *testing.T, rm *replicaset.ReplicaSetController, dc *deployment.DeploymentController, informers informers.SharedInformerFactory) func() {
+	ctx, cancelFn := context.WithCancel(context.Background())
+	informers.Start(ctx.Done())
+	go rm.Run(ctx, 5)
+	go dc.Run(ctx, 5)
+	return cancelFn
+}
+
 // addPodConditionReady sets given pod status to ready at given time
 func addPodConditionReady(pod *v1.Pod, time metav1.Time) {
 	pod.Status = v1.PodStatus{

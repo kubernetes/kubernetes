@@ -54,11 +54,8 @@ func TestNewDeployment(t *testing.T) {
 	}
 
 	// Start informer and controllers
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	informers.Start(stopCh)
-	go rm.Run(context.TODO(), 5)
-	go dc.Run(context.TODO(), 5)
+	stopControllers := runControllersAndInformers(t, rm, dc, informers)
+	defer stopControllers()
 
 	// Wait for the Deployment to be updated to revision 1
 	if err := tester.waitForDeploymentRevisionAndImage("1", fakeImage); err != nil {
@@ -121,11 +118,8 @@ func TestDeploymentRollingUpdate(t *testing.T) {
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
 	// Start informer and controllers
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	informers.Start(stopCh)
-	go rm.Run(context.TODO(), 5)
-	go dc.Run(context.TODO(), 5)
+	stopControllers := runControllersAndInformers(t, rm, dc, informers)
+	defer stopControllers()
 
 	replicas := int32(20)
 	tester := &deploymentTester{t: t, c: c, deployment: newDeployment(name, ns.Name, replicas)}
@@ -264,11 +258,8 @@ func TestPausedDeployment(t *testing.T) {
 	}
 
 	// Start informer and controllers
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	informers.Start(stopCh)
-	go rm.Run(context.TODO(), 5)
-	go dc.Run(context.TODO(), 5)
+	stopControllers := runControllersAndInformers(t, rm, dc, informers)
+	defer stopControllers()
 
 	// Verify that the paused deployment won't create new replica set.
 	if err := tester.expectNoNewReplicaSet(); err != nil {
@@ -365,11 +356,8 @@ func TestScalePausedDeployment(t *testing.T) {
 	}
 
 	// Start informer and controllers
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	informers.Start(stopCh)
-	go rm.Run(context.TODO(), 5)
-	go dc.Run(context.TODO(), 5)
+	stopControllers := runControllersAndInformers(t, rm, dc, informers)
+	defer stopControllers()
 
 	// Wait for the Deployment to be updated to revision 1
 	if err := tester.waitForDeploymentRevisionAndImage("1", fakeImage); err != nil {
@@ -446,11 +434,8 @@ func TestDeploymentHashCollision(t *testing.T) {
 	}
 
 	// Start informer and controllers
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	informers.Start(stopCh)
-	go rm.Run(context.TODO(), 5)
-	go dc.Run(context.TODO(), 5)
+	stopControllers := runControllersAndInformers(t, rm, dc, informers)
+	defer stopControllers()
 
 	// Wait for the Deployment to be updated to revision 1
 	if err := tester.waitForDeploymentRevisionAndImage("1", fakeImage); err != nil {
@@ -549,11 +534,8 @@ func TestFailedDeployment(t *testing.T) {
 	}
 
 	// Start informer and controllers
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	informers.Start(stopCh)
-	go rm.Run(context.TODO(), 5)
-	go dc.Run(context.TODO(), 5)
+	stopControllers := runControllersAndInformers(t, rm, dc, informers)
+	defer stopControllers()
 
 	if err = tester.waitForDeploymentUpdatedReplicasGTE(replicas); err != nil {
 		t.Fatal(err)
@@ -590,12 +572,10 @@ func TestOverlappingDeployments(t *testing.T) {
 		{t: t, c: c, deployment: newDeployment(firstDeploymentName, ns.Name, replicas)},
 		{t: t, c: c, deployment: newDeployment(secondDeploymentName, ns.Name, replicas)},
 	}
+
 	// Start informer and controllers
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	informers.Start(stopCh)
-	go rm.Run(context.TODO(), 5)
-	go dc.Run(context.TODO(), 5)
+	stopControllers := runControllersAndInformers(t, rm, dc, informers)
+	defer stopControllers()
 
 	// Create 2 deployments with overlapping selectors
 	var err error
@@ -665,11 +645,9 @@ func TestScaledRolloutDeployment(t *testing.T) {
 	ns := framework.CreateTestingNamespace(name, s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	informers.Start(stopCh)
-	go rm.Run(context.TODO(), 5)
-	go dc.Run(context.TODO(), 5)
+	// Start informer and controllers
+	stopControllers := runControllersAndInformers(t, rm, dc, informers)
+	defer stopControllers()
 
 	// Create a deployment with rolling update strategy, max surge = 3, and max unavailable = 2
 	var err error
@@ -868,11 +846,8 @@ func TestSpecReplicasChange(t *testing.T) {
 	}
 
 	// Start informer and controllers
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	informers.Start(stopCh)
-	go rm.Run(context.TODO(), 5)
-	go dc.Run(context.TODO(), 5)
+	stopControllers := runControllersAndInformers(t, rm, dc, informers)
+	defer stopControllers()
 
 	// Scale up/down deployment and verify its replicaset has matching .spec.replicas
 	if err = tester.scaleDeployment(2); err != nil {
@@ -926,11 +901,8 @@ func TestDeploymentAvailableCondition(t *testing.T) {
 	}
 
 	// Start informer and controllers
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	informers.Start(stopCh)
-	go rm.Run(context.TODO(), 5)
-	go dc.Run(context.TODO(), 5)
+	stopControllers := runControllersAndInformers(t, rm, dc, informers)
+	defer stopControllers()
 
 	// Wait for the deployment to be observed by the controller and has at least specified number of updated replicas
 	if err = tester.waitForDeploymentUpdatedReplicasGTE(replicas); err != nil {
@@ -1043,11 +1015,8 @@ func TestGeneralReplicaSetAdoption(t *testing.T) {
 	}
 
 	// Start informer and controllers
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	informers.Start(stopCh)
-	go rm.Run(context.TODO(), 5)
-	go dc.Run(context.TODO(), 5)
+	stopControllers := runControllersAndInformers(t, rm, dc, informers)
+	defer stopControllers()
 
 	// Wait for the Deployment to be updated to revision 1
 	if err := tester.waitForDeploymentRevisionAndImage("1", fakeImage); err != nil {
@@ -1135,11 +1104,8 @@ func TestDeploymentScaleSubresource(t *testing.T) {
 	}
 
 	// Start informer and controllers
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	informers.Start(stopCh)
-	go rm.Run(context.TODO(), 5)
-	go dc.Run(context.TODO(), 5)
+	stopControllers := runControllersAndInformers(t, rm, dc, informers)
+	defer stopControllers()
 
 	// Wait for the Deployment to be updated to revision 1
 	if err := tester.waitForDeploymentRevisionAndImage("1", fakeImage); err != nil {
@@ -1179,11 +1145,8 @@ func TestReplicaSetOrphaningAndAdoptionWhenLabelsChange(t *testing.T) {
 	}
 
 	// Start informer and controllers
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	informers.Start(stopCh)
-	go rm.Run(context.TODO(), 5)
-	go dc.Run(context.TODO(), 5)
+	stopControllers := runControllersAndInformers(t, rm, dc, informers)
+	defer stopControllers()
 
 	// Wait for the Deployment to be updated to revision 1
 	if err := tester.waitForDeploymentRevisionAndImage("1", fakeImage); err != nil {
