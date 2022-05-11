@@ -666,6 +666,25 @@ func TestScaleFinderNoResource(t *testing.T) {
 			apiResources: []metav1.APIResource{
 				{
 					Kind: customGVK.Kind,
+					Name: resourceName + "/status",
+				},
+				{
+					Kind:    "Scale",
+					Group:   autoscalingapi.GroupName,
+					Version: "v1",
+					Name:    resourceName + "/scale",
+				},
+				{
+					Kind: customGVK.Kind,
+					Name: resourceName,
+				},
+			},
+			expectError: false,
+		},
+		"resource implements unsupported data format for scale subresource": {
+			apiResources: []metav1.APIResource{
+				{
+					Kind: customGVK.Kind,
 					Name: resourceName,
 				},
 				{
@@ -673,7 +692,7 @@ func TestScaleFinderNoResource(t *testing.T) {
 					Name: resourceName + "/scale",
 				},
 			},
-			expectError: false,
+			expectError: true,
 		},
 		"resource does not implement scale": {
 			apiResources: []metav1.APIResource{

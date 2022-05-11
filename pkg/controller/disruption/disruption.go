@@ -297,14 +297,13 @@ func (dc *DisruptionController) getScaleController(ctx context.Context, controll
 		return nil, err
 	}
 	gr := mapping.Resource.GroupResource()
-
 	scale, err := dc.scaleNamespacer.Scales(namespace).Get(ctx, gr, controllerRef.Name, metav1.GetOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// The IsNotFound error can mean either that the resource does not exist,
 			// or it exist but doesn't implement the scale subresource. We check which
 			// situation we are facing so we can give an appropriate error message.
-			isScale, err := dc.implementsScale(gv, controllerRef.Kind)
+			isScale, err := dc.implementsScale(mapping.Resource)
 			if err != nil {
 				return nil, err
 			}
@@ -321,17 +320,24 @@ func (dc *DisruptionController) getScaleController(ctx context.Context, controll
 	return &controllerAndScale{scale.UID, scale.Spec.Replicas}, nil
 }
 
-func (dc *DisruptionController) implementsScale(gv schema.GroupVersion, kind string) (bool, error) {
-	resourceList, err := dc.discoveryClient.ServerResourcesForGroupVersion(gv.String())
+func (dc *DisruptionController) implementsScale(gvr schema.GroupVersionResource) (bool, error) {
+	resourceList, err := dc.discoveryClient.ServerResourcesForGroupVersion(gvr.GroupVersion().String())
 	if err != nil {
 		return false, err
 	}
+
+	scaleSubresourceName := fmt.Sprintf("%s/scale", gvr.Resource)
 	for _, resource := range resourceList.APIResources {
-		if resource.Kind != kind {
+		if resource.Name != scaleSubresourceName {
 			continue
 		}
-		if strings.HasSuffix(resource.Name, "/scale") {
-			return true, nil
+
+		for _, scaleGv := range scaleclient.NewScaleConverter().ScaleVersions() {
+			if resource.Group == scaleGv.Group &&
+				resource.Version == scaleGv.Version &&
+				resource.Kind == "Scale" {
+				return true, nil
+			}
 		}
 	}
 	return false, nil
