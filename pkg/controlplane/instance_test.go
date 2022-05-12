@@ -399,68 +399,6 @@ func TestStorageVersionHashes(t *testing.T) {
 	}
 }
 
-func TestStorageVersionHashEqualities(t *testing.T) {
-	apiserver, etcdserver, _, assert := newInstance(t)
-	defer etcdserver.Terminate(t)
-
-	server := httptest.NewServer(apiserver.GenericAPIServer.Handler.GoRestfulContainer.ServeMux)
-
-	// Test 1: extensions/v1beta1/ingresses and apps/v1/ingresses have
-	// the same storage version hash.
-	resp, err := http.Get(server.URL + "/apis/extensions/v1beta1")
-	assert.Empty(err)
-	extList := metav1.APIResourceList{}
-	assert.NoError(decodeResponse(resp, &extList))
-	var extIngressHash, appsIngressHash string
-	for _, r := range extList.APIResources {
-		if r.Name == "ingresses" {
-			extIngressHash = r.StorageVersionHash
-			assert.NotEmpty(extIngressHash)
-		}
-	}
-
-	resp, err = http.Get(server.URL + "/apis/networking.k8s.io/v1beta1")
-	assert.Empty(err)
-	appsList := metav1.APIResourceList{}
-	assert.NoError(decodeResponse(resp, &appsList))
-	for _, r := range appsList.APIResources {
-		if r.Name == "ingresses" {
-			appsIngressHash = r.StorageVersionHash
-			assert.NotEmpty(appsIngressHash)
-		}
-	}
-	if len(extIngressHash) > 0 && len(appsIngressHash) > 0 {
-		assert.Equal(extIngressHash, appsIngressHash)
-	}
-
-	// Test 2: batch/v1/jobs and batch/v1beta1/cronjobs have different
-	// storage version hashes.
-	resp, err = http.Get(server.URL + "/apis/batch/v1")
-	assert.Empty(err)
-	batchv1 := metav1.APIResourceList{}
-	assert.NoError(decodeResponse(resp, &batchv1))
-	var jobsHash string
-	for _, r := range batchv1.APIResources {
-		if r.Name == "jobs" {
-			jobsHash = r.StorageVersionHash
-		}
-	}
-	assert.NotEmpty(jobsHash)
-
-	resp, err = http.Get(server.URL + "/apis/batch/v1beta1")
-	assert.Empty(err)
-	batchv1beta1 := metav1.APIResourceList{}
-	assert.NoError(decodeResponse(resp, &batchv1beta1))
-	var cronjobsHash string
-	for _, r := range batchv1beta1.APIResources {
-		if r.Name == "cronjobs" {
-			cronjobsHash = r.StorageVersionHash
-		}
-	}
-	assert.NotEmpty(cronjobsHash)
-	assert.NotEqual(jobsHash, cronjobsHash)
-}
-
 func TestNoAlphaVersionsEnabledByDefault(t *testing.T) {
 	config := DefaultAPIResourceConfigSource()
 	for gv, enable := range config.GroupVersionConfigs {
