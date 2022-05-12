@@ -70,15 +70,49 @@ func NewDefaultTestServerOptions() *TestServerInstanceOptions {
 // 		 files that because Golang testing's call to os.Exit will not give a stop channel go routine
 // 		 enough time to remove temporary files.
 func StartTestServer(t Logger, _ *TestServerInstanceOptions, customFlags []string, storageConfig *storagebackend.Config) (result TestServer, err error) {
+	// create listener for the server
+	ln, port, err := createLocalhostListenerOnFreePort()
+	if err != nil {
+		return result, fmt.Errorf("failed to create listener: %v", err)
+	}
+
+	// create kubeconfig which will not actually be used. But generic apiserver CoreAPI needs it to startup.
+	fakeKubeConfig, err := ioutil.TempFile("", "kubeconfig")
+	if err != nil {
+		return result, fmt.Errorf("failed to create temp file: %v", err)
+	}
+	fakeKubeConfig.WriteString(`
+apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    server: http://` + ln.Addr().String() + `
+  name: integration
+contexts:
+- context:
+    cluster: integration
+    user: test
+  name: default-context
+current-context: default-context
+users:
+- name: test
+  user:
+    password: test
+    username: test
+`)
+	fakeKubeConfig.Close()
+
 	stopCh := make(chan struct{})
 	tearDown := func() {
 		// Closing stopCh is stopping apiextensions apiserver and its
 		// delegates, which itself is cleaning up after itself,
 		// including shutting down its storage layer.
 		close(stopCh)
+		os.Remove(fakeKubeConfig.Name())
 		if len(result.TmpDir) != 0 {
 			os.RemoveAll(result.TmpDir)
 		}
+
 	}
 	defer func() {
 		if result.TearDownFn == nil {
@@ -96,7 +130,14 @@ func StartTestServer(t Logger, _ *TestServerInstanceOptions, customFlags []strin
 	s := options.NewCustomResourceDefinitionsServerOptions(os.Stdout, os.Stderr)
 	s.AddFlags(fs)
 
-	s.RecommendedOptions.SecureServing.Listener, s.RecommendedOptions.SecureServing.BindPort, err = createLocalhostListenerOnFreePort()
+	// Since there is no apiserver running for the apiextensions-apiserver, consider the authn/z kubeconfig flags as optional.
+	// If no kubeconfig is given, all token requests are considered to be anonymous and no client CA is looked up in the cluster.
+	s.RecommendedOptions.Authentication.RemoteKubeConfigFileOptional = true
+	s.RecommendedOptions.Authorization.RemoteKubeConfigFileOptional = true
+	s.RecommendedOptions.CoreAPI.CoreAPIKubeconfigPath = fakeKubeConfig.Name()
+
+	s.RecommendedOptions.SecureServing.Listener = ln
+	s.RecommendedOptions.SecureServing.BindPort = port
 	if err != nil {
 		return result, fmt.Errorf("failed to create listener: %v", err)
 	}

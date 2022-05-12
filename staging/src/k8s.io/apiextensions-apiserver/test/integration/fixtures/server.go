@@ -17,7 +17,6 @@ limitations under the License.
 package fixtures
 
 import (
-	"io/ioutil"
 	"os"
 	"strings"
 	"time"
@@ -38,49 +37,18 @@ import (
 
 // StartDefaultServer starts a test server.
 func StartDefaultServer(t servertesting.Logger, flags ...string) (func(), *rest.Config, *options.CustomResourceDefinitionsServerOptions, error) {
-	// create kubeconfig which will not actually be used. But authz/authn needs it to startup.
-	fakeKubeConfig, err := ioutil.TempFile("", "kubeconfig")
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	fakeKubeConfig.WriteString(`
-apiVersion: v1
-kind: Config
-clusters:
-- cluster:
-    server: http://127.1.2.3:12345
-  name: integration
-contexts:
-- context:
-    cluster: integration
-    user: test
-  name: default-context
-current-context: default-context
-users:
-- name: test
-  user:
-    password: test
-    username: test
-`)
-	fakeKubeConfig.Close()
-
 	s, err := servertesting.StartTestServer(t, nil, append([]string{
 		"--etcd-prefix", uuid.New().String(),
 		"--etcd-servers", strings.Join(IntegrationEtcdServers(), ","),
 		"--authentication-skip-lookup",
-		"--authentication-kubeconfig", fakeKubeConfig.Name(),
-		"--authorization-kubeconfig", fakeKubeConfig.Name(),
-		"--kubeconfig", fakeKubeConfig.Name(),
 		"--disable-admission-plugins", "NamespaceLifecycle,MutatingAdmissionWebhook,ValidatingAdmissionWebhook"},
 		flags...,
 	), nil)
 	if err != nil {
-		os.Remove(fakeKubeConfig.Name())
 		return nil, nil, nil, err
 	}
 
 	tearDownFn := func() {
-		defer os.Remove(fakeKubeConfig.Name())
 		s.TearDownFn()
 	}
 
