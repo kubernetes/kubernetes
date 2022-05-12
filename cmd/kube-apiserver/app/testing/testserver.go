@@ -44,6 +44,8 @@ import (
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	testutil "k8s.io/kubernetes/test/utils"
+
+	"k8s.io/klog/v2"
 )
 
 // This key is for testing purposes only and is not considered secure.
@@ -99,25 +101,33 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 		instanceOptions = NewDefaultTestServerOptions()
 	}
 
+	result.TmpDir, err = os.MkdirTemp("", "kubernetes-kube-apiserver")
+	if err != nil {
+		return result, fmt.Errorf("failed to create temp dir: %v", err)
+	}
+
 	stopCh := make(chan struct{})
+	var errCh chan error
 	tearDown := func() {
 		// Closing stopCh is stopping apiserver and cleaning up
 		// after itself, including shutting down its storage layer.
 		close(stopCh)
-		if len(result.TmpDir) != 0 {
-			os.RemoveAll(result.TmpDir)
+
+		// If the apiserver was started, let's wait for it to
+		// shutdown clearly.
+		if errCh != nil {
+			err, ok := <-errCh
+			if ok && err != nil {
+				klog.Errorf("Failed to shutdown test server clearly: %v", err)
+			}
 		}
+		os.RemoveAll(result.TmpDir)
 	}
 	defer func() {
 		if result.TearDownFn == nil {
 			tearDown()
 		}
 	}()
-
-	result.TmpDir, err = os.MkdirTemp("", "kubernetes-kube-apiserver")
-	if err != nil {
-		return result, fmt.Errorf("failed to create temp dir: %v", err)
-	}
 
 	fs := pflag.NewFlagSet("test", pflag.PanicOnError)
 
@@ -209,8 +219,9 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 		server.GenericAPIServer.StorageVersionManager = instanceOptions.StorageVersionWrapFunc(server.GenericAPIServer.StorageVersionManager)
 	}
 
-	errCh := make(chan error)
+	errCh = make(chan error)
 	go func(stopCh <-chan struct{}) {
+		defer close(errCh)
 		prepared, err := server.PrepareRun()
 		if err != nil {
 			errCh <- err
@@ -302,7 +313,10 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 	result.ClientConfig.QPS = 1000
 	result.ClientConfig.Burst = 10000
 	result.ServerOpts = s
-	result.TearDownFn = tearDown
+	result.TearDownFn = func() {
+		tearDown()
+		etcdClient.Close()
+	}
 	result.EtcdClient = etcdClient
 	result.EtcdStoragePrefix = storageConfig.Prefix
 
