@@ -90,4 +90,8 @@ func TestKubeletDirs(t *testing.T) {
 	got = kubelet.getPodResourcesDir()
 	exp = filepath.Join(root, "pod-resources")
 	assert.Equal(t, exp, got)
+
+	got = kubelet.getRootDir()
+	exp = filepath.Join(root)
+	assert.Equal(t, exp, got)
 }
