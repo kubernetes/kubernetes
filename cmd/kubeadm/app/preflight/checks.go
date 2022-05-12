@@ -279,7 +279,7 @@ func (fac FileAvailableCheck) Name() string {
 
 // Check validates if the given file does not already exist.
 func (fac FileAvailableCheck) Check() (warnings, errorList []error) {
-	klog.V(1).Infof("validating the existence of file %s", fac.Path)
+	klog.V(1).Infof("validating the existence of file %s, expect not exist", fac.Path)
 
 	if _, err := os.Stat(fac.Path); err == nil {
 		return nil, []error{errors.Errorf("%s already exists", fac.Path)}
@@ -303,7 +303,7 @@ func (fac FileExistingCheck) Name() string {
 
 // Check validates if the given file already exists.
 func (fac FileExistingCheck) Check() (warnings, errorList []error) {
-	klog.V(1).Infof("validating the existence of file %s", fac.Path)
+	klog.V(1).Infof("validating the existence of file %s, expect exist", fac.Path)
 
 	if _, err := os.Stat(fac.Path); err != nil {
 		return nil, []error{errors.Errorf("%s doesn't exist", fac.Path)}
