@@ -678,15 +678,7 @@ var (
 	// see https://github.com/kubernetes/enhancements/tree/master/keps/sig-architecture/3136-beta-apis-off-by-default
 	// for more details.
 	legacyBetaEnabledByDefaultResources = []schema.GroupVersionResource{
-		autoscalingapiv2beta1.SchemeGroupVersion.WithResource("horizontalpodautoscalers"), // remove in 1.25
 		autoscalingapiv2beta2.SchemeGroupVersion.WithResource("horizontalpodautoscalers"), // remove in 1.26
-		batchapiv1beta1.SchemeGroupVersion.WithResource("cronjobs"),                       // remove in 1.25
-		discoveryv1beta1.SchemeGroupVersion.WithResource("endpointslices"),                // remove in 1.25
-		eventsv1beta1.SchemeGroupVersion.WithResource("events"),                           // remove in 1.25
-		nodev1beta1.SchemeGroupVersion.WithResource("runtimeclasses"),                     // remove in 1.25
-		policyapiv1beta1.SchemeGroupVersion.WithResource("poddisruptionbudgets"),          // remove in 1.25
-		policyapiv1beta1.SchemeGroupVersion.WithResource("podsecuritypolicies"),           // remove in 1.25
-		storageapiv1beta1.SchemeGroupVersion.WithResource("csinodes"),                     // remove in 1.25
 		storageapiv1beta1.SchemeGroupVersion.WithResource("csistoragecapacities"),         // remove in 1.27
 		flowcontrolv1beta1.SchemeGroupVersion.WithResource("flowschemas"),                 // remove in 1.26
 		flowcontrolv1beta1.SchemeGroupVersion.WithResource("prioritylevelconfigurations"), // remove in 1.26
