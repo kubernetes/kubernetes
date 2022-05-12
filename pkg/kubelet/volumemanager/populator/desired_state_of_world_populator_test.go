@@ -1293,6 +1293,13 @@ func (p *fakePodStateProvider) ShouldPodRuntimeBeRemoved(uid kubetypes.UID) bool
 	return ok
 }
 
+type fakeReconciler struct {
+}
+
+func (rc *fakeReconciler) SyncStates(_ types.UniquePodName) {
+
+}
+
 func createDswpWithVolumeWithCustomPluginMgr(t *testing.T, pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim,
 	fakeVolumePluginMgr *volume.VolumePluginMgr) (*desiredStateOfWorldPopulator, kubepod.Manager, cache.DesiredStateOfWorld, *containertest.FakeRuntime, *fakePodStateProvider) {
 	fakeClient := &fake.Clientset{}
@@ -1330,5 +1337,7 @@ func createDswpWithVolumeWithCustomPluginMgr(t *testing.T, pv *v1.PersistentVolu
 		intreeToCSITranslator:    csiTranslator,
 		volumePluginMgr:          fakeVolumePluginMgr,
 	}
+
+	dswp.InitPodReconstructer(&fakeReconciler{})
 	return dswp, fakePodManager, fakesDSW, fakeRuntime, fakeStateProvider
 }

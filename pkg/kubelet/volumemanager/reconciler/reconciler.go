@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"io/fs"
+	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -70,6 +71,9 @@ type Reconciler interface {
 	// StatesHasBeenSynced returns true only after syncStates process starts to sync
 	// states at least once after kubelet starts
 	StatesHasBeenSynced() bool
+
+	// SyncStates reconstruct one pod
+	SyncStates(podName volumetypes.UniquePodName)
 }
 
 // NewReconciler returns a new instance of Reconciler.
@@ -122,6 +126,7 @@ func NewReconciler(
 		volumePluginMgr:               volumePluginMgr,
 		kubeletPodsDir:                kubeletPodsDir,
 		timeOfLastSync:                time.Time{},
+		syncPodState:                  make(chan volumetypes.UniquePodName),
 	}
 }
 
@@ -140,6 +145,7 @@ type reconciler struct {
 	volumePluginMgr               *volumepkg.VolumePluginMgr
 	kubeletPodsDir                string
 	timeOfLastSync                time.Time
+	syncPodState                  chan volumetypes.UniquePodName
 }
 
 func (rc *reconciler) Run(stopCh <-chan struct{}) {
@@ -161,6 +167,8 @@ func (rc *reconciler) reconciliationLoopFunc() func() {
 }
 
 func (rc *reconciler) reconcile() {
+	rc.trySyncStates()
+
 	// Unmounts are triggered before mounts so that a volume that was
 	// referenced by a pod that was deleted and is now referenced by another
 	// pod is unmounted from the first pod before being mounted to the new
@@ -334,7 +342,7 @@ func (rc *reconciler) unmountDetachDevices() {
 // it will try to clean up the mount paths with operation executor.
 func (rc *reconciler) sync() {
 	defer rc.updateLastSyncTime()
-	rc.syncStates()
+	rc.syncStates("")
 }
 
 func (rc *reconciler) updateLastSyncTime() {
@@ -366,14 +374,29 @@ type reconstructedVolume struct {
 	blockVolumeMapper   volumepkg.BlockVolumeMapper
 }
 
+func (rc *reconciler) SyncStates(podName volumetypes.UniquePodName) {
+	rc.syncPodState <- podName
+}
+
+func (rc *reconciler) trySyncStates() {
+	for {
+		select {
+		case podName := <-rc.syncPodState:
+			rc.syncStates(podName)
+		default:
+			return
+		}
+	}
+}
+
 // syncStates scans the volume directories under the given pod directory.
 // If the volume is not in desired state of world, this function will reconstruct
 // the volume related information and put it in both the actual and desired state of worlds.
 // For some volume plugins that cannot support reconstruction, it will clean up the existing
 // mount points since the volume is no long needed (removed from desired state)
-func (rc *reconciler) syncStates() {
+func (rc *reconciler) syncStates(podName volumetypes.UniquePodName) {
 	// Get volumes information by reading the pod's directory
-	podVolumes, err := getVolumesFromPodDir(rc.kubeletPodsDir)
+	podVolumes, err := getVolumesFromPodDir(rc.kubeletPodsDir, podName)
 	if err != nil {
 		klog.ErrorS(err, "Cannot get volumes from disk, skip sync states for volume reconstruction")
 		return
@@ -386,7 +409,11 @@ func (rc *reconciler) syncStates() {
 			// There is nothing to reconstruct
 			continue
 		}
-		volumeInDSW := rc.desiredStateOfWorld.VolumeExistsWithSpecName(volume.podName, volume.volumeSpecName)
+
+		volumeInDSW := false
+		if podName == "" {
+			volumeInDSW = rc.desiredStateOfWorld.VolumeExistsWithSpecName(volume.podName, volume.volumeSpecName)
+		}
 
 		reconstructedVolume, err := rc.reconstructVolume(volume)
 		if err != nil {
@@ -674,11 +701,26 @@ func (rc *reconciler) updateStates(volumesNeedUpdate map[v1.UniqueVolumeName]*re
 // getVolumesFromPodDir scans through the volumes directories under the given pod directory.
 // It returns a list of pod volume information including pod's uid, volume's plugin name, mount path,
 // and volume spec name.
-func getVolumesFromPodDir(podDir string) ([]podVolume, error) {
-	podsDirInfo, err := os.ReadDir(podDir)
-	if err != nil {
-		return nil, err
+func getVolumesFromPodDir(podDir string, filterPodName volumetypes.UniquePodName) ([]podVolume, error) {
+	var (
+		podsDirInfo []fs.FileInfo
+		errPodsInfo error
+	)
+
+	if filterPodName != "" {
+		if podDirInfo, err := os.Stat(path.Join(podDir, string(filterPodName))); err == nil {
+			podsDirInfo = append(podsDirInfo, podDirInfo)
+		} else {
+			errPodsInfo = err
+		}
+	} else {
+		podsDirInfo, errPodsInfo = ioutil.ReadDir(podDir)
 	}
+
+	if errPodsInfo != nil {
+		return nil, errPodsInfo
+	}
+
 	volumes := []podVolume{}
 	for i := range podsDirInfo {
 		if !podsDirInfo[i].IsDir() {
@@ -697,8 +739,9 @@ func getVolumesFromPodDir(podDir string) ([]podVolume, error) {
 		volumesDirs[v1.PersistentVolumeBlock] = path.Join(podDir, config.DefaultKubeletVolumeDevicesDirName)
 
 		for volumeMode, volumesDir := range volumesDirs {
-			var volumesDirInfo []fs.DirEntry
-			if volumesDirInfo, err = os.ReadDir(volumesDir); err != nil {
+			var volumesDirInfo []os.FileInfo
+			var err error
+			if volumesDirInfo, err = ioutil.ReadDir(volumesDir); err != nil {
 				// Just skip the loop because given volumesDir doesn't exist depending on volumeMode
 				continue
 			}

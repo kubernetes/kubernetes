@@ -228,6 +228,8 @@ func NewVolumeManager(
 		volumePluginMgr,
 		kubeletPodsDir)
 
+	vm.desiredStateOfWorldPopulator.InitPodReconstructer(vm.reconciler)
+
 	return vm
 }
 

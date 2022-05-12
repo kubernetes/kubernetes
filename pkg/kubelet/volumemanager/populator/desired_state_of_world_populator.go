@@ -66,6 +66,12 @@ type DesiredStateOfWorldPopulator interface {
 	// a chance many or all pods are missing from the list of active pods and
 	// so few to none will have been added.
 	HasAddedPods() bool
+
+	InitPodReconstructer(podReconstruct podReconstructer)
+}
+
+type podReconstructer interface {
+	SyncStates(podName volumetypes.UniquePodName)
 }
 
 // podStateProvider can determine if a pod is going to be terminated.
@@ -133,11 +139,16 @@ type desiredStateOfWorldPopulator struct {
 	csiMigratedPluginManager  csimigration.PluginManager
 	intreeToCSITranslator     csimigration.InTreeToCSITranslator
 	volumePluginMgr           *volume.VolumePluginMgr
+	podReconstruct            podReconstructer
 }
 
 type processedPods struct {
 	processedPods map[volumetypes.UniquePodName]bool
 	sync.RWMutex
+}
+
+func (dswp *desiredStateOfWorldPopulator) InitPodReconstructer(podReconstruct podReconstructer) {
+	dswp.podReconstruct = podReconstruct
 }
 
 func (dswp *desiredStateOfWorldPopulator) Run(sourcesReady config.SourcesReady, stopCh <-chan struct{}) {
@@ -207,6 +218,7 @@ func (dswp *desiredStateOfWorldPopulator) findAndAddNewPods() {
 // Iterate through all pods in desired state of world, and remove if they no
 // longer exist
 func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
+	reconsturctPodNames := map[volumetypes.UniquePodName]struct{}{}
 	for _, volumeToMount := range dswp.desiredStateOfWorld.GetVolumesToMount() {
 		pod, podExists := dswp.podManager.GetPodByUID(volumeToMount.Pod.UID)
 		if podExists {
@@ -246,14 +258,21 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 			volumeToMountSpecName = volumeToMount.VolumeSpec.Name()
 		}
 		removed := dswp.actualStateOfWorld.PodRemovedFromVolume(volumeToMount.PodName, volumeToMount.VolumeName)
-		if removed && podExists {
-			klog.V(4).InfoS("Actual state does not yet have volume mount information and pod still exists in pod manager, skip removing volume from desired state", "pod", klog.KObj(volumeToMount.Pod), "podUID", volumeToMount.Pod.UID, "volumeName", volumeToMountSpecName)
-			continue
+		if removed {
+			if podExists {
+				klog.V(4).InfoS("Actual state does not yet have volume mount information and pod still exists in pod manager, skip removing volume from desired state", "pod", klog.KObj(volumeToMount.Pod), "podUID", volumeToMount.Pod.UID, "volumeName", volumeToMountSpecName)
+				continue
+			}
+			if _, ok := reconsturctPodNames[volumeToMount.PodName]; !ok {
+				reconsturctPodNames[volumeToMount.PodName] = struct{}{}
+				dswp.podReconstruct.SyncStates(volumeToMount.PodName)
+			}
 		}
 		klog.V(4).InfoS("Removing volume from desired state", "pod", klog.KObj(volumeToMount.Pod), "podUID", volumeToMount.Pod.UID, "volumeName", volumeToMountSpecName)
 
 		dswp.desiredStateOfWorld.DeletePodFromVolume(
 			volumeToMount.PodName, volumeToMount.VolumeName)
+
 		dswp.deleteProcessedPod(volumeToMount.PodName)
 	}
 
