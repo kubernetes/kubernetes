@@ -521,8 +521,12 @@ func TestTransformationFailure(t *testing.T) {
 }
 
 func TestList(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RemainingItemCount, true)()
 	ctx, store, _ := testSetup(t)
+	RunTestList(ctx, t, store)
+}
+
+func RunTestList(ctx context.Context, t *testing.T, store storage.Interface) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RemainingItemCount, true)()
 
 	initialRV, preset, err := seedMultiLevelData(ctx, store)
 	if err != nil {
@@ -964,8 +968,12 @@ func TestList(t *testing.T) {
 }
 
 func TestListWithoutPaging(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RemainingItemCount, true)()
 	ctx, store, _ := testSetup(t, withoutPaging())
+	RunTestListWithoutPaging(ctx, t, store)
+}
+
+func RunTestListWithoutPaging(ctx context.Context, t *testing.T, store storage.Interface) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RemainingItemCount, true)()
 
 	_, preset, err := seedMultiLevelData(ctx, store)
 	if err != nil {
