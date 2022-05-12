@@ -267,7 +267,7 @@ func TestQuantityParse(t *testing.T) {
 		{"2P", decQuantity(2, 15, DecimalSI)},
 		{"1E", decQuantity(1, 18, DecimalSI)},
 
-		// Decimal exponents
+		// Integer exponents
 		{"1E-3", decQuantity(1, -3, DecimalExponent)},
 		{"1e3", decQuantity(1, 3, DecimalExponent)},
 		{"1E6", decQuantity(1, 6, DecimalExponent)},
@@ -491,6 +491,37 @@ func TestQuantityParse(t *testing.T) {
 		"1i",
 		"-3.01i",
 		"-3.01e-",
+
+		// Exponents with decimals are not permitted
+		// - full form
+		"1e1.0",
+		"1e-1.0",
+		"1E1.0",
+		"1E-1.0",
+		"1e1.1",
+		"1e-1.1",
+		"1E1.1",
+		"1E-1.1",
+
+		// leading dot
+		"1e.0",
+		"1e-.0",
+		"1E.0",
+		"1E-.0",
+		"1e.1",
+		"1e-.1",
+		"1E.1",
+		"1E-.1",
+
+		// trailing dot
+		"1e0.",
+		"1e-0.",
+		"1E0.",
+		"1E-0.",
+		"1e1.",
+		"1e-1.",
+		"1E1.",
+		"1E-1.",
 
 		// trailing whitespace is forbidden
 		" 1",
