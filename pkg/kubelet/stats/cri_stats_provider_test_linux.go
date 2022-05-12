@@ -19,6 +19,12 @@ limitations under the License.
 
 package stats
 
+import (
+	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	"github.com/stretchr/testify/assert"
+	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
+)
+
 func checkCRIPodCPUAndMemoryStatsHelperMethod(assert *assert.Assertions, actual statsapi.PodStats, cs *cadvisorapiv2.ContainerStats) {
 	return
 }
