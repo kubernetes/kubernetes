@@ -156,6 +156,15 @@ func TestCleanScope(t *testing.T) {
 			expectedScope: "resource",
 		},
 		{
+			name: "POST resource scope",
+			requestInfo: &request.RequestInfo{
+				Verb:              "create",
+				Namespace:         "my-namespace",
+				IsResourceRequest: false,
+			},
+			expectedScope: "resource",
+		},
+		{
 			name: "namespace scope",
 			requestInfo: &request.RequestInfo{
 				Namespace:         "my-namespace",
