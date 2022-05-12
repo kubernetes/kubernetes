@@ -100,7 +100,18 @@ func CreateSingleUseGrpcTunnel(ctx context.Context, address string, opts ...grpc
 }
 
 func (t *grpcTunnel) serve(c clientConn) {
-	defer c.Close()
+	defer func() {
+		c.Close()
+
+		// A connection in t.conns after serve() returns means
+		// we never received a CLOSE_RSP for it, so we need to
+		// close any channels remaining for these connections.
+		t.connsLock.Lock()
+		for _, conn := range t.conns {
+			close(conn.readCh)
+		}
+		t.connsLock.Unlock()
+	}()
 
 	for {
 		pkt, err := t.stream.Recv()
