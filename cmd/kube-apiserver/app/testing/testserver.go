@@ -35,7 +35,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/apiserver/pkg/storageversion"
 	"k8s.io/client-go/kubernetes"
@@ -59,8 +58,6 @@ type TearDownFunc func()
 
 // TestServerInstanceOptions Instance options the TestServer
 type TestServerInstanceOptions struct {
-	// DisableStorageCleanup Disable the automatic storage cleanup
-	DisableStorageCleanup bool
 	// Enable cert-auth for the kube-apiserver
 	EnableCertAuth bool
 	// Wrap the storage version interface of the created server's generic server.
@@ -87,8 +84,7 @@ type Logger interface {
 // NewDefaultTestServerOptions Default options for TestServer instances
 func NewDefaultTestServerOptions() *TestServerInstanceOptions {
 	return &TestServerInstanceOptions{
-		DisableStorageCleanup: false,
-		EnableCertAuth:        true,
+		EnableCertAuth: true,
 	}
 }
 
@@ -103,18 +99,10 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 		instanceOptions = NewDefaultTestServerOptions()
 	}
 
-	// TODO : Remove TrackStorageCleanup below when PR
-	// https://github.com/kubernetes/kubernetes/pull/50690
-	// merges as that shuts down storage properly
-	if !instanceOptions.DisableStorageCleanup {
-		registry.TrackStorageCleanup()
-	}
-
 	stopCh := make(chan struct{})
 	tearDown := func() {
-		if !instanceOptions.DisableStorageCleanup {
-			registry.CleanupStorage()
-		}
+		// Closing stopCh is stopping apiserver and cleaning up
+		// after itself, including shutting down its storage layer.
 		close(stopCh)
 		if len(result.TmpDir) != 0 {
 			os.RemoveAll(result.TmpDir)
