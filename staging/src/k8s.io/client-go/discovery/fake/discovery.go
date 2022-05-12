@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/version"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/openapi"
 	kubeversion "k8s.io/client-go/pkg/version"
 	restclient "k8s.io/client-go/rest"
@@ -83,13 +84,17 @@ func (c *FakeDiscovery) ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav
 // ServerPreferredResources returns the supported resources with the version
 // preferred by the server.
 func (c *FakeDiscovery) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
-	return nil, nil
+	_, sgs, err := c.ServerGroupsAndResources()
+	return sgs, err
 }
 
 // ServerPreferredNamespacedResources returns the supported namespaced resources
 // with the version preferred by the server.
 func (c *FakeDiscovery) ServerPreferredNamespacedResources() ([]*metav1.APIResourceList, error) {
-	return nil, nil
+	all, err := c.ServerPreferredResources()
+	return discovery.FilteredBy(discovery.ResourcePredicateFunc(func(groupVersion string, r *metav1.APIResource) bool {
+		return r.Namespaced
+	}), all), err
 }
 
 // ServerGroups returns the supported groups, with information like supported
