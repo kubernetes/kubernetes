@@ -80,11 +80,11 @@ type GaugeVecMetric interface {
 	// In contrast, the Vec behavior in this package is that member extraction before registration
 	// returns a permanent noop object.
 
-	// WithLabelValuesChecked, if called on a hidden vector,
-	// will return a noop gauge and a nil error.
-	// If called before this vector has been registered in
+	// WithLabelValuesChecked, if called before this vector has been registered in
 	// at least one registry, will return a noop gauge and
 	// an error that passes ErrIsNotRegistered.
+	// If called on a hidden vector,
+	// will return a noop gauge and a nil error.
 	// If called with a syntactic problem in the labels, will
 	// return a noop gauge and an error about the labels.
 	// If none of the above apply, this method will return
@@ -98,11 +98,11 @@ type GaugeVecMetric interface {
 	// all other errors cause a panic.
 	WithLabelValues(labelValues ...string) GaugeMetric
 
-	// WithChecked, if called on a hidden vector,
-	// will return a noop gauge and a nil error.
-	// If called before this vector has been registered in
+	// WithChecked, if called before this vector has been registered in
 	// at least one registry, will return a noop gauge and
 	// an error that passes ErrIsNotRegistered.
+	// If called on a hidden vector,
+	// will return a noop gauge and a nil error.
 	// If called with a syntactic problem in the labels, will
 	// return a noop gauge and an error about the labels.
 	// If none of the above apply, this method will return

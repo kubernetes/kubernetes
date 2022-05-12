@@ -24,10 +24,16 @@ import (
 	promext "k8s.io/component-base/metrics/prometheusextension"
 )
 
-// TimingHistogram is our internal representation for our wrapping struct around timing
-// histograms. It implements both kubeCollector and GaugeMetric
-type TimingHistogram struct {
+// PrometheusTimingHistogram is the abstraction of the underlying histogram
+// that we want to promote from the wrapper.
+type PrometheusTimingHistogram interface {
 	GaugeMetric
+}
+
+// TimingHistogram is our internal representation for our wrapping struct around
+// timing histograms. It implements both kubeCollector and GaugeMetric
+type TimingHistogram struct {
+	PrometheusTimingHistogram
 	*TimingHistogramOpts
 	nowFunc func() time.Time
 	lazyMetric
@@ -60,7 +66,7 @@ func NewTestableTimingHistogram(nowFunc func() time.Time, opts *TimingHistogramO
 
 // setPrometheusHistogram sets the underlying KubeGauge object, i.e. the thing that does the measurement.
 func (h *TimingHistogram) setPrometheusHistogram(histogram promext.TimingHistogram) {
-	h.GaugeMetric = histogram
+	h.PrometheusTimingHistogram = histogram
 	h.initSelfCollection(histogram)
 }
 
@@ -90,7 +96,7 @@ func (h *TimingHistogram) initializeDeprecatedMetric() {
 
 // WithContext allows the normal TimingHistogram metric to pass in context. The context is no-op now.
 func (h *TimingHistogram) WithContext(ctx context.Context) GaugeMetric {
-	return h.GaugeMetric
+	return h.PrometheusTimingHistogram
 }
 
 // TimingHistogramVec is the internal representation of our wrapping struct around prometheus
@@ -151,20 +157,20 @@ func (v *TimingHistogramVec) initializeDeprecatedMetric() {
 	v.initializeMetric()
 }
 
-// WithLabelValuesChecked, if called on a hidden vector,
-// will return a noop gauge and a nil error.
-// If called before this vector has been registered in
+// WithLabelValuesChecked, if called before this vector has been registered in
 // at least one registry, will return a noop gauge and
 // an error that passes ErrIsNotRegistered.
+// If called on a hidden vector,
+// will return a noop gauge and a nil error.
 // If called with a syntactic problem in the labels, will
 // return a noop gauge and an error about the labels.
 // If none of the above apply, this method will return
 // the appropriate vector member and a nil error.
 func (v *TimingHistogramVec) WithLabelValuesChecked(lvs ...string) (GaugeMetric, error) {
-	if v.IsHidden() {
-		return noop, nil
-	}
 	if !v.IsCreated() {
+		if v.IsHidden() {
+			return noop, nil
+		}
 		return noop, errNotRegistered
 	}
 	if v.LabelValueAllowLists != nil {
@@ -187,20 +193,20 @@ func (v *TimingHistogramVec) WithLabelValues(lvs ...string) GaugeMetric {
 	panic(err)
 }
 
-// WithChecked, if called on a hidden vector,
-// will return a noop gauge and a nil error.
-// If called before this vector has been registered in
+// WithChecked, if called before this vector has been registered in
 // at least one registry, will return a noop gauge and
 // an error that passes ErrIsNotRegistered.
+// If called on a hidden vector,
+// will return a noop gauge and a nil error.
 // If called with a syntactic problem in the labels, will
 // return a noop gauge and an error about the labels.
 // If none of the above apply, this method will return
 // the appropriate vector member and a nil error.
 func (v *TimingHistogramVec) WithChecked(labels map[string]string) (GaugeMetric, error) {
-	if v.IsHidden() {
-		return noop, nil
-	}
 	if !v.IsCreated() {
+		if v.IsHidden() {
+			return noop, nil
+		}
 		return noop, errNotRegistered
 	}
 	if v.LabelValueAllowLists != nil {
