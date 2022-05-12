@@ -23,24 +23,18 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 )
 
-var _ = SIGDescribe("Downward API [Serial] [Disruptive] [NodeFeature:EphemeralStorage]", func() {
+var _ = SIGDescribe("Downward API [Serial] [Disruptive] [Feature:EphemeralStorage]", func() {
 	f := framework.NewDefaultFramework("downward-api")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Context("Downward API tests for local ephemeral storage", func() {
-		ginkgo.BeforeEach(func() {
-			e2eskipper.SkipUnlessFeatureGateEnabled(kubefeatures.LocalStorageCapacityIsolation)
-		})
-
 		ginkgo.It("should provide container's limits.ephemeral-storage and requests.ephemeral-storage as env vars", func() {
 			podName := "downward-api-" + string(uuid.NewUUID())
 			env := []v1.EnvVar{
