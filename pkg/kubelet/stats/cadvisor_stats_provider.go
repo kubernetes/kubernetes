@@ -125,7 +125,17 @@ func (p *cadvisorStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 			// the user and has network stats.
 			podStats.Network = cadvisorInfoToNetworkStats(&cinfo)
 		} else {
-			podStats.Containers = append(podStats.Containers, *cadvisorInfoToContainerStats(containerName, &cinfo, &rootFsInfo, &imageFsInfo))
+			containerStat := cadvisorInfoToContainerStats(containerName, &cinfo, &rootFsInfo, &imageFsInfo)
+			// NOTE: This doesn't support the old pod log path, `/var/log/pods/UID`. For containers
+			// using old log path, they will be populated by cadvisorInfoToContainerStats.
+			podUID := types.UID(podStats.PodRef.UID)
+			logs, err := p.hostStatsProvider.getPodContainerLogStats(podStats.PodRef.Namespace, podStats.PodRef.Name, podUID, containerName, &rootFsInfo)
+			if err != nil {
+				klog.ErrorS(err, "Unable to fetch container log stats", "containerName", containerName)
+			} else {
+				containerStat.Logs = logs
+			}
+			podStats.Containers = append(podStats.Containers, *containerStat)
 		}
 	}
 
