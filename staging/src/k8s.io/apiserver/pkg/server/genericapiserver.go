@@ -411,17 +411,6 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 	}
 	s.installReadyz()
 
-	// Register audit backend preShutdownHook.
-	if s.AuditBackend != nil {
-		err := s.AddPreShutdownHook("audit-backend", func() error {
-			s.AuditBackend.Shutdown()
-			return nil
-		})
-		if err != nil {
-			klog.Errorf("Failed to add pre-shutdown hook for audit-backend %s", err)
-		}
-	}
-
 	return preparedGenericAPIServer{s}
 }
 
@@ -439,21 +428,31 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 //           |                                                       |
 //  AfterShutdownDelayDuration (delayedStopCh)   PreShutdownHooksStopped (preShutdownHooksHasStoppedCh)
 //           |                                                       |
-//           |----------------------------------                     |
-//           |                                  |                    |
-//           |                       (HandlerChainWaitGroup::Wait)   |
-//           |                                  |                    |
-//           |                  InFlightRequestsDrained (drainedCh)  |
-//           |                                  |                    |
-// [without ShutdownSendRetryAfter]  [with ShutdownSendRetryAfter]   |
-//           |                                  |                    |
-//           ---------------------------------------------------------
-//                                     |
-//                              stopHttpServerCh
-//                                     |
-//                             listenerStoppedCh
-//                                     |
-//             HTTPServerStoppedListening (httpServerStoppedListeningCh)
+//           |-------------------------------------------------------|
+//                                    |
+//                                    |
+//               NotAcceptingNewRequest (notAcceptingNewRequestCh)
+//                                    |
+//                                    |
+//           |---------------------------------------------------------|
+//           |                        |              |                 |
+//        [without                 [with             |                 |
+// ShutdownSendRetryAfter]  ShutdownSendRetryAfter]  |                 |
+//           |                        |              |                 |
+//           |                        ---------------|                 |
+//           |                                       |                 |
+//           |                         (HandlerChainWaitGroup::Wait)   |
+//           |                                       |                 |
+//           |                    InFlightRequestsDrained (drainedCh)  |
+//           |                                       |                 |
+//           ----------------------------------------|-----------------|
+//                                 |                 |
+//                       stopHttpServerCh     (AuditBackend::Shutdown())
+//                                 |
+//                       listenerStoppedCh
+//                                 |
+//      HTTPServerStoppedListening (httpServerStoppedListeningCh)
+//
 func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 	delayedStopCh := s.lifecycleSignals.AfterShutdownDelayDuration
 	shutdownInitiatedCh := s.lifecycleSignals.ShutdownInitiated
@@ -494,8 +493,6 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 	}()
 
 	// close socket after delayed stopCh
-	drainedCh := s.lifecycleSignals.InFlightRequestsDrained
-	delayedStopOrDrainedCh := delayedStopCh.Signaled()
 	shutdownTimeout := s.ShutdownTimeout
 	if s.ShutdownSendRetryAfter {
 		// when this mode is enabled, we do the following:
@@ -504,19 +501,22 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 		// - once drained, http Server Shutdown is invoked with a timeout of 2s,
 		//   net/http waits for 1s for the peer to respond to a GO_AWAY frame, so
 		//   we should wait for a minimum of 2s
-		delayedStopOrDrainedCh = drainedCh.Signaled()
 		shutdownTimeout = 2 * time.Second
 		klog.V(1).InfoS("[graceful-termination] using HTTP Server shutdown timeout", "ShutdownTimeout", shutdownTimeout)
 	}
 
-	// pre-shutdown hooks need to finish before we stop the http server
-	preShutdownHooksHasStoppedCh := s.lifecycleSignals.PreShutdownHooksStopped
+	notAcceptingNewRequestCh := s.lifecycleSignals.NotAcceptingNewRequest
+	drainedCh := s.lifecycleSignals.InFlightRequestsDrained
 	stopHttpServerCh := make(chan struct{})
 	go func() {
 		defer close(stopHttpServerCh)
 
-		<-delayedStopOrDrainedCh
-		<-preShutdownHooksHasStoppedCh.Signaled()
+		timeToStopHttpServerCh := notAcceptingNewRequestCh.Signaled()
+		if s.ShutdownSendRetryAfter {
+			timeToStopHttpServerCh = drainedCh.Signaled()
+		}
+
+		<-timeToStopHttpServerCh
 	}()
 
 	// Start the audit backend before any request comes in. This means we must call Backend.Run
@@ -540,12 +540,28 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 		klog.V(1).InfoS("[graceful-termination] shutdown event", "name", httpServerStoppedListeningCh.Name())
 	}()
 
+	// we don't accept new request as soon as both ShutdownDelayDuration has
+	// elapsed and preshutdown hooks have completed.
+	preShutdownHooksHasStoppedCh := s.lifecycleSignals.PreShutdownHooksStopped
 	go func() {
-		defer drainedCh.Signal()
-		defer klog.V(1).InfoS("[graceful-termination] shutdown event", "name", drainedCh.Name())
+		defer klog.V(1).InfoS("[graceful-termination] shutdown event", "name", notAcceptingNewRequestCh.Name())
+		defer notAcceptingNewRequestCh.Signal()
 
 		// wait for the delayed stopCh before closing the handler chain
 		<-delayedStopCh.Signaled()
+
+		// Additionally wait for preshutdown hooks to also be finished, as some of them need
+		// to send API calls to clean up after themselves (e.g. lease reconcilers removing
+		// itself from the active servers).
+		<-preShutdownHooksHasStoppedCh.Signaled()
+	}()
+
+	go func() {
+		defer klog.V(1).InfoS("[graceful-termination] shutdown event", "name", drainedCh.Name())
+		defer drainedCh.Signal()
+
+		// wait for the delayed stopCh before closing the handler chain (it rejects everything after Wait has been called).
+		<-notAcceptingNewRequestCh.Signaled()
 
 		// Wait for all requests to finish, which are bounded by the RequestTimeout variable.
 		// once HandlerChainWaitGroup.Wait is invoked, the apiserver is
@@ -578,11 +594,17 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 	if err != nil {
 		return err
 	}
-	klog.V(1).Info("[graceful-termination] RunPreShutdownHooks has completed")
 
 	// Wait for all requests in flight to drain, bounded by the RequestTimeout variable.
 	<-drainedCh.Signaled()
+
+	if s.AuditBackend != nil {
+		s.AuditBackend.Shutdown()
+		klog.V(1).InfoS("[graceful-termination] audit backend shutdown completed")
+	}
+
 	// wait for stoppedCh that is closed when the graceful termination (server.Shutdown) is finished.
+	<-listenerStoppedCh
 	<-stoppedCh
 
 	klog.V(1).Info("[graceful-termination] apiserver is exiting")
@@ -612,10 +634,6 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}, shutdow
 	go func() {
 		<-stopCh
 		close(internalStopCh)
-		if stoppedCh != nil {
-			<-stoppedCh
-		}
-		s.HandlerChainWaitGroup.Wait()
 	}()
 
 	s.RunPostStartHooks(stopCh)
