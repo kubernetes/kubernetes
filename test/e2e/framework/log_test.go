@@ -146,26 +146,18 @@ k8s.io/kubernetes/test/e2e/framework_test.runTests()
 		output.TestResult{
 			Name: "[Top Level] log error",
 			Output: `INFO: before
-FAIL: hard-coded error
-Unexpected error:
+INFO: Unexpected error: hard-coded error: 
     <*errors.errorString>: {
         s: "an error with a long, useless description",
     }
-    an error with a long, useless description
-occurred
+FAIL: hard-coded error: an error with a long, useless description
 
 Full Stack Trace
 k8s.io/kubernetes/test/e2e/framework_test.glob..func1.4()
 	log_test.go:64
 k8s.io/kubernetes/test/e2e/framework_test.runTests()
 	log_test.go:47` + commonOutput,
-			Failure: `hard-coded error
-Unexpected error:
-    <*errors.errorString>: {
-        s: "an error with a long, useless description",
-    }
-    an error with a long, useless description
-occurred`,
+			Failure: `hard-coded error: an error with a long, useless description`,
 			Stack: `k8s.io/kubernetes/test/e2e/framework_test.glob..func1.4()
 	log_test.go:64
 k8s.io/kubernetes/test/e2e/framework_test.runTests()

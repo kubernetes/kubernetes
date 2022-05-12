@@ -53,11 +53,11 @@ func runTests(t *testing.T, reporter ginkgo.Reporter) {
 
 var _ = ginkgo.Describe("pod", func() {
 	ginkgo.It("not found", func() {
-		framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(clientSet, "no-such-pod", "default", timeout), "wait for pod running")
+		framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(clientSet, "no-such-pod", "default", timeout /* no explanation here to cover that code path */))
 	})
 
 	ginkgo.It("not running", func() {
-		framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(clientSet, podName, podNamespace, timeout), "wait for pod running")
+		framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(clientSet, podName, podNamespace, timeout), "wait for pod %s running", podName /* tests printf formatting */)
 	})
 })
 
@@ -82,8 +82,7 @@ INFO: Ignoring NotFound error while getting pod default/no-such-pod
 INFO: Ignoring NotFound error while getting pod default/no-such-pod
 INFO: Ignoring NotFound error while getting pod default/no-such-pod
 INFO: Timed out while waiting for pod default/no-such-pod to be running. Last observed as:     <*v1.Pod>: nil
-FAIL: wait for pod running
-Unexpected error:
+INFO: Unexpected error: 
     <*fmt.wrapError>: {
         msg: "error while waiting for pod default/no-such-pod to be running: pods \"no-such-pod\" not found",
         err: {
@@ -103,8 +102,7 @@ Unexpected error:
             },
         },
     }
-    error while waiting for pod default/no-such-pod to be running: pods "no-such-pod" not found
-occurred
+FAIL: error while waiting for pod default/no-such-pod to be running: pods "no-such-pod" not found
 
 Full Stack Trace
 k8s.io/kubernetes/test/e2e/framework/pod_test.glob..func1.1()
@@ -113,29 +111,7 @@ k8s.io/kubernetes/test/e2e/framework/pod_test.runTests()
 	wait_test.go:51
 
 `,
-			Failure: `wait for pod running
-Unexpected error:
-    <*fmt.wrapError>: {
-        msg: "error while waiting for pod default/no-such-pod to be running: pods \"no-such-pod\" not found",
-        err: {
-            ErrStatus: {
-                TypeMeta: {Kind: "", APIVersion: ""},
-                ListMeta: {
-                    SelfLink: "",
-                    ResourceVersion: "",
-                    Continue: "",
-                    RemainingItemCount: nil,
-                },
-                Status: "Failure",
-                Message: "pods \"no-such-pod\" not found",
-                Reason: "NotFound",
-                Details: {Name: "no-such-pod", Group: "", Kind: "pods", UID: "", Causes: nil, RetryAfterSeconds: 0},
-                Code: 404,
-            },
-        },
-    }
-    error while waiting for pod default/no-such-pod to be running: pods "no-such-pod" not found
-occurred`,
+			Failure: `error while waiting for pod default/no-such-pod to be running: pods "no-such-pod" not found`,
 			Stack: `k8s.io/kubernetes/test/e2e/framework/pod_test.glob..func1.1()
 	wait_test.go:56
 k8s.io/kubernetes/test/e2e/framework/pod_test.runTests()
@@ -224,13 +200,11 @@ INFO: Timed out while waiting for pod default/pending-pod to be running. Last ob
             EphemeralContainerStatuses: nil,
         },
     }
-FAIL: wait for pod running
-Unexpected error:
+INFO: Unexpected error: wait for pod pending-pod running: 
     <*pod.timeoutError>: {
         msg: "timed out while waiting for pod default/pending-pod to be running",
     }
-    timed out while waiting for pod default/pending-pod to be running
-occurred
+FAIL: wait for pod pending-pod running: timed out while waiting for pod default/pending-pod to be running
 
 Full Stack Trace
 k8s.io/kubernetes/test/e2e/framework/pod_test.glob..func1.2()
@@ -239,13 +213,7 @@ k8s.io/kubernetes/test/e2e/framework/pod_test.runTests()
 	wait_test.go:51
 
 `,
-			Failure: `wait for pod running
-Unexpected error:
-    <*pod.timeoutError>: {
-        msg: "timed out while waiting for pod default/pending-pod to be running",
-    }
-    timed out while waiting for pod default/pending-pod to be running
-occurred`,
+			Failure: `wait for pod pending-pod running: timed out while waiting for pod default/pending-pod to be running`,
 			Stack: `k8s.io/kubernetes/test/e2e/framework/pod_test.glob..func1.2()
 	wait_test.go:60
 k8s.io/kubernetes/test/e2e/framework/pod_test.runTests()
