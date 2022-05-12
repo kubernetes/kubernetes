@@ -5623,7 +5623,7 @@ type NodeInclusionPolicy string
 const (
 	// NodeInclusionPolicyIgnore means ignore this scheduling directive when calculating pod topology spread skew.
 	NodeInclusionPolicyIgnore NodeInclusionPolicy = "Ignore"
-	// NodeInclusionPolicyHonor means use this scheduling policy when calculating pod topology spread skew.
+	// NodeInclusionPolicyHonor means use this scheduling directive when calculating pod topology spread skew.
 	NodeInclusionPolicyHonor NodeInclusionPolicy = "Honor"
 )
 
