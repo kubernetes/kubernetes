@@ -18,6 +18,7 @@ package testing
 
 import (
 	"context"
+	"fmt"
 	"path"
 	"reflect"
 	"testing"
@@ -169,5 +170,26 @@ func TestCheckStop(t *testing.T, w watch.Interface) {
 		}
 	case <-time.After(wait.ForeverTestTimeout):
 		t.Errorf("time out after waiting 1s on ResultChan")
+	}
+}
+
+// ResourceVersionNotOlderThan returns a function to validate resource versions. Resource versions
+// referring to points in logical time before the sentinel generate an error. All logical times as
+// new as the sentinel or newer generate no error.
+func ResourceVersionNotOlderThan(sentinel string) func(string) error {
+	return func(resourceVersion string) error {
+		objectVersioner := storage.APIObjectVersioner{}
+		actualRV, err := objectVersioner.ParseResourceVersion(resourceVersion)
+		if err != nil {
+			return err
+		}
+		expectedRV, err := objectVersioner.ParseResourceVersion(sentinel)
+		if err != nil {
+			return err
+		}
+		if actualRV < expectedRV {
+			return fmt.Errorf("expected a resourceVersion no smaller than than %d, but got %d", expectedRV, actualRV)
+		}
+		return nil
 	}
 }

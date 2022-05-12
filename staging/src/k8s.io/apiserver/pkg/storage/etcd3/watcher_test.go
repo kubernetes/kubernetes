@@ -234,7 +234,7 @@ func TestProgressNotify(t *testing.T) {
 	if err := store.Create(ctx, key, input, out, 0); err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
-	validateResourceVersion := resourceVersionNotOlderThan(out.ResourceVersion)
+	validateResourceVersion := storagetesting.ResourceVersionNotOlderThan(out.ResourceVersion)
 
 	opts := storage.ListOptions{
 		ResourceVersion: out.ResourceVersion,
@@ -275,25 +275,4 @@ type testCodec struct {
 
 func (c *testCodec) Decode(data []byte, defaults *schema.GroupVersionKind, into runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
 	return nil, nil, errTestingDecode
-}
-
-// resourceVersionNotOlderThan returns a function to validate resource versions. Resource versions
-// referring to points in logical time before the sentinel generate an error. All logical times as
-// new as the sentinel or newer generate no error.
-func resourceVersionNotOlderThan(sentinel string) func(string) error {
-	return func(resourceVersion string) error {
-		objectVersioner := storage.APIObjectVersioner{}
-		actualRV, err := objectVersioner.ParseResourceVersion(resourceVersion)
-		if err != nil {
-			return err
-		}
-		expectedRV, err := objectVersioner.ParseResourceVersion(sentinel)
-		if err != nil {
-			return err
-		}
-		if actualRV < expectedRV {
-			return fmt.Errorf("expected a resourceVersion no smaller than than %d, but got %d", expectedRV, actualRV)
-		}
-		return nil
-	}
 }
