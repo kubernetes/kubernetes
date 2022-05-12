@@ -170,7 +170,7 @@ func TestWatchDeleteEventObjectHaveLatestRV(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
-	rv, err := APIObjectVersioner{}.ObjectResourceVersion(storedObj)
+	rv, err := storage.APIObjectVersioner{}.ObjectResourceVersion(storedObj)
 	if err != nil {
 		t.Fatalf("failed to parse resourceVersion on stored object: %v", err)
 	}
@@ -282,7 +282,7 @@ func (c *testCodec) Decode(data []byte, defaults *schema.GroupVersionKind, into 
 // new as the sentinel or newer generate no error.
 func resourceVersionNotOlderThan(sentinel string) func(string) error {
 	return func(resourceVersion string) error {
-		objectVersioner := APIObjectVersioner{}
+		objectVersioner := storage.APIObjectVersioner{}
 		actualRV, err := objectVersioner.ParseResourceVersion(resourceVersion)
 		if err != nil {
 			return err
