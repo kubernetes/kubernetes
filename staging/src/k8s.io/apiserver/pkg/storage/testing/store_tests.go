@@ -21,12 +21,10 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"reflect"
 	"strconv"
 	"sync"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -701,28 +699,6 @@ func RunTestGuaranteedUpdateWithSuggestionAndConflict(ctx context.Context, t *te
 	}
 }
 
-// TestPropogateStore helps propagates store with objects, automates key generation, and returns
-// keys and stored objects.
-func TestPropogateStore(ctx context.Context, t *testing.T, store storage.Interface, obj *example.Pod) (string, *example.Pod) {
-	// Setup store with a key and grab the output for returning.
-	key := "/testkey"
-	return key, TestPropogateStoreWithKey(ctx, t, store, key, obj)
-}
-
-// TestPropogateStoreWithKey helps propagate store with objects, the given object will be stored at the specified key.
-func TestPropogateStoreWithKey(ctx context.Context, t *testing.T, store storage.Interface, key string, obj *example.Pod) *example.Pod {
-	// Setup store with the specified key and grab the output for returning.
-	err := store.Delete(ctx, key, &example.Pod{}, nil, storage.ValidateAllObjectFunc, nil)
-	if err != nil && !storage.IsNotFound(err) {
-		t.Fatalf("Cleanup failed: %v", err)
-	}
-	setOutput := &example.Pod{}
-	if err := store.Create(ctx, key, obj, setOutput, 0); err != nil {
-		t.Fatalf("Set failed: %v", err)
-	}
-	return setOutput
-}
-
 func RunTestCount(ctx context.Context, t *testing.T, store storage.Interface) {
 
 	resourceA := "/foo.bar.io/abc"
@@ -756,16 +732,5 @@ func RunTestCount(ctx context.Context, t *testing.T, store storage.Interface) {
 	// even though resourceA is a prefix of resourceB.
 	if int64(resourceACountExpected) != resourceACountGot {
 		t.Fatalf("store.Count for resource %s: expected %d but got %d", resourceA, resourceACountExpected, resourceACountGot)
-	}
-}
-
-func ExpectNoDiff(t *testing.T, msg string, expected, got interface{}) {
-	t.Helper()
-	if !reflect.DeepEqual(expected, got) {
-		if diff := cmp.Diff(expected, got); diff != "" {
-			t.Errorf("%s: %s", msg, diff)
-		} else {
-			t.Errorf("%s:\nexpected: %#v\ngot: %#v", msg, expected, got)
-		}
 	}
 }
