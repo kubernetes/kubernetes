@@ -141,10 +141,10 @@ func (v *GaugeVec) initializeDeprecatedMetric() {
 }
 
 func (v *GaugeVec) WithLabelValuesChecked(lvs ...string) (GaugeMetric, error) {
-	if v.IsHidden() {
-		return noop, nil
-	}
 	if !v.IsCreated() {
+		if v.IsHidden() {
+			return noop, nil
+		}
 		return noop, errNotRegistered // return no-op gauge
 	}
 	if v.LabelValueAllowLists != nil {
@@ -178,10 +178,10 @@ func (v *GaugeVec) WithLabelValues(lvs ...string) GaugeMetric {
 }
 
 func (v *GaugeVec) WithChecked(labels map[string]string) (GaugeMetric, error) {
-	if v.IsHidden() {
-		return noop, nil
-	}
 	if !v.IsCreated() {
+		if v.IsHidden() {
+			return noop, nil
+		}
 		return noop, errNotRegistered // return no-op gauge
 	}
 	if v.LabelValueAllowLists != nil {

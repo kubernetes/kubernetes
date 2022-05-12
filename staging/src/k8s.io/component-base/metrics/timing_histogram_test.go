@@ -102,8 +102,8 @@ func TestTimingHistogram(t *testing.T) {
 			}()
 			m1 := <-metricChan
 			gm1, ok := m1.(GaugeMetric)
-			if !ok || gm1 != c.GaugeMetric {
-				t.Error("Unexpected metric", m1, c.GaugeMetric)
+			if !ok || gm1 != c.PrometheusTimingHistogram {
+				t.Error("Unexpected metric", m1, c.PrometheusTimingHistogram)
 			}
 			m2, ok := <-metricChan
 			if ok {
