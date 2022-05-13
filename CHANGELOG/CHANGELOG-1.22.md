@@ -147,7 +147,7 @@
     - [Kubernetes release cadence change](#kubernetes-release-cadence-change)
     - [External credential providers](#external-credential-providers)
     - [Server-side Apply graduates to GA](#server-side-apply-graduates-to-ga)
-    - [Cluster Storage Interface graduations](#cluster-storage-interface-graduations)
+    - [Container Storage Interface graduations](#container-storage-interface-graduations)
     - [SIG Windows development tools](#sig-windows-development-tools)
     - [Deploy a more secure control plane with kubeadm](#deploy-a-more-secure-control-plane-with-kubeadm)
     - [etcd moves to version 3.5.0](#etcd-moves-to-version-350)
@@ -1191,7 +1191,7 @@ Related to this topic, the in-tree Azure and GCP authentication plugins have bee
 
 Server-side Apply is a new object merge algorithm, as well as tracking of field ownership, running on the Kubernetes API server. Server-side Apply helps users and controllers manage their resources via declarative configurations. It allows them to create and/or modify their objects declaratively, simply by sending their fully specified intent. After being in beta for a couple releases, [Server-side Apply](https://kubernetes.io/docs/reference/using-api/server-side-apply/) is now generally available.
 
-### Cluster Storage Interface graduations
+### Container Storage Interface graduations
 
 CSI support for Windows nodes moves to GA in the 1.22 release. In Kubernetes v1.22, Windows privileged containers are only an alpha feature. To allow using CSI storage on Windows nodes, [CSIProxy](https://github.com/kubernetes-csi/csi-proxy) enables CSI node plugins to be deployed as unprivileged pods, using the proxy to perform privileged storage operations on the node.
 
