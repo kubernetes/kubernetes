@@ -2295,4 +2295,4 @@ recursive-delete-patterns:
 - '*/BUILD.bazel'
 - Gopkg.toml
 - '*/.gitattributes'
-default-go-version: 1.18.1
+default-go-version: 1.18.2
