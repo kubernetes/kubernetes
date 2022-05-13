@@ -141,9 +141,11 @@ var (
 	imageConfigs, originalImageConfigs = initImageConfigs(registry)
 )
 
+type ImageID int
+
 const (
 	// None is to be used for unset/default images
-	None = iota
+	None ImageID = iota
 	// Agnhost image
 	Agnhost
 	// AgnhostPrivate image
@@ -229,8 +231,8 @@ const (
 	WindowsServer
 )
 
-func initImageConfigs(list RegistryList) (map[int]Config, map[int]Config) {
-	configs := map[int]Config{}
+func initImageConfigs(list RegistryList) (map[ImageID]Config, map[ImageID]Config) {
+	configs := map[ImageID]Config{}
 	configs[Agnhost] = Config{list.PromoterE2eRegistry, "agnhost", "2.36"}
 	configs[AgnhostPrivate] = Config{list.PrivateRegistry, "agnhost", "2.6"}
 	configs[AuthenticatedAlpine] = Config{list.GcAuthenticatedRegistry, "alpine", "3.7"}
@@ -274,7 +276,7 @@ func initImageConfigs(list RegistryList) (map[int]Config, map[int]Config) {
 	configs[VolumeRBDServer] = Config{list.PromoterE2eRegistry, "volume/rbd", "1.0.4"}
 	configs[WindowsServer] = Config{list.MicrosoftRegistry, "windows", "1809"}
 
-	// This adds more config entries. Those have no pre-defined index number,
+	// This adds more config entries. Those have no pre-defined ImageID number,
 	// but will be used via ReplaceRegistryInImageURL when deploying
 	// CSI drivers (test/e2e/storage/util/create.go).
 	appendCSIImageConfigs(configs)
@@ -290,8 +292,8 @@ func initImageConfigs(list RegistryList) (map[int]Config, map[int]Config) {
 
 // GetMappedImageConfigs returns the images if they were mapped to the provided
 // image repository.
-func GetMappedImageConfigs(originalImageConfigs map[int]Config, repo string) map[int]Config {
-	configs := make(map[int]Config)
+func GetMappedImageConfigs(originalImageConfigs map[ImageID]Config, repo string) map[ImageID]Config {
+	configs := make(map[ImageID]Config)
 	for i, config := range originalImageConfigs {
 		switch i {
 		case InvalidRegistryImage, AuthenticatedAlpine,
@@ -303,7 +305,7 @@ func GetMappedImageConfigs(originalImageConfigs map[int]Config, repo string) map
 			continue
 		}
 
-		// Build a new tag with a the index, a hash of the image spec (to be unique) and
+		// Build a new tag with the ImageID, a hash of the image spec (to be unique) and
 		// shorten and make the pull spec "safe" so it will fit in the tag
 		configs[i] = getRepositoryMappedConfig(i, config, repo)
 	}
@@ -316,11 +318,11 @@ var (
 )
 
 // getRepositoryMappedConfig maps an existing image to the provided repo, generating a
-// tag that is unique with the input config. The tag will contain the index, a hash of
+// tag that is unique with the input config. The tag will contain the imageID, a hash of
 // the image spec (to be unique) and shorten and make the pull spec "safe" so it will
-// fit in the tag to allow a human to recognize the value. If index is -1, then no
-// index will be added to the tag.
-func getRepositoryMappedConfig(index int, config Config, repo string) Config {
+// fit in the tag to allow a human to recognize the value. If imageID is None, then no
+// imageID will be added to the tag.
+func getRepositoryMappedConfig(imageID ImageID, config Config, repo string) Config {
 	parts := strings.SplitN(repo, "/", 2)
 	registry, name := parts[0], parts[1]
 
@@ -337,10 +339,10 @@ func getRepositoryMappedConfig(index int, config Config, repo string) Config {
 		shortName = shortName[len(shortName)-maxLength:]
 	}
 	var version string
-	if index == -1 {
+	if imageID == None {
 		version = fmt.Sprintf("e2e-%s-%s", shortName, hash)
 	} else {
-		version = fmt.Sprintf("e2e-%d-%s-%s", index, shortName, hash)
+		version = fmt.Sprintf("e2e-%d-%s-%s", imageID, shortName, hash)
 	}
 
 	return Config{
@@ -351,22 +353,22 @@ func getRepositoryMappedConfig(index int, config Config, repo string) Config {
 }
 
 // GetOriginalImageConfigs returns the configuration before any mapping rules.
-func GetOriginalImageConfigs() map[int]Config {
+func GetOriginalImageConfigs() map[ImageID]Config {
 	return originalImageConfigs
 }
 
 // GetImageConfigs returns the map of imageConfigs
-func GetImageConfigs() map[int]Config {
+func GetImageConfigs() map[ImageID]Config {
 	return imageConfigs
 }
 
 // GetConfig returns the Config object for an image
-func GetConfig(image int) Config {
+func GetConfig(image ImageID) Config {
 	return imageConfigs[image]
 }
 
 // GetE2EImage returns the fully qualified URI to an image (including version)
-func GetE2EImage(image int) string {
+func GetE2EImage(image ImageID) string {
 	return fmt.Sprintf("%s/%s:%s", imageConfigs[image].registry, imageConfigs[image].name, imageConfigs[image].version)
 }
 
@@ -394,10 +396,10 @@ func replaceRegistryInImageURLWithList(imageURL string, reg RegistryList) (strin
 	registryAndUser := strings.Join(parts[:countParts-1], "/")
 
 	if repo := os.Getenv("KUBE_TEST_REPO"); len(repo) > 0 {
-		index := -1
+		imageID := None
 		for i, v := range originalImageConfigs {
 			if v.GetE2EImage() == imageURL {
-				index = i
+				imageID = i
 				break
 			}
 		}
@@ -405,7 +407,7 @@ func replaceRegistryInImageURLWithList(imageURL string, reg RegistryList) (strin
 		if len(last) == 1 {
 			return "", fmt.Errorf("image %q is required to be in an image:tag format", imageURL)
 		}
-		config := getRepositoryMappedConfig(index, Config{
+		config := getRepositoryMappedConfig(imageID, Config{
 			registry: parts[0],
 			name:     strings.Join([]string{strings.Join(parts[1:countParts-1], "/"), last[0]}, "/"),
 			version:  last[1],

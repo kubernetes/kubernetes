@@ -24,7 +24,7 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/yaml"
-	"k8s.io/kubernetes/test/e2e/testing-manifests"
+	e2etestingmanifests "k8s.io/kubernetes/test/e2e/testing-manifests"
 )
 
 // All of the image tags are of the format k8s.gcr.io/sig-storage/hostpathplugin:v1.7.3.
@@ -33,11 +33,11 @@ var imageRE = regexp.MustCompile(`^(.*)/([^/:]*):(.*)$`)
 // appendCSIImageConfigs extracts image repo, name and version from
 // the YAML files under test/e2e/testing-manifests/storage-csi and
 // creates new config entries  for them.
-func appendCSIImageConfigs(configs map[int]Config) {
-	embeddedFS := testing_manifests.GetE2ETestingManifestsFS().EmbeddedFS
+func appendCSIImageConfigs(configs map[ImageID]Config) {
+	embeddedFS := e2etestingmanifests.GetE2ETestingManifestsFS().EmbeddedFS
 
-	// We add our images with index numbers that start after the highest existing number.
-	index := 0
+	// We add our images with ImageID numbers that start after the highest existing number.
+	index := ImageID(0)
 	for i := range configs {
 		if i > index {
 			index = i
