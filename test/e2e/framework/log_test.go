@@ -40,7 +40,7 @@ import (
 //
 //
 //
-//
+// This must be line #43.
 
 func runTests(t *testing.T, reporter ginkgo.Reporter) {
 	// This source code line will be part of the stack dump comparison.
