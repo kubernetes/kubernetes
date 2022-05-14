@@ -634,7 +634,7 @@ message Container {
   // to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will
   // produce the string literal "$(VAR_NAME)". Escaped references will never be expanded, regardless
   // of whether the variable exists or not. Cannot be updated.
-  // More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell
+  // More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#run-a-command-in-a-shell
   // +optional
   repeated string command = 3;
 
@@ -645,7 +645,7 @@ message Container {
   // to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will
   // produce the string literal "$(VAR_NAME)". Escaped references will never be expanded, regardless
   // of whether the variable exists or not. Cannot be updated.
-  // More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell
+  // More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#run-a-command-in-a-shell
   // +optional
   repeated string args = 4;
 
@@ -1240,7 +1240,7 @@ message EphemeralContainerCommon {
   // to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will
   // produce the string literal "$(VAR_NAME)". Escaped references will never be expanded, regardless
   // of whether the variable exists or not. Cannot be updated.
-  // More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell
+  // More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#run-a-command-in-a-shell
   // +optional
   repeated string command = 3;
 
@@ -1251,7 +1251,7 @@ message EphemeralContainerCommon {
   // to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will
   // produce the string literal "$(VAR_NAME)". Escaped references will never be expanded, regardless
   // of whether the variable exists or not. Cannot be updated.
-  // More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell
+  // More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#run-a-command-in-a-shell
   // +optional
   repeated string args = 4;
 
