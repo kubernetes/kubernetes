@@ -92,6 +92,8 @@ func IsProbableEOF(err error) bool {
 		return true
 	case msg == "http: can't write HTTP request on broken connection":
 		return true
+	case msg == "http2: client connection lost":
+		return true
 	case strings.Contains(msg, "http2: server sent GOAWAY and closed the connection"):
 		return true
 	case strings.Contains(msg, "connection reset by peer"):
