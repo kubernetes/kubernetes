@@ -137,10 +137,19 @@ func UnsafeGuessKindToResource(kind schema.GroupVersionKind) ( /*plural*/ schema
 		}
 	}
 
-	switch string(singularName[len(singularName)-1]) {
-	case "s":
+	switch {
+	case strings.HasSuffix(singularName, "s"),
+		strings.HasSuffix(singularName, "z"),
+		strings.HasSuffix(singularName, "ch"),
+		strings.HasSuffix(singularName, "sh"),
+		strings.HasSuffix(singularName, "x"):
 		return kind.GroupVersion().WithResource(singularName + "es"), singular
-	case "y":
+	case strings.HasSuffix(singularName, "ay"),
+		strings.HasSuffix(singularName, "ey"),
+		strings.HasSuffix(singularName, "iy"),
+		strings.HasSuffix(singularName, "oy"),
+		strings.HasSuffix(singularName, "uy"):
+	case strings.HasSuffix(singularName, "y"):
 		return kind.GroupVersion().WithResource(strings.TrimSuffix(singularName, "y") + "ies"), singular
 	}
 

@@ -448,6 +448,8 @@ func TestKindToResource(t *testing.T) {
 
 		// Add "ies" when ending with "y"
 		{Kind: "ImageRepository", Plural: "imagerepositories", Singular: "imagerepository"},
+		// except if a vowel comes before y
+		{Kind: "Gateway", Plural: "gateways", Singular: "gateway"},
 		// Add "es" when ending with "s"
 		{Kind: "miss", Plural: "misses", Singular: "miss"},
 		// Add "s" otherwise
