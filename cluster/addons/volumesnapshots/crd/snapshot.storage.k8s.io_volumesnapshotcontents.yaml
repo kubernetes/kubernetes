@@ -117,6 +117,9 @@ spec:
                         This field is immutable.
                       type: string
                   type: object
+                  oneOf:
+                    - required: ["snapshotHandle"]
+                    - required: ["volumeHandle"]
                 sourceVolumeMode:
                   description: SourceVolumeMode is the mode of the volume whose snapshot
                     is taken. Can be either “Filesystem” or “Block”. If not specified,
