@@ -20,21 +20,33 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
-func (m *kubeGenericRuntimeManager) applySandboxResources(pod *v1.Pod, config *runtimeapi.PodSandboxConfig) error {
-	return nil
-}
-
-func getPodSandboxWindowsConfig(m *kubeGenericRuntimeManager, pod *v1.Pod, podSandboxConfig *runtimeapi.PodSandboxConfig) (*runtimeapi.WindowsPodSandboxConfig, error) {
-	wc, err := m.generatePodSandboxWindowsConfig(pod)
-	if err != nil {
-		return nil, err
+func TestGetPodSandboxWindowsConfig(t *testing.t) {
+	_, _, m, err := createTestRuntimeManager()
+	require.NoError(t, err)
+	pod := newTestPod()
+	podSandboxConfig := &runtimeapi.PodSandboxConfig{
+		Metadata: &runtimeapi.PodSandboxMetadata{
+			Name:      pod.Name,
+			Namespace: pod.Namespace,
+			Uid:       podUID,
+			Attempt:   attempt,
+		},
+		Labels:      newPodLabels(pod),
+		Annotations: newPodAnnotations(pod),
 	}
-	return wc, err
-}
 
-func addNonWindowsRelatedContext(lc *runtimeapi.LinuxPodSandboxConfig, sc *v1.PodSecurityContext) {
+	windowsConfig := getPodSandboxWindowsConfig(m, pod, podSandboxConfig)
+	wc, err := m.generatePodSandboxWindowsConfig(pod)
+	assert.Equal(t, windowsConfig, wc)
+
 }

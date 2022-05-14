@@ -45,5 +45,6 @@ func addNonWindowsRelatedContext(lc *runtimeapi.LinuxPodSandboxConfig, sc *v1.Po
 	}
 }
 
-func getPodSandboxWindowsConfig(m *kubeGenericRuntimeManager, pod *v1.Pod, podSandBoxConfig *runtimeapi.PodSandboxConfig) {
+func getPodSandboxWindowsConfig(m *kubeGenericRuntimeManager, pod *v1.Pod, podSandBoxConfig *runtimeapi.PodSandboxConfig) (*runtimeapi.WindowsPodSandboxConfig, error) {
+	return nil, nil
 }
