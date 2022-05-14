@@ -2,7 +2,7 @@
 // +build windows
 
 /*
-Copyright 2021 The Kubernetes Authors.
+Copyright 2022 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
-func TestGetPodSandboxWindowsConfig(t *testing.t) {
+func TestGetPodSandboxWindowsConfig(t *testing.T) {
 	_, _, m, err := createTestRuntimeManager()
 	require.NoError(t, err)
 	pod := newTestPod()
@@ -45,8 +45,10 @@ func TestGetPodSandboxWindowsConfig(t *testing.t) {
 		Annotations: newPodAnnotations(pod),
 	}
 
-	windowsConfig := getPodSandboxWindowsConfig(m, pod, podSandboxConfig)
+	windowsConfig, err := getPodSandboxWindowsConfig(m, pod, podSandboxConfig)
+	require.NoError(t, err)
 	wc, err := m.generatePodSandboxWindowsConfig(pod)
+	require.NoError(t, err)
 	assert.Equal(t, windowsConfig, wc)
 
 }

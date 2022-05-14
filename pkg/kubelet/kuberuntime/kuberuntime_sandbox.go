@@ -139,6 +139,9 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *v1.Pod, attemp
 	}
 	podSandboxConfig.Linux = lc
 	wc, err := getPodSandboxWindowsConfig(m, pod, podSandboxConfig)
+	if err != nil {
+		return nil, err
+	}
 	podSandboxConfig.Windows = wc
 
 	// Update config to include overhead, sandbox level resources
