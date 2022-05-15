@@ -77,8 +77,8 @@ func TestWatchRestartsIfTimeoutNotReached(t *testing.T) {
 		Host: s.URL,
 	}
 
-	namespaceObject := framework.CreateTestingNamespace("retry-watch", s, t)
-	defer framework.DeleteTestingNamespace(namespaceObject, s, t)
+	namespaceObject := framework.CreateTestingNamespace("retry-watch", t)
+	defer framework.DeleteTestingNamespace(namespaceObject, t)
 
 	getListFunc := func(c *kubernetes.Clientset, secret *corev1.Secret) func(options metav1.ListOptions) *corev1.SecretList {
 		return func(options metav1.ListOptions) *corev1.SecretList {

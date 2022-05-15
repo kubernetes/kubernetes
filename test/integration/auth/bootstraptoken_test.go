@@ -123,8 +123,8 @@ func TestBootstrapTokenAuth(t *testing.T) {
 			_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 			defer closeFn()
 
-			ns := framework.CreateTestingNamespace("auth-bootstrap-token", s, t)
-			defer framework.DeleteTestingNamespace(ns, s, t)
+			ns := framework.CreateTestingNamespace("auth-bootstrap-token", t)
+			defer framework.DeleteTestingNamespace(ns, t)
 
 			previousResourceVersion := make(map[string]float64)
 			transport := http.DefaultTransport

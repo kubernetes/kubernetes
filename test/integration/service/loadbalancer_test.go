@@ -47,8 +47,8 @@ func Test_ServiceLoadBalancerDisableAllocateNodePorts(t *testing.T) {
 		t.Fatalf("Error creating clientset: %v", err)
 	}
 
-	ns := framework.CreateTestingNamespace("test-service-allocate-node-ports", server, t)
-	defer framework.DeleteTestingNamespace(ns, server, t)
+	ns := framework.CreateTestingNamespace("test-service-allocate-node-ports", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -90,8 +90,8 @@ func Test_ServiceUpdateLoadBalancerDisableAllocateNodePorts(t *testing.T) {
 		t.Fatalf("Error creating clientset: %v", err)
 	}
 
-	ns := framework.CreateTestingNamespace("test-service-allocate-node-ports", server, t)
-	defer framework.DeleteTestingNamespace(ns, server, t)
+	ns := framework.CreateTestingNamespace("test-service-allocate-node-ports", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -143,8 +143,8 @@ func Test_ServiceLoadBalancerEnableThenDisableAllocatedNodePorts(t *testing.T) {
 		t.Fatalf("Error creating clientset: %v", err)
 	}
 
-	ns := framework.CreateTestingNamespace("test-service-deallocate-node-ports", server, t)
-	defer framework.DeleteTestingNamespace(ns, server, t)
+	ns := framework.CreateTestingNamespace("test-service-deallocate-node-ports", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -196,8 +196,8 @@ func Test_ServiceLoadBalancerDisableThenEnableAllocatedNodePorts(t *testing.T) {
 		t.Fatalf("Error creating clientset: %v", err)
 	}
 
-	ns := framework.CreateTestingNamespace("test-service-reallocate-node-ports", server, t)
-	defer framework.DeleteTestingNamespace(ns, server, t)
+	ns := framework.CreateTestingNamespace("test-service-reallocate-node-ports", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -259,8 +259,8 @@ func Test_ServiceLoadBalancerEnableLoadBalancerClass(t *testing.T) {
 		t.Fatalf("Error creating clientset: %v", err)
 	}
 
-	ns := framework.CreateTestingNamespace("test-service-load-balancer-class", server, t)
-	defer framework.DeleteTestingNamespace(ns, server, t)
+	ns := framework.CreateTestingNamespace("test-service-load-balancer-class", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	controller, cloud, informer := newServiceController(t, client)
 
@@ -308,8 +308,8 @@ func Test_SetLoadBalancerClassThenUpdateLoadBalancerClass(t *testing.T) {
 		t.Fatalf("Error creating clientset: %v", err)
 	}
 
-	ns := framework.CreateTestingNamespace("test-service-immutable-load-balancer-class", server, t)
-	defer framework.DeleteTestingNamespace(ns, server, t)
+	ns := framework.CreateTestingNamespace("test-service-immutable-load-balancer-class", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	controller, cloud, informer := newServiceController(t, client)
 
@@ -362,8 +362,8 @@ func Test_UpdateLoadBalancerWithLoadBalancerClass(t *testing.T) {
 		t.Fatalf("Error creating clientset: %v", err)
 	}
 
-	ns := framework.CreateTestingNamespace("test-service-update-load-balancer-class", server, t)
-	defer framework.DeleteTestingNamespace(ns, server, t)
+	ns := framework.CreateTestingNamespace("test-service-update-load-balancer-class", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	controller, cloud, informer := newServiceController(t, client)
 

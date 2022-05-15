@@ -19,7 +19,6 @@ package statefulset
 import (
 	"context"
 	"fmt"
-	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -160,7 +159,7 @@ func newStatefulSetPVC(name string) v1.PersistentVolumeClaim {
 }
 
 // scSetup sets up necessities for Statefulset integration test, including control plane, apiserver, informers, and clientset
-func scSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, *statefulset.StatefulSetController, informers.SharedInformerFactory, clientset.Interface) {
+func scSetup(t *testing.T) (framework.CloseFunc, *statefulset.StatefulSetController, informers.SharedInformerFactory, clientset.Interface) {
 	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
 	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 
@@ -180,7 +179,7 @@ func scSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, *statefulset.
 		clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "statefulset-controller")),
 	)
 
-	return s, closeFn, sc, informers, clientSet
+	return closeFn, sc, informers, clientSet
 }
 
 // Run STS controller and informers

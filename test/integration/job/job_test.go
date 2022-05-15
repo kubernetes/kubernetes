@@ -1174,9 +1174,9 @@ func setup(t *testing.T, nsBaseName string) (framework.CloseFunc, *restclient.Co
 	if err != nil {
 		t.Fatalf("Error creating clientset: %v", err)
 	}
-	ns := framework.CreateTestingNamespace(nsBaseName, server, t)
+	ns := framework.CreateTestingNamespace(nsBaseName, t)
 	closeFn := func() {
-		framework.DeleteTestingNamespace(ns, server, t)
+		framework.DeleteTestingNamespace(ns, t)
 		apiServerCloseFn()
 	}
 	return closeFn, &config, clientSet, ns

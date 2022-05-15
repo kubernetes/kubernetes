@@ -123,10 +123,10 @@ func TestVolumeTemplateNoopUpdate(t *testing.T) {
 }
 
 func TestSpecReplicasChange(t *testing.T) {
-	s, closeFn, rm, informers, c := scSetup(t)
+	closeFn, rm, informers, c := scSetup(t)
 	defer closeFn()
-	ns := framework.CreateTestingNamespace("test-spec-replicas-change", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateTestingNamespace("test-spec-replicas-change", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 	cancel := runControllerAndInformers(rm, informers)
 	defer cancel()
 
@@ -166,10 +166,10 @@ func TestSpecReplicasChange(t *testing.T) {
 }
 
 func TestDeletingAndFailedPods(t *testing.T) {
-	s, closeFn, rm, informers, c := scSetup(t)
+	closeFn, rm, informers, c := scSetup(t)
 	defer closeFn()
-	ns := framework.CreateTestingNamespace("test-deleting-and-failed-pods", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateTestingNamespace("test-deleting-and-failed-pods", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 	cancel := runControllerAndInformers(rm, informers)
 	defer cancel()
 
@@ -267,10 +267,10 @@ func TestStatefulSetAvailable(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetMinReadySeconds, test.enabled)()
-			s, closeFn, rm, informers, c := scSetup(t)
+			closeFn, rm, informers, c := scSetup(t)
 			defer closeFn()
-			ns := framework.CreateTestingNamespace("test-available-pods", s, t)
-			defer framework.DeleteTestingNamespace(ns, s, t)
+			ns := framework.CreateTestingNamespace("test-available-pods", t)
+			defer framework.DeleteTestingNamespace(ns, t)
 			cancel := runControllerAndInformers(rm, informers)
 			defer cancel()
 
@@ -381,8 +381,8 @@ func TestStatefulSetStatusWithPodFail(t *testing.T) {
 		clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "statefulset-controller")),
 	)
 
-	ns := framework.CreateTestingNamespace("test-pod-fail", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateTestingNamespace("test-pod-fail", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

@@ -19,7 +19,6 @@ package cronjob
 import (
 	"context"
 	"fmt"
-	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -36,7 +35,7 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
-func setup(t *testing.T) (*httptest.Server, framework.CloseFunc, *cronjob.ControllerV2, *job.Controller, informers.SharedInformerFactory, clientset.Interface, restclient.Config) {
+func setup(t *testing.T) (framework.CloseFunc, *cronjob.ControllerV2, *job.Controller, informers.SharedInformerFactory, clientset.Interface, restclient.Config) {
 	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
 	_, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 
@@ -53,7 +52,7 @@ func setup(t *testing.T) (*httptest.Server, framework.CloseFunc, *cronjob.Contro
 	}
 	jc := job.NewController(informerSet.Core().V1().Pods(), informerSet.Batch().V1().Jobs(), clientSet)
 
-	return server, closeFn, cjc, jc, informerSet, clientSet, config
+	return closeFn, cjc, jc, informerSet, clientSet, config
 }
 
 func newCronJob(name, namespace, schedule string) *batchv1.CronJob {
@@ -144,14 +143,14 @@ func validateJobAndPod(t *testing.T, clientSet clientset.Interface, namespace st
 }
 
 func TestCronJobLaunchesPodAndCleansUp(t *testing.T) {
-	server, closeFn, cjc, jc, informerSet, clientSet, _ := setup(t)
+	closeFn, cjc, jc, informerSet, clientSet, _ := setup(t)
 	defer closeFn()
 
 	cronJobName := "foo"
 	namespaceName := "simple-cronjob-test"
 
-	ns := framework.CreateTestingNamespace(namespaceName, server, t)
-	defer framework.DeleteTestingNamespace(ns, server, t)
+	ns := framework.CreateTestingNamespace(namespaceName, t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	cjClient := clientSet.BatchV1().CronJobs(ns.Name)
 

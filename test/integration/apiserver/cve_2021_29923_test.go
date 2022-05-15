@@ -48,8 +48,8 @@ func TestCanaryCVE_2021_29923(t *testing.T) {
 		t.Fatalf("unexpected error creating dynamic client: %v", err)
 	}
 
-	ns := framework.CreateTestingNamespace("test-cve-2021-29923", server, t)
-	defer framework.DeleteTestingNamespace(ns, server, t)
+	ns := framework.CreateTestingNamespace("test-cve-2021-29923", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	objects := map[schema.GroupVersionResource]string{
 		// k8s.io/kubernetes/pkg/api/v1

@@ -74,9 +74,9 @@ func initTestAPIServer(t *testing.T, nsPrefix string, admission admission.Interf
 	s := testCtx.httpServer
 
 	if nsPrefix != "default" {
-		testCtx.ns = framework.CreateTestingNamespace(nsPrefix+string(uuid.NewUUID()), s, t)
+		testCtx.ns = framework.CreateTestingNamespace(nsPrefix+string(uuid.NewUUID()), t)
 	} else {
-		testCtx.ns = framework.CreateTestingNamespace("default", s, t)
+		testCtx.ns = framework.CreateTestingNamespace("default", t)
 	}
 
 	// 2. Create kubeclient
@@ -133,7 +133,7 @@ func cleanupTest(t *testing.T, testCtx *testContext) {
 	testCtx.cancelFn()
 	// Cleanup nodes.
 	testCtx.clientSet.CoreV1().Nodes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
-	framework.DeleteTestingNamespace(testCtx.ns, testCtx.httpServer, t)
+	framework.DeleteTestingNamespace(testCtx.ns, t)
 	testCtx.closeFn()
 }
 

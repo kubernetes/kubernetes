@@ -42,8 +42,8 @@ func Test_ExternalNameServiceStopsDefaultingInternalTrafficPolicy(t *testing.T) 
 		t.Fatalf("Error creating clientset: %v", err)
 	}
 
-	ns := framework.CreateTestingNamespace("test-external-name-drops-internal-traffic-policy", server, t)
-	defer framework.DeleteTestingNamespace(ns, server, t)
+	ns := framework.CreateTestingNamespace("test-external-name-drops-internal-traffic-policy", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -88,8 +88,8 @@ func Test_ExternalNameServiceDropsInternalTrafficPolicy(t *testing.T) {
 		t.Fatalf("Error creating clientset: %v", err)
 	}
 
-	ns := framework.CreateTestingNamespace("test-external-name-drops-internal-traffic-policy", server, t)
-	defer framework.DeleteTestingNamespace(ns, server, t)
+	ns := framework.CreateTestingNamespace("test-external-name-drops-internal-traffic-policy", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	internalTrafficPolicy := corev1.ServiceInternalTrafficPolicyCluster
 	service := &corev1.Service{
@@ -137,8 +137,8 @@ func Test_ConvertingToExternalNameServiceDropsInternalTrafficPolicy(t *testing.T
 		t.Fatalf("Error creating clientset: %v", err)
 	}
 
-	ns := framework.CreateTestingNamespace("test-external-name-drops-internal-traffic-policy", server, t)
-	defer framework.DeleteTestingNamespace(ns, server, t)
+	ns := framework.CreateTestingNamespace("test-external-name-drops-internal-traffic-policy", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{

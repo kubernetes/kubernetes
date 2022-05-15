@@ -64,8 +64,8 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 	s, closeFn, rm, informers, _ := rmSetup(t)
 	defer closeFn()
 
-	ns := framework.CreateTestingNamespace("concurrent-eviction-requests", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateTestingNamespace("concurrent-eviction-requests", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -183,8 +183,8 @@ func TestTerminalPodEviction(t *testing.T) {
 	s, closeFn, rm, informers, _ := rmSetup(t)
 	defer closeFn()
 
-	ns := framework.CreateTestingNamespace("terminalpod-eviction", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateTestingNamespace("terminalpod-eviction", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
