@@ -130,14 +130,16 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 
 			ginkgo.By("Waiting for devices to become available on the local node")
 			gomega.Eventually(func() bool {
-				return numberOfSampleResources(getLocalNode(f)) > 0
+				node, ready := getLocalTestNode(f)
+				return ready && numberOfSampleResources(node) > 0
 			}, 5*time.Minute, framework.Poll).Should(gomega.BeTrue())
 			framework.Logf("Successfully created device plugin pod")
 
 			ginkgo.By("Waiting for the resource exported by the sample device plugin to become available on the local node")
 			gomega.Eventually(func() bool {
-				node := getLocalNode(f)
-				return numberOfDevicesCapacity(node, resourceName) == devsLen &&
+				node, ready := getLocalTestNode(f)
+				return ready &&
+					numberOfDevicesCapacity(node, resourceName) == devsLen &&
 					numberOfDevicesAllocatable(node, resourceName) == devsLen
 			}, 30*time.Second, framework.Poll).Should(gomega.BeTrue())
 		})
@@ -162,8 +164,11 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 
 			ginkgo.By("Waiting for devices to become unavailable on the local node")
 			gomega.Eventually(func() bool {
-				return numberOfSampleResources(getLocalNode(f)) <= 0
+				node, ready := getLocalTestNode(f)
+				return ready && numberOfSampleResources(node) <= 0
 			}, 5*time.Minute, framework.Poll).Should(gomega.BeTrue())
+
+			ginkgo.By("devices now unavailable on the local node")
 		})
 
 		ginkgo.It("Can schedule a pod that requires a device", func() {
@@ -284,8 +289,9 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 
 			ginkgo.By("Waiting for resource to become available on the local node after re-registration")
 			gomega.Eventually(func() bool {
-				node := getLocalNode(f)
-				return numberOfDevicesCapacity(node, resourceName) == devsLen &&
+				node, ready := getLocalTestNode(f)
+				return ready &&
+					numberOfDevicesCapacity(node, resourceName) == devsLen &&
 					numberOfDevicesAllocatable(node, resourceName) == devsLen
 			}, 30*time.Second, framework.Poll).Should(gomega.BeTrue())
 
