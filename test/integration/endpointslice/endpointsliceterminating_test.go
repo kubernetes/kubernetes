@@ -181,8 +181,8 @@ func TestEndpointSliceTerminating(t *testing.T) {
 			go epsController.Run(1, stopCh)
 
 			// Create namespace
-			ns := framework.CreateTestingNamespace("test-endpoints-terminating", server, t)
-			defer framework.DeleteTestingNamespace(ns, server, t)
+			ns := framework.CreateTestingNamespace("test-endpoints-terminating", t)
+			defer framework.DeleteTestingNamespace(ns, t)
 
 			node := &corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{

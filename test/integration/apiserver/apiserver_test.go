@@ -323,8 +323,8 @@ func Test202StatusCode(t *testing.T) {
 	s, clientSet, closeFn := setup(t)
 	defer closeFn()
 
-	ns := framework.CreateTestingNamespace("status-code", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateTestingNamespace("status-code", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	rsClient := clientSet.AppsV1().ReplicaSets(ns.Name)
 
@@ -380,11 +380,11 @@ func TestListOptions(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIListChunking, true)()
 			etcdOptions := framework.DefaultEtcdOptions()
 			etcdOptions.EnableWatchCache = watchCacheEnabled
-			s, clientSet, closeFn := setupWithOptions(t, &framework.ControlPlaneConfigOptions{EtcdOptions: etcdOptions})
+			_, clientSet, closeFn := setupWithOptions(t, &framework.ControlPlaneConfigOptions{EtcdOptions: etcdOptions})
 			defer closeFn()
 
-			ns := framework.CreateTestingNamespace("list-options", s, t)
-			defer framework.DeleteTestingNamespace(ns, s, t)
+			ns := framework.CreateTestingNamespace("list-options", t)
+			defer framework.DeleteTestingNamespace(ns, t)
 
 			rsClient := clientSet.AppsV1().ReplicaSets(ns.Name)
 
@@ -612,11 +612,11 @@ func TestListResourceVersion0(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIListChunking, true)()
 			etcdOptions := framework.DefaultEtcdOptions()
 			etcdOptions.EnableWatchCache = tc.watchCacheEnabled
-			s, clientSet, closeFn := setupWithOptions(t, &framework.ControlPlaneConfigOptions{EtcdOptions: etcdOptions})
+			_, clientSet, closeFn := setupWithOptions(t, &framework.ControlPlaneConfigOptions{EtcdOptions: etcdOptions})
 			defer closeFn()
 
-			ns := framework.CreateTestingNamespace("list-paging", s, t)
-			defer framework.DeleteTestingNamespace(ns, s, t)
+			ns := framework.CreateTestingNamespace("list-paging", t)
+			defer framework.DeleteTestingNamespace(ns, t)
 
 			rsClient := clientSet.AppsV1().ReplicaSets(ns.Name)
 
@@ -665,11 +665,11 @@ func TestListResourceVersion0(t *testing.T) {
 
 func TestAPIListChunking(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIListChunking, true)()
-	s, clientSet, closeFn := setup(t)
+	_, clientSet, closeFn := setup(t)
 	defer closeFn()
 
-	ns := framework.CreateTestingNamespace("list-paging", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateTestingNamespace("list-paging", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	rsClient := clientSet.AppsV1().ReplicaSets(ns.Name)
 
@@ -743,13 +743,13 @@ func makeSecret(name string) *v1.Secret {
 }
 
 func TestNameInFieldSelector(t *testing.T) {
-	s, clientSet, closeFn := setup(t)
+	_, clientSet, closeFn := setup(t)
 	defer closeFn()
 
 	numNamespaces := 3
 	for i := 0; i < 3; i++ {
-		ns := framework.CreateTestingNamespace(fmt.Sprintf("ns%d", i), s, t)
-		defer framework.DeleteTestingNamespace(ns, s, t)
+		ns := framework.CreateTestingNamespace(fmt.Sprintf("ns%d", i), t)
+		defer framework.DeleteTestingNamespace(ns, t)
 
 		_, err := clientSet.CoreV1().Secrets(ns.Name).Create(context.TODO(), makeSecret("foo"), metav1.CreateOptions{})
 		if err != nil {

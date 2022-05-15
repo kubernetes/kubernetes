@@ -41,8 +41,8 @@ func TestStorageClasses(t *testing.T) {
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 
-	ns := framework.CreateTestingNamespace("storageclass", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateTestingNamespace("storageclass", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	DoTestStorageClasses(t, client, ns)
 }
