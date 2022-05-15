@@ -8,6 +8,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
+
 	"testing"
 )
 
@@ -29,7 +30,7 @@ func TestPreStartContainer(t *testing.T) {
 		{
 			name: "when only cpu manager is not nil",
 			i: internalContainerLifecycleImpl{
-				cpuManager:      cpumanager.NewFakeManager(),
+				cpuManager:      nil,
 				memoryManager:   nil,
 				topologyManager: nil,
 			},
@@ -93,19 +94,19 @@ func TestPreStartContainer(t *testing.T) {
 		i := test.i
 
 		t.Run(test.name, func(t *testing.T) {
-
-			//("Running PreStart Container",i.PreStartContainer())
-			err := i.PreStartContainer(pod, container, containerId)
-			if err != nil {
-				t.Error("Error Occured!")
-			}
 			mockCPUManager := cpumanager.NewMockManager(mockCtrl)
 			mockMemoryManager := memorymanager.NewMockManager(mockCtrl)
 			mockTopologyManager := topologymanager.NewMockManager(mockCtrl)
 
+			// run the function
+			err := i.PreStartContainer(pod, container, containerId)
+			if err != nil {
+				t.Error("Error Occured!")
+			}
+
 			if i.cpuManager != nil {
 				//i.cpuManager.AddContainer(pod, container, containerId)
-				mockCPUManager.EXPECT().AddContainer(pod, container, containerId).Return(nil).AnyTimes()
+				mockCPUManager.EXPECT().AddContainer(pod, container, containerId).Return(nil).Times(1)
 			} else {
 				mockCPUManager.EXPECT().AddContainer(pod, container, containerId).Return(nil).Times(0)
 			}
@@ -134,5 +135,42 @@ func TestPreStopContainer(t *testing.T) {
 }
 
 func TestPostStopContainer(t *testing.T) {
+	tests := []struct {
+		name string
+		i    internalContainerLifecycleImpl
+	}{
+		{
+			name: "when topology manager feature gate enabled",
+			i: internalContainerLifecycleImpl{
+				cpuManager:      cpumanager.NewFakeManager(),
+				memoryManager:   nil,
+				topologyManager: topologymanager.NewFakeManager(),
+			},
+		},
+		{
+			name: "when topology manager feature gate disabled",
+			i: internalContainerLifecycleImpl{
+				cpuManager:      nil,
+				memoryManager:   nil,
+				topologyManager: topologymanager.NewFakeManager(),
+			},
+		},
+	}
 
+	mockCtrl := gomock.NewController(t)
+	containerId := "test-id"
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			mockTopologyManager := topologymanager.NewMockManager(mockCtrl)
+			test.i.PostStopContainer(containerId)
+
+			if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.TopologyManager) {
+				mockTopologyManager.EXPECT().RemoveContainer(containerId).Times(1).Return(nil)
+			} else {
+				mockTopologyManager.EXPECT().RemoveContainer(containerId).Times(0)
+			}
+		})
+
+	}
 }

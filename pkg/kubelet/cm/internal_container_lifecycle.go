@@ -49,7 +49,7 @@ func (i *internalContainerLifecycleImpl) PreStartContainer(pod *v1.Pod, containe
 		i.memoryManager.AddContainer(pod, container, containerID)
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.TopologyManager) {
+	if i.topologyManager != nil && utilfeature.DefaultFeatureGate.Enabled(kubefeatures.TopologyManager) {
 		i.topologyManager.AddContainer(pod, container, containerID)
 	}
 	return nil
