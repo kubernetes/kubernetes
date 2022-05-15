@@ -39,8 +39,9 @@ func TestNewDeployment(t *testing.T) {
 	closeFn, rm, dc, informers, c := dcSetup(t)
 	defer closeFn()
 	name := "test-new-deployment"
-	ns := framework.CreateTestingNamespace(name, t)
-	defer framework.DeleteTestingNamespace(ns, t)
+
+	ns := framework.CreateNamespaceOrDie(c, name, t)
+	defer framework.DeleteNamespaceOrDie(c, ns, t)
 
 	replicas := int32(20)
 	tester := &deploymentTester{t: t, c: c, deployment: newDeployment(name, ns.Name, replicas)}
@@ -113,9 +114,10 @@ func TestNewDeployment(t *testing.T) {
 func TestDeploymentRollingUpdate(t *testing.T) {
 	closeFn, rm, dc, informers, c := dcSetup(t)
 	defer closeFn()
+
 	name := "test-rolling-update-deployment"
-	ns := framework.CreateTestingNamespace(name, t)
-	defer framework.DeleteTestingNamespace(ns, t)
+	ns := framework.CreateNamespaceOrDie(c, name, t)
+	defer framework.DeleteNamespaceOrDie(c, ns, t)
 
 	// Start informer and controllers
 	stopControllers := runControllersAndInformers(t, rm, dc, informers)
@@ -207,9 +209,10 @@ func TestDeploymentRollingUpdate(t *testing.T) {
 func TestDeploymentSelectorImmutability(t *testing.T) {
 	closeFn, c := dcSimpleSetup(t)
 	defer closeFn()
+
 	name := "test-deployment-selector-immutability"
-	ns := framework.CreateTestingNamespace(name, t)
-	defer framework.DeleteTestingNamespace(ns, t)
+	ns := framework.CreateNamespaceOrDie(c, name, t)
+	defer framework.DeleteNamespaceOrDie(c, ns, t)
 
 	tester := &deploymentTester{t: t, c: c, deployment: newDeployment(name, ns.Name, int32(20))}
 	var err error
@@ -241,9 +244,10 @@ func TestDeploymentSelectorImmutability(t *testing.T) {
 func TestPausedDeployment(t *testing.T) {
 	closeFn, rm, dc, informers, c := dcSetup(t)
 	defer closeFn()
+
 	name := "test-paused-deployment"
-	ns := framework.CreateTestingNamespace(name, t)
-	defer framework.DeleteTestingNamespace(ns, t)
+	ns := framework.CreateNamespaceOrDie(c, name, t)
+	defer framework.DeleteNamespaceOrDie(c, ns, t)
 
 	replicas := int32(1)
 	tester := &deploymentTester{t: t, c: c, deployment: newDeployment(name, ns.Name, replicas)}
@@ -340,9 +344,10 @@ func TestPausedDeployment(t *testing.T) {
 func TestScalePausedDeployment(t *testing.T) {
 	closeFn, rm, dc, informers, c := dcSetup(t)
 	defer closeFn()
+
 	name := "test-scale-paused-deployment"
-	ns := framework.CreateTestingNamespace(name, t)
-	defer framework.DeleteTestingNamespace(ns, t)
+	ns := framework.CreateNamespaceOrDie(c, name, t)
+	defer framework.DeleteNamespaceOrDie(c, ns, t)
 
 	replicas := int32(1)
 	tester := &deploymentTester{t: t, c: c, deployment: newDeployment(name, ns.Name, replicas)}
@@ -420,9 +425,10 @@ func TestScalePausedDeployment(t *testing.T) {
 func TestDeploymentHashCollision(t *testing.T) {
 	closeFn, rm, dc, informers, c := dcSetup(t)
 	defer closeFn()
+
 	name := "test-hash-collision-deployment"
-	ns := framework.CreateTestingNamespace(name, t)
-	defer framework.DeleteTestingNamespace(ns, t)
+	ns := framework.CreateNamespaceOrDie(c, name, t)
+	defer framework.DeleteNamespaceOrDie(c, ns, t)
 
 	replicas := int32(1)
 	tester := &deploymentTester{t: t, c: c, deployment: newDeployment(name, ns.Name, replicas)}
@@ -518,9 +524,10 @@ func checkPodsHashLabel(pods *v1.PodList) (string, error) {
 func TestFailedDeployment(t *testing.T) {
 	closeFn, rm, dc, informers, c := dcSetup(t)
 	defer closeFn()
+
 	name := "test-failed-deployment"
-	ns := framework.CreateTestingNamespace(name, t)
-	defer framework.DeleteTestingNamespace(ns, t)
+	ns := framework.CreateNamespaceOrDie(c, name, t)
+	defer framework.DeleteNamespaceOrDie(c, ns, t)
 
 	deploymentName := "progress-check"
 	replicas := int32(1)
@@ -561,9 +568,10 @@ func TestFailedDeployment(t *testing.T) {
 func TestOverlappingDeployments(t *testing.T) {
 	closeFn, rm, dc, informers, c := dcSetup(t)
 	defer closeFn()
+
 	name := "test-overlapping-deployments"
-	ns := framework.CreateTestingNamespace(name, t)
-	defer framework.DeleteTestingNamespace(ns, t)
+	ns := framework.CreateNamespaceOrDie(c, name, t)
+	defer framework.DeleteNamespaceOrDie(c, ns, t)
 
 	replicas := int32(1)
 	firstDeploymentName := "first-deployment"
@@ -641,9 +649,10 @@ func TestOverlappingDeployments(t *testing.T) {
 func TestScaledRolloutDeployment(t *testing.T) {
 	closeFn, rm, dc, informers, c := dcSetup(t)
 	defer closeFn()
+
 	name := "test-scaled-rollout-deployment"
-	ns := framework.CreateTestingNamespace(name, t)
-	defer framework.DeleteTestingNamespace(ns, t)
+	ns := framework.CreateNamespaceOrDie(c, name, t)
+	defer framework.DeleteNamespaceOrDie(c, ns, t)
 
 	// Start informer and controllers
 	stopControllers := runControllersAndInformers(t, rm, dc, informers)
@@ -830,9 +839,10 @@ func TestScaledRolloutDeployment(t *testing.T) {
 func TestSpecReplicasChange(t *testing.T) {
 	closeFn, rm, dc, informers, c := dcSetup(t)
 	defer closeFn()
+
 	name := "test-spec-replicas-change"
-	ns := framework.CreateTestingNamespace(name, t)
-	defer framework.DeleteTestingNamespace(ns, t)
+	ns := framework.CreateNamespaceOrDie(c, name, t)
+	defer framework.DeleteNamespaceOrDie(c, ns, t)
 
 	deploymentName := "deployment"
 	replicas := int32(1)
@@ -883,9 +893,10 @@ func TestSpecReplicasChange(t *testing.T) {
 func TestDeploymentAvailableCondition(t *testing.T) {
 	closeFn, rm, dc, informers, c := dcSetup(t)
 	defer closeFn()
+
 	name := "test-deployment-available-condition"
-	ns := framework.CreateTestingNamespace(name, t)
-	defer framework.DeleteTestingNamespace(ns, t)
+	ns := framework.CreateNamespaceOrDie(c, name, t)
+	defer framework.DeleteNamespaceOrDie(c, ns, t)
 
 	deploymentName := "deployment"
 	replicas := int32(10)
@@ -1001,9 +1012,10 @@ func testRSControllerRefPatch(t *testing.T, tester *deploymentTester, rs *apps.R
 func TestGeneralReplicaSetAdoption(t *testing.T) {
 	closeFn, rm, dc, informers, c := dcSetup(t)
 	defer closeFn()
+
 	name := "test-general-replicaset-adoption"
-	ns := framework.CreateTestingNamespace(name, t)
-	defer framework.DeleteTestingNamespace(ns, t)
+	ns := framework.CreateNamespaceOrDie(c, name, t)
+	defer framework.DeleteNamespaceOrDie(c, ns, t)
 
 	deploymentName := "deployment"
 	replicas := int32(1)
@@ -1090,9 +1102,10 @@ func testScalingUsingScaleSubresource(t *testing.T, tester *deploymentTester, re
 func TestDeploymentScaleSubresource(t *testing.T) {
 	closeFn, rm, dc, informers, c := dcSetup(t)
 	defer closeFn()
+
 	name := "test-deployment-scale-subresource"
-	ns := framework.CreateTestingNamespace(name, t)
-	defer framework.DeleteTestingNamespace(ns, t)
+	ns := framework.CreateNamespaceOrDie(c, name, t)
+	defer framework.DeleteNamespaceOrDie(c, ns, t)
 
 	deploymentName := "deployment"
 	replicas := int32(2)
@@ -1131,9 +1144,10 @@ func TestDeploymentScaleSubresource(t *testing.T) {
 func TestReplicaSetOrphaningAndAdoptionWhenLabelsChange(t *testing.T) {
 	closeFn, rm, dc, informers, c := dcSetup(t)
 	defer closeFn()
+
 	name := "test-replicaset-orphaning-and-adoption-when-labels-change"
-	ns := framework.CreateTestingNamespace(name, t)
-	defer framework.DeleteTestingNamespace(ns, t)
+	ns := framework.CreateNamespaceOrDie(c, name, t)
+	defer framework.DeleteNamespaceOrDie(c, ns, t)
 
 	deploymentName := "deployment"
 	replicas := int32(1)
