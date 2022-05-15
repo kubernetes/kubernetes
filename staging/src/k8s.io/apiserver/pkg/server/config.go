@@ -370,7 +370,7 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 		// Generic API servers have no inherent long-running subresources
 		LongRunningFunc:           genericfilters.BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString()),
 		lifecycleSignals:          lifecycleSignals,
-		StorageObjectCountTracker: flowcontrolrequest.NewStorageObjectCountTracker(lifecycleSignals.ShutdownInitiated.Signaled()),
+		StorageObjectCountTracker: flowcontrolrequest.NewStorageObjectCountTracker(),
 
 		APIServerID:           id,
 		StorageVersionManager: storageversion.NewDefaultManager(),
@@ -749,6 +749,19 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 				return nil
 			})
 			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	// Add PostStartHook for maintenaing the object count tracker.
+	if c.StorageObjectCountTracker != nil {
+		const storageObjectCountTrackerHookName = "storage-object-count-tracker-hook"
+		if !s.isPostStartHookRegistered(storageObjectCountTrackerHookName) {
+			if err := s.AddPostStartHook(storageObjectCountTrackerHookName, func(context PostStartHookContext) error {
+				go c.StorageObjectCountTracker.RunUntil(context.StopCh)
+				return nil
+			}); err != nil {
 				return nil, err
 			}
 		}
