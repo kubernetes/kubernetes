@@ -26,13 +26,5 @@ import (
 )
 
 func checkCRIPodCPUAndMemoryStatsHelperMethod(assert *assert.Assertions, actual statsapi.PodStats, cs *cadvisorapiv2.ContainerStats) {
-	assert.Equal(cs.Timestamp.UnixNano(), actual.CPU.Time.UnixNano())
-	assert.Equal(cs.Cpu.Usage.Total, *actual.CPU.UsageCoreNanoSeconds)
-	assert.Equal(cs.CpuInst.Usage.Total, *actual.CPU.UsageNanoCores)
-
-	assert.Equal(cs.Memory.Usage, *actual.Memory.UsageBytes)
-	assert.Equal(cs.Memory.WorkingSet, *actual.Memory.WorkingSetBytes)
-	assert.Equal(cs.Memory.RSS, *actual.Memory.RSSBytes)
-	assert.Equal(cs.Memory.ContainerData.Pgfault, *actual.Memory.PageFaults)
-	assert.Equal(cs.Memory.ContainerData.Pgmajfault, *actual.Memory.MajorPageFaults)
+	return
 }
