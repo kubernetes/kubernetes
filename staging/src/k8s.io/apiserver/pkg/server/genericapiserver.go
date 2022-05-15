@@ -317,6 +317,12 @@ func (s *GenericAPIServer) MuxAndDiscoveryCompleteSignals() map[string]<-chan st
 	return s.muxAndDiscoveryCompleteSignals
 }
 
+// RegisterDestroyFunc registers a function that will be called during Destroy().
+// The function have to be idempotent and prepared to be called more than once.
+func (s *GenericAPIServer) RegisterDestroyFunc(destroyFn func()) {
+	s.destroyFns = append(s.destroyFns, destroyFn)
+}
+
 // Destroy cleans up all its and its delegation target resources on shutdown.
 // It starts with destroying its own resources and later proceeds with
 // its delegation target.
@@ -617,7 +623,7 @@ func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *A
 		resourceInfos = append(resourceInfos, r...)
 	}
 
-	s.destroyFns = append(s.destroyFns, apiGroupInfo.destroyStorage)
+	s.RegisterDestroyFunc(apiGroupInfo.destroyStorage)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) &&
 		utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) {

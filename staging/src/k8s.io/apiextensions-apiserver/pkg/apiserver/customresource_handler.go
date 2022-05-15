@@ -583,6 +583,23 @@ func (r *crdHandler) tearDown(oldInfo *crdInfo) {
 	}
 }
 
+// Destroy shuts down storage layer for all registered CRDs.
+// It should be called as a last step of the shutdown sequence.
+func (r *crdHandler) destroy() {
+	r.customStorageLock.Lock()
+	defer r.customStorageLock.Unlock()
+
+	storageMap := r.customStorage.Load().(crdStorageMap)
+	for _, crdInfo := range storageMap {
+		for _, storage := range crdInfo.storages {
+			// DestroyFunc have to be implemented in idempotent way,
+			// so the potential race with r.tearDown() (being called
+			// from a goroutine) is safe.
+			storage.CustomResource.DestroyFunc()
+		}
+	}
+}
+
 // GetCustomResourceListerCollectionDeleter returns the ListerCollectionDeleter of
 // the given crd.
 func (r *crdHandler) GetCustomResourceListerCollectionDeleter(crd *apiextensionsv1.CustomResourceDefinition) (finalizer.ListerCollectionDeleter, error) {
