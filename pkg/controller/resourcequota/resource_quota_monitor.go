@@ -306,6 +306,7 @@ func (qm *QuotaMonitor) IsSynced() bool {
 // closed. Any running monitors will be stopped before Run returns.
 func (qm *QuotaMonitor) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
+	defer qm.resourceChanges.ShutDown()
 
 	klog.Infof("QuotaMonitor running")
 	defer klog.Infof("QuotaMonitor stopping")
