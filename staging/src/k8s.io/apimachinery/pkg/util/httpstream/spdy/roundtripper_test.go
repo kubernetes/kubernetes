@@ -31,6 +31,8 @@ import (
 
 	"github.com/armon/go-socks5"
 	"github.com/elazarl/goproxy"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"k8s.io/apimachinery/pkg/util/httpstream"
 )
@@ -678,6 +680,21 @@ func TestRoundTripSocks5AndNewConnection(t *testing.T) {
 
 			// The channel must be closed before any of the connections are closed
 			close(closed)
+		})
+	}
+}
+
+func TestRoundTripPassesContextToDialer(t *testing.T) {
+	urls := []string{"http://127.0.0.1:1233/", "https://127.0.0.1:1233/"}
+	for _, u := range urls {
+		t.Run(u, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+			req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
+			require.NoError(t, err)
+			spdyTransport := NewRoundTripper(&tls.Config{})
+			_, err = spdyTransport.Dial(req)
+			assert.EqualError(t, err, "dial tcp 127.0.0.1:1233: operation was canceled")
 		})
 	}
 }
