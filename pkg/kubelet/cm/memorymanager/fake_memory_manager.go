@@ -17,8 +17,6 @@ limitations under the License.
 package memorymanager
 
 import (
-	"github.com/golang/mock/gomock"
-	"github.com/stretchr/testify/mock"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
@@ -31,7 +29,6 @@ import (
 
 type fakeManager struct {
 	state state.State
-	mock.Mock
 }
 
 func (m *fakeManager) Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error {
@@ -94,35 +91,4 @@ func NewFakeManager() Manager {
 	return &fakeManager{
 		state: state.NewMemoryState(),
 	}
-}
-
-type MockManager struct {
-	ctrl     *gomock.Controller
-	recorder *MockManagerMockRecorder
-}
-
-type MockManagerMockRecorder struct {
-	mock *MockManager
-}
-
-func NewMockManager(ctrl *gomock.Controller) *MockManager {
-	mock := &MockManager{ctrl: ctrl}
-	mock.recorder = &MockManagerMockRecorder{mock}
-	return mock
-}
-
-func (_m *MockManager) EXPECT() *MockManagerMockRecorder {
-	return _m.recorder
-}
-
-func (_m *MockManager) AddContainer(pod *v1.Pod, container *v1.Container, containerID string) error {
-	klog.InfoS("AddContainer", "pod", klog.KObj(pod), "containerName", container.Name, "containerID", containerID)
-
-	_m.ctrl.Call(_m, "AddContainer", pod, container, containerID)
-
-	return nil
-}
-
-func (_mr *MockManagerMockRecorder) AddContainer(pod *v1.Pod, container *v1.Container, containerID string) *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "AddContainer")
 }
