@@ -214,7 +214,7 @@ func CleanupTest(t *testing.T, testCtx *TestContext) {
 	testCtx.CancelFn()
 	// Cleanup nodes.
 	testCtx.ClientSet.CoreV1().Nodes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
-	framework.DeleteTestingNamespace(testCtx.NS, testCtx.HTTPServer, t)
+	framework.DeleteTestingNamespace(testCtx.NS, t)
 	testCtx.CloseFn()
 }
 
@@ -351,9 +351,9 @@ func InitTestAPIServer(t *testing.T, nsPrefix string, admission admission.Interf
 	_, testCtx.HTTPServer, testCtx.CloseFn = framework.RunAnAPIServer(controlPlaneConfig)
 
 	if nsPrefix != "default" {
-		testCtx.NS = framework.CreateTestingNamespace(nsPrefix+string(uuid.NewUUID()), testCtx.HTTPServer, t)
+		testCtx.NS = framework.CreateTestingNamespace(nsPrefix+string(uuid.NewUUID()), t)
 	} else {
-		testCtx.NS = framework.CreateTestingNamespace("default", testCtx.HTTPServer, t)
+		testCtx.NS = framework.CreateTestingNamespace("default", t)
 	}
 
 	// 2. Create kubeclient

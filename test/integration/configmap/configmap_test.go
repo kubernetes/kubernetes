@@ -38,8 +38,8 @@ func TestConfigMap(t *testing.T) {
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 
-	ns := framework.CreateTestingNamespace("config-map", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateTestingNamespace("config-map", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	DoTestConfigMap(t, client, ns)
 }

@@ -108,8 +108,8 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 	_, s, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 
-	ns := framework.CreateTestingNamespace("pv-recycler", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateTestingNamespace("pv-recycler", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	testClient, ctrl, informers, watchPV, watchPVC := createClients(ns, t, s, defaultSyncPeriod)
 	defer watchPV.Stop()
@@ -163,8 +163,8 @@ func TestPersistentVolumeDeleter(t *testing.T) {
 	_, s, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 
-	ns := framework.CreateTestingNamespace("pv-deleter", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateTestingNamespace("pv-deleter", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	testClient, ctrl, informers, watchPV, watchPVC := createClients(ns, t, s, defaultSyncPeriod)
 	defer watchPV.Stop()
@@ -223,8 +223,8 @@ func TestPersistentVolumeBindRace(t *testing.T) {
 	_, s, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 
-	ns := framework.CreateTestingNamespace("pv-bind-race", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateTestingNamespace("pv-bind-race", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	testClient, ctrl, informers, watchPV, watchPVC := createClients(ns, t, s, defaultSyncPeriod)
 	defer watchPV.Stop()
@@ -293,8 +293,8 @@ func TestPersistentVolumeClaimLabelSelector(t *testing.T) {
 	_, s, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 
-	ns := framework.CreateTestingNamespace("pvc-label-selector", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateTestingNamespace("pvc-label-selector", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	testClient, controller, informers, watchPV, watchPVC := createClients(ns, t, s, defaultSyncPeriod)
 	defer watchPV.Stop()
@@ -374,8 +374,8 @@ func TestPersistentVolumeClaimLabelSelectorMatchExpressions(t *testing.T) {
 	_, s, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 
-	ns := framework.CreateTestingNamespace("pvc-match-expressions", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateTestingNamespace("pvc-match-expressions", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	testClient, controller, informers, watchPV, watchPVC := createClients(ns, t, s, defaultSyncPeriod)
 	defer watchPV.Stop()
@@ -474,8 +474,8 @@ func TestPersistentVolumeMultiPVs(t *testing.T) {
 	_, s, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 
-	ns := framework.CreateTestingNamespace("multi-pvs", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateTestingNamespace("multi-pvs", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	testClient, controller, informers, watchPV, watchPVC := createClients(ns, t, s, defaultSyncPeriod)
 	defer watchPV.Stop()
@@ -564,8 +564,8 @@ func TestPersistentVolumeMultiPVsPVCs(t *testing.T) {
 	_, s, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 
-	ns := framework.CreateTestingNamespace("multi-pvs-pvcs", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateTestingNamespace("multi-pvs-pvcs", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	testClient, binder, informers, watchPV, watchPVC := createClients(ns, t, s, defaultSyncPeriod)
 	defer watchPV.Stop()
@@ -724,8 +724,8 @@ func TestPersistentVolumeControllerStartup(t *testing.T) {
 	_, s, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 
-	ns := framework.CreateTestingNamespace("controller-startup", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateTestingNamespace("controller-startup", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	objCount := getObjectCount()
 
@@ -853,8 +853,8 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 	_, s, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 
-	ns := framework.CreateTestingNamespace("provision-multi-pvs", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateTestingNamespace("provision-multi-pvs", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	testClient, binder, informers, watchPV, watchPVC := createClients(ns, t, s, defaultSyncPeriod)
 	defer watchPV.Stop()
@@ -948,8 +948,8 @@ func TestPersistentVolumeMultiPVsDiffAccessModes(t *testing.T) {
 	_, s, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 
-	ns := framework.CreateTestingNamespace("multi-pvs-diff-access", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateTestingNamespace("multi-pvs-diff-access", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	testClient, controller, informers, watchPV, watchPVC := createClients(ns, t, s, defaultSyncPeriod)
 	defer watchPV.Stop()

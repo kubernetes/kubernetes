@@ -87,10 +87,10 @@ func TestQuota(t *testing.T) {
 	_, _, closeFn := framework.RunAnAPIServerUsingServer(controlPlaneConfig, s, h)
 	defer closeFn()
 
-	ns := framework.CreateTestingNamespace("quotaed", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
-	ns2 := framework.CreateTestingNamespace("non-quotaed", s, t)
-	defer framework.DeleteTestingNamespace(ns2, s, t)
+	ns := framework.CreateTestingNamespace("quotaed", t)
+	defer framework.DeleteTestingNamespace(ns, t)
+	ns2 := framework.CreateTestingNamespace("non-quotaed", t)
+	defer framework.DeleteTestingNamespace(ns2, t)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -320,8 +320,8 @@ func TestQuotaLimitedResourceDenial(t *testing.T) {
 	_, _, closeFn := framework.RunAnAPIServerUsingServer(controlPlaneConfig, s, h)
 	defer closeFn()
 
-	ns := framework.CreateTestingNamespace("quota", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateTestingNamespace("quota", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -449,8 +449,8 @@ func TestQuotaLimitService(t *testing.T) {
 	_, _, closeFn := framework.RunAnAPIServerUsingServer(controlPlaneConfig, s, h)
 	defer closeFn()
 
-	ns := framework.CreateTestingNamespace("quota", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateTestingNamespace("quota", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

@@ -1597,8 +1597,8 @@ func Test_ServiceChangeTypeHeadlessToExternalNameWithPatch(t *testing.T) {
 		t.Fatalf("Error creating clientset: %v", err)
 	}
 
-	ns := framework.CreateTestingNamespace("test-service-allocate-node-ports", server, t)
-	defer framework.DeleteTestingNamespace(ns, server, t)
+	ns := framework.CreateTestingNamespace("test-service-allocate-node-ports", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
