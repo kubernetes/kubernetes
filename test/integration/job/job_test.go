@@ -47,6 +47,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/controller-manager/pkg/informerfactory"
+	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
 	jobcontroller "k8s.io/kubernetes/pkg/controller/job"
@@ -586,9 +587,7 @@ func TestFinalizersClearedWhenBackoffLimitExceeded(t *testing.T) {
 	closeFn, restConfig, clientSet, ns := setup(t, "simple")
 	defer closeFn()
 	ctx, cancel := startJobControllerAndWaitForCaches(restConfig)
-	defer func() {
-		cancel()
-	}()
+	defer cancel()
 
 	// Job tracking with finalizers requires less calls in Indexed mode,
 	// so it's more likely to process all finalizers before all the pods
@@ -785,9 +784,7 @@ func TestSuspendJobControllerRestart(t *testing.T) {
 	closeFn, restConfig, clientSet, ns := setup(t, "suspend")
 	defer closeFn()
 	ctx, cancel := startJobControllerAndWaitForCaches(restConfig)
-	defer func() {
-		cancel()
-	}()
+	defer cancel()
 
 	job, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
 		Spec: batchv1.JobSpec{
@@ -1162,24 +1159,23 @@ func createJobWithDefaults(ctx context.Context, clientSet clientset.Interface, n
 }
 
 func setup(t *testing.T, nsBaseName string) (framework.CloseFunc, *restclient.Config, clientset.Interface, *v1.Namespace) {
-	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	_, server, apiServerCloseFn := framework.RunAnAPIServer(controlPlaneConfig)
+	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
 
-	config := restclient.Config{
-		Host:  server.URL,
-		QPS:   200.0,
-		Burst: 200,
-	}
-	clientSet, err := clientset.NewForConfig(&config)
+	config := restclient.CopyConfig(server.ClientConfig)
+	config.QPS = 200
+	config.Burst = 200
+	clientSet, err := clientset.NewForConfig(config)
 	if err != nil {
 		t.Fatalf("Error creating clientset: %v", err)
 	}
-	ns := framework.CreateTestingNamespace(nsBaseName, t)
+
+	ns := framework.CreateNamespaceOrDie(clientSet, nsBaseName, t)
 	closeFn := func() {
-		framework.DeleteTestingNamespace(ns, t)
-		apiServerCloseFn()
+		framework.DeleteNamespaceOrDie(clientSet, ns, t)
+		server.TearDownFn()
 	}
-	return closeFn, &config, clientSet, ns
+	return closeFn, config, clientSet, ns
 }
 
 func startJobControllerAndWaitForCaches(restConfig *restclient.Config) (context.Context, context.CancelFunc) {
