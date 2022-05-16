@@ -156,6 +156,7 @@ func TestNewWithDelegate(t *testing.T) {
 		"/healthz/poststarthook/delegate-post-start-hook",
 		"/healthz/poststarthook/generic-apiserver-start-informers",
 		"/healthz/poststarthook/max-in-flight-filter",
+		"/healthz/poststarthook/storage-object-count-tracker-hook",
 		"/healthz/poststarthook/wrapping-post-start-hook",
 		"/healthz/wrapping-health",
 		"/livez",
@@ -165,6 +166,7 @@ func TestNewWithDelegate(t *testing.T) {
 		"/livez/poststarthook/delegate-post-start-hook",
 		"/livez/poststarthook/generic-apiserver-start-informers",
 		"/livez/poststarthook/max-in-flight-filter",
+		"/livez/poststarthook/storage-object-count-tracker-hook",
 		"/livez/poststarthook/wrapping-post-start-hook",
 		"/metrics",
 		"/readyz",
@@ -175,6 +177,7 @@ func TestNewWithDelegate(t *testing.T) {
 		"/readyz/poststarthook/delegate-post-start-hook",
 		"/readyz/poststarthook/generic-apiserver-start-informers",
 		"/readyz/poststarthook/max-in-flight-filter",
+		"/readyz/poststarthook/storage-object-count-tracker-hook",
 		"/readyz/poststarthook/wrapping-post-start-hook",
 		"/readyz/shutdown",
 	}
@@ -203,6 +206,7 @@ func TestNewWithDelegate(t *testing.T) {
 [-]delegate-health failed: reason withheld
 [+]poststarthook/generic-apiserver-start-informers ok
 [+]poststarthook/max-in-flight-filter ok
+[+]poststarthook/storage-object-count-tracker-hook ok
 [+]poststarthook/delegate-post-start-hook ok
 [+]poststarthook/wrapping-post-start-hook ok
 healthz check failed
