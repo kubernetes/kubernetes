@@ -24,10 +24,9 @@ import (
 	"net/http"
 	"net/url"
 
-	"k8s.io/klog/v2"
-
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/third_party/forked/golang/netutil"
+	"k8s.io/klog/v2"
 )
 
 // dialURL will dial the specified URL using the underlying dialer held by the passed
@@ -107,21 +106,6 @@ func dialURL(ctx context.Context, url *url.URL, transport http.RoundTripper) (ne
 			if err != nil {
 				return nil, err
 			}
-		}
-
-		// Return if we were configured to skip validation
-		if tlsConfig != nil && tlsConfig.InsecureSkipVerify {
-			return tlsConn, nil
-		}
-
-		// Verify
-		host, _, _ := net.SplitHostPort(dialAddr)
-		if tlsConfig != nil && len(tlsConfig.ServerName) > 0 {
-			host = tlsConfig.ServerName
-		}
-		if err := tlsConn.VerifyHostname(host); err != nil {
-			tlsConn.Close()
-			return nil, err
 		}
 
 		return tlsConn, nil
