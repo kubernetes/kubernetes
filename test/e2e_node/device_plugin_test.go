@@ -19,7 +19,11 @@ package e2enode
 import (
 	"context"
 	"path/filepath"
+	"regexp"
 	"time"
+
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -30,8 +34,6 @@ import (
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"regexp"
-
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -40,9 +42,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-
-	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 const (
