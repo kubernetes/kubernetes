@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	cloudproviderapi "k8s.io/cloud-provider/api"
 	cliflag "k8s.io/component-base/cli/flag"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/kubelet/config/v1beta1"
@@ -341,7 +342,7 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 	fs.MarkDeprecated("keep-terminated-pod-volumes", "will be removed in a future version")
 	fs.StringVar(&f.ExperimentalMounterPath, "experimental-mounter-path", f.ExperimentalMounterPath, "[Experimental] Path of mounter binary. Leave empty to use the default mount.")
 	fs.MarkDeprecated("experimental-mounter-path", "will be removed in 1.25 or later. in favor of using CSI.")
-	fs.StringVar(&f.CloudProvider, "cloud-provider", f.CloudProvider, "The provider for cloud services. Set to empty string for running with no cloud provider. If set, the cloud provider determines the name of the node (consult cloud provider documentation to determine if and how the hostname is used).")
+	fs.StringVar(&f.CloudProvider, "cloud-provider", f.CloudProvider, fmt.Sprintf("The provider for cloud services. Set to empty string for running with no cloud provider. If set, the cloud provider determines the name of the node (consult cloud provider documentation to determine if and how the hostname is used).  If set to 'external', then kubelet will taint nodes with %s.", cloudproviderapi.TaintExternalCloudProvider))
 	fs.MarkDeprecated("cloud-provider", "will be removed in 1.25 or later, in favor of removing cloud provider code from Kubelet.")
 	fs.StringVar(&f.CloudConfigFile, "cloud-config", f.CloudConfigFile, "The path to the cloud provider configuration file. Empty string for no configuration file.")
 	fs.MarkDeprecated("cloud-config", "will be removed in 1.25 or later, in favor of removing cloud provider code from Kubelet.")
