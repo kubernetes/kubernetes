@@ -48,16 +48,16 @@ func NewStorage(s rest.StandardStorage, authorizer authorizer.Authorizer, ruleRe
 }
 
 // Destroy cleans up resources on shutdown.
-func (r *Storage) Destroy() {
-	r.StandardStorage.Destroy()
+func (s *Storage) Destroy() {
+	s.StandardStorage.Destroy()
 }
 
-func (r *Storage) NamespaceScoped() bool {
+func (s *Storage) NamespaceScoped() bool {
 	return false
 }
 
-func (r *Storage) StorageVersion() runtime.GroupVersioner {
-	svp, ok := r.StandardStorage.(rest.StorageVersionProvider)
+func (s *Storage) StorageVersion() runtime.GroupVersioner {
+	svp, ok := s.StandardStorage.(rest.StorageVersionProvider)
 	if !ok {
 		return nil
 	}
