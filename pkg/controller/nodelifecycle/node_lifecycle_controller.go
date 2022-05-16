@@ -840,7 +840,7 @@ func (nc *Controller) monitorNodeHealth(ctx context.Context) error {
 				// Report node event only once when status changed.
 				controllerutil.RecordNodeStatusChange(nc.recorder, node, "NodeNotReady")
 				fallthrough
-			case needsRetry && observedReadyCondition.Status != v1.ConditionTrue:
+			case needsRetry && currentReadyCondition.Status != v1.ConditionTrue:
 				if err = controllerutil.MarkPodsNotReady(ctx, nc.kubeClient, nc.recorder, pods, node.Name); err != nil {
 					utilruntime.HandleError(fmt.Errorf("unable to mark all pods NotReady on node %v: %v; queuing for retry", node.Name, err))
 					nc.nodesToRetry.Store(node.Name, struct{}{})
