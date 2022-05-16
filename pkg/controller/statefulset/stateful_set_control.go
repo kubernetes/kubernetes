@@ -618,7 +618,11 @@ func updateStatefulSetAfterInvariantEstablished(
 		if err != nil {
 			return &status, err
 		}
-
+		// maxUnavailable might be zero for small percentage without round up.
+		// So we have to enforce it not to be less than 1.
+		if maxUnavailable < 1 {
+			maxUnavailable = 1
+		}
 	}
 
 	// Collect all targets in the range between the 0 and Spec.Replicas. Count any targets in that range
