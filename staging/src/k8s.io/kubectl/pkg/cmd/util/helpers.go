@@ -139,8 +139,8 @@ func isInvalidReasonStatusError(err error) bool {
 	if !apierrors.IsInvalid(err) {
 		return false
 	}
-	statusError, isStatusError := err.(*apierrors.StatusError)
-	if !isStatusError {
+	var statusError *apierrors.StatusError
+	if !errors.As(err, &statusError) {
 		return false
 	}
 	status := statusError.Status()
@@ -163,7 +163,9 @@ func checkErr(err error, handleErr func(string, int)) {
 	case err == ErrExit:
 		handleErr("", DefaultErrorExitCode)
 	case isInvalidReasonStatusError(err):
-		status := err.(*apierrors.StatusError).Status()
+		var statusError *apierrors.StatusError
+		_ = errors.As(err, &statusError)
+		status := statusError.Status()
 		details := status.Details
 		s := "The request is invalid"
 		if details == nil {

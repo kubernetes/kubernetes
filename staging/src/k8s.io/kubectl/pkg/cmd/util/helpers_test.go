@@ -401,6 +401,11 @@ func TestCheckInvalidErr(t *testing.T) {
 			`The request is invalid: admission webhook "my.webhook" denied the request without explanation`,
 			DefaultErrorExitCode,
 		},
+		{
+			fmt.Errorf("wrapped error: %w", errors.NewInvalid(corev1.SchemeGroupVersion.WithKind("Invalid6").GroupKind(), "invalidation", field.ErrorList{})),
+			"The Invalid6 \"invalidation\" is invalid",
+			DefaultErrorExitCode,
+		},
 	})
 }
 
