@@ -151,7 +151,7 @@ func NewCmdDebug(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 		Example:               debugExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
-			cmdutil.CheckErr(o.Validate(cmd))
+			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run(f, cmd))
 		},
 	}
@@ -221,7 +221,7 @@ func (o *DebugOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 }
 
 // Validate checks that the provided debug options are specified.
-func (o *DebugOptions) Validate(cmd *cobra.Command) error {
+func (o *DebugOptions) Validate() error {
 	// Attach
 	if o.Attach && o.attachChanged && len(o.Image) == 0 && len(o.Container) == 0 {
 		return fmt.Errorf("you must specify --container or create a new container using --image in order to attach.")

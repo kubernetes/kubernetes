@@ -123,7 +123,7 @@ func NewCmdReplace(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		Example:               replaceExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
-			cmdutil.CheckErr(o.Validate(cmd))
+			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run(f))
 		},
 	}
@@ -218,7 +218,7 @@ func (o *ReplaceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 	return nil
 }
 
-func (o *ReplaceOptions) Validate(cmd *cobra.Command) error {
+func (o *ReplaceOptions) Validate() error {
 	if o.DeleteOptions.GracePeriod >= 0 && !o.DeleteOptions.ForceDeletion {
 		return fmt.Errorf("--grace-period must have --force specified")
 	}
@@ -228,24 +228,24 @@ func (o *ReplaceOptions) Validate(cmd *cobra.Command) error {
 	}
 
 	if cmdutil.IsFilenameSliceEmpty(o.DeleteOptions.FilenameOptions.Filenames, o.DeleteOptions.FilenameOptions.Kustomize) {
-		return cmdutil.UsageErrorf(cmd, "Must specify --filename to replace")
+		return fmt.Errorf("Must specify --filename to replace")
 	}
 
 	if len(o.Raw) > 0 {
 		if len(o.DeleteOptions.FilenameOptions.Filenames) != 1 {
-			return cmdutil.UsageErrorf(cmd, "--raw can only use a single local file or stdin")
+			return fmt.Errorf("--raw can only use a single local file or stdin")
 		}
 		if strings.Index(o.DeleteOptions.FilenameOptions.Filenames[0], "http://") == 0 || strings.Index(o.DeleteOptions.FilenameOptions.Filenames[0], "https://") == 0 {
-			return cmdutil.UsageErrorf(cmd, "--raw cannot read from a url")
+			return fmt.Errorf("--raw cannot read from a url")
 		}
 		if o.DeleteOptions.FilenameOptions.Recursive {
-			return cmdutil.UsageErrorf(cmd, "--raw and --recursive are mutually exclusive")
+			return fmt.Errorf("--raw and --recursive are mutually exclusive")
 		}
-		if len(cmdutil.GetFlagString(cmd, "output")) > 0 {
-			return cmdutil.UsageErrorf(cmd, "--raw and --output are mutually exclusive")
+		if o.PrintFlags.OutputFormat != nil && len(*o.PrintFlags.OutputFormat) > 0 {
+			return fmt.Errorf("--raw and --output are mutually exclusive")
 		}
 		if _, err := url.ParseRequestURI(o.Raw); err != nil {
-			return cmdutil.UsageErrorf(cmd, "--raw must be a valid URL path: %v", err)
+			return fmt.Errorf("--raw must be a valid URL path: %v", err)
 		}
 	}
 
