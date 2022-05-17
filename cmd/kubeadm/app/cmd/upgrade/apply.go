@@ -156,20 +156,13 @@ func runApply(flags *applyFlags, args []string) error {
 		return errors.Wrap(err, "[upgrade/apply] FATAL")
 	}
 
+	// Clean this up in 1.26
 	// TODO: https://github.com/kubernetes/kubeadm/issues/2200
-	fmt.Printf("[upgrade/postupgrade] Removing the deprecated label %s='' from all control plane Nodes. "+
-		"After this step only the label %s='' will be present on control plane Nodes.\n",
-		kubeadmconstants.LabelNodeRoleOldControlPlane, kubeadmconstants.LabelNodeRoleControlPlane)
-	if err := upgrade.RemoveOldControlPlaneLabel(client); err != nil {
-		return err
-	}
-
-	// TODO: https://github.com/kubernetes/kubeadm/issues/2200
-	fmt.Printf("[upgrade/postupgrade] Adding the new taint %s to all control plane Nodes. "+
-		"After this step both taints %s and %s should be present on control plane Nodes.\n",
-		kubeadmconstants.ControlPlaneTaint.String(), kubeadmconstants.ControlPlaneTaint.String(),
-		kubeadmconstants.OldControlPlaneTaint.String())
-	if err := upgrade.AddNewControlPlaneTaint(client); err != nil {
+	fmt.Printf("[upgrade/postupgrade] Removing the old taint %s from all control plane Nodes. "+
+		"After this step only the %s taint will be present on control plane Nodes.\n",
+		kubeadmconstants.OldControlPlaneTaint.String(),
+		kubeadmconstants.ControlPlaneTaint.String())
+	if err := upgrade.RemoveOldControlPlaneTaint(client); err != nil {
 		return err
 	}
 
