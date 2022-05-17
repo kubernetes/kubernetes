@@ -25,6 +25,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -32,7 +33,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 type KeyValidation func(ctx context.Context, t *testing.T, key string)
@@ -424,6 +429,593 @@ func RunTestPreconditionalDeleteWithSuggestion(ctx context.Context, t *testing.T
 	if err := store.Get(ctx, key, storage.GetOptions{}, &example.Pod{}); !storage.IsNotFound(err) {
 		t.Errorf("Unexpected error on reading object: %v", err)
 	}
+}
+
+func RunTestList(ctx context.Context, t *testing.T, store storage.Interface) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RemainingItemCount, true)()
+
+	initialRV, preset, err := seedMultiLevelData(ctx, store)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	list := &example.PodList{}
+	storageOpts := storage.ListOptions{
+		ResourceVersion: "0",
+		Predicate:       storage.Everything,
+		Recursive:       true,
+	}
+	if err := store.GetList(ctx, "/two-level", storageOpts, list); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	continueRV, _ := strconv.Atoi(list.ResourceVersion)
+	secondContinuation, err := storage.EncodeContinue("/two-level/2", "/two-level/", int64(continueRV))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	getAttrs := func(obj runtime.Object) (labels.Set, fields.Set, error) {
+		pod := obj.(*example.Pod)
+		return nil, fields.Set{"metadata.name": pod.Name}, nil
+	}
+
+	tests := []struct {
+		name                       string
+		rv                         string
+		rvMatch                    metav1.ResourceVersionMatch
+		prefix                     string
+		pred                       storage.SelectionPredicate
+		expectedOut                []*example.Pod
+		expectContinue             bool
+		expectedRemainingItemCount *int64
+		expectError                bool
+		expectRVTooLarge           bool
+		expectRV                   string
+		expectRVFunc               func(string) error
+	}{
+		{
+			name:        "rejects invalid resource version",
+			prefix:      "/",
+			pred:        storage.Everything,
+			rv:          "abc",
+			expectError: true,
+		},
+		{
+			name:   "rejects resource version and continue token",
+			prefix: "/",
+			pred: storage.SelectionPredicate{
+				Label:    labels.Everything(),
+				Field:    fields.Everything(),
+				Limit:    1,
+				Continue: secondContinuation,
+			},
+			rv:          "1",
+			expectError: true,
+		},
+		{
+			name:             "rejects resource version set too high",
+			prefix:           "/",
+			rv:               strconv.FormatInt(math.MaxInt64, 10),
+			expectRVTooLarge: true,
+		},
+		{
+			name:        "test List on existing key",
+			prefix:      "/one-level/",
+			pred:        storage.Everything,
+			expectedOut: []*example.Pod{preset[0]},
+		},
+		{
+			name:        "test List on existing key with resource version set to 0",
+			prefix:      "/one-level/",
+			pred:        storage.Everything,
+			expectedOut: []*example.Pod{preset[0]},
+			rv:          "0",
+		},
+		{
+			name:        "test List on existing key with resource version set before first write, match=Exact",
+			prefix:      "/one-level/",
+			pred:        storage.Everything,
+			expectedOut: []*example.Pod{},
+			rv:          initialRV,
+			rvMatch:     metav1.ResourceVersionMatchExact,
+			expectRV:    initialRV,
+		},
+		{
+			name:        "test List on existing key with resource version set to 0, match=NotOlderThan",
+			prefix:      "/one-level/",
+			pred:        storage.Everything,
+			expectedOut: []*example.Pod{preset[0]},
+			rv:          "0",
+			rvMatch:     metav1.ResourceVersionMatchNotOlderThan,
+		},
+		{
+			name:        "test List on existing key with resource version set to 0, match=Invalid",
+			prefix:      "/one-level/",
+			pred:        storage.Everything,
+			rv:          "0",
+			rvMatch:     "Invalid",
+			expectError: true,
+		},
+		{
+			name:        "test List on existing key with resource version set before first write, match=NotOlderThan",
+			prefix:      "/one-level/",
+			pred:        storage.Everything,
+			expectedOut: []*example.Pod{preset[0]},
+			rv:          initialRV,
+			rvMatch:     metav1.ResourceVersionMatchNotOlderThan,
+		},
+		{
+			name:        "test List on existing key with resource version set before first write, match=Invalid",
+			prefix:      "/one-level/",
+			pred:        storage.Everything,
+			rv:          initialRV,
+			rvMatch:     "Invalid",
+			expectError: true,
+		},
+		{
+			name:        "test List on existing key with resource version set to current resource version",
+			prefix:      "/one-level/",
+			pred:        storage.Everything,
+			expectedOut: []*example.Pod{preset[0]},
+			rv:          list.ResourceVersion,
+		},
+		{
+			name:        "test List on existing key with resource version set to current resource version, match=Exact",
+			prefix:      "/one-level/",
+			pred:        storage.Everything,
+			expectedOut: []*example.Pod{preset[0]},
+			rv:          list.ResourceVersion,
+			rvMatch:     metav1.ResourceVersionMatchExact,
+			expectRV:    list.ResourceVersion,
+		},
+		{
+			name:        "test List on existing key with resource version set to current resource version, match=NotOlderThan",
+			prefix:      "/one-level/",
+			pred:        storage.Everything,
+			expectedOut: []*example.Pod{preset[0]},
+			rv:          list.ResourceVersion,
+			rvMatch:     metav1.ResourceVersionMatchNotOlderThan,
+		},
+		{
+			name:        "test List on non-existing key",
+			prefix:      "/non-existing/",
+			pred:        storage.Everything,
+			expectedOut: nil,
+		},
+		{
+			name:   "test List with pod name matching",
+			prefix: "/one-level/",
+			pred: storage.SelectionPredicate{
+				Label: labels.Everything(),
+				Field: fields.ParseSelectorOrDie("metadata.name!=foo"),
+			},
+			expectedOut: nil,
+		},
+		{
+			name:   "test List with limit",
+			prefix: "/two-level/",
+			pred: storage.SelectionPredicate{
+				Label: labels.Everything(),
+				Field: fields.Everything(),
+				Limit: 1,
+			},
+			expectedOut:                []*example.Pod{preset[1]},
+			expectContinue:             true,
+			expectedRemainingItemCount: utilpointer.Int64Ptr(1),
+		},
+		{
+			name:   "test List with limit at current resource version",
+			prefix: "/two-level/",
+			pred: storage.SelectionPredicate{
+				Label: labels.Everything(),
+				Field: fields.Everything(),
+				Limit: 1,
+			},
+			expectedOut:                []*example.Pod{preset[1]},
+			expectContinue:             true,
+			expectedRemainingItemCount: utilpointer.Int64Ptr(1),
+			rv:                         list.ResourceVersion,
+			expectRV:                   list.ResourceVersion,
+		},
+		{
+			name:   "test List with limit at current resource version and match=Exact",
+			prefix: "/two-level/",
+			pred: storage.SelectionPredicate{
+				Label: labels.Everything(),
+				Field: fields.Everything(),
+				Limit: 1,
+			},
+			expectedOut:                []*example.Pod{preset[1]},
+			expectContinue:             true,
+			expectedRemainingItemCount: utilpointer.Int64Ptr(1),
+			rv:                         list.ResourceVersion,
+			rvMatch:                    metav1.ResourceVersionMatchExact,
+			expectRV:                   list.ResourceVersion,
+		},
+		{
+			name:   "test List with limit at resource version 0",
+			prefix: "/two-level/",
+			pred: storage.SelectionPredicate{
+				Label: labels.Everything(),
+				Field: fields.Everything(),
+				Limit: 1,
+			},
+			expectedOut:                []*example.Pod{preset[1]},
+			expectContinue:             true,
+			expectedRemainingItemCount: utilpointer.Int64Ptr(1),
+			rv:                         "0",
+			expectRVFunc:               ResourceVersionNotOlderThan(list.ResourceVersion),
+		},
+		{
+			name:   "test List with limit at resource version 0 match=NotOlderThan",
+			prefix: "/two-level/",
+			pred: storage.SelectionPredicate{
+				Label: labels.Everything(),
+				Field: fields.Everything(),
+				Limit: 1,
+			},
+			expectedOut:                []*example.Pod{preset[1]},
+			expectContinue:             true,
+			expectedRemainingItemCount: utilpointer.Int64Ptr(1),
+			rv:                         "0",
+			rvMatch:                    metav1.ResourceVersionMatchNotOlderThan,
+			expectRVFunc:               ResourceVersionNotOlderThan(list.ResourceVersion),
+		},
+		{
+			name:   "test List with limit at resource version before first write and match=Exact",
+			prefix: "/two-level/",
+			pred: storage.SelectionPredicate{
+				Label: labels.Everything(),
+				Field: fields.Everything(),
+				Limit: 1,
+			},
+			expectedOut:    []*example.Pod{},
+			expectContinue: false,
+			rv:             initialRV,
+			rvMatch:        metav1.ResourceVersionMatchExact,
+			expectRV:       initialRV,
+		},
+		{
+			name:   "test List with pregenerated continue token",
+			prefix: "/two-level/",
+			pred: storage.SelectionPredicate{
+				Label:    labels.Everything(),
+				Field:    fields.Everything(),
+				Limit:    1,
+				Continue: secondContinuation,
+			},
+			expectedOut: []*example.Pod{preset[2]},
+		},
+		{
+			name:   "ignores resource version 0 for List with pregenerated continue token",
+			prefix: "/two-level/",
+			pred: storage.SelectionPredicate{
+				Label:    labels.Everything(),
+				Field:    fields.Everything(),
+				Limit:    1,
+				Continue: secondContinuation,
+			},
+			rv:          "0",
+			expectedOut: []*example.Pod{preset[2]},
+		},
+		{
+			name:        "test List with multiple levels of directories and expect flattened result",
+			prefix:      "/two-level/",
+			pred:        storage.Everything,
+			expectedOut: []*example.Pod{preset[1], preset[2]},
+		},
+		{
+			name:   "test List with filter returning only one item, ensure only a single page returned",
+			prefix: "/",
+			pred: storage.SelectionPredicate{
+				Field: fields.OneTermEqualSelector("metadata.name", "fourth"),
+				Label: labels.Everything(),
+				Limit: 1,
+			},
+			expectedOut:    []*example.Pod{preset[3]},
+			expectContinue: true,
+		},
+		{
+			name:   "test List with filter returning only one item, covers the entire list",
+			prefix: "/",
+			pred: storage.SelectionPredicate{
+				Field: fields.OneTermEqualSelector("metadata.name", "fourth"),
+				Label: labels.Everything(),
+				Limit: 2,
+			},
+			expectedOut:    []*example.Pod{preset[3]},
+			expectContinue: false,
+		},
+		{
+			name:   "test List with filter returning only one item, covers the entire list, with resource version 0",
+			prefix: "/",
+			pred: storage.SelectionPredicate{
+				Field: fields.OneTermEqualSelector("metadata.name", "fourth"),
+				Label: labels.Everything(),
+				Limit: 2,
+			},
+			rv:             "0",
+			expectedOut:    []*example.Pod{preset[3]},
+			expectContinue: false,
+		},
+		{
+			name:   "test List with filter returning two items, more pages possible",
+			prefix: "/",
+			pred: storage.SelectionPredicate{
+				Field: fields.OneTermEqualSelector("metadata.name", "foo"),
+				Label: labels.Everything(),
+				Limit: 2,
+			},
+			expectContinue: true,
+			expectedOut:    []*example.Pod{preset[0], preset[1]},
+		},
+		{
+			name:   "filter returns two items split across multiple pages",
+			prefix: "/",
+			pred: storage.SelectionPredicate{
+				Field: fields.OneTermEqualSelector("metadata.name", "bar"),
+				Label: labels.Everything(),
+				Limit: 2,
+			},
+			expectedOut: []*example.Pod{preset[2], preset[4]},
+		},
+		{
+			name:   "filter returns one item for last page, ends on last item, not full",
+			prefix: "/",
+			pred: storage.SelectionPredicate{
+				Field:    fields.OneTermEqualSelector("metadata.name", "bar"),
+				Label:    labels.Everything(),
+				Limit:    2,
+				Continue: EncodeContinueOrDie("z-level/3", int64(continueRV)),
+			},
+			expectedOut: []*example.Pod{preset[4]},
+		},
+		{
+			name:   "filter returns one item for last page, starts on last item, full",
+			prefix: "/",
+			pred: storage.SelectionPredicate{
+				Field:    fields.OneTermEqualSelector("metadata.name", "bar"),
+				Label:    labels.Everything(),
+				Limit:    1,
+				Continue: EncodeContinueOrDie("z-level/3/test-2", int64(continueRV)),
+			},
+			expectedOut: []*example.Pod{preset[4]},
+		},
+		{
+			name:   "filter returns one item for last page, starts on last item, partial page",
+			prefix: "/",
+			pred: storage.SelectionPredicate{
+				Field:    fields.OneTermEqualSelector("metadata.name", "bar"),
+				Label:    labels.Everything(),
+				Limit:    2,
+				Continue: EncodeContinueOrDie("z-level/3/test-2", int64(continueRV)),
+			},
+			expectedOut: []*example.Pod{preset[4]},
+		},
+		{
+			name:   "filter returns two items, page size equal to total list size",
+			prefix: "/",
+			pred: storage.SelectionPredicate{
+				Field: fields.OneTermEqualSelector("metadata.name", "bar"),
+				Label: labels.Everything(),
+				Limit: 5,
+			},
+			expectedOut: []*example.Pod{preset[2], preset[4]},
+		},
+		{
+			name:   "filter returns one item, page size equal to total list size",
+			prefix: "/",
+			pred: storage.SelectionPredicate{
+				Field: fields.OneTermEqualSelector("metadata.name", "fourth"),
+				Label: labels.Everything(),
+				Limit: 5,
+			},
+			expectedOut: []*example.Pod{preset[3]},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.pred.GetAttrs == nil {
+				tt.pred.GetAttrs = getAttrs
+			}
+
+			out := &example.PodList{}
+			storageOpts := storage.ListOptions{
+				ResourceVersion:      tt.rv,
+				ResourceVersionMatch: tt.rvMatch,
+				Predicate:            tt.pred,
+				Recursive:            true,
+			}
+			err = store.GetList(ctx, tt.prefix, storageOpts, out)
+			if tt.expectRVTooLarge {
+				if err == nil || !storage.IsTooLargeResourceVersion(err) {
+					t.Fatalf("expecting resource version too high error, but get: %s", err)
+				}
+				return
+			}
+
+			if err != nil {
+				if !tt.expectError {
+					t.Fatalf("GetList failed: %v", err)
+				}
+				return
+			}
+			if tt.expectError {
+				t.Fatalf("expected error but got none")
+			}
+			if (len(out.Continue) > 0) != tt.expectContinue {
+				t.Errorf("unexpected continue token: %q", out.Continue)
+			}
+
+			// If a client requests an exact resource version, it must be echoed back to them.
+			if tt.expectRV != "" {
+				if tt.expectRV != out.ResourceVersion {
+					t.Errorf("resourceVersion in list response want=%s, got=%s", tt.expectRV, out.ResourceVersion)
+				}
+			}
+			if tt.expectRVFunc != nil {
+				if err := tt.expectRVFunc(out.ResourceVersion); err != nil {
+					t.Errorf("resourceVersion in list response invalid: %v", err)
+				}
+			}
+			if len(tt.expectedOut) != len(out.Items) {
+				t.Fatalf("length of list want=%d, got=%d", len(tt.expectedOut), len(out.Items))
+			}
+			if diff := cmp.Diff(tt.expectedRemainingItemCount, out.ListMeta.GetRemainingItemCount()); diff != "" {
+				t.Errorf("incorrect remainingItemCount: %s", diff)
+			}
+			for j, wantPod := range tt.expectedOut {
+				getPod := &out.Items[j]
+				ExpectNoDiff(t, fmt.Sprintf("%s: incorrect pod", tt.name), wantPod, getPod)
+			}
+		})
+	}
+}
+
+func RunTestListWithoutPaging(ctx context.Context, t *testing.T, store storage.Interface) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RemainingItemCount, true)()
+
+	_, preset, err := seedMultiLevelData(ctx, store)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	getAttrs := func(obj runtime.Object) (labels.Set, fields.Set, error) {
+		pod := obj.(*example.Pod)
+		return nil, fields.Set{"metadata.name": pod.Name}, nil
+	}
+
+	tests := []struct {
+		name                       string
+		disablePaging              bool
+		rv                         string
+		rvMatch                    metav1.ResourceVersionMatch
+		prefix                     string
+		pred                       storage.SelectionPredicate
+		expectedOut                []*example.Pod
+		expectContinue             bool
+		expectedRemainingItemCount *int64
+		expectError                bool
+	}{
+		{
+			name:          "test List with limit when paging disabled",
+			disablePaging: true,
+			prefix:        "/two-level/",
+			pred: storage.SelectionPredicate{
+				Label: labels.Everything(),
+				Field: fields.Everything(),
+				Limit: 1,
+			},
+			expectedOut:    []*example.Pod{preset[1], preset[2]},
+			expectContinue: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.pred.GetAttrs == nil {
+				tt.pred.GetAttrs = getAttrs
+			}
+
+			out := &example.PodList{}
+			storageOpts := storage.ListOptions{
+				ResourceVersion:      tt.rv,
+				ResourceVersionMatch: tt.rvMatch,
+				Predicate:            tt.pred,
+				Recursive:            true,
+			}
+
+			if err := store.GetList(ctx, tt.prefix, storageOpts, out); err != nil {
+				t.Fatalf("GetList failed: %v", err)
+				return
+			}
+			if (len(out.Continue) > 0) != tt.expectContinue {
+				t.Errorf("unexpected continue token: %q", out.Continue)
+			}
+
+			if len(tt.expectedOut) != len(out.Items) {
+				t.Fatalf("length of list want=%d, got=%d", len(tt.expectedOut), len(out.Items))
+			}
+			if diff := cmp.Diff(tt.expectedRemainingItemCount, out.ListMeta.GetRemainingItemCount()); diff != "" {
+				t.Errorf("incorrect remainingItemCount: %s", diff)
+			}
+			for j, wantPod := range tt.expectedOut {
+				getPod := &out.Items[j]
+				ExpectNoDiff(t, fmt.Sprintf("%s: incorrect pod", tt.name), wantPod, getPod)
+			}
+		})
+	}
+}
+
+// seedMultiLevelData creates a set of keys with a multi-level structure, returning a resourceVersion
+// from before any were created along with the full set of objects that were persisted
+func seedMultiLevelData(ctx context.Context, store storage.Interface) (string, []*example.Pod, error) {
+	// Setup storage with the following structure:
+	//  /
+	//   - one-level/
+	//  |            - test
+	//  |
+	//   - two-level/
+	//  |            - 1/
+	//  |           |   - test
+	//  |           |
+	//  |            - 2/
+	//  |               - test
+	//  |
+	//   - z-level/
+	//               - 3/
+	//              |   - test
+	//              |
+	//               - 3/
+	//                  - test-2
+	preset := []struct {
+		key       string
+		obj       *example.Pod
+		storedObj *example.Pod
+	}{
+		{
+			key: "/one-level/test",
+			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
+		},
+		{
+			key: "/two-level/1/test",
+			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
+		},
+		{
+			key: "/two-level/2/test",
+			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}},
+		},
+		{
+			key: "/z-level/3/test",
+			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "fourth"}},
+		},
+		{
+			key: "/z-level/3/test-2",
+			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}},
+		},
+	}
+
+	// we want to figure out the resourceVersion before we create anything
+	initialList := &example.PodList{}
+	if err := store.GetList(ctx, "/", storage.ListOptions{Predicate: storage.Everything, Recursive: true}, initialList); err != nil {
+		return "", nil, fmt.Errorf("failed to determine starting resourceVersion: %w", err)
+	}
+	initialRV := initialList.ResourceVersion
+
+	for i, ps := range preset {
+		preset[i].storedObj = &example.Pod{}
+		err := store.Create(ctx, ps.key, ps.obj, preset[i].storedObj, 0)
+		if err != nil {
+			return "", nil, fmt.Errorf("failed to create object: %w", err)
+		}
+	}
+
+	var created []*example.Pod
+	for _, item := range preset {
+		created = append(created, item.storedObj)
+	}
+	return initialRV, created, nil
 }
 
 func RunTestGetListNonRecursive(ctx context.Context, t *testing.T, store storage.Interface) {
