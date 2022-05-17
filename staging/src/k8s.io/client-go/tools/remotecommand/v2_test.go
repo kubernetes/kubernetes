@@ -52,6 +52,9 @@ func (f *fakeStreamCreator) CreateStream(headers http.Header) (httpstream.Stream
 	return nil, f.errors[streamType]
 }
 
+func (f *fakeStreamCreator) Run() {
+}
+
 func TestV2CreateStreams(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -129,7 +132,7 @@ func TestV2CreateStreams(t *testing.T) {
 			opts.Stderr = &fakeWriter{}
 		}
 
-		h := newStreamProtocolV2(opts).(*streamProtocolV2)
+		h := newStreamProtocolV2(opts)
 		err := h.createStreams(conn)
 
 		if test.expectError {
@@ -196,7 +199,7 @@ func TestV2ErrorStreamReading(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		h := newStreamProtocolV2(StreamOptions{}).(*streamProtocolV2)
+		h := newStreamProtocolV2(StreamOptions{})
 		h.errorStream = test.stream
 
 		ch := watchErrorStream(h.errorStream, &errorDecoderV2{})

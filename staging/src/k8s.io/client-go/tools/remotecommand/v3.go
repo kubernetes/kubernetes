@@ -36,9 +36,9 @@ type streamProtocolV3 struct {
 
 var _ streamProtocolHandler = &streamProtocolV3{}
 
-func newStreamProtocolV3(options StreamOptions) streamProtocolHandler {
+func newStreamProtocolV3(options StreamOptions) *streamProtocolV3 {
 	return &streamProtocolV3{
-		streamProtocolV2: newStreamProtocolV2(options).(*streamProtocolV2),
+		streamProtocolV2: newStreamProtocolV2(options),
 	}
 }
 
@@ -88,6 +88,8 @@ func (p *streamProtocolV3) stream(conn streamCreator) error {
 	}
 
 	// now that all the streams have been created, proceed with reading & copying
+
+	go conn.Run()
 
 	errorChan := watchErrorStream(p.errorStream, &errorDecoderV3{})
 
