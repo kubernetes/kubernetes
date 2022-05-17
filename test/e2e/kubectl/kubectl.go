@@ -1158,16 +1158,28 @@ metadata:
 			meta := unknownFieldMetadataJSON(gvk, "test-cr")
 			unknownRootMetaCR := fmt.Sprintf(embeddedCRPattern, meta, "")
 			_, err = framework.RunKubectlInput(ns, unknownRootMetaCR, "create", "--validate=true", "-f", "-")
+			if err == nil {
+				framework.Failf("unexpected nil error when creating CR with unknown root metadata field")
+			}
 			if !(strings.Contains(err.Error(), `unknown field "unknownMeta"`) || strings.Contains(err.Error(), `unknown field "metadata.unknownMeta"`)) {
 				framework.Failf("error missing root unknown metadata field, got: %v", err)
+			}
+			if strings.Contains(err.Error(), `unknown field "namespace"`) || strings.Contains(err.Error(), `unknown field "metadata.namespace"`) {
+				framework.Failf("unexpected error, CR's root metadata namespace field unrecognized: %v", err)
 			}
 
 			ginkgo.By("attempting to create a CR with unknown metadata fields in the embedded object")
 			metaEmbedded := fmt.Sprintf(metaPattern, testCRD.Crd.Spec.Names.Kind, testCRD.Crd.Spec.Group, testCRD.Crd.Spec.Versions[0].Name, "test-cr-embedded")
 			unknownEmbeddedMetaCR := fmt.Sprintf(embeddedCRPattern, metaEmbedded, `"unknownMetaEmbedded": "bar",`)
 			_, err = framework.RunKubectlInput(ns, unknownEmbeddedMetaCR, "create", "--validate=true", "-f", "-")
+			if err == nil {
+				framework.Failf("unexpected nil error when creating CR with unknown embedded metadata field")
+			}
 			if !(strings.Contains(err.Error(), `unknown field "unknownMetaEmbedded"`) || strings.Contains(err.Error(), `unknown field "spec.template.metadata.unknownMetaEmbedded"`)) {
 				framework.Failf("error missing embedded unknown metadata field, got: %v", err)
+			}
+			if strings.Contains(err.Error(), `unknown field "namespace"`) || strings.Contains(err.Error(), `unknown field "spec.template.metadata.namespace"`) {
+				framework.Failf("unexpected error, CR's embedded metadata namespace field unrecognized: %v", err)
 			}
 		})
 
@@ -1206,8 +1218,14 @@ metadata:
 	}
 		`
 			_, err := framework.RunKubectlInput(ns, invalidMetaDeployment, "create", "-f", "-")
+			if err == nil {
+				framework.Failf("unexpected nil error when creating deployment with unknown metadata field")
+			}
 			if !(strings.Contains(err.Error(), `unknown field "unknownMeta"`) || strings.Contains(err.Error(), `unknown field "metadata.unknownMeta"`)) {
 				framework.Failf("error missing unknown metadata field, got: %v", err)
+			}
+			if strings.Contains(err.Error(), `unknown field "namespace"`) || strings.Contains(err.Error(), `unknown field "metadata.namespace"`) {
+				framework.Failf("unexpected error, deployment's metadata namespace field unrecognized: %v", err)
 			}
 
 		})
