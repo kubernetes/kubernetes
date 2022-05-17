@@ -77,6 +77,8 @@ type CopyOptions struct {
 	Clientset         kubernetes.Interface
 	ExecParentCmdName string
 
+	args []string
+
 	genericclioptions.IOStreams
 }
 
@@ -149,9 +151,9 @@ func NewCmdCp(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.C
 			return comps, cobra.ShellCompDirectiveNoSpace
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Complete(f, cmd))
-			cmdutil.CheckErr(o.Validate(cmd, args))
-			cmdutil.CheckErr(o.Run(args))
+			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.Run())
 		},
 	}
 	cmdutil.AddContainerVarFlags(cmd, &o.Container, o.Container)
@@ -198,7 +200,7 @@ func extractFileSpec(arg string) (fileSpec, error) {
 }
 
 // Complete completes all the required options
-func (o *CopyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
+func (o *CopyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	if cmd.Parent() != nil {
 		o.ExecParentCmdName = cmd.Parent().CommandPath()
 	}
@@ -218,24 +220,26 @@ func (o *CopyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	if err != nil {
 		return err
 	}
+
+	o.args = args
 	return nil
 }
 
 // Validate makes sure provided values for CopyOptions are valid
-func (o *CopyOptions) Validate(cmd *cobra.Command, args []string) error {
-	if len(args) != 2 {
+func (o *CopyOptions) Validate() error {
+	if len(o.args) != 2 {
 		return fmt.Errorf("source and destination are required")
 	}
 	return nil
 }
 
 // Run performs the execution
-func (o *CopyOptions) Run(args []string) error {
-	srcSpec, err := extractFileSpec(args[0])
+func (o *CopyOptions) Run() error {
+	srcSpec, err := extractFileSpec(o.args[0])
 	if err != nil {
 		return err
 	}
-	destSpec, err := extractFileSpec(args[1])
+	destSpec, err := extractFileSpec(o.args[1])
 	if err != nil {
 		return err
 	}
