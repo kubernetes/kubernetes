@@ -421,6 +421,33 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 
 // Run spawns the secure http server. It only returns if stopCh is closed
 // or the secure port cannot be listened on initially.
+// This is the diagram of what channels/signals are dependent on each other:
+//
+//                                  stopCh
+//                                    |
+//           ---------------------------------------------------------
+//           |                                                       |
+//    ShutdownInitiated (shutdownInitiatedCh)                        |
+//           |                                                       |
+// (ShutdownDelayDuration)                                    (PreShutdownHooks)
+//           |                                                       |
+//  AfterShutdownDelayDuration (delayedStopCh)           preShutdownHooksHasStoppedCh
+//           |                                                       |
+//           |----------------------------------                     |
+//           |                                  |                    |
+//           |                       (HandlerChainWaitGroup::Wait)   |
+//           |                                  |                    |
+//           |                  InFlightRequestsDrained (drainedCh)  |
+//           |                                  |                    |
+// [without ShutdownSendRetryAfter]  [with ShutdownSendRetryAfter]   |
+//           |                                  |                    |
+//           ---------------------------------------------------------
+//                                     |
+//                              stopHttpServerCh
+//                                     |
+//                             listenerStoppedCh
+//                                     |
+//             HTTPServerStoppedListening (httpServerStoppedListeningCh)
 func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 	delayedStopCh := s.lifecycleSignals.AfterShutdownDelayDuration
 	shutdownInitiatedCh := s.lifecycleSignals.ShutdownInitiated
