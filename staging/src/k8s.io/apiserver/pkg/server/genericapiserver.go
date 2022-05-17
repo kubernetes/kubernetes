@@ -437,7 +437,7 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 //           |                                                       |
 // (ShutdownDelayDuration)                                    (PreShutdownHooks)
 //           |                                                       |
-//  AfterShutdownDelayDuration (delayedStopCh)           preShutdownHooksHasStoppedCh
+//  AfterShutdownDelayDuration (delayedStopCh)   PreShutdownHooksStopped (preShutdownHooksHasStoppedCh)
 //           |                                                       |
 //           |----------------------------------                     |
 //           |                                  |                    |
@@ -510,12 +510,13 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 	}
 
 	// pre-shutdown hooks need to finish before we stop the http server
-	preShutdownHooksHasStoppedCh, stopHttpServerCh := make(chan struct{}), make(chan struct{})
+	preShutdownHooksHasStoppedCh := s.lifecycleSignals.PreShutdownHooksStopped
+	stopHttpServerCh := make(chan struct{})
 	go func() {
 		defer close(stopHttpServerCh)
 
 		<-delayedStopOrDrainedCh
-		<-preShutdownHooksHasStoppedCh
+		<-preShutdownHooksHasStoppedCh.Signaled()
 	}()
 
 	// Start the audit backend before any request comes in. This means we must call Backend.Run
@@ -556,7 +557,10 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 	// run shutdown hooks directly. This includes deregistering from
 	// the kubernetes endpoint in case of kube-apiserver.
 	func() {
-		defer close(preShutdownHooksHasStoppedCh)
+		defer func() {
+			preShutdownHooksHasStoppedCh.Signal()
+			klog.V(1).InfoS("[graceful-termination] pre-shutdown hooks completed", "name", preShutdownHooksHasStoppedCh.Name())
+		}()
 		err = s.RunPreShutdownHooks()
 	}()
 	if err != nil {

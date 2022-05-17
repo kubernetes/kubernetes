@@ -120,6 +120,10 @@ type lifecycleSignals struct {
 	// ShutdownDelayDuration allows the apiserver to delay shutdown for some time.
 	AfterShutdownDelayDuration lifecycleSignal
 
+	// PreShutdownHooksStopped event is signaled when all registered
+	// preshutdown hook(s) have finished running.
+	PreShutdownHooksStopped lifecycleSignal
+
 	// InFlightRequestsDrained event is signaled when the existing requests
 	// in flight have completed. This is used as signal to shut down the audit backends
 	InFlightRequestsDrained lifecycleSignal
@@ -143,6 +147,7 @@ func newLifecycleSignals() lifecycleSignals {
 	return lifecycleSignals{
 		ShutdownInitiated:          newNamedChannelWrapper("ShutdownInitiated"),
 		AfterShutdownDelayDuration: newNamedChannelWrapper("AfterShutdownDelayDuration"),
+		PreShutdownHooksStopped:    newNamedChannelWrapper("PreShutdownHooksStopped"),
 		InFlightRequestsDrained:    newNamedChannelWrapper("InFlightRequestsDrained"),
 		HTTPServerStoppedListening: newNamedChannelWrapper("HTTPServerStoppedListening"),
 		HasBeenReady:               newNamedChannelWrapper("HasBeenReady"),
