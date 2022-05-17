@@ -71,7 +71,9 @@ var _ = SIGDescribe("Probing container", func() {
 		framework.ExpectNoError(err)
 		isReady, err := testutils.PodRunningReady(p)
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(isReady, true, "pod should be ready")
+		if !isReady {
+			framework.Failf("pod %s/%s should be ready", f.Namespace.Name, p.Name)
+		}
 
 		// We assume the pod became ready when the container became ready. This
 		// is true for a single container pod.
@@ -110,7 +112,9 @@ var _ = SIGDescribe("Probing container", func() {
 		framework.ExpectNoError(err)
 
 		isReady, _ := testutils.PodRunningReady(p)
-		framework.ExpectNotEqual(isReady, true, "pod should be not ready")
+		if isReady {
+			framework.Failf("pod %s/%s should be not ready", f.Namespace.Name, p.Name)
+		}
 
 		restartCount := getRestartCount(p)
 		framework.ExpectEqual(restartCount, 0, "pod should have a restart count of 0 but got %v", restartCount)
@@ -430,7 +434,9 @@ var _ = SIGDescribe("Probing container", func() {
 
 		isReady, err := testutils.PodRunningReady(p)
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(isReady, true, "pod should be ready")
+		if !isReady {
+			framework.Failf("pod %s/%s should be ready", f.Namespace.Name, p.Name)
+		}
 
 		readyIn := readyTime.Sub(startedTime)
 		framework.Logf("Container started at %v, pod became ready at %v, %v after startupProbe succeeded", startedTime, readyTime, readyIn)
