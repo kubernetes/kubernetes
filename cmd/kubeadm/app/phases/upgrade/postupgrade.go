@@ -238,10 +238,10 @@ func RemoveOldControlPlaneLabel(client clientset.Interface) error {
 	return nil
 }
 
-// AddNewControlPlaneTaint finds all nodes with the new "control-plane" node-role label
-// and adds the new "control-plane" taint to them.
+// RemoveOldControlPlaneTaint finds all nodes with the new "control-plane" node-role label
+// and removes the old "control-plane" taint to them.
 // TODO: https://github.com/kubernetes/kubeadm/issues/2200
-func AddNewControlPlaneTaint(client clientset.Interface) error {
+func RemoveOldControlPlaneTaint(client clientset.Interface) error {
 	selectorControlPlane := labels.SelectorFromSet(labels.Set(map[string]string{
 		kubeadmconstants.LabelNodeRoleControlPlane: "",
 	}))
@@ -253,22 +253,21 @@ func AddNewControlPlaneTaint(client clientset.Interface) error {
 	}
 
 	for _, n := range nodes.Items {
-		// Check if the node has the old / new taints
+		// Check if the node has the old taint
 		hasOldTaint := false
-		hasNewTaint := false
+		taints := []v1.Taint{}
 		for _, t := range n.Spec.Taints {
-			switch t.String() {
-			case kubeadmconstants.OldControlPlaneTaint.String():
+			if t.String() == kubeadmconstants.OldControlPlaneTaint.String() {
 				hasOldTaint = true
-			case kubeadmconstants.ControlPlaneTaint.String():
-				hasNewTaint = true
+				continue
 			}
+			// Collect all other taints
+			taints = append(taints, t)
 		}
-		// If the old taint is present and the new taint is missing, patch the node with the new taint.
-		// When the old taint is missing, assume the user has manually untainted the node and take no action.
-		if !hasNewTaint && hasOldTaint {
+		// If the old taint is present remove it
+		if hasOldTaint {
 			err = apiclient.PatchNode(client, n.Name, func(n *v1.Node) {
-				n.Spec.Taints = append(n.Spec.Taints, kubeadmconstants.ControlPlaneTaint)
+				n.Spec.Taints = taints
 			})
 			if err != nil {
 				return err
