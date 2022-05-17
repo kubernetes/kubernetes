@@ -20,6 +20,7 @@ import (
 	"net"
 	"testing"
 
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	netutils "k8s.io/utils/net"
 )
 
@@ -122,6 +123,65 @@ func TestClusterServiceIPRange(t *testing.T) {
 func getIPnetFromCIDR(cidr string) *net.IPNet {
 	_, ipnet, _ := netutils.ParseCIDRSloppy(cidr)
 	return ipnet
+}
+
+func TestValidateServiceNodePort(t *testing.T) {
+	testCases := []struct {
+		name         string
+		options      *ServerRunOptions
+		expectErrors bool
+	}{
+		{
+			name:         "validate port less than 0",
+			options:      makeOptionsWithPort(-1, 30065, 1),
+			expectErrors: true,
+		},
+		{
+			name:         "validate port more than 65535",
+			options:      makeOptionsWithPort(65536, 30065, 1),
+			expectErrors: true,
+		},
+		{
+			name:         "validate port equal 0",
+			options:      makeOptionsWithPort(0, 0, 1),
+			expectErrors: true,
+		},
+		{
+			name:         "validate port less than base",
+			options:      makeOptionsWithPort(30064, 30065, 1),
+			expectErrors: true,
+		},
+		{
+			name:         "validate port minus base more than size",
+			options:      makeOptionsWithPort(30067, 30065, 1),
+			expectErrors: true,
+		},
+		{
+			name:         "validate success",
+			options:      makeOptionsWithPort(30067, 30065, 5),
+			expectErrors: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateServiceNodePort(tc.options)
+			if err != nil && !tc.expectErrors {
+				t.Errorf("expected no errors, error found %+v", err)
+			}
+		})
+	}
+}
+
+func makeOptionsWithPort(kubernetesServiceNodePort int, base int, size int) *ServerRunOptions {
+	var portRange = utilnet.PortRange{
+		Base: base,
+		Size: size,
+	}
+	return &ServerRunOptions{
+		ServiceNodePortRange:      portRange,
+		KubernetesServiceNodePort: kubernetesServiceNodePort,
+	}
 }
 
 func TestValidateMaxCIDRRange(t *testing.T) {
