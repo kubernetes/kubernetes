@@ -74,6 +74,8 @@ type StatefulSetController struct {
 	revListerSynced cache.InformerSynced
 	// StatefulSets that need to be synced.
 	queue workqueue.RateLimitingInterface
+	// eventBroadcaster is the core of event processing pipeline.
+	eventBroadcaster record.EventBroadcaster
 }
 
 // NewStatefulSetController creates a new statefulset controller.
@@ -85,8 +87,6 @@ func NewStatefulSetController(
 	kubeClient clientset.Interface,
 ) *StatefulSetController {
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartStructuredLogging(0)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "statefulset-controller"})
 	ssc := &StatefulSetController{
 		kubeClient: kubeClient,
@@ -101,10 +101,11 @@ func NewStatefulSetController(
 			recorder,
 		),
 		pvcListerSynced: pvcInformer.Informer().HasSynced,
+		revListerSynced: revInformer.Informer().HasSynced,
 		queue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "statefulset"),
 		podControl:      controller.RealPodControl{KubeClient: kubeClient, Recorder: recorder},
 
-		revListerSynced: revInformer.Informer().HasSynced,
+		eventBroadcaster: eventBroadcaster,
 	}
 
 	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -142,6 +143,12 @@ func NewStatefulSetController(
 // Run runs the statefulset controller.
 func (ssc *StatefulSetController) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
+
+	// Start events processing pipeline.
+	ssc.eventBroadcaster.StartStructuredLogging(0)
+	ssc.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: ssc.kubeClient.CoreV1().Events("")})
+	defer ssc.eventBroadcaster.Shutdown()
+
 	defer ssc.queue.ShutDown()
 
 	klog.Infof("Starting stateful set controller")
