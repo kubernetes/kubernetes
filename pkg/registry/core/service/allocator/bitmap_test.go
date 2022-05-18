@@ -541,3 +541,27 @@ func TestPreAllocateReservedFull_BitmapReserved(t *testing.T) {
 		t.Errorf("expect to get %d, but got %d", max-1, f)
 	}
 }
+
+func TestAllocateUniqueness(t *testing.T) {
+	max := 128
+	dynamicOffset := 16
+	uniqueAllocated := map[int]bool{}
+	m := NewAllocationMapWithOffset(max, "test", dynamicOffset)
+
+	// Allocate all the values in both the dynamic and reserved blocks
+	for i := 0; i < max; i++ {
+		alloc, ok, _ := m.AllocateNext()
+		if !ok {
+			t.Fatalf("unexpected error")
+		}
+		if _, ok := uniqueAllocated[alloc]; ok {
+			t.Fatalf("unexpected allocated value %d", alloc)
+		} else {
+			uniqueAllocated[alloc] = true
+		}
+	}
+
+	if max != len(uniqueAllocated) {
+		t.Errorf("expect to get %d, but got %d", max, len(uniqueAllocated))
+	}
+}
