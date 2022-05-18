@@ -68,17 +68,23 @@ func (e *listWorkEstimator) estimate(r *http.Request, flowSchemaName, priorityLe
 		// pruner will eventually remove the CRD from the cache.
 		return WorkEstimate{InitialSeats: maximumSeats}
 	case err == ObjectCountNotFoundErr:
-		// there are two scenarios in which we can see this error:
+		// there are multiple scenarios in which we can see this error:
 		//  a. the type is truly unknown, a typo on the caller's part.
 		//  b. the count has gone stale for too long and the pruner
 		//     has removed the type from the cache.
-		// we don't have a way to distinguish between a and b. b seems to indicate
-		// to a more severe case of degradation, although b can naturally trigger
-		// when a CRD is removed. let's be conservative and allocate maximum seats.
-		return WorkEstimate{InitialSeats: maximumSeats}
+		//  c. the type is an aggregated resource that is served by a
+		//     different apiserver (thus its object count is not updated)
+		// we don't have a way to distinguish between those situations.
+		// However, in case c, the request is delegated to a different apiserver,
+		// and thus its cost for our server is minimal. To avoid the situation
+		// when aggregated API calls are overestimated, we allocate the minimum
+		// possible seats (see #109106 as an example when being more conservative
+		// led to problems).
+		return WorkEstimate{InitialSeats: minimumSeats}
 	case err != nil:
 		// we should never be here since Get returns either ObjectCountStaleErr or
 		// ObjectCountNotFoundErr, return maximumSeats to be on the safe side.
+		klog.ErrorS(err, "Unexpected error from object count tracker")
 		return WorkEstimate{InitialSeats: maximumSeats}
 	}
 

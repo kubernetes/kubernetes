@@ -1,5 +1,3 @@
-// +build linux
-
 package fs2
 
 import (

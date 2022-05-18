@@ -19,6 +19,7 @@ package service
 import (
 	"context"
 	"testing"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,8 +29,6 @@ import (
 	restclient "k8s.io/client-go/rest"
 	servicecontroller "k8s.io/cloud-provider/controllers/service"
 	fakecloud "k8s.io/cloud-provider/fake"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -48,8 +47,8 @@ func Test_ServiceLoadBalancerDisableAllocateNodePorts(t *testing.T) {
 		t.Fatalf("Error creating clientset: %v", err)
 	}
 
-	ns := framework.CreateTestingNamespace("test-service-allocate-node-ports", server, t)
-	defer framework.DeleteTestingNamespace(ns, server, t)
+	ns := framework.CreateTestingNamespace("test-service-allocate-node-ports", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -91,8 +90,8 @@ func Test_ServiceUpdateLoadBalancerDisableAllocateNodePorts(t *testing.T) {
 		t.Fatalf("Error creating clientset: %v", err)
 	}
 
-	ns := framework.CreateTestingNamespace("test-service-allocate-node-ports", server, t)
-	defer framework.DeleteTestingNamespace(ns, server, t)
+	ns := framework.CreateTestingNamespace("test-service-allocate-node-ports", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -144,8 +143,8 @@ func Test_ServiceLoadBalancerEnableThenDisableAllocatedNodePorts(t *testing.T) {
 		t.Fatalf("Error creating clientset: %v", err)
 	}
 
-	ns := framework.CreateTestingNamespace("test-service-deallocate-node-ports", server, t)
-	defer framework.DeleteTestingNamespace(ns, server, t)
+	ns := framework.CreateTestingNamespace("test-service-deallocate-node-ports", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -197,8 +196,8 @@ func Test_ServiceLoadBalancerDisableThenEnableAllocatedNodePorts(t *testing.T) {
 		t.Fatalf("Error creating clientset: %v", err)
 	}
 
-	ns := framework.CreateTestingNamespace("test-service-reallocate-node-ports", server, t)
-	defer framework.DeleteTestingNamespace(ns, server, t)
+	ns := framework.CreateTestingNamespace("test-service-reallocate-node-ports", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -249,7 +248,6 @@ func serviceHasNodePorts(svc *corev1.Service) bool {
 // Test_ServiceLoadBalancerEnableLoadBalancerClass tests that when a LoadBalancer
 // type of service has spec.LoadBalancerClass set, cloud provider should not create default load balancer.
 func Test_ServiceLoadBalancerEnableLoadBalancerClass(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceLoadBalancerClass, true)()
 
 	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
 	_, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
@@ -261,8 +259,8 @@ func Test_ServiceLoadBalancerEnableLoadBalancerClass(t *testing.T) {
 		t.Fatalf("Error creating clientset: %v", err)
 	}
 
-	ns := framework.CreateTestingNamespace("test-service-load-balancer-class", server, t)
-	defer framework.DeleteTestingNamespace(ns, server, t)
+	ns := framework.CreateTestingNamespace("test-service-load-balancer-class", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	controller, cloud, informer := newServiceController(t, client)
 
@@ -289,16 +287,16 @@ func Test_ServiceLoadBalancerEnableLoadBalancerClass(t *testing.T) {
 		t.Fatalf("Error creating test service: %v", err)
 	}
 
+	time.Sleep(5 * time.Second) // sleep 5 second to wait for the service controller reconcile
 	if len(cloud.Calls) > 0 {
 		t.Errorf("Unexpected cloud provider calls: %v", cloud.Calls)
 	}
 }
 
-// Test_ServiceLoadBalancerEnableLoadBalancerClassThenUpdateLoadBalancerClass tests that when a LoadBalancer
+// Test_SetLoadBalancerClassThenUpdateLoadBalancerClass tests that when a LoadBalancer
 // type of service has spec.LoadBalancerClass set, it should be immutable as long as the service type
 // is still LoadBalancer.
-func Test_ServiceLoadBalancerEnableLoadBalancerClassThenUpdateLoadBalancerClass(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceLoadBalancerClass, true)()
+func Test_SetLoadBalancerClassThenUpdateLoadBalancerClass(t *testing.T) {
 
 	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
 	_, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
@@ -310,8 +308,8 @@ func Test_ServiceLoadBalancerEnableLoadBalancerClassThenUpdateLoadBalancerClass(
 		t.Fatalf("Error creating clientset: %v", err)
 	}
 
-	ns := framework.CreateTestingNamespace("test-service-immutable-load-balancer-class", server, t)
-	defer framework.DeleteTestingNamespace(ns, server, t)
+	ns := framework.CreateTestingNamespace("test-service-immutable-load-balancer-class", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	controller, cloud, informer := newServiceController(t, client)
 
@@ -338,18 +336,68 @@ func Test_ServiceLoadBalancerEnableLoadBalancerClassThenUpdateLoadBalancerClass(
 		t.Fatalf("Error creating test service: %v", err)
 	}
 
-	if len(cloud.Calls) > 0 {
-		t.Errorf("Unexpected cloud provider calls: %v", cloud.Calls)
-	}
-
 	service.Spec.LoadBalancerClass = utilpointer.StringPtr("test.com/update")
 	_, err = client.CoreV1().Services(ns.Name).Update(ctx, service, metav1.UpdateOptions{})
 	if err == nil {
-		t.Fatal("Error updating test service load balancer class should throw error")
+		t.Fatal("Error: updating test service load balancer class should throw error, field is immutable")
 	}
 
+	time.Sleep(5 * time.Second) // sleep 5 second to wait for the service controller reconcile
 	if len(cloud.Calls) > 0 {
 		t.Errorf("Unexpected cloud provider calls: %v", cloud.Calls)
+	}
+}
+
+// Test_UpdateLoadBalancerWithLoadBalancerClass tests that when a Load Balancer type of Service that
+// is updated from non loadBalancerClass set to loadBalancerClass set, it should be not allowed.
+func Test_UpdateLoadBalancerWithLoadBalancerClass(t *testing.T) {
+
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
+	_, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
+	defer closeFn()
+
+	config := restclient.Config{Host: server.URL}
+	client, err := clientset.NewForConfig(&config)
+	if err != nil {
+		t.Fatalf("Error creating clientset: %v", err)
+	}
+
+	ns := framework.CreateTestingNamespace("test-service-update-load-balancer-class", t)
+	defer framework.DeleteTestingNamespace(ns, t)
+
+	controller, cloud, informer := newServiceController(t, client)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	informer.Start(ctx.Done())
+	go controller.Run(ctx, 1)
+
+	service := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-update-load-balancer-class",
+		},
+		Spec: corev1.ServiceSpec{
+			Type: corev1.ServiceTypeLoadBalancer,
+			Ports: []corev1.ServicePort{{
+				Port: int32(80),
+			}},
+		},
+	}
+
+	service, err = client.CoreV1().Services(ns.Name).Create(ctx, service, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Error creating test service: %v", err)
+	}
+
+	service.Spec.LoadBalancerClass = utilpointer.StringPtr("test.com/test")
+	_, err = client.CoreV1().Services(ns.Name).Update(ctx, service, metav1.UpdateOptions{})
+	if err == nil {
+		t.Fatal("Error: updating test service load balancer class should throw error, field is immutable")
+	}
+
+	time.Sleep(5 * time.Second) // sleep 5 second to wait for the service controller reconcile
+	if len(cloud.Calls) == 0 {
+		t.Errorf("expected cloud provider calls to create load balancer")
 	}
 }
 
@@ -368,6 +416,6 @@ func newServiceController(t *testing.T, client *clientset.Clientset) (*serviceco
 	if err != nil {
 		t.Fatalf("Error creating service controller: %v", err)
 	}
-	cloud.Calls = nil // ignore any cloud calls made in init()
+	cloud.ClearCalls() // ignore any cloud calls made in init()
 	return controller, cloud, informerFactory
 }

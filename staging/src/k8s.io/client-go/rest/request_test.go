@@ -938,7 +938,7 @@ func TestRequestWatch(t *testing.T) {
 			},
 			Err: true,
 			ErrFn: func(err error) bool {
-				return apierrors.IsInternalError(err)
+				return !apierrors.IsInternalError(err) && strings.Contains(err.Error(), "failed to reset the request body while retrying a request: EOF")
 			},
 		},
 		{
@@ -954,7 +954,10 @@ func TestRequestWatch(t *testing.T) {
 			serverReturns: []responseErr{
 				{response: nil, err: io.EOF},
 			},
-			Empty: true,
+			Err: true,
+			ErrFn: func(err error) bool {
+				return !apierrors.IsInternalError(err)
+			},
 		},
 		{
 			name: "max retries 2, server always returns a response with Retry-After header",
@@ -995,7 +998,8 @@ func TestRequestWatch(t *testing.T) {
 				c.Client = client
 			}
 			testCase.Request.backoff = &noSleepBackOff{}
-			testCase.Request.retry = &withRetry{maxRetries: testCase.maxRetries}
+			testCase.Request.maxRetries = testCase.maxRetries
+			testCase.Request.retryFn = defaultRequestRetryFn
 
 			watch, err := testCase.Request.Watch(context.Background())
 
@@ -1130,7 +1134,7 @@ func TestRequestStream(t *testing.T) {
 			},
 			Err: true,
 			ErrFn: func(err error) bool {
-				return apierrors.IsInternalError(err)
+				return !apierrors.IsInternalError(err) && strings.Contains(err.Error(), "failed to reset the request body while retrying a request: EOF")
 			},
 		},
 		{
@@ -1208,7 +1212,8 @@ func TestRequestStream(t *testing.T) {
 				c.Client = client
 			}
 			testCase.Request.backoff = &noSleepBackOff{}
-			testCase.Request.retry = &withRetry{maxRetries: testCase.maxRetries}
+			testCase.Request.maxRetries = testCase.maxRetries
+			testCase.Request.retryFn = defaultRequestRetryFn
 
 			body, err := testCase.Request.Stream(context.Background())
 
@@ -1263,7 +1268,7 @@ func TestRequestDo(t *testing.T) {
 	}
 	for i, testCase := range testCases {
 		testCase.Request.backoff = &NoBackoff{}
-		testCase.Request.retry = &withRetry{}
+		testCase.Request.retryFn = defaultRequestRetryFn
 		body, err := testCase.Request.Do(context.Background()).Raw()
 		hasErr := err != nil
 		if hasErr != testCase.Err {
@@ -1426,8 +1431,9 @@ func TestConnectionResetByPeerIsRetried(t *testing.T) {
 				return nil, &net.OpError{Err: syscall.ECONNRESET}
 			}),
 		},
-		backoff: backoff,
-		retry:   &withRetry{maxRetries: 10},
+		backoff:    backoff,
+		maxRetries: 10,
+		retryFn:    defaultRequestRetryFn,
 	}
 	// We expect two retries of "connection reset by peer" and the success.
 	_, err := req.Do(context.Background()).Raw()
@@ -2433,6 +2439,7 @@ func TestRequestWithRetry(t *testing.T) {
 		body                         io.Reader
 		serverReturns                responseErr
 		errExpected                  error
+		errContains                  string
 		transformFuncInvokedExpected int
 		roundTripInvokedExpected     int
 	}{
@@ -2449,7 +2456,7 @@ func TestRequestWithRetry(t *testing.T) {
 			body:                         &readSeeker{err: io.EOF},
 			serverReturns:                responseErr{response: retryAfterResponse(), err: nil},
 			errExpected:                  nil,
-			transformFuncInvokedExpected: 1,
+			transformFuncInvokedExpected: 0,
 			roundTripInvokedExpected:     1,
 		},
 		{
@@ -2472,7 +2479,7 @@ func TestRequestWithRetry(t *testing.T) {
 			name:                         "server returns retryable err, request body Seek returns error, retry aborted",
 			body:                         &readSeeker{err: io.EOF},
 			serverReturns:                responseErr{response: nil, err: io.ErrUnexpectedEOF},
-			errExpected:                  io.ErrUnexpectedEOF,
+			errContains:                  "failed to reset the request body while retrying a request: EOF",
 			transformFuncInvokedExpected: 0,
 			roundTripInvokedExpected:     1,
 		},
@@ -2500,8 +2507,9 @@ func TestRequestWithRetry(t *testing.T) {
 				c: &RESTClient{
 					Client: client,
 				},
-				backoff: &noSleepBackOff{},
-				retry:   &withRetry{maxRetries: 1},
+				backoff:    &noSleepBackOff{},
+				maxRetries: 1,
+				retryFn:    defaultRequestRetryFn,
 			}
 
 			var transformFuncInvoked int
@@ -2515,8 +2523,15 @@ func TestRequestWithRetry(t *testing.T) {
 			if test.transformFuncInvokedExpected != transformFuncInvoked {
 				t.Errorf("Expected transform func to be invoked %d times, but got: %d", test.transformFuncInvokedExpected, transformFuncInvoked)
 			}
-			if test.errExpected != unWrap(err) {
-				t.Errorf("Expected error: %v, but got: %v", test.errExpected, unWrap(err))
+			switch {
+			case test.errExpected != nil:
+				if test.errExpected != unWrap(err) {
+					t.Errorf("Expected error: %v, but got: %v", test.errExpected, unWrap(err))
+				}
+			case len(test.errContains) > 0:
+				if !strings.Contains(err.Error(), test.errContains) {
+					t.Errorf("Expected error message to caontain: %q, but got: %q", test.errContains, err.Error())
+				}
 			}
 		})
 	}
@@ -2581,6 +2596,58 @@ func TestRequestWatchRetryWithRateLimiterBackoffAndMetrics(t *testing.T) {
 			// body of the response object, we need to wait here to avoid race condition.
 			<-w.ResultChan()
 		}
+	})
+}
+
+func TestRequestDoWithRetryInvokeOrder(t *testing.T) {
+	// both request.Do and request.DoRaw have the same behavior and expectations
+	testWithRetryInvokeOrder(t, "Do", func(ctx context.Context, r *Request) {
+		r.DoRaw(ctx)
+	})
+}
+
+func TestRequestStreamWithRetryInvokeOrder(t *testing.T) {
+	testWithRetryInvokeOrder(t, "Stream", func(ctx context.Context, r *Request) {
+		r.Stream(ctx)
+	})
+}
+
+func TestRequestWatchWithRetryInvokeOrder(t *testing.T) {
+	testWithRetryInvokeOrder(t, "Watch", func(ctx context.Context, r *Request) {
+		w, err := r.Watch(ctx)
+		if err == nil {
+			// in this test the the response body returned by the server is always empty,
+			// this will cause StreamWatcher.receive() to:
+			// - return an io.EOF to indicate that the watch closed normally and
+			// - then close the io.Reader
+			// since we assert on the number of times 'Close' has been called on the
+			// body of the response object, we need to wait here to avoid race condition.
+			<-w.ResultChan()
+		}
+	})
+}
+
+func TestRequestWatchWithWrapPreviousError(t *testing.T) {
+	testWithWrapPreviousError(t, func(ctx context.Context, r *Request) error {
+		w, err := r.Watch(ctx)
+		if err == nil {
+			// in this test the the response body returned by the server is always empty,
+			// this will cause StreamWatcher.receive() to:
+			// - return an io.EOF to indicate that the watch closed normally and
+			// - then close the io.Reader
+			// since we assert on the number of times 'Close' has been called on the
+			// body of the response object, we need to wait here to avoid race condition.
+			<-w.ResultChan()
+		}
+		return err
+	})
+}
+
+func TestRequestDoWithWrapPreviousError(t *testing.T) {
+	// both request.Do and request.DoRaw have the same behavior and expectations
+	testWithWrapPreviousError(t, func(ctx context.Context, r *Request) error {
+		result := r.Do(ctx)
+		return result.err
 	})
 }
 
@@ -2719,8 +2786,9 @@ func testRequestWithRetry(t *testing.T, key string, doFunc func(ctx context.Cont
 					content: defaultContentConfig(),
 					Client:  client,
 				},
-				backoff: &noSleepBackOff{},
-				retry:   &withRetry{maxRetries: test.maxRetries},
+				backoff:    &noSleepBackOff{},
+				maxRetries: test.maxRetries,
+				retryFn:    defaultRequestRetryFn,
 			}
 
 			doFunc(context.Background(), req)
@@ -2943,7 +3011,8 @@ func testRetryWithRateLimiterBackoffAndMetrics(t *testing.T, key string, doFunc 
 				pathPrefix:  "/api/v1",
 				rateLimiter: interceptor,
 				backoff:     interceptor,
-				retry:       &withRetry{maxRetries: test.maxRetries},
+				maxRetries:  test.maxRetries,
+				retryFn:     defaultRequestRetryFn,
 			}
 
 			doFunc(ctx, req)
@@ -2963,6 +3032,337 @@ func testRetryWithRateLimiterBackoffAndMetrics(t *testing.T, key string, doFunc 
 			}
 			if !cmp.Equal(statusCodesWant, interceptor.statusCodesGot) {
 				t.Errorf("%s: Expected status codes to match, diff: %s", key, cmp.Diff(statusCodesWant, interceptor.statusCodesGot))
+			}
+		})
+	}
+}
+
+type retryInterceptor struct {
+	WithRetry
+	invokeOrderGot []string
+}
+
+func (ri *retryInterceptor) IsNextRetry(ctx context.Context, restReq *Request, httpReq *http.Request, resp *http.Response, err error, f IsRetryableErrorFunc) bool {
+	ri.invokeOrderGot = append(ri.invokeOrderGot, "WithRetry.IsNextRetry")
+	return ri.WithRetry.IsNextRetry(ctx, restReq, httpReq, resp, err, f)
+}
+
+func (ri *retryInterceptor) Before(ctx context.Context, request *Request) error {
+	ri.invokeOrderGot = append(ri.invokeOrderGot, "WithRetry.Before")
+	return ri.WithRetry.Before(ctx, request)
+}
+
+func (ri *retryInterceptor) After(ctx context.Context, request *Request, resp *http.Response, err error) {
+	ri.invokeOrderGot = append(ri.invokeOrderGot, "WithRetry.After")
+	ri.WithRetry.After(ctx, request, resp, err)
+}
+
+func (ri *retryInterceptor) Do() {
+	ri.invokeOrderGot = append(ri.invokeOrderGot, "Client.Do")
+}
+
+func testWithRetryInvokeOrder(t *testing.T, key string, doFunc func(ctx context.Context, r *Request)) {
+	// we define the expected order of how the client
+	// should invoke the retry interface
+	// scenario:
+	//  - A: original request fails with a retryable response: (500, 'Retry-After: 1')
+	//  - B: retry 1: successful with a status code 200
+	// so we have a total of 2 attempts
+	defaultInvokeOrderWant := []string{
+		// first attempt (A)
+		"WithRetry.Before",
+		"Client.Do",
+		"WithRetry.After",
+		// server returns a retryable response: (500, 'Retry-After: 1')
+		// IsNextRetry is expected to return true
+		"WithRetry.IsNextRetry",
+
+		// second attempt (B) - retry 1: successful with a status code 200
+		"WithRetry.Before",
+		"Client.Do",
+		"WithRetry.After",
+		// success: IsNextRetry is expected to return false
+		// Watch and Stream are an exception, they return as soon as the
+		// server sends a status code of success.
+		"WithRetry.IsNextRetry",
+	}
+
+	tests := []struct {
+		name          string
+		maxRetries    int
+		serverReturns []responseErr
+		// expectations differ based on whether it is 'Watch', 'Stream' or 'Do'
+		expectations map[string][]string
+	}{
+		{
+			name:       "success after one retry",
+			maxRetries: 1,
+			serverReturns: []responseErr{
+				{response: retryAfterResponse(), err: nil},
+				{response: &http.Response{StatusCode: http.StatusOK}, err: nil},
+			},
+			expectations: map[string][]string{
+				"Do": defaultInvokeOrderWant,
+				// Watch and Stream skip the final 'IsNextRetry' by returning
+				// as soon as they see a success from the server.
+				"Watch":  defaultInvokeOrderWant[0 : len(defaultInvokeOrderWant)-1],
+				"Stream": defaultInvokeOrderWant[0 : len(defaultInvokeOrderWant)-1],
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			interceptor := &retryInterceptor{
+				WithRetry: &withRetry{maxRetries: test.maxRetries},
+			}
+
+			var attempts int
+			client := clientForFunc(func(req *http.Request) (*http.Response, error) {
+				defer func() {
+					attempts++
+				}()
+
+				interceptor.Do()
+				resp := test.serverReturns[attempts].response
+				if resp != nil {
+					resp.Body = ioutil.NopCloser(bytes.NewReader([]byte{}))
+				}
+				return resp, test.serverReturns[attempts].err
+			})
+
+			base, err := url.Parse("http://foo.bar")
+			if err != nil {
+				t.Fatalf("Wrong test setup - did not find expected for: %s", key)
+			}
+			req := &Request{
+				verb: "GET",
+				body: bytes.NewReader([]byte{}),
+				c: &RESTClient{
+					base:    base,
+					content: defaultContentConfig(),
+					Client:  client,
+				},
+				pathPrefix:  "/api/v1",
+				rateLimiter: flowcontrol.NewFakeAlwaysRateLimiter(),
+				backoff:     &NoBackoff{},
+				retryFn:     func(_ int) WithRetry { return interceptor },
+			}
+
+			doFunc(context.Background(), req)
+
+			if attempts != 2 {
+				t.Errorf("%s: Expected attempts: %d, but got: %d", key, 2, attempts)
+			}
+			invokeOrderWant, ok := test.expectations[key]
+			if !ok {
+				t.Fatalf("Wrong test setup - did not find expected for: %s", key)
+			}
+			if !cmp.Equal(invokeOrderWant, interceptor.invokeOrderGot) {
+				t.Errorf("%s: Expected invoke order to match, diff: %s", key, cmp.Diff(invokeOrderWant, interceptor.invokeOrderGot))
+			}
+		})
+	}
+}
+
+func testWithWrapPreviousError(t *testing.T, doFunc func(ctx context.Context, r *Request) error) {
+	var (
+		containsFormatExpected = "- error from a previous attempt: %s"
+		nonRetryableErr        = errors.New("non retryable error")
+	)
+
+	tests := []struct {
+		name             string
+		maxRetries       int
+		serverReturns    []responseErr
+		expectedErr      error
+		wrapped          bool
+		attemptsExpected int
+		contains         string
+	}{
+		{
+			name:       "success at first attempt",
+			maxRetries: 2,
+			serverReturns: []responseErr{
+				{response: &http.Response{StatusCode: http.StatusOK}, err: nil},
+			},
+			attemptsExpected: 1,
+			expectedErr:      nil,
+		},
+		{
+			name:       "success after a series of retry-after from the server",
+			maxRetries: 2,
+			serverReturns: []responseErr{
+				{response: retryAfterResponse(), err: nil},
+				{response: retryAfterResponse(), err: nil},
+				{response: &http.Response{StatusCode: http.StatusOK}, err: nil},
+			},
+			attemptsExpected: 3,
+			expectedErr:      nil,
+		},
+		{
+			name:       "success after a series of retryable errors",
+			maxRetries: 2,
+			serverReturns: []responseErr{
+				{response: nil, err: io.EOF},
+				{response: nil, err: io.EOF},
+				{response: &http.Response{StatusCode: http.StatusOK}, err: nil},
+			},
+			attemptsExpected: 3,
+			expectedErr:      nil,
+		},
+		{
+			name:       "request errors out with a non retryable error",
+			maxRetries: 2,
+			serverReturns: []responseErr{
+				{response: nil, err: nonRetryableErr},
+			},
+			attemptsExpected: 1,
+			expectedErr:      nonRetryableErr,
+		},
+		{
+			name:       "request times out after retries, but no previous error",
+			maxRetries: 2,
+			serverReturns: []responseErr{
+				{response: retryAfterResponse(), err: nil},
+				{response: retryAfterResponse(), err: nil},
+				{response: nil, err: context.Canceled},
+			},
+			attemptsExpected: 3,
+			expectedErr:      context.Canceled,
+		},
+		{
+			name:       "request times out after retries, and we have a relevant previous error",
+			maxRetries: 3,
+			serverReturns: []responseErr{
+				{response: nil, err: io.EOF},
+				{response: retryAfterResponse(), err: nil},
+				{response: retryAfterResponse(), err: nil},
+				{response: nil, err: context.Canceled},
+			},
+			attemptsExpected: 4,
+			wrapped:          true,
+			expectedErr:      context.Canceled,
+			contains:         fmt.Sprintf(containsFormatExpected, io.EOF),
+		},
+		{
+			name:       "interleaved retry-after responses with retryable errors",
+			maxRetries: 8,
+			serverReturns: []responseErr{
+				{response: retryAfterResponse(), err: nil},
+				{response: retryAfterResponse(), err: nil},
+				{response: nil, err: io.ErrUnexpectedEOF},
+				{response: retryAfterResponse(), err: nil},
+				{response: retryAfterResponse(), err: nil},
+				{response: nil, err: io.EOF},
+				{response: retryAfterResponse(), err: nil},
+				{response: retryAfterResponse(), err: nil},
+				{response: nil, err: context.Canceled},
+			},
+			attemptsExpected: 9,
+			wrapped:          true,
+			expectedErr:      context.Canceled,
+			contains:         fmt.Sprintf(containsFormatExpected, io.EOF),
+		},
+		{
+			name:       "request errors out with a retryable error, followed by a non-retryable one",
+			maxRetries: 3,
+			serverReturns: []responseErr{
+				{response: nil, err: io.EOF},
+				{response: nil, err: nonRetryableErr},
+			},
+			attemptsExpected: 2,
+			wrapped:          true,
+			expectedErr:      nonRetryableErr,
+			contains:         fmt.Sprintf(containsFormatExpected, io.EOF),
+		},
+		{
+			name:       "use the most recent error",
+			maxRetries: 2,
+			serverReturns: []responseErr{
+				{response: nil, err: io.ErrUnexpectedEOF},
+				{response: nil, err: io.EOF},
+				{response: nil, err: context.Canceled},
+			},
+			attemptsExpected: 3,
+			wrapped:          true,
+			expectedErr:      context.Canceled,
+			contains:         fmt.Sprintf(containsFormatExpected, io.EOF),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var attempts int
+			client := clientForFunc(func(req *http.Request) (*http.Response, error) {
+				defer func() {
+					attempts++
+				}()
+
+				resp := test.serverReturns[attempts].response
+				if resp != nil {
+					resp.Body = ioutil.NopCloser(bytes.NewReader([]byte{}))
+				}
+				return resp, test.serverReturns[attempts].err
+			})
+
+			base, err := url.Parse("http://foo.bar")
+			if err != nil {
+				t.Fatalf("Failed to create new HTTP request - %v", err)
+			}
+			req := &Request{
+				verb: "GET",
+				body: bytes.NewReader([]byte{}),
+				c: &RESTClient{
+					base:    base,
+					content: defaultContentConfig(),
+					Client:  client,
+				},
+				pathPrefix:  "/api/v1",
+				rateLimiter: flowcontrol.NewFakeAlwaysRateLimiter(),
+				backoff:     &noSleepBackOff{},
+				maxRetries:  test.maxRetries,
+				retryFn:     defaultRequestRetryFn,
+			}
+
+			err = doFunc(context.Background(), req)
+			if test.attemptsExpected != attempts {
+				t.Errorf("Expected attempts: %d, but got: %d", test.attemptsExpected, attempts)
+			}
+
+			switch {
+			case test.expectedErr == nil:
+				if err != nil {
+					t.Errorf("Expected a nil error, but got: %v", err)
+					return
+				}
+			case test.expectedErr != nil:
+				if !strings.Contains(err.Error(), test.contains) {
+					t.Errorf("Expected error message to contain %q, but got: %v", test.contains, err)
+				}
+
+				urlErrGot, _ := err.(*url.Error)
+				if test.wrapped {
+					// we expect the url.Error from net/http to be wrapped by WrapPreviousError
+					unwrapper, ok := err.(interface {
+						Unwrap() error
+					})
+					if !ok {
+						t.Errorf("Expected error to implement Unwrap method, but got: %v", err)
+						return
+					}
+					urlErrGot, _ = unwrapper.Unwrap().(*url.Error)
+				}
+				// we always get a url.Error from net/http
+				if urlErrGot == nil {
+					t.Errorf("Expected error to be url.Error, but got: %v", err)
+					return
+				}
+
+				errGot := urlErrGot.Unwrap()
+				if test.expectedErr != errGot {
+					t.Errorf("Expected error %v, but got: %v", test.expectedErr, errGot)
+				}
 			}
 		})
 	}
@@ -3145,5 +3545,106 @@ func TestTransportConcurrency(t *testing.T) {
 			}
 			wg.Wait()
 		})
+	}
+}
+
+// TODO: see if we can consolidate the other trackers into one.
+type requestBodyTracker struct {
+	io.ReadSeeker
+	f func(string)
+}
+
+func (t *requestBodyTracker) Read(p []byte) (int, error) {
+	t.f("Request.Body.Read")
+	return t.ReadSeeker.Read(p)
+}
+
+func (t *requestBodyTracker) Seek(offset int64, whence int) (int64, error) {
+	t.f("Request.Body.Seek")
+	return t.ReadSeeker.Seek(offset, whence)
+}
+
+type responseBodyTracker struct {
+	io.ReadCloser
+	f func(string)
+}
+
+func (t *responseBodyTracker) Read(p []byte) (int, error) {
+	t.f("Response.Body.Read")
+	return t.ReadCloser.Read(p)
+}
+
+func (t *responseBodyTracker) Close() error {
+	t.f("Response.Body.Close")
+	return t.ReadCloser.Close()
+}
+
+type recorder struct {
+	order []string
+}
+
+func (r *recorder) record(call string) {
+	r.order = append(r.order, call)
+}
+
+func TestRequestBodyResetOrder(t *testing.T) {
+	recorder := &recorder{}
+	respBodyTracker := &responseBodyTracker{
+		ReadCloser: nil, // the server will fill it
+		f:          recorder.record,
+	}
+
+	var attempts int
+	client := clientForFunc(func(req *http.Request) (*http.Response, error) {
+		defer func() {
+			attempts++
+		}()
+
+		// read the request body.
+		ioutil.ReadAll(req.Body)
+
+		// first attempt, we send a retry-after
+		if attempts == 0 {
+			resp := retryAfterResponse()
+			respBodyTracker.ReadCloser = ioutil.NopCloser(bytes.NewReader([]byte{}))
+			resp.Body = respBodyTracker
+			return resp, nil
+		}
+
+		return &http.Response{StatusCode: http.StatusOK}, nil
+	})
+
+	reqBodyTracker := &requestBodyTracker{
+		ReadSeeker: bytes.NewReader([]byte{}), // empty body ensures one Read operation at most.
+		f:          recorder.record,
+	}
+	req := &Request{
+		verb: "POST",
+		body: reqBodyTracker,
+		c: &RESTClient{
+			content: defaultContentConfig(),
+			Client:  client,
+		},
+		backoff:    &noSleepBackOff{},
+		maxRetries: 1,
+		retryFn:    defaultRequestRetryFn,
+	}
+
+	req.Do(context.Background())
+
+	expected := []string{
+		// 1st attempt: the server handler reads the request body
+		"Request.Body.Read",
+		// the server sends a retry-after, client reads the
+		// response body, and closes it
+		"Response.Body.Read",
+		"Response.Body.Close",
+		// client retry logic seeks to the beginning of the request body
+		"Request.Body.Seek",
+		// 2nd attempt: the server reads the request body
+		"Request.Body.Read",
+	}
+	if !reflect.DeepEqual(expected, recorder.order) {
+		t.Errorf("Expected invocation request and response body operations for retry do not match: %s", cmp.Diff(expected, recorder.order))
 	}
 }

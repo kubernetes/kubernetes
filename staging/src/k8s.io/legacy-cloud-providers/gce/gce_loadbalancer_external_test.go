@@ -585,35 +585,54 @@ func TestEnsureExternalLoadBalancerRBSAnnotation(t *testing.T) {
 
 	for desc, tc := range map[string]struct {
 		annotations map[string]string
-		expectError *error
+		wantError   *error
 	}{
 		"When RBS enabled": {
 			annotations: map[string]string{RBSAnnotationKey: RBSEnabled},
-			expectError: &cloudprovider.ImplementedElsewhere,
+			wantError:   &cloudprovider.ImplementedElsewhere,
 		},
 		"When RBS not enabled": {
 			annotations: map[string]string{},
-			expectError: nil,
+			wantError:   nil,
 		},
 		"When RBS annotation has wrong value": {
 			annotations: map[string]string{RBSAnnotationKey: "WrongValue"},
-			expectError: nil,
+			wantError:   nil,
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
 			vals := DefaultTestClusterValues()
-			gce, err := fakeGCECloud(DefaultTestClusterValues())
-			require.NoError(t, err)
-			nodeNames := []string{"test-node-1"}
+			gce, err := fakeGCECloud(vals)
+			if err != nil {
+				t.Fatalf("fakeGCECloud(%v) returned error %v, want nil", vals, err)
+			}
 
+			nodeNames := []string{"test-node-1"}
 			nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
-			require.NoError(t, err)
+			if err != nil {
+				t.Fatalf("createAndInsertNodes(_, %v, %v) returned error %v, want nil", nodeNames, vals.ZoneName, err)
+			}
 
 			svc := fakeLoadbalancerService("")
 			svc.Annotations = tc.annotations
+
 			_, err = gce.ensureExternalLoadBalancer(vals.ClusterName, vals.ClusterID, svc, nil, nodes)
-			if tc.expectError != nil {
-				assert.EqualError(t, err, (*tc.expectError).Error())
+			if tc.wantError != nil {
+				assert.EqualError(t, err, (*tc.wantError).Error())
+			} else {
+				assert.NoError(t, err, "Should not return an error "+desc)
+			}
+
+			err = gce.updateExternalLoadBalancer(vals.ClusterName, svc, nodes)
+			if tc.wantError != nil {
+				assert.EqualError(t, err, (*tc.wantError).Error())
+			} else {
+				assert.NoError(t, err, "Should not return an error "+desc)
+			}
+
+			err = gce.ensureExternalLoadBalancerDeleted(vals.ClusterName, vals.ClusterID, svc)
+			if tc.wantError != nil {
+				assert.EqualError(t, err, (*tc.wantError).Error())
 			} else {
 				assert.NoError(t, err, "Should not return an error "+desc)
 			}
@@ -625,32 +644,52 @@ func TestEnsureExternalLoadBalancerRBSFinalizer(t *testing.T) {
 	t.Parallel()
 
 	for desc, tc := range map[string]struct {
-		finalizers  []string
-		expectError *error
+		finalizers []string
+		wantError  *error
 	}{
 		"When has ELBRbsFinalizer": {
-			finalizers:  []string{ELBRbsFinalizer},
-			expectError: &cloudprovider.ImplementedElsewhere,
+			finalizers: []string{NetLBFinalizerV2},
+			wantError:  &cloudprovider.ImplementedElsewhere,
 		},
 		"When has no finalizer": {
-			finalizers:  []string{},
-			expectError: nil,
+			finalizers: []string{},
+			wantError:  nil,
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
 			vals := DefaultTestClusterValues()
-			gce, err := fakeGCECloud(DefaultTestClusterValues())
-			require.NoError(t, err)
-			nodeNames := []string{"test-node-1"}
 
+			gce, err := fakeGCECloud(vals)
+			if err != nil {
+				t.Fatalf("fakeGCECloud(%v) returned error %v, want nil", vals, err)
+			}
+
+			nodeNames := []string{"test-node-1"}
 			nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
-			require.NoError(t, err)
+			if err != nil {
+				t.Fatalf("createAndInsertNodes(_, %v, %v) returned error %v, want nil", nodeNames, vals.ZoneName, err)
+			}
 
 			svc := fakeLoadbalancerService("")
 			svc.Finalizers = tc.finalizers
+
 			_, err = gce.ensureExternalLoadBalancer(vals.ClusterName, vals.ClusterID, svc, nil, nodes)
-			if tc.expectError != nil {
-				assert.EqualError(t, err, (*tc.expectError).Error())
+			if tc.wantError != nil {
+				assert.EqualError(t, err, (*tc.wantError).Error())
+			} else {
+				assert.NoError(t, err, "Should not return an error "+desc)
+			}
+
+			err = gce.updateExternalLoadBalancer(vals.ClusterName, svc, nodes)
+			if tc.wantError != nil {
+				assert.EqualError(t, err, (*tc.wantError).Error())
+			} else {
+				assert.NoError(t, err, "Should not return an error "+desc)
+			}
+
+			err = gce.ensureExternalLoadBalancerDeleted(vals.ClusterName, vals.ClusterID, svc)
+			if tc.wantError != nil {
+				assert.EqualError(t, err, (*tc.wantError).Error())
 			} else {
 				assert.NoError(t, err, "Should not return an error "+desc)
 			}
@@ -663,38 +702,43 @@ func TestEnsureExternalLoadBalancerExistingFwdRule(t *testing.T) {
 
 	for desc, tc := range map[string]struct {
 		existingForwardingRule *compute.ForwardingRule
-		expectError            *error
+		wantError              *error
 	}{
 		"When has existingForwardingRule with backend service": {
 			existingForwardingRule: &compute.ForwardingRule{
 				BackendService: "exists",
 			},
-			expectError: &cloudprovider.ImplementedElsewhere,
+			wantError: &cloudprovider.ImplementedElsewhere,
 		},
 		"When has existingForwardingRule with empty backend service": {
 			existingForwardingRule: &compute.ForwardingRule{
 				BackendService: "",
 			},
-			expectError: nil,
+			wantError: nil,
 		},
 		"When has no existingForwardingRule": {
 			existingForwardingRule: nil,
-			expectError:            nil,
+			wantError:              nil,
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
 			vals := DefaultTestClusterValues()
-			gce, err := fakeGCECloud(DefaultTestClusterValues())
-			require.NoError(t, err)
-			nodeNames := []string{"test-node-1"}
 
+			gce, err := fakeGCECloud(vals)
+			if err != nil {
+				t.Fatalf("fakeGCECloud(%v) returned error %v, want nil", vals, err)
+			}
+
+			nodeNames := []string{"test-node-1"}
 			nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
-			require.NoError(t, err)
+			if err != nil {
+				t.Fatalf("createAndInsertNodes(_, %v, %v) returned error %v, want nil", nodeNames, vals.ZoneName, err)
+			}
 
 			svc := fakeLoadbalancerService("")
 			_, err = gce.ensureExternalLoadBalancer(vals.ClusterName, vals.ClusterID, svc, tc.existingForwardingRule, nodes)
-			if tc.expectError != nil {
-				assert.EqualError(t, err, (*tc.expectError).Error())
+			if tc.wantError != nil {
+				assert.EqualError(t, err, (*tc.wantError).Error())
 			} else {
 				assert.NoError(t, err, "Should not return an error "+desc)
 			}

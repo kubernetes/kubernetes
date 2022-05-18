@@ -26,6 +26,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -91,31 +92,31 @@ func TestCachingObjectFieldAccessors(t *testing.T) {
 
 	// Given accessors for all fields implement the same logic,
 	// we are choosing an arbitrary one to test.
-	clusterName := "clusterName"
-	object.SetClusterName(clusterName)
+	namespace := "namespace"
+	object.SetNamespace(namespace)
 
-	encodeClusterName := func(obj runtime.Object, w io.Writer) error {
+	encodeNamespace := func(obj runtime.Object, w io.Writer) error {
 		accessor, err := meta.Accessor(obj)
 		if err != nil {
 			t.Fatalf("failed to get accessor for %#v: %v", obj, err)
 		}
-		_, err = w.Write([]byte(accessor.GetClusterName()))
+		_, err = w.Write([]byte(accessor.GetNamespace()))
 		return err
 	}
 	buffer := bytes.NewBuffer(nil)
-	if err := object.CacheEncode("", encodeClusterName, buffer); err != nil {
+	if err := object.CacheEncode("", encodeNamespace, buffer); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if a, e := buffer.String(), clusterName; a != e {
+	if a, e := buffer.String(), namespace; a != e {
 		t.Errorf("unexpected serialization: %s, expected: %s", a, e)
 	}
 
-	// GetObject should also set clusterName.
+	// GetObject should also set namespace.
 	buffer.Reset()
-	if err := encodeClusterName(object.GetObject(), buffer); err != nil {
+	if err := encodeNamespace(object.GetObject(), buffer); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if a, e := buffer.String(), clusterName; a != e {
+	if a, e := buffer.String(), namespace; a != e {
 		t.Errorf("unexpected serialization: %s, expected: %s", a, e)
 	}
 }
@@ -139,7 +140,7 @@ func TestCachingObjectRaces(t *testing.T) {
 	for i := 0; i < numWorkers; i++ {
 		go func() {
 			defer wg.Done()
-			object.SetClusterName("clusterName")
+			object.SetNamespace("namespace")
 			buffer := bytes.NewBuffer(nil)
 			for _, encoder := range encoders {
 				buffer.Reset()
@@ -155,10 +156,36 @@ func TestCachingObjectRaces(t *testing.T) {
 				t.Errorf("failed to get accessor: %v", err)
 				return
 			}
-			if clusterName := accessor.GetClusterName(); clusterName != "clusterName" {
-				t.Errorf("unexpected clusterName: %s", clusterName)
+			if namespace := accessor.GetNamespace(); namespace != "namespace" {
+				t.Errorf("unexpected namespace: %s", namespace)
 			}
 		}()
 	}
 	wg.Wait()
+}
+
+func TestCachingObjectLazyDeepCopy(t *testing.T) {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "name",
+			ResourceVersion: "123",
+		},
+	}
+	object, err := newCachingObject(pod)
+	if err != nil {
+		t.Fatalf("couldn't create cachingObject: %v", err)
+	}
+
+	if object.deepCopied != false {
+		t.Errorf("object deep-copied without the need")
+	}
+
+	object.SetResourceVersion("123")
+	if object.deepCopied != false {
+		t.Errorf("object deep-copied on no-op change")
+	}
+	object.SetResourceVersion("234")
+	if object.deepCopied != true {
+		t.Errorf("object not deep-copied on change")
+	}
 }

@@ -170,3 +170,37 @@ func TestEscapingFuzz(t *testing.T) {
 }
 
 var validCelIdent = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
+
+func TestCanSkipRegex(t *testing.T) {
+	cases := []struct {
+		unescaped        string
+		canSkip          bool
+		invalidCharFound bool
+	}{
+		{unescaped: "a.a", canSkip: false},
+		{unescaped: "a-a", canSkip: false},
+		{unescaped: "a__a", canSkip: false},
+		{unescaped: "a.-/__a", canSkip: false},
+		{unescaped: "a_a", canSkip: true},
+		{unescaped: "a_a_a", canSkip: true},
+		{unescaped: "@", invalidCharFound: true},
+		{unescaped: "👑", invalidCharFound: true},
+		// if escape keyword is detected before invalid character, invalidCharFound
+		{unescaped: "/👑", canSkip: false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.unescaped, func(t *testing.T) {
+			escapeCheck := skipRegexCheck(tc.unescaped)
+			if escapeCheck.invalidCharFound {
+				if escapeCheck.invalidCharFound != tc.invalidCharFound {
+					t.Errorf("Expected input validation to be %v, but got %t", tc.invalidCharFound, escapeCheck.invalidCharFound)
+				}
+			} else {
+				if escapeCheck.canSkipRegex != tc.canSkip {
+					t.Errorf("Expected %v, but got %t", tc.canSkip, escapeCheck.canSkipRegex)
+				}
+			}
+		})
+	}
+}

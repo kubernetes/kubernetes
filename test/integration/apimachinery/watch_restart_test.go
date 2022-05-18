@@ -77,8 +77,8 @@ func TestWatchRestartsIfTimeoutNotReached(t *testing.T) {
 		Host: s.URL,
 	}
 
-	namespaceObject := framework.CreateTestingNamespace("retry-watch", s, t)
-	defer framework.DeleteTestingNamespace(namespaceObject, s, t)
+	namespaceObject := framework.CreateTestingNamespace("retry-watch", t)
+	defer framework.DeleteTestingNamespace(namespaceObject, t)
 
 	getListFunc := func(c *kubernetes.Clientset, secret *corev1.Secret) func(options metav1.ListOptions) *corev1.SecretList {
 		return func(options metav1.ListOptions) *corev1.SecretList {
@@ -121,7 +121,8 @@ func TestWatchRestartsIfTimeoutNotReached(t *testing.T) {
 				patch := fmt.Sprintf(`{"metadata": {"annotations": {"count": "%d"}}}`, counter)
 				_, err := c.CoreV1().Secrets(secret.Namespace).Patch(context.TODO(), secret.Name, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{})
 				if err != nil {
-					t.Fatalf("Failed to patch secret: %v", err)
+					t.Errorf("Failed to patch secret: %v", err)
+					return
 				}
 
 				*referenceOutput = append(*referenceOutput, fmt.Sprintf("%d", counter))

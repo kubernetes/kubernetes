@@ -18,7 +18,6 @@ package volumescheduling
 
 import (
 	"context"
-	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
@@ -29,14 +28,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/events"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controlplane"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -65,32 +62,21 @@ func initTestAPIServer(t *testing.T, nsPrefix string, admission admission.Interf
 	}
 
 	// 1. Create API server
-	h := &framework.APIServerHolder{Initialized: make(chan struct{})}
-	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		<-h.Initialized
-		h.M.GenericAPIServer.Handler.ServeHTTP(w, req)
-	}))
-
 	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
 	resourceConfig := controlplane.DefaultAPIResourceConfigSource()
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIStorageCapacity) {
-		resourceConfig.EnableVersions(schema.GroupVersion{
-			Group:   "storage.k8s.io",
-			Version: "v1alpha1",
-		})
-	}
 	controlPlaneConfig.ExtraConfig.APIResourceConfigSource = resourceConfig
 
 	if admission != nil {
 		controlPlaneConfig.GenericConfig.AdmissionControl = admission
 	}
 
-	_, testCtx.httpServer, testCtx.closeFn = framework.RunAnAPIServerUsingServer(controlPlaneConfig, s, h)
+	_, testCtx.httpServer, testCtx.closeFn = framework.RunAnAPIServer(controlPlaneConfig)
+	s := testCtx.httpServer
 
 	if nsPrefix != "default" {
-		testCtx.ns = framework.CreateTestingNamespace(nsPrefix+string(uuid.NewUUID()), s, t)
+		testCtx.ns = framework.CreateTestingNamespace(nsPrefix+string(uuid.NewUUID()), t)
 	} else {
-		testCtx.ns = framework.CreateTestingNamespace("default", s, t)
+		testCtx.ns = framework.CreateTestingNamespace("default", t)
 	}
 
 	// 2. Create kubeclient
@@ -147,7 +133,7 @@ func cleanupTest(t *testing.T, testCtx *testContext) {
 	testCtx.cancelFn()
 	// Cleanup nodes.
 	testCtx.clientSet.CoreV1().Nodes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
-	framework.DeleteTestingNamespace(testCtx.ns, testCtx.httpServer, t)
+	framework.DeleteTestingNamespace(testCtx.ns, t)
 	testCtx.closeFn()
 }
 

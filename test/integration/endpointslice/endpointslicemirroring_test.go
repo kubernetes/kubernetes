@@ -174,8 +174,8 @@ func TestEndpointSliceMirroring(t *testing.T) {
 
 	for i, tc := range testCases {
 		t.Run(tc.testName, func(t *testing.T) {
-			ns := framework.CreateTestingNamespace(fmt.Sprintf("test-endpointslice-mirroring-%d", i), server, t)
-			defer framework.DeleteTestingNamespace(ns, server, t)
+			ns := framework.CreateTestingNamespace(fmt.Sprintf("test-endpointslice-mirroring-%d", i), t)
+			defer framework.DeleteTestingNamespace(ns, t)
 
 			resourceName := ""
 			if tc.service != nil {
@@ -294,8 +294,8 @@ func TestEndpointSliceMirroringUpdates(t *testing.T) {
 
 	for i, tc := range testCases {
 		t.Run(tc.testName, func(t *testing.T) {
-			ns := framework.CreateTestingNamespace(fmt.Sprintf("test-endpointslice-mirroring-%d", i), server, t)
-			defer framework.DeleteTestingNamespace(ns, server, t)
+			ns := framework.CreateTestingNamespace(fmt.Sprintf("test-endpointslice-mirroring-%d", i), t)
+			defer framework.DeleteTestingNamespace(ns, t)
 
 			service := &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
@@ -476,8 +476,8 @@ func TestEndpointSliceMirroringSelectorTransition(t *testing.T) {
 
 	for i, tc := range testCases {
 		t.Run(tc.testName, func(t *testing.T) {
-			ns := framework.CreateTestingNamespace(fmt.Sprintf("test-endpointslice-mirroring-%d", i), server, t)
-			defer framework.DeleteTestingNamespace(ns, server, t)
+			ns := framework.CreateTestingNamespace(fmt.Sprintf("test-endpointslice-mirroring-%d", i), t)
+			defer framework.DeleteTestingNamespace(ns, t)
 			meta := metav1.ObjectMeta{Name: "test-123", Namespace: ns.Name}
 
 			service := &corev1.Service{

@@ -22,7 +22,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
+	"k8s.io/component-helpers/storage/volume"
 )
 
 func verifyListPVs(t *testing.T, cache PVAssumeCache, expectedPVs map[string]*v1.PersistentVolume, storageClassName string) {
@@ -445,7 +445,7 @@ func TestAssumeUpdatePVCCache(t *testing.T) {
 
 	// Assume PVC
 	newPVC := pvc.DeepCopy()
-	newPVC.Annotations[pvutil.AnnSelectedNode] = "test-node"
+	newPVC.Annotations[volume.AnnSelectedNode] = "test-node"
 	if err := cache.Assume(newPVC); err != nil {
 		t.Fatalf("failed to assume PVC: %v", err)
 	}

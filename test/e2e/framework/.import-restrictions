@@ -242,6 +242,7 @@ rules:
       - k8s.io/kubernetes/pkg/scheduler/internal/cache
   - selectorRegexp: k8s[.]io/kubernetes/test/
     allowedPrefixes:
+      - k8s.io/kubernetes/test/e2e/common
       - k8s.io/kubernetes/test/e2e/framework
       - k8s.io/kubernetes/test/e2e/framework/auth
       - k8s.io/kubernetes/test/e2e/framework/ginkgowrapper

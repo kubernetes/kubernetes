@@ -156,8 +156,8 @@ func TestPodDeletionWithDswp(t *testing.T) {
 		},
 	}
 
-	ns := framework.CreateTestingNamespace(namespaceName, server, t)
-	defer framework.DeleteTestingNamespace(ns, server, t)
+	ns := framework.CreateTestingNamespace(namespaceName, t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	testClient, ctrl, _, informers := createAdClients(ns, t, server, defaultSyncPeriod, defaultTimerConfig)
 	pod := fakePodWithVol(namespaceName)
@@ -231,8 +231,8 @@ func TestPodUpdateWithWithADC(t *testing.T) {
 		},
 	}
 
-	ns := framework.CreateTestingNamespace(namespaceName, server, t)
-	defer framework.DeleteTestingNamespace(ns, server, t)
+	ns := framework.CreateTestingNamespace(namespaceName, t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	testClient, ctrl, _, informers := createAdClients(ns, t, server, defaultSyncPeriod, defaultTimerConfig)
 
@@ -301,8 +301,8 @@ func TestPodUpdateWithKeepTerminatedPodVolumes(t *testing.T) {
 		},
 	}
 
-	ns := framework.CreateTestingNamespace(namespaceName, server, t)
-	defer framework.DeleteTestingNamespace(ns, server, t)
+	ns := framework.CreateTestingNamespace(namespaceName, t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	testClient, ctrl, _, informers := createAdClients(ns, t, server, defaultSyncPeriod, defaultTimerConfig)
 
@@ -484,8 +484,8 @@ func TestPodAddedByDswp(t *testing.T) {
 		},
 	}
 
-	ns := framework.CreateTestingNamespace(namespaceName, server, t)
-	defer framework.DeleteTestingNamespace(ns, server, t)
+	ns := framework.CreateTestingNamespace(namespaceName, t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	testClient, ctrl, _, informers := createAdClients(ns, t, server, defaultSyncPeriod, defaultTimerConfig)
 
@@ -550,8 +550,8 @@ func TestPVCBoundWithADC(t *testing.T) {
 	defer closeFn()
 	namespaceName := "test-pod-deletion"
 
-	ns := framework.CreateTestingNamespace(namespaceName, server, t)
-	defer framework.DeleteTestingNamespace(ns, server, t)
+	ns := framework.CreateTestingNamespace(namespaceName, t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	testClient, ctrl, pvCtrl, informers := createAdClients(ns, t, server, defaultSyncPeriod, attachdetach.TimerConfig{
 		ReconcilerLoopPeriod:                        100 * time.Millisecond,

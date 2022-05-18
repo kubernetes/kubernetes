@@ -19,6 +19,7 @@ package vsphere
 import (
 	"context"
 	"fmt"
+	"net"
 	neturl "net/url"
 	"sync"
 
@@ -72,7 +73,7 @@ func Connect(ctx context.Context, vs *VSphere) error {
 
 // NewClient creates a new client for vSphere connection
 func NewClient(ctx context.Context, vs *VSphere) (*govmomi.Client, error) {
-	url, err := neturl.Parse(fmt.Sprintf("https://%s:%s/sdk", vs.Config.Hostname, vs.Config.Port))
+	url, err := neturl.Parse(fmt.Sprintf("https://%s/sdk", net.JoinHostPort(vs.Config.Hostname, vs.Config.Port)))
 	if err != nil {
 		klog.Errorf("Failed to parse URL: %s. err: %+v", url, err)
 		return nil, err

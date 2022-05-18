@@ -18,12 +18,15 @@ package persistentvolume
 
 import (
 	"errors"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
+	"k8s.io/component-helpers/storage/volume"
 	pvtesting "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/testing"
-	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
 )
 
 // Test single call to syncVolume, expecting recycling to happen.
@@ -31,11 +34,14 @@ import (
 // 2. Call the syncVolume *once*.
 // 3. Compare resulting volumes with expected volumes.
 func TestDeleteSync(t *testing.T) {
+	const gceDriver = "pd.csi.storage.gke.io"
+	// Default enable the HonorPVReclaimPolicy feature gate.
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HonorPVReclaimPolicy, true)()
 	tests := []controllerTest{
 		{
 			// delete volume bound by controller
 			"8-1 - successful delete",
-			newVolumeArray("volume8-1", "1Gi", "uid8-1", "claim8-1", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty, pvutil.AnnBoundByController),
+			newVolumeArray("volume8-1", "1Gi", "uid8-1", "claim8-1", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty, volume.AnnBoundByController),
 			novolumes,
 			noclaims,
 			noclaims,
@@ -103,8 +109,8 @@ func TestDeleteSync(t *testing.T) {
 			// starts. This simulates "volume no longer needs recycling,
 			// skipping".
 			"8-7 - volume is bound before deleting",
-			newVolumeArray("volume8-7", "1Gi", "uid8-7", "claim8-7", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty, pvutil.AnnBoundByController),
-			newVolumeArray("volume8-7", "1Gi", "uid8-7", "claim8-7", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty, pvutil.AnnBoundByController),
+			newVolumeArray("volume8-7", "1Gi", "uid8-7", "claim8-7", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty, volume.AnnBoundByController),
+			newVolumeArray("volume8-7", "1Gi", "uid8-7", "claim8-7", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty, volume.AnnBoundByController),
 			noclaims,
 			newClaimArray("claim8-7", "uid8-7", "10Gi", "volume8-7", v1.ClaimBound, nil),
 			noevents, noerrors,
@@ -132,15 +138,15 @@ func TestDeleteSync(t *testing.T) {
 		{
 			// PV requires external deleter
 			"8-10 - external deleter",
-			newVolumeArray("volume8-10", "1Gi", "uid10-1", "claim10-1", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty, pvutil.AnnBoundByController),
-			newVolumeArray("volume8-10", "1Gi", "uid10-1", "claim10-1", v1.VolumeReleased, v1.PersistentVolumeReclaimDelete, classEmpty, pvutil.AnnBoundByController),
+			[]*v1.PersistentVolume{newExternalProvisionedVolume("volume8-10", "1Gi", "uid10-1", "claim10-1", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty, gceDriver, nil, volume.AnnBoundByController)},
+			[]*v1.PersistentVolume{newExternalProvisionedVolume("volume8-10", "1Gi", "uid10-1", "claim10-1", v1.VolumeReleased, v1.PersistentVolumeReclaimDelete, classEmpty, gceDriver, nil, volume.AnnBoundByController)},
 			noclaims,
 			noclaims,
 			noevents, noerrors,
 			func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
 				// Inject external deleter annotation
-				test.initialVolumes[0].Annotations[pvutil.AnnDynamicallyProvisioned] = "external.io/test"
-				test.expectedVolumes[0].Annotations[pvutil.AnnDynamicallyProvisioned] = "external.io/test"
+				test.initialVolumes[0].Annotations[volume.AnnDynamicallyProvisioned] = "external.io/test"
+				test.expectedVolumes[0].Annotations[volume.AnnDynamicallyProvisioned] = "external.io/test"
 				return testSyncVolume(ctrl, reactor, test)
 			},
 		},
@@ -149,11 +155,11 @@ func TestDeleteSync(t *testing.T) {
 			// One of the PVs is deleted.
 			"8-11 - two PVs provisioned for a single claim",
 			[]*v1.PersistentVolume{
-				newVolume("volume8-11-1", "1Gi", "uid8-11", "claim8-11", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty, pvutil.AnnDynamicallyProvisioned),
-				newVolume("volume8-11-2", "1Gi", "uid8-11", "claim8-11", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty, pvutil.AnnDynamicallyProvisioned),
+				newVolume("volume8-11-1", "1Gi", "uid8-11", "claim8-11", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty, volume.AnnDynamicallyProvisioned),
+				newVolume("volume8-11-2", "1Gi", "uid8-11", "claim8-11", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty, volume.AnnDynamicallyProvisioned),
 			},
 			[]*v1.PersistentVolume{
-				newVolume("volume8-11-2", "1Gi", "uid8-11", "claim8-11", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty, pvutil.AnnDynamicallyProvisioned),
+				newVolume("volume8-11-2", "1Gi", "uid8-11", "claim8-11", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty, volume.AnnDynamicallyProvisioned),
 			},
 			// the claim is bound to volume8-11-2 -> volume8-11-1 has lost the race and will be deleted
 			newClaimArray("claim8-11", "uid8-11", "10Gi", "volume8-11-2", v1.ClaimBound, nil),
@@ -169,12 +175,12 @@ func TestDeleteSync(t *testing.T) {
 			// external provisioner.
 			"8-12 - two PVs externally provisioned for a single claim",
 			[]*v1.PersistentVolume{
-				newVolume("volume8-12-1", "1Gi", "uid8-12", "claim8-12", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty, pvutil.AnnDynamicallyProvisioned),
-				newVolume("volume8-12-2", "1Gi", "uid8-12", "claim8-12", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty, pvutil.AnnDynamicallyProvisioned),
+				newExternalProvisionedVolume("volume8-12-1", "1Gi", "uid8-12", "claim8-12", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty, gceDriver, nil, volume.AnnDynamicallyProvisioned),
+				newExternalProvisionedVolume("volume8-12-2", "1Gi", "uid8-12", "claim8-12", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty, gceDriver, nil, volume.AnnDynamicallyProvisioned),
 			},
 			[]*v1.PersistentVolume{
-				newVolume("volume8-12-1", "1Gi", "uid8-12", "claim8-12", v1.VolumeReleased, v1.PersistentVolumeReclaimDelete, classEmpty, pvutil.AnnDynamicallyProvisioned),
-				newVolume("volume8-12-2", "1Gi", "uid8-12", "claim8-12", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty, pvutil.AnnDynamicallyProvisioned),
+				newExternalProvisionedVolume("volume8-12-1", "1Gi", "uid8-12", "claim8-12", v1.VolumeReleased, v1.PersistentVolumeReclaimDelete, classEmpty, gceDriver, nil, volume.AnnDynamicallyProvisioned),
+				newExternalProvisionedVolume("volume8-12-2", "1Gi", "uid8-12", "claim8-12", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty, gceDriver, nil, volume.AnnDynamicallyProvisioned),
 			},
 			// the claim is bound to volume8-12-2 -> volume8-12-1 has lost the race and will be "Released"
 			newClaimArray("claim8-12", "uid8-12", "10Gi", "volume8-12-2", v1.ClaimBound, nil),
@@ -182,10 +188,20 @@ func TestDeleteSync(t *testing.T) {
 			noevents, noerrors,
 			func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
 				// Inject external deleter annotation
-				test.initialVolumes[0].Annotations[pvutil.AnnDynamicallyProvisioned] = "external.io/test"
-				test.expectedVolumes[0].Annotations[pvutil.AnnDynamicallyProvisioned] = "external.io/test"
+				test.initialVolumes[0].Annotations[volume.AnnDynamicallyProvisioned] = "external.io/test"
+				test.expectedVolumes[0].Annotations[volume.AnnDynamicallyProvisioned] = "external.io/test"
 				return testSyncVolume(ctrl, reactor, test)
 			},
+		},
+		{
+			// delete success - volume has deletion timestamp before doDelete() starts
+			"8-13 - volume has deletion timestamp and processed",
+			volumesWithFinalizers(withVolumeDeletionTimestamp(newVolumeArray("volume8-13", "1Gi", "uid8-13", "claim8-13", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty, volume.AnnBoundByController)), []string{volume.PVDeletionInTreeProtectionFinalizer}),
+			novolumes,
+			noclaims,
+			noclaims,
+			noevents, noerrors,
+			wrapTestWithReclaimCalls(operationDelete, []error{nil}, testSyncVolume),
 		},
 	}
 	runSyncTests(t, tests, []*storage.StorageClass{}, []*v1.Pod{})
@@ -211,7 +227,7 @@ func TestDeleteMultiSync(t *testing.T) {
 			// delete failure - delete returns error. The controller should
 			// try again.
 			"9-1 - delete returns error",
-			newVolumeArray("volume9-1", "1Gi", "uid9-1", "claim9-1", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty),
+			volumesWithFinalizers(newVolumeArray("volume9-1", "1Gi", "uid9-1", "claim9-1", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty), []string{volume.PVDeletionInTreeProtectionFinalizer}),
 			novolumes,
 			noclaims,
 			noclaims,

@@ -45,6 +45,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -102,6 +103,10 @@ import (
 	"k8s.io/utils/exec"
 	netutils "k8s.io/utils/net"
 )
+
+func init() {
+	utilruntime.Must(logs.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
+}
 
 const (
 	// Kubelet component name
@@ -226,7 +231,7 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 			// Config and flags parsed, now we can initialize logging.
 			logs.InitLogs()
 			logOption := &logs.Options{Config: kubeletConfig.Logging}
-			if err := logOption.ValidateAndApply(); err != nil {
+			if err := logOption.ValidateAndApply(utilfeature.DefaultFeatureGate); err != nil {
 				klog.ErrorS(err, "Failed to initialize logging")
 				os.Exit(1)
 			}
@@ -256,7 +261,7 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 				config.StaticPodURLHeader[k] = []string{"<masked>"}
 			}
 			// log the kubelet's config for inspection
-			klog.V(5).InfoS("KubeletConfiguration", "configuration", kubeletServer.KubeletConfiguration)
+			klog.V(5).InfoS("KubeletConfiguration", "configuration", config)
 
 			// run the kubelet
 			return Run(ctx, kubeletServer, kubeletDeps, utilfeature.DefaultFeatureGate)
@@ -392,6 +397,9 @@ func UnsecuredDependencies(s *options.KubeletServer, featureGate featuregate.Fea
 func Run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Dependencies, featureGate featuregate.FeatureGate) error {
 	// To help debugging, immediately log version
 	klog.InfoS("Kubelet version", "kubeletVersion", version.Get())
+
+	klog.InfoS("Golang settings", "GOGC", os.Getenv("GOGC"), "GOMAXPROCS", os.Getenv("GOMAXPROCS"), "GOTRACEBACK", os.Getenv("GOTRACEBACK"))
+
 	if err := initForOS(s.KubeletFlags.WindowsService, s.KubeletFlags.WindowsPriorityClass); err != nil {
 		return fmt.Errorf("failed OS init: %w", err)
 	}
@@ -554,14 +562,14 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		klog.InfoS("Standalone mode, no API client")
 
 	case kubeDeps.KubeClient == nil, kubeDeps.EventClient == nil, kubeDeps.HeartbeatClient == nil:
-		clientConfig, closeAllConns, err := buildKubeletClientConfig(ctx, s, nodeName)
+		clientConfig, onHeartbeatFailure, err := buildKubeletClientConfig(ctx, s, nodeName)
 		if err != nil {
 			return err
 		}
-		if closeAllConns == nil {
-			return errors.New("closeAllConns must be a valid function other than nil")
+		if onHeartbeatFailure == nil {
+			return errors.New("onHeartbeatFailure must be a valid function other than nil")
 		}
-		kubeDeps.OnHeartbeatFailure = closeAllConns
+		kubeDeps.OnHeartbeatFailure = onHeartbeatFailure
 
 		kubeDeps.KubeClient, err = clientset.NewForConfig(clientConfig)
 		if err != nil {
@@ -819,7 +827,7 @@ func buildKubeletClientConfig(ctx context.Context, s *options.KubeletServer, nod
 		}
 
 		legacyregistry.RawMustRegister(metrics.NewGaugeFunc(
-			metrics.GaugeOpts{
+			&metrics.GaugeOpts{
 				Subsystem: kubeletmetrics.KubeletSubsystem,
 				Name:      "certificate_manager_client_ttl_seconds",
 				Help: "Gauge of the TTL (time-to-live) of the Kubelet's client certificate. " +
@@ -845,11 +853,24 @@ func buildKubeletClientConfig(ctx context.Context, s *options.KubeletServer, nod
 		if err != nil {
 			return nil, nil, err
 		}
+		var onHeartbeatFailure func()
+		// Kubelet needs to be able to recover from stale http connections.
+		// HTTP2 has a mechanism to detect broken connections by sending periodical pings.
+		// HTTP1 only can have one persistent connection, and it will close all Idle connections
+		// once the Kubelet heartbeat fails. However, since there are many edge cases that we can't
+		// control, users can still opt-in to the previous behavior for closing the connections by
+		// setting the environment variable DISABLE_HTTP2.
+		if s := os.Getenv("DISABLE_HTTP2"); len(s) > 0 {
+			klog.InfoS("HTTP2 has been explicitly disabled, Kubelet will forcefully close active connections on heartbeat failures")
+			onHeartbeatFailure = closeAllConns
+		} else {
+			onHeartbeatFailure = func() { utilnet.CloseIdleConnectionsFor(transportConfig.Transport) }
+		}
 
 		klog.V(2).InfoS("Starting client certificate rotation")
 		clientCertificateManager.Start()
 
-		return transportConfig, closeAllConns, nil
+		return transportConfig, onHeartbeatFailure, nil
 	}
 
 	if len(s.BootstrapKubeconfig) > 0 {
@@ -873,19 +894,19 @@ func buildKubeletClientConfig(ctx context.Context, s *options.KubeletServer, nod
 	// once the Kubelet heartbeat fails. However, since there are many edge cases that we can't
 	// control, users can still opt-in to the previous behavior for closing the connections by
 	// setting the environment variable DISABLE_HTTP2.
-	var closeAllConns func()
+	var onHeartbeatFailure func()
 	if s := os.Getenv("DISABLE_HTTP2"); len(s) > 0 {
 		klog.InfoS("HTTP2 has been explicitly disabled, updating Kubelet client Dialer to forcefully close active connections on heartbeat failures")
-		closeAllConns, err = updateDialer(clientConfig)
+		onHeartbeatFailure, err = updateDialer(clientConfig)
 		if err != nil {
 			return nil, nil, err
 		}
 	} else {
-		closeAllConns = func() {
+		onHeartbeatFailure = func() {
 			utilnet.CloseIdleConnectionsFor(clientConfig.Transport)
 		}
 	}
-	return clientConfig, closeAllConns, nil
+	return clientConfig, onHeartbeatFailure, nil
 }
 
 // updateDialer instruments a restconfig with a dial. the returned function allows forcefully closing all active connections.

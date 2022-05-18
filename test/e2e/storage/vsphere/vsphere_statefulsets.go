@@ -30,6 +30,7 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2estatefulset "k8s.io/kubernetes/test/e2e/framework/statefulset"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 /*
@@ -56,6 +57,7 @@ const (
 
 var _ = utils.SIGDescribe("vsphere statefulset [Feature:vsphere]", func() {
 	f := framework.NewDefaultFramework("vsphere-statefulset")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var (
 		namespace string
 		client    clientset.Interface

@@ -49,7 +49,7 @@ const (
 	// is expected to fail.
 	ExpectProvisionFailureKey = "expect-provision-failure"
 	// The node is marked as uncertain. The attach operation will fail and return timeout error
-	// for the first attach call. The following call will return sucesssfully.
+	// for the first attach call. The following call will return successfully.
 	UncertainAttachNode = "uncertain-attach-node"
 	// The detach operation will keep failing on the node.
 	FailDetachNode = "fail-detach-node"
@@ -175,6 +175,7 @@ type FakeVolumePlugin struct {
 	LastProvisionerOptions VolumeOptions
 	NewAttacherCallCount   int
 	NewDetacherCallCount   int
+	NodeExpandCallCount    int
 	VolumeLimits           map[string]int64
 	VolumeLimitsError      error
 	LimitKey               string
@@ -471,6 +472,7 @@ func (plugin *FakeVolumePlugin) RequiresFSResize() bool {
 }
 
 func (plugin *FakeVolumePlugin) NodeExpand(resizeOptions NodeResizeOptions) (bool, error) {
+	plugin.NodeExpandCallCount++
 	if resizeOptions.VolumeSpec.Name() == FailWithInUseVolumeName {
 		return false, volumetypes.NewFailedPreconditionError("volume-in-use")
 	}
@@ -478,12 +480,7 @@ func (plugin *FakeVolumePlugin) NodeExpand(resizeOptions NodeResizeOptions) (boo
 		return false, fmt.Errorf("Test failure: NodeExpand")
 	}
 
-	// Set up fakeVolumePlugin not support STAGE_UNSTAGE for testing the behavior
-	// so as volume can be node published before we can resize
-	if resizeOptions.CSIVolumePhase == volume.CSIVolumeStaged {
-		return false, nil
-	}
-	if resizeOptions.CSIVolumePhase == volume.CSIVolumePublished && resizeOptions.VolumeSpec.Name() == FailVolumeExpansion {
+	if resizeOptions.VolumeSpec.Name() == FailVolumeExpansion {
 		return false, fmt.Errorf("fail volume expansion for volume: %s", FailVolumeExpansion)
 	}
 	return true, nil

@@ -320,7 +320,7 @@ func NodeAllocatableRoot(cgroupRoot string, cgroupsPerQOS bool, cgroupDriver str
 	if cgroupsPerQOS {
 		nodeAllocatableRoot = NewCgroupName(nodeAllocatableRoot, defaultNodeAllocatableCgroupName)
 	}
-	if libcontainerCgroupManagerType(cgroupDriver) == libcontainerSystemd {
+	if cgroupDriver == "systemd" {
 		return nodeAllocatableRoot.ToSystemd()
 	}
 	return nodeAllocatableRoot.ToCgroupfs()

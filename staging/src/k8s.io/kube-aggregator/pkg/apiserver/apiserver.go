@@ -144,6 +144,9 @@ type APIAggregator struct {
 	// Enable swagger and/or OpenAPI if these configs are non-nil.
 	openAPIConfig *openapicommon.Config
 
+	// Enable OpenAPI V3 if these configs are non-nil
+	openAPIV3Config *openapicommon.Config
+
 	// openAPIAggregationController downloads and merges OpenAPI v2 specs.
 	openAPIAggregationController *openapicontroller.AggregationController
 
@@ -207,6 +210,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		APIRegistrationInformers:   informerFactory,
 		serviceResolver:            c.ExtraConfig.ServiceResolver,
 		openAPIConfig:              c.GenericConfig.OpenAPIConfig,
+		openAPIV3Config:            c.GenericConfig.OpenAPIV3Config,
 		egressSelector:             c.GenericConfig.EgressSelector,
 		proxyCurrentCertKeyContent: func() (bytes []byte, bytes2 []byte) { return nil, nil },
 	}
@@ -244,14 +248,27 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		if err != nil {
 			return nil, err
 		}
-		if err := aggregatorProxyCerts.RunOnce(); err != nil {
+		// We are passing the context to ProxyCerts.RunOnce as it needs to implement RunOnce(ctx) however the
+		// context is not used at all. So passing a empty context shouldn't be a problem
+		ctx := context.TODO()
+		if err := aggregatorProxyCerts.RunOnce(ctx); err != nil {
 			return nil, err
 		}
 		aggregatorProxyCerts.AddListener(apiserviceRegistrationController)
 		s.proxyCurrentCertKeyContent = aggregatorProxyCerts.CurrentCertKeyContent
 
-		s.GenericAPIServer.AddPostStartHookOrDie("aggregator-reload-proxy-client-cert", func(context genericapiserver.PostStartHookContext) error {
-			go aggregatorProxyCerts.Run(1, context.StopCh)
+		s.GenericAPIServer.AddPostStartHookOrDie("aggregator-reload-proxy-client-cert", func(postStartHookContext genericapiserver.PostStartHookContext) error {
+			// generate a context  from stopCh. This is to avoid modifying files which are relying on apiserver
+			// TODO: See if we can pass ctx to the current method
+			ctx, cancel := context.WithCancel(context.Background())
+			go func() {
+				select {
+				case <-postStartHookContext.StopCh:
+					cancel() // stopCh closed, so cancel our context
+				case <-ctx.Done():
+				}
+			}()
+			go aggregatorProxyCerts.Run(ctx, 1)
 			return nil
 		})
 	}
@@ -350,9 +367,13 @@ func (s *APIAggregator) PrepareRun() (preparedAPIAggregator, error) {
 	if s.openAPIConfig != nil {
 		s.GenericAPIServer.AddPostStartHookOrDie("apiservice-openapi-controller", func(context genericapiserver.PostStartHookContext) error {
 			go s.openAPIAggregationController.Run(context.StopCh)
-			if utilfeature.DefaultFeatureGate.Enabled(features.OpenAPIV3) {
-				go s.openAPIV3AggregationController.Run(context.StopCh)
-			}
+			return nil
+		})
+	}
+
+	if s.openAPIV3Config != nil && utilfeature.DefaultFeatureGate.Enabled(features.OpenAPIV3) {
+		s.GenericAPIServer.AddPostStartHookOrDie("apiservice-openapiv3-controller", func(context genericapiserver.PostStartHookContext) error {
+			go s.openAPIV3AggregationController.Run(context.StopCh)
 			return nil
 		})
 	}
@@ -372,18 +393,18 @@ func (s *APIAggregator) PrepareRun() (preparedAPIAggregator, error) {
 			return preparedAPIAggregator{}, err
 		}
 		s.openAPIAggregationController = openapicontroller.NewAggregationController(&specDownloader, openAPIAggregator)
-		if utilfeature.DefaultFeatureGate.Enabled(features.OpenAPIV3) {
-			specDownloaderV3 := openapiv3aggregator.NewDownloader()
-			openAPIV3Aggregator, err := openapiv3aggregator.BuildAndRegisterAggregator(
-				specDownloaderV3,
-				s.GenericAPIServer.NextDelegate(),
-				s.GenericAPIServer.Handler.NonGoRestfulMux)
-			if err != nil {
-				return preparedAPIAggregator{}, err
-			}
-			_ = openAPIV3Aggregator
-			s.openAPIV3AggregationController = openapiv3controller.NewAggregationController(openAPIV3Aggregator)
+	}
+
+	if s.openAPIV3Config != nil && utilfeature.DefaultFeatureGate.Enabled(features.OpenAPIV3) {
+		specDownloaderV3 := openapiv3aggregator.NewDownloader()
+		openAPIV3Aggregator, err := openapiv3aggregator.BuildAndRegisterAggregator(
+			specDownloaderV3,
+			s.GenericAPIServer.NextDelegate(),
+			s.GenericAPIServer.Handler.NonGoRestfulMux)
+		if err != nil {
+			return preparedAPIAggregator{}, err
 		}
+		s.openAPIV3AggregationController = openapiv3controller.NewAggregationController(openAPIV3Aggregator)
 	}
 
 	return preparedAPIAggregator{APIAggregator: s, runnable: prepared}, nil

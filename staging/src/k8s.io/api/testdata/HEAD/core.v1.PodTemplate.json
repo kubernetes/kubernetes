@@ -31,7 +31,6 @@
     "finalizers": [
       "finalizersValue"
     ],
-    "clusterName": "clusterNameValue",
     "managedFields": [
       {
         "manager": "managerValue",
@@ -75,7 +74,6 @@
       "finalizers": [
         "finalizersValue"
       ],
-      "clusterName": "clusterNameValue",
       "managedFields": [
         {
           "manager": "managerValue",
@@ -403,7 +401,6 @@
                 "finalizers": [
                   "finalizersValue"
                 ],
-                "clusterName": "clusterNameValue",
                 "managedFields": [
                   {
                     "manager": "managerValue",
@@ -1601,7 +1598,10 @@
                 ]
               }
             ]
-          }
+          },
+          "minDomains": 5,
+          "nodeAffinityPolicy": "nodeAffinityPolicyValue",
+          "nodeTaintsPolicy": "nodeTaintsPolicyValue"
         }
       ],
       "setHostnameAsFQDN": true,

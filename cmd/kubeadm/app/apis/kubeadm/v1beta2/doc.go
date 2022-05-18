@@ -176,12 +176,12 @@ limitations under the License.
 // 	    effect: "NoSchedule"
 // 	  kubeletExtraArgs:
 // 	    v: 4
-//	  ignorePreflightErrors:
-//	  - IsPrivilegedUser
+// 	  ignorePreflightErrors:
+// 	  - IsPrivilegedUser
 // 	localAPIEndpoint:
 // 	  advertiseAddress: "10.100.0.1"
 // 	  bindPort: 6443
-//	certificateKey: "e6a2eb8581237ab72a4f494f30285ec12a9694d750b9785706a83bfcbbbd2204"
+// 	certificateKey: "e6a2eb8581237ab72a4f494f30285ec12a9694d750b9785706a83bfcbbbd2204"
 // 	---
 // 	apiVersion: kubeadm.k8s.io/v1beta2
 // 	kind: ClusterConfiguration

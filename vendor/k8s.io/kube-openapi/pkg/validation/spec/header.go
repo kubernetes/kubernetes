@@ -53,7 +53,11 @@ func (h Header) MarshalJSON() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return swag.ConcatJSON(b1, b2, b3), nil
+	b4, err := json.Marshal(h.VendorExtensible)
+	if err != nil {
+		return nil, err
+	}
+	return swag.ConcatJSON(b1, b2, b3, b4), nil
 }
 
 // UnmarshalJSON unmarshals this header from JSON

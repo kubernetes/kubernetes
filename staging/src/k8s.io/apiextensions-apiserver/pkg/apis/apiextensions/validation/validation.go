@@ -17,9 +17,12 @@ limitations under the License.
 package validation
 
 import (
+	"context"
 	"fmt"
+	"math"
 	"reflect"
 	"regexp"
+	"sort"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -47,8 +50,16 @@ var (
 	openapiV3Types                        = sets.NewString("string", "number", "integer", "boolean", "array", "object")
 )
 
+const (
+	// StaticEstimatedCostLimit represents the largest-allowed static CEL cost on a per-expression basis.
+	StaticEstimatedCostLimit = 10000000
+	// StaticEstimatedCRDCostLimit represents the largest-allowed total cost for the x-kubernetes-validations rules of a CRD.
+	StaticEstimatedCRDCostLimit = 100000000
+)
+
 // ValidateCustomResourceDefinition statically validates
-func ValidateCustomResourceDefinition(obj *apiextensions.CustomResourceDefinition) field.ErrorList {
+// context is passed for supporting context cancellation during cel validation when validating defaults
+func ValidateCustomResourceDefinition(ctx context.Context, obj *apiextensions.CustomResourceDefinition) field.ErrorList {
 	nameValidationFn := func(name string, prefix bool) []string {
 		ret := genericvalidation.NameIsDNSSubdomain(name, prefix)
 		requiredName := obj.Spec.Names.Plural + "." + obj.Spec.Group
@@ -71,7 +82,7 @@ func ValidateCustomResourceDefinition(obj *apiextensions.CustomResourceDefinitio
 	}
 
 	allErrs := genericvalidation.ValidateObjectMeta(&obj.ObjectMeta, false, nameValidationFn, field.NewPath("metadata"))
-	allErrs = append(allErrs, validateCustomResourceDefinitionSpec(&obj.Spec, opts, field.NewPath("spec"))...)
+	allErrs = append(allErrs, validateCustomResourceDefinitionSpec(ctx, &obj.Spec, opts, field.NewPath("spec"))...)
 	allErrs = append(allErrs, ValidateCustomResourceDefinitionStatus(&obj.Status, field.NewPath("status"))...)
 	allErrs = append(allErrs, ValidateCustomResourceDefinitionStoredVersions(obj.Status.StoredVersions, obj.Spec.Versions, field.NewPath("status").Child("storedVersions"))...)
 	allErrs = append(allErrs, validateAPIApproval(obj, nil)...)
@@ -106,7 +117,8 @@ type validationOptions struct {
 }
 
 // ValidateCustomResourceDefinitionUpdate statically validates
-func ValidateCustomResourceDefinitionUpdate(obj, oldObj *apiextensions.CustomResourceDefinition) field.ErrorList {
+// context is passed for supporting context cancellation during cel validation when validating defaults
+func ValidateCustomResourceDefinitionUpdate(ctx context.Context, obj, oldObj *apiextensions.CustomResourceDefinition) field.ErrorList {
 	opts := validationOptions{
 		allowDefaults:                            true,
 		requireRecognizedConversionReviewVersion: oldObj.Spec.Conversion == nil || hasValidConversionReviewVersionOrEmpty(oldObj.Spec.Conversion.ConversionReviewVersions),
@@ -120,7 +132,7 @@ func ValidateCustomResourceDefinitionUpdate(obj, oldObj *apiextensions.CustomRes
 	}
 
 	allErrs := genericvalidation.ValidateObjectMetaUpdate(&obj.ObjectMeta, &oldObj.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, validateCustomResourceDefinitionSpecUpdate(&obj.Spec, &oldObj.Spec, opts, field.NewPath("spec"))...)
+	allErrs = append(allErrs, validateCustomResourceDefinitionSpecUpdate(ctx, &obj.Spec, &oldObj.Spec, opts, field.NewPath("spec"))...)
 	allErrs = append(allErrs, ValidateCustomResourceDefinitionStatus(&obj.Status, field.NewPath("status"))...)
 	allErrs = append(allErrs, ValidateCustomResourceDefinitionStoredVersions(obj.Status.StoredVersions, obj.Spec.Versions, field.NewPath("status").Child("storedVersions"))...)
 	allErrs = append(allErrs, validateAPIApproval(obj, oldObj)...)
@@ -163,12 +175,13 @@ func ValidateUpdateCustomResourceDefinitionStatus(obj, oldObj *apiextensions.Cus
 }
 
 // validateCustomResourceDefinitionVersion statically validates.
-func validateCustomResourceDefinitionVersion(version *apiextensions.CustomResourceDefinitionVersion, fldPath *field.Path, statusEnabled bool, opts validationOptions) field.ErrorList {
+// context is passed for supporting context cancellation during cel validation when validating defaults
+func validateCustomResourceDefinitionVersion(ctx context.Context, version *apiextensions.CustomResourceDefinitionVersion, fldPath *field.Path, statusEnabled bool, opts validationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for _, err := range validateDeprecationWarning(version.Deprecated, version.DeprecationWarning) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("deprecationWarning"), version.DeprecationWarning, err))
 	}
-	allErrs = append(allErrs, validateCustomResourceDefinitionValidation(version.Schema, statusEnabled, opts, fldPath.Child("schema"))...)
+	allErrs = append(allErrs, validateCustomResourceDefinitionValidation(ctx, version.Schema, statusEnabled, opts, fldPath.Child("schema"))...)
 	allErrs = append(allErrs, ValidateCustomResourceDefinitionSubresources(version.Subresources, fldPath.Child("subresources"))...)
 	for i := range version.AdditionalPrinterColumns {
 		allErrs = append(allErrs, ValidateCustomResourceColumnDefinition(&version.AdditionalPrinterColumns[i], fldPath.Child("additionalPrinterColumns").Index(i))...)
@@ -206,7 +219,8 @@ func validateDeprecationWarning(deprecated bool, deprecationWarning *string) []s
 	return errors
 }
 
-func validateCustomResourceDefinitionSpec(spec *apiextensions.CustomResourceDefinitionSpec, opts validationOptions, fldPath *field.Path) field.ErrorList {
+// context is passed for supporting context cancellation during cel validation when validating defaults
+func validateCustomResourceDefinitionSpec(ctx context.Context, spec *apiextensions.CustomResourceDefinitionSpec, opts validationOptions, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if len(spec.Group) == 0 {
@@ -270,7 +284,7 @@ func validateCustomResourceDefinitionSpec(spec *apiextensions.CustomResourceDefi
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("versions").Index(i).Child("name"), spec.Versions[i].Name, strings.Join(errs, ",")))
 		}
 		subresources := getSubresourcesForVersion(spec, version.Name)
-		allErrs = append(allErrs, validateCustomResourceDefinitionVersion(&version, fldPath.Child("versions").Index(i), hasStatusEnabled(subresources), opts)...)
+		allErrs = append(allErrs, validateCustomResourceDefinitionVersion(ctx, &version, fldPath.Child("versions").Index(i), hasStatusEnabled(subresources), opts)...)
 	}
 
 	// The top-level and per-version fields are mutual exclusive
@@ -325,7 +339,7 @@ func validateCustomResourceDefinitionSpec(spec *apiextensions.CustomResourceDefi
 	}
 
 	allErrs = append(allErrs, ValidateCustomResourceDefinitionNames(&spec.Names, fldPath.Child("names"))...)
-	allErrs = append(allErrs, validateCustomResourceDefinitionValidation(spec.Validation, hasAnyStatusEnabled(spec), opts, fldPath.Child("validation"))...)
+	allErrs = append(allErrs, validateCustomResourceDefinitionValidation(ctx, spec.Validation, hasAnyStatusEnabled(spec), opts, fldPath.Child("validation"))...)
 	allErrs = append(allErrs, ValidateCustomResourceDefinitionSubresources(spec.Subresources, fldPath.Child("subresources"))...)
 
 	for i := range spec.AdditionalPrinterColumns {
@@ -448,8 +462,9 @@ func validateCustomResourceConversion(conversion *apiextensions.CustomResourceCo
 }
 
 // validateCustomResourceDefinitionSpecUpdate statically validates
-func validateCustomResourceDefinitionSpecUpdate(spec, oldSpec *apiextensions.CustomResourceDefinitionSpec, opts validationOptions, fldPath *field.Path) field.ErrorList {
-	allErrs := validateCustomResourceDefinitionSpec(spec, opts, fldPath)
+// context is passed for supporting context cancellation during cel validation when validating defaults
+func validateCustomResourceDefinitionSpecUpdate(ctx context.Context, spec, oldSpec *apiextensions.CustomResourceDefinitionSpec, opts validationOptions, fldPath *field.Path) field.ErrorList {
+	allErrs := validateCustomResourceDefinitionSpec(ctx, spec, opts, fldPath)
 
 	if opts.requireImmutableNames {
 		// these effect the storage and cannot be changed therefore
@@ -654,10 +669,15 @@ type specStandardValidator interface {
 	// insideResourceMeta returns true when validating either TypeMeta or ObjectMeta, from an embedded resource or on the top-level.
 	insideResourceMeta() bool
 	withInsideResourceMeta() specStandardValidator
+
+	// forbidOldSelfValidations returns the path to the first ancestor of the visited path that can't be safely correlated between two revisions of an object, or nil if there is no such path
+	forbidOldSelfValidations() *field.Path
+	withForbidOldSelfValidations(path *field.Path) specStandardValidator
 }
 
 // validateCustomResourceDefinitionValidation statically validates
-func validateCustomResourceDefinitionValidation(customResourceValidation *apiextensions.CustomResourceValidation, statusSubresourceEnabled bool, opts validationOptions, fldPath *field.Path) field.ErrorList {
+// context is passed for supporting context cancellation during cel validation when validating defaults
+func validateCustomResourceDefinitionValidation(ctx context.Context, customResourceValidation *apiextensions.CustomResourceValidation, statusSubresourceEnabled bool, opts validationOptions, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if customResourceValidation == nil {
@@ -703,7 +723,20 @@ func validateCustomResourceDefinitionValidation(customResourceValidation *apiext
 			requireValidPropertyType: opts.requireValidPropertyType,
 		}
 
-		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema, fldPath.Child("openAPIV3Schema"), openAPIV3Schema, true, &opts)...)
+		costInfo := rootCostInfo()
+		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema, fldPath.Child("openAPIV3Schema"), openAPIV3Schema, true, &opts, costInfo)...)
+
+		if costInfo.TotalCost != nil {
+			if costInfo.TotalCost.totalCost > StaticEstimatedCRDCostLimit {
+				for _, expensive := range costInfo.TotalCost.mostExpensive {
+					costErrorMsg := fmt.Sprintf("contributed to estimated rule cost total exceeding cost limit for entire OpenAPIv3 schema")
+					allErrs = append(allErrs, field.Forbidden(expensive.path, costErrorMsg))
+				}
+
+				costErrorMsg := getCostErrorMessage("x-kubernetes-validations estimated rule cost total for entire OpenAPIv3 schema", costInfo.TotalCost.totalCost, StaticEstimatedCRDCostLimit)
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("openAPIV3Schema"), costErrorMsg))
+			}
+		}
 
 		if opts.requireStructuralSchema {
 			if ss, err := structuralschema.NewStructural(schema); err != nil {
@@ -713,7 +746,7 @@ func validateCustomResourceDefinitionValidation(customResourceValidation *apiext
 				}
 			} else if validationErrors := structuralschema.ValidateStructural(fldPath.Child("openAPIV3Schema"), ss); len(validationErrors) > 0 {
 				allErrs = append(allErrs, validationErrors...)
-			} else if validationErrors, err := structuraldefaulting.ValidateDefaults(fldPath.Child("openAPIV3Schema"), ss, true, opts.requirePrunedDefaults); err != nil {
+			} else if validationErrors, err := structuraldefaulting.ValidateDefaults(ctx, fldPath.Child("openAPIV3Schema"), ss, true, opts.requirePrunedDefaults); err != nil {
 				// this should never happen
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("openAPIV3Schema"), "", err.Error()))
 			} else {
@@ -731,16 +764,139 @@ func validateCustomResourceDefinitionValidation(customResourceValidation *apiext
 	return allErrs
 }
 
+// unbounded uses nil to represent an unbounded cardinality value.
+var unbounded *uint64 = nil
+
+type costInfo struct {
+	// MaxCardinality represents a limit to the number of data elements that can exist for the current
+	// schema based on MaxProperties or MaxItems limits present on parent schemas, If all parent
+	// map and array schemas have MaxProperties or MaxItems limits declared MaxCardinality is
+	// an int pointer representing the product of these limits.  If least one parent map or list schema
+	// does not have a MaxProperties or MaxItems limits set, the MaxCardinality is nil, indicating
+	// that the parent schemas offer no bound to the number of times a data element for the current
+	// schema can exist.
+	MaxCardinality *uint64
+	// TotalCost accumulates the x-kubernetes-validators estimated rule cost total for an entire custom resource
+	// definition. A single totalCost is allocated for each validation call and passed through the stack as the
+	// custom resource definition's OpenAPIv3 schema is recursively validated.
+	TotalCost *totalCost
+}
+
+type totalCost struct {
+	// totalCost accumulates the x-kubernetes-validators estimated rule cost total.
+	totalCost uint64
+	// mostExpensive accumulates the top 4 most expensive rules contributing to the totalCost. Only rules
+	// that accumulate at least 1% of total cost limit are included.
+	mostExpensive []ruleCost
+}
+
+func (c *totalCost) observeExpressionCost(path *field.Path, cost uint64) {
+	if math.MaxUint64-c.totalCost < cost {
+		c.totalCost = math.MaxUint64
+	} else {
+		c.totalCost += cost
+	}
+
+	if cost < StaticEstimatedCRDCostLimit/100 { // ignore rules that contribute < 1% of total cost limit
+		return
+	}
+	c.mostExpensive = append(c.mostExpensive, ruleCost{path: path, cost: cost})
+	sort.Slice(c.mostExpensive, func(i, j int) bool {
+		// sort in descending order so the most expensive rule is first
+		return c.mostExpensive[i].cost > c.mostExpensive[j].cost
+	})
+	if len(c.mostExpensive) > 4 {
+		c.mostExpensive = c.mostExpensive[:4]
+	}
+}
+
+type ruleCost struct {
+	path *field.Path
+	cost uint64
+}
+
+// MultiplyByElementCost returns a costInfo where the MaxCardinality is multiplied by the
+// factor that the schema increases the cardinality of its children. If the costInfo's
+// MaxCardinality is unbounded (nil) or the factor that the schema increase the cardinality
+// is unbounded, the resulting costInfo's MaxCardinality is also unbounded.
+func (c *costInfo) MultiplyByElementCost(schema *apiextensions.JSONSchemaProps) costInfo {
+	result := costInfo{TotalCost: c.TotalCost, MaxCardinality: unbounded}
+	if schema == nil {
+		// nil schemas can be passed since we call MultiplyByElementCost
+		// before ValidateCustomResourceDefinitionOpenAPISchema performs its nil check
+		return result
+	}
+	if c.MaxCardinality == unbounded {
+		return result
+	}
+	maxElements := extractMaxElements(schema)
+	if maxElements == unbounded {
+		return result
+	}
+	result.MaxCardinality = uint64ptr(multiplyWithOverflowGuard(*c.MaxCardinality, *maxElements))
+	return result
+}
+
+// extractMaxElements returns the factor by which the schema increases the cardinality
+// (number of possible data elements) of its children.  If schema is a map and has
+// MaxProperties or an array has MaxItems, the int pointer of the max value is returned.
+// If schema is a map or array and does not have MaxProperties or MaxItems,
+// unbounded (nil) is returned to indicate that there is no limit to the possible
+// number of data elements imposed by the current schema.  If the schema is an object, 1 is
+// returned to indicate that there is no increase to the number of possible data elements
+// for its children.  Primitives do not have children, but 1 is returned for simplicity.
+func extractMaxElements(schema *apiextensions.JSONSchemaProps) *uint64 {
+	switch schema.Type {
+	case "object":
+		if schema.AdditionalProperties != nil {
+			if schema.MaxProperties != nil {
+				maxProps := uint64(zeroIfNegative(*schema.MaxProperties))
+				return &maxProps
+			}
+			return unbounded
+		}
+		// return 1 to indicate that all fields of an object exist at most one for
+		// each occurrence of the object they are fields of
+		return uint64ptr(1)
+	case "array":
+		if schema.MaxItems != nil {
+			maxItems := uint64(zeroIfNegative(*schema.MaxItems))
+			return &maxItems
+		}
+		return unbounded
+	default:
+		return uint64ptr(1)
+	}
+}
+
+func zeroIfNegative(v int64) int64 {
+	if v < 0 {
+		return 0
+	}
+	return v
+}
+
+func uint64ptr(i uint64) *uint64 {
+	return &i
+}
+
+func rootCostInfo() costInfo {
+	rootCardinality := uint64(1)
+	return costInfo{
+		MaxCardinality: &rootCardinality,
+		TotalCost:      &totalCost{},
+	}
+}
+
 var metaFields = sets.NewString("metadata", "kind", "apiVersion")
 
 // ValidateCustomResourceDefinitionOpenAPISchema statically validates
-func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSchemaProps, fldPath *field.Path, ssv specStandardValidator, isRoot bool, opts *validationOptions) field.ErrorList {
+func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSchemaProps, fldPath *field.Path, ssv specStandardValidator, isRoot bool, opts *validationOptions, nodeCostInfo costInfo) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if schema == nil {
 		return allErrs
 	}
-
 	allErrs = append(allErrs, ssv.validate(schema, fldPath)...)
 
 	if schema.UniqueItems == true {
@@ -769,62 +925,75 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 			// we have to forbid defaults inside additionalProperties because pruning without actual value is ambiguous
 			subSsv = ssv.withForbiddenDefaults("inside additionalProperties applying to object metadata")
 		}
-		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.AdditionalProperties.Schema, fldPath.Child("additionalProperties"), subSsv, false, opts)...)
+		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.AdditionalProperties.Schema, fldPath.Child("additionalProperties"), subSsv, false, opts, nodeCostInfo.MultiplyByElementCost(schema))...)
 	}
 
 	if len(schema.Properties) != 0 {
 		for property, jsonSchema := range schema.Properties {
 			subSsv := ssv
 
+			if !cel.MapIsCorrelatable(schema.XMapType) {
+				subSsv = subSsv.withForbidOldSelfValidations(fldPath)
+			}
+
 			if (isRoot || schema.XEmbeddedResource) && metaFields.Has(property) {
 				// we recurse into the schema that applies to ObjectMeta.
-				subSsv = ssv.withInsideResourceMeta()
+				subSsv = subSsv.withInsideResourceMeta()
 				if isRoot {
 					subSsv = subSsv.withForbiddenDefaults(fmt.Sprintf("in top-level %s", property))
 				}
 			}
-			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("properties").Key(property), subSsv, false, opts)...)
+			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("properties").Key(property), subSsv, false, opts, nodeCostInfo.MultiplyByElementCost(schema))...)
 		}
 	}
 
-	allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.Not, fldPath.Child("not"), ssv, false, opts)...)
+	allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.Not, fldPath.Child("not"), ssv, false, opts, nodeCostInfo.MultiplyByElementCost(schema))...)
 
 	if len(schema.AllOf) != 0 {
 		for i, jsonSchema := range schema.AllOf {
-			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("allOf").Index(i), ssv, false, opts)...)
+			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("allOf").Index(i), ssv, false, opts, nodeCostInfo.MultiplyByElementCost(schema))...)
 		}
 	}
 
 	if len(schema.OneOf) != 0 {
 		for i, jsonSchema := range schema.OneOf {
-			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("oneOf").Index(i), ssv, false, opts)...)
+			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("oneOf").Index(i), ssv, false, opts, nodeCostInfo.MultiplyByElementCost(schema))...)
 		}
 	}
 
 	if len(schema.AnyOf) != 0 {
 		for i, jsonSchema := range schema.AnyOf {
-			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("anyOf").Index(i), ssv, false, opts)...)
+			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("anyOf").Index(i), ssv, false, opts, nodeCostInfo.MultiplyByElementCost(schema))...)
 		}
 	}
 
 	if len(schema.Definitions) != 0 {
 		for definition, jsonSchema := range schema.Definitions {
-			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("definitions").Key(definition), ssv, false, opts)...)
+			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("definitions").Key(definition), ssv, false, opts, nodeCostInfo.MultiplyByElementCost(schema))...)
 		}
 	}
 
 	if schema.Items != nil {
-		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.Items.Schema, fldPath.Child("items"), ssv, false, opts)...)
+		subSsv := ssv
+
+		// we can only correlate old/new items for "map" and "set" lists, and correlation of
+		// "set" elements by identity is not supported for cel (x-kubernetes-validations)
+		// rules. an unset list type defaults to "atomic".
+		if schema.XListType == nil || *schema.XListType != "map" {
+			subSsv = subSsv.withForbidOldSelfValidations(fldPath)
+		}
+
+		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.Items.Schema, fldPath.Child("items"), subSsv, false, opts, nodeCostInfo.MultiplyByElementCost(schema))...)
 		if len(schema.Items.JSONSchemas) != 0 {
 			for i, jsonSchema := range schema.Items.JSONSchemas {
-				allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("items").Index(i), ssv, false, opts)...)
+				allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("items").Index(i), subSsv, false, opts, nodeCostInfo.MultiplyByElementCost(schema))...)
 			}
 		}
 	}
 
 	if schema.Dependencies != nil {
 		for dependency, jsonSchemaPropsOrStringArray := range schema.Dependencies {
-			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(jsonSchemaPropsOrStringArray.Schema, fldPath.Child("dependencies").Key(dependency), ssv, false, opts)...)
+			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(jsonSchemaPropsOrStringArray.Schema, fldPath.Child("dependencies").Key(dependency), ssv, false, opts, nodeCostInfo.MultiplyByElementCost(schema))...)
 		}
 	}
 
@@ -928,16 +1097,29 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 
 		structural, err := structuralschema.NewStructural(schema)
 		if err == nil {
-			compResults, err := cel.Compile(structural, isRoot)
+			compResults, err := cel.Compile(structural, isRoot, cel.PerCallLimit)
 			if err != nil {
 				allErrs = append(allErrs, field.InternalError(fldPath.Child("x-kubernetes-validations"), err))
 			} else {
 				for i, cr := range compResults {
+					expressionCost := getExpressionCost(cr, nodeCostInfo)
+					if expressionCost > StaticEstimatedCostLimit {
+						costErrorMsg := getCostErrorMessage("estimated rule cost", expressionCost, StaticEstimatedCostLimit)
+						allErrs = append(allErrs, field.Forbidden(fldPath.Child("x-kubernetes-validations").Index(i).Child("rule"), costErrorMsg))
+					}
+					if nodeCostInfo.TotalCost != nil {
+						nodeCostInfo.TotalCost.observeExpressionCost(fldPath.Child("x-kubernetes-validations").Index(i).Child("rule"), expressionCost)
+					}
 					if cr.Error != nil {
 						if cr.Error.Type == cel.ErrorTypeRequired {
 							allErrs = append(allErrs, field.Required(fldPath.Child("x-kubernetes-validations").Index(i).Child("rule"), cr.Error.Detail))
 						} else {
 							allErrs = append(allErrs, field.Invalid(fldPath.Child("x-kubernetes-validations").Index(i).Child("rule"), schema.XValidations[i], cr.Error.Detail))
+						}
+					}
+					if cr.TransitionRule {
+						if uncorrelatablePath := ssv.forbidOldSelfValidations(); uncorrelatablePath != nil {
+							allErrs = append(allErrs, field.Invalid(fldPath.Child("x-kubernetes-validations").Index(i).Child("rule"), schema.XValidations[i].Rule, fmt.Sprintf("oldSelf cannot be used on the uncorrelatable portion of the schema within %v", uncorrelatablePath)))
 						}
 					}
 				}
@@ -950,6 +1132,41 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 	}
 
 	return allErrs
+}
+
+// multiplyWithOverflowGuard returns the product of baseCost and cardinality unless that product
+// would exceed math.MaxUint, in which case math.MaxUint is returned.
+func multiplyWithOverflowGuard(baseCost, cardinality uint64) uint64 {
+	if baseCost == 0 {
+		// an empty rule can return 0, so guard for that here
+		return 0
+	} else if math.MaxUint/baseCost < cardinality {
+		return math.MaxUint
+	}
+	return baseCost * cardinality
+}
+
+func getExpressionCost(cr cel.CompilationResult, cardinalityCost costInfo) uint64 {
+	if cardinalityCost.MaxCardinality != unbounded {
+		return multiplyWithOverflowGuard(cr.MaxCost, *cardinalityCost.MaxCardinality)
+	}
+	return multiplyWithOverflowGuard(cr.MaxCost, cr.MaxCardinality)
+}
+
+func getCostErrorMessage(costName string, expressionCost, costLimit uint64) string {
+	exceedFactor := float64(expressionCost) / float64(costLimit)
+	var factor string
+	if exceedFactor > 100.0 {
+		// if exceedFactor is greater than 2 orders of magnitude, the rule is likely O(n^2) or worse
+		// and will probably never validate without some set limits
+		// also in such cases the cost estimation is generally large enough to not add any value
+		factor = fmt.Sprintf("more than 100x")
+	} else if exceedFactor < 1.5 {
+		factor = fmt.Sprintf("%fx", exceedFactor) // avoid reporting "exceeds budge by a factor of 1.0x"
+	} else {
+		factor = fmt.Sprintf("%.1fx", exceedFactor)
+	}
+	return fmt.Sprintf("%s exceeds budget by factor of %s (try simplifying the rule, or adding maxItems, maxProperties, and maxLength where arrays, maps, and strings are declared)", costName, factor)
 }
 
 var newlineMatcher = regexp.MustCompile(`[\n\r]+`) // valid newline chars in CEL grammar
@@ -1006,10 +1223,11 @@ func validateMapListKeysMapSet(schema *apiextensions.JSONSchemaProps, fldPath *f
 }
 
 type specStandardValidatorV3 struct {
-	allowDefaults            bool
-	disallowDefaultsReason   string
-	isInsideResourceMeta     bool
-	requireValidPropertyType bool
+	allowDefaults                       bool
+	disallowDefaultsReason              string
+	isInsideResourceMeta                bool
+	requireValidPropertyType            bool
+	uncorrelatableOldSelfValidationPath *field.Path
 }
 
 func (v *specStandardValidatorV3) withForbiddenDefaults(reason string) specStandardValidator {
@@ -1027,6 +1245,21 @@ func (v *specStandardValidatorV3) withInsideResourceMeta() specStandardValidator
 
 func (v *specStandardValidatorV3) insideResourceMeta() bool {
 	return v.isInsideResourceMeta
+}
+
+func (v *specStandardValidatorV3) withForbidOldSelfValidations(path *field.Path) specStandardValidator {
+	if v.uncorrelatableOldSelfValidationPath != nil {
+		// oldSelf validations are already forbidden. preserve the highest-level path
+		// causing oldSelf validations to be forbidden
+		return v
+	}
+	clone := *v
+	clone.uncorrelatableOldSelfValidationPath = path
+	return &clone
+}
+
+func (v *specStandardValidatorV3) forbidOldSelfValidations() *field.Path {
+	return v.uncorrelatableOldSelfValidationPath
 }
 
 // validate validates against OpenAPI Schema v3.

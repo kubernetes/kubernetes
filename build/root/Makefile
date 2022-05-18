@@ -73,16 +73,17 @@ define ALL_HELP_INFO
 #   GOFLAGS: Extra flags to pass to 'go' when building.
 #   GOLDFLAGS: Extra linking flags passed to 'go' when building.
 #   GOGCFLAGS: Additional go compile flags passed to 'go' when building.
+#   DBG: If set to "1", build with optimizations disabled for easier
+#     debugging.  Any other value is ignored.
 #
 # Example:
 #   make
 #   make all
 #   make all WHAT=cmd/kubelet GOFLAGS=-v
-#   make all GOLDFLAGS=""
-#     Note: Specify GOLDFLAGS as an empty string for building unstripped binaries, which allows
-#           you to use code debugging tools like delve. When GOLDFLAGS is unspecified, it defaults
-#           to "-s -w" which strips debug information. Other flags that can be used for GOLDFLAGS 
-#           are documented at https://golang.org/cmd/link/
+#   make all DBG=1
+#     Note: Specify DBG=1 for building unstripped binaries, which allows you to use code debugging
+#           tools like delve. When DBG is unspecified, it defaults to "-s -w" which strips debug
+#           information.
 endef
 .PHONY: all
 ifeq ($(PRINT_HELP),y)
@@ -105,7 +106,7 @@ ginkgo:
 	echo "$$GINKGO_HELP_INFO"
 else
 ginkgo:
-	hack/make-rules/build.sh vendor/github.com/onsi/ginkgo/ginkgo
+	hack/make-rules/build.sh github.com/onsi/ginkgo/ginkgo
 endif
 
 define VERIFY_HELP_INFO
@@ -222,8 +223,6 @@ define TEST_E2E_NODE_HELP_INFO
 #  ARTIFACTS: Local directory to scp test artifacts into from the remote hosts
 #    for REMOTE=true. Local directory to write juntil xml results into for REMOTE=false.
 #    Defaults to "/tmp/_artifacts/$$(date +%y%m%dT%H%M%S)".
-#  LIST_IMAGES: For REMOTE=true only. If true, don't run tests. Just output the
-#    list of available images for testing.  Defaults to false.
 #  TIMEOUT: For REMOTE=true only. How long (in golang duration format) to wait
 #    for ginkgo tests to complete. Defaults to 45m.
 #  PARALLELISM: The number of ginkgo nodes to run.  Defaults to 8.
@@ -249,7 +248,7 @@ define TEST_E2E_NODE_HELP_INFO
 #  CLEANUP: For REMOTE=true only.  If false, do not stop processes or delete
 #    test files on remote hosts.  Defaults to true.
 #  IMAGE_PROJECT: For REMOTE=true only.  Project containing images provided to
-#    $$IMAGES.  Defaults to "kubernetes-node-e2e-images".
+#    $$IMAGES.  Defaults to "cos-cloud".
 #  INSTANCE_PREFIX: For REMOTE=true only.  Instances created from images will
 #    have the name "$${INSTANCE_PREFIX}-$${IMAGE_NAME}".  Defaults to "test".
 #  INSTANCE_METADATA: For REMOTE=true and running on GCE only.
@@ -524,7 +523,7 @@ generated_files:
 	echo "$$GENERATED_FILES_HELP_INFO"
 else
 generated_files gen_openapi:
-	$(MAKE) -f Makefile.generated_files $@ CALLED_FROM_MAIN_MAKEFILE=1
+	$(MAKE) -f Makefile.generated_files $@ CALLED_FROM_MAIN_MAKEFILE=1 SHELL="$(SHELL)"
 endif
 
 define HELP_INFO

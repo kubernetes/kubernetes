@@ -195,6 +195,8 @@ func NewKubeGenericRuntimeManager(
 	getNodeAllocatable func() v1.ResourceList,
 	memoryThrottlingFactor float64,
 ) (KubeGenericRuntime, error) {
+	runtimeService = newInstrumentedRuntimeService(runtimeService)
+	imageService = newInstrumentedImageManagerService(imageService)
 	kubeRuntimeManager := &kubeGenericRuntimeManager{
 		recorder:               recorder,
 		cpuCFSQuota:            cpuCFSQuota,
@@ -206,8 +208,8 @@ func NewKubeGenericRuntimeManager(
 		machineInfo:            machineInfo,
 		osInterface:            osInterface,
 		runtimeHelper:          runtimeHelper,
-		runtimeService:         newInstrumentedRuntimeService(runtimeService),
-		imageService:           newInstrumentedImageManagerService(imageService),
+		runtimeService:         runtimeService,
+		imageService:           imageService,
 		internalLifecycle:      internalLifecycle,
 		logManager:             logManager,
 		runtimeClassManager:    runtimeClassManager,
@@ -494,7 +496,7 @@ func (m *kubeGenericRuntimeManager) podSandboxChanged(pod *v1.Pod, podStatus *ku
 	}
 
 	// Needs to create a new sandbox when the sandbox does not have an IP address.
-	if !kubecontainer.IsHostNetworkPod(pod) && sandboxStatus.Network.Ip == "" {
+	if !kubecontainer.IsHostNetworkPod(pod) && sandboxStatus.Network != nil && sandboxStatus.Network.Ip == "" {
 		klog.V(2).InfoS("Sandbox for pod has no IP address. Need to start a new one", "pod", klog.KObj(pod))
 		return true, sandboxStatus.Metadata.Attempt + 1, sandboxStatus.Id
 	}

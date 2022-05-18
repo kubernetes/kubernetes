@@ -39,7 +39,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
@@ -191,8 +190,7 @@ func ConnectResource(connecter rest.Connecter, scope *RequestScope, admit admiss
 		}
 		ctx := req.Context()
 		ctx = request.WithNamespace(ctx, namespace)
-		ae := audit.AuditEventFrom(ctx)
-		admit = admission.WithAudit(admit, ae)
+		admit = admission.WithAudit(admit)
 
 		opts, subpath, subpathKey := connecter.NewConnectOptions()
 		if err := getRequestOptions(req, scope, opts, subpath, subpathKey, isSubresource); err != nil {
@@ -354,16 +352,6 @@ func dedupOwnerReferencesAndAddWarning(obj runtime.Object, requestContext contex
 			strings.Join(duplicates, ", ")))
 		accessor.SetOwnerReferences(deduped)
 	}
-}
-
-// ensureNonNilItems ensures that for empty lists we don't return <nil> items.
-func ensureNonNilItems(obj runtime.Object) error {
-	if meta.IsListType(obj) && meta.LenList(obj) == 0 {
-		if err := meta.SetList(obj, []runtime.Object{}); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func summarizeData(data []byte, maxLength int) string {

@@ -62,8 +62,8 @@ func TestEndpointUpdates(t *testing.T) {
 	go epController.Run(ctx, 1)
 
 	// Create namespace
-	ns := framework.CreateTestingNamespace("test-endpoints-updates", server, t)
-	defer framework.DeleteTestingNamespace(ns, server, t)
+	ns := framework.CreateTestingNamespace("test-endpoints-updates", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	// Create a pod with labels
 	pod := &v1.Pod{
@@ -191,8 +191,8 @@ func TestEndpointWithTerminatingPod(t *testing.T) {
 	go epController.Run(ctx, 1)
 
 	// Create namespace
-	ns := framework.CreateTestingNamespace("test-endpoints-terminating", server, t)
-	defer framework.DeleteTestingNamespace(ns, server, t)
+	ns := framework.CreateTestingNamespace("test-endpoints-terminating", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	// Create a pod with labels
 	pod := &v1.Pod{

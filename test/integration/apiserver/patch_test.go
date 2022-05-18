@@ -35,11 +35,11 @@ import (
 
 // Tests that the apiserver retries patches
 func TestPatchConflicts(t *testing.T) {
-	s, clientSet, closeFn := setup(t)
+	_, clientSet, closeFn := setup(t)
 	defer closeFn()
 
-	ns := framework.CreateTestingNamespace("status-code", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateTestingNamespace("status-code", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	numOfConcurrentPatches := 100
 

@@ -171,8 +171,8 @@ func (pl *TestPlugin) ScoreExtensions() framework.ScoreExtensions {
 	return nil
 }
 
-func (pl *TestPlugin) PreFilter(ctx context.Context, state *framework.CycleState, p *v1.Pod) *framework.Status {
-	return framework.NewStatus(framework.Code(pl.inj.PreFilterStatus), "injected status")
+func (pl *TestPlugin) PreFilter(ctx context.Context, state *framework.CycleState, p *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+	return nil, framework.NewStatus(framework.Code(pl.inj.PreFilterStatus), "injected status")
 }
 
 func (pl *TestPlugin) PreFilterExtensions() framework.PreFilterExtensions {
@@ -222,9 +222,9 @@ func (pl *TestPreFilterPlugin) Name() string {
 	return preFilterPluginName
 }
 
-func (pl *TestPreFilterPlugin) PreFilter(ctx context.Context, state *framework.CycleState, p *v1.Pod) *framework.Status {
+func (pl *TestPreFilterPlugin) PreFilter(ctx context.Context, state *framework.CycleState, p *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
 	pl.PreFilterCalled++
-	return nil
+	return nil, nil
 }
 
 func (pl *TestPreFilterPlugin) PreFilterExtensions() framework.PreFilterExtensions {
@@ -242,9 +242,9 @@ func (pl *TestPreFilterWithExtensionsPlugin) Name() string {
 	return preFilterWithExtensionsPluginName
 }
 
-func (pl *TestPreFilterWithExtensionsPlugin) PreFilter(ctx context.Context, state *framework.CycleState, p *v1.Pod) *framework.Status {
+func (pl *TestPreFilterWithExtensionsPlugin) PreFilter(ctx context.Context, state *framework.CycleState, p *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
 	pl.PreFilterCalled++
-	return nil
+	return nil, nil
 }
 
 func (pl *TestPreFilterWithExtensionsPlugin) AddPod(ctx context.Context, state *framework.CycleState, podToSchedule *v1.Pod,
@@ -270,8 +270,8 @@ func (dp *TestDuplicatePlugin) Name() string {
 	return duplicatePluginName
 }
 
-func (dp *TestDuplicatePlugin) PreFilter(ctx context.Context, state *framework.CycleState, p *v1.Pod) *framework.Status {
-	return nil
+func (dp *TestDuplicatePlugin) PreFilter(ctx context.Context, state *framework.CycleState, p *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+	return nil, nil
 }
 
 func (dp *TestDuplicatePlugin) PreFilterExtensions() framework.PreFilterExtensions {
@@ -630,6 +630,44 @@ func TestNewFrameworkMultiPointExpansion(t *testing.T) {
 				},
 				Score: config.PluginSet{
 					Enabled: []config.Plugin{
+						{Name: scorePlugin1},
+						{Name: testPlugin},
+					},
+				},
+			},
+			wantPlugins: &config.Plugins{
+				QueueSort:  config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				PreFilter:  config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				Filter:     config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				PostFilter: config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				PreScore: config.PluginSet{Enabled: []config.Plugin{
+					{Name: testPlugin},
+					{Name: scorePlugin1},
+				}},
+				Score: config.PluginSet{Enabled: []config.Plugin{
+					{Name: scorePlugin1, Weight: 1},
+					{Name: testPlugin, Weight: 1},
+					{Name: scoreWithNormalizePlugin1, Weight: 1},
+				}},
+				Reserve:  config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				Permit:   config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				PreBind:  config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				Bind:     config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				PostBind: config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+			},
+		},
+		{
+			name: "Reorder MultiPoint plugins (specified extension only takes precedence when it exists in MultiPoint)",
+			plugins: &config.Plugins{
+				MultiPoint: config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: testPlugin},
+						{Name: scorePlugin1},
+					},
+				},
+				Score: config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: scoreWithNormalizePlugin1},
 						{Name: scorePlugin1},
 						{Name: testPlugin},
 					},
@@ -1196,7 +1234,6 @@ func TestFilterPlugins(t *testing.T) {
 		plugins       []*TestPlugin
 		wantStatus    *framework.Status
 		wantStatusMap framework.PluginToStatus
-		runAllFilters bool
 	}{
 		{
 			name: "SuccessFilter",
@@ -1249,7 +1286,7 @@ func TestFilterPlugins(t *testing.T) {
 				"TestPlugin": framework.NewStatus(framework.UnschedulableAndUnresolvable, "injected filter status").WithFailedPlugin("TestPlugin"),
 			},
 		},
-		// followings tests cover multiple-plugins scenarios
+		// following tests cover multiple-plugins scenarios
 		{
 			name: "ErrorAndErrorFilters",
 			plugins: []*TestPlugin{
@@ -1337,56 +1374,6 @@ func TestFilterPlugins(t *testing.T) {
 				"TestPlugin2": framework.NewStatus(framework.Unschedulable, "injected filter status").WithFailedPlugin("TestPlugin2"),
 			},
 		},
-		{
-			name: "SuccessFilterWithRunAllFilters",
-			plugins: []*TestPlugin{
-				{
-					name: "TestPlugin",
-					inj:  injectedResult{FilterStatus: int(framework.Success)},
-				},
-			},
-			runAllFilters: true,
-			wantStatus:    nil,
-			wantStatusMap: framework.PluginToStatus{},
-		},
-		{
-			name: "ErrorAndErrorFilters",
-			plugins: []*TestPlugin{
-				{
-					name: "TestPlugin1",
-					inj:  injectedResult{FilterStatus: int(framework.Error)},
-				},
-
-				{
-					name: "TestPlugin2",
-					inj:  injectedResult{FilterStatus: int(framework.Error)},
-				},
-			},
-			runAllFilters: true,
-			wantStatus:    framework.AsStatus(fmt.Errorf(`running "TestPlugin1" filter plugin: %w`, errInjectedFilterStatus)).WithFailedPlugin("TestPlugin1"),
-			wantStatusMap: framework.PluginToStatus{
-				"TestPlugin1": framework.AsStatus(fmt.Errorf(`running "TestPlugin1" filter plugin: %w`, errInjectedFilterStatus)).WithFailedPlugin("TestPlugin1"),
-			},
-		},
-		{
-			name: "ErrorAndErrorFilters",
-			plugins: []*TestPlugin{
-				{
-					name: "TestPlugin1",
-					inj:  injectedResult{FilterStatus: int(framework.UnschedulableAndUnresolvable)},
-				},
-				{
-					name: "TestPlugin2",
-					inj:  injectedResult{FilterStatus: int(framework.Unschedulable)},
-				},
-			},
-			runAllFilters: true,
-			wantStatus:    framework.NewStatus(framework.UnschedulableAndUnresolvable, "injected filter status", "injected filter status").WithFailedPlugin("TestPlugin1"),
-			wantStatusMap: framework.PluginToStatus{
-				"TestPlugin1": framework.NewStatus(framework.UnschedulableAndUnresolvable, "injected filter status").WithFailedPlugin("TestPlugin1"),
-				"TestPlugin2": framework.NewStatus(framework.Unschedulable, "injected filter status").WithFailedPlugin("TestPlugin2"),
-			},
-		},
 	}
 
 	for _, tt := range tests {
@@ -1408,7 +1395,7 @@ func TestFilterPlugins(t *testing.T) {
 					config.Plugin{Name: pl.name})
 			}
 			profile := config.KubeSchedulerProfile{Plugins: cfgPls}
-			f, err := newFrameworkWithQueueSortAndBind(registry, profile, WithRunAllFilters(tt.runAllFilters))
+			f, err := newFrameworkWithQueueSortAndBind(registry, profile)
 			if err != nil {
 				t.Fatalf("fail to create framework: %s", err)
 			}

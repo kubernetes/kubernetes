@@ -228,7 +228,7 @@ func (p *astPruner) prune(node *exprpb.Expr) (*exprpb.Expr, bool) {
 		}
 	}
 
-	// We have either an unknown/error value, or something we dont want to
+	// We have either an unknown/error value, or something we don't want to
 	// transform, or expression was not evaluated. If possible, drill down
 	// more.
 

@@ -351,9 +351,7 @@ func execPluginClientTests(t *testing.T, unauthorizedCert, unauthorizedKey []byt
 			wantMetrics:                   &execPluginMetrics{},
 		},
 		{
-			// This is not the behavior we would expect, see
-			//   https://github.com/kubernetes/kubernetes/issues/99603
-			name: "good token with static auth cert and key favors exec plugin",
+			name: "good token with static auth cert and key favors static cert",
 			clientConfigFunc: func(c *rest.Config) {
 				c.ExecProvider.Env = []clientcmdapi.ExecEnvVar{
 					{
@@ -370,9 +368,10 @@ func execPluginClientTests(t *testing.T, unauthorizedCert, unauthorizedKey []byt
 				c.CertData = unauthorizedCert
 				c.KeyData = unauthorizedKey
 			},
-			wantAuthorizationHeaderValues: [][]string{{"Bearer " + clientAuthorizedToken}},
+			wantAuthorizationHeaderValues: [][]string{nil},
+			wantClientErrorPrefix:         "Unauthorized",
 			wantCertificate:               x509KeyPair(unauthorizedCert, unauthorizedKey, false),
-			wantMetrics:                   &execPluginMetrics{calls: []execPluginCall{{exitCode: 0, callStatus: "no_error"}}},
+			wantMetrics:                   &execPluginMetrics{},
 		},
 		{
 			name: "unknown binary",
@@ -481,7 +480,7 @@ func TestExecPluginViaClient(t *testing.T) {
 			_, err = client.CoreV1().ConfigMaps("default").List(ctx, metav1.ListOptions{})
 			if test.wantClientErrorPrefix != "" {
 				if err == nil || !strings.HasPrefix(err.Error(), test.wantClientErrorPrefix) {
-					t.Fatalf(`got %q, wanted "%s..."`, err, test.wantClientErrorPrefix)
+					t.Fatalf(`got %v, wanted "%s..."`, err, test.wantClientErrorPrefix)
 				}
 			} else if err != nil {
 				t.Fatal(err)

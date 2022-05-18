@@ -163,7 +163,6 @@ func TestPluginGetPluginName(t *testing.T) {
 }
 
 func TestPluginGetFSGroupPolicy(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeFSGroupPolicy, true)()
 	defaultPolicy := storage.ReadWriteOnceWithFSTypeFSGroupPolicy
 	testCases := []struct {
 		name                  string

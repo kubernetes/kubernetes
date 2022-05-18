@@ -18,10 +18,10 @@ import (
 	"github.com/google/cel-go/common/types/ref"
 )
 
-// IsUnknownOrError returns whether the input element ref.Val is an ErrType or UnknonwType.
+// IsUnknownOrError returns whether the input element ref.Val is an ErrType or UnknownType.
 func IsUnknownOrError(val ref.Val) bool {
-	switch val.Type() {
-	case UnknownType, ErrType:
+	switch val.(type) {
+	case Unknown, *Err:
 		return true
 	}
 	return false
@@ -35,4 +35,14 @@ func IsPrimitiveType(val ref.Val) bool {
 		return true
 	}
 	return false
+}
+
+// Equal returns whether the two ref.Value are heterogeneously equivalent.
+func Equal(lhs ref.Val, rhs ref.Val) ref.Val {
+	lNull := lhs == NullValue
+	rNull := rhs == NullValue
+	if lNull || rNull {
+		return Bool(lNull == rNull)
+	}
+	return lhs.Equal(rhs)
 }

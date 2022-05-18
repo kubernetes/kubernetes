@@ -91,7 +91,7 @@ body:
   - type: textarea
     id: runtime
     attributes:
-      label: Container runtime (CRI) and and version (if applicable)
+      label: Container runtime (CRI) and version (if applicable)
       value: |
         <details>
 

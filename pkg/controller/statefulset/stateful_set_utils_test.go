@@ -720,7 +720,6 @@ func TestGetPersistentVolumeClaims(t *testing.T) {
 	statefulSet.Spec.Selector.MatchLabels = nil
 	claims := getPersistentVolumeClaims(statefulSet, pod)
 	pvc := newPVC("datadir-foo-0")
-	pvc.SetNamespace(v1.NamespaceDefault)
 	resultClaims := map[string]v1.PersistentVolumeClaim{"datadir": pvc}
 
 	if !reflect.DeepEqual(claims, resultClaims) {
@@ -777,7 +776,7 @@ func newPod() *v1.Pod {
 func newPVC(name string) v1.PersistentVolumeClaim {
 	return v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "default",
+			Namespace: v1.NamespaceDefault,
 			Name:      name,
 		},
 		Spec: v1.PersistentVolumeClaimSpec{

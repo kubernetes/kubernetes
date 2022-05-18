@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -120,6 +121,7 @@ func runPodPidsLimitTests(f *framework.Framework) {
 // Serial because the test updates kubelet configuration.
 var _ = SIGDescribe("PodPidsLimit [Serial]", func() {
 	f := framework.NewDefaultFramework("pids-limit-test")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("With config updated with pids limits", func() {
 		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
 			initialConfig.PodPidsLimit = int64(1024)

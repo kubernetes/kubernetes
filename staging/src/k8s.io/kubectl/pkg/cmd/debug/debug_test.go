@@ -1538,7 +1538,7 @@ func TestCompleteAndValidate(t *testing.T) {
 					if gotError != nil {
 						return
 					}
-					gotError = opts.Validate(cmd)
+					gotError = opts.Validate()
 				},
 			}
 			cmd.SetArgs(strings.Split(tc.args, " "))

@@ -40,8 +40,12 @@ type Images struct {
 	Images []string
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // ComponentUpgradePlan represents information about upgrade plan for one component
 type ComponentUpgradePlan struct {
+	metav1.TypeMeta
+
 	Name           string
 	CurrentVersion string
 	NewVersion     string

@@ -172,7 +172,7 @@ func createJob(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration)
 		return errors.Wrapf(lastError, "could not create Job %q in the namespace %q", jobName, ns)
 	}
 
-	// Waiting and manually deleteing the Job is a workaround to not enabling the TTL controller.
+	// Waiting and manually deleting the Job is a workaround to not enabling the TTL controller.
 	// TODO: refactor this if the TTL controller is enabled in kubeadm once it goes Beta.
 
 	// Wait for the Job to complete

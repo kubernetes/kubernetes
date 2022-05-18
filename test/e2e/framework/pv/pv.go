@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package framework
+package pv
 
 import (
 	"context"
@@ -671,6 +671,14 @@ func createPDWithRetry(zone string) (string, error) {
 		return newDiskName, nil
 	}
 	return "", err
+}
+
+func CreateShare() (string, string, string, error) {
+	return framework.TestContext.CloudConfig.Provider.CreateShare()
+}
+
+func DeleteShare(accountName, shareName string) error {
+	return framework.TestContext.CloudConfig.Provider.DeleteShare(accountName, shareName)
 }
 
 // CreatePDWithRetry creates PD with retry.

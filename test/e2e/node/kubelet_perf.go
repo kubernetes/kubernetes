@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/perftype"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 )
@@ -196,6 +197,7 @@ func verifyCPULimits(expected e2ekubelet.ContainersCPUSummary, actual e2ekubelet
 var _ = SIGDescribe("Kubelet [Serial] [Slow]", func() {
 	var nodeNames sets.String
 	f := framework.NewDefaultFramework("kubelet-perf")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var om *e2ekubelet.RuntimeOperationMonitor
 	var rm *e2ekubelet.ResourceMonitor
 

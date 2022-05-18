@@ -322,7 +322,7 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 		initTrace.Step("Objects listed", trace.Field{Key: "error", Value: err})
 		if err != nil {
 			klog.Warningf("%s: failed to list %v: %v", r.name, r.expectedTypeName, err)
-			return fmt.Errorf("failed to list %v: %v", r.expectedTypeName, err)
+			return fmt.Errorf("failed to list %v: %w", r.expectedTypeName, err)
 		}
 
 		// We check if the list was paginated and if so set the paginatedResult based on that.

@@ -58,7 +58,7 @@ func UnstructuredToVal(unstructured interface{}, schema *structuralschema.Struct
 	if schema.Type == "object" {
 		m, ok := unstructured.(map[string]interface{})
 		if !ok {
-			return types.NewErr("invalid data, expected map[string]interface{} to match the provided schema with type=object")
+			return types.NewErr("invalid data, expected a map for the provided schema with type=object")
 		}
 		if schema.XEmbeddedResource || schema.Properties != nil {
 			if schema.XEmbeddedResource {
@@ -101,7 +101,7 @@ func UnstructuredToVal(unstructured interface{}, schema *structuralschema.Struct
 	if schema.Type == "array" {
 		l, ok := unstructured.([]interface{})
 		if !ok {
-			return types.NewErr("invalid data, expected []interface{} to match the provided schema with type=array")
+			return types.NewErr("invalid data, expected an array for the provided schema with type=array")
 		}
 		if schema.Items == nil {
 			return types.NewErr("invalid array type, expected Items with a non-empty Schema")

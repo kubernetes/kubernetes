@@ -26,10 +26,12 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/tools/cache"
 	credentialproviderapi "k8s.io/kubelet/pkg/apis/credentialprovider"
 	credentialproviderv1alpha1 "k8s.io/kubelet/pkg/apis/credentialprovider/v1alpha1"
+	credentialproviderv1beta1 "k8s.io/kubelet/pkg/apis/credentialprovider/v1beta1"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/utils/clock"
@@ -408,17 +410,28 @@ func Test_getCachedCredentials(t *testing.T) {
 func Test_encodeRequest(t *testing.T) {
 	testcases := []struct {
 		name         string
-		apiVersion   string
+		apiVersion   schema.GroupVersion
 		request      *credentialproviderapi.CredentialProviderRequest
 		expectedData []byte
 		expectedErr  bool
 	}{
 		{
-			name: "successful",
+			name:       "successful with v1alpha1",
+			apiVersion: credentialproviderv1alpha1.SchemeGroupVersion,
 			request: &credentialproviderapi.CredentialProviderRequest{
 				Image: "test.registry.io/foobar",
 			},
 			expectedData: []byte(`{"kind":"CredentialProviderRequest","apiVersion":"credentialprovider.kubelet.k8s.io/v1alpha1","image":"test.registry.io/foobar"}
+`),
+			expectedErr: false,
+		},
+		{
+			name:       "successful with v1beta1",
+			apiVersion: credentialproviderv1beta1.SchemeGroupVersion,
+			request: &credentialproviderapi.CredentialProviderRequest{
+				Image: "test.registry.io/foobar",
+			},
+			expectedData: []byte(`{"kind":"CredentialProviderRequest","apiVersion":"credentialprovider.kubelet.k8s.io/v1beta1","image":"test.registry.io/foobar"}
 `),
 			expectedErr: false,
 		},
@@ -433,7 +446,7 @@ func Test_encodeRequest(t *testing.T) {
 			}
 
 			e := &execPlugin{
-				encoder: codecs.EncoderForVersion(info.Serializer, credentialproviderv1alpha1.SchemeGroupVersion),
+				encoder: codecs.EncoderForVersion(info.Serializer, testcase.apiVersion),
 			}
 
 			data, err := e.encodeRequest(testcase.request)
@@ -462,7 +475,24 @@ func Test_decodeResponse(t *testing.T) {
 		expectedErr      bool
 	}{
 		{
-			name: "success",
+			name: "success with v1beta1",
+			data: []byte(`{"kind":"CredentialProviderResponse","apiVersion":"credentialprovider.kubelet.k8s.io/v1beta1","cacheKeyType":"Registry","cacheDuration":"1m","auth":{"*.registry.io":{"username":"user","password":"password"}}}`),
+			expectedResponse: &credentialproviderapi.CredentialProviderResponse{
+				CacheKeyType: credentialproviderapi.RegistryPluginCacheKeyType,
+				CacheDuration: &metav1.Duration{
+					Duration: time.Minute,
+				},
+				Auth: map[string]credentialproviderapi.AuthConfig{
+					"*.registry.io": {
+						Username: "user",
+						Password: "password",
+					},
+				},
+			},
+			expectedErr: false,
+		},
+		{
+			name: "success with v1alpha1",
 			data: []byte(`{"kind":"CredentialProviderResponse","apiVersion":"credentialprovider.kubelet.k8s.io/v1alpha1","cacheKeyType":"Registry","cacheDuration":"1m","auth":{"*.registry.io":{"username":"user","password":"password"}}}`),
 			expectedResponse: &credentialproviderapi.CredentialProviderResponse{
 				CacheKeyType: credentialproviderapi.RegistryPluginCacheKeyType,
@@ -480,13 +510,13 @@ func Test_decodeResponse(t *testing.T) {
 		},
 		{
 			name:             "wrong Kind",
-			data:             []byte(`{"kind":"WrongKind","apiVersion":"credentialprovider.kubelet.k8s.io/v1alpha1","cacheKeyType":"Registry","cacheDuration":"1m","auth":{"*.registry.io":{"username":"user","password":"password"}}}`),
+			data:             []byte(`{"kind":"WrongKind","apiVersion":"credentialprovider.kubelet.k8s.io/v1beta1","cacheKeyType":"Registry","cacheDuration":"1m","auth":{"*.registry.io":{"username":"user","password":"password"}}}`),
 			expectedResponse: nil,
 			expectedErr:      true,
 		},
 		{
 			name:             "wrong Group",
-			data:             []byte(`{"kind":"CredentialProviderResponse","apiVersion":"foobar.kubelet.k8s.io/v1alpha1","cacheKeyType":"Registry","cacheDuration":"1m","auth":{"*.registry.io":{"username":"user","password":"password"}}}`),
+			data:             []byte(`{"kind":"CredentialProviderResponse","apiVersion":"foobar.kubelet.k8s.io/v1beta1","cacheKeyType":"Registry","cacheDuration":"1m","auth":{"*.registry.io":{"username":"user","password":"password"}}}`),
 			expectedResponse: nil,
 			expectedErr:      true,
 		},

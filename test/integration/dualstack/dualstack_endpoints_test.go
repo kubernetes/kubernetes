@@ -156,8 +156,8 @@ func TestDualStackEndpoints(t *testing.T) {
 
 	for i, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			ns := framework.CreateTestingNamespace(fmt.Sprintf("test-endpointslice-dualstack-%d", i), s, t)
-			defer framework.DeleteTestingNamespace(ns, s, t)
+			ns := framework.CreateTestingNamespace(fmt.Sprintf("test-endpointslice-dualstack-%d", i), t)
+			defer framework.DeleteTestingNamespace(ns, t)
 
 			// Create a pod with labels
 			pod := &v1.Pod{

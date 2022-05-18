@@ -1125,11 +1125,8 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 						if err != nil && !errors.Is(err, cloudprovider.InstanceNotFound) {
 							return nil, err
 						}
-
-						// If a node is not supposed to be included in the LB, it
-						// would not be in the `nodes` slice. We need to check the nodes that
-						// have been added to the LB's backendpool, find the unwanted ones and
-						// delete them from the pool.
+						// If the node appears in the local cache of nodes to exclude,
+						// delete it from the load balancer backend pool.
 						shouldExcludeLoadBalancer, err := az.ShouldNodeExcludedFromLoadBalancer(nodeName)
 						if err != nil {
 							klog.Errorf("ShouldNodeExcludedFromLoadBalancer(%s) failed with error: %v", nodeName, err)
@@ -1700,6 +1697,10 @@ func (az *Cloud) reconcileLoadBalancerRule(
 			loadDistribution = network.LoadDistributionSourceIP
 		}
 
+		tcpReset := enableTCPReset
+		if port.Protocol != v1.ProtocolTCP {
+			tcpReset = nil
+		}
 		expectedRule := network.LoadBalancingRule{
 			Name: &lbRuleName,
 			LoadBalancingRulePropertiesFormat: &network.LoadBalancingRulePropertiesFormat{
@@ -1714,7 +1715,7 @@ func (az *Cloud) reconcileLoadBalancerRule(
 				FrontendPort:        to.Int32Ptr(port.Port),
 				BackendPort:         to.Int32Ptr(port.Port),
 				DisableOutboundSnat: to.BoolPtr(az.disableLoadBalancerOutboundSNAT()),
-				EnableTCPReset:      enableTCPReset,
+				EnableTCPReset:      tcpReset,
 				EnableFloatingIP:    to.BoolPtr(true),
 			},
 		}
@@ -2409,14 +2410,21 @@ func equalLoadBalancingRulePropertiesFormat(s *network.LoadBalancingRuleProperti
 		return false
 	}
 
-	properties := reflect.DeepEqual(s.Protocol, t.Protocol) &&
-		reflect.DeepEqual(s.FrontendIPConfiguration, t.FrontendIPConfiguration) &&
+	properties := reflect.DeepEqual(s.Protocol, t.Protocol)
+	if !properties {
+		return false
+	}
+
+	if reflect.DeepEqual(s.Protocol, network.TransportProtocolTCP) {
+		properties = properties && reflect.DeepEqual(to.Bool(s.EnableTCPReset), to.Bool(t.EnableTCPReset))
+	}
+
+	properties = properties && reflect.DeepEqual(s.FrontendIPConfiguration, t.FrontendIPConfiguration) &&
 		reflect.DeepEqual(s.BackendAddressPool, t.BackendAddressPool) &&
 		reflect.DeepEqual(s.LoadDistribution, t.LoadDistribution) &&
 		reflect.DeepEqual(s.FrontendPort, t.FrontendPort) &&
 		reflect.DeepEqual(s.BackendPort, t.BackendPort) &&
 		reflect.DeepEqual(s.EnableFloatingIP, t.EnableFloatingIP) &&
-		reflect.DeepEqual(to.Bool(s.EnableTCPReset), to.Bool(t.EnableTCPReset)) &&
 		reflect.DeepEqual(to.Bool(s.DisableOutboundSnat), to.Bool(t.DisableOutboundSnat))
 
 	if wantLB && s.IdleTimeoutInMinutes != nil && t.IdleTimeoutInMinutes != nil {

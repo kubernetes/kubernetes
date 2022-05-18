@@ -140,29 +140,75 @@ func TestPriorityClassAdmission(t *testing.T) {
 		existingClasses []*scheduling.PriorityClass
 		newClass        *scheduling.PriorityClass
 		userInfo        user.Info
+		operation       admission.Operation
 		expectError     bool
 	}{
 		{
-			"one default class",
+			"create operator with default class",
 			[]*scheduling.PriorityClass{},
 			defaultClass1,
 			nil,
+			admission.Create,
 			false,
 		},
 		{
-			"more than one default classes",
+			"create operator with one existing default class",
 			[]*scheduling.PriorityClass{defaultClass1},
 			defaultClass2,
 			nil,
+			admission.Create,
 			true,
 		},
 		{
-			"system name and value are allowed by admission controller",
+			"create operator with system name and value allowed by admission controller",
 			[]*scheduling.PriorityClass{},
 			systemClass,
 			&user.DefaultInfo{
 				Name: user.APIServerUser,
 			},
+			admission.Create,
+			false,
+		},
+		{
+			"update operator with default class",
+			[]*scheduling.PriorityClass{},
+			defaultClass1,
+			nil,
+			admission.Update,
+			false,
+		},
+		{
+			"update operator with one existing default class",
+			[]*scheduling.PriorityClass{defaultClass1},
+			defaultClass2,
+			nil,
+			admission.Update,
+			true,
+		},
+		{
+			"update operator with system name and value allowed by admission controller",
+			[]*scheduling.PriorityClass{},
+			systemClass,
+			&user.DefaultInfo{
+				Name: user.APIServerUser,
+			},
+			admission.Update,
+			false,
+		},
+		{
+			"update operator with different default classes",
+			[]*scheduling.PriorityClass{defaultClass1},
+			defaultClass2,
+			nil,
+			admission.Update,
+			true,
+		},
+		{
+			"delete operation with default class",
+			[]*scheduling.PriorityClass{},
+			defaultClass1,
+			nil,
+			admission.Delete,
 			false,
 		},
 	}
@@ -184,7 +230,7 @@ func TestPriorityClassAdmission(t *testing.T) {
 			"",
 			scheduling.Resource("priorityclasses").WithVersion("version"),
 			"",
-			admission.Create,
+			test.operation,
 			&metav1.CreateOptions{},
 			false,
 			test.userInfo,

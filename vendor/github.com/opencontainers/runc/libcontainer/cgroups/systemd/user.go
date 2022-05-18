@@ -1,10 +1,10 @@
-// +build linux
-
 package systemd
 
 import (
 	"bufio"
 	"bytes"
+	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,8 +13,8 @@ import (
 
 	systemdDbus "github.com/coreos/go-systemd/v22/dbus"
 	dbus "github.com/godbus/dbus/v5"
+
 	"github.com/opencontainers/runc/libcontainer/userns"
-	"github.com/pkg/errors"
 )
 
 // newUserSystemdDbus creates a connection for systemd user-instance.
@@ -31,17 +31,17 @@ func newUserSystemdDbus() (*systemdDbus.Conn, error) {
 	return systemdDbus.NewConnection(func() (*dbus.Conn, error) {
 		conn, err := dbus.Dial(addr)
 		if err != nil {
-			return nil, errors.Wrapf(err, "error while dialing %q", addr)
+			return nil, fmt.Errorf("error while dialing %q: %w", addr, err)
 		}
 		methods := []dbus.Auth{dbus.AuthExternal(strconv.Itoa(uid))}
 		err = conn.Auth(methods)
 		if err != nil {
 			conn.Close()
-			return nil, errors.Wrapf(err, "error while authenticating connection, address=%q, UID=%d", addr, uid)
+			return nil, fmt.Errorf("error while authenticating connection (address=%q, UID=%d): %w", addr, uid, err)
 		}
 		if err = conn.Hello(); err != nil {
 			conn.Close()
-			return nil, errors.Wrapf(err, "error while sending Hello message, address=%q, UID=%d", addr, uid)
+			return nil, fmt.Errorf("error while sending Hello message (address=%q, UID=%d): %w", addr, uid, err)
 		}
 		return conn, nil
 	})
@@ -57,7 +57,7 @@ func DetectUID() (int, error) {
 	}
 	b, err := exec.Command("busctl", "--user", "--no-pager", "status").CombinedOutput()
 	if err != nil {
-		return -1, errors.Wrapf(err, "could not execute `busctl --user --no-pager status`: %q", string(b))
+		return -1, fmt.Errorf("could not execute `busctl --user --no-pager status` (output: %q): %w", string(b), err)
 	}
 	scanner := bufio.NewScanner(bytes.NewReader(b))
 	for scanner.Scan() {
@@ -66,7 +66,7 @@ func DetectUID() (int, error) {
 			uidStr := strings.TrimPrefix(s, "OwnerUID=")
 			i, err := strconv.Atoi(uidStr)
 			if err != nil {
-				return -1, errors.Wrapf(err, "could not detect the OwnerUID: %s", s)
+				return -1, fmt.Errorf("could not detect the OwnerUID: %w", err)
 			}
 			return i, nil
 		}
@@ -93,7 +93,7 @@ func DetectUserDbusSessionBusAddress() (string, error) {
 	}
 	b, err := exec.Command("systemctl", "--user", "--no-pager", "show-environment").CombinedOutput()
 	if err != nil {
-		return "", errors.Wrapf(err, "could not execute `systemctl --user --no-pager show-environment`, output=%q", string(b))
+		return "", fmt.Errorf("could not execute `systemctl --user --no-pager show-environment` (output=%q): %w", string(b), err)
 	}
 	scanner := bufio.NewScanner(bytes.NewReader(b))
 	for scanner.Scan() {

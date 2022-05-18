@@ -122,6 +122,19 @@ var (
 		},
 		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component"},
 	)
+	fieldValidationRequestLatencies = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Name: "field_validation_request_duration_seconds",
+			Help: "Response latency distribution in seconds for each field validation value and whether field validation is enabled or not",
+			// This metric is supplementary to the requestLatencies metric.
+			// It measures request durations for the various field validation
+			// values.
+			Buckets: []float64{0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0, 1.25, 1.5, 2, 3,
+				4, 5, 6, 8, 10, 15, 20, 30, 45, 60},
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"field_validation", "enabled"},
+	)
 	responseSizes = compbasemetrics.NewHistogramVec(
 		&compbasemetrics.HistogramOpts{
 			Name: "apiserver_response_sizes",
@@ -132,12 +145,13 @@ var (
 		},
 		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component"},
 	)
-	// DroppedRequests is a number of requests dropped with 'Try again later' response"
-	DroppedRequests = compbasemetrics.NewCounterVec(
+	// droppedRequests is a number of requests dropped with 'Try again later' response"
+	droppedRequests = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
-			Name:           "apiserver_dropped_requests_total",
-			Help:           "Number of requests dropped with 'Try again later' response",
-			StabilityLevel: compbasemetrics.ALPHA,
+			Name:              "apiserver_dropped_requests_total",
+			Help:              "Number of requests dropped with 'Try again later' response. Use apiserver_request_total and/or apiserver_request_terminations_total metrics instead.",
+			StabilityLevel:    compbasemetrics.ALPHA,
+			DeprecatedVersion: "1.24.0",
 		},
 		[]string{"request_kind"},
 	)
@@ -260,8 +274,9 @@ var (
 		longRunningRequestGauge,
 		requestLatencies,
 		requestSloLatencies,
+		fieldValidationRequestLatencies,
 		responseSizes,
-		DroppedRequests,
+		droppedRequests,
 		TLSHandshakeErrors,
 		RegisteredWatchers,
 		WatchEvents,
@@ -403,6 +418,33 @@ func RecordRequestAbort(req *http.Request, requestInfo *request.RequestInfo) {
 	requestAbortsTotal.WithContext(req.Context()).WithLabelValues(reportedVerb, group, version, resource, subresource, scope).Inc()
 }
 
+// RecordDroppedRequest records that the request was rejected via http.TooManyRequests.
+func RecordDroppedRequest(req *http.Request, requestInfo *request.RequestInfo, component string, isMutatingRequest bool) {
+	if requestInfo == nil {
+		requestInfo = &request.RequestInfo{Verb: req.Method, Path: req.URL.Path}
+	}
+	scope := CleanScope(requestInfo)
+	dryRun := cleanDryRun(req.URL)
+
+	// We don't use verb from <requestInfo>, as this may be propagated from
+	// InstrumentRouteFunc which is registered in installer.go with predefined
+	// list of verbs (different than those translated to RequestInfo).
+	// However, we need to tweak it e.g. to differentiate GET from LIST.
+	reportedVerb := cleanVerb(CanonicalVerb(strings.ToUpper(req.Method), scope), getVerbIfWatch(req), req)
+
+	if requestInfo.IsResourceRequest {
+		requestCounter.WithContext(req.Context()).WithLabelValues(reportedVerb, dryRun, requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component, codeToString(http.StatusTooManyRequests)).Inc()
+	} else {
+		requestCounter.WithContext(req.Context()).WithLabelValues(reportedVerb, dryRun, "", "", "", requestInfo.Subresource, scope, component, codeToString(http.StatusTooManyRequests)).Inc()
+	}
+
+	if isMutatingRequest {
+		droppedRequests.WithContext(req.Context()).WithLabelValues(MutatingKind).Inc()
+	} else {
+		droppedRequests.WithContext(req.Context()).WithLabelValues(ReadOnlyKind).Inc()
+	}
+}
+
 // RecordRequestTermination records that the request was terminated early as part of a resource
 // preservation or apiserver self-defense mechanism (e.g. timeouts, maxinflight throttling,
 // proxyHandler errors). RecordRequestTermination should only be called zero or one times
@@ -482,6 +524,10 @@ func MonitorRequest(req *http.Request, verb, group, version, resource, subresour
 		}
 	}
 	requestLatencies.WithContext(req.Context()).WithLabelValues(reportedVerb, dryRun, group, version, resource, subresource, scope, component).Observe(elapsedSeconds)
+	fieldValidation := cleanFieldValidation(req.URL)
+	fieldValidationEnabled := strconv.FormatBool(utilfeature.DefaultFeatureGate.Enabled(features.ServerSideFieldValidation))
+	fieldValidationRequestLatencies.WithContext(req.Context()).WithLabelValues(fieldValidation, fieldValidationEnabled)
+
 	if wd, ok := request.LatencyTrackersFrom(req.Context()); ok {
 		sloLatency := elapsedSeconds - (wd.MutatingWebhookTracker.GetLatency() + wd.ValidatingWebhookTracker.GetLatency()).Seconds()
 		requestSloLatencies.WithContext(req.Context()).WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component).Observe(sloLatency)
@@ -531,7 +577,7 @@ func InstrumentHandlerFunc(verb, group, version, resource, subresource, scope, c
 
 // CleanScope returns the scope of the request.
 func CleanScope(requestInfo *request.RequestInfo) string {
-	if requestInfo.Name != "" {
+	if requestInfo.Name != "" || requestInfo.Verb == "create" {
 		return "resource"
 	}
 	if requestInfo.Namespace != "" {
@@ -620,6 +666,21 @@ func cleanDryRun(u *url.URL) string {
 	// TODO: this is a fairly large allocation for what it does, consider
 	//   a sort and dedup in a single pass
 	return strings.Join(utilsets.NewString(dryRun...).List(), ",")
+}
+
+func cleanFieldValidation(u *url.URL) string {
+	// avoid allocating when we don't see dryRun in the query
+	if !strings.Contains(u.RawQuery, "fieldValidation") {
+		return ""
+	}
+	fieldValidation := u.Query()["fieldValidation"]
+	if len(fieldValidation) != 1 {
+		return "invalid"
+	}
+	if errs := validation.ValidateFieldValidation(nil, fieldValidation[0]); len(errs) > 0 {
+		return "invalid"
+	}
+	return fieldValidation[0]
 }
 
 var _ http.ResponseWriter = (*ResponseWriterDelegator)(nil)

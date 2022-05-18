@@ -29,10 +29,12 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/batch/validation"
+	"k8s.io/kubernetes/pkg/features"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
@@ -88,6 +90,10 @@ func (cronJobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object)
 
 	cronJob.Generation = 1
 
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CronJobTimeZone) {
+		cronJob.Spec.TimeZone = nil
+	}
+
 	pod.DropDisabledTemplateFields(&cronJob.Spec.JobTemplate.Spec.Template, nil)
 }
 
@@ -96,6 +102,10 @@ func (cronJobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Ob
 	newCronJob := obj.(*batch.CronJob)
 	oldCronJob := old.(*batch.CronJob)
 	newCronJob.Status = oldCronJob.Status
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CronJobTimeZone) && oldCronJob.Spec.TimeZone == nil {
+		newCronJob.Spec.TimeZone = nil
+	}
 
 	pod.DropDisabledTemplateFields(&newCronJob.Spec.JobTemplate.Spec.Template, &oldCronJob.Spec.JobTemplate.Spec.Template)
 
@@ -110,7 +120,7 @@ func (cronJobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Ob
 func (cronJobStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	cronJob := obj.(*batch.CronJob)
 	opts := pod.GetValidationOptionsFromPodTemplate(&cronJob.Spec.JobTemplate.Spec.Template, nil)
-	return validation.ValidateCronJob(cronJob, opts)
+	return validation.ValidateCronJobCreate(cronJob, opts)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.

@@ -44,8 +44,8 @@ func TestSecrets(t *testing.T) {
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 
-	ns := framework.CreateTestingNamespace("secret", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateTestingNamespace("secret", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	DoTestSecrets(t, client, ns)
 }

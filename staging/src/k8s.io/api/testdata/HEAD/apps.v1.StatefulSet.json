@@ -31,7 +31,6 @@
     "finalizers": [
       "finalizersValue"
     ],
-    "clusterName": "clusterNameValue",
     "managedFields": [
       {
         "manager": "managerValue",
@@ -91,7 +90,6 @@
         "finalizers": [
           "finalizersValue"
         ],
-        "clusterName": "clusterNameValue",
         "managedFields": [
           {
             "manager": "managerValue",
@@ -419,7 +417,6 @@
                   "finalizers": [
                     "finalizersValue"
                   ],
-                  "clusterName": "clusterNameValue",
                   "managedFields": [
                     {
                       "manager": "managerValue",
@@ -1617,7 +1614,10 @@
                   ]
                 }
               ]
-            }
+            },
+            "minDomains": 5,
+            "nodeAffinityPolicy": "nodeAffinityPolicyValue",
+            "nodeTaintsPolicy": "nodeTaintsPolicyValue"
           }
         ],
         "setHostnameAsFQDN": true,
@@ -1658,7 +1658,6 @@
           "finalizers": [
             "finalizersValue"
           ],
-          "clusterName": "clusterNameValue",
           "managedFields": [
             {
               "manager": "managerValue",
@@ -1741,7 +1740,8 @@
     "updateStrategy": {
       "type": "typeValue",
       "rollingUpdate": {
-        "partition": 1
+        "partition": 1,
+        "maxUnavailable": "maxUnavailableValue"
       }
     },
     "revisionHistoryLimit": 8,

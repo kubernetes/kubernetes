@@ -2093,9 +2093,7 @@ func TestCSIDriverValidationUpdate(t *testing.T) {
 }
 
 func TestCSIDriverStorageCapacityEnablement(t *testing.T) {
-	run := func(t *testing.T, enabled, withField bool) {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIStorageCapacity, enabled)()
-
+	run := func(t *testing.T, withField bool) {
 		driverName := "test-driver"
 		attachRequired := true
 		podInfoOnMount := true
@@ -2113,7 +2111,7 @@ func TestCSIDriverStorageCapacityEnablement(t *testing.T) {
 			csiDriver.Spec.StorageCapacity = &storageCapacity
 		}
 		errs := ValidateCSIDriver(&csiDriver)
-		success := !enabled || withField
+		success := withField
 		if success && len(errs) != 0 {
 			t.Errorf("expected success, got: %v", errs)
 		}
@@ -2123,13 +2121,9 @@ func TestCSIDriverStorageCapacityEnablement(t *testing.T) {
 	}
 
 	yesNo := []bool{true, false}
-	for _, enabled := range yesNo {
-		t.Run(fmt.Sprintf("CSIStorageCapacity=%v", enabled), func(t *testing.T) {
-			for _, withField := range yesNo {
-				t.Run(fmt.Sprintf("with-field=%v", withField), func(t *testing.T) {
-					run(t, enabled, withField)
-				})
-			}
+	for _, withField := range yesNo {
+		t.Run(fmt.Sprintf("with-field=%v", withField), func(t *testing.T) {
+			run(t, withField)
 		})
 	}
 }

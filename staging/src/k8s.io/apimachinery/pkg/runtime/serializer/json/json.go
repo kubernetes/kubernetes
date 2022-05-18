@@ -166,7 +166,20 @@ func (s *Serializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, i
 			strictErrs, err := s.unmarshal(into, data, originalData)
 			if err != nil {
 				return nil, actual, err
-			} else if len(strictErrs) > 0 {
+			}
+
+			// when decoding directly into a provided unstructured object,
+			// extract the actual gvk decoded from the provided data,
+			// and ensure it is non-empty.
+			if isUnstructured {
+				*actual = into.GetObjectKind().GroupVersionKind()
+				if len(actual.Kind) == 0 {
+					return nil, actual, runtime.NewMissingKindErr(string(originalData))
+				}
+				// TODO(109023): require apiVersion here as well once unstructuredJSONScheme#Decode does
+			}
+
+			if len(strictErrs) > 0 {
 				return into, actual, runtime.NewStrictDecodingError(strictErrs)
 			}
 			return into, actual, nil
@@ -261,9 +274,9 @@ func (s *Serializer) unmarshal(into runtime.Object, data, originalData []byte) (
 	var strictJSONErrs []error
 	if u, isUnstructured := into.(runtime.Unstructured); isUnstructured {
 		// Unstructured is a custom unmarshaler that gets delegated
-		// to, so inorder to detect strict JSON errors we need
+		// to, so in order to detect strict JSON errors we need
 		// to unmarshal directly into the object.
-		m := u.UnstructuredContent()
+		m := map[string]interface{}{}
 		strictJSONErrs, err = kjson.UnmarshalStrict(data, &m)
 		u.SetUnstructuredContent(m)
 	} else {

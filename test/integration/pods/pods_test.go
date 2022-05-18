@@ -41,8 +41,8 @@ func TestPodUpdateActiveDeadlineSeconds(t *testing.T) {
 	_, s, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 
-	ns := framework.CreateTestingNamespace("pod-activedeadline-update", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateTestingNamespace("pod-activedeadline-update", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 
@@ -159,8 +159,8 @@ func TestPodReadOnlyFilesystem(t *testing.T) {
 	defer closeFn()
 
 	isReadOnly := true
-	ns := framework.CreateTestingNamespace("pod-readonly-root", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateTestingNamespace("pod-readonly-root", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 
@@ -194,8 +194,8 @@ func TestPodCreateEphemeralContainers(t *testing.T) {
 	_, s, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 
-	ns := framework.CreateTestingNamespace("pod-create-ephemeral-containers", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateTestingNamespace("pod-create-ephemeral-containers", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 
@@ -264,8 +264,8 @@ func TestPodPatchEphemeralContainers(t *testing.T) {
 	_, s, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 
-	ns := framework.CreateTestingNamespace("pod-patch-ephemeral-containers", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateTestingNamespace("pod-patch-ephemeral-containers", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 
@@ -496,8 +496,8 @@ func TestPodUpdateEphemeralContainers(t *testing.T) {
 	_, s, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 
-	ns := framework.CreateTestingNamespace("pod-update-ephemeral-containers", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateTestingNamespace("pod-update-ephemeral-containers", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 
@@ -689,8 +689,8 @@ func TestPodEphemeralContainersDisabled(t *testing.T) {
 	_, s, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 
-	ns := framework.CreateTestingNamespace("pod-ephemeral-containers-disabled", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateTestingNamespace("pod-ephemeral-containers-disabled", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 

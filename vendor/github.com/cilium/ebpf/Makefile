@@ -18,11 +18,14 @@ TARGETS := \
 	testdata/loader-clang-7 \
 	testdata/loader-clang-9 \
 	testdata/loader-$(CLANG) \
+	testdata/btf_map_init \
 	testdata/invalid_map \
 	testdata/raw_tracepoint \
 	testdata/invalid_map_static \
-	testdata/initialized_btf_map \
+	testdata/invalid_btf_map_init \
 	testdata/strings \
+	testdata/freplace \
+	testdata/iproute2_map_compat \
 	internal/btf/testdata/relocs
 
 .PHONY: all clean docker-all docker-shell

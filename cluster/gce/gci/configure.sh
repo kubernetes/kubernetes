@@ -374,32 +374,6 @@ EOF
   rm -f "${crictl}"
 }
 
-function install-exec-auth-plugin {
-  if [[ ! "${EXEC_AUTH_PLUGIN_URL:-}" ]]; then
-      return
-  fi
-  local -r plugin_url="${EXEC_AUTH_PLUGIN_URL}"
-  local -r plugin_hash="${EXEC_AUTH_PLUGIN_HASH}"
-
-  if is-preloaded "gke-exec-auth-plugin" "${plugin_hash}"; then
-    echo "gke-exec-auth-plugin is preloaded"
-    return
-  fi
-
-  echo "Downloading gke-exec-auth-plugin binary"
-  download-or-bust "${plugin_hash}" "${plugin_url}"
-  mv "${KUBE_HOME}/gke-exec-auth-plugin" "${KUBE_BIN}/gke-exec-auth-plugin"
-  chmod a+x "${KUBE_BIN}/gke-exec-auth-plugin"
-
-  if [[ ! "${EXEC_AUTH_PLUGIN_LICENSE_URL:-}" ]]; then
-      return
-  fi
-  local -r license_url="${EXEC_AUTH_PLUGIN_LICENSE_URL}"
-  echo "Downloading gke-exec-auth-plugin license"
-  download-or-bust "" "${license_url}"
-  mv "${KUBE_HOME}/LICENSES/LICENSE" "${KUBE_BIN}/gke-exec-auth-plugin-license"
-}
-
 function install-kube-manifests {
   # Put kube-system pods manifests in ${KUBE_HOME}/kube-manifests/.
   local dst_dir="${KUBE_HOME}/kube-manifests"
@@ -427,9 +401,9 @@ function install-kube-manifests {
   tar xzf "${KUBE_HOME}/${manifests_tar}" -C "${dst_dir}" --overwrite
   local -r kube_addon_registry="${KUBE_ADDON_REGISTRY:-k8s.gcr.io}"
   if [[ "${kube_addon_registry}" != "k8s.gcr.io" ]]; then
-    find "${dst_dir}" \(-name '*.yaml' -or -name '*.yaml.in'\) -print0 | \
+    find "${dst_dir}" \( -name '*.yaml' -or -name '*.yaml.in' \) -print0 | \
       xargs -0 sed -ri "s@(image:\s.*)k8s.gcr.io@\1${kube_addon_registry}@"
-    find "${dst_dir}" \(-name '*.manifest' -or -name '*.json'\) -print0 | \
+    find "${dst_dir}" \( -name '*.manifest' -or -name '*.json' \) -print0 | \
       xargs -0 sed -ri "s@(image\":\s+\")k8s.gcr.io@\1${kube_addon_registry}@"
   fi
   cp "${dst_dir}/kubernetes/gci-trusty/gci-configure-helper.sh" "${KUBE_BIN}/configure-helper.sh"
@@ -457,8 +431,10 @@ function try-load-docker-image {
 
   if [[ "${CONTAINER_RUNTIME_NAME:-}" == "containerd" || "${CONTAINERD_TEST:-}"  == "containerd" ]]; then
     load_image_command=${LOAD_IMAGE_COMMAND:-ctr -n=k8s.io images import}
+    tag_image_command=${TAG_IMAGE_COMMAND:-ctr -n=k8s.io images tag}
   else
     load_image_command="${LOAD_IMAGE_COMMAND:-}"
+    tag_image_command="${TAG_IMAGE_COMMAND:-}"
   fi
 
   # Deliberately word split load_image_command
@@ -472,6 +448,15 @@ function try-load-docker-image {
       sleep 5
     fi
   done
+
+  if [[ -n "${KUBE_ADDON_REGISTRY:-}" ]]; then
+    # remove the prefix and suffix from the path to get the container name
+    container=${img##*/}
+    container=${container%.tar}
+    # find the right one for which we will need an additional tag
+    container=$(ctr -n k8s.io images ls | grep "k8s.gcr.io/${container}" | awk '{print $1}' | cut -f 2 -d '/')
+    ${tag_image_command} "k8s.gcr.io/${container}" "${KUBE_ADDON_REGISTRY}/${container}"
+  fi
   # Re-enable errexit.
   set -e
 }
@@ -661,9 +646,6 @@ function install-kube-binary-config {
 
   # Install crictl on each node.
   log-wrap "InstallCrictl" install-crictl
-
-  # TODO(awly): include the binary and license in the OS image.
-  log-wrap "InstallExecAuthPlugin" install-exec-auth-plugin
 
   # Clean up.
   rm -rf "${KUBE_HOME}/kubernetes"

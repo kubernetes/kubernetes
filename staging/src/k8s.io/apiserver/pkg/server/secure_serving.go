@@ -93,36 +93,45 @@ func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, erro
 		if s.Cert != nil {
 			s.Cert.AddListener(dynamicCertificateController)
 		}
-
+		// generate a context from stopCh. This is to avoid modifying files which are relying on apiserver
+		// TODO: See if we can pass ctx to the current method
+		ctx, cancel := context.WithCancel(context.Background())
+		go func() {
+			select {
+			case <-stopCh:
+				cancel() // stopCh closed, so cancel our context
+			case <-ctx.Done():
+			}
+		}()
 		// start controllers if possible
 		if controller, ok := s.ClientCA.(dynamiccertificates.ControllerRunner); ok {
 			// runonce to try to prime data.  If this fails, it's ok because we fail closed.
 			// Files are required to be populated already, so this is for convenience.
-			if err := controller.RunOnce(); err != nil {
+			if err := controller.RunOnce(ctx); err != nil {
 				klog.Warningf("Initial population of client CA failed: %v", err)
 			}
 
-			go controller.Run(1, stopCh)
+			go controller.Run(ctx, 1)
 		}
 		if controller, ok := s.Cert.(dynamiccertificates.ControllerRunner); ok {
 			// runonce to try to prime data.  If this fails, it's ok because we fail closed.
 			// Files are required to be populated already, so this is for convenience.
-			if err := controller.RunOnce(); err != nil {
+			if err := controller.RunOnce(ctx); err != nil {
 				klog.Warningf("Initial population of default serving certificate failed: %v", err)
 			}
 
-			go controller.Run(1, stopCh)
+			go controller.Run(ctx, 1)
 		}
 		for _, sniCert := range s.SNICerts {
 			sniCert.AddListener(dynamicCertificateController)
 			if controller, ok := sniCert.(dynamiccertificates.ControllerRunner); ok {
 				// runonce to try to prime data.  If this fails, it's ok because we fail closed.
 				// Files are required to be populated already, so this is for convenience.
-				if err := controller.RunOnce(); err != nil {
+				if err := controller.RunOnce(ctx); err != nil {
 					klog.Warningf("Initial population of SNI serving certificate failed: %v", err)
 				}
 
-				go controller.Run(1, stopCh)
+				go controller.Run(ctx, 1)
 			}
 		}
 

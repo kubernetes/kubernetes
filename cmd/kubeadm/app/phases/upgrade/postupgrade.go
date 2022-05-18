@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -67,12 +66,6 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 	// Write the new kubelet config down to disk and the env file if needed
 	if err := writeKubeletConfigFiles(client, cfg, dryRun); err != nil {
 		errs = append(errs, err)
-	}
-
-	// TODO: Temporary workaround. Remove in 1.25:
-	// https://github.com/kubernetes/kubeadm/issues/2426
-	if err := UpdateKubeletDynamicEnvFileWithURLScheme(dryRun); err != nil {
-		return err
 	}
 
 	// Annotate the node with the crisocket information, sourced either from the InitConfiguration struct or
@@ -253,16 +246,20 @@ func AddNewControlPlaneTaint(client clientset.Interface) error {
 	}
 
 	for _, n := range nodes.Items {
-		// Check if the node has the taint already and skip it if so
-		hasTaint := false
+		// Check if the node has the old / new taints
+		hasOldTaint := false
+		hasNewTaint := false
 		for _, t := range n.Spec.Taints {
-			if t.String() == kubeadmconstants.ControlPlaneTaint.String() {
-				hasTaint = true
-				break
+			switch t.String() {
+			case kubeadmconstants.OldControlPlaneTaint.String():
+				hasOldTaint = true
+			case kubeadmconstants.ControlPlaneTaint.String():
+				hasNewTaint = true
 			}
 		}
-		// If the node does not have the taint, patch it
-		if !hasTaint {
+		// If the old taint is present and the new taint is missing, patch the node with the new taint.
+		// When the old taint is missing, assume the user has manually untainted the node and take no action.
+		if !hasNewTaint && hasOldTaint {
 			err = apiclient.PatchNode(client, n.Name, func(n *v1.Node) {
 				n.Spec.Taints = append(n.Spec.Taints, kubeadmconstants.ControlPlaneTaint)
 			})
@@ -270,29 +267,6 @@ func AddNewControlPlaneTaint(client clientset.Interface) error {
 				return err
 			}
 		}
-	}
-	return nil
-}
-
-// UpdateKubeletDynamicEnvFileWithURLScheme reads the kubelet dynamic environment file
-// from disk, ensure that the CRI endpoint flag has a scheme prefix and writes it
-// back to disk.
-// TODO: Temporary workaround. Remove in 1.25:
-// https://github.com/kubernetes/kubeadm/issues/2426
-func UpdateKubeletDynamicEnvFileWithURLScheme(dryRun bool) error {
-	filePath := filepath.Join(kubeadmconstants.KubeletRunDirectory, kubeadmconstants.KubeletEnvFileName)
-	if dryRun {
-		fmt.Printf("[upgrade] Would ensure that %q includes a CRI endpoint URL scheme\n", filePath)
-		return nil
-	}
-	klog.V(2).Infof("Ensuring that %q includes a CRI endpoint URL scheme", filePath)
-	bytes, err := os.ReadFile(filePath)
-	if err != nil {
-		return errors.Wrapf(err, "failed to read kubelet configuration from file %q", filePath)
-	}
-	updated := updateKubeletDynamicEnvFileWithURLScheme(string(bytes))
-	if err := os.WriteFile(filePath, []byte(updated), 0644); err != nil {
-		return errors.Wrapf(err, "failed to write kubelet configuration to the file %q", filePath)
 	}
 	return nil
 }
