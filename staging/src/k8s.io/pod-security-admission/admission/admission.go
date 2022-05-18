@@ -249,6 +249,13 @@ func (a *Admission) ValidateNamespace(ctx context.Context, attrs api.Attributes)
 		if len(newErrs) > 0 {
 			return invalidResponse(attrs, newErrs)
 		}
+		if a.exemptNamespace(attrs.GetNamespace()) {
+			if warning := a.exemptNamespaceWarning(namespace.Name, newPolicy); warning != "" {
+				response := allowedResponse()
+				response.Warnings = append(response.Warnings, warning)
+				return response
+			}
+		}
 		return sharedAllowedResponse
 
 	case admissionv1.Update:
@@ -286,7 +293,12 @@ func (a *Admission) ValidateNamespace(ctx context.Context, attrs api.Attributes)
 			return sharedAllowedResponse
 		}
 		if a.exemptNamespace(attrs.GetNamespace()) {
-			return sharedAllowedByNamespaceExemptionResponse
+			if warning := a.exemptNamespaceWarning(namespace.Name, newPolicy); warning != "" {
+				response := allowedResponse()
+				response.Warnings = append(response.Warnings, warning)
+				return response
+			}
+			return sharedAllowedResponse
 		}
 		response := allowedResponse()
 		response.Warnings = a.EvaluatePodsInNamespace(ctx, namespace.Name, newPolicy.Enforce)
@@ -334,10 +346,10 @@ func (a *Admission) ValidatePod(ctx context.Context, attrs api.Attributes) *admi
 	if err != nil {
 		klog.ErrorS(err, "failed to fetch pod namespace", "namespace", attrs.GetNamespace())
 		a.Metrics.RecordError(true, attrs)
-		return errorResponse(err, &apierrors.NewInternalError(fmt.Errorf("failed to lookup namespace %s", attrs.GetNamespace())).ErrStatus)
+		return errorResponse(err, &apierrors.NewInternalError(fmt.Errorf("failed to lookup namespace %q", attrs.GetNamespace())).ErrStatus)
 	}
 	nsPolicy, nsPolicyErrs := a.PolicyToEvaluate(namespace.Labels)
-	if len(nsPolicyErrs) == 0 && nsPolicy.Enforce.Level == api.LevelPrivileged && nsPolicy.Warn.Level == api.LevelPrivileged && nsPolicy.Audit.Level == api.LevelPrivileged {
+	if len(nsPolicyErrs) == 0 && nsPolicy.FullyPrivileged() {
 		a.Metrics.RecordEvaluation(metrics.DecisionAllow, nsPolicy.Enforce, metrics.ModeEnforce, attrs)
 		return sharedAllowedPrivilegedResponse
 	}
@@ -400,7 +412,7 @@ func (a *Admission) ValidatePodController(ctx context.Context, attrs api.Attribu
 		a.Metrics.RecordError(true, attrs)
 		response := allowedResponse()
 		response.AuditAnnotations = map[string]string{
-			"error": fmt.Sprintf("failed to lookup namespace %s: %v", attrs.GetNamespace(), err),
+			"error": fmt.Sprintf("failed to lookup namespace %q: %v", attrs.GetNamespace(), err),
 		}
 		return response
 	}
@@ -722,4 +734,15 @@ func containsString(needle string, haystack []string) bool {
 		}
 	}
 	return false
+}
+
+// exemptNamespaceWarning returns a non-empty warning message if the exempt namespace has a
+// non-privileged policy and sets pod security labels.
+func (a *Admission) exemptNamespaceWarning(exemptNamespace string, policy api.Policy) string {
+	if policy.FullyPrivileged() || policy.Equivalent(&a.defaultPolicy) {
+		return ""
+	}
+
+	return fmt.Sprintf("namespace %q is exempt from Pod Security, and the policy (%s) will be ignored",
+		exemptNamespace, policy.CompactString())
 }
