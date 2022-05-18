@@ -99,9 +99,6 @@ func TestDetermineNeededServiceUpdates(t *testing.T) {
 	}
 }
 
-// There are 3*5 possibilities(3 types of RestartPolicy by 5 types of PodPhase).
-// Not listing them all here. Just listing all of the 3 false cases and 3 of the
-// 12 true cases.
 func TestShouldPodBeInEndpointSlice(t *testing.T) {
 	testCases := []struct {
 		name               string
@@ -179,7 +176,6 @@ func TestShouldPodBeInEndpointSlice(t *testing.T) {
 			},
 			expected: false,
 		},
-		// Pod should be in endpoints:
 		{
 			name: "Failed pod with Always RestartPolicy",
 			pod: &v1.Pod{
@@ -191,8 +187,9 @@ func TestShouldPodBeInEndpointSlice(t *testing.T) {
 					PodIP: "1.2.3.4",
 				},
 			},
-			expected: true,
+			expected: false,
 		},
+		// Pod should be in endpoints:
 		{
 			name: "Pending pod with Never RestartPolicy",
 			pod: &v1.Pod{
