@@ -207,30 +207,6 @@ func rollbackFiles(files map[string]string, originalErr error) error {
 	return errors.Errorf("couldn't move these files: %v. Got errors: %v", files, errorsutil.NewAggregate(errs))
 }
 
-// RemoveOldControlPlaneLabel finds all nodes with the legacy node-role label and removes it
-// TODO: https://github.com/kubernetes/kubeadm/issues/2200
-func RemoveOldControlPlaneLabel(client clientset.Interface) error {
-	selectorOldControlPlane := labels.SelectorFromSet(labels.Set(map[string]string{
-		kubeadmconstants.LabelNodeRoleOldControlPlane: "",
-	}))
-	nodesWithOldLabel, err := client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
-		LabelSelector: selectorOldControlPlane.String(),
-	})
-	if err != nil {
-		return errors.Wrapf(err, "could not list nodes labeled with %q", kubeadmconstants.LabelNodeRoleOldControlPlane)
-	}
-
-	for _, n := range nodesWithOldLabel.Items {
-		err = apiclient.PatchNode(client, n.Name, func(n *v1.Node) {
-			delete(n.ObjectMeta.Labels, kubeadmconstants.LabelNodeRoleOldControlPlane)
-		})
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // RemoveOldControlPlaneTaint finds all nodes with the new "control-plane" node-role label
 // and removes the old "control-plane" taint to them.
 // TODO: https://github.com/kubernetes/kubeadm/issues/2200
