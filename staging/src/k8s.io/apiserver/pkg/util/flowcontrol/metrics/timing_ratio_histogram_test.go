@@ -17,6 +17,8 @@ limitations under the License.
 package metrics
 
 import (
+	"errors"
+	"fmt"
 	"math/rand"
 	"testing"
 	"time"
@@ -25,6 +27,14 @@ import (
 	"k8s.io/klog/v2"
 	testclock "k8s.io/utils/clock/testing"
 )
+
+const (
+	ddtRangeCentiPeriods  = 300
+	ddtOffsetCentiPeriods = 50
+	numIterations         = 100
+)
+
+var errMetricNotFound = errors.New("not found")
 
 func TestTimingRatioHistogramVecElementSimple(t *testing.T) {
 	testHistogramName := "vec_element_simple"
@@ -128,6 +138,30 @@ func exerciseTimingRatioHistogram(t *testing.T, histogramName string, t0 time.Ti
 			t.Errorf("For i=%d, t0=%s, ddt=%s, t1=%s, expectedCount=%d, actualCount=%d", i, t0, ddt, t1, expectedCount, actualCount)
 		}
 	}
+}
+
+/* getHistogramCount returns the count of the named histogram or an error (if any) */
+func getHistogramCount(registry compbasemetrics.KubeRegistry, metricName string) (int64, error) {
+	mfs, err := registry.Gather()
+	if err != nil {
+		return 0, fmt.Errorf("failed to gather metrics: %w", err)
+	}
+	for _, mf := range mfs {
+		thisName := mf.GetName()
+		if thisName != metricName {
+			continue
+		}
+		metric := mf.GetMetric()[0]
+		hist := metric.GetHistogram()
+		if hist == nil {
+			return 0, errors.New("dto.Metric has nil Histogram")
+		}
+		if hist.SampleCount == nil {
+			return 0, errors.New("dto.Histogram has nil SampleCount")
+		}
+		return int64(*hist.SampleCount), nil
+	}
+	return 0, errMetricNotFound
 }
 
 func BenchmarkTimingRatioHistogram(b *testing.B) {
