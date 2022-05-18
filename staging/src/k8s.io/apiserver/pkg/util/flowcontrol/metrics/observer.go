@@ -16,50 +16,66 @@ limitations under the License.
 
 package metrics
 
-// Observer is something that can be given numeric observations.
-type Observer interface {
-	// Observe takes an observation
-	Observe(float64)
-}
-
-//  ChangeObserver extends Observer with the ability to take
-// an observation that is relative to the previous observation.
-type ChangeObserver interface {
-	Observer
-
-	// Observe a new value that differs by the given amount from the previous observation.
+// Gauge is the methods of a gauge that are used by instrumented code.
+type Gauge interface {
+	Set(float64)
+	Inc()
+	Dec()
 	Add(float64)
+	SetToCurrentTime()
 }
 
-// RatioedChangeObserver tracks ratios.
-// The numerator is set/changed through the ChangeObserver methods,
+// RatioedGauge tracks ratios.
+// The numerator is set/changed through the Gauge methods,
 // and the denominator can be updated through the SetDenominator method.
-// A ratio is tracked whenever the numerator is set/changed.
-type RatioedChangeObserver interface {
-	ChangeObserver
+// A ratio is tracked whenever the numerator or denominator is set/changed.
+type RatioedGauge interface {
+	Gauge
 
 	// SetDenominator sets the denominator to use until it is changed again
 	SetDenominator(float64)
 }
 
-// RatioedChangeObserverGenerator creates related observers that are
+// RatioedGaugeVec creates related observers that are
 // differentiated by a series of label values
-type RatioedChangeObserverGenerator interface {
-	Generate(initialNumerator, initialDenominator float64, labelValues []string) RatioedChangeObserver
+type RatioedGaugeVec interface {
+
+	// NewForLabelValuesSafe makes a new vector member for the given tuple of label values,
+	// initialized with the given numerator and denominator.
+	// Unlike the usual Vec WithLabelValues method, this is intended to be called only
+	// once per vector member (at the start of its lifecycle).
+	// The "Safe" part is saying that the returned object will function properly after metric registration
+	// even if this method is called before registration.
+	NewForLabelValuesSafe(initialNumerator, initialDenominator float64, labelValues []string) RatioedGauge
 }
 
-// RatioedChangeObserverPair is a corresponding pair of observers, one for the
+//////////////////////////////// Pairs ////////////////////////////////
+
+/* API Priority and Fairness tends to use RatioedGaugeVec members in pairs,
+ * one for requests waiting in a queue and one for requests being executed.
+ * The following definitions are a convenience layer that adds support for that
+ * particular pattern of usage.
+ */
+
+// RatioedGaugePair is a corresponding pair of gauges, one for the
 // number of requests waiting in queue(s) and one for the number of
-// requests being executed
-type RatioedChangeObserverPair struct {
+// requests being executed.
+type RatioedGaugePair struct {
 	// RequestsWaiting is given observations of the number of currently queued requests
-	RequestsWaiting RatioedChangeObserver
+	RequestsWaiting RatioedGauge
 
 	// RequestsExecuting is given observations of the number of requests currently executing
-	RequestsExecuting RatioedChangeObserver
+	RequestsExecuting RatioedGauge
 }
 
-// RatioedChangeObserverPairGenerator generates pairs
-type RatioedChangeObserverPairGenerator interface {
-	Generate(initialWaitingDenominator, initialExecutingDenominator float64, labelValues []string) RatioedChangeObserverPair
+// RatioedGaugePairVec generates pairs
+type RatioedGaugePairVec interface {
+
+	// NewForLabelValuesSafe makes a new vector member for the given tuple of label values,
+	// initialized with the given denominators and zeros for numerators.
+	// Unlike the usual Vec WithLabelValues method, this is intended to be called only
+	// once per vector member (at the start of its lifecycle).
+	// The "Safe" part is saying that the returned object will function properly after metric registration
+	// even if this method is called before registration.
+	NewForLabelValuesSafe(initialWaitingDenominator, initialExecutingDenominator float64, labelValues []string) RatioedGaugePair
 }
