@@ -528,9 +528,9 @@ func completeOpenAPI(config *openapicommon.Config, version *version.Info) {
 	}
 }
 
-// StopNotify returns a lifecycle signal of genericapiserver shutting down.
-func (c *Config) StopNotify() <-chan struct{} {
-	return c.lifecycleSignals.ShutdownInitiated.Signaled()
+// DrainedNotify returns a lifecycle signal of genericapiserver already drained while shutting down.
+func (c *Config) DrainedNotify() <-chan struct{} {
+	return c.lifecycleSignals.InFlightRequestsDrained.Signaled()
 }
 
 // Complete fills in any fields not set that are required to have valid data and can be derived
