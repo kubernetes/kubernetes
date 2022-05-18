@@ -749,6 +749,48 @@ func TestIsPodAvailable(t *testing.T) {
 	}
 }
 
+func TestIsPodTerminal(t *testing.T) {
+	now := metav1.Now()
+
+	tests := []struct {
+		podPhase v1.PodPhase
+		expected bool
+	}{
+		{
+			podPhase: v1.PodFailed,
+			expected: true,
+		},
+		{
+			podPhase: v1.PodSucceeded,
+			expected: true,
+		},
+		{
+			podPhase: v1.PodUnknown,
+			expected: false,
+		},
+		{
+			podPhase: v1.PodPending,
+			expected: false,
+		},
+		{
+			podPhase: v1.PodRunning,
+			expected: false,
+		},
+		{
+			expected: false,
+		},
+	}
+
+	for i, test := range tests {
+		pod := newPod(now, true, 0)
+		pod.Status.Phase = test.podPhase
+		isTerminal := IsPodTerminal(pod)
+		if isTerminal != test.expected {
+			t.Errorf("[tc #%d] expected terminal pod: %t, got: %t", i, test.expected, isTerminal)
+		}
+	}
+}
+
 func TestGetContainerStatus(t *testing.T) {
 	type ExpectedStruct struct {
 		status v1.ContainerStatus
