@@ -23,22 +23,13 @@ package app
 import (
 	"context"
 
-	"k8s.io/klog/v2"
-
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/scale"
 	"k8s.io/controller-manager/controller"
 	"k8s.io/kubernetes/pkg/controller/disruption"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 )
 
 func startDisruptionController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
-	if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodDisruptionBudget) {
-		klog.InfoS("Refusing to start disruption because the PodDisruptionBudget feature is disabled")
-		return nil, false, nil
-	}
-
 	client := controllerContext.ClientBuilder.ClientOrDie("disruption-controller")
 	config := controllerContext.ClientBuilder.ConfigOrDie("disruption-controller")
 	scaleKindResolver := scale.NewDiscoveryScaleKindResolver(client.Discovery())

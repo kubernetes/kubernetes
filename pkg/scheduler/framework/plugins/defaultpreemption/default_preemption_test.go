@@ -365,7 +365,7 @@ func TestPostFilter(t *testing.T) {
 			p := DefaultPreemption{
 				fh:        f,
 				podLister: informerFactory.Core().V1().Pods().Lister(),
-				pdbLister: getPDBLister(informerFactory, true),
+				pdbLister: getPDBLister(informerFactory),
 				args:      *getDefaultDefaultPreemptionArgs(),
 			}
 
@@ -1113,7 +1113,7 @@ func TestDryRunPreemption(t *testing.T) {
 			pl := &DefaultPreemption{
 				fh:        fwk,
 				podLister: informerFactory.Core().V1().Pods().Lister(),
-				pdbLister: getPDBLister(informerFactory, true),
+				pdbLister: getPDBLister(informerFactory),
 				args:      *tt.args,
 			}
 
@@ -1361,7 +1361,7 @@ func TestSelectBestCandidate(t *testing.T) {
 			pl := &DefaultPreemption{
 				fh:        fwk,
 				podLister: informerFactory.Core().V1().Pods().Lister(),
-				pdbLister: getPDBLister(informerFactory, true),
+				pdbLister: getPDBLister(informerFactory),
 				args:      *getDefaultDefaultPreemptionArgs(),
 			}
 			pe := preemption.Evaluator{
@@ -1698,7 +1698,7 @@ func TestPreempt(t *testing.T) {
 			pl := DefaultPreemption{
 				fh:        fwk,
 				podLister: informerFactory.Core().V1().Pods().Lister(),
-				pdbLister: getPDBLister(informerFactory, true),
+				pdbLister: getPDBLister(informerFactory),
 				args:      *getDefaultDefaultPreemptionArgs(),
 			}
 
