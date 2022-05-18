@@ -857,3 +857,33 @@ func withTestContext(req *http.Request, user user.Info, ae *auditinternal.Event)
 	}
 	return req.WithContext(ctx)
 }
+
+func TestAggregatorApiServerWatchStreamClose(t *testing.T) {
+	fakeRuleEvaluator := policy.NewFakePolicyRuleEvaluator(auditinternal.LevelRequestResponse, nil)
+	handler := WithAudit(&fakeAggregatorApiServerWatchStreamCloseHandler{}, &sink{
+		t: t,
+	}, fakeRuleEvaluator, nil)
+	req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
+	req = withTestContext(req, nil, nil)
+	req.RemoteAddr = "127.0.0.1"
+	handler.ServeHTTP(httptest.NewRecorder(), req)
+}
+
+type fakeAggregatorApiServerWatchStreamCloseHandler struct{}
+
+func (*fakeAggregatorApiServerWatchStreamCloseHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	panic(http.ErrAbortHandler)
+}
+
+type sink struct {
+	t *testing.T
+}
+
+func (s *sink) ProcessEvents(evs ...*auditinternal.Event) bool {
+	for _, ev := range evs {
+		if ev.Stage == auditinternal.StagePanic {
+			s.t.Errorf("should not get panic error")
+		}
+	}
+	return true
+}

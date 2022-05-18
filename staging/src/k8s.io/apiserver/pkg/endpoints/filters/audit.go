@@ -82,7 +82,7 @@ func WithAudit(handler http.Handler, sink audit.Sink, policy audit.PolicyRuleEva
 		// send audit event when we leave this func, either via a panic or cleanly. In the case of long
 		// running requests, this will be the second audit event.
 		defer func() {
-			if r := recover(); r != nil {
+			if r := recover(); r != nil && r != http.ErrAbortHandler {
 				defer panic(r)
 				ev.Stage = auditinternal.StagePanic
 				ev.ResponseStatus = &metav1.Status{
