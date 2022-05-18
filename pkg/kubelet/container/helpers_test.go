@@ -699,3 +699,216 @@ func TestShouldRecordEvent(t *testing.T) {
 	_, actual = innerEventRecorder.shouldRecordEvent(nilObj)
 	assert.Equal(t, false, actual, "should not panic if the typed nil was used, see https://github.com/kubernetes/kubernetes/issues/95552")
 }
+
+func TestHasWindowsHostProcessContainer(t *testing.T) {
+	trueVar := true
+	falseVar := false
+	const containerName = "container"
+
+	testCases := []struct {
+		name           string
+		podSpec        *v1.PodSpec
+		expectedResult bool
+	}{
+		{
+			name: "hostprocess not set anywhere",
+			podSpec: &v1.PodSpec{
+				Containers: []v1.Container{{
+					Name: containerName,
+				}},
+			},
+			expectedResult: false,
+		},
+		{
+			name: "pod with hostprocess=false",
+			podSpec: &v1.PodSpec{
+				HostNetwork: true,
+				SecurityContext: &v1.PodSecurityContext{
+					WindowsOptions: &v1.WindowsSecurityContextOptions{
+						HostProcess: &falseVar,
+					},
+				},
+				Containers: []v1.Container{{
+					Name: containerName,
+				}},
+			},
+			expectedResult: false,
+		},
+		{
+			name: "pod with hostprocess=true",
+			podSpec: &v1.PodSpec{
+				HostNetwork: true,
+				SecurityContext: &v1.PodSecurityContext{
+					WindowsOptions: &v1.WindowsSecurityContextOptions{
+						HostProcess: &trueVar,
+					},
+				},
+				Containers: []v1.Container{{
+					Name: containerName,
+				}},
+			},
+			expectedResult: true,
+		},
+		{
+			name: "container with hostprocess=false",
+			podSpec: &v1.PodSpec{
+				HostNetwork: true,
+				Containers: []v1.Container{{
+					Name: containerName,
+					SecurityContext: &v1.SecurityContext{
+						WindowsOptions: &v1.WindowsSecurityContextOptions{
+							HostProcess: &falseVar,
+						},
+					},
+				}},
+			},
+			expectedResult: false,
+		},
+		{
+			name: "container with hostprocess=true",
+			podSpec: &v1.PodSpec{
+				HostNetwork: true,
+				Containers: []v1.Container{{
+					Name: containerName,
+					SecurityContext: &v1.SecurityContext{
+						WindowsOptions: &v1.WindowsSecurityContextOptions{
+							HostProcess: &trueVar,
+						},
+					},
+				}},
+			},
+			expectedResult: true,
+		},
+		{
+			name: "pod with hostprocess=false, container with hostprocess=true",
+			podSpec: &v1.PodSpec{
+				HostNetwork: true,
+				SecurityContext: &v1.PodSecurityContext{
+					WindowsOptions: &v1.WindowsSecurityContextOptions{
+						HostProcess: &falseVar,
+					},
+				},
+				Containers: []v1.Container{{
+					Name: containerName,
+					SecurityContext: &v1.SecurityContext{
+						WindowsOptions: &v1.WindowsSecurityContextOptions{
+							HostProcess: &trueVar,
+						},
+					},
+				}},
+			},
+			expectedResult: true,
+		},
+		{
+			name: "pod with hostprocess=true, container with hostprocess=flase",
+			podSpec: &v1.PodSpec{
+				HostNetwork: true,
+				SecurityContext: &v1.PodSecurityContext{
+					WindowsOptions: &v1.WindowsSecurityContextOptions{
+						HostProcess: &trueVar,
+					},
+				},
+				Containers: []v1.Container{{
+					Name: containerName,
+					SecurityContext: &v1.SecurityContext{
+						WindowsOptions: &v1.WindowsSecurityContextOptions{
+							HostProcess: &falseVar,
+						},
+					},
+				}},
+			},
+			expectedResult: false,
+		},
+		{
+			name: "containers with hostproces=mixed",
+			podSpec: &v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name: containerName,
+						SecurityContext: &v1.SecurityContext{
+							WindowsOptions: &v1.WindowsSecurityContextOptions{
+								HostProcess: &falseVar,
+							},
+						},
+					},
+					{
+						Name: containerName,
+						SecurityContext: &v1.SecurityContext{
+							WindowsOptions: &v1.WindowsSecurityContextOptions{
+								HostProcess: &trueVar,
+							},
+						},
+					},
+				},
+			},
+			expectedResult: true,
+		},
+		{
+			name: "pod with hostProcess=false, containers with hostproces=mixed",
+			podSpec: &v1.PodSpec{
+				SecurityContext: &v1.PodSecurityContext{
+					WindowsOptions: &v1.WindowsSecurityContextOptions{
+						HostProcess: &falseVar,
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Name: containerName,
+						SecurityContext: &v1.SecurityContext{
+							WindowsOptions: &v1.WindowsSecurityContextOptions{
+								HostProcess: &falseVar,
+							},
+						},
+					},
+					{
+						Name: containerName,
+						SecurityContext: &v1.SecurityContext{
+							WindowsOptions: &v1.WindowsSecurityContextOptions{
+								HostProcess: &trueVar,
+							},
+						},
+					},
+				},
+			},
+			expectedResult: true,
+		},
+		{
+			name: "pod with hostProcess=true, containers with hostproces=mixed",
+			podSpec: &v1.PodSpec{
+				SecurityContext: &v1.PodSecurityContext{
+					WindowsOptions: &v1.WindowsSecurityContextOptions{
+						HostProcess: &trueVar,
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Name: containerName,
+						SecurityContext: &v1.SecurityContext{
+							WindowsOptions: &v1.WindowsSecurityContextOptions{
+								HostProcess: &falseVar,
+							},
+						},
+					},
+					{
+						Name: containerName,
+						SecurityContext: &v1.SecurityContext{
+							WindowsOptions: &v1.WindowsSecurityContextOptions{
+								HostProcess: &trueVar,
+							},
+						},
+					},
+				},
+			},
+			expectedResult: true,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			pod := &v1.Pod{}
+			pod.Spec = *testCase.podSpec
+			result := HasWindowsHostProcessContainer(pod)
+			assert.Equal(t, result, testCase.expectedResult)
+		})
+	}
+}
