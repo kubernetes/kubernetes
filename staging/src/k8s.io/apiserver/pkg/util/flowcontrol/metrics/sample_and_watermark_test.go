@@ -56,11 +56,11 @@ func TestSampler(t *testing.T) {
 	t0 := time.Now()
 	clk := testclock.NewFakePassiveClock(t0)
 	buckets := []float64{0, 1}
-	gen := NewSampleAndWaterMarkHistogramsGenerator(clk, samplingPeriod,
+	gen := NewSampleAndWaterMarkHistogramsVec(clk, samplingPeriod,
 		&compbasemetrics.HistogramOpts{Name: samplesHistName, Buckets: buckets},
 		&compbasemetrics.HistogramOpts{Name: "marks", Buckets: buckets},
 		[]string{})
-	saw := gen.Generate(0, 1, []string{})
+	saw := gen.NewForLabelValuesSafe(0, 1, []string{})
 	toRegister := gen.metrics()
 	registry := compbasemetrics.NewKubeRegistry()
 	for _, reg := range toRegister {
@@ -84,7 +84,7 @@ func TestSampler(t *testing.T) {
 			dt = diff
 		}
 		clk.SetTime(t1)
-		saw.Observe(1)
+		saw.Set(1)
 		expectedCount := int64(dt / samplingPeriod)
 		actualCount, err := getHistogramCount(registry, samplesHistName)
 		if err != nil && !(err == errMetricNotFound && expectedCount == 0) {
