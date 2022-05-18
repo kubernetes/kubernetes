@@ -20,10 +20,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	corelisters "k8s.io/client-go/listers/core/v1"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -31,7 +32,6 @@ import (
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	corelisters "k8s.io/client-go/listers/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
@@ -74,10 +74,6 @@ type Scheduler struct {
 	// stale while they sit in a channel.
 	NextPod func() *framework.QueuedPodInfo
 
-	// Error is called if there is an error. It is passed the pod in
-	// question, and the error
-	Error func(*framework.QueuedPodInfo, error)
-
 	// SchedulePod tries to schedule the given pod to one of the nodes in the node list.
 	// Return a struct of ScheduleResult with the name of suggested host on success,
 	// otherwise will return a FitError with reasons.
@@ -99,6 +95,9 @@ type Scheduler struct {
 	percentageOfNodesToScore int32
 
 	nextStartNodeIndex int
+
+	//PreErrorFunc captures podInfo and error before scheduleOne fails
+	PreErrorFunc func(p *framework.QueuedPodInfo, err error)
 }
 
 type schedulerOptions struct {
@@ -318,7 +317,6 @@ func New(client clientset.Interface,
 		schedulerCache,
 		extenders,
 		internalqueue.MakeNextPodFunc(podQueue),
-		MakeDefaultErrorFunc(client, podLister, podQueue, schedulerCache),
 		stopEverything,
 		podQueue,
 		profiles,
@@ -339,6 +337,7 @@ func (sched *Scheduler) Run(ctx context.Context) {
 	sched.SchedulingQueue.Close()
 }
 
+// Deprecated:
 // MakeDefaultErrorFunc construct a function to handle pod scheduler error
 func MakeDefaultErrorFunc(client clientset.Interface, podLister corelisters.PodLister, podQueue internalqueue.SchedulingQueue, schedulerCache internalcache.Cache) func(*framework.QueuedPodInfo, error) {
 	return func(podInfo *framework.QueuedPodInfo, err error) {
@@ -460,7 +459,6 @@ func newScheduler(
 	cache internalcache.Cache,
 	extenders []framework.Extender,
 	nextPod func() *framework.QueuedPodInfo,
-	Error func(*framework.QueuedPodInfo, error),
 	stopEverything <-chan struct{},
 	schedulingQueue internalqueue.SchedulingQueue,
 	profiles profile.Map,
@@ -471,7 +469,6 @@ func newScheduler(
 		Cache:                    cache,
 		Extenders:                extenders,
 		NextPod:                  nextPod,
-		Error:                    Error,
 		StopEverything:           stopEverything,
 		SchedulingQueue:          schedulingQueue,
 		Profiles:                 profiles,
@@ -480,6 +477,7 @@ func newScheduler(
 		percentageOfNodesToScore: percentageOfNodesToScore,
 	}
 	sched.SchedulePod = sched.schedulePod
+	sched.PreErrorFunc = func(p *framework.QueuedPodInfo, err error) {}
 	return &sched
 }
 
