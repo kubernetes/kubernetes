@@ -358,25 +358,37 @@ func deployCustomResourceWebhookAndService(f *framework.Framework, image string,
 func verifyV1Object(crd *apiextensionsv1.CustomResourceDefinition, obj *unstructured.Unstructured) {
 	gomega.Expect(obj.GetAPIVersion()).To(gomega.BeEquivalentTo(crd.Spec.Group + "/v1"))
 	hostPort, exists := obj.Object["hostPort"]
-	framework.ExpectEqual(exists, true)
+	if !exists {
+		framework.Failf("Host port does not exist")
+	}
 
 	gomega.Expect(hostPort).To(gomega.BeEquivalentTo("localhost:8080"))
 	_, hostExists := obj.Object["host"]
-	framework.ExpectEqual(hostExists, false)
+	if hostExists {
+		framework.Failf("Host should not exist")
+	}
 	_, portExists := obj.Object["port"]
-	framework.ExpectEqual(portExists, false)
+	if portExists {
+		framework.Failf("Port should not exist")
+	}
 }
 
 func verifyV2Object(crd *apiextensionsv1.CustomResourceDefinition, obj *unstructured.Unstructured) {
 	gomega.Expect(obj.GetAPIVersion()).To(gomega.BeEquivalentTo(crd.Spec.Group + "/v2"))
 	_, hostPortExists := obj.Object["hostPort"]
-	framework.ExpectEqual(hostPortExists, false)
+	if hostPortExists {
+		framework.Failf("Host port should not exist")
+	}
 
 	host, hostExists := obj.Object["host"]
-	framework.ExpectEqual(hostExists, true)
+	if !hostExists {
+		framework.Failf("Host should exist")
+	}
 	gomega.Expect(host).To(gomega.BeEquivalentTo("localhost"))
 	port, portExists := obj.Object["port"]
-	framework.ExpectEqual(portExists, true)
+	if !portExists {
+		framework.Failf("Port should exist")
+	}
 	gomega.Expect(port).To(gomega.BeEquivalentTo("8080"))
 }
 
