@@ -1466,5 +1466,5 @@ func newObserverPair(clk clock.PassiveClock) metrics.RatioedChangeObserverPair {
 }
 
 func newExecSeatsObserver(clk clock.PassiveClock) metrics.RatioedChangeObserver {
-	return metrics.PriorityLevelExecutionSeatsObserverGenerator.Generate(1, 1, []string{"test"})
+	return metrics.PriorityLevelExecutionSeatsObserverGenerator.Generate(0, 1, []string{"test"})
 }
