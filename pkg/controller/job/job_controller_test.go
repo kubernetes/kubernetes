@@ -2591,21 +2591,17 @@ func TestWatchOrphanPods(t *testing.T) {
 	manager.podStoreSynced = alwaysReady
 	manager.jobStoreSynced = alwaysReady
 
-	jobSynced := false
-	manager.syncHandler = func(ctx context.Context, jobKey string) (bool, error) {
-		jobSynced = true
-		return true, nil
-	}
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	go sharedInformers.Core().V1().Pods().Informer().Run(stopCh)
+	podInformer := sharedInformers.Core().V1().Pods().Informer()
+	go podInformer.Run(stopCh)
+	cache.WaitForCacheSync(stopCh, podInformer.HasSynced)
 	go manager.Run(context.TODO(), 1)
 
 	// Create job but don't add it to the store.
 	cases := map[string]struct {
-		job           *batch.Job
-		inCache       bool
-		wantJobSynced bool
+		job     *batch.Job
+		inCache bool
 	}{
 		"job_does_not_exist": {
 			job: newJob(2, 2, 6, batch.NonIndexedCompletion),
@@ -2625,9 +2621,13 @@ func TestWatchOrphanPods(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			jobSynced = false
 			if tc.inCache {
-				sharedInformers.Batch().V1().Jobs().Informer().GetIndexer().Add(tc.job)
+				if err := sharedInformers.Batch().V1().Jobs().Informer().GetIndexer().Add(tc.job); err != nil {
+					t.Fatalf("Failed to insert job in index: %v", err)
+				}
+				t.Cleanup(func() {
+					sharedInformers.Batch().V1().Jobs().Informer().GetIndexer().Delete(tc.job)
+				})
 			}
 
 			podBuilder := buildPod().name(name).deletionTimestamp().trackingFinalizer()
@@ -2648,9 +2648,6 @@ func TestWatchOrphanPods(t *testing.T) {
 				return !hasJobTrackingFinalizer(p), nil
 			}); err != nil {
 				t.Errorf("Waiting for Pod to get the finalizer removed: %v", err)
-			}
-			if !tc.inCache && jobSynced {
-				t.Error("Tried to sync deleted job")
 			}
 		})
 	}
