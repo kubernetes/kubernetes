@@ -120,3 +120,71 @@ func getHistogramCount(registry compbasemetrics.KubeRegistry, metricName string)
 	}
 	return 0, errMetricNotFound
 }
+
+func BenchmarkSampleAndWaterMarkHistogramsVecEltSafeEarly(b *testing.B) {
+	b.StopTimer()
+	now := time.Now()
+	clk := testclock.NewFakePassiveClock(now)
+	thv := NewSampleAndWaterMarkHistogramsVec(clk, time.Millisecond,
+		&compbasemetrics.HistogramOpts{
+			Namespace: "testns",
+			Subsystem: "testsubsys",
+			Name:      "samplehist",
+			Help:      "Me",
+			Buckets:   []float64{1, 2, 4, 8, 16, 32},
+		},
+		&compbasemetrics.HistogramOpts{
+			Namespace: "testns",
+			Subsystem: "testsubsys",
+			Name:      "markhist",
+			Help:      "Me",
+			Buckets:   []float64{1, 2, 4, 8, 16, 32},
+		},
+		[]string{"labelname"})
+	th := thv.NewForLabelValuesSafe(0, 3, []string{"labelvalue"})
+	registry := compbasemetrics.NewKubeRegistry()
+	registry.MustRegister(thv.metrics()...)
+	var x int
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		delta := (i % 6) + 1
+		now = now.Add(time.Duration(delta) * time.Millisecond)
+		clk.SetTime(now)
+		th.Set(float64(x))
+		x = (x + i) % 60
+	}
+}
+
+func BenchmarkSampleAndWaterMarkHistogramsVecEltSafeLate(b *testing.B) {
+	b.StopTimer()
+	now := time.Now()
+	clk := testclock.NewFakePassiveClock(now)
+	thv := NewSampleAndWaterMarkHistogramsVec(clk, time.Millisecond,
+		&compbasemetrics.HistogramOpts{
+			Namespace: "testns",
+			Subsystem: "testsubsys",
+			Name:      "samplehist",
+			Help:      "Me",
+			Buckets:   []float64{1, 2, 4, 8, 16, 32},
+		},
+		&compbasemetrics.HistogramOpts{
+			Namespace: "testns",
+			Subsystem: "testsubsys",
+			Name:      "markhist",
+			Help:      "Me",
+			Buckets:   []float64{1, 2, 4, 8, 16, 32},
+		},
+		[]string{"labelname"})
+	registry := compbasemetrics.NewKubeRegistry()
+	registry.MustRegister(thv.metrics()...)
+	th := thv.NewForLabelValuesSafe(0, 3, []string{"labelvalue"})
+	var x int
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		delta := (i % 6) + 1
+		now = now.Add(time.Duration(delta) * time.Millisecond)
+		clk.SetTime(now)
+		th.Set(float64(x))
+		x = (x + i) % 60
+	}
+}
