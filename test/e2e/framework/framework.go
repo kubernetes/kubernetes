@@ -460,6 +460,9 @@ func (f *Framework) CreateNamespace(ctx context.Context, baseName string, labels
 	labels[admissionapi.EnforceLevelLabel] = firstNonEmptyPSaLevelOrRestricted(f.NamespacePodSecurityEnforceLevel, f.NamespacePodSecurityLevel)
 	labels[admissionapi.WarnLevelLabel] = firstNonEmptyPSaLevelOrRestricted(f.NamespacePodSecurityWarnLevel, f.NamespacePodSecurityLevel)
 	labels[admissionapi.AuditLevelLabel] = firstNonEmptyPSaLevelOrRestricted(f.NamespacePodSecurityAuditLevel, f.NamespacePodSecurityLevel)
+	// turn off the OpenShift label syncer so that it does not attempt to sync
+	// the PodSecurity admission labels
+	labels["security.openshift.io/scc.podSecurityLabelSync"] = "false"
 
 	ns, err := createTestingNS(ctx, baseName, f.ClientSet, labels)
 	// check ns instead of err to see if it's nil as we may
