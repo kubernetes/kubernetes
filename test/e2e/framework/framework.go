@@ -436,6 +436,9 @@ func (f *Framework) CreateNamespace(baseName string, labels map[string]string) (
 		enforceLevel = f.NamespacePodSecurityEnforceLevel
 	}
 	labels[admissionapi.EnforceLevelLabel] = string(enforceLevel)
+	// turn off the OpenShift label syncer so that it does not attempt to sync
+	// the PodSecurity admission labels
+	labels["security.openshift.io/scc.podSecurityLabelSync"] = "false"
 
 	ns, err := createTestingNS(baseName, f.ClientSet, labels)
 	// check ns instead of err to see if it's nil as we may
