@@ -20,6 +20,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"k8s.io/client-go/kubernetes/scheme"
+	clientcache "k8s.io/client-go/tools/cache"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
+	fakecache "k8s.io/kubernetes/pkg/scheduler/internal/cache/fake"
 	"math"
 	"reflect"
 	"regexp"
@@ -39,9 +43,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
-	"k8s.io/client-go/kubernetes/scheme"
 	clienttesting "k8s.io/client-go/testing"
-	clientcache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/component-helpers/storage/volume"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
@@ -49,7 +51,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
@@ -57,7 +58,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
-	fakecache "k8s.io/kubernetes/pkg/scheduler/internal/cache/fake"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -590,10 +590,6 @@ func TestSchedulerScheduleOne(t *testing.T) {
 				func() *framework.QueuedPodInfo {
 					return &framework.QueuedPodInfo{PodInfo: framework.NewPodInfo(item.sendPod)}
 				},
-				func(p *framework.QueuedPodInfo, err error) {
-					gotPod = p.Pod
-					gotError = err
-				},
 				nil,
 				internalqueue.NewTestQueue(ctx, nil),
 				profile.Map{
@@ -602,6 +598,10 @@ func TestSchedulerScheduleOne(t *testing.T) {
 				client,
 				nil,
 				0)
+			s.PreErrorFunc = func(p *framework.QueuedPodInfo, err error) {
+				gotPod = p.Pod
+				gotError = err
+			}
 			s.SchedulePod = func(ctx context.Context, fwk framework.Framework, state *framework.CycleState, pod *v1.Pod) (ScheduleResult, error) {
 				return item.mockResult.result, item.mockResult.err
 			}
@@ -2024,7 +2024,6 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				nil,
 				nil,
 				nil,
-				nil,
 				snapshot,
 				schedulerapi.DefaultPercentageOfNodesToScore)
 			informerFactory.Start(ctx.Done())
@@ -2326,7 +2325,6 @@ func TestZeroRequest(t *testing.T) {
 				nil,
 				nil,
 				nil,
-				nil,
 				snapshot,
 				schedulerapi.DefaultPercentageOfNodesToScore)
 
@@ -2510,7 +2508,6 @@ func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
 				nil,
 				nil,
 				nil,
-				nil,
 				snapshot,
 				schedulerapi.DefaultPercentageOfNodesToScore)
 
@@ -2566,7 +2563,6 @@ func makeScheduler(nodes []*v1.Node) *Scheduler {
 
 	s := newScheduler(
 		cache,
-		nil,
 		nil,
 		nil,
 		nil,
@@ -2669,9 +2665,6 @@ func setupTestScheduler(ctx context.Context, queuedPodStore *clientcache.FIFO, c
 		func() *framework.QueuedPodInfo {
 			return &framework.QueuedPodInfo{PodInfo: framework.NewPodInfo(clientcache.Pop(queuedPodStore).(*v1.Pod))}
 		},
-		func(p *framework.QueuedPodInfo, err error) {
-			errChan <- err
-		},
 		nil,
 		schedulingQueue,
 		profile.Map{
@@ -2680,6 +2673,9 @@ func setupTestScheduler(ctx context.Context, queuedPodStore *clientcache.FIFO, c
 		client,
 		internalcache.NewEmptySnapshot(),
 		schedulerapi.DefaultPercentageOfNodesToScore)
+	sched.PreErrorFunc = func(p *framework.QueuedPodInfo, err error) {
+		errChan <- err
+	}
 	return sched, bindingChan, errChan
 }
 

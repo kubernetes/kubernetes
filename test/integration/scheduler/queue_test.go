@@ -19,32 +19,32 @@ package scheduler
 import (
 	"context"
 	"fmt"
-	"testing"
-	"time"
-
-	v1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/kube-scheduler/config/v1beta3"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
-	"k8s.io/kubernetes/pkg/scheduler"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
-	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testfwk "k8s.io/kubernetes/test/integration/framework"
-	testutils "k8s.io/kubernetes/test/integration/util"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	"k8s.io/utils/pointer"
+	"testing"
+	"time"
+
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/scheduler"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
+	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	testutils "k8s.io/kubernetes/test/integration/util"
 )
 
 // TestCoreResourceEnqueue verify Pods failed by in-tree default plugins can be
@@ -60,6 +60,8 @@ func TestCoreResourceEnqueue(t *testing.T) {
 		scheduler.WithPodMaxBackoffSeconds(0),
 	)
 	testutils.SyncInformerFactory(testCtx)
+
+	errFunc := scheduler.MakeDefaultErrorFunc(testCtx.ClientSet, testCtx.InformerFactory.Core().V1().Pods().Lister(), testCtx.Scheduler.SchedulingQueue, testCtx.Scheduler.Cache)
 
 	defer testutils.CleanupTest(t, testCtx)
 
@@ -104,8 +106,7 @@ func TestCoreResourceEnqueue(t *testing.T) {
 		if fitError == nil {
 			t.Fatalf("Expect Pod %v to fail at scheduling.", podInfo.Pod.Name)
 		}
-		testCtx.Scheduler.Error(podInfo, fitError)
-
+		errFunc(podInfo, fitError)
 		// Scheduling cycle is incremented by one after NextPod() is called, so
 		// pass a number larger than i to move Pod to unschedulablePods.
 		testCtx.Scheduler.SchedulingQueue.AddUnschedulableIfNotPresent(podInfo, int64(i+10))
@@ -246,6 +247,7 @@ func TestCustomResourceEnqueue(t *testing.T) {
 		scheduler.WithPodMaxBackoffSeconds(0),
 	)
 	testutils.SyncInformerFactory(testCtx)
+	errFunc := scheduler.MakeDefaultErrorFunc(testCtx.ClientSet, testCtx.InformerFactory.Core().V1().Pods().Lister(), testCtx.Scheduler.SchedulingQueue, testCtx.Scheduler.Cache)
 
 	defer testutils.CleanupTest(t, testCtx)
 
@@ -282,8 +284,7 @@ func TestCustomResourceEnqueue(t *testing.T) {
 	if fitError == nil {
 		t.Fatalf("Expect Pod %v to fail at scheduling.", podInfo.Pod.Name)
 	}
-	testCtx.Scheduler.Error(podInfo, fitError)
-
+	errFunc(podInfo, fitError)
 	// Scheduling cycle is incremented from 0 to 1 after NextPod() is called, so
 	// pass a number larger than 1 to move Pod to unschedulablePods.
 	testCtx.Scheduler.SchedulingQueue.AddUnschedulableIfNotPresent(podInfo, 10)
