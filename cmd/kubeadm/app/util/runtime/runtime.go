@@ -17,6 +17,7 @@ limitations under the License.
 package runtime
 
 import (
+	"os"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -68,7 +69,9 @@ func (runtime *CRIRuntime) Socket() string {
 
 // crictl creates a crictl command for the provided args.
 func (runtime *CRIRuntime) crictl(args ...string) utilsexec.Cmd {
-	return runtime.exec.Command(runtime.crictlPath, append([]string{"-r", runtime.Socket()}, args...)...)
+	cmd := runtime.exec.Command(runtime.crictlPath, append([]string{"-r", runtime.Socket()}, args...)...)
+	cmd.SetEnv(os.Environ())
+	return cmd
 }
 
 // IsRunning checks if runtime is running
