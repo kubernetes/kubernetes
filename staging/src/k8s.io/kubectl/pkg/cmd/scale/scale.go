@@ -21,14 +21,13 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"k8s.io/klog/v2"
-
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scale"
 	"k8s.io/kubectl/pkg/util"
@@ -231,10 +230,7 @@ func (o *ScaleOptions) RunScale() error {
 		waitForReplicas = scale.NewRetryParams(1*time.Second, o.Timeout)
 	}
 
-	counter := 0
-	for _, info := range infos {
-		counter++
-
+	visit := func(info *resource.Info) error {
 		mapping := info.ResourceMapping()
 		if o.dryRunStrategy == cmdutil.DryRunClient {
 			return o.PrintObj(info.Object, o.Out)
@@ -258,12 +254,15 @@ func (o *ScaleOptions) RunScale() error {
 		}
 
 		return o.PrintObj(info.Object, o.Out)
+	}
 
+	for _, info := range infos {
+		if err = visit(info); err != nil {
+			return err
+		}
 	}
-	if err != nil {
-		return err
-	}
-	if counter == 0 {
+
+	if len(infos) == 0 {
 		return fmt.Errorf("no objects passed to scale")
 	}
 	return nil
