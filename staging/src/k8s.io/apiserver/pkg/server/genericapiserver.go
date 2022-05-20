@@ -544,10 +544,22 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 		defer drainedCh.Signal()
 		defer klog.V(1).InfoS("[graceful-termination] shutdown event", "name", drainedCh.Name())
 
-		// wait for the delayed stopCh before closing the handler chain (it rejects everything after Wait has been called).
+		// wait for the delayed stopCh before closing the handler chain
 		<-delayedStopCh.Signaled()
 
 		// Wait for all requests to finish, which are bounded by the RequestTimeout variable.
+		// once HandlerChainWaitGroup.Wait is invoked, the apiserver is
+		// expected to reject any incoming request with a {503, Retry-After}
+		// response via the WithWaitGroup filter. On the contrary, we observe
+		// that incoming request(s) get a 'connection refused' error, this is
+		// because, at this point, we have called 'Server.Shutdown' and
+		// net/http server has stopped listening. This causes incoming
+		// request to get a 'connection refused' error.
+		// On the other hand, if 'ShutdownSendRetryAfter' is enabled incoming
+		// requests will be rejected with a {429, Retry-After} since
+		// 'Server.Shutdown' will be invoked only after in-flight requests
+		// have been drained.
+		// TODO: can we consolidate these two modes of graceful termination?
 		s.HandlerChainWaitGroup.Wait()
 	}()
 
