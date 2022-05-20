@@ -729,7 +729,8 @@ kube::golang::is_instrumented_package() {
 # Echos the path to a dummy test used for coverage information.
 kube::golang::path_for_coverage_dummy_test() {
   local package="$1"
-  local path="${KUBE_GOPATH}/src/${package}"
+  local path
+  path=$(go list -find -f '{{.Dir}}' "${package}")
   local name
   name=$(basename "${package}")
   echo "${path}/zz_generated_${name}_test.go"
