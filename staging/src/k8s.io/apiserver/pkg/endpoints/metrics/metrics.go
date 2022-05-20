@@ -458,11 +458,11 @@ func InstrumentHandlerFunc(verb, group, version, resource, subresource, scope, c
 
 // CleanScope returns the scope of the request.
 func CleanScope(requestInfo *request.RequestInfo) string {
+	if requestInfo.Name != "" || requestInfo.Verb == "create" {
+		return "resource"
+	}
 	if requestInfo.Namespace != "" {
 		return "namespace"
-	}
-	if requestInfo.Name != "" {
-		return "resource"
 	}
 	if requestInfo.IsResourceRequest {
 		return "cluster"
