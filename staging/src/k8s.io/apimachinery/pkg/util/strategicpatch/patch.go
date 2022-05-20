@@ -718,6 +718,13 @@ func diffListsOfMaps(original, modified []interface{}, schema LookupPatchMeta, m
 	patch := make([]interface{}, 0, len(modified))
 	deletionList := make([]interface{}, 0, len(original))
 
+	if err := setMergeKeyForEmptyMapInSlice(original, mergeKey); err != nil {
+		return nil, nil, err
+	}
+	if err := setMergeKeyForEmptyMapInSlice(modified, mergeKey); err != nil {
+		return nil, nil, err
+	}
+
 	originalSorted, err := sortMergeListsByNameArray(original, schema, mergeKey, false)
 	if err != nil {
 		return nil, nil, err
@@ -1516,6 +1523,13 @@ func mergeSlice(original, patch []interface{}, schema LookupPatchMeta, mergeKey 
 			return nil, fmt.Errorf("cannot merge lists without merge key for %s", schema.Name())
 		}
 
+		if err = setMergeKeyForEmptyMapInSlice(original, mergeKey); err != nil {
+			return nil, err
+		}
+		if err = setMergeKeyForEmptyMapInSlice(patch, mergeKey); err != nil {
+			return nil, err
+		}
+
 		original, patch, err = mergeSliceWithSpecialElements(original, patch, mergeKey)
 		if err != nil {
 			return nil, err
@@ -2250,4 +2264,23 @@ func hasAdditionalNewField(original, modified map[string]interface{}) bool {
 		}
 	}
 	return false
+}
+
+func setMergeKeyForEmptyMapInSlice(m []interface{}, mergeKey string) error {
+	for i, v := range m {
+		typedV, ok := v.(map[string]interface{})
+		if !ok {
+			return mergepatch.ErrBadArgType(typedV, v)
+		}
+
+		if len(typedV) == 0 {
+			if typedV == nil {
+				m[i] = map[string]interface{}{mergeKey: nil}
+			} else {
+				typedV[mergeKey] = nil
+			}
+		}
+	}
+
+	return nil
 }
