@@ -319,20 +319,6 @@ func newCmdConfigImagesPull() *cobra.Command {
 	return cmd
 }
 
-// ImagesPull is the struct used to hold information relating to image pulling
-type ImagesPull struct {
-	runtime utilruntime.ContainerRuntime
-	images  []string
-}
-
-// NewImagesPull initializes and returns the `kubeadm config images pull` command
-func NewImagesPull(runtime utilruntime.ContainerRuntime, images []string) *ImagesPull {
-	return &ImagesPull{
-		runtime: runtime,
-		images:  images,
-	}
-}
-
 // PullControlPlaneImages pulls all images that the ImagesPull knows about
 func PullControlPlaneImages(runtime utilruntime.ContainerRuntime, cfg *kubeadmapi.ClusterConfiguration) error {
 	images := images.GetControlPlaneImages(cfg)
