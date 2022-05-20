@@ -18,6 +18,7 @@ package testing
 
 import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kube-scheduler/config/v1beta2"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
@@ -37,7 +38,7 @@ func NewFramework(fns []RegisterPluginFunc, profileName string, opts ...runtime.
 	for _, f := range fns {
 		f(&registry, profile)
 	}
-	return runtime.NewFramework(registry, profile, opts...)
+	return runtime.NewFramework(registry, profile, wait.NeverStop, opts...)
 }
 
 // RegisterPluginFunc is a function signature used in method RegisterFilterPlugin()
