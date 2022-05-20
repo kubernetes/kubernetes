@@ -32,9 +32,6 @@ import (
 
 const (
 	controlPlaneLabel = "node-role.kubernetes.io/control-plane"
-	// TODO: remove the legacy label in 1.25:
-	// https://github.com/kubernetes/kubeadm/issues/2200
-	controlPlaneLabelLegacy = "node-role.kubernetes.io/master"
 )
 
 // Define container for all the test specification aimed at verifying
@@ -59,11 +56,8 @@ var _ = Describe("control-plane node", func() {
 		gomega.Expect(controlPlanes.Items).NotTo(gomega.BeEmpty(), "at least one node with label %s should exist. if you are running test on a single-node cluster, you can skip this test with SKIP=multi-node", controlPlaneLabel)
 
 		// checks that the control-plane nodes have the expected taints
-		// TODO: remove the legacy taint check in 1.25:
-		// https://github.com/kubernetes/kubeadm/issues/2200
 		for _, cp := range controlPlanes.Items {
 			framework.ExpectNodeHasTaint(f.ClientSet, cp.GetName(), &corev1.Taint{Key: controlPlaneLabel, Effect: corev1.TaintEffectNoSchedule})
-			framework.ExpectNodeHasTaint(f.ClientSet, cp.GetName(), &corev1.Taint{Key: controlPlaneLabelLegacy, Effect: corev1.TaintEffectNoSchedule})
 		}
 	})
 })
