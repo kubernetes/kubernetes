@@ -44,7 +44,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"regexp"
 	"strings"
 	"time"
 
@@ -90,58 +89,75 @@ const (
 )
 
 var _ = SIGDescribe("[Feature:Windows] GMSA Full [Serial] [Slow]", func() {
+	var (
+		podName               string
+		webhookCleanup        func()
+		customResourceCleanup func()
+		rbacRoleCleanup       func()
+	)
+
 	f := framework.NewDefaultFramework("gmsa-full-test-windows")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
+	ginkgo.BeforeEach(func() {
+		defer ginkgo.GinkgoRecover()
+
+		ginkgo.By("finding the worker node that fulfills this test's assumptions")
+		nodes := findPreconfiguredGmsaNodes(f.ClientSet)
+		if len(nodes) != 1 {
+			e2eskipper.Skipf("Expected to find exactly one node with the %q label, found %d", gmsaFullNodeLabel, len(nodes))
+		}
+		node := nodes[0]
+
+		ginkgo.By("retrieving the contents of the GMSACredentialSpec custom resource manifest from the node")
+		crdManifestContents := retrieveCRDManifestFileContents(f, node)
+
+		ginkgo.By("deploying the GMSA webhook")
+		webhookCleanUp, err := deployGmsaWebhook(f)
+		defer webhookCleanUp()
+		if err != nil {
+			framework.Failf(err.Error())
+		}
+
+		ginkgo.By("creating the GMSA custom resource")
+		customResourceCleanup, err := createGmsaCustomResource(f.Namespace.Name, crdManifestContents)
+		defer customResourceCleanup()
+		if err != nil {
+			framework.Failf(err.Error())
+		}
+
+		ginkgo.By("creating an RBAC role to grant use access to that GMSA resource")
+		rbacRoleName, rbacRoleCleanup, err := createRBACRoleForGmsa(f)
+		defer rbacRoleCleanup()
+		if err != nil {
+			framework.Failf(err.Error())
+		}
+
+		ginkgo.By("creating a service account")
+		serviceAccountName := createServiceAccount(f)
+
+		ginkgo.By("binding the RBAC role to the service account")
+		bindRBACRoleToServiceAccount(f, serviceAccountName, rbacRoleName)
+
+		ginkgo.By("creating a pod using the GMSA cred spec")
+		podName = createPodWithGmsa(f, serviceAccountName)
+	})
+
+	ginkgo.AfterEach(func() {
+		webhookCleanup()
+		customResourceCleanup()
+		rbacRoleCleanup()
+	})
+
 	ginkgo.Describe("GMSA support", func() {
 		ginkgo.It("works end to end", func() {
-			defer ginkgo.GinkgoRecover()
-
-			ginkgo.By("finding the worker node that fulfills this test's assumptions")
-			nodes := findPreconfiguredGmsaNodes(f.ClientSet)
-			if len(nodes) != 1 {
-				e2eskipper.Skipf("Expected to find exactly one node with the %q label, found %d", gmsaFullNodeLabel, len(nodes))
-			}
-			node := nodes[0]
-
-			ginkgo.By("retrieving the contents of the GMSACredentialSpec custom resource manifest from the node")
-			crdManifestContents := retrieveCRDManifestFileContents(f, node)
-
-			ginkgo.By("deploying the GMSA webhook")
-			webhookCleanUp, err := deployGmsaWebhook(f)
-			defer webhookCleanUp()
-			if err != nil {
-				framework.Failf(err.Error())
-			}
-
-			ginkgo.By("creating the GMSA custom resource")
-			customResourceCleanup, err := createGmsaCustomResource(f.Namespace.Name, crdManifestContents)
-			defer customResourceCleanup()
-			if err != nil {
-				framework.Failf(err.Error())
-			}
-
-			ginkgo.By("creating an RBAC role to grant use access to that GMSA resource")
-			rbacRoleName, rbacRoleCleanup, err := createRBACRoleForGmsa(f)
-			defer rbacRoleCleanup()
-			if err != nil {
-				framework.Failf(err.Error())
-			}
-
-			ginkgo.By("creating a service account")
-			serviceAccountName := createServiceAccount(f)
-
-			ginkgo.By("binding the RBAC role to the service account")
-			bindRBACRoleToServiceAccount(f, serviceAccountName, rbacRoleName)
-
-			ginkgo.By("creating a pod using the GMSA cred spec")
-			podName := createPodWithGmsa(f, serviceAccountName)
 
 			// nltest /QUERY will only return successfully if there is a GMSA
 			// identity configured, _and_ it succeeds in contacting the AD controller
 			// and authenticating with it.
 			ginkgo.By("checking that nltest /QUERY returns successfully")
 			var output string
+			var err error
 			gomega.Eventually(func() bool {
 				output, err = runKubectlExecInNamespace(f.Namespace.Name, podName, "nltest", "/QUERY")
 				if err != nil {
@@ -165,53 +181,10 @@ var _ = SIGDescribe("[Feature:Windows] GMSA Full [Serial] [Slow]", func() {
 		})
 
 		ginkgo.It("can read and write file to remote SMB folder", func() {
-			defer ginkgo.GinkgoRecover()
-
-			ginkgo.By("finding the worker node that fulfills this test's assumptions")
-			nodes := findPreconfiguredGmsaNodes(f.ClientSet)
-			if len(nodes) != 1 {
-				e2eskipper.Skipf("Expected to find exactly one node with the %q label, found %d", gmsaFullNodeLabel, len(nodes))
-			}
-			node := nodes[0]
-
-			ginkgo.By("retrieving the contents of the GMSACredentialSpec custom resource manifest from the node")
-			crdManifestContents := retrieveCRDManifestFileContents(f, node)
-
-			ginkgo.By("deploying the GMSA webhook")
-			webhookCleanUp, err := deployGmsaWebhook(f)
-			defer webhookCleanUp()
-			if err != nil {
-				framework.Failf(err.Error())
-			}
-
-			ginkgo.By("creating the GMSA custom resource")
-			customResourceCleanup, err := createGmsaCustomResource(f.Namespace.Name, crdManifestContents)
-			defer customResourceCleanup()
-			if err != nil {
-				framework.Failf(err.Error())
-			}
-
-			ginkgo.By("creating an RBAC role to grant use access to that GMSA resource")
-			rbacRoleName, rbacRoleCleanup, err := createRBACRoleForGmsa(f)
-			defer rbacRoleCleanup()
-			if err != nil {
-				framework.Failf(err.Error())
-			}
-
-			ginkgo.By("creating a service account")
-			serviceAccountName := createServiceAccount(f)
-
-			ginkgo.By("binding the RBAC role to the service account")
-			bindRBACRoleToServiceAccount(f, serviceAccountName, rbacRoleName)
-
-			ginkgo.By("creating a pod using the GMSA cred spec")
-			podName := createPodWithGmsa(f, serviceAccountName)
-
 			ginkgo.By("getting the ip of GMSA domain")
-			gmsaDomainIP := getGmsaDomainIP(f, podName)
 
 			ginkgo.By("checking that file can be read and write from the remote folder successfully")
-			filePath := fmt.Sprintf("\\\\%s\\%s\\write-test-%s.txt", gmsaDomainIP, gmsaSharedFolder, string(uuid.NewUUID())[0:4])
+			filePath := fmt.Sprintf("\\\\%s\\%s\\write-test-%s.txt", gmsaDomain, gmsaSharedFolder, string(uuid.NewUUID())[0:4])
 			gomega.Eventually(func() bool {
 				// The filePath is a remote folder, do not change the format of it
 				_, _ = runKubectlExecInNamespace(f.Namespace.Name, podName, "--", "powershell.exe", "-Command", "echo 'This is a test file.' > "+filePath)
@@ -543,17 +516,4 @@ func createPodWithGmsa(f *framework.Framework, serviceAccountName string) string
 func runKubectlExecInNamespace(namespace string, args ...string) (string, error) {
 	namespaceOption := fmt.Sprintf("--namespace=%s", namespace)
 	return framework.RunKubectl(namespace, append([]string{"exec", namespaceOption}, args...)...)
-}
-
-func getGmsaDomainIP(f *framework.Framework, podName string) string {
-	output, _ := runKubectlExecInNamespace(f.Namespace.Name, podName, "powershell.exe", "--", "nslookup", gmsaDomain)
-	re := regexp.MustCompile(`(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}`)
-	idx := strings.Index(output, gmsaDomain)
-
-	submatchall := re.FindAllString(output[idx:], -1)
-	if len(submatchall) < 1 {
-		framework.Logf("fail to get the ip of the gmsa domain")
-		return ""
-	}
-	return submatchall[0]
 }
