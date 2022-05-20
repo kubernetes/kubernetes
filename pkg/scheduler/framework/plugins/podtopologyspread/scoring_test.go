@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -497,7 +498,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			informerFactory := informers.NewSharedInformerFactory(fake.NewSimpleClientset(tt.objs...), 0)
-			f, err := frameworkruntime.NewFramework(nil, nil,
+			f, err := frameworkruntime.NewFramework(nil, nil, wait.NeverStop,
 				frameworkruntime.WithSnapshotSharedLister(cache.NewSnapshot(nil, tt.nodes)),
 				frameworkruntime.WithInformerFactory(informerFactory))
 			if err != nil {
@@ -1299,7 +1300,7 @@ func BenchmarkTestDefaultEvenPodsSpreadPriority(b *testing.B) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
-			f, err := frameworkruntime.NewFramework(nil, nil,
+			f, err := frameworkruntime.NewFramework(nil, nil, wait.NeverStop,
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithInformerFactory(informerFactory))
 			if err != nil {
