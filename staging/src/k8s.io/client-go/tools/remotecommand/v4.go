@@ -37,18 +37,10 @@ type streamProtocolV4 struct {
 
 var _ streamProtocolHandler = &streamProtocolV4{}
 
-func newStreamProtocolV4(options StreamOptions) streamProtocolHandler {
+func newStreamProtocolV4(options StreamOptions) *streamProtocolV4 {
 	return &streamProtocolV4{
-		streamProtocolV3: newStreamProtocolV3(options).(*streamProtocolV3),
+		streamProtocolV3: newStreamProtocolV3(options),
 	}
-}
-
-func (p *streamProtocolV4) createStreams(conn streamCreator) error {
-	return p.streamProtocolV3.createStreams(conn)
-}
-
-func (p *streamProtocolV4) handleResizes() {
-	p.streamProtocolV3.handleResizes()
 }
 
 func (p *streamProtocolV4) stream(conn streamCreator) error {
@@ -57,6 +49,8 @@ func (p *streamProtocolV4) stream(conn streamCreator) error {
 	}
 
 	// now that all the streams have been created, proceed with reading & copying
+
+	go conn.Run()
 
 	errorChan := watchErrorStream(p.errorStream, &errorDecoderV4{})
 
@@ -115,5 +109,5 @@ func (d *errorDecoderV4) decode(message []byte) error {
 		return errors.New("error stream protocol error: unknown error")
 	}
 
-	return fmt.Errorf(status.Message)
+	return errors.New(status.Message)
 }

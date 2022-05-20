@@ -138,10 +138,7 @@ func (f *Framework) ExecShellInPodWithFullOutput(podName string, cmd string) (st
 }
 
 func execute(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool) error {
-	exec, err := remotecommand.NewSPDYExecutor(config, method, url)
-	if err != nil {
-		return err
-	}
+	exec := remotecommand.NewWebSocketExecutor(config, method, url.String())
 	return exec.Stream(remotecommand.StreamOptions{
 		Stdin:  stdin,
 		Stdout: stdout,

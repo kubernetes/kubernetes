@@ -311,7 +311,7 @@ func runRemoteCommandTest(t *testing.T, commandType string) {
 	s, testServer := startTestServer(t)
 	defer testServer.Close()
 
-	var reqURL *url.URL
+	var reqURL string
 	stdin, stdout, stderr := true, true, true
 	containerID := testContainerID
 	switch commandType {
@@ -324,8 +324,7 @@ func runRemoteCommandTest(t *testing.T, commandType string) {
 			Stderr:      stderr,
 		})
 		require.NoError(t, err)
-		reqURL, err = url.Parse(resp.Url)
-		require.NoError(t, err)
+		reqURL = resp.Url
 	case "attach":
 		resp, err := s.GetAttach(&runtimeapi.AttachRequest{
 			ContainerId: containerID,
@@ -334,8 +333,7 @@ func runRemoteCommandTest(t *testing.T, commandType string) {
 			Stderr:      stderr,
 		})
 		require.NoError(t, err)
-		reqURL, err = url.Parse(resp.Url)
-		require.NoError(t, err)
+		reqURL = resp.Url
 	}
 
 	wg := sync.WaitGroup{}
@@ -347,8 +345,7 @@ func runRemoteCommandTest(t *testing.T, commandType string) {
 
 	go func() {
 		defer wg.Done()
-		exec, err := remotecommand.NewSPDYExecutor(&restclient.Config{}, "POST", reqURL)
-		require.NoError(t, err)
+		exec := remotecommand.NewWebSocketExecutor(&restclient.Config{}, "POST", reqURL)
 
 		opts := remotecommand.StreamOptions{
 			Stdin:  stdinR,
@@ -367,7 +364,7 @@ func runRemoteCommandTest(t *testing.T, commandType string) {
 	wg.Wait()
 
 	// Repeat request with the same URL should be a 404.
-	resp, err := http.Get(reqURL.String())
+	resp, err := http.Get(reqURL)
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
