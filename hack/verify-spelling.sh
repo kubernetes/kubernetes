@@ -26,7 +26,7 @@ export KUBE_ROOT
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 # Ensure that we find the binaries we build before anything else.
-export GOBIN="${KUBE_OUTPUT_BINPATH}"
+export GOBIN="${KUBE_OUTPUT_BIN}"
 PATH="${GOBIN}:${PATH}"
 
 # Install tools we need
