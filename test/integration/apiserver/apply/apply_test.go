@@ -34,7 +34,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	yamlutil "k8s.io/apimachinery/pkg/util/yaml"
@@ -44,28 +44,23 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/controlplane"
+	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
-// TODO(wojtek-t): Migrate to use testing.TestServer instead.
-func setup(t testing.TB, groupVersions ...schema.GroupVersion) (clientset.Interface, framework.CloseFunc) {
-	opts := framework.ControlPlaneConfigOptions{EtcdOptions: framework.DefaultEtcdOptions()}
-	opts.EtcdOptions.DefaultStorageMediaType = "application/vnd.kubernetes.protobuf"
-	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfigWithOptions(&opts)
-	if len(groupVersions) > 0 {
-		resourceConfig := controlplane.DefaultAPIResourceConfigSource()
-		resourceConfig.EnableVersions(groupVersions...)
-		controlPlaneConfig.ExtraConfig.APIResourceConfigSource = resourceConfig
-	}
-	controlPlaneConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
-	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
+func setup(t testing.TB) (clientset.Interface, kubeapiservertesting.TearDownFunc) {
+	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
 
-	clientSet, err := clientset.NewForConfig(&restclient.Config{Host: s.URL, QPS: -1})
+	config := restclient.CopyConfig(server.ClientConfig)
+	// There are some tests (in scale_test.go) that rely on the response to be returned in JSON.
+	// So we overwrite it here.
+	config.ContentType = runtime.ContentTypeJSON
+	clientSet, err := clientset.NewForConfig(config)
 	if err != nil {
 		t.Fatalf("Error in create clientset: %v", err)
 	}
-	return clientSet, closeFn
+	return clientSet, server.TearDownFn
 }
 
 // TestApplyAlsoCreates makes sure that PATCH requests with the apply content type
@@ -2812,15 +2807,13 @@ spec:
 }
 
 func TestStopTrackingManagedFieldsOnFeatureDisabled(t *testing.T) {
-	sharedEtcd := framework.DefaultEtcdOptions()
-	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfigWithOptions(&framework.ControlPlaneConfigOptions{
-		EtcdOptions: sharedEtcd,
-	})
-	controlPlaneConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
+	sharedEtcd := framework.SharedEtcd()
 
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
-	_, instanceConfig, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
-	client, err := clientset.NewForConfig(&restclient.Config{Host: instanceConfig.URL, QPS: -1})
+
+	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, sharedEtcd)
+	client, err := clientset.NewForConfig(server.ClientConfig)
 	if err != nil {
 		t.Fatalf("Error in create clientset: %v", err)
 	}
@@ -2870,14 +2863,15 @@ spec:
 	}
 
 	// Restart server with server-side apply disabled
-	closeFn()
+	server.TearDownFn()
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, false)()
-	_, instanceConfig, closeFn = framework.RunAnAPIServer(controlPlaneConfig)
-	client, err = clientset.NewForConfig(&restclient.Config{Host: instanceConfig.URL, QPS: -1})
+
+	server = kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, sharedEtcd)
+	defer server.TearDownFn()
+	client, err = clientset.NewForConfig(server.ClientConfig)
 	if err != nil {
 		t.Fatalf("Error in create clientset: %v", err)
 	}
-	defer closeFn()
 
 	_, err = client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
 		AbsPath("/apis/apps/v1").
