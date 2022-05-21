@@ -595,8 +595,17 @@ kube::golang::outfile_for_binary() {
 # Returns 0 if the binary can be built with coverage, 1 otherwise.
 # NB: this ignores whether coverage is globally enabled or not.
 kube::golang::is_instrumented_package() {
-  kube::util::array_contains "$1" "${KUBE_COVERAGE_INSTRUMENTED_PACKAGES[@]}"
-  return $?
+  if kube::util::array_contains "$1" "${KUBE_COVERAGE_INSTRUMENTED_PACKAGES[@]}"; then
+    return 0
+  fi
+  # Some cases, like `make kubectl`, pass $1 as "./cmd/kubectl" rather than
+  # "k8s.io/kubernetes/kubectl".  Try to normalize and handle that.  We don't
+  # do this always because it is a bit slow.
+  pkg=$(go list -find "$1")
+  if kube::util::array_contains "${pkg}" "${KUBE_COVERAGE_INSTRUMENTED_PACKAGES[@]}"; then
+    return 0
+  fi
+  return 1
 }
 
 # Argument: the name of a Kubernetes package (e.g. k8s.io/kubernetes/cmd/kube-scheduler)
