@@ -688,6 +688,8 @@ kube::golang::build_some_binaries() {
    fi
 }
 
+# Args:
+#  $1: platform (e.g. darwin/amd64)
 kube::golang::build_binaries_for_platform() {
   # This is for sanity.  Without it, user umasks can leak through.
   umask 0022
