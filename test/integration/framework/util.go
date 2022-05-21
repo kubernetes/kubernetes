@@ -66,6 +66,24 @@ func DeleteTestingNamespace(ns *v1.Namespace, t *testing.T) {
 	// cleaning up data they create has no impact.
 }
 
+// CreateNamespaceOrDie creates a namespace.
+func CreateNamespaceOrDie(c clientset.Interface, baseName string, t *testing.T) *v1.Namespace {
+	ns := &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: baseName}}
+	result, err := c.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create namespace: %v", err)
+	}
+	return result
+}
+
+// DeleteNamespaceOrDie deletes a namespace.
+func DeleteNamespaceOrDie(c clientset.Interface, ns *v1.Namespace, t *testing.T) {
+	err := c.CoreV1().Namespaces().Delete(context.TODO(), ns.Name, metav1.DeleteOptions{})
+	if err != nil {
+		t.Fatalf("Failed to delete namespace: %v", err)
+	}
+}
+
 // GetReadySchedulableNodes addresses the common use case of getting nodes you can do work on.
 // 1) Needs to be schedulable.
 // 2) Needs to be ready.
