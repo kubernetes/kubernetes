@@ -43,7 +43,7 @@ KUBE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 
 KUBE_OUTPUT_SUBPATH="${KUBE_OUTPUT_SUBPATH:-_output/local}"
 KUBE_OUTPUT="${KUBE_ROOT}/${KUBE_OUTPUT_SUBPATH}"
-KUBE_OUTPUT_BINPATH="${KUBE_OUTPUT}/bin"
+KUBE_OUTPUT_BIN="${KUBE_OUTPUT}/bin"
 
 # This controls rsync compression. Set to a value > 0 to enable rsync
 # compression for build container
@@ -66,7 +66,7 @@ source "${KUBE_ROOT}/hack/lib/version.sh"
 source "${KUBE_ROOT}/hack/lib/golang.sh"
 source "${KUBE_ROOT}/hack/lib/etcd.sh"
 
-KUBE_OUTPUT_HOSTBIN="${KUBE_OUTPUT_BINPATH}/$(kube::util::host_platform)"
+KUBE_OUTPUT_HOSTBIN="${KUBE_OUTPUT_BIN}/$(kube::util::host_platform)"
 export KUBE_OUTPUT_HOSTBIN
 
 # list of all available group versions.  This should be used when generated code
