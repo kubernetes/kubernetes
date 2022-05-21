@@ -130,7 +130,7 @@ func TestHasUsageStats(t *testing.T) {
 
 type fakeEvaluator struct{}
 
-func (fakeEvaluator) Evaluate(a admission.Attributes) error {
+func (fakeEvaluator) Evaluate(ctx context.Context, a admission.Attributes) error {
 	return errors.New("should not be called")
 }
 

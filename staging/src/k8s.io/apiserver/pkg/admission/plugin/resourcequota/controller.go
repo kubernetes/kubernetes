@@ -17,6 +17,7 @@ limitations under the License.
 package resourcequota
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"strings"
@@ -40,11 +41,18 @@ import (
 	"k8s.io/client-go/util/workqueue"
 )
 
+type contextKey string
+
+const (
+	// CtxKeyIsRollbackQuota uses Context to transfer rollback flag
+	CtxKeyIsRollbackQuota contextKey = "isRollbackQuota"
+)
+
 // Evaluator is used to see if quota constraints are satisfied.
 type Evaluator interface {
 	// Evaluate takes an operation and checks to see if quota constraints are satisfied.  It returns an error if they are not.
 	// The default implementation processes related operations in chunks when possible.
-	Evaluate(a admission.Attributes) error
+	Evaluate(ctx context.Context, a admission.Attributes) error
 }
 
 type quotaEvaluator struct {
@@ -80,6 +88,9 @@ type admissionWaiter struct {
 	attributes admission.Attributes
 	finished   chan struct{}
 	result     error
+
+	// rollback flag to handle quota update
+	isRollbackQuota bool
 }
 
 type defaultDeny struct{}
@@ -222,8 +233,17 @@ func (e *quotaEvaluator) checkQuotas(quotas []corev1.ResourceQuota, admissionAtt
 
 	atLeastOneChanged := false
 	for i := range admissionAttributes {
+		var (
+			newQuotas []corev1.ResourceQuota
+			err       error
+		)
 		admissionAttribute := admissionAttributes[i]
-		newQuotas, err := e.checkRequest(quotas, admissionAttribute.attributes)
+		if admissionAttribute.isRollbackQuota {
+			// rollback logic is implemented by updating the quotas status based on the current usage
+			newQuotas, err = e.getCurrentUsage(quotas)
+		} else {
+			newQuotas, err = e.checkRequest(quotas, admissionAttribute.attributes)
+		}
 		if err != nil {
 			admissionAttribute.result = err
 			continue
@@ -574,6 +594,29 @@ func CheckRequest(quotas []corev1.ResourceQuota, a admission.Attributes, evaluat
 	return outQuotas, nil
 }
 
+// getCurrentUsage gets current quotas usage
+func (e *quotaEvaluator) getCurrentUsage(quotas []corev1.ResourceQuota) ([]corev1.ResourceQuota, error) {
+	outQuotas, err := copyQuotas(quotas)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range outQuotas {
+		ns := outQuotas[i].Namespace
+		scopes := outQuotas[i].Spec.Scopes
+		hardLimits := outQuotas[i].Spec.Hard
+		scopeSelector := outQuotas[i].Spec.ScopeSelector
+
+		newUsage, err := quota.CalculateUsage(ns, scopes, hardLimits, e.registry, scopeSelector)
+		if err != nil {
+			return nil, err
+		}
+		outQuotas[i].Status.Used = newUsage
+	}
+
+	return outQuotas, nil
+}
+
 func getScopeSelectorsFromQuota(quota corev1.ResourceQuota) []corev1.ScopedResourceSelectorRequirement {
 	selectors := []corev1.ScopedResourceSelectorRequirement{}
 	for _, scope := range quota.Spec.Scopes {
@@ -589,7 +632,7 @@ func getScopeSelectorsFromQuota(quota corev1.ResourceQuota) []corev1.ScopedResou
 	return selectors
 }
 
-func (e *quotaEvaluator) Evaluate(a admission.Attributes) error {
+func (e *quotaEvaluator) Evaluate(ctx context.Context, a admission.Attributes) error {
 	e.init.Do(func() {
 		go e.run()
 	})
@@ -616,6 +659,10 @@ func (e *quotaEvaluator) Evaluate(a admission.Attributes) error {
 		return nil
 	}
 	waiter := newAdmissionWaiter(a)
+	// get rollback flag from Context
+	if isRollbackQuota, ok := ctx.Value(CtxKeyIsRollbackQuota).(bool); ok && isRollbackQuota {
+		waiter.isRollbackQuota = true
+	}
 
 	e.addWork(waiter)
 

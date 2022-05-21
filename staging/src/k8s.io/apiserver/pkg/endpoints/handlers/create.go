@@ -210,6 +210,10 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 					result, err = requestFunc()
 				}
 			}
+			// If err not nil, need to rollback the quota added by QuotaAdmission.
+			if err != nil {
+				rest.AdmissionToRollbackObjectQuotaFunc(admit, admissionAttributes, scope)
+			}
 			return result, err
 		})
 		trace.Step("Write to database call finished", utiltrace.Field{"len", len(body)}, utiltrace.Field{"err", err})

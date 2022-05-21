@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 
+	"k8s.io/apiserver/pkg/admission/plugin/resourcequota"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
@@ -212,6 +214,35 @@ func AdmissionToValidateObjectFunc(admit admission.Interface, staticAttributes a
 			staticAttributes.GetKind(),
 			staticAttributes.GetNamespace(),
 			name,
+			staticAttributes.GetResource(),
+			staticAttributes.GetSubresource(),
+			staticAttributes.GetOperation(),
+			staticAttributes.GetOperationOptions(),
+			staticAttributes.IsDryRun(),
+			staticAttributes.GetUserInfo(),
+		)
+		if !validatingAdmission.Handles(finalAttributes.GetOperation()) {
+			return nil
+		}
+		return validatingAdmission.Validate(ctx, finalAttributes, o)
+	}
+}
+
+// AdmissionToRollbackObjectQuotaFunc converts validating admission to a rest validate object func
+func AdmissionToRollbackObjectQuotaFunc(admit admission.Interface, staticAttributes admission.Attributes, o admission.ObjectInterfaces) ValidateObjectUpdateFunc {
+	validatingAdmission, ok := admit.(admission.ValidationInterface)
+	if !ok {
+		return func(ctx context.Context, obj, old runtime.Object) error { return nil }
+	}
+	return func(ctx context.Context, obj, old runtime.Object) error {
+		// use Context to transfer rollback flag
+		ctx = context.WithValue(ctx, resourcequota.CtxKeyIsRollbackQuota, true)
+		finalAttributes := admission.NewAttributesRecord(
+			obj,
+			old,
+			staticAttributes.GetKind(),
+			staticAttributes.GetNamespace(),
+			staticAttributes.GetName(),
 			staticAttributes.GetResource(),
 			staticAttributes.GetSubresource(),
 			staticAttributes.GetOperation(),

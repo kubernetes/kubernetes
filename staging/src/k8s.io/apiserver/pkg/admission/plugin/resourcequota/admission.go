@@ -143,7 +143,7 @@ func (a *QuotaAdmission) Validate(ctx context.Context, attr admission.Attributes
 	if attr.GetNamespace() == "" || isNamespaceCreation(attr) {
 		return nil
 	}
-	return a.evaluator.Evaluate(attr)
+	return a.evaluator.Evaluate(ctx, attr)
 }
 
 func isNamespaceCreation(attr admission.Attributes) bool {
