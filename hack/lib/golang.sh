@@ -691,10 +691,10 @@ kube::golang::setup_gomaxprocs() {
 }
 
 # This will take binaries from $GOPATH/bin and copy them to the appropriate
-# place in ${KUBE_OUTPUT_BINDIR}
+# place in ${KUBE_OUTPUT_BIN}
 #
 # Ideally this wouldn't be necessary and we could just set GOBIN to
-# KUBE_OUTPUT_BINDIR but that won't work in the face of cross compilation.  'go
+# KUBE_OUTPUT_BIN but that won't work in the face of cross compilation.  'go
 # install' will place binaries that match the host platform directly in $GOBIN
 # while placing cross compiled binaries into `platform_arch` subdirs.  This
 # complicates pretty much everything else we do around packaging and such.
@@ -712,14 +712,14 @@ kube::golang::place_bins() {
     if [[ "${platform}" == "${host_platform}" ]]; then
       platform_src=""
       rm -f "${THIS_PLATFORM_BIN}"
-      ln -s "${KUBE_OUTPUT_BINPATH}/${platform}" "${THIS_PLATFORM_BIN}"
+      ln -s "${KUBE_OUTPUT_BIN}/${platform}" "${THIS_PLATFORM_BIN}"
     fi
 
     local full_binpath_src="${KUBE_GOPATH}/bin${platform_src}"
     if [[ -d "${full_binpath_src}" ]]; then
-      mkdir -p "${KUBE_OUTPUT_BINPATH}/${platform}"
+      mkdir -p "${KUBE_OUTPUT_BIN}/${platform}"
       find "${full_binpath_src}" -maxdepth 1 -type f -exec \
-        rsync -pc {} "${KUBE_OUTPUT_BINPATH}/${platform}" \;
+        rsync -pc {} "${KUBE_OUTPUT_BIN}/${platform}" \;
     fi
   done
 }
