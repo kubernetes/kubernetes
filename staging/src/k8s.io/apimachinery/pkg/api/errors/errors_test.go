@@ -657,3 +657,49 @@ func TestStatusCauseSupportsWrappedErrors(t *testing.T) {
 		t.Errorf("expected cause when nested, got %v: %#v", ok, cause)
 	}
 }
+
+func BenchmarkIsAlreadyExistsWrappedErrors(b *testing.B) {
+	err := NewAlreadyExists(schema.GroupResource{}, "")
+	wrapped := fmt.Errorf("once: %w", err)
+
+	b.Run("Nil", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			IsAlreadyExists(nil)
+		}
+	})
+
+	b.Run("Bare", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			IsAlreadyExists(err)
+		}
+	})
+
+	b.Run("Wrapped", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			IsAlreadyExists(wrapped)
+		}
+	})
+}
+
+func BenchmarkIsNotFoundWrappedErrors(b *testing.B) {
+	err := NewNotFound(schema.GroupResource{}, "")
+	wrapped := fmt.Errorf("once: %w", err)
+
+	b.Run("Nil", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			IsNotFound(nil)
+		}
+	})
+
+	b.Run("Bare", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			IsNotFound(err)
+		}
+	})
+
+	b.Run("Wrapped", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			IsNotFound(wrapped)
+		}
+	})
+}
