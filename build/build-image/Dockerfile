@@ -34,7 +34,7 @@ ENV HOME=/go/src/k8s.io/kubernetes
 WORKDIR ${HOME}
 
 # Make output from the dockerized build go someplace else
-ENV KUBE_OUTPUT_SUBPATH=_output/dockerized
+ENV KUBE_BUILDNAME=dockerized
 
 # Pick up version stuff here as we don't copy our .git over.
 ENV KUBE_GIT_VERSION_FILE=${HOME}/.dockerized-kube-version-defs
