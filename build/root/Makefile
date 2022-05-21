@@ -485,7 +485,7 @@ else
 cross cross-in-a-container: KUBE_BUILD_CONFORMANCE = y
 cross:
 	hack/make-rules/cross.sh
-cross-in-a-container: KUBE_OUTPUT_SUBPATH = $(OUT_DIR)/dockerized
+cross-in-a-container: KUBE_BUILDNAME = dockerized
 cross-in-a-container:
 ifeq (,$(wildcard /.dockerenv))
 	echo -e "\nThe 'cross-in-a-container' target can only be used from within a docker container.\n"

@@ -34,9 +34,33 @@ export GO111MODULE=off
 # The root of the build/dist directory
 KUBE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 
-KUBE_OUTPUT_SUBPATH="${KUBE_OUTPUT_SUBPATH:-_output/local}"
-KUBE_OUTPUT="${KUBE_ROOT}/${KUBE_OUTPUT_SUBPATH}"
-KUBE_OUTPUT_BIN="${KUBE_OUTPUT}/bin"
+# Where output goes.  We should avoid redefining these anywhere else.
+#
+# KUBE_OUTPUT: the root directory (absolute) where this build should drop any
+#     files (subdirs are encouraged).
+# KUBE_OUTPUT_BIN: the directory in which compiled binaries will be placed,
+#     under OS/ARCH specific subdirs
+# THIS_PLATFORM_BIN: a symlink to the output directory for binaries built for
+#     the current host platform (e.g. build/test tools).
+#
+# Compat: The KUBE_OUTPUT_SUBPATH variable is sometimes passed in by callers.
+# If it is specified, we'll use it as we always have, and fall back on
+# compatible behavior.  Perhaps one day we can remove this.
+if [[ -n "${KUBE_OUTPUT_SUBPATH:-}" ]]; then
+    if [[ -n "${KUBE_BUILDNAME:-}" ]]; then
+        echo "ERROR: \$KUBE_OUTPUT_SUBPATH and \$KUBE_BUILDNAME are mutually exclusive"
+        exit 1
+    fi
+    export KUBE_OUTPUT="${KUBE_ROOT}/${KUBE_OUTPUT_SUBPATH}"
+    export THIS_PLATFORM_BIN="${KUBE_ROOT}/_output/bin"
+else
+    # The "name" of this build variety.
+    KUBE_BUILDNAME="${KUBE_BUILDNAME:-"local"}"
+    KUBE_OUTPUT_ROOT="${KUBE_ROOT}/_output"
+    export KUBE_OUTPUT="${KUBE_OUTPUT_ROOT}/${KUBE_BUILDNAME}"
+    export THIS_PLATFORM_BIN="${KUBE_OUTPUT_ROOT}/bin"
+fi
+export KUBE_OUTPUT_BIN="${KUBE_OUTPUT}/bin"
 
 # This controls rsync compression. Set to a value > 0 to enable rsync
 # compression for build container
@@ -45,9 +69,6 @@ KUBE_RSYNC_COMPRESS="${KUBE_RSYNC_COMPRESS:-0}"
 # Set no_proxy for localhost if behind a proxy, otherwise,
 # the connections to localhost in scripts will time out
 export no_proxy="127.0.0.1,localhost${no_proxy:+,${no_proxy}}"
-
-# This is a symlink to binaries for "this platform", e.g. build tools.
-export THIS_PLATFORM_BIN="${KUBE_ROOT}/_output/bin"
 
 source "${KUBE_ROOT}/hack/lib/util.sh"
 source "${KUBE_ROOT}/hack/lib/logging.sh"
@@ -58,9 +79,6 @@ kube::util::ensure-bash-version
 source "${KUBE_ROOT}/hack/lib/version.sh"
 source "${KUBE_ROOT}/hack/lib/golang.sh"
 source "${KUBE_ROOT}/hack/lib/etcd.sh"
-
-KUBE_OUTPUT_HOSTBIN="${KUBE_OUTPUT_BIN}/$(kube::util::host_platform)"
-export KUBE_OUTPUT_HOSTBIN
 
 # list of all available group versions.  This should be used when generated code
 # or when starting an API server that you want to have everything.
