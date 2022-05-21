@@ -70,7 +70,7 @@ fi
 # Start kube-apiserver
 # omit enums from static openapi snapshots used to generate clients until #109177 is resolved
 kube::log::status "Starting kube-apiserver"
-"${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
+"${THIS_PLATFORM_BIN}/kube-apiserver" \
   --bind-address="${API_HOST}" \
   --secure-port="${API_PORT}" \
   --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
