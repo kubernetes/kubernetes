@@ -104,8 +104,6 @@ func (swg *sampleAndWaterMarkObserverGenerator) Generate(initialNumerator, initi
 	return &sampleAndWaterMarkHistograms{
 		sampleAndWaterMarkObserverGenerator: swg,
 		labelValues:                         labelValues,
-		loLabelValues:                       append([]string{labelValueLo}, labelValues...),
-		hiLabelValues:                       append([]string{labelValueHi}, labelValues...),
 		denominator:                         initialDenominator,
 		sampleAndWaterMarkAccumulator: sampleAndWaterMarkAccumulator{
 			lastSet:    when,
@@ -114,7 +112,11 @@ func (swg *sampleAndWaterMarkObserverGenerator) Generate(initialNumerator, initi
 			ratio:      ratio,
 			loRatio:    ratio,
 			hiRatio:    ratio,
-		}}
+		},
+		samplesObserver:      swg.samples.WithLabelValues(labelValues...),
+		waterMarksLoObserver: swg.waterMarks.WithLabelValues(append([]string{labelValueLo}, labelValues...)...),
+		waterMarksHiObserver: swg.waterMarks.WithLabelValues(append([]string{labelValueHi}, labelValues...)...),
+	}
 }
 
 func (swg *sampleAndWaterMarkObserverGenerator) metrics() Registerables {
@@ -123,12 +125,15 @@ func (swg *sampleAndWaterMarkObserverGenerator) metrics() Registerables {
 
 type sampleAndWaterMarkHistograms struct {
 	*sampleAndWaterMarkObserverGenerator
-	labelValues                  []string
-	loLabelValues, hiLabelValues []string
+	labelValues []string
 
 	sync.Mutex
 	denominator float64
 	sampleAndWaterMarkAccumulator
+
+	samplesObserver      compbasemetrics.ObserverMetric
+	waterMarksLoObserver compbasemetrics.ObserverMetric
+	waterMarksHiObserver compbasemetrics.ObserverMetric
 }
 
 type sampleAndWaterMarkAccumulator struct {
@@ -200,9 +205,9 @@ func (saw *sampleAndWaterMarkHistograms) innerSet(updateNumeratorOrDenominator f
 		klog.Errorf("Time went backwards from %s to %s for labelValues=%#+v", lastSetS, whenS, saw.labelValues)
 	}
 	for acc.lastSetInt < whenInt {
-		saw.samples.WithLabelValues(saw.labelValues...).Observe(acc.ratio)
-		saw.waterMarks.WithLabelValues(saw.loLabelValues...).Observe(acc.loRatio)
-		saw.waterMarks.WithLabelValues(saw.hiLabelValues...).Observe(acc.hiRatio)
+		saw.samplesObserver.Observe(acc.ratio)
+		saw.waterMarksLoObserver.Observe(acc.loRatio)
+		saw.waterMarksHiObserver.Observe(acc.hiRatio)
 		acc.lastSetInt++
 		acc.loRatio, acc.hiRatio = acc.ratio, acc.ratio
 	}
