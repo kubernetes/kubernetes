@@ -201,6 +201,12 @@ type KubeletConfiguration struct {
 	// image garbage collection is never run. Lowest disk usage to garbage
 	// collect to. The percent is calculated as this field value out of 100.
 	ImageGCLowThresholdPercent int32
+	// imageGCConfig is the configuration file used to control the behavior of the
+	// image GC manager. This configuration file can be used to exempt images from
+	// getting GC'ed once the image GC threshold configuration have been met. This
+	// file enables you to safe guard system critical images from getting GC'ed by
+	// kubelet.
+	ImageGCConfig string
 	// How frequently to calculate and cache volume disk usage for all pods
 	VolumeStatsAggPeriod metav1.Duration
 	// KubeletCgroups is the absolute name of cgroups to isolate the kubelet in

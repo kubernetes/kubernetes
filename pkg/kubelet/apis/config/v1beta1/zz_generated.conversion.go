@@ -397,6 +397,7 @@ func autoConvert_v1beta1_KubeletConfiguration_To_config_KubeletConfiguration(in 
 	if err := v1.Convert_Pointer_int32_To_int32(&in.ImageGCLowThresholdPercent, &out.ImageGCLowThresholdPercent, s); err != nil {
 		return err
 	}
+	out.ImageGCConfig = in.ImageGCConfig
 	out.VolumeStatsAggPeriod = in.VolumeStatsAggPeriod
 	out.KubeletCgroups = in.KubeletCgroups
 	out.SystemCgroups = in.SystemCgroups
@@ -573,6 +574,7 @@ func autoConvert_config_KubeletConfiguration_To_v1beta1_KubeletConfiguration(in 
 	if err := v1.Convert_int32_To_Pointer_int32(&in.ImageGCLowThresholdPercent, &out.ImageGCLowThresholdPercent, s); err != nil {
 		return err
 	}
+	out.ImageGCConfig = in.ImageGCConfig
 	out.VolumeStatsAggPeriod = in.VolumeStatsAggPeriod
 	out.KubeletCgroups = in.KubeletCgroups
 	out.SystemCgroups = in.SystemCgroups

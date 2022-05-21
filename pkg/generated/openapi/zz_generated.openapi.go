@@ -52844,6 +52844,13 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							Format:      "int32",
 						},
 					},
+					"imageGCConfig": {
+						SchemaProps: spec.SchemaProps{
+							Description: "imageGCConfig is the configuration file used to control the behavior of the image GC manager. This configuration file can be used to exempt images from getting GC'ed once the image GC threshold configuration have been met. This file enables you to safe guard system critical images from getting GC'ed by kubelet. Default: \"\"",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 					"volumeStatsAggPeriod": {
 						SchemaProps: spec.SchemaProps{
 							Description: "volumeStatsAggPeriod is the frequency for calculating and caching volume disk usage for all pods. Default: \"1m\"",

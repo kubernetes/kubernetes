@@ -304,6 +304,14 @@ type KubeletConfiguration struct {
 	// Default: 80
 	// +optional
 	ImageGCLowThresholdPercent *int32 `json:"imageGCLowThresholdPercent,omitempty"`
+	// imageGCConfig is the configuration file used to control the behavior of the
+	// image GC manager. This configuration file can be used to exempt images from
+	// getting GC'ed once the image GC threshold configuration have been met. This
+	// file enables you to safe guard system critical images from getting GC'ed by
+	// kubelet.
+	// Default: ""
+	// +optional
+	ImageGCConfig string `json:"imageGCConfig,omitempty"`
 	// volumeStatsAggPeriod is the frequency for calculating and caching volume
 	// disk usage for all pods.
 	// Default: "1m"

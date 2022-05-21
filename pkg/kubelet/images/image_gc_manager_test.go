@@ -18,6 +18,8 @@ package images
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -203,6 +205,39 @@ func TestDeleteUnusedImagesExemptSandboxImage(t *testing.T) {
 	err := manager.DeleteUnusedImages()
 	assert := assert.New(t)
 	assert.Len(fakeRuntime.ImageList, 1)
+	require.NoError(t, err)
+}
+
+func TestDeleteExemptedImage(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	mockStatsProvider := statstest.NewMockProvider(mockCtrl)
+	dir, err := os.Getwd()
+	if err != nil {
+		t.Fail()
+	}
+	manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{
+		ImageGCConfig: filepath.Join(dir, "testdata", "gc-exempt-config.yaml"),
+	}, mockStatsProvider)
+	fakeRuntime.ImageList = []container.Image{
+		{
+			ID:   "sha256:1",
+			Size: 256,
+		},
+		{
+			ID:   "sha256:4",
+			Size: 256,
+		},
+		{
+			ID: "sha256:3",
+			RepoTags: []string{
+				"image1:tag1",
+			},
+		},
+	}
+	manager.loadImageExemptionCache()
+	err = manager.DeleteUnusedImages()
+	assert := assert.New(t)
+	assert.Len(fakeRuntime.ImageList, 2)
 	require.NoError(t, err)
 }
 

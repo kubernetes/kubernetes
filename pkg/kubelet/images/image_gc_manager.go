@@ -17,19 +17,23 @@ limitations under the License.
 package images
 
 import (
+	"bytes"
 	goerrors "errors"
 	"fmt"
 	"math"
+	"os"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 
-	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/tools/record"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/container"
@@ -73,6 +77,15 @@ type ImageGCPolicy struct {
 
 	// Minimum age at which an image can be garbage collected.
 	MinAge time.Duration
+
+	// Configuration file used to control the images getting GC'ed by providing an optional
+	// exemption list
+	ImageGCConfig string
+}
+
+type imageGCConfig struct {
+	ExemptByID  []string `json:"exemptByID"`
+	ExemptByTag []string `json:"exemptByTag"`
 }
 
 type realImageGCManager struct {
@@ -103,6 +116,10 @@ type realImageGCManager struct {
 
 	// sandbox image exempted from GC
 	sandboxImage string
+
+	exemptedIDs map[string]bool
+
+	exemptedTags map[string]bool
 }
 
 // imageCache caches latest result of ListImages.
@@ -149,6 +166,8 @@ type imageRecord struct {
 
 	// Pinned status of the image
 	pinned bool
+
+	exempted bool
 }
 
 // NewImageGCManager instantiates a new ImageGCManager object.
@@ -163,6 +182,7 @@ func NewImageGCManager(runtime container.Runtime, statsProvider StatsProvider, r
 	if policy.LowThresholdPercent > policy.HighThresholdPercent {
 		return nil, fmt.Errorf("LowThresholdPercent %d can not be higher than HighThresholdPercent %d", policy.LowThresholdPercent, policy.HighThresholdPercent)
 	}
+
 	im := &realImageGCManager{
 		runtime:       runtime,
 		policy:        policy,
@@ -172,12 +192,46 @@ func NewImageGCManager(runtime container.Runtime, statsProvider StatsProvider, r
 		nodeRef:       nodeRef,
 		initialized:   false,
 		sandboxImage:  sandboxImage,
+		exemptedIDs:   make(map[string]bool),
+		exemptedTags:  make(map[string]bool),
 	}
 
 	return im, nil
 }
 
+func (im *realImageGCManager) loadImageExemptionCache() {
+	exemptedIDs := map[string]bool{}
+	exemptedTags := map[string]bool{}
+	if im.policy.ImageGCConfig != "" {
+		klog.InfoS("Loading ImageGCConfig file to ensure controlled GC of images from kubelet", "path", im.policy.ImageGCConfig)
+		data, err := os.ReadFile(im.policy.ImageGCConfig)
+		if err != nil {
+			klog.ErrorS(err, "failed to load ImageGCConfig file for controlling image GC")
+			return
+		}
+		decoder := yaml.NewYAMLOrJSONDecoder(bytes.NewReader(data), 1024)
+		config := &imageGCConfig{}
+		err = decoder.Decode(config)
+		if err != nil {
+			klog.ErrorS(err, "failed to load ImageGCConfig file for controlling image GC")
+			return
+		}
+		for _, id := range config.ExemptByID {
+			if !strings.HasPrefix(id, "sha256:") {
+				id = fmt.Sprintf("sha256:%s", id)
+			}
+			exemptedIDs[id] = true
+		}
+		for _, tag := range config.ExemptByTag {
+			exemptedTags[tag] = true
+		}
+	}
+	im.exemptedIDs = exemptedIDs
+	im.exemptedTags = exemptedTags
+}
+
 func (im *realImageGCManager) Start() {
+	im.loadImageExemptionCache()
 	go wait.Until(func() {
 		// Initial detection make detected time "unknown" in the past.
 		var ts time.Time
@@ -263,6 +317,19 @@ func (im *realImageGCManager) detectImages(detectTime time.Time) (sets.String, e
 
 		klog.V(5).InfoS("Image ID is pinned", "imageID", image.ID, "pinned", image.Pinned)
 		im.imageRecords[image.ID].pinned = image.Pinned
+
+		if _, ok := im.exemptedIDs[image.ID]; ok {
+			klog.V(5).InfoS("Image ID is exempted", "imageID", image.ID)
+			im.imageRecords[image.ID].exempted = true
+		}
+
+		for _, tag := range image.RepoTags {
+			if _, ok := im.exemptedTags[tag]; ok {
+				klog.V(5).InfoS("Image ID is exempted by tag match", "imageID", image.ID)
+				im.imageRecords[image.ID].exempted = true
+				break
+			}
+		}
 	}
 
 	// Remove old images from our records.
@@ -355,8 +422,14 @@ func (im *realImageGCManager) freeSpace(bytesToFree int64, freeTime time.Time) (
 		if record.pinned {
 			klog.V(5).InfoS("Image is pinned, skipping garbage collection", "imageID", image)
 			continue
-
 		}
+
+		// check if the image is exempted by the GC workflow
+		if record.exempted {
+			klog.V(5).InfoS("Image is marked as exempted. skipping garbage collection", "imageID", image)
+			continue
+		}
+
 		images = append(images, evictionInfo{
 			id:          image,
 			imageRecord: *record,

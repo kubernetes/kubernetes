@@ -1,0 +1,6 @@
+exemptByTag:
+- image1:tag1
+- image2:tag2
+exemptByID:
+- "1"
+- "2"
