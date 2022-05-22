@@ -135,7 +135,7 @@ func DeepHashObjectToString(objectToWrite interface{}) string {
 	return hex.EncodeToString(hasher.Sum(nil)[0:])
 }
 
-// ShouldPodBeInEndpointSlice returns true if a specified pod should be in an EndpointSlice object.
+// ShouldPodBeInEndpointSlice returns true if a specified pod should be in an Endpoint or EndpointSlice object.
 // Terminating pods are only included if includeTerminating is true
 func ShouldPodBeInEndpointSlice(pod *v1.Pod, includeTerminating bool) bool {
 	// "Terminal" describes when a Pod is complete (in a succeeded or failed phase).
