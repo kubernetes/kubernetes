@@ -298,7 +298,49 @@ var _ = SIGDescribe("Pods Extended", func() {
 				}
 			}
 		})
+
+		ginkgo.It("evicted pods should be terminal", func() {
+			ginkgo.By("creating the pod that should be evicted")
+
+			name := "pod-should-be-evicted" + string(uuid.NewUUID())
+			image := imageutils.GetE2EImage(imageutils.BusyBox)
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: name,
+				},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyOnFailure,
+					Containers: []v1.Container{
+						{
+							Name:  "bar",
+							Image: image,
+							Command: []string{
+								"/bin/sh", "-c", "sleep 10; fallocate -l 10M file; sleep 10000",
+							},
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									"ephemeral-storage": resource.MustParse("5Mi"),
+								},
+							}},
+					},
+				},
+			}
+
+			ginkgo.By("submitting the pod to kubernetes")
+			podClient.Create(pod)
+			defer func() {
+				ginkgo.By("deleting the pod")
+				podClient.Delete(context.TODO(), pod.Name, metav1.DeleteOptions{})
+			}()
+
+			err := e2epod.WaitForPodTerminatedInNamespace(f.ClientSet, pod.Name, "Evicted", f.Namespace.Name)
+			if err != nil {
+				framework.Failf("error waiting for pod to be evicted: %v", err)
+			}
+
+		})
 	})
+
 })
 
 func createAndTestPodRepeatedly(workers, iterations int, scenario podScenario, podClient v1core.PodInterface) {
