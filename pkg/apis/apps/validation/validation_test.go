@@ -33,6 +33,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
 )
@@ -1405,7 +1406,7 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 			testCase.old.ObjectMeta.ResourceVersion = "1"
 			testCase.update.ObjectMeta.ResourceVersion = "1"
 
-			errs := ValidateStatefulSetUpdate(&testCase.update, &testCase.old)
+			errs := ValidateStatefulSetUpdate(&testCase.update, &testCase.old, apivalidation.PodValidationOptions{})
 			wantErrs := testCase.errs
 			if diff := cmp.Diff(wantErrs, errs, cmpOpts...); diff != "" {
 				t.Errorf("Unexpected validation errors (-want,+got):\n%s", diff)
