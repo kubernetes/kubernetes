@@ -72,10 +72,10 @@ func TestValidateStatefulSet(t *testing.T) {
 	invalidPodTemplate2 := api.PodTemplate{
 		Template: api.PodTemplateSpec{
 			ObjectMeta: metav1.ObjectMeta{
-				Labels: map[string]string{"foo": "bar"},
+				Labels: validLabels,
 			},
 			Spec: api.PodSpec{
-				RestartPolicy:         api.RestartPolicyOnFailure,
+				RestartPolicy:         api.RestartPolicyAlways,
 				DNSPolicy:             api.DNSClusterFirst,
 				ActiveDeadlineSeconds: &invalidTime,
 			},
@@ -236,7 +236,7 @@ func TestValidateStatefulSet(t *testing.T) {
 			},
 			errs: field.ErrorList{
 				field.Required(field.NewPath("spec", "selector"), ""),
-				field.Invalid(field.NewPath("spec", "template", "metadata", "labels"), nil, ""),
+				field.Invalid(field.NewPath("spec", "template", "metadata", "labels"), nil, ""), // selector is empty, labels are not, so select doesn't match labels
 			},
 		},
 		{
@@ -255,21 +255,6 @@ func TestValidateStatefulSet(t *testing.T) {
 			},
 		},
 		{
-			name: "invalid manifest",
-			set: apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy: apps.OrderedReadyPodManagement,
-					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
-					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-				},
-			},
-			errs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "template", "metadata", "labels"), nil, ""),
-				field.NotSupported(field.NewPath("spec", "template", "spec", "restartPolicy"), nil, nil),
-			},
-		},
-		{
 			name: "negative_replicas",
 			set: apps.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
@@ -277,13 +262,12 @@ func TestValidateStatefulSet(t *testing.T) {
 					PodManagementPolicy: apps.OrderedReadyPodManagement,
 					Replicas:            -1,
 					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+					Template:            validPodTemplate.Template,
 					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
 				},
 			},
 			errs: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "replicas"), nil, ""),
-				field.Invalid(field.NewPath("spec", "template", "metadata", "labels"), nil, ""),
-				field.NotSupported(field.NewPath("spec", "template", "spec", "restartPolicy"), nil, nil),
 			},
 		},
 		{
@@ -319,15 +303,15 @@ func TestValidateStatefulSet(t *testing.T) {
 				},
 				Spec: apps.StatefulSetSpec{
 					PodManagementPolicy: apps.OrderedReadyPodManagement,
+					Selector:            &metav1.LabelSelector{MatchLabels: invalidLabels},
 					Template:            invalidPodTemplate.Template,
 					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
 				},
 			},
 			errs: field.ErrorList{
 				field.Invalid(field.NewPath("metadata", "labels"), nil, ""),
-				field.Required(field.NewPath("spec", "selector"), ""),
-				field.Invalid(field.NewPath("spec", "template", "labels"), nil, ""),
-				field.Invalid(field.NewPath("spec", "template", "metadata", "labels"), nil, ""),
+				field.Invalid(field.NewPath("spec", "selector"), nil, ""),
+				field.Invalid(field.NewPath("spec", "selector", "matchLabels"), nil, ""),
 			},
 		},
 		{
@@ -393,6 +377,32 @@ func TestValidateStatefulSet(t *testing.T) {
 							RestartPolicy: api.RestartPolicyNever,
 							DNSPolicy:     api.DNSClusterFirst,
 							Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: validLabels,
+						},
+					},
+					UpdateStrategy: apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+				},
+			},
+			errs: field.ErrorList{
+				field.NotSupported(field.NewPath("spec", "template", "spec", "restartPolicy"), nil, nil),
+			},
+		},
+		{
+			name: "empty restart policy",
+			set: apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "abc-123",
+					Namespace: metav1.NamespaceDefault,
+				},
+				Spec: apps.StatefulSetSpec{
+					PodManagementPolicy: apps.OrderedReadyPodManagement,
+					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+					Template: api.PodTemplateSpec{
+						Spec: api.PodSpec{
+							DNSPolicy:  api.DNSClusterFirst,
+							Containers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 						},
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: validLabels,
@@ -512,7 +522,7 @@ func TestValidateStatefulSet(t *testing.T) {
 			set: apps.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
 				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy: "foo",
+					PodManagementPolicy: apps.OrderedReadyPodManagement,
 					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
 					Template:            invalidPodTemplate2.Template,
 					Replicas:            3,
@@ -520,10 +530,7 @@ func TestValidateStatefulSet(t *testing.T) {
 				},
 			},
 			errs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "podManagementPolicy"), nil, ""),
-				field.Invalid(field.NewPath("spec", "template", "metadata", "labels"), nil, ""),
 				field.Forbidden(field.NewPath("spec", "template", "spec", "activeDeadlineSeconds"), ""),
-				field.NotSupported(field.NewPath("spec", "template", "spec", "restartPolicy"), nil, nil),
 			},
 		},
 		{
@@ -549,7 +556,8 @@ func TestValidateStatefulSet(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
 				Spec: apps.StatefulSetSpec{
 					PersistentVolumeClaimRetentionPolicy: &apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
-						WhenScaled: apps.PersistentVolumeClaimRetentionPolicyType("invalid-delete-policy"),
+						WhenScaled:  apps.PersistentVolumeClaimRetentionPolicyType("invalid-retention-policy"),
+						WhenDeleted: apps.PersistentVolumeClaimRetentionPolicyType("invalid-retention-policy"),
 					},
 					PodManagementPolicy: apps.OrderedReadyPodManagement,
 					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
