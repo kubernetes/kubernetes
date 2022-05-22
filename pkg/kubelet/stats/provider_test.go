@@ -48,6 +48,7 @@ const (
 	offsetMemMajorPageFaults
 	offsetMemUsageBytes
 	offsetMemRSSBytes
+	offsetMemSwapBytes
 	offsetMemWorkingSetBytes
 	offsetNetRxBytes
 	offsetNetRxErrors
@@ -489,6 +490,7 @@ func getTestContainerInfo(seed int, podName string, podNamespace string, contain
 			Usage:      uint64(seed + offsetMemUsageBytes),
 			WorkingSet: uint64(seed + offsetMemWorkingSetBytes),
 			RSS:        uint64(seed + offsetMemRSSBytes),
+			Swap:       uint64(seed + offsetMemSwapBytes),
 			ContainerData: cadvisorapiv1.MemoryStatsMemoryData{
 				Pgfault:    uint64(seed + offsetMemPageFaults),
 				Pgmajfault: uint64(seed + offsetMemMajorPageFaults),
@@ -647,29 +649,6 @@ func checkNetworkStats(t *testing.T, label string, seed int, stats *statsapi.Net
 
 }
 
-// container which had no stats should have zero-valued CPU usage
-func checkEmptyCPUStats(t *testing.T, label string, seed int, stats *statsapi.CPUStats) {
-	require.NotNil(t, stats.Time, label+".CPU.Time")
-	require.NotNil(t, stats.UsageNanoCores, label+".CPU.UsageNanoCores")
-	require.NotNil(t, stats.UsageNanoCores, label+".CPU.UsageCoreSeconds")
-	assert.EqualValues(t, testTime(timestamp, seed).Unix(), stats.Time.Time.Unix(), label+".CPU.Time")
-	assert.EqualValues(t, 0, *stats.UsageNanoCores, label+".CPU.UsageCores")
-	assert.EqualValues(t, 0, *stats.UsageCoreNanoSeconds, label+".CPU.UsageCoreSeconds")
-}
-
-// container which had no stats should have zero-valued Memory usage
-func checkEmptyMemoryStats(t *testing.T, label string, seed int, info cadvisorapiv2.ContainerInfo, stats *statsapi.MemoryStats) {
-	assert.EqualValues(t, testTime(timestamp, seed).Unix(), stats.Time.Time.Unix(), label+".Mem.Time")
-	require.NotNil(t, stats.WorkingSetBytes, label+".Mem.WorkingSetBytes")
-	assert.EqualValues(t, 0, *stats.WorkingSetBytes, label+".Mem.WorkingSetBytes")
-	assert.Nil(t, stats.UsageBytes, label+".Mem.UsageBytes")
-	assert.Nil(t, stats.RSSBytes, label+".Mem.RSSBytes")
-	assert.Nil(t, stats.SwapBytes, label+".Mem.SwapBytes")
-	assert.Nil(t, stats.PageFaults, label+".Mem.PageFaults")
-	assert.Nil(t, stats.MajorPageFaults, label+".Mem.MajorPageFaults")
-	assert.Nil(t, stats.AvailableBytes, label+".Mem.AvailableBytes")
-}
-
 func checkCPUStats(t *testing.T, label string, seed int, stats *statsapi.CPUStats) {
 	require.NotNil(t, stats.Time, label+".CPU.Time")
 	require.NotNil(t, stats.UsageNanoCores, label+".CPU.UsageNanoCores")
@@ -684,6 +663,7 @@ func checkMemoryStats(t *testing.T, label string, seed int, info cadvisorapiv2.C
 	assert.EqualValues(t, seed+offsetMemUsageBytes, *stats.UsageBytes, label+".Mem.UsageBytes")
 	assert.EqualValues(t, seed+offsetMemWorkingSetBytes, *stats.WorkingSetBytes, label+".Mem.WorkingSetBytes")
 	assert.EqualValues(t, seed+offsetMemRSSBytes, *stats.RSSBytes, label+".Mem.RSSBytes")
+	assert.EqualValues(t, seed+offsetMemSwapBytes, stats.SwapBytes, label+".Mem.SwapBytes")
 	assert.EqualValues(t, seed+offsetMemPageFaults, *stats.PageFaults, label+".Mem.PageFaults")
 	assert.EqualValues(t, seed+offsetMemMajorPageFaults, *stats.MajorPageFaults, label+".Mem.MajorPageFaults")
 	if !info.Spec.HasMemory || isMemoryUnlimited(info.Spec.Memory.Limit) {
