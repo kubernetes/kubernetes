@@ -206,7 +206,7 @@ func TestValidateStatefulSet(t *testing.T) {
 				},
 			},
 			errs: field.ErrorList{
-				nil, // to be filled
+				field.Required(field.NewPath("metadata", "name"), ""),
 			},
 		},
 		{
@@ -221,7 +221,7 @@ func TestValidateStatefulSet(t *testing.T) {
 				},
 			},
 			errs: field.ErrorList{
-				nil, // to be filled
+				field.Required(field.NewPath("metadata", "namespace"), ""),
 			},
 		},
 		{
@@ -235,7 +235,8 @@ func TestValidateStatefulSet(t *testing.T) {
 				},
 			},
 			errs: field.ErrorList{
-				nil, // to be filled
+				field.Required(field.NewPath("spec", "selector"), ""),
+				field.Invalid(field.NewPath("spec", "template", "metadata", "labels"), nil, ""),
 			},
 		},
 		{
@@ -250,7 +251,7 @@ func TestValidateStatefulSet(t *testing.T) {
 				},
 			},
 			errs: field.ErrorList{
-				nil, // to be filled
+				field.Invalid(field.NewPath("spec", "template", "metadata", "labels"), nil, ""),
 			},
 		},
 		{
@@ -264,7 +265,8 @@ func TestValidateStatefulSet(t *testing.T) {
 				},
 			},
 			errs: field.ErrorList{
-				nil, // to be filled
+				field.Invalid(field.NewPath("spec", "template", "metadata", "labels"), nil, ""),
+				field.NotSupported(field.NewPath("spec", "template", "spec", "restartPolicy"), nil, nil),
 			},
 		},
 		{
@@ -279,7 +281,9 @@ func TestValidateStatefulSet(t *testing.T) {
 				},
 			},
 			errs: field.ErrorList{
-				nil, // to be filled
+				field.Invalid(field.NewPath("spec", "replicas"), nil, ""),
+				field.Invalid(field.NewPath("spec", "template", "metadata", "labels"), nil, ""),
+				field.NotSupported(field.NewPath("spec", "template", "spec", "restartPolicy"), nil, nil),
 			},
 		},
 		{
@@ -300,7 +304,7 @@ func TestValidateStatefulSet(t *testing.T) {
 				},
 			},
 			errs: field.ErrorList{
-				nil, // to be filled
+				field.Invalid(field.NewPath("metadata", "labels"), nil, ""),
 			},
 		},
 		{
@@ -320,7 +324,10 @@ func TestValidateStatefulSet(t *testing.T) {
 				},
 			},
 			errs: field.ErrorList{
-				nil, // to be filled
+				field.Invalid(field.NewPath("metadata", "labels"), nil, ""),
+				field.Required(field.NewPath("spec", "selector"), ""),
+				field.Invalid(field.NewPath("spec", "template", "labels"), nil, ""),
+				field.Invalid(field.NewPath("spec", "template", "metadata", "labels"), nil, ""),
 			},
 		},
 		{
@@ -341,7 +348,7 @@ func TestValidateStatefulSet(t *testing.T) {
 				},
 			},
 			errs: field.ErrorList{
-				nil, // to be filled
+				field.Invalid(field.NewPath("metadata", "annotations"), nil, ""),
 			},
 		},
 		{
@@ -368,7 +375,7 @@ func TestValidateStatefulSet(t *testing.T) {
 				},
 			},
 			errs: field.ErrorList{
-				nil, // to be filled
+				field.NotSupported(field.NewPath("spec", "template", "spec", "restartPolicy"), nil, nil),
 			},
 		},
 		{
@@ -395,7 +402,7 @@ func TestValidateStatefulSet(t *testing.T) {
 				},
 			},
 			errs: field.ErrorList{
-				nil, // to be filled
+				field.NotSupported(field.NewPath("spec", "template", "spec", "restartPolicy"), nil, nil),
 			},
 		},
 		{
@@ -411,7 +418,7 @@ func TestValidateStatefulSet(t *testing.T) {
 				},
 			},
 			errs: field.ErrorList{
-				nil, // to be filled
+				field.Invalid(field.NewPath("spec", "updateStrategy"), nil, ""),
 			},
 		},
 		{
@@ -427,7 +434,7 @@ func TestValidateStatefulSet(t *testing.T) {
 				},
 			},
 			errs: field.ErrorList{
-				nil, // to be filled
+				field.Required(field.NewPath("spec", "updateStrategy"), ""),
 			},
 		},
 		{
@@ -446,7 +453,7 @@ func TestValidateStatefulSet(t *testing.T) {
 				},
 			},
 			errs: field.ErrorList{
-				nil, // to be filled
+				field.Invalid(field.NewPath("spec", "updateStrategy", "rollingUpdate"), nil, ""),
 			},
 		},
 		{
@@ -465,7 +472,7 @@ func TestValidateStatefulSet(t *testing.T) {
 				},
 			},
 			errs: field.ErrorList{
-				nil, // to be filled
+				field.Invalid(field.NewPath("spec", "updateStrategy", "rollingUpdate", "partition"), nil, ""),
 			},
 		},
 		{
@@ -481,7 +488,7 @@ func TestValidateStatefulSet(t *testing.T) {
 				},
 			},
 			errs: field.ErrorList{
-				nil, // to be filled
+				field.Required(field.NewPath("spec", "podManagementPolicy"), ""),
 			},
 		},
 		{
@@ -497,7 +504,7 @@ func TestValidateStatefulSet(t *testing.T) {
 				},
 			},
 			errs: field.ErrorList{
-				nil, // to be filled
+				field.Invalid(field.NewPath("spec", "podManagementPolicy"), nil, ""),
 			},
 		},
 		{
@@ -513,7 +520,10 @@ func TestValidateStatefulSet(t *testing.T) {
 				},
 			},
 			errs: field.ErrorList{
-				nil, // to be filled
+				field.Invalid(field.NewPath("spec", "podManagementPolicy"), nil, ""),
+				field.Invalid(field.NewPath("spec", "template", "metadata", "labels"), nil, ""),
+				field.Forbidden(field.NewPath("spec", "template", "spec", "activeDeadlineSeconds"), ""),
+				field.NotSupported(field.NewPath("spec", "template", "spec", "restartPolicy"), nil, nil),
 			},
 		},
 		{
@@ -529,7 +539,8 @@ func TestValidateStatefulSet(t *testing.T) {
 				},
 			},
 			errs: field.ErrorList{
-				nil, // to be filled
+				field.NotSupported(field.NewPath("spec", "persistentVolumeClaimRetentionPolicy", "whenDeleted"), nil, nil),
+				field.NotSupported(field.NewPath("spec", "persistentVolumeClaimRetentionPolicy", "whenScaled"), nil, nil),
 			},
 		},
 		{
@@ -547,7 +558,8 @@ func TestValidateStatefulSet(t *testing.T) {
 				},
 			},
 			errs: field.ErrorList{
-				nil, // to be filled
+				field.NotSupported(field.NewPath("spec", "persistentVolumeClaimRetentionPolicy", "whenDeleted"), nil, nil),
+				field.NotSupported(field.NewPath("spec", "persistentVolumeClaimRetentionPolicy", "whenScaled"), nil, nil),
 			},
 		},
 		{
@@ -568,7 +580,7 @@ func TestValidateStatefulSet(t *testing.T) {
 				},
 			},
 			errs: field.ErrorList{
-				nil, // to be filled
+				field.Invalid(field.NewPath("spec", "updateStrategy", "rollingUpdate", "maxUnavailable"), nil, ""),
 			},
 		},
 		{
@@ -589,7 +601,7 @@ func TestValidateStatefulSet(t *testing.T) {
 				},
 			},
 			errs: field.ErrorList{
-				nil, // to be filled
+				field.Invalid(field.NewPath("spec", "updateStrategy", "rollingUpdate", "maxUnavailable"), nil, ""),
 			},
 		},
 		{
@@ -610,7 +622,7 @@ func TestValidateStatefulSet(t *testing.T) {
 				},
 			},
 			errs: field.ErrorList{
-				nil, // to be filled
+				field.Invalid(field.NewPath("spec", "updateStrategy", "rollingUpdate", "maxUnavailable"), nil, ""),
 			},
 		},
 	}
@@ -1080,7 +1092,8 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 				},
 			},
 			errs: field.ErrorList{
-				nil, // to be filled
+				field.Invalid(field.NewPath("metadata", "name"), nil, ""),
+				field.Forbidden(field.NewPath("spec"), ""),
 			},
 		},
 		{
@@ -1102,9 +1115,9 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 					UpdateStrategy: apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
 				},
 			},
-			errs: field.ErrorList{
-				nil, // to be filled
-			},
+			// this case doesn't return any errors after doing
+			// testCase.old.ObjectMeta.ResourceVersion = "1"
+			// testCase.update.ObjectMeta.ResourceVersion = "1"
 		},
 		{
 			name: "invalid pod creation policy",
@@ -1127,7 +1140,7 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 				},
 			},
 			errs: field.ErrorList{
-				nil, // to be filled
+				field.Forbidden(field.NewPath("spec"), ""),
 			},
 		},
 		{
@@ -1151,7 +1164,8 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 				},
 			},
 			errs: field.ErrorList{
-				nil, // to be filled
+				field.Invalid(field.NewPath("metadata", "name"), nil, ""),
+				field.Forbidden(field.NewPath("spec"), ""),
 			},
 		},
 		{
@@ -1175,7 +1189,8 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 				},
 			},
 			errs: field.ErrorList{
-				nil, // to be filled
+				field.Invalid(field.NewPath("metadata", "name"), nil, ""),
+				field.Forbidden(field.NewPath("spec"), ""),
 			},
 		},
 		{
@@ -1198,7 +1213,8 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 				},
 			},
 			errs: field.ErrorList{
-				nil, // to be filled
+				field.Forbidden(field.NewPath("spec"), ""),
+				field.Invalid(field.NewPath("spec", "replicas"), nil, ""),
 			},
 		},
 	}
