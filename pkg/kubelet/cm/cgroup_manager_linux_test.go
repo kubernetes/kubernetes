@@ -169,3 +169,35 @@ func TestParseSystemdToCgroupName(t *testing.T) {
 		}
 	}
 }
+
+func TestName(t *testing.T) {
+	testCases := []struct {
+		name       string
+		input      CgroupName
+		useSystemd bool
+		expected   string
+	}{
+		{
+			name:       "test systemd style cgroup name",
+			input:      NewCgroupName(RootCgroupName, "Burstable", "pod-123"),
+			useSystemd: true,
+			expected:   "/Burstable.slice/Burstable-pod_123.slice",
+		},
+		{
+			name:       "test cgroupfs style cgroup name",
+			input:      NewCgroupName(RootCgroupName, "Burstable", "pod-123"),
+			useSystemd: false,
+			expected:   "/Burstable/pod-123",
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			manager := cgroupManagerImpl{&CgroupSubsystems{}, testCase.useSystemd}
+			actual := manager.Name(testCase.input)
+			if actual != testCase.expected {
+				t.Errorf("got: %s, want: %s", actual, testCase.expected)
+			}
+		})
+	}
+}
