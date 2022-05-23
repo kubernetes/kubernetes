@@ -504,7 +504,7 @@ Service `ClusterIP` are unique, hence, trying to create a Service with a `Cluste
 
 ### Bug or Regression
 
-- A node IP provided to kublet via `--node-ip` will now be preferred for when determining the node's primary IP and using the external cloud provider (CCM). ([#107750](https://github.com/kubernetes/kubernetes/pull/107750), [@stephenfin](https://github.com/stephenfin))
+- A node IP provided to kubelet via `--node-ip` will now be preferred for when determining the node's primary IP and using the external cloud provider (CCM). ([#107750](https://github.com/kubernetes/kubernetes/pull/107750), [@stephenfin](https://github.com/stephenfin))
 - A static pod that is rapidly updated was failing to start until the Kubelet was restarted. ([#107900](https://github.com/kubernetes/kubernetes/pull/107900), [@smarterclayton](https://github.com/smarterclayton))
 - Add one metrics(`kubelet_volume_stats_health_abnormal`) of volume health state to kubelet ([#108758](https://github.com/kubernetes/kubernetes/pull/108758), [@fengzixu](https://github.com/fengzixu))
 - Added a new label `type` to `apiserver_flowcontrol_request_execution_seconds` metric - it has the following values: - 'regular': indicates that it is a non long running request - 'watch': indicates that it is a watch request. ([#105517](https://github.com/kubernetes/kubernetes/pull/105517), [@tkashem](https://github.com/tkashem))
@@ -1141,7 +1141,7 @@ name | architectures
 
 ### Bug or Regression
 
-- A node IP provided to kublet via `--node-ip` will now be preferred for
+- A node IP provided to kubelet via `--node-ip` will now be preferred for
   when determining the node's primary IP and using the external cloud provider
   (CCM). ([#107750](https://github.com/kubernetes/kubernetes/pull/107750), [@stephenfin](https://github.com/stephenfin)) [SIG Cloud Provider and Node]
 - Add one metrics(`kubelet_volume_stats_health_abnormal`) of volume health state to kubelet ([#108758](https://github.com/kubernetes/kubernetes/pull/108758), [@fengzixu](https://github.com/fengzixu)) [SIG Instrumentation, Node, Storage and Testing]
