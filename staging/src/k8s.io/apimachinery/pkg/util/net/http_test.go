@@ -896,6 +896,11 @@ func TestIsProbableEOF(t *testing.T) {
 			expected: true,
 		},
 		{
+			name:     "with http2 client connection lost error",
+			err:      fmt.Errorf("http2: client connection lost"),
+			expected: true,
+		},
+		{
 			name: "with url error",
 			err: &url.Error{
 				Err: io.ErrUnexpectedEOF,
