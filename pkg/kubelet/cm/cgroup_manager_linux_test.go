@@ -205,3 +205,31 @@ func TestName(t *testing.T) {
 		})
 	}
 }
+
+func TestIsSystemdStyleName(t *testing.T) {
+	testCases := []struct {
+		name     string
+		input    string
+		expected bool
+	}{
+		{
+			name:     "test systemd style cgroup name",
+			input:    "/parent/parent-child.slice",
+			expected: true,
+		},
+		{
+			name:     "test cgroupfs style cgroup name",
+			input:    "/parent/child",
+			expected: false,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			actual := IsSystemdStyleName(testCase.input)
+			if actual != testCase.expected {
+				t.Errorf("got: %t, want: %t", actual, testCase.expected)
+			}
+		})
+	}
+}
