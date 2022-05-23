@@ -31,9 +31,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
 )
@@ -652,7 +652,7 @@ func TestValidateStatefulSet(t *testing.T) {
 				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)()
 			}
 
-			errs := ValidateStatefulSet(&testCase.set, corevalidation.PodValidationOptions{})
+			errs := ValidateStatefulSet(&testCase.set, pod.GetValidationOptionsFromPodTemplate(&testCase.set.Spec.Template, nil))
 			wantErrs := testCase.errs
 			if diff := cmp.Diff(wantErrs, errs, cmpOpts...); diff != "" {
 				t.Errorf("Unexpected validation errors (-want,+got):\n%s", diff)
@@ -953,34 +953,11 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 			},
 		},
 	}
+	validPVCTemplateChangedSize := *validPVCTemplate.DeepCopy()
+	validPVCTemplateChangedSize.Spec.Resources.Requests[api.ResourceStorage] = resource.MustParse("2Gi")
 
-	validPVCTemplateChangedSize := api.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "pvc-abc",
-		},
-		Spec: api.PersistentVolumeClaimSpec{
-			StorageClassName: &storageClass,
-			Resources: api.ResourceRequirements{
-				Requests: api.ResourceList{
-					api.ResourceStorage: resource.MustParse("2Gi"),
-				},
-			},
-		},
-	}
-
-	validPVCTemplateChangedClass := api.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "pvc-abc",
-		},
-		Spec: api.PersistentVolumeClaimSpec{
-			StorageClassName: &storageClass2,
-			Resources: api.ResourceRequirements{
-				Requests: api.ResourceList{
-					api.ResourceStorage: resource.MustParse("1Gi"),
-				},
-			},
-		},
-	}
+	validPVCTemplateChangedClass := *validPVCTemplate.DeepCopy()
+	validPVCTemplateChangedClass.Spec.StorageClassName = &storageClass2
 
 	validPVCTemplate2 := api.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1313,6 +1290,31 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 			},
 		},
 		{
+			name: "update to negative replicas",
+			old: apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: apps.StatefulSetSpec{
+					PodManagementPolicy: apps.OrderedReadyPodManagement,
+					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+					Template:            validPodTemplate.Template,
+					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+				},
+			},
+			update: apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: apps.StatefulSetSpec{
+					PodManagementPolicy: apps.OrderedReadyPodManagement,
+					Replicas:            -1,
+					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+					Template:            validPodTemplate.Template,
+					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+				},
+			},
+			errs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "replicas"), nil, ""),
+			},
+		},
+		{
 			name: "update pvc template size",
 			old: apps.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
@@ -1406,7 +1408,7 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 			testCase.old.ObjectMeta.ResourceVersion = "1"
 			testCase.update.ObjectMeta.ResourceVersion = "1"
 
-			errs := ValidateStatefulSetUpdate(&testCase.update, &testCase.old, apivalidation.PodValidationOptions{})
+			errs := ValidateStatefulSetUpdate(&testCase.update, &testCase.old, pod.GetValidationOptionsFromPodTemplate(&testCase.update.Spec.Template, &testCase.old.Spec.Template))
 			wantErrs := testCase.errs
 			if diff := cmp.Diff(wantErrs, errs, cmpOpts...); diff != "" {
 				t.Errorf("Unexpected validation errors (-want,+got):\n%s", diff)
