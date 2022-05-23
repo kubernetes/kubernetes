@@ -1981,7 +1981,7 @@ func TestNewManager(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			stateFileDirectory, err := os.MkdirTemp("/tmp/", "memory_manager_tests")
+			stateFileDirectory, err := os.MkdirTemp("", "memory_manager_tests")
 			if err != nil {
 				t.Errorf("Cannot create state file: %s", err.Error())
 			}

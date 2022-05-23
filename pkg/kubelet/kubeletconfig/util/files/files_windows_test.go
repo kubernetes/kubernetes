@@ -1,8 +1,8 @@
-//go:build !linux
-// +build !linux
+//go:build windows
+// +build windows
 
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2022 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,11 +17,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta1
+package files
 
-// DefaultEvictionHard includes default options for hard eviction.
-var DefaultEvictionHard = map[string]string{
-	"memory.available":  "100Mi",
-	"nodefs.available":  "10%",
-	"imagefs.available": "15%",
-}
+const (
+	missingFileError   = "The system cannot find the file specified."
+	missingFolderError = "The system cannot find the path specified."
+)
