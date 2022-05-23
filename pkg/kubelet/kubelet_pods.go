@@ -1105,8 +1105,8 @@ func (kl *Kubelet) HandlePodCleanups() error {
 	}
 
 	// Stop probing pods that are not running
-	klog.V(3).InfoS("Clean up probes for terminating and terminated pods")
-	kl.probeManager.CleanupPods(runningPods)
+	klog.V(3).InfoS("Clean up probes for terminated pods")
+	kl.probeManager.CleanupPods(possiblyRunningPods)
 
 	// Terminate any pods that are observed in the runtime but not
 	// present in the list of known running pods from config.
