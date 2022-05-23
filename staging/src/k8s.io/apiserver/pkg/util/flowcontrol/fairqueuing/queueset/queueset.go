@@ -243,6 +243,9 @@ func (qs *queueSet) setConfiguration(ctx context.Context, qCfg fq.QueuingConfig,
 	if qll < 1 {
 		qll = 1
 	}
+	if qCfg.DesiredNumQueues > 0 {
+		qll *= qCfg.DesiredNumQueues
+	}
 	qs.reqsGaugePair.RequestsWaiting.SetDenominator(float64(qll))
 	qs.reqsGaugePair.RequestsExecuting.SetDenominator(float64(dCfg.ConcurrencyLimit))
 	qs.execSeatsGauge.SetDenominator(float64(dCfg.ConcurrencyLimit))

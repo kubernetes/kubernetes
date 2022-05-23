@@ -192,12 +192,14 @@ func (v *TimingRatioHistogramVec) NewForLabelValuesChecked(initialNumerator, ini
 func (v *TimingRatioHistogramVec) NewForLabelValuesSafe(initialNumerator, initialDenominator float64, labelValues []string) RatioedGauge {
 	tro, err := v.NewForLabelValuesChecked(initialNumerator, initialDenominator, labelValues)
 	if err == nil {
+		klog.V(3).InfoS("TimingRatioHistogramVec.NewForLabelValuesSafe hit the efficient case", "fqName", v.FQName(), "labelValues", labelValues)
 		return tro
 	}
 	if !compbasemetrics.ErrIsNotRegistered(err) {
 		klog.ErrorS(err, "Failed to extract TimingRatioHistogramVec member, using noop instead", "vectorname", v.FQName(), "labelValues", labelValues)
 		return tro
 	}
+	klog.V(3).InfoS("TimingRatioHistogramVec.NewForLabelValuesSafe hit the inefficient case", "fqName", v.FQName(), "labelValues", labelValues)
 	// At this point we know v.NewForLabelValuesChecked(..) returns a permanent noop,
 	// which we precisely want to avoid using.  Instead, make our own gauge that
 	// fetches the element on every Set.
