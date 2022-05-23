@@ -161,6 +161,10 @@ func TestParseSystemdToCgroupName(t *testing.T) {
 			input:    "/test.slice",
 			expected: []string{"test"},
 		},
+		{
+			input:    "/parent.slice/parent-child.slice",
+			expected: []string{"parent", "child"},
+		},
 	}
 
 	for _, testCase := range testCases {
