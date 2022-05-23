@@ -37,6 +37,16 @@ const (
 	envBackoffDuration = "KUBE_CLIENT_BACKOFF_DURATION"
 )
 
+const (
+	// default configuration for exponentially backoff delay with jitter:
+	//  - an initial delay of 250ms,
+	//  - maximum delay of 15s, and
+	//  - a maximum of 10% jitter.
+	defaultBackoffInitialDelay = 250 * time.Millisecond
+	defaultBackoffMaxDelay     = 15 * time.Second
+	defaultBackoffMaxJitter    = 0.1
+)
+
 // Interface captures the set of operations for generically interacting with Kubernetes REST apis.
 type Interface interface {
 	GetRateLimiter() flowcontrol.RateLimiter
@@ -135,6 +145,18 @@ func (c *RESTClient) GetRateLimiter() flowcontrol.RateLimiter {
 	return c.rateLimiter
 }
 
+// defaultBackoffManager returns the BackoffManager that should be
+// used by default. The default is to return an exponentially backoff
+// delay with jitter.
+func defaultBackoffManager() BackoffManager {
+	return &URLBackoff{
+		Backoff: flowcontrol.NewBackOffWithJitter(
+			defaultBackoffInitialDelay,
+			defaultBackoffMaxDelay,
+			defaultBackoffMaxJitter),
+	}
+}
+
 // readExpBackoffConfig handles the internal logic of determining what the
 // backoff policy is.  By default if no information is available, NoBackoff.
 // TODO Generalize this see #17727 .
@@ -145,12 +167,13 @@ func readExpBackoffConfig() BackoffManager {
 	backoffBaseInt, errBase := strconv.ParseInt(backoffBase, 10, 64)
 	backoffDurationInt, errDuration := strconv.ParseInt(backoffDuration, 10, 64)
 	if errBase != nil || errDuration != nil {
-		return &NoBackoff{}
+		return defaultBackoffManager()
 	}
 	return &URLBackoff{
-		Backoff: flowcontrol.NewBackOff(
+		Backoff: flowcontrol.NewBackOffWithJitter(
 			time.Duration(backoffBaseInt)*time.Second,
-			time.Duration(backoffDurationInt)*time.Second)}
+			time.Duration(backoffDurationInt)*time.Second,
+			defaultBackoffMaxJitter)}
 }
 
 // Verb begins a request with a verb (GET, POST, PUT, DELETE).

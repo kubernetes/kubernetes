@@ -2065,6 +2065,13 @@ func testRESTClientWithConfig(t testing.TB, srv *httptest.Server, contentConfig 
 	if err != nil {
 		t.Fatalf("failed to create a client: %v", err)
 	}
+
+	// the tests by default can continue to use NoBackoff
+	// to maintain shorter test duration.
+	client.createBackoffMgr = func() BackoffManager {
+		return &NoBackoff{}
+	}
+
 	return client
 
 }
@@ -3710,5 +3717,56 @@ func TestRequestBodyResetOrder(t *testing.T) {
 	}
 	if !reflect.DeepEqual(expected, recorder.order) {
 		t.Errorf("Expected invocation request and response body operations for retry do not match: %s", cmp.Diff(expected, recorder.order))
+	}
+}
+
+type sleepTrackingBackoffManager struct {
+	BackoffManager
+	total  time.Duration
+	sleeps []time.Duration
+}
+
+func (s *sleepTrackingBackoffManager) Sleep(d time.Duration) {
+	s.total += d
+	s.sleeps = append(s.sleeps, d)
+}
+
+func TestSleepDurationWithDefaultRetrySettings(t *testing.T) {
+	var attemptsGot int
+	client := clientForFunc(func(req *http.Request) (*http.Response, error) {
+		attemptsGot++
+		// always send retry-after response so we exhaust maximum retries
+		return retryAfterResponse(), nil
+	})
+
+	base, _ := url.Parse("http://localhost")
+	versionedAPIPath := defaultResourcePathWithPrefix("", "", "", "")
+	restClient, err := NewRESTClient(base, versionedAPIPath, defaultContentConfig(), nil, client)
+	if err != nil {
+		t.Fatalf("failed to create a client: %v", err)
+	}
+
+	request := NewRequest(restClient)
+	sb := &sleepTrackingBackoffManager{BackoffManager: request.backoff}
+	request.backoff = sb
+
+	request.Do(context.Background())
+	attemptsExpected := request.maxRetries + 1
+	if attemptsExpected != attemptsGot {
+		t.Errorf("Expected %d attempts, but got: %d", attemptsExpected, attemptsGot)
+	}
+	t.Logf("default max retries: %d", request.maxRetries)
+	t.Logf("sleep sequence with retries: %v", sb.sleeps)
+	t.Logf("total sleep duration: %s", sb.total)
+}
+
+func TestRequestBackoffWithBackwardCompatibility(t *testing.T) {
+	r := &Request{}
+	r.BackOff(nil)
+
+	// providing nil should set &NoBackoff{} as the backoff manager,
+	// this maintains backward compatibility.
+	if _, ok := r.backoff.(*NoBackoff); !ok {
+		t.Errorf("Expected a NoBackoff instance")
 	}
 }

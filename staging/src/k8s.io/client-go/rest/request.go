@@ -80,8 +80,6 @@ func (r *RequestConstructionError) Error() string {
 	return fmt.Sprintf("request construction error: '%v'", r.Err)
 }
 
-var noBackoff = &NoBackoff{}
-
 type requestRetryFunc func(maxRetries int) WithRetry
 
 func defaultRequestRetryFn(maxRetries int) WithRetry {
@@ -129,7 +127,7 @@ func NewRequest(c *RESTClient) *Request {
 		backoff = c.createBackoffMgr()
 	}
 	if backoff == nil {
-		backoff = noBackoff
+		backoff = defaultBackoffManager()
 	}
 
 	var pathPrefix string

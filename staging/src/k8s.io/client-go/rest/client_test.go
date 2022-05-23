@@ -360,14 +360,14 @@ func TestCreateBackoffManager(t *testing.T) {
 		t.Errorf("Zero backoff duration, but backoff still occurring.")
 	}
 
-	// No env -> No backoff.
+	// No env -> default is exponential backoff with jitter.
 	os.Setenv(envBackoffBase, "")
 	os.Setenv(envBackoffDuration, "")
 	backoff = readExpBackoffConfig()
 	backoff.UpdateBackoff(theUrl, nil, 500)
 	backoff.UpdateBackoff(theUrl, nil, 500)
-	if backoff.CalculateBackoff(theUrl)/time.Second != 0 {
-		t.Errorf("Backoff should have been 0.")
+	if backoff.CalculateBackoff(theUrl) == 0 {
+		t.Errorf("Backoff should not have been 0.")
 	}
 
 }
