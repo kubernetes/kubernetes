@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
+	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/admission/plugin/resourcequota"
 	resourcequotaapi "k8s.io/apiserver/pkg/admission/plugin/resourcequota/apis/resourcequota"
 	"k8s.io/client-go/informers"
@@ -36,6 +37,7 @@ import (
 	testcore "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	"k8s.io/kubernetes/pkg/quota/v1/install"
 )
 
@@ -99,15 +101,18 @@ func createHandlerWithConfig(kubeClient kubernetes.Interface, informerFactory in
 	}
 	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
 
-	handler, err := resourcequota.NewResourceQuota(config, 5, stopCh)
+	handler, err := resourcequota.NewResourceQuota(config, 5)
 	if err != nil {
 		return nil, err
 	}
-	handler.SetExternalKubeClientSet(kubeClient)
-	handler.SetExternalKubeInformerFactory(informerFactory)
-	handler.SetQuotaConfiguration(quotaConfiguration)
 
-	return handler, nil
+	initializers := admission.PluginInitializers{
+		genericadmissioninitializer.New(kubeClient, informerFactory, nil, nil, stopCh),
+		kubeapiserveradmission.NewPluginInitializer(nil, nil, quotaConfiguration),
+	}
+	initializers.Initialize(handler)
+
+	return handler, admission.ValidateInitialization(handler)
 }
 
 // TestAdmissionIgnoresDelete verifies that the admission controller ignores delete operations
