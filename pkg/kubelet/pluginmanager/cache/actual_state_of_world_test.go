@@ -119,9 +119,13 @@ func Test_ASW_RemovePlugin_Positive(t *testing.T) {
 func Test_ASW_PluginExistsWithCorrectTimestamp_Negative_WrongTimestamp(t *testing.T) {
 	// First, add a plugin
 	asw := NewActualStateOfWorld()
+	// On Windows, time.Now() is not as precise, which means that 2 consecutive calls may
+	// return the same timestamp. This would cause the test to fail, since they would have
+	// the same timestamp.
+	timestamp := time.Now().Add(-time.Second)
 	pluginInfo := PluginInfo{
 		SocketPath: "/var/lib/kubelet/device-plugins/test-plugin.sock",
-		Timestamp:  time.Now(),
+		Timestamp:  timestamp,
 		Handler:    nil,
 		Name:       "test",
 	}

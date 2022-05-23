@@ -18,6 +18,7 @@ package cache
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -70,6 +71,10 @@ func Test_DSW_AddOrUpdatePlugin_Positive_ExistingPlugin(t *testing.T) {
 		t.Fatalf("Expected\n%s\nin desired state of world, but got\n%v\n", socketPath, dswPlugins[0])
 	}
 	oldTimestamp := dswPlugins[0].Timestamp
+	// On Windows, time.Now() is not as precise, which means that 2 consecutive calls may
+	// return the same timestamp. This would cause the test to fail, since they would have
+	// the same timestamp. Sleeping will cause in different times.
+	time.Sleep(time.Millisecond)
 
 	// Adding the plugin again so that the timestamp will be updated
 	err = dsw.AddOrUpdatePlugin(socketPath)

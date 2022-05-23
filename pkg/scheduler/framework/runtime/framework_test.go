@@ -170,6 +170,10 @@ func (pl *TestPlugin) Less(*framework.QueuedPodInfo, *framework.QueuedPodInfo) b
 }
 
 func (pl *TestPlugin) Score(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) (int64, *framework.Status) {
+	// NOTE: The tests expect some non-zero latency to occur while running these methods. On Windows, time.Now()
+	// is not as precise, 2 consecutive calls may return the same timestamp, resulting in 0 time delta / latency,
+	// causing the tests to fail.
+	time.Sleep(time.Millisecond)
 	return 0, framework.NewStatus(framework.Code(pl.inj.ScoreStatus), injectReason)
 }
 
@@ -178,6 +182,7 @@ func (pl *TestPlugin) ScoreExtensions() framework.ScoreExtensions {
 }
 
 func (pl *TestPlugin) PreFilter(ctx context.Context, state *framework.CycleState, p *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+	time.Sleep(time.Millisecond)
 	return nil, framework.NewStatus(framework.Code(pl.inj.PreFilterStatus), injectReason)
 }
 
@@ -194,28 +199,35 @@ func (pl *TestPlugin) PostFilter(_ context.Context, _ *framework.CycleState, _ *
 }
 
 func (pl *TestPlugin) PreScore(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodes []*v1.Node) *framework.Status {
+	time.Sleep(time.Millisecond)
 	return framework.NewStatus(framework.Code(pl.inj.PreScoreStatus), injectReason)
 }
 
 func (pl *TestPlugin) Reserve(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) *framework.Status {
+	time.Sleep(time.Millisecond)
 	return framework.NewStatus(framework.Code(pl.inj.ReserveStatus), injectReason)
 }
 
 func (pl *TestPlugin) Unreserve(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) {
+	time.Sleep(time.Millisecond)
 }
 
 func (pl *TestPlugin) PreBind(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) *framework.Status {
+	time.Sleep(time.Millisecond)
 	return framework.NewStatus(framework.Code(pl.inj.PreBindStatus), injectReason)
 }
 
 func (pl *TestPlugin) PostBind(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) {
+	time.Sleep(time.Millisecond)
 }
 
 func (pl *TestPlugin) Permit(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) (*framework.Status, time.Duration) {
+	time.Sleep(time.Millisecond)
 	return framework.NewStatus(framework.Code(pl.inj.PermitStatus), injectReason), time.Duration(0)
 }
 
 func (pl *TestPlugin) Bind(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) *framework.Status {
+	time.Sleep(time.Millisecond)
 	return framework.NewStatus(framework.Code(pl.inj.BindStatus), injectReason)
 }
 
