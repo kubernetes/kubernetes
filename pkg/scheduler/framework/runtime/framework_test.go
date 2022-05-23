@@ -2811,9 +2811,7 @@ func collectAndComparePluginMetrics(t *testing.T, wantExtensionPoint, wantPlugin
 	if err != nil {
 		t.Errorf("Failed to get %s value, err: %v", metrics.PluginExecutionDuration.Name, err)
 	}
-	if value <= 0 {
-		t.Errorf("Expect latency to be greater than 0, got: %v", value)
-	}
+	checkLatency(t, value)
 }
 
 func collectAndCompareFrameworkMetrics(t *testing.T, wantExtensionPoint string, wantStatus framework.Code) {
@@ -2831,9 +2829,7 @@ func collectAndCompareFrameworkMetrics(t *testing.T, wantExtensionPoint string, 
 	if err != nil {
 		t.Errorf("Failed to get %s value, err: %v", metrics.FrameworkExtensionPointDuration.Name, err)
 	}
-	if value <= 0 {
-		t.Errorf("Expect latency to be greater than 0, got: %v", value)
-	}
+	checkLatency(t, value)
 }
 
 func collectAndComparePermitWaitDuration(t *testing.T, wantRes string) {
@@ -2854,9 +2850,7 @@ func collectAndComparePermitWaitDuration(t *testing.T, wantRes string) {
 		if err != nil {
 			t.Errorf("Failed to get %s value, err: %v", metrics.PermitWaitDuration.Name, err)
 		}
-		if value <= 0 {
-			t.Errorf("Expect latency to be greater than 0, got: %v", value)
-		}
+		checkLatency(t, value)
 	}
 }
 
