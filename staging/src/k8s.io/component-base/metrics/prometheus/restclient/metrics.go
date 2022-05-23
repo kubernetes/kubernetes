@@ -140,7 +140,7 @@ type latencyAdapter struct {
 }
 
 func (l *latencyAdapter) Observe(ctx context.Context, verb string, u url.URL, latency time.Duration) {
-	l.m.WithContext(ctx).WithLabelValues(verb, u.String()).Observe(latency.Seconds())
+	l.m.WithContext(ctx).WithLabelValues(verb, u.Host).Observe(latency.Seconds())
 }
 
 type resultAdapter struct {
