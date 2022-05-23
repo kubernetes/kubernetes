@@ -278,7 +278,7 @@ func New(client clientset.Interface,
 	snapshot := internalcache.NewEmptySnapshot()
 	clusterEventMap := make(map[framework.ClusterEvent]sets.String)
 
-	profiles, err := profile.NewMap(options.profiles, registry, recorderFactory,
+	profiles, err := profile.NewMap(options.profiles, registry, recorderFactory, stopCh,
 		frameworkruntime.WithComponentConfigVersion(options.componentConfigVersion),
 		frameworkruntime.WithClientSet(client),
 		frameworkruntime.WithKubeConfig(options.kubeConfig),

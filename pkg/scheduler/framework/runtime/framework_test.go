@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -391,7 +392,7 @@ func newFrameworkWithQueueSortAndBind(r Registry, profile config.KubeSchedulerPr
 	if len(profile.Plugins.Bind.Enabled) == 0 {
 		profile.Plugins.Bind.Enabled = append(profile.Plugins.Bind.Enabled, config.Plugin{Name: bindPlugin})
 	}
-	return NewFramework(r, &profile, opts...)
+	return NewFramework(r, &profile, wait.NeverStop, opts...)
 }
 
 func TestInitFrameworkWithScorePlugins(t *testing.T) {
@@ -488,7 +489,7 @@ func TestNewFrameworkErrors(t *testing.T) {
 				Plugins:      tc.plugins,
 				PluginConfig: tc.pluginCfg,
 			}
-			_, err := NewFramework(registry, profile)
+			_, err := NewFramework(registry, profile, wait.NeverStop)
 			if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
 				t.Errorf("Unexpected error, got %v, expect: %s", err, tc.wantErr)
 			}
@@ -796,7 +797,7 @@ func TestNewFrameworkMultiPointExpansion(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			fw, err := NewFramework(registry, &config.KubeSchedulerProfile{Plugins: tc.plugins})
+			fw, err := NewFramework(registry, &config.KubeSchedulerProfile{Plugins: tc.plugins}, wait.NeverStop)
 			if err != nil {
 				if tc.wantErr == "" || !strings.Contains(err.Error(), tc.wantErr) {
 					t.Fatalf("Unexpected error, got %v, expect: %s", err, tc.wantErr)
@@ -2228,7 +2229,9 @@ func TestRecordingMetrics(t *testing.T) {
 				Bind:      pluginSet,
 				PostBind:  pluginSet,
 			}
-			recorder := newMetricsRecorder(100, time.Nanosecond)
+
+			stopCh := make(chan struct{})
+			recorder := newMetricsRecorder(100, time.Nanosecond, stopCh)
 			profile := config.KubeSchedulerProfile{
 				SchedulerName: testProfileName,
 				Plugins:       plugins,
@@ -2241,7 +2244,7 @@ func TestRecordingMetrics(t *testing.T) {
 			tt.action(f)
 
 			// Stop the goroutine which records metrics and ensure it's stopped.
-			close(recorder.stopCh)
+			close(stopCh)
 			<-recorder.isStoppedCh
 			// Try to clean up the metrics buffer again in case it's not empty.
 			recorder.flushMetrics()
@@ -2337,7 +2340,8 @@ func TestRunBindPlugins(t *testing.T) {
 				pluginSet.Enabled = append(pluginSet.Enabled, config.Plugin{Name: name})
 			}
 			plugins := &config.Plugins{Bind: pluginSet}
-			recorder := newMetricsRecorder(100, time.Nanosecond)
+			stopCh := make(chan struct{})
+			recorder := newMetricsRecorder(100, time.Nanosecond, stopCh)
 			profile := config.KubeSchedulerProfile{
 				SchedulerName: testProfileName,
 				Plugins:       plugins,
@@ -2353,7 +2357,7 @@ func TestRunBindPlugins(t *testing.T) {
 			}
 
 			// Stop the goroutine which records metrics and ensure it's stopped.
-			close(recorder.stopCh)
+			close(stopCh)
 			<-recorder.isStoppedCh
 			// Try to clean up the metrics buffer again in case it's not empty.
 			recorder.flushMetrics()
