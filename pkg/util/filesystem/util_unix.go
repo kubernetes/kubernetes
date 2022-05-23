@@ -22,6 +22,7 @@ package filesystem
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 )
 
 // IsUnixDomainSocket returns whether a given file is a AF_UNIX socket file
@@ -35,3 +36,6 @@ func IsUnixDomainSocket(filePath string) (bool, error) {
 	}
 	return true, nil
 }
+
+// IsAbs is filepath.IsAbs.
+var IsAbs = filepath.IsAbs
