@@ -1769,14 +1769,11 @@ func (kl *Kubelet) syncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatu
 	kl.statusManager.SetPodStatus(pod, apiPodStatus)
 
 	if gracePeriod != nil {
-		if *gracePeriod <= 1 {
-			// If we plan to terminate quickly, stop probes immediately, otherwise we will  wait until the pod is completely done
-			kl.probeManager.RemovePod(pod)
-		}
 		klog.V(4).InfoS("Pod terminating with grace period", "pod", klog.KObj(pod), "podUID", pod.UID, "gracePeriod", *gracePeriod)
 	} else {
 		klog.V(4).InfoS("Pod terminating with grace period", "pod", klog.KObj(pod), "podUID", pod.UID, "gracePeriod", nil)
 	}
+
 	kl.probeManager.StopLivenessAndStartup(pod)
 
 	p := kubecontainer.ConvertPodStatusToRunningPod(kl.getRuntime().Type(), podStatus)
