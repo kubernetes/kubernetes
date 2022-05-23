@@ -163,7 +163,7 @@ func (m *manager) AddPod(pod *v1.Pod) {
 		if c.StartupProbe != nil {
 			key.probeType = startup
 			if _, ok := m.workers[key]; ok {
-				klog.ErrorS(nil, "Startup probe already exists for container",
+				klog.V(4).ErrorS(nil, "Startup probe already exists for container",
 					"pod", klog.KObj(pod), "containerName", c.Name)
 				return
 			}
@@ -175,7 +175,7 @@ func (m *manager) AddPod(pod *v1.Pod) {
 		if c.ReadinessProbe != nil {
 			key.probeType = readiness
 			if _, ok := m.workers[key]; ok {
-				klog.ErrorS(nil, "Readiness probe already exists for container",
+				klog.V(4).ErrorS(nil, "Readiness probe already exists for container",
 					"pod", klog.KObj(pod), "containerName", c.Name)
 				return
 			}
@@ -187,7 +187,7 @@ func (m *manager) AddPod(pod *v1.Pod) {
 		if c.LivenessProbe != nil {
 			key.probeType = liveness
 			if _, ok := m.workers[key]; ok {
-				klog.ErrorS(nil, "Liveness probe already exists for container",
+				klog.V(4).ErrorS(nil, "Liveness probe already exists for container",
 					"pod", klog.KObj(pod), "containerName", c.Name)
 				return
 			}
