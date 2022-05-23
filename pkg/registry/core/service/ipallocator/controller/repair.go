@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -113,27 +114,28 @@ func NewRepair(interval time.Duration, serviceClient corev1client.ServicesGetter
 	}
 }
 
-// Start starts events recording.
-func (c *Repair) Start(stopCh chan struct{}) {
-	c.broadcaster.StartRecordingToSink(stopCh)
-}
-
 // RunUntil starts the controller until the provided ch is closed.
-func (c *Repair) RunUntil(stopCh chan struct{}) {
-	wait.Until(func() {
-		if err := c.RunOnce(); err != nil {
-			runtime.HandleError(err)
-		}
-	}, c.interval, stopCh)
-}
+func (c *Repair) RunUntil(onFirstSuccess func(), stopCh chan struct{}) {
+	c.broadcaster.StartRecordingToSink(stopCh)
+	defer c.broadcaster.Shutdown()
 
-// RunOnce verifies the state of the cluster IP allocations and returns an error if an unrecoverable problem occurs.
-func (c *Repair) RunOnce() error {
-	return retry.RetryOnConflict(retry.DefaultBackoff, c.runOnce)
+	var once sync.Once
+	wait.Until(func() {
+		if err := c.runOnce(); err != nil {
+			runtime.HandleError(err)
+			return
+		}
+		once.Do(onFirstSuccess)
+	}, c.interval, stopCh)
 }
 
 // runOnce verifies the state of the cluster IP allocations and returns an error if an unrecoverable problem occurs.
 func (c *Repair) runOnce() error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, c.doRunOnce)
+}
+
+// doRunOnce verifies the state of the cluster IP allocations and returns an error if an unrecoverable problem occurs.
+func (c *Repair) doRunOnce() error {
 	// TODO: (per smarterclayton) if Get() or ListServices() is a weak consistency read,
 	// or if they are executed against different leaders,
 	// the ordering guarantee required to ensure no IP is allocated twice is violated.
