@@ -39,7 +39,6 @@ type RatioedGauge interface {
 // RatioedGaugeVec creates related observers that are
 // differentiated by a series of label values
 type RatioedGaugeVec interface {
-
 	// NewForLabelValuesSafe makes a new vector member for the given tuple of label values,
 	// initialized with the given numerator and denominator.
 	// Unlike the usual Vec WithLabelValues method, this is intended to be called only
@@ -50,12 +49,11 @@ type RatioedGaugeVec interface {
 }
 
 //////////////////////////////// Pairs ////////////////////////////////
-
-/* API Priority and Fairness tends to use RatioedGaugeVec members in pairs,
- * one for requests waiting in a queue and one for requests being executed.
- * The following definitions are a convenience layer that adds support for that
- * particular pattern of usage.
- */
+//
+// API Priority and Fairness tends to use RatioedGaugeVec members in pairs,
+// one for requests waiting in a queue and one for requests being executed.
+// The following definitions are a convenience layer that adds support for that
+// particular pattern of usage.
 
 // RatioedGaugePair is a corresponding pair of gauges, one for the
 // number of requests waiting in queue(s) and one for the number of
@@ -70,7 +68,6 @@ type RatioedGaugePair struct {
 
 // RatioedGaugePairVec generates pairs
 type RatioedGaugePairVec interface {
-
 	// NewForLabelValuesSafe makes a new vector member for the given tuple of label values,
 	// initialized with the given denominators and zeros for numerators.
 	// Unlike the usual Vec WithLabelValues method, this is intended to be called only
