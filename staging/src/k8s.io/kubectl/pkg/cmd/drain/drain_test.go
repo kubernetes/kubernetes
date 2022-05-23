@@ -599,7 +599,7 @@ func TestDrain(t *testing.T) {
 			args:                  []string{"node", "--force"},
 			expectFatal:           false,
 			expectDelete:          true,
-			expectWarning:         "WARNING: deleting Pods that declare no controller: default/bar",
+			expectWarning:         "Warning: deleting Pods that declare no controller: default/bar",
 			expectOutputToContain: "node/node drained",
 		},
 		{
@@ -620,7 +620,7 @@ func TestDrain(t *testing.T) {
 			pods:                  []corev1.Pod{dsPodWithEmptyDir},
 			rcs:                   []corev1.ReplicationController{rc},
 			args:                  []string{"node", "--ignore-daemonsets"},
-			expectWarning:         "WARNING: ignoring DaemonSet-managed Pods: default/bar",
+			expectWarning:         "Warning: ignoring DaemonSet-managed Pods: default/bar",
 			expectFatal:           false,
 			expectDelete:          false,
 			expectOutputToContain: "node/node drained",

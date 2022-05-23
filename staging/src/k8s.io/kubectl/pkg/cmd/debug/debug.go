@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
@@ -50,6 +51,7 @@ import (
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/interrupt"
 	"k8s.io/kubectl/pkg/util/templates"
+	"k8s.io/kubectl/pkg/util/term"
 	"k8s.io/utils/pointer"
 )
 
@@ -127,6 +129,7 @@ type DebugOptions struct {
 	podClient corev1client.CoreV1Interface
 
 	genericclioptions.IOStreams
+	warningPrinter *printers.WarningPrinter
 }
 
 // NewDebugOptions returns a DebugOptions initialized with default values.
@@ -217,6 +220,9 @@ func (o *DebugOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	o.attachChanged = cmd.Flags().Changed("attach")
 	o.shareProcessedChanged = cmd.Flags().Changed("share-processes")
 
+	// Warning printer
+	o.warningPrinter = printers.NewWarningPrinter(o.ErrOut, printers.WarningPrinterOptions{Color: term.AllowsColorOutput(o.ErrOut)})
+
 	return nil
 }
 
@@ -291,6 +297,11 @@ func (o *DebugOptions) Validate() error {
 	// TTY
 	if o.TTY && !o.Interactive {
 		return fmt.Errorf("-i/--stdin is required for containers with -t/--tty=true")
+	}
+
+	// warningPrinter
+	if o.warningPrinter == nil {
+		return fmt.Errorf("warningPrinter can not be used without initialization")
 	}
 
 	return nil
@@ -742,7 +753,7 @@ func (o *DebugOptions) waitForContainer(ctx context.Context, ns, podName, contai
 				return true, nil
 			}
 			if !o.Quiet && s.State.Waiting != nil && s.State.Waiting.Message != "" {
-				fmt.Fprintf(o.ErrOut, "Warning: container %s: %s\n", containerName, s.State.Waiting.Message)
+				o.warningPrinter.Print(fmt.Sprintf("container %s: %s", containerName, s.State.Waiting.Message))
 			}
 			return false, nil
 		})
