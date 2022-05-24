@@ -173,9 +173,7 @@ func (statefulSetStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.
 	oldStatefulSet := old.(*apps.StatefulSet)
 
 	opts := pod.GetValidationOptionsFromPodTemplate(&newStatefulSet.Spec.Template, &oldStatefulSet.Spec.Template)
-	validationErrorList := validation.ValidateStatefulSet(newStatefulSet, opts)
-	updateErrorList := validation.ValidateStatefulSetUpdate(newStatefulSet, oldStatefulSet)
-	return append(validationErrorList, updateErrorList...)
+	return validation.ValidateStatefulSetUpdate(newStatefulSet, oldStatefulSet, opts)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
