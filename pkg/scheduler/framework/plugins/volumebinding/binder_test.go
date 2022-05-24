@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	pvtesting "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/testing"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 var (
@@ -369,7 +370,7 @@ func (env *testEnv) updateClaims(ctx context.Context, pvcs []*v1.PersistentVolum
 	}
 	return wait.Poll(100*time.Millisecond, 3*time.Second, func() (bool, error) {
 		for _, pvc := range pvcs {
-			obj, err := env.internalPVCCache.GetAPIObj(getPVCName(pvc))
+			obj, err := env.internalPVCCache.GetAPIObj(framework.GetNamespacedName(pvc.Namespace, pvc.Name))
 			if obj == nil || err != nil {
 				return false, nil
 			}
@@ -485,7 +486,7 @@ func (env *testEnv) validateAssume(t *testing.T, pod *v1.Pod, bindings []*Bindin
 	// Check pvc cache
 	pvcCache := env.internalBinder.pvcCache
 	for _, p := range provisionings {
-		pvcKey := getPVCName(p)
+		pvcKey := framework.GetNamespacedName(p.Namespace, p.Name)
 		pvc, err := pvcCache.GetPVC(pvcKey)
 		if err != nil {
 			t.Errorf("GetPVC %q returned error: %v", pvcKey, err)
@@ -512,7 +513,7 @@ func (env *testEnv) validateCacheRestored(t *testing.T, pod *v1.Pod, bindings []
 	// Check pvc cache
 	pvcCache := env.internalBinder.pvcCache
 	for _, p := range provisionings {
-		pvcKey := getPVCName(p)
+		pvcKey := framework.GetNamespacedName(p.Namespace, p.Name)
 		pvc, err := pvcCache.GetPVC(pvcKey)
 		if err != nil {
 			t.Errorf("GetPVC %q returned error: %v", pvcKey, err)
@@ -560,9 +561,9 @@ func (env *testEnv) validateProvision(
 	// Check pvc cache
 	pvcCache := env.internalBinder.pvcCache
 	for _, pvc := range expectedPVCs {
-		cachedPVC, err := pvcCache.GetPVC(getPVCName(pvc))
+		cachedPVC, err := pvcCache.GetPVC(framework.GetNamespacedName(pvc.Namespace, pvc.Name))
 		if err != nil {
-			t.Errorf("GetPVC %q returned error: %v", getPVCName(pvc), err)
+			t.Errorf("GetPVC %q returned error: %v", framework.GetNamespacedName(pvc.Namespace, pvc.Name), err)
 		}
 		// Cache may be overridden by API object with higher version, compare but ignore resource version.
 		newCachedPVC := cachedPVC.DeepCopy()
@@ -2067,7 +2068,8 @@ func TestBindPodVolumes(t *testing.T) {
 		if scenario.apiPVC != nil {
 			_, err := testEnv.client.CoreV1().PersistentVolumeClaims(scenario.apiPVC.Namespace).Update(ctx, scenario.apiPVC, metav1.UpdateOptions{})
 			if err != nil {
-				t.Fatalf("failed to update PVC %q", getPVCName(scenario.apiPVC))
+				t.Fatalf("failed to update PVC %q", framework.GetNamespacedName(scenario.apiPVC.Namespace, scenario.apiPVC.Name))
+
 			}
 		}
 

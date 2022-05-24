@@ -23,6 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/component-helpers/storage/volume"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 func verifyListPVs(t *testing.T, cache PVAssumeCache, expectedPVs map[string]*v1.PersistentVolume, storageClassName string) {
@@ -361,7 +362,7 @@ func TestAssumePVC(t *testing.T) {
 
 		// Add oldPVC to cache
 		internalCache.add(scenario.oldPVC)
-		if err := verifyPVC(cache, getPVCName(scenario.oldPVC), scenario.oldPVC); err != nil {
+		if err := verifyPVC(cache, framework.GetNamespacedName(scenario.oldPVC.Namespace, scenario.oldPVC.Name), scenario.oldPVC); err != nil {
 			t.Errorf("Failed to GetPVC() after initial update: %v", err)
 			continue
 		}
@@ -380,7 +381,7 @@ func TestAssumePVC(t *testing.T) {
 		if !scenario.shouldSucceed {
 			expectedPV = scenario.oldPVC
 		}
-		if err := verifyPVC(cache, getPVCName(scenario.oldPVC), expectedPV); err != nil {
+		if err := verifyPVC(cache, framework.GetNamespacedName(scenario.oldPVC.Namespace, scenario.oldPVC.Name), expectedPV); err != nil {
 			t.Errorf("Failed to GetPVC() after initial update: %v", err)
 		}
 	}
@@ -401,13 +402,13 @@ func TestRestorePVC(t *testing.T) {
 
 	// Add oldPVC to cache
 	internalCache.add(oldPVC)
-	if err := verifyPVC(cache, getPVCName(oldPVC), oldPVC); err != nil {
+	if err := verifyPVC(cache, framework.GetNamespacedName(oldPVC.Namespace, oldPVC.Name), oldPVC); err != nil {
 		t.Fatalf("Failed to GetPVC() after initial update: %v", err)
 	}
 
 	// Restore PVC
-	cache.Restore(getPVCName(oldPVC))
-	if err := verifyPVC(cache, getPVCName(oldPVC), oldPVC); err != nil {
+	cache.Restore(framework.GetNamespacedName(oldPVC.Namespace, oldPVC.Name))
+	if err := verifyPVC(cache, framework.GetNamespacedName(oldPVC.Namespace, oldPVC.Name), oldPVC); err != nil {
 		t.Fatalf("Failed to GetPVC() after initial restore: %v", err)
 	}
 
@@ -415,13 +416,13 @@ func TestRestorePVC(t *testing.T) {
 	if err := cache.Assume(newPVC); err != nil {
 		t.Fatalf("Assume() returned error %v", err)
 	}
-	if err := verifyPVC(cache, getPVCName(oldPVC), newPVC); err != nil {
+	if err := verifyPVC(cache, framework.GetNamespacedName(oldPVC.Namespace, oldPVC.Name), newPVC); err != nil {
 		t.Fatalf("Failed to GetPVC() after Assume: %v", err)
 	}
 
 	// Restore PVC
-	cache.Restore(getPVCName(oldPVC))
-	if err := verifyPVC(cache, getPVCName(oldPVC), oldPVC); err != nil {
+	cache.Restore(framework.GetNamespacedName(oldPVC.Namespace, oldPVC.Name))
+	if err := verifyPVC(cache, framework.GetNamespacedName(oldPVC.Namespace, oldPVC.Name), oldPVC); err != nil {
 		t.Fatalf("Failed to GetPVC() after restore: %v", err)
 	}
 }
@@ -439,7 +440,7 @@ func TestAssumeUpdatePVCCache(t *testing.T) {
 	// Add a PVC
 	pvc := makeClaim(pvcName, "1", pvcNamespace)
 	internalCache.add(pvc)
-	if err := verifyPVC(cache, getPVCName(pvc), pvc); err != nil {
+	if err := verifyPVC(cache, framework.GetNamespacedName(pvc.Namespace, pvc.Name), pvc); err != nil {
 		t.Fatalf("failed to get PVC: %v", err)
 	}
 
@@ -449,13 +450,13 @@ func TestAssumeUpdatePVCCache(t *testing.T) {
 	if err := cache.Assume(newPVC); err != nil {
 		t.Fatalf("failed to assume PVC: %v", err)
 	}
-	if err := verifyPVC(cache, getPVCName(pvc), newPVC); err != nil {
+	if err := verifyPVC(cache, framework.GetNamespacedName(pvc.Namespace, pvc.Name), newPVC); err != nil {
 		t.Fatalf("failed to get PVC after assume: %v", err)
 	}
 
 	// Add old PVC
 	internalCache.add(pvc)
-	if err := verifyPVC(cache, getPVCName(pvc), newPVC); err != nil {
+	if err := verifyPVC(cache, framework.GetNamespacedName(pvc.Namespace, pvc.Name), newPVC); err != nil {
 		t.Fatalf("failed to get PVC after old PVC added: %v", err)
 	}
 }
