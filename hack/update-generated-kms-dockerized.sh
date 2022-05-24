@@ -19,42 +19,9 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
-KUBE_KMS_GRPC_ROOT="${KUBE_ROOT}/staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1/"
-source "${KUBE_ROOT}/hack/lib/init.sh"
+KUBE_KMS_V1BETA1="${KUBE_ROOT}/staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1/"
+KUBE_KMS_V2ALPHA1="${KUBE_ROOT}/staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v2alpha1/"
 
-kube::golang::setup_env
-
-GO111MODULE=on GOPROXY=off go install k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo
-
-if [[ -z "$(which protoc)" || "$(protoc --version)" != "libprotoc 3."* ]]; then
-  echo "Generating protobuf requires protoc 3.0.0-beta1 or newer. Please download and"
-  echo "install the platform appropriate Protobuf package for your OS: "
-  echo
-  echo "  https://github.com/protocolbuffers/protobuf/releases"
-  echo
-  echo "WARNING: Protobuf changes are not being validated"
-  exit 1
-fi
-
-function cleanup {
-	rm -f "${KUBE_KMS_GRPC_ROOT}/service.pb.go.bak"
-	rm -f "${KUBE_KMS_GRPC_ROOT}/service.pb.go.tmp"
-}
-
-trap cleanup EXIT
-
-gogopath=$(dirname "$(kube::util::find-binary "protoc-gen-gogo")")
-
-PATH="${gogopath}:${PATH}" \
-  protoc \
-  --proto_path="${KUBE_KMS_GRPC_ROOT}" \
-  --proto_path="${KUBE_ROOT}/vendor" \
-  --gogo_out=plugins=grpc:"${KUBE_KMS_GRPC_ROOT}" "${KUBE_KMS_GRPC_ROOT}/service.proto"
-
-# Update boilerplate for the generated file.
-cat hack/boilerplate/boilerplate.generatego.txt "${KUBE_KMS_GRPC_ROOT}/service.pb.go" > "${KUBE_KMS_GRPC_ROOT}/service.pb.go.tmp" && \
-mv "${KUBE_KMS_GRPC_ROOT}/service.pb.go.tmp" "${KUBE_KMS_GRPC_ROOT}/service.pb.go"
-
-# Run gofmt to clean up the generated code.
-kube::golang::verify_go_version
-gofmt -l -s -w "${KUBE_KMS_GRPC_ROOT}/service.pb.go"
+source "${KUBE_ROOT}/hack/lib/protoc.sh"
+kube::protoc::generate_proto "${KUBE_KMS_V1BETA1}"
+kube::protoc::generate_proto "${KUBE_KMS_V2ALPHA1}"
