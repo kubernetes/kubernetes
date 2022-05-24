@@ -193,7 +193,7 @@ const (
 	// TODO: Remove once UnversionedKubeletConfigMap graduates to GA:
 	// https://github.com/kubernetes/kubeadm/issues/1582
 	KubeletBaseConfigMapRolePrefix = "kubeadm:kubelet-config-"
-	// KubeletBaseConfigMapRolePrefix defines the base kubelet configuration ConfigMap.
+	// KubeletBaseConfigMapRole defines the base kubelet configuration ConfigMap.
 	KubeletBaseConfigMapRole = "kubeadm:kubelet-config"
 	// KubeProxyClusterRoleBindingName sets the name for the kube-proxy CluterRoleBinding
 	KubeProxyClusterRoleBindingName = "kubeadm:node-proxier"
@@ -450,21 +450,8 @@ var (
 		Effect: v1.TaintEffectNoSchedule,
 	}
 
-	// OldControlPlaneToleration is the toleration to apply on the PodSpec for being able to run that Pod on the control-plane
-	// DEPRECATED: https://github.com/kubernetes/kubeadm/issues/2200
-	OldControlPlaneToleration = v1.Toleration{
-		Key:    LabelNodeRoleOldControlPlane,
-		Effect: v1.TaintEffectNoSchedule,
-	}
-
 	// ControlPlaneTaint is the taint to apply on the PodSpec for being able to run that Pod on the control-plane
 	ControlPlaneTaint = v1.Taint{
-		Key:    LabelNodeRoleControlPlane,
-		Effect: v1.TaintEffectNoSchedule,
-	}
-
-	// ControlPlaneToleration is the toleration to apply on the PodSpec for being able to run that Pod on the control-plane
-	ControlPlaneToleration = v1.Toleration{
 		Key:    LabelNodeRoleControlPlane,
 		Effect: v1.TaintEffectNoSchedule,
 	}
