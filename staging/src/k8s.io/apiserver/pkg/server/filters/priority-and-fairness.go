@@ -47,8 +47,8 @@ type PriorityAndFairnessClassification struct {
 // waitingMark tracks requests waiting rather than being executed
 var waitingMark = &requestWatermark{
 	phase:            epmetrics.WaitingPhase,
-	readOnlyObserver: fcmetrics.ReadWriteConcurrencyObserverPairGenerator.Generate(1, 1, []string{epmetrics.ReadOnlyKind}).RequestsWaiting,
-	mutatingObserver: fcmetrics.ReadWriteConcurrencyObserverPairGenerator.Generate(1, 1, []string{epmetrics.MutatingKind}).RequestsWaiting,
+	readOnlyObserver: fcmetrics.ReadWriteConcurrencyPairVec.NewForLabelValuesSafe(1, 1, []string{epmetrics.ReadOnlyKind}).RequestsWaiting,
+	mutatingObserver: fcmetrics.ReadWriteConcurrencyPairVec.NewForLabelValuesSafe(1, 1, []string{epmetrics.MutatingKind}).RequestsWaiting,
 }
 
 var atomicMutatingExecuting, atomicReadOnlyExecuting int32
