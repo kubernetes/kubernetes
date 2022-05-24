@@ -22,6 +22,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -158,6 +160,40 @@ func makeServiceWithInternalTrafficPolicy(policy *api.ServiceInternalTrafficPoli
 		Spec: api.ServiceSpec{
 			InternalTrafficPolicy: policy,
 		},
+	}
+}
+
+func TestMatchService(t *testing.T) {
+	testCases := []struct {
+		in            *api.Service
+		fieldSelector fields.Selector
+		expectMatch   bool
+	}{
+		{
+			in: &api.Service{
+				Spec: api.ServiceSpec{Type: api.ServiceTypeClusterIP},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("spec.type=ClusterIP"),
+			expectMatch:   true,
+		},
+		{
+			in: &api.Service{
+				Spec: api.ServiceSpec{Type: api.ServiceTypeClusterIP},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("spec.type=foobar"),
+			expectMatch:   false,
+		},
+	}
+
+	for _, testCase := range testCases {
+		m := Matcher(labels.Everything(), testCase.fieldSelector)
+		result, err := m.Matches(testCase.in)
+		if err != nil {
+			t.Errorf("Unexpected error %v", err)
+		}
+		if result != testCase.expectMatch {
+			t.Errorf("Result %v, Expected %v, Selector: %v, Service: %v, Spec: %v", result, testCase.expectMatch, testCase.fieldSelector.String(), testCase.in, testCase.in.Spec)
+		}
 	}
 }
 

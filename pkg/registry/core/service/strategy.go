@@ -18,11 +18,18 @@ package service
 
 import (
 	"context"
+	"fmt"
+	"net"
 	"reflect"
 
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/registry/rest"
+	pkgstorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -396,4 +403,32 @@ func needsExternalTrafficPolicy(svc *api.Service) bool {
 
 func sameExternalTrafficPolicy(oldSvc, newSvc *api.Service) bool {
 	return oldSvc.Spec.ExternalTrafficPolicy == newSvc.Spec.ExternalTrafficPolicy
+}
+
+// SelectableFields returns a field set that can be used for filter selection
+func SelectableFields(svc *api.Service) fields.Set {
+	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(&svc.ObjectMeta, false)
+	specificFieldsSet := fields.Set{
+		"spec.type": string(svc.Spec.Type),
+	}
+	return generic.MergeFieldsSets(objectMetaFieldsSet, specificFieldsSet)
+}
+
+// GetAttrs returns labels and fields of a given object for filtering purposes.
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+	svc, ok := obj.(*api.Service)
+	if !ok {
+		return nil, nil, fmt.Errorf("not a service")
+	}
+	return labels.Set(svc.Labels), SelectableFields(svc), nil
+}
+
+// Matcher returns a selection predicate for a given label and field selector.
+func Matcher(label labels.Selector, field fields.Selector) pkgstorage.SelectionPredicate {
+	return pkgstorage.SelectionPredicate{
+		Label:       label,
+		Field:       field,
+		GetAttrs:    GetAttrs,
+		IndexFields: []string{"metadata.name"},
+	}
 }
