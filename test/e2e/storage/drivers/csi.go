@@ -811,6 +811,7 @@ func InitGcePDCSIDriver() storageframework.TestDriver {
 				storageframework.CapSnapshotDataSource:  true,
 				storageframework.CapReadWriteOncePod:    true,
 				storageframework.CapMultiplePVsSameID:   true,
+				storageframework.CapPVCDataSource:       true,
 			},
 			RequiredAccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
 			TopologyKeys:        []string{GCEPDCSIZoneTopologyKey},
