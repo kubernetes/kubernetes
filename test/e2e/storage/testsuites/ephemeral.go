@@ -246,7 +246,7 @@ func (p *ephemeralTestSuite) DefineTests(driver storageframework.TestDriver, pat
 			currentPvcSize := pvc.Spec.Resources.Requests[v1.ResourceStorage]
 			newSize := currentPvcSize.DeepCopy()
 			newSize.Add(resource.MustParse("1Gi"))
-			framework.Logf("currentPvcSize %v, newSize %v", currentPvcSize, newSize)
+			framework.Logf("currentPvcSize %s, requested new size %s", currentPvcSize.String(), newSize.String())
 
 			newPVC, err := ExpandPVCSize(pvc, newSize, f.ClientSet)
 			framework.ExpectNoError(err, "While updating pvc for more size")
@@ -255,7 +255,7 @@ func (p *ephemeralTestSuite) DefineTests(driver storageframework.TestDriver, pat
 
 			pvcSize := pvc.Spec.Resources.Requests[v1.ResourceStorage]
 			if pvcSize.Cmp(newSize) != 0 {
-				framework.Failf("error updating pvc size %q", pvc.Name)
+				framework.Failf("error updating pvc %s from %s to %s size", pvc.Name, currentPvcSize.String(), newSize.String())
 			}
 
 			ginkgo.By("Waiting for cloudprovider resize to finish")
