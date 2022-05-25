@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
@@ -318,6 +319,18 @@ func newDefaultBuilderWith(fakeClientFn FakeClientFunc) *Builder {
 		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...)
 }
 
+func newDefaultBuilderWithScheme(sch *runtime.Scheme) *Builder {
+	return NewFakeBuilder(
+		fakeClient(),
+		func() (meta.RESTMapper, error) {
+			return testrestmapper.TestOnlyStaticRESTMapper(sch), nil
+		},
+		func() (restmapper.CategoryExpander, error) {
+			return FakeCategoryExpander, nil
+		}).
+		WithScheme(sch, sch.PrioritizedVersionsAllGroups()...)
+}
+
 func newUnstructuredDefaultBuilder() *Builder {
 	return newUnstructuredDefaultBuilderWith(fakeClient())
 }
@@ -340,6 +353,10 @@ type errorRestMapper struct {
 }
 
 func (l *errorRestMapper) RESTMapping(gk schema.GroupKind, versions ...string) (*meta.RESTMapping, error) {
+	return nil, l.err
+}
+
+func (l *errorRestMapper) RESTMappings(gk schema.GroupKind, versions ...string) ([]*meta.RESTMapping, error) {
 	return nil, l.err
 }
 
@@ -1955,4 +1972,75 @@ func TestStdinMultiUseError(t *testing.T) {
 	if got, want := newUnstructuredDefaultBuilder().StdinInUse().Stdin().Do().Err(), StdinMultiUseError; !errors.Is(got, want) {
 		t.Errorf("got: %q, want: %q", got, want)
 	}
+}
+
+func TestMappingForConflictingKinds(t *testing.T) {
+	barBazV1Beta1GVK := schema.GroupVersionKind{
+		Group:   "bar.baz",
+		Version: "v1beta1",
+		Kind:    "Foo",
+	}
+
+	barWhooshV1Beta1GVK := schema.GroupVersionKind{
+		Group:   "bar.whoosh",
+		Version: "v1beta1",
+		Kind:    "Foo",
+	}
+
+	t.Run("with an unambiguous resource it returns a mapping but does not output", func(t *testing.T) {
+		sch := runtime.NewScheme()
+		sch.AddKnownTypeWithName(barBazV1Beta1GVK, &unstructured.Unstructured{})
+
+		buf := bytes.NewBuffer(nil)
+
+		b := newDefaultBuilderWithScheme(sch).WithWarningPrinter(buf)
+
+		mapping, err := b.mappingFor("foo")
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+
+		if mapping == nil {
+			t.Fatalf("expected mapping not to be nil")
+		}
+
+		if mapping.GroupVersionKind != barBazV1Beta1GVK {
+			t.Errorf("unexpected mapping, expected GVK: %+v, got GVK: %+v", barBazV1Beta1GVK, mapping.GroupVersionKind)
+		}
+
+		out := buf.String()
+		if out != "" {
+			t.Errorf("unexpected output to warning printer: %s", out)
+		}
+	})
+
+	t.Run("with an ambiguous resource it returns a mapping and writes a warning", func(t *testing.T) {
+		sch := runtime.NewScheme()
+		sch.AddKnownTypeWithName(barBazV1Beta1GVK, &unstructured.Unstructured{})
+		sch.AddKnownTypeWithName(barWhooshV1Beta1GVK, &unstructured.Unstructured{})
+
+		buf := bytes.NewBuffer(nil)
+
+		b := newDefaultBuilderWithScheme(sch).WithWarningPrinter(buf)
+
+		mapping, err := b.mappingFor("foo")
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+
+		if mapping == nil {
+			t.Fatalf("expected mapping not to be nil")
+		}
+
+		if mapping.GroupVersionKind != barBazV1Beta1GVK {
+			t.Errorf("unexpected mapping, expected GVK: %+v, got GVK: %+v", barBazV1Beta1GVK, mapping.GroupVersionKind)
+		}
+
+		expectedOutput := fmt.Sprintf("Warning: "+resourceAmbiguousFmt+"\n", "foo")
+
+		out := buf.String()
+		if out != expectedOutput {
+			t.Errorf("unexpected output to warning printer: expected: %q, got: %q", expectedOutput, out)
+		}
+	})
 }

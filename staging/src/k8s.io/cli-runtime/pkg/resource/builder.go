@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
@@ -47,6 +48,8 @@ var InputExtensions = append(FileExtensions, "stdin")
 
 const defaultHttpGetAttempts = 3
 const pathNotExistError = "the path %q does not exist"
+
+const resourceAmbiguousFmt = "resource or kind %s is ambigious: multiple resources found: please specify the fully qualified resource name"
 
 // Builder provides convenience functions for taking arguments and parameters
 // from the command line and converting them to a list of resources to iterate
@@ -108,6 +111,9 @@ type Builder struct {
 	singleItemImplied bool
 
 	schema ContentValidator
+
+	// warningPrinter is used to print warnings where appropriate
+	warningPrinter *printers.WarningPrinter
 
 	// fakeClientFn is used for testing
 	fakeClientFn FakeClientFunc
@@ -658,6 +664,27 @@ func (b *Builder) ReplaceAliases(input string) string {
 	return strings.Join(replaced, ",")
 }
 
+// WithWarningPrinter sets the warning printer for the builder, allowing it
+// to print warnings.
+// Note: Normally this would take a genericclioptions.IOStreams as an input,
+// however that would create an import cycle.
+func (b *Builder) WithWarningPrinter(out io.Writer) *Builder {
+	var errOut io.Writer = os.Stderr
+	if out != nil {
+		errOut = out
+	}
+	warningPrinter := printers.NewWarningPrinter(errOut, printers.WarningPrinterOptions{Color: printers.AllowsColorOutput(errOut)})
+
+	b.warningPrinter = warningPrinter
+	return b
+}
+
+func (b *Builder) printWarning(message string, args ...interface{}) {
+	if b.warningPrinter != nil {
+		b.warningPrinter.Print(fmt.Sprintf(message, args...))
+	}
+}
+
 func hasCombinedTypeArgs(args []string) (bool, error) {
 	hasSlash := 0
 	for _, s := range args {
@@ -768,7 +795,13 @@ func (b *Builder) mappingFor(resourceOrKindArg string) (*meta.RESTMapping, error
 		gvk, _ = restMapper.KindFor(*fullySpecifiedGVR)
 	}
 	if gvk.Empty() {
-		gvk, _ = restMapper.KindFor(groupResource.WithVersion(""))
+		gvks, _ := restMapper.KindsFor(groupResource.WithVersion(""))
+		if len(gvks) > 0 {
+			gvk = gvks[0]
+		}
+		if len(gvks) > 1 {
+			b.printWarning(resourceAmbiguousFmt, resourceOrKindArg)
+		}
 	}
 	if !gvk.Empty() {
 		return restMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
@@ -786,7 +819,7 @@ func (b *Builder) mappingFor(resourceOrKindArg string) (*meta.RESTMapping, error
 		}
 	}
 
-	mapping, err := restMapper.RESTMapping(groupKind, gvk.Version)
+	mappings, err := restMapper.RESTMappings(groupKind, gvk.Version)
 	if err != nil {
 		// if we error out here, it is because we could not match a resource or a kind
 		// for the given argument. To maintain consistency with previous behavior,
@@ -799,7 +832,11 @@ func (b *Builder) mappingFor(resourceOrKindArg string) (*meta.RESTMapping, error
 		return nil, err
 	}
 
-	return mapping, nil
+	if len(mappings) > 1 {
+		b.printWarning(resourceAmbiguousFmt, resourceOrKindArg)
+	}
+
+	return mappings[0], nil
 }
 
 func (b *Builder) resourceMappings() ([]*meta.RESTMapping, error) {
