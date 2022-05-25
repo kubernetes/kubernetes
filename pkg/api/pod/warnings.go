@@ -85,7 +85,7 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 
 	// use of deprecated node labels in selectors/affinity/topology
 	for k := range podSpec.NodeSelector {
-		if msg, deprecated := nodeapi.GetLabelDeprecatedMessage(k); deprecated {
+		if msg, deprecated := nodeapi.GetNodeLabelDeprecatedMessage(k); deprecated {
 			warnings = append(warnings, fmt.Sprintf("%s: %s", fieldPath.Child("spec", "nodeSelector").Key(k), msg))
 		}
 	}
@@ -94,16 +94,16 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 		if n.RequiredDuringSchedulingIgnoredDuringExecution != nil {
 			termFldPath := fieldPath.Child("spec", "affinity", "nodeAffinity", "requiredDuringSchedulingIgnoredDuringExecution", "nodeSelectorTerms")
 			for i, term := range n.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
-				warnings = append(warnings, nodeapi.WarningsForNodeSelectorTerm(term, termFldPath.Index(i))...)
+				warnings = append(warnings, nodeapi.GetWarningsForNodeSelectorTerm(term, termFldPath.Index(i))...)
 			}
 		}
 		preferredFldPath := fieldPath.Child("spec", "affinity", "nodeAffinity", "preferredDuringSchedulingIgnoredDuringExecution")
 		for i, term := range n.PreferredDuringSchedulingIgnoredDuringExecution {
-			warnings = append(warnings, nodeapi.WarningsForNodeSelectorTerm(term.Preference, preferredFldPath.Index(i).Child("preference"))...)
+			warnings = append(warnings, nodeapi.GetWarningsForNodeSelectorTerm(term.Preference, preferredFldPath.Index(i).Child("preference"))...)
 		}
 	}
 	for i, t := range podSpec.TopologySpreadConstraints {
-		if msg, deprecated := nodeapi.GetLabelDeprecatedMessage(t.TopologyKey); deprecated {
+		if msg, deprecated := nodeapi.GetNodeLabelDeprecatedMessage(t.TopologyKey); deprecated {
 			warnings = append(warnings, fmt.Sprintf(
 				"%s: %s is %s",
 				fieldPath.Child("spec", "topologySpreadConstraints").Index(i).Child("topologyKey"),

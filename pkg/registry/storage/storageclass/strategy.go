@@ -53,7 +53,7 @@ func (storageClassStrategy) Validate(ctx context.Context, obj runtime.Object) fi
 
 // WarningsOnCreate returns warnings for the creation of the given object.
 func (storageClassStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
-	return storageutil.GetWarningsForStorageClass(ctx, obj.(*storage.StorageClass))
+	return storageutil.GetWarningsForStorageClass(obj.(*storage.StorageClass))
 }
 
 // Canonicalize normalizes the object after validation.
@@ -75,7 +75,7 @@ func (storageClassStrategy) ValidateUpdate(ctx context.Context, obj, old runtime
 
 // WarningsOnUpdate returns warnings for the given update.
 func (storageClassStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
-	return storageutil.GetWarningsForStorageClass(ctx, obj.(*storage.StorageClass))
+	return storageutil.GetWarningsForStorageClass(obj.(*storage.StorageClass))
 }
 
 func (storageClassStrategy) AllowUnconditionalUpdate() bool {

@@ -17,7 +17,6 @@ limitations under the License.
 package storage
 
 import (
-	"context"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -77,7 +76,7 @@ func TestStorageClassWarnings(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run("podspec_"+tc.name, func(t *testing.T) {
-			actual := sets.NewString(GetWarningsForStorageClass(context.TODO(), tc.template)...)
+			actual := sets.NewString(GetWarningsForStorageClass(tc.template)...)
 			expected := sets.NewString(tc.expected...)
 			for _, missing := range expected.Difference(actual).List() {
 				t.Errorf("missing: %s", missing)
@@ -158,7 +157,7 @@ func TestCSIStorageCapacityWarnings(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run("podspec_"+tc.name, func(t *testing.T) {
-			actual := sets.NewString(GetWarningsForCSIStorageCapacity(context.TODO(), tc.template)...)
+			actual := sets.NewString(GetWarningsForCSIStorageCapacity(tc.template)...)
 			expected := sets.NewString(tc.expected...)
 			for _, missing := range expected.Difference(actual).List() {
 				t.Errorf("missing: %s", missing)

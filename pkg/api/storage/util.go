@@ -17,7 +17,6 @@ limitations under the License.
 package storage
 
 import (
-	"context"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -25,14 +24,14 @@ import (
 	"k8s.io/kubernetes/pkg/apis/storage"
 )
 
-func GetWarningsForStorageClass(ctx context.Context, sc *storage.StorageClass) []string {
+func GetWarningsForStorageClass(sc *storage.StorageClass) []string {
 	var warnings []string
 
 	if sc != nil && sc.AllowedTopologies != nil {
 		// use of deprecated node labels in allowedTopologies's matchLabelExpressions
 		for i, topo := range sc.AllowedTopologies {
 			for j, expression := range topo.MatchLabelExpressions {
-				if msg, deprecated := nodeapi.GetLabelDeprecatedMessage(expression.Key); deprecated {
+				if msg, deprecated := nodeapi.GetNodeLabelDeprecatedMessage(expression.Key); deprecated {
 					warnings = append(warnings, fmt.Sprintf("%s: %s", field.NewPath("allowedTopologies").Index(i).Child("matchLabelExpressions").Index(j).Child("key"), msg))
 				}
 			}
@@ -42,9 +41,9 @@ func GetWarningsForStorageClass(ctx context.Context, sc *storage.StorageClass) [
 	return warnings
 }
 
-func GetWarningsForCSIStorageCapacity(ctx context.Context, csc *storage.CSIStorageCapacity) []string {
+func GetWarningsForCSIStorageCapacity(csc *storage.CSIStorageCapacity) []string {
 	if csc != nil {
-		return nodeapi.WarningsForNodeSelector(csc.NodeTopology, field.NewPath("nodeTopology"))
+		return nodeapi.GetWarningsForNodeSelector(csc.NodeTopology, field.NewPath("nodeTopology"))
 	}
 	return nil
 }

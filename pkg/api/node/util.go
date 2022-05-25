@@ -33,9 +33,9 @@ var deprecatedNodeLabels = map[string]string{
 	`beta.kubernetes.io/instance-type`:         `deprecated since v1.17; use "node.kubernetes.io/instance-type" instead`,
 }
 
-// GetLabelDeprecatedMessage returns the message for the deprecated label
+// GetNodeLabelDeprecatedMessage returns the message for the deprecated node label
 // and a bool indicating if the label is deprecated.
-func GetLabelDeprecatedMessage(key string) (string, bool) {
+func GetNodeLabelDeprecatedMessage(key string) (string, bool) {
 	msg, ok := deprecatedNodeLabels[key]
 	return msg, ok
 }
@@ -46,7 +46,7 @@ func GetWarningsForRuntimeClass(rc *node.RuntimeClass) []string {
 	if rc != nil && rc.Scheduling != nil && rc.Scheduling.NodeSelector != nil {
 		// use of deprecated node labels in scheduling's node affinity
 		for key := range rc.Scheduling.NodeSelector {
-			if msg, deprecated := GetLabelDeprecatedMessage(key); deprecated {
+			if msg, deprecated := GetNodeLabelDeprecatedMessage(key); deprecated {
 				warnings = append(warnings, fmt.Sprintf("%s: %s", field.NewPath("scheduling", "nodeSelector"), msg))
 			}
 		}
@@ -55,9 +55,9 @@ func GetWarningsForRuntimeClass(rc *node.RuntimeClass) []string {
 	return warnings
 }
 
-// WarningsForNodeSelector tests if any of the node selector requirements in the template is deprecated.
+// GetWarningsForNodeSelector tests if any of the node selector requirements in the template is deprecated.
 // If there are deprecated node selector requirements in either match expressions or match labels, a warning is returned.
-func WarningsForNodeSelector(nodeSelector *metav1.LabelSelector, fieldPath *field.Path) []string {
+func GetWarningsForNodeSelector(nodeSelector *metav1.LabelSelector, fieldPath *field.Path) []string {
 	if nodeSelector == nil {
 		return nil
 	}
@@ -65,7 +65,7 @@ func WarningsForNodeSelector(nodeSelector *metav1.LabelSelector, fieldPath *fiel
 	var warnings []string
 	// use of deprecated node labels in matchLabelExpressions
 	for i, expression := range nodeSelector.MatchExpressions {
-		if msg, deprecated := GetLabelDeprecatedMessage(expression.Key); deprecated {
+		if msg, deprecated := GetNodeLabelDeprecatedMessage(expression.Key); deprecated {
 			warnings = append(
 				warnings,
 				fmt.Sprintf(
@@ -80,19 +80,19 @@ func WarningsForNodeSelector(nodeSelector *metav1.LabelSelector, fieldPath *fiel
 
 	// use of deprecated node labels in matchLabels
 	for label := range nodeSelector.MatchLabels {
-		if msg, deprecated := GetLabelDeprecatedMessage(label); deprecated {
+		if msg, deprecated := GetNodeLabelDeprecatedMessage(label); deprecated {
 			warnings = append(warnings, fmt.Sprintf("%s: %s", fieldPath.Child("matchLabels").Child(label), msg))
 		}
 	}
 	return warnings
 }
 
-// WarningsForNodeSelectorTerm checks match expressions of node selector term
-func WarningsForNodeSelectorTerm(nodeSelectorTerm api.NodeSelectorTerm, fieldPath *field.Path) []string {
+// GetWarningsForNodeSelectorTerm checks match expressions of node selector term
+func GetWarningsForNodeSelectorTerm(nodeSelectorTerm api.NodeSelectorTerm, fieldPath *field.Path) []string {
 	var warnings []string
 	// use of deprecated node labels in matchLabelExpressions
 	for i, expression := range nodeSelectorTerm.MatchExpressions {
-		if msg, deprecated := GetLabelDeprecatedMessage(expression.Key); deprecated {
+		if msg, deprecated := GetNodeLabelDeprecatedMessage(expression.Key); deprecated {
 			warnings = append(
 				warnings,
 				fmt.Sprintf(

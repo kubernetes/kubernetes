@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,7 +17,6 @@ limitations under the License.
 package persistentvolume
 
 import (
-	"context"
 	"reflect"
 	"testing"
 
@@ -170,7 +169,7 @@ func TestWarnings(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run("podspec_"+tc.name, func(t *testing.T) {
-			actual := sets.NewString(GetWarningsForPersistentVolume(context.TODO(), tc.template)...)
+			actual := sets.NewString(GetWarningsForPersistentVolume(tc.template)...)
 			expected := sets.NewString(tc.expected...)
 			for _, missing := range expected.Difference(actual).List() {
 				t.Errorf("missing: %s", missing)

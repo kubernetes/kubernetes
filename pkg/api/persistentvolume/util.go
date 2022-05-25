@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,8 +17,6 @@ limitations under the License.
 package persistentvolume
 
 import (
-	"context"
-
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	nodeapi "k8s.io/kubernetes/pkg/api/node"
@@ -47,7 +45,7 @@ func hasNodeExpansionSecrets(oldPVSpec *api.PersistentVolumeSpec) bool {
 	return false
 }
 
-func GetWarningsForPersistentVolume(ctx context.Context, pv *api.PersistentVolume) []string {
+func GetWarningsForPersistentVolume(pv *api.PersistentVolume) []string {
 	if pv == nil {
 		return nil
 	}
@@ -61,7 +59,7 @@ func warningsForPersistentVolumeSpecAndMeta(fieldPath *field.Path, pvSpec *api.P
 		termFldPath := fieldPath.Child("spec", "nodeAffinity", "required", "nodeSelectorTerms")
 		// use of deprecated node labels in node affinity
 		for i, term := range pvSpec.NodeAffinity.Required.NodeSelectorTerms {
-			warnings = append(warnings, nodeapi.WarningsForNodeSelectorTerm(term, termFldPath.Index(i))...)
+			warnings = append(warnings, nodeapi.GetWarningsForNodeSelectorTerm(term, termFldPath.Index(i))...)
 		}
 	}
 
