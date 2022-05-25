@@ -1444,7 +1444,10 @@ func initTestPreferNominatedNode(t *testing.T, nsPrefix string, opts ...schedule
 	f := testCtx.Scheduler.NextPod
 	testCtx.Scheduler.NextPod = func() (podInfo *framework.QueuedPodInfo) {
 		podInfo = f()
-		podInfo.Pod.Status.NominatedNodeName = "node-1"
+		// Scheduler.Next() may return nil when scheduler is shutting down.
+		if podInfo != nil {
+			podInfo.Pod.Status.NominatedNodeName = "node-1"
+		}
 		return podInfo
 	}
 	go testCtx.Scheduler.Run(testCtx.Ctx)

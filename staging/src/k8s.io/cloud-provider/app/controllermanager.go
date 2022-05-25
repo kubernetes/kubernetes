@@ -34,6 +34,7 @@ import (
 	"k8s.io/apiserver/pkg/server/healthz"
 	cacheddiscovery "k8s.io/client-go/discovery/cached"
 	"k8s.io/client-go/informers"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/metadata/metadatainformer"
 	"k8s.io/client-go/restmapper"
@@ -142,6 +143,11 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 	// To help debugging, immediately log version
 	klog.Infof("Version: %+v", version.Get())
 
+	// Start events processing pipeline.
+	c.EventBroadcaster.StartStructuredLogging(0)
+	c.EventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: c.Client.CoreV1().Events("")})
+	defer c.EventBroadcaster.Shutdown()
+
 	// setup /configz endpoint
 	if cz, err := configz.New(ConfigzName); err == nil {
 		cz.Set(c.ComponentConfig)
@@ -182,8 +188,10 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 	}
 
 	if !c.ComponentConfig.Generic.LeaderElection.LeaderElect {
-		run(context.TODO(), controllerInitializers)
-		panic("unreachable")
+		ctx, _ := wait.ContextForChannel(stopCh)
+		run(ctx, controllerInitializers)
+		<-stopCh
+		return nil
 	}
 
 	// Identity used to distinguish between multiple cloud controller manager instances
@@ -251,7 +259,8 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 			})
 	}
 
-	select {}
+	<-stopCh
+	return nil
 }
 
 // startControllers starts the cloud specific controller loops.
@@ -304,7 +313,8 @@ func startControllers(ctx context.Context, cloud cloudprovider.Interface, contro
 	c.SharedInformers.Start(stopCh)
 	controllerContext.InformerFactory.Start(controllerContext.Stop)
 
-	select {}
+	<-stopCh
+	return nil
 }
 
 // InitCloudFunc is used to initialize cloud
