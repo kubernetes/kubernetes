@@ -175,14 +175,14 @@ func main(cmd *cobra.Command, args []string) {
 		close(sigTermReceived)
 	}()
 
-	if delayShutdown > 0 {
-		go func() {
-			<-sigTermReceived
+	go func() {
+		<-sigTermReceived
+		if delayShutdown > 0 {
 			log.Printf("Sleeping %d seconds before terminating...", delayShutdown)
 			time.Sleep(time.Duration(delayShutdown) * time.Second)
-			os.Exit(0)
-		}()
-	}
+		}
+		os.Exit(0)
+	}()
 
 	if httpOverride != "" {
 		mux := http.NewServeMux()
