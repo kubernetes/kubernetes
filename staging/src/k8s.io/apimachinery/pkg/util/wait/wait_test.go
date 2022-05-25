@@ -692,7 +692,7 @@ func TestContextForChannel(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			ctx, cancel := contextForChannel(parentCh)
+			ctx, cancel := ContextForChannel(parentCh)
 			defer cancel()
 			<-ctx.Done()
 		}()

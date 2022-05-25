@@ -288,13 +288,13 @@ func (b *Backoff) Step() time.Duration {
 	return duration
 }
 
-// contextForChannel derives a child context from a parent channel.
+// ContextForChannel derives a child context from a parent channel.
 //
 // The derived context's Done channel is closed when the returned cancel function
 // is called or when the parent channel is closed, whichever happens first.
 //
 // Note the caller must *always* call the CancelFunc, otherwise resources may be leaked.
-func contextForChannel(parentCh <-chan struct{}) (context.Context, context.CancelFunc) {
+func ContextForChannel(parentCh <-chan struct{}) (context.Context, context.CancelFunc) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	go func() {
@@ -464,7 +464,7 @@ func PollWithContext(ctx context.Context, interval, timeout time.Duration, condi
 // PollUntil always waits interval before the first run of 'condition'.
 // 'condition' will always be invoked at least once.
 func PollUntil(interval time.Duration, condition ConditionFunc, stopCh <-chan struct{}) error {
-	ctx, cancel := contextForChannel(stopCh)
+	ctx, cancel := ContextForChannel(stopCh)
 	defer cancel()
 	return PollUntilWithContext(ctx, interval, condition.WithContext())
 }
@@ -531,7 +531,7 @@ func PollImmediateWithContext(ctx context.Context, interval, timeout time.Durati
 // PollImmediateUntil runs the 'condition' before waiting for the interval.
 // 'condition' will always be invoked at least once.
 func PollImmediateUntil(interval time.Duration, condition ConditionFunc, stopCh <-chan struct{}) error {
-	ctx, cancel := contextForChannel(stopCh)
+	ctx, cancel := ContextForChannel(stopCh)
 	defer cancel()
 	return PollImmediateUntilWithContext(ctx, interval, condition.WithContext())
 }
@@ -629,7 +629,7 @@ type WaitWithContextFunc func(ctx context.Context) <-chan struct{}
 // "uniform pseudo-random", the `fn` might still run one or multiple time,
 // though eventually `WaitFor` will return.
 func WaitFor(wait WaitFunc, fn ConditionFunc, done <-chan struct{}) error {
-	ctx, cancel := contextForChannel(done)
+	ctx, cancel := ContextForChannel(done)
 	defer cancel()
 	return WaitForWithContext(ctx, wait.WithContext(), fn.WithContext())
 }
