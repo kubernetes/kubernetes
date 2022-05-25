@@ -23,10 +23,14 @@ import (
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	dynamic "k8s.io/client-go/dynamic/dynamiclister"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
+	cache "k8s.io/client-go/tools/cache"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	storagehelpers "k8s.io/component-helpers/storage/volume"
 	"k8s.io/klog/v2"
@@ -39,6 +43,20 @@ type VolumeZone struct {
 	pvLister  corelisters.PersistentVolumeLister
 	pvcLister corelisters.PersistentVolumeClaimLister
 	scLister  storagelisters.StorageClassLister
+	snapshotLister dynamic.Lister
+	snapshotContentLister dynamic.Lister
+}
+
+var snapshotGVR = schema.GroupVersionResource{
+	Group:   "snapshot.storage.k8s.io",
+	Version: "v1",
+	Resource:    "VolumeSnapshots",
+}
+
+var snapshotContentGVR = schema.GroupVersionResource{
+	Group:   "snapshot.storage.k8s.io",
+	Version: "v1",
+	Resource:    "VolumeSnapshotContents",
 }
 
 var _ framework.FilterPlugin = &VolumeZone{}
@@ -50,6 +68,15 @@ const (
 
 	// ErrReasonConflict is used for NoVolumeZoneConflict predicate error.
 	ErrReasonConflict = "node(s) had no available volume zone"
+
+	//boundVolumeSnapshotContentName is the name of the volume snapshot content we need to inspect to get the node label from.
+	boundVolumeSnapshotContentName = "BoundVolumeSnapshotContentName"
+
+	labels = "labels"
+
+	// volumeSnapshotContentManagedByLabel is applied by the snapshot controller to the VolumeSnapshotContent object in case distributed snapshotting is enabled.
+	// The value contains the name of the node that handles the snapshot for the volume local to that node.
+	volumeSnapshotContentManagedByLabel = "snapshot.storage.kubernetes.io/managed-by"
 )
 
 var volumeZoneLabels = sets.NewString(
@@ -133,33 +160,55 @@ func (pl *VolumeZone) Filter(ctx context.Context, _ *framework.CycleState, pod *
 				return framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("VolumeBindingMode not set for StorageClass %q", scName))
 			}
 			if *class.VolumeBindingMode == storage.VolumeBindingWaitForFirstConsumer {
-				// Skip unbound volumes
+				if sourcePvName, err := pl.getPVFromPVCDatasource(pvc); err != nil {
+					if s := getErrorAsStatus(err); !s.IsSuccess() {
+						return s
+					}
+				} else if sourcePvName != nil {
+					if status := pl.verifyPVLabelZones(*sourcePvName, nodeConstraints, pod, node); status != nil {
+						return status
+					}
+				}
+				if pl.sourceSnapshotOnNode(pvc, node); err != nil {
+					if s := getErrorAsStatus(err); !s.IsSuccess() {
+						return s
+					}
+				}
+
+				// Skip unbound volumes without datasource or datasourceRef set.
 				continue
 			}
 
 			return framework.NewStatus(framework.UnschedulableAndUnresolvable, "PersistentVolume had no name")
 		}
 
-		pv, err := pl.pvLister.Get(pvName)
-		if s := getErrorAsStatus(err); !s.IsSuccess() {
-			return s
+		if status := pl.verifyPVLabelZones(pvName, nodeConstraints, pod, node); status != nil {
+			return status
+		}
+	}
+	return nil
+}
+
+func (pl *VolumeZone) verifyPVLabelZones(pvName string, nodeConstraints map[string]string, pod *v1.Pod, node *v1.Node) *framework.Status {
+	pv, err := pl.pvLister.Get(pvName)
+	if s := getErrorAsStatus(err); !s.IsSuccess() {
+		return s
+	}
+
+	for k, v := range pv.ObjectMeta.Labels {
+		if !volumeZoneLabels.Has(k) {
+			continue
+		}
+		nodeV := nodeConstraints[k]
+		volumeVSet, err := volumehelpers.LabelZonesToSet(v)
+		if err != nil {
+			klog.InfoS("Failed to parse label, ignoring the label", "label", fmt.Sprintf("%s:%s", k, v), "err", err)
+			continue
 		}
 
-		for k, v := range pv.ObjectMeta.Labels {
-			if !volumeZoneLabels.Has(k) {
-				continue
-			}
-			nodeV := nodeConstraints[k]
-			volumeVSet, err := volumehelpers.LabelZonesToSet(v)
-			if err != nil {
-				klog.InfoS("Failed to parse label, ignoring the label", "label", fmt.Sprintf("%s:%s", k, v), "err", err)
-				continue
-			}
-
-			if !volumeVSet.Has(nodeV) {
-				klog.V(10).InfoS("Won't schedule pod onto node due to volume (mismatch on label key)", "pod", klog.KObj(pod), "node", klog.KObj(node), "PV", klog.KRef("", pvName), "PVLabelKey", k)
-				return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict)
-			}
+		if !volumeVSet.Has(nodeV) {
+			klog.V(10).InfoS("Won't schedule pod onto node due to volume (mismatch on label key)", "pod", klog.KObj(pod), "node", klog.KObj(node), "PV", klog.KRef("", pvName), "PVLabelKey", k)
+			return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict)
 		}
 	}
 	return nil
@@ -198,9 +247,82 @@ func New(_ runtime.Object, handle framework.Handle) (framework.Plugin, error) {
 	pvLister := informerFactory.Core().V1().PersistentVolumes().Lister()
 	pvcLister := informerFactory.Core().V1().PersistentVolumeClaims().Lister()
 	scLister := informerFactory.Storage().V1().StorageClasses().Lister()
+	snapshotIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	snapshotLister := dynamic.New(snapshotIndexer, snapshotGVR)
+	snapshotContentIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+	snapshotContentLister := dynamic.New(snapshotContentIndexer, snapshotContentGVR)
 	return &VolumeZone{
 		pvLister,
 		pvcLister,
 		scLister,
+		snapshotLister,
+		snapshotContentLister,
 	}, nil
+}
+
+func (pl *VolumeZone) getPVFromPVCDatasource(pvc *v1.PersistentVolumeClaim) (*string, error) {
+	if pvc.Spec.DataSource != nil {
+		return pl.getDataSourcePVFromObjectReference(pvc.Namespace, pvc.Spec.DataSource)
+	} else if pvc.Spec.DataSourceRef != nil {
+		return pl.getDataSourcePVFromObjectReference(pvc.Namespace, pvc.Spec.DataSourceRef)
+	}
+	return nil, nil
+}
+
+func (pl *VolumeZone) getDataSourcePVFromObjectReference(namespace string, obj *v1.TypedLocalObjectReference) (*string, error) {
+	if obj != nil && obj.APIGroup == &v1.SchemeGroupVersion.Group && obj.Kind == string(framework.PersistentVolumeClaim) {
+		sourcePvc, err := pl.pvcLister.PersistentVolumeClaims(namespace).Get(obj.Name)
+		if err != nil {
+			return nil, err
+		}
+		pvName := sourcePvc.Spec.VolumeName
+		if pvName == "" {
+			return nil, nil
+		}
+		return &pvName, nil
+	}
+	return nil, nil
+}
+
+func (pl *VolumeZone) sourceSnapshotOnNode(pvc *v1.PersistentVolumeClaim, node *v1.Node) error {
+	if pvc.Spec.DataSource != nil {
+		return pl.sourceSnapshotOnNodeFromObjectReference(pvc.Namespace, pvc.Spec.DataSource, node)
+	} else if pvc.Spec.DataSourceRef != nil {
+		return pl.sourceSnapshotOnNodeFromObjectReference(pvc.Namespace, pvc.Spec.DataSourceRef, node)
+	}
+	return nil
+}
+
+func (pl *VolumeZone) sourceSnapshotOnNodeFromObjectReference(namespace string, obj *v1.TypedLocalObjectReference, node *v1.Node) error {
+	if obj != nil && obj.APIGroup == &snapshotGVR.Group && obj.Kind == "VolumeSnapshot" {
+		// Lookup snapshot so we can find the associated snapshot content name
+		snapshot, err := pl.snapshotLister.Namespace(namespace).Get(obj.Name)
+		if err != nil {
+			return err
+		}
+		snapshotContentName, bound, err := unstructured.NestedString(snapshot.UnstructuredContent(), boundVolumeSnapshotContentName)
+		if !bound {
+			// snapshot not bound to content yet, so we can ignore
+			return nil
+		} else if err != nil {
+			return err
+		}
+		// Look up snapshot content so we can find the label set in PR https://github.com/kubernetes-csi/external-snapshotter/pull/585
+		snapshotContent, err := pl.snapshotContentLister.Get(snapshotContentName)
+		if err != nil {
+			return err
+		}
+		labels, exists, err := unstructured.NestedStringMap(snapshotContent.UnstructuredContent(), labels)
+		if !exists {
+			return nil
+		} else if err != nil {
+			return err
+		}
+		labelNode, ok := labels[volumeSnapshotContentManagedByLabel]
+		if !ok || labelNode == node.Name {
+			return nil
+		}
+		return fmt.Errorf("snapshot content not on node %s", node.Name)
+	}
+	return nil
 }
