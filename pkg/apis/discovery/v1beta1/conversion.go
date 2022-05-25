@@ -40,12 +40,16 @@ func Convert_v1beta1_Endpoint_To_discovery_Endpoint(in *v1beta1.Endpoint, out *d
 			delete(out.DeprecatedTopology, corev1.LabelTopologyZone)
 		}
 
+		// Move hostname from topology map if nodename in v1beta1 is nil.
 		// Remove hostname from the topology map ONLY IF it is the same value as
 		// nodeName.  This preserves the (rather odd) ability to have different
 		// values for topology[hostname] and nodename in v1beta1, without showing
 		// duplicate values in v1.
 		if node, ok := in.Topology[corev1.LabelHostname]; ok {
-			if out.NodeName != nil && node == *out.NodeName {
+			if out.NodeName == nil {
+				out.NodeName = &node
+				delete(out.DeprecatedTopology, corev1.LabelHostname)
+			} else if node == *out.NodeName {
 				delete(out.DeprecatedTopology, corev1.LabelHostname)
 			}
 		}

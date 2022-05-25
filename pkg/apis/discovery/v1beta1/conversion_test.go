@@ -112,9 +112,7 @@ func TestEndpointZoneConverstion(t *testing.T) {
 				},
 			},
 			internal: discovery.Endpoint{
-				DeprecatedTopology: map[string]string{
-					corev1.LabelHostname: "node-1",
-				},
+				NodeName: utilpointer.StringPtr("node-1"),
 			},
 		},
 		{
