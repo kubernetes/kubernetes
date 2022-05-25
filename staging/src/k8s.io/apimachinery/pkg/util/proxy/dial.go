@@ -51,10 +51,7 @@ func dialURL(ctx context.Context, url *url.URL, transport http.RoundTripper) (ne
 		return d.DialContext(ctx, "tcp", dialAddr)
 	case "https":
 		// Get the tls config from the transport if we recognize it
-		var tlsConfig *tls.Config
-		var tlsConn *tls.Conn
-		var err error
-		tlsConfig, err = utilnet.TLSClientConfig(transport)
+		tlsConfig, err := utilnet.TLSClientConfig(transport)
 		if err != nil {
 			klog.V(5).Infof("Unable to unwrap transport %T to get at TLS config: %v", transport, err)
 		}
@@ -74,7 +71,7 @@ func dialURL(ctx context.Context, url *url.URL, transport http.RoundTripper) (ne
 					InsecureSkipVerify: true,
 				}
 			} else if len(tlsConfig.ServerName) == 0 && !tlsConfig.InsecureSkipVerify {
-				// tls.Handshake() requires ServerName or InsecureSkipVerify
+				// tls.HandshakeContext() requires ServerName or InsecureSkipVerify
 				// infer the ServerName from the hostname we're connecting to.
 				inferredHost := dialAddr
 				if host, _, err := net.SplitHostPort(dialAddr); err == nil {
@@ -86,7 +83,7 @@ func dialURL(ctx context.Context, url *url.URL, transport http.RoundTripper) (ne
 				tlsConfig = tlsConfigCopy
 			}
 
-			// Since this method is primary used within a "Connection: Upgrade" call we assume the caller is
+			// Since this method is primarily used within a "Connection: Upgrade" call we assume the caller is
 			// going to write HTTP/1.1 request to the wire. http2 should not be allowed in the TLSConfig.NextProtos,
 			// so we explicitly set that here. We only do this check if the TLSConfig support http/1.1.
 			if supportsHTTP11(tlsConfig.NextProtos) {
@@ -94,23 +91,21 @@ func dialURL(ctx context.Context, url *url.URL, transport http.RoundTripper) (ne
 				tlsConfig.NextProtos = []string{"http/1.1"}
 			}
 
-			tlsConn = tls.Client(netConn, tlsConfig)
-			if err := tlsConn.Handshake(); err != nil {
+			tlsConn := tls.Client(netConn, tlsConfig)
+			if err := tlsConn.HandshakeContext(ctx); err != nil {
 				netConn.Close()
 				return nil, err
 			}
-
+			return tlsConn, nil
 		} else {
-			// Dial. This Dial method does not allow to pass a context unfortunately
-			tlsConn, err = tls.Dial("tcp", dialAddr, tlsConfig)
-			if err != nil {
-				return nil, err
+			// Dial.
+			tlsDialer := tls.Dialer{
+				Config: tlsConfig,
 			}
+			return tlsDialer.DialContext(ctx, "tcp", dialAddr)
 		}
-
-		return tlsConn, nil
 	default:
-		return nil, fmt.Errorf("Unknown scheme: %s", url.Scheme)
+		return nil, fmt.Errorf("unknown scheme: %s", url.Scheme)
 	}
 }
 
