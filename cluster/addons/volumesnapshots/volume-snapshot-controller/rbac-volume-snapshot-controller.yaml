@@ -53,7 +53,6 @@ metadata:
   name: volume-snapshot-controller-role
   namespace: kube-system
   labels:
-    kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
 subjects:
   - kind: ServiceAccount
@@ -72,7 +71,6 @@ metadata:
   name: volume-snapshot-controller-leaderelection
   namespace: kube-system
   labels:
-    kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
 rules:
 - apiGroups: ["coordination.k8s.io"]
@@ -86,7 +84,6 @@ metadata:
   name: volume-snapshot-controller-leaderelection
   namespace: kube-system
   labels:
-    kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
 subjects:
   - kind: ServiceAccount
