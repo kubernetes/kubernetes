@@ -368,6 +368,10 @@ func (c *dynamicResourceClient) List(ctx context.Context, opts metav1.ListOption
 
 	}
 
+	if err != nil {
+		return nil, err
+	}
+
 	if obj == nil {
 		return nil, err
 	}
