@@ -807,7 +807,9 @@ var _ = SIGDescribe("Pods", func() {
 		ginkgo.By("submitting the pod to kubernetes")
 		f.PodClient().Create(pod)
 		e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
-		framework.ExpectEqual(podClient.PodIsReady(podName), false, "Expect pod's Ready condition to be false initially.")
+		if podClient.PodIsReady(podName) {
+			framework.Failf("Expect pod(%s/%s)'s Ready condition to be false initially.", f.Namespace.Name, pod.Name)
+		}
 
 		ginkgo.By(fmt.Sprintf("patching pod status with condition %q to true", readinessGate1))
 		_, err := podClient.Patch(context.TODO(), podName, types.StrategicMergePatchType, []byte(fmt.Sprintf(patchStatusFmt, readinessGate1, "True")), metav1.PatchOptions{}, "status")
@@ -815,7 +817,9 @@ var _ = SIGDescribe("Pods", func() {
 		// Sleep for 10 seconds.
 		time.Sleep(syncLoopFrequency)
 		// Verify the pod is still not ready
-		framework.ExpectEqual(podClient.PodIsReady(podName), false, "Expect pod's Ready condition to be false with only one condition in readinessGates equal to True")
+		if podClient.PodIsReady(podName) {
+			framework.Failf("Expect pod(%s/%s)'s Ready condition to be false with only one condition in readinessGates equal to True", f.Namespace.Name, pod.Name)
+		}
 
 		ginkgo.By(fmt.Sprintf("patching pod status with condition %q to true", readinessGate2))
 		_, err = podClient.Patch(context.TODO(), podName, types.StrategicMergePatchType, []byte(fmt.Sprintf(patchStatusFmt, readinessGate2, "True")), metav1.PatchOptions{}, "status")
@@ -1058,7 +1062,9 @@ var _ = SIGDescribe("Pods", func() {
 			postDeletePodJSON, _ = json.Marshal(postDeletePod)
 		}
 		framework.ExpectError(err, "pod %v found in namespace %v, but it should be deleted: %s", testPodName, testNamespaceName, string(postDeletePodJSON))
-		framework.ExpectEqual(apierrors.IsNotFound(err), true, fmt.Sprintf("expected IsNotFound error, got %#v", err))
+		if !apierrors.IsNotFound(err) {
+			framework.Failf("expected IsNotFound error, got %#v", err)
+		}
 	})
 })
 
