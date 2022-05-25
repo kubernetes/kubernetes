@@ -37,8 +37,14 @@ import (
 	"k8s.io/kubectl/pkg/validation"
 )
 
+type FactoryOptions struct {
+	ClientGetter genericclioptions.RESTClientGetter
+	IOStreams    genericclioptions.IOStreams
+}
+
 type factoryImpl struct {
 	clientGetter genericclioptions.RESTClientGetter
+	ioStreams    genericclioptions.IOStreams
 
 	// Caches OpenAPI document and parsed resources
 	openAPIParser *openapi.CachedOpenAPIParser
@@ -47,15 +53,22 @@ type factoryImpl struct {
 	getter        sync.Once
 }
 
-func NewFactory(clientGetter genericclioptions.RESTClientGetter) Factory {
-	if clientGetter == nil {
+func NewFactoryWithOptions(opts FactoryOptions) Factory {
+	if opts.ClientGetter == nil {
 		panic("attempt to instantiate client_access_factory with nil clientGetter")
 	}
 	f := &factoryImpl{
-		clientGetter: clientGetter,
+		clientGetter: opts.ClientGetter,
+		ioStreams:    opts.IOStreams,
 	}
 
 	return f
+}
+
+func NewFactory(clientGetter genericclioptions.RESTClientGetter) Factory {
+	return NewFactoryWithOptions(FactoryOptions{
+		ClientGetter: clientGetter,
+	})
 }
 
 func (f *factoryImpl) ToRESTConfig() (*restclient.Config, error) {
@@ -92,7 +105,7 @@ func (f *factoryImpl) DynamicClient() (dynamic.Interface, error) {
 
 // NewBuilder returns a new resource builder for structured api objects.
 func (f *factoryImpl) NewBuilder() *resource.Builder {
-	return resource.NewBuilder(f.clientGetter)
+	return resource.NewBuilder(f.clientGetter).WithWarningPrinter(f.ioStreams.ErrOut)
 }
 
 func (f *factoryImpl) RESTClient() (*restclient.RESTClient, error) {
