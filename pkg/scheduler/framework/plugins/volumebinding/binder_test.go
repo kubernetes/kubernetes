@@ -561,9 +561,10 @@ func (env *testEnv) validateProvision(
 	// Check pvc cache
 	pvcCache := env.internalBinder.pvcCache
 	for _, pvc := range expectedPVCs {
-		cachedPVC, err := pvcCache.GetPVC(framework.GetNamespacedName(pvc.Namespace, pvc.Name))
+		pvcKey := framework.GetNamespacedName(pvc.Namespace, pvc.Name)
+		cachedPVC, err := pvcCache.GetPVC(pvcKey)
 		if err != nil {
-			t.Errorf("GetPVC %q returned error: %v", framework.GetNamespacedName(pvc.Namespace, pvc.Name), err)
+			t.Errorf("GetPVC %q returned error: %v", pvcKey, err)
 		}
 		// Cache may be overridden by API object with higher version, compare but ignore resource version.
 		newCachedPVC := cachedPVC.DeepCopy()
