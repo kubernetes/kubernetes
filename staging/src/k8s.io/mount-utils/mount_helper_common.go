@@ -53,7 +53,7 @@ func CleanupMountWithForce(mountPath string, mounter MounterForceUnmounter, exte
 	}
 	var notMnt bool
 	var err error
-	if !mounter.CanSafelySkipMountPointCheck() && !corruptedMnt {
+	if !mounter.canSafelySkipMountPointCheck() && !corruptedMnt {
 		notMnt, err = removePathIfNotMountPoint(mountPath, mounter, extensiveMountPointCheck)
 		// if mountPath was not a mount point - we would have attempted to remove mountPath
 		// and hence return errors if any.
@@ -68,7 +68,7 @@ func CleanupMountWithForce(mountPath string, mounter MounterForceUnmounter, exte
 		return err
 	}
 
-	if mounter.CanSafelySkipMountPointCheck() {
+	if mounter.canSafelySkipMountPointCheck() {
 		return removePath(mountPath)
 	}
 
@@ -90,7 +90,7 @@ func CleanupMountWithForce(mountPath string, mounter MounterForceUnmounter, exte
 func doCleanupMountPoint(mountPath string, mounter Interface, extensiveMountPointCheck bool, corruptedMnt bool) error {
 	var notMnt bool
 	var err error
-	if !mounter.CanSafelySkipMountPointCheck() && !corruptedMnt {
+	if !mounter.canSafelySkipMountPointCheck() && !corruptedMnt {
 		notMnt, err = removePathIfNotMountPoint(mountPath, mounter, extensiveMountPointCheck)
 		// if mountPath was not a mount point - we would have attempted to remove mountPath
 		// and hence return errors if any.
@@ -105,7 +105,7 @@ func doCleanupMountPoint(mountPath string, mounter Interface, extensiveMountPoin
 		return err
 	}
 
-	if mounter.CanSafelySkipMountPointCheck() {
+	if mounter.canSafelySkipMountPointCheck() {
 		return removePath(mountPath)
 	}
 
@@ -146,7 +146,7 @@ func removePathIfNotMountPoint(mountPath string, mounter Interface, extensiveMou
 
 // removePath attempts to remove the directory. Returns nil if the directory was removed or does not exist.
 func removePath(mountPath string) error {
-	klog.Warningf("Warning: deleting path %q", mountPath)
+	klog.V(4).Infof("Warning: deleting path %q", mountPath)
 	err := os.Remove(mountPath)
 	if os.IsNotExist(err) {
 		klog.V(4).Infof("%q does not exist", mountPath)

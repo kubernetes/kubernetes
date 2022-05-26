@@ -393,8 +393,8 @@ func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	return true, nil
 }
 
-// CanSafelySkipMountPointCheck relies on the detected behavior of umount when given a target that is not a mount point.
-func (mounter *Mounter) CanSafelySkipMountPointCheck() bool {
+// canSafelySkipMountPointCheck relies on the detected behavior of umount when given a target that is not a mount point.
+func (mounter *Mounter) canSafelySkipMountPointCheck() bool {
 	return mounter.withSafeNotMountedBehavior
 }
 

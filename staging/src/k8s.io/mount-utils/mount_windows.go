@@ -244,8 +244,8 @@ func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	return true, nil
 }
 
-// CanSafelySkipMountPointCheck always returns false on Windows
-func (mounter *Mounter) CanSafelySkipMountPointCheck() bool {
+// canSafelySkipMountPointCheck always returns false on Windows
+func (mounter *Mounter) canSafelySkipMountPointCheck() bool {
 	return false
 }
 

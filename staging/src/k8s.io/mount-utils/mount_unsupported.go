@@ -74,8 +74,8 @@ func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	return true, errUnsupported
 }
 
-// CanSafelySkipMountPointCheck always returns false on unsupported platforms
-func (mounter *Mounter) CanSafelySkipMountPointCheck() bool {
+// canSafelySkipMountPointCheck always returns false on unsupported platforms
+func (mounter *Mounter) canSafelySkipMountPointCheck() bool {
 	return false
 }
 
