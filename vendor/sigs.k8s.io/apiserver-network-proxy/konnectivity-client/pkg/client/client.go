@@ -94,13 +94,24 @@ func CreateSingleUseGrpcTunnel(ctx context.Context, address string, opts ...grpc
 		readTimeoutSeconds: 10,
 	}
 
-	go tunnel.serve(c)
+	go tunnel.serve(ctx, c)
 
 	return tunnel, nil
 }
 
-func (t *grpcTunnel) serve(c clientConn) {
-	defer c.Close()
+func (t *grpcTunnel) serve(ctx context.Context, c clientConn) {
+	defer func() {
+		c.Close()
+
+		// A connection in t.conns after serve() returns means
+		// we never received a CLOSE_RSP for it, so we need to
+		// close any channels remaining for these connections.
+		t.connsLock.Lock()
+		for _, conn := range t.conns {
+			close(conn.readCh)
+		}
+		t.connsLock.Unlock()
+	}()
 
 	for {
 		pkt, err := t.stream.Recv()
@@ -141,6 +152,9 @@ func (t *grpcTunnel) serve(c clientConn) {
 					// In either scenario, we should return here as this tunnel is no longer needed.
 					klog.V(1).InfoS("Pending dial has been cancelled; dropped", "connectionID", resp.ConnectID, "dialID", resp.Random)
 					return
+				case <-ctx.Done():
+					klog.V(1).InfoS("Tunnel has been cancelled; dropped", "connectionID", resp.ConnectID, "dialID", resp.Random)
+					return
 				}
 			}
 
@@ -164,6 +178,8 @@ func (t *grpcTunnel) serve(c clientConn) {
 				case <-timer.C:
 					klog.ErrorS(fmt.Errorf("timeout"), "readTimeout has been reached, the grpc connection to the proxy server will be closed", "connectionID", conn.connID, "readTimeoutSeconds", t.readTimeoutSeconds)
 					return
+				case <-ctx.Done():
+					klog.V(1).InfoS("Tunnel has been cancelled, the grpc connection to the proxy server will be closed", "connectionID", conn.connID)
 				}
 			} else {
 				klog.V(1).InfoS("connection not recognized", "connectionID", resp.ConnectID)

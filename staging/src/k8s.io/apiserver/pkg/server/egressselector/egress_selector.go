@@ -210,10 +210,12 @@ func (u *udsGRPCConnector) connect(_ context.Context) (proxier, error) {
 		return c, err
 	})
 
-	// CreateSingleUseGrpcTunnel() unfortunately couples dial and connection contexts. Because of that,
-	// we cannot use ctx just for dialing and control the connection lifetime separately.
-	// See https://github.com/kubernetes-sigs/apiserver-network-proxy/issues/357.
-	tunnelCtx := context.TODO()
+	// Request context cannot be used to cancel the tunnel, because
+	// the proxy connection may be re-used by a subsequent
+	// request. Normally the tunnel is closed by the connection
+	// closing, but as an extra layer of defense against leaks, an
+	// outer context is used.
+	tunnelCtx, _ := context.WithTimeout(context.Background(), 30*time.Minute)
 	tunnel, err := client.CreateSingleUseGrpcTunnel(tunnelCtx, udsName, dialOption, grpc.WithInsecure())
 	if err != nil {
 		return nil, err
