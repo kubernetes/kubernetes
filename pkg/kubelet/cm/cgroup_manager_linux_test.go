@@ -20,6 +20,10 @@ limitations under the License.
 package cm
 
 import (
+	"bou.ke/monkey"
+	"fmt"
+	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"path"
 	"reflect"
 	"testing"
@@ -167,5 +171,63 @@ func TestParseSystemdToCgroupName(t *testing.T) {
 		if actual := ParseSystemdToCgroupName(testCase.input); !reflect.DeepEqual(actual, testCase.expected) {
 			t.Errorf("Unexpected result, input: %v, expected: %v, actual: %v", testCase.input, testCase.expected, actual)
 		}
+	}
+}
+
+func TestValidateInCgroup2UnifiedMode(t *testing.T) {
+	testCases := []struct {
+		name                        string
+		supportedUnifiedControllers sets.String
+		enabledUnifiedControllers   sets.String
+		readUnifiedControllersError error
+		expected                    error
+	}{
+		{
+			name:                        "test when all subsystem cgroups exist",
+			supportedUnifiedControllers: sets.NewString("cpuset", "cpu", "io", "memory", "hugetlb", "pids", "rdma", "misc"),
+			enabledUnifiedControllers:   sets.NewString("cpuset", "cpu", "io", "memory", "hugetlb", "pids", "rdma", "misc"),
+			readUnifiedControllersError: nil,
+			expected:                    nil,
+		},
+		{
+			name:                        "test when less enabled unified controllers exit",
+			supportedUnifiedControllers: sets.NewString("cpuset", "cpu", "io", "memory", "hugetlb", "pids", "rdma", "misc"),
+			enabledUnifiedControllers:   sets.NewString("cpuset", "cpu", "io", "hugetlb", "pids", "rdma", "misc"),
+			readUnifiedControllersError: nil,
+			expected:                    fmt.Errorf("cgroup [\"a\" \"b\"] has some missing controllers: memory"),
+		},
+		{
+			name:                        "test when more enabled unified controllers exit",
+			supportedUnifiedControllers: sets.NewString("cpuset", "cpu", "io", "memory", "hugetlb", "pids", "rdma", "misc"),
+			enabledUnifiedControllers:   sets.NewString("cpuset", "cpu", "io", "memory", "SOMEMORE", "hugetlb", "pids", "rdma", "misc"),
+			readUnifiedControllersError: nil,
+			expected:                    nil,
+		},
+		{
+			name:                        "test when enabledUnifiedControllers returns error",
+			supportedUnifiedControllers: sets.NewString("cpuset", "cpu", "io", "memory", "hugetlb", "pids", "rdma", "misc"),
+			enabledUnifiedControllers:   sets.NewString("cpuset", "cpu", "io", "memory", "hugetlb", "pids", "rdma", "misc"),
+			readUnifiedControllersError: fmt.Errorf("ERROR!"),
+			expected:                    fmt.Errorf("could not read controllers for cgroup [\"a\" \"b\"]: %w", fmt.Errorf("ERROR!")),
+		},
+	}
+
+	monkey.Patch(libcontainercgroups.IsCgroup2UnifiedMode, func() bool { return true })
+	manager := cgroupManagerImpl{&CgroupSubsystems{}, true}
+	cgroupName := CgroupName([]string{"a", "b"})
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			monkey.Patch(getSupportedUnifiedControllers, func() sets.String { return testCase.supportedUnifiedControllers })
+			monkey.Patch(readUnifiedControllers, func(string) (sets.String, error) {
+				return testCase.enabledUnifiedControllers, testCase.readUnifiedControllersError
+			})
+
+			actual := manager.Validate(cgroupName)
+
+			if !reflect.DeepEqual(actual, testCase.expected) {
+				t.Errorf("got: %v, want: %v", actual, testCase.expected)
+			}
+		})
 	}
 }
